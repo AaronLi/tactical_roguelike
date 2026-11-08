@@ -1155,6 +1155,138 @@
                       }
                     ],
                     "description": "What it is (free text)."
+                  },
+                  "share": {
+                    "oneOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0.01,
+                        "description": "The step's part of the reload's time, relative to the other steps (default 1)."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The step's part of the reload's time, relative to the other steps (default 1)."
+                  },
+                  "ease": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "smooth",
+                          "linear",
+                          "in",
+                          "out",
+                          "spring",
+                          "detent",
+                          "heavy",
+                          "magnet"
+                        ],
+                        "description": "The shape of its motion on the way out (default smooth): smooth (eased in and out), linear, in (speeding up), out (slowing down), spring (released: a sharp start, past the end by over, settled back; the gun kicks), detent (a firm pull: it creeps, holds at a detent, then gives and drops onto its stop; the hand leads, the gun dips with the effort), heavy (a weight lifted: slow, the gun sagging under it and recovering), magnet (drawn in: speeding up all the way, then a soft, damped stop with no bounce)."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The shape of its motion on the way out (default smooth): smooth (eased in and out), linear, in (speeding up), out (slowing down), spring (released: a sharp start, past the end by over, settled back; the gun kicks), detent (a firm pull: it creeps, holds at a detent, then gives and drops onto its stop; the hand leads, the gun dips with the effort), heavy (a weight lifted: slow, the gun sagging under it and recovering), magnet (drawn in: speeding up all the way, then a soft, damped stop with no bounce)."
+                  },
+                  "over": {
+                    "oneOf": [
+                      {
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 0.3,
+                        "description": "A spring's overshoot past the end, a fraction of the move (ease spring; default 0.06)."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "A spring's overshoot past the end, a fraction of the move (ease spring; default 0.06)."
+                  },
+                  "back": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "share": {
+                            "oneOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0.01,
+                                "description": "Its part of the time, relative."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "Its part of the time, relative."
+                          },
+                          "ease": {
+                            "oneOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "smooth",
+                                  "linear",
+                                  "in",
+                                  "out",
+                                  "spring",
+                                  "detent",
+                                  "heavy",
+                                  "magnet"
+                                ],
+                                "description": "The shape of its motion back."
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ],
+                            "description": "The shape of its motion back."
+                          }
+                        },
+                        "required": [],
+                        "additionalProperties": false,
+                        "description": "The way back (the new block going in): share and ease as above (defaults: the way out's share; smooth)."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The way back (the new block going in): share and ease as above (defaults: the way out's share; smooth)."
+                  },
+                  "hand": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "part": {
+                            "type": "string",
+                            "description": "The part_ node the hand holds."
+                          },
+                          "at": {
+                            "type": "array",
+                            "items": {
+                              "type": "number"
+                            },
+                            "minItems": 3,
+                            "maxItems": 3,
+                            "description": "Where on it, in its own frame."
+                          }
+                        },
+                        "required": [
+                          "part",
+                          "at"
+                        ],
+                        "additionalProperties": false,
+                        "description": "The support hand during the step: on part (a part_ node) at at, [forward, up, right] metres in that node's own frame (it moves with it). Without one the hand stays where the step before had it."
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The support hand during the step: on part (a part_ node) at at, [forward, up, right] metres in that node's own frame (it moves with it). Without one the hand stays where the step before had it."
                   }
                 },
                 "required": [
@@ -1170,13 +1302,13 @@
             "sequence"
           ],
           "additionalProperties": false,
-          "description": "A sequence of moves that takes the gun apart for a reload (the Tempest changes its whole barrel block): each step moves one part_ node, in order; the reload animation plays them forward (the old block comes out) and back (the new one goes in). part: the node (its key, \"lever\", or its name \"part_lever\"); rotate_deg turns it about axis x, y or z (three.js rotation, degrees) at its pivot; move slides it [forward, up, right] metres, in the frame of the part_ node named by frame (default: its own parent's). GUN_MODEL_CONTRACT.multi."
+          "description": "A sequence of moves that takes the gun apart for a reload (the Tempest changes its whole barrel block): each step moves one part_ node, in order; the reload animation plays them forward (the old block comes out) and back (the new one goes in). part: the node (its key, \"lever\", or its name \"part_lever\"); rotate_deg turns it about axis x, y or z (three.js rotation, degrees) at its pivot; move slides it [forward, up, right] metres, in the frame of the part_ node named by frame (default: its own parent's). How each step FEELS is data too (all optional): share, its part of the time (relative to the other steps, default 1); ease, the shape of its motion on the way out; over, a spring's overshoot; back { share, ease }, the same for the way back (default: the way out's share, smooth); hand { part, at }, where the support hand holds the gun during the step (a point of that part_ node, [forward, up, right] metres in its own frame: the hand moves with the part). GUN_MODEL_CONTRACT.multi."
         },
         {
           "type": "null"
         }
       ],
-      "description": "A sequence of moves that takes the gun apart for a reload (the Tempest changes its whole barrel block): each step moves one part_ node, in order; the reload animation plays them forward (the old block comes out) and back (the new one goes in). part: the node (its key, \"lever\", or its name \"part_lever\"); rotate_deg turns it about axis x, y or z (three.js rotation, degrees) at its pivot; move slides it [forward, up, right] metres, in the frame of the part_ node named by frame (default: its own parent's). GUN_MODEL_CONTRACT.multi."
+      "description": "A sequence of moves that takes the gun apart for a reload (the Tempest changes its whole barrel block): each step moves one part_ node, in order; the reload animation plays them forward (the old block comes out) and back (the new one goes in). part: the node (its key, \"lever\", or its name \"part_lever\"); rotate_deg turns it about axis x, y or z (three.js rotation, degrees) at its pivot; move slides it [forward, up, right] metres, in the frame of the part_ node named by frame (default: its own parent's). How each step FEELS is data too (all optional): share, its part of the time (relative to the other steps, default 1); ease, the shape of its motion on the way out; over, a spring's overshoot; back { share, ease }, the same for the way back (default: the way out's share, smooth); hand { part, at }, where the support hand holds the gun during the step (a point of that part_ node, [forward, up, right] metres in its own frame: the hand moves with the part). GUN_MODEL_CONTRACT.multi."
     }
   },
   "required": [

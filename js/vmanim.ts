@@ -31,7 +31,11 @@ const G_VMAnim = (() => {
   type Rig = GunRig; // (one gun in the hands: its holder, its parts, its anchors, its magazine's check data: js/gunrig.ts)
   interface MagState { mode: VmMagMode; at?: number; d?: number; k?: number; q?: THREE.Quaternion }
   // one frame of a clip: the gun's offset and what each part and hand is doing (null: left alone)
-  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
+  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; hsteps?: number[] | null; Lon?: HingeHold | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
+  // the support hand during a reload sequence (hingeClip): between a and b (k: 0..1), each a point in the gun's space or ON a part_ node (it moves with it: resolved in apply, once the
+  // sequence has posed the parts); lead: how far it presses ahead of that point, down (m); carry: the block (part_mag) goes where the hand takes it
+  type HingeRef = V3 | { part: string; at: number[] };
+  interface HingeHold { a: HingeRef; b: HingeRef; k: number; lead: number; carry: boolean; grip: HingeRef | null }
   interface Arm { g: THREE.Group; sleeve: THREE.Mesh; glove: THREE.Group; fist?: THREE.Group }
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
@@ -349,44 +353,153 @@ const G_VMAnim = (() => {
     }
     return pose;
   }
-  // A reload that takes the gun apart, from the model's own sequence (info.hinge: GUN_MODEL_CONTRACT.multi): the steps play in order (pose.hinge 0..1 through them) as the block comes out, a
-  // moment with it clear of the gun, then back in the other way round with the new one. The left hand follows the block (carried by its handle), the right stays on the grip, the gun
-  // turned up a little to see into it. Nothing in it is a gun: the parts, their pivots and their moves are the model's.
+  // A reload that takes the gun apart, from the model's own sequence (info.hinge: GUN_MODEL_CONTRACT.multi): the steps play in order as the block comes out, a moment with it clear of
+  // the gun (away to the pouch, a fresh one back), then back in the other way round. How each step feels is its own data: its share of the time, the shape of its motion out and back
+  // (HINGE_EASE), and where the support hand holds the gun while it moves (hand: a point of a part_ node, followed as it moves: apply). The right hand stays on the grip, the gun turned up a
+  // little to see into it, and it answers each step's ease (hingeReact: a spring's kick, the dip of a firm pull, the sag of a weight). Nothing in it is a gun: the parts, their pivots,
+  // their moves and their feel are the model's.
+  type HingeStep = { part: string; axis?: string | null; rotate_deg?: number | null; move?: number[] | null; frame?: string | null; share?: number | null; ease?: string | null; over?: number | null; back?: { share?: number | null; ease?: string | null } | null; hand?: { part: string; at: number[] } | null };
+  // v 0..1 through a step's time -> 0..1 of its travel (a spring's goes past 1 and comes back). o: a spring's overshoot. js/glb.ts HINGE_EASES lists them for the contract.
+  const HINGE_EASE: Record<string, (v: number, o: number) => number> = {
+    smooth: (v) => v * v * (3 - 2 * v),
+    linear: (v) => v,
+    in: (v) => v * v,
+    out: (v) => 1 - (1 - v) * (1 - v),
+    // released: out fast (its first 30%, slowing as a spring spends itself) to past the end by o with no speed left, back through the end a little short (a quarter of o), settled: still at the end
+    spring: (v, o) => { const a = 0.3; if (v < a) { const w = 1 - v / a; return (1 + o) * (1 - w * w * w); } const w = (v - a) / (1 - a); return 1 + o * Math.cos(1.5 * Math.PI * w) * (1 - w) * (1 - w) * (1 + 2 * w); },
+    // a firm pull: it creeps (8% of the way in its first 30%), holds at the detent (to 10% by 52%), then gives, speeding up all the way onto its stop (it lands with speed: hingeReact's thud)
+    detent: (v) => { if (v < 0.3) return 0.08 * S(0, 0.3, v); if (v < 0.52) return 0.08 + 0.02 * S(0.3, 0.52, v); const w = (v - 0.52) / 0.48; return 0.1 + 0.9 * w * w * (2 - w); },
+    // a weight lifted: slow to get going, eased into place
+    heavy: (v) => S(0, 1, Math.pow(v, 1.4)),
+    // drawn in: speeding up all the way (cubic) to 85% of the travel at 72% of the time, then a damped stop (exponential, the speed matched where it takes over): no bounce, all but still at the end
+    magnet: (v) => { const a = 0.72, x = 0.85; if (v < a) return x * Math.pow(v / a, 3); const k = 3 * x * (1 - a) / (a * (1 - x)), w = (v - a) / (1 - a); return x + (1 - x) * (1 - Math.exp(-k * w)) / (1 - Math.exp(-k)); },
+  };
+  const hingeEase = (name: string | null | undefined, v: number, o: number) => (HINGE_EASE[name || 'smooth'] || HINGE_EASE.smooth)(G.U.clamp(v, 0, 1), o);
+  // the parts of the reload beside the steps, in shares of its time as the steps' (share 1 each by default): the hand to the gun, from one hold to another, the block away and a fresh one
+  // fetched, the hand back to the handguard
+  const H_LEAD = 0.35, H_GAP = 0.3, H_AWAY = 1.1, H_TAIL = 0.4;
+  // The reload's timeline from the sequence: segments in order over t 0..1 (lead, then each step out with a gap before it where the hand changes hold, away, each step back, the tail),
+  // each with the hand's hold at its start and end (a step's own hand, or the one before's; the first: the handguard). Cached per sequence.
+  interface HingeSeg { kind: 'lead' | 'gap' | 'step' | 'away' | 'tail'; i: number; back: boolean; t0: number; t1: number; from: HingeRef | null; to: HingeRef | null }
+  const _htl = new WeakMap<object, HingeSeg[]>();
+  function hingeTimeline(seq: HingeStep[]) {
+    const c = _htl.get(seq);
+    if (c) return c;
+    const n = seq.length, hand: (HingeRef | null)[] = [];
+    for (let i = 0; i < n; i++) hand.push(seq[i].hand ? { part: seq[i].hand!.part, at: seq[i].hand!.at } : i ? hand[i - 1] : null); // (null: the handguard)
+    const same = (a: HingeRef | null, b: HingeRef | null) => a === b || (!!a && !!b && !(a instanceof T.Vector3) && !(b instanceof T.Vector3) && a.part === b.part && a.at.every((x, k) => x === b.at[k]));
+    const segs: HingeSeg[] = [];
+    let u = 0;
+    const add = (kind: HingeSeg['kind'], i: number, back: boolean, w: number, from: HingeRef | null, to: HingeRef | null) => { segs.push({ kind, i, back, t0: u, t1: u + w, from, to }); u += w; };
+    add('lead', -1, false, H_LEAD, null, hand[0]);
+    for (let i = 0; i < n; i++) { if (i && !same(hand[i - 1], hand[i])) add('gap', i, false, H_GAP, hand[i - 1], hand[i]); add('step', i, false, seq[i].share || 1, hand[i], hand[i]); }
+    add('away', -1, false, H_AWAY, hand[n - 1], hand[n - 1]);
+    for (let i = n - 1; i >= 0; i--) { if (i < n - 1 && !same(hand[i + 1], hand[i])) add('gap', i, true, H_GAP, hand[i + 1], hand[i]); const b = seq[i].back; add('step', i, true, (b && b.share) || seq[i].share || 1, hand[i], hand[i]); }
+    add('tail', -1, true, H_TAIL, hand[0], null);
+    for (const s of segs) { s.t0 /= u; s.t1 /= u; }
+    _htl.set(seq, segs);
+    return segs;
+  }
+  // each step's travel at t (0..1 of its move; a spring's past 1 for a moment): out in order, all out through the away, back in reverse order
+  function hingeSteps(seq: HingeStep[], segs: HingeSeg[], t: number) {
+    const p = seq.map(() => 0);
+    for (const s of segs) {
+      if (s.kind !== 'step' || t < s.t0) continue;
+      const st = seq[s.i], v = (t - s.t0) / (s.t1 - s.t0);
+      if (!s.back) p[s.i] = v >= 1 ? 1 : hingeEase(st.ease, v, st.over != null ? st.over : 0.06);
+      else p[s.i] = v >= 1 ? 0 : 1 - hingeEase(st.back && st.back.ease, v, 0.06);
+    }
+    return p;
+  }
+  // the gun's answer to a step's motion (v: 0..1 through it; after: how long since it ended, in its own lengths); lead: how far the hand presses ahead of its hold, down (m)
+  function hingeReact(pose: Pose, ease: string | null | undefined, v: number, after: number) {
+    let lead = 0;
+    if (ease === 'spring' && after <= 0) { // (the block shot forward: the gun kicks back and its muzzle up, at once, and dies away)
+      const j = v < 0.08 ? v / 0.08 : Math.exp(-(v - 0.08) * 6);
+      pose.gun[2] += 0.012 * j; pose.gun[3] += 0.045 * j;
+    } else if (ease === 'detent') { // (pulled down hard against the detent: the gun dips with the effort and comes back as it gives; then the thud of the stop)
+      if (after <= 0) { const e = S(0, 0.3, v) * (1 - S(0.52, 0.78, v)); pose.gun[3] -= 0.07 * e; pose.gun[1] -= 0.012 * e; lead = 0.012 * e; }
+      else if (after < 0.3) { const d = Math.sin(Math.PI * after / 0.3); pose.gun[1] -= 0.006 * d; pose.gun[3] -= 0.025 * d; }
+    } else if (ease === 'heavy' && after <= 0) { // (a weight heaved up: the gun sags under it and recovers as it comes home; the hand pushes up ahead of it)
+      const l = Math.sin(Math.PI * v);
+      pose.gun[1] -= 0.016 * l; pose.gun[3] -= 0.06 * l; lead = -0.006 * l;
+    } else if (ease === 'magnet' && after <= 0) { // (the mass drawn back into the gun pulls it a little forward as it speeds up, let go of softly as it stops)
+      const r = v < 0.72 ? (v / 0.72) * (v / 0.72) : 1 - S(0.72, 1, v);
+      pose.gun[2] -= 0.004 * r;
+    }
+    return lead;
+  }
   const pl0 = () => G.Me;
+  const hingeNode = (h: Rig, k: string) => (h.an as Record<string, THREE.Object3D | undefined>)[k.replace(/^part_/, '')];
+  // whether a hold is on the block (the magazine part, or inside it): with no block in the gun, the hand goes to the pouch for one instead
+  const onBlock = (h: Rig, r: HingeRef | null) => { if (!r || r instanceof T.Vector3 || !h.an.mag) return false; for (let o: THREE.Object3D | null | undefined = hingeNode(h, r.part); o; o = o.parent) if (o === h.an.mag) return true; return false; };
   function hingeClip(t: number, h: Rig) {
-    const A = h.A, pose = base(), out = S(0.05, 0.43, t), back = S(0.55, 0.93, t);
-    pose.hinge = out * (1 - back);
-    const tilt = S(0.02, 0.14, t) * (1 - S(0.88, 0.97, t));
+    const A = h.A, pose = base(), seq = (h.info.hinge!.sequence || []) as HingeStep[];
+    if (!seq.length) return pose;
+    const segs = hingeTimeline(seq), had = !pl0().cur().noMag; // (had: there is a block in the gun to take out)
+    pose.hsteps = hingeSteps(seq, segs, t);
+    const lead = segs[0].t1, tail = segs[segs.length - 1].t0;
+    const tilt = S(0, lead + 0.03, t) * (1 - S(tail - 0.02, 1, t));
     pose.gun[3] += 0.3 * tilt; pose.gun[5] -= 0.22 * tilt; pose.gun[1] += 0.035 * tilt; pose.gun[0] -= 0.05 * tilt;
-    const blk = h.an.mag, had = !pl0().cur().noMag; // (had: there is a block in the gun to take out)
-    let grab: V3 = A.S;
-    if (blk) { blk.updateWorldMatrix(true, false); grab = h.holder.worldToLocal(new T.Vector3().setFromMatrixPosition(blk.matrixWorld)); grab.y += 0.04; } // (the carry handle: on top of the block)
-    // the old block comes out in the hand (t < 0.44), goes away to the pouch (or the floor) while the hand fetches the fresh one (0.44 to 0.54), which comes back
-    // along the same path; with no block in the gun there is none to take out, and the hand fetches one first
-    const P = off(A.P, 0, 0.02), gone = had ? t >= 0.44 && t < 0.54 : t < 0.54;
-    if (had) pose.L = path(t, [[0, A.S], [0.07, A.S], [0.2, grab], [0.44, grab], [0.49, P], [0.54, grab], [0.93, grab], [1, A.S]]);
-    else pose.L = path(t, [[0, A.S], [0.08, P], [0.46, P], [0.54, grab], [0.93, grab], [1, A.S]]);
-    pose.mag = { mode: gone ? 'gone' : 'in' };
+    // the gun's answer to each step (and to one just ended)
+    let press = 0;
+    for (const s of segs) if (s.kind === 'step' && t >= s.t0) {
+      const st = seq[s.i], d = s.t1 - s.t0, v = (t - s.t0) / d, after = v > 1 ? v - 1 : 0;
+      if (after < 0.5) press += hingeReact(pose, s.back ? st.back && st.back.ease : st.ease, Math.min(v, 1), after);
+    }
+    // the hand: the segment it's in, from its start hold to its end one (with no block in the gun, the holds on it are the pouch)
+    const P = off(A.P, 0, 0.02), sg = segs.find((s) => t < s.t1) || segs[segs.length - 1], k = S(sg.t0, sg.t1, t);
+    const at = (r: HingeRef | null): HingeRef => (!r ? A.S : !had && onBlock(h, r) ? P : r);
+    const grip = onBlock(h, segs.find((s) => s.kind === 'away')!.from) ? segs.find((s) => s.kind === 'away')!.from : null; // (where the block is carried by, out to the pouch and back)
+    if (sg.kind === 'away') { // (out to the pouch with the old block, a moment there, back with the new: it goes where the hand takes it)
+      const w = (t - sg.t0) / (sg.t1 - sg.t0);
+      const a = had ? at(sg.from) : P, b = at(sg.to);
+      pose.Lon = w < 0.4 ? { a, b: P, k: S(0, 0.4, w), lead: 0, carry: !!grip && had, grip } : w < 0.6 ? { a: P, b: P, k: 0, lead: 0, carry: false, grip: null } : { a: P, b, k: S(0.6, 1, w), lead: 0, carry: !!grip, grip };
+      pose.mag = { mode: (had ? w > 0.33 : true) && w < 0.67 ? 'gone' : 'in' };
+    } else {
+      pose.Lon = { a: at(sg.from), b: at(sg.to), k, lead: press, carry: false, grip: null };
+      pose.mag = { mode: !had && segs.indexOf(sg) < segs.findIndex((s) => s.kind === 'away') ? 'gone' : 'in' }; // (no block to take out: none in the gun until the hand brings one)
+    }
+    pose.hinge = t;
     return pose;
   }
-  // The model's sequence at p (0..1 through its steps, js/vmanim.ts hingeClip): each step in turn, eased, moves or turns its node from where it rests. A rotation turns the node about its own pivot (rotate_deg about
-  // axis x, y or z); a move slides it [forward, up, right] metres in the frame of the node named by frame (default: its parent's), which has to be worked out as the frame stands as the earlier steps left it.
+  // where a hold is, in the gun's space, as the parts stand now (the sequence has posed them: apply)
+  function hingeAt(h: Rig, r: HingeRef) {
+    if (r instanceof T.Vector3) return r.clone();
+    const nd = hingeNode(h, r.part);
+    if (!nd) return h.A.S.clone();
+    return h.holder.worldToLocal(nd.localToWorld(new T.Vector3(r.at[2] || 0, r.at[1], -r.at[0])));
+  }
+  // the support hand's target from its hold (after hingePose), and the block carried with it
+  function hingeHold(h: Rig, on: HingeHold) {
+    h.holder.updateMatrixWorld(true);
+    const L = hingeAt(h, on.a).lerp(hingeAt(h, on.b), on.k);
+    L.y -= on.lead;
+    const blk = h.an.mag;
+    if (on.carry && on.grip && blk && blk.parent) { // (the block moved by where the hand has its handle from where the sequence left it)
+      const g = hingeAt(h, on.grip), par = blk.parent;
+      const d = par.worldToLocal(h.holder.localToWorld(L.clone())).sub(par.worldToLocal(h.holder.localToWorld(g)));
+      blk.position.add(d); blk.updateMatrix(); blk.updateMatrixWorld(true);
+    }
+    return L;
+  }
+  // The model's sequence posed: each step moves or turns its node from where it rests by its travel (steps: 0..1 each, hingeClip; null: all home). A rotation turns the node about its own
+  // pivot (rotate_deg about axis x, y or z); a move slides it [forward, up, right] metres in the frame of the node named by frame (default: its parent's), which has to be worked out as the
+  // frame stands as the earlier steps left it.
   const _hv = new T.Vector3(), _hq = new T.Quaternion(), _hq2 = new T.Quaternion();
-  function hingePose(h: Rig, p: number) {
-    const seq = h.info.hinge && h.info.hinge.sequence;
+  function hingePose(h: Rig, steps: number[] | null) {
+    const seq = h.info.hinge && (h.info.hinge.sequence as HingeStep[]);
     if (!seq) return;
-    const node = (k: string) => (h.an as Record<string, THREE.Object3D | undefined>)[k.replace(/^part_/, '')];
     const done = new Set<THREE.Object3D>();
-    for (const st of seq) { const n = node(st.part); if (n && !done.has(n)) { done.add(n); if (!n.userData.home) n.userData.home = { p: n.position.clone(), r: n.rotation.clone() }; n.position.copy(n.userData.home.p); n.rotation.copy(n.userData.home.r); } }
-    const n = seq.length;
-    seq.forEach((st: { part: string; axis?: string | null; rotate_deg?: number | null; move?: number[] | null; frame?: string | null }, i: number) => {
-      const nd = node(st.part);
+    for (const st of seq) { const n = hingeNode(h, st.part); if (n && !done.has(n)) { done.add(n); if (!n.userData.home) n.userData.home = { p: n.position.clone(), r: n.rotation.clone() }; n.position.copy(n.userData.home.p); n.rotation.copy(n.userData.home.r); } }
+    seq.forEach((st, i) => {
+      const nd = hingeNode(h, st.part);
       if (!nd) return;
-      const s = S(i / n, (i + 1) / n, p);
+      const s = steps ? steps[i] || 0 : 0;
       if (st.rotate_deg != null && st.axis) (nd.rotation as any)[st.axis] += (st.rotate_deg * Math.PI / 180) * s;
       if (st.move) {
         _hv.set(st.move[2] || 0, st.move[1], -st.move[0]).multiplyScalar(s); // (the move in its frame's own axes: x right, y up, z back)
-        const fr = st.frame ? node(st.frame) : null;
+        const fr = st.frame ? hingeNode(h, st.frame) : null;
         if (fr && nd.parent) { // (another node's frame: its turn, then back into the parent's)
           h.holder.updateMatrixWorld(true);
           fr.getWorldQuaternion(_hq); nd.parent.getWorldQuaternion(_hq2).invert();
@@ -741,11 +854,12 @@ const G_VMAnim = (() => {
       if (an.bipod) G.GunRig.bipodPose(an.bipod, pl.bipodT || 0); // (down on the ground or a ledge: js/player.ts bipodStep)
       if (an.pump && pose && pose.pump != null && !h.info.hinge) an.pump.position.z = pose.pump * PUMP;
       if (an.lever && !h.info.hinge) an.lever.rotation.x = h.info.block ? (pose ? pose.brk : 0) * h.info.block.lever : (pose && pose.lever != null ? pose.lever : cyc && a.k.action === 'lever' ? cyc : 0) * 0.9; // (a falling block's lever: down with the block)
-      if (h.info.hinge) hingePose(h, pose && pose.hinge != null ? pose.hinge : 0); // (a model's own reload sequence, js/vmanim.ts hingeClip)
+      if (h.info.hinge) hingePose(h, pose && pose.hsteps ? pose.hsteps : null); // (a model's own reload sequence, js/vmanim.ts hingeClip)
       if (an.bolt && A.boltHome) { const b = (pose && pose.bolt) || [0, 0]; an.bolt.rotation.z = b[0] * BOLT_LIFT; an.bolt.position.z = A.boltHome.z + b[1] * boltBack(h); } // (worked by hand: js/player.ts rack)
 
       // hands: resting on the gun unless the clip has them somewhere else
       let Rt = pose && pose.R ? res(pose.R) : A.G.clone(), Lt = pose && pose.L ? res(pose.L) : A.S.clone();
+      if (pose && pose.Lon && h.info.hinge) Lt = hingeHold(h, pose.Lon); // (a reload sequence's hold: on a part, as the sequence has just posed it)
       // working the action between shots: the left hand riding the pump (a bolt's worked as a rack)
       if (!pose && cyc > 0 && a.k.action === 'pump' && an.pump) Lt = A.S.clone().add(new T.Vector3(0, 0, an.pump.position.z));
       if (a.def.akimbo) { // one gun in each hand
@@ -937,7 +1051,7 @@ const G_VMAnim = (() => {
     arm.glove.quaternion.copy(_q).multiply(RX);
   }
 
-  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap };
+  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap, hingeTimeline, hingeSteps, HINGE_EASE };
 })();
 G.VMAnim = G_VMAnim;
 
