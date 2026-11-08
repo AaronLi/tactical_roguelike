@@ -365,20 +365,23 @@ const G_GunRecipes = (() => {
     // magnifies the dot; swung out and down beside the receiver (about -160°) you look past it. Its rear lens is the picture-in-picture lens.
     // Built from the optic's mount_magnifier anchor alone, [its fSight, its sy]: the tube on the sight line, the foot and hinge below it
     // by fixed amounts (the foot's base 34 mm under it, a red dot's height over its rail; on a lower sight the foot sinks into the rail),
-    // so the magnifier's shape is its own and the optic only moves it.
+    // so the magnifier's shape is its own and the optic only moves it. The foot, the hinge block and the flip arm are at the tube's FRONT end,
+    // right behind the sight (fSight - 59 mm .. fSight - 25 mm, whatever the tube's length): the tube reaches back over the rail from there,
+    // and swings out about a forward axis at its front. So the foot needs only 34 mm of rail behind the sight (the MP5's short claw-mount rail).
     magnifier(k: Kit, sight: { sy: number; fSight: number }, m: any, anim: Anim) {
-      const sy = sight.sy, top = sy - 0.034, len = m.len || 0.085, R = 0.0165, fRear = sight.fSight - 0.025 - len, fc = fRear + len * 0.5;
+      const sy = sight.sy, top = sy - 0.034, len = m.len || 0.075, R = 0.0165, fFront = sight.fSight - 0.025, fRear = fFront - len, fc = fRear + len * 0.5;
+      const fm = fFront - 0.017; // (the foot's and the hinge's middle, 34 mm long, ending at the tube's front)
       k.anchor('optic', 'mount_magnifier', [sight.fSight, sy, 0]);
       const hx = 0.024, hy = top + 0.014;
-      k.box(0.03, 0.012, 0.034, M.black(), fc - 0.017, top + 0.006);
-      k.box(0.008, 0.014, 0.03, M.black(), fc - 0.015, hy, hx);
-      const hinge = k.hang(new T.Group(), hx, hy, fc);
-      const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, mat); mesh.position.set(x - hx, y - hy, -(f - fc)); mesh.userData.slot = k.slot; hinge.add(mesh); return mesh; };
+      k.box(0.03, 0.012, 0.034, M.black(), fm - 0.017, top + 0.006);
+      k.box(0.008, 0.014, 0.034, M.black(), fm - 0.017, hy, hx);
+      const hinge = k.hang(new T.Group(), hx, hy, fm);
+      const add = (geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, f: number) => { const mesh = new T.Mesh(geo, mat); mesh.position.set(x - hx, y - hy, -(f - fm)); mesh.userData.slot = k.slot; hinge.add(mesh); return mesh; };
       const tube = new T.CylinderGeometry(R, R * 1.08, len, 24, 1, true); tube.rotateX(Math.PI / 2); add(tube, M.tubeDS(), 0, sy, fc);
-      for (const ff of [fRear, fRear + len]) { const ring = new T.TorusGeometry(R, 0.0025, 6, 24); add(ring, M.black(), 0, sy, ff); }
-      add(new T.BoxGeometry(0.02, sy - hy - R + 0.004, 0.026), M.black(), hx * 0.45, (sy - R + hy) / 2, fc);
-      const front = new T.CircleGeometry(R * 0.95, 24); add(front, M.lens(), 0, sy, fRear + len - 0.002);
-      k.pip = { f: fRear - 0.001, y: sy, r: R - 0.0015, parent: hinge, pos: new T.Vector3(-hx, sy - hy, -(fRear - 0.001 - fc)) };
+      for (const ff of [fRear, fFront]) { const ring = new T.TorusGeometry(R, 0.0025, 6, 24); add(ring, M.black(), 0, sy, ff); }
+      add(new T.BoxGeometry(0.02, sy - hy - R + 0.004, 0.026), M.black(), hx * 0.45, (sy - R + hy) / 2, fm);
+      const front = new T.CircleGeometry(R * 0.95, 24); add(front, M.lens(), 0, sy, fFront - 0.002);
+      k.pip = { f: fRear - 0.001, y: sy, r: R - 0.0015, parent: hinge, pos: new T.Vector3(-hx, sy - hy, -(fRear - 0.001 - fm)) };
       anim.magn = hinge;
       return { sy, fSight: fRear, relief: 0.075 };
     },
