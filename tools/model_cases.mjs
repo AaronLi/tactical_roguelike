@@ -135,6 +135,11 @@ export function generate(G, id) {
     const b = { ...def, optic: p.id }; delete b.magnifier; GS.prune(id, b); add(`authored optic (${p.id})`, b);
     if (p.provides && p.provides.magnifier) { const ms = slotOf(b, 'magnifier'); const m = ms && options(ms, b)[0]; if (m) add(`magnifier behind the authored optic (${p.id})`, { ...b, magnifier: m.id }); }
   } }
+  // authored magnifiers (models/parts/magnifier): each one behind the first sight that takes one, on the default build (the rules above fit only the first)
+  { const os = slotOf(def, 'optic'), o = os && options(os, def).find(isReflex); if (o) {
+    const b = { ...def, optic: o.id }; delete b.magnifier; GS.prune(id, b); const ms = slotOf(b, 'magnifier');
+    if (ms) for (const m of options(ms, b).slice(1)) if (m.model && m.model.apMagn) add(`authored magnifier (${m.id}) behind ${o.id}`, { ...b, magnifier: m.id });
+  } }
   // authored furniture (models/parts/{stock,grip,muzzle,handguard}): each entry an authored model replaces, fitted alone where it fits and is not the default (the
   // Kestrel on any tube, the IR-12 on any AR, the FDE rail): the default build already has the factory ones
   for (const name of ['stock', 'grip', 'muzzle', 'handguard']) { const s = slotOf(def, name); if (s) for (const p of options(s, def)) if (p.model && (p.model.apStock || p.model.apGrip || p.model.apMuzzle || p.model.apHg || (p.model.apHgBy && p.model.apHgBy[id])) && def[s.slot] !== p.id) {

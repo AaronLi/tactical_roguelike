@@ -1188,7 +1188,8 @@ const G_Gunsmith = (() => {
   }
   // The key an authored piece of furniture's model rides on in a part's model (and so in the spec): the recipe draws the model there instead of its own
   // (tools/models/recipes.ts; the parts replaced are set at the end of the catalogue). One per slot, as the spec merges every slot's patch into one object.
-  const AP_KEY: Record<string, 'apStock' | 'apGrip' | 'apMuzzle' | 'apHg'> = { stock: 'apStock', grip: 'apGrip', muzzle: 'apMuzzle', handguard: 'apHg' };
+  // (a flip magnifier likewise: apMagn, S.magnifier draws the authored one from models/parts/magnifier/<id>/ instead of its own)
+  const AP_KEY: Record<string, 'apStock' | 'apGrip' | 'apMuzzle' | 'apHg' | 'apMagn'> = { stock: 'apStock', grip: 'apGrip', muzzle: 'apMuzzle', handguard: 'apHg', magnifier: 'apMagn' };
   // The model spec for a build: the platform's receiver spec with every installed part's patch applied.
   function modelSpec(def: any) {
     const plat = PLATFORMS[def.id];
@@ -1535,6 +1536,9 @@ const G_Gunsmith = (() => {
     {"apart":"handguard/vantage_vx13_fde","names":["Vantage VX-13 M-LOK (FDE)"],"len":0.32},
     {"apart":"handguard/vantage_vx15","names":["Vantage VX-15 M-LOK 15\""],"len":0.36},
     {"apart":"handguard/vantage_vx5","names":["Vantage VX-5 M-LOK 5\""],"len":0.12},
+    {"apart":"magnifier/brightline_2x","names":["Brightline 2× micro magnifier"],"len":0.06,"px":2},
+    {"apart":"magnifier/meridian_5x","names":["Meridian 5× flip magnifier"],"len":0.09,"px":5},
+    {"apart":"magnifier/strix_fts3","names":["Strix FTS 3× flip magnifier"],"len":0.075,"px":3},
     {"apart":"muzzle/ironvale_a2_556","names":["Ironvale A2 5.56 birdcage"]},
     {"apart":"optic/brightline_pip","names":["Brightline Pip red dot"]},
     {"apart":"optic/ember","names":["Halcyon Ember pistol dot"]},
@@ -1648,7 +1652,10 @@ const G_Gunsmith = (() => {
         if (!ps.length) throw new Error(`models/parts/${r.apart}/model.json replaces ${JSON.stringify(n)}, which ${typeof n === 'string' ? 'is not in the catalogue' : 'matches no entry'}`);
         for (const p of ps) {
           if (!p.model || p.slot !== slot) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", which is not a ${slot}`);
-          if (r.len != null && !r.gun && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          if (slot === 'handguard' && r.len != null && !r.gun && !(p.model.hg && Math.abs((p.model.hg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", ${p.model.hg ? p.model.hg.len : '?'} m long; the model is ${r.len} m`);
+          if (slot === 'magnifier') { const mg = (p.model as any).magnifier || {}; // (a magnifier's entries are the model's tube and power: the catalogue's len and set.magnifier)
+            if (!(Math.abs((mg.len || 0) - r.len) <= 0.0015)) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", its tube ${mg.len} m long; the model's is ${r.len} m`);
+            if (p.set.magnifier !== r.px) throw new Error(`models/parts/${r.apart}/model.json replaces "${p.name}", a ${p.set.magnifier}× magnifier; the model says ${r.px}×`); }
           if (r.gun) { const m = p.model as any; m[key + 'By'] = Object.assign(m[key + 'By'] || {}, { [r.gun]: r.apart }); continue; } // (one gun's own model for a shared entry: modelSpec picks it by the gun)
           (p.model as any)[key] = r.apart;
         }

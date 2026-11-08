@@ -386,7 +386,20 @@ const G_GunRecipes = (() => {
     // so the magnifier's shape is its own and the optic only moves it. The foot, the hinge block and the flip arm are at the tube's FRONT end,
     // right behind the sight (fSight - 59 mm .. fSight - 25 mm, whatever the tube's length): the tube reaches back over the rail from there,
     // and swings out about a forward axis at its front. So the foot needs only 34 mm of rail behind the sight (the MP5's short claw-mount rail).
-    magnifier(k: Kit, sight: { sy: number; fSight: number }, m: any, anim: Anim) {
+    // ap: the fitted magnifier is an AUTHORED model (o.apMagn, "magnifier/<id>": models/parts/magnifier, GUN_MODEL_CONTRACT.authoredParts.magnifier): the
+    // file's clamp and tube instead, seated with its origin at mount_magnifier, its tube on part_magn at the file's hinge; the pip lens, the eye relief and
+    // the angle it flips out to (info.magnOut) are its model.json's.
+    magnifier(k: Kit, sight: { sy: number; fSight: number }, m: any, anim: Anim, ap?: string | null) {
+      if (ap) {
+        const sy = sight.sy, f = sight.fSight, { hinge, at, p } = G.AuthoredParts.magnifier(k, ap, f, sy), a = p.anchors!, mg = p.magnifier!, pip = a.pip!;
+        foot('magnifier', f + a.foot![0], f + a.foot_end![0], sy + a.foot![1], 'magnifier ' + ap);
+        k.anchor('optic', 'mount_magnifier', [f, sy, 0]);
+        const pf = f + mg.pip.f, py = sy + pip[1];
+        k.pip = { f: pf, y: py, r: mg.pip.r, parent: hinge, pos: new T.Vector3(pip[2] - at[2], py - at[1], -(pf - at[0])) };
+        k.magnOut = (mg.flip.out_deg * Math.PI) / 180;
+        anim.magn = hinge;
+        return { sy, fSight: pf, relief: mg.relief };
+      }
       const sy = sight.sy, top = sy - 0.034, len = m.len || 0.075, R = 0.0165, fFront = sight.fSight - 0.025, fRear = fFront - len, fc = fRear + len * 0.5;
       const fm = fFront - 0.017; // (the foot's and the hinge's middle, 34 mm long, ending at the tube's front)
       foot('magnifier', fm - 0.017, fm + 0.017, top, 'magnifier ' + len);
@@ -961,7 +974,7 @@ const G_GunRecipes = (() => {
   function magIn(k: Kit, sight: Sight, top: number, o: RecipeSpec, anim: Anim) {
     if (!o.magnifier || !k.reflex) return sight;
     k.tag('magnifier');
-    return S.magnifier(k, sight, o.magnifier, anim);
+    return S.magnifier(k, sight, o.magnifier, anim, o.apMagn);
   }
   // where a barrel's front sight stands (its mount_frontsight, forward): on the barrel, behind its end, wherever the barrel's muzzle device is
   const frontSightF = (L: number, bl: number) => L + Math.min(bl * 0.82, bl - 0.03);
@@ -1756,7 +1769,7 @@ const G_GunRecipes = (() => {
       : tr && tr.sightF != null && o.optic === 'notch' && o.sightRise ? raisedSights(k, tr, bEnd, top, o.sightRise, by)
       : tr && tr.sightF != null && o.optic === 'notch' ? (rcv === 'break' ? breakSights(k, tr, bEnd - 0.012, top + (tr.sh || 0.0075), by + 0.004, top) : S.pistolSights(k, tr.sightF, L - 0.012, top + (tr.sh || 0.0075), top, false, top, tr.sw))
       : sightOf(k, o, top, L, o.integral ? o.integral.len : bl, br, bEnd, ofs, true, by);
-    if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim); } // (a Thor's: on the rail, it tips with it)
+    if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim, o.apMagn); } // (a Thor's: on the rail, it tips with it)
     if (onBarrels) k.into(null);
     k.tag('base');
     const hgHold = o.apHg && hgLen ? G.AuthoredParts.get(o.apHg).anchors!.support! : null; // (an authored handguard says where it is held: its support anchor, [forward, up] from its rear on the bore)
@@ -2190,7 +2203,7 @@ const G_GunRecipes = (() => {
         if (o.optic && !(['irons', 'notch', 'bead', 'none', 'night', 'riser'] as (string | undefined)[]).includes(o.optic)) { // (a pistol dot's here on a riser: the slide's own sight isn't drawn in a chassis)
           // (a dot on a riser is the riser dot's own piece, keyed by that part alone: the riser under it is the mount's)
           sight = o.riser ? k.at('riserdot', () => sightOf(k, o, top, f0, rl, 0.01, fN, ofs)) : sightOf(k, o, top, f0, rl, 0.01, fN, ofs);
-          if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim); }
+          if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim, o.apMagn); }
         } else {
           if (o.optic === 'riser') k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, B, ofs - 0.017, top + (o.riser || 0.022) / 2)); // (with nothing on it: the irons still work)
           sight = o.optic === 'riser' ? ch_bare() : S.irons(k, f0 + 0.012, fN - 0.014, top + 0.026, top, top, 'ar'); // (a riser with nothing on it draws only its mount: the same optic piece with or without a dot on it)
@@ -2362,7 +2375,7 @@ const G_GunRecipes = (() => {
       if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) {
         // (with a magnifier behind it, the sight goes forward on the rail, so the magnifier's mount sits on the rail too)
         k.tag('optic'); sight = sightOf(k, o, top, lug, bl, br, bl, r0 + (o.magnifier ? Math.max(rl * 0.55, Math.min(rl - 0.035, 0.125)) : rl * 0.55));
-        if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim); }
+        if (o.magnifier && k.reflex) { k.tag('magnifier'); sight = S.magnifier(k, sight, o.magnifier, anim, o.apMagn); }
       }
     }
     k.into(null);
@@ -2714,6 +2727,7 @@ const G_GunRecipes = (() => {
     info.anim = info.anim || {};
     if (k.reflex) info.reflex = Object.assign({}, k.reflex); // (a reflex sight's window and a scope's picture-in-picture lens, for the viewmodel: js/glb.ts)
     if (k.pip) { const q = k.pip; info.pip = { f: q.f, y: q.y, r: q.r }; if (q.parent) { info.pip.parent = 'magn'; info.pip.pos = [q.f, q.y, 0]; } }
+    if (k.magnOut != null) info.magnOut = k.magnOut; // (an authored magnifier: the angle it flips out to, its model.json's)
     k.g.userData.bake = k.bake; // (what each part provides: anchors, for the baker; not info, whose fields are the contract's)
     return info;
   }

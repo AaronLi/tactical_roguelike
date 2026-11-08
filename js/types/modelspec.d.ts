@@ -48,6 +48,7 @@ interface RecipeSpec<M = THREE.Material | null> {
   // the odd ones
   avBarrel?: string; avMuzzle?: string; avMag?: string /* (an authored gun's variant barrel / magazine fitted: the file name beside the model, e.g. "barrel_short") */;
   apStock?: string | null; apGrip?: string | null; apMuzzle?: string | null; apHg?: string | null /* (the fitted stock, grip, muzzle device or handguard is an authored model: its key, "<slot>/<id>", models/parts/) */;
+  apMagn?: string | null /* (the fitted magnifier is an authored model, "magnifier/<id>": S.magnifier draws it) */;
   boltTravel?: number /* (a manually cycled pistol: how far its bolt comes back, metres; the Welrod's) */;
   ext?: number; len0?: number; cr?: number; cl?: number; chambers?: number; limb?: string; motor?: string; cap?: string; drum?: boolean | Record<string, any>; slide?: Record<string, any>;
 }

@@ -2,7 +2,7 @@
 // the expected message, and the real parts must pass.   node tools/check_authored_parts.test.mjs
 import fs from 'fs'; import path from 'path';
 import { loadModels, loadGame, ROOT } from './model_env.mjs';
-import { authoredPartKeys, checkAuthoredPart, checkGeometry, checkFurniture, checkPipClear, boundsOf, readAuthoredPart, entryOf, partsTsWithBlock, PARTS_TS, FINISH } from './authored_parts.mjs';
+import { authoredPartKeys, checkAuthoredPart, checkGeometry, checkFurniture, checkMagnifier, checkPipClear, boundsOf, readAuthoredPart, entryOf, partsTsWithBlock, PARTS_TS, FINISH } from './authored_parts.mjs';
 const M = loadModels(); let bad = 0, n = 0;
 const run = (label, msgs, re) => {
   n++; const all = msgs.join('\n'), ok = re === null ? msgs.length === 0 : re.test(all);
@@ -125,6 +125,56 @@ FG('handguard/ironvale_ir12', 'the support off the handguard', () => {}, /anchor
   run('the A2 birdcage (the r556 factory muzzle) has the model', has(Gm.Gunsmith.PLATFORMS.hk416.defaults.muzzle, 'apMuzzle', 'muzzle/ironvale_a2_556'), null);
   const spec = Gm.Gunsmith.modelSpec({ id: 'ar9', build: Gm.Gunsmith.defaultBuild('ar9') });
   run('a build\'s spec carries the furniture keys (the AR-9: the Kestrel and the A2 grip)', spec.apStock === 'stock/kestrel_cs4' && spec.apGrip === 'grip/brightline_a2' && spec.apHg == null ? [] : [JSON.stringify({ apStock: spec.apStock, apGrip: spec.apGrip, apHg: spec.apHg })], null); }
+// FLIP MAGNIFIERS (models/parts/magnifier: GUN_MODEL_CONTRACT.authoredParts.magnifier): the config, the node tree (one part_magn), the geometry (checkMagnifier), the catalogue
+fconf('magnifier/strix_fts3', 'the FTS 3 is valid', () => {}, null);
+fconf('magnifier/strix_fts3', 'the optic frame on a magnifier', (c) => { c.frame = 'rail-top'; }, /"frame" is "rail-top", expected "magnifier-mount"/);
+fconf('magnifier/strix_fts3', 'a missing anchor', (c) => { delete c.anchors.hinge; }, /anchors\.hinge is missing \(a magnifier has pip, hinge, foot, foot_end\)/);
+fconf('magnifier/strix_fts3', 'an anchor of another slot', (c) => { c.anchors.support = [0, 0, 0]; }, /anchors\.support: not an anchor of a magnifier/);
+fconf('magnifier/strix_fts3', 'part data instead of magnifier data', (c) => { c.part = { px: 3 }; }, /unknown field "part" \(a magnifier's data is "magnifier"\)/);
+fconf('magnifier/strix_fts3', 'no magnifier data', (c) => { delete c.magnifier; }, /"magnifier" is missing/);
+fconf('magnifier/strix_fts3', 'a power out of range', (c) => { c.magnifier.px = 30; }, /magnifier\.px: the power, 1\.2 to 10/);
+fconf('magnifier/strix_fts3', 'a tube length in millimetres', (c) => { c.magnifier.len = 75; }, /magnifier\.len: the tube's length/);
+fconf('magnifier/strix_fts3', 'the pip lens not at the tube\'s rear', (c) => { c.magnifier.pip.f = -0.08; c.anchors.pip[0] = -0.08; }, /magnifier\.pip\.f \(-0\.08\) is not the tube's rear \(-0\.025 - len = -0\.1000\)/);
+fconf('magnifier/strix_fts3', 'the pip anchor off the sight line', (c) => { c.anchors.pip = [-0.1, 0.004, 0]; }, /anchors\.pip \[-0\.1,0\.004,0\] is not \[magnifier\.pip\.f, 0, 0\]/);
+fconf('magnifier/strix_fts3', 'a flip about another axis', (c) => { c.magnifier.flip.axis = 'x'; }, /magnifier\.flip\.axis: "x", expected "y"/);
+fconf('magnifier/strix_fts3', 'a flip of the wrong node', (c) => { c.magnifier.flip.part = 'part_tube'; }, /magnifier\.flip\.part: "part_tube", expected "part_magn"/);
+fconf('magnifier/strix_fts3', 'a flip in radians', (c) => { c.magnifier.flip.out_deg = -2.8; }, /magnifier\.flip\.out_deg: the angle it swings out to, 60 to 180 degrees/);
+fconf('magnifier/strix_fts3', 'the foot\'s ends swapped', (c) => { [c.anchors.foot, c.anchors.foot_end] = [c.anchors.foot_end, c.anchors.foot]; }, /anchors\.foot \(-0\.025\) must be behind anchors\.foot_end/);
+fconf('magnifier/strix_fts3', 'the clamp under the sight', (c) => { c.anchors.foot_end = [0.01, -0.034, 0]; }, /anchors\.foot_end \(0\.01\) reaches under the sight/);
+fconf('magnifier/strix_fts3', 'a magnifier always replaces', (c) => { delete c.replaces; }, /"replaces": expected a non-empty list .*always replace-only/);
+T('a magnifier\'s part_magn is only for a magnifier', tree([mesh('optic_1'), { name: 'part_magn', extras: { part: 'magn' }, mesh: false, uv: false, materials: [], children: [mesh('optic_2')] }]), /flat meshes under the root/);
+{ const MT = (label, kids, re) => run('magnifier tree: ' + label, (({ errors, warnings }) => [...errors, ...warnings])(M.validateAuthoredPart(tree(kids, 'strix_fts3'), 'strix_fts3', 'magnifier')), re);
+  const pm = (kids, extras = { part: 'magn' }) => ({ name: 'part_magn', extras, mesh: false, uv: false, materials: [], children: kids });
+  MT('a clamp and a part_magn tube are valid', [mesh('magnifier_1', 'magnifier'), pm([mesh('magnifier_2', 'magnifier', 'glass')])], null);
+  MT('no part_magn', [mesh('magnifier_1', 'magnifier')], /one part_magn node under its root .* this one has 0/);
+  MT('an empty part_magn', [mesh('magnifier_1', 'magnifier'), pm([])], /node "part_magn" has no meshes/);
+  MT('another part_ node', [mesh('magnifier_1', 'magnifier'), pm([mesh('magnifier_2', 'magnifier')]), { name: 'part_ch', extras: { part: 'ch' }, mesh: false, uv: false, materials: [], children: [] }], /node "part_ch": an authored part is flat meshes under the root .*but its one part_magn/);
+  MT('part_magn with another part key', [mesh('magnifier_1', 'magnifier'), pm([mesh('magnifier_2', 'magnifier')], { part: 'ch' })], /node "part_magn": extras\.part is "ch", expected "magn"/);
+  MT('a tube mesh named for another slot', [mesh('magnifier_1', 'magnifier'), pm([mesh('optic_2', 'magnifier')])], /must be named "magnifier_<n>"/); }
+{ const mp = readAuthoredPart('magnifier/strix_fts3'), mc = () => JSON.parse(JSON.stringify(mp.cfg));
+  const MG = (label, cmut, re, meshMut, nodes) => { const c = mc(); if (cmut) cmut(c); const ms = meshMut ? meshMut(mp.meshes) : mp.meshes; run('magnifier geometry: ' + label, checkMagnifier(c, ms, nodes || mp.nodes), re); };
+  for (const k of ['brightline_2x', 'strix_fts3', 'meridian_5x']) { const p = readAuthoredPart('magnifier/' + k); run(`magnifier geometry: ${k} as authored`, checkMagnifier(p.cfg, p.meshes, p.nodes), null); }
+  MG('the tube\'s meshes read as part_magn\'s', null, null, (ms) => (ms.some((e) => e.part === 'magn') && ms.some((e) => !e.part) ? ms : []));
+  MG('nothing under part_magn', null, /no meshes under part_magn/, (ms) => ms.map((e) => ({ ...e, part: undefined })));
+  MG('the node off the hinge', null, /the part_magn node is at .* not at anchors\.hinge/, null, { part_magn: [0.03, -0.02, 0.042] });
+  MG('the hinge anchor off the node', (c) => { c.anchors.hinge = [-0.042, -0.01, 0.024]; }, /not at anchors\.hinge \[-0\.042,-0\.01,0\.024\]/);
+  MG('the tube\'s rear not at the pip lens', (c) => { c.magnifier.pip.f = -0.09; }, /the tube's rear is at forward -100\.0 mm, not at magnifier\.pip\.f \(-90\.0 mm\)/);
+  MG('the foot under the rail top', (c) => { c.anchors.foot[1] = -0.03; c.anchors.foot_end[1] = -0.03; }, /the clamp reaches 4\.0 mm below anchors\.foot/);
+  MG('the foot floating over the rail', (c) => { c.anchors.foot[1] = -0.04; c.anchors.foot_end[1] = -0.04; }, /the clamp's lowest vertex is 6\.0 mm above anchors\.foot/);
+  MG('the foot\'s span not the anchors\'', (c) => { c.anchors.foot[0] = -0.07; }, /the clamp's foot runs forward -59\.0 mm to -25\.0 mm, not anchors\.foot to foot_end \(-70\.0 mm to -25\.0 mm\)/);
+  MG('a flip the wrong way (down through the rail)', (c) => { c.magnifier.flip.out_deg = 160; }, /the tube swings DOWN through the rail/);
+  MG('a flip too small to clear the view', (c) => { c.magnifier.flip.out_deg = -10; }, /only .* from the sight line: it still blocks the view/);
+  MG('a lens off the sight line', null, /the lens "magnifier_\d+" is centred .* off the sight line/, (ms) => ms.map((e) => (e.mat === 'glass' && e.part ? { ...e, pos: e.pos.map((v, i) => (i % 3 === 1 ? v + 0.003 : v)) } : e)));
+  MG('reaching into the sight', null, /it must stay behind the sight/, (ms) => ms.map((e, i) => (i === 0 ? { ...e, pos: e.pos.map((v, j) => (j % 3 === 2 ? v - 0.05 : v)) } : e)));
+  const pc = (f) => checkPipClear({ optic: { pip: { f, y: 0, r: mp.cfg.magnifier.pip.r } } }, mp.meshes);
+  run('magnifier pip clear: the FTS 3 as authored', pc(mp.cfg.magnifier.pip.f), null);
+  run('magnifier pip clear: the disc inside the eyepiece', pc(mp.cfg.magnifier.pip.f + 0.004), /is not on the eye side of the glass mesh/); }
+{ const Gm = loadGame(), P = Gm.Gunsmith.PARTS, byName = (n) => Object.values(P).find((q) => q.name === n);
+  for (const [n, k] of [['Brightline 2× micro magnifier', 'brightline_2x'], ['Strix FTS 3× flip magnifier', 'strix_fts3'], ['Meridian 5× flip magnifier', 'meridian_5x']]) { const p = byName(n); run(`the ${n} has its model`, p && p.model && p.model.apMagn === 'magnifier/' + k ? [] : [`${n}: model ${JSON.stringify(p && p.model)}`], null); }
+  const b = { ...Gm.Gunsmith.defaultBuild('m4'), optic: byName('Strix HX-2 holographic').id, magnifier: byName('Meridian 5× flip magnifier').id }, spec = Gm.Gunsmith.modelSpec({ id: 'm4', build: b });
+  run('a build\'s spec carries the magnifier\'s key (the Mk18 with the 5x behind an HX-2)', spec.apMagn === 'magnifier/meridian_5x' && spec.magnifier && spec.magnifier.len === 0.09 ? [] : [JSON.stringify({ apMagn: spec.apMagn, magnifier: spec.magnifier })], null);
+  const spec0 = Gm.Gunsmith.modelSpec({ id: 'm4', build: { ...b, magnifier: undefined } });
+  run('and none without a magnifier', spec0.apMagn == null ? [] : ['apMagn ' + spec0.apMagn], null); }
 // the catalogue entry and the generated block
 const entry = entryOf('optic/falcon', cfg0());
 run('the catalogue id is derived', entry.id === 'op.auth.falcon' && entry.model.apart === 'optic/falcon' && entry.model.optic === 'authored' && entry.model.ret === 'dot' && entry.magnifier === true ? [] : ['entry ' + JSON.stringify(entry)], null);

@@ -5,6 +5,8 @@
 //   models/parts/<slot>/<id>/model.json   { source: 'authored', kind: 'part', slot, frame, optic: { sy, fSight, relief, reflex?, pip?, ... }, part: { catalogue data } }
 //                                         or, FURNITURE (stock, grip, muzzle, handguard): { ..., frame: '<slot>-mount', anchors: { ... }, part: { its own data }, replaces: [names or matches] }
 //                                         (the origin is the gun's mount_<slot>: GUN_MODEL_CONTRACT.authoredParts.furniture)
+//                                         or, a FLIP MAGNIFIER: { ..., slot: 'magnifier', frame: 'magnifier-mount', anchors: { pip, hinge, foot, foot_end }, magnifier: { px, len, relief, pip, flip }, replaces }
+//                                         (the origin is the red dot's eye point, mount_magnifier; its tube under a part_magn node: GUN_MODEL_CONTRACT.authoredParts.magnifier)
 //
 // What this file does (tools/bake_models.mjs, tools/model_env.mjs, tools/check_models.mjs; nothing here is about one part):
 //   authoredPartKeys()          the parts that exist: ['optic/falcon', ...]
@@ -38,8 +40,10 @@ export function readAuthoredPart(key) {
   const roots = (j.scenes[j.scene || 0] || {}).nodes || [];
   if (roots.length !== 1) throw new Error(`${key}: one root node named "${id}"`);
   const meshes = [], I = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
-  const walk = (ni, parentW) => {
+  const nodes = {}; // (a part_ node's place in the part's frame, glTF axes: a magnifier's part_magn, on its hinge)
+  const walk = (ni, parentW, inPart) => {
     const n = j.nodes[ni], W = mul(parentW, local(n)), ex = n.extras || {};
+    if (n.name && n.name.startsWith('part_')) { nodes[n.name] = [W[12], W[13], W[14]]; inPart = n.name.slice(5); }
     if (n.mesh != null) for (const prim of j.meshes[n.mesh].primitives) {
       const P = readAccessor(g, prim.attributes.POSITION), Nm = prim.attributes.NORMAL != null ? readAccessor(g, prim.attributes.NORMAL) : null, UV = prim.attributes.TEXCOORD_0 != null ? readAccessor(g, prim.attributes.TEXCOORD_0) : null, cnt = P.length / 3;
       const pos = new Float32Array(cnt * 3), nrm = new Float32Array(cnt * 3);
@@ -51,16 +55,17 @@ export function readAuthoredPart(key) {
       const idx = prim.indices != null ? readAccessor(g, prim.indices) : Uint32Array.from({ length: cnt }, (_, i) => i);
       const e = { slot: ex.slot || slot, mat: (prim.material != null && j.materials[prim.material].name) || 'black', name: n.name, pos, nrm, uv: UV ? Float32Array.from(UV) : null, idx: idx instanceof Uint16Array || idx instanceof Uint32Array ? idx : Uint32Array.from(idx) };
       if (ex.display) e.display = ex.display;
+      if (inPart) e.part = inPart; // (under a part_ node: a magnifier's swinging tube)
       meshes.push(e);
     }
-    for (const c of n.children || []) walk(c, W);
+    for (const c of n.children || []) walk(c, W, inPart);
   };
-  walk(roots[0], I);
-  return { key, slot, id, cfg, meshes };
+  walk(roots[0], I, null);
+  return { key, slot, id, cfg, meshes, nodes };
 }
 /** Fills G.AuthoredParts.store (tools/models/authoredparts.ts) from every part. Call after the recipes are loaded. */
 export function loadAuthoredPartsInto(G) {
-  for (const k of authoredPartKeys()) { const p = readAuthoredPart(k); G.AuthoredParts.store[k] = { id: p.id, slot: p.slot, optic: p.cfg.optic, anchors: p.cfg.anchors || null, part: p.cfg.optic ? null : p.cfg.part, finish: FINISH[p.slot] || null, meshes: p.meshes }; }
+  for (const k of authoredPartKeys()) { const p = readAuthoredPart(k); G.AuthoredParts.store[k] = { id: p.id, slot: p.slot, optic: p.cfg.optic, anchors: p.cfg.anchors || null, part: p.cfg.optic ? null : p.cfg.part || null, magnifier: p.cfg.magnifier || null, finish: FINISH[p.slot] || null, meshes: p.meshes }; }
 }
 
 /** The material a piece of furniture's catalogue finish goes on (js/glb.ts AUTHORED_PART_SLOTS finish: the test checks they agree): those meshes take the
@@ -100,6 +105,46 @@ export function checkFurniture(slot, cfg, b) {
     if (typeof L === 'number' && Math.abs(fMax - L) > 0.003) E(`the handguard ends at forward ${mm(fMax)}, not at part.len (${mm(L)}): the length the catalogue fits by must be the model's`);
     const cy = (b.min[1] + b.max[1]) / 2; if (Math.abs(cy) > 0.02) E(`the handguard is not round the bore (its middle is ${mm(cy)} up): the origin is on the bore axis`);
     const v = at('support'); if (v && (v[0] < fMin || v[0] > fMax)) E(`anchors.support [${v}] is off the handguard (forward ${mm(fMin)} to ${mm(fMax)})`);
+  }
+  return out;
+}
+/** A FLIP MAGNIFIER's geometry against its frame (GUN_MODEL_CONTRACT.authoredParts.magnifier; glTF axes, forward = -z; origin the red dot's eye point): the
+ *  part_magn node on the hinge, the tube on the sight line from the pip lens forward, the clamp's foot on the rail top at the anchors, nothing reaching into
+ *  the sight, and the flip swinging the tube up and over to the hinge's side (not down through the rail). meshes: readAuthoredPart's (e.part 'magn' under
+ *  part_magn); nodes: its part_ nodes' places. Returns messages; made-up meshes can be fed in (the test does). */
+export function checkMagnifier(cfg, meshes, nodes) {
+  const out = [], E = (m) => out.push(m), mm = (x) => (x * 1000).toFixed(1) + ' mm', a = cfg.anchors || {}, m = cfg.magnifier || {};
+  const swing = meshes.filter((e) => e.part === 'magn' && !(e.name && e.name.startsWith('display_'))), fixed = meshes.filter((e) => !e.part && !(e.name && e.name.startsWith('display_')));
+  if (!swing.length) return ['no meshes under part_magn: the tube that swings is its children'];
+  if (!fixed.length) E('no fixed meshes (the clamp on the rail) under the root: only the tube swings');
+  const bs = boundsOf(swing), bf = boundsOf(fixed), ball = boundsOf(meshes), h = a.hinge, n = nodes && nodes.part_magn;
+  if (n && h && Math.hypot(n[0] - h[2], n[1] - h[1], n[2] + h[0]) > 0.0005) E(`the part_magn node is at [forward ${mm(-n[2])}, up ${mm(n[1])}, right ${mm(n[0])}], not at anchors.hinge [${h}]: the node is the pivot the game swings it about`);
+  // the tube: its rear at the pip lens, on the sight line
+  const tubeMin = -bs.max[2];
+  if (m.pip && Math.abs(tubeMin - m.pip.f) > 0.0015) E(`the tube's rear is at forward ${mm(tubeMin)}, not at magnifier.pip.f (${mm(m.pip.f)}): the lens is the eyepiece`);
+  const glass = swing.filter((e) => /glass|lens/i.test(e.mat || ''));
+  if (!glass.length) E('the tube has no glass (an eyepiece and an objective, material glass)');
+  for (const g of glass) { const b = boundsOf([g]), cx = (b.min[0] + b.max[0]) / 2, cy = (b.min[1] + b.max[1]) / 2; if (Math.hypot(cx, cy) > 0.001) E(`the lens "${g.name}" is centred ${mm(Math.hypot(cx, cy))} off the sight line (right ${mm(cx)}, up ${mm(cy)}): the tube's axis is the sight line, up 0, right 0`); }
+  // nothing reaches into the sight in front of it
+  if (-ball.min[2] > -0.015) E(`the magnifier reaches forward to ${mm(-ball.min[2])}: it must stay behind the sight (the origin is the sight's eye point; at most -15 mm)`);
+  // the clamp: its lowest vertex on the rail top (anchors.foot's height), its foot centred, the foot's span the anchors'
+  if (a.foot && isFinite(bf.min[1])) {
+    if (bf.min[1] < a.foot[1] - 0.0005) E(`the clamp reaches ${mm(a.foot[1] - bf.min[1])} below anchors.foot (up ${mm(a.foot[1])}): nothing goes under the rail top`);
+    if (bf.min[1] > a.foot[1] + 0.0015) E(`the clamp's lowest vertex is ${mm(bf.min[1] - a.foot[1])} above anchors.foot (up ${mm(a.foot[1])}): the foot rests ON the rail, or it floats`);
+    let x0 = Infinity, x1 = -Infinity, f0 = Infinity, f1 = -Infinity;
+    for (const e of fixed) for (let i = 0; i < e.pos.length; i += 3) if (e.pos[i + 1] < bf.min[1] + 0.0015) { x0 = Math.min(x0, e.pos[i]); x1 = Math.max(x1, e.pos[i]); f0 = Math.min(f0, -e.pos[i + 2]); f1 = Math.max(f1, -e.pos[i + 2]); }
+    if (Math.abs((x0 + x1) / 2) > 0.004) E(`the clamp's foot is not centred on the rail (right ${mm((x0 + x1) / 2)} off)`);
+    if (a.foot_end && (Math.abs(f0 - a.foot[0]) > 0.003 || Math.abs(f1 - a.foot_end[0]) > 0.003)) E(`the clamp's foot runs forward ${mm(f0)} to ${mm(f1)}, not anchors.foot to foot_end (${mm(a.foot[0])} to ${mm(a.foot_end[0])}): the rail check reads the anchors`);
+  }
+  // the flip: about the hinge's axis (along the tube), out_deg as the game turns part_magn (three's rotation about its z, the axis back at the eye). Halfway out the
+  // tube's centre is above the hinge (it swings up and over, not down through the rail), and once out it is clear of the sight line, on the hinge's side.
+  const fl = m.flip || {};
+  if (h && isFinite(fl.out_deg)) {
+    const at = (deg) => { const t = (deg * Math.PI) / 180, rx = -h[2], ry = -h[1]; return [h[2] + Math.cos(t) * rx - Math.sin(t) * ry, h[1] + Math.sin(t) * rx + Math.cos(t) * ry]; };
+    const mid = at(fl.out_deg / 2), end = at(fl.out_deg), r = (m.pip && m.pip.r) || 0.012;
+    if (mid[1] < h[1]) E(`flipping by magnifier.flip.out_deg ${fl.out_deg}, the tube swings DOWN through the rail (halfway out its centre is ${mm(h[1] - mid[1])} below the hinge): the sign is the other way (negative swings it out clockwise as the shooter sees it, for a hinge on the right)`);
+    if (Math.hypot(end[0], end[1]) < 2.5 * r) E(`flipped out (${fl.out_deg} degrees) the tube's centre is only ${mm(Math.hypot(end[0], end[1]))} from the sight line: it still blocks the view`);
+    if (Math.sign(end[0]) !== Math.sign(h[2] || 1)) E(`flipped out the tube ends on the other side (right ${mm(end[0])}) from its hinge (right ${mm(h[2])})`);
   }
   return out;
 }
@@ -163,7 +208,13 @@ export function checkAuthoredPart(Models, key) {
     let ra = null; try { const ex = (j.nodes[j.scenes[j.scene || 0].nodes[0]] || {}).extras || {}; ra = typeof ex.anchors_json === 'string' ? JSON.parse(ex.anchors_json) : null; } catch (e) { errors.push(`${id}.glb: root extras.anchors_json is not valid JSON: ${e.message}`); }
     if (ra && JSON.stringify(ra) !== JSON.stringify(cfg.anchors)) errors.push(`${id}.glb: root extras.anchors_json ${JSON.stringify(ra)} differs from model.json's anchors ${JSON.stringify(cfg.anchors)}: export them together`);
   }
-  if (!errors.length) { const p = readAuthoredPart(key); errors.push(...(slot === 'optic' ? [...checkGeometry(slot, cfg, boundsOf(p.meshes)), ...checkPipClear(cfg, p.meshes)] : checkFurniture(slot, cfg, boundsOf(p.meshes)))); }
+  if (!errors.length) {
+    const p = readAuthoredPart(key);
+    if (slot === 'magnifier') { // (its pip disc is on the tube, the sight line at up 0: no glass behind it, as an optic's)
+      const pipCfg = cfg.magnifier && cfg.magnifier.pip ? { optic: { pip: { f: cfg.magnifier.pip.f, y: 0, r: cfg.magnifier.pip.r } } } : {};
+      errors.push(...checkMagnifier(cfg, p.meshes, p.nodes), ...checkPipClear(pipCfg, p.meshes).map((s) => s.replace('optic.pip', 'magnifier.pip')));
+    } else errors.push(...(slot === 'optic' ? [...checkGeometry(slot, cfg, boundsOf(p.meshes)), ...checkPipClear(cfg, p.meshes)] : checkFurniture(slot, cfg, boundsOf(p.meshes))));
+  }
   if (!errors.length && slot !== 'optic' && FINISH[slot] && !readAuthoredPart(key).meshes.some((m) => m.mat === FINISH[slot])) warnings.push(`no mesh is in the ${slot}'s finish material (${FINISH[slot]}): no catalogue finish will show on it`);
   return { errors, warnings };
 }
@@ -184,7 +235,7 @@ const cfgAt = (k) => JSON.parse(fs.readFileSync(cfgOf(k), 'utf8'));
 export function catalogue() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => !c.replaces).map(([k, c]) => entryOf(k, c)); }
 /** Every REPLACE-ONLY part (a model.json with "replaces": [entry names, or (furniture) matches { mount?, model }]): { apart, names }, and a handguard's len (the
  *  entries it takes must be that long, to 1.5 mm: js/parts.ts). The entries keep everything but their model. */
-export function replacements() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => c.replaces).map(([k, c]) => Object.assign({ apart: k, names: c.replaces }, c.slot === 'handguard' ? { len: c.part.len } : {}, c.gun ? { gun: c.gun } : {})); }
+export function replacements() { return authoredPartKeys().map((k) => [k, cfgAt(k)]).filter(([, c]) => c.replaces).map(([k, c]) => Object.assign({ apart: k, names: c.replaces }, c.slot === 'handguard' ? { len: c.part.len } : c.slot === 'magnifier' ? { len: c.magnifier.len, px: c.magnifier.px } : {}, c.gun ? { gun: c.gun } : {})); }
 /** The generated block for js/parts.ts. */
 export function catalogueBlock() { return ['  ' + BLOCK_BEGIN,'  const AUTHORED_PARTS: any[] = [', ...catalogue().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  const AUTHORED_REPLACES: any[] = [', ...replacements().map((e) => '    ' + JSON.stringify(e) + ','), '  ];', '  ' + BLOCK_END].join('\n'); }
 /** js/parts.ts's text with its generated block current (throws if the markers are missing). */
