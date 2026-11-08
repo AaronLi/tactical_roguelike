@@ -174,12 +174,12 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=pump.optic,receiver=rcv.mp5sd,stock=stk.smg.1": {
    "label": "optic=pump.optic",
-   "geometry": "96d3ba6f091e53eb",
+   "geometry": "f50597be0b4977f9",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=dbl.optic,receiver=rcv.mp5sd,stock=stk.smg.1": {
    "label": "optic=dbl.optic",
-   "geometry": "96d3ba6f091e53eb",
+   "geometry": "f50597be0b4977f9",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=saiga.optic,receiver=rcv.mp5sd,stock=stk.smg.1": {
@@ -224,7 +224,7 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=sawn.optic,receiver=rcv.mp5sd,stock=stk.smg.1": {
    "label": "optic=sawn.optic",
-   "geometry": "96d3ba6f091e53eb",
+   "geometry": "f50597be0b4977f9",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=thor.optic,receiver=rcv.mp5sd,stock=stk.smg.1": {
@@ -264,7 +264,7 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=hailstorm.optic,receiver=rcv.mp5sd,stock=stk.smg.1": {
    "label": "optic=hailstorm.optic",
-   "geometry": "96d3ba6f091e53eb",
+   "geometry": "f50597be0b4977f9",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=op.th.0,receiver=rcv.mp5sd,stock=stk.smg.1": {
@@ -524,12 +524,12 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=pump.optic,railmount=rm.0,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0": {
    "label": "optic=pump.optic from loaded A",
-   "geometry": "7a7f0c411bbae674",
+   "geometry": "b49a8b76b0a81c72",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=dbl.optic,railmount=rm.0,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0": {
    "label": "optic=dbl.optic from loaded A",
-   "geometry": "7a7f0c411bbae674",
+   "geometry": "b49a8b76b0a81c72",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=saiga.optic,railmount=rm.0,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0": {
@@ -574,7 +574,7 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=sawn.optic,railmount=rm.0,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0": {
    "label": "optic=sawn.optic from loaded A",
-   "geometry": "7a7f0c411bbae674",
+   "geometry": "b49a8b76b0a81c72",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=thor.optic,railmount=rm.0,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0": {
@@ -614,7 +614,7 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=hailstorm.optic,railmount=rm.0,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0": {
    "label": "optic=hailstorm.optic from loaded A",
-   "geometry": "7a7f0c411bbae674",
+   "geometry": "b49a8b76b0a81c72",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=op.th.0,railmount=rm.0,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0": {
@@ -899,12 +899,12 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=pump.optic,railmount=rm.1,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0,tacL=tac.0": {
    "label": "optic=pump.optic from loaded undefined",
-   "geometry": "f2753531312425b3",
+   "geometry": "384aa43a1b385d05",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=dbl.optic,railmount=rm.1,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0,tacL=tac.0": {
    "label": "optic=dbl.optic from loaded undefined",
-   "geometry": "f2753531312425b3",
+   "geometry": "384aa43a1b385d05",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=saiga.optic,railmount=rm.1,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0,tacL=tac.0": {
@@ -949,7 +949,7 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=sawn.optic,railmount=rm.1,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0,tacL=tac.0": {
    "label": "optic=sawn.optic from loaded undefined",
-   "geometry": "f2753531312425b3",
+   "geometry": "384aa43a1b385d05",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=thor.optic,railmount=rm.1,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0,tacL=tac.0": {
@@ -989,7 +989,7 @@
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=hailstorm.optic,railmount=rm.1,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0,tacL=tac.0": {
    "label": "optic=hailstorm.optic from loaded undefined",
-   "geometry": "f2753531312425b3",
+   "geometry": "384aa43a1b385d05",
    "info": "54beec66db9adbca"
   },
   "barrel=mp5sd.barrel,grip=oem.gr.ar.4,mag=mp5.mag.30,optic=op.th.0,railmount=rm.1,receiver=rcv.mp5sd,stock=stk.smg.1,tac=tac.0,tacL=tac.0": {

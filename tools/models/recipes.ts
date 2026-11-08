@@ -40,6 +40,7 @@ const G_GunRecipes = (() => {
       place(geo: THREE.BufferGeometry, m: THREE.Material, x: number, y: number, f: number) { return put(geo, m, x, y, f); }, // (a shape of your own, on whatever part it's built on: it tips with a hinge, as add doesn't)
       hang(o: THREE.Object3D, x: number, y: number, f: number) { o.position.set(x, y - oy, -(f - of)); tgt.add(o); return o; }, // (a group of your own, likewise)
       get slot() { return slot; },
+      get atNow() { return at; }, // (the anchor owner the meshes being built are placed by, if any)
       bake,
       anchor(owner: string, name: string, v: number[] | number[][]) { (bake.anchors[owner] || (bake.anchors[owner] = {}))[name] = v; },
       // build something, then move all of it by (df forward, dy up): a part drawn for another gun's frame, seated on this one's
@@ -250,7 +251,7 @@ const G_GunRecipes = (() => {
     // gun, built on the sight line) and its BASE (the column from 4 mm over the bore up to the head: `optic@sightbase`, a mount piece, the one thing that follows the
     // gun's sight height). Not onBarrel (a pistol's, an AUG's own): one piece in the optic's tag.)
     irons(k: Kit, fR: number, fF: number, sy: number, rb: number, fb: number, style = 'ar', onBarrel = false) {
-      const B = M.black(), frontOf = (head: () => void, base: () => void) => { if (onBarrel) { fb += 0.004; k.at('barrel', head); k.at('sightbase', base); } else { base(); head(); } };
+      const B = M.black(), frontOf = (head: () => void, base: () => void) => { if (onBarrel) fb += 0.004; if (onBarrel || (k.inSightOf && !k.atNow)) { k.at(k.inSightOf ? 'barrel' : 'barrelend', head); k.at(k.inSightOf ? 'sightbase' : 'endbase', base); } else { base(); head(); } }; // (not on the barrel (a pistol's chassis, a derringer's rib, a rail gun's): the front sight is still a piece of its own, placed by the barrel's length, its geometry as it was)
       const col = (w: number, y0: number, y1: number, len: number, f0: number, x = 0) => { if (y1 - y0 > 0.0008) k.box(w, y1 - y0, len, B, f0, (y0 + y1) / 2, x); };
       if (style === 'ak') {
         // rear: the leaf rises toward you from its hinge; the notch blade stands at its back end
@@ -398,17 +399,20 @@ const G_GunRecipes = (() => {
       // (`optic@sightbase`: a mount piece, as long as the barrel)
       // (the rib of a gun whose barrels carry one (spec.rib) is the BARREL's (S.rib, drawn with it): here, on the barrel, only the bead, the one head every gun shares)
       if (onBarrel && rib) {
-        k.at('barrel', () => k.sphere(0.0036, BEAD, fFront, sy - 0.0018));
+        k.at('barrelend', () => k.sphere(0.0036, BEAD, fFront, sy - 0.0018)); // (the bead stands at the barrel's END (its mount_frontsight is a post's place): a tag of its own, optic@barrelend)
         return { sy, fSight: fRear, relief: 0.3 };
       }
+      // (as pieces of their own unless they are already part of another's: the rib, as long as the barrel runs (`optic@rib`: one box STRETCHED along the bore at
+      // assembly), each of its five posts (the same post at its place along the run: `optic@ribpost<i>`) and the bead at its front end (`optic@barrelend`))
+      const own = !!k.inSightOf && !k.atNow, piece = (a: string, fn: () => void) => (own ? k.at(a, fn) : fn());
       if (rib) {
         const ry = sy - 0.0065, len = rib[1] - rib[0];
-        k.box(0.007, 0.003, len, M.black(), rib[0], ry);
+        piece('rib', () => k.box(0.007, 0.003, len, M.black(), rib[0], ry));
         const gap = ry - 0.0015 - barrelTop;
-        if (gap > 0.004) for (let i = 0; i < 5; i++) k.box(0.003, gap, 0.004, M.black(), rib[0] + 0.01 + (len - 0.02) * i / 4, barrelTop + gap / 2);
+        if (gap > 0.004) for (let i = 0; i < 5; i++) piece('ribpost' + i, () => k.box(0.003, gap, 0.004, M.black(), rib[0] + 0.01 + (len - 0.02) * i / 4, barrelTop + gap / 2));
       }
       // the bead sits on the rib, its top just over the sight line: put it on the target
-      k.sphere(0.0036, BEAD, fFront, sy - 0.0018);
+      piece('barrelend', () => k.sphere(0.0036, BEAD, fFront, sy - 0.0018));
       return { sy, fSight: fRear, relief: 0.3 };
     },
   };
@@ -941,7 +945,12 @@ const G_GunRecipes = (() => {
   // onBarrel (a rifle's, whose barrel is a part of its own): the irons' front sight and a bead sight's rib and bead are pieces of the
   // sight that stand on the barrel (userData.at 'barrel'), built from the barrel's anchors only (frontSightF; front = the barrel's end,
   // not its muzzle device's; by = the bore's height) so they depend on the barrel by position (and a rib by length) and never by shape
-  function sightOf(k: Kit, o: RecipeSpec, top: number, L: number, bl: number, br: number, front: number, ofs: number, onBarrel = false, by = 0) {
+  // (a sight drawn here stands its front sight, a bead and a rib on the barrel as pieces of their own (k.inSightOf: S.irons, S.bead), placed by the barrel's length)
+  function sightOf(k: Kit, o: RecipeSpec, top: number, L: number, bl: number, br: number, front: number, ofs: number, onBarrel = false, by = 0): Sight {
+    const was = k.inSightOf; k.inSightOf = true;
+    try { return sightOf0(k, o, top, L, bl, br, front, ofs, onBarrel, by); } finally { k.inSightOf = was; }
+  }
+  function sightOf0(k: Kit, o: RecipeSpec, top: number, L: number, bl: number, br: number, front: number, ofs: number, onBarrel = false, by = 0) {
     const frontF = frontSightF(L, bl);
     if (onBarrel) k.anchor('barrel', 'mount_frontsight', [(o.optic || 'irons') === 'bead' ? front - 0.008 : frontF, by, 0]);
     if (o.optic === 'riser') k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2)); // a pistol optic riser with nothing on it (the irons still work)
@@ -1758,7 +1767,7 @@ const G_GunRecipes = (() => {
   // stands on the barrel: userData.at 'barrel'), from 4 mm above the bore up to the sight line, so it's the sight's shape and not the barrel's
   function breakSights(k: Kit, tr: Trace, fF: number, sy: number, fb: number, rb: number) {
     const sight = S.pistolSights(k, tr.sightF, null, sy, rb, false, rb, tr.sw);
-    k.at('barrel', () => S.pistolFront(k, fF, sy, fb, false));
+    k.at('barrelend', () => S.pistolFront(k, fF, sy, fb, false));
     return sight;
   }
 
@@ -1768,7 +1777,7 @@ const G_GunRecipes = (() => {
     const sy = top + (tr.sh || 0.0075) + rise, rb = top + rise, fF = front - 0.012, fb = sy - 0.006, B = M.black();
     k.box(0.024, 0.005, 0.032, B, tr.sightF - 0.016, top + 0.0025); // (its clamp on the rail)
     k.prof([[tr.sightF - 0.016, top + 0.005], [tr.sightF + 0.016, top + 0.005], [tr.sightF + 0.006, rb], [tr.sightF - 0.006, rb]], 0.018, B, 0, null, 0.001);
-    k.at('barrel', () => { // (the tall base and the blade on it stand on the barrel, at its end)
+    k.at('barrelend', () => { // (the tall base and the blade on it stand on the barrel, at its end)
       k.cyl(0.0112, 0.02, B, fF - 0.016, by);
       k.prof([[fF - 0.016, by + 0.008], [fF + 0.004, by + 0.008], [fF + 0.004, fb], [fF - 0.005, fb]], 0.009, B, 0, null, 0.0008);
       S.pistolFront(k, fF, sy, fb, false);
