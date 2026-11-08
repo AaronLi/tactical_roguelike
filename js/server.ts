@@ -103,7 +103,8 @@ const G_Server = {
   summons: 0,
   accMult: 1,
   forceLeader: false, // (a debug start: ?leader, js/debugstart.ts)
-  dbgNext: null as { th?: number; lvl?: number; leader?: boolean; stronghold?: boolean; night?: boolean } | null, // (and the rest of what it asks of the next level)
+  dbgSeed: null as number | null,
+  dbgNext: null as { th?: number; lvl?: number; seed?: number; leader?: boolean; stronghold?: boolean; night?: boolean } | null, // (and the rest of what it asks of the next level)
   bores: new Map<number, number[]>(), // each suspect's gun as the host's screen last drew it: [muzzle x, y, z, bore x, y, z] (handle 'bores', onTarget)
   dmgMult: 1,
   skins: new Map<string, any>(), // the squad's guns' sticker lists by hash (js/stickers.ts share): kept for whoever joins
@@ -496,10 +497,12 @@ const G_Server = {
       if (d.leader) this.forceLeader = true;
       if (n && d.stronghold) n.stronghold = true;
       if (n && d.night) n.night = true;
+      if (typeof d.seed === 'number' && Number.isInteger(d.seed)) this.dbgSeed = d.seed;
     }
     this.bores = new Map();
     this.phase = 'level';
-    this.seed = (Math.random() * 2 ** 31) | 0;
+    const want = this.dbgSeed; this.dbgSeed = null; // (a debug start's ?seed=: that level again)
+    this.seed = want != null ? want : (Math.random() * 2 ** 31) | 0;
     this.night = this.isNight();
     this.map = G.Level.generate(this.seed, this.level, this.theme as number, this.night);
     G.ServerHost.born(this.map); // (what it was built with: G.ServerLink.digest)

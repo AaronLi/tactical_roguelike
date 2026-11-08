@@ -9,7 +9,7 @@
     "th": 0,
     "night": false
    },
-   "hash": "7c22c81a",
+   "hash": "093f9c4d",
    "parts": {
     "floors": "27131e4b",
     "terrain": "77074ba4",
@@ -25,11 +25,11 @@
     "boxes": "9b7c8ad8",
     "crest": "77074ba4",
     "fx": "741638a5",
-    "solids": "16abc9da",
+    "solids": "5a08cf61",
     "mats": "e1b6bf4d",
     "tex": "c18283f1",
     "nodes": "acee717b",
-    "all": "7c22c81a"
+    "all": "093f9c4d"
    },
    "count": {
     "floors": 3,
@@ -41,13 +41,13 @@
     "lamps": 96,
     "props": 354,
     "fx": 0,
-    "solids": 1437,
+    "solids": 1422,
     "mats": 90,
     "tex": 12,
     "nodes": 1787
    },
    "proc": {},
-   "bytes": 1363305
+   "bytes": 1361879
   },
   "Apartment night": {
    "args": {
@@ -57,7 +57,7 @@
     "th": 0,
     "night": true
    },
-   "hash": "5fc3ca61",
+   "hash": "a3e5dd76",
    "parts": {
     "floors": "27131e4b",
     "terrain": "77074ba4",
@@ -73,11 +73,11 @@
     "boxes": "9b7c8ad8",
     "crest": "77074ba4",
     "fx": "741638a5",
-    "solids": "16abc9da",
+    "solids": "5a08cf61",
     "mats": "ed3a98d9",
     "tex": "c18283f1",
     "nodes": "7f183317",
-    "all": "5fc3ca61"
+    "all": "a3e5dd76"
    },
    "count": {
     "floors": 3,
@@ -89,13 +89,13 @@
     "lamps": 25,
     "props": 354,
     "fx": 0,
-    "solids": 1437,
+    "solids": 1422,
     "mats": 94,
     "tex": 12,
     "nodes": 1812
    },
    "proc": {},
-   "bytes": 1360988
+   "bytes": 1359562
   },
   "Warehouse day": {
    "args": {
@@ -995,7 +995,7 @@
     "th": 0,
     "night": false
    },
-   "hash": "f3198f61",
+   "hash": "b2d8c3cd",
    "parts": {
     "floors": "cda93496",
     "terrain": "77074ba4",
@@ -1011,11 +1011,11 @@
     "boxes": "aa452309",
     "crest": "77074ba4",
     "fx": "741638a5",
-    "solids": "08fa0f58",
+    "solids": "cae64717",
     "mats": "11bdb599",
     "tex": "8cfa2ada",
     "nodes": "92c5018d",
-    "all": "f3198f61"
+    "all": "b2d8c3cd"
    },
    "count": {
     "floors": 3,
@@ -1027,13 +1027,13 @@
     "lamps": 114,
     "props": 429,
     "fx": 0,
-    "solids": 1696,
+    "solids": 1682,
     "mats": 80,
     "tex": 12,
     "nodes": 2039
    },
    "proc": {},
-   "bytes": 1573746
+   "bytes": 1572639
   },
   "Suburbs (basement, upstairs) L5 night": {
    "args": {

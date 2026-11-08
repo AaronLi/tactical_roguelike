@@ -108,7 +108,7 @@ const G_DebugStart = (() => {
       await until(() => G.Game.hub && G.Me.pos);
     } else {
       // the level the route would build: its place and number set as it starts (js/server.ts startLevel: dbg)
-      G.Net.toHost({ t: 'startRun', dbg: { th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), stronghold: q.has('stronghold'), night: q.has('night') } });
+      G.Net.toHost({ t: 'startRun', dbg: { th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), stronghold: q.has('stronghold'), night: q.has('night'), seed: q.has('seed') ? +q.get('seed')! : undefined } });
       await until(() => G.Game.phase === 'route' && G.Game.routeMap);
       arm();
       const g0 = G.Game;

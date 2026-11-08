@@ -454,7 +454,7 @@ const G_World = (() => {
     // again, js/level.ts layProp)
     const seen = new Set<LvProp>(), seenB = new Set<LvBox>();
     for (const p of [...(map.propList || []), ...(map.props || new Map()).values()]) {
-      if (seen.has(p)) continue;
+      if (seen.has(p) || p.gone) continue; // (gone: cleared out of a room a home moved into, js/homes.ts clear: not drawn, so not solid either)
       seen.add(p);
       for (const b of p.boxes) {
         if (seenB.has(b)) continue;
