@@ -55,6 +55,10 @@ in the room); from another, by `listen()`'s path; with no way round, through the
 
 ## Ambience (`js/ambience.ts`)
 
+The ambience plays in its own audio context (`G.Audio.ambCtx`), so its own render thread: its loops and its room reverb are
+steady work that shares nothing with the shots, handling and footsteps (which share the rooms' measured reverbs in the
+game's context). Volume, mute, the loading screen's hush, the listener and the watchdog act on both.
+
 A place is a recipe (`RECIPES`, by theme name) of loops (`L`: beds, hums, motors, wind, traffic...), one-shots (`E`,
 so many a minute) and spots (sources placed in the level: furnaces, freezers, the festival's stage). Each loop and
 one-shot goes on the **in** bus or the **out** bus; each bus reaches you two ways: along its path through the

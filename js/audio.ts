@@ -51,84 +51,102 @@ const G_Audio = {
     return B.getFile('assets/audio/' + path).catch(loose);
   },
   bankJson(path: string): Promise<any> { return this.bankFile(path).then((b) => JSON.parse(new TextDecoder().decode(b))); },
-  // The master's way out: a compressor (all of it, under -14 dB) into the speakers, and a tap after it for the watchdog.
-  _comp: null as DynamicsCompressorNode | null,
-  _tap: null as AnalyserNode | null,
-  _tapBuf: null as Float32Array<ArrayBuffer> | null,
-  _hush: null as GainNode | null,
+  // Two audio contexts, each its own render thread: the game's (ctx: the shots, echoes, handling, footsteps, cases, doors:
+  // everything that shares the rooms' measured reverbs) and the ambience's (ambCtx: js/ambience.ts, its loops, one-shots,
+  // spots and its own room reverb). The ambience is steady work that shares nothing with the rest, so it's the cut that
+  // spreads the load without doubling anything (measured: 24 long reverbs in one context fell to 86% of real time; split
+  // over two, both kept time). Each has its master (volume, mute) and its way out (_outChain); the hush, the volume, the
+  // listener (js/gunaudio.ts updateListener) and the watchdog work on both.
+  ambCtx: null as unknown as AudioContext,
+  ambMaster: null as unknown as GainNode,
+  // The master's way out: a compressor (all of it, under -14 dB), the make-up gain (OUTPUT), the hush, a limiter, the
+  // speakers; and a tap after the compressor for the watchdog. One per context.
   /** the whole game's level after the compressor (+6 dB: the volume setting can come down that much), into a limiter
    *  that keeps it from clipping */
   OUTPUT: 2,
-  _up: null as GainNode | null,
-  _outChain() {
-    const c = this.ctx;
-    if (this._comp) { try { this.master.disconnect(this._comp); this._comp.disconnect(); } catch { /* (gone already) */ } }
-    if (!this._hush) {
+  _outs: [] as { name: string; ctx: AudioContext; master: GainNode; comp: DynamicsCompressorNode | null; up: GainNode | null; hush: GainNode | null; tap: AnalyserNode | null; tapBuf: Float32Array<ArrayBuffer> | null; wd: { t: number; ct: number; behindSaid: number; stallSaid: number } }[],
+  _addOut(name: string, ctx: AudioContext, master: GainNode) {
+    const o = { name, ctx, master, comp: null, up: null, hush: null, tap: null, tapBuf: null, wd: { t: 0, ct: 0, behindSaid: 0, stallSaid: 0 } } as (typeof this._outs)[number];
+    this._outs.push(o); this._outChain(o);
+    return o;
+  },
+  _outChain(o: (typeof this._outs)[number]) {
+    const c = o.ctx;
+    if (o.comp) { try { o.master.disconnect(o.comp); o.comp.disconnect(); } catch { /* (gone already) */ } }
+    if (!o.hush) {
       // the compressor -> the make-up gain -> the hush -> a limiter (fast, hard: nothing over -1 dBFS) -> the speakers
       const up = c.createGain(); up.gain.value = this.OUTPUT;
       const lim = c.createDynamicsCompressor();
       lim.threshold.value = -1; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.08;
-      this._hush = c.createGain(); this._hush.gain.value = this._hushed ? 0 : 1;
-      up.connect(this._hush); this._hush.connect(lim); lim.connect(c.destination);
-      this._up = up;
+      o.hush = c.createGain(); o.hush.gain.value = this._hushed ? 0 : 1;
+      up.connect(o.hush); o.hush.connect(lim); lim.connect(c.destination);
+      o.up = up;
     }
     const comp = c.createDynamicsCompressor();
     comp.threshold.value = -14; comp.ratio.value = 6;
-    comp.connect(this._up!);
-    this.master.connect(comp);
+    comp.connect(o.up!);
+    o.master.connect(comp);
     const tap = c.createAnalyser(); tap.fftSize = 1024; comp.connect(tap);
-    this._comp = comp; this._tap = tap; this._tapBuf = new Float32Array(tap.fftSize);
+    o.comp = comp; o.tap = tap; o.tapBuf = new Float32Array(tap.fftSize);
   },
+  /** the game's contexts (for anything that's to act on all of them: the listener, resuming) */
+  contexts(): AudioContext[] { return this._outs.map((o) => o.ctx); },
   // Everything hushed while the loading screen's up (js/game.ts veil): the level being built under it, the hangar's
   // hall and ambience starting, the shaders compiling in stutters, all unheard; out in a moment, back in over ~1 s as
   // it lifts. After the compressor, so the volume and the mute (master) are untouched.
   _hushed: false,
   hush(on: boolean) {
     this._hushed = on;
-    const h = this._hush, c = this.ctx;
-    if (!h || !c) return;
-    const t = c.currentTime;
-    h.gain.cancelScheduledValues(t); h.gain.setValueAtTime(h.gain.value, t);
-    h.gain.setTargetAtTime(on ? 0 : 1, t, on ? 0.03 : 0.3);
+    for (const o of this._outs) {
+      const h = o.hush; if (!h) continue;
+      const t = o.ctx.currentTime;
+      h.gain.cancelScheduledValues(t); h.gain.setValueAtTime(h.gain.value, t);
+      h.gain.setTargetAtTime(on ? 0 : 1, t, on ? 0.03 : 0.3);
+    }
   },
-  // A watchdog on the sound coming out, twice a second (init). Sound that blanks out and stays out has a few causes, each
-  // put right here and said in the console ('[audio] ...') with what was playing:
+  // A watchdog on the sound coming out of each context, twice a second (init). Sound that blanks out and stays out has a few
+  // causes, each put right here and said in the console ('[audio] ...') with what was playing:
   //   a NaN (an unstable filter, a bad level) reaching the compressor: its state goes NaN and it gives silence for good,
   //     long after what made it has stopped; the compressor's rebuilt;
   //   the context suspended or interrupted (the device changed, the OS took it): resumed;
   //   its clock stopped though it says it's running: said (a reload's the cure);
   //   the audio thread falling behind real time (more live sound than it can render: load()): said, with how far.
-  _wd: { t: 0, ct: 0, behindSaid: 0, stallSaid: 0 },
   watch() {
-    const c = this.ctx;
-    if (!c) return;
-    const now = performance.now() / 1000, w = this._wd, live = () => `(gunshot voices ${G.GunAudio ? G.GunAudio.voices : '?'}, cases ${this._caseVoices}, steps ${G.Footsteps ? G.Footsteps.voices : '?'})`;
-    if (c.state !== 'running') {
-      console.warn(`[audio] the context is ${c.state}: resuming ${live()}`);
-      c.resume().catch(() => {});
-      w.t = 0; return;
+    const now = performance.now() / 1000, live = () => `(gunshot voices ${G.GunAudio ? G.GunAudio.voices : '?'}, cases ${this._caseVoices}, steps ${G.Footsteps ? G.Footsteps.voices : '?'})`;
+    for (const o of this._outs) {
+      const c = o.ctx, w = o.wd, who = o.name === 'game' ? '' : ` (${o.name})`;
+      if (c.state !== 'running') {
+        console.warn(`[audio] the context${who} is ${c.state}: resuming ${live()}`);
+        c.resume().catch(() => {});
+        w.t = 0; continue;
+      }
+      if (o.tap && o.tapBuf) {
+        o.tap.getFloatTimeDomainData(o.tapBuf);
+        let bad = 0; for (let i = 0; i < o.tapBuf.length; i++) if (!Number.isFinite(o.tapBuf[i])) bad++;
+        if (bad) { console.warn(`[audio] NaN in the output${who} (${bad} samples): the compressor rebuilt ${live()}`); this._outChain(o); }
+      }
+      if (w.t && now - w.t < 2) { // (a gap of seconds: the page was in the background, not the audio's doing)
+        const rate = (c.currentTime - w.ct) / (now - w.t);
+        if (rate < 0.02 && now - w.stallSaid > 10) { w.stallSaid = now; console.warn(`[audio] the audio clock${who} has stopped though the context is running ${live()}`); }
+        else if (rate < 0.9 && now - w.behindSaid > 5) { w.behindSaid = now; console.warn(`[audio] the audio thread${who} is behind: rendering at ${Math.round(rate * 100)}% of real time ${live()}`); }
+      }
+      w.t = now; w.ct = c.currentTime;
     }
-    if (this._tap && this._tapBuf) {
-      this._tap.getFloatTimeDomainData(this._tapBuf);
-      let bad = 0; for (let i = 0; i < this._tapBuf.length; i++) if (!Number.isFinite(this._tapBuf[i])) bad++;
-      if (bad) { console.warn(`[audio] NaN in the output (${bad} samples): the compressor rebuilt ${live()}`); this._outChain(); }
-    }
-    if (w.t && now - w.t < 2) { // (a gap of seconds: the page was in the background, not the audio's doing)
-      const rate = (c.currentTime - w.ct) / (now - w.t);
-      if (rate < 0.02 && now - w.stallSaid > 10) { w.stallSaid = now; console.warn(`[audio] the audio clock has stopped though the context is running ${live()}`); }
-      else if (rate < 0.9 && now - w.behindSaid > 5) { w.behindSaid = now; console.warn(`[audio] the audio thread is behind: rendering at ${Math.round(rate * 100)}% of real time ${live()}`); }
-    }
-    w.t = now; w.ct = c.currentTime;
   },
 
   init() {
-    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
+    if (this.ctx) { for (const c of this.contexts()) if (c.state === 'suspended') c.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     this.ctx = new AC();
     this.master = this.ctx.createGain();
     this.master.gain.value = this.muted ? 0 : this.vol;
-    this._outChain();
+    this._addOut('game', this.ctx, this.master);
+    // the ambience's own (its own render thread: above)
+    this.ambCtx = new AC();
+    this.ambMaster = this.ambCtx.createGain();
+    this.ambMaster.gain.value = this.muted ? 0 : this.vol;
+    this._addOut('ambience', this.ambCtx, this.ambMaster);
     setInterval(() => this.watch(), 500);
     const len = this.ctx.sampleRate * 1.5;
     this.noise = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
@@ -219,7 +237,7 @@ const G_Audio = {
     g.gain.value = gain;
     src.connect(lp); lp.connect(pan); pan.connect(g);
   },
-  setVolume(v: number) { this.vol = v; if (this.master) this.master.gain.value = this.muted ? 0 : v; },
+  setVolume(v: number) { this.vol = v; for (const o of this._outs) o.master.gain.value = this.muted ? 0 : v; },
   setMuted(m: boolean) { this.muted = m; this.setVolume(this.vol); },
 
   _noise(t: number, dur: number, f: number, q: number, gain: number, type: BiquadFilterType = 'lowpass', fEnd?: number) {

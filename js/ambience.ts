@@ -254,7 +254,7 @@ const G_Ambience = (() => {
       return (c, dest) => {
         const g = gain(c, vol), srcs: AudioScheduledSourceNode[] = [];
         const rec = G.Audio && G.Audio.samples && G.Audio.samples.crowd_bed;
-        if (rec && c === (G.Audio.ctx as BaseAudioContext)) {
+        if (rec && (c === (G.Audio.ambCtx as BaseAudioContext) || c === (G.Audio.ctx as BaseAudioContext))) { // (a decoded buffer plays in either of the game's contexts)
           const s = c.createBufferSource(); s.buffer = rec; s.loop = true; s.start(c.currentTime, Math.random() * rec.duration);
           const lp = filt(c, 'lowpass', 2600); chain(s, lp, g); srcs.push(s);
         } else {
@@ -979,10 +979,11 @@ const G_Ambience = (() => {
     reverbIn(): AudioNode | null { return cur ? cur.verbIn : null; },
     /** start a place by name (or stop, with null): what the game calls through update(), and the audition page directly */
     play(name: string | null, o: AmbOpts = { night: false, hub: false }, map: LvMap | null = null) {
+      // (in the ambience's own audio context, its own render thread: js/audio.ts ambCtx)
       const A = G.Audio;
-      if (!A.ctx || !A.master) return null;
-      const c = A.ctx;
-      if (!bus) { bus = gain(c, vol); bus.connect(A.master); }
+      if (!A.ambCtx || !A.ambMaster) return null;
+      const c = A.ambCtx;
+      if (!bus) { bus = gain(c, vol); bus.connect(A.ambMaster); }
       if (cur) { stopScene(cur, c.currentTime); cur = null; }
       if (!name) return null;
       cur = scene(c, bus, name, o, map);
@@ -995,13 +996,13 @@ const G_Ambience = (() => {
     /** each frame: the place that's up (a level's, the hangar's; none on the menu), where you are in it, the next events */
     update(dt: number, map: LvMap | null, cam: THREE.Camera | null) {
       const A = G.Audio;
-      if (!A.ctx || A.ctx.state !== 'running') return;
+      if (!A.ambCtx || A.ambCtx.state !== 'running') return;
       if (map !== curMap) {
         curMap = map; wasAboard = false;
         this.play(map && map.theme ? map.theme.name : null, { night: !!map && !!map.night, hub: !!map && !!map.hub }, map);
       }
       if (!cur) return;
-      const c = A.ctx;
+      const c = A.ambCtx;
       // aboard the helicopter (in its seat, flying in or on the pad), nothing of the place outside: the rotors and the
       // cabin are all there is (out as you board, back as you step down)
       const aboard = !!(G.Me && G.Me.seat != null);

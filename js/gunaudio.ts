@@ -483,7 +483,7 @@ const G_GunAudio = {
       const lv = this.listenerVerb(ctx, map);
       if (lv && lv !== rv) { const sg = ctx.createGain(); sg.gain.value = gain; g.connect(sg); sg.connect(lv.cv); }
     } else if (!measured) {
-      const room = G.Ambience && G.Ambience.reverbIn();
+      const room0 = G.Ambience && G.Ambience.reverbIn(), room = room0 && room0.context === ctx ? room0 : null; // (the ambience is in its own context now: not reachable from here)
       if (room && heard && !heard.same) { const sg = ctx.createGain(); sg.gain.value = gain * 0.8; g.connect(sg); sg.connect(room); }
     }
     this.voices++;
@@ -523,11 +523,13 @@ const G_GunAudio = {
 
   // Keep the Web Audio listener glued to the camera so HRTF panning tracks where you look.
   updateListener(cam: THREE.Camera) {
-    const ctx = G.Audio.ctx;
-    if (!ctx) return;
-    const l = ctx.listener, p = cam.position;
+    const p = cam.position;
     const f = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
     const u = new THREE.Vector3(0, 1, 0).applyQuaternion(cam.quaternion);
+    for (const ctx of G.Audio.contexts()) this.placeListener(ctx, p, f, u); // (the game's and the ambience's: js/audio.ts)
+  },
+  placeListener(ctx: AudioContext, p: THREE.Vector3, f: THREE.Vector3, u: THREE.Vector3) {
+    const l = ctx.listener;
     if (l.positionX) {
       const t = ctx.currentTime;
       l.positionX.setValueAtTime(p.x, t); l.positionY.setValueAtTime(p.y, t); l.positionZ.setValueAtTime(p.z, t);
