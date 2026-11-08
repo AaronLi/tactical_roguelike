@@ -385,7 +385,8 @@ const G_Cloud = (() => {
   }
   function statusLine(): { short: string; long: string; bad: boolean } {
     if (!on()) return { short: '', long: '', bad: false };
-    if (state === 'offline') return { short: 'offline', long: "Offline: your progress is saved here and goes up when you're back online.", bad: true };
+    if (state === 'offline') return navigator.onLine === false ? { short: 'offline', long: "Offline: your progress is saved here and goes up when you're back online.", bad: true }
+      : { short: 'not reachable', long: "Can't reach the save server: your progress is saved here and goes up once it can.", bad: true };
     if (state === 'error') return { short: 'sync failed', long: 'Sync failed' + (why ? ': ' + why : '') + '. Saved here; retrying.', bad: true };
     if (state === 'syncing') return { short: '', long: 'Syncing...', bad: false };
     if (state === 'ok' && lastOk) return { short: '', long: 'Synced ' + new Date(lastOk).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }), bad: false };
