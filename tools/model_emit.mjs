@@ -112,10 +112,14 @@ export async function makeEmitter({ G, GM, Models, logger }) {
   /**
    * Builds the THREE scene of one pack from its capture: { root, hash, tris }. `off` = { rigid [f,u,r] } the capture carries (undone here).
    */
+  const shown = { id: null, map: new Map() };
   function buildPack({ id, tag, entry, name }) {
     const cap = entry.capture, off = entry.off;
-    const { group, info } = GM.display(defOf(G, id, cap.build));
-    G.GunRig.describe(group); // (the magazine check's references as data on the nodes, as a whole-gun bake writes them)
+    // (one display a capture build: the pieces of a platform taken from one build share it)
+    const ck = id + '|' + JSON.stringify(Object.entries(cap.build).sort()); if (shown.id !== id) { shown.id = id; shown.map.clear(); }
+    let hit = shown.map.get(ck); const fresh = !!hit; if (!hit) { hit = GM.display(defOf(G, id, cap.build)); shown.map.set(ck, hit); }
+    const { group, info } = hit;
+    if (!fresh) G.GunRig.describe(group); // (the magazine check's references as data on the nodes, as a whole-gun bake writes them)
     const fr = fragments(group, info, tag);
     const [rf, ru, rr] = off.rigid, shift = new T.Vector3(rr, ru, -rf);
     const un = (v) => v.sub(shift); // a point of the capture's frame back to the pack's

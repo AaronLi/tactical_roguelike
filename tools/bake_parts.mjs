@@ -138,19 +138,20 @@ function register(reg, canon, scene, tag) {
 export async function platformJob(env, Models, em, id, src, keep) {
   const t0 = Date.now(), logs = [];
   const cases = generate(env.G, id), regs = regressionsOf(env.G, [id]).cases.map((c) => c.build);
+  const tm = [Date.now()];
   const C = collectBuilds(env, Models, id, { extra: [...cases.map((c) => c.build), ...regs], sweepBases: cases.filter((c) => /\b(loaded-last|bare)\b/.test(c.why)).map((c) => c.build) });
-  const L = learnPlatform(C), I = learnInfo(L, C), problems = [...L.problems, ...I.problems];
+  tm.push(Date.now()); const L = learnPlatform(C); tm.push(Date.now()); const I = learnInfo(L, C); tm.push(Date.now()); const problems = [...L.problems, ...I.problems];
   if (problems.length) throw new Error(`${id}: the per-part rules do not explain the recipe:\n  ` + problems.slice(0, 12).join('\n  '));
   const learnt = C.memo.size;
   const { ix, pieces } = indexOf(C, L, I, Models, src);
   // the checks: every build the rules were learnt from, and a random sample of others, planned from the index by the game's planner
-  const lix = localIndex(ix, pieces), bad = [];
+  tm.push(Date.now()); const lix = localIndex(ix, pieces), bad = [];
   for (const B of C.all()) { const d = checkBuild(Models, lix, pieces, B); if (d.length) bad.push(B.k + ': ' + d.slice(0, 3).join('; ')); }
   const seen = new Set(C.memo.keys()); let sampled = 0;
   for (const b of randomBuilds(env.GS, id, C.sw.bases, SAMPLE, 31337, seen, 2, 6)) { sampled++; const B = C.getB(b); const d = checkBuild(Models, lix, pieces, B); if (d.length) bad.push('SAMPLE ' + B.k + ': ' + d.slice(0, 3).join('; ')); }
   if (bad.length) throw new Error(`${id}: ${bad.length} builds do not assemble from the pieces as the recipe builds them:\n  ` + bad.slice(0, 8).join('\n  '));
   // the pieces' scenes (a capture build's meshes of the tag, as in that build), registered by shape for the sharing
-  const reg = makeRegistry(); let n = 0;
+  tm.push(Date.now()); const reg = makeRegistry(); let n = 0;
   for (const p of pieces) {
     const ps = p.key.split('#')[0].split('='), entry = { capture: p.obs.B, off: { rigid: [0, 0, 0] }, dep: ps[0] ? [ps[0]] : [], key: ps[0] ? [ps[1]] : [] };
     const { root, tris } = em.buildPack({ id, tag: p.tag, entry, name: `${id}.${p.tag}.${++n}` }), canon = canonOf(root);
@@ -158,7 +159,7 @@ export async function platformJob(env, Models, em, id, src, keep) {
     p.nodes = [...new Set(p.obs.B.tags[p.tag].meshes.map((m) => m.node).filter((x) => x.startsWith('part_')))].sort();
   }
   keep.set(id, reg.reps.map((r) => r.scene));
-  logs.push(`${id.padEnd(10)} ${String(learnt).padStart(5)} builds ${String(sampled).padStart(2)} sampled ${String(pieces.length).padStart(4)} pieces ${String(reg.reps.length).padStart(4)} shapes ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+  logs.push(`${id.padEnd(10)} ${String(learnt).padStart(5)} builds ${String(sampled).padStart(2)} sampled ${String(pieces.length).padStart(4)} pieces ${String(reg.reps.length).padStart(4)} shapes ${((Date.now() - t0) / 1000).toFixed(1)}s (builds ${(tm[1] - tm[0]) / 1000}, pieces ${(tm[2] - tm[1]) / 1000}, info ${(tm[3] - tm[2]) / 1000}, index ${(tm[4] - tm[3]) / 1000}, checks ${(tm[5] - tm[4]) / 1000}, scenes ${(Date.now() - tm[5]) / 1000} s)`);
   return {
     id, ix, pieces: pieces.map((p) => ({ tag: p.tag, key: p.key, Pcap: p.Pcap, stretch: p.stretch, rep: p.rep, tris: p.tris, min: p.min, nodes: p.nodes })),
     reps: reg.reps.map((r) => ({ tag: r.tag, canon: r.canon })), builds: C.memo.size, learnt, sampled, logs,
