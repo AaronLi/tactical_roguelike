@@ -43,6 +43,10 @@ and **Table Editor** shows your rows. `?cloud=0` in the URL turns cloud saves of
 
 - **Local until you sign in.** Signed out, the game saves in this browser exactly as it always did: no account, no request to
   Supabase (the client isn't even loaded until you open **Account**, or there's a session to restore).
+- **The offer to register**: with cloud saves set up and not signed in, the main menu opens on *Keep your progress* (the same email
+  sign-in, **Play as guest**, **Don't show again**). Not on a debug start (`?play`, `?hangar`, `?demo`), with `?cloud=0`, signed in, or
+  once *Don't show again* is ticked (`bp_noOffer`, this device only, not synced; Esc is Play as guest). The client isn't loaded for it
+  until an email is typed. Dismissed for good, signing in is still the Account box's **Sign in with email** (or delete `bp_noOffer`).
 - **Sign in with email** (Account box: *Not signed in: progress saved on this device. Sign in with email to keep it everywhere.*):
   a magic link or its code (`signInWithOtp`), which creates the account if the email has none yet. Everything in this browser merges
   into the account (below). From then on it syncs.

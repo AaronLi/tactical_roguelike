@@ -356,12 +356,23 @@ const G_Cloud = (() => {
       b = `<p>Signed in as <b>${esc(user.email || '')}</b>. Your progress is saved to your account.</p><div class="acct-row"><button class="btn small" data-acct="out">Sign out</button></div>`;
     }
     sum.innerHTML = s + (st.short ? ` <span class="acct-st ${st.bad ? 'bad' : ''}">· ${st.short}</span>` : '');
-    body.innerHTML = b + (st.long ? `<div class="acct-status${st.bad ? ' bad' : ''}">${esc(st.long)}</div>` : '') + (mailMsg ? `<div class="acct-msg${mailErr ? ' bad' : ''}">${esc(mailMsg)}</div>` : '');
+    const tail = (st.long ? `<div class="acct-status${st.bad ? ' bad' : ''}">${esc(st.long)}</div>` : '') + (mailMsg ? `<div class="acct-msg${mailErr ? ' bad' : ''}">${esc(mailMsg)}</div>` : '');
+    paint(body, b + tail);
+    // the offer to register (offer): its form, the same; gone once you're signed in
+    const ob = document.getElementById('regBody');
+    if (offerOpen && user && !isAnon(user)) hideOffer();
+    else if (ob && offerOpen) paint(ob, emailForm('reg') + tail);
   }
-  function emailForm() {
-    if (mail) return `<p class="acct-sent">We've sent a link to <b>${G.U.esc(mail.email)}</b>. Open it in this browser, or enter the code from the email:</p>
-      <div class="acct-row"><input id="acctCode" maxlength="10" placeholder="Code" autocomplete="one-time-code" inputmode="numeric"><button class="btn small" data-acct="code">Confirm</button><button class="btn small" data-acct="cancel">Back</button></div>`;
-    return `<div class="acct-row"><input id="acctEmail" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email"><button class="btn small" data-acct="signin">Sign in with email</button></div>
+  // (drawn again, what's being typed is kept, and where)
+  function paint(el: HTMLElement, html: string) {
+    const keep = [...el.querySelectorAll<HTMLInputElement>('input[id]')].map((i) => [i.id, i.value, document.activeElement === i] as [string, string, boolean]);
+    el.innerHTML = html;
+    for (const [id, v, had] of keep) { const i = el.querySelector<HTMLInputElement>('#' + id); if (!i) continue; i.value = v; if (had) i.focus(); }
+  }
+  function emailForm(p = 'acct') {
+    if (mail) return `<p class="acct-sent"><b>Check your email.</b> We've sent a link to <b>${G.U.esc(mail.email)}</b>. Open it in this browser, or enter the code from the email:</p>
+      <div class="acct-row"><input id="${p}Code" maxlength="10" placeholder="Code" autocomplete="one-time-code" inputmode="numeric"><button class="btn small" data-acct="code">Confirm</button><button class="btn small" data-acct="cancel">Back</button></div>`;
+    return `<div class="acct-row"><input id="${p}Email" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email"><button class="btn small" data-acct="signin">Sign in with email</button></div>
       <small class="dim">A link (and a code) by email, no password. A new email makes your account, and what's on this device goes into it.</small>`;
   }
   function statusLine(): { short: string; long: string; bad: boolean } {
@@ -373,25 +384,73 @@ const G_Cloud = (() => {
     if (state === 'ok' && lastOk) return { short: '', long: 'Synced ' + new Date(lastOk).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }), bad: false };
     return { short: '', long: '', bad: false };
   }
-  async function act(what: string) {
-    const em = (document.getElementById('acctEmail') as HTMLInputElement | null), email = em ? em.value.trim() : '';
+  async function act(what: string, p = 'acct') {
+    const em = (document.getElementById(p + 'Email') as HTMLInputElement | null), email = em ? em.value.trim() : '';
     const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     mailMsg = ''; mailErr = false;
     try {
       if (what === 'signin' && !valid) throw new Error('Enter your email address.');
       if (what === 'signin') await signInEmail(email);
-      else if (what === 'code') { const c = document.getElementById('acctCode') as HTMLInputElement | null; await verifyCode(c ? c.value : ''); }
+      else if (what === 'code') { const c = document.getElementById(p + 'Code') as HTMLInputElement | null; await verifyCode(c ? c.value : ''); }
       else if (what === 'cancel') mail = null;
       else if (what === 'out') { if (confirm('Sign out? Your progress stays in your account, and leaves this browser until you sign in again.')) await signOut(); }
     } catch (e: any) { mailMsg = (e && e.message) || String(e); mailErr = true; }
     render();
+    if (p === 'reg' && offerOpen) { const f = document.querySelector<HTMLInputElement>(mail ? '#regCode' : '#regEmail'); if (f) f.focus(); }
+  }
+  function bindForm(el: HTMLElement, p: string) {
+    el.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-acct]'); if (b) act(b.dataset.acct!, p); });
+    el.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; const t = e.target as HTMLElement; if (t.id === p + 'Code') act('code', p); else if (t.id === p + 'Email') act('signin', p); });
+  }
+  // ------------------------------------------------------------- the offer to register, as the main menu opens
+  // Shown with cloud saves set up, not signed in (no session kept here either), not on a debug start (?play, ?hangar...) or a magic
+  // link's way back, and not after "Don't show again" (bp_noOffer: this device's, not synced). The client isn't loaded for it until
+  // you type an email: a guest who clicks through makes no request.
+  let offerOpen = false;
+  function showOffer() {
+    const box = document.getElementById('regOffer'), menu = document.querySelector<HTMLElement>('#menu > .menu-box:not(.reg-offer)');
+    if (!box || !menu) return;
+    offerOpen = true; mailMsg = ''; mailErr = false;
+    menu.classList.add('hidden'); box.classList.remove('hidden');
+    paint(document.getElementById('regBody')!, emailForm('reg'));
+    const f = document.getElementById('regEmail'); if (f) f.focus();
+  }
+  function hideOffer() {
+    const box = document.getElementById('regOffer'), menu = document.querySelector<HTMLElement>('#menu > .menu-box:not(.reg-offer)');
+    offerOpen = false;
+    if (box) box.classList.add('hidden');
+    if (menu) menu.classList.remove('hidden');
+    render();
+  }
+  // Play as guest (or Esc): to the menu; "Don't show again" ticked, never again here
+  function guestOn() {
+    const never = document.getElementById('regNever') as HTMLInputElement | null;
+    if (never && never.checked) S.put('noOffer', 1);
+    hideOffer();
+  }
+  function bindOffer() {
+    const box = document.getElementById('regOffer'), body = document.getElementById('regBody');
+    if (!box || !body || box.dataset.bound) return;
+    box.dataset.bound = '1';
+    bindForm(body, 'reg');
+    body.addEventListener('input', (e) => { if ((e.target as HTMLElement).id === 'regEmail' && on() && !loading) load(); }); // (typing an email: the client, from the CDN; nothing asked of the project yet)
+    document.getElementById('regGuest')!.addEventListener('click', guestOn);
+    document.addEventListener('keydown', (e) => {
+      if (!offerOpen) return;
+      if (e.key === 'Escape') { e.preventDefault(); guestOn(); return; }
+      if (e.key !== 'Tab') return; // (focus kept in the panel while it's open)
+      const f = [...box.querySelectorAll<HTMLElement>('input, button, [tabindex]:not([tabindex="-1"])')].filter((x) => !x.hasAttribute('disabled') && x.offsetParent !== null);
+      if (!f.length) return;
+      const i = f.indexOf(document.activeElement as HTMLElement), n = i < 0 && !e.shiftKey ? 0 : e.shiftKey ? (i <= 0 ? f.length - 1 : i - 1) : (i < 0 || i >= f.length - 1 ? 0 : i + 1);
+      e.preventDefault(); f[n].focus();
+    });
   }
   function bindUI() {
     const body = document.getElementById('acctBody');
     if (!body || body.dataset.bound) return;
     body.dataset.bound = '1';
-    body.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-acct]'); if (b) act(b.dataset.acct!); });
-    body.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; const t = e.target as HTMLElement; if (t.id === 'acctCode') act('code'); else if (t.id === 'acctEmail') act('signin'); });
+    bindForm(body, 'acct');
+    bindOffer();
     // (the box opened: the client's wanted, to show who you are and to sign in)
     const det = document.getElementById('acctBox') as HTMLDetailsElement | null;
     if (det) det.addEventListener('toggle', () => { if (det.open && on() && !loading) load(); });
@@ -414,12 +473,14 @@ const G_Cloud = (() => {
     const back = /access_token=|error_description=|[?&]code=/.test(location.hash + location.search);
     const stored = () => { try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i) || ''; if (/^sb-.+-auth-token$/.test(k)) return true; } } catch (e) { /* storage unavailable */ } return false; };
     const go = () => { if (back || stored()) load(); };
+    const dbg = ['play', 'hangar', 'demo'].some((k) => q.has(k));
+    if (!back && !stored() && !dbg && !S.get('noOffer', 0)) showOffer();
     if (back) go();
     else if (document.readyState === 'complete') setTimeout(go, 1500);
     else window.addEventListener('load', () => setTimeout(go, 1500));
   }
 
-  return { boot, add, runChanged, flush, sync, signInEmail, verifyCode, signOut, render,
+  return { boot, add, runChanged, flush, sync, signInEmail, showOffer, hideOffer, get offerOpen() { return offerOpen; }, verifyCode, signOut, render,
     mergePrefs, mergeArsenal, careerPlus, careerAsDelta, careerFrom,
     on, configured, guest, queue: () => Q(), meta: () => meta(),
     get state() { return state; }, get user() { return user; }, get client() { return client; } };

@@ -1015,3 +1015,10 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .career-body { max-height: none; }
 /* the hangar's Career tab: the same, across the pane */
 .shop-career { grid-column: 1 / -1; padding: 4px 2px; }
+/* the offer to register, in the main menu's place the first time (js/cloud.ts showOffer) */
+.reg-offer .reg-title { margin: 26px 0 6px; font-size: 24px; letter-spacing: 6px; }
+.reg-offer .reg-line { font: 300 14px/1.5 var(--ui-font); color: var(--ui-dim); margin: 0 0 10px; }
+.reg-offer .acct-body { font-size: 13px; }
+.reg-offer .acct-row input { font-size: 15px; padding: 9px 12px; }
+.menu-box label.reg-never { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; text-transform: none; letter-spacing: 0.5px; font: 300 13px var(--ui-font); cursor: pointer; }
+.reg-never input { width: auto; }
