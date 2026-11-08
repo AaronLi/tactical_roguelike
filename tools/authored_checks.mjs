@@ -25,6 +25,7 @@ export const LIMITS = {
                          // facets and the measuring): smaller and the front post is lost in a pinhole (the Mk18's first irons were about 1 degree)
   postDeg: 1.2,          // the front post's width as seen from the eye: wider and it hides what it is aimed at
   notchClear: 1.5,       // a notch's half-width over the front blade's half-width: a bar of light each side of the blade
+  sightTop: 0.001,       // how far over sy the front sight's top may stand: sy is the post's tip, or the CENTRE of a fibre or dot across its top (the 2011's, r 0.8 mm)
   coneDeg: 0.6,          // the cone round the sight line that must be clear up to the front sight (what the eye sees just round the post's tip)
   relief: [0.06, 0.09],  // eye relief for aperture irons on a long gun (a warning outside it: the eye is not where a shooter puts it)
   topRoundBuried: 0.003, // how far below the magazine body's top the top round's crown may be
@@ -105,7 +106,8 @@ function offAxis(ax, th, az) {
 // ---- a. iron sights ----
 /**
  * The gun's own iron sights from the aiming eye E = [fSight - relief, sy, 0] (info): the sight line runs forward from E level with the bore.
- *  - The front post (or blade, bead, fin): the furthest-forward place where a ray straight down at right = 0 meets a surface within -1.5..+0.6 mm of sy: its tip.
+ *  - The front post (or blade, bead, fin): the furthest-forward place where a ray straight down at right = 0 meets a surface within -1.5 mm..+LIMITS.sightTop of sy: its tip.
+ *    sy is the AIMING POINT: the post's tip, or the centre of a fibre or dot on it (a fibre's top up to LIMITS.sightTop over sy; what is found is then the fibre's top).
  *    Its width is measured 1 mm under the tip from inside it (rays out to either side), as an angle from E.
  *  - The line E -> just under the tip must reach the post (nothing else crosses it), and a cone of LIMITS.coneDeg round E -> tip (beside and over the tip)
  *    must be clear from 30 mm past the rear sight to the front sight's assembly (25 mm behind the post).
@@ -126,15 +128,15 @@ export function checkIrons(M, E, W) {
   const irons = M.meshes.filter((m) => !m.mount); // (the gun's own optic mount is never there with the irons: a rail sight stands on it)
   const pistol = M.info.pistol === true, S = scene(irons), all = boxOf(irons), eye = [fSight - relief, sy, 0], at = `models/${M.id}: the iron sights (sights.builtin ${kinds.join(', ')}; eye at forward ${mm(eye[0])} mm, sy ${mm(sy)} mm)`;
   const out = { eye };
-  // the front post's tip: scan forward from the eye, rays straight down at right = 0
-  const lo = sy - 0.0015, hi = sy + 0.0006, top = Math.max(all[4], sy) + 0.01, step = 0.00025;
+  // the front post's tip: scan forward from the eye, rays straight down at right = 0 (a fibre or dot standing over sy: the picture is aimed at its centre, sy, P below)
+  const lo = sy - 0.0015, hi = sy + LIMITS.sightTop, top = Math.max(all[4], sy) + 0.01, step = 0.00025;
   let runEnd = null, runStart = null, tip = -Infinity;
   for (let f = all[3]; f > eye[0] + 0.01; f -= step) {
     const hs = hits(S, [f, top, 0], [0, -1, 0], top - lo + 1e-4).map((h) => top - h.t).filter((y) => y >= lo && y <= hi);
     if (hs.length) { if (runEnd == null) runEnd = f; runStart = f; tip = Math.max(tip, ...hs); } else if (runEnd != null) break;
   }
-  if (runEnd == null) { E(`${at}: no front sight found: nothing on the bore plane (right = 0) reaches the sight line (sy ${mm(sy)} mm, -1.5 to +0.6 mm) ahead of the eye. The front post's tip is at sy`); return out; }
-  const fc = (runStart + runEnd) / 2, P = [fc, tip, 0], dP = Math.hypot(...sub(P, eye));
+  if (runEnd == null) { E(`${at}: no front sight found: nothing on the bore plane (right = 0) reaches the sight line (sy ${mm(sy)} mm, -1.5 to +${mm(LIMITS.sightTop)} mm) ahead of the eye. sy is the front post's tip, or the centre of a fibre or dot on it`); return out; }
+  const fc = (runStart + runEnd) / 2, P = [fc, tip > sy + 0.0006 ? sy : tip, 0], dP = Math.hypot(...sub(P, eye));
   // its width, 1 mm under the tip, from inside it
   const wy = tip - 0.001, wR = first(S, [fc, wy, 0], [0, 0, 1], 0.05), wL = first(S, [fc, wy, 0], [0, 0, -1], 0.05);
   const width = wR && wL ? wR.t + wL.t : null;
@@ -147,15 +149,17 @@ export function checkIrons(M, E, W) {
   if (lineHit) E(`${at}: the sight line from the eye to the front post's tip (forward ${mm(fc)} mm) is crossed by ${lineHit.m.name} ${mm(lineHit.t)} mm from the eye (forward ${mm(eye[0] + d0[0] * lineHit.t)} mm): the post cannot be seen`);
   // the rear sight: how far round the line rays stay clear, in 16 directions (stopped by something in the rear part of the sight radius)
   const dT = norm(sub(P, eye)), front = dP - 0.025, rearMax = dP * (pistol ? 0.8 : 0.7), MAXA = 8 * Math.PI / 180, STEP = 0.1 * Math.PI / 180;
-  const clear = (az) => { // the first angle out from the line where a ray is stopped, and what stops it (rays from the line out: the inside of a ring stops them first)
-    const blocked = (th) => first(S, eye, offAxis(dT, th, az), rearMax);
+  const clear = (az, ax = dT) => { // the first angle out from the line where a ray is stopped, and what stops it (rays from the line out: the inside of a ring stops them first)
+    const blocked = (th) => first(S, eye, offAxis(ax, th, az), rearMax);
     let a = 0, b = null; for (let th = STEP / 2; th <= MAXA; th += STEP) { if (blocked(th)) { b = th; break; } a = th; }
     if (b == null) return { th: MAXA, open: true };
     for (let i = 0; i < 12; i++) { const c = (a + b) / 2; if (blocked(c)) b = c; else a = c; }
     const h = blocked(b); return { th: a, open: false, by: h.m.name, at: h.t };
   };
   const dirs = Array.from({ length: 16 }, (_, k) => ({ az: k * Math.PI / 8, ...clear(k * Math.PI / 8) }));
-  const up = dirs[4], sides = [dirs[0], dirs[8]], rearEnd = dirs.some((x) => !x.open) ? Math.max(...dirs.filter((x) => !x.open).map((x) => x.at)) + 0.03 : 0;
+  // (a fibre over sy, its centre level with the notch's top edges: the notch's sides are measured on the line to the fibre's bottom, where it sits on the post)
+  const fib = tip > sy + 0.0006, dB = fib ? norm(sub([fc, 2 * sy - tip, 0], eye)) : dT;
+  const up = dirs[4], sides = fib ? [clear(0, dB), clear(Math.PI, dB)] : [dirs[0], dirs[8]], rearEnd = dirs.some((x) => !x.open) ? Math.max(...dirs.filter((x) => !x.open).map((x) => x.at)) + 0.03 : 0;
   // the cone round the tip, past the rear sight: clear up to the front sight
   if (!lineHit) for (let k = 0; k <= 6; k++) { // (beside and over the tip: under it is the post, on whatever it stands on)
     const d = offAxis(dT, LIMITS.coneDeg * Math.PI / 180, k * Math.PI / 6), h = hits(S, eye, d, front).find((x) => x.t > rearEnd);
