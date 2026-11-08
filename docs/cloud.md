@@ -27,9 +27,12 @@ was: no request to Supabase, and the Account box in the main menu says cloud sav
    another browser (a desktop game's mail client). Add `{{ .Token }}` to the **Magic Link** and **Change Email Address** templates, e.g.
    `<p>Or enter this code in the game: <b>{{ .Token }}</b></p>`. Without it the link alone works.
    The built-in email sender is limited to a few emails an hour: set up custom SMTP (**Project Settings > Auth > SMTP**) before many people use it.
-5. **Run the migration**: either paste `supabase/migrations/20261107000000_progress.sql` into **SQL Editor** and run it, or with the
-   Supabase CLI: `supabase link --project-ref <ref>` then `supabase db push`.
-6. **Paste the URL and the anon key** into `js/cloudconfig.ts` (from **Project Settings > API**: "Project URL" and the `anon` `public`
+5. **Enable pg_cron** (for the guest cleanup): **Database > Extensions**, search *pg_cron*, enable it. (Optional: without it the
+   cleanup isn't scheduled, and the migration says so with a notice; enable it later and run the second migration again.)
+6. **Run the migrations**, in order: either paste each file of `supabase/migrations/` (`20261107000000_progress.sql`, then
+   `20261108000000_guest_cleanup.sql`) into **SQL Editor** and run it, or with the Supabase CLI: `supabase link --project-ref <ref>`
+   then `supabase db push`.
+7. **Paste the URL and the anon key** into `js/cloudconfig.ts` (from **Project Settings > API**: "Project URL" and the `anon` `public`
    key; newer projects call it the "publishable" key, which works the same). **Never** the `service_role` / secret key: it bypasses
    Row Level Security. Rebuild (`npm run build`) and deploy as usual.
 
@@ -65,7 +68,7 @@ role (no session) has no grants at all.
 
 | Table | Columns | Limits |
 | --- | --- | --- |
-| `profiles` | `name`, `animal`, `look` (jsonb), `settings` (jsonb: `animal2 sens fov vol loadKit muted quick turn`), `mt` (jsonb: when each was last changed), `updated_at` | name/animal ≤ 32 chars, look ≤ 4 KB, settings ≤ 8 KB |
+| `profiles` | `name`, `animal`, `look` (jsonb), `settings` (jsonb: `animal2 sens fov vol loadKit muted quick`; never the TURN relay's), `mt` (jsonb: when each was last changed), `updated_at` | name/animal ≤ 32 chars, look ≤ 4 KB, settings ≤ 8 KB |
 | `progress` | `arsenal` (jsonb: `{ got, n, pro, on }`, js/arsenal.ts), `wishlist` (jsonb array), `mt`, `updated_at` | arsenal ≤ 32 KB, wishlist ≤ 500 items / 32 KB |
 | `career` | `runs runs_done deepest acts levels kills incaps headshots arrests rescued civ_killed unauth deaths downs revives evidence credits`, `best_level`, `best_credits` (jsonb run summaries) | non-negative, capped; written only through `career_add` |
 | `runs` | PK `(user_id, id)`; `id` (client uuid), `started_at`, `ended_at`, `solo`, `host`, `squad`, `joined_at`, `outcome` (`playing wiped left abandoned`), `deepest`, `credits`, `kills`, `arrests`, `levels` (jsonb), `updated_at` | ≤ 200 levels / 64 KB; squad 1-16; the newest 1000 runs a player are kept |
@@ -88,7 +91,8 @@ Only your own, host or client, from your screen's messages (never the simulation
 - **kills / incaps** suspects you put down (killed, or incapacitated: the host's `kill` / `incap`), **headshots** of those;
   **civ_killed / unauth** a civilian or a surrendered suspect you killed; **arrests**, **rescued** (civilians you secured),
   **evidence** weapons you bagged.
-- **downs** you went down (not killed outright), **deaths** you were killed, **revives** teammates you revived.
+- **downs** you went down, or were killed outright (as the scoreboard counts them); **deaths** you were killed; **revives**
+  teammates you revived.
 - **credits** credits earned (kills, arrests, evidence, bodies, mission bonuses; penalties don't subtract here). A run's own
   `credits` is net of penalties; **best_credits** is the run with the most.
 
@@ -112,8 +116,10 @@ Per item:
 - **Career counters**: added (the account's + this browser's unsent additions). **deepest**: the higher. **Best runs**: the better.
 - **Runs**: the union by id; for the same run, the later copy, unless this browser has changes the account hasn't seen.
 
-Known trade-offs: tallies take the higher, so increments made at the same time on two devices are not summed (8 and 7 from 5 give
-8, not 10). The preference clock is each device's own.
+Known limitation (kept on purpose): the sidearm tallies take the higher, with no record of what each device added, so tallies made
+on two devices between syncs are not summed (8 on one and 7 on the other, both from 5, give 8, not 10). It only slows an unlock a
+little, and only for someone playing on two devices at once. The career's counters don't have this problem (they're added).
+The preference clock is each device's own.
 
 ## Security
 
@@ -126,9 +132,14 @@ Known trade-offs: tallies take the higher, so increments made at the same time o
   doesn't control, e.g. the host reporting each player's events to an **Edge Function** that validates them (plausible rates, levels in
   order, a run's events signed by the host's session) and writes a separate, server-only table (no client insert/update policy), or the
   simulation itself running server-side. Leaderboard reads would then be a view over that table, readable by everyone.
-- The TURN relay's settings (`turn`, including its password if you set one) sync with your other settings into your own row.
-- Anonymous users pile up from players who never save to an email; Supabase can clean those up (e.g. a scheduled job deleting
-  anonymous users with no sign-in for 30+ days: `auth.users` where `is_anonymous` and `last_sign_in_at` is old).
+- **Connection secrets stay local.** The TURN relay's settings (`turn`: its URL, user and password) are never synced: they stay in the
+  browser they were typed into. A `turn` an older build wrote into a profile row is dropped by the next write from any client, and
+  never merged back into a browser.
+- **Guest cleanup** (`20261108000000_guest_cleanup.sql`): `public.bp_cleanup_guests(idle_days default 90)`, security definer, not callable
+  through the API, deletes anonymous users who never linked an email and have had no activity for 90 days (no sign-in, no change
+  to their user record, none of their rows written), and their rows with them (cascade). pg_cron runs it daily at 04:17 UTC (job
+  `bp-cleanup-guests`). Without pg_cron the migration makes the function and skips the schedule with a notice; run
+  `select public.bp_cleanup_guests();` in the SQL Editor by hand, or enable pg_cron and run the migration again.
 
 ## Testing
 
@@ -136,12 +147,13 @@ Known trade-offs: tallies take the higher, so increments made at the same time o
 
 - the migration applied to a real Postgres in-process (PGlite, `@electric-sql/pglite`), with a stand-in for Supabase's `auth` schema
   (`auth.users`, `auth.uid()` from the request's claims, the `anon` and `authenticated` roles): RLS between two users, the anon role
-  refused, the size/range checks, `career_add`'s caps and maxima, the 1000-run cap;
+  refused, the size/range checks, `career_add`'s caps and maxima, the 1000-run cap, the guest cleanup (an idle guest goes with its
+  rows; a recently active one, a new one and an emailed one stay; players can't call it). pg_cron's scheduling itself can't run there;
 - the game's own `dist/js/util.js`, `career.js`, `cloud.js`, in script contexts that each act as a browser with its own localStorage,
   against a stand-in for supabase-js over that database (each table call run as the signed-in user, so RLS decides): a guest made
   with the local progress already there, a reload restoring the session without counting anything twice, the offline queue, two
   guests kept apart through the API, saving a guest to an email (by its code), signing in on a second browser and the merge, the
-  first browser picking the merge up, sign-out and back in.
+  first browser picking the merge up, sign-out and back in, the TURN settings kept out of the row (and stripped from one that had them).
 
 Not covered until a real project exists: supabase-js itself from the CDN (its session storage, token refresh, the magic link's
 redirect back with the session in the URL), the emails Supabase sends and their templates, the Auth settings above, real network

@@ -2672,6 +2672,7 @@ const G_Me = {
     G.HUD.damage(from, 100);
     G.Audio.hurt();
     this.stats.downs++;
+    if (!this.dead) G.Career.ev('down'); // (a down, as the scoreboard counts it; and a death, in die)
     this.die(how || 'Killed outright');
   },
   // Blasts and other plain damage. Body armour takes some of the fragments.

@@ -11,7 +11,7 @@ import { PGlite } from '@electric-sql/pglite';
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const AUTH = `
 create schema if not exists auth;
-create table auth.users (id uuid primary key, email text unique, is_anonymous boolean not null default true, created_at timestamptz not null default now());
+create table auth.users (id uuid primary key, email text unique, is_anonymous boolean not null default true, created_at timestamptz not null default now(), updated_at timestamptz default now(), last_sign_in_at timestamptz default now());
 create or replace function auth.uid() returns uuid language sql stable as $$
   select nullif(coalesce(current_setting('request.jwt.claim.sub', true), (nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub')), '')::uuid
 $$;

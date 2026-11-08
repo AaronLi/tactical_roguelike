@@ -16,8 +16,8 @@ interface CloudMeta { v: number; owner: string | null; ownerAnon: boolean; mt: R
 interface CloudQueue { add: Record<string, number>; max: Record<string, number>; best: Record<string, CareerBest>; profile: number; progress: number }
 const G_Cloud = (() => {
   const V = 1; // (the data's shape: schema_version in every row. The client's version is in load's import, and js/types/supabase-cdn.d.ts)
-  // what's synced, by where it goes: the profile row's columns, its settings (jsonb), and the progress row
-  const PROFILE = ['name', 'animal', 'look'], SETTINGS = ['animal2', 'sens', 'fov', 'vol', 'loadKit', 'muted', 'quick', 'turn'], PROGRESS = ['arsenal', 'wishlist'];
+  // what's synced, by where it goes (never the TURN relay's settings, 'turn': a connection's credentials stay in this browser): the profile row's columns, its settings (jsonb), and the progress row
+  const PROFILE = ['name', 'animal', 'look'], SETTINGS = ['animal2', 'sens', 'fov', 'vol', 'loadKit', 'muted', 'quick'], PROGRESS = ['arsenal', 'wishlist'];
   const PREFS = [...PROFILE, ...SETTINGS], SYNCED = new Set([...PREFS, ...PROGRESS]);
   const DEBOUNCE = 4000, RETRY0 = 5000, RETRY_MAX = 60000;
   const q = new URLSearchParams(location.search);
@@ -224,7 +224,9 @@ const G_Cloud = (() => {
       const cv: Record<string, any> = Object.assign({}, row ? row.settings : {}); for (const k of PROFILE) if (row && row[k] != null) cv[k] = row[k];
       const r = mergePrefs(PREFS, local, m.mt, cv, cmt);
       for (const k of r.toLocal) { S.put(k, r.vals[k]); m.mt[k] = r.mt[k]; }
-      changed = r.toLocal; up = r.toCloud || !row;
+      // (a row holding what's no longer synced, a TURN password an older version wrote, is written again without it)
+      const stale = !!row && Object.keys(row.settings || {}).some((k) => !SETTINGS.includes(k));
+      changed = r.toLocal; up = r.toCloud || !row || stale;
       const settings: Record<string, any> = {}; for (const k of SETTINGS) if (r.vals[k] !== undefined) settings[k] = r.vals[k];
       Object.assign(out, { name: r.vals.name != null ? String(r.vals.name).slice(0, 32) : null, animal: r.vals.animal != null ? String(r.vals.animal).slice(0, 32) : null, look: r.vals.look || null, settings, mt: r.mt });
     } else {

@@ -89,6 +89,25 @@ await test('limits: oversized and out-of-range rows are refused, career_add caps
   assert.equal(+(await D.admin('select count(*) n from public.runs where user_id = $1', [a]))[0].n, 1000);
 });
 
+await test('guest cleanup: anonymous users idle 90 days go, with their rows; active, recent or emailed ones stay', async () => {
+  const old = "now() - interval '100 days'";
+  const idle = await D.user(), played = await D.user(), fresh = await D.user(), mailed = await D.user('kept@example.com');
+  for (const u of [idle, played, mailed]) await D.admin(`update auth.users set created_at = ${old}, updated_at = ${old}, last_sign_in_at = ${old} where id = $1`, [u]);
+  await D.admin(`update auth.users set is_anonymous = false where id = $1`, [mailed]);
+  for (const u of [idle, played, fresh]) await D.as(u, `select public.career_add('{"add":{"kills":1}}'::jsonb)`);
+  await D.admin('set session_replication_role = replica'); // (its rows idle too: past the trigger that stamps updated_at)
+  await D.admin(`update public.career set updated_at = ${old} where user_id = $1`, [idle]);
+  await D.admin('set session_replication_role = origin');
+  await D.as(played, `insert into public.runs (user_id, id, started_at) values ($1, gen_random_uuid(), now())`, [played]); // (played lately: a run row)
+  const n = (await D.admin('select public.bp_cleanup_guests(90) n'))[0].n;
+  const left = new Set((await D.admin('select id from auth.users')).map((r) => r.id));
+  assert.equal(left.has(idle), false); assert.ok(left.has(played) && left.has(fresh) && left.has(mailed));
+  assert.equal((await D.admin('select count(*) n from public.career where user_id = $1', [idle]))[0].n, 0, 'its rows cascaded');
+  assert.ok(n >= 1);
+  await assert.rejects(D.as(fresh, 'select public.bp_cleanup_guests(90)'), /permission denied/, 'not callable by players');
+  await assert.rejects(D.admin('select public.bp_cleanup_guests(5)'), /at least 30/);
+});
+
 // ---------------------------------------------------------------- the game's client against the stand-in
 await test('merge rules (pure functions)', async () => {
   const w = browser(null, storage(), { cfg: null }), C = w.G.Cloud;
@@ -156,7 +175,22 @@ await test('offline: writes queue while the network is down, and go up once it i
   await until(async () => (await careerRow(D, uidA)).kills === 3 && A.G.Cloud.state === 'ok', 15000);
   const c = await careerRow(D, uidA), prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
   assert.equal(c.rescued, 1); assert.equal(prof.settings.fov, 95);
+  await until(() => JSON.parse(stA.getItem('bp_cloudq')).profile === 0);
   const q2 = JSON.parse(stA.getItem('bp_cloudq')); assert.deepEqual(q2.add, {}); assert.equal(q2.profile, 0);
+});
+await test('the TURN relay\'s settings stay in the browser, and one an older version synced is dropped by the next write', async () => {
+  A.G.U.store.set('turn', { url: 'turn:relay.example:3478', user: 'u', pass: 'secret' });
+  A.G.U.store.set('sens', 1.6); A.G.Cloud.flush();
+  await until(async () => (await D.admin('select settings from public.profiles where user_id = $1', [uidA]))[0].settings.sens === 1.6, 15000);
+  let prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
+  assert.equal(prof.settings.turn, undefined); assert.equal(prof.mt.turn, undefined); assert.equal(prof.settings.sens, 1.6);
+  // as an older client left it: the credentials in the row
+  await D.admin(`update public.profiles set settings = settings || '{"turn":{"url":"turn:old","pass":"leaked"}}'::jsonb, mt = mt || '{"turn":99999999999999}'::jsonb where user_id = $1`, [uidA]);
+  A.G.U.store.set('fov', 96); A.G.Cloud.flush();
+  await until(async () => (await D.admin('select settings from public.profiles where user_id = $1', [uidA]))[0].settings.fov === 96, 15000);
+  prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
+  assert.equal(prof.settings.turn, undefined, 'dropped'); assert.equal(prof.mt.turn, undefined);
+  assert.equal(JSON.parse(stA.getItem('bp_turn')).pass, 'secret', 'the local one untouched, the row\'s never merged in');
 });
 const stB = storage();
 let B;
