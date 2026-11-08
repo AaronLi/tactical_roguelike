@@ -143,6 +143,11 @@ A career addition (the move's, or one queued while signed in) is written to `bp_
 sent, and only forgotten once the reply confirms it; whatever's still there when the page loads (a tab closed mid-request, a reply
 lost) is sent again with the same id. `career_add` remembers the ids it has applied (`career_applied`, 90 days, per user) and skips an
 id it has seen, returning the row as it is: an addition is counted exactly once.
+
+Everything sent is for one account: each write, debounce and retry is made for the signed-in user and checked against it after every wait;
+a sign-in or sign-out cancels what's pending and stale auth events are ignored. An account's unsent work when it signs out (or when
+another account's copy replaces this one) is kept for it: queued career additions as its own in-flight records, changed progress and
+unsent runs in `bp_cloudstash`, sent when that account signs in here again and never under another's session.
 Per item:
 
 - **Sidearm unlocks** (`got`): the union. **Tallies** (`n`): per gun and stat, the higher. **Pro builds earned**: earned on either

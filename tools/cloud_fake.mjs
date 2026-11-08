@@ -4,7 +4,7 @@
 // sent emails) is shared by every client made from it, as one project is by every browser; each client keeps its session in its own
 // storage, as a browser does. `server.offline = true` makes every call fail as fetch does with no network.
 export function fakeServer(D) {
-  const server = { D, offline: false, mail: [], calls: [], faults: [] };
+  const server = { D, offline: false, mail: [], calls: [], faults: [], refusals: 0 };
   const netErr = () => ({ message: 'TypeError: Failed to fetch', status: 0, name: 'AuthRetryableFetchError' });
   const isoRow = (r) => { if (!r) return r; const o = {}; for (const [k, v] of Object.entries(r)) o[k] = v instanceof Date ? v.toISOString() : typeof v === 'bigint' ? Number(v) : v; return o; };
   const userOf = async (id) => { const [u] = await D.admin('select id, email, is_anonymous from auth.users where id = $1', [id]); return u ? { id: u.id, email: u.email || undefined, is_anonymous: u.is_anonymous, aud: 'authenticated' } : null; };
@@ -25,7 +25,7 @@ export function fakeServer(D) {
       let f = server.faults.find((x) => x.what === what && x.n > 0);
       if (f && f.skip > 0) { f.skip--; f = null; } // (skip: let that many through first)
       if (f && f.when === 'before') { f.n--; return { data: null, error: netErr() }; }
-      try { const data = await fn(); if (f) { f.n--; return { data: null, error: netErr() }; } return { data, error: null }; } catch (e) { if (process.env.FAKE_DEBUG) console.log('[fake] ' + what + ' as ' + uid() + ': ' + e.message, new Error().stack.split('\n').slice(2, 9).join(' | ')); return { data: null, error: { message: e.message, code: e.code } }; }
+      try { const data = await fn(); if (f) { f.n--; return { data: null, error: netErr() }; } return { data, error: null }; } catch (e) { if (/row-level security/.test(e.message)) server.refusals++; if (process.env.FAKE_DEBUG) console.log('[fake] ' + what + ' as ' + uid() + ' (rows of ' + (server.lastRows || '?') + '): ' + e.message); return { data: null, error: { message: e.message, code: e.code } }; }
     };
     const uid = () => (session ? session.user.id : null);
 
@@ -90,7 +90,7 @@ export function fakeServer(D) {
         then(res, rej) { return run(false).then(res, rej); },
         upsert(rows, o = {}) {
           return call('upsert ' + table, async () => {
-            const list = Array.isArray(rows) ? rows : [rows], conflict = (o.onConflict || 'user_id').split(',').map((s) => s.trim());
+            const list = Array.isArray(rows) ? rows : [rows]; server.lastRows = list.map((r) => r.user_id).join(); const conflict = (o.onConflict || 'user_id').split(',').map((s) => s.trim());
             for (const r of list) {
               const cols = Object.keys(r), vals = cols.map((c) => (r[c] !== null && typeof r[c] === 'object' ? JSON.stringify(r[c]) : r[c]));
               const set = cols.filter((c) => !conflict.includes(c)).map((c) => `${c} = excluded.${c}`);

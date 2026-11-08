@@ -85,7 +85,14 @@ const G_Cloud = (() => {
     if (!on()) return;
     if (user) schedule(); // (signed out: it stays here, and merges in when you sign in)
   }
-  function schedule(ms = DEBOUNCE) { clearTimeout(timer); timer = setTimeout(() => { flush(); }, ms); }
+  // A write later, for whoever's signed in now (and only them: signed out or in as someone else by then, it's dropped). Every auth
+  // change clears it (switched), and every write checks it's still for the signed-in user after each wait (alive).
+  function schedule(ms = DEBOUNCE) { clearTimeout(timer); const for_ = user ? user.id : null; timer = setTimeout(() => { if (for_ && user && user.id === for_) flush(); }, ms); }
+  let epoch = 0; // (bumped on every change of who's signed in: an auth event from before is stale)
+  function switched() { epoch++; clearTimeout(timer); again = false; retryMs = RETRY0; }
+  const SWITCHED = { switched: true };
+  // still the user this work was for? If not, the work stops here, quietly (theirs stays queued for them: bp_cloudq, bp_cloudfly)
+  function alive(uid: string) { if (!user || user.id !== uid) throw SWITCHED; }
 
   // ------------------------------------------------------------- merging (pure: tools/cloud.test.mjs tests them)
   // Preferences (callsign, look, settings, the wishlist): each key the newer of the two, by when it was changed (mt, the
@@ -168,7 +175,7 @@ const G_Cloud = (() => {
       const fake = (window as any).__bpCloudClient; // (a stand-in, for the tests: tools/cloud.test.mjs)
       const cl: SbClient = fake ? fake(c.url, c.key, opts) : (await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/+esm')).createClient(c.url, c.key, opts);
       client = cl;
-      cl.auth.onAuthStateChange((ev, session) => { setTimeout(() => authChanged(ev, session ? session.user : null), 0); }); // (not inside the callback: supabase-js's own lock is held there)
+      cl.auth.onAuthStateChange((ev, session) => { const e = epoch; setTimeout(() => { if (e === epoch) authChanged(ev, session ? session.user : null); }, 0); }); // (an event from before a sign-in or out that's happened since: stale, ignored) // (not inside the callback: supabase-js's own lock is held there)
       const { data, error } = await cl.auth.getSession();
       if (error) throw error;
       if (data.session) await setUser(data.session.user);
@@ -179,6 +186,7 @@ const G_Cloud = (() => {
   }
   async function setUser(u: SbUser | null) {
     const was = user;
+    if ((was ? was.id : null) !== (u ? u.id : null)) switched();
     user = u;
     if (!u) { setState(on() ? 'idle' : 'off'); return; }
     // an anonymous session an earlier version made: let go of (this browser's copy stays, and merges into your account when you sign
@@ -189,7 +197,7 @@ const G_Cloud = (() => {
     await sync();
   }
   function authChanged(ev: string, u: SbUser | null) {
-    if (ev === 'SIGNED_OUT') { if (user) { user = null; render(); tellHost(); } return; }
+    if (ev === 'SIGNED_OUT') { if (user) { switched(); user = null; render(); tellHost(); } return; }
     if (u && (!user || user.id !== u.id)) { setUser(u); return; }
     if (u) { const was = user && user.email; user = u; if (u.email !== was) { render(); tellHost(); } }
   }
@@ -203,8 +211,9 @@ const G_Cloud = (() => {
   const one = (t: string, uid: string) => must(client!.from(t).select('*').eq('user_id', uid).maybeSingle());
   // the profile or progress row: pulled, merged with what's here, what changed here written in, what's newer here written up
   async function syncDoc(table: 'profiles' | 'progress', uid: string, mode: 'same' | 'adopt' | 'replace') {
+    alive(uid);
     const row: any = await one(table, uid);
-    if (!user || user.id !== uid) return;
+    alive(uid);
     const m = meta(), cmt: Record<string, number> = (row && row.mt) || {}, local: Record<string, any> = {};
     let changed: string[] = [], up = false;
     const out: any = { user_id: uid, schema_version: V };
@@ -243,7 +252,7 @@ const G_Cloud = (() => {
     }
     keepMeta();
     if (changed.length) applyLive(changed);
-    if (up) await must(client!.from(table).upsert(out, { onConflict: 'user_id' }));
+    if (up) { alive(uid); await must(client!.from(table).upsert(out, { onConflict: 'user_id' })); }
   }
   // what's merged in, into the game as it is now (the menu's controls, the arsenal's copy, the wishlist, the quick slots)
   function applyLive(keys: string[]) {
@@ -261,12 +270,13 @@ const G_Cloud = (() => {
     const uid = user.id;
     try {
       const m = meta(), mode: 'same' | 'adopt' | 'replace' = m.owner === uid ? 'same' : !m.owner || m.ownerAnon ? 'adopt' : 'replace';
+      await unstash(uid); // (this account's unsent work from before it signed out here: up first)
       if (mode === 'adopt') { await migrate(uid); ok(); return; }
       const [crow, runs] = await Promise.all([one('career', uid), must(client.from('runs').select('*').eq('user_id', uid).order('started_at', { ascending: false }).limit(20))]);
       await syncDoc('profiles', uid, mode);
       await syncDoc('progress', uid, mode);
-      if (!user || user.id !== uid) return;
-      if (mode === 'replace') { queueV = { add: {}, max: {}, best: {}, profile: 0, progress: 0 }; keepQ(); } // (the other account's unsent additions: theirs, not this one's)
+      alive(uid);
+      if (mode === 'replace') stash(m.owner); // (the other account's unsent work: kept for it, not sent to this one)
       G.Career.setStats(careerPlus(careerFrom(crow), pendingOf(uid)));
       const recs = (runs as any[]).map(runFrom);
       if (mode === 'replace') G.Career.onlyRuns(recs); else G.Career.mergeRuns(recs);
@@ -274,7 +284,7 @@ const G_Cloud = (() => {
       await sendCareer(uid);
       await pushRuns(uid);
       ok();
-    } catch (e) { if (user && user.id === uid) fail(e, 'sync'); /* (signed in as someone else meanwhile: theirs is on its way) */ } finally { busy = false; if (again) { again = false; schedule(0); } }
+    } catch (e) { if (e !== SWITCHED && user && user.id === uid) fail(e, 'sync'); /* (signed in or out meanwhile: this was for the one before) */ } finally { busy = false; if (again) { again = false; schedule(0); } }
   }
   // Moving a guest save into an account: its preferences and progress merged and written, its career added (once: by an id the server
   // remembers), every run sent; only when the server has confirmed all of it is the guest save wiped and the account's copy taken in
@@ -293,11 +303,11 @@ const G_Cloud = (() => {
       await pushRuns(uid);
       const y = Q(); if (!y.profile && !y.progress && !migDelta(uid) && !G.Career.runs().some((r) => r.sy !== r.u)) break;
     }
-    if (!user || user.id !== uid) return;
+    alive(uid);
     // all confirmed: the account's copy, read back, in place of the guest save
     const snap = G.Career.stats(), snapA = careerAsDelta(snap).add;
     const [crow, prow, runs] = await Promise.all([one('career', uid), one('progress', uid), must(client!.from('runs').select('*').eq('user_id', uid).order('started_at', { ascending: false }).limit(20))]);
-    if (!user || user.id !== uid) return;
+    alive(uid);
     const now = careerAsDelta(G.Career.stats()).add, extra: Record<string, number> = {}; // (played while it was read back: still to add)
     for (const [k, n] of Object.entries(now)) if (n - (snapA[k] || 0) > 0) extra[k] = n - (snapA[k] || 0);
     const pr: any = prow || {};
@@ -320,10 +330,11 @@ const G_Cloud = (() => {
   }
   // one addition, by its id: sent, and once confirmed, forgotten (and, a move's, counted as moved)
   async function sendRec(rec: CloudFly) {
+    alive(rec.uid); // (an addition is its account's: never sent under another's session)
     const row = await must(client!.rpc('career_add', { d: Object.assign(rpcDelta(rec.d), { id: rec.id }) }));
     const l = fly(), i = l.findIndex((r) => r.id === rec.id); if (i >= 0) { l.splice(i, 1); keepFly(); }
     if (rec.mig) { const m = meta(); for (const [k, n] of Object.entries(rec.d.add)) m.migSent[k] = (m.migSent[k] || 0) + n; m.migSent.__max = 1; keepMeta(); }
-    else G.Career.setStats(careerPlus(careerFrom(Array.isArray(row) ? row[0] : row), pendingOf(rec.uid))); // (the account's, and what's still to come)
+    else if (meta().owner === rec.uid) G.Career.setStats(careerPlus(careerFrom(Array.isArray(row) ? row[0] : row), pendingOf(rec.uid))); // (the account's, and what's still to come; not into a guest save being moved, whose career is its own)
   }
   async function sendFlying(uid: string) { for (const r of fly().filter((q) => q.uid === uid)) await sendRec(r); }
   // the queue's additions into flight (persisted first, then sent), and everything in flight for this account
@@ -331,6 +342,28 @@ const G_Cloud = (() => {
     const x = Q();
     if (careerPending(x)) { fly().push({ id: uuid(), uid, d: { add: x.add, max: x.max, best: x.best, profile: 0, progress: 0 }, mig: false }); keepFly(); x.add = {}; x.max = {}; x.best = {}; keepQ(); }
     await sendFlying(uid);
+  }
+  // An account's unsent work, set aside as it signs out (or as another account's copy replaces this one): its queued career additions
+  // become in-flight records of its own (sent only under its session), its changed progress and unsent runs go to bp_cloudstash.
+  function stash(uid: string | null) {
+    if (!uid) return;
+    const x = Q();
+    if (careerPending(x)) { fly().push({ id: uuid(), uid, d: { add: x.add, max: x.max, best: x.best, profile: 0, progress: 0 }, mig: false }); keepFly(); }
+    const runs = G.Career.runs().filter((r) => r.sy !== r.u), st = S.get('cloudstash', {}) || {};
+    if (x.progress || runs.length) { const o = st[uid] || {}; st[uid] = { arsenal: x.progress ? S.get('arsenal', null) : o.arsenal || null, wishlist: x.progress ? S.get('wishlist', null) : o.wishlist || null, runs: [...(o.runs || []), ...runs].slice(-200) }; S.put('cloudstash', st); }
+    queueV = { add: {}, max: {}, best: {}, profile: 0, progress: 0 }; keepQ();
+  }
+  // ...and sent once it's back: its progress merged into the account's (unions, maxima), its runs upserted
+  async function unstash(uid: string) {
+    const st = S.get('cloudstash', {}) || {}, o = st[uid];
+    if (!o) return;
+    if (o.arsenal || o.wishlist) {
+      const row: any = await one('progress', uid); alive(uid);
+      const arsenal = mergeArsenal(o.arsenal, row ? row.arsenal : null, true), wl = Array.isArray(o.wishlist) ? o.wishlist : row ? row.wishlist : [];
+      alive(uid); await must(client!.from('progress').upsert({ user_id: uid, schema_version: V, arsenal, wishlist: wl, mt: (row && row.mt) || {} }, { onConflict: 'user_id' }));
+    }
+    if (o.runs && o.runs.length) { alive(uid); await must(client!.from('runs').upsert(o.runs.map((r: CareerRun) => runRow(r, uid)), { onConflict: 'user_id,id' })); }
+    const now = S.get('cloudstash', {}) || {}; delete now[uid]; S.put('cloudstash', now);
   }
   // what's here the account hasn't confirmed: the queue, and the additions in flight
   function pendingOf(uid: string): CloudQueue {
@@ -343,6 +376,7 @@ const G_Cloud = (() => {
       const dirty = G.Career.runs().filter((r) => r.sy !== r.u).slice(0, BATCH);
       if (!dirty.length) return;
       const ver = dirty.map((r) => [r.id, r.u] as [string, number]);
+        alive(uid);
       await must(client!.from('runs').upsert(dirty.map((r) => runRow(r, uid)), { onConflict: 'user_id,id' }));
       for (const [id, u] of ver) G.Career.markSynced(id, u);
     }
@@ -362,7 +396,7 @@ const G_Cloud = (() => {
       await sendCareer(uid);
       await pushRuns(uid);
       ok();
-    } catch (e) { if (user && user.id === uid) fail(e, 'flush'); } finally { busy = false; if (again) { again = false; schedule(500); } }
+    } catch (e) { if (e !== SWITCHED && user && user.id === uid) fail(e, 'flush'); } finally { busy = false; if (again) { again = false; schedule(500); } }
   }  function ok() { retryMs = RETRY0; lastOk = Date.now(); why = ''; setState('ok'); const x = Q(); if (x.profile || x.progress || careerPending(x) || (user && fly().some((r) => r.uid === user!.id)) || G.Career.runs().some((r) => r.sy !== r.u)) schedule(); }
   function fail(e: any, where: string) {
     const msg = (e && (e.message || e.error_description || e.msg)) || String(e);
@@ -371,7 +405,8 @@ const G_Cloud = (() => {
     setState(net ? 'offline' : 'error');
     if (!net) console.warn('cloud: ' + where + ': ' + msg);
     clearTimeout(timer);
-    timer = setTimeout(() => { if (user) flush(); else if (!client) { loading = null; load(); } }, retryMs);
+    const for_ = user ? user.id : null;
+    timer = setTimeout(() => { if (for_) { if (user && user.id === for_) flush(); } else if (!client) { loading = null; load(); } }, retryMs);
     retryMs = Math.min(RETRY_MAX, retryMs * 2);
   }
   function setState(s: CloudState) { state = s; render(); }
@@ -399,7 +434,8 @@ const G_Cloud = (() => {
     const was = user ? user.id : null, m = meta();
     const { error } = await client.auth.signOut();
     if (error) throw error;
-    user = null;
+    switched(); user = null;
+    if (was && m.owner === was) stash(was); // (what didn't go up: kept for this account, sent when it signs in again, never to another)
     // (a guest save still being moved in, not yet confirmed: it stays as it is, and the move picks up where it was if you sign in
     // to the same account again)
     if (m.owner !== was) { setState('idle'); tellHost(); return; }

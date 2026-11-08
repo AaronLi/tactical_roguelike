@@ -382,5 +382,35 @@ await test('after a move, signing out leaves an empty guest save, and a second e
   assert.equal(+(await D.admin('select count(*) n from public.runs where user_id = $1', [u2]))[0].n, 0);
   assert.equal((await careerRow(D, uidM)).kills, 9, 'the first account untouched');
 });
+await test('a rapid sign-out and sign-in with another email, with a debounced write and a retry pending: none of it goes to the new account, it\'s kept for the old one, no write refused', async () => {
+  server.faults = []; server.offline = false;
+  const st = storage(), P = browser(server, st); P.G.Cloud.boot();
+  await signIn(P, 'pend-a@example.com'); const ua = P.G.Cloud.user.id;
+  P.G.U.store.set('arsenal', { got: ['usp'], n: { usp: { hs: 3 } }, pro: {}, on: {} }); await P.G.Cloud.flush();
+  const k0 = (await careerRow(D, ua) || { kills: 0 }).kills;
+  // a retry pending: a career addition whose request fails (twice: the sign-out's own flush fails too)
+  server.faults = [{ what: 'rpc career_add', when: 'before', n: 2 }];
+  P.G.Career.runStart(); P.G.Career.ev('kill', 50); await P.G.Cloud.flush();
+  assert.equal(P.G.Cloud.state, 'offline');
+  // a debounced write pending, and an addition queued
+  P.G.U.store.set('arsenal', { got: ['usp', 'm1911'], n: { usp: { hs: 4 } }, pro: {}, on: {} }); P.G.Career.ev('kill', 50);
+  const refused0 = server.refusals;
+  await P.G.Cloud.signOut();
+  await signIn(P, 'pend-b@example.com'); const ub = P.G.Cloud.user.id;
+  await sleep(6500); // (past the debounce and the retry)
+  assert.equal(server.refusals, refused0, 'no write refused by RLS');
+  const cb = await careerRow(D, ub), pb = (await D.admin('select * from public.progress where user_id = $1', [ub]))[0];
+  assert.ok(!cb || cb.kills === 0, 'B has none of A\'s career'); assert.deepEqual(pb ? pb.arsenal.got : [], [], 'nor A\'s sidearm tree');
+  assert.equal(+(await D.admin('select count(*) n from public.runs where user_id = $1', [ub]))[0].n, 0, 'nor A\'s runs');
+  assert.equal(((await careerRow(D, ua)) || { kills: 0 }).kills, k0, 'A\'s additions not sent yet');
+  assert.equal(P.G.Cloud.fly().filter((r) => r.uid === ua).length >= 1, true, 'kept for A');
+  // A again: what was pending arrives, once
+  await P.G.Cloud.signOut(); await signIn(P, 'pend-a@example.com'); await sleep(300);
+  await until(async () => ((await careerRow(D, ua)) || { kills: 0 }).kills === k0 + 2, 8000);
+  const pa = (await D.admin('select * from public.progress where user_id = $1', [ua]))[0];
+  assert.deepEqual([...pa.arsenal.got].sort(), ['m1911', 'usp']); assert.equal(pa.arsenal.n.usp.hs, 4);
+  assert.ok(+(await D.admin('select count(*) n from public.runs where user_id = $1', [ua]))[0].n >= 1, 'A\'s run arrived');
+  assert.equal(P.G.Cloud.fly().length, 0); assert.equal(server.refusals, refused0);
+});
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
