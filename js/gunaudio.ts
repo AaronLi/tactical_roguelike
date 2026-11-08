@@ -153,19 +153,41 @@ const G_GunAudio = {
     if (!s) { s = window.GunshotSynth.precompute(this.sourceParams(id)) as Promise<unknown>; this.sources.set(id, s); }
     return s;
   },
+  // A render's end trimmed off where it's gone silent: the synth renders a fixed span (the source 0.6 s and the bolt's,
+  // then the placement's padding), and the last ~0.35 s of a shot was digital silence, every voice and echo playing it
+  // (its panner, filter and room send working, and its slot under MAX_VOICES held) for nothing. Cut 10 ms past the last
+  // sample above -100 dBFS, those 10 ms faded out, so nothing that's heard changes.
+  TRIM_FLOOR: 1e-5,
+  trim(buf: AudioBuffer) {
+    const sr = buf.sampleRate, nc = buf.numberOfChannels, chs: Float32Array[] = [];
+    let last = 0;
+    for (let c = 0; c < nc; c++) {
+      const d = buf.getChannelData(c); chs.push(d);
+      for (let i = d.length - 1; i > last; i--) if (Math.abs(d[i]) > this.TRIM_FLOOR) { last = i; break; }
+    }
+    const fade = Math.ceil(0.01 * sr), len = Math.min(buf.length, last + 1 + fade);
+    if (len >= buf.length - fade) return buf;
+    const out = new AudioBuffer({ numberOfChannels: nc, length: len, sampleRate: sr });
+    for (let c = 0; c < nc; c++) {
+      const d = chs[c].slice(0, len);
+      for (let i = last + 1; i < len; i++) d[i] *= (len - i) / fade;
+      out.copyToChannel(d, c);
+    }
+    return out;
+  },
   buildDry(id: string, urgent?: boolean) {
     if (this.dry.has(id)) return;
     const dryPlace: RoomSig = { env: 'none', envSize: 0, envReflect: 0, envMix: 0 };
     this.enqueue('dry:' + id, () => this.getSource(id)
       .then((src: unknown) => window.GunshotSynth.place(src, this.placeParams(id, dryPlace)))
-      .then((buf: AudioBuffer) => { this.dry.set(id, buf); }), urgent);
+      .then((buf: AudioBuffer) => { this.dry.set(id, this.trim(buf)); }), urgent);
   },
   build(id: string, sig: RoomSig, urgent?: boolean) {
     const key = id + '|' + this.sigKey(sig);
     if (this.bufs.has(key)) return;
     this.enqueue(key, () => this.getSource(id)
       .then((src: unknown) => window.GunshotSynth.place(src, this.placeParams(id, sig)))
-      .then((buf: AudioBuffer) => { this.bufs.set(key, buf); }), urgent);
+      .then((buf: AudioBuffer) => { this.bufs.set(key, this.trim(buf)); }), urgent);
   },
 
   // Pre-render every distinct acoustic space in the level for the given weapons, so shots
