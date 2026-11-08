@@ -103,7 +103,7 @@ cut(rs, box(-1.9 * mm, 1.9 * mm, -0.02, 0.2, U(200), 0.04))   # (the notch: its 
 bevel(rs, 0.4 * mm, 2); smooth(rs)
 K.adopt(rs, 'optic', 'black', pslide)
 # the front sight: a tall post, its fibre across the top
-fs = K.tmp(prism(PL([(908, 222), (955, 222), (952, 199), (914, 197)]), 'x', -1.4 * mm, 1.4 * mm))   # (2.8 mm wide); bevel(fs, 0.4 * mm, 1); smooth(fs)
+fs = K.tmp(prism(PL([(908, 222), (955, 222), (952, 199), (914, 197)]), 'x', -1.4 * mm, 1.4 * mm)); bevel(fs, 0.4 * mm, 1); smooth(fs)   # (2.8 mm wide)
 K.adopt(fs, 'slide', 'black', pslide)
 o = K.obj(cyl(0.9 * mm, F(916), F(950), 'y', (0, U(201)), 10), 'slide', 'sightPaint', pslide)
 
