@@ -1,14 +1,3 @@
 {
-  "_comment": "Magnifier-rail waivers (tools/check_magnifier_rails.mjs, docs/models.md 'Magnifiers on the rail'): { gun: { maxMm, why } }. A waived gun's feet may hang off its rail up to maxMm and print as warnings; more is an error, and every other gun stays an error over 3 mm. Only for the guns that failed when the check came in (2026-11-08): move the sight forward (optF / optFMag) or lengthen the rail, then remove the entry (a waiver whose gun passes warns 'no longer needed').",
-  "hailstorm": { "maxMm": 63.4, "why": "the magnifier's foot 39-63 mm behind its 72 mm rail, and the long dots' own feet 4-8 mm off its rear" },
-  "skorp": { "maxMm": 47, "why": "the magnifier's foot 23-47 mm behind the rail's rear" },
-  "mp7": { "maxMm": 42, "why": "the magnifier's foot 18-42 mm behind the rail's rear" },
-  "uzi": { "maxMm": 33, "why": "the magnifier's foot 9-33 mm behind the rail's rear" },
-  "qbz95": { "maxMm": 25.7, "why": "the magnifier's foot up to 26 mm behind the handle rail's rear" },
-  "p90": { "maxMm": 19.3, "why": "the magnifier's foot 8-19 mm behind the rail's rear" },
-  "pocketgl": { "maxMm": 18, "why": "the magnifier's foot 7-18 mm behind the rail's rear" },
-  "tempest": { "maxMm": 15, "why": "the magnifier's foot 4-15 mm behind the rail's rear" },
-  "mac10": { "maxMm": 14.4, "why": "the magnifier's foot 3-14 mm behind the rail's rear" },
-  "fal": { "maxMm": 7.1, "why": "the magnifier's foot 7 mm behind the rail's rear behind the long dots" },
-  "mpx": { "maxMm": 7, "why": "the magnifier's foot 7 mm behind the rail's rear behind the long dots" }
+  "_comment": "Magnifier-rail waivers (tools/check_magnifier_rails.mjs, docs/models.md 'Magnifiers on the rail'): { gun: { maxMm, why } }. A waived gun's feet may hang off its rail up to maxMm and print as warnings; more is an error, and every other gun stays an error over 3 mm. None now: the 13 guns that failed when the check came in (2026-11-08) were fixed by a sight seat for a magnifier (spec optFMag) or a longer rail (skorp, p90, pocketgl, hailstorm). A waiver whose gun passes warns 'no longer needed'."
 }

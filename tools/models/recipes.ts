@@ -1110,7 +1110,7 @@ const G_GunRecipes = (() => {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
       else { k.prof([[0, -H * 0.55], [0, H * 0.45], [L, H * 0.45], [L, -H * 0.55]], Wd, rm); top = H * 0.45; }
       if (o.siderails) for (const x of [-1, 1]) sideRail(k, L * 0.58, L * 0.38, -0.004, x * (Wd / 2 + 0.0035)); // (a short rail each side of the front: an MP7's)
-      if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) { rcvTop = top; top = k.under('optic', () => S.rail(k, L * 0.15, L * 0.7, top, rm)); } // (the optic's rail: it is there only with one)
+      if (o.optic && !(['irons', 'notch', 'bead', 'none'] as (string | undefined)[]).includes(o.optic)) { rcvTop = top; top = k.under('optic', () => S.rail(k, o.optRail ? o.optRail[0] : L * 0.15, o.optRail ? o.optRail[1] - o.optRail[0] : L * 0.7, top, rm)); } // (the optic's rail: it is there only with one)
     } else if (rcv === 'authored') {
       // A gun made in Blender: the receiver is the model's own. With an optic (or a riser, A.sights.rail), a rail along the model's optic mount, or
       // the model's own adapter (A.rig.mount: the MP5's claw mount, its meshes extras.mount), the sight on its rail
@@ -2437,7 +2437,7 @@ const G_GunRecipes = (() => {
     k.tag('optic');
     let sight: Sight;
     if (!o.optic || o.optic === 'bead') sight = sightOf(k, { ...o, optic: 'bead' }, top, L, bl, outer, front, L * 0.5, true, 0);
-    else { const rt = S.rail(k, 0.008, L - BLK - 0.012, top, M.black()); sight = magIn(k, sightOf(k, o, rt, L, bl, outer, front, magOfs(o, 0.008, L - BLK - 0.012, (L - BLK) * 0.5), true, 0), rt, o, anim); }
+    else { const rt = S.rail(k, 0.004, 0.137, top, M.black()); sight = magIn(k, sightOf(k, o, rt, L, bl, outer, front, magOfs(o, 0.004, 0.137, (L - BLK) * 0.5) + (o.magnifier ? 0.003 : 0), true, 0), rt, o, anim); }
     k.tag('stock');
     if (o.stock) stock(k, o.stock, o.sm || M.wood(), true, o.apStock);
     k.tag('base');
@@ -2520,8 +2520,8 @@ const G_GunRecipes = (() => {
     k.tag('stock');
     stock(k, o.stock || 'wire', o.sm || M.blued(), false, o.apStock);
     k.tag('optic');
-    const rt = o.optic && o.optic !== 'notch' && S.rail(k, 0.05, 0.12, 0.024, M.black());
-    const sight = rt ? magIn(k, sightOf(k, o, rt, bl, bl, 0.024, bl, magOfs(o, 0.05, 0.12, 0.1), true, 0), rt, o, anim) : S.notch(k, 0.05, bl - 0.03, 0.042, 0.024, 0, true);
+    const rt = o.optic && o.optic !== 'notch' && S.rail(k, 0.033, 0.137, 0.024, M.black());
+    const sight = rt ? magIn(k, sightOf(k, o, rt, bl, bl, 0.024, bl, magOfs(o, 0.033, 0.137, 0.1) + (o.magnifier ? 0.003 : 0), true, 0), rt, o, anim) : S.notch(k, 0.05, bl - 0.03, 0.042, 0.024, 0, true);
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief || 0.3, muzzles: [[bl, 0, 0]], grip: [0.035, -0.075, 0], support: [0.2, -0.03, 0], anim, port: [0.0, 0.0, 0] };
   }
@@ -2680,7 +2680,7 @@ const G_GunRecipes = (() => {
     k.prof(pts([[170, 262], [170, 136], [186, 122], [470, 118], [496, 136], [530, 212], [530, 290], [462, 290], [456, 214], [430, 190], [252, 190], [250, 262]]), 0.044, B, 0,
       [pts([[420, 150], [482, 148], [486, 168], [422, 170]])]);
     for (const x of [-0.0232, 0.0232]) sideRail(k, F(410), F(250) - F(410), Y(161), x);
-    const top = S.rail(k, F(445), F(200) - F(445), Y(119), B);
+    const top = S.rail(k, F(470), F(187) - F(470), Y(119), B);
     k.tag('tac'); tactical(k, o.tac, F(232), Y(161), 0.0245);
     k.tag('tacL'); tactical(k, o.tacL, F(232), Y(161), -0.0245, -1);
     // the magazine: clear, lying along the top from the housing's front post to the stock, the rounds across it
@@ -2700,7 +2700,7 @@ const G_GunRecipes = (() => {
     k.tag('optic');
     // (irons at the two ends of the housing's rail; anything else in the middle of it)
     const anim = { mag: magP, handle: hp };
-    const sight = (['irons', 'notch', undefined] as (string | undefined)[]).includes(o.optic) ? S.irons(k, F(440), F(210), top + 0.034, top, top, o.irons || 'ar') : magIn(k, sightOf(k, o, top, F(167), bl, 0.0085, front, magOfs(o, F(445), F(200) - F(445), F(325))), top, o, anim);
+    const sight = (['irons', 'notch', undefined] as (string | undefined)[]).includes(o.optic) ? S.irons(k, F(440), F(210), top + 0.034, top, top, o.irons || 'ar') : magIn(k, sightOf(k, o, top, F(167), bl, 0.0085, front, magOfs(o, F(470), F(187) - F(470), F(325)) + (o.magnifier ? 0.003 : 0)), top, o, anim);
     k.tag('base');
     return { sy: sight.sy, fSight: sight.fSight, relief: sight.relief, muzzles: [[front, 0, 0]], grip: [F(468), Y(425), 0], support: [F(300), Y(445), 0], anim, handle,
       magAt: [m0 + 0.08, my], magTop: true, chamberAt: { side: 'right', f: F(780), y: Y(275), x: 0.028 } };
