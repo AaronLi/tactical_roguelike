@@ -1,11 +1,11 @@
-// Bakes the game's procedural guns into glTF binaries (.glb), so the browser can load a model instead of building it.
+// Bakes the game's procedural guns into glTF binaries (.glb): every part's pieces, which the game assembles into any build (and, with --guns, whole default guns for the tools).
 //   npm run bake:models              (tsc, then this)         node tools/bake_models.mjs [id ...]   (just those guns)
 //   node tools/bake_models.mjs --check                        lists the bakes that are stale against the current code
-//   node tools/bake_models.mjs --guns | --parts [id ...]      only the whole default guns / only the per-part packs (default: both)
+//   node tools/bake_models.mjs --guns [--parts] [id ...]     also (or only) the whole default guns, assets/models/guns/ (for the tools: the game loads none; default: the pieces only)
 //   -j N | --jobs N (or MODEL_BAKE_JOBS=N)   worker threads (default min(cores - 1, 8); -j 1: one process). The output is byte-identical for any N.
 //   --verbose (every platform detail line, gltf-transform log lines)   --no-props (skip the props bake that a full run ends with: tools/bake_props.mjs)   --no-hangar (skip the hangar's scene: tools/bake_hangar.mjs, which needs a Chromium)   --no-bundle (skip the bundling that runs last: tools/bundle_models.mjs)
 //
-// WHAT IT DOES. Loads the compiled game (dist/js) in a vm with the node build of three r149, builds every platform's
+// WHAT IT DOES (--guns). Loads the compiled game (dist/js) in a vm with the node build of three r149, builds every platform's
 // DEFAULT build with G.GunRecipes.display(G.Gunsmith.compile(id, defaultBuild(id))), exports it with three's GLTFExporter,
 // then shrinks it with gltf-transform (dedup, weld, prune, quantize, meshopt: never join/flatten, the parts stay separate
 // nodes). Output (all git-ignored, regenerate with the script):
@@ -51,7 +51,7 @@ for (let i = 0; i < argv.length; i++) {
   else only.push(a);
 }
 const check = flags.has('--check'), verbose = flags.has('--verbose'), noProps = flags.has('--no-props');
-const doGuns = !flags.has('--parts') || flags.has('--guns'), doParts = !flags.has('--guns') || flags.has('--parts');
+const doGuns = flags.has('--guns'), doParts = !flags.has('--guns') || flags.has('--parts'); // (the whole default guns only when asked: the game assembles every build from the pieces, the default one too)
 const jobs = Math.max(1, Math.floor(+(jobsArg || process.env.MODEL_BAKE_JOBS || Math.min((os.availableParallelism ? os.availableParallelism() : os.cpus().length) - 1, 8))) || 1);
 
 // ---- progress: [k/N] <what> <secs>s · elapsed · ETA (from the running mean)
@@ -80,7 +80,7 @@ for (const k of authoredPartKeys()) { // (the authored parts: sights etc. made i
 const platIds = Object.keys(GS.PLATFORMS || {}).filter((id) => G.WEAPONS[id]);
 const ids2 = only.length ? only : platIds.length ? platIds : G.WEAPON_LIST.map((w) => w.id);
 const pool = await makePool(jobs, { env, verbose });
-fs.mkdirSync(OUT, { recursive: true });
+if (doGuns) fs.mkdirSync(OUT, { recursive: true }); else if (!only.length && !check && doParts) fs.rmSync(OUT, { recursive: true, force: true }); // (a whole bake without them leaves none behind)
 console.log(`baking ${ids2.length} ${only.length ? 'platforms (' + ids2.join(' ') + ')' : 'platforms'} on ${jobs} ${jobs === 1 ? 'process' : 'worker threads'}${check ? ' (check)' : ''}`);
 
 // ---- how long each platform took last time (slowest first keeps the workers busy to the end); kept outside the repo, per checkout

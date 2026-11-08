@@ -257,10 +257,10 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
 }, anchors: {
   where: 'A node may carry `extras.anchors`: positions it PROVIDES, in the node\'s OWN frame (the same [forward, up, right] metres, measured from the node\'s origin along its axes; a part\'s mesh positions are in that same frame). Allowed on `part_<key>` and `group_<n>` nodes, and on the root of a per-part pack (a .glb holding one swappable part). Keys are the info anchors a part can provide (' + ANCHOR_KEYS.join(', ') + ') or a mount point `mount_<slot>` (a [forward, up, right] vec3; e.g. mount_muzzle on a frame says where a muzzle device sits).',
   assembly: [
-    'Assembly (runtime assembly of per-part packs, milestone 2; the same rule applies to the node tree of a whole-gun file) starts from the receiver\'s `info` and visits the parts in the gunsmith\'s slot order.',
+    'Assembly (the per-part pieces follow the same rules: GUN_MODEL_CONTRACT.packs; the rule applies to the node tree of a whole-gun file) starts from the receiver\'s `info` and visits the parts in the gunsmith\'s slot order.',
     'Every provided position is first moved into the gun\'s frame: the providing node\'s transform in the assembled gun applied to the position (the part\'s placement), then re-expressed as [forward, up, right] = [-z, y, x].',
     '`muzzles` is a LIST built from whichever parts provide it: if any part provides `muzzles`, the gun\'s `info.muzzles` is the concatenation of those parts\' lists (tree order) and the receiver\'s own default is dropped; if none does, the receiver\'s is kept. A barrel block with 6 barrels provides 6 muzzles.',
-    '`mount_<slot>` anchors are OFFSETS: the displacement [forward, up, right] metres of the part in <slot> from where its pack stores it (a pack stores a part where it sits when every other part is the platform\'s reference one). Every provider\'s offsets for a slot ADD UP (a barrel and a handguard may both move a light); the sum is `info.mounts.mount_<slot>` and the whole part moves by it.',
+    '`mount_<slot>` anchors are OFFSETS: the displacement [forward, up, right] metres of the part in <slot> from where its piece sits when no part offsets it (no offset from the provider itself: GUN_MODEL_CONTRACT.packs offsets). Every provider\'s offsets for a slot ADD UP (a barrel and a handguard may both move a light); the sum is `info.mounts.mount_<slot>` and the whole part moves by it.',
     'Every other anchor (grip, support, magAt, port, ch, bolt, slide, cylAt, cup, cheek, chamberAt) is single-valued: a part\'s value overrides the receiver\'s and an earlier part\'s (the last provider in slot order wins; the validator warns when two parts of one gun both provide it).',
   ],
   muzzles: 'A gun can have MORE THAN ONE muzzle (an over/under, a Metal Storm-style barrel block): `info.muzzles` is always a list of at least one [forward, up, right]; consumers must iterate it and never assume entry [0] is the only one.',
@@ -1131,39 +1131,12 @@ function contractMarkdown(): string {
 //  THE LOADER
 // ===================================================================================================================
 
-interface BakedIndex { version: number; three: string; src: string; guns: Record<string, { file: string; code: string; hash: string; bytes: number; gz: number; meshes: number; tris: number }> }
 
   const qs = (() => { try { return new URLSearchParams(location.search); } catch (e) { return new URLSearchParams(''); } })();
   /** ?checkModels: validate each model as it loads. (Every gun the game shows comes from these files: there is no flag and no procedural fallback.) */
   const on = true, checking = qs.has('checkModels');
-  const BASE = 'assets/models/guns/', R = { base: '' }; // (R.base: where the page's folder is from here: '' on the page, '../../' in the export worker, js/exportworker.ts)
-  let index: Promise<BakedIndex | null> | null = null, indexData: BakedIndex | null = null;
-  const loaded = new Map<string, any>(); // gun id -> its loaded root node (the glTF scene's child)
-  const pending = new Map<string, Promise<boolean>>();
+  const R = { base: '' }; // (R.base: where the page's folder is from here: '' on the page, '../../' in the export worker, js/exportworker.ts)
   const glbReady = (): Promise<boolean> => (G.GLB ? G.GLB.ready.then((x) => x, () => false) : Promise.resolve(false));
-  const getIndex = () => index || (index = fetch(R.base + BASE + 'index.json', { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null).then((ix) => (indexData = ix)));
-
-  /** Loads the baked models of these gun ids (all of them if none are named); resolves to how many are ready. */
-  async function preload(ids?: string[]): Promise<number> {
-    if (!on) return 0;
-    const [ix, ok] = await Promise.all([getIndex(), glbReady()]);
-    if (!ix || !ok) return 0;
-    const want = (ids && ids.length ? ids : Object.keys(ix.guns)).filter((id) => ix.guns[id]);
-    let n = 0, i = 0;
-    const one = async (id: string) => {
-      if (loaded.has(id)) { n++; return; }
-      let p = pending.get(id);
-      if (!p) pending.set(id, (p = G.GLB!.load(BASE + ix.guns[id].file).then((scene) => {
-        if (checking) { const r = validate(describeScene(scene), id); for (const e of r.errors) console.error(`[checkModels] ${id}: ${e}`); for (const w of r.warnings) console.warn(`[checkModels] ${id}: ${w}`); }
-        const root = scene.children.find((c: any) => c.name === id) || scene.children[0];
-        if (root) loaded.set(id, root);
-        return !!root;
-      }, (e: any) => { console.warn('[baked guns] ' + id + ': ' + (e && e.message || e)); return false; })));
-      if (await p) n++;
-    };
-    await Promise.all(Array.from({ length: Math.min(6, want.length) }, async () => { while (i < want.length) await one(want[i++]); }));
-    return n;
-  }
 
   // ---- per-part packs: loading, and assembling any build from them ----
   const PARTS_BASE = 'assets/models/parts/', SHARED_DIR = '_shared/';
@@ -1303,36 +1276,15 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
   }
 
   /**
-   * The baked version of display(def): { group, info } built from the loaded glTF (the whole default gun) or assembled from the
-   * platform's packs (any other build), or null (not on, not loaded yet, or not covered: the procedural model is used then; the
-   * platform's packs are fetched in the background so that the next one is).
+   * The baked version of display(def): { group, info } assembled from the platform's pieces, or null (not loaded yet: the platform's pieces are parsed in
+   * the background so that the next ask is answered). Every build, the default one too, is assembled: there is no whole-gun file to clone (assembling a
+   * default build takes about as long as cloning one did, ~1 ms).
    */
   function displayBaked(def: any, skin?: any): { group: THREE.Group; info: any } | null {
     if (!on || !def) return null;
-    const whole = displayWhole(def, skin); if (whole) return whole;
     const a = assemble(def, skin); if (a) return a;
     if (!platPending.has(def.id)) preloadPlatform(def.id);
     return null;
-  }
-  function displayWhole(def: any, skin?: any): { group: THREE.Group; info: any } | null {
-    const src = loaded.get(def.id), ix = indexData;
-    if (!src) return null;
-    const code = def.code || G.Gunsmith.defaultCode(def.id);
-    if (code !== G.Gunsmith.defaultCode(def.id) || (ix && ix.guns[def.id] && ix.guns[def.id].code !== code)) return null; // (a custom build, or a default that has moved on since the bake)
-    const group = src.clone(true) as THREE.Group, M = G.GunMaterials.M as Record<string, () => THREE.Material>;
-    const ex = src.userData[NAMES.extras.info] || {};
-    group.name = ''; group.userData = {};
-    group.traverse((o: any) => {
-      if (!o.isMesh) return;
-      o.geometry = o.geometry.clone(); // (own geometry, as a procedural gun's: the gunsmith and icons dispose it)
-      const name = o.material && o.material.name;
-      if (M[name] && !o.name.startsWith(NAMES.displayPrefix)) o.material = M[name](); // (a display surface keeps its own: the game paints it)
-    });
-    const info = JSON.parse(JSON.stringify(ex)); info.anim = {};
-    for (const [k, nm] of Object.entries(ex.anim || {})) { const n = group.getObjectByName(nm as string); if (n) info.anim[k] = n; }
-    if (ex.quarrelMats) delete info.quarrelMats; // (viewmodel only; the viewmodel isn't baked)
-    if (skin && skin.length) G.Stickers.decorate(group, skin);
-    return { group, info };
   }
   // ===================================================================================================================
   //  LOADING AT RUN TIME: the classic GLTFLoader, the boot's indexes, the preloads, what is ready (js/gunmodels.ts is the facade over these)
@@ -1408,8 +1360,8 @@ interface BakedIndex { version: number; three: string; src: string; guns: Record
     return plan.tags.every((t) => !t.entry || packRoots.has(packUrl(def.id, t.entry.file!)));
   }
   return {
-    boot, ready, infoFromIndex, setRoot, loadFile, dequantize, fetchJson, on, checking, preload, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredVariant, validateAuthoredPart, validateAuthoredPartConfig, authoredPartSlots: AUTHORED_PART_SLOTS, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
-    infoSchema, partsIndexSchema, contractMarkdown, loaded: (id: string) => loaded.has(id), platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
+    boot, ready, infoFromIndex, setRoot, loadFile, dequantize, fetchJson, on, checking, preloadPlatform, ensure, assemble, infoOf, loadIndex: async (id: string) => !!(await platformIndex(id)), displayBaked, contract: GUN_MODEL_CONTRACT, infoFields: INFO_FIELDS, partsIndexFields: PARTS_INDEX_FIELDS, validate, validateAuthored, validateAuthoredConfig, validateAuthoredVariant, validateAuthoredPart, validateAuthoredPartConfig, authoredPartSlots: AUTHORED_PART_SLOTS, validatePack, validatePartsIndex, describeGltfJson, describeScene, glbJson,
+    infoSchema, partsIndexSchema, contractMarkdown, platformLoaded: (id: string) => platIx.has(id), SLOTS, PARTS, NAMES,
     // the pure side of the packs (no three.js): the baker and the tests check the packs with the same code the game plans with
     planBuild, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,
   };
