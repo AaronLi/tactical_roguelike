@@ -406,8 +406,8 @@ const G_Gunsmith = (() => {
     desc: 'Lifts a pistol red dot to rifle height on a rail. Mount one on it.' });
   for (const p of BY_MOUNT.get('op:pso')!) if (p.model!.optic === 'minidot') { p.alsoMounts = ['op:rmr']; if (!BY_MOUNT.has('op:rmr')) BY_MOUNT.set('op:rmr', []); BY_MOUNT.get('op:rmr')!.push(p); }
   // Magnifiers: behind a red dot or holographic sight, flipped in or out of the way (scroll while aiming)
-  [['bright', 'Brightline 2× micro magnifier', 2, 0.07, 300, { ergo: -2, weight: 0.2 }, 1], ['strix', 'Strix FTS 3× flip magnifier', 3, 0.085, 420, { ergo: -4, weight: 0.3 }, 2],
-    ['meridian', 'Meridian 5× flip magnifier', 5, 0.1, 640, { ergo: -6, weight: 0.38 }, 3]]
+  [['bright', 'Brightline 2× micro magnifier', 2, 0.06, 300, { ergo: -2, weight: 0.2 }, 1], ['strix', 'Strix FTS 3× flip magnifier', 3, 0.075, 420, { ergo: -4, weight: 0.3 }, 2],
+    ['meridian', 'Meridian 5× flip magnifier', 5, 0.09, 640, { ergo: -6, weight: 0.38 }, 3]]
     .forEach(([b, n, px, len, price, st, tier]: any[], i) => add({ id: `mgn.${i}`, slot: 'magnifier', mount: 'magn', brand: BR[b], name: n, price, tier, st, set: { magnifier: px },
       desc: `Flips in behind the dot for ${px}×, out of the way for 1× (scroll while aiming).`, model: { magnifier: { px, len } } }));
 
@@ -796,9 +796,10 @@ const G_Gunsmith = (() => {
   // the HK MP5 (A2) and MP5SD, modelled in Blender (models/mp5, models/mp5sd, built by models/mp5_kit.py; L, hgMax and mag from their anchors): the stamped
   // receiver, the SEF trigger housing with its grip, the A2 stock, the drum sight; the MP5's slim handguard, front sight and three-lug barrel, the MP5SD's
   // ribbed handguard round its can. The model's handguard is the real 121 mm one; the catalogue's slim forend stays 85 mm (hgMax only caps what fits:
-  // its 121 mm is over every handguard on the mount, so the fits are what they were). grip: where the AR grips hang (their front top on mount_grip)
-  P('mp5', 'rifle', { irons: 'hk', rcv: 'authored', authored: 'mp5', L: 0.2574, hgMax: 0.1216, W: 0.041, optF: 0.12, grip: 0.0734, support: 0.31, mag: { f: 0.2028, y: -0.012 } }, { barrel: { len: 0.1 }, thread: 'r9', muzzle: 'tri', handguard: ['smg', { t: 'slim', len: 0.085, m: 'polymer' }], stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.18, d: 0.032, c: 0.058, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
-  P('mp5sd', 'rifle', { irons: 'hk', rcv: 'authored', authored: 'mp5sd', L: 0.2574, hgMax: 0, W: 0.041, optF: 0.12, grip: 0.0734, support: 0.36, mag: { f: 0.2028, y: -0.012 } }, { barrel: { len: 0.1 }, integral: { len: 0.2, r: 0.025 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.18, d: 0.032, c: 0.058, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
+  // its 121 mm is over every handguard on the mount, so the fits are what they were). grip: where the AR grips hang (their front top on mount_grip). optFMag: a sight with
+  // a magnifier behind it goes forward on the claw mount's 138 mm rail (0.0952 .. 0.2332): every reflex sight's foot and the magnifier's (34 mm, right behind the sight) on it
+  P('mp5', 'rifle', { irons: 'hk', rcv: 'authored', authored: 'mp5', L: 0.2574, hgMax: 0.1216, W: 0.041, optF: 0.12, optFMag: 0.2, grip: 0.0734, support: 0.31, mag: { f: 0.2028, y: -0.012 } }, { barrel: { len: 0.1 }, thread: 'r9', muzzle: 'tri', handguard: ['smg', { t: 'slim', len: 0.085, m: 'polymer' }], stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.18, d: 0.032, c: 0.058, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
+  P('mp5sd', 'rifle', { irons: 'hk', rcv: 'authored', authored: 'mp5sd', L: 0.2574, hgMax: 0, W: 0.041, optF: 0.12, optFMag: 0.2, grip: 0.0734, support: 0.36, mag: { f: 0.2028, y: -0.012 } }, { barrel: { len: 0.1 }, integral: { len: 0.2, r: 0.025 }, thread: 'r9', muzzle: 'crown', stock: ['smg', 'fixed'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.18, d: 0.032, c: 0.058, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
   // (the MP5SD's two other barrels are modelled beside it, models/mp5sd/barrel_long.glb and barrel_open.glb: the extended can and the unsuppressed conversion)
   for (const n of ['long', 'open']) PARTS['mp5sd.br.' + n].model!.avBarrel = 'barrel_' + n;
   // the KRISS Vector Gen II, traced from a photo (js/gunmodels.ts rifle(), rcv 'vector'): the bore low, the magazine raked back
