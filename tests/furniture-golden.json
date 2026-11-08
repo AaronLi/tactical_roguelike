@@ -3427,26 +3427,26 @@
    "level": 10,
    "theme": 9,
    "night": false,
-   "groups": 2690,
-   "prims": 26154,
-   "mats": 172,
+   "groups": 2694,
+   "prims": 26170,
+   "mats": 175,
    "tex": 26,
    "kinds": {
-    "box": 19792,
-    "cyl": 2796,
+    "box": 19796,
+    "cyl": 2804,
     "ico": 3115,
     "side": 7,
-    "sph": 417,
+    "sph": 421,
     "plane": 10,
     "grid": 17
    },
-   "hash": "051b114b",
-   "solids": "ea9e9e37",
+   "hash": "e2945aa7",
+   "solids": "82295b46",
    "pieces": {
     "(rooms)": [
      23,
      242,
-     "7048bc8e"
+     "206f17bf"
     ],
     "bench": [
      6,
@@ -3517,6 +3517,11 @@
      1,
      30,
      "63598293"
+    ],
+    "flagpole": [
+     4,
+     16,
+     "595d29c8"
     ],
     "fruittree": [
      8,
@@ -3590,26 +3595,26 @@
    "level": 10,
    "theme": 9,
    "night": true,
-   "groups": 2690,
-   "prims": 26154,
-   "mats": 172,
+   "groups": 2694,
+   "prims": 26170,
+   "mats": 175,
    "tex": 26,
    "kinds": {
-    "box": 19792,
-    "cyl": 2796,
+    "box": 19796,
+    "cyl": 2804,
     "ico": 3115,
     "side": 7,
-    "sph": 417,
+    "sph": 421,
     "plane": 10,
     "grid": 17
    },
-   "hash": "051b114b",
-   "solids": "ea9e9e37",
+   "hash": "e2945aa7",
+   "solids": "82295b46",
    "pieces": {
     "(rooms)": [
      23,
      242,
-     "7048bc8e"
+     "206f17bf"
     ],
     "bench": [
      6,
@@ -3680,6 +3685,11 @@
      1,
      30,
      "63598293"
+    ],
+    "flagpole": [
+     4,
+     16,
+     "595d29c8"
     ],
     "fruittree": [
      8,
@@ -4985,6 +4995,20 @@
    },
    "hash": "f6d5dbd7",
    "solids": "efca4559"
+  },
+  "flagpole": {
+   "v": 0.8622266186866909,
+   "groups": 1,
+   "prims": 4,
+   "mats": 3,
+   "tex": 0,
+   "kinds": {
+    "cyl": 2,
+    "sph": 1,
+    "box": 1
+   },
+   "hash": "ff3189ab",
+   "solids": "b92f8fa4"
   },
   "flamp": {
    "v": 0.27942180912941694,

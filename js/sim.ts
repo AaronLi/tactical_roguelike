@@ -49,11 +49,46 @@ const G_Sim = {
     return w;
   },
 
+  // ---------------------------------------------------------------- the wind
+  // A level's wind (docs/level-data.md "Wind"): the air out in the open moving sideways, { x, z } m/s (where it blows TO),
+  // from the level's seed and the theme's mean speed (G.THEMES wind; none, no wind) at the level's clock t (s). Three
+  // terms of smooth noise (each three sines, their rates and phases from the seed): the direction wanders slowly about
+  // one picked from the seed (DIR radians either way, over minutes), the speed swells and eases (SPD of the mean, over a
+  // minute or so), and gusts on top (GUST of the mean, over seconds). Smooth in t (no steps), the same for the same seed and t.
+  // The host's simulation works it out on its clock and tells everyone ('wind': js/server.ts windTick); the screens use
+  // what they're told (js/wind.ts), so nobody's clock has to agree with anybody's.
+  WIND: { DIR: 1.1, DIR_T: 300, SPD: 0.3, SPD_T: 90, GUST: 0.2, GUST_T: 8, SEND: 0.5 },
+  windAt(seed: number, mean: number, t: number) {
+    if (!(mean > 0)) return { x: 0, z: 0 };
+    const W = this.WIND, r = G.U.rng(((seed >>> 0) ^ 0x3d1e5a) >>> 0), d0 = r() * Math.PI * 2;
+    // smooth noise in about [-1, 1], period about T: three sines, their rates 1, ~1.8 and ~3.2 times the slowest, each 0.4 the last's size
+    const n = (T: number) => { let s = 0, a = 1, f = 1; for (let i = 0; i < 3; i++) { const w = (2 * Math.PI / T) * f * (0.8 + 0.4 * r()), ph = r() * Math.PI * 2; s += a * Math.sin(w * t + ph); a *= 0.4; f *= 1.6 + r() * 0.4; } return s / 1.56; };
+    const dir = d0 + W.DIR * n(W.DIR_T), gust = n(W.GUST_T), sp = Math.max(0, mean * (1 + W.SPD * n(W.SPD_T) + W.GUST * gust));
+    return { x: sp * Math.cos(dir), z: sp * Math.sin(dir) };
+  },
+  // whether the wind reaches (x, y, z): open to the sky there, on the floor it's on (map.out: indoors there's none, and nor
+  // under a roof); off the map, the open air
+  windy(map: LvMap | null, x: number, y: number, z: number) {
+    if (!map) return false;
+    const L = G.Level, TS = L.TS, tx = Math.floor(x / TS), tz = Math.floor(z / TS);
+    if (tx < 0 || tz < 0 || tx >= map.W || tz >= map.H) return true;
+    const fm = L.floorMap(map, L.floorAt(map, x, y, z)), out = (fm && fm.out) || map.out;
+    return !!(out && out[tz * map.W + tx]);
+  },
+  // The wind on a round in flight, a step on: drag works on the round's speed through the air, not over the ground, so
+  // over a step where drag leaves k of its speed (k = exp(-len / drag), js/player.ts stepRound) its velocity goes
+  // k v + (1 - k) w: it's carried toward the wind's. Over a flight that adds up to the lag-time rule, drift = w (t - t
+  // in a vacuum), exactly, for this game's drag (speed falling off exponentially with distance: tools/wind.test.mjs).
+  windStep(v: { x: number; z: number }, k: number, w: { x: number; z: number } | null | undefined) { if (w) { v.x += (1 - k) * w.x; v.z += (1 - k) * w.z; } },
+  // the lag time (s) of a round leaving at v0 m/s, drag metres (G.dragOf), s metres out, gravity left out: its time of flight,
+  // drag / v0 (e^(s / drag) - 1), less s / v0, the time it'd take with no drag. A crosswind of w carries it w times this sideways.
+  lagAt(v0: number, drag: number, s: number) { return drag > 1e8 ? 0 : (drag / v0) * Math.expm1(s / drag) - s / v0; },
+
   // ---------------------------------------------------------------- a round's arc
   // where a round would end up if nobody's in the way: its arc, stepped against the walls only (what the squad is told, to
-  // draw it going there)
-  predictEnd(p0: THREE.Vector3, v0: THREE.Vector3, drag: number, grav: number, map: LvMap) {
-    const p = p0.clone(), v = v0.clone(), dt = 1 / 60;
+  // draw it going there); wind: the level's now (windAt), carrying it out in the open (windy)
+  predictEnd(p0: THREE.Vector3, v0: THREE.Vector3, drag: number, grav: number, map: LvMap, wind?: { x: number; z: number } | null) {
+    const p = p0.clone(), v = v0.clone(), dt = 1 / 60, wo = wind && (wind.x || wind.z) ? wind : null;
     for (let i = 0, dist = 0; i < 240 && dist < G.ROUND_LIFE.dist; i++) {
       const p1 = p.clone().addScaledVector(v, dt); p1.y -= 0.5 * grav * dt * dt;
       const seg = p1.clone().sub(p), len = seg.length();
@@ -61,7 +96,9 @@ const G_Sim = {
       seg.divideScalar(len);
       const h = G.Level.raycast(map, p.x, p.y, p.z, seg.x, seg.y, seg.z, len);
       if (h.t < len) return p.addScaledVector(seg, h.t);
-      v.multiplyScalar(Math.exp(-len / drag)); v.y -= grav * dt;
+      const k = Math.exp(-len / drag);
+      v.multiplyScalar(k); v.y -= grav * dt;
+      if (wo && this.windy(map, p.x, p.y, p.z)) this.windStep(v, k, wo);
       p.copy(p1); dist += len;
     }
     return p;
