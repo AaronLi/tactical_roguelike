@@ -4,442 +4,442 @@
  "builds": {
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "default",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,receiver=rcv.rpk": {
    "label": "bare (required slots only)",
-   "geometry": "035f2718188b6cfb",
+   "geometry": "b5555e9ce3f0e56b",
    "info": "b0ebe547c05e82b8"
   },
   "barrel=rpk.br.16,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "shortest barrel rpk.br.16",
-   "geometry": "4eba1d938eceb297",
+   "geometry": "9aabec98b17b96e3",
    "info": "1c0127efdeca8ffe"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.ak,stock=oem.stk.ak.4": {
    "label": "receiver=rcv.ak",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.ak74,stock=oem.stk.ak.4": {
    "label": "receiver=rcv.ak74",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.br.16_3,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "barrel=rpk.br.16_3",
-   "geometry": "0e955654ae563b0b",
+   "geometry": "ca5d037a5fa17436",
    "info": "953aee43699ade1a"
   },
   "barrel=rpk.br.20,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "barrel=rpk.br.20",
-   "geometry": "14e7f06ae2b14f36",
+   "geometry": "598ce2eb3f2c0639",
    "info": "2fbcfd09232b048a"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.prong,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.prong",
-   "geometry": "5932b6a19e977c51",
+   "geometry": "252e6582b9bd37c6",
    "info": "26345aff0a813ac3"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.comp,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.comp",
-   "geometry": "5a9e6f857c0ac994",
+   "geometry": "fe445a5878b4662b",
    "info": "27b874b4b4c6357d"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.brake,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.brake",
-   "geometry": "7195d9374e95c1ee",
+   "geometry": "8549a03ad33be9e1",
    "info": "43a4ec949a8a8933"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.can,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.can",
-   "geometry": "086d91cac67cf6f7",
+   "geometry": "b562549058fdc08b",
    "info": "66b88a78394485c3"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.short,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.short",
-   "geometry": "b18e4216853732b9",
+   "geometry": "137f0771be216e1c",
    "info": "ca6e4f8588a0c6e9"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.a2,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.a2",
-   "geometry": "ec96a78e5d2ebe75",
+   "geometry": "94519ca971db2b20",
    "info": "e4df4f35553834d0"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.slant,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.slant",
-   "geometry": "3ea7b82b248ebbd8",
+   "geometry": "f80a5a9f2f3419ce",
    "info": "8b07eaad1988b09f"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.74,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.74",
-   "geometry": "7195d9374e95c1ee",
+   "geometry": "8549a03ad33be9e1",
    "info": "43a4ec949a8a8933"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.boost,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=mz.rak.boost",
-   "geometry": "95553249230adb29",
+   "geometry": "ab1e7aa490c597f3",
    "info": "4d7f7850ba97ab5b"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "muzzle=(none)",
-   "geometry": "970da5a7c56351b0",
+   "geometry": "ff1ae145d7a51a3a",
    "info": "b0ebe547c05e82b8"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=hg.ak.0",
-   "geometry": "5b34393bb32e9583",
+   "geometry": "5b1a22476f30e2b0",
    "info": "82725c889a6459cb"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=hg.ak.1,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=hg.ak.1",
-   "geometry": "0cefe56209b105c9",
+   "geometry": "ab7309247a1e6eab",
    "info": "d0b408aa51cf17f8"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=hg.ak.2,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=hg.ak.2",
-   "geometry": "637089fa84d327d7",
+   "geometry": "cc3d55861b403a03",
    "info": "d0b408aa51cf17f8"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=hg.ak.3,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=hg.ak.3",
-   "geometry": "7e42ceac44adc8ff",
+   "geometry": "19b611695cb36630",
    "info": "82725c889a6459cb"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.6,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=oem.hg.ak.6",
-   "geometry": "9faf0bc34565bf1b",
+   "geometry": "7de9692b3ff63fc4",
    "info": "97eaecde23595c36"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.7,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=oem.hg.ak.7",
-   "geometry": "b78ad6dbcd6021eb",
+   "geometry": "3db3cd92eca7d3bc",
    "info": "1d2727d72e0d2210"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.8,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=oem.hg.ak.8",
-   "geometry": "ddc2ec4658223777",
+   "geometry": "20b17ea411710ee9",
    "info": "561202f5097edaf1"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.9,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=oem.hg.ak.9",
-   "geometry": "e9791300b8d299fe",
+   "geometry": "fabe8fde8baf2940",
    "info": "97eaecde23595c36"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=hg.ak.short.rail,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=hg.ak.short.rail",
-   "geometry": "9fcacf593f7ba2c8",
+   "geometry": "043360319b95504d",
    "info": "561202f5097edaf1"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=hg.ak.short.mlok,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "handguard=hg.ak.short.mlok",
-   "geometry": "8076587dd2c20ade",
+   "geometry": "16d41b51c4f64aff",
    "info": "561202f5097edaf1"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.0,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.0",
-   "geometry": "f7c9476bbfeeef4b",
+   "geometry": "ea94eb27e2a04505",
    "info": "cbee41e1f127652a"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.1,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.1",
-   "geometry": "7a3a931182b220ce",
+   "geometry": "cc2efe16824ef87f",
    "info": "aa80f4f3863498a8"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.2,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.2",
-   "geometry": "ef39a117f70586a4",
+   "geometry": "d0e259cdc8ac5889",
    "info": "15836a73cbadb13c"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.3,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.3",
-   "geometry": "d3af852bab03b7bc",
+   "geometry": "272c98ec02af12b8",
    "info": "b8a0a759b4ff595b"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.4,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.4",
-   "geometry": "741f1f1310ba530e",
+   "geometry": "c9d1ecf01416b20a",
    "info": "b8a0a759b4ff595b"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.5,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.5",
-   "geometry": "21675250060114b9",
+   "geometry": "848f90569f6de8a5",
    "info": "85424f6a874478a9"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.6,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.6",
-   "geometry": "de27d17cca18c5b2",
+   "geometry": "c3d4666e75c356d5",
    "info": "a2ebc238c9023f5f"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.7,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.7",
-   "geometry": "e2e32143ac8a5b31",
+   "geometry": "d99dfa4ebd63b1db",
    "info": "e3c2631ef012abac"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.8,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.8",
-   "geometry": "6d925548f0ea9992",
+   "geometry": "4819c37020b9e7e1",
    "info": "94872bba0bb2daca"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.9,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.9",
-   "geometry": "c51a02abf54e3599",
+   "geometry": "0475197204bceb1f",
    "info": "62f89181f7f85e43"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.10,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.10",
-   "geometry": "2080ea763c40f090",
+   "geometry": "d3a45751eb41bd49",
    "info": "f2e1ba579bfe5259"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.11,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.11",
-   "geometry": "6e2ddbc0bd3cfe84",
+   "geometry": "261fc65da30e4310",
    "info": "3c97603cc06df008"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.12,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.12",
-   "geometry": "7db3463654c4302f",
+   "geometry": "a7f9b258a6da785b",
    "info": "cbee41e1f127652a"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.13,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.13",
-   "geometry": "886d5f2b9eee72e7",
+   "geometry": "6728b781d7383b2f",
    "info": "5ae8f99f32fd5faa"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.14,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.14",
-   "geometry": "f7dfe747846a02f5",
+   "geometry": "62734cab8730c9c0",
    "info": "373b857d60ba29a4"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.15,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.15",
-   "geometry": "1e670011ee0a73e3",
+   "geometry": "084ab30bb6cecba7",
    "info": "0f63dbfc63d07df5"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.pic.16,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.pic.16",
-   "geometry": "603ef39877a425f3",
+   "geometry": "9bad7f12d66bfc64",
    "info": "dc6819778b0e320d"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=ak.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=ak.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=aug.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=aug.optic",
-   "geometry": "f7c9476bbfeeef4b",
+   "geometry": "ea94eb27e2a04505",
    "info": "cbee41e1f127652a"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=an94.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=an94.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=oem.op.pic.20,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=oem.op.pic.20",
-   "geometry": "5fe3a308f3def916",
+   "geometry": "d5899ed381aa1563",
    "info": "42a601f6480ea6ac"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=oem.op.pic.21,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=oem.op.pic.21",
-   "geometry": "5b418bd5f8ea005f",
+   "geometry": "950f71c4749553db",
    "info": "5c881ce5120dc980"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=oem.op.pic.22,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=oem.op.pic.22",
-   "geometry": "454ee27e21d23364",
+   "geometry": "cb813cf1c2252074",
    "info": "708f3cff1118d866"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=oem.op.pic.23,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=oem.op.pic.23",
-   "geometry": "8d93c13e5b56a01b",
+   "geometry": "77f8fa426231bb2b",
    "info": "708f3cff1118d866"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=uzi.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=uzi.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=ppsh.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=ppsh.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=pump.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=pump.optic",
-   "geometry": "8a28e583ff03fa4f",
+   "geometry": "d8184aff3056da2f",
    "info": "08bf2795b60c1595"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=dbl.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=dbl.optic",
-   "geometry": "8a28e583ff03fa4f",
+   "geometry": "d8184aff3056da2f",
    "info": "08bf2795b60c1595"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=saiga.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=saiga.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=pkm.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=pkm.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=skorp.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=skorp.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=mac10.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=mac10.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=ak74.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=ak74.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=aks74u.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=aks74u.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=aug9.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=aug9.optic",
-   "geometry": "f7c9476bbfeeef4b",
+   "geometry": "ea94eb27e2a04505",
    "info": "cbee41e1f127652a"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=sawn.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=sawn.optic",
-   "geometry": "8a28e583ff03fa4f",
+   "geometry": "d8184aff3056da2f",
    "info": "08bf2795b60c1595"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=thor.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=thor.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=pocketgl.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=pocketgl.optic",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=oem.op.pic.39,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=oem.op.pic.39",
-   "geometry": "9caf2a81d026a0fe",
+   "geometry": "26e256ba9c9e4c80",
    "info": "fe3be6b28bac9cf6"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=qbz95.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=qbz95.optic",
-   "geometry": "f7c9476bbfeeef4b",
+   "geometry": "ea94eb27e2a04505",
    "info": "cbee41e1f127652a"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=crossbow.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=crossbow.optic",
-   "geometry": "357bfb0d610a0f8a",
+   "geometry": "c7cb3ec5febce14b",
    "info": "37231b821f99affd"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.auth.falcon,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.auth.falcon",
-   "geometry": "592075dbdd832c10",
+   "geometry": "818b0d29ae3a8eb4",
    "info": "a43c3a0b84adbbd5"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.bc.0,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.bc.0",
-   "geometry": "4be62f7195411e2f",
+   "geometry": "93499db45aba82b9",
    "info": "62f89181f7f85e43"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=hailstorm.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=hailstorm.optic",
-   "geometry": "8a28e583ff03fa4f",
+   "geometry": "d8184aff3056da2f",
    "info": "08bf2795b60c1595"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=op.th.0,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=op.th.0",
-   "geometry": "3cfbbead9b658d38",
+   "geometry": "bad4f2f045e4ecd1",
    "info": "49c17e71c924bf14"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "optic=(none)",
-   "geometry": "f57a788a3a1003dd",
+   "geometry": "3d14f6c197267602",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=gr.ak.0,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "grip=gr.ak.0",
-   "geometry": "ccacb2ad8715ea14",
+   "geometry": "c4e24de59f715b00",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=gr.ak.1,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "grip=gr.ak.1",
-   "geometry": "61668e9cd5c20deb",
+   "geometry": "0add094360861cc4",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=gr.ak.2,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "grip=gr.ak.2",
-   "geometry": "997ff7fbe2da2a6c",
+   "geometry": "6f101b97bf802b0a",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.4,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "grip=oem.gr.ak.4",
-   "geometry": "71f213ab50e2fc46",
+   "geometry": "7797825c785af8cc",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.5,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "grip=oem.gr.ak.5",
-   "geometry": "daedfa0254391bcb",
+   "geometry": "6131ab1bb6911ea3",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=stk.ak.0": {
    "label": "stock=stk.ak.0",
-   "geometry": "1d4513879eae08af",
+   "geometry": "da7a7abbb54a5d22",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=stk.ak.1": {
    "label": "stock=stk.ak.1",
-   "geometry": "eef43f279e16a249",
+   "geometry": "2c01bafb0146b0bb",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=stk.ak.2": {
    "label": "stock=stk.ak.2",
-   "geometry": "0f169b42e292aabb",
+   "geometry": "813ebcecfbade042",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=stk.ak.3": {
    "label": "stock=stk.ak.3",
-   "geometry": "da5f97795dbd7186",
+   "geometry": "50a5ec180caf5e51",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.5": {
    "label": "stock=oem.stk.ak.5",
-   "geometry": "bf106ea659a33df2",
+   "geometry": "1317a9785a4b9f50",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.40,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk": {
    "label": "stock=(none)",
-   "geometry": "139f2619db630a2f",
+   "geometry": "d8a59c439c91b4ba",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.20,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "mag=akm.mag.20",
-   "geometry": "76ec58ddb2e6cca5",
+   "geometry": "126f7aa99d1ff164",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.30,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "mag=akm.mag.30",
-   "geometry": "383323a519858e87",
+   "geometry": "e3565e5cb7ae8329",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.75,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "mag=akm.mag.75",
-   "geometry": "ca531379fb7311d1",
+   "geometry": "814c0e9d12ea6f7a",
    "info": "a58118957631b823"
   },
   "barrel=rpk.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=akm.mag.30c,muzzle=mz.rak.cap,optic=rpk.optic,receiver=rcv.rpk,stock=oem.stk.ak.4": {
    "label": "mag=akm.mag.30c",
-   "geometry": "6cc797d79cb29799",
+   "geometry": "9ab2f5f5e191f880",
    "info": "a58118957631b823"
   }
  }
