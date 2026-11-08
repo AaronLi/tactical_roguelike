@@ -195,8 +195,8 @@ and blows the flags.
   wind, and the suspects aim off for it as they hold up for the drop (js/server.ts fire). At 20 m in 5 m/s a 5.56 drifts
   about a millimetre; at 600 m about 1.4 m (tools/wind.test.mjs).
 - **The ballistic computer** (op.bc.0, `def.calc` 2: js/viewmodel.ts `calcStep`, still 5 Hz): `G.flight` samples carry
-  `lag`; the marker moves sideways by the crosswind across the line of sight (the wind where the measured range ends, if
-  it's windy there) times the lag at that range, in 0.5 mil cells. The BC-1 rail module shows range only: unchanged.
+  `lag`; the marker moves sideways by the crosswind across the line of sight times the lag at that range, times the share
+  of eight points along the line that are out in the wind (from a room out a window, the part outside), in 0.5 mil cells. The BC-1 rail module shows range only: unchanged.
 - **Flags**: the `flagpole` piece (js/furniture.ts: a footing, a 7.2 m pole, a ball; solids are the footing and the pole)
   is ordinary furniture, so it's in the description's `props` and the Bevy port places it as any piece. The Sandia Crest
   gets one by a wall of each building (the Crest House, the viewing site, the greenhouse) and one each at the parking lot
