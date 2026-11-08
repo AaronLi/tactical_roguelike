@@ -17,10 +17,10 @@ const G_Arsenal = (() => {
       pro: { name: 'Hornet', stat: 'burst', n: 30, what: 'five-hit bursts', parts: { barrel: 'tx22.br.match', muzzle: 'mz.r22.comp', optic: 'op.pso.1' } } },
     { id: 'b92', from: 'tx22', path: 'auto', ring: 2, stat: 'burst', n: 15, what: 'five-hit bursts', how: "Five hits on one suspect inside a second, once a suspect. They needn't go down.",
       pro: { name: 'Tre Colpi', stat: 'trio', n: 25, what: 'burst kills', parts: { slide: 'b92.sl.comp', tac: 'ptac.1', grip: 'gr.pistol.0' } } },
-    { id: 'g18', from: 'b92', path: 'auto', ring: 3, stat: 'trio', n: 15, what: 'burst kills', how: 'Two or more rounds of one burst hit them, and they go down.',
-      pro: { name: 'Buzzsaw', stat: 'multi', n: 20, what: 'double kills', parts: { slide: 'g18.sl.comp', tac: 'ptac.1', stock: 'stk.pistol.0' } } },
-    { id: 'skorp', from: 'g18', path: 'auto', ring: 4, stat: 'multi', n: 10, what: 'double kills', how: 'Two suspects down inside three seconds.',
+    { id: 'skorp', from: 'b92', path: 'auto', ring: 3, stat: 'trio', n: 15, what: 'burst kills', how: 'Two or more rounds of one burst hit them, and they go down.',
       pro: { name: 'Street Sweeper', stat: 'kills', n: 50, what: 'kills', parts: { barrel: 'br.7.65x17.5.5', muzzle: 'mz.r9.can', optic: 'op.pic.1' } } },
+    { id: 'g18', from: 'skorp', path: 'auto', ring: 4, stat: 'multi', n: 10, what: 'double kills', how: 'Two suspects down inside three seconds.',
+      pro: { name: 'Buzzsaw', stat: 'multi', n: 20, what: 'double kills', parts: { slide: 'g18.sl.comp', tac: 'ptac.1', stock: 'stk.pistol.0' } } },
     { id: 'auto9', from: 'b92', path: 'auto', ring: 3, a: -66, r: 880, stat: 'hs', n: 15, what: 'headshot kills', how: 'A burst is three chances at the head. Make one of them count.',
       pro: { name: 'Directive', stat: 'trio', n: 25, what: 'burst kills', parts: { slide: 'auto9.sl.comp', optic: 'op.pso.2', tac: 'ptac.1' } } },
     { id: 'derringer', from: 'p9', path: 'heavy', ring: 1, stat: 'close', n: 15, what: 'kills within 5 m', how: "Get close enough that it can't go wrong.",
@@ -58,7 +58,7 @@ const G_Arsenal = (() => {
   const RINGS = [0, 440, 660, 880, 1100, 1320], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, BURST = 5, BURST_MS = 1000, MULTI = 3000, CLOSE = 5, MID = 10, FAR = 20;
   let save: any = null;
   const data = () => { if (!save) { const s = G.U.store.get('arsenal', null); save = s && s.got && s.n ? s : { got: [], n: {} }; save.pro = save.pro || {}; save.on = save.on || {}; migrate(save); } return save; };
-  // the MAC-10's place on the web went to the Skorpion (the MAC-10 switched off, js/data.ts OFF_GUNS): what was earned on it carries over
+  // the MAC-10's place on the web went to the Skorpion (now before the G18) (the MAC-10 switched off, js/data.ts OFF_GUNS): what was earned on it carries over
   function migrate(s: any) {
     if (s.got.includes('mac10') && !s.got.includes('skorp')) s.got.push('skorp');
     if (s.pro.mac10 && !s.pro.skorp) { s.pro.skorp = 1; if (s.on.mac10) s.on.skorp = true; }
