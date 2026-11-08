@@ -954,3 +954,53 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .route-tip .boss b { color: #ffd24a; } .route-tip .boss path { fill: #ffd24a; stroke: #ffd24a; stroke-width: 1; stroke-linejoin: round; }
 .route-tip .tt-plain { color: var(--ui-dim); padding: 7px 0; border-top: 1px solid var(--ui-line-lo); }
 .route-tip .tt-foot { margin-top: 6px; padding-top: 7px; border-top: 1px solid var(--ui-line-lo); color: var(--ui-dim); font-size: 11px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; }
+
+/* ---------- the account (cloud saves, js/cloud.ts) and the career (js/career.ts) ---------- */
+.settings.account { margin-top: 12px; }
+.acct-sum { color: var(--ui-text); font-weight: 400; letter-spacing: 1px; text-transform: none; margin-left: 6px; }
+.acct-sum .acct-st { color: var(--ui-dim); }
+.acct-sum .acct-st.bad, .acct-status.bad, .acct-msg.bad { color: var(--bad); }
+.acct-body { font: 300 13px/1.5 var(--ui-font); color: var(--ui-dim); padding-top: 6px; }
+.acct-body p { margin: 6px 0; }
+.acct-body b { color: var(--ui-text); font-weight: 500; }
+.acct-body code { font: 400 12px var(--mono); color: var(--ui-text); }
+.acct-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.acct-row input { flex: 1; padding: 7px 10px; font-size: 14px; }
+.acct-row .btn { white-space: nowrap; }
+.acct-alt { justify-content: flex-end; }
+.acct-alt small { margin-right: auto; }
+.acct-status, .acct-msg { margin-top: 8px; font: 300 12px var(--ui-font); color: var(--ui-dim); }
+.career-row { margin-top: 10px; }
+/* your animal's a preference: a second choice, and a word when the host gave you another */
+.animal2-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; font: 300 12px var(--ui-font); color: var(--ui-dim); }
+.animal2-row select { width: auto; flex: 0 1 220px; padding: 5px 8px; font-size: 13px; }
+.animal-note { font: 300 12px var(--ui-font); color: var(--ui-dim); margin-top: 6px; min-height: 0; }
+.animal-note:empty { display: none; }
+/* a guest (signed in to the cloud saves anonymously), beside their name in the lobby, the hangar's roster and the scoreboard */
+.guest-mark { display: inline-block; margin-left: 6px; color: var(--ui-dim); font: 500 9px/1.4 var(--ui-font); letter-spacing: 1.5px; border: 1px solid var(--ui-line); padding: 0 5px; border-radius: var(--ui-r); vertical-align: 1px; text-transform: uppercase; }
+.lp .guest-mark { font-size: 10px; padding: 1px 6px; letter-spacing: 2px; margin-left: 0; }
+/* the career: tiles of figures, the best runs, the last runs (each opening onto its levels) */
+.cr-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+@media (max-width: 760px) { .cr-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.cr-tile { background: var(--ui-fill); border-radius: var(--ui-r); padding: 8px 10px; display: flex; flex-direction: column; min-width: 0; }
+.cr-tile b { font: 300 22px/1.1 var(--ui-font); color: var(--ui-text); }
+.cr-tile span { font: 500 10px var(--ui-font); letter-spacing: 1.8px; text-transform: uppercase; color: var(--ui-dim); margin-top: 3px; }
+.cr-tile small { font: 300 11px var(--ui-font); color: var(--ui-dim); margin-top: 2px; }
+.cr-h { font: 500 11px var(--ui-font); letter-spacing: 2.5px; text-transform: uppercase; color: var(--ui-dim); margin: 16px 0 6px; }
+.cr-h small { letter-spacing: 1px; text-transform: none; font-weight: 300; }
+.cr-bests { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cr-best { border: 1px solid var(--ui-line-lo); border-radius: var(--ui-r); padding: 7px 10px; display: flex; flex-direction: column; }
+.cr-best span { font: 500 10px var(--ui-font); letter-spacing: 1.8px; text-transform: uppercase; color: var(--ui-dim); }
+.cr-best b { font: 300 18px var(--ui-font); }
+.cr-best small { font: 300 11px var(--ui-font); color: var(--ui-dim); }
+.cr-run { border-bottom: 1px solid var(--ui-line-lo); }
+.cr-run summary { display: grid; grid-template-columns: 1.6fr 1fr 0.8fr 0.7fr 1fr; gap: 8px; padding: 5px 2px; font: 400 13px var(--ui-font); cursor: pointer; list-style: none; }
+.cr-run summary::-webkit-details-marker { display: none; }
+.cr-run summary:hover { background: var(--ui-fill); }
+.cr-run ul { margin: 2px 0 8px; padding-left: 6px; list-style: none; font: 300 12px/1.6 var(--ui-font); }
+.cr-run ul b { font-weight: 500; }
+.cr-run li > b:first-child { display: inline-block; min-width: 2em; }
+.cr-run > .dim { font: 300 12px var(--ui-font); padding: 0 0 8px 4px; }
+.career-body { max-height: none; }
+/* the hangar's Career tab: the same, across the pane */
+.shop-career { grid-column: 1 / -1; padding: 4px 2px; }

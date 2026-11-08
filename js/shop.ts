@@ -485,7 +485,7 @@ const G_Shop = {
     document.getElementById('shopTitle')!.innerHTML = `Level ${this.level} cleared <span>— next up: level ${this.level + 1}${G.Route.isBoss(this.level + 1) ? ' <b class="red">(BOSS)</b>' : ''}</span>${rep}`;
     // (the route map's tab first, as an icon: a folded map)
     const MAP_ICON = '<svg class="tab-ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6.5 9 4l6 2.5L21 4v13.5L15 20l-6-2.5L3 20Z M9 4v13.5 M15 6.5V20"/></svg>';
-    const tabs = [['route', MAP_ICON, 'Route map'], ['stock', 'Stock'], ['kit', 'Kit'], ['gunsmith', 'Gunsmith'], ['zero', 'Zeroing'], ['svc', 'Supplies']];
+    const tabs = [['route', MAP_ICON, 'Route map'], ['stock', 'Stock'], ['kit', 'Kit'], ['gunsmith', 'Gunsmith'], ['zero', 'Zeroing'], ['svc', 'Supplies'], ['career', 'Career']];
     document.getElementById('shopTabs')!.innerHTML = tabs.map(([k, n, t]) => `<button class="tab${k === 'route' ? ' tab-icon' : ''}${this.tab === k ? ' on' : ''}" data-tab="${k}"${t ? ` title="${t}" aria-label="${t}"` : ''}>${n}</button>`).join('');
     let html = '';
     const O = this.offers;
@@ -501,6 +501,7 @@ const G_Shop = {
       if (sold.length) html += `<h3 class="shop-sub">Out of stock</h3>` + sold.join('');
     }
     else if (this.tab === 'route') html = this.routeHtml();
+    else if (this.tab === 'career') html = `<div class="shop-career">${G.Career.html()}</div>`; // (your career: js/career.ts)
     else if (this.tab === 'svc') html = this.services().map((s: ShopService) => `<div class="card">
         <div class="ch"><span class="cn">${s.name}</span></div>${s.sel || ''}<div class="cd">${s.desc}</div>
         <div class="cfoot"><span></span><button class="btn small buy" data-k="svc" data-id="${s.id}" ${s.disabled || Me.credits < s.price ? 'disabled' : ''}>${s.disabled ? '—' : '¢' + G.U.fmt(s.price)}</button></div></div>`).join('');
@@ -522,7 +523,7 @@ const G_Shop = {
       `<div class="lo"><span>Frags ${Me.nades} · Medical items ${Me.meds}</span></div>`;
     let roster = '';
     for (const [id, p] of Object.entries(G.Game.roster)) {
-      roster += `<div class="lo"><span style="color:${G.U.hex(p.color)}">${G.Callsigns.html(p.animal)}${G.U.esc(p.name)}${id === G.Net.myId ? ' (you)' : ''}</span><small class="${p.ready ? 'rdy' : ''}">${p.ready ? 'READY' : 'shopping'}</small></div>`;
+      roster += `<div class="lo"><span style="color:${G.U.hex(p.color)}">${G.Callsigns.html(p.animal)}${G.U.esc(p.name)}${G.Game.guestMark(id)}${id === G.Net.myId ? ' (you)' : ''}</span><small class="${p.ready ? 'rdy' : ''}">${p.ready ? 'READY' : 'shopping'}</small></div>`;
     }
     document.getElementById('shopRoster')!.innerHTML = roster;
     const rb = document.getElementById('btnReady')!;

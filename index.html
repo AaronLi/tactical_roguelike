@@ -19,8 +19,10 @@
 
     <label>Callsign</label>
     <input id="nameInput" maxlength="16" placeholder="Operator">
-    <label>Squad animal <small>(on your shoulder, your back patch and your pings)</small></label>
+    <label>Preferred callsign <small>(your animal: on your shoulder, your back patch and your pings; one of each to a squad, so the host may give you another)</small></label>
     <div id="colorRow" class="color-row"></div>
+    <div class="animal2-row"><span>If it's taken</span><select id="animal2" title="Your second choice, if someone in the squad already has your animal"></select></div>
+    <div id="animalNote" class="animal-note"></div>
     <details class="look-details"><summary>Appearance</summary><div id="lookBox"></div></details>
 
     <div class="btn-row">
@@ -39,6 +41,10 @@
     </div>
     <div id="modelLoad" class="model-load" title="The game's gun models download while you set up"><div class="ml-bar"><i id="modelBar"></i></div><span id="modelTxt"></span> <button id="modelRetry" class="btn small hidden">Retry</button></div>
     <div id="menuMsg" class="msg"></div>
+
+    <!-- your account (cloud saves, js/cloud.ts) and your career (js/career.ts) -->
+    <details id="acctBox" class="settings account"><summary>Account <span id="acctSum" class="acct-sum"></span></summary><div id="acctBody" class="acct-body"></div></details>
+    <div class="career-row"><button id="btnCareer" class="btn small">Career &amp; stats</button></div>
 
     <details class="settings">
       <summary>Settings &amp; controls</summary>
@@ -71,6 +77,7 @@
       <div class="code-line"><span id="lobbyCode">-----</span><button id="btnCopy" class="btn small">Copy</button><button id="btnNewCode" class="btn small" title="Host under a fresh code (anyone in the lobby will need the new one)">New code</button></div>
     </div>
     <div id="lobbyPlayers" class="lobby-players"></div>
+    <div id="lobbyAnimal" class="animal-note"></div>
     <div id="lobbyMsg" class="msg"></div>
     <div class="btn-row">
       <button id="btnStart" class="btn primary">Deploy</button>
@@ -207,6 +214,15 @@
   </div>
 </div>
 
+<!-- ======================= CAREER ======================= -->
+<div id="career" class="screen side ui hidden">
+  <div class="menu-box wide ui-panel fade">
+    <h2>Career</h2>
+    <div id="careerBody" class="career-body"></div>
+    <div class="btn-row"><button id="btnCareerBack" class="btn">Back</button></div>
+  </div>
+</div>
+
 <div id="clickToPlay" class="ui hidden">Click to engage</div>
 <div id="veil"><svg class="veil-shape" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"/></svg><div class="veil-load ui"><div class="veil-row"><i class="veil-spin"></i><b>Loading</b></div><div id="veilStatus"></div></div></div>
 
@@ -281,6 +297,10 @@
 <script defer src="dist/js/menushow.js"></script>
 <script defer src="dist/js/hangar.js"></script>
 <script defer src="dist/js/landing.js"></script>
+<!-- (the cloud saves: the Supabase client itself loads only if they're set up, once the page is in: js/cloud.ts) -->
+<script defer src="dist/js/cloudconfig.js"></script>
+<script defer src="dist/js/career.js"></script>
+<script defer src="dist/js/cloud.js"></script>
 <script defer src="dist/js/game.js"></script>
 <script defer src="dist/js/profiler.js"></script>
 <script defer src="dist/js/demo.js"></script>

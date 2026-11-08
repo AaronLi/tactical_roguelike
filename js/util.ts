@@ -94,9 +94,14 @@ const G_U = {
     return { reach: S(0.03, 0.2, t), lift: S(0.22, 0.38, t), envUp: S(0.3, 0.42, t), insert: S(0.44, 0.6, t), seal: S(0.6, 0.7, t), down: S(0.72, 0.95, t) };
   },
   hex: (n: number) => '#' + (n >>> 0).toString(16).padStart(6, '0'),
+  // What's kept in this browser, under bp_<key>. set tells the cloud saves (js/cloud.ts sets onSet: the keys it syncs are marked
+  // changed, and when) unless auto (a default written for you, not your choice: it doesn't outweigh what the account has). put
+  // writes without telling anyone: the cloud's own writes, of what it merged in.
   store: {
+    onSet: null as null | ((k: string, v: any, auto: boolean) => void),
     get(k: string, d?: any) { try { const v = localStorage.getItem('bp_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    set(k: string, v: any) { try { localStorage.setItem('bp_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    put(k: string, v: any) { try { if (v === undefined) localStorage.removeItem('bp_' + k); else localStorage.setItem('bp_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    set(k: string, v: any, auto = false) { G_U.store.put(k, v); if (G_U.store.onSet) try { G_U.store.onSet(k, v, auto); } catch (e) { console.warn('store: onSet', e); } },
   },
 };
 G.U = G_U;

@@ -18,7 +18,7 @@ interface GmReport { civKilled: number; unauth: number; allRescued?: boolean; st
 // only ever the host's word for the hangar phase: this.phase is never set to it)
 type GmPhase = 'menu' | 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 // the full-screen panels this.screen shows one of (index.html)
-type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause';
+type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause' | 'career';
 // the sliders in the menu, and the keys they keep in storage
 type GmSetting = 'sens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
@@ -48,6 +48,7 @@ const G_Game = {
   settings: undefined as unknown as Record<GmSetting, number>, // (init)
   myName: undefined as unknown as string, // (init: your callsign's name, its animal and colour, and what you wear)
   myAnimal: undefined as unknown as string,
+  prefAnimal: undefined as unknown as string,
   myColor: undefined as unknown as number,
   myLook: undefined as unknown as ReturnType<typeof G.Rig.cleanLook>,
   last: undefined as unknown as number, // (init: the clock of the last frame)
@@ -98,10 +99,12 @@ const G_Game = {
     G.Hangar.load(); // (the hangar's baked scene, parsed as soon as the bundle's in: js/hangar.ts; what enters the game waits for it, needModels)
     this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
-    G.U.store.set('name', this.myName); // (kept: the same name after a refresh, so the squad knows who's back)
-    // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.ts)
-    this.myAnimal = G.U.store.get('animal', null);
-    if (!G.Callsigns.valid(this.myAnimal)) this.myAnimal = G.Callsigns.LIST[Math.floor(Math.random() * G.Callsigns.LIST.length)].id;
+    G.U.store.set('name', this.myName, true); // (kept: the same name after a refresh, so the squad knows who's back. auto: a made-up one doesn't outweigh an account's, js/cloud.ts)
+    // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.ts). prefAnimal is your preference, the one
+    // you ask the host for (and the one you'd rather have next if it's taken, animal2); myAnimal the one you have this session
+    this.prefAnimal = G.U.store.get('animal', null);
+    if (!G.Callsigns.valid(this.prefAnimal)) this.prefAnimal = G.Callsigns.LIST[Math.floor(Math.random() * G.Callsigns.LIST.length)].id;
+    this.myAnimal = this.prefAnimal;
     this.myColor = G.Callsigns.of(this.myAnimal).color;
     this.myLook = G.Rig.cleanLook(G.U.store.get('look', null)); // top, pants, eyewear, gloves (the menu)
     G.R.init();
@@ -111,6 +114,7 @@ const G_Game = {
     G.Audio.vol = this.settings.vol;
     G.Audio.muted = new URLSearchParams(location.search).has('mute') || G.U.store.get('muted', false);
     this.bindMenu();
+    G.Cloud.boot(); // (the cloud saves, if they're set up: js/cloud.ts; and the career's record here, js/career.ts)
     // hosting: the remote players' messages to the simulation's thread, and their comings and goings (js/serverlink.ts); everyone's
     // game (the host's own too) hears the host's word in onMsg
     G.Net.onServer = (m, from) => G.ServerLink.fromPeer(m, from);
@@ -128,7 +132,7 @@ const G_Game = {
   // ------------------------------------------------------------- menu UI
   $<T extends HTMLElement = HTMLElement>(id: string) { return document.getElementById(id) as T; },
   screen(id: GmScreen | null) {
-    for (const s of ['menu', 'lobby', 'shop', 'route', 'gameover', 'pause']) this.$(s).classList.toggle('hidden', s !== id);
+    for (const s of ['menu', 'lobby', 'shop', 'route', 'gameover', 'pause', 'career']) this.$(s).classList.toggle('hidden', s !== id);
     G.HUD.show(this.phase === 'level');
   },
   // The loading veil: a change of scene goes behind a black panel, wobbled down the screen on a slant (css/style.css #veil). A
@@ -163,11 +167,7 @@ const G_Game = {
   // ------------------------------------------------------------- your look (top, pants, eyewear, gloves)
   // the menu's options, a preview of you, and your own arms in first person
   bindLook() {
-    const L = this.myLook, O = G.Rig.LOOKS as Record<string, string[]>, NAMES: Record<string, string> = { combat: 'Combat', longsleeve: 'Long-sleeve', tshirt: 'T-shirt', hoodie: 'Hoodie', cargo: 'Cargo', jeans: 'Jeans', none: 'None', glasses: 'Glasses', shooting: 'Shooting glasses', goggles: 'Goggles', tactical: 'Tactical', leather: 'Leather', fingerless: 'Fingerless' };
-    const TOPC = [0x3a4048, 0x4d5639, 0x5a5240, 0x26282c, 0x2e3a52, 0x6a6e70, 0x7a2e2a, 0xb8b0a0], PANTC = [0x2e3238, 0x4d5639, 0x5a5240, 0x1f2226, 0x2b3550, 0x6b5b45, 0x3a3a3c];
-    const sel = (k: string, label: string) => `<label>${label}<select data-look="${k}">${O[k].map((v) => `<option value="${v}"${L[k] === v ? ' selected' : ''}>${NAMES[v] || v}</option>`).join('')}</select></label>`;
-    const sw = (k: string, cols: number[]) => `<div class="color-row look-row">${cols.map((c) => `<button class="sw${L[k] === c ? ' on' : ''}" data-lookc="${k}" data-c="${c}" style="background:${G.U.hex(c)}"></button>`).join('')}</div>`;
-    this.$('lookBox').innerHTML = `<div class="look-grid"><div>${sel('top', 'Top')}${sw('topC', TOPC)}${sel('pants', 'Pants')}${sw('pantsC', PANTC)}${sel('eyes', 'Eyewear')}${sel('gloves', 'Gloves')}</div><canvas id="lookPreview" width="150" height="230"></canvas></div>`;
+    this.bindLookBox();
     const save = () => { G.U.store.set('look', this.myLook); this.lookPreview(); this.applyLook(); };
     this.$('lookBox').addEventListener('change', ((e: GmEvt<HTMLSelectElement>) => { const k = e.target.dataset.look; if (k) { this.myLook[k] = e.target.value; save(); } }) as EventListener);
     this.$('lookBox').addEventListener('click', ((e: GmEvt) => {
@@ -176,6 +176,17 @@ const G_Game = {
       b.parentElement!.querySelectorAll('.sw').forEach((x) => x.classList.toggle('on', x === b));
       save();
     }) as EventListener);
+  },
+  // the look's options, as they're set now (and the figure, and your arms)
+  bindLookBox() {
+    const L = this.myLook, O = G.Rig.LOOKS as Record<string, string[]>, NAMES: Record<string, string> = { combat: 'Combat', longsleeve: 'Long-sleeve', tshirt: 'T-shirt', hoodie: 'Hoodie', cargo: 'Cargo', jeans: 'Jeans', none: 'None', glasses: 'Glasses', shooting: 'Shooting glasses', goggles: 'Goggles', tactical: 'Tactical', leather: 'Leather', fingerless: 'Fingerless' };
+    const TOPC = [0x3a4048, 0x4d5639, 0x5a5240, 0x26282c, 0x2e3a52, 0x6a6e70, 0x7a2e2a, 0xb8b0a0], PANTC = [0x2e3238, 0x4d5639, 0x5a5240, 0x1f2226, 0x2b3550, 0x6b5b45, 0x3a3a3c];
+    const sel = (k: string, label: string) => `<label>${label}<select data-look="${k}">${O[k].map((v) => `<option value="${v}"${L[k] === v ? ' selected' : ''}>${NAMES[v] || v}</option>`).join('')}</select></label>`;
+    const sw = (k: string, cols: number[]) => `<div class="color-row look-row">${cols.map((c) => `<button class="sw${L[k] === c ? ' on' : ''}" data-lookc="${k}" data-c="${c}" style="background:${G.U.hex(c)}"></button>`).join('')}</div>`;
+    // (the figure's canvas is kept: its renderer draws on it)
+    const box = this.$('lookBox'), cv = box.querySelector('#lookPreview');
+    box.innerHTML = `<div class="look-grid"><div>${sel('top', 'Top')}${sw('topC', TOPC)}${sel('pants', 'Pants')}${sw('pantsC', PANTC)}${sel('eyes', 'Eyewear')}${sel('gloves', 'Gloves')}</div><canvas id="lookPreview" width="150" height="230"></canvas></div>`;
+    if (cv) box.querySelector('#lookPreview')!.replaceWith(cv);
     this.lookPreview();
     this.applyLook();
   },
@@ -209,11 +220,53 @@ const G_Game = {
     lp.sc.add(lp.rig.root);
   },
   // your callsign (picked in the menu, or the host's pick for you when yours was taken)
+  // (keep: your pick in the menu, your preference from now on, kept and synced; otherwise the host's pick for this session)
   setAnimal(id: string, keep?: boolean) {
-    if (!G.Callsigns.valid(id) || id === this.myAnimal) return;
-    this.myAnimal = id; this.myColor = G.Callsigns.of(id).color;
-    if (keep) G.U.store.set('animal', id);
-    if (this._lp && this._lp.rig) this.lookPreview(); // (the officer in the menu, in the new patches)
+    if (!G.Callsigns.valid(id)) return;
+    if (keep && id !== this.prefAnimal) { this.prefAnimal = id; G.U.store.set('animal', id); }
+    if (id !== this.myAnimal) {
+      this.myAnimal = id; this.myColor = G.Callsigns.of(id).color;
+      if (this._lp && this._lp.rig) this.lookPreview(); // (the officer in the menu, in the new patches)
+    }
+    this.animalNote();
+  },
+  // the note under the menu's animals (and in the lobby): the host gave you another one this session, yours being taken
+  animalNote() {
+    const el = document.getElementById('animalNote');
+    const other = this.phase !== 'menu' && this.myAnimal !== this.prefAnimal;
+    const txt = other ? `The host gave you the ${G.Callsigns.of(this.myAnimal).name} this session: the ${G.Callsigns.of(this.prefAnimal).name} was taken.` : '';
+    if (el) el.textContent = txt;
+    const lb = document.getElementById('lobbyAnimal'); if (lb) lb.textContent = txt;
+  },
+  // a small GUEST mark beside a player playing as a cloud saves guest (the roster's anon: js/server.ts hello, js/cloud.ts)
+  guestMark(id: string | null | undefined) {
+    const r = id ? this.roster && this.roster[id] : null;
+    return r && r.anon ? ' <small class="guest-mark" title="Playing as a guest: their progress isn\'t saved to an email">GUEST</small>' : '';
+  },
+  // what's kept changed under the game (the cloud saves merged an account's in: js/cloud.ts): read again, the menu's controls with it
+  applyStored(keys: string[]) {
+    const S = G.U.store, has = (k: string) => keys.includes(k);
+    for (const k of ['sens', 'fov', 'vol', 'loadKit'] as GmSetting[]) if (has(k)) {
+      const v = +S.get(k, this.settings[k]); if (!isFinite(v)) continue;
+      this.settings[k] = v;
+      for (const id of [k, k + '2']) { const el = this.$<HTMLInputElement>(id); if (el) el.value = String(v); }
+      const lab = this.$(k + 'Val'); if (lab) lab.textContent = k === 'sens' ? v.toFixed(2) : k === 'fov' ? v + '°' : k === 'vol' ? Math.round(v * 100) + '%' : lab.textContent;
+      if (k === 'vol') G.Audio.setVolume(v);
+    }
+    if (has('muted') && !new URLSearchParams(location.search).has('mute')) { const m = !!S.get('muted', false); G.Audio.setMuted(m); this.$<HTMLInputElement>('mute').checked = m; }
+    if (has('name')) { const n = String(S.get('name', this.myName) || '').trim().slice(0, 16); if (n) { this.myName = n; this.$<HTMLInputElement>('nameInput').value = n; if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, n); } }
+    if (has('animal')) { const a = S.get('animal', null); if (G.Callsigns.valid(a)) { this.prefAnimal = a; if (this.phase === 'menu') this.setAnimal(a); this.markAnimals(); } }
+    if (has('animal2')) this.animal2Options();
+    if (has('look')) { this.myLook = G.Rig.cleanLook(S.get('look', null)); this.bindLookBox(); }
+    if (has('turn')) { const t = S.get('turn', {}) || {}; this.$<HTMLInputElement>('turnUrl').value = t.url || ''; this.$<HTMLInputElement>('turnUser').value = t.user || ''; this.$<HTMLInputElement>('turnPass').value = t.pass || ''; }
+  },
+  // the menu's animals, the preferred one lit
+  markAnimals() { this.$('colorRow').querySelectorAll<HTMLElement>('.sw').forEach((x) => x.classList.toggle('on', x.dataset.a === this.prefAnimal)); },
+  // your second choice, if your first is taken (asked of the host in your hello: js/server.ts)
+  animal2Options() {
+    const sel = this.$<HTMLSelectElement>('animal2'); if (!sel) return;
+    const v = G.U.store.get('animal2', '');
+    sel.innerHTML = `<option value="">The first one free</option>` + G.Callsigns.LIST.map((a) => `<option value="${a.id}"${a.id === v ? ' selected' : ''}>${G.U.esc(a.name)}</option>`).join('');
   },
   // your own arms in first person: sleeves in your top's colour (bare forearms in a T-shirt), your gloves
   applyLook() {
@@ -251,7 +304,12 @@ const G_Game = {
     name.value = this.myName;
     name.addEventListener('input', () => { this.myName = name.value.trim().slice(0, 16) || 'Operator'; G.U.store.set('name', this.myName); if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, this.myName); });
     const row = this.$('colorRow');
-    row.innerHTML = G.Callsigns.LIST.map((a) => `<button class="sw animal${a.id === this.myAnimal ? ' on' : ''}" data-a="${a.id}" title="${a.name}">${G.Callsigns.html(a.id)}<span style="color:${G.U.hex(a.color)}">${a.name}</span></button>`).join('');
+    this.animal2Options();
+    this.$('animal2').addEventListener('change', () => G.U.store.set('animal2', this.$<HTMLSelectElement>('animal2').value)); // ('': none, the host's first free)
+    // your career (js/career.ts), from the menu
+    this.$('btnCareer').onclick = () => { this.$('careerBody').innerHTML = G.Career.html(); this.screen('career'); };
+    this.$('btnCareerBack').onclick = () => this.screen('menu');
+    row.innerHTML = G.Callsigns.LIST.map((a) => `<button class="sw animal${a.id === this.prefAnimal ? ' on' : ''}" data-a="${a.id}" title="${a.name}">${G.Callsigns.html(a.id)}<span style="color:${G.U.hex(a.color)}">${a.name}</span></button>`).join('');
     row.addEventListener('click', ((e: GmEvt) => {
       const b = e.target.closest<HTMLElement>('.sw'); if (!b) return;
       this.setAnimal(b.dataset.a!, true);
@@ -536,9 +594,12 @@ const G_Game = {
     if (G.Net.isHost && !G.Net.solo) G.Net.startBeacon(); // (findable from the same network)
     G.Me.newRun();
     this.runStarted = false;
-    G.Net.toHost({ t: 'hello', name: this.myName, animal: this.myAnimal, look: this.myLook });
+    // (your preferred animal, and your second choice; anon: you're a cloud saves guest, for the GUEST mark: js/server.ts hello)
+    const a2 = G.U.store.get('animal2', '');
+    G.Net.toHost({ t: 'hello', name: this.myName, animal: this.prefAnimal, ...(G.Callsigns.valid(a2) ? { animal2: a2 } : {}), look: this.myLook, ...(G.Cloud.guest() ? { anon: 1 } : {}) });
   },
   toMenu(reason?: string) {
+    if (G.Career.run) G.Career.runEnd('left'); // (a run you walked out of, or lost the host in)
     G.Net.leave();
     G.ServerLink.stop();
     G.Views.clearAll();
@@ -547,6 +608,7 @@ const G_Game = {
     G.R.setViewmodel(null);
     this.map = null;
     this.phase = 'menu';
+    this.setAnimal(this.prefAnimal); // (back to yours: the host's pick was for that session)
     if (document.pointerLockElement) document.exitPointerLock();
     this.veil(false, true);
     this.screen('menu');
@@ -596,6 +658,8 @@ const G_Game = {
         if (this.roster[G.Net.myId!]) this.setAnimal(this.roster[G.Net.myId!].animal);
         G.Views.syncRoster(this.roster);
         if (m.route) this.setRoute(m.route);
+        if ((m.phase === 'route' || m.phase === 'level' || m.phase === 'shop') && !G.Career.run) G.Career.runStart(m.level || 1); // (joined a run already going: yours from here)
+        G.Career.squad(Object.keys(this.roster).length);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
         else if (m.phase === 'level') {
           this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc);
@@ -619,6 +683,7 @@ const G_Game = {
         if (this.roster[G.Net.myId!]) this.setAnimal(this.roster[G.Net.myId!].animal); // (yours was taken: the host's pick)
         for (const [id, r] of Object.entries(this.roster)) if (id !== G.Net.myId && r.ready && prev[id] && !prev[id].ready) this.readyNote(r);
         G.Views.syncRoster(this.roster);
+        G.Career.squad(Object.keys(this.roster).length);
         if (this.phase === 'lobby') this.renderLobby();
         if (this.hub) { G.Shop.render(); G.Hangar.refresh(); }
         if (this.phase === 'route') this.renderRoute();
@@ -627,6 +692,7 @@ const G_Game = {
       case 'arms': this.arms = m.a || {}; if (this.phase === 'route') { this.sidearmPick(); this.renderRoute(); } break;
       case 'rvotes': if (this.routeSt) { this.routeSt.votes = m.v || {}; if (this.phase === 'route') this.renderRoute(); } break;
       case 'newrun':
+        G.Career.runStart(); // (your career's record of it: js/career.ts)
         this.tGrid = null; this.arms = {}; this.armSel = null;
         G.Me.newRun();
             break;
@@ -720,6 +786,7 @@ const G_Game = {
       case 'applying': if (this.phase === 'level') G.Me.beingTreated(m.by, this.nameOf(m.by), m.part, m.mt, m.dur, !!m.off); break;
       case 'revive': {
         if (m.tg === G.Net.myId) G.Me.revived(m.hp);
+        if (m.by === G.Net.myId && m.tg !== G.Net.myId) G.Career.ev('revive');
         const by = this.nameOf(m.by), tg = this.nameOf(m.tg);
         G.HUD.feed(`<b>${G.U.esc(by)}</b> revived <b>${G.U.esc(tg)}</b>`);
         break;
@@ -776,6 +843,7 @@ const G_Game = {
         if (m.by === G.Net.myId) {
           const cr = m.cr;
           G.Me.credits += cr;
+          G.Career.ev('evidence', cr);
           G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
           G.Audio.pickup();
         }
@@ -790,6 +858,7 @@ const G_Game = {
           if (m.by === G.Net.myId && m.cr > 0) {
             const cr = m.cr;
             G.Me.credits += cr;
+            G.Career.ev('body', cr);
             G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
             G.Audio.pickup();
           }
@@ -803,6 +872,7 @@ const G_Game = {
           const cr = m.cr;
           G.Me.credits += cr;
           if (!m.civ && !m.dn) G.Me.stats.arrests = (G.Me.stats.arrests || 0) + 1;
+          G.Career.ev(m.civ ? 'rescue' : m.dn ? 'body' : 'arrest', cr); // (one secured where they lay was counted when they went down)
           G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
           G.Audio.pickup();
         }
@@ -881,16 +951,16 @@ const G_Game = {
       if (m.bo || m.cz) G.HUD.feed(`<span class="dim">${def ? def.name : 'Suspect'} ${m.cz === 'burns' ? 'died of burns' : m.cz === 'blast' ? 'died of blast lung' : 'bled out'}</span>`);
       return;
     }
-    this.credit(m);
+    this.credit(m, 'kill');
   },
   // A suspect incapacitated (down for good): counted now, the same as a kill
   onIncap(m: any) {
     if (this.phase !== 'level') return;
     if (G.Highlights) G.Highlights.incap(m);
-    this.credit(m);
+    this.credit(m, 'incap');
   },
   // the feed and, for whoever did it, the credits and their tally: a kill, or a suspect incapacitated
-  credit(m: any) {
+  credit(m: any, kind: 'kill' | 'incap' = 'kill') {
     const Me = G.Me, def = (G.ENEMIES as Record<string, any>)[m.ty];
     const killer = this.nameOf(m.by);
     const kc = m.by === G.Net.myId ? '#ffd24a' : this.roster[m.by] ? G.U.hex(this.roster[m.by].color) : '#fff';
@@ -900,6 +970,7 @@ const G_Game = {
       G.HUD.feed(`<span class="bad">${m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED FORCE'}</span>`);
       if (m.by === G.Net.myId) {
         Me.credits = Math.max(0, Me.credits + m.cr);
+        G.Career.ev(m.why === 'civ' ? 'civ' : 'unauth', m.cr);
         G.HUD.feed(`<span class="bad">-¢${-m.cr}</span>`);
         G.HUD.toast(m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED USE OF FORCE', `-¢${-m.cr}`, 2.5);
         G.Audio.deny();
@@ -912,6 +983,7 @@ const G_Game = {
       Me.stats.kills++;
       if (m.h) Me.stats.hs++;
       if (G.Arsenal) G.Arsenal.kill(m);
+      G.Career.ev(kind, cr, !!m.h); // (your career: js/career.ts)
       G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
     }
   },
@@ -932,9 +1004,10 @@ const G_Game = {
     this.$('lobbyCode').textContent = G.Net.code || '';
     let html = '';
     for (const [id, p] of Object.entries(this.roster)) {
-      html += `<div class="lp">${G.Callsigns.html(p.animal)}<span style="color:${G.U.hex(p.color)}">${G.U.esc(p.name)}</span>${p.host ? ' <small>HOST</small>' : ''}${id === G.Net.myId ? ' <small>YOU</small>' : ''}</div>`;
+      html += `<div class="lp">${G.Callsigns.html(p.animal)}<span style="color:${G.U.hex(p.color)}">${G.U.esc(p.name)}</span>${this.guestMark(id)}${p.host ? ' <small>HOST</small>' : ''}${id === G.Net.myId ? ' <small>YOU</small>' : ''}</div>`;
     }
     this.$('lobbyPlayers').innerHTML = html;
+    this.animalNote();
     this.$('btnStart').classList.toggle('hidden', !G.Net.isHost);
     this.$('btnNewCode').classList.toggle('hidden', !G.Net.isHost || G.Net.solo); // (the host's: a fresh code)
     if (!G.Net.isHost) this.$('lobbyMsg').textContent = 'Waiting for the host to deploy...';
@@ -1364,6 +1437,7 @@ const G_Game = {
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0;
     this.map = G.Level.generate(seed, level, th, night);
+    G.Career.levelStart(level, th, night, this.stronghold()); // (your run's log: js/career.ts)
     G.ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
     if (G.Prof) G.Prof.reset(); // (the worst frames and totals: this level's)
     if (G.Highlights) { G.Highlights.drop(); G.Highlights.reset(); } // (last level's replays go; this one's start recording)
@@ -1401,12 +1475,14 @@ const G_Game = {
     this.phase = 'level';
     if (G.Me.navRearm) G.Me.navRearm();
     G.Shop.report = report || null;
+    let paid = 0;
     if (G.Me.pos) {
       const clean = report && report.civKilled === 0 && report.unauth === 0;
       const bonus = Math.round((250 + 75 * level + (clean ? 200 : 0) + (report && report.allRescued ? 150 + 50 * level : 0) + (report && report.stronghold ? G.Route.strongholdPay(level) : 0)));
       G.Me.credits += bonus;
-      this.lastBonus = bonus;
+      this.lastBonus = bonus; paid = bonus;
     }
+    if (report) G.Career.levelEnd(report, paid); // (extracted: the level's report, into your run's log)
     this.level = level;
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0; this.civsLeft = 0; this.bodiesLeft = 0; this.weaponsLeft = 0; this.unitsCleared = 0;
@@ -1448,6 +1524,7 @@ const G_Game = {
     this.$('clickToPlay').classList.add('hidden');
     this.screen('gameover');
     this.$('goSub').textContent = `Your squad fell on level ${m.level}.`;
+    G.Career.runEnd('wiped');
     let html = '<table><tr><th>Operator</th><th>Incapacitated</th><th>Headshots</th><th>Damage</th><th>Downs</th><th>Revives</th></tr>';
     for (const [, s] of Object.entries(m.stats || {})) {
       const sx = s.sx || [0, 0, 0, 0, 0];

@@ -132,7 +132,9 @@ const G_Arsenal = (() => {
     k.holster = ev.armed === 1; // (their weapon away, holstered or slung, when the round hit: js/views.ts)
     k.back = !!(p && f && k.d > 0 && (-Math.sin(ev.yaw || 0) * (f[0] - p.x) + -Math.cos(ev.yaw || 0) * (f[2] - p.z)) / k.d < -0.25);
   }
-  return { NODES, PATHS, RINGS, BY, along, has, proGot, proOn, proSet, build, partNames, open, count, name, at, left, tally, hit, kill, get all() { return data(); } };
+  // read again from storage (the cloud saves merged an account's in: js/cloud.ts)
+  const reload = () => { save = null; };
+  return { NODES, PATHS, RINGS, BY, along, has, proGot, proOn, proSet, build, partNames, open, count, name, at, left, tally, hit, kill, reload, get all() { return data(); } };
 })();
 G.Arsenal = G_Arsenal;
 

@@ -2724,6 +2724,7 @@ const G_Me = {
     this.crouch = false; this.prone = false;
     this.bleed = G.Med.bleedOut(this.body);
     this.stats.downs++;
+    G.Career.ev('down'); // (your career: js/career.ts)
     this.reloading = false;
     this.action = null; // (whatever your hands were doing, zip-tying, bagging, at a door: let go, so the squad doesn't see you still reaching)
     if (this.slot !== 's' && this.weapons.s) { this.slot = 's'; G.R.setViewmodel(this.cur().def); }
@@ -2749,6 +2750,7 @@ const G_Me = {
   giveUp: 0,
   die(how?: any) {
     G.Views.spawnSelfBody(); // (before anything else changes: as you were, then down)
+    if (!this.dead) G.Career.ev('death'); // (your career: js/career.ts)
     this.down = false; this.out = false;
     this.dead = true;
     this.hp = 0;

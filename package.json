@@ -19,13 +19,16 @@
     "test:models:full": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_model_cases.mjs --quiet --sweep --held 10000",
     "test:level": "tsc -p . && node tools/check_level_golden.mjs --quiet",
     "test": "npm run test:models && npm run test:level",
+    "test:cloud": "tsc -p . && node tools/cloud.test.mjs",
     "cases:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/model_cases.mjs"
   },
   "license": "ISC",
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.11",
     "@gltf-transform/core": "^4.5.1",
     "@gltf-transform/extensions": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
+    "@supabase/supabase-js": "2.118.0",
     "@types/three": "0.186.0",
     "meshoptimizer": "^1.3.0",
     "three": "0.186.1",

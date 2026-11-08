@@ -497,12 +497,12 @@ const G_HUD = {
   scoreboardHTML() {
     const rows = [];
     const me = G.Me.state();
-    rows.push({ name: G.Game.myName, color: G.Game.myColor, animal: G.Game.myAnimal, st: me });
-    for (const pv of G.Views.players.values()) rows.push({ name: pv.name, color: pv.color, animal: pv.animal, st: pv.st });
+    rows.push({ id: G.Net.myId, name: G.Game.myName, color: G.Game.myColor, animal: G.Game.myAnimal, st: me });
+    for (const [id, pv] of G.Views.players) rows.push({ id, name: pv.name, color: pv.color, animal: pv.animal, st: pv.st });
     let html = '<table><tr><th>Operator</th><th>Incap.</th><th>HS</th><th>Damage</th><th>Downs</th><th>Revives</th><th>Credits</th></tr>';
     for (const r of rows) {
       const sx = (r.st && r.st.sx) || [0, 0, 0, 0, 0];
-      html += `<tr><td style="color:${G.U.hex(r.color)}">${G.Callsigns.html(r.animal)}${G.U.esc(r.name)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${G.U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td><td>${r.st ? G.U.fmt(r.st.cred) : '—'}</td></tr>`;
+      html += `<tr><td style="color:${G.U.hex(r.color)}">${G.Callsigns.html(r.animal)}${G.U.esc(r.name)}${G.Game.guestMark(r.id)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${G.U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td><td>${r.st ? G.U.fmt(r.st.cred) : '—'}</td></tr>`;
     }
     html += '</table>';
     if (G.Net.code) html += `<div class="sb-perks">Room code: <b>${G.Net.code}</b></div>`;

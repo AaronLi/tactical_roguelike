@@ -7,7 +7,7 @@ const STATE_CODE: Partial<Record<EnemyState, number>> = { normal: 0, flee: 0, su
 type Tbl = Record<string, any>;
 interface Loose { [k: string]: any }
 // The kinds of message the host's handle() switches on (what an officer's game sends it with G.Net.toHost: the `t` field)
-type NetMsgKind = 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo';
+type NetMsgKind = 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
 // A message off the wire: its kind, and whatever else that kind carries (dynamic: checked where it's read)
 interface NetMsg { t: NetMsgKind; [k: string]: any }
 type DamageMap = Parameters<typeof G.Damage.apply>[0]; // (what js/damage.ts takes for a map)
@@ -35,7 +35,7 @@ interface StickerBox { s: string; by: string | null }
 interface SoundCache { map: LvMap; cache: Map<string, Float32Array> }
 // A player's last state (position p: [x, y, z]); the rest is the client's short-keyed state (js/player.ts state())
 interface PState { [k: string]: any; p: number[]; dd: number; dn: number; pr: number; cr: number; sx: any; yw: number; mv: any; tl: number; ln: number; sd: number; se: number; lr: number }
-interface Player { id: string; name: string; color: any; animal: any; look: any; ready: boolean; st: PState | null; lux?: number; luxAt?: number; firedAt?: number; flashK?: number } // (lux: the light on them this tick, officerLux; firedAt: their last shot, the level's clock; flashK: how much flash it made, its muzzle's)
+interface Player { id: string; name: string; color: any; animal: any; look: any; ready: boolean; st: PState | null; anon?: number; lux?: number; luxAt?: number; firedAt?: number; flashK?: number } // (lux: the light on them this tick, officerLux; firedAt: their last shot, the level's clock; flashK: how much flash it made, its muzzle's)
 type LivePlayer = Player & { st: PState }
 // A suspect or civilian (addEnemy makes them; think() and the hit/injury code grow the optional fields)
 interface EnemyCover { x: number; y: number; z: number; lean: number; px?: number; pz?: number; fl?: number; cx?: number; cz?: number }
@@ -143,7 +143,7 @@ const G_Server = {
   },
   roster() {
     const r: Record<string, any> = {};
-    for (const [id, p] of this.players) r[id] = { name: p.name, color: p.color, animal: p.animal, look: p.look, ready: p.ready, host: id === SvNet.myId };
+    for (const [id, p] of this.players) r[id] = { name: p.name, color: p.color, animal: p.animal, look: p.look, ready: p.ready, host: id === SvNet.myId, ...(p.anon ? { anon: 1 } : {}) };
     return r;
   },
   sendRoster() { SvNet.broadcast({ t: 'roster', roster: this.roster() }); },
@@ -153,12 +153,14 @@ const G_Server = {
     switch (m.t) {
       case 'hello': {
         const name = String(m.name || 'Operator').slice(0, 16);
-        // their animal (one of each to a squad: if theirs is taken, the first one free)
+        // their animal (one of each to a squad: if theirs is taken, their second choice (animal2, optional), else the first one free)
         const CS = G.Callsigns, taken = new Set([...this.players.values()].filter((q) => q.id !== from).map((q) => q.animal));
         let animal = CS.valid(m.animal) ? m.animal : null;
+        if ((!animal || taken.has(animal)) && CS.valid(m.animal2) && !taken.has(m.animal2)) animal = m.animal2;
         if (!animal || taken.has(animal)) animal = (CS.LIST.find((a) => !taken.has(a.id)) || CS.of(animal)).id;
         const color = CS.of(animal).color;
-        this.players.set(from, { id: from, name, color, animal, look: G.Sim.cleanLook(m.look), ready: false, st: null });
+        // anon: signed in to the cloud saves as a guest (js/cloud.ts; optional: an older client sends nothing, and shows nothing)
+        this.players.set(from, { id: from, name, color, animal, look: G.Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });
         SvNet.sendTo(from, {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
           seed: this.seed, shopSeed: this.shopSeed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), stock: this.phase === 'shop' ? this.stock : null,
@@ -176,6 +178,7 @@ const G_Server = {
         if (from !== SvNet.myId) SvNet.broadcast({ t: 'chat', id: null, m: name + ' joined the squad.' });
         break;
       }
+      case 'acct': if (p && (p.anon ? 1 : 0) !== (m.anon === 1 ? 1 : 0)) { p.anon = m.anon === 1 ? 1 : 0; this.sendRoster(); } break; // (signed in or out of the cloud saves since their hello: the guest mark)
       case 'st': if (p) p.st = m.s; break;
       case 'rfx': if (p && Array.isArray(m.a)) SvNet.broadcast({ t: 'rfx', a: m.a.slice(0, 32) }, from); break; // (the marks a round left on what it went through or off)
       case 'bstk': if (p) SvNet.broadcast(m, from); break; // (a bolt that stuck: js/bolts.ts)
