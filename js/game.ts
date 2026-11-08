@@ -1385,7 +1385,7 @@ const G_Game = {
     const others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !arms[pid]).length;
     const pic = (id: string) => { const it = G.Gear.gunItem(G.Me.makeWeapon(id, A.proOn(id) ? A.build(id) : undefined)), [cw, ch] = G.Gear.size(it); const url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
     // the web: a ring for each step out, spokes between, and the paths on it
-    const W = 1200, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
+    const W = 1500, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r], rings = A.RINGS.slice(1);
     const web = rings.map((r) => `<polygon points="${spokes.map((a) => spot(a, r).map((v) => v.toFixed(1)).join()).join(' ')}"/>`).join('') + spokes.map((a) => { const [x, y] = spot(a, rings[rings.length - 1]); return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
     const strands = A.NODES.filter((q) => q.from).map((q) => {
       const [x0, y0] = A.at(A.BY.get(q.from!)!), [x1, y1] = A.at(q), got = A.open(q.id), f = got ? 1 : A.open(q.from!) ? A.left(q) / q.n! : 0;
@@ -1395,7 +1395,8 @@ const G_Game = {
       const [x, y] = A.at(q), st = A.open(q.id) ? 'got' : A.open(q.from!) ? 'next' : 'far', tip = st === 'next' ? `<small>${A.left(q)}/${q.n} ${G.U.esc(q.what!)}</small>` : st === 'far' ? '<small>Locked</small>' : A.proGot(q.id) ? `<small>${A.proOn(q.id) ? 'Pro: ' : 'Pro earned: '}${G.U.esc(q.pro!.name)}</small>` : '';
       return `<button class="web-node ${st}${this.armLook === q.id ? ' look' : ''}${this.armSel === q.id ? ' sel' : ''}" data-arm="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${((src) => src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>')(pic(q.id))}<b>${G.U.esc(A.name(q.id))}</b>${tip}</button>`;
     }).join('');
-    const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[p.len] + 165); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
+    // each path's name in a box over the middle of its first strand (the first ring is wide enough apart for them to sit clear of the nodes)
+    const paths = Object.entries(A.PATHS).map(([k, p]) => { const [x, y] = A.along(k, A.RINGS[1] / 2); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${p.name}</span>`; }).join('');
     // what you're looking at: the gun, and what it takes
     const id = this.armLook, q = A.BY.get(id)!, d = G.WEAPONS[id], cal = G.CALIBERS[G.calOf(d)], got = A.open(id), modes = (d.modes || [d.mode]).map((m: string) => G.MODE_NAME[m]).join(' / ');
     const nextOn = A.NODES.filter((c) => c.from === id && !A.open(c.id)).map((c) => `<li><b>${G.U.esc(A.name(c.id))}</b> <span>${A.left(c)}/${c.n}</span> ${G.U.esc(c.what!)}<small>${G.U.esc(c.how!)}</small></li>`).join('');
@@ -1408,7 +1409,7 @@ const G_Game = {
         <div class="web-head"><h2>Your sidearm</h2><p>Drag to move · scroll to zoom · click a gun</p></div><button class="btn web-home" data-armhome>Back to the P9</button></div>
       <aside class="web-side"><img src="${pic(id)}" alt=""><h3>${G.U.esc(d.name)}</h3><div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${G.U.fmt(Math.round(G.Ballistics.energy(d)))} J · ${d.rpm} rpm</span></div><em>${G.U.esc(d.desc)}</em>${ask}
         ${nextOn ? `<h4>With this gun</h4><ul class="web-next">${nextOn}</ul>` : ''}${pro}${others.length && got ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}
-        <div class="web-foot"><p>Your own equipment, not a squad vote, and what you earn here stays yours. It starts loaded with ${G.ammoOk(G.calOf(d), 'tracer') === 'tracer' ? 'tracers' : 'buckshot'}, two spare loads in your pocket.</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
+        <div class="web-foot"><p>Your own equipment, not a squad vote, and what you earn here stays yours. It starts loaded with ${((am: string) => am === 'tracer' ? 'tracers' : G.AMMO[am] && am !== G.ballFor(G.calOf(d)) ? G.AMMO[am].name + ' rounds' : 'buckshot')(A.startAm(id))}, two spare loads in your pocket.</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
         <button class="btn primary arm-ok" data-armok ${got ? '' : 'disabled'}>${got ? `Take ${/^the /i.test(d.name) ? '' : 'the '}${G.U.esc(d.name)}${A.proOn(id) ? ` ${G.U.esc(P.name)}` : ''}` : 'Not yet yours'}</button></div></aside><div class="web-preview hidden"></div></div>`;
     el.classList.remove('hidden');
     const place = () => { const v = this.armView, w = el.querySelector<HTMLElement>('.web-world'); if (w) w.style.transform = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.z.toFixed(3)})`; };

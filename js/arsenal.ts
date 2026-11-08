@@ -10,7 +10,7 @@ const G_Arsenal = (() => {
   // id, what it's reached from, which path, how far out (a: a branch off its path: its own angle and r, its distance out); and what it takes: stat, how many, of what
   // pro: mastering it, with it: what it takes, and the named build that earns you, to start with if you like (parts: on top of its own)
   interface ProBuild { name: string; stat: string; n: number; what: string; parts: Record<string, string>; }
-  interface ArsenalNode { id: string; from?: string; path?: string; ring: number; stat?: string; n?: number; what?: string; how?: string; a?: number; r?: number; pro?: ProBuild; }
+  interface ArsenalNode { id: string; from?: string; path?: string; ring: number; stat?: string; n?: number; what?: string; how?: string; a?: number; r?: number; pro?: ProBuild; am?: string; }
   const NODES: ArsenalNode[] = [
     { id: 'p9', ring: 0, pro: { name: 'Patrolman', stat: 'kills', n: 30, what: 'kills', parts: { tac: 'ptac.2', grip: 'gr.pistol.2' } } },
     { id: 'tx22', from: 'p9', path: 'auto', ring: 1, stat: 'tap', n: 15, what: 'double-tap kills', how: 'Two hits on them inside half a second, and they go down.',
@@ -19,35 +19,51 @@ const G_Arsenal = (() => {
       pro: { name: 'Tre Colpi', stat: 'trio', n: 25, what: 'burst kills', parts: { slide: 'b92.sl.comp', tac: 'ptac.1', grip: 'gr.pistol.0' } } },
     { id: 'g18', from: 'b92', path: 'auto', ring: 3, stat: 'trio', n: 15, what: 'burst kills', how: 'Two or more rounds of one burst hit them, and they go down.',
       pro: { name: 'Buzzsaw', stat: 'multi', n: 20, what: 'double kills', parts: { slide: 'g18.sl.comp', tac: 'ptac.1', stock: 'stk.pistol.0' } } },
-    { id: 'mac10', from: 'g18', path: 'auto', ring: 4, stat: 'multi', n: 10, what: 'double kills', how: 'Two suspects down inside three seconds.',
-      pro: { name: 'Street Sweeper', stat: 'kills', n: 50, what: 'kills', parts: { muzzle: 'mz.r45.can', stock: 'stk.smg.0', optic: 'op.pic.1' } } },
+    { id: 'skorp', from: 'g18', path: 'auto', ring: 4, stat: 'multi', n: 10, what: 'double kills', how: 'Two suspects down inside three seconds.',
+      pro: { name: 'Street Sweeper', stat: 'kills', n: 50, what: 'kills', parts: { barrel: 'br.7.65x17.5.5', muzzle: 'mz.r9.can', optic: 'op.pic.1' } } },
+    { id: 'auto9', from: 'b92', path: 'auto', ring: 3, a: -66, r: 880, stat: 'hs', n: 15, what: 'headshot kills', how: 'A burst is three chances at the head. Make one of them count.',
+      pro: { name: 'Directive', stat: 'trio', n: 25, what: 'burst kills', parts: { slide: 'auto9.sl.comp', optic: 'op.pso.2', tac: 'ptac.1' } } },
     { id: 'derringer', from: 'p9', path: 'heavy', ring: 1, stat: 'close', n: 15, what: 'kills within 5 m', how: "Get close enough that it can't go wrong.",
       pro: { name: 'Last Word', stat: 'close', n: 30, what: 'kills within 5 m', parts: { barrel: 'derringer.br.long', grip: 'gr.derringer.rubber' } } },
     { id: 'rev', from: 'derringer', path: 'heavy', ring: 2, stat: 'one', n: 16, what: 'one-round kills', how: "One round fired at them, and they're done.",
       pro: { name: 'Peacemaker', stat: 'one', n: 30, what: 'one-round kills', parts: { barrel: 'rev.br.long', loader: 'ld.0', optic: 'op.pso.0' } } },
-    { id: 'judge', from: 'rev', path: 'heavy', ring: 3, a: 60, r: 600, stat: 'close', n: 15, what: 'kills within 5 m', how: 'In the room with them, where a cylinder of buckshot starts to look like the better idea.',
+    { id: 'judge', from: 'rev', path: 'heavy', ring: 3, a: 60, r: 790, stat: 'close', n: 15, what: 'kills within 5 m', how: 'In the room with them, where a cylinder of buckshot starts to look like the better idea.',
       pro: { name: 'Hanging Judge', stat: 'multi', n: 20, what: 'double kills', parts: { barrel: 'judge.br.long', loader: 'ld.1', optic: 'op.pso.5' } } },
+    { id: 'sawn', from: 'judge', path: 'heavy', ring: 4, a: 60, r: 1020, stat: 'multi', n: 10, what: 'double kills', how: "Two suspects down inside three seconds, at a revolver's pace.",
+      pro: { name: 'Doorman', stat: 'close', n: 30, what: 'kills within 5 m', parts: { barrel: 'sawn.br.short', optic: 'op.pic.2' } } },
+    { id: 'hc500', from: 'deagle', path: 'heavy', ring: 4, a: 41, r: 1100, stat: 'far', n: 12, what: 'kills past 20 m', how: 'A revolver, further out than a revolver has any business reaching.',
+      pro: { name: 'Grizzly', stat: 'one', n: 30, what: 'one-round kills', parts: { barrel: 'hc500.br.long', optic: 'op.pso.4', loader: 'ld.1' } } },
     { id: 'deagle', from: 'rev', path: 'heavy', ring: 3, stat: 'armed', n: 15, what: 'kills on armoured suspects', how: "A vest or a helmet: it doesn't save them. Pick your spot, or hit them hard enough.",
       pro: { name: 'Sledgehammer', stat: 'armed', n: 25, what: 'kills on armoured suspects', parts: { slide: 'deagle.sl.comp', optic: 'op.pso.2', grip: 'gr.pistol.2' } } },
-    { id: 'thor', from: 'deagle', path: 'heavy', ring: 4, stat: 'wall', n: 15, what: 'wall-bang kills', how: 'Through a wall, a door or whatever they thought was cover.',
+    { id: 'thor', from: 'deagle', path: 'heavy', ring: 4, a: 19, r: 1100, stat: 'wall', n: 15, what: 'wall-bang kills', how: 'Through a wall, a door or whatever they thought was cover.',
       pro: { name: 'Mjolnir', stat: 'wall', n: 25, what: 'wall-bang kills', parts: { barrel: 'thor.br.long', optic: 'op.pic.1', grip: 'gr.ak.1' } } },
     { id: 'ppk', from: 'p9', path: 'modern', ring: 1, stat: 'sur', n: 15, what: 'kills on unaware suspects', how: 'Down a suspect before they react. If they have seen you or heard gunfire, it does not count.',
       pro: { name: 'Diplomat', stat: 'sur', n: 30, what: 'kills on unaware suspects', parts: { barrel: 'pbr.7.65x17.thr', muzzle: 'mz.rp.can', grip: 'gr.pistol.1' } } },
-    { id: 'welrod', from: 'ppk', path: 'modern', ring: 2, a: 124, r: 470, stat: 'holster', n: 15, what: 'kills on suspects with their weapon holstered', how: 'Down a suspect with the PPK while their weapon is still holstered or slung. Once it is in their hands, it does not count.',
+    { id: 'g19', from: 'ppk', path: 'modern', ring: 2, a: 176, r: 660, stat: 'kills', n: 20, what: 'kills', how: 'Twenty down with the PPK. Nothing clever: the everyday carry, earned the everyday way.',
+      pro: { name: 'Duty', stat: 'tap', n: 30, what: 'double-tap kills', parts: { slide: 'g19.sl.port', optic: 'op.pso.1', tac: 'ptac.2' } } },
+    { id: 'welrod', from: 'ppk', path: 'modern', ring: 2, a: 124, r: 660, stat: 'holster', n: 15, what: 'kills on suspects with their weapon holstered', how: 'Down a suspect with the PPK while their weapon is still holstered or slung. Once it is in their hands, it does not count.',
       pro: { name: 'Night Work', stat: 'sur', n: 30, what: 'kills on unaware suspects', parts: { mag: 'welrod.mag.ext' } } },
-    { id: 'maxim9', from: 'welrod', path: 'modern', ring: 3, a: 124, r: 690, stat: 'hsback', n: 15, what: 'kills to the back of the head', how: 'Come up behind a suspect and put the Welrod to the back of their head. A shot from the front or the side does not count.',
+    { id: 'maxim9', from: 'welrod', path: 'modern', ring: 3, a: 124, r: 880, stat: 'hsback', n: 15, what: 'kills to the back of the head', how: 'Come up behind a suspect and put the Welrod to the back of their head. A shot from the front or the side does not count.',
       pro: { name: 'Quiet Room', stat: 'one', n: 30, what: 'one-round kills', parts: { barrel: 'maxim9.br.short', optic: 'op.pso.2', tac: 'ptac.1' } } },
     { id: 'm1911', from: 'ppk', path: 'modern', ring: 2, stat: 'hs', n: 15, what: 'headshot kills', how: 'Put it where it counts.',
       pro: { name: 'Old Faithful', stat: 'hs', n: 30, what: 'headshot kills', parts: { barrel: 'pbr.11.43x23.match', optic: 'op.pso.0', grip: 'gr.pistol.1' } } },
-    { id: 'usp', from: 'm1911', path: 'modern', ring: 3, stat: 'hsfar', n: 15, what: 'headshot kills past 10 m', how: 'A headshot, from further off than a pistol wants to be.',
+    { id: 'usp', from: 'm1911', path: 'modern', ring: 3, am: 'tracer_p', stat: 'hsfar', n: 15, what: 'headshot kills past 10 m', how: 'A headshot, from further off than a pistol wants to be.',
       pro: { name: 'Whisper', stat: 'sur', n: 30, what: 'kills on unaware suspects', parts: { barrel: 'pbr.11.43x23.thr', muzzle: 'mz.rp.can', tac: 'ptac.3' } } },
     { id: 'fiveseven', from: 'usp', path: 'modern', ring: 4, stat: 'far', n: 15, what: 'kills past 20 m', how: "A pistol, at a rifle's distance.",
       pro: { name: 'Long Reach', stat: 'far', n: 30, what: 'kills past 20 m', parts: { slide: 'fiveseven.sl.long', optic: 'op.pso.4', tac: 'ptac.1' } } },
+    { id: 'mp7', from: 'fiveseven', path: 'modern', ring: 5, stat: 'armed', n: 15, what: 'kills on armoured suspects', how: 'Its little round was made for vests. Show it some.',
+      pro: { name: 'Personal Defence', stat: 'armed', n: 25, what: 'kills on armoured suspects', parts: { barrel: 'br.4.6x30.9', optic: 'op.pic.3', tac: 'tac.2' } } },
   ];
-  const PATHS: Record<string, { name: string; a: number; len: number }> = { auto: { name: 'Full auto', a: -90, len: 4 }, heavy: { name: 'Heavy calibre', a: 30, len: 4 }, modern: { name: 'Modern classics', a: 150, len: 4 } };
-  const RINGS = [0, 250, 470, 690, 910], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, BURST = 5, BURST_MS = 1000, MULTI = 3000, CLOSE = 5, MID = 10, FAR = 20;
+  const PATHS: Record<string, { name: string; a: number; len: number }> = { auto: { name: 'Full auto', a: -90, len: 4 }, heavy: { name: 'Heavy calibre', a: 30, len: 4 }, modern: { name: 'Modern classics', a: 150, len: 5 } };
+  const RINGS = [0, 440, 660, 880, 1100, 1320], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, BURST = 5, BURST_MS = 1000, MULTI = 3000, CLOSE = 5, MID = 10, FAR = 20;
   let save: any = null;
-  const data = () => { if (!save) { const s = G.U.store.get('arsenal', null); save = s && s.got && s.n ? s : { got: [], n: {} }; save.pro = save.pro || {}; save.on = save.on || {}; } return save; };
+  const data = () => { if (!save) { const s = G.U.store.get('arsenal', null); save = s && s.got && s.n ? s : { got: [], n: {} }; save.pro = save.pro || {}; save.on = save.on || {}; migrate(save); } return save; };
+  // the MAC-10's place on the web went to the Skorpion (the MAC-10 switched off, js/data.ts OFF_GUNS): what was earned on it carries over
+  function migrate(s: any) {
+    if (s.got.includes('mac10') && !s.got.includes('skorp')) s.got.push('skorp');
+    if (s.pro.mac10 && !s.pro.skorp) { s.pro.skorp = 1; if (s.on.mac10) s.on.skorp = true; }
+    if (s.n.mac10 && !s.n.skorp) s.n.skorp = s.n.mac10;
+  }
   const keep = () => G.U.store.set('arsenal', data());
   const has = (id: string) => BY.has(id);
   // pro: earned it? set to start with it? and the build itself
@@ -56,6 +72,8 @@ const G_Arsenal = (() => {
   const proSet = (id: string, on: any) => { if (proGot(id)) { data().on[id] = !!on; keep(); } };
   function build(id: string) { const q = BY.get(id), b = Object.assign(G.Gunsmith.defaultBuild(id), q && q.pro ? q.pro.parts : {}); G.Gunsmith.prune(id, b); return b; }
   const partNames = (id: string) => Object.values(BY.get(id)!.pro!.parts).map((p) => G.Gunsmith.PARTS[p].name);
+  // what it starts loaded with: tracers, or the node's own load (the USP's +P tracers); one its caliber can't take falls back as G.ammoOk does
+  const startAm = (id: string) => { const q = BY.get(id), d = G.WEAPONS[id]; return G.ammoOk(G.calOf(d), (q && q.am) || 'tracer'); };
   const open = (id: string) => id === 'p9' || (has(id) && data().got.includes(id));
   const count = (id: string, stat: string) => (data().n[id] && data().n[id][stat]) || 0;
   const name = (id: string) => (G.WEAPONS[id] ? G.WEAPONS[id].name : id);
@@ -134,7 +152,7 @@ const G_Arsenal = (() => {
   }
   // read again from storage (the cloud saves merged an account's in: js/cloud.ts)
   const reload = () => { save = null; };
-  return { NODES, PATHS, RINGS, BY, along, has, proGot, proOn, proSet, build, partNames, open, count, name, at, left, tally, hit, kill, reload, get all() { return data(); } };
+  return { NODES, PATHS, RINGS, BY, along, has, startAm, proGot, proOn, proSet, build, partNames, open, count, name, at, left, tally, hit, kill, reload, get all() { return data(); } };
 })();
 G.Arsenal = G_Arsenal;
 
