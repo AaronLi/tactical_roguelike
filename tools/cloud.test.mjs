@@ -132,18 +132,31 @@ await test('not set up: no client made, nothing queued, the Account box says so'
 const server = fakeServer(D);
 const stA = storage();
 let A, uidA;
-await test('guest: local progress from before the cloud goes up to a new anonymous user on the first visit', async () => {
-  // played offline first, no project: an unlock, tallies, a run with a kill
-  const pre = browser(null, stA, { cfg: null });
-  pre.G.Cloud.boot();
+const usersBefore = +(await D.admin('select count(*) n from auth.users'))[0].n;
+// signing in with an email (a magic link's code), as the Account box does
+async function signIn(w, email) {
+  await w.G.Cloud.signInEmail(email);
+  const mail = [...server.mail].reverse().find((m) => m.to === email && m.type === 'email' && !m.used);
+  assert.ok(mail, 'a sign-in email was sent'); assert.equal(mail.redirect, 'http://localhost:8080/');
+  await w.G.Cloud.verifyCode(mail.token);
+  await until(() => w.G.Cloud.user && w.G.Cloud.user.email === email && w.G.Cloud.state === 'ok', 10000);
+}
+await test('not signed in: playing and changing settings, with the project set up, make no request and no account; GUEST to the squad', async () => {
+  const pre = browser(server, stA); pre.G.Cloud.boot();
   pre.G.U.store.set('arsenal', { got: ['tx22'], n: { p9: { kills: 31 } }, pro: { p9: 1 }, on: {} });
   pre.G.U.store.set('name', 'Hawkeye'); pre.G.U.store.set('sens', 1.4);
   const C = pre.G.Career; C.runStart(); C.levelStart(1, 0, false, false); C.ev('kill', 60, true); C.ev('arrest', 120); C.levelEnd({ arrests: 1, incap: 1, civKilled: 0 }, 400); C.runEnd('left');
-  // then the project's there
-  A = browser(server, stA); A.G.Cloud.boot();
-  await until(() => A.G.Cloud.state === 'ok' && A.G.Cloud.user);
+  await sleep(1800);
+  assert.equal(server.calls.length, 0); assert.equal(pre.G.Cloud.client, null); assert.equal(pre.G.Cloud.user, null);
+  assert.equal(pre.G.Cloud.guest(), true);
+  assert.equal(+(await D.admin('select count(*) n from auth.users'))[0].n, usersBefore, 'no user made');
+  A = pre;
+});
+await test('first sign-in with an email: the account is made, and everything here merges into it', async () => {
+  await signIn(A, 'hawk@example.com');
   uidA = A.G.Cloud.user.id;
-  assert.equal(A.G.Cloud.user.is_anonymous, true); assert.equal(A.G.Cloud.guest(), true);
+  assert.equal(A.G.Cloud.user.is_anonymous, false); assert.equal(A.G.Cloud.guest(), false);
+  assert.ok(!server.calls.includes('auth.anon'), 'never an anonymous sign-in');
   const prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0], prog = (await D.admin('select * from public.progress where user_id = $1', [uidA]))[0];
   assert.equal(prof.name, 'Hawkeye'); assert.equal(prof.settings.sens, 1.4);
   assert.deepEqual(prog.arsenal.got, ['tx22']); assert.equal(prog.arsenal.n.p9.kills, 31);
@@ -151,8 +164,7 @@ await test('guest: local progress from before the cloud goes up to a new anonymo
   assert.equal(c.kills, 1); assert.equal(c.arrests, 1); assert.equal(c.runs, 1); assert.equal(c.levels, 1); assert.equal(c.headshots, 1); assert.equal(c.deepest, 1); assert.equal(+c.credits, 580);
   const runs = await D.admin('select * from public.runs where user_id = $1', [uidA]);
   assert.equal(runs.length, 1); assert.equal(runs[0].outcome, 'left'); assert.equal(runs[0].levels[0].report.arrests, 1);
-});
-await test('reload: the session is restored, nothing counted twice; a change while playing goes up after the debounce', async () => {
+});await test('reload: the session is restored, nothing counted twice; a change while playing goes up after the debounce', async () => {
   A = browser(server, stA); A.G.Cloud.boot();
   await until(() => A.G.Cloud.state === 'ok' && A.G.Cloud.user);
   assert.equal(A.G.Cloud.user.id, uidA);
@@ -216,53 +228,39 @@ await test('callsign preference: an older row\'s animal and second choice, or a 
   prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
   assert.deepEqual(prof.settings.animals, mine); assert.equal(ALL.every((a) => mine.includes(a)), true);
 });
-const stB = storage();
-let B;
-await test('two guests: RLS keeps them apart through the API too', async () => {
+await test('two accounts: RLS keeps them apart through the API too', async () => {
   server.offline = false; // (whatever the last test left)
-  B = browser(server, stB); B.G.Cloud.boot(); B.G.U.store.set('vol', 0.3);
-  await until(() => B.G.Cloud.state === 'ok' && B.G.Cloud.user);
-  const cl = B.G.Cloud.client;
-  assert.notEqual(B.G.Cloud.user.id, uidA);
+  const O = browser(server, storage()); O.G.Cloud.boot(); O.G.U.store.set('vol', 0.5);
+  await signIn(O, 'other@example.com');
+  const cl = O.G.Cloud.client;
+  assert.notEqual(O.G.Cloud.user.id, uidA);
   assert.equal((await cl.from('career').select('*').eq('user_id', uidA).maybeSingle()).data, null);
-  assert.equal((await cl.from('profiles').select('*')).data.length, 1, 'B sees only their own profile');
+  assert.equal((await cl.from('profiles').select('*')).data.length, 1, 'they see only their own profile');
   const up = await cl.from('profiles').upsert({ user_id: uidA, name: 'pwned' }, { onConflict: 'user_id' });
   assert.ok(up.error, 'writing A\'s row is refused');
   assert.equal((await D.admin('select name from public.profiles where user_id = $1', [uidA]))[0].name, 'Hawkeye');
   const rpc = await cl.rpc('career_add', { d: { add: { kills: 5 } } });
-  assert.equal(rpc.data.user_id, B.G.Cloud.user.id, 'career_add adds to your own row only');
+  assert.equal(rpc.data.user_id, O.G.Cloud.user.id, 'career_add adds to your own row only');
   assert.equal((await careerRow(D, uidA)).kills, 3);
 });
-await test('save to email: the guest becomes an email account, the same user and rows', async () => {
-  await A.G.Cloud.saveEmail('hawk@example.com');
-  const mail = server.mail.find((m) => m.to === 'hawk@example.com' && m.type === 'email_change');
-  assert.ok(mail, 'a confirmation was sent'); assert.equal(mail.redirect, 'http://localhost:8080/');
-  await A.G.Cloud.verifyCode(mail.token);
-  await until(() => !A.G.Cloud.guest());
-  assert.equal(A.G.Cloud.user.id, uidA); assert.equal(A.G.Cloud.user.email, 'hawk@example.com');
-  assert.equal(A.G.Cloud.meta().ownerAnon, false);
-});
-await test('sign in on another browser: its guest progress merges into the account (unions, maxima, newer settings, career added)', async () => {
-  // B, a guest with progress of its own: another unlock, a higher tally, a lower one, a newer setting, a career
+const stB = storage();
+let B;
+await test('sign in on another browser: what it has, never signed in, merges into the account (unions, maxima, newer settings, career added)', async () => {
+  B = browser(server, stB); B.G.Cloud.boot();
   B.G.U.store.set('arsenal', { got: ['derringer'], n: { p9: { kills: 12, close: 7 } }, pro: {}, on: {} });
-  B.G.U.store.set('fov', 70); // (newer than A's 95)
+  B.G.U.store.set('fov', 70); B.G.U.store.set('vol', 0.3); // (newer than A's 95; one A never set)
   const C = B.G.Career; C.runStart(); C.levelStart(1, 0, false, false); C.ev('kill', 50); C.ev('kill', 50); C.ev('down'); C.levelEnd({ arrests: 0 }, 300); C.runEnd('left');
-  await B.G.Cloud.flush();
-  const uidB = B.G.Cloud.user.id, bKills = (await careerRow(D, uidB)).kills;
-  assert.equal(bKills, 7); // (5 through the rpc above, 2 here)
-  await B.G.Cloud.signInEmail('hawk@example.com');
-  const mail = [...server.mail].reverse().find((m) => m.to === 'hawk@example.com' && m.type === 'email');
-  await B.G.Cloud.verifyCode(mail.token);
-  await until(() => B.G.Cloud.user && B.G.Cloud.user.id === uidA && B.G.Cloud.state === 'ok', 10000);
+  await sleep(1800); assert.equal(B.G.Cloud.client, null, 'no request before signing in');
+  await signIn(B, 'hawk@example.com');
+  assert.equal(B.G.Cloud.user.id, uidA);
   const prog = (await D.admin('select * from public.progress where user_id = $1', [uidA]))[0], prof = (await D.admin('select * from public.profiles where user_id = $1', [uidA]))[0];
   assert.deepEqual([...prog.arsenal.got].sort(), ['derringer', 'tx22']);
   assert.equal(prog.arsenal.n.p9.kills, 31); assert.equal(prog.arsenal.n.p9.close, 7); assert.equal(prog.arsenal.pro.p9, 1);
   assert.equal(prof.settings.fov, 70, 'the newer setting'); assert.equal(prof.name, 'Hawkeye', 'B never chose a name: the account\'s');
   assert.equal(prof.settings.vol, 0.3, 'a setting only B had');
   const c = await careerRow(D, uidA);
-  assert.equal(c.kills, 3 + bKills); assert.equal(c.downs, 1); assert.equal(c.runs, 2 + 1);
-  assert.equal((await D.admin('select count(*) n from public.runs where user_id = $1', [uidA]))[0].n, 3, 'A\'s two runs and B\'s one, copied in; and B\'s guest rows stay its own');
-  // and here, the merged copy
+  assert.equal(c.kills, 3 + 2); assert.equal(c.downs, 1); assert.equal(c.runs, 2 + 1);
+  assert.equal((await D.admin('select count(*) n from public.runs where user_id = $1', [uidA]))[0].n, 3, 'A\'s two runs and B\'s one');
   assert.deepEqual([...JSON.parse(stB.getItem('bp_arsenal')).got].sort(), ['derringer', 'tx22']);
   assert.equal(B.G.Career.stats().kills, c.kills);
   assert.equal(JSON.parse(stB.getItem('bp_name')), 'Hawkeye');
@@ -274,17 +272,32 @@ await test('the other browser picks up the merged progress on its next sync', as
   assert.equal(JSON.parse(stA.getItem('bp_fov')), 70);
   assert.equal(A.G.Career.stats().kills, (await careerRow(D, uidA)).kills);
 });
-await test('sign out: the account\'s progress leaves this browser, preferences stay; signing back in brings it back', async () => {
+await test('sign out, play, sign in again: the account\'s progress left and comes back, the career counted once (and what was played signed out added)', async () => {
+  const before = (await careerRow(D, uidA)).kills;
   await B.G.Cloud.signOut();
   assert.equal(B.G.Cloud.user, null); assert.equal(stB.getItem('bp_arsenal'), null); assert.equal(B.G.Career.stats().kills, 0);
-  assert.equal(JSON.parse(stB.getItem('bp_fov')), 70); assert.equal(B.G.Cloud.meta().owner, null);
-  await B.G.Cloud.signInEmail('hawk@example.com');
-  const mail = [...server.mail].reverse().find((m) => m.to === 'hawk@example.com' && m.type === 'email' && !m.used);
-  await B.G.Cloud.verifyCode(mail.token);
-  await until(() => B.G.Cloud.user && B.G.Cloud.state === 'ok', 10000);
-  assert.equal(B.G.Career.stats().kills, (await careerRow(D, uidA)).kills, 'nothing added twice');
+  assert.equal(JSON.parse(stB.getItem('bp_fov')), 70); assert.equal(B.G.Cloud.meta().owner, null); assert.equal(B.G.Cloud.guest(), true);
+  const n0 = server.calls.length;
+  B.G.Career.runStart(); B.G.Career.ev('kill', 50); await sleep(1800);
+  assert.equal(server.calls.length, n0, 'signed out: no writes');
+  await signIn(B, 'hawk@example.com');
+  assert.equal((await careerRow(D, uidA)).kills, before + 1, 'nothing added twice; the kill played signed out added once');
+  assert.equal(B.G.Career.stats().kills, before + 1);
   assert.deepEqual([...JSON.parse(stB.getItem('bp_arsenal')).got].sort(), ['derringer', 'tx22']);
+  // and again, straight away: still once
+  await B.G.Cloud.signOut(); await signIn(B, 'hawk@example.com');
+  assert.equal((await careerRow(D, uidA)).kills, before + 1);
 });
-
+await test('an anonymous session an earlier version made is let go of; its progress stays here and merges in on signing in', async () => {
+  const st = storage();
+  await server.client('u', 'k', {}, st).auth.signInAnonymously(); // (as the earlier version left it)
+  const E = browser(server, st); E.G.U.store.set('arsenal', { got: ['ppk'], n: {}, pro: {}, on: {} }); E.G.Career.runStart(); E.G.Career.ev('kill', 50);
+  E.G.Cloud.boot();
+  await until(() => E.G.Cloud.client && E.G.Cloud.state === 'idle', 8000);
+  assert.equal(E.G.Cloud.user, null); assert.equal(E.G.Cloud.guest(), true); assert.equal(JSON.parse(st.getItem('bp_arsenal')).got[0], 'ppk');
+  await signIn(E, 'eve@example.com');
+  const c = await careerRow(D, E.G.Cloud.user.id), prog = (await D.admin('select * from public.progress where user_id = $1', [E.G.Cloud.user.id]))[0];
+  assert.equal(c.kills, 1); assert.deepEqual(prog.arsenal.got, ['ppk']);
+});
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);

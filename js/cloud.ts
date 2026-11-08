@@ -3,9 +3,9 @@
 // device. What's kept: the sidearm tree (G.U.store 'arsenal'), your callsign, look and settings, the wishlist, the career and the
 // run log (js/career.ts). It all lives in this browser first, as it always has (G.U.store, under bp_); this copies it up and back.
 //   - Not set up (js/cloudconfig.ts empty) or ?cloud=0: nothing happens here past drawing the menu's Account box. No request.
-//   - Set up: the Supabase client loads from the CDN once the page is in (never in the simulation's thread). You start as a
-//     guest, an anonymous Supabase user, made the first time there's something to save; "Save to email" links an email to that
-//     same user (a magic link, or its code), "Sign in with email" brings an account onto another browser.
+//   - Set up: until you sign in, nothing changes either: everything's saved in this browser, and the Supabase client isn't even
+//     loaded (it loads from the CDN when you open the Account box, or when there's a session to restore; never in the simulation's
+//     thread). "Sign in with email" (a magic link, or its code) makes the account if it's new; what's here merges into it.
 //   - Changes are written a few seconds after they're made (debounced), queued while offline (bp_cloudq) and sent when back.
 //   - On signing in, what's here merges with what the account has (merge rules: docs/cloud.md, and the functions below).
 // The page only: the server worker never loads this file (docs/threads.md).
@@ -22,8 +22,8 @@ const G_Cloud = (() => {
   const DEBOUNCE = 4000, RETRY0 = 5000, RETRY_MAX = 60000;
   const q = new URLSearchParams(location.search);
   let state: CloudState = 'off', why = '', client: SbClient | null = null, user: SbUser | null = null, loading: Promise<SbClient | null> | null = null;
-  let timer: ReturnType<typeof setTimeout> | undefined, retryMs = RETRY0, busy = false, again = false, signing: Promise<void> | null = null, lastOk = 0;
-  let mail: { email: string; kind: 'link' | 'signin' } | null = null, mailMsg = '', mailErr = false;
+  let timer: ReturnType<typeof setTimeout> | undefined, retryMs = RETRY0, busy = false, again = false, lastOk = 0;
+  let mail: { email: string } | null = null, mailMsg = '', mailErr = false;
 
   // ------------------------------------------------------------- config
   function config() {
@@ -74,7 +74,7 @@ const G_Cloud = (() => {
   // there's something to send: a session first if there isn't one (a guest), then a flush in a moment
   function want() {
     if (!on()) return;
-    if (user) schedule(); else ensure();
+    if (user) schedule(); // (signed out: it stays here, and merges in when you sign in)
   }
   function schedule(ms = DEBOUNCE) { clearTimeout(timer); timer = setTimeout(() => { flush(); }, ms); }
 
@@ -164,51 +164,31 @@ const G_Cloud = (() => {
       const { data, error } = await cl.auth.getSession();
       if (error) throw error;
       if (data.session) await setUser(data.session.user);
-      else if (hasSomething()) ensure();
       else setState('idle');
       return cl;
     })().catch((e) => { loading = null; fail(e, 'load'); return null; });
     return loading;
   }
-  // anything here worth an account yet (a fresh visitor who looks at the menu and leaves makes no guest)
-  function hasSomething() {
-    const x = Q(), m = meta();
-    return !!(G.Career.stats().runs || S.get('arsenal', null) || Object.values(m.mt).some((t) => t > 0) || x.profile || x.progress);
-  }
-  // a guest: an anonymous user, the first time there's something to save
-  function ensure(): Promise<void> {
-    if (!on() || user) return Promise.resolve();
-    if (signing) return signing;
-    signing = (async () => {
-      const cl = await load();
-      if (!cl || user) return;
-      if (navigator.onLine === false) { setState('offline'); return; }
-      const { data, error } = await cl.auth.signInAnonymously();
-      if (error) throw error;
-      if (data.user) await setUser(data.user);
-    })().catch((e) => fail(e, 'guest')).finally(() => { signing = null; });
-    return signing;
-  }
   async function setUser(u: SbUser | null) {
     const was = user;
     user = u;
     if (!u) { setState(on() ? 'idle' : 'off'); return; }
+    // an anonymous session an earlier version made: let go of (this browser's copy stays, and merges into your account when you sign
+    // in with an email: it's a guest's, sync's adopt); the project's cleanup deletes the user in time
+    if (isAnon(u)) { user = null; try { await client!.auth.signOut({ scope: 'local' }); } catch (e) { /* (gone from here regardless) */ } setState('idle'); tellHost(); return; }
     if (was && was.id === u.id) { render(); tellHost(); return; } // (the same user: an email confirmed, a token refreshed)
     tellHost();
     await sync();
   }
   function authChanged(ev: string, u: SbUser | null) {
-    if (ev === 'SIGNED_OUT') { user = null; render(); tellHost(); return; }
+    if (ev === 'SIGNED_OUT') { if (user) { user = null; render(); tellHost(); } return; }
     if (u && (!user || user.id !== u.id)) { setUser(u); return; }
-    if (u && user && (u.email !== user.email || isAnon(u) !== isAnon(user))) {
-      const wasAnon = isAnon(user); user = u;
-      if (wasAnon && !isAnon(u)) { mail = null; mailMsg = 'Saved to ' + (u.email || 'your email') + '.'; mailErr = false; meta().ownerAnon = false; keepMeta(); }
-      render(); tellHost();
-    } else if (u) user = u;
+    if (u) { const was = user && user.email; user = u; if (u.email !== was) { render(); tellHost(); } }
   }
   // the guest mark the squad sees (js/server.ts 'acct'), if you're in a game
   function tellHost() { render(); if (G.Net && G.Net.peer && G.Game && G.Game.phase !== 'menu') G.Net.toHost({ t: 'acct', anon: guest() ? 1 : 0 }); }
-  const guest = () => on() && !!user && isAnon(user);
+  // (GUEST, to the squad: cloud saves on, and not signed in. Off or not set up: nothing to say)
+  const guest = () => on() && !(user && !isAnon(user));
 
   // ------------------------------------------------------------- reading and writing the rows
   async function must<T>(p: PromiseLike<{ data: T; error: any }>): Promise<T> { const { data, error } = await p; if (error) throw error; return data; }
@@ -324,33 +304,24 @@ const G_Cloud = (() => {
     setState(net ? 'offline' : 'error');
     if (!net) console.warn('cloud: ' + where + ': ' + msg);
     clearTimeout(timer);
-    timer = setTimeout(() => { if (user) flush(); else ensure(); }, retryMs);
+    timer = setTimeout(() => { if (user) flush(); else if (!client) { loading = null; load(); } }, retryMs);
     retryMs = Math.min(RETRY_MAX, retryMs * 2);
   }
   function setState(s: CloudState) { state = s; render(); }
 
-  // ------------------------------------------------------------- email: save the guest to one, sign in with one, sign out
-  async function saveEmail(email: string) {
-    if (!client || !user) await ensure();
-    if (!client || !user) throw new Error(state === 'offline' ? "You're offline" : why || 'No connection to the save server');
-    if (isAnon(user)) {
-      const { error } = await client.auth.updateUser({ email }, { emailRedirectTo: redirect() });
-      if (error) throw error;
-      mail = { email, kind: 'link' };
-    } else await signInEmail(email);
-  }
+  // ------------------------------------------------------------- email: sign in with one (made if it's new), sign out
   async function signInEmail(email: string) {
     const cl = await load();
     if (!cl) throw new Error(why || 'No connection to the save server');
     if (user) await flush();
     const { error } = await cl.auth.signInWithOtp({ email, options: { emailRedirectTo: redirect(), shouldCreateUser: true } });
     if (error) throw error;
-    mail = { email, kind: 'signin' };
+    mail = { email };
   }
   // the code in the email, instead of its link (a desktop game whose mail opens in another browser)
   async function verifyCode(code: string) {
     if (!client || !mail) return;
-    const { data, error } = await client.auth.verifyOtp({ email: mail.email, token: code.trim(), type: mail.kind === 'link' ? 'email_change' : 'email' });
+    const { data, error } = await client.auth.verifyOtp({ email: mail.email, token: code.trim(), type: 'email' });
     if (error) throw error;
     mail = null;
     if (data.user) authChanged('USER_UPDATED', data.user);
@@ -378,11 +349,8 @@ const G_Cloud = (() => {
     if (!configured()) { s = 'Not set up'; b = `<p>Cloud saves aren't set up for this copy of the game. Your progress is saved in this browser.</p>`; }
     else if (switchedOff()) { s = 'Off'; b = `<p>Cloud saves are off for this visit (<code>?cloud=0</code>). Your progress is saved in this browser.</p>`; }
     else if (!user) {
-      s = state === 'loading' ? 'Connecting...' : 'Saved in this browser';
-      b = `<p>Your progress is saved in this browser. It goes to the cloud as a guest once there's something to save.</p>${emailForm('signin')}`;
-    } else if (isAnon(user)) {
-      s = 'Guest (progress saved)';
-      b = `<p>Playing as a <b>guest</b>: your progress is saved to the cloud, for this browser. Save it to an email to keep it if this browser's data goes, or to play on another device.</p>${emailForm('link')}`;
+      s = state === 'loading' ? 'Connecting...' : 'Not signed in';
+      b = `<p>Not signed in: progress saved on this device. Sign in with email to keep it everywhere.</p>${emailForm()}`;
     } else {
       s = esc(user.email || 'Signed in');
       b = `<p>Signed in as <b>${esc(user.email || '')}</b>. Your progress is saved to your account.</p><div class="acct-row"><button class="btn small" data-acct="out">Sign out</button></div>`;
@@ -390,11 +358,11 @@ const G_Cloud = (() => {
     sum.innerHTML = s + (st.short ? ` <span class="acct-st ${st.bad ? 'bad' : ''}">· ${st.short}</span>` : '');
     body.innerHTML = b + (st.long ? `<div class="acct-status${st.bad ? ' bad' : ''}">${esc(st.long)}</div>` : '') + (mailMsg ? `<div class="acct-msg${mailErr ? ' bad' : ''}">${esc(mailMsg)}</div>` : '');
   }
-  function emailForm(kind: 'link' | 'signin') {
+  function emailForm() {
     if (mail) return `<p class="acct-sent">We've sent a link to <b>${G.U.esc(mail.email)}</b>. Open it in this browser, or enter the code from the email:</p>
       <div class="acct-row"><input id="acctCode" maxlength="10" placeholder="Code" autocomplete="one-time-code" inputmode="numeric"><button class="btn small" data-acct="code">Confirm</button><button class="btn small" data-acct="cancel">Back</button></div>`;
-    return `<div class="acct-row"><input id="acctEmail" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email">${kind === 'link' ? '<button class="btn small" data-acct="save">Save to email</button>' : ''}</div>
-      <div class="acct-row acct-alt">${kind === 'link' ? '<small class="dim">Saved to an email before?</small>' : ''}<button class="btn small" data-acct="signin">Sign in with email</button></div>`;
+    return `<div class="acct-row"><input id="acctEmail" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email"><button class="btn small" data-acct="signin">Sign in with email</button></div>
+      <small class="dim">A link (and a code) by email, no password. A new email makes your account, and what's on this device goes into it.</small>`;
   }
   function statusLine(): { short: string; long: string; bad: boolean } {
     if (!on()) return { short: '', long: '', bad: false };
@@ -410,9 +378,8 @@ const G_Cloud = (() => {
     const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
     mailMsg = ''; mailErr = false;
     try {
-      if ((what === 'save' || what === 'signin') && !valid) throw new Error('Enter your email address.');
-      if (what === 'save') await saveEmail(email);
-      else if (what === 'signin') await signInEmail(email);
+      if (what === 'signin' && !valid) throw new Error('Enter your email address.');
+      if (what === 'signin') await signInEmail(email);
       else if (what === 'code') { const c = document.getElementById('acctCode') as HTMLInputElement | null; await verifyCode(c ? c.value : ''); }
       else if (what === 'cancel') mail = null;
       else if (what === 'out') { if (confirm('Sign out? Your progress stays in your account, and leaves this browser until you sign in again.')) await signOut(); }
@@ -424,7 +391,7 @@ const G_Cloud = (() => {
     if (!body || body.dataset.bound) return;
     body.dataset.bound = '1';
     body.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-acct]'); if (b) act(b.dataset.acct!); });
-    body.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; const t = e.target as HTMLElement; if (t.id === 'acctCode') act('code'); else if (t.id === 'acctEmail') act(guest() ? 'save' : 'signin'); });
+    body.addEventListener('keydown', (e) => { if (e.key !== 'Enter') return; const t = e.target as HTMLElement; if (t.id === 'acctCode') act('code'); else if (t.id === 'acctEmail') act('signin'); });
     // (the box opened: the client's wanted, to show who you are and to sign in)
     const det = document.getElementById('acctBox') as HTMLDetailsElement | null;
     if (det) det.addEventListener('toggle', () => { if (det.open && on() && !loading) load(); });
@@ -438,19 +405,21 @@ const G_Cloud = (() => {
     bindUI(); render();
     if (!on()) { state = 'off'; render(); return; }
     state = 'idle';
-    window.addEventListener('online', () => { retryMs = RETRY0; if (user) flush(); else if (hasSomething()) ensure(); });
+    window.addEventListener('online', () => { retryMs = RETRY0; if (user) flush(); });
     window.addEventListener('offline', () => setState('offline'));
     window.addEventListener('pagehide', () => { if (user) flush(); });
-    // the client loads once the page is in and idle (it mustn't hold up the first paint or the models), at once if this is a
-    // magic link's way back in (its session is in the URL's hash)
+    // The client loads only if there's a session to restore (supabase-js keeps it under sb-<project>-auth-token), once the page is in
+    // and idle (it mustn't hold up the first paint or the models), or at once if this is a magic link's way back in (its session in
+    // the URL's hash). Otherwise when the Account box is opened (bindUI): someone who never signs in makes no request at all.
     const back = /access_token=|error_description=|[?&]code=/.test(location.hash + location.search);
-    const go = () => { if (back || hasSomething() || meta().owner) load(); };
+    const stored = () => { try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i) || ''; if (/^sb-.+-auth-token$/.test(k)) return true; } } catch (e) { /* storage unavailable */ } return false; };
+    const go = () => { if (back || stored()) load(); };
     if (back) go();
     else if (document.readyState === 'complete') setTimeout(go, 1500);
     else window.addEventListener('load', () => setTimeout(go, 1500));
   }
 
-  return { boot, add, runChanged, flush, sync, ensure, saveEmail, signInEmail, verifyCode, signOut, render,
+  return { boot, add, runChanged, flush, sync, signInEmail, verifyCode, signOut, render,
     mergePrefs, mergeArsenal, careerPlus, careerAsDelta, careerFrom,
     on, configured, guest, queue: () => Q(), meta: () => meta(),
     get state() { return state; }, get user() { return user; }, get client() { return client; } };

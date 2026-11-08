@@ -16,10 +16,10 @@ was: no request to Supabase, and the Account box in the main menu says cloud sav
 
 1. **Create a project** at [supabase.com](https://supabase.com) (the free tier is plenty). Note its region; nothing else is needed yet.
 2. **Auth > Sign In / Providers**:
-   - turn on **Allow anonymous sign-ins** (players start as guests);
    - **Email** on (it is by default), with **Confirm email** on. Passwords aren't used by the game; nothing to change there.
-   - (Optional, recommended) **Auth > Attack Protection**: turn on CAPTCHA for anonymous sign-ins later if guest accounts get abused;
-     the rate limits under **Auth > Rate Limits** apply as they are.
+   - **Allow anonymous sign-ins** is no longer needed: the game never signs in anonymously, so you can turn it off. (The guest
+     cleanup still deletes any anonymous users an earlier build made.)
+   - The rate limits under **Auth > Rate Limits** apply as they are.
 3. **Auth > URL Configuration**:
    - **Site URL**: `https://d5g.ca`
    - **Redirect URLs**: add `https://d5g.ca/**` and `http://localhost:8080/**` (and any other port you serve on, e.g. `http://localhost:8270/**`).
@@ -36,26 +36,29 @@ was: no request to Supabase, and the Account box in the main menu says cloud sav
    key; newer projects call it the "publishable" key, which works the same). **Never** the `service_role` / secret key: it bypasses
    Row Level Security. Rebuild (`npm run build`) and deploy as usual.
 
-To check it: open the game, play a level (or star a part), open **Account** in the main menu: it should say *Guest (progress saved)*,
+To check it: open the game, open **Account** in the main menu (*Not signed in*), sign in with your email (the link, or the code),
 and **Table Editor** shows your rows. `?cloud=0` in the URL turns cloud saves off for that visit.
 
 ## How it behaves
 
-- **Guest first.** The first time there is something to save (a run, an unlock, a setting changed), the game signs in anonymously
-  (`signInAnonymously`) and everything local goes up. A visitor who only looks at the menu makes no account.
-- **Save to email** (Account box): links an email to the same guest user (`updateUser({ email })`; the email's link, or its code,
-  confirms it). Same user id, same rows: nothing is copied.
-- **Sign in with email** (another browser, or after clearing this one): a magic link or code (`signInWithOtp`), which creates the
-  account if the email has none yet. This browser's guest progress merges into the account (below).
-- **Sign out** (email accounts only): the account's progress (sidearm tree, wishlist, career, runs) leaves this browser; your
-  preferences (callsign, look, settings) stay. Signing back in brings it back. The next thing worth saving makes a new guest.
-- **Offline / signed out**: the game plays and saves locally exactly as before. Cloud writes queue (`bp_cloudq`; the runs carry their
-  own "sent" mark) and go up when the network is back (the browser's `online` event, and retries backing off from 5 s to a minute).
+- **Local until you sign in.** Signed out, the game saves in this browser exactly as it always did: no account, no request to
+  Supabase (the client isn't even loaded until you open **Account**, or there's a session to restore).
+- **Sign in with email** (Account box: *Not signed in: progress saved on this device. Sign in with email to keep it everywhere.*):
+  a magic link or its code (`signInWithOtp`), which creates the account if the email has none yet. Everything in this browser merges
+  into the account (below). From then on it syncs.
+- **Sign out**: the account's progress (sidearm tree, wishlist, career, runs) leaves this browser; your preferences (callsign, look,
+  settings) stay. Signing back in brings it back. Signed out, you play and save locally again, and that merges in when you sign in.
+- **Offline**: signed in, cloud writes queue (`bp_cloudq`; the runs carry their own "sent" mark) and go up when the network is back
+  (the browser's `online` event, and retries backing off from 5 s to a minute).
 - **Debounced**: a change goes up 4 s after the last one. Writes are small; a level makes a handful of requests.
 - The Account box shows *offline* or *sync failed* (with the reason) beside the account, and a status line inside.
 - **Other players** see a small **GUEST** mark beside your name in the lobby, the hangar's roster and the Tab scoreboard while you
-  play as a guest (the optional `anon: 1` on `hello`, and the `acct` message when it changes mid-session; js/server.ts). A player
-  with cloud saves off isn't marked. Names are display names only (not unique); the account's identity is its user id.
+  play not signed in on a build with cloud saves set up (the optional `anon: 1` on `hello`, and the `acct` message when you sign in or
+  out mid-session; js/server.ts). A player with cloud saves off or not set up isn't marked. Names are display names only (not
+  unique); the account's identity is its user id.
+- **Anonymous users** (from an earlier version, which made a guest account at once): a session one left in a browser is let go of
+  (signed out locally), its progress kept in the browser, merging into the email account you sign in with; the guest cleanup
+  (below) deletes the user itself.
 - **Callsign preference**: every animal, ranked (*Callsign preference* in the main menu: one row in your order, each with its rank;
   dragged to rank with the mouse or a finger, moved with the arrow keys / Home / End, or clicked to put it 1st), kept as one list
   (`animals`, all of them) and synced like the rest of your look. `hello` sends it as `prefs` (and `animal`, the 1st, for an older
@@ -68,7 +71,7 @@ and **Table Editor** shows your rows. `?cloud=0` in the URL turns cloud saves of
 ## The data
 
 Every row has `schema_version` (1 now). All tables: `user_id uuid` = `auth.uid()`, cascading on the user's deletion, Row Level
-Security on, one policy each: *own rows only*, for the `authenticated` role (anonymous guests are `authenticated` too). The `anon`
+Security on, one policy each: *own rows only*, for the `authenticated` role. The `anon`
 role (no session) has no grants at all.
 
 | Table | Columns | Limits |
@@ -103,12 +106,12 @@ Only your own, host or client, from your screen's messages (never the simulation
 
 ## Merge rules (signing in)
 
-What's in the browser has an *owner* (`bp_cloudmeta`: the account it was last synced with, and whether that was a guest).
+What's in the browser has an *owner* (`bp_cloudmeta`: the account it was last synced with, and whether that was an anonymous one).
 
 | This browser's copy | Mode | What happens |
 | --- | --- | --- |
 | Of this account | same | Pull, merge (below), push. The career gets only what's queued since the last sync. |
-| Of no account, or of a guest | adopt | Everything here merges *into* the account, the career added in whole, every local run copied in. (A guest signing in to an email account on another device brings its progress along. The old guest's rows stay where they were.) |
+| Of no account (never signed in, or signed out), or of an anonymous user | adopt | Everything here merges *into* the account, the career added in whole, every local run copied in. Signing out clears the account's progress from this copy and the owner with it, so signing in again adds only what was played since: the career is never counted twice. |
 | Of another email account | replace | The account's progress replaces this copy (the other account's is safe in its own rows); preferences still merge by time. |
 
 Per item:
@@ -155,10 +158,12 @@ The preference clock is each device's own.
   refused, the size/range checks, `career_add`'s caps and maxima, the 1000-run cap, the guest cleanup (an idle guest goes with its
   rows; a recently active one, a new one and an emailed one stay; players can't call it). pg_cron's scheduling itself can't run there;
 - the game's own `dist/js/util.js`, `career.js`, `cloud.js`, in script contexts that each act as a browser with its own localStorage,
-  against a stand-in for supabase-js over that database (each table call run as the signed-in user, so RLS decides): a guest made
-  with the local progress already there, a reload restoring the session without counting anything twice, the offline queue, two
-  guests kept apart through the API, saving a guest to an email (by its code), signing in on a second browser and the merge, the
-  first browser picking the merge up, sign-out and back in, the TURN settings kept out of the row (and stripped from one that had them).
+  against a stand-in for supabase-js over that database (each table call run as the signed-in user, so RLS decides): playing and
+  changing settings signed out with the project set up (no request, no user made), the first email sign-in merging everything local
+  into the new account, a reload restoring the session without counting anything twice, the offline queue, two accounts kept apart
+  through the API, signing in on a second browser and the merge, the first browser picking the merge up, signing out, playing and
+  signing in again (and again) with the career counted once, an anonymous session from the earlier version let go of with its
+  progress kept, the TURN settings kept out of the row (and stripped from one that had them), the callsign list's migration.
 
 Not covered until a real project exists: supabase-js itself from the CDN (its session storage, token refresh, the magic link's
 redirect back with the session in the URL), the emails Supabase sends and their templates, the Auth settings above, real network
