@@ -107,7 +107,9 @@ const G_R = {
   init() {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance', reversedDepthBuffer: true }));
     this.reverseDepth(r);
-    r.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    // (a phone's screen is 2 to 3 device pixels to the point, and its GPU isn't a desktop's: the HUD is the page's own, sharp at any ratio, so only the 3D is softer)
+    const coarse = matchMedia('(hover: none) and (pointer: coarse)').matches;
+    r.setPixelRatio(Math.min(window.devicePixelRatio, coarse ? (Math.min(screen.width, screen.height) < 600 ? 1 : 1.25) : 1.5));
     r.setSize(window.innerWidth, window.innerHeight);
     r.domElement.id = 'c';
     // Light adds up past what a screen can show (a festival's strings of bulbs over lit stalls, a muzzle flash in a lit

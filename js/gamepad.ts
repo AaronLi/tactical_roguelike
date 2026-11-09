@@ -3,7 +3,7 @@
 // control scheme of its own: in a level its buttons are the keys and mouse buttons they stand for, sent as those events down the same handlers
 // (js/player.ts bindInput, js/game.ts bindMenu); in a menu it drives a cursor that presses, drags and right-clicks what's on the screen with
 // pointer events, so a shop, the inventory's grids and the gunsmith's canvas all work as they do with a mouse. Only the sticks' fractions go in
-// direct (G.Me.padMove, G.Me.lookBy). A button press isn't a user gesture to a browser, so there's no pointer lock to be had from one: G.Game.padLocked
+// direct (G.Me.padMove, G.Me.lookBy). A button press isn't a user gesture to a browser, so there's no pointer lock to be had from one: G.Game.softLocked
 // stands in for it (js/game.ts lock).
 type PadBtn = 'A' | 'B' | 'X' | 'Y' | 'LB' | 'RB' | 'LT' | 'RT' | 'VIEW' | 'MENU' | 'L3' | 'R3' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type PadDir = [number, number];
@@ -69,7 +69,7 @@ const G_Pad = (() => {
     releaseAll(); wasPlay = false; setOn(false); closeOsk(false);
     if (!was) return;
     G.HUD.toast('', 'Controller disconnected', 3);
-    if (playing && G.Game.padLocked) G.Game.unlock(); // (no way of playing on: the pause menu, and a mouse or the next controller takes it from there)
+    if (playing && G.Game.softLocked) G.Game.unlock(); // (no way of playing on: the pause menu, and a mouse or the next controller takes it from there)
   }
 
   function update(dt: number) {
@@ -404,8 +404,10 @@ const G_Pad = (() => {
   return {
     init, update,
     active: () => on,
+    // the events a level's buttons are, and the two that take working out (js/touch.ts sends the same ones)
+    synth: { fire, key, tap, wheelStep, nextGrenade },
     // a key prompt, in the controller's buttons while it's the one being used
-    text(html: string) { if (!on) return html; for (const [re, to] of SUBS) html = html.replace(re, to); return html; },
+    text(html: string) { if (G.Touch.active()) return G.Touch.text(html); if (!on) return html; for (const [re, to] of SUBS) html = html.replace(re, to); return html; },
   };
 })();
 G.Pad = G_Pad;

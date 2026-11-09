@@ -22,7 +22,7 @@ const G_InvUI = (() => {
   // inventory scales with it (--ik, css/style.css)
   let C = 34;
   function scaleUI() {
-    C = Math.round(Math.min(72, Math.max(40, Math.min(window.innerHeight / 24, window.innerWidth / 34)))); // (the tighter of height and width)
+    C = Math.round(Math.min(72, Math.max(G.Touch.active() && Math.min(window.innerWidth, window.innerHeight) < 600 ? 34 : 40, Math.min(window.innerHeight / 24, window.innerWidth / 34)))); // (the tighter of height and width)
     document.documentElement.style.setProperty('--ik', (C / 34).toFixed(3));
   }
   const GG = () => G.Gear;
@@ -42,7 +42,7 @@ const G_InvUI = (() => {
   type Src = SrcGrid | SrcSlot | SrcGunMag | SrcGunPart | SrcLoose;
   // a timed job (field ammo handling, treating): see "field jobs"
   interface Job { label: string; per: number; t: number; prog: () => string; step: (me: Me) => string; end?: (me: Me) => void; tell?: { tg: string, part: string, mt: string } | null; told?: boolean }
-  interface Drag { it: Item; rot: number; gx: number; gy: number; ghost: HTMLElement }
+  interface Drag { pid: number; it: Item; rot: number; gx: number; gy: number; ghost: HTMLElement }
   let root: HTMLElement | null = null, drag: Drag | null = null, editMolle = false, menu: HTMLElement | null = null, field = false, pressed = false; // (pressed: a pointer's held down)
   let patient: string | null = null; // a teammate you're treating (their player id), or null: yourself
   let ptPart: string | null = null, lastDropAt = 0; // the part of a body you've picked to treat (highlighted); when something was last dropped on one
@@ -553,12 +553,12 @@ const G_InvUI = (() => {
       const out = G.Med.unconscious(b), warn = pv.st.dn && G.Med.reviveWarn(b);
       return `<div class="pt-head"><b>${G.U.esc(pv.name)}</b>${pv.st.dn ? ` <i class="c heavy">${out ? 'UNCONSCIOUS' : 'DOWN'} · ${pv.st.bl < 0 ? 'stable' : pv.st.bl + ' s to bleed out'}</i>` : ''}${far ? ' <i class="c">too far</i>' : ''}
         ${pv.st.dn ? `<button class="btn tiny" data-revive ${far || out ? 'disabled' : ''} title="${out ? 'Blood bags first: they come round over ' + G.Med.UNCON + '%' : ''}">Revive (4 s)</button>` : ''}<button class="btn tiny" data-self>Back to me</button></div>
-        ${warn && !out ? `<div class="hl-status bad">${warn}</div>` : ''}${bodyHTML(b)}<p class="inv-hint">Click a part of ${G.U.esc(pv.name)}'s body to treat it with what you carry, or their blood bar for a blood bag.</p>`;
+        ${warn && !out ? `<div class="hl-status bad">${warn}</div>` : ''}${bodyHTML(b)}<p class="inv-hint">${G.Pad.text(`Click a part of ${G.U.esc(pv.name)}'s body to treat it with what you carry, or their blood bar for a blood bag.`)}</p>`;
     }
     const piece = (name: string, it: Item) => { const d = Gr.defOf(it); if (!d) return ''; const c = d.dur ? Math.round(Gr.cond(it) * 100) : null; return `<div class="hl-row"><span>${name}</span><b>${G.U.esc(d.name)}</b><i>${c == null ? '' : c + '%'}</i></div>`; };
     const status = me.dead ? `Dead: ${G.U.esc((me as any).deathCause || 'killed')}` : me.down ? (me.bleed == null ? 'Down, stable: a teammate can get you up' : `Down: ${Math.ceil(me.bleed)} s until you bleed out`) : G.Med.bleeding(me.body) ? 'Bleeding' : G.Med.downable(me.body) ? 'Low on blood: one more hit puts you down' : me.hp < 50 ? 'Badly hurt' : me.hp < 90 ? 'Hurt' : 'OK';
     return `<div class="hl-status ${G.Med.bleeding(me.body) ? 'bad' : ''}">${status}</div>${bodyHTML(me.body)}
-      <p class="inv-hint">Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds). Click the blood bar for a blood bag.</p>
+      <p class="inv-hint">${G.Pad.text('Click a part to treat it with what you carry, or drag a medical item onto it (it takes a few seconds). Click the blood bar for a blood bag.')}</p>
       ${squadHTML(me)}
       ${piece('Helmet', me.kit.helmet)}${me.kit.helmet && me.kit.helmet.face ? piece('Face', me.kit.helmet.face) : ''}${me.kit.helmet && me.kit.helmet.nvg ? piece('Night vision', me.kit.helmet.nvg) : ''}${piece('Armour', me.kit.carrier)}${me.kit.carrier ? piece('Plate', me.kit.carrier.plate) + piece('Shoulders', me.kit.carrier.shoulder) + piece('Pelvis', me.kit.carrier.groin) : ''}${me.kit.belt ? piece('Legs', me.kit.belt.legs) : ''}`;
   }
@@ -611,14 +611,14 @@ const G_InvUI = (() => {
     if (field) {
       root.innerHTML = `<div class="inv field">
         <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}${quickHTML(me)}<div class="inv-sell inv-drop" data-drop>Drop here to put it on the ground</div></div>
-        <div class="inv-col"><div id="invJob" class="inv-job">${jobHTML()}</div><h4 class="hd">On you</h4>${body}<p class="inv-hint">Drag to move · R turns what you're holding · double-click opens a pouch, pack or gun · right-click to load or unload (it takes time: a round at a time) · Tab or Esc closes and stops what you're doing</p></div>
+        <div class="inv-col"><div id="invJob" class="inv-job">${jobHTML()}</div><h4 class="hd">On you</h4>${body}<p class="inv-hint">${G.Pad.text("Drag to move · R turns what you're holding · double-click opens a pouch, pack or gun · right-click to load or unload (it takes time: a round at a time) · Tab or Esc closes and stops what you're doing")}</p></div>
         <div class="inv-col">${cab != null ? `<h4 class="hd">First aid cabinet <small>(medical gear only · the squad shares it)</small></h4><div class="inv-row">${gridHTML(G.Game.cabGrid(cab))}</div>` : ''}<h4 class="hd">${patient != null ? 'Treating' : 'Body'}</h4><div id="invHealth">${healthHTML(me)}</div>${openedHTML(me)}</div></div>`;
       return;
     }
     root.innerHTML = `<div class="inv">
       <div class="inv-col eq"><h4>Equipment</h4>${SLOTS.map(([s, n]) => slotHTML(me, s, n)).join('')}${stats(me)}${quickHTML(me)}
         <div class="inv-sell" data-sell>Drop here to sell</div></div>
-      <div class="inv-col"><h4 class="hd">On you</h4>${body}<p class="inv-hint">Drag to move · R turns what you're holding · double-click opens a pouch, pack or rig (anything else goes to or from the locker) · right-click for more · drop a box of rounds on a magazine to load it · Edit pouches to move, add or take off MOLLE pouches · stow a gun in a big enough backpack and swap to it in the field with B</p></div>
+      <div class="inv-col"><h4 class="hd">On you</h4>${body}<p class="inv-hint">${G.Pad.text("Drag to move · R turns what you're holding · double-click opens a pouch, pack or rig (anything else goes to or from the locker) · right-click for more")} · drop a box of rounds on a magazine to load it · Edit pouches to move, add or take off MOLLE pouches · stow a gun in a big enough backpack and swap to it in the field with B</p></div>
       <div class="inv-col"><h4 class="hd">Locker <small>(stays here between levels)</small></h4>${gridHTML(me.locker)}
         <h4 class="hd">Team locker <small>(the whole squad shares it)</small></h4>${gridHTML(G.Game.teamGrid())}${openedHTML(me)}</div></div>`;
   }
@@ -642,12 +642,14 @@ const G_InvUI = (() => {
     if (WSLOT[s]) { me.weapons[WSLOT[s]] = it.w; if (!me.weapons[me.slot]) me.slot = WSLOT[s]; }
     else if ((GG().MOUNTS as Rec)[s]) GG().mountOn(me, s)[s] = it; else me.kit[s] = it;
   }
+  function unbindDrag() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', drop); window.removeEventListener('pointercancel', cancelDrag); window.removeEventListener('pointerdown', onFinger, true); window.removeEventListener('keydown', onKey); G.Touch.dragEnd(); }
+  function cancelDrag() { if (!drag) return; drag.ghost.remove(); drag = null; unbindDrag(); }
   function drop(e: PointerEvent) {
     const me = G.Me, d = drag;
-    if (!d) return;
+    if (!d || e.pointerId !== d.pid) return;
     drag = null;
     d.ghost.remove();
-    window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', drop); window.removeEventListener('keydown', onKey);
+    unbindDrag();
     const t = document.elementFromPoint(e.clientX, e.clientY);
     if (!t) return render();
     const src = locate(me, d.it.uid!);
@@ -781,12 +783,15 @@ const G_InvUI = (() => {
     if (src.it.k === 'gun') G.Gunsmith.strip(src.it.w.def, me.stash); // its aftermarket parts stay with you
   }
   function onMove(e: PointerEvent) {
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.pid) return;
+    if (e.pointerType === 'touch') G.Touch.dragAt(e.clientX, e.clientY);
     drag.ghost.style.left = e.clientX - drag.gx * C - C / 2 + 'px';
     drag.ghost.style.top = e.clientY - drag.gy * C - C / 2 + 'px';
   }
   function sizeGhost() { const [w, h] = GG().size(drag!.it, drag!.rot); drag!.ghost.style.width = w * C - 3 + 'px'; drag!.ghost.style.height = h * C - 3 + 'px'; }
-  function onKey(e: KeyboardEvent) { if (drag && e.code === 'KeyR') { drag.rot ^= 1; [drag.gx, drag.gy] = [drag.gy, drag.gx]; sizeGhost(); } }
+  function turnDrag() { drag!.rot ^= 1; [drag!.gx, drag!.gy] = [drag!.gy, drag!.gx]; sizeGhost(); }
+  function onKey(e: KeyboardEvent) { if (drag && e.code === 'KeyR') turnDrag(); }
+  function onFinger(e: PointerEvent) { if (drag && e.pointerType === 'touch' && e.pointerId !== drag.pid) { e.preventDefault(); e.stopPropagation(); turnDrag(); G.Audio.click(); } } // (a second finger, anywhere: R)
   function onDown(e: PointerEvent) {
     const el = (e.target as HTMLElement).closest<HTMLElement>('.inv-item');
     if (!el || e.button !== 0 || locked()) return;
@@ -796,12 +801,12 @@ const G_InvUI = (() => {
     if (field && src.gunPart) return G.HUD.toast('', 'Parts are changed at the quartermaster\'s', 1.5);
     const r = el.getBoundingClientRect();
     const rot = src.p ? src.p!.r : 0;
-    drag = { it: src.it, rot, gx: Math.max(0, Math.floor((e.clientX - r.left) / C)), gy: Math.max(0, Math.floor((e.clientY - r.top) / C)), ghost: el.cloneNode(true) as HTMLElement };
+    drag = { pid: e.pointerId, it: src.it, rot, gx: Math.max(0, Math.floor((e.clientX - r.left) / C)), gy: Math.max(0, Math.floor((e.clientY - r.top) / C)), ghost: el.cloneNode(true) as HTMLElement };
     if (src.slot) { drag.gx = 0; drag.gy = 0; }
     Object.assign(drag.ghost.style, { position: 'fixed', pointerEvents: 'none', zIndex: 50, opacity: 0.85 });
     document.body.appendChild(drag.ghost);
     sizeGhost(); onMove(e);
-    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', drop); window.addEventListener('keydown', onKey);
+    window.addEventListener('pointermove', onMove); window.addEventListener('pointerup', drop); window.addEventListener('pointercancel', cancelDrag); window.addEventListener('pointerdown', onFinger, true); window.addEventListener('keydown', onKey);
   }
   // open a container (one you're wearing is already shown under "On you")
   function open(me: Me, src: Src) {
@@ -953,11 +958,13 @@ const G_InvUI = (() => {
     if (field && !src.gunPart) acts.push(['drop', 'Drop on the ground']);
     const price = Gr.sale(src.it);
     if (!field && price > 0 && !hasContents(src.it) && !lastGun(me, src) && !cantDetach(src)) acts.push(['sell', `Sell for ¢${G.U.fmt(price)}`]);
-    if (!acts.length) return;
+    const info = G.Touch.active() && el.title ? `<p class="inv-menu-info">${G.U.esc(el.title)}</p>` : ''; // (a finger can't hover for the item's description)
+    if (!acts.length && !info) return;
     menu = document.createElement('div');
     menu.className = 'inv-menu ui';
-    menu.innerHTML = `<b>${G.U.esc(Gr.defOf(src.it) ? Gr.defOf(src.it)!.name : Gr.label(src.it))}</b>` + acts.map(([a, n, arg]) => `<button data-act="${a}"${arg != null ? ` data-arg="${arg}"` : ''}>${n}</button>`).join('');
+    menu.innerHTML = `<b>${G.U.esc(Gr.defOf(src.it) ? Gr.defOf(src.it)!.name : Gr.label(src.it))}</b>${info}` + acts.map(([a, n, arg]) => `<button data-act="${a}"${arg != null ? ` data-arg="${arg}"` : ''}>${n}</button>`).join('');
     Object.assign(menu.style, { left: Math.min(e.clientX, innerWidth - 180) + 'px', top: Math.min(e.clientY, innerHeight - 30 - acts.length * 26) + 'px' });
+    if (G.Touch.active()) requestAnimationFrame(() => { if (!menu) return; const r = menu.getBoundingClientRect(); menu.style.left = G.U.clamp(r.left, 8, Math.max(8, innerWidth - r.width - 8)) + 'px'; menu.style.top = G.U.clamp(r.top, 8, Math.max(8, innerHeight - r.height - 8)) + 'px'; }); // (taller than it looks: buttons a finger can hit, the description)
     menu.addEventListener('click', (ev) => {
       const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-act]');
       if (!b) return;
@@ -1012,7 +1019,8 @@ const G_InvUI = (() => {
       const f = seen[0];
       if (f) { if (f.slot && WSLOT[f.slot] && Object.keys(me.weapons).length <= 1) return; detach(me, f); }
     },
-    hide() { cancelJobs(); if (root) cabSync(); cab = null; patient = null; closeMenu(); if (drag) { drag.ghost.remove(); drag = null; } if (root) root.classList.remove('inv-host'); root = null; field = false; },
+    cancelDrag,
+    hide() { cancelJobs(); if (root) cabSync(); cab = null; patient = null; closeMenu(); cancelDrag(); if (root) root.classList.remove('inv-host'); root = null; field = false; },
     // the health panel only (kept fresh while the field screen is open, without disturbing a drag)
     update,
     get busy() { return jobs.length > 0; },

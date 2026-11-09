@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <link rel="icon" href="data:,">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Breach Protocol</title>
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@200;300;400;500;600&amp;display=swap">
@@ -18,7 +18,7 @@
     <div class="subtitle">co-op roguelike tactical shooter</div>
 
     <label>Callsign</label>
-    <input id="nameInput" maxlength="16" placeholder="Operator">
+    <input id="nameInput" maxlength="16" placeholder="Operator" autocomplete="off" autocapitalize="words" enterkeyhint="done">
     <label id="animalLabel">Callsign preference <small>(drag to rank; the host gives you the highest one that's free. Your animal: on your shoulder, back patch and pings)</small></label>
     <div id="colorRow" class="color-row rank-row" role="list" aria-labelledby="animalLabel"></div>
     <div id="animalLive" class="sr-only" aria-live="polite"></div>
@@ -30,7 +30,7 @@
       <button id="btnSolo" class="btn">Play Solo</button>
     </div>
     <div class="join-row">
-      <input id="joinCode" maxlength="5" placeholder="ROOM CODE">
+      <input id="joinCode" maxlength="5" placeholder="ROOM CODE" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go">
       <button id="btnJoin" class="btn">Join</button>
     </div>
     <div class="lan-row"><button id="btnLan" class="btn small">Find LAN games</button><div id="lanList" class="lan-list"></div></div>
@@ -49,7 +49,8 @@
     <details class="settings">
       <summary>Settings &amp; controls</summary>
       <div class="set-grid">
-        <label>Mouse sensitivity <span id="sensVal"></span></label><input id="sens" type="range" min="0.2" max="3" step="0.05">
+        <label class="touch-only">Touch look sensitivity <span id="touchSensVal"></span></label><input class="touch-only" id="touchSens" type="range" min="0.2" max="3" step="0.05">
+        <label class="not-touch">Mouse sensitivity <span id="sensVal"></span></label><input class="not-touch" id="sens" type="range" min="0.2" max="3" step="0.05">
         <label>Stick sensitivity <span id="padSensVal"></span></label><input id="padSens" type="range" min="0.2" max="3" step="0.05">
         <label>Field of view <span id="fovVal"></span></label><input id="fov" type="range" min="60" max="110" step="1">
         <label>Volume <span id="volVal"></span></label><input id="vol" type="range" min="0" max="1" step="0.05">
@@ -58,7 +59,11 @@
         <label>Relay (TURN) server <span class="dim">optional: if friends can't connect to you</span></label>
         <div class="turn-row"><input id="turnUrl" placeholder="turn:host:3478"><input id="turnUser" placeholder="username"><input id="turnPass" type="password" placeholder="password"></div>
       </div>
-      <div class="controls">
+      <div class="controls touch-only">
+        <b>Left side of the screen</b> drag to move, further is faster &middot; <b>right side</b> drag to look (a finger on Fire, Aim or Ping turns the view too) &middot; <b>Aim</b> tap to stay up, hold for as long as you hold &middot; <b>Use</b> hold to interact (lit when there's something to use) &middot; <b>Crouch</b> tap, hold for prone &middot; <b>Reload</b> tap, tap twice for a dump reload, hold to check the magazine &middot; <b>Nade</b> the next grenade, then back to the gun &middot; <b>More</b> ping (hold: comms wheel), shout, steady, lowered weapon, fire mode, inspect, backpack swap, night vision, mute, vote<br>
+        <b>Menus</b>: long-press for what right-click and hover show &middot; double-tap opens a pouch &middot; drag to carry, a second finger turns what you carry &middot; pinch to zoom the gunsmith and the sidearm web &middot; on the route map, tap a node for its card and again to go. Sideways is the better way to play on a phone.
+      </div>
+      <div class="controls not-touch">
         <b>WASD</b> move &middot; <b>Space</b> toggle lowered weapon &middot; <b>Shift</b> slow &amp; steady &middot; <b>C</b> crouch &middot; <b>Q / E</b> lean<br>
         <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>MMB</b> ping (<b>hold MMB</b> the comms wheel: light, laser, magnifier, calls to the squad) &middot; <b>R</b> reload (<b>R R</b> dump reload, <b>hold R</b> check the magazine, or the chamber on a gun without one) &middot; <b>I</b> inspect (<b>hold I</b> hold the chamber check open; the mouse turns what you hold) &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
         <b>3 / 4 / 5</b> a grenade into your hand (frag and flashbang to start; drag one onto a key's box in the inventory to change it): <b>hold LMB</b> to pull the pin, <b>release</b> to throw, <b>RMB</b> underhand / weak / strong; the key again or 1 / 2 puts it away &middot; <b>H</b> body &amp; kit (as Tab) &middot; hold <b>B</b> swap with the gun in your backpack &middot; <b>V</b> shout compliance &middot; <b>X</b> fire selector &middot; <b>N</b> night vision down / up (on your helmet; also on the comms wheel), <b>Shift+N</b> its IR illuminator &middot; <b>T</b> a thermal sight's palette<br>
@@ -127,7 +132,7 @@
 
   <div id="hudLeft">
   <div id="chatLog"></div>
-  <input id="chatInput" class="hidden" maxlength="120" placeholder="say something...">
+  <input id="chatInput" class="hidden" maxlength="120" placeholder="say something..." autocomplete="off" enterkeyhint="send">
   <div id="vitals">
     <div class="vrow"><span class="vlabel">ARMOR</span><div class="bar armor"><div id="armorFill"></div></div><span id="armorText"></span></div>
     <div class="vrow"><span class="vlabel">BLOOD</span><div class="bar hp"><div id="hpFill"></div></div><span id="hpText"></span></div>
@@ -151,7 +156,7 @@
   </div>
   <div id="deadMsg" class="hidden">
     <div class="big">KIA</div>
-    <div class="small">Spectating &mdash; you'll redeploy next level if your squad extracts. <span class="kb-only">Click</span><span class="pad-only">RT</span> to switch view.</div>
+    <div class="small">Spectating &mdash; you'll redeploy next level if your squad extracts. <span class="kb-only">Click</span><span class="pad-only">RT</span><span class="touch-only">Fire</span> to switch view.</div>
   </div>
 
   <div id="scoreboard" class="ui ui-panel hidden"></div>
@@ -165,7 +170,8 @@
     <h2>Paused</h2>
     <div class="small dim">The game keeps running for your squad.</div>
     <div class="set-grid">
-      <label>Mouse sensitivity</label><input id="sens2" type="range" min="0.2" max="3" step="0.05">
+      <label class="touch-only">Touch look sensitivity</label><input class="touch-only" id="touchSens2" type="range" min="0.2" max="3" step="0.05">
+      <label class="not-touch">Mouse sensitivity</label><input class="not-touch" id="sens2" type="range" min="0.2" max="3" step="0.05">
       <label>Stick sensitivity</label><input id="padSens2" type="range" min="0.2" max="3" step="0.05">
       <label>Field of view</label><input id="fov2" type="range" min="60" max="110" step="1">
       <label>Volume</label><input id="vol2" type="range" min="0" max="1" step="0.05">
@@ -237,7 +243,7 @@
   </div>
 </div>
 
-<div id="clickToPlay" class="ui hidden">Click to engage</div>
+<div id="clickToPlay" class="ui hidden"><span class="not-touch">Click</span><span class="touch-only">Tap</span> to engage</div>
 <div id="veil"><svg class="veil-shape" viewBox="0 0 100 100" preserveAspectRatio="none"><path d="M0 15.6C33 10.4 66 5.2 100 0L100 84.4C66 89.6 33 94.8 0 100Z"/></svg><div class="veil-load ui"><div class="veil-row"><i class="veil-spin"></i><b>Loading</b></div><div id="veilStatus"></div></div></div>
 
 <!-- the model bundle starts downloading first thing, before three.js and the rest are even fetched (docs/models.md "Bundles") -->
@@ -316,6 +322,7 @@
 <script defer src="dist/js/career.js"></script>
 <script defer src="dist/js/cloud.js"></script>
 <script defer src="dist/js/gamepad.js"></script>
+<script defer src="dist/js/touch.js"></script>
 <script defer src="dist/js/game.js"></script>
 <script defer src="dist/js/profiler.js"></script>
 <script defer src="dist/js/demo.js"></script>

@@ -506,7 +506,7 @@ const G_Me = {
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; if (e.code === 'KeyR') this.rRelease(); });
     window.addEventListener('blur', () => { this.keys = {}; this.mouse.l = this.mouse.r = false; this.midAt = 0; if (this.wheel) this.wheelClose(false); });
     window.addEventListener('mousedown', (e) => {
-      if (!G.Game.locked || G.Game.menuOpen() || (e.isTrusted && G.Game.padLocked)) return;
+      if (!G.Game.locked || G.Game.menuOpen() || (e.isTrusted && G.Game.softLocked)) return;
       if (e.button === 0) { this.mouse.l = true; this.pressBuf = 0.15; if (this.dead) this.specIdx++; }
       if (e.button === 2) this.mouse.r = true;
       if (e.button === 1) { // the middle button: a tap pings, held it opens the comms wheel (wheelOpen)
@@ -516,6 +516,7 @@ const G_Me = {
       }
     });
     window.addEventListener('mouseup', (e) => {
+      if (e.isTrusted && G.Game.softLocked) return; // (the one a browser sends after any tap: it isn't this button letting go)
       if (e.button === 0) this.mouse.l = false;
       if (e.button === 2) this.mouse.r = false;
       if (e.button === 1 && this.midAt) {
@@ -530,7 +531,7 @@ const G_Me = {
     // the wheel: while aiming through a variable scope or a magnifier, steps the power (up: more); otherwise
     // swaps weapons
     window.addEventListener('wheel', (e) => {
-      if (!G.Game.locked || G.Game.phase !== 'level' || Math.abs(e.deltaY) <= 5 || (e.isTrusted && G.Game.padLocked)) return;
+      if (!G.Game.locked || G.Game.phase !== 'level' || Math.abs(e.deltaY) <= 5 || (e.isTrusted && G.Game.softLocked)) return;
       const w = this.cur(), L = w && w.def.magLevels;
       if (L && this.ads && this.adsT > 0.5) {
         const i = this.sight(w).i, n = G.U.clamp(i + (e.deltaY < 0 ? 1 : -1), 0, L.length - 1);
@@ -539,7 +540,7 @@ const G_Me = {
       }
       this.swap(this.slot === 'p' ? 's' : 'p');
     });
-    document.addEventListener('mousemove', (e) => { if (!(e.isTrusted && G.Game.padLocked)) this.lookBy(e.movementX, e.movementY, 0.0022 * G.Game.settings.sens); });
+    document.addEventListener('mousemove', (e) => { if (!(e.isTrusted && G.Game.softLocked)) this.lookBy(e.movementX, e.movementY, 0.0022 * G.Game.settings.sens); });
   },
   // the mouse, or the right stick (js/gamepad.ts), moved by dx, dy; sens: how far a unit of that turns the view, in radians
   lookBy(dx: number, dy: number, sens: number) {
