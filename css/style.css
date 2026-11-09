@@ -1067,6 +1067,7 @@ body.touch-on .not-touch, body.touch-on .kb-only { display: none !important; }
 .tb-more { right: calc(20px + var(--sr)); bottom: calc(180px + var(--sb)); width: 44px; height: 44px; font-size: 9px; }
 .tb-leanL, .tb-leanR { width: 44px; height: 44px; font-size: 9px; bottom: calc(150px + var(--sb)); opacity: 0.8; }
 .tb-leanL { left: calc(14px + var(--sl)); }
+.tb-fireL { left: calc(122px + var(--sl)); bottom: calc(146px + var(--sb)); width: 64px; height: 64px; font-size: 11px; }
 .tb-leanR { left: calc(66px + var(--sl)); }
 .t-top { position: absolute; top: calc(6px + var(--st)); right: calc(8px + var(--sr)); display: flex; gap: 6px; }
 .t-top .tb { position: static; width: 44px; height: 36px; border-radius: var(--ui-r); font-size: 9px; }
@@ -1074,6 +1075,8 @@ body.touch-on .not-touch, body.touch-on .kb-only { display: none !important; }
 #touchStick.live { opacity: 1; margin: -56px 0 0 -56px; }
 #touchStick:not(.live) { top: auto !important; left: calc(92px + var(--sl)) !important; margin: 0 0 0 -56px; bottom: calc(26px + var(--sb)) !important; }
 #touchStick i { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: rgba(233,237,240,0.55); }
+#touchStick.fast i { background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.3); }
+#touchStick.slow i { background: rgba(233,237,240,0.32); }
 #touchMore { position: absolute; top: calc(52px + var(--st)); left: 50%; transform: translateX(-50%); display: grid; grid-template-columns: repeat(7, 48px); gap: 6px; padding: 6px; background: rgba(8,10,13,0.5); border-radius: var(--ui-r); }
 #touchMore .tb { position: static; width: 48px; height: 44px; border-radius: var(--ui-r); font-size: 9px; letter-spacing: 0.5px; }
 @media (orientation: portrait) {
@@ -1086,6 +1089,7 @@ body.touch-on .not-touch, body.touch-on .kb-only { display: none !important; }
   .tb-nade { right: calc(32px + var(--sr)); bottom: calc(90px + var(--sb)); }
   .tb-more { right: calc(20px + var(--sr)); bottom: calc(322px + var(--sb)); }
   .tb-leanL, .tb-leanR { bottom: calc(190px + var(--sb)); }
+  .tb-fireL { bottom: calc(186px + var(--sb)); }
   #touchMore { top: calc(150px + var(--st)); grid-template-columns: repeat(5, 48px); }
   #touchStick:not(.live) { bottom: calc(60px + var(--sb)) !important; }
 }
@@ -1187,7 +1191,7 @@ body.touch-on #team { left: calc(8px + env(safe-area-inset-left, 0px)); top: cal
 body.touch-on .tm { padding: 2px 5px 3px; margin-bottom: 3px; }
 body.touch-on .tn { font-size: 10px; margin-bottom: 1px; }
 body.touch-on #killfeed { top: calc(136px + env(safe-area-inset-top, 0px)); right: calc(8px + env(safe-area-inset-right, 0px)); font-size: 10px; max-width: 40vw; }
-body.touch-on #topbar { top: calc(4px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 370px); min-width: 180px; }
+body.touch-on #topbar { top: calc(4px + env(safe-area-inset-top, 0px)); max-width: calc(100vw - 416px); min-width: 180px; }
 body.touch-on #levelInfo { font-size: 10px; letter-spacing: 2px; }
 body.touch-on #objective { font-size: 11px; line-height: 1.2; margin-top: 1px; }
 body.touch-on #bossBar { top: 62px; width: 240px; }

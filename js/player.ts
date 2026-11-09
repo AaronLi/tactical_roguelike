@@ -59,7 +59,7 @@ const G_Me = {
   PRONE_T: 0.8, // getting down onto your front, or back up (s): no shooting meanwhile
   LEAN: 0.38, // metres the head moves sideways at full lean
   mouse: { l: false, r: false },
-  padMove: null as { st: number; fw: number; k: number } | null, // (the left stick, this frame: js/gamepad.ts)
+  padMove: null as { st: number; fw: number; k: number; slow?: boolean; fast?: boolean } | null, // (the left stick, this frame: js/gamepad.ts; slow and fast: a touch stick's creep and low-ready run, js/touch.ts)
   pos: null as unknown as THREE.Vector3,
   vel: null as unknown as THREE.Vector3,
   yaw: 0,
@@ -708,8 +708,8 @@ const G_Me = {
     // Space: weapon to low ready, move quicker, can't shoot. Shift: creep with the weapon steadied.
     const wasLow = this.lowReady;
     if (this.mouse.l || this.mouse.r || this.down || this.stowed) this.lowToggle = false; // firing or aiming brings the weapon up
-    this.lowReady = !blocked && !!this.lowToggle;
-    this.steadying = !blocked && !this.lowReady && !!(k.ShiftLeft || k.ShiftRight);
+    this.lowReady = !blocked && (!!this.lowToggle || !!(pm && pm.fast && !this.mouse.l && !this.mouse.r && !this.down && !this.stowed));
+    this.steadying = !blocked && !this.lowReady && !!(k.ShiftLeft || k.ShiftRight || (pm && pm.slow));
     if (wasLow && !this.lowReady) this.raiseT = this.raiseMax = 0.5; // bringing the gun back up
     this.stanceT = Math.max(0, (this.stanceT || 0) - dt);
     let speed = this.lowReady ? this.SPEED.low : this.steadying ? this.SPEED.steady : this.SPEED.walk;
