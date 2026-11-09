@@ -2238,9 +2238,9 @@ On a phone or a tablet the controls are on the screen from the start; on a lapto
 
 | On screen | Does |
 | --- | --- |
-| Left side, drag | Move (further is faster) |
-| Right side, drag | Look (Settings: Touch look sensitivity); a finger on Fire, Aim or Ping turns the view too |
-| Fire / Aim | Fire / aim (Aim: a tap stays up, or hold it) |
+| Left side, drag | Move (Settings: the joystick can stay where you leave it, instead of going back to its corner): a little is a slow steady walk (as Shift), most of the way a walk, all the way forward the low-ready run (as Space; firing or aiming brings the gun up) |
+| Right side, drag | Look (Settings: Touch look sensitivity); a finger on either Fire, Aim or Ping turns the view too |
+| Fire (either side) / Aim | Fire / aim (Aim: a tap stays up, or hold it) |
 | Reload | As R: tap, double tap, hold |
 | Swap, Nade | Swap weapon (aiming: magnification); next grenade, then back to the gun |
 | Use (hold) | Interact (lit when there's something to use; out cold: give up) |
@@ -2249,7 +2249,7 @@ On a phone or a tablet the controls are on the screen from the start; on a lapto
 | More | Ping (hold: comms wheel, drag to pick), shout, steady, lowered weapon, prone, fire mode, inspect, backpack swap, night vision, IR, thermal palette, body and kit, mute, vote |
 | Chat, Kit, Menu | Chat, inventory, pause |
 
-In the menus a long press is the right click and shows what hovering would; two quick taps are the double click; a second finger turns what you carry; two fingers zoom the gunsmith and the sidearm web; on the route map the first tap shows a node's card and the second picks it. On a phone the 3D renders at a lower resolution (the HUD stays sharp). `?touch` in the URL keeps the touch controls on.
+In the menus a long press is the right click and shows what hovering would; two quick taps are the double click; a second finger turns what you carry; two fingers zoom the gunsmith and the sidearm web; on the route map the first tap shows a node's card and the second picks it. On a phone the 3D renders at a lower resolution (the HUD stays sharp). A level goes fullscreen at the first tap, where the browser allows it; an iPhone only fills the screen from the Home Screen (Share, Add to Home Screen, and open it from there). `?touch` in the URL keeps the touch controls on.
 
 ## Interface
 

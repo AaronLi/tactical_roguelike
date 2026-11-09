@@ -5,6 +5,14 @@
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Breach Protocol</title>
+<!-- the game as an app of its own, from the Home Screen: on an iPhone the only way a page can fill the screen (js/touch.ts) -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Breach">
+<meta name="theme-color" content="#0b0d10">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@200;300;400;500;600&amp;display=swap">
 <link rel="stylesheet" href="css/style.css">
@@ -50,6 +58,7 @@
       <summary>Settings &amp; controls</summary>
       <div class="set-grid">
         <label class="touch-only">Touch look sensitivity <span id="touchSensVal"></span></label><input class="touch-only" id="touchSens" type="range" min="0.2" max="3" step="0.05">
+        <label class="check touch-only"><input type="checkbox" class="stick-stay"> Joystick stays where you leave it <span class="dim">(off: back to its corner)</span></label>
         <label class="not-touch">Mouse sensitivity <span id="sensVal"></span></label><input class="not-touch" id="sens" type="range" min="0.2" max="3" step="0.05">
         <label>Stick sensitivity <span id="padSensVal"></span></label><input id="padSens" type="range" min="0.2" max="3" step="0.05">
         <label>Field of view <span id="fovVal"></span></label><input id="fov" type="range" min="60" max="110" step="1">
@@ -60,8 +69,8 @@
         <div class="turn-row"><input id="turnUrl" placeholder="turn:host:3478"><input id="turnUser" placeholder="username"><input id="turnPass" type="password" placeholder="password"></div>
       </div>
       <div class="controls touch-only">
-        <b>Left side of the screen</b> drag to move, further is faster &middot; <b>right side</b> drag to look (a finger on Fire, Aim or Ping turns the view too) &middot; <b>Aim</b> tap to stay up, hold for as long as you hold &middot; <b>Use</b> hold to interact (lit when there's something to use) &middot; <b>Crouch</b> tap, hold for prone &middot; <b>Reload</b> tap, tap twice for a dump reload, hold to check the magazine &middot; <b>Nade</b> the next grenade, then back to the gun &middot; <b>More</b> ping (hold: comms wheel), shout, steady, lowered weapon, fire mode, inspect, backpack swap, night vision, mute, vote<br>
-        <b>Menus</b>: long-press for what right-click and hover show &middot; double-tap opens a pouch &middot; drag to carry, a second finger turns what you carry &middot; pinch to zoom the gunsmith and the sidearm web &middot; on the route map, tap a node for its card and again to go. Sideways is the better way to play on a phone.
+        <b>Left side of the screen</b> drag to move: a little is a slow steady walk, most of the way a walk, all the way forward the low-ready run &middot; <b>right side</b> drag to look (a finger on Fire, Aim or Ping turns the view too) &middot; <b>Fire</b> on either side &middot; <b>Aim</b> tap to stay up, hold for as long as you hold &middot; <b>Use</b> hold to interact (lit when there's something to use) &middot; <b>Crouch</b> tap, hold for prone &middot; <b>Reload</b> tap, tap twice for a dump reload, hold to check the magazine &middot; <b>Nade</b> the next grenade, then back to the gun &middot; <b>More</b> ping (hold: comms wheel), shout, steady, lowered weapon, fire mode, inspect, backpack swap, night vision, mute, vote<br>
+        <b>Menus</b>: long-press for what right-click and hover show &middot; double-tap opens a pouch &middot; drag to carry, a second finger turns what you carry &middot; pinch to zoom the gunsmith and the sidearm web &middot; on the route map, tap a node for its card and again to go. Sideways is the better way to play on a phone. A level goes fullscreen at the first tap; on an iPhone, Share, then Add to Home Screen, and open it from there.
       </div>
       <div class="controls not-touch">
         <b>WASD</b> move &middot; <b>Space</b> toggle lowered weapon &middot; <b>Shift</b> slow &amp; steady &middot; <b>C</b> crouch &middot; <b>Q / E</b> lean<br>
@@ -171,6 +180,7 @@
     <div class="small dim">The game keeps running for your squad.</div>
     <div class="set-grid">
       <label class="touch-only">Touch look sensitivity</label><input class="touch-only" id="touchSens2" type="range" min="0.2" max="3" step="0.05">
+      <label class="check touch-only"><input type="checkbox" class="stick-stay"> Joystick stays where you leave it <span class="dim">(off: back to its corner)</span></label>
       <label class="not-touch">Mouse sensitivity</label><input class="not-touch" id="sens2" type="range" min="0.2" max="3" step="0.05">
       <label>Stick sensitivity</label><input id="padSens2" type="range" min="0.2" max="3" step="0.05">
       <label>Field of view</label><input id="fov2" type="range" min="60" max="110" step="1">

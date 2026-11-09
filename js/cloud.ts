@@ -21,7 +21,7 @@ interface CloudQueue { add: Record<string, number>; max: Record<string, number>;
 const G_Cloud = (() => {
   const V = 1; // (the data's shape: schema_version in every row. The client's version is in load's import, and js/types/supabase-cdn.d.ts)
   // what's synced, by where it goes (never the TURN relay's settings, 'turn': a connection's credentials stay in this browser): the profile row's columns, its settings (jsonb), and the progress row
-  const PROFILE = ['name', 'look'], SETTINGS = ['animals', 'sens', 'padSens', 'touchSens', 'fov', 'vol', 'loadKit', 'muted', 'quick'], PROGRESS = ['arsenal', 'wishlist'];
+  const PROFILE = ['name', 'look'], SETTINGS = ['animals', 'sens', 'padSens', 'touchSens', 'stickStay', 'fov', 'vol', 'loadKit', 'muted', 'quick'], PROGRESS = ['arsenal', 'wishlist'];
   const PREFS = [...PROFILE, ...SETTINGS], SYNCED = new Set([...PREFS, ...PROGRESS]);
   const DEBOUNCE = 4000, RETRY0 = 5000, RETRY_MAX = 60000;
   const q = new URLSearchParams(location.search);

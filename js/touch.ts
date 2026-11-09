@@ -7,11 +7,11 @@
 // Comes on at once on a phone or a tablet, or on a laptop's touch screen the first time it's touched; a real mouse or keyboard puts it away again. ?touch keeps it on.
 const G_Touch = (() => {
   const FORCED = new URLSearchParams(location.search).has('touch'), PHONE = FORCED || matchMedia('(hover: none) and (pointer: coarse)').matches;
-  const STICK_R = 56, DEAD = 0.14, LOOK = 0.0048, HOLD_MS = 350, AIM_TAP_MS = 220, LONG_MS = 500, SLOP = 10, DBL_MS = 320, EDGE = 56, EDGE_SPEED = 14;
+  const STICK_R = 56, DEAD = 0.14, SLOW_R = 0.5, FAST_R = 0.92, FAST_FW = 0.75, LOOK = 0.0048, HOLD_MS = 350, AIM_TAP_MS = 220, LONG_MS = 500, SLOP = 10, DBL_MS = 320, EDGE = 56, EDGE_SPEED = 14;
   // a key held for as long as the button is (so R's tap, double tap and hold all still work): [code, with shift]
   const KEYS: Record<string, [string, boolean?]> = { reload: ['KeyR'], leanL: ['KeyQ'], leanR: ['KeyE'], inspect: ['KeyI'], pack: ['KeyB'], shout: ['KeyV'], mode: ['KeyX'], prone: ['KeyZ'], nv: ['KeyN'], ir: ['KeyN', true], therm: ['KeyT'], body: ['KeyH'], mute: ['KeyM'], vote: ['KeyY'], lower: ['Space'], bag: ['Tab'], pause: ['Escape'] };
-  const LOOK_THROUGH = new Set(['fire', 'aim', 'ping']); // (a finger on one of these turns the view as well: and on Ping, picks on the comms wheel)
-  const MAIN: [string, string][] = [['fire', 'Fire'], ['aim', 'Aim'], ['reload', 'Reload'], ['swap', 'Swap'], ['use', 'Use'], ['crouch', 'Crouch'], ['nade', 'Nade'], ['more', 'More'], ['leanL', 'Lean L'], ['leanR', 'Lean R']];
+  const LOOK_THROUGH = new Set(['fire', 'fireL', 'aim', 'ping']); // (a finger on one of these turns the view as well: and on Ping, picks on the comms wheel)
+  const MAIN: [string, string][] = [['fire', 'Fire'], ['fireL', 'Fire'], ['aim', 'Aim'], ['reload', 'Reload'], ['swap', 'Swap'], ['use', 'Use'], ['crouch', 'Crouch'], ['nade', 'Nade'], ['more', 'More'], ['leanL', 'Lean L'], ['leanR', 'Lean R']];
   const TOP: [string, string][] = [['chat', 'Chat'], ['bag', 'Kit'], ['pause', 'Menu']];
   const MORE: [string, string][] = [['ping', 'Ping'], ['shout', 'Shout'], ['steady', 'Steady'], ['lower', 'Lower'], ['prone', 'Prone'], ['mode', 'Mode'], ['inspect', 'Inspect'], ['pack', 'Pack'], ['nv', 'Night'], ['ir', 'IR'], ['therm', 'Therm'], ['body', 'Body'], ['mute', 'Mute'], ['vote', 'Vote']];
   const SUBS: [RegExp, string][] = [
@@ -23,7 +23,7 @@ const G_Touch = (() => {
   type Finger = { kind: 'stick' | 'look' | 'btn'; t?: string; el?: HTMLElement; x: number; y: number; ox: number; oy: number };
   let on = false, wasPlay = false, uiEl: HTMLElement, moreEl: HTMLElement, stickEl: HTMLElement, knobEl: HTMLElement, closeEl: HTMLElement, tipEl: HTMLElement, turnEl: HTMLElement, turnGone = false;
   const fingers = new Map<number, Finger>(), off: Record<number, () => void> = {}, btn: Record<string, HTMLElement> = {};
-  let sx = 0, sy = 0, crouchAt = 0, crouchDone = false, aimWas = false, aimAt = 0, fsTried = false;
+  let sx = 0, sy = 0, crouchAt = 0, crouchDone = false, aimWas = false, aimAt = 0, fires = 0, fsTried = false, stay = false, kept: { x: number; y: number } | null = null; // (stay: the setting; kept: where the stick was left)
 
   const S = () => G.Pad.synth;
   const mouse = (type: 'mousedown' | 'mouseup', n: number) => S().fire(window, new MouseEvent(type, { button: n }));
@@ -44,7 +44,7 @@ const G_Touch = (() => {
     el.classList.add('held');
     if (KEYS[t]) { const [c, sh] = KEYS[t]; s.key('keydown', c, !!sh); off[id] = () => s.key('keyup', c, !!sh); return; }
     switch (t) {
-      case 'fire': mouse('mousedown', 0); off[id] = () => mouse('mouseup', 0); break;
+      case 'fire': case 'fireL': if (fires++ === 0) mouse('mousedown', 0); off[id] = () => { if (--fires === 0) mouse('mouseup', 0); }; break; // (the two are one trigger: it's let go when both are)
       case 'ping': mouse('mousedown', 1); off[id] = () => mouse('mouseup', 1); break;
       // Aim: a tap puts it up (or down again) and it stays so, and a held one's up for as long as it's held. A grenade's is the throw picker: press and let go, as RMB
       case 'aim': aimWas = me.mouse.r; aimAt = performance.now(); if (!aimWas) mouse('mousedown', 2);
@@ -60,7 +60,7 @@ const G_Touch = (() => {
   function letGo(id: number, f: Finger) {
     if (f.el) f.el.classList.remove('held');
     const o = off[id]; if (o) { delete off[id]; o(); }
-    if (f.kind === 'stick') { sx = sy = 0; stickEl.classList.remove('live'); knobEl.style.transform = ''; if (G.Me) G.Me.padMove = null; }
+    if (f.kind === 'stick') { sx = sy = 0; stickEl.classList.remove('live', 'slow', 'fast'); knobEl.style.transform = ''; if (stay) { kept = { x: f.ox, y: f.oy }; stickEl.classList.add('kept'); } if (G.Me) G.Me.padMove = null; }
     fingers.delete(id);
   }
   function releaseAll() {
@@ -77,9 +77,12 @@ const G_Touch = (() => {
     const f: Finger = { kind: 'look', x: e.clientX, y: e.clientY, ox: e.clientX, oy: e.clientY };
     if (b) { f.kind = 'btn'; f.t = b.dataset.t; f.el = b; fingers.set(e.pointerId, f); press(f.t!, b, e.pointerId); return; }
     if (e.clientX < innerWidth * (portrait() ? 0.5 : 0.42) && ![...fingers.values()].some((g) => g.kind === 'stick')) {
-      f.kind = 'stick'; stickEl.classList.add('live'); stickEl.style.left = f.ox + 'px'; stickEl.style.top = f.oy + 'px'; stickEl.style.bottom = 'auto'; knobEl.style.transform = '';
+      f.kind = 'stick'; stickEl.classList.add('live'); knobEl.style.transform = '';
+      if (stay && kept && Math.hypot(f.x - kept.x, f.y - kept.y) <= STICK_R * 1.4) { f.ox = kept.x; f.oy = kept.y; } // (a finger on the stick where it was left takes it from there; anywhere else it's moved there)
+      stickEl.style.left = f.ox + 'px'; stickEl.style.top = f.oy + 'px'; stickEl.style.bottom = 'auto';
     }
     fingers.set(e.pointerId, f);
+    if (f.kind === 'stick') onMove(e);
   }
   function onMove(e: PointerEvent) {
     const f = fingers.get(e.pointerId);
@@ -110,7 +113,8 @@ const G_Touch = (() => {
     const me = G.Me;
     if (crouchAt && !crouchDone && performance.now() - crouchAt > HOLD_MS) { crouchDone = true; S().tap('KeyZ'); }
     const r = Math.min(1, Math.hypot(sx, sy));
-    if (r > DEAD) { const k = (r - DEAD) / (1 - DEAD), n = Math.hypot(sx, sy); me.padMove = { st: (sx / n) * k, fw: (-sy / n) * k, k: Math.max(0.3, k) }; } else me.padMove = null;
+    // how far it's pushed picks the pace, as the keys do: a little is Shift's creep, most of the way a walk, and all the way forward Space's low-ready run
+    if (r > DEAD) { const n = Math.hypot(sx, sy), fw = -sy / n, slow = r < SLOW_R, fast = r >= FAST_R && fw > FAST_FW; me.padMove = { st: sx / n, fw, k: 1, slow, fast }; stickEl.classList.toggle('slow', slow); stickEl.classList.toggle('fast', fast); } else { me.padMove = null; stickEl.classList.remove('slow', 'fast'); }
     // what the buttons show
     btn.aim.classList.toggle('on', !!me.mouse.r); btn.crouch.classList.toggle('on', !!(me.crouch || me.prone)); btn.prone.classList.toggle('on', !!me.prone);
     btn.steady.classList.toggle('on', !!me.keys.ShiftLeft); btn.lower.classList.toggle('on', !!me.lowToggle); btn.more.classList.toggle('on', !moreEl.classList.contains('hidden'));
@@ -211,6 +215,12 @@ const G_Touch = (() => {
     chat.addEventListener('blur', () => { if (on && G.Game.chatOpen) setTimeout(() => { if (G.Game.chatOpen && document.activeElement !== chat) G.Game.closeChat(); }, 120); });
   }
 
+  // the setting: the stick stays where it was last used, or goes back to its corner
+  function setStay(v: boolean) {
+    stay = v;
+    if (!v) { kept = null; if (stickEl) stickEl.classList.remove('kept'); }
+    document.querySelectorAll<HTMLInputElement>('.stick-stay').forEach((c) => { c.checked = v; });
+  }
   function init() {
     const b = ([t, n]: [string, string]) => `<button class="tb tb-${t}" data-t="${t}">${n}</button>`;
     uiEl = document.createElement('div'); uiEl.id = 'touchUi'; uiEl.className = 'ui hidden';
@@ -233,6 +243,9 @@ const G_Touch = (() => {
     turnEl.addEventListener('click', () => { turnGone = true; turnEl.classList.add('hidden'); });
     document.body.appendChild(turnEl);
 
+    document.querySelectorAll<HTMLInputElement>('.stick-stay').forEach((c) => c.addEventListener('change', () => { setStay(c.checked); G.U.store.set('stickStay', c.checked); }));
+    setStay(!!G.U.store.get('stickStay', false));
+    window.addEventListener('resize', () => { kept = null; stickEl.classList.remove('kept'); }); // (turned sideways: where it was may be off the screen)
     gestures(); keyboard();
     window.addEventListener('pointerdown', (e) => {
       if (!e.isTrusted) return;
@@ -241,7 +254,7 @@ const G_Touch = (() => {
     }, true);
     window.addEventListener('pointermove', (e) => { if (e.isTrusted && on && e.pointerType === 'mouse' && Math.abs(e.movementX) + Math.abs(e.movementY) > 4) setOn(false); }, true);
     window.addEventListener('keydown', (e) => { if (e.isTrusted && on && e.code && !(e.target instanceof HTMLInputElement)) setOn(false); }, true); // (a phone's own keyboard: into a box, or no code at all)
-    // the browser's bars out of the way, in a level (a phone only allows it inside a tap, and iPhones not at all)
+    // the browser's bars out of the way, in a level (a phone only allows it inside a tap; an iPhone not at all: there it's the Home Screen, manifest.json)
     window.addEventListener('pointerup', (e) => {
       if (!on || fsTried || !e.isTrusted || !G.Game || G.Game.phase !== 'level' || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
       fsTried = true;
@@ -254,7 +267,7 @@ const G_Touch = (() => {
   }
 
   return {
-    init, update, setOn,
+    init, update, setOn, setStay,
     active: () => on,
     // a key prompt, in the on-screen buttons' names while touch is what's being used
     text(html: string) { for (const [re, to] of SUBS) html = html.replace(re, to); return html; },
