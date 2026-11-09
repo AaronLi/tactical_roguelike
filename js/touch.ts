@@ -12,7 +12,7 @@ const G_Touch = (() => {
   const KEYS: Record<string, [string, boolean?]> = { reload: ['KeyR'], leanL: ['KeyQ'], leanR: ['KeyE'], inspect: ['KeyI'], pack: ['KeyB'], shout: ['KeyV'], mode: ['KeyX'], prone: ['KeyZ'], nv: ['KeyN'], ir: ['KeyN', true], therm: ['KeyT'], body: ['KeyH'], mute: ['KeyM'], vote: ['KeyY'], lower: ['Space'], bag: ['Tab'], pause: ['Escape'] };
   const LOOK_THROUGH = new Set(['fire', 'fireL', 'aim', 'ping']); // (a finger on one of these turns the view as well: and on Ping, picks on the comms wheel)
   const MAIN: [string, string][] = [['fire', 'Fire'], ['fireL', 'Fire'], ['aim', 'Aim'], ['reload', 'Reload'], ['swap', 'Swap'], ['use', 'Use'], ['crouch', 'Crouch'], ['nade', 'Nade'], ['more', 'More'], ['leanL', 'Lean L'], ['leanR', 'Lean R']];
-  const TOP: [string, string][] = [['fs', 'Full'], ['chat', 'Chat'], ['bag', 'Kit'], ['pause', 'Menu']];
+  const TOP: [string, string][] = [['chat', 'Chat'], ['bag', 'Kit'], ['pause', 'Menu']];
   const MORE: [string, string][] = [['ping', 'Ping'], ['shout', 'Shout'], ['steady', 'Steady'], ['lower', 'Lower'], ['prone', 'Prone'], ['mode', 'Mode'], ['inspect', 'Inspect'], ['pack', 'Pack'], ['nv', 'Night'], ['ir', 'IR'], ['therm', 'Therm'], ['body', 'Body'], ['mute', 'Mute'], ['vote', 'Vote']];
   const SUBS: [RegExp, string][] = [
     [/\bPress <b>[FG]<\/b>/g, 'Tap <b>USE</b>'], [/<b>[FG]<\/b>/g, '<b>USE</b>'], [/\bPress Y\b/g, 'Tap <b>VOTE</b> under <b>MORE</b>'], [/\bLMB\b/g, 'FIRE'], [/\bRMB\b/g, 'AIM'], [/\bTab to treat/g, 'KIT to treat'], [/\bTab:/g, 'KIT:'], [/<b>N<\/b> flips/g, '<b>NIGHT</b> flips'],
@@ -23,7 +23,7 @@ const G_Touch = (() => {
   type Finger = { kind: 'stick' | 'look' | 'btn'; t?: string; el?: HTMLElement; x: number; y: number; ox: number; oy: number };
   let on = false, wasPlay = false, uiEl: HTMLElement, moreEl: HTMLElement, stickEl: HTMLElement, knobEl: HTMLElement, closeEl: HTMLElement, tipEl: HTMLElement, turnEl: HTMLElement, turnGone = false;
   const fingers = new Map<number, Finger>(), off: Record<number, () => void> = {}, btn: Record<string, HTMLElement> = {};
-  let sx = 0, sy = 0, crouchAt = 0, crouchDone = false, aimWas = false, aimAt = 0, fires = 0;
+  let sx = 0, sy = 0, crouchAt = 0, crouchDone = false, aimWas = false, aimAt = 0, fires = 0, fsTried = false, stay = false, kept: { x: number; y: number } | null = null; // (stay: the setting; kept: where the stick was left)
 
   const S = () => G.Pad.synth;
   const mouse = (type: 'mousedown' | 'mouseup', n: number) => S().fire(window, new MouseEvent(type, { button: n }));
@@ -60,7 +60,7 @@ const G_Touch = (() => {
   function letGo(id: number, f: Finger) {
     if (f.el) f.el.classList.remove('held');
     const o = off[id]; if (o) { delete off[id]; o(); }
-    if (f.kind === 'stick') { sx = sy = 0; stickEl.classList.remove('live'); knobEl.style.transform = ''; if (G.Me) G.Me.padMove = null; }
+    if (f.kind === 'stick') { sx = sy = 0; stickEl.classList.remove('live', 'slow', 'fast'); knobEl.style.transform = ''; if (stay) { kept = { x: f.ox, y: f.oy }; stickEl.classList.add('kept'); } if (G.Me) G.Me.padMove = null; }
     fingers.delete(id);
   }
   function releaseAll() {
@@ -77,9 +77,12 @@ const G_Touch = (() => {
     const f: Finger = { kind: 'look', x: e.clientX, y: e.clientY, ox: e.clientX, oy: e.clientY };
     if (b) { f.kind = 'btn'; f.t = b.dataset.t; f.el = b; fingers.set(e.pointerId, f); press(f.t!, b, e.pointerId); return; }
     if (e.clientX < innerWidth * (portrait() ? 0.5 : 0.42) && ![...fingers.values()].some((g) => g.kind === 'stick')) {
-      f.kind = 'stick'; stickEl.classList.add('live'); stickEl.style.left = f.ox + 'px'; stickEl.style.top = f.oy + 'px'; stickEl.style.bottom = 'auto'; knobEl.style.transform = '';
+      f.kind = 'stick'; stickEl.classList.add('live'); knobEl.style.transform = '';
+      if (stay && kept && Math.hypot(f.x - kept.x, f.y - kept.y) <= STICK_R * 1.4) { f.ox = kept.x; f.oy = kept.y; } // (a finger on the stick where it was left takes it from there; anywhere else it's moved there)
+      stickEl.style.left = f.ox + 'px'; stickEl.style.top = f.oy + 'px'; stickEl.style.bottom = 'auto';
     }
     fingers.set(e.pointerId, f);
+    if (f.kind === 'stick') onMove(e);
   }
   function onMove(e: PointerEvent) {
     const f = fingers.get(e.pointerId);
@@ -103,6 +106,7 @@ const G_Touch = (() => {
     const play = level && g.locked && !g.menuOpen() && pauseHid && !g.$('hud').classList.contains('hidden');
     closeEl.classList.toggle('hidden', !(g.invOpen || g.aboxOpen || (g.shopOpen && g.hub)));
     turnEl.classList.toggle('hidden', !(play && portrait() && !turnGone));
+    if (!level) fsTried = false;
     if (!play) { if (wasPlay) { releaseAll(); moreEl.classList.add('hidden'); uiEl.classList.add('hidden'); } wasPlay = false; return; }
     if (!wasPlay) uiEl.classList.remove('hidden');
     wasPlay = true;
@@ -211,6 +215,12 @@ const G_Touch = (() => {
     chat.addEventListener('blur', () => { if (on && G.Game.chatOpen) setTimeout(() => { if (G.Game.chatOpen && document.activeElement !== chat) G.Game.closeChat(); }, 120); });
   }
 
+  // the setting: the stick stays where it was last used, or goes back to its corner
+  function setStay(v: boolean) {
+    stay = v;
+    if (!v) { kept = null; if (stickEl) stickEl.classList.remove('kept'); }
+    document.querySelectorAll<HTMLInputElement>('.stick-stay').forEach((c) => { c.checked = v; });
+  }
   function init() {
     const b = ([t, n]: [string, string]) => `<button class="tb tb-${t}" data-t="${t}">${n}</button>`;
     uiEl = document.createElement('div'); uiEl.id = 'touchUi'; uiEl.className = 'ui hidden';
@@ -223,20 +233,6 @@ const G_Touch = (() => {
     window.addEventListener('pointermove', onMove);
     window.addEventListener('blur', () => { if (on && wasPlay) releaseAll(); });
     // the chat's opened on the click: a phone only brings its keyboard up for a focus inside a real tap
-    // Fullscreen, on the click (the browser only allows it inside a real tap). An iPhone has none for a page: there the game fills the screen when it's opened from the Home Screen
-    // (manifest.json), so the button says how, and goes once it's been done
-    const fsBtns = [btn.fs, ...document.querySelectorAll<HTMLElement>('[data-fs]')];
-    const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void }, d = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void };
-    const can = !!(root.requestFullscreen || root.webkitRequestFullscreen), isFs = () => !!(document.fullscreenElement || d.webkitFullscreenElement);
-    const fsLabel = () => { btn.fs.textContent = isFs() ? 'Exit' : 'Full'; document.querySelectorAll<HTMLElement>('[data-fs]').forEach((e) => { e.textContent = isFs() ? 'Exit fullscreen' : 'Fullscreen'; }); };
-    const toggleFs = () => {
-      if (isFs()) { if (document.exitFullscreen) document.exitFullscreen().catch(() => {}); else if (d.webkitExitFullscreen) d.webkitExitFullscreen(); return; }
-      if (root.requestFullscreen) root.requestFullscreen({ navigationUI: 'hide' }).catch(() => G.HUD.toast('', "This browser wouldn't go fullscreen", 2)); else if (root.webkitRequestFullscreen) root.webkitRequestFullscreen();
-    };
-    const standalone = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || !!(navigator as Navigator & { standalone?: boolean }).standalone;
-    const howTo = (e: MouseEvent) => showTip('On an iPhone a game fills the screen only from the Home Screen. In Safari tap Share, then Add to Home Screen, and open Breach from there.', e.clientX || innerWidth / 2, e.clientY || innerHeight / 2);
-    for (const e of fsBtns) { if (can) e.addEventListener('click', toggleFs); else if (standalone) e.classList.add('hidden'); else e.addEventListener('click', howTo); }
-    for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, fsLabel);
     btn.chat.addEventListener('click', () => { S().tap('Enter'); (document.getElementById('chatInput') as HTMLInputElement).focus(); });
 
     closeEl = document.createElement('button'); closeEl.id = 'touchClose'; closeEl.className = 'ui hidden'; closeEl.textContent = '×'; closeEl.setAttribute('aria-label', 'Close');
@@ -247,6 +243,9 @@ const G_Touch = (() => {
     turnEl.addEventListener('click', () => { turnGone = true; turnEl.classList.add('hidden'); });
     document.body.appendChild(turnEl);
 
+    document.querySelectorAll<HTMLInputElement>('.stick-stay').forEach((c) => c.addEventListener('change', () => { setStay(c.checked); G.U.store.set('stickStay', c.checked); }));
+    setStay(!!G.U.store.get('stickStay', false));
+    window.addEventListener('resize', () => { kept = null; stickEl.classList.remove('kept'); }); // (turned sideways: where it was may be off the screen)
     gestures(); keyboard();
     window.addEventListener('pointerdown', (e) => {
       if (!e.isTrusted) return;
@@ -255,13 +254,20 @@ const G_Touch = (() => {
     }, true);
     window.addEventListener('pointermove', (e) => { if (e.isTrusted && on && e.pointerType === 'mouse' && Math.abs(e.movementX) + Math.abs(e.movementY) > 4) setOn(false); }, true);
     window.addEventListener('keydown', (e) => { if (e.isTrusted && on && e.code && !(e.target instanceof HTMLInputElement)) setOn(false); }, true); // (a phone's own keyboard: into a box, or no code at all)
+    // the browser's bars out of the way, in a level (a phone only allows it inside a tap; an iPhone not at all: there it's the Home Screen, manifest.json)
+    window.addEventListener('pointerup', (e) => {
+      if (!on || fsTried || !e.isTrusted || !G.Game || G.Game.phase !== 'level' || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+      fsTried = true;
+      const p = document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      if (p && p.catch) p.catch(() => {});
+    }, true);
     document.addEventListener('gesturestart', (e) => { if (on) e.preventDefault(); }, { passive: false }); // (Safari's pinch: the page isn't to zoom under the controls)
     setOn(PHONE);
     if (PHONE) G.InvUI.scaleUI();
   }
 
   return {
-    init, update, setOn,
+    init, update, setOn, setStay,
     active: () => on,
     // a key prompt, in the on-screen buttons' names while touch is what's being used
     text(html: string) { for (const [re, to] of SUBS) html = html.replace(re, to); return html; },

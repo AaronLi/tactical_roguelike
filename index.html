@@ -52,12 +52,13 @@
 
     <!-- your account (cloud saves, js/cloud.ts) and your career (js/career.ts) -->
     <details id="acctBox" class="settings account"><summary>Account <span id="acctSum" class="acct-sum"></span></summary><div id="acctBody" class="acct-body"></div></details>
-    <div class="career-row"><button id="btnCareer" class="btn small">Career &amp; stats</button> <button class="btn small touch-only" data-fs>Fullscreen</button></div>
+    <div class="career-row"><button id="btnCareer" class="btn small">Career &amp; stats</button></div>
 
     <details class="settings">
       <summary>Settings &amp; controls</summary>
       <div class="set-grid">
         <label class="touch-only">Touch look sensitivity <span id="touchSensVal"></span></label><input class="touch-only" id="touchSens" type="range" min="0.2" max="3" step="0.05">
+        <label class="check touch-only"><input type="checkbox" class="stick-stay"> Joystick stays where you leave it <span class="dim">(off: back to its corner)</span></label>
         <label class="not-touch">Mouse sensitivity <span id="sensVal"></span></label><input class="not-touch" id="sens" type="range" min="0.2" max="3" step="0.05">
         <label>Stick sensitivity <span id="padSensVal"></span></label><input id="padSens" type="range" min="0.2" max="3" step="0.05">
         <label>Field of view <span id="fovVal"></span></label><input id="fov" type="range" min="60" max="110" step="1">
@@ -68,8 +69,8 @@
         <div class="turn-row"><input id="turnUrl" placeholder="turn:host:3478"><input id="turnUser" placeholder="username"><input id="turnPass" type="password" placeholder="password"></div>
       </div>
       <div class="controls touch-only">
-        <b>Left side of the screen</b> drag to move: a little is a slow steady walk, most of the way a walk, all the way forward the low-ready run &middot; <b>right side</b> drag to look (a finger on Fire, Aim or Ping turns the view too) &middot; <b>Fire</b> on either side &middot; <b>Full</b> fullscreen on or off (iPhone: Share, then Add to Home Screen, and open it from there) &middot; <b>Aim</b> tap to stay up, hold for as long as you hold &middot; <b>Use</b> hold to interact (lit when there's something to use) &middot; <b>Crouch</b> tap, hold for prone &middot; <b>Reload</b> tap, tap twice for a dump reload, hold to check the magazine &middot; <b>Nade</b> the next grenade, then back to the gun &middot; <b>More</b> ping (hold: comms wheel), shout, steady, lowered weapon, fire mode, inspect, backpack swap, night vision, mute, vote<br>
-        <b>Menus</b>: long-press for what right-click and hover show &middot; double-tap opens a pouch &middot; drag to carry, a second finger turns what you carry &middot; pinch to zoom the gunsmith and the sidearm web &middot; on the route map, tap a node for its card and again to go. Sideways is the better way to play on a phone.
+        <b>Left side of the screen</b> drag to move: a little is a slow steady walk, most of the way a walk, all the way forward the low-ready run &middot; <b>right side</b> drag to look (a finger on Fire, Aim or Ping turns the view too) &middot; <b>Fire</b> on either side &middot; <b>Aim</b> tap to stay up, hold for as long as you hold &middot; <b>Use</b> hold to interact (lit when there's something to use) &middot; <b>Crouch</b> tap, hold for prone &middot; <b>Reload</b> tap, tap twice for a dump reload, hold to check the magazine &middot; <b>Nade</b> the next grenade, then back to the gun &middot; <b>More</b> ping (hold: comms wheel), shout, steady, lowered weapon, fire mode, inspect, backpack swap, night vision, mute, vote<br>
+        <b>Menus</b>: long-press for what right-click and hover show &middot; double-tap opens a pouch &middot; drag to carry, a second finger turns what you carry &middot; pinch to zoom the gunsmith and the sidearm web &middot; on the route map, tap a node for its card and again to go. Sideways is the better way to play on a phone. A level goes fullscreen at the first tap; on an iPhone, Share, then Add to Home Screen, and open it from there.
       </div>
       <div class="controls not-touch">
         <b>WASD</b> move &middot; <b>Space</b> toggle lowered weapon &middot; <b>Shift</b> slow &amp; steady &middot; <b>C</b> crouch &middot; <b>Q / E</b> lean<br>
@@ -179,6 +180,7 @@
     <div class="small dim">The game keeps running for your squad.</div>
     <div class="set-grid">
       <label class="touch-only">Touch look sensitivity</label><input class="touch-only" id="touchSens2" type="range" min="0.2" max="3" step="0.05">
+      <label class="check touch-only"><input type="checkbox" class="stick-stay"> Joystick stays where you leave it <span class="dim">(off: back to its corner)</span></label>
       <label class="not-touch">Mouse sensitivity</label><input class="not-touch" id="sens2" type="range" min="0.2" max="3" step="0.05">
       <label>Stick sensitivity</label><input id="padSens2" type="range" min="0.2" max="3" step="0.05">
       <label>Field of view</label><input id="fov2" type="range" min="60" max="110" step="1">
@@ -189,7 +191,7 @@
       <button id="btnResume" class="btn primary">Resume</button>
       <button id="btnQuit" class="btn">Leave game</button>
     </div>
-    <div class="btn-row"><button class="btn touch-only" data-fs>Fullscreen</button><button id="btnProf" class="btn">Save performance profile</button></div>
+    <div class="btn-row"><button id="btnProf" class="btn">Save performance profile</button></div>
     <div id="profLine" class="small dim"></div>
   </div>
 </div>
