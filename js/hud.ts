@@ -34,6 +34,7 @@ const G_HUD = {
     for (const n of document.querySelectorAll<HTMLElement>('#hud [id]')) this.el[n.id] = n;
   },
   set(id: string, html: string) {
+    html = G.Pad.text(html);
     if (this.cache[id] === html) return;
     this.cache[id] = html;
     this.el[id].innerHTML = html;
@@ -49,7 +50,7 @@ const G_HUD = {
     this.dirs.push({ el: d, from: from.clone ? from.clone() : from, t: 1.2 });
   },
   toast(title: string, sub: string, dur = 2.5) {
-    this.el.toast.innerHTML = (title ? `<div class="tt">${title}</div>` : '') + (sub ? `<div class="ts">${sub}</div>` : '');
+    this.el.toast.innerHTML = (title ? `<div class="tt">${title}</div>` : '') + (sub ? `<div class="ts">${G.Pad.text(sub)}</div>` : '');
     this.el.toast.style.opacity = 1 as unknown as string;
     this.toastT = dur;
   },

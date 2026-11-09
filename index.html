@@ -50,6 +50,7 @@
       <summary>Settings &amp; controls</summary>
       <div class="set-grid">
         <label>Mouse sensitivity <span id="sensVal"></span></label><input id="sens" type="range" min="0.2" max="3" step="0.05">
+        <label>Stick sensitivity <span id="padSensVal"></span></label><input id="padSens" type="range" min="0.2" max="3" step="0.05">
         <label>Field of view <span id="fovVal"></span></label><input id="fov" type="range" min="60" max="110" step="1">
         <label>Volume <span id="volVal"></span></label><input id="vol" type="range" min="0" max="1" step="0.05">
         <label>Load Magazines (hangar) <span class="dim">which magazines it tops up</span></label><select id="loadKit"><option value="1">Equipped and carried only</option><option value="0">Everything</option></select>
@@ -62,7 +63,10 @@
         <b>LMB</b> fire &middot; <b>RMB</b> aim &middot; <b>MMB</b> ping (<b>hold MMB</b> the comms wheel: light, laser, magnifier, calls to the squad) &middot; <b>R</b> reload (<b>R R</b> dump reload, <b>hold R</b> check the magazine, or the chamber on a gun without one) &middot; <b>I</b> inspect (<b>hold I</b> hold the chamber check open; the mouse turns what you hold) &middot; <b>1 / 2 / wheel</b> swap (<b>wheel</b> while aiming: magnification)<br>
         <b>3 / 4 / 5</b> a grenade into your hand (frag and flashbang to start; drag one onto a key's box in the inventory to change it): <b>hold LMB</b> to pull the pin, <b>release</b> to throw, <b>RMB</b> underhand / weak / strong; the key again or 1 / 2 puts it away &middot; <b>H</b> body &amp; kit (as Tab) &middot; hold <b>B</b> swap with the gun in your backpack &middot; <b>V</b> shout compliance &middot; <b>X</b> fire selector &middot; <b>N</b> night vision down / up (on your helmet; also on the comms wheel), <b>Shift+N</b> its IR illuminator &middot; <b>T</b> a thermal sight's palette<br>
         hold <b>F</b> doors (aim high: open, low: kick), bag evidence, arrest, restrain or revive<br>
-        <b>Y</b> vote to leave &middot; <b>M</b> mute &middot; <b>F8</b> echo paths &middot; <b>F9</b> hitboxes &middot; <b>Tab</b> inventory, health &amp; scoreboard &middot; <b>Enter</b> chat &middot; <b>Esc</b> menu
+        <b>Y</b> vote to leave &middot; <b>M</b> mute &middot; <b>F8</b> echo paths &middot; <b>F9</b> hitboxes &middot; <b>Tab</b> inventory, health &amp; scoreboard &middot; <b>Enter</b> chat &middot; <b>Esc</b> menu<br><br>
+        <b>Controller</b> (Xbox names): <b>LS</b> move, further is faster &middot; <b>RS</b> look &middot; <b>L3</b> slow &amp; steady on / off &middot; <b>R3</b> shout &middot; <b>RT</b> fire &middot; <b>LT</b> aim &middot; hold <b>A</b> interact &middot; <b>B</b> crouch (hold: prone) &middot; <b>X</b> reload &middot; <b>Y</b> swap (aiming: magnification) &middot; <b>LB</b> ping (hold: comms wheel, RS picks) &middot; tap <b>RB</b> next grenade &middot; <b>D-pad</b> up night vision, down lowered weapon, left / right lean &middot; <b>View</b> inventory &middot; <b>Menu</b> pause<br>
+        hold <b>RB</b> with: <b>A</b> vote to leave &middot; <b>B</b> body &amp; kit &middot; <b>X</b> fire selector &middot; <b>Y</b> backpack swap &middot; <b>Up</b> IR illuminator &middot; <b>Down</b> thermal palette &middot; <b>Left</b> inspect &middot; <b>Right</b> mute &middot; <b>View</b> chat<br>
+        menus: <b>D-pad</b> select &middot; <b>LS</b> cursor &middot; <b>RS</b> scroll &middot; <b>A</b> confirm (hold and move: carry) &middot; <b>B</b> back &middot; <b>X</b> more (right-click) &middot; <b>Y</b> turn what you carry &middot; <b>LB / RB</b> tabs
       </div>
     </details>
   </div>
@@ -147,7 +151,7 @@
   </div>
   <div id="deadMsg" class="hidden">
     <div class="big">KIA</div>
-    <div class="small">Spectating &mdash; you'll redeploy next level if your squad extracts. Click to switch view.</div>
+    <div class="small">Spectating &mdash; you'll redeploy next level if your squad extracts. <span class="kb-only">Click</span><span class="pad-only">RT</span> to switch view.</div>
   </div>
 
   <div id="scoreboard" class="ui ui-panel hidden"></div>
@@ -162,6 +166,7 @@
     <div class="small dim">The game keeps running for your squad.</div>
     <div class="set-grid">
       <label>Mouse sensitivity</label><input id="sens2" type="range" min="0.2" max="3" step="0.05">
+      <label>Stick sensitivity</label><input id="padSens2" type="range" min="0.2" max="3" step="0.05">
       <label>Field of view</label><input id="fov2" type="range" min="60" max="110" step="1">
       <label>Volume</label><input id="vol2" type="range" min="0" max="1" step="0.05">
     </div>
@@ -310,6 +315,7 @@
 <script defer src="dist/js/cloudconfig.js"></script>
 <script defer src="dist/js/career.js"></script>
 <script defer src="dist/js/cloud.js"></script>
+<script defer src="dist/js/gamepad.js"></script>
 <script defer src="dist/js/game.js"></script>
 <script defer src="dist/js/profiler.js"></script>
 <script defer src="dist/js/demo.js"></script>

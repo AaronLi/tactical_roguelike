@@ -36,7 +36,7 @@ const G_GunsmithUI = (() => {
     const rim = new T.DirectionalLight(0x9fc0ff, Math.PI * 0.5); rim.position.set(-1.5, 0.5, -1); scene.add(rim);
     camera = new T.PerspectiveCamera(30, 1, 0.01, 20);
     let drag: { x: number, y: number, moved: number } | null = null;
-    canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; canvas.setPointerCapture(e.pointerId); view.auto = false; });
+    canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* (a controller's pointer: js/gamepad.ts) */ } view.auto = false; });
     canvas.addEventListener('pointermove', (e) => {
       if (st.stk && !drag) { stkHoverAt(e); return; }
       if (drag) {

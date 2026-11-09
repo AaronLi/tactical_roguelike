@@ -2210,6 +2210,28 @@ On top of the baked room reverb, echoes are **ray-traced through the level** for
 | Y | Vote to leave, once order is restored (again to take it back) |
 | Enter / Esc | Chat / pause |
 
+### Controller
+
+An Xbox pad or a Steam Deck's controls (the browser's standard mapping), picked up as soon as you press something; a mouse or a key takes over again at once.
+
+| Button | In a level | With RB held | In a menu |
+| --- | --- | --- | --- |
+| Left stick | Move (further is faster) | | Free cursor |
+| Right stick | Look (Settings: Stick sensitivity); picks on the comms wheel | | Scroll / zoom |
+| RT / LT | Fire / aim | | |
+| A (hold) | Interact (out cold: give up) | Vote to leave | Confirm; held and moved, carry |
+| B | Crouch (hold: prone) | Body and kit | Back (on the keyboard: delete) |
+| X | Reload (tap, double tap, hold, as R) | Fire selector | Right-click: an item's menu |
+| Y | Swap weapon (aiming: magnification) | Backpack swap (hold) | Turn what you carry |
+| LB | Ping (hold: comms wheel) | | Previous shop tab |
+| RB | Tap: next grenade, then back to the gun | | Next shop tab |
+| D-pad | Up night vision, down lowered weapon, left / right lean | Up IR illuminator, down thermal palette, left inspect, right mute | Move between controls; sliders and lists left / right |
+| L3 / R3 | Slow and steady on / off / shout | | |
+| View | Inventory | Chat | Inventory closes |
+| Menu | Pause | | Resume; done on the keyboard |
+
+Text boxes (the room code, the chat) open an on-screen keyboard. A button press isn't a user gesture to a browser, so with nothing but a controller the sound stays off until the first touch of the screen (the hints along the bottom say so).
+
 ## Interface
 
 - **No minimap and no crosshair.** You find your way and aim by looking.
