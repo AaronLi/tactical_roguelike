@@ -27,7 +27,7 @@ const G_GunsmithUI = (() => {
     canvas = document.createElement('canvas');
     canvas.className = 'gs-canvas';
     renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, matchMedia('(hover: none) and (pointer: coarse)').matches ? 1.5 : 2));
     scene = new T.Scene();
     scene.environment = G.R._envMap(renderer);
     scene.add(new T.HemisphereLight(0xe8eef5, 0x2a2622, Math.PI * 1.0));
@@ -36,8 +36,9 @@ const G_GunsmithUI = (() => {
     const rim = new T.DirectionalLight(0x9fc0ff, Math.PI * 0.5); rim.position.set(-1.5, 0.5, -1); scene.add(rim);
     camera = new T.PerspectiveCamera(30, 1, 0.01, 20);
     let drag: { x: number, y: number, moved: number } | null = null;
-    canvas.addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY, moved: 0 }; try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* (a controller's pointer: js/gamepad.ts) */ } view.auto = false; });
+    canvas.addEventListener('pointerdown', (e) => { if (!e.isPrimary) return; if (e.pointerType === 'touch' && !st.stk) hover(e); drag = { x: e.clientX, y: e.clientY, moved: 0 }; try { canvas.setPointerCapture(e.pointerId); } catch (err) { /* (a controller's pointer: js/gamepad.ts) */ } view.auto = false; });
     canvas.addEventListener('pointermove', (e) => {
+      if (!e.isPrimary) return;
       if (st.stk && !drag) { stkHoverAt(e); return; }
       if (drag) {
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
@@ -46,11 +47,12 @@ const G_GunsmithUI = (() => {
       } else hover(e);
     });
     canvas.addEventListener('pointerup', (e) => {
+      if (!e.isPrimary) return;
       if (drag && drag.moved < 4 && st.stk) stkPlace(e);
       else if (drag && drag.moved < 4) { const s = pick(e); if (s) { st.slot = s; G.Audio.click(); refresh(); } }
       drag = null;
     });
-    canvas.addEventListener('pointerleave', () => { if (st.hoverSlot) { st.hoverSlot = null; paint(); label(null); } });
+    canvas.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch' && st.hoverSlot) { st.hoverSlot = null; paint(); label(null); } });
     canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (st.stk && st.stkPick && (e.shiftKey || e.ctrlKey || e.altKey)) return stkWheel(e); view.dist = G.U.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.1), 0.3, 4); }, { passive: false });
   }
 
@@ -410,7 +412,7 @@ const G_GunsmithUI = (() => {
         <label class="stk-flip"><input type="checkbox" data-gstkflip ${st.stkF ? 'checked' : ''}> Mirror</label>
       </div>
       <div class="stk-act">${st.stkAt ? `<button class="btn small buy" data-gstkapply ${G.Shop.ready ? 'disabled' : ''}>Stick it on <small>(for good)</small></button> <button class="btn small" data-gstkmove>Move it</button>`
-        : `<span>${full ? 'This gun has all the stickers it can take.' : st.stkPick ? 'Click the gun where it goes.' : names.length ? 'Pick a sticker, then click the gun where it goes.' : ''}</span>`}</div>
+        : `<span>${G.Pad.text(full ? 'This gun has all the stickers it can take.' : st.stkPick ? 'Click the gun where it goes.' : names.length ? 'Pick a sticker, then click the gun where it goes.' : '')}</span>`}</div>
       <p class="stk-hint">Shift + scroll: size · Ctrl + scroll: turn · a sticker's on its gun for good, wherever the gun goes</p>`;
   }
 
@@ -467,7 +469,7 @@ const G_GunsmithUI = (() => {
     return `<div class="gs-wrap">
       <div class="gs-tabs">${tabs}</div>
       <div class="gs-main">
-        <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div id="gsDots" class="gs-dots"></div><div class="gs-hint">${st.stk ? 'Drag to turn · scroll to zoom · click the gun to put the sticker there' : 'Drag to turn · scroll to zoom · click a part or a dot'}</div></div>
+        <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div id="gsDots" class="gs-dots"></div><div class="gs-hint">${G.Pad.text(st.stk ? 'Drag to turn · scroll to zoom · click the gun to put the sticker there' : 'Drag to turn · scroll to zoom · click a part or a dot')}</div></div>
         ${st.stk ? `<div class="gs-list gs-stk">${stkHtml(w)}</div>` : `<div class="gs-list"><div class="gs-sub">${cur ? GS.slotLabel(cur) + (cur.req ? '' : ' (optional)') : ''}</div>${list}</div>`}</div>
         <div class="gs-side"><div class="gs-title">${def.name}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}</div>
           <div class="gs-slots">${slotRows}</div>

@@ -2232,6 +2232,25 @@ An Xbox pad or a Steam Deck's controls (the browser's standard mapping), picked 
 
 Text boxes (the room code, the chat) open an on-screen keyboard. A button press isn't a user gesture to a browser, so with nothing but a controller the sound stays off until the first touch of the screen (the hints along the bottom say so).
 
+### Touch
+
+On a phone or a tablet the controls are on the screen from the start; on a laptop's touch screen they appear the first time you touch it, and a mouse or a key takes over again. Sideways is better for playing (upright works, and a level says so once); the menus work either way.
+
+| On screen | Does |
+| --- | --- |
+| Left side, drag | Move (further is faster) |
+| Right side, drag | Look (Settings: Touch look sensitivity); a finger on Fire, Aim or Ping turns the view too |
+| Fire / Aim | Fire / aim (Aim: a tap stays up, or hold it) |
+| Reload | As R: tap, double tap, hold |
+| Swap, Nade | Swap weapon (aiming: magnification); next grenade, then back to the gun |
+| Use (hold) | Interact (lit when there's something to use; out cold: give up) |
+| Crouch | Tap: crouch; hold: prone |
+| Lean L / Lean R (hold) | Lean |
+| More | Ping (hold: comms wheel, drag to pick), shout, steady, lowered weapon, prone, fire mode, inspect, backpack swap, night vision, IR, thermal palette, body and kit, mute, vote |
+| Chat, Kit, Menu | Chat, inventory, pause |
+
+In the menus a long press is the right click and shows what hovering would; two quick taps are the double click; a second finger turns what you carry; two fingers zoom the gunsmith and the sidearm web; on the route map the first tap shows a node's card and the second picks it. On a phone the 3D renders at a lower resolution (the HUD stays sharp). `?touch` in the URL keeps the touch controls on.
+
 ## Interface
 
 - **No minimap and no crosshair.** You find your way and aim by looking.

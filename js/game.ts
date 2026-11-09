@@ -20,7 +20,7 @@ type GmPhase = 'menu' | 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 // the full-screen panels this.screen shows one of (index.html)
 type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause' | 'career';
 // the sliders in the menu, and the keys they keep in storage
-type GmSetting = 'sens' | 'padSens' | 'fov' | 'vol' | 'loadKit';
+type GmSetting = 'sens' | 'padSens' | 'touchSens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
 type GmMsgKind = 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
@@ -42,7 +42,7 @@ const G_Game = {
   enemiesLeft: 0,
   chatOpen: false,
   locked: false,
-  padLocked: false, // (playing on a controller, with no pointer lock to be had from a button press: counts as locked; js/gamepad.ts)
+  softLocked: false, // (playing on a controller or a touch screen, with no pointer lock to be had: counts as locked; js/gamepad.ts, js/touch.ts)
   runStarted: false,
   // the rest of what it keeps, made as it goes (init and the methods below): all here, so its whole shape is in one place. Those marked (init)
   // are always set before anything reads them.
@@ -98,7 +98,7 @@ const G_Game = {
     G.Stickers.load().then((names) => G.ServerLink.stickers(names)); // (which stickers there are: js/stickers.ts; the sticker box hands out one of them)
     G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
     G.Hangar.load(); // (the hangar's baked scene, parsed as soon as the bundle's in: js/hangar.ts; what enters the game waits for it, needModels)
-    this.settings = { sens: G.U.store.get('sens', 1), padSens: G.U.store.get('padSens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
+    this.settings = { sens: G.U.store.get('sens', 1), padSens: G.U.store.get('padSens', 1), touchSens: G.U.store.get('touchSens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
     G.U.store.set('name', this.myName, true); // (kept: the same name after a refresh, so the squad knows who's back. auto: a made-up one doesn't outweigh an account's, js/cloud.ts)
     // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.ts). prefAnimals is your preference, every
@@ -111,6 +111,7 @@ const G_Game = {
     G.HUD.init();
     G.Me.bindInput();
     G.Pad.init();
+    G.Touch.init();
     G.Shop.bind();
     G.Audio.vol = this.settings.vol;
     G.Audio.muted = new URLSearchParams(location.search).has('mute') || G.U.store.get('muted', false);
@@ -248,11 +249,11 @@ const G_Game = {
   // what's kept changed under the game (the cloud saves merged an account's in: js/cloud.ts): read again, the menu's controls with it
   applyStored(keys: string[]) {
     const S = G.U.store, has = (k: string) => keys.includes(k);
-    for (const k of ['sens', 'padSens', 'fov', 'vol', 'loadKit'] as GmSetting[]) if (has(k)) {
+    for (const k of ['sens', 'padSens', 'touchSens', 'fov', 'vol', 'loadKit'] as GmSetting[]) if (has(k)) {
       const v = +S.get(k, this.settings[k]); if (!isFinite(v)) continue;
       this.settings[k] = v;
       for (const id of [k, k + '2']) { const el = this.$<HTMLInputElement>(id); if (el) el.value = String(v); }
-      const lab = this.$(k + 'Val'); if (lab) lab.textContent = k === 'sens' || k === 'padSens' ? v.toFixed(2) : k === 'fov' ? v + '°' : k === 'vol' ? Math.round(v * 100) + '%' : lab.textContent;
+      const lab = this.$(k + 'Val'); if (lab) lab.textContent = k === 'sens' || k === 'padSens' || k === 'touchSens' ? v.toFixed(2) : k === 'fov' ? v + '°' : k === 'vol' ? Math.round(v * 100) + '%' : lab.textContent;
       if (k === 'vol') G.Audio.setVolume(v);
     }
     if (has('muted') && !new URLSearchParams(location.search).has('mute')) { const m = !!S.get('muted', false); G.Audio.setMuted(m); this.$<HTMLInputElement>('mute').checked = m; }
@@ -371,22 +372,37 @@ const G_Game = {
     this.bindLook();
     // hovering a node on the route map: its card (js/route.ts tip), beside the pointer, kept on screen
     const tipEl = document.createElement('div'); tipEl.id = 'routeTip'; tipEl.className = 'route-tip ui hidden'; document.body.appendChild(tipEl);
-    let tipOn: number | null = null;
+    let tipOn: number | null = null, tipHeld: number | null = null; // (tipHeld: the node a finger tapped, whose card stays up)
+    const tipAt = (x: number, y: number) => {
+      const w = tipEl.offsetWidth, h = tipEl.offsetHeight, W = window.innerWidth, H = window.innerHeight;
+      let tx = x + 18, ty = y + 18;
+      if (tx + w > W - 8) tx = x - w - 18;
+      if (ty + h > H - 8) ty = y - h - 18;
+      tipEl.style.left = Math.max(8, tx) + 'px'; tipEl.style.top = Math.max(8, ty) + 'px';
+    };
     // (on the route screen's map, and on the hangar's Tab menu's view of it: js/shop.ts routeHtml)
     this.routeHover = (el: HTMLElement, view = false) => {
     el.addEventListener('pointermove', ((e: PointerEvent) => {
+      if (e.pointerType === 'touch') return;
       const g = (e.target as HTMLElement).closest<HTMLElement>('[data-node]');
       if (!g || !this.routeMap || !this.routeSt) { tipEl.classList.add('hidden'); tipOn = null; return; }
       const id = +g.dataset.node!;
       if (id !== tipOn) { tipOn = id; tipEl.innerHTML = G.Route.tip(this.routeMap, id, Object.assign(this.routeTipSt(), { view })); }
       tipEl.classList.remove('hidden');
-      const w = tipEl.offsetWidth, h = tipEl.offsetHeight, W = window.innerWidth, H = window.innerHeight;
-      let x = e.clientX + 18, y = e.clientY + 18;
-      if (x + w > W - 8) x = e.clientX - w - 18;
-      if (y + h > H - 8) y = e.clientY - h - 18;
-      tipEl.style.left = Math.max(8, x) + 'px'; tipEl.style.top = Math.max(8, y) + 'px';
+      tipAt(e.clientX, e.clientY);
     }) as EventListener);
-    el.addEventListener('pointerleave', () => { tipEl.classList.add('hidden'); tipOn = null; });
+    el.addEventListener('pointerleave', ((e: PointerEvent) => { if (e.pointerType === 'touch') return; tipEl.classList.add('hidden'); tipOn = null; }) as EventListener);
+    // a finger has no hovering: the first tap on a node is its card, the second is the click (off the map: the card goes)
+    el.addEventListener('click', ((e: MouseEvent) => {
+      if (!G.Touch.active()) return;
+      const g = (e.target as HTMLElement).closest<HTMLElement>('[data-node]'), id = g ? +g.dataset.node! : null;
+      if (id == null || !this.routeMap || !this.routeSt || id === tipHeld) { tipEl.classList.add('hidden'); tipOn = tipHeld = null; return; }
+      e.stopPropagation();
+      tipOn = tipHeld = id;
+      tipEl.innerHTML = G.Pad.text(G.Route.tip(this.routeMap, id, Object.assign(this.routeTipSt(), { view })));
+      tipEl.classList.remove('hidden');
+      const r = g!.getBoundingClientRect(); tipAt(r.left + r.width / 2, r.top + r.height / 2);
+    }) as EventListener, true);
     };
     this.routeHover(this.$('routeMap'));
     this.$('routeMap').addEventListener('click', ((e: GmEvt) => { const g = e.target.closest<HTMLElement>('[data-node]'); if (g) this.pickRoute(+g.dataset.node!); }) as EventListener);
@@ -415,6 +431,7 @@ const G_Game = {
     };
     bindRange(['sens', 'sens2'], 'sens', (v) => v.toFixed(2));
     bindRange(['padSens', 'padSens2'], 'padSens', (v) => v.toFixed(2));
+    bindRange(['touchSens', 'touchSens2'], 'touchSens', (v) => v.toFixed(2));
     bindRange(['fov', 'fov2'], 'fov', (v) => v + '°');
     bindRange(['vol', 'vol2'], 'vol', (v) => Math.round(v * 100) + '%', (v) => G.Audio.setVolume(v));
 
@@ -452,13 +469,13 @@ const G_Game = {
     this.$('btnNewRun').onclick = () => { if (G.Net.isHost) G.Net.toHost({ t: 'toLobby' }); };
     this.$('btnMenu').onclick = () => this.toMenu();
     this.$('clickToPlay').onclick = () => this.lock();
-    G.R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.padLocked)) this.lock(); });
+    G.R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked)) this.lock(); });
 
     document.addEventListener('pointerlockchange', () => this.lockChanged());
 
     window.addEventListener('keydown', (e) => {
       if (this.phase !== 'level') return;
-      if (e.code === 'Escape' && this.padLocked && !this.menuOpen()) { this.unlock(); return; } // (no pointer lock for the browser's own Esc to let go)
+      if (e.code === 'Escape' && this.softLocked && !this.menuOpen()) { this.unlock(); return; } // (no pointer lock for the browser's own Esc to let go)
       // in the hangar: Esc puts a shop panel away, and Tab is your stash and loadout (the panel's Kit tab), not the field kit
       if (this.hub) {
         if (e.code === 'Escape' && this.shopOpen) { this.closeShop(); return; }
@@ -468,7 +485,7 @@ const G_Game = {
       if (e.code === 'Escape' && this.invOpen) { this.toggleInv(false); return; }
       if (e.code === 'Escape' && this.aboxOpen) { this.aboxHide(); return; }
       if (e.code === 'KeyY' && !this.chatOpen && !e.repeat && !this.hub) this.vote();
-      if (e.code === 'Enter') {
+      if (e.code === 'Enter' || e.key === 'Enter') { // (a phone's own keyboard has a key but no code)
         const inp = this.$<HTMLInputElement>('chatInput');
         if (!this.chatOpen) { this.chatOpen = true; inp.classList.remove('hidden'); inp.value = ''; setTimeout(() => inp.focus(), 0); G.Me.keys = {}; }
         else {
@@ -551,8 +568,8 @@ const G_Game = {
   // the mouse captured or let go (or the controller's stand-in for that): into the game, or the pause menu
   lockChanged() {
     const real = document.pointerLockElement === G.R.renderer.domElement;
-    if (real) this.padLocked = false;
-    this.locked = real || this.padLocked;
+    if (real) this.softLocked = false;
+    this.locked = real || this.softLocked;
     // a lock asked for a moment ago (closing a menu, a click) can land after another menu has opened (Tab, Tab):
     // a menu keeps the mouse, so let it straight go again
     if (this.locked && this.menuOpen()) { this.unlock(); return; }
@@ -561,12 +578,12 @@ const G_Game = {
     else if (!this.chatOpen && !this.invOpen && !this.shopOpen && !this.aboxOpen) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
   },
   unlock() {
-    if (this.padLocked) { this.padLocked = false; this.lockChanged(); }
+    if (this.softLocked) { this.softLocked = false; this.lockChanged(); }
     if (document.pointerLockElement) document.exitPointerLock();
   },
   lock() {
     G.Audio.init();
-    if (G.Pad.active()) { if (!this.locked) { this.padLocked = true; this.lockChanged(); } return; }
+    if (G.Pad.active() || G.Touch.active()) { if (!this.locked) { this.softLocked = true; this.lockChanged(); } return; }
     const c = G.R.renderer.domElement;
     try {
       const p = c.requestPointerLock({ unadjustedMovement: true });
@@ -1419,7 +1436,7 @@ const G_Game = {
     const pro = !got ? '' : `<h4>Pro build</h4><div class="web-pro${A.proGot(id) ? ' got' : ''}" tabindex="0" title=""><b>${G.U.esc(P.name)}</b><ul>${parts}</ul>${A.proGot(id) ? `<label><input type="checkbox" data-armpro ${A.proOn(id) ? 'checked' : ''}> Start in pro mode</label>` : `<span>${Math.min(P.n, A.count(id, P.stat))}/${P.n}</span> ${G.U.esc(P.what)} with this gun`}</div>`;
     const was = el.querySelector('.web-world');
     el.innerHTML = `<div class="web-full"><div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
-        <div class="web-head"><h2>Your sidearm</h2><p>Drag to move · scroll to zoom · click a gun</p></div><button class="btn web-home" data-armhome>Back to the P9</button></div>
+        <div class="web-head"><h2>Your sidearm</h2><p>${G.Pad.text('Drag to move · scroll to zoom · click a gun')}</p></div><button class="btn web-home" data-armhome>Back to the P9</button></div>
       <aside class="web-side"><img src="${pic(id)}" alt=""><h3>${G.U.esc(d.name)}</h3><div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${G.U.fmt(Math.round(G.Ballistics.energy(d)))} J · ${d.rpm} rpm</span></div><em>${G.U.esc(d.desc)}</em>${ask}
         ${nextOn ? `<h4>With this gun</h4><ul class="web-next">${nextOn}</ul>` : ''}${pro}${others.length && got ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}
         <div class="web-foot"><p>Your own equipment, not a squad vote, and what you earn here stays yours. It starts loaded with ${((am: string) => am === 'tracer' ? 'tracers' : G.AMMO[am] && am !== G.ballFor(G.calOf(d)) ? G.AMMO[am].name + ' rounds' : 'buckshot')(A.startAm(id))}, two spare loads in your pocket.</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
@@ -1445,12 +1462,12 @@ const G_Game = {
       for (const [ev, on] of [['pointerover', true], ['pointerout', false], ['focusin', true], ['focusout', false]] as [string, boolean][]) el.addEventListener(ev, ((e: GmEvt) => { if (e.target.closest && e.target.closest('.web-pro')) preview(on); }) as EventListener);
       const go = (x: number, y: number) => { const v = this.armView, w = el.querySelector<HTMLElement>('.web-world'); this.armFrom = w ? w.style.transform : null; v.x = x * v.z; v.y = y * v.z; };
       el.addEventListener('pointerdown', ((e: GmEvt & PointerEvent) => {
-        if (e.button !== 0 || !e.target.closest('.web-view') || e.target.closest('.web-home')) return;
+        if (e.button !== 0 || !e.isPrimary || !e.target.closest('.web-view') || e.target.closest('.web-home')) return;
         drag = { x: e.clientX, y: e.clientY, vx: this.armView.x, vy: this.armView.y }; moved = false;
         const w = el.querySelector('.web-world'); if (w) w.classList.remove('glide');
       }) as EventListener);
       window.addEventListener('pointermove', (e) => {
-        if (!drag) return;
+        if (!drag || !e.isPrimary) return;
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         if (Math.hypot(dx, dy) > 5) moved = true;
         if (moved) { const v = this.armView, R = 1050 * v.z; v.x = G.U.clamp(drag.vx + dx, -R, R); v.y = G.U.clamp(drag.vy + dy, -R, R); this.armPlace(); }
@@ -1512,7 +1529,7 @@ const G_Game = {
     const boss = opts.length === 1 && rm.nodes.get(opts[0])!.boss;
     this.$('routeTitle').innerHTML = `Act ${rm.act} <span>— level ${this.level}${boss ? ' <b class="red">(BOSS)</b>' : ''}</span>`;
     const ids = Object.keys(this.roster || {}), voted = ids.filter((id) => st.votes[id] != null).length;
-    this.$('routeMsg').innerHTML = mine == null ? (boss ? 'The Kingpin is waiting. Click the node to go in.' : !st.path.length ? `The way in: ${G.U.esc(G.THEMES[rm.nodes.get(opts[0])!.th].name)}. Click it to deploy; the routes split after it.` : 'Pick where to deploy next: click one of the lit nodes. Each path decides the environments ahead.')
+    this.$('routeMsg').innerHTML = mine == null ? G.Pad.text(boss ? 'The Kingpin is waiting. Click the node to go in.' : !st.path.length ? `The way in: ${G.U.esc(G.THEMES[rm.nodes.get(opts[0])!.th].name)}. Click it to deploy; the routes split after it.` : 'Pick where to deploy next: click one of the lit nodes. Each path decides the environments ahead.')
       : ids.length > 1 ? `Voted. Waiting for the squad (${voted}/${ids.length}); most votes wins, ties are a coin toss.` : 'Deploying...';
     if (opts.some((o) => rm.nodes.get(o)!.stronghold)) this.$('routeMsg').innerHTML += `<div class="arm-squad"><b class="red">! Stronghold</b> (red badge): no civilians, about half as many suspects again, +¢${G.Route.strongholdPay(this.level)} for clearing it.</div>`;
     if (opts.some((o) => rm.nodes.get(o)!.night)) this.$('routeMsg').innerHTML += `<div class="arm-squad"><b>☾ Night</b> (moon badge): the lights are out bar the emergency lights. Suspects can hardly see you in the dark, unless you show a light; you'll want yours.</div>`;
@@ -1638,6 +1655,7 @@ const G_Game = {
     const raw = now - this.last, dt = Math.min(raw / 1000, 0.05);
     this.last = now;
     G.Pad.update(dt); // (before anything reads the controls this frame)
+    G.Touch.update(dt);
     G.Ambience.update(dt, this.phase === 'level' ? this.map : null, G.R.camera); // the place's own sound (js/ambience.ts), for where you are in it
     if (this.phase === 'level') {
       if (G.Net.isHost && !this.hub) G.Views.boresOut(); // (the suspects' guns as they were last drawn, to the simulation: before anything moves this frame)
