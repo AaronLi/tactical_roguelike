@@ -10,7 +10,7 @@ type PadDir = [number, number];
 const G_Pad = (() => {
   const BTNS: PadBtn[] = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'VIEW', 'MENU', 'L3', 'R3', 'UP', 'DOWN', 'LEFT', 'RIGHT'];
   const DIRS: Partial<Record<PadBtn, PadDir>> = { UP: [0, -1], DOWN: [0, 1], LEFT: [-1, 0], RIGHT: [1, 0] };
-  const DEAD_MOVE = 0.18, DEAD_LOOK = 0.14, LOOK_YAW = 3.4, LOOK_PITCH = 2.3, LOOK_UNITS = 700; // (full stick: rad/s, each way. LOOK_UNITS: "pixels"/s, what the comms wheel's picked by)
+  const DEAD_MOVE = 0.05, DEAD_LOOK = 0.05, LOOK_YAW = 3.4, LOOK_PITCH = 2.3, LOOK_UNITS = 700; // (full stick: rad/s, each way. LOOK_UNITS: "pixels"/s, what the comms wheel's picked by)
   const LOOK_CURVE = 2.2, CURSOR = 1150, SCROLL = 1000, HOLD = 0.35, REPEAT0 = 0.36, REPEAT = 0.11;
   // what a button is, in a level (RB held: the second column). A key held for as long as the button is, so R's tap, double tap and hold all still work.
   const KEYS: Partial<Record<PadBtn, string>> = { X: 'KeyR', UP: 'KeyN', DOWN: 'Space', LEFT: 'KeyQ', RIGHT: 'KeyE', R3: 'KeyV', VIEW: 'Tab' };
