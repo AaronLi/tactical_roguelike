@@ -20,7 +20,7 @@ type GmPhase = 'menu' | 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 // the full-screen panels this.screen shows one of (index.html)
 type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause' | 'career';
 // the sliders in the menu, and the keys they keep in storage
-type GmSetting = 'sens' | 'fov' | 'vol' | 'loadKit';
+type GmSetting = 'sens' | 'padSens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
 type GmMsgKind = 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
@@ -42,6 +42,7 @@ const G_Game = {
   enemiesLeft: 0,
   chatOpen: false,
   locked: false,
+  padLocked: false, // (playing on a controller, with no pointer lock to be had from a button press: counts as locked; js/gamepad.ts)
   runStarted: false,
   // the rest of what it keeps, made as it goes (init and the methods below): all here, so its whole shape is in one place. Those marked (init)
   // are always set before anything reads them.
@@ -97,7 +98,7 @@ const G_Game = {
     G.Stickers.load().then((names) => G.ServerLink.stickers(names)); // (which stickers there are: js/stickers.ts; the sticker box hands out one of them)
     G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
     G.Hangar.load(); // (the hangar's baked scene, parsed as soon as the bundle's in: js/hangar.ts; what enters the game waits for it, needModels)
-    this.settings = { sens: G.U.store.get('sens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
+    this.settings = { sens: G.U.store.get('sens', 1), padSens: G.U.store.get('padSens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
     G.U.store.set('name', this.myName, true); // (kept: the same name after a refresh, so the squad knows who's back. auto: a made-up one doesn't outweigh an account's, js/cloud.ts)
     // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.ts). prefAnimals is your preference, every
@@ -109,6 +110,7 @@ const G_Game = {
     G.R.init();
     G.HUD.init();
     G.Me.bindInput();
+    G.Pad.init();
     G.Shop.bind();
     G.Audio.vol = this.settings.vol;
     G.Audio.muted = new URLSearchParams(location.search).has('mute') || G.U.store.get('muted', false);
@@ -246,11 +248,11 @@ const G_Game = {
   // what's kept changed under the game (the cloud saves merged an account's in: js/cloud.ts): read again, the menu's controls with it
   applyStored(keys: string[]) {
     const S = G.U.store, has = (k: string) => keys.includes(k);
-    for (const k of ['sens', 'fov', 'vol', 'loadKit'] as GmSetting[]) if (has(k)) {
+    for (const k of ['sens', 'padSens', 'fov', 'vol', 'loadKit'] as GmSetting[]) if (has(k)) {
       const v = +S.get(k, this.settings[k]); if (!isFinite(v)) continue;
       this.settings[k] = v;
       for (const id of [k, k + '2']) { const el = this.$<HTMLInputElement>(id); if (el) el.value = String(v); }
-      const lab = this.$(k + 'Val'); if (lab) lab.textContent = k === 'sens' ? v.toFixed(2) : k === 'fov' ? v + '°' : k === 'vol' ? Math.round(v * 100) + '%' : lab.textContent;
+      const lab = this.$(k + 'Val'); if (lab) lab.textContent = k === 'sens' || k === 'padSens' ? v.toFixed(2) : k === 'fov' ? v + '°' : k === 'vol' ? Math.round(v * 100) + '%' : lab.textContent;
       if (k === 'vol') G.Audio.setVolume(v);
     }
     if (has('muted') && !new URLSearchParams(location.search).has('mute')) { const m = !!S.get('muted', false); G.Audio.setMuted(m); this.$<HTMLInputElement>('mute').checked = m; }
@@ -412,6 +414,7 @@ const G_Game = {
       if (this.$(key + 'Val')) this.$(key + 'Val').textContent = fmt(this.settings[key]);
     };
     bindRange(['sens', 'sens2'], 'sens', (v) => v.toFixed(2));
+    bindRange(['padSens', 'padSens2'], 'padSens', (v) => v.toFixed(2));
     bindRange(['fov', 'fov2'], 'fov', (v) => v + '°');
     bindRange(['vol', 'vol2'], 'vol', (v) => Math.round(v * 100) + '%', (v) => G.Audio.setVolume(v));
 
@@ -449,20 +452,13 @@ const G_Game = {
     this.$('btnNewRun').onclick = () => { if (G.Net.isHost) G.Net.toHost({ t: 'toLobby' }); };
     this.$('btnMenu').onclick = () => this.toMenu();
     this.$('clickToPlay').onclick = () => this.lock();
-    G.R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && !this.locked) this.lock(); });
+    G.R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.padLocked)) this.lock(); });
 
-    document.addEventListener('pointerlockchange', () => {
-      this.locked = document.pointerLockElement === G.R.renderer.domElement;
-      // a lock asked for a moment ago (closing a menu, a click) can land after another menu has opened (Tab, Tab):
-      // a menu keeps the mouse, so let it straight go again
-      if (this.locked && this.menuOpen()) { document.exitPointerLock(); return; }
-      if (this.phase !== 'level') return;
-      if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
-      else if (!this.chatOpen && !this.invOpen && !this.shopOpen && !this.aboxOpen) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
-    });
+    document.addEventListener('pointerlockchange', () => this.lockChanged());
 
     window.addEventListener('keydown', (e) => {
       if (this.phase !== 'level') return;
+      if (e.code === 'Escape' && this.padLocked && !this.menuOpen()) { this.unlock(); return; } // (no pointer lock for the browser's own Esc to let go)
       // in the hangar: Esc puts a shop panel away, and Tab is your stash and loadout (the panel's Kit tab), not the field kit
       if (this.hub) {
         if (e.code === 'Escape' && this.shopOpen) { this.closeShop(); return; }
@@ -495,7 +491,7 @@ const G_Game = {
     G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
     G.Shop.tab = tab || 'stock'; G.Shop.title = title || null;
     this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
-    if (document.pointerLockElement) document.exitPointerLock();
+    this.unlock();
     this.screen('shop');
     G.Shop.render();
     G.HUD.setPrompt('');
@@ -543,7 +539,7 @@ const G_Game = {
       this.$('fiScore').innerHTML = G.HUD.scoreboardHTML();
       G.InvUI.show(this.$('fiBody'), { field: true, patient: opts && opts.patient, cab: opts && opts.cab });
       this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
-      if (document.pointerLockElement) document.exitPointerLock();
+      this.unlock();
     } else {
       G.InvUI.hide();
       if (this.phase !== 'level') return;
@@ -552,8 +548,25 @@ const G_Game = {
       setTimeout(() => { if (!this.locked && !this.invOpen && this.phase === 'level') this.$('clickToPlay').classList.remove('hidden'); }, 300);
     }
   },
+  // the mouse captured or let go (or the controller's stand-in for that): into the game, or the pause menu
+  lockChanged() {
+    const real = document.pointerLockElement === G.R.renderer.domElement;
+    if (real) this.padLocked = false;
+    this.locked = real || this.padLocked;
+    // a lock asked for a moment ago (closing a menu, a click) can land after another menu has opened (Tab, Tab):
+    // a menu keeps the mouse, so let it straight go again
+    if (this.locked && this.menuOpen()) { this.unlock(); return; }
+    if (this.phase !== 'level') return;
+    if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
+    else if (!this.chatOpen && !this.invOpen && !this.shopOpen && !this.aboxOpen) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
+  },
+  unlock() {
+    if (this.padLocked) { this.padLocked = false; this.lockChanged(); }
+    if (document.pointerLockElement) document.exitPointerLock();
+  },
   lock() {
     G.Audio.init();
+    if (G.Pad.active()) { if (!this.locked) { this.padLocked = true; this.lockChanged(); } return; }
     const c = G.R.renderer.domElement;
     try {
       const p = c.requestPointerLock({ unadjustedMovement: true });
@@ -691,7 +704,7 @@ const G_Game = {
     this.map = null;
     this.phase = 'menu';
     this.setAnimal(this.prefAnimals[0]); // (back to yours: the host's pick was for that session)
-    if (document.pointerLockElement) document.exitPointerLock();
+    this.unlock();
     this.veil(false, true);
     this.screen('menu');
     this.menuBackdrop();
@@ -1075,7 +1088,7 @@ const G_Game = {
     this.toggleInv(false);
     this.leaveHub();
     this.phase = 'lobby';
-    if (document.pointerLockElement) document.exitPointerLock();
+    this.unlock();
     G.Views.clearLevel();
     if (!this.map && !(G.MenuShow && G.MenuShow.live)) this.menuBackdrop(); // (the menu's guns go on behind the lobby too: showcaseBehind; the level's only built for it if they're not up yet)
     this.screen('lobby');
@@ -1133,7 +1146,7 @@ const G_Game = {
     this.aboxOpen = true;
     G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
     this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
-    if (document.pointerLockElement) document.exitPointerLock();
+    this.unlock();
     const el = this.$('aboxPick');
     el.classList.remove('hidden');
     if (!el.dataset.bound) { el.dataset.bound = 1 as unknown as string; el.addEventListener('click', ((e: GmEvt) => this.aboxClick(e)) as EventListener); el.addEventListener('mouseover', ((e: GmEvt) => this.aboxHover(e)) as EventListener); }
@@ -1362,7 +1375,7 @@ const G_Game = {
     this.hub = false; // (the hangar stays up behind the map: G.Hangar.leave when the level replaces it)
     this.phase = 'route';
     this.level = level;
-    if (document.pointerLockElement) document.exitPointerLock();
+    this.unlock();
     this.$('clickToPlay').classList.add('hidden');
     G.Views.clearLevel();
     if (!this.map && !(G.MenuShow && G.MenuShow.live)) this.menuBackdrop();
@@ -1603,7 +1616,7 @@ const G_Game = {
     this.closeShop();
     this.hub = false;
     this.phase = 'gameover';
-    if (document.pointerLockElement) document.exitPointerLock();
+    this.unlock();
     this.$('clickToPlay').classList.add('hidden');
     this.screen('gameover');
     this.$('goSub').textContent = `Your squad fell on level ${m.level}.`;
@@ -1624,6 +1637,7 @@ const G_Game = {
     const now = performance.now();
     const raw = now - this.last, dt = Math.min(raw / 1000, 0.05);
     this.last = now;
+    G.Pad.update(dt); // (before anything reads the controls this frame)
     G.Ambience.update(dt, this.phase === 'level' ? this.map : null, G.R.camera); // the place's own sound (js/ambience.ts), for where you are in it
     if (this.phase === 'level') {
       if (G.Net.isHost && !this.hub) G.Views.boresOut(); // (the suspects' guns as they were last drawn, to the simulation: before anything moves this frame)

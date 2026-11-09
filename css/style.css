@@ -1022,3 +1022,28 @@ i.c.heavy { background: #a02828; } i.c.light { background: #7a3a30; } i.c.frac {
 .reg-offer .acct-row input { font-size: 15px; padding: 9px 12px; }
 .menu-box label.reg-never { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; text-transform: none; letter-spacing: 0.5px; font: 300 13px var(--ui-font); cursor: pointer; }
 .reg-never input { width: auto; }
+/* a controller (js/gamepad.ts): the focus ring and cursor, the hints along the bottom, the keyboard on the screen, and button faces in the prompts */
+.pad-only { display: none; }
+body.pad-on .pad-only { display: inline; }
+body.pad-on .kb-only { display: none; }
+body.pad-on, body.pad-on canvas { cursor: none; }
+#padRing, #padCursor { position: fixed; pointer-events: none; display: none; z-index: 9000; }
+#padRing.on, #padCursor.on { display: block; }
+#padRing { box-sizing: border-box; border: 2px solid #fff; border-radius: 4px; box-shadow: 0 0 0 1px rgba(0,0,0,0.7), 0 0 10px rgba(255,255,255,0.45); }
+#padCursor { left: -7px; top: -7px; width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.9); border: 2px solid rgba(0,0,0,0.75); box-sizing: border-box; }
+#padHints { position: fixed; left: 50%; bottom: 6px; transform: translateX(-50%); z-index: 8990; display: none; padding: 4px 12px; border-radius: 14px; background: rgba(8,10,13,0.82); color: #dfe3e6; font: 400 12px var(--ui-font); white-space: nowrap; pointer-events: none; }
+#padHints.on { display: block; }
+.pad-warn { color: #ffcf6a; }
+.pad-g { display: inline-block; min-width: 1.35em; padding: 0 0.3em; box-sizing: border-box; border-radius: 0.8em; background: #e9edf0; color: #14161a; font-weight: 600; font-size: 0.85em; line-height: 1.35em; text-align: center; font-style: normal; }
+.pad-a { background: #6ec45a; } .pad-b { background: #e8604f; } .pad-x { background: #4f9de8; } .pad-y { background: #eec545; }
+#padKeys { position: fixed; inset: 0; z-index: 8000; display: flex; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); }
+.osk-box { padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; background: var(--ui-panel-solid); }
+.osk-what { font: 500 11px var(--ui-font); letter-spacing: 2.5px; text-transform: uppercase; color: var(--ui-dim); }
+.osk-text { min-height: 30px; padding: 5px 10px; font: 400 20px var(--ui-font); color: var(--ui-text); border: 1px solid var(--ui-line); white-space: pre; overflow: hidden; }
+.osk-text i { display: inline-block; width: 2px; height: 1em; margin-left: 1px; vertical-align: text-bottom; background: var(--ui-text); }
+.osk-row { display: flex; justify-content: center; gap: 5px; }
+.osk-row .btn { min-width: 58px; padding: 9px 6px; letter-spacing: 1px; text-transform: none; }
+.osk-row .btn.on { background: var(--ui-fill-hi); }
+.osk-row .osk-wide { flex: 1; }
+/* a Steam Deck's 1280x800, and a laptop's short screen: the tall menus keep to it, and scroll */
+@media (max-height: 820px) { .menu-box { max-height: calc(100vh - 28px); overflow-y: auto; box-sizing: border-box; padding-top: 22px; padding-bottom: 22px; } }

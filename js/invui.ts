@@ -1016,6 +1016,7 @@ const G_InvUI = (() => {
     // the health panel only (kept fresh while the field screen is open, without disturbing a drag)
     update,
     get busy() { return jobs.length > 0; },
+    get dragCell() { return drag ? C : 0; }, // (carrying something: how far a cell is, for a controller's D-pad)
     tick() { if (field) paintHealth(); },
     get field() { return field; },
     get cab() { return cab; },

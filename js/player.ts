@@ -59,6 +59,7 @@ const G_Me = {
   PRONE_T: 0.8, // getting down onto your front, or back up (s): no shooting meanwhile
   LEAN: 0.38, // metres the head moves sideways at full lean
   mouse: { l: false, r: false },
+  padMove: null as { st: number; fw: number; k: number } | null, // (the left stick, this frame: js/gamepad.ts)
   pos: null as unknown as THREE.Vector3,
   vel: null as unknown as THREE.Vector3,
   yaw: 0,
@@ -343,7 +344,7 @@ const G_Me = {
     let el = document.getElementById('commWheel');
     if (!el) { el = document.createElement('div'); el.id = 'commWheel'; document.body.appendChild(el); }
     const N = this.wheel.items.length;
-    el.innerHTML = this.wheel.items.map((it: { off?: boolean; label: string; sub: string }, i: number) => { const a = (i / N) * Math.PI * 2 - Math.PI / 2; return `<div class="cw-it${it.off ? ' off' : ''}" style="left:calc(50% + ${(Math.cos(a) * 118).toFixed(1)}px);top:calc(50% + ${(Math.sin(a) * 118).toFixed(1)}px)"><b>${it.label}</b><small>${it.sub}</small></div>`; }).join('') + '<i class="cw-ptr"></i>';
+    el.innerHTML = this.wheel.items.map((it: { off?: boolean; label: string; sub: string }, i: number) => { const a = (i / N) * Math.PI * 2 - Math.PI / 2; return `<div class="cw-it${it.off ? ' off' : ''}" style="left:calc(50% + ${(Math.cos(a) * 118).toFixed(1)}px);top:calc(50% + ${(Math.sin(a) * 118).toFixed(1)}px)"><b>${it.label}</b><small>${G.Pad.text(it.sub)}</small></div>`; }).join('') + '<i class="cw-ptr"></i>';
     el.classList.add('on');
     G.Audio.click();
   },
@@ -505,7 +506,7 @@ const G_Me = {
     window.addEventListener('keyup', (e) => { this.keys[e.code] = false; if (e.code === 'KeyR') this.rRelease(); });
     window.addEventListener('blur', () => { this.keys = {}; this.mouse.l = this.mouse.r = false; this.midAt = 0; if (this.wheel) this.wheelClose(false); });
     window.addEventListener('mousedown', (e) => {
-      if (!G.Game.locked || G.Game.menuOpen()) return;
+      if (!G.Game.locked || G.Game.menuOpen() || (e.isTrusted && G.Game.padLocked)) return;
       if (e.button === 0) { this.mouse.l = true; this.pressBuf = 0.15; if (this.dead) this.specIdx++; }
       if (e.button === 2) this.mouse.r = true;
       if (e.button === 1) { // the middle button: a tap pings, held it opens the comms wheel (wheelOpen)
@@ -529,7 +530,7 @@ const G_Me = {
     // the wheel: while aiming through a variable scope or a magnifier, steps the power (up: more); otherwise
     // swaps weapons
     window.addEventListener('wheel', (e) => {
-      if (!G.Game.locked || G.Game.phase !== 'level' || Math.abs(e.deltaY) <= 5) return;
+      if (!G.Game.locked || G.Game.phase !== 'level' || Math.abs(e.deltaY) <= 5 || (e.isTrusted && G.Game.padLocked)) return;
       const w = this.cur(), L = w && w.def.magLevels;
       if (L && this.ads && this.adsT > 0.5) {
         const i = this.sight(w).i, n = G.U.clamp(i + (e.deltaY < 0 ? 1 : -1), 0, L.length - 1);
@@ -538,18 +539,20 @@ const G_Me = {
       }
       this.swap(this.slot === 'p' ? 's' : 'p');
     });
-    document.addEventListener('mousemove', (e) => {
-      if (!G.Game.locked || this.dead || this.out) return; // (out cold: no looking round)
-      if (this.wheel) { this.wheelMove(e.movementX, e.movementY); return; } // (the comms wheel open: the mouse picks on it)
-      const z = this.viewer ? 1 / this.VIEWER.MAG : G.U.lerp(1, this.sight(this.cur()).zoom, this.adsT || 0); // (a viewer's magnification slows the view as much)
-      const s = 0.0022 * G.Game.settings.sens * z;
-      // a magazine in your hand, or the gun held open for a chamber check: the mouse turns that, not your view
-      const mc = this.magChk;
-      if (mc && !mc.rel && mc.k > 0.6) { mc.yaw = G.U.clamp(mc.yaw + e.movementX * s * 1.6, -1.4, 1.4); mc.pitch = G.U.clamp(mc.pitch + e.movementY * s * 1.6, -0.8, 1.4); return; }
-      if (this.inspHold || (this.rChk && !this.rChk.rel && this.rChk.k > 0.6)) { this.inspYaw = G.U.clamp((this.inspYaw || 0) + e.movementX * s * 1.4, -1.5, 1.5); this.inspPitch = G.U.clamp((this.inspPitch || 0) + e.movementY * s, -0.6, 0.6); return; } // (inspYaw: the roll)
-      this.yaw -= e.movementX * s;
-      this.pitch = G.U.clamp(this.pitch - e.movementY * s, -1.5, 1.5);
-    });
+    document.addEventListener('mousemove', (e) => { if (!(e.isTrusted && G.Game.padLocked)) this.lookBy(e.movementX, e.movementY, 0.0022 * G.Game.settings.sens); });
+  },
+  // the mouse, or the right stick (js/gamepad.ts), moved by dx, dy; sens: how far a unit of that turns the view, in radians
+  lookBy(dx: number, dy: number, sens: number) {
+    if (!G.Game.locked || this.dead || this.out) return; // (out cold: no looking round)
+    if (this.wheel) { this.wheelMove(dx, dy); return; } // (the comms wheel open: the mouse picks on it)
+    const z = this.viewer ? 1 / this.VIEWER.MAG : G.U.lerp(1, this.sight(this.cur()).zoom, this.adsT || 0); // (a viewer's magnification slows the view as much)
+    const s = sens * z;
+    // a magazine in your hand, or the gun held open for a chamber check: the mouse turns that, not your view
+    const mc = this.magChk;
+    if (mc && !mc.rel && mc.k > 0.6) { mc.yaw = G.U.clamp(mc.yaw + dx * s * 1.6, -1.4, 1.4); mc.pitch = G.U.clamp(mc.pitch + dy * s * 1.6, -0.8, 1.4); return; }
+    if (this.inspHold || (this.rChk && !this.rChk.rel && this.rChk.k > 0.6)) { this.inspYaw = G.U.clamp((this.inspYaw || 0) + dx * s * 1.4, -1.5, 1.5); this.inspPitch = G.U.clamp((this.inspPitch || 0) + dy * s, -0.6, 0.6); return; } // (inspYaw: the roll)
+    this.yaw -= dx * s;
+    this.pitch = G.U.clamp(this.pitch - dy * s, -1.5, 1.5);
   },
 
   // ------------------------------------------------------------- lifecycle
@@ -693,12 +696,14 @@ const G_Me = {
     if (this.climb) { this.climbStep(dt); return; } // (on the ladder, likewise)
     if (this.viewer) { // (at a viewer: standing still, till you walk off)
       const k = this.keys;
-      if (k.KeyW || k.KeyA || k.KeyS || k.KeyD || this.down || this.dead) this.viewerOff();
+      if (k.KeyW || k.KeyA || k.KeyS || k.KeyD || this.padMove || this.down || this.dead) this.viewerOff();
       else { this.vel.set(0, 0, 0); this.hspeed = 0; return; }
     }
     const k = this.keys, blocked = this.down || G.Game.chatOpen || !G.Game.locked || !!(this.action && (this.action.kind === 'zip' || this.action.kind === 'bag'));
     let fw = blocked ? 0 : (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
     let st = blocked ? 0 : (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
+    const pm = blocked ? null : this.padMove; // (a stick pushed part of the way: part of the speed, below)
+    if (pm) { fw += pm.fw; st += pm.st; }
     // Space: weapon to low ready, move quicker, can't shoot. Shift: creep with the weapon steadied.
     const wasLow = this.lowReady;
     if (this.mouse.l || this.mouse.r || this.down || this.stowed) this.lowToggle = false; // firing or aiming brings the weapon up
@@ -710,6 +715,7 @@ const G_Me = {
     if (this.prone) speed = this.stanceT > 0 ? 0 : this.SPEED.prone; // (a crawl; nothing while getting down or up)
     else if (this.crouch) speed = Math.min(speed, this.SPEED.crouch) * (this.lowReady ? 1.3 : this.steadying ? 0.75 : 1);
     speed *= this.speedMult();
+    if (pm) speed *= pm.k;
     if (this.adsT > 0.5) speed *= 0.55; // aimed walk
     if (Math.abs(this.lean || 0) > 0.3) speed *= 0.7;
     const sy = Math.sin(this.yaw), cy = Math.cos(this.yaw);
