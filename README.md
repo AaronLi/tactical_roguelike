@@ -2247,7 +2247,7 @@ On a phone or a tablet the controls are on the screen from the start; on a lapto
 | Crouch | Tap: crouch; hold: prone |
 | Lean L / Lean R (hold) | Lean |
 | More | Ping (hold: comms wheel, drag to pick), shout, steady, lowered weapon, prone, fire mode, inspect, backpack swap, night vision, IR, thermal palette, body and kit, mute, vote |
-| Full, Chat, Kit, Menu | Fullscreen on or off (also in the menu and pause screens, where the browser has it), chat, inventory, pause |
+| Full, Chat, Kit, Menu | Fullscreen on or off (also in the menu and pause screens; an iPhone only goes fullscreen from the Home Screen: Share, Add to Home Screen, and the button says so), chat, inventory, pause |
 
 In the menus a long press is the right click and shows what hovering would; two quick taps are the double click; a second finger turns what you carry; two fingers zoom the gunsmith and the sidearm web; on the route map the first tap shows a node's card and the second picks it. On a phone the 3D renders at a lower resolution (the HUD stays sharp). `?touch` in the URL keeps the touch controls on.
 

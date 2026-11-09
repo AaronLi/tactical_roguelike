@@ -5,6 +5,14 @@
 <link rel="icon" href="data:,">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <title>Breach Protocol</title>
+<!-- the game as an app of its own, from the Home Screen: on an iPhone the only way a page can fill the screen (js/touch.ts) -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="assets/icons/icon-180.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Breach">
+<meta name="theme-color" content="#0b0d10">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@200;300;400;500;600&amp;display=swap">
 <link rel="stylesheet" href="css/style.css">
@@ -60,7 +68,7 @@
         <div class="turn-row"><input id="turnUrl" placeholder="turn:host:3478"><input id="turnUser" placeholder="username"><input id="turnPass" type="password" placeholder="password"></div>
       </div>
       <div class="controls touch-only">
-        <b>Left side of the screen</b> drag to move: a little is a slow steady walk, most of the way a walk, all the way forward the low-ready run &middot; <b>right side</b> drag to look (a finger on Fire, Aim or Ping turns the view too) &middot; <b>Fire</b> on either side &middot; <b>Full</b> fullscreen on or off &middot; <b>Aim</b> tap to stay up, hold for as long as you hold &middot; <b>Use</b> hold to interact (lit when there's something to use) &middot; <b>Crouch</b> tap, hold for prone &middot; <b>Reload</b> tap, tap twice for a dump reload, hold to check the magazine &middot; <b>Nade</b> the next grenade, then back to the gun &middot; <b>More</b> ping (hold: comms wheel), shout, steady, lowered weapon, fire mode, inspect, backpack swap, night vision, mute, vote<br>
+        <b>Left side of the screen</b> drag to move: a little is a slow steady walk, most of the way a walk, all the way forward the low-ready run &middot; <b>right side</b> drag to look (a finger on Fire, Aim or Ping turns the view too) &middot; <b>Fire</b> on either side &middot; <b>Full</b> fullscreen on or off (iPhone: Share, then Add to Home Screen, and open it from there) &middot; <b>Aim</b> tap to stay up, hold for as long as you hold &middot; <b>Use</b> hold to interact (lit when there's something to use) &middot; <b>Crouch</b> tap, hold for prone &middot; <b>Reload</b> tap, tap twice for a dump reload, hold to check the magazine &middot; <b>Nade</b> the next grenade, then back to the gun &middot; <b>More</b> ping (hold: comms wheel), shout, steady, lowered weapon, fire mode, inspect, backpack swap, night vision, mute, vote<br>
         <b>Menus</b>: long-press for what right-click and hover show &middot; double-tap opens a pouch &middot; drag to carry, a second finger turns what you carry &middot; pinch to zoom the gunsmith and the sidearm web &middot; on the route map, tap a node for its card and again to go. Sideways is the better way to play on a phone.
       </div>
       <div class="controls not-touch">

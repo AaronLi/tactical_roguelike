@@ -223,7 +223,8 @@ const G_Touch = (() => {
     window.addEventListener('pointermove', onMove);
     window.addEventListener('blur', () => { if (on && wasPlay) releaseAll(); });
     // the chat's opened on the click: a phone only brings its keyboard up for a focus inside a real tap
-    // Fullscreen, on the click (the browser only allows it inside a real tap); not offered where there's none to be had (iPhones)
+    // Fullscreen, on the click (the browser only allows it inside a real tap). An iPhone has none for a page: there the game fills the screen when it's opened from the Home Screen
+    // (manifest.json), so the button says how, and goes once it's been done
     const fsBtns = [btn.fs, ...document.querySelectorAll<HTMLElement>('[data-fs]')];
     const root = document.documentElement as HTMLElement & { webkitRequestFullscreen?: () => void }, d = document as Document & { webkitFullscreenElement?: Element; webkitExitFullscreen?: () => void };
     const can = !!(root.requestFullscreen || root.webkitRequestFullscreen), isFs = () => !!(document.fullscreenElement || d.webkitFullscreenElement);
@@ -232,7 +233,9 @@ const G_Touch = (() => {
       if (isFs()) { if (document.exitFullscreen) document.exitFullscreen().catch(() => {}); else if (d.webkitExitFullscreen) d.webkitExitFullscreen(); return; }
       if (root.requestFullscreen) root.requestFullscreen({ navigationUI: 'hide' }).catch(() => G.HUD.toast('', "This browser wouldn't go fullscreen", 2)); else if (root.webkitRequestFullscreen) root.webkitRequestFullscreen();
     };
-    for (const e of fsBtns) { if (can) e.addEventListener('click', toggleFs); else e.classList.add('hidden'); }
+    const standalone = matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || !!(navigator as Navigator & { standalone?: boolean }).standalone;
+    const howTo = (e: MouseEvent) => showTip('On an iPhone a game fills the screen only from the Home Screen. In Safari tap Share, then Add to Home Screen, and open Breach from there.', e.clientX || innerWidth / 2, e.clientY || innerHeight / 2);
+    for (const e of fsBtns) { if (can) e.addEventListener('click', toggleFs); else if (standalone) e.classList.add('hidden'); else e.addEventListener('click', howTo); }
     for (const ev of ['fullscreenchange', 'webkitfullscreenchange']) document.addEventListener(ev, fsLabel);
     btn.chat.addEventListener('click', () => { S().tap('Enter'); (document.getElementById('chatInput') as HTMLInputElement).focus(); });
 
