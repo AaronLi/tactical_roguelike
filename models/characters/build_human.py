@@ -162,7 +162,7 @@ def sphere(r, sub, scale=(1, 1, 1), at=(0, 0, 0)):
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=r)
     for v in bm.verts: v.co = V((v.co.x * scale[0] + at[0], v.co.y * scale[1] + at[1], v.co.z * scale[2] + at[2]))
     return bm
-EYE = [V((s * 0.0315, -0.0705, 0.004)) for s in (1, -1)]  # (R, L), in the head's own frame
+EYE = [V((s * 0.0315, -0.074, 0.004)) for s in (1, -1)]  # (R, L), in the head's own frame
 def build_head(at):
     bm = head_mesh(5); me = bpy.data.meshes.new('head'); bm.to_mesh(me); bm.free()
     h = link('head', me)
@@ -191,7 +191,7 @@ def build_head(at):
         for v in b2.verts: v.co = V((v.co.x * 0.007 + s * 0.0745 - s * 0.006 * max(0, -v.co.y), v.co.y * 0.016 + 0.012, v.co.z * 0.03 - 0.01))
         add(b2, 'skin')
     for e in EYE:
-        for lo, hi in ((0.0068, 1), (-1, -0.0086)):
+        for lo, hi in ((0.0042, 1), (-1, -0.0078)):
             b2 = sphere(0.0151, 2); bmesh.ops.delete(b2, geom=[v for v in b2.verts if not (lo <= v.co.z <= hi and v.co.y < 0.003)], context='VERTS')
             for v in b2.verts: v.co += e
             add(b2, 'skin')
