@@ -479,6 +479,7 @@ const G_Me = {
       if (isGameKey(e.code)) e.preventDefault();
       if (e.repeat) return;
       this.keys[e.code] = true;
+      if (G.Space.key(e.code)) return; // (in a seat of the squad's ship: the key is hers)
       if (!G.Game.locked) return;
       switch (e.code) {
         case 'Digit1': this.swap('p'); break;
@@ -685,7 +686,7 @@ const G_Me = {
     // belted into a seat in the helicopter (the hangar's, or the one that's brought you in): nowhere to go, the view turned
     // no further than a head turns
     if (this.seat != null) {
-      const sp = (G.Game.hub ? G.Hangar : G.Landing).seatPos(this.seat);
+      const sp = (G.Space.on() ? G.Space : G.Game.hub ? G.Hangar : G.Landing).seatPos(this.seat); // (a seat of the squad's ship: js/space.ts)
       this.pos.set(sp.x, sp.y, sp.z); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0;
       this.crouch = true; this.stowed = true; this.lowToggle = false;
       this.yaw = sp.yaw + G.U.clamp(G.U.angDiff(sp.yaw, this.yaw), -1.9, 1.9);
@@ -2405,6 +2406,8 @@ const G_Me = {
     const map = G.Game.map!, held = this.keys.KeyF && !G.Game.chatOpen;
     if (!held) this.fLatch = false;
     const F = held && !this.fLatch;
+    // the squad's ship and a mission's things (js/space.ts): her seats, the helm, the missions terminal, the artifact...
+    { const so = G.Space.interact(this, dt, !!held, !!F); if (so) { G.HUD.setPrompt(so.prompt); G.HUD.setProgress(so.prog, so.label); return; } }
     // the hangar: look at what's for sale or what to use (js/hangar.ts)
     if (G.Game.hub) {
       const o = G.Hangar.interact(this, dt, held, F);
@@ -3165,7 +3168,7 @@ const G_Me = {
     return {
       p: [r2(this.pos.x), r2(this.pos.y), r2(this.pos.z)], yw: r2(this.yaw), pt: r2(this.pitch),
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
-      pr: this.prone ? 1 : 0, bp: this.bipodT > 0.5 ? 1 : 0, cl: this.climb ? 1 : 0, zp: this.zipRide ? 1 : 0, se: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
+      pr: this.prone ? 1 : 0, bp: this.bipodT > 0.5 ? 1 : 0, cl: this.climb ? 1 : 0, zp: this.zipRide ? 1 : 0, se: this.seat != null || G.Space.sealed() ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
       w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, ad: this.zipRide && (this.ads || this.sinceShot < 0.9) ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held || this.menuLook() ? 1 : 0, mn: this.menuLook() ? 1 : 0,
       hk: this.held ? (this.held.kind === 'flash' ? 2 : this.held.kind === 'tb' ? 3 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
       ra: this.act && this.cur().def.manual ? r2(Math.min(1, this.act.t)) : -1, ld: G.loaded(this.cur()) > 0 ? 1 : 0, nm: this.cur().noMag ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,

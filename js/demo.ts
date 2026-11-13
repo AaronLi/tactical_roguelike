@@ -88,7 +88,7 @@ const G_Demo = (() => {
   async function run() {
     const up = G.Me.update; G.Me.update = function (dt) { const r = up.call(this, dt); tick(dt); return r; };
     G.Game.solo(); await sleep(0.8);
-    G.Net.toHost({ t: 'startRun' }); // (the host's simulation, in its own thread: js/serverlink.ts)
+    G.Net.toHost({ t: 'startRun', dbg: { classic: true } }); // (the host's simulation, in its own thread: js/serverlink.ts)
     await untilReal(() => G.Game.phase === 'route' && G.Game.routeMap);
     const g0 = G.Game; g0.pickRoute(G.Route.options(g0.routeMap!, g0.routeSt!.path[g0.routeSt!.path.length - 1])[0]);
     await untilReal(() => G.Game.phase === 'level' && G.Me.kit);

@@ -410,6 +410,12 @@ const G_HUD = {
       const ids = Object.keys(Gm.roster || {}), ready = ids.filter((id) => Gm.roster[id].ready).length;
       obj = `<b>Kit up, then hold <b>F</b> on the helicopter</b><br><span style="opacity:0.75">Tab: your stash and loadout · ${ready}/${ids.length} ready</span>`;
     }
+    // the game in space (js/space.ts): the base, or a mission (whose own panel says what's wanted: js/spaceui.ts)
+    if (G.Space.on()) {
+      const s = G.Space.S;
+      this.set('levelInfo', Gm.hub ? `THE BASE <span>· ${s.docked ? 'ship on the pad' : 'under way'}</span>` : `${G.U.esc(s.ms ? s.ms.name : '')} <span>· ${Gm.map!.theme.name}</span>`);
+      obj = !Gm.hub ? '' : s.board.picked.length ? `<b>${s.board.picked.length} mission${s.board.picked.length > 1 ? 's' : ''} taken</b><br><span style="opacity:0.75">Board the ship by her ramp, take the helm, fly to an anchor</span>` : '<b>Take a mission at the board by the pad</b><br><span style="opacity:0.75">Tab: your stash and loadout</span>';
+    }
     this.set('objective', obj);
 
     // crosshair

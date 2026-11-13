@@ -15,6 +15,10 @@
 //   ?nofoes               nobody in the level; ?stronghold makes it one (js/route.ts); ?night makes it a night level
 //                         (the lights out: js/level.ts nightify)
 //   ?hangar               the hangar between levels instead of a level (the shop, the gunsmith, the range)
+//   ?fly                  the game in space (docs/space.md): at the helm of the squad's ship, lifting off the hangar's pad
+//   ?board=<size>         straight to a boarding mission: small, medium or large; &obj=artifact|hvt|destruct; &hull=0..2 whose ship;
+//                         &dock: already against her hull, standing in the airlock; &ship=<id> the squad's ship (kestrel, atlas, wraith)
+//   ?assault=<place>      straight to a planetary assault on that kind of place (&dock: set down on its pad)
 //   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
 // It plays as if the mouse were captured (no click-to-play screen). When it's there, window.__debugReady is true and
 // G.DebugStart.ready resolves: scripts wait on that. Add ?mute to keep it quiet.
@@ -100,15 +104,34 @@ const G_DebugStart = (() => {
     const th = themeOf(q.get('play')), lvl = q.has('level') ? Math.max(1, +q.get('level')! || 1) : null;
     G.Game.solo(); await sleep(0.8);
     // (the host's simulation is in its own thread, js/serverlink.ts: what's wanted of it is asked, as the lobby and the menus ask)
-    if (q.has('hangar')) {
-      G.Net.toHost({ t: 'startRun' });
-      await until(() => G.Game.phase === 'route');
-      arm();
-      G.Net.toHost({ t: 'toShop' });
-      await until(() => G.Game.hub && G.Me.pos);
+    const space = q.has('board') || q.has('assault') || q.has('fly');
+    if (q.has('hangar') || space) {
+      // (the game in space starts in the hangar: js/spaceserver.ts startRun)
+      G.Net.toHost({ t: 'startRun', dbg: q.has('ship') ? { fleet: { owned: [q.get('ship')], ship: q.get('ship') } } : undefined });
+      if (!G.SpaceData.ON) { await until(() => G.Game.phase === 'route'); arm(); G.Net.toHost({ t: 'toShop' }); }
+      await until(() => G.Game.hub && G.Me.pos && !G.Game.$('veil').classList.contains('on'), 30);
+      if (G.SpaceData.ON) arm();
+      const Sp = G.Space, helm = () => { (G.Me as any).fLatch = false; const m = G.Me as any, p = Sp.seatPos(0); m.seat = 0; m.pos.set(p.x, p.y, p.z); m.yaw = p.yaw; m.pitch = 0; m.crouch = true; m.stowed = true; Sp.S.ctl = G.Net.myId; G.Net.toHost({ t: 'seat', s: 0 }); };
+      if (q.has('board') || q.has('assault')) {
+        // straight to a mission: a ship to board (?board=small|medium|large, &obj=artifact|hvt|destruct) or a base (?assault=<place>), at
+        // the helm as she comes out of the jump; &dock: against the hull (or on the pad) already
+        const size = ['small', 'medium', 'large'].includes(q.get('board') || '') ? q.get('board') : 'small', pth = themeOf(q.get('assault'));
+        helm();
+        G.Net.toHost({ t: 'dbgMs', ms: { kind: q.has('assault') ? 'assault' : 'board', size, obj: q.get('obj'), th: q.has('assault') ? pth : q.has('hull') ? G.SpaceData.TH0 + (+q.get('hull')! || 0) : undefined, seed: q.has('seed') ? +q.get('seed')! : undefined, diff: lvl || 1, night: q.has('night'), fuse: q.has('fuse') ? +q.get('fuse')! : undefined } });
+        await until(() => !G.Game.hub && G.Game.phase === 'level' && Sp.S.on && Sp.S.kind !== 'hub' && !G.Game.$('veil').classList.contains('on'), 40);
+        if (q.get('gun') || q.get('gear')) arm();
+        if (q.has('dock')) {
+          await until(() => !Sp.S.ftl, 12);
+          if (Sp.S.kind === 'assault') { Sp.S.stage = 'atmo'; (Sp as any).dbgStage('atmo'); }
+          G.Net.toHost({ t: 'sdock', on: 1 }); (Sp as any).dbgDock();
+          await sleep(0.6); (G.Me as any).seat = null; G.Me.crouch = false; G.Me.stowed = false; G.Net.toHost({ t: 'seat', s: -1 });
+          const w = G.SpaceData.toWorld(Sp.S.berth, 0, G.SpaceData.FLOOR, Sp.S.kind === 'board' ? Sp.S.def.z0 - 1.5 : Sp.S.def.z1 - 1.5); G.Me.pos.set(w.x, w.y, w.z); G.Me.yaw = Sp.S.berth.yaw + (Sp.S.kind === 'board' ? 0 : Math.PI);
+        }
+        if (q.has('nofoes')) { G.Net.toHost({ t: 'noFoes' }); await sleep(0.5); }
+      } else if (q.has('fly')) { helm(); await sleep(0.3); (Sp as any).dbgLaunch(); }
     } else {
       // the level the route would build: its place and number set as it starts (js/server.ts startLevel: dbg)
-      G.Net.toHost({ t: 'startRun', dbg: { th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), stronghold: q.has('stronghold'), night: q.has('night'), seed: q.has('seed') ? +q.get('seed')! : undefined } });
+      G.Net.toHost({ t: 'startRun', dbg: { classic: true, th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), stronghold: q.has('stronghold'), night: q.has('night'), seed: q.has('seed') ? +q.get('seed')! : undefined } });
       await until(() => G.Game.phase === 'route' && G.Game.routeMap);
       arm();
       const g0 = G.Game;
@@ -131,7 +154,7 @@ const G_DebugStart = (() => {
     say(`ready: ${G.Game.hub ? 'the hangar' : `level ${G.Game.level}, ${(G.Game.map && G.Game.map.theme && G.Game.map.theme.name) || '?'}`}`);
     done();
   }
-  if (q.has('play') || q.has('hangar')) window.addEventListener('load', () => setTimeout(() => { run().catch((e) => console.error('[debug start]', e)); }, 300));
+  if (q.has('play') || q.has('hangar') || q.has('board') || q.has('assault') || q.has('fly')) window.addEventListener('load', () => setTimeout(() => { run().catch((e) => console.error('[debug start]', e)); }, 300));
   return { run, ready };
 })();
 G.DebugStart = G_DebugStart;

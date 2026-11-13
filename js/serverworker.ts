@@ -9,8 +9,8 @@
 // (what a file reaches for while it loads or builds a level: none of it is drawn here)
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
 // (the scripts, in the page's order: index.html)
-const SERVER_SCRIPTS = ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents',
-  'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'serverhost'];
+const SERVER_SCRIPTS = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents',
+  'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'spaceserver', 'serverhost'];
 const svBooted = import('./threeboot.js').then(() => {
   importScripts(...SERVER_SCRIPTS.map((f) => f + '.js'));
 });

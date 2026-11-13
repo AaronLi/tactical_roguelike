@@ -104,7 +104,7 @@ const G_Server = {
   accMult: 1,
   forceLeader: false, // (a debug start: ?leader, js/debugstart.ts)
   dbgSeed: null as number | null,
-  dbgNext: null as { th?: number; lvl?: number; seed?: number; leader?: boolean; stronghold?: boolean; night?: boolean } | null, // (and the rest of what it asks of the next level)
+  dbgNext: null as { th?: number; lvl?: number; seed?: number; leader?: boolean; stronghold?: boolean; night?: boolean; classic?: boolean; fleet?: unknown } | null, // (and the rest of what it asks of the next level)
   bores: new Map<number, number[]>(), // each suspect's gun as the host's screen last drew it: [muzzle x, y, z, bore x, y, z] (handle 'bores', onTarget)
   dmgMult: 1,
   skins: new Map<string, any>(), // the squad's guns' sticker lists by hash (js/stickers.ts share): kept for whoever joins
@@ -166,6 +166,7 @@ const G_Server = {
         this.players.set(from, { id: from, name, color, animal, look: G.Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });
         SvNet.sendTo(from, {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
+          sp: !G.SpaceData.ON ? undefined : this.phase === 'shop' ? G.SpaceSv.shopMsg() : this.phase === 'level' ? G.SpaceSv.levelMsg() : undefined, // (the game in space: js/spaceserver.ts)
           seed: this.seed, shopSeed: this.shopSeed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), stock: this.phase === 'shop' ? this.stock : null,
           doors: this.map && this.phase === 'level' ? this.map.doors.map((d: Door) => (d.open ? 1 : 0)) : null,
           holes: this.phase === 'level' ? this.holes || null : null, fallen: this.phase === 'level' ? this.fallen || null : null,
@@ -293,7 +294,7 @@ const G_Server = {
       }
       case 'useDoor': {
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
-        if (d && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2) {
+        if (d && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2 && G.SpaceSv.mayOpen(d, from)) {
           this.setDoor(d.id, !d.open);
           if (d.kind === 'vault') { // both leaves together
             const partner = d.mirror ? this.map!.doors[d.id - 1] : this.map!.doors[d.id + 1] && this.map!.doors[d.id + 1].mirror ? this.map!.doors[d.id + 1] : null;
@@ -408,6 +409,7 @@ const G_Server = {
       }
       // the F9 readout's look at a suspect (js/hud.ts): their record as it is here
       case 'eInfo': if (from === SvNet.myId) SvNet.sendTo(from, { t: 'eInfo', id: m.id, e: this.eInfo(m.id) }); break;
+      default: G.SpaceSv.handle(m, from, p); // (the missions board, the ship, a mission's own things: js/spaceserver.ts)
     }
   },
   // A suspect's record (or the dead one's, as they died) for the F9 readout: what it shows, as plain data
@@ -428,11 +430,14 @@ const G_Server = {
     SvNet.broadcast({ t: 'chat', id: null, m: p.name + ' left the squad.' });
     this.sendRoster();
     this.checkReady();
+    G.SpaceSv.left(id);
     if (this.route) { delete this.route.votes[id]; this.checkPicks(); }
   },
 
   // --------------------------------------------------------------- phases
   startRun() {
+    // (the game in space: the hangar first, missions off its board, js/spaceserver.ts; a debug start's ?play still goes the old way)
+    if (G.SpaceData.ON && !(this.dbgNext && this.dbgNext.classic)) { const f = this.dbgNext && this.dbgNext.fleet; this.dbgNext = null; G.SpaceSv.startRun(f); return; }
     this.level = 1;
     this.team = { ver: 0, items: [] };
     this.arms = {}; // (the sidearms picked: each player's own)
@@ -468,10 +473,10 @@ const G_Server = {
   },
   // Building the next place stalls the host, and it's built before anyone's told: so everyone's screen goes black first
   // (js/game.ts veil), and go runs once it has, if the phase is still the one it was asked from. Only one at a time.
-  overBlack(go: () => void) {
+  overBlack(go: () => void, kind?: string) { // (kind 'ftl': a jump, not a black panel: js/space.ts)
     if (this.leaving) return;
     const run = this.leaving = {}, from = this.phase;
-    SvNet.broadcast({ t: 'veil' });
+    SvNet.broadcast({ t: 'veil', k: kind });
     setTimeout(() => {
       if (this.leaving !== run) return; // (gone back to the menu)
       this.leaving = null;
@@ -488,7 +493,7 @@ const G_Server = {
     const at = this.route && this.route.path[this.route.path.length - 1], n = this.routeMap && at != null ? this.routeMap.nodes.get(at) : null;
     return !!(n && n.night);
   },
-  startLevel() {
+  startLevel(ms?: SpMission) { // (ms: a mission's level, js/spaceserver.ts begin: its seed, place and how hard it is are the mission's)
     if (this.dbgNext) { // (a debug start's: js/debugstart.ts, 'startRun')
       const d = this.dbgNext, n = this.routeMap && this.route ? this.routeMap.nodes.get(this.route.path[this.route.path.length - 1]) : null;
       this.dbgNext = null;
@@ -502,9 +507,10 @@ const G_Server = {
     this.bores = new Map();
     this.phase = 'level';
     const want = this.dbgSeed; this.dbgSeed = null; // (a debug start's ?seed=: that level again)
-    this.seed = want != null ? want : (Math.random() * 2 ** 31) | 0;
-    this.night = this.isNight();
-    this.map = G.Level.generate(this.seed, this.level, this.theme as number, this.night);
+    this.seed = ms ? ms.seed : want != null ? want : (Math.random() * 2 ** 31) | 0;
+    if (ms) { this.level = ms.diff; this.theme = ms.th; }
+    this.night = ms ? ms.night : this.isNight();
+    this.map = G.Level.generate(this.seed, this.level, this.theme as number, this.night, ms ? G.SpaceSv.genOf(ms) : null);
     G.ServerHost.born(this.map); // (what it was built with: G.ServerLink.digest)
     this.enemies.clear();
     this.extract = { active: false, votes: new Set() };
@@ -517,6 +523,7 @@ const G_Server = {
     this.bodies = new Map(); // the dead, until secured: id -> { id, type, x, z, yaw, civ, secured }
     for (const p of this.players.values()) { p.ready = false; p.st = null; }
     this.spawnEnemies();
+    if (ms) G.SpaceSv.populate();
     this.wcase = this.map.case ? this.rollCase() : null;
     this.cabs = (this.map.cabinets || []).map(() => ({ open: false, ver: 0, items: this.layCab(this.rollCab()) }));
     this.caseOpen = false;
@@ -524,7 +531,7 @@ const G_Server = {
     // the sticker box's sticker: one of the host's (js/stickers.ts names; none, and the box isn't there)
     const sn = G.Stickers.names;
     this.sbox = this.map.sbox && sn.length ? { s: sn[Math.floor(Math.random() * sn.length)], by: null } : null;
-    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg() });
+    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? G.SpaceSv.levelMsg() : undefined });
   },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
@@ -727,7 +734,7 @@ const G_Server = {
     this.stock = G.Shop.scaleStock(G.Shop.baseStock(this.level, this.shopSeed), this.players.size); // (as many of each as there are of you)
     this.liftT = null; this.snapT = 0;
     for (const p of this.players.values()) p.ready = false;
-    SvNet.broadcast({ t: 'phase', phase: 'shop', level: this.level, shopSeed: this.shopSeed, report: this.report, stock: this.stock });
+    SvNet.broadcast({ t: 'phase', phase: 'shop', level: this.level, shopSeed: this.shopSeed, report: G.SpaceData.ON ? null : this.report, stock: this.stock, sp: G.SpaceData.ON ? G.SpaceSv.shopMsg() : undefined });
     SvNet.broadcast(this.teamMsg());
     this.sendRoster();
   },
@@ -828,7 +835,7 @@ const G_Server = {
       this.addEnemy('civ', (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, 1, fy(tf));
       placed++;
     }
-    if (G.Route.isBoss(L)) {
+    if (G.Route.isBoss(L) && !G.SpaceSv.st.M) {
       const ex = this.map!.extract;
       const b = this.addEnemy('warden', ex.x, ex.z, (1 + 0.5 * (G.Route.actOf(L) - 1)) * (1 + 0.35 * (np - 1)));
       b.guard = true;
@@ -1226,6 +1233,7 @@ const G_Server = {
   // restored the squad can vote to leave (Y); the level ends when every officer still alive has voted.
   checkClear() {
     const left = this.remaining(false);
+    if (G.SpaceSv.st.M) return; // (a mission isn't left by a vote: the ship leaves, js/spaceserver.ts)
     if (left === 0 && !this.extract.active) { this.extract.active = true; SvNet.broadcast({ t: 'clear' }); }
   },
   // every civilian secured, none killed
@@ -1288,6 +1296,7 @@ const G_Server = {
     if (!fresh.length) return;
     for (const id of fresh) { ws[id].broken = true; G.World.windowSolids(this.map!.world, this.map, ws[id]); this.glassBroken.add(id); this.hear(ws[id].x, ws[id].z, 16, ws[id].fy || 0); }
     SvNet.broadcast({ t: 'glass', ids: fresh });
+    G.SpaceSv.glass(fresh); // (a ship's hull window: the air goes)
   },
   // A weapon light in their eyes (the player they're shooting at has one on and pointed at them, close enough):
   // they can hardly see to aim. Returns a multiplier on their hit chance.
@@ -1427,7 +1436,7 @@ const G_Server = {
     // a secured weapon can't be grabbed back by a faking suspect
     const owner = this.enemies.get(v.owner);
     if (owner) owner.fake = false;
-    SvNet.broadcast({ t: 'evsec', i, by: from, cr: Math.round(this.evidenceValue(v.wpn) / 2), wpn: v.wpn });
+    SvNet.broadcast({ t: 'evsec', i, by: from, cr: this.pay(Math.round(this.evidenceValue(v.wpn) / 2)), wpn: v.wpn });
     this.checkClear();
   },
   // at: where the officer saw the body lying, its ragdoll (it can slide or fall a way from where they went down):
@@ -1443,7 +1452,7 @@ const G_Server = {
       if (!b || b.secured || reach(b.x, b.z) > 2.6) return;
       b.secured = true;
       this.report.bodies++;
-      SvNet.broadcast({ t: 'cuffed', e: eid, by: from, cr: b.civ ? 0 : this.carrierShare(b.def || (G.ENEMIES as Tbl)[b.type]), civ: b.civ, ty: b.type, body: true });
+      SvNet.broadcast({ t: 'cuffed', e: eid, by: from, cr: b.civ ? 0 : this.pay(this.carrierShare(b.def || (G.ENEMIES as Tbl)[b.type])), civ: b.civ, ty: b.type, body: true });
       this.checkClear();
       return;
     }
@@ -1455,7 +1464,7 @@ const G_Server = {
     // (a suspect cuffed where they lay is already counted, incapacitated: securing them pays like securing a body)
     const cr = civ ? 200 + 40 * this.level : dn ? this.carrierShare(e.def) : Math.round(e.def.cr * 2.5 * (1 + 0.08 * (this.level - 1))) + this.carrierShare(e.def);
     if (civ) this.report.rescued++; else if (!dn) this.report.arrests++;
-    SvNet.broadcast({ t: 'cuffed', e: e.id, by: from, cr, civ, ty: e.type, dn: dn ? 1 : 0 });
+    SvNet.broadcast({ t: 'cuffed', e: e.id, by: from, cr: this.pay(cr), civ, ty: e.type, dn: dn ? 1 : 0 });
     this.checkClear();
   },
   // ---------------------------------------------------------------- suspects' injuries
@@ -1650,7 +1659,7 @@ const G_Server = {
       if (!hl.bo && e.lastGr) hl.gr = e.lastGr; // (a frag grenade did it: which)
       if (!hl.bo && e.lastFb) hl.fb = e.lastFb; // (blind from a flashbang when it was done: which)
       if (m.cz === 'burns' || m.cz === 'blast') { hl.cz = m.cz; if (e.lastGr) hl.gr = e.lastGr; } // (died of a thermobaric's burns or blast lung: injuryTick; the grenade's)
-      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr, h: !!m.h, ty: e.type, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
+      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr: this.pay(cr), h: !!m.h, ty: e.type, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
       this.checkClear();
     }
   },
@@ -1659,6 +1668,8 @@ const G_Server = {
   // there, the same as a kill: the officer's credit and tally, and whether it was authorised (st: what they were
   // doing when shot). Lethal force pays least. If they bleed out afterwards, that's kept (report.bleedouts, and
   // bleedBy: by the officer who put them down), not counted again.
+  // what's paid on the spot: nothing on a mission (its fee is paid when it's done, js/spaceserver.ts); what a wrong costs still is
+  pay(cr: number) { return G.SpaceSv.st.M && cr > 0 ? 0 : cr; },
   incapacitate(e: Enemy, by: string | null, st: string) {
     e.incap = { by: by || null, t: this.clock || 0 };
     if (st !== 'normal') { this.report.unauth++; return { cr: -Math.round(e.def.cr * 2), why: 'unauth' }; }
@@ -1669,7 +1680,7 @@ const G_Server = {
   incapMsg(e: Enemy) {
     if (e.def.civ || e.incap) return; // (a civilian down still needs rescuing)
     const { cr, why } = this.incapacitate(e, e.lastHit, e.hitState || e.state);
-    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr, h: !!e.lastH, ty: e.type, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
+    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr: this.pay(cr), h: !!e.lastH, ty: e.type, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
   },
   // A suspect down for good, for the highlights (js/highlights.ts suspectDown): incapacitated, their clip. The round
   // that put them down, with what a kill of it would carry; or, more than 4 s after a round last hit them, a bleed-out
@@ -1701,6 +1712,8 @@ const G_Server = {
     if (this.phase === 'shop') return this.updateHub(dt);
     if (this.phase !== 'level' || !this.map) return;
     this.clock = (this.clock || 0) + dt;
+    G.SpaceSv.tick(dt);
+    if (this.phase !== 'level') return;
     const map = this.map!, L = G.Level;
     const all = [...this.players.values()].filter((p) => p.st) as LivePlayer[];
     const alive = all.filter((p) => !p.st.dn && !p.st.dd);
@@ -2130,7 +2143,7 @@ const G_Server = {
     if (q.phase === 'set') {
       turn(q.yaw, 5);
       if (q.t > 0) return true;
-      if (!q.d.open && !q.d.fallen) { this.setDoor(q.d.id, true); q.phase = 'open'; q.t = 0.5; return true; }
+      if (!q.d.open && !q.d.fallen && G.SpaceSv.crewMayOpen(q.d)) { this.setDoor(q.d.id, true); q.phase = 'open'; q.t = 0.5; return true; }
       q.phase = 'look'; q.t = 1.4 + Math.random();
     }
     if (q.phase === 'open') {
@@ -2445,7 +2458,7 @@ const G_Server = {
     if (e.doorWait > 0) { e.doorWait -= dt; return; }
     const ahead = map.world && G.World.raycast(map.world, e.x, (e.y || 0) + 1.0, e.z, mx, 0, mz, 0.9, { move: true }); // (what they'd walk into)
     const d = ahead && ahead.solid && ahead.solid.kind === 'door' ? ahead.solid.door : null;
-    if (d && !d.open) { this.setDoor(d.id, true); e.doorWait = 0.5; return; }
+    if (d && !d.open) { if (!G.SpaceSv.crewMayOpen(d)) return; this.setDoor(d.id, true); e.doorWait = 0.5; return; } // (a locked or sealed door: they hold where they are)
     if (e.collapsed) return; // legs gone: they're on the floor
     speed *= this.injSpeed(e) * (e.str == null || e.str >= 0.6 ? 1 : 0.3 + 0.7 * e.str / 0.6); // a broken leg limps; blood loss slows
     e.x += mx * speed * dt; e.z += mz * speed * dt;

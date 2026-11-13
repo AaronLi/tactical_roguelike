@@ -136,8 +136,8 @@ const G_Hangar = (() => {
     add(L.table[0], 0, L.table[1], L.table[2], L.table[4], L.table[3]);
     add(L.bar[0], 0, L.bar[1], L.bar[2], L.bar[4], L.bar[3]);
     // the helicopter: the cabin and nose, and the tail boom (above head height at its end, but there's no walking through it)
-    add(HELI.x - 3.4, 0, HELI.z - 1.35, HELI.x + 2.4, 2.8, HELI.z + 1.35);
-    add(HELI.x + 2.4, 1.5, HELI.z - 0.3, HELI.x + 8.3, 2.5, HELI.z + 0.3);
+    // (the game in space: the squad's ship stands on the pad instead, its deck its own: js/space.ts)
+    if (!G.SpaceData.ON) { add(HELI.x - 3.4, 0, HELI.z - 1.35, HELI.x + 2.4, 2.8, HELI.z + 1.35); add(HELI.x + 2.4, 1.5, HELI.z - 0.3, HELI.x + 8.3, 2.5, HELI.z + 0.3); }
   }
 
   // ------------------------------------------------------------------------ drawing helpers
@@ -381,7 +381,9 @@ const G_Hangar = (() => {
     S.root = (BAKED ? BAKED.clone() : new T.Group()) as THREE.Group; S.root.position.set(0, 0, RZ);
     S.anchors = new Map(); S.root.traverse((o) => { if (o.userData.anchor) S.anchors!.set(o.name, o); });
     G.R.levelRoot.add(S.root);
-    workshop(); outfitters(); store(); stash(); nightjar(); helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget, at }); outline();
+    // (the game in space: no helicopter, nor the sign that hung over its door: the squad's ship stands there, js/space.ts)
+    if (G.SpaceData.ON) { const hp = S.root.getObjectByName('helipad'); if (hp) for (const c of [...hp.children]) if (Math.abs(c.position.y - 2.98) < 0.05) hp.remove(c); }
+    workshop(); outfitters(); store(); stash(); nightjar(); if (!G.SpaceData.ON) helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget, at }); outline();
     if (G.Highlights) G.Highlights.mount(S.root, { addTarget, at }); // (the TVs, showing the level just played, F to record it: js/highlights.ts)
     refresh(true);
     batch();

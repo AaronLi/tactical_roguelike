@@ -459,7 +459,7 @@ const G_Game = {
       for (const id of ['turnUrl', 'turnUser', 'turnPass']) this.$(id).addEventListener('change', save); }
     // what a host's LAN beacon tells whoever's looking
     G.Net.lanInfo = () => ({ name: this.myName, players: Object.keys(this.roster || {}).length || 1, phase: this.phase });
-    this.$('btnStart').onclick = () => { if (G.Net.isHost) G.Net.toHost({ t: 'startRun' }); };
+    this.$('btnStart').onclick = () => { if (G.Net.isHost) { G.Net.toHost({ t: 'finit', f: G.U.store.get('fleet', null) }); G.Net.toHost({ t: 'startRun' }); } }; // (finit: the squad's ships, as this host kept them: js/space.ts)
     this.$('btnLeave').onclick = () => this.toMenu();
     this.$('btnNewCode').onclick = () => this.newCode();
     this.$('btnCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(G.Net.code || ''); this.$('btnCopy').textContent = 'Copied'; setTimeout(() => (this.$('btnCopy').textContent = 'Copy'), 1200); };
@@ -546,7 +546,7 @@ const G_Game = {
   // Tab in a level: your kit and health (and the scoreboard), the mouse freed to move things about. You stand
   // still while it's open; the level doesn't stop.
   // a panel that takes the mouse is open: the field kit (Tab), the hangar's shop, the chat, the attachments box (no firing)
-  menuOpen(): boolean { return !!(this.invOpen || this.shopOpen || this.chatOpen || this.aboxOpen); },
+  menuOpen(): boolean { return !!(this.invOpen || this.shopOpen || this.chatOpen || this.aboxOpen || G.Space.S.uiOpen); },
   toggleInv(open: boolean, opts?: { patient?: string; cab?: number }) {
     if (!!open === !!this.invOpen) return;
     this.invOpen = !!open;
@@ -575,7 +575,7 @@ const G_Game = {
     if (this.locked && this.menuOpen()) { this.unlock(); return; }
     if (this.phase !== 'level') return;
     if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
-    else if (!this.chatOpen && !this.invOpen && !this.shopOpen && !this.aboxOpen) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
+    else if (!this.menuOpen()) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
   },
   unlock() {
     if (this.softLocked) { this.softLocked = false; this.lockChanged(); }
@@ -715,6 +715,7 @@ const G_Game = {
     G.Net.leave();
     G.ServerLink.stop();
     G.Views.clearAll();
+    G.Space.reset();
     this.leaveHub();
     G.R.clearLevel();
     G.R.setViewmodel(null);
@@ -774,7 +775,7 @@ const G_Game = {
         G.Career.squad(Object.keys(this.roster).length);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
         else if (m.phase === 'level') {
-          this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc);
+          this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp);
           if (m.doors) m.doors.forEach((o: number, i: number) => { const d = this.map!.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map!.world, this.map!, d); } });
           if (m.holes) for (const h of m.holes) G.Damage.apply(this.map as unknown as GmDmgMap, h); // (what's been shot out of the place)
           if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map as unknown as GmDmgMap, this.map!.doors[i] as any, ang, dir, seed, true);
@@ -785,7 +786,7 @@ const G_Game = {
           G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...(a as [any, any, any, any, any, any, any]));
           for (const id of m.glass || []) G.Views.breakGlass(id); // windows already broken when we joined
           for (const [id, p] of m.cracked || []) G.Views.crackGlass(id, new THREE.Vector3(...p));
-        } else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, null, m.stock);
+        } else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, null, m.stock, m.sp);
         else this.enterLobby();
         break;
       case 'roster': {
@@ -808,12 +809,12 @@ const G_Game = {
         this.tGrid = null; this.arms = {}; this.armSel = null;
         G.Me.newRun();
             break;
-      case 'veil': this.veil(true); break;
+      case 'veil': G.Space.veilKind(m.k); this.veil(true); break; // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
       case 'phase':
         if (m.route) this.setRoute(m.route);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
-        else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock);
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
+        else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock, m.sp);
         else if (m.phase === 'gameover') this.enterGameover(m);
         else if (m.phase === 'lobby') this.enterLobby();
         break;
@@ -994,6 +995,7 @@ const G_Game = {
         G.Me.credits += m.amt;
         if (this.hub) G.Shop.render();
         break;
+      default: G.Space.onMsg(m); // (the missions board, the ship, a mission's own things: js/space.ts)
     }
   },
   playerPos(id: string) {
@@ -1103,6 +1105,7 @@ const G_Game = {
   // ------------------------------------------------------------- phases
   enterLobby() {
     this.toggleInv(false);
+    G.Space.reset();
     this.leaveHub();
     this.phase = 'lobby';
     this.unlock();
@@ -1542,14 +1545,17 @@ const G_Game = {
     G.Audio.click();
     G.Net.toHost({ t: 'pick', n });
   },
-  enterLevel(level: number, seed: number, th?: number, night = false, wc?: string | null) {
+  // sp: a mission's level (js/spaceserver.ts levelMsg): what it's generated for, the mission, the ship. Then there's no helicopter:
+  // you're aboard the squad's ship as she comes out of the jump (js/space.ts).
+  enterLevel(level: number, seed: number, th?: number, night = false, wc?: string | null, sp?: any) {
     this.veil(true, true); // (already black, unless you've just joined)
+    G.Space.leave(); if (!sp) G.Space.S.keep = null;
     this.leaveHub();
     this.phase = 'level';
     this.level = level;
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0;
-    this.map = G.Level.generate(seed, level, th, night);
+    this.map = G.Level.generate(seed, level, th, night, sp ? sp.gen : null);
     G.Career.levelStart(level, th, night, this.stronghold()); // (your run's log: js/career.ts)
     G.ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
     if (G.Prof) G.Prof.reset(); // (the worst frames and totals: this level's)
@@ -1567,21 +1573,22 @@ const G_Game = {
     G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo), ...(w.def.barrels ? Object.keys(w.def.barrels.rounds).flatMap((k) => G.barrelMm(w.def, k).map((mm: number) => G.shotSoundKey(G.roundSpec(w.def, k), mm, w.ammo))) : [])]), ...this.enemyGuns(level), ...team], this.map);
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
     const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!));
-    G.Landing.enter(this.map);
-    G.Me.spawn(this.map.spawn.x, this.map.spawn.z);
-    G.Landing.board(G.Me, Math.min(i, G.Hangar.HELI.seats - 1));
+    if (sp) { G.Me.spawn(this.map.spawn.x, this.map.spawn.z); G.Space.enterLevel(this.map, sp); }
+    else { G.Landing.enter(this.map); G.Me.spawn(this.map.spawn.x, this.map.spawn.z); G.Landing.board(G.Me, Math.min(i, G.Hangar.HELI.seats - 1)); }
     this.screen(null);
     G.HUD.show(true);
-    G.HUD.toast(`LEVEL ${level}`, this.map.theme.name + (G.Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
-    if (G.Route.isBoss(level)) G.Audio.alarm();
+    if (sp) G.HUD.toast(G.U.esc(sp.ms.name), G.U.esc(sp.ms.where) + ' · ' + G.SpaceData.OBJ[sp.ms.obj as SpObj].name, 4.5);
+    else G.HUD.toast(`LEVEL ${level}`, this.map.theme.name + (G.Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
+    if (!sp && G.Route.isBoss(level)) G.Audio.alarm();
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
     this.veilSay('Placing everyone');
   },
   // Between levels: the hangar (js/hangar.ts). To the game it's a level with nothing in it but the shop, so you walk
   // about it, the squad is there, and rays, steps and sound are all the ordinary ones; the host just doesn't send
   // enemies. this.hub marks it (the phase is still 'level' here).
-  enterShop(level: number, seed: number, report: GmReport | null, stock: any) {
+  enterShop(level: number, seed: number, report: GmReport | null, stock: any, spc?: any) { // (spc: the game in space, js/spaceserver.ts shopMsg: the board, the fleet, where the ship is)
     this.veil(true, true);
+    G.Space.leave();
     this.toggleInv(false);
     this.closeShop();
     this.hub = true; this.shopOpen = false;
@@ -1589,7 +1596,8 @@ const G_Game = {
     if (G.Me.navRearm) G.Me.navRearm();
     G.Shop.report = report || null;
     let paid = 0;
-    if (G.Me.pos) {
+    this.lastBonus = 0;
+    if (G.Me.pos && !G.SpaceData.ON) { // (in space a mission's fee is what's paid, when it's done: js/space.ts mdone)
       const clean = report && report.civKilled === 0 && report.unauth === 0;
       const bonus = Math.round((250 + 75 * level + (clean ? 200 : 0) + (report && report.allRescued ? 150 + 50 * level : 0) + (report && report.stronghold ? G.Route.strongholdPay(level) : 0)));
       G.Me.credits += bonus;
@@ -1613,9 +1621,11 @@ const G_Game = {
     const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!)), sp = G.Hangar.spawnAt(i);
     G.Me.spawn(sp.x, sp.z);
     G.Me.yaw = 0; // (facing the hall)
+    if (G.SpaceData.ON) G.Space.enterHub(this.map, spc); // (the squad's ship on the pad, or out by an anchor with you aboard; the rock round the base)
     this.screen(null);
     G.HUD.show(true);
-    G.HUD.toast('THE HANGAR', `Level ${level} cleared · look at what you want and press <b>F</b>`, 4);
+    if (G.SpaceData.ON) { if (!spc || !spc.ship || spc.ship.docked) G.HUD.toast('THE BASE', 'The missions board is by the pad · your ship is on it', 4); }
+    else G.HUD.toast('THE HANGAR', `Level ${level} cleared · look at what you want and press <b>F</b>`, 4);
     G.Shop.wishNotice(); // (starred parts in this visit's stock)
     if (this.lastBonus) G.HUD.chat(null, 0, `Mission bonus: +¢${this.lastBonus}`);
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
@@ -1666,6 +1676,7 @@ const G_Game = {
       if (this.hub) { G.Hangar.update(dt); G.Hangar.mark(); }
       G.Views.update(dt);
       if (!this.hub) G.Landing.update(dt); // (after everyone's posed: in the air it moves the camera, and hides who's riding with you)
+      G.Space.update(dt); // (the squad's ship: flown, and what's outside her moved: js/space.ts)
       if (G.Me.dead) G.Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
       G.GunAudio.updateListener(G.R.camera); // (after that: dead, you hear from where the camera is, not where you fell)
       G.Me.flushHits();

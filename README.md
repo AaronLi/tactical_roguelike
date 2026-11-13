@@ -3,6 +3,8 @@
 Peer-to-peer co-op roguelike tactical FPS that runs in the browser. Written in TypeScript (`js/*.ts`), Three.js
 for rendering, WebRTC (via PeerJS) for networking.
 
+**This branch takes the game into space** (the hangar is a base in an asteroid; missions are flown to in the squad's own ship, boarding ships or landing at bases): see [docs/space.md](docs/space.md).
+
 ## Running it
 
 ```bash

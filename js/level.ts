@@ -3,8 +3,8 @@
   case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
   grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
   above?: LvMap | null; voidAbove?: ArrayLike<number> | null; units?: number; navG?: any; lightT?: number; underground?: boolean; rollers?: number[][]; hub?: boolean; glassRuns?: any; fences: LvFence[]; doorVer?: number; cracked?: any; dmg?: any;
-  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux; desc?: LvDesc } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
-type RoomType = 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom' | 'terrace' | 'viewing';
+  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux; desc?: LvDesc; sp?: ShMeta | null } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean; ship?: string; lootRoom?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
+type RoomType = 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom' | 'terrace' | 'viewing' | 'bridge' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine';
 type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
 type LvDoorKind = 'stair' | 'fire' | 'vault'; // (a door that isn't the plain wooden one)
 type LvLightKind = 'string' | 'highbay' | 'panel' | 'exit';
@@ -13,7 +13,7 @@ interface LvDress { who: string; type0: RoomType; wall: string; paper?: number; 
 // what a ray is asked to do (G.World.raycast, G.Level.raycast): through glass, a look not a round, bars, what stops people, solids to skip
 interface LvRayOpts { glass?: boolean; sight?: boolean; bars?: boolean; move?: boolean; skip?: (s: any) => boolean }
 interface LvBuilding { floors: LvLay[]; stairs: any; rail?: string; base?: number; units?: number; lz?: LvLz | null }
-interface LvLay { W: number; H: number; t: Uint8Array; rooms: LvRoom[]; out?: Uint8Array; doors?: LvDoorSpec[]; fences?: LvFence[]; grate?: any; crest?: any; glass?: any[]; spawn?: any; lz?: LvLz | null; entries?: number[][] | null; units?: number; underground?: boolean; chasm?: number; rollers?: number[][]; ids?: Int16Array; homes?: any; ringDoors?: boolean } interface LvPt { x: number; z: number; y?: number; cx?: number; cz?: number; fl?: number; lean?: any } interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[] } type LvDoorSpec = [number, number, LvAxis, boolean?, boolean?, any?]; type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; unit?: number; head?: number[]; drop?: number[] } interface LvStair { axis: LvAxis; up: number; x0: number; x1: number; z0: number; z1: number; f: number; y0?: number; steps?: any; rise?: number } interface LvNav { stairOf: number[]; foot: Set<string>; WH: number }
+interface LvLay { W: number; H: number; t: Uint8Array; rooms: LvRoom[]; out?: Uint8Array; doors?: LvDoorSpec[]; fences?: LvFence[]; grate?: any; crest?: any; glass?: any[]; spawn?: any; lz?: LvLz | null; entries?: number[][] | null; units?: number; underground?: boolean; chasm?: number; rollers?: number[][]; ids?: Int16Array; homes?: any; ringDoors?: boolean; sp?: any } interface LvPt { x: number; z: number; y?: number; cx?: number; cz?: number; fl?: number; lean?: any } interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[] } type LvDoorSpec = [number, number, LvAxis, boolean?, boolean?, any?]; type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; unit?: number; head?: number[]; drop?: number[] } interface LvStair { axis: LvAxis; up: number; x0: number; x1: number; z0: number; z1: number; f: number; y0?: number; steps?: any; rise?: number } interface LvNav { stairOf: number[]; foot: Set<string>; WH: number }
 // Procedural level generation, collision, raycasting and path flow-fields.
 // The map is a tile grid (TS metres per tile, after refinement: see TS/CTS/K below). 0 = floor, 1 = wall, 2 = furniture you can take cover behind,
 // 3 = door, 4 = other furniture (garden fences are furniture too). map.out marks tiles open to the sky. Furniture collision boxes live in map.props (see js/furniture.ts).
@@ -36,7 +36,9 @@ const G_Level = {
 
   // th: the environment (index into G.THEMES) picked on the route map; by default they come round in turn. night: a night
   // level (the route node's: js/route.ts), the same place with the lights out (nightify)
-  generate(seed: number, level: number, th?: number, night = false) {
+  // sp: what a mission's level is for besides (js/spacedata.ts SpGen: a ship's size and what's wanted aboard her)
+  generate(seed: number, level: number, th?: number, night = false, sp?: SpGen | null) {
+    this.genSp = sp || null;
     this.genNight = night; // (the furniture's plan reads it: fewer cars left in the car parks at night, js/furniture.ts)
     let map: LvMap;
     try { map = this.generateDay(seed, level, th); } finally { this.genNight = false; }
@@ -58,11 +60,17 @@ const G_Level = {
     return map;
   },
   genNight: false,
+  genSp: null as SpGen | null,
   generateDay(seed: number, level: number, th?: number) {
     const U = G.U, r = U.rng(seed);
-    const theme = G.THEMES[th != null && G.THEMES[th] ? th : (level - 1) % G.THEMES.length];
+    const theme = (th != null && G.SpaceData.themeAt(th)) || G.THEMES[(level - 1) % G.THEMES.length]; // (th from 1000: a ship, js/spacedata.ts)
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
+    if (theme.layout === 'ship') { // a ship to board (js/shipgen.ts): one deck, open space round it
+      const sl = G.ShipGen.lay(r, level, this.genSp), sm = G.ShipGen.finish(this.plan(sl, r, seed, level, theme), sl);
+      G.World.fromTileMap(sm);
+      return sm;
+    }
     const lay = (theme.layout === 'apartments' ? this.layApartments(r, level) : theme.layout === 'warehouse' ? this.layWarehouse(r, level)
       : theme.layout === 'houses' ? this.layHouses(r, level) : theme.layout === 'festival' ? this.layFestival(r, level) : theme.layout === 'mart' ? this.layMart(r, level)
       : theme.layout === 'foundry' ? this.layFoundry(r, level) : theme.layout === 'crest' ? this.layCrest(r, level)
@@ -474,7 +482,7 @@ const G_Level = {
     // floor along a wall in a room away from the spawn: two clear cells side by side against the wall
     map.case = null;
     const hasCase = r() < this.CASE_CHANCE || !!map.theme.starter;
-    const keepIn = (q: LvRoom) => !map.theme.starter || q.type === 'stockroom'; // (a starter level: its stockroom has them all)
+    const lootRooms = rooms.some((q) => q.lootRoom), keepIn = (q: LvRoom) => (!map.theme.starter || q.type === 'stockroom') && (!lootRooms || !!q.lootRoom); // (a ship with an armoury: in it) // (a starter level: its stockroom has them all)
     const clear = (x: number, z: number) => t[z * W + x] === 0 && !map.props.has(z * W + x);
     if (hasCase) for (const rm of U.shuffle(r, rooms.filter((q) => q !== spawnRoom && !q.front && !q.lid && q.type !== 'roof' && keepIn(q)))) {
       const spots = [];
@@ -576,7 +584,7 @@ const G_Level = {
         for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) map.lights.push({ kind: 'panel', x: x0 + (i + 0.5) * rm.w * TS / nx, z: z0 + (j + 0.5) * rm.h * TS / nz });
         continue;
       }
-      if (rm.type === 'corridor') { for (let x = rm.x + 2; x < rm.x + rm.w; x += 7) map.lights.push({ x: (x + 0.5) * TS, z: (rm.cz + 0.5) * TS }); continue; } // down a hallway
+      if (rm.type === 'corridor' || rm.type === 'spine') { for (let x = rm.x + 2; x < rm.x + rm.w; x += 7) map.lights.push({ x: (x + 0.5) * TS, z: (rm.cz + 0.5) * TS }); continue; } // down a hallway
       if (rm.type === 'hangar') { // a lamp every 8 m by 6 m down the hall
         for (let z = rm.z + 3; z < rm.z + rm.h; z += 9) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 12) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
       } else if (rm.type === 'hall' || rm.type === 'dock') {
@@ -765,7 +773,7 @@ const G_Level = {
       const [nx, nz, roomSide] = c, ax = nz ? 1 : 0, az = nx ? 1 : 0, c2 = thruAt(x + ax, z + az);
       if (!c2 || c2[0] !== nx || c2[1] !== nz || nearDoor(x, z) || nearDoor(x + ax, z + az)) continue;
       if (tall(roomSide) || tall(c2[2]) || used.has((z - az) * W + x - ax) || used.has((z - 2 * az) * W + x - 2 * ax)) continue;
-      if (rw() < 0.45) add([z * W + x, (z + az) * W + x + ax], nx, nz, false);
+      if (rw() < (map.theme.thru != null ? map.theme.thru : 0.45)) add([z * W + x, (z + az) * W + x + ax], nx, nz, false);
     }
     // the building's outer walls: a wall face of a room, with solid wall from there to the edge of the map (and
     // not too thick); a couple to a room

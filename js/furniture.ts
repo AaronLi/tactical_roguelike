@@ -1219,6 +1219,21 @@ const G_Furniture = (() => {
     garden: { floor: 'soil', out: 1 }, greenhouse: { floor: 'flag', out: 1, sound: 'concrete' }, antennas: { floor: 'dirt', out: 1 },
     giftshop: { must: 'counter', wall: ['shopwall', 'rack', 'shopwall', 'files'], center: ['endcap'], small: ['plant', 'cardboard', 'bin'], floor: 'wood' },
     storeroom: { must: 'rack', wall: ['rack', 'crates', 'rack'], center: [], small: ['cardboard', 'bin'], floor: null, noArt: 1 },
+    // a ship's compartments (js/shipgen.ts): what she has goes by her size
+    bridge: { must: 'console', wall: ['console', 'console', 'desk', 'console'], center: ['deskpair'], small: ['bin'], floor: null, noArt: 1 },
+    engine: { must: 'panel', wall: ['panel', 'panel', 'panel', 'lockers'], center: ['crates'], small: ['bin'], floor: null, noArt: 1, dense: 1 },
+    reactor: { must: 'panel', wall: ['panel', 'panel'], center: ['crates'], small: ['bin'], floor: null, noArt: 1 },
+    cargo: { must: 'rack', wall: ['rack', 'crates', 'rack', 'pallet'], center: ['crates', 'pallet', 'crates'], small: ['cardboard', 'bin'], floor: null, noArt: 1, dense: 1 },
+    quarters: { must: 'bed', wall: ['wardrobe', 'desk', 'bed', 'lockers'], center: [], small: ['sidetable', 'bin'], floor: null, noArt: 1 },
+    barracks: { must: 'bed', wall: ['bed', 'lockers', 'bed', 'lockers'], center: ['bench'], small: ['bin'], floor: null, noArt: 1 },
+    mess: { must: 'counter', wall: ['fridge', 'counter', 'tv'], center: ['dining', 'dining'], small: ['cooler', 'bin'], floor: null, noArt: 1 },
+    galley: { must: 'counter', wall: ['counter', 'fridge', 'counter', 'sinks'], center: ['island'], small: ['bin'], floor: null, noArt: 1 },
+    medbay: { must: 'bed', wall: ['sinks', 'files', 'bed', 'lockers'], center: [], small: ['bin', 'cooler'], floor: null, noArt: 1 },
+    armoury: { must: 'lockers', wall: ['lockers', 'rack', 'lockers', 'bench'], center: ['bench'], small: ['bin'], floor: null, noArt: 1 },
+    magazine: { must: 'rack', wall: ['rack', 'crates', 'rack'], center: ['crates'], small: ['cardboard'], floor: null, noArt: 1, dense: 1 },
+    vault: { must: 'rack', wall: ['lockers', 'rack'], center: [], small: ['bin'], floor: null, noArt: 1 },
+    brig: { must: 'bench', wall: ['bench', 'lockers'], center: [], small: ['bin'], floor: null, noArt: 1 },
+    pods: { floor: null, bare: 1, noArt: 1 }, spine: { floor: null, bare: 1, noArt: 1 },
   };
   // small pieces give only their boxes; they need a footprint too when they're set against a wall
   for (const rec of Object.values(R)) if (rec.w == null || rec.d == null) {
