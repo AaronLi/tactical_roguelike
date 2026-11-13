@@ -38,14 +38,14 @@ def head(name, style, skin):
     f = {'A': dict(nose=0, wings=0, brow=0.3, sock=0, lips=0, chin=0.6, cheek=0.4, sub=4),
          'B': dict(nose=1.25, wings=0.6, brow=1.5, sock=1.5, lips=0.9, chin=1.3, cheek=1.4, sub=4),
          'C': dict(nose=0.55, wings=0, brow=0.4, sock=0.25, lips=0, chin=0.8, cheek=0.7, sub=4),
-         'D': dict(nose=1.0, wings=1.0, brow=1.0, sock=1.0, lips=1.0, chin=1.0, cheek=1.0, sub=5)}[style]
+         'D': dict(nose=1.0, wings=1.0, brow=1.0, sock=1.35, lips=1.25, chin=1.0, cheek=1.0, sub=6)}[style]
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=f['sub'], radius=1)
     for v in bm.verts:
         x, y, z = v.co
         X, Y, Z = x * 0.077, y * 0.097, z * 0.115
         if z < 0:
             t = -z
-            X *= 1 - 0.30 * t ** 1.4                      # the jaw narrows to the chin
+            X *= 1.04 * (1 - 0.30 * t ** 1.4)             # the jaw narrows to the chin
             if y > 0: Y *= 1 - 0.42 * t ** 1.2             # the back of the skull comes in to the neck
             else: Y *= 1 - 0.10 * t ** 2
         else: X *= 1 + 0.04 * (1 - z); Y += 0.006 * z        # the cranium, a little back
@@ -65,6 +65,11 @@ def head(name, style, skin):
         v.co = (X, Y, Z)
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     h = obj(name, me, skin, style != 'B')
+    if style == 'D':  # the lips are the face's own surface: its faces there take the lip's colour
+        me.materials.append(LIP)
+        for p in me.polygons:
+            c = p.center
+            if c.y < -0.06 and (c.x / 0.0235) ** 2 + ((c.z + 0.0655) / 0.0088) ** 2 < 1: p.material_index = 1
     if style == 'B':
         m = h.modifiers.new('planes', 'DECIMATE'); m.ratio = 0.045
     # the neck
@@ -85,11 +90,17 @@ def head(name, style, skin):
         box(name + '_mouth', (0.03, 0.004, 0.0028), DARK, (0, -0.079, -0.064), h)
     if style == 'D':
         for s in (-1, 1):
-            sphere(name + '_ball', 0.0115, WHITE, (s * 0.031, -0.0735, 0.004), parent=h, sub=3)
-            sphere(name + '_iris', 0.0058, DARK, (s * 0.031, -0.0826, 0.004), (1, 0.45, 1), h, 3)
-            box(name + '_brow', (0.027, 0.005, 0.0035), HAIR, (s * 0.031, -0.0885, 0.0235), h, (0, s * -0.1, 0))
+            sphere(name + '_ball', 0.0115, WHITE, (s * 0.031, -0.0700, 0.004), parent=h, sub=3)
+            sphere(name + '_iris', 0.0056, DARK, (s * 0.031, -0.0791, 0.0035), (1, 0.45, 1), h, 3)
+            # lids: shells of skin over the ball, the upper one down to the top of the iris, the lower a rim
+            for lo, hi in ((0.0045, 1), (-1, -0.0068)):
+                bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=4, radius=0.0124)
+                bmesh.ops.delete(bm, geom=[v for v in bm.verts if not (lo <= v.co.z <= hi and v.co.y < 0.003)], context='VERTS')
+                lm = bpy.data.meshes.new(name + '_lid'); bm.to_mesh(lm); bm.free()
+                lid = obj(name + '_lid', lm, skin); lid.location = (s * 0.031, -0.0700, 0.004); lid.parent = h
+                sd = lid.modifiers.new('thick', 'SOLIDIFY'); sd.thickness = 0.0012; sd.offset = 1
+            box(name + '_brow', (0.027, 0.005, 0.0035), HAIR, (s * 0.031, -0.0875, 0.0245), h, (0, s * -0.1, 0))
             sphere(name + '_ear', 1, skin, (s * 0.078, 0.008, -0.008), (0.007, 0.016, 0.028), h, 3)
-        sphere(name + '_lipU', 1, LIP, (0, -0.0868, -0.0612), (0.021, 0.006, 0.0042), h, 3); sphere(name + '_lipL', 1, LIP, (0, -0.0858, -0.0702), (0.018, 0.006, 0.0046), h, 3)
     if style in ('B', 'C'):
         for s in (-1, 1): sphere(name + '_ear', 1, skin, (s * 0.076, 0.008, -0.008), (0.006, 0.014, 0.024), h, 1 if style == 'B' else 3)
         if style == 'B':
@@ -112,11 +123,20 @@ def body(name, x0):
     root = bpy.data.objects.new(name, None); sc.collection.objects.link(root)
     tube(name + '_torso', [((0, 0.005, 0.84), 0.11, 0.085), ((0, 0.01, 0.93), 0.172, 0.115), ((0, 0.005, 1.03), 0.158, 0.105), ((0, 0, 1.12), 0.142, 0.098), ((0, -0.008, 1.25), 0.162, 0.115), ((0, -0.012, 1.35), 0.178, 0.122), ((0, 0, 1.43), 0.185, 0.1), ((0, 0.01, 1.485), 0.1, 0.075), ((0, 0.016, 1.51), 0.056, 0.058)], CLOTH, root)
     for s in (-1, 1):
-        sphere(name + '_sh', 1, CLOTH, (s * 0.2, 0, 1.425), (0.062, 0.066, 0.07), root, 3)
-        tube(name + '_arm', [((s * 0.205, 0, 1.44), 0.05, 0.055), ((s * 0.222, 0.004, 1.31), 0.05, 0.056), ((s * 0.236, 0.01, 1.15), 0.04, 0.043), ((s * 0.246, 0.002, 1.07), 0.043, 0.047), ((s * 0.254, -0.018, 0.9), 0.029, 0.033)], CLOTH, root, 12)
+        tube(name + '_arm', [((s * 0.17, 0, 1.455), 0.05, 0.06), ((s * 0.208, 0, 1.415), 0.062, 0.066), ((s * 0.222, 0.004, 1.31), 0.052, 0.058), ((s * 0.236, 0.01, 1.15), 0.04, 0.043), ((s * 0.246, 0.002, 1.07), 0.043, 0.047), ((s * 0.254, -0.018, 0.9), 0.031, 0.035), ((s * 0.255, -0.02, 0.86), 0.03, 0.034)], CLOTH, root, 12)
         tube(name + '_hand', [((s * 0.254, -0.018, 0.905), 0.027, 0.031), ((s * 0.257, -0.026, 0.84), 0.02, 0.045), ((s * 0.258, -0.032, 0.77), 0.017, 0.042), ((s * 0.258, -0.04, 0.71), 0.012, 0.03)], SKIN, root, 10)
         tube(name + '_leg', [((s * 0.092, 0.005, 0.92), 0.09, 0.1), ((s * 0.098, 0, 0.72), 0.08, 0.088), ((s * 0.104, -0.006, 0.5), 0.057, 0.062), ((s * 0.107, 0.016, 0.37), 0.057, 0.066), ((s * 0.11, 0.016, 0.11), 0.04, 0.046), ((s * 0.11, 0.012, 0.04), 0.044, 0.05)], CLOTH, root, 12)
         sphere(name + '_foot', 1, BOOT, (s * 0.113, -0.055, 0.045), (0.05, 0.135, 0.045), root, 3)
+    # one skin: the parts joined, filled as a single volume and smoothed (the hands and boots stay their own)
+    parts = [c for c in root.children if c.data.materials[0] == CLOTH]
+    dg = bpy.context.evaluated_depsgraph_get(); bm = bmesh.new()
+    for c in parts:
+        tmp = bpy.data.meshes.new_from_object(c.evaluated_get(dg)); tmp.transform(c.matrix_local); bm.from_mesh(tmp); bpy.data.meshes.remove(tmp)
+    me = bpy.data.meshes.new(name + '_skin'); bm.to_mesh(me); bm.free()
+    for c in parts: bpy.data.objects.remove(c)
+    sk = obj(name + '_skin', me, CLOTH); sk.parent = root
+    rm = sk.modifiers.new('one', 'REMESH'); rm.mode = 'VOXEL'; rm.voxel_size = 0.009; rm.use_smooth_shade = True
+    sm = sk.modifiers.new('smooth', 'SMOOTH'); sm.factor = 0.7; sm.iterations = 14
     root.location.x = x0
     return root
 
@@ -150,6 +170,13 @@ for i, s in enumerate('ABCD'):
 camera((0, -3, 0.2), (0, 0, 0.2), 1.3)
 sc.render.resolution_x, sc.render.resolution_y = 1600, 1000
 sc.render.filepath = os.path.join(OUT, 'faces.png'); bpy.ops.render.render(write_still=True)
+
+# D on its own, closer: front, three-quarter, side
+for i, rz in enumerate((0, 38, 90)):
+    q = head('headD_close%d' % i, 'D', SKIN); q.location = (8 + (i - 1) * 0.27, 0, 0); q.rotation_euler = (0, 0, math.radians(rz))
+camera((8, -3, -0.01), (8, 0, -0.01), 0.86)
+sc.render.resolution_x, sc.render.resolution_y = 1700, 760
+sc.render.filepath = os.path.join(OUT, 'face_d.png'); bpy.ops.render.render(write_still=True)
 
 # the figure: front and side, a 1.78 m rule and head-heights beside it
 bx = 4.0
