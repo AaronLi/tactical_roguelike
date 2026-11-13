@@ -260,11 +260,23 @@ const G_ShipModel = (() => {
         K.box(win, x0 + 0.55, RY + 1.3, z0 + 1.6, x0 + 0.6, RY + 2.0, z1 - 1.6); K.box(win, x0 + 1.2, RY + 1.3, z0 + 1.15, x1 - 1.2, RY + 2.0, z0 + 1.2); K.box(win, x0 + 1.2, RY + 1.3, z1 - 1.2, x1 - 1.2, RY + 2.0, z1 - 1.15);
         K.box(dark, cx - 0.06, RY + 2.9, cz - 0.06, cx + 0.06, RY + 7.5, cz + 0.06); K.box(dark, cx + 1.2, RY + 2.9, cz + 1.0, cx + 1.26, RY + 5.2, cz + 1.06); K.box(nav, cx - 0.1, RY + 7.5, cz - 0.1, cx + 0.1, RY + 7.7, cz + 0.1);
         // the prow: a ram that tapers forward under the lowest deck's line, a brow over the bridge's windows
-        if (langOf(own.size) === 'pirate') for (let k = 0; k < 4; k++) K.box(k & 1 ? plate : dark, x0 - 1.5 * (k + 1), -1.0 - 0.25 * k, z0 + 1.2 * (k + 1), x0 - 1.5 * k, 0.7 - 0.2 * k, z1 - 1.2 * (k + 1)); // (a ram: the pirates')
-        K.box(dark, x0 - 1.2, f * FH + 2.95, z0, x0, RY + 0.2, z1);
+        if (langOf(own.size) === 'pirate' && !(sp.wing && own.main)) for (let k = 0; k < 4; k++) K.box(k & 1 ? plate : dark, x0 - 1.5 * (k + 1), -1.0 - 0.25 * k, z0 + 1.2 * (k + 1), x0 - 1.5 * k, 0.7 - 0.2 * k, z1 - 1.2 * (k + 1)); // (a ram: the pirates')
+        if (!(sp.wing && own.main)) K.box(dark, x0 - 1.2, f * FH + 2.95, z0, x0, RY + 0.2, z1);
       } else if (role === 'engine') {
         // the engine block, and her nozzles out of the stern: lit (a ship of two decks: as tall as both)
         const top = own.main ? TOP : WH, mid = top / 2 - 0.1;
+        if (sp.wing && own.main && cz - own.z0 > cx - own.x0) {
+          // (a flying wing's south arm: its engines out of its end, to the south)
+          K.box(dark, x0 + 0.5, top + 0.3, z0 + 0.5, x1 - 0.5, top + 1.7, z1 + 0.6); K.box(plate, x0 + 1.5, top + 1.7, z0 + 1.5, x1 - 1.5, top + 2.3, z1 - 0.5); K.box(dark, x0 + 1, -2.2, z0, x1 - 1, -1.0, z1 + 0.6);
+          const nN = Math.max(2, Math.round((x1 - x0) / 5));
+          for (let k = 0; k < nN; k++) {
+            const x = x0 + (k + 0.5) * (x1 - x0) / nN, rad = Math.min(top * 0.47, (x1 - x0) / nN * 0.42);
+            part(g, new T.Mesh(new T.CylinderGeometry(rad, rad * 0.62, 3.2, 14, 1, true), bellM), x, mid, z1 + 2.2).rotation.x = -Math.PI / 2;
+            part(g, new T.Mesh(new T.CircleGeometry(rad * 0.7, 14), eng), x, mid, z1 + 1.4);
+            part(g, new T.Mesh(new T.ConeGeometry(rad * 0.8, rad * 8, 12, 1, true), new T.MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.28, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide })), x, mid, z1 + 2.6 + rad * 4).rotation.x = Math.PI / 2;
+          }
+          return;
+        }
         K.box(dark, x0 + 0.5, top + 0.3, z0 + 0.5, x1 + 0.6, top + 1.7, z1 - 0.5); K.box(plate, x0 + 1.5, top + 1.7, z0 + 1.5, x1 - 0.5, top + 2.3, z1 - 1.5); K.box(dark, x0, -2.2, z0 + 1, x1 + 0.6, -1.0, z1 - 1);
         const nN = Math.max(2, Math.round((z1 - z0) / (NF > 1 && own.main ? 7 : 5)));
         for (let k = 0; k < nN; k++) {
@@ -312,7 +324,7 @@ const G_ShipModel = (() => {
       const CONT = [0xb5651d, 0x2d5f8a, 0x4f7a3a, 0x8a8f94, 0x9a2f25, 0xc9a227].map((c) => DM(c, 0.8));
       const ti = (m: number) => Math.max(0, Math.min(W - 1, Math.floor(m / TS))), tj = (m: number) => Math.max(0, Math.min(H - 1, Math.floor(m / TS)));
       sp.hulls.forEach((hm, h) => {
-        const lang = langOf(hm.size), top = hm.main ? TOP : WH, RY = top + 0.3, rr = G.U.rng((map.seed ^ (0x51ed + h * 977)) >>> 0), R = (a: number, b: number) => a + rr() * (b - a);
+        const lang = hm.main && sp.wing ? 'wing' : langOf(hm.size), top = hm.main ? TOP : WH, RY = top + 0.3, rr = G.U.rng((map.seed ^ (0x51ed + h * 977)) >>> 0), R = (a: number, b: number) => a + rr() * (b - a);
         // her side at a station down her length (the outer face of her wall, +z or -z), her bow's face and her stern's
         const side = (xm: number, sg: number) => { const x = ti(xm); let z = tj(hm.zc); if (!solid(x, z)) return null; while (solid(x, z + sg)) z += sg; return (z + (sg > 0 ? 1 : 0)) * TS; };
         const end = (sg: number) => { let x = ti((hm.x0 + hm.x1) / 2); const z = tj(hm.zc); if (!solid(x, z)) return sg < 0 ? hm.x0 : hm.x1; while (solid(x + sg, z)) x += sg; return (x + (sg > 0 ? 1 : 0)) * TS; };
@@ -323,7 +335,26 @@ const G_ShipModel = (() => {
         const nose = (m: THREE.Material, len: number, hw: number, y0: number, y1: number) => hexa(m, face, [V(bow - len, y0, pc - hw), V(bow - len, y0, pc + hw), V(bow - len, y1, pc + hw), V(bow - len, y1, pc - hw)]);
         // (a run of her side, a few metres at a time: each piece where her side is there)
         const along = (x0: number, x1: number, step: number, f: (x: number, len: number, zf: number, sg: number) => void) => { for (let x = x0; x < x1 - 0.5; x += step) for (const sg of [-1, 1]) { const zf = side(x + step / 2, sg); if (zf != null && Math.abs(zf - zc) > 2.5) f(x, Math.min(step, x1 - x), zf, sg); } };
-        if (lang === 'navy') {
+        if (lang === 'wing') {
+          // A flying wing: she flies bow corner first. Her two outer sides are her leading edges: a blade down each (a bay in three
+          // left clear), the roof's edge sloped back over it; her bow corner is a glazed canopy over the bridge's corner windows,
+          // a chin under it and a brow over; a ridge runs back down her middle from it; a fin stands at each arm's tip.
+          const X0 = hm.x0, Z0 = hm.z0, X1 = hm.x1, Z1 = hm.z1, bi = map.rooms.findIndex((q, i) => sp.roles[i] === 'bridge' && sp.hullOf[i] === h), br = map.rooms[bi];
+          const bx1 = br ? (br.x + br.w + 1) * TS : X0 + 8, bz1 = br ? (br.z + br.h + 1) * TS : Z0 + 6, wm = langOf(hm.size) === 'pirate' ? dDark : dPlate;
+          let ni = 0;
+          for (let x = bx1 + 0.3; x < X1 - 1; x += TS * 2) { const ln = Math.min(TS * 2, X1 - x); prism(wm, [V(x, RY + 0.2, Z0 - 0.3), V(x, RY + 1.0, Z0 + 2.0), V(x, RY + 0.2, Z0 + 2.0)], V(ln, 0, 0)); if (ni++ % 3 !== 2) prism(wm, [V(x + 0.04, -1.0, Z0), V(x + 0.04, 1.1, Z0 - 1.9), V(x + 0.04, 2.95, Z0)], V(ln - 0.08, 0, 0)); }
+          for (let z = bz1 + 0.3; z < Z1 - 1; z += TS * 2) { const ln = Math.min(TS * 2, Z1 - z); prism(wm, [V(X0 - 0.3, RY + 0.2, z), V(X0 + 2.0, RY + 1.0, z), V(X0 + 2.0, RY + 0.2, z)], V(0, 0, ln)); if (ni++ % 3 !== 2) prism(wm, [V(X0, -1.0, z + 0.04), V(X0 - 1.9, 1.1, z + 0.04), V(X0, 2.95, z + 0.04)], V(0, 0, ln - 0.08)); }
+          const nn = 3.2, kite = (y: number) => [[V(X0, y, bz1), V(X0 - nn, y, Z0 - nn), V(X0, y, Z0)], [V(X0, y, Z0), V(X0 - nn, y, Z0 - nn), V(bx1, y, Z0)]]; // (an arrowhead round her corner, as its two halves)
+          const glassM = new T.MeshStandardMaterial({ color: 0x9fd8ff, transparent: true, opacity: 0.26, roughness: 0.15, metalness: 0.3, emissive: 0x14303c, side: T.DoubleSide, depthWrite: false });
+          for (const [m, y, hh] of [[wm, -1.0, 1.55], [glassM, 0.55, 2.3], [dDark, 2.85, RY + 0.25 - 2.85]] as [THREE.Material, number, number][]) for (const half of kite(y)) prism(m, half, V(0, hh, 0));
+          for (const [a, b] of [[V(X0 - nn, 0.55, Z0 - nn), V(X0 - nn, 2.85, Z0 - nn)], [V(X0 - nn * 0.5, 0.55, (bz1 + Z0 - nn) / 2), V(X0 - nn * 0.5, 2.85, (bz1 + Z0 - nn) / 2)], [V((bx1 + X0 - nn) / 2, 0.55, Z0 - nn * 0.5), V((bx1 + X0 - nn) / 2, 2.85, Z0 - nn * 0.5)]]) bar(dDark, a, b, 0.09);
+          K.box(blue, X0 - nn - 0.12, RY + 0.25, Z0 - nn - 0.12, X0 - nn + 0.12, RY + 0.45, Z0 - nn + 0.12);
+          const tk = Math.min(X1 - X0, Z1 - Z0) * 0.45;
+          hexa(dDark, [V(X0 + 1.2, RY, Z0 + 2.6), V(X0 + 2.6, RY, Z0 + 1.2), V(X0 + tk + 0.7, RY, Z0 + tk - 0.7), V(X0 + tk - 0.7, RY, Z0 + tk + 0.7)], [V(X0 + 1.8, RY + 1.3, Z0 + 2.2), V(X0 + 2.2, RY + 1.3, Z0 + 1.8), V(X0 + tk + 0.2, RY + 0.5, Z0 + tk - 0.2), V(X0 + tk - 0.2, RY + 0.5, Z0 + tk + 0.2)]);
+          prism(dDark, [V(X1 - 6, RY, Z0 + 0.3), V(X1 + 0.4, RY, Z0 + 0.3), V(X1 + 2.6, RY + 4.6, Z0 + 0.3), V(X1 - 0.6, RY + 4.6, Z0 + 0.3)], V(0, 0, 0.28));
+          prism(dDark, [V(X0 + 0.3, RY, Z1 - 6), V(X0 + 0.3, RY, Z1 + 0.4), V(X0 + 0.3, RY + 4.6, Z1 + 2.6), V(X0 + 0.3, RY + 4.6, Z1 - 0.6)], V(0.28, 0, 0));
+          for (const [x, z] of [[X1 + 1.6, Z0 + 0.3], [X0 + 0.3, Z1 + 1.6]]) K.box(red, x - 0.1, RY + 4.6, z - 0.1, x + 0.18, RY + 4.8, z + 0.18);
+        } else if (lang === 'navy') {
           // a long wedge of a bow, its edge a blade; armour sloped in over her roof's edges and a V under her keel
           const len = Math.min(20, pw * 0.8 + 5);
           nose(dDark, len, 0.25, 0.1, top * 0.55);

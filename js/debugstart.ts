@@ -117,7 +117,7 @@ const G_DebugStart = (() => {
         // the helm as she comes out of the jump; &dock: against the hull (or on the pad) already
         const size = (G.SpaceData.SIZES as Record<string, unknown>)[q.get('board') || ''] ? q.get('board') : 'small', pth = themeOf(q.get('assault'));
         helm();
-        G.Net.toHost({ t: 'dbgMs', ms: { kind: q.has('assault') ? 'assault' : 'board', size, other: q.get('other'), obj: q.get('obj'), th: q.has('assault') ? pth : q.has('hull') ? G.SpaceData.TH0 + (+q.get('hull')! || 0) : undefined, seed: q.has('seed') ? +q.get('seed')! : undefined, diff: lvl || 1, night: q.has('night'), fuse: q.has('fuse') ? +q.get('fuse')! : undefined } });
+        G.Net.toHost({ t: 'dbgMs', ms: { kind: q.has('assault') ? 'assault' : 'board', size, other: q.get('other'), wing: q.has('wing'), obj: q.get('obj'), th: q.has('assault') ? pth : q.has('hull') ? G.SpaceData.TH0 + (+q.get('hull')! || 0) : undefined, seed: q.has('seed') ? +q.get('seed')! : undefined, diff: lvl || 1, night: q.has('night'), fuse: q.has('fuse') ? +q.get('fuse')! : undefined } });
         await until(() => !G.Game.hub && G.Game.phase === 'level' && Sp.S.on && Sp.S.kind !== 'hub' && !G.Game.$('veil').classList.contains('on'), 40);
         if (q.get('gun') || q.get('gear')) arm();
         if (q.has('dock')) {

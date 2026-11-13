@@ -171,3 +171,12 @@ ship (cruisers, capital ships) a long wedge bow, armour sloped over her roof's e
 with masts, tail fins, and on two decks a chine between them. Every inside corner of her plan is faired in. What's over her
 sides is smashed away where she's rammed (`cutAt`, called from `js/space.ts` cutHere and for the pirates' pods).
 `node tools/space_shot.mjs "mute&board=large&hull=2" tools/hull_views.mjs --out <dir> --gpu` looks at one from outside.
+
+## A flying wing (`sp.wing`)
+
+Some corvettes and frigates (three in ten on the board; `?board=small&wing`) fly corner first: two arms swept back from her bow
+corner, one east and one south (`js/shipgen.ts` wingSkeleton, wingDeck). Each arm is a spine with compartments on its leading
+and its trailing side and an engine room across its end; the bridge is across the corner, glazed down both of its outer walls
+(corner windows); the spines meet behind it, and a compartment sits in the crook. Outside (`js/shipmodel.ts`, the 'wing'
+language): a blade down each leading edge, a glazed canopy round the corner with a chin under it and a brow over, a ridge down
+her middle, a fin at each tip, engines out of both arms' ends. `node tools/ship_dump.mjs small 7 2 artifact --wing` prints one.

@@ -4,7 +4,7 @@ import { loadLevel } from './level_env.mjs';
 const { G } = loadLevel();
 const size = process.argv[2] || 'small', seed = +(process.argv[3] || 7), level = +(process.argv[4] || 2), other = process.argv[6] || null;
 const t0 = performance.now();
-const map = G.Level.generate(seed, level, G.SpaceData.TH0, false, { size, obj: process.argv[5] || 'artifact', other });
+const map = G.Level.generate(seed, level, G.SpaceData.TH0, false, { size, obj: process.argv[5] || 'artifact', other, wing: process.argv.includes('--wing') });
 const ms = performance.now() - t0, sp = map.sp, TS = G.Level.TS, floors = map.floors || [map];
 floors.forEach((fm, f) => {
   const { W, H, t } = fm, ch = new Array(W * H);

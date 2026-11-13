@@ -16,13 +16,14 @@
 type ShRole = 'bridge' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine' | 'stairs';
 interface ShSlot { rm: LvRoom; pos: number; side: number; deep: boolean; inner: LvRoom | null; door: number[]; x: number }
 interface ShSeg { x: number; w: number; d: number[]; split: boolean[]; stair: boolean }
-interface ShSk { size: SpSize; len: number; sw: number; dmax: number; W: number; H: number; zc: number; segs: ShSeg[] }
+interface ShWing { dO: number; dI: number; ew: number; len: number }
+interface ShSk { wing?: ShWing; size: SpSize; len: number; sw: number; dmax: number; W: number; H: number; zc: number; segs: ShSeg[] }
 interface ShPt { x: number; z: number; y: number }
 // a stretch of hull a ship can breach: three cells of its wall (c the middle one), the way out of her (nx, nz), the wall's middle there
 interface ShSite { c: number; nx: number; nz: number; x: number; z: number; cells: number[] }
 interface ShHull { x0: number; z0: number; x1: number; z1: number; zc: number; main: boolean; size: SpSize }
 interface ShMeta { size: SpSize; obj: SpObj | null; decks: number; other: SpSize | null; breach: { x: number; z: number; face: number; door: number; room: number }; sites?: ShSite[]; cuts: number[][]; locks: Record<number, string>; roles: (ShRole | null)[];
-  hullOf: number[]; console: ShPt | null; artifact: ShPt | null; pods: ShPt[]; salvage: ShPt[]; hullWin: Record<number, number>; hvtRoom: number; cardRooms: Record<string, number>; hull: ShHull; hulls: ShHull[] }
+  hullOf: number[]; console: ShPt | null; artifact: ShPt | null; pods: ShPt[]; salvage: ShPt[]; hullWin: Record<number, number>; wing?: boolean; hvtRoom: number; cardRooms: Record<string, number>; hull: ShHull; hulls: ShHull[] }
 const G_ShipGen = (() => {
   // her frame by class: the spine's length (tiles), its width, how deep her sides are, the bow and stern rooms, how often a deep side is split
   const SPEC: Record<SpSize, { len: number[]; sw: number; dep: number[]; bw: number; bd: number; ew: number; ed: number; split: number; big: number; decks: number }> = {
@@ -142,8 +143,61 @@ const G_ShipGen = (() => {
     return { hold: hold ? hold.rm : null, breach: hold ? [hold.rm.cx, hold.rm.z + hold.rm.h] : null, stairs: st };
   }
 
+  // ---- A flying wing (sp.wing: a corvette or a frigate): she flies corner first. Two arms run back from her bow corner, one
+  // east and one south, each a spine with compartments on its leading side (against the outer hull) and its trailing side,
+  // an engine room across its end. The bridge is across the corner itself, glazed on both of its outer walls; the spines
+  // meet behind it, and a compartment sits in the crook between the arms.
+  function wingSkeleton(r: LvRng, size: SpSize): ShSk {
+    const U = G.U, S = SPEC[size], big = size !== 'small', dO = big ? 3 : 2, dI = big ? 3 : 2, ew = big ? 3 : 2, len = big ? U.ri(r, 14, 17) : U.ri(r, 9, 11), sw = S.sw;
+    const span = 1 + dO + 1 + sw + 1 + len + 1 + ew + 1;
+    return { wing: { dO, dI, ew, len }, size, len, sw, dmax: dO, W: span, H: span, zc: 1 + dO + 1, segs: [] };
+  }
+  function wingDeck(c: Ctx, sk: ShSk, ox: number, oz: number, r: LvRng, hi: number) {
+    const U = G.U, L = G.Level, { W, t, out, rooms, doors, locks } = c, sw = sk.sw, { dO, dI, ew, len } = sk.wing!;
+    const carve = (x: number, z: number, w: number, h: number, role: ShRole) => {
+      for (let j = z - 1; j <= z + h; j++) for (let i = x - 1; i <= x + w; i++) {
+        const k = j * W + i, inside = i >= x && i < x + w && j >= z && j < z + h;
+        if (inside) { t[k] = 0; out[k] = 0; } else if (t[k] === 5) { t[k] = 1; out[k] = 0; }
+      }
+      const rm = L._room(x, z, w, h, { type: role, ship: role, hull: hi, stairs: false }); rooms.push(rm);
+      return rm;
+    };
+    const door = (x: number, z: number, axis: LvAxis, lock?: string | null, mirror?: boolean) => { doors.push([x, z, axis, !lock && r() < 0.15, !!mirror, lock ? 'blast' : 'slide']); if (lock) locks.push([x, z, lock]); };
+    // (where the spines cross behind the bridge; where each arm's compartments begin)
+    const xS = ox + 1 + dO + 1, zS = oz + 1 + dO + 1, a0 = xS + sw + 1, b0 = zS + sw + 1;
+    const bridge = carve(ox + 1, oz + 1, dO + 1 + sw, dO, 'bridge');
+    const spineA = carve(xS, zS, sw + 1 + len, sw, 'spine'); carve(xS, zS + sw, sw, 1 + len, 'spine');
+    carve(a0 + len + 1, zS - 1, ew, sw + 2, 'engine'); carve(xS - 1, b0 + len + 1, sw + 2, ew, 'engine');
+    const lock = sk.size !== 'small' ? 'bridge' : null;
+    for (let k = 0; k < sw; k++) { door(xS + k, zS - 1, 'z', lock, k > 0); door(a0 + len, zS + k, 'x', null, k > 0); door(xS + k, b0 + len, 'z', null, k > 0); }
+    // a run of compartments: each three or four tiles, a bulkhead between
+    const runs = (n: number) => { const o: number[][] = []; for (let x = 0; x < n;) { let w = U.ri(r, 3, 4); if (n - (x + w) < 4) w = n - x; if (w >= 2) o.push([x, w]); x += w + 1; } return o; };
+    interface WSlot { rm: LvRoom; pos: number; side: number; deep: boolean; door: [number, number, LvAxis] }
+    const slots: WSlot[] = [], slot = (rm: LvRoom, pos: number, side: number, d: [number, number, LvAxis]) => { slots.push({ rm, pos, side, deep: false, door: d }); return rm; };
+    slot(carve(a0, b0, dI, dI, 'cargo'), 0.1, 1, [a0 + U.ri(r, 0, dI - 1), zS + sw, 'z']); // (the crook)
+    for (const [x, w] of runs(len)) slot(carve(a0 + x, oz + 1, w, dO, 'cargo'), (x + w / 2) / len, -1, [a0 + x + U.ri(r, 0, w - 1), zS - 1, 'z']);
+    const holds: LvRoom[] = [];
+    for (const [x, w] of runs(len - dI - 1)) holds.push(slot(carve(a0 + dI + 1 + x, b0, w, dI, 'cargo'), (dI + 1 + x + w / 2) / len, 1, [a0 + dI + 1 + x + U.ri(r, 0, w - 1), zS + sw, 'z']));
+    for (const [z, w] of runs(len + sw + 1)) slot(carve(ox + 1, zS + z, dO, w, 'cargo'), Math.max(0, z - sw) / len, -1, [xS - 1, zS + z + U.ri(r, 0, w - 1), 'x']);
+    for (const [z, w] of runs(len - dI - 1)) slot(carve(a0, b0 + dI + 1 + z, dI, w, 'cargo'), (dI + 1 + z + w / 2) / len, 1, [xS + sw, b0 + dI + 1 + z + U.ri(r, 0, w - 1), 'x']);
+    // who gets which: the hold the breach is suggested at (on the east arm's trailing side, well out along it), then the programme
+    const free = slots.slice(), take = (s: WSlot, role: ShRole) => { free.splice(free.indexOf(s), 1); s.rm.type = role as RoomType; s.rm.ship = role; if (role === 'armoury') s.rm.lootRoom = true; };
+    const hold = slots.filter((s) => holds.includes(s.rm)).sort((a, b) => Math.abs(a.pos - 0.65) - Math.abs(b.pos - 0.65))[0] || slots[0];
+    take(hold, 'cargo');
+    for (const [role, pref] of PROGRAM[sk.size + ':0']) {
+      if (!free.length) break;
+      const sc = (s: WSlot) => (pref == null ? 0 : Math.abs(s.pos - pref) * 2) + r() * 0.5;
+      take(free.map((s) => [sc(s), s] as [number, WSlot]).sort((a, b) => a[0] - b[0])[0][1], role);
+    }
+    for (const s of free.slice()) take(s, U.pick(r, FILL));
+    for (const s of slots) door(s.door[0], s.door[1], s.door[2], s.rm.ship === 'armoury' ? 'armory' : s.rm.ship === 'vault' ? 'bridge' : null);
+    // the bridge's windows: glass down both of its outer walls, meeting at her bow corner
+    c.glass.push({ x0: ox, x1: ox, z0: bridge.z, z1: bridge.z + bridge.h - 1, v: 1, sill: 0.8, top: 2.7 }, { x0: bridge.x, x1: bridge.x + bridge.w - 1, z0: oz, z1: oz, v: 0, sill: 0.8, top: 2.7 });
+    return { hold: hold.rm, breach: [hold.rm.cx, hold.rm.z + hold.rm.h], stairs: spineA };
+  }
+
   function lay(r: LvRng, _level: number, sp: SpGen | null): LvLay {
-    const U = G.U, size: SpSize = (sp && sp.size && SPEC[sp.size] ? sp.size : 'small'), S = SPEC[size], main = skeleton(r, size);
+    const U = G.U, size: SpSize = (sp && sp.size && SPEC[sp.size] ? sp.size : 'small'), S = SPEC[size], wing = !!(sp && sp.wing) && (size === 'small' || size === 'medium'), main = wing ? wingSkeleton(r, size) : skeleton(r, size);
     const osz = sp && sp.other && SPEC[sp.other] && S.decks === 1 ? sp.other : null, other = osz ? skeleton(r, osz) : null;
     const W = 2 * MX + Math.max(main.W, other ? other.W : 0), H = MZ0 + (other ? other.H + GAP : 0) + main.H + MZB;
     const mo = [MX, MZ0 + (other ? other.H + GAP : 0)], oo = other ? [MX + U.ri(r, 0, Math.max(0, main.W - other.W)), MZ0] : [0, 0];
@@ -151,14 +205,14 @@ const G_ShipGen = (() => {
     let breach: number[] = [0, 0];
     for (let f = 0; f < S.decks; f++) {
       const c: Ctx = { W, H, t: new Uint8Array(W * H).fill(5), out: new Uint8Array(W * H).fill(1), rooms: [], doors: [], locks: [], glass: [], entries: [] };
-      const m = deck(c, main, mo[0], mo[1], f, S.decks, r, 0, stairs);
+      const m = wing ? wingDeck(c, main, mo[0], mo[1], r, 0) : deck(c, main, mo[0], mo[1], f, S.decks, r, 0, stairs);
       if (m.breach) breach = m.breach;
       if (other && f === 0) deck(c, other, oo[0], oo[1], 0, 1, r, 1, []);
       for (const [x, z, k] of c.locks) locks.push([f, x, z, k]);
       floors.push({ W, H, t: c.t, rooms: c.rooms, out: c.out, doors: c.doors, glass: c.glass, spawn: f === 0 ? m.hold : m.stairs, entries: c.entries.length ? c.entries : null, chasm: 300 });
     }
     const hull = (sk: ShSk, o: number[], isMain: boolean): any => ({ x0: o[0], z0: o[1], x1: o[0] + sk.W - 1, z1: o[1] + sk.H - 1, zc: o[1] + sk.zc + sk.sw / 2, main: isMain, size: sk.size });
-    const src = { size, obj: (sp && sp.obj) || null, decks: S.decks, other: osz, locks, breach, hulls: [hull(main, mo, true)].concat(other ? [hull(other, oo, false)] : []) };
+    const src = { wing, size, obj: (sp && sp.obj) || null, decks: S.decks, other: osz, locks, breach, hulls: [hull(main, mo, true)].concat(other ? [hull(other, oo, false)] : []) };
     if (S.decks === 1) return Object.assign(floors[0], { sp: src });
     return { floors, stairs, sp: src } as unknown as LvLay;
   }
@@ -223,7 +277,7 @@ const G_ShipGen = (() => {
     const cardRooms: Record<string, number> = {};
     if (Object.values(locks).includes('bridge')) cardRooms.bridge = room('quarters', at) >= 0 ? room('quarters', at) : room('mess', at);
     if (Object.values(locks).includes('armory')) cardRooms.armory = room('barracks', at) >= 0 ? room('barracks', at) : room('mess', at);
-    const sp: ShMeta = { size: src.size, obj: src.obj, decks: src.decks, other: src.other, breach, cuts: [], locks, roles, hullOf, console: cons, artifact: ar >= 0 ? clearIn(ar) : null, pods, salvage, hullWin, hvtRoom: bridge, cardRooms, hull: hulls[0], hulls };
+    const sp: ShMeta = { wing: !!src.wing, size: src.size, obj: src.obj, decks: src.decks, other: src.other, breach, cuts: [], locks, roles, hullOf, console: cons, artifact: ar >= 0 ? clearIn(ar) : null, pods, salvage, hullWin, hvtRoom: bridge, cardRooms, hull: hulls[0], hulls };
     map.sp = sp;
     map.theme = Object.assign({}, map.theme, { big: S.big });
     return map;
