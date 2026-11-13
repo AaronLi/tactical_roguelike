@@ -61,14 +61,12 @@ def body_parts():
     parts = []
     # the trunk, pelvis to neck: level rings
     T = [(0.80, 0.07, 0.07, 0.006), (0.86, 0.14, 0.105, 0.008), (0.93, 0.168, 0.12, 0.012), (1.0, 0.158, 0.112, 0.008), (1.04, 0.15, 0.107, 0.005), (1.10, 0.142, 0.104, 0), (1.22, 0.154, 0.122, -0.01), (1.32, 0.164, 0.134, -0.016),
-         (1.39, 0.166, 0.124, -0.008), (1.435, 0.168, 0.11, 0.002), (1.468, 0.165, 0.098, 0.006), (1.49, 0.135, 0.088, 0.011), (1.508, 0.098, 0.078, 0.015), (1.522, 0.076, 0.071, 0.017), (1.535, 0.065, 0.067, 0.018), (1.60, 0.06, 0.064, 0.016)]
+         (1.39, 0.166, 0.124, -0.008), (1.435, 0.172, 0.112, 0.002), (1.47, 0.172, 0.1, 0.006), (1.495, 0.14, 0.088, 0.011), (1.512, 0.1, 0.078, 0.015), (1.525, 0.076, 0.071, 0.017), (1.535, 0.065, 0.067, 0.018), (1.60, 0.06, 0.064, 0.016)]
     parts.append(to_obj('trunk', tube([(V((0, y, z)), rx, ry) for z, rx, ry, y in T], 16)))
     for s, n in ((1, 'R'), (-1, 'L')):
         S, E, W, F, a = J['sh' + n], J['el' + n], J['wr' + n], J['fi' + n], J['arm' + n]
-        # the deltoid: a cap over the shoulder joint, the trapezius running into it; the arm comes out of it
-        parts.append(to_obj('delt' + n, sphere(1, 2, (0.066, 0.074, 0.062), (s * 0.198, 0.002, 1.436))))
         # the arm: from inside the shoulder, a ring either side of the elbow close to it, down to the wrist
-        parts.append(to_obj('arm' + n, tube([(S - a * 0.01 + V((0, 0, -0.02)), 0.045, 0.05), (S + a * 0.06, 0.06, 0.066), (along(S, E, 0.42), 0.056, 0.062), (along(S, E, 0.8), 0.046, 0.05), (E - a * 0.03, 0.043, 0.046), (E, 0.042, 0.045), (E + a * 0.03, 0.044, 0.047),
+        parts.append(to_obj('arm' + n, tube([(S - a * 0.075, 0.022, 0.03), (S - a * 0.05, 0.046, 0.054), (S - a * 0.01, 0.062, 0.068), (S + a * 0.07, 0.064, 0.069), (along(S, E, 0.42), 0.056, 0.062), (along(S, E, 0.8), 0.046, 0.05), (E - a * 0.03, 0.043, 0.046), (E, 0.042, 0.045), (E + a * 0.03, 0.044, 0.047),
                                              (along(E, W, 0.33), 0.047, 0.05), (along(E, W, 0.72), 0.036, 0.04), (W - a * 0.015, 0.028, 0.033), (W + a * 0.01, 0.026, 0.032)], 10)))
         # the hand: flat, its palm toward the thigh; the fingers one block, the thumb its own
         parts.append(to_obj('hand' + n, tube([(W - a * 0.005, 0.02, 0.03), (W + a * 0.035, 0.016, 0.042), (W + a * 0.09, 0.014, 0.045), (W + a * 0.14, 0.012, 0.04), (F, 0.008, 0.026)], 8)))
@@ -94,6 +92,10 @@ def union(parts, name):
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.0015)
     bmesh.ops.dissolve_degenerate(bm, edges=bm.edges, dist=0.0005)
     bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
+    # where the parts run into each other the join is eased, so a shoulder (and a hip) is one form, not shapes set together
+    for cen, rad, it in [(J['sh' + n] + V((0, 0, -0.01)), 0.115, 10) for n in 'RL'] + [(J['hp' + n] + V((0, 0, -0.06)), 0.1, 4) for n in 'RL']:
+        vs = [v for v in bm.verts if (v.co - cen).length < rad]
+        for _ in range(it): bmesh.ops.smooth_vert(bm, verts=vs, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(me); bm.free()
     return link(name, me)
@@ -113,35 +115,51 @@ def dress(o):
 
 # ---- the head: face D (face_options.py's, coarser), its features kept where the surface is thinned out
 G = lambda d, r: math.exp(-(d / r) ** 2)
+# The head's side view is traced from Gray's Anatomy fig. 1193 (models/characters/ref/head_profile.png: the outline of the
+# side of the face over the skull), 0.544 mm to its pixel: [y, z] in the head's own frame (its middle at the origin, the
+# face toward -y). BASE is the face without the nose and lips (they're added down the midline, so they don't spread across
+# it); BACK the back of the skull; WIDE the half-width seen from the front (not in the plate: the usual figures).
+BASE = [(0.022, 0.115), (-0.027, 0.110), (-0.054, 0.097), (-0.073, 0.081), (-0.087, 0.062), (-0.097, 0.043), (-0.102, 0.026), (-0.098, 0.007), (-0.098, -0.02), (-0.101, -0.05), (-0.102, -0.07), (-0.102, -0.088), (-0.104, -0.101), (-0.095, -0.115)]
+BACK = [(0.022, 0.115), (0.060, 0.100), (0.087, 0.073), (0.101, 0.040), (0.103, 0.013), (0.100, -0.020), (0.090, -0.047), (0.082, -0.066), (0.072, -0.096), (0.062, -0.115)]
+NOSE = [(0, 0.007), (0.011, -0.014), (0.021, -0.036), (0.025, -0.042), (0.021, -0.047), (0.006, -0.051), (0, -0.054)]
+LIPS = [(0, -0.052), (0.011, -0.061), (0.006, -0.0685), (0.004, -0.0705), (0.008, -0.079), (0.001, -0.088), (0, -0.092)]
+WIDE = [(0, 0.115), (0.03, 0.108), (0.052, 0.095), (0.068, 0.075), (0.0755, 0.05), (0.077, 0.02), (0.0745, 0.0), (0.071, -0.02), (0.066, -0.045), (0.054, -0.075), (0.041, -0.095), (0.029, -0.108), (0.021, -0.115)]
+def curve(pts):  # a value at a height, from points given top to bottom: straight between them, eased a little
+    def at(z):
+        if z >= pts[0][1]: return pts[0][0]
+        for (v0, z0), (v1, z1) in zip(pts, pts[1:]):
+            if z >= z1: return v0 + (v1 - v0) * (z0 - z) / (z0 - z1)
+        return pts[-1][0]
+    return lambda z: (at(z - 0.004) + 2 * at(z) + at(z + 0.004)) / 4
+fBASE, fBACK, fNOSE, fLIPS, fWIDE = curve(BASE), curve(BACK), curve(NOSE), curve(LIPS), curve(WIDE)
 def head_mesh(sub=4):
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=1)
     for v in bm.verts:
-        x, y, z = v.co; X, Y, Z = x * 0.0745, y * 0.097, z * 0.115
-        if z < 0:
-            t = -z; X *= 1.04 * (1 - 0.35 * t ** 1.4)
-            Y *= (1 - 0.42 * t ** 1.2) if y > 0 else (1 - 0.10 * t ** 2)
-        else: X *= 1 + 0.04 * (1 - z); Y += 0.006 * z
-        if y < 0: Y *= 0.93
-        fr = max(0.0, -y) ** 1.5; ax = abs(X); d = 0.0
-        d += 0.004 * G(Z - 0.024, 0.011) * G(max(0, ax - 0.03), 0.03)
-        d -= 1.1 * 0.0075 * G(Z - 0.004, 0.012) * G(ax - 0.031, 0.015)
-        d += 0.007 * G(ax, 0.0085) * G(Z + 0.008, 0.03) + 0.019 * G(ax, 0.011) * G(Z + 0.034, 0.013) + 0.006 * G(ax - 0.013, 0.007) * G(Z + 0.039, 0.008)
-        d += 1.25 * (0.0045 * G(Z + 0.060, 0.005) + 0.004 * G(Z + 0.071, 0.006) - 0.004 * G(Z + 0.0655, 0.0022)) * G(ax, 0.024)
-        d += 0.006 * G(Z + 0.100, 0.014) * G(ax, 0.022) + 0.004 * G(Z + 0.016, 0.02) * G(ax - 0.05, 0.02)
-        Y -= d * fr; X += math.copysign(0.002 * G(Z + 0.07, 0.03) * G(ax - 0.05, 0.02), X)
-        v.co = (X, Y, Z)
+        ux, uy, uz = v.co; rr = math.hypot(ux, uy) or 1e-9; cx, sy = ux / rr, uy / rr
+        if uz > -0.75: Z = 0.115 * uz; shrink = 1.0
+        else:  # the underside: flat under the jaw, closing in the neck
+            t = (-uz - 0.75) / 0.25; Z = -0.115 * (0.75 + 0.25 * (1 - (1 - t) ** 2)); shrink = math.sqrt(max(0.0, 1 - uz * uz)) / math.sqrt(1 - 0.75 ** 2)
+        yf, yb = fBASE(Z), fBACK(Z); c, h = (yf + yb) / 2, (yb - yf) / 2
+        X = fWIDE(Z) * cx * shrink; Y = c + h * sy * shrink
+        fr = max(0.0, -sy) ** 1.5 * shrink; ax = abs(X); d = 0.0
+        d += fNOSE(Z) * G(ax, 0.0075 + 0.2 * fNOSE(Z)) + 0.006 * G(ax - 0.014, 0.007) * G(Z + 0.045, 0.007)       # the nose down the midline, its wings
+        d += fLIPS(Z) * G(ax, 0.02) * max(0.0, 1 - (ax / 0.03) ** 2)                                               # the lips
+        d += 0.004 * G(Z - 0.024, 0.01) * G(max(0, ax - 0.02), 0.03)                                               # the brow out over the eyes
+        d -= 0.011 * G(Z - 0.004, 0.012) * G(ax - 0.031, 0.015)                                                    # the sockets
+        d += 0.003 * G(Z + 0.018, 0.02) * G(ax - 0.05, 0.02)                                                       # the cheekbones
+        v.co = (X, Y - d * fr, Z)
     return bm
 def sphere(r, sub, scale=(1, 1, 1), at=(0, 0, 0)):
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=r)
     for v in bm.verts: v.co = V((v.co.x * scale[0] + at[0], v.co.y * scale[1] + at[1], v.co.z * scale[2] + at[2]))
     return bm
-EYE = [V((s * 0.0305, -0.0705, 0.004)) for s in (1, -1)]  # (R, L), in the head's own frame
+EYE = [V((s * 0.031, -0.0715, 0.004)) for s in (1, -1)]  # (R, L), in the head's own frame
 def build_head(at):
     bm = head_mesh(5); me = bpy.data.meshes.new('head'); bm.to_mesh(me); bm.free()
     h = link('head', me)
     vg = h.vertex_groups.new(name='plain')
     for v in me.vertices:
-        c = v.co; face = max(0.0, min(1.0, (-c.y - 0.02) / 0.05)) * (1.0 if -0.105 < c.z < 0.04 else 0.25) * max(0.0, min(1.0, (0.062 - abs(c.x)) / 0.02))
+        c = v.co; face = max(0.0, min(1.0, (-c.y - 0.03) / 0.05)) * (1.0 if -0.112 < c.z < 0.04 else 0.25) * max(0.0, min(1.0, (0.062 - abs(c.x)) / 0.02))
         vg.add([v.index], 1.0 - 0.93 * face, 'REPLACE')
     d = h.modifiers.new('thin', 'DECIMATE'); d.ratio = 0.2; d.vertex_group = 'plain'; d.vertex_group_factor = 30.0
     # (which way the group counts isn't to be trusted: both ways are tried, and the one that leaves the face the denser is kept)
@@ -155,19 +173,27 @@ def build_head(at):
     print('HEAD base tris', sum(len(p.vertices) - 2 for p in me2.polygons))
     bm = bmesh.new(); bm.from_mesh(me2)
     # the rest of the head, in the one mesh: ears, lids, the hair's cap (materials by face, below)
-    tags = []
+    tags = []; bm.faces.index_update(); n_base = len(bm.faces)
     def add(b2, tag):
         n0 = len(bm.faces); m3 = bpy.data.meshes.new('t'); b2.to_mesh(m3); b2.free(); bm.from_mesh(m3); bpy.data.meshes.remove(m3); bm.faces.ensure_lookup_table(); tags.append((n0, len(bm.faces), tag))
     for s in (1, -1):
         b2 = bmesh.new(); bmesh.ops.create_uvsphere(b2, u_segments=8, v_segments=5, radius=1)
-        for v in b2.verts: v.co = V((v.co.x * 0.007 + s * 0.0775 - s * 0.006 * max(0, -v.co.y), v.co.y * 0.016 + 0.01, v.co.z * 0.03 - 0.008))
+        for v in b2.verts: v.co = V((v.co.x * 0.007 + s * 0.0745 - s * 0.006 * max(0, -v.co.y), v.co.y * 0.016 + 0.012, v.co.z * 0.03 - 0.01))
         add(b2, 'skin')
     for e in EYE:
-        for lo, hi in ((0.0045, 1), (-1, -0.0068)):
+        for lo, hi in ((0.0056, 1), (-1, -0.0076)):
             b2 = sphere(0.0131, 2); bmesh.ops.delete(b2, geom=[v for v in b2.verts if not (lo <= v.co.z <= hi and v.co.y < 0.003)], context='VERTS')
             for v in b2.verts: v.co += e
             add(b2, 'skin')
-    add(sphere(1, 2, (0.0795, 0.1, 0.096), (0, 0.012, 0.03)), 'hair')
+    bm.normal_update(); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); bm.faces.index_update(); bm.verts.index_update()
+    # the hair: the scalp's own faces over the hairline (high on the forehead, down past the temple, behind the ear to the nape), stood 5 mm off it
+    def haired(c):
+        line = 0.088 if c.y < -0.055 else 0.088 - 0.068 * (c.y + 0.055) / 0.055 if c.y < 0.0 else 0.02 - 0.085 * min(1.0, c.y / 0.06)
+        return c.z > line
+    # (from a plainer copy of the same head, so the hairline runs along even faces, not the thinned scalp's big ones)
+    b2 = head_mesh(4); bmesh.ops.delete(b2, geom=[f for f in b2.faces if not haired(f.calc_center_median())], context='FACES')
+    for v in b2.verts: v.co = V((v.co.x * 1.085, 0.004 + (v.co.y - 0.004) * 1.075, v.co.z * 1.06 + 0.001))
+    add(b2, 'hair')
     from mathutils.bvhtree import BVHTree
     bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); tree = BVHTree.FromBMesh(bm)
     def strip(xs, z_lo, z_hi, rows, tag, lift=0.0007):
@@ -186,8 +212,8 @@ def build_head(at):
             if f.normal.y > 0: f.normal_flip()
         add(b2, tag)
     xs = [k * 0.0235 / 5 for k in range(-5, 6)]; bow = lambda x: 1 - (x / 0.0238) ** 2
-    strip(xs, lambda x: -0.0655, lambda x: -0.0655 + 0.0068 * bow(x) ** 0.7 - 0.0012 * G(x, 0.004), 2, 'lip', 0.0011)
-    strip(xs, lambda x: -0.0655 - 0.008 * bow(x) ** 0.8, lambda x: -0.0655, 2, 'lip', 0.0012)
+    strip(xs, lambda x: -0.0700, lambda x: -0.0700 + 0.0072 * bow(x) ** 0.7 - 0.0012 * G(x, 0.004), 2, 'lip', 0.0009)
+    strip(xs, lambda x: -0.0700 - 0.0085 * bow(x) ** 0.8, lambda x: -0.0700, 2, 'lip', 0.0009)
     for sg in (1, -1): strip([sg * (0.014 + k * 0.006) for k in range(6)], lambda x: 0.0215 + 0.002 * G(abs(x) - 0.03, 0.02), lambda x: 0.0262 + 0.003 * G(abs(x) - 0.028, 0.02), 1, 'hair', 0.0022)
     bm.faces.ensure_lookup_table()
     me = bpy.data.meshes.new('head'); bm.to_mesh(me); bm.free()
@@ -234,7 +260,7 @@ def skin_to(o, arm, bone):
     o.vertex_groups.new(name=bone).add(range(len(o.data.vertices)), 1.0, 'REPLACE')
 
 body = union(body_parts(), 'body'); dress(body)
-head, eyes = build_head(J['head'] + V((0, -0.008, 0.056)))
+head, eyes = build_head(J['head'] + V((0, -0.006, 0.056)))
 arm = build_rig([e.location.copy() for e in eyes])
 skin_auto(body, arm)
 skin_to(head, arm, 'head')
@@ -278,7 +304,7 @@ for kind, loc, en, rot in (('SUN', (0, 0, 3), 3.0, (math.radians(50), 0, math.ra
     d = bpy.data.lights.new(kind, kind); d.energy = en; o = bpy.data.objects.new(kind, d); o.rotation_euler = rot; sc.collection.objects.link(o)
 cd = bpy.data.cameras.new('cam'); cd.type = 'ORTHO'; cd.ortho_scale = 2.05; cam = bpy.data.objects.new('cam', cd); sc.collection.objects.link(cam); sc.camera = cam
 def shoot(path, az, wire=False, c=None, scale=2.05):
-    a = math.radians(az); c = c or V((0, -0.05, 0.9)); cd.ortho_scale = scale; cam.location = c + V((math.sin(a) * 6, -math.cos(a) * 6, 0.5)); cam.rotation_euler = (c - cam.location).to_track_quat('-Z', 'Y').to_euler()
+    a = math.radians(az); flat = c is not None and scale < 0.35; c = c or V((0, -0.05, 0.9)); cd.ortho_scale = scale; cam.location = c + V((math.sin(a) * 6, -math.cos(a) * 6, 0 if flat else 0.5)); cam.rotation_euler = (c - cam.location).to_track_quat('-Z', 'Y').to_euler()
     for o in (body, head):
         for m in [m for m in o.modifiers if m.type == 'WIREFRAME']: o.modifiers.remove(m)
     sc.render.filepath = path; bpy.ops.render.render(write_still=True)
@@ -303,6 +329,10 @@ pose({'thigh.R': (0.05, -0.97, 0.2), 'shin.R': (0, 0.55, -0.83), 'thigh.L': (-0.
 close = []
 for az in (30, 90, 180): f = os.path.join(OUT, '_knee_%d.png' % az); shoot(f, az, c=V((0, -0.1, 0.62)), scale=1.25); close.append(f)
 shots.append(('hips and knees, bent hard', close))
+pose({})
+sc.render.resolution_x, sc.render.resolution_y = 800, 800
+shoot(os.path.join(OUT, '_profile.png'), 90, c=head.location.copy(), scale=0.30)
+sc.render.resolution_x, sc.render.resolution_y = 430, 640
 # the shoulders and the neck, close: arms at the sides, and at rest
 for nm, dirs in (('shoulders and neck, arms down', POSES[1][1]), ('shoulders and neck, at rest', {})):
     pose(dirs); close = []

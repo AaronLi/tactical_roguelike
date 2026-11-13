@@ -17,3 +17,9 @@ sheet.save(os.path.join(HERE, 'poses.png'))
 for _, files in rows:
     for fn in files: os.remove(fn)
 print('poses.png', sheet.size)
+# the head's side view with the plate it was traced from laid over it (Gray's fig. 1193: 0.544 mm a pixel, the head's middle at 350, 223.5)
+prof = os.path.join(HERE, '_profile.png'); plate = os.path.join(HERE, '..', 'ref', 'head_profile.png')
+if os.path.exists(prof) and os.path.exists(plate):
+    im = Image.open(prof).convert('RGB'); pl = Image.open(plate).convert('RGB'); k = 0.000544 * 800 / 0.30
+    pl = pl.resize((round(pl.size[0] * k), round(pl.size[1] * k))); lay = Image.new('RGB', im.size, (255, 255, 255)); lay.paste(pl, (round(400 - 350 * k), round(400 - 223.5 * k)))
+    both = Image.new('RGB', (1600, 800)); both.paste(im, (0, 0)); both.paste(Image.blend(im, lay, 0.45), (800, 0)); both.save(os.path.join(HERE, 'head_profile.png')); os.remove(prof)
