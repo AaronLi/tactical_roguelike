@@ -493,6 +493,48 @@ const G_ShipModel = (() => {
     return { group: g, guns, marker: mk, cutAt };
   }
 
+  // ---- A ship under way out in the zone (js/space.ts traffic): seen passing, not boarded. Built bow to -z, her middle at the
+  // origin: a hull by her kind (freighter, cutter, pirate, navy, wing: the same lines as the ships that are boarded, in little),
+  // engines alight, navigation lights, a strobe that shows a long way off.
+  function traffic(kind: string, seed: number): { group: THREE.Group; len: number } {
+    const r = G.U.rng(seed >>> 0), R = (a: number, b: number) => a + r() * (b - a), K = new Kit(), g = new T.Group();
+    const pal = ({ freighter: [0x8b8f8e, 0x3a3d42], cutter: [0xdfe3e4, 0x7f8a94], pirate: [0x4a3a32, 0x241c1a], navy: [0x69757f, 0x2c3238], wing: [0x59626c, 0x23272c] } as Record<string, number[]>)[kind] || [0x8b8f8e, 0x3a3d42];
+    const E = (c: number, k: number) => new T.Color(c).multiplyScalar(k).getHex(), body = M(pal[0], { emissive: E(pal[0], 0.16) }), dark = M(pal[1], { emissive: E(pal[1], 0.16) }), eng = lit(0x7fd0ff), win = lit(0xffe2a8);
+    const L = kind === 'navy' ? R(120, 200) : kind === 'freighter' ? R(70, 130) : kind === 'cutter' ? R(40, 65) : R(45, 85), w = L * R(0.16, 0.22), h = L * R(0.07, 0.095);
+    const cone = (m: THREE.Material, rad: number, len: number, z: number, sy: number) => { const c = new T.Mesh(new T.ConeGeometry(rad, len, 4), m); c.rotation.order = 'YXZ'; c.rotation.x = -Math.PI / 2; c.rotation.z = Math.PI / 4; c.scale.set(1, 1, 1); c.position.set(0, 0, z - len / 2); const o = new T.Group(); o.scale.y = sy; o.add(c); g.add(o); };
+    const plume = (x: number, y: number, z: number, rad: number) => {
+      const d = part(g, new T.Mesh(new T.CircleGeometry(rad, 10), eng), x, y, z + 0.2);
+      const p = part(g, new T.Mesh(new T.ConeGeometry(rad * 1.1, rad * 9, 10, 1, true), new T.MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.3, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide })), x, y, z + rad * 4.5); p.rotation.x = Math.PI / 2; void d;
+    };
+    let aft = L / 2;
+    if (kind === 'wing') {
+      // two arms swept back from her bow corner
+      const al = L * 0.75, aw = L * 0.2;
+      for (const sd of [-1, 1]) {
+        const arm = new T.Mesh(new T.BoxGeometry(aw, h, al), body), o = new T.Group(); arm.position.set(0, 0, al / 2); o.rotation.y = sd * Math.PI / 4; o.position.set(0, 0, -L * 0.3); o.add(arm);
+        const fin = new T.Mesh(new T.BoxGeometry(0.6, h * 1.6, aw * 0.8), dark); fin.position.set(0, h * 1.1, al - aw * 0.4); o.add(fin); g.add(o);
+        plume(sd * (al * 0.7071 + aw * 0.1), 0, -L * 0.3 + al * 0.7071 + aw * 0.5, h * 0.45);
+      }
+      part(g, new T.Mesh(new T.BoxGeometry(aw * 0.9, h * 0.5, aw * 0.9), new T.MeshStandardMaterial({ color: 0x9fd8ff, emissive: 0x24506a, roughness: 0.2 })), 0, h * 0.1, -L * 0.3).rotation.y = Math.PI / 4;
+      aft = L * 0.3;
+    } else {
+      K.box(body, -w / 2, -h / 2, -L * 0.36, w / 2, h / 2, L / 2); K.box(dark, -w * 0.3, h / 2, L * 0.12, w * 0.3, h * 0.95, L * 0.4); K.box(win, -w * 0.3 - 0.05, h * 0.62, L * 0.14, w * 0.3 + 0.05, h * 0.78, L * 0.2);
+      cone(kind === 'pirate' ? dark : body, w * 0.7071, kind === 'navy' ? L * 0.34 : kind === 'cutter' ? L * 0.42 : kind === 'pirate' ? L * 0.18 : L * 0.1, -L * 0.36, h / w);
+      for (const sd of [-1, 1]) { K.box(win, sd * w / 2 - 0.06, -h * 0.1, -L * 0.3, sd * w / 2 + 0.06, h * 0.12, L * 0.4); }
+      const n = kind === 'navy' ? 3 : 2;
+      for (let k = 0; k < n; k++) { const x = (k - (n - 1) / 2) * w * 0.34; K.box(dark, x - w * 0.13, -h * 0.35, L / 2, x + w * 0.13, h * 0.35, L / 2 + h * 0.6); plume(x, 0, L / 2 + h * 0.6, h * 0.3); }
+      if (kind === 'freighter') { const C = [0xb5651d, 0x2d5f8a, 0x4f7a3a, 0x9a2f25, 0xc9a227].map((c) => M(c, { emissive: E(c, 0.14) })); for (let z = -L * 0.3; z < L * 0.06; z += h * 1.05) for (const x of [-w * 0.24, w * 0.24]) if (r() < 0.8) K.box(C[Math.floor(r() * C.length)], x - w * 0.2, h / 2, z, x + w * 0.2, h / 2 + h * R(0.45, 0.9), z + h); }
+      if (kind === 'navy') { for (const sd of [-1, 1]) K.box(dark, sd * w * 0.3 - 0.4, h / 2, L * 0.34, sd * w * 0.3 + 0.4, h * 1.7, L * 0.5); K.box(dark, -w * 0.18, h * 0.95, L * 0.16, w * 0.18, h * 1.3, L * 0.3); K.box(dark, -0.25, h * 1.3, L * 0.22, 0.25, h * 2.3, L * 0.24); }
+      if (kind === 'cutter') K.box(body, -0.3, h / 2, L * 0.3, 0.3, h * 1.8, L * 0.48);
+      if (kind === 'pirate') { const rust = M(0x5a3222, { emissive: 0x100806 }); for (let k = 0; k < 6; k++) { const z = R(-L * 0.3, L * 0.4), sd = r() < 0.5 ? -1 : 1; K.box(rust, sd * w / 2, R(-h * 0.4, 0), z, sd * (w / 2 + R(0.6, 2)), R(0.1, h * 0.5), z + R(3, 8)); } K.box(dark, w / 2, h * 0.2, -L * 0.05, w / 2 + L * 0.16, h * 0.32, -L * 0.03); }
+    }
+    K.build(g);
+    // her lights: red to port, green to starboard, a white strobe over her back (js/space.ts blinks it)
+    for (const [c, x] of [[0xff3528, -w / 2 - 0.4], [0x30ff60, w / 2 + 0.4]] as number[][]) part(g, new T.Mesh(new T.SphereGeometry(Math.max(0.7, L * 0.008), 6, 5), lit(c)), kind === 'wing' ? x * 2.2 : x, 0, kind === 'wing' ? L * 0.1 : 0);
+    const st = part(g, new T.Mesh(new T.SphereGeometry(Math.max(1.2, L * 0.014), 6, 5), lit(0xffffff)), 0, h * 1.6, aft * 0.5); g.userData.strobe = st;
+    return { group: g, len: L };
+  }
+
   // ---- the asteroid the base is cut into: a rock three kilometres through, a hollow planed into its top for the hangar
   // (flat for 70 m round the level, then walls 90 m high, then the rock's own curve). height(x, z): its surface there.
   function asteroid(Wm: number, Hm: number, seed: number) {
@@ -575,7 +617,7 @@ const G_ShipModel = (() => {
     const g = new T.Group(); g.add(m); g.userData.tex = cv.tex; g.userData.mat = m.material;
     return g;
   }
-  return { ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex };
+  return { traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex };
 })();
 G.ShipModel = G_ShipModel;
 interface GameModules { ShipModel: typeof G_ShipModel; }

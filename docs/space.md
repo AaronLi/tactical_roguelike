@@ -180,3 +180,13 @@ and its trailing side and an engine room across its end; the bridge is across th
 (corner windows); the spines meet behind it, and a compartment sits in the crook. Outside (`js/shipmodel.ts`, the 'wing'
 language): a blade down each leading edge, a glazed canopy round the corner with a chin under it and a brow over, a ridge down
 her middle, a fin at each tip, engines out of both arms' ends. `node tools/ship_dump.mjs small 7 2 artifact --wing` prints one.
+
+## The zone
+
+A mission's space, and the base's, is an open zone a long way round, flown freely. Others are under way in it
+(`js/space.ts` zoneTraffic, zoneStep; their models `js/shipmodel.ts` traffic: freighters, cutters, pirates, navy ships, flying
+wings): each keeps a course of its own, a loop through a few buoys round the middle, at its own pace, placed by the zone's
+clock alone (the host's on a mission: `zt` in the mission's state; the day's at the base) so every screen agrees. The ship
+being boarded is under way too, bow first at 12 m/s: the zone slides by her, and by the level and everyone aboard or near her
+(`zoneV`), so the anchor to jump home by, which is a place in the zone, falls astern as the mission goes on. The others are
+only seen: nothing collides with them and they can't be boarded.

@@ -12,7 +12,7 @@
 //   A jump is the change of level: the screens go to the jump's light instead of black (the veil, kind 'ftl'), the place
 //   is built behind it, and she comes out of the tunnel when it's ready.
 interface SpWp { id: string; name: string; sub: string; p: THREE.Vector3; kind: 'anchor' | 'base' | 'breach' | 'lz' | 'entry'; i?: number; hide?: boolean }
-interface SpMs { raid?: number[][]; hold: number; left?: number; salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
+interface SpMs { raid?: number[][]; hold: number; left?: number; zt?: number; salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
 type SpKind = 'hub' | 'board' | 'assault';
 const G_Space = (() => {
   const T = THREE, SD = G.SpaceData;
@@ -21,8 +21,9 @@ const G_Space = (() => {
     def: SD.SHIPS.kestrel, fleet: SD.fleet0(), seatsDef: [] as SpSeat[], berth: { x: 0, y: 0, z: 0, yaw: 0 }, Dp: new T.Vector3(), Dq: new T.Quaternion(),
     model: null as SmShip | null, solids: [] as { s: any; tag?: string; ship?: boolean; on: boolean; b: number[] }[], noseT: 0, rampT: 0,
     docked: true, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(),
+    zone: null as THREE.Group | null, zoneV: new T.Vector3(), zt0: 0, ztAt: 0, traffic: [] as { obj: THREE.Object3D; pts: THREE.Vector3[]; lens: number[]; total: number; speed: number; off: number; ph: number }[],
     root: null as THREE.Group | null, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null,
-    hull: null as ReturnType<typeof G.ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3 }[],
+    hull: null as ReturnType<typeof G.ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3; p0?: THREE.Vector3 }[],
     ftl: null as null | { st: 'spool' | 'wait' | 'tunnel'; t: number; to: number; T: number }, seats: {} as Record<string, number>, ctl: null as string | null,
     hp: 100, hpMax: 100, ms: null as SpMission | null, state: null as SpMs | null, board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[] },
     auto: null as null | { t: number; T: number; P0: THREE.Vector3; Q0: THREE.Quaternion; P1: THREE.Vector3; Q1: THREE.Quaternion; mid: THREE.Vector3 | null; then: () => void },
@@ -83,6 +84,7 @@ const G_Space = (() => {
     const docked = !sp || !sp.ship || !!sp.ship.docked;
     S.docked = docked; S.noseT = 0; S.rampT = docked && kind !== 'board' ? 1 : 0;
     S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.net = null; S.cruise = false;
+    S.zone = new T.Group(); S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = performance.now();
     if (kind === 'hub') setupHub(map, sp); else if (kind === 'board') setupBoard(map); else setupAssault(map);
     if (docked) { S.P.copy(S.Dp); S.Q.copy(S.Dq); }
     syncSolids();
@@ -199,6 +201,7 @@ const G_Space = (() => {
   function setupHub(map: LvMap, sp: any) {
     const TS = G.Level.TS, Wm = map.W * TS, Hm = map.H * TS, RZ = G.Hangar.RZ;
     const rock = G.ShipModel.asteroid(Wm, Hm, 99); addObj(rock.group);
+    zoneTraffic(4271, new T.Vector3(Wm / 2, 900, Hm / 2), 6500, 5000, 5); // (what's about the base: nothing comes within a few kilometres of the rock)
     const base = new T.Vector3(S.berth.x, 0, S.berth.z);
     S.wps.push({ id: 'base', name: 'HOME', sub: 'Hangar pad', p: base.clone().setY(40), kind: 'base' });
     placeAnchors();
@@ -246,7 +249,12 @@ const G_Space = (() => {
     for (const hh of sp.hulls) if (!hh.main) S.wps.push({ id: 'other', name: SD.SIZES[hh.size].name.toUpperCase(), sub: 'Not the mission: board her for salvage, or leave her', p: new T.Vector3((hh.x0 + hh.x1) / 2, 6, (hh.z0 + hh.z1) / 2), kind: 'base' });
     const out = new T.Vector3(b.x, 150, b.face + 2600);
     const a = addObj(G.ShipModel.anchor(), out); a.lookAt(new T.Vector3(b.x, 0, b.face));
-    S.anchors.push({ i: -1, obj: a, p: out });
+    S.anchors.push({ i: -1, obj: a, p: out, p0: out.clone() });
+    // She's under way: the zone goes by her (and by everyone with her) at her own pace, bow first (a flying wing's is her corner).
+    // The anchor is a place in the zone, so it falls astern; the others out here hold their own courses.
+    S.zone!.add(a); if (S.state && S.state.zt != null) { S.zt0 = S.state.zt; S.ztAt = performance.now(); } else S.zt0 = 0;
+    S.zoneV.copy(sp.wing ? new T.Vector3(-0.7071, 0, -0.7071) : new T.Vector3(-1, 0, 0)).multiplyScalar(12);
+    zoneTraffic(map.seed, new T.Vector3((sp.hull.x0 + sp.hull.x1) / 2, 0, (sp.hull.z0 + sp.hull.z1) / 2), 1500, 7000, 6);
     S.wps.push({ id: 'breach', name: 'SUGGESTED BREACH', sub: 'The hold: or ram any clear stretch of her hull', p: new T.Vector3(b.x, 1.4, b.face + 0.4), kind: 'breach' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
     S.tgt = 0;
     arriveAt(new T.Vector3(b.x + 260, 140, b.face + 1700), new T.Vector3(-0.15, -0.08, -1).normalize());
@@ -280,6 +288,40 @@ const G_Space = (() => {
     for (const id of Object.keys(sp.locks)) {
       const d = map.doors[+id], k = sp.locks[+id]; if (!d || k === 'breach') continue;
       const l = new T.Mesh(new T.BoxGeometry(0.3, 0.1, 0.9), lit(0xff3020)); l.position.set(d.x, (d.fy || 0) + G.Level.DOOR_H + 0.25, d.z); if (d.axis === 'z') l.rotation.y = Math.PI / 2; l.userData.lock = k; root.add(l); S.things.push({ k: 'lock', x: d.x, z: d.z, obj: l });
+    }
+  }
+  // ---- The zone: open space a long way round, and what else is under way in it. Each of the others (zoneTraffic) keeps a
+  // course of its own, a loop through a few points round the middle (never through it), at its own pace; where it is goes by
+  // the zone's clock alone (the host's on a mission, the day's at the base), so it's the same on every screen. On a mission
+  // the ship being boarded is under way too: the zone slides by her (zoneV), which is to say by the level and all aboard.
+  function zoneTraffic(seed: number, c: THREE.Vector3, r0: number, rSpan: number, n: number) {
+    const r = G.U.rng((seed ^ 0x20e5) >>> 0), KINDS = ['freighter', 'freighter', 'cutter', 'pirate', 'navy', 'wing', 'freighter'], buoy = G.ShipModel.lit(0x66c8ff), bg = new T.OctahedronGeometry(7);
+    for (let i = 0; i < n; i++) {
+      const m = 3 + Math.floor(r() * 3), rad = r0 + r() * rSpan, a0 = r() * 6.283, tilt = (r() - 0.5) * 0.5, pts: THREE.Vector3[] = [];
+      for (let k = 0; k < m; k++) { const an = a0 + k * 6.283 / m + (r() - 0.5) * 0.4, rr = rad * (0.85 + r() * 0.3); pts.push(new T.Vector3(c.x + Math.cos(an) * rr, c.y + Math.sin(an) * rr * tilt + (r() - 0.5) * 300, c.z + Math.sin(an) * rr)); }
+      const lens = pts.map((p, k) => p.distanceTo(pts[(k + 1) % m])), total = lens.reduce((a, b) => a + b, 0), kind = KINDS[Math.floor(r() * KINDS.length)];
+      const t = G.ShipModel.traffic(kind, (seed + i * 7919) >>> 0); S.zone!.add(t.group);
+      S.traffic.push({ obj: t.group, pts, lens, total, speed: kind === 'freighter' ? 40 + r() * 30 : kind === 'navy' ? 60 + r() * 40 : 80 + r() * 70, off: r() * total, ph: r() * 3 });
+      for (const p of pts) { const b = new T.Mesh(bg, buoy); b.position.copy(p); S.zone!.add(b); } // (a buoy at each turn of a course)
+    }
+  }
+  const _zd = new T.Vector3(), _zd2 = new T.Vector3();
+  function zoneStep() {
+    if (!S.zone) return;
+    const t = S.zt0 + (performance.now() - S.ztAt) / 1000;
+    S.zone.position.copy(S.zoneV).multiplyScalar(-t);
+    for (const a of S.anchors) if (a.p0) a.p.copy(a.p0).addScaledVector(S.zoneV, -t);
+    for (const q of S.traffic) {
+      let s = (t * q.speed + q.off) % q.total, k = 0;
+      while (s > q.lens[k]) { s -= q.lens[k]; k = (k + 1) % q.lens.length; }
+      const n = q.pts.length, a = q.pts[k], b = q.pts[(k + 1) % n], u = s / q.lens[k];
+      q.obj.position.lerpVectors(a, b, u);
+      // (her head comes round over the last and the first few hundred metres of a leg, not all at once at the buoy)
+      _zd.subVectors(b, a).normalize(); const turn = Math.min(1, 400 / q.lens[k]);
+      if (u > 1 - turn) _zd.lerp(_zd2.subVectors(q.pts[(k + 2) % n], b).normalize(), (u - (1 - turn)) / turn * 0.5).normalize();
+      else if (u < turn) _zd.lerp(_zd2.subVectors(a, q.pts[(k + n - 1) % n]).normalize(), (1 - u / turn) * 0.5).normalize();
+      q.obj.quaternion.copy(lookQ(_zd));
+      const st = q.obj.userData.strobe as THREE.Object3D | undefined; if (st) st.visible = (t + q.ph) % 1.6 < 0.18;
     }
   }
   // -- a base on a planet: in orbit over it first (the level out of sight), then down through the cloud to its pad
@@ -581,6 +623,7 @@ const G_Space = (() => {
   function update(dt: number) {
     if (!S.on || !S.model || G.Game.map !== S.map) return;
     S.t += dt;
+    zoneStep();
     const m = me();
     if (isCtl() || (!S.ctl && Object.keys(G.Game.roster || {}).length < 2)) { fly(dt); if (!S.docked) sendPose(); } else { if (S.auto) S.auto = null; follow(dt); S.stick.multiplyScalar(Math.exp(-dt * 2.2)); }
     ftlStep(dt);
@@ -825,7 +868,7 @@ const G_Space = (() => {
         if (S.on && m.by !== G.Net.myId) { S.auto = null; dockLocal(!!m.on); if (!m.on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); } }
         if (S.on && m.on && S.kind === 'board') { S.shake = 1; G.HUD.toast('BREACH', 'She\'s through the hull. Go.', 2.2); }
         return true;
-      case 'ms': S.state = m; raidPods(m.raid); G.SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
+      case 'ms': if (m.zt != null && S.kind === 'board') { S.zt0 = m.zt; S.ztAt = performance.now(); } S.state = m; raidPods(m.raid); G.SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
       case 'mdone': {
         if (m.ok === 2) { me().credits += m.pay || 0; G.HUD.chat(null, 0, `Salvage: +¢${G.U.fmt(m.pay || 0)}`); G.HUD.feed(`<span class="cr">Salvage +¢${G.U.fmt(m.pay || 0)}</span>`); }
         else if (m.ok) { const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; G.HUD.toast('MISSION COMPLETE', `${G.U.esc(m.name)} · +¢${G.U.fmt(n)}${m.bonus ? ' (taken alive)' : ''}`, 5); G.HUD.chat(null, 0, `Mission complete: +¢${G.U.fmt(n)}`); G.Audio.extract(); if (G.Career.run) G.Career.ev('evidence', n); }
