@@ -60,13 +60,15 @@ along = lambda a, b, u: a + (b - a) * u
 def body_parts():
     parts = []
     # the trunk, pelvis to neck: level rings
-    T = [(0.80, 0.07, 0.07, 0.006), (0.86, 0.14, 0.105, 0.008), (0.93, 0.172, 0.12, 0.012), (1.0, 0.163, 0.112, 0.008), (1.04, 0.156, 0.107, 0.005), (1.10, 0.146, 0.104, 0), (1.22, 0.166, 0.123, -0.01), (1.32, 0.19, 0.138, -0.016),
-         (1.40, 0.2, 0.125, -0.004), (1.45, 0.19, 0.108, 0.004), (1.485, 0.15, 0.09, 0.01), (1.51, 0.085, 0.076, 0.014), (1.54, 0.058, 0.063, 0.017), (1.60, 0.054, 0.06, 0.016)]
+    T = [(0.80, 0.07, 0.07, 0.006), (0.86, 0.14, 0.105, 0.008), (0.93, 0.168, 0.12, 0.012), (1.0, 0.158, 0.112, 0.008), (1.04, 0.15, 0.107, 0.005), (1.10, 0.142, 0.104, 0), (1.22, 0.154, 0.122, -0.01), (1.32, 0.164, 0.134, -0.016),
+         (1.39, 0.166, 0.124, -0.008), (1.435, 0.168, 0.11, 0.002), (1.468, 0.165, 0.098, 0.006), (1.49, 0.135, 0.088, 0.011), (1.508, 0.098, 0.078, 0.015), (1.522, 0.076, 0.071, 0.017), (1.535, 0.065, 0.067, 0.018), (1.60, 0.06, 0.064, 0.016)]
     parts.append(to_obj('trunk', tube([(V((0, y, z)), rx, ry) for z, rx, ry, y in T], 16)))
     for s, n in ((1, 'R'), (-1, 'L')):
         S, E, W, F, a = J['sh' + n], J['el' + n], J['wr' + n], J['fi' + n], J['arm' + n]
+        # the deltoid: a cap over the shoulder joint, the trapezius running into it; the arm comes out of it
+        parts.append(to_obj('delt' + n, sphere(1, 2, (0.066, 0.074, 0.062), (s * 0.198, 0.002, 1.436))))
         # the arm: from inside the shoulder, a ring either side of the elbow close to it, down to the wrist
-        parts.append(to_obj('arm' + n, tube([(S - a * 0.045 + V((0, 0, -0.012)), 0.04, 0.05), (S + a * 0.025, 0.063, 0.068), (along(S, E, 0.42), 0.056, 0.062), (along(S, E, 0.8), 0.046, 0.05), (E - a * 0.03, 0.043, 0.046), (E, 0.042, 0.045), (E + a * 0.03, 0.044, 0.047),
+        parts.append(to_obj('arm' + n, tube([(S - a * 0.01 + V((0, 0, -0.02)), 0.045, 0.05), (S + a * 0.06, 0.06, 0.066), (along(S, E, 0.42), 0.056, 0.062), (along(S, E, 0.8), 0.046, 0.05), (E - a * 0.03, 0.043, 0.046), (E, 0.042, 0.045), (E + a * 0.03, 0.044, 0.047),
                                              (along(E, W, 0.33), 0.047, 0.05), (along(E, W, 0.72), 0.036, 0.04), (W - a * 0.015, 0.028, 0.033), (W + a * 0.01, 0.026, 0.032)], 10)))
         # the hand: flat, its palm toward the thigh; the fingers one block, the thumb its own
         parts.append(to_obj('hand' + n, tube([(W - a * 0.005, 0.02, 0.03), (W + a * 0.035, 0.016, 0.042), (W + a * 0.09, 0.014, 0.045), (W + a * 0.14, 0.012, 0.04), (F, 0.008, 0.026)], 8)))
@@ -104,7 +106,7 @@ def dress(o):
         c = p.center; mi = 0
         if c.z < 1.0 and abs(c.x) < 0.21: mi = 1  # (the belt line: a ring of the trunk)
         if c.z < 0.13 or (c.z < 0.2 and c.y < -0.06): mi = 2
-        if c.z > 1.5 and abs(c.x) < 0.085: mi = 3
+        if c.z > 1.528 and abs(c.x) < 0.085: mi = 3  # (the collar sits at the base of the neck)
         for n in 'RL':
             if (c - J['wr' + n]).dot(J['arm' + n]) > -0.004 and (c - J['wr' + n]).length < 0.24: mi = 3
         p.material_index = mi
@@ -301,6 +303,11 @@ pose({'thigh.R': (0.05, -0.97, 0.2), 'shin.R': (0, 0.55, -0.83), 'thigh.L': (-0.
 close = []
 for az in (30, 90, 180): f = os.path.join(OUT, '_knee_%d.png' % az); shoot(f, az, c=V((0, -0.1, 0.62)), scale=1.25); close.append(f)
 shots.append(('hips and knees, bent hard', close))
+# the shoulders and the neck, close: arms at the sides, and at rest
+for nm, dirs in (('shoulders and neck, arms down', POSES[1][1]), ('shoulders and neck, at rest', {})):
+    pose(dirs); close = []
+    for az in (0, 55, 180): f = os.path.join(OUT, '_%s_%d.png' % (nm.replace(' ', '_').replace(',', ''), az)); shoot(f, az, c=V((0, 0, 1.47)), scale=0.82); close.append(f)
+    shots.append((nm, close))
 # the mesh itself, at rest: its edges shown
 pose({})
 for o in (body, head): o.display_type = 'WIRE'

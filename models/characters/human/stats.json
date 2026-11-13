@@ -1,12 +1,12 @@
 {
  "triangles": {
-  "body": 2028,
+  "body": 2314,
   "head": 1358,
   "eyes": 200,
-  "total": 3586
+  "total": 3872
  },
  "vertices": {
-  "body": 1022,
+  "body": 1165,
   "head": 748
  },
  "bones": [
@@ -128,6 +128,22 @@
     "F:\\workspace\\rt-space\\models\\characters\\human\\_knee_30.png",
     "F:\\workspace\\rt-space\\models\\characters\\human\\_knee_90.png",
     "F:\\workspace\\rt-space\\models\\characters\\human\\_knee_180.png"
+   ]
+  ],
+  [
+   "shoulders and neck, arms down",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_arms_down_0.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_arms_down_55.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_arms_down_180.png"
+   ]
+  ],
+  [
+   "shoulders and neck, at rest",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_at_rest_0.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_at_rest_55.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_at_rest_180.png"
    ]
   ]
  ],
