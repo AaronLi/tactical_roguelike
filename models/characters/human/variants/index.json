@@ -1,0 +1,282 @@
+[
+ {
+  "id": "m01",
+  "sex": "m",
+  "name": "average",
+  "height": 1.756,
+  "scale": 1.0,
+  "hair": "short",
+  "triangles": {
+   "body": 2528,
+   "head": 1977,
+   "eyes": 200,
+   "total": 4705
+  }
+ },
+ {
+  "id": "m02",
+  "sex": "m",
+  "name": "heavy-set",
+  "height": 1.8,
+  "scale": 1.0251,
+  "hair": "buzz",
+  "triangles": {
+   "body": 2560,
+   "head": 1977,
+   "eyes": 200,
+   "total": 4737
+  }
+ },
+ {
+  "id": "m03",
+  "sex": "m",
+  "name": "tall and lean",
+  "height": 1.87,
+  "scale": 1.0649,
+  "hair": "receding",
+  "triangles": {
+   "body": 2562,
+   "head": 1921,
+   "eyes": 200,
+   "total": 4683
+  }
+ },
+ {
+  "id": "m04",
+  "sex": "m",
+  "name": "muscular",
+  "height": 1.83,
+  "scale": 1.0421,
+  "hair": "bald",
+  "triangles": {
+   "body": 2586,
+   "head": 1892,
+   "eyes": 200,
+   "total": 4678
+  }
+ },
+ {
+  "id": "m05",
+  "sex": "m",
+  "name": "short and stocky",
+  "height": 1.68,
+  "scale": 0.9567,
+  "hair": "short",
+  "triangles": {
+   "body": 2550,
+   "head": 1977,
+   "eyes": 200,
+   "total": 4727
+  }
+ },
+ {
+  "id": "m06",
+  "sex": "m",
+  "name": "slim",
+  "height": 1.72,
+  "scale": 0.9795,
+  "hair": "full",
+  "triangles": {
+   "body": 2554,
+   "head": 1977,
+   "eyes": 200,
+   "total": 4731
+  }
+ },
+ {
+  "id": "m07",
+  "sex": "m",
+  "name": "older, a belly",
+  "height": 1.75,
+  "scale": 0.9966,
+  "hair": "receding",
+  "triangles": {
+   "body": 2534,
+   "head": 1921,
+   "eyes": 200,
+   "total": 4655
+  }
+ },
+ {
+  "id": "m08",
+  "sex": "m",
+  "name": "wiry",
+  "height": 1.74,
+  "scale": 0.9909,
+  "hair": "short",
+  "triangles": {
+   "body": 2560,
+   "head": 1977,
+   "eyes": 200,
+   "total": 4737
+  }
+ },
+ {
+  "id": "m09",
+  "sex": "m",
+  "name": "big and tall",
+  "height": 1.91,
+  "scale": 1.0877,
+  "hair": "buzz",
+  "triangles": {
+   "body": 2580,
+   "head": 1977,
+   "eyes": 200,
+   "total": 4757
+  }
+ },
+ {
+  "id": "m10",
+  "sex": "m",
+  "name": "athletic",
+  "height": 1.79,
+  "scale": 1.0194,
+  "hair": "hightop",
+  "triangles": {
+   "body": 2552,
+   "head": 1977,
+   "eyes": 200,
+   "total": 4729
+  }
+ },
+ {
+  "id": "f01",
+  "sex": "f",
+  "name": "average",
+  "height": 1.63,
+  "scale": 0.9282,
+  "hair": "ponytail",
+  "triangles": {
+   "body": 2576,
+   "head": 2026,
+   "eyes": 200,
+   "total": 4802
+  }
+ },
+ {
+  "id": "f02",
+  "sex": "f",
+  "name": "athletic",
+  "height": 1.7,
+  "scale": 0.9681,
+  "hair": "bun",
+  "triangles": {
+   "body": 2568,
+   "head": 2058,
+   "eyes": 200,
+   "total": 4826
+  }
+ },
+ {
+  "id": "f03",
+  "sex": "f",
+  "name": "petite",
+  "height": 1.56,
+  "scale": 0.8884,
+  "hair": "bob",
+  "triangles": {
+   "body": 2584,
+   "head": 2050,
+   "eyes": 200,
+   "total": 4834
+  }
+ },
+ {
+  "id": "f04",
+  "sex": "f",
+  "name": "strong, heavy",
+  "height": 1.69,
+  "scale": 0.9624,
+  "hair": "buzz",
+  "triangles": {
+   "body": 2560,
+   "head": 1978,
+   "eyes": 200,
+   "total": 4738
+  }
+ },
+ {
+  "id": "f05",
+  "sex": "f",
+  "name": "tall and lean",
+  "height": 1.77,
+  "scale": 1.008,
+  "hair": "bob",
+  "triangles": {
+   "body": 2588,
+   "head": 2050,
+   "eyes": 200,
+   "total": 4838
+  }
+ },
+ {
+  "id": "f06",
+  "sex": "f",
+  "name": "curvy",
+  "height": 1.62,
+  "scale": 0.9226,
+  "hair": "topbun",
+  "triangles": {
+   "body": 2606,
+   "head": 2058,
+   "eyes": 200,
+   "total": 4864
+  }
+ },
+ {
+  "id": "f07",
+  "sex": "f",
+  "name": "older",
+  "height": 1.6,
+  "scale": 0.9112,
+  "hair": "pixie",
+  "triangles": {
+   "body": 2592,
+   "head": 1978,
+   "eyes": 200,
+   "total": 4770
+  }
+ },
+ {
+  "id": "f08",
+  "sex": "f",
+  "name": "muscular",
+  "height": 1.73,
+  "scale": 0.9852,
+  "hair": "ponytail",
+  "triangles": {
+   "body": 2548,
+   "head": 2026,
+   "eyes": 200,
+   "total": 4774
+  }
+ },
+ {
+  "id": "f09",
+  "sex": "f",
+  "name": "short and stocky",
+  "height": 1.55,
+  "scale": 0.8827,
+  "hair": "bob",
+  "triangles": {
+   "body": 2564,
+   "head": 2050,
+   "eyes": 200,
+   "total": 4814
+  }
+ },
+ {
+  "id": "f10",
+  "sex": "f",
+  "name": "slim",
+  "height": 1.67,
+  "scale": 0.951,
+  "hair": "bun",
+  "triangles": {
+   "body": 2602,
+   "head": 2058,
+   "eyes": 200,
+   "total": 4860
+  }
+ }
+]

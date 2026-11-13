@@ -17,13 +17,19 @@ HERE = os.path.dirname(os.path.abspath(__file__)); OUT = os.path.join(HERE, 'hum
 bpy.ops.wm.read_factory_settings(use_empty=True)
 sc = bpy.context.scene
 V = Vector
+# which figure: none named is the base one (the pose sheet and human.glb); HUMAN_VARIANT=m03 makes that variant into human/variants
+import sys; sys.path.insert(0, HERE)
+from human_variants import params
+VID = os.environ.get('HUMAN_VARIANT', ''); P = params(VID)
+if VID: OUT = os.path.join(OUT, 'variants'); os.makedirs(OUT, exist_ok=True)
 
 def mat(name, col, rough=0.7):
     m = bpy.data.materials.new(name); m.use_nodes = True
     b = m.node_tree.nodes['Principled BSDF']; b.inputs['Base Color'].default_value = (*col, 1); b.inputs['Roughness'].default_value = rough
     return m
-M = {k: mat(k, c, r) for k, c, r in [('skin', (0.55, 0.37, 0.28), 0.6), ('shirt', (0.13, 0.15, 0.17), 0.85), ('trousers', (0.10, 0.11, 0.12), 0.85), ('boots', (0.03, 0.03, 0.035), 0.6),
-                                     ('hair', (0.05, 0.035, 0.03), 0.85), ('eye', (0.85, 0.85, 0.82), 0.25), ('iris', (0.03, 0.03, 0.035), 0.2), ('lip', (0.46, 0.25, 0.22), 0.5)]}
+sk, hc = P['skin'], P['hair_col']
+M = {k: mat(k, c, r) for k, c, r in [('skin', sk, 0.6), ('stubble', tuple(a * 0.62 + b * 0.38 for a, b in zip(sk, hc)), 0.7), ('shirt', (0.13, 0.15, 0.17), 0.85), ('trousers', (0.10, 0.11, 0.12), 0.85), ('boots', (0.03, 0.03, 0.035), 0.6),
+                                     ('hair', hc, 0.85), ('eye', (0.85, 0.85, 0.82), 0.25), ('iris', P['iris'], 0.2), ('lip', (sk[0] * 0.84, sk[1] * (0.6 if P['sex'] == 'f' else 0.68), sk[2] * (0.7 if P['sex'] == 'f' else 0.79)), 0.5)]}
 def link(name, me, smooth=True):
     o = bpy.data.objects.new(name, me); sc.collection.objects.link(o)
     for p in me.polygons: p.use_smooth = smooth
@@ -64,12 +70,23 @@ def body_parts():
     # the trunk, pelvis to neck: level rings
     T = [(0.80, 0.07, 0.07, 0.006), (0.86, 0.14, 0.105, 0.008), (0.93, 0.168, 0.12, 0.012), (1.0, 0.158, 0.112, 0.008), (1.04, 0.15, 0.107, 0.005), (1.10, 0.142, 0.104, 0), (1.22, 0.154, 0.122, -0.01), (1.32, 0.164, 0.134, -0.016),
          (1.38, 0.166, 0.126, -0.01), (1.415, 0.172, 0.114, -0.002), (1.445, 0.168, 0.102, 0.004), (1.475, 0.135, 0.09, 0.009), (1.502, 0.092, 0.078, 0.014), (1.525, 0.066, 0.068, 0.015), (1.54, 0.055, 0.063, 0.011), (1.62, 0.051, 0.06, 0.0)]
-    parts.append(to_obj('trunk', tube([(V((0, y, z)), rx, ry) for z, rx, ry, y in T], 16)))
+    # (a variant's build: the rings wider or deeper by the region they're in, and a bust forward of the chest)
+    ZA = [(0.80, 'hip'), (0.93, 'hip'), (1.10, 'waist'), (1.32, 'chest'), (1.43, 'shoulder'), (1.49, 'shoulder'), (1.535, 'neck'), (1.7, 'neck')]
+    def reg(tab, z):
+        for (z0, k0), (z1, k1) in zip(ZA, ZA[1:]):
+            if z <= z1: return tab[k0] + (tab[k1] - tab[k0]) * max(0.0, z - z0) / (z1 - z0)
+        return tab['neck']
+    def ring(z, rx, ry, y):
+        b = P['bust'] * G(z - 1.3, 0.05)
+        return (V((0, y - b / 2, z)), rx * reg(P['w'], z), ry * reg(P['d'], z) + b / 2)
+    girth = lambda rings, ks: [(c, rx * k, ry * k) for (c, rx, ry), k in zip(rings, ks)]
+    dl, ua, fa, th_, cf = P['delt'], P['arm'], P['fore'], P['thigh'], P['calf']; el_, kn_ = (ua + fa) / 2, (th_ + cf) / 2
+    parts.append(to_obj('trunk', tube([ring(z, rx, ry, y) for z, rx, ry, y in T], 16)))
     for s, n in ((1, 'R'), (-1, 'L')):
         S, E, W, F, a = J['sh' + n], J['el' + n], J['wr' + n], J['fi' + n], J['arm' + n]
         # the arm: from inside the shoulder, a ring either side of the elbow close to it, down to the wrist
-        parts.append(to_obj('arm' + n, tube([(S - a * 0.075, 0.022, 0.03), (S - a * 0.05, 0.047, 0.055), (S - a * 0.01, 0.063, 0.069), (S + a * 0.065, 0.064, 0.07), (along(S, E, 0.42), 0.056, 0.062), (along(S, E, 0.8), 0.046, 0.05), (E - a * 0.03, 0.043, 0.046), (E, 0.042, 0.045), (E + a * 0.03, 0.044, 0.047),
-                                             (along(E, W, 0.33), 0.047, 0.05), (along(E, W, 0.72), 0.036, 0.04), (W - a * 0.015, 0.028, 0.033), (W + a * 0.01, 0.026, 0.032)], 10)))
+        parts.append(to_obj('arm' + n, tube(girth([(S - a * 0.075, 0.022, 0.03), (S - a * 0.05, 0.047, 0.055), (S - a * 0.01, 0.063, 0.069), (S + a * 0.065, 0.064, 0.07), (along(S, E, 0.42), 0.056, 0.062), (along(S, E, 0.8), 0.046, 0.05), (E - a * 0.03, 0.043, 0.046), (E, 0.042, 0.045), (E + a * 0.03, 0.044, 0.047),
+                                             (along(E, W, 0.33), 0.047, 0.05), (along(E, W, 0.72), 0.036, 0.04), (W - a * 0.015, 0.028, 0.033), (W + a * 0.01, 0.026, 0.032)], [dl, dl, dl, dl, ua, ua, el_, el_, el_, fa, fa, (1 + fa) / 2, (1 + fa) / 2]), 10)))
         # the hand: its palm toward the thigh; four fingers, a little curled in toward it, and the thumb forward of them
         pn = V((-s * math.cos(40 * D2R), 0, -math.sin(40 * D2R)))  # (the way the palm faces: in toward the body)
         kn = W + a * 0.095
@@ -81,8 +98,8 @@ def body_parts():
         parts.append(to_obj('thumb' + n, tube([(th - td * 0.014, 0.012, 0.013), (t1, 0.0105, 0.011), (t1 + (td + a * 0.4 + pn * 0.2).normalized() * 0.03, 0.007, 0.0075)], 6)))
         H, K, A = J['hp' + n], J['kn' + n], J['an' + n]
         z = lambda zz, y=0.0: V((H.x, y, zz))
-        parts.append(to_obj('leg' + n, tube([(z(0.96, 0.004), 0.085, 0.098), (z(0.86, 0.004), 0.094, 0.104), (z(0.70), 0.082, 0.09), (z(0.55, -0.004), 0.064, 0.069), (z(0.51, -0.005), 0.06, 0.064), (z(0.48, -0.005), 0.059, 0.063), (z(0.45, -0.002), 0.058, 0.064),
-                                             (z(0.36, 0.014), 0.06, 0.069), (z(0.22, 0.014), 0.046, 0.053), (z(0.12, 0.013), 0.04, 0.047), (z(0.05, 0.012), 0.042, 0.048)], 10)))
+        parts.append(to_obj('leg' + n, tube(girth([(z(0.96, 0.004), 0.085, 0.098), (z(0.86, 0.004), 0.094, 0.104), (z(0.70), 0.082, 0.09), (z(0.55, -0.004), 0.064, 0.069), (z(0.51, -0.005), 0.06, 0.064), (z(0.48, -0.005), 0.059, 0.063), (z(0.45, -0.002), 0.058, 0.064),
+                                             (z(0.36, 0.014), 0.06, 0.069), (z(0.22, 0.014), 0.046, 0.053), (z(0.12, 0.013), 0.04, 0.047), (z(0.05, 0.012), 0.042, 0.048)], [th_, th_, th_, kn_, kn_, kn_, kn_, cf, cf, (1 + cf) / 2, (1 + cf) / 2]), 10)))
         # the boot: heel to toe
         b = lambda y, zz: V((H.x + s * 0.004, y, zz))
         parts.append(to_obj('boot' + n, tube([(b(0.075, 0.04), 0.03, 0.032), (b(0.045, 0.052), 0.044, 0.05), (b(-0.03, 0.05), 0.048, 0.048), (b(-0.11, 0.04), 0.05, 0.038), (b(-0.17, 0.033), 0.044, 0.031), (b(-0.205, 0.03), 0.028, 0.022)], 8, deep=V((0, 0, 1)))))
@@ -115,7 +132,7 @@ def dress(o):
         c = p.center; mi = 0
         if c.z < 1.0 and abs(c.x) < 0.21: mi = 1  # (the belt line: a ring of the trunk)
         if c.z < 0.13 or (c.z < 0.2 and c.y < -0.06): mi = 2
-        if min(me.vertices[i].co.z for i in p.vertices) > 1.524 and max(abs(me.vertices[i].co.x) for i in p.vertices) < 0.079: mi = 3  # (the collar: the ring of the trunk at the base of the neck)
+        if min(me.vertices[i].co.z for i in p.vertices) > 1.524 and max(abs(me.vertices[i].co.x) for i in p.vertices) < 0.079 * max(1.0, P['w']['neck']): mi = 3  # (the collar: the ring of the trunk at the base of the neck)
         for n in 'RL':
             if (c - J['wr' + n]).dot(J['arm' + n]) > -0.004 and (c - J['wr' + n]).length < 0.26: mi = 3
         p.material_index = mi
@@ -149,27 +166,28 @@ def head_mesh(sub=4):
         else:  # the underside: flat under the jaw, closing in the neck
             t = (-uz - 0.75) / 0.25; Z = -0.115 * (0.75 + 0.25 * (1 - (1 - t) ** 2)); shrink = math.sqrt(max(0.0, 1 - uz * uz)) / math.sqrt(1 - 0.75 ** 2)
         yf, yb = fBASE(Z), fBACK(Z); c, h = (yf + yb) / 2, (yb - yf) / 2
-        X = fWIDE(Z) * cx * shrink; Y = c + h * sy * shrink
+        X = fWIDE(Z) * cx * shrink * P['head_w'] * (1 + (P['jaw'] - 1) * max(0.0, min(1.0, (-0.02 - Z) / 0.06))); Y = c + h * sy * shrink
         fr = max(0.0, -sy) ** 1.5 * shrink; ax = abs(X); d = 0.0
-        d += fNOSE(Z) * G(ax, 0.0075 + 0.2 * fNOSE(Z)) + 0.006 * G(ax - 0.014, 0.007) * G(Z + 0.045, 0.007)       # the nose down the midline, its wings
-        d += fLIPS(Z) * G(ax, 0.02) * max(0.0, 1 - (ax / 0.03) ** 2)                                               # the lips
-        d += 0.004 * G(Z - 0.024, 0.01) * G(max(0, ax - 0.02), 0.03)                                               # the brow out over the eyes
-        d -= 0.011 * G(Z - 0.004, 0.014) * G(ax - 0.0315, 0.018)                                                    # the sockets
-        d += 0.003 * G(Z + 0.018, 0.02) * G(ax - 0.05, 0.02)                                                       # the cheekbones
+        nz, nw = fNOSE(Z) * P['nose'], P['nose_w']
+        d += nz * G(ax, (0.0075 + 0.2 * nz) * nw) + 0.006 * nw * G(ax - 0.014 * nw, 0.007) * G(Z + 0.045, 0.007)       # the nose down the midline, its wings
+        d += fLIPS(Z) * (0.55 + 0.45 * P['lips']) * G(ax, 0.02) * max(0.0, 1 - (ax / 0.03) ** 2)                                               # the lips
+        d += 0.004 * P['brow'] * G(Z - 0.024, 0.01) * G(max(0, ax - 0.02), 0.03)                                               # the brow out over the eyes
+        d -= 0.011 * G(Z - 0.004, 0.014) * G(ax - P['eye_x'], 0.018)                                                    # the sockets
+        d += 0.003 * P['cheek'] * G(Z + 0.018, 0.02) * G(ax - 0.05, 0.02) + P['chin'] * G(Z + 0.1, 0.016) * G(ax, 0.03)                                                       # the cheekbones
         Y -= d * fr
         # under the jaw's edge the surface turns in sharply and runs back flat to the throat: the edge stands, with its shadow under it
         zj = jawz(Y)
         if Z < zj:
             u = min(1.0, (zj - Z) / 0.012); Z = zj - (zj - Z) * 0.3; X *= 1 - 0.3 * u
             if Y < -0.02: Y += 0.014 * u
-        elif Z < zj + 0.01 and Y < 0.03: X *= 1 + 0.035 * (1 - (Z - zj) / 0.01)
+        elif Z < zj + 0.01 and Y < 0.03: X *= 1 + 0.035 * P['jaw_edge'] * (1 - (Z - zj) / 0.01)
         v.co = (X, Y, Z)
     return bm
 def sphere(r, sub, scale=(1, 1, 1), at=(0, 0, 0)):
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=r)
     for v in bm.verts: v.co = V((v.co.x * scale[0] + at[0], v.co.y * scale[1] + at[1], v.co.z * scale[2] + at[2]))
     return bm
-EYE = [V((s * 0.0315, -0.074, 0.004)) for s in (1, -1)]  # (R, L), in the head's own frame
+EYE = [V((s * P['eye_x'], -0.074, 0.004)) for s in (1, -1)]  # (R, L), in the head's own frame
 def build_head(at):
     bm = head_mesh(5); me = bpy.data.meshes.new('head'); bm.to_mesh(me); bm.free()
     h = link('head', me)
@@ -177,8 +195,9 @@ def build_head(at):
     for v in me.vertices:
         c = v.co; face = max(0.0, min(1.0, (-c.y - 0.03) / 0.05)) * (1.0 if -0.112 < c.z < 0.04 else 0.25) * max(0.0, min(1.0, (0.062 - abs(c.x)) / 0.02))
         if abs(c.z - jawz(c.y)) < 0.012 and c.y < 0.03: face = max(face, 0.8)  # (the jaw's edge kept, right round to the ear)
+        if P['hair'] == 'bald' and c.z > 0.02: face = max(face, 0.75)  # (a bare scalp is seen: kept round)
         vg.add([v.index], 1.0 - 0.93 * face, 'REPLACE')
-    d = h.modifiers.new('thin', 'DECIMATE'); d.ratio = 0.2; d.vertex_group = 'plain'; d.vertex_group_factor = 30.0
+    d = h.modifiers.new('thin', 'DECIMATE'); d.ratio = 0.3 if P['hair'] == 'bald' else 0.2; d.vertex_group = 'plain'; d.vertex_group_factor = 30.0
     # (which way the group counts isn't to be trusted: both ways are tried, and the one that leaves the face the denser is kept)
     best = None
     for inv in (False, True):
@@ -197,12 +216,12 @@ def build_head(at):
         b2 = bmesh.new(); bmesh.ops.create_uvsphere(b2, u_segments=8, v_segments=5, radius=1)
         for v in b2.verts:
             ey, ez = v.co.y, v.co.z; wide = 0.016 * (1.0 if ez > -0.2 else 1.0 + ez * 0.55)  # (narrowing to the lobe)
-            v.co = V((s * (0.0725 + 0.004 * v.co.x * s + 0.011 * (ey + 1) * 0.5), ey * wide + 0.014, ez * 0.031 - 0.008))
+            v.co = V((s * (0.0725 * P['head_w'] + 0.004 * v.co.x * s + 0.011 * (ey + 1) * 0.5), ey * wide + 0.014, ez * 0.031 - 0.008))
         add(b2, 'skin')
     for e in EYE:
         r_l = 0.0151; xs = [-0.0147 + k * 0.0294 / 8 for k in range(9)]
         open_ = lambda x: max(0.0, 1 - (x / 0.0128) ** 2) ** 0.7
-        for lo, hi in ((lambda x: 0.0048 * open_(x) + 0.0006, lambda x: 0.0128), (lambda x: -0.0112, lambda x: -0.0056 * open_(x) - 0.0004)):
+        for lo, hi in ((lambda x: 0.0048 * P['eye_open'] * open_(x) + 0.0006, lambda x: 0.0128), (lambda x: -0.0112, lambda x: -0.0056 * P['eye_open'] * open_(x) - 0.0004)):
             b2 = bmesh.new(); grid = []
             for x in xs:
                 col = []
@@ -216,27 +235,46 @@ def build_head(at):
             for f in b2.faces:
                 if f.normal.y > 0: f.normal_flip()
             add(b2, 'skin')
-    HL = [(-0.2, 0.09), (-0.05, 0.09), (-0.036, 0.045), (-0.024, 0.016), (-0.01, 0.012), (0.02, 0.022), (0.036, -0.02), (0.06, -0.065), (0.2, -0.065)]
+    # the hair, by its style: where its line runs (a man's has a sideburn, a receding one sits high at the front), how far the cap
+    # stands off the scalp (across, front to back, up, and lifted at the crown), and whatever hangs or is tied behind
+    style = P['hair']
+    HL = ([(-0.2, 0.108), (-0.026, 0.108), (-0.018, 0.05), (-0.012, 0.016), (-0.004, 0.012), (0.02, 0.022), (0.036, -0.02), (0.06, -0.065), (0.2, -0.065)] if style == 'receding' else
+          [(-0.2, 0.086), (-0.052, 0.086), (-0.038, 0.05), (-0.026, 0.03), (-0.01, 0.024), (0.02, 0.024), (0.036, -0.02), (0.06, -0.065), (0.2, -0.065)] if P['sex'] == 'f' else
+          [(-0.2, 0.09), (-0.05, 0.09), (-0.036, 0.045), (-0.024, 0.016), (-0.01, 0.012), (0.02, 0.022), (0.036, -0.02), (0.06, -0.065), (0.2, -0.065)])
+    tied = (1.055, 1.055, 1.045, 0)
+    kx, ky, kz, top = {'buzz': (1.04, 1.04, 1.03, 0), 'receding': (1.055, 1.055, 1.04, 0), 'full': (1.12, 1.11, 1.06, 0.01), 'hightop': (1.09, 1.085, 1.06, 0.022), 'bob': (1.1, 1.09, 1.06, 0.004),
+                       'ponytail': tied, 'bun': tied, 'topbun': tied}.get(style, (1.085, 1.075, 1.06, 0))
     def hairline(y):
         for (y0, z0), (y1, z1) in zip(HL, HL[1:]):
             if y <= y1: return z0 + (z1 - z0) * (y - y0) / (y1 - y0)
         return HL[-1][1]
     def haired(c, m=0.0):
         return c.z > hairline(c.y) + m
-    # (the scalp under the hair is drawn in a little, so its coarser faces never show through it)
-    for v in bm.verts:
-        if haired(v.co, 0.014): v.co = V((v.co.x * 0.93, 0.004 + (v.co.y - 0.004) * 0.93, v.co.z * 0.95))
-    # (from a plainer copy of the same head, so the hairline runs along even faces, not the thinned scalp's big ones)
-    b2 = head_mesh(4); bmesh.ops.delete(b2, geom=[f for f in b2.faces if not haired(f.calc_center_median())], context='FACES')
     from mathutils.bvhtree import BVHTree
-    plain = head_mesh(4); skin_of = BVHTree.FromBMesh(plain)
-    for ed in b2.edges:  # (its edge is brought to the line along the head's own surface: straight down would sink it under the brow's slope)
-        if len(ed.link_faces) == 1:
-            for v in ed.verts:
-                for _ in range(3): v.co = skin_of.find_nearest(V((v.co.x, v.co.y, hairline(v.co.y) - 0.002)))[0]
-    plain.free()
-    for v in b2.verts: v.co = V((v.co.x * 1.085, 0.004 + (v.co.y - 0.004) * 1.075, v.co.z * 1.06 + 0.001))
-    add(b2, 'hair')
+    if style != 'bald':
+        # (the scalp under the hair is drawn in a little, so its coarser faces never show through it)
+        for v in bm.verts:
+            if haired(v.co, 0.014): v.co = V((v.co.x * 0.93, 0.004 + (v.co.y - 0.004) * 0.93, v.co.z * 0.95))
+        # (from a plainer copy of the same head, so the hairline runs along even faces, not the thinned scalp's big ones)
+        b2 = head_mesh(4); bmesh.ops.delete(b2, geom=[f for f in b2.faces if not haired(f.calc_center_median())], context='FACES')
+        plain = head_mesh(4); skin_of = BVHTree.FromBMesh(plain)
+        for ed in b2.edges:  # (its edge is brought to the line along the head's own surface: straight down would sink it under the brow's slope)
+            if len(ed.link_faces) == 1:
+                for v in ed.verts:
+                    for _ in range(3): v.co = skin_of.find_nearest(V((v.co.x, v.co.y, hairline(v.co.y) - 0.002)))[0]
+        plain.free()
+        for v in b2.verts: v.co = V((v.co.x * kx, 0.004 + (v.co.y - 0.004) * ky, v.co.z * kz + 0.001 + top * max(0.0, min(1.0, (v.co.z - 0.06) / 0.04))))
+        add(b2, 'hair')
+        hw = P['head_w']
+        if style == 'bob':  # a curtain round the back from before one ear to before the other, down to the jaw
+            b2 = bmesh.new(); rows = [(0.05, 0.93), (-0.02, 1.02), (-0.085, 1.0), (-0.128, 0.94)]
+            grid = [[b2.verts.new((0.089 * hw * math.sin(math.radians(-102 + 17 * k)) * m, 0.01 + 0.112 * math.cos(math.radians(-102 + 17 * k)) * m, z)) for z, m in rows] for k in range(13)]
+            for c0, c1 in zip(grid, grid[1:]):
+                for q in range(len(rows) - 1): b2.faces.new((c0[q], c1[q], c1[q + 1], c0[q + 1]))
+            bmesh.ops.recalc_face_normals(b2, faces=b2.faces); add(b2, 'hair')
+        if style == 'ponytail': add(tube([(V((0, 0.085, 0.055)), 0.02, 0.02), (V((0, 0.135, 0.035)), 0.027, 0.025), (V((0, 0.152, -0.05)), 0.022, 0.02), (V((0, 0.14, -0.14)), 0.008, 0.008)], 6, deep=V((1, 0, 0))), 'hair')
+        if style == 'bun': add(sphere(0.037, 2, (1.1, 0.85, 1.0), (0, 0.118, 0.012)), 'hair')
+        if style == 'topbun': add(sphere(0.036, 2, (1.1, 1.0, 0.85), (0, 0.05, 0.142)), 'hair')
     from mathutils.bvhtree import BVHTree
     bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); tree = BVHTree.FromBMesh(bm)
     def strip(xs, z_lo, z_hi, rows, tag, lift=0.0007):
@@ -255,16 +293,18 @@ def build_head(at):
             if f.normal.y > 0: f.normal_flip()
         add(b2, tag)
     xs = [k * 0.0235 / 5 for k in range(-5, 6)]; bow = lambda x: 1 - (x / 0.0238) ** 2
-    strip(xs, lambda x: -0.0700, lambda x: -0.0700 + 0.0072 * bow(x) ** 0.7 - 0.0012 * G(x, 0.004), 2, 'lip', 0.0009)
-    strip(xs, lambda x: -0.0700 - 0.0085 * bow(x) ** 0.8, lambda x: -0.0700, 2, 'lip', 0.0009)
-    for sg in (1, -1): strip([sg * (0.014 + k * 0.006) for k in range(6)], lambda x: 0.0215 + 0.002 * G(abs(x) - 0.03, 0.02), lambda x: 0.0262 + 0.003 * G(abs(x) - 0.028, 0.02), 1, 'hair', 0.0022)
+    strip(xs, lambda x: -0.0700, lambda x: -0.0700 + 0.0072 * P['lips'] * bow(x) ** 0.7 - 0.0012 * G(x, 0.004), 2, 'lip', 0.0009)
+    strip(xs, lambda x: -0.0700 - 0.0085 * P['lips'] * bow(x) ** 0.8, lambda x: -0.0700, 2, 'lip', 0.0009)
+    for sg in (1, -1): strip([sg * (0.014 + k * 0.006) for k in range(6)], lambda x: 0.0215 + 0.002 * G(abs(x) - 0.03, 0.02), lambda x: 0.0215 + 0.0047 * P['browthick'] + 0.003 * G(abs(x) - 0.028, 0.02), 1, 'hair', 0.0022)
     bm.faces.ensure_lookup_table()
     me = bpy.data.meshes.new('head'); bm.to_mesh(me); bm.free()
     me.materials.clear()
-    for k in ('skin', 'hair', 'lip'): me.materials.append(M[k])
+    for k in ('skin', 'hair', 'lip', 'stubble'): me.materials.append(M[k])
     for p in me.polygons:
         c = p.center; tag = next((t for a, b, t in tags if a <= p.index < b), None)
         p.material_index = 1 if tag == 'hair' else 2 if tag == 'lip' else 0
+        # (stubble: the jaw, the chin and the upper lip, rising to the ear at the sides)
+        if P['stubble'] and p.index < n_base and c.y < 0.012 and c.z < -0.03 - 0.022 * max(0.0, min(1.0, (-c.y - 0.03) / 0.06)): p.material_index = 3
     h = link('head', me); h.location = at
     eyes = []
     for e, n in zip(EYE, 'RL'):
@@ -309,7 +349,7 @@ skin_auto(body, arm)
 skin_to(head, arm, 'head')
 for e, n in zip(eyes, 'RL'): skin_to(e, arm, 'eye.' + n)
 tris = lambda o: sum(len(p.vertices) - 2 for p in o.data.polygons)
-stats = {'triangles': {'body': tris(body), 'head': tris(head), 'eyes': sum(tris(e) for e in eyes)}, 'vertices': {'body': len(body.data.vertices), 'head': len(head.data.vertices)}, 'bones': [b[0] for b in BONES] + ['eye.R', 'eye.L'], 'height': 1.756}
+stats = {'triangles': {'body': tris(body), 'head': tris(head), 'eyes': sum(tris(e) for e in eyes)}, 'vertices': {'body': len(body.data.vertices), 'head': len(head.data.vertices)}, 'bones': [b[0] for b in BONES] + ['eye.R', 'eye.L'], 'height': P['height']}
 stats['triangles']['total'] = sum(stats['triangles'].values())
 print('STATS', json.dumps(stats))
 
@@ -351,6 +391,17 @@ def shoot(path, az, wire=False, c=None, scale=2.05):
     for o in (body, head):
         for m in [m for m in o.modifiers if m.type == 'WIREFRAME']: o.modifiers.remove(m)
     sc.render.filepath = path; bpy.ops.render.render(write_still=True)
+if VID:
+    pose(POSES[1][1]); arm.scale = (P['scale'],) * 3; sc.render.resolution_x, sc.render.resolution_y = 430, 640
+    shoot(os.path.join(OUT, VID + '_body.png'), 20, scale=2.2)
+    arm.scale = (1, 1, 1); sc.render.resolution_x, sc.render.resolution_y = 430, 430
+    for az in (0, 40): shoot(os.path.join(OUT, '%s_head_%d.png' % (VID, az)), az, c=V((0, 0, 1.635)), scale=0.44)
+    pose({})
+    for q in bpy.context.selected_objects: q.select_set(False)
+    for o in (arm, body, head, *eyes): o.select_set(True)
+    bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, VID + '.glb'), export_format='GLB', use_selection=True, export_yup=True, export_apply=False, export_animations=False)
+    with open(os.path.join(OUT, VID + '.json'), 'w') as f: json.dump({'id': VID, 'sex': P['sex'], 'name': P['name'], 'height': P['height'], 'scale': P['scale'], 'hair': P['hair'], 'triangles': stats['triangles']}, f)
+    print('DONE', VID); sys.stdout.flush(); os._exit(0)
 sc.render.resolution_x, sc.render.resolution_y = 430, 640
 shots = []
 for name, dirs, hp, look in POSES:
