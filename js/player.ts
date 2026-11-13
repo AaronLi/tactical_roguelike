@@ -124,6 +124,8 @@ const G_Me = {
   _quick: undefined as (PHeldKind | null)[] | undefined, _rm: undefined as WeakMap<WeaponDef, PRecoilModel> | undefined,
   _climbArms: undefined as { g: THREE.Group; arms: { s: THREE.Mesh; h: THREE.Mesh }[] } | undefined, _zipKit: undefined as THREE.Object3D | undefined,
   _specQ: undefined as THREE.Quaternion | null | undefined, _look: undefined as THREE.Vector3 | undefined, _lookW: undefined as unknown as number,
+  _vmRot: null as { vm: THREE.Object3D; x: number; y: number; z: number } | null, // (the gun's eased turn, less the aim: updateCamera)
+  _offShown: null as { y: number; p: number; rcy: number; rcp: number } | null, // (the aim offset the gun was last drawn with, and the recoil then: shoot)
   _lyaw: undefined as number | undefined, _lpitch: undefined as number | undefined, _dtCam: undefined as unknown as number,
   _hp: undefined as number[] | null | undefined, _hpL: undefined as number[] | null | undefined, _limbs: undefined as PLimbs | undefined,
 
@@ -1424,8 +1426,10 @@ const G_Me = {
     const cx = mz ? mz.reduce((a, m) => a + m[2], 0) / mz.length : 0, cy = mz ? mz.reduce((a, m) => a + m[1], 0) / mz.length : 0;
     const cam = G.R.camera;
     this.sinceFire = 0; this.flashBarrels = multi ? list : null;
-    // the round leaves along the gun's bore: your aim plus the gun's offset (recoil, sway), not the camera
-    const off = this.aimOffset();
+    // the round leaves along the gun's bore: your aim plus the gun's offset (recoil, sway), not the camera. The offset as the gun was last
+    // drawn (updateCamera: what the scope showed when you pressed: the sway's moved on a little since), plus any recoil since then (a
+    // second round in the same frame); before the first frame's drawn, as it is now
+    const sh = this._offShown, off = sh ? { y: sh.y + this.rc.y - sh.rcy, p: sh.p + this.rc.p - sh.rcp } : this.aimOffset();
     const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch + off.p, this.yaw + off.y, cam.rotation.z, 'YXZ'));
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(aq);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(aq);
@@ -2873,6 +2877,7 @@ const G_Me = {
     let y = G.U.lerp(u.hip.y, u.ads.y, a) - Math.abs(Math.cos(this.bobT)) * 0.012 * bobAmt;
     // the gun turns so its bore points at the real aim point (relative to the punched view) and shoves back
     const off = this.aimOffset();
+    this._offShown = { y: off.y, p: off.p, rcy: this.rc.y, rcp: this.rc.p }; // (what the next shot leaves along: shoot)
     this.aimScreen = { y: off.y - punchY, p: off.p - punch }; // for the crosshair
     // (the shove back into your shoulder, recoilStep; from the hip the muzzle climbing tips it back a little more)
     let z = G.U.lerp(u.hip.z, u.ads.z, a) + this.shove + Math.max(0, this.rc.p) * 0.35 * (1 - a);
@@ -2911,9 +2916,14 @@ const G_Me = {
     vm.position.x += (x - vm.position.x) * lp;
     vm.position.y += (y - vm.position.y) * lp;
     vm.position.z += (z - vm.position.z) * lp;
-    vm.rotation.x += (rx - vm.rotation.x) * lp;
-    vm.rotation.y += (ry - vm.rotation.y) * lp * 0.6;
-    vm.rotation.z += (rz - vm.rotation.z) * lp * 0.6;
+    // The gun's turn: the part that's where the bore points (aimRx, aimRy: the aim offset, sway, recoil, the arms' lag, what every round
+    // is fired along: shoot) is taken as it is this frame, so a scope's picture (js/render.ts _renderPip: through the lens on the gun)
+    // is where the round goes; only the rest (raising, lowering, reloads, the draw, the zipline's swing) is eased in.
+    const aimRx = off.p - punch, aimRy = off.y - punchY, st = this._vmRot && this._vmRot.vm === vm ? this._vmRot : (this._vmRot = { vm, x: vm.rotation.x - aimRx, y: vm.rotation.y - aimRy, z: vm.rotation.z });
+    st.x += (rx - aimRx - st.x) * lp;
+    st.y += (ry - aimRy - st.y) * lp * 0.6;
+    st.z += (rz - st.z) * lp * 0.6;
+    vm.rotation.set(st.x + aimRx, st.y + aimRy, st.z);
     u.flashes.forEach((fl: any, i: number) => {
       fl.visible = this.flashT > 0 && (this.flashBarrels ? this.flashBarrels.includes(i) : u.flashes.length < 2 || i === this.flashIdx); // (a gun of several barrels: a flash from each that fired)
       if (fl.visible) { fl.rotation.z = Math.random() * 6; fl.scale.setScalar(0.8 + Math.random() * 0.6); }
