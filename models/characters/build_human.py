@@ -61,7 +61,7 @@ def body_parts():
     parts = []
     # the trunk, pelvis to neck: level rings
     T = [(0.80, 0.07, 0.07, 0.006), (0.86, 0.14, 0.105, 0.008), (0.93, 0.168, 0.12, 0.012), (1.0, 0.158, 0.112, 0.008), (1.04, 0.15, 0.107, 0.005), (1.10, 0.142, 0.104, 0), (1.22, 0.154, 0.122, -0.01), (1.32, 0.164, 0.134, -0.016),
-         (1.39, 0.166, 0.124, -0.008), (1.435, 0.172, 0.112, 0.002), (1.47, 0.172, 0.1, 0.006), (1.495, 0.14, 0.088, 0.011), (1.512, 0.1, 0.078, 0.015), (1.525, 0.076, 0.071, 0.017), (1.535, 0.065, 0.067, 0.018), (1.60, 0.06, 0.064, 0.016)]
+         (1.39, 0.166, 0.124, -0.008), (1.435, 0.172, 0.112, 0.002), (1.47, 0.172, 0.1, 0.006), (1.495, 0.14, 0.088, 0.011), (1.512, 0.09, 0.076, 0.015), (1.525, 0.066, 0.068, 0.017), (1.537, 0.055, 0.063, 0.018), (1.60, 0.051, 0.06, 0.016)]
     parts.append(to_obj('trunk', tube([(V((0, y, z)), rx, ry) for z, rx, ry, y in T], 16)))
     for s, n in ((1, 'R'), (-1, 'L')):
         S, E, W, F, a = J['sh' + n], J['el' + n], J['wr' + n], J['fi' + n], J['arm' + n]
@@ -145,7 +145,7 @@ def head_mesh(sub=4):
         d += fNOSE(Z) * G(ax, 0.0075 + 0.2 * fNOSE(Z)) + 0.006 * G(ax - 0.014, 0.007) * G(Z + 0.045, 0.007)       # the nose down the midline, its wings
         d += fLIPS(Z) * G(ax, 0.02) * max(0.0, 1 - (ax / 0.03) ** 2)                                               # the lips
         d += 0.004 * G(Z - 0.024, 0.01) * G(max(0, ax - 0.02), 0.03)                                               # the brow out over the eyes
-        d -= 0.011 * G(Z - 0.004, 0.012) * G(ax - 0.031, 0.015)                                                    # the sockets
+        d -= 0.011 * G(Z - 0.004, 0.014) * G(ax - 0.0315, 0.018)                                                    # the sockets
         d += 0.003 * G(Z + 0.018, 0.02) * G(ax - 0.05, 0.02)                                                       # the cheekbones
         v.co = (X, Y - d * fr, Z)
     return bm
@@ -153,7 +153,7 @@ def sphere(r, sub, scale=(1, 1, 1), at=(0, 0, 0)):
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=r)
     for v in bm.verts: v.co = V((v.co.x * scale[0] + at[0], v.co.y * scale[1] + at[1], v.co.z * scale[2] + at[2]))
     return bm
-EYE = [V((s * 0.031, -0.0715, 0.004)) for s in (1, -1)]  # (R, L), in the head's own frame
+EYE = [V((s * 0.0315, -0.0705, 0.004)) for s in (1, -1)]  # (R, L), in the head's own frame
 def build_head(at):
     bm = head_mesh(5); me = bpy.data.meshes.new('head'); bm.to_mesh(me); bm.free()
     h = link('head', me)
@@ -181,8 +181,8 @@ def build_head(at):
         for v in b2.verts: v.co = V((v.co.x * 0.007 + s * 0.0745 - s * 0.006 * max(0, -v.co.y), v.co.y * 0.016 + 0.012, v.co.z * 0.03 - 0.01))
         add(b2, 'skin')
     for e in EYE:
-        for lo, hi in ((0.0056, 1), (-1, -0.0076)):
-            b2 = sphere(0.0131, 2); bmesh.ops.delete(b2, geom=[v for v in b2.verts if not (lo <= v.co.z <= hi and v.co.y < 0.003)], context='VERTS')
+        for lo, hi in ((0.0068, 1), (-1, -0.0086)):
+            b2 = sphere(0.0151, 2); bmesh.ops.delete(b2, geom=[v for v in b2.verts if not (lo <= v.co.z <= hi and v.co.y < 0.003)], context='VERTS')
             for v in b2.verts: v.co += e
             add(b2, 'skin')
     bm.normal_update(); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); bm.faces.index_update(); bm.verts.index_update()
@@ -225,10 +225,10 @@ def build_head(at):
     h = link('head', me); h.location = at
     eyes = []
     for e, n in zip(EYE, 'RL'):
-        bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=0.012)
+        bm = bmesh.new(); bmesh.ops.create_uvsphere(bm, u_segments=10, v_segments=6, radius=0.014)
         bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0), matrix=Matrix.Rotation(math.pi / 2, 3, 'X'))  # (its pole to the front)
         em = bpy.data.meshes.new('eye' + n); bm.to_mesh(em); bm.free(); em.materials.append(M['eye']); em.materials.append(M['iris'])
-        for p in em.polygons: p.material_index = 1 if p.center.y < -0.0098 else 0
+        for p in em.polygons: p.material_index = 1 if p.center.y < -0.0118 else 0
         o = link('eye' + n, em); o.location = at + e; eyes.append(o)
     return h, eyes
 
