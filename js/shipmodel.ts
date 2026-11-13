@@ -4,7 +4,7 @@
 // each compartment shows on the hull as what it is), the asteroid the base is cut into, an interspatial anchor, a planet,
 // the stars, the tunnel of a jump. Boxes mostly, merged a material: a ship is one draw call a colour.
 interface SmShip { group: THREE.Group; nose: THREE.Group[]; ramp: THREE.Group; turrets: { base: THREE.Group; gun: THREE.Group; muzzle: THREE.Object3D }[]; thrust: THREE.MeshBasicMaterial; glow: THREE.MeshBasicMaterial; screen: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture }; nav: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture }; lights: THREE.PointLight[] }
-interface SmGun { x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
+interface SmGun { k: 'pd' | 'cannon' | 'missile'; x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
 const G_ShipModel = (() => {
   const T = THREE;
   // boxes gathered by material, then merged
@@ -159,20 +159,24 @@ const G_ShipModel = (() => {
   // ---- the outside of a ship that's boarded, from her deck plan (the level's own walls are her sides: this is what's
   // over and under them, and what each compartment shows of itself)
   function hull(map: LvMap): { group: THREE.Group; guns: SmGun[]; marker: THREE.Object3D } {
-    const g = new T.Group(), K = new Kit(), TS = G.Level.TS, { W, H, t } = map, sp = map.sp!, th = map.theme, WH = G.Level.WALL_H;
+    const g = new T.Group(), K = new Kit(), TS = G.Level.TS, { W, H, t } = map, sp = map.sp!, th = map.theme, WH = G.Level.WALL_H, FH = G.Level.FLOOR_H, NF = map.floors ? map.floors.length : 1, TOP = (NF - 1) * FH + WH;
     const base = new T.Color(th.wall as string), r = G.U.rng((map.seed ^ 0x4a11) >>> 0);
     const shade = (k: number, o?: Record<string, any>) => M(base.clone().multiplyScalar(k).getHex(), Object.assign({ emissive: base.clone().multiplyScalar(k * 0.1).getHex() }, o || {}));
     const plate = shade(0.62), dark = shade(0.36, { metalness: 0.5 }), light = shade(0.85), trim = M(0xb8862a, { emissive: 0x2a1c06 }), win = lit(0xffe2a8), nav = lit(0xff4030), eng = lit(0x7fd0ff);
     const solid = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] !== 5;
-    // the belly and the roof's edge: over every run of cells that's part of her (a row at a time)
+    // the belly: under every run of cells that's part of a hull (a row at a time)
     for (let z = 0; z < H; z++) for (let x = 0; x < W;) {
       if (!solid(x, z)) { x++; continue; }
       let x1 = x; while (solid(x1 + 1, z)) x1++;
       K.box(plate, x * TS - 0.02, -1.0, z * TS, (x1 + 1) * TS + 0.02, -0.03, (z + 1) * TS);
       x = x1 + 1;
     }
-    // belts of armour along her sides, under the windows' sills and over their tops, standing proud of the wall
-    const belt = (x0: number, z0: number, x1: number, z1: number) => { K.box(dark, x0, -1.0, z0, x1, -0.02, z1); K.box(dark, x0, 2.92, z0, x1, WH + 0.5, z1); }; // (clear of the deck's height: she can be breached anywhere along it)
+    // belts of armour along her sides, standing proud of the wall: under her lowest deck, between the windows of one deck
+    // and the next, over the top one's (clear of the deck's own height: she can be breached anywhere along it)
+    const belt = (x0: number, z0: number, x1: number, z1: number) => {
+      K.box(dark, x0, -1.0, z0, x1, -0.02, z1);
+      for (let f = 0; f < NF; f++) K.box(dark, x0, f * FH + 2.92, z0, x1, f === NF - 1 ? TOP + 0.5 : (f + 1) * FH + 0.72, z1);
+    };
     for (let z = 0; z < H; z++) for (const dz of [-1, 1]) for (let x = 0; x < W;) {
       if (!(solid(x, z) && !solid(x, z + dz))) { x++; continue; }
       let x1 = x; while (solid(x1 + 1, z) && !solid(x1 + 1, z + dz)) x1++;
@@ -185,64 +189,76 @@ const G_ShipModel = (() => {
       const xf = dx < 0 ? x * TS : (x + 1) * TS; belt(xf + (dx < 0 ? -0.3 : 0), z * TS, xf + (dx < 0 ? 0 : 0.3), (z1 + 1) * TS);
       z = z1 + 1;
     }
-    // each compartment on the roof (and under the keel) as what it is
-    const bellM = shade(0.3, { metalness: 0.5, side: T.DoubleSide });
-    const guns: SmGun[] = [], Y = WH + 0.3;
-    const gunAt = (x: number, z: number, y: number) => {
+    // what she carries on her hull, by her class (js/spacedata.ts SIZES guns): point-defence guns, heavy cannon, missile
+    // launchers, down her back; a ship that isn't the mission's carries none
+    const guns: SmGun[] = [], Y = TOP + 0.3, bellM = shade(0.3, { metalness: 0.5, side: T.DoubleSide });
+    const gunAt = (k: 'pd' | 'cannon' | 'missile', x: number, z: number, y: number) => {
       const o = new T.Group(), gn = new T.Group(); o.position.set(x, y, z);
-      part(o, new T.Mesh(new T.CylinderGeometry(0.9, 1.1, 0.7, 12), dark), 0, 0.35, 0);
-      part(gn, new T.Mesh(new T.BoxGeometry(1.1, 0.7, 1.4), plate), 0, 0.35, 0);
-      for (const sx of [-0.25, 0.25]) part(gn, new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 2.6, 8), dark), sx, 0.4, -1.7).rotation.x = Math.PI / 2;
-      gn.position.y = 0.7; o.add(gn); g.add(o);
-      guns.push({ x, y: y + 1.1, z, hp: 100, obj: o, gun: gn, cool: 1 + r() * 2 });
+      if (k === 'pd') {
+        part(o, new T.Mesh(new T.CylinderGeometry(0.9, 1.1, 0.7, 12), dark), 0, 0.35, 0);
+        part(gn, new T.Mesh(new T.BoxGeometry(1.1, 0.7, 1.4), plate), 0, 0.35, 0);
+        for (const sx of [-0.25, 0.25]) part(gn, new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 2.6, 8), dark), sx, 0.4, -1.7).rotation.x = Math.PI / 2;
+      } else if (k === 'cannon') {
+        part(o, new T.Mesh(new T.CylinderGeometry(2.2, 2.6, 1.2, 14), dark), 0, 0.6, 0);
+        part(gn, new T.Mesh(new T.BoxGeometry(3.4, 1.6, 4.2), plate), 0, 0.8, 0.3);
+        for (const sx of [-0.8, 0.8]) part(gn, new T.Mesh(new T.CylinderGeometry(0.22, 0.26, 7.5, 10), dark), sx, 0.9, -5.2).rotation.x = Math.PI / 2;
+      } else {
+        part(o, new T.Mesh(new T.BoxGeometry(3.2, 0.6, 3.2), dark), 0, 0.3, 0);
+        const bx = part(gn, new T.Mesh(new T.BoxGeometry(2.6, 1.5, 3.4), plate), 0, 0.9, 0); bx.rotation.x = 0.5;
+        for (const sx of [-0.8, 0, 0.8]) for (const sy of [0.5, 1.2]) part(gn, new T.Mesh(new T.CircleGeometry(0.3, 10), nav), sx, sy + 0.95, -1.42).rotation.x = 0.5;
+      }
+      gn.position.y = k === 'cannon' ? 1.2 : 0.7; o.add(gn); g.add(o);
+      guns.push({ k, x, y: y + (k === 'cannon' ? 2.1 : 1.1), z, hp: k === 'pd' ? 100 : k === 'cannon' ? 320 : 180, obj: o, gun: gn, cool: 1 + r() * 3 });
     };
+    {
+      const C = G.SpaceData.SIZES[sp.size].guns, list: ('pd' | 'cannon' | 'missile')[] = [], hm = sp.hull;
+      for (let k = 0; k < Math.max(C.pd, C.cannon, C.missile); k++) { if (k < C.cannon) list.push('cannon'); if (k < C.pd) list.push('pd'); if (k < C.missile) list.push('missile'); }
+      for (let k = C.pd; k > 0 && list.filter((q) => q === 'pd').length < C.pd; k--) list.push('pd');
+      list.forEach((k, n) => { const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * (k === 'cannon' ? 0 : 3.4); K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); });
+    }
+    // each compartment on the roof (her top deck's) and under the keel (her lowest's) as what it is
     map.rooms.forEach((rm, i) => {
       const role = sp.roles[i], x0 = rm.x * TS, z0 = rm.z * TS, x1 = (rm.x + rm.w) * TS, z1 = (rm.z + rm.h) * TS, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, in1 = Math.min(1.2, (x1 - x0) / 5, (z1 - z0) / 5);
+      const f = rm.fl || 0, own = sp.hulls[sp.hullOf[i]] || sp.hull, roof = f === NF - 1 || !own.main, RY = own.main ? Y : WH + 0.3, keel = f === 0;
       if (role === 'bridge') {
         // a command tower: a deck above the bridge with its own windows all round, masts over it
-        K.box(light, x0 + 0.6, Y, z0 + 1.2, x1 - 0.6, Y + 2.6, z1 - 1.2); K.box(dark, x0 + 0.3, Y + 2.6, z0 + 0.9, x1 - 0.3, Y + 2.9, z1 - 0.9);
-        K.box(win, x0 + 0.55, Y + 1.3, z0 + 1.6, x0 + 0.6, Y + 2.0, z1 - 1.6); K.box(win, x0 + 1.2, Y + 1.3, z0 + 1.15, x1 - 1.2, Y + 2.0, z0 + 1.2); K.box(win, x0 + 1.2, Y + 1.3, z1 - 1.2, x1 - 1.2, Y + 2.0, z1 - 1.15);
-        K.box(dark, cx - 0.06, Y + 2.9, cz - 0.06, cx + 0.06, Y + 7.5, cz + 0.06); K.box(dark, cx + 1.2, Y + 2.9, cz + 1.0, cx + 1.26, Y + 5.2, cz + 1.06); K.box(nav, cx - 0.1, Y + 7.5, cz - 0.1, cx + 0.1, Y + 7.7, cz + 0.1);
-        // the prow under her windows: a ram that tapers forward, a brow over them
+        K.box(light, x0 + 0.6, RY, z0 + 1.2, x1 - 0.6, RY + 2.6, z1 - 1.2); K.box(dark, x0 + 0.3, RY + 2.6, z0 + 0.9, x1 - 0.3, RY + 2.9, z1 - 0.9);
+        K.box(win, x0 + 0.55, RY + 1.3, z0 + 1.6, x0 + 0.6, RY + 2.0, z1 - 1.6); K.box(win, x0 + 1.2, RY + 1.3, z0 + 1.15, x1 - 1.2, RY + 2.0, z0 + 1.2); K.box(win, x0 + 1.2, RY + 1.3, z1 - 1.2, x1 - 1.2, RY + 2.0, z1 - 1.15);
+        K.box(dark, cx - 0.06, RY + 2.9, cz - 0.06, cx + 0.06, RY + 7.5, cz + 0.06); K.box(dark, cx + 1.2, RY + 2.9, cz + 1.0, cx + 1.26, RY + 5.2, cz + 1.06); K.box(nav, cx - 0.1, RY + 7.5, cz - 0.1, cx + 0.1, RY + 7.7, cz + 0.1);
+        // the prow: a ram that tapers forward under the lowest deck's line, a brow over the bridge's windows
         for (let k = 0; k < 4; k++) K.box(k & 1 ? plate : dark, x0 - 1.5 * (k + 1), -1.0 - 0.25 * k, z0 + 1.2 * (k + 1), x0 - 1.5 * k, 0.7 - 0.2 * k, z1 - 1.2 * (k + 1));
-        K.box(dark, x0 - 1.2, 2.95, z0, x0, WH + 0.5, z1);
+        K.box(dark, x0 - 1.2, f * FH + 2.95, z0, x0, RY + 0.2, z1);
       } else if (role === 'engine') {
-        // the engine block, and her nozzles out of the stern: lit
-        K.box(dark, x0 + 0.5, Y, z0 + 0.5, x1 + 0.6, Y + 1.4, z1 - 0.5); K.box(plate, x0 + 1.5, Y + 1.4, z0 + 1.5, x1 - 0.5, Y + 2.0, z1 - 1.5); K.box(dark, x0, -2.2, z0 + 1, x1 + 0.6, -1.0, z1 - 1);
-        const nN = Math.max(2, Math.round((z1 - z0) / 5));
+        // the engine block, and her nozzles out of the stern: lit (a ship of two decks: as tall as both)
+        const top = own.main ? TOP : WH, mid = top / 2 - 0.1;
+        K.box(dark, x0 + 0.5, top + 0.3, z0 + 0.5, x1 + 0.6, top + 1.7, z1 - 0.5); K.box(plate, x0 + 1.5, top + 1.7, z0 + 1.5, x1 - 0.5, top + 2.3, z1 - 1.5); K.box(dark, x0, -2.2, z0 + 1, x1 + 0.6, -1.0, z1 - 1);
+        const nN = Math.max(2, Math.round((z1 - z0) / (NF > 1 && own.main ? 7 : 5)));
         for (let k = 0; k < nN; k++) {
-          const z = z0 + (k + 0.5) * (z1 - z0) / nN, rad = Math.min(1.9, (z1 - z0) / nN * 0.42);
-          const bell = part(g, new T.Mesh(new T.CylinderGeometry(rad, rad * 0.62, 3.2, 14, 1, true), bellM), x1 + 2.2, 1.9, z); bell.rotation.z = Math.PI / 2;
-          const disc = part(g, new T.Mesh(new T.CircleGeometry(rad * 0.7, 14), eng), x1 + 1.4, 1.9, z); disc.rotation.y = Math.PI / 2;
-          const plume = part(g, new T.Mesh(new T.ConeGeometry(rad * 0.8, 14, 12, 1, true), new T.MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.28, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide })), x1 + 9.5, 1.9, z); plume.rotation.z = -Math.PI / 2;
+          const z = z0 + (k + 0.5) * (z1 - z0) / nN, rad = Math.min(top * 0.47, (z1 - z0) / nN * 0.42);
+          const bell = part(g, new T.Mesh(new T.CylinderGeometry(rad, rad * 0.62, 3.2, 14, 1, true), bellM), x1 + 2.2, mid, z); bell.rotation.z = Math.PI / 2;
+          const disc = part(g, new T.Mesh(new T.CircleGeometry(rad * 0.7, 14), eng), x1 + 1.4, mid, z); disc.rotation.y = Math.PI / 2;
+          const plume = part(g, new T.Mesh(new T.ConeGeometry(rad * 0.8, rad * 8, 12, 1, true), new T.MeshBasicMaterial({ color: 0x5ab4ff, transparent: true, opacity: 0.28, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide })), x1 + 2.6 + rad * 4, mid, z); plume.rotation.z = -Math.PI / 2;
         }
-      } else if (role === 'reactor') {
-        K.box(dark, x0 + in1, Y, z0 + in1, x1 - in1, Y + 0.9, z1 - in1);
-        for (let x = x0 + 1; x < x1 - 0.8; x += 1.1) K.box(light, x, Y + 0.9, z0 + 0.6, x + 0.12, Y + 3.2, z1 - 0.6); // radiator fins
-      } else if (role === 'magazine') {
-        K.box(plate, x0 + in1, Y, z0 + in1, x1 - in1, Y + 0.6, z1 - in1); gunAt(cx, cz, Y + 0.6);
+      } else if (role === 'reactor' && roof) {
+        K.box(dark, x0 + in1, RY, z0 + in1, x1 - in1, RY + 0.9, z1 - in1);
+        for (let x = x0 + 1; x < x1 - 0.8; x += 1.1) K.box(light, x, RY + 0.9, z0 + 0.6, x + 0.12, RY + 3.2, z1 - 0.6); // radiator fins
       } else if (role === 'cargo') {
-        K.box(plate, x0 + in1, Y, z0 + in1, x1 - in1, Y + 0.35, z1 - in1); K.box(trim, cx - 0.06, Y + 0.35, z0 + in1, cx + 0.06, Y + 0.4, z1 - in1); // hatch covers
-        K.box(dark, x0 + 1, -1.9, z0 + 1, x1 - 1, -1.0, z1 - 1);
+        if (roof) { K.box(plate, x0 + in1, RY, z0 + in1, x1 - in1, RY + 0.35, z1 - in1); K.box(trim, cx - 0.06, RY + 0.35, z0 + in1, cx + 0.06, RY + 0.4, z1 - in1); } // hatch covers
+        if (keel) K.box(dark, x0 + 1, -1.9, z0 + 1, x1 - 1, -1.0, z1 - 1);
       } else if (role === 'pods') {
         // the pods' blisters on her side
-        const south = cz > sp.hull.zc, zf = south ? z1 + TS : z0 - TS;
-        for (let k = 0; k < 3; k++) { const x = x0 + (k + 0.5) * (x1 - x0) / 3; K.box(trim, x - 0.9, 0.2, zf + (south ? 0 : -1.3), x + 0.9, 2.3, zf + (south ? 1.3 : 0)); }
-        K.box(plate, x0 + in1, Y, z0 + in1, x1 - in1, Y + 0.3, z1 - in1);
+        const south = cz > own.zc, zf = south ? z1 + TS : z0 - TS, by = f * FH;
+        for (let k = 0; k < 3; k++) { const x = x0 + (k + 0.5) * (x1 - x0) / 3; K.box(trim, x - 0.9, by + 2.95, zf + (south ? 0 : -1.3), x + 0.9, by + 3.9, zf + (south ? 1.3 : 0)); }
+        if (roof) K.box(plate, x0 + in1, RY, z0 + in1, x1 - in1, RY + 0.3, z1 - in1);
       } else if (role === 'spine') {
-        K.box(dark, x0, Y, cz - 0.9, x1, Y + 0.7, cz + 0.9); // a ridge down her back, lights along it
-        for (let x = x0 + 3; x < x1 - 2; x += 8) K.box(win, x, Y + 0.7, cz - 0.15, x + 0.6, Y + 0.76, cz + 0.15);
+        if (roof) { K.box(dark, x0, RY, cz - 0.9, x1, RY + 0.7, cz + 0.9); for (let x = x0 + 3; x < x1 - 2; x += 8) K.box(win, x, RY + 0.7, cz - 0.15, x + 0.6, RY + 0.76, cz + 0.15); } // a ridge down her back, lights along it
       } else {
-        const hgt = 0.3 + r() * 0.7; K.box(r() < 0.5 ? plate : light, x0 + in1, Y, z0 + in1, x1 - in1, Y + hgt, z1 - in1);
-        if (r() < 0.4) K.box(dark, cx - 0.7, Y + hgt, cz - 0.7, cx + 0.7, Y + hgt + 0.5, cz + 0.7);
-        if (r() < 0.5) K.box(dark, x0 + 1.2, -1.6, z0 + 1.2, x1 - 1.2, -1.0, z1 - 1.2);
+        if (roof) { const hgt = 0.3 + r() * 0.7; K.box(r() < 0.5 ? plate : light, x0 + in1, RY, z0 + in1, x1 - in1, RY + hgt, z1 - in1); if (r() < 0.4) K.box(dark, cx - 0.7, RY + hgt, cz - 0.7, cx + 0.7, RY + hgt + 0.5, cz + 0.7); }
+        if (keel && r() < 0.5) K.box(dark, x0 + 1.2, -1.6, z0 + 1.2, x1 - 1.2, -1.0, z1 - 1.2);
       }
     });
-    // a ship with no magazine still has a gun or two, if she's big enough to carry them
-    if (!guns.length && sp.size !== 'small') { const s = map.rooms[sp.roles.indexOf('spine')]; if (s) gunAt((s.x + s.w * 0.3) * TS, (s.cz + 0.5) * TS, Y + 0.7); }
-    if (sp.size === 'large' && guns.length < 3) { const s = map.rooms[sp.roles.indexOf('spine')]; if (s) gunAt((s.x + s.w * 0.75) * TS, (s.cz + 0.5) * TS, Y + 0.7); }
     K.build(g);
-    // the breach: where to put the nose, marked for whoever's flying (js/space.ts pulses it)
+    // the breach that's suggested: marked for whoever's flying (js/space.ts pulses it)
     const mk = new T.Group(), b = sp.breach, ring = lit(0xffb020);
     for (const [bx, by, bw, bh] of [[-1.5, 0.1, 3, 0.14], [-1.5, 2.9, 3, 0.14], [-1.5, 0.1, 0.14, 2.94], [1.36, 0.1, 0.14, 2.94]]) part(mk, new T.Mesh(new T.BoxGeometry(bw, bh, 0.1), ring), bx + bw / 2, by + bh / 2, 0);
     mk.position.set(b.x, 0, b.face + 0.34); g.add(mk);

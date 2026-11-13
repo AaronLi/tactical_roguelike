@@ -71,7 +71,10 @@ const G_Level = {
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
     if (theme.layout === 'ship') { // a ship to board (js/shipgen.ts): one deck, open space round it
-      const sl = G.ShipGen.lay(r, level, this.genSp), sm = G.ShipGen.finish(this.plan(sl, r, seed, level, theme), sl);
+      const sl = G.ShipGen.lay(r, level, this.genSp) as LvLay & Partial<LvBuilding>;
+      // (a capital ship: her decks planned one by one and stacked, as a building's storeys are)
+      if (sl.floors) return G.ShipGen.finish(this.stack(sl.floors.map((fl: LvLay) => this.plan(fl, r, seed, level, theme)), sl), sl);
+      const sm = G.ShipGen.finish(this.plan(sl, r, seed, level, theme), sl);
       G.World.fromTileMap(sm);
       return sm;
     }

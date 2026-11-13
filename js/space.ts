@@ -12,7 +12,7 @@
 //   A jump is the change of level: the screens go to the jump's light instead of black (the veil, kind 'ftl'), the place
 //   is built behind it, and she comes out of the tunnel when it's ready.
 interface SpWp { id: string; name: string; sub: string; p: THREE.Vector3; kind: 'anchor' | 'base' | 'breach' | 'lz' | 'entry'; i?: number; hide?: boolean }
-interface SpMs { cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
+interface SpMs { salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
 type SpKind = 'hub' | 'board' | 'assault';
 const G_Space = (() => {
   const T = THREE, SD = G.SpaceData;
@@ -27,8 +27,8 @@ const G_Space = (() => {
     hp: 100, hpMax: 100, ms: null as SpMission | null, state: null as SpMs | null, board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[] },
     auto: null as null | { t: number; T: number; P0: THREE.Vector3; Q0: THREE.Quaternion; P1: THREE.Vector3; Q1: THREE.Quaternion; mid: THREE.Vector3 | null; then: () => void },
     hidden: null as Map<THREE.Object3D, boolean> | null, net: null as null | { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3 }, sendT: 0, hold: 0, holdK: '', keep: null as null | { x: number; y: number; z: number; yaw: number },
-    things: [] as { k: string; n?: number; x: number; z: number; obj: THREE.Object3D }[], cardObjs: [] as THREE.Object3D[], term: null as null | { x: number; z: number }, t: 0, shake: 0, cruise: false,
-    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], fireT: 0,
+    things: [] as { k: string; n?: number; x: number; z: number; y?: number; obj: THREE.Object3D }[], cardObjs: [] as THREE.Object3D[], term: null as null | { x: number; z: number }, t: 0, shake: 0, cruise: false,
+    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], fireT: 0,
   };
   const me = () => G.Me, on = () => S.on;
   const isCtl = () => S.ctl === G.Net.myId;
@@ -50,7 +50,7 @@ const G_Space = (() => {
     if (S.sun && S.sun.target.parent) S.sun.target.parent.remove(S.sun.target);
     G.R.levelRoot.position.set(0, 0, 0); G.R.levelRoot.quaternion.identity(); G.R.levelRoot.visible = true;
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
-    S.on = false; S.map = null; S.ftl = null; S.auto = null; S.net = null; S.boomT = -1; S.tracers = [];
+    S.on = false; S.map = null; S.ftl = null; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.mis = [];
     if (me().seat != null) me().seat = null;
     G.SpaceUI.show(false);
   }
@@ -137,8 +137,8 @@ const G_Space = (() => {
   // there, a lintel over the opening and a torn frame round it
   function cutHere(a: number[]) {
     const map = S.map!, s = siteAt(a); if (!map.sp || !G.ShipGen.cut(map, s)) return;
-    const TS = G.Level.TS, L = G.Level, wm = map.wallMesh as THREE.InstancedMesh | undefined, zero = new T.Matrix4().makeScale(0, 0, 0);
-    if (wm && map.wallIdx) { for (const c of s.cells) { const i = map.wallIdx.get(c); if (i != null) { wm.setMatrixAt(i, zero); if (map.wallBase) map.wallBase.set(zero.elements, i * 16); } } wm.instanceMatrix.needsUpdate = true; }
+    const TS = G.Level.TS, L = G.Level, f0 = map.floors ? map.floors[0] : map, wm = f0.wallMesh as THREE.InstancedMesh | undefined, zero = new T.Matrix4().makeScale(0, 0, 0);
+    if (wm && f0.wallIdx) { for (const c of s.cells) { const i = f0.wallIdx.get(c); if (i != null) { wm.setMatrixAt(i, zero); if (f0.wallBase) f0.wallBase.set(zero.elements, i * 16); } } wm.instanceMatrix.needsUpdate = true; }
     const g = new T.Group(), along = s.nz ? 1 : 0, wall = G.ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 }), torn = G.ShipModel.M(0x1a1c1f, { metalness: 0.6 }), hot = G.ShipModel.lit(0xff7a1a);
     const bx = (mt: THREE.Material, u0: number, y0: number, u1: number, y1: number, d0 = -TS / 2, d1 = TS / 2) => { const mm = new T.Mesh(new T.BoxGeometry(along ? u1 - u0 : d1 - d0, y1 - y0, along ? d1 - d0 : u1 - u0), mt); mm.position.set(along ? (u0 + u1) / 2 : (d0 + d1) / 2, (y0 + y1) / 2, along ? (d0 + d1) / 2 : (u0 + u1) / 2); g.add(mm); };
     bx(wall, -1.5 * TS, L.DOOR_H + 0.1, 1.5 * TS, L.WALL_H);
@@ -212,7 +212,9 @@ const G_Space = (() => {
     const sp = map.sp!, b = sp.breach, h = S.hull = G.ShipModel.hull(map);
     G.R.levelRoot.add(h.group);
     const TS = G.Level.TS;
-    map.rooms.forEach((rm) => S.boxes.push([rm.x * TS - 1.2, -2.4, rm.z * TS - 1.2, (rm.x + rm.w) * TS + 1.2, G.Level.WALL_H + 1.2, (rm.z + rm.h) * TS + 1.2]));
+    map.rooms.forEach((rm) => { const y = (rm.fl || 0) * G.Level.FLOOR_H; S.boxes.push([rm.x * TS - 1.2, y - 2.4, rm.z * TS - 1.2, (rm.x + rm.w) * TS + 1.2, y + G.Level.WALL_H + 1.2, (rm.z + rm.h) * TS + 1.2]); });
+    // a ship that isn't the mission's, lying off her: marked, to be boarded or left
+    for (const hh of sp.hulls) if (!hh.main) S.wps.push({ id: 'other', name: SD.SIZES[hh.size].name.toUpperCase(), sub: 'Not the mission: board her for salvage, or leave her', p: new T.Vector3((hh.x0 + hh.x1) / 2, 6, (hh.z0 + hh.z1) / 2), kind: 'base' });
     const out = new T.Vector3(b.x, 150, b.face + 2600);
     const a = addObj(G.ShipModel.anchor(), out); a.lookAt(new T.Vector3(b.x, 0, b.face));
     S.anchors.push({ i: -1, obj: a, p: out });
@@ -224,26 +226,31 @@ const G_Space = (() => {
   // what the mission wants aboard her: the artifact on its stand, the self-destruct's console, the pods' hatches, lights over the locked doors
   function things(map: LvMap) {
     const sp = map.sp!, M = G.ShipModel.M, lit = G.ShipModel.lit, root = G.R.levelRoot, obj = S.ms ? S.ms.obj : sp.obj;
-    const put = (k: string, x: number, z: number, o: THREE.Object3D, n?: number) => { o.position.set(x, 0, z); root.add(o); S.things.push({ k, n, x, z, obj: o }); };
+    const put = (k: string, at: { x: number; z: number; y?: number }, o: THREE.Object3D, n?: number) => { o.position.set(at.x, at.y || 0, at.z); root.add(o); S.things.push({ k, n, x: at.x, z: at.z, y: at.y || 0, obj: o }); };
     if (obj === 'artifact' && sp.artifact) {
       const g = new T.Group(), st = new T.Mesh(new T.CylinderGeometry(0.22, 0.3, 0.8, 10), M(0x2c3036)); st.position.y = 0.4; g.add(st);
       const a = new T.Mesh(new T.OctahedronGeometry(0.2), new T.MeshStandardMaterial({ color: 0x40ffd0, emissive: 0x20c8a0, emissiveIntensity: 2, roughness: 0.2 })); a.position.y = 1.15; g.add(a); g.userData.art = a;
       const l = new T.PointLight(0x40ffd0, 2.5, 6, 1.5); l.position.y = 1.2; g.add(l);
-      put('art', sp.artifact.x, sp.artifact.z, g);
+      put('art', sp.artifact, g);
     }
     if (obj === 'destruct' && sp.console) {
       const g = new T.Group(), c = new T.Mesh(new T.BoxGeometry(0.7, 1.05, 0.4), M(0x30343a)); c.position.y = 0.52; g.add(c);
       const s2 = new T.Mesh(new T.BoxGeometry(0.56, 0.3, 0.02), lit(0xff3020)); s2.position.set(0, 1.12, 0); s2.rotation.x = -0.4; g.add(s2); g.userData.scr = s2;
-      put('cons', sp.console.x, sp.console.z, g);
+      put('cons', sp.console, g);
     }
     sp.pods.forEach((p, n) => {
       const g = new T.Group(), f = new T.Mesh(new T.TorusGeometry(0.55, 0.07, 6, 18), M(0xb8862a, { emissive: 0x2a1c06 })); f.rotation.x = Math.PI / 2; f.position.y = 0.03; g.add(f);
       const d = new T.Mesh(new T.CircleGeometry(0.5, 18), lit(0x1c7a40)); d.rotation.x = -Math.PI / 2; d.position.y = 0.02; g.add(d);
-      put('pod', p.x, p.z, g, n);
+      put('pod', p, g, n);
+    });
+    sp.salvage.forEach((p, n) => {
+      const g = new T.Group(), c = new T.Mesh(new T.BoxGeometry(0.7, 0.5, 0.5), M(0x4a5a3a, { emissive: 0x0c1008 })); c.position.y = 0.25; g.add(c);
+      const l2 = new T.Mesh(new T.BoxGeometry(0.5, 0.04, 0.3), lit(0x9cff8a)); l2.position.y = 0.52; g.add(l2);
+      put('salv', p, g, n);
     });
     for (const id of Object.keys(sp.locks)) {
       const d = map.doors[+id], k = sp.locks[+id]; if (!d || k === 'breach') continue;
-      const l = new T.Mesh(new T.BoxGeometry(0.3, 0.1, 0.9), lit(0xff3020)); l.position.set(d.x, G.Level.DOOR_H + 0.25, d.z); if (d.axis === 'z') l.rotation.y = Math.PI / 2; l.userData.lock = k; root.add(l); S.things.push({ k: 'lock', x: d.x, z: d.z, obj: l });
+      const l = new T.Mesh(new T.BoxGeometry(0.3, 0.1, 0.9), lit(0xff3020)); l.position.set(d.x, (d.fy || 0) + G.Level.DOOR_H + 0.25, d.z); if (d.axis === 'z') l.rotation.y = Math.PI / 2; l.userData.lock = k; root.add(l); S.things.push({ k: 'lock', x: d.x, z: d.z, obj: l });
     }
   }
   // -- a base on a planet: in orbit over it first (the level out of sight), then down through the cloud to its pad
@@ -562,7 +569,7 @@ const G_Space = (() => {
     S.model.thrust.opacity += (th - S.model.thrust.opacity) * Math.min(1, dt * 4);
     S.model.glow.color.setHex(S.docked ? 0x2a8a5a : S.ftl ? 0x4060ff : 0xa07020);
     for (const a of S.anchors) { a.obj.rotation.z += dt * 0.15; (a.obj.userData.film.material as THREE.MeshBasicMaterial).opacity = 0.1 + 0.05 * Math.sin(S.t * 2); }
-    if (S.hull) { S.hull.marker.visible = !S.docked && Math.sin(S.t * 6) > -0.4; guns(dt); }
+    if (S.hull) { S.hull.marker.visible = !S.docked && Math.sin(S.t * 6) > -0.4; guns(dt); missiles(dt); }
     for (const q of S.things) {
       if (q.k === 'art') { const a = q.obj.userData.art as THREE.Mesh; a.rotation.y += dt * 1.5; a.position.y = 1.15 + Math.sin(S.t * 2) * 0.05; }
       if (q.k === 'lock') (q.obj as THREE.Mesh).material = lockMat(!!(S.state && S.state.keys.includes(q.obj.userData.lock)));
@@ -597,6 +604,8 @@ const G_Space = (() => {
     const inv = _r.clone().invert(), o = mw.clone().sub(_p).applyQuaternion(inv), d = dw.clone().applyQuaternion(inv);
     let best = -1, bt = e.range || 1500;
     if (S.hull) S.hull.guns.forEach((gn, i) => { if (gn.hp <= 0) return; const to = new T.Vector3(gn.x, gn.y, gn.z).sub(o), tt = to.dot(d); if (tt < 0 || tt > bt) return; if (to.addScaledVector(d, -tt).length() < 2.2 + tt * 0.004) { bt = tt; best = i; } });
+    // (a missile in the way of it is shot down)
+    for (const ms of S.mis.slice()) { const to = ms.o.position.clone().sub(o), tt = to.dot(d); if (tt > 0 && tt < bt && to.addScaledVector(d, -tt).length() < 5 + tt * 0.006) { const a = [ms.id, 0, 0, 0, 1]; missile(a); G.Net.toHost({ t: 'smis', a }); } }
     tracer(o, d, bt, e.id === 'rail');
     G.Net.toHost({ t: 'sfire', a: [o.x, o.y, o.z, d.x, d.y, d.z, bt, e.id === 'rail' ? 1 : 0] });
     if (best >= 0) { const gn = S.hull!.guns[best]; gunHit(best, gn.hp - (e.dmg || 5)); G.Net.toHost({ t: 'shit', i: best, hp: gn.hp }); }
@@ -611,24 +620,56 @@ const G_Space = (() => {
   function gunHit(i: number, hp: number) {
     const gn = S.hull && S.hull.guns[i]; if (!gn) return;
     const was = gn.hp; gn.hp = Math.max(0, hp);
-    if (was > 0 && gn.hp <= 0) { gn.gun.rotation.x = -0.5; gn.gun.visible = false; G.HUD.feed('<b>Point defence gun destroyed</b>'); }
+    if (was > 0 && gn.hp <= 0) { gn.gun.rotation.x = -0.5; gn.gun.visible = false; G.HUD.feed(`<b>${gn.k === 'pd' ? 'Point defence gun' : gn.k === 'cannon' ? 'Cannon' : 'Missile launcher'} destroyed</b>`); }
   }
   // her guns: they track the squad's ship inside 1300 m and fire; the pilot's screen says what lands
+  // Her weapons, by kind (js/spacedata.ts HULLGUN). Point defence: fast, short, blind close in under its own deck. Cannon: a
+  // heavy shot every few seconds out to 4.5 km, poor against anything quick or close. Missiles: launched at 6.5 km, they
+  // home (missiles()); a turret can shoot one down. The pilot's screen says what lands.
   function guns(dt: number) {
     if (!S.hull || S.docked || S.ftl || (S.state && S.state.boom)) return;
     for (const gn of S.hull.guns) {
       if (gn.hp <= 0) continue;
-      const to = S.P.clone().add(new T.Vector3(0, 1.5, 0)).sub(new T.Vector3(gn.x, gn.y, gn.z)), dist = to.length();
-      if (dist > 1300) continue;
-      if (to.y < -1.5 && Math.hypot(to.x, to.z) < 90) continue; // (under their own deck's edge, close in: they can't bear)
-      gn.obj.rotation.y = Math.atan2(-to.x, -to.z); gn.gun.rotation.x = Math.asin(G.U.clamp(to.y / dist, -0.2, 1));
+      const H = SD.HULLGUN[gn.k], from = new T.Vector3(gn.x, gn.y, gn.z), to = S.P.clone().add(new T.Vector3(0, 1.5, 0)).sub(from), dist = to.length();
+      if (dist > H.range) continue;
+      if (gn.k !== 'missile' && to.y < -1.5 && Math.hypot(to.x, to.z) < (gn.k === 'pd' ? 90 : 260)) continue; // (under their own deck's edge, close in: they can't bear)
+      if (gn.k !== 'missile') { gn.obj.rotation.y = Math.atan2(-to.x, -to.z); gn.gun.rotation.x = Math.asin(G.U.clamp(to.y / dist, -0.2, 1)); }
       gn.cool -= dt;
       if (gn.cool > 0) continue;
-      gn.cool = 0.8 + Math.random() * 0.9;
-      const sp = S.V.length(), miss = Math.random() < G.U.clamp(0.25 + sp / 260 + dist / 3000, 0.25, 0.92), d = to.clone().normalize();
+      gn.cool = H.cool[0] + Math.random() * (H.cool[1] - H.cool[0]);
+      if (gn.k === 'missile') { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); G.Net.toHost({ t: 'smis', a }); } continue; }
+      const sp = S.V.length(), miss = Math.random() < (gn.k === 'pd' ? G.U.clamp(0.25 + sp / 260 + dist / 3000, 0.25, 0.92) : G.U.clamp(0.3 + sp / 110 + dist / 12000, 0.3, 0.96)), d = to.clone().normalize();
       if (miss) d.add(new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.05)).normalize();
-      tracer(new T.Vector3(gn.x, gn.y, gn.z), d, miss ? dist + 300 : dist, false);
-      if (!miss && isCtl()) { damage(2.2); S.shake = Math.max(S.shake, 0.3); }
+      tracer(from, d, miss ? dist + 300 : dist, gn.k === 'cannon');
+      if (!miss && isCtl()) { damage(H.dmg, gn.k === 'cannon' ? 'A cannon shell' : undefined); S.shake = Math.max(S.shake, gn.k === 'cannon' ? 0.8 : 0.3); }
+    }
+  }
+  // a missile: a[0] its number, where it left her; a[4] 1: it's been shot down
+  function missile(a: number[]) {
+    if (!S.root) return;
+    const was = S.mis.find((q) => q.id === a[0]);
+    if (a[4]) { if (was) { was.o.parent && was.o.parent.remove(was.o); S.mis.splice(S.mis.indexOf(was), 1); G.HUD.feed('<b>Missile shot down</b>'); } return; }
+    if (was) return;
+    const o = new T.Group(), body = new T.Mesh(new T.ConeGeometry(0.5, 3.4, 8), G.ShipModel.M(0xd8dde2, { emissive: 0x30343a })); body.rotation.x = -Math.PI / 2; o.add(body);
+    const fl = new T.Mesh(new T.ConeGeometry(0.7, 9, 8, 1, true), new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.7, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide })); fl.rotation.x = Math.PI / 2; fl.position.z = 6; o.add(fl);
+    o.position.set(a[1], a[2], a[3]); o.frustumCulled = false; S.root.add(o);
+    S.mis.push({ id: a[0], o, v: new T.Vector3(0, 1, 0), t: 0 });
+    G.HUD.toast('MISSILE', 'Turn across it, or have a turret shoot it down', 2.2); G.Audio.deny();
+  }
+  function missiles(dt: number) {
+    const H = SD.HULLGUN.missile;
+    for (let i = S.mis.length - 1; i >= 0; i--) {
+      const m = S.mis[i], to = S.P.clone().add(new T.Vector3(0, 1.4, 0)).sub(m.o.position), d = to.length();
+      m.t += dt;
+      // it turns toward her no faster than it can; a hard turn across its nose leaves it behind
+      const want = to.normalize(), ang = m.v.angleTo(want), k = ang > 1e-4 ? Math.min(1, H.turn * dt / ang) : 1;
+      m.v.lerp(want, m.t < 1.2 ? k * 0.4 : k).normalize();
+      m.o.position.addScaledVector(m.v, H.speed * (m.t < 1.2 ? 0.45 : 1) * dt); m.o.lookAt(m.o.position.clone().add(m.v));
+      const gone = m.t > H.life || S.docked || !!S.ftl;
+      if (d < 9 || gone) {
+        if (d < 9) { if (isCtl()) damage(H.dmg, 'A missile'); S.shake = 1; G.SpaceUI.flash(0.35); G.Audio.boom(20); }
+        m.o.parent && m.o.parent.remove(m.o); S.mis.splice(i, 1);
+      }
     }
   }
   function boomStep(dt: number) {
@@ -687,7 +728,7 @@ const G_Space = (() => {
       return out;
     }
     if (m.dead || m.down) return null;
-    const px = m.pos.x, pz = m.pos.z, near = (x: number, z: number, r: number) => Math.hypot(px - x, pz - z) < r;
+    const px = m.pos.x, pz = m.pos.z, near = (x: number, z: number, r: number, y = m.pos.y) => Math.hypot(px - x, pz - z) < r && Math.abs(m.pos.y - y) < 2.2;
     // aboard: the nearest seat
     if (aboard()) {
       let best = -1, bd = 1.15;
@@ -715,8 +756,9 @@ const G_Space = (() => {
       const at = st.artAt ? { x: st.artAt[0], z: st.artAt[1] } : sp.artifact;
       const doIt = (k: string, label: string, text: string, need: number, n?: number) => { const p = holdFor(k + (n || 0), held && !m.fLatch, dt, need, () => { m.fLatch = true; G.Net.toHost({ t: 'mobj', k, n }); }); if (p >= 0) { out.prog = p; out.label = label; } out.prompt = hint('Hold F', text); return out; };
       if (S.ms && S.ms.obj === 'artifact' && st.art === 0 && at && near(at.x, at.z, 1.9)) return doIt('art', 'Taking it', 'to take the artifact', 0.8);
-      if (S.ms && S.ms.obj === 'destruct' && st.arm == null && sp.console && near(sp.console.x, sp.console.z, 1.9)) return doIt('cons', 'Arming', 'to start the self-destruct', 2.5);
-      for (let n = 0; n < sp.pods.length; n++) if (near(sp.pods[n].x, sp.pods[n].z, 1.5)) return doIt('pod', 'Strapping in', 'to leave in the escape pod', 1.5, n);
+      if (S.ms && S.ms.obj === 'destruct' && st.arm == null && sp.console && near(sp.console.x, sp.console.z, 1.9, sp.console.y)) return doIt('cons', 'Arming', 'to start the self-destruct', 2.5);
+      for (let n = 0; n < sp.pods.length; n++) if (near(sp.pods[n].x, sp.pods[n].z, 1.5, sp.pods[n].y)) return doIt('pod', 'Strapping in', 'to leave in the escape pod', 1.5, n);
+      for (let n = 0; n < sp.salvage.length; n++) if (!(st.salv || []).includes(n) && near(sp.salvage[n].x, sp.salvage[n].z, 1.7, sp.salvage[n].y)) return doIt('salv', 'Taking it', 'to take her cargo manifest (salvage)', 1.0, n);
     }
     return null;
   }
@@ -756,7 +798,8 @@ const G_Space = (() => {
         return true;
       case 'ms': S.state = m; G.SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
       case 'mdone': {
-        if (m.ok) { const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; G.HUD.toast('MISSION COMPLETE', `${G.U.esc(m.name)} · +¢${G.U.fmt(n)}${m.bonus ? ' (taken alive)' : ''}`, 5); G.HUD.chat(null, 0, `Mission complete: +¢${G.U.fmt(n)}`); G.Audio.extract(); if (G.Career.run) G.Career.ev('evidence', n); }
+        if (m.ok === 2) { me().credits += m.pay || 0; G.HUD.chat(null, 0, `Salvage: +¢${G.U.fmt(m.pay || 0)}`); G.HUD.feed(`<span class="cr">Salvage +¢${G.U.fmt(m.pay || 0)}</span>`); }
+        else if (m.ok) { const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; G.HUD.toast('MISSION COMPLETE', `${G.U.esc(m.name)} · +¢${G.U.fmt(n)}${m.bonus ? ' (taken alive)' : ''}`, 5); G.HUD.chat(null, 0, `Mission complete: +¢${G.U.fmt(n)}`); G.Audio.extract(); if (G.Career.run) G.Career.ev('evidence', n); }
         else G.HUD.toast('MISSION ABANDONED', G.U.esc(m.name) + ' · nothing paid', 4);
         return true;
       }
@@ -773,6 +816,7 @@ const G_Space = (() => {
         if ((m.lost || []).includes(G.Net.myId) && !me().dead) me().die('Went up with the ship');
         return true;
       }
+      case 'smis': if (S.on && m.by !== G.Net.myId) missile(m.a); return true;
       case 'sfire': if (S.on && m.by !== G.Net.myId && S.root) tracer(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true;
       case 'shit': if (m.i >= 0) gunHit(m.i, m.hp); else if (!isCtl()) S.hp = m.hp; return true;
     }
@@ -789,6 +833,7 @@ const G_Space = (() => {
       G.R.levelRoot.add(c); S.cardObjs.push(c);
     }
     for (const q of S.things) if (q.k === 'art') { q.obj.visible = S.state.art === 0; if (S.state.artAt) q.obj.position.set(S.state.artAt[0], 0, S.state.artAt[1]); }
+    for (const q of S.things) if (q.k === 'salv') q.obj.visible = !(S.state.salv || []).includes(q.n as number);
     for (const q of S.things) if (q.k === 'cons') ((q.obj.userData.scr as THREE.Mesh).material as THREE.MeshBasicMaterial).color.setHex(S.state.arm != null ? 0xffd020 : 0xff3020);
   }
 

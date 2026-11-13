@@ -34,7 +34,7 @@ def box(name, size, m, loc, parent=None, rot=(0, 0, 0)):
 
 # ---- a head: 23 cm crown to chin, the face toward -Y, its middle at the origin (the eye line)
 G = lambda d, r: math.exp(-(d / r) ** 2)
-def head(name, style, skin):
+def head(name, style, skin, look=(0, 0)):  # look: where D's eyes are turned, degrees (right, up)
     f = {'A': dict(nose=0, wings=0, brow=0.3, sock=0, lips=0, chin=0.6, cheek=0.4, sub=4),
          'B': dict(nose=1.25, wings=0.6, brow=1.5, sock=1.5, lips=0.9, chin=1.3, cheek=1.4, sub=4),
          'C': dict(nose=0.55, wings=0, brow=0.4, sock=0.25, lips=0, chin=0.8, cheek=0.7, sub=4),
@@ -90,8 +90,10 @@ def head(name, style, skin):
         box(name + '_mouth', (0.03, 0.004, 0.0028), DARK, (0, -0.079, -0.064), h)
     if style == 'D':
         for s in (-1, 1):
-            sphere(name + '_ball', 0.0115, WHITE, (s * 0.031, -0.0700, 0.004), parent=h, sub=3)
-            sphere(name + '_iris', 0.0056, DARK, (s * 0.031, -0.0791, 0.0035), (1, 0.45, 1), h, 3)
+            # the eye turns in its socket: the iris is the ball's, and the ball is what's rotated (in the game: toward what they're looking at)
+            ball = sphere(name + '_ball', 0.0115, WHITE, (s * 0.031, -0.0700, 0.004), parent=h, sub=3)
+            sphere(name + '_iris', 0.0056, DARK, (0, -0.0091, 0), (1, 0.45, 1), ball, 3)
+            ball.rotation_euler = (math.radians(look[1]), 0, math.radians(-look[0]))
             # lids: shells of skin over the ball, the upper one down to the top of the iris, the lower a rim
             for lo, hi in ((0.0045, 1), (-1, -0.0068)):
                 bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=4, radius=0.0124)
@@ -121,12 +123,15 @@ def tube(name, rings, m, parent, seg=16):
     o = obj(name, me, m); o.parent = parent; ss = o.modifiers.new('sub', 'SUBSURF'); ss.levels = ss.render_levels = 2; return o
 def body(name, x0):
     root = bpy.data.objects.new(name, None); sc.collection.objects.link(root)
-    tube(name + '_torso', [((0, 0.005, 0.84), 0.11, 0.085), ((0, 0.01, 0.93), 0.172, 0.115), ((0, 0.005, 1.03), 0.158, 0.105), ((0, 0, 1.12), 0.142, 0.098), ((0, -0.008, 1.25), 0.162, 0.115), ((0, -0.012, 1.35), 0.178, 0.122), ((0, 0, 1.43), 0.185, 0.1), ((0, 0.01, 1.485), 0.1, 0.075), ((0, 0.016, 1.51), 0.056, 0.058)], CLOTH, root)
+    # Proportions from ANSUR II, the US Army's anthropometric survey of its own soldiers (men's means, public data): stature
+    # 1.756 m, 0.51 across the deltoids, 0.415 between the shoulder points, chest 1.06 round, waist 0.94 (0.88 here: fit),
+    # hips 0.35 across, crotch 0.85 up, knee 0.48, thigh 0.625 round, calf 0.39, upper arm 0.36 flexed, forearm 0.31, neck 0.40.
+    tube(name + '_torso', [((0, 0.005, 0.83), 0.11, 0.09), ((0, 0.012, 0.92), 0.176, 0.125), ((0, 0.006, 1.02), 0.162, 0.112), ((0, 0, 1.10), 0.15, 0.108), ((0, -0.01, 1.22), 0.165, 0.125), ((0, -0.016, 1.32), 0.185, 0.14), ((0, -0.004, 1.40), 0.2, 0.125), ((0, 0.01, 1.455), 0.12, 0.085), ((0, 0.018, 1.485), 0.064, 0.066)], CLOTH, root)
     for s in (-1, 1):
-        tube(name + '_arm', [((s * 0.17, 0, 1.455), 0.05, 0.06), ((s * 0.208, 0, 1.415), 0.062, 0.066), ((s * 0.222, 0.004, 1.31), 0.052, 0.058), ((s * 0.236, 0.01, 1.15), 0.04, 0.043), ((s * 0.246, 0.002, 1.07), 0.043, 0.047), ((s * 0.254, -0.018, 0.9), 0.031, 0.035), ((s * 0.255, -0.02, 0.86), 0.03, 0.034)], CLOTH, root, 12)
-        tube(name + '_hand', [((s * 0.254, -0.018, 0.905), 0.027, 0.031), ((s * 0.257, -0.026, 0.84), 0.02, 0.045), ((s * 0.258, -0.032, 0.77), 0.017, 0.042), ((s * 0.258, -0.04, 0.71), 0.012, 0.03)], SKIN, root, 10)
-        tube(name + '_leg', [((s * 0.092, 0.005, 0.92), 0.09, 0.1), ((s * 0.098, 0, 0.72), 0.08, 0.088), ((s * 0.104, -0.006, 0.5), 0.057, 0.062), ((s * 0.107, 0.016, 0.37), 0.057, 0.066), ((s * 0.11, 0.016, 0.11), 0.04, 0.046), ((s * 0.11, 0.012, 0.04), 0.044, 0.05)], CLOTH, root, 12)
-        sphere(name + '_foot', 1, BOOT, (s * 0.113, -0.055, 0.045), (0.05, 0.135, 0.045), root, 3)
+        tube(name + '_arm', [((s * 0.17, 0, 1.43), 0.055, 0.065), ((s * 0.222, 0, 1.395), 0.07, 0.074), ((s * 0.24, 0.004, 1.29), 0.058, 0.064), ((s * 0.25, 0.01, 1.14), 0.045, 0.048), ((s * 0.258, 0.002, 1.07), 0.05, 0.053), ((s * 0.264, -0.018, 0.9), 0.033, 0.037), ((s * 0.265, -0.02, 0.86), 0.031, 0.035)], CLOTH, root, 12)
+        tube(name + '_hand', [((s * 0.264, -0.018, 0.895), 0.028, 0.032), ((s * 0.267, -0.026, 0.83), 0.021, 0.046), ((s * 0.268, -0.032, 0.76), 0.018, 0.043), ((s * 0.268, -0.04, 0.70), 0.012, 0.03)], SKIN, root, 10)
+        tube(name + '_leg', [((s * 0.092, 0.005, 0.91), 0.094, 0.108), ((s * 0.098, 0, 0.71), 0.086, 0.094), ((s * 0.104, -0.006, 0.49), 0.06, 0.064), ((s * 0.107, 0.018, 0.36), 0.062, 0.07), ((s * 0.11, 0.016, 0.11), 0.042, 0.048), ((s * 0.11, 0.012, 0.04), 0.046, 0.052)], CLOTH, root, 12)
+        sphere(name + '_foot', 1, BOOT, (s * 0.113, -0.055, 0.045), (0.052, 0.14, 0.046), root, 3)
     # one skin: the parts joined, filled as a single volume and smoothed (the hands and boots stay their own)
     parts = [c for c in root.children if c.data.materials[0] == CLOTH]
     dg = bpy.context.evaluated_depsgraph_get(); bm = bmesh.new()
@@ -172,21 +177,40 @@ sc.render.resolution_x, sc.render.resolution_y = 1600, 1000
 sc.render.filepath = os.path.join(OUT, 'faces.png'); bpy.ops.render.render(write_still=True)
 
 # D on its own, closer: front, three-quarter, side
-for i, rz in enumerate((0, 38, 90)):
-    q = head('headD_close%d' % i, 'D', SKIN); q.location = (8 + (i - 1) * 0.27, 0, 0); q.rotation_euler = (0, 0, math.radians(rz))
-camera((8, -3, -0.01), (8, 0, -0.01), 0.86)
-sc.render.resolution_x, sc.render.resolution_y = 1700, 760
+for i, (rz, look) in enumerate(((0, (0, 0)), (0, (-28, 0)), (0, (24, 14)), (38, (-38, -6)), (90, (0, 0)))):
+    q = head('headD_close%d' % i, 'D', SKIN, look); q.location = (8 + (i - 2) * 0.27, 0, 0); q.rotation_euler = (0, 0, math.radians(rz))
+camera((8, -3, -0.01), (8, 0, -0.01), 1.4)
+sc.render.resolution_x, sc.render.resolution_y = 2400, 660
 sc.render.filepath = os.path.join(OUT, 'face_d.png'); bpy.ops.render.render(write_still=True)
 
 # the figure: front and side, a 1.78 m rule and head-heights beside it
 bx = 4.0
 for k, rz in enumerate((0, math.radians(90))):
-    b = body('body%d' % k, 0); h = head('bodyhead%d' % k, 'D', SKIN); h.location = (0, 0.005, 1.665); h.parent = b
+    b = body('body%d' % k, 0); h = head('bodyhead%d' % k, 'D', SKIN); h.location = (0, 0.005, 1.641); h.parent = b
     b.location = (bx + (k - 0.5) * 0.9, 0, 0); b.rotation_euler = (0, 0, rz)
 for i in range(9):
-    z = 1.78 - i * 1.78 / 7.5
+    z = 1.756 - i * 1.756 / 7.5
     if z >= -0.01: box('rule', (2.1, 0.002, 0.003), WHITE, (bx, 0.3, max(0, z)))
-label('1.78 m, 7.5 heads', (bx, -0.3, 1.86), 0.06)
+label('1.756 m (ANSUR II mean), 7.5 heads', (bx, -0.3, 1.86), 0.055)
+# A reference photo laid over the figure, half see-through, if there is one: models/characters/ref/front.(png|jpg) over the
+# front view, side.(png|jpg) over the side view. The picture is scaled so its height is REF_H metres (the whole picture
+# from the soles to the top of the head: crop it so) and stood on the floor on the figure's middle; REF_DX nudges it sideways.
+REF_H = float(os.environ.get('REF_H', 1.756)); REF_DX = float(os.environ.get('REF_DX', 0)); REF_A = float(os.environ.get('REF_A', 0.5))
+for k, nm in enumerate(('front', 'side')):
+    f = next((os.path.join(HERE, 'ref', nm + e) for e in ('.png', '.jpg', '.jpeg') if os.path.exists(os.path.join(HERE, 'ref', nm + e))), None)
+    if not f: continue
+    img = bpy.data.images.load(f); w = REF_H * img.size[0] / img.size[1]
+    bm = bmesh.new(); bmesh.ops.create_grid(bm, x_segments=1, y_segments=1, size=0.5); pm = bpy.data.meshes.new('ref'); uv = bm.loops.layers.uv.new()
+    for fc in bm.faces:
+        for lp in fc.loops: lp[uv].uv = (lp.vert.co.x + 0.5, lp.vert.co.y + 0.5)
+    bm.to_mesh(pm); bm.free()
+    m = bpy.data.materials.new('ref_' + nm); m.use_nodes = True; nt = m.node_tree; nt.nodes.clear()
+    tx = nt.nodes.new('ShaderNodeTexImage'); tx.image = img; em = nt.nodes.new('ShaderNodeEmission'); tr = nt.nodes.new('ShaderNodeBsdfTransparent'); mx = nt.nodes.new('ShaderNodeMixShader'); out = nt.nodes.new('ShaderNodeOutputMaterial')
+    mx.inputs[0].default_value = REF_A; nt.links.new(tx.outputs['Color'], em.inputs['Color']); nt.links.new(tr.outputs[0], mx.inputs[1]); nt.links.new(em.outputs[0], mx.inputs[2]); nt.links.new(mx.outputs[0], out.inputs['Surface'])
+    try: m.surface_render_method = 'BLENDED'
+    except Exception: m.blend_method = 'BLEND'
+    o = obj('ref_' + nm, pm, m, False); o.scale = (w, REF_H, 1); o.rotation_euler = (math.pi / 2, 0, 0); o.location = (bx + (k - 0.5) * 0.9 + REF_DX, -0.5, REF_H / 2)
+    print('reference over the', nm, 'view:', f)
 camera((bx, -6, 0.93), (bx, 0, 0.93), 2.15)
 sc.render.resolution_x, sc.render.resolution_y = 1100, 1300
 sc.render.filepath = os.path.join(OUT, 'body.png'); bpy.ops.render.render(write_still=True)

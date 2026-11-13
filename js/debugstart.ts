@@ -16,7 +16,7 @@
 //                         (the lights out: js/level.ts nightify)
 //   ?hangar               the hangar between levels instead of a level (the shop, the gunsmith, the range)
 //   ?fly                  the game in space (docs/space.md): at the helm of the squad's ship, lifting off the hangar's pad
-//   ?board=<size>         straight to a boarding mission: small, medium or large; &obj=artifact|hvt|destruct; &hull=0..2 whose ship;
+//   ?board=<class>        straight to a boarding mission: transport, small, medium, large or capital; &other=transport a second ship off her; &obj=artifact|hvt|destruct; &hull=0..2 whose ship;
 //                         &dock: already against her hull, standing in the airlock; &ship=<id> the squad's ship (kestrel, atlas, wraith)
 //   ?assault=<place>      straight to a planetary assault on that kind of place (&dock: set down on its pad)
 //   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
@@ -115,9 +115,9 @@ const G_DebugStart = (() => {
       if (q.has('board') || q.has('assault')) {
         // straight to a mission: a ship to board (?board=small|medium|large, &obj=artifact|hvt|destruct) or a base (?assault=<place>), at
         // the helm as she comes out of the jump; &dock: against the hull (or on the pad) already
-        const size = ['small', 'medium', 'large'].includes(q.get('board') || '') ? q.get('board') : 'small', pth = themeOf(q.get('assault'));
+        const size = (G.SpaceData.SIZES as Record<string, unknown>)[q.get('board') || ''] ? q.get('board') : 'small', pth = themeOf(q.get('assault'));
         helm();
-        G.Net.toHost({ t: 'dbgMs', ms: { kind: q.has('assault') ? 'assault' : 'board', size, obj: q.get('obj'), th: q.has('assault') ? pth : q.has('hull') ? G.SpaceData.TH0 + (+q.get('hull')! || 0) : undefined, seed: q.has('seed') ? +q.get('seed')! : undefined, diff: lvl || 1, night: q.has('night'), fuse: q.has('fuse') ? +q.get('fuse')! : undefined } });
+        G.Net.toHost({ t: 'dbgMs', ms: { kind: q.has('assault') ? 'assault' : 'board', size, other: q.get('other'), obj: q.get('obj'), th: q.has('assault') ? pth : q.has('hull') ? G.SpaceData.TH0 + (+q.get('hull')! || 0) : undefined, seed: q.has('seed') ? +q.get('seed')! : undefined, diff: lvl || 1, night: q.has('night'), fuse: q.has('fuse') ? +q.get('fuse')! : undefined } });
         await until(() => !G.Game.hub && G.Game.phase === 'level' && Sp.S.on && Sp.S.kind !== 'hub' && !G.Game.$('veil').classList.contains('on'), 40);
         if (q.get('gun') || q.get('gear')) arm();
         if (q.has('dock')) {

@@ -522,7 +522,8 @@ const G_Server = {
     this.holes = []; this.fallen = []; // (what's been shot out of the place: js/damage.ts)
     this.bodies = new Map(); // the dead, until secured: id -> { id, type, x, z, yaw, civ, secured }
     for (const p of this.players.values()) { p.ready = false; p.st = null; }
-    this.spawnEnemies();
+    // (a ship has her own complement, by her class: js/spaceserver.ts crew)
+    if (ms && this.map.sp) G.SpaceSv.crew(); else this.spawnEnemies();
     if (ms) G.SpaceSv.populate();
     this.wcase = this.map.case ? this.rollCase() : null;
     this.cabs = (this.map.cabinets || []).map(() => ({ open: false, ver: 0, items: this.layCab(this.rollCab()) }));

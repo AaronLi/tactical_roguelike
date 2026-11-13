@@ -175,26 +175,30 @@ const G_SpaceUI = (() => {
     c.fillStyle = '#04090d'; c.fillRect(0, 0, W, H);
     c.font = `${big ? 13 : 12}px sans-serif`; c.textBaseline = 'middle';
     if (!map || !map.sp || s.kind !== 'board' || !SD.fitted(s.fleet, 'sensors')) { c.fillStyle = '#3d6a80'; c.fillText(s.kind === 'board' ? 'NO SCANNER FITTED' : 'SCANNER: NOTHING IN RANGE', 14, H / 2); return; }
-    const sp = map.sp, TS = G.Level.TS, h = sp.hull, range = s.docked ? 0 : s.P.distanceTo(s.Dp);
+    const sp = map.sp, TS = G.Level.TS, range = s.docked ? 0 : s.P.distanceTo(s.Dp), NF = map.floors ? map.floors.length : 1, FH = G.Level.FLOOR_H;
     if (range > 3000) { c.fillStyle = '#3d6a80'; c.fillText('SCANNER: OUT OF RANGE (' + SD.dist(range) + ')', 14, H / 2); return; }
-    const k = Math.min((W - 30) / (h.x1 - h.x0 + 8), (H - (big ? 60 : 30)) / (h.z1 - h.z0 + 4)), ox = (W - (h.x1 - h.x0) * k) / 2 - h.x0 * k, oz = (big ? 40 : 18) - h.z0 * k;
-    const X = (x: number) => x * k + ox, Z = (z: number) => z * k + oz;
+    // every hull in the scan, her decks one under the other (the top deck first)
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const hh of sp.hulls) { x0 = Math.min(x0, hh.x0); z0 = Math.min(z0, hh.z0); x1 = Math.max(x1, hh.x1); z1 = Math.max(z1, hh.z1); }
+    const dz = z1 - z0 + 5, k = Math.min((W - 30) / (x1 - x0 + 8), (H - (big ? 60 : 30)) / (dz * NF)), ox = (W - (x1 - x0) * k) / 2 - x0 * k, oz = (big ? 40 : 18) - z0 * k;
+    const X = (x: number) => x * k + ox, Z = (z: number, f = 0) => (z + (NF - 1 - f) * dz) * k + oz, fOf = (y: number) => G.U.clamp(Math.floor((y + 0.6) / FH), 0, NF - 1);
     map.rooms.forEach((rm, i) => {
-      const role = sp.roles[i], vac = !!(s.state && s.state.vac.includes(i));
-      c.fillStyle = vac ? '#3a1612' : role === 'spine' ? '#10222c' : role === 'bridge' ? '#143246' : '#0f2a36'; c.strokeStyle = vac ? '#ff6a50' : '#3f88a8'; c.lineWidth = 1;
-      c.fillRect(X(rm.x * TS), Z(rm.z * TS), rm.w * TS * k, rm.h * TS * k); c.strokeRect(X(rm.x * TS), Z(rm.z * TS), rm.w * TS * k, rm.h * TS * k);
-      if (big && role && role !== 'spine') { c.fillStyle = vac ? '#ff9a8a' : '#9fd0e6'; c.textAlign = 'center'; c.fillText((G.ShipGen.NAMES[role] || role).toUpperCase(), X((rm.x + rm.w / 2) * TS), Z((rm.z + rm.h / 2) * TS)); }
+      const role = sp.roles[i], vac = !!(s.state && s.state.vac.includes(i)), f = rm.fl || 0, own = !sp.hullOf[i];
+      c.fillStyle = vac ? '#3a1612' : !own ? '#16201a' : role === 'spine' ? '#10222c' : role === 'bridge' ? '#143246' : role === 'stairs' ? '#2a2a14' : '#0f2a36'; c.strokeStyle = vac ? '#ff6a50' : own ? '#3f88a8' : '#4a7a5a'; c.lineWidth = 1;
+      c.fillRect(X(rm.x * TS), Z(rm.z * TS, f), rm.w * TS * k, rm.h * TS * k); c.strokeRect(X(rm.x * TS), Z(rm.z * TS, f), rm.w * TS * k, rm.h * TS * k);
+      if (big && role && role !== 'spine' && rm.w * TS * k > 44) { c.fillStyle = vac ? '#ff9a8a' : '#9fd0e6'; c.textAlign = 'center'; c.fillText((G.ShipGen.NAMES[role] || role).toUpperCase(), X((rm.x + rm.w / 2) * TS), Z((rm.z + rm.h / 2) * TS, f)); }
     });
-    for (const d of map.doors) { const lk = sp.locks[d.id]; if (lk === 'breach') continue; c.fillStyle = lk ? (s.state && s.state.keys.includes(lk) ? '#7dff9a' : '#ff5a40') : d.open ? '#4a7f96' : '#c8e6f4'; const w = d.axis === 'x' ? 2 : 1.3 * k, hh = d.axis === 'x' ? 1.3 * k : 2; c.fillRect(X(d.x) - w / 2, Z(d.z) - hh / 2, w, hh); }
+    for (const d of map.doors) { const lk = sp.locks[d.id]; c.fillStyle = lk ? (s.state && s.state.keys.includes(lk) ? '#7dff9a' : '#ff5a40') : d.open ? '#4a7f96' : '#c8e6f4'; const w = d.axis === 'x' ? 2 : 1.3 * k, hh = d.axis === 'x' ? 1.3 * k : 2; c.fillRect(X(d.x) - w / 2, Z(d.z, d.fl || 0) - hh / 2, w, hh); }
     c.strokeStyle = '#ffb020'; c.strokeRect(X(sp.breach.x) - 1.4 * k, Z(sp.breach.face) - 2, 2.8 * k, 4);
     c.fillStyle = '#ffb020'; for (const q of sp.cuts) { const x = (q[0] % map.W + 0.5) * TS, z = (((q[0] / map.W) | 0) + 0.5) * TS; c.beginPath(); c.arc(X(x), Z(z), big ? 6 : 4, 0, 7); c.fill(); if (big) { c.textAlign = 'center'; c.fillText('BREACH', X(x), Z(z) + 14); } }
-    const dot = (p: { x: number; z: number } | null, col: string, t?: string) => { if (!p) return; c.fillStyle = col; c.beginPath(); c.arc(X(p.x), Z(p.z), big ? 5 : 3, 0, 7); c.fill(); if (big && t) { c.textAlign = 'left'; c.fillText(t, X(p.x) + 8, Z(p.z)); } };
+    const dot = (p: { x: number; z: number; y?: number } | null, col: string, t?: string) => { if (!p) return; const f = fOf(p.y || 0); c.fillStyle = col; c.beginPath(); c.arc(X(p.x), Z(p.z, f), big ? 5 : 3, 0, 7); c.fill(); if (big && t) { c.textAlign = 'left'; c.fillText(t, X(p.x) + 8, Z(p.z, f)); } };
     const o = s.ms ? s.ms.obj : null;
-    if (o === 'artifact' && s.state && s.state.art === 0) dot(s.state.artAt ? { x: s.state.artAt[0], z: s.state.artAt[1] } : sp.artifact, '#40ffd0', 'ARTIFACT');
+    if (o === 'artifact' && s.state && s.state.art === 0) dot(s.state.artAt ? { x: s.state.artAt[0], z: s.state.artAt[1], y: sp.artifact ? sp.artifact.y : 0 } : sp.artifact, '#40ffd0', 'ARTIFACT');
     if (o === 'destruct') dot(sp.console, '#ffd24a', 'SELF-DESTRUCT');
     for (const p of sp.pods) dot(p, '#7dff9a');
-    if (range < 900) for (const e of G.Views.enemies.values()) { if (!e.alive) continue; c.fillStyle = e.def && e.def.civ ? '#8ea4b4' : s.state && s.state.hvtId === e.id ? '#ff40c0' : '#ff5a40'; c.fillRect(X(e.pos.x) - 2, Z(e.pos.z) - 2, 4, 4); }
-    for (const pv of G.Views.players.values()) if (pv.st && !G.SpaceData.aboard(s.def, s.berth, pv.st.p[0], pv.st.p[1], pv.st.p[2])) { c.fillStyle = '#7dff9a'; c.fillRect(X(pv.st.p[0]) - 3, Z(pv.st.p[2]) - 3, 6, 6); }
+    sp.salvage.forEach((p, n) => { if (!(s.state && (s.state.salv || []).includes(n))) dot(p, '#9cff8a', 'SALVAGE'); });
+    if (range < 900) for (const e of G.Views.enemies.values()) { if (!e.alive) continue; c.fillStyle = e.def && e.def.civ ? '#8ea4b4' : s.state && s.state.hvtId === e.id ? '#ff40c0' : '#ff5a40'; c.fillRect(X(e.pos.x) - 2, Z(e.pos.z, fOf(e.pos.y)) - 2, 4, 4); }
+    for (const pv of G.Views.players.values()) if (pv.st && !G.SpaceData.aboard(s.def, s.berth, pv.st.p[0], pv.st.p[1], pv.st.p[2])) { c.fillStyle = '#7dff9a'; c.fillRect(X(pv.st.p[0]) - 3, Z(pv.st.p[2], fOf(pv.st.p[1])) - 3, 6, 6); }
+    if (big && NF > 1) { c.textAlign = 'left'; c.fillStyle = '#7f97a8'; for (let f = 0; f < NF; f++) c.fillText(f === NF - 1 ? 'UPPER DECK' : 'LOWER DECK', 14, Z(z0, f) + 10); }
     if (big) { c.textAlign = 'left'; c.fillStyle = '#8fd6ff'; c.fillText(`DECK SCAN · ${s.ms ? s.ms.name : ''} · ${range < 900 ? 'life signs resolved' : 'close to 900 m for life signs (' + SD.dist(range) + ')'}`, 14, 18); }
   }
 
@@ -207,6 +211,7 @@ const G_SpaceUI = (() => {
     if (st.arm != null && st.arm !== armLeft) { armLeft = st.arm; armAt = performance.now(); }
     const left = st.arm != null ? Math.max(0, st.arm - (performance.now() - armAt) / 1000) : null;
     const O = SD.OBJ[ms.obj], lines: string[] = [], meta = s.map && s.map.sp;
+    if (ms.size && ms.kind === 'board') lines.push(`<small>${SD.SIZES[ms.size].name}: ${meta && meta.decks > 1 ? 'two decks, ' : ''}${(() => { const g = SD.SIZES[ms.size!].guns, a = [g.pd ? g.pd + ' point defence' : '', g.cannon ? g.cannon + ' cannon' : '', g.missile ? g.missile + ' missile launcher' + (g.missile > 1 ? 's' : '') : ''].filter(Boolean); return a.length ? a.join(', ') : 'unarmed'; })()}</small>`);
     const needKey = (k: string) => !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k);
     if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Ram her hull nose-on to board: the marked stretch, or anywhere clear.');
     if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === G.Net.myId ? 'You have' : G.U.esc(G.Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
@@ -216,7 +221,7 @@ const G_SpaceUI = (() => {
     if (needKey('bridge') && (ms.obj !== 'artifact' || (meta && meta.roles.includes('vault')))) lines.push('The bridge' + (meta && meta.roles.includes('vault') ? ' and the vault are' : ' is') + ' locked: an officer carries the card.');
     if (needKey('armory')) lines.push('<small>The armoury is locked: a keycard is with the crew.</small>');
     if (st.keys.length) lines.push('<small class="ok">Keycards: ' + st.keys.map((k) => (k === 'bridge' ? 'bridge' : 'armoury')).join(', ') + '</small>');
-    if (meta && G.Me.pos && st.vac.includes(G.ShipGen.roomAt(s.map!, G.Me.pos.x, G.Me.pos.z)) && !G.Space.aboard()) lines.push('<span class="bad">VACUUM</span> · your suit is holding');
+    if (meta && G.Me.pos && st.vac.includes(G.ShipGen.roomAt(s.map!, G.Me.pos.x, G.Me.pos.z, G.Level.floorAt(s.map!, G.Me.pos.x, G.Me.pos.y, G.Me.pos.z))) && !G.Space.aboard()) lines.push('<span class="bad">VACUUM</span> · your suit is holding');
     const html = `<h4>${G.U.esc(O.name.toUpperCase())}</h4><p><small>${G.U.esc(ms.name)} · ¢${G.U.fmt(ms.pay)}</small></p>` + lines.map((l) => `<p>${l}</p>`).join('');
     if (force || html !== objKey) { objKey = html; obj.innerHTML = html; }
     obj.style.display = '';
@@ -263,7 +268,7 @@ const G_SpaceUI = (() => {
         return `<div class="card${on ? ' on' : ''}${done ? ' done' : ''}"><div class="row"><h3>${esc(m.name)}</h3><span class="pay">¢${G.U.fmt(m.pay)}</span></div>
           <div><span class="tag${m.kind === 'assault' ? ' r' : ''}">${m.kind === 'assault' ? 'PLANET ASSAULT' : 'BOARDING'}</span><span class="tag">${esc(SD.OBJ[m.obj].name.toUpperCase())}</span><span class="tag">THREAT ${m.diff}</span>${m.night ? '<span class="tag">NIGHT</span>' : ''}</div>
           <small>${esc(m.where)} · anchor ${SD.dist(d)} out · jump ${m.ly.toFixed(1)} ly</small><p>${esc(m.brief)}</p>
-          <div class="row"><small>${m.size === 'large' ? 'Barracks, sick bay, magazines, a vault, a big bridge: a long fight.' : m.size === 'medium' ? 'An armoury and a locked bridge: find the keycards.' : m.size === 'small' ? 'A few compartments off one corridor.' : 'Set down on the pad outside.'}</small>
+          <div class="row"><small>${m.size === 'capital' ? 'Two decks, security squads, cannon and missiles on her hull: the hardest there is.' : m.size === 'large' ? 'Barracks, sick bay, magazines, a vault, a big bridge: a long fight.' : m.size === 'medium' ? 'An armoury and a locked bridge: find the keycards.' : m.size === 'small' ? 'A few compartments off one corridor, one gun on her hull.' : m.size === 'transport' ? 'Civilian: a few guards, no guns on her hull.' : 'Set down on the pad outside.'}</small>
           <button class="b" data-pick="${i}"${done || (!on && full) || !s.docked ? ' disabled' : ''}>${done ? 'DONE' : on ? 'DROP' : 'TAKE'}</button></div></div>`;
       }).join('') + `</div><div class="foot"><span>Take up to ${SD.PICKS}. Each has an anchor out past the rock: fly to it, hold J at the helm to jump. Pay comes when the mission is done and you have jumped home.</span><span>${s.board.picked.length} / ${SD.PICKS}</span></div>`;
     } else {

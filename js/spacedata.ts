@@ -4,11 +4,15 @@
 // missions a visit to the base offers (from the visit's seed, so nobody has to be sent the list), where each one's anchor
 // is in the space round the base, and how a distance is written. Nothing here draws.
 type SpObj = 'artifact' | 'hvt' | 'destruct' | 'assault';
-type SpSize = 'small' | 'medium' | 'large';
+// a ship's class, least to most: a civilian transport, a corvette, a frigate, a cruiser, a capital ship (SIZES, js/shipgen.ts SPEC)
+type SpSize = 'transport' | 'small' | 'medium' | 'large' | 'capital';
+// what a class carries on her hull, and who's aboard her: light guards posted singly, security squads (four, armed and armoured), breach
+// response squads (three, lighter: they come to where the hull is breached), and those who don't fight
+interface SpClass { name: string; tier: number; pay: number; diff: number; guns: { pd: number; cannon: number; missile: number }; crew: { guard: number; squads: number; resp: number; civ: number } }
 // what a level is generated for, besides the four figures (js/level.ts generate: its fifth). size: the ship boarded; obj: what's
 // wanted aboard; side: which side the breach is on (1 starboard, -1 port); ship: the squad's own ship (its berth is cut to it)
-interface SpGen { size?: SpSize; obj?: SpObj; ship?: string; planet?: number }
-interface SpMission { i: number; kind: 'board' | 'assault'; obj: SpObj; size: SpSize | null; th: number; seed: number; diff: number; pay: number; name: string; brief: string; where: string; night: boolean; ly: number; anchor: [number, number, number] }
+interface SpGen { size?: SpSize; obj?: SpObj; ship?: string; planet?: number; other?: SpSize | null } // (other: a second ship lying off her, nothing to do with the mission)
+interface SpMission { i: number; kind: 'board' | 'assault'; obj: SpObj; size: SpSize | null; th: number; seed: number; diff: number; pay: number; name: string; brief: string; where: string; night: boolean; ly: number; anchor: [number, number, number]; other?: SpSize | null; fuse?: number }
 interface SpSeat { k: 'helm' | 'sensors' | 'turret' | 'jump'; x: number; y: number; z: number; yaw: number; n?: number }
 interface SpShipDef { id: string; name: string; cls: string; blurb: string; price: number; hw: number; z0: number; z1: number; nose: number; hull: number; speed: number; cruise: number; turn: number; turrets: number; utils: number; jump: number }
 interface SpEquip { id: string; name: string; slot: 'turret' | 'util'; price: number; blurb: string; dmg?: number; rof?: number; range?: number }
@@ -101,7 +105,15 @@ const G_SpaceData = (() => {
   const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G.THEMES[th] || null);
   const themeIndex = (T: ThemeDef | null | undefined) => { if (!T) return -1; const i = G.THEMES.findIndex((q) => q.name === T.name); return i >= 0 ? i : THEMES.findIndex((q) => q.name === T.name) >= 0 ? TH0 + THEMES.findIndex((q) => q.name === T.name) : -1; };
 
-  const SIZES: Record<SpSize, { name: string; pay: number; diff: number }> = { small: { name: 'corvette', pay: 900, diff: 0 }, medium: { name: 'frigate', pay: 1700, diff: 1 }, large: { name: 'cruiser', pay: 2800, diff: 2 } };
+  const SIZES: Record<SpSize, SpClass> = {
+    transport: { name: 'civilian transport', tier: 1, pay: 600, diff: -1, guns: { pd: 0, cannon: 0, missile: 0 }, crew: { guard: 3, squads: 0, resp: 0, civ: 6 } },
+    small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 1, cannon: 0, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
+    medium: { name: 'frigate', tier: 3, pay: 1700, diff: 1, guns: { pd: 2, cannon: 1, missile: 0 }, crew: { guard: 4, squads: 1, resp: 1, civ: 5 } },
+    large: { name: 'cruiser', tier: 4, pay: 2800, diff: 2, guns: { pd: 3, cannon: 2, missile: 1 }, crew: { guard: 5, squads: 2, resp: 2, civ: 7 } },
+    capital: { name: 'capital ship', tier: 5, pay: 4600, diff: 3, guns: { pd: 5, cannon: 3, missile: 2 }, crew: { guard: 6, squads: 4, resp: 3, civ: 10 } },
+  };
+  // the hull's weapons: what each does to the squad's ship (js/space.ts guns)
+  const HULLGUN = { pd: { range: 1300, cool: [0.8, 1.7], dmg: 2.2 }, cannon: { range: 4500, cool: [3.5, 5.5], dmg: 10 }, missile: { range: 6500, cool: [9, 14], dmg: 24, speed: 230, turn: 0.85, life: 34 } };
   const OBJ: Record<SpObj, { name: string; pay: number; line: string }> = {
     artifact: { name: 'Recover the artifact', pay: 500, line: 'Something old and valuable is locked aboard. Find it, carry it back to your ship and get clear.' },
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },
@@ -115,18 +127,20 @@ const G_SpaceData = (() => {
   const OFFERS = 6, PICKS = 3;
   function offers(seed: number, level: number): SpMission[] {
     const r = G.U.rng((seed ^ 0x5bace) >>> 0), U = G.U, out: SpMission[] = [];
-    const sizes: SpSize[] = level < 2 ? ['small', 'small', 'medium'] : level < 4 ? ['small', 'medium', 'medium', 'large'] : ['small', 'medium', 'large', 'large'];
+    // what's about goes by how far the squad has got: transports and corvettes first, capital ships late
+    const sizes: SpSize[] = level < 2 ? ['transport', 'transport', 'small'] : level < 3 ? ['transport', 'small', 'small', 'medium'] : level < 5 ? ['small', 'medium', 'medium', 'large'] : level < 7 ? ['medium', 'large', 'large', 'capital'] : ['large', 'capital', 'capital'];
     const planets = G.THEMES.map((T, i) => i).filter((i) => { const T = G.THEMES[i]; return !T.starter && !T.residents && !T.rock && T.layout !== 'festival' && T.layout !== 'houses' && !(T.from! > level + 1); });
     for (let i = 0; i < OFFERS; i++) {
-      const assault = i === 2 || (i === 5 && r() < 0.5), size = assault ? null : i === 0 ? 'small' : U.pick(r, sizes);
+      const assault = i === 2 || (i === 5 && r() < 0.5), size = assault ? null : i === 0 ? sizes[0] : U.pick(r, sizes);
       const obj: SpObj = assault ? 'assault' : i === 0 ? 'artifact' : U.pick(r, ['artifact', 'hvt', 'destruct'] as SpObj[]);
-      const th = assault ? U.pick(r, planets) : TH0 + U.ri(r, 0, THEMES.length - 1), T = themeAt(th)!;
+      const rth = TH0 + U.ri(r, 0, THEMES.length - 1), th = assault ? U.pick(r, planets) : size === 'transport' ? TH0 + U.ri(r, 0, 1) : size === 'capital' ? TH0 + 2 : rth, T = themeAt(th)!;
+      const other: SpSize | null = !assault && size !== 'capital' && r() < 0.4 ? (level >= 4 && r() < 0.35 ? 'small' : 'transport') : null;
       const diff = Math.max(1, level + (size ? SIZES[size].diff : 1) + (r() < 0.3 ? 1 : 0) - (i === 0 ? 1 : 0));
       const pay = Math.round(((size ? SIZES[size].pay : 1300) + OBJ[obj].pay + 160 * diff) / 50) * 50;
       // its anchor: a direction off the golden angle, a little above or below the plane, 7 to 13 km out
       const a = i * 2.39996 + r() * 0.5, el = (r() - 0.5) * 0.7, d = 7000 + r() * 6000;
       const name = assault ? U.pick(r, WORLDS) : (T.name === 'Navy warship' ? 'NSV ' : T.name === 'Freighter' ? 'MV ' : 'CSV ') + U.pick(r, SHIP_NAMES);
-      out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name, brief: OBJ[obj].line, night: assault && !T.night && r() < 0.25,
+      out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name, brief: OBJ[obj].line + (other ? ' A ' + SIZES[other].name + ' is lying off her: nothing to do with the job, but she can be boarded.' : ''), other, night: assault && !T.night && r() < 0.25,
         ly: Math.round((3 + r() * 40) * 10) / 10, anchor: [Math.cos(a) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(a) * Math.cos(el) * d] });
     }
     return out;
@@ -142,7 +156,7 @@ const G_SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, OBJ, OFFERS, PICKS, offers, dist, speed, eta };
+  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta };
 })();
 G.SpaceData = G_SpaceData;
 interface GameModules { SpaceData: typeof G_SpaceData; }

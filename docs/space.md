@@ -57,12 +57,27 @@ to it. `sdock`, `jump`, `seat`, `mpick` and the shipyard's messages go through t
 corridor aft to the engine room across the stern, compartments off it to port and starboard with bulkheads between. Open
 space round her is tile 5, open to the sky, with `chasm` 300 so nothing is drawn or stood on there.
 
-| Size | Hull | Has |
-| --- | --- | --- |
-| small (corvette) | about 40 x 20 m | bridge, engine room, a hold, quarters, a mess |
-| medium (frigate) | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked |
-| large (cruiser) | about 100 x 36 m | adds a galley, a brig, a reactor, a vault, more of each; deeper sides split in two |
+| Class | Hull | Aboard | On her hull |
+| --- | --- | --- | --- |
+| civilian transport | about 34 x 18 m | bridge, engine room, a hold, cabins, a mess. 6 crew, 3 light guards | nothing |
+| corvette | about 40 x 20 m | the same, larger. 4 guards, one breach response squad | 1 point-defence gun |
+| frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 2 point defence, 1 cannon |
+| cruiser | about 100 x 36 m | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 cannon, 1 missile launcher |
+| capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 5 point defence, 3 cannon, 2 missile launchers |
 
+What the board offers goes by how far the squad has got: transports and corvettes first, capital ships from the fifth rank.
+
+- **Her complement** (`G.SpaceSv.crew`, by `G.SpaceData.SIZES`): those who don't fight; light guards posted singly; security
+  squads of four, armed and armoured, their chief with the first; breach response squads of three, lighter, who come to
+  where the hull is breached (the comms jammer stops them being called).
+- **Her weapons** (`HULLGUN`, js/space.ts guns): point defence (1.3 km, blind under its own deck within 90 m); cannon (4.5 km,
+  10 a hit, poor against anything quick or close in); missiles (6.5 km: they home, a hard turn across the nose shakes
+  one, a turret can shoot one down, 24 a hit). All can be destroyed from a turret seat.
+- **A second ship** (`sp.other`, four offers in ten except with a capital ship): a transport or corvette lying 44 m off the
+  target's port side, nothing to do with the mission. She has her own crew and a cargo manifest in her hold: take it
+  (hold F) for salvage money, paid at the jump home whether or not the mission is done.
+- **Decks** are stacked as a building's storeys are (js/level.ts stack): the same hull on each, a flight of stairs in each
+  stairwell. She's breached on her lowest deck. The sensor station draws each deck.
 - **Breach sites** (`G.ShipGen.sites`, `cut`): three cells of hull wall in a row (2 m), floor clear behind the middle of it,
   no window, and open space out from it for the squad's ship (22 m, widening from her collar to her engine pods). A cut
   makes those cells floor and takes the wall's solids out up to a door's height, the same on the host and every screen;
@@ -118,4 +133,6 @@ not 45). The host's fleet is kept in its browser (`fleet`).
   proportions (`models/characters/options/`) for a direction to be picked first.
 - The classic run's hangar has no helicopter while `ON` is true, so the old loop only works for a single `?play` level.
 - The career log and highlights don't know about missions (a mission's fee is logged as evidence money).
-- No ship-to-ship fighting beyond a hull's point-defence guns.
+- The squad's ship has no weapons of her own beyond her turrets; missiles are only drawn on the screens that are told of them.
+- Other ships are only met alongside a mission's target, not out in the space round the base.
+- A second ship isn't generated beside a capital ship (her upper deck would leave it roofless).
