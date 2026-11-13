@@ -6,7 +6,7 @@
   wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux; desc?: LvDesc; sp?: ShMeta | null } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean; ship?: string; lootRoom?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
 type RoomType = 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom' | 'terrace' | 'viewing' | 'bridge' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine';
 type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
-type LvDoorKind = 'stair' | 'fire' | 'vault'; // (a door that isn't the plain wooden one)
+type LvDoorKind = 'stair' | 'fire' | 'vault' | 'slide' | 'blast'; // (a door that isn't the plain wooden one. slide, blast: a ship's, which slide into the wall: slides())
 type LvLightKind = 'string' | 'highbay' | 'panel' | 'exit';
 type LvFxKind = 'sparks' | 'jet' | 'embers' | 'steam' | 'smoke';
 interface LvDress { who: string; type0: RoomType; wall: string; paper?: number; ceil: string; trim: string; floor: HomeFloor; cells: number[] | null; hung: any[]; was: Map<any, any>; own: any[] }
@@ -60,6 +60,10 @@ const G_Level = {
     return map;
   },
   genNight: false,
+  // A door that slides into the wall beside it instead of swinging (a ship's bulkhead door, and its locked blast doors): open,
+  // there's no leaf standing in the room. sturdy: no hinges or handle to shoot out, and not to be kicked in.
+  slides(d: { kind?: any }) { return d.kind === 'slide' || d.kind === 'blast'; },
+  sturdy(d: { kind?: any }) { return d.kind === 'vault' || d.kind === 'slide' || d.kind === 'blast'; },
   genSp: null as SpGen | null,
   generateDay(seed: number, level: number, th?: number) {
     const U = G.U, r = U.rng(seed);
@@ -631,7 +635,7 @@ const G_Level = {
     // An open door's leaf stands out into the room beside its hinge; it hides whoever's behind it and stops
     // rounds (like the closed door), though you can walk past it. Which cells it stands in, per door.
     map.leafAt = new Map();
-    for (const d of map.doors) this.hangLeaf(map, d);
+    for (const d of map.doors) if (!this.slides(d)) this.hangLeaf(map, d);
     map.unitAt = null;
     if (map.units) {
       map.unitAt = new Int8Array(W * H).fill(-1);

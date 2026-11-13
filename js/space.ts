@@ -12,14 +12,14 @@
 //   A jump is the change of level: the screens go to the jump's light instead of black (the veil, kind 'ftl'), the place
 //   is built behind it, and she comes out of the tunnel when it's ready.
 interface SpWp { id: string; name: string; sub: string; p: THREE.Vector3; kind: 'anchor' | 'base' | 'breach' | 'lz' | 'entry'; i?: number; hide?: boolean }
-interface SpMs { i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
+interface SpMs { cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
 type SpKind = 'hub' | 'board' | 'assault';
 const G_Space = (() => {
   const T = THREE, SD = G.SpaceData;
   const S = {
     on: false, kind: 'hub' as SpKind, stage: 'space' as 'space' | 'orbit' | 'atmo', map: null as LvMap | null,
     def: SD.SHIPS.kestrel, fleet: SD.fleet0(), seatsDef: [] as SpSeat[], berth: { x: 0, y: 0, z: 0, yaw: 0 }, Dp: new T.Vector3(), Dq: new T.Quaternion(),
-    model: null as SmShip | null, solids: [] as { s: any; tag?: string; on: boolean; b: number[] }[], noseT: 0, rampT: 0,
+    model: null as SmShip | null, solids: [] as { s: any; tag?: string; ship?: boolean; on: boolean; b: number[] }[], noseT: 0, rampT: 0,
     docked: true, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(),
     root: null as THREE.Group | null, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null,
     hull: null as ReturnType<typeof G.ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3 }[],
@@ -73,12 +73,7 @@ const G_Space = (() => {
     // the ship herself, and her deck in the world
     const m = S.model = G.ShipModel.ship(d, S.fleet);
     m.group.position.copy(S.Dp); m.group.quaternion.copy(S.Dq); G.R.scene.add(m.group);
-    S.solids = [];
-    for (const b of SD.boxes(d)) {
-      const a = SD.toWorld(S.berth, b[0], b[1], b[2]), c = SD.toWorld(S.berth, b[3], b[4], b[5]);
-      const bb = [Math.min(a.x, c.x), Math.min(a.y, c.y), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.y, c.y), Math.max(a.z, c.z)];
-      S.solids.push({ s: null, tag: b[6], on: false, b: bb });
-    }
+    S.solids = []; deck();
     // what's out there
     S.root = new T.Group(); G.R.scene.add(S.root);
     S.stars = G.ShipModel.stars(7); G.R.scene.add(S.stars);
@@ -113,6 +108,61 @@ const G_Space = (() => {
     if (S.stars) S.stars.visible = space;
     const fog = G.R.scene.fog as THREE.Fog;
     if (space) { fog.near = 1e6; fog.far = 2e6; } else { fog.color.setHex(th.fog); fog.near = 300; fog.far = 5200; }
+  }
+  // her deck's boxes, where she's berthed (in the world once syncSolids has put them there)
+  function deck() {
+    const w = S.map && S.map.world;
+    S.solids = S.solids.filter((q) => { if (q.tag === undefined && !q.ship) return true; if (q.on && w) G.World.remove(w, q.s); return false; });
+    for (const b of SD.boxes(S.def)) {
+      const a = SD.toWorld(S.berth, b[0], b[1], b[2]), c = SD.toWorld(S.berth, b[3], b[4], b[5]);
+      S.solids.push({ s: null, tag: b[6], ship: true, on: false, b: [Math.min(a.x, c.x), Math.min(a.y, c.y), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.y, c.y), Math.max(a.z, c.z)] });
+    }
+  }
+  // ---- breaching her anywhere (js/shipgen.ts sites, cut). The berth goes to the site: nose-on to that stretch of hull.
+  function berthAt(s: { x: number; z: number; nx: number; nz: number }) {
+    const TS = G.Level.TS, yaw = s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2, zN = S.def.z0 - S.def.nose - 0.22;
+    const px = s.x + s.nx * (TS / 2 + 0.03), pz = s.z + s.nz * (TS / 2 + 0.03);
+    return { x: px - zN * Math.sin(yaw), y: 0, z: pz - zN * Math.cos(yaw), yaw };
+  }
+  const siteAt = (a: number[]) => { const map = S.map!, W = map.W, TS = G.Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0; return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) } as ShSite; };
+  // she stands somewhere else now: her deck with her, and you if you're aboard (her pose in the level is what it was)
+  function rebase(b: { x: number; y: number; z: number; yaw: number }) {
+    const m = me(), was = S.berth, ab = !!m.pos && aboard(), loc = ab ? SD.toShip(was, m.pos.x, m.pos.y, m.pos.z) : null;
+    S.berth = b; S.Dp.set(b.x, b.y, b.z); S.Dq.copy(yawQ(b.yaw));
+    if (S.model) { S.model.group.position.copy(S.Dp); S.model.group.quaternion.copy(S.Dq); }
+    deck(); syncSolids();
+    if (loc && m.seat == null) { const w = SD.toWorld(b, loc.x, loc.y, loc.z); m.pos.set(w.x, w.y, w.z); m.yaw += b.yaw - was.yaw; }
+  }
+  // the hull cut through at a site, on this screen: the world and the grid (js/shipgen.ts cut), the wall's cubes out of sight
+  // there, a lintel over the opening and a torn frame round it
+  function cutHere(a: number[]) {
+    const map = S.map!, s = siteAt(a); if (!map.sp || !G.ShipGen.cut(map, s)) return;
+    const TS = G.Level.TS, L = G.Level, wm = map.wallMesh as THREE.InstancedMesh | undefined, zero = new T.Matrix4().makeScale(0, 0, 0);
+    if (wm && map.wallIdx) { for (const c of s.cells) { const i = map.wallIdx.get(c); if (i != null) { wm.setMatrixAt(i, zero); if (map.wallBase) map.wallBase.set(zero.elements, i * 16); } } wm.instanceMatrix.needsUpdate = true; }
+    const g = new T.Group(), along = s.nz ? 1 : 0, wall = G.ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 }), torn = G.ShipModel.M(0x1a1c1f, { metalness: 0.6 }), hot = G.ShipModel.lit(0xff7a1a);
+    const bx = (mt: THREE.Material, u0: number, y0: number, u1: number, y1: number, d0 = -TS / 2, d1 = TS / 2) => { const mm = new T.Mesh(new T.BoxGeometry(along ? u1 - u0 : d1 - d0, y1 - y0, along ? d1 - d0 : u1 - u0), mt); mm.position.set(along ? (u0 + u1) / 2 : (d0 + d1) / 2, (y0 + y1) / 2, along ? (d0 + d1) / 2 : (u0 + u1) / 2); g.add(mm); };
+    bx(wall, -1.5 * TS, L.DOOR_H + 0.1, 1.5 * TS, L.WALL_H);
+    for (const sd of [-1, 1]) { bx(torn, sd * 1.5 * TS - 0.06, 0, sd * 1.5 * TS + 0.06, L.DOOR_H + 0.1, -TS / 2 - 0.04, TS / 2 + 0.04); bx(hot, sd * 1.5 * TS - 0.02, 0.1, sd * 1.5 * TS + 0.02, L.DOOR_H, -TS / 2 - 0.06, -TS / 2 - 0.04); }
+    bx(torn, -1.5 * TS, L.DOOR_H + 0.04, 1.5 * TS, L.DOOR_H + 0.16, -TS / 2 - 0.04, TS / 2 + 0.04);
+    g.position.set(s.x, 0, s.z); G.R.levelRoot.add(g);
+  }
+  // Where her nose is headed on the hull: the site its line meets (nearest), how far off, and how far the nose is off the
+  // line straight into it. null: she isn't pointed at anywhere she could breach.
+  function aim(maxT = 320) {
+    if (S.kind !== 'board' || !S.map || !S.map.sp) return null;
+    const zn = S.def.z0 - S.def.nose - 0.22, N = new T.Vector3(0, 1.4, zn).applyQuaternion(S.Q).add(S.P), f = fwd(S.Q), TS = G.Level.TS;
+    let best: ShSite | null = null, bo = 1.0, bt = 0; // (within a metre of a site's middle: the collar pulls her onto it)
+    const list = G.ShipGen.sites(S.map).concat((S.map.sp.cuts || []).map(siteAt)); // (and the holes already made)
+    for (const s of list) {
+      const dn = f.x * s.nx + f.z * s.nz; if (dn > -0.5) continue;
+      const px = s.x + s.nx * TS / 2, pz = s.z + s.nz * TS / 2, t = ((px - N.x) * s.nx + (pz - N.z) * s.nz) / dn;
+      if (t < -1 || t > maxT) continue;
+      const off = Math.abs(s.nz ? N.x + f.x * t - px : N.z + f.z * t - pz);
+      if (off < bo) { bo = off; best = s; bt = t; }
+    }
+    if (!best) return null;
+    const lat = best.nz ? (N.x - best.x) * -best.nz : (N.z - best.z) * best.nx, range = (N.x - best.x) * best.nx + (N.z - best.z) * best.nz - TS / 2;
+    return { site: best, t: bt, range, dx: lat, dy: N.y - 1.4, align: -(f.x * best.nx + f.z * best.nz), close: -(S.V.x * best.nx + S.V.z * best.nz) };
   }
   const addObj = (o: THREE.Object3D, p?: THREE.Vector3) => { if (p) o.position.copy(p); S.root!.add(o); return o; };
 
@@ -166,7 +216,7 @@ const G_Space = (() => {
     const out = new T.Vector3(b.x, 150, b.face + 2600);
     const a = addObj(G.ShipModel.anchor(), out); a.lookAt(new T.Vector3(b.x, 0, b.face));
     S.anchors.push({ i: -1, obj: a, p: out });
-    S.wps.push({ id: 'breach', name: 'BREACH POINT', sub: 'Ram the marked plate', p: new T.Vector3(b.x, 1.4, b.face + 0.4), kind: 'breach' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
+    S.wps.push({ id: 'breach', name: 'SUGGESTED BREACH', sub: 'The hold: or ram any clear stretch of her hull', p: new T.Vector3(b.x, 1.4, b.face + 0.4), kind: 'breach' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
     S.tgt = 0;
     arriveAt(new T.Vector3(b.x + 260, 140, b.face + 1700), new T.Vector3(-0.15, -0.08, -1).normalize());
     things(map);
@@ -376,7 +426,9 @@ const G_Space = (() => {
   function collide(dt: number) {
     const R = 5.5, P = S.P; let hit = 0;
     if (S.floorAt) { const h = S.floorAt(P.x, P.z); if (P.y < h) { hit = Math.max(hit, -S.V.y); P.y = h; if (S.V.y < 0) S.V.y = 0; S.V.multiplyScalar(Math.exp(-dt * 1.5)); } }
-    for (const b of S.boxes) {
+    // (lined up on a stretch of hull she can breach, and close: the way in is clear by that site's own measure)
+    const ap = S.kind === 'board' ? aim(20) : null, lined = !!ap && ap.align > 0.8 && Math.abs(ap.dy) < 1.6;
+    for (const b of lined ? [] : S.boxes) {
       const qx = G.U.clamp(P.x, b[0], b[3]), qy = G.U.clamp(P.y + 1.4, b[1], b[4]), qz = G.U.clamp(P.z, b[2], b[5]);
       const dx = P.x - qx, dy = P.y + 1.4 - qy, dz = P.z - qz, dd = Math.hypot(dx, dy, dz);
       if (dd >= R) continue;
@@ -401,13 +453,14 @@ const G_Space = (() => {
   // what happens as she flies: the breach, the descent, the way up
   function events() {
     if (S.kind === 'board' && S.map && !S.state?.boom) {
-      const zn = S.def.z0 - S.def.nose - 0.22, nose = new T.Vector3(0, 1.4, zn).applyQuaternion(S.Q).add(S.P), b = S.map.sp!.breach, tg = new T.Vector3(b.x, 1.4, b.face + 0.05);
-      const f = fwd(S.Q), up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), sp = -S.V.z, dd = nose.distanceTo(tg);
-      if (dd < 3.2 && f.z < -0.8 && up.y > 0.8 && sp > 3.5) {
-        // in: the last of it is the collar seating itself on the plate
-        S.shake = 1; const hard = sp > 45;
-        if (hard) damage((sp - 45) * 1.5, 'Too fast into the hull');
-        auto(S.Dp, S.Dq, 0.35, null, () => { G.Net.toHost({ t: 'sdock', on: 1 }); dockLocal(true); });
+      // her nose into the hull, square on and fast enough: she's through, wherever that is along it
+      const a = aim(6), up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q);
+      if (a && a.range < 2.6 && a.align > 0.8 && up.y > 0.8 && a.close > 3.5 && Math.abs(a.dy) < 1.6) {
+        S.shake = 1;
+        if (a.close > 45) damage((a.close - 45) * 1.5, 'Too fast into the hull');
+        const at = [a.site.c, a.site.nx, a.site.nz];
+        rebase(berthAt(a.site));
+        auto(S.Dp, S.Dq, 0.35, null, () => { G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); dockLocal(true); });
         G.Audio.kick(2);
       }
     }
@@ -567,14 +620,15 @@ const G_Space = (() => {
       if (gn.hp <= 0) continue;
       const to = S.P.clone().add(new T.Vector3(0, 1.5, 0)).sub(new T.Vector3(gn.x, gn.y, gn.z)), dist = to.length();
       if (dist > 1300) continue;
+      if (to.y < -1.5 && Math.hypot(to.x, to.z) < 90) continue; // (under their own deck's edge, close in: they can't bear)
       gn.obj.rotation.y = Math.atan2(-to.x, -to.z); gn.gun.rotation.x = Math.asin(G.U.clamp(to.y / dist, -0.2, 1));
       gn.cool -= dt;
       if (gn.cool > 0) continue;
-      gn.cool = 0.5 + Math.random() * 0.5;
+      gn.cool = 0.8 + Math.random() * 0.9;
       const sp = S.V.length(), miss = Math.random() < G.U.clamp(0.25 + sp / 260 + dist / 3000, 0.25, 0.92), d = to.clone().normalize();
       if (miss) d.add(new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.05)).normalize();
       tracer(new T.Vector3(gn.x, gn.y, gn.z), d, miss ? dist + 300 : dist, false);
-      if (!miss && isCtl()) { damage(3.5); S.shake = Math.max(S.shake, 0.3); }
+      if (!miss && isCtl()) { damage(2.2); S.shake = Math.max(S.shake, 0.3); }
     }
   }
   function boomStep(dt: number) {
@@ -619,7 +673,7 @@ const G_Space = (() => {
             const dd = S.P.distanceTo(S.Dp);
             if (dd < 160 && S.V.length() < 45) { const p = holdFor('L', K('KeyL'), dt, 0.8, land); if (p >= 0) { out.prog = p; out.label = 'Setting down'; } lines.push(hint('Hold L', 'to set down on the pad')); }
           }
-          if (S.kind === 'board' && S.P.distanceTo(S.Dp) < 120 && !(S.state && S.state.boom)) lines.push(S.V.length() < 4 ? 'Ram the marked plate: nose on, 5 m/s or more' : 'Nose onto the marked plate');
+          if (S.kind === 'board' && !(S.state && S.state.boom)) { const a = aim(120); if (a) lines.push(a.close < 4 ? 'Ram the hull: nose on, 5 m/s or more' : 'Hold her square to the hull'); }
         }
         if (ctl && !S.docked && !S.ftl && S.t - S.helpAt < 20) lines.push('<small><b>W S A D</b> thrust · <b>Space C</b> up down · <b>Q E</b> roll · <b>Shift</b> cruise · <b>X</b> brake · <b>T</b> target · <b>right mouse</b> look about</small>');
       } else if (seat.k === 'turret') {
@@ -695,7 +749,11 @@ const G_Space = (() => {
       }
       case 'seats': S.seats = m.s || {}; if (m.ctl !== undefined) S.ctl = m.ctl; if (m.no != null && me().seat === m.no) { stand(); G.HUD.toast('', 'That seat is taken', 1.5); } return true;
       case 'spose': heardPose(m.a); S.ctl = m.by; return true;
-      case 'sdock': if (S.on && m.by !== G.Net.myId) { S.auto = null; dockLocal(!!m.on); if (!m.on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); } } if (S.on && m.on && S.kind === 'board') { S.shake = 1; G.HUD.toast('BREACH', 'The plate is in. Go.', 2.2); } return true;
+      case 'sdock':
+        if (S.on && m.on && m.site && S.kind === 'board') { if (m.by !== G.Net.myId) rebase(berthAt(siteAt(m.site))); cutHere(m.site); }
+        if (S.on && m.by !== G.Net.myId) { S.auto = null; dockLocal(!!m.on); if (!m.on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); } }
+        if (S.on && m.on && S.kind === 'board') { S.shake = 1; G.HUD.toast('BREACH', 'She\'s through the hull. Go.', 2.2); }
+        return true;
       case 'ms': S.state = m; G.SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
       case 'mdone': {
         if (m.ok) { const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; G.HUD.toast('MISSION COMPLETE', `${G.U.esc(m.name)} · +¢${G.U.fmt(n)}${m.bonus ? ' (taken alive)' : ''}`, 5); G.HUD.chat(null, 0, `Mission complete: +¢${G.U.fmt(n)}`); G.Audio.extract(); if (G.Career.run) G.Career.ev('evidence', n); }
@@ -740,9 +798,11 @@ const G_Space = (() => {
     S.ms = sp.ms; S.state = sp.state;
     setup(map, sp.ms.kind === 'board' ? 'board' : 'assault', sp);
     cards(); G.SpaceUI.objDraw();
+    // (joined late: the holes already in her, and the ship where she's against one)
+    if (sp.state && S.kind === 'board') { for (const c of sp.state.cuts || []) cutHere(c); if (sp.state.site) rebase(berthAt(siteAt(sp.state.site))); }
     if (sp.state && sp.state.docked) dockLocal(true);
   }
-  return { S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, crewAboard, dbgDock: () => dockLocal(true), dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }

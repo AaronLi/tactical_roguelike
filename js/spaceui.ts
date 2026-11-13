@@ -131,20 +131,19 @@ const G_SpaceUI = (() => {
     const s = S(), c = cv.getContext('2d')!, W = cv.width, H = cv.height;
     c.fillStyle = '#04090d'; c.fillRect(0, 0, W, H); c.textBaseline = 'middle'; c.font = '11px sans-serif'; c.lineWidth = 1;
     const cx = 100, cy = 104, R = 82, inv = s.Q.clone().invert();
-    const sp = s.map && s.map.sp, b = s.kind === 'board' && sp ? sp.breach : null, zn = s.def.z0 - s.def.nose - 0.22;
-    const nose = new T.Vector3(0, 1.4, zn).applyQuaternion(s.Q).add(s.P), range = b ? nose.z - b.face : 1e9;
+    const a = s.kind === 'board' && !(s.state && s.state.boom) ? G.Space.aim(260) : null;
     c.strokeStyle = '#1f4a5e';
-    if (b && range < 260 && range > -2 && !(s.state && s.state.boom)) {
-      // the approach
-      const dx = nose.x - b.x, dy = nose.y - 1.4, f = new T.Vector3(0, 0, -1).applyQuaternion(s.Q), k = R / 8, close = -s.V.z;
+    if (a) {
+      // the approach: to wherever on her hull the nose is pointed
+      const range = a.range, dx = a.dx, dy = a.dy, f = new T.Vector3(0, 0, -1).applyQuaternion(s.Q.clone().premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -(a.site.nz > 0 ? 0 : a.site.nz < 0 ? Math.PI : a.site.nx > 0 ? Math.PI / 2 : -Math.PI / 2)))), k = R / 8, close = a.close;
       for (const r of [R, R * 0.5, R * 0.2]) { c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke(); }
       c.beginPath(); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.moveTo(cx, cy - R); c.lineTo(cx, cy + R); c.stroke();
-      const ok = Math.hypot(dx, dy) < 2.6 && f.z < -0.8;
+      const ok = Math.abs(dy) < 1.6 && a.align > 0.8;
       c.fillStyle = ok ? '#7dff9a' : '#ffb020'; c.beginPath(); c.arc(cx + G.U.clamp(-dx * k, -R, R), cy + G.U.clamp(dy * k, -R, R), 6, 0, 7); c.fill();
       c.strokeStyle = '#8fd6ff'; c.beginPath(); const ax = cx + G.U.clamp(f.x * 160, -R, R), ay = cy - G.U.clamp(f.y * 160, -R, R); c.moveTo(ax - 9, ay); c.lineTo(ax + 9, ay); c.moveTo(ax, ay - 9); c.lineTo(ax, ay + 9); c.stroke();
       c.fillStyle = '#8fd6ff'; c.fillText('BREACH APPROACH', 196, 16);
       c.fillStyle = '#d7e6f2'; c.fillText('range  ' + SD.dist(Math.max(0, range)), 196, 44); c.fillText('off line  ' + Math.hypot(dx, dy).toFixed(1) + ' m', 196, 62); c.fillText('closing  ' + close.toFixed(0) + ' m/s', 196, 80);
-      c.fillStyle = close < 4 ? '#ffb020' : close > 45 ? '#ff5a40' : '#7dff9a'; c.fillText(close < 4 ? 'TOO SLOW TO BREACH' : close > 45 ? 'TOO FAST' : ok ? 'ON THE PLATE' : 'LINE UP', 196, 104);
+      c.fillStyle = close < 4 ? '#ffb020' : close > 45 ? '#ff5a40' : '#7dff9a'; c.fillText(close < 4 ? 'TOO SLOW TO BREACH' : close > 45 ? 'TOO FAST' : ok ? 'CLEAR HULL: GO' : 'SQUARE HER UP', 196, 104);
       c.fillStyle = '#12303e'; c.fillRect(196, 122, 110, 8); c.fillStyle = close > 45 ? '#ff5a40' : '#7dff9a'; c.fillRect(196, 122, G.U.clamp(close / 60, 0, 1) * 110, 8); c.fillStyle = '#d7e6f2'; c.fillRect(196 + 110 * 4 / 60, 119, 1, 14); c.fillRect(196 + 110 * 45 / 60, 119, 1, 14);
       c.fillStyle = '#7f97a8'; c.fillText('dot: nose · cross: heading', 196, 150);
       return;
@@ -166,7 +165,7 @@ const G_SpaceUI = (() => {
     c.fillStyle = '#8fd6ff'; c.fillText('NAV', 196, 16); c.fillStyle = '#ffd24a'; c.fillText(wp ? wp.name.slice(0, 20) : 'no target', 196, 38);
     c.fillStyle = '#d7e6f2'; c.fillText('range  ' + (wp ? SD.dist(dist) : '—'), 196, 60); c.fillText('speed  ' + SD.speed(speed), 196, 78); c.fillText('closing  ' + SD.speed(Math.max(0, close)), 196, 96); c.fillText('ETA  ' + (wp && close > 2 ? SD.eta(dist / close) : '--:--'), 196, 114);
     c.fillStyle = s.cruise ? '#8fd6ff' : '#7f97a8'; c.fillText(s.cruise ? 'CRUISE DRIVE' : G.Space.clearOf() > 420 ? 'cruise available' : 'too close to cruise', 196, 138);
-    const a = G.Space.nearAnchor(); if (a) { c.fillStyle = '#7dff9a'; c.fillText('IN THE ANCHOR: jump ready', 196, 160); }
+    const na = G.Space.nearAnchor(); if (na) { c.fillStyle = '#7dff9a'; c.fillText('IN THE ANCHOR: jump ready', 196, 160); }
     c.fillStyle = s.hp < s.hpMax * 0.35 ? '#ff5a40' : '#7f97a8'; c.fillText('hull  ' + Math.round(s.hp / s.hpMax * 100) + '%', 196, 182);
   }
   // a boarded ship's deck, as the scanner has it: the compartments named, the doors (locked ones red), the breach; who's
@@ -187,8 +186,8 @@ const G_SpaceUI = (() => {
       if (big && role && role !== 'spine') { c.fillStyle = vac ? '#ff9a8a' : '#9fd0e6'; c.textAlign = 'center'; c.fillText((G.ShipGen.NAMES[role] || role).toUpperCase(), X((rm.x + rm.w / 2) * TS), Z((rm.z + rm.h / 2) * TS)); }
     });
     for (const d of map.doors) { const lk = sp.locks[d.id]; if (lk === 'breach') continue; c.fillStyle = lk ? (s.state && s.state.keys.includes(lk) ? '#7dff9a' : '#ff5a40') : d.open ? '#4a7f96' : '#c8e6f4'; const w = d.axis === 'x' ? 2 : 1.3 * k, hh = d.axis === 'x' ? 1.3 * k : 2; c.fillRect(X(d.x) - w / 2, Z(d.z) - hh / 2, w, hh); }
-    c.fillStyle = '#ffb020'; c.fillRect(X(sp.breach.x) - 1.4 * k, Z(sp.breach.face) - 2, 2.8 * k, 4);
-    if (big) { c.textAlign = 'center'; c.fillText('BREACH', X(sp.breach.x), Z(sp.breach.face) + 12); }
+    c.strokeStyle = '#ffb020'; c.strokeRect(X(sp.breach.x) - 1.4 * k, Z(sp.breach.face) - 2, 2.8 * k, 4);
+    c.fillStyle = '#ffb020'; for (const q of sp.cuts) { const x = (q[0] % map.W + 0.5) * TS, z = (((q[0] / map.W) | 0) + 0.5) * TS; c.beginPath(); c.arc(X(x), Z(z), big ? 6 : 4, 0, 7); c.fill(); if (big) { c.textAlign = 'center'; c.fillText('BREACH', X(x), Z(z) + 14); } }
     const dot = (p: { x: number; z: number } | null, col: string, t?: string) => { if (!p) return; c.fillStyle = col; c.beginPath(); c.arc(X(p.x), Z(p.z), big ? 5 : 3, 0, 7); c.fill(); if (big && t) { c.textAlign = 'left'; c.fillText(t, X(p.x) + 8, Z(p.z)); } };
     const o = s.ms ? s.ms.obj : null;
     if (o === 'artifact' && s.state && s.state.art === 0) dot(s.state.artAt ? { x: s.state.artAt[0], z: s.state.artAt[1] } : sp.artifact, '#40ffd0', 'ARTIFACT');
@@ -209,7 +208,7 @@ const G_SpaceUI = (() => {
     const left = st.arm != null ? Math.max(0, st.arm - (performance.now() - armAt) / 1000) : null;
     const O = SD.OBJ[ms.obj], lines: string[] = [], meta = s.map && s.map.sp;
     const needKey = (k: string) => !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k);
-    if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Fly to the breach point and ram the marked plate.');
+    if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Ram her hull nose-on to board: the marked stretch, or anywhere clear.');
     if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === G.Net.myId ? 'You have' : G.U.esc(G.Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
     if (ms.obj === 'hvt') lines.push(st.hvt === 1 ? '<span class="ok">Target dead.</span> Back to the ship and jump home.' : st.hvt === 2 ? '<span class="ok">Target in restraints.</span> Back to the ship and jump home.' : 'Find the target (the bridge): kill or restrain.');
     if (ms.obj === 'destruct') lines.push(st.boom ? '<span class="ok">She\'s gone.</span> Jump home.' : left != null ? `<span class="tm">${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</span><br>Get off her: your ship, or an escape pod. Then undock.` : 'Reach the bridge and start the self-destruct.');

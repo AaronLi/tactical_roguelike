@@ -1711,7 +1711,8 @@ const G_Game = {
       const piv = m.doorMeshes[i], u = piv.userData;
       if (u.fallen) { G.LightGrid.setDoor(i, 1); return; } // (off its hinges: js/damage.ts has it)
       u.ang += ((d.open ? 1 : 0) - u.ang) * Math.min(1, dt * (u.rate || 7));
-      piv.rotation.y = u.base + u.ang * Math.PI / 2 * 0.95 * (u.sign || 1);
+      if (u.slide) { const k = u.ang * u.w * 0.97; piv.position.x = u.px - Math.cos(u.base) * k; piv.position.z = u.pz + Math.sin(u.base) * k; } // (a ship's door: along the wall, into it)
+      else piv.rotation.y = u.base + u.ang * Math.PI / 2 * 0.95 * (u.sign || 1);
       const k = Math.min(1, u.ang * 2.5); // (the lamps' light past it: all in by the time it's well ajar)
       G.LightGrid.setDoor(i, k < 0.01 ? 0 : k > 0.99 ? 1 : k);
     });

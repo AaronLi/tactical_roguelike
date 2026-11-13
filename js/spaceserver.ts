@@ -12,7 +12,7 @@ interface SvMission {
   ms: SpMission; meta: ShMeta | null; docked: boolean; done: boolean; keys: Record<string, boolean>; cards: SvCard[];
   art: 0 | 1 | 2; artBy: string | null; // (0 where it lies, 1 carried, 2 lost with the ship)
   hvt: number | null; hvtSt: 0 | 1 | 2; // (0 at large, 1 dead, 2 in restraints)
-  arm: number | null; boom: boolean; cleared: boolean; // (arm: seconds left on the self-destruct)
+  arm: number | null; boom: boolean; cleared: boolean; site: number[] | null; // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
   vac: Set<number>; sealT: Map<number, number>; doorRooms: Map<number, number[]> | null; vacT: number; armSay: number;
 }
 const G_SpaceSv = (() => {
@@ -34,7 +34,7 @@ const G_SpaceSv = (() => {
   function msMsg() {
     const M = st.M; if (!M) return null;
     return { t: 'ms', i: M.ms.i, docked: M.docked ? 1 : 0, done: M.done ? 1 : 0, keys: Object.keys(M.keys).filter((k) => M.keys[k]), cards: M.cards.filter((c) => c.st === 1).map((c) => [c.key, c.x, c.z, c.y]),
-      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0 };
+      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0 };
   }
   const levelMsg = () => (st.M ? { ms: st.M.ms, gen: genOf(st.M.ms), state: msMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg(), board: boardMsg() } : null);
   const genOf = (ms: SpMission): SpGen | null => (ms.kind === 'board' ? { size: ms.size!, obj: ms.obj, ship: st.fleet.ship } : null);
@@ -76,7 +76,7 @@ const G_SpaceSv = (() => {
   function begin(ms: SpMission) {
     const sv = S();
     st.ship.docked = false; st.ship.at = ms.i; st.ship.pose = null;
-    st.M = { ms, meta: null, docked: false, done: false, keys: {}, cards: [], art: 0, artBy: null, hvt: null, hvtSt: 0, arm: null, boom: false, cleared: false, vac: new Set(), sealT: new Map(), doorRooms: null, vacT: 0, armSay: 0 };
+    st.M = { ms, meta: null, docked: false, done: false, keys: {}, cards: [], art: 0, artBy: null, hvt: null, hvtSt: 0, arm: null, boom: false, cleared: false, site: null, vac: new Set(), sealT: new Map(), doorRooms: null, vacT: 0, armSay: 0 };
     sv.startLevel(ms);
   }
   // the level is built and the crew is aboard her (js/server.ts startLevel calls it before it tells anyone): the mission's own people
@@ -123,21 +123,28 @@ const G_SpaceSv = (() => {
   }
 
   // ---- the ship: she's against the hull (the plate goes in), on the pad, or away again
-  function dock(on: boolean, from: string) {
+  function dock(on: boolean, from: string, at?: unknown) {
     const sv = S();
     if (sv.phase === 'shop') { st.ship.docked = on; if (on) { st.ship.at = null; landed(); } net().broadcast({ t: 'sdock', on: on ? 1 : 0, by: from }); return; }
     const M = st.M; if (!M || sv.phase !== 'level' || M.docked === on || M.boom) return;
-    M.docked = on; st.ship.docked = on;
-    net().broadcast({ t: 'sdock', on: on ? 1 : 0, by: from });
+    // against her hull: at the site the pilot's game says she hit (any clear stretch of it), cut through there if it isn't already
+    let site: ShSite | null = null;
     if (on && M.meta && sv.map) {
-      const b = M.meta.breach, d = sv.map.doors[b.door] as Door;
-      if (d && !d.fallen) {
-        const fall: [number, number[], number] = [0, [0, -1], (Math.random() * 1e9) | 0];
-        (sv.fallen = sv.fallen || []).push([d.id, ...fall]);
-        G.Damage.fall(sv.map as unknown as DamageMap, d as any, ...fall);
-        net().broadcast({ t: 'dfall', i: d.id, f: fall });
-      }
-      sv.hear(b.x, b.z, G.SpaceData.fitted(st.fleet, 'jammer') ? 14 : 45, 0); // (the whole ship rings with it)
+      const a = Array.isArray(at) && at.length === 3 && at.every(Number.isInteger) ? (at as number[]) : null;
+      site = a ? G.ShipGen.siteOf(sv.map, a[0], a[1], a[2]) : null;
+      if (!site && a && M.meta.cuts.some((q) => q[0] === a[0] && q[1] === a[1] && q[2] === a[2])) { M.site = a; } // (the hole she made before)
+      else if (!site) return;
+      else { G.ShipGen.cut(sv.map, site); M.site = [site.c, site.nx, site.nz]; }
+    }
+    M.docked = on; st.ship.docked = on;
+    net().broadcast({ t: 'sdock', on: on ? 1 : 0, by: from, site: on ? M.site : undefined });
+    if (on && M.meta && sv.map && M.site) {
+      const W = sv.map.W, TS = G.Level.TS, x = (M.site[0] % W + 0.5) * TS, z = (((M.site[0] / W) | 0) + 0.5) * TS;
+      sv.hear(x, z, G.SpaceData.fitted(st.fleet, 'jammer') ? 14 : 45, 0); // (the whole ship rings with it)
+    } else if (!on && M.meta && sv.map && M.site) {
+      // she's backed out of the hole: that compartment is open to space
+      const W = sv.map.W, TS = G.Level.TS, x = (M.site[0] % W + 0.5 - M.site[1] * 1.5) * TS, z = (((M.site[0] / W) | 0) + 0.5 - M.site[2] * 1.5) * TS;
+      vent(G.ShipGen.roomAt(sv.map, x, z), 'the breach');
     }
     sync();
   }
@@ -167,7 +174,6 @@ const G_SpaceSv = (() => {
   function mayOpen(d: { id: number; open: boolean }, from: string) {
     const M = st.M, k = lockOf(d);
     if (!M || !k) return true;
-    if (k === 'breach') return false;
     if (M.keys[k] || d.open) return true;
     net().sendTo(from, { t: 'locked', i: d.id, k });
     return false;
@@ -204,7 +210,7 @@ const G_SpaceSv = (() => {
     if (!M || !M.meta || !map || !M.vac.size) return;
     const DR = doorRooms(M), clock = sv.clock || 0;
     for (const d of map.doors as Door[]) {
-      const rs = DR.get(d.id); if (!rs || M.meta.locks[d.id] === 'breach') continue;
+      const rs = DR.get(d.id); if (!rs) continue;
       const va = M.vac.has(rs[0]), vb = M.vac.has(rs[1]);
       if (!va && !vb) continue;
       if (va && vb) { M.sealT.delete(d.id); continue; }
@@ -284,7 +290,7 @@ const G_SpaceSv = (() => {
         break;
       }
       case 'jump': jump(m.to | 0, from); break;
-      case 'sdock': if (p) dock(!!m.on, from); break;
+      case 'sdock': if (p) dock(!!m.on, from, m.site); break;
       case 'seat': {
         if (!p) break;
         const s = m.s == null || m.s < 0 ? -1 : m.s | 0;

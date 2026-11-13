@@ -439,7 +439,7 @@ const G_LevelDesc = (() => {
     for (const d of map.doors) {
       const dw = d.w || TS, half = dw / 2, leafL = dw - 0.05, gy = map.terrain ? d.fy || 0 : 0; // (on rolling ground, the ground it's in: a storey's floor is its whole group's)
       out.push(B.mesh(d.axis === 'x' ? B.geo('box', [TS, L.WALL_H - L.DOOR_H, dw]) : B.geo('box', [dw, L.WALL_H - L.DOOR_H, TS]), lintelMat, { p: [d.x, gy + (L.WALL_H + L.DOOR_H) / 2, d.z], l1: 1 }));
-      const c: LdNode[] = [], vault = d.kind === 'vault', glassDoor = d.kind === 'stair', LH = L.DOOR_H - 0.04;
+      const c: LdNode[] = [], slide = L.slides(d), vault = d.kind === 'vault' || d.kind === 'blast', glassDoor = d.kind === 'stair', LH = L.DOOR_H - 0.04; // (slide: a ship's door, drawn shut across the opening and slid along the wall as it opens, js/game.ts updateDoors)
       const part = (w: number, h: number, dd: number, x: number, y: number, z: number, mat = steelMat) => c.push(B.mesh(B.geo('box', [w, h, dd]), mat, { p: [x, y, z] }));
       if (glassDoor) {
         // a stairwell door: a glass leaf in a steel frame. It swings away from the side with the push bar (the bar across the
@@ -453,16 +453,19 @@ const G_LevelDesc = (() => {
         part(0.03, 0.42, 0.03, leafL - 0.1, 1.05, -push * 0.085, barMat); // the pull handle on the other face, on two stand-offs
         for (const y of [0.88, 1.22]) part(0.025, 0.025, 0.06, leafL - 0.1, y, -push * 0.055, barMat);
       }
-      if (vault) { // the locking wheel and bolts on the outside face
+      if (slide) { // a sliding door: a rib across each face, a lit strip by its leading edge
+        for (const sd of [-1, 1]) { part(leafL - 0.1, 0.07, 0.03, leafL / 2 + 0.02, 1.25, sd * (vault ? 0.11 : 0.05), knobMat); part(0.035, LH - 0.5, 0.012, leafL - 0.07, LH / 2, sd * (vault ? 0.105 : 0.045), barMat); }
+      }
+      if (d.kind === 'vault') { // the locking wheel and bolts on the outside face
         const wp = [leafL * (d.mirror ? 0.3 : 0.7), 1.2, 0.13];
         c.push(B.mesh(B.geo('torus', [0.22, 0.03, 8, 20]), knobMat, { p: wp }));
         for (let k = 0; k < 3; k++) c.push(B.mesh(B.geo('box', [0.44, 0.03, 0.03]), knobMat, { p: wp, r: [0, 0, k * PI / 3] }));
         for (const y of [0.3, 1.2, 2.0]) c.push(B.mesh(B.geo('box', [0.12, 0.08, 0.06]), knobMat, { p: [d.mirror ? 0.06 : leafL - 0.06, y, 0.12] }));
       }
-      c.push(B.mesh(B.geo('box', [leafL, LH, vault ? 0.2 : 0.05]), vault ? vaultMat : glassDoor ? doorGlass : d.kind === 'fire' ? fireMat : leafMat, { p: [leafL / 2 + 0.02, (L.DOOR_H - 0.04) / 2, 0], l1: 1, h: 'leaf' }));
-      if (!glassDoor) for (const side of [-1, 1]) c.push(B.mesh(B.geo('sphere', [0.03, 8, 6]), knobMat, { p: [leafL - 0.08, 1.0, side * 0.045], h: 'knob' }));
+      c.push(B.mesh(B.geo('box', [leafL, LH, vault ? 0.2 : slide ? 0.08 : 0.05]), vault ? vaultMat : glassDoor ? doorGlass : d.kind === 'fire' || slide ? fireMat : leafMat, { p: [leafL / 2 + 0.02, (L.DOOR_H - 0.04) / 2, 0], l1: 1, h: 'leaf' }));
+      if (!glassDoor && !slide) for (const side of [-1, 1]) c.push(B.mesh(B.geo('sphere', [0.03, 8, 6]), knobMat, { p: [leafL - 0.08, 1.0, side * 0.045], h: 'knob' }));
       // its hinges, on the side it opens toward (shot out, they're gone, and when they all are so's the door: js/damage.ts)
-      if (!vault) for (const y of G.Damage.HINGES) {
+      if (!vault && !slide) for (const y of G.Damage.HINGES) {
         c.push(B.mesh(B.geo('cyl', [0.012, 0.012, 0.1, 8]), steelMat, { p: [0.005, y, -0.03], h: 'hk' }));
         c.push(B.mesh(B.geo('box', [0.05, 0.09, 0.004]), steelMat, { p: [0.04, y, -0.0275], h: 'hp' }));
       }

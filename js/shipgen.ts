@@ -14,7 +14,9 @@
 // which room is which, where the self-destruct console, the artifact and the escape pods are, which windows are in the hull.
 type ShRole = 'bridge' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine';
 interface ShSlot { rm: LvRoom; pos: number; side: number; deep: boolean; inner: LvRoom | null; door: number[] }
-interface ShMeta { size: SpSize; obj: SpObj | null; breach: { x: number; z: number; face: number; door: number; room: number }; locks: Record<number, string>; roles: (ShRole | null)[]; console: { x: number; z: number } | null; artifact: { x: number; z: number } | null;
+// a stretch of hull a ship can breach: three cells of its wall (c the middle one), the way out of her (nx, nz), the wall's middle there
+interface ShSite { c: number; nx: number; nz: number; x: number; z: number; cells: number[] }
+interface ShMeta { size: SpSize; obj: SpObj | null; breach: { x: number; z: number; face: number; door: number; room: number }; sites?: ShSite[]; cuts: number[][]; locks: Record<number, string>; roles: (ShRole | null)[]; console: { x: number; z: number } | null; artifact: { x: number; z: number } | null;
   pods: { x: number; z: number }[]; hullWin: Record<number, number>; hvtRoom: number; cardRooms: Record<string, number>; hull: { x0: number; z0: number; x1: number; z1: number; zc: number; bow: number[]; stern: number[] } }
 const G_ShipGen = (() => {
   const SPEC: Record<SpSize, { len: number[]; sw: number; dep: number[]; bw: number; bd: number; ew: number; ed: number; split: number; foes: number; big: number }> = {
@@ -30,7 +32,7 @@ const G_ShipGen = (() => {
     large: [['armoury', 0.35], ['vault', 0.5], ['barracks', null], ['mess', null], ['galley', null], ['medbay', null], ['quarters', 0], ['magazine', 0.85], ['reactor', 1], ['pods', 0.5], ['brig', null], ['barracks', null], ['quarters', 0.1], ['magazine', 0.2], ['pods', 0.7]],
   };
   const FILL: ShRole[] = ['cargo', 'quarters', 'mess', 'cargo', 'barracks'];
-  const MX = 3, MZ0 = 3, MZB = 12; // (the margins of open space: bow and stern, port, and starboard where the squad's ship stands)
+  const MX = 12, MZ0 = 12, MZB = 12; // (the margins of open space all round her: room for the squad's ship to stand nose-on to any side)
 
   function lay(r: LvRng, _level: number, sp: SpGen | null): LvLay {
     const U = G.U, size: SpSize = (sp && sp.size) || 'small', S = SPEC[size], L = G.Level;
@@ -49,7 +51,7 @@ const G_ShipGen = (() => {
       return rm;
     };
     const door = (x: number, z: number, axis: LvAxis, lock?: string | null, mirror?: boolean) => {
-      doors.push([x, z, axis, !lock && r() < 0.15, !!mirror, lock ? 'vault' : 'fire']);
+      doors.push([x, z, axis, !lock && r() < 0.15, !!mirror, lock ? 'blast' : 'slide']); // (a ship's doors slide: js/level.ts slides)
       if (lock && lock !== 'none') locks.push([x, z, lock]);
     };
     // the bridge, the spine, the engine room
@@ -109,7 +111,6 @@ const G_ShipGen = (() => {
     }
     // the breach: a plate in the hull at the south wall of the hold, the open space south of it clear to the map's edge
     const br = bs.rm, bx = br.cx, bz = br.z + br.h;
-    doors.push([bx, bz, 'z', false, false, 'vault']); locks.push([bx, bz, 'breach']);
     // the spine's cover: on a two-wide spine a crate against one side or the other every few tiles (never in front of a door),
     // and at each bulkhead a rib that narrows it to one
     if (sw === 2) {
@@ -151,10 +152,9 @@ const G_ShipGen = (() => {
       }
       return best;
     };
-    const [bx, bz] = src.breach as number[], bd = doorAt(bx, bz)!, bri = map.rooms.indexOf(map.spawnRoom);
-    const breach = { x: bd.x, z: bd.z, face: bd.z + TS / 2, door: bd.id, room: bri };
-    // (the plate's own tile: the cells of it outside the hull's line are open space, not a ledge)
-    { const bz1 = Math.floor(bd.z / TS) + 1, bx0 = Math.floor(bx * CT / TS); for (let x = bx0; x < bx0 + L.K; x++) { const i = bz1 * W + x; if (t[i] !== 1) { t[i] = 5; map.out[i] = 1; } } }
+    // where the breach is suggested (the hold's hull, amidships to starboard): the wall's middle line there. She can be breached anywhere (sites).
+    const [bx, bz] = src.breach as number[], bri = map.rooms.indexOf(map.spawnRoom), bzc = (bz * L.K + 1.5) * TS;
+    const breach = { x: (bx + 0.5) * CT, z: bzc, face: bzc + TS / 2, door: -1, room: bri };
     const bridge = room('bridge'), vault = room('vault'), at = { x: breach.x, z: breach.z };
     // the artifact: in the vault if she has one, else the hold or cabin furthest from the breach
     let ar = vault;
@@ -181,7 +181,7 @@ const G_ShipGen = (() => {
     if (Object.values(locks).includes('bridge')) cardRooms.bridge = room('quarters', at) >= 0 ? room('quarters', at) : room('mess', at);
     if (Object.values(locks).includes('armory')) cardRooms.armory = room('barracks', at) >= 0 ? room('barracks', at) : room('mess', at);
     const hull = { x0: src.hull.x0 * CT, z0: src.hull.z0 * CT, x1: (src.hull.x1 + 1) * CT, z1: (src.hull.z1 + 1) * CT, zc: src.hull.zc * CT, bow: src.hull.bow.map((v: number) => v * CT), stern: src.hull.stern.map((v: number) => v * CT) };
-    const sp: ShMeta = { size: src.size, obj: src.obj, breach, locks, roles, console: cons, artifact: ar >= 0 ? clearIn(ar) : null, pods, hullWin, hvtRoom: bridge, cardRooms, hull };
+    const sp: ShMeta = { size: src.size, obj: src.obj, breach, cuts: [], locks, roles, console: cons, artifact: ar >= 0 ? clearIn(ar) : null, pods, hullWin, hvtRoom: bridge, cardRooms, hull };
     map.sp = sp;
     // (more of a crew in a bigger ship: js/server.ts spawnEnemies reads the theme's)
     map.theme = Object.assign({}, map.theme, { foes: (map.theme.foes || 1) * S.foes, big: S.big });
@@ -195,8 +195,51 @@ const G_ShipGen = (() => {
     map.rooms.forEach((rm, i) => { if (cx < rm.x - 1 || cx > rm.x + rm.w + 1 || cz < rm.z - 1 || cz > rm.z + rm.h + 1) return; const d = Math.max(Math.abs(cx - (rm.x + rm.w / 2)) - rm.w / 2, Math.abs(cz - (rm.z + rm.h / 2)) - rm.h / 2); if (d < bd) { bd = d; best = i; } });
     return best;
   }
+  // ---- breaching her anywhere. A site: three cells in a row of the hull's wall (two metres), floor clear behind each and
+  // open space in front, with room out there for a ship to stand nose-on (22 m out, 4 m either side). Worked out once.
+  function sites(map: LvMap): ShSite[] {
+    const sp = map.sp!; if (sp.sites) return sp.sites;
+    const { W, H, t } = map, TS = G.Level.TS, out: ShSite[] = [], win = map.winAt as Map<number, unknown> | undefined;
+    const at = (x: number, z: number) => (x < 0 || z < 0 || x >= W || z >= H ? -1 : t[z * W + x]);
+    const free = (x: number, z: number) => at(x, z) === 0 && !map.props.has(z * W + x);
+    for (let z = 2; z < H - 2; z++) for (let x = 2; x < W - 2; x++) {
+      if (t[z * W + x] !== 1) continue;
+      for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const ax = nz ? 1 : 0, az = nx ? 1 : 0; let ok = true;
+        // (the way in clear behind the middle of it; what stands against the wall either side can stay)
+        for (let k = -1; k <= 1 && ok; k++) { const cx = x + ax * k, cz = z + az * k, in1 = at(cx - nx, cz - nz); ok = at(cx, cz) === 1 && !(win && win.has(cz * W + cx)) && in1 !== 1 && in1 !== 5 && in1 !== 3 && at(cx + nx, cz + nz) === 5; }
+        ok = ok && free(x - nx, z - nz) && free(x - 2 * nx, z - 2 * nz);
+        // (out there: the collar's width at the hull, her cabin's behind it, her engine pods' from ten metres out)
+        for (let d = 1; d <= 33 && ok; d++) for (let w = d <= 5 ? 3 : d <= 14 ? 5 : 7, k = -w; k <= w && ok; k++) ok = at(x + nx * d + ax * k, z + nz * d + az * k) === 5;
+        if (ok) out.push({ c: z * W + x, nx, nz, x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) });
+      }
+    }
+    return (sp.sites = out);
+  }
+  const siteOf = (map: LvMap, c: number, nx: number, nz: number) => sites(map).find((s) => s.c === c && s.nx === nx && s.nz === nz) || null;
+  // The hull cut through at a site: its three cells are floor now, and the wall there is gone up to a door's height (the
+  // world's wall boxes that cross it are cut round the opening). The same on the host and on every screen.
+  function cut(map: LvMap, s: ShSite) {
+    const sp = map.sp!, TS = G.Level.TS, W = map.W, w = map.world, Wd = G.World;
+    if (sp.cuts.some((q) => q[0] === s.c && q[1] === s.nx)) return false;
+    sp.cuts.push([s.c, s.nx, s.nz]); sp.sites = undefined;
+    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
+    for (const c of s.cells) { map.t[c] = 0; const x = c % W, z = (c / W) | 0; x0 = Math.min(x0, x * TS); z0 = Math.min(z0, z * TS); x1 = Math.max(x1, (x + 1) * TS); z1 = Math.max(z1, (z + 1) * TS); }
+    const H0 = [x0, -0.6, z0], H1 = [x1, G.Level.DOOR_H + 0.1, z1], hit: any[] = [];
+    Wd.query(w, [x0 + 0.01, 0.1, z0 + 0.01], [x1 - 0.01, 2, z1 - 0.01], (q: any) => { if (q.kind === 'wall' && !q.edge) hit.push(q); });
+    for (const q of hit) {
+      const a = q.min as number[], b = q.max as number[]; Wd.remove(w, q);
+      const add = (m0: number[], m1: number[]) => { if (m1[0] - m0[0] > 1e-3 && m1[1] - m0[1] > 1e-3 && m1[2] - m0[2] > 1e-3) Wd.add(w, Wd.box(m0[0], m0[1], m0[2], m1[0], m1[1], m1[2], { kind: 'wall' })); };
+      const ix0 = Math.max(a[0], H0[0]), ix1 = Math.min(b[0], H1[0]), iz0 = Math.max(a[2], H0[2]), iz1 = Math.min(b[2], H1[2]);
+      add([a[0], a[1], a[2]], [ix0, b[1], b[2]]); add([ix1, a[1], a[2]], [b[0], b[1], b[2]]);
+      add([ix0, a[1], a[2]], [ix1, b[1], iz0]); add([ix0, a[1], iz1], [ix1, b[1], b[2]]);
+      add([ix0, a[1], iz0], [ix1, H0[1], iz1]); add([ix0, H1[1], iz0], [ix1, b[1], iz1]);
+    }
+    map.doorVer = (map.doorVer || 0) + 1; // (sound gets through it now)
+    return true;
+  }
   const NAMES: Record<string, string> = { bridge: 'Bridge', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine' };
-  return { lay, finish, roomAt, NAMES, SPEC };
+  return { lay, finish, roomAt, sites, siteOf, cut, NAMES, SPEC };
 })();
 G.ShipGen = G_ShipGen;
 interface GameModules { ShipGen: typeof G_ShipGen; }

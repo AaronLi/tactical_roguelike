@@ -172,7 +172,7 @@ const G_ShipModel = (() => {
       x = x1 + 1;
     }
     // belts of armour along her sides, under the windows' sills and over their tops, standing proud of the wall
-    const belt = (x0: number, z0: number, x1: number, z1: number) => { K.box(dark, x0, -1.0, z0, x1, 0.72, z1); K.box(dark, x0, 2.92, z0, x1, WH + 0.5, z1); };
+    const belt = (x0: number, z0: number, x1: number, z1: number) => { K.box(dark, x0, -1.0, z0, x1, -0.02, z1); K.box(dark, x0, 2.92, z0, x1, WH + 0.5, z1); }; // (clear of the deck's height: she can be breached anywhere along it)
     for (let z = 0; z < H; z++) for (const dz of [-1, 1]) for (let x = 0; x < W;) {
       if (!(solid(x, z) && !solid(x, z + dz))) { x++; continue; }
       let x1 = x; while (solid(x1 + 1, z) && !solid(x1 + 1, z + dz)) x1++;

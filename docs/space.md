@@ -29,9 +29,11 @@ off: the game is then the route map and the helicopter, as it was. A debug start
    drive spools, the screens go to the jump's light (the host's veil, kind `ftl`: CSS only, so it keeps moving while the
    page builds the level), and the ship comes out of the tunnel 4.5 s after the level is ready. A corvette's level built in
    about half a second on the machine this was tested on.
-5. **Boarding.** She arrives 1.7 km off. Fly to the marked plate on the starboard side and ram it nose-on at 5 to 45 m/s
-   (the navigation screen becomes the approach: offset from the line, range, closing speed). The plate goes in, her
-   breaching door opens, and it's the CQB game from there. Hold G at the helm to undock.
+5. **Boarding.** She arrives 1.7 km off. Ram her hull nose-on at 5 to 45 m/s, **anywhere there's a clear stretch of it**:
+   port, starboard or the stern quarters (the hold amidships to starboard is marked as a suggestion). The navigation screen
+   becomes the approach to wherever the nose is pointed: offset, range, closing speed. The hull is cut through there, her
+   breaching door opens, and it's the CQB game from there. Hold G at the helm to undock: the compartment she backs out of
+   is open to space. She can go in again somewhere else.
 6. **A planet.** She arrives in orbit. Fly into the descent corridor: cloud covers the change, and she comes out above the
    base. Within 160 m of the pad, under 45 m/s, hold L to set down. To leave, lift off and climb past 1500 m.
 7. **Home.** Back in the mission's anchor, hold J. The fee is paid to every officer then, if the mission's done. Fly to
@@ -61,7 +63,13 @@ space round her is tile 5, open to the sky, with `chasm` 300 so nothing is drawn
 | medium (frigate) | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked |
 | large (cruiser) | about 100 x 36 m | adds a galley, a brig, a reactor, a vault, more of each; deeper sides split in two |
 
-- **Doors.** Steel (`fire`) everywhere. The armoury, the vault and the bridge are `vault` doors with a lock: a keycard each,
+- **Breach sites** (`G.ShipGen.sites`, `cut`): three cells of hull wall in a row (2 m), floor clear behind the middle of it,
+  no window, and open space out from it for the squad's ship (22 m, widening from her collar to her engine pods). A cut
+  makes those cells floor and takes the wall's solids out up to a door's height, the same on the host and every screen;
+  the ship's berth moves to the site (`rebase`). A frigate has a few dozen sites; the bow is the bridge's glass, so none there.
+  Her point-defence guns can't bear on a ship under their deck's edge within 90 m.
+- **Doors.** A ship's doors **slide** into the wall (`slide`; a building's still swing): no leaf standing in the room when
+  open, no hinges to shoot off, not to be kicked. The armoury, the vault and the bridge are `blast` doors with a lock: a keycard each,
   carried by one of the crew, dropped where they go down or are restrained, picked up by walking over it. The crew don't
   open locked doors. The weapon case and the attachments box are in the armoury where there is one (`lootRoom`).
 - **Open to space.** A pane in the hull shot out lets its room's air out. Doors between a room with air and one without
@@ -104,9 +112,10 @@ not 45). The host's fleet is kept in its browser (`fleet`).
 - **Co-op is untested.** The messages are there (pose relay, seats, late joiners' `welcome`), but only solo was run.
 - Controller and touch can't fly the ship (keyboard and mouse only).
 - The squad's ship has one deck plan scaled per class; the three differ in size, seats, paint and numbers.
-- The breach is at one marked plate per ship, not wherever she's rammed.
 - Rooms are furnished from the existing furniture (beds, lockers, racks, consoles): no ship-specific pieces yet.
-- Airlock doors swing like any door; there's no decompression effect on screen or in the sound.
+- There's no decompression effect on screen or in the sound.
+- The human models are still the old ones: `models/characters/face_options.py` renders four face styles and the new
+  proportions (`models/characters/options/`) for a direction to be picked first.
 - The classic run's hangar has no helicopter while `ON` is true, so the old loop only works for a single `?play` level.
 - The career log and highlights don't know about missions (a mission's fee is logged as evidence money).
 - No ship-to-ship fighting beyond a hull's point-defence guns.

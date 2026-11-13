@@ -296,7 +296,7 @@ const G_Server = {
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
         if (d && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2 && G.SpaceSv.mayOpen(d, from)) {
           this.setDoor(d.id, !d.open);
-          if (d.kind === 'vault') { // both leaves together
+          if (d.kind === 'vault' || G.Level.slides(d)) { // both leaves together
             const partner = d.mirror ? this.map!.doors[d.id - 1] : this.map!.doors[d.id + 1] && this.map!.doors[d.id + 1].mirror ? this.map!.doors[d.id + 1] : null;
             if (partner) this.setDoor(partner.id, d.open);
           }
@@ -308,7 +308,7 @@ const G_Server = {
       case 'kickDoor': {
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
         if (d && !d.open) { this.kickAt = this.kickAt || {}; this.kickAt[from] = this.clock || 0; } // (a kill soon after: a breach, for the highlights)
-        if (d && !d.open && d.kind !== 'vault' && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2) this.kickDoor(d);
+        if (d && !d.open && !G.Level.sturdy(d) && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2) this.kickDoor(d);
         break;
       }
       case 'shout': if (p && p.st && this.phase === 'level') this.shout(p as LivePlayer, from); break;
@@ -1182,7 +1182,7 @@ const G_Server = {
   // A round struck what holds a door. Its handle gone, the latch lets go and it swings open; all its hinges gone, nothing's holding
   // it up, and it falls (js/damage.ts: the same fall for everyone, from what's said here).
   doorHit(d: Door, pt: string | number, J: any, dir: any) {
-    if (d.fallen || d.kind === 'vault' || !(pt === 'h' || pt === 0 || pt === 1 || pt === 2) || !Array.isArray(dir)) return;
+    if (d.fallen || G.Level.sturdy(d) || !(pt === 'h' || pt === 0 || pt === 1 || pt === 2) || !Array.isArray(dir)) return;
     const hp = d.hp || (d.hp = { h: G.Damage.PARTS.handle, 0: G.Damage.PARTS.hinge, 1: G.Damage.PARTS.hinge, 2: G.Damage.PARTS.hinge });
     if (hp[pt] <= 0) return;
     hp[pt] -= Math.max(0, +J || 0);

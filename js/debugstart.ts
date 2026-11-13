@@ -123,7 +123,8 @@ const G_DebugStart = (() => {
         if (q.has('dock')) {
           await until(() => !Sp.S.ftl, 12);
           if (Sp.S.kind === 'assault') { Sp.S.stage = 'atmo'; (Sp as any).dbgStage('atmo'); }
-          G.Net.toHost({ t: 'sdock', on: 1 }); (Sp as any).dbgDock();
+          if (Sp.S.kind !== 'board') G.Net.toHost({ t: 'sdock', on: 1 });
+          (Sp as any).dbgDock();
           await sleep(0.6); (G.Me as any).seat = null; G.Me.crouch = false; G.Me.stowed = false; G.Net.toHost({ t: 'seat', s: -1 });
           const w = G.SpaceData.toWorld(Sp.S.berth, 0, G.SpaceData.FLOOR, Sp.S.kind === 'board' ? Sp.S.def.z0 - 1.5 : Sp.S.def.z1 - 1.5); G.Me.pos.set(w.x, w.y, w.z); G.Me.yaw = Sp.S.berth.yaw + (Sp.S.kind === 'board' ? 0 : Math.PI);
         }

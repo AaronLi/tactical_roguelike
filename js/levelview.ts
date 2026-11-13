@@ -99,8 +99,8 @@ const G_LevelView = {
       if (isDoor) {
         // a door's pivot: turned by how far open the door is (G.Game.updateDoors), its leaf, knobs and hinges for what hits them
         const d = ctx.map.doors[+n.h!.slice(5)], H = ctx.door!, k = H.hk || [], p = H.hp || [];
-        o.userData = { base: o.rotation.y, ang: d && d.open ? 1 : 0, sign: n.sg || 1, leaf: (H.leaf || [])[0], knobs: H.knob || [], hinges: k.map((q, i) => [q, p[i]]) };
-        o.rotation.y = o.userData.base + (d && d.open ? Math.PI / 2 * 0.95 * (n.sg || 1) : 0);
+        o.userData = { base: o.rotation.y, ang: d && d.open ? 1 : 0, sign: n.sg || 1, leaf: (H.leaf || [])[0], knobs: H.knob || [], hinges: k.map((q, i) => [q, p[i]]), slide: !!d && G.Level.slides(d), px: o.position.x, pz: o.position.z, w: (d && d.w) || G.Level.TS };
+        if (!o.userData.slide) o.rotation.y = o.userData.base + (d && d.open ? Math.PI / 2 * 0.95 * (n.sg || 1) : 0);
       }
       ctx.door = outer;
     }
