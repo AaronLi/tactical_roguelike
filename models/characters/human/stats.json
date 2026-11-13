@@ -1,12 +1,12 @@
 {
  "triangles": {
-  "body": 2550,
+  "body": 2528,
   "head": 1977,
   "eyes": 200,
-  "total": 4727
+  "total": 4705
  },
  "vertices": {
-  "body": 1283,
+  "body": 1271,
   "head": 1109
  },
  "bones": [

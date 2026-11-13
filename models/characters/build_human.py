@@ -34,9 +34,10 @@ D2R = math.pi / 180
 ARM = V((math.sin(40 * D2R), 0, -math.cos(40 * D2R)))
 J = {'hips': V((0, 0, 0.95)), 'spine': V((0, 0, 1.03)), 'chest': V((0, 0, 1.22)), 'neck': V((0, 0.014, 1.51)), 'head': V((0, 0.016, 1.585)), 'top': V((0, 0.016, 1.756))}
 for s, n in ((1, 'R'), (-1, 'L')):  # (the figure's own right is +x seen from behind: it faces -y)
-    sh = V((s * 0.2, 0, 1.48)); arm = V((s * ARM.x, 0, ARM.z)); el = sh + arm * 0.29; wr = el + arm * 0.27 + V((0, -0.008, 0))
+    sh = V((s * 0.2, 0, 1.445));  # (3.5 cm under the game's own shoulder joint, which sits at the height of the shoulder's top, not its middle)
+    arm = V((s * ARM.x, 0, ARM.z)); el = sh + arm * 0.29; wr = el + arm * 0.27 + V((0, -0.008, 0))
     hp = V((s * 0.1, 0, 0.92)); kn = hp + V((0, 0, -0.44)); an = kn + V((0, 0, -0.44))
-    J['cl' + n] = V((s * 0.03, -0.02, 1.455))
+    J['cl' + n] = V((s * 0.03, -0.02, 1.44))
     J.update({'sh' + n: sh, 'el' + n: el, 'wr' + n: wr, 'fi' + n: wr + arm * 0.19, 'hp' + n: hp, 'kn' + n: kn, 'an' + n: an + V((0, 0.012, 0.045)), 'toe' + n: V((s * 0.105, -0.2, 0.03)), 'arm' + n: arm})
 
 # ---- a tube through rings set square to its own line: (centre, half-width across, half-depth), 'deep' the way its depth lies
@@ -62,7 +63,7 @@ def body_parts():
     parts = []
     # the trunk, pelvis to neck: level rings
     T = [(0.80, 0.07, 0.07, 0.006), (0.86, 0.14, 0.105, 0.008), (0.93, 0.168, 0.12, 0.012), (1.0, 0.158, 0.112, 0.008), (1.04, 0.15, 0.107, 0.005), (1.10, 0.142, 0.104, 0), (1.22, 0.154, 0.122, -0.01), (1.32, 0.164, 0.134, -0.016),
-         (1.39, 0.166, 0.124, -0.008), (1.435, 0.172, 0.112, 0.002), (1.47, 0.172, 0.1, 0.006), (1.495, 0.14, 0.088, 0.011), (1.512, 0.09, 0.076, 0.015), (1.525, 0.066, 0.068, 0.015), (1.54, 0.055, 0.063, 0.011), (1.62, 0.051, 0.06, 0.0)]
+         (1.38, 0.166, 0.126, -0.01), (1.415, 0.172, 0.114, -0.002), (1.445, 0.168, 0.102, 0.004), (1.475, 0.135, 0.09, 0.009), (1.502, 0.092, 0.078, 0.014), (1.525, 0.066, 0.068, 0.015), (1.54, 0.055, 0.063, 0.011), (1.62, 0.051, 0.06, 0.0)]
     parts.append(to_obj('trunk', tube([(V((0, y, z)), rx, ry) for z, rx, ry, y in T], 16)))
     for s, n in ((1, 'R'), (-1, 'L')):
         S, E, W, F, a = J['sh' + n], J['el' + n], J['wr' + n], J['fi' + n], J['arm' + n]
