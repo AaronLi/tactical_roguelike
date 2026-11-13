@@ -61,7 +61,7 @@ def body_parts():
     parts = []
     # the trunk, pelvis to neck: level rings
     T = [(0.80, 0.07, 0.07, 0.006), (0.86, 0.14, 0.105, 0.008), (0.93, 0.168, 0.12, 0.012), (1.0, 0.158, 0.112, 0.008), (1.04, 0.15, 0.107, 0.005), (1.10, 0.142, 0.104, 0), (1.22, 0.154, 0.122, -0.01), (1.32, 0.164, 0.134, -0.016),
-         (1.39, 0.166, 0.124, -0.008), (1.435, 0.172, 0.112, 0.002), (1.47, 0.172, 0.1, 0.006), (1.495, 0.14, 0.088, 0.011), (1.512, 0.09, 0.076, 0.015), (1.525, 0.066, 0.068, 0.017), (1.537, 0.055, 0.063, 0.018), (1.60, 0.051, 0.06, 0.016)]
+         (1.39, 0.166, 0.124, -0.008), (1.435, 0.172, 0.112, 0.002), (1.47, 0.172, 0.1, 0.006), (1.495, 0.14, 0.088, 0.011), (1.512, 0.09, 0.076, 0.015), (1.525, 0.066, 0.068, 0.015), (1.54, 0.055, 0.063, 0.011), (1.62, 0.051, 0.06, 0.0)]
     parts.append(to_obj('trunk', tube([(V((0, y, z)), rx, ry) for z, rx, ry, y in T], 16)))
     for s, n in ((1, 'R'), (-1, 'L')):
         S, E, W, F, a = J['sh' + n], J['el' + n], J['wr' + n], J['fi' + n], J['arm' + n]
@@ -260,7 +260,7 @@ def skin_to(o, arm, bone):
     o.vertex_groups.new(name=bone).add(range(len(o.data.vertices)), 1.0, 'REPLACE')
 
 body = union(body_parts(), 'body'); dress(body)
-head, eyes = build_head(J['head'] + V((0, -0.006, 0.056)))
+head, eyes = build_head(J['head'] + V((0, -0.02, 0.07)))  # (carried a little forward of the spine's line, as a head is, and clear of the shoulders)
 arm = build_rig([e.location.copy() for e in eyes])
 skin_auto(body, arm)
 skin_to(head, arm, 'head')
