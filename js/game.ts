@@ -1549,7 +1549,8 @@ const G_Game = {
   // sp: a mission's level (js/spaceserver.ts levelMsg): what it's generated for, the mission, the ship. Then there's no helicopter:
   // you're aboard the squad's ship as she comes out of the jump (js/space.ts).
   enterLevel(level: number, seed: number, th?: number, night = false, wc?: string | null, sp?: any) {
-    this.veil(true, true); // (already black, unless you've just joined)
+    const seamless = !!(sp && sp.zone && sp.zone.near && G.Space.S.on && G.Space.S.kind === 'board'); // (come up with another of the zone's ships: no wipe, js/space.ts)
+    if (!seamless) this.veil(true, true); // (already black, unless you've just joined)
     G.Space.leave(); if (!sp) G.Space.S.keep = null;
     this.leaveHub();
     this.phase = 'level';
@@ -1581,8 +1582,8 @@ const G_Game = {
     if (sp) G.HUD.toast(G.U.esc(sp.ms.name), G.U.esc(sp.ms.where) + ' · ' + G.SpaceData.OBJ[sp.ms.obj as SpObj].name, 4.5);
     else G.HUD.toast(`LEVEL ${level}`, this.map.theme.name + (G.Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
     if (!sp && G.Route.isBoss(level)) G.Audio.alarm();
-    if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
-    this.veilSay('Placing everyone');
+    if (!this.locked && !seamless) this.$('clickToPlay').classList.remove('hidden');
+    if (!seamless) this.veilSay('Placing everyone');
   },
   // Between levels: the hangar (js/hangar.ts). To the game it's a level with nothing in it but the shop, so you walk
   // about it, the squad is there, and rays, steps and sound are all the ordinary ones; the host just doesn't send

@@ -44,7 +44,7 @@ const G_SpaceSv = (() => {
     return { t: 'ms', i: M.ms.i, docked: M.docked ? 1 : 0, done: M.done ? 1 : 0, keys: Object.keys(M.keys).filter((k) => M.keys[k]), cards: M.cards.filter((c) => c.st === 1).map((c) => [c.key, c.x, c.z, c.y]),
       art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj !== 'visit' || M.breached ? 1 : 0, left: M.ms.obj === 'hostage' ? S().remaining(false) : 0 };
   }
-  const levelMsg = () => (st.M ? { zone: Z ? { ms: { seed: Z.ms.seed, size: Z.ms.size, th: Z.ms.th, wing: !!Z.ms.wing, name: Z.ms.name }, act: Z.active, near: Z.active !== 0 || !!st.M.revisit } : null, ms: st.M.ms, gen: genOf(st.M.ms), state: msMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg(), board: boardMsg() } : null);
+  const levelMsg = () => (st.M ? { zone: Z ? { ms: { seed: Z.ms.seed, size: Z.ms.size, th: Z.ms.th, wing: !!Z.ms.wing, name: Z.ms.name, obj: Z.ms.obj, other: Z.ms.other || null }, act: Z.active, near: Z.active !== 0 || !!st.M.revisit } : null, ms: st.M.ms, gen: genOf(st.M.ms), state: msMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg(), board: boardMsg() } : null);
   const genOf = (ms: SpMission): SpGen | null => (ms.kind === 'board' ? { size: ms.size!, obj: ms.obj, ship: st.fleet.ship, other: ms.other || null, wing: !!ms.wing } : null);
   const say = (m: string) => net().broadcast({ t: 'chat', id: null, m });
   const sync = () => { const m = msMsg(); if (m) net().broadcast(m); };
@@ -396,11 +396,11 @@ const G_SpaceSv = (() => {
         const c = SD.zone(Z.ms)[k]; if (!c) break;
         const zz = Z;
         if (M.ms.obj === 'visit') zz.loot += M.salv.length; else { zz.main = M; M.cutsWas = M.meta.cuts.map((q) => q.slice()); }
-        sv.overBlack(() => {
+        { // (at once: nothing's drawn over it. Each screen carries the squad's ship across as she is: js/space.ts carry)
           zz.active = k;
           if (k === 0 && zz.main) { const B = zz.main; zz.main = null; B.revisit = true; B.meta = null; B.docked = false; B.site = null; B.cards = []; B.resp = new Map(); B.hvt = null; st.M = B; st.ship.docked = false; sv.startLevel(B.ms); }
           else beginIn({ i: zz.ms.i, kind: 'board', obj: 'visit', size: c.size, th: c.th, seed: c.seed, diff: Math.max(1, zz.ms.diff - 1), pay: 0, name: c.name, brief: SD.OBJ.visit.line, where: SD.SIZES[c.size].name, night: false, ly: 0, anchor: [0, 0, 0], wing: c.wing });
-        }, 'close');
+        }
         break;
       }
       case 'sdock': if (p) dock(!!m.on, from, m.site); break;

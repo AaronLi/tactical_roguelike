@@ -21,7 +21,8 @@ const G_Space = (() => {
     def: SD.SHIPS.kestrel, fleet: SD.fleet0(), seatsDef: [] as SpSeat[], berth: { x: 0, y: 0, z: 0, yaw: 0 }, Dp: new T.Vector3(), Dq: new T.Quaternion(),
     model: null as SmShip | null, solids: [] as { s: any; tag?: string; ship?: boolean; on: boolean; b: number[] }[], noseT: 0, rampT: 0,
     docked: true, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(),
-    zone: null as THREE.Group | null, zoneV: new T.Vector3(), zt0: 0, ztAt: 0, traffic: [] as { obj: THREE.Object3D; c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number; k?: number; name?: string }; wp: SpWp | null; ph: number }[],
+    zone: null as THREE.Group | null, zoneV: new T.Vector3(), zt0: 0, ztAt: 0, traffic: [] as { obj: THREE.Object3D; c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number; k?: number; name?: string }; wp: SpWp | null; ph: number; real?: boolean; bow?: number }[],
+    carry: null as null | { k: number; v: THREE.Vector3; yaw: number; Q: THREE.Quaternion; V: THREE.Vector3 },
     zdef: [] as SpContact[], zact: 0, zC: new T.Vector3(), zinfo: null as null | { ms: any; act: number; near: boolean }, tclose: null as null | { k: number; t: number; sent?: boolean; name: string },
     root: null as THREE.Group | null, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null,
     hull: null as ReturnType<typeof G.ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3; p0?: THREE.Vector3 }[],
@@ -46,6 +47,10 @@ const G_Space = (() => {
   // ------------------------------------------------------------------ coming and going
   function leave() {
     if (!S.on && !S.model) return;
+    if (S.on && S.kind === 'board' && S.tclose && S.zone) {
+      const q = S.traffic.find((o) => o.c.k === S.tclose!.k && o.wp);
+      if (q) { const z = SD.zonePos(q.c, S.zt0 + (performance.now() - S.ztAt) / 1000), d = new T.Vector3(z.d[0], 0, z.d[2]).applyQuaternion(S.zone.quaternion); S.carry = { k: q.c.k!, v: S.P.clone().sub(q.wp!.p), yaw: Math.atan2(d.x, d.z), Q: S.Q.clone(), V: S.V.clone() }; }
+    }
     if (S.on && me().pos && aboard()) { const p = SD.toShip(S.berth, me().pos.x, me().pos.y, me().pos.z); S.keep = { x: p.x, y: p.y, z: p.z, yaw: me().yaw - S.berth.yaw }; } else S.keep = null;
     unhide();
     for (const o of [S.model && S.model.group, S.root, S.stars, S.tunnel, S.sun]) if (o && o.parent) o.parent.remove(o);
@@ -264,10 +269,15 @@ const G_Space = (() => {
       const wp: SpWp = { id: 't' + c.k, name: c.k === 0 ? c.name + ' · THE MISSION' : c.name, sub: SD.SIZES[c.size].name + (c.wing ? ', a flying wing' : '') + ' · come within 450 m to match her course and board', p: new T.Vector3(), kind: 'base' };
       S.wps.push(wp); S.traffic.push({ obj: t.group, c, wp, ph: (c.seed % 30) / 10 });
     }
-    zoneStep();
+    zoneStep(); for (let k = 0; k < S.traffic.length; k++) zoneReal(true);
     S.wps.push({ id: 'breach', name: 'SUGGESTED BREACH', sub: 'The hold: or ram any clear stretch of her hull', p: new T.Vector3(b.x, 1.4, b.face + 0.4), kind: 'breach' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
     S.tgt = 0;
-    if (zi && zi.near) { S.P.set(b.x + 30, 28, b.face + 260); S.Q.copy(lookQ(new T.Vector3(-0.1, -0.1, -1).normalize())); S.V.set(0, 0, 0); S.docked = false; } // (come up on her: no jump)
+    if (zi && zi.near) { // (come up with her: no jump. The squad's ship is where she was by her, heading as she was)
+      const c = S.carry && S.carry.k === zi.act ? S.carry : null;
+      if (c) { const rot = yawQ((sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0)) - c.yaw); S.P.copy(c.v).applyQuaternion(rot).add(S.zC); S.Q.copy(rot).multiply(c.Q); S.V.copy(c.V).applyQuaternion(rot); }
+      else { S.P.set(b.x + 30, 28, b.face + 260); S.Q.copy(lookQ(new T.Vector3(-0.1, -0.1, -1).normalize())); S.V.set(0, 0, 0); }
+      S.docked = false; S.carry = null;
+    }
     else arriveAt(new T.Vector3(b.x + 260, 140, b.face + 1700), new T.Vector3(-0.15, -0.08, -1).normalize());
     things(map);
   }
@@ -331,11 +341,30 @@ const G_Space = (() => {
     for (const q of S.anchors) if (q.p0) q.p.copy(q.p0).applyQuaternion(S.zone.quaternion).add(S.zone.position);
     for (const q of S.traffic) {
       const z = SD.zonePos(q.c, t);
-      q.obj.position.set(z.p[0], z.p[1], z.p[2]); q.obj.quaternion.copy(lookQ(_zd.set(z.d[0], z.d[1], z.d[2])));
+      q.obj.position.set(z.p[0], z.p[1], z.p[2]);
+      if (q.real) q.obj.quaternion.copy(yawQ(Math.atan2(z.d[0], z.d[2]) - q.bow!)); else q.obj.quaternion.copy(lookQ(_zd.set(z.d[0], z.d[1], z.d[2])));
       if (q.wp) q.wp.p.copy(q.obj.position).applyQuaternion(S.zone.quaternion).add(S.zone.position);
       const st = q.obj.userData.strobe as THREE.Object3D | undefined; if (st) st.visible = (t + q.ph) % 1.6 < 0.18;
     }
     void _zq;
+    zoneReal(false);
+  }
+  // A ship of the zone's that's come within five kilometres is drawn as herself: her own hull (the level she'd be, laid out
+  // from her seed: js/level.ts generate, js/shipmodel.ts hull), not the stand-in seen further off. So when the squad's ship
+  // comes up with her and she becomes the level, nothing outside changes. One a frame (all: every one in reach, at once).
+  function zoneReal(all: boolean) {
+    if (S.kind !== 'board' || !S.zone) return;
+    for (const q of S.traffic) {
+      if (q.real || !q.wp || q.c.k == null || S.P.distanceTo(q.wp.p) > 5000) continue;
+      const c = S.zdef[q.c.k], zi = S.zinfo, main = c.k === 0 && zi ? zi.ms : null;
+      const map = G.Level.generate(c.seed, G.Game.level, c.th, false, { size: c.size, obj: main ? main.obj : 'visit', other: main ? main.other : null, wing: c.wing });
+      if (!map.sp) { q.real = true; continue; }
+      const h = G.ShipModel.hull(map), holder = new T.Group(); h.marker.visible = false;
+      h.group.position.set(-(map.sp.hull.x0 + map.sp.hull.x1) / 2, 0, -(map.sp.hull.z0 + map.sp.hull.z1) / 2); holder.add(h.group);
+      holder.position.copy(q.obj.position); S.zone.remove(q.obj); S.zone.add(holder);
+      q.obj = holder; q.real = true; q.bow = map.sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0);
+      if (!all) return;
+    }
   }
   // The squad's ship has come up with one of the zone's others (within 450 m, for two seconds): the host is asked to make her the
   // level (js/spaceserver.ts 'tboard'). Whoever's flying asks.

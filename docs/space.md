@@ -194,7 +194,10 @@ A mission's zone is vast, with only now and then someone else in it (`js/spaceda
 four or five others on wide loops; one comes within a few kilometres). Every one of them is a ship of her own class, theme and
 seed, on the navigation screen by name. Come up within 450 m of one for two seconds and the squad's ship matches her course:
 the host makes her the level (`tboard` in `js/spaceserver.ts`; the zone is then drawn from her, turning when she turns) and the
-ship left behind goes on her way as one of the zone's others. She can be boarded like any ship: a breach is an attack whoever
+ship left behind goes on her way as one of the zone's others. Nothing is drawn over this: no wipe, no loading screen. Within
+five kilometres a ship of the zone's is already drawn as her own hull (`zoneReal`: her level laid out from her seed, for its
+outside only), and when she becomes the level the squad's ship is put where she was by her, heading as she was (`carry`), so
+the only thing that changes is that she now has an inside and a crew. She can be boarded like any ship: a breach is an attack whoever
 she is (her crew fight, her response squads come, and her guns, silent till then, open up when the squad's ship is off her
 again). What's in her holds is salvage, paid at home with the rest. Going back to the mission's ship is the same thing the other
 way: what was done aboard her stands (objectives, keycards, holes in her hull, vented compartments), but her crew are at their
