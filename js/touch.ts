@@ -91,7 +91,7 @@ const G_Touch = (() => {
     f.x = e.clientX; f.y = e.clientY;
     if (f.kind === 'stick') {
       let ax = f.x - f.ox, ay = f.y - f.oy, r = Math.hypot(ax, ay);
-      if (r > STICK_R) { f.ox = f.x - (ax / r) * STICK_R; f.oy = f.y - (ay / r) * STICK_R; ax = f.x - f.ox; ay = f.y - f.oy; r = STICK_R; stickEl.style.left = f.ox + 'px'; stickEl.style.top = f.oy + 'px'; } // (the stick follows a finger gone past its edge)
+      if (r > STICK_R) { ax = (ax / r) * STICK_R; ay = (ay / r) * STICK_R; r = STICK_R; } // (a finger gone past the edge: the stick stays where it was put down, its knob held at the rim in the finger's direction)
       sx = ax / STICK_R; sy = ay / STICK_R;
       knobEl.style.transform = `translate(${ax}px, ${ay}px)`;
     } else if ((f.kind === 'look' || LOOK_THROUGH.has(f.t!)) && (dx || dy)) G.Me.lookBy(dx, dy, LOOK * G.Game.settings.touchSens);
