@@ -1563,7 +1563,7 @@ const G_Game = {
     G.ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
     if (G.Prof) G.Prof.reset(); // (the worst frames and totals: this level's)
     if (G.Highlights) { G.Highlights.drop(); G.Highlights.reset(); } // (last level's replays go; this one's start recording)
-    G.Views.warmed = false; // compile the new level's shaders once it's populated (G.R.warmup)
+    G.Views.warmed = seamless; G.Views.slowFill = seamless; // compile the new level's shaders once it's populated (G.R.warmup). (Come up with from outside: nothing stops for it. What she's made of was built and compiled on the way in, js/space.ts zonePrep; her people are made a few at a time)
     this.cabGrids = [];
     G.Loot.clear();
     G.R.setLevel(this.map);
@@ -1697,7 +1697,7 @@ const G_Game = {
     }
     G.R.update(dt);
     G.HUD.update(dt);
-    if (this.showcaseBehind() && G.MenuShow.live) G.MenuShow.render(G.R.renderer); else if (!G.R.warmStep()) G.R.render(); // (the shaders being built under the veil: nothing drawn till they are, js/render.ts warmup)
+    if (this.showcaseBehind() && G.MenuShow.live) G.MenuShow.render(G.R.renderer); else if (!G.R.warmStep()) { G.R.render(); G.Space.prep(); } // (the shaders being built under the veil: nothing drawn till they are, js/render.ts warmup)
     // the veil lifts once the new place has drawn veilN SMOOTH frames in a row (the first ones after a build upload textures and collect garbage: lifting
     // on those makes the wipe stutter off), or after 90 frames whatever they took (a slow machine still gets in)
     if (this.veilN > 0) {

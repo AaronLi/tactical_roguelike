@@ -208,3 +208,14 @@ sums (`js/lightgrid.ts` compute: a second, for a cruiser). When one of the zone'
 is laid out on the page for her hull (`zoneReal`, tens of milliseconds) and a worker thread is asked for her light grid; when
 she becomes the level the page takes that layout (`G.Space.takeMap`) and those sums (`G.Prep.take`, `map.lgPre`), so the frame
 she's put up in has only her meshes to make: about 0.1 s for a transport and 0.4 s for a cruiser, where it was 0.6 s and 1.4 s.
+
+And her meshes are made ahead too (`zonePrep`, from the game's loop once each frame's drawn), for the nearest of them within
+two kilometres, a few milliseconds a frame and nothing of it in the scene: her drawing mesh by mesh (`js/levelview.ts` begin,
+step: `build` is the same steps run straight through, and takes over whatever's left of one begun, `map.viewPre`), then all
+of it sent to the graphics card and its shaders found for the scene as it will be lit (`js/render.ts` preload: the level
+now on screen has its own lights out of the count, and the new one's artifact glow is stood in for). Left three kilometres
+behind, it's thrown away. In the frame she becomes the level: her hull is the one she's been seen in (`zoneHulls`), and the
+hull of the ship left is kept, holes and all, to be seen from her; no shaders are rebuilt behind a stopped picture (they
+were found on the way in); her people are made a few a snapshot (`G.Views.slowFill`); and the rooms' acoustics are measured a
+piece four times a second while the squad's ship is flying (`js/acoustics.ts` prewarm). That frame is 60-80 ms, whatever her
+size. Come up with faster than she can be got ready, the rest is done in that frame as before.

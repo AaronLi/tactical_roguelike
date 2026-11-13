@@ -4,6 +4,7 @@
 //   node tools/space_shot.mjs "<query>" <steps.mjs> [--port 8151] [--out dir] [--gpu]
 // steps.mjs: export default async ({ ev, shot, sleep, key, log }) => { ... }
 //   ev(js): evaluate in the page (a promise is awaited); shot(name): a PNG in the out dir; key(code, down): a key held or let go
+//   send(method, params): a DevTools protocol command of your own (Profiler.start, ...)
 // The page is served by `node serve.js` (PORT) already running, or --port's.
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { spawn } from 'node:child_process'; import { pathToFileURL } from 'node:url';
 const arg = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : null; };
@@ -48,7 +49,7 @@ try {
   const t0 = Date.now();
   while (Date.now() - t0 < 120000) { await sleep(500); if (await ev('!!window.__debugReady').catch(() => false)) break; }
   console.log('ready after', ((Date.now() - t0) / 1000).toFixed(1), 's:', await ev('!!window.__debugReady'));
-  if (stepsFile) await (await import(pathToFileURL(path.resolve(stepsFile)).href)).default({ ev, shot, sleep, key, log: console.log });
+  if (stepsFile) await (await import(pathToFileURL(path.resolve(stepsFile)).href)).default({ ev, shot, sleep, key, send, log: console.log });
   else await shot('page');
 } catch (e) { console.error('FAILED:', e.message); code = 1; }
 for (const e of [...new Set(errs)].slice(0, 40)) console.log(e);

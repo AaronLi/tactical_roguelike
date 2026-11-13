@@ -402,13 +402,19 @@ const G_Acoustics = (() => {
   }
   /** measure every indoor room in idle time, one at a time, so the first shot in each needn't wait */
   function prewarm(map: LvMap) {
-    const d = of(map), todo = d.zones.filter((z) => !z.out && z.tiles > 3).map((z) => z.id);
+    // (a piece of work a turn, so no frame carries more than one: the level's zones found; then a zone measured, and each of
+    // its two responses built, the gun's, at its level, and the ambience's)
+    let todo: number[] | null = null, more: (() => void)[] = [];
     const step = () => {
       if (G.Game && G.Game.map !== map) return; // (a new level: its own)
-      const zi = todo.shift(); if (zi === undefined) return;
-      const p = startOf(map, zi); const tr = roomAt(map, p.x, p.y, p.z), c = G.Audio && G.Audio.ctx;
-      if (tr && c) { impulse(c, tr); impulse(c, tr, 1); } // (its responses built too: the gun's, at its level, and the ambience's)
-      setTimeout(step, 15);
+      if (!todo) todo = of(map).zones.filter((z) => !z.out && z.tiles > 3).map((z) => z.id);
+      else if (more.length) more.shift()!();
+      else {
+        const zi = todo.shift(); if (zi === undefined) return;
+        const p = startOf(map, zi); const tr = roomAt(map, p.x, p.y, p.z), c = G.Audio && G.Audio.ctx;
+        if (tr && c) more = [() => { impulse(c, tr); }, () => { impulse(c, tr, 1); }];
+      }
+      setTimeout(step, G.Space && G.Space.S.on && !G.Space.S.docked ? 250 : 15); // (out flying, where a slow frame shows and none of it's wanted yet: a piece four times a second)
     };
     setTimeout(step, 500);
   }

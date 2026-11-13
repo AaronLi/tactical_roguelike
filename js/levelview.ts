@@ -8,28 +8,53 @@
 // boxes' lids, the cabinets' doors and shelves (G.Views). What the description leaves to others is done here where it falls:
 // the furniture (js/furnmesh.ts build), what a foundry's machinery gives off (fx), the zipline trolleys (zipKit). Then the
 // light grid (js/lightgrid.ts), and everything that never changes merged into a few meshes (mergeStatic).
+interface LvViewPre { root: THREE.Group; it: Generator<void, void, void>; done: boolean; up?: unknown }
 interface LvViewCtx { fm: LvMap; reg: Map<string, LvObj[]>; door: Record<string, LvObj[]> | null; geos: Map<LdGeo, THREE.BufferGeometry>; mats: (THREE.Material | null)[]; texs: (THREE.Texture | null)[]; D: LdDraw; map: LvMap }
 const G_LevelView = {
   warned: new Set<string>(),
   // opts.pool false: no light grid and nothing merged (the hangar's bake); opts.hubFixed: the hangar's bake (tools/bake_hangar.mjs),
   // the nodes it bakes (hf) drawn and marked userData.hubFixed. Otherwise, with the baked hangar loaded, they're left out.
   skipHf: false, markHf: false,
+  // build(map): all of it at once. Or a piece at a time, ahead of when it's wanted (a ship of the zone's the squad's ship is
+  // closing with: js/space.ts zonePrep): begin(map) starts it, step(map, ms) does as much as fits in ms (true once it's all
+  // made), and build(map) then finishes whatever's left and hands the same thing over. Made ahead, nothing of it is in the
+  // scene and the light grid is left alone (it's the level on the screen's till build).
   build(map: LvMap, opts?: { pool?: boolean; hubFixed?: boolean }) {
+    const pre = (map as any).viewPre as LvViewPre | null | undefined; (map as any).viewPre = null;
+    if (pre && !opts) { this.markHf = this.skipHf = false; while (!pre.done) pre.done = !!pre.it.next().done; G.LightGrid.build(map); return pre.root; }
+    const root = new THREE.Group(), it = this.steps(map, root, opts, false);
+    while (!it.next().done) { /* (all of it) */ }
+    return root;
+  },
+  begin(map: LvMap): LvViewPre { const root = new THREE.Group(); return ((map as any).viewPre = { root, it: this.steps(map, root, undefined, true), done: false }); },
+  step(map: LvMap, ms: number) {
+    const p = (map as any).viewPre as LvViewPre | null | undefined; if (!p) return true;
+    this.markHf = this.skipHf = false;
+    const t = performance.now(); while (!p.done && performance.now() - t < ms) p.done = !!p.it.next().done;
+    return p.done;
+  },
+  *steps(map: LvMap, root: THREE.Group, opts: { pool?: boolean; hubFixed?: boolean } | undefined, ahead: boolean): Generator<void, void, void> {
     const pool = !opts || opts.pool !== false;
     if (pool) { map.dmg = null; for (const d of map.doors || []) { d.holes = null; d.gone = null; d.fallen = false; d.rest = null; } } // (a fresh start: js/damage.ts)
     this.markHf = !!map.hub && !!opts && !!opts.hubFixed;
     this.skipHf = !!map.hub && !this.markHf && !!(G.Hangar && G.Hangar.baked());
-    const desc = map.desc!, D = desc.draw, root = new THREE.Group();
+    const desc = map.desc!, D = desc.draw;
     const mats: (THREE.Material | null)[] = D.mats.map(() => null), texs: (THREE.Texture | null)[] = D.tex.map(() => null), geos = new Map<LdGeo, THREE.BufferGeometry>();
     const fms: LvMap[] = map.floors || [map];
     map.doorMeshes = []; map.winMeshes = [];
-    const floor = (fm: LvMap, parent: THREE.Object3D, nodes: LdNode[]) => {
+    const self = this;
+    const floor = function* (fm: LvMap, parent: THREE.Object3D, nodes: LdNode[]): Generator<void, void, void> {
       const ctx: LvViewCtx = { fm, reg: new Map(), door: null, geos, mats, texs, D, map };
-      for (const n of nodes) this.node(n, parent, ctx);
+      for (const n of nodes) {
+        // (a group of many: its children one at a time, into the group, as node would)
+        if (ahead && n.t === 'g' && n.c && n.c.length > 8 && !n.h && !(n.hf && self.skipHf)) { const g = new THREE.Group() as LvObj; self.place(g, n); for (const c of n.c) { self.node(c, g, ctx); yield; } parent.add(g); }
+        else self.node(n, parent, ctx);
+        yield;
+      }
       // the handles: this floor's walls, doors, panes, the case, the boxes and the cabinets
       const one = (k: string) => (ctx.reg.get(k) || [])[0] || null;
       const walls = one('walls');
-      if (walls) { const wn = this.wallNode(nodes); fm.wallMesh = walls; fm.wallIdx = new Map(wn!.cells!.map((c, i) => [c, i])); fm.wallBase = (walls.instanceMatrix.array as Float32Array).slice(); }
+      if (walls) { const wn = self.wallNode(nodes); fm.wallMesh = walls; fm.wallIdx = new Map(wn!.cells!.map((c, i) => [c, i])); fm.wallBase = (walls.instanceMatrix.array as Float32Array).slice(); }
       const mine: LvObj[] = [], all = map.doorMeshes;
       for (const [k, v] of ctx.reg) {
         if (k.startsWith('door:')) { mine.push(v[0]); all[+k.slice(5)] = v[0]; } // (by the door's id: numbered through the floors)
@@ -45,18 +70,18 @@ const G_LevelView = {
       // a building of several floors: each floor's nodes in its own group (at its height), then what's the building's
       const ctx: LvViewCtx = { fm: map, reg: new Map(), door: null, geos, mats, texs, D, map };
       for (const n of D.root) {
-        if (n.t === 'g' && n.fl != null) { const g = new THREE.Group(); this.place(g, n); root.add(g); floor(fms[n.fl], g, n.c || []); }
+        if (n.t === 'g' && n.fl != null) { const g = new THREE.Group(); this.place(g, n); root.add(g); yield* floor(fms[n.fl], g, n.c || []); }
         else this.node(n, root, ctx);
+        yield;
       }
       for (const [k, v] of ctx.reg) if (k.startsWith('pane:')) map.winMeshes[+k.slice(5)] = v[0];
       const b = fms[map.base || 0];
       map.caseView = b.caseView; map.aboxView = b.aboxView; map.sboxView = b.sboxView; map.cabViews = b.cabViews;
       for (const d of map.doors) if (d.pane) map.winMeshes[d.pane.id] = map.doorMeshes[d.id].userData.leaf; // (a glass door's pane: its leaf)
-    } else floor(map, root, D.root);
+    } else yield* floor(map, root, D.root);
     map.lightPool = [];
-    if (pool) G.LightGrid.build(map); // every lamp, on every floor: js/lightgrid.ts
-    if (pool) this.mergeStatic(root, map);
-    return root;
+    if (pool && !ahead) G.LightGrid.build(map); // every lamp, on every floor: js/lightgrid.ts
+    if (pool) yield* this.mergeSteps(root, map);
   },
   wallNode(nodes: LdNode[]) { return nodes.find((n) => n.h === 'walls') || null; },
 
@@ -412,7 +437,8 @@ const G_LevelView = {
     wheel.position.z = 0.09; const w2 = wheel.clone(); w2.position.z = -0.09; g.add(w2);
     return g;
   },
-  mergeStatic(root: THREE.Object3D, map: LvMap, CH = 24) {
+  mergeStatic(root: THREE.Object3D, map: LvMap, CH = 24) { const it = this.mergeSteps(root, map, CH); let r = it.next(); while (!r.done) r = it.next(); return r.value; },
+  *mergeSteps(root: THREE.Object3D, map: LvMap, CH = 24): Generator<void, number, void> {
     const T = THREE, keep = new Set();
     for (const m of [map, ...(map.floors || [])]) {
       for (const o of m.doorMeshes || []) keep.add(o);
@@ -427,14 +453,20 @@ const G_LevelView = {
     root.updateMatrixWorld(true);
     const inv = new T.Matrix4().copy(root.matrixWorld).invert(), M = new T.Matrix4(), c = new T.Vector3(), bins = new Map(), took: LvObj[] = [];
     const ids = new Map(), idOf = (mt: THREE.Material) => { if (!ids.has(mt)) ids.set(mt, ids.size); return ids.get(mt); }; // (by the material itself, not its uuid)
+    const cand: LvObj[] = [];
     const walk = (o: LvObj) => {
       if (keep.has(o) || !o.visible) return;
       for (const ch of [...o.children]) walk(ch);
-      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.children.length || o.renderOrder || o.morphTargetInfluences) return;
+      cand.push(o);
+    };
+    walk(root as LvObj);
+    for (let ci = 0; ci < cand.length; ci++) {
+      const o = cand[ci]; if ((ci & 15) === 15) yield;
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.children.length || o.renderOrder || o.morphTargetInfluences) continue;
       const g = o.geometry, mats = Array.isArray(o.material) ? o.material : [o.material];
-      if (!g.attributes.position || !mats.every(plain) || Object.values(g.attributes).some((a) => !(a.array instanceof Float32Array))) return;
+      if (!g.attributes.position || !mats.every(plain) || Object.values(g.attributes).some((a) => !(a.array instanceof Float32Array))) continue;
       M.multiplyMatrices(inv, o.matrixWorld);
-      if (M.determinant() <= 0) return; // (mirrored: its faces would turn inside out)
+      if (M.determinant() <= 0) continue; // (mirrored: its faces would turn inside out)
       if (!g.boundingSphere) g.computeBoundingSphere();
       c.copy(g.boundingSphere.center).applyMatrix4(M);
       const names = Object.keys(g.attributes).sort().join(','), cell = Math.floor(c.x / CH) + ',' + Math.floor(c.y / 8) + ',' + Math.floor(c.z / CH);
@@ -448,11 +480,11 @@ const G_LevelView = {
         b.list.push({ g: ng, start: p.start, count: Math.min(p.count, ng.attributes.position.count - p.start), o });
       }
       took.push(o);
-    };
-    walk(root);
+    }
     const merged = new Set<any>();
     for (const b of bins.values()) {
       if (b.list.length < 2) continue; // (alone in its stretch: nothing to save)
+      yield;
       const out = new T.BufferGeometry(), first = b.list[0].g;
       let n = 0; for (const e of b.list) n += e.count;
       for (const name of b.names.split(',')) {

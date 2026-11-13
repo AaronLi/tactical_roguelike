@@ -153,7 +153,9 @@ const G_Views = {
     this.players.delete(id);
   },
 
+  slowFill: false, // (a level come up with from outside, with no veil: its people are made a few a snapshot, not all in one frame. js/game.ts enterLevel)
   applySnap(m: any) {
+    const fillT = performance.now();
     if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => G.R.warmup(() => { G.Game.veilN = G.Game.VEIL_SMOOTH; G.Game.veilWait = 0; }), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
     for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd, fc = 0, rd = 0] of m.e) {
@@ -161,6 +163,7 @@ const G_Views = {
       let ev = this.enemies.get(id);
       if (!ev) {
         if (!(G.ENEMIES as Record<string, any>)[type]) continue;
+        if (this.slowFill && performance.now() - fillT > 4) continue;
         // the type, with this suspect's kit (weapon | vest | helmet | face | tac | what's mounted) laid over it
         const def = Object.create((G.ENEMIES as Record<string, any>)[type]);
         if (kit) { const [wpn, vest, helmet, face, tac, ex] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; }

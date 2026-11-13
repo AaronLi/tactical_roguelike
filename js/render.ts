@@ -1712,6 +1712,45 @@ const G_R = {
     world.add(new T.Line(pts, new T.LineBasicMaterial({ transparent: true })), new T.LineSegments(pts, new T.LineBasicMaterial({ vertexColors: true })));
     return (this._kit = { world, vm, vmClip });
   },
+  // What a level made ahead of when it's wanted (js/levelview.ts begin) would ask of the graphics card in the first frame
+  // it's drawn, asked now instead, a little a frame: its textures sent, each material's program found (for the scene as it's
+  // lit now), each mesh's geometry sent (drawn once, plainly, into a target of a few pixels: nothing of it is in the scene).
+  // preload(root) gives step(ms): as much as fits in ms, true once there's no more. The lights are counted as they'll be when
+  // it's the level (a shader's built for how many there are of each kind): the level now in the scene has its own out of the
+  // count meanwhile, and points stands for the point lights the new one will bring (js/space.ts things).
+  _preRT: null as THREE.WebGLRenderTarget | null, _preMat: null as THREE.Material | null,
+  preload(root: THREE.Object3D, points = 0) {
+    const r = this.renderer, texs: THREE.Texture[] = [], objs: any[] = [], seenT = new Set<unknown>(), seenG = new Set<unknown>();
+    const KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'alphaMap', 'aoMap', 'bumpMap'];
+    root.traverse((o: any) => {
+      if (!o.geometry || !o.material) return;
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) for (const k of KEYS) { const t = m[k]; if (t && t.isTexture && t.image && !seenT.has(t)) { seenT.add(t); texs.push(t); } }
+      objs.push(o);
+    });
+    if (!this._preRT) { this._preRT = new THREE.WebGLRenderTarget(4, 4); this._preMat = new THREE.MeshBasicMaterial({ fog: false }); }
+    const stand: THREE.PointLight[] = []; for (let i = 0; i < points; i++) stand.push(new THREE.PointLight(0xffffff, 0));
+    return (ms: number) => {
+      const t0 = performance.now(), late = () => performance.now() - t0 > ms, hid: THREE.Object3D[] = [];
+      this.levelRoot.traverseVisible((o: any) => { if (o.isLight) hid.push(o); }); for (const o of hid) o.visible = false;
+      for (const l of stand) this.scene.add(l);
+      try {
+        while (texs.length && !late()) r.initTexture(texs.pop()!);
+        while (objs.length && !late()) {
+          const o = objs.pop(), kids = o.children.splice(0), mat = o.material, fc = o.frustumCulled, vis = o.visible;
+          try {
+            r.compile(o, this.camera, this.scene);
+            if (o.isMesh && (o.isInstancedMesh || !seenG.has(o.geometry))) {
+              seenG.add(o.geometry);
+              o.material = this._preMat; o.frustumCulled = false; o.visible = true;
+              r.setRenderTarget(this._preRT); r.render(o, this.camera);
+            }
+          } finally { r.setRenderTarget(null); o.material = mat; o.frustumCulled = fc; o.visible = vis; o.children.push(...kids); }
+        }
+      } catch (e) { console.warn('preload', e); texs.length = 0; objs.length = 0; }
+      for (const o of hid) o.visible = true; for (const l of stand) this.scene.remove(l);
+      return !texs.length && !objs.length;
+    };
+  },
   // Starts building the shaders (above); done() once they're all built and the level can be shown (js/views.ts applySnap).
   // The work is done a frame at a time by warmStep, from the game's loop.
   warmup(done?: () => void) {
