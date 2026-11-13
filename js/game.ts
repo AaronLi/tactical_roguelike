@@ -1557,7 +1557,8 @@ const G_Game = {
     this.level = level;
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0;
-    this.map = G.Level.generate(seed, level, th, night, sp ? sp.gen : null);
+    this.map = (seamless && G.Space.takeMap(seed, level, th, night, sp.gen)) || G.Level.generate(seed, level, th, night, sp ? sp.gen : null); // (laid out already, if she's been in sight: js/space.ts zoneReal)
+    if (G.Prep) (this.map as any).lgPre = G.Prep.take(seed, level, th, night, sp ? sp.gen : null); // (its light worked out ahead, if it was seen coming: js/prep.ts)
     G.Career.levelStart(level, th, night, this.stronghold()); // (your run's log: js/career.ts)
     G.ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
     if (G.Prof) G.Prof.reset(); // (the worst frames and totals: this level's)

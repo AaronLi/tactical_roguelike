@@ -202,3 +202,9 @@ she is (her crew fight, her response squads come, and her guns, silent till then
 again). What's in her holds is salvage, paid at home with the rest. Going back to the mission's ship is the same thing the other
 way: what was done aboard her stands (objectives, keycards, holes in her hull, vented compartments), but her crew are at their
 posts again unless she was already cleared. Round the base the others are only seen.
+
+Getting her ready ahead (`js/prep.ts`, `js/prepworker.ts`): the slow part of putting a level on screen is its light grid's
+sums (`js/lightgrid.ts` compute: a second, for a cruiser). When one of the zone's ships comes within five kilometres her level
+is laid out on the page for her hull (`zoneReal`, tens of milliseconds) and a worker thread is asked for her light grid; when
+she becomes the level the page takes that layout (`G.Space.takeMap`) and those sums (`G.Prep.take`, `map.lgPre`), so the frame
+she's put up in has only her meshes to make: about 0.1 s for a transport and 0.4 s for a cruiser, where it was 0.6 s and 1.4 s.

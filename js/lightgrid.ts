@@ -131,7 +131,15 @@ const G_LightGrid = (() => {
   const K = 8;
   interface LgState { W: number; H: number; NF: number; N: number; cur: Float32Array; hl: Uint16Array; hd: Uint16Array; tl: THREE.DataTexture; td: THREE.DataTexture; dirty: Set<number>; layers: ({ at: Int32Array; v: Float32Array } | null)[]; k: Float32Array }
   let G0: LgState | null = null; // { W, H, NF, N, cur (sums, K a tile), hl, hd (half floats sent), tl, td (textures), layers: [door id] -> { at, v } , k: [door id] -> how far open it counts }
-  function build(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[] }) {
+  // build = compute + install. compute is the sums alone (no texture, nothing of the renderer's): it's most of what building a
+  // level costs a screen (a second, for a cruiser), so it can be done ahead on another thread (js/prepworker.ts, js/prep.ts)
+  // and handed over (map.lgPre), and then install is all that's left for the frame the level's put up in.
+  interface LgData { W: number; H: number; NF: number; cur: Float32Array; layers: ({ at: Int32Array; v: Float32Array } | null)[]; bounces: number[]; ms: number }
+  function build(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[]; lgPre?: LgData | null }) {
+    const floors = map.floors || [map], pre = map.lgPre; map.lgPre = null;
+    install(map, pre && pre.W === map.W && pre.H === map.H && pre.NF === floors.length && pre.layers.length === (map.doors || []).length ? pre : compute(map));
+  }
+  function compute(map: LvMap): LgData {
     const L = G.Level, TS = L.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, N = W * H;
     const col = new T.Color(), DECAY = 1.6, t0 = performance.now();
     const cur = new Float32Array(N * NF * K), doors = map.doors || [], layers: (Map<number, Float32Array> | null)[] = doors.map(() => null), shutAt: Map<number, LvDoor>[] = [], winAt: Set<number>[] = [];
@@ -315,6 +323,11 @@ const G_LightGrid = (() => {
       });
       for (let i = 0; i < N; i++) { const o = (base + i) * K, k = keep(i); if (!lit[i]) continue; cur[o] += out[i * 4] * k; cur[o + 1] += out[i * 4 + 1] * k; cur[o + 2] += out[i * 4 + 2] * k; cur[o + 4] -= out[i * 4 + 3] * UP * k; cur[o + 6] += out[i * 4 + 3] * k; }
     });
+    return { W, H, NF, cur, bounces: bouncesUsed, ms: Math.round(performance.now() - t0),
+      layers: layers.map((ly) => { if (!ly) return null; const at = Int32Array.from(ly.keys()), v = new Float32Array(at.length * K); let n = 0; for (const o of ly.values()) v.set(o, K * n++); return { at, v }; }) };
+  }
+  function install(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[] }, d: LgData) {
+    const L = G.Level, TS = L.TS, floors = map.floors || [map], doors = map.doors || [], { W, H, NF, cur } = d, N = W * H;
     dispose();
     const tex = (data: Uint16Array) => {
       const tx = new T.DataTexture(data as Uint16Array<ArrayBuffer>, W, H * NF, T.RGBAFormat, T.HalfFloatType);
@@ -322,9 +335,7 @@ const G_LightGrid = (() => {
       return tx;
     };
     const hl = new Uint16Array(N * NF * 4), hd = new Uint16Array(N * NF * 4);
-    G0 = { W, H, NF, N, cur, hl, hd, tl: tex(hl), td: tex(hd), dirty: new Set(),
-      layers: layers.map((ly) => { if (!ly) return null; const at = Int32Array.from(ly.keys()), v = new Float32Array(at.length * K); let n = 0; for (const o of ly.values()) v.set(o, K * n++); return { at, v }; }),
-      k: new Float32Array(doors.length) };
+    G0 = { W, H, NF, N, cur, hl, hd, tl: tex(hl), td: tex(hd), dirty: new Set(), layers: d.layers, k: new Float32Array(doors.length) };
     for (let gi = 0; gi < N * NF; gi++) write(gi);
     doors.forEach((d: LvDoor, i: number) => setDoor(i, d.open ? 1 : 0));
     flush();
@@ -336,9 +347,9 @@ const G_LightGrid = (() => {
     U.lgSize.value.set(W, H, NF, (floors[0].fy || 0) - (L.FLOOR_H - L.WALL_H) + 0.02);
     U.lgFloorH.value = L.FLOOR_H;
     built = true;
-    map.lightGridMs = Math.round(performance.now() - t0);
+    map.lightGridMs = d.ms;
     map.lightLayers = G0.layers.filter(Boolean).length;
-    map.lightBounces = bouncesUsed;
+    map.lightBounces = d.bounces;
   }
   // a tile's sums, to what the textures hold: the light and its direction, premultiplied by how open the tile is
   // (so the texture's filtering averages only open tiles: the shader divides by it)
@@ -393,7 +404,7 @@ const G_LightGrid = (() => {
   }
   // on while the level's drawn (G.R.render), off for anything else drawn with the same materials
   const on = (v: boolean) => { U.lgGrid.value.w = v && built ? 1 : 0; };
-  return { build, dispose, on, at, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
+  return { build, compute, dispose, on, at, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();
 G.LightGrid = G_LightGrid;
 interface GameModules { LightGrid: typeof G_LightGrid; }

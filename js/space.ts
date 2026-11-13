@@ -352,17 +352,38 @@ const G_Space = (() => {
   // A ship of the zone's that's come within five kilometres is drawn as herself: her own hull (the level she'd be, laid out
   // from her seed: js/level.ts generate, js/shipmodel.ts hull), not the stand-in seen further off. So when the squad's ship
   // comes up with her and she becomes the level, nothing outside changes. One a frame (all: every one in reach, at once).
+  /** The level already laid out for one of the zone's ships (for her hull, seen from outside), if it's the one now wanted: it's hers to be the level with (js/game.ts enterLevel). */
+  function takeMap(seed: number, level: number, th: number | undefined, night: boolean, gen: any): LvMap | null {
+    if (!G.Prep) return null;
+    const key = G.Prep.keyOf(seed, level, th, night, gen);
+    for (const h of zoneHulls.values()) if (h.map && h.key === key) { const m = h.map; h.map = null; return m; }
+    return null;
+  }
+  // (the figures the host will make her level with, should the squad's ship come up with her: js/spaceserver.ts 'tboard', genOf)
+  function zoneLevel(c: SpContact) {
+    const zi = S.zinfo, zm = zi ? zi.ms : null, main = c.k === 0 && zm ? zm : null, diff = zm && zm.diff ? zm.diff : G.Game.level;
+    return { seed: c.seed, level: main ? diff : Math.max(1, diff - 1), th: c.th, night: main ? !!main.night : false, gen: { size: c.size, obj: main ? main.obj : 'visit', ship: S.fleet.ship, other: main ? main.other : null, wing: !!c.wing } };
+  }
+  const zoneHulls = new Map<string, { holder: THREE.Group; bow: number; map: LvMap | null; key: string }>(); let zoneHullsOf = -1; // (the hulls made, kept from one of the zone's ships to the next)
   function zoneReal(all: boolean) {
     if (S.kind !== 'board' || !S.zone) return;
+    const zseed = S.zinfo ? S.zinfo.ms.seed : -2;
+    if (zoneHullsOf !== zseed) { zoneHulls.clear(); zoneHullsOf = zseed; }
     for (const q of S.traffic) {
       if (q.real || !q.wp || q.c.k == null || S.P.distanceTo(q.wp.p) > 5000) continue;
-      const c = S.zdef[q.c.k], zi = S.zinfo, main = c.k === 0 && zi ? zi.ms : null;
-      const map = G.Level.generate(c.seed, G.Game.level, c.th, false, { size: c.size, obj: main ? main.obj : 'visit', other: main ? main.other : null, wing: c.wing });
-      if (!map.sp) { q.real = true; continue; }
-      const h = G.ShipModel.hull(map), holder = new T.Group(); h.marker.visible = false;
-      h.group.position.set(-(map.sp.hull.x0 + map.sp.hull.x1) / 2, 0, -(map.sp.hull.z0 + map.sp.hull.z1) / 2); holder.add(h.group);
-      holder.position.copy(q.obj.position); S.zone.remove(q.obj); S.zone.add(holder);
-      q.obj = holder; q.real = true; q.bow = map.sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0);
+      const c = S.zdef[q.c.k], lv = zoneLevel(c);
+      // (she may be the level soon: her light's worked out on another thread meanwhile, js/prep.ts)
+      if (G.Prep) G.Prep.want(lv.seed, lv.level, lv.th, lv.night, lv.gen);
+      let hit = zoneHulls.get(zseed + ':' + c.k);
+      if (!hit) {
+        const map = G.Level.generate(lv.seed, lv.level, lv.th, lv.night, lv.gen);
+        if (!map.sp) { q.real = true; continue; }
+        const h = G.ShipModel.hull(map), holder = new T.Group(); h.marker.visible = false;
+        h.group.position.set(-(map.sp.hull.x0 + map.sp.hull.x1) / 2, 0, -(map.sp.hull.z0 + map.sp.hull.z1) / 2); holder.add(h.group);
+        hit = { holder, bow: map.sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0), map, key: G.Prep ? G.Prep.keyOf(lv.seed, lv.level, lv.th, lv.night, lv.gen) : '' }; zoneHulls.set(zseed + ':' + c.k, hit);
+      }
+      hit.holder.position.copy(q.obj.position); S.zone.remove(q.obj); S.zone.add(hit.holder);
+      q.obj = hit.holder; q.real = true; q.bow = hit.bow;
       if (!all) return;
     }
   }
@@ -975,7 +996,7 @@ const G_Space = (() => {
     if (sp.state) raidPods(sp.state.raid);
     if (sp.state && sp.state.docked) dockLocal(true);
   }
-  return { S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }
