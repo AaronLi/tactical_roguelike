@@ -188,5 +188,14 @@ A mission's space, and the base's, is an open zone a long way round, flown freel
 wings): each keeps a course of its own, a loop through a few buoys round the middle, at its own pace, placed by the zone's
 clock alone (the host's on a mission: `zt` in the mission's state; the day's at the base) so every screen agrees. The ship
 being boarded is under way too, bow first at 12 m/s: the zone slides by her, and by the level and everyone aboard or near her
-(`zoneV`), so the anchor to jump home by, which is a place in the zone, falls astern as the mission goes on. The others are
-only seen: nothing collides with them and they can't be boarded.
+so the anchor to jump home by, which is a place in the zone, falls astern as the mission goes on.
+
+A mission's zone is vast, with only now and then someone else in it (`js/spacedata.ts` zone: the mission's ship, contact 0, and
+four or five others on wide loops; one comes within a few kilometres). Every one of them is a ship of her own class, theme and
+seed, on the navigation screen by name. Come up within 450 m of one for two seconds and the squad's ship matches her course:
+the host makes her the level (`tboard` in `js/spaceserver.ts`; the zone is then drawn from her, turning when she turns) and the
+ship left behind goes on her way as one of the zone's others. She can be boarded like any ship: a breach is an attack whoever
+she is (her crew fight, her response squads come, and her guns, silent till then, open up when the squad's ship is off her
+again). What's in her holds is salvage, paid at home with the rest. Going back to the mission's ship is the same thing the other
+way: what was done aboard her stands (objectives, keycards, holes in her hull, vented compartments), but her crew are at their
+posts again unless she was already cleared. Round the base the others are only seen.

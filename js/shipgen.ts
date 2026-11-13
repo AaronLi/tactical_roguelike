@@ -258,7 +258,7 @@ const G_ShipGen = (() => {
     const pods: ShPt[] = [], salvage: ShPt[] = [];
     map.rooms.forEach((rm, i) => {
       // a ship that isn't the mission's: what's worth carrying off is in her hold
-      if (hullOf[i] && roles[i] === 'cargo' && salvage.length < 2) { const c = clearIn(i); if (c) salvage.push(c); }
+      if ((hullOf[i] || src.obj === 'visit') && roles[i] === 'cargo' && salvage.length < (src.obj === 'visit' ? 3 : 2)) { const c = clearIn(i); if (c) salvage.push(c); }
       if (roles[i] !== 'pods' || hullOf[i]) return;
       // against the hull side of the room (the side away from the spine), up to three hatches
       const south = (rm.cz + 0.5) * TS > hulls[0].zc, z = south ? (rm.z + rm.h - 0.5) * TS : (rm.z + 0.5) * TS;

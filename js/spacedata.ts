@@ -3,7 +3,9 @@
 // what fits on their hardpoints, the kinds of place a mission goes to (a ship to board, a base on a planet to assault), the
 // missions a visit to the base offers (from the visit's seed, so nobody has to be sent the list), where each one's anchor
 // is in the space round the base, and how a distance is written. Nothing here draws.
-type SpObj = 'artifact' | 'hvt' | 'destruct' | 'assault' | 'hostage';
+type SpObj = 'artifact' | 'hvt' | 'destruct' | 'assault' | 'hostage' | 'visit';
+// a ship under way in a mission's zone (zone): what she is (kind: her lines; size, th, seed, wing: the level she is when she's boarded), her course (a loop of points, metres in the zone's frame), her pace and where on it she started
+interface SpContact { k: number; kind: string; size: SpSize; th: number; seed: number; wing: boolean; name: string; pts: number[][]; lens: number[]; total: number; speed: number; off: number }
 // a ship's class, least to most: a civilian transport, a corvette, a frigate, a cruiser, a capital ship (SIZES, js/shipgen.ts SPEC)
 type SpSize = 'transport' | 'small' | 'medium' | 'large' | 'capital';
 // what a class carries on her hull, and who's aboard her: light guards posted singly, security squads (four, armed and armoured), breach
@@ -105,6 +107,42 @@ const G_SpaceData = (() => {
   const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G.THEMES[th] || null);
   const themeIndex = (T: ThemeDef | null | undefined) => { if (!T) return -1; const i = G.THEMES.findIndex((q) => q.name === T.name); return i >= 0 ? i : THEMES.findIndex((q) => q.name === T.name) >= 0 ? TH0 + THEMES.findIndex((q) => q.name === T.name) : -1; };
 
+  // ---- A mission's zone: a vast stretch of open space with the ship the mission is about under way in it (contact 0: bow
+  // first, in a straight line, slowly) and now and then someone else passing (the rest: four or five, each on a wide loop of
+  // its own; the first of them comes within a few kilometres). Any of them can be closed with and boarded (js/spaceserver.ts
+  // 'tboard'): each is a ship of her own class, theme and seed, so she's the same ship whenever she's looked at.
+  // The zone's frame: the mission ship's own at the moment the squad came out of the jump, its middle the origin.
+  function zone(ms: { seed: number; size: SpSize | null; th: number; wing?: boolean; name: string }): SpContact[] {
+    const r = G.U.rng((ms.seed ^ 0x20e5) >>> 0), U = G.U, out: SpContact[] = [];
+    const mk = (kind: string, size: SpSize, th: number, seed: number, wing: boolean, name: string, pts: number[][], speed: number, off: number) => {
+      const lens = pts.map((p, i) => { const q = pts[(i + 1) % pts.length]; return Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]); });
+      out.push({ k: out.length, kind, size, th, seed, wing, name, pts, lens, total: lens.reduce((a, b) => a + b, 0), speed, off });
+    };
+    const wing = !!ms.wing, size = ms.size || 'small', d = wing ? [-0.7071, 0, -0.7071] : [-1, 0, 0], T0 = themeAt(ms.th);
+    mk(wing ? 'wing' : size === 'transport' ? (T0 && T0.name === 'Corporate cutter' ? 'cutter' : 'freighter') : size === 'large' || size === 'capital' ? 'navy' : 'pirate', size, ms.th, ms.seed, wing, ms.name,
+      [[-d[0] * 60000, 0, -d[2] * 60000], [d[0] * 60000, 0, d[2] * 60000]], 12, 60000);
+    const n = 4 + (r() < 0.5 ? 1 : 0), n0 = U.ri(r, 0, SHIP_NAMES.length - 1); // (no two of them of a name)
+    for (let i = 1; i <= n; i++) {
+      const kind = U.pick(r, ['freighter', 'freighter', 'cutter', 'pirate', 'navy', 'wing']), sz: SpSize = kind === 'freighter' || kind === 'cutter' ? 'transport' : kind === 'navy' ? 'large' : r() < 0.5 ? 'small' : 'medium';
+      const th = kind === 'freighter' ? TH0 : kind === 'cutter' ? TH0 + 1 : kind === 'navy' ? TH0 + 2 : TH0 + U.ri(r, 0, 2);
+      const m = 3 + Math.floor(r() * 3), rad = i === 1 ? 2200 + r() * 1200 : 5000 + r() * 20000, a0 = r() * 6.283, tilt = (r() - 0.5) * 0.3, pts: number[][] = [];
+      for (let k = 0; k < m; k++) { const an = a0 + k * 6.283 / m + (r() - 0.5) * 0.4, rr = rad * (0.85 + r() * 0.3); pts.push([Math.cos(an) * rr, Math.sin(an) * rr * tilt + (r() - 0.5) * 300, Math.sin(an) * rr]); }
+      mk(kind, sz, th, (ms.seed ^ Math.imul(i, 0x9e3779b1)) >>> 0 & 0x7fffffff, kind === 'wing', (kind === 'navy' ? 'NSV ' : kind === 'freighter' ? 'MV ' : 'CSV ') + SHIP_NAMES[(n0 + i * 5) % SHIP_NAMES.length],
+        pts, kind === 'freighter' ? 35 + r() * 25 : kind === 'navy' ? 50 + r() * 30 : 60 + r() * 50, r() * 1e5);
+    }
+    return out;
+  }
+  /** Where a contact is at the zone's time t, and the way she's heading (her head comes round over the last and first of each leg). */
+  function zonePos(c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number }, t: number): { p: number[]; d: number[] } {
+    let s = (t * c.speed + c.off) % c.total, k = 0;
+    while (s > c.lens[k]) { s -= c.lens[k]; k = (k + 1) % c.lens.length; }
+    const n = c.pts.length, a = c.pts[k], b = c.pts[(k + 1) % n], u = s / c.lens[k], turn = Math.min(0.5, 1500 / c.lens[k]);
+    const dir = (p: number[], q: number[]) => { const x = q[0] - p[0], y = q[1] - p[1], z = q[2] - p[2], l = Math.hypot(x, y, z) || 1; return [x / l, y / l, z / l]; };
+    let d = dir(a, b), w = 0, o = d;
+    if (u > 1 - turn) { o = dir(b, c.pts[(k + 2) % n]); w = (u - (1 - turn)) / turn * 0.5; } else if (u < turn) { o = dir(c.pts[(k + n - 1) % n], a); w = (1 - u / turn) * 0.5; }
+    if (w > 0) { d = [d[0] + (o[0] - d[0]) * w, d[1] + (o[1] - d[1]) * w, d[2] + (o[2] - d[2]) * w]; const l = Math.hypot(d[0], d[1], d[2]) || 1; d = [d[0] / l, d[1] / l, d[2] / l]; }
+    return { p: [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u], d };
+  }
   /** What a ship's people wear, by her class (js/rig.ts create): a liner's are civilians, the big warships a navy's, the rest pirates'. */
   const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
   /** ...aboard the ship being boarded now (null anywhere else). */
@@ -123,6 +161,7 @@ const G_SpaceData = (() => {
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },
     destruct: { name: 'Scuttle her', pay: 700, line: 'Reach the bridge, start the self-destruct, and be off the ship (yours, or one of her escape pods) before it runs out.' },
     hostage: { name: 'Retake the ship', pay: 600, line: 'Pirates have boarded her (their pods are still in her hull) and hold her people tied in one compartment. Clear every pirate off her: dead, down or in restraints. Each hostage alive at the end pays.' },
+    visit: { name: 'Unlisted ship', pay: 0, line: 'Not the mission: a ship that happened to be passing. What is in her hold is worth carrying off. A breach is an attack: she will fight.' },
     assault: { name: 'Planetary assault', pay: 300, line: 'Land at the pad outside the base and bring it under control: every hostile down or in restraints.' },
   };
   const SHIP_NAMES = ['Calliope', 'Morrow', 'Ibex', 'Halcyon', 'Tantalus', 'Brightwater', 'Osprey', 'Vantongeren', 'Larkspur', 'Meridian', 'Oriel', 'Castellan', 'Wintermute', 'Anselm', 'Petrel', 'Corvid'];
@@ -163,7 +202,7 @@ const G_SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta, wearOf, wearNow };
+  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta, wearOf, wearNow, zone, zonePos };
 })();
 G.SpaceData = G_SpaceData;
 interface GameModules { SpaceData: typeof G_SpaceData; }
