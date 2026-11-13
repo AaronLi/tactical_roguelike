@@ -137,6 +137,7 @@ const G_Space = (() => {
   // there, a lintel over the opening and a torn frame round it
   function cutHere(a: number[]) {
     const map = S.map!, s = siteAt(a); if (!map.sp || !G.ShipGen.cut(map, s)) return;
+    if (S.hull) S.hull.cutAt(s.x, s.z, s.nx, s.nz); // (what's over her plating there goes with it)
     const TS = G.Level.TS, L = G.Level, f0 = map.floors ? map.floors[0] : map, wm = f0.wallMesh as THREE.InstancedMesh | undefined, zero = new T.Matrix4().makeScale(0, 0, 0);
     if (wm && f0.wallIdx) { for (const c of s.cells) { const i = f0.wallIdx.get(c); if (i != null) { wm.setMatrixAt(i, zero); if (f0.wallBase) f0.wallBase.set(zero.elements, i * 16); } } wm.instanceMatrix.needsUpdate = true; }
     const g = new T.Group(), along = s.nz ? 1 : 0, wall = G.ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 }), torn = G.ShipModel.M(0x1a1c1f, { metalness: 0.6 }), hot = G.ShipModel.lit(0xff7a1a);
@@ -154,7 +155,8 @@ const G_Space = (() => {
     const done = map._pods || (map._pods = new Set()), TS = G.Level.TS, SM = G.ShipModel;
     for (const a of list) {
       if (done.has(a.join(','))) continue; done.add(a.join(','));
-      const s = siteAt(a), g = new T.Group(), hullM = SM.M(0x7a4634, { roughness: 0.8, metalness: 0.2, emissive: 0x24120c }), dark = SM.M(0x1c1a19, { roughness: 0.7, metalness: 0.5 }), hot = SM.lit(0xff5a1a), red = SM.lit(0xff2a1a);
+      const s = siteAt(a), g = new T.Group(); if (S.hull) S.hull.cutAt(s.x, s.z, s.nx, s.nz);
+      const hullM = SM.M(0x7a4634, { roughness: 0.8, metalness: 0.2, emissive: 0x24120c }), dark = SM.M(0x1c1a19, { roughness: 0.7, metalness: 0.5 }), hot = SM.lit(0xff5a1a), red = SM.lit(0xff2a1a);
       const add = (geo: THREE.BufferGeometry, m: THREE.Material, z: number, y = 0, x = 0) => { const mm = new T.Mesh(geo, m); mm.position.set(x, y, z); g.add(mm); return mm; };
       // (built along +z, out from the hull, its floor level with her deck; then turned to the site's own way out)
       const body = add(new T.CylinderGeometry(1.25, 1.9, 8.5, 8), hullM, 4.6, 1.35); body.rotation.x = Math.PI / 2; body.rotation.y = Math.PI / 8;

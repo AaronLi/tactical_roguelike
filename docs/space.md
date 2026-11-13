@@ -159,3 +159,15 @@ left standing, and each hostage alive pays a bonus. `?board=transport&obj=hostag
 
 Every hull carries lights outside (`js/shipmodel.ts` hull): a line of light along the top of each side, a red one along the keel,
 floodlamps under the upper belt with their wash painted on the plating, and navigation lights.
+
+## Her lines (`js/shipmodel.ts` hull)
+
+A ship's outside is her compartments' boxes with her kind's own pieces over them (`docs/hull_languages.png`):
+a **freighter** (a transport in the Freighter theme) has a blunt bow, containers down her back, tanks slung off her roof's
+edges, gantries, a dish, and ribs and pipes down her sides; a **corporate cutter** a needle bow, rounded shoulders and keel, a
+fairing over her sides, a swept fin and two nacelles; **pirates** (corvettes, frigates) a toothed ram, scrap plate on her roof
+and sides, spikes, hoops of girder, a boom to one side and an engine strapped on at the other, all dark and rusted; a **navy**
+ship (cruisers, capital ships) a long wedge bow, armour sloped over her roof's edges, her sides and under her keel, a citadel
+with masts, tail fins, and on two decks a chine between them. Every inside corner of her plan is faired in. What's over her
+sides is smashed away where she's rammed (`cutAt`, called from `js/space.ts` cutHere and for the pirates' pods).
+`node tools/space_shot.mjs "mute&board=large&hull=2" tools/hull_views.mjs --out <dir> --gpu` looks at one from outside.

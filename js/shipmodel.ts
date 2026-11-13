@@ -158,9 +158,16 @@ const G_ShipModel = (() => {
 
   // ---- the outside of a ship that's boarded, from her deck plan (the level's own walls are her sides: this is what's
   // over and under them, and what each compartment shows of itself)
-  function hull(map: LvMap): { group: THREE.Group; guns: SmGun[]; marker: THREE.Object3D } {
+  function hull(map: LvMap): { group: THREE.Group; guns: SmGun[]; marker: THREE.Object3D; cutAt: (x: number, z: number, nx: number, nz: number) => void } {
     const g = new T.Group(), K = new Kit(), TS = G.Level.TS, { W, H, t } = map, sp = map.sp!, th = map.theme, WH = G.Level.WALL_H, FH = G.Level.FLOOR_H, NF = map.floors ? map.floors.length : 1, TOP = (NF - 1) * FH + WH;
+    // Whose lines she has (her design language), by what she is: a freighter's (containers, tanks and gantries on a blunt hull), a
+    // corporate cutter's (a needle bow, rounded shoulders, fins and nacelles), a pirate's (a toothed ram, scrap plates, spikes and
+    // a boom, strapped-on engines, nothing matching) or a navy's (a long wedge bow, sloped armour over her roof and under her keel,
+    // a citadel with masts, tail fins). Pirates' plating is dark and rusted whatever she was built as.
+    const langOf = (size: SpSize): string => (size === 'transport' ? (th.name === 'Corporate cutter' ? 'cutter' : 'freighter') : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
+    const decor: THREE.Mesh[] = [], washes: THREE.Mesh[] = []; // (what's cut away where she's rammed: cutAt)
     const base = new T.Color(th.wall as string), r = G.U.rng((map.seed ^ 0x4a11) >>> 0);
+    if (langOf(sp.size) === 'pirate') base.multiplyScalar(0.62).lerp(new T.Color(0x5a3222), 0.3);
     const shade = (k: number, o?: Record<string, any>) => M(base.clone().multiplyScalar(k).getHex(), Object.assign({ emissive: base.clone().multiplyScalar(k * 0.16).getHex() }, o || {}));
     const plate = shade(0.62), dark = shade(0.36, { metalness: 0.5 }), light = shade(0.85), trim = M(0xb8862a, { emissive: 0x2a1c06 }), win = lit(0xffe2a8), nav = lit(0xff4030), eng = lit(0x7fd0ff);
     const solid = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] !== 5;
@@ -191,7 +198,7 @@ const G_ShipModel = (() => {
       bx(keelL, u0 + 0.2, -0.72, 0.28, u1 - 0.2, -0.66, 0.34);
       for (let f2 = 0; f2 < NF; f2++) for (let u = u0 + 1.6; u < u1 - 1; u += 5.2) {
         bx(lampL, u - 0.3, f2 * FH + 2.8, 0.02, u + 0.3, f2 * FH + 2.9, 0.26);
-        const wm = new T.Mesh(washG, washM); wm.position.set(alongX ? u : f + o * 0.03, f2 * FH + 1.42, alongX ? f + o * 0.03 : u); if (!alongX) wm.rotation.y = Math.PI / 2; wm.renderOrder = 3; g.add(wm);
+        const wm = new T.Mesh(washG, washM); wm.position.set(alongX ? u : f + o * 0.03, f2 * FH + 1.42, alongX ? f + o * 0.03 : u); if (!alongX) wm.rotation.y = Math.PI / 2; wm.renderOrder = 3; g.add(wm); washes.push(wm);
       }
     };
     let bx0 = 1e9, bx1 = -1e9, bz0 = 1e9, bz1 = -1e9;
@@ -253,7 +260,7 @@ const G_ShipModel = (() => {
         K.box(win, x0 + 0.55, RY + 1.3, z0 + 1.6, x0 + 0.6, RY + 2.0, z1 - 1.6); K.box(win, x0 + 1.2, RY + 1.3, z0 + 1.15, x1 - 1.2, RY + 2.0, z0 + 1.2); K.box(win, x0 + 1.2, RY + 1.3, z1 - 1.2, x1 - 1.2, RY + 2.0, z1 - 1.15);
         K.box(dark, cx - 0.06, RY + 2.9, cz - 0.06, cx + 0.06, RY + 7.5, cz + 0.06); K.box(dark, cx + 1.2, RY + 2.9, cz + 1.0, cx + 1.26, RY + 5.2, cz + 1.06); K.box(nav, cx - 0.1, RY + 7.5, cz - 0.1, cx + 0.1, RY + 7.7, cz + 0.1);
         // the prow: a ram that tapers forward under the lowest deck's line, a brow over the bridge's windows
-        for (let k = 0; k < 4; k++) K.box(k & 1 ? plate : dark, x0 - 1.5 * (k + 1), -1.0 - 0.25 * k, z0 + 1.2 * (k + 1), x0 - 1.5 * k, 0.7 - 0.2 * k, z1 - 1.2 * (k + 1));
+        if (langOf(own.size) === 'pirate') for (let k = 0; k < 4; k++) K.box(k & 1 ? plate : dark, x0 - 1.5 * (k + 1), -1.0 - 0.25 * k, z0 + 1.2 * (k + 1), x0 - 1.5 * k, 0.7 - 0.2 * k, z1 - 1.2 * (k + 1)); // (a ram: the pirates')
         K.box(dark, x0 - 1.2, f * FH + 2.95, z0, x0, RY + 0.2, z1);
       } else if (role === 'engine') {
         // the engine block, and her nozzles out of the stern: lit (a ship of two decks: as tall as both)
@@ -284,12 +291,175 @@ const G_ShipModel = (() => {
         if (keel && r() < 0.5) K.box(dark, x0 + 1.2, -1.6, z0 + 1.2, x1 - 1.2, -1.0, z1 - 1.2);
       }
     });
+    // ---- her own lines: what stands off the boxes of her compartments: over her roof, under her keel, off her bow and stern, and
+    // over her sides' plating too (in short pieces: where she's rammed, what's there is smashed away with the wall: cutAt).
+    {
+      const DM = (c: number | THREE.Color, k = 1) => { const col = new T.Color(c as any).multiplyScalar(k); return M(col.getHex(), { side: T.DoubleSide, emissive: col.clone().multiplyScalar(0.15).getHex() }); };
+      const tris = new Map<THREE.Material, number[]>(), V = (x: number, y: number, z: number) => new T.Vector3(x, y, z);
+      const tri = (m: THREE.Material, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => { let q = tris.get(m); if (!q) tris.set(m, q = []); q.push(a.x, a.y, a.z, b.x, b.y, b.z, c.x, c.y, c.z); };
+      const quad = (m: THREE.Material, a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3) => { tri(m, a, b, c); tri(m, a, c, d); };
+      // a solid between two four-cornered faces; a flat shape pushed through a distance; a round (or square) bar between two points
+      const hexa = (m: THREE.Material, b: THREE.Vector3[], t: THREE.Vector3[]) => { quad(m, b[0], b[1], b[2], b[3]); quad(m, t[0], t[1], t[2], t[3]); for (let i = 0; i < 4; i++) quad(m, b[i], b[(i + 1) % 4], t[(i + 1) % 4], t[i]); };
+      const prism = (m: THREE.Material, poly: THREE.Vector3[], off: THREE.Vector3) => { const q = poly.map((v) => v.clone().add(off)), n = poly.length; for (let i = 1; i + 1 < n; i++) { tri(m, poly[0], poly[i], poly[i + 1]); tri(m, q[0], q[i], q[i + 1]); } for (let i = 0; i < n; i++) quad(m, poly[i], poly[(i + 1) % n], q[(i + 1) % n], q[i]); };
+      const bar = (m: THREE.Material, a: THREE.Vector3, b: THREE.Vector3, r0 = 0.09, r1 = r0, n = 4) => {
+        const d = b.clone().sub(a).normalize(), u = (Math.abs(d.y) < 0.9 ? V(0, 1, 0) : V(1, 0, 0)).cross(d).normalize(), v = d.clone().cross(u);
+        const ring = (c: THREE.Vector3, rd: number) => Array.from({ length: n }, (_, i) => c.clone().addScaledVector(u, Math.cos(i * 2 * Math.PI / n + 0.7854) * rd).addScaledVector(v, Math.sin(i * 2 * Math.PI / n + 0.7854) * rd));
+        const A = ring(a, r0), B = ring(b, r1);
+        for (let i = 0; i < n; i++) quad(m, A[i], A[(i + 1) % n], B[(i + 1) % n], B[i]);
+        for (let i = 1; i + 1 < n; i++) { tri(m, A[0], A[i], A[i + 1]); tri(m, B[0], B[i], B[i + 1]); }
+      };
+      const dPlate = DM(base, 0.62), dDark = DM(base, 0.36), dLight = DM(base, 0.9), rust = DM(0x5a3222), rust2 = DM(0x2e2623), paint = DM(0xdfe3e4), glowO = lit(0xff7a2a), glowB = lit(0x7fd0ff), red = lit(0xff3528), blue = lit(0x9fd8ff);
+      const CONT = [0xb5651d, 0x2d5f8a, 0x4f7a3a, 0x8a8f94, 0x9a2f25, 0xc9a227].map((c) => DM(c, 0.8));
+      const ti = (m: number) => Math.max(0, Math.min(W - 1, Math.floor(m / TS))), tj = (m: number) => Math.max(0, Math.min(H - 1, Math.floor(m / TS)));
+      sp.hulls.forEach((hm, h) => {
+        const lang = langOf(hm.size), top = hm.main ? TOP : WH, RY = top + 0.3, rr = G.U.rng((map.seed ^ (0x51ed + h * 977)) >>> 0), R = (a: number, b: number) => a + rr() * (b - a);
+        // her side at a station down her length (the outer face of her wall, +z or -z), her bow's face and her stern's
+        const side = (xm: number, sg: number) => { const x = ti(xm); let z = tj(hm.zc); if (!solid(x, z)) return null; while (solid(x, z + sg)) z += sg; return (z + (sg > 0 ? 1 : 0)) * TS; };
+        const end = (sg: number) => { let x = ti((hm.x0 + hm.x1) / 2); const z = tj(hm.zc); if (!solid(x, z)) return sg < 0 ? hm.x0 : hm.x1; while (solid(x + sg, z)) x += sg; return (x + (sg > 0 ? 1 : 0)) * TS; };
+        const bow = end(-1), stern = end(1), L = stern - bow, zc = hm.zc;
+        const pz0 = side(bow + 1.5, -1) ?? zc - 3, pz1 = side(bow + 1.5, 1) ?? zc + 3, pw = pz1 - pz0, pc = (pz0 + pz1) / 2;
+        const onRoof = (xm: number, zm: number) => solid(ti(xm), tj(zm));
+        const face = [V(bow, -1.0, pz0), V(bow, -1.0, pz1), V(bow, RY, pz1), V(bow, RY, pz0)];
+        const nose = (m: THREE.Material, len: number, hw: number, y0: number, y1: number) => hexa(m, face, [V(bow - len, y0, pc - hw), V(bow - len, y0, pc + hw), V(bow - len, y1, pc + hw), V(bow - len, y1, pc - hw)]);
+        // (a run of her side, a few metres at a time: each piece where her side is there)
+        const along = (x0: number, x1: number, step: number, f: (x: number, len: number, zf: number, sg: number) => void) => { for (let x = x0; x < x1 - 0.5; x += step) for (const sg of [-1, 1]) { const zf = side(x + step / 2, sg); if (zf != null && Math.abs(zf - zc) > 2.5) f(x, Math.min(step, x1 - x), zf, sg); } };
+        if (lang === 'navy') {
+          // a long wedge of a bow, its edge a blade; armour sloped in over her roof's edges and a V under her keel
+          const len = Math.min(20, pw * 0.8 + 5);
+          nose(dDark, len, 0.25, 0.1, top * 0.55);
+          hexa(dPlate, [V(bow, RY - 0.9, pz0 - 0.05), V(bow, RY - 0.9, pz1 + 0.05), V(bow, RY + 0.05, pz1 + 0.05), V(bow, RY + 0.05, pz0 - 0.05)], [V(bow - len * 0.96, top * 0.5, pc - 0.28), V(bow - len * 0.96, top * 0.5, pc + 0.28), V(bow - len * 0.96, top * 0.58, pc + 0.28), V(bow - len * 0.96, top * 0.58, pc - 0.28)]);
+          along(bow + 0.5, stern - 0.5, 4, (x, ln, zf, sg) => {
+            prism(dPlate, [V(x, RY + 0.2, zf + sg * 0.3), V(x, RY + 1.5, zf - sg * 2.4), V(x, RY + 0.2, zf - sg * 2.4)], V(ln, 0, 0));
+            prism(dDark, [V(x, -1.0, zf + sg * 0.3), V(x, -2.7, zf - sg * 3.2), V(x, -1.0, zf - sg * 3.2)], V(ln, 0, 0));
+          });
+          { let ni = 0; along(bow + 0.7, stern - 0.7, TS * 2, (x, ln, zf, sg) => { if ((ni++ >> 1) % 3 === 2) return; const o = zf + sg * 0.02; prism(dPlate, [V(x + 0.04, 2.9, o), V(x + 0.04, 2.05, o + sg * 0.7), V(x + 0.04, 0.85, o + sg * 0.7), V(x + 0.04, 0, o)], V(ln - 0.08, 0, 0)); }); } // (sloped armour over her sides, a gap at every third bay)
+          // a ship of two decks: her tall sides broken by a chine standing out between the decks, and armour sloped back in over the upper one
+          if (hm.main && NF > 1) for (let f2 = 1; f2 < NF; f2++) {
+            const yb = (f2 - 1) * FH + 2.92, yt = f2 * FH + 0.72; let ni = 0;
+            along(bow + 0.7, stern - 0.7, TS * 2, (x, ln, zf, sg) => {
+              const o = zf + sg * 0.3;
+              prism(dDark, [V(x, yb, o), V(x, (yb + yt) / 2 - 0.25, o + sg * 1.0), V(x, (yb + yt) / 2 + 0.25, o + sg * 1.0), V(x, yt, o)], V(ln, 0, 0));
+              if ((ni++ >> 1) % 3 === 2) return;
+              const o2 = zf + sg * 0.02; prism(dPlate, [V(x + 0.04, f2 * FH + 2.9, o2), V(x + 0.04, f2 * FH + 2.2, o2 + sg * 0.45), V(x + 0.04, f2 * FH + 1.1, o2 + sg * 0.7), V(x + 0.04, yt, o2 + sg * 0.3)], V(ln - 0.08, 0, 0));
+            });
+          }
+          // her citadel amidships: two stepped, sloped blocks, masts with yards and an array over them
+          const cx = bow + L * 0.46, cw = Math.min(5, pw * 0.3), cl = Math.max(6, L * 0.1), fr = (y0: number, y1: number, a: number, b: number, c2: number, d: number, m: THREE.Material) => hexa(m, [V(cx - a, y0, zc - b), V(cx + a, y0, zc - b), V(cx + a, y0, zc + b), V(cx - a, y0, zc + b)], [V(cx - c2, y1, zc - d), V(cx + c2, y1, zc - d), V(cx + c2, y1, zc + d), V(cx - c2, y1, zc + d)]);
+          fr(RY, RY + 3.4, cl, cw, cl - 1.6, cw - 1.2, dPlate); fr(RY + 3.4, RY + 5.6, cl - 2.2, cw - 1.6, cl - 3.2, cw - 2.3, dLight);
+          K.box(win, cx - cl + 1.5, RY + 4.2, zc - cw + 1.55, cx - cl + 1.6, RY + 4.9, zc + cw - 1.55);
+          for (const dx of [-1.6, 1.8]) { bar(dDark, V(cx + dx, RY + 5.6, zc), V(cx + dx, RY + 11.5 - Math.abs(dx), zc), 0.12, 0.06); for (const yy of [7.4, 8.8]) bar(dDark, V(cx + dx, RY + yy, zc - 1.6), V(cx + dx, RY + yy, zc + 1.6), 0.05); K.box(blue, cx + dx - 0.1, RY + 11.5 - Math.abs(dx), zc - 0.1, cx + dx + 0.1, RY + 11.7 - Math.abs(dx), zc + 0.1); }
+          hexa(dLight, [V(cx + 3.2, RY + 6.2, zc - 2.2), V(cx + 3.2, RY + 6.2, zc + 2.2), V(cx + 3.2, RY + 8.6, zc + 2.2), V(cx + 3.2, RY + 8.6, zc - 2.2)], [V(cx + 3.8, RY + 6.0, zc - 2.2), V(cx + 3.8, RY + 6.0, zc + 2.2), V(cx + 3.8, RY + 8.4, zc + 2.2), V(cx + 3.8, RY + 8.4, zc - 2.2)]);
+          // tail fins over her engines, swept back
+          for (const sg of [-1, 1]) { const z = zc + sg * Math.min(pw * 0.32, 6); prism(dDark, [V(stern - 9, RY, z), V(stern - 1.5, RY, z), V(stern + 2, RY + 6.5, z), V(stern - 1, RY + 6.5, z)], V(0, 0, 0.3)); K.box(blue, stern + 0.4, RY + 6.5, z, stern + 0.7, RY + 6.7, z + 0.3); }
+        } else if (lang === 'cutter') {
+          // a needle bow, her roof's and keel's edges rounded off, a swept fin and two slim nacelles at her stern
+          nose(paint, pw * 1.1 + 6, 0.12, 1.1, 1.6);
+          along(bow + 0.3, stern - 0.3, 4, (x, ln, zf, sg) => {
+            prism(paint, [V(x, RY + 0.2, zf + sg * 0.3), V(x, RY + 0.9, zf - sg * 0.5), V(x, RY + 1.15, zf - sg * 2.2), V(x, RY + 0.2, zf - sg * 2.2)], V(ln, 0, 0));
+            prism(dLight, [V(x, -1.0, zf + sg * 0.3), V(x, -1.75, zf - sg * 0.7), V(x, -2.0, zf - sg * 2.6), V(x, -1.0, zf - sg * 2.6)], V(ln, 0, 0));
+          });
+          { let ni = 0; along(bow + 0.5, stern - 0.5, TS * 2, (x, ln, zf, sg) => { if ((ni++ >> 1) % 4 === 3) return; const o = zf + sg * 0.02; prism(paint, [V(x + 0.02, 2.9, o), V(x + 0.02, 2.4, o + sg * 0.42), V(x + 0.02, 0.5, o + sg * 0.42), V(x + 0.02, 0, o)], V(ln - 0.04, 0, 0)); }); } // (a smooth fairing over her sides)
+          prism(paint, [V(stern - 10, RY, zc - 0.12), V(stern - 2, RY, zc - 0.12), V(stern + 2.5, RY + 5.5, zc - 0.12), V(stern + 0.4, RY + 5.5, zc - 0.12)], V(0, 0, 0.24));
+          for (const sg of [-1, 1]) {
+            const zf = side(stern - 5, sg) ?? zc + sg * 4, z = zf + sg * 2.3, y = top + 1.5;
+            bar(paint, V(stern - 10, y, z), V(stern - 8, y, z), 0.15, 0.85, 10); bar(paint, V(stern - 8, y, z), V(stern + 1, y, z), 0.85, 0.7, 10); bar(glowB, V(stern + 1, y, z), V(stern + 1.05, y, z), 0.55, 0.55, 10);
+            for (const dx of [-7, -2]) bar(dLight, V(stern + dx, RY, zf - sg * 0.6), V(stern + dx, y, z), 0.14);
+          }
+        } else if (lang === 'freighter') {
+          // a blunt bow; containers down her back, tanks slung off her roof's edges, gantries over the stacks, a dish aft
+          nose(dPlate, 2.8, pw * 0.36, -0.4, top * 0.8);
+          along(bow + 0.5, stern - 0.5, TS * 4, (x, ln, zf, sg) => { // (ribs down her sides, and two pipes along them)
+            bar(dDark, V(x, -0.02, zf + sg * 0.26), V(x, 2.92, zf + sg * 0.26), 0.11);
+            bar(dLight, V(x, 2.45, zf + sg * 0.42), V(x + ln, 2.45, zf + sg * 0.42), 0.13, 0.13, 6); bar(dDark, V(x, 0.45, zf + sg * 0.4), V(x + ln, 0.45, zf + sg * 0.4), 0.1, 0.1, 6);
+          });
+          along(bow + 0.4, stern - 0.4, 4, (x, ln, zf, sg) => prism(dPlate, [V(x, RY + 0.2, zf + sg * 0.3), V(x, RY + 0.75, zf - sg * 0.9), V(x, RY + 0.2, zf - sg * 0.9)], V(ln, 0, 0)));
+          const rows = pw > 15 ? [-4.9, -2.2, 2.2, 4.9] : pw > 9 ? [-2.2, 2.2] : [0];
+          for (let x = bow + L * 0.28; x < stern - L * 0.22 - 6; x += 6.3) for (const dz of rows) {
+            if (!onRoof(x + 3, zc + dz) || rr() < 0.2) continue;
+            const m = CONT[Math.floor(rr() * CONT.length)], two = rr() < 0.35;
+            K.box(m, x, RY, zc + dz - 1.2, x + 6, RY + 2.5, zc + dz + 1.2); if (two) K.box(CONT[Math.floor(rr() * CONT.length)], x + 0.05, RY + 2.5, zc + dz - 1.2, x + 6.05, RY + 5, zc + dz + 1.2);
+          }
+          for (const u of [0.4, 0.66]) for (const sg of [-1, 1]) {
+            const x = bow + L * u, zf = side(x, sg); if (zf == null) continue;
+            const z = zf + sg * 1.5, y = top + 1.5, ln = Math.min(8, L * 0.16);
+            bar(paint, V(x - ln / 2, y, z), V(x + ln / 2, y, z), 1.05, 1.05, 12); bar(paint, V(x - ln / 2 - 0.7, y, z), V(x - ln / 2, y, z), 0.5, 1.05, 12); bar(paint, V(x + ln / 2, y, z), V(x + ln / 2 + 0.7, y, z), 1.05, 0.5, 12);
+            for (const dx of [-ln * 0.3, ln * 0.3]) { bar(dDark, V(x + dx, RY, zf - sg * 1.0), V(x + dx, y + 1.2, zf - sg * 1.0), 0.12); bar(dDark, V(x + dx, y + 1.2, zf - sg * 1.0), V(x + dx, y + 1.2, z), 0.12); bar(dDark, V(x + dx, y + 1.2, z), V(x + dx, y + 1.0, z), 0.1); }
+          }
+          for (const u of [0.36, 0.6]) {
+            const x = bow + L * u, a = (side(x, -1) ?? zc - 3) + 0.6, b = (side(x, 1) ?? zc + 3) - 0.6, y = RY + 6.2;
+            bar(dDark, V(x, RY, a), V(x, y, a), 0.16); bar(dDark, V(x, RY, b), V(x, y, b), 0.16); bar(dDark, V(x, y, a - 0.8), V(x, y, b + 0.8), 0.2); K.box(trim, x - 0.5, y - 0.9, zc + R(-2, 2) - 0.5, x + 0.5, y - 0.2, zc + 0.5);
+          }
+          { const x = stern - L * 0.14, y = RY + 2.2; bar(dDark, V(x, RY, zc + 2), V(x, y + 1.5, zc + 2), 0.1); bar(paint, V(x - 0.2, y + 1.5, zc + 2), V(x - 1.0, y + 2.6, zc + 2), 0.15, 1.5, 12); }
+        } else {
+          // pirates: a jaw of blades over her ram, scrap plate leaning off her roof's edges, spikes, hoops of girder over her back,
+          // a boom out to one side and an engine strapped on at the other
+          const nT = Math.max(3, Math.round(pw / 2.2));
+          for (let k = 0; k < nT; k++) { const z = pz0 + (k + 0.5) * pw / nT, ln = R(3, 7.5); prism(k & 1 ? rust : dDark, [V(bow + 0.3, 0.3, z - 0.12), V(bow + 0.3, 2.7, z - 0.12), V(bow - ln, 1.2 + R(-0.5, 0.6), z - 0.12)], V(0, 0, 0.24)); }
+          for (const sg of [-1, 1]) K.box(red, bow - 0.12, top * 0.72, pc + sg * pw * 0.25 - 0.35, bow, top * 0.72 + 0.25, pc + sg * pw * 0.25 + 0.35);
+          along(bow + 1, stern - 1, 3.4, (x, ln, zf, sg) => {
+            if (rr() < 0.55) { const hh = R(0.9, 2.2), lean = R(0.3, 1.5), a = V(x + 0.2, RY - 0.2, zf + sg * 0.3), b = V(x + 0.2, RY + hh, zf + sg * (0.3 + lean)); prism(rr() < 0.5 ? rust : rust2, [a, b, b.clone().add(V(0, 0, -sg * 0.14)), a.clone().add(V(0, 0, -sg * 0.14))], V(ln * R(0.6, 0.95), 0, 0)); }
+            if (rr() < 0.4) bar(rust2, V(x + 1, RY, zf - sg * 0.2), V(x + 1 + R(-1.5, 1.5), RY + R(1.5, 4), zf + sg * R(1.2, 3.6)), 0.1, 0.02);
+          });
+          along(bow + 0.6, stern - 0.6, TS * 2, (x, ln, zf, sg) => { // (scrap plate bolted over her sides, no two alike)
+            if (rr() > 0.5) return;
+            const o = zf + sg * 0.02, y0 = R(0, 1.1), y1 = Math.min(2.9, y0 + R(1, 1.8)), t0 = R(0.05, 0.25), t1 = R(0.15, 0.6), x0 = x + R(0, 0.3);
+            prism(rr() < 0.4 ? rust : rr() < 0.5 ? rust2 : dDark, [V(x0, y0, o + sg * t0), V(x0, y1, o + sg * t1), V(x0, y1, o + sg * (t1 + 0.08)), V(x0, y0, o + sg * (t0 + 0.08))], V(ln * R(0.7, 1.25), 0, 0));
+          });
+          for (let x = bow + L * 0.2; x < stern - 3; x += R(5.5, 8.5)) {
+            const a = (side(x, -1) ?? zc - 3) - 0.7, b = (side(x, 1) ?? zc + 3) + 0.7, y = RY + R(1.8, 2.8);
+            bar(dDark, V(x, RY - 0.4, a), V(x, y, a + 0.6), 0.13); bar(dDark, V(x, RY - 0.4, b), V(x, y, b - 0.6), 0.13); bar(dDark, V(x, y, a + 0.6), V(x, y + R(-0.4, 0.4), b - 0.6), 0.13);
+          }
+          const sg = rr() < 0.5 ? -1 : 1, xb = bow + L * R(0.35, 0.6), zb = (side(xb, sg) ?? zc + sg * 3), tip = V(xb + R(-2, 3), RY + R(3, 5), zb + sg * R(7, 11));
+          bar(dDark, V(xb, RY, zc + sg * 1), tip, 0.2, 0.1); bar(rust2, V(xb + 2.5, RY, zb - sg * 0.5), tip.clone().lerp(V(xb, RY, zc), 0.35), 0.08); bar(rust, tip, tip.clone().add(V(-0.6, 0.9, sg * 0.5)), 0.12, 1.3, 8); K.box(red, tip.x - 0.12, tip.y - 0.4, tip.z - 0.12, tip.x + 0.12, tip.y - 0.16, tip.z + 0.12);
+          { const zf = side(stern - 3, -sg) ?? zc - sg * 3, z = zf - sg * 2.2, y = top + 1.3, ln = R(4.5, 7); bar(rust, V(stern - ln, y, z), V(stern + 1.2, y, z), 1.0, 1.15, 8); bar(rust2, V(stern + 1.2, y, z), V(stern + 2.4, y, z), 1.15, 0.8, 8); bar(glowO, V(stern + 2.4, y, z), V(stern + 2.45, y, z), 0.62, 0.62, 8);
+            for (const dx of [-ln + 0.8, -0.5]) { bar(dDark, V(stern + dx, RY, zf + sg * 0.8), V(stern + dx, y, z), 0.13); bar(dDark, V(stern + dx + 0.9, RY, zf + sg * 0.3), V(stern + dx, y + 0.5, z), 0.08); } }
+        }
+      });
+      // Streamlining. Where her side steps in or out (an inside corner of her plan) the corner's filled: a fairing from the step's
+      // full depth down to nothing along the longer wall, keel to roof, in slices (it's smashed through like the rest: cutAt).
+      {
+        const fairM = langOf(sp.size) === 'cutter' ? paint : dPlate, seen = new Set<string>();
+        for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
+          if (solid(x, z)) continue;
+          for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+            if (!solid(x + sx, z) || !solid(x, z + sz)) continue;
+            // (the wall across x there runs away along z, the wall across z along x: each as far as it's still her side)
+            let da = 0; while (da < 14 && solid(x + sx, z - da * sz) && !solid(x, z - da * sz)) da++;
+            let db = 0; while (db < 14 && solid(x - db * sx, z + sz) && !solid(x - db * sx, z)) db++;
+            if (da < 2 || db < 2) continue;
+            const cx = (sx > 0 ? x + 1 : x) * TS, cz = (sz > 0 ? z + 1 : z) * TS, key = cx.toFixed(2) + ',' + cz.toFixed(2); if (seen.has(key)) continue; seen.add(key);
+            const A = da * TS, B = db * TS, alongX = B >= A, short = Math.min(alongX ? A : B, 6), long = Math.min(alongX ? B : A, Math.max(3, 2.4 * short), 10);
+            const u = alongX ? V(-sx, 0, 0) : V(0, 0, -sz), v = alongX ? V(0, 0, -sz) : V(-sx, 0, 0), C0 = V(cx, 0, cz);
+            const hm = sp.hulls.find((q) => cx > q.x0 - 2 && cx < q.x1 + 2 && cz > q.z0 - 2 && cz < q.z1 + 2) || sp.hull, y0 = -1.0, y1 = (hm.main ? TOP : WH) + 0.5, n = Math.max(2, Math.ceil(long / (TS * 1.5)));
+            for (let k = 0; k < n; k++) {
+              const t0 = long * k / n, t1 = long * (k + 1) / n, P = (t: number, out: number, y: number) => C0.clone().addScaledVector(u, t).addScaledVector(v, out * short * (1 - t / long)).setY(y);
+              hexa(fairM, [P(t0, 0, y0), P(t1, 0, y0), P(t1, 1, y0), P(t0, 1, y0)], [P(t0, 0, y1), P(t1, 0, y1), P(t1, 1, y1), P(t0, 1, y1)]);
+            }
+          }
+        }
+      }
+      for (const [m, q] of tris) { const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(q, 3)); geo.computeVertexNormals(); const mesh = new T.Mesh(geo, m); mesh.frustumCulled = false; g.add(mesh); decor.push(mesh); }
+    }
     K.build(g);
     // the breach that's suggested: marked for whoever's flying (js/space.ts pulses it)
     const mk = new T.Group(), b = sp.breach, ring = lit(0xffb020);
     for (const [bx, by, bw, bh] of [[-1.5, 0.1, 3, 0.14], [-1.5, 2.9, 3, 0.14], [-1.5, 0.1, 0.14, 2.94], [1.36, 0.1, 0.14, 2.94]]) part(mk, new T.Mesh(new T.BoxGeometry(bw, bh, 0.1), ring), bx + bw / 2, by + bh / 2, 0);
     mk.position.set(b.x, 0, b.face + 0.34); g.add(mk);
-    return { group: g, guns, marker: mk };
+    // she's been rammed there (a site: the middle of its stretch of wall, the way out of her): what stood over that stretch of
+    // her side is gone with it (each piece whose middle is in the hole), and the lamp's light that fell there
+    const cutAt = (x: number, z: number, nx: number, nz: number) => {
+      const inHole = (px: number, py: number, pz: number) => { const out = (px - x) * nx + (pz - z) * nz, al = nx ? pz - z : px - x; return Math.abs(al) < 2.3 && out > -0.5 && out < 2.4 && py > -0.9 && py < 3.5; };
+      for (const m of decor) {
+        const a = m.geometry.attributes.position as THREE.BufferAttribute, q = a.array as Float32Array; let ch = false;
+        for (let i = 0; i < q.length; i += 9) {
+          if (!inHole((q[i] + q[i + 3] + q[i + 6]) / 3, (q[i + 1] + q[i + 4] + q[i + 7]) / 3, (q[i + 2] + q[i + 5] + q[i + 8]) / 3)) continue;
+          for (const k of [3, 6]) { q[i + k] = q[i]; q[i + k + 1] = q[i + 1]; q[i + k + 2] = q[i + 2]; } ch = true;
+        }
+        if (ch) a.needsUpdate = true;
+      }
+      for (const w of washes) if (inHole(w.position.x, 1.4, w.position.z)) w.visible = false;
+    };
+    return { group: g, guns, marker: mk, cutAt };
   }
 
   // ---- the asteroid the base is cut into: a rock three kilometres through, a hollow planed into its top for the hangar
