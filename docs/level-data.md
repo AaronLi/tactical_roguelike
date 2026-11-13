@@ -201,7 +201,7 @@ and blows the flags.
   oem.op.pic.20/21 5×, oem.op.pic.22/23 6×; the ballistic computer op.bc.0; the thermal op.th.0) has windage marks in mils, a mark every
   0.5 mil (one of the computer's cells), longer every 2.5 mil, out to 10 mil, under the horizontal wire (js/viewmodel.ts `windage`,
   `WIND_STEP`; the thermal's screen, js/render.ts, has a tick a mil, longer every 5, as half-mil ones would be too fine at its 8×). The range reticle also has windage dots a mil apart on its
-  200 m and 400 m holdover rows (every 200: `WIND_ROWS`), 3 and 5 either side, those rows' numbers moved past them. They're drawn in the reticle's mils (`pmil`), so they follow
+  200 m and 400 m holdover rows (every 200: `WIND_ROWS`), 3 and 5 either side, those rows' numbers moved past them. The holdover has no 100 m or 300 m row (`HOLD_ROWS`: 200, 400, 500). They're drawn in the reticle's mils (`pmil`), so they follow
   its focal plane like the rest of its marks. The crossbow's 1-12× bolt-drop reticle already had a tick every mil on its wire: unchanged.
   4× and under (prisms, the ACOG, dots, the AUG's ring) unchanged.
 - **Glass roofs**: a layout can put glass roofs over rooms it leaves open to the sky (`lay.glassRoofs`: coarse tiles and the
