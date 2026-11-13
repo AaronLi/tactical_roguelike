@@ -1,4 +1,4 @@
-'use strict'; interface LvMap { W: number; H: number; t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: LvDoor[]; cover: LvPt[]; wallSpots: LvPt[]; lights: LvLight[]; lamps: LvLight[]; stairs: LvStair[]; windows: LvWin[]; cabinets: LvCab[]; fx: Record<string, any>[]; winMeshes: THREE.Object3D[]; lightPool: THREE.PointLight[]; enemySpots: number[][];
+'use strict'; interface LvMap { W: number; H: number; t: Uint8Array; out: Uint8Array; glassRoofs?: number[][]; rooms: LvRoom[]; doors: LvDoor[]; cover: LvPt[]; wallSpots: LvPt[]; lights: LvLight[]; lamps: LvLight[]; stairs: LvStair[]; windows: LvWin[]; cabinets: LvCab[]; fx: Record<string, any>[]; winMeshes: THREE.Object3D[]; lightPool: THREE.PointLight[]; enemySpots: number[][];
   seed: number; level: number; theme: ThemeDef; TS?: number; world: ReturnType<typeof G_World.create>; crest?: any; chasm: number; floors: LvMap[]; props: Map<number, LvProp>; propList: LvProp[];
   case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
   grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
@@ -13,7 +13,7 @@ interface LvDress { who: string; type0: RoomType; wall: string; paper?: number; 
 // what a ray is asked to do (G.World.raycast, G.Level.raycast): through glass, a look not a round, bars, what stops people, solids to skip
 interface LvRayOpts { glass?: boolean; sight?: boolean; bars?: boolean; move?: boolean; skip?: (s: any) => boolean }
 interface LvBuilding { floors: LvLay[]; stairs: any; rail?: string; base?: number; units?: number; lz?: LvLz | null }
-interface LvLay { W: number; H: number; t: Uint8Array; rooms: LvRoom[]; out?: Uint8Array; doors?: LvDoorSpec[]; fences?: LvFence[]; grate?: any; crest?: any; glass?: any[]; spawn?: any; lz?: LvLz | null; entries?: number[][] | null; units?: number; underground?: boolean; chasm?: number; rollers?: number[][]; ids?: Int16Array; homes?: any; ringDoors?: boolean } interface LvPt { x: number; z: number; y?: number; cx?: number; cz?: number; fl?: number; lean?: any } interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[] } type LvDoorSpec = [number, number, LvAxis, boolean?, boolean?, any?]; type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; unit?: number; head?: number[]; drop?: number[] } interface LvStair { axis: LvAxis; up: number; x0: number; x1: number; z0: number; z1: number; f: number; y0?: number; steps?: any; rise?: number } interface LvNav { stairOf: number[]; foot: Set<string>; WH: number }
+interface LvLay { W: number; H: number; t: Uint8Array; rooms: LvRoom[]; out?: Uint8Array; glassRoofs?: number[][]; doors?: LvDoorSpec[]; fences?: LvFence[]; grate?: any; crest?: any; glass?: any[]; spawn?: any; lz?: LvLz | null; entries?: number[][] | null; units?: number; underground?: boolean; chasm?: number; rollers?: number[][]; ids?: Int16Array; homes?: any; ringDoors?: boolean } interface LvPt { x: number; z: number; y?: number; cx?: number; cz?: number; fl?: number; lean?: any } interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[] } type LvDoorSpec = [number, number, LvAxis, boolean?, boolean?, any?]; type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; unit?: number; head?: number[]; drop?: number[] } interface LvStair { axis: LvAxis; up: number; x0: number; x1: number; z0: number; z1: number; f: number; y0?: number; steps?: any; rise?: number } interface LvNav { stairOf: number[]; foot: Set<string>; WH: number }
 // Procedural level generation, collision, raycasting and path flow-fields.
 // The map is a tile grid (TS metres per tile, after refinement: see TS/CTS/K below). 0 = floor, 1 = wall, 2 = furniture you can take cover behind,
 // 3 = door, 4 = other furniture (garden fences are furniture too). map.out marks tiles open to the sky. Furniture collision boxes live in map.props (see js/furniture.ts).
@@ -75,6 +75,9 @@ const G_Level = {
     }
     const map = this.plan(lay, r, seed, level, theme);
     if (map.crest) { this.crestLadder(map); this.crestGround(map); } // (a way up onto the Crest House; a mountain top: the ground rolls)
+    // glass roofs the layout puts over open-to-the-sky rooms ([x0, z0, x1, z1] coarse tiles, the walls and all, and the roof's top over
+    // the ground there, metres): the sky's light comes through, its wind doesn't (G.Sim.windy). In metres, the top over the ground as it lies.
+    if (lay.glassRoofs) map.glassRoofs = lay.glassRoofs.map(([x0, z0, x1, z1, h]) => { const C = this.CTS; return [x0 * C, z0 * C, x1 * C, z1 * C, this.groundHeight(map, (x0 + x1) / 2 * C, (z0 + z1) / 2 * C) + h]; });
     G.World.fromTileMap(map); // the level as 3D solids (js/world.ts): what every ray, sight line and step is asked of
     if (map.crest) this.crestSolids(map); // (the viewing building's roof and its parapet)
     return this.landing(map, lay.lz);
@@ -987,7 +990,7 @@ const G_Level = {
   // foot: where you stand to climb (and step off at the bottom), y0 the ground there; top: the roof's height; head: where
   // you step off on the roof; over: how high over the roof's edge you're lifted getting on and off (a parapet's).
   // (Hold F at either end: js/player.ts climbStep. Suspects don't climb them.)
-  ROOF_Y: 4.3, PARAPET: { H: 1.05, T: 0.2, KERB: 0.15 }, GUARD_H: 1.05,
+  GH_RIDGE: 2.2, ROOF_Y: 4.3, PARAPET: { H: 1.05, T: 0.2, KERB: 0.15 }, GUARD_H: 1.05,
   crestLadder(map: LvMap) {
     const cr = map.crest, { W, t } = map, TS = this.TS, K = this.K, [HX, HZ] = cr.house, [BX0, BX1] = cr.viewing, VZ1 = cr.site[2];
     cr.roofs = []; cr.ladders = [];
@@ -1233,7 +1236,8 @@ const G_Level = {
     // hand's width in from it: shot out, the glass leaves a sill you'd step over into the gorge (crestSolids)
     const guard = [(BX0 + 1) * CS, BX1 * CS, VZ1 * CS + this.TS - 0.14];
     const crest = { W, H, kind, CX0, CX1, SZ, OZ0, OZ1, OX1, site: [SX0, SX1, VZ1], viewing: [BX0, BX1], house: [HX, HZ], gh: [GX, GZ], masts: [], scopes: [], lines, guard };
-    return { W, H, t, rooms, doors, out, fences, glass, spawn: lot, lz, crest, chasm: this.CHASM };
+    // (the greenhouse's glass roof, its ridge GH_RIDGE over its walls' tops: js/leveldesc.ts draws it)
+    return { W, H, t, rooms, doors, out, fences, glass, spawn: lot, lz, crest, chasm: this.CHASM, glassRoofs: [[GX, GZ, GX + 7, GZ + 9, this.WALL_H + this.GH_RIDGE]] };
   },
   // Each returns { W, H, t, rooms, doors?, ringDoors?, out?, fences?, spawn? } on the coarse grid. t starts as all wall
   // (1); rooms are carved to floor (0).

@@ -200,12 +200,22 @@ and blows the flags.
 - **Windage marks**: every scope over 4× (the ones that get the range-finding reticle: op.pic.7 LV-6, op.pic.8 3-9×, op.pic.9 5-25×,
   oem.op.pic.20/21 5×, oem.op.pic.22/23 6×; the ballistic computer op.bc.0; the thermal op.th.0) has windage marks in mils, a mark every
   0.5 mil (one of the computer's cells), longer every 2.5 mil, out to 10 mil, under the horizontal wire (js/viewmodel.ts `windage`,
-  `WIND_STEP`; the thermal's screen, js/render.ts, has a tick a mil, longer every 5, as half-mil ones would be too fine at its 8×). The range reticle also has windage dots a mil apart on each holdover row, two at
-  100 m to six at 500 m (a Christmas tree), its numbers moved past them. They're drawn in the reticle's mils (`pmil`), so they follow
+  `WIND_STEP`; the thermal's screen, js/render.ts, has a tick a mil, longer every 5, as half-mil ones would be too fine at its 8×). The range reticle also has windage dots a mil apart on its
+  200 m and 400 m holdover rows (every 200: `WIND_ROWS`), 3 and 5 either side, those rows' numbers moved past them. They're drawn in the reticle's mils (`pmil`), so they follow
   its focal plane like the rest of its marks. The crossbow's 1-12× bolt-drop reticle already had a tick every mil on its wire: unchanged.
   4× and under (prisms, the ACOG, dots, the AUG's ring) unchanged.
-- **The greenhouse**: its interior is open to the sky in the level (`out`: its glass roof is drawn, not a ceiling), so it counts as
-  outdoors for the wind; a round into it keeps the wind's pull for the last few metres, which doesn't show at that range.
+- **Glass roofs**: a layout can put glass roofs over rooms it leaves open to the sky (`lay.glassRoofs`: coarse tiles and the
+  roof's height; the Sandia Crest's greenhouse). `G.Level.generate` turns them into `map.glassRoofs` ([x0, z0, x1, z1, the
+  roof's top], metres), and the description carries them (`glassRoofs`, only where there are any). The sky's light comes
+  through (`out` is unchanged), its wind doesn't: under one, `G.Sim.windy` is false, so rounds and the scope's outdoor share
+  treat it as indoors.
+- **Suspects misjudge it**: each holds off for the wind as they hold over for drop, but wrong by their own bias for the level
+  (`G.Sim.windJudge`: 20-35% of the drift, over or under, the better shot the less: a lookout about 20%, a gunman about a
+  third) and a little more each shot (`windShot`, 6% spread). A third of the drift at 300 m in 6.5 m/s is about 14 cm for a
+  7.62x39; at 20 m it's half a millimetre.
+- **The scope's picture**: the gun's turn in the hands is split in two (js/player.ts updateCamera): where the bore points (the
+  aim offset: sway, recoil, the arms' lag) is taken as it is each frame, and only the rest (raising, lowering, reloads, the
+  draw) is eased in. So the scope's picture is where the round goes, sway and all, frame by frame.
 - **Flags**: the `flagpole` piece (js/furniture.ts: a footing, a 7.2 m pole, a ball; solids are the footing and the pole)
   is ordinary furniture, so it's in the description's `props` and the Bevy port places it as any piece. The Sandia Crest
   gets one by a wall of each building (the Crest House, the viewing site, the greenhouse) and one each at the parking lot

@@ -41,6 +41,7 @@ type LivePlayer = Player & { st: PState }
 interface EnemyCover { x: number; y: number; z: number; lean: number; px?: number; pz?: number; fl?: number; cx?: number; cz?: number }
 interface HideSpot { x: number; z: number; y?: number; lean: number; fl?: number; flow?: ReturnType<typeof G.Level.flow>; stuck?: number; [k: string]: any }
 interface Enemy {
+  windErr?: number; // (how it misjudges the wind: G.Sim.windJudge)
   id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; hp: number; maxHp: number;
   alert: boolean; spot: number; tgt: string | null; tgtD: number; canSee: boolean; percT: number; cool: number; burstLeft: number; aiming: boolean; aimT: number;
   strafe: number; strafeT: number; idleT: number; idleYaw: number; pendingAlert: number; lostT: number; lastHit: string | null;
@@ -2889,7 +2890,10 @@ const G_Server = {
     const fv = new THREE.Vector3(...from), aim = new THREE.Vector3(tx + (-dz / d) * ex, ty + ey, tz + (dx / d) * ex).sub(fv), far = aim.length();
     aim.divideScalar(far); aim.y += G.GRAVITY * far / (2 * v0 * v0); // (held up for the drop: they've used this gun before)
     const wind = this.windNow(), wdrag = G.dragOf(wdef, am);
-    if (wind && G.Sim.windy(map, from[0], from[1], from[2])) { const lag = G.Sim.lagAt(v0, wdrag, far) / far; aim.x -= wind.x * lag; aim.z -= wind.z * lag; } // (and off into the wind: they feel it on their face)
+    if (wind && G.Sim.windy(map, from[0], from[1], from[2])) { // (and off into the wind: they feel it on their face, and misjudge it: each their own way, a little more or less each shot)
+      if (e.windErr == null) e.windErr = G.Sim.windJudge(def.acc);
+      const lag = G.Sim.lagAt(v0, wdrag, far) / far * G.Sim.windShot(e.windErr); aim.x -= wind.x * lag; aim.z -= wind.z * lag;
+    }
     aim.normalize();
     const right = new THREE.Vector3(-aim.z, 0, aim.x).normalize(), upv = new THREE.Vector3().crossVectors(right, aim), pr = Math.tan(((wdef.choke || 0) * Math.PI) / 180), pellets = def.pellets || 1;
     const r2 = (v: number) => Math.round(v * 100) / 100, sid = (this.eSid = (this.eSid || 0) + 1), ds: number[][] = [];
