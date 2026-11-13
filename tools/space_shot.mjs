@@ -4,7 +4,7 @@
 //   node tools/space_shot.mjs "<query>" <steps.mjs> [--port 8151] [--out dir] [--gpu]
 // steps.mjs: export default async ({ ev, shot, sleep, key, log }) => { ... }
 //   ev(js): evaluate in the page (a promise is awaited); shot(name): a PNG in the out dir; key(code, down): a key held or let go
-//   send(method, params): a DevTools protocol command of your own (Profiler.start, ...)
+//   send(method, params): a DevTools protocol command of your own (Profiler.start, ...); on(method, fn): its events; out: the out dir
 // The page is served by `node serve.js` (PORT) already running, or --port's.
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { spawn } from 'node:child_process'; import { pathToFileURL } from 'node:url';
 const arg = (n) => { const i = process.argv.indexOf(n); return i >= 0 ? process.argv[i + 1] : null; };
@@ -24,10 +24,11 @@ let wsUrl = null;
 for (let i = 0; i < 100 && !wsUrl; i++) { await sleep(100); try { const [p] = fs.readFileSync(path.join(prof, 'DevToolsActivePort'), 'utf8').split('\n'); const tabs = await (await fetch(`http://127.0.0.1:${p}/json`)).json(); const t = tabs.find((q) => q.type === 'page'); if (t) wsUrl = t.webSocketDebuggerUrl; } catch { /* not up yet */ } }
 if (!wsUrl) { console.error('the browser did not start'); proc.kill(); process.exit(1); }
 const ws = new WebSocket(wsUrl); await new Promise((r) => ws.addEventListener('open', r));
-let seq = 0; const pend = new Map(), errs = [];
+let seq = 0; const pend = new Map(), errs = [], subs = new Map();
 ws.addEventListener('message', (e) => {
   const m = JSON.parse(e.data);
   if (m.id && pend.has(m.id)) { const p = pend.get(m.id); pend.delete(m.id); m.error ? p.rej(new Error(m.error.message)) : p.res(m.result); return; }
+  if (m.method && subs.has(m.method)) subs.get(m.method)(m.params);
   if (m.method === 'Runtime.exceptionThrown') { const d = m.params.exceptionDetails; errs.push('EXCEPTION ' + ((d.exception && d.exception.description) || d.text) + (d.url ? ' @ ' + d.url.split('/').pop() + ':' + d.lineNumber : '')); }
   if (m.method === 'Runtime.consoleAPICalled' && (m.params.type === 'error' || (m.params.type === 'log' && process.argv.includes('--logs')))) errs.push(m.params.type.toUpperCase() + ' ' + m.params.args.map((a) => a.value || a.description || '').join(' ').slice(0, 400));
 });
@@ -49,7 +50,7 @@ try {
   const t0 = Date.now();
   while (Date.now() - t0 < 120000) { await sleep(500); if (await ev('!!window.__debugReady').catch(() => false)) break; }
   console.log('ready after', ((Date.now() - t0) / 1000).toFixed(1), 's:', await ev('!!window.__debugReady'));
-  if (stepsFile) await (await import(pathToFileURL(path.resolve(stepsFile)).href)).default({ ev, shot, sleep, key, send, log: console.log });
+  if (stepsFile) await (await import(pathToFileURL(path.resolve(stepsFile)).href)).default({ ev, shot, sleep, key, send, on: (method, fn) => subs.set(method, fn), out, log: console.log });
   else await shot('page');
 } catch (e) { console.error('FAILED:', e.message); code = 1; }
 for (const e of [...new Set(errs)].slice(0, 40)) console.log(e);

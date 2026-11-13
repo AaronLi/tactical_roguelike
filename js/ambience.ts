@@ -58,6 +58,10 @@ interface AmbBedOpts {
   mono?: boolean;
 }
 type AmbRecipe = (s: AmbScene, o: AmbOpts, map: LvMap | null) => void;
+/** How the squad's ship is flying, for her sound (js/space.ts sound): how much of her is heard and how dulled; her way on
+ *  (0..1 of her speed), cruising, how hard she's gaining or losing it, turning; the jump (1 spooling, ftlK how far; 2 in
+ *  transit); something that's just happened to her. */
+interface AmbShipState { k: number; muf: number; thr: number; cruise: number; burn: number; turn: number; ftl: number; ftlK: number; ev?: string | null }
 
 const G_Ambience = (() => {
   const rnd = (a: number, b: number) => a + Math.random() * (b - a);
@@ -269,6 +273,33 @@ const G_Ambience = (() => {
     },
     /** traffic far off: a low rumble that comes and goes */
     traffic(vol: number): AmbLoop { return L.bed({ noise: 'brown', vol, lp: 380, swell: { rate: 0.05, depth: 0.6 } }); },
+    /** a ship's air: what comes out of the ducts (a broad hiss with a body to it), a little uneven as the fans hunt */
+    air(vol: number, f = 650): AmbLoop {
+      return (c, dest) => {
+        const g = gain(c, vol), srcs: AudioScheduledSourceNode[] = [];
+        const n = wideNoise(c, 'pink'), bp = filt(c, 'bandpass', f, 0.5), ng = gain(c, 1.7); chain(n.out, bp, ng, g); srcs.push(...n.srcs);
+        const b = wideNoise(c, 'brown'), bl = filt(c, 'lowpass', 170), bg = gain(c, 0.6); chain(b.out, bl, bg, g); srcs.push(...b.srcs);
+        srcs.push(...wobble(c, g.gain, 0.04, vol * 0.12), ...wobble(c, bp.frequency, 0.03, f * 0.12));
+        g.connect(dest);
+        return stopper(c, g, srcs);
+      };
+    },
+    /** a reactor, or a drive at rest: a deep note and its octave, each doubled a hair apart so they beat, a slow throb over
+     *  the lot, and the rumble of what it's bolted to */
+    reactor(f0: number, vol: number, whine = 0): AmbLoop {
+      return (c, dest) => {
+        const g = gain(c, vol), srcs: AudioScheduledSourceNode[] = [];
+        for (const [m, a] of [[1, 0.42], [1.008, 0.36], [2.006, 0.28], [3.02, 0.2], [4.01, 0.13], [6.03, 0.08], [8.05, 0.04]] as [number, number][]) { // (its upper partials are what a small speaker has of it)
+          const os = c.createOscillator(), og = gain(c, a); os.type = m < 1.5 ? 'triangle' : 'sine'; os.frequency.value = f0 * m * rnd(0.999, 1.001);
+          chain(os, og, g); os.start(); srcs.push(os);
+        }
+        const n = noise(c, 'brown'), lp = filt(c, 'lowpass', 140), ng = gain(c, 0.8); chain(n, lp, ng, g); srcs.push(n);
+        if (whine) { const w = noise(c, 'pink'), wb = filt(c, 'bandpass', 1900, 14), wg = gain(c, whine); chain(w, wb, wg, g); srcs.push(w, ...wobble(c, wb.frequency, 0.05, 60)); }
+        srcs.push(...wobble(c, g.gain, 0.6, vol * 0.1));
+        g.connect(dest);
+        return stopper(c, g, srcs);
+      };
+    },
     /** a city below: a low, even roar */
     city(vol: number): AmbLoop { return L.bed({ noise: 'brown', vol, lp: 220, hp: 30, swell: { rate: 0.02, depth: 0.3 } }); },
     /** a sequenced loop: a beat (kick, bass, hats) at bpm, scheduled bar by bar a second ahead */
@@ -539,6 +570,25 @@ const G_Ambience = (() => {
     chime(c, d, t) {
       for (const [f, dt] of [[784, 0], [622, 0.45]] as [number, number][]) ring(c, d, t + dt, f, 0.05, 1.8, [1, 2, 3.01, 4.2]);
     },
+    /** a hull taking up a strain: a low note sliding a little, through a narrow band, and a tick or two as it lets go */
+    groan(c, d, t, k) {
+      const dur = 0.9 + k * 1.6, f = 55 + k * 60, o = c.createOscillator(), bp = filt(c, 'bandpass', f * 3, 5), g = gain(c, 0);
+      o.type = 'sawtooth'; o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * (k > 0.5 ? 1.18 : 0.86), t + dur);
+      g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.12, t + dur * 0.35); g.gain.linearRampToValueAtTime(0, t + dur);
+      chain(o, bp, g, d); o.start(t); o.stop(t + dur + 0.1);
+      for (let i = 0; i < 1 + Math.floor(k * 2.5); i++) ring(c, d, t + dur * rnd(0.5, 1.1), 900 + k * 1400, 0.035, 0.12, [1, 2.4, 4.1]);
+    },
+    /** a contactor closing somewhere behind a panel: a dry clack, and what it switched coming up */
+    relay(c, d, t, k) {
+      burst(c, d, t, 'white', 'bandpass', 2200 + k * 1500, 2, 0.1, 0.001, 0.02);
+      clunk(c, d, t + 0.004, 0.1 + k * 0.08);
+      if (k > 0.4) { const o = c.createOscillator(), g = gain(c, 0); o.frequency.setValueAtTime(140, t + 0.05); o.frequency.exponentialRampToValueAtTime(300 + k * 200, t + 1.1); env(g.gain, t + 0.05, 0.02, 0.5, 0.8); chain(o, g, d); o.start(t); o.stop(t + 2.2); }
+    },
+    /** a valve letting go: a short hiss that tails off, in a pipe */
+    valve(c, d, t, k) {
+      burst(c, d, t, 'white', 'bandpass', 3200 + k * 2600, 1.2, 0.07 + k * 0.05, 0.03, 0.35 + k * 0.7);
+      burst(c, d, t, 'pink', 'bandpass', 700, 3, 0.04, 0.02, 0.3);
+    },
     /** a cheer going up from the crowd, somewhere off */
     cheer(c, d, t, k) {
       const dur = rnd(2, 4), g = gain(c, 0), hp = filt(c, 'highpass', 300);
@@ -683,6 +733,15 @@ const G_Ambience = (() => {
     },
     // the hangar between levels: a huge hall's air, its doors open on the airfield (jets, the wind), the PA's chime, the tools
     Hangar(s) {
+      if (G.SpaceData && G.SpaceData.ON) { // (the base is a hall cut into a rock, in space: no weather and nothing outside it to hear)
+        s.loop('in', L.air(0.09, 520));
+        s.loop('in', L.reactor(41, 0.06));
+        s.loop('in', L.motor(19, 0.035, 0.7, 500));
+        s.every('in', 1.6, 'a contactor', E.relay, 0.6);
+        s.every('in', 0.8, 'the rock settling', E.groan, 0.5);
+        s.every('in', 1.0, 'a valve', E.valve, 0.4);
+        return;
+      }
       s.bed('in', { noise: 'brown', vol: 0.08, lp: 180, swell: { rate: 0.03, depth: 0.3 } });
       s.bed('in', { noise: 'pink', vol: 0.02, bp: 400, q: 0.5 });
       s.loop('in', L.motor(19, 0.025, 0.7, 500));
@@ -695,6 +754,36 @@ const G_Ambience = (() => {
       s.every('out', 1, 'crow', E.crow, 0.4);
     },
   };
+  // Ships (js/spacedata.ts THEMES). Nothing is heard from outside one: there's no air out there to carry it. What there is
+  // comes through her frames: her drive's note everywhere, her air, and what she's made of working as she goes.
+  // a freighter: old, loose and loud; a slow heavy drive, big fans, her frames complaining
+  R.Freighter = (s) => {
+    s.loop('in', L.reactor(31, 0.11));
+    s.loop('in', L.air(0.09, 480));
+    s.loop('in', L.motor(22, 0.05, 0.8, 380));
+    s.every('in', 2.6, 'her frames', E.groan, 0.9);
+    s.every('in', 1.6, 'a contactor', E.relay, 0.7);
+    s.every('in', 1.8, 'a valve', E.valve, 0.6);
+  };
+  // a company's cutter: new and quiet; a smooth high drive, soft air, tidy little sounds
+  R['Corporate cutter'] = (s) => {
+    s.loop('in', L.reactor(58, 0.055, 0.004));
+    s.loop('in', L.air(0.06, 900));
+    s.hum('in', 400, [[1, 0.5], [2, 0.2], [3, 0.1]], 0.008, { wobble: 0.1 });
+    s.every('in', 0.9, 'a contactor', E.relay, 0.4);
+    s.every('in', 0.5, 'a valve', E.valve, 0.3);
+    s.every('in', 0.3, 'her frames', E.groan, 0.3);
+  };
+  // a warship: dense and hard; a big plant held well down, power everywhere (400 Hz in every panel), things switching
+  R['Navy warship'] = (s) => {
+    s.loop('in', L.reactor(44, 0.09, 0.006));
+    s.loop('in', L.air(0.07, 700));
+    s.hum('in', 400, [[1, 0.5], [2, 0.3], [3, 0.15], [5, 0.05]], 0.012, { wobble: 0.08 });
+    s.loop('in', L.motor(33, 0.035, 0.5, 1200));
+    s.every('in', 3.0, 'a contactor', E.relay, 0.7);
+    s.every('in', 1.0, 'a valve', E.valve, 0.5);
+    s.every('in', 0.6, 'her frames', E.groan, 0.5);
+  };
   /** the ones a level's sound comes from as well: things in it (rooms of a type) */
   function spots(s: AmbScene, map: LvMap) {
     const TS = G.Level ? G.Level.TS : 2 / 3, fms = map.floors || [map];
@@ -706,6 +795,12 @@ const G_Ambience = (() => {
         else if (r.type === 'freezer') s.spot('a freezer', x, y, z, 12, L.compressor(0.4, 47), 0.5);
         else if (r.type === 'kitchen' || r.type === 'kitchenette') s.spot('a fridge', x, y, z, 7, L.compressor(0.25, 60), 0.35);
         else if (r.type === 'mcc' || r.type === 'control') s.spot('the cabinets', x, y, z, 14, L.motor(47, 0.25, 0.8, 2400), 0.4);
+        // (a ship's: js/shipgen.ts)
+        else if (r.type === 'engine') s.spot('her drive', x, y, z, 34, L.reactor(36, 0.6, 0.02), 0.9);
+        else if (r.type === 'reactor') s.spot('her reactor', x, y, z, 26, L.reactor(62, 0.4, 0.05), 0.7);
+        else if (r.type === 'bridge') s.spot('the consoles', x, y, z, 12, L.motor(47, 0.2, 0.8, 2600), 0.3);
+        else if (r.type === 'mess') s.spot('the galley', x, y, z, 7, L.compressor(0.25, 60), 0.3);
+        else if (r.type === 'medbay') s.spot('the medbay', x, y, z, 7, L.hum(400, [[1, 0.5], [2, 0.3], [4, 0.1]], 0.12, { wobble: 0.1 }), 0.3);
       }
     });
     // what machinery gives off (js/level.ts map.fx: world coordinates, y above its floor)
@@ -727,7 +822,7 @@ const G_Ambience = (() => {
   }
   // (a one-shot plays if 'events' is in ONLY, or its own name in E as 'event:<name>': 'event:car')
   const EVENT_NAME = new Map<AmbPlay, string>(Object.entries(E).map(([k, f]) => [f, k]));
-  let ONLY: Set<string> | null = new Set(['wind', 'hum', 'motor', 'compressor', 'fluorescent', 'crickets', 'traffic', 'city', 'event:car']);
+  let ONLY: Set<string> | null = new Set(['wind', 'hum', 'motor', 'compressor', 'fluorescent', 'crickets', 'traffic', 'city', 'event:car', 'air', 'reactor', 'event:groan', 'event:relay', 'event:valve']);
   const plays = (l: AmbLoop) => !ONLY || ONLY.has(LOOP_KIND.get(l) || '');
 
   // ---- a scene ----
@@ -955,6 +1050,83 @@ const G_Ambience = (() => {
 
   // ---- in the game ----
   let wasAboard = false;
+  // ---- the squad's own ship ----
+  // What she sounds like from inside (js/space.ts sound: how she's flying, each frame), made of parts that follow it:
+  //   the cabin    her air and the 400 Hz of her panels, always
+  //   the reactor  a low beating note, a little harder as she's worked
+  //   the drive    a rumble that opens up with her speed, and a kick of it while she's gaining or losing way
+  //   cruise       the long-range drive: a note under the floor and a thin singing over it
+  //   thrusters    a hiss while she's turned
+  //   the jump     spooling, a note that climbs as it charges; in transit, a hollow roar that pulses
+  // and one-shots: the breach (ev 'ram'), dropping out of a jump ('drop'), clamps ('clamp', 'release').
+  // k is how much of her you hear (aboard her: all; from the deck of what she's against, less with distance) and muf how
+  // dulled (through her open nose, or her hull). It plays into any context: the game's, or an offline one for a film.
+  function shipVoice(c: BaseAudioContext, dest: AudioNode) {
+    const out = gain(c, 0), lp = filt(c, 'lowpass', 16000, 0.5), srcs: AudioScheduledSourceNode[] = [];
+    chain(lp, out, dest);
+    const layer = (v: number) => { const g = gain(c, v); g.connect(lp); return g; };
+    const osc = (f: number, type: OscillatorType, v: number, to: AudioNode) => { const o = c.createOscillator(), g = gain(c, v); o.type = type; o.frequency.value = f; chain(o, g, to); o.start(); srcs.push(o); return o; };
+    // the cabin
+    const cab = layer(1);
+    { const n = wideNoise(c, 'pink'), bp = filt(c, 'bandpass', 700, 0.5), g = gain(c, 0.1); chain(n.out, bp, g, cab); srcs.push(...n.srcs);
+      const b = wideNoise(c, 'brown'), bl = filt(c, 'lowpass', 150), bg = gain(c, 0.05); chain(b.out, bl, bg, cab); srcs.push(...b.srcs);
+      for (const [m, a] of [[1, 0.5], [2, 0.22], [3, 0.1]]) osc(400 * m * rnd(0.999, 1.001), 'sine', a * 0.006, cab); }
+    // the reactor
+    const rea = layer(0.5);
+    for (const [f, a] of [[47, 0.42], [47.45, 0.36], [94.3, 0.26], [141.6, 0.18], [188.9, 0.12], [283.1, 0.07]]) osc(f, f < 60 ? 'triangle' : 'sine', a * 0.075, rea);
+    srcs.push(...wobble(c, rea.gain, 0.5, 0.04));
+    // the drive
+    const drv = layer(0), dlp = filt(c, 'lowpass', 110, 0.9), dg = gain(c, 0.6);
+    { const b = wideNoise(c, 'brown'); chain(b.out, dlp, dg, drv); srcs.push(...b.srcs);
+      const n = wideNoise(c, 'pink'), bp = filt(c, 'bandpass', 520, 0.6), g = gain(c, 0.55); chain(n.out, bp, g, drv); srcs.push(...n.srcs); } // (and the roar over the rumble)
+    const slp = filt(c, 'lowpass', 170, 2), saw = osc(34, 'sawtooth', 0.22, slp); slp.connect(drv);
+    // cruise
+    const cru = layer(0), cbp = filt(c, 'bandpass', 1000, 9);
+    { const n = wideNoise(c, 'pink'), g = gain(c, 2.6); chain(n.out, cbp, g, cru); srcs.push(...n.srcs, ...wobble(c, cbp.frequency, 0.15, 40)); }
+    osc(27.5, 'sine', 0.3, cru); osc(55.3, 'triangle', 0.2, cru); osc(110.9, 'sine', 0.08, cru);
+    // thrusters
+    const rcs = layer(0);
+    { const n = wideNoise(c, 'white'), hp = filt(c, 'highpass', 2400), bp = filt(c, 'bandpass', 4200, 0.7); chain(n.out, hp, bp, rcs); srcs.push(...n.srcs); }
+    // the jump, spooling
+    const spl = layer(0), sbp = filt(c, 'bandpass', 300, 3), so = osc(70, 'sawtooth', 1.3, sbp), so2 = osc(140.6, 'sine', 0.12, spl);
+    sbp.connect(spl); srcs.push(...wobble(c, spl.gain, 9, 0.06));
+    // the jump, in transit
+    const tun = layer(0), tbp = filt(c, 'bandpass', 420, 0.7);
+    { const n = wideNoise(c, 'pink'), g = gain(c, 3.2); chain(n.out, tbp, g, tun); srcs.push(...n.srcs, ...wobble(c, tbp.frequency, 0.3, 110));
+      const b = wideNoise(c, 'brown'), bl = filt(c, 'lowpass', 90), bg = gain(c, 0.6); chain(b.out, bl, bg, tun); srcs.push(...b.srcs);
+      const th = gain(c, 0.16); osc(31, 'sine', 1, th); osc(62.3, 'triangle', 0.6, th); th.connect(tun); srcs.push(...wobble(c, th.gain, 3.1, 0.25)); }
+    const once: Record<string, (t: number) => void> = {
+      ram(t) { clunk(c, lp, t, 0.9); burst(c, lp, t, 'brown', 'lowpass', 300, 0.7, 0.9, 0.004, 0.9); burst(c, lp, t + 0.02, 'white', 'bandpass', 1800, 0.8, 0.35, 0.002, 0.5); ring(c, lp, t + 0.03, 180, 0.2, 1.6); E.groan(c, lp, t + 0.25, 0.9); },
+      drop(t) { clunk(c, lp, t, 0.7); burst(c, lp, t, 'brown', 'lowpass', 160, 0.7, 0.8, 0.01, 1.4); burst(c, lp, t, 'pink', 'bandpass', 900, 0.6, 0.12, 0.01, 1.8); },
+      clamp(t) { clunk(c, lp, t, 0.5); clunk(c, lp, t + 0.18, 0.35); ring(c, lp, t, 260, 0.06, 0.6); E.valve(c, lp, t + 0.3, 0.3); },
+      release(t) { E.valve(c, lp, t, 0.8); clunk(c, lp, t + 0.25, 0.4); },
+    };
+    return {
+      set(st: AmbShipState, t: number) {
+        const T = (p: AudioParam, v: number, tc = 0.15) => p.setTargetAtTime(v, t, tc), thr = Math.max(0, Math.min(1.3, st.thr)), burn = Math.max(0, Math.min(1, st.burn));
+        T(out.gain, st.k, 0.25); T(lp.frequency, 16000 * Math.pow(0.022, Math.max(0, Math.min(1, st.muf))), 0.25);
+        T(rea.gain, 0.5 + 0.35 * thr + 0.3 * burn, 0.4);
+        T(drv.gain, Math.min(1.1, 0.5 * Math.pow(thr, 1.3) + 0.55 * burn), 0.22);
+        T(dlp.frequency, 100 + 480 * thr + 380 * burn, 0.3); T(saw.frequency, 34 * (1 + 0.6 * thr + 0.25 * burn), 0.4); T(slp.frequency, 150 + 260 * burn + 120 * thr, 0.3);
+        T(cru.gain, st.cruise * 0.42, 0.7); T(cbp.frequency, 850 + 650 * st.cruise, 1.2);
+        T(rcs.gain, Math.min(1, st.turn) * 0.05, 0.07);
+        T(spl.gain, st.ftl === 1 ? 0.3 : 0, st.ftl === 1 ? 0.15 : 0.06);
+        const sf = 70 + 620 * st.ftlK * st.ftlK; T(so.frequency, sf, 0.08); T(so2.frequency, sf * 2.01, 0.08); T(sbp.frequency, sf * 2.2, 0.08);
+        T(tun.gain, st.ftl === 2 ? 0.75 : 0, st.ftl === 2 ? 0.3 : 0.12);
+        if (st.ev && once[st.ev]) once[st.ev](t);
+      },
+      stop(t: number) { out.gain.cancelScheduledValues(t); out.gain.setTargetAtTime(0, t, 0.15); for (const s of srcs) s.stop(t + 1.2); setTimeout(() => out.disconnect(), 2500); },
+    };
+  }
+  const SHIP_VOL = 0.5; // (her level under the master volume: over the places' own, vol)
+  let shipLive: ReturnType<typeof shipVoice> | null = null, shipBus: GainNode | null = null;
+  function shipUpdate(st: AmbShipState | null) {
+    const A = G.Audio, c = A.ambCtx;
+    if (!st) { if (shipLive) { shipLive.stop(c.currentTime); shipLive = null; } return; }
+    if (!shipBus) { shipBus = gain(c, SHIP_VOL); shipBus.connect(A.ambMaster); }
+    if (!shipLive) shipLive = shipVoice(c, shipBus);
+    shipLive.set(st, c.currentTime);
+  }
   let bus: GainNode | null = null, cur: AmbScene | null = null, curMap: LvMap | null | undefined, outT = 0, spotT = 0, vol = 0.21; // (vol: the ambience under the master volume: 0.7 at first, a quarter off, then half of that, then 2 dB more under the shots)
   /** bring spots in range on (and the far ones off), heard by the way they reach you */
   function updateSpots(s: AmbScene, p: THREE.Vector3) {
@@ -997,6 +1169,7 @@ const G_Ambience = (() => {
     update(dt: number, map: LvMap | null, cam: THREE.Camera | null) {
       const A = G.Audio;
       if (!A.ambCtx || A.ambCtx.state !== 'running') return;
+      shipUpdate(G.Space && G.Space.sound ? G.Space.sound(dt) : null); // (the squad's own ship, if there is one here)
       if (map !== curMap) {
         curMap = map; wasAboard = false;
         this.play(map && map.theme ? map.theme.name : null, { night: !!map && !!map.night, hub: !!map && !!map.hub }, map);
@@ -1005,7 +1178,7 @@ const G_Ambience = (() => {
       const c = A.ambCtx;
       // aboard the helicopter (in its seat, flying in or on the pad), nothing of the place outside: the rotors and the
       // cabin are all there is (out as you board, back as you step down)
-      const aboard = !!(G.Me && G.Me.seat != null);
+      const aboard = !!(G.Me && G.Me.seat != null) || !!(G.Space && G.Space.sealed()); // (or shut in the squad's ship, out in space: nothing carries)
       if (aboard !== wasAboard) { wasAboard = aboard; const g = cur.out.gain; g.cancelScheduledValues(c.currentTime); g.setValueAtTime(g.value, c.currentTime); g.setTargetAtTime(aboard ? 0 : 1, c.currentTime, aboard ? 0.3 : 0.8); }
       if (cam) { const p = cam.position; here = { x: p.x, y: p.y, z: p.z }; cur.lisAt = () => here; }
       if (cam && (outT -= dt) <= 0) { outT = 0.2; const p = cam.position; if (map) applyMix(cur, mixAt(cur, map, p.x, p.y, p.z), c.currentTime); placeRings(cur, here, c.currentTime); }
@@ -1043,6 +1216,24 @@ const G_Ambience = (() => {
       s.out.gain.value = vol; // (the ambience under the guns as the game has it: its bus at vol, the shots at G.GunAudio.GAIN)
       for (const sh of shots) { if (doorsAt) doorsAt(sh.t); shotInto(s, map, sh, track, dt); }
       if (doorsAt) doorsAt(0);
+      return c.startRendering();
+    },
+    /**
+     * A flight's sound, rendered offline: the squad's ship as she flew (`track`: her state every `dt` s, as js/space.ts sound
+     * gives it, with `place` the name of the place heard just then and `pk` how much of it), under the same levels as
+     * the game. For a film of a flight (tools/space_film.mjs).
+     */
+    async renderFlight(track: (AmbShipState & { place?: string | null; pk?: number })[], dt: number) {
+      const secs = track.length * dt + 1, c = new OfflineAudioContext(2, Math.ceil(44100 * secs), 44100);
+      const sb = gain(c, SHIP_VOL), pb = gain(c, vol), v = shipVoice(c, sb), places = new Map<string, AmbScene>();
+      // (the game's way out, near enough: a compressor over everything, then its make-up gain)
+      const comp = c.createDynamicsCompressor(), mk = gain(c, 0.6 * 2); comp.threshold.value = -14; comp.ratio.value = 4; chain(comp, mk, c.destination); sb.connect(comp); pb.connect(comp);
+      here = { x: 0, y: 1.6, z: 0 };
+      track.forEach((st, i) => {
+        const t = i * dt; v.set(st, t);
+        for (const [name, sc] of places) sc.out.gain.setTargetAtTime(st.place === name ? st.pk ?? 1 : 0, t, 0.4);
+        if (st.place && !places.has(st.place)) { const sc = scene(c, pb, st.place, { night: false, hub: st.place === 'Hangar' }, null); sc.lisAt = () => here; applyMix(sc, mixByHand(0), 0, 0.01); placeRings(sc, here, 0, 0.01); sc.out.gain.setValueAtTime(0, 0); sc.out.gain.setTargetAtTime(st.pk ?? 1, t, 0.4); schedule(sc, secs); places.set(st.place, sc); }
+      });
       return c.startRendering();
     },
     /** the first `secs` of a place, rendered offline (stereo): to check its levels, or to listen to without a game running */

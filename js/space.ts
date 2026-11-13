@@ -1045,8 +1045,26 @@ const G_Space = (() => {
     if (sp.state) raidPods(sp.state.raid);
     if (sp.state && sp.state.docked) dockLocal(true);
   }
+  // How she's flying, for her sound (js/ambience.ts shipVoice), each frame: null with no ship here. Aboard her you hear all of
+  // her; off her (the hangar's floor, the deck of what she's against) less with distance, and dulled.
+  const snd = { v: new T.Vector3(), docked: true, ftl: 0, has: false };
+  function sound(dt: number): AmbShipState | null {
+    if (!S.on || !S.model || !me().pos) { snd.has = false; return null; }
+    const ab = aboard(), d = me().pos.distanceTo(S.Dp), k = ab ? 1 : G.U.clamp(1 - (d - 5) / 26, 0, 1) * 0.7;
+    const sp = S.V.length(), acc = snd.has ? snd.v.sub(S.V).length() / Math.max(dt, 1e-3) : 0, ftl = S.ftl ? (S.ftl.st === 'tunnel' ? 2 : 1) : 0;
+    let ev: string | null = null;
+    if (snd.has) {
+      if (S.docked && !snd.docked) ev = S.kind === 'board' ? 'ram' : 'clamp';
+      else if (!S.docked && snd.docked) ev = 'release';
+      else if (!ftl && snd.ftl === 2) ev = 'drop';
+    }
+    snd.v.copy(S.V); snd.docked = S.docked; snd.ftl = ftl; snd.has = true;
+    const flying = !S.docked || !!S.auto;
+    return { k, muf: ab ? 0 : 0.45 + 0.3 * G.U.clamp(d / 30, 0, 1), thr: flying ? Math.min(1.3, sp / S.def.speed) : 0, cruise: S.cruise ? 1 : 0, burn: flying ? G.U.clamp(acc / 45, 0, 1) : 0,
+      turn: flying ? G.U.clamp(S.Wv.length() / Math.max(0.3, S.def.turn) + S.stick.length() * 0.6, 0, 1) : 0, ftl, ftlK: S.ftl && ftl === 1 ? G.U.clamp(S.ftl.t / Math.max(0.1, S.ftl.T), 0, 1) : 0, ev };
+  }
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
-  return { dbgPrep, prep: zonePrep, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { sound, dbgPrep, prep: zonePrep, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }

@@ -219,3 +219,25 @@ hull of the ship left is kept, holes and all, to be seen from her; no shaders ar
 were found on the way in); her people are made a few a snapshot (`G.Views.slowFill`); and the rooms' acoustics are measured a
 piece four times a second while the squad's ship is flying (`js/acoustics.ts` prewarm). That frame is 60-80 ms, whatever her
 size. Come up with faster than she can be got ready, the rest is done in that frame as before.
+
+## What it sounds like (`js/ambience.ts`)
+
+All of it is synthesized as it plays, as the places on the ground are. There is no air outside a hull, so nothing is ever heard
+from outside one.
+
+The squad's own ship (`shipVoice`) is made of parts that follow how she's flying, which `G.Space.sound` reports each frame:
+her cabin (air, and the 400 Hz of her panels), her reactor (a low beating note), her drive (a rumble and a roar that open up
+with her speed, harder while she's gaining or losing way), the cruise drive (a note under the floor and a thin singing over
+it), her thrusters (a hiss while she's turned), and the jump (a note that climbs while it spools, a hollow pulsing roar in
+transit). One-shots mark the breach, dropping out of a jump, and her clamps. Aboard her you hear all of it; from the hangar
+floor or the deck of a ship she's against, less with distance and dulled.
+
+A ship being boarded has a recipe by her kind (`Freighter`: a slow heavy drive, big fans, her frames groaning; `Corporate
+cutter`: quiet and smooth; `Navy warship`: dense, 400 Hz everywhere, contactors), and sources in her rooms heard nearer and
+further as you move (her drive in the engine room, her reactor, the bridge's consoles, the galley, the medbay). It is silent
+while you are shut in your own ship out in space. The base's hangar, being a hall cut in a rock, has no weather: air, a
+reactor, contactors, the rock settling.
+
+`tools/space_film.mjs` films a whole flight with its sound (hangar, helm, anchor, jump, run in, breach, aboard), the ship
+flown through her own controls by a scripted pilot; the sound is rendered afterwards from how she flew (`renderFlight`),
+since a headless page plays none.
