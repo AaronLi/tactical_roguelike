@@ -161,7 +161,7 @@ const G_ShipModel = (() => {
   function hull(map: LvMap): { group: THREE.Group; guns: SmGun[]; marker: THREE.Object3D } {
     const g = new T.Group(), K = new Kit(), TS = G.Level.TS, { W, H, t } = map, sp = map.sp!, th = map.theme, WH = G.Level.WALL_H, FH = G.Level.FLOOR_H, NF = map.floors ? map.floors.length : 1, TOP = (NF - 1) * FH + WH;
     const base = new T.Color(th.wall as string), r = G.U.rng((map.seed ^ 0x4a11) >>> 0);
-    const shade = (k: number, o?: Record<string, any>) => M(base.clone().multiplyScalar(k).getHex(), Object.assign({ emissive: base.clone().multiplyScalar(k * 0.1).getHex() }, o || {}));
+    const shade = (k: number, o?: Record<string, any>) => M(base.clone().multiplyScalar(k).getHex(), Object.assign({ emissive: base.clone().multiplyScalar(k * 0.16).getHex() }, o || {}));
     const plate = shade(0.62), dark = shade(0.36, { metalness: 0.5 }), light = shade(0.85), trim = M(0xb8862a, { emissive: 0x2a1c06 }), win = lit(0xffe2a8), nav = lit(0xff4030), eng = lit(0x7fd0ff);
     const solid = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] !== 5;
     // the belly: under every run of cells that's part of a hull (a row at a time)
@@ -177,16 +177,43 @@ const G_ShipModel = (() => {
       K.box(dark, x0, -1.0, z0, x1, -0.02, z1);
       for (let f = 0; f < NF; f++) K.box(dark, x0, f * FH + 2.92, z0, x1, f === NF - 1 ? TOP + 0.5 : (f + 1) * FH + 0.72, z1);
     };
+    // Her lights, outside: a line of light along the top of each side and a dim red one along her keel, floodlamps under the
+    // upper belt every few metres washing the plating below them, and her navigation lights (red to port, green to starboard,
+    // white at her ends and over her back). The wash is drawn, not cast: a lamp's cone of light painted on the wall under it.
+    const runL = lit(0x9fd8ff), keelL = lit(0xc0302a), lampL = lit(0xffe9c0), port = lit(0xff3528), stbd = lit(0x30ff60), white = lit(0xffffff);
+    const washM = new T.MeshBasicMaterial({ map: canvasTex(64, 64, (c, w, h) => { const gr = c.createRadialGradient(w / 2, 0, 1, w / 2, h * 0.2, h * 0.95); gr.addColorStop(0, 'rgba(255,236,200,1)'); gr.addColorStop(0.35, 'rgba(255,226,180,0.45)'); gr.addColorStop(1, 'rgba(255,220,170,0)'); c.fillStyle = gr; c.fillRect(0, 0, w, h); }).tex,
+      transparent: true, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide, opacity: 0.7 });
+    const washG = new T.PlaneGeometry(3.4, 2.95);
+    // (a side's run: from u0 to u1 along it, its wall's face at f, out the way (ox, oz))
+    const sideLights = (alongX: boolean, u0: number, u1: number, f: number, o: number) => {
+      const bx = (m: THREE.Material, a0: number, y0: number, d0: number, a1: number, y1: number, d1: number) => (alongX ? K.box(m, a0, y0, Math.min(f + o * d0, f + o * d1), a1, y1, Math.max(f + o * d0, f + o * d1)) : K.box(m, Math.min(f + o * d0, f + o * d1), y0, a0, Math.max(f + o * d0, f + o * d1), y1, a1));
+      bx(runL, u0 + 0.2, TOP + 0.36, 0.28, u1 - 0.2, TOP + 0.44, 0.34);
+      bx(keelL, u0 + 0.2, -0.72, 0.28, u1 - 0.2, -0.66, 0.34);
+      for (let f2 = 0; f2 < NF; f2++) for (let u = u0 + 1.6; u < u1 - 1; u += 5.2) {
+        bx(lampL, u - 0.3, f2 * FH + 2.8, 0.02, u + 0.3, f2 * FH + 2.9, 0.26);
+        const wm = new T.Mesh(washG, washM); wm.position.set(alongX ? u : f + o * 0.03, f2 * FH + 1.42, alongX ? f + o * 0.03 : u); if (!alongX) wm.rotation.y = Math.PI / 2; wm.renderOrder = 3; g.add(wm);
+      }
+    };
+    let bx0 = 1e9, bx1 = -1e9, bz0 = 1e9, bz1 = -1e9;
+    for (let z = 0; z < H; z++) for (let x = 0; x < W; x++) if (solid(x, z)) { bx0 = Math.min(bx0, x); bx1 = Math.max(bx1, x + 1); bz0 = Math.min(bz0, z); bz1 = Math.max(bz1, z + 1); }
+    if (bx1 > bx0) {
+      const cx = (bx0 + bx1) / 2 * TS, cz = (bz0 + bz1) / 2 * TS, nb = (m: THREE.Material, x: number, y: number, z: number, sz = 0.3) => K.box(m, x - sz / 2, y - sz / 2, z - sz / 2, x + sz / 2, y + sz / 2, z + sz / 2);
+      // (her length runs whichever way she's longer)
+      const longX = bx1 - bx0 >= bz1 - bz0;
+      for (const [m, sd] of [[port, -1], [stbd, 1]] as [THREE.Material, number][]) for (const k of [0.2, 0.5, 0.8]) longX ? nb(m, (bx0 + (bx1 - bx0) * k) * TS, TOP + 0.75, sd < 0 ? bz0 * TS - 0.4 : bz1 * TS + 0.4) : nb(m, sd < 0 ? bx0 * TS - 0.4 : bx1 * TS + 0.4, TOP + 0.75, (bz0 + (bz1 - bz0) * k) * TS);
+      for (const e of [0, 1]) longX ? nb(white, (e ? bx1 : bx0) * TS + (e ? 0.4 : -0.4), TOP * 0.5, cz, 0.36) : nb(white, cx, TOP * 0.5, (e ? bz1 : bz0) * TS + (e ? 0.4 : -0.4), 0.36);
+      nb(white, cx, TOP + 2.3, cz, 0.3); K.box(dark, cx - 0.06, TOP, cz - 0.06, cx + 0.06, TOP + 2.2, cz + 0.06);
+    }
     for (let z = 0; z < H; z++) for (const dz of [-1, 1]) for (let x = 0; x < W;) {
       if (!(solid(x, z) && !solid(x, z + dz))) { x++; continue; }
       let x1 = x; while (solid(x1 + 1, z) && !solid(x1 + 1, z + dz)) x1++;
-      const zf = dz < 0 ? z * TS : (z + 1) * TS; belt(x * TS - 0.3, zf + (dz < 0 ? -0.3 : 0), (x1 + 1) * TS + 0.3, zf + (dz < 0 ? 0 : 0.3));
+      const zf = dz < 0 ? z * TS : (z + 1) * TS; belt(x * TS - 0.3, zf + (dz < 0 ? -0.3 : 0), (x1 + 1) * TS + 0.3, zf + (dz < 0 ? 0 : 0.3)); sideLights(true, x * TS, (x1 + 1) * TS, zf, dz);
       x = x1 + 1;
     }
     for (let x = 0; x < W; x++) for (const dx of [-1, 1]) for (let z = 0; z < H;) {
       if (!(solid(x, z) && !solid(x + dx, z))) { z++; continue; }
       let z1 = z; while (solid(x, z1 + 1) && !solid(x + dx, z1 + 1)) z1++;
-      const xf = dx < 0 ? x * TS : (x + 1) * TS; belt(xf + (dx < 0 ? -0.3 : 0), z * TS, xf + (dx < 0 ? 0 : 0.3), (z1 + 1) * TS);
+      const xf = dx < 0 ? x * TS : (x + 1) * TS; belt(xf + (dx < 0 ? -0.3 : 0), z * TS, xf + (dx < 0 ? 0 : 0.3), (z1 + 1) * TS); sideLights(false, z * TS, (z1 + 1) * TS, xf, dx);
       z = z1 + 1;
     }
     // what she carries on her hull, by her class (js/spacedata.ts SIZES guns): point-defence guns, heavy cannon, missile

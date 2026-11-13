@@ -12,7 +12,7 @@
 //   A jump is the change of level: the screens go to the jump's light instead of black (the veil, kind 'ftl'), the place
 //   is built behind it, and she comes out of the tunnel when it's ready.
 interface SpWp { id: string; name: string; sub: string; p: THREE.Vector3; kind: 'anchor' | 'base' | 'breach' | 'lz' | 'entry'; i?: number; hide?: boolean }
-interface SpMs { salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
+interface SpMs { raid?: number[][]; hold: number; left?: number; salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
 type SpKind = 'hub' | 'board' | 'assault';
 const G_Space = (() => {
   const T = THREE, SD = G.SpaceData;
@@ -146,13 +146,40 @@ const G_Space = (() => {
     bx(torn, -1.5 * TS, L.DOOR_H + 0.04, 1.5 * TS, L.DOOR_H + 0.16, -TS / 2 - 0.04, TS / 2 + 0.04);
     g.position.set(s.x, 0, s.z); G.R.levelRoot.add(g);
   }
+  // The pirates' pods in a taken ship's hull (the mission's state: raid, as sites): each a blunt rust-dark boarding pod driven in
+  // nose first, its collar against her plating and its engines still glowing; inside, where it came through, its hatch shut in
+  // a ring of torn plate. (Nothing of hers is cut for it: the pod fills its own hole.)
+  function raidPods(list?: number[][]) {
+    const map = S.map as (LvMap & { _pods?: Set<string> }) | null; if (!map || !map.sp || S.kind !== 'board' || !list) return;
+    const done = map._pods || (map._pods = new Set()), TS = G.Level.TS, SM = G.ShipModel;
+    for (const a of list) {
+      if (done.has(a.join(','))) continue; done.add(a.join(','));
+      const s = siteAt(a), g = new T.Group(), hullM = SM.M(0x7a4634, { roughness: 0.8, metalness: 0.2, emissive: 0x24120c }), dark = SM.M(0x1c1a19, { roughness: 0.7, metalness: 0.5 }), hot = SM.lit(0xff5a1a), red = SM.lit(0xff2a1a);
+      const add = (geo: THREE.BufferGeometry, m: THREE.Material, z: number, y = 0, x = 0) => { const mm = new T.Mesh(geo, m); mm.position.set(x, y, z); g.add(mm); return mm; };
+      // (built along +z, out from the hull, its floor level with her deck; then turned to the site's own way out)
+      const body = add(new T.CylinderGeometry(1.25, 1.9, 8.5, 8), hullM, 4.6, 1.35); body.rotation.x = Math.PI / 2; body.rotation.y = Math.PI / 8;
+      const collar = add(new T.CylinderGeometry(2.15, 2.15, 0.5, 8), dark, 0.3, 1.35); collar.rotation.x = Math.PI / 2; collar.rotation.y = Math.PI / 8;
+      for (const k of [0, 1, 2, 3]) { const f = add(new T.BoxGeometry(0.16, 1.5, 3.2), dark, 6.6, 1.35); f.position.x = Math.cos(k * Math.PI / 2 + 0.6) * 1.75; f.position.y += Math.sin(k * Math.PI / 2 + 0.6) * 1.75; f.rotation.z = k * Math.PI / 2 + 0.6 - Math.PI / 2; }
+      for (const k of [0, 1, 2]) { const an = k * 2.094, e = add(new T.CylinderGeometry(0.42, 0.5, 0.9, 8), dark, 9.1, 1.35 + Math.sin(an) * 0.62, Math.cos(an) * 0.62); e.rotation.x = Math.PI / 2; const gl = add(new T.CircleGeometry(0.36, 8), hot, 9.57, 1.35 + Math.sin(an) * 0.62, Math.cos(an) * 0.62); void gl; }
+      add(new T.BoxGeometry(2.3, 0.5, 0.06), SM.M(0xb8ae98, { roughness: 0.9 }), 3.4, 2.75).rotation.x = -0.12; // (a pale band across her back: whose she is)
+      for (const x of [-1, 1]) add(new T.BoxGeometry(0.12, 0.12, 0.12), red, 1.0, 2.9, x * 0.9);
+      // inside her: the pod's hatch, shut, set in the wall where it came through
+      add(new T.BoxGeometry(2.3, 2.3, 0.08), dark, -TS / 2 - 0.05, 1.2);
+      add(new T.BoxGeometry(1.5, 2.0, 0.1), hullM, -TS / 2 - 0.07, 1.05);
+      for (const [w, h, x, y] of [[2.5, 0.08, 0, 2.4], [2.5, 0.08, 0, 0.04], [0.08, 2.4, -1.25, 1.2], [0.08, 2.4, 1.25, 1.2]]) add(new T.BoxGeometry(w, h, 0.05), hot, -TS / 2 - 0.045, y, x);
+      add(new T.BoxGeometry(0.16, 0.08, 0.06), red, -TS / 2 - 0.13, 2.15);
+      g.position.set(s.x + s.nx * TS / 2, 0, s.z + s.nz * TS / 2); g.rotation.y = Math.atan2(s.nx, s.nz);
+      G.R.levelRoot.add(g);
+    }
+  }
   // Where her nose is headed on the hull: the site its line meets (nearest), how far off, and how far the nose is off the
   // line straight into it. null: she isn't pointed at anywhere she could breach.
   function aim(maxT = 320) {
     if (S.kind !== 'board' || !S.map || !S.map.sp) return null;
     const zn = S.def.z0 - S.def.nose - 0.22, N = new T.Vector3(0, 1.4, zn).applyQuaternion(S.Q).add(S.P), f = fwd(S.Q), TS = G.Level.TS;
     let best: ShSite | null = null, bo = 1.0, bt = 0; // (within a metre of a site's middle: the collar pulls her onto it)
-    const list = G.ShipGen.sites(S.map).concat((S.map.sp.cuts || []).map(siteAt)); // (and the holes already made)
+    const raid: number[][] = (S.state && S.state.raid) || [], W0 = S.map.W, nearPod = (s: ShSite) => raid.some((q) => Math.hypot(s.c % W0 - q[0] % W0, ((s.c / W0) | 0) - ((q[0] / W0) | 0)) * G.Level.TS < 8);
+    const list = G.ShipGen.sites(S.map).concat((S.map.sp.cuts || []).map(siteAt)).filter((s) => !nearPod(s)); // (and the holes already made; not where a pirate pod is)
     for (const s of list) {
       const dn = f.x * s.nx + f.z * s.nz; if (dn > -0.5) continue;
       const px = s.x + s.nx * TS / 2, pz = s.z + s.nz * TS / 2, t = ((px - N.x) * s.nx + (pz - N.z) * s.nz) / dn;
@@ -796,7 +823,7 @@ const G_Space = (() => {
         if (S.on && m.by !== G.Net.myId) { S.auto = null; dockLocal(!!m.on); if (!m.on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); } }
         if (S.on && m.on && S.kind === 'board') { S.shake = 1; G.HUD.toast('BREACH', 'She\'s through the hull. Go.', 2.2); }
         return true;
-      case 'ms': S.state = m; G.SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
+      case 'ms': S.state = m; raidPods(m.raid); G.SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
       case 'mdone': {
         if (m.ok === 2) { me().credits += m.pay || 0; G.HUD.chat(null, 0, `Salvage: +¢${G.U.fmt(m.pay || 0)}`); G.HUD.feed(`<span class="cr">Salvage +¢${G.U.fmt(m.pay || 0)}</span>`); }
         else if (m.ok) { const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; G.HUD.toast('MISSION COMPLETE', `${G.U.esc(m.name)} · +¢${G.U.fmt(n)}${m.bonus ? ' (taken alive)' : ''}`, 5); G.HUD.chat(null, 0, `Mission complete: +¢${G.U.fmt(n)}`); G.Audio.extract(); if (G.Career.run) G.Career.ev('evidence', n); }
@@ -845,6 +872,7 @@ const G_Space = (() => {
     cards(); G.SpaceUI.objDraw();
     // (joined late: the holes already in her, and the ship where she's against one)
     if (sp.state && S.kind === 'board') { for (const c of sp.state.cuts || []) cutHere(c); if (sp.state.site) rebase(berthAt(siteAt(sp.state.site))); }
+    if (sp.state) raidPods(sp.state.raid);
     if (sp.state && sp.state.docked) dockLocal(true);
   }
   return { S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };

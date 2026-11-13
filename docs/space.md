@@ -148,3 +148,14 @@ clothes with security guards, the corvettes' and frigates' as pirates (vests, ba
 ships' as a navy (coveralls, working uniform with a white belt, officers in white with boards and cuff rings).
 `node tools/space_shot.mjs "mute&hangar" tools/human_lineup.mjs --out <dir> --gpu [--ids m04,f03] [--sets heavy] [--wear navy]`
 stands them in rows to look at.
+
+## A taken ship (`obj: 'hostage'`)
+
+One mission on every board is a civilian transport that pirates have boarded. Their pods (two or three) are still lodged in her
+hull (`js/spaceserver.ts` populate picks the sites, clear of each other and of the marked stretch; `js/space.ts` raidPods draws
+them and the shut hatch inside; nobody can breach within eight metres of one). Her people are tied in her biggest compartment
+with three pirates over them, the rest are about the ship and their leader is on the bridge (crew). It is done when no pirate is
+left standing, and each hostage alive pays a bonus. `?board=transport&obj=hostage&dock` starts one.
+
+Every hull carries lights outside (`js/shipmodel.ts` hull): a line of light along the top of each side, a red one along the keel,
+floodlamps under the upper belt with their wash painted on the plating, and navigation lights.

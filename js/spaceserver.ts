@@ -12,7 +12,8 @@ interface SvMission {
   ms: SpMission; meta: ShMeta | null; docked: boolean; done: boolean; keys: Record<string, boolean>; cards: SvCard[];
   art: 0 | 1 | 2; artBy: string | null; // (0 where it lies, 1 carried, 2 lost with the ship)
   hvt: number | null; hvtSt: 0 | 1 | 2; // (0 at large, 1 dead, 2 in restraints)
-  arm: number | null; boom: boolean; cleared: boolean; site: number[] | null; // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
+  arm: number | null; boom: boolean; cleared: boolean; leftSaid?: number; site: number[] | null; raid: number[][]; hold: number; told?: boolean; // (raid: where the pirates' pods are in her hull, as sites; hold: the room their hostages are in)
+  // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
   resp: Map<number, number>; salv: number[]; // (resp: the breach response squads' people, and the hull each is aboard; salv: the salvage taken, by its number)
   vac: Set<number>; sealT: Map<number, number>; doorRooms: Map<number, number[]> | null; vacT: number; armSay: number;
 }
@@ -35,7 +36,7 @@ const G_SpaceSv = (() => {
   function msMsg() {
     const M = st.M; if (!M) return null;
     return { t: 'ms', i: M.ms.i, docked: M.docked ? 1 : 0, done: M.done ? 1 : 0, keys: Object.keys(M.keys).filter((k) => M.keys[k]), cards: M.cards.filter((c) => c.st === 1).map((c) => [c.key, c.x, c.z, c.y]),
-      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0 };
+      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, left: M.ms.obj === 'hostage' ? S().remaining(false) : 0 };
   }
   const levelMsg = () => (st.M ? { ms: st.M.ms, gen: genOf(st.M.ms), state: msMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg(), board: boardMsg() } : null);
   const genOf = (ms: SpMission): SpGen | null => (ms.kind === 'board' ? { size: ms.size!, obj: ms.obj, ship: st.fleet.ship, other: ms.other || null } : null);
@@ -77,7 +78,7 @@ const G_SpaceSv = (() => {
   function begin(ms: SpMission) {
     const sv = S();
     st.ship.docked = false; st.ship.at = ms.i; st.ship.pose = null;
-    st.M = { ms, meta: null, docked: false, done: false, keys: {}, cards: [], art: 0, artBy: null, hvt: null, hvtSt: 0, arm: null, boom: false, cleared: false, site: null, resp: new Map(), salv: [], vac: new Set(), sealT: new Map(), doorRooms: null, vacT: 0, armSay: 0 };
+    st.M = { ms, meta: null, docked: false, done: false, keys: {}, cards: [], art: 0, artBy: null, hvt: null, hvtSt: 0, arm: null, boom: false, cleared: false, site: null, raid: [], hold: -1, resp: new Map(), salv: [], vac: new Set(), sealT: new Map(), doorRooms: null, vacT: 0, armSay: 0 };
     sv.startLevel(ms);
   }
   // A ship's complement, by her class (js/spacedata.ts SIZES crew), in place of the usual scatter (js/server.ts spawnEnemies):
@@ -103,6 +104,18 @@ const G_SpaceSv = (() => {
       const rooms = (...roles: string[]) => { const out: number[] = []; for (const role of roles) map.rooms.forEach((rm, i) => { if (meta.hullOf[i] === h && meta.roles[i] === role) out.push(i); }); return out; };
       const all = rooms('spine', 'cargo', 'quarters', 'mess', 'barracks', 'engine', 'magazine', 'galley', 'medbay', 'reactor', 'brig');
       const put = (type: EnemyKind, list: number[], k: number) => { for (let a = 0; a < list.length + all.length; a++) { const ri = a < list.length ? list[(k + a) % list.length] : all[(k + a) % all.length], p = spot(ri); if (p) return sv.addEnemy(type, p.x, p.z, hp, p.y); } return null; };
+      // a ship pirates have taken: her people tied in her biggest compartment with three of them standing over it, the rest about
+      // the ship, their leader on the bridge. No crew of her own is left to fight, and nobody answers a breach.
+      if (M && M.ms.obj === 'hostage' && h === 0) {
+        const area = (i: number) => map.rooms[i].w * map.rooms[i].h, hold = rooms('mess', 'cargo', 'quarters', 'galley').sort((a, b) => area(b) - area(a))[0] ?? all[0];
+        M.hold = hold;
+        for (let k = 0; k < cls.crew.civ + 4; k++) { const e = put('civ', [hold], 0); if (e) { e.state = 'cuffed'; e.armed = false; } }
+        for (const kd of ['suspect', 'suspect', 'rusher'] as EnemyKind[]) { const e = put(kd, [hold], 0); if (e) { e.guard = true; e.drawn = true; } }
+        const about = 4 + Math.min(4, Math.floor(L / 2)) + 2 * (np - 1), rest = all.filter((i) => i !== hold);
+        for (let k = 0; k < about; k++) { const e = put(k % 3 === 0 ? 'grunt' : k % 3 === 1 ? 'suspect' : 'rusher', rest.length ? [rest[(k * 2 + 1) % rest.length]] : all, 0); if (e) e.bold = true; }
+        const e = put('leader', rooms('bridge'), 0); if (e) e.drawn = true;
+        continue;
+      }
       const civAt = rooms('mess', 'galley', 'medbay', 'engine', 'quarters', 'bridge', 'cargo', 'reactor');
       for (let k = 0; k < C.civ; k++) put('civ', civAt, k);
       const post = rooms('bridge', 'spine', 'engine', 'cargo', 'quarters', 'mess');
@@ -135,6 +148,11 @@ const G_SpaceSv = (() => {
     if (!meta) return; // (a base on a planet: nothing but the people in it)
     const spotIn = (ri: number) => { const rm = map.rooms[ri]; if (!rm) return null; const c = map.enemySpots.filter(([x, z, f]) => (f || 0) === (rm.fl || 0) && x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h); const s = c.length ? c[Math.floor(Math.random() * c.length)] : [rm.cx, rm.cz]; return { x: (s[0] + 0.5) * TS, z: (s[1] + 0.5) * TS, y: G.Level.floorMap(map, rm.fl || 0).fy || 0 }; };
     const hp = 1 + 0.04 * (sv.level - 1) + 0.1 * (Math.max(1, sv.players.size) - 1);
+    // the pirates' own pods, still in her hull where they came through: two or three, apart from each other (nobody else can come in there)
+    if (M.ms.obj === 'hostage') {
+      const W = map.W, want = Math.random() < 0.5 ? 2 : 3, by = Math.floor(meta.breach.z / TS) * W + Math.floor(meta.breach.x / TS), ss = G.ShipGen.sites(map).slice().sort(() => Math.random() - 0.5), far = (c: number, q: number[], m = 6.5) => Math.hypot(c % W - q[0] % W, ((c / W) | 0) - ((q[0] / W) | 0)) * TS > m; // (metres: a pod is four across, the squad's ship nine)
+      for (const s of ss) { if (M.raid.length < want && M.raid.every((q) => far(s.c, q)) && far(s.c, [by], 9)) M.raid.push([s.c, s.nx, s.nz]); } // (and clear of the marked stretch: the squad's own way in)
+    }
     if (M.ms.obj === 'hvt') {
       const p = spotIn(meta.hvtRoom);
       if (p) { const e = sv.addEnemy('leader', p.x, p.z, hp * 1.4, p.y); e.guard = true; e.drawn = true; M.hvt = e.id; }
@@ -156,7 +174,8 @@ const G_SpaceSv = (() => {
       if (M.salv.length) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 2, pay: M.salv.length * (350 + 60 * M.ms.diff), name: 'Salvage' });
       if (ok && !st.board.done.includes(M.ms.i)) {
         st.board.done.push(M.ms.i);
-        const bonus = M.ms.obj === 'hvt' && M.hvtSt === 2 ? Math.round(M.ms.pay * 0.5) : 0;
+        const freed = M.ms.obj === 'hostage' ? [...sv.enemies.values()].filter((e) => e.def.civ && e.state !== 'dead' && e.hp > 0).length : 0;
+        const bonus = M.ms.obj === 'hvt' && M.hvtSt === 2 ? Math.round(M.ms.pay * 0.5) : freed * 120;
         net().broadcast({ t: 'mdone', i: M.ms.i, ok: 1, pay: M.ms.pay, bonus, name: M.ms.name });
       } else if (!ok) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 0, pay: 0, name: M.ms.name });
       st.ship.at = M.ms.i;
@@ -180,6 +199,7 @@ const G_SpaceSv = (() => {
     let site: ShSite | null = null;
     if (on && M.meta && sv.map) {
       const a = Array.isArray(at) && at.length === 3 && at.every(Number.isInteger) ? (at as number[]) : null;
+      if (a && M.raid.some((q) => Math.hypot(a[0] % sv.map!.W - q[0] % sv.map!.W, ((a[0] / sv.map!.W) | 0) - ((q[0] / sv.map!.W) | 0)) * G.Level.TS < 8)) return; // (a pirate pod's there)
       site = a ? G.ShipGen.siteOf(sv.map, a[0], a[1], a[2]) : null;
       if (!site && a && M.meta.cuts.some((q) => q[0] === a[0] && q[1] === a[1] && q[2] === a[2])) { M.site = a; } // (the hole she made before)
       else if (!site) return;
@@ -190,6 +210,7 @@ const G_SpaceSv = (() => {
     if (on && M.meta && sv.map && M.site) {
       const W = sv.map.W, TS = G.Level.TS, x = (M.site[0] % W + 0.5) * TS, z = (((M.site[0] / W) | 0) + 0.5) * TS;
       sv.hear(x, z, G.SpaceData.fitted(st.fleet, 'jammer') ? 14 : 45, 0); // (the whole ship rings with it)
+      if (M.ms.obj === 'hostage' && !M.told) { M.told = true; const role = M.meta.roles[M.hold]; say(`The pirates are holding her people in ${role ? 'the ' + G.ShipGen.NAMES[role].toLowerCase() : 'one compartment'}. Clear the ship.`); }
       if (!G.SpaceData.fitted(st.fleet, 'jammer')) respond(x - M.site[1] * 2 * TS, z - M.site[2] * 2 * TS);
     } else if (!on && M.meta && sv.map && M.site) {
       // she's backed out of the hole: that compartment is open to space
@@ -299,6 +320,12 @@ const G_SpaceSv = (() => {
         else { c.st = 1; ch = true; }
       } else if (c.st === 1) for (const p of sv.players.values()) if (near(p, c, 1.7)) { c.st = 2; M.keys[c.key] = true; ch = true; say(`${p.name} picked up the ${c.key === 'bridge' ? 'bridge' : 'armoury'} keycard.`); break; }
     }
+    // a taken ship: hers again when the last pirate is dead, down or tied
+    if (M.ms.obj === 'hostage' && !M.cleared) {
+      const n = sv.remaining(false);
+      if (n === 0 && M.docked) { M.cleared = true; ch = true; say('She is clear of pirates. Back to the ship and jump home.'); }
+      else if (n !== M.leftSaid) { M.leftSaid = n; ch = true; }
+    }
     // the wanted officer
     if (M.hvt != null && M.hvtSt === 0) {
       const e = sv.enemies.get(M.hvt);
@@ -374,7 +401,7 @@ const G_SpaceSv = (() => {
       case 'dbgMs': {
         if (from !== net().myId || sv.phase !== 'shop' || !m.ms) break;
         const q = m.ms, board = q.kind !== 'assault', o = offers()[board ? 0 : 2];
-        const ms: SpMission = Object.assign({}, o, { i: 0, kind: board ? 'board' : 'assault', obj: board ? (['artifact', 'hvt', 'destruct'].includes(q.obj) ? q.obj : 'artifact') : 'assault', size: board ? (SD.SIZES[q.size as SpSize] ? q.size : 'small') : null, other: board && SD.SIZES[q.other as SpSize] ? q.other : null,
+        const ms: SpMission = Object.assign({}, o, { i: 0, kind: board ? 'board' : 'assault', obj: board ? (['artifact', 'hvt', 'destruct', 'hostage'].includes(q.obj) ? q.obj : 'artifact') : 'assault', size: board ? (SD.SIZES[q.size as SpSize] ? q.size : 'small') : null, other: board && SD.SIZES[q.other as SpSize] ? q.other : null,
           th: Number.isInteger(q.th) && SD.themeAt(q.th) ? q.th : board ? SD.TH0 : o.th, seed: Number.isInteger(q.seed) ? q.seed : o.seed, diff: Math.max(1, q.diff | 0), night: !!q.night, name: board ? 'MV Debug' : 'Debug', where: 'debug start', fuse: q.fuse > 0 ? +q.fuse : undefined });
         st.board.picked = [0]; st.ship.docked = false;
         sv.overBlack(() => begin(ms), 'ftl');
