@@ -123,7 +123,7 @@ BASE = [(0.022, 0.115), (-0.027, 0.110), (-0.054, 0.097), (-0.073, 0.081), (-0.0
 BACK = [(0.022, 0.115), (0.060, 0.100), (0.087, 0.073), (0.101, 0.040), (0.103, 0.013), (0.100, -0.020), (0.090, -0.047), (0.082, -0.066), (0.072, -0.096), (0.062, -0.115)]
 NOSE = [(0, 0.007), (0.011, -0.014), (0.021, -0.036), (0.025, -0.042), (0.021, -0.047), (0.006, -0.051), (0, -0.054)]
 LIPS = [(0, -0.052), (0.011, -0.061), (0.006, -0.0685), (0.004, -0.0705), (0.008, -0.079), (0.001, -0.088), (0, -0.092)]
-WIDE = [(0, 0.115), (0.03, 0.108), (0.052, 0.095), (0.068, 0.075), (0.0755, 0.05), (0.077, 0.02), (0.0745, 0.0), (0.071, -0.02), (0.066, -0.045), (0.054, -0.075), (0.041, -0.095), (0.029, -0.108), (0.021, -0.115)]
+WIDE = [(0, 0.115), (0.03, 0.108), (0.052, 0.095), (0.068, 0.075), (0.0755, 0.05), (0.077, 0.02), (0.0745, 0.0), (0.071, -0.02), (0.066, -0.045), (0.057, -0.075), (0.047, -0.095), (0.036, -0.108), (0.027, -0.115)]
 def curve(pts):  # a value at a height, from points given top to bottom: straight between them, eased a little
     def at(z):
         if z >= pts[0][1]: return pts[0][0]
@@ -132,6 +132,8 @@ def curve(pts):  # a value at a height, from points given top to bottom: straigh
         return pts[-1][0]
     return lambda z: (at(z - 0.004) + 2 * at(z) + at(z + 0.004)) / 4
 fBASE, fBACK, fNOSE, fLIPS, fWIDE = curve(BASE), curve(BACK), curve(NOSE), curve(LIPS), curve(WIDE)
+# the jaw's edge, by how far back along the head: level under the chin, rising to its angle under the ear, then up the back of the jaw to the skull
+jawz = lambda Y: -0.113 if Y < -0.08 else -0.113 + 0.031 * (Y + 0.08) / 0.075 if Y < -0.005 else -0.082 + 0.03 * min(1.0, (Y + 0.005) / 0.035)
 def head_mesh(sub=4):
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=1)
     for v in bm.verts:
@@ -147,7 +149,14 @@ def head_mesh(sub=4):
         d += 0.004 * G(Z - 0.024, 0.01) * G(max(0, ax - 0.02), 0.03)                                               # the brow out over the eyes
         d -= 0.011 * G(Z - 0.004, 0.014) * G(ax - 0.0315, 0.018)                                                    # the sockets
         d += 0.003 * G(Z + 0.018, 0.02) * G(ax - 0.05, 0.02)                                                       # the cheekbones
-        v.co = (X, Y - d * fr, Z)
+        Y -= d * fr
+        # under the jaw's edge the surface turns in sharply and runs back flat to the throat: the edge stands, with its shadow under it
+        zj = jawz(Y)
+        if Z < zj:
+            u = min(1.0, (zj - Z) / 0.012); Z = zj - (zj - Z) * 0.3; X *= 1 - 0.3 * u
+            if Y < -0.02: Y += 0.014 * u
+        elif Z < zj + 0.01 and Y < 0.03: X *= 1 + 0.035 * (1 - (Z - zj) / 0.01)
+        v.co = (X, Y, Z)
     return bm
 def sphere(r, sub, scale=(1, 1, 1), at=(0, 0, 0)):
     bm = bmesh.new(); bmesh.ops.create_icosphere(bm, subdivisions=sub, radius=r)
@@ -160,6 +169,7 @@ def build_head(at):
     vg = h.vertex_groups.new(name='plain')
     for v in me.vertices:
         c = v.co; face = max(0.0, min(1.0, (-c.y - 0.03) / 0.05)) * (1.0 if -0.112 < c.z < 0.04 else 0.25) * max(0.0, min(1.0, (0.062 - abs(c.x)) / 0.02))
+        if abs(c.z - jawz(c.y)) < 0.012 and c.y < 0.03: face = max(face, 0.8)  # (the jaw's edge kept, right round to the ear)
         vg.add([v.index], 1.0 - 0.93 * face, 'REPLACE')
     d = h.modifiers.new('thin', 'DECIMATE'); d.ratio = 0.2; d.vertex_group = 'plain'; d.vertex_group_factor = 30.0
     # (which way the group counts isn't to be trusted: both ways are tried, and the one that leaves the face the denser is kept)
@@ -187,9 +197,12 @@ def build_head(at):
             add(b2, 'skin')
     bm.normal_update(); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); bm.faces.index_update(); bm.verts.index_update()
     # the hair: the scalp's own faces over the hairline (high on the forehead, down past the temple, behind the ear to the nape), stood 5 mm off it
-    def haired(c):
+    def haired(c, m=0.0):
         line = 0.088 if c.y < -0.055 else 0.088 - 0.068 * (c.y + 0.055) / 0.055 if c.y < 0.0 else 0.02 - 0.085 * min(1.0, c.y / 0.06)
-        return c.z > line
+        return c.z > line + m
+    # (the scalp under the hair is drawn in a little, so its coarser faces never show through it)
+    for v in bm.verts:
+        if haired(v.co, 0.012): v.co = V((v.co.x * 0.95, 0.004 + (v.co.y - 0.004) * 0.95, v.co.z * 0.96))
     # (from a plainer copy of the same head, so the hairline runs along even faces, not the thinned scalp's big ones)
     b2 = head_mesh(4); bmesh.ops.delete(b2, geom=[f for f in b2.faces if not haired(f.calc_center_median())], context='FACES')
     for v in b2.verts: v.co = V((v.co.x * 1.085, 0.004 + (v.co.y - 0.004) * 1.075, v.co.z * 1.06 + 0.001))
