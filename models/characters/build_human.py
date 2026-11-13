@@ -30,6 +30,10 @@ def mat(name, col, rough=0.7):
 sk, hc = P['skin'], P['hair_col']
 M = {k: mat(k, c, r) for k, c, r in [('skin', sk, 0.6), ('stubble', tuple(a * 0.62 + b * 0.38 for a, b in zip(sk, hc)), 0.7), ('shirt', (0.13, 0.15, 0.17), 0.85), ('trousers', (0.10, 0.11, 0.12), 0.85), ('boots', (0.03, 0.03, 0.035), 0.6),
                                      ('hair', hc, 0.85), ('eye', (0.85, 0.85, 0.82), 0.25), ('iris', P['iris'], 0.2), ('lip', (sk[0] * 0.84, sk[1] * (0.6 if P['sex'] == 'f' else 0.68), sk[2] * (0.7 if P['sex'] == 'f' else 0.79)), 0.5)]}
+# (the game gives each of these its own material by what's worn: the same colour here as the one it's a part of)
+for k, of in (('upsleeve', 'shirt'), ('sleeve', 'shirt'), ('neck', 'skin'), ('hand', 'skin'), ('finger', 'skin'), ('eyeskin', 'skin'), ('brow', 'hair')):
+    M[k] = mat(k, tuple(M[of].node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value)[:3], 0.7)
+FIT = {}  # (what the game's gear is fitted to: body_parts fills it)
 def link(name, me, smooth=True):
     o = bpy.data.objects.new(name, me); sc.collection.objects.link(o)
     for p in me.polygons: p.use_smooth = smooth
@@ -81,7 +85,14 @@ def body_parts():
         return (V((0, y - b / 2, z)), rx * reg(P['w'], z), ry * reg(P['d'], z) + b / 2)
     girth = lambda rings, ks: [(c, rx * k, ry * k) for (c, rx, ry), k in zip(rings, ks)]
     dl, ua, fa, th_, cf = P['delt'], P['arm'], P['fore'], P['thigh'], P['calf']; el_, kn_ = (ua + fa) / 2, (th_ + cf) / 2
-    parts.append(to_obj('trunk', tube([ring(z, rx, ry, y) for z, rx, ry, y in T], 16)))
+    rings = [ring(z, rx, ry, y) for z, rx, ry, y in T]
+    # the gear's fit: across a band of the trunk, its half-width, how far its front stands forward of the spine's line and its back behind it
+    def ext(z0, z1):
+        sel = [(c, rx, ry) for c, rx, ry in rings if z0 <= c.z <= z1]
+        return [round(max(rx for c, rx, ry in sel), 4), round(max(ry - c.y for c, rx, ry in sel), 4), round(max(ry + c.y for c, rx, ry in sel), 4)]
+    FIT.update(chest=ext(1.2, 1.42), belt=ext(0.97, 1.06), pelvis=ext(0.9, 0.96), delt=round(dl, 3), arm=round(ua, 3), fore=round(fa, 3), thigh=round(th_, 3), calf=round(cf, 3), head_w=round(P['head_w'], 3))
+    FIT['pelvis'][0] = round(max(FIT['pelvis'][0], 0.1 + 0.094 * th_), 4)  # (the hips are as wide as the thighs' tops)
+    parts.append(to_obj('trunk', tube(rings, 16)))
     for s, n in ((1, 'R'), (-1, 'L')):
         S, E, W, F, a = J['sh' + n], J['el' + n], J['wr' + n], J['fi' + n], J['arm' + n]
         # the arm: from inside the shoulder, a ring either side of the elbow close to it, down to the wrist
@@ -126,15 +137,20 @@ def union(parts, name):
 
 # what each face is made of, by where it is
 def dress(o):
+    names = ('shirt', 'trousers', 'boots', 'neck', 'upsleeve', 'sleeve', 'hand', 'finger')
     me = o.data; me.materials.clear()
-    for k in ('shirt', 'trousers', 'boots', 'skin'): me.materials.append(M[k])
+    for k in names: me.materials.append(M[k])
     for p in me.polygons:
         c = p.center; mi = 0
         if c.z < 1.0 and abs(c.x) < 0.21: mi = 1  # (the belt line: a ring of the trunk)
         if c.z < 0.13 or (c.z < 0.2 and c.y < -0.06): mi = 2
         if min(me.vertices[i].co.z for i in p.vertices) > 1.524 and max(abs(me.vertices[i].co.x) for i in p.vertices) < 0.079 * max(1.0, P['w']['neck']): mi = 3  # (the collar: the ring of the trunk at the base of the neck)
         for n in 'RL':
-            if (c - J['wr' + n]).dot(J['arm' + n]) > -0.004 and (c - J['wr' + n]).length < 0.26: mi = 3
+            S, W, a = J['sh' + n], J['wr' + n], J['arm' + n]; t = (c - S).dot(a); off = ((c - S) - a * t).length
+            # the sleeve: its top over the shoulder and down to mid upper arm (a T-shirt's), the rest to the wrist; then the hand, and the fingers past the knuckles
+            if off < 0.1 and t < 0.13 and abs(c.x) > 0.205: mi = 4
+            elif off < 0.1 and t >= 0.13: mi = 5
+            if (c - W).dot(a) > -0.004 and (c - W).length < 0.26: mi = 6 if (c - W).dot(a) < 0.092 else 7
         p.material_index = mi
 
 # ---- the head: face D (face_options.py's, coarser), its features kept where the surface is thinned out
@@ -234,7 +250,7 @@ def build_head(at):
             bmesh.ops.recalc_face_normals(b2, faces=b2.faces)
             for f in b2.faces:
                 if f.normal.y > 0: f.normal_flip()
-            add(b2, 'skin')
+            add(b2, 'eyeskin')
     # the hair, by its style: where its line runs (a man's has a sideburn, a receding one sits high at the front), how far the cap
     # stands off the scalp (across, front to back, up, and lifted at the crown), and whatever hangs or is tied behind
     style = P['hair']
@@ -295,14 +311,16 @@ def build_head(at):
     xs = [k * 0.0235 / 5 for k in range(-5, 6)]; bow = lambda x: 1 - (x / 0.0238) ** 2
     strip(xs, lambda x: -0.0700, lambda x: -0.0700 + 0.0072 * P['lips'] * bow(x) ** 0.7 - 0.0012 * G(x, 0.004), 2, 'lip', 0.0009)
     strip(xs, lambda x: -0.0700 - 0.0085 * P['lips'] * bow(x) ** 0.8, lambda x: -0.0700, 2, 'lip', 0.0009)
-    for sg in (1, -1): strip([sg * (0.014 + k * 0.006) for k in range(6)], lambda x: 0.0215 + 0.002 * G(abs(x) - 0.03, 0.02), lambda x: 0.0215 + 0.0047 * P['browthick'] + 0.003 * G(abs(x) - 0.028, 0.02), 1, 'hair', 0.0022)
+    for sg in (1, -1): strip([sg * (0.014 + k * 0.006) for k in range(6)], lambda x: 0.0215 + 0.002 * G(abs(x) - 0.03, 0.02), lambda x: 0.0215 + 0.0047 * P['browthick'] + 0.003 * G(abs(x) - 0.028, 0.02), 1, 'brow', 0.0022)
     bm.faces.ensure_lookup_table()
     me = bpy.data.meshes.new('head'); bm.to_mesh(me); bm.free()
     me.materials.clear()
-    for k in ('skin', 'hair', 'lip', 'stubble'): me.materials.append(M[k])
+    for k in ('skin', 'hair', 'lip', 'stubble', 'brow', 'eyeskin'): me.materials.append(M[k])
     for p in me.polygons:
         c = p.center; tag = next((t for a, b, t in tags if a <= p.index < b), None)
-        p.material_index = 1 if tag == 'hair' else 2 if tag == 'lip' else 0
+        p.material_index = {'hair': 1, 'lip': 2, 'brow': 4, 'eyeskin': 5}.get(tag, 0)
+        # (round the eyes and across the bridge of the nose: what a balaclava leaves bare)
+        if p.index < n_base and c.y < -0.05 and abs(c.x) < 0.056 and -0.011 < c.z < 0.02: p.material_index = 5
         # (stubble: the jaw, the chin and the upper lip, rising to the ear at the sides)
         if P['stubble'] and p.index < n_base and c.y < 0.012 and c.z < -0.03 - 0.022 * max(0.0, min(1.0, (-c.y - 0.03) / 0.06)): p.material_index = 3
     h = link('head', me); h.location = at
@@ -391,6 +409,9 @@ def shoot(path, az, wire=False, c=None, scale=2.05):
     for o in (body, head):
         for m in [m for m in o.modifiers if m.type == 'WIREFRAME']: o.modifiers.remove(m)
     sc.render.filepath = path; bpy.ops.render.render(write_still=True)
+def hexof(c):  # (a colour as the game writes one: sRGB, 0xRRGGBB)
+    e = lambda v: round(255 * (12.92 * v if v <= 0.0031308 else 1.055 * v ** (1 / 2.4) - 0.055))
+    return (e(c[0]) << 16) | (e(c[1]) << 8) | e(c[2])
 if VID:
     pose(POSES[1][1]); arm.scale = (P['scale'],) * 3; sc.render.resolution_x, sc.render.resolution_y = 430, 640
     shoot(os.path.join(OUT, VID + '_body.png'), 20, scale=2.2)
@@ -399,8 +420,10 @@ if VID:
     pose({})
     for q in bpy.context.selected_objects: q.select_set(False)
     for o in (arm, body, head, *eyes): o.select_set(True)
-    bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, VID + '.glb'), export_format='GLB', use_selection=True, export_yup=True, export_apply=False, export_animations=False)
-    with open(os.path.join(OUT, VID + '.json'), 'w') as f: json.dump({'id': VID, 'sex': P['sex'], 'name': P['name'], 'height': P['height'], 'scale': P['scale'], 'hair': P['hair'], 'triangles': stats['triangles']}, f)
+    GLB = os.path.join(HERE, '..', '..', 'assets', 'models', 'humans'); os.makedirs(GLB, exist_ok=True)
+    bpy.ops.export_scene.gltf(filepath=os.path.join(GLB, VID + '.glb'), export_format='GLB', use_selection=True, export_yup=True, export_apply=False, export_animations=False)
+    with open(os.path.join(OUT, VID + '.json'), 'w') as f: json.dump({'id': VID, 'sex': P['sex'], 'name': P['name'], 'height': P['height'], 'scale': P['scale'], 'hair': P['hair'], 'triangles': stats['triangles'], 'fit': FIT,
+                                                                           'skin': hexof(P['skin']), 'hair_col': hexof(P['hair_col'])}, f)
     print('DONE', VID); sys.stdout.flush(); os._exit(0)
 sc.render.resolution_x, sc.render.resolution_y = 430, 640
 shots = []

@@ -1,1 +1,1 @@
-{"id": "f06", "sex": "f", "name": "curvy", "height": 1.62, "scale": 0.9226, "hair": "topbun", "triangles": {"body": 2606, "head": 2058, "eyes": 200, "total": 4864}}
+{"id": "f06", "sex": "f", "name": "curvy", "height": 1.62, "scale": 0.9226, "hair": "topbun", "triangles": {"body": 2606, "head": 2058, "eyes": 200, "total": 4864}, "fit": {"chest": [0.1672, 0.1571, 0.1048], "belt": [0.1634, 0.1067, 0.1227], "pelvis": [0.2024, 0.12, 0.144], "delt": 0.9, "arm": 0.882, "fore": 0.85, "thigh": 1.089, "calf": 0.967, "head_w": 1.0}, "skin": 9795941, "hair_col": 1907485}

@@ -121,7 +121,7 @@ const G_Rig = (() => {
     else if (cd && cd.id !== 'c.recon') { y = 0.2; z = ((cd.id === 'c.heavy' ? 0.3 : 0.27) + (k.plate ? 0.03 : 0)) / 2 + 0.003; }
     const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.05), new T.MeshLambertMaterial({ map: G.Callsigns.backTex(cs.id, cs.name) }));
     m.position.set(0, y, z);
-    rig.chest.add(m); rig.kitParts.push(m);
+    rig.chest.add(m); fitPart(rig, rig.chest, m); rig.kitParts.push(m);
   }
   // a callsign with "thicc" in it: a fuller seat to the trousers, behind the pelvis and under the belt and the kit at the back
   function setSeat(rig: Rig) {
@@ -142,6 +142,71 @@ const G_Rig = (() => {
     if ((o as THREE.Mesh).isMesh) o.layers.enable(3); // (js/render.ts HEAT_LAYER: the video's worker has no G.R)
     for (const c of o.children) heatMark(c, skip);
   }
+  // ---------------------------------------------------------------- the body (js/humans.ts), and the fit of what's worn on it
+  // What's worn was made for the old figure of boxes and tubes: a chest 0.19 across (half) and 0.115 deep, hips 0.15 by 0.105.
+  // A body's own measure (js/humandata.ts fit) over those is how much wider, and how much further forward and back, each thing
+  // on the chest and the hips sits and is; on a limb, how much thicker.
+  function fitOf(d: HumanDef) {
+    const F = d.fit;
+    return { cx: F.chest[0] / 0.19, cf: F.chest[1] / 0.125, cb: F.chest[2] / 0.125, hx: (0.65 * F.belt[0] + 0.35 * F.pelvis[0]) / 0.15, hf: F.belt[1] / 0.105, hb: F.belt[2] / 0.105, px: F.pelvis[0] / 0.16, pf: F.pelvis[1] / 0.1, pb: F.pelvis[2] / 0.1,
+      delt: 1.05 * F.delt, arm: 1.12 * F.arm, fore: 1.05 * F.fore, thx: 1.07 * F.thigh, thz: 1.18 * F.thigh, shx: 1.05 * F.calf, shz: 1.1 * F.calf, chestF: F.chest[1] };
+  }
+  // a thing on the chest, the hips or a limb, moved and stretched to the body's fit (a box, a tube: across and in depth; a
+  // turned thing, or a group, is only moved)
+  function fitPart(rig: Rig, parent: THREE.Object3D, m: THREE.Object3D) {
+    const f = rig.fit; if (!f) return;
+    let sx = 1, zf = 1, zb = 1;
+    if (parent === rig.chest) { sx = f.cx; zf = f.cf; zb = f.cb; m.position.y -= 0.035; } // (and as much lower as a body's shoulders are)
+    else if (parent === rig.hips) { if (m.position.y < 0.03) { sx = f.px; zf = f.pf; zb = f.pb; } else { sx = f.hx; zf = f.hf; zb = f.hb; } } // (under the belt: the pelvis and the seat, fuller than the waist)
+    else if (parent === rig.armL.sh || parent === rig.armR.sh) { sx = zf = zb = f.delt; m.position.y *= 0.7; }
+    else if (parent === rig.armL.up || parent === rig.armR.up) sx = zf = zb = f.arm;
+    else if (parent === rig.armL.lo || parent === rig.armR.lo) sx = zf = zb = f.fore;
+    else if (parent === rig.legL.th || parent === rig.legR.th) { sx = f.thx; zf = zb = f.thz; }
+    else if (parent === rig.legL.sh || parent === rig.legR.sh) { sx = f.shx; zf = zb = f.shz; }
+    else return;
+    const g = (z: number) => z * (z < 0 ? zf : zb), geo = (m as THREE.Mesh).geometry;
+    m.position.x *= sx;
+    if (!geo || m.rotation.x || m.rotation.y || m.rotation.z) { m.position.z = g(m.position.z); return; }
+    if (!geo.boundingBox) geo.computeBoundingBox();
+    const bb = geo.boundingBox!, lo = m.position.z + bb.min.z * m.scale.z, hi = m.position.z + bb.max.z * m.scale.z;
+    m.scale.x *= sx;
+    if (hi - lo > 1e-4) { const k = (g(hi) - g(lo)) / (hi - lo); m.position.z = g(lo) - bb.min.z * m.scale.z * k; m.scale.z *= k; } else m.position.z = g(m.position.z);
+  }
+  // The body put on: each bone of the model set in the joint it follows (rig.hJoint), where it is when that joint is at the
+  // model's rest (rig.hRest: the joints as made, the arms 40 degrees out), so the skin goes wherever the animation takes the
+  // joints. The model's file faces +z, y up: turned about to face the rig's -z. The old figure's own pieces (rig.prims) go.
+  const TURN = new T.Matrix4().makeRotationY(Math.PI), ID4 = new T.Matrix4();
+  function attachHuman(rig: Rig) {
+    const parts = rig.human && G.Humans.get(rig.human);
+    if (!parts || rig.humanOn || !live.has(rig)) return;
+    rig.humanOn = true;
+    for (const m of rig.prims as THREE.Mesh[]) { if (m.parent) m.parent.remove(m); m.geometry.dispose(); }
+    rig.prims = [];
+    const bones = new Map<string, THREE.Bone>(), skels = new Map<THREE.Matrix4[], THREE.Skeleton>();
+    const boneOf = (name: string, inv: THREE.Matrix4) => {
+      let b = bones.get(name);
+      if (!b) {
+        const j = (rig.hJoint[name] || rig.hips) as THREE.Object3D;
+        b = new T.Bone(); b.matrixAutoUpdate = false;
+        b.matrix.copy(rig.hRest.get(j)).invert().multiply(TURN).multiply(_m.copy(inv).invert());
+        j.add(b); bones.set(name, b);
+      }
+      return b;
+    };
+    rig.hairMesh = null;
+    for (const p of parts) {
+      const mat = rig.hMat(p.mat, p.color);
+      if (!mat) continue;
+      let sk = skels.get(p.inv);
+      if (!sk) { sk = new T.Skeleton(p.bones.map((n: string, i: number) => boneOf(n, p.inv[i])), p.inv); skels.set(p.inv, sk); }
+      const sm = new T.SkinnedMesh(p.geo, mat);
+      sm.userData.shared = true; sm.frustumCulled = false; // (its geometry is every such body's; where it's drawn is the joints' affair, not its own place's)
+      sm.bind(sk, ID4);
+      (p.head ? rig.head : rig.body).add(sm);
+      heatMark(sm);
+      if (p.mat === 'hair') { rig.hairMesh = sm; sm.visible = !rig.hatOn; }
+    }
+  }
   function setKit(rig: Rig, k: any) {
     rig.nvWant = k && k.nd ? 1 : 0; // (night vision flipped down or up: animated in update, not a new model)
     const key = JSON.stringify(Object.assign({}, k || {}, { nd: 0 })) + (rig.callsign ? '|' + rig.callsign.id + '|' + rig.callsign.name : '');
@@ -154,14 +219,15 @@ const G_Rig = (() => {
     if (!k) return;
     const D = (id: any) => (id && G.Gear && G.Gear.DEFS[id]) || null;
     let part: string | null = null; // (which piece of kit the parts being made are: the hangar shows each on its own)
-    const box = (parent: THREE.Object3D, w: number, h: number, d: number, c: number, x: number, y: number, z: number, o?: Record<string, any>) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), KM(c, o)); m.position.set(x, y, z); m.userData.part = part; parent.add(m); rig.kitParts.push(m); return m; };
-    const add = (parent: THREE.Object3D, m: THREE.Object3D, x: number, y: number, z: number) => { m.position.set(x, y, z); m.userData.part = part; parent.add(m); rig.kitParts.push(m); return m; };
+    const box = (parent: THREE.Object3D, w: number, h: number, d: number, c: number, x: number, y: number, z: number, o?: Record<string, any>) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), KM(c, o)); m.position.set(x, y, z); m.userData.part = part; parent.add(m); fitPart(rig, parent, m); rig.kitParts.push(m); return m; };
+    const add = (parent: THREE.Object3D, m: THREE.Object3D, x: number, y: number, z: number) => { m.position.set(x, y, z); m.userData.part = part; parent.add(m); fitPart(rig, parent, m); rig.kitParts.push(m); return m; };
     const pouches = (parent: THREE.Object3D, n: number, c: number, x0: number, y0: number, z: number, w = 0.07, h = 0.09) => { for (let i = 0; i < Math.min(n, 8); i++) box(parent, w, h, 0.05, c, x0 + (i % 4) * (w + 0.015), y0 - Math.floor(i / 4) * (h + 0.015), z); };
-    const C = rig.chest, Hd = rig.head, Hp = rig.hips;
+    const C = rig.chest, Hd = rig.hat || rig.head, Hp = rig.hips; // (the head's things: on the hat, which is the head's fit)
     // the helmet: its cut and colour by model; rails and a night-vision mount on the modern ones
     const hd = D(k.helmet);
     part = 'helmet';
-    if (rig.hairMesh) rig.hairMesh.visible = !hd;
+    rig.hatOn = !!hd || !rig.hairShown;
+    if (rig.hairMesh) rig.hairMesh.visible = !rig.hatOn;
     const putHd = (m: THREE.Object3D) => add(Hd, m, m.position.x, m.position.y, m.position.z);
     if (hd) G.Headgear.helmet(hd.id, KM, putHd); // (its cut, rails, shroud and visor: js/headgear.ts)
     // on the helmet's mount: a mandible round the jaw, or a shield over the face
@@ -262,7 +328,9 @@ const G_Rig = (() => {
     return { helmet: H, face: (H && face) || 0, carrier: V ? V[0] : 0, plate: V ? V[1] : 0, sh: X('shoulder'), gr: X('groin'), cp: V ? V[2] : 0, belt: armored ? 'b.battle' : 0, lg: X('legs'), bp: armored ? 2 : 0, pack: 0, ifak: 0 };
   }
   function create(o: any) {
-    const s = o.scale || 1, style = o.style || 'tactical';
+    // whose body (js/humans.ts): its height is a scale of the whole figure, on top of the character's own
+    const hid: string | null = G.Humans ? G.Humans.pick(o) : null, hdef = hid ? G.Humans.def(hid) : null;
+    const s = (o.scale || 1) * (hdef ? hdef.scale : 1), style = o.style || 'tactical';
     let seed = (o.seed || Math.floor(Math.random() * 1e6)) >>> 0;
     const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
     const pick = (a: any[]) => a[Math.floor(rnd() * a.length)];
@@ -270,7 +338,8 @@ const G_Rig = (() => {
     // ---- what they're wearing: a look { top, topC, pants, pantsC, eyes, gloves }. Officers bring their own (the
     // main menu); everyone else is dressed for who they are.
     let vestM = null, helmetM = null, headCover = null, hairM = null;
-    const skin = L(o.mannequin ? 0xa9afb5 : o.skinColor != null ? o.skinColor : pick(PAL.skin)); // (a mannequin: plain grey, no face, no hair: see G.Hangar)
+    const skin0 = o.mannequin || o.skinColor != null ? 0 : pick(PAL.skin);
+    const skin = L(o.mannequin ? 0xa9afb5 : o.skinColor != null ? o.skinColor : hdef ? hdef.skin : skin0); // (a mannequin: plain grey, no face, no hair: see G.Hangar)
     const gear = L(0x23251f);
     let look;
     if (style === 'tactical') look = Object.assign({}, OFFICER_LOOK, o.look || {});
@@ -304,7 +373,10 @@ const G_Rig = (() => {
     const dark = L(0x141414);
     const mats = [top, bottom, skin];
     const tieMat = L(0xe6e6e0); // white zip tie, easy to spot on a body
-    const M_ = (geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0, parent?: THREE.Object3D) => { const me = new T.Mesh(geo, m); me.position.set(x, y, z); if (parent) parent.add(me); return me; };
+    // (M_: a thing worn or carried, fitted to the body once the rig's made; B_: a piece of the old figure itself, which goes when the body's put on)
+    const fits: [THREE.Object3D, THREE.Object3D][] = [], prims: THREE.Mesh[] = [];
+    const M_ = (geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0, parent?: THREE.Object3D) => { const me = new T.Mesh(geo, m); me.position.set(x, y, z); if (parent) { parent.add(me); fits.push([parent, me]); } return me; };
+    const B_ = (geo: THREE.BufferGeometry, m: THREE.Material, x = 0, y = 0, z = 0, parent?: THREE.Object3D) => { const me = M_(geo, m, x, y, z, parent); if (parent) fits.pop(); prims.push(me); return me; };
     const cyl = (rt: number, rb: number, h: number, m?: any, seg = 12) => new T.CylinderGeometry(rt, rb, h, seg);
 
     // ---- the body: a tapered chest and waist, sloping shoulders, a rounded head with a face
@@ -312,12 +384,12 @@ const G_Rig = (() => {
     const body = joint(root, 0, 0, 0);
     body.scale.setScalar(s);
     const hips = joint(body, 0, HIP_H, 0);
-    const pelvis = M_(cyl(0.155, 0.14, 0.2), bottom, 0, 0, 0, hips); pelvis.scale.z = 0.7;
+    const pelvis = B_(cyl(0.155, 0.14, 0.2), bottom, 0, 0, 0, hips); pelvis.scale.z = 0.7;
     const spine = joint(hips, 0, 0.08, 0);
-    const abdomen = M_(cyl(0.145, 0.152, 0.17), torsoM, 0, 0.1, 0, spine); abdomen.scale.z = 0.7;
+    const abdomen = B_(cyl(0.145, 0.152, 0.17), torsoM, 0, 0.1, 0, spine); abdomen.scale.z = 0.7;
     const chest = joint(spine, 0, 0.19, 0);
-    const torso = M_(cyl(0.2, 0.152, 0.33, 14), torsoM, 0, 0.14, 0, chest); torso.scale.z = 0.62;
-    const traps = M_(cyl(0.075, 0.19, 0.07, 14), torsoM, 0, 0.34, 0, chest); traps.scale.z = 0.6; // neck down to the shoulders
+    const torso = B_(cyl(0.2, 0.152, 0.33, 14), torsoM, 0, 0.14, 0, chest); torso.scale.z = 0.62;
+    const traps = B_(cyl(0.075, 0.19, 0.07, 14), torsoM, 0, 0.34, 0, chest); traps.scale.z = 0.6; // neck down to the shoulders
     if (vestM) {
       M_(new T.BoxGeometry(0.41, 0.28, 0.28), vestM, 0, 0.12, 0, chest);
       for (const x of [-0.12, 0, 0.12]) M_(new T.BoxGeometry(0.09, 0.09, 0.05), gear, x, 0.05, -0.16, chest);
@@ -326,63 +398,67 @@ const G_Rig = (() => {
     if (look.top === 'hoodie') { const hood = M_(new T.SphereGeometry(0.11, 12, 8), top, 0, 0.31, 0.1, chest); hood.scale.set(1.25, 0.55, 0.75); } // the hood, down
     const neck = joint(chest, 0, 0.3, 0);
     const faceM = headCover || skin;
-    M_(cyl(0.048, 0.056, 0.1, 10), faceM, 0, 0.02, 0, neck);
+    B_(cyl(0.048, 0.056, 0.1, 10), faceM, 0, 0.02, 0, neck);
     const head = joint(neck, 0, 0.06, 0);
+    // the hat: where everything worn on the head goes. On the old figure it's the head itself; on a body it's set to that head's
+    // fit (lower, and narrower: the old cranium's middle was 0.13 up and 0.092 across, a body's eyes are 0.079 up and its skull 0.077)
+    const hat = joint(head, 0, 0, 0);
+    if (hdef) { hat.position.set(0, 0.079 - 0.135 * 1.06, -0.004); hat.scale.set(0.837 * hdef.fit.head_w, 1.06, 1.03); }
     // the head: cranium, jaw, nose, ears; the same shape whatever's on it (it sits inside every helmet)
-    const cranium = M_(new T.SphereGeometry(0.1, 18, 14), faceM, 0, 0.13, 0, head); cranium.scale.set(0.92, 1.06, 1.0);
-    const jaw = M_(new T.SphereGeometry(0.075, 14, 10), faceM, 0, 0.065, -0.018, head); jaw.scale.set(1.0, 0.95, 1.05);
-    M_(new T.BoxGeometry(0.022, 0.038, 0.03), faceM, 0, 0.105, -0.1, head); // nose
-    for (const x of [-1, 1]) { const ear = M_(new T.SphereGeometry(0.026, 8, 6), faceM, x * 0.091, 0.12, 0.005, head); ear.scale.set(0.45, 1, 0.75); }
+    const cranium = B_(new T.SphereGeometry(0.1, 18, 14), faceM, 0, 0.13, 0, head); cranium.scale.set(0.92, 1.06, 1.0);
+    const jaw = B_(new T.SphereGeometry(0.075, 14, 10), faceM, 0, 0.065, -0.018, head); jaw.scale.set(1.0, 0.95, 1.05);
+    B_(new T.BoxGeometry(0.022, 0.038, 0.03), faceM, 0, 0.105, -0.1, head); // nose
+    for (const x of [-1, 1]) { const ear = B_(new T.SphereGeometry(0.026, 8, 6), faceM, x * 0.091, 0.12, 0.005, head); ear.scale.set(0.45, 1, 0.75); }
     if (headCover) { // balaclava: the eyes show through a slot
-      M_(new T.BoxGeometry(0.12, 0.034, 0.012), skin, 0, 0.136, -0.094, head);
-      for (const x of [-0.033, 0.033]) M_(new T.BoxGeometry(0.02, 0.012, 0.006), dark, x, 0.136, -0.1, head);
+      B_(new T.BoxGeometry(0.12, 0.034, 0.012), skin, 0, 0.136, -0.094, head);
+      for (const x of [-0.033, 0.033]) B_(new T.BoxGeometry(0.02, 0.012, 0.006), dark, x, 0.136, -0.1, head);
     } else if (!o.mannequin) {
-      for (const x of [-0.033, 0.033]) { M_(new T.BoxGeometry(0.022, 0.013, 0.008), dark, x, 0.135, -0.097, head); M_(new T.BoxGeometry(0.03, 0.007, 0.01), hairM || dark, x, 0.152, -0.097, head); } // eyes, brows
-      M_(new T.BoxGeometry(0.04, 0.006, 0.006), L(0x5a3a32), 0, 0.055, -0.096, head); // mouth
+      for (const x of [-0.033, 0.033]) { B_(new T.BoxGeometry(0.022, 0.013, 0.008), dark, x, 0.135, -0.097, head); B_(new T.BoxGeometry(0.03, 0.007, 0.01), hairM || dark, x, 0.152, -0.097, head); } // eyes, brows
+      B_(new T.BoxGeometry(0.04, 0.006, 0.006), L(0x5a3a32), 0, 0.055, -0.096, head); // mouth
     }
     let hairMesh = null;
-    if (hairM) { hairMesh = M_(new T.SphereGeometry(0.104, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.46), hairM, 0, 0.134, 0.006, head); hairMesh.scale.set(0.94, 1.06, 1.02); }
+    if (hairM) { hairMesh = B_(new T.SphereGeometry(0.104, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.46), hairM, 0, 0.134, 0.006, head); hairMesh.scale.set(0.94, 1.06, 1.02); }
     // eyewear
     if (look.eyes === 'glasses') {
       const fr = dark, lens = L(0x9ab4c4); lens.transparent = true; lens.opacity = 0.35;
-      for (const x of [-0.034, 0.034]) { M_(new T.BoxGeometry(0.034, 0.024, 0.004), lens, x, 0.136, -0.107, head); M_(new T.BoxGeometry(0.036, 0.004, 0.005), fr, x, 0.149, -0.107, head); }
-      M_(new T.BoxGeometry(0.018, 0.004, 0.005), fr, 0, 0.142, -0.107, head);
-      for (const x of [-1, 1]) M_(new T.BoxGeometry(0.004, 0.004, 0.1), fr, x * 0.088, 0.142, -0.06, head);
+      for (const x of [-0.034, 0.034]) { M_(new T.BoxGeometry(0.034, 0.024, 0.004), lens, x, 0.136, -0.107, hat); M_(new T.BoxGeometry(0.036, 0.004, 0.005), fr, x, 0.149, -0.107, hat); }
+      M_(new T.BoxGeometry(0.018, 0.004, 0.005), fr, 0, 0.142, -0.107, hat);
+      for (const x of [-1, 1]) M_(new T.BoxGeometry(0.004, 0.004, 0.1), fr, x * 0.088, 0.142, -0.06, hat);
     } else if (look.eyes === 'shooting') { // wraparound shooting glasses
       const lens = L(0x1a1d22); lens.transparent = true; lens.opacity = 0.85;
-      M_(new T.BoxGeometry(0.13, 0.03, 0.008), lens, 0, 0.137, -0.105, head);
-      for (const x of [-1, 1]) M_(new T.BoxGeometry(0.005, 0.012, 0.1), dark, x * 0.088, 0.142, -0.06, head);
+      M_(new T.BoxGeometry(0.13, 0.03, 0.008), lens, 0, 0.137, -0.105, hat);
+      for (const x of [-1, 1]) M_(new T.BoxGeometry(0.005, 0.012, 0.1), dark, x * 0.088, 0.142, -0.06, hat);
     } else if (look.eyes === 'goggles') { // a frame, a tinted lens and a strap round the head
-      M_(new T.BoxGeometry(0.14, 0.052, 0.03), L(0x2a2c2e), 0, 0.137, -0.098, head);
+      M_(new T.BoxGeometry(0.14, 0.052, 0.03), L(0x2a2c2e), 0, 0.137, -0.098, hat);
       const lens = L(0x5a6a50); lens.transparent = true; lens.opacity = 0.8;
-      M_(new T.BoxGeometry(0.12, 0.036, 0.006), lens, 0, 0.137, -0.115, head);
-      const strap = M_(new T.TorusGeometry(0.1, 0.007, 4, 28), dark, 0, 0.14, 0.004, head); strap.rotation.x = Math.PI / 2; strap.scale.set(0.95, 1.04, 1);
+      M_(new T.BoxGeometry(0.12, 0.036, 0.006), lens, 0, 0.137, -0.115, hat);
+      const strap = M_(new T.TorusGeometry(0.1, 0.007, 4, 28), dark, 0, 0.14, 0.004, hat); strap.rotation.x = Math.PI / 2; strap.scale.set(0.95, 1.04, 1);
     }
-    if (helmetM) G.Headgear.helmet(style === 'tactical' ? 'h.fast' : 'generic', (c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => head.add(m), helmetM.color.getHex()); // (js/headgear.ts)
+    if (helmetM) G.Headgear.helmet(style === 'tactical' ? 'h.fast' : 'generic', (c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => hat.add(m), helmetM.color.getHex()); // (js/headgear.ts)
     if (o.vex) { // Vex, as his portrait has him: a dark hood, a black visor with two orange eyes, a grey respirator, a gold strap
       const hoodM = new T.MeshLambertMaterial({ color: 0x1d1c18, side: T.DoubleSide });
-      const hood = M_(new T.SphereGeometry(0.128, 18, 12, 5.58, 4.54, 0, Math.PI * 0.66), hoodM, 0, 0.125, 0.012, head); hood.scale.set(0.98, 1.04, 1.06); // (open at the front)
+      const hood = M_(new T.SphereGeometry(0.128, 18, 12, 5.58, 4.54, 0, Math.PI * 0.66), hoodM, 0, 0.125, 0.012, hat); hood.scale.set(0.98, 1.04, 1.06); // (open at the front)
       const cowl = M_(new T.CylinderGeometry(0.115, 0.215, 0.17, 16, 1, true), hoodM, 0, 0.3, 0.02, chest); cowl.scale.z = 0.8; // (over the shoulders)
-      M_(new T.BoxGeometry(0.19, 0.052, 0.05), L(0x101010), 0, 0.137, -0.088, head); // the visor
+      M_(new T.BoxGeometry(0.19, 0.052, 0.05), L(0x101010), 0, 0.137, -0.088, hat); // the visor
       const glow = new T.MeshBasicMaterial({ color: 0xff9a2e }), pupil = new T.MeshBasicMaterial({ color: 0xfff3c4 });
       for (const x of [-0.04, 0.04]) {
-        const e = M_(new T.CylinderGeometry(0.0185, 0.0185, 0.008, 14), glow, x, 0.137, -0.116, head); e.rotation.x = Math.PI / 2;
-        const p = M_(new T.CylinderGeometry(0.0085, 0.0085, 0.009, 10), pupil, x, 0.137, -0.1205, head); p.rotation.x = Math.PI / 2;
+        const e = M_(new T.CylinderGeometry(0.0185, 0.0185, 0.008, 14), glow, x, 0.137, -0.116, hat); e.rotation.x = Math.PI / 2;
+        const p = M_(new T.CylinderGeometry(0.0085, 0.0085, 0.009, 10), pupil, x, 0.137, -0.1205, hat); p.rotation.x = Math.PI / 2;
       }
-      const mask = M_(new T.BoxGeometry(0.125, 0.07, 0.05), L(0x3b3b36), 0, 0.055, -0.083, head); mask.rotation.x = 0.12; // the respirator
-      for (const x of [-0.03, 0, 0.03]) { const v = M_(new T.CylinderGeometry(0.0075, 0.0075, 0.006, 8), L(0x1b1b19), x, 0.05, -0.1105, head); v.rotation.x = Math.PI / 2; }
+      const mask = M_(new T.BoxGeometry(0.125, 0.07, 0.05), L(0x3b3b36), 0, 0.055, -0.083, hat); mask.rotation.x = 0.12; // the respirator
+      for (const x of [-0.03, 0, 0.03]) { const v = M_(new T.CylinderGeometry(0.0075, 0.0075, 0.006, 8), L(0x1b1b19), x, 0.05, -0.1105, hat); v.rotation.x = Math.PI / 2; }
       const strap = M_(new T.BoxGeometry(0.045, 0.34, 0.012), L(0xc9a227), -0.1, 0.12, -0.151, chest); strap.rotation.z = -0.5; // gold, across the chest
     }
-    if (style === 'suspect' && !headCover && rnd() < 0.5) { if (hairMesh) hairMesh.scale.y *= 0.9; G.Headgear.cap((c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => head.add(m), pick(PAL.hoodie)); } // a baseball cap
+    if (style === 'suspect' && !headCover && rnd() < 0.5) { if (hairMesh) hairMesh.scale.y *= 0.9; G.Headgear.cap((c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => hat.add(m), pick(PAL.hoodie)); } // a baseball cap
 
     // a leader's radio kit (o.leader): a headset over the head (a band, an ear cup on the left with a boom mic curving to the mouth, a foam cup
     // on the right), and a radio set on the chest harness with its antenna up by the shoulder, a push-to-talk lead to the headset
     if (o.leader) {
       const hs = L(0x1c1d1f), cup = L(0x2c2f33), led = new T.MeshBasicMaterial({ color: 0x57e06b });
-      const band = M_(new T.TorusGeometry(0.108, 0.006, 5, 24, Math.PI), hs, 0, 0.14, 0.005, head); band.rotation.z = 0; band.scale.set(1, 1.02, 1.0); band.rotation.y = Math.PI / 2;
-      for (const x of [-1, 1]) M_(cyl(0.032, 0.032, 0.026, 12), x < 0 ? cup : hs, x * 0.106, 0.12, 0.005, head).rotation.z = Math.PI / 2;
-      const boom = M_(new T.TorusGeometry(0.06, 0.0035, 4, 10, Math.PI * 0.6), hs, -0.09, 0.085, -0.055, head); boom.rotation.set(0, 0.6, -Math.PI / 2 - 0.5);
-      M_(new T.SphereGeometry(0.011, 6, 5), cup, -0.045, 0.062, -0.1, head);
+      const band = M_(new T.TorusGeometry(0.108, 0.006, 5, 24, Math.PI), hs, 0, 0.14, 0.005, hat); band.rotation.z = 0; band.scale.set(1, 1.02, 1.0); band.rotation.y = Math.PI / 2;
+      for (const x of [-1, 1]) M_(cyl(0.032, 0.032, 0.026, 12), x < 0 ? cup : hs, x * 0.106, 0.12, 0.005, hat).rotation.z = Math.PI / 2;
+      const boom = M_(new T.TorusGeometry(0.06, 0.0035, 4, 10, Math.PI * 0.6), hs, -0.09, 0.085, -0.055, hat); boom.rotation.set(0, 0.6, -Math.PI / 2 - 0.5);
+      M_(new T.SphereGeometry(0.011, 6, 5), cup, -0.045, 0.062, -0.1, hat);
       M_(new T.BoxGeometry(0.075, 0.125, 0.04), cup, -0.15, 0.1, -0.175, chest); // the set
       M_(new T.BoxGeometry(0.05, 0.03, 0.006), L(0x4a5a46), -0.15, 0.13, -0.197, chest); // its little screen
       M_(new T.BoxGeometry(0.008, 0.008, 0.005), led, -0.128, 0.083, -0.197, chest); // a pilot light
@@ -392,23 +468,23 @@ const G_Rig = (() => {
 
     // ---- arms: tapered, with elbows; sleeves (short for a T-shirt), and hands with fingers and a thumb
     const longSleeves = look.top !== 'tshirt';
+    const handM = gloveM || skin, fingerM = look.gloves === 'fingerless' ? skin : handM;
     const mkArm = (side: number) => {
-      const sh = joint(chest, side * 0.2, 0.26, 0);
-      M_(new T.SphereGeometry(0.066, 10, 8), vestM || top, 0, 0, 0, sh);
+      const sh = joint(chest, side * 0.2, 0.225, 0); // (the middle of the shoulder, not its top: where the body's own joint is)
+      B_(new T.SphereGeometry(0.066, 10, 8), vestM || top, 0, 0, 0, sh);
       const up = joint(sh, 0, 0, 0);
-      if (longSleeves) M_(cyl(0.056, 0.047, UARM, 10), top, 0, -UARM / 2, 0, up);
-      else { M_(cyl(0.06, 0.056, UARM * 0.45, 10), top, 0, -UARM * 0.22, 0, up); M_(cyl(0.05, 0.045, UARM * 0.7, 10), skin, 0, -UARM * 0.62, 0, up); }
+      if (longSleeves) B_(cyl(0.056, 0.047, UARM, 10), top, 0, -UARM / 2, 0, up);
+      else { B_(cyl(0.06, 0.056, UARM * 0.45, 10), top, 0, -UARM * 0.22, 0, up); B_(cyl(0.05, 0.045, UARM * 0.7, 10), skin, 0, -UARM * 0.62, 0, up); }
       if (style === 'tactical' && side < 0 && o.animal && G.Callsigns) { // their animal's patch on the shoulder
         const p = new T.Mesh(new T.PlaneGeometry(0.058, 0.058), new T.MeshLambertMaterial({ map: G.Callsigns.armTex(o.animal) }));
         p.position.set(side * 0.06, -0.085, 0); p.rotation.y = side * Math.PI / 2; up.add(p);
       } else if (style === 'tactical' && side < 0 && o.color != null) M_(cyl(0.059, 0.059, 0.03, 12), L(o.color), 0, -0.08, 0, up); // the squad armband
       const lo = joint(up, 0, -UARM, 0);
-      M_(new T.SphereGeometry(0.047, 10, 8), longSleeves ? top : skin, 0, 0, 0, lo); // elbow
-      M_(cyl(0.046, 0.036, FARM, 10), longSleeves ? top : skin, 0, -FARM / 2, 0, lo);
-      const handM = gloveM || skin, fingerM = look.gloves === 'fingerless' ? skin : handM;
-      M_(new T.BoxGeometry(0.068, 0.08, 0.035), handM, 0, -FARM - 0.035, 0, lo); // palm
-      const fing = M_(new T.BoxGeometry(0.066, 0.045, 0.03), fingerM, 0, -FARM - 0.095, -0.006, lo); fing.rotation.x = 0.25;
-      const thumb = M_(new T.BoxGeometry(0.022, 0.045, 0.024), fingerM, side * -0.036, -FARM - 0.045, -0.02, lo); thumb.rotation.z = side * 0.35;
+      B_(new T.SphereGeometry(0.047, 10, 8), longSleeves ? top : skin, 0, 0, 0, lo); // elbow
+      B_(cyl(0.046, 0.036, FARM, 10), longSleeves ? top : skin, 0, -FARM / 2, 0, lo);
+      B_(new T.BoxGeometry(0.068, 0.08, 0.035), handM, 0, -FARM - 0.035, 0, lo); // palm
+      const fing = B_(new T.BoxGeometry(0.066, 0.045, 0.03), fingerM, 0, -FARM - 0.095, -0.006, lo); fing.rotation.x = 0.25;
+      const thumb = B_(new T.BoxGeometry(0.022, 0.045, 0.024), fingerM, side * -0.036, -FARM - 0.045, -0.02, lo); thumb.rotation.z = side * 0.35;
       const tie = new T.Mesh(new T.TorusGeometry(0.04, 0.011, 5, 12), tieMat); tie.rotation.x = Math.PI / 2; tie.position.y = -FARM + 0.025; tie.visible = false; lo.add(tie);
       return { sh, up, lo, tie };
     };
@@ -416,14 +492,14 @@ const G_Rig = (() => {
     // ---- legs: tapered thighs and shins, knees; cargo pockets or knee pads; boots (shoes for civilians)
     const mkLeg = (side: number) => {
       const th = joint(hips, side * 0.1, -0.03, 0);
-      M_(cyl(0.088, 0.064, THIGH, 12), bottom, 0, -THIGH / 2, 0, th);
+      B_(cyl(0.088, 0.064, THIGH, 12), bottom, 0, -THIGH / 2, 0, th);
       if (look.pants === 'cargo') M_(new T.BoxGeometry(0.035, 0.12, 0.1), bottom, side * 0.08, -THIGH * 0.5, 0, th); // the cargo pocket
       const sh = joint(th, 0, -THIGH, 0);
-      M_(new T.SphereGeometry(0.064, 10, 8), bottom, 0, 0, 0, sh); // knee
+      B_(new T.SphereGeometry(0.064, 10, 8), bottom, 0, 0, 0, sh); // knee
       if (look.pants === 'combat') M_(new T.BoxGeometry(0.09, 0.1, 0.03), dark, 0, -0.03, -0.06, sh); // knee pad
-      M_(cyl(0.061, 0.046, SHIN, 10), bottom, 0, -SHIN / 2, 0, sh);
-      if (style !== 'civ') M_(cyl(0.054, 0.058, 0.13, 10), bootM, 0, -SHIN + 0.03, 0, sh); // the boot's upper
-      M_(new T.BoxGeometry(0.1, 0.07, 0.25), bootM, 0, -SHIN - 0.01, -0.05, sh);
+      B_(cyl(0.061, 0.046, SHIN, 10), bottom, 0, -SHIN / 2, 0, sh);
+      if (style !== 'civ') B_(cyl(0.054, 0.058, 0.13, 10), bootM, 0, -SHIN + 0.03, 0, sh); // the boot's upper
+      B_(new T.BoxGeometry(0.1, 0.07, 0.25), bootM, 0, -SHIN - 0.01, -0.05, sh);
       return { th, sh };
     };
     const legL = mkLeg(-1), legR = mkLeg(1);
@@ -435,6 +511,7 @@ const G_Rig = (() => {
     const hipMount = joint(hips, 0.2, 0.02, -0.02); hipMount.rotation.set(-Math.PI / 2, 0, 0);
 
     const rig = {
+      human: hid, humanOn: false, fit: hdef ? fitOf(hdef) : null, hat, prims, hairShown: !!hairM, hatOn: !hairM,
       hairMesh, look, pantsM: bottom, seat: null, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null, atakAlways: !!o.animal,
       root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style, shoe,
       gun: null, gunInfo: null, gunKey: null,
@@ -443,6 +520,37 @@ const G_Rig = (() => {
       state: 'alive', deadT: 0, fallX: 1, fallZ: 0, downW: 0,
       hb: null, dbg: null,
     } as unknown as Rig;
+    for (const [par, m] of fits) fitPart(rig, par, m);
+    for (const m of [slingMount, hipMount]) fitPart(rig, m.parent!, m);
+    if (hid) {
+      // which joint each of the body's bones follows (the model's R is the side its +x was: the rig's left, turned about), and
+      // each joint where it is at the model's rest: as made, the arms 40 degrees out from the sides
+      rig.hJoint = { hips, spine, chest, neck, head, eyeR: head, eyeL: head, clavicleR: chest, clavicleL: chest,
+        upperarmR: armL.up, forearmR: armL.lo, handR: armL.lo, upperarmL: armR.up, forearmL: armR.lo, handL: armR.lo,
+        thighR: legL.th, shinR: legL.sh, footR: legL.sh, thighL: legR.th, shinL: legR.sh, footL: legR.sh };
+      armL.up.rotation.z = -40 * D2R; armR.up.rotation.z = 40 * D2R;
+      rig.hRest = new Map();
+      for (const j of new Set(Object.values(rig.hJoint) as THREE.Object3D[])) {
+        const m = new T.Matrix4();
+        for (let n: THREE.Object3D = j; n !== body; n = n.parent!) { n.updateMatrix(); m.premultiply(n.matrix); }
+        rig.hRest.set(j, m);
+      }
+      armL.up.rotation.z = armR.up.rotation.z = 0;
+      // what each of the body's materials is, by what's worn (null: not there at all)
+      const bare = !!o.mannequin, covered = !!headCover || bare;
+      rig.hMat = (name: string, color: number): THREE.Material | null => {
+        switch (name) {
+          case 'shirt': return torsoM; case 'upsleeve': return top; case 'sleeve': return longSleeves ? top : skin;
+          case 'trousers': return bottom; case 'boots': return bootM; case 'neck': case 'skin': return faceM;
+          case 'hand': return handM; case 'finger': return fingerM; case 'eyeskin': return skin;
+          case 'lip': case 'stubble': return covered ? faceM : L(color);
+          case 'brow': return covered ? null : L(color);
+          case 'hair': return bare || headCover ? null : L(color);
+          case 'eye': case 'iris': return bare ? null : L(color);
+        }
+        return skin;
+      };
+    }
     rig.setGun = (code: any, skin: any) => setGun(rig, code, skin); // (skin: its stickers, js/stickers.ts)
     rig.update = (dt: number, p: any) => update(rig, dt, p);
     rig.hitboxes = () => hitboxes(rig);
@@ -512,6 +620,7 @@ const G_Rig = (() => {
     setSeat(rig);
     heatMark(rig.root, rig.gun); // (warm: js/render.ts _heatPass)
     rig.cold = !!o.mannequin; live.add(rig);
+    if (hid) { if (G.Humans.get(hid)) attachHuman(rig); else G.Humans.ensure(hid).then(() => attachHuman(rig)); }
     // put the weapon away (true) or bring it to the hands (false)
     // anim: the hand carries it there (slingSwap) rather than it jumping; and it isn't taken back up while the ATAK's still out
     // (the phone's folded away first: rig.slingWant waits for it)
@@ -563,7 +672,7 @@ const G_Rig = (() => {
     rig.dispose = () => {
       if (rig.dropped && rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g);
       if (rig.dbg) rig.dbg.forEach((m: THREE.Object3D) => m.parent && m.parent.remove(m));
-      for (const o of [rig.root, rig.dropped && rig.dropped.g]) if (o) o.traverse((c: any) => { if (c.geometry) c.geometry.dispose(); });
+      for (const o of [rig.root, rig.dropped && rig.dropped.g]) if (o) o.traverse((c: any) => { if (c.geometry && !c.userData.shared) c.geometry.dispose(); }); // (not a body's: every such body's)
       live.delete(rig);
     };
     return rig;
@@ -635,7 +744,7 @@ const G_Rig = (() => {
     const skip = new Set<THREE.Object3D>();
     for (const r of [mt, rig.armL && rig.armL.sh, rig.armR && rig.armR.sh, rig.gunMount, rig.slingMount, rig.hipMount, rig.gun, rig.neck]) if (r) r.traverse((o: THREE.Object3D) => skip.add(o));
     const list = meshes.filter((o) => !skip.has(o)), rc = new T.Raycaster(), o = new T.Vector3(), d = new T.Vector3();
-    let z = Infinity;
+    let z = rig.fit ? -rig.fit.chestF : Infinity; // (a body's own chest isn't a mesh on the chest joint: its measure)
     for (const x of [-hw, -hw / 2, 0, hw / 2, hw]) for (const y of [y0, (y0 + y1) / 2, y1]) {
       o.set(x, y, -0.6); rig.chest.localToWorld(o); d.set(x, y, 0); rig.chest.localToWorld(d); d.sub(o); const len = d.length(); d.divideScalar(len);
       rc.set(o, d); rc.far = len + 0.3;

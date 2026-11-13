@@ -1,1 +1,1 @@
-{"id": "f05", "sex": "f", "name": "tall and lean", "height": 1.77, "scale": 1.008, "hair": "bob", "triangles": {"body": 2588, "head": 2050, "eyes": 200, "total": 4838}}
+{"id": "f05", "sex": "f", "name": "tall and lean", "height": 1.77, "scale": 1.008, "hair": "bob", "triangles": {"body": 2588, "head": 2050, "eyes": 200, "total": 4838}, "fit": {"chest": [0.1665, 0.142, 0.1027], "belt": [0.1465, 0.0964, 0.1124], "pelvis": [0.1884, 0.108, 0.132], "delt": 0.9, "arm": 0.798, "fore": 0.85, "thigh": 0.941, "calf": 0.893, "head_w": 0.97}, "skin": 13940394, "hair_col": 12362355}

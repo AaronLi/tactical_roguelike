@@ -97,6 +97,7 @@ const G_Game = {
     G.ServerLink.boot(); // (the host's simulation's thread, loading now so it's there when you host: js/serverlink.ts)
     G.Stickers.load().then((names) => G.ServerLink.stickers(names)); // (which stickers there are: js/stickers.ts; the sticker box hands out one of them)
     G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
+    G.Humans.boot(); // (every body's file, behind the menu: js/humans.ts)
     G.Hangar.load(); // (the hangar's baked scene, parsed as soon as the bundle's in: js/hangar.ts; what enters the game waits for it, needModels)
     this.settings = { sens: G.U.store.get('sens', 1), padSens: G.U.store.get('padSens', 1), touchSens: G.U.store.get('touchSens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));

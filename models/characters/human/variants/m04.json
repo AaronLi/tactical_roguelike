@@ -1,1 +1,1 @@
-{"id": "m04", "sex": "m", "name": "muscular", "height": 1.83, "scale": 1.0421, "hair": "bald", "triangles": {"body": 2586, "head": 1892, "eyes": 200, "total": 4678}}
+{"id": "m04", "sex": "m", "name": "muscular", "height": 1.83, "scale": 1.0421, "hair": "bald", "triangles": {"body": 2586, "head": 1892, "eyes": 200, "total": 4678}, "fit": {"chest": [0.1804, 0.1634, 0.1314], "belt": [0.1593, 0.1031, 0.1191], "pelvis": [0.2015, 0.108, 0.132], "delt": 1.13, "arm": 1.18, "fore": 1.1, "thigh": 1.08, "calf": 1.06, "head_w": 1.0}, "skin": 8151378, "hair_col": 1907485}

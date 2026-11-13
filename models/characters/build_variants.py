@@ -1,6 +1,6 @@
 # Makes every variant in human_variants.py (four Blenders at a time) and lays them out on one sheet:
 #   python models/characters/build_variants.py [m03 f07 ...]      (needs Pillow; BLENDER names the program if it isn't on the usual path)
-# Writes models/characters/human/variants/<id>.glb for each, variants/index.json (id, sex, name, height, the scale to give the
+# Writes assets/models/humans/<id>.glb for each (what the game loads), js/humandata.ts, human/variants/index.json (id, sex, name, height, the scale to give the
 # figure in the game, triangles) and human/variants.png. With ids given, only those are remade (the sheet is of whatever is there).
 import json, os, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
@@ -19,6 +19,15 @@ with ThreadPoolExecutor(4) as ex: done = list(ex.map(make, ids))
 have = [v for v in VARIANTS if os.path.exists(os.path.join(OUT, v + '.json'))]
 index = [json.load(open(os.path.join(OUT, v + '.json'))) for v in have]
 json.dump(index, open(os.path.join(OUT, 'index.json'), 'w'), indent=1)
+# what the game knows of each before its file has loaded (js/humandata.ts: its height's scale, its colours, the fit of the gear on it)
+with open(os.path.join(HERE, '..', '..', 'js', 'humandata.ts'), 'w', encoding='utf-8', newline='\n') as f:
+    f.write("'use strict';\n// The human models' variants (assets/models/humans/<id>.glb): written by models/characters/build_variants.py, not by hand.\n")
+    f.write("// scale: the figure's height over the skeleton's own (1.756 m); skin, hair: colours; fit: the trunk's half-width, front and back\n")
+    f.write("// (metres from the spine's line) across the chest, the belt and the pelvis, and the limbs' girth against the base figure's.\n")
+    f.write('interface HumanDef { sex: string; name: string; scale: number; hairStyle: string; skin: number; hair: number; fit: { chest: number[]; belt: number[]; pelvis: number[]; delt: number; arm: number; fore: number; thigh: number; calf: number; head_w: number } }\n')
+    f.write('const G_HumanData: Record<string, HumanDef> = {\n')
+    for e in index: f.write("  %s: { sex: '%s', name: '%s', scale: %s, hairStyle: '%s', skin: 0x%06x, hair: 0x%06x, fit: %s },\n" % (e['id'], e['sex'], e['name'], e['scale'], e['hair'], e['skin'], e['hair_col'], json.dumps(e['fit'])))
+    f.write('};\nG.HumanData = G_HumanData;\ninterface GameModules { HumanData: typeof G_HumanData }\n')
 # the sheet: a row for the men, a row for the women; each figure standing (to its own height), its head from the front and turned
 shown = [e for e in index if os.path.exists(os.path.join(OUT, e['id'] + '_body.png'))]
 if shown:

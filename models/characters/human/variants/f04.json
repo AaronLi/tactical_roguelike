@@ -1,1 +1,1 @@
-{"id": "f04", "sex": "f", "name": "strong, heavy", "height": 1.69, "scale": 0.9624, "hair": "buzz", "triangles": {"body": 2560, "head": 1978, "eyes": 200, "total": 4738}}
+{"id": "f04", "sex": "f", "name": "strong, heavy", "height": 1.69, "scale": 0.9624, "hair": "buzz", "triangles": {"body": 2560, "head": 1978, "eyes": 200, "total": 4738}, "fit": {"chest": [0.1751, 0.1633, 0.1142], "belt": [0.1735, 0.114, 0.13], "pelvis": [0.2042, 0.12, 0.144], "delt": 1.008, "arm": 0.991, "fore": 0.952, "thigh": 1.109, "calf": 1.004, "head_w": 1.02}, "skin": 8151378, "hair_col": 1907485}

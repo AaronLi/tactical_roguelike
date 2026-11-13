@@ -1,1 +1,1 @@
-{"id": "f10", "sex": "f", "name": "slim", "height": 1.67, "scale": 0.951, "hair": "bun", "triangles": {"body": 2602, "head": 2058, "eyes": 200, "total": 4860}}
+{"id": "f10", "sex": "f", "name": "slim", "height": 1.67, "scale": 0.951, "hair": "bun", "triangles": {"body": 2602, "head": 2058, "eyes": 200, "total": 4860}, "fit": {"chest": [0.1665, 0.1429, 0.1027], "belt": [0.1479, 0.096, 0.112], "pelvis": [0.1903, 0.108, 0.132], "delt": 0.9, "arm": 0.806, "fore": 0.85, "thigh": 0.96, "calf": 0.93, "head_w": 1.0}, "skin": 6639685, "hair_col": 1907485}

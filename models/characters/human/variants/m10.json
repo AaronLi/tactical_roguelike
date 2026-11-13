@@ -1,1 +1,1 @@
-{"id": "m10", "sex": "m", "name": "athletic", "height": 1.79, "scale": 1.0194, "hair": "hightop", "triangles": {"body": 2552, "head": 1977, "eyes": 200, "total": 4729}}
+{"id": "m10", "sex": "m", "name": "athletic", "height": 1.79, "scale": 1.0194, "hair": "hightop", "triangles": {"body": 2552, "head": 1977, "eyes": 200, "total": 4729}, "fit": {"chest": [0.1727, 0.154, 0.122], "belt": [0.1554, 0.1017, 0.1177], "pelvis": [0.1968, 0.108, 0.132], "delt": 1.05, "arm": 1.06, "fore": 1.03, "thigh": 1.03, "calf": 1.0, "head_w": 1.0}, "skin": 6639685, "hair_col": 1907485}

@@ -1,1 +1,1 @@
-{"id": "m08", "sex": "m", "name": "wiry", "height": 1.74, "scale": 0.9909, "hair": "short", "triangles": {"body": 2560, "head": 1977, "eyes": 200, "total": 4737}}
+{"id": "m08", "sex": "m", "name": "wiry", "height": 1.74, "scale": 0.9909, "hair": "short", "triangles": {"body": 2560, "head": 1977, "eyes": 200, "total": 4737}, "fit": {"chest": [0.1713, 0.1446, 0.1137], "belt": [0.1504, 0.1003, 0.1163], "pelvis": [0.1893, 0.108, 0.132], "delt": 1.0, "arm": 0.96, "fore": 1.0, "thigh": 0.95, "calf": 0.97, "head_w": 0.98}, "skin": 11638652, "hair_col": 1907485}

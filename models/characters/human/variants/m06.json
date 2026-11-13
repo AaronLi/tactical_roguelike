@@ -1,1 +1,1 @@
-{"id": "m06", "sex": "m", "name": "slim", "height": 1.72, "scale": 0.9795, "hair": "full", "triangles": {"body": 2554, "head": 1977, "eyes": 200, "total": 4731}}
+{"id": "m06", "sex": "m", "name": "slim", "height": 1.72, "scale": 0.9795, "hair": "full", "triangles": {"body": 2554, "head": 1977, "eyes": 200, "total": 4731}, "fit": {"chest": [0.1664, 0.142, 0.1126], "belt": [0.1497, 0.1008, 0.1168], "pelvis": [0.1893, 0.108, 0.132], "delt": 0.94, "arm": 0.92, "fore": 0.94, "thigh": 0.95, "calf": 0.95, "head_w": 1.0}, "skin": 13349271, "hair_col": 1907485}

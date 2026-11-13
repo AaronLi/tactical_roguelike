@@ -1,1 +1,1 @@
-{"id": "m02", "sex": "m", "name": "heavy-set", "height": 1.8, "scale": 1.0251, "hair": "buzz", "triangles": {"body": 2560, "head": 1977, "eyes": 200, "total": 4737}}
+{"id": "m02", "sex": "m", "name": "heavy-set", "height": 1.8, "scale": 1.0251, "hair": "buzz", "triangles": {"body": 2560, "head": 1977, "eyes": 200, "total": 4737}, "fit": {"chest": [0.1771, 0.1607, 0.1295], "belt": [0.174, 0.1195, 0.1341], "pelvis": [0.2015, 0.1152, 0.1392], "delt": 1.0, "arm": 1.1, "fore": 1.08, "thigh": 1.08, "calf": 1.05, "head_w": 1.03}, "skin": 12097406, "hair_col": 1907485}
