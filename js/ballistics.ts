@@ -363,7 +363,24 @@ const G_Ballistics = (() => {
     chest: [[['skin', 2], ['fat', 8], ['muscle', 16], ['rib', 12]], 'viscera'], abdomen: [[['skin', 2], ['fat', 18], ['muscle', 12]], 'viscera'], pelvis: [[['skin', 2], ['fat', 18], ['muscle', 25]], 'viscera'],
     uarm: [[['skin', 2], ['fat', 4]], 'muscle'], farm: [[['skin', 2], ['fat', 3]], 'muscle'], thigh: [[['skin', 2], ['fat', 8]], 'muscle'], shin: [[['skin', 2], ['fat', 3]], 'muscle'],
   };
-  function segs() {
+  // The segments of a body (js/humans.ts): the trunk's reshaped to that body's own measure (rig.fit.shape: a segment's half-width
+  // and the depth it has for its width, and how much wider and deeper the organs in it sit and are), so a broad chest is broad
+  // and a deep one deep, in true metres. The head's and the limbs' are the same shapes, set by segFrame.
+  function segs(rig?: BRig): BSeg[] {
+    const f = rig && rig.fit;
+    if (f && f.shape) {
+      if (!rig!._segs) rig!._segs = segs().map((s) => {
+        const t = f.shape[s.id] as { rx0: number; rx1: number; kz: number; wx: number; dz: number } | undefined;
+        if (!t) return s;
+        const P = (c: number[]) => [c[0] * t.wx, c[1], c[2] * t.dz];
+        const organs = (s.organs || []).map(([id, sh]) => [id, sh[0] === 'ell' ? E_(P(sh[1]), P(sh[2])) : C_(P(sh[1]), P(sh[2]), sh[3] * Math.sqrt(t.wx * t.dz))]);
+        const n = cyl(s.id, s.bone, s.part, s.y0, s.y1, t.rx0, t.rx1, t.kz, { organs });
+        n.bb = bbox(n); for (const o of n.organs) o.push(shapeBox(o[1]));
+        n.wall = s.wall; n.fill = s.fill; n.wallT = s.wallT;
+        return n;
+      });
+      return rig!._segs;
+    }
     if ((segs as any).list) return (segs as any).list;
     const L = [];
     // the head: the cranium (skull shell 7 mm) and the jaw under it, as js/rig.ts shapes them
@@ -488,8 +505,16 @@ const G_Ballistics = (() => {
     return sc;
   }
   const _sv = new T.Vector3(), _sm = new T.Matrix4();
+  /** Where to hang a drawing of a segment's shapes (its organs) so they're where segFrame has them: the bone itself, or on a body a node in it set to that body's fit. */
+  function segNode(rig: BRig, s: BSeg, bone: THREE.Object3D): THREE.Object3D {
+    const f = rig.fit && rig.fit.seg[s.id]; if (!f) return bone;
+    const key = '_sn_' + s.id + (s.side || '');
+    let n = rig[key] as THREE.Object3D | undefined;
+    if (!n || n.parent !== bone) { n = new T.Group(); n.position.set(f.o[0], f.o[1], f.o[2]); n.scale.setScalar(f.k); bone.add(n); rig[key] = n; }
+    return n;
+  }
   function through(rig: BRig, o: BVec, u: BVec, v: number, p0: BRound, armour: BArmour[] | null, tMax = 3, trace: BTrace | null = null) {
-    const S = segs(), mats: BMat[] = [];
+    const S = segs(rig), mats: BMat[] = [];
     rig.root.updateMatrixWorld(true);
     // each segment's frame, the ray in it, and the stretch of the ray it can be in (its box)
     let tLo = Infinity, tHi = -Infinity;
@@ -670,7 +695,7 @@ const G_Ballistics = (() => {
   // with the organs in it in the order the line reaches them. Just the shapes: no armour, no round. Returns
   // { t (metres to where it enters), path: [{ seg, part, side, t, organs: [id] }] } or null.
   function probe(rig: BRig, o: BVec, u: BVec, tMax = 3) {
-    const S = segs(), mats: BMat[] = [];
+    const S = segs(rig), mats: BMat[] = [];
     rig.root.updateMatrixWorld(true);
     let tLo = Infinity, tHi = -Infinity;
     for (const s of S) {
@@ -910,7 +935,7 @@ const G_Ballistics = (() => {
   const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
   const layersText = (L: BLayer[]) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
+  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
 })();
 G.Ballistics = G_Ballistics;
 

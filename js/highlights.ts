@@ -2606,7 +2606,7 @@ const G_Highlights = (() => {
   function organsOn(rig: HlRig, O: Record<string, number>, overlay: boolean) {
     const B = G.Ballistics, ORG = B.ORG, all = [], hit = [];
     const bone = (n: string) => n.startsWith('up') || n.startsWith('lo') ? ((n.endsWith('L') ? rig.armL : rig.armR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : n.startsWith('th') || n.startsWith('sh') ? ((n.endsWith('L') ? rig.legL : rig.legR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : rig[n];
-    for (const s of B.segs()) {
+    for (const s of B.segs(rig as any)) {
       const b = bone(s.bone); if (!b) continue;
       for (const [id, sh] of s.organs || []) {
         const pct = O[id] || 0, col = pct >= 100 ? 0xff2a2a : pct > 0 ? 0xffb02a : ORG[id] && ORG[id].bone ? 0xe8e2c8 : 0x6fd08c;
@@ -2620,7 +2620,7 @@ const G_Highlights = (() => {
           mesh.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), bb.clone().sub(a).normalize());
         }
         if (overlay) mesh.renderOrder = 20 + (pct > 0 ? 1 : 0);
-        b.add(mesh); all.push(mesh);
+        B.segNode(rig as any, s, b).add(mesh); all.push(mesh);
         if (pct > 0) hit.push({ mesh, pct, id, col, base: mesh.scale.clone(), lit: false, pop: 0 });
       }
     }

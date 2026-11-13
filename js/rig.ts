@@ -153,10 +153,16 @@ const G_Rig = (() => {
       // The head's is lower and a little smaller (the old one's top was 0.236 over the neck's joint, a body's is 0.19); the trunk's are as
       // wide and deep as this body's, their middle where its is (a chest stands forward of the spine's line); a limb's as thick.
       seg: ((): Record<string, { k: number; o: number[] }> => {
-        const mid = (a: number[], w0: number, d0: number, kw = 0.5) => ({ k: kw * a[0] / w0 + (1 - kw) * (a[1] + a[2]) / 2 / d0, o: [0, 0, (a[2] - a[1]) / 2] }); // (kw: how much its width counts against its depth)
+        const mid = (a: number[]) => ({ k: 1, o: [0, 0, (a[2] - a[1]) / 2] }); // (the trunk's: only moved, to where this body's middle is: their shapes are its own, below)
         const head = { k: 0.94, o: [0, 0.19 - 0.236 * 0.94, -0.004] }, L = (k: number) => ({ k, o: [0, 0, 0] });
-        return { cranium: head, jaw: head, neck: { k: 1, o: [0, 0, 0.012] }, chest: mid(F.chest, 0.19, 0.115, 0.3), abdomen: mid(F.belt, 0.15, 0.105), pelvis: mid(F.pelvis, 0.165, 0.105),
+        return { cranium: head, jaw: head, neck: { k: 1, o: [0, 0, 0.012] }, chest: { k: 1, o: [0, -0.035, (F.chest[2] - F.chest[1]) / 2] }, abdomen: mid(F.belt), pelvis: mid(F.pelvis), // (the chest as much lower as a body's shoulders are)
           uarm: L(1.12 * F.arm), farm: L(1.05 * F.fore), thigh: L(1.12 * F.thigh), shin: L(1.07 * F.calf) };
+      })(),
+      // the trunk's segments in this body's own shape (js/ballistics.ts segs(rig)): half-widths bottom and top, depth over width, and how
+      // much wider and deeper than the old figure's (0.19 by 0.115 at the chest, 0.15 by 0.105 at the waist) its organs are spread
+      shape: ((): Record<string, { rx0: number; rx1: number; kz: number; wx: number; dz: number }> => {
+        const D = (a: number[]) => (a[1] + a[2]) / 2, S = (a: number[], w0: number, d0: number, r0: number, r1: number) => ({ rx0: r0, rx1: r1, kz: D(a) / Math.max(r0, r1), wx: a[0] / w0, dz: D(a) / d0 });
+        return { chest: S(F.chest, 0.19, 0.115, F.chest[0] * 0.94, F.chest[0]), abdomen: S(F.belt, 0.15, 0.105, F.belt[0], F.belt[0] * 0.97), pelvis: S(F.pelvis, 0.165, 0.105, F.pelvis[0] * 0.9, F.belt[0]) };
       })(),
       // the hit capsules' radii (hitboxes): head, chest, abdomen, upper arm, forearm, thigh, shin
       hbR: [0.12, F.chest[0] + 0.018, Math.max(F.belt[0], F.pelvis[0] * 0.9) + 0.005, 0.066 * F.arm, 0.055 * F.fore, 0.099 * F.thigh, 0.074 * F.calf],
