@@ -1,13 +1,13 @@
 {
  "triangles": {
-  "body": 2178,
-  "head": 1877,
+  "body": 2550,
+  "head": 1977,
   "eyes": 200,
-  "total": 4255
+  "total": 4727
  },
  "vertices": {
-  "body": 1097,
-  "head": 1034
+  "body": 1283,
+  "head": 1109
  },
  "bones": [
   "hips",
@@ -15,12 +15,14 @@
   "chest",
   "neck",
   "head",
+  "clavicle.R",
   "upperarm.R",
   "forearm.R",
   "hand.R",
   "thigh.R",
   "shin.R",
   "foot.R",
+  "clavicle.L",
   "upperarm.L",
   "forearm.L",
   "hand.L",

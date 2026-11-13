@@ -36,6 +36,7 @@ J = {'hips': V((0, 0, 0.95)), 'spine': V((0, 0, 1.03)), 'chest': V((0, 0, 1.22))
 for s, n in ((1, 'R'), (-1, 'L')):  # (the figure's own right is +x seen from behind: it faces -y)
     sh = V((s * 0.2, 0, 1.48)); arm = V((s * ARM.x, 0, ARM.z)); el = sh + arm * 0.29; wr = el + arm * 0.27 + V((0, -0.008, 0))
     hp = V((s * 0.1, 0, 0.92)); kn = hp + V((0, 0, -0.44)); an = kn + V((0, 0, -0.44))
+    J['cl' + n] = V((s * 0.03, -0.02, 1.455))
     J.update({'sh' + n: sh, 'el' + n: el, 'wr' + n: wr, 'fi' + n: wr + arm * 0.19, 'hp' + n: hp, 'kn' + n: kn, 'an' + n: an + V((0, 0.012, 0.045)), 'toe' + n: V((s * 0.105, -0.2, 0.03)), 'arm' + n: arm})
 
 # ---- a tube through rings set square to its own line: (centre, half-width across, half-depth), 'deep' the way its depth lies
@@ -66,12 +67,17 @@ def body_parts():
     for s, n in ((1, 'R'), (-1, 'L')):
         S, E, W, F, a = J['sh' + n], J['el' + n], J['wr' + n], J['fi' + n], J['arm' + n]
         # the arm: from inside the shoulder, a ring either side of the elbow close to it, down to the wrist
-        parts.append(to_obj('arm' + n, tube([(S - a * 0.075, 0.022, 0.03), (S - a * 0.05, 0.046, 0.054), (S - a * 0.01, 0.062, 0.068), (S + a * 0.07, 0.064, 0.069), (along(S, E, 0.42), 0.056, 0.062), (along(S, E, 0.8), 0.046, 0.05), (E - a * 0.03, 0.043, 0.046), (E, 0.042, 0.045), (E + a * 0.03, 0.044, 0.047),
+        parts.append(to_obj('arm' + n, tube([(S - a * 0.075, 0.022, 0.03), (S - a * 0.05, 0.047, 0.055), (S - a * 0.01, 0.063, 0.069), (S + a * 0.065, 0.064, 0.07), (along(S, E, 0.42), 0.056, 0.062), (along(S, E, 0.8), 0.046, 0.05), (E - a * 0.03, 0.043, 0.046), (E, 0.042, 0.045), (E + a * 0.03, 0.044, 0.047),
                                              (along(E, W, 0.33), 0.047, 0.05), (along(E, W, 0.72), 0.036, 0.04), (W - a * 0.015, 0.028, 0.033), (W + a * 0.01, 0.026, 0.032)], 10)))
-        # the hand: flat, its palm toward the thigh; the fingers one block, the thumb its own
-        parts.append(to_obj('hand' + n, tube([(W - a * 0.005, 0.02, 0.03), (W + a * 0.035, 0.016, 0.042), (W + a * 0.09, 0.014, 0.045), (W + a * 0.14, 0.012, 0.04), (F, 0.008, 0.026)], 8)))
-        th = W + a * 0.03 + V((0, -0.034, 0)); td = (a + V((0, -0.75, 0))).normalized()
-        parts.append(to_obj('thumb' + n, tube([(th - td * 0.012, 0.012, 0.013), (th + td * 0.03, 0.012, 0.012), (th + td * 0.062, 0.008, 0.008)], 6)))
+        # the hand: its palm toward the thigh; four fingers, a little curled in toward it, and the thumb forward of them
+        pn = V((-s * math.cos(40 * D2R), 0, -math.sin(40 * D2R)))  # (the way the palm faces: in toward the body)
+        kn = W + a * 0.095
+        parts.append(to_obj('palm' + n, tube([(W - a * 0.005, 0.02, 0.03), (W + a * 0.04, 0.016, 0.041), (kn - a * 0.01, 0.014, 0.043), (kn + a * 0.006, 0.011, 0.04)], 8)))
+        for k, (fy, fl) in enumerate(((-0.03, 0.074), (-0.01, 0.082), (0.01, 0.076), (0.029, 0.06))):
+            b0 = kn + V((0, fy, 0)) - a * 0.004; d1 = (a + pn * 0.22).normalized(); d2 = (a * 0.75 + pn * 0.66).normalized(); b1 = b0 + d1 * fl * 0.5
+            parts.append(to_obj('finger%d%s' % (k, n), tube([(b0, 0.0088, 0.0092), (b1, 0.008, 0.0085), (b1 + d2 * fl * 0.5, 0.0058, 0.0062)], 5)))
+        th = W + a * 0.035 + V((0, -0.032, 0)); td = (a * 0.7 + V((0, -0.62, 0)) + pn * 0.3).normalized(); t1 = th + td * 0.034
+        parts.append(to_obj('thumb' + n, tube([(th - td * 0.014, 0.012, 0.013), (t1, 0.0105, 0.011), (t1 + (td + a * 0.4 + pn * 0.2).normalized() * 0.03, 0.007, 0.0075)], 6)))
         H, K, A = J['hp' + n], J['kn' + n], J['an' + n]
         z = lambda zz, y=0.0: V((H.x, y, zz))
         parts.append(to_obj('leg' + n, tube([(z(0.96, 0.004), 0.085, 0.098), (z(0.86, 0.004), 0.094, 0.104), (z(0.70), 0.082, 0.09), (z(0.55, -0.004), 0.064, 0.069), (z(0.51, -0.005), 0.06, 0.064), (z(0.48, -0.005), 0.059, 0.063), (z(0.45, -0.002), 0.058, 0.064),
@@ -93,7 +99,7 @@ def union(parts, name):
     bmesh.ops.dissolve_degenerate(bm, edges=bm.edges, dist=0.0005)
     bmesh.ops.triangulate(bm, faces=[f for f in bm.faces if len(f.verts) > 4])
     # where the parts run into each other the join is eased, so a shoulder (and a hip) is one form, not shapes set together
-    for cen, rad, it in [(J['sh' + n] + V((0, 0, -0.01)), 0.115, 10) for n in 'RL'] + [(J['hp' + n] + V((0, 0, -0.06)), 0.1, 4) for n in 'RL']:
+    for cen, rad, it in [(J['sh' + n] + V((0, 0, -0.01)), 0.11, 8) for n in 'RL'] + [(J['hp' + n] + V((0, 0, -0.06)), 0.1, 4) for n in 'RL']:
         vs = [v for v in bm.verts if (v.co - cen).length < rad]
         for _ in range(it): bmesh.ops.smooth_vert(bm, verts=vs, factor=0.5, use_axis_x=True, use_axis_y=True, use_axis_z=True)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
@@ -108,9 +114,9 @@ def dress(o):
         c = p.center; mi = 0
         if c.z < 1.0 and abs(c.x) < 0.21: mi = 1  # (the belt line: a ring of the trunk)
         if c.z < 0.13 or (c.z < 0.2 and c.y < -0.06): mi = 2
-        if c.z > 1.528 and abs(c.x) < 0.085: mi = 3  # (the collar sits at the base of the neck)
+        if min(me.vertices[i].co.z for i in p.vertices) > 1.524 and max(abs(me.vertices[i].co.x) for i in p.vertices) < 0.079: mi = 3  # (the collar: the ring of the trunk at the base of the neck)
         for n in 'RL':
-            if (c - J['wr' + n]).dot(J['arm' + n]) > -0.004 and (c - J['wr' + n]).length < 0.24: mi = 3
+            if (c - J['wr' + n]).dot(J['arm' + n]) > -0.004 and (c - J['wr' + n]).length < 0.26: mi = 3
         p.material_index = mi
 
 # ---- the head: face D (face_options.py's, coarser), its features kept where the surface is thinned out
@@ -188,23 +194,46 @@ def build_head(at):
         n0 = len(bm.faces); m3 = bpy.data.meshes.new('t'); b2.to_mesh(m3); b2.free(); bm.from_mesh(m3); bpy.data.meshes.remove(m3); bm.faces.ensure_lookup_table(); tags.append((n0, len(bm.faces), tag))
     for s in (1, -1):
         b2 = bmesh.new(); bmesh.ops.create_uvsphere(b2, u_segments=8, v_segments=5, radius=1)
-        for v in b2.verts: v.co = V((v.co.x * 0.007 + s * 0.0745 - s * 0.006 * max(0, -v.co.y), v.co.y * 0.016 + 0.012, v.co.z * 0.03 - 0.01))
+        for v in b2.verts:
+            ey, ez = v.co.y, v.co.z; wide = 0.016 * (1.0 if ez > -0.2 else 1.0 + ez * 0.55)  # (narrowing to the lobe)
+            v.co = V((s * (0.0725 + 0.004 * v.co.x * s + 0.011 * (ey + 1) * 0.5), ey * wide + 0.014, ez * 0.031 - 0.008))
         add(b2, 'skin')
     for e in EYE:
-        for lo, hi in ((0.0042, 1), (-1, -0.0078)):
-            b2 = sphere(0.0151, 2); bmesh.ops.delete(b2, geom=[v for v in b2.verts if not (lo <= v.co.z <= hi and v.co.y < 0.003)], context='VERTS')
-            for v in b2.verts: v.co += e
+        r_l = 0.0151; xs = [-0.0147 + k * 0.0294 / 8 for k in range(9)]
+        open_ = lambda x: max(0.0, 1 - (x / 0.0128) ** 2) ** 0.7
+        for lo, hi in ((lambda x: 0.0048 * open_(x) + 0.0006, lambda x: 0.0128), (lambda x: -0.0112, lambda x: -0.0056 * open_(x) - 0.0004)):
+            b2 = bmesh.new(); grid = []
+            for x in xs:
+                col = []
+                for q in range(3):
+                    z = lo(x) + (hi(x) - lo(x)) * q / 2; y = -math.sqrt(max(1e-8, r_l * r_l - x * x - z * z))
+                    col.append(b2.verts.new(e + V((x, y, z))))
+                grid.append(col)
+            for c0, c1 in zip(grid, grid[1:]):
+                for q in range(2): b2.faces.new((c0[q], c1[q], c1[q + 1], c0[q + 1]))
+            bmesh.ops.recalc_face_normals(b2, faces=b2.faces)
+            for f in b2.faces:
+                if f.normal.y > 0: f.normal_flip()
             add(b2, 'skin')
-    bm.normal_update(); bm.verts.ensure_lookup_table(); bm.faces.ensure_lookup_table(); bm.faces.index_update(); bm.verts.index_update()
-    # the hair: the scalp's own faces over the hairline (high on the forehead, down past the temple, behind the ear to the nape), stood 5 mm off it
+    HL = [(-0.2, 0.09), (-0.05, 0.09), (-0.036, 0.045), (-0.024, 0.016), (-0.01, 0.012), (0.02, 0.022), (0.036, -0.02), (0.06, -0.065), (0.2, -0.065)]
+    def hairline(y):
+        for (y0, z0), (y1, z1) in zip(HL, HL[1:]):
+            if y <= y1: return z0 + (z1 - z0) * (y - y0) / (y1 - y0)
+        return HL[-1][1]
     def haired(c, m=0.0):
-        line = 0.088 if c.y < -0.055 else 0.088 - 0.068 * (c.y + 0.055) / 0.055 if c.y < 0.0 else 0.02 - 0.085 * min(1.0, c.y / 0.06)
-        return c.z > line + m
+        return c.z > hairline(c.y) + m
     # (the scalp under the hair is drawn in a little, so its coarser faces never show through it)
     for v in bm.verts:
-        if haired(v.co, 0.012): v.co = V((v.co.x * 0.95, 0.004 + (v.co.y - 0.004) * 0.95, v.co.z * 0.96))
+        if haired(v.co, 0.014): v.co = V((v.co.x * 0.93, 0.004 + (v.co.y - 0.004) * 0.93, v.co.z * 0.95))
     # (from a plainer copy of the same head, so the hairline runs along even faces, not the thinned scalp's big ones)
     b2 = head_mesh(4); bmesh.ops.delete(b2, geom=[f for f in b2.faces if not haired(f.calc_center_median())], context='FACES')
+    from mathutils.bvhtree import BVHTree
+    plain = head_mesh(4); skin_of = BVHTree.FromBMesh(plain)
+    for ed in b2.edges:  # (its edge is brought to the line along the head's own surface: straight down would sink it under the brow's slope)
+        if len(ed.link_faces) == 1:
+            for v in ed.verts:
+                for _ in range(3): v.co = skin_of.find_nearest(V((v.co.x, v.co.y, hairline(v.co.y) - 0.002)))[0]
+    plain.free()
     for v in b2.verts: v.co = V((v.co.x * 1.085, 0.004 + (v.co.y - 0.004) * 1.075, v.co.z * 1.06 + 0.001))
     add(b2, 'hair')
     from mathutils.bvhtree import BVHTree
@@ -248,7 +277,7 @@ def build_head(at):
 # ---- the skeleton
 BONES = [('hips', None, 'hips', 'spine'), ('spine', 'hips', 'spine', 'chest'), ('chest', 'spine', 'chest', 'neck'), ('neck', 'chest', 'neck', 'head'), ('head', 'neck', 'head', 'top')]
 for n in 'RL':
-    BONES += [('upperarm.' + n, 'chest', 'sh' + n, 'el' + n), ('forearm.' + n, 'upperarm.' + n, 'el' + n, 'wr' + n), ('hand.' + n, 'forearm.' + n, 'wr' + n, 'fi' + n),
+    BONES += [('clavicle.' + n, 'chest', 'cl' + n, 'sh' + n), ('upperarm.' + n, 'clavicle.' + n, 'sh' + n, 'el' + n), ('forearm.' + n, 'upperarm.' + n, 'el' + n, 'wr' + n), ('hand.' + n, 'forearm.' + n, 'wr' + n, 'fi' + n),
               ('thigh.' + n, 'hips', 'hp' + n, 'kn' + n), ('shin.' + n, 'thigh.' + n, 'kn' + n, 'an' + n), ('foot.' + n, 'shin.' + n, 'an' + n, 'toe' + n)]
 def build_rig(eye_at):
     ad = bpy.data.armatures.new('human'); arm = bpy.data.objects.new('human', ad); sc.collection.objects.link(arm)
@@ -299,7 +328,7 @@ POSES = [
     ('rest', {}, (0, 0, 0), (0, 0)),
     ('arms down', {**both('upperarm', 0.12, 0, -1), **both('forearm', 0.08, -0.12, -1), **both('hand', 0.05, -0.15, -1)}, (0, 0, 0), (25, 0)),
     ('aiming', {'upperarm.R': (0.25, -0.7, -0.66), 'forearm.R': (-0.62, -0.75, 0.25), 'hand.R': (-0.5, -0.85, 0.1), 'upperarm.L': (-0.1, -0.92, -0.38), 'forearm.L': (0.3, -0.94, 0.16), 'hand.L': (0.4, -0.9, 0.1), 'chest': (0, -0.1, 1), 'neck': (0, -0.2, 1)}, (0, 0, 0), (0, 0)),
-    ('hands up', {**both('upperarm', 0.55, -0.05, 0.83), **both('forearm', 0.05, -0.1, 1), **both('hand', 0, -0.1, 1)}, (0, 0, 0), (0, 12)),
+    ('hands up', {**both('clavicle', 0.17, 0.02, 0.085), **both('upperarm', 0.55, -0.05, 0.83), **both('forearm', 0.05, -0.1, 1), **both('hand', 0, -0.1, 1)}, (0, 0, 0), (0, 12)),
     ('crouch', {**both('thigh', 0.12, -0.9, -0.42), **both('shin', 0, 0.5, -0.87), **both('foot', 0, -1, -0.15), 'spine': (0, -0.25, 0.97), 'chest': (0, -0.35, 0.94), 'neck': (0, 0.1, 1), 'head': (0, 0.15, 1),
                 'upperarm.R': (0.2, -0.75, -0.6), 'forearm.R': (-0.6, -0.75, 0.3), 'upperarm.L': (-0.1, -0.9, -0.4), 'forearm.L': (0.3, -0.94, 0.16)}, (0, 0.1, -0.36), (0, 0)),
     ('kneeling', {'thigh.R': (0.05, -0.95, -0.3), 'shin.R': (0, 0.12, -1), 'thigh.L': (-0.05, 0.12, -1), 'shin.L': (0, 0.97, -0.25), 'foot.L': (0, 0.4, -0.9), **both('upperarm', 0.1, -0.3, -0.95), **both('forearm', -0.2, -0.9, -0.3)}, (0, 0, -0.4), (0, 0)),
@@ -334,7 +363,7 @@ close = []
 pose({}, (0, 0, 0), (22, 8))
 for az in (0, 32, 90): f = os.path.join(OUT, '_head_%d.png' % az); shoot(f, az, c=V((0, 0, 1.64)), scale=0.42); close.append(f)
 shots.append(('head (eyes turned)', close))
-pose({'upperarm.R': (0.3, -0.5, -0.8), 'forearm.R': (-0.3, -0.6, 0.75), 'hand.R': (-0.2, -0.3, 0.9), 'upperarm.L': (-1, 0, 0.05), 'forearm.L': (-0.1, -0.2, 1)}, (0, 0, 0), (0, 0))
+pose({'upperarm.R': (0.3, -0.5, -0.8), 'forearm.R': (-0.3, -0.6, 0.75), 'hand.R': (-0.2, -0.3, 0.9), 'clavicle.L': (-0.17, 0.01, 0.06), 'upperarm.L': (-1, 0, 0.05), 'forearm.L': (-0.1, -0.2, 1)}, (0, 0, 0), (0, 0))
 close = []
 for az in (20, 110, 180): f = os.path.join(OUT, '_elbow_%d.png' % az); shoot(f, az, c=V((0, 0, 1.38)), scale=1.1); close.append(f)
 shots.append(('elbows and shoulders, bent hard', close))
