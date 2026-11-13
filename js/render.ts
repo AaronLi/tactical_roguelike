@@ -1422,7 +1422,7 @@ const G_R = {
     return new THREE.ShaderMaterial({ toneMapped: false,
       uniforms: { map: { value: null }, osd: { value: osd }, live: { value: 0 }, eye: { value: new THREE.Vector2() }, pmil: { value: 1 }, zoom: { value: 1 }, pal: { value: 0 }, dim: { value: 1 } },
       vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: `uniform sampler2D map, osd; uniform float live, zoom, dim; uniform int pal; varying vec2 vUv;
+      fragmentShader: `uniform sampler2D map, osd; uniform float live, zoom, dim, pmil; uniform int pal; varying vec2 vUv;
         vec3 iron(float t) { return clamp(vec3(1.6 * t - 0.1, 2.2 * t * t - 0.25, 0.55 * sin(3.1416 * t * 1.25) + max(0.0, t - 0.85) * 4.0), 0.0, 1.0); }
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
@@ -1432,6 +1432,10 @@ const G_R = {
           c *= 0.94 + 0.06 * step(0.5, fract(vUv.y * 144.0));
           float ax = abs(p.x), ay = abs(p.y), w = 0.008;
           float cr = (ax < w && ay > 0.06 && ay < 0.5) || (ay < w && ax > 0.06 && ax < 0.5) || length(p) < 0.014 ? 1.0 : 0.0;
+          // windage ticks under the horizontal bars (every scope over 4×, js/viewmodel.ts windage): a tick a mil, longer every 5, out to 10,
+          // in the picture's mils (pmil at the sensor's widest, times the digital zoom); the short ones left out where they'd crowd (a low power)
+          float ms = pmil * zoom, mk = floor(p.x / ms + 0.5), mbig = step(abs(mod(mk, 5.0)), 0.5), mx = abs(p.x - mk * ms);
+          if ((mbig > 0.5 || ms > 0.012) && abs(mk) > 0.5 && abs(mk) <= 10.0 && abs(mk * ms) > 0.06 && abs(mk * ms) < 0.5 && mx < w * 0.6 && p.y < 0.0 && -p.y < (mbig > 0.5 ? 0.05 : 0.025)) cr = max(cr, mix(0.6, 1.0, mbig));
           c = mix(c, vec3(1.0, 0.16, 0.12), cr);
           vec4 o = texture2D(osd, vUv); c = mix(c, o.rgb, o.a);
           gl_FragColor = vec4(c * live * dim, 1.0); // (a screen: its own levels, as they are; dimmed for night vision)
@@ -1594,6 +1598,7 @@ const G_R = {
       pip.mat.uniforms.dim.value = this.nv && this.nv.k > 0.5 ? this.NV_DIM * 0.25 : 1; // (its night-vision mode: the screen turned right down, so it doesn't bloom the tubes)
       if (this.frameNo & 1) return;
       sc.fov = THREE.MathUtils.radToDeg(2 * Math.atan(pip.r / d)) / pip.mag0; sc.far = this.scopeReach(pip.mag0).far; sc.updateProjectionMatrix();
+      pip.mat.uniforms.pmil.value = 0.001 / Math.tan(THREE.MathUtils.degToRad(sc.fov) / 2); // (a mil's share of the screen's radius at the sensor's widest: the windage ticks, times the zoom)
       this._heatPass(sc, pip.heatRT, false);
       this.renderer.setRenderTarget(null);
       return;

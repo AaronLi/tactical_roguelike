@@ -197,6 +197,15 @@ and blows the flags.
 - **The ballistic computer** (op.bc.0, `def.calc` 2: js/viewmodel.ts `calcStep`, still 5 Hz): `G.flight` samples carry
   `lag`; the marker moves sideways by the crosswind across the line of sight times the lag at that range, times the share
   of eight points along the line that are out in the wind (from a room out a window, the part outside), in 0.5 mil cells. The BC-1 rail module shows range only: unchanged.
+- **Windage marks**: every scope over 4× (the ones that get the range-finding reticle: op.pic.7 LV-6, op.pic.8 3-9×, op.pic.9 5-25×,
+  oem.op.pic.20/21 5×, oem.op.pic.22/23 6×; the ballistic computer op.bc.0; the thermal op.th.0) has windage marks in mils, a mark every
+  0.5 mil (one of the computer's cells), longer every 2.5 mil, out to 10 mil, under the horizontal wire (js/viewmodel.ts `windage`,
+  `WIND_STEP`; the thermal's screen, js/render.ts, has a tick a mil, longer every 5, as half-mil ones would be too fine at its 8×). The range reticle also has windage dots a mil apart on each holdover row, two at
+  100 m to six at 500 m (a Christmas tree), its numbers moved past them. They're drawn in the reticle's mils (`pmil`), so they follow
+  its focal plane like the rest of its marks. The crossbow's 1-12× bolt-drop reticle already had a tick every mil on its wire: unchanged.
+  4× and under (prisms, the ACOG, dots, the AUG's ring) unchanged.
+- **The greenhouse**: its interior is open to the sky in the level (`out`: its glass roof is drawn, not a ceiling), so it counts as
+  outdoors for the wind; a round into it keeps the wind's pull for the last few metres, which doesn't show at that range.
 - **Flags**: the `flagpole` piece (js/furniture.ts: a footing, a 7.2 m pole, a ball; solids are the footing and the pole)
   is ordinary furniture, so it's in the description's `props` and the Bevy port places it as any piece. The Sandia Crest
   gets one by a wall of each building (the Crest House, the viewing site, the greenhouse) and one each at the parking lot

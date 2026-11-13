@@ -202,6 +202,8 @@ const G_Viewmodel = (() => {
   //     up), is the heavier part of each bar, for a target half behind cover (or a crouched man: his whole body is about this). A target of another size scales it.
   //   - HOLDOVER, under the middle: a tick for each of 100..500 m, at the drop of the round that fires next (the chambered one) from this gun's bore as the zeroing
   //     table has it turned (G.flight and G.boreTip, the sums every round is flown by), numbered 1..5. It is rebuilt when the load or the zero changes.
+  //   - WINDAGE: ticks under the horizontal wire every half mil (the ballistic computer's cells), longer every 2.5, out to 10; and windage dots a mil apart on
+  //     each holdover row, more the further the range (2 at 100 m to 6 at 500 m: a Christmas tree), its number past them. Hold the dot for the wind's drift.
   //   - FOCAL PLANE: first (ffp: the marks grow with the picture, true at any power) or second (sfp: they stay one size on the glass, true at one power only, the
   //     scope's top: js/render.ts _renderPip puts pmil there). Mils are drawn on RANGE_R either side of the middle.
   const RANGE_R = 44, RANGE_TEX = new Map<string, any>(), RANGES = [100, 200, 300, 400, 500];
@@ -239,7 +241,21 @@ const G_Viewmodel = (() => {
     holds.forEach((y, i) => {
       if (y == null) return;
       line(W * 1.5, () => { g.moveTo(-1.1, y); g.lineTo(1.1, y); });
-      label(String(i + 1), 1.5, y, TH);
+      label(String(i + 1), 2 + i + 0.7, y, TH); // (its number past the row's windage dots)
+    });
+    // WINDAGE: under the horizontal wire, a tick every half mil (the ballistic computer's cells), longer every 2.5 mil, out to 10 either
+    // side; and on each holdover row, dots a mil apart either side of the vertical wire, more the further the range (a Christmas tree):
+    // 2 at 100 m out to 6 at 500 m, wide enough to hold off for a strong crosswind there. Faint, so the stadia and the holds read first.
+    line(W * 0.6, () => { for (let k = 1; k * WIND_STEP <= WIND_MAX; k++) { const x = k * WIND_STEP, h = k % WIND_MAJOR ? 0.25 : 0.6; for (const sx of [x, -x]) { g.moveTo(sx, 0); g.lineTo(sx, h); } } });
+    g.fillStyle = '#000';
+    const labels: number[][] = RANGES.map((_, i) => [-3.2 - i * 3.2, TH * 0.95]); // (the numbers' middles: the stadia's, and the rows')
+    holds.forEach((y, i) => { if (y != null) labels.push([2 + i + 0.7 + 0.5, y]); });
+    holds.forEach((y, i) => {
+      if (y == null) return;
+      for (let k = 1; k <= 2 + i; k++) for (const sx of [k, -k]) {
+        if (labels.some(([lx, ly]) => Math.abs(sx - lx) < 0.75 && Math.abs(y - ly) < 1.0)) continue; // (not over a number: a flat round's rows are close together)
+        g.beginPath(); g.arc(sx, y, k % 5 ? 0.09 : 0.13, 0, 7); g.fill();
+      }
     });
     const t = new T.CanvasTexture(c);
     t.generateMipmaps = true; t.minFilter = T.LinearMipmapLinearFilter; t.anisotropy = 8;
@@ -273,6 +289,8 @@ const G_Viewmodel = (() => {
   const rangeText = (r: number | null) => (r == null ? '----' : String(Math.min(9999, Math.round(r))).padStart(4, ' '));
   // the point of impact, where the next round strikes at a range, is one cell lit red on a coarse grid of faint grey cells (a cell is this many mils: the marker snaps from cell to cell)
   const POI_CELL = 0.5, POI_FAR = 560;
+  // windage marks (every scope over 4×: docs/level-data.md "Wind"): a mark every WIND_STEP mil (a computer's cell), a longer one every WIND_MAJOR of them, out to WIND_MAX mil
+  const WIND_STEP = POI_CELL, WIND_MAJOR = 5, WIND_MAX = 10;
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
   const PIP_FS = G.R.TONE + `
     uniform sampler2D map; uniform float live; uniform vec2 eye; uniform int ret; uniform vec3 illum;
@@ -281,6 +299,15 @@ const G_Viewmodel = (() => {
     varying vec2 vUv;
     float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
     float ink(float d, float w) { float aa = fwidth(d) * 0.75; return 1.0 - smoothstep(w - aa, w + aa, d); }
+    // windage marks on the horizontal wire, in mils (pm: a mil's share of the lens's radius, so they're true where the scope's
+    // marks are): a tick under the wire every ${WIND_STEP} mil (the computer's cells), longer every ${WIND_STEP * WIND_MAJOR} mil, out to
+    // ${WIND_MAX} mil each way, faded out when they'd crowd (a low power on a first focal plane); none inside the wire's gap (gap)
+    float windage(vec2 p, float pm, float w, float gap) {
+      float s = ${WIND_STEP.toFixed(2)} * pm, k = floor(p.x / s + 0.5), ak = abs(k), big = step(abs(mod(k, ${WIND_MAJOR.toFixed(1)})), 0.5);
+      if (ak < 0.5 || ak * ${WIND_STEP.toFixed(2)} > ${WIND_MAX.toFixed(1)} + 0.01 || abs(k * s) < gap) return 0.0;
+      float h = (big > 0.5 ? 0.7 : 0.3) * pm;
+      return ink(seg(p, vec2(k * s, 0.0), vec2(k * s, -h)), w) * smoothstep(0.008, 0.02, s) * mix(0.85, 1.0, big);
+    }
     void main() {
       vec2 p = vUv * 2.0 - 1.0; float r = length(p);
       vec3 img = bpTone(texture2D(map, vUv).rgb); // (the scene through it, rolled off as the screen's is: js/render.ts)
@@ -301,6 +328,7 @@ const G_Viewmodel = (() => {
       } else if (ret == 8) { // a ballistic computer scope's: fine duplex wires, a lit dot (the computer's marks are drawn below)
         float tw = abs(p.x) > 0.5 ? 0.02 : 0.0035, th = abs(p.y) > 0.5 ? 0.02 : 0.0035;
         black = max(ink(abs(p.y), tw), ink(abs(p.x), th)) * step(0.025, max(abs(p.x), abs(p.y)));
+        black = max(black, windage(p, pmil, 0.003, 0.025) * step(abs(p.x), 0.5)); // (windage ticks along the fine wire, under it)
         glow = ink(r, 0.012);
       } else if (ret >= 6) { // drawn in mils, looked up in mils: it grows with the picture (a second focal plane: pmil is held at its true power)
         float rr = ret == 7 ? ${RANGE_R.toFixed(1)} : ${BDC_R.toFixed(1)};
