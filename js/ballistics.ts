@@ -477,6 +477,17 @@ const G_Ballistics = (() => {
   // the crushed channel's radius, rT: the temporary cavity's, v, yawed, expanded }), and trace.frags with each fragment's
   // track ({ t: where it broke off, dir, len: how far through them, v0: its speed there, v: what it left them at (0: it stopped
   // in them), m, sp: a splinter of bone }): for showing it (js/highlights.ts, the x-ray breakdown; js/shotlog.ts, F9's record).
+  // A segment's frame on a body (js/humans.ts): the segments are the old figure's shapes, each in its bone's frame; on a body
+  // each is moved and scaled (evenly: its metres stay metres along a track) to that body's own measure (js/rig.ts fitOf seg:
+  // { k, o }), so the skull, the chest and each limb, with the organs in them, are where that body's are and as big.
+  function segFrame(rig: BRig, s: BSeg, bone: THREE.Object3D, inv: THREE.Matrix4) {
+    const f = rig.fit && rig.fit.seg[s.id];
+    inv.copy(bone.matrixWorld).invert();
+    let sc = _sv.setFromMatrixScale(bone.matrixWorld).x || 1;
+    if (f) { inv.premultiply(_sm.makeTranslation(-f.o[0], -f.o[1], -f.o[2])).premultiply(_sm.makeScale(1 / f.k, 1 / f.k, 1 / f.k)); sc *= f.k; }
+    return sc;
+  }
+  const _sv = new T.Vector3(), _sm = new T.Matrix4();
   function through(rig: BRig, o: BVec, u: BVec, v: number, p0: BRound, armour: BArmour[] | null, tMax = 3, trace: BTrace | null = null) {
     const S = segs(), mats: BMat[] = [];
     rig.root.updateMatrixWorld(true);
@@ -485,7 +496,7 @@ const G_Ballistics = (() => {
     for (const s of S) {
       const bone = boneOf(rig, s.bone);
       if (!bone) continue;
-      const inv = new T.Matrix4().copy(bone.matrixWorld).invert(), lo = _o.copy(o).applyMatrix4(inv), ld = _ud.copy(u).transformDirection(inv), sc = new T.Vector3().setFromMatrixScale(bone.matrixWorld).x || 1;
+      const inv = new T.Matrix4(), sc = segFrame(rig, s, bone, inv), lo = _o.copy(o).applyMatrix4(inv), ld = _ud.copy(u).transformDirection(inv);
       const b = s.bb; let t0 = 0, t1 = tMax / sc, ok = true;
       for (let a = 0; a < 3; a++) {
         const oo = a === 0 ? lo.x : a === 1 ? lo.y : lo.z, dd = a === 0 ? ld.x : a === 1 ? ld.y : ld.z;
@@ -665,7 +676,7 @@ const G_Ballistics = (() => {
     for (const s of S) {
       const bone = boneOf(rig, s.bone);
       if (!bone) continue;
-      const inv = new T.Matrix4().copy(bone.matrixWorld).invert(), lo = _o.copy(o).applyMatrix4(inv), ld = _ud.copy(u).transformDirection(inv), sc = new T.Vector3().setFromMatrixScale(bone.matrixWorld).x || 1;
+      const inv = new T.Matrix4(), sc = segFrame(rig, s, bone, inv), lo = _o.copy(o).applyMatrix4(inv), ld = _ud.copy(u).transformDirection(inv);
       const b = s.bb; let t0 = 0, t1 = tMax / sc, ok = true;
       for (let a = 0; a < 3 && ok; a++) {
         const oo = a === 0 ? lo.x : a === 1 ? lo.y : lo.z, dd = a === 0 ? ld.x : a === 1 ? ld.y : ld.z;

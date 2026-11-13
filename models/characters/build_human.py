@@ -31,7 +31,7 @@ sk, hc = P['skin'], P['hair_col']
 M = {k: mat(k, c, r) for k, c, r in [('skin', sk, 0.6), ('stubble', tuple(a * 0.62 + b * 0.38 for a, b in zip(sk, hc)), 0.7), ('shirt', (0.13, 0.15, 0.17), 0.85), ('trousers', (0.10, 0.11, 0.12), 0.85), ('boots', (0.03, 0.03, 0.035), 0.6),
                                      ('hair', hc, 0.85), ('eye', (0.85, 0.85, 0.82), 0.25), ('iris', P['iris'], 0.2), ('lip', (sk[0] * 0.84, sk[1] * (0.6 if P['sex'] == 'f' else 0.68), sk[2] * (0.7 if P['sex'] == 'f' else 0.79)), 0.5)]}
 # (the game gives each of these its own material by what's worn: the same colour here as the one it's a part of)
-for k, of in (('upsleeve', 'shirt'), ('sleeve', 'shirt'), ('neck', 'skin'), ('hand', 'skin'), ('finger', 'skin'), ('eyeskin', 'skin'), ('brow', 'hair')):
+for k, of in (('upsleeve', 'shirt'), ('sleeve', 'shirt'), ('neck', 'skin'), ('hand', 'skin'), ('finger', 'skin'), ('eyeskin', 'skin'), ('brow', 'hair'), ('front', 'shirt'), ('lowleg', 'trousers')):
     M[k] = mat(k, tuple(M[of].node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value)[:3], 0.7)
 FIT = {}  # (what the game's gear is fitted to: body_parts fills it)
 def link(name, me, smooth=True):
@@ -137,7 +137,7 @@ def union(parts, name):
 
 # what each face is made of, by where it is
 def dress(o):
-    names = ('shirt', 'trousers', 'boots', 'neck', 'upsleeve', 'sleeve', 'hand', 'finger')
+    names = ('shirt', 'trousers', 'boots', 'neck', 'upsleeve', 'sleeve', 'hand', 'finger', 'front', 'lowleg')
     me = o.data; me.materials.clear()
     for k in names: me.materials.append(M[k])
     for p in me.polygons:
@@ -151,6 +151,8 @@ def dress(o):
             if off < 0.1 and t < 0.13 and abs(c.x) > 0.205: mi = 4
             elif off < 0.1 and t >= 0.13: mi = 5
             if (c - W).dot(a) > -0.004 and (c - W).length < 0.26: mi = 6 if (c - W).dot(a) < 0.092 else 7
+        if mi == 0 and c.y < -0.03 and abs(c.x) < 0.05: mi = 8  # (down the front of the chest: what an open jacket shows of the shirt under it)
+        if mi == 1 and c.z < 0.5: mi = 9                        # (below the knee: bare under shorts)
         p.material_index = mi
 
 # ---- the head: face D (face_options.py's, coarser), its features kept where the surface is thinned out

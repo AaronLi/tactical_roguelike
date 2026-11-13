@@ -149,6 +149,17 @@ const G_Rig = (() => {
   function fitOf(d: HumanDef) {
     const F = d.fit;
     return { cx: F.chest[0] / 0.19, cf: F.chest[1] / 0.125, cb: F.chest[2] / 0.125, hx: (0.65 * F.belt[0] + 0.35 * F.pelvis[0]) / 0.15, hf: F.belt[1] / 0.105, hb: F.belt[2] / 0.105, px: F.pelvis[0] / 0.16, pf: F.pelvis[1] / 0.1, pb: F.pelvis[2] / 0.1,
+      // the anatomy's segments (js/ballistics.ts segs: the old figure's shapes) on this body: each scaled by k about its bone and moved by o.
+      // The head's is lower and a little smaller (the old one's top was 0.236 over the neck's joint, a body's is 0.19); the trunk's are as
+      // wide and deep as this body's, their middle where its is (a chest stands forward of the spine's line); a limb's as thick.
+      seg: ((): Record<string, { k: number; o: number[] }> => {
+        const mid = (a: number[], w0: number, d0: number, kw = 0.5) => ({ k: kw * a[0] / w0 + (1 - kw) * (a[1] + a[2]) / 2 / d0, o: [0, 0, (a[2] - a[1]) / 2] }); // (kw: how much its width counts against its depth)
+        const head = { k: 0.94, o: [0, 0.19 - 0.236 * 0.94, -0.004] }, L = (k: number) => ({ k, o: [0, 0, 0] });
+        return { cranium: head, jaw: head, neck: { k: 1, o: [0, 0, 0.012] }, chest: mid(F.chest, 0.19, 0.115, 0.3), abdomen: mid(F.belt, 0.15, 0.105), pelvis: mid(F.pelvis, 0.165, 0.105),
+          uarm: L(1.12 * F.arm), farm: L(1.05 * F.fore), thigh: L(1.12 * F.thigh), shin: L(1.07 * F.calf) };
+      })(),
+      // the hit capsules' radii (hitboxes): head, chest, abdomen, upper arm, forearm, thigh, shin
+      hbR: [0.12, F.chest[0] + 0.018, Math.max(F.belt[0], F.pelvis[0] * 0.9) + 0.005, 0.066 * F.arm, 0.055 * F.fore, 0.099 * F.thigh, 0.074 * F.calf],
       delt: 1.05 * F.delt, arm: 1.12 * F.arm, fore: 1.05 * F.fore, thx: 1.07 * F.thigh, thz: 1.18 * F.thigh, shx: 1.05 * F.calf, shz: 1.1 * F.calf, chestF: F.chest[1] };
   }
   // a thing on the chest, the hips or a limb, moved and stretched to the body's fit (a box, a tube: across and in depth; a
@@ -355,6 +366,33 @@ const G_Rig = (() => {
       const tp = rnd();
       look = { top: tp < 0.5 ? 'tshirt' : tp < 0.85 ? 'longsleeve' : 'hoodie', topC: pick(PAL.shirt), pants: pick(['jeans', 'jeans', 'cargo']), pantsC: pick(PAL.pants), eyes: rnd() < 0.15 ? 'glasses' : 'none', gloves: 'none' };
     }
+    // Aboard a ship (docs/space.md) the crew wear what their ship's kind does (o.wear, or the ship being boarded: G.SpaceData.wearNow):
+    //   navy    a crewman's dark blue coverall and cap; the guards' working uniform with a white belt; the squads' blue combat dress;
+    //           an officer's white shirt, cap, gold shoulder boards and cuff rings
+    //   pirate  a sleeveless vest, a T-shirt or an open jacket in faded colours, a bandana, a sash; whoever's with them in everyday clothes
+    //   civil   a liner's people in everyday clothes, her guards in a security shirt and cap
+    // ex: what goes with it (a cap, a bandana, a belt, a sash, boards, cuffs: made below, with the body)
+    const wear: string | null = o.wear !== undefined ? o.wear : style === 'tactical' || o.vex || o.mannequin || !G.SpaceData || !G.SpaceData.wearNow ? null : G.SpaceData.wearNow();
+    const ex: Record<string, number | null> = {};
+    if (wear) {
+      const officer = !!(o.leader || o.boss), casual = () => { const tp = rnd(); return { top: tp < 0.35 ? 'tshirt' : tp < 0.6 ? 'longsleeve' : tp < 0.8 ? 'jacket' : 'hoodie', topC: pick(PAL.shirt), frontC: pick(PAL.shirt), pants: pick(['jeans', 'jeans', 'cargo', 'shorts']), pantsC: pick(PAL.pants), eyes: rnd() < 0.15 ? 'glasses' : 'none', gloves: 'none' }; };
+      if (wear === 'navy') {
+        if (officer && style !== 'armored') { look = { top: 'longsleeve', topC: 0xe6e6e0, pants: 'jeans', pantsC: 0x1b2438, eyes: 'none', gloves: 'none' }; ex.cap = 0xe6e6e0; ex.belt = 0x1b2438; }
+        else if (style === 'civ') { look = { top: 'longsleeve', topC: 0x24304c, pants: 'cargo', pantsC: 0x24304c, eyes: rnd() < 0.12 ? 'glasses' : 'none', gloves: 'none' }; ex.cap = rnd() < 0.7 ? 0x1b2438 : null; }
+        else if (style === 'armored') look = { top: 'combat', topC: 0x27324a, pants: 'combat', pantsC: 0x1f2738, eyes: rnd() < 0.5 ? 'shooting' : 'none', gloves: 'tactical' };
+        else { look = { top: 'longsleeve', topC: 0x2b3a5e, pants: 'cargo', pantsC: 0x1f2a44, eyes: rnd() < 0.2 ? 'shooting' : 'none', gloves: rnd() < 0.4 ? 'tactical' : 'none' }; ex.cap = 0x1f2a44; ex.belt = 0xd8d8d0; }
+        if (officer) { ex.boards = 0xc9a227; ex.cuffs = 0xc9a227; }
+      } else if (wear === 'pirate' && style !== 'civ') {
+        const PP = [0x7a2e22, 0x8a6a22, 0x2f5a5a, 0x1c1c1e, 0xb8ae98, 0x4a2f48], tp = rnd();
+        look = { top: tp < 0.3 ? 'vest' : tp < 0.55 ? 'tshirt' : tp < 0.8 ? 'jacket' : 'longsleeve', topC: pick(PP), frontC: pick(PP), pants: pick(['cargo', 'cargo', 'jeans', 'shorts']), pantsC: pick([0x2a2622, 0x3d3528, 0x1c1c1e, 0x4a4030]),
+          eyes: rnd() < 0.2 ? 'goggles' : 'none', gloves: rnd() < 0.5 ? 'fingerless' : 'none' };
+        ex.bandana = rnd() < 0.5 ? pick([0x8a1f1a, 0x1c1c1e, 0x2f5a5a]) : null; ex.sash = rnd() < 0.6 || officer ? pick([0x8a1f1a, 0x8a6a22]) : null;
+      } else if (wear === 'civil' && style !== 'civ') { look = { top: 'longsleeve', topC: 0x8fa3b8, pants: 'jeans', pantsC: 0x23272e, eyes: 'none', gloves: 'none' }; ex.cap = 0x23272e; ex.belt = 0x1c1c1e; }
+      else look = casual();
+    } else if (style === 'civ' && !o.look) { // (everyday clothes anywhere: sometimes a jacket open over a shirt, sometimes shorts)
+      if (rnd() < 0.2) { look.top = 'jacket'; look.frontC = pick(PAL.shirt); look.topC = pick(PAL.hoodie); }
+      if (rnd() < 0.15) look.pants = 'shorts';
+    }
     const top = L(look.topC), bottom = L(look.pantsC);
     // a combat shirt: a light body (it's worn under armour) with the sleeves in its colour
     const torsoM = look.top === 'combat' ? L(new T.Color(look.topC).lerp(new T.Color(0xb8b0a0), 0.4).getHex()) : top;
@@ -362,12 +400,13 @@ const G_Rig = (() => {
     else if (style === 'armored') { if (!o.dressed) { vestM = L(o.boss ? 0x3a2f24 : 0x3b4232); helmetM = L(0x2a2d30); } headCover = L(0x161616); }
     else if (style === 'suspect') { if (rnd() < 0.6) headCover = L(0x151515); else hairM = L(pick(PAL.hair)); }
     else hairM = L(pick(PAL.hair));
+    if (wear) { headCover = null; if (!hairM && !helmetM) hairM = L(pick(PAL.hair)); } // (a crew show their faces)
     // armour worn over street clothes (o.vest: 'soft', 'soft2' or a plate carrier; o.helmet)
     if (!o.dressed && o.vest && !vestM) vestM = L(o.vest === 'soft2' ? 0x5c5a50 : o.vest === 'soft' ? 0x34373b : 0x3b4232);
     if (!o.dressed && o.helmet && !helmetM) { helmetM = L(0x2a2d30); hairM = null; }
     const gloveM = ({ tactical: L(0x1c1d1f), leather: L(0x5e3e24), fingerless: L(0x1c1d1f) } as Record<string, THREE.MeshLambertMaterial>)[look.gloves] || null;
     // (a civilian's shoes: white trainers, brown leather dress shoes, black everyday shoes; heard so too: js/footsteps.ts feetOf)
-    const shoeC: number | null = style === 'civ' ? pick([0xeeeeee, 0x3a2a1a, 0x222222]) : null;
+    const shoeC: number | null = style === 'civ' && wear !== 'navy' ? pick([0xeeeeee, 0x3a2a1a, 0x222222]) : null;
     const shoe: FsSole | null = shoeC == null ? null : shoeC === 0xeeeeee ? 'sneaker' : shoeC === 0x3a2a1a ? 'dress' : 'shoe';
     const bootM = L(shoeC ?? 0x1e1f21);
     const dark = L(0x141414);
@@ -455,7 +494,7 @@ const G_Rig = (() => {
     // on the right), and a radio set on the chest harness with its antenna up by the shoulder, a push-to-talk lead to the headset
     if (o.leader) {
       const hs = L(0x1c1d1f), cup = L(0x2c2f33), led = new T.MeshBasicMaterial({ color: 0x57e06b });
-      const band = M_(new T.TorusGeometry(0.108, 0.006, 5, 24, Math.PI), hs, 0, 0.14, 0.005, hat); band.rotation.z = 0; band.scale.set(1, 1.02, 1.0); band.rotation.y = Math.PI / 2;
+      const band = M_(new T.TorusGeometry(0.108, 0.006, 5, 24, Math.PI), hs, 0, 0.14, 0.005, hat); band.scale.set(1, 1.02, 1.0); // (over the top of the head, ear to ear)
       for (const x of [-1, 1]) M_(cyl(0.032, 0.032, 0.026, 12), x < 0 ? cup : hs, x * 0.106, 0.12, 0.005, hat).rotation.z = Math.PI / 2;
       const boom = M_(new T.TorusGeometry(0.06, 0.0035, 4, 10, Math.PI * 0.6), hs, -0.09, 0.085, -0.055, hat); boom.rotation.set(0, 0.6, -Math.PI / 2 - 0.5);
       M_(new T.SphereGeometry(0.011, 6, 5), cup, -0.045, 0.062, -0.1, hat);
@@ -466,8 +505,17 @@ const G_Rig = (() => {
       const lead = M_(cyl(0.0035, 0.0035, 0.2, 4), hs, -0.17, 0.2, -0.13, chest); lead.rotation.z = 0.18;
     }
 
+    // what goes with a ship's clothes (ex): a cap, a bandana tied at the back, a belt or a sash, an officer's boards
+    if (ex.cap != null) G.Headgear.cap((c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => hat.add(m), ex.cap);
+    if (ex.bandana != null) {
+      const bm = L(ex.bandana), dome = M_(new T.SphereGeometry(0.106, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.4), bm, 0, 0.134, 0.004, hat); dome.scale.set(0.96, 1.05, 1.03);
+      M_(new T.BoxGeometry(0.035, 0.03, 0.03), bm, 0, 0.115, 0.108, hat); const tail = M_(new T.BoxGeometry(0.03, 0.08, 0.008), bm, 0.012, 0.07, 0.112, hat); tail.rotation.z = 0.25;
+    }
+    if (ex.belt != null) M_(new T.BoxGeometry(0.33, 0.045, 0.235), L(ex.belt), 0, 0.075, 0, hips);
+    if (ex.sash != null) { const sm = L(ex.sash); M_(new T.BoxGeometry(0.335, 0.075, 0.24), sm, 0, 0.07, 0, hips); M_(new T.BoxGeometry(0.05, 0.17, 0.018), sm, 0.12, -0.03, -0.112, hips); }
+    if (ex.boards != null) for (const x of [-1, 1]) M_(new T.BoxGeometry(0.05, 0.012, 0.085), L(ex.boards), x * 0.165, 0.3, 0, chest);
     // ---- arms: tapered, with elbows; sleeves (short for a T-shirt), and hands with fingers and a thumb
-    const longSleeves = look.top !== 'tshirt';
+    const longSleeves = look.top !== 'tshirt' && look.top !== 'vest';
     const handM = gloveM || skin, fingerM = look.gloves === 'fingerless' ? skin : handM;
     const mkArm = (side: number) => {
       const sh = joint(chest, side * 0.2, 0.225, 0); // (the middle of the shoulder, not its top: where the body's own joint is)
@@ -485,6 +533,7 @@ const G_Rig = (() => {
       B_(new T.BoxGeometry(0.068, 0.08, 0.035), handM, 0, -FARM - 0.035, 0, lo); // palm
       const fing = B_(new T.BoxGeometry(0.066, 0.045, 0.03), fingerM, 0, -FARM - 0.095, -0.006, lo); fing.rotation.x = 0.25;
       const thumb = B_(new T.BoxGeometry(0.022, 0.045, 0.024), fingerM, side * -0.036, -FARM - 0.045, -0.02, lo); thumb.rotation.z = side * 0.35;
+      if (ex.cuffs != null) for (const y of [0.035, 0.055]) M_(cyl(0.034, 0.033, 0.009, 12), L(ex.cuffs), 0, -FARM + y, 0, lo); // (an officer's rings)
       const tie = new T.Mesh(new T.TorusGeometry(0.04, 0.011, 5, 12), tieMat); tie.rotation.x = Math.PI / 2; tie.position.y = -FARM + 0.025; tie.visible = false; lo.add(tie);
       return { sh, up, lo, tie };
     };
@@ -511,7 +560,8 @@ const G_Rig = (() => {
     const hipMount = joint(hips, 0.2, 0.02, -0.02); hipMount.rotation.set(-Math.PI / 2, 0, 0);
 
     const rig = {
-      human: hid, humanOn: false, fit: hdef ? fitOf(hdef) : null, hat, prims, hairShown: !!hairM, hatOn: !hairM,
+      human: hid, humanOn: false, fit: hdef ? fitOf(hdef) : null, hat, prims, wear,
+      hairShown: !!hairM && ex.bandana == null && !(ex.cap != null && hdef && /hightop|topbun|full/.test(hdef.hairStyle)), hatOn: !hairM || ex.bandana != null || !!(ex.cap != null && hdef && /hightop|topbun|full/.test(hdef.hairStyle)), // (hair that a cap or a bandana can't go over isn't shown under one)
       hairMesh, look, pantsM: bottom, seat: null, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null, atakAlways: !!o.animal,
       root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style, shoe,
       gun: null, gunInfo: null, gunKey: null,
@@ -540,7 +590,8 @@ const G_Rig = (() => {
       const bare = !!o.mannequin, covered = !!headCover || bare;
       rig.hMat = (name: string, color: number): THREE.Material | null => {
         switch (name) {
-          case 'shirt': return torsoM; case 'upsleeve': return top; case 'sleeve': return longSleeves ? top : skin;
+          case 'shirt': return torsoM; case 'upsleeve': return look.top === 'vest' ? skin : top; case 'sleeve': return longSleeves ? top : skin;
+          case 'front': return look.top === 'jacket' ? L(look.frontC != null ? look.frontC : 0xd9d9d6) : torsoM; case 'lowleg': return look.pants === 'shorts' ? skin : bottom;
           case 'trousers': return bottom; case 'boots': return bootM; case 'neck': case 'skin': return faceM;
           case 'hand': return handM; case 'finger': return fingerM; case 'eyeskin': return skin;
           case 'lip': case 'stubble': return covered ? faceM : L(color);
@@ -1823,7 +1874,10 @@ const G_Rig = (() => {
     }
     const s = rig.scale, h = rig.hb;
     const W = (o: THREE.Object3D, x: number, y: number, z: number, out: THREE.Vector3) => o.localToWorld(out.set(x, y, z));
-    W(rig.head, 0, 0.1, -0.01, h[0].a); h[0].b.copy(h[0].a);                    // head (sphere)
+    const R = rig.fit && rig.fit.hbR; // (a body's own: js/humans.ts)
+    if (R) { h[0].r = R[0]; h[1].r = R[1]; h[2].r = R[2]; for (const i of [3, 5]) { h[i].r = R[3]; h[i + 1].r = R[4]; } for (const i of [7, 9]) { h[i].r = R[5]; h[i + 1].r = R[6]; } }
+    if (R) W(rig.head, 0, 0.075, -0.004, h[0].a); else W(rig.head, 0, 0.1, -0.01, h[0].a);
+    h[0].b.copy(h[0].a);                                                       // head (sphere)
     W(rig.chest, 0, 0.05, 0, h[1].a); W(rig.chest, 0, 0.135, 0, h[1].b);        // chest (its rounded top stops at the chin)
     W(rig.hips, 0, 0.0, 0, h[2].a); W(rig.spine, 0, 0.16, 0, h[2].b);           // abdomen / pelvis
     let i = 3;

@@ -105,6 +105,10 @@ const G_SpaceData = (() => {
   const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G.THEMES[th] || null);
   const themeIndex = (T: ThemeDef | null | undefined) => { if (!T) return -1; const i = G.THEMES.findIndex((q) => q.name === T.name); return i >= 0 ? i : THEMES.findIndex((q) => q.name === T.name) >= 0 ? TH0 + THEMES.findIndex((q) => q.name === T.name) : -1; };
 
+  /** What a ship's people wear, by her class (js/rig.ts create): a liner's are civilians, the big warships a navy's, the rest pirates'. */
+  const wearOf = (size: string | null | undefined): string | null => (!size ? null : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
+  /** ...aboard the ship being boarded now (null anywhere else). */
+  const wearNow = (): string | null => { const g = (G as any).Game, sp = g && g.map && g.map.sp; return sp ? wearOf(sp.size) : null; };
   const SIZES: Record<SpSize, SpClass> = {
     transport: { name: 'civilian transport', tier: 1, pay: 600, diff: -1, guns: { pd: 0, cannon: 0, missile: 0 }, crew: { guard: 3, squads: 0, resp: 0, civ: 6 } },
     small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 1, cannon: 0, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
@@ -156,7 +160,7 @@ const G_SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta };
+  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta, wearOf, wearNow };
 })();
 G.SpaceData = G_SpaceData;
 interface GameModules { SpaceData: typeof G_SpaceData; }

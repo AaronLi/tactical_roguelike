@@ -23,8 +23,10 @@ export default async ({ ev, sleep, log }) => {
         { top: 'hoodie', topC: 0x5a3a2a, pants: 'cargo', pantsC: 0x4a4030, gloves: 'fingerless' }, { top: 'longsleeve', topC: 0x2f4a3a, pants: 'jeans', pantsC: 0x3a3a3c, gloves: 'leather' }];
       const H = G.Humans; if (${process.argv.includes('--prim')}) G.Humans = null; // (--prim: the old figure, to compare)
       const rigs = ids.map((id, i) => {
-        const rig = G.Rig.create({ style: 'tactical', bare: true, human: id, seed: 11 + i, look: Object.assign({ eyes: i % 5 === 2 ? 'glasses' : i % 5 === 4 ? 'shooting' : 'none' }, LOOKS[i % 4]) });
-        rig.setKit(${JSON.stringify(kit)}); sc.add(rig.root);
+        const wear = ${JSON.stringify(arg('--wear'))}, st = ['civ', 'suspect', 'armored', 'suspect', 'suspect'][i % 5]; // (--wear navy|pirate|civil: a ship's people, a crewman, a guard, a trooper, an officer, a guard, in turn)
+        const rig = wear ? G.Rig.create({ style: st, leader: i % 5 === 3, wear, human: id, seed: 11 + i * 7, dressed: true })
+          : G.Rig.create({ style: 'tactical', bare: true, human: id, seed: 11 + i, look: Object.assign({ eyes: i % 5 === 2 ? 'glasses' : i % 5 === 4 ? 'shooting' : 'none' }, LOOKS[i % 4]) });
+        rig.setKit(wear ? (st === 'armored' ? G.Rig.armourKit('steel', 'ach', true) : null) : ${JSON.stringify(kit)}); sc.add(rig.root);
         const p = { pos: new T.Vector3((i % per - (per - 1) / 2) * 0.95, -Math.floor(i / per) * 2.15, 0), yaw: ${yaw}, pitch: 0, crouch: false, alert: false, lean: 0, state: 'alive' };
         for (let k = 0; k < 20; k++) rig.update(1 / 30, p);
         return rig;
@@ -37,6 +39,6 @@ export default async ({ ev, sleep, log }) => {
       for (const rig of rigs) { sc.remove(rig.root); rig.dispose(); }
       return url;
     })()`);
-    const f = path.join(out, `lineup_${set}_${view}${only ? '_close' : ''}.png`); fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64')); log('wrote ' + f);
+    const f = path.join(out, `lineup_${arg('--wear') || set}_${view}${only ? '_close' : ''}.png`); fs.writeFileSync(f, Buffer.from(url.split(',')[1], 'base64')); log('wrote ' + f);
   }
 };

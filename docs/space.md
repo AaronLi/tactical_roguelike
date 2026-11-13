@@ -136,3 +136,15 @@ not 45). The host's fleet is kept in its browser (`fleet`).
 - The squad's ship has no weapons of her own beyond her turrets; missiles are only drawn on the screens that are told of them.
 - Other ships are only met alongside a mission's target, not out in the space round the base.
 - A second ship isn't generated beside a capital ship (her upper deck would leave it roofless).
+
+## People
+
+Everyone's body is one of twenty figures (ten men, ten women: `models/characters/human_variants.py`, built by
+`models/characters/build_variants.py` into `assets/models/humans/<id>.glb` and `js/humandata.ts`), skinned to the rig's joints
+(`js/humans.ts`, `js/rig.ts` attachHuman). A figure's height is a scale of the whole character; its build is the fit of what it
+wears (rig.ts fitPart: helmets, carriers, belts, packs, limb armour), of its hit capsules and of the anatomy inside it
+(`js/ballistics.ts` segFrame). Aboard a ship the crew dress by her kind (`G.SpaceData.wearOf`): a transport's people in everyday
+clothes with security guards, the corvettes' and frigates' as pirates (vests, bandanas, sashes), the cruisers' and capital
+ships' as a navy (coveralls, working uniform with a white belt, officers in white with boards and cuff rings).
+`node tools/space_shot.mjs "mute&hangar" tools/human_lineup.mjs --out <dir> --gpu [--ids m04,f03] [--sets heavy] [--wear navy]`
+stands them in rows to look at.
