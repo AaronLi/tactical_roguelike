@@ -203,10 +203,12 @@ const G_Viewmodel = (() => {
   //   - HOLDOVER, under the middle: a tick for each of 100..500 m, at the drop of the round that fires next (the chambered one) from this gun's bore as the zeroing
   //     table has it turned (G.flight and G.boreTip, the sums every round is flown by), numbered 1..5. It is rebuilt when the load or the zero changes.
   //   - WINDAGE: ticks under the horizontal wire every half mil (the ballistic computer's cells), longer every 2.5, out to 10; and windage dots a mil apart on
-  //     each holdover row, more the further the range (2 at 100 m to 6 at 500 m: a Christmas tree), its number past them. Hold the dot for the wind's drift.
+  //     the 200 m and 400 m holdover rows (every 200: WIND_ROWS), 3 and 5 either side, those rows' numbers past them. Hold the dot for the wind's drift.
   //   - FOCAL PLANE: first (ffp: the marks grow with the picture, true at any power) or second (sfp: they stay one size on the glass, true at one power only, the
   //     scope's top: js/render.ts _renderPip puts pmil there). Mils are drawn on RANGE_R either side of the middle.
   const RANGE_R = 44, RANGE_TEX = new Map<string, any>(), RANGES = [100, 200, 300, 400, 500];
+  // the holdover rows that carry windage dots (every 200 m), and how many either side: 3 at 200, 5 at 400 (7 at 600, were there a row)
+  const WIND_ROWS = [200, 400, 600], dotsOf = (i: number) => (WIND_ROWS.includes(RANGES[i]) ? 1 + RANGES[i] / 100 : 0);
   function nextRound(def: any, w: any) {
     const cdef = G.asCal(def, G.cartOf(w.def ? w : { def, rl: w.rl }) || G.calOf(def));
     const am = (G.chambered(def) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || G.ballFor(G.calOf(def));
@@ -241,18 +243,18 @@ const G_Viewmodel = (() => {
     holds.forEach((y, i) => {
       if (y == null) return;
       line(W * 1.5, () => { g.moveTo(-1.1, y); g.lineTo(1.1, y); });
-      label(String(i + 1), 2 + i + 0.7, y, TH); // (its number past the row's windage dots)
+      label(String(i + 1), dotsOf(i) ? dotsOf(i) + 0.7 : 1.5, y, TH); // (its number past the row's windage dots, if it has them)
     });
     // WINDAGE: under the horizontal wire, a tick every half mil (the ballistic computer's cells), longer every 2.5 mil, out to 10 either
-    // side; and on each holdover row, dots a mil apart either side of the vertical wire, more the further the range (a Christmas tree):
-    // 2 at 100 m out to 6 at 500 m, wide enough to hold off for a strong crosswind there. Faint, so the stadia and the holds read first.
+    // side; and on the 200 m and 400 m holdover rows (WIND_ROWS: every 200), dots a mil apart either side of the vertical wire, 3 and 5,
+    // wide enough to hold off for a strong crosswind there. Faint, so the stadia and the holds read first.
     line(W * 0.6, () => { for (let k = 1; k * WIND_STEP <= WIND_MAX; k++) { const x = k * WIND_STEP, h = k % WIND_MAJOR ? 0.25 : 0.6; for (const sx of [x, -x]) { g.moveTo(sx, 0); g.lineTo(sx, h); } } });
     g.fillStyle = '#000';
     const labels: number[][] = RANGES.map((_, i) => [-3.2 - i * 3.2, TH * 0.95]); // (the numbers' middles: the stadia's, and the rows')
-    holds.forEach((y, i) => { if (y != null) labels.push([2 + i + 0.7 + 0.5, y]); });
+    holds.forEach((y, i) => { if (y != null) labels.push([(dotsOf(i) ? dotsOf(i) + 0.7 : 1.5) + 0.5, y]); });
     holds.forEach((y, i) => {
       if (y == null) return;
-      for (let k = 1; k <= 2 + i; k++) for (const sx of [k, -k]) {
+      for (let k = 1; k <= dotsOf(i); k++) for (const sx of [k, -k]) {
         if (labels.some(([lx, ly]) => Math.abs(sx - lx) < 0.75 && Math.abs(y - ly) < 1.0)) continue; // (not over a number: a flat round's rows are close together)
         g.beginPath(); g.arc(sx, y, k % 5 ? 0.09 : 0.13, 0, 7); g.fill();
       }

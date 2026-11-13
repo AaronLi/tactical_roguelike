@@ -67,19 +67,32 @@ const G_Sim = {
     return { x: sp * Math.cos(dir), z: sp * Math.sin(dir) };
   },
   // whether the wind reaches (x, y, z): open to the sky there, on the floor it's on (map.out: indoors there's none, and nor
-  // under a roof); off the map, the open air
+  // under a roof, a glass one too: map.glassRoofs); off the map, the open air
   windy(map: LvMap | null, x: number, y: number, z: number) {
     if (!map) return false;
     const L = G.Level, TS = L.TS, tx = Math.floor(x / TS), tz = Math.floor(z / TS);
     if (tx < 0 || tz < 0 || tx >= map.W || tz >= map.H) return true;
     const fm = L.floorMap(map, L.floorAt(map, x, y, z)), out = (fm && fm.out) || map.out;
-    return !!(out && out[tz * map.W + tx]);
+    if (!(out && out[tz * map.W + tx])) return false;
+    // under a glass roof (map.glassRoofs: [x0, z0, x1, z1, the roof's top], metres): open to the sky's light, not to its wind
+    for (const g of map.glassRoofs || []) if (x > g[0] && x < g[2] && z > g[1] && z < g[3] && y < g[4]) return false;
+    return true;
   },
   // The wind on a round in flight, a step on: drag works on the round's speed through the air, not over the ground, so
   // over a step where drag leaves k of its speed (k = exp(-len / drag), js/player.ts stepRound) its velocity goes
   // k v + (1 - k) w: it's carried toward the wind's. Over a flight that adds up to the lag-time rule, drift = w (t - t
   // in a vacuum), exactly, for this game's drag (speed falling off exponentially with distance: tools/wind.test.mjs).
   windStep(v: { x: number; z: number }, k: number, w: { x: number; z: number } | null | undefined) { if (w) { v.x += (1 - k) * w.x; v.z += (1 - k) * w.z; } },
+  // How a suspect judges the wind (js/server.ts fire): each misjudges it their own way for the level, by JUDGE.LO to JUDGE.HI of the drift
+  // (the better shot, acc: their type's, the nearer LO), over or under, and by a little more (SHOT, a normal's spread) each shot.
+  // windJudge: their bias (a share of the drift, + holds off too far); windShot: what they hold off this shot, times the true drift.
+  // Close in it makes no odds: the drift itself is millimetres.
+  JUDGE: { LO: 0.2, HI: 0.35, SHOT: 0.06 },
+  windJudge(acc: number | null | undefined, rnd = Math.random) {
+    const J = this.JUDGE, k = G.U.clamp(((acc == null ? 0.4 : acc) - 0.3) / 0.45, 0, 1), m = J.HI + (J.LO - J.HI) * k;
+    return (rnd() < 0.5 ? -1 : 1) * G.U.clamp(m * (0.9 + 0.2 * rnd()), J.LO, J.HI);
+  },
+  windShot(bias: number, rnd = Math.random) { const n = Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(2 * Math.PI * rnd()); return Math.max(0, 1 + bias + this.JUDGE.SHOT * n); },
   // the lag time (s) of a round leaving at v0 m/s, drag metres (G.dragOf), s metres out, gravity left out: its time of flight,
   // drag / v0 (e^(s / drag) - 1), less s / v0, the time it'd take with no drag. A crosswind of w carries it w times this sideways.
   lagAt(v0: number, drag: number, s: number) { return drag > 1e8 ? 0 : (drag / v0) * Math.expm1(s / drag) - s / v0; },

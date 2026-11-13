@@ -4,7 +4,8 @@
 //    lag (what the ballistic computer's marker uses) says the same;
 //  - the wind's smooth in time (no steps from one 50 ms tick to the next), slow (its direction turning over minutes), its
 //    mean about the theme's, and the same on two machines (two separately loaded games) for the same seed and time;
-//  - the Sandia Crest has flagpoles; indoors (the Crest House) there's no wind, out in the open there is.
+//  - the Sandia Crest has flagpoles; indoors (the Crest House) there's no wind, out in the open there is; nor under a glass roof (the greenhouse);
+//  - suspects misjudge the wind by 20-35% of the drift each (G.Sim.windJudge), a little more each shot (windShot).
 //   node tools/wind.test.mjs        (after tsc -p .)
 import { loadLevel } from './level_env.mjs';
 
@@ -77,6 +78,32 @@ if (A.Sim.windAt(5, 0, 10).x !== 0 || A.Sim.windAt(5, undefined, 10).z !== 0) fa
   const sp = map.spawn; if (!A.Sim.windy(map, sp.x, 1.5, sp.z)) fail('no wind in the parking lot'); else ok('wind out in the parking lot');
   for (const name of ['Apartment', 'Warehouse', 'Bunker', 'Research Lab', 'Foundry', 'Cold Storage', 'Convenience Store']) { const t = A.THEMES.find((q) => q.name === name); if (t.wind) fail(`${name} has wind ${t.wind}`); }
   ok('the indoor themes have none');
+}
+// ---- glass roofs (the level's map.glassRoofs: the greenhouse's) keep the wind out, not the light
+for (const seed of [31, 5]) {
+  const map = A.Level.generate(seed, 6, A.THEMES.indexOf(th), false), gr = map.glassRoofs || [];
+  if (!gr.length) { fail(`seed ${seed}: the Sandia Crest has no glass roof`); continue; }
+  const [x0, z0, x1, z1, top] = gr[0], cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, gy = A.Level.groundHeight(map, cx, cz), L = A.Level, out = map.out[Math.floor(cz / L.TS) * map.W + Math.floor(cx / L.TS)];
+  const inside = A.Sim.windy(map, cx, gy + 1.3, cz), over = A.Sim.windy(map, cx, top + 0.5, cz), beside = A.Sim.windy(map, x0 - 3, gy + 1.3, cz);
+  const msg = `seed ${seed}: the greenhouse (${x0}..${x1}, ${z0}..${z1}, roof top ${top.toFixed(1)} m, open to the sky in the level: ${out ? 'yes' : 'no'}): wind inside ${inside}, over the roof ${over}, outside its west wall ${beside}`;
+  if (inside || !over || !beside || !out) fail(msg); else ok(msg);
+  if (JSON.stringify(map.desc.glassRoofs) !== JSON.stringify(gr)) fail('the level description has no glassRoofs'); 
+}
+for (const name of ['Apartment', 'Suburbs', 'Festival']) { const m = A.Level.generate(424242, 3, A.THEMES.findIndex((t) => t.name === name), false); if (m.glassRoofs) fail(`${name} has glass roofs`); }
+
+// ---- suspects misjudge the wind: a bias each, 20-35% of the drift (the better shot, the less), and a little more each shot
+{
+  let r = 12345; const rnd = () => ((r = (r * 1103515245 + 12345) & 0x7fffffff) / 0x80000000);
+  for (const [type, acc] of [['suspect', A.ENEMIES.suspect.acc], ['grunt', A.ENEMIES.grunt.acc], ['marksman', A.ENEMIES.marksman.acc]]) {
+    const bs = Array.from({ length: 400 }, () => A.Sim.windJudge(acc, rnd)), mag = bs.map(Math.abs), lo = Math.min(...mag), hi = Math.max(...mag), mean = mag.reduce((a, b) => a + b, 0) / mag.length, neg = bs.filter((b) => b < 0).length / bs.length;
+    const shots = Array.from({ length: 2000 }, () => A.Sim.windShot(0.25, rnd)), sm = shots.reduce((a, b) => a + b, 0) / shots.length, sd = Math.sqrt(shots.reduce((a, b) => a + (b - sm) ** 2, 0) / shots.length);
+    const msg = `${type} (acc ${acc}): bias ${(lo * 100).toFixed(0)}-${(hi * 100).toFixed(0)}% of the drift (mean ${(mean * 100).toFixed(0)}%), under ${(neg * 100).toFixed(0)}% of the time; a shot at +25%: holds ${sm.toFixed(3)} +- ${sd.toFixed(3)} of the drift`;
+    if (lo < 0.199 || hi > 0.351 || neg < 0.4 || neg > 0.6 || Math.abs(sm - 1.25) > 0.01 || sd < 0.04 || sd > 0.08) fail(msg); else ok(msg);
+  }
+  if (!(Math.abs(A.Sim.windJudge(0.75, () => 0.99)) < Math.abs(A.Sim.windJudge(0.3, () => 0.99)))) fail('a marksman misjudges the wind no less than a suspect'); else ok('the better the shot, the smaller the misjudgement');
+  // what that comes to: a 7.62x39 at 300 m in 6.5 m/s across, 30% out, and at 20 m
+  const d = A.WEAPONS.ak, am = A.ballFor(A.calOf(d)), bl = A.ballistics(d, am);
+  ok(`a 30% misjudgement in 6.5 m/s: ${(0.3 * 6.5 * A.Sim.lagAt(bl.v0, bl.drag, 300) * 100).toFixed(1)} cm at 300 m, ${(0.3 * 6.5 * A.Sim.lagAt(bl.v0, bl.drag, 20) * 1000).toFixed(2)} mm at 20 m (7.62x39)`);
 }
 console.log(bad ? `${bad} FAILED` : 'all ok');
 process.exit(bad ? 1 : 0);

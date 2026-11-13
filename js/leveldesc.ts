@@ -97,7 +97,7 @@ const G_LevelDesc = (() => {
       TS, WALL_H: L.WALL_H, DOOR_H: L.DOOR_H, FLOOR_H: L.FLOOR_H, W: map.W, H: map.H, NF: fms.length, base: map.base || 0,
       floors: fms.map((m, f) => ({ f, fy: m.fy || 0, skirt: m.skirt || 0, t: str(m.t), out: str(m.out), grate: str(m.grate), units: str(m.unitAt ? Array.from(m.unitAt, (u) => u + 1) : null) })),
       terrain: map.terrain ? { VW: map.terrain.VW, VH: map.terrain.VH, TS: map.terrain.TS, v: Array.from(map.terrain.v), hole: str(map.terrain.hole) } : null,
-      chasm: map.chasm || 0, minY: map.minY || 0,
+      chasm: map.chasm || 0, minY: map.minY || 0, ...(map.glassRoofs ? { glassRoofs: map.glassRoofs } : {}), // (glass roofs: [x0, z0, x1, z1, top] m; under one, no wind: G.Sim.windy)
       rooms: (map.rooms || []).map((r) => ({ fl: r.fl || 0, type: r.type, x: r.x, z: r.z, w: r.w, h: r.h, cx: r.cx, cz: r.cz, out: !!r.out, unit: r.unit != null ? r.unit : null })),
       doors: map.doors.map((d) => ({ id: d.id, fl: d.fl || 0, fy: d.fy || 0, cells: d.cells || [d.i], x: d.x, z: d.z, axis: d.axis, w: d.w || TS, mirror: !!d.mirror, kind: d.kind || null, open: !!d.open, leaf: d.leaf || null, pane: d.pane ? d.pane.id : null })),
       windows: (map.windows || []).map((w) => ({ id: w.id, fl: w.fl || 0, fy: w.fy || 0, x: w.x, z: w.z, len: w.len, cells: w.cells, nx: w.nx || 0, nz: w.nz || 0, ext: !!w.ext, armor: !!w.armor, cooler: !!w.cooler,
@@ -988,7 +988,7 @@ const G_LevelDesc = (() => {
     }
     // ---- the greenhouse's roof: a ridge down its length, white glazing bars, glass between
     {
-      const [gx0, gz0] = cr.gh, x0 = gx0 * CS + 1, x1 = (gx0 + 6) * CS + 1, z0 = gz0 * CS + 1, z1 = (gz0 + 8) * CS + 1, ridge = 2.2, Y = L.groundHeight(map, x0, z0) + L.WALL_H, half = (x1 - x0) / 2, slope = Math.hypot(half, ridge), ang = Math.atan2(ridge, half);
+      const [gx0, gz0] = cr.gh, x0 = gx0 * CS + 1, x1 = (gx0 + 6) * CS + 1, z0 = gz0 * CS + 1, z1 = (gz0 + 8) * CS + 1, ridge = L.GH_RIDGE, Y = L.groundHeight(map, x0, z0) + L.WALL_H, half = (x1 - x0) / 2, slope = Math.hypot(half, ridge), ang = Math.atan2(ridge, half);
       const bar = B.std({ color: 0xeceae4, roughness: 0.5 }), pane = B.std({ color: 0x9fb8c0, transparent: true, opacity: 0.22, roughness: 0.05, metalness: 0.4, depthWrite: false, side: 2 });
       for (const s of [-1, 1]) { // (each slope: level, then tipped down toward its eave)
         out.push(B.mesh(B.geo('plane', [slope, z1 - z0], [['rx', -PI / 2]]), pane, { r: [0, 0, -s * ang], p: [(x0 + x1) / 2 + s * half / 2, Y + ridge / 2, (z0 + z1) / 2], ro: 2 }));
