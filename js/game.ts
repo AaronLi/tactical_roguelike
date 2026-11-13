@@ -256,7 +256,6 @@ const G_Game = {
       const lab = this.$(k + 'Val'); if (lab) lab.textContent = k === 'sens' || k === 'padSens' || k === 'touchSens' ? v.toFixed(2) : k === 'fov' ? v + '°' : k === 'vol' ? Math.round(v * 100) + '%' : lab.textContent;
       if (k === 'vol') G.Audio.setVolume(v);
     }
-    if (has('stickStay')) G.Touch.setStay(!!S.get('stickStay', false));
     if (has('muted') && !new URLSearchParams(location.search).has('mute')) { const m = !!S.get('muted', false); G.Audio.setMuted(m); this.$<HTMLInputElement>('mute').checked = m; }
     if (has('name')) { const n = String(S.get('name', this.myName) || '').trim().slice(0, 16); if (n) { this.myName = n; this.$<HTMLInputElement>('nameInput').value = n; if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, n); } }
     if (has('animals')) { this.prefAnimals = this.animalPrefs(false); if (this.phase === 'menu') this.setAnimal(this.prefAnimals[0]); this.animalPicks(); }

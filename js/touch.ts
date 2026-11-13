@@ -23,7 +23,7 @@ const G_Touch = (() => {
   type Finger = { kind: 'stick' | 'look' | 'btn'; t?: string; el?: HTMLElement; x: number; y: number; ox: number; oy: number };
   let on = false, wasPlay = false, uiEl: HTMLElement, moreEl: HTMLElement, stickEl: HTMLElement, knobEl: HTMLElement, closeEl: HTMLElement, tipEl: HTMLElement, turnEl: HTMLElement, turnGone = false;
   const fingers = new Map<number, Finger>(), off: Record<number, () => void> = {}, btn: Record<string, HTMLElement> = {};
-  let sx = 0, sy = 0, crouchAt = 0, crouchDone = false, aimWas = false, aimAt = 0, fires = 0, fsTried = false, stay = false, kept: { x: number; y: number } | null = null; // (stay: the setting; kept: where the stick was left)
+  let sx = 0, sy = 0, crouchAt = 0, crouchDone = false, aimWas = false, aimAt = 0, fires = 0, fsTried = false;
 
   const S = () => G.Pad.synth;
   const mouse = (type: 'mousedown' | 'mouseup', n: number) => S().fire(window, new MouseEvent(type, { button: n }));
@@ -60,7 +60,7 @@ const G_Touch = (() => {
   function letGo(id: number, f: Finger) {
     if (f.el) f.el.classList.remove('held');
     const o = off[id]; if (o) { delete off[id]; o(); }
-    if (f.kind === 'stick') { sx = sy = 0; stickEl.classList.remove('live', 'slow', 'fast'); knobEl.style.transform = ''; if (stay) { kept = { x: f.ox, y: f.oy }; stickEl.classList.add('kept'); } if (G.Me) G.Me.padMove = null; }
+    if (f.kind === 'stick') { sx = sy = 0; stickEl.classList.remove('live', 'slow', 'fast'); knobEl.style.transform = ''; if (G.Me) G.Me.padMove = null; }
     fingers.delete(id);
   }
   function releaseAll() {
@@ -78,7 +78,6 @@ const G_Touch = (() => {
     if (b) { f.kind = 'btn'; f.t = b.dataset.t; f.el = b; fingers.set(e.pointerId, f); press(f.t!, b, e.pointerId); return; }
     if (e.clientX < innerWidth * (portrait() ? 0.5 : 0.42) && ![...fingers.values()].some((g) => g.kind === 'stick')) {
       f.kind = 'stick'; stickEl.classList.add('live'); knobEl.style.transform = '';
-      if (stay && kept && Math.hypot(f.x - kept.x, f.y - kept.y) <= STICK_R * 1.4) { f.ox = kept.x; f.oy = kept.y; } // (a finger on the stick where it was left takes it from there; anywhere else it's moved there)
       stickEl.style.left = f.ox + 'px'; stickEl.style.top = f.oy + 'px'; stickEl.style.bottom = 'auto';
     }
     fingers.set(e.pointerId, f);
@@ -215,12 +214,6 @@ const G_Touch = (() => {
     chat.addEventListener('blur', () => { if (on && G.Game.chatOpen) setTimeout(() => { if (G.Game.chatOpen && document.activeElement !== chat) G.Game.closeChat(); }, 120); });
   }
 
-  // the setting: the stick stays where it was last used, or goes back to its corner
-  function setStay(v: boolean) {
-    stay = v;
-    if (!v) { kept = null; if (stickEl) stickEl.classList.remove('kept'); }
-    document.querySelectorAll<HTMLInputElement>('.stick-stay').forEach((c) => { c.checked = v; });
-  }
   function init() {
     const b = ([t, n]: [string, string]) => `<button class="tb tb-${t}" data-t="${t}">${n}</button>`;
     uiEl = document.createElement('div'); uiEl.id = 'touchUi'; uiEl.className = 'ui hidden';
@@ -243,9 +236,6 @@ const G_Touch = (() => {
     turnEl.addEventListener('click', () => { turnGone = true; turnEl.classList.add('hidden'); });
     document.body.appendChild(turnEl);
 
-    document.querySelectorAll<HTMLInputElement>('.stick-stay').forEach((c) => c.addEventListener('change', () => { setStay(c.checked); G.U.store.set('stickStay', c.checked); }));
-    setStay(!!G.U.store.get('stickStay', false));
-    window.addEventListener('resize', () => { kept = null; stickEl.classList.remove('kept'); }); // (turned sideways: where it was may be off the screen)
     gestures(); keyboard();
     window.addEventListener('pointerdown', (e) => {
       if (!e.isTrusted) return;
@@ -267,7 +257,7 @@ const G_Touch = (() => {
   }
 
   return {
-    init, update, setOn, setStay,
+    init, update, setOn,
     active: () => on,
     // a key prompt, in the on-screen buttons' names while touch is what's being used
     text(html: string) { for (const [re, to] of SUBS) html = html.replace(re, to); return html; },

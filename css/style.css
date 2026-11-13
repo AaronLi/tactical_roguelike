@@ -1073,8 +1073,7 @@ body.touch-on .not-touch, body.touch-on .kb-only { display: none !important; }
 .t-top .tb { position: static; width: 44px; height: 36px; border-radius: var(--ui-r); font-size: 9px; }
 #touchStick { position: absolute; left: calc(92px + var(--sl)); bottom: calc(26px + var(--sb)); width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.22); background: rgba(8,10,13,0.16); pointer-events: none; opacity: 0.55; }
 #touchStick.live { opacity: 1; margin: -56px 0 0 -56px; }
-#touchStick.kept { margin: -56px 0 0 -56px; }
-#touchStick:not(.live):not(.kept) { top: auto !important; left: calc(92px + var(--sl)) !important; margin: 0 0 0 -56px; bottom: calc(26px + var(--sb)) !important; }
+#touchStick:not(.live) { top: auto !important; left: calc(92px + var(--sl)) !important; margin: 0 0 0 -56px; bottom: calc(26px + var(--sb)) !important; }
 #touchStick i { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: rgba(233,237,240,0.55); }
 #touchStick.fast i { background: #fff; box-shadow: 0 0 0 3px rgba(255,255,255,0.3); }
 #touchStick.slow i { background: rgba(233,237,240,0.32); }
@@ -1092,7 +1091,7 @@ body.touch-on .not-touch, body.touch-on .kb-only { display: none !important; }
   .tb-leanL, .tb-leanR { bottom: calc(190px + var(--sb)); }
   .tb-fireL { bottom: calc(186px + var(--sb)); }
   #touchMore { top: calc(150px + var(--st)); grid-template-columns: repeat(5, 48px); }
-  #touchStick:not(.live):not(.kept) { bottom: calc(60px + var(--sb)) !important; }
+  #touchStick:not(.live) { bottom: calc(60px + var(--sb)) !important; }
 }
 #touchClose { position: fixed; z-index: 70; top: calc(4px + env(safe-area-inset-top, 0px)); right: calc(6px + env(safe-area-inset-right, 0px)); width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--ui-line-hi); background: var(--ui-panel-solid); color: var(--ui-text); font: 300 26px/1 var(--ui-font); touch-action: manipulation; }
 #touchTip { max-width: calc(100vw - 16px); white-space: pre-line; z-index: 95; }
