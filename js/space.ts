@@ -893,7 +893,7 @@ const G_Space = (() => {
     const left = crewAboard();
     if (left.length) { G.HUD.toast('NOT YET', 'Not aboard: ' + left.join(', '), 2); return; }
     G.Net.toHost({ t: 'sdock', on: 0 }); dockLocal(false);
-    const away = S.kind === 'board' ? S.Dp.clone().add(new T.Vector3(0, 0, 30)) : S.Dp.clone().add(new T.Vector3(0, 12, 0));
+    const away = S.kind === 'board' ? S.Dp.clone().add(new T.Vector3(0, 0, 30).applyQuaternion(S.Dq)) : S.Dp.clone().add(new T.Vector3(0, 12, 0)); // (off a hull: straight back along her tail, whichever way she's against it)
     S.P.copy(S.Dp); S.Q.copy(S.Dq);
     auto(away, S.Dq, S.kind === 'board' ? 2.5 : 3.2, null, () => {});
   }
