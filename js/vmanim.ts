@@ -1049,7 +1049,7 @@ const G_VMAnim = (() => {
   // and the thumb brought round toward the palm. (The model's L is your right: it faces +z, so its -x side turns to your right.)
   const HUM_SH = [new T.Vector3(0.17, -0.2, 0.12), new T.Vector3(-0.16, -0.22, 0.06)]; // (the shoulders, camera space: right, left)
   const HUM_POLE = [new T.Vector3(0.75, -1, 0.3).normalize(), new T.Vector3(-0.45, -1, 0.2).normalize()]; // (where the elbows go, camera space)
-  const HUM_MAGCHK = 0.008; // (the left hand's hold on a magazine it's looking over: a little up its body from the floorplate)
+  const HUM_MAGCHK = 0.003; // (the left hand's hold on a magazine it's looking over: a little up its body from the floorplate)
   interface HumArm {
     meshes: THREE.SkinnedMesh[]; bones: Record<string, THREE.Bone>; bindW: Record<string, THREE.Matrix4>; s: string; th: number;
     S: V3; E: V3; W: V3; lu: number; lf: number; f: V3; X: V3; Y: V3; Cinv: THREE.Matrix4;
@@ -1108,6 +1108,7 @@ const G_VMAnim = (() => {
   }
   // your arms, on a viewmodel: now if your body's file is in, else when it comes
   function dressArms(root: THREE.Object3D, a: Vma) {
+    if (!G.Humans || !G.Rig || !G.Game) return;
     const lk = G.Rig.armLook({ animal: G.Game.myAnimal, callName: G.Game.myName, seed: 977, look: G.Game.myLook });
     const go = () => { const parts = G.Humans.get(lk.human); if (!parts || root.userData.vma !== a || a.R.hum) return; a.R.hum = humArm(root, a.R, parts, 'L', lk.col); a.L.hum = humArm(root, a.L, parts, 'R', lk.col); };
     if (G.Humans.get(lk.human)) go(); else G.Humans.ensure(lk.human).then(go);
