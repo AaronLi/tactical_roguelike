@@ -102,6 +102,7 @@ const G_SpaceData = (() => {
       // the cockpit: its deck (on to the foot of the down flight), its sides, the glass at its front, its back wall under the up flight
       [-fw - W, 0, zc + 0.3, fw + W, FC, zr], [-fw - W, FC, zc + 0.3, -fw, CC, zk], [fw, FC, zc + 0.3, fw + W, CC, zk], [-fw, FC, zc + 0.3, fw, CC, zc + 0.5],
       [-fw, FC, zk, -0.06, FB - 0.3, zk + 0.05], [-fw - W, CC, zc + 0.3, fw + W, CC + 0.2, zt], // (and its roof, under the tunnel)
+      [-fw, FC, zc + 0.3, -fw + 0.24, FC + 0.55, zc + 3.1], [fw - 0.24, FC, zc + 0.3, fw, FC + 0.55, zc + 3.1], [-fw, FC, zc + 0.3, fw, FC + 0.55, zc + 0.57], // (the glass leans in toward its foot: kept off it there)
       // the breach deck: the tunnel's floor, sides and roof; the staging space's floor, sides, roof and the wall either side of the tunnel's mouth; the low wall
       [-tw - W, CC, zc, tw + W, FB, zt], [-tw - W, FB, zc, -tw, CB, zt], [tw, FB, zc, tw + W, CB, zt], [-tw - W, CB, zc, tw + W, top, zt],
       [-sw - W, CC, zt, sw + W, FB, zk], [-sw - W, FB, zt, -sw, CB, zk], [sw, FB, zt, sw + W, CB, zk], [-sw - W, CB, zt, sw + W, top, zk],

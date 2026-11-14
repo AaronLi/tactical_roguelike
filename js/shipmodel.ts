@@ -59,21 +59,27 @@ const G_ShipModel = (() => {
     // the cockpit's glazed walls (below), the doors and the steps off the ramp (their own)
     const glazed = (b: (number | string | undefined)[]) => b[1] === FC && b[4] === CC && b[2] === zc + 0.3;
     for (const b of SD.boxes(d)) {
-      if (b[6] || glazed(b) || (b[2] === zc + 0.3 && b[4] === FC)) continue;
+      if (b[6] || glazed(b) || (b[2] === zc + 0.3 && (b[4] === FC || b[4] === FC + 0.55))) continue; // (and what keeps you off the glass's foot: behind it)
       const flat = b[4] - b[1] <= 0.36 || (b[1] === 0 && b[4] <= FB + 0.01 && b[3] - b[0] < 2 * fw);
       K.box(flat ? deck : inner, b[0], b[1], b[2], b[3], b[4], b[5]);
     }
-    // the cockpit's front: a sill, a header and the glass between, no pillar in the pilot's way
-    K.box(deck, -fw - 0.2, 0, zf, fw + 0.2, FC, zr); K.box(dark, -fw - 0.2, 0, zc + 0.3, fw + 0.2, FC - 0.03, zc + 0.34); K.box(dark, -0.03, FC - 0.04, zc + 0.34, 0.03, FC - 0.01, zf);
-    part(g, new T.Mesh(new T.BoxGeometry(2 * fw + 0.4, 0.03, zf - zc - 0.34), glass), 0, FC - 0.02, (zc + 0.34 + zf) / 2); // (the glass deck ahead of the seat)
+    // the cockpit's glazing: every pane leans in toward its foot, 0.3 m, the canopy's outline at the header drawn in at the deck; posts at its corners
+    const IN = 0.3, crown = [[-fw, zg1], [-fw, zg0], [-fc, zc + 0.33], [fc, zc + 0.33], [fw, zg0], [fw, zg1]], foot = [[-fw + IN, zg1], [-fw + IN, zg0 + 0.12], [-fc + 0.12, zc + 0.33 + IN], [fc - 0.12, zc + 0.33 + IN], [fw - IN, zg0 + 0.12], [fw - IN, zg1]];
+    const quad = (a: number[], b: number[], c: number[], d: number[], m: THREE.Material) => { const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute([...a, ...b, ...c, ...a, ...c, ...d], 3)); geo.computeVertexNormals(); const me = new T.Mesh(geo, m); g.add(me); return me; };
+    const post = (a: number[], b: number[]) => { const va = new T.Vector3(a[0], a[1], a[2]), vb = new T.Vector3(b[0], b[1], b[2]), m = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, va.distanceTo(vb), 6), dark); m.position.copy(va).add(vb).multiplyScalar(0.5); m.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), vb.clone().sub(va).normalize()); g.add(m); };
+    for (let i = 0; i < crown.length - 1; i++) quad([foot[i][0], SILL, foot[i][1]], [foot[i + 1][0], SILL, foot[i + 1][1]], [crown[i + 1][0], HEADER, crown[i + 1][1]], [crown[i][0], HEADER, crown[i][1]], glass);
+    for (let i = 1; i < crown.length - 1; i++) post([foot[i][0], SILL, foot[i][1]], [crown[i][0], HEADER, crown[i][1]]);
+    for (const i of [0, 5]) post([foot[i][0], SILL, foot[i][1]], [crown[i][0], HEADER, crown[i][1]]);
+    K.box(deck, -fw + IN, 0, zf, fw - IN, FC, zg1); K.box(deck, -fw - 0.2, 0, zg1, fw + 0.2, FC, zr); // (the deck: inside the glass's foot where it's glazed)
+    part(g, new T.Mesh(new T.BoxGeometry(2 * (fw - IN), 0.03, zf - zc - 0.6), glass), 0, FC - 0.02, (zc + 0.6 + zf) / 2); // (the glass deck ahead of the seat)
     K.box(dark, -fw, HEADER, zc + 0.3, fw, CC, zc + 0.36);
-    part(g, new T.Mesh(new T.PlaneGeometry(2 * fc, HEADER - SILL), glass), 0, (SILL + HEADER) / 2, zc + 0.33);
-    for (const s of [-1, 1]) { const cut = part(g, new T.Mesh(new T.PlaneGeometry(Math.hypot(0.45, zg0 - zc - 0.33), HEADER - SILL), glass), s * (fc + 0.225), (SILL + HEADER) / 2, (zc + 0.33 + zg0) / 2); cut.rotation.y = -s * Math.atan2(zg0 - zc - 0.33, 0.45); K.box(dark, s * fc - 0.03, SILL, zc + 0.31, s * fc + 0.03, HEADER, zc + 0.36); K.box(dark, s * fw - 0.03, SILL, zg0 - 0.03, s * fw + 0.03, HEADER, zg0 + 0.03); }
+    // (the front's posts and panes: above)
+    void fc;
     for (const s of [-1, 1]) {
       const a = s * fw, b = s * (fw + W);
       K.box(inner, a, SILL, zg1, b, CC, zk); K.box(dark, a, HEADER, zg0, b, CC, zg1); // (the wall behind the side glass, its header)
-      K.box(dark, a, SILL, zg1 - 0.06, b, HEADER, zg1); for (const zm of [zc + 1.9]) K.box(dark, a, SILL, zm - 0.03, b, HEADER, zm + 0.03); // (its frame, a mullion beside the sensor station)
-      part(g, new T.Mesh(new T.BoxGeometry(0.03, HEADER - SILL, zg1 - zg0), glass), s * (fw + W / 2), (SILL + HEADER) / 2, (zg0 + zg1) / 2);
+      for (const zm of [zc + 1.9]) post([s * (fw - IN), SILL, zm], [s * fw, HEADER, zm]); // (a post beside the sensor station)
+      void a; void b;
     }
     // ---- the cockpit's fittings: the helm's console under the glass (the navigation screen on it), the sensor station's screen
     // on the wall at its right hand (js/space.ts draws the deck plan on it), the seats
@@ -119,7 +125,8 @@ const G_ShipModel = (() => {
       // an engine pod on a swept pylon either side aft: a spike at its intake, a ring and a lit throat at the back
       const px = X + 1.6, py = FM + 0.2, pz0 = z1 - 3.4, pz1 = z1 + 1.7, hex = (r: number, cx = px, cy = py) => [0, 1, 2, 3, 4, 5].map((k) => [cx + Math.cos(k * Math.PI / 3 + Math.PI / 6) * r, cy + Math.sin(k * Math.PI / 3 + Math.PI / 6) * r * 1.05]);
       g.add(loft([{ z: pz0 - 2.0, pts: hex(0.06, px - 0.25, py - 0.1) }, { z: pz0, pts: hex(0.62) }, { z: pz1 - 1.2, pts: hex(0.78) }, { z: pz1, pts: hex(0.66) }], armor, mir));
-      g.add(loft([{ z: pz0 + 0.2, pts: [[X + 0.3, py - 0.12], [px, py - 0.1], [px, py + 0.1], [X + 0.3, py + 0.34]] }, { z: pz1 - 1.4, pts: [[X + 0.3, py - 0.12], [px, py - 0.1], [px, py + 0.1], [X + 0.3, py + 0.34]] }], hull, mir));
+      // the flank pinches out into a wing to the pod: the crew deck's whole side at its root, thin at the pod, swept
+      g.add(loft([{ z: zr + 0.4, pts: [[X, FM - 0.1], [X + 0.25, FM + 0.12], [X + 0.32, FM + 0.24], [X + 0.32, FM + 0.32], [X + 0.25, FM + 0.45], [X, CM]] }, { z: pz0 - 0.3, pts: [[X, 0.35], [px - 0.5, py - 0.15], [px, py - 0.08], [px, py + 0.1], [px - 0.5, py + 0.2], [X, CM + 0.1]] }, { z: pz1 - 0.6, pts: [[X, 0.4], [px - 0.5, py - 0.15], [px, py - 0.08], [px, py + 0.1], [px - 0.5, py + 0.2], [X, CM]] }, { z: z1 + 0.35, pts: [[X, 0.7], [px - 0.7, py - 0.1], [px - 0.25, py - 0.05], [px - 0.25, py + 0.06], [px - 0.7, py + 0.12], [X, CM - 0.3]] }], hull, mir));
       const ring = part(g, new T.Mesh(new T.TorusGeometry(0.62, 0.1, 6, 6), accent), s * px, py, pz1 + 0.02); ring.rotation.z = Math.PI / 6;
       part(g, new T.Mesh(new T.CircleGeometry(0.55, 6), thrust), s * px, py, pz1 + 0.05).rotation.z = Math.PI / 6;
       part(g, new T.Mesh(new T.CircleGeometry(0.5, 6), dark), s * px, py, pz1 - 0.02).rotation.z = Math.PI / 6;
