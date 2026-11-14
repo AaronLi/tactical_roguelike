@@ -887,16 +887,17 @@ const G_Space = (() => {
   function nearAnchor() { let best: typeof S.anchors[0] | null = null, bd = 420; for (const a of S.anchors) { if (!a.obj.visible) continue; const d = S.P.distanceTo(a.p); if (d < bd && !(S.kind === 'hub' && S.board.done.includes(a.i))) { bd = d; best = a; } } return best; }
   // the stars smeared into lines by the drive, k how far (0: none); eased, and drawn from her nose in the stars' frame
   let smearK = 0;
-  function smear(dt: number, want: number) {
-    smearK += (want - smearK) * Math.min(1, dt * 4);
+  let moteK = 0;
+  function smear(dt: number, want: number, motes = 0) {
+    smearK += (want - smearK) * Math.min(1, dt * 4); moteK += (motes - moteK) * Math.min(1, dt * 4);
     const st = S.stars; if (!st) return;
     const u = st.userData.streak as { f: { value: THREE.Vector3 }; k: { value: number }; tr: { value: THREE.Vector3 }; R: { value: number } }, line = st.userData.streaks as THREE.Object3D;
-    u.k.value = smearK; void line;
+    u.k.value = smearK; (u as any).mk.value = moteK; void line;
     u.f.value.copy(fwd(S.Q)); if (S.zone) u.f.value.applyQuaternion(_zq.copy(S.zone.quaternion).invert());
     // (the motes near her go by as fast as the smear's long: kept within one box's width, the shader wraps them)
     const w = 2 * u.R.value, t = u.tr.value.addScaledVector(u.f.value, smearK * 1400 * dt);
     const tm = (st.userData.streak as any).tm; tm.value = (tm.value + smearK * 0.9 * dt) % 1000; // (the far stars along their way out from the middle)
-    const pm = st.material as THREE.PointsMaterial; pm.color.setScalar(1 - Math.min(0.85, smearK * 1.6)); // (as they go by, the still ones dim)
+    const pm = st.material as THREE.PointsMaterial; pm.color.setScalar(Math.max(0, 1 - smearK * 2.6)); // (the still ones gone once the drive's going: every star's a streak going by)
     t.set(((t.x % w) + w) % w, ((t.y % w) + w) % w, ((t.z % w) + w) % w);
   }
   let tunUp: { map: LvMap | null; steps: ((ms: number) => boolean)[] } | null = null;
@@ -917,7 +918,7 @@ const G_Space = (() => {
     f.t += dt;
     const tn = S.tunnel!, tex = tn.userData.tex as THREE.Texture, mat = tn.userData.mat as THREE.MeshBasicMaterial;
     tn.visible = false; // (no tube: the stars smear instead)
-    smear(dt, f.st === 'spool' ? 0.35 * (f.t / f.T) ** 2 : f.st === 'wait' ? 0.45 : 0.7 * G.U.clamp((f.T - f.t) / 0.6, 0, 1));
+    { const k = f.st === 'spool' ? 0.35 * (f.t / f.T) ** 2 : f.st === 'wait' ? 0.45 : 0.7 * G.U.clamp((f.T - f.t) / 0.6, 0, 1); smear(dt, k, k); } // (the jump: motes going by too; the warp, a few kilometres, none)
     if (f.st === 'spool') {
       const u = Math.min(1, f.t / f.T); mat.opacity = u * 0.9; tex.offset.y -= dt * (0.4 + u * 3);
       S.V.multiplyScalar(Math.exp(-dt * 3));
