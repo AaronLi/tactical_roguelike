@@ -2694,6 +2694,7 @@ const G_Me = {
     if (killed) { this.killed(from, friendly ? 'Friendly fire' : killed); return; }
     if (fate === 'dead') { this.killed(from, friendly ? 'Friendly fire' : this.body.parts.head.hp <= 0 ? 'A head wound' : 'Bled out where they fell'); return; }
     if (o.stopped && !friendly) G.Net.toHost({ t: 'saved', n: o.stopped }); // (your armour stopped them: js/highlights.ts saved)
+    if (o.stopped && !friendly && G.Loadout) G.Loadout.stopped(this, Object.keys(o.wear || {}).filter((k) => o.wear[k] > 0)); // (for the helmet and armour trees' challenges)
     this.hurt(f, from, fate);
   },
   // a round to the head you weren't wearing a helmet for: no bleeding out, no revive

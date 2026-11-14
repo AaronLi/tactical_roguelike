@@ -77,6 +77,8 @@ const G_Game = {
   arms: undefined as Record<string, string> | undefined, // (each player's sidearm pick)
   armSel: undefined as string | null | undefined,
   armLook: undefined as string | null | undefined,
+  armTake: null as string | null, // (the sidearm picked for the loadout, taken on Deploy)
+  loTab: 'p' as string, loLook: {} as Record<string, string>, // (the loadout screen's tab, and what's looked at on each tree)
   routeWait: 0,
   armModels: undefined as Promise<unknown> | 'ready' | undefined, // (the sidearm web's guns, stock and pro, loading before it opens: sidearmPick)
   armView: undefined as unknown as GmArmView,
@@ -1377,6 +1379,7 @@ const G_Game = {
     if (this.armModels) return this.armModels;
     const A = G.Arsenal, defs: any[] = [];
     for (const q of A.NODES) { defs.push(G.Me.makeWeapon(q.id).def); if (q.pro) defs.push(G.Me.makeWeapon(q.id, A.build(q.id)).def); }
+    if (G.Loadout) for (const q of G.Loadout.TREES.p.NODES) defs.push(G.Me.makeWeapon(q.id).def); // (and the primary tree's)
     let n = 0; const say = () => this.veilSay(`Loading the arsenal ${n} / ${defs.length}`); say();
     const each = (d: any) => G.Models.ensure(d, 0).catch(() => false).then(() => { n++; say(); });
     return (this.armModels = Promise.all(defs.map(each)).then(() => { this.armModels = 'ready'; }));
@@ -1416,6 +1419,9 @@ const G_Game = {
     // with every picture drawn; anything still missing after that shows a spinner until it comes in ('gunicons')
     if (this.armModels !== 'ready') { el.classList.add('hidden'); this.armLoad().then(() => { if (this.phase === 'route') this.sidearmPick(); }); return; }
     if (!this.armLook) { this.armLook = this.armSel = 'p9'; this.armView = { x: 0, y: 0, z: 0.7 }; }
+    if (!this.armTake) this.armTake = 'p9';
+    if (!G.SpaceData.ON) this.loTab = 's'; // (a run on the ground: the sidearm alone, taken at once)
+    if (this.loTab !== 's') { this.loWeb(el); this.armBind(el); return; } // (the primary, helmet and armour trees: loWeb)
     // who's taken it (the squad's own picks: told by the host)
     const takers = (id: string) => Object.entries(arms).filter(([pid, a]) => a === id && roster[pid]).map(([pid]) => `<i style="color:${G.U.hex(roster[pid].color)}">${G.Callsigns.html(roster[pid].animal)}${G.U.esc(roster[pid].name)}</i>`);
     const others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !arms[pid]).length;
@@ -1441,18 +1447,22 @@ const G_Game = {
     const P = q.pro!, parts = A.partNames(id).map((n) => `<li>${G.U.esc(n!)}</li>`).join('');
     const pro = !got ? '' : `<h4>Pro build</h4><div class="web-pro${A.proGot(id) ? ' got' : ''}" tabindex="0" title=""><b>${G.U.esc(P.name)}</b><ul>${parts}</ul>${A.proGot(id) ? `<label><input type="checkbox" data-armpro ${A.proOn(id) ? 'checked' : ''}> Start in pro mode</label>` : `<span>${Math.min(P.n, A.count(id, P.stat))}/${P.n}</span> ${G.U.esc(P.what)} with this gun`}</div>`;
     const was = el.querySelector('.web-world');
-    el.innerHTML = `<div class="web-full"><div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
+    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
         <div class="web-head"><h2>Your sidearm</h2><p>${G.Pad.text('Drag to move · scroll to zoom · click a gun')}</p></div><button class="btn web-home" data-armhome>Back to the P9</button></div>
       <aside class="web-side"><img src="${pic(id)}" alt=""><h3>${G.U.esc(d.name)}</h3><div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${G.U.fmt(Math.round(G.Ballistics.energy(d)))} J · ${d.rpm} rpm</span></div><em>${G.U.esc(d.desc)}</em>${ask}
         ${nextOn ? `<h4>With this gun</h4><ul class="web-next">${nextOn}</ul>` : ''}${pro}${others.length && got ? `<span class="arm-who">${takers(id).join('') || '<small>no one yet</small>'}</span>` : ''}
         <div class="web-foot"><p>Your own equipment, not a squad vote, and what you earn here stays yours. It starts loaded with ${((am: string) => am === 'tracer' ? 'tracers' : G.AMMO[am] && am !== G.ballFor(G.calOf(d)) ? G.AMMO[am].name + ' rounds' : 'buckshot')(A.startAm(id))}, two spare loads in your pocket.</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
-        <button class="btn primary arm-ok" data-armok ${got ? '' : 'disabled'}>${got ? `Take ${/^the /i.test(d.name) ? '' : 'the '}${G.U.esc(d.name)}${A.proOn(id) ? ` ${G.U.esc(P.name)}` : ''}` : 'Not yet yours'}</button></div></aside><div class="web-preview hidden"></div></div>`;
+        <button class="btn primary arm-ok" data-armok ${got && this.armTake !== id ? '' : 'disabled'}>${!got ? 'Not yet yours' : this.armTake === id ? 'Your sidearm' : `Take ${/^the /i.test(d.name) ? '' : 'the '}${G.U.esc(d.name)}${A.proOn(id) ? ` ${G.U.esc(P.name)}` : ''}`}</button></div></aside><div class="web-preview hidden"></div></div>`;
     el.classList.remove('hidden');
     const place = () => { const v = this.armView, w = el.querySelector<HTMLElement>('.web-world'); if (w) w.style.transform = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.z.toFixed(3)})`; };
     this.armPlace = place;
     // (where it was, then across to where it's going: the map's built afresh each time)
     if (this.armFrom) { const w = el.querySelector<HTMLElement>('.web-world')!; w.style.transform = this.armFrom; this.armFrom = null; requestAnimationFrame(() => { w.classList.add('glide'); place(); }); } else place();
     if (was) was.remove();
+    this.armBind(el);
+  },
+  // the web's handlers (drag, zoom, clicks), once: every tab of the loadout screen is drawn into the same element
+  armBind(el: HTMLElement) {
     if (!el.dataset.bound) {
       el.dataset.bound = 1 as unknown as string;
       let drag: { x: number; y: number; vx: number; vy: number } | null = null, moved = false;
@@ -1491,6 +1501,17 @@ const G_Game = {
       el.addEventListener('click', ((e: GmEvt) => {
         const dragged = moved; moved = false;
         if (G.Me.sidearmChosen) return;
+        // the loadout's own: a tab, a node on one of its trees, taking it (or leaving the slot empty), and deploying
+        const lt = e.target.closest<HTMLElement>('[data-lotab]'), ln = e.target.closest<HTMLElement>('[data-lonode]');
+        if (lt) { this.loTab = lt.dataset.lotab!; this.armView = { x: 0, y: 0, z: 0.7 }; G.Audio.click(); return this.sidearmPick(); }
+        if (e.target.closest('[data-lodeploy]')) { G.Audio.click(); return this.loDeploy(); }
+        if (ln) {
+          if (dragged) return;
+          const sl = this.loTab, q = G.Loadout.BY[sl].get(ln.dataset.lonode!)!; this.loLook[sl] = q.id;
+          const [x, y] = G.Loadout.at(sl, q); go(-x, -y); G.Audio.click(); return this.sidearmPick();
+        }
+        if (e.target.closest('[data-lotake]')) { G.Loadout.pick(this.loTab, this.loLook[this.loTab]); G.Audio.click(); return this.sidearmPick(); }
+        if (e.target.closest('[data-loclear]')) { G.Loadout.pick(this.loTab, null); G.Audio.click(); return this.sidearmPick(); }
         const b = e.target.closest<HTMLElement>('[data-arm]'), ok = e.target.closest<HTMLButtonElement>('[data-armok]');
         const tick = e.target.closest<HTMLInputElement>('[data-armpro]');
         if (tick) { G.Arsenal.proSet(this.armLook!, tick.checked); G.Audio.click(); return this.sidearmPick(); }
@@ -1502,15 +1523,65 @@ const G_Game = {
           G.Audio.click(); return this.sidearmPick(); // (chosen, not yet taken)
         }
         if (!ok || ok.disabled || !G.Arsenal.open(this.armLook!)) return;
-        const id = this.armLook!;
-        G.Me.setSidearm(id, G.Arsenal.proOn(id) ? G.Arsenal.build(id) : undefined); G.Audio.click();
-        G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)
-        G.HUD.toast('', `Sidearm: ${G.WEAPONS[id].name}`, 1.4);
-        this.armSel = this.armLook = null; this.sidearmPick(); this.renderRoute();
+        this.armTake = this.armLook!; G.Audio.click(); if (!G.SpaceData.ON) return this.loDeploy(); this.sidearmPick(); // (picked: taken with the rest on Deploy; on the ground, taken at once)
       }) as EventListener);
     }
   },
+  // ---- The loadout screen (a run in space, before the base): a bar across the top, your rank and its XP and the four slots, each a tab
+  // with what's in it; under it the slot's tree (the sidearm's: the web above; the rest: loWeb). Deploy takes the lot.
+  loBar() {
+    if (!G.SpaceData.ON) return '';
+    const L = G.Loadout, r = L.rank(), x = L.xp(), lo = L.rankAt(r), hi = L.rankAt(r + 1), pct = Math.round(((x - lo) / (hi - lo)) * 100);
+    const val = (sl: string) => { const id = L.sel(sl); return id ? L.name(sl, id) : sl === 'p' ? 'None' : 'Issue kit'; };
+    const tab = (sl: string, label: string, v: string) => `<button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}</small><b>${G.U.esc(v)}</b></button>`;
+    return `<div class="lo-bar"><div class="lo-rank"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></div>${tab('p', 'Primary', val('p'))}${tab('s', 'Sidearm', G.WEAPONS[this.armTake || 'p9'].name)}${tab('h', 'Helmet', val('h'))}${tab('a', 'Body armour', val('a'))}<button class="btn primary lo-go" data-lodeploy>Deploy</button></div>`;
+  },
+  // a tree of the loadout's (primary, helmet, body armour), drawn as the sidearm's web is
+  loWeb(el: HTMLElement) {
+    const L = G.Loadout, sl = this.loTab, T = L.TREES[sl], BY = L.BY[sl], look = this.loLook[sl] = this.loLook[sl] && BY.has(this.loLook[sl]) ? this.loLook[sl] : L.sel(sl) || T.mid;
+    const item = (id: string) => { if (sl === 'p') return G.Gear.gunItem(G.Me.makeWeapon(id)); const k = BY.get(id)!.kit!, it = G.Gear.gearItem((k.helmet || k.carrier)!); if (k.face) it.face = G.Gear.gearItem(k.face); if (k.plate) it.plate = G.Gear.gearItem(k.plate); return it; };
+    const pic = (id: string) => { const it = item(id), [cw, ch] = G.Gear.size(it), url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
+    const W = 1500, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r], rings = L.RINGS.slice(1, 5);
+    const web = rings.map((r) => `<polygon points="${spokes.map((a) => spot(a, r).map((v) => v.toFixed(1)).join()).join(' ')}"/>`).join('') + spokes.map((a) => { const [x, y] = spot(a, rings[rings.length - 1]); return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
+    const strands = T.NODES.filter((q) => q.from).map((q) => {
+      const [x0, y0] = L.at(sl, BY.get(q.from!)!), [x1, y1] = L.at(sl, q), f = L.open(sl, q.id) ? 1 : L.open(sl, q.from!) && q.stat ? L.left(sl, q) / q.n! : 0;
+      return `<line class="strand" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>${f > 0 ? `<line class="strand on" x1="${x0}" y1="${y0}" x2="${(x0 + (x1 - x0) * f).toFixed(1)}" y2="${(y0 + (y1 - y0) * f).toFixed(1)}"/>` : ''}`;
+    }).join('');
+    const nodes = T.NODES.map((q) => {
+      const [x, y] = L.at(sl, q), st = L.open(sl, q.id) ? 'got' : !q.from || L.open(sl, q.from) ? 'next' : 'far', tip = st === 'got' ? '' : st === 'far' ? '<small>Locked</small>' : `<small>${G.U.esc(L.need(sl, q))}</small>`;
+      return `<button class="web-node ${st}${look === q.id ? ' look' : ''}${L.sel(sl) === q.id ? ' sel' : ''}" data-lonode="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${((src) => src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>')(pic(q.id))}<b>${G.U.esc(L.name(sl, q.id))}</b>${tip}</button>`;
+    }).join('');
+    const paths = Object.entries(T.PATHS).map(([k, pa]) => { const [x, y] = L.along(sl, k, L.RINGS[1] / 2); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${pa.name}</span>`; }).join('');
+    // what you're looking at: what it is, what it takes, what's next from it
+    const q = BY.get(look)!, got = L.open(sl, look), mine = L.sel(sl) === look;
+    let about = '';
+    if (sl === 'p') { const d = G.WEAPONS[look], cal = G.CALIBERS[G.calOf(d)], modes = (d.modes || [d.mode]).map((m: string) => G.MODE_NAME[m]).join(' / '); about = `<div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} rounds</span><span>${modes}</span><span>${d.rpm} rpm</span></div><em>${G.U.esc(d.desc)}</em>`; }
+    else { const k = q.kit!, ds = [k.helmet, k.face, k.carrier, k.plate].filter(Boolean).map((g) => G.Gear.DEFS[g!]); about = ds.map((d) => `<em><b>${G.U.esc(d.name)}</b> ${G.U.esc(d.desc || '')}</em>`).join(''); }
+    const ask = got ? '' : !q.from || L.open(sl, q.from) ? `<div class="web-ask"><b>${G.U.esc(L.need(sl, q))}</b>${q.how ? `<small>${G.U.esc(q.how)}</small>` : q.rank != null ? '<small>XP comes from the missions you complete: the higher the threat, the more.</small>' : ''}</div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(L.name(sl, q.from))} first.</div>`;
+    const nextOn = T.NODES.filter((c) => c.from === look && !L.open(sl, c.id)).map((c) => `<li><b>${G.U.esc(L.name(sl, c.id))}</b> ${G.U.esc(L.need(sl, c))}${c.how ? `<small>${G.U.esc(c.how)}</small>` : ''}</li>`).join('');
+    const was = el.querySelector('.web-world');
+    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
+        <div class="web-head"><h2>Your ${T.title.toLowerCase()}</h2><p>${G.Pad.text('Drag to move · scroll to zoom · click to look')}</p></div><button class="btn web-home" data-armhome>Back to the middle</button></div>
+      <aside class="web-side"><img src="${pic(look)}" alt=""><h3>${G.U.esc(L.name(sl, look))}</h3>${about}${ask}${nextOn ? `<h4>From here</h4><ul class="web-next">${nextOn}</ul>` : ''}
+        <div class="web-foot"><p>Earned for good: kept between runs, whatever squad you're in.${sl !== 'p' ? ' With nothing taken you wear the issue kit: a worn bump helmet and concealable vest.' : ''}</p>
+        <button class="btn primary arm-ok" data-lotake ${got && !mine ? '' : 'disabled'}>${!got ? 'Not yet yours' : mine ? 'In your loadout' : 'Take it'}</button>${L.sel(sl) ? `<button class="btn lo-clear" data-loclear>${sl === 'p' ? 'Go without a primary' : 'Use the issue kit'}</button>` : ''}</div></aside></div>`;
+    el.classList.remove('hidden');
+    const place = () => { const v = this.armView, w = el.querySelector<HTMLElement>('.web-world'); if (w) w.style.transform = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.z.toFixed(3)})`; };
+    this.armPlace = place;
+    if (this.armFrom) { const w = el.querySelector<HTMLElement>('.web-world')!; w.style.transform = this.armFrom; this.armFrom = null; requestAnimationFrame(() => { w.classList.add('glide'); place(); }); } else place();
+    if (was) was.remove();
+  },
+  // Deploy: the sidearm (told the squad: the host waits on everyone's), and the rest put on you
+  loDeploy() {
+    const id = this.armTake || 'p9', L = G.Loadout;
+    G.Me.setSidearm(id, G.Arsenal.proOn(id) ? G.Arsenal.build(id) : undefined);
+    if (G.SpaceData.ON) L.apply(G.Me);
+    G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)
+    G.HUD.toast('LOADOUT', [L.sel('p') ? L.name('p', L.sel('p')!) : null, G.WEAPONS[id].name, L.sel('h') ? L.name('h', L.sel('h')!) : null, L.sel('a') ? L.name('a', L.sel('a')!) : null].filter(Boolean).map((n) => G.U.esc(n!)).join(' · '), 2.4);
+    this.armSel = this.armLook = null; this.sidearmPick(); this.renderRoute();
+  },
   // the route's state as the map draws it (js/route.ts svg, tip)
+
   routeTipSt() {
     const st = this.routeSt!, rm = this.routeMap!;
     return { path: st.path, opts: G.Route.options(rm, st.path[st.path.length - 1]), votes: st.votes, mine: st.votes[G.Net.myId!] };

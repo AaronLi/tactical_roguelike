@@ -1217,3 +1217,17 @@ body.touch-on #scoreboard { top: 10%; }
 body.touch-on #fieldInv { background: rgba(7, 9, 11, 0.95); }
 @media (orientation: landscape) { body.touch-on .inv > .inv-col.eq { flex: 0 0 210px; } body.touch-on .inv > .inv-col:nth-child(2) { flex: 1 1 300px; max-width: none; } }
 body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
+/* the loadout screen (js/game.ts loBar, loWeb): a bar over the tree, rank and XP, the four slots, Deploy */
+.web-full:has(.lo-bar) { padding-top: 66px; box-sizing: border-box; }
+.lo-bar { position: absolute; left: 0; top: 0; right: 0; z-index: 2; height: 66px; display: flex; align-items: stretch; gap: 8px; padding: 8px 14px; box-sizing: border-box; background: #0b0e11; border-bottom: 1px solid var(--ui-line); }
+.lo-rank { display: flex; flex-direction: column; justify-content: center; min-width: 150px; gap: 3px; font: 400 12px var(--ui-font); color: var(--ui-dim); text-align: left; }
+.lo-rank b { font: 500 16px var(--ui-font); color: var(--ui-text); }
+.lo-rank i { display: block; height: 4px; background: var(--ui-line); border-radius: 2px; overflow: hidden; }
+.lo-rank em { display: block; height: 100%; background: #9fd6ff; }
+.lo-tab { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 4px 12px; background: var(--ui-fill); border: 1px solid var(--ui-line); border-radius: var(--ui-r); color: var(--ui-text); cursor: pointer; font: inherit; }
+.lo-tab small { font: 400 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1px; }
+.lo-tab b { font: 500 14px var(--ui-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.lo-tab:hover { border-color: var(--ui-line-hi); }
+.lo-tab.on { border-color: var(--ui-line-hi); background: var(--ui-fill-hi); box-shadow: inset 0 -2px 0 #9fd6ff; }
+.lo-go { align-self: center; padding: 10px 26px; }
+.lo-clear { margin-top: 6px; width: 100%; }

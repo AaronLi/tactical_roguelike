@@ -87,6 +87,7 @@ const G_Arsenal = (() => {
   const left = (q: ArsenalNode) => Math.min(q.n!, count(q.from!, q.stat!));
   // one more of something, with that gun: what it's for, and whatever that's earned
   function tally(id: string, stat: string) {
+    if (G.Loadout) G.Loadout.gunStat(id, stat); // (the primary tree's challenges are the same kills: js/loadout.ts)
     if (!open(id)) return;
     const d = data(), ns = d.n[id] || (d.n[id] = {});
     ns[stat] = (ns[stat] || 0) + 1;
