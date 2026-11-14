@@ -431,6 +431,7 @@ finger_bones(arm, body)
 skin_to(head, arm, 'head')
 for e, n in zip(eyes, 'RL'): skin_to(e, arm, 'eye.' + n)
 import kit_armour; kits = kit_armour.build(body, arm)  # (its body armour, made on it: models/characters/kit_armour.py)
+import kit_head; kits += kit_head.build(head, arm)  # (its helmets and face pieces, made on its head: models/characters/kit_head.py)
 tris = lambda o: sum(len(p.vertices) - 2 for p in o.data.polygons)
 stats = {'triangles': {'body': tris(body), 'head': tris(head), 'eyes': sum(tris(e) for e in eyes)}, 'vertices': {'body': len(body.data.vertices), 'head': len(head.data.vertices)}, 'bones': [b[0] for b in BONES] + ['eye.R', 'eye.L'] + ['%s%d.%s' % (k[:-1], i, k[-1]) for k in FING for i in (1, 2, 3)], 'height': P['height']}
 stats['triangles']['total'] = sum(stats['triangles'].values()); stats['triangles']['kit'] = sum(tris(o) for o in kits) # (the armour apart: worn one piece at a time)
