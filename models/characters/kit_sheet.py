@@ -34,9 +34,9 @@ both = lambda k, x, y, z: {k + '.R': (x, y, z), k + '.L': (-x, y, z)}
 POSES = [('rest', {}, (0, 0, 0)), ('arms down', {**both('upperarm', 0.12, 0, -1), **both('forearm', 0.08, -0.12, -1)}, (0, 0, 0)),
          ('aiming', {'upperarm.R': (0.25, -0.7, -0.66), 'forearm.R': (-0.62, -0.75, 0.25), 'upperarm.L': (-0.1, -0.92, -0.38), 'forearm.L': (0.3, -0.94, 0.16), 'chest': (0, -0.1, 1), 'neck': (0, -0.2, 1)}, (0, 0, 0)),
          ('crouch', {**both('thigh', 0.12, -0.9, -0.42), **both('shin', 0, 0.5, -0.87), 'spine': (0, -0.25, 0.97), 'chest': (0, -0.35, 0.94), 'neck': (0, 0.1, 1), 'upperarm.R': (0.2, -0.75, -0.6), 'forearm.R': (-0.6, -0.75, 0.3), 'upperarm.L': (-0.1, -0.9, -0.4), 'forearm.L': (0.3, -0.94, 0.16)}, (0, 0.1, -0.36))]
-SETS = {'soft': ['kitsoft', 'kitdelt', 'kitthigh'], 'pc': ['kitpc', 'kitplatepc', 'kitpouchpca', 'kitpouchpcb', 'kitpouchpcc', 'kitpelvis', 'kitaxil', 'kitdelt'],
-        'heavy': ['kitheavy', 'kitplateheavy', 'kitpouchheavya', 'kitpouchheavyb', 'kitshcap', 'kitgflap', 'kitgplate', 'kitlegwrap', 'kitshin'],
-        'wrap': ['kitwrap', 'kitplatewrap', 'kitpouchwrapa', 'kitpouchwrapb']}
+SETS = {'soft': ['kitsoft', 'kitdelt', 'kitthigh'], 'pc': ['kitpc', 'kitplatepc', 'kitpelvis', 'kitaxil', 'kitdelt'],
+        'heavy': ['kitheavy', 'kitplateheavy', 'kitbeltwide', 'kitshcap', 'kitgflap', 'kitgplate', 'kitlegwrap', 'kitshin'],
+        'wrap': ['kitwrap', 'kitplatewrap', 'kitbelt']}
 COL = {'soft': (0.3, 0.3, 0.27), 'pc': (0.22, 0.25, 0.16), 'heavy': (0.26, 0.23, 0.17), 'wrap': (0.2, 0.21, 0.22)}
 for e in ('BLENDER_EEVEE', 'BLENDER_EEVEE_NEXT'):
     try: sc.render.engine = e; break

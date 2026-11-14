@@ -9,7 +9,8 @@
 #                      cummerbund right round the waist under them, straps over the shoulders (the slick, patrol and assaulter
 #                      carriers; the heavy one larger and thicker, a collar round the neck and pads over the shoulders)
 #   kitplatepc, kitplateheavy        the plate in its bag: its outline standing proud of the front bag (only with a plate in)
-#   kitpouchpca..d, kitpouchheavya..d    magazine pouches across the front bag, left to right (as many as the carrier has)
+#   kitbelt, kitbeltwide            a duty belt; a padded battle or war belt
+#   (the pouches on a carrier's or a belt's MOLLE aren't made here: js/rig.ts lays what's mounted onto these surfaces)
 import bpy, bmesh, math
 from mathutils import Vector as V, Matrix
 from mathutils.bvhtree import BVHTree
@@ -135,11 +136,12 @@ def _weigh(o, body, arm, only=None, allow=TRUNK):
             for n, w in sorted(acc.items(), key=lambda a: -a[1])[:4]: o.vertex_groups[n].add([v.index], w / tot, 'REPLACE')
     o.parent = arm; md = o.modifiers.new('arm', 'ARMATURE'); md.object = arm
 
-def _done(o, name, mats, body, arm, only=None, allow=TRUNK):
+def _done(o, name, mats, body, arm, only=None, allow=TRUNK, weigh=True):
     if name not in mats: mats[name] = _mat(name, (0.2, 0.22, 0.18))
     o.name = name; o.data.name = name; o.data.materials.clear(); o.data.materials.append(mats[name])
     o.data.shade_smooth(); o.data.set_sharp_from_angle(angle=math.radians(40))  # (smooth over the body's curve, hard at its rims: fewer vertices than flat)
-    _weigh(o, body, arm, only, allow); o.hide_render = True
+    if weigh: _weigh(o, body, arm, only, allow)
+    o.hide_render = True
     return o
 
 def _join(objs, name):
@@ -157,21 +159,18 @@ def build(body, arm):
     for x in (-0.09, 0.09): parts.append(_strap('st', body, x, 0.05, 0.004, 0.01))
     out.append(_done(_join(parts, 'kitsoft'), 'kitsoft', mats, body, arm))
     # -- the plate carriers: (key, bag width, height, its thickness with the plate, the cummerbund's height, its strap width)
-    pouch = lambda key, top, bh, bt, pw, ph, pdp, n: [_pouch(body, arm, mats, key, c, (-(n - 1) / 2 + i) * (pw + 0.008), top - bh + 0.075, bt, pw, ph, pdp) for i, c in enumerate('abcd'[:n])]
     for key, bw, bh, bt, ch, stw in (('pc', 0.27, 0.32, 0.03, 0.15, 0.055), ('heavy', 0.31, 0.35, 0.042, 0.19, 0.07)):
         top = 1.47 if key == 'pc' else 1.49  # (its top at the sternum's notch: the plate over the top of the lungs)
         parts = [_panel('pf', body, -1, -bw / 2, bw / 2, top - bh, top, 0.006, bt, cut=0.05), _panel('pb', body, 1, -bw / 2 - 0.005, bw / 2 + 0.005, top - bh + 0.01, top + 0.01, 0.006, bt * 0.85, cut=0.03),
                  _band('cb', body, top - bh, top - bh + ch, 0.004, 0.014)]
         for x in (-0.1, 0.1): parts.append(_strap('st', body, x * (1 if key == 'pc' else 1.05), stw * 0.9, 0.004 + bt * 0.3, 0.014))  # (its inner edge off the neck's side)
         if key == 'heavy':
-            parts.append(_band('collar', body, 1.46, 1.5, 0.012, 0.025, seg=20))  # (a collar round the neck's base)
+            parts.append(_band('collar', body, 1.5, 1.545, 0.014, 0.022, seg=20))  # (a collar round the neck's base)
             parts += [_panel('af', body, -1, -bw / 2 + 0.02, bw / 2 - 0.02, 1.0, top - bh + 0.03, 0.008, 0.014), _panel('ab', body, 1, -bw / 2 + 0.01, bw / 2 - 0.01, 1.0, top - bh + 0.03, 0.008, 0.014)]  # (the belly and the small of the back)
         out.append(_done(_join(parts, 'kit' + key), 'kit' + key, mats, body, arm))
         # the plate in it: its outline, proud of the front bag
         out.append(_done(_panel('pl', body, -1, -bw / 2 + 0.025, bw / 2 - 0.025, top - bh + 0.03, top - 0.02, 0.006 + bt, 0.005, cut=0.045), 'kitplate' + key, mats, body, arm))
         # its pouches: across the front bag's lower half, standing on its face (each rides the chest)
-        pw, ph, pdp = (0.062, 0.1, 0.045) if key == 'pc' else (0.068, 0.11, 0.05)
-        out += pouch(key, top, bh, bt, pw, ph, pdp, 4)
     # -- the full-wrap vest (IIIA): soft armour closed right round the trunk, from under the collarbones down to the belt, higher under
     # the arms than the concealable one; thicker, a plate pocket in front, two pouches low on it
     parts = [_panel('wf', body, -1, -0.16, 0.16, 0.97, 1.45, 0.005, 0.018, cut=0.07), _panel('wb', body, 1, -0.165, 0.165, 0.97, 1.47, 0.005, 0.018, cut=0.04),
@@ -179,16 +178,19 @@ def build(body, arm):
     for x in (-0.09, 0.09): parts.append(_strap('st', body, x, 0.06, 0.006, 0.014))
     out.append(_done(_join(parts, 'kitwrap'), 'kitwrap', mats, body, arm))
     out.append(_done(_panel('pl', body, -1, -0.11, 0.11, 1.15, 1.43, 0.024, 0.005, cut=0.045), 'kitplatewrap', mats, body, arm))
-    out += pouch('wrap', 1.45, 0.42, 0.018, 0.062, 0.1, 0.045, 2)
+    # -- belts: a plain duty belt, and the padded battle/war belt (each on the hips alone: it rides them, it doesn't stretch)
+    out.append(_done(_band('bl', body, 0.98, 1.025, 0.012, 0.008, seg=24), 'kitbelt', mats, body, arm, only='hips'))
+    out.append(_done(_band('bw', body, 0.962, 1.042, 0.012, 0.018, seg=24), 'kitbeltwide', mats, body, arm, only='hips'))
     # -- what's worn on the limbs and the hips (a carrier's or a belt's): each on its own bones
     B = lambda n: arm.matrix_world @ arm.data.bones[n].head_local
     E = lambda n: arm.matrix_world @ arm.data.bones[n].tail_local
     UP, FWD = V((0, 0, 1)), V((0, -1, 0))
-    ARMS = ('upperarm.R', 'upperarm.L', 'clavicle.R', 'clavicle.L', 'chest')
     two = lambda f: [f(s) for s in ('R', 'L')]
     # soft deltoid pads over the top of each arm; a hard cap (the hard guards) larger and thicker
-    out.append(_done(_join(two(lambda s: _tube('dp', body, B('upperarm.' + s), E('upperarm.' + s), 0.04, 0.5, -1.7, 1.7, 0.006, 0.014, UP)), 'kitdelt'), 'kitdelt', mats, body, arm, allow=ARMS))
-    out.append(_done(_join(two(lambda s: _tube('hc', body, B('upperarm.' + s), E('upperarm.' + s), -0.05, 0.42, -2.1, 2.1, 0.012, 0.022, UP, smooth=2)), 'kitshcap'), 'kitshcap', mats, body, arm, allow=ARMS))
+    # (each side its own arm's: weighted before they're joined, so a pad goes where its arm does and not half with the chest)
+    side = lambda o, s: (_weigh(o, body, arm, allow=('upperarm.' + s, 'clavicle.' + s)), o)[1]
+    out.append(_done(_join(two(lambda s: side(_tube('dp', body, B('upperarm.' + s), E('upperarm.' + s), 0.04, 0.5, -1.7, 1.7, 0.006, 0.014, UP), s)), 'kitdelt'), 'kitdelt', mats, body, arm, weigh=False))
+    out.append(_done(_join(two(lambda s: side(_tube('hc', body, B('upperarm.' + s), E('upperarm.' + s), -0.05, 0.42, -2.1, 2.1, 0.012, 0.022, UP, smooth=2), s)), 'kitshcap'), 'kitshcap', mats, body, arm, weigh=False))
     # an axillary panel down each flank under the arm (over a vest)
     out.append(_done(_join([_band('ax', body, 1.2, 1.35, 0.016, 0.012, a0=0.38 * math.pi, a1=0.62 * math.pi, seg=6, closed=False), _band('ax2', body, 1.2, 1.35, 0.016, 0.012, a0=1.38 * math.pi, a1=1.62 * math.pi, seg=6, closed=False)], 'kitaxil'), 'kitaxil', mats, body, arm))
     # the groin flap hanging from the carrier, a plate on it, a wrap right round the hips
@@ -202,8 +204,3 @@ def build(body, arm):
     out.append(_done(_join(two(lambda s: _tube('sg', body, B('shin.' + s), E('shin.' + s), 0.04, 0.85, -1.0, 1.0, 0.008, 0.008, FWD, seg=8)), 'kitshin'), 'kitshin', mats, body, arm, allow=LEGS))
     return out
 
-def _pouch(body, arm, mats, key, c, x, z, bt, pw, ph, pdp):
-    """a magazine pouch standing on the front bag's face at x, z (it rides the chest)"""
-    hit = _out(body, V((0, 0, z)), V((x * 2.2, -0.3, 0)), 0.006 + bt)
-    y = (hit.y if hit else -0.16) - pdp / 2
-    return _done(_box('pp', V((x, y, z)), (pw, pdp, ph)), 'kitpouch%s%s' % (key, c), mats, body, arm, only='chest')

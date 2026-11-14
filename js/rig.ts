@@ -25,7 +25,7 @@ interface ZipSwing { th: number; w: number; v: number; a: number }
 interface RigLeg { th: THREE.Object3D; sh: THREE.Object3D }
 type RigState = 'alive' | 'down' | 'dead';
 interface Rig { // a character's skeleton and its meshes (what create makes, and what update, the hit and the zip tie add as they go)
-  hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; hKit?: Record<string, (m: THREE.Material) => THREE.SkinnedMesh>; kit: Record<string, any> | null;
+  hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; hKit?: Record<string, (m: THREE.Material) => THREE.SkinnedMesh>; hPart?: Record<string, HumanPart>; hBone?: (name: string) => { b: THREE.Bone; inv: THREE.Matrix4 } | null; kit: Record<string, any> | null;
   callsign: { id: string; name: string } | null; root: THREE.Object3D; body: THREE.Object3D; hips: THREE.Object3D; spine: THREE.Object3D; chest: THREE.Object3D; neck: THREE.Object3D; head: THREE.Object3D;
   armL: RigArm; armR: RigArm; legL: RigLeg; legR: RigLeg; gunMount: THREE.Object3D; slingMount: THREE.Object3D; hipMount: THREE.Object3D; slung: boolean; mats: any[]; scale: number; style: string; shoe: FsSole | null;
   gun: THREE.Object3D | null; gunInfo: Record<string, any> | null; gunKey: string | null; phase: number; vel: THREE.Vector3; lastPos: THREE.Vector3 | null;
@@ -113,6 +113,40 @@ const G_Rig = (() => {
   const cleanLook = (l: Record<string, any>) => G.Sim.cleanLook(l);
   const KIT_COL = (d: any) => (!d ? 0x2e3236 : /Sable|Paragon/.test(d.brand || '') ? 0x5a5240 : /Kestrel|Vantage/.test(d.brand || '') ? 0x4d5639 : 0x2e3236);
   const kitMat = new Map();
+  // a pouch's MOLLE footprint (columns, rows) and its boxes ([w, h, d, x, y, z, colour] in its frame: x across, y up, z out from the
+  // surface it's on), with what's in it showing: magazines' tops out of a mag pouch, a med pouch's red tab, a dump pouch full or rolled
+  const POUCH_DEF: Record<string, { mw: number; mh: number }> = { p: { mw: 1, mh: 1 }, r: { mw: 1, mh: 1 }, R: { mw: 1, mh: 2 }, T: { mw: 2, mh: 2 }, d: { mw: 2, mh: 1 }, m: { mw: 1, mh: 1 } };
+  const MAG_C = 0x1b1c1e, shade = (c: number, k: number) => (Math.round(((c >> 16) & 255) * k) << 16) | (Math.round(((c >> 8) & 255) * k) << 8) | Math.round((c & 255) * k); // (a pouch a shade off its carrier)
+  function pouchBoxes(code: string, n: number, c: number): number[][] {
+    const out: number[][] = [], mag = (x: number, top: number, z: number, w = 0.056, d = 0.022) => out.push([w, 0.03, d, x, top + 0.012, z, MAG_C]);
+    if (code === 'p') for (const [i, x] of [-0.019, 0.019].entries()) { out.push([0.034, 0.075, 0.03, x, 0.005, 0.015, c]); if (i < n) mag(x, 0.042, 0.015, 0.026, 0.017); else out.push([0.036, 0.018, 0.032, x, 0.04, 0.016, c]); }
+    else if (code === 'R') { out.push([0.07, 0.17, 0.062, 0, -0.03, 0.031, c]); for (let i = 0; i < 2; i++) if (i < n) mag(0, 0.055, 0.016 + i * 0.03); if (!n) out.push([0.074, 0.025, 0.064, 0, 0.05, 0.032, c]); }
+    else if (code === 'T') { out.push([0.15, 0.17, 0.045, 0, -0.03, 0.022, c]); for (let i = 0; i < 3; i++) if (i < n) mag(-0.048 + i * 0.048, 0.055, 0.022, 0.042); }
+    else if (code === 'm') { out.push([0.075, 0.1, 0.055, 0, 0, 0.028, c]); out.push([0.03, 0.03, 0.004, 0, 0.012, 0.057, 0xa02a24]); }
+    else if (code === 'd') { if (n) out.push([0.15, 0.1, 0.06, 0, -0.005, 0.03, c]); else out.push([0.15, 0.04, 0.03, 0, 0.03, 0.015, c]); }
+    else { out.push([0.068, 0.105, 0.04, 0, 0, 0.02, c]); if (n) mag(0, 0.052, 0.02); else out.push([0.072, 0.025, 0.042, 0, 0.045, 0.021, c]); }
+    return out;
+  }
+  // the outer surface of a piece of the body's own kit round the trunk at height y (its model's space: up y, the front +z), every
+  // SURF_STEP degrees from behind round by the left (-180..180): rays from outside in, the first face met (null where it isn't there)
+  const SURF_STEP = 1, surfCache = new WeakMap<THREE.BufferGeometry, Map<number, ({ p: THREE.Vector3; n: THREE.Vector3 } | null)[]>>(), _rc = new T.Raycaster();
+  function surface(geo: THREE.BufferGeometry, y: number) {
+    let m = surfCache.get(geo); if (!m) surfCache.set(geo, (m = new Map()));
+    let pts = m.get(y);
+    if (!pts) {
+      const mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ side: T.DoubleSide })); pts = [];
+      for (let a = -180; a <= 180; a += SURF_STEP) {
+        const r = (a * Math.PI) / 180, d = new T.Vector3(-Math.sin(r), 0, -Math.cos(r));
+        _rc.set(new T.Vector3(Math.sin(r) * 0.8, y, Math.cos(r) * 0.8), d); _rc.far = 0.8;
+        const h = _rc.intersectObject(mesh, false)[0];
+        pts.push(h ? { p: h.point.clone(), n: d.clone().negate() } : null);
+      }
+      (mesh.material as THREE.Material).dispose(); m.set(y, pts);
+    }
+    return pts;
+  }
+  const MOLLE_Y: Record<string, number> = { pc: 1.225, heavy: 1.215, wrap: 1.105 }; // (the carriers' MOLLE: its top row's middle, model space: models/characters/kit_armour.py)
+  const BELT_A = [78, 104, 130, 156, 180, -156, -130, -104]; // (a belt's columns round it: the right hip, round the back, to the left; the holster's at the left hip)
   const KM = (c: number, o?: Record<string, any>) => { const key = c + JSON.stringify(o || {}); if (!kitMat.has(key)) kitMat.set(key, new T.MeshLambertMaterial(Object.assign({ color: c }, o || {}))); return kitMat.get(key); };
   const PACK: Record<string, number[]> = { 'k.sling': [0.22, 0.26, 0.09, 0.12], 'k.assault': [0.3, 0.36, 0.13, 0.14], 'k.ruck': [0.34, 0.5, 0.2, 0.2] };
   // the name patch, high on the back (rig.callsign: { id: their animal, name }): on the backpack if they wear
@@ -302,8 +336,10 @@ const G_Rig = (() => {
       return sm;
     };
     // the body armour made on this body (models/characters/kit_armour.py: kit*): not worn yet, each to be put on by setKit, skinned as the body is
-    rig.hKit = {};
-    for (const p of parts) if (p.mat.startsWith('kit')) rig.hKit[p.mat] = (m: THREE.Material) => skin(p, m);
+    rig.hKit = {}; rig.hPart = {};
+    for (const p of parts) if (p.mat.startsWith('kit')) { rig.hKit[p.mat] = (m: THREE.Material) => skin(p, m); rig.hPart[p.mat] = p; }
+    // a bone of the body's, and its inverse bind (from the model space a piece is made in to the bone's): what a pouch is laid on
+    rig.hBone = (name: string) => { for (const p of parts) { const i = p.bones.indexOf(name); if (i >= 0) return { b: boneOf(name, p.inv[i]), inv: p.inv[i] }; } return null; };
     for (const p of parts) {
       if (p.mat.startsWith('kit')) continue;
       const mat = rig.hMat(p.mat, p.color);
@@ -341,6 +377,39 @@ const G_Rig = (() => {
     const C = rig.chest, Hd = rig.hat || rig.head, Hp = rig.hips; // (the head's things: on the hat, which is the head's fit)
     // a piece of the body's own armour (made on it in Blender, skinned to its bones), if it has it: shown in colour c
     const HK = rig.hKit && rig.hKit.kitpc ? rig.hKit : null;
+    // MOLLE: what's mounted on a carrier or a belt (k.cq, k.bq: [kind, column, row, things in it] each; without them, k.cp or k.bp rifle
+    // pouches in a row), each pouch on the surface of the body's own carrier or belt where its column is: across the carrier's front from
+    // the middle out (a column a 7.5 cm of it), round the belt from the right hip back and on round (BELT_A, clear of the holster's hip)
+    const slots = (q: any, n: number, d: any): any[] => {
+      if (q) return q;
+      const iss = (d && d.pouches) || [];
+      if (iss.length === (n || 0)) return iss.map(([pid, x, y]: any) => [({ 'q.pistol': 'p', 'q.rifle2': 'R', 'q.rifle3': 'T', 'q.dump': 'd', 'q.med': 'm' } as Record<string, string>)[pid] || 'r', x, y, 1]);
+      const w = d && d.molle ? d.molle[0] : 4;
+      return Array.from({ length: Math.min(n || 0, 8) }, (_, i) => ['r', i % w, Math.floor(i / w), 1]);
+    };
+    const molle = (mesh: string, bone: string, y0: number, list: any[], c: number, angles: number[] | null) => {
+      const p = rig.hPart && rig.hPart[mesh], B = rig.hBone && rig.hBone(bone);
+      if (!p || !B || !list.length) return;
+      const pts = surface(p.geo, y0), at = (a: number) => { const i = Math.max(0, Math.min(pts.length - 2, Math.floor((a + 180) / SURF_STEP))), f = (a + 180) / SURF_STEP - i, A = pts[i], Bq = pts[i + 1]; return A && Bq ? { p: A.p.clone().lerp(Bq.p, f), n: A.n.clone().lerp(Bq.n, f).normalize() } : A || Bq; };
+      // the angle round the trunk that's s along the surface from its front (the carrier's columns: by the distance across it)
+      const arcAt = (s: number) => { let a = 0, d = 0; const dir = Math.sign(s); let prev = at(0); while (prev && Math.abs(a) < 170) { const nx = at(a + dir * 1); if (!nx) break; const step = nx.p.distanceTo(prev.p); if (d + step >= Math.abs(s)) return a + dir * ((Math.abs(s) - d) / Math.max(step, 1e-6)); d += step; a += dir; prev = nx; } return a; };
+      const cols = list.reduce((w: number, e: any) => Math.max(w, e[1] + 1), 0), DEF = (c2: string) => POUCH_DEF[c2] || POUCH_DEF.r;
+      const W = angles ? 0 : Math.max(cols, ...(list.map((e: any) => e[1] + DEF(e[0]).mw)));
+      for (const [code, x, y, n] of list) {
+        const D = DEF(code), cx = x + (D.mw - 1) / 2;
+        const a = angles ? (D.mw > 1 ? (angles[Math.min(x, angles.length - 1)] + angles[Math.min(x + 1, angles.length - 1)]) / 2 : angles[Math.min(x, angles.length - 1)]) : arcAt((cx - (W - 1) / 2) * 0.075);
+        const s = at(a);
+        if (!s) continue;
+        // the pouch's frame in the model's space: across (t), up, out from the surface (n); its top a little under the row's line
+        const up = new T.Vector3(0, 1, 0), nn = s.n.clone(); nn.y = 0; nn.normalize(); const t = up.clone().cross(nn);
+        const F = new T.Matrix4().makeBasis(t, up, nn).setPosition(s.p.clone().addScaledVector(up, -(y + (D.mh - 1) / 2) * 0.1 - (angles ? 0.045 : 0)));
+        const L = B.inv.clone().multiply(F);
+        for (const [w, h, d, bx, by, bz, col] of pouchBoxes(code, n || 0, c)) {
+          const m = new T.Mesh(new T.BoxGeometry(w, h, d), KM(col)), M = L.clone().multiply(new T.Matrix4().makeTranslation(bx, by, bz));
+          M.decompose(m.position, m.quaternion, m.scale); m.userData.part = part; B.b.add(m); rig.kitParts.push(m);
+        }
+      }
+    };
     const own = (name: string, c: number) => { const f = HK && HK[name]; if (!f) return null; const m = f(KM(c)); m.userData.part = part; rig.body.add(m); rig.kitParts.push(m); return m; };
     // the helmet: its cut and colour by model; rails and a night-vision mount on the modern ones
     const hd = D(k.helmet);
@@ -371,7 +440,7 @@ const G_Rig = (() => {
       const key = cd.thin ? 'soft' : cd.id === 'c.heavy' ? 'heavy' : cd.id === 'c.wrap' ? 'wrap' : 'pc', col = cd.thin ? cd.col : cc;
       own('kit' + key, col);
       if (k.plate && !cd.thin) { part = 'plate'; own('kitplate' + key, col); part = 'carrier'; }
-      for (let i = 0; i < Math.min(k.cp || 0, key === 'wrap' ? 2 : 4); i++) own('kitpouch' + key + 'abcd'[i], 0x23251f);
+      if (key !== 'soft') molle('kit' + key, 'chest', MOLLE_Y[key], slots(k.cq, k.cp, cd), shade(cc, 0.8), null);
       if (key === 'heavy') { if (!k.sh) own('kitdelt', cc); if (!k.gr) { own('kitgflap', cc); own('kitgplate', 0x3d4044); } if (!k.lg) own('kitthigh', cc); }
     } else if (cd) {
       // Not a block round the chest: what a carrier is. A plate bag on the chest and one on the back (thicker with a plate in), joined round
@@ -471,7 +540,11 @@ const G_Rig = (() => {
     // the belt and what's on it; the IFAK at the back
     const bd = D(k.belt);
     part = 'belt';
-    if (bd) {
+    if (bd && HK && HK.kitbelt) {
+      const bc = bd.id === 'b.war' ? 0x3b3528 : 0x232527;
+      own(bd.id === 'b.duty' ? 'kitbelt' : 'kitbeltwide', bc);
+      molle(bd.id === 'b.duty' ? 'kitbelt' : 'kitbeltwide', 'hips', 1.0, slots(k.bq, k.bp, bd), bd.id === 'b.war' ? 0x3b3528 : 0x2b2d2a, BELT_A);
+    } else if (bd) {
       box(Hp, 0.35, 0.06, 0.25, bd.id === 'b.war' ? 0x3b3528 : 0x232527, 0, 0.06, 0);
       const n = k.bp || 0;
       for (let i = 0; i < Math.min(n, 6); i++) { const side = i % 2 ? 1 : -1, j = i >> 1; box(Hp, 0.05, 0.08, 0.07, 0x23251f, side * 0.18, 0.04, -0.06 + j * 0.08); }

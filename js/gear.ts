@@ -397,6 +397,12 @@ const G_Gear = (() => {
   // the grids of the pouches mounted on a carrier's or belt's MOLLE
   // (left to right across the panel, top to bottom in a column: the order you'd reach for them)
   function mounted(gear: GItem) { return gear && gear.molle ? [...gear.molle.items].sort((a, b) => a.x - b.x || a.y - b.y).flatMap((p) => p.it.grids!) : []; }
+  // what's mounted on a carrier's or a belt's MOLLE, as it looks (js/rig.ts setKit): [kind, column, row, how many things are in it] each
+  const POUCH_CODE: Record<string, string> = { 'q.pistol': 'p', 'q.rifle': 'r', 'q.rifle2': 'R', 'q.rifle3': 'T', 'q.dump': 'd', 'q.med': 'm' };
+  function molleLook(gear: GItem | null) {
+    if (!gear || !gear.molle) return [];
+    return gear.molle.items.map((c) => [POUCH_CODE[c.it.pid!] || 'r', c.x, c.y, (c.it.grids || []).reduce((n, g) => n + g.items.length, 0)]);
+  }
   // the MOLLE panels you wear
   function molles(me: GMe) { return [me.kit.carrier, me.kit.belt].filter((g) => g && g.molle).map((g) => g.molle); }
   // the guns you have: in your hands, then any stowed in your backpack or locker
@@ -739,7 +745,7 @@ const G_Gear = (() => {
     return base > 0 ? Math.max(1, Math.floor(base * c * c)) : 0;
   }
   return {
-    LIST: LIST.filter((d) => !d.off), DEFS, POUCHES, MOUNTS, mountOn, mountFree, clash, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, tbItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
+    LIST: LIST.filter((d) => !d.off), DEFS, POUCHES, MOUNTS, molleLook, mountOn, mountFree, clash, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, tbItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
     newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, exchange, takeRounds, chamberIn, spares, refitMags, boxItem, boxCap, loadMag, loadAll, loadTargets, loadNeed, roundPrice,
     defOf, cond, piece, speed, label, price, sale,
   };
