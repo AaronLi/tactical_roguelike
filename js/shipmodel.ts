@@ -670,6 +670,7 @@ const G_ShipModel = (() => {
     return g;
   }
   // ---- the stars (points on a far sphere, kept round the camera) and the tunnel of a jump (streaks rushing past)
+  const RUSH = 320; // (the box round her the motes going by are in: js/space.ts smear)
   function stars(seed: number) {
     const r = G.U.rng(seed), n = 2600, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
@@ -685,11 +686,26 @@ const G_ShipModel = (() => {
     for (let i = 0; i < n; i++) { for (let e = 0; e < 2; e++) { lp.set(pos.subarray(i * 3, i * 3 + 3), (i * 2 + e) * 3); lc.set(col.subarray(i * 3, i * 3 + 3), (i * 2 + e) * 3); le[i * 2 + e] = e; } }
     const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.BufferAttribute(lp, 3)); lg.setAttribute('color', new T.BufferAttribute(lc, 3)); lg.setAttribute('head', new T.BufferAttribute(le, 1));
     const lm = new T.ShaderMaterial({
-      uniforms: { f: { value: new T.Vector3(0, 0, -1) }, k: { value: 0 } }, transparent: false, depthWrite: false, /* (drawn with the opaque things, first: the ship's inside over it) */ depthTest: false, blending: T.AdditiveBlending, vertexColors: true,
+      uniforms: { f: { value: new T.Vector3(0, 0, -1) }, k: { value: 0 }, tr: { value: new T.Vector3() }, R: { value: RUSH } }, transparent: false, depthWrite: false, /* (drawn with the opaque things, first: the ship's inside over it) */ depthTest: false, blending: T.AdditiveBlending, vertexColors: true,
       vertexShader: 'attribute float head; uniform vec3 f; uniform float k; varying vec3 vC; void main() { vec3 d = normalize(position); vec3 p = head > 0.5 ? d : normalize(d + f * k); vC = color * mix(0.15, 1.1, head) * min(1.0, k * 5.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(p * 900.0, 1.0); }',
       fragmentShader: 'varying vec3 vC; void main() { gl_FragColor = vec4(vC, 1.0); }',
     });
     const streaks = new T.LineSegments(lg, lm); streaks.frustumCulled = false; streaks.renderOrder = -9; pts.add(streaks); // (always drawn, black at k 0: its shader made with the stars', not the moment a drive starts)
+    // and near her, motes going by: in a box 2R across round her (wrapped, so there are always more), each moved back past her by
+    // how far she's gone (tr) and drawn as a line back toward where it came from, longer the faster she goes (k); faded in at the
+    // box's far edge and out as it goes by, so none of them pops. What the drive's doing, seen going past.
+    const nr = 700, rp = new Float32Array(nr * 6), rc = new Float32Array(nr * 6), re = new Float32Array(nr * 2);
+    for (let i = 0; i < nr; i++) {
+      const x = (r() * 2 - 1) * RUSH, y = (r() * 2 - 1) * RUSH, z = (r() * 2 - 1) * RUSH, k = 0.5 + r() * 0.5, w = r();
+      for (let e = 0; e < 2; e++) { rp.set([x, y, z], (i * 2 + e) * 3); rc.set([k * (0.8 + 0.2 * w), k * 0.9, k], (i * 2 + e) * 3); re[i * 2 + e] = e; }
+    }
+    const rg = new T.BufferGeometry(); rg.setAttribute('position', new T.BufferAttribute(rp, 3)); rg.setAttribute('color', new T.BufferAttribute(rc, 3)); rg.setAttribute('head', new T.BufferAttribute(re, 1));
+    const rm = new T.ShaderMaterial({
+      uniforms: lm.uniforms, transparent: false, depthWrite: false, depthTest: false, blending: T.AdditiveBlending, vertexColors: true,
+      vertexShader: 'attribute float head; uniform vec3 f; uniform vec3 tr; uniform float k; uniform float R; varying vec3 vC; void main() { vec3 p = mod(position - tr + R, 2.0 * R) - R; float d = length(p); vec3 q = head > 0.5 ? p : p + f * (k * 260.0); float fade = (1.0 - smoothstep(0.5 * R, R, d)) * smoothstep(6.0, 40.0, d); vC = color * mix(0.0, 1.3, head) * fade * clamp(k * 4.0 - 0.05, 0.0, 1.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(q, 1.0); }',
+      fragmentShader: 'varying vec3 vC; void main() { gl_FragColor = vec4(vC, 1.0); }',
+    });
+    const rush = new T.LineSegments(rg, rm); rush.frustumCulled = false; rush.renderOrder = -9; pts.add(rush);
     pts.userData.streak = lm.uniforms; pts.userData.streaks = streaks;
     return pts;
   }

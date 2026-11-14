@@ -865,9 +865,12 @@ const G_Space = (() => {
   function smear(dt: number, want: number) {
     smearK += (want - smearK) * Math.min(1, dt * 4);
     const st = S.stars; if (!st) return;
-    const u = st.userData.streak as { f: { value: THREE.Vector3 }; k: { value: number } }, line = st.userData.streaks as THREE.Object3D;
+    const u = st.userData.streak as { f: { value: THREE.Vector3 }; k: { value: number }; tr: { value: THREE.Vector3 }; R: { value: number } }, line = st.userData.streaks as THREE.Object3D;
     u.k.value = smearK; void line;
     u.f.value.copy(fwd(S.Q)); if (S.zone) u.f.value.applyQuaternion(_zq.copy(S.zone.quaternion).invert());
+    // (the motes near her go by as fast as the smear's long: kept within one box's width, the shader wraps them)
+    const w = 2 * u.R.value, t = u.tr.value.addScaledVector(u.f.value, smearK * 1400 * dt);
+    t.set(((t.x % w) + w) % w, ((t.y % w) + w) % w, ((t.z % w) + w) % w);
   }
   let tunUp: { map: LvMap | null; steps: ((ms: number) => boolean)[] } | null = null;
   let hid: THREE.Object3D[] | null = null;
