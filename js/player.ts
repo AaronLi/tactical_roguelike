@@ -2577,7 +2577,8 @@ const G_Me = {
       if (free && !lt && !dm) {
         const aimed = this.aimedDoor(map);
         if (aimed) {
-          const vault = G.Level.sturdy(aimed.d), kick = aimed.y < KICK_H && !vault, id = aimed.d.id;
+          // (a vault's wheel is a haul; a ship's door slides open at a touch, as quick as any door, but no boot moves it either)
+          const sturdy = G.Level.sturdy(aimed.d), vault = sturdy && !G.Level.slides(aimed.d), kick = aimed.y < KICK_H && !sturdy, id = aimed.d.id;
           prompt = vault ? 'Hold <b>F</b> to haul the vault door open <small>(too heavy to kick)</small>' : kick ? 'Hold <b>F</b> to kick door' : 'Hold <b>F</b> to open door';
           if (F && vault) this.startAction('Spinning the wheel', 2.4, null, 'open', [{ at: 0.95, fn: () => G.Net.toHost({ t: 'useDoor', i: id }) }]);
           else if (F) {
