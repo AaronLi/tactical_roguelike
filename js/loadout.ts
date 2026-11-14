@@ -28,9 +28,9 @@ const G_Loadout = (() => {
         { id: 'p90', pts: 4, from: 'mpx', path: 'smg', ring: 3, stat: 'armed', n: 15, what: 'kills on armoured suspects', how: "A vest or a helmet: put enough rounds where it isn't." },
         { id: 'aks74u', pts: 4, from: 'uzi', path: 'rifle', ring: 1, rank: 3 },
         { id: 'ak', pts: 4, from: 'aks74u', path: 'rifle', ring: 2, stat: 'kills', n: 25, what: 'kills', how: 'Twenty-five down with the Krinkov.' },
-        { id: 'm4', pts: 4, from: 'ak', path: 'rifle', ring: 3, rank: 4 },
+        { id: 'm4', pts: 5, from: 'ak', path: 'rifle', ring: 3, rank: 4 },
         { id: 'dbl', pts: 3, from: 'uzi', path: 'breach', ring: 1, rank: 2 },
-        { id: 'pump', pts: 3, from: 'dbl', path: 'breach', ring: 2, stat: 'close', n: 15, what: 'kills within 5 m', how: "Get close enough that it can't go wrong." },
+        { id: 'pump', pts: 4, from: 'dbl', path: 'breach', ring: 2, stat: 'close', n: 15, what: 'kills within 5 m', how: "Get close enough that it can't go wrong." },
       ],
     },
     h: {
@@ -143,6 +143,7 @@ const G_Loadout = (() => {
     face: [M(2), St(8), St(20)], plate: [M(1), St(6), St(15), St(30)], shoulder: [M(2), St(10), St(25)], groin: [M(2), St(10), St(25)],
   };
   const isGun = (slot: string) => slot === 'p' || slot === 's';
+  const LO_OFF = ['p.ceramic', 'p.ceramic2']; // (not to be had at the start of a run: the ceramic plates)
   // (a plate comes dearer: a point a 200 credits; the rest a point a 400; a primary's set on its node, pts)
   const BUDGET = 10, pts = (price: number, per = 400) => Math.round((price || 0) / per), PLATE_PER = 200;
   // every attachment it could take (of the kind k, or all), each with what it takes and whether it's earned
@@ -162,7 +163,7 @@ const G_Loadout = (() => {
       const d = G.Gear.DEFS[id], mounts = slot === 'h' ? (d.face ? ['face'] : []) : [d.plate ? 'plate' : '', d.shoulder ? 'shoulder' : '', d.groin ? 'groin' : ''].filter(Boolean);
       for (const k of mounts) {
         if (only && only !== k) continue;
-        for (const g of G.Gear.LIST.filter((x) => x.kind === k)) {
+        for (const g of G.Gear.LIST.filter((x) => x.kind === k && !LO_OFF.includes(x.id))) {
           const q = GEAR_ATT[k][Math.min(GEAR_ATT[k].length - 1, Math.max(0, (g.tier || 1) - 1))], have = count(slot, id, q.stat);
           out.push({ k, id: g.id, name: g.name, pts: pts(g.price, k === 'plate' ? PLATE_PER : 400), open: open(slot, id) && have >= q.n, stat: q.stat, what: q.what, n: q.n, have: Math.min(q.n, have) });
         }

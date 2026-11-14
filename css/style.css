@@ -1220,7 +1220,8 @@ body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
 /* the loadout screen (js/game.ts loBar, loWeb): a bar over the tree, rank and XP, the four slots, Deploy */
 .web-full:has(.lo-bar) { padding-top: 104px; box-sizing: border-box; }
 .lo-bar { position: absolute; left: 0; top: 0; right: 0; z-index: 2; height: 104px; display: flex; align-items: stretch; gap: 8px; padding: 8px 14px; box-sizing: border-box; background: #0b0e11; border-bottom: 1px solid var(--ui-line); }
-.lo-rank { display: flex; flex-direction: column; justify-content: center; min-width: 150px; gap: 3px; font: 400 12px var(--ui-font); color: var(--ui-dim); text-align: left; }
+.lo-rank { display: flex; flex-direction: column; justify-content: center; min-width: 150px; gap: 3px; font: 400 12px var(--ui-font); color: var(--ui-dim); text-align: left; background: none; border: 1px solid transparent; border-radius: var(--ui-r); padding: 4px 8px; cursor: pointer; }
+.lo-rank:hover, .lo-rank.on { border-color: var(--ui-line-hi); background: var(--ui-fill); }
 .lo-rank b { font: 500 16px var(--ui-font); color: var(--ui-text); }
 .lo-rank i { display: block; height: 4px; background: var(--ui-line); border-radius: 2px; overflow: hidden; }
 .lo-rank em { display: block; height: 100%; background: #9fd6ff; }
@@ -1291,3 +1292,22 @@ body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
 .lo-card.other { border-style: dashed; }
 .lo-card.locked { opacity: 0.45; cursor: default; }
 .lo-empty { margin: 4px 0 6px; }
+
+/* the ranks' timeline (js/game.ts loRankView): a column a rank, what it opens, a line where you are */
+.lo-tscroll { overflow-x: auto; padding-top: 30px; margin-top: -20px; }
+.lo-timeline { position: relative; height: 470px; margin-top: 10px; }
+.lo-rtrack { position: absolute; left: 0; right: 0; top: 44px; height: 2px; background: var(--ui-line); }
+.lo-rcol { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 8px; box-sizing: border-box; border-left: 1px solid rgba(255, 255, 255, 0.04); }
+.lo-rhead { display: flex; flex-direction: column; align-items: center; height: 56px; justify-content: flex-start; }
+.lo-rhead b { font: 500 15px var(--ui-font); color: var(--ui-dim); }
+.lo-rhead small { font: 400 11px var(--ui-font); color: var(--ui-dim); }
+.lo-rcol.got .lo-rhead b { color: var(--ui-text); }
+.lo-ritem { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 6px; background: rgba(20, 24, 28, 0.92); border: 1px solid var(--ui-line); border-radius: var(--ui-r); text-align: center; }
+.lo-ritem img { height: 46px; max-width: 100%; object-fit: contain; }
+.lo-ritem b { font: 500 12.5px var(--ui-font); color: var(--ui-text); line-height: 1.2; }
+.lo-ritem small { font: 400 11px var(--ui-font); color: var(--ui-dim); }
+.lo-ritem.locked img, .lo-ritem.locked b { opacity: 0.45; }
+.lo-lock { position: absolute; top: 14px; left: 50%; width: 26px; height: 26px; transform: translateX(-50%); color: #e8edf2; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9)); }
+.lo-rnone { font: 400 12px var(--ui-font); color: var(--ui-dim); margin: 6px 0 0; }
+.lo-rnow { position: absolute; top: 30px; bottom: 0; width: 2px; margin-left: -1px; background: #9fd6ff; box-shadow: 0 0 8px rgba(159, 214, 255, 0.7); z-index: 2; pointer-events: none; }
+.lo-rnow span { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 8px; border-radius: 3px; background: #9fd6ff; color: #071018; font: 600 11px var(--ui-font); }

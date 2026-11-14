@@ -77,7 +77,7 @@ const G_Game = {
   arms: undefined as Record<string, string> | undefined, // (each player's sidearm pick)
   armSel: undefined as string | null | undefined,
   armLook: undefined as string | null | undefined,
-  loTab: 'p' as string, loLook: {} as Record<string, string>, loAtt: null as null | { sl: string; box: number }, // (loAtt: an attachment box being filled: its own view, in place of the tree) // (the loadout screen's tab, and what's looked at on each tree)
+  loTab: 'p' as string, loLook: {} as Record<string, string>, loAtt: null as null | { sl: string; box: number }, loRanks: false, // (loRanks: the ranks' timeline in the tree's place) // (loAtt: an attachment box being filled: its own view, in place of the tree) // (the loadout screen's tab, and what's looked at on each tree)
   routeWait: 0,
   armModels: undefined as Promise<unknown> | 'ready' | undefined, // (the sidearm web's guns, stock and pro, loading before it opens: sidearmPick)
   armView: undefined as unknown as GmArmView,
@@ -1454,10 +1454,11 @@ const G_Game = {
       const L = G.Loadout, sl = this.loTab, look = this.loLook[sl];
       const lt = e.target.closest<HTMLElement>('[data-lotab]'), ln = e.target.closest<HTMLElement>('[data-lonode]'), lb = e.target.closest<HTMLElement>('[data-lobox]'), lp = e.target.closest<HTMLElement>('[data-lopart]');
       // an attachment box (under a slot in the bar): its own view, of what can go in it; a part from it fitted, or the box emptied
-      if (lb) { const [bs, bi] = lb.dataset.lobox!.split(':'); if (L.sel(bs)) { this.loTab = bs; this.loAtt = { sl: bs, box: +bi }; } G.Audio.click(); return this.sidearmPick(); }
+      if (lb) { const [bs, bi] = lb.dataset.lobox!.split(':'); if (L.sel(bs)) { this.loTab = bs; this.loAtt = { sl: bs, box: +bi }; this.loRanks = false; } G.Audio.click(); return this.sidearmPick(); }
       if (lp && this.loAtt) { const v = lp.dataset.lopart!, [k, id] = v.split('|'), A = this.loAtt, it = L.sel(A.sl); if (it) L.fit(A.sl, it, A.box, v ? { k, id } : null); this.loAtt = null; G.Audio.click(); return this.sidearmPick(); }
-      if (e.target.closest('[data-loback]')) { this.loAtt = null; G.Audio.click(); return this.sidearmPick(); }
-      if (lt) { this.loTab = lt.dataset.lotab!; this.loAtt = null; this.armView = this.loCentre(this.loTab); G.Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-loranks]')) { this.loRanks = !this.loRanks; this.loAtt = null; G.Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-loback]')) { this.loAtt = null; this.loRanks = false; G.Audio.click(); return this.sidearmPick(); }
+      if (lt) { this.loTab = lt.dataset.lotab!; this.loAtt = null; this.loRanks = false; this.armView = this.loCentre(this.loTab); G.Audio.click(); return this.sidearmPick(); }
       if (e.target.closest('[data-lodeploy]')) { G.Audio.click(); return this.loDeploy(); }
       if (e.target.closest('[data-armhome]')) { go(0, 0); G.Audio.click(); return this.sidearmPick(); }
       if (ln) {
@@ -1489,11 +1490,12 @@ const G_Game = {
       return `<div class="lo-slot${this.loTab === sl ? ' on' : ''}"><button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}<i>${c} pt${c === 1 ? '' : 's'}</i></small><b>${G.U.esc(val(sl))}</b></button><div class="lo-tboxes">${box(0)}${box(1)}</div></div>`;
     };
     const tot = L.total(), over = tot > L.BUDGET;
-    return `<div class="lo-bar"><div class="lo-rank"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></div>${tab('p', 'Primary')}${tab('s', 'Sidearm')}${tab('h', 'Helmet')}${tab('a', 'Body armour')}<div class="lo-pts${over ? ' over' : ''}" title="What you take into a run can't cost more than ${L.BUDGET} points"><b>${tot} / ${L.BUDGET}</b><span>${over ? `${tot - L.BUDGET} over` : 'points'}</span></div><button class="btn primary lo-go" data-lodeploy ${over ? 'disabled' : ''}>Deploy</button></div>`;
+    return `<div class="lo-bar"><button class="lo-rank${this.loRanks ? ' on' : ''}" data-loranks title="What each rank opens"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></button>${tab('p', 'Primary')}${tab('s', 'Sidearm')}${tab('h', 'Helmet')}${tab('a', 'Body armour')}<div class="lo-pts${over ? ' over' : ''}" title="What you take into a run can't cost more than ${L.BUDGET} points"><b>${tot} / ${L.BUDGET}</b><span>${over ? `${tot - L.BUDGET} over` : 'points'}</span></div><button class="btn primary lo-go" data-lodeploy ${over ? 'disabled' : ''}>Deploy</button></div>`;
   },
   // a slot's tree, drawn as a web: the piece in the middle, paths out from it; under the piece you're looking at (once it's yours), its two
   // attachment boxes; beside it all, what it is, what it takes, what's next
   loWeb(el: HTMLElement) {
+    if (this.loRanks && G.SpaceData.ON) return this.loRankView(el);
     if (this.loAtt && G.Loadout.sel(this.loAtt.sl)) return this.loAttView(el);
     this.loAtt = null;
     const L = G.Loadout, sl = this.loTab, T = L.TREES[sl], BY = L.by(sl), gun = sl === 'p' || sl === 's';
@@ -1533,6 +1535,28 @@ const G_Game = {
     // (where it was, then across to where it's going: the map's built afresh each time)
     if (this.armFrom) { const w = el.querySelector<HTMLElement>('.web-world')!; w.style.transform = this.armFrom; this.armFrom = null; requestAnimationFrame(() => { w.classList.add('glide'); place(); }); } else place();
     if (was) was.remove();
+  },
+  // The ranks, as a timeline (in the tree's place, the bar over it): a column for each rank, what it opens on the trees (a lock over
+  // what isn't yours yet: the rank not reached, or the piece before it not yet earned), and a line where you are, between your rank
+  // and the next as far as your XP has got
+  loRankView(el: HTMLElement) {
+    const L = G.Loadout, r = L.rank(), x = L.xp(), f = (x - L.rankAt(r)) / (L.rankAt(r + 1) - L.rankAt(r)), TITLE: Record<string, string> = { p: 'Primary', h: 'Helmet', a: 'Body armour' };
+    const at: Record<number, { sl: string; id: string }[]> = {};
+    for (const sl of ['p', 'h', 'a']) for (const q of L.TREES[sl].NODES) if (q.rank != null) (at[q.rank] = at[q.rank] || []).push({ sl, id: q.id });
+    const top = Math.max(r + 1, ...Object.keys(at).map(Number)), W = 190;
+    const pic = (sl: string, id: string) => { const it = sl === 'p' ? G.Gear.gunItem(G.Me.makeWeapon(id)) : G.Gear.gearItem(id), [cw, ch] = G.Gear.size(it), url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
+    const LOCK = '<svg class="lo-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="4.5" y="10" width="15" height="11" rx="2" fill="currentColor"/></svg>';
+    const cols = [...Array(top + 1).keys()].map((k) => `<div class="lo-rcol${k <= r ? ' got' : ''}" style="left:${k * W}px;width:${W}px"><div class="lo-rhead"><b>Rank ${k}</b><small>${G.U.fmt(L.rankAt(k))} XP</small></div>${(at[k] || []).map(({ sl, id }) => {
+      const mine = L.open(sl, id), src = pic(sl, id), q = L.by(sl).get(id)!, why = mine ? '' : k > r ? `Rank ${k}` : `Earn the ${L.name(sl, q.from!)} first`;
+      return `<div class="lo-ritem${mine ? '' : ' locked'}" title="${G.U.esc(why)}">${src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>'}${mine ? '' : LOCK}<b>${G.U.esc(L.name(sl, id))}</b><small>${TITLE[sl]}${mine ? '' : ' · ' + G.U.esc(why)}</small></div>`;
+    }).join('') || '<p class="lo-rnone">Nothing new</p>'}</div>`).join('');
+    const now = (r + Math.min(1, Math.max(0, f))) * W + W / 2;
+    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>Ranks <span>— what each opens</span></h2><p>XP comes from the missions you complete: 150 for each, and 100 more for each step of its threat. Some pieces are earned by challenges instead: those are on the trees.</p></div>
+        <div class="lo-tscroll"><div class="lo-timeline" style="width:${(top + 1) * W}px"><div class="lo-rtrack"></div>${cols}<div class="lo-rnow" style="left:${now.toFixed(0)}px"><span>You · ${G.U.fmt(x)} XP</span></div></div></div></div><button class="btn web-home" data-loback>Back to the tree</button></div>
+      <aside class="web-side"><h3>Rank ${r}</h3><div class="lo-cost">${G.U.fmt(x)} XP</div><p class="lo-note">${G.U.fmt(L.rankAt(r + 1) - x)} XP to rank ${r + 1}: a threat-${Math.max(1, Math.ceil((L.rankAt(r + 1) - x - 150) / 100))} mission would do it.</p>
+        <h4>Next up</h4><ul class="web-next">${(at[r + 1] || []).map(({ sl, id }) => `<li><b>${G.U.esc(L.name(sl, id))}</b> ${TITLE[sl]}</li>`).join('') || '<li>Nothing new at the next rank</li>'}</ul></aside></div>`;
+    el.classList.remove('hidden');
+    const sc = el.querySelector<HTMLElement>('.lo-tscroll'); if (sc) sc.scrollLeft = Math.max(0, now - sc.clientWidth / 2); // (where you are, in view)
   },
   // the kinds of attachment, by name (a gun's by its part's kind; the gear's by the mount)
   loKinds() {
