@@ -1,5 +1,7 @@
 # Makes every variant in human_variants.py (four Blenders at a time) and lays them out on one sheet:
 #   python models/characters/build_variants.py [m03 f07 ...]      (needs Pillow; BLENDER names the program if it isn't on the usual path)
+# When they're made it runs tools/bake_humans.mjs --source (node): the checks the bake makes of them (docs/models.md "Human bodies"), so a body that
+# breaks them is known of here, before it's committed.
 # Writes human/variants/<id>.glb for each (kept in the repo) and its copy assets/models/humans/<id>.glb (what the game loads: tools/bake_humans.mjs makes
 # that copy where there's no Blender), js/humandata.ts, human/variants/index.json (id, sex, name, height, the scale to give the
 # figure in the game, triangles) and human/variants.png. With ids given, only those are remade (the sheet is of whatever is there).
@@ -43,4 +45,8 @@ if shown:
             sheet.paste(p('_body.png'), (x, y + 30))
             for k, n in enumerate(('_head_0.png', '_head_40.png')): sheet.paste(p(n).resize((215, 215), Image.LANCZOS), (x + k * 215, y + 30 + 640))
     sheet.save(os.path.join(HERE, 'human', 'variants.png')); print('variants.png', sheet.size)
-sys.exit(0 if all(done) else 1)
+# (the checks the bake makes of them, here and now: docs/models.md "Human bodies")
+import subprocess
+try: chk = subprocess.run(['node', os.path.join(HERE, '..', '..', 'tools', 'bake_humans.mjs'), '--source']).returncode
+except OSError: chk = 0; print('(node not found: the bodies are unchecked till npm run test:models)')
+sys.exit(0 if all(done) and not chk else 1)

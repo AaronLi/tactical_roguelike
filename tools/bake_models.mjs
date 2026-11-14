@@ -3,7 +3,7 @@
 //   node tools/bake_models.mjs --check                        lists the bakes that are stale against the current code
 //   node tools/bake_models.mjs --guns [--parts] [id ...]     also (or only) the whole default guns, assets/models/guns/ (for the tools: the game loads none; default: the pieces only)
 //   -j N | --jobs N (or MODEL_BAKE_JOBS=N)   worker threads (default min(cores - 1, 8); -j 1: one process). The output is byte-identical for any N.
-//   --verbose (every platform detail line, gltf-transform log lines)   --no-props (skip the props bake that a full run ends with: tools/bake_props.mjs)   --no-hangar (skip the hangar's scene: tools/bake_hangar.mjs, which needs a Chromium)   --no-bundle (skip the bundling that runs last: tools/bundle_models.mjs)
+//   --verbose (every platform detail line, gltf-transform log lines)   --no-props (skip the props bake that a full run ends with: tools/bake_props.mjs)   --no-humans (skip the human bodies: tools/bake_humans.mjs)   --no-hangar (skip the hangar's scene: tools/bake_hangar.mjs, which needs a Chromium)   --no-bundle (skip the bundling that runs last: tools/bundle_models.mjs)
 //
 // WHAT IT DOES (--guns). Loads the compiled game (dist/js) in a vm with the node build of three r149, builds every platform's
 // DEFAULT build with G.GunRecipes.display(G.Gunsmith.compile(id, defaultBuild(id))), exports it with three's GLTFExporter,
@@ -168,6 +168,12 @@ if (!flags.has('--no-hangar') && !fails && !only.length) {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/bake_hangar.mjs')], { stdio: ['ignore', verbose ? 'inherit' : 'ignore', 'inherit'] });
   if (r.status) { fails++; console.error('bake_hangar failed (exit ' + r.status + ')'); }
 }
+// ---- the human bodies (kept in the repo as made in Blender: checked, and put in the tree. tools/bake_humans.mjs)
+if (!flags.has('--no-humans') && !fails && !only.length) {
+  phase('humans');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/bake_humans.mjs')], { stdio: ['ignore', verbose ? 'inherit' : 'ignore', 'inherit'] });
+  if (r.status) { fails++; console.error('bake_humans failed (exit ' + r.status + ')'); }
+}
 // ---- the bundles the game loads (tools/bundle_models.mjs: reads the finished tree, deterministic), last
 if (!flags.has('--no-bundle') && !fails) {
   phase('bundles');
@@ -176,6 +182,6 @@ if (!flags.has('--no-bundle') && !fails) {
 }
 phase('done');
 const row = (n, t) => `  ${n.padEnd(10)} ${fmt(t)}`;
-const label = { guns: 'guns', platforms: 'platforms', sharing: 'sharing', writes: 'pack files', indexes: 'indexes', props: 'props', hangar: 'hangar', bundles: 'bundles' };
+const label = { guns: 'guns', platforms: 'platforms', sharing: 'sharing', writes: 'pack files', indexes: 'indexes', props: 'props', hangar: 'hangar', humans: 'humans', bundles: 'bundles' };
 console.log(`\nbake ${fails ? 'FAILED' : 'done'} on ${jobs} ${jobs === 1 ? 'process' : 'workers'}:\n` + phases.map(([n, t]) => row(label[n] || n, t)).join('\n') + '\n' + row('total', now()));
 process.exit(fails ? 1 : 0);

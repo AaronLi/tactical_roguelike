@@ -489,6 +489,29 @@ Every pack and prop (`tools/model_emit.mjs` `compression()`, after the weld on f
 | GPU memory | float32 positions | the same (dequantised at load; no textures) |
 
 
+## Human bodies
+
+The twenty bodies (`js/humans.ts`) are made in Blender by a script (`models/characters/build_variants.py`, from
+`build_human.py` and the figures in `human_variants.py`) and kept in the repo as it exports them:
+`models/characters/human/variants/<id>.glb`, with `index.json` beside them and `js/humandata.ts` (what the game knows of each
+without its file). Blender is wanted only to change them. The bake's `humans` phase (`tools/bake_humans.mjs`, in
+`npm run bake:models`; `npm run bake:humans` alone) checks each and puts it in the baked tree, `assets/models/humans/<id>.glb`
+with `humans/index.json` (`{ version, humans: { <id>: { file, bytes, sha1, tris, prims, mats } } }`), and the bundling packs
+them with everything else.
+
+What a body must be (a failure names the body and the rule):
+
+| Rule | Why |
+|---|---|
+| One skeleton, with exactly these bones: `hips spine chest neck head`, `clavicle upperarm forearm hand` `.L`/`.R`, `thigh shin foot` `.L`/`.R`, `eye.L eye.R` | `js/rig.ts` attachHuman hangs each on the rig's joint of that name; one it doesn't know would ride the hips |
+| Every mesh skinned (`JOINTS_0`, `WEIGHTS_0`) | an unskinned mesh is left out |
+| Every material named one of `shirt trousers boots neck upsleeve sleeve hand finger front lowleg skin eyeskin hair brow lip stubble eye iris` | the material's name is how `js/rig.ts` dresses it (hMat); another name is drawn as nothing |
+| `shirt trousers boots hand skin eye` all present | no body is without them |
+| In `index.json` and in `js/humandata.ts`, both ways | its size and the fit of its kit come from there before its file does |
+
+The same checks run in three places: when the bodies are made (`build_variants.py` ends with `bake_humans.mjs --source`),
+in the bake, and in `npm run test:models` (`--check`: the sources, and that the baked tree is their copy).
+
 ## Bundles
 
 The bake leaves ~2,100 small files (parts/ and props/: 24.6 MB raw with the indexes, ~8 KB a pack). The game would need thousands of requests, so the last step of `npm run bake:models`, `tools/bundle_models.mjs` (library `tools/model_bundles.mjs`), packs them into **ONE container file, `assets/models/bundles/models.rtb`, which is the only form of the models the game loads** (3.26 MB gzipped, 24.6 MB raw, 2,086 files); the loose files stay on disk for the tools and tests only.
