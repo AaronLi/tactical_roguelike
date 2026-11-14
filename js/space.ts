@@ -657,7 +657,7 @@ const G_Space = (() => {
   // be worth it) the drive spins up by itself, and holds while she's kept on it (she's eased the last of the way on: warpAim).
   // Spun up, T launches her: she's flung at it, faster and faster, and brought down again to come out 300 m short of its hull,
   // going as it goes (tv). Turning off it spins the drive down; picking another target starts it again.
-  const WARP_OUT = 300, WARP_ACC = 2500;
+  const WARP_OUT = 300, WARP_ACC = 2500, WARP_BRAKE = 500, WARP_EASE = 1.6;
   /** the target's own velocity, from where it was last frame (the zone's ships go by under way) */
   function tgtTrack(dt: number) {
     const w = S.wps[S.tgt];
@@ -710,7 +710,10 @@ const G_Space = (() => {
     W.t += dt; S.cruise = true; S.Wv.set(0, 0, 0); S.stick.set(0, 0);
     const rel = w.p.clone().sub(S.P), d = rel.length(), dir = rel.divideScalar(Math.max(1e-3, d)), left = d - (WARP_OUT + tgtR(w));
     // (as fast as it'll go, till it's time to come down again: v^2 = 2as from where she's to stop)
-    if (left <= W.u * W.u / (2 * WARP_ACC) + W.u * dt) W.u = Math.max(30, W.u - WARP_ACC * dt); else W.u = Math.min(W.top, W.u + WARP_ACC * dt);
+    // (coming out is gentler than going in: a steady WARP_BRAKE, and the last hundred metres or so eased off by distance, so she
+    // settles in alongside rather than stopping dead)
+    const want = Math.min(W.top, Math.sqrt(2 * WARP_BRAKE * Math.max(0, left)), Math.max(0, left) * WARP_EASE);
+    W.u = W.u < want ? Math.min(want, W.u + WARP_ACC * dt) : want;
     const go = Math.min(W.u * dt, Math.max(0, left));
     S.P.addScaledVector(S.tv, dt).addScaledVector(dir, go);
     S.V.copy(S.tv).addScaledVector(dir, W.u);
