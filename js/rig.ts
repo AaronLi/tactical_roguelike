@@ -180,6 +180,7 @@ const G_Rig = (() => {
     const f = rig.fit; if (!f) return;
     let sx = 1, zf = 1, zb = 1;
     if (parent === rig.chest) { sx = f.cx; zf = f.cf; zb = f.cb; m.position.y -= 0.035; } // (and as much lower as a body's shoulders are)
+    else if (parent === rig.spine) { sx = f.hx; zf = f.hf; zb = f.hb; } // (the belly: as the waist)
     else if (parent === rig.hips) { if (m.position.y < 0.03) { sx = f.px; zf = f.pf; zb = f.pb; } else { sx = f.hx; zf = f.hf; zb = f.hb; } } // (under the belt: the pelvis and the seat, fuller than the waist)
     else if (parent === rig.armL.sh || parent === rig.armR.sh) { sx = zf = zb = f.delt; m.position.y *= 0.7; }
     else if (parent === rig.armL.up || parent === rig.armR.up) sx = zf = zb = f.arm;
@@ -366,6 +367,9 @@ const G_Rig = (() => {
         if (heavy) for (const x of [-1, 1]) box(C, 0.13, 0.07, 0.2, cc, x * 0.22, 0.3, 0); // shoulder armour
         if (heavy) { box(C, 0.3, 0.07, 0.26, cc, 0, 0.32, 0.01); box(Hp, 0.2, 0.16, 0.04, cc, 0, -0.06, -0.12); } // collar, groin plate
       }
+      // its soft armour reaches down over the belly to the belt, all round, as it protects there (js/ballistics.ts covers: 'torso' is the
+      // chest and the abdomen)
+      if ((cd.prot || []).some((p: any) => p.at === 'torso')) box(rig.spine, cd.thin ? 0.34 : 0.36, 0.25, cd.thin ? 0.25 : cd.id === 'c.heavy' ? 0.29 : 0.27, cd.thin ? cd.col : cc, 0, 0.145, 0); // (up under the chest's, no gap between)
     }
     // what's mounted on the carrier and belt, on the limbs they cover: pads and caps round the top of each arm, a panel or a
     // wrap at the hips, panels, wraps and guards down the legs (each where its protection is: js/ballistics.ts covers)

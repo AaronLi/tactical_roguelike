@@ -293,34 +293,39 @@ const G_Ballistics = (() => {
   //   'plate' (front and back of the chest, a SAPI-sized 25 x 32 cm plate), 'side' (the flanks under the arms),
   //   'torso' (soft armour: chest and abdomen all round, except high under the arms), 'axilla' (that gap under the arms),
   //   'groin' (the front of the pelvis), 'groinplate' (a hard plate on the middle of that), 'pelvis' (all round it),
-  //   'shoulder' (the upper arm's top half), 'thigh' (the front of the upper thigh), 'legwrap' (the thigh all round, near
-  //   to the knee), 'shin' (the front of the shin), 'helmet' (the skull above the brim: piece.cut 'high' or 'full'),
+  //   'shoulder' (the upper arm's top half), 'thigh' (a panel down the front of the upper thigh), 'legwrap' (the thigh all round, near
+  //   to the knee), 'shin' (the front of the shin), 'helmet' (the skull above the brim: piece.cut 'high', 'mid' or 'full': as it's drawn),
   //   'face' (the face below the brim: piece.lower for a mandible guard, just the jaw).
   // covers(at, seg, q): does that kind of protection cover segment seg at its local point q?
   function covers(at: string, piece: Record<string, any>, seg: BSeg, q: BVec) {
     const id = seg.id;
     if (at === 'plate') return id === 'chest' && Math.abs(q.x) <= 0.125 && q.y >= -0.005 && q.y <= 0.3 && Math.abs(q.z) > 0.04;
     if (at === 'side') return id === 'chest' && Math.abs(q.x) > seg.rx(q.y) * 0.72 && q.y >= 0.06 && q.y <= 0.22;
-    if (at === 'torso') return (id === 'chest' && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || id === 'abdomen';
+    if (at === 'torso') return (id === 'chest' && q.y <= 0.24 && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || id === 'abdomen'; // (up to the vest's neckline: js/rig.ts setKit)
     if (at === 'axilla') return id === 'chest' && q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8;
     if (at === 'groin') return id === 'pelvis' && q.z < 0;
     if (at === 'groinplate') return id === 'pelvis' && q.z < 0 && Math.abs(q.x) <= 0.09 && q.y <= 0.04;
     if (at === 'pelvis') return id === 'pelvis';
     if (at === 'shoulder') return id === 'uarm' && q.y > -0.13;
-    if (at === 'thigh') return id === 'thigh' && q.y > -0.22 && q.z < 0.01;
+    if (at === 'thigh') return id === 'thigh' && q.y > -0.235 && q.y < 0 && q.z < -0.03 && Math.abs(q.x) <= 0.072; // (a panel down the front, as drawn)
     if (at === 'legwrap') return id === 'thigh' && q.y > -0.36;
     if (at === 'shin') return id === 'shin' && q.y < -0.04 && q.y > -0.38 && q.z < 0.01;
     if (at === 'helmet') return (id === 'cranium') && q.y >= brim(piece.cut, q);
     if (at === 'face') return (id === 'jaw' || (id === 'cranium' && q.y < brim('high', q) && q.z < -0.03)) && (!piece.lower || q.y < 0.1);
     return false;
   }
-  // a helmet's lower edge round the head (head frame): over the brows at the front, high over the ears (a high cut) or
-  // down over them (full cut), the nape at the back
+  // a helmet's lower edge round the head (head frame): where the shell drawn on the head ends (js/headgear.ts CUT, as it sits on
+  // every body: measured off them, every sixteenth of the way from the front round to the back), so a round that meets the
+  // helmet you see meets the helmet. A high cut over the brows and up over the ears; a mid cut lower all round, over them; a
+  // full cut (the visor helmet's) down over them and the nape
+  const BRIM: Record<string, number[]> = {
+    high: [0.134, 0.13, 0.13, 0.126, 0.122, 0.126, 0.13, 0.142, 0.15, 0.15, 0.142, 0.122, 0.102, 0.088, 0.082, 0.078, 0.078],
+    mid: [0.122, 0.118, 0.118, 0.118, 0.11, 0.106, 0.106, 0.106, 0.11, 0.106, 0.098, 0.086, 0.076, 0.07, 0.066, 0.064, 0.062],
+    full: [0.12, 0.116, 0.112, 0.108, 0.104, 0.1, 0.096, 0.092, 0.088, 0.085, 0.082, 0.078, 0.074, 0.07, 0.066, 0.064, 0.062],
+  };
   function brim(cut: string, q: BVec) {
-    const a = Math.atan2(q.x, -(q.z)); // 0 front, ±π back
-    const [f, s, b] = cut === 'full' ? [0.16, 0.115, 0.07] : [0.162, 0.15, 0.095];
-    const k = Math.abs(a) / Math.PI; // 0 front .. 1 back
-    return k < 0.5 ? f + (s - f) * (k / 0.5) : s + (b - s) * ((k - 0.5) / 0.5);
+    const t = BRIM[cut] || BRIM.mid, k = Math.abs(Math.atan2(q.x, -(q.z))) / Math.PI * 16, i = Math.min(15, Math.floor(k)); // (0 front .. 16 back)
+    return t[i] + (t[i + 1] - t[i]) * (k - i);
   }
 
   // ---------------------------------------------------------------- the body, as the rigs are built

@@ -480,7 +480,7 @@ G.SUPPRESSOR = G_SUPPRESSOR;
 // Body armour and helmets that suspects wear (the squad's kit, carriers, plates, helmets and belts, is in
 // js/gear.ts, and works the same way). Armour is material, so thick, where it is on the body (js/ballistics.ts):
 // prot is a list of { at, layers: [[material, mm], ...] }, at 'plate' (front and back of the chest), 'side', 'torso'
-// (soft armour, chest and stomach), 'groin', 'shoulder', 'thigh', 'helmet' (above its brim: cut 'high' or 'full'),
+// (soft armour, chest and stomach), 'groin', 'shoulder', 'thigh', 'helmet' (above its brim: cut 'high', 'mid' or 'full', as js/headgear.ts draws it),
 // 'face' (the rest of them: js/ballistics.ts covers). Whether a round gets through is worked out from the round and the layers; armour wears by the energy it
 // soaks up (dur: how much it takes), and a worn layer is thinner.
 const G_ARMOR_LIST: ArmorDef[] = [
@@ -496,11 +496,11 @@ const G_ARMOR_LIST: ArmorDef[] = [
   { id: 'assault', kind: 'vest', name: 'Assault Armour', tier: 4, prot: [{ at: 'plate', layers: [['ceramic', 9], ['pe', 6]] }, { at: 'side', layers: [['steel', 5]] }, { at: 'torso', layers: [['aramid', 8]] }, { at: 'groin', layers: [['aramid', 8]] }, { at: 'shoulder', layers: [['aramid', 6]] }, { at: 'thigh', layers: [['aramid', 6]] }], dur: 8, speed: 0.88, price: 3200,
     desc: 'Plates front, back and sides, a groin plate, shoulder and thigh protection. Slow.' },
   { id: 'nohelm', kind: 'helmet', name: 'No Helmet', tier: 0, prot: [], dur: 0, speed: 1, price: 0, desc: '' },
-  { id: 'ach', kind: 'helmet', name: 'Ballistic Helmet (IIIA)', tier: 1, cut: 'full', prot: [{ at: 'helmet', layers: [['aramid', 8]] }], dur: 3, speed: 1, price: 600,
+  { id: 'ach', kind: 'helmet', name: 'Ballistic Helmet (IIIA)', tier: 1, cut: 'mid', prot: [{ at: 'helmet', layers: [['aramid', 8]] }], dur: 3, speed: 1, price: 600,
     desc: 'Stops handgun rounds to the top of the head. Not to your face.' },
-  { id: 'riflehelm', kind: 'helmet', name: 'Rifle-rated Helmet', tier: 3, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }], dur: 3, speed: 0.99, price: 1700,
+  { id: 'riflehelm', kind: 'helmet', name: 'Rifle-rated Helmet', tier: 3, cut: 'mid', prot: [{ at: 'helmet', layers: [['pe', 18]] }], dur: 3, speed: 0.99, price: 1700,
     desc: 'Turns some rifle rounds too. Still not your face.' },
-  { id: 'visor', kind: 'helmet', name: 'Helmet with Ballistic Visor', tier: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], dur: 4, speed: 0.97, price: 2800,
+  { id: 'visor', kind: 'helmet', name: 'Helmet with Ballistic Visor', tier: 4, cut: 'full', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], dur: 4, speed: 0.97, price: 2800,
     desc: 'Rifle-rated, with a visor that stops handgun rounds to the face.' },
 ];
 G.ARMOR_LIST = G_ARMOR_LIST;
