@@ -52,31 +52,36 @@ const G_ShipModel = (() => {
     const glass = new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0.6, depthWrite: false, side: T.DoubleSide, emissive: 0x06202c });
     const glow = lit(0x2a8a5a), strip = lit(0xdff2ff), hot = lit(c2), thrust = new T.MeshBasicMaterial({ color: 0x66c8ff, transparent: true, opacity: 0.0, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
     // the cockpit's glass: across its front over a low sill, and down each side for its first three metres
-    const SILL = FC + 0.62, HEADER = CC - 0.14, zg0 = zc + 0.5, zg1 = zc + 3.1;
+    // (glazed floor to ceiling: across the front, its corners cut back so the view wraps round, down both sides past the sensor station, and the deck
+    // ahead of the helm's seat glass too)
+    const SILL = FC, HEADER = CC - 0.06, zg0 = zc + 0.77, zg1 = zc + 3.1, zf = zc + 1.08, fc = fw - 0.45;
     // ---- inside: every solid of hers is drawn as it stands (decks and stairs in the deck's grey, walls and roofs lighter), bar
     // the cockpit's glazed walls (below), the doors and the steps off the ramp (their own)
     const glazed = (b: (number | string | undefined)[]) => b[1] === FC && b[4] === CC && b[2] === zc + 0.3;
     for (const b of SD.boxes(d)) {
-      if (b[6] || glazed(b)) continue;
+      if (b[6] || glazed(b) || (b[2] === zc + 0.3 && b[4] === FC)) continue;
       const flat = b[4] - b[1] <= 0.36 || (b[1] === 0 && b[4] <= FB + 0.01 && b[3] - b[0] < 2 * fw);
       K.box(flat ? deck : inner, b[0], b[1], b[2], b[3], b[4], b[5]);
     }
     // the cockpit's front: a sill, a header and the glass between, no pillar in the pilot's way
-    K.box(inner, -fw, FC, zc + 0.3, fw, SILL, zc + 0.5); K.box(inner, -fw, HEADER, zc + 0.3, fw, CC, zc + 0.5);
-    const fg = part(g, new T.Mesh(new T.PlaneGeometry(2 * fw, HEADER - SILL), glass), 0, (SILL + HEADER) / 2, zc + 0.42); fg.rotation.x = -0.18;
+    K.box(deck, -fw - 0.2, 0, zf, fw + 0.2, FC, zr); K.box(dark, -fw - 0.2, 0, zc + 0.3, fw + 0.2, FC - 0.03, zc + 0.34); K.box(dark, -0.03, FC - 0.04, zc + 0.34, 0.03, FC - 0.01, zf);
+    part(g, new T.Mesh(new T.BoxGeometry(2 * fw + 0.4, 0.03, zf - zc - 0.34), glass), 0, FC - 0.02, (zc + 0.34 + zf) / 2); // (the glass deck ahead of the seat)
+    K.box(dark, -fw, HEADER, zc + 0.3, fw, CC, zc + 0.36);
+    part(g, new T.Mesh(new T.PlaneGeometry(2 * fc, HEADER - SILL), glass), 0, (SILL + HEADER) / 2, zc + 0.33);
+    for (const s of [-1, 1]) { const cut = part(g, new T.Mesh(new T.PlaneGeometry(Math.hypot(0.45, zg0 - zc - 0.33), HEADER - SILL), glass), s * (fc + 0.225), (SILL + HEADER) / 2, (zc + 0.33 + zg0) / 2); cut.rotation.y = -s * Math.atan2(zg0 - zc - 0.33, 0.45); K.box(dark, s * fc - 0.03, SILL, zc + 0.31, s * fc + 0.03, HEADER, zc + 0.36); K.box(dark, s * fw - 0.03, SILL, zg0 - 0.03, s * fw + 0.03, HEADER, zg0 + 0.03); }
     for (const s of [-1, 1]) {
       const a = s * fw, b = s * (fw + W);
-      K.box(inner, a, FC, zc + 0.3, b, SILL, zk); K.box(inner, a, HEADER, zc + 0.3, b, CC, zk); K.box(inner, a, SILL, zg1, b, HEADER, zk); // under, over and behind the side glass
-      K.box(dark, a, SILL, zc + 0.3, b, HEADER, zg0); K.box(dark, a, SILL, zg1 - 0.08, b, HEADER, zg1); // its frame
+      K.box(inner, a, SILL, zg1, b, CC, zk); K.box(dark, a, HEADER, zg0, b, CC, zg1); // (the wall behind the side glass, its header)
+      K.box(dark, a, SILL, zg1 - 0.06, b, HEADER, zg1); for (const zm of [zc + 1.9]) K.box(dark, a, SILL, zm - 0.03, b, HEADER, zm + 0.03); // (its frame, a mullion beside the sensor station)
       part(g, new T.Mesh(new T.BoxGeometry(0.03, HEADER - SILL, zg1 - zg0), glass), s * (fw + W / 2), (SILL + HEADER) / 2, (zg0 + zg1) / 2);
     }
     // ---- the cockpit's fittings: the helm's console under the glass (the navigation screen on it), the sensor station's screen
     // on the wall at its right hand (js/space.ts draws the deck plan on it), the seats
     const scr = canvasTex(256, 160, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
-    K.box(dark, -fw + 0.1, FC, zc + 0.5, fw - 0.1, SILL - 0.04, zc + 0.95);
-    const nf = part(g, new T.Mesh(new T.PlaneGeometry(0.62, 0.38), new T.MeshBasicMaterial({ map: nav.tex })), -0.42, SILL + 0.02, zc + 0.86); nf.rotation.x = -0.95;
-    const sf = part(g, new T.Mesh(new T.PlaneGeometry(0.8, 0.5), new T.MeshBasicMaterial({ map: scr.tex })), fw - 0.03, FC + 1.45, zc + 2.45); sf.rotation.y = -Math.PI / 2;
-    K.box(dark, fw - 0.06, FC + 1.15, zc + 1.95, fw, FC + 1.75, zc + 2.95);
+    K.box(dark, -0.82, FC, zc + 1.2, -0.74, FC + 0.75, zc + 1.28); // (the navigation screen on an arm at the pilot's left knee, clear of the glass)
+    const nf = part(g, new T.Mesh(new T.PlaneGeometry(0.5, 0.32), new T.MeshBasicMaterial({ map: nav.tex })), -0.7, FC + 0.85, zc + 1.2); nf.rotation.set(-0.7, 0.55, 0, 'YXZ');
+    const sf = part(g, new T.Mesh(new T.PlaneGeometry(0.62, 0.4), new T.MeshBasicMaterial({ map: scr.tex })), 0.68, FC + 1.25, zc + 2.4); sf.rotation.set(-0.35, -0.75, 0, 'YXZ'); // (the sensor station's, on an arm at its right)
+    K.box(dark, 0.78, FC, zc + 2.5, 0.86, FC + 1.0, zc + 2.58);
     for (const st of SD.seats(d)) {
       const F = st.f, c = Math.cos(st.yaw), s = Math.sin(st.yaw), fx = -s, fz = -c; // (the way it faces)
       const sx = st.x - fx * 0.05, sz = st.z - fz * 0.05, h = st.k === 'jump' ? 0.2 : 0.25, up = st.y - F - 0.26;
@@ -96,11 +101,11 @@ const G_ShipModel = (() => {
     // ---- outside. The nose: a wedge under the cockpit's glass; the cockpit's sides and the breach deck over it, plated; the
     // tunnel narrower, out to the collar; the crew deck aft, wider and lower, armour sloped down her flanks to a chine
     const O = 0.03;
-    g.add(loft([{ z: zc + 0.32, pts: [[-fw - W, 0.02], [fw + W, 0.02], [fw + W, SILL], [-fw - W, SILL]] }, { z: zc - 0.45, pts: [[-fw * 0.7, 0.35], [fw * 0.7, 0.35], [fw * 0.8, SILL - 0.25], [-fw * 0.8, SILL - 0.25]] }], armor));
-    g.add(loft([{ z: zc + 0.32, pts: [[-fw - W, HEADER], [fw + W, HEADER], [fw + W, CC + 0.2], [-fw - W, CC + 0.2]] }, { z: zc - 0.05, pts: [[-fw - W + 0.1, HEADER + 0.08], [fw + W - 0.1, HEADER + 0.08], [fw + W, CC + 0.2], [-fw - W, CC + 0.2]] }], armor)); // (a brow over the glass)
+    // (no chin: the glass deck looks straight down)
+    g.add(loft([{ z: zc + 0.32, pts: [[-fw - W, HEADER], [fw + W, HEADER], [fw + W, CC + 0.2], [-fw - W, CC + 0.2]] }, { z: zc + 0.05, pts: [[-fw - W + 0.1, CC], [fw + W - 0.1, CC], [fw + W, CC + 0.2], [-fw - W, CC + 0.2]] }], armor)); // (a brow over the glass)
     for (const s of [-1, 1]) {
       const mir = s < 0, x = fw + W + O;
-      K.box(hull, s * x, 0.02, zc + 0.3, s * (x + 0.04), SILL, zr); K.box(hull, s * x, HEADER, zc + 0.3, s * (x + 0.04), CC + 0.2, zr); K.box(hull, s * x, SILL, zg1, s * (x + 0.04), HEADER, zr);
+      K.box(hull, s * x, 0.02, zg1, s * (x + 0.04), CC + 0.2, zr); K.box(hull, s * x, HEADER, zg0, s * (x + 0.04), CC + 0.2, zg1);
       // the breach deck's sides: the tunnel's, then the wider space behind it (its underside overhangs the cockpit)
       K.box(hull, s * (tw + W + O), CC, zc, s * (tw + W + O + 0.04), top, zt); K.box(hull, s * (sw + W + O), CC, zt, s * (sw + W + O + 0.04), top, zk);
       K.box(armor, s * (fw + W), CC, zt, s * (sw + W + O), CC + 0.05, zk);
@@ -127,7 +132,7 @@ const G_ShipModel = (() => {
     K.box(armor, -tw - W - O, top, zc, tw + W + O, top + 0.06, zt); K.box(armor, -sw - W - O, top, zt, sw + W + O, top + 0.06, zk); K.box(armor, -fw - W - O, top, zk, fw + W + O, top + 0.06, zr);
     K.box(hull, -X - O, CM + 0.2, zr, X + O, CM + 0.25, z1 + 0.1);
     g.add(loft([{ z: zr - 0.1, pts: [[-0.8, CM + 0.25], [0.8, CM + 0.25], [0.5, top + 0.05], [-0.5, top + 0.05]] }, { z: z1 - 1, pts: [[-0.75, CM + 0.25], [0.75, CM + 0.25], [0.45, CM + 0.7], [-0.45, CM + 0.7]] }, { z: z1 + 0.6, pts: [[-0.6, CM + 0.25], [0.6, CM + 0.25], [0.3, CM + 0.45], [-0.3, CM + 0.45]] }], armor));
-    K.box(dark, -fw - W, -0.03, zc + 0.3, fw + W, 0.02, zr); K.box(dark, -X, -0.03, zr, X, 0.02, z1 + 0.1);
+    K.box(dark, -fw - W, -0.03, zf, fw + W, 0.02, zr); K.box(dark, -X, -0.03, zr, X, 0.02, z1 + 0.1);
     // the collar: an eight-sided ring round the breaching door, lit, the tunnel's mouth plated round inside it
     const cy = FB + (CB - FB) / 2 + 0.08, col = part(g, new T.Mesh(new T.TorusGeometry(1.28, 0.12, 6, 8), accent), 0, cy, zc - 0.1); col.rotation.z = Math.PI / 8; col.scale.set(0.95, 0.92, 1); // (no lower than the breach deck's floor: clear of the windscreen under it)
     const col2 = part(g, new T.Mesh(new T.TorusGeometry(1.12, 0.05, 5, 8), hot), 0, cy, zc - 0.2); col2.rotation.z = Math.PI / 8; col2.scale.set(0.95, 0.92, 1);

@@ -76,16 +76,18 @@ const G_SpaceData = (() => {
   //     ground when it's open). Up the left flight from it to the breach deck, down the right to the cockpit.
   // When she's breaching, it's the breach deck's floor that's level with the deck she's breached (her keel lift lower).
   function layout(d: SpShipDef): SpLayout {
-    const k = d.hw / 1.7, zc = d.z0 - d.nose - 0.5, zt = zc + 2.4, zk = zc + 4.6, FB = 2.7;
-    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.9 * k, zc, zt, zw: zt + 1.0, zk, zr: zk + 1.6, z1: d.z1 + 1, FC: 0.3, FB, FM: 1.5, CC: 2.5, CB: 4.9, CM: 3.9, lift: FB - FLOOR };
+    // (the breach deck a step lower than it might be, 2.2 m clear over it; the cockpit's floor low in her keel so it keeps its headroom under that;
+    // the crew deck no longer than its two rows of seats and the ramp need)
+    const k = d.hw / 1.7, zc = d.z0 - d.nose - 0.5, zt = zc + 2.4, zk = zc + 4.6, zr = zk + 2.3, FB = 2.4;
+    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.9 * k, zc, zt, zw: zt + 1.0, zk, zr, z1: zr + 4.6 + Math.max(0, d.jump - 4) * 0.48, FC: 0.15, FB, FM: 1.5, CC: 2.2, CB: FB + 2.2, CM: 3.9, lift: FB - FLOOR };
   }
   function seats(d: SpShipDef): SpSeat[] {
     const L = layout(d), F = L.FC;
     const s: SpSeat[] = [
-      { k: 'helm', x: 0, y: F + 0.26, z: L.zc + 1.35, yaw: 0, f: F, sx: 0.75, sz: L.zc + 1.5 },
-      { k: 'sensors', x: 0, y: F + 0.62, z: L.zc + 2.45, yaw: 0, f: F, sx: 0.75, sz: L.zc + 2.6 }, // (raised: eyes over the pilot's head)
+      { k: 'helm', x: 0, y: F + 0.1, z: L.zc + 1.45, yaw: 0, f: F, sx: 0.75, sz: L.zc + 1.6 }, // (low: the glass floor ahead of it, and headroom over it)
+      { k: 'sensors', x: 0, y: F + 0.42, z: L.zc + 2.5, yaw: 0, f: F, sx: 0.75, sz: L.zc + 2.65 }, // (raised: eyes over the pilot's head)
     ];
-    for (let i = 0; i < d.turrets; i++) s.push({ k: 'turret', n: i, x: (i ? 1 : -1) * 0.55, y: F + 0.26, z: L.zc + 3.55, yaw: 0, f: F, sx: 0, sz: L.zc + 4.25 });
+    for (let i = 0; i < d.turrets; i++) s.push({ k: 'turret', n: i, x: (i ? 1 : -1) * 0.55, y: F + 0.1, z: L.zc + 3.55, yaw: 0, f: F, sx: 0, sz: L.zc + 4.25 });
     for (let i = 0; i < d.jump; i++) { const sd = i % 2 ? 1 : -1, z = L.zr + 1.4 + Math.floor(i / 2) * 0.95; s.push({ k: 'jump', x: sd * (L.hw - 0.4), y: L.FM, z, yaw: sd * Math.PI / 2, f: L.FM, sx: sd * (L.hw - 1.1), sz: z }); }
     return s;
   }
@@ -93,7 +95,9 @@ const G_SpaceData = (() => {
   // while it's open), 'ramp' the rear door (the same), 'steps' the steps down off the open ramp (there only while it's open).
   type ShipBox = [number, number, number, number, number, number, string?];
   function boxes(d: SpShipDef): ShipBox[] {
-    const L = layout(d), W = 0.2, { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, R = 0.4, top = CB + W;
+    const L = layout(d), W = 0.2, { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, top = CB + W;
+    // (each flight as many steps as keep a rise to 0.3 m, over the same run)
+    const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), run = zr - zk;
     const out: ShipBox[] = [
       // the cockpit: its deck (on to the foot of the down flight), its sides, the glass at its front, its back wall under the up flight
       [-fw - W, 0, zc + 0.3, fw + W, FC, zr], [-fw - W, FC, zc + 0.3, -fw, CC, zk], [fw, FC, zc + 0.3, fw + W, CC, zk], [-fw, FC, zc + 0.3, fw, CC, zc + 0.5],
@@ -112,8 +116,9 @@ const G_SpaceData = (() => {
       [-hw, FM, zr - W, -fw, CM, zr], [fw, FM, zr - W, hw, CM, zr], [-fw, CM, zr - 0.05, fw, CB, zr + 0.05],
       [-hw, FM, z1, hw, CM, z1 + W, 'ramp'],
     ];
-    for (let i = 0; i < 3; i++) out.push([0.06, 0, zr - R * (i + 1), fw, FM - 0.3 * (i + 1), zr - R * i]); // down to the cockpit, on the right
-    for (let i = 0; i < 4; i++) out.push([-fw, 0, zr - R * (i + 1), -0.06, FM + 0.3 * (i + 1), zr - R * i]); // up to the breach deck, on the left
+    const rD = run - 0.95; // (down: on the cockpit's deck the best part of a metre before its ceiling, so your head's under it as you come to it)
+    for (let i = 0; i < nD - 1; i++) out.push([0.06, 0, zr - rD * (i + 1) / (nD - 1), fw, FM - (FM - FC) * (i + 1) / nD, zr - rD * i / (nD - 1)]); // down to the cockpit, on the right
+    for (let i = 0; i < nU; i++) out.push([-fw, 0, zr - run * (i + 1) / nU, -0.06, FM + (FB - FM) * (i + 1) / nU, zr - run * i / nU]); // up to the breach deck, on the left
     for (let i = 0; i < 4; i++) out.push([-hw + 0.3, 0, z1 + W + 0.38 * i, hw - 0.3, FM - 0.3 * (i + 1), z1 + W + 0.38 * (i + 1), 'steps']); // off the open ramp
     return out;
   }
