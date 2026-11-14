@@ -386,7 +386,8 @@ const G_InvUI = (() => {
     else if (d && d.dur) sub = `${Math.round(Gr.cond(it) * 100)}%`;
     else if (it.k === 'part') { const p = GS().PARTS[it.pid]; sub = p && p.factory ? 'factory' : ''; }
     const P = it.k === 'part' ? GS().PARTS[it.pid] : null;
-    const title = d ? `${d.brand} ${d.name}\n${d.desc}` : P ? `${P.brand} ${P.name}\n${(GS().SLOT_LABEL as Rec)[P.slot]} · ${GS().ifaceName(P.mount)}` : Gr.label(it);
+    const cov = d && d.prot ? G.Ballistics.coverageText(d, (it as any).plate ? Gr.defOf((it as any).plate) : null) : '';
+    const title = d ? `${d.brand} ${d.name}\n${d.desc}${cov ? '\n\n' + cov : ''}` : P ? `${P.brand} ${P.name}\n${(GS().SLOT_LABEL as Rec)[P.slot]} · ${GS().ifaceName(P.mount)}` : Gr.label(it);
     return `<div class="inv-item k-${it.k}" data-uid="${it.uid}" style="width:${w * C - 3}px;height:${h * C - 3}px;background:${COLORS[it.k] || '#333'} url(${G.Icons.of(it, w, h, rot)}) center/contain no-repeat;${extra}" title="${G.U.esc(title)}">
       <span class="inv-name">${G.U.esc(d ? d.name : Gr.label(it))}</span><span class="inv-sub">${sub}</span></div>`;
   }

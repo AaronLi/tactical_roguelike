@@ -892,7 +892,7 @@ const G_Ballistics = (() => {
     if (!def) return null;
     return { p: projectile(def, am!), v: G.roundSpeed(def, am, 10) || 400 };
   }
-  const stopsRound = (r: { p: BRound; v: number }, layers: BLayer[]) => { let ok = 0; for (let i = 0; i < 5; i++) ok += layerStack(Object.assign({}, r.p), r.v, layers) ? 0 : 1; return ok >= 3; }; // (no glancing head-on)
+  const stopsRound = (r: { p: BRound; v: number }, layers: BLayer[], cosT = 1) => { let ok = 0; for (let i = 0; i < 5; i++) ok += layerStack(Object.assign({}, r.p), r.v, layers, cosT) ? 0 : 1; return ok >= 3; }; // (no glancing: the layers' own stopping)
   // how hard each threat is to stop: the thickness of steel, of aramid and of polyethylene it takes, each as a share of
   // what a .50's takes, added up (not its energy: a soft lead slug carries more than a 7.62x51 and a thin vest stops it)
   let HARD: Record<string, number> | null = null;
@@ -905,18 +905,57 @@ const G_Ballistics = (() => {
     for (const [name, r] of rs) HARD[name] = (['steel', 'aramid', 'pe'] as MatKey[]).reduce((a, mat, i) => a + need(r, mat) / top[i], 0);
     return HARD;
   }
-  // the threats a set of layers stops head-on, those it doesn't, and the hardest to stop of those it does (best)
-  function rating(layers: BLayer[]) {
+  // the threats a set of layers stops head-on (or struck at an angle: cosT, the cosine off square), those it doesn't, and the hardest
+  // to stop of those it does (best)
+  function rating(layers: BLayer[], cosT = 1) {
     const stops = [], fails = [], H = hardness();
     let best = null;
     for (const [name, cal, am, raw] of THREATS) {
       const r = refRound(cal, am, raw);
       if (!r) continue;
-      if (stopsRound(r, layers)) { stops.push(name); if (!best || H[name] > H[best]) best = name; } else fails.push(name);
+      if (stopsRound(r, layers, cosT)) { stops.push(name); if (!best || H[name] > H[best]) best = name; } else fails.push(name);
     }
     return { stops, fails, best };
   }
-  function layerStack(p: BRound, v: number, layers: BLayer[]) { for (const [mat, mm] of layers) { const r = layer(p, v, mat, mm, 1, 1); if (!r.through) return false; v = r.v; } return true; }
+  function layerStack(p: BRound, v: number, layers: BLayer[], cosT = 1) { for (const [mat, mm] of layers) { const r = layer(p, v, mat, mm, 1, cosT); if (!r.through) return false; v = r.v; } return true; }
+  // The fastest a grenade's fragment (a ragged 0.3 g steel chip: js/player.ts takeDamage) can be going and still be stopped, new: m/s
+  const FRAG = { m: 0.0003, d: 0.004, len: 0.004, core: 'mild', nose: 'ball' } as unknown as BRound;
+  function fragLimit(layers: BLayer[]) {
+    const stops = (v: number) => { let ok = 0; for (let i = 0; i < 3; i++) ok += layerStack(Object.assign({}, FRAG), v, layers) ? 0 : 1; return ok >= 2; };
+    let lo = 0, hi = 2400; if (stops(hi)) return hi;
+    while (hi - lo > 20) { const m = (lo + hi) / 2; if (stops(m)) lo = m; else hi = m; }
+    return Math.round(lo / 10) * 10;
+  }
+  // What a piece of armour covers, and how well (a card's, a tooltip's): each place its protection is (WHERE), the hardest round it
+  // stops there head-on and at 45 degrees (a layer's thicker along a slanting path: t / cos), and the fastest fragment it stops. A
+  // carrier with a plate in it: the plate's too (it's what's over the chest). Kept, a piece and its plate.
+  const WHERE: Record<string, string> = { plate: 'Chest, front and back (plate)', side: 'Sides, under the arms', torso: 'Chest and stomach, all round', carrier: 'Chest and upper stomach', wrap: 'Chest, stomach and top of the hips', collar: 'Base of the neck',
+    axilla: 'Armpits', groin: 'Front of the pelvis', groinplate: 'Middle of the groin (plate)', pelvis: 'Hips, all round', shoulder: 'Upper arms', thigh: 'Front of the thighs', legwrap: 'Thighs, all round', shin: 'Front of the shins', helmet: 'Top of the head', face: 'Face' };
+  const covCache = new Map<string, { where: string; best: string | null; more45: string[]; frag: number }[]>();
+  function coverage(d: Record<string, any>, plate?: Record<string, any> | null) {
+    const key = d.id + '|' + (plate ? plate.id : '');
+    let rows = covCache.get(key);
+    if (rows) return rows;
+    const prot = [...(plate && plate.prot ? plate.prot : []), ...(d.prot || [])];
+    rows = prot.map((pr: { at: string; layers: BLayer[] }) => {
+      const where = pr.at === 'face' && d.lower ? 'Jaw' : pr.at === 'helmet' ? 'Top of the head' + (d.cut === 'high' ? ' (above the ears)' : d.cut === 'full' ? ' (down over the ears and nape)' : ' (over the ears)') : WHERE[pr.at] || pr.at;
+      const r0 = rating(pr.layers), r45 = rating(pr.layers, Math.SQRT1_2);
+      return { where, best: r0.best, more45: r45.stops.filter((n) => !r0.stops.includes(n)), frag: fragLimit(pr.layers) }; // (more45: what it stops too, hit at 45 degrees)
+    });
+    covCache.set(key, rows);
+    return rows;
+  }
+  const fragWord = (v: number) => v >= 1200 ? `stops grenade fragments, even close in (to ${v} m/s)` : v >= 700 ? `stops grenade fragments but at point blank (to ${v} m/s)` : v >= 300 ? `stops spent fragments only (to ${v} m/s)` : 'not fragments';
+  function coverageText(d: Record<string, any>, plate?: Record<string, any> | null) {
+    const rows = coverage(d, plate);
+    return rows.length ? rows.map((r) => `${r.where}: stops ${r.best || 'nothing'} head-on${r.more45.length ? ', and ' + r.more45.join(', ') + ' at 45°' : ''}; ${fragWord(r.frag)}`).join('\n') : '';
+  }
+  function coverageHTML(d: Record<string, any>, plate?: Record<string, any> | null) {
+    const rows = coverage(d, plate), E = G.U.esc;
+    if (!rows.length) return '';
+    return `<table class="cov"><thead><tr><th>Covers</th><th>Bullets head-on</th><th>Also at 45°</th><th>Fragments</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${E(r.where)}</td><td>${E(r.best || 'nothing')}</td><td>${E(r.more45.join(', ') || '—')}</td><td class="${r.frag >= 1200 ? 'ok' : r.frag >= 700 ? 'mid' : 'no'}">${r.frag >= 300 ? 'to ' + r.frag + ' m/s' : 'no'}</td></tr>`).join('')}</tbody></table>
+      <p class="cov-note">The hardest round it stops, new; and what it stops besides when hit at 45°. Hit at an angle, a layer is thicker along the path (×1.4 at 45°), and a hard plate can turn a round past about 40°. Grenade fragments leave at about 1,500 m/s and slow fast: half that a few metres out.</p>`;
+  }
 
   // ---------------------------------------------------------------- for the shop and the gunsmith
   // a gun's round's energy (J, all its pellets) d metres out, with this load (ball by default)
@@ -950,7 +989,7 @@ const G_Ballistics = (() => {
   const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', carrier: 'chest and upper stomach', wrap: 'chest, stomach and hips', collar: 'neck', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
   const layersText = (L: BLayer[]) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
+  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS, coverage, coverageText, coverageHTML, fragLimit };
 })();
 G.Ballistics = G_Ballistics;
 
