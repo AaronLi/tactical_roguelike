@@ -108,7 +108,7 @@ const G_DebugStart = (() => {
     const space = q.has('board') || q.has('assault') || q.has('fly');
     if (q.has('hangar') || space) {
       // (the game in space starts in the hangar: js/spaceserver.ts startRun)
-      G.Net.toHost({ t: 'startRun', dbg: q.has('ship') ? { fleet: { owned: [q.get('ship')], ship: q.get('ship') } } : undefined });
+      G.Net.toHost({ t: 'startRun', dbg: q.has('ship') ? { fleet: { owned: [q.get('ship')], ship: q.get('ship') } } : {} }); // (dbg: a debug start's, so no sidearm picker)
       if (!G.SpaceData.ON) { await until(() => G.Game.phase === 'route'); arm(); G.Net.toHost({ t: 'toShop' }); }
       await until(() => G.Game.hub && G.Me.pos && !G.Game.$('veil').classList.contains('on'), 30);
       if (G.SpaceData.ON) arm();

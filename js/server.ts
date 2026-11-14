@@ -438,7 +438,7 @@ const G_Server = {
   // --------------------------------------------------------------- phases
   startRun() {
     // (the game in space: the hangar first, missions off its board, js/spaceserver.ts; a debug start's ?play still goes the old way)
-    if (G.SpaceData.ON && !(this.dbgNext && this.dbgNext.classic)) { const f = this.dbgNext && this.dbgNext.fleet; this.dbgNext = null; G.SpaceSv.startRun(f); return; }
+    if (G.SpaceData.ON && !(this.dbgNext && this.dbgNext.classic)) { const dbg = !!this.dbgNext, f = this.dbgNext && this.dbgNext.fleet; this.dbgNext = null; G.SpaceSv.startRun(f, dbg); return; } // (a debug start: no sidearm picker, js/debugstart.ts)
     this.level = 1;
     this.team = { ver: 0, items: [] };
     this.arms = {}; // (the sidearms picked: each player's own)

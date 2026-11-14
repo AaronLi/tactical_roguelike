@@ -50,13 +50,14 @@ const G_SpaceSv = (() => {
   const sync = () => { const m = msMsg(); if (m) net().broadcast(m); };
 
   // ---- a run begins: the hangar, the ship on its pad, a fresh board
-  function startRun(fleet?: unknown) {
+  function startRun(fleet?: unknown, dbg?: boolean) {
     const sv = S();
     st.rank = 1; st.fleet = SD.cleanFleet(fleet || st.fleet); st.seats = {}; st.M = null;
     st.board = { seed: (Math.random() * 2 ** 31) | 0, level: st.rank, picked: [], done: [] };
     st.ship = { docked: true, at: null, ctl: null, pose: null };
     sv.level = 1; sv.team = { ver: 0, items: [] }; sv.arms = {};
     net().broadcast({ t: 'newrun' });
+    if (dbg) { sv.toShop(); return; }
     // first everyone's sidearm (the route screen's picker, with no route under it: js/game.ts armsOnly); the base once the
     // whole squad has one (js/server.ts checkArms)
     sv.route = null; sv.routeMap = null; sv.phase = 'route';

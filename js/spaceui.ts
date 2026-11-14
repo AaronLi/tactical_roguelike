@@ -74,6 +74,7 @@ const G_SpaceUI = (() => {
   const _v = new T.Vector3(), _q = new T.Quaternion();
   function update(dt: number) {
     const s = S(); if (!s.on || !made) return;
+    hud.style.visibility = G.Game.invOpen || G.Game.shopOpen ? 'hidden' : ''; // (under the Tab screen and the shop, as the rest of the HUD is: #hud holds them, and this isn't in it)
     const seat = G.Space.mySeat(), flying = !s.docked || !!s.auto, aboard = G.Space.aboard(), wp = s.wps[s.tgt] && !s.wps[s.tgt].hide ? s.wps[s.tgt] : null;
     const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(_v.copy(s.P).sub(wp.p).normalize()) : 0;
     // the line at the top: for everyone aboard while she's under way
