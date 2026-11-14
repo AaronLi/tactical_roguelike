@@ -3,7 +3,8 @@
 //   2. the stickers (tools/bake_stickers.mjs) and the synthesized audio (tools/bake_audio.mjs: only what's changed)
 //   3. the models (tools/bake_models.mjs: the guns' pieces, the props, the hangar's scene, the human bodies) and their bundle
 // Needs node and what npm install brings, nothing else: no Blender, no browser.
-//   npm run build                    all of it (the models take a minute or two)
+//   npm run build                    all of it (the models take a minute or two the first time, and whenever what the guns are made from
+//                                    has changed; otherwise a few seconds. -- --force bakes them regardless)
 //   npm run build -- --no-models     1 and 2 only: what a change to the game's code needs (npm run compile is step 1 alone)
 //   npm run build -- -j 4            worker threads for the audio and the models; anything else is handed to the models' bake
 import { spawnSync } from 'node:child_process'; import path from 'node:path'; import { fileURLToPath } from 'node:url';

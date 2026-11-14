@@ -3,6 +3,7 @@
 //   node tools/bake_models.mjs --check                        lists the bakes that are stale against the current code
 //   node tools/bake_models.mjs --guns [--parts] [id ...]     also (or only) the whole default guns, assets/models/guns/ (for the tools: the game loads none; default: the pieces only)
 //   -j N | --jobs N (or MODEL_BAKE_JOBS=N)   worker threads (default min(cores - 1, 8); -j 1: one process). The output is byte-identical for any N.
+//   --force (bake the platforms' pieces though nothing they're made from has changed: a whole bake otherwise leaves them, see "up to date?" below)
 //   --verbose (every platform detail line, gltf-transform log lines)   --no-props (skip the props bake that a full run ends with: tools/bake_props.mjs)   --no-humans (skip the human bodies: tools/bake_humans.mjs)   --no-hangar (skip the hangar's scene: tools/bake_hangar.mjs, which needs a Chromium)   --no-bundle (skip the bundling that runs last: tools/bundle_models.mjs)
 //
 // WHAT IT DOES (--guns). Loads the compiled game (dist/js) in a vm with the node build of three r149, builds every platform's
@@ -67,6 +68,31 @@ function progressOf(total, label) {
 const phases = []; let phaseT = now(), phaseName = null;
 const phase = (name) => { const t = now(); if (phaseName) phases.push([phaseName, t - phaseT]); phaseName = name; phaseT = t; };
 
+// ---- up to date? The platforms' pieces are most of a bake's time (a minute and more) and come from a known set of files: the
+// baker and the recipes (tools/), the game's files the recipes run on (js/), the models made in Blender (models/), three and
+// gltf-transform (package-lock.json). Their fingerprint is kept beside the pieces (parts/inputs.json) when a whole bake has
+// succeeded; a whole bake that finds it unchanged, with the pieces there, leaves them as they are. --force bakes regardless.
+// (The props, the hangar, the bodies and the bundling take a few seconds between them and are always done.)
+function inputsHash() {
+  const files = [], walk = (dir, keep) => { for (const d of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) { const r = dir + '/' + d.name; if (d.isDirectory()) { if (r !== 'models/characters') walk(r, keep); } else if (keep(d.name)) files.push(r); } };
+  walk('tools/models', (n) => n.endsWith('.ts'));
+  for (const f of fs.readdirSync(path.join(ROOT, 'tools'))) if (/^(bake_models|bake_worker|bake_parts|bake_authored|authored_parts|authored_checks|extrude_r149|model_[a-z_]+)\.mjs$/.test(f)) files.push('tools/' + f);
+  for (const f of ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'gunmaterials', 'gunrig', 'glb', 'modelbundles']) files.push('js/' + f + '.ts');
+  walk('models', (n) => n.endsWith('.glb') || n.endsWith('.json'));
+  files.push('package-lock.json');
+  const h = crypto.createHash('sha1');
+  for (const f of files.sort()) { h.update(f + '\0'); h.update(fs.readFileSync(path.join(ROOT, f))); h.update('\0'); }
+  return { hash: h.digest('hex'), files: files.length };
+}
+const INPUTS = path.join(ROOT, 'assets/models/parts/inputs.json'), inputs = inputsHash();
+const wholeParts = !only.length && !check && !flags.has('--guns');
+let upToDate = false;
+if (wholeParts && !flags.has('--force')) {
+  try { const was = JSON.parse(fs.readFileSync(INPUTS, 'utf8')); upToDate = was.hash === inputs.hash && fs.existsSync(path.join(ROOT, 'assets/models/parts/index.json')); } catch (e) { /* never baked whole */ }
+}
+let fails = 0;
+if (upToDate) console.log(`the platforms' pieces are up to date (none of the ${inputs.files} files they're made from has changed since they were baked: --force bakes them anyway)`);
+else {
 // ---- the environment (the game in a vm, the contract) and the pool of workers that run the jobs
 const env = await makeEnv({ verbose }), { G, GS, Models, src } = env;
 for (const id of authoredIds()) { // (the authored sources: the contract and the platform's spec first)
@@ -92,7 +118,7 @@ const slowestFirst = (list) => list.map((id, i) => [id, i]).sort((a, b) => cost(
 const indexFile = OUT + 'index.json';
 const old = fs.existsSync(indexFile) ? JSON.parse(fs.readFileSync(indexFile, 'utf8')) : { guns: {} };
 const index = { version: 1, three: THREE_NS.REVISION, src, guns: only.length || check ? { ...old.guns } : {} };
-let fails = 0, rawTotal = 0, gzTotal = 0, stale = 0;
+let rawTotal = 0, gzTotal = 0, stale = 0;
 
 // ---- phase 1: the whole default guns
 if (doGuns) {
@@ -152,9 +178,11 @@ if (doParts) {
     const gzAll = totals.gz + totals.sharedGz;
     console.log(`\nbaked pieces for ${vals.length} platforms: ${totals.pieces} pieces, ${totals.anchors} offsets; ${totals.files} platform files (${totals.bytes} B, ${totals.gz} B gzipped) + ${totals.sharedFiles} shared files (${totals.sharedBytes} B, ${totals.sharedGz} B gzipped) = ${gzAll} B gzipped (+ indexes ${totals.index} B, ${totals.indexGz} gzipped); learnt from ${totals.builds} builds, ${totals.sampled} more sampled: every one assembles from them as the recipe builds it`);
     if (!only.length) { try { fs.writeFileSync(timesFile, JSON.stringify(times)); } catch (e) { /* the cache is a convenience */ } }
+    if (wholeParts) fs.writeFileSync(INPUTS, JSON.stringify(inputs) + String.fromCharCode(10)); // (what they were made from: the next whole bake that finds it the same leaves them)
   }
 }
 await pool.close();
+}
 
 // ---- the props (the cartridges, the quarrel): a separate script, run last
 if (!noProps && !fails) {
