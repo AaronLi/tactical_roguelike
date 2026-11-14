@@ -354,22 +354,55 @@ const G_Rig = (() => {
     const cd = D(k.carrier), cc = KIT_COL(cd);
     part = 'carrier';
     if (cd) {
-      if (cd.thin) box(C, 0.4, 0.27, 0.245, cd.col, 0, 0.12, 0);
-      else if (cd.id === 'c.recon') { // a chest rig: a panel of pouches across the front, straps over the shoulders
+      // Not a block round the chest: what a carrier is. A plate bag on the chest and one on the back (thicker with a plate in), joined round
+      // the ribs by the cummerbund, straps over the shoulders, pouches on the front; a soft vest thin panels wrapping the trunk. All in the
+      // chest's frame at its standard size (front and back 0.125 off its middle, 0.19 across), fitted to each body (fitPart).
+      const soft = !!cd.thin, heavy = cd.id === 'c.heavy', pd = soft ? 0.014 : k.plate ? (heavy ? 0.045 : 0.036) : 0.022, bd = soft ? 0.014 : heavy ? 0.045 : 0.03;
+      const pw = soft ? 0.3 : heavy ? 0.32 : 0.26, ph = soft ? 0.25 : heavy ? 0.33 : 0.29, py = soft ? 0.115 : 0.13, col = soft ? cd.col : cc;
+      // the trunk's section in the chest's frame at its standard size (an ellipse, 0.165 across each way, 0.12 front and back): what the
+      // bags and the cummerbund curve round, a few millimetres off it
+      const A0 = 0.165, B0 = 0.12;
+      const shell = (parent: THREE.Object3D, side: number, a0: number, a1: number, h: number, t: number, y: number, c: number, gap = 0.004) => {
+        // a curved slab: round the ellipse (a, b) + gap from angle a0 to a1 (0 straight ahead, or behind with side = 1), t thick, h tall
+        const N = Math.max(4, Math.round((a1 - a0) / 0.12)), pos: number[] = [], idx: number[] = [], at = (u: number, off: number) => { const th = a0 + (a1 - a0) * u; return [Math.sin(th) * (A0 + gap + off), side * Math.cos(th) * (B0 + gap + off)]; };
+        for (let i = 0; i <= N; i++) for (const off of [0, t]) for (const yy of [-h / 2, h / 2]) { const [x, z] = at(i / N, off); pos.push(x, yy, z); }
+        const v = (i: number, o: number, top: number) => i * 4 + o * 2 + top, q = (a: number, b: number, c2: number, d: number) => idx.push(a, b, c2, a, c2, d);
+        for (let i = 0; i < N; i++) { q(v(i, 1, 0), v(i + 1, 1, 0), v(i + 1, 1, 1), v(i, 1, 1)); q(v(i, 0, 1), v(i + 1, 0, 1), v(i + 1, 0, 0), v(i, 0, 0)); q(v(i, 0, 1), v(i, 1, 1), v(i + 1, 1, 1), v(i + 1, 0, 1)); q(v(i + 1, 0, 0), v(i + 1, 1, 0), v(i, 1, 0), v(i, 0, 0)); }
+        q(v(0, 0, 0), v(0, 1, 0), v(0, 1, 1), v(0, 0, 1)); q(v(N, 0, 1), v(N, 1, 1), v(N, 1, 0), v(N, 0, 0));
+        const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+        return add(parent, new T.Mesh(g, KM(c, { side: T.DoubleSide })), 0, y, 0);
+      };
+      const half = (w: number) => Math.asin(Math.min(0.99, w / 2 / A0)); // (the angle a bag's half-width takes round the trunk)
+      if (cd.id === 'c.recon') { // a chest rig: a panel of pouches across the front, straps over the shoulders
         box(C, 0.36, 0.15, 0.06, cc, 0, 0.03, -0.13);
         for (const x of [-1, 1]) box(C, 0.04, 0.26, 0.24, cc, x * 0.12, 0.17, 0);
         pouches(C, Math.max(2, k.cp || 0), 0x23251f, -0.13, 0.04, -0.17);
       } else {
-        const heavy = cd.id === 'c.heavy', depth = (heavy ? 0.3 : 0.27) + (k.plate ? 0.03 : 0);
-        box(C, heavy ? 0.44 : 0.4, heavy ? 0.32 : 0.28, depth, cc, 0, 0.12, 0);
-        if (k.plate) { part = 'plate'; box(C, 0.26, 0.22, 0.02, cc, 0, 0.14, -depth / 2 - 0.005); part = 'carrier'; } // the plate's outline at the front
-        pouches(C, k.cp || 0, 0x23251f, -0.16, 0.06, -depth / 2 - 0.03);
+        // the front plate bag and the back, curved round the trunk and leant in at the top as the chest and the back are
+        const fa = half(pw), ba = half(pw + 0.01);
+        shell(C, -1, -fa, fa, ph, pd, py, col).rotation.x = 0.1;
+        shell(C, 1, -ba, ba, ph + 0.01, bd, py, col).rotation.x = -0.06;
+        if (k.plate && !soft) { part = 'plate'; shell(C, -1, -fa * 0.8, fa * 0.8, ph - 0.07, 0.005, py + 0.01, col, 0.004 + pd).rotation.x = 0.1; part = 'carrier'; } // the plate's outline, standing proud in the bag
+        // the cummerbund (a soft vest's sides): round each flank from the front bag's edge to the back's
+        const cy = soft ? py - 0.015 : py - 0.07, chh = soft ? ph - 0.07 : 0.14;
+        for (const sd of [-1, 1]) shell(C, -1, sd < 0 ? -Math.PI + ba - 0.05 : fa - 0.05, sd < 0 ? -fa + 0.05 : Math.PI - ba + 0.05, chh, soft ? 0.012 : 0.02, cy, col, soft ? 0.004 : 0.006);
+        // the shoulder straps, over each shoulder from the front bag's top to the back's
+        for (const x of [-1, 1]) box(C, 0.055, 0.02, 2 * B0 + 0.03, col, x * 0.085, py + ph / 2 + 0.004, 0);
+        if (!soft) pouches(C, k.cp || 0, 0x23251f, -0.11, py - 0.06, -B0 - pd - 0.03, 0.065, 0.09);
         if (heavy) for (const x of [-1, 1]) box(C, 0.13, 0.07, 0.2, cc, x * 0.22, 0.3, 0); // shoulder armour
         if (heavy) { box(C, 0.3, 0.07, 0.26, cc, 0, 0.32, 0.01); box(Hp, 0.2, 0.16, 0.04, cc, 0, -0.06, -0.12); } // collar, groin plate
       }
-      // its soft armour reaches down over the belly to the belt, all round, as it protects there (js/ballistics.ts covers: 'torso' is the
-      // chest and the abdomen)
-      if ((cd.prot || []).some((p: any) => p.at === 'torso')) box(rig.spine, cd.thin ? 0.34 : 0.36, 0.25, cd.thin ? 0.25 : cd.id === 'c.heavy' ? 0.29 : 0.27, cd.thin ? cd.col : cc, 0, 0.145, 0); // (up under the chest's, no gap between)
+      // its soft armour reaches down over the belly to the belt, as it protects there (js/ballistics.ts covers: 'torso' is the chest and the
+      // abdomen): a flap in front and behind, and the cummerbund round the sides (the waist's frame: 0.105 front and back, 0.15 across)
+      if ((cd.prot || []).some((p: any) => p.at === 'torso')) {
+        // (a band right round the waist: an ellipse 0.15 across, 0.105 front and back, at its standard size; fitted as the waist is)
+        const t = soft ? 0.012 : 0.018, N = 20, pos: number[] = [], idx: number[] = [], h = 0.19;
+        for (let i = 0; i <= N; i++) for (const off of [0.004, 0.004 + t]) for (const yy of [-h / 2, h / 2]) { const th = (i / N) * Math.PI * 2; pos.push(Math.sin(th) * (0.15 + off), yy, -Math.cos(th) * (0.105 + off)); }
+        const v = (i: number, o: number, top: number) => i * 4 + o * 2 + top, q = (a2: number, b2: number, c2: number, d2: number) => idx.push(a2, b2, c2, a2, c2, d2);
+        for (let i = 0; i < N; i++) { q(v(i, 1, 0), v(i + 1, 1, 0), v(i + 1, 1, 1), v(i, 1, 1)); q(v(i, 0, 1), v(i, 1, 1), v(i + 1, 1, 1), v(i + 1, 0, 1)); q(v(i + 1, 0, 0), v(i + 1, 1, 0), v(i, 1, 0), v(i, 0, 0)); }
+        const bg = new T.BufferGeometry(); bg.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); bg.setIndex(idx); bg.computeVertexNormals();
+        add(rig.spine, new T.Mesh(bg, KM(col, { side: T.DoubleSide })), 0, 0.115, 0);
+      }
     }
     // what's mounted on the carrier and belt, on the limbs they cover: pads and caps round the top of each arm, a panel or a
     // wrap at the hips, panels, wraps and guards down the legs (each where its protection is: js/ballistics.ts covers)
