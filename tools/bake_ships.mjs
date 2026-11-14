@@ -31,7 +31,7 @@ for (const f of fs.existsSync(SRC) ? fs.readdirSync(SRC) : []) {
   const L = S.layout, W = 0.22, at = (n) => (byName.get(n) && byName.get(n).translation) || [0, 0, 0], near = (n, want, tol = 0.02) => { const t = at(n); if (byName.has(n) && want.some((v, i) => v != null && Math.abs(t[i] - v) > tol)) err(id, `${n} at [${t.map((v) => v.toFixed(2))}], her layout puts it at [${want.map((v) => (v == null ? '-' : v.toFixed(2)))}] (rebuild: blender -b -P models/ships/build_ship.py -- ${id})`); };
   near('nose_L', [0, null, L.zc - W / 2]); near('nose_R', [0, null, L.zc - W / 2]);
   near('ramp', [0, L.FM, L.z1 + W / 2]);
-  near('hp_0', [-(L.hw - 0.7), L.CM + 0.32, L.zr + 1.6]); near('hp_1', [L.hw - 0.7, L.CM + 0.32, L.zr + 1.6]);
+  near('hp_0', [-(L.hw - 0.7), null, L.zr + 1.6]); near('hp_1', [L.hw - 0.7, null, L.zr + 1.6]); // (how high: on her skin, the model's own)
   let tris = 0; for (const m of j.meshes || []) for (const p of m.primitives) tris += (p.indices != null ? j.accessors[p.indices].count : j.accessors[p.attributes.POSITION].count) / 3;
   ships[id] = { file: f, bytes: buf.length, sha1: crypto.createHash('sha1').update(buf).digest('hex'), tris: Math.round(tris) };
   if (checkOnly) { const o = path.join(OUT, f); if (!fs.existsSync(o)) err(id, 'not baked (npm run bake:ships)'); else if (!fs.readFileSync(o).equals(buf)) err(id, 'the baked file is not the model kept in the repo (npm run bake:ships)'); }

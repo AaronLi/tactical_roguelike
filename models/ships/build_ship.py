@@ -78,14 +78,14 @@ class Mesh:
     def poly(s, m, pts, smooth=False):
         vs = [s.bm.verts.new(V(*p)) for p in pts]
         f = s.bm.faces.new(vs); s.faces([f], m, smooth); return f
-    def loft(s, m, secs, mirror=False, caps=True, smooth=False):
-        """rings of (x, y) at each z, joined; mirror: on the port side (x negated)"""
+    def loft(s, m, secs, mirror=False, caps=True, smooth=False, closed=True):
+        """rings of (x, y) at each z, joined; mirror: on the port side (x negated); closed=False: an open profile (no face from its last point back to its first)"""
         sg = -1 if mirror else 1
         rings = [[s.bm.verts.new(V(sg * x, y, z)) for (x, y) in pts] for z, pts in secs]
         fs = []
         for a, b in zip(rings, rings[1:]):
             n = len(a)
-            for i in range(n):
+            for i in range(n if closed else n - 1):
                 j = (i + 1) % n
                 fs.append(s.bm.faces.new((a[i], a[j], b[j], b[i])))
         if caps: fs.append(s.bm.faces.new(rings[0])); fs.append(s.bm.faces.new(list(reversed(rings[-1]))))
@@ -214,17 +214,34 @@ for sx in (-1.04, 1.04): B.box('strip', sx - 0.05, CM - 0.02, zr + 0.6, sx + 0.0
 
 # ================================================================ outside
 O = 0.03
+# ---- her skin: one surface over the breach deck and the crew deck, a rounded crown the collar's round at the nose, wider over the
+# space behind the tunnel, sweeping down over the crew deck to the tail; clear of every wall and roof inside (by 0.2 m and more), open
+# at the collar and at the ramp. Under the breach deck's overhang a fairing slopes in to the cockpit's flank.
+HEAD_TOP, SKIN_TOP = TOP + 0.2, CM + 0.55
+def prof(a, yb, b, r, n=6):
+    left = [(-a + r + r * math.cos(math.pi - k * math.pi / 2 / n), b - r + r * math.sin(math.pi - k * math.pi / 2 / n)) for k in range(n + 1)]
+    right = [(a - r + r * math.cos(math.pi / 2 - k * math.pi / 2 / n), b - r + r * math.sin(math.pi / 2 - k * math.pi / 2 / n)) for k in range(n + 1)]
+    return [(-a, yb)] + left + right + [(a, yb)]
+SKIN = [(zc - 0.05, tw + W + 0.3, CC, HEAD_TOP, 0.95), (zt - 0.15, tw + W + 0.3, CC, HEAD_TOP, 0.95), (zt + 0.75, sw + W + 0.22, CC, HEAD_TOP, 0.7), (zk + 0.2, sw + W + 0.22, CC, HEAD_TOP, 0.7),
+        (zr + 0.2, X + 0.2, FM - 0.2, HEAD_TOP - 0.25, 0.75), (zr + 1.4, X + 0.2, FM - 0.2, SKIN_TOP, 0.7), (z1 - 0.2, X + 0.2, FM - 0.2, SKIN_TOP - 0.05, 0.7), (z1 + 0.02, X + 0.1, FM - 0.2, SKIN_TOP - 0.1, 0.65)]
+B.loft('hull', [(z, prof(a, yb, b, r)) for z, a, yb, b, r in SKIN], caps=False, closed=False)
+# (the tail above the ramp closed; seams round her where the panels meet)
+za, a, yb, b, r = SKIN[-1]; cap = [(x, max(y, CM + 0.2)) for x, y in prof(a, CM + 0.2, b, r)]
+B.poly('hull', [(x, y, za) for x, y in cap])
+for k in (1, 3, 5):
+    za, a, yb, b, r = SKIN[k]; pts = prof(a + 0.012, yb, b + 0.012, r)
+    for p0, p1 in zip(pts, pts[1:]): B.beam('dark', (p0[0], p0[1], za), (p1[0], p1[1], za), 0.04)
+for s_ in (-1, 1):
+    x0 = fw + W + O
+    B.loft('armor', [(zg1 - 0.05, [(x0, CC - 0.05), (sw + W + 0.22, CC), (x0, CC)]), (zg1 + 0.6, [(x0, 1.05), (sw + W + 0.22, CC), (x0, CC)]), (zk + 0.2, [(x0, 1.0), (sw + W + 0.22, CC), (x0, CC)]),
+                     (zr + 0.2, [(x0, 0.55), (X + 0.2, FM - 0.2), (x0, FM - 0.2)])], s_ < 0)
 # the brow over the glass
 B.loft('armor', [(zc + 0.32, [(-fw - W, HEADER), (fw + W, HEADER), (fw + W, CC + 0.2), (-fw - W, CC + 0.2)]), (zc + 0.02, [(-fw - W + 0.1, CC), (fw + W - 0.1, CC), (fw + W, CC + 0.22), (-fw - W, CC + 0.22)])])
 for s in (-1, 1):
     mir = s < 0
     # the cockpit's flank behind the glass, the breach deck's sides (the tunnel's, the wider space's), the stairs' section: plated, seams between
     panels(B, 'hull', 'x', s * (fw + W + O) - (0.04 if mir else 0), 0.04, 0.02, CC + 0.2, zg1, zr, 2, 2)
-    panels(B, 'hull', 'x', s * (tw + W + O) - (0.04 if mir else 0), 0.04, CC, TOP, zc, zt, 2, 2)
-    panels(B, 'hull', 'x', s * (sw + W + O) - (0.04 if mir else 0), 0.04, CC, TOP, zt, zk, 2, 2)
-    B.box('armor', s * (fw + W), CC - 0.04, zt, s * (sw + W + O + 0.04), CC + 0.06, zk, 0.02)  # (the overhang's underside)
     # the crew deck's flank, plated; armour sloped from the keel to a chine; a line of her colour down it
-    panels(B, 'hull', 'x', s * (X + O) - (0.04 if mir else 0), 0.04, FM - 0.2, CM + 0.2, zr, z1 + 0.1, 3, 2)
     B.loft('armor', [(zr - 0.2, [(fw + W, 0.04), (fw + W + 0.2, 0.04), (X + 0.2, FM - 0.3), (X, FM)]), (zr + 1.2, [(X - 0.4, 0.04), (X + 0.2, 0.04), (X + 0.75, FM - 0.25), (X, FM + 0.1)]),
                      (z1 - 0.8, [(X - 0.4, 0.04), (X + 0.25, 0.04), (X + 0.85, FM - 0.25), (X, FM + 0.1)]), (z1 + 0.6, [(X - 0.4, 0.3), (X, 0.3), (X + 0.4, FM - 0.2), (X, FM)])], mir)
     # the wing: the flank pinches out into it, swept, thin at the pod; a lit leading edge, a light at its tip
@@ -247,28 +264,23 @@ for s in (-1, 1):
     empty('thrust_' + ('L' if mir else 'R'), (s * px, py, pz1 + 0.42))
     B.box('strip' if not mir else 'strip', s * (px - 0.05), py + 0.7, pz1 - 0.6, s * (px + 0.05), py + 0.76, pz1 - 0.4)
     # a canted fin off the roof's edge, a running light at its tip; thruster blocks at her corners
-    B.loft('armor', [(z1 - 2.4, [(X - 0.5, CM + 0.2), (X - 0.3, CM + 0.2), (X - 0.4, CM + 0.28)]), (z1 + 0.6, [(X - 0.5, CM + 0.2), (X - 0.3, CM + 0.2), (X + 0.3, CM + 1.5)])], mir)
+    B.loft('armor', [(z1 - 2.4, [(X - 0.7, SKIN_TOP - 0.05), (X - 0.5, SKIN_TOP - 0.05), (X - 0.6, SKIN_TOP + 0.05)]), (z1 + 0.6, [(X - 0.7, SKIN_TOP - 0.1), (X - 0.5, SKIN_TOP - 0.1), (X + 0.1, SKIN_TOP + 1.2)])], mir)
     for zz, yy in ((zr + 0.2, CM - 0.1), (z1 - 0.2, CM - 0.1), (zc + 0.6, CB - 0.2)):
-        xx = s * ((X + O + 0.04) if zz > zr else (tw + W + O + 0.04))
+        xx = s * ((X + 0.2 + O) if zz > zr else (tw + W + 0.3 + O))
         B.box('dark', xx, yy - 0.18, zz - 0.18, xx + s * 0.12, yy + 0.18, zz + 0.18, 0.02)
         for e in (-1, 1): B.box('armor', xx + s * 0.12, yy + e * 0.08 - 0.03, zz - 0.04, xx + s * 0.16, yy + e * 0.08 + 0.03, zz + 0.04)
     # the hardpoint: a raised octagonal plinth on the roof's shoulder
     hx, hz = s * (hw - 0.7), zr + 1.6
-    B.cyl('armor', (hx, CM + 0.2, hz), (hx, CM + 0.32, hz), 0.55, 8, 0.48, smooth=False)
-    empty('hp_' + ('0' if mir else '1'), (hx, CM + 0.32, hz))
+    B.cyl('armor', (hx, SKIN_TOP - 0.05, hz), (hx, SKIN_TOP + 0.12, hz), 0.55, 8, 0.48, smooth=False)
+    empty('hp_' + ('0' if mir else '1'), (hx, SKIN_TOP + 0.12, hz))
 B.box('glow' , -0.03, 0, 0, 0.03, 0.01, 0.01) if False else None
 # lights at the fins' tips (port red, starboard green)
-B.box('hot', -(X + 0.3), CM + 1.42, z1 + 0.5, -(X + 0.2), CM + 1.52, z1 + 0.6)
-B.box('glow', X + 0.2, CM + 1.42, z1 + 0.5, X + 0.3, CM + 1.52, z1 + 0.6)
+B.box('hot', -(X + 0.15), SKIN_TOP + 1.12, z1 + 0.5, -(X + 0.05), SKIN_TOP + 1.22, z1 + 0.6)
+B.box('glow', X + 0.05, SKIN_TOP + 1.12, z1 + 0.5, X + 0.15, SKIN_TOP + 1.22, z1 + 0.6)
 # the roofs: the breach deck's, plated; a spine down the crew deck's, an antenna and a sensor dome on it
-panels(B, 'armor', 'y', TOP, 0.06, -tw - W - O, tw + W + O, zc, zt, 1, 2)
-panels(B, 'armor', 'y', TOP, 0.06, -sw - W - O, sw + W + O, zt, zk, 2, 2)
-panels(B, 'armor', 'y', TOP, 0.06, -fw - W - O, fw + W + O, zk, zr, 1, 1)
-panels(B, 'hull', 'y', CM + 0.2, 0.05, -X - O, X + O, zr, z1 + 0.1, 3, 3)
-B.loft('armor', [(zr - 0.1, [(-0.8, CM + 0.25), (0.8, CM + 0.25), (0.5, TOP + 0.05), (-0.5, TOP + 0.05)]), (z1 - 1, [(-0.75, CM + 0.25), (0.75, CM + 0.25), (0.45, CM + 0.7), (-0.45, CM + 0.7)]), (z1 + 0.6, [(-0.6, CM + 0.25), (0.6, CM + 0.25), (0.3, CM + 0.45), (-0.3, CM + 0.45)])])
-B.cyl('dark', (0.2, CM + 0.6, z1 - 1.6), (0.2, CM + 1.6, z1 - 1.6), 0.025, 6, smooth=False); B.cyl('dark', (0.2, CM + 1.6, z1 - 1.6), (0.2, CM + 1.62, z1 - 1.6), 0.12, 8, smooth=False)
-B.cyl('dark', (-0.2, CM + 0.55, z1 - 2.6), (-0.2, CM + 0.75, z1 - 2.6), 0.3, 12, 0.22)
-B.cyl('glass', (0, TOP + 0.06, zt + 0.6), (0, TOP + 0.24, zt + 0.6), 0.26, 12, 0.12)  # (a sensor blister over the breach deck)
+B.cyl('dark', (0.2, SKIN_TOP - 0.05, z1 - 1.6), (0.2, SKIN_TOP + 1.0, z1 - 1.6), 0.025, 6, smooth=False); B.cyl('dark', (0.2, SKIN_TOP + 1.0, z1 - 1.6), (0.2, SKIN_TOP + 1.02, z1 - 1.6), 0.12, 8, smooth=False)
+B.cyl('dark', (-0.2, SKIN_TOP - 0.05, z1 - 2.6), (-0.2, SKIN_TOP + 0.18, z1 - 2.6), 0.3, 12, 0.22)
+B.cyl('glass', (0, HEAD_TOP - 0.05, zt + 0.9), (0, HEAD_TOP + 0.16, zt + 0.9), 0.26, 12, 0.12)  # (a sensor blister over the breach deck)
 # her belly: plated, vents aft
 panels(B, 'dark', 'y', -0.04, 0.04, -fw - W, fw + W, zf, zr, 1, 3)
 panels(B, 'dark', 'y', -0.04, 0.04, -X, X, zr, z1 + 0.1, 3, 3)
