@@ -203,7 +203,7 @@ const G_Rig = (() => {
     const boneOf = (name: string, inv: THREE.Matrix4) => {
       let b = bones.get(name);
       if (!b) {
-        const j = (rig.hJoint[name] || rig.hips) as THREE.Object3D;
+        const j = (rig.hJoint[name] || rig.hJoint[name.replace(/^(thumb|index|middle|ring|pinky)\d/, 'hand')] || rig.hips) as THREE.Object3D; // (a finger's bones ride the hand)
         b = new T.Bone(); b.matrixAutoUpdate = false;
         b.matrix.copy(rig.hRest.get(j)).invert().multiply(TURN).multiply(_m.copy(inv).invert());
         j.add(b); bones.set(name, b);

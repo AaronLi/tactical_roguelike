@@ -500,11 +500,17 @@ without its file). Blender is wanted only to change them. The bake's `humans` ph
 with `humans/index.json` (`{ version, humans: { <id>: { file, bytes, sha1, tris, prims, mats } } }`), and the bundling packs
 them with everything else.
 
+The fingers have bones of their own: three a finger and three for the thumb, each from one knuckle to the next (`index1` off the hand, `index3`
+to the tip), parented to the hand and rolled as it is, so a knuckle bends about the bone's x. `build_human.py` adds them after the body is
+skinned to the rest of the skeleton (whose weights are left as they were) and hands each finger vertex's hand weight on to the bones along that
+finger, eased across each knuckle (4.5 mm either side; 8 mm on the thumb). In the game a bone keeps its digits (`index1L`: js/humans.ts);
+the third-person rig lets them ride the hand, and the first-person arms (js/vmanim.ts) curl them round what each hand holds.
+
 What a body must be (a failure names the body and the rule):
 
 | Rule | Why |
 |---|---|
-| One skeleton, with exactly these bones: `hips spine chest neck head`, `clavicle upperarm forearm hand` `.L`/`.R`, `thigh shin foot` `.L`/`.R`, `eye.L eye.R` | `js/rig.ts` attachHuman hangs each on the rig's joint of that name; one it doesn't know would ride the hips |
+| One skeleton, with exactly these bones: `hips spine chest neck head`, `clavicle upperarm forearm hand` `.L`/`.R`, `thigh shin foot` `.L`/`.R`, `eye.L eye.R`, and the fingers' `thumb1..3 index1..3 middle1..3 ring1..3 pinky1..3` `.L`/`.R` | `js/rig.ts` attachHuman hangs each on the rig's joint of that name (a finger's bones on its hand's); one it doesn't know would ride the hips |
 | Every mesh skinned (`JOINTS_0`, `WEIGHTS_0`) | an unskinned mesh is left out |
 | Every material named one of `shirt trousers boots neck upsleeve sleeve hand finger front lowleg skin eyeskin hair brow lip stubble eye iris` | the material's name is how `js/rig.ts` dresses it (hMat); another name is drawn as nothing |
 | `shirt trousers boots hand skin eye` all present | no body is without them |

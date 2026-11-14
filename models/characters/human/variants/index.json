@@ -7,10 +7,10 @@
   "scale": 1.0,
   "hair": "short",
   "triangles": {
-   "body": 2528,
+   "body": 3034,
    "head": 1977,
    "eyes": 200,
-   "total": 4705
+   "total": 5211
   },
   "fit": {
    "chest": [
@@ -46,10 +46,10 @@
   "scale": 1.0251,
   "hair": "buzz",
   "triangles": {
-   "body": 2560,
+   "body": 3068,
    "head": 1977,
    "eyes": 200,
-   "total": 4737
+   "total": 5245
   },
   "fit": {
    "chest": [
@@ -85,10 +85,10 @@
   "scale": 1.0649,
   "hair": "receding",
   "triangles": {
-   "body": 2562,
+   "body": 3060,
    "head": 1921,
    "eyes": 200,
-   "total": 4683
+   "total": 5181
   },
   "fit": {
    "chest": [
@@ -124,10 +124,10 @@
   "scale": 1.0421,
   "hair": "bald",
   "triangles": {
-   "body": 2586,
+   "body": 3090,
    "head": 1892,
    "eyes": 200,
-   "total": 4678
+   "total": 5182
   },
   "fit": {
    "chest": [
@@ -163,10 +163,10 @@
   "scale": 0.9567,
   "hair": "short",
   "triangles": {
-   "body": 2550,
+   "body": 3058,
    "head": 1977,
    "eyes": 200,
-   "total": 4727
+   "total": 5235
   },
   "fit": {
    "chest": [
@@ -202,10 +202,10 @@
   "scale": 0.9795,
   "hair": "full",
   "triangles": {
-   "body": 2554,
+   "body": 3064,
    "head": 1977,
    "eyes": 200,
-   "total": 4731
+   "total": 5241
   },
   "fit": {
    "chest": [
@@ -241,10 +241,10 @@
   "scale": 0.9966,
   "hair": "receding",
   "triangles": {
-   "body": 2534,
+   "body": 3040,
    "head": 1921,
    "eyes": 200,
-   "total": 4655
+   "total": 5161
   },
   "fit": {
    "chest": [
@@ -280,10 +280,10 @@
   "scale": 0.9909,
   "hair": "short",
   "triangles": {
-   "body": 2560,
+   "body": 3068,
    "head": 1977,
    "eyes": 200,
-   "total": 4737
+   "total": 5245
   },
   "fit": {
    "chest": [
@@ -319,10 +319,10 @@
   "scale": 1.0877,
   "hair": "buzz",
   "triangles": {
-   "body": 2580,
+   "body": 3088,
    "head": 1977,
    "eyes": 200,
-   "total": 4757
+   "total": 5265
   },
   "fit": {
    "chest": [
@@ -358,10 +358,10 @@
   "scale": 1.0194,
   "hair": "hightop",
   "triangles": {
-   "body": 2552,
+   "body": 3064,
    "head": 1977,
    "eyes": 200,
-   "total": 4729
+   "total": 5241
   },
   "fit": {
    "chest": [
@@ -397,10 +397,10 @@
   "scale": 0.9282,
   "hair": "ponytail",
   "triangles": {
-   "body": 2576,
+   "body": 3088,
    "head": 2026,
    "eyes": 200,
-   "total": 4802
+   "total": 5314
   },
   "fit": {
    "chest": [
@@ -436,10 +436,10 @@
   "scale": 0.9681,
   "hair": "bun",
   "triangles": {
-   "body": 2568,
+   "body": 3076,
    "head": 2058,
    "eyes": 200,
-   "total": 4826
+   "total": 5334
   },
   "fit": {
    "chest": [
@@ -475,10 +475,10 @@
   "scale": 0.8884,
   "hair": "bob",
   "triangles": {
-   "body": 2584,
+   "body": 3088,
    "head": 2050,
    "eyes": 200,
-   "total": 4834
+   "total": 5338
   },
   "fit": {
    "chest": [
@@ -514,10 +514,10 @@
   "scale": 0.9624,
   "hair": "buzz",
   "triangles": {
-   "body": 2560,
+   "body": 3066,
    "head": 1978,
    "eyes": 200,
-   "total": 4738
+   "total": 5244
   },
   "fit": {
    "chest": [
@@ -553,10 +553,10 @@
   "scale": 1.008,
   "hair": "bob",
   "triangles": {
-   "body": 2588,
+   "body": 3096,
    "head": 2050,
    "eyes": 200,
-   "total": 4838
+   "total": 5346
   },
   "fit": {
    "chest": [
@@ -592,10 +592,10 @@
   "scale": 0.9226,
   "hair": "topbun",
   "triangles": {
-   "body": 2606,
+   "body": 3112,
    "head": 2058,
    "eyes": 200,
-   "total": 4864
+   "total": 5370
   },
   "fit": {
    "chest": [
@@ -631,10 +631,10 @@
   "scale": 0.9112,
   "hair": "pixie",
   "triangles": {
-   "body": 2592,
+   "body": 3104,
    "head": 1978,
    "eyes": 200,
-   "total": 4770
+   "total": 5282
   },
   "fit": {
    "chest": [
@@ -670,10 +670,10 @@
   "scale": 0.9852,
   "hair": "ponytail",
   "triangles": {
-   "body": 2548,
+   "body": 3056,
    "head": 2026,
    "eyes": 200,
-   "total": 4774
+   "total": 5282
   },
   "fit": {
    "chest": [
@@ -709,10 +709,10 @@
   "scale": 0.8827,
   "hair": "bob",
   "triangles": {
-   "body": 2564,
+   "body": 3066,
    "head": 2050,
    "eyes": 200,
-   "total": 4814
+   "total": 5316
   },
   "fit": {
    "chest": [
@@ -748,10 +748,10 @@
   "scale": 0.951,
   "hair": "bun",
   "triangles": {
-   "body": 2602,
+   "body": 3110,
    "head": 2058,
    "eyes": 200,
-   "total": 4860
+   "total": 5368
   },
   "fit": {
    "chest": [
