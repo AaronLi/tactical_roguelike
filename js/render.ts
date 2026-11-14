@@ -109,7 +109,8 @@ const G_R = {
     this.reverseDepth(r);
     // (a phone's screen is 2 to 3 device pixels to the point, and its GPU isn't a desktop's: the HUD is the page's own, sharp at any ratio, so only the 3D is softer)
     const coarse = matchMedia('(hover: none) and (pointer: coarse)').matches;
-    r.setPixelRatio(Math.min(window.devicePixelRatio, coarse ? (Math.min(screen.width, screen.height) < 600 ? 1 : 1.25) : 1.5));
+    this.basePR = Math.min(window.devicePixelRatio, coarse ? (Math.min(screen.width, screen.height) < 600 ? 1 : 1.25) : 1.5);
+    r.setPixelRatio(this.basePR * this.scalePct / 100);
     r.setSize(window.innerWidth, window.innerHeight);
     r.domElement.id = 'c';
     // Light adds up past what a screen can show (a festival's strings of bulbs over lit stalls, a muzzle flash in a lit
@@ -229,6 +230,15 @@ const G_R = {
     };
     const bmat = (kind: BloodKind) => new THREE.MeshStandardMaterial({ map: bloodTex(kind), transparent: true, depthWrite: false, roughness: 0.25, metalness: 0.1, polygonOffset: true, polygonOffsetFactor: -3 });
     return (this._bloodMats = { drop: bmat('drop'), spatter: bmat('spatter'), pool: bmat('pool') });
+  },
+  // How finely the 3D is drawn: a percentage (33 to 100) of the screen's own resolution, each way. The picture is stretched
+  // to the window; the HUD and the menus are the page's own and stay sharp. (The settings' "Render resolution": js/game.ts)
+  basePR: 1, scalePct: 100,
+  setScale(pct: number) {
+    this.scalePct = Math.max(33, Math.min(100, Math.round(pct) || 100));
+    if (!this.renderer) return;
+    this.renderer.setPixelRatio(this.basePR * this.scalePct / 100);
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
   },
   resize() {
     this.renderer.setSize(window.innerWidth, window.innerHeight);

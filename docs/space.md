@@ -30,7 +30,8 @@ off: the game is then the route map and the helicopter, as it was. A debug start
    page builds the level), and the ship comes out of the tunnel 4.5 s after the level is ready. A corvette's level built in
    about half a second on the machine this was tested on.
 5. **Boarding.** She arrives 1.7 km off. Ram her hull nose-on at 5 m/s or more (no speed is too high), **anywhere there's a clear stretch of it**:
-   port, starboard or the stern quarters (the hold amidships to starboard is marked as a suggestion). The navigation screen
+   port, starboard or the stern quarters. Nothing marks a place for it, and nothing inside stops it: the furniture within a
+   couple of metres of the hole is destroyed (`js/shipgen.ts` cut; wreckage across the deck, `js/space.ts` wreck). The navigation screen
    becomes the approach to wherever the nose is pointed: offset, range, closing speed. The hull is cut through there, her
    breaching door opens, and it's the CQB game from there. Hold G at the helm to undock: the compartment she backs out of
    is open to space. She can go in again somewhere else.
@@ -152,7 +153,7 @@ stands them in rows to look at.
 ## A taken ship (`obj: 'hostage'`)
 
 One mission on every board is a civilian transport that pirates have boarded. Their pods (two or three) are still lodged in her
-hull (`js/spaceserver.ts` populate picks the sites, clear of each other and of the marked stretch; `js/space.ts` raidPods draws
+hull (`js/spaceserver.ts` populate picks the sites, clear of each other and of where the squad's ship comes out of the jump lying off; `js/space.ts` raidPods draws
 them and the shut hatch inside; nobody can breach within eight metres of one). Her people are tied in her biggest compartment
 with three pirates over them, the rest are about the ship and their leader is on the bridge (crew). It is done when no pirate is
 left standing, and each hostage alive pays a bonus. `?board=transport&obj=hostage&dock` starts one.
@@ -192,7 +193,7 @@ so the anchor to jump home by, which is a place in the zone, falls astern as the
 
 A mission's zone is vast, with only now and then someone else in it (`js/spacedata.ts` zone: the mission's ship, contact 0, and
 four or five others on wide loops; one comes within a few kilometres). Every one of them is a ship of her own class, theme and
-seed, on the navigation screen by name. Come up within 450 m of one for two seconds and the squad's ship matches her course:
+seed, on the navigation screen by name. Come up within 800 m of one, nearer her than the ship that's the level, and the squad's ship matches her course:
 the host makes her the level (`tboard` in `js/spaceserver.ts`; the zone is then drawn from her, turning when she turns) and the
 ship left behind goes on her way as one of the zone's others. Nothing is drawn over this: no wipe, no loading screen. Within
 five kilometres a ship of the zone's is already drawn as her own hull (`zoneReal`: her level laid out from her seed, for its
@@ -201,7 +202,7 @@ the only thing that changes is that she now has an inside and a crew. She can be
 she is (her crew fight, her response squads come, and her guns, silent till then, open up when the squad's ship is off her
 again). What's in her holds is salvage, paid at home with the rest. Going back to the mission's ship is the same thing the other
 way: what was done aboard her stands (objectives, keycards, holes in her hull, vented compartments), but her crew are at their
-posts again unless she was already cleared. Round the base the others are only seen.
+posts again unless she was already cleared. There are no ships that are only to look at: round the base there is none.
 
 Getting her ready ahead (`js/prep.ts`, `js/prepworker.ts`): the slow part of putting a level on screen is its light grid's
 sums (`js/lightgrid.ts` compute: a second, for a cruiser). When one of the zone's ships comes within five kilometres her level

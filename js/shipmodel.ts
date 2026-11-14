@@ -472,10 +472,7 @@ const G_ShipModel = (() => {
       for (const [m, q] of tris) { const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(q, 3)); geo.computeVertexNormals(); const mesh = new T.Mesh(geo, m); mesh.frustumCulled = false; g.add(mesh); decor.push(mesh); }
     }
     K.build(g);
-    // the breach that's suggested: marked for whoever's flying (js/space.ts pulses it)
-    const mk = new T.Group(), b = sp.breach, ring = lit(0xffb020);
-    for (const [bx, by, bw, bh] of [[-1.5, 0.1, 3, 0.14], [-1.5, 2.9, 3, 0.14], [-1.5, 0.1, 0.14, 2.94], [1.36, 0.1, 0.14, 2.94]]) part(mk, new T.Mesh(new T.BoxGeometry(bw, bh, 0.1), ring), bx + bw / 2, by + bh / 2, 0);
-    mk.position.set(b.x, 0, b.face + 0.34); g.add(mk);
+    const mk = new T.Group(); g.add(mk); // (nothing's marked on her: she's breached wherever she's rammed. An empty group, for what's kept of the old mark's handle)
     // she's been rammed there (a site: the middle of its stretch of wall, the way out of her): what stood over that stretch of
     // her side is gone with it (each piece whose middle is in the hole), and the lamp's light that fell there
     const cutAt = (x: number, z: number, nx: number, nz: number) => {

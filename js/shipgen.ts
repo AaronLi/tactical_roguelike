@@ -279,8 +279,8 @@ const G_ShipGen = (() => {
     if (Object.values(locks).includes('armory')) cardRooms.armory = room('barracks', at) >= 0 ? room('barracks', at) : room('mess', at);
     const sp: ShMeta = { wing: !!src.wing, size: src.size, obj: src.obj, decks: src.decks, other: src.other, breach, cuts: [], locks, roles, hullOf, console: cons, artifact: ar >= 0 ? clearIn(ar) : null, pods, salvage, hullWin, hvtRoom: bridge, cardRooms, hull: hulls[0], hulls };
     map.sp = sp;
-    // (the stretch that's marked is one she can be breached at: the nearest such along that wall to the hold's middle. What's
-    // stood against the hull inside can rule out the middle itself, and a ram at the mark must go through)
+    // (sp.breach: a stretch of the hold's hull she can be breached at, nothing more than a point to reckon from: where the squad's
+    // ship comes out of the jump lying off, what the pirates' pods keep clear of. Nothing marks it: she's breached wherever she's rammed)
     { const b = sp.breach, near = sites(map).filter((q) => q.nz === 1 && Math.abs(q.z - b.z) < TS).sort((p, q) => Math.abs(p.x - b.x) - Math.abs(q.x - b.x))[0]; if (near) b.x = near.x; }
     map.theme = Object.assign({}, map.theme, { big: S.big });
     return map;
@@ -299,14 +299,12 @@ const G_ShipGen = (() => {
     const sp = map.sp!; if (sp.sites) return sp.sites;
     const { W, H, t } = map, TS = G.Level.TS, out: ShSite[] = [], win = map.winAt as Map<number, unknown> | undefined;
     const at = (x: number, z: number) => (x < 0 || z < 0 || x >= W || z >= H ? -1 : t[z * W + x]);
-    const free = (x: number, z: number) => at(x, z) === 0 && !map.props.has(z * W + x);
     for (let z = 2; z < H - 2; z++) for (let x = 2; x < W - 2; x++) {
       if (t[z * W + x] !== 1) continue;
       for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const ax = nz ? 1 : 0, az = nx ? 1 : 0; let ok = true;
-        // (the way in clear behind the middle of it; what stands against the wall either side can stay)
+        // (hull with a compartment behind it. What's stood against it inside is no bar: a ram goes through that too, cut)
         for (let k = -1; k <= 1 && ok; k++) { const cx = x + ax * k, cz = z + az * k, in1 = at(cx - nx, cz - nz); ok = at(cx, cz) === 1 && !(win && win.has(cz * W + cx)) && in1 !== 1 && in1 !== 5 && in1 !== 3 && in1 !== 7 && in1 !== 6 && at(cx + nx, cz + nz) === 5; }
-        ok = ok && free(x - nx, z - nz) && free(x - 2 * nx, z - 2 * nz);
         // (out there: the collar's width at the hull, her cabin's behind it, her engine pods' from ten metres out)
         for (let d = 1; d <= 33 && ok; d++) for (let w = d <= 5 ? 3 : d <= 14 ? 5 : 7, k = -w; k <= w && ok; k++) ok = at(x + nx * d + ax * k, z + nz * d + az * k) === 5;
         if (ok) out.push({ c: z * W + x, nx, nz, x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) });
@@ -333,6 +331,26 @@ const G_ShipGen = (() => {
       add([ix0, a[1], a[2]], [ix1, b[1], iz0]); add([ix0, a[1], iz1], [ix1, b[1], b[2]]);
       add([ix0, a[1], iz0], [ix1, H0[1], iz1]); add([ix0, H1[1], iz0], [ix1, b[1], iz1]);
     }
+    // What stood inside where she came through is gone with the plate: every piece of furniture any part of which is within
+    // a couple of metres either side of the hole and three and a half in from it. Out of the world (nothing stops there now),
+    // out of the grid (it's floor), out of the list; where each was is kept (sp.gone: boxes [x0, y0, z0, x1, y1, z1]) for the
+    // screens to clear its picture away (js/space.ts cutHere).
+    const D = 1.75, cxm = s.x - s.nx * (TS / 2 + D), czm = s.z - s.nz * (TS / 2 + D), hx = s.nx ? D : 2.3, hz = s.nz ? D : 2.3, gone = new Set<LvProp>();
+    Wd.query(w, [cxm - hx, 0.05, czm - hz], [cxm + hx, 2.8, czm + hz], (q: any) => { if (q.kind === 'prop' && q.prop) gone.add(q.prop); });
+    const boxes: number[][] = [];
+    if (gone.size) {
+      const gb = new Set<LvBox>();
+      for (const p of gone) for (const b of p.boxes) { gb.add(b); const y = (b.gy || 0) + (b.y0 || 0); boxes.push([b.cx - b.hx - 0.14, y - 0.02, b.cz - b.hz - 0.14, b.cx + b.hx + 0.14, y + b.h + 0.75, b.cz + b.hz + 0.14]); }
+      for (const q of w.solids.slice()) if (q && (q as any).prop && gone.has((q as any).prop)) Wd.remove(w, q);
+      for (const [i, p] of [...map.props]) {
+        if (!gone.has(p) && !p.boxes.some((b) => gb.has(b))) continue;
+        const left = p.boxes.filter((b) => !gb.has(b));
+        if (left.length && !gone.has(p)) { p.boxes = left; continue; } // (a cell two pieces shared: the other's still there)
+        map.props.delete(i); if (i < W * map.H && (map.t[i] === 2 || map.t[i] === 4)) map.t[i] = 0;
+      }
+      if (map.propList) map.propList = map.propList.filter((p: LvProp) => !gone.has(p));
+    }
+    (sp as any).gone = boxes;
     map.doorVer = (map.doorVer || 0) + 1; // (sound gets through it now)
     return true;
   }

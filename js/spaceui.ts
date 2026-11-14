@@ -188,7 +188,6 @@ const G_SpaceUI = (() => {
       if (big && role && role !== 'spine' && rm.w * TS * k > 44) { c.fillStyle = vac ? '#ff9a8a' : '#9fd0e6'; c.textAlign = 'center'; c.fillText((G.ShipGen.NAMES[role] || role).toUpperCase(), X((rm.x + rm.w / 2) * TS), Z((rm.z + rm.h / 2) * TS, f)); }
     });
     for (const d of map.doors) { const lk = sp.locks[d.id]; c.fillStyle = lk ? (s.state && s.state.keys.includes(lk) ? '#7dff9a' : '#ff5a40') : d.open ? '#4a7f96' : '#c8e6f4'; const w = d.axis === 'x' ? 2 : 1.3 * k, hh = d.axis === 'x' ? 1.3 * k : 2; c.fillRect(X(d.x) - w / 2, Z(d.z, d.fl || 0) - hh / 2, w, hh); }
-    c.strokeStyle = '#ffb020'; c.strokeRect(X(sp.breach.x) - 1.4 * k, Z(sp.breach.face) - 2, 2.8 * k, 4);
     c.fillStyle = '#ffb020'; for (const q of sp.cuts) { const x = (q[0] % map.W + 0.5) * TS, z = (((q[0] / map.W) | 0) + 0.5) * TS; c.beginPath(); c.arc(X(x), Z(z), big ? 6 : 4, 0, 7); c.fill(); if (big) { c.textAlign = 'center'; c.fillText('BREACH', X(x), Z(z) + 14); } }
     const dot = (p: { x: number; z: number; y?: number } | null, col: string, t?: string) => { if (!p) return; const f = fOf(p.y || 0); c.fillStyle = col; c.beginPath(); c.arc(X(p.x), Z(p.z, f), big ? 5 : 3, 0, 7); c.fill(); if (big && t) { c.textAlign = 'left'; c.fillText(t, X(p.x) + 8, Z(p.z, f)); } };
     const o = s.ms ? s.ms.obj : null;
@@ -213,7 +212,7 @@ const G_SpaceUI = (() => {
     const O = SD.OBJ[ms.obj], lines: string[] = [], meta = s.map && s.map.sp;
     if (ms.size && ms.kind === 'board') lines.push(`<small>${SD.SIZES[ms.size].name}: ${meta && meta.decks > 1 ? 'two decks, ' : ''}${(() => { const g = SD.SIZES[ms.size!].guns, a = [g.pd ? g.pd + ' point defence' : '', g.cannon ? g.cannon + ' cannon' : '', g.missile ? g.missile + ' missile launcher' + (g.missile > 1 ? 's' : '') : ''].filter(Boolean); return a.length ? a.join(', ') : 'unarmed'; })()}</small>`);
     const needKey = (k: string) => !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k);
-    if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Ram her hull nose-on to board: the marked stretch, or anywhere clear.');
+    if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Ram her hull nose-on to board, anywhere along it: what is inside there is destroyed.');
     if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === G.Net.myId ? 'You have' : G.U.esc(G.Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
     if (ms.obj === 'hvt') lines.push(st.hvt === 1 ? '<span class="ok">Target dead.</span> Back to the ship and jump home.' : st.hvt === 2 ? '<span class="ok">Target in restraints.</span> Back to the ship and jump home.' : 'Find the target (the bridge): kill or restrain.');
     if (ms.obj === 'destruct') lines.push(st.boom ? '<span class="ok">She\'s gone.</span> Jump home.' : left != null ? `<span class="tm">${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</span><br>Get off her: your ship, or an escape pod. Then undock.` : 'Reach the bridge and start the self-destruct.');

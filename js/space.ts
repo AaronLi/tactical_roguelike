@@ -152,6 +152,7 @@ const G_Space = (() => {
   function cutHere(a: number[]) {
     const map = S.map!, s = siteAt(a); if (!map.sp || !G.ShipGen.cut(map, s)) return;
     if (S.hull) S.hull.cutAt(s.x, s.z, s.nx, s.nz); // (what's over her plating there goes with it)
+    wreck(((map.sp as any).gone || []) as number[][], s);
     const TS = G.Level.TS, L = G.Level, f0 = map.floors ? map.floors[0] : map, wm = f0.wallMesh as THREE.InstancedMesh | undefined, zero = new T.Matrix4().makeScale(0, 0, 0);
     if (wm && f0.wallIdx) { for (const c of s.cells) { const i = f0.wallIdx.get(c); if (i != null) { wm.setMatrixAt(i, zero); if (f0.wallBase) f0.wallBase.set(zero.elements, i * 16); } } wm.instanceMatrix.needsUpdate = true; }
     const g = new T.Group(), along = s.nz ? 1 : 0, wall = G.ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 }), torn = G.ShipModel.M(0x1a1c1f, { metalness: 0.6 }), hot = G.ShipModel.lit(0xff7a1a);
@@ -160,6 +161,40 @@ const G_Space = (() => {
     for (const sd of [-1, 1]) { bx(torn, sd * 1.5 * TS - 0.06, 0, sd * 1.5 * TS + 0.06, L.DOOR_H + 0.1, -TS / 2 - 0.04, TS / 2 + 0.04); bx(hot, sd * 1.5 * TS - 0.02, 0.1, sd * 1.5 * TS + 0.02, L.DOOR_H, -TS / 2 - 0.06, -TS / 2 - 0.04); }
     bx(torn, -1.5 * TS, L.DOOR_H + 0.04, 1.5 * TS, L.DOOR_H + 0.16, -TS / 2 - 0.04, TS / 2 + 0.04);
     g.position.set(s.x, 0, s.z); G.R.levelRoot.add(g);
+  }
+  // What the breach destroyed inside (js/shipgen.ts cut: sp.gone, a box round each piece that's gone): its picture cleared out of
+  // the level's drawing (the furniture is merged into a few meshes: each triangle whose middle is in one of the boxes is
+  // folded to nothing), and wreckage thrown across the deck from the hole, the way she came in.
+  function wreck(boxes: number[][], s: { x: number; z: number; nx: number; nz: number }) {
+    if (!boxes.length) return;
+    const inBox = (x: number, y: number, z: number) => { for (const b of boxes) if (x > b[0] && x < b[3] && y > b[1] && y < b[4] && z > b[2] && z < b[5]) return true; return false; };
+    const skip = new Set<THREE.Object3D>(); if (S.hull) S.hull.group.traverse((o) => skip.add(o));
+    G.R.levelRoot.updateMatrixWorld(true);
+    const inv = new T.Matrix4().copy(G.R.levelRoot.matrixWorld).invert(), M = new T.Matrix4(), v = [new T.Vector3(), new T.Vector3(), new T.Vector3()];
+    G.R.levelRoot.traverse((o: any) => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || skip.has(o) || o.geometry.index || !o.geometry.attributes.position) return;
+      const a = o.geometry.attributes.position as THREE.BufferAttribute, q = a.array as Float32Array;
+      if (!(q instanceof Float32Array) || q.length < 9) return;
+      if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+      M.multiplyMatrices(inv, o.matrixWorld); // (to the level's own frame, which is the boxes')
+      const bb = o.geometry.boundingBox!.clone().applyMatrix4(M); if (!boxes.some((b) => bb.max.x > b[0] && bb.min.x < b[3] && bb.max.y > b[1] && bb.min.y < b[4] && bb.max.z > b[2] && bb.min.z < b[5])) return;
+      let ch = false;
+      for (let i = 0; i + 8 < q.length; i += 9) {
+        for (let k = 0; k < 3; k++) v[k].set(q[i + k * 3], q[i + k * 3 + 1], q[i + k * 3 + 2]).applyMatrix4(M);
+        if (Math.max(v[0].distanceTo(v[1]), v[1].distanceTo(v[2]), v[2].distanceTo(v[0])) > 4.5) continue; // (a floor's or a wall's own: not furniture)
+        if (!inBox((v[0].x + v[1].x + v[2].x) / 3, (v[0].y + v[1].y + v[2].y) / 3, (v[0].z + v[1].z + v[2].z) / 3)) continue;
+        for (const k of [3, 6]) { q[i + k] = q[i]; q[i + k + 1] = q[i + 1]; q[i + k + 2] = q[i + 2]; } ch = true;
+      }
+      if (ch) a.needsUpdate = true;
+    });
+    const g = new T.Group(), dark = G.ShipModel.M(0x2a2d31, { roughness: 0.8, metalness: 0.4 }), pale = G.ShipModel.M(0x7d858c, { roughness: 0.7, metalness: 0.3 }), r = G.U.rng(((s.x * 131 + s.z * 17) | 0) >>> 0);
+    for (let i = 0; i < 16 + boxes.length * 5; i++) {
+      const b = boxes[Math.floor(r() * boxes.length)], along = 0.6 + r() * 3.6, x = b[0] + r() * (b[3] - b[0]) - s.nx * along, z = b[2] + r() * (b[5] - b[2]) - s.nz * along;
+      if (S.map && S.map.t[Math.floor(z / G.Level.TS) * S.map.W + Math.floor(x / G.Level.TS)] === 1) continue; // (not through a bulkhead)
+      const w = 0.08 + r() * 0.42, m = new T.Mesh(new T.BoxGeometry(w, 0.02 + r() * 0.1, 0.06 + r() * 0.3), r() < 0.55 ? dark : pale);
+      m.position.set(x, 0.02 + r() * 0.05, z); m.rotation.set((r() - 0.5) * 0.5, r() * 6.283, (r() - 0.5) * 0.5); g.add(m);
+    }
+    G.R.levelRoot.add(g);
   }
   // The pirates' pods in a taken ship's hull (the mission's state: raid, as sites): each a blunt rust-dark boarding pod driven in
   // nose first, its collar against her plating and its engines still glowing; inside, where it came through, its hatch shut in
@@ -213,7 +248,6 @@ const G_Space = (() => {
   function setupHub(map: LvMap, sp: any) {
     const TS = G.Level.TS, Wm = map.W * TS, Hm = map.H * TS, RZ = G.Hangar.RZ;
     const rock = G.ShipModel.asteroid(Wm, Hm, 99); addObj(rock.group);
-    zoneTraffic(4271, new T.Vector3(Wm / 2, 900, Hm / 2), 6500, 5000, 5); // (what's about the base: nothing comes within a few kilometres of the rock)
     const base = new T.Vector3(S.berth.x, 0, S.berth.z);
     S.wps.push({ id: 'base', name: 'HOME', sub: 'Hangar pad', p: base.clone().setY(40), kind: 'base' });
     placeAnchors();
@@ -276,11 +310,11 @@ const G_Space = (() => {
     for (const c of S.zdef) {
       if (c.k === S.zact) continue;
       const t = G.ShipModel.traffic(c.kind, c.seed); S.zone!.add(t.group);
-      const wp: SpWp = { id: 't' + c.k, name: c.k === 0 ? c.name + ' · THE MISSION' : c.name, sub: SD.SIZES[c.size].name + (c.wing ? ', a flying wing' : '') + ' · come within 450 m to match her course and board', p: new T.Vector3(), kind: 'base' };
+      const wp: SpWp = { id: 't' + c.k, name: c.k === 0 ? c.name + ' · THE MISSION' : c.name, sub: SD.SIZES[c.size].name + (c.wing ? ', a flying wing' : '') + ' · come up with her and ram her hull to board', p: new T.Vector3(), kind: 'base' };
       S.wps.push(wp); S.traffic.push({ obj: t.group, c, wp, ph: (c.seed % 30) / 10 });
     }
     zoneStep(); for (let k = 0; k < S.traffic.length; k++) zoneReal(true);
-    S.wps.push({ id: 'breach', name: 'SUGGESTED BREACH', sub: 'The hold: or ram any clear stretch of her hull', p: new T.Vector3(b.x, 1.4, b.face + 0.4), kind: 'breach' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
+    S.wps.push({ id: 'ship', name: ((S.ms && S.ms.name) || 'THE SHIP').toUpperCase(), sub: 'Ram her hull nose-on to board: anywhere along it', p: new T.Vector3(S.zC.x, 2, S.zC.z), kind: 'base' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
     S.tgt = 0;
     if (zi && zi.near) { // (come up with her: no jump. The squad's ship is where she was by her, heading as she was)
       const c = S.carry && S.carry.k === zi.act ? S.carry : null;
@@ -321,21 +355,11 @@ const G_Space = (() => {
       const l = new T.Mesh(new T.BoxGeometry(0.3, 0.1, 0.9), lit(0xff3020)); l.position.set(d.x, (d.fy || 0) + G.Level.DOOR_H + 0.25, d.z); if (d.axis === 'z') l.rotation.y = Math.PI / 2; l.userData.lock = k; root.add(l); S.things.push({ k: 'lock', x: d.x, z: d.z, obj: l });
     }
   }
-  // ---- The zone: open space a long way round, and what else is under way in it. Each of the others (zoneTraffic) keeps a
+  // ---- The zone: open space a long way round, and what else is under way in it: every one of them a ship that can be come
+  // up with and boarded (there's none that's only to look at: round the base there's nothing). Each of the others keeps a
   // course of its own, a loop through a few points round the middle (never through it), at its own pace; where it is goes by
   // the zone's clock alone (the host's on a mission, the day's at the base), so it's the same on every screen. On a mission
   // the ship being boarded is under way too: the zone slides by her (zoneV), which is to say by the level and all aboard.
-  function zoneTraffic(seed: number, c: THREE.Vector3, r0: number, rSpan: number, n: number) { // (round the base: only seen)
-    const r = G.U.rng((seed ^ 0x20e5) >>> 0), KINDS = ['freighter', 'freighter', 'cutter', 'pirate', 'navy', 'wing', 'freighter'], buoy = G.ShipModel.lit(0x66c8ff), bg = new T.OctahedronGeometry(7);
-    for (let i = 0; i < n; i++) {
-      const m = 3 + Math.floor(r() * 3), rad = r0 + r() * rSpan, a0 = r() * 6.283, tilt = (r() - 0.5) * 0.5, pts: number[][] = [];
-      for (let k = 0; k < m; k++) { const an = a0 + k * 6.283 / m + (r() - 0.5) * 0.4, rr = rad * (0.85 + r() * 0.3); pts.push([c.x + Math.cos(an) * rr, c.y + Math.sin(an) * rr * tilt + (r() - 0.5) * 300, c.z + Math.sin(an) * rr]); }
-      const lens = pts.map((p, k) => Math.hypot(pts[(k + 1) % m][0] - p[0], pts[(k + 1) % m][1] - p[1], pts[(k + 1) % m][2] - p[2])), total = lens.reduce((a, b) => a + b, 0), kind = KINDS[Math.floor(r() * KINDS.length)];
-      const t = G.ShipModel.traffic(kind, (seed + i * 7919) >>> 0); S.zone!.add(t.group);
-      S.traffic.push({ obj: t.group, c: { pts, lens, total, speed: kind === 'freighter' ? 40 + r() * 30 : kind === 'navy' ? 60 + r() * 40 : 80 + r() * 70, off: r() * total }, wp: null, ph: r() * 3 });
-      for (const p of pts) { const b = new T.Mesh(bg, buoy); b.position.set(p[0], p[1], p[2]); S.zone!.add(b); }
-    }
-  }
   // Where everything in the zone is now. On a mission the level is one of the zone's ships (zact), under way on her own course:
   // the zone is drawn from her (it goes by, and turns when she does), so the others, the anchor and the stars are where they'd be
   // seen from her deck or from the squad's ship keeping her company.
@@ -436,16 +460,16 @@ const G_Space = (() => {
     if (!pre.up) { const lv = zoneLevel(S.zdef[best.c.k!]); pre.up = G.R.preload(pre.root, lv.gen.obj === 'artifact' && hit.map.sp && hit.map.sp.artifact ? 1 : 0); } // (the artifact's glow: things)
     if (pre.up !== true && (pre.up as (ms: number) => boolean)(3)) pre.up = true;
   }
-  // The squad's ship has come up with one of the zone's others (within 450 m, for two seconds): the host is asked to make her the
+  // The squad's ship has come up with one of the zone's others (within 800 m, and nearer her than the one that's the level): the host is asked to make her the
   // level (js/spaceserver.ts 'tboard'). Whoever's flying asks.
   function zoneClose(dt: number) {
     if (S.kind !== 'board' || S.docked || S.ftl || (S.state && S.state.boom)) { S.tclose = null; return; }
-    let best: typeof S.traffic[0] | null = null, bd = 450;
+    let best: typeof S.traffic[0] | null = null, bd = Math.min(800, S.P.distanceTo(S.zC)); // (within 800 m, and nearer than the ship that's the level now)
     for (const q of S.traffic) { if (!q.wp || q.c.k == null) continue; const d = S.P.distanceTo(q.wp.p); if (d < bd) { bd = d; best = q; } }
     if (!best) { S.tclose = null; return; }
     if (!S.tclose || S.tclose.k !== best.c.k) S.tclose = { k: best.c.k!, t: 0, name: best.wp!.name };
     S.tclose.t += dt;
-    if (S.tclose.t > 2 && !S.tclose.sent) { S.tclose.sent = true; G.Net.toHost({ t: 'tboard', k: S.tclose.k }); }
+    if (S.tclose.t > 0.35 && !S.tclose.sent) { S.tclose.sent = true; G.Net.toHost({ t: 'tboard', k: S.tclose.k }); }
   }
   // -- a base on a planet: in orbit over it first (the level out of sight), then down through the cloud to its pad
   function setupAssault(map: LvMap) {
@@ -764,7 +788,7 @@ const G_Space = (() => {
     S.model.thrust.opacity += (th - S.model.thrust.opacity) * Math.min(1, dt * 4);
     S.model.glow.color.setHex(S.docked ? 0x2a8a5a : S.ftl ? 0x4060ff : 0xa07020);
     for (const a of S.anchors) { a.obj.rotation.z += dt * 0.15; (a.obj.userData.film.material as THREE.MeshBasicMaterial).opacity = 0.1 + 0.05 * Math.sin(S.t * 2); }
-    if (S.hull) { S.hull.marker.visible = !S.docked && Math.sin(S.t * 6) > -0.4; guns(dt); missiles(dt); }
+    if (S.hull) { guns(dt); missiles(dt); }
     for (const q of S.things) {
       if (q.k === 'art') { const a = q.obj.userData.art as THREE.Mesh; a.rotation.y += dt * 1.5; a.position.y = 1.15 + Math.sin(S.t * 2) * 0.05; }
       if (q.k === 'lock') (q.obj as THREE.Mesh).material = lockMat(!!(S.state && S.state.keys.includes(q.obj.userData.lock)));
