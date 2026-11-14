@@ -31,16 +31,16 @@ const G_VMAnim = (() => {
   type Rig = GunRig; // (one gun in the hands: its holder, its parts, its anchors, its magazine's check data: js/gunrig.ts)
   interface MagState { mode: VmMagMode; at?: number; d?: number; k?: number; q?: THREE.Quaternion }
   // one frame of a clip: the gun's offset and what each part and hand is doing (null: left alone)
-  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; hsteps?: number[] | null; Lon?: HingeHold | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean }
+  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; hsteps?: number[] | null; Lon?: HingeHold | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean; Lk?: number; Rk?: number; Lkind?: VmHold } // (Lk, Rk: how far a hand is on an action's control, Lkind which one, for how it holds it: holdSupport)
   // the support hand during a reload sequence (hingeClip): between a and b (k: 0..1), each a point in the gun's space or ON a part_ node (it moves with it: resolved in apply, once the
   // sequence has posed the parts); lead: how far it presses ahead of that point, down (m); carry: the block (part_mag) goes where the hand takes it
   type HingeRef = V3 | { part: string; at: number[] };
   interface HingeHold { a: HingeRef; b: HingeRef; k: number; lead: number; carry: boolean; grip: HingeRef | null }
-  interface Arm { g: THREE.Group; sleeve: THREE.Mesh; glove: THREE.Group; fist?: THREE.Group }
+  interface Arm { g: THREE.Group; sleeve: THREE.Mesh; glove: THREE.Group; fist?: THREE.Group; hum?: HumArm } // (hum: your body's arm, once its file's in: humArm; till then the sleeve and glove stand in)
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
   // the arms and props of a viewmodel (its userData.vma)
-  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number } | null; chv: ChvHeads | ChvPort | null; fw: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion }
+  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion }
   type MagChk = GunRigMagChk;
   const S = (a: number, b: number, t: number) => G.U.smooth(a, b, t);
   const lerpV = (a: V3, b: V3, k: number) => a.clone().lerp(b, k);
@@ -62,7 +62,7 @@ const G_VMAnim = (() => {
   }
   // The Wolverine grip (js/parts.ts hsl.0): the loading hand a loose fist, a round held in each of the three gaps between its four fingers, bases toward the
   // palm and noses out past the knuckles like claws. CLAW_X: across the glove, the gaps; CLAW_AT: a round's middle, up and along the glove (its -z the fingers' way).
-  const CLAW_N = 3, CLAW_X = [-0.0105, 0, 0.0105], CLAW_Y = -0.008, CLAW_Z = -0.069;
+  const CLAW_N = 3, CLAW_X = [-0.0105, 0, 0.0105], CLAW_Y = -0.008, CLAW_Z = -0.069, HUM_CLAW = [[-0.02, 0, 0.02], [-0.004], [-0.05]]; // (HUM_CLAW: the same on a body's own fist, its frame's middle a hold's: humArm)
   // the fist held up between the pouch and the gun, the knuckles to the eye and the rounds standing up out of them, leaning away a little (the viewmodel's frame: x right, y up, z back)
   const CLAW_UP = (() => { const Z = new T.Vector3(-0.12, -0.8, 0.45).normalize(), X = new T.Vector3(1, 0, 0), Y = new T.Vector3().crossVectors(Z, X).normalize(); X.crossVectors(Y, Z).normalize(); return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(X, Y, Z)); })();
   function makeFist(M: Mats) { // four knuckles curled in, shown in place of the flat fingers while the hand holds the rounds
@@ -115,7 +115,8 @@ const G_VMAnim = (() => {
     const props: Record<string, THREE.Group> = { shell: prop('shell', M, def), case: prop('case', M, def), loader: prop('loader', M, def), clip: prop('clip', M), bolt: prop('bolt', M) };
     if (k.reload === 'block') { props.claw = prop('claw', M, def); L.fist = makeFist(M); L.glove.add(L.fist); } // (a falling block: a Wolverine grip may load it, def.perLoad)
     for (const p of Object.values(props)) hs[0].holder.add(p);
-    u.vma = { def, k, hs, R, L, props, drop: null, chv: chamberView(hs[0], def, M), fw: 0 };
+    u.vma = { def, k, hs, R, L, props, drop: null, chv: chamberView(hs[0], def, M), fw: 0, trig: 1 };
+    dressArms(root, u.vma);
   }
 
   // What a chamber check shows: the ejection port open (a dark window on the right of the receiver, or on top of
@@ -232,6 +233,7 @@ const G_VMAnim = (() => {
   function actionPose(kind: VmHold, h: Rig, pose: Pose, pull: number, on: number, rest: V3 | null, grab?: V3 | null) {
     const A = h.A, R0 = rest || A.S;
     pose.open = (kind === 'bolt' ? G.U.clamp(pull * 2 - 1, 0, 1) : pull) * actTravel(h, kind);
+    if (kind === 'bolt') pose.Rk = on; else if (kind === 'pistol' || kind === 'ar' || kind === 'handle') { pose.Lk = on; pose.Lkind = kind; } // (the hand on its control: holdSupport)
     if (kind === 'pistol' && A.slide) { pose.slide = pull; pose.L = lerpV(R0, off(grab || off(A.slide, -0.02, 0.012), -SLIDE * pull), on); }
     else if (kind === 'ar' && A.ch) { pose.ch = pull; pose.L = lerpV(R0, off(grab || off(A.ch, 0, 0.012), -CH * pull), on); }
     else if (kind === 'handle' && A.H) { pose.handle = pull; pose.L = lerpV(R0, off(grab || A.H, -h.travel * pull), on); }
@@ -312,7 +314,7 @@ const G_VMAnim = (() => {
     pose.handle = st.back; pose.lock = st.lock; pose.open = h.travel * st.back; // (the bolt: off the chamber while the handle is back)
     // the left hand: on the handle, wherever it is, while it works it; on the magazine in between
     const onH = slapGrab(h, st.back, st.lock);
-    pose.L = lerpV(pose.L || A.S, onH, st.hand);
+    pose.L = lerpV(pose.L || A.S, onH, st.hand); pose.Lk = st.hand; pose.Lkind = 'handle';
     // the gun turned to show its left side to the hand on the handle, as for any left-hand handle
     const r = S(0.02, 0.09, t) * (1 - S(0.0, 0.14, m)) * (t < SLAP.mag1 - 0.05 ? 1 : 0) + S(SLAP.mag1 - 0.04, SLAP.mag1, t) * (1 - S(SLAP.home, SLAP.rest, t)); // (the turn to the handle hands over to the magazine's own tilt as it comes in, magTilt, not before it: no sag between)
     pose.gun[5] -= 0.3 * r; pose.gun[3] += 0.2 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r;
@@ -788,6 +790,7 @@ const G_VMAnim = (() => {
     const pose = a.pose, w = pl.cur();
     vm.updateMatrix();
     _inv.copy(vm.matrix).invert();
+    a.trig += ((pose ? 0 : 1) - a.trig) * 0.25; // (the trigger finger: on the trigger, or off it along the frame while the gun's being worked)
     a.hs.forEach((h, idx) => {
       const A = h.A, an = h.an;
       h.holder.updateMatrix();
@@ -863,14 +866,15 @@ const G_VMAnim = (() => {
       // working the action between shots: the left hand riding the pump (a bolt's worked as a rack)
       if (!pose && cyc > 0 && a.k.action === 'pump' && an.pump) Lt = A.S.clone().add(new T.Vector3(0, 0, an.pump.position.z));
       if (a.def.akimbo) { // one gun in each hand
-        const arm = h.side > 0 ? a.R : a.L, sh = h.side > 0 ? SHOULDER_R : SHOULDER_L;
-        place(arm, sh.clone().applyMatrix4(_inv), A.G.clone().applyMatrix4(h.holder.matrix));
+        const arm = h.side > 0 ? a.R : a.L, sh = h.side > 0 ? SHOULDER_R : SHOULDER_L, at = A.G.clone().applyMatrix4(h.holder.matrix);
+        if (arm.hum) { humHold(arm, h, at, holdGrip(arm.hum, h, h.side, 0, a.trig)); humSolve(arm, h.side > 0 ? 0 : 1); } else place(arm, sh.clone().applyMatrix4(_inv), at);
         return;
       }
       if (idx === 0) {
-        place(a.R, SHOULDER_R.clone().applyMatrix4(_inv), Rt.applyMatrix4(h.holder.matrix));
-        place(a.L, SHOULDER_L.clone().applyMatrix4(_inv), Lt.clone().applyMatrix4(h.holder.matrix));
-        a.L.sleeve.visible = a.L.glove.visible = !pl.zipRide; // (on a zipline the left hand's up on the trolley, out of view)
+        if (a.R.hum) humHold(a.R, h, Rt.applyMatrix4(h.holder.matrix), holdGrip(a.R.hum, h, 1, pose && pose.Rk || 0, a.trig)); else place(a.R, SHOULDER_R.clone().applyMatrix4(_inv), Rt.applyMatrix4(h.holder.matrix));
+        if (a.L.hum) humHold(a.L, h, Lt.clone().applyMatrix4(h.holder.matrix), holdSupport(a.L.hum, h, pose, Lt, !!(h.info as { pistol?: boolean }).pistol || a.k.action === 'pistol' || (!!h.A.S && !!h.A.G && h.A.S.distanceTo(h.A.G) < 0.07))); else place(a.L, SHOULDER_L.clone().applyMatrix4(_inv), Lt.clone().applyMatrix4(h.holder.matrix));
+        a.L.sleeve.visible = a.L.glove.visible = !pl.zipRide && !a.L.hum; // (on a zipline the left hand's up on the trolley, out of view)
+        if (a.L.hum) for (const m of a.L.hum.meshes) m.visible = !pl.zipRide;
         // looking something over, the hands turn with it: the right with the gun on its grip, the left under
         // the magazine it's holding (eased in and out so nothing snaps)
         const look = !!(pose && (pl.inspectT > 0 || pl.magChk || pl.rChk));
@@ -883,7 +887,7 @@ const G_VMAnim = (() => {
           if (pose && pose.mag && pose.mag.mode === 'chk' && an.mag) {
             const mq = _q3.copy(h.holder.quaternion).multiply(an.mag.quaternion);
             a.L.glove.quaternion.slerp(mq.multiply(PALM_Q), a.fw);
-            a.L.glove.position.add(_v2.set(0, -0.024, 0).applyQuaternion(mq));
+            a.L.glove.position.add(_v2.set(0, a.L.hum ? HUM_MAGCHK : -0.024, 0).applyQuaternion(mq));
           }
         }
         // the chamber: the port open during a check, the round in it if there is one
@@ -920,10 +924,10 @@ const G_VMAnim = (() => {
         }
         // something in the left hand
         if (pose && pose.dropCase && pl.handCase && !pl.handOut) { pl.handOut = true; G.Casings.loose(a.def, h.holder.localToWorld(a.props.case.position.clone()), h.holder, pl.handCase); } // (a real case now, falling from where the hand had it)
-        if (a.L.fist) { const fist = !!(pose && pose.prop && pose.prop.kind === 'claw'); a.L.fist.visible = fist; a.L.glove.children[1].visible = !fist; if (fist && pose!.prop!.up) a.L.glove.quaternion.slerp(CLAW_UP, pose!.prop!.up); } // (the Wolverine grip's fist, in place of the flat fingers; turned up to show the rounds)
+        if (a.L.fist) { const fist = !!(pose && pose.prop && pose.prop.kind === 'claw'); a.L.fist.visible = fist && !a.L.hum; a.L.glove.children[1].visible = !fist && !a.L.hum; if (fist && a.L.hum) a.L.hum.F = FP.fist; if (fist && pose!.prop!.up) a.L.glove.quaternion.slerp(CLAW_UP, pose!.prop!.up); } // (the Wolverine grip's fist, in place of the flat fingers (a body's own, curled right in); turned up to show the rounds)
         for (const [kind, obj] of Object.entries(a.props)) {
           obj.visible = !!(pose && pose.prop && pose.prop.kind === kind);
-          if (kind === 'claw') { if (obj.visible) clawPose(obj, pose!.prop!, a.L.glove, h.holder, Lt); continue; }
+          if (kind === 'claw') { if (obj.visible) clawPose(obj, pose!.prop!, a.L.glove, h.holder, Lt, !!a.L.hum); continue; }
           const rx = (obj.visible && pose!.prop!.rx) || 0; // (tipped up with a derringer's barrels, held by its base)
           obj.rotation.x = rx;
           if (obj.visible) obj.position.copy(Lt).add(new T.Vector3(0.0, -0.012, -0.03).applyAxisAngle(_X, rx)).add(_v2.set(pose!.prop!.dx || 0, 0, 0)); // (dx: held to the side of the hand)
@@ -933,13 +937,15 @@ const G_VMAnim = (() => {
             hull.material = shot ? shellMat(w.ammo) : G.GunMaterials.M.brass(); hull.scale.set(s, 1, s); base.scale.set(s, 1, s);
           }
         }
+        if (a.R.hum) humSolve(a.R, 0);
+        if (a.L.hum) humSolve(a.L, 1);
       }
     });
   }
   // the Wolverine grip's rounds: each where it sits between the fingers (in the glove's frame, nose along the fingers), turned and moved as the hand comes over
   // the chambers (seat) to where it goes in, along its own bore, riding the hand till it's seated (at: holder space, the hand at home)
   const _gm = new T.Matrix4(), _hm = new T.Matrix4(), _gq = new T.Quaternion(), _cq = new T.Quaternion(), _rp = new T.Vector3();
-  function clawPose(g: THREE.Object3D, pr: NonNullable<Pose['prop']>, glove: THREE.Object3D, holder: THREE.Object3D, Lt: V3) {
+  function clawPose(g: THREE.Object3D, pr: NonNullable<Pose['prop']>, glove: THREE.Object3D, holder: THREE.Object3D, Lt: V3, hum: boolean) {
     g.position.set(0, 0, 0); g.rotation.set(0, 0, 0);
     _gm.compose(glove.position, glove.quaternion, _v2.set(1, 1, 1)); _hm.copy(holder.matrix).invert(); // (the glove's frame is the viewmodel's, as the holder's parent)
     _cq.copy(holder.quaternion).invert(); _gq.copy(_cq).multiply(glove.quaternion); // (the glove's turn in the holder's frame)
@@ -947,7 +953,7 @@ const G_VMAnim = (() => {
     g.children.forEach((r, i) => {
       r.visible = i < n;
       if (!r.visible) return;
-      _rp.set(CLAW_X[i], CLAW_Y, CLAW_Z).applyMatrix4(_gm).applyMatrix4(_hm); // (between the fingers: fewer than three, from the index finger's side)
+      (hum ? _rp.set(HUM_CLAW[0][i], HUM_CLAW[1][0], HUM_CLAW[2][0]) : _rp.set(CLAW_X[i], CLAW_Y, CLAW_Z)).applyMatrix4(_gm).applyMatrix4(_hm); // (between the fingers: fewer than three, from the index finger's side)
       const seated = pr.at![i].clone().sub(pr.home!).add(Lt); // (on its bore, as far from it as the hand is from its home)
       r.position.copy(_rp).lerp(seated, k);
       r.quaternion.copy(_gq).slerp(_cq.identity(), k);
@@ -1035,6 +1041,291 @@ const G_VMAnim = (() => {
     o.mesh.position.set(o.px, o.py + B[1] - A[1], o.pz - (B[0] - A[0]));
     o.mesh.rotation.x = o.rx + B[2] - A[2];
   }
+  // ------------------------------------------------------------------ your own arms
+  // Each arm is your body's (js/humans.ts, picked as js/game.ts picks it, dressed as js/rig.ts armLook dresses it): the faces of its
+  // sleeves, hand and fingers on that side alone, skinned to bones of the arm's own that are set every frame. The hand goes where its
+  // frame is (Arm.glove: at the middle of what it holds, the palm toward it (+y), the fingers forward (-z)), the wrist follows from
+  // it, and a two-bone IK from the shoulder to the wrist finds the elbow, bent toward its pole (down and out). The body's fingers
+  // have bones of their own (three a finger, and the thumb's): each hold poses them (the fingers section below), closed round what it holds. (The model's L is your right: it faces +z, so its -x side turns to your right.)
+  const HUM_SH = [new T.Vector3(0.17, -0.2, 0.12), new T.Vector3(-0.16, -0.22, 0.06)]; // (the shoulders, camera space: right, left)
+  const HUM_POLE = [new T.Vector3(0.75, -1, 0.3).normalize(), new T.Vector3(-0.45, -1, 0.2).normalize()]; // (where the elbows go, camera space)
+  const HUM_MAGCHK = 0.003; // (the left hand's hold on a magazine it's looking over: a little up its body from the floorplate)
+  interface HumArm {
+    meshes: THREE.SkinnedMesh[]; bones: Record<string, THREE.Bone>; bindW: Record<string, THREE.Matrix4>; s: string; th: number;
+    S: V3; E: V3; W: V3; lu: number; lf: number; f: V3; X: V3; Y: V3; Cinv: THREE.Matrix4;
+    fingers: HumFinger[]; F: FPose; r: number; fz: number; Mh: THREE.Matrix4; cache: Record<string, { r: number; off: V3; F: FPose }>;
+  }
+  type FPose = number[][]; // (a hand's fingers: the fingers section below)
+  interface HumFinger { n: string[]; P: V3[]; ax: V3[]; opp: V3; M: THREE.Matrix4[] } // (a finger: its bones' names, its knuckles and tip, the axes they bend about, the thumb's turn across the palm, its bones' turns)
+  interface HumObj { c: V3; ax: V3; u: V3; a: number; b: number } // (something a hand holds, in the gun's space: an elliptic bar through c along ax, its half-widths a along u and b along ax x u)
+  interface HumHoldT { q: THREE.Quaternion; r: number; fz?: number; F: FPose; off?: V3 } // (a hold: the hand's frame in the gun's space, how far the palm is from the middle of what it holds (and back along the fingers, fz: what it hooks is at the fingertips), its fingers, and off: its middle moved from the anchor onto what it holds, in the gun's space)
+  const _hmats = new Map<string, THREE.Material>();
+  const humMat = (c: number, rough: number) => { const k = c + '|' + rough; if (!_hmats.has(k)) _hmats.set(k, new T.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0 })); return _hmats.get(k)!; };
+  // the faces of a part all of whose corners keep says so, as a geometry of their own (every attribute, the kept corners only)
+  function subset(geo: THREE.BufferGeometry, keep: (i: number) => boolean) {
+    const idx = geo.index, n = idx ? idx.count : geo.attributes.position.count, map = new Map<number, number>(), tri: number[] = [];
+    for (let t = 0; t + 2 < n; t += 3) {
+      const v = idx ? [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)] : [t, t + 1, t + 2];
+      if (!v.every(keep)) continue;
+      for (const i of v) { if (!map.has(i)) map.set(i, map.size); tri.push(map.get(i)!); }
+    }
+    if (!tri.length) return null;
+    const out = new T.BufferGeometry();
+    for (const [name, at] of Object.entries(geo.attributes)) {
+      const src = at as THREE.BufferAttribute, k = src.itemSize, arr = new (src.array.constructor as Float32ArrayConstructor)(map.size * k);
+      for (const [o, i] of map) for (let j = 0; j < k; j++) arr[i * k + j] = src.getComponent(o, j);
+      out.setAttribute(name, new T.BufferAttribute(arr, k, src.normalized));
+    }
+    out.setIndex(tri);
+    return out;
+  }
+  // your arms, on a viewmodel: now if your body's file is in, else when it comes
+  function dressArms(root: THREE.Object3D, a: Vma) {
+    if (!G.Humans || !G.Rig || !G.Game) return;
+    const lk = G.Rig.armLook({ animal: G.Game.myAnimal, callName: G.Game.myName, seed: 977, look: G.Game.myLook });
+    const go = () => { const parts = G.Humans.get(lk.human); if (!parts || root.userData.vma !== a || a.R.hum) return; a.R.hum = humArm(root, a.R, parts, 'L', lk.col); a.L.hum = humArm(root, a.L, parts, 'R', lk.col); };
+    if (G.Humans.get(lk.human)) go(); else G.Humans.ensure(lk.human).then(go);
+  }
+  // one arm: s, the model's side of it ('L': your right)
+  function humArm(root: THREE.Object3D, arm: Arm, parts: HumanPart[], s: string, col: Record<string, number>): HumArm | undefined {
+    const sx = s === 'L' ? -1 : 1, bones: Record<string, THREE.Bone> = {}, bindW: Record<string, THREE.Matrix4> = {};
+    const bone = (n: string) => { if (!bones[n]) { const b = new T.Bone(); b.matrixAutoUpdate = false; root.add(b); bones[n] = b; } return bones[n]; };
+    for (const p of parts) p.bones.forEach((n, i) => { if (!bindW[n]) bindW[n] = p.inv[i].clone().invert(); });
+    if (!bindW['hand' + s] || !bindW['forearm' + s] || !bindW['upperarm' + s]) return undefined;
+    const at = (n: string) => new T.Vector3().setFromMatrixPosition(bindW[n + s]);
+    const S = at('upperarm'), E = at('forearm'), W = at('hand');
+    // the hand's frame in the file: f along it (the bone's y), Y the way its palm faces (in toward the body), X across it (the thumb's side on the right hand)
+    const f = new T.Vector3().setFromMatrixColumn(bindW['hand' + s], 1).normalize(), Y = new T.Vector3(-sx, 0, 0), X = new T.Vector3();
+    Y.addScaledVector(f, -Y.dot(f)).normalize(); X.crossVectors(Y, f.clone().negate()).normalize();
+    const geos: Record<string, THREE.BufferGeometry> = {}, meshes: THREE.SkinnedMesh[] = [];
+    for (const p of parts) {
+      if (!['upsleeve', 'sleeve', 'hand', 'finger'].includes(p.mat) || col[p.mat] == null) continue;
+      const pos = p.geo.attributes.position;
+      const geo = subset(p.geo, (i) => pos.getX(i) * sx > 0.12); // (that side's arm: clear of the chest)
+      if (!geo) continue;
+      geos[p.mat] = geo;
+      const sk = new T.Skeleton(p.bones.map(bone), p.inv);
+      const sm = new T.SkinnedMesh(geo, humMat(col[p.mat], p.mat === 'hand' || p.mat === 'finger' ? (col.hand === col.sleeve ? 0.8 : 0.65) : 0.9));
+      sm.frustumCulled = false; sm.bind(sk, new T.Matrix4());
+      root.add(sm); meshes.push(sm);
+    }
+    if (!geos.hand) { for (const m of meshes) root.remove(m); return undefined; }
+    // the fingers' bones (the thumb's last): their knuckles and tips in the file, and the axis each knuckle bends about (square to the bone and the palm's way: a
+    // turn about it brings the finger in toward the palm); the thumb's first turned across the palm as well, about the hand's length (opp)
+    const th = s === 'L' ? 1 : -1, fingers: HumFinger[] = [];
+    for (const nm of FINGER_NAMES) {
+      const n = [1, 2, 3].map((k) => nm + k + s);
+      if (!n.every((k) => bindW[k])) { fingers.length = 0; break; }
+      const P = n.map((k) => new T.Vector3().setFromMatrixPosition(bindW[k]));
+      P.push(P[2].clone().add(P[2].clone().sub(P[1]).multiplyScalar(nm === 'thumb' ? 0.95 : 0.85)));
+      fingers.push({ n, P, ax: [0, 1, 2].map((k) => P[k + 1].clone().sub(P[k]).cross(Y).normalize()), opp: X.clone().multiplyScalar(th).cross(Y).normalize(), M: [new T.Matrix4(), new T.Matrix4(), new T.Matrix4()] });
+    }
+    // the palm: its face (the most its way, between the wrist and the knuckles, across the fingers' width), its middle there
+    const v = new T.Vector3(), kn = new T.Vector3();
+    let bmin = -0.04, bmax = 0.04, akm = 0.09;
+    if (fingers.length) {
+      bmin = Infinity; bmax = -Infinity;
+      for (const fd of fingers.slice(0, 4)) { kn.add(fd.P[0]); const b = fd.P[0].clone().sub(W).dot(X); bmin = Math.min(bmin, b - 0.009); bmax = Math.max(bmax, b + 0.009); }
+      akm = kn.multiplyScalar(0.25).sub(W).dot(f);
+    }
+    const hp = geos.hand.attributes.position;
+    let cp = -Infinity;
+    for (let i = 0; i < hp.count; i++) {
+      v.fromBufferAttribute(hp, i).sub(W);
+      const a0 = v.dot(f), b0 = v.dot(X);
+      if (a0 > 0.3 * akm && a0 < 0.85 * akm && b0 > bmin && b0 < bmax) cp = Math.max(cp, v.dot(Y));
+    }
+    const P0 = W.clone().addScaledVector(f, 0.55 * akm).addScaledVector(X, (bmin + bmax) / 2).addScaledVector(Y, cp > -1 ? cp : 0.01);
+    const Cinv = new T.Matrix4().makeBasis(X, Y, f.clone().negate()).setPosition(P0).invert();
+    for (const m of [arm.sleeve, ...arm.glove.children]) m.visible = false; // (the stand-ins go)
+    return { meshes, bones, bindW, s, th, S, E, W, lu: S.distanceTo(E), lf: E.distanceTo(W), f, X, Y, Cinv, fingers, F: FP.open.map((a) => a.slice()), r: 0.015, fz: 0, Mh: new T.Matrix4(), cache: {} };
+  }
+  // ------------------------------------------------------------------ the fingers
+  // A hand's fingers are a pose: for each (index, middle, ring, little finger, thumb) [opp, its three knuckles' bends] in radians (opp: the thumb's turn across the
+  // palm; a finger's is 0). FP: the poses holds are made of. A hold round something (a grip, a handguard: HumObj, measured off the gun by holdObj) has its fingers
+  // closed on it: each knuckle bent in turn till the finger past it would touch (fingerWrap).
+  const FINGER_NAMES = ['index', 'middle', 'ring', 'pinky', 'thumb'];
+  const fp = (fi: number[], mi: number[], ri: number[], pi: number[], tb: number[]): FPose => [[0, ...fi], [0, ...mi], [0, ...ri], [0, ...pi], tb];
+  const FP: Record<string, FPose> = {
+    open: fp([0.35, 0.45, 0.3], [0.4, 0.5, 0.3], [0.45, 0.5, 0.3], [0.5, 0.55, 0.3], [0.45, 0.1, 0.2, 0.2]), // (carrying: a magazine by its floorplate, a round in the palm)
+    top: fp([0.45, 0.7, 0.45], [0.5, 0.75, 0.45], [0.9, 1.1, 0.7], [1.0, 1.2, 0.7], [0.75, 0.2, 0.35, 0.3]), // (a round or a clip pinched, pressed in from above)
+    rack: fp([0.55, 1.0, 0.65], [0.6, 1.05, 0.65], [0.65, 1.1, 0.7], [0.7, 1.1, 0.7], [0.65, 0.2, 0.3, 0.2]), // (over a slide, or round a handle)
+    hook: fp([0.3, 1.35, 0.9], [0.3, 1.4, 0.9], [0.6, 1.5, 1.0], [0.7, 1.5, 1.0], [0.5, 0.1, 0.2, 0.2]), // (an AR's charging handle, hooked from in front)
+    bolt: fp([0.65, 0.85, 0.55], [1.2, 1.45, 0.9], [1.3, 1.5, 0.9], [1.35, 1.5, 0.9], [1.0, 0.25, 0.4, 0.3]), // (a bolt's knob between the thumb and the crooked index finger)
+    fist: fp([1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [0.85, 0.3, 0.7, 0.5]), // (the Wolverine grip: a loose fist)
+    grip: fp([1.0, 1.2, 0.7], [1.2, 1.4, 0.8], [1.25, 1.4, 0.8], [1.3, 1.4, 0.8], [0.9, 0.15, 0.3, 0.2]), // (round a grip, when there's none to measure: holdObj)
+    sup: fp([0.8, 0.9, 0.5], [0.85, 0.9, 0.5], [0.9, 0.95, 0.5], [0.95, 1.0, 0.5], [0.15, 0.05, 0.1, 0.1]), // (under a handguard, the thumb along its left side)
+    psup: fp([0.9, 1.1, 0.6], [0.95, 1.1, 0.6], [1.0, 1.1, 0.6], [1.0, 1.1, 0.6], [0.35, 0.0, 0.1, 0.1]), // (on a pistol, round the right hand's fingers, the thumb forward under the right's)
+    trigger: fp([0.2, 0.75, 0.4], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0, 0]), // (the index finger on the trigger, its pad on the blade)
+    indexed: fp([0.02, 0.05, 0.02], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0, 0]), // (off it, straight along the frame: working the gun, not firing it)
+  };
+  const fmix = (a: FPose, b: FPose, k: number): FPose => (k <= 0 ? a : k >= 1 ? b : a.map((r, i) => r.map((x, j) => x + (b[i][j] - x) * k)));
+  const fpick = (base: FPose, from: FPose, which: number[]): FPose => base.map((r, i) => (which.includes(i) ? from[i] : r)); // (some fingers from another pose)
+  // a finger's bones posed (M: each bone's turn in the file, about its knuckle, carrying the ones after it)
+  const _fr = new T.Matrix4(), _ft = new T.Matrix4(), _fq = new T.Quaternion(), _fq2 = new T.Quaternion();
+  function fingerPose(fd: HumFinger, a: number[]) {
+    for (let k = 0; k < 3; k++) {
+      _fq.setFromAxisAngle(fd.ax[k], a[k + 1]);
+      if (k === 0 && a[0]) _fq.premultiply(_fq2.setFromAxisAngle(fd.opp, a[0]));
+      _fr.makeTranslation(fd.P[k].x, fd.P[k].y, fd.P[k].z).multiply(_ft.makeRotationFromQuaternion(_fq)).multiply(_ft.makeTranslation(-fd.P[k].x, -fd.P[k].y, -fd.P[k].z));
+      if (k) fd.M[k].multiplyMatrices(fd.M[k - 1], _fr); else fd.M[0].copy(_fr);
+    }
+  }
+  // The bar a hold closes on, measured off the gun (its meshes by slot): the grip (or what the hand holds for one: a stock's wrist) cut across level at the grip
+  // anchor's height, the handguard (or a pump, a tube, a barrel) cut square across at the support anchor; null where none of those is there. Kept on the rig.
+  function holdObj(h: Rig, which: 'grip' | 'sup'): HumObj | null {
+    const ud = h as unknown as { _hobj?: Record<string, HumObj | null> }, c = ud._hobj || (ud._hobj = {});
+    if (which in c) return c[which];
+    const at = which === 'grip' ? h.A.G : h.A.S, slots = which === 'grip' ? ['grip', 'stock', 'base'] : ['handguard', 'pump', 'tube', 'barrel', 'base'];
+    let out: HumObj | null = null;
+    if (at) {
+      h.holder.updateMatrixWorld(true);
+      const inv = new T.Matrix4().copy(h.holder.matrixWorld).invert(), m = new T.Matrix4(), p = new T.Vector3();
+      for (const slot of slots) {
+        let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, n = 0;
+        h.holder.traverse((o: any) => {
+          if (!o.isMesh || o.userData.slot !== slot || !o.geometry || !o.geometry.attributes.position) return;
+          const pos = o.geometry.attributes.position; m.multiplyMatrices(inv, o.matrixWorld);
+          for (let i = 0; i < pos.count; i++) {
+            p.fromBufferAttribute(pos, i).applyMatrix4(m);
+            if (which === 'grip' ? Math.abs(p.y - at.y) < 0.01 && Math.abs(p.z - at.z) < 0.05 : Math.abs(p.z - at.z) < 0.015 && Math.abs(p.y - at.y) < 0.06 && Math.abs(p.x) < 0.06) {
+              x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x); const q = which === 'grip' ? p.z : p.y; y0 = Math.min(y0, q); y1 = Math.max(y1, q); n++;
+            }
+          }
+        });
+        const a = (x1 - x0) / 2, b = (y1 - y0) / 2;
+        if (n < 4 || a < 0.004 || b < 0.004 || a > 0.045 || b > 0.05) continue;
+        out = which === 'grip' ? { c: new T.Vector3((x0 + x1) / 2, at.y, (y0 + y1) / 2), ax: new T.Vector3(0, Math.cos(RAKE), -Math.sin(RAKE)), u: new T.Vector3(1, 0, 0), a, b: b * Math.cos(RAKE) }
+          : { c: new T.Vector3((x0 + x1) / 2, (y0 + y1) / 2, at.z), ax: new T.Vector3(0, 0, 1), u: new T.Vector3(1, 0, 0), a, b };
+        break;
+      }
+    }
+    c[which] = out;
+    return out;
+  }
+  // how far the bar's edge is from its middle, the way n points (n square to its axis)
+  const reachOf = (o: HumObj, n: V3) => { const w = new T.Vector3().crossVectors(o.ax, o.u).normalize(), x = n.dot(o.u), y = n.dot(w), l = Math.hypot(x, y) || 1; return 1 / Math.hypot(x / l / o.a, y / l / o.b); };
+  // The fingers closed on a bar (o, in the gun's space) from a hold (its frame q at at, the palm r off it): each finger's first knuckle bent in steps till the finger
+  // past it would touch it (grow: the bar taken as that much fatter), then the second, then the last. Only the fingers in which; the rest as base has them.
+  function fingerWrap(h: HumArm, base: FPose, o: HumObj, q: THREE.Quaternion, at: V3, r: number, which: number[], grow = 0): FPose {
+    const FH = new T.Matrix4().compose(at, q, _hone).multiply(new T.Matrix4().makeTranslation(0, -r, 0)).multiply(h.Cinv), w = new T.Vector3().crossVectors(o.ax, o.u).normalize();
+    const pt = new T.Vector3(), d = new T.Vector3(), out = base.map((x) => x.slice()), MAX = [1.2, 1.7, 1.2];
+    const inside = (p: V3, rad: number) => { d.copy(p).applyMatrix4(FH).sub(o.c); d.addScaledVector(o.ax, -d.dot(o.ax)); const x = d.dot(o.u) / (o.a + grow + rad), y = d.dot(w) / (o.b + grow + rad); return x * x + y * y < 1; };
+    for (const i of which) {
+      const fd = h.fingers[i], a = out[i];
+      if (!fd) continue;
+      for (let k = 0; k < 3; k++) {
+        a[k + 1] = 0;
+        for (let t = 0; t <= MAX[k]; t += 0.05) {
+          a[k + 1] = t; fingerPose(fd, a);
+          let hit = false;
+          for (let j = k; j < 3 && !hit; j++) for (const u of [0.5, 1]) { pt.lerpVectors(fd.P[j], fd.P[j + 1], u).applyMatrix4(fd.M[j]); if (inside(pt, j === 2 && u === 1 ? 0.0055 : 0.0075)) { hit = true; break; } }
+          if (hit) { a[k + 1] = Math.max(0, t - 0.05); break; }
+        }
+      }
+    }
+    return out;
+  }
+  // the hands' holds (frames in the gun's space: makeBasis of x, the palm's way y, the fingers' way -z)
+  const qBasis = (y: V3, z: V3) => { const Y = y.clone().normalize(), X = new T.Vector3().crossVectors(Y, z).normalize(), Z = new T.Vector3().crossVectors(X, Y); return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(X, Y, Z)); };
+  const RAKE = 0.3; // (a pistol grip's slope, its bottom back: the fingers square to it)
+  const Q_GRIP = [qBasis(new T.Vector3(1, 0, 0), new T.Vector3(0, Math.sin(RAKE), Math.cos(RAKE))), qBasis(new T.Vector3(-1, 0, 0), new T.Vector3(0, Math.sin(RAKE), Math.cos(RAKE)))]; // (the left hand's, the right's: the palm on the grip's side, the fingers round its front)
+  const Q_BOLT = qBasis(new T.Vector3(-0.6, 0, -1), new T.Vector3(0.2, -1, 0.2)); // (the right hand on a bolt's knob: pinched from behind, the fingers up round it, the hand below it)
+  const Q_SUP = qBasis(new T.Vector3(0.35, 1, 0), new T.Vector3(-0.75, 0, 0.65)); // (the support hand under a handguard, the thumb along its left side)
+  const Q_PSUP = qBasis(new T.Vector3(1, 0.35, 0), new T.Vector3(0, 0.3, 1)); // (on a pistol, the left hand round the right, its palm on the grip's left side)
+  const Q_RACK = qBasis(new T.Vector3(0, -1, 0), new T.Vector3(-1, 0, 0.3)); // (over the top on a slide or a handle on the right, the fingers down its right side)
+  const Q_CH = qBasis(new T.Vector3(0, -0.35, 1), new T.Vector3(0.3, -1, -0.35)); // (an AR's charging handle: the fingers hooked over it from in front, the palm toward you, below the sight line)
+  const Q_UNDER = qBasis(new T.Vector3(0, 1, 0), new T.Vector3(-1, 0, -0.3)); // (a handle on the right: from under the gun, the palm up, the fingers round it from below)
+  const Q_HL = qBasis(new T.Vector3(1, 0.2, 0), new T.Vector3(0, -0.4, 1)); // (a handle on the left: from that side, the palm toward the gun, the fingers round it)
+  const Q_FREE = new T.Quaternion(); // (palm up, the fingers forward: carrying something, a magazine by its floorplate)
+  const Q_TOP = qBasis(new T.Vector3(0.25, -1, 0), new T.Vector3(-1, 0.2, 0.45)); // (over the gun, the palm down and the fingers across it to the right, the arm from the left: a round, a clip or a bolt pressed in from above)
+  // The firing hand on the grip (side: its hand, -1 the left, an akimbo pair's), or on the bolt's knob (bolt 0..1); trig 0..1: the index finger on the trigger, or off
+  // it along the frame. On a grip it can measure (holdObj), the hand's middle on the grip's, the palm against its side and the fingers closed round it.
+  function holdGrip(arm: HumArm, h: Rig, side: number, bolt: number, trig: number): HumHoldT {
+    const q = Q_GRIP[side > 0 ? 1 : 0].clone(), key = 'grip' + side;
+    let c = arm.cache[key];
+    if (!c) {
+      const o = holdObj(h, 'grip'), r = o ? o.a + 0.004 : 0.017;
+      c = arm.cache[key] = { r, off: o ? o.c.clone().sub(h.A.G) : new T.Vector3(), F: o && arm.fingers.length ? fingerWrap(arm, FP.grip, o, q, o.c, r, [1, 2, 3]) : FP.grip };
+    }
+    if (bolt) q.slerp(Q_BOLT, bolt);
+    const F = fmix(fpick(c.F, fmix(FP.indexed, FP.trigger, trig), [0]), FP.bolt, bolt);
+    return { q, r: G.U.lerp(c.r, 0.006, bolt), fz: 0.035 * bolt, F, off: c.off.clone().multiplyScalar(1 - bolt) };
+  }
+  // The support hand: on the handguard (its fingers closed round what's there to measure, or a pistol's grip round the firing hand's fingers), carrying, over the
+  // gun, or on a control (pose.Lk, pose.Lkind)
+  function holdSupport(arm: HumArm, h: Rig, pose: Pose | null | undefined, Lt: V3, pistol: boolean): HumHoldT {
+    const on = 1 - S(0.02, 0.09, Lt.distanceTo(h.A.S)), k = (pose && pose.Lk) || 0;
+    const up = S(0.0, 0.035, Lt.y) * (1 - on), q = Q_FREE.clone().slerp(pose && pose.prop && pose.prop.kind !== 'clip' ? Q_HL : Q_TOP, up).slerp(pistol ? Q_PSUP : Q_SUP, on), lk = pose && pose.Lkind, left = lk === 'handle' && h.A.H && h.A.H.x < -0.005; // (up: over the gun, putting something in from above: a clip pressed down, a round or a bolt from the left, clear of a sight over it)
+    if (k) q.slerp(lk === 'ar' ? Q_CH : left ? Q_HL : lk === 'handle' && h.A.H && h.A.H.x > 0.005 ? Q_UNDER : Q_RACK, k);
+    let c = arm.cache.sup;
+    if (!c) {
+      const qs = pistol ? Q_PSUP : Q_SUP, o = holdObj(h, pistol ? 'grip' : 'sup'), n = new T.Vector3(0, 1, 0).applyQuaternion(qs);
+      if (pistol) { const r = o ? reachOf(o, n.clone().addScaledVector(o.ax, -n.dot(o.ax)).normalize()) + 0.012 : 0.016, at = o ? o.c.clone().add(new T.Vector3(0, -0.012, -0.008)) : h.A.S; c = { r, off: at.clone().sub(h.A.S), F: o && arm.fingers.length ? fingerWrap(arm, FP.psup, o, qs, at, r, [0, 1, 2, 3], 0.012) : FP.psup }; } // (round the grip's middle, a little low and forward of it: over the firing hand's fingers)
+      else { const r = o ? reachOf(o, n.clone().addScaledVector(o.ax, -n.dot(o.ax)).normalize()) + 0.004 : 0.022; c = { r, off: o ? o.c.clone().sub(h.A.S) : new T.Vector3(), F: o && arm.fingers.length ? fingerWrap(arm, FP.sup, o, qs, o.c, r, [0, 1, 2, 3]) : FP.sup }; }
+      arm.cache.sup = c;
+    }
+    let F = fmix(fmix(FP.open, FP.top, up), c.F, on);
+    if (k) F = fmix(F, lk === 'ar' ? FP.hook : FP.rack, k);
+    return { q, r: G.U.lerp(0.012, c.r, on) * (1 - k) + 0.01 * k, fz: k * (lk === 'ar' ? 0.05 : lk === 'pistol' ? 0.01 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
+  }
+  // the hand set at a hold: its frame (Arm.glove: where vmanim's clips and turns can move it on), the palm's reach, the fingers
+  function humHold(arm: Arm, h: Rig, at: V3, o: HumHoldT) {
+    if (o.off) at.add(o.off.clone().applyQuaternion(h.holder.quaternion));
+    arm.glove.position.copy(at); arm.glove.quaternion.copy(h.holder.quaternion).multiply(o.q);
+    arm.hum!.r = o.r; arm.hum!.fz = o.fz || 0; arm.hum!.F = o.F;
+  }
+
+  // the turn taking (u0, v0) to (u1, v1): each pair an axis and a direction off it (squared up to it)
+  const _tb0 = new T.Matrix4(), _tb1 = new T.Matrix4(), _tx = new T.Vector3(), _ty = new T.Vector3(), _tz = new T.Vector3();
+  function turnOf(u0: V3, v0: V3, u1: V3, v1: V3, out: THREE.Quaternion) {
+    const mk = (u: V3, w: V3, m: THREE.Matrix4) => { _tx.copy(u).normalize(); _ty.copy(w).addScaledVector(_tx, -w.dot(_tx)).normalize(); _tz.crossVectors(_tx, _ty); return m.makeBasis(_tx, _ty, _tz); };
+    return out.setFromRotationMatrix(mk(u1, v1, _tb1).multiply(mk(u0, v0, _tb0).transpose()));
+  }
+  // the arm from where its hand is: the hand's bone on its frame, the wrist from that, the elbow by IK from the shoulder (i: 0 right, 1 left)
+  const _hS = new T.Vector3(), _hW = new T.Vector3(), _hE = new T.Vector3(), _hd = new T.Vector3(), _hp = new T.Vector3(), _hT = new T.Matrix4(), _hone = new T.Vector3(1, 1, 1);
+  const _hQa = new T.Quaternion(), _hQb = new T.Quaternion(), _ant = new T.Vector3(0, 0, 1), _hMu = new T.Matrix4(), _hMf = new T.Matrix4(), _hsc = new T.Matrix4();
+  const along = (u: V3, k: number) => { const x = u.x / u.length(), y = u.y / u.length(), z = u.z / u.length(), e = k - 1; return _hsc.set(1 + e * x * x, e * x * y, e * x * z, 0, e * x * y, 1 + e * y * y, e * y * z, 0, e * x * z, e * y * z, 1 + e * z * z, 0, 0, 0, 0, 1); }; // (drawn out k times along u, no thicker)
+  const HUM_STRETCH = 1.3, HUM_TWIST = 0.8; // (how much longer an arm may be drawn to reach a hold out past its length: the viewmodel's guns sit further off than a body's arms reach)
+  function humSolve(arm: Arm, i: number) {
+    const h = arm.hum!, g = arm.glove, Mh = h.Mh;
+    _hp.set(0, 1, 0).applyQuaternion(g.quaternion); // (the palm's way)
+    Mh.compose(_hd.copy(g.position).addScaledVector(_hp, -h.r).addScaledVector(_v2.set(0, 0, 1).applyQuaternion(g.quaternion), h.fz), g.quaternion, _hone).multiply(h.Cinv);
+    _hW.copy(h.W).applyMatrix4(Mh);
+    _hS.copy(HUM_SH[i]).applyMatrix4(_inv);
+    const pole = HUM_POLE[i].clone().transformDirection(_inv);
+    // (out of reach: the arm a little longer, up to HUM_STRETCH, and then the shoulder brought forward along the line to the wrist)
+    _hd.subVectors(_hW, _hS);
+    let d = _hd.length();
+    const k = G.U.clamp(d / (0.97 * (h.lu + h.lf)), 1, HUM_STRETCH), lu = h.lu * k, lf = h.lf * k, reach = lu + lf - 0.002;
+    if (d > reach) { _hS.addScaledVector(_hd, (d - reach) / d); d = reach; }
+    _hd.normalize();
+    const ca = G.U.clamp((lu * lu + d * d - lf * lf) / (2 * lu * d), -1, 1), sa = Math.sqrt(1 - ca * ca);
+    pole.addScaledVector(_hd, -pole.dot(_hd)).normalize();
+    _hE.copy(_hS).addScaledVector(_hd, lu * ca).addScaledVector(pole, lu * sa);
+    // the upper arm: along it, its front (the elbow's inside) toward the forearm; the forearm: along it, turned with the palm (most of the way) and the elbow
+    const uF = new T.Vector3().subVectors(h.E, h.S), uV = new T.Vector3().subVectors(_hE, _hS), fF = new T.Vector3().subVectors(h.W, h.E), fV = new T.Vector3().subVectors(_hW, _hE);
+    const bend = fV.clone().addScaledVector(uV, -fV.dot(uV) / uV.lengthSq());
+    if (bend.lengthSq() < 1e-8) bend.copy(pole).negate();
+    turnOf(uF, _ant, uV, bend, _hQa);
+    _hMu.makeRotationFromQuaternion(_hQa).setPosition(_hS).multiply(along(uF, k)).multiply(_hT.makeTranslation(-h.S.x, -h.S.y, -h.S.z));
+    turnOf(fF, _ant, fV, uV.clone().negate(), _hQa);
+    { // (then twisted about its length most of the way to the palm's turn: the wrist takes the rest)
+      const ax = fV.clone().normalize(), pe = h.Y.clone().applyQuaternion(_hQa), pv = _hp.clone();
+      pe.addScaledVector(ax, -pe.dot(ax)); pv.addScaledVector(ax, -pv.dot(ax));
+      if (pe.lengthSq() > 1e-8 && pv.lengthSq() > 1e-8) _hQa.premultiply(_hQb.setFromAxisAngle(ax, HUM_TWIST * Math.atan2(_v2.crossVectors(pe, pv).dot(ax), pe.dot(pv))));
+    }
+    _hMf.makeRotationFromQuaternion(_hQa).setPosition(_hE).multiply(along(fF, k)).multiply(_hT.makeTranslation(-h.E.x, -h.E.y, -h.E.z));
+    for (const [n, b] of Object.entries(h.bones)) {
+      b.matrix.multiplyMatrices(n === 'hand' + h.s ? Mh : n === 'forearm' + h.s ? _hMf : _hMu, h.bindW[n]);
+      b.matrixWorldNeedsUpdate = true;
+    }
+    h.fingers.forEach((fd, i) => { // (the fingers: posed in the hand's frame)
+      fingerPose(fd, h.F[i]);
+      for (let k = 0; k < 3; k++) { const b = h.bones[fd.n[k]]; if (b) b.matrix.multiplyMatrices(Mh, fd.M[k]).multiply(h.bindW[fd.n[k]]); }
+    });
+  }
+
   // stretch an arm from the shoulder to the hand (both in viewmodel space)
   const _q2 = new T.Quaternion(), _q3 = new T.Quaternion(), _v2 = new T.Vector3();
   const PALM_Q = new T.Quaternion(); // palm under the floorplate, fingers along it

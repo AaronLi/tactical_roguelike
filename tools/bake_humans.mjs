@@ -12,7 +12,8 @@
 import fs from 'node:fs'; import path from 'node:path'; import crypto from 'node:crypto'; import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), SRC = path.join(ROOT, 'models/characters/human/variants'), OUT = path.join(ROOT, 'assets/models/humans');
 const sourceOnly = process.argv.includes('--source'), checkOnly = sourceOnly || process.argv.includes('--check');
-const BONES = ['hips', 'spine', 'chest', 'clavicle.L', 'upperarm.L', 'forearm.L', 'hand.L', 'clavicle.R', 'upperarm.R', 'forearm.R', 'hand.R', 'neck', 'head', 'eye.L', 'eye.R', 'thigh.L', 'shin.L', 'foot.L', 'thigh.R', 'shin.R', 'foot.R'];
+const BONES = ['hips', 'spine', 'chest', 'clavicle.L', 'upperarm.L', 'forearm.L', 'hand.L', 'clavicle.R', 'upperarm.R', 'forearm.R', 'hand.R', 'neck', 'head', 'eye.L', 'eye.R', 'thigh.L', 'shin.L', 'foot.L', 'thigh.R', 'shin.R', 'foot.R',
+  ...['thumb', 'index', 'middle', 'ring', 'pinky'].flatMap((f) => [1, 2, 3].flatMap((i) => [f + i + '.L', f + i + '.R']))]; // (the fingers: three bones each, the first off the hand; js/humans.ts keeps their digits)
 const MATS = new Set(['shirt', 'trousers', 'boots', 'neck', 'upsleeve', 'sleeve', 'hand', 'finger', 'front', 'lowleg', 'eye', 'iris', 'skin', 'hair', 'lip', 'brow', 'eyeskin', 'stubble']), NEED = ['shirt', 'trousers', 'boots', 'hand', 'skin', 'eye'];
 const errs = [], err = (id, m) => errs.push(id + ': ' + m);
 

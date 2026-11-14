@@ -34,6 +34,7 @@ M = {k: mat(k, c, r) for k, c, r in [('skin', sk, 0.6), ('stubble', tuple(a * 0.
 for k, of in (('upsleeve', 'shirt'), ('sleeve', 'shirt'), ('neck', 'skin'), ('hand', 'skin'), ('finger', 'skin'), ('eyeskin', 'skin'), ('brow', 'hair'), ('front', 'shirt'), ('lowleg', 'trousers')):
     M[k] = mat(k, tuple(M[of].node_tree.nodes['Principled BSDF'].inputs['Base Color'].default_value)[:3], 0.7)
 FIT = {}  # (what the game's gear is fitted to: body_parts fills it)
+FINGERS = ('index', 'middle', 'ring', 'pinky'); FING = {}  # (each finger's joints, knuckle to tip, by its name and side (the thumb's too): body_parts fills it)
 def link(name, me, smooth=True):
     o = bpy.data.objects.new(name, me); sc.collection.objects.link(o)
     for p in me.polygons: p.use_smooth = smooth
@@ -102,11 +103,19 @@ def body_parts():
         pn = V((-s * math.cos(40 * D2R), 0, -math.sin(40 * D2R)))  # (the way the palm faces: in toward the body)
         kn = W + a * 0.095
         parts.append(to_obj('palm' + n, tube([(W - a * 0.005, 0.02, 0.03), (W + a * 0.04, 0.016, 0.041), (kn - a * 0.01, 0.014, 0.043), (kn + a * 0.006, 0.011, 0.04)], 8)))
+        # (each finger in three bones, knuckle to knuckle (FINGERS: their joints), with rings either side of each knuckle so it bends there; the same line as ever:
+        # straight off the knuckle, curling in toward the palm toward the tip)
         for k, (fy, fl) in enumerate(((-0.03, 0.074), (-0.01, 0.082), (0.01, 0.076), (0.029, 0.06))):
-            b0 = kn + V((0, fy, 0)) - a * 0.004; d1 = (a + pn * 0.22).normalized(); d2 = (a * 0.75 + pn * 0.66).normalized(); b1 = b0 + d1 * fl * 0.5
-            parts.append(to_obj('finger%d%s' % (k, n), tube([(b0, 0.0088, 0.0092), (b1, 0.008, 0.0085), (b1 + d2 * fl * 0.5, 0.0058, 0.0062)], 5)))
-        th = W + a * 0.035 + V((0, -0.032, 0)); td = (a * 0.7 + V((0, -0.62, 0)) + pn * 0.3).normalized(); t1 = th + td * 0.034
-        parts.append(to_obj('thumb' + n, tube([(th - td * 0.014, 0.012, 0.013), (t1, 0.0105, 0.011), (t1 + (td + a * 0.4 + pn * 0.2).normalized() * 0.03, 0.007, 0.0075)], 6)))
+            b0 = kn + V((0, fy, 0)) - a * 0.004; d1 = (a + pn * 0.22).normalized(); d2 = (a * 0.75 + pn * 0.66).normalized(); dm = (d1 + d2).normalized()
+            j1 = b0 + d1 * fl * 0.45; j2 = j1 + dm * fl * 0.3; tip = j2 + d2 * fl * 0.25; q = 0.003
+            FING[FINGERS[k] + n] = [b0, j1, j2, tip]
+            parts.append(to_obj('finger%d%s' % (k, n), tube([(b0 - d1 * 0.004, 0.0088, 0.0092), (b0 + d1 * q, 0.0087, 0.0091), (j1 - d1 * q, 0.0081, 0.0086), (j1 + dm * q, 0.0078, 0.0083), (along(j1, j2, 0.5), 0.0072, 0.0077),
+                                                             (j2 - dm * q, 0.0068, 0.0072), (j2 + d2 * q, 0.0065, 0.0069), (tip - d2 * 0.004, 0.0059, 0.0063), (tip, 0.0055, 0.0058)], 5)))
+        th = W + a * 0.035 + V((0, -0.032, 0)); td = (a * 0.7 + V((0, -0.62, 0)) + pn * 0.3).normalized(); t1 = th + td * 0.034; t2d = (td + a * 0.4 + pn * 0.2).normalized()
+        t2 = t1 + t2d * 0.016; ttip = t2 + t2d * 0.015; q = 0.003
+        FING['thumb' + n] = [th, t1, t2, ttip]
+        parts.append(to_obj('thumb' + n, tube([(th - td * 0.014, 0.012, 0.013), (along(th, t1, 0.5), 0.0112, 0.012), (t1 - td * q, 0.0106, 0.0111), (t1 + t2d * q, 0.0102, 0.0106), (t2 - t2d * q, 0.0088, 0.0092), (t2 + t2d * q, 0.0084, 0.0088),
+                                               (ttip - t2d * 0.004, 0.0072, 0.0076), (ttip, 0.0068, 0.0072)], 6)))
         H, K, A = J['hp' + n], J['kn' + n], J['an' + n]
         z = lambda zz, y=0.0: V((H.x, y, zz))
         parts.append(to_obj('leg' + n, tube(girth([(z(0.96, 0.004), 0.085, 0.098), (z(0.86, 0.004), 0.094, 0.104), (z(0.70), 0.082, 0.09), (z(0.55, -0.004), 0.064, 0.069), (z(0.51, -0.005), 0.06, 0.064), (z(0.48, -0.005), 0.059, 0.063), (z(0.45, -0.002), 0.058, 0.064),
@@ -358,6 +367,55 @@ def skin_auto(o, arm):
         if g in o.vertex_groups: o.vertex_groups.remove(o.vertex_groups[g])
     # (no more than four bones a vertex, their weights adding to one: what the game's skinning takes)
     bpy.context.view_layer.objects.active = o; bpy.ops.object.vertex_group_limit_total(limit=4); bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+# The fingers' bones, put in after the body's skinned (so every weight it had is as it was): three a finger and the thumb, each from its knuckle to the next,
+# parented to the hand; 'index1.R' the bone off the knuckle, 'index3.R' the tip's. Then a vertex the hand had on a finger or the thumb hands its weight on to
+# the bones along it, eased across each knuckle (FB metres either side), the first bone's taken from the hand's.
+FB = {'finger': 0.0045, 'thumb': 0.008}
+def finger_bones(arm, o):
+    bpy.context.view_layer.objects.active = arm; bpy.ops.object.mode_set(mode='EDIT'); ad = arm.data
+    for key, pts in FING.items():
+        f, n = key[:-1], key[-1]
+        for i in range(3):
+            e = ad.edit_bones.new('%s%d.%s' % (f, i + 1, n)); e.head = pts[i]; e.tail = pts[i + 1]
+            e.parent = ad.edit_bones['hand.' + n if i == 0 else '%s%d.%s' % (f, i, n)]
+            e.align_roll(ad.edit_bones['hand.' + n].z_axis)  # (rolled as the hand is: a knuckle bends about the bone's x)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    vg = {g.name: g for g in o.vertex_groups}
+    for key in FING:
+        for i in range(3): nm = '%s%d.%s' % (key[:-1], i + 1, key[-1]); vg[nm] = o.vertex_groups.new(name=nm)
+    def near(p, pts):  # (how far from a finger's line, and how far along it from the first knuckle, in metres)
+        best = (1e9, 0.0); u0 = 0.0
+        for a, b in zip(pts, pts[1:]):
+            ab = b - a; L = ab.length; t = max(0.0, min(1.0, (p - a).dot(ab) / (L * L)))
+            if a == pts[0]: t = min(1.0, (p - a).dot(ab) / (L * L))  # (behind the first knuckle: on the line's extension, into the palm)
+            d = (p - (a + ab * t)).length
+            if d < best[0]: best = (d, u0 + t * L)
+            u0 += L
+        return best
+    moved = 0
+    for v in o.data.vertices:
+        n = 'R' if v.co.x > 0 else 'L'; hg = vg['hand.' + n]
+        try: wh = hg.weight(v.index)
+        except RuntimeError: continue
+        if wh <= 0: continue
+        best = None
+        for key, pts in FING.items():
+            if key[-1] != n: continue
+            d, u = near(v.co, pts)
+            if best is None or d < best[0]: best = (d, u, key)
+        d, u, key = best; th = key.startswith('thumb')
+        if d > (0.02 if th else 0.016): continue
+        pts = FING[key]; L1 = (pts[1] - pts[0]).length; L2 = (pts[2] - pts[1]).length; bw = FB['thumb' if th else 'finger']
+        ease = lambda x, at: max(0.0, min(1.0, (x - at + bw) / (2 * bw)))
+        k0 = ease(u, 0.0); k1 = ease(u, L1); k2 = ease(u, L1 + L2)  # (past the first knuckle, the second, the third)
+        ws = [1 - k0, k0 - k1, k1 - k2, k2]  # (the hand, bone 1, 2, 3)
+        if ws[0] >= 0.999: continue
+        hg.add([v.index], wh * ws[0], 'REPLACE')
+        for i in range(3):
+            if ws[i + 1] > 1e-4: vg['%s%d.%s' % (key[:-1], i + 1, n)].add([v.index], wh * ws[i + 1], 'REPLACE')
+        moved += 1
+    bpy.context.view_layer.objects.active = o; bpy.ops.object.vertex_group_limit_total(limit=4); bpy.ops.object.vertex_group_normalize_all(lock_active=False)
+    print('FINGERS', moved, 'vertices')
 def skin_to(o, arm, bone):
     o.parent = arm; md = o.modifiers.new('arm', 'ARMATURE'); md.object = arm
     o.vertex_groups.new(name=bone).add(range(len(o.data.vertices)), 1.0, 'REPLACE')
@@ -366,10 +424,11 @@ body = union(body_parts(), 'body'); dress(body)
 head, eyes = build_head(J['head'] + V((0, -0.02, 0.07)))  # (carried a little forward of the spine's line, as a head is, and clear of the shoulders)
 arm = build_rig([e.location.copy() for e in eyes])
 skin_auto(body, arm)
+finger_bones(arm, body)
 skin_to(head, arm, 'head')
 for e, n in zip(eyes, 'RL'): skin_to(e, arm, 'eye.' + n)
 tris = lambda o: sum(len(p.vertices) - 2 for p in o.data.polygons)
-stats = {'triangles': {'body': tris(body), 'head': tris(head), 'eyes': sum(tris(e) for e in eyes)}, 'vertices': {'body': len(body.data.vertices), 'head': len(head.data.vertices)}, 'bones': [b[0] for b in BONES] + ['eye.R', 'eye.L'], 'height': P['height']}
+stats = {'triangles': {'body': tris(body), 'head': tris(head), 'eyes': sum(tris(e) for e in eyes)}, 'vertices': {'body': len(body.data.vertices), 'head': len(head.data.vertices)}, 'bones': [b[0] for b in BONES] + ['eye.R', 'eye.L'] + ['%s%d.%s' % (k[:-1], i, k[-1]) for k in FING for i in (1, 2, 3)], 'height': P['height']}
 stats['triangles']['total'] = sum(stats['triangles'].values())
 print('STATS', json.dumps(stats))
 
