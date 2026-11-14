@@ -1060,7 +1060,7 @@ const G_VMAnim = (() => {
   interface HumObj { c: V3; ax: V3; u: V3; a: number; b: number } // (something a hand holds, in the gun's space: an elliptic bar through c along ax, its half-widths a along u and b along ax x u)
   interface HumHoldT { q: THREE.Quaternion; r: number; fz?: number; F: FPose; off?: V3 } // (a hold: the hand's frame in the gun's space, how far the palm is from the middle of what it holds (and back along the fingers, fz: what it hooks is at the fingertips), its fingers, and off: its middle moved from the anchor onto what it holds, in the gun's space)
   const _hmats = new Map<string, THREE.Material>();
-  const humMat = (c: number, rough: number) => { const k = c + '|' + rough; if (!_hmats.has(k)) _hmats.set(k, new T.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0 })); return _hmats.get(k)!; };
+  const humMat = (c: number, rough: number, two = false) => { const k = c + '|' + rough + '|' + two; if (!_hmats.has(k)) _hmats.set(k, new T.MeshStandardMaterial({ color: c, roughness: rough, metalness: 0, side: two ? T.DoubleSide : T.FrontSide })); return _hmats.get(k)!; }; // (two: both faces drawn, a sleeve's: its inside shows at the open cuff)
   // the faces of a part all of whose corners keep says so, as a geometry of their own (every attribute, the kept corners only)
   function subset(geo: THREE.BufferGeometry, keep: (i: number) => boolean) {
     const idx = geo.index, n = idx ? idx.count : geo.attributes.position.count, map = new Map<number, number>(), tri: number[] = [];
@@ -1078,6 +1078,18 @@ const G_VMAnim = (() => {
     }
     out.setIndex(tri);
     return out;
+  }
+  // a skinned geometry's weight on the bones in off (by their index) moved onto the bone into (its own index), so those corners ride it instead
+  function reweigh(geo: THREE.BufferGeometry, into: number, off: Set<number>) {
+    const si = geo.attributes.skinIndex as THREE.BufferAttribute, sw = geo.attributes.skinWeight as THREE.BufferAttribute;
+    if (into < 0 || !si || !sw) return;
+    for (let v = 0; v < si.count; v++) {
+      let moved = 0, slot = -1, free = -1;
+      for (let j = 0; j < 4; j++) { const b = si.getComponent(v, j); if (b === into) slot = j; if (off.has(b) && sw.getComponent(v, j) > 0) { moved += sw.getComponent(v, j); sw.setComponent(v, j, 0); if (free < 0) free = j; } }
+      if (!moved) continue;
+      if (slot < 0) { slot = free; si.setComponent(v, slot, into); sw.setComponent(v, slot, 0); }
+      sw.setComponent(v, slot, sw.getComponent(v, slot) + moved);
+    }
   }
   // your arms, on a viewmodel: now if your body's file is in, else when it comes
   function dressArms(root: THREE.Object3D, a: Vma) {
@@ -1104,21 +1116,15 @@ const G_VMAnim = (() => {
       const geo = subset(p.geo, (i) => pos.getX(i) * sx > 0.12); // (that side's arm: clear of the chest)
       if (!geo) continue;
       // (a sleeve rides the arm, not the hand: what of it the file gives the hand or the fingers goes to the forearm, so the cuff keeps its
-      // shape however the wrist turns and the hand turns inside it, not tearing it into spikes on a hard bend)
-      if (p.mat === 'sleeve' || p.mat === 'upsleeve') {
-        const into = p.bones.indexOf('forearm' + s), off = new Set(p.bones.map((n, i) => (/^(hand|(thumb|index|middle|ring|pinky)\d)[LR]$/.test(n) ? i : -1)).filter((i) => i >= 0));
-        const si = geo.attributes.skinIndex as THREE.BufferAttribute, sw = geo.attributes.skinWeight as THREE.BufferAttribute;
-        if (into >= 0 && si && sw) for (let v = 0; v < si.count; v++) {
-          let moved = 0, slot = -1, free = -1;
-          for (let j = 0; j < 4; j++) { const b = si.getComponent(v, j); if (b === into) slot = j; if (off.has(b) && sw.getComponent(v, j) > 0) { moved += sw.getComponent(v, j); sw.setComponent(v, j, 0); if (free < 0) free = j; } }
-          if (!moved) continue;
-          if (slot < 0) { slot = free; si.setComponent(v, slot, into); sw.setComponent(v, slot, 0); }
-          sw.setComponent(v, slot, sw.getComponent(v, slot) + moved);
-        }
-      }
+      // shape however the wrist turns and the hand turns inside it, not tearing it into spikes on a hard bend. The hand likewise is the hand's
+      // and its fingers' alone: what of it the file gives the forearm goes to the hand, so a wrist bent hard on a grip doesn't draw the hand's
+      // heel out into spikes back toward the cuff; its base sits inside the cuff)
+      const fing = (n: string) => /^(hand|(thumb|index|middle|ring|pinky)\d)[LR]$/.test(n);
+      if (p.mat === 'sleeve' || p.mat === 'upsleeve') reweigh(geo, p.bones.indexOf('forearm' + s), new Set(p.bones.map((n, i) => (fing(n) ? i : -1)).filter((i) => i >= 0)));
+      else reweigh(geo, p.bones.indexOf('hand' + s), new Set(p.bones.map((n, i) => (fing(n) ? -1 : i)).filter((i) => i >= 0)));
       geos[p.mat] = geo;
       const sk = new T.Skeleton(p.bones.map(bone), p.inv);
-      const sm = new T.SkinnedMesh(geo, humMat(col[p.mat], p.mat === 'hand' || p.mat === 'finger' ? (col.hand === col.sleeve ? 0.8 : 0.65) : 0.9));
+      const sm = new T.SkinnedMesh(geo, humMat(col[p.mat], p.mat === 'hand' || p.mat === 'finger' ? (col.hand === col.sleeve ? 0.8 : 0.65) : 0.9, p.mat === 'sleeve' || p.mat === 'upsleeve'));
       sm.frustumCulled = false; sm.bind(sk, new T.Matrix4());
       root.add(sm); meshes.push(sm);
     }

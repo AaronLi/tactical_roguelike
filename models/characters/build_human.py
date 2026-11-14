@@ -159,7 +159,9 @@ def dress(o):
             # the sleeve: its top over the shoulder and down to mid upper arm (a T-shirt's), the rest to the wrist; then the hand, and the fingers past the knuckles
             if off < 0.1 and t < 0.13 and abs(c.x) > 0.205: mi = 4
             elif off < 0.1 and t >= 0.13: mi = 5
-            if (c - W).dot(a) > -0.004 and (c - W).length < 0.26: mi = 6 if (c - W).dot(a) < 0.092 else 7
+            # (the hand from the cuff: a face all of whose corners are past the arm's last ring, so the cuff's edge is that ring, straight round, not a saw of
+            # long teeth either way that a hand bent at the wrist, the hand's on it and the sleeve's on the arm, would draw out into blades)
+            if min((me.vertices[i].co - W).dot(a) for i in p.vertices) > -0.006 and (c - W).length < 0.26: mi = 6 if (c - W).dot(a) < 0.092 else 7
         if mi == 0 and c.y < -0.03 and abs(c.x) < 0.05: mi = 8  # (down the front of the chest: what an open jacket shows of the shirt under it)
         if mi == 1 and c.z < 0.5: mi = 9                        # (below the knee: bare under shorts)
         p.material_index = mi
@@ -368,9 +370,10 @@ def skin_auto(o, arm):
     # (no more than four bones a vertex, their weights adding to one: what the game's skinning takes)
     bpy.context.view_layer.objects.active = o; bpy.ops.object.vertex_group_limit_total(limit=4); bpy.ops.object.vertex_group_normalize_all(lock_active=False)
 # The fingers' bones, put in after the body's skinned (so every weight it had is as it was): three a finger and the thumb, each from its knuckle to the next,
-# parented to the hand; 'index1.R' the bone off the knuckle, 'index3.R' the tip's. Then a vertex the hand had on a finger or the thumb hands its weight on to
-# the bones along it, eased across each knuckle (FB metres either side), the first bone's taken from the hand's.
-FB = {'finger': 0.0045, 'thumb': 0.008}
+# parented to the hand; 'index1.R' the bone off the knuckle, 'index3.R' the tip's. Then a vertex the hand had on a finger or the thumb (within FR of its line)
+# hands its weight on to the bones along it, eased across each knuckle (FB metres either side). The first knuckle's ease is all past it: nothing of the palm
+# behind a knuckle (its back, its heel round the thumb's root) goes with the finger, or a finger bent hard draws the palm out after it in blades.
+FB = {'finger': 0.0045, 'thumb': 0.008}; FR = {'finger': 0.0125, 'thumb': 0.015}
 def finger_bones(arm, o):
     bpy.context.view_layer.objects.active = arm; bpy.ops.object.mode_set(mode='EDIT'); ad = arm.data
     for key, pts in FING.items():
@@ -404,10 +407,10 @@ def finger_bones(arm, o):
             d, u = near(v.co, pts)
             if best is None or d < best[0]: best = (d, u, key)
         d, u, key = best; th = key.startswith('thumb')
-        if d > (0.02 if th else 0.016): continue
+        if d > FR['thumb' if th else 'finger'] or u < 0: continue
         pts = FING[key]; L1 = (pts[1] - pts[0]).length; L2 = (pts[2] - pts[1]).length; bw = FB['thumb' if th else 'finger']
         ease = lambda x, at: max(0.0, min(1.0, (x - at + bw) / (2 * bw)))
-        k0 = ease(u, 0.0); k1 = ease(u, L1); k2 = ease(u, L1 + L2)  # (past the first knuckle, the second, the third)
+        k0 = ease(u, bw); k1 = ease(u, L1); k2 = ease(u, L1 + L2)  # (past the first knuckle (all of its ease past it), the second, the third)
         ws = [1 - k0, k0 - k1, k1 - k2, k2]  # (the hand, bone 1, 2, 3)
         if ws[0] >= 0.999: continue
         hg.add([v.index], wh * ws[0], 'REPLACE')
