@@ -174,6 +174,8 @@ const G_Materials = (() => {
     carton: C([['card', 3]], 'goods', 0.6), wrapped: C([['hdpe', 0.3], ['card', 3]], 'goods', 0.7), drum: C([['sheet', 1]], 'water', 0.9), // the load
     stock: C([['card', 0.1]], 'goods', 0.01), // a shelf's run of packets, tins and bottles: mostly air, next to nothing to a round (a look it still stops)
   };
+  // the squad's ship: a breaching pod's armoured hull and decks, hardened steel all through (what stops a rifle's round and more)
+  const SHIP = ONE([['steel', 20]]);
   const CRATE = PROPS.crates, RAIL = ONE([['mild', 3]]), GRATE = ONE([['mild', 4]]); // (a bar of it: what a round has to get through is js/world.ts barHit's)
   // the same construction with only what's needed changed: a void wall's stud, say
   const wallOf = (theme: any, out: any) => { const w = (WALLS as Record<string, any>)[theme.name] || WALLS.Apartment; return w[out ? 1 : 0]; };
@@ -211,7 +213,7 @@ const G_Materials = (() => {
         return theme.hub ? SOLID('concrete') : CRATE;
     }
   }
-  return { MAT, TISSUE, CORE_E, PROPS, PARTS, WALLS, of, outAt, built };
+  return { MAT, TISSUE, CORE_E, PROPS, PARTS, WALLS, SHIP, of, outAt, built };
 })();
 G.Materials = G_Materials;
 

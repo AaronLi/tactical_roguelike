@@ -297,7 +297,7 @@ const G_World = (() => {
   // whether (x, z) is across its width.
   function rampAt(st: any, x: number, z: number) {
     const along = st.axis === 'z', a = along ? z : x, lat = along ? x : z, lo = along ? st.z0 : st.x0, hi = along ? st.z1 : st.x1;
-    const u = st.up < 0 ? hi - a : a - lo, len = hi - lo, n = st.steps ? st.steps.length : Math.round(st.rise / 0.2), rn = st.rise / n, run = len / n;
+    const u = st.up < 0 ? hi - a : a - lo, len = hi - lo, n = st.n ? st.n : st.steps ? st.steps.length : Math.round(st.rise / 0.2), rn = st.rise / n, run = len / n;
     return { u, len, across: lat > (along ? st.x0 : st.z0) && lat < (along ? st.x1 : st.z1), h: st.y0 + G.U.clamp((u / run + 0.5 * G.U.clamp(u / run, 0, 1)) * rn, 0, st.rise) }; // (the half step eased in over the first tread: no bump onto it)
   }
   // the flights someone at p can walk onto (or is on): across one's width, at its foot, on it or at its head,

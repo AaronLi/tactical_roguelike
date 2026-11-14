@@ -212,6 +212,16 @@ const G_SpaceSv = (() => {
     return o === 'artifact' ? M.art === 1 : o === 'hvt' ? M.hvtSt > 0 : o === 'destruct' ? M.arm != null || M.boom : M.cleared;
   }
 
+  // ---- The squad's ship against the hull, in the host's world as on everyone's screen: her walls, decks and the tunnel are there to
+  // be seen through (they can't), shot through (hardened steel: js/materials.ts SHIP) or walked on, not open space past the hole
+  let hostShip: { w: any; s: any[] } | null = null;
+  function shipSolids(on: boolean) {
+    const sv = S(), M = st.M, w = sv.map && sv.map.world;
+    if (hostShip) { for (const s of hostShip.s) if (hostShip.w === w) G.World.remove(hostShip.w, s); hostShip = null; }
+    if (!on || !M || !M.site || !w || !sv.map) return;
+    const W = sv.map.W, TS = G.Level.TS, a = M.site, site = { x: (a[0] % W + 0.5) * TS, z: (((a[0] / W) | 0) + 0.5) * TS, nx: a[1], nz: a[2] }, d = SD.SHIPS[st.fleet.ship];
+    hostShip = { w, s: SD.worldBoxes(d, SD.berthAt(d, site), (t) => t !== 'nose' && t !== 'steps').map((q) => G.World.add(w, G.World.box(q.b[0], q.b[1], q.b[2], q.b[3], q.b[4], q.b[5], { kind: 'prop', mat: G.Materials.SHIP }))) };
+  }
   // ---- the ship: she's against the hull (the plate goes in), on the pad, or away again
   function dock(on: boolean, from: string, at?: unknown) {
     const sv = S();
@@ -229,6 +239,7 @@ const G_SpaceSv = (() => {
     }
     if (on && M.meta && !M.breached) { M.breached = true; if (M.ms.obj === 'visit') say(`${M.ms.name} takes the breach for an attack: her crew are coming for you.`); }
     M.docked = on; st.ship.docked = on;
+    shipSolids(on);
     net().broadcast({ t: 'sdock', on: on ? 1 : 0, by: from, site: on ? M.site : undefined });
     if (on && M.meta && sv.map && M.site) {
       const W = sv.map.W, TS = G.Level.TS, x = (M.site[0] % W + 0.5) * TS, z = (((M.site[0] / W) | 0) + 0.5) * TS;

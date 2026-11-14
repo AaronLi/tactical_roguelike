@@ -19,7 +19,7 @@ const G_Space = (() => {
   const S = {
     on: false, kind: 'hub' as SpKind, stage: 'space' as 'space' | 'orbit' | 'atmo', map: null as LvMap | null,
     def: SD.SHIPS.kestrel, fleet: SD.fleet0(), seatsDef: [] as SpSeat[], berth: { x: 0, y: 0, z: 0, yaw: 0 }, Dp: new T.Vector3(), Dq: new T.Quaternion(),
-    model: null as SmShip | null, solids: [] as { s: any; tag?: string; ship?: boolean; on: boolean; b: number[] }[], noseT: 0, rampT: 0,
+    model: null as SmShip | null, solids: [] as { s: any; tag?: string; ship?: boolean; on: boolean; b: number[]; fl?: any }[], flights: [] as any[], noseT: 0, rampT: 0,
     docked: true, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(),
     zone: null as THREE.Group | null, zoneV: new T.Vector3(), zt0: 0, ztAt: 0, traffic: [] as { obj: THREE.Object3D; c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number; k?: number; name?: string }; wp: SpWp | null; ph: number; real?: boolean; bow?: number; pend?: LvMap | null }[],
     carry: null as null | { k: number; v: THREE.Vector3; yaw: number; Q: THREE.Quaternion; V: THREE.Vector3 },
@@ -133,17 +133,17 @@ const G_Space = (() => {
   function deck() {
     const w = S.map && S.map.world;
     S.solids = S.solids.filter((q) => { if (q.tag === undefined && !q.ship) return true; if (q.on && w) G.World.remove(w, q.s); return false; });
-    for (const b of SD.boxes(S.def)) {
-      const a = SD.toWorld(S.berth, b[0], b[1], b[2]), c = SD.toWorld(S.berth, b[3], b[4], b[5]);
-      S.solids.push({ s: null, tag: b[6], ship: true, on: false, b: [Math.min(a.x, c.x), Math.min(a.y, c.y), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.y, c.y), Math.max(a.z, c.z)] });
-    }
+    if (w && w.ramps) w.ramps = w.ramps.filter((st: any) => !S.flights.includes(st));
+    // her flights of stairs as a level's are: slopes to walk up (js/world.ts rampAt), their steps theirs
+    const B = S.berth, alongX = Math.abs(Math.sin(B.yaw)) > 0.5;
+    S.flights = SD.flights(S.def).map((fl) => {
+      const a = SD.toWorld(B, fl.x0, 0, fl.zf), c = SD.toWorld(B, fl.x1, 0, fl.zh), foot = alongX ? a.x : a.z, head = alongX ? c.x : c.z;
+      return { tag: fl.tag, axis: alongX ? 'x' : 'z', up: head > foot ? 1 : -1, x0: Math.min(a.x, c.x), x1: Math.max(a.x, c.x), z0: Math.min(a.z, c.z), z1: Math.max(a.z, c.z), y0: B.y + fl.y0, rise: fl.rise, n: fl.n, f: 0, steps: [] as any[], on: false };
+    });
+    for (const q of SD.worldBoxes(S.def, S.berth)) S.solids.push({ s: null, tag: q.tag, ship: true, on: false, fl: S.flights.find((f) => f.tag === q.tag), b: q.b });
   }
   // ---- breaching her anywhere (js/shipgen.ts sites, cut). The berth goes to the site: nose-on to that stretch of hull.
-  function berthAt(s: { x: number; z: number; nx: number; nz: number }) {
-    const TS = G.Level.TS, yaw = s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2, L = SD.layout(S.def), zN = L.zc - 0.22;
-    const px = s.x + s.nx * (TS / 2 + 0.03), pz = s.z + s.nz * (TS / 2 + 0.03);
-    return { x: px - zN * Math.sin(yaw), y: -L.lift, z: pz - zN * Math.cos(yaw), yaw };
-  }
+  const berthAt = (s: { x: number; z: number; nx: number; nz: number }) => SD.berthAt(S.def, s);
   const siteAt = (a: number[]) => { const map = S.map!, W = map.W, TS = G.Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0; return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) } as ShSite; };
   // she stands somewhere else now: her deck with her, and you if you're aboard (her pose in the level is what it was)
   function rebase(b: { x: number; y: number; z: number; yaw: number }) {
@@ -584,8 +584,12 @@ const G_Space = (() => {
     const noseOpen = S.docked && S.kind === 'board', rampOpen = S.docked && S.kind !== 'board';
     for (const q of S.solids) {
       const want = q.tag === 'nose' ? !noseOpen : q.tag === 'ramp' ? !rampOpen : q.tag === 'steps' ? rampOpen : true;
-      if (want && !q.on) { q.s = G.World.add(w, G.World.box(q.b[0], q.b[1], q.b[2], q.b[3], q.b[4], q.b[5], { kind: 'prop' })); q.on = true; }
-      else if (!want && q.on) { G.World.remove(w, q.s); q.on = false; }
+      if (want && !q.on) { q.s = G.World.add(w, G.World.box(q.b[0], q.b[1], q.b[2], q.b[3], q.b[4], q.b[5], q.fl ? { kind: 'step', stair: q.fl, mat: G.Materials.SHIP } : { kind: 'prop', mat: G.Materials.SHIP })); q.on = true; if (q.fl) q.fl.steps.push(q.s); }
+      else if (!want && q.on) { G.World.remove(w, q.s); q.on = false; if (q.fl) q.fl.steps = q.fl.steps.filter((s: any) => s !== q.s); }
+    }
+    for (const fl of S.flights) { // (a flight's slope there while its steps are)
+      const want = fl.steps.length > 0;
+      if (want !== fl.on) { fl.on = want; if (want) (w.ramps = w.ramps || []).push(fl); else w.ramps = (w.ramps || []).filter((st: any) => st !== fl); }
     }
   }
   function doors(dt: number) {

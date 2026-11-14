@@ -103,7 +103,7 @@ const G_SpaceData = (() => {
   function boxes(d: SpShipDef): ShipBox[] {
     const L = layout(d), W = 0.2, { fw, tw, sw, hw, zc, zt, zw, lw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, top = CB + W;
     // (each flight as many steps as keep a rise to 0.3 m, over the same run)
-    const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), run = zr - zk;
+    const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), run = zr - zk, rD = run - 0.95; // (rD: the down flight's run, on the cockpit's deck the best part of a metre before its ceiling, so your head's under it as you come to it)
     const out: ShipBox[] = [
       // the cockpit: its deck (on to the foot of the down flight), its sides, the glass at its front, its back wall under the up flight
       [-fw - W, 0, zc + 0.3, fw + W, FC, zr], [-fw - W, FC, zc + 0.3, -fw, CC, zk], [fw, FC, zc + 0.3, fw + W, CC, zk], [-fw, FC, zc + 0.3, fw, CC, zc + 0.5],
@@ -119,14 +119,40 @@ const G_SpaceData = (() => {
       // the stairs: their sides and roof, the wall between the two flights
       [-fw - W, 0, zk, -fw, CB, zr], [fw, 0, zk, fw + W, CB, zr], [-fw - W, CB, zk, fw + W, top, zr], [-0.06, 0, zk, 0.06, FB + 0.9, zr],
       // the crew deck: the hold under it, its sides, roof, the bulkhead at its front either side of the stairs (and over them), the ramp
-      [-hw - W, 0, zr, hw + W, FM, z1], [-hw - W, FM, zr, -hw, CM, z1], [hw, FM, zr, hw + W, CM, z1], [-hw - W, CM, zr, hw + W, CM + W, z1],
+      [-hw - W, 0, zr, 0.06, FM, z1], [fw, 0, zr, hw + W, FM, z1], [0.06, 0, zr + rD / (nD - 1), fw, FM, z1], [0.06, 0, zr, fw, FM, zr + rD / (nD - 1), 'down'], [-hw - W, FM, zr, -hw, CM, z1], // (the hold; the strip at the down flight's head its last tread) [hw, FM, zr, hw + W, CM, z1], [-hw - W, CM, zr, hw + W, CM + W, z1],
       [-hw, FM, zr - W, -fw, CM, zr], [fw, FM, zr - W, hw, CM, zr], [-fw, CM, zr - 0.05, fw, CB, zr + 0.05],
       [-hw, FM, z1, hw, CM, z1 + W, 'ramp'],
     ];
-    const rD = run - 0.95; // (down: on the cockpit's deck the best part of a metre before its ceiling, so your head's under it as you come to it)
-    for (let i = 0; i < nD - 1; i++) out.push([0.06, 0, zr - rD * (i + 1) / (nD - 1), fw, FM - (FM - FC) * (i + 1) / nD, zr - rD * i / (nD - 1)]); // down to the cockpit, on the right
-    for (let i = 0; i < nU; i++) out.push([-fw, 0, zr - run * (i + 1) / nU, -0.06, FM + (FB - FM) * (i + 1) / nU, zr - run * i / nU]); // up to the breach deck, on the left
+    for (let i = 0; i < nD - 1; i++) out.push([0.06, 0, zr - rD * (i + 1) / (nD - 1), fw, FM - (FM - FC) * (i + 1) / nD, zr - rD * i / (nD - 1), 'down']); // down to the cockpit, on the right
+    for (let i = 0; i < nU; i++) out.push([-fw, 0, zr - run * (i + 1) / nU, -0.06, FM + (FB - FM) * (i + 1) / nU, zr - run * i / nU, 'up']); // up to the breach deck, on the left
     for (let i = 0; i < 4; i++) out.push([-hw + 0.3, 0, z1 + W + 0.38 * i, hw - 0.3, FM - 0.3 * (i + 1), z1 + W + 0.38 * (i + 1), 'steps']); // off the open ramp
+    return out;
+  }
+  // Her flights of stairs, walked as slopes (js/world.ts rampAt, as a level's are): each across x0..x1, from its foot (zf, at y0) to its
+  // head (zh, rise higher) in n treads; its steps are the boxes tagged with its tag (the last tread may be the deck it comes up to)
+  function flights(d: SpShipDef) {
+    const L = layout(d), { fw, zk, zr, z1, FC, FB, FM, hw } = L, W = 0.2;
+    const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), rD = zr - zk - 0.95, tD = rD / (nD - 1);
+    return [
+      { tag: 'up', x0: -fw, x1: -0.06, zf: zr, zh: zk, y0: FM, rise: FB - FM, n: nU },
+      { tag: 'down', x0: 0.06, x1: fw, zf: zr - rD, zh: zr - rD + nD * tD, y0: FC, rise: FM - FC, n: nD },
+      { tag: 'steps', x0: -hw + 0.3, x1: hw - 0.3, zf: z1 + W + 1.52, zh: z1 + W + 1.52 - 5 * 0.38, y0: 0, rise: FM, n: 5 }, // (off the open ramp)
+    ];
+  }
+  /** where she stands against a stretch of a ship's hull (js/shipgen.ts site: its middle, the way out of it), nose-on: her collar in the hole, her breach deck level with that deck */
+  function berthAt(d: SpShipDef, s: { x: number; z: number; nx: number; nz: number }) {
+    const TS = G.Level.TS, yaw = s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2, L = layout(d), zN = L.zc - 0.22;
+    const px = s.x + s.nx * (TS / 2 + 0.03), pz = s.z + s.nz * (TS / 2 + 0.03);
+    return { x: px - zN * Math.sin(yaw), y: -L.lift, z: pz - zN * Math.cos(yaw), yaw };
+  }
+  /** her solids in the world at berth b ([min x, y, z, max x, y, z] and the box's tag), those keep says */
+  function worldBoxes(d: SpShipDef, b: { x: number; y: number; z: number; yaw: number }, keep: (tag?: string) => boolean = () => true) {
+    const out: { b: number[]; tag?: string }[] = [];
+    for (const q of boxes(d)) {
+      if (!keep(q[6])) continue;
+      const a = toWorld(b, q[0], q[1], q[2]), c = toWorld(b, q[3], q[4], q[5]);
+      out.push({ tag: q[6], b: [Math.min(a.x, c.x), Math.min(a.y, c.y), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.y, c.y), Math.max(a.z, c.z)] });
+    }
     return out;
   }
   // a point of the ship's frame in the world, the ship standing at berth b ({ x, y, z, yaw }: yaw as an officer's, 0 facing -z)
@@ -253,7 +279,7 @@ const G_SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta, wearOf, wearNow, zone, zonePos };
+  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta, wearOf, wearNow, zone, zonePos };
 })();
 G.SpaceData = G_SpaceData;
 interface GameModules { SpaceData: typeof G_SpaceData; }
