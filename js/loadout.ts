@@ -7,9 +7,9 @@
 //   rank: 0 to start; the Micro Uzi, the primary tree's middle, comes at rank 1 (your first mission does it).
 // Each piece takes up to two attachments (BOXES), earned with it: a gun's parts by challenges with that gun (ATT: each kind of part its
 // own, harder as the part's tier goes up); a helmet's face piece and a carrier's plate, shoulder and groin pieces by the missions flown
-// in it and the rounds it's stopped (GEAR_ATT). And all of it is costed (points: about one a 400 credits of what it'd cost; the issue
+// in it and the rounds it's stopped (GEAR_ATT). And all of it is costed (points: about one a 400 credits of what it'd cost, a primary its own (pts) and a plate one a 200; the issue
 // kit, the bump helmet and the P9 nothing): what you take into a run can't come to more than BUDGET.
-interface LoNode { id: string; from?: string; path?: string; ring: number; a?: number; r?: number; rank?: number; stat?: string; n?: number; what?: string; how?: string }
+interface LoNode { pts?: number; id: string; from?: string; path?: string; ring: number; a?: number; r?: number; rank?: number; stat?: string; n?: number; what?: string; how?: string }
 interface LoTree { slot: string; title: string; mid: string; NODES: LoNode[]; PATHS: Record<string, { name: string; a: number }> }
 interface LoAtt { k: string; id: string; name: string; pts: number; open: boolean; stat: string; what: string; n: number; have: number }
 const G_Loadout = (() => {
@@ -21,16 +21,16 @@ const G_Loadout = (() => {
       slot: 'p', title: 'Primary', mid: 'uzi',
       PATHS: { smg: { name: 'Submachine guns', a: -90 }, rifle: { name: 'Rifles', a: 30 }, breach: { name: 'Breaching', a: 150 } },
       NODES: [
-        { id: 'uzi', ring: 0, rank: 1 },
-        { id: 'mp5', from: 'uzi', path: 'smg', ring: 1, rank: 2 },
-        { id: 'mpx', from: 'mp5', path: 'smg', ring: 2, stat: 'tap', n: 20, what: 'double-tap kills', how: 'Two hits on them inside half a second, and they go down.' },
-        { id: 'mp5sd', from: 'mp5', path: 'smg', ring: 2, a: -122, r: 660, stat: 'sur', n: 15, what: 'kills on unaware suspects', how: 'Down a suspect before they react. If they have seen you or heard gunfire, it does not count.' },
-        { id: 'p90', from: 'mpx', path: 'smg', ring: 3, stat: 'armed', n: 15, what: 'kills on armoured suspects', how: "A vest or a helmet: put enough rounds where it isn't." },
-        { id: 'aks74u', from: 'uzi', path: 'rifle', ring: 1, rank: 3 },
-        { id: 'ak', from: 'aks74u', path: 'rifle', ring: 2, stat: 'kills', n: 25, what: 'kills', how: 'Twenty-five down with the Krinkov.' },
-        { id: 'm4', from: 'ak', path: 'rifle', ring: 3, rank: 4 },
-        { id: 'dbl', from: 'uzi', path: 'breach', ring: 1, rank: 2 },
-        { id: 'pump', from: 'dbl', path: 'breach', ring: 2, stat: 'close', n: 15, what: 'kills within 5 m', how: "Get close enough that it can't go wrong." },
+        { id: 'uzi', pts: 2, ring: 0, rank: 1 },
+        { id: 'mp5', pts: 3, from: 'uzi', path: 'smg', ring: 1, rank: 2 },
+        { id: 'mpx', pts: 4, from: 'mp5', path: 'smg', ring: 2, stat: 'tap', n: 20, what: 'double-tap kills', how: 'Two hits on them inside half a second, and they go down.' },
+        { id: 'mp5sd', pts: 4, from: 'mp5', path: 'smg', ring: 2, a: -122, r: 660, stat: 'sur', n: 15, what: 'kills on unaware suspects', how: 'Down a suspect before they react. If they have seen you or heard gunfire, it does not count.' },
+        { id: 'p90', pts: 4, from: 'mpx', path: 'smg', ring: 3, stat: 'armed', n: 15, what: 'kills on armoured suspects', how: "A vest or a helmet: put enough rounds where it isn't." },
+        { id: 'aks74u', pts: 4, from: 'uzi', path: 'rifle', ring: 1, rank: 3 },
+        { id: 'ak', pts: 4, from: 'aks74u', path: 'rifle', ring: 2, stat: 'kills', n: 25, what: 'kills', how: 'Twenty-five down with the Krinkov.' },
+        { id: 'm4', pts: 4, from: 'ak', path: 'rifle', ring: 3, rank: 4 },
+        { id: 'dbl', pts: 3, from: 'uzi', path: 'breach', ring: 1, rank: 2 },
+        { id: 'pump', pts: 3, from: 'dbl', path: 'breach', ring: 2, stat: 'close', n: 15, what: 'kills within 5 m', how: "Get close enough that it can't go wrong." },
       ],
     },
     h: {
@@ -143,7 +143,8 @@ const G_Loadout = (() => {
     face: [M(2), St(8), St(20)], plate: [M(1), St(6), St(15), St(30)], shoulder: [M(2), St(10), St(25)], groin: [M(2), St(10), St(25)],
   };
   const isGun = (slot: string) => slot === 'p' || slot === 's';
-  const BUDGET = 10, pts = (price: number) => Math.round((price || 0) / 400);
+  // (a plate comes dearer: a point a 200 credits; the rest a point a 400; a primary's set on its node, pts)
+  const BUDGET = 10, pts = (price: number, per = 400) => Math.round((price || 0) / per), PLATE_PER = 200;
   // every attachment it could take (of the kind k, or all), each with what it takes and whether it's earned
   function atts(slot: string, id: string, only?: string): LoAtt[] {
     const out: LoAtt[] = [];
@@ -163,7 +164,7 @@ const G_Loadout = (() => {
         if (only && only !== k) continue;
         for (const g of G.Gear.LIST.filter((x) => x.kind === k)) {
           const q = GEAR_ATT[k][Math.min(GEAR_ATT[k].length - 1, Math.max(0, (g.tier || 1) - 1))], have = count(slot, id, q.stat);
-          out.push({ k, id: g.id, name: g.name, pts: pts(g.price), open: open(slot, id) && have >= q.n, stat: q.stat, what: q.what, n: q.n, have: Math.min(q.n, have) });
+          out.push({ k, id: g.id, name: g.name, pts: pts(g.price, k === 'plate' ? PLATE_PER : 400), open: open(slot, id) && have >= q.n, stat: q.stat, what: q.what, n: q.n, have: Math.min(q.n, have) });
         }
       }
     }
@@ -190,7 +191,7 @@ const G_Loadout = (() => {
   // ---- points: what it'd cost, about one a 400 credits (the issue kit, the bump helmet and the P9: nothing), its boxes' too
   function cost(slot: string, id: string | null): number {
     if (!id) return 0;
-    const own = isGun(slot) ? pts(G.WEAPONS[id].price) : pts(G.Gear.DEFS[id].price);
+    const q = slot === 's' ? null : node(slot, id), own = q && q.pts != null ? q.pts : isGun(slot) ? pts(G.WEAPONS[id].price) : pts(G.Gear.DEFS[id].price); // (a primary's its own, pts: about alike across the kinds)
     return own + boxes(slot, id).reduce((n, b) => n + (atts(slot, id, b.k).find((a) => a.id === b.id)?.pts || 0), 0);
   }
   // ---- the loadout itself: what's picked for each slot (kept, so the next run starts with it), and putting it on you
