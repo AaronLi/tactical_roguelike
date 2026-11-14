@@ -1231,3 +1231,15 @@ body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
 .lo-tab.on { border-color: var(--ui-line-hi); background: var(--ui-fill-hi); box-shadow: inset 0 -2px 0 #9fd6ff; }
 .lo-go { align-self: center; padding: 10px 26px; }
 .lo-clear { margin-top: 6px; width: 100%; }
+.lo-tab small i { font-style: normal; margin-left: 8px; color: #9fd6ff; letter-spacing: 0; text-transform: none; }
+.lo-pts { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 74px; font: 400 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1px; }
+.lo-pts b { font: 500 18px var(--ui-font); color: var(--ui-text); letter-spacing: 0; }
+.lo-pts.over b, .lo-pts.over span { color: #ff6a5a; }
+.lo-cost { font: 500 13px var(--ui-font); color: #9fd6ff; }
+.lo-cost small { color: var(--ui-dim); font-weight: 400; }
+.lo-atts { display: flex; flex-direction: column; gap: 7px; }
+.lo-att { display: flex; flex-direction: column; gap: 2px; }
+.lo-att small { font: 400 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1px; }
+.lo-att select { background: var(--ui-fill); color: var(--ui-text); border: 1px solid var(--ui-line); border-radius: 4px; padding: 4px 6px; font: 400 12.5px var(--ui-font); }
+.lo-att select:disabled { opacity: 0.55; }
+.lo-att span { font: 400 11.5px var(--ui-font); color: var(--ui-dim); }

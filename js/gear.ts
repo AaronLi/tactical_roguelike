@@ -22,6 +22,7 @@ type ItemKind = 'gun' | 'mag' | 'ammo' | 'med' | 'frag' | 'flash' | 'tb' | 'part
 // a piece of gear's definition (LIST, DEFS): the fields that only some kinds have are optional
 interface GearDef {
   id: string; kind: GearKind; brand: string; name: string; tier: number; price: number; speed: number; desc: string;
+  off?: boolean; // (switched off: not offered anywhere, LIST leaves it out; DEFS still knows it)
   dur?: number; plate?: boolean; shoulder?: boolean; groin?: boolean; legs?: boolean; face?: boolean; thin?: boolean; col?: number;
   prot?: { at: string; layers: [string, number][] }[]; molle?: [number, number]; pouches?: [string, number, number][];
   kg?: number; fwd?: number; cut?: string; cover?: number; lower?: boolean; sz?: [number, number]; grids?: [number, number, string[] | null][];
@@ -66,7 +67,7 @@ const G_Gear = (() => {
     { id: 'c.patrol', kind: 'carrier', brand: B.iron, name: 'Patrol plate carrier', tier: 2, price: 900, speed: 0.99, dur: 6, plate: true, shoulder: true, groin: true,
       prot: [{ at: 'torso', layers: [['aramid', 6]] }], molle: [4, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0]],
       desc: 'Soft backer. Issued with two magazine pouches; the rest of the MOLLE is yours to fill.' },
-    { id: 'c.recon', kind: 'carrier', brand: B.vant, name: 'Recon chest rig', tier: 2, price: 650, speed: 1, dur: 0, plate: false,
+    { id: 'c.recon', off: true, kind: 'carrier', brand: B.vant, name: 'Recon chest rig', tier: 2, price: 650, speed: 1, dur: 0, plate: false,
       prot: [], molle: [7, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0]], desc: 'No armour at all: wide MOLLE, two magazine pouches as issued. Fast.' },
     { id: 'c.assault', kind: 'carrier', brand: B.para, name: 'Assaulter carrier', tier: 3, price: 1500, speed: 0.98, dur: 7, plate: true, shoulder: true, groin: true,
       prot: [{ at: 'torso', layers: [['aramid', 7]] }], molle: [5, 2], pouches: [['q.rifle2', 0, 0], ['q.rifle', 2, 0]],
@@ -735,7 +736,7 @@ const G_Gear = (() => {
     return base > 0 ? Math.max(1, Math.floor(base * c * c)) : 0;
   }
   return {
-    LIST, DEFS, POUCHES, MOUNTS, mountOn, mountFree, clash, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, tbItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
+    LIST: LIST.filter((d) => !d.off), DEFS, POUCHES, MOUNTS, mountOn, mountFree, clash, headLoad, mixed, pack, unpack, mergeBox, mergeMed, medStack, medCount, absorb, combine, setLoad, loadIn, magShape, magName, magVid, BRANDS: B, ammoFor, ammoItem, gearItem, gunItem, pouchItem, mounted, molles, pickMag, dumpGrid, dumpMag, partItem, partSize, flashItem, tbItem, stow, inField, roomFor, unloadMag, unloadGun, fillMag, fillFrom, fillGun, partCount, stashProxy, gunSize, guns, packGuns, medItem, fragItem, grid, size, isGear, fits, put, findSpot, place, removeFrom,
     newKit, starter, body, all, each, feeds, rounds, count, take, swapMag, exchange, takeRounds, chamberIn, spares, refitMags, boxItem, boxCap, loadMag, loadAll, loadTargets, loadNeed, roundPrice,
     defOf, cond, piece, speed, label, price, sale,
   };

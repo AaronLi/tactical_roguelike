@@ -1475,6 +1475,7 @@ const G_Game = {
         box.innerHTML = `<img src="${G.Icons.of(it, cw, ch, false)}" alt=""><h3>${G.U.esc(A.name(id))} <b>${G.U.esc(q.pro!.name)}</b></h3><ul>${A.partNames(id).map((n) => `<li>${G.U.esc(n!)}</li>`).join('')}</ul><h4>Against the stock gun</h4><div class="gs-stats">${G.GunsmithUI.statsHtml(G.Me.makeWeapon(id).def, w.def)}</div>`;
         box.classList.remove('hidden');
       };
+      el.addEventListener('change', ((e: GmEvt) => { const s = e.target.closest && e.target.closest('[data-loatt]') as HTMLSelectElement | null; if (!s) return; G.Loadout.fit(this.loLook.p, s.dataset.loatt!, s.value || null); G.Audio.click(); this.sidearmPick(); }) as EventListener);
       for (const [ev, on] of [['pointerover', true], ['pointerout', false], ['focusin', true], ['focusout', false]] as [string, boolean][]) el.addEventListener(ev, ((e: GmEvt) => { if (e.target.closest && e.target.closest('.web-pro')) preview(on); }) as EventListener);
       const go = (x: number, y: number) => { const v = this.armView, w = el.querySelector<HTMLElement>('.web-world'); this.armFrom = w ? w.style.transform : null; v.x = x * v.z; v.y = y * v.z; };
       el.addEventListener('pointerdown', ((e: GmEvt & PointerEvent) => {
@@ -1533,8 +1534,9 @@ const G_Game = {
     if (!G.SpaceData.ON) return '';
     const L = G.Loadout, r = L.rank(), x = L.xp(), lo = L.rankAt(r), hi = L.rankAt(r + 1), pct = Math.round(((x - lo) / (hi - lo)) * 100);
     const val = (sl: string) => { const id = L.sel(sl); return id ? L.name(sl, id) : sl === 'p' ? 'None' : 'Issue kit'; };
-    const tab = (sl: string, label: string, v: string) => `<button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}</small><b>${G.U.esc(v)}</b></button>`;
-    return `<div class="lo-bar"><div class="lo-rank"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></div>${tab('p', 'Primary', val('p'))}${tab('s', 'Sidearm', G.WEAPONS[this.armTake || 'p9'].name)}${tab('h', 'Helmet', val('h'))}${tab('a', 'Body armour', val('a'))}<button class="btn primary lo-go" data-lodeploy>Deploy</button></div>`;
+    const tab = (sl: string, label: string, v: string, c: number) => `<button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}<i>${c} pt${c === 1 ? '' : 's'}</i></small><b>${G.U.esc(v)}</b></button>`;
+    const side = this.armTake || 'p9', tot = L.total(side), over = tot > L.BUDGET;
+    return `<div class="lo-bar"><div class="lo-rank"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></div>${tab('p', 'Primary', val('p'), L.cost('p', L.sel('p')))}${tab('s', 'Sidearm', G.WEAPONS[side].name, L.cost('s', side))}${tab('h', 'Helmet', val('h'), L.cost('h', L.sel('h')))}${tab('a', 'Body armour', val('a'), L.cost('a', L.sel('a')))}<div class="lo-pts${over ? ' over' : ''}" title="What you take into a run can't cost more than ${L.BUDGET} points"><b>${tot} / ${L.BUDGET}</b><span>${over ? `${tot - L.BUDGET} over` : 'points'}</span></div><button class="btn primary lo-go" data-lodeploy ${over ? 'disabled' : ''}>Deploy</button></div>`;
   },
   // a tree of the loadout's (primary, helmet, body armour), drawn as the sidearm's web is
   loWeb(el: HTMLElement) {
@@ -1562,7 +1564,7 @@ const G_Game = {
     const was = el.querySelector('.web-world');
     el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
         <div class="web-head"><h2>Your ${T.title.toLowerCase()}</h2><p>${G.Pad.text('Drag to move · scroll to zoom · click to look')}</p></div><button class="btn web-home" data-armhome>Back to the middle</button></div>
-      <aside class="web-side"><img src="${pic(look)}" alt=""><h3>${G.U.esc(L.name(sl, look))}</h3>${about}${ask}${nextOn ? `<h4>From here</h4><ul class="web-next">${nextOn}</ul>` : ''}
+      <aside class="web-side"><img src="${pic(look)}" alt=""><h3>${G.U.esc(L.name(sl, look))}</h3><div class="lo-cost">${L.cost(sl, look)} point${L.cost(sl, look) === 1 ? '' : 's'}${sl === 'p' && L.cost(sl, look) !== L.pts(G.WEAPONS[look].price) ? ` <small>(${L.pts(G.WEAPONS[look].price)} the gun, the rest its attachments)</small>` : ''}</div>${about}${ask}${sl === 'p' && got ? this.loAtt(look) : ''}${nextOn ? `<h4>From here</h4><ul class="web-next">${nextOn}</ul>` : ''}
         <div class="web-foot"><p>Earned for good: kept between runs, whatever squad you're in.${sl !== 'p' ? ' With nothing taken you wear the issue kit: a worn bump helmet and concealable vest.' : ''}</p>
         <button class="btn primary arm-ok" data-lotake ${got && !mine ? '' : 'disabled'}>${!got ? 'Not yet yours' : mine ? 'In your loadout' : 'Take it'}</button>${L.sel(sl) ? `<button class="btn lo-clear" data-loclear>${sl === 'p' ? 'Go without a primary' : 'Use the issue kit'}</button>` : ''}</div></aside></div>`;
     el.classList.remove('hidden');
@@ -1571,9 +1573,20 @@ const G_Game = {
     if (this.armFrom) { const w = el.querySelector<HTMLElement>('.web-world')!; w.style.transform = this.armFrom; this.armFrom = null; requestAnimationFrame(() => { w.classList.add('glide'); place(); }); } else place();
     if (was) was.remove();
   },
+  // a gun's attachments, slot by slot: what's fitted (a choice of what's earned with it, each with its points), and what's next to earn
+  loAtt(gun: string) {
+    const L = G.Loadout, GS = G.Gunsmith, rows = L.attSlots(gun).map((s) => {
+      const def = GS.defaultBuild(gun)[s.slot], got = s.opts.filter((p: any) => L.attOpen(gun, p)), next = s.opts.find((p: any) => !L.attOpen(gun, p));
+      const opt = (p: any) => `<option value="${p.id}"${p.id === s.cur ? ' selected' : ''}>${G.U.esc(p.name)} · ${L.pts(GS.buyPrice(p))} pt</option>`;
+      const nq = next && L.attNeed(next), have = nq ? Math.min(nq.n, L.count('p', gun, nq.stat)) : 0;
+      return `<div class="lo-att"><small>${G.U.esc(s.label)}</small><select data-loatt="${s.slot}"${got.length ? '' : ' disabled'}><option value="">${def && GS.PARTS[def] ? G.U.esc(GS.PARTS[def].name) + ' (as it comes)' : 'None'}</option>${got.map(opt).join('')}</select>${next ? `<span>Next: ${G.U.esc(next.name)} · ${have}/${nq!.n} ${G.U.esc(nq!.what)}</span>` : ''}</div>`;
+    }).join('');
+    return rows ? `<h4>Attachments</h4><div class="lo-atts">${rows}</div>` : '';
+  },
   // Deploy: the sidearm (told the squad: the host waits on everyone's), and the rest put on you
   loDeploy() {
     const id = this.armTake || 'p9', L = G.Loadout;
+    if (G.SpaceData.ON && L.total(id) > L.BUDGET) { G.Audio.deny(); return; }
     G.Me.setSidearm(id, G.Arsenal.proOn(id) ? G.Arsenal.build(id) : undefined);
     if (G.SpaceData.ON) L.apply(G.Me);
     G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)

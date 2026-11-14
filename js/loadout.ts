@@ -6,6 +6,9 @@
 // with that gun, so many rounds stopped by that armour, so many missions flown in it). What's earned stays yours, kept on this machine
 // (G.U.store 'loadout') between runs, whatever squad you're in.
 //   rank: 0 to start; the Micro Uzi, the primary tree's middle, comes at rank 1 (your first mission does it).
+// A gun's attachments are earned with it, by challenges (ATT: each kind of part its own, harder as the part's tier goes up), and
+// fitted to it on this screen. And all of it is costed (points: about one a 400 credits of what it'd cost, the issue kit and the P9
+// nothing): what you take into a run can't come to more than BUDGET.
 interface LoNode { id: string; from?: string; path?: string; ring: number; a?: number; r?: number; rank?: number; stat?: string; n?: number; what?: string; how?: string; kit?: { helmet?: string; face?: string; carrier?: string; plate?: string } }
 interface LoTree { slot: 'p' | 'h' | 'a'; title: string; mid: string; NODES: LoNode[]; PATHS: Record<string, { name: string; a: number }> }
 const G_Loadout = (() => {
@@ -54,7 +57,7 @@ const G_Loadout = (() => {
     },
     a: {
       slot: 'a', title: 'Body armour', mid: 'c.lite',
-      PATHS: { soft: { name: 'Concealable', a: -90 }, plates: { name: 'Plate carriers', a: 30 }, light: { name: 'Light and fast', a: 150 } },
+      PATHS: { soft: { name: 'Concealable', a: -90 }, plates: { name: 'Plate carriers', a: 30 } },
       NODES: [
         { id: 'c.lite', ring: 0, rank: 0, kit: { carrier: 'c.lite' } },
         { id: 'c.ghost', from: 'c.lite', path: 'soft', ring: 1, rank: 1, kit: { carrier: 'c.ghost' } },
@@ -63,8 +66,7 @@ const G_Loadout = (() => {
         { id: 'c.patrol+p.pe', from: 'c.slick+p.steel', path: 'plates', ring: 2, stat: 'stop', n: 15, what: 'rounds stopped by it', how: 'Let it take fifteen rounds.', kit: { carrier: 'c.patrol', plate: 'p.pe' } },
         { id: 'c.assault+p.ceramic', from: 'c.patrol+p.pe', path: 'plates', ring: 3, rank: 5, kit: { carrier: 'c.assault', plate: 'p.ceramic' } },
         { id: 'c.heavy+p.ceramic2', from: 'c.assault+p.ceramic', path: 'plates', ring: 4, stat: 'stop', n: 25, what: 'rounds stopped by it', how: 'Twenty-five rounds that would have killed you.', kit: { carrier: 'c.heavy', plate: 'p.ceramic2' } },
-        { id: 'c.recon', from: 'c.lite', path: 'light', ring: 1, rank: 2, kit: { carrier: 'c.recon' } },
-        { id: 'c.patrol+p.steel', from: 'c.recon', path: 'light', ring: 2, stat: 'missions', n: 4, what: 'missions completed in it', how: 'Bring it home from four missions.', kit: { carrier: 'c.patrol', plate: 'p.steel' } },
+        { id: 'c.patrol+p.steel', from: 'c.slick+p.steel', path: 'plates', ring: 2, a: 58, r: 660, stat: 'missions', n: 4, what: 'missions completed in it', how: 'Bring it home from four missions.', kit: { carrier: 'c.patrol', plate: 'p.steel' } },
       ],
     },
   };
@@ -74,7 +76,7 @@ const G_Loadout = (() => {
   const xpOf = (diff: number) => 150 + 100 * Math.max(1, diff | 0);
   const rankAt = (r: number) => (250 * r * (r + 1)) / 2;
   let save: any = null;
-  const data = () => { if (!save) { const s = G.U.store.get('loadout', null); save = s && typeof s === 'object' ? s : {}; save.xp = Math.max(0, +save.xp || 0); save.n = save.n || {}; save.got = save.got || []; save.sel = save.sel || {}; } return save; };
+  const data = () => { if (!save) { const s = G.U.store.get('loadout', null); save = s && typeof s === 'object' ? s : {}; save.xp = Math.max(0, +save.xp || 0); save.n = save.n || {}; save.got = save.got || []; save.sel = save.sel || {}; save.att = save.att || {}; } return save; };
   const keep = () => G.U.store.set('loadout', data());
   const xp = () => data().xp;
   const rank = () => { let r = 0; while (xp() >= rankAt(r + 1)) r++; return r; };
@@ -132,6 +134,46 @@ const G_Loadout = (() => {
     const w = worn(me);
     for (const s of ['p', 'h', 'a']) if (w[s]) tally(s, w[s]!, 'missions');
   }
+  // ---- a gun's attachments: what kinds of part are earned with it, each kind by its own challenge, a part of tier t when the count
+  // reaches the t-th of n (the gun's own count, as the tree's are)
+  const ATT: Record<string, { stat: string; what: string; n: number[] }> = {
+    optic: { stat: 'hs', what: 'headshot kills', n: [3, 10, 20, 35] }, muzzle: { stat: 'kills', what: 'kills', n: [8, 20, 35, 50] },
+    barrel: { stat: 'far', what: 'kills past 20 m', n: [3, 8, 15, 25] }, handguard: { stat: 'kills', what: 'kills', n: [5, 15, 30, 45] },
+    tac: { stat: 'kills', what: 'kills', n: [4, 12, 25, 40] }, fg: { stat: 'tap', what: 'double-tap kills', n: [3, 8, 15, 25] },
+    grip: { stat: 'tap', what: 'double-tap kills', n: [3, 8, 15, 25] }, stock: { stat: 'multi', what: 'double kills', n: [2, 5, 10, 18] },
+    charging: { stat: 'kills', what: 'kills', n: [6, 15, 30, 45] }, loader: { stat: 'close', what: 'kills within 5 m', n: [3, 8, 15, 25] },
+    railmount: { stat: 'kills', what: 'kills', n: [4, 12, 25, 40] },
+  };
+  // (a suppressor's for quiet work: the unaware kills count for it)
+  const attNeed = (p: any) => { const k = G.Gunsmith.kindOf(p.slot), a = ATT[k]; if (!a) return null; const sup = k === 'muzzle' && /suppress|silenc|\bcan\b/i.test(p.name); return { stat: sup ? 'sur' : a.stat, what: sup ? 'kills on unaware suspects' : a.what, n: a.n[Math.min(3, Math.max(0, (p.tier || 1) - 1))] }; };
+  const attOpen = (gun: string, p: any) => { const q = attNeed(p); return !!q && open('p', gun) && count('p', gun, q.stat) >= q.n; };
+  // the parts that can go on it as it's built (the gunsmith's own list), by slot
+  function attSlots(gun: string) {
+    const GS = G.Gunsmith, b = build(gun), out: { slot: string; label: string; cur: string; opts: any[] }[] = [];
+    for (const s of GS.visibleSlots(gun, b)) {
+      const k = GS.kindOf(s.slot); if (!ATT[k]) continue;
+      const d0 = GS.defaultBuild(gun)[s.slot], opts = GS.LIST.filter((p: any) => p.id !== d0 && GS.fitsSlot(s, p, gun, b) && !p.factory && !p.retired && !p.variant && !p.becomes && !GS.plainHere(p, gun)).sort((x: any, y: any) => (x.tier || 1) - (y.tier || 1) || GS.buyPrice(x) - GS.buyPrice(y));
+      if (opts.length) out.push({ slot: s.slot, label: GS.slotLabel(s), cur: b[s.slot], opts });
+    }
+    return out;
+  }
+  // the gun as it's taken: as it comes, with what you've fitted of what's earned (whatever no longer fits dropped)
+  function build(gun: string) {
+    const GS = G.Gunsmith, b = GS.defaultBuild(gun), mine = data().att[gun] || {};
+    for (const [slot, pid] of Object.entries(mine)) { const p = GS.PARTS[pid as string]; if (p && attOpen(gun, p)) b[slot] = pid; }
+    GS.prune(gun, b); return b;
+  }
+  function fit(gun: string, slot: string, pid: string | null) { const d = data(), m = d.att[gun] || (d.att[gun] = {}); if (pid) { const p = G.Gunsmith.PARTS[pid]; if (!p || !attOpen(gun, p)) return; m[slot] = pid; } else delete m[slot]; keep(); }
+  // ---- points: what it'd cost, about one a 400 credits (the issue kit, the bump helmet and the P9: nothing)
+  const BUDGET = 10, pts = (price: number) => Math.round((price || 0) / 400);
+  function partsPts(gun: string, b: Record<string, string>) { const GS = G.Gunsmith, d = GS.defaultBuild(gun); let n = 0; for (const [s, pid] of Object.entries(b)) if (pid && pid !== d[s] && GS.PARTS[pid]) n += pts(GS.buyPrice(GS.PARTS[pid])); return n; }
+  function cost(slot: string, id: string | null): number {
+    if (!id) return 0;
+    if (slot === 'p') return pts(G.WEAPONS[id].price) + partsPts(id, build(id));
+    if (slot === 's') return pts(G.WEAPONS[id].price) + (G.Arsenal.proOn(id) ? partsPts(id, G.Arsenal.build(id)) : 0);
+    const k = node(slot, id)?.kit || {}; return pts([k.helmet, k.face, k.carrier, k.plate].reduce((a, g) => a + (g ? G.Gear.DEFS[g].price : 0), 0));
+  }
+  const total = (sidearm: string) => cost('p', sel('p')) + cost('s', sidearm) + cost('h', sel('h')) + cost('a', sel('a'));
   // ---- the loadout itself: what's picked for each slot (kept, so the next run starts with it), and putting it on you
   const sel = (slot: string): string | null => { const d = data().sel, id = slot in d ? d[slot] : TREES[slot].mid; return id && open(slot, id) ? id : null; }; // (never set: the tree's middle, once it's yours; set empty: empty)
   const pick = (slot: string, id: string | null) => { if (id && !open(slot, id)) return; data().sel[slot] = id; keep(); };
@@ -140,12 +182,12 @@ const G_Loadout = (() => {
     if (H) { const k = node('h', H)!.kit!, it = Gr.gearItem(k.helmet!); if (k.face) it.face = Gr.gearItem(k.face); me.kit.helmet = it; }
     if (A) { const k = node('a', A)!.kit!, it = Gr.gearItem(k.carrier!); if (k.plate) it.plate = Gr.gearItem(k.plate); me.kit.carrier = it; }
     if (P) { // (after the armour: its spare loads go on what you're wearing now)
-      const w = me.makeWeapon(P); me.weapons.p = w;
+      const w = me.makeWeapon(P, build(P)); me.weapons.p = w;
       for (let i = 0; i < 3; i++) { const it = Gr.ammoItem(w.def, Gr.ammoFor(w.def).kind === 'mag' ? null : 12); if (!Gr.stow(me, it)) break; } // (three spare loads, wherever they fit)
     }
   }
   function reload() { save = null; }
-  return { TREES, RINGS, BY, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload };
+  return { TREES, RINGS, BY, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, ATT, attNeed, attOpen, attSlots, build, fit, BUDGET, pts, cost, total };
 })();
 G.Loadout = G_Loadout;
 interface GameModules { Loadout: typeof G_Loadout }
