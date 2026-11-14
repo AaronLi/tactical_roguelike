@@ -730,19 +730,19 @@ const G_Space = (() => {
     collide(dt);
     events();
   }
-  // Coming in on a stretch of hull she can breach (within 45 m of it, her nose on it within about 55 degrees), she squares herself
+  // Coming in on a stretch of hull she can breach (within 140 m of it, her nose on it within about 55 degrees), she squares herself
   // up to it: her nose turned straight at it and level, her roll taken out, her collar eased to the height of the deck beyond (and
-  // onto the nearest place it can go in, if that's within 3 m to one side). The
+  // onto the nearest place it can go in, if that's within 8 m to one side). The
   // nearer, the harder; the pilot's own turning eases it off. (What the breach wants: js/space.ts events, square on, level, at height.)
   function squareUp(dt: number) {
-    const a = aim(60, 25); if (!a || a.range > 45 || a.range < -0.5 || a.align < 0.55) return;
-    const k = G.U.clamp((45 - a.range) / 25, 0, 1) * (1 - 0.7 * Math.min(1, S.stick.length()));
+    const a = aim(160, 25); if (!a || a.range > 140 || a.range < -0.5 || a.align < 0.55) return;
+    const k = G.U.clamp((140 - a.range) / 70, 0, 1) * (1 - 0.7 * Math.min(1, S.stick.length())); // (from 140 m out, full by 70 m)
     if (k <= 0) return;
     S.Q.slerp(lookQ(new T.Vector3(-a.site.nx, 0, -a.site.nz)), Math.min(1, dt * 5 * k)).normalize();
     S.P.y -= G.U.clamp(a.dy, -4, 4) * Math.min(1, dt * 2.5 * k);
-    // (and within 3 m to one side of the stretch she's on for, drawn across onto it: the collar's middle onto the site's)
+    // (and within 8 m to one side of the stretch she's on for, drawn across onto it: the collar's middle onto the site's)
     const L = SD.layout(S.def), N = new T.Vector3(0, 0, L.zc - 0.22).applyQuaternion(S.Q).add(S.P), tx = -a.site.nz, tz = a.site.nx, off = (N.x - a.site.x) * tx + (N.z - a.site.z) * tz;
-    if (Math.abs(off) < 3) { const m = off * Math.min(1, dt * 2.5 * k); S.P.x -= tx * m; S.P.z -= tz * m; }
+    if (Math.abs(off) < 8) { const m = off * Math.min(1, dt * 2.5 * k); S.P.x -= tx * m; S.P.z -= tz * m; }
   }
   // how far she is from anything big (no cruising close in)
   function clearOf() {
