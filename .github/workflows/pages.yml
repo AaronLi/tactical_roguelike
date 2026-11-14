@@ -39,7 +39,7 @@ jobs:
       # (npm run build does everything, the models too: here they're baked apart, below, so a push that changes none of what they're made from reuses the last bake)
       - run: npm run build -- -j 4 --no-models
       # The guns and the hangar's scene: the game loads them only as baked glTF (assets/models, git-ignored), so the site bakes them here
-      # (the hangar's in the runner's own headless Chrome: tools/bake_hangar.mjs).
+      # (the hangar's too, in node: tools/bake_hangar.mjs).
       # Cached on everything a bake reads (the recipes and the baker, the parts data, the authored models): a push that
       # changes none of it reuses the last bake.
       - name: Baked models (cache)

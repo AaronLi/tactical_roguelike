@@ -162,7 +162,7 @@ if (!noProps && !fails) {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/bake_props.mjs')], { stdio: ['ignore', verbose ? 'inherit' : 'ignore', 'inherit'] });
   if (r.status) { fails++; console.error('bake_props failed (exit ' + r.status + ')'); }
 }
-// ---- the hangar's scene (its fixed parts, from the game's own code in a headless browser: tools/bake_hangar.mjs)
+// ---- the hangar's scene (its fixed parts, from the game's own code, in node: tools/bake_hangar.mjs)
 if (!flags.has('--no-hangar') && !fails && !only.length) {
   phase('hangar');
   const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/bake_hangar.mjs')], { stdio: ['ignore', verbose ? 'inherit' : 'ignore', 'inherit'] });

@@ -8,7 +8,7 @@ highlights' export worker (`js/exportworker.ts`).
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Compiles, keeps compiling as you save (`tsc --watch`), and serves the game on :8080 (`tools/dev.js`). |
-| `npm run build` | Everything a fresh clone needs (`tools/build.mjs`): compiles into `dist/`, bakes the stickers and the audio, bakes and bundles the models (a minute or two; `-- --no-models` leaves them out). All git-ignored. No Blender; a Chromium for the hangar's scene. |
+| `npm run build` | Everything a fresh clone needs (`tools/build.mjs`): compiles into `dist/`, bakes the stickers and the audio, bakes and bundles the models (a minute or two; `-- --no-models` leaves them out). All git-ignored. Needs node and nothing else: no Blender, no browser. |
 | `npm run compile` | Compiles once into `dist/` and nothing else. |
 | `npm run typecheck` | Checks the types without writing anything. CI runs it. |
 | `npm run typecheck:strict` | The same with `--strict`: how far the code is from full strictness. |
