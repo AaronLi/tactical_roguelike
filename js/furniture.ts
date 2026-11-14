@@ -1349,6 +1349,7 @@ const G_Furniture = (() => {
     storeroom: { must: 'rack', wall: ['rack', 'crates', 'rack'], center: [], small: ['cardboard', 'bin'], floor: null, noArt: 1 },
     // a ship's compartments (js/shipgen.ts): what she has goes by her size
     bridge: { must: 'scons', wall: ['scons', 'scons', 'panel', 'scons'], center: ['holotable'], small: ['bin'], floor: null, noArt: 1 },
+    gunnery: { must: 'scons', wall: ['scons', 'panel', 'scons', 'scons'], center: [], small: ['bin'], floor: null, noArt: 1 }, // (gun control: a console for each of her guns)
     engine: { must: 'panel', wall: ['panel', 'panel', 'panel', 'lockers'], center: ['turbine'], small: ['canister'], floor: null, noArt: 1, dense: 1 },
     reactor: { must: 'panel', wall: ['panel', 'panel'], center: ['core'], small: ['canister'], floor: null, noArt: 1 },
     cargo: { must: 'srack', wall: ['srack', 'crates', 'srack', 'drums'], center: ['crates', 'drums', 'crates'], small: ['canister', 'bin'], floor: null, noArt: 1, dense: 1 },

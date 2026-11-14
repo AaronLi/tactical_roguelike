@@ -12,6 +12,7 @@ interface SvMission {
   ms: SpMission; meta: ShMeta | null; docked: boolean; done: boolean; keys: Record<string, boolean>; cards: SvCard[];
   art: 0 | 1 | 2; artBy: string | null; // (0 where it lies, 1 carried, 2 lost with the ship)
   hvt: number | null; hvtSt: 0 | 1 | 2; // (0 at large, 1 dead, 2 in restraints)
+  gunners?: number[]; gn?: number; // (her gun crew, the ids of those posted in her gun control; how many of them are still at it, last told)
   arm: number | null; boom: boolean; cleared: boolean; zt: number; leftSaid?: number; revisit?: boolean; cutsWas?: number[][]; breached?: boolean; // (zt: the zone's clock, seconds since the squad came out of the jump: where everything that's under way out there is)
   site: number[] | null; raid: number[][]; hold: number; told?: boolean; // (raid: where the pirates' pods are in her hull, as sites; hold: the room their hostages are in)
   // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
@@ -39,10 +40,15 @@ const G_SpaceSv = (() => {
   // been carried off the others (loot: paid with the salvage at home).
   interface SvZone { ms: SpMission; active: number; main: SvMission | null; zt: number; loot: number }
   let Z: SvZone | null = null;
+  // her gun crew still at their posts' work: standing, not cuffed, not given up (without them her guns don't fire: js/space.ts guns)
+  function gunnersLeft() {
+    const M = st.M, sv = S(); if (!M || !M.gunners) return 0;
+    return M.gunners.filter((id) => { const e = sv.enemies.get(id); return e && !e.down && e.hp > 0 && e.state !== 'dead' && e.state !== 'cuffed' && e.state !== 'surrender'; }).length;
+  }
   function msMsg() {
     const M = st.M; if (!M) return null;
     return { t: 'ms', i: M.ms.i, docked: M.docked ? 1 : 0, done: M.done ? 1 : 0, keys: Object.keys(M.keys).filter((k) => M.keys[k]), cards: M.cards.filter((c) => c.st === 1).map((c) => [c.key, c.x, c.z, c.y]),
-      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj !== 'visit' || M.breached ? 1 : 0, left: M.ms.obj === 'hostage' ? S().remaining(false) : 0 };
+      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj !== 'visit' || M.breached ? 1 : 0, gn: gunnersLeft(), left: M.ms.obj === 'hostage' ? S().remaining(false) : 0 };
   }
   const levelMsg = () => (st.M ? { zone: Z ? { ms: { seed: Z.ms.seed, size: Z.ms.size, th: Z.ms.th, wing: !!Z.ms.wing, name: Z.ms.name, obj: Z.ms.obj, other: Z.ms.other || null, diff: Z.ms.diff, night: !!Z.ms.night }, act: Z.active, near: Z.active !== 0 || !!st.M.revisit } : null, ms: st.M.ms, gen: genOf(st.M.ms), state: msMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg(), board: boardMsg() } : null);
   const genOf = (ms: SpMission): SpGen | null => (ms.kind === 'board' ? { size: ms.size!, obj: ms.obj, ship: st.fleet.ship, other: ms.other || null, wing: !!ms.wing } : null);
@@ -144,6 +150,9 @@ const G_SpaceSv = (() => {
         const kinds: EnemyKind[] = [q === 0 ? 'leader' : 'grunt', 'grunt', 'rusher', L >= 3 ? 'heavy' : 'grunt'];
         for (const kd of kinds) { const e = put(kd, [sq[q % Math.max(1, sq.length)]].filter((v) => v != null), 0); if (e) e.drawn = true; }
       }
+      // her gun crew: two at gun control for each hull that has guns (the boarded ship's are what her guns need: gunnersLeft)
+      const G0 = G.SpaceData.SIZES[meta.hulls[h].size].guns;
+      if (G0.pd + G0.cannon + G0.missile > 0) for (let k = 0; k < 2; k++) { const e = put('suspect', rooms('gunnery'), k); if (e && M && h === 0) (M.gunners = M.gunners || []).push(e.id); }
       const rs = rooms('mess', 'quarters', 'spine', 'cargo');
       for (let q = 0; q < C.resp; q++) for (const kd of ['suspect', 'rusher', 'suspect'] as EnemyKind[]) { const e = put(kd, [rs[q % Math.max(1, rs.length)]].filter((v) => v != null), 0); if (e && M) M.resp.set(e.id, h); }
     }
@@ -348,6 +357,10 @@ const G_SpaceSv = (() => {
     // a base on a planet: done when it's under control
     if (!M.meta) { if (!M.cleared && M.docked && sv.remaining(false) === 0) { M.cleared = true; M.done = true; say('The base is under control. Back to the ship.'); sync(); } return; }
     if (M.boom) return;
+    // her gun crew: told when there's one fewer (her guns stop with the last of them)
+    const gl = gunnersLeft();
+    if (M.gn == null) M.gn = gl;
+    else if (gl !== M.gn) { const was = M.gn; M.gn = gl; if (was > 0 && gl === 0 && M.gunners && M.gunners.length) say('Her gun control is silent: nobody is left to man her guns.'); sync(); }
     // the keycards: with their carriers till they're down, in restraints or dead; then on the floor, for whoever walks up
     let ch = false;
     for (const c of M.cards) {

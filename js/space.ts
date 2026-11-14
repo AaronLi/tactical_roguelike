@@ -12,7 +12,7 @@
 //   A jump is the change of level: the screens go to the jump's light instead of black (the veil, kind 'ftl'), the place
 //   is built behind it, and she comes out of the tunnel when it's ready.
 interface SpWp { id: string; name: string; sub: string; p: THREE.Vector3; kind: 'anchor' | 'base' | 'breach' | 'lz' | 'entry'; i?: number; hide?: boolean }
-interface SpMs { raid?: number[][]; hold: number; left?: number; zt?: number; hostile?: number; salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
+interface SpMs { gn?: number; raid?: number[][]; hold: number; left?: number; zt?: number; hostile?: number; salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
 type SpKind = 'hub' | 'board' | 'assault';
 const G_Space = (() => {
   const T = THREE, SD = G.SpaceData;
@@ -1052,13 +1052,15 @@ const G_Space = (() => {
     const was = gn.hp; gn.hp = Math.max(0, hp);
     if (was > 0 && gn.hp <= 0) { gn.gun.rotation.x = -0.5; gn.gun.visible = false; G.HUD.feed(`<b>${gn.k === 'pd' ? 'Point defence gun' : gn.k === 'cannon' ? 'Cannon' : 'Missile launcher'} destroyed</b>`); }
   }
-  // her guns: they track the squad's ship inside 1300 m and fire; the pilot's screen says what lands
+  // her guns: they track the squad's ship inside 1300 m and fire, while there's anyone at her gun control (js/spaceserver.ts gunnersLeft) and
+  // she isn't counting down to her self-destruct; the pilot's screen says what lands
   // Her weapons, by kind (js/spacedata.ts HULLGUN). Point defence: fast, short, blind close in under its own deck. Cannon: a
   // heavy shot every few seconds out to 4.5 km, poor against anything quick or close. Missiles: launched at 6.5 km, they
   // home (missiles()); a turret can shoot one down. The pilot's screen says what lands.
   function guns(dt: number) {
     if (!S.hull || S.docked || S.ftl || (S.state && S.state.boom)) return;
     if (S.state && S.state.hostile === 0) return; // (a ship that isn't the mission's holds her fire till she's breached)
+    if (!S.state || !S.state.gn || S.state.arm != null) return; // (nobody left at her gun control, or she's counting down to blowing herself apart: her guns are silent)
     for (const gn of S.hull.guns) {
       if (gn.hp <= 0) continue;
       const H = SD.HULLGUN[gn.k], from = new T.Vector3(gn.x, gn.y, gn.z), to = S.P.clone().add(new T.Vector3(0, 1.5, 0)).sub(from), dist = to.length();
