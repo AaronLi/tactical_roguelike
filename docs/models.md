@@ -362,6 +362,36 @@ A one-off colour that isn't in the catalogue is named `m_<rrggbb>` (hex colour) 
 **Extras keys:** root: `info`, `gun`, `anchors`; mesh: `slot`, `display`, `chk`; part: `part`, `anchors`, `owner`, `parent`, `leg`, `check`; pack: `pack`.
 <!-- contract:end -->
 
+### Hand frames
+
+`info.grip` and `info.support` say where the hands go; `G.GunRig.holds(def, info)` (js/gunrig.ts) says how: for each hand a frame in the gun's
+own space (x right, y up, z back, metres), so a hand is turned to the gun from data and not worked out from how the arm happens to come in.
+Third person (js/rig.ts gripHand) holds every gun by it; the first-person arms are to take the same frames.
+
+| field | meaning |
+| --- | --- |
+| `at` | the point the hand goes to: `info.grip`; `info.support` a centimetre to the left, and on a foregrip that far down it |
+| `palm` | unit vector: the way the palm faces, from its face into what it holds |
+| `fingers` | unit vector, square to `palm`: the way the fingers run from the knuckles before they close round what's held |
+| `hold` | which point of the hand goes on `at`: `closed`, the closed hand's hold (a grip's axis runs through it, under the knuckles), or `palm`, the middle of the palm's face |
+| `kind` | `grip`; the support's `forend`, `fg` (a foregrip) or `pistol` |
+
+For a right-handed shooter:
+
+- **grip** (the right hand): the palm on the grip's right side facing left (`palm` -x), the fingers forward along the bore (`fingers` -z) and
+  closed round the grip's front, the thumb up over the top. A raked grip runs back across the palm, as it does in a hand, so the frame is the
+  bore's, not the grip's rake; a stock's wrist (a gun with no pistol grip) is taken the same way.
+- **support on a forend**: the left hand's palm under it facing up and to the right (`palm` (0.5, 0.87, 0)), the fingers out to the right and
+  forward and round its far side.
+- **support on a foregrip** (a vertical or stubby `fg` part in the build, or `HOLD_FIX`): closed round it 45 mm (28 mm stubby) under
+  `info.support`, the palm on its left side facing right (`palm` +x), the fingers forward.
+- **support on a pistol**: the palm on the grip's left panel facing right, the fingers forward and down over the firing hand's.
+
+`HOLD_FIX` in js/gunrig.ts corrects a gun the rules get wrong (the AUG's front grip is part of its stock: `fgDrop`). `tools/check_holds.test.mjs`
+(in `test:models`) fails a gun whose frames aren't unit and square, whose grip palm doesn't face the gun's left or whose fingers don't run
+forward (a hand on the grip back to front or upside down), whose support palm faces the wrong way for its kind, or whose support isn't ahead
+of the grip.
+
 ## Barrels, grips and box handguards (one object on every gun)
 
 - **A shared barrel is cartridge x length x profile** (`br.<cartridge>.<inches>` is the standard profile, `.light`, `.tapered`, `.heavy` the others): ONE object on every gun that takes it. It is a tube as long as the barrel (inches x 25.4 mm + a 6 mm shank) at its profile's radius, drawn ending where that length ends on the gun: the gun gives only the place of its factory barrel's end, so the part is never scaled and the same file is on every gun (the part inside the receiver is hidden by it). `js/parts.ts` `BARREL_PROFILES`: standard 9.5 mm, light 7.0 mm, tapered 9.5 mm to 7.6 mm at the muzzle, heavy 12 mm (14 mm on the .50 BMG). A profile carries figures (weight, handling, recoil, accuracy) against the profile of the gun's own barrel (zero for that one), so a gun's own barrel keeps its exact figures and two barrels of one gun never read the same.
