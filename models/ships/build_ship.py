@@ -222,18 +222,22 @@ def prof(a, yb, b, r, n=6):
     left = [(-a + r + r * math.cos(math.pi - k * math.pi / 2 / n), b - r + r * math.sin(math.pi - k * math.pi / 2 / n)) for k in range(n + 1)]
     right = [(a - r + r * math.cos(math.pi / 2 - k * math.pi / 2 / n), b - r + r * math.sin(math.pi / 2 - k * math.pi / 2 / n)) for k in range(n + 1)]
     return [(-a, yb)] + left + right + [(a, yb)]
-SKIN = [(zc - 0.05, tw + W + 0.3, CC, HEAD_TOP, 0.95), (zt - 0.15, tw + W + 0.3, CC, HEAD_TOP, 0.95), (zt + 0.75, sw + W + 0.22, CC, HEAD_TOP, 0.7), (zk + 0.2, sw + W + 0.22, CC, HEAD_TOP, 0.7),
-        (zr + 0.2, X + 0.2, FM - 0.2, HEAD_TOP - 0.25, 0.75), (zr + 1.4, X + 0.2, FM - 0.2, SKIN_TOP, 0.7), (z1 - 0.2, X + 0.2, FM - 0.2, SKIN_TOP - 0.05, 0.7), (z1 + 0.02, X + 0.1, FM - 0.2, SKIN_TOP - 0.1, 0.65)]
+# (seen from above her sides turn twice: one taper from the collar out to the front of the space behind the tunnel, a second on to
+# her full width where the crew deck begins, then straight to the tail; each clears what's inside it)
+A0, A1, A2, ZA1, ZA2 = tw + W + 0.3, sw + W + 0.15, X + 0.2, zt, zr + 0.2
+def aw(z): return A0 + (A1 - A0) * (z - zc) / (ZA1 - zc) if z <= ZA1 else A1 + (A2 - A1) * min(1.0, (z - ZA1) / (ZA2 - ZA1))
+SKIN = [(zc - 0.05, aw(zc), CC, HEAD_TOP, 0.95), (ZA1, aw(ZA1), CC, HEAD_TOP, 0.8), (zk + 0.2, aw(zk + 0.2), CC, HEAD_TOP, 0.75),
+        (ZA2, A2, FM - 0.2, HEAD_TOP - 0.25, 0.75), (zr + 1.4, X + 0.2, FM - 0.2, SKIN_TOP, 0.7), (z1 - 0.2, X + 0.2, FM - 0.2, SKIN_TOP - 0.05, 0.7), (z1 + 0.02, X + 0.1, FM - 0.2, SKIN_TOP - 0.1, 0.65)]
 B.loft('hull', [(z, prof(a, yb, b, r)) for z, a, yb, b, r in SKIN], caps=False, closed=False)
 # (the tail above the ramp closed; seams round her where the panels meet)
 za, a, yb, b, r = SKIN[-1]; cap = [(x, max(y, CM + 0.2)) for x, y in prof(a, CM + 0.2, b, r)]
 B.poly('hull', [(x, y, za) for x, y in cap])
-for k in (1, 3, 5):
+for k in (1, 3, 4):
     za, a, yb, b, r = SKIN[k]; pts = prof(a + 0.012, yb, b + 0.012, r)
     for p0, p1 in zip(pts, pts[1:]): B.beam('dark', (p0[0], p0[1], za), (p1[0], p1[1], za), 0.04)
 for s_ in (-1, 1):
     x0 = fw + W + O
-    B.loft('armor', [(zg1 - 0.05, [(x0, CC - 0.05), (sw + W + 0.22, CC), (x0, CC)]), (zg1 + 0.6, [(x0, 1.05), (sw + W + 0.22, CC), (x0, CC)]), (zk + 0.2, [(x0, 1.0), (sw + W + 0.22, CC), (x0, CC)]),
+    B.loft('armor', [(zg1 - 0.05, [(x0, CC - 0.05), (aw(zg1 - 0.05) - 0.02, CC), (x0, CC)]), (zg1 + 0.6, [(x0, 1.05), (aw(zg1 + 0.6) - 0.02, CC), (x0, CC)]), (zk + 0.2, [(x0, 1.0), (aw(zk + 0.2) - 0.02, CC), (x0, CC)]),
                      (zr + 0.2, [(x0, 0.55), (X + 0.2, FM - 0.2), (x0, FM - 0.2)])], s_ < 0)
 # the brow over the glass
 B.loft('armor', [(zc + 0.32, [(-fw - W, HEADER), (fw + W, HEADER), (fw + W, CC + 0.2), (-fw - W, CC + 0.2)]), (zc + 0.02, [(-fw - W + 0.1, CC), (fw + W - 0.1, CC), (fw + W, CC + 0.22), (-fw - W, CC + 0.22)])])
