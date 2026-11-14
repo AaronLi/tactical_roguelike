@@ -77,7 +77,7 @@ const G_Game = {
   arms: undefined as Record<string, string> | undefined, // (each player's sidearm pick)
   armSel: undefined as string | null | undefined,
   armLook: undefined as string | null | undefined,
-  loTab: 'p' as string, loLook: {} as Record<string, string>, loBox: null as number | null, // (loBox: the attachment box whose list is open) // (the loadout screen's tab, and what's looked at on each tree)
+  loTab: 'p' as string, loLook: {} as Record<string, string>, loAtt: null as null | { sl: string; box: number }, // (loAtt: an attachment box being filled: its own view, in place of the tree) // (the loadout screen's tab, and what's looked at on each tree)
   routeWait: 0,
   armModels: undefined as Promise<unknown> | 'ready' | undefined, // (the sidearm web's guns, stock and pro, loading before it opens: sidearmPick)
   armView: undefined as unknown as GmArmView,
@@ -1428,7 +1428,7 @@ const G_Game = {
     let drag: { x: number; y: number; vx: number; vy: number } | null = null, moved = false;
     const go = (x: number, y: number) => { const v = this.armView, w = el.querySelector<HTMLElement>('.web-world'); this.armFrom = w ? w.style.transform : null; v.x = x * v.z; v.y = y * v.z; };
     el.addEventListener('pointerdown', ((e: GmEvt & PointerEvent) => {
-      if (e.button !== 0 || !e.isPrimary || !e.target.closest('.web-view') || e.target.closest('.web-home, .lo-boxes')) return;
+      if (e.button !== 0 || !e.isPrimary || !e.target.closest('.web-view') || e.target.closest('.web-home, .lo-attview')) return;
       drag = { x: e.clientX, y: e.clientY, vx: this.armView.x, vy: this.armView.y }; moved = false;
       const w = el.querySelector('.web-world'); if (w) w.classList.remove('glide');
     }) as EventListener);
@@ -1441,7 +1441,7 @@ const G_Game = {
     window.addEventListener('pointerup', () => { drag = null; });
     el.addEventListener('wheel', ((e: GmEvt & WheelEvent) => {
       const view = e.target.closest('.web-view');
-      if (!view || e.target.closest('.lo-menu')) return;
+      if (!view || view.classList.contains('lo-attview')) return; // (the attachment view scrolls as a page does)
       e.preventDefault();
       const v = this.armView, r = view.getBoundingClientRect(), z = G.U.clamp(v.z * Math.exp(-e.deltaY * 0.0012), 0.4, 1.5), k = z / v.z, cx = e.clientX - r.left - r.width / 2, cy = e.clientY - r.top - r.height / 2; // (about the cursor: what's under it stays there)
       v.x = cx - (cx - v.x) * k; v.y = cy - (cy - v.y) * k; v.z = z;
@@ -1453,11 +1453,11 @@ const G_Game = {
       if (G.Me.sidearmChosen) return;
       const L = G.Loadout, sl = this.loTab, look = this.loLook[sl];
       const lt = e.target.closest<HTMLElement>('[data-lotab]'), ln = e.target.closest<HTMLElement>('[data-lonode]'), lb = e.target.closest<HTMLElement>('[data-lobox]'), lp = e.target.closest<HTMLElement>('[data-lopart]');
-      // an attachment box: its list opens (again: shut); a part from it fitted, or the box emptied
-      if (lb) { const i = +lb.dataset.lobox!; this.loBox = this.loBox === i ? null : i; G.Audio.click(); return this.sidearmPick(); }
-      if (lp) { const v = lp.dataset.lopart!, [k, id] = v.split('|'); L.fit(sl, look, this.loBox || 0, v ? { k, id } : null); this.loBox = null; G.Audio.click(); return this.sidearmPick(); }
-      if (this.loBox != null && !e.target.closest('.lo-menu')) { this.loBox = null; this.sidearmPick(); if (!lt && !ln) return; } // (a click anywhere else shuts the list)
-      if (lt) { this.loTab = lt.dataset.lotab!; this.armView = this.loCentre(this.loTab); G.Audio.click(); return this.sidearmPick(); }
+      // an attachment box (under a slot in the bar): its own view, of what can go in it; a part from it fitted, or the box emptied
+      if (lb) { const [bs, bi] = lb.dataset.lobox!.split(':'); if (L.sel(bs)) { this.loTab = bs; this.loAtt = { sl: bs, box: +bi }; } G.Audio.click(); return this.sidearmPick(); }
+      if (lp && this.loAtt) { const v = lp.dataset.lopart!, [k, id] = v.split('|'), A = this.loAtt, it = L.sel(A.sl); if (it) L.fit(A.sl, it, A.box, v ? { k, id } : null); this.loAtt = null; G.Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-loback]')) { this.loAtt = null; G.Audio.click(); return this.sidearmPick(); }
+      if (lt) { this.loTab = lt.dataset.lotab!; this.loAtt = null; this.armView = this.loCentre(this.loTab); G.Audio.click(); return this.sidearmPick(); }
       if (e.target.closest('[data-lodeploy]')) { G.Audio.click(); return this.loDeploy(); }
       if (e.target.closest('[data-armhome]')) { go(0, 0); G.Audio.click(); return this.sidearmPick(); }
       if (ln) {
@@ -1480,14 +1480,22 @@ const G_Game = {
   loBar() {
     if (!G.SpaceData.ON) return '';
     const L = G.Loadout, r = L.rank(), x = L.xp(), lo = L.rankAt(r), hi = L.rankAt(r + 1), pct = Math.round(((x - lo) / (hi - lo)) * 100);
-    const val = (sl: string) => { const id = L.sel(sl); return id ? L.name(sl, id) + (L.boxes(sl, id).length ? ` +${L.boxes(sl, id).length}` : '') : sl === 'p' ? 'None' : 'Issue kit'; };
-    const tab = (sl: string, label: string) => { const c = L.cost(sl, L.sel(sl)); return `<button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}<i>${c} pt${c === 1 ? '' : 's'}</i></small><b>${G.U.esc(val(sl))}</b></button>`; };
+    const val = (sl: string) => { const id = L.sel(sl); return id ? L.name(sl, id) : sl === 'p' ? 'None' : 'Issue kit'; };
+    // a slot: its tab, and under it the two attachment boxes of what's taken in it (each opens its own view: loAttView)
+    const tab = (sl: string, label: string) => {
+      const c = L.cost(sl, L.sel(sl)), id = L.sel(sl), bx = id ? L.boxes(sl, id) : [], all = id ? L.atts(sl, id) : [];
+      const box = (i: number) => { const b = bx[i], a = b && all.find((t) => t.id === b.id), on = this.loAtt && this.loAtt.sl === sl && this.loAtt.box === i;
+        return `<button class="lo-tbox${a ? ' full' : ''}${on ? ' on' : ''}" data-lobox="${sl}:${i}" ${id && all.length ? '' : 'disabled'} title="${a ? G.U.esc(a.name) : 'An attachment'}">${a ? `<b>${G.U.esc(a.name)}</b><i>${a.pts}</i>` : `<small>${all.length ? '+ attachment' : '—'}</small>`}</button>`; };
+      return `<div class="lo-slot${this.loTab === sl ? ' on' : ''}"><button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}<i>${c} pt${c === 1 ? '' : 's'}</i></small><b>${G.U.esc(val(sl))}</b></button><div class="lo-tboxes">${box(0)}${box(1)}</div></div>`;
+    };
     const tot = L.total(), over = tot > L.BUDGET;
     return `<div class="lo-bar"><div class="lo-rank"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></div>${tab('p', 'Primary')}${tab('s', 'Sidearm')}${tab('h', 'Helmet')}${tab('a', 'Body armour')}<div class="lo-pts${over ? ' over' : ''}" title="What you take into a run can't cost more than ${L.BUDGET} points"><b>${tot} / ${L.BUDGET}</b><span>${over ? `${tot - L.BUDGET} over` : 'points'}</span></div><button class="btn primary lo-go" data-lodeploy ${over ? 'disabled' : ''}>Deploy</button></div>`;
   },
   // a slot's tree, drawn as a web: the piece in the middle, paths out from it; under the piece you're looking at (once it's yours), its two
   // attachment boxes; beside it all, what it is, what it takes, what's next
   loWeb(el: HTMLElement) {
+    if (this.loAtt && G.Loadout.sel(this.loAtt.sl)) return this.loAttView(el);
+    this.loAtt = null;
     const L = G.Loadout, sl = this.loTab, T = L.TREES[sl], BY = L.by(sl), gun = sl === 'p' || sl === 's';
     const look = this.loLook[sl] = this.loLook[sl] && BY.has(this.loLook[sl]) ? this.loLook[sl] : L.sel(sl) || T.mid;
     const item = (id: string) => { if (gun) return G.Gear.gunItem(G.Me.makeWeapon(id, L.build(sl, id))); const it = G.Gear.gearItem(id); for (const b of L.boxes(sl, id)) (it as any)[b.k] = G.Gear.gearItem(b.id); return it; };
@@ -1503,37 +1511,18 @@ const G_Game = {
       return `<button class="web-node ${st}${look === q.id ? ' look' : ''}${L.sel(sl) === q.id ? ' sel' : ''}" data-lonode="${q.id}" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${((src) => src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>')(pic(q.id))}<b>${G.U.esc(L.name(sl, q.id))}</b>${tip}</button>`;
     }).join('');
     const paths = Object.entries(T.PATHS).map(([k, pa]) => { const [x, y] = L.along(sl, k, L.RINGS[1] / 2); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${pa.name}</span>`; }).join('');
-    // its attachment boxes, and the list of what can go in one
-    const q = BY.get(look)!, got = L.open(sl, look), mine = L.sel(sl) === look, all = got ? L.atts(sl, look) : [], bx = got ? L.boxes(sl, look) : [];
-    const KIND: Record<string, string> = { optic: 'Sight', muzzle: 'Muzzle', barrel: 'Barrel', handguard: 'Handguard', tac: 'Tactical', fg: 'Foregrip', grip: 'Grip', stock: 'Stock', charging: 'Charging handle', loader: 'Loader', railmount: 'Rail mount', slide: 'Slide', face: 'Face piece', plate: 'Plate', shoulder: 'Shoulders', groin: 'Groin' };
-    const kind = (k: string) => KIND[gun ? G.Gunsmith.kindOf(k) : k] || k;
-    let boxes = '';
-    if (got && all.length) {
-      const [x, y] = L.at(sl, q), box = (i: number) => {
-        const b = bx[i], a = b && all.find((t) => t.id === b.id);
-        return `<button class="lo-box${a ? ' full' : ''}${this.loBox === i ? ' on' : ''}" data-lobox="${i}">${a ? `<small>${G.U.esc(kind(a.k))} · ${a.pts} pt</small><b>${G.U.esc(a.name)}</b>` : '<b>+</b><small>Attachment</small>'}</button>`;
-      };
-      let menu = '';
-      if (this.loBox != null) {
-        const ks = [...new Set(all.map((a) => a.k))], cur = bx[this.loBox];
-        menu = `<div class="lo-menu">${cur ? '<button class="lo-part clear" data-lopart="">Empty this box</button>' : ''}${ks.map((k) => {
-          const xs = all.filter((a) => a.k === k), shown = xs.filter((a) => a.open).concat(xs.filter((a) => !a.open).slice(0, 1)); // (what's earned, and the next to earn)
-          return `<h5>${G.U.esc(kind(k))}</h5>${shown.map((a) => a.open ? `<button class="lo-part${bx.some((b) => b.id === a.id) ? ' in' : ''}" data-lopart="${a.k}|${a.id}"><b>${G.U.esc(a.name)}</b><i>${a.pts} pt</i></button>` : `<div class="lo-part locked"><b>${G.U.esc(a.name)}</b><small>${a.have}/${a.n} ${G.U.esc(a.what)}</small></div>`).join('')}`;
-        }).join('')}</div>`;
-      }
-      boxes = `<div class="lo-boxes" style="left:${x.toFixed(1)}px;top:${(y + 72).toFixed(1)}px">${box(0)}${box(1)}${menu}</div>`;
-    }
+    const q = BY.get(look)!, got = L.open(sl, look), mine = L.sel(sl) === look, all = got ? L.atts(sl, look) : [];
     // what you're looking at: what it is, what it takes, what's next from it
     let about = '';
     if (gun) { const d = G.Me.makeWeapon(look, L.build(sl, look)).def, cal = G.CALIBERS[G.calOf(d)], modes = (d.modes || [d.mode]).map((m: string) => G.MODE_NAME[m]).join(' / '); about = `<div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${d.rpm} rpm</span></div><em>${G.U.esc(G.WEAPONS[look].desc)}</em>`; }
     else { const d = G.Gear.DEFS[look]; about = `<em>${G.U.esc(d.desc || '')}</em>`; }
     const ask = got ? '' : !q.from || L.open(sl, q.from) ? `<div class="web-ask"><b>${G.U.esc(L.need(sl, q))}</b>${q.how ? `<small>${G.U.esc(q.how)}</small>` : q.rank != null ? '<small>XP comes from the missions you complete: the higher the threat, the more.</small>' : ''}</div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(L.name(sl, q.from))} first.</div>`;
     const soon = all.filter((a) => !a.open).sort((x, y) => (y.have / y.n) - (x.have / x.n)).filter((a, i, xs) => xs.findIndex((b) => b.k === a.k) === i).slice(0, 4); // (the nearest to earn, one of a kind)
-    const attInfo = got && all.length ? `<h4>Attachments</h4><p class="lo-note">Up to two, in the boxes under it. ${all.filter((a) => a.open).length} of ${all.length} earned with it.</p>${soon.length ? `<ul class="web-next">${soon.map((a) => `<li><b>${G.U.esc(a.name)}</b> ${a.have}/${a.n} ${G.U.esc(a.what)}</li>`).join('')}</ul>` : ''}` : '';
+    const attInfo = got && all.length ? `<h4>Attachments</h4><p class="lo-note">Up to two, in its boxes in the bar above (once it's taken). ${all.filter((a) => a.open).length} of ${all.length} earned with it.</p>${soon.length ? `<ul class="web-next">${soon.map((a) => `<li><b>${G.U.esc(a.name)}</b> ${a.have}/${a.n} ${G.U.esc(a.what)}</li>`).join('')}</ul>` : ''}` : '';
     const nextOn = T.NODES.filter((c) => c.from === look && !L.open(sl, c.id)).map((c) => `<li><b>${G.U.esc(L.name(sl, c.id))}</b> ${G.U.esc(L.need(sl, c))}${c.how ? `<small>${G.U.esc(c.how)}</small>` : ''}</li>`).join('');
     const roster = this.roster || {}, others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !(this.arms || {})[pid]).length, c = L.cost(sl, look);
     const was = el.querySelector('.web-world');
-    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}${boxes}</div>
+    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
         <div class="web-head"><h2>Your ${T.title.toLowerCase()}</h2><p>${G.Pad.text('Drag to move · scroll to zoom · click to look')}</p></div><button class="btn web-home" data-armhome>Back to the middle</button></div>
       <aside class="web-side"><img src="${pic(look)}" alt=""><h3>${G.U.esc(L.name(sl, look))}</h3>${G.SpaceData.ON ? `<div class="lo-cost">${c} point${c === 1 ? '' : 's'}</div>` : ''}${about}${ask}${attInfo}${nextOn ? `<h4>From here</h4><ul class="web-next">${nextOn}</ul>` : ''}
         <div class="web-foot"><p>Earned for good: kept between runs, whatever squad you're in.${sl === 'h' || sl === 'a' ? ' With nothing taken you wear the issue kit: a worn bump helmet and concealable vest.' : ''}</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
@@ -1545,6 +1534,29 @@ const G_Game = {
     if (this.armFrom) { const w = el.querySelector<HTMLElement>('.web-world')!; w.style.transform = this.armFrom; this.armFrom = null; requestAnimationFrame(() => { w.classList.add('glide'); place(); }); } else place();
     if (was) was.remove();
   },
+  // the kinds of attachment, by name (a gun's by its part's kind; the gear's by the mount)
+  loKinds() {
+    const KIND: Record<string, string> = { optic: 'Sight', muzzle: 'Muzzle', barrel: 'Barrel', handguard: 'Handguard', tac: 'Tactical', fg: 'Foregrip', grip: 'Grip', stock: 'Stock', charging: 'Charging handle', loader: 'Loader', railmount: 'Rail mount', slide: 'Slide', face: 'Face piece', plate: 'Plate', shoulder: 'Shoulders', groin: 'Groin' };
+    return (sl: string, k: string) => KIND[sl === 'p' || sl === 's' ? G.Gunsmith.kindOf(k) : k] || k;
+  },
+  // An attachment box being filled, as a view of its own (in the tree's place, the bar over it): every part that can go in it, by kind, a
+  // card each (its picture, its points; one not yet earned dimmed, with how far along it is); beside it, the piece as it'll be
+  loAttView(el: HTMLElement) {
+    const L = G.Loadout, A = this.loAtt!, sl = A.sl, id = L.sel(sl)!, gun = sl === 'p' || sl === 's', all = L.atts(sl, id), bx = L.boxes(sl, id), cur = bx[A.box], KIND = this.loKinds();
+    const icon = (pid: string) => { const it = gun ? G.Gear.partItem(pid) : G.Gear.gearItem(pid), [cw, ch] = G.Gear.size(it), url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
+    const whole = () => { const it = gun ? G.Gear.gunItem(G.Me.makeWeapon(id, L.build(sl, id))) : G.Gear.gearItem(id); if (!gun) for (const b of bx) (it as any)[b.k] = G.Gear.gearItem(b.id); const [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
+    const ks = [...new Set(all.map((a) => a.k))].sort((x, y) => all.filter((a) => a.k === y && a.open).length - all.filter((a) => a.k === x && a.open).length); // (the kinds with something earned first)
+    const groups = ks.map((k) => `<section><h4>${G.U.esc(KIND(sl, k))}</h4><div class="lo-cards">${all.filter((a) => a.k === k).sort((x, y) => +y.open - +x.open).map((a) => {
+      const inThis = cur && cur.id === a.id, other = !inThis && bx.some((b) => b.id === a.id), src = icon(a.id);
+      return `<button class="lo-card${a.open ? '' : ' locked'}${inThis ? ' in' : ''}${other ? ' other' : ''}" ${a.open && !inThis ? `data-lopart="${a.k}|${a.id}"` : 'disabled'}>${src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>'}<b>${G.U.esc(a.name)}</b>${a.open ? `<i>${a.pts} pt${a.pts === 1 ? '' : 's'}${inThis ? ' · in this box' : other ? ' · in the other box' : ''}</i>` : `<small>${a.have}/${a.n} ${G.U.esc(a.what)}</small>`}</button>`;
+    }).join('')}</div></section>`).join('');
+    const one = bx.length && !cur ? bx.find((b) => b) : null, oneK = one ? KIND(sl, one.k) : '';
+    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>${G.U.esc(L.name(sl, id))} <span>— attachment ${A.box + 1} of 2</span></h2><p>${cur ? 'Pick another to put in its place, or empty the box.' : 'Pick what goes in this box.'} One of each kind: a second ${oneK ? oneK.toLowerCase() : 'sight'} takes the first one's place.</p></div>${cur ? '<button class="btn lo-empty" data-lopart="">Empty this box</button>' : ''}${groups}</div><button class="btn web-home" data-loback>Back to the tree</button></div>
+      <aside class="web-side"><img src="${whole()}" alt=""><h3>${G.U.esc(L.name(sl, id))}</h3><div class="lo-cost">${L.cost(sl, id)} point${L.cost(sl, id) === 1 ? '' : 's'} as it stands</div>
+        <h4>In its boxes</h4><ul class="web-next">${[0, 1].map((i) => { const b = bx[i], a = b && all.find((t) => t.id === b.id); return `<li><b>${i + 1}.</b> ${a ? `${G.U.esc(a.name)} <span>${a.pts} pt</span>` : '<span>empty</span>'}</li>`; }).join('')}</ul>
+        <p class="lo-note">${all.filter((a) => a.open).length} of ${all.length} earned with it. The rest come with what's asked of each, done with it.</p></aside></div>`;
+    el.classList.remove('hidden');
+  },
   // Deploy: the sidearm (told the squad: the host waits on everyone's), and the rest put on you (on the ground, the sidearm alone)
   loDeploy() {
     const L = G.Loadout, ON = !!G.SpaceData.ON;
@@ -1553,7 +1565,7 @@ const G_Game = {
     const id = L.sel('s') || 'p9';
     G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)
     G.HUD.toast(ON ? 'LOADOUT' : '', ON ? (['p', 's', 'h', 'a'].map((s) => L.sel(s) && L.name(s, L.sel(s)!)).filter(Boolean) as string[]).map((n) => G.U.esc(n)).join(' · ') : `Sidearm: ${G.U.esc(G.WEAPONS[id].name)}`, 2.4);
-    this.loBox = null; this.sidearmPick(); this.renderRoute();
+    this.loAtt = null; this.sidearmPick(); this.renderRoute();
   },
   // the route's state as the map draws it (js/route.ts svg, tip)
 

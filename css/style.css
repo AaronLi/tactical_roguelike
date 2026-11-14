@@ -1218,8 +1218,8 @@ body.touch-on #fieldInv { background: rgba(7, 9, 11, 0.95); }
 @media (orientation: landscape) { body.touch-on .inv > .inv-col.eq { flex: 0 0 210px; } body.touch-on .inv > .inv-col:nth-child(2) { flex: 1 1 300px; max-width: none; } }
 body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
 /* the loadout screen (js/game.ts loBar, loWeb): a bar over the tree, rank and XP, the four slots, Deploy */
-.web-full:has(.lo-bar) { padding-top: 66px; box-sizing: border-box; }
-.lo-bar { position: absolute; left: 0; top: 0; right: 0; z-index: 2; height: 66px; display: flex; align-items: stretch; gap: 8px; padding: 8px 14px; box-sizing: border-box; background: #0b0e11; border-bottom: 1px solid var(--ui-line); }
+.web-full:has(.lo-bar) { padding-top: 104px; box-sizing: border-box; }
+.lo-bar { position: absolute; left: 0; top: 0; right: 0; z-index: 2; height: 104px; display: flex; align-items: stretch; gap: 8px; padding: 8px 14px; box-sizing: border-box; background: #0b0e11; border-bottom: 1px solid var(--ui-line); }
 .lo-rank { display: flex; flex-direction: column; justify-content: center; min-width: 150px; gap: 3px; font: 400 12px var(--ui-font); color: var(--ui-dim); text-align: left; }
 .lo-rank b { font: 500 16px var(--ui-font); color: var(--ui-text); }
 .lo-rank i { display: block; height: 4px; background: var(--ui-line); border-radius: 2px; overflow: hidden; }
@@ -1260,3 +1260,34 @@ body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
 .lo-part.locked small { color: var(--ui-dim); font-size: 11px; }
 .lo-part.clear { color: #ff9a8a; }
 .lo-note { margin: 0; font: 400 12px var(--ui-font); color: var(--ui-dim); }
+
+/* a slot in the bar: its tab, and under it the two attachment boxes of what's taken in it */
+.lo-slot { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.lo-slot > .lo-tab { flex: 1 1 auto; }
+.lo-tboxes { display: flex; gap: 4px; height: 30px; }
+.lo-tbox { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; background: rgba(20, 24, 28, 0.9); border: 1px dashed var(--ui-line-hi); border-radius: 4px; color: var(--ui-dim); cursor: pointer; font: inherit; }
+.lo-tbox b { font: 500 11.5px var(--ui-font); color: var(--ui-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.lo-tbox i { font-style: normal; font: 500 11px var(--ui-font); color: #9fd6ff; }
+.lo-tbox small { font: 400 11px var(--ui-font); }
+.lo-tbox.full { border-style: solid; border-color: #9fd6ff; }
+.lo-tbox:hover:not(:disabled), .lo-tbox.on { background: var(--ui-fill-hi); border-color: #9fd6ff; }
+.lo-tbox.on { box-shadow: inset 0 -2px 0 #9fd6ff; }
+.lo-tbox:disabled { opacity: 0.35; cursor: default; }
+/* an attachment box being filled: its own view, a card for each part */
+.lo-attview { cursor: default; }
+.lo-attscroll { position: absolute; inset: 0; overflow-y: auto; padding: 18px 24px 80px; box-sizing: border-box; text-align: left; }
+.lo-atthead h2 { margin: 0; font: 300 24px var(--ui-font); color: var(--ui-text); letter-spacing: 2px; }
+.lo-atthead h2 span { color: var(--ui-dim); font-size: 16px; letter-spacing: 0; }
+.lo-atthead p { margin: 4px 0 10px; font: 400 12.5px var(--ui-font); color: var(--ui-dim); }
+.lo-attview section h4 { margin: 14px 0 6px; font: 500 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1.5px; }
+.lo-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.lo-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; background: rgba(20, 24, 28, 0.92); border: 1px solid var(--ui-line); border-radius: var(--ui-r); color: var(--ui-text); cursor: pointer; font: inherit; text-align: center; }
+.lo-card img { height: 46px; max-width: 100%; object-fit: contain; pointer-events: none; }
+.lo-card b { font: 500 12.5px var(--ui-font); line-height: 1.2; }
+.lo-card i { font-style: normal; font: 500 11.5px var(--ui-font); color: #9fd6ff; }
+.lo-card small { font: 400 11px var(--ui-font); color: var(--ui-dim); }
+.lo-card:hover:not(:disabled) { border-color: #9fd6ff; background: var(--ui-fill-hi); }
+.lo-card.in { border-color: #9fd6ff; box-shadow: inset 0 0 0 1px #9fd6ff; cursor: default; }
+.lo-card.other { border-style: dashed; }
+.lo-card.locked { opacity: 0.45; cursor: default; }
+.lo-empty { margin: 4px 0 6px; }
