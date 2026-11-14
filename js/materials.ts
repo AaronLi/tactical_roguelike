@@ -139,10 +139,15 @@ const G_Materials = (() => {
     Festival: [C([['ply', 12]], null, 1, STUD), C([['ply', 12]], null, 1, STUD)],
     'Sandia Crest': [SOLID('granite'), SOLID('granite')], // (the outcrops, and the Crest House is built of the same stone)
     Hangar: [SOLID('concrete'), SOLID('concrete')],
+    // the ships (js/spacedata.ts THEMES): bulkheads of steel sheet over insulation, a hull of steel plate, a warship's thicker and armoured
+    Freighter: [C([['mild', 1.5]], 'wool', 0.3), C([['mild', 10]], 'pur', 0.4)],
+    'Corporate cutter': [C([['mild', 1.5]], 'wool', 0.3), C([['mild', 10]], 'pur', 0.4)],
+    'Navy warship': [C([['mild', 4]], 'wool', 0.3), C([['steel', 15]], 'pur', 0.4)],
   };
   // floors and ceilings by environment: [the ground's, between storeys]
   const SLAB = SOLID('concrete'), JOISTS = C([['ply', 18], ['gypsum', 13]], 'wool', 0.1);
-  const DECK = { Apartment: SLAB, Suburbs: JOISTS, Festival: C([['ply', 18]]), 'Cold Storage': C([['sheet', 0.7]], 'pur'), Warehouse: C([['sheet', 1.5]], 'wool', 0.1) };
+  const DECK = { Apartment: SLAB, Suburbs: JOISTS, Festival: C([['ply', 18]]), 'Cold Storage': C([['sheet', 0.7]], 'pur'), Warehouse: C([['sheet', 1.5]], 'wool', 0.1),
+    Freighter: ONE([['mild', 8]]), 'Corporate cutter': ONE([['mild', 8]]), 'Navy warship': ONE([['mild', 12]]) }; // (a ship's decks: steel plate)
   // furniture, by the piece (js/furniture.ts)
   const CAB = C([['mdf', 18]]), SHEET = (mm: number, core: MatKey | null = null, fill = 1) => C([[mm <= 1.5 ? 'sheet' : 'mild', mm]], core, fill), MACHINE = C([['mild', 12]], 'iron', 0.35);
   const PROPS = {
@@ -190,15 +195,20 @@ const G_Materials = (() => {
     if (s.mat) return s.mat;
     const theme = map.theme || {};
     switch (s.kind) {
-      case 'wall': case 'lintel': if (s.edge) return SOLID('concrete'); return wallOf(theme, outAt(map, p) || (q && outAt(map, q)));
+      case 'wall': case 'lintel': // (a ship's edge is her hull)
+        if (s.edge) return theme.layout === 'ship' ? wallOf(theme, true) : SOLID('concrete');
+        return wallOf(theme, outAt(map, p) || (q && outAt(map, q)));
       case 'floor': case 'ceil': case 'step': {
         if (theme.hub) return SOLID('concrete');
+        if (theme.layout === 'ship') return (DECK as Record<string, any>)[theme.name] || ONE([['mild', 8]]); // (her lowest deck too: there's no ground under it)
         if ((s.kind === 'floor' && s.max[1] <= 0.01 && s.min[1] <= -0.4) || outAt(map, p)) return outAt(map, p) ? SOLID('soil') : SOLID('concrete'); // (the ground: earth outdoors, a slab on it in)
         return (DECK as Record<string, any>)[theme.name] || SLAB;
       }
       case 'door': case 'leaf': {
         const d = s.door || {};
         if (d.kind === 'vault') return C([['mild', 25]], 'mild', 0.04);
+        if (d.kind === 'blast') return ONE([['mild', 20]]); // (a ship's: a blast door's a slab of steel; a sliding door steel skins round a filling, a warship's heavier)
+        if (d.kind === 'slide') return theme.name === 'Navy warship' ? C([['mild', 4]], 'wool', 0.4) : C([['mild', 1.5]], 'wool', 0.4);
         if (s.glass != null) return ONE([['glass', 8]]);
         if (d.kind === 'fire') return C([['sheet', 1.5]], 'wool', 0.5); // (a roof's)
         return theme.name === 'Bunker' || theme.name === 'Foundry' || theme.name === 'Warehouse' ? C([['sheet', 1.5]], 'wool', 0.5) : theme.name === 'Cold Storage' || theme.name === 'Research Lab' ? C([['sheet', 1]], 'pur') : C([['hardwood', 4]]); // (hollow-core timber, or a steel fire door)
