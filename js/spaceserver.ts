@@ -65,9 +65,11 @@ const G_SpaceSv = (() => {
     net().broadcast({ t: 'phase', phase: 'route', level: 1, route: null });
     sv.sendRoster();
   }
-  // the ship has set down in the hangar with missions flown: the board turns over (and the squad is that much further on)
+  // the ship has set down in the hangar with every mission the squad took on flown: the board turns over (and the squad is that much
+  // further on). With some still to fly, it stays as it is: what's done marked done, the rest still theirs
   function landed() {
-    if (!st.board.done.length) return;
+    const B = st.board;
+    if (!B.done.length || B.picked.some((i) => !B.done.includes(i))) return;
     st.rank += st.board.done.length;
     S().level = st.rank;
     st.board = { seed: (Math.random() * 2 ** 31) | 0, level: st.rank, picked: [], done: [] };
@@ -402,6 +404,7 @@ const G_SpaceSv = (() => {
         if (!p || sv.phase !== 'shop' || !st.ship.docked || !offers()[i] || B.done.includes(i)) break;
         if (B.picked.includes(i)) B.picked = B.picked.filter((q) => q !== i); else if (B.picked.length < SD.PICKS) B.picked.push(i); else break;
         net().broadcast(boardMsg());
+        if (B.done.length && B.picked.every((q) => B.done.includes(q))) landed(); // (the last one still to fly let go of: the board turns over now)
         break;
       }
       case 'jump': jump(m.to | 0, from); break;
