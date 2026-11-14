@@ -18,6 +18,7 @@
 //   ?fly                  the game in space (docs/space.md): at the helm of the squad's ship, lifting off the hangar's pad
 //   ?board=<class>        straight to a boarding mission: transport, small, medium, large or capital; &other=transport a second ship off her; &obj=artifact|hvt|destruct; &hull=0..2 whose ship;
 //                         &dock: already against her hull, standing in the airlock; &ship=<id> the squad's ship (kestrel, atlas, wraith)
+//   ?mousedbg             (with any of these, or alone) a panel of what the browser reports the mouse moved, with and without a button held
 //   ?assault=<place>      straight to a planetary assault on that kind of place (&dock: set down on its pad)
 //   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
 // It plays as if the mouse were captured (no click-to-play screen). When it's there, window.__debugReady is true and
@@ -155,6 +156,24 @@ const G_DebugStart = (() => {
     say(`ready: ${G.Game.hub ? 'the hangar' : `level ${G.Game.level}, ${(G.Game.map && G.Game.map.theme && G.Game.map.theme.name) || '?'}`}`);
     done();
   }
+  // ?mousedbg: what the browser says the mouse moved, with no button held and with one held, side by side: the events a second,
+  // the mean of |movementX| + |movementY| an event, and their sum a second, over the last three seconds of each. Sweep the mouse
+  // at one steady pace with and without a button down: if the sums differ, the browser is scaling the movement it reports by
+  // whether a button's held (the game makes nothing of the buttons when it turns the view: js/player.ts lookBy), and "raw" says
+  // whether it gave the unaccelerated movement that was asked for (js/game.ts lock: Safari has none to give).
+  if (q.has('mousedbg')) window.addEventListener('load', () => {
+    const el = document.createElement('div'); el.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99999;background:rgba(0,0,0,.75);color:#9fe8b0;font:12px/1.5 monospace;padding:6px 10px;white-space:pre;pointer-events:none';
+    document.body.appendChild(el);
+    const ev: { t: number; d: number; b: number }[] = []; let raw = '?';
+    document.addEventListener('mousemove', (e) => { if (e.isTrusted) ev.push({ t: performance.now(), d: Math.abs(e.movementX) + Math.abs(e.movementY), b: e.buttons ? 1 : 0 }); }, true);
+    document.addEventListener('pointerlockchange', () => { raw = document.pointerLockElement ? 'asked for; see the console if it was refused' : '-'; });
+    const last = [null, null] as (string | null)[];
+    setInterval(() => {
+      const now = performance.now(); while (ev.length && now - ev[0].t > 3000) ev.shift();
+      for (const b of [0, 1]) { const l = ev.filter((q2) => q2.b === b); if (l.length > 20) { const span = Math.max(0.2, (l[l.length - 1].t - l[0].t) / 1000), sum = l.reduce((a2, q2) => a2 + q2.d, 0); last[b] = `${(l.length / span).toFixed(0).padStart(4)} events/s   ${(sum / l.length).toFixed(2).padStart(6)} px/event   ${(sum / span).toFixed(0).padStart(6)} px/s`; } }
+      el.textContent = `mouse, as the browser reports it (devicePixelRatio ${window.devicePixelRatio})\nno button: ${last[0] || 'move the mouse'}\nbutton held: ${last[1] || 'hold a button and move it'}\nsensitivity setting ${G.Game && G.Game.settings ? G.Game.settings.sens : '?'}, raw movement ${raw}`;
+    }, 300);
+  });
   if (q.has('play') || q.has('hangar') || q.has('board') || q.has('assault') || q.has('fly')) window.addEventListener('load', () => setTimeout(() => { run().catch((e) => console.error('[debug start]', e)); }, 300));
   return { run, ready };
 })();

@@ -279,6 +279,9 @@ const G_ShipGen = (() => {
     if (Object.values(locks).includes('armory')) cardRooms.armory = room('barracks', at) >= 0 ? room('barracks', at) : room('mess', at);
     const sp: ShMeta = { wing: !!src.wing, size: src.size, obj: src.obj, decks: src.decks, other: src.other, breach, cuts: [], locks, roles, hullOf, console: cons, artifact: ar >= 0 ? clearIn(ar) : null, pods, salvage, hullWin, hvtRoom: bridge, cardRooms, hull: hulls[0], hulls };
     map.sp = sp;
+    // (the stretch that's marked is one she can be breached at: the nearest such along that wall to the hold's middle. What's
+    // stood against the hull inside can rule out the middle itself, and a ram at the mark must go through)
+    { const b = sp.breach, near = sites(map).filter((q) => q.nz === 1 && Math.abs(q.z - b.z) < TS).sort((p, q) => Math.abs(p.x - b.x) - Math.abs(q.x - b.x))[0]; if (near) b.x = near.x; }
     map.theme = Object.assign({}, map.theme, { big: S.big });
     return map;
   }

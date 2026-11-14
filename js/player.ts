@@ -547,7 +547,12 @@ const G_Me = {
   lookBy(dx: number, dy: number, sens: number) {
     if (!G.Game.locked || this.dead || this.out) return; // (out cold: no looking round)
     if (this.wheel) { this.wheelMove(dx, dy); return; } // (the comms wheel open: the mouse picks on it)
-    const z = this.viewer ? 1 / this.VIEWER.MAG : G.U.lerp(1, this.sight(this.cur()).zoom, this.adsT || 0); // (a viewer's magnification slows the view as much)
+    // Aiming, the view turns less for the same push, by as much as the picture is magnified: so what you're looking at crosses
+    // the screen at the rate it does from the hip, whatever the sight (it used to go by the sight's own figure, which for a
+    // scope was well short of its power: a 4x turned the picture at nearly twice the hip's rate). Irons and dots narrow the
+    // whole view (js/player.ts fov: by zoom); a scope narrows it to 0.8 and magnifies the picture in its lens by its power.
+    const sg = this.sight(this.cur()), hf = G.Game.settings.fov * Math.PI / 360, aimK = sg.scoped ? Math.tan(hf * 0.8) / Math.tan(hf) / Math.max(1, sg.mag) : Math.tan(hf * sg.zoom) / Math.tan(hf);
+    const z = this.viewer ? 1 / this.VIEWER.MAG : G.U.lerp(1, aimK, this.adsT || 0); // (a viewer's magnification slows the view as much)
     const s = sens * z;
     // a magazine in your hand, or the gun held open for a chamber check: the mouse turns that, not your view
     const mc = this.magChk;

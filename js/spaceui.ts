@@ -126,7 +126,7 @@ const G_SpaceUI = (() => {
   // The navigation screen. Left: a scope, her own nose up, everything with a waypoint on it by bearing and (log) range, the
   // one that's the target ringed. Right: the figures. Close to a breach it's the approach instead: the plate dead ahead is
   // the middle of the rings, the dot her nose's offset from the line into it, the bar her closing speed against what a
-  // breach wants (5 to 45 m/s).
+  // breach wants (5 m/s or more: none is too fast).
   function drawNav(cv: HTMLCanvasElement) {
     const s = S(), c = cv.getContext('2d')!, W = cv.width, H = cv.height;
     c.fillStyle = '#04090d'; c.fillRect(0, 0, W, H); c.textBaseline = 'middle'; c.font = '11px sans-serif'; c.lineWidth = 1;
@@ -143,8 +143,8 @@ const G_SpaceUI = (() => {
       c.strokeStyle = '#8fd6ff'; c.beginPath(); const ax = cx + G.U.clamp(f.x * 160, -R, R), ay = cy - G.U.clamp(f.y * 160, -R, R); c.moveTo(ax - 9, ay); c.lineTo(ax + 9, ay); c.moveTo(ax, ay - 9); c.lineTo(ax, ay + 9); c.stroke();
       c.fillStyle = '#8fd6ff'; c.fillText('BREACH APPROACH', 196, 16);
       c.fillStyle = '#d7e6f2'; c.fillText('range  ' + SD.dist(Math.max(0, range)), 196, 44); c.fillText('off line  ' + Math.hypot(dx, dy).toFixed(1) + ' m', 196, 62); c.fillText('closing  ' + close.toFixed(0) + ' m/s', 196, 80);
-      c.fillStyle = close < 4 ? '#ffb020' : close > 45 ? '#ff5a40' : '#7dff9a'; c.fillText(close < 4 ? 'TOO SLOW TO BREACH' : close > 45 ? 'TOO FAST' : ok ? 'CLEAR HULL: GO' : 'SQUARE HER UP', 196, 104);
-      c.fillStyle = '#12303e'; c.fillRect(196, 122, 110, 8); c.fillStyle = close > 45 ? '#ff5a40' : '#7dff9a'; c.fillRect(196, 122, G.U.clamp(close / 60, 0, 1) * 110, 8); c.fillStyle = '#d7e6f2'; c.fillRect(196 + 110 * 4 / 60, 119, 1, 14); c.fillRect(196 + 110 * 45 / 60, 119, 1, 14);
+      c.fillStyle = close < 4 ? '#ffb020' : '#7dff9a'; c.fillText(close < 4 ? 'TOO SLOW TO BREACH' : ok ? 'CLEAR HULL: GO' : 'SQUARE HER UP', 196, 104);
+      c.fillStyle = '#12303e'; c.fillRect(196, 122, 110, 8); c.fillStyle = '#7dff9a'; c.fillRect(196, 122, G.U.clamp(close / 60, 0, 1) * 110, 8); c.fillStyle = '#d7e6f2'; c.fillRect(196 + 110 * 4 / 60, 119, 1, 14);
       c.fillStyle = '#7f97a8'; c.fillText('dot: nose · cross: heading', 196, 150);
       return;
     }

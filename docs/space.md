@@ -29,7 +29,7 @@ off: the game is then the route map and the helicopter, as it was. A debug start
    drive spools, the screens go to the jump's light (the host's veil, kind `ftl`: CSS only, so it keeps moving while the
    page builds the level), and the ship comes out of the tunnel 4.5 s after the level is ready. A corvette's level built in
    about half a second on the machine this was tested on.
-5. **Boarding.** She arrives 1.7 km off. Ram her hull nose-on at 5 to 45 m/s, **anywhere there's a clear stretch of it**:
+5. **Boarding.** She arrives 1.7 km off. Ram her hull nose-on at 5 m/s or more (no speed is too high), **anywhere there's a clear stretch of it**:
    port, starboard or the stern quarters (the hold amidships to starboard is marked as a suggestion). The navigation screen
    becomes the approach to wherever the nose is pointed: offset, range, closing speed. The hull is cut through there, her
    breaching door opens, and it's the CQB game from there. Hold G at the helm to undock: the compartment she backs out of

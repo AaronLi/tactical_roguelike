@@ -655,10 +655,10 @@ const G_Space = (() => {
   function events() {
     if (S.kind === 'board' && S.map && !S.state?.boom) {
       // her nose into the hull, square on and fast enough: she's through, wherever that is along it
-      const a = aim(6), up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q);
-      if (a && a.range < 2.6 && a.align > 0.8 && up.y > 0.8 && a.close > 3.5 && Math.abs(a.dy) < 1.6) {
+      // (no speed is too high for it: the collar takes it. Fast, she covers metres a frame, so the plate's looked for that much further ahead)
+      const lead = S.V.length() * 0.05, a = aim(6 + lead), up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q);
+      if (a && a.range < 2.6 + lead && a.align > 0.8 && up.y > 0.8 && a.close > 3.5 && Math.abs(a.dy) < 1.6) {
         S.shake = 1;
-        if (a.close > 45) damage((a.close - 45) * 1.5, 'Too fast into the hull');
         const at = [a.site.c, a.site.nx, a.site.nz];
         rebase(berthAt(a.site));
         auto(S.Dp, S.Dq, 0.35, null, () => { G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); dockLocal(true); });
