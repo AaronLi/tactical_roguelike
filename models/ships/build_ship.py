@@ -134,17 +134,17 @@ B = Mesh('body')
 # glazed walls and deck (drawn with the glass), what keeps you off the glass's foot (behind it), and the doors
 def same(a, b): return abs(a - b) < 1e-6
 for b in BOXES:
-    if len(b) > 6: continue
-    bx0, by0, bz0, bx1, by1, bz1 = b
+    if len(b) > 6 and b[6] not in ('up', 'down'): continue  # (the doors, the steps off the ramp: their own)
+    bx0, by0, bz0, bx1, by1, bz1 = b[:6]
     if same(by0, FC) and same(by1, CC) and same(bz0, zc + 0.3): continue
     if same(bz0, zc + 0.3) and (same(by1, FC) or same(by1, FC + 0.55)): continue
     flat = by1 - by0 <= 0.36 or (by0 == 0 and by1 <= FB + 0.01 and bx1 - bx0 < 2 * fw)
     B.box('deck' if flat else 'inner', bx0, by0, bz0, bx1, by1, bz1, 0.015)
 # the stairs' treads: a lit nosing on each step
 for b in BOXES:
-    if len(b) > 6: continue
-    bx0, by0, bz0, bx1, by1, bz1 = b
-    if by0 == 0 and same(bx1 - bx0, fw - 0.06) and zk - 0.01 < bz0 < zr: B.box('hot', bx0 + 0.05, by1, bz0 + 0.01, bx1 - 0.05, by1 + 0.006, bz0 + 0.04)
+    if len(b) < 7 or b[6] not in ('up', 'down'): continue
+    bx0, by0, bz0, bx1, by1, bz1 = b[:6]
+    if by1 < FM - 0.01 or b[6] == 'up': B.box('hot', bx0 + 0.05, by1, bz0 + 0.01, bx1 - 0.05, by1 + 0.006, bz0 + 0.04)
 # the cockpit's deck: inside the glass's foot where it's glazed, the deck ahead of the helm's seat glass
 B.box('deck', -fw + IN, 0, zf, fw - IN, FC, zg1, 0.01); B.box('deck', -fw - 0.2, 0, zg1, fw + 0.2, FC, zr, 0.01)
 B.box('glass', -(fw - IN), FC - 0.035, zc + 0.6, fw - IN, FC - 0.005, zf)
@@ -180,7 +180,9 @@ screen('screen_nav', (-0.7, FC + 0.85, zc + 1.2), 0.5, 0.32, 0.55, -0.7)
 screen('screen_sensors', (SX + 0.28, FC + 0.72, SZ - 0.38), 0.46, 0.3, -0.5, -0.75)  # (low by its right knee, tipped up: clear of the glass)
 B.box('dark', -0.98, FC + 0.66, zc + 1.0, -0.42, FC + 1.02, zc + 1.42, 0.02) if False else None
 # the seats: a pedestal, a pan, a back with a headrest and wings, arms; the jump seats folding pans on the wall
-for st in SEATS:
+BODY = B
+for si, st in enumerate(SEATS):
+    B = Mesh('seat_%d' % si)
     F, c, sn = st['f'], math.cos(st['yaw']), math.sin(st['yaw'])
     fx, fz = -sn, -c; ax, az = abs(fz), abs(fx)  # (the way it faces; across it)
     sx, sz = st['x'] - fx * 0.05, st['z'] - fz * 0.05
@@ -194,7 +196,9 @@ for st in SEATS:
     if not jump:
         B.box('seat', bx - ax * 0.13 - az * 0.07, top, bz - az * 0.13 - ax * 0.07, bx + ax * 0.13 + az * 0.07, top + 0.2, bz + az * 0.13 + ax * 0.07, 0.04)
         for e in (-1, 1): B.box('dark', sx + ax * e * (h + 0.04) - az * 0.2 - ax * 0.03, pan + 0.2, sz + az * e * (h + 0.04) - ax * 0.2 - az * 0.03, sx + ax * e * (h + 0.04) + az * 0.06 + ax * 0.03, pan + 0.26, sz + az * e * (h + 0.04) + ax * 0.06 + az * 0.03, 0.015)
-    if st['k'] == 'turret': B.box('hot', sx - 0.18, pan + 0.75, sz - 0.42, sx + 0.18, pan + 0.79, sz - 0.3, 0.005); B.box('dark', sx - 0.22, pan + 0.55, sz - 0.5, sx + 0.22, pan + 0.75, sz - 0.28, 0.02)
+    if st['k'] == 'turret': BODY.box('hot', sx - 0.18, pan + 0.75, sz - 0.42, sx + 0.18, pan + 0.79, sz - 0.3, 0.005); BODY.box('dark', sx - 0.22, pan + 0.55, sz - 0.5, sx + 0.22, pan + 0.75, sz - 0.28, 0.02)
+    B.obj()
+B = BODY
 # ---- the breach deck: the tunnel ribbed, lit strips down its floor to the door, hazard stripes on the low wall, lamps over it
 for k in range(int((zt - zc - 0.3) / 0.6) + 1):
     z = zc + 0.25 + k * 0.6

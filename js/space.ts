@@ -63,6 +63,7 @@ const G_Space = (() => {
     if (S.on && me().pos && aboard()) { const p = SD.toShip(S.berth, me().pos.x, me().pos.y, me().pos.z); S.keep = { x: p.x, y: p.y, z: p.z, yaw: me().yaw - S.berth.yaw }; } else S.keep = null;
     unhide();
     for (const o of [S.model && S.model.group, S.root, S.stars, S.tunnel, S.sun]) if (o && o.parent) o.parent.remove(o);
+    litSeat = -1;
     if (S.sun && S.sun.target.parent) S.sun.target.parent.remove(S.sun.target);
     G.R.levelRoot.position.set(0, 0, 0); G.R.levelRoot.quaternion.identity(); G.R.levelRoot.visible = true;
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
@@ -640,6 +641,30 @@ const G_Space = (() => {
   }
 
   // ------------------------------------------------------------------ seats
+  // The seat you're looking at: the one the middle of your view meets first within 2 m (a box round each chair, from its deck to its
+  // headrest, a little wider than it), and lit while it is (seatLit)
+  function seatLooked() {
+    const cam = G.R.camera, o = cam.getWorldPosition(new T.Vector3()), dir = cam.getWorldDirection(new T.Vector3());
+    const p = SD.toShip(S.berth, o.x, o.y, o.z), c = Math.cos(S.berth.yaw), s = Math.sin(S.berth.yaw), dx = dir.x * c - dir.z * s, dz = dir.x * s + dir.z * c, dy = dir.y;
+    let best = -1, bt = 2.0;
+    S.seatsDef.forEach((st, i) => {
+      const h = st.k === 'jump' ? 0.3 : 0.34, lo = [st.x - h, st.f, st.z - h], hi = [st.x + h, st.y + 1.15, st.z + h], O = [p.x, p.y, p.z], D = [dx, dy, dz];
+      let t0 = 0, t1 = bt;
+      for (let a = 0; a < 3; a++) {
+        if (Math.abs(D[a]) < 1e-9) { if (O[a] < lo[a] || O[a] > hi[a]) return; continue; }
+        let ta = (lo[a] - O[a]) / D[a], tb = (hi[a] - O[a]) / D[a]; if (ta > tb) [ta, tb] = [tb, ta];
+        t0 = Math.max(t0, ta); t1 = Math.min(t1, tb); if (t0 > t1) return;
+      }
+      if (t0 < bt) { bt = t0; best = i; }
+    });
+    return best;
+  }
+  let litSeat = -1;
+  function seatLit(i: number) {
+    const ms = S.model && S.model.seats; if (!ms || i === litSeat) return;
+    for (const m of ms[litSeat] || []) m.emissive.setHex(m.userData.e0);
+    litSeat = i; for (const m of ms[i] || []) { if (m.userData.e0 == null) m.userData.e0 = m.emissive.getHex(); m.emissive.setHex(0x2c5a78); }
+  }
   function seatPos(i: number) {
     const s = S.seatsDef[i] || S.seatsDef[0], w = SD.toWorld(S.berth, s.x, s.y, s.z);
     return { x: w.x, y: w.y, z: w.z, yaw: S.berth.yaw + s.yaw };
@@ -870,6 +895,8 @@ const G_Space = (() => {
     u.f.value.copy(fwd(S.Q)); if (S.zone) u.f.value.applyQuaternion(_zq.copy(S.zone.quaternion).invert());
     // (the motes near her go by as fast as the smear's long: kept within one box's width, the shader wraps them)
     const w = 2 * u.R.value, t = u.tr.value.addScaledVector(u.f.value, smearK * 1400 * dt);
+    const tm = (st.userData.streak as any).tm; tm.value = (tm.value + smearK * 0.9 * dt) % 1000; // (the far stars along their way out from the middle)
+    const pm = st.material as THREE.PointsMaterial; pm.color.setScalar(1 - Math.min(0.85, smearK * 1.6)); // (as they go by, the still ones dim)
     t.set(((t.x % w) + w) % w, ((t.y % w) + w) % w, ((t.z % w) + w) % w);
   }
   let tunUp: { map: LvMap | null; steps: ((ms: number) => boolean)[] } | null = null;
@@ -1078,6 +1105,7 @@ const G_Space = (() => {
   function interact(m: typeof G.Me, dt: number, held: boolean, F: boolean): { prompt: string; prog: number; label: string } | null {
     if (!S.on) return null;
     const out = { prompt: '', prog: -1, label: '' };
+    if (m.seat != null || !aboard()) seatLit(-1);
     if (!held && !K('KeyG') && !K('KeyL') && !K('KeyJ')) { S.hold = 0; S.holdK = ''; }
     const seat = mySeat();
     if (seat) {
@@ -1123,8 +1151,8 @@ const G_Space = (() => {
     const px = m.pos.x, pz = m.pos.z, near = (x: number, z: number, r: number, y = m.pos.y) => Math.hypot(px - x, pz - z) < r && Math.abs(m.pos.y - y) < 2.2;
     // aboard: the nearest seat
     if (aboard()) {
-      let best = -1, bd = 1.15;
-      S.seatsDef.forEach((s, i) => { const w = seatPos(i), d = Math.hypot(px - w.x, pz - w.z); if (d < bd && Math.abs(m.pos.y - (S.berth.y + s.f)) < 0.8) { bd = d; best = i; } }); // (on its deck: not the one under your feet)
+      const best = seatLooked();
+      seatLit(best);
       if (best >= 0) {
         const s = S.seatsDef[best], taken = Object.keys(S.seats).some((id) => id !== G.Net.myId && S.seats[id] === best && G.Game.roster[id]);
         const what = s.k === 'helm' ? 'take the helm' : s.k === 'sensors' ? 'sit at the sensor station' : s.k === 'turret' ? 'man the turret' : 'sit down';
@@ -1261,7 +1289,7 @@ const G_Space = (() => {
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
   /** in a jump, aboard: what the screen shows is the pod and the tunnel, not a veil (js/game.ts) */
   const jumping = () => S.on && !!S.ftl && aboard();
-  return { sound, dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { sound, dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }

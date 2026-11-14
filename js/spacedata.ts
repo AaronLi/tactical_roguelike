@@ -81,19 +81,19 @@ const G_SpaceData = (() => {
     // the crew deck no longer than its two rows of seats and the ramp need)
     // (the cockpit two rows long: the pilot, then the sensor station and the gunners side by side; the tunnel over it as short as leaves a
     // space to wait in behind the low wall; the crew deck no wider than its two walls of seats and the way between them want)
-    const k = d.hw / 1.7, zc = d.z0 - d.nose - 0.5, zt = zc + 1.8, zk = zc + 3.5, zr = zk + 2.3, FB = 2.4;
-    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.3 * k, zc, zt, zw: zt + 0.9, lw: 0.6, zk, zr, z1: zr + 4.6 + Math.max(0, d.jump - 4) * 0.48, FC: 0.15, FB, FM: 1.5, CC: 2.2, CB: FB + 2.2, CM: 3.9, lift: FB - FLOOR };
+    const k = d.hw / 1.7, zc = d.z0 - d.nose - 0.5, zt = zc + 1.5, zk = zc + 3.5, zr = zk + 2.0, FB = 2.4; // (the tunnel 1.5 m: the staging space behind it deep enough to go round the low wall either side; the stairs 2 m long)
+    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.3 * k, zc, zt, zw: zt + 0.85, lw: 0.6, zk, zr, z1: zr + 4.6 + Math.max(0, d.jump - 4) * 0.48, FC: 0.15, FB, FM: 1.5, CC: 2.2, CB: FB + 2.2, CM: 3.9, lift: FB - FLOOR };
   }
   function seats(d: SpShipDef): SpSeat[] {
     const L = layout(d), F = L.FC;
     const s: SpSeat[] = [
       { k: 'helm', x: 0, y: F + 0.1, z: L.zc + 1.45, yaw: 0, f: F, sx: 0.75, sz: L.zc + 1.6 }, // (low: the glass floor ahead of it, and headroom over it)
     ];
-    // the second row, side by side behind the pilot: the sensor station (raised, eyes over the pilot's head) and the gunners; with two guns
-    // the sensor station's in the middle
-    const row = d.turrets > 1 ? [0, -0.8, 0.8] : [0.55, -0.55], zrw = L.zc + 2.55;
-    s.push({ k: 'sensors', x: row[0], y: F + 0.42, z: zrw, yaw: 0, f: F, sx: row[0], sz: zrw + 0.65 });
-    for (let i = 0; i < d.turrets; i++) s.push({ k: 'turret', n: i, x: row[1 + i], y: F + 0.1, z: zrw, yaw: 0, f: F, sx: row[1 + i], sz: zrw + 0.65 });
+    // behind the pilot on the left, the copilot at the sensor station (raised, eyes over the pilot's head); the gunner in the alcove under the
+    // up flight, facing forward (a second gun's on the right of the second row)
+    const zrw = L.zc + 2.55, ax = (-L.fw - 0.06) / 2;
+    s.push({ k: 'sensors', x: -0.55, y: F + 0.42, z: zrw, yaw: 0, f: F, sx: -0.55, sz: zrw + 0.65 });
+    for (let i = 0; i < d.turrets; i++) s.push(i === 0 ? { k: 'turret', n: i, x: ax, y: F + 0.1, z: L.zk + 0.45, yaw: 0, f: F, sx: ax + 0.05, sz: L.zk - 0.45 } : { k: 'turret', n: i, x: 0.55, y: F + 0.1, z: zrw, yaw: 0, f: F, sx: 0.55, sz: zrw + 0.65 });
     for (let i = 0; i < d.jump; i++) { const sd = i % 2 ? 1 : -1, z = L.zr + 1.4 + Math.floor(i / 2) * 0.95; s.push({ k: 'jump', x: sd * (L.hw - 0.4), y: L.FM, z, yaw: sd * Math.PI / 2, f: L.FM, sx: sd * (L.hw - 1.1), sz: z }); }
     return s;
   }
@@ -103,11 +103,11 @@ const G_SpaceData = (() => {
   function boxes(d: SpShipDef): ShipBox[] {
     const L = layout(d), W = 0.2, { fw, tw, sw, hw, zc, zt, zw, lw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, top = CB + W;
     // (each flight as many steps as keep a rise to 0.3 m, over the same run)
-    const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), run = zr - zk, rD = run - 0.95; // (rD: the down flight's run, on the cockpit's deck the best part of a metre before its ceiling, so your head's under it as you come to it)
+    const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), run = zr - zk, rD = run - 0.75; // (rD: the down flight's run, on the cockpit's deck most of a metre before its ceiling, so your head's under it as you come to it)
     const out: ShipBox[] = [
       // the cockpit: its deck (on to the foot of the down flight), its sides, the glass at its front, its back wall under the up flight
       [-fw - W, 0, zc + 0.3, fw + W, FC, zr], [-fw - W, FC, zc + 0.3, -fw, CC, zk], [fw, FC, zc + 0.3, fw + W, CC, zk], [-fw, FC, zc + 0.3, fw, CC, zc + 0.5],
-      [-fw, FC, zk, -0.06, FB - 0.3, zk + 0.05], [-fw - W, CC, zc + 0.3, fw + W, CC + 0.2, zt], // (and its roof, under the tunnel)
+      [-fw - W, CC, zc + 0.3, fw + W, CC + 0.2, zt], // (and its roof, under the tunnel)
       [-fw, FC, zc + 0.3, -fw + 0.24, FC + 0.55, zc + 3.1], [fw - 0.24, FC, zc + 0.3, fw, FC + 0.55, zc + 3.1], [-fw, FC, zc + 0.3, fw, FC + 0.55, zc + 0.57], // (the glass leans in toward its foot: kept off it there)
       // the breach deck: the tunnel's floor, sides and roof; the staging space's floor, sides, roof and the wall either side of the tunnel's mouth; the low wall
       [-tw - W, CC, zc, tw + W, FB, zt], [-tw - W, FB, zc, -tw, CB, zt], [tw, FB, zc, tw + W, CB, zt], [-tw - W, CB, zc, tw + W, top, zt],
@@ -124,7 +124,7 @@ const G_SpaceData = (() => {
       [-hw, FM, z1, hw, CM, z1 + W, 'ramp'],
     ];
     for (let i = 0; i < nD - 1; i++) out.push([0.06, 0, zr - rD * (i + 1) / (nD - 1), fw, FM - (FM - FC) * (i + 1) / nD, zr - rD * i / (nD - 1), 'down']); // down to the cockpit, on the right
-    for (let i = 0; i < nU; i++) out.push([-fw, 0, zr - run * (i + 1) / nU, -0.06, FM + (FB - FM) * (i + 1) / nU, zr - run * i / nU, 'up']); // up to the breach deck, on the left
+    for (let i = 0; i < nU; i++) { const t = FM + (FB - FM) * (i + 1) / nU; out.push([-fw, t - 0.3, zr - run * (i + 1) / nU, -0.06, t, zr - run * i / nU, 'up']); } // up to the breach deck, on the left: treads, the gunner's alcove under them
     for (let i = 0; i < 4; i++) out.push([-hw + 0.3, 0, z1 + W + 0.38 * i, hw - 0.3, FM - 0.3 * (i + 1), z1 + W + 0.38 * (i + 1), 'steps']); // off the open ramp
     return out;
   }
@@ -132,7 +132,7 @@ const G_SpaceData = (() => {
   // head (zh, rise higher) in n treads; its steps are the boxes tagged with its tag (the last tread may be the deck it comes up to)
   function flights(d: SpShipDef) {
     const L = layout(d), { fw, zk, zr, z1, FC, FB, FM, hw } = L, W = 0.2;
-    const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), rD = zr - zk - 0.95, tD = rD / (nD - 1);
+    const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), rD = zr - zk - 0.75, tD = rD / (nD - 1);
     return [
       { tag: 'up', x0: -fw, x1: -0.06, zf: zr, zh: zk, y0: FM, rise: FB - FM, n: nU },
       { tag: 'down', x0: 0.06, x1: fw, zf: zr - rD, zh: zr - rD + nD * tD, y0: FC, rise: FM - FC, n: nD },

@@ -3,7 +3,7 @@
 // boxes has it, so what's drawn is what stops you), the outside of a ship that's boarded, made from her deck plan (js/shipgen.ts:
 // each compartment shows on the hull as what it is), the asteroid the base is cut into, an interspatial anchor, a planet,
 // the stars, the tunnel of a jump. Boxes mostly, merged a material: a ship is one draw call a colour.
-interface SmShip { group: THREE.Group; nose: THREE.Group[]; ramp: THREE.Group; turrets: { base: THREE.Group; gun: THREE.Group; muzzle: THREE.Object3D }[]; thrust: THREE.MeshBasicMaterial; glow: THREE.MeshBasicMaterial; screen: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture }; nav: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture }; lights: THREE.PointLight[] }
+interface SmShip { group: THREE.Group; nose: THREE.Group[]; ramp: THREE.Group; turrets: { base: THREE.Group; gun: THREE.Group; muzzle: THREE.Object3D }[]; thrust: THREE.MeshBasicMaterial; glow: THREE.MeshBasicMaterial; screen: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture }; nav: { cv: HTMLCanvasElement; tex: THREE.CanvasTexture }; lights: THREE.PointLight[]; seats?: THREE.MeshStandardMaterial[][] }
 interface SmGun { k: 'pd' | 'cannon' | 'missile'; x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
 const G_ShipModel = (() => {
   const T = THREE;
@@ -68,11 +68,13 @@ const G_ShipModel = (() => {
       glow, strip: lit(0xdff2ff), hot,
     };
     const scr = canvasTex(256, 160, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
-    const root = src.clone(true); g.add(root);
+    const root = src.clone(true), seats: THREE.MeshStandardMaterial[][] = []; g.add(root);
     root.traverse((o: any) => {
       if (!o.isMesh) return;
       const name = String(o.material && o.material.name || '').replace(/\.\d+$/, '');
       o.material = o.name === 'screen_nav' || o.parent?.name === 'screen_nav' ? new T.MeshBasicMaterial({ map: nav.tex }) : o.name === 'screen_sensors' || o.parent?.name === 'screen_sensors' ? new T.MeshBasicMaterial({ map: scr.tex }) : mats[name] || mats.inner;
+      // (a seat's own: lit when it's the one looked at, js/space.ts seatLit)
+      const sm = /^seat_(\d+)$/.exec(o.name) || /^seat_(\d+)$/.exec(String(o.parent && o.parent.name)); if (sm) { const m = (o.material as THREE.MeshStandardMaterial).clone(); o.material = m; (seats[+sm[1]] = seats[+sm[1]] || []).push(m); }
     });
     const node = (n: string) => root.getObjectByName(n)!;
     // the breaching door's leaves (the game slides them apart: js/space.ts doors), the ramp (turned down to the ground behind her)
@@ -100,7 +102,7 @@ const G_ShipModel = (() => {
     }
     // her own light, the same wherever she is: the cockpit, the breach deck, the crew deck
     const lights = [[3, 0xbfe0ff], [3.5, 0xdfeaff], [4.5, 0xdfeaff]].map(([k, c], i) => { const l = new T.PointLight(c, k, 7, 1.6); l.position.copy(node('light_' + i).position); g.add(l); return l; });
-    return { group: g, nose, ramp, turrets, thrust, glow, screen: scr, nav, lights };
+    return { group: g, nose, ramp, turrets, thrust, glow, screen: scr, nav, lights, seats };
   }
   function shipRecipe(d: SpShipDef, fleet: SpFleet): SmShip {
     const SD = G.SpaceData, L = SD.layout(d), { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, W = 0.22, g = new T.Group(), K = new Kit(), X = hw + W, top = CB + 0.2;
@@ -680,14 +682,16 @@ const G_ShipModel = (() => {
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3));
     const pts = new T.Points(g, new T.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false, depthTest: false }));
     pts.frustumCulled = false; pts.renderOrder = -10;
-    // the drive's smear (warp, jump): each star a line as well, its tail drawn back towards the point she's flying at (f, in
-    // the stars' own frame) by k, so they stream out from it; nothing to see at k 0. All on the graphics card: k and f a frame.
+    // the drive's smear (warp, jump): each star a line as well, flying out from the point she's flying at (f, in the stars' own
+    // frame) and on past her, over and over (each its own way out from there and its own time along it: tm, how far the drive's
+    // gone), its tail back the way it came, longer the faster (k); faded in leaving the middle and out going by. Nothing at k 0.
+    // All on the graphics card: k, f and tm a frame.
     const lp = new Float32Array(n * 6), lc = new Float32Array(n * 6), le = new Float32Array(n * 2);
     for (let i = 0; i < n; i++) { for (let e = 0; e < 2; e++) { lp.set(pos.subarray(i * 3, i * 3 + 3), (i * 2 + e) * 3); lc.set(col.subarray(i * 3, i * 3 + 3), (i * 2 + e) * 3); le[i * 2 + e] = e; } }
     const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.BufferAttribute(lp, 3)); lg.setAttribute('color', new T.BufferAttribute(lc, 3)); lg.setAttribute('head', new T.BufferAttribute(le, 1));
     const lm = new T.ShaderMaterial({
-      uniforms: { f: { value: new T.Vector3(0, 0, -1) }, k: { value: 0 }, tr: { value: new T.Vector3() }, R: { value: RUSH } }, transparent: false, depthWrite: false, /* (drawn with the opaque things, first: the ship's inside over it) */ depthTest: false, blending: T.AdditiveBlending, vertexColors: true,
-      vertexShader: 'attribute float head; uniform vec3 f; uniform float k; varying vec3 vC; void main() { vec3 d = normalize(position); vec3 p = head > 0.5 ? d : normalize(d + f * k); vC = color * mix(0.15, 1.1, head) * min(1.0, k * 5.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(p * 900.0, 1.0); }',
+      uniforms: { f: { value: new T.Vector3(0, 0, -1) }, k: { value: 0 }, tr: { value: new T.Vector3() }, R: { value: RUSH }, tm: { value: 0 } }, transparent: false, depthWrite: false, /* (drawn with the opaque things, first: the ship's inside over it) */ depthTest: false, blending: T.AdditiveBlending, vertexColors: true,
+      vertexShader: 'attribute float head; uniform vec3 f; uniform float k; uniform float tm; varying vec3 vC; float h(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); } void main() { vec3 d = normalize(position); float s = fract(h(position) + tm * (0.5 + 0.8 * h(position.yzx))); vec3 e = d - f * dot(d, f); float le = length(e); e = le > 1e-4 ? e / le : normalize(cross(f, vec3(0.3, 1.0, 0.2))); float th = mix(0.02, 2.5, s * s), a = head > 0.5 ? th : max(0.0, th - k * (0.12 + 0.8 * s)); vec3 p = f * cos(a) + e * sin(a); float fade = smoothstep(0.06, 0.45, th) * (1.0 - smoothstep(0.82, 1.0, s)); vC = color * mix(0.12, 1.25, head) * fade * min(1.0, k * 5.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(p * 900.0, 1.0); }',
       fragmentShader: 'varying vec3 vC; void main() { gl_FragColor = vec4(vC, 1.0); }',
     });
     const streaks = new T.LineSegments(lg, lm); streaks.frustumCulled = false; streaks.renderOrder = -9; pts.add(streaks); // (always drawn, black at k 0: its shader made with the stars', not the moment a drive starts)
