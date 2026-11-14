@@ -1103,6 +1103,19 @@ const G_VMAnim = (() => {
       const pos = p.geo.attributes.position;
       const geo = subset(p.geo, (i) => pos.getX(i) * sx > 0.12); // (that side's arm: clear of the chest)
       if (!geo) continue;
+      // (a sleeve rides the arm, not the hand: what of it the file gives the hand or the fingers goes to the forearm, so the cuff keeps its
+      // shape however the wrist turns and the hand turns inside it, not tearing it into spikes on a hard bend)
+      if (p.mat === 'sleeve' || p.mat === 'upsleeve') {
+        const into = p.bones.indexOf('forearm' + s), off = new Set(p.bones.map((n, i) => (/^(hand|(thumb|index|middle|ring|pinky)\d)[LR]$/.test(n) ? i : -1)).filter((i) => i >= 0));
+        const si = geo.attributes.skinIndex as THREE.BufferAttribute, sw = geo.attributes.skinWeight as THREE.BufferAttribute;
+        if (into >= 0 && si && sw) for (let v = 0; v < si.count; v++) {
+          let moved = 0, slot = -1, free = -1;
+          for (let j = 0; j < 4; j++) { const b = si.getComponent(v, j); if (b === into) slot = j; if (off.has(b) && sw.getComponent(v, j) > 0) { moved += sw.getComponent(v, j); sw.setComponent(v, j, 0); if (free < 0) free = j; } }
+          if (!moved) continue;
+          if (slot < 0) { slot = free; si.setComponent(v, slot, into); sw.setComponent(v, slot, 0); }
+          sw.setComponent(v, slot, sw.getComponent(v, slot) + moved);
+        }
+      }
       geos[p.mat] = geo;
       const sk = new T.Skeleton(p.bones.map(bone), p.inv);
       const sm = new T.SkinnedMesh(geo, humMat(col[p.mat], p.mat === 'hand' || p.mat === 'finger' ? (col.hand === col.sleeve ? 0.8 : 0.65) : 0.9));
