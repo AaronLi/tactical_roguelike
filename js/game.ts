@@ -811,7 +811,7 @@ const G_Game = {
         this.tGrid = null; this.arms = {}; this.armSel = null;
         G.Me.newRun();
             break;
-      case 'veil': G.Space.veilKind(m.k); this.veil(true); break; // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
+      case 'veil': if (m.k === 'ftl' && G.Space.jumping()) break; G.Space.veilKind(m.k); this.veil(true); break; // (a jump with you aboard: the pod and the tunnel, no veil: js/space.ts) // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
       case 'phase':
         if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined; // (none: the game in space's sidearm picker)
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
@@ -1560,7 +1560,8 @@ const G_Game = {
   // sp: a mission's level (js/spaceserver.ts levelMsg): what it's generated for, the mission, the ship. Then there's no helicopter:
   // you're aboard the squad's ship as she comes out of the jump (js/space.ts).
   enterLevel(level: number, seed: number, th?: number, night = false, wc?: string | null, sp?: any) {
-    const seamless = !!(sp && sp.zone && sp.zone.near && G.Space.S.on && G.Space.S.kind === 'board'); // (come up with another of the zone's ships: no wipe, js/space.ts)
+    const pre = sp && G.Space.S.on ? G.Space.takeMap(seed, level, th as number, night, sp.gen) : null; // (made ahead: one of the zone's ships, or where a jump's going)
+    const jump = G.Space.jumping(), seamless = !!pre || jump || !!(sp && sp.zone && sp.zone.near && G.Space.S.on && G.Space.S.kind === 'board'); // (come up with another of the zone's ships, or jumped here aboard: no wipe, js/space.ts)
     if (!seamless) this.veil(true, true); // (already black, unless you've just joined)
     G.Space.leave(); if (!sp) G.Space.S.keep = null;
     this.leaveHub();
@@ -1568,7 +1569,7 @@ const G_Game = {
     this.level = level;
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0;
-    this.map = (seamless && G.Space.takeMap(seed, level, th, night, sp.gen)) || G.Level.generate(seed, level, th, night, sp ? sp.gen : null); // (laid out already, if she's been in sight: js/space.ts zoneReal)
+    this.map = pre || G.Level.generate(seed, level, th, night, sp ? sp.gen : null); // (laid out already, if she's been in sight or the jump's made her on the way: js/space.ts)
     if (G.Prep) (this.map as any).lgPre = G.Prep.take(seed, level, th, night, sp ? sp.gen : null); // (its light worked out ahead, if it was seen coming: js/prep.ts)
     G.Career.levelStart(level, th, night, this.stronghold()); // (your run's log: js/career.ts)
     G.ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
@@ -1601,7 +1602,8 @@ const G_Game = {
   // about it, the squad is there, and rays, steps and sound are all the ordinary ones; the host just doesn't send
   // enemies. this.hub marks it (the phase is still 'level' here).
   enterShop(level: number, seed: number, report: GmReport | null, stock: any, spc?: any) { // (spc: the game in space, js/spaceserver.ts shopMsg: the board, the fleet, where the ship is)
-    this.veil(true, true);
+    const jump = G.SpaceData.ON && G.Space.jumping(); // (home by the jump, aboard: the pod and the tunnel, no veil)
+    if (!jump) this.veil(true, true);
     G.Space.leave();
     this.toggleInv(false);
     this.closeShop();
@@ -1624,7 +1626,7 @@ const G_Game = {
     // the level just played stays, out of sight, for the highlights on the hangar's TVs (js/highlights.ts)
     if (G.Highlights && this.map && !this.map.hub) G.Highlights.take(this.map, G.R.detachLevel());
     this.map = G.Level.generateHub(seed, level);
-    G.Views.warmed = false; // (compiled under the veil too, and what lifts it)
+    G.Views.warmed = jump; // (compiled under the veil too, and what lifts it; in a jump, as it's drawn)
     G.Loot.clear();
     G.R.setLevel(this.map);
     G.Views.clearLevel();

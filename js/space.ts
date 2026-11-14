@@ -71,7 +71,7 @@ const G_Space = (() => {
     G.SpaceUI.show(false);
   }
   // off for good (the menu, the lobby): nothing kept
-  function reset() { leave(); S.keep = null; S.ms = null; S.state = null; S.seats = {}; S.ctl = null; G.SpaceUI.closeOps(); veilKind(null); }
+  function reset() { leave(); if (jumpPre) { viewDrop(jumpPre.map); jumpPre = null; } S.keep = null; S.ms = null; S.state = null; S.seats = {}; S.ctl = null; G.SpaceUI.closeOps(); veilKind(null); }
 
   function setup(map: LvMap, kind: SpKind, sp: any) {
     const keep = S.keep; leave(); S.keep = keep;
@@ -394,6 +394,7 @@ const G_Space = (() => {
   function takeMap(seed: number, level: number, th: number | undefined, night: boolean, gen: any): LvMap | null {
     if (!G.Prep) return null;
     const key = G.Prep.keyOf(seed, level, th, night, gen);
+    if (jumpPre && jumpPre.key === key && jumpPre.map) { const m = jumpPre.map; jumpPre = null; return m; } // (where the jump's going: made on the way)
     for (const h of zoneHulls.values()) if (h.map && h.key === key) { const m = h.map; h.map = null; return m; }
     return null;
   }
@@ -440,6 +441,35 @@ const G_Space = (() => {
   // (js/levelview.ts begin, step); then all of it sent to the graphics card and its shaders found (js/render.ts preload). Her
   // light's being worked out on another thread meanwhile (js/prep.ts). js/game.ts enterLevel takes the lot (takeMap) and has
   // only to put it in the scene. Whatever isn't done by then is finished in that frame, as it all used to be.
+  /** a level made ahead, a few milliseconds a frame: its drawing (js/levelview.ts begin, step), then sent to the graphics card (js/render.ts preload). true when it's all done */
+  function prepStep(map: LvMap, things: number) {
+    const pre = (map as any).viewPre as LvViewPre | null;
+    if (!pre) { G.LevelView.begin(map); return false; }
+    if (!pre.done) { G.LevelView.step(map, 4); return false; }
+    if (!pre.up) pre.up = G.R.preload(pre.root, things);
+    if (pre.up !== true && (pre.up as (ms: number) => boolean)(3)) pre.up = true;
+    return pre.up === true;
+  }
+  // ---- The jump's way out, made on the way: from the base, the mission at the anchor she's by (or spooling for) is laid out,
+  // drawn and sent to the graphics card a frame at a time while she's still flying, so when the host puts the squad there
+  // nothing stops (js/game.ts enterLevel takes it: takeMap) and the pod stays as it was the whole way, walked about in.
+  let jumpPre: { key: string; map: LvMap | null; d: { seed: number; level: number; th: number; night: boolean; gen: any } } | null = null;
+  function jumpDest() {
+    if (S.kind !== 'hub' || !S.board) return null; // (home is the base: not made ahead)
+    const idx = S.ftl ? S.ftl.to : (nearAnchor() || { i: -1 }).i;
+    if (idx < 0 || !S.board.picked.includes(idx) || S.board.done.includes(idx)) return null;
+    const ms = SD.offers(S.board.seed, S.board.level)[idx] as any; if (!ms) return null;
+    return { seed: ms.seed, level: ms.diff, th: ms.th, night: !!ms.night, gen: ms.kind === 'board' ? { size: ms.size, obj: ms.obj, ship: S.fleet.ship, other: ms.other || null, wing: !!ms.wing } : null };
+  }
+  function jumpPrep() {
+    if (!S.on || !G.Prep) return;
+    const d = jumpDest();
+    if (!d) { if (jumpPre && !S.ftl) { viewDrop(jumpPre.map); jumpPre = null; } return; }
+    const key = G.Prep.keyOf(d.seed, d.level, d.th, d.night, d.gen);
+    if (!jumpPre || jumpPre.key !== key) { if (jumpPre) viewDrop(jumpPre.map); jumpPre = { key, map: null, d }; G.Prep.want(d.seed, d.level, d.th, d.night, d.gen); return; }
+    if (!jumpPre.map) { jumpPre.map = G.Level.generate(d.seed, d.level, d.th, d.night, d.gen); return; }
+    prepStep(jumpPre.map, d.gen && d.gen.obj === 'artifact' && jumpPre.map.sp && jumpPre.map.sp.artifact ? 1 : 0);
+  }
   function zonePrep() { // (from the game's loop, once the frame's drawn: the scene lit as it's drawn, which is what the shaders are found for)
     if (!S.on || S.kind !== 'board' || !S.zone || !S.zinfo || S.docked || S.ftl || S.warp || zoneHullsOf !== S.zinfo.ms.seed) return;
     let best: typeof S.traffic[0] | null = null, bd = 2000; const far = new Set<ZHull>();
@@ -458,11 +488,8 @@ const G_Space = (() => {
       return;
     }
     if (!hit.key) return; // (no taking it: takeMap)
-    const pre = (hit.map as any).viewPre as LvViewPre | null;
-    if (!pre) { G.LevelView.begin(hit.map); return; }
-    if (!pre.done) { G.LevelView.step(hit.map, 4); return; }
-    if (!pre.up) { const lv = zoneLevel(S.zdef[best.c.k!]); pre.up = G.R.preload(pre.root, lv.gen.obj === 'artifact' && hit.map.sp && hit.map.sp.artifact ? 1 : 0); } // (the artifact's glow: things)
-    if (pre.up !== true && (pre.up as (ms: number) => boolean)(3)) pre.up = true;
+    const lv = zoneLevel(S.zdef[best.c.k!]);
+    prepStep(hit.map, lv.gen.obj === 'artifact' && hit.map.sp && hit.map.sp.artifact ? 1 : 0); // (the artifact's glow: things)
   }
   // The squad's ship has come up with one of the zone's others (within 800 m, and nearer her than the one that's the level): the host is asked to make her the
   // level (js/spaceserver.ts 'tboard'). Whoever's flying asks.
@@ -801,17 +828,26 @@ const G_Space = (() => {
 
   // ------------------------------------------------------------------ the jump
   function nearAnchor() { let best: typeof S.anchors[0] | null = null, bd = 420; for (const a of S.anchors) { if (!a.obj.visible) continue; const d = S.P.distanceTo(a.p); if (d < bd && !(S.kind === 'hub' && S.board.done.includes(a.i))) { bd = d; best = a; } } return best; }
+  // the stars smeared into lines by the drive, k how far (0: none); eased, and drawn from her nose in the stars' frame
+  let smearK = 0;
+  function smear(dt: number, want: number) {
+    smearK += (want - smearK) * Math.min(1, dt * 4);
+    const st = S.stars; if (!st) return;
+    const u = st.userData.streak as { f: { value: THREE.Vector3 }; k: { value: number } }, line = st.userData.streaks as THREE.Object3D;
+    line.visible = smearK > 0.003; u.k.value = smearK;
+    u.f.value.copy(fwd(S.Q)); if (S.zone) u.f.value.applyQuaternion(_zq.copy(S.zone.quaternion).invert());
+  }
   function ftlStep(dt: number) {
     const f = S.ftl;
     if (!f) {
-      if (!S.tunnel) return;
-      const on = !!S.warp && S.warp.u > 400; S.tunnel.visible = on;
-      if (on) { (S.tunnel.userData.mat as THREE.MeshBasicMaterial).opacity = Math.min(0.4, S.warp!.u / 8000); (S.tunnel.userData.tex as THREE.Texture).offset.y -= dt * 3; }
+      if (S.tunnel) S.tunnel.visible = false;
+      smear(dt, S.warp ? Math.sqrt(G.U.clamp(S.warp.u / S.warp.top, 0, 1)) * 0.55 : S.spin * 0.015);
       return;
     }
     f.t += dt;
     const tn = S.tunnel!, tex = tn.userData.tex as THREE.Texture, mat = tn.userData.mat as THREE.MeshBasicMaterial;
-    tn.visible = true;
+    tn.visible = false; // (no tube: the stars smear instead)
+    smear(dt, f.st === 'spool' ? 0.35 * (f.t / f.T) ** 2 : f.st === 'wait' ? 0.45 : 0.7 * G.U.clamp((f.T - f.t) / 0.6, 0, 1));
     if (f.st === 'spool') {
       const u = Math.min(1, f.t / f.T); mat.opacity = u * 0.9; tex.offset.y -= dt * (0.4 + u * 3);
       S.V.multiplyScalar(Math.exp(-dt * 3));
@@ -823,7 +859,7 @@ const G_Space = (() => {
       if (left <= 0) { S.ftl = null; tn.visible = false; G.SpaceUI.flash(); S.V.copy(fwd(S.Q)).multiplyScalar(45); if (isCtl() || !S.ctl) sendPose(true); }
     }
     const vis = !(f.st === 'tunnel');
-    if (S.root) S.root.visible = vis; if (S.kind !== 'assault') G.R.levelRoot.visible = vis; if (S.stars) S.stars.visible = vis && (S.kind !== 'assault' || S.stage !== 'atmo');
+    if (S.root) S.root.visible = vis; if (S.kind !== 'assault') G.R.levelRoot.visible = vis; if (S.stars) S.stars.visible = S.kind !== 'assault' || S.stage !== 'atmo'; // (in the tunnel the place is out of sight, the stars aren't: they're what's smeared)
     if (!S.ftl) { if (S.root) S.root.visible = true; if (S.kind !== 'assault') G.R.levelRoot.visible = true; sky(); }
   }
 
@@ -1172,7 +1208,9 @@ const G_Space = (() => {
       turn: flying ? G.U.clamp(S.Wv.length() / Math.max(0.3, S.def.turn) + S.stick.length() * 0.6, 0, 1) : 0, ftl, ftlK: S.ftl && ftl === 1 ? G.U.clamp(S.ftl.t / Math.max(0.1, S.ftl.T), 0, 1) : 0, ev };
   }
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
-  return { sound, dbgPrep, prep: zonePrep, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  /** in a jump, aboard: what the screen shows is the pod and the tunnel, not a veil (js/game.ts) */
+  const jumping = () => S.on && !!S.ftl && aboard();
+  return { sound, dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }

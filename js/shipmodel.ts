@@ -601,6 +601,18 @@ const G_ShipModel = (() => {
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3)); g.setAttribute('color', new T.BufferAttribute(col, 3));
     const pts = new T.Points(g, new T.PointsMaterial({ size: 1.6, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false, depthTest: false }));
     pts.frustumCulled = false; pts.renderOrder = -10;
+    // the drive's smear (warp, jump): each star a line as well, its tail drawn back towards the point she's flying at (f, in
+    // the stars' own frame) by k, so they stream out from it; nothing to see at k 0. All on the graphics card: k and f a frame.
+    const lp = new Float32Array(n * 6), lc = new Float32Array(n * 6), le = new Float32Array(n * 2);
+    for (let i = 0; i < n; i++) { for (let e = 0; e < 2; e++) { lp.set(pos.subarray(i * 3, i * 3 + 3), (i * 2 + e) * 3); lc.set(col.subarray(i * 3, i * 3 + 3), (i * 2 + e) * 3); le[i * 2 + e] = e; } }
+    const lg = new T.BufferGeometry(); lg.setAttribute('position', new T.BufferAttribute(lp, 3)); lg.setAttribute('color', new T.BufferAttribute(lc, 3)); lg.setAttribute('head', new T.BufferAttribute(le, 1));
+    const lm = new T.ShaderMaterial({
+      uniforms: { f: { value: new T.Vector3(0, 0, -1) }, k: { value: 0 } }, transparent: false, depthWrite: false, /* (drawn with the opaque things, first: the ship's inside over it) */ depthTest: false, blending: T.AdditiveBlending, vertexColors: true,
+      vertexShader: 'attribute float head; uniform vec3 f; uniform float k; varying vec3 vC; void main() { vec3 d = normalize(position); vec3 p = head > 0.5 ? d : normalize(d + f * k); vC = color * mix(0.15, 1.1, head) * min(1.0, k * 5.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(p * 900.0, 1.0); }',
+      fragmentShader: 'varying vec3 vC; void main() { gl_FragColor = vec4(vC, 1.0); }',
+    });
+    const streaks = new T.LineSegments(lg, lm); streaks.frustumCulled = false; streaks.renderOrder = -9; streaks.visible = false; pts.add(streaks);
+    pts.userData.streak = lm.uniforms; pts.userData.streaks = streaks;
     return pts;
   }
   function tunnel() {
