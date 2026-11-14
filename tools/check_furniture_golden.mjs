@@ -15,7 +15,7 @@ import { ROOT, DIST } from './model_env.mjs';
 const args = process.argv.slice(2), update = args.includes('--update'), dumpAt = args.includes('--dump') ? args[args.indexOf('--dump') + 1] : null;
 const GOLDEN = path.join(ROOT, 'tests/furniture-golden.json');
 // The simulation's side of the game (what js/serverworker.ts loads to generate a level, its description: js/leveldesc.ts, and js/furnspec.ts), on node's three
-const FILES = ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers'];
+const FILES = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers'];
 function loadLevelGame() {
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Uint8ClampedArray, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, TextEncoder, performance, location: { search: '' }, URLSearchParams, THREE: { ...THREE_NS } };
   ctx.window = ctx; ctx.self = ctx; ctx.G = { Hangar: { decorate() {} } }; // (the hangar's solids: js/hangar.ts, page-side; nothing it does is furniture)

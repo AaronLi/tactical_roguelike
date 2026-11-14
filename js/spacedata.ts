@@ -99,9 +99,9 @@ const G_SpaceData = (() => {
 
   // ---- the places missions go to (the level's theme: js/level.ts generate, th from 1000 up)
   const THEMES: ThemeDef[] = [
-    { name: 'Freighter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.3, floor: '#4c5055', wall: '#8b8f8e', crate: '#7a6a44', fog: 0x020306, light: 0xffe2c0, ceil: '#3a3d42', hemi: 0x8fa6c8, hemiI: 0.35, far: 30000 },
-    { name: 'Corporate cutter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.14, foes: 1.1, crowd: 0.8, home: 0, reflect: 0.4, floor: '#b9bec2', wall: '#dfe3e4', crate: '#5f7384', fog: 0x020306, light: 0xeef4ff, ceil: '#cfd5d8', hemi: 0x9fb4d8, hemiI: 0.4, far: 30000 },
-    { name: 'Navy warship', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.07, foes: 1.35, crowd: 0.4, home: 0, reflect: 0.3, floor: '#3d444c', wall: '#69757f', crate: '#4f5a48', fog: 0x020306, light: 0xdfe8ff, ceil: '#2c3238', hemi: 0x8fa6c8, hemiI: 0.3, far: 30000 },
+    { name: 'Freighter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.3, floor: '#4a4e52', wall: '#868b8c', crate: '#b0702c', accent: '#e8922a', fog: 0x020306, light: 0xffe2c0, ceil: '#5a5f66', hemi: 0x8fa6c8, hemiI: 0.35, far: 30000 },
+    { name: 'Corporate cutter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.14, foes: 1.1, crowd: 0.8, home: 0, reflect: 0.4, floor: '#a9afb4', wall: '#dde2e4', crate: '#4f7896', accent: '#2fc6d6', fog: 0x020306, light: 0xeef4ff, ceil: '#cfd5d8', hemi: 0x9fb4d8, hemiI: 0.4, far: 30000 },
+    { name: 'Navy warship', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.07, foes: 1.35, crowd: 0.4, home: 0, reflect: 0.3, floor: '#3a4149', wall: '#65717b', crate: '#566650', accent: '#d23a30', fog: 0x020306, light: 0xdfe8ff, ceil: '#4a525b', hemi: 0x8fa6c8, hemiI: 0.3, far: 30000 },
   ];
   const TH0 = 1000;
   const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G.THEMES[th] || null);

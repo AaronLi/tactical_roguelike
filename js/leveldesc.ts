@@ -203,6 +203,7 @@ const G_LevelDesc = (() => {
   function floorNodes(map: LvMap, B: LdB): LdNode[] {
     const L = G.Level, TS = L.TS, K = L.K, WALL_H = L.WALL_H, th = map.theme, root: LdNode[] = [];
     const { W, H, t } = map, SK = map.skirt || 0, va = map.voidAbove, gr = map.grate;
+    const ship = th.space ? ':' + (th.accent || '#e8922a') : ''; // (a ship: her own surfaces, js/levelview.ts _shipTex, in her colour)
     const cell = (i: number, y: number) => [((i % W) + 0.5) * TS, y, (Math.floor(i / W) + 0.5) * TS];
     // The hangar's fixed shell (its floor, ceiling, roof, lamps' fittings and roller doors) is baked with the rest of its fittings
     // (js/hangar.ts, tools/bake_hangar.mjs): marked hf, a screen with the baked hangar loaded leaves it out (js/levelview.ts).
@@ -211,13 +212,13 @@ const G_LevelDesc = (() => {
     const hf = <N extends LdNode>(n: N): N => (map.hub ? Object.assign(n, { hf: 1 }) : n);
     // floor + ceiling (upstairs, the floor only where there is one: not over a drop, and steel grating where it's a catwalk)
     if (!t.includes(5) && !gr) {
-      const fmat = B.std({ map: lvTex(B, th.rock ? 'rock' : 'floor', th.floor, [W / K, H / K]), roughness: 0.92 });
+      const fmat = B.std({ map: lvTex(B, ship ? 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [W / K, H / K]), roughness: ship ? 0.7 : 0.92 });
       root.push(hf(B.mesh(B.geo('plane', [W * TS, H * TS]), fmat, { r: [-PI / 2, 0, 0], p: [(W * TS) / 2, 0, (H * TS) / 2], l1: 1 }))); // (layer 1: what hides the evidence glow: walls, floors, doors)
     } else {
       const cells: number[] = [], tr = map.terrain, hills: number[] = [];
       const raised = (i: number) => { const k = ((i / W) | 0) * tr.VW + (i % W); return Math.abs(tr.v[k]) > 1e-3 || Math.abs(tr.v[k + 1]) > 1e-3 || Math.abs(tr.v[k + tr.VW]) > 1e-3 || Math.abs(tr.v[k + tr.VW + 1]) > 1e-3; }; // (off level at 0: up or down)
       for (let i = 0; i < W * H; i++) if (t[i] !== 5 && !(gr && gr[i])) (tr && raised(i) ? hills : cells).push(i);
-      const fm = B.std({ map: lvTex(B, th.rock ? 'rock' : 'floor', th.floor, [1 / K, 1 / K]), roughness: 0.92 });
+      const fm = B.std({ map: lvTex(B, ship ? 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [1 / K, 1 / K]), roughness: ship ? 0.7 : 0.92 });
       root.push({ t: 'i', g: B.geo('plane', [TS, TS], [['rx', -PI / 2]]), m: fm, n: cells.length, tr: cells.flatMap((i) => cell(i, 0)), l1: 1 });
       // the rolling ground (map.terrain: crestGround): those cells as one surface over their corners' heights (a procedural
       // surface, made from the description: proc 'terrain')
@@ -242,7 +243,7 @@ const G_LevelDesc = (() => {
     if (caps.length) root.push({ t: 'i', g: B.geo('box', [TS, capUp!.skirt, TS]), m: B.std({ color: 0xbdb6aa, roughness: 0.9 }), n: caps.length, tr: caps.flatMap((i) => cell(i, WALL_H + capUp!.skirt / 2)), l1: 1 });
     if (gr) root.push(...grate(map, B));
     // ceiling over everything indoors (gardens are open to the night sky; nor under a drop in the floor above)
-    const ctex = lvTex(B, 'floor', th.ceil, [0.5, 0.5]);
+    const ctex = lvTex(B, ship ? 'overhead' + ship : 'floor', th.ceil, [0.5, 0.5]);
     const roofed: number[] = [];
     for (let i = 0; i < W * H; i++) if (!map.out[i] && !(va && va[i])) roofed.push(i);
     // the top of it, for what's looking down from the air (you ride in over the roofs: js/landing.ts), wherever nothing's
@@ -270,12 +271,12 @@ const G_LevelDesc = (() => {
       if (vis) walls.push(z * W + x);
     }
     const heads = map.rooms.some((q) => q.lid); // (a roof's stair heads: bare grey render, a flat top, not the homes' paint and a pitched roof)
-    const wtex = lvTex(B, heads || th.home >= 1 ? 'plaster' : th.rock ? 'rock' : 'wall', heads ? '#7f807c' : th.wall, [1, 2]);
+    const wtex = ship ? lvTex(B, 'bulkhead' + ship, th.wall, [1, 1]) : lvTex(B, heads || th.home >= 1 ? 'plaster' : th.rock ? 'rock' : 'wall', heads ? '#7f807c' : th.wall, [1, 2]);
     const paintWalls = map.rooms.some((rm) => rm.dress);
     const wallMat = B.std(Object.assign({ map: wtex, roughness: 0.85 }, paintWalls ? { paint: 1 } : {})); // (paint: a resident's wallpaper, js/homes.ts paint)
     const rs = G.U.rng((map.seed ^ 0x3a11c0 ^ Math.imul((map.fl || 0) + 1, 0x9e3779b1)) >>> 0), wcol: number[] = [];
     for (const i of walls) {
-      const s = 0.85 + rs() * 0.2, rk = rockAt(i);
+      const s = ship ? 0.93 + rs() * 0.1 : 0.85 + rs() * 0.2, rk = rockAt(i); // (a ship's panels: nearer alike)
       if (rk === 1) { const p = 0.92 + rs() * 0.1; wcol.push(s * 0.86, s * 0.62 * p, s * 0.57 * p); } else if (rk === 2) wcol.push(s * 0.78, s * 0.74, s * 0.7); else wcol.push(s, s, s);
     }
     // (which of them's which tile, and how they stood: a round takes cubes out of it, js/damage.ts)
@@ -318,12 +319,12 @@ const G_LevelDesc = (() => {
       }
       root.push(B.group(seg));
     }
-    root.push({ t: 'h', k: 'furniture', tex: lvTex(B, 'crate', th.crate, [1, 1]) }); // (js/furniture.ts build: the pieces in map.propList)
+    root.push({ t: 'h', k: 'furniture', tex: lvTex(B, ship ? 'cargo' + ship : 'crate', th.crate, [1, 1]) }); // (js/furniture.ts build: the pieces in map.propList)
     root.push(...windows(map, B, wallMat, hf));
 
     // ceiling lamps' fittings (the light grid lights the level from the lamps: js/lightgrid.ts)
     // (a lamp that's off, a night level's: its fitting unlit, a dull glass; an exit sign: a lit panel over a doorway)
-    let lampMat = -1, bayMat = -1, panelMat = -1, porchMat = -1, porchBox = -1, offMat = -1;
+    let lampMat = -1, bayMat = -1, panelMat = -1, porchMat = -1, porchBox = -1, offMat = -1, barBox = -1;
     const lampGeo = B.geo('sphere', [0.32, 16, 8, 0, PI * 2, 0, PI / 2], [['s', 1, 0.45, 1], ['rx', PI]]), bayGeo = B.geo('cyl', [0.1, 0.42, 0.32, 16, 1, 1]), bayLens = B.geo('circle', [0.38, 16], [['rx', PI / 2]]);
     const panelGeo = B.geo('box', [1.2, 0.04, 0.6]), signGeo = B.geo('box', [0.36, 0.15, 0.05]), signMats = new Map<number, number>();
     const M0 = () => { if (lampMat >= 0) return; lampMat = B.basic({ color: th.light }); bayMat = B.std({ color: 0x3a3e42, roughness: 0.5, metalness: 0.6, side: 2 }); panelMat = B.basic({ color: 0xf4f8ff }); porchMat = B.basic({ color: 0xffe2a8 }); porchBox = B.std({ color: 0x1c1c1e, roughness: 0.6 }); offMat = B.std({ color: 0x4a4844, roughness: 0.4 }); };
@@ -349,14 +350,59 @@ const G_LevelDesc = (() => {
         root.push(hf(B.mesh(bayLens, lit ? lampMat : offMat, { p: [l.x, l.y! - 0.26, l.z] })));
         continue;
       }
+      if (ship) { // a ship's: a bar of light let into the overhead, in a dark surround
+        if (barBox < 0) barBox = B.std({ color: 0x1b1e22, roughness: 0.5, metalness: 0.4 });
+        root.push(B.mesh(B.geo('box', [1.36, 0.07, 0.4]), barBox, { p: [l.x, (l.gy || 0) + WALL_H - 0.035, l.z] }));
+        root.push(B.mesh(B.geo('box', [1.2, 0.03, 0.24]), lit ? lampMat : offMat, { p: [l.x, (l.gy || 0) + WALL_H - 0.08, l.z] }));
+        continue;
+      }
       root.push(hf(B.mesh(lampGeo, lit ? lampMat : offMat, { p: [l.x, (l.gy || 0) + WALL_H, l.z] })));
     }
+    if (ship) root.push(...shipTrim(map, B));
     root.push(...doors(map, B, wtex, paintWalls));
     if (map.fest) root.push(...festival(map, B));
     if (map.crest) root.push(...crest(map, B));
     if (map.fx && map.fx.length) root.push({ t: 'h', k: 'fx' }); // (js/levelview.ts fx: the sparks, embers, smoke and steam off map.fx, moving each frame)
     root.push(...boxes(map, B));
     return root;
+  }
+
+  // What a ship's passages have that a building's don't (her spine and any room that's a passage: js/shipgen.ts): frames
+  // across them every few metres (a post up each side, a beam under the overhead: none where a door's in the way), trunking
+  // and a pipe along the top of each side, and a strip of her colour let into the deck along each edge, lit (dark on a night
+  // level, with her power off). Only looked at: nothing here stops anyone or anything.
+  function shipTrim(map: LvMap, B: LdB): LdNode[] {
+    const L = G.Level, TS = L.TS, WH = L.WALL_H, { W, H, t } = map, th = map.theme, out: LdNode[] = [];
+    const acc = parseInt((th.accent || '#e8922a').slice(1), 16), wc = parseInt(th.wall.slice(1), 16), frame = B.std({ color: (Math.floor((wc >> 16 & 255) * 0.62) << 16) | (Math.floor((wc >> 8 & 255) * 0.62) << 8) | Math.floor((wc & 255) * 0.62), roughness: 0.6, metalness: 0.3 });
+    const trunk = B.std({ color: 0x2a2e33, roughness: 0.55, metalness: 0.4 }), pipe = B.std({ color: 0x8a9096, roughness: 0.35, metalness: 0.7 }), strip = map.night ? B.std({ color: acc, roughness: 0.6 }) : B.basic({ color: acc });
+    const wall = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] === 1;
+    for (const rm of map.rooms) {
+      if (rm.type !== 'spine' && rm.type !== 'corridor') continue;
+      const ax = rm.w >= rm.h, n = ax ? rm.w : rm.h, len = n * TS, u0 = (ax ? rm.x : rm.z) * TS, a0 = ax ? rm.x : rm.z;
+      // (its sides: the first line of tiles out from it each way that's mostly wall, which may be a tile or two past what's marked as the room)
+      const lineOf = (b: number) => { let k = 0; for (let i = 0; i < n; i++) if (ax ? wall(a0 + i, b) : wall(b, a0 + i)) k++; return k > n * 0.55; };
+      let lo = (ax ? rm.z : rm.x) - 1, hi = ax ? rm.z + rm.h : rm.x + rm.w;
+      for (let k = 0; k < 3 && !lineOf(lo); k++) lo--; for (let k = 0; k < 3 && !lineOf(hi); k++) hi++;
+      if (!lineOf(lo) || !lineOf(hi)) continue;
+      const v0 = (lo + 1) * TS, wd = (hi - lo - 1) * TS;
+      if (wd > 5.6 || n < 4) continue; // (a hall, not a passage)
+      const box = (lu: number, h: number, lv: number, u: number, y: number, v: number, m: number) => out.push(B.mesh(ax ? B.geo('box', [lu, h, lv]) : B.geo('box', [lv, h, lu]), m, { p: ax ? [u, y, v] : [v, y, u] }));
+      for (const sd of [0, 1]) {
+        const v = sd ? v0 + wd : v0, s = sd ? -1 : 1;
+        box(len, 0.02, 0.06, u0 + len / 2, 0.012, v + s * 0.09, strip);
+        box(len, 0.16, 0.2, u0 + len / 2, 3.52, v + s * 0.1, trunk);
+        out.push(B.mesh(B.geo('cyl', [0.045, 0.045, len, 8]), pipe, { p: ax ? [u0 + len / 2, 3.3, v + s * 0.08] : [v + s * 0.08, 3.3, u0 + len / 2], r: ax ? [0, 0, PI / 2] : [PI / 2, 0, 0] }));
+      }
+      for (let k = 2; k < n - 1; k += 4) {
+        const a = a0 + k;
+        if (!(ax ? wall(a, lo) && wall(a, hi) : wall(lo, a) && wall(hi, a))) continue;
+        const u = (a + 0.5) * TS;
+        box(0.22, WH, 0.13, u, WH / 2, v0 + 0.065, frame); box(0.22, WH, 0.13, u, WH / 2, v0 + wd - 0.065, frame);
+        box(0.22, 0.26, wd, u, WH - 0.13, v0 + wd / 2, frame);
+        box(0.24, 0.3, 0.3, u, WH - 0.4, v0 + 0.2, frame); box(0.24, 0.3, 0.3, u, WH - 0.4, v0 + wd - 0.2, frame); // (its knees)
+      }
+    }
+    return out;
   }
 
   // Steel grating (a foundry's catwalks: map.grate): bar grating, bearing bars a few centimetres apart and a cross bar every so
@@ -399,7 +445,7 @@ const G_LevelDesc = (() => {
     const frameMat = B.std({ color: map.theme.home >= 1 ? 0xe8e4da : 0x3a3e42, roughness: 0.6 });
     // tinted, a little reflective, seen from both sides: it has to read as glass, not a hole
     const glassMat = B.std({ color: 0x7e98a8, transparent: true, opacity: 0.38, roughness: 0.08, metalness: 0.55, depthWrite: false, side: 2, envMapIntensity: 1.2 });
-    const view = map.windows.some((w) => w.ext) ? B.mat('outside', { seed: (map.seed ^ 0x77) >>> 0, drop: map.theme.layout === 'apartments' ? 18 : 0 }) : -1;
+    const view = !map.theme.space && map.windows.some((w) => w.ext) ? B.mat('outside', { seed: (map.seed ^ 0x77) >>> 0, drop: map.theme.layout === 'apartments' ? 18 : 0 }) : -1;
     // bulletproof glass with steel wire in it (the grid drawn into the pane, a grey steel frame round it); a cooler's doors
     const wiredMat = map.windows.some((w) => w.armor) ? B.std({ color: 0x9fb2b8, map: B.tex('wired', { rep: [4, 4] }), transparent: true, opacity: 0.5, roughness: 0.2, metalness: 0.4, depthWrite: false, side: 2 }) : -1;
     const coolerMat = map.windows.some((w) => w.cooler) ? B.std({ color: 0xbfe6ff, transparent: true, opacity: 0.32, roughness: 0.05, metalness: 0.3, emissive: 0x0d2a3a, depthWrite: false, side: 2 }) : -1;
@@ -436,9 +482,18 @@ const G_LevelDesc = (() => {
     const fireMat = B.std({ color: 0x5d666e, roughness: 0.5, metalness: 0.5 }), knobMat = B.std({ color: 0xb8a060, roughness: 0.3, metalness: 0.9 }), vaultMat = B.std({ color: 0x7a8288, roughness: 0.35, metalness: 0.85 });
     const steelMat = B.std({ color: 0x3a3f44, roughness: 0.45, metalness: 0.7 }), barMat = B.std({ color: 0xc4c8cc, roughness: 0.25, metalness: 0.9 });
     const doorGlass = B.std({ color: 0x8fa8b4, transparent: true, opacity: 0.3, roughness: 0.08, metalness: 0.5, depthWrite: false, side: 2 });
+    const shipAcc = th.space ? parseInt((th.accent || '#e8922a').slice(1), 16) : -1;
+    const frameMat = shipAcc >= 0 ? B.std({ color: 0x24282d, roughness: 0.5, metalness: 0.5 }) : -1, accMat = shipAcc >= 0 ? B.std({ color: shipAcc, roughness: 0.6 }) : -1, accLit = shipAcc >= 0 ? (map.night ? accMat : B.basic({ color: shipAcc })) : -1;
     for (const d of map.doors) {
       const dw = d.w || TS, half = dw / 2, leafL = dw - 0.05, gy = map.terrain ? d.fy || 0 : 0; // (on rolling ground, the ground it's in: a storey's floor is its whole group's)
       out.push(B.mesh(d.axis === 'x' ? B.geo('box', [TS, L.WALL_H - L.DOOR_H, dw]) : B.geo('box', [dw, L.WALL_H - L.DOOR_H, TS]), lintelMat, { p: [d.x, gy + (L.WALL_H + L.DOOR_H) / 2, d.z], l1: 1 }));
+      if (shipAcc >= 0 && d.kind !== 'stair') { // (a ship's: a frame proud of the bulkhead either side, a lit bar of her colour over the opening)
+        const ax = d.axis === 'x', fr = (along: number, y: number, h: number, w: number, deep: number, m: number) => out.push(B.mesh(ax ? B.geo('box', [deep, h, w]) : B.geo('box', [w, h, deep]), m, { p: [d.x + (ax ? 0 : along), gy + y, d.z + (ax ? along : 0)] }));
+        for (const sd of [-1, 1]) fr(sd * (half - 0.04), L.DOOR_H / 2, L.DOOR_H, 0.09, TS + 0.14, frameMat);
+        fr(0, L.DOOR_H + 0.09, 0.18, dw, TS + 0.14, frameMat);
+        fr(0, L.DOOR_H + 0.09, 0.05, dw * 0.55, TS + 0.17, accLit);
+        for (const sd of [-1, 1]) fr(sd * (half - 0.04), 0.5, 0.5, 0.095, TS + 0.15, accMat);
+      }
       const c: LdNode[] = [], slide = L.slides(d), vault = d.kind === 'vault' || d.kind === 'blast', glassDoor = d.kind === 'stair', LH = L.DOOR_H - 0.04; // (slide: a ship's door, drawn shut across the opening and slid along the wall as it opens, js/game.ts updateDoors)
       const part = (w: number, h: number, dd: number, x: number, y: number, z: number, mat = steelMat) => c.push(B.mesh(B.geo('box', [w, h, dd]), mat, { p: [x, y, z] }));
       if (glassDoor) {
@@ -454,6 +509,7 @@ const G_LevelDesc = (() => {
         for (const y of [0.88, 1.22]) part(0.025, 0.025, 0.06, leafL - 0.1, y, -push * 0.055, barMat);
       }
       if (slide) { // a sliding door: a rib across each face, a lit strip by its leading edge
+        if (shipAcc >= 0) for (const sd of [-1, 1]) { const z = sd * (vault ? 0.104 : 0.044); part(leafL - 0.16, 0.7, 0.012, leafL / 2 + 0.02, 1.78, z, frameMat); part(leafL - 0.16, 0.72, 0.012, leafL / 2 + 0.02, 0.72, z, frameMat); part(leafL - 0.04, 0.16, 0.014, leafL / 2 + 0.02, 0.1, z, accMat); } // (a ship's: two set-in panels and her colour along its foot)
         for (const sd of [-1, 1]) { part(leafL - 0.1, 0.07, 0.03, leafL / 2 + 0.02, 1.25, sd * (vault ? 0.11 : 0.05), knobMat); part(0.035, LH - 0.5, 0.012, leafL - 0.07, LH / 2, sd * (vault ? 0.105 : 0.045), barMat); }
       }
       if (d.kind === 'vault') { // the locking wheel and bolts on the outside face

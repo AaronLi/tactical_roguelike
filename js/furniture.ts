@@ -957,6 +957,134 @@ const G_Furniture = (() => {
       k.box(dark, 0.03, 0.1, 0.03, x + 0.13, 1.1, 0.24);
     }
   } };
+  // ---------------------------------------------------------------- a ship's (js/shipgen.ts compartments, the recipes below)
+  // What a ship is fitted with: built in, of plate and moulded panel, lit from inside. Footprints and solids as the buildings'
+  // pieces they stand in for, so a compartment lays out the same way.
+  const HULL = [0x8a9198, 0x6f7880, 0xa7adb2, 0x59626b], GLOW = [0x39d0e0, 0x4aa8ff, 0xffa030, 0x58e090];
+  const glow = (k: Kit, c: number, i = 1) => k.mat(k.tint(c, 0.5), 0.3, 0, { emissive: c, emissiveIntensity: i });
+  // A berth: a locker base, the mattress, a moulded head with a reading light, and a second berth over it on four posts.
+  R.bunk = { w: 1.6, d: 1.95, boxes: [[0, 0.03, 1.6, 1.89, 0.62], [0, 0.03, 1.6, 1.89, 1.62, 1.44], [0, -0.94, 1.6, 0.07, 2.05]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.55, 0.3), dark = k.mat(0x23272c, 0.6, 0.3), pad = k.mat(k.pick([0x3f4f6a, 0x46545c, 0x5a4a3e, 0x4f6b5a]), 0.95), sheet = k.mat(0xd9dcdc, 0.95), lit = glow(k, k.pick(GLOW), 0.9);
+    k.box(sh, 1.6, 0.42, 1.89, 0, 0.21, 0.03); k.box(dark, 1.5, 0.3, 0.012, 0, 0.21, 0.98); for (const x of [-0.37, 0.37]) k.box(sh, 0.3, 0.04, 0.02, x, 0.3, 0.99);
+    k.box(dark, 1.6, 2.05, 0.07, 0, 1.025, -0.94);
+    for (const y of [0.42, 1.44]) {
+      k.box(sh, 1.6, 0.06, 1.89, 0, y + 0.03, 0.03); k.box(pad, 1.46, 0.12, 1.78, 0, y + 0.12, 0.03); k.box(sheet, 1.3, 0.05, 0.4, 0, y + 0.2, -0.62);
+      k.box(sh, 1.6, 0.16, 0.04, 0, y + 0.14, 0.955); k.box(lit, 0.5, 0.03, 0.02, -0.4, y + 0.62, -0.895);
+    }
+    for (const x of [-0.77, 0.77]) for (const z of [-0.88, 0.94]) k.box(dark, 0.06, 1.62, 0.06, x, 0.81, z);
+    for (let i = 0; i < 4; i++) k.box(dark, 0.3, 0.03, 0.05, 0.62, 0.62 + i * 0.22, 0.95); // (the rungs up)
+  } };
+  // A helm or a watch station: a sloped desk in a moulded surround, three canted displays, lit keys, a seat on a post.
+  R.scons = { w: 1.9, d: 0.95, cover: 1, boxes: [[0, -0.12, 1.9, 0.7, 0.98]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.5, 0.35), dark = k.mat(0x16191d, 0.45, 0.4), g1 = k.pick(GLOW), scr = glow(k, g1, 0.8), key = glow(k, k.pick(GLOW), 0.6), pad = k.mat(0x2d3238, 0.9);
+    k.box(sh, 1.9, 0.7, 0.7, 0, 0.35, -0.12); k.box(dark, 1.9, 0.1, 0.72, 0, 0.05, -0.12); k.box(dark, 1.8, 0.05, 0.5, 0, 0.78, 0.0, 0, -0.32);
+    for (const x of [-0.92, 0.92]) k.box(sh, 0.06, 0.98, 0.7, x, 0.49, -0.12);
+    for (const x of [-0.6, 0, 0.6]) { k.box(dark, 0.56, 0.4, 0.05, x, 1.02, -0.38, x * -0.35, 0.18); k.box(scr, 0.5, 0.33, 0.01, x, 1.02, -0.35 + Math.abs(x) * 0.02, x * -0.35, 0.18); }
+    for (let i = 0; i < 9; i++) k.box(key, 0.12, 0.012, 0.05, -0.72 + i * 0.18, 0.805 - 0.02, 0.1);
+    k.box(glow(k, g1, 0.5), 1.7, 0.02, 0.012, 0, 0.16, 0.235);
+    k.cyl(dark, 0.05, 0.08, 0.42, 0.1, 0.21, 0.42, 8); k.box(pad, 0.46, 0.08, 0.44, 0.1, 0.46, 0.42); k.box(pad, 0.44, 0.5, 0.07, 0.1, 0.76, 0.63, 0, 0.12);
+  } };
+  // A plot table: a plinth with a lit glass top and what it's showing standing over it.
+  R.holotable = { w: 1.6, d: 1.5, cover: 1, boxes: [[0, 0, 1.6, 1.5, 0.88]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.5, 0.35), dark = k.mat(0x16191d, 0.45, 0.4), c = k.pick([0x39d0e0, 0x4aa8ff, 0x58e090]), top = glow(k, c, 0.55);
+    k.box(dark, 1.3, 0.12, 1.2, 0, 0.06, 0); k.box(sh, 1.1, 0.6, 1.0, 0, 0.42, 0); k.box(sh, 1.6, 0.14, 1.5, 0, 0.79, 0); k.box(dark, 1.62, 0.04, 1.52, 0, 0.72, 0);
+    k.box(top, 1.44, 0.012, 1.34, 0, 0.866, 0);
+    const holo = k.mat(c, 0.2, 0, { emissive: c, emissiveIntensity: 0.9, transparent: true, opacity: 0.35, depthWrite: false });
+    k.ico(holo, 0.3, 0, 1.35, 0, 0.4); k.cyl(holo, 0.5, 0.5, 0.004, 0, 1.35, 0, 24); k.cyl(holo, 0.02, 0.3, 0.42, 0, 1.08, 0, 12);
+    for (const x of [-0.68, 0.68]) k.box(glow(k, 0xffa030, 0.7), 0.05, 0.02, 0.4, x, 0.87, 0.3);
+  } };
+  // A reactor's core in its cage: a lit column between a base and a cap, four posts, coolant pipes round its foot.
+  R.core = { w: 1.7, d: 1.7, cover: 1, boxes: [[0, 0, 1.5, 1.5, 2.9]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.5, 0.4), dark = k.mat(0x16191d, 0.45, 0.5), c = k.pick([0x39d0e0, 0x58e090, 0x7a8cff]), lit = glow(k, c, 1.4), haz = k.mat(0xe0a020, 0.6);
+    k.cyl(dark, 0.75, 0.78, 0.3, 0, 0.15, 0, 16); k.cyl(sh, 0.6, 0.7, 0.3, 0, 0.45, 0, 16); k.cyl(haz, 0.76, 0.76, 0.05, 0, 0.3, 0, 16);
+    k.cyl(lit, 0.34, 0.34, 1.7, 0, 1.45, 0, 16);
+    for (const y of [0.9, 1.45, 2.0]) k.cyl(dark, 0.4, 0.4, 0.07, 0, y, 0, 16);
+    k.cyl(sh, 0.7, 0.6, 0.3, 0, 2.45, 0, 16); k.cyl(dark, 0.5, 0.7, 0.3, 0, 2.75, 0, 16);
+    for (const x of [-0.56, 0.56]) for (const z of [-0.56, 0.56]) k.box(dark, 0.08, 2.9, 0.08, x, 1.45, z);
+    for (const a of [0, 1, 2, 3]) k.cyl(k.mat(0x9aa2a8, 0.3, 0.8), 0.05, 0.05, 0.9, Math.cos(a * 1.571 + 0.6) * 0.62, 0.75, Math.sin(a * 1.571 + 0.6) * 0.62, 8);
+  } };
+  // A drive's machinery: a drum in a housing on a bed, pipes over it, a lit gauge panel on its end.
+  R.turbine = { w: 1.7, d: 1.7, cover: 1, boxes: [[0, 0, 1.6, 1.6, 1.45]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.5, 0.45), dark = k.mat(0x1b1f23, 0.5, 0.5), steel = k.mat(0xa8aeb4, 0.3, 0.85), haz = k.mat(0xe0a020, 0.6);
+    k.box(dark, 1.6, 0.2, 1.6, 0, 0.1, 0); k.box(haz, 1.62, 0.05, 1.62, 0, 0.2, 0);
+    k.cylX(sh, 0.55, 0.55, 1.3, 0, 0.8, 0, 16); for (const x of [-0.5, 0, 0.5]) k.cylX(dark, 0.6, 0.6, 0.1, x, 0.8, 0, 16);
+    for (const x of [-0.72, 0.72]) k.box(sh, 0.14, 1.2, 1.3, x, 0.8, 0);
+    k.cylX(steel, 0.06, 0.06, 1.5, 0, 1.36, 0.3, 8); k.cylX(steel, 0.045, 0.045, 1.5, 0, 1.4, -0.25, 8); k.cyl(steel, 0.06, 0.06, 0.5, 0.4, 1.2, 0.3, 8);
+    k.box(dark, 0.02, 0.4, 0.6, 0.8, 0.95, 0); for (const z of [-0.18, 0, 0.18]) k.box(glow(k, k.pick(GLOW), 0.9), 0.01, 0.1, 0.12, 0.812, 1.0, z);
+  } };
+  // A sick bay's bed: a pad on a pedestal, a scanner's arch over its head end, a display on an arm.
+  R.medbed = { w: 1.6, d: 1.95, boxes: [[0, 0.03, 0.95, 1.89, 0.8], [0, -0.94, 1.6, 0.07, 1.7]], build(k: Kit) {
+    const sh = k.mat(0xd4d9dc, 0.4, 0.2), dark = k.mat(0x23272c, 0.5, 0.3), pad = k.mat(0x6fb0a8, 0.9), lit = glow(k, 0x58e090, 0.9);
+    k.box(dark, 0.5, 0.5, 1.2, 0, 0.25, 0.03); k.box(sh, 0.95, 0.14, 1.89, 0, 0.57, 0.03); k.box(pad, 0.85, 0.08, 1.78, 0, 0.68, 0.03); k.box(sh, 0.6, 0.06, 0.34, 0, 0.75, -0.66);
+    k.box(sh, 1.6, 1.7, 0.07, 0, 0.85, -0.94); k.box(lit, 1.0, 0.04, 0.02, 0, 1.5, -0.9);
+    for (const x of [-0.6, 0.6]) k.box(sh, 0.1, 1.25, 0.3, x, 0.63 + 0.3, -0.5); k.box(sh, 1.3, 0.12, 0.3, 0, 1.56, -0.5); k.box(lit, 1.0, 0.02, 0.2, 0, 1.495, -0.5);
+    k.box(dark, 0.04, 0.5, 0.04, 0.7, 1.2, 0.3); k.box(dark, 0.42, 0.3, 0.04, 0.7, 1.5, 0.3, 0.5); k.box(glow(k, 0x39d0e0, 0.8), 0.38, 0.26, 0.008, 0.69, 1.5, 0.322, 0.5);
+  } };
+  // A mess table: bolted down, a bench each side on the same posts.
+  R.messtable = { w: 1.9, d: 1.7, boxes: [[0, 0, 1.6, 0.8, 0.76], [0, -0.62, 1.6, 0.32, 0.46], [0, 0.62, 1.6, 0.32, 0.46]], build(k: Kit) {
+    const top = k.mat(k.pick([0xc9ced2, 0x9aa4ac, 0xd8d2c2]), 0.4, 0.2), dark = k.mat(0x23272c, 0.5, 0.4), pad = k.mat(k.pick([0x3f4f6a, 0x7a4e3a, 0x4f6b5a]), 0.9);
+    k.box(top, 1.6, 0.05, 0.8, 0, 0.735, 0); k.box(dark, 1.62, 0.03, 0.82, 0, 0.7, 0);
+    for (const x of [-0.6, 0.6]) { k.box(dark, 0.1, 0.7, 0.1, x, 0.35, 0); k.box(dark, 0.08, 0.06, 1.5, x, 0.2, 0); for (const z of [-0.62, 0.62]) k.box(dark, 0.08, 0.4, 0.08, x, 0.2, z); }
+    for (const z of [-0.62, 0.62]) { k.box(dark, 1.6, 0.04, 0.32, 0, 0.4, z); k.box(pad, 1.54, 0.05, 0.28, 0, 0.44, z); }
+    k.box(glow(k, 0xffa030, 0.5), 0.3, 0.012, 0.08, 0, 0.765, 0);
+  } };
+  // A galley's wall unit: dispensers behind lit panels, a recess with a shelf, lockers under.
+  R.dispenser = { w: 1.9, d: 0.72, boxes: [[0, 0, 1.9, 0.66, 2.05]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.45, 0.35), dark = k.mat(0x16191d, 0.45, 0.4), steel = k.mat(0xb4babf, 0.3, 0.8);
+    k.box(sh, 1.9, 2.05, 0.6, 0, 1.025, -0.03); k.box(dark, 1.9, 0.1, 0.62, 0, 0.05, -0.02);
+    k.box(dark, 0.8, 0.55, 0.3, -0.45, 1.25, 0.14); k.box(steel, 0.78, 0.03, 0.3, -0.45, 1.0, 0.16); for (const x of [-0.65, -0.25]) k.cyl(steel, 0.02, 0.02, 0.14, x, 1.42, 0.2, 6);
+    for (let i = 0; i < 3; i++) k.box(glow(k, k.pick(GLOW), 0.7), 0.22, 0.34, 0.012, 0.22 + i * 0.27, 1.3, 0.276);
+    k.box(glow(k, 0xeef4ff, 0.8), 1.7, 0.04, 0.012, 0, 1.88, 0.276);
+    for (const x of [-0.63, 0, 0.63]) { k.box(dark, 0.008, 0.72, 0.01, x + 0.31, 0.5, 0.275); k.box(steel, 0.03, 0.14, 0.03, x + 0.24, 0.6, 0.285); }
+  } };
+  // A galley's counter: plate, a lit hob and a sink let into it, a rail over the back.
+  R.sgalley = { w: 1.98, d: 0.64, cover: 1, boxes: [[0, 0, 1.98, 0.64, 0.92]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.45, 0.35), steel = k.mat(0xb8bec3, 0.28, 0.85), dark = k.mat(0x16191d, 0.45, 0.4);
+    k.box(sh, 1.98, 0.86, 0.6, 0, 0.43, -0.02); k.box(dark, 1.98, 0.1, 0.56, 0, 0.05, -0.02); k.box(steel, 1.98, 0.04, 0.64, 0, 0.9, 0);
+    k.box(dark, 0.5, 0.012, 0.36, -0.55, 0.922, 0); for (const x of [-0.67, -0.43]) k.cyl(glow(k, 0xffa030, 0.9), 0.08, 0.08, 0.006, x, 0.93, 0, 14);
+    k.box(dark, 0.46, 0.02, 0.34, 0.5, 0.915, 0); k.cyl(steel, 0.015, 0.015, 0.26, 0.5, 1.05, -0.22, 6); k.box(steel, 0.03, 0.03, 0.16, 0.5, 1.17, -0.15);
+    for (const x of [-0.66, 0, 0.66]) k.box(dark, 0.6, 0.02, 0.012, x, 0.72, 0.285);
+    k.box(steel, 1.9, 0.03, 0.03, 0, 1.3, -0.28); for (const x of [-0.9, 0.9]) k.box(steel, 0.03, 0.4, 0.03, x, 1.1, -0.28);
+  } };
+  // A cabin's work station: a slab out of the bulkhead, a display over it, a stool on a post.
+  R.station = { w: 1.4, d: 1.15, boxes: [[0, -0.3, 1.4, 0.55, 0.78], [0, 0.26, 0.42, 0.42, 0.5]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.5, 0.3), dark = k.mat(0x16191d, 0.45, 0.4), pad = k.mat(0x2d3238, 0.9);
+    k.box(sh, 1.4, 0.06, 0.55, 0, 0.75, -0.3); k.box(dark, 1.3, 0.3, 0.06, 0, 0.6, -0.54); for (const x of [-0.6, 0.6]) k.box(dark, 0.06, 0.72, 0.5, x, 0.36, -0.3);
+    k.box(dark, 0.9, 0.5, 0.04, 0, 1.3, -0.55); k.box(glow(k, k.pick(GLOW), 0.8), 0.84, 0.44, 0.008, 0, 1.3, -0.528); k.box(glow(k, 0xeef4ff, 0.6), 0.5, 0.012, 0.16, 0, 0.787, -0.2);
+    k.cyl(dark, 0.04, 0.07, 0.44, 0, 0.22, 0.26, 8); k.cyl(pad, 0.2, 0.2, 0.07, 0, 0.47, 0.26, 14);
+  } };
+  // A bench of plate along a bulkhead.
+  R.sbench = { w: 1.8, d: 0.6, boxes: [[0, 0, 1.8, 0.5, 0.5]], build(k: Kit) {
+    const sh = k.mat(k.pick(HULL), 0.5, 0.35), dark = k.mat(0x1b1f23, 0.5, 0.4), pad = k.mat(k.pick([0x3f4f6a, 0x46545c, 0x5a4a3e]), 0.9);
+    k.box(sh, 1.8, 0.06, 0.5, 0, 0.44, 0); k.box(pad, 1.7, 0.04, 0.42, 0, 0.49, 0); for (const x of [-0.75, 0, 0.75]) k.box(dark, 0.08, 0.42, 0.44, x, 0.21, 0);
+    k.box(dark, 1.8, 0.05, 0.05, 0, 0.1, 0.2);
+  } };
+  // Stores racking: plate shelves between four posts, cases and bins lashed on them.
+  R.srack = { w: 1.9, d: 0.6, boxes: [[0, 0, 1.9, 0.6, 2.0]], build(k: Kit) {
+    const dark = k.mat(0x23272c, 0.55, 0.5), sh = k.mat(k.pick(HULL), 0.5, 0.4), CASE = [0x4f7896, 0xb0702c, 0x566650, 0x8a3a30, 0xc8c4b4, 0x3a4149];
+    for (const x of [-0.92, 0.92]) for (const z of [-0.27, 0.27]) k.box(dark, 0.05, 2.0, 0.05, x, 1.0, z);
+    for (const y of [0.12, 0.72, 1.32, 1.92]) {
+      k.box(sh, 1.88, 0.04, 0.58, 0, y, 0);
+      if (y > 1.9) continue;
+      let x = -0.86;
+      while (x < 0.7) { const w = 0.26 + k.rnd() * 0.34, h = 0.22 + k.rnd() * 0.26; if (x + w > 0.88) break; if (k.rnd() < 0.82) { const c = k.pick(CASE); k.box(k.mat(c, 0.6, 0.2), w, h, 0.46, x + w / 2, y + 0.02 + h / 2, 0); k.box(k.mat(k.tint(c, 0.55), 0.6, 0.2), w + 0.004, 0.03, 0.47, x + w / 2, y + 0.02 + h * 0.62, 0); k.box(dark, 0.08, 0.03, 0.02, x + w / 2, y + 0.02 + h * 0.4, 0.235); } x += w + 0.04; }
+      k.box(glow(k, 0xffa030, 0.5), 0.06, 0.02, 0.012, 0.86, y + 0.035, 0.29);
+    }
+  } };
+  // Drums on a skid, strapped: four, banded in the colour of what's in them.
+  R.drums = { w: 1.4, d: 1.4, cover: 1, boxes: [[0, 0, 1.25, 1.25, 1.12]], build(k: Kit) {
+    const dark = k.mat(0x23272c, 0.6, 0.4), c = k.pick([0x4f7896, 0xb0702c, 0x566650, 0x8a3a30, 0xc8c4b4]), body = k.mat(c, 0.5, 0.4), band = k.mat(k.pick([0xe0a020, 0xd8dcdc, 0x23272c]), 0.6);
+    k.box(dark, 1.25, 0.1, 1.25, 0, 0.05, 0); for (const x of [-0.5, 0.5]) k.box(dark, 0.12, 0.06, 1.25, x, 0.13, 0);
+    for (const x of [-0.3, 0.3]) for (const z of [-0.3, 0.3]) { k.cyl(body, 0.28, 0.28, 0.9, x, 0.61, z, 14); k.cyl(band, 0.287, 0.287, 0.1, x, 0.78, z, 14); k.cyl(dark, 0.26, 0.26, 0.02, x, 1.07, z, 14); k.cyl(dark, 0.04, 0.04, 0.04, x + 0.14, 1.09, z, 6); }
+    k.box(band, 1.22, 0.04, 0.012, 0, 0.5, 0.6); k.box(band, 1.22, 0.04, 0.012, 0, 0.5, -0.6);
+  } };
+  // Gas bottles in a stand, or a carrying case: what's left about in a corner.
+  R.canister = { small: 1, boxes: [[0, 0, 0.5, 0.42, 0.82]], build(k: Kit) {
+    const dark = k.mat(0x23272c, 0.6, 0.4), steel = k.mat(0xa8aeb4, 0.3, 0.8);
+    k.box(dark, 0.5, 0.06, 0.42, 0, 0.03, 0);
+    for (const x of [-0.12, 0.12]) { const c = k.pick([0x4f7896, 0xb0702c, 0x8a3a30, 0xc8c4b4, 0x566650]); k.cyl(k.mat(c, 0.45, 0.4), 0.1, 0.1, 0.6, x, 0.36, 0, 12); k.sph(k.mat(c, 0.45, 0.4), 0.1, x, 0.66, 0); k.cyl(steel, 0.025, 0.035, 0.1, x, 0.78, 0, 8); }
+    k.box(dark, 0.5, 0.03, 0.03, 0, 0.5, 0.12); k.box(dark, 0.5, 0.03, 0.03, 0, 0.5, -0.12);
+  } };
   // ---------------------------------------------------------------- the Sandia Crest
   // (js/level.ts layCrest: the outcrops are its walls; what stands about on them is here)
   const GRANITE = [0xb08478, 0xa47a6e, 0xba8e80, 0x9a7468, 0xc49a8a];
@@ -1220,19 +1348,19 @@ const G_Furniture = (() => {
     giftshop: { must: 'counter', wall: ['shopwall', 'rack', 'shopwall', 'files'], center: ['endcap'], small: ['plant', 'cardboard', 'bin'], floor: 'wood' },
     storeroom: { must: 'rack', wall: ['rack', 'crates', 'rack'], center: [], small: ['cardboard', 'bin'], floor: null, noArt: 1 },
     // a ship's compartments (js/shipgen.ts): what she has goes by her size
-    bridge: { must: 'console', wall: ['console', 'console', 'desk', 'console'], center: ['deskpair'], small: ['bin'], floor: null, noArt: 1 },
-    engine: { must: 'panel', wall: ['panel', 'panel', 'panel', 'lockers'], center: ['crates'], small: ['bin'], floor: null, noArt: 1, dense: 1 },
-    reactor: { must: 'panel', wall: ['panel', 'panel'], center: ['crates'], small: ['bin'], floor: null, noArt: 1 },
-    cargo: { must: 'rack', wall: ['rack', 'crates', 'rack', 'pallet'], center: ['crates', 'pallet', 'crates'], small: ['cardboard', 'bin'], floor: null, noArt: 1, dense: 1 },
-    quarters: { must: 'bed', wall: ['wardrobe', 'desk', 'bed', 'lockers'], center: [], small: ['sidetable', 'bin'], floor: null, noArt: 1 },
-    barracks: { must: 'bed', wall: ['bed', 'lockers', 'bed', 'lockers'], center: ['bench'], small: ['bin'], floor: null, noArt: 1 },
-    mess: { must: 'counter', wall: ['fridge', 'counter', 'tv'], center: ['dining', 'dining'], small: ['cooler', 'bin'], floor: null, noArt: 1 },
-    galley: { must: 'counter', wall: ['counter', 'fridge', 'counter', 'sinks'], center: ['island'], small: ['bin'], floor: null, noArt: 1 },
-    medbay: { must: 'bed', wall: ['sinks', 'files', 'bed', 'lockers'], center: [], small: ['bin', 'cooler'], floor: null, noArt: 1 },
-    armoury: { must: 'lockers', wall: ['lockers', 'rack', 'lockers', 'bench'], center: ['bench'], small: ['bin'], floor: null, noArt: 1 },
-    magazine: { must: 'rack', wall: ['rack', 'crates', 'rack'], center: ['crates'], small: ['cardboard'], floor: null, noArt: 1, dense: 1 },
-    vault: { must: 'rack', wall: ['lockers', 'rack'], center: [], small: ['bin'], floor: null, noArt: 1 },
-    brig: { must: 'bench', wall: ['bench', 'lockers'], center: [], small: ['bin'], floor: null, noArt: 1 },
+    bridge: { must: 'scons', wall: ['scons', 'scons', 'panel', 'scons'], center: ['holotable'], small: ['bin'], floor: null, noArt: 1 },
+    engine: { must: 'panel', wall: ['panel', 'panel', 'panel', 'lockers'], center: ['turbine'], small: ['canister'], floor: null, noArt: 1, dense: 1 },
+    reactor: { must: 'panel', wall: ['panel', 'panel'], center: ['core'], small: ['canister'], floor: null, noArt: 1 },
+    cargo: { must: 'srack', wall: ['srack', 'crates', 'srack', 'drums'], center: ['crates', 'drums', 'crates'], small: ['canister', 'bin'], floor: null, noArt: 1, dense: 1 },
+    quarters: { must: 'bunk', wall: ['lockers', 'station', 'bunk', 'lockers'], center: [], small: ['bin'], floor: null, noArt: 1 },
+    barracks: { must: 'bunk', wall: ['bunk', 'lockers', 'bunk', 'lockers'], center: ['sbench'], small: ['bin'], floor: null, noArt: 1 },
+    mess: { must: 'dispenser', wall: ['dispenser', 'sgalley', 'sbench'], center: ['messtable', 'messtable'], small: ['bin'], floor: null, noArt: 1 },
+    galley: { must: 'sgalley', wall: ['sgalley', 'dispenser', 'sgalley', 'sgalley'], center: ['messtable'], small: ['bin', 'canister'], floor: null, noArt: 1 },
+    medbay: { must: 'medbed', wall: ['lockers', 'panel', 'medbed', 'lockers'], center: [], small: ['bin', 'canister'], floor: null, noArt: 1 },
+    armoury: { must: 'lockers', wall: ['lockers', 'srack', 'lockers', 'sbench'], center: ['sbench'], small: ['bin'], floor: null, noArt: 1 },
+    magazine: { must: 'srack', wall: ['srack', 'crates', 'srack'], center: ['crates'], small: ['canister'], floor: null, noArt: 1, dense: 1 },
+    vault: { must: 'srack', wall: ['lockers', 'srack'], center: [], small: ['bin'], floor: null, noArt: 1 },
+    brig: { must: 'sbench', wall: ['sbench', 'lockers'], center: [], small: ['bin'], floor: null, noArt: 1 },
     pods: { floor: null, bare: 1, noArt: 1 }, spine: { floor: null, bare: 1, noArt: 1 },
   };
   // small pieces give only their boxes; they need a footprint too when they're set against a wall

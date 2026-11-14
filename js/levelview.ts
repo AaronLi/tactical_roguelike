@@ -305,7 +305,64 @@ const G_LevelView = {
   // A level's procedural textures: a tile's noise (the noise is this screen's own: Math.random) and its lines
   // ---------------------------------------------------------------- textures
   // ----------------------------------------------------------------- meshes
+  // What a ship's made of (js/leveldesc.ts: a theme with space set), painted as the buildings' are: kind 'bulkhead', 'deck',
+  // 'overhead' or 'cargo', then ':' and the ship's own colour (js/spacedata.ts THEMES accent).
+  //   bulkhead  one wall tile's width and the wall's whole height (4 m): a kick plate, a lower panel, a rail with her colour
+  //             along it, an upper panel, a strip of light over the doors' height, then ribbed plating and vents up to the trunking
+  //   deck      two metres square: four plates with studded faces, one of them a grating, bolts at the corners
+  //   overhead  frames crossing, a recessed panel between them, a cable run
+  //   cargo     a container's side: corrugated, framed, a band of her colour and a label
+  _shipTex(kd: string, base: string, acc: string) {
+    const W = kd === 'bulkhead' ? 128 : 256, H = kd === 'bulkhead' ? 768 : 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const g = c.getContext('2d')!, dk = (a: number) => `rgba(0,0,0,${a})`, lt = (a: number) => `rgba(255,255,255,${a})`, R = Math.random;
+    const rect = (x: number, y: number, w: number, h: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, h); };
+    const inset = (x: number, y: number, w: number, h: number) => { g.lineWidth = 2; g.strokeStyle = dk(0.3); g.strokeRect(x, y, w, h); g.lineWidth = 1; g.strokeStyle = lt(0.1); g.strokeRect(x + 2, y + 2, w - 4, h - 4); };
+    const bolt = (x: number, y: number, r = 2.2) => { g.fillStyle = dk(0.4); g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.fillStyle = lt(0.16); g.beginPath(); g.arc(x - 0.6, y - 0.6, r * 0.45, 0, 7); g.fill(); };
+    rect(0, 0, W, H, base);
+    for (let i = 0; i < W * H / 50; i++) { const v = R() * 2 - 1; g.fillStyle = v > 0 ? lt(v * 0.05) : dk(-v * 0.07); if (kd === 'bulkhead' || kd === 'cargo') g.fillRect(R() * W, R() * H, 1, 6 + R() * 26); else g.fillRect(R() * W, R() * H, 3 + R() * 14, 1); } // (brushed: its grain)
+    if (kd === 'bulkhead') {
+      const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, f: string) => rect(0, Y(m1), W, Y(m0) - Y(m1), f);
+      band(2.5, 4, dk(0.34)); // the plating over the light
+      for (let m = 2.75; m < 3.7; m += 0.25) { band(m, m + 0.012, dk(0.3)); band(m - 0.012, m, lt(0.05)); }
+      for (let x = 22; x < W - 22; x += 12) rect(x, Y(3.4), 6, Y(3.06) - Y(3.4), dk(0.55)); // a vent
+      inset(14, Y(3.46), W - 28, Y(3.0) - Y(3.46));
+      band(3.68, 3.86, dk(0.35)); band(3.86, 3.875, lt(0.12)); band(3.74, 3.76, acc); band(3.74, 3.76, dk(0.35)); // the trunking, a faint line of her colour on it
+      band(2.34, 2.5, dk(0.5)); band(2.37, 2.47, '#eef4ff'); band(2.37, 2.385, acc); band(2.37, 2.385, lt(0.45)); // the strip of light, in its channel
+      inset(8, Y(2.28), W - 16, Y(1.26) - Y(2.28)); for (const x of [15, W - 15]) for (const m of [2.22, 1.32]) bolt(x, Y(m));
+      rect(W - 46, Y(2.12), 28, 14, dk(0.28)); rect(W - 43, Y(2.12) + 3, 12, 2, lt(0.35)); rect(W - 43, Y(2.12) + 8, 20, 2, lt(0.2)); // a stencilled plate
+      band(1.04, 1.2, dk(0.5)); band(1.09, 1.15, acc); band(1.2, 1.21, lt(0.1)); // the rail
+      band(0.25, 1.04, dk(0.1)); inset(8, Y(0.98), W - 16, Y(0.31) - Y(0.98)); for (const x of [15, W - 15]) for (const m of [0.92, 0.37]) bolt(x, Y(m));
+      band(0, 0.25, dk(0.52)); for (let m = 0.04; m < 0.24; m += 0.05) band(m, m + 0.008, lt(0.07)); // the kick plate
+      for (let i = 0; i < 26; i++) { g.fillStyle = dk(0.05 + R() * 0.08); g.fillRect(R() * W, Y(0.25 + R() * 0.9), 4 + R() * 22, 1 + R() * 2); } // (scuffed, low down)
+      rect(0, 0, 2, H, dk(0.42)); rect(W - 2, 0, 2, H, dk(0.42)); rect(2, 0, 1, H, lt(0.08)); // the joint with the next
+    } else if (kd === 'deck') {
+      const P = W / 2;
+      for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {
+        const x0 = px * P, y0 = py * P;
+        if (px === 1 && py === 0) { // the grating
+          rect(x0 + 6, y0 + 6, P - 12, P - 12, dk(0.3));
+          for (let y = y0 + 12; y < y0 + P - 12; y += 9) for (let x = x0 + 12; x < x0 + P - 14; x += 26) rect(x, y, 20, 4, dk(0.6));
+        } else for (let y = y0 + 14; y < y0 + P - 10; y += 12) for (let x = x0 + 14 + ((y / 12) & 1) * 6; x < x0 + P - 10; x += 12) { rect(x, y, 4, 2, lt(0.09)); rect(x, y + 2, 4, 1, dk(0.22)); } // studs
+        g.lineWidth = 3; g.strokeStyle = dk(0.5); g.strokeRect(x0 + 1.5, y0 + 1.5, P - 3, P - 3); g.lineWidth = 1; g.strokeStyle = lt(0.09); g.strokeRect(x0 + 4.5, y0 + 4.5, P - 9, P - 9);
+        for (const [bx, by] of [[9, 9], [P - 9, 9], [9, P - 9], [P - 9, P - 9]]) bolt(x0 + bx, y0 + by, 2.6);
+      }
+      for (let i = 0; i < 40; i++) { g.fillStyle = dk(0.04 + R() * 0.07); g.fillRect(R() * W, R() * H, 8 + R() * 40, 1 + R() * 2); } // (walked on)
+    } else if (kd === 'overhead') {
+      rect(0, 0, W, 18, dk(0.4)); rect(0, 18, W, 2, lt(0.08)); rect(0, 0, 18, H, dk(0.4)); rect(18, 0, 2, H, lt(0.08)); // the frames
+      inset(34, 34, W - 50, H - 50); rect(W / 2 + 20, 20, 22, H - 20, dk(0.32)); for (let y = 30; y < H; y += 22) rect(W / 2 + 22, y, 18, 2, lt(0.08)); // a cable run
+      for (const [x, y] of [[9, 9], [42, 42], [W - 24, 42], [42, H - 24], [W - 24, H - 24]]) bolt(x, y, 2.6);
+    } else { // cargo
+      for (let x = 14; x < W - 14; x += 16) { rect(x, 14, 8, H - 28, dk(0.16)); rect(x + 8, 14, 2, H - 28, lt(0.09)); rect(x - 1, 14, 1, H - 28, dk(0.2)); } // corrugated
+      rect(0, Math.round(H * 0.56), W, 34, acc); rect(0, Math.round(H * 0.56), W, 34, dk(0.12));
+      g.lineWidth = 14; g.strokeStyle = dk(0.42); g.strokeRect(7, 7, W - 14, H - 14); g.lineWidth = 1; g.strokeStyle = lt(0.12); g.strokeRect(14.5, 14.5, W - 29, H - 29);
+      for (const [x, y] of [[0, 0], [W - 22, 0], [0, H - 22], [W - 22, H - 22]]) { rect(x, y, 22, 22, dk(0.35)); rect(x + 7, y + 7, 8, 8, dk(0.5)); } // corner castings
+      rect(34, 38, 74, 44, '#e6e8e4'); for (let x = 40; x < 100; x += 3 + ((x * 7) % 5)) rect(x, 44, 1 + (x % 3), 20, '#15181a'); rect(40, 69, 46, 5, '#15181a'); // a label
+    }
+    const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
+    return tex;
+  },
   _tex(kind: string, base: string) {
+    if (kind.indexOf(':') > 0) { const [kd, acc] = kind.split(':'); return this._shipTex(kd, base, acc); }
     const c = document.createElement('canvas');
     c.width = c.height = 128;
     const g = c.getContext('2d')!;

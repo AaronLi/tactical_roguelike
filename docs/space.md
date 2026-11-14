@@ -241,3 +241,23 @@ reactor, contactors, the rock settling.
 `tools/space_film.mjs` films a whole flight with its sound (hangar, helm, anchor, jump, run in, breach, aboard), the ship
 flown through her own controls by a scripted pilot; the sound is rendered afterwards from how she flew (`renderFlight`),
 since a headless page plays none.
+
+## What she's like inside (`docs/ship_interiors.png`)
+
+A ship's compartments were a building's: plaster-and-skirting walls, a tiled floor, wooden beds and desks, cardboard boxes. A
+theme with `space` set (the three in `js/spacedata.ts`, each with its own `accent`) is now drawn and fitted as a ship:
+
+- Surfaces (`js/levelview.ts` `_shipTex`, asked for by `js/leveldesc.ts` as `bulkhead:<accent>` and so on). The bulkhead is
+  painted for the wall's whole four metres: a kick plate, a lower panel, a rail in her colour, an upper panel, a strip of
+  light over the doors' height, then ribbed plating, vents and trunking. The deck is studded plate with a grating in every
+  fourth; the overhead is frames and a cable run; a crate is a corrugated container with her colour banded round it.
+- Fittings (`js/leveldesc.ts`): lamps are bars of light let into the overhead; every door has a frame proud of the bulkhead
+  with a lit bar of her colour over it, and the sliding leaf two set-in panels and her colour along its foot; her passages
+  (`shipTrim`) have frames across them every few metres, trunking and a pipe along each side, and a lit strip let into the
+  deck along each edge (unlit on a night level). None of the trim stops anyone or anything.
+- Furniture (`js/furniture.ts`, the pieces from `R.bunk` to `R.canister` and the compartments' recipes): bunks, watch stations,
+  a plot table, a reactor core, drive machinery, a sick-bay bed, bolted mess tables, galley units, cabin work stations, plate
+  benches, stores racking, drums on skids, gas bottles. Each has the footprint and solids of the building's piece it stands
+  in for, so compartments lay out as before. Lockers and switchgear cabinets are the buildings' own.
+
+The buildings' themes and the hangar are untouched (the level golden's 31 cases and the furniture golden pass unchanged).
