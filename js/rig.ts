@@ -38,7 +38,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   secure(t: number): void; settle(sec?: number): void; startle(): void; dispose(): void;
   // (what the animation keeps from frame to frame)
   powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; zipSw?: ZipSwing; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
-  gunFg?: number; gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
+  gunHold?: GunHolds; gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
   cold?: boolean; // (no warmth for a thermal channel: a mannequin)
   nvPivot?: THREE.Object3D | null; nvLit?: THREE.Mesh[]; nvK?: number; nvWant?: number; // (night vision on the helmet: what swings, its lit eyepieces, how far down it is and is going: setKit, update)
   blindW?: number; radioW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; atakAlways?: boolean; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
@@ -209,17 +209,16 @@ const G_Rig = (() => {
   const CURL_REST = 0.2; // (a hand at rest: a little closed)
   const WRIST = new T.Vector3(); // (a hand turned about the wrist, where the arm put it)
   // How far each knuckle bends with the hand fully closed (rad, from the hand out): a finger's round a grip, the thumb's across it
-  const BEND = { finger: [1.2, 1.5, 0.9], thumb: [0.3, 0.6, 0.6] };
+  const BEND = { finger: [-1.2, -1.5, -0.9], thumb: [0.3, 0.6, 0.6] }; // (a finger closes about its bones' -x, the thumb about its +x: both toward the palm, on either hand)
   // The low ready (the gun lowered): where the grip goes (the chest's frame) and how far the muzzle's down and turned across the body to
   // the left (rad), a long gun's and a handgun's; where the elbows bend toward (the chest's frame); how far a wrist may bend before the
-  // hand stops short of the hold (the right one turning the gun with it: gripHand); the support hand's palm, how far round from under the
-  // forend to its left side. Found by a search for the pose that keeps the wrists within 40 degrees of straight, the forearms' turn and
+  // hand stops short of the hold (the right one turning the gun with it: gripHand). Found by a search for the pose that keeps the wrists within 40 degrees of straight, the forearms' turn and
   // the elbows where an arm has them, the muzzle 30 degrees down and the left hand on the forend, on an AK, an M4, an MP5, a pump, a bolt
   // rifle, a pistol and a revolver
   const LOW = { rifle: new T.Vector3(0.04, -0.18, -0.16), rifleTurn: [-0.85, 0.85], pistol: new T.Vector3(0.05, -0.25, -0.34), pistolTurn: [-0.55, 0.2],
-    poleR: new T.Vector3(0.7, -0.5, 0.2), poleL: new T.Vector3(-0.4, -0.6, 0.3), wrist: 40 * Math.PI / 180, supp: 0.52 };
+    poleR: new T.Vector3(0.7, -0.5, 0.2), poleL: new T.Vector3(-0.4, -0.6, 0.3), wrist: 40 * Math.PI / 180 };
   const AIM_POLE_R = new T.Vector3(0.6, -0.2, 0.4), AIM_POLE_L = new T.Vector3(-0.6, -0.3, 0.2);
-  // The fingers closed by rig.curl (the right hand's then the left's): each knuckle turned about its bone's x from the bone's rest on the
+  // The fingers closed by rig.curl (the right hand's then the left's): each knuckle turned about its bone's x (BEND) from the bone's rest on the
   // hand (rig.fingers: each finger's bones, their rest in the wrist's frame and each one's on the one before)
   const _fx = new T.Matrix4(), _fm = new T.Matrix4();
   function poseFingers(rig: Rig) {
@@ -839,9 +838,7 @@ const G_Rig = (() => {
     if (!def) { rig.gun = null; rig.gunInfo = null; return; }
     rig.gun = G.GunModels.world(def, skin);
     rig.gunInfo = rig.gun.userData.info;
-    // whether the support hand has a grip of its own to take: a vertical or stubby foregrip, hanging this far (m) from info.support
-    const fg = (def.parts || []).find((pt: any) => pt && pt.slot === 'fg'), fgT = fg && fg.model && fg.model.fg;
-    rig.gunFg = fgT === 'vertical' ? 0.045 : fgT === 'stubby' ? 0.028 : 0;
+    rig.gunHold = G.GunRig.holds(def, rig.gunInfo!); // (how each hand takes it: js/gunrig.ts holds)
     rig.gunMount.add(rig.gun);
   }
 
@@ -1111,7 +1108,7 @@ const G_Rig = (() => {
       // till the support hand's on it
       if (!gi.pistol && !p.zip) { // (one-handed on a zipline: the left's on the trolley)
         rig.chest.updateMatrixWorld(true);
-        const S = rig.gun.localToWorld(_a.set(gi.support[2] - 0.01, gi.support[1], -gi.support[0])), P = rig.armL.up.getWorldPosition(_b);
+        const S = rig.gun.localToWorld(_a.copy(rig.gunHold!.support.at)), P = rig.armL.up.getWorldPosition(_b);
         const f = _c.set(0, 0, -1).transformDirection(rig.gun.matrixWorld), D = _d.subVectors(S, P), R = (UARM + FARM) * s * 0.98;
         // first the shoulder rolls forward toward it (as reaching does), up to 7 cm; then the gun comes back
         const far = D.length() - R;
@@ -1139,14 +1136,14 @@ const G_Rig = (() => {
       // front and the hand along the bore (a raked grip runs back across the palm, as it does in a hand); the left under the forend, the
       // palm up and to the right and the fingers round its far side, reaching forward a little, or closed round a foregrip, or on a pistol
       // over the right hand on the grip's left side. Off the gun (a throw, a reload) the wrist comes straight again.
-      const gm = rig.gun.matrixWorld, GX = new T.Vector3(1, 0, 0).transformDirection(gm), GY = new T.Vector3(0, 1, 0).transformDirection(gm), GZ = new T.Vector3(0, 0, 1).transformDirection(gm);
+      const gm = rig.gun.matrixWorld, HD = rig.gunHold!, D = (u: THREE.Vector3) => u.clone().transformDirection(gm); // (the hands' frames on this gun, in the world)
       const poleR = elbow(1, LOW.poleR.clone().lerp(AIM_POLE_R, rig.aimW)), poleL = elbow(-1, LOW.poleL.clone().lerp(AIM_POLE_L, rig.aimW)); // (lowered: the elbows back by the ribs)
       if (rig.throwT >= 0) { ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rTarget, poleR); rig.curl[0] = 0.6; }
       else {
         // (a powered body going weak holds it as the old figure did, the wrist straight on the grip: its simulated arm sags from there, and
         // the gun with it, rather than folding up with the hand cocked back to the grip: powerStep)
         const wk = rig.powered && p.str != null ? 1 - U.clamp((p.str - 0.4) / 0.35, 0, 1) : 0;
-        const off = gripHand(rig, rig.armR, rTarget, GX.clone().negate(), GZ.clone().negate(), poleR, wk ? HAND_GRIP.clone().multiplyScalar(1 - wk) : HAND_GRIP, 1, 1 - wk, U.lerp(LOW.wrist, Math.PI, rig.aimW));
+        const off = gripHand(rig, rig.armR, rTarget, D(HD.grip.palm), D(HD.grip.fingers), poleR, wk ? HAND_GRIP.clone().multiplyScalar(1 - wk) : HAND_GRIP, 1, 1 - wk, U.lerp(LOW.wrist, Math.PI, rig.aimW));
         if (off) { // (lowered, past what a wrist bends: the gun turns with the hand, about the wrist)
           const wp = rig.armR.wr.getWorldPosition(new T.Vector3()), g = rig.gun, M = new T.Matrix4();
           M.makeTranslation(-wp.x, -wp.y, -wp.z).premultiply(new T.Matrix4().makeRotationFromQuaternion(off)).premultiply(new T.Matrix4().makeTranslation(wp.x, wp.y, wp.z)).multiply(g.matrixWorld);
@@ -1154,7 +1151,7 @@ const G_Rig = (() => {
           g.updateMatrixWorld(true);
         }
       }
-      const supp = rig.gun.localToWorld(new T.Vector3(gi.support[2] - 0.01, gi.support[1], -gi.support[0]));
+      const supp = rig.gun.localToWorld(HD.support.at.clone());
       // the support hand in a reload: to the magazine, down to a pouch on the belt, back up with the new one,
       // seating it; in a magazine check: the magazine out and up in front of the chest
       const well = rig.gun.localToWorld(new T.Vector3(gi.grip[2], gi.grip[1] - 0.07, -(gi.grip[0] + 0.09)));
@@ -1180,11 +1177,9 @@ const G_Rig = (() => {
       } else if (p.magChk != null && p.magChk >= 0) sp = well.clone().lerp(rig.chest.localToWorld(new T.Vector3(-0.04, 0.32, -0.4)), U.smooth(0.25, 1, p.magChk));
       const wL = 1 - U.smooth(0.02, 0.08, sp.distanceTo(supp) / s);
       if (wL < 0.01) { ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, sp, poleL); rig.curl[1] = 0.4; }
-      else if (gi.pistol) gripHand(rig, rig.armL, sp, GX, GY.clone().multiplyScalar(-0.5).addScaledVector(GZ, -0.85), poleL, HAND_PALM, U.lerp(0.55, 0.9, wL), wL, U.lerp(LOW.wrist, Math.PI, rig.aimW));
-      else if (rig.gunFg) gripHand(rig, rig.armL, sp.clone().addScaledVector(GY, -rig.gunFg * s), GX, GZ.clone().negate().addScaledVector(GY, -0.2), poleL, HAND_GRIP, U.lerp(0.4, 1, wL), wL); // (a foregrip: closed round it, the palm on its left)
-      else { // (the palm up and to the right, LOW.supp round from under it lowered)
-        const a = U.lerp(LOW.supp, 0.52, rig.aimW), sa = Math.sin(a), ca = Math.cos(a);
-        gripHand(rig, rig.armL, sp, GX.clone().multiplyScalar(sa).addScaledVector(GY, ca), GX.clone().multiplyScalar(ca * 0.85).addScaledVector(GY, -sa * 0.85).addScaledVector(GZ, -0.53), poleL, HAND_PALM, U.lerp(0.4, 0.75, wL), wL, U.lerp(LOW.wrist, Math.PI, rig.aimW));
+      else { // (closed round a foregrip, over the firing hand on a pistol, the palm under a forend: G.GunRig.holds)
+        const k = HD.support.kind, c = k === 'pistol' ? U.lerp(0.55, 0.9, wL) : k === 'fg' ? U.lerp(0.4, 1, wL) : U.lerp(0.4, 0.75, wL);
+        gripHand(rig, rig.armL, sp, D(HD.support.palm), D(HD.support.fingers), poleL, HD.support.hold === 'closed' ? HAND_GRIP : HAND_PALM, c, wL, U.lerp(LOW.wrist, Math.PI, rig.aimW));
       }
       // the magazine: in the support hand from when it comes out to when the new one's seated (or while it's
       // checked), otherwise on the gun
@@ -1415,8 +1410,8 @@ const G_Rig = (() => {
     if (gi && gi.grip) {
       const grip = g.localToWorld(new T.Vector3(gi.grip[2], gi.grip[1], -gi.grip[0])), arm = rig.armR;
       const w = sw.on ? 1 - G.U.smooth(0.8, 1, f) : G.U.smooth(0, REACH, f), cur = arm.wr.localToWorld(HAND_GRIP.clone());
-      const gm = g.matrixWorld;
-      if (w > 0.01) gripHand(rig, arm, cur.lerp(grip, w), new T.Vector3(-1, 0, 0).transformDirection(gm), new T.Vector3(0, 0, -1).transformDirection(gm), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.1)), HAND_GRIP, G.U.lerp(CURL_REST, 1, w), w);
+      const gm = g.matrixWorld, H = rig.gunHold!.grip;
+      if (w > 0.01) gripHand(rig, arm, cur.lerp(grip, w), H.palm.clone().transformDirection(gm), H.fingers.clone().transformDirection(gm), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.1)), HAND_GRIP, G.U.lerp(CURL_REST, 1, w), w);
     }
     if (sw.t >= SWAP_T) endSwap(rig);
   }
@@ -1558,7 +1553,7 @@ const G_Rig = (() => {
       }
       // where the support hand should be on it (next frame, the left hand reaches for it there)
       const gi = rig.gunInfo;
-      rig.gunSupport = gi && !gi.pistol ? g.localToWorld((rig.gunSupport || new T.Vector3()).set(gi.support[2] - 0.01, gi.support[1], -gi.support[0])) : null;
+      rig.gunSupport = gi && !gi.pistol && rig.gunHold ? g.localToWorld((rig.gunSupport || new T.Vector3()).copy(rig.gunHold.support.at)) : null;
     } else rig.gunSupport = null;
   }
   const _gbox = new T.Box3(), _gc = new T.Vector3(), _ga = new T.Vector3(), _gf = new T.Vector3(), _gw = new T.Vector3(), _gI = new T.Quaternion(), _gr = new T.Matrix4();
