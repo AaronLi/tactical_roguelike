@@ -1091,6 +1091,15 @@ const G_VMAnim = (() => {
       sw.setComponent(v, slot, sw.getComponent(v, slot) + moved);
     }
   }
+  // the corners of a skinned geometry within a couple of centimetres of the wrist (W, the hand's way f: its seam with the sleeve) weighted half on the forearm (fa), half on the hand (h)
+  function seam(geo: THREE.BufferGeometry, fa: number, h: number, W: THREE.Vector3, f: THREE.Vector3) {
+    const si = geo.attributes.skinIndex as THREE.BufferAttribute, sw = geo.attributes.skinWeight as THREE.BufferAttribute, pos = geo.attributes.position, v = new T.Vector3();
+    if (fa < 0 || h < 0 || !si || !sw) return;
+    for (let i = 0; i < pos.count; i++) {
+      const d = v.fromBufferAttribute(pos, i).sub(W).dot(f); if (Math.abs(d) > 0.02 || v.addScaledVector(f, -d).length() > 0.08) continue;
+      si.setXYZW(i, fa, h, 0, 0); sw.setXYZW(i, 0.5, 0.5, 0, 0);
+    }
+  }
   // your arms, on a viewmodel: now if your body's file is in, else when it comes
   function dressArms(root: THREE.Object3D, a: Vma) {
     if (!G.Humans || !G.Rig || !G.Game) return;
@@ -1122,6 +1131,9 @@ const G_VMAnim = (() => {
       const fing = (n: string) => /^(hand|(thumb|index|middle|ring|pinky)\d)[LR]$/.test(n);
       if (p.mat === 'sleeve' || p.mat === 'upsleeve') reweigh(geo, p.bones.indexOf('forearm' + s), new Set(p.bones.map((n, i) => (fing(n) ? i : -1)).filter((i) => i >= 0)));
       else reweigh(geo, p.bones.indexOf('hand' + s), new Set(p.bones.map((n, i) => (fing(n) ? -1 : i)).filter((i) => i >= 0)));
+      // (the seam: the sleeve's last ring and the hand's first are the same ring in the file, so both are given the same weights, half the forearm's and
+      // half the hand's, and stay one ring however the wrist bends or the hand's set off the forearm's end: no gap between them to see through)
+      if (p.mat === 'sleeve' || p.mat === 'hand') seam(geo, p.bones.indexOf('forearm' + s), p.bones.indexOf('hand' + s), W, f);
       geos[p.mat] = geo;
       const sk = new T.Skeleton(p.bones.map(bone), p.inv);
       const sm = new T.SkinnedMesh(geo, humMat(col[p.mat], p.mat === 'hand' || p.mat === 'finger' ? (col.hand === col.sleeve ? 0.8 : 0.65) : 0.9, p.mat === 'sleeve' || p.mat === 'upsleeve'));

@@ -21,6 +21,7 @@ interface SpLayout {
   fw: number; tw: number; sw: number; hw: number; // half-widths: the cockpit, the breach tunnel, the staging space behind it, the crew deck
   zc: number; zt: number; zw: number; zk: number; zr: number; z1: number; // the collar, the tunnel's mouth, the low wall, the cockpit's back (the stairs' top), the stairs' foot (the crew deck's front), the tail
   FC: number; FB: number; FM: number; CC: number; CB: number; CM: number; // floors and ceilings: the cockpit, the breach deck, the crew deck
+  lw: number; // the low wall's half-width (a clear way round it either side, straight on from the up flight)
   lift: number; // how far over her keel the breach deck's floor is above a deck she's breaching (her keel sits that much lower)
 }
 interface SpShipDef { id: string; name: string; cls: string; blurb: string; price: number; hw: number; z0: number; z1: number; nose: number; hull: number; speed: number; cruise: number; turn: number; turrets: number; utils: number; jump: number }
@@ -81,7 +82,7 @@ const G_SpaceData = (() => {
     // (the cockpit two rows long: the pilot, then the sensor station and the gunners side by side; the tunnel over it as short as leaves a
     // space to wait in behind the low wall; the crew deck no wider than its two walls of seats and the way between them want)
     const k = d.hw / 1.7, zc = d.z0 - d.nose - 0.5, zt = zc + 1.8, zk = zc + 3.5, zr = zk + 2.3, FB = 2.4;
-    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.3 * k, zc, zt, zw: zt + 0.9, zk, zr, z1: zr + 4.6 + Math.max(0, d.jump - 4) * 0.48, FC: 0.15, FB, FM: 1.5, CC: 2.2, CB: FB + 2.2, CM: 3.9, lift: FB - FLOOR };
+    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.3 * k, zc, zt, zw: zt + 0.9, lw: 0.6, zk, zr, z1: zr + 4.6 + Math.max(0, d.jump - 4) * 0.48, FC: 0.15, FB, FM: 1.5, CC: 2.2, CB: FB + 2.2, CM: 3.9, lift: FB - FLOOR };
   }
   function seats(d: SpShipDef): SpSeat[] {
     const L = layout(d), F = L.FC;
@@ -100,7 +101,7 @@ const G_SpaceData = (() => {
   // while it's open), 'ramp' the rear door (the same), 'steps' the steps down off the open ramp (there only while it's open).
   type ShipBox = [number, number, number, number, number, number, string?];
   function boxes(d: SpShipDef): ShipBox[] {
-    const L = layout(d), W = 0.2, { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, top = CB + W;
+    const L = layout(d), W = 0.2, { fw, tw, sw, hw, zc, zt, zw, lw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, top = CB + W;
     // (each flight as many steps as keep a rise to 0.3 m, over the same run)
     const nU = Math.ceil((FB - FM) / 0.3 - 1e-6), nD = Math.ceil((FM - FC) / 0.3 - 1e-6), run = zr - zk;
     const out: ShipBox[] = [
@@ -112,7 +113,7 @@ const G_SpaceData = (() => {
       [-tw - W, CC, zc, tw + W, FB, zt], [-tw - W, FB, zc, -tw, CB, zt], [tw, FB, zc, tw + W, CB, zt], [-tw - W, CB, zc, tw + W, top, zt],
       [-sw - W, CC, zt, sw + W, FB, zk], [-sw - W, FB, zt, -sw, CB, zk], [sw, FB, zt, sw + W, CB, zk], [-sw - W, CB, zt, sw + W, top, zk],
       [-sw, FB, zt - W, -tw, CB, zt], [tw, FB, zt - W, sw, CB, zt],
-      [-1.0, FB, zw, 1.0, FB + 1.0, zw + 0.25],
+      [-lw, FB, zw, lw, FB + 1.0, zw + 0.25],
       [-sw, FB, zk - 0.05, -fw, CB, zk], [0.06, FB, zk - 0.05, sw, FB + 1.0, zk], // (the stairwell's rail on the right; the up flight comes in on the left)
       [-tw, FB, zc - W, tw, CB, zc, 'nose'],
       // the stairs: their sides and roof, the wall between the two flights

@@ -157,7 +157,7 @@ const G_ShipModel = (() => {
     }
     // ---- the breach deck: lit strips down the tunnel's floor to the door, a hazard line at the low wall, lights overhead
     for (const sx of [-0.55, 0.55]) K.box(hot, sx - 0.03, FB, zc + 0.2, sx + 0.03, FB + 0.01, zt);
-    K.box(hot, -1.0, FB + 1.0, zw - 0.01, 1.0, FB + 1.03, zw + 0.26);
+    K.box(hot, -L.lw, FB + 1.0, zw - 0.01, L.lw, FB + 1.03, zw + 0.26);
     for (const sx of [-0.4, 0.4]) { K.box(strip, sx - 0.05, CB - 0.02, zc + 0.3, sx + 0.05, CB, zk - 0.3); K.box(strip, sx * 2.6 - 0.05, CM - 0.02, zr + 0.6, sx * 2.6 + 0.05, CM, z1 - 0.5); }
     K.box(strip, -0.3, CC - 0.02, zc + 1.0, 0.3, CC, zc + 3.6);
     // the crew deck: a lit line down each wall over the seats, her colour along the floor's edge
