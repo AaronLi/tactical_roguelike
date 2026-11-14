@@ -649,8 +649,8 @@ const G_Space = (() => {
     return dmin;
   }
   function collide(dt: number) {
-    const R = 5.5, P = S.P; let hit = 0;
-    if (S.floorAt) { const h = S.floorAt(P.x, P.z); if (P.y < h) { hit = Math.max(hit, -S.V.y); P.y = h; if (S.V.y < 0) S.V.y = 0; S.V.multiplyScalar(Math.exp(-dt * 1.5)); } }
+    const R = 5.5, P = S.P; let hit = 0, ground = 0; // (hit: how hard she's struck anything, for the shake; ground: the ground, which is what hurts her)
+    if (S.floorAt) { const h = S.floorAt(P.x, P.z); if (P.y < h) { hit = ground = Math.max(hit, -S.V.y); P.y = h; if (S.V.y < 0) S.V.y = 0; S.V.multiplyScalar(Math.exp(-dt * 1.5)); } }
     // (lined up on a stretch of hull she can breach, and close: the way in is clear by that site's own measure)
     const ap = S.kind === 'board' ? aim(20) : null, lined = !!ap && ap.align > 0.8 && Math.abs(ap.dy) < 1.6;
     for (const b of lined ? [] : S.boxes) {
@@ -661,7 +661,9 @@ const G_Space = (() => {
       P.addScaledVector(n, R - dd);
       if (vn < 0) { hit = Math.max(hit, -vn); S.V.addScaledVector(n, -vn * 1.3); }
     }
-    if (hit > 12) { damage((hit - 12) * 1.2, 'She hit something hard'); S.shake = Math.min(1, hit / 40); }
+    // (a ship's hull does her no harm, however she meets it: she's built to ram. She's thrown off it and shaken, no more)
+    if (ground > 12) damage((ground - 12) * 1.2, 'She hit the ground hard');
+    if (hit > 12) S.shake = Math.min(1, hit / 40);
   }
   function damage(n: number, why?: string) {
     if (!isCtl()) return;
