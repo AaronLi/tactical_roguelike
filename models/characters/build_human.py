@@ -422,8 +422,11 @@ if VID:
     pose({})
     for q in bpy.context.selected_objects: q.select_set(False)
     for o in (arm, body, head, *eyes): o.select_set(True)
+    # (the model itself is kept in the repo, beside its figures: human/variants/<id>.glb. The game loads a copy of it from
+    # assets/models/humans/, which nothing keeps: tools/bake_humans.mjs makes that copy on a machine with no Blender)
     GLB = os.path.join(HERE, '..', '..', 'assets', 'models', 'humans'); os.makedirs(GLB, exist_ok=True)
-    bpy.ops.export_scene.gltf(filepath=os.path.join(GLB, VID + '.glb'), export_format='GLB', use_selection=True, export_yup=True, export_apply=False, export_animations=False)
+    bpy.ops.export_scene.gltf(filepath=os.path.join(OUT, VID + '.glb'), export_format='GLB', use_selection=True, export_yup=True, export_apply=False, export_animations=False)
+    import shutil; shutil.copyfile(os.path.join(OUT, VID + '.glb'), os.path.join(GLB, VID + '.glb'))
     with open(os.path.join(OUT, VID + '.json'), 'w') as f: json.dump({'id': VID, 'sex': P['sex'], 'name': P['name'], 'height': P['height'], 'scale': P['scale'], 'hair': P['hair'], 'triangles': stats['triangles'], 'fit': FIT,
                                                                            'skin': hexof(P['skin']), 'hair_col': hexof(P['hair_col'])}, f)
     print('DONE', VID); sys.stdout.flush(); os._exit(0)

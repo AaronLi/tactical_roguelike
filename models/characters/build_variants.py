@@ -1,6 +1,7 @@
 # Makes every variant in human_variants.py (four Blenders at a time) and lays them out on one sheet:
 #   python models/characters/build_variants.py [m03 f07 ...]      (needs Pillow; BLENDER names the program if it isn't on the usual path)
-# Writes assets/models/humans/<id>.glb for each (what the game loads), js/humandata.ts, human/variants/index.json (id, sex, name, height, the scale to give the
+# Writes human/variants/<id>.glb for each (kept in the repo) and its copy assets/models/humans/<id>.glb (what the game loads: tools/bake_humans.mjs makes
+# that copy where there's no Blender), js/humandata.ts, human/variants/index.json (id, sex, name, height, the scale to give the
 # figure in the game, triangles) and human/variants.png. With ids given, only those are remade (the sheet is of whatever is there).
 import json, os, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
