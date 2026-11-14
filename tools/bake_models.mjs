@@ -202,6 +202,12 @@ if (!flags.has('--no-humans') && !fails && !only.length) {
   const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/bake_humans.mjs')], { stdio: ['ignore', verbose ? 'inherit' : 'ignore', 'inherit'] });
   if (r.status) { fails++; console.error('bake_humans failed (exit ' + r.status + ')'); }
 }
+// ---- the squad's ships (kept in the repo as made in Blender: checked against her layout, and put in the tree. tools/bake_ships.mjs)
+if (!flags.has('--no-ships') && !fails && !only.length) {
+  phase('ships');
+  const r = spawnSync(process.execPath, [path.join(ROOT, 'tools/bake_ships.mjs')], { stdio: ['ignore', verbose ? 'inherit' : 'ignore', 'inherit'] });
+  if (r.status) { fails++; console.error('bake_ships failed (exit ' + r.status + ')'); }
+}
 // ---- the bundles the game loads (tools/bundle_models.mjs: reads the finished tree, deterministic), last
 if (!flags.has('--no-bundle') && !fails) {
   phase('bundles');
@@ -210,6 +216,6 @@ if (!flags.has('--no-bundle') && !fails) {
 }
 phase('done');
 const row = (n, t) => `  ${n.padEnd(10)} ${fmt(t)}`;
-const label = { guns: 'guns', platforms: 'platforms', sharing: 'sharing', writes: 'pack files', indexes: 'indexes', props: 'props', hangar: 'hangar', humans: 'humans', bundles: 'bundles' };
+const label = { guns: 'guns', platforms: 'platforms', sharing: 'sharing', writes: 'pack files', indexes: 'indexes', props: 'props', hangar: 'hangar', humans: 'humans', ships: 'ships', bundles: 'bundles' };
 console.log(`\nbake ${fails ? 'FAILED' : 'done'} on ${jobs} ${jobs === 1 ? 'process' : 'workers'}:\n` + phases.map(([n, t]) => row(label[n] || n, t)).join('\n') + '\n' + row('total', now()));
 process.exit(fails ? 1 : 0);

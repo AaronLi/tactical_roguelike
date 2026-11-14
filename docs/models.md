@@ -718,3 +718,25 @@ Builds two rules give are one case carrying both labels. When the rules give som
 **Adding a case.** A new KIND of case: add a rule in `generate()` in tools/model_cases.mjs. A build that went wrong: add it to tests/model-regressions.json. Either way, `--update-golden` and review.
 
 **Timings** (24-core Windows machine, `-j 3`). The whole bake (`npm run bake:models`): 1 min 36 s, the platforms 1 min 23 s (before the per-part bake: 7 min 14 s and 6 min 36 s). `npm run test:models`: about 2.5 minutes, the suite itself about 2 for 2,463 cases + 9 regressions + golden. `test:models:full` (the sweep and 10,000 held-out builds against the recipe) is the occasional job.
+
+## The squad's ship
+
+The squad's ships are made in Blender by `models/ships/build_ship.py`, from the game's own layout of each
+(`js/spacedata.ts` `layout`, `seats`, `boxes`, written to `models/ships/<id>.layout.json` by `tools/ship_layout.mjs`), so
+her decks, stairs and walls are drawn where the game's solids are. The `.glb` is kept in the repo; `tools/bake_ships.mjs`
+(a phase of `npm run bake:models`; `npm run bake:ships` alone) checks it and puts it in `assets/models/ships/` for the
+bundle. Blender is wanted only to change her:
+
+    node tools/ship_layout.mjs && blender -b -P models/ships/build_ship.py -- kestrel && npm run bake:ships
+
+What the game finds in her file, by name (`js/shipmodel.ts` `fromModel`; a ship with no file is drawn by its recipe,
+`shipRecipe`, from the same layout):
+- `body`: everything that doesn't move. Its materials are named for what they are and swapped for the game's own:
+  `hull`, `armor`, `accent` (her paint), `deck`, `inner`, `dark`, `seat`, `glass`, `glow`, `strip`, `hot` (lit).
+- `nose_L`, `nose_R`: the breaching door's leaves, each with its origin at the door's middle (slid apart in x).
+- `ramp`: the rear door, closed, its origin at its hinge on the crew deck's floor (turned about x to open).
+- `screen_nav`, `screen_sensors`: the screens, UVs a canvas's way up (the game draws on them).
+- `hp_0`, `hp_1` (the hardpoints, port then starboard), `light_0..2` (her lamps), `thrust_L`, `thrust_R` (the exhausts).
+
+The bake fails a ship whose file is missing one of these, whose doors, ramp or hardpoints aren't where her layout now puts
+them (the layout changed: rebuild her), or whose materials the game doesn't dress. `npm run test:models` runs its check.

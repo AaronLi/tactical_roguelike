@@ -44,7 +44,65 @@ const G_ShipModel = (() => {
   // craft: a ram prow round the airlock with a toothed collar on its end, armour sloped out under a visor slit and in over
   // it, engine pods swept back on pylons. Her deck inside is js/spacedata.ts boxes: what's drawn there is what stops you.
   const PAINT: Record<string, number[]> = { kestrel: [0x77828e, 0x39424c, 0xff7a1a], atlas: [0x6f7868, 0x3a4136, 0xe8c040], wraith: [0x2c323c, 0x191c22, 0x4ad8ff] };
+  // ---- The squad's ship as made in Blender (models/ships/build_ship.py, from her layout; checked and baked by tools/bake_ships.mjs
+  // into assets/models/ships/<id>.glb, in the models' bundle). Loaded behind the menu (boot); till it's in, or for a ship that
+  // has none, she's drawn by the recipe below (shipRecipe), from the same layout. The file is dressed in the game's own
+  // materials, by name (her paint, the lit strips, the glass), and what moves or is fitted is found by its node's name
+  // (docs/models.md "The squad's ship").
+  const MODELS = new Map<string, THREE.Object3D>();
+  function boot() {
+    for (const id of Object.keys(G.SpaceData.SHIPS)) G.Models.loadFile('assets/models/ships/' + id + '.glb').then((sc: any) => { if (sc) MODELS.set(id, sc); }, () => { /* (none made for her yet: the recipe) */ });
+  }
   function ship(d: SpShipDef, fleet: SpFleet): SmShip {
+    const src = MODELS.get(d.id);
+    return src ? fromModel(src, d, fleet) : shipRecipe(d, fleet);
+  }
+  function fromModel(src: THREE.Object3D, d: SpShipDef, fleet: SpFleet): SmShip {
+    const SD = G.SpaceData, L = SD.layout(d), g = new T.Group();
+    const [c0, c1, c2] = PAINT[d.id] || PAINT.kestrel, DS = { side: T.DoubleSide, flatShading: true };
+    const glow = lit(0x2a8a5a), hot = lit(c2), thrust = new T.MeshBasicMaterial({ color: 0x66c8ff, transparent: true, opacity: 0.0, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
+    const mats: Record<string, THREE.Material> = {
+      hull: M(c0, Object.assign({ emissive: 0x101316, metalness: 0.45, roughness: 0.55 }, DS)), armor: M(c1, Object.assign({ emissive: 0x08090b, metalness: 0.55, roughness: 0.5 }, DS)), accent: M(c2, { emissive: new T.Color(c2).multiplyScalar(0.35).getHex(), flatShading: true }),
+      deck: M(0x2b2f34, { roughness: 0.85, emissive: 0x08090a, flatShading: true }), inner: M(0x5d656e, { emissive: 0x15181b, flatShading: true }), dark: M(0x15171a, { metalness: 0.5, flatShading: true }), seat: M(0x3d444d, { emissive: 0x101216, flatShading: true }),
+      glass: new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0.6, depthWrite: false, side: T.DoubleSide, emissive: 0x06202c }),
+      glow, strip: lit(0xdff2ff), hot,
+    };
+    const scr = canvasTex(256, 160, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
+    const root = src.clone(true); g.add(root);
+    root.traverse((o: any) => {
+      if (!o.isMesh) return;
+      const name = String(o.material && o.material.name || '').replace(/\.\d+$/, '');
+      o.material = o.name === 'screen_nav' || o.parent?.name === 'screen_nav' ? new T.MeshBasicMaterial({ map: nav.tex }) : o.name === 'screen_sensors' || o.parent?.name === 'screen_sensors' ? new T.MeshBasicMaterial({ map: scr.tex }) : mats[name] || mats.inner;
+    });
+    const node = (n: string) => root.getObjectByName(n)!;
+    // the breaching door's leaves (the game slides them apart: js/space.ts doors), the ramp (turned down to the ground behind her)
+    const nose = (['nose_L', 'nose_R'] as const).map((n, i) => { const lf = node(n); lf.userData.s = i ? 1 : -1; return lf as THREE.Group; });
+    const ramp = node('ramp') as THREE.Group; ramp.userData.open = Math.acos(-L.FM / (L.CM - L.FM));
+    // the drive's glow at each exhaust: a disc and a cone of light aft
+    for (const n of ['thrust_L', 'thrust_R']) {
+      const e = node(n), disc = new T.Mesh(new T.CircleGeometry(0.5, 10), thrust); disc.position.copy(e.position); g.add(disc);
+      const cone = new T.Mesh(new T.ConeGeometry(0.48, 4.2, 10, 1, true), thrust); cone.position.copy(e.position).add(new T.Vector3(0, 0, 2.1)); cone.rotation.x = Math.PI / 2; g.add(cone);
+    }
+    // a turret on each hardpoint that has a gun (laid from the gunners' seats)
+    const fit = fleet.fit[d.id] || [], turrets: SmShip['turrets'] = [];
+    for (let i = 0; i < d.turrets; i++) {
+      const base = new T.Group(), gun = new T.Group(), muzzle = new T.Object3D(), e = fit[i] ? SD.EQUIP[fit[i]!] : null;
+      base.position.copy(node('hp_' + i).position);
+      part(base, new T.Mesh(new T.CylinderGeometry(0.36, 0.46, 0.2, 8), mats.armor), 0, 0.1, 0);
+      if (e) {
+        part(gun, new T.Mesh(new T.BoxGeometry(0.44, 0.3, 0.7), mats.hull), 0, 0.17, 0);
+        const long = e.id === 'rail';
+        for (const sx of long ? [0] : [-0.11, 0.11]) { const b = part(gun, new T.Mesh(new T.CylinderGeometry(long ? 0.07 : 0.04, long ? 0.07 : 0.04, long ? 2.4 : 1.3, 8), mats.dark), sx, 0.2, long ? -1.4 : -0.9); b.rotation.x = Math.PI / 2; }
+        muzzle.position.set(0, 0.2, long ? -2.6 : -1.6); gun.add(muzzle);
+        gun.position.y = 0.2; base.add(gun);
+      }
+      g.add(base); turrets.push({ base, gun, muzzle });
+    }
+    // her own light, the same wherever she is: the cockpit, the breach deck, the crew deck
+    const lights = [[3, 0xbfe0ff], [3.5, 0xdfeaff], [4.5, 0xdfeaff]].map(([k, c], i) => { const l = new T.PointLight(c, k, 7, 1.6); l.position.copy(node('light_' + i).position); g.add(l); return l; });
+    return { group: g, nose, ramp, turrets, thrust, glow, screen: scr, nav, lights };
+  }
+  function shipRecipe(d: SpShipDef, fleet: SpFleet): SmShip {
     const SD = G.SpaceData, L = SD.layout(d), { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, W = 0.22, g = new T.Group(), K = new Kit(), X = hw + W, top = CB + 0.2;
     const [c0, c1, c2] = PAINT[d.id] || PAINT.kestrel, DS = { side: T.DoubleSide, flatShading: true };
     const hull = M(c0, Object.assign({ emissive: 0x101316, metalness: 0.45, roughness: 0.55 }, DS)), armor = M(c1, Object.assign({ emissive: 0x08090b, metalness: 0.55, roughness: 0.5 }, DS)), accent = M(c2, { emissive: new T.Color(c2).multiplyScalar(0.35).getHex() });
@@ -646,7 +704,7 @@ const G_ShipModel = (() => {
     const g = new T.Group(); g.add(m); g.userData.tex = cv.tex; g.userData.mat = m.material;
     return g;
   }
-  return { traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex };
+  return { boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
 })();
 G.ShipModel = G_ShipModel;
 interface GameModules { ShipModel: typeof G_ShipModel; }

@@ -214,13 +214,13 @@ function makeBundle(cfg: BundleCfg) {
     },
   });
 }
-// The models: props/**, scenes/*.glb (the hangar: tools/bake_hangar.mjs), humans/*.glb (the bodies: tools/bake_humans.mjs) and parts/<id>/** (not the whole-gun files, the scenes'
+// The models: props/**, scenes/*.glb (the hangar: tools/bake_hangar.mjs), humans/*.glb (the bodies: tools/bake_humans.mjs), ships/*.glb (the squad's ships: tools/bake_ships.mjs) and parts/<id>/** (not the whole-gun files, the scenes'
 // data (for the tools and the Bevy port) nor the bake's reports: parts/index.json, rules.json...).
 // FORMAT 3: the files' format, in the manifest (v) and on the stored copy: 2 = meshopt with float32 positions, 3 = int16 positions the loader
 // undoes (js/glb.ts dequantize). A copy of another format is never used.
 const G_Bundles = makeBundle({
   name: 'models', dir: 'assets/models/bundles/', root: 'assets/models/', format: 3, flag: 'rt-models-stored',
-  bundleOf: (p) => p.startsWith('props/') || (p.startsWith('scenes/') && p.endsWith('.glb')) || (p.startsWith('humans/') && p.endsWith('.glb')) || (p.startsWith('parts/') && p.indexOf('/', 6) > 6),
+  bundleOf: (p) => p.startsWith('props/') || (p.startsWith('scenes/') && p.endsWith('.glb')) || (p.startsWith('humans/') && p.endsWith('.glb')) || (p.startsWith('ships/') && p.endsWith('.glb')) || (p.startsWith('parts/') && p.indexOf('/', 6) > 6),
 });
 // The synthesized audio: the guns' handling bank and the footsteps (each folder's manifest.json and its clips), Ogg Vorbis, the
 // container gzipped (it halves it: every clip carries the same Vorbis setup header). FORMAT 1.
