@@ -1983,8 +1983,17 @@ const G_Rig = (() => {
   }
   // where someone lying (dead, or down for good) is: their ragdoll's hips, wherever it came to rest
   function bodyAt(rig: Rig) { return (rig.hips || rig.root).getWorldPosition(new THREE.Vector3()); }
+  // What your own arms are in first person (js/vmanim.ts): your body (o as create takes it: your callsign and name) and the colours of
+  // its arm's materials as create dresses an officer in that look: the sleeves the top's (bare arms in a T-shirt, bare upper arms in a
+  // vest), the hands and fingers gloved if the look has gloves (a fingerless glove's fingers bare).
+  function armLook(o: any) {
+    const hid = G.Humans.pick(o), hdef = G.Humans.def(hid), look = Object.assign({}, OFFICER_LOOK, o.look || {});
+    const skin = hdef ? hdef.skin : 0xc4a490, glove = ({ tactical: 0x1c1d1f, leather: 0x5e3e24, fingerless: 0x1c1d1f } as Record<string, number>)[look.gloves as string];
+    const long = look.top !== 'tshirt' && look.top !== 'vest', hand = glove != null ? glove : skin, top = look.topC as number;
+    return { human: hid, col: { upsleeve: look.top === 'vest' ? skin : top, sleeve: long ? top : skin, hand, finger: look.gloves === 'fingerless' ? skin : hand } as Record<string, number>, gloved: glove != null };
+  }
   return {
-    create, live, zipSwing, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt,
+    create, live, armLook, zipSwing, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt,
     get debug() { return debug; },
     toggleDebug() { debug = !debug; return debug; },
   };
