@@ -232,10 +232,10 @@ const G_Space = (() => {
   }
   // Where her nose is headed on the hull: the site its line meets (nearest), how far off, and how far the nose is off the
   // line straight into it. null: she isn't pointed at anywhere she could breach.
-  function aim(maxT = 320) {
+  function aim(maxT = 320, reach = 1.0) {
     if (S.kind !== 'board' || !S.map || !S.map.sp) return null;
     const L = SD.layout(S.def), zn = L.zc - 0.22, N = new T.Vector3(0, L.FB + 1.16, zn).applyQuaternion(S.Q).add(S.P), f = fwd(S.Q), TS = G.Level.TS; // (the collar's middle: 1.4 over the deck she breaches when she's level with it)
-    let best: ShSite | null = null, bo = 1.0, bt = 0; // (within a metre of a site's middle: the collar pulls her onto it)
+    let best: ShSite | null = null, bo = reach, bt = 0; // (within a metre of a site's middle: the collar pulls her onto it. reach: further, for her squaring up to the hull)
     const raid: number[][] = (S.state && S.state.raid) || [], W0 = S.map.W, nearPod = (s: ShSite) => raid.some((q) => Math.hypot(s.c % W0 - q[0] % W0, ((s.c / W0) | 0) - ((q[0] / W0) | 0)) * G.Level.TS < 8);
     const list = G.ShipGen.sites(S.map).concat((S.map.sp.cuts || []).map(siteAt)).filter((s) => !nearPod(s)); // (and the holes already made; not where a pirate pod is)
     for (const s of list) {
@@ -720,6 +720,7 @@ const G_Space = (() => {
     S.Wv.lerp(wv, Math.min(1, dt * 5));
     const dq = new T.Quaternion().setFromEuler(new T.Euler(S.Wv.x * dt, S.Wv.y * dt, S.Wv.z * dt, 'YXZ'));
     S.Q.multiply(dq).normalize();
+    if (helm && S.kind === 'board') squareUp(dt);
     // in air she rights herself (no rolling over above a base)
     if (S.stage === 'atmo' && S.kind === 'assault') { const up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), fix = new T.Quaternion().setFromUnitVectors(up, new T.Vector3(up.x * 0.5, Math.max(0.6, up.y), up.z * 0.5).normalize()); S.Q.premultiply(new T.Quaternion().slerp(fix, Math.min(1, dt * 1.5))).normalize(); }
     want.applyQuaternion(S.Q);
@@ -728,6 +729,20 @@ const G_Space = (() => {
     S.P.addScaledVector(S.V, dt);
     collide(dt);
     events();
+  }
+  // Coming in on a stretch of hull she can breach (within 45 m of it, her nose on it within about 55 degrees), she squares herself
+  // up to it: her nose turned straight at it and level, her roll taken out, her collar eased to the height of the deck beyond (and
+  // onto the nearest place it can go in, if that's within 3 m to one side). The
+  // nearer, the harder; the pilot's own turning eases it off. (What the breach wants: js/space.ts events, square on, level, at height.)
+  function squareUp(dt: number) {
+    const a = aim(60, 25); if (!a || a.range > 45 || a.range < -0.5 || a.align < 0.55) return;
+    const k = G.U.clamp((45 - a.range) / 25, 0, 1) * (1 - 0.7 * Math.min(1, S.stick.length()));
+    if (k <= 0) return;
+    S.Q.slerp(lookQ(new T.Vector3(-a.site.nx, 0, -a.site.nz)), Math.min(1, dt * 5 * k)).normalize();
+    S.P.y -= G.U.clamp(a.dy, -4, 4) * Math.min(1, dt * 2.5 * k);
+    // (and within 3 m to one side of the stretch she's on for, drawn across onto it: the collar's middle onto the site's)
+    const L = SD.layout(S.def), N = new T.Vector3(0, 0, L.zc - 0.22).applyQuaternion(S.Q).add(S.P), tx = -a.site.nz, tz = a.site.nx, off = (N.x - a.site.x) * tx + (N.z - a.site.z) * tz;
+    if (Math.abs(off) < 3) { const m = off * Math.min(1, dt * 2.5 * k); S.P.x -= tx * m; S.P.z -= tz * m; }
   }
   // how far she is from anything big (no cruising close in)
   function clearOf() {
