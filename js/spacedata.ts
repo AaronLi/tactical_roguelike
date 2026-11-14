@@ -78,16 +78,21 @@ const G_SpaceData = (() => {
   function layout(d: SpShipDef): SpLayout {
     // (the breach deck a step lower than it might be, 2.2 m clear over it; the cockpit's floor low in her keel so it keeps its headroom under that;
     // the crew deck no longer than its two rows of seats and the ramp need)
-    const k = d.hw / 1.7, zc = d.z0 - d.nose - 0.5, zt = zc + 2.4, zk = zc + 4.6, zr = zk + 2.3, FB = 2.4;
-    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.9 * k, zc, zt, zw: zt + 1.0, zk, zr, z1: zr + 4.6 + Math.max(0, d.jump - 4) * 0.48, FC: 0.15, FB, FM: 1.5, CC: 2.2, CB: FB + 2.2, CM: 3.9, lift: FB - FLOOR };
+    // (the cockpit two rows long: the pilot, then the sensor station and the gunners side by side; the tunnel over it as short as leaves a
+    // space to wait in behind the low wall; the crew deck no wider than its two walls of seats and the way between them want)
+    const k = d.hw / 1.7, zc = d.z0 - d.nose - 0.5, zt = zc + 1.8, zk = zc + 3.5, zr = zk + 2.3, FB = 2.4;
+    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.3 * k, zc, zt, zw: zt + 0.9, zk, zr, z1: zr + 4.6 + Math.max(0, d.jump - 4) * 0.48, FC: 0.15, FB, FM: 1.5, CC: 2.2, CB: FB + 2.2, CM: 3.9, lift: FB - FLOOR };
   }
   function seats(d: SpShipDef): SpSeat[] {
     const L = layout(d), F = L.FC;
     const s: SpSeat[] = [
       { k: 'helm', x: 0, y: F + 0.1, z: L.zc + 1.45, yaw: 0, f: F, sx: 0.75, sz: L.zc + 1.6 }, // (low: the glass floor ahead of it, and headroom over it)
-      { k: 'sensors', x: 0, y: F + 0.42, z: L.zc + 2.5, yaw: 0, f: F, sx: 0.75, sz: L.zc + 2.65 }, // (raised: eyes over the pilot's head)
     ];
-    for (let i = 0; i < d.turrets; i++) s.push({ k: 'turret', n: i, x: (i ? 1 : -1) * 0.55, y: F + 0.1, z: L.zc + 3.55, yaw: 0, f: F, sx: 0, sz: L.zc + 4.25 });
+    // the second row, side by side behind the pilot: the sensor station (raised, eyes over the pilot's head) and the gunners; with two guns
+    // the sensor station's in the middle
+    const row = d.turrets > 1 ? [0, -0.8, 0.8] : [0.55, -0.55], zrw = L.zc + 2.55;
+    s.push({ k: 'sensors', x: row[0], y: F + 0.42, z: zrw, yaw: 0, f: F, sx: row[0], sz: zrw + 0.65 });
+    for (let i = 0; i < d.turrets; i++) s.push({ k: 'turret', n: i, x: row[1 + i], y: F + 0.1, z: zrw, yaw: 0, f: F, sx: row[1 + i], sz: zrw + 0.65 });
     for (let i = 0; i < d.jump; i++) { const sd = i % 2 ? 1 : -1, z = L.zr + 1.4 + Math.floor(i / 2) * 0.95; s.push({ k: 'jump', x: sd * (L.hw - 0.4), y: L.FM, z, yaw: sd * Math.PI / 2, f: L.FM, sx: sd * (L.hw - 1.1), sz: z }); }
     return s;
   }

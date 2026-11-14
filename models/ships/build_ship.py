@@ -162,7 +162,8 @@ for s in (-1, 1):
     B.box('inner', a, SILL, zg1, b_, CC, zk, 0.01); B.box('dark', a, HEADER, zg0, b_, CC, zg1, 0.01)
 # the screens on arms: the navigation screen by the pilot's left knee, the sensor station's at its right
 B.cyl('dark', (-0.78, FC, zc + 1.24), (-0.78, FC + 0.78, zc + 1.24), 0.035, 8); B.box('dark', -0.98, FC, zc + 1.1, -0.58, FC + 0.04, zc + 1.38, 0.01)
-B.cyl('dark', (0.82, FC, zc + 2.54), (0.82, FC + 1.05, zc + 2.54), 0.035, 8); B.box('dark', 0.62, FC, zc + 2.4, 1.02, FC + 0.04, zc + 2.68, 0.01)
+SX = [st for st in SEATS if st['k'] == 'sensors'][0]['x']; SZ = [st for st in SEATS if st['k'] == 'sensors'][0]['z']
+B.cyl('dark', (SX + 0.36, FC, SZ - 0.3), (SX + 0.36, FC + 0.62, SZ - 0.3), 0.035, 8); B.box('dark', SX + 0.16, FC, SZ - 0.44, SX + 0.56, FC + 0.04, SZ - 0.16, 0.01)
 def screen(name, c, wdt, hgt, yaw, pitch):
     """a screen facing (yaw about y, then pitch), UVs a canvas's way up; with a bezel"""
     S = Mesh(name); cx, cy, cz = c
@@ -176,7 +177,7 @@ def screen(name, c, wdt, hgt, yaw, pitch):
     bz = [R @ Vector((x, y, -0.02)) for x, y in ((-wdt / 2 - 0.03, -hgt / 2 - 0.03), (wdt / 2 + 0.03, hgt / 2 + 0.03))]
     return o
 screen('screen_nav', (-0.7, FC + 0.85, zc + 1.2), 0.5, 0.32, 0.55, -0.7)
-screen('screen_sensors', (0.68, FC + 1.25, zc + 2.4), 0.62, 0.4, -0.75, -0.35)
+screen('screen_sensors', (SX + 0.28, FC + 0.72, SZ - 0.38), 0.46, 0.3, -0.5, -0.75)  # (low by its right knee, tipped up: clear of the glass)
 B.box('dark', -0.98, FC + 0.66, zc + 1.0, -0.42, FC + 1.02, zc + 1.42, 0.02) if False else None
 # the seats: a pedestal, a pan, a back with a headrest and wings, arms; the jump seats folding pans on the wall
 for st in SEATS:
@@ -203,7 +204,7 @@ for sx in (-0.55, 0.55): B.box('hot', sx - 0.03, FB, zc + 0.2, sx + 0.03, FB + 0
 for k in range(10):
     x0 = -1.0 + k * 0.2; B.box('hot' if k % 2 else 'dark', x0, FB + 1.0, zw - 0.005, x0 + 0.2, FB + 1.03, zw + 0.255)
 for sx in (-0.4, 0.4): B.box('strip', sx - 0.05, CB - 0.02, zc + 0.3, sx + 0.05, CB, zk - 0.3)
-for sx in (-0.5, 0.5): B.box('strip', sx - 0.03, CC - 0.02, zc + 1.6, sx + 0.03, CC, zc + 3.8)  # (two thin lamps over the cockpit, clear of the glass)
+for sx in (-0.5, 0.5): B.box('strip', sx - 0.03, CC - 0.02, zc + 1.6, sx + 0.03, CC, zk - 0.2)  # (two thin lamps over the cockpit, clear of the glass)
 # ---- the crew deck: lockers over the seats, a lit line down each wall, her colour along the floor's edge, lamps overhead
 for s in (-1, 1):
     B.box('inner', s * (hw - 0.38), CM - 0.55, zr + 0.9, s * hw, CM - 0.05, z1 - 0.9, 0.02)
