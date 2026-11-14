@@ -15,14 +15,14 @@
 //
 // A part is one material's faces: { geo (shared: never disposed with a body), mat (its material's name: shirt, upsleeve, sleeve,
 // trousers, boots, neck, hand, finger, skin, eyeskin, hair, brow, lip, stubble, eye, iris), color, head (it rides the head),
-// bones (names, letters only: 'upperarmR'), inv (their inverse rest matrices, in the file's frame: y up, the figure facing +z) }.
+// bones (names without their dots: 'upperarmR', a finger's 'index1R' .. 'index3R', 'thumb1R'), inv (their inverse rest matrices, in the file's frame: y up, the figure facing +z) }.
 interface HumanPart { geo: THREE.BufferGeometry; mat: string; color: number; head: boolean; bones: string[]; inv: THREE.Matrix4[] }
 const G_Humans = (() => {
   const DIR = 'assets/models/humans/';
   const DATA = G.HumanData, ids = Object.keys(DATA);
   const loaded = new Map<string, HumanPart[]>(), loading = new Map<string, Promise<HumanPart[] | null>>();
   const HEAD = new Set(['skin', 'eyeskin', 'hair', 'brow', 'lip', 'stubble', 'eye', 'iris']);
-  const letters = (s: string) => s.replace(/[^a-zA-Z]/g, '');
+  const letters = (s: string) => s.replace(/[^a-zA-Z]/g, ''), boneName = (s: string) => s.replace(/[^a-zA-Z0-9]/g, ''); // (a bone keeps its digits: index1L, index2L)
   function ensure(id: string): Promise<HumanPart[] | null> {
     if (!DATA[id]) return Promise.resolve(null);
     let p = loading.get(id);
@@ -32,7 +32,7 @@ const G_Humans = (() => {
         scene.traverse((o: any) => {
           if (!o.isSkinnedMesh) return;
           const mat = letters(String(o.material.name || '').split('.')[0]);
-          parts.push({ geo: o.geometry, mat, color: o.material.color.getHex(), head: HEAD.has(mat), bones: o.skeleton.bones.map((b: any) => letters(b.name)), inv: o.skeleton.boneInverses });
+          parts.push({ geo: o.geometry, mat, color: o.material.color.getHex(), head: HEAD.has(mat), bones: o.skeleton.bones.map((b: any) => boneName(b.name)), inv: o.skeleton.boneInverses });
         });
         loaded.set(id, parts);
         return parts;
