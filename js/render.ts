@@ -1964,6 +1964,10 @@ const G_R = {
       }
       r.setRenderTarget(this.fishRT);
     }
+    // a full-screen menu up (the Tab screen, the shop): the frame drawn at half the render resolution and blurred here, behind it,
+    // rather than by the page (a backdrop-filter is done at the screen's own resolution, every frame)
+    const blur = !nv && !fish && G.Game && (G.Game.invOpen || G.Game.shopOpen) && dbs.x >= 16 && dbs.y >= 16;
+    if (blur) r.setRenderTarget(this._blurTargets(Math.max(1, dbs.x >> 1), Math.max(1, dbs.y >> 1))[0]);
     if (nv) r.setRenderTarget(this.nvRT!);
     r.clear();
     r.render(this.scene, this.camera);
@@ -1996,8 +2000,33 @@ const G_R = {
     if (nv) this.nvRT!.texture.generateMipmaps = true;
     r.render(this.vmScene, this.camera);
     if (nv) { LU.lgNv.value.w = 0; this._nvComposite(); }
+    if (blur) this._blurPasses();
     G.LightGrid.on(false);
     r.info.autoReset = true;
+  },
+  // ---- the menus' blur: the frame (half size) blurred across into a second target, then down onto the screen
+  _blur: null as null | { a: THREE.WebGLRenderTarget; b: THREE.WebGLRenderTarget; mat: THREE.ShaderMaterial; scene: THREE.Scene; cam: THREE.OrthographicCamera },
+  _blurTargets(w: number, h: number) {
+    let B = this._blur;
+    if (!B) {
+      const mat = new THREE.ShaderMaterial({
+        uniforms: { map: { value: null }, dir: { value: new THREE.Vector2() }, fin: { value: 0 } }, depthTest: false, depthWrite: false, toneMapped: false,
+        vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
+        // (13 taps, 1.5 texels apart: about the 8 px the page's blur was, on the screen)
+        // (fin: the second pass, onto the screen: the tone curve and the screen's colour, as the fisheye's pass does)
+        fragmentShader: this.TONE + ' uniform sampler2D map; uniform vec2 dir; uniform float fin; varying vec2 vUv; void main() { vec4 c = vec4(0.0); float t = 0.0; for (int i = -6; i <= 6; i++) { float w = exp(-float(i * i) / 18.0); c += texture2D(map, vUv + dir * float(i) * 1.5) * w; t += w; } c /= t; gl_FragColor = fin > 0.5 ? linearToOutputTexel(vec4(bpTone(c.rgb), 1.0)) : c; }',
+      });
+      const scene = new THREE.Scene(), quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); quad.frustumCulled = false; scene.add(quad);
+      const mk = () => new THREE.WebGLRenderTarget(w, h, { depthBuffer: true, stencilBuffer: true, type: THREE.HalfFloatType }); // (half float: the over-bright kept for the tone curve)
+      B = this._blur = { a: mk(), b: mk(), mat, scene, cam: new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1) };
+    }
+    if (B.a.width !== w || B.a.height !== h) { B.a.setSize(w, h); B.b.setSize(w, h); }
+    return [B.a, B.b];
+  },
+  _blurPasses() {
+    const r = this.renderer, B = this._blur!, u = B.mat.uniforms;
+    u.map.value = B.a.texture; u.dir.value.set(1 / B.a.width, 0); u.fin.value = 0; r.setRenderTarget(B.b); r.render(B.scene, B.cam);
+    u.map.value = B.b.texture; u.dir.value.set(0, 1 / B.b.height); u.fin.value = 1; r.setRenderTarget(null); r.render(B.scene, B.cam);
   },
 };
 G.R = G_R;
