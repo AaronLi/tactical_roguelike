@@ -257,10 +257,10 @@ const G_Server = {
         break;
       // a vote on the route map for where to go next
       case 'arm': // a player's own sidearm for the run (not a vote: everyone's told who took what)
-        if (p && G.Arsenal.has(m.id)) { this.arms = this.arms || {}; this.arms[from] = m.id; SvNet.broadcast({ t: 'arms', a: this.arms }); }
+        if (p && G.Arsenal.has(m.id)) { this.arms = this.arms || {}; this.arms[from] = m.id; SvNet.broadcast({ t: 'arms', a: this.arms }); this.checkArms(); }
         break;
       case 'pick':
-        if (p && this.phase === 'route' && G.Route.options(this.routeMap!, this.route!.path[this.route!.path.length - 1]).includes(m.n)) {
+        if (p && this.phase === 'route' && this.route && this.routeMap && G.Route.options(this.routeMap!, this.route!.path[this.route!.path.length - 1]).includes(m.n)) {
           this.route!.votes[from] = m.n;
           SvNet.broadcast({ t: 'rvotes', v: this.route!.votes });
           this.checkPicks();
@@ -432,6 +432,7 @@ const G_Server = {
     this.checkReady();
     G.SpaceSv.left(id);
     if (this.route) { delete this.route.votes[id]; this.checkPicks(); }
+    this.checkArms();
   },
 
   // --------------------------------------------------------------- phases
@@ -460,6 +461,13 @@ const G_Server = {
     this.sendRoster();
   },
   routeMsg() { return this.route ? { seed: this.route.seed, act: this.route.act, path: this.route.path, votes: this.route.votes } : null; },
+  // The game in space: a run starts on the sidearm picker alone (js/spaceserver.ts startRun), and goes to the base once all the
+  // squad have picked theirs.
+  checkArms() {
+    if (!G.SpaceData.ON || this.phase !== 'route' || this.route || !this.players.size || this.leaving) return;
+    for (const id of this.players.keys()) if (!(this.arms && this.arms[id])) return;
+    this.overBlack(() => this.toShop());
+  },
   checkPicks() {
     if (this.phase !== 'route' || !this.players.size || this.leaving) return;
     for (const id of this.players.keys()) if (this.route!.votes[id] == null) return;

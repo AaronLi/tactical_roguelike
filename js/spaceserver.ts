@@ -57,7 +57,12 @@ const G_SpaceSv = (() => {
     st.ship = { docked: true, at: null, ctl: null, pose: null };
     sv.level = 1; sv.team = { ver: 0, items: [] }; sv.arms = {};
     net().broadcast({ t: 'newrun' });
-    sv.toShop();
+    // first everyone's sidearm (the route screen's picker, with no route under it: js/game.ts armsOnly); the base once the
+    // whole squad has one (js/server.ts checkArms)
+    sv.route = null; sv.routeMap = null; sv.phase = 'route';
+    for (const p of sv.players.values()) p.ready = false;
+    net().broadcast({ t: 'phase', phase: 'route', level: 1, route: null });
+    sv.sendRoster();
   }
   // the ship has set down in the hangar with missions flown: the board turns over (and the squad is that much further on)
   function landed() {

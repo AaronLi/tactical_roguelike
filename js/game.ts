@@ -772,7 +772,7 @@ const G_Game = {
         this.roster = m.roster;
         if (this.roster[G.Net.myId!]) this.setAnimal(this.roster[G.Net.myId!].animal);
         G.Views.syncRoster(this.roster);
-        if (m.route) this.setRoute(m.route);
+        if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined;
         if ((m.phase === 'route' || m.phase === 'level' || m.phase === 'shop') && !G.Career.run) G.Career.runStart(m.level || 1); // (joined a run already going: yours from here)
         G.Career.squad(Object.keys(this.roster).length);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
@@ -813,7 +813,7 @@ const G_Game = {
             break;
       case 'veil': G.Space.veilKind(m.k); this.veil(true); break; // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
       case 'phase':
-        if (m.route) this.setRoute(m.route);
+        if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined; // (none: the game in space's sidearm picker)
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
         else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock, m.sp);
@@ -1515,6 +1515,14 @@ const G_Game = {
     return { path: st.path, opts: G.Route.options(rm, st.path[st.path.length - 1]), votes: st.votes, mine: st.votes[G.Net.myId!] };
   },
   renderRoute() {
+    if (this.armsOnly()) { // (the game in space: the picker alone, before the base)
+      const ids = Object.keys(this.roster || {}), arms = this.arms || {}, roster = this.roster || {}, got = ids.filter((id) => arms[id]).length;
+      this.$('routeMap').innerHTML = '';
+      this.$('routeTitle').innerHTML = 'A new run <span>— your sidearm</span>';
+      this.$('routeMsg').innerHTML = !G.Me.sidearmChosen ? 'Choose the sidearm you start with.' : got < ids.length ? `Waiting for the squad to choose (${got}/${ids.length})…` : 'To the base...';
+      if (ids.length > 1) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${G.U.hex(roster[id].color)}">${G.U.esc(roster[id].name)}</i> ${arms[id] ? G.U.esc(G.WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
+      return;
+    }
     const rm = this.routeMap, st = this.routeSt;
     if (!rm || !st) return;
     const opts = G.Route.options(rm, st.path[st.path.length - 1]), colors: Record<string, number> = {};
@@ -1541,6 +1549,8 @@ const G_Game = {
     const arms = this.arms || {}, roster = this.roster || {};
     if (this.level === 1 && ids.length > 1 && G.Me.sidearmChosen) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${G.U.hex(roster[id].color)}">${G.U.esc(roster[id].name)}</i> ${arms[id] ? G.U.esc(G.WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
   },
+  // the route screen is only the sidearm picker: a run in space starting (js/spaceserver.ts startRun sends no route)
+  armsOnly(): boolean { return this.phase === 'route' && !!G.SpaceData.ON && !this.routeSt; },
   pickRoute(n: number) {
     if (!G.Me.sidearmChosen) return; // (pick your sidearm first)
     if (this.phase !== 'route' || !this.routeMap || !G.Route.options(this.routeMap, this.routeSt!.path[this.routeSt!.path.length - 1]).includes(n)) return;
