@@ -76,7 +76,7 @@ const G_Gear = (() => {
       prot: [{ at: 'carrier', layers: [['aramid', 7]] }], molle: [5, 2], pouches: [['q.rifle2', 0, 0], ['q.rifle', 2, 0]],
       desc: 'The most MOLLE: issued with a double and a single magazine pouch, the rest to fill.' },
     { id: 'c.heavy', kind: 'carrier', brand: B.sable, name: 'Heavy assault armour', tier: 4, price: 2600, speed: 0.9, dur: 9, plate: true,
-      prot: [{ at: 'side', layers: [['steel', 5]] }, { at: 'torso', layers: [['aramid', 8]] }, { at: 'groin', layers: [['aramid', 8]] }, { at: 'shoulder', layers: [['aramid', 6]] }, { at: 'thigh', layers: [['aramid', 6]] }], molle: [5, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0], ['q.med', 2, 0]],
+      prot: [{ at: 'side', layers: [['steel', 5]] }, { at: 'torso', layers: [['aramid', 8]] }, { at: 'groin', layers: [['aramid', 8]] }, { at: 'shoulder', layers: [['aramid', 6]] }, { at: 'thigh', layers: [['aramid', 6]] }, { at: 'collar', layers: [['aramid', 6]] }], molle: [5, 2], pouches: [['q.rifle', 0, 0], ['q.rifle', 1, 0], ['q.med', 2, 0]],
       desc: "Side and groin plates, shoulder and thigh protection. Slow, and less MOLLE than you'd like." },
     // ---------------------------------------------------------------- shoulder and pelvis armour (on a plate carrier's mounts)
     { id: 's.deltoid', kind: 'shoulder', brand: B.gray, name: 'Deltoid pads (II)', tier: 1, price: 280, speed: 0.995, dur: 3, prot: [{ at: 'shoulder', layers: [['aramid', 6]] }], desc: 'Soft pads strapped to the carrier over the top of each arm. Handgun-rated, not a magnum.' },

@@ -293,7 +293,7 @@ const G_Ballistics = (() => {
   //   'plate' (front and back of the chest, a SAPI-sized 25 x 32 cm plate), 'side' (the flanks under the arms),
   //   'torso' (soft armour: chest and abdomen all round, except high under the arms), 'carrier' (a plate carrier's soft backer: in its bags
   //   and cummerbund, the chest and the top of the abdomen, not the belly below them), 'wrap' (the full-wrap vest: the torso's and on down
-  //   over the top of the pelvis), 'axilla' (that gap under the arms),
+  //   over the top of the pelvis), 'collar' (the base of the neck), 'axilla' (that gap under the arms),
   //   'groin' (the front of the pelvis), 'groinplate' (a hard plate on the middle of that), 'pelvis' (all round it),
   //   'shoulder' (the upper arm's top half), 'thigh' (a panel down the front of the upper thigh), 'legwrap' (the thigh all round, near
   //   to the knee), 'shin' (the front of the shin), 'helmet' (the skull above the brim: piece.cut 'high', 'mid' or 'full': as it's drawn),
@@ -301,18 +301,23 @@ const G_Ballistics = (() => {
   // covers(at, seg, q): does that kind of protection cover segment seg at its local point q?
   function covers(at: string, piece: Record<string, any>, seg: BSeg, q: BVec) {
     const id = seg.id;
-    if (at === 'plate') return id === 'chest' && Math.abs(q.x) <= 0.125 && q.y >= -0.005 && q.y <= 0.3 && Math.abs(q.z) > 0.04;
+    // Each where it's drawn on the body (models/characters/kit_armour.py, as worn: measured by casting at bodies wearing it, every 2 cm
+    // up and every 15 degrees round, the drawn piece against this). A soft vest's or a carrier's chest: up to its neckline (higher at
+    // the back), its sides only as high as its side panels or cummerbund reach (above them, out past the front bag, is the armpit's gap)
+    const chestSoft = (yCut: number, xCut: number) => id === 'chest' && q.y <= (q.z > 0 ? 0.28 : 0.24) && !(q.y > yCut && Math.abs(q.x) > (q.z > 0 ? Math.min(xCut, 0.11) : xCut)); // (the back panel's narrower round the side)
+    if (at === 'plate') return id === 'chest' && Math.abs(q.x) <= 0.125 && q.y >= -0.03 && q.y <= (q.z > 0 ? 0.3 : 0.275) && Math.abs(q.z) > 0.04;
     if (at === 'side') return id === 'chest' && Math.abs(q.x) > seg.rx(q.y) * 0.72 && q.y >= 0.06 && q.y <= 0.22;
-    if (at === 'torso') return (id === 'chest' && q.y <= 0.24 && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || id === 'abdomen'; // (up to the vest's neckline: js/rig.ts setKit)
-    if (at === 'carrier') return (id === 'chest' && q.y <= 0.24 && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || (id === 'abdomen' && q.y >= 0.11); // (the bags' bottom edge: models/characters/kit_armour.py)
-    if (at === 'wrap') return (id === 'chest' && q.y <= 0.24 && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || id === 'abdomen' || (id === 'pelvis' && q.y >= 0.02);
-    if (at === 'axilla') return id === 'chest' && q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8;
-    if (at === 'groin') return id === 'pelvis' && q.z < 0;
-    if (at === 'groinplate') return id === 'pelvis' && q.z < 0 && Math.abs(q.x) <= 0.09 && q.y <= 0.04;
-    if (at === 'pelvis') return id === 'pelvis';
-    if (at === 'shoulder') return id === 'uarm' && q.y > -0.13;
-    if (at === 'thigh') return id === 'thigh' && q.y > -0.235 && q.y < 0 && q.z < -0.03 && Math.abs(q.x) <= 0.072; // (a panel down the front, as drawn)
-    if (at === 'legwrap') return id === 'thigh' && q.y > -0.36;
+    if (at === 'torso') return chestSoft(0.085, 0.135) || id === 'abdomen' || (id === 'pelvis' && q.y >= 0.065);
+    if (at === 'carrier') return chestSoft(0.075, 0.11) || (id === 'abdomen' && q.y >= 0.12); // (the bags' and the cummerbund's bottom edge)
+    if (at === 'wrap') return chestSoft(0.14, 0.135) || id === 'abdomen' || (id === 'pelvis' && q.y >= 0.02);
+    if (at === 'collar') return id === 'neck' && q.y <= 0.025; // (the heavy armour's, round the base of the neck)
+    if (at === 'axilla') return id === 'chest' && q.y > 0.12 && q.y <= 0.26 && Math.abs(q.x) > 0.11;
+    if (at === 'groin') return id === 'pelvis' && q.z < 0 && Math.abs(q.x) <= 0.09 && q.y <= 0.045; // (the flap, down the front)
+    if (at === 'groinplate') return id === 'pelvis' && q.z < 0 && Math.abs(q.x) <= 0.07 && q.y <= 0.03 && q.y >= -0.07;
+    if (at === 'pelvis') return (id === 'pelvis' && q.y >= -0.07 && q.y <= 0.045) || (id === 'thigh' && q.y > -0.035); // (a band round the hips, over the tops of the thighs)
+    if (at === 'shoulder') return id === 'uarm' && q.y <= -0.008 && q.y >= -0.119;
+    if (at === 'thigh') return id === 'thigh' && q.y >= -0.21 && q.y <= -0.032 && q.z < -0.03 && Math.abs(q.x) <= 0.06; // (a panel down the front)
+    if (at === 'legwrap') return id === 'thigh' && q.y >= -0.305 && q.y <= -0.065;
     if (at === 'shin') return id === 'shin' && q.y < -0.04 && q.y > -0.38 && q.z < 0.01;
     if (at === 'helmet') return (id === 'cranium') && q.y >= brim(piece.cut, q);
     if (at === 'face') return (id === 'jaw' || (id === 'cranium' && q.y < brim('high', q) && q.z < -0.03)) && (!piece.lower || q.y < 0.1);
@@ -942,7 +947,7 @@ const G_Ballistics = (() => {
     const pr = pick('plate') || pick('helmet') || pick('face') || pick('torso') || pick('wrap') || pick('carrier') || (d.prot || [])[0];
     return pr ? pr.layers : null;
   }
-  const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', carrier: 'chest and upper stomach', wrap: 'chest, stomach and hips', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
+  const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', carrier: 'chest and upper stomach', wrap: 'chest, stomach and hips', collar: 'neck', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
   const layersText = (L: BLayer[]) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
   return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };

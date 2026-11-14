@@ -162,7 +162,7 @@ def build(body, arm):
     for key, bw, bh, bt, ch, stw in (('pc', 0.27, 0.32, 0.03, 0.15, 0.055), ('heavy', 0.31, 0.35, 0.042, 0.19, 0.07)):
         top = 1.47 if key == 'pc' else 1.49  # (its top at the sternum's notch: the plate over the top of the lungs)
         parts = [_panel('pf', body, -1, -bw / 2, bw / 2, top - bh, top, 0.006, bt, cut=0.05), _panel('pb', body, 1, -bw / 2 - 0.005, bw / 2 + 0.005, top - bh + 0.01, top + 0.01, 0.006, bt * 0.85, cut=0.03),
-                 _band('cb', body, top - bh, top - bh + ch, 0.004, 0.014)]
+                 _band('cb', body, top - bh, top - bh + ch, 0.004, 0.014) if key == 'pc' else _band('cb', body, 1.0, 1.34, 0.004, 0.016)]
         for x in (-0.1, 0.1): parts.append(_strap('st', body, x * (1 if key == 'pc' else 1.05), stw * 0.9, 0.004 + bt * 0.3, 0.014))  # (its inner edge off the neck's side)
         if key == 'heavy':
             parts.append(_band('collar', body, 1.5, 1.545, 0.014, 0.022, seg=20))  # (a collar round the neck's base)
