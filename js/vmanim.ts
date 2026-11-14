@@ -62,7 +62,7 @@ const G_VMAnim = (() => {
   }
   // The Wolverine grip (js/parts.ts hsl.0): the loading hand a loose fist, a round held in each of the three gaps between its four fingers, bases toward the
   // palm and noses out past the knuckles like claws. CLAW_X: across the glove, the gaps; CLAW_AT: a round's middle, up and along the glove (its -z the fingers' way).
-  const CLAW_N = 3, CLAW_X = [-0.0105, 0, 0.0105], CLAW_Y = -0.008, CLAW_Z = -0.069;
+  const CLAW_N = 3, CLAW_X = [-0.0105, 0, 0.0105], CLAW_Y = -0.008, CLAW_Z = -0.069, HUM_CLAW = [[-0.02, 0, 0.02], [-0.004], [-0.05]]; // (HUM_CLAW: the same on a body's own fist, its frame's middle a hold's: humArm)
   // the fist held up between the pouch and the gun, the knuckles to the eye and the rounds standing up out of them, leaning away a little (the viewmodel's frame: x right, y up, z back)
   const CLAW_UP = (() => { const Z = new T.Vector3(-0.12, -0.8, 0.45).normalize(), X = new T.Vector3(1, 0, 0), Y = new T.Vector3().crossVectors(Z, X).normalize(); X.crossVectors(Y, Z).normalize(); return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(X, Y, Z)); })();
   function makeFist(M: Mats) { // four knuckles curled in, shown in place of the flat fingers while the hand holds the rounds
@@ -926,7 +926,7 @@ const G_VMAnim = (() => {
         if (a.L.fist) { const fist = !!(pose && pose.prop && pose.prop.kind === 'claw'); a.L.fist.visible = fist && !a.L.hum; a.L.glove.children[1].visible = !fist && !a.L.hum; if (fist && a.L.hum) a.L.hum.curl = [1, 1, 1, 1, 0.6]; if (fist && pose!.prop!.up) a.L.glove.quaternion.slerp(CLAW_UP, pose!.prop!.up); } // (the Wolverine grip's fist, in place of the flat fingers (a body's own, curled right in); turned up to show the rounds)
         for (const [kind, obj] of Object.entries(a.props)) {
           obj.visible = !!(pose && pose.prop && pose.prop.kind === kind);
-          if (kind === 'claw') { if (obj.visible) clawPose(obj, pose!.prop!, a.L.glove, h.holder, Lt); continue; }
+          if (kind === 'claw') { if (obj.visible) clawPose(obj, pose!.prop!, a.L.glove, h.holder, Lt, !!a.L.hum); continue; }
           const rx = (obj.visible && pose!.prop!.rx) || 0; // (tipped up with a derringer's barrels, held by its base)
           obj.rotation.x = rx;
           if (obj.visible) obj.position.copy(Lt).add(new T.Vector3(0.0, -0.012, -0.03).applyAxisAngle(_X, rx)).add(_v2.set(pose!.prop!.dx || 0, 0, 0)); // (dx: held to the side of the hand)
@@ -944,7 +944,7 @@ const G_VMAnim = (() => {
   // the Wolverine grip's rounds: each where it sits between the fingers (in the glove's frame, nose along the fingers), turned and moved as the hand comes over
   // the chambers (seat) to where it goes in, along its own bore, riding the hand till it's seated (at: holder space, the hand at home)
   const _gm = new T.Matrix4(), _hm = new T.Matrix4(), _gq = new T.Quaternion(), _cq = new T.Quaternion(), _rp = new T.Vector3();
-  function clawPose(g: THREE.Object3D, pr: NonNullable<Pose['prop']>, glove: THREE.Object3D, holder: THREE.Object3D, Lt: V3) {
+  function clawPose(g: THREE.Object3D, pr: NonNullable<Pose['prop']>, glove: THREE.Object3D, holder: THREE.Object3D, Lt: V3, hum: boolean) {
     g.position.set(0, 0, 0); g.rotation.set(0, 0, 0);
     _gm.compose(glove.position, glove.quaternion, _v2.set(1, 1, 1)); _hm.copy(holder.matrix).invert(); // (the glove's frame is the viewmodel's, as the holder's parent)
     _cq.copy(holder.quaternion).invert(); _gq.copy(_cq).multiply(glove.quaternion); // (the glove's turn in the holder's frame)
@@ -952,7 +952,7 @@ const G_VMAnim = (() => {
     g.children.forEach((r, i) => {
       r.visible = i < n;
       if (!r.visible) return;
-      _rp.set(CLAW_X[i], CLAW_Y, CLAW_Z).applyMatrix4(_gm).applyMatrix4(_hm); // (between the fingers: fewer than three, from the index finger's side)
+      (hum ? _rp.set(HUM_CLAW[0][i], HUM_CLAW[1][0], HUM_CLAW[2][0]) : _rp.set(CLAW_X[i], CLAW_Y, CLAW_Z)).applyMatrix4(_gm).applyMatrix4(_hm); // (between the fingers: fewer than three, from the index finger's side)
       const seated = pr.at![i].clone().sub(pr.home!).add(Lt); // (on its bore, as far from it as the hand is from its home)
       r.position.copy(_rp).lerp(seated, k);
       r.quaternion.copy(_gq).slerp(_cq.identity(), k);
