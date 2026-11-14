@@ -611,7 +611,7 @@ const G_ShipModel = (() => {
       vertexShader: 'attribute float head; uniform vec3 f; uniform float k; varying vec3 vC; void main() { vec3 d = normalize(position); vec3 p = head > 0.5 ? d : normalize(d + f * k); vC = color * mix(0.15, 1.1, head) * min(1.0, k * 5.0); gl_Position = projectionMatrix * modelViewMatrix * vec4(p * 900.0, 1.0); }',
       fragmentShader: 'varying vec3 vC; void main() { gl_FragColor = vec4(vC, 1.0); }',
     });
-    const streaks = new T.LineSegments(lg, lm); streaks.frustumCulled = false; streaks.renderOrder = -9; streaks.visible = false; pts.add(streaks);
+    const streaks = new T.LineSegments(lg, lm); streaks.frustumCulled = false; streaks.renderOrder = -9; pts.add(streaks); // (always drawn, black at k 0: its shader made with the stars', not the moment a drive starts)
     pts.userData.streak = lm.uniforms; pts.userData.streaks = streaks;
     return pts;
   }

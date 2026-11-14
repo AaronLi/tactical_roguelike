@@ -66,6 +66,7 @@ const G_Space = (() => {
     if (S.sun && S.sun.target.parent) S.sun.target.parent.remove(S.sun.target);
     G.R.levelRoot.position.set(0, 0, 0); G.R.levelRoot.quaternion.identity(); G.R.levelRoot.visible = true;
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
+    if (hid) { for (const o of hid) o.visible = true; hid = null; } tunUp = null;
     S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.mis = [];
     if (me().seat != null) me().seat = null;
     G.SpaceUI.show(false);
@@ -834,8 +835,16 @@ const G_Space = (() => {
     smearK += (want - smearK) * Math.min(1, dt * 4);
     const st = S.stars; if (!st) return;
     const u = st.userData.streak as { f: { value: THREE.Vector3 }; k: { value: number } }, line = st.userData.streaks as THREE.Object3D;
-    line.visible = smearK > 0.003; u.k.value = smearK;
+    u.k.value = smearK; void line;
     u.f.value.copy(fwd(S.Q)); if (S.zone) u.f.value.applyQuaternion(_zq.copy(S.zone.quaternion).invert());
+  }
+  let tunUp: { map: LvMap | null; steps: ((ms: number) => boolean)[] } | null = null;
+  let hid: THREE.Object3D[] | null = null;
+  function unseen(on: boolean) {
+    if (!on) { if (hid) { for (const o of hid) o.visible = true; hid = null; } return; }
+    if (hid) return;
+    hid = [];
+    for (const root of [S.root, S.kind !== 'assault' ? G.R.levelRoot : null]) if (root) root.traverse((o: any) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; hid!.push(o); } });
   }
   function ftlStep(dt: number) {
     const f = S.ftl;
@@ -856,11 +865,17 @@ const G_Space = (() => {
     else {
       // the tunnel on the way out: the place is there already, out of sight till she drops out of it
       const left = f.T - f.t; mat.opacity = G.U.clamp(left / 0.5, 0, 1) * 0.95; tex.offset.y -= dt * 3.4;
+      // (meanwhile what she'll see when she drops out, sent to the graphics card and its shaders found a few milliseconds a frame:
+      // out of sight it's never drawn, so the first frame out would do all of it at once)
+      if (!tunUp || tunUp.map !== S.map) tunUp = { map: S.map, steps: [G.R.preload(G.R.levelRoot), ...(S.root ? [G.R.preload(S.root)] : [])] };
+      while (tunUp.steps.length && tunUp.steps[0](3)) tunUp.steps.shift();
       if (left <= 0) { S.ftl = null; tn.visible = false; G.SpaceUI.flash(); S.V.copy(fwd(S.Q)).multiplyScalar(45); if (isCtl() || !S.ctl) sendPose(true); }
     }
-    const vis = !(f.st === 'tunnel');
-    if (S.root) S.root.visible = vis; if (S.kind !== 'assault') G.R.levelRoot.visible = vis; if (S.stars) S.stars.visible = S.kind !== 'assault' || S.stage !== 'atmo'; // (in the tunnel the place is out of sight, the stars aren't: they're what's smeared)
-    if (!S.ftl) { if (S.root) S.root.visible = true; if (S.kind !== 'assault') G.R.levelRoot.visible = true; sky(); }
+    // in the tunnel the place is out of sight (its meshes: its lights stay, or every shader would be made again for the change
+    // in them when she drops out), the stars aren't: they're what's smeared
+    unseen(f.st === 'tunnel' && !!S.ftl);
+    if (S.stars) S.stars.visible = S.kind !== 'assault' || S.stage !== 'atmo';
+    if (!S.ftl) sky();
   }
 
   // ------------------------------------------------------------------ the pose, told and heard
