@@ -564,7 +564,7 @@ const G_InvUI = (() => {
   }
   function stats(me: Me) {
     // each zone: the hardest to stop of the reference rounds what's there stops head-on, new (js/ballistics.ts rating)
-    const Gr = GG(), B = G.Ballistics, AT: Record<string, string[]> = { head: ['helmet'], face: ['face'], chest: ['plate', 'torso'], abdomen: ['torso'], shoulder: ['shoulder'], pelvis: ['groin', 'groinplate', 'pelvis'], thigh: ['thigh', 'legwrap'], shin: ['shin'] };
+    const Gr = GG(), B = G.Ballistics, AT: Record<string, string[]> = { head: ['helmet'], face: ['face'], chest: ['plate', 'torso', 'carrier', 'wrap'], abdomen: ['torso', 'carrier', 'wrap'], shoulder: ['shoulder'], pelvis: ['groin', 'groinplate', 'pelvis', 'wrap'], thigh: ['thigh', 'legwrap'], shin: ['shin'] };
     const zone = (z: string) => {
       const L = [];
       for (const a of B.kitArmour(me)) for (const pr of a.def.prot) if (AT[z].includes(pr.at) && !(z === 'face' && a.def.lower)) L.push(...pr.layers);

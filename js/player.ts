@@ -2714,7 +2714,7 @@ const G_Me = {
     const B = G.Ballistics, frag = { m: 0.0003, d: 0.004, len: 0.004, core: 'mild', nose: 'ball' };
     let st = 0;
     const ka = B.kitArmour(this);
-    for (const a of ka) for (const pr of a.def.prot) if (pr.at === 'torso' || pr.at === 'plate') { const r = B.stack(Object.assign({}, frag), 900, pr.layers, a.cond, 1); if (!r.through) { st = Math.max(st, pr.at === 'torso' ? 0.85 : 0.5); a.wear = (a.wear || 0) + r.absorbed * 4; } }
+    for (const a of ka) for (const pr of a.def.prot) if (pr.at === 'torso' || pr.at === 'carrier' || pr.at === 'wrap' || pr.at === 'plate') { const r = B.stack(Object.assign({}, frag), 900, pr.layers, a.cond, 1); if (!r.through) { st = Math.max(st, pr.at === 'plate' ? 0.5 : 0.85); a.wear = (a.wear || 0) + r.absorbed * 4; } }
     if (st > 0) { B.wearOut(ka); G.Audio.armorHit(); }
     // fragments: spread over the body, the legs and lower body most
     const total = d * (1 - st * 0.4);

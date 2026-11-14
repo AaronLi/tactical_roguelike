@@ -29,7 +29,7 @@ function inspect(id, buf) {
   for (const b of BONES) if (!bones.includes(b)) err(id, 'no bone ' + b);
   for (const b of bones) if (!BONES.includes(b)) err(id, 'a bone the rig does not know: ' + b);
   const mats = (j.materials || []).map((m) => String(m.name || '').split('.')[0]);
-  for (const m of mats) if (!MATS.has(m)) err(id, 'a material nothing dresses: ' + (m || '(unnamed)'));
+  for (const m of mats) if (!MATS.has(m) && !/^kit[a-z]+$/.test(m)) err(id, 'a material nothing dresses: ' + (m || '(unnamed)')); // (kit*: its armour, js/rig.ts setKit)
   for (const m of NEED) if (!mats.includes(m)) err(id, 'no material ' + m);
   let tris = 0, prims = 0;
   for (const m of j.meshes || []) for (const p of m.primitives) {

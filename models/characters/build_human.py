@@ -430,9 +430,10 @@ skin_auto(body, arm)
 finger_bones(arm, body)
 skin_to(head, arm, 'head')
 for e, n in zip(eyes, 'RL'): skin_to(e, arm, 'eye.' + n)
+import kit_armour; kits = kit_armour.build(body, arm)  # (its body armour, made on it: models/characters/kit_armour.py)
 tris = lambda o: sum(len(p.vertices) - 2 for p in o.data.polygons)
 stats = {'triangles': {'body': tris(body), 'head': tris(head), 'eyes': sum(tris(e) for e in eyes)}, 'vertices': {'body': len(body.data.vertices), 'head': len(head.data.vertices)}, 'bones': [b[0] for b in BONES] + ['eye.R', 'eye.L'] + ['%s%d.%s' % (k[:-1], i, k[-1]) for k in FING for i in (1, 2, 3)], 'height': P['height']}
-stats['triangles']['total'] = sum(stats['triangles'].values())
+stats['triangles']['total'] = sum(stats['triangles'].values()); stats['triangles']['kit'] = sum(tris(o) for o in kits) # (the armour apart: worn one piece at a time)
 print('STATS', json.dumps(stats))
 
 # ---- posed: each bone turned to point a given way (the figure faces -y; R is +x), the hips moved, the eyes turned
@@ -483,7 +484,7 @@ if VID:
     for az in (0, 40): shoot(os.path.join(OUT, '%s_head_%d.png' % (VID, az)), az, c=V((0, 0, 1.635)), scale=0.44)
     pose({})
     for q in bpy.context.selected_objects: q.select_set(False)
-    for o in (arm, body, head, *eyes): o.select_set(True)
+    for o in (arm, body, head, *eyes, *kits): o.select_set(True)
     # (the model itself is kept in the repo, beside its figures: human/variants/<id>.glb. The game loads a copy of it from
     # assets/models/humans/, which nothing keeps: tools/bake_humans.mjs makes that copy on a machine with no Blender)
     GLB = os.path.join(HERE, '..', '..', 'assets', 'models', 'humans'); os.makedirs(GLB, exist_ok=True)

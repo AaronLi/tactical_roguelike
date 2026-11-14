@@ -49,6 +49,7 @@ const G_Loadout = (() => {
       NODES: [
         { id: 'c.lite', ring: 0, rank: 0 },
         { id: 'c.ghost', from: 'c.lite', path: 'soft', ring: 1, rank: 1 },
+        { id: 'c.wrap', from: 'c.ghost', path: 'soft', ring: 2, rank: 2 },
         { id: 'c.slick', from: 'c.lite', path: 'plates', ring: 1, rank: 2 },
         { id: 'c.patrol', from: 'c.slick', path: 'plates', ring: 2, stat: 'missions', n: 3, what: 'missions completed in it', how: 'Bring it home from three missions.' },
         { id: 'c.assault', from: 'c.patrol', path: 'plates', ring: 3, rank: 5 },

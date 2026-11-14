@@ -1,12 +1,13 @@
 {
  "triangles": {
-  "body": 2528,
+  "body": 3034,
   "head": 1977,
   "eyes": 200,
-  "total": 4705
+  "total": 5211,
+  "kit": 11108
  },
  "vertices": {
-  "body": 1271,
+  "body": 1525,
   "head": 1109
  },
  "bones": [
@@ -30,7 +31,37 @@
   "shin.L",
   "foot.L",
   "eye.R",
-  "eye.L"
+  "eye.L",
+  "index1.R",
+  "index2.R",
+  "index3.R",
+  "middle1.R",
+  "middle2.R",
+  "middle3.R",
+  "ring1.R",
+  "ring2.R",
+  "ring3.R",
+  "pinky1.R",
+  "pinky2.R",
+  "pinky3.R",
+  "thumb1.R",
+  "thumb2.R",
+  "thumb3.R",
+  "index1.L",
+  "index2.L",
+  "index3.L",
+  "middle1.L",
+  "middle2.L",
+  "middle3.L",
+  "ring1.L",
+  "ring2.L",
+  "ring3.L",
+  "pinky1.L",
+  "pinky2.L",
+  "pinky3.L",
+  "thumb1.L",
+  "thumb2.L",
+  "thumb3.L"
  ],
  "height": 1.756,
  "poses": [

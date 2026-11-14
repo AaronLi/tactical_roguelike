@@ -25,7 +25,7 @@ interface ZipSwing { th: number; w: number; v: number; a: number }
 interface RigLeg { th: THREE.Object3D; sh: THREE.Object3D }
 type RigState = 'alive' | 'down' | 'dead';
 interface Rig { // a character's skeleton and its meshes (what create makes, and what update, the hit and the zip tie add as they go)
-  hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; kit: Record<string, any> | null;
+  hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; hKit?: Record<string, (m: THREE.Material) => THREE.SkinnedMesh>; kit: Record<string, any> | null;
   callsign: { id: string; name: string } | null; root: THREE.Object3D; body: THREE.Object3D; hips: THREE.Object3D; spine: THREE.Object3D; chest: THREE.Object3D; neck: THREE.Object3D; head: THREE.Object3D;
   armL: RigArm; armR: RigArm; legL: RigLeg; legR: RigLeg; gunMount: THREE.Object3D; slingMount: THREE.Object3D; hipMount: THREE.Object3D; slung: boolean; mats: any[]; scale: number; style: string; shoe: FsSole | null;
   gun: THREE.Object3D | null; gunInfo: Record<string, any> | null; gunKey: string | null; phase: number; vel: THREE.Vector3; lastPos: THREE.Vector3 | null;
@@ -293,14 +293,22 @@ const G_Rig = (() => {
       return b;
     };
     rig.hairMesh = null;
-    for (const p of parts) {
-      const mat = rig.hMat(p.mat, p.color);
-      if (!mat) continue;
+    const skin = (p: HumanPart, mat: THREE.Material) => {
       let sk = skels.get(p.inv);
       if (!sk) { sk = new T.Skeleton(p.bones.map((n: string, i: number) => boneOf(n, p.inv[i])), p.inv); skels.set(p.inv, sk); }
       const sm = new T.SkinnedMesh(p.geo, mat);
       sm.userData.shared = true; sm.frustumCulled = false; // (its geometry is every such body's; where it's drawn is the joints' affair, not its own place's)
       sm.bind(sk, ID4);
+      return sm;
+    };
+    // the body armour made on this body (models/characters/kit_armour.py: kit*): not worn yet, each to be put on by setKit, skinned as the body is
+    rig.hKit = {};
+    for (const p of parts) if (p.mat.startsWith('kit')) rig.hKit[p.mat] = (m: THREE.Material) => skin(p, m);
+    for (const p of parts) {
+      if (p.mat.startsWith('kit')) continue;
+      const mat = rig.hMat(p.mat, p.color);
+      if (!mat) continue;
+      const sm = skin(p, mat);
       (p.head ? rig.head : rig.body).add(sm);
       heatMark(sm);
       if (p.mat === 'hair') { rig.hairMesh = sm; sm.visible = !rig.hatOn; }
@@ -313,13 +321,14 @@ const G_Rig = (() => {
       rig.fingers.push({ hand, thumb: f === 'thumb', bones: bs as THREE.Bone[], rest, step: rest.map((m, k) => k ? rest[k - 1].clone().invert().multiply(m) : m) });
     }
     poseFingers(rig);
+    if (rig.kit && rig.hKit.kitpc) { rig.kitKey = null; setKit(rig, rig.kit); } // (what's worn, again: on this body's own armour now)
   }
   function setKit(rig: Rig, k: any) {
     rig.nvWant = k && k.nd ? 1 : 0; // (night vision flipped down or up: animated in update, not a new model)
     const key = JSON.stringify(Object.assign({}, k || {}, { nd: 0 })) + (rig.callsign ? '|' + rig.callsign.id + '|' + rig.callsign.name : '');
     if (rig.kitKey === key) return;
     rig.kitKey = key; rig.kit = k;
-    for (const m of rig.kitParts as THREE.Mesh[]) { if (m.parent) m.parent.remove(m); if (m.geometry) m.geometry.dispose(); }
+    for (const m of rig.kitParts as THREE.Mesh[]) { if (m.parent) m.parent.remove(m); if (m.geometry && !m.userData.shared) m.geometry.dispose(); }
     rig.kitParts = [];
     rig.nvPivot = null; rig.nvLit = [];
     backPatch(rig, k);
@@ -330,6 +339,9 @@ const G_Rig = (() => {
     const add = (parent: THREE.Object3D, m: THREE.Object3D, x: number, y: number, z: number) => { m.position.set(x, y, z); m.userData.part = part; parent.add(m); fitPart(rig, parent, m); rig.kitParts.push(m); return m; };
     const pouches = (parent: THREE.Object3D, n: number, c: number, x0: number, y0: number, z: number, w = 0.07, h = 0.09) => { for (let i = 0; i < Math.min(n, 8); i++) box(parent, w, h, 0.05, c, x0 + (i % 4) * (w + 0.015), y0 - Math.floor(i / 4) * (h + 0.015), z); };
     const C = rig.chest, Hd = rig.hat || rig.head, Hp = rig.hips; // (the head's things: on the hat, which is the head's fit)
+    // a piece of the body's own armour (made on it in Blender, skinned to its bones), if it has it: shown in colour c
+    const HK = rig.hKit && rig.hKit.kitpc ? rig.hKit : null;
+    const own = (name: string, c: number) => { const f = HK && HK[name]; if (!f) return null; const m = f(KM(c)); m.userData.part = part; rig.body.add(m); rig.kitParts.push(m); return m; };
     // the helmet: its cut and colour by model; rails and a night-vision mount on the modern ones
     const hd = D(k.helmet);
     part = 'helmet';
@@ -353,7 +365,15 @@ const G_Rig = (() => {
     // the carrier: a soft vest, a slick plate carrier, a chest rig, or a full carrier with its pouches
     const cd = D(k.carrier), cc = KIT_COL(cd);
     part = 'carrier';
-    if (cd) {
+    if (cd && HK && cd.id !== 'c.recon') {
+      // the body's own: a soft vest, the full wrap, a plate carrier or the heavy armour; its plate's outline, its pouches; the heavy armour's
+      // pads, groin flap and thigh panels unless something else is worn there
+      const key = cd.thin ? 'soft' : cd.id === 'c.heavy' ? 'heavy' : cd.id === 'c.wrap' ? 'wrap' : 'pc', col = cd.thin ? cd.col : cc;
+      own('kit' + key, col);
+      if (k.plate && !cd.thin) { part = 'plate'; own('kitplate' + key, col); part = 'carrier'; }
+      for (let i = 0; i < Math.min(k.cp || 0, key === 'wrap' ? 2 : 4); i++) own('kitpouch' + key + 'abcd'[i], 0x23251f);
+      if (key === 'heavy') { if (!k.sh) own('kitdelt', cc); if (!k.gr) { own('kitgflap', cc); own('kitgplate', 0x3d4044); } if (!k.lg) own('kitthigh', cc); }
+    } else if (cd) {
       // Not a block round the chest: what a carrier is. A plate bag on the chest and one on the back (thicker with a plate in), joined round
       // the ribs by the cummerbund, straps over the shoulders, pouches on the front; a soft vest thin panels wrapping the trunk. All in the
       // chest's frame at its standard size (front and back 0.125 off its middle, 0.19 across), fitted to each body (fitPart).
@@ -409,7 +429,11 @@ const G_Rig = (() => {
     const tube = (parent: THREE.Object3D, r0: number, r1: number, h: number, c: number, y: number, z = 0) => add(parent, new T.Mesh(new T.CylinderGeometry(r0, r1, h, 12), KM(c)), 0, y, z);
     const sd = D(k.sh);
     part = 'shoulder';
-    if (sd) {
+    if (sd && HK) {
+      const c = KIT_COL(sd);
+      if (sd.id === 's.plate') own('kitshcap', 0x4a4438); else own('kitdelt', c);
+      if (sd.id !== 's.deltoid') own('kitaxil', c);
+    } else if (sd) {
       const hard = sd.id === 's.plate', c = KIT_COL(sd);
       for (const arm of [rig.armL, rig.armR]) {
         tube(arm.up, 0.066, 0.064, 0.13, hard ? 0x4a4438 : c, -0.065);
@@ -419,7 +443,11 @@ const G_Rig = (() => {
     }
     const gd = D(k.gr);
     part = 'groin';
-    if (gd) {
+    if (gd && HK) {
+      const c = KIT_COL(gd) === 0x2e3236 ? 0x34383c : KIT_COL(gd);
+      if (gd.id === 'g.pelvis') own('kitpelvis', c); else own('kitgflap', c);
+      if (gd.id === 'g.plate') own('kitgplate', 0x3d4044);
+    } else if (gd) {
       const c = KIT_COL(gd) === 0x2e3236 ? 0x34383c : KIT_COL(gd);
       if (gd.id === 'g.pelvis') { const w = add(Hp, new T.Mesh(new T.CylinderGeometry(0.17, 0.175, 0.18, 12), KM(c)), 0, -0.02, 0); w.scale.z = 0.72; }
       else box(Hp, 0.2, 0.17, 0.025, c, 0, -0.06, -0.122);
@@ -427,7 +455,12 @@ const G_Rig = (() => {
     }
     const ld = D(k.lg);
     part = 'legs';
-    if (ld) {
+    if (ld && HK) {
+      const c = KIT_COL(ld) === 0x2e3236 ? 0x34383c : KIT_COL(ld);
+      if (ld.id === 'l.thigh') own('kitthigh', c);
+      if (ld.id === 'l.wrap' || ld.id === 'l.full') own('kitlegwrap', c);
+      if (ld.id === 'l.shin' || ld.id === 'l.full') own('kitshin', 0x4a4f55);
+    } else if (ld) {
       const c = KIT_COL(ld) === 0x2e3236 ? 0x34383c : KIT_COL(ld), shin = ld.id === 'l.shin' || ld.id === 'l.full', wrap = ld.id === 'l.wrap' || ld.id === 'l.full';
       for (const leg of [rig.legL, rig.legR]) {
         if (ld.id === 'l.thigh') box(leg.th, 0.13, 0.22, 0.025, c, 0, -0.12, -0.088);

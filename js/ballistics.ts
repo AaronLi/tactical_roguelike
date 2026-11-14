@@ -291,7 +291,9 @@ const G_Ballistics = (() => {
 
   // Where armour is on a body: each piece's protection is a list of { at, layers: [[material, mm], ...] }, at one of
   //   'plate' (front and back of the chest, a SAPI-sized 25 x 32 cm plate), 'side' (the flanks under the arms),
-  //   'torso' (soft armour: chest and abdomen all round, except high under the arms), 'axilla' (that gap under the arms),
+  //   'torso' (soft armour: chest and abdomen all round, except high under the arms), 'carrier' (a plate carrier's soft backer: in its bags
+  //   and cummerbund, the chest and the top of the abdomen, not the belly below them), 'wrap' (the full-wrap vest: the torso's and on down
+  //   over the top of the pelvis), 'axilla' (that gap under the arms),
   //   'groin' (the front of the pelvis), 'groinplate' (a hard plate on the middle of that), 'pelvis' (all round it),
   //   'shoulder' (the upper arm's top half), 'thigh' (a panel down the front of the upper thigh), 'legwrap' (the thigh all round, near
   //   to the knee), 'shin' (the front of the shin), 'helmet' (the skull above the brim: piece.cut 'high', 'mid' or 'full': as it's drawn),
@@ -302,6 +304,8 @@ const G_Ballistics = (() => {
     if (at === 'plate') return id === 'chest' && Math.abs(q.x) <= 0.125 && q.y >= -0.005 && q.y <= 0.3 && Math.abs(q.z) > 0.04;
     if (at === 'side') return id === 'chest' && Math.abs(q.x) > seg.rx(q.y) * 0.72 && q.y >= 0.06 && q.y <= 0.22;
     if (at === 'torso') return (id === 'chest' && q.y <= 0.24 && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || id === 'abdomen'; // (up to the vest's neckline: js/rig.ts setKit)
+    if (at === 'carrier') return (id === 'chest' && q.y <= 0.24 && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || (id === 'abdomen' && q.y >= 0.11); // (the bags' bottom edge: models/characters/kit_armour.py)
+    if (at === 'wrap') return (id === 'chest' && q.y <= 0.24 && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || id === 'abdomen' || (id === 'pelvis' && q.y >= 0.02);
     if (at === 'axilla') return id === 'chest' && q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8;
     if (at === 'groin') return id === 'pelvis' && q.z < 0;
     if (at === 'groinplate') return id === 'pelvis' && q.z < 0 && Math.abs(q.x) <= 0.09 && q.y <= 0.04;
@@ -560,7 +564,8 @@ const G_Ballistics = (() => {
       // the layers that cover this point, outside in (plates, then the soft armour behind them)
       const out = [];
       for (const a of armour || []) for (const pr of a.def.prot || []) if (covers(pr.at, a.def, m.s, q)) out.push({ a, pr, L: entering ? G.Materials.built(pr) : G.Materials.built(pr).reverse() });
-      out.sort((x, y) => (x.pr.at === 'torso' ? 1 : 0) - (y.pr.at === 'torso' ? 1 : 0)); // (soft backers last)
+      const SOFT = (at: string) => (at === 'torso' || at === 'carrier' || at === 'wrap' ? 1 : 0);
+      out.sort((x, y) => SOFT(x.pr.at) - SOFT(y.pr.at)); // (soft backers last)
       if (!entering) out.reverse();
       return out;
     };
@@ -934,10 +939,10 @@ const G_Ballistics = (() => {
   function mainLayers(d: Record<string, any>, plate?: Record<string, any> | null) {
     const pick = (at: string) => (d.prot || []).find((p: { at: string }) => p.at === at);
     if (plate && plate.prot) return plate.prot[0].layers;
-    const pr = pick('plate') || pick('helmet') || pick('face') || pick('torso') || (d.prot || [])[0];
+    const pr = pick('plate') || pick('helmet') || pick('face') || pick('torso') || pick('wrap') || pick('carrier') || (d.prot || [])[0];
     return pr ? pr.layers : null;
   }
-  const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
+  const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', carrier: 'chest and upper stomach', wrap: 'chest, stomach and hips', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
   const layersText = (L: BLayer[]) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
   return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
