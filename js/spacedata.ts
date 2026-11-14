@@ -15,7 +15,14 @@ interface SpClass { name: string; tier: number; pay: number; diff: number; guns:
 // wanted aboard; side: which side the breach is on (1 starboard, -1 port); ship: the squad's own ship (its berth is cut to it)
 interface SpGen { size?: SpSize; obj?: SpObj; ship?: string; planet?: number; other?: SpSize | null; wing?: boolean } // (other: a second ship lying off her, nothing to do with the mission)
 interface SpMission { i: number; kind: 'board' | 'assault'; obj: SpObj; size: SpSize | null; th: number; seed: number; diff: number; pay: number; name: string; brief: string; where: string; night: boolean; ly: number; anchor: [number, number, number]; other?: SpSize | null; fuse?: number; wing?: boolean } // (wing: a corvette or a frigate built as a flying wing: js/shipgen.ts wingDeck)
-interface SpSeat { k: 'helm' | 'sensors' | 'turret' | 'jump'; x: number; y: number; z: number; yaw: number; n?: number }
+interface SpSeat { k: 'helm' | 'sensors' | 'turret' | 'jump'; x: number; y: number; z: number; yaw: number; n?: number; f: number; sx: number; sz: number } // (f: the floor it stands on; sx, sz: where you stand when you get up)
+/** The squad's ship as she's laid out (js/spacedata.ts layout): three levels. Her frame: x to starboard, y up from her keel, z aft (her nose to -z). */
+interface SpLayout {
+  fw: number; tw: number; sw: number; hw: number; // half-widths: the cockpit, the breach tunnel, the staging space behind it, the crew deck
+  zc: number; zt: number; zw: number; zk: number; zr: number; z1: number; // the collar, the tunnel's mouth, the low wall, the cockpit's back (the stairs' top), the stairs' foot (the crew deck's front), the tail
+  FC: number; FB: number; FM: number; CC: number; CB: number; CM: number; // floors and ceilings: the cockpit, the breach deck, the crew deck
+  lift: number; // how far over her keel the breach deck's floor is above a deck she's breaching (her keel sits that much lower)
+}
 interface SpShipDef { id: string; name: string; cls: string; blurb: string; price: number; hw: number; z0: number; z1: number; nose: number; hull: number; speed: number; cruise: number; turn: number; turrets: number; utils: number; jump: number }
 interface SpEquip { id: string; name: string; slot: 'turret' | 'util'; price: number; blurb: string; dmg?: number; rof?: number; range?: number }
 interface SpFleet { owned: string[]; ship: string; fit: Record<string, (string | null)[]> }
@@ -59,26 +66,56 @@ const G_SpaceData = (() => {
   const fitted = (f: SpFleet, id: string) => (f.fit[f.ship] || []).includes(id);
   // The seats of a ship, in its own frame: the helm (port, forward), the sensor station beside it, a seat under each
   // hardpoint, and the jump seats down the cabin's sides.
+  // ---- How she's laid out (the Kestrel's plan; the others the same, to their size). Three levels, joined at her waist by two
+  // flights of stairs, a wall between them:
+  //   the cockpit, low in her narrow nose: the pilot at the front glass, the sensor station behind and raised to see over, the
+  //     gunners side by side behind that (their guns are on her roof: they're laid from here);
+  //   the breach deck over it, as long: the tunnel forward to the collar and the breaching door, and behind the tunnel's mouth
+  //     the space to wait in, wider, with a wall at crouching height a metre back from the mouth to wait behind;
+  //   the crew deck aft, between the two: wide and lower, jump seats down both walls, the ramp at the tail (steps down to the
+  //     ground when it's open). Up the left flight from it to the breach deck, down the right to the cockpit.
+  // When she's breaching, it's the breach deck's floor that's level with the deck she's breached (her keel lift lower).
+  function layout(d: SpShipDef): SpLayout {
+    const k = d.hw / 1.7, zc = d.z0 - d.nose - 0.5, zt = zc + 2.4, zk = zc + 4.6, FB = 2.7;
+    return { fw: 1.25 * k, tw: 0.85, sw: 1.85 * k, hw: d.hw + 0.9 * k, zc, zt, zw: zt + 1.0, zk, zr: zk + 1.6, z1: d.z1 + 1, FC: 0.3, FB, FM: 1.5, CC: 2.5, CB: 4.9, CM: 3.9, lift: FB - FLOOR };
+  }
   function seats(d: SpShipDef): SpSeat[] {
-    const s: SpSeat[] = [{ k: 'helm', x: -d.hw * 0.48, y: FLOOR + 0.26, z: d.z0 + 1.0, yaw: 0 }, { k: 'sensors', x: d.hw * 0.48, y: FLOOR + 0.26, z: d.z0 + 1.0, yaw: 0 }]; // (the two forward seats sit high: eyes over the consoles, at the glass)
-    for (let i = 0; i < d.turrets; i++) s.push({ k: 'turret', n: i, x: (i ? 1 : -1) * (d.hw - 0.45), y: FLOOR, z: d.z0 + 3 + i * 0.01, yaw: (i ? -1 : 1) * Math.PI / 2 });
-    for (let i = 0; i < d.jump; i++) { const sd = i % 2 ? 1 : -1; s.push({ k: 'jump', x: sd * (d.hw - 0.4), y: FLOOR, z: d.z1 - 3.6 + Math.floor(i / 2) * 0.9, yaw: sd * Math.PI / 2 }); }
+    const L = layout(d), F = L.FC;
+    const s: SpSeat[] = [
+      { k: 'helm', x: 0, y: F + 0.26, z: L.zc + 1.35, yaw: 0, f: F, sx: 0.75, sz: L.zc + 1.5 },
+      { k: 'sensors', x: 0, y: F + 0.62, z: L.zc + 2.45, yaw: 0, f: F, sx: 0.75, sz: L.zc + 2.6 }, // (raised: eyes over the pilot's head)
+    ];
+    for (let i = 0; i < d.turrets; i++) s.push({ k: 'turret', n: i, x: (i ? 1 : -1) * 0.55, y: F + 0.26, z: L.zc + 3.55, yaw: 0, f: F, sx: 0, sz: L.zc + 4.25 });
+    for (let i = 0; i < d.jump; i++) { const sd = i % 2 ? 1 : -1, z = L.zr + 1.4 + Math.floor(i / 2) * 0.95; s.push({ k: 'jump', x: sd * (L.hw - 0.4), y: L.FM, z, yaw: sd * Math.PI / 2, f: L.FM, sx: sd * (L.hw - 1.1), sz: z }); }
     return s;
   }
   // What stops you aboard, as boxes in the ship's frame: [x0, y0, z0, x1, y1, z1, tag]. Tags: 'nose' the breaching door (gone
-  // while it's open), 'ramp' the rear door (the same).
+  // while it's open), 'ramp' the rear door (the same), 'steps' the steps down off the open ramp (there only while it's open).
   type ShipBox = [number, number, number, number, number, number, string?];
   function boxes(d: SpShipDef): ShipBox[] {
-    const F = FLOOR, T = F + HEAD, w = d.hw, n = 0.9, zn = d.z0 - d.nose, W = 0.22;
-    return [
-      [-w - W, 0, d.z0, w + W, F, d.z1 + 0.05], [-n - W, 0, zn, n + W, F, d.z0], // the deck
-      [-w - W, T, d.z0 - W, w + W, T + 0.2, d.z1 + W], [-n - W, T, zn - W, n + W, T + 0.2, d.z0], // the overhead
-      [-w - W, F, d.z0, -w, T, d.z1], [w, F, d.z0, w + W, T, d.z1], // the cabin's sides
-      [-w - W, F, d.z0 - W, -n, T, d.z0], [n, F, d.z0 - W, w + W, T, d.z0], // the cockpit's front, either side of the airlock
-      [-n - W, F, zn, -n, T, d.z0], [n, F, zn, n + W, T, d.z0], // the airlock's sides
-      [-n, F, zn - W, n, T, zn, 'nose'],
-      [-w, F, d.z1, w, T, d.z1 + W, 'ramp'],
+    const L = layout(d), W = 0.2, { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, R = 0.4, top = CB + W;
+    const out: ShipBox[] = [
+      // the cockpit: its deck (on to the foot of the down flight), its sides, the glass at its front, its back wall under the up flight
+      [-fw - W, 0, zc + 0.3, fw + W, FC, zr], [-fw - W, FC, zc + 0.3, -fw, CC, zk], [fw, FC, zc + 0.3, fw + W, CC, zk], [-fw, FC, zc + 0.3, fw, CC, zc + 0.5],
+      [-fw, FC, zk, -0.06, FB - 0.3, zk + 0.05], [-fw - W, CC, zc + 0.3, fw + W, CC + 0.2, zt], // (and its roof, under the tunnel)
+      // the breach deck: the tunnel's floor, sides and roof; the staging space's floor, sides, roof and the wall either side of the tunnel's mouth; the low wall
+      [-tw - W, CC, zc, tw + W, FB, zt], [-tw - W, FB, zc, -tw, CB, zt], [tw, FB, zc, tw + W, CB, zt], [-tw - W, CB, zc, tw + W, top, zt],
+      [-sw - W, CC, zt, sw + W, FB, zk], [-sw - W, FB, zt, -sw, CB, zk], [sw, FB, zt, sw + W, CB, zk], [-sw - W, CB, zt, sw + W, top, zk],
+      [-sw, FB, zt - W, -tw, CB, zt], [tw, FB, zt - W, sw, CB, zt],
+      [-1.0, FB, zw, 1.0, FB + 1.0, zw + 0.25],
+      [-sw, FB, zk - 0.05, -fw, CB, zk], [0.06, FB, zk - 0.05, sw, FB + 1.0, zk], // (the stairwell's rail on the right; the up flight comes in on the left)
+      [-tw, FB, zc - W, tw, CB, zc, 'nose'],
+      // the stairs: their sides and roof, the wall between the two flights
+      [-fw - W, 0, zk, -fw, CB, zr], [fw, 0, zk, fw + W, CB, zr], [-fw - W, CB, zk, fw + W, top, zr], [-0.06, 0, zk, 0.06, FB + 0.9, zr],
+      // the crew deck: the hold under it, its sides, roof, the bulkhead at its front either side of the stairs (and over them), the ramp
+      [-hw - W, 0, zr, hw + W, FM, z1], [-hw - W, FM, zr, -hw, CM, z1], [hw, FM, zr, hw + W, CM, z1], [-hw - W, CM, zr, hw + W, CM + W, z1],
+      [-hw, FM, zr - W, -fw, CM, zr], [fw, FM, zr - W, hw, CM, zr], [-fw, CM, zr - 0.05, fw, CB, zr + 0.05],
+      [-hw, FM, z1, hw, CM, z1 + W, 'ramp'],
     ];
+    for (let i = 0; i < 3; i++) out.push([0.06, 0, zr - R * (i + 1), fw, FM - 0.3 * (i + 1), zr - R * i]); // down to the cockpit, on the right
+    for (let i = 0; i < 4; i++) out.push([-fw, 0, zr - R * (i + 1), -0.06, FM + 0.3 * (i + 1), zr - R * i]); // up to the breach deck, on the left
+    for (let i = 0; i < 4; i++) out.push([-hw + 0.3, 0, z1 + W + 0.38 * i, hw - 0.3, FM - 0.3 * (i + 1), z1 + W + 0.38 * (i + 1), 'steps']); // off the open ramp
+    return out;
   }
   // a point of the ship's frame in the world, the ship standing at berth b ({ x, y, z, yaw }: yaw as an officer's, 0 facing -z)
   function toWorld(b: { x: number; y: number; z: number; yaw: number }, lx: number, ly: number, lz: number) {
@@ -92,7 +129,9 @@ const G_SpaceData = (() => {
   // is this point of the world aboard (inside the hull's box)
   function aboard(d: SpShipDef, b: { x: number; y: number; z: number; yaw: number }, wx: number, wy: number, wz: number) {
     const p = toShip(b, wx, wy, wz);
-    return p.y > -0.2 && p.y < FLOOR + HEAD + 0.3 && p.z > d.z0 - d.nose - 0.1 && p.z < d.z1 + 0.1 && Math.abs(p.x) < (p.z < d.z0 ? 0.95 : d.hw + 0.05);
+    const L = layout(d);
+    if (p.y < -0.2 || p.z < L.zc - 0.3 || p.z > L.z1 + 0.1) return false;
+    return p.z < L.zr ? p.y < L.CB + 0.4 && Math.abs(p.x) < (p.y > L.CC - 0.1 ? (p.z < L.zt ? L.tw : L.sw) : L.fw) + 0.1 : p.y < L.CM + 0.4 && Math.abs(p.x) < L.hw + 0.05;
   }
   // Where the ship stands in the hangar (the pad in front of the hall: js/hangar.ts), nose to the west.
   const HUB_BERTH = { x: 27, y: 0, z: G_HANGAR_ROWS * 2 + 35, yaw: Math.PI / 2 };
@@ -202,7 +241,7 @@ const G_SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta, wearOf, wearNow, zone, zonePos };
+  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta, wearOf, wearNow, zone, zonePos };
 })();
 G.SpaceData = G_SpaceData;
 interface GameModules { SpaceData: typeof G_SpaceData; }

@@ -84,7 +84,7 @@ const G_Space = (() => {
     // her berth
     const d = S.def;
     if (kind === 'hub') S.berth = Object.assign({}, SD.HUB_BERTH);
-    else if (kind === 'board') { const b = map.sp!.breach; S.berth = { x: b.x, y: 0, z: b.face + 0.03 - (d.z0 - d.nose - 0.22), yaw: 0 }; }
+    else if (kind === 'board') { const b = map.sp!.breach, L = SD.layout(d); S.berth = { x: b.x, y: -L.lift, z: b.face + 0.03 - (L.zc - 0.22), yaw: 0 }; } // (her breach deck level with the hull's: the rest of her below it)
     else { const lz = map.lz || { x: map.spawn.x, y: 0, z: map.spawn.z }; S.berth = { x: lz.x + 3.2 + Math.max(0, d.z1 - 5) * 0.5, y: lz.y || 0, z: lz.z, yaw: Math.PI / 2 }; }
     S.Dp.set(S.berth.x, S.berth.y, S.berth.z); S.Dq.copy(yawQ(S.berth.yaw));
     // the ship herself, and her deck in the world
@@ -110,7 +110,7 @@ const G_Space = (() => {
     sky();
     // you, aboard where you were (the ship came here with you in it), or aboard anyway if she isn't against anything
     if (S.keep || !docked) {
-      const k = S.keep || { x: 0, y: SD.FLOOR, z: d.z1 - 2.2, yaw: 0 }, w = SD.toWorld(S.berth, G.U.clamp(k.x, -d.hw + 0.4, d.hw - 0.4), SD.FLOOR, G.U.clamp(k.z, d.z0 + 0.5, d.z1 - 0.5));
+      const L = SD.layout(d), k = S.keep || { x: 0, y: L.FM, z: L.z1 - 2.2, yaw: 0 }, w = SD.toWorld(S.berth, k.x, k.y + 0.02, k.z); // (where you stood in her, on whichever deck)
       me().pos.set(w.x, w.y, w.z); me().yaw = S.berth.yaw + k.yaw;
     }
     S.keep = null;
@@ -138,9 +138,9 @@ const G_Space = (() => {
   }
   // ---- breaching her anywhere (js/shipgen.ts sites, cut). The berth goes to the site: nose-on to that stretch of hull.
   function berthAt(s: { x: number; z: number; nx: number; nz: number }) {
-    const TS = G.Level.TS, yaw = s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2, zN = S.def.z0 - S.def.nose - 0.22;
+    const TS = G.Level.TS, yaw = s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2, L = SD.layout(S.def), zN = L.zc - 0.22;
     const px = s.x + s.nx * (TS / 2 + 0.03), pz = s.z + s.nz * (TS / 2 + 0.03);
-    return { x: px - zN * Math.sin(yaw), y: 0, z: pz - zN * Math.cos(yaw), yaw };
+    return { x: px - zN * Math.sin(yaw), y: -L.lift, z: pz - zN * Math.cos(yaw), yaw };
   }
   const siteAt = (a: number[]) => { const map = S.map!, W = map.W, TS = G.Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0; return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) } as ShSite; };
   // she stands somewhere else now: her deck with her, and you if you're aboard (her pose in the level is what it was)
@@ -231,7 +231,7 @@ const G_Space = (() => {
   // line straight into it. null: she isn't pointed at anywhere she could breach.
   function aim(maxT = 320) {
     if (S.kind !== 'board' || !S.map || !S.map.sp) return null;
-    const zn = S.def.z0 - S.def.nose - 0.22, N = new T.Vector3(0, 1.4, zn).applyQuaternion(S.Q).add(S.P), f = fwd(S.Q), TS = G.Level.TS;
+    const L = SD.layout(S.def), zn = L.zc - 0.22, N = new T.Vector3(0, L.FB + 1.16, zn).applyQuaternion(S.Q).add(S.P), f = fwd(S.Q), TS = G.Level.TS; // (the collar's middle: 1.4 over the deck she breaches when she's level with it)
     let best: ShSite | null = null, bo = 1.0, bt = 0; // (within a metre of a site's middle: the collar pulls her onto it)
     const raid: number[][] = (S.state && S.state.raid) || [], W0 = S.map.W, nearPod = (s: ShSite) => raid.some((q) => Math.hypot(s.c % W0 - q[0] % W0, ((s.c / W0) | 0) - ((q[0] / W0) | 0)) * G.Level.TS < 8);
     const list = G.ShipGen.sites(S.map).concat((S.map.sp.cuts || []).map(siteAt)).filter((s) => !nearPod(s)); // (and the holes already made; not where a pirate pod is)
@@ -556,7 +556,7 @@ const G_Space = (() => {
     const w = S.map && S.map.world; if (!w) return;
     const noseOpen = S.docked && S.kind === 'board', rampOpen = S.docked && S.kind !== 'board';
     for (const q of S.solids) {
-      const want = q.tag === 'nose' ? !noseOpen : q.tag === 'ramp' ? !rampOpen : true;
+      const want = q.tag === 'nose' ? !noseOpen : q.tag === 'ramp' ? !rampOpen : q.tag === 'steps' ? rampOpen : true;
       if (want && !q.on) { q.s = G.World.add(w, G.World.box(q.b[0], q.b[1], q.b[2], q.b[3], q.b[4], q.b[5], { kind: 'prop' })); q.on = true; }
       else if (!want && q.on) { G.World.remove(w, q.s); q.on = false; }
     }
@@ -565,7 +565,7 @@ const G_Space = (() => {
     const m = S.model!, noseOpen = S.docked && S.kind === 'board' ? 1 : 0, rampOpen = S.docked && S.kind !== 'board' && !S.auto ? 1 : 0;
     S.noseT += G.U.clamp(noseOpen - S.noseT, -dt * 1.6, dt * 1.6); S.rampT += G.U.clamp(rampOpen - S.rampT, -dt * 0.8, dt * 0.8);
     for (const lf of m.nose) lf.position.x = lf.userData.s * 0.86 * S.noseT;
-    m.ramp.rotation.x = S.rampT * (Math.PI / 2 + 0.1);
+    m.ramp.rotation.x = S.rampT * (m.ramp.userData.open || Math.PI / 2 + 0.1); // (down to the ground behind her)
   }
 
   // ------------------------------------------------------------------ what's outside, moved by the inverse of her pose
@@ -622,7 +622,7 @@ const G_Space = (() => {
   }
   function stand() {
     const m = me(), i = m.seat; if (i == null) return;
-    const s = S.seatsDef[i], w = SD.toWorld(S.berth, G.U.clamp(s.x * 0.45, -S.def.hw + 0.5, S.def.hw - 0.5), SD.FLOOR, s.z + (s.k === 'jump' || s.k === 'turret' ? 0 : 0.9));
+    const s = S.seatsDef[i], w = SD.toWorld(S.berth, s.sx, s.f + 0.02, s.sz); // (beside it, on its deck)
     m.seat = null; m.pos.set(w.x, w.y, w.z); m.vel.set(0, 0, 0); m.crouch = false; m.stowed = false;
     G.Net.toHost({ t: 'seat', s: -1 }); G.Audio.click();
   }
@@ -1088,7 +1088,7 @@ const G_Space = (() => {
     // aboard: the nearest seat
     if (aboard()) {
       let best = -1, bd = 1.15;
-      S.seatsDef.forEach((s, i) => { const w = seatPos(i), d = Math.hypot(px - w.x, pz - w.z); if (d < bd) { bd = d; best = i; } });
+      S.seatsDef.forEach((s, i) => { const w = seatPos(i), d = Math.hypot(px - w.x, pz - w.z); if (d < bd && Math.abs(m.pos.y - (S.berth.y + s.f)) < 0.8) { bd = d; best = i; } }); // (on its deck: not the one under your feet)
       if (best >= 0) {
         const s = S.seatsDef[best], taken = Object.keys(S.seats).some((id) => id !== G.Net.myId && S.seats[id] === best && G.Game.roster[id]);
         const what = s.k === 'helm' ? 'take the helm' : s.k === 'sensors' ? 'sit at the sensor station' : s.k === 'turret' ? 'man the turret' : 'sit down';
@@ -1163,7 +1163,7 @@ const G_Space = (() => {
       case 'vent': { const role = S.map && S.map.sp ? S.map.sp.roles[m.r] : null; G.HUD.feed(`<span class="bad">${(role && G.ShipGen.NAMES[role]) || 'A compartment'} is open to space</span>`); return true; }
       case 'pod': {
         // out in a pod, and picked up: aboard your own ship
-        const w = SD.toWorld(S.berth, 0, SD.FLOOR, S.def.z1 - 1.5); me().pos.set(w.x, w.y, w.z); me().vel.set(0, 0, 0); me().yaw = S.berth.yaw;
+        const L = SD.layout(S.def), w = SD.toWorld(S.berth, 0, L.FM + 0.02, L.z1 - 1.5); me().pos.set(w.x, w.y, w.z); me().vel.set(0, 0, 0); me().yaw = S.berth.yaw;
         G.SpaceUI.flash(); G.HUD.toast('ESCAPE POD', 'Picked up by your own ship', 2.5);
         return true;
       }

@@ -127,7 +127,7 @@ const G_DebugStart = (() => {
           if (Sp.S.kind !== 'board') G.Net.toHost({ t: 'sdock', on: 1 });
           (Sp as any).dbgDock();
           await sleep(0.6); (G.Me as any).seat = null; G.Me.crouch = false; G.Me.stowed = false; G.Net.toHost({ t: 'seat', s: -1 });
-          const w = G.SpaceData.toWorld(Sp.S.berth, 0, G.SpaceData.FLOOR, Sp.S.kind === 'board' ? Sp.S.def.z0 - 1.5 : Sp.S.def.z1 - 1.5); G.Me.pos.set(w.x, w.y, w.z); G.Me.yaw = Sp.S.berth.yaw + (Sp.S.kind === 'board' ? 0 : Math.PI);
+          const L = G.SpaceData.layout(Sp.S.def), w = Sp.S.kind === 'board' ? G.SpaceData.toWorld(Sp.S.berth, 0, L.FB + 0.02, L.zw + 0.7) : G.SpaceData.toWorld(Sp.S.berth, 0, L.FM + 0.02, L.z1 - 1.5); G.Me.pos.set(w.x, w.y, w.z); G.Me.yaw = Sp.S.berth.yaw + (Sp.S.kind === 'board' ? 0 : Math.PI); // (breaching: behind the low wall)
         }
         if (q.has('nofoes')) { G.Net.toHost({ t: 'noFoes' }); await sleep(0.5); }
       } else if (q.has('fly')) { helm(); await sleep(0.3); (Sp as any).dbgLaunch(); }

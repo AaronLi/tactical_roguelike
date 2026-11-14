@@ -45,102 +45,110 @@ const G_ShipModel = (() => {
   // it, engine pods swept back on pylons. Her deck inside is js/spacedata.ts boxes: what's drawn there is what stops you.
   const PAINT: Record<string, number[]> = { kestrel: [0x77828e, 0x39424c, 0xff7a1a], atlas: [0x6f7868, 0x3a4136, 0xe8c040], wraith: [0x2c323c, 0x191c22, 0x4ad8ff] };
   function ship(d: SpShipDef, fleet: SpFleet): SmShip {
-    const SD = G.SpaceData, F = SD.FLOOR, Tp = F + SD.HEAD, w = d.hw, n = 0.9, zn = d.z0 - d.nose, W = 0.22, g = new T.Group(), K = new Kit(), X = w + W;
+    const SD = G.SpaceData, L = SD.layout(d), { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, W = 0.22, g = new T.Group(), K = new Kit(), X = hw + W, top = CB + 0.2;
     const [c0, c1, c2] = PAINT[d.id] || PAINT.kestrel, DS = { side: T.DoubleSide, flatShading: true };
     const hull = M(c0, Object.assign({ emissive: 0x101316, metalness: 0.45, roughness: 0.55 }, DS)), armor = M(c1, Object.assign({ emissive: 0x08090b, metalness: 0.55, roughness: 0.5 }, DS)), accent = M(c2, { emissive: new T.Color(c2).multiplyScalar(0.35).getHex() });
     const deck = M(0x2b2f34, { roughness: 0.85, emissive: 0x08090a }), inner = M(0x5d656e, { emissive: 0x15181b }), dark = M(0x15171a, { metalness: 0.5 }), seatM = M(0x3d444d, { emissive: 0x101216 });
-    const glass = new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.2, roughness: 0.05, metalness: 0.6, depthWrite: false, side: T.DoubleSide, emissive: 0x06202c });
+    const glass = new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0.6, depthWrite: false, side: T.DoubleSide, emissive: 0x06202c });
     const glow = lit(0x2a8a5a), strip = lit(0xdff2ff), hot = lit(c2), thrust = new T.MeshBasicMaterial({ color: 0x66c8ff, transparent: true, opacity: 0.0, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
-    const SILL = F + 1.22, LIN = F + 1.68; // (the visor slit down each side)
-    // ---- inside: the deck, the overhead (light down its middle), the walls under and over the slit, ribs between
-    K.box(deck, -X, 0, d.z0, X, F, d.z1 + 0.05); K.box(deck, -n - W, 0, zn, n + W, F, d.z0);
-    K.box(inner, -X, Tp, d.z0 + 2.2, X, Tp + 0.2, d.z1 + W);
-    // (the airlock is glazed over its sill, roof and all, on hoops: the helm looks down it and out past the collar)
-    part(g, new T.Mesh(new T.BoxGeometry(2 * n + 2 * W, 0.04, d.nose), glass), 0, Tp + 0.1, (zn + d.z0) / 2);
-    for (let k = 0; k <= 3; k++) { const z = zn + 0.1 + k * (d.nose - 0.2) / 3; K.box(dark, -n - W, Tp, z - 0.06, n + W, Tp + 0.2, z + 0.06); for (const s of [-1, 1]) K.box(dark, s * n, SILL, z - 0.06, s * (n + W), Tp, z + 0.06); }
-    K.box(inner, -X, Tp, d.z0 - W, -w + 0.5, Tp + 0.2, d.z0 + 2.2); K.box(inner, w - 0.5, Tp, d.z0 - W, X, Tp + 0.2, d.z0 + 2.2); K.box(inner, -n, Tp, d.z0 - W, n, Tp + 0.2, d.z0 + 0.2);
-    for (const sx of [-0.55, 0.55]) K.box(strip, sx - 0.05, Tp - 0.02, d.z0 + 2.6, sx + 0.05, Tp, d.z1 - 0.6);
-    for (const s of [-1, 1]) {
-      const x0 = s * w, x1 = s * X;
-      K.box(inner, x0, F, d.z0, x1, SILL, d.z1); K.box(inner, x0, LIN, d.z0, x1, Tp, d.z1);
-      const nb = Math.round((d.z1 - d.z0) / 1.6);
-      for (let k = 0; k <= nb; k++) { const z = d.z0 + k * (d.z1 - d.z0) / nb; K.box(dark, x0 - s * 0.07, F, z - 0.07, x1, Tp, z + 0.07); }
-      part(g, new T.Mesh(new T.BoxGeometry(0.04, LIN - SILL, d.z1 - d.z0), glass), s * (w + W / 2), (SILL + LIN) / 2, (d.z0 + d.z1) / 2);
-      K.box(glow, s * (w - 0.02), LIN + 0.1, d.z0 + 2.4, s * w, LIN + 0.14, d.z1 - 0.4);
-      K.box(hot, s * (w - 0.02), F + 0.08, d.z0 + 0.4, s * w, F + 0.11, d.z1 - 0.4);
-      // the cockpit's front, either side of the airlock: a windscreen each, raked
-      const a = s * n, b = s * X;
-      K.box(inner, a, F, d.z0 - W, b, SILL - 0.25, d.z0); K.box(inner, a, LIN + 0.4, d.z0 - W, b, Tp, d.z0); K.box(dark, a, SILL - 0.25, d.z0 - W, a + s * 0.1, LIN + 0.4, d.z0); K.box(dark, b - s * 0.14, SILL - 0.25, d.z0 - W, b, LIN + 0.4, d.z0);
-      part(g, new T.Mesh(new T.BoxGeometry(Math.abs(b - a), LIN + 0.65 - SILL, 0.04), glass), (a + b) / 2, (SILL - 0.25 + LIN + 0.4) / 2, d.z0 - W / 2);
-      K.box(inner, s * n, F, zn, s * (n + W), SILL, d.z0); // the airlock's side, glass over it
-      part(g, new T.Mesh(new T.BoxGeometry(0.04, Tp - SILL, d.nose), glass), s * (n + W / 2), (SILL + Tp) / 2, (zn + d.z0) / 2);
-      K.box(inner, x0, F, d.z1, x1, Tp, d.z1 + W); // the ramp's frame
+    // the cockpit's glass: across its front over a low sill, and down each side for its first three metres
+    const SILL = FC + 0.62, HEADER = CC - 0.14, zg0 = zc + 0.5, zg1 = zc + 3.1;
+    // ---- inside: every solid of hers is drawn as it stands (decks and stairs in the deck's grey, walls and roofs lighter), bar
+    // the cockpit's glazed walls (below), the doors and the steps off the ramp (their own)
+    const glazed = (b: (number | string | undefined)[]) => b[1] === FC && b[4] === CC && b[2] === zc + 0.3;
+    for (const b of SD.boxes(d)) {
+      if (b[6] || glazed(b)) continue;
+      const flat = b[4] - b[1] <= 0.36 || (b[1] === 0 && b[4] <= FB + 0.01 && b[3] - b[0] < 2 * fw);
+      K.box(flat ? deck : inner, b[0], b[1], b[2], b[3], b[4], b[5]);
     }
-    // the canopy over the helm: a faceted blister of glass on a dark frame
-    const cz0 = d.z0 - W, cz1 = d.z0 + 2.3, cw = w - 0.5;
-    g.add(loft([{ z: cz0, pts: [[-cw, Tp + 0.02], [cw, Tp + 0.02], [cw * 0.7, Tp + 0.3], [-cw * 0.7, Tp + 0.3]] }, { z: (cz0 + cz1) / 2, pts: [[-cw, Tp + 0.02], [cw, Tp + 0.02], [cw * 0.75, Tp + 0.55], [-cw * 0.75, Tp + 0.55]] }, { z: cz1, pts: [[-cw, Tp + 0.02], [cw, Tp + 0.02], [cw * 0.8, Tp + 0.62], [-cw * 0.8, Tp + 0.62]] }], glass));
-    // ---- outside
+    // the cockpit's front: a sill, a header and the glass between, no pillar in the pilot's way
+    K.box(inner, -fw, FC, zc + 0.3, fw, SILL, zc + 0.5); K.box(inner, -fw, HEADER, zc + 0.3, fw, CC, zc + 0.5);
+    const fg = part(g, new T.Mesh(new T.PlaneGeometry(2 * fw, HEADER - SILL), glass), 0, (SILL + HEADER) / 2, zc + 0.42); fg.rotation.x = -0.18;
     for (const s of [-1, 1]) {
-      const mir = s < 0, zf = d.z0 + 0.2, zm = d.z0 + 2.4, zt = d.z1 + 0.9;
-      // armour sloped out from the keel to a hard chine under the slit, drawn in to the bow
-      g.add(loft([{ z: zf, pts: [[X, 0.04], [X + 0.1, 0.04], [X + 0.25, SILL - 0.3], [X, SILL]] }, { z: zm, pts: [[X, 0.04], [X + 0.35, 0.04], [X + 0.95, SILL - 0.32], [X, SILL]] }, { z: zt - 2, pts: [[X, 0.04], [X + 0.4, 0.04], [X + 1.05, SILL - 0.32], [X, SILL]] }, { z: zt, pts: [[X, 0.2], [X + 0.2, 0.2], [X + 0.6, SILL - 0.3], [X, SILL]] }], armor, mir));
-      // and drawn in over it to the spine: the tumblehome, starting behind the canopy
-      g.add(loft([{ z: zm - 0.3, pts: [[X, LIN], [X + 0.25, LIN + 0.08], [cw, Tp + 0.25], [cw - 0.3, Tp + 0.2], [X, Tp + 0.2]] }, { z: zm + 1.4, pts: [[X, LIN], [X + 0.7, LIN + 0.1], [0.75, Tp + 0.75], [0.6, Tp + 0.2], [X, Tp + 0.2]] }, { z: zt - 1.5, pts: [[X, LIN], [X + 0.75, LIN + 0.1], [0.75, Tp + 0.85], [0.6, Tp + 0.2], [X, Tp + 0.2]] }, { z: zt, pts: [[X, LIN], [X + 0.4, LIN + 0.1], [0.7, Tp + 0.55], [0.6, Tp + 0.2], [X, Tp + 0.2]] }], hull, mir));
-      // the cockpit's cheek, under the windscreen
-      g.add(loft([{ z: zf, pts: [[X, LIN + 0.45], [X + 0.12, LIN + 0.5], [cw, Tp + 0.05], [X, Tp + 0.2]] }, { z: zm - 0.3, pts: [[X, LIN], [X + 0.25, LIN + 0.08], [cw, Tp + 0.25], [X, Tp + 0.2]] }], hull, mir));
-      // the prow: a blade either side of the airlock, running out to the collar, low enough to see over from the helm
-      g.add(loft([{ z: d.z0 - W, pts: [[n + W, 0.04], [X + 0.1, 0.04], [X + 0.2, SILL - 0.45], [n + W, SILL - 0.3]] }, { z: zn + 1.0, pts: [[n + W, 0.1], [n + 0.75, 0.1], [n + 0.8, SILL - 0.75], [n + W, SILL - 0.5]] }, { z: zn - 0.25, pts: [[n + W, 0.3], [n + 0.4, 0.3], [n + 0.42, SILL - 0.95], [n + W, SILL - 0.8]] }], armor, mir));
-      // the airlock's own armour over that, and a tooth on the collar's shoulder
-      for (const [ty, tl] of [[0.55, 1.5], [Tp - 0.25, 1.2]]) g.add(loft([{ z: zn + 0.25, pts: [[n + W, ty - 0.22], [n + 0.6, ty], [n + W, ty + 0.22]] }, { z: zn - tl * 0.55, pts: [[n + W + 0.02, ty - 0.04], [n + 0.36, ty], [n + W + 0.02, ty + 0.04]] }], accent, mir));
-      // an engine pod on a swept pylon: a spike at its intake, a ring and a lit throat at the back
-      const px = X + 1.75, py = 1.35, pz0 = d.z1 - 3.6, pz1 = d.z1 + 1.9, hex = (r: number, cx = px, cy = py) => [0, 1, 2, 3, 4, 5].map((k) => [cx + Math.cos(k * Math.PI / 3 + Math.PI / 6) * r, cy + Math.sin(k * Math.PI / 3 + Math.PI / 6) * r * 1.05]);
-      g.add(loft([{ z: pz0 - 2.2, pts: hex(0.06, px - 0.25, py - 0.1) }, { z: pz0, pts: hex(0.62) }, { z: pz1 - 1.2, pts: hex(0.78) }, { z: pz1, pts: hex(0.66) }], armor, mir));
+      const a = s * fw, b = s * (fw + W);
+      K.box(inner, a, FC, zc + 0.3, b, SILL, zk); K.box(inner, a, HEADER, zc + 0.3, b, CC, zk); K.box(inner, a, SILL, zg1, b, HEADER, zk); // under, over and behind the side glass
+      K.box(dark, a, SILL, zc + 0.3, b, HEADER, zg0); K.box(dark, a, SILL, zg1 - 0.08, b, HEADER, zg1); // its frame
+      part(g, new T.Mesh(new T.BoxGeometry(0.03, HEADER - SILL, zg1 - zg0), glass), s * (fw + W / 2), (SILL + HEADER) / 2, (zg0 + zg1) / 2);
+    }
+    // ---- the cockpit's fittings: the helm's console under the glass (the navigation screen on it), the sensor station's screen
+    // on the wall at its right hand (js/space.ts draws the deck plan on it), the seats
+    const scr = canvasTex(256, 160, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
+    K.box(dark, -fw + 0.1, FC, zc + 0.5, fw - 0.1, SILL - 0.04, zc + 0.95);
+    const nf = part(g, new T.Mesh(new T.PlaneGeometry(0.62, 0.38), new T.MeshBasicMaterial({ map: nav.tex })), -0.42, SILL + 0.02, zc + 0.86); nf.rotation.x = -0.95;
+    const sf = part(g, new T.Mesh(new T.PlaneGeometry(0.8, 0.5), new T.MeshBasicMaterial({ map: scr.tex })), fw - 0.03, FC + 1.45, zc + 2.45); sf.rotation.y = -Math.PI / 2;
+    K.box(dark, fw - 0.06, FC + 1.15, zc + 1.95, fw, FC + 1.75, zc + 2.95);
+    for (const st of SD.seats(d)) {
+      const F = st.f, c = Math.cos(st.yaw), s = Math.sin(st.yaw), fx = -s, fz = -c; // (the way it faces)
+      const sx = st.x - fx * 0.05, sz = st.z - fz * 0.05, h = st.k === 'jump' ? 0.2 : 0.25, up = st.y - F - 0.26;
+      if (up > 0.02) K.box(dark, sx - 0.3, F, sz - 0.3, sx + 0.3, F + up, sz + 0.3);
+      K.box(seatM, sx - h, F + up + 0.4, sz - h, sx + h, F + up + 0.48, sz + h);
+      K.box(seatM, sx - fx * 0.26 - Math.abs(fz) * h - Math.abs(fx) * 0.04, F + up + 0.48, sz - fz * 0.26 - Math.abs(fx) * h - Math.abs(fz) * 0.04, sx - fx * 0.26 + Math.abs(fz) * h + Math.abs(fx) * 0.04, F + up + (st.k === 'jump' ? 1.1 : 1.3), sz - fz * 0.26 + Math.abs(fx) * h + Math.abs(fz) * 0.04);
+      if (st.k !== 'jump') K.box(dark, sx - 0.06, F + up, sz - 0.06, sx + 0.06, F + up + 0.4, sz + 0.06);
+      if (st.k === 'turret') K.box(hot, sx - 0.2, F + up + 0.75, sz - 0.42, sx + 0.2, F + up + 0.79, sz - 0.3); // (the gunner's sight: the gun's on the roof)
+    }
+    // ---- the breach deck: lit strips down the tunnel's floor to the door, a hazard line at the low wall, lights overhead
+    for (const sx of [-0.55, 0.55]) K.box(hot, sx - 0.03, FB, zc + 0.2, sx + 0.03, FB + 0.01, zt);
+    K.box(hot, -1.0, FB + 1.0, zw - 0.01, 1.0, FB + 1.03, zw + 0.26);
+    for (const sx of [-0.4, 0.4]) { K.box(strip, sx - 0.05, CB - 0.02, zc + 0.3, sx + 0.05, CB, zk - 0.3); K.box(strip, sx * 2.6 - 0.05, CM - 0.02, zr + 0.6, sx * 2.6 + 0.05, CM, z1 - 0.5); }
+    K.box(strip, -0.3, CC - 0.02, zc + 1.0, 0.3, CC, zc + 3.6);
+    // the crew deck: a lit line down each wall over the seats, her colour along the floor's edge
+    for (const s of [-1, 1]) { K.box(glow, s * (hw - 0.02), CM - 0.6, zr + 0.6, s * hw, CM - 0.56, z1 - 0.4); K.box(hot, s * (hw - 0.02), FM + 0.06, zr + 0.4, s * hw, FM + 0.09, z1 - 0.4); }
+    // ---- outside. The nose: a wedge under the cockpit's glass; the cockpit's sides and the breach deck over it, plated; the
+    // tunnel narrower, out to the collar; the crew deck aft, wider and lower, armour sloped down her flanks to a chine
+    const O = 0.03;
+    g.add(loft([{ z: zc + 0.32, pts: [[-fw - W, 0.02], [fw + W, 0.02], [fw + W, SILL], [-fw - W, SILL]] }, { z: zc - 0.45, pts: [[-fw * 0.7, 0.35], [fw * 0.7, 0.35], [fw * 0.8, SILL - 0.25], [-fw * 0.8, SILL - 0.25]] }], armor));
+    g.add(loft([{ z: zc + 0.32, pts: [[-fw - W, HEADER], [fw + W, HEADER], [fw + W, CC + 0.2], [-fw - W, CC + 0.2]] }, { z: zc - 0.05, pts: [[-fw - W + 0.1, HEADER + 0.08], [fw + W - 0.1, HEADER + 0.08], [fw + W, CC + 0.2], [-fw - W, CC + 0.2]] }], armor)); // (a brow over the glass)
+    for (const s of [-1, 1]) {
+      const mir = s < 0, x = fw + W + O;
+      K.box(hull, s * x, 0.02, zc + 0.3, s * (x + 0.04), SILL, zr); K.box(hull, s * x, HEADER, zc + 0.3, s * (x + 0.04), CC + 0.2, zr); K.box(hull, s * x, SILL, zg1, s * (x + 0.04), HEADER, zr);
+      // the breach deck's sides: the tunnel's, then the wider space behind it (its underside overhangs the cockpit)
+      K.box(hull, s * (tw + W + O), CC, zc, s * (tw + W + O + 0.04), top, zt); K.box(hull, s * (sw + W + O), CC, zt, s * (sw + W + O + 0.04), top, zk);
+      K.box(armor, s * (fw + W), CC, zt, s * (sw + W + O), CC + 0.05, zk);
+      K.box(hull, s * (fw + W + O), CC, zk, s * (fw + W + O + 0.04), top, zr);
+      // the crew deck's flank, and armour sloped out from the keel to a chine below the seats
+      K.box(hull, s * (X + O), FM - 0.2, zr, s * (X + O + 0.04), CM + 0.2, z1 + 0.1);
+      g.add(loft([{ z: zr - 0.2, pts: [[fw + W, 0.04], [fw + W + 0.2, 0.04], [X + 0.2, FM - 0.3], [X, FM]] }, { z: zr + 1.6, pts: [[X - 0.4, 0.04], [X + 0.2, 0.04], [X + 0.75, FM - 0.25], [X, FM + 0.1]] }, { z: z1 - 1.0, pts: [[X - 0.4, 0.04], [X + 0.25, 0.04], [X + 0.85, FM - 0.25], [X, FM + 0.1]] }, { z: z1 + 0.6, pts: [[X - 0.4, 0.3], [X, 0.3], [X + 0.4, FM - 0.2], [X, FM]] }], armor, mir));
+      K.box(hot, s * (X + 0.8), FM - 0.33, zr + 1.8, s * (X + 0.84), FM - 0.29, z1 - 1.2); // (a line of her colour down the chine)
+      // a fairing from the breach deck's shoulders down onto the crew deck's roof
+      g.add(loft([{ z: zk - 0.4, pts: [[sw + W, top], [sw + W, CC], [sw + W + 0.05, CC]] }, { z: zr + 2.2, pts: [[fw + W + 0.3, CM + 0.2], [X, CM + 0.2], [X, CM + 0.2]] }], hull, mir));
+      // an engine pod on a swept pylon either side aft: a spike at its intake, a ring and a lit throat at the back
+      const px = X + 1.6, py = FM + 0.2, pz0 = z1 - 3.4, pz1 = z1 + 1.7, hex = (r: number, cx = px, cy = py) => [0, 1, 2, 3, 4, 5].map((k) => [cx + Math.cos(k * Math.PI / 3 + Math.PI / 6) * r, cy + Math.sin(k * Math.PI / 3 + Math.PI / 6) * r * 1.05]);
+      g.add(loft([{ z: pz0 - 2.0, pts: hex(0.06, px - 0.25, py - 0.1) }, { z: pz0, pts: hex(0.62) }, { z: pz1 - 1.2, pts: hex(0.78) }, { z: pz1, pts: hex(0.66) }], armor, mir));
       g.add(loft([{ z: pz0 + 0.2, pts: [[X + 0.3, py - 0.12], [px, py - 0.1], [px, py + 0.1], [X + 0.3, py + 0.34]] }, { z: pz1 - 1.4, pts: [[X + 0.3, py - 0.12], [px, py - 0.1], [px, py + 0.1], [X + 0.3, py + 0.34]] }], hull, mir));
-      g.add(loft([{ z: pz0 + 1.0, pts: [[px + 0.5, py - 0.05], [px + 0.5, py + 0.06], [px + 0.7, py]] }, { z: pz1 + 0.6, pts: [[px + 0.5, py - 0.04], [px + 0.5, py + 0.05], [px + 2.1, py + 0.25]] }], armor, mir)); // a swept winglet
       const ring = part(g, new T.Mesh(new T.TorusGeometry(0.62, 0.1, 6, 6), accent), s * px, py, pz1 + 0.02); ring.rotation.z = Math.PI / 6;
       part(g, new T.Mesh(new T.CircleGeometry(0.55, 6), thrust), s * px, py, pz1 + 0.05).rotation.z = Math.PI / 6;
       part(g, new T.Mesh(new T.CircleGeometry(0.5, 6), dark), s * px, py, pz1 - 0.02).rotation.z = Math.PI / 6;
       const cone = part(g, new T.Mesh(new T.ConeGeometry(0.5, 4.2, 6, 1, true), thrust), s * px, py, pz1 + 2.15); cone.rotation.x = Math.PI / 2;
-      // a canted tail fin, a running light at its tip
-      g.add(loft([{ z: d.z1 - 2.4, pts: [[0.72, Tp + 0.5], [0.86, Tp + 0.5], [0.8, Tp + 0.56]] }, { z: zt + 0.5, pts: [[0.72, Tp + 0.4], [0.86, Tp + 0.4], [1.5, Tp + 1.7]] }], armor, mir));
-      K.box(s < 0 ? lit(0xff3030) : lit(0x30ff60), s * 1.44, Tp + 1.6, zt + 0.42, s * 1.54, Tp + 1.7, zt + 0.52);
-      K.box(hot, s * (X + 0.98), SILL - 0.36, zm + 0.2, s * (X + 1.02), SILL - 0.31, zt - 2.2); // a line of her colour down the chine
+      // a canted tail fin off the roof's edge, a running light at its tip
+      g.add(loft([{ z: z1 - 2.6, pts: [[X - 0.5, CM + 0.2], [X - 0.3, CM + 0.2], [X - 0.4, CM + 0.28]] }, { z: z1 + 0.6, pts: [[X - 0.5, CM + 0.2], [X - 0.3, CM + 0.2], [X + 0.3, CM + 1.5]] }], armor, mir));
+      K.box(s < 0 ? lit(0xff3030) : lit(0x30ff60), s * (X + 0.25), CM + 1.42, z1 + 0.5, s * (X + 0.35), CM + 1.52, z1 + 0.6);
     }
-    // the collar: an eight-sided ring round the breaching door, lit, and the plate under the door's sill
-    const col = part(g, new T.Mesh(new T.TorusGeometry(1.62, 0.13, 6, 8), accent), 0, F + SD.HEAD / 2, zn - 0.1); col.rotation.z = Math.PI / 8; col.scale.set(0.82, 1, 1);
-    const col2 = part(g, new T.Mesh(new T.TorusGeometry(1.42, 0.05, 5, 8), hot), 0, F + SD.HEAD / 2, zn - 0.2); col2.rotation.z = Math.PI / 8; col2.scale.set(0.82, 1, 1);
-    K.box(dark, -n - W, 0.02, zn - W, n + W, F, zn + 0.2);
-    // the spine and the keel
-    g.add(loft([{ z: d.z0 + 2.3, pts: [[-0.6, Tp + 0.2], [0.6, Tp + 0.2], [0.3, Tp + 0.5], [-0.3, Tp + 0.5]] }, { z: d.z1 - 1, pts: [[-0.75, Tp + 0.2], [0.75, Tp + 0.2], [0.45, Tp + 0.95], [-0.45, Tp + 0.95]] }, { z: d.z1 + 1.1, pts: [[-0.7, Tp + 0.2], [0.7, Tp + 0.2], [0.3, Tp + 0.6], [-0.3, Tp + 0.6]] }], armor));
-    part(g, new T.Mesh(new T.SphereGeometry(0.28, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), dark), 0, Tp + 0.9, d.z1 - 1.6);
-    // the cockpit: a console under each windscreen (its screen lit), a seat at each; the sensor station's screen is a picture (js/space.ts draws the deck plan on it)
-    const scr = canvasTex(256, 160, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
-    for (const s of [-1, 1]) {
-      const cx = s * w * 0.48;
-      K.box(dark, cx - 0.55, F, d.z0, cx + 0.55, F + 0.7, d.z0 + 0.36);
-      const face = part(g, new T.Mesh(new T.PlaneGeometry(0.9, 0.42), new T.MeshBasicMaterial({ map: s < 0 ? nav.tex : scr.tex })), cx, F + 0.82, d.z0 + 0.3); face.rotation.x = -0.75;
-    }
-    for (const st of SD.seats(d)) {
-      const c = Math.cos(st.yaw), s = Math.sin(st.yaw), fx = -s, fz = -c; // (the way it faces)
-      const sx = st.x - fx * 0.05, sz = st.z - fz * 0.05, h = st.k === 'jump' ? 0.2 : 0.26;
-      const up = st.y - F; if (up > 0) K.box(dark, sx - 0.3, F, sz - 0.3, sx + 0.3, F + up, sz + 0.3);
-      K.box(seatM, sx - h, F + up + 0.4, sz - h, sx + h, F + up + 0.48, sz + h);
-      K.box(seatM, sx - fx * 0.26 - Math.abs(fz) * h - Math.abs(fx) * 0.04, F + 0.48, sz - fz * 0.26 - Math.abs(fx) * h - Math.abs(fz) * 0.04, sx - fx * 0.26 + Math.abs(fz) * h + Math.abs(fx) * 0.04, F + (st.k === 'jump' ? 1.1 : 1.3), sz - fz * 0.26 + Math.abs(fx) * h + Math.abs(fz) * 0.04);
-      if (st.k !== 'jump') K.box(dark, sx - 0.06, F, sz - 0.06, sx + 0.06, F + 0.4, sz + 0.06);
-      if (st.k === 'turret') K.box(hot, st.x - 0.3 + fx * 0.3, Tp - 0.04, st.z - 0.3, st.x + 0.3 + fx * 0.3, Tp, st.z + 0.3);
-    }
+    // the roofs: the breach deck's, a spine down the crew deck's, her belly
+    K.box(armor, -tw - W - O, top, zc, tw + W + O, top + 0.06, zt); K.box(armor, -sw - W - O, top, zt, sw + W + O, top + 0.06, zk); K.box(armor, -fw - W - O, top, zk, fw + W + O, top + 0.06, zr);
+    K.box(hull, -X - O, CM + 0.2, zr, X + O, CM + 0.25, z1 + 0.1);
+    g.add(loft([{ z: zr - 0.1, pts: [[-0.8, CM + 0.25], [0.8, CM + 0.25], [0.5, top + 0.05], [-0.5, top + 0.05]] }, { z: z1 - 1, pts: [[-0.75, CM + 0.25], [0.75, CM + 0.25], [0.45, CM + 0.7], [-0.45, CM + 0.7]] }, { z: z1 + 0.6, pts: [[-0.6, CM + 0.25], [0.6, CM + 0.25], [0.3, CM + 0.45], [-0.3, CM + 0.45]] }], armor));
+    K.box(dark, -fw - W, -0.03, zc + 0.3, fw + W, 0.02, zr); K.box(dark, -X, -0.03, zr, X, 0.02, z1 + 0.1);
+    // the collar: an eight-sided ring round the breaching door, lit, the tunnel's mouth plated round inside it
+    const cy = FB + (CB - FB) / 2 + 0.08, col = part(g, new T.Mesh(new T.TorusGeometry(1.28, 0.12, 6, 8), accent), 0, cy, zc - 0.1); col.rotation.z = Math.PI / 8; col.scale.set(0.95, 0.92, 1); // (no lower than the breach deck's floor: clear of the windscreen under it)
+    const col2 = part(g, new T.Mesh(new T.TorusGeometry(1.12, 0.05, 5, 8), hot), 0, cy, zc - 0.2); col2.rotation.z = Math.PI / 8; col2.scale.set(0.95, 0.92, 1);
     K.build(g);
-    // the breaching door: two leaves that part sideways into the collar
-    const nose = [-1, 1].map((s) => { const lf = new T.Group(); const m = new T.Mesh(new T.BoxGeometry(n, SILL - F, 0.16), armor); m.position.set(s * n / 2, (F + SILL) / 2, 0); lf.add(m); const gw = new T.Mesh(new T.BoxGeometry(n, Tp - SILL, 0.05), glass); gw.position.set(s * n / 2, (SILL + Tp) / 2, 0); lf.add(gw); const tb = new T.Mesh(new T.BoxGeometry(n, 0.1, 0.16), armor); tb.position.set(s * n / 2, Tp - 0.05, 0); lf.add(tb); const st2 = new T.Mesh(new T.BoxGeometry(0.06, SD.HEAD, 0.18), hot); st2.position.set(s * 0.04, F + SD.HEAD / 2, 0); lf.add(st2); lf.position.set(0, 0, zn - W / 2); lf.userData.s = s; g.add(lf); return lf; });
-    // the ramp: hinged at the deck, it lies down behind her
-    const ramp = new T.Group(); ramp.position.set(0, F, d.z1 + W / 2); g.add(ramp);
-    const rm = new T.Mesh(new T.BoxGeometry(2 * w, SD.HEAD, 0.14), armor); rm.position.set(0, SD.HEAD / 2, 0); ramp.add(rm);
-    for (const ry of [0.5, 1.2, 1.9]) { const rs = new T.Mesh(new T.BoxGeometry(2 * w - 0.6, 0.06, 0.02), hot); rs.position.set(0, ry, -0.08); ramp.add(rs); }
-    // a turret on each hardpoint that has a gun: a ring on the spine, the gun's cradle turning on it
+    // the breaching door: two leaves that part sideways into the tunnel's walls
+    const nose = [-1, 1].map((s) => {
+      const lf = new T.Group(), hgt = CB - FB;
+      const m = new T.Mesh(new T.BoxGeometry(tw, hgt, 0.16), armor); m.position.set(s * tw / 2, FB + hgt / 2, 0); lf.add(m);
+      const st2 = new T.Mesh(new T.BoxGeometry(0.06, hgt, 0.18), hot); st2.position.set(s * 0.04, FB + hgt / 2, 0); lf.add(st2);
+      lf.position.set(0, 0, zc - W / 2); lf.userData.s = s; g.add(lf); return lf;
+    });
+    // the ramp: hinged at the crew deck's floor, it comes down to the ground behind her (open: as far as that takes)
+    const ramp = new T.Group(); ramp.position.set(0, FM, z1 + W / 2); g.add(ramp);
+    const rh = CM - FM, rm = new T.Mesh(new T.BoxGeometry(2 * hw, rh, 0.14), armor); rm.position.set(0, rh / 2, 0); ramp.add(rm);
+    for (const ry of [0.5, 1.2, 1.9]) { const rs = new T.Mesh(new T.BoxGeometry(2 * hw - 0.6, 0.06, 0.02), hot); rs.position.set(0, ry, -0.08); ramp.add(rs); }
+    ramp.userData.open = Math.acos(-FM / rh);
+    // the hardpoints: one on each of her roof's shoulders, aft (port first); a turret on each that has a gun, laid from the cockpit
     const fit = fleet.fit[d.id] || [], turrets: SmShip['turrets'] = [];
     for (let i = 0; i < d.turrets; i++) {
       const base = new T.Group(), gun = new T.Group(), muzzle = new T.Object3D(), e = fit[i] ? SD.EQUIP[fit[i]!] : null;
-      base.position.set(0, Tp + 0.7, d.z0 + 3.6 + i * 2.6);
+      base.position.set((i ? 1 : -1) * (hw - 0.7), CM + 0.25, zr + 1.6);
       part(base, new T.Mesh(new T.CylinderGeometry(0.36, 0.46, 0.2, 8), armor), 0, 0.1, 0);
       if (e) {
         part(gun, new T.Mesh(new T.BoxGeometry(0.44, 0.3, 0.7), hull), 0, 0.17, 0);
@@ -151,8 +159,8 @@ const G_ShipModel = (() => {
       }
       g.add(base); turrets.push({ base, gun, muzzle });
     }
-    // her own light: the same wherever she is
-    const lights = [d.z0 + 1.2, (d.z0 + d.z1) / 2 + 1, d.z1 - 1.2].map((z, i) => { const l = new T.PointLight(i ? 0xdfeaff : 0xbfe0ff, i ? 4.5 : 3, 7, 1.6); l.position.set(0, Tp - 0.35, z); g.add(l); return l; });
+    // her own light, the same wherever she is: the cockpit, the breach deck, the crew deck
+    const lights = [[CC - 0.3, zc + 2.2, 3, 0xbfe0ff], [CB - 0.3, zw, 3.5, 0xdfeaff], [CM - 0.35, (zr + z1) / 2, 4.5, 0xdfeaff]].map(([y, z, k, c]) => { const l = new T.PointLight(c, k, 7, 1.6); l.position.set(0, y, z); g.add(l); return l; });
     return { group: g, nose, ramp, turrets, thrust, glow, screen: scr, nav, lights };
   }
 
