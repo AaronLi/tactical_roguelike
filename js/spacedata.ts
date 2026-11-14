@@ -31,7 +31,7 @@ const G_SpaceData = (() => {
   const SHIPS: Record<string, SpShipDef> = {
     kestrel: { id: 'kestrel', name: 'Kestrel', cls: 'Breaching cutter', blurb: 'What the squad starts with: small, quick to turn, one dorsal hardpoint and one equipment bay.', price: 0, hw: 1.7, z0: -5, z1: 5, nose: 3, hull: 100, speed: 140, cruise: 1100, turn: 1.25, turrets: 1, utils: 1, jump: 4 },
     atlas: { id: 'atlas', name: 'Atlas', cls: 'Assault lander', blurb: 'A longer, wider deck with two hardpoints and two equipment bays, and armour to take a point-defence gun on the way in. Slower to turn.', price: 9000, hw: 2.3, z0: -6, z1: 7, nose: 3, hull: 180, speed: 120, cruise: 1000, turn: 0.9, turrets: 2, utils: 2, jump: 6 },
-    wraith: { id: 'wraith', name: 'Wraith', cls: 'Interceptor', blurb: 'Light and very fast, with a long-legged cruise drive. One hardpoint, two equipment bays, thin plating.', price: 14000, hw: 1.5, z0: -5, z1: 4, nose: 3, hull: 70, speed: 190, cruise: 1700, turn: 1.6, turrets: 1, utils: 2, jump: 4 },
+    wraith: { id: 'wraith', name: 'Wraith', cls: 'Interceptor', blurb: 'Light and very fast, with a long-legged warp drive. One hardpoint, two equipment bays, thin plating.', price: 14000, hw: 1.5, z0: -5, z1: 4, nose: 3, hull: 70, speed: 190, cruise: 1700, turn: 1.6, turrets: 1, utils: 2, jump: 4 },
   };
   // What goes on a hardpoint (a turret a teammate mans from its seat) or in an equipment bay.
   const EQUIP: Record<string, SpEquip> = {
@@ -39,7 +39,7 @@ const G_SpaceData = (() => {
     rail: { id: 'rail', name: 'Lancet railgun', slot: 'turret', price: 4200, blurb: 'One heavy slug every second and a half, out to four kilometres: what takes a turret off a hull.', dmg: 60, rof: 1.5, range: 4000 },
     sensors: { id: 'sensors', name: 'Deck scanner', slot: 'util', price: 0, blurb: 'The sensor station reads a ship\'s deck plan through its hull: rooms, doors, and who is in them once you are close.' },
     plating: { id: 'plating', name: 'Ablative plating', slot: 'util', price: 2600, blurb: 'Half as much hull again.' },
-    drive: { id: 'drive', name: 'Tuned cruise drive', slot: 'util', price: 3400, blurb: 'Cruise a third faster.' },
+    drive: { id: 'drive', name: 'Tuned warp drive', slot: 'util', price: 3400, blurb: 'The warp drive spins up sooner and runs a third faster.' },
     jammer: { id: 'jammer', name: 'Comms jammer', slot: 'util', price: 3800, blurb: 'A crew that sees you can\'t raise the rest of the ship: nobody is called to the breach.' },
   };
   const fleet0 = (): SpFleet => ({ owned: ['kestrel'], ship: 'kestrel', fit: { kestrel: ['pd', 'sensors'] } });

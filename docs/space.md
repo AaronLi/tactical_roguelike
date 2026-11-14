@@ -22,7 +22,12 @@ off: the game is then the route map and the helicopter, as it was. A debug start
 3. **Lift off.** At the helm, hold G. Nobody on their feet may be left outside. Flight is first person, from the seat,
    through the glazed airlock and the windscreens:
    - the mouse turns her (right button held: look about instead), W S thrust, A D sideways, Space C up and down, Q E roll,
-     Shift with W the cruise drive (not within 420 m of anything big), X brake, T the next waypoint;
+     X brake, T the next waypoint;
+   - the warp drive (`js/space.ts` warpStep): with a target picked (T) and her nose on it (within 3 degrees; inside 10 the
+     drive eases her the rest of the way on), it spins up by itself (3.5 s, 2.5 s with the tuned drive) and holds while she's
+     kept on it; turning off it spins it down. Spun up, T warps her: flung at the target at up to ten times her old cruise
+     speed (11 km/s for the Kestrel) and brought down again to come out 300 m off its hull, going as it goes (a passing ship
+     then has its course matched and is the level: zoneClose). Not in atmosphere, nor for a target within 800 m or so;
    - a ring where her nose points and a green ring where she's actually going; every waypoint marked on the view with its
      distance (m, km, Mm, light-seconds: `G.SpaceData.dist`); the navigation screen on the helm's console and on the glass.
 4. **The anchor.** Each mission taken has an interspatial anchor 7 to 13 km out. In the ring, under 80 m/s, hold J: the
@@ -112,7 +117,7 @@ Nothing is paid for a kill, an arrest or evidence on a mission (`G.Server.pay`);
 
 Kestrel (the starter), Atlas (¢9,000: two hardpoints, two bays, more hull), Wraith (¢14,000: fast, thin). Hardpoints take
 the PD-20 autocannon or the Lancet railgun; bays take the deck scanner (the sensor station reads a ship's deck plan inside
-3 km, and who's aboard inside 900 m), ablative plating, a tuned cruise drive, a comms jammer (the breach is heard 14 m off,
+3 km, and who's aboard inside 900 m), ablative plating, a tuned warp drive, a comms jammer (the breach is heard 14 m off,
 not 45). The host's fleet is kept in its browser (`fleet`).
 
 ## Checking it
@@ -228,7 +233,7 @@ from outside one.
 
 The squad's own ship (`shipVoice`) is made of parts that follow how she's flying, which `G.Space.sound` reports each frame:
 her cabin (air, and the 400 Hz of her panels), her reactor (a low beating note), her drive (a rumble and a roar that open up
-with her speed, harder while she's gaining or losing way), the cruise drive (a note under the floor and a thin singing over
+with her speed, harder while she's gaining or losing way), the warp drive (spinning up and at warp: a note under the floor and a thin singing over
 it), her thrusters (a hiss while she's turned), and the jump (a note that climbs while it spools, a hollow pulsing roar in
 transit). One-shots mark the breach, dropping out of a jump, and her clamps. Aboard her you hear all of it; from the hangar
 floor or the deck of a ship she's against, less with distance and dulled.

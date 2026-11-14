@@ -82,7 +82,7 @@ const G_SpaceUI = (() => {
     if (showTop) {
       const f = s.ftl;
       top.innerHTML = f ? (f.st === 'tunnel' ? `<b>IN TRANSIT</b> · dropping out in ${Math.max(0, f.T - f.t).toFixed(0)} s` : `<b>JUMP DRIVE</b> · ${f.st === 'spool' ? 'spooling ' + Math.round(Math.min(1, f.t / f.T) * 100) + '%' : 'engaged'}`)
-        : `<b>${s.cruise ? 'CRUISE' : s.kind === 'assault' && s.stage === 'atmo' ? 'IN ATMOSPHERE' : 'UNDER WAY'}</b>` + (wp ? ` · ${G.U.esc(wp.name)} <b>${SD.dist(dist)}</b>${close > 2 ? ' · ETA ' + SD.eta(dist / close) : ''}` : '') + (s.hp < s.hpMax * 0.5 ? ` · <span class="warn">HULL ${Math.round(s.hp / s.hpMax * 100)}%</span>` : '');
+        : `<b>${s.warp ? 'WARP' : s.spin >= 1 ? 'WARP READY' : s.spin > 0 ? 'SPINNING UP ' + Math.round(s.spin * 100) + '%' : s.kind === 'assault' && s.stage === 'atmo' ? 'IN ATMOSPHERE' : 'UNDER WAY'}</b>` + (wp ? ` · ${G.U.esc(wp.name)} <b>${SD.dist(dist)}</b>${close > 2 ? ' · ETA ' + SD.eta(dist / close) : ''}` : '') + (s.hp < s.hpMax * 0.5 ? ` · <span class="warn">HULL ${Math.round(s.hp / s.hpMax * 100)}%</span>` : '');
     }
     // the helm's own instruments
     const atHelm = !!seat && seat.k === 'helm';
@@ -164,7 +164,7 @@ const G_SpaceUI = (() => {
     const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(s.P.clone().sub(wp.p).normalize()) : 0;
     c.fillStyle = '#8fd6ff'; c.fillText('NAV', 196, 16); c.fillStyle = '#ffd24a'; c.fillText(wp ? wp.name.slice(0, 20) : 'no target', 196, 38);
     c.fillStyle = '#d7e6f2'; c.fillText('range  ' + (wp ? SD.dist(dist) : '—'), 196, 60); c.fillText('speed  ' + SD.speed(speed), 196, 78); c.fillText('closing  ' + SD.speed(Math.max(0, close)), 196, 96); c.fillText('ETA  ' + (wp && close > 2 ? SD.eta(dist / close) : '--:--'), 196, 114);
-    c.fillStyle = s.cruise ? '#8fd6ff' : '#7f97a8'; c.fillText(s.cruise ? 'CRUISE DRIVE' : G.Space.clearOf() > 420 ? 'cruise available' : 'too close to cruise', 196, 138);
+    c.fillStyle = s.warp || s.spin >= 1 ? '#8fd6ff' : '#7f97a8'; c.fillText(s.warp ? 'AT WARP' : s.spin >= 1 ? 'WARP READY: T' : s.spin > 0 ? 'WARP SPIN-UP ' + Math.round(s.spin * 100) + '%' : G.Space.warpGate() ? 'face the target to warp' : 'no warp target', 196, 138);
     const na = G.Space.nearAnchor(); if (na) { c.fillStyle = '#7dff9a'; c.fillText('IN THE ANCHOR: jump ready', 196, 160); }
     c.fillStyle = s.hp < s.hpMax * 0.35 ? '#ff5a40' : '#7f97a8'; c.fillText('hull  ' + Math.round(s.hp / s.hpMax * 100) + '%', 196, 182);
   }
@@ -278,7 +278,7 @@ const G_SpaceUI = (() => {
         const own = F.owned.includes(sh.id), use = F.ship === sh.id;
         return `<div class="card${use ? ' on' : ''}"><div class="row"><h3>${esc(sh.name)}</h3><span class="pay">${own ? (use ? 'ON THE PAD' : 'OWNED') : '¢' + G.U.fmt(sh.price)}</span></div>
           <div><span class="tag">${esc(sh.cls.toUpperCase())}</span><span class="tag">${sh.turrets} HARDPOINT${sh.turrets > 1 ? 'S' : ''}</span><span class="tag">${sh.utils} BAY${sh.utils > 1 ? 'S' : ''}</span></div>
-          <small>hull ${sh.hull} · ${sh.speed} m/s · cruise ${(sh.cruise / 1000).toFixed(1)} km/s · ${2 + sh.turrets + sh.jump} seats</small><p>${esc(sh.blurb)}</p>
+          <small>hull ${sh.hull} · ${sh.speed} m/s · warp ${(sh.cruise * 10 / 1000).toFixed(0)} km/s · ${2 + sh.turrets + sh.jump} seats</small><p>${esc(sh.blurb)}</p>
           <div class="row"><span></span>${use ? '' : own ? `<button class="b" data-use="${sh.id}"${s.docked ? '' : ' disabled'}>BRING HER OUT</button>` : `<button class="b" data-buy="${sh.id}"${cr >= sh.price ? '' : ' disabled'}>BUY</button>`}</div></div>`;
       }).join('') + '</div><h2 style="margin:16px 0 8px;font-size:14px">' + esc(d.name.toUpperCase()) + ': HARDPOINTS AND BAYS</h2><div class="grid">';
       for (let i = 0; i < d.turrets + d.utils; i++) {

@@ -31,6 +31,9 @@ const G_Space = (() => {
     auto: null as null | { t: number; T: number; P0: THREE.Vector3; Q0: THREE.Quaternion; P1: THREE.Vector3; Q1: THREE.Quaternion; mid: THREE.Vector3 | null; then: () => void },
     hidden: null as Map<THREE.Object3D, boolean> | null, net: null as null | { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3 }, sendT: 0, hold: 0, holdK: '', keep: null as null | { x: number; y: number; z: number; yaw: number },
     things: [] as { k: string; n?: number; x: number; z: number; y?: number; obj: THREE.Object3D }[], cardObjs: [] as THREE.Object3D[], term: null as null | { x: number; z: number }, t: 0, shake: 0, cruise: false,
+    // the warp drive (warpStep): spin, how far it's spun up (0..1) on the target she's facing; warp, the run itself; tv, the
+    // target's own velocity (tgtTrack), which she's left matching at the end of it
+    spin: 0, warp: null as null | { j: number; u: number; t: number; top: number }, tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1,
     boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], fireT: 0,
   };
   const me = () => G.Me, on = () => S.on;
@@ -63,7 +66,7 @@ const G_Space = (() => {
     if (S.sun && S.sun.target.parent) S.sun.target.parent.remove(S.sun.target);
     G.R.levelRoot.position.set(0, 0, 0); G.R.levelRoot.quaternion.identity(); G.R.levelRoot.visible = true;
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
-    S.on = false; S.map = null; S.ftl = null; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.mis = [];
+    S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.mis = [];
     if (me().seat != null) me().seat = null;
     G.SpaceUI.show(false);
   }
@@ -95,7 +98,7 @@ const G_Space = (() => {
     S.wps = []; S.anchors = []; S.boxes = []; S.floorAt = null; S.hull = null; S.planet = null; S.things = []; S.cardObjs = []; S.term = null;
     const docked = !sp || !sp.ship || !!sp.ship.docked;
     S.docked = docked; S.noseT = 0; S.rampT = docked && kind !== 'board' ? 1 : 0;
-    S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.net = null; S.cruise = false;
+    S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.net = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1;
     S.zone = new T.Group(); S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = performance.now();
     if (kind === 'hub') setupHub(map, sp); else if (kind === 'board') setupBoard(map); else setupAssault(map);
     if (docked) { S.P.copy(S.Dp); S.Q.copy(S.Dq); }
@@ -314,8 +317,9 @@ const G_Space = (() => {
       S.wps.push(wp); S.traffic.push({ obj: t.group, c, wp, ph: (c.seed % 30) / 10 });
     }
     zoneStep(); for (let k = 0; k < S.traffic.length; k++) zoneReal(true);
-    S.wps.push({ id: 'ship', name: ((S.ms && S.ms.name) || 'THE SHIP').toUpperCase(), sub: 'Ram her hull nose-on to board: anywhere along it', p: new T.Vector3(S.zC.x, 2, S.zC.z), kind: 'base' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
+    S.wps.push({ id: 'ship', name: (((S.zdef[S.zact] && S.zdef[S.zact].name) || (S.ms && S.ms.name)) || 'THE SHIP').toUpperCase(), sub: 'Ram her hull nose-on to board: anywhere along it', p: new T.Vector3(S.zC.x, 2, S.zC.z), kind: 'base' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
     S.tgt = 0;
+    if (zi && zi.near) S.tgt = S.wps.findIndex((w) => w.id === 'ship'); // (come up with her: she's still the target)
     if (zi && zi.near) { // (come up with her: no jump. The squad's ship is where she was by her, heading as she was)
       const c = S.carry && S.carry.k === zi.act ? S.carry : null;
       if (c) { const rot = yawQ((sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0)) - c.yaw); S.P.copy(c.v).applyQuaternion(rot).add(S.zC); S.Q.copy(rot).multiply(c.Q); S.V.copy(c.V).applyQuaternion(rot); }
@@ -437,7 +441,7 @@ const G_Space = (() => {
   // light's being worked out on another thread meanwhile (js/prep.ts). js/game.ts enterLevel takes the lot (takeMap) and has
   // only to put it in the scene. Whatever isn't done by then is finished in that frame, as it all used to be.
   function zonePrep() { // (from the game's loop, once the frame's drawn: the scene lit as it's drawn, which is what the shaders are found for)
-    if (!S.on || S.kind !== 'board' || !S.zone || !S.zinfo || S.docked || S.ftl || zoneHullsOf !== S.zinfo.ms.seed) return;
+    if (!S.on || S.kind !== 'board' || !S.zone || !S.zinfo || S.docked || S.ftl || S.warp || zoneHullsOf !== S.zinfo.ms.seed) return;
     let best: typeof S.traffic[0] | null = null, bd = 2000; const far = new Set<ZHull>();
     for (const q of S.traffic) {
       if (!q.real || !q.wp || q.c.k == null) continue;
@@ -463,7 +467,7 @@ const G_Space = (() => {
   // The squad's ship has come up with one of the zone's others (within 800 m, and nearer her than the one that's the level): the host is asked to make her the
   // level (js/spaceserver.ts 'tboard'). Whoever's flying asks.
   function zoneClose(dt: number) {
-    if (S.kind !== 'board' || S.docked || S.ftl || (S.state && S.state.boom)) { S.tclose = null; return; }
+    if (S.kind !== 'board' || S.docked || S.ftl || S.warp || (S.state && S.state.boom)) { S.tclose = null; return; }
     let best: typeof S.traffic[0] | null = null, bd = Math.min(800, S.P.distanceTo(S.zC)); // (within 800 m, and nearer than the ship that's the level now)
     for (const q of S.traffic) { if (!q.wp || q.c.k == null) continue; const d = S.P.distanceTo(q.wp.p); if (d < bd) { bd = d; best = q; } }
     if (!best) { S.tclose = null; return; }
@@ -615,26 +619,27 @@ const G_Space = (() => {
     } else if (helm) S.lookP = me().pitch;
     S.stick.multiplyScalar(Math.exp(-dt * 2.2));
     if (S.auto) { autoStep(dt); return; }
-    if (S.docked || S.ftl) { S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); return; }
+    if (S.docked || S.ftl) { S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.spin = 0; S.warp = null; return; }
+    if (S.warp) { warpStep(dt); return; }
+    S.cruise = false;
     const want = new T.Vector3(), wv = new T.Vector3();
     let acc = 26;
     if (helm) {
-      const far = clearOf() > 420;
-      S.cruise = K('ShiftLeft') && K('KeyW') && far && S.stage !== 'atmo';
-      const sp = S.cruise ? d.cruise * (SD.fitted(S.fleet, 'drive') ? 1.33 : 1) : S.stage === 'atmo' ? Math.min(d.speed, 110) : d.speed;
+      const sp = S.stage === 'atmo' ? Math.min(d.speed, 110) : d.speed;
       want.set((K('KeyD') ? 1 : 0) - (K('KeyA') ? 1 : 0), (K('Space') ? 1 : 0) - (K('KeyC') ? 1 : 0), (K('KeyS') ? 1 : 0) - (K('KeyW') ? 1 : 0));
       want.x *= d.speed * 0.4; want.y *= d.speed * 0.4; want.z *= want.z < 0 ? sp : d.speed * 0.4;
       if (K('KeyX')) want.set(0, 0, 0);
-      acc = S.cruise ? 260 : K('KeyX') ? 60 : 30;
+      acc = K('KeyX') ? 60 : 30;
       wv.set(S.stick.y * d.turn, S.stick.x * d.turn, ((K('KeyQ') ? 1 : 0) - (K('KeyE') ? 1 : 0)) * 1.3);
-    } else S.cruise = false;
+    }
+    spinUp(dt, helm);
     S.Wv.lerp(wv, Math.min(1, dt * 5));
     const dq = new T.Quaternion().setFromEuler(new T.Euler(S.Wv.x * dt, S.Wv.y * dt, S.Wv.z * dt, 'YXZ'));
     S.Q.multiply(dq).normalize();
     // in air she rights herself (no rolling over above a base)
     if (S.stage === 'atmo' && S.kind === 'assault') { const up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), fix = new T.Quaternion().setFromUnitVectors(up, new T.Vector3(up.x * 0.5, Math.max(0.6, up.y), up.z * 0.5).normalize()); S.Q.premultiply(new T.Quaternion().slerp(fix, Math.min(1, dt * 1.5))).normalize(); }
     want.applyQuaternion(S.Q);
-    const dv = want.sub(S.V), l = dv.length(), step = acc * dt * (S.V.length() > d.speed * 1.2 && !S.cruise ? 6 : 1);
+    const dv = want.sub(S.V), l = dv.length(), step = acc * dt * (S.V.length() > d.speed * 1.2 ? 6 : 1);
     if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, step / l));
     S.P.addScaledVector(S.V, dt);
     collide(dt);
@@ -647,6 +652,70 @@ const G_Space = (() => {
     else if (S.kind === 'board') dmin = S.P.distanceTo(S.Dp);
     else if (S.stage === 'atmo') dmin = 0; else dmin = S.P.y + 4000;
     return dmin;
+  }
+  // ---- The warp drive. T picks what to warp to (the target); with her nose on it (within a few degrees, and it far enough off to
+  // be worth it) the drive spins up by itself, and holds while she's kept on it (she's eased the last of the way on: warpAim).
+  // Spun up, T launches her: she's flung at it, faster and faster, and brought down again to come out 300 m short of its hull,
+  // going as it goes (tv). Turning off it spins the drive down; picking another target starts it again.
+  const WARP_OUT = 300, WARP_ACC = 2500;
+  /** the target's own velocity, from where it was last frame (the zone's ships go by under way) */
+  function tgtTrack(dt: number) {
+    const w = S.wps[S.tgt];
+    if (!w || w.hide || dt <= 0) { S.tvJ = -1; S.tv.set(0, 0, 0); return; }
+    if (S.tvJ === S.tgt) { const v = w.p.clone().sub(S.tvP).divideScalar(dt); if (v.length() < 600) S.tv.lerp(v, Math.min(1, dt * 6)); } // (more than that: it was put somewhere else, not moved)
+    else S.tv.set(0, 0, 0);
+    S.tvP.copy(w.p); S.tvJ = S.tgt;
+  }
+  /** how far out from a target's middle its hull reaches */
+  function tgtR(w: SpWp) {
+    const q = S.traffic.find((x) => x.wp === w);
+    if (q) { const o = q.obj as THREE.Object3D & { _r?: number }; if (o._r == null) { const b = new T.Box3().setFromObject(o); o._r = b.isEmpty() ? 60 : b.getSize(new T.Vector3()).length() / 2; } return o._r; }
+    if (w.id === 'ship' && S.map && S.map.sp) { const h = S.map.sp.hull; return Math.hypot(h.x1 - h.x0, h.z1 - h.z0) / 2; }
+    return 0;
+  }
+  /** the target, if she can warp to it from here: where it is, how far, how square she's on it */
+  function warpGate() {
+    if (S.docked || S.auto || S.ftl || (S.kind === 'assault' && S.stage === 'atmo')) return null;
+    const w = S.wps[S.tgt]; if (!w || w.hide) return null;
+    const rel = w.p.clone().sub(S.P), d = rel.length(), stop = WARP_OUT + tgtR(w);
+    if (d < stop + 500) return null;
+    const dir = rel.divideScalar(d);
+    return { w, d, dir, stop, face: fwd(S.Q).dot(dir) };
+  }
+  const COS3 = Math.cos(3 * Math.PI / 180), COS10 = Math.cos(10 * Math.PI / 180);
+  function spinUp(dt: number, helm: boolean) {
+    const g = helm ? warpGate() : null;
+    if (!g) { S.spin = Math.max(0, S.spin - dt * 2); return; }
+    if (g.face > COS10 && S.stick.length() < 0.25) warpAim(g.dir, dt * 1.2); // (near enough on: the drive draws her the rest of the way)
+    const T0 = SD.fitted(S.fleet, 'drive') ? 2.5 : 3.5;
+    if (g.face > COS3) S.spin = Math.min(1, S.spin + dt / T0);
+    else if (g.face < COS10) S.spin = Math.max(0, S.spin - dt);
+  }
+  function warpAim(dir: THREE.Vector3, k: number) {
+    const turn = new T.Quaternion().setFromUnitVectors(fwd(S.Q), dir);
+    S.Q.premultiply(new T.Quaternion().slerp(turn, Math.min(1, k))).normalize();
+  }
+  function warpGo() {
+    const g = warpGate(); if (!g || S.spin < 1) return false;
+    const top = S.def.cruise * 10 * (SD.fitted(S.fleet, 'drive') ? 1.33 : 1);
+    S.warp = { j: S.tgt, u: Math.max(0, S.V.clone().sub(S.tv).dot(g.dir)), t: 0, top };
+    S.shake = Math.max(S.shake, 0.5); G.Audio.kick(1.2);
+    G.HUD.toast('WARP', g.w.name, 1.6);
+    return true;
+  }
+  function warpStep(dt: number) {
+    const W = S.warp!, w = S.wps[W.j];
+    const end = () => { S.warp = null; S.spin = 0; S.cruise = false; S.V.copy(S.tv); S.Wv.set(0, 0, 0); S.shake = Math.max(S.shake, 0.35); sendPose(true); };
+    if (!w || w.hide || W.j !== S.tgt) { end(); return; }
+    W.t += dt; S.cruise = true; S.Wv.set(0, 0, 0); S.stick.set(0, 0);
+    const rel = w.p.clone().sub(S.P), d = rel.length(), dir = rel.divideScalar(Math.max(1e-3, d)), left = d - (WARP_OUT + tgtR(w));
+    // (as fast as it'll go, till it's time to come down again: v^2 = 2as from where she's to stop)
+    if (left <= W.u * W.u / (2 * WARP_ACC) + W.u * dt) W.u = Math.max(30, W.u - WARP_ACC * dt); else W.u = Math.min(W.top, W.u + WARP_ACC * dt);
+    const go = Math.min(W.u * dt, Math.max(0, left));
+    S.P.addScaledVector(S.tv, dt).addScaledVector(dir, go);
+    S.V.copy(S.tv).addScaledVector(dir, W.u);
+    warpAim(dir, dt * 6);
+    if (left - go < 2) end();
   }
   function collide(dt: number) {
     const R = 5.5, P = S.P; let hit = 0, ground = 0; // (hit: how hard she's struck anything, for the shake; ground: the ground, which is what hurts her)
@@ -730,7 +799,13 @@ const G_Space = (() => {
   // ------------------------------------------------------------------ the jump
   function nearAnchor() { let best: typeof S.anchors[0] | null = null, bd = 420; for (const a of S.anchors) { if (!a.obj.visible) continue; const d = S.P.distanceTo(a.p); if (d < bd && !(S.kind === 'hub' && S.board.done.includes(a.i))) { bd = d; best = a; } } return best; }
   function ftlStep(dt: number) {
-    const f = S.ftl; if (!f) { if (S.tunnel) S.tunnel.visible = false; return; }
+    const f = S.ftl;
+    if (!f) {
+      if (!S.tunnel) return;
+      const on = !!S.warp && S.warp.u > 400; S.tunnel.visible = on;
+      if (on) { (S.tunnel.userData.mat as THREE.MeshBasicMaterial).opacity = Math.min(0.4, S.warp!.u / 8000); (S.tunnel.userData.tex as THREE.Texture).offset.y -= dt * 3; }
+      return;
+    }
     f.t += dt;
     const tn = S.tunnel!, tex = tn.userData.tex as THREE.Texture, mat = tn.userData.mat as THREE.MeshBasicMaterial;
     tn.visible = true;
@@ -773,6 +848,7 @@ const G_Space = (() => {
     if (!S.on || !S.model || G.Game.map !== S.map) return;
     S.t += dt;
     zoneStep();
+    tgtTrack(dt);
     const m = me();
     if (isCtl() || (!S.ctl && Object.keys(G.Game.roster || {}).length < 2)) { fly(dt); if (!S.docked) sendPose(); zoneClose(dt); } else { if (S.auto) S.auto = null; follow(dt); S.stick.multiplyScalar(Math.exp(-dt * 2.2)); }
     ftlStep(dt);
@@ -921,6 +997,7 @@ const G_Space = (() => {
         if (!ctl) lines.push('Taking the helm...');
         else if (S.ftl) lines.push(S.ftl.st === 'tunnel' ? 'In transit' : 'Jump drive spooling');
         else if (S.auto) lines.push('Hold on');
+        else if (S.warp) lines.push('At warp: ' + G.U.esc((S.wps[S.warp.j] || { name: '?' }).name));
         else if (S.docked) {
           const p = holdFor('G', K('KeyG'), dt, 0.8, launch);
           if (p >= 0) { out.prog = p; out.label = S.kind === 'board' ? 'Undocking' : 'Lifting off'; }
@@ -936,10 +1013,12 @@ const G_Space = (() => {
             const dd = S.P.distanceTo(S.Dp);
             if (dd < 160 && S.V.length() < 45) { const p = holdFor('L', K('KeyL'), dt, 0.8, land); if (p >= 0) { out.prog = p; out.label = 'Setting down'; } lines.push(hint('Hold L', 'to set down on the pad')); }
           }
+          const g = warpGate();
+          if (g) lines.push(S.spin >= 1 ? hint('T', 'to warp to ' + G.U.esc(g.w.name)) : S.spin > 0 ? `Warp drive spinning up · ${Math.round(S.spin * 100)}% <small>(keep her on ${G.U.esc(g.w.name)})</small>` : `<small>Turn her nose onto ${G.U.esc(g.w.name)} to spin up the warp drive</small>`);
           if (S.tclose) lines.push(`Matching course with ${G.U.esc(S.tclose.name)}…`);
           if (S.kind === 'board' && !(S.state && S.state.boom)) { const a = aim(120); if (a) lines.push(a.close < 4 ? 'Ram the hull: nose on, 5 m/s or more' : 'Hold her square to the hull'); }
         }
-        if (ctl && !S.docked && !S.ftl && S.t - S.helpAt < 20) lines.push('<small><b>W S A D</b> thrust · <b>Space C</b> up down · <b>Q E</b> roll · <b>Shift</b> cruise · <b>X</b> brake · <b>T</b> target · <b>right mouse</b> look about</small>');
+        if (ctl && !S.docked && !S.ftl && S.t - S.helpAt < 20) lines.push('<small><b>W S A D</b> thrust · <b>Space C</b> up down · <b>Q E</b> roll · <b>X</b> brake · <b>T</b> target, then face it to spin up the warp drive and <b>T</b> to warp · <b>right mouse</b> look about</small>');
       } else if (seat.k === 'turret') {
         const e = SD.EQUIP[(S.fleet.fit[S.def.id] || [])[seat.n || 0] || ''];
         lines.push(e ? `${G.U.esc(e.name)} <small>· the mouse lays it, the trigger fires</small>` : 'Nothing is fitted to this hardpoint');
@@ -989,7 +1068,7 @@ const G_Space = (() => {
   function key(code: string) {
     const seat = mySeat(); if (!seat) return false;
     if (seat.k === 'helm') {
-      if (code === 'KeyT') { for (let k = 1; k <= S.wps.length; k++) { const j = (S.tgt + k) % S.wps.length; if (!S.wps[j].hide) { S.tgt = j; break; } } return true; }
+      if (code === 'KeyT') { if (S.warp) return true; if (isCtl() && warpGo()) return true; S.spin = 0; for (let k = 1; k <= S.wps.length; k++) { const j = (S.tgt + k) % S.wps.length; if (!S.wps[j].hide) { S.tgt = j; break; } } return true; }
     }
     return ['KeyC', 'KeyV', 'KeyX', 'KeyT', 'KeyG', 'KeyQ', 'KeyE', 'KeyR', 'KeyB', 'KeyZ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyH', 'KeyN', 'KeyY'].includes(code);
   }
@@ -1086,11 +1165,11 @@ const G_Space = (() => {
     }
     snd.v.copy(S.V); snd.docked = S.docked; snd.ftl = ftl; snd.has = true;
     const flying = !S.docked || !!S.auto;
-    return { k, muf: ab ? 0 : 0.45 + 0.3 * G.U.clamp(d / 30, 0, 1), thr: flying ? Math.min(1.3, sp / S.def.speed) : 0, cruise: S.cruise ? 1 : 0, burn: flying ? G.U.clamp(acc / 45, 0, 1) : 0,
+    return { k, muf: ab ? 0 : 0.45 + 0.3 * G.U.clamp(d / 30, 0, 1), thr: flying ? Math.min(1.3, sp / S.def.speed) : 0, cruise: S.cruise || sp > S.def.speed * 2 ? 1 : S.spin * 0.5, burn: flying ? G.U.clamp(acc / 45, 0, 1) : 0,
       turn: flying ? G.U.clamp(S.Wv.length() / Math.max(0.3, S.def.turn) + S.stick.length() * 0.6, 0, 1) : 0, ftl, ftlK: S.ftl && ftl === 1 ? G.U.clamp(S.ftl.t / Math.max(0.1, S.ftl.T), 0, 1) : 0, ev };
   }
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
-  return { sound, dbgPrep, prep: zonePrep, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { sound, dbgPrep, prep: zonePrep, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }
