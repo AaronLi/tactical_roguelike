@@ -328,8 +328,8 @@ const G_Ballistics = (() => {
   // helmet you see meets the helmet. A high cut over the brows and up over the ears; a mid cut lower all round, over them; a
   // full cut (the visor helmet's) down over them and the nape
   const BRIM: Record<string, number[]> = {
-    high: [0.134, 0.13, 0.13, 0.126, 0.122, 0.126, 0.13, 0.142, 0.15, 0.15, 0.142, 0.122, 0.102, 0.088, 0.082, 0.078, 0.078],
-    mid: [0.122, 0.118, 0.118, 0.118, 0.11, 0.106, 0.106, 0.106, 0.11, 0.106, 0.098, 0.086, 0.076, 0.07, 0.066, 0.064, 0.062],
+    high: [0.143, 0.142, 0.139, 0.136, 0.132, 0.127, 0.113, 0.145, 0.142, 0.129, 0.113, 0.11, 0.098, 0.091, 0.087, 0.087, 0.087], // (the body's own helmets, models/characters/kit_head.py: measured off every other body)
+    mid: [0.138, 0.138, 0.133, 0.129, 0.125, 0.117, 0.101, 0.119, 0.114, 0.106, 0.094, 0.091, 0.085, 0.081, 0.079, 0.077, 0.078],
     full: [0.12, 0.116, 0.112, 0.108, 0.104, 0.1, 0.096, 0.092, 0.088, 0.085, 0.082, 0.078, 0.074, 0.07, 0.066, 0.064, 0.062],
   };
   function brim(cut: string, q: BVec) {

@@ -410,34 +410,47 @@ const G_Rig = (() => {
         }
       }
     };
-    const own = (name: string, c: number) => { const f = HK && HK[name]; if (!f) return null; const m = f(KM(c)); m.userData.part = part; rig.body.add(m); rig.kitParts.push(m); return m; };
+    const own = (name: string, c: number, o?: Record<string, any>) => { const f = HK && HK[name]; if (!f) return null; const m = f(KM(c, o)); m.userData.part = part; rig.body.add(m); rig.kitParts.push(m); return m; };
     // the helmet: its cut and colour by model; rails and a night-vision mount on the modern ones
     const hd = D(k.helmet);
     part = 'helmet';
     rig.hatOn = !!hd || !rig.hairShown;
     if (rig.hairMesh) rig.hairMesh.visible = !rig.hatOn;
     const putHd = (m: THREE.Object3D) => add(Hd, m, m.position.x, m.position.y, m.position.z);
-    if (hd) G.Headgear.helmet(hd.id, KM, putHd); // (its cut, rails, shroud and visor: js/headgear.ts)
+    // the body's own helmet (models/characters/kit_head.py: its shell, rails, shroud, loop panels...) with the chinstrap; else drawn here (js/headgear.ts)
+    const HELM: Record<string, string> = { 'h.bump': 'bump', 'h.fast': 'fast', 'h.ach': 'ach', 'h.rifle': 'rifle' }, hk = hd && HK && HK['kithelm' + HELM[hd.id]] ? HELM[hd.id] : null;
+    if (hd && hk) { own('kithelm' + hk, k.hc || G.Headgear.MODELS[hd.id].col!); if (!own('kitstrap', 0x18191a)) G.Headgear.strap(KM, putHd); }
+    else if (hd) G.Headgear.helmet(hd.id, KM, putHd, k.hc || undefined); // (its cut, rails, shroud and visor: js/headgear.ts)
     // on the helmet's mount: a mandible round the jaw, or a shield over the face
     const fd = D(k.face);
     part = 'face';
-    if (fd && hd) G.Headgear.face(fd.id, hd.id, KM, putHd);
+    if (fd && hd && hk) {
+      if (fd.id === 'f.mandible') { own('kitmandible', k.hc ? shade(k.hc, 0.9) : 0x50575e); own('kitmandarms' + (G.Headgear.MODELS[hd.id].cut === 'high' ? 'high' : 'mid'), 0x3c4248); }
+      else { const rifle = fd.id === 'f.rifle'; own(rifle ? 'kitshieldrifle' : 'kitshield', rifle ? 0x3e4e56 : 0x8aaaba, { transparent: true, opacity: rifle ? 0.72 : 0.38, depthWrite: false }); own('kitshieldframe', 0x1c1e20); }
+    } else if (fd && hd) G.Headgear.face(fd.id, hd.id, KM, putHd);
     // night vision on its shroud: down in front of the eyes or swung up (nvK: as far as it's got, kept through a rebuild)
     const nd = D(k.nv);
     part = 'nvg';
     if (nd && hd) {
-      const nv = G.Headgear.nvg(nd.id, hd.id, KM, putHd);
+      // (on the body's own helmet: hung from its mount, where the model has it (kitnv*), in the head's frame)
+      let hinge: THREE.Vector3 | null = null;
+      const ap = hk && rig.hPart && rig.hPart['kitnv' + hk], hb = ap && rig.hBone && rig.hBone('head');
+      if (ap && hb) {
+        const pa = ap.geo.getAttribute('position'), v = new T.Vector3(); for (let i = 0; i < pa.count; i++) v.add(new T.Vector3().fromBufferAttribute(pa, i)); v.divideScalar(pa.count);
+        rig.root.updateMatrixWorld(true); hinge = Hd.worldToLocal(v.applyMatrix4(hb.inv).applyMatrix4(hb.b.matrixWorld));
+      }
+      const nv = G.Headgear.nvg(nd.id, hd.id, KM, putHd, hinge);
       rig.nvPivot = nv.pivot; rig.nvLit = nv.lit;
       if (rig.nvK == null) rig.nvK = rig.nvWant;
       nvPose(rig);
     }
     // the carrier: a soft vest, a slick plate carrier, a chest rig, or a full carrier with its pouches
-    const cd = D(k.carrier), cc = KIT_COL(cd);
+    const cd = D(k.carrier), cc = k.cc || KIT_COL(cd); // (k.cc: the armour in one colour, js/loadout.ts COLOURS)
     part = 'carrier';
     if (cd && HK && cd.id !== 'c.recon') {
       // the body's own: a soft vest, the full wrap, a plate carrier or the heavy armour; its plate's outline, its pouches; the heavy armour's
       // pads, groin flap and thigh panels unless something else is worn there
-      const key = cd.thin ? 'soft' : cd.id === 'c.heavy' ? 'heavy' : cd.id === 'c.wrap' ? 'wrap' : 'pc', col = cd.thin ? cd.col : cc;
+      const key = cd.thin ? 'soft' : cd.id === 'c.heavy' ? 'heavy' : cd.id === 'c.wrap' ? 'wrap' : 'pc', col = cd.thin ? k.cc || cd.col : cc;
       own('kit' + key, col);
       if (k.plate && !cd.thin) { part = 'plate'; own('kitplate' + key, col); part = 'carrier'; }
       if (key !== 'soft') molle('kit' + key, 'chest', MOLLE_Y[key], slots(k.cq, k.cp, cd), shade(cc, 0.8), null);
@@ -447,7 +460,7 @@ const G_Rig = (() => {
       // the ribs by the cummerbund, straps over the shoulders, pouches on the front; a soft vest thin panels wrapping the trunk. All in the
       // chest's frame at its standard size (front and back 0.125 off its middle, 0.19 across), fitted to each body (fitPart).
       const soft = !!cd.thin, heavy = cd.id === 'c.heavy', pd = soft ? 0.014 : k.plate ? (heavy ? 0.045 : 0.036) : 0.022, bd = soft ? 0.014 : heavy ? 0.045 : 0.03;
-      const pw = soft ? 0.3 : heavy ? 0.32 : 0.26, ph = soft ? 0.25 : heavy ? 0.33 : 0.29, py = soft ? 0.115 : 0.13, col = soft ? cd.col : cc;
+      const pw = soft ? 0.3 : heavy ? 0.32 : 0.26, ph = soft ? 0.25 : heavy ? 0.33 : 0.29, py = soft ? 0.115 : 0.13, col = soft ? k.cc || cd.col : cc;
       // the trunk's section in the chest's frame at its standard size (an ellipse, 0.165 across each way, 0.12 front and back): what the
       // bags and the cummerbund curve round, a few millimetres off it
       const A0 = 0.165, B0 = 0.12;
@@ -499,7 +512,7 @@ const G_Rig = (() => {
     const sd = D(k.sh);
     part = 'shoulder';
     if (sd && HK) {
-      const c = KIT_COL(sd);
+      const c = k.cc || KIT_COL(sd);
       if (sd.id === 's.plate') own('kitshcap', 0x4a4438); else own('kitdelt', c);
       if (sd.id !== 's.deltoid') own('kitaxil', c);
     } else if (sd) {
@@ -513,7 +526,7 @@ const G_Rig = (() => {
     const gd = D(k.gr);
     part = 'groin';
     if (gd && HK) {
-      const c = KIT_COL(gd) === 0x2e3236 ? 0x34383c : KIT_COL(gd);
+      const c = k.cc || (KIT_COL(gd) === 0x2e3236 ? 0x34383c : KIT_COL(gd));
       if (gd.id === 'g.pelvis') own('kitpelvis', c); else own('kitgflap', c);
       if (gd.id === 'g.plate') own('kitgplate', 0x3d4044);
     } else if (gd) {
@@ -525,7 +538,7 @@ const G_Rig = (() => {
     const ld = D(k.lg);
     part = 'legs';
     if (ld && HK) {
-      const c = KIT_COL(ld) === 0x2e3236 ? 0x34383c : KIT_COL(ld);
+      const c = k.cc || (KIT_COL(ld) === 0x2e3236 ? 0x34383c : KIT_COL(ld));
       if (ld.id === 'l.thigh') own('kitthigh', c);
       if (ld.id === 'l.wrap' || ld.id === 'l.full') own('kitlegwrap', c);
       if (ld.id === 'l.shin' || ld.id === 'l.full') own('kitshin', 0x4a4f55);

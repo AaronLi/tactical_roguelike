@@ -66,7 +66,7 @@ const G_Loadout = (() => {
   const xpOf = (diff: number) => 150 + 100 * Math.max(1, diff | 0);
   const rankAt = (r: number) => (250 * r * (r + 1)) / 2;
   let save: any = null;
-  const data = () => { if (!save) { const s = G.U.store.get('loadout', null); save = s && typeof s === 'object' ? s : {}; save.xp = Math.max(0, +save.xp || 0); save.n = save.n || {}; save.got = save.got || []; save.sel = save.sel || {}; save.box = save.box || {}; } return save; };
+  const data = () => { if (!save) { const s = G.U.store.get('loadout', null); save = s && typeof s === 'object' ? s : {}; save.xp = Math.max(0, +save.xp || 0); save.n = save.n || {}; save.got = save.got || []; save.sel = save.sel || {}; save.box = save.box || {}; save.col = save.col || {}; } return save; };
   const keep = () => G.U.store.set('loadout', data());
   const xp = () => data().xp;
   const rank = () => { let r = 0; while (xp() >= rankAt(r + 1)) r++; return r; };
@@ -200,19 +200,25 @@ const G_Loadout = (() => {
   const sel = (slot: string): string | null => { const d = data().sel, id = slot in d ? d[slot] : TREES[slot].mid; return id && open(slot, id) ? id : null; }; // (never set: the tree's middle, once it's yours; set empty: empty)
   const pick = (slot: string, id: string | null) => { if (id && !open(slot, id)) return; data().sel[slot] = id; keep(); };
   const total = () => ['p', 's', 'h', 'a'].reduce((n, s) => n + cost(s, sel(s)), 0);
+  // Colours: a helmet (and its face piece) or the armour (the carrier, its pouches and what's mounted on it) in one solid colour of
+  // these, kept with the loadout; null: each piece's own (its maker's)
+  const COLOURS: [string, number | null][] = [['Issue', null], ['Black', 0x1d1f21], ['Coyote', 0x7a6748], ['Tan', 0x9a8a68], ['Ranger green', 0x3f4a35], ['Olive drab', 0x4f5236], ['Wolf grey', 0x585c5f], ['Navy', 0x242c3a]];
+  const col = (slot: string): number | null => { const c = data().col[slot]; return typeof c === 'number' ? c : null; };
+  function setCol(slot: string, c: number | null) { if (c == null) delete data().col[slot]; else data().col[slot] = c; keep(); }
   function apply(me: any, sidearmOnly = false) {
     const P = sel('p'), S = sel('s') || 'p9', H = sel('h'), A = sel('a'), Gr = G.Gear;
     me.setSidearm(S, build('s', S));
     if (sidearmOnly) return;
-    if (H) { const it = Gr.gearItem(H); for (const b of boxes('h', H)) (it as any)[b.k] = Gr.gearItem(b.id); me.kit.helmet = it; }
-    if (A) { const it = Gr.gearItem(A); for (const b of boxes('a', A)) (it as any)[b.k] = Gr.gearItem(b.id); me.kit.carrier = it; }
+    const tint = (it: any, c: number | null) => { if (c != null) it.col = c; return it; };
+    if (H) { const it = tint(Gr.gearItem(H), col('h')); for (const b of boxes('h', H)) (it as any)[b.k] = tint(Gr.gearItem(b.id), col('h')); me.kit.helmet = it; }
+    if (A) { const it = tint(Gr.gearItem(A), col('a')); for (const b of boxes('a', A)) (it as any)[b.k] = tint(Gr.gearItem(b.id), col('a')); me.kit.carrier = it; }
     if (P) { // (after the armour: its spare loads go on what you're wearing now)
       const w = me.makeWeapon(P, build('p', P)); me.weapons.p = w;
       for (let i = 0; i < 3; i++) { const it = Gr.ammoItem(w.def, Gr.ammoFor(w.def).kind === 'mag' ? null : 12); if (!Gr.stow(me, it)) break; } // (three spare loads, wherever they fit)
     }
   }
   function reload() { save = null; }
-  return { TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, atts, boxes, fit, build, BUDGET, pts, cost, total };
+  return { TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, fit, build, BUDGET, pts, cost, total };
 })();
 G.Loadout = G_Loadout;
 interface GameModules { Loadout: typeof G_Loadout }

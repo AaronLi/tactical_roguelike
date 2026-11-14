@@ -5,8 +5,7 @@
 # What's made (one mesh each, its material its name; js/rig.ts setKit wears them, coloured as the game colours them):
 #   the helmets as they are:   kithelmbump, kithelmfast, kithelmach, kithelmrifle   (shell, rails, shroud, loop panels, counterweight...)
 #   the face pieces:           kitmandible, kitshield, kitshieldrifle               (the shields' clear sheet; kitshieldframe their frames)
-#   a sci-fi set beside them:  kitscihelm (faceted plates, a crown ridge, ear pods, a neck guard), kitscibrow (its lit brow band),
-#                              kitscijaw (a segmented jaw guard), kitscivisor (a wrap-round visor)
+#   the mandible's arms:       kitmandarmshigh, kitmandarmsmid                     (up to a high-cut's rails, or a mid-cut's)
 import bpy, bmesh, math
 from mathutils import Vector as V
 from mathutils.bvhtree import BVHTree
@@ -16,8 +15,8 @@ PI = math.pi
 ease = lambda a: (1 - math.cos(a)) / 2
 notch = lambda a, a0, w: math.exp(-(((abs(a) - a0) / w) ** 2))
 CUT = {  # (js/headgear.ts: the polar angle of the lower edge, round from straight ahead)
-    'high': lambda a: PI * (0.47 + 0.13 * ease(a) - 0.12 * notch(a, 1.72, 0.42)),
-    'mid': lambda a: PI * (0.5 + 0.13 * ease(a) - 0.045 * notch(a, 1.7, 0.36)),
+    'high': lambda a: PI * (0.44 + 0.16 * ease(a) - 0.12 * notch(a, 1.72, 0.42)),
+    'mid': lambda a: PI * (0.455 + 0.175 * ease(a) - 0.045 * notch(a, 1.7, 0.36)),
 }
 SC = (1.0, 1.1, 1.02)  # (js/headgear.ts SC: a head's longer front to back; in this frame x, y (depth), z)
 
@@ -36,7 +35,7 @@ def build(head, arm):
     # the skull's surface as a field of radii round C (a x th), each the farthest of it near that way plus gap, eased smooth and never
     # inside the head: what every shell is laid on
     NA, NT, TMAX = 64, 30, 0.86 * PI
-    def field(gap, smooth=6, shell=False):
+    def field(gap, smooth=6, shell=False, convex=None):
         R = [[0.0] * (NT + 1) for _ in range(NA)]
         for i in range(NA):
             for j in range(NT + 1):
@@ -52,10 +51,20 @@ def build(head, arm):
         def egg(d): return 1 / math.sqrt((d.x / ax) ** 2 + (d.y / (af if d.y < 0 else ab)) ** 2 + (d.z / az) ** 2)
         rs = sorted(need[i][j] / egg(dirs(i, j)) for i in range(NA) for j in range(NT + 1) if TMAX * j / NT < 0.45 * PI); k = rs[int(len(rs) * 0.85)]  # (most of it, not its one high spot)
         if shell: R = [[max(need[i][j], k * egg(dirs(i, j))) for j in range(NT + 1)] for i in range(NA)]
+        if convex:  # (a sheet over the face: wholly an egg, as small as clears the face there (its nose, its chin), none of its shape)
+            a0, a1, t0, t1 = convex
+            ins = [(i, j) for i in range(NA) for j in range(NT + 1) if a0 <= -PI + 2 * PI * i / NA <= a1 and t0 <= TMAX * j / NT <= t1]
+            face = [(i, j) for i, j in ins if abs(-PI + 2 * PI * i / NA) < 0.9]  # (its width the cheeks', not the ears')
+            ex = lambda f, L=None: max(need[i][j] * f(dirs(i, j)) for i, j in (L or ins)) or 0.1  # (the face's own: its width, its depth ahead, up and down)
+            cx = ex(lambda d: abs(d.x), face); cf, cu, cd = ex(lambda d: max(0, -d.y)), ex(lambda d: max(0, d.z)), ex(lambda d: max(0, -d.z))
+            fegg = lambda d: 1 / math.sqrt((d.x / cx) ** 2 + (min(0, d.y) / cf) ** 2 + (d.z / (cu if d.z > 0 else cd)) ** 2 + 1e-9)
+            kc = max(need[i][j] / fegg(dirs(i, j)) for i, j in ins)
+            R = [[kc * fegg(dirs(i, j)) for j in range(NT + 1)] for i in range(NA)]; smooth = 0
         for _ in range(smooth):  # (eased: each the mean of it and its neighbours, then no less than the head needs)
             R = [[max(need[i][j], (R[i][j] * 2 + R[(i - 1) % NA][j] + R[(i + 1) % NA][j] + R[i][max(0, j - 1)] + R[i][min(NT, j + 1)]) / 6) for j in range(NT + 1)] for i in range(NA)]
         R0 = sum(R[i][0] for i in range(NA)) / NA
-        for i in range(NA): R[i][0] = R0  # (one crown)
+        if not convex:
+            for i in range(NA): R[i][0] = R0  # (one crown)
         def at(a, th, off=0.0):
             u = ((a + PI) / (2 * PI) * NA) % NA; v = min(NT, max(0.0, th / TMAX * NT))
             i0, j0 = int(u) % NA, min(NT - 1, int(v)); fu, fv = u - int(u), v - j0
@@ -93,6 +102,13 @@ def build(head, arm):
         R = mathutils.Matrix((x, n, z)).transposed().to_4x4() @ mathutils.Matrix.Rotation(tilt, 4, 'X')
         o.data.transform(R); o.data.transform(mathutils.Matrix.Translation(p)); return o
 
+    def strip(name, p0, p1, w, d):
+        """a flat bar from p0 to p1, its face turned out from the head"""
+        import mathutils
+        L = (p1 - p0); y = L.normalized(); n = ((p0 + p1) / 2 - C); n = (n - y * n.dot(y)).normalized(); x = y.cross(n)
+        o = K._box(name, V((0, 0, 0)), (w, L.length + 0.01, d))
+        o.data.transform(mathutils.Matrix((x, y, n)).transposed().to_4x4()); o.data.transform(mathutils.Matrix.Translation((p0 + p1) / 2)); return o
+
     def pod(name, at, a, th, r, depth, off):
         """a round pod on the side of the head (an ear's comms): a cylinder out of the shell"""
         p = at(a, th, off); n = (p - C).normalized()
@@ -110,10 +126,10 @@ def build(head, arm):
     MODELS = {'bump': ('high', 0.012, 0.004), 'fast': ('high', 0.014, 0.007), 'ach': ('mid', 0.015, 0.008), 'rifle': ('mid', 0.017, 0.012)}
     for key, (cutk, gap, t) in MODELS.items():
         cut = CUT[cutk]; at = field(gap, smooth=16, shell=True)  # (eased hard: a shell's a smooth dome, not the skull's every bump)
-        parts = [sheet('sh', at, -PI, PI, 0.0, cut, t, closed=True, cols=48, rows=14)]
+        parts = [sheet('sh', at, -PI, PI, 0.0, cut, t, closed=True, cols=30, rows=8)]
         if key in ('bump', 'fast', 'rifle'):
             for s in (-1, 1):  # ARC rails along the cut over each ear
-                parts.append(sheet('rl', at, 1.0 * s if s > 0 else -2.35, 2.35 if s > 0 else -1.0, lambda a: cut(a) - 0.075 * PI, lambda a: cut(a) - 0.01 * PI, 0.009, off=t, cols=14, rows=3))
+                parts.append(sheet('rl', at, 1.0 * s if s > 0 else -2.35, 2.35 if s > 0 else -1.0, lambda a: cut(a) - 0.075 * PI, lambda a: cut(a) - 0.01 * PI, 0.009, off=t, cols=8, rows=2))
             parts.append(sheet('sr', at, -0.32, 0.32, 0.31 * PI, lambda a: cut(a) - 0.015 * PI, 0.005, off=t, cols=8, rows=4))  # the night-vision shroud
             parts.append(box('mt', at, 0.0, 0.38 * PI, (0.03, 0.016, 0.022), t + 0.004, tilt=-0.35))  # its mount
         if key in ('fast', 'rifle'):
@@ -121,31 +137,34 @@ def build(head, arm):
             for s in (-1, 1): parts.append(sheet('ls', at, 1.3 if s > 0 else -2.2, 2.2 if s > 0 else -1.3, 0.25 * PI, 0.33 * PI, 0.002, off=t, cols=6, rows=2))
             parts.append(box('cw', at, PI, 0.5 * PI, (0.075, 0.022, 0.045), t, tilt=0.3))  # the counterweight pouch
         if key == 'ach':
-            parts.append(sheet('cv', at, -PI, PI, lambda a: cut(a) - 0.09 * PI, lambda a: cut(a) - 0.06 * PI, 0.002, off=t, closed=True, cols=48, rows=2))  # the cover's band
+            parts.append(sheet('cv', at, -PI, PI, lambda a: cut(a) - 0.09 * PI, lambda a: cut(a) - 0.06 * PI, 0.002, off=t, closed=True, cols=30, rows=1))  # the cover's band
             parts.append(box('br', at, 0.0, 0.4 * PI, (0.034, 0.006, 0.03), t, tilt=-0.6))  # the front bracket
         if key == 'bump':
             for a, th in ((0.5, 0.18), (-0.5, 0.18), (2.4, 0.22), (-2.4, 0.22), (PI, 0.3), (1.4, 0.2), (-1.4, 0.2)): parts.append(box('vt', at, a, th * PI, (0.02, 0.002, 0.01), t - 0.0015))  # vents
         out.append(done(K._join(parts, 'kithelm' + key), 'kithelm' + key))
+        if key != 'ach':  # where night vision hangs: its mount on the shroud (js/rig.ts finds it and hangs js/headgear.ts nvg there)
+            p = at(0.0, 0.36 * PI, t + 0.018); out.append(done(K._grid('nv', [[p, p + V((0.001, 0, 0))], [p + V((0, 0, 0.001)), p + V((0.001, 0, 0.001))]]), 'kitnv' + key))
+    # the chinstrap: from under the shell in front of and behind each ear, down the cheek to a cup under the chin, on the skin
+    sat = field(0.003, smooth=6)
+    straps = [sheet('cs', sat, s * a0 - 0.035, s * a0 + 0.035, 0.45 * PI, th1, 0.003, cols=1, rows=6) for s in (-1, 1) for a0, th1 in ((1.32, 0.82 * PI), (1.95, 0.78 * PI))]
+    straps.append(sheet('cc', sat, -1.3, 1.3, 0.8 * PI, 0.84 * PI, 0.003, cols=10, rows=1))
+    out.append(done(K._join(straps, 'kitstrap'), 'kitstrap'))
 
-    # the face pieces: a mandible round the jaw on the mid cut's rails; a face shield from the brow to below the chin
-    jat = field(0.028, smooth=8); at = field(0.015)
-    out.append(done(sheet('md', jat, -1.6, 1.6, 0.62 * PI, 0.84 * PI, 0.012, cols=24, rows=6), 'kitmandible'))
-    vat = field(0.05, smooth=14)  # (a sheet clear of the nose: eased hard)
-    out.append(done(sheet('fs', vat, -1.2, 1.2, 0.38 * PI, 0.8 * PI, 0.007, cols=20, rows=10), 'kitshield'))
-    out.append(done(sheet('fr', vat, -1.2, 1.2, 0.38 * PI, 0.8 * PI, 0.016, cols=20, rows=10), 'kitshieldrifle'))
-    out.append(done(K._join([sheet('fb', vat, -1.22, 1.22, 0.36 * PI, 0.4 * PI, 0.012, off=0.002, cols=20, rows=1)] + [box('fa', at, s * 1.4, 0.42 * PI, (0.014, 0.05, 0.03), 0.012) for s in (-1, 1)], 'kitshieldframe'), 'kitshieldframe'))
-
-    # -- the sci-fi set: plates, not a dome (flat-shaded facets), a ridge over the crown, comms pods over the ears, a neck guard, a lit
-    # band across the brow; a jaw guard of overlapping plates; a visor wrapping the face
-    cut = CUT['mid']; at = field(0.017, smooth=10, shell=True)
-    parts = [sheet('ss', at, -PI, PI, 0.0, lambda a: cut(a) - 0.02 * PI, 0.01, closed=True, cols=14, rows=6, flat=True),
-             sheet('sg', at, PI - 1.25, PI + 1.25, lambda a: cut(a) - 0.06 * PI, lambda a: cut(a) + 0.07 * PI, 0.008, off=0.012, cols=8, rows=2, flat=True),  # the neck guard
-             sheet('sr', at, -0.09, 0.09, 0.02 * PI, 0.52 * PI, 0.012, off=0.008, cols=2, rows=10, flat=True)]  # the crown ridge, front to back
-    for s in (-1, 1): parts.append(pod('pd', at, s * PI / 2, 0.56 * PI, 0.034, 0.024, 0.006))
-    for s in (-1, 1): parts.append(sheet('sp', at, s * 0.55, s * 1.25, 0.18 * PI, 0.42 * PI, 0.004, off=0.01, cols=3, rows=2, flat=True))  # side plates
-    o = K._join(parts, 'kitscihelm'); o['flat'] = 1; out.append(done(o, 'kitscihelm'))
-    o = sheet('sb', at, -1.05, 1.05, 0.425 * PI, 0.45 * PI, 0.004, off=0.008, cols=10, rows=1, flat=True); out.append(done(o, 'kitscibrow'))
-    jaw = [sheet('j%d' % k, jat, -1.5 + k * 0.6, -0.9 + k * 0.6, 0.6 * PI, 0.85 * PI, 0.01, off=0.004 * (k % 2), cols=2, rows=3, flat=True) for k in range(5)]
-    o = K._join(jaw, 'kitscijaw'); o['flat'] = 1; out.append(done(o, 'kitscijaw'))
-    out.append(done(sheet('sv', field(0.055, smooth=16), -1.45, 1.45, 0.4 * PI, 0.78 * PI, 0.006, cols=24, rows=10), 'kitscivisor'))
+    # the face pieces: a mandible round the jaw, a smooth guard clear of the chin, on arms up to each helmet's rails (one pair for the
+    # high cut's rails, one for the mid cut's); a face shield from the brow to below the chin, a smooth sheet clear of the nose
+    at = field(0.015)
+    MJ = (-1.45, 1.45, 0.6 * PI, 0.76 * PI)
+    jat = field(0.024, smooth=24)  # (close round the jaw, eased over the lips and the chin)
+    out.append(done(sheet('md', jat, MJ[0], MJ[1], MJ[2], MJ[3], 0.012, cols=16, rows=4), 'kitmandible'))
+    for cutk, (gap, t) in (('high', (0.014, 0.007)), ('mid', (0.016, 0.01))):
+        hat, cut = field(gap, smooth=16, shell=True), CUT[cutk]; arms = []
+        for sd in (-1, 1):
+            a = sd * 1.5; p0 = jat(a * 0.97, MJ[2] + 0.02 * PI, 0.012); p1 = hat(sd * 1.55, cut(sd * 1.55) - 0.035 * PI, t + 0.006)
+            arms.append(strip('ma', p0, p1, 0.022, 0.009)); arms.append(box('mk', hat, sd * 1.55, cut(sd * 1.55) - 0.035 * PI, (0.026, 0.01, 0.03), t))  # (the arm, its clamp on the rail)
+        out.append(done(K._join(arms, 'kitmandarms' + cutk), 'kitmandarms' + cutk))
+    FS = (-1.2, 1.2, 0.38 * PI, 0.8 * PI)
+    vat = field(0.045, convex=FS)
+    out.append(done(sheet('fs', vat, FS[0], FS[1], FS[2], FS[3], 0.007, cols=14, rows=7), 'kitshield'))
+    out.append(done(sheet('fr', vat, FS[0], FS[1], FS[2], FS[3], 0.016, cols=14, rows=7), 'kitshieldrifle'))
+    out.append(done(K._join([sheet('fb', vat, -1.22, 1.22, 0.36 * PI, 0.4 * PI, 0.012, off=0.002, cols=20, rows=1)] + [box('fa', at, s2 * 1.4, 0.42 * PI, (0.014, 0.05, 0.03), 0.012) for s2 in (-1, 1)], 'kitshieldframe'), 'kitshieldframe'))
     return out

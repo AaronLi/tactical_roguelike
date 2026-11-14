@@ -22,9 +22,8 @@ from mathutils import Vector as V
 HERE = os.path.dirname(os.path.abspath(__file__)); OUT = os.path.join(HERE, 'human')
 sc = bpy.context.scene
 SETS = {'real': [('Bump', ['kithelmbump']), ('High-cut', ['kithelmfast']), ('Full-cut', ['kithelmach']), ('Rifle-rated', ['kithelmrifle']),
-                 ('High-cut + mandible', ['kithelmfast', 'kitmandible']), ('Full-cut + shield', ['kithelmach', 'kitshield', 'kitshieldframe']), ('Rifle + rifle shield', ['kithelmrifle', 'kitshieldrifle', 'kitshieldframe'])],
-        'scifi': [('Sci-fi helmet', ['kitscihelm', 'kitscibrow']), ('+ jaw guard', ['kitscihelm', 'kitscibrow', 'kitscijaw']), ('+ visor', ['kitscihelm', 'kitscibrow', 'kitscivisor']), ('+ jaw + visor', ['kitscihelm', 'kitscibrow', 'kitscijaw', 'kitscivisor'])]}
-COL = {'kithelmbump': (0.24, 0.25, 0.26), 'kithelmfast': (0.42, 0.37, 0.27), 'kithelmach': (0.29, 0.31, 0.25), 'kithelmrifle': (0.18, 0.2, 0.21), 'kitmandible': (0.31, 0.34, 0.37),
+                 ('High-cut + mandible', ['kithelmfast', 'kitmandible', 'kitmandarmshigh']), ('Full-cut + mandible', ['kithelmach', 'kitmandible', 'kitmandarmsmid']), ('Full-cut + shield', ['kithelmach', 'kitshield', 'kitshieldframe']), ('Rifle + rifle shield', ['kithelmrifle', 'kitshieldrifle', 'kitshieldframe'])]}
+COL = {'kitmandarmshigh': (0.24, 0.26, 0.28), 'kitmandarmsmid': (0.24, 0.26, 0.28), 'kithelmbump': (0.24, 0.25, 0.26), 'kithelmfast': (0.42, 0.37, 0.27), 'kithelmach': (0.29, 0.31, 0.25), 'kithelmrifle': (0.18, 0.2, 0.21), 'kitmandible': (0.31, 0.34, 0.37),
        'kitshield': (0.54, 0.67, 0.73), 'kitshieldrifle': (0.24, 0.31, 0.34), 'kitshieldframe': (0.1, 0.1, 0.11), 'kitscihelm': (0.23, 0.25, 0.28), 'kitscibrow': (0.2, 0.9, 1.0), 'kitscijaw': (0.16, 0.17, 0.19), 'kitscivisor': (0.15, 0.12, 0.05)}
 GLASS = {'kitshield': 0.4, 'kitshieldrifle': 0.7, 'kitscivisor': 0.6}
 for e in ('BLENDER_EEVEE', 'BLENDER_EEVEE_NEXT'):

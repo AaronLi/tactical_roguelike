@@ -56,8 +56,8 @@ const G_Headgear = (() => {
 
   // The cuts: the shell's lower edge (polar angle) all the way round
   const CUT: Record<string, (a: number) => number> = {
-    high: (a: number) => PI * (0.47 + 0.13 * ease(a) - 0.12 * notch(a, 1.72, 0.42)), // brow, ears cut high, nape
-    mid: (a: number) => PI * (0.5 + 0.13 * ease(a) - 0.045 * notch(a, 1.7, 0.36)),
+    high: (a: number) => PI * (0.44 + 0.16 * ease(a) - 0.12 * notch(a, 1.72, 0.42)), // brow, ears cut high, nape
+    mid: (a: number) => PI * (0.455 + 0.175 * ease(a) - 0.045 * notch(a, 1.7, 0.36)),
     full: (a: number) => PI * (0.41 + 0.27 * Math.min(1, ease(a) * 2.6) + 0.02 * ease(a)), // the brow cut away for the visor, then down over the ears
   };
   const MODELS: Record<string, Model> = {
@@ -107,11 +107,14 @@ const G_Headgear = (() => {
       put(new T.Mesh(band(vr + 0.002, -1.32, 1.32, PI * 0.7, PI * 0.73, 0.012, { cols: 18, rows: 1 }), mat(0x23262a)));
       for (const s of [-1, 1]) { const p = at(M.r + 0.012, s * 1.45, PI * 0.42), b = new T.Mesh(new T.CylinderGeometry(0.014, 0.014, 0.018, 12), mat(0x3a3e42)); b.position.copy(p); b.rotation.z = PI / 2; put(b); }
     }
-    // the chinstrap: from in front of and behind each ear down under the jaw
+    strap(mat, put);
+    return M;
+  }
+  // the chinstrap: from in front of and behind each ear down under the jaw (with a helmet drawn here, or the body's own: js/rig.ts setKit)
+  function strap(mat: Mat, put: Put) {
     const strap = mat(0x18191a);
     for (const s of [-1, 1]) for (const [z0, ang] of [[-0.035, 0.25], [0.035, -0.3]]) { const m = new T.Mesh(new T.BoxGeometry(0.004, 0.085, 0.008), strap); m.position.set(s * 0.094, 0.078, z0); m.rotation.x = ang; m.rotation.z = s * -0.18; put(m); }
     const chin = new T.Mesh(new T.TorusGeometry(0.06, 0.0035, 4, 16, PI), strap); chin.position.set(0, 0.04, -0.022); chin.rotation.set(PI * 0.45, 0, 0); chin.scale.set(1.45, 1, 1); put(chin);
-    return M;
   }
   // A face piece on a helmet's rails: a mandible ('f.mandible') or a face shield ('f.shield', 'f.rifle')
   function face(id: string, helmetId: string, mat: Mat, put: Put) {
@@ -141,9 +144,9 @@ const G_Headgear = (() => {
   // quads' battery pack rides at the back of the helmet as a counterweight. The eyecups glow faintly with the phosphor
   // when they're on (glow: its material, to light or not). Returns { pivot, glow }.
   const NV_UP = 1.95, glowMats: Record<string, THREE.MeshBasicMaterial> = {};
-  function nvg(id: string, helmetId: string, mat: Mat, put: Put) {
+  function nvg(id: string, helmetId: string, mat: Mat, put: Put, hingeAt?: THREE.Vector3 | null) {
     const M = MODELS[helmetId] || MODELS.generic, d = G.Gear && G.Gear.DEFS[id], v = d && d.nv, n = v ? v.tubes.length : 2;
-    const hinge = at(M.r + 0.018, 0, PI * 0.36), dark = 0x1a1c1e, body = 0x2c3034, rubber = 0x101112;
+    const hinge = hingeAt || at(M.r + 0.018, 0, PI * 0.36), dark = 0x1a1c1e, body = 0x2c3034, rubber = 0x101112;
     const mount = new T.Mesh(new T.BoxGeometry(0.036, 0.03, 0.022), mat(dark)); mount.position.copy(hinge); mount.rotation.x = -0.4; put(mount);
     const pivot = new T.Group(); pivot.position.copy(hinge); put(pivot);
     const add = (m: THREE.Mesh, x: number, y: number, z: number) => { m.position.set(x, y, z); pivot.add(m); return m; };
@@ -179,7 +182,7 @@ const G_Headgear = (() => {
     const peak = new T.Mesh(new T.RingGeometry(0.1, 0.19, 18, 1, PI / 2 - PI * 0.26, PI * 0.52), mat(col, { side: T.DoubleSide }));
     peak.rotation.x = -PI / 2 - 0.2; peak.position.set(0, 0.16, 0.0); peak.scale.set(0.85, 1, 1); put(peak);
   }
-  return { band, helmet, face, nvg, NV_UP, cap, MODELS, CUT };
+  return { band, helmet, face, nvg, NV_UP, cap, MODELS, CUT, strap };
 })();
 G.Headgear = G_Headgear;
 interface GameModules { Headgear: typeof G_Headgear; }

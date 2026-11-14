@@ -3167,7 +3167,7 @@ const G_Me = {
   // what you're wearing, as others see it (js/rig.ts setKit)
   kitLook() {
     const k = this.kit || {}, g = (it: GItem | null) => (it ? it.gid : 0), n = (it: GItem | null) => (it && it.molle ? it.molle.items.length : 0);
-    return { helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, nv: k.helmet && k.helmet.nvg ? k.helmet.nvg.gid : 0, nd: k.helmet && k.helmet.nvg && k.helmet.nvg.dn ? 1 : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, sh: k.carrier && k.carrier.shoulder ? k.carrier.shoulder.gid : 0, gr: k.carrier && k.carrier.groin ? k.carrier.groin.gid : 0, cp: n(k.carrier), cq: G.Gear.molleLook(k.carrier), belt: g(k.belt), lg: k.belt && k.belt.legs ? k.belt.legs.gid : 0, bp: n(k.belt), bq: G.Gear.molleLook(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
+    return { hc: k.helmet && k.helmet.col || 0, cc: k.carrier && k.carrier.col || 0, helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, nv: k.helmet && k.helmet.nvg ? k.helmet.nvg.gid : 0, nd: k.helmet && k.helmet.nvg && k.helmet.nvg.dn ? 1 : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, sh: k.carrier && k.carrier.shoulder ? k.carrier.shoulder.gid : 0, gr: k.carrier && k.carrier.groin ? k.carrier.groin.gid : 0, cp: n(k.carrier), cq: G.Gear.molleLook(k.carrier), belt: g(k.belt), lg: k.belt && k.belt.legs ? k.belt.legs.gid : 0, bp: n(k.belt), bq: G.Gear.molleLook(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
   },
   menuLook(): boolean { const pz = document.getElementById('pause'); return G.Game.phase === 'level' && !this.dead && !this.down && (G.Game.menuOpen() || !!(pz && !pz.classList.contains('hidden'))); }, // (a screen is up: others see the ATAK)
   state() {

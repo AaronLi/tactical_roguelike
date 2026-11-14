@@ -1468,6 +1468,8 @@ const G_Game = {
       }
       if (e.target.closest('[data-lotake]')) { L.pick(sl, look); G.Audio.click(); if (!G.SpaceData.ON) return this.loDeploy(); return this.sidearmPick(); } // (on the ground, taken at once)
       if (e.target.closest('[data-loclear]')) { L.pick(sl, null); G.Audio.click(); return this.sidearmPick(); }
+      const cb = e.target.closest('[data-locol]') as HTMLElement | null;
+      if (cb) { const v = cb.dataset.locol; L.setCol(sl, v ? +v : null); G.Audio.click(); return this.sidearmPick(); }
     }) as EventListener);
   },
   // where a tab's web opens: on what's taken (or the middle), a little above it so its boxes show
@@ -1517,7 +1519,8 @@ const G_Game = {
     // what you're looking at: what it is, what it takes, what's next from it
     let about = '';
     if (gun) { const d = G.Me.makeWeapon(look, L.build(sl, look)).def, cal = G.CALIBERS[G.calOf(d)], modes = (d.modes || [d.mode]).map((m: string) => G.MODE_NAME[m]).join(' / '); about = `<div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${d.rpm} rpm</span></div><em>${G.U.esc(G.WEAPONS[look].desc)}</em>`; }
-    else { const d = G.Gear.DEFS[look], pb = L.sel(sl) === look ? L.boxes(sl, look).find((b) => G.Gear.DEFS[b.id] && G.Gear.DEFS[b.id].kind === 'plate') : null; about = `<em>${G.U.esc(d.desc || '')}</em>${G.Ballistics.coverageHTML(d, pb ? G.Gear.DEFS[pb.id] : null)}`; }
+    else { const d = G.Gear.DEFS[look], pb = L.sel(sl) === look ? L.boxes(sl, look).find((b) => G.Gear.DEFS[b.id] && G.Gear.DEFS[b.id].kind === 'plate') : null; const cur = L.col(sl), sw = mine ? `<h4>Colour</h4><div class="lo-swatches">${L.COLOURS.map(([n, c]) => `<button class="lo-sw${cur === c ? ' on' : ''}${c == null ? ' issue' : ''}" data-locol="${c == null ? '' : c}" title="${n}" style="${c == null ? '' : 'background:#' + c.toString(16).padStart(6, '0')}">${c == null ? 'Issue' : ''}</button>`).join('')}</div>` : '';
+      about = `<em>${G.U.esc(d.desc || '')}</em>${sw}${G.Ballistics.coverageHTML(d, pb ? G.Gear.DEFS[pb.id] : null)}`; }
     const ask = got ? '' : !q.from || L.open(sl, q.from) ? `<div class="web-ask"><b>${G.U.esc(L.need(sl, q))}</b>${q.how ? `<small>${G.U.esc(q.how)}</small>` : q.rank != null ? '<small>XP comes from the missions you complete: the higher the threat, the more.</small>' : ''}</div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(L.name(sl, q.from))} first.</div>`;
     const soon = all.filter((a) => !a.open).sort((x, y) => (y.have / y.n) - (x.have / x.n)).filter((a, i, xs) => xs.findIndex((b) => b.k === a.k) === i).slice(0, 4); // (the nearest to earn, one of a kind)
     const attInfo = got && all.length ? `<h4>Attachments</h4><p class="lo-note">Up to two, in its boxes in the bar above (once it's taken). ${all.filter((a) => a.open).length} of ${all.length} earned with it.</p>${soon.length ? `<ul class="web-next">${soon.map((a) => `<li><b>${G.U.esc(a.name)}</b> ${a.have}/${a.n} ${G.U.esc(a.what)}</li>`).join('')}</ul>` : ''}` : '';
