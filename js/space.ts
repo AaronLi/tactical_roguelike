@@ -26,7 +26,7 @@ const G_Space = (() => {
     zdef: [] as SpContact[], zact: 0, zC: new T.Vector3(), zinfo: null as null | { ms: any; act: number; near: boolean }, tclose: null as null | { k: number; t: number; sent?: boolean; name: string },
     root: null as THREE.Group | null, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null,
     hull: null as ReturnType<typeof G.ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3; p0?: THREE.Vector3 }[],
-    ftl: null as null | { st: 'spool' | 'wait' | 'tunnel'; t: number; to: number; T: number }, seats: {} as Record<string, number>, ctl: null as string | null,
+    ftl: null as null | { st: 'spool' | 'wait' | 'tunnel'; t: number; to: number; T: number; held?: number }, seats: {} as Record<string, number>, ctl: null as string | null,
     hp: 100, hpMax: 100, ms: null as SpMission | null, state: null as SpMs | null, board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[] },
     auto: null as null | { t: number; T: number; P0: THREE.Vector3; Q0: THREE.Quaternion; P1: THREE.Vector3; Q1: THREE.Quaternion; mid: THREE.Vector3 | null; then: () => void },
     hidden: null as Map<THREE.Object3D, boolean> | null, net: null as null | { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3 }, sendT: 0, hold: 0, holdK: '', keep: null as null | { x: number; y: number; z: number; yaw: number },
@@ -67,6 +67,7 @@ const G_Space = (() => {
     G.R.levelRoot.position.set(0, 0, 0); G.R.levelRoot.quaternion.identity(); G.R.levelRoot.visible = true;
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
     if (hid) { for (const o of hid) o.visible = true; hid = null; } tunUp = null;
+    G.R.padTo = 0;
     S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.mis = [];
     if (me().seat != null) me().seat = null;
     G.SpaceUI.show(false);
@@ -96,6 +97,7 @@ const G_Space = (() => {
     S.stars = G.ShipModel.stars(7); G.R.scene.add(S.stars);
     S.tunnel = G.ShipModel.tunnel(); S.tunnel.visible = false; m.group.add(S.tunnel);
     S.sun = new T.DirectionalLight(0xfff4e0, 0); G.R.scene.add(S.sun, S.sun.target);
+    G.R.padTo = PAD_POINTS; // (as many point lights at the base, on the jump and aboard: nothing's shaders made again on the way, js/render.ts lightPad)
     S.wps = []; S.anchors = []; S.boxes = []; S.floorAt = null; S.hull = null; S.planet = null; S.things = []; S.cardObjs = []; S.term = null;
     const docked = !sp || !sp.ship || !!sp.ship.docked;
     S.docked = docked; S.noseT = 0; S.rampT = docked && kind !== 'board' ? 1 : 0;
@@ -307,7 +309,7 @@ const G_Space = (() => {
     // The anchor is a place in the zone, so it falls astern; the others out here hold their own courses.
     S.zone!.add(a); if (S.state && S.state.zt != null) { S.zt0 = S.state.zt; S.ztAt = performance.now(); } else S.zt0 = 0;
     // the zone's ships (js/spacedata.ts zone): the one this level is isn't drawn out there (she's here); each of the rest is, on
-    // her course, and is on the navigation screen: come up within 450 m of one and the squad's ship matches her course (update)
+    // her course, and is on the navigation screen: come up within 2 km of one and the squad's ship matches her course (zoneClose)
     const zi = S.zinfo;
     S.zdef = SD.zone(zi ? zi.ms : { seed: map.seed, size: sp.size, th: SD.themeIndex(map.theme), wing: !!sp.wing, name: (S.ms && S.ms.name) || '' }); S.zact = zi ? zi.act : 0;
     S.zC.set((sp.hull.x0 + sp.hull.x1) / 2, 0, (sp.hull.z0 + sp.hull.z1) / 2);
@@ -317,7 +319,7 @@ const G_Space = (() => {
       const wp: SpWp = { id: 't' + c.k, name: c.k === 0 ? c.name + ' · THE MISSION' : c.name, sub: SD.SIZES[c.size].name + (c.wing ? ', a flying wing' : '') + ' · come up with her and ram her hull to board', p: new T.Vector3(), kind: 'base' };
       S.wps.push(wp); S.traffic.push({ obj: t.group, c, wp, ph: (c.seed % 30) / 10 });
     }
-    zoneStep(); for (let k = 0; k < S.traffic.length; k++) zoneReal(true);
+    zoneStep(); if (zi && zi.near) for (let k = 0; k < S.traffic.length; k++) zoneReal(true); // (come up with her: the rest are made already, kept. Jumped in: a step a frame, in the tunnel)
     S.wps.push({ id: 'ship', name: (((S.zdef[S.zact] && S.zdef[S.zact].name) || (S.ms && S.ms.name)) || 'THE SHIP').toUpperCase(), sub: 'Ram her hull nose-on to board: anywhere along it', p: new T.Vector3(S.zC.x, 2, S.zC.z), kind: 'base' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
     S.tgt = 0;
     if (zi && zi.near) S.tgt = S.wps.findIndex((w) => w.id === 'ship'); // (come up with her: she's still the target)
@@ -404,7 +406,12 @@ const G_Space = (() => {
     const zi = S.zinfo, zm = zi ? zi.ms : null, main = c.k === 0 && zm ? zm : null, diff = zm && zm.diff ? zm.diff : G.Game.level;
     return { seed: c.seed, level: main ? diff : Math.max(1, diff - 1), th: c.th, night: main ? !!main.night : false, gen: { size: c.size, obj: main ? main.obj : 'visit', ship: S.fleet.ship, other: main ? main.other : null, wing: !!c.wing } };
   }
-  type ZHull = { holder: THREE.Group; h: ReturnType<typeof G.ShipModel.hull>; bow: number; map: LvMap | null; key: string };
+  /** a level laid out: on the other thread if there's one (null till it's come: js/prep.ts map), else here and now */
+  function layOut(lv: { seed: number; level: number; th: number | undefined; night: boolean; gen: any }): LvMap | null {
+    const m = G.Prep ? G.Prep.map(lv.seed, lv.level, lv.th, lv.night, lv.gen) : false;
+    return m === false ? G.Level.generate(lv.seed, lv.level, lv.th, lv.night, lv.gen) : m;
+  }
+  type ZHull = { holder: THREE.Group; h: ReturnType<typeof G.ShipModel.hull>; bow: number; map: LvMap | null; key: string; up?: ((ms: number) => boolean) | null };
   const viewDrop = (map: LvMap | null) => { // (what was made of her ahead, not wanted after all)
     const p = map && (map as any).viewPre as LvViewPre | null; if (!p) return;
     p.root.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) { if (m.map) m.map.dispose(); m.dispose(); } });
@@ -412,27 +419,39 @@ const G_Space = (() => {
   };
   const zoneClear = () => { for (const h of zoneHulls.values()) { viewDrop(h.map); h.holder.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); } zoneHulls.clear(); };
   const zoneHulls = new Map<string, ZHull>(); let zoneHullsOf = -1; // (the hulls made, kept from one of the zone's ships to the next)
+  // how near one of the others must be: to be drawn as herself (and made ready to be the level: zonePrep); for that to be let go
+  // (the zone's whole width: there are six of them at most, so what's made of each is kept while the squad's in it); to become
+  // the level (zoneClose: once she's ready, or nearer than ZONE_NOW whether or not)
+  const PAD_POINTS = 4; // (her own three lamps, and the artifact's glow)
+  const ZONE_REAL = 5000, ZONE_DROP = 60000, ZONE_TAKE = 2000, ZONE_NOW = 400;
   function zoneReal(all: boolean) {
     if (S.kind !== 'board' || !S.zone) return;
     const zseed = S.zinfo ? S.zinfo.ms.seed : -2;
     if (zoneHullsOf !== zseed) { zoneClear(); zoneHullsOf = zseed; }
-    for (const q of S.traffic) {
-      if (q.real || !q.wp || q.c.k == null || S.P.distanceTo(q.wp.p) > 5000) continue;
-      const c = S.zdef[q.c.k], lv = zoneLevel(c);
+    // (nearest first; a step a frame unless all: her layout, her hull, then her hull sent to the graphics card, then she's swapped in)
+    const want = S.traffic.filter((q) => !q.real && q.wp && q.c.k != null && S.P.distanceTo(q.wp.p) <= ZONE_REAL).sort((a, b) => S.P.distanceTo(a.wp!.p) - S.P.distanceTo(b.wp!.p));
+    for (const q of want) {
+      const c = S.zdef[q.c.k!], lv = zoneLevel(c), id = zseed + ':' + c.k;
       // (she may be the level soon: her light's worked out on another thread meanwhile, js/prep.ts)
       if (G.Prep) G.Prep.want(lv.seed, lv.level, lv.th, lv.night, lv.gen);
-      let hit = zoneHulls.get(zseed + ':' + c.k);
+      let hit = zoneHulls.get(id);
       if (!hit) {
-        const map = q.pend || G.Level.generate(lv.seed, lv.level, lv.th, lv.night, lv.gen);
-        if (!map.sp) { q.real = true; continue; }
-        if (!all && !q.pend) { q.pend = map; return; } // (laid out in this frame, her hull made in the next)
-        q.pend = null;
+        if (!q.pend) {
+          const m = all ? G.Level.generate(lv.seed, lv.level, lv.th, lv.night, lv.gen) : layOut(lv); if (!m) continue; // (on its way from the other thread: the next meanwhile)
+          q.pend = m; if (!m.sp) { q.pend = null; q.real = true; continue; } if (!all) return;
+        }
+        const map = q.pend; q.pend = null;
         const h = G.ShipModel.hull(map), holder = new T.Group(); h.marker.visible = false;
-        h.group.position.set(-(map.sp.hull.x0 + map.sp.hull.x1) / 2, 0, -(map.sp.hull.z0 + map.sp.hull.z1) / 2); holder.add(h.group);
-        hit = { holder, h, bow: map.sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0), map, key: G.Prep ? G.Prep.keyOf(lv.seed, lv.level, lv.th, lv.night, lv.gen) : '' }; zoneHulls.set(zseed + ':' + c.k, hit);
+        h.group.position.set(-(map.sp!.hull.x0 + map.sp!.hull.x1) / 2, 0, -(map.sp!.hull.z0 + map.sp!.hull.z1) / 2); holder.add(h.group);
+        hit = { holder, h, bow: map.sp!.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0), map, key: G.Prep ? G.Prep.keyOf(lv.seed, lv.level, lv.th, lv.night, lv.gen) : '', up: all ? null : G.R.preload(holder) };
+        zoneHulls.set(id, hit);
+        if (!all) return;
       }
+      if (hit.up) { const done = hit.up(3); if (done) hit.up = null; if (!all || !done) return; } // (her first drawing: done out of sight, a few milliseconds a frame)
+      if (!all && !G.R.progsReady()) return; // (and her shaders made)
       hit.holder.position.copy(q.obj.position); S.zone.remove(q.obj); S.zone.add(hit.holder);
       q.obj = hit.holder; q.real = true; q.bow = hit.bow;
+      if (hid) hit.holder.traverse((o: any) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; hid!.push(o); } }); // (in the tunnel: out of sight with the rest)
       if (!all) return;
     }
   }
@@ -449,7 +468,10 @@ const G_Space = (() => {
     if (!pre.done) { G.LevelView.step(map, 4); return false; }
     if (!pre.up) pre.up = G.R.preload(pre.root, things);
     if (pre.up !== true && (pre.up as (ms: number) => boolean)(3)) pre.up = true;
-    return pre.up === true;
+    // (and the ship's own things, new in the level's frame: her stars, her screens. A material that isn't lit keeps the shader
+    // it was first given, which may be from wherever the scene was before space, so the new ones' wouldn't be there to be had)
+    if (pre.up === true && !(pre as any).kit) { (pre as any).kit = true; G.R.lightPad(); for (const o of [S.stars, S.model && S.model.group]) if (o) G.R.renderer.compile(o, G.R.camera, G.R.scene); }
+    return pre.up === true && G.R.progsReady(); // (and its shaders made, on the driver's threads: or drawing her would wait for them)
   }
   // ---- The jump's way out, made on the way: from the base, the mission at the anchor she's by (or spooling for) is laid out,
   // drawn and sent to the graphics card a frame at a time while she's still flying, so when the host puts the squad there
@@ -468,36 +490,41 @@ const G_Space = (() => {
     if (!d) { if (jumpPre && !S.ftl) { viewDrop(jumpPre.map); jumpPre = null; } return; }
     const key = G.Prep.keyOf(d.seed, d.level, d.th, d.night, d.gen);
     if (!jumpPre || jumpPre.key !== key) { if (jumpPre) viewDrop(jumpPre.map); jumpPre = { key, map: null, d }; G.Prep.want(d.seed, d.level, d.th, d.night, d.gen); return; }
-    if (!jumpPre.map) { jumpPre.map = G.Level.generate(d.seed, d.level, d.th, d.night, d.gen); return; }
+    if (!jumpPre.map) { jumpPre.map = layOut(d); return; }
     prepStep(jumpPre.map, d.gen && d.gen.obj === 'artifact' && jumpPre.map.sp && jumpPre.map.sp.artifact ? 1 : 0);
   }
+  /** one of the zone's ships ready to be the level: laid out, drawn and sent to the graphics card (or there's no taking what's made: takeMap) */
+  function zoneReady(h: ZHull | undefined) { if (!h) return false; if (!h.key && h.map) return true; const p = h.map && (h.map as any).viewPre as LvViewPre | null; return !!(p && p.done && p.up === true && G.R.progsReady()); }
   function zonePrep() { // (from the game's loop, once the frame's drawn: the scene lit as it's drawn, which is what the shaders are found for)
     if (!S.on || S.kind !== 'board' || !S.zone || !S.zinfo || S.docked || S.ftl || S.warp || zoneHullsOf !== S.zinfo.ms.seed) return;
-    let best: typeof S.traffic[0] | null = null, bd = 2000; const far = new Set<ZHull>();
+    let best: typeof S.traffic[0] | null = null, bd = ZONE_REAL + 1;
     for (const q of S.traffic) {
       if (!q.real || !q.wp || q.c.k == null) continue;
       const d = S.P.distanceTo(q.wp.p), h = zoneHulls.get(S.zinfo.ms.seed + ':' + q.c.k);
-      if (h && d > 3000) far.add(h);
-      if (d < bd) { bd = d; best = q; }
+      if (!h) continue;
+      if (d > ZONE_DROP) { if (h.map && (h.map as any).viewPre) { viewDrop(h.map); h.map = null; } continue; } // (left behind: what was made of her goes)
+      if (d < bd && !zoneReady(h)) { bd = d; best = q; }
     }
-    for (const h of far) if (h.map && (h.map as any).viewPre) { viewDrop(h.map); h.map = null; } // (left behind: hers goes)
     const hit = best && zoneHulls.get(S.zinfo.ms.seed + ':' + best.c.k); if (!best || !hit) return;
+    const lv = zoneLevel(S.zdef[best.c.k!]);
     if (!hit.map) {
-      const lv = zoneLevel(S.zdef[best.c.k!]);
-      hit.map = G.Level.generate(lv.seed, lv.level, lv.th, lv.night, lv.gen); hit.key = G.Prep ? G.Prep.keyOf(lv.seed, lv.level, lv.th, lv.night, lv.gen) : '';
+      const m = layOut(lv); if (!m) return;
+      hit.map = m; hit.key = G.Prep ? G.Prep.keyOf(lv.seed, lv.level, lv.th, lv.night, lv.gen) : '';
       if (G.Prep) G.Prep.want(lv.seed, lv.level, lv.th, lv.night, lv.gen);
       return;
     }
-    if (!hit.key) return; // (no taking it: takeMap)
-    const lv = zoneLevel(S.zdef[best.c.k!]);
     prepStep(hit.map, lv.gen.obj === 'artifact' && hit.map.sp && hit.map.sp.artifact ? 1 : 0); // (the artifact's glow: things)
   }
-  // The squad's ship has come up with one of the zone's others (within 800 m, and nearer her than the one that's the level): the host is asked to make her the
-  // level (js/spaceserver.ts 'tboard'). Whoever's flying asks.
+  // The squad's ship has come up with one of the zone's others (within 2 km, and well nearer her than the one that's the level), and
+  // she's ready (zonePrep: so nothing stops), or within 400 m anyway: the host is asked to make her the level (js/spaceserver.ts
+  // 'tboard'). Whoever's flying asks.
   function zoneClose(dt: number) {
     if (S.kind !== 'board' || S.docked || S.ftl || S.warp || (S.state && S.state.boom)) { S.tclose = null; return; }
-    let best: typeof S.traffic[0] | null = null, bd = Math.min(800, S.P.distanceTo(S.zC)); // (within 800 m, and nearer than the ship that's the level now)
-    for (const q of S.traffic) { if (!q.wp || q.c.k == null) continue; const d = S.P.distanceTo(q.wp.p); if (d < bd) { bd = d; best = q; } }
+    let best: typeof S.traffic[0] | null = null, bd = Math.min(ZONE_TAKE, S.P.distanceTo(S.zC) * 0.8); // (and a fifth nearer than the ship that's the level now: no to and fro between two)
+    for (const q of S.traffic) {
+      if (!q.wp || q.c.k == null) continue; const d = S.P.distanceTo(q.wp.p);
+      if (d < bd && (d < ZONE_NOW || (S.zinfo && zoneReady(zoneHulls.get(S.zinfo.ms.seed + ':' + q.c.k))))) { bd = d; best = q; }
+    }
     if (!best) { S.tclose = null; return; }
     if (!S.tclose || S.tclose.k !== best.c.k) S.tclose = { k: best.c.k!, t: 0, name: best.wp!.name };
     S.tclose.t += dt;
@@ -869,6 +896,8 @@ const G_Space = (() => {
       // out of sight it's never drawn, so the first frame out would do all of it at once)
       if (!tunUp || tunUp.map !== S.map) tunUp = { map: S.map, steps: [G.R.preload(G.R.levelRoot), ...(S.root ? [G.R.preload(S.root)] : [])] };
       while (tunUp.steps.length && tunUp.steps[0](3)) tunUp.steps.shift();
+      // (and she doesn't drop out till it is, its shaders made too, on the driver's threads: the clock's held short of the end, four seconds at most)
+      if (left < 0.6 && left > 0.3 && (tunUp.steps.length || !G.R.progsReady()) && (f.held = (f.held || 0) + dt) < 4) f.t -= dt;
       if (left <= 0) { S.ftl = null; tn.visible = false; G.SpaceUI.flash(); S.V.copy(fwd(S.Q)).multiplyScalar(45); if (isCtl() || !S.ctl) sendPose(true); }
     }
     // in the tunnel the place is out of sight (its meshes: its lights stay, or every shader would be made again for the change

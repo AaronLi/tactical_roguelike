@@ -1729,6 +1729,20 @@ const G_R = {
   // it's the level (a shader's built for how many there are of each kind): the level now in the scene has its own out of the
   // count meanwhile, and points stands for the point lights the new one will bring (js/space.ts things).
   _preRT: null as THREE.WebGLRenderTarget | null, _preMat: null as THREE.Material | null,
+  // Every shader three makes is made for the scene's lights as they are, so much as one point light more (a level's lamp) and
+  // every material drawn is made again, in the frame it changes: a stop of a few hundred milliseconds. Where the scene goes
+  // from one place to the next without a stop (space: the base, the jump, the ship boarded), padTo is how many point lights
+  // it always has: those it hasn't are made up with dark ones (lightPad, before each frame and each shader found ahead).
+  padTo: 0, _pads: [] as THREE.PointLight[],
+  lightPad() {
+    const want = this.padTo;
+    if (!want) { for (const l of this._pads) l.visible = false; return; }
+    let n = 0; this.scene.traverseVisible((o: any) => { if (o.isPointLight && !o.userData.pad) n++; });
+    while (this._pads.length < want) { const l = new THREE.PointLight(0x000000, 0, 0.01); l.position.set(0, -1e5, 0); l.userData.pad = true; l.visible = false; this.scene.add(l); this._pads.push(l); }
+    this._pads.forEach((l, i) => { l.visible = i < want - n; if (!l.parent) this.scene.add(l); });
+  },
+  /** every shader asked for has been made (on the driver's own threads, KHR_parallel_shader_compile): drawing with any of them won't stop to wait */
+  progsReady() { for (const p of (this.renderer.info.programs || []) as any[]) if (p.isReady && !p.isReady()) return false; return true; },
   preload(root: THREE.Object3D, points = 0) {
     const r = this.renderer, texs: THREE.Texture[] = [], objs: any[] = [], seenT = new Set<unknown>(), seenG = new Set<unknown>();
     const KEYS = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'alphaMap', 'aoMap', 'bumpMap'];
@@ -1743,6 +1757,7 @@ const G_R = {
       const t0 = performance.now(), late = () => performance.now() - t0 > ms, hid: THREE.Object3D[] = [];
       this.levelRoot.traverseVisible((o: any) => { if (o.isLight) hid.push(o); }); for (const o of hid) o.visible = false;
       for (const l of stand) this.scene.add(l);
+      this.lightPad();
       try {
         while (texs.length && !late()) r.initTexture(texs.pop()!);
         while (objs.length && !late()) {
@@ -1758,6 +1773,7 @@ const G_R = {
         }
       } catch (e) { console.warn('preload', e); texs.length = 0; objs.length = 0; }
       for (const o of hid) o.visible = true; for (const l of stand) this.scene.remove(l);
+      this.lightPad();
       return !texs.length && !objs.length;
     };
   },
@@ -1927,6 +1943,7 @@ const G_R = {
     if (this.debris) { const now = performance.now(); this.debris.update(Math.min(0.05, (now - (this.debrisT || now)) / 1000)); this.debrisT = now; }
     // (the draw calls and triangles counted over the whole frame, every pass: js/profiler.ts reads them after)
     r.info.autoReset = false; r.info.reset();
+    this.lightPad();
     G.LightGrid.on(true); // (the lamps' light: only for the level's own frame)
     for (const m of this.streaks) if (m.visible && m.userData.f !== this.frameNo) m.visible = false; // (rounds that stopped)
     for (const m of this.glows) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;

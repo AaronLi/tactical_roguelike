@@ -1,35 +1,57 @@
 'use strict';
 // Levels got ready ahead (js/prepworker.ts): a level that's coming (a ship of the zone's the squad's ship is drawing near to:
 // js/space.ts) is asked for by its figures, worked on in another thread while the game goes on, and what was worked out is
-// taken when the level's put up (js/game.ts enterLevel), so that frame has little left to do. Nothing depends on it: a level
-// that wasn't asked for, or isn't ready, is worked out on the spot as before.
+// taken when it's wanted, so the frame it's put up has little left to do. Nothing depends on it: a level that wasn't asked
+// for, or isn't ready, is worked out on the spot as before.
 //   G.Prep.want(seed, level, th, night, gen)   start on it (once)
-//   G.Prep.take(seed, level, th, night, gen)   what was worked out, if it's ready (the light grid's sums: map.lgPre), else null
+//   G.Prep.map(seed, level, th, night, gen)    the level laid out there (js/level.ts generate, as it would be here: a level
+//                                              has nothing in it of anything outside it, so it comes over whole), if it's
+//                                              come; asked for if it isn't on its way. null meanwhile; false if there's no
+//                                              other thread, so it's to be laid out here
+//   G.Prep.take(seed, level, th, night, gen)   its light grid's sums (map.lgPre), if they've come, else null
 const G_Prep = (() => {
   let w: Worker | null = null, dead = false;
-  const got = new Map<string, any>(), asked = new Set<string>();
+  const got = new Map<string, any>(), maps = new Map<string, LvMap>(), flying = new Set<string>(), bad = new Set<string>();
   const keyOf = (seed: number, level: number, th: number | undefined, night: boolean, gen: any) => JSON.stringify([seed, level, th, !!night, gen ? Object.keys(gen).sort().map((k) => [k, gen[k] == null ? null : gen[k]]) : null]);
+  const cap = (m: Map<string, unknown>, n: number) => { while (m.size > n) m.delete(m.keys().next().value!); };
   function worker() {
     if (w || dead) return w;
     try {
       w = new Worker('dist/js/prepworker.js');
-      w.onmessage = (e) => { const m = e.data; if (m && m.t === 'prep' && m.d) { got.set(m.key, m.d); while (got.size > 4) got.delete(got.keys().next().value!); } };
-      w.onerror = () => { dead = true; w = null; };
+      w.onmessage = (e) => {
+        const m = e.data; if (!m || m.t !== 'prep') return;
+        if (m.err) { bad.add(m.key); console.warn('prep', m.err); }
+        if (m.d || m.err) flying.delete(m.key); // (the level comes first, then its light: it's on its way till that has)
+        if (m.d) { got.set(m.key, m.d); cap(got, 8); }
+        if (m.map) { maps.set(m.key, m.map); cap(maps, 8); }
+      };
+      w.onerror = () => { dead = true; w = null; flying.clear(); };
     } catch (e) { dead = true; w = null; }
     return w;
   }
-  function want(seed: number, level: number, th: number | undefined, night: boolean, gen: any) {
-    const key = keyOf(seed, level, th, night, gen); if (asked.has(key)) return;
-    const ww = worker(); if (!ww) return;
-    asked.add(key);
+  function ask(key: string, seed: number, level: number, th: number | undefined, night: boolean, gen: any) {
+    const ww = worker(); if (!ww || flying.has(key)) return;
+    flying.add(key);
     ww.postMessage({ t: 'prep', key, seed, level, th, night: !!night, gen, opts: Object.assign({}, G.LightGrid.opts) });
+  }
+  function want(seed: number, level: number, th: number | undefined, night: boolean, gen: any) {
+    const key = keyOf(seed, level, th, night, gen); if (got.has(key) || maps.has(key)) return;
+    ask(key, seed, level, th, night, gen);
+  }
+  function map(seed: number, level: number, th: number | undefined, night: boolean, gen: any): LvMap | null | false {
+    if (!worker()) return false;
+    const key = keyOf(seed, level, th, night, gen), m = maps.get(key);
+    if (bad.has(key)) return false; // (it failed there: here, then)
+    if (m) { maps.delete(key); return m; }
+    ask(key, seed, level, th, night, gen);
+    return null;
   }
   function take(seed: number, level: number, th: number | undefined, night: boolean, gen: any) {
     const key = keyOf(seed, level, th, night, gen), d = got.get(key) || null;
-    got.delete(key); asked.delete(key);
+    got.delete(key);
     return d;
   }
-  return { want, take, keyOf, boot: () => { worker(); } };
+  return { want, map, take, keyOf, boot: () => { worker(); } };
 })();
 G.Prep = G_Prep;
 interface GameModules { Prep: typeof G_Prep }

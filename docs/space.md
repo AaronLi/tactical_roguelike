@@ -27,13 +27,16 @@ off: the game is then the route map and the helicopter, as it was. A debug start
      drive eases her the rest of the way on), it spins up by itself (3.5 s, 2.5 s with the tuned drive) and holds while she's
      kept on it; turning off it spins it down. Spun up, T warps her: flung at the target at up to ten times her old cruise
      speed (11 km/s for the Kestrel) and brought down again to come out 300 m off its hull, going as it goes (a passing ship
-     then has its course matched and is the level: zoneClose). Not in atmosphere, nor for a target within 800 m or so;
+     then has its course matched and is the level: zoneClose). Not in atmosphere, nor for a target within 2 km or so;
    - a ring where her nose points and a green ring where she's actually going; every waypoint marked on the view with its
      distance (m, km, Mm, light-seconds: `G.SpaceData.dist`); the navigation screen on the helm's console and on the glass.
 4. **The anchor.** Each mission taken has an interspatial anchor 7 to 13 km out. In the ring, under 80 m/s, hold J: the
-   drive spools, the screens go to the jump's light (the host's veil, kind `ftl`: CSS only, so it keeps moving while the
-   page builds the level), and the ship comes out of the tunnel 4.5 s after the level is ready. A corvette's level built in
-   about half a second on the machine this was tested on.
+   drive spools and the stars smear; the level she's going to was laid out (on another thread: `js/prep.ts`), drawn and sent
+   to the graphics card while she was still flying, so nothing covers the screen and the pod's walked about in the whole
+   way. In the tunnel what's outside is out of sight while the rest of it is sent; she comes out after 4.5 s, or up to 4 s
+   more if its shaders aren't all made yet (the driver's own threads: drawing with one that isn't would stop the frame).
+   While in space the scene always has four point lights (dark ones made up: `G.R.padTo`, `lightPad`), since one light more
+   or less would have every shader made again at the swap.
 5. **Boarding.** She arrives 1.7 km off. Ram her hull nose-on at 5 m/s or more (no speed is too high), **anywhere there's a clear stretch of it**:
    port, starboard or the stern quarters. Nothing marks a place for it, and nothing inside stops it: the furniture within a
    couple of metres of the hole is destroyed (`js/shipgen.ts` cut; wreckage across the deck, `js/space.ts` wreck). The navigation screen
@@ -198,7 +201,7 @@ so the anchor to jump home by, which is a place in the zone, falls astern as the
 
 A mission's zone is vast, with only now and then someone else in it (`js/spacedata.ts` zone: the mission's ship, contact 0, and
 four or five others on wide loops; one comes within a few kilometres). Every one of them is a ship of her own class, theme and
-seed, on the navigation screen by name. Come up within 800 m of one, nearer her than the ship that's the level, and the squad's ship matches her course:
+seed, on the navigation screen by name. Come up within 2 km of one, a fifth nearer her than the ship that's the level, once she's ready (every one within 5 km is laid out, drawn and sent to the graphics card in the background, nearest first, and kept while the squad's in the zone: zoneReal, zonePrep; her layout's made on another thread, js/prep.ts), or within 400 m whether or not, and the squad's ship matches her course:
 the host makes her the level (`tboard` in `js/spaceserver.ts`; the zone is then drawn from her, turning when she turns) and the
 ship left behind goes on her way as one of the zone's others. Nothing is drawn over this: no wipe, no loading screen. Within
 five kilometres a ship of the zone's is already drawn as her own hull (`zoneReal`: her level laid out from her seed, for its
