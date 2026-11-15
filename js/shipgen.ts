@@ -13,7 +13,7 @@
 // A level can hold a second ship, nothing to do with the mission (sp.other: a transport or a corvette lying off the
 // target's port side), to be boarded or left alone.
 // finish(map, lay), after the plan: what the mission needs of the finished map (map.sp).
-type ShRole = 'bridge' | 'gunnery' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine' | 'stairs';
+type ShRole = 'bridge' | 'security' | 'gunnery' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine' | 'stairs';
 interface ShSlot { rm: LvRoom; pos: number; side: number; deep: boolean; inner: LvRoom | null; door: number[]; x: number }
 interface ShSeg { x: number; w: number; d: number[]; split: boolean[]; stair: boolean }
 interface ShWing { dO: number; dI: number; ew: number; len: number }
@@ -38,9 +38,9 @@ const G_ShipGen = (() => {
   const PROGRAM: Record<string, [ShRole, number | null][]> = {
     'transport:0': [['quarters', 0.2], ['mess', null], ['cargo', 0.8]],
     'small:0': [['gunnery', 0.3], ['quarters', 0.1], ['mess', null], ['cargo', 0.8]],
-    'medium:0': [['gunnery', 0.4], ['armoury', 0.3], ['barracks', null], ['mess', null], ['medbay', null], ['quarters', 0], ['magazine', 0.9], ['pods', 0.5], ['cargo', null]],
-    'large:0': [['gunnery', 0.4], ['armoury', 0.35], ['vault', 0.5], ['barracks', null], ['mess', null], ['galley', null], ['medbay', null], ['quarters', 0], ['magazine', 0.85], ['reactor', 1], ['pods', 0.5], ['brig', null], ['barracks', null], ['quarters', 0.1], ['magazine', 0.2], ['pods', 0.7]],
-    'capital:0': [['gunnery', 0.4], ['armoury', 0.35], ['vault', 0.55], ['barracks', 0.25], ['barracks', 0.7], ['magazine', 0.9], ['magazine', 0.15], ['brig', null], ['medbay', null], ['pods', 0.5], ['cargo', null], ['barracks', null], ['cargo', null], ['magazine', 0.5]],
+    'medium:0': [['gunnery', 0.4], ['security', 0.55], ['armoury', 0.3], ['barracks', null], ['mess', null], ['medbay', null], ['quarters', 0], ['magazine', 0.9], ['pods', 0.5], ['cargo', null]],
+    'large:0': [['gunnery', 0.4], ['security', 0.6], ['armoury', 0.35], ['vault', 0.5], ['barracks', null], ['mess', null], ['galley', null], ['medbay', null], ['quarters', 0], ['magazine', 0.85], ['reactor', 1], ['pods', 0.5], ['brig', null], ['barracks', null], ['quarters', 0.1], ['magazine', 0.2], ['pods', 0.7]],
+    'capital:0': [['gunnery', 0.4], ['security', 0.6], ['armoury', 0.35], ['vault', 0.55], ['barracks', 0.25], ['barracks', 0.7], ['magazine', 0.9], ['magazine', 0.15], ['brig', null], ['medbay', null], ['pods', 0.5], ['cargo', null], ['barracks', null], ['cargo', null], ['magazine', 0.5]],
     'capital:1': [['quarters', 0.05], ['armoury', 0.2], ['mess', 0.5], ['galley', 0.55], ['medbay', null], ['barracks', 0.8], ['pods', 0.4], ['quarters', 0.15], ['quarters', null], ['pods', 0.75], ['mess', null], ['barracks', null], ['quarters', null]],
   };
   const FILL: ShRole[] = ['cargo', 'quarters', 'mess', 'cargo', 'barracks'];
@@ -407,7 +407,7 @@ const G_ShipGen = (() => {
       }
     }
   }
-  const NAMES: Record<string, string> = { bridge: 'Bridge', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell' };
+  const NAMES: Record<string, string> = { bridge: 'Bridge', security: 'Security', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell' };
   return { lay, finish, roomAt, sites, siteOf, siteAt, cut, seal, NAMES, SPEC };
 })();
 G.ShipGen = G_ShipGen;

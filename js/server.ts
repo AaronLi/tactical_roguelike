@@ -59,6 +59,7 @@ interface Enemy {
   spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean; lastGr?: number; lastFb?: number; tb?: { burn: number; blast: number; n: number }; flashId?: number;
   hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeVis?: number; blind?: boolean; onWait?: number;
+  post?: { x: number; y: number; z: number; yaw: number; flow?: Int16Array } | null; shelter?: { x: number; y: number; z: number; flow?: Int16Array; room?: number } | null; // (a doorway to hold, a room to get to: a ship's response, js/spaceserver.ts)
   order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
   coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
   visK?: number; noiseAt?: number; nsAt?: number; guess?: { x: number; y: number; z: number; until: number } | null; // (night: how well they see who they're on, lightK; when they last heard something; when their own search last started; where they think you are)
@@ -937,6 +938,16 @@ const G_Server = {
   },
   // Somewhere to amble to, near where they started: a few steps along a way with room to walk it (not toward a
   // point behind a wall, to stand pressed against the wall till they give up), or null to stay put.
+  // On the way to a spot (by a flow field to it, its own or one shared by everyone going to the same room): a step, true; there, false
+  travel(e: Enemy, g: { x: number; y: number; z: number; flow?: Int16Array }, speed: number, dt: number) {
+    const L = G.Level, U = G.U, map = this.map!, d = Math.hypot(g.x - e.x, g.z - e.z);
+    if (d < 0.4) return false;
+    if (!g.flow) g.flow = L.flow(map, [L.src(map, g.x, g.y, g.z)]);
+    const step = d > 3 ? L.flowStep(map, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dx = tx - e.x, dz = tz - e.z, dd = Math.hypot(dx, dz) || 1;
+    e.idleYaw = Math.atan2(-dx, -dz); e.yaw += U.angDiff(e.yaw, e.idleYaw) * Math.min(1, dt * 6);
+    this.moveEntity(e, dx / dd, dz / dd, speed, dt);
+    return true;
+  },
   amble(e: Enemy) {
     for (let k = 0; k < 4; k++) {
       const a = Math.random() * Math.PI * 2, want = 0.6 + Math.random() * 1.9;
@@ -1900,6 +1911,10 @@ const G_Server = {
         if (e.noise) e.idleYaw = Math.atan2(-(e.noise.x - e.x), -(e.noise.z - e.z));
         e.calmT -= dt;
         if (e.calmT <= 0) { e.suspicious = false; e.noise = null; if (!def.ready) e.drawn = false; }
+      } else if (e.post) {
+        // posted (a ship's response: a doorway of the room her people are in): there, and watching the way in
+        e.drawn = true;
+        if (!this.travel(e, e.post, Math.min(2.6, def.speed * 0.8), dt)) e.idleYaw = e.post.yaw;
       } else {
         // pottering about like anyone else in the building
         e.idleT -= dt;
@@ -2041,6 +2056,11 @@ const G_Server = {
         // under a leader's order (callIn): to the spot by its own way in, and then searching outward from it
         const os = this.orderStep(e, dt);
         if (os) { mx = os.mx; mz = os.mz; sp = os.sp; e.holding = false; } else e.holding = true;
+      } else if (e.post && !e.canSee && (!e.lastSeen || e.lostT > 5) && Math.hypot(e.post.x - e.x, e.post.z - e.z) > 0.6) {
+        // posted (a ship's response) and lost them: back to the doorway they were put on
+        const L2 = G.Level, map2 = this.map!, g = e.post; if (!g.flow) g.flow = L2.flow(map2, [L2.src(map2, g.x, g.y, g.z)]);
+        const d = Math.hypot(g.x - e.x, g.z - e.z), step = d > 3 ? L2.flowStep(map2, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dd = Math.hypot(tx - e.x, tz - e.z) || 1;
+        mx = (tx - e.x) / dd; mz = (tz - e.z) / dd; sp = 0.8; e.cover = null; e.inCover = false; e.holding = false;
       } else if (this.brave(e) && e.lastSeen && e.lostT < 12 && leash && Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z) > 2) {
         // a push on where police were last seen. A grenade goes first, if they have one and it's far enough off to be safe (5-20 m;
         // not at someone behind bulletproof glass: it'd come back at them): thrown as the push starts, once a push, and they hold
@@ -2227,7 +2247,7 @@ const G_Server = {
   // holds the way in from a few metres off, gun on the door, and goes in a while later; a third pushes after a delay. Lookouts (a rifle with
   // a scope) always hold. Then they search outward from the spot (orderStep).
   dispatch(l: Enemy) {
-    const T = l.callTgt!, c = this.clock, map = this.map!, L = G.Level, TS = L.TS, R = this.RADIO, fT = this.flowTo(T.x, T.y, T.z);
+    const T = l.callTgt!, R = this.RADIO, fT = this.flowTo(T.x, T.y, T.z);
     const field = this.soundField(l.x, l.z, l.y);
     const who: Enemy[] = [];
     for (const e of this.enemies.values()) {
@@ -2237,6 +2257,11 @@ const G_Server = {
       who.push(e);
     }
     if (!who.length) { this.logCall(l, 'nobody within earshot'); return; }
+    this.dispatchGroup(T, who, l.id, (m) => this.logCall(l, m));
+  },
+  // A group sent to clear round a spot (T): each by its own way in (the doors round it), pushing or holding, then searching outward (orderStep)
+  dispatchGroup(T: { x: number; y: number; z: number }, who: Enemy[], by: number, log?: (m: string) => void) {
+    const c = this.clock, map = this.map!, L = G.Level, TS = L.TS, R = this.RADIO, fT = this.flowTo(T.x, T.y, T.z);
     // the ways in
     const entries: OrderSpot[] = [], want = Math.min(5, Math.max(2, Math.ceil(who.length / 2)));
     const mk = (x: number, y: number, z: number, kind: 'door' | 'point') => entries.push({ x, y, z, flow: this.flowTo(x, y, z), kind, n: 0 });
@@ -2269,13 +2294,13 @@ const G_Server = {
       if (!best) continue;
       const hold = best.n === 1 || !!e.def.aimTime, delay = best.n >= 2 ? 3 * (best.n - 1) : 0;
       if (!e.def.aimTime) best.n++; // (a lookout holds wherever it is and doesn't take the way in from the rest)
-      e.order = { by: l.id, role: hold ? 'hold' : 'push', phase: 'approach', x: T.x, y: T.y, z: T.z, entry: best, tflow: fT, at: c, until: c + R.LIFE, holdUntil: 0, rest: delay + Math.random() * 0.6, leg: 'run', legT: 0, cv: null, cvFlow: null, sp: null, ring: 6, done: [], look: 0, delay, rt: c };
+      e.order = { by, own: by < 0 ? true : undefined, role: hold ? 'hold' : 'push', phase: 'approach', x: T.x, y: T.y, z: T.z, entry: best, tflow: fT, at: c, until: c + R.LIFE, holdUntil: 0, rest: delay + Math.random() * 0.6, leg: 'run', legT: 0, cv: null, cvFlow: null, sp: null, ring: 6, done: [], look: 0, delay, rt: c };
       e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.lurk = false; e.hide = null; e.dp = null; e.heard = undefined; e.walkTo = null; e.pendingAlert = -1; e.dpOk = c + 20;
       e.noise = { x: T.x, z: T.z };
       this.alertEnemy(e, false);
       split.push(`#${e.id}>${best.kind}${entries.indexOf(best)}${hold ? 'H' : ''}`);
     }
-    this.logCall(l, `dispatched ${split.length} (${entries.length} ways in: ${entries.map((q, i) => `${q.kind}${i}@${q.x.toFixed(0)},${q.z.toFixed(0)}`).join(' ')}): ${split.join(' ')}`);
+    if (log) log(`dispatched ${split.length} (${entries.length} ways in: ${entries.map((q, i) => `${q.kind}${i}@${q.x.toFixed(0)},${q.z.toFixed(0)}`).join(' ')}): ${split.join(' ')}`);
   },
   endOrder(e: Enemy) { e.order = null; e.holding = false; e.cover = null; e.inCover = false; },
   // They've seen the police and lost them: the search starts again from where they were last seen
@@ -2524,7 +2549,10 @@ const G_Server = {
   // Civilians: mill about until something scares them, then cower or bolt away from the shooting.
   thinkCiv(e: Enemy, dt: number) {
     const def = e.def, U = G.U, L = G.Level;
-    if (e.state === 'cuffed' || e.state === 'surrender' || e.state === 'cower') return;
+    if (e.state === 'cuffed' || e.state === 'surrender') return;
+    // sent to shelter (a ship's response): fleeing, hiding or frozen, they make for it once there's no officer on top of them
+    if (e.shelter && (e.state === 'cower' || e.state === 'hide' || e.state === 'flee')) { const near = this.nearestOfficer(e); if (!near || near.d > 6) { e.state = 'normal'; e.hide = null; e.crouch = false; e.leanOut = 0; } }
+    if (e.state === 'cower') return;
     if (e.state === 'hide') {
       if (!e.hide && !this.seekHide(e)) { e.state = 'cower'; e.crouch = false; e.leanOut = 0; return; }
       // an officer right on top of them: they give up and freeze
@@ -2544,6 +2572,10 @@ const G_Server = {
       }
       if (e.fleeT <= 0 || !step) e.state = Math.random() < 0.6 && this.seekHide(e) ? 'hide' : 'cower';
       return;
+    }
+    if (e.shelter && Math.hypot(e.x - e.shelter.x, e.z - e.shelter.z) > 1.2) { // (sent to shelter: there first, at a hurry; in the room, there)
+      if (e.shelter.room != null && G.ShipGen.roomAt(this.map!, e.x, e.z, e.fl || 0) === e.shelter.room) { e.shelter.x = e.home.x = e.x; e.shelter.z = e.home.z = e.z; }
+      else { e.walkTo = null; this.travel(e, e.shelter, def.speed * 1.4, dt); return; }
     }
     e.idleT -= dt;
     if (e.idleT <= 0) {

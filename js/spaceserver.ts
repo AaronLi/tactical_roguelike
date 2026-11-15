@@ -13,7 +13,8 @@ interface SvMission {
   art: 0 | 1 | 2; artBy: string | null; // (0 where it lies, 1 carried, 2 lost with the ship)
   hvt: number | null; hvtSt: 0 | 1 | 2; // (0 at large, 1 dead, 2 in restraints)
   gunners?: number[]; gn?: number; // (her gun crew, the ids of those posted in her gun control; how many of them are still at it, last told)
-  arm: number | null; boom: boolean; cleared: boolean; unlocked?: number[]; zt: number; leftSaid?: number; revisit?: boolean; cutsWas?: number[][]; breached?: boolean; // (zt: the zone's clock, seconds since the squad came out of the jump: where everything that's under way out there is)
+  arm: number | null; boom: boolean; cleared: boolean; unlocked?: number[];
+  alarm?: boolean; squads?: number[]; camOp?: number | null; camOn?: boolean; belief?: { x: number; y: number; z: number; room: number } | null; sweepAt?: number; respT?: number; safe?: number; zt: number; leftSaid?: number; revisit?: boolean; cutsWas?: number[][]; breached?: boolean; // (zt: the zone's clock, seconds since the squad came out of the jump: where everything that's under way out there is)
   site: number[] | null; raid: number[][]; hold: number; told?: boolean; // (raid: where the pirates' pods are in her hull, as sites; hold: the room their hostages are in)
   // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
   resp: Map<number, number>; salv: number[]; // (resp: the breach response squads' people, and the hull each is aboard; salv: the salvage taken, by its number)
@@ -161,14 +162,102 @@ const G_SpaceSv = (() => {
       const sq = rooms('barracks', 'armoury', 'magazine', 'spine');
       for (let q = 0; q < C.squads; q++) {
         const kinds: EnemyKind[] = [q === 0 ? 'leader' : 'grunt', 'grunt', 'rusher', L >= 3 ? 'heavy' : 'grunt'];
-        for (const kd of kinds) { const e = put(kd, [sq[q % Math.max(1, sq.length)]].filter((v) => v != null), 0); if (e) e.drawn = true; }
+        for (const kd of kinds) { const e = put(kd, [sq[q % Math.max(1, sq.length)]].filter((v) => v != null), 0); if (e) { e.drawn = true; if (M && h === 0) (M.squads = M.squads || []).push(e.id); } }
       }
+      // her security office (frigates and up): one on the cameras, watching the ship
+      if (h === 0 && M) { const so = rooms('security'); if (so.length) { const e = put('suspect', so, 0); if (e) M.camOp = e.id; } }
       // her gun crew: two at gun control for each hull that has guns (the boarded ship's are what her guns need: gunnersLeft)
       const G0 = G.SpaceData.SIZES[meta.hulls[h].size].guns;
       if (G0.pd + G0.cannon + G0.missile > 0) for (let k = 0; k < 2; k++) { const e = put('suspect', rooms('gunnery'), k); if (e && M && h === 0) (M.gunners = M.gunners || []).push(e.id); }
       const rs = rooms('mess', 'quarters', 'spine', 'cargo');
       for (let q = 0; q < C.resp; q++) for (const kd of ['suspect', 'rusher', 'suspect'] as EnemyKind[]) { const e = put(kd, [rs[q % Math.max(1, rs.length)]].filter((v) => v != null), 0); if (e && M) M.resp.set(e.id, h); }
     }
+  }
+  // ---- Her response to being boarded, by what she is (each hull of hers by its class):
+  //   a civilian transport or a corvette: shelter. Her people are got to the safest compartment she has (the farthest from where the
+  //     squad is, with the fewest ways in, none locked to her own crew), her guards and her breach team posted in its doorways, watching
+  //     the way in; nobody goes looking for the squad.
+  //   a frigate, a cruiser, a capital ship: sweep. Her response teams and her security squads are sent to clear the compartment they
+  //     think the squad is in (dispatchGroup: each by its own way in, then searching outward). With someone at her security office's
+  //     cameras that's where the squad is, as they move; without, the breach, then wherever one of her crew last saw them.
+  // The alarm's the breach (unless the squad's ship jammed her: then the first of her crew to see them).
+  const doctrine = (h: number) => { const M = st.M, sz = M && M.meta && M.meta.hulls[h] ? M.meta.hulls[h].size : 'small'; return sz === 'transport' || sz === 'small' ? 'shelter' : 'sweep'; };
+  function alarm(x: number, z: number) {
+    const sv = S(), M = st.M, map = sv.map; if (!M || !M.meta || !map || M.alarm || M.ms.obj === 'hostage') return;
+    M.alarm = true;
+    const ri = G.ShipGen.roomAt(map, x, z, 0), hull = ri >= 0 ? M.meta.hullOf[ri] : 0;
+    M.belief = { x, y: 0, z, room: ri }; M.sweepAt = -1e9;
+    if (doctrine(hull) === 'shelter') shelter(hull, x, z);
+    else respond(x, z);
+  }
+  // her people to the safest compartment, her guards in its doorways
+  function shelter(hull: number, x: number, z: number) {
+    const sv = S(), M = st.M!, map = sv.map!, meta = M.meta!, L = G.Level, TS = L.TS;
+    const from = sv.flowTo(x, 0, z), locked = (d: LvDoor) => !!meta.locks[d.id];
+    const doorsOf = (i: number) => map.doors.filter((d) => { const rr = doorRooms(M).get(d.id) || []; return rr.includes(i); });
+    let best = -1, bs = -1e9;
+    map.rooms.forEach((rm, i) => {
+      if (meta.hullOf[i] !== hull || (rm.fl || 0) !== 0 || ['spine', 'pods', 'stairs', 'engine', 'reactor'].includes(meta.roles[i] || '')) return;
+      const ds = doorsOf(i); if (!ds.length || ds.some(locked)) return;
+      const g = sv.flowDist(from, (rm.cx + 0.5) * TS, 0, (rm.cz + 0.5) * TS); if (g < 0) return;
+      const sc = g - 12 * ds.length + rm.w * rm.h * 0.05; // (far from the squad, few ways in, room for everyone)
+      if (sc > bs) { bs = sc; best = i; }
+    });
+    if (best < 0) { respond(x, z); return; }
+    M.safe = best;
+    const rm = map.rooms[best], flow = L.flow(map, [[rm.cx, rm.cz, 0]]), spots = map.enemySpots.filter(([sx, sz, f]) => (f || 0) === 0 && sx >= rm.x && sx < rm.x + rm.w && sz >= rm.z && sz < rm.z + rm.h);
+    const spot = (k: number) => { const s = spots.length ? spots[k % spots.length] : [rm.cx, rm.cz]; return { x: (s[0] + 0.5) * TS + (Math.random() - 0.5) * 0.4, y: 0, z: (s[1] + 0.5) * TS + (Math.random() - 0.5) * 0.4 }; };
+    const onHull = (e: any) => { const r = G.ShipGen.roomAt(map, e.x, e.z, 0); return r >= 0 && meta.hullOf[r] === hull; };
+    let k = 0;
+    for (const e of sv.enemies.values()) if (e.def.civ && e.state !== 'cuffed' && !e.down && onHull(e)) { const p = spot(k++); e.shelter = Object.assign(p, { flow, room: best }); e.state = e.state === 'cower' || e.state === 'hide' || e.state === 'flee' ? 'normal' : e.state; e.hide = null; e.crouch = false; e.home = { x: p.x, y: 0, z: p.z }; }
+    // the doorways: a post just inside each, facing out through it (two to a door, the rest in the room)
+    const posts: { x: number; y: number; z: number; yaw: number; flow: Int16Array }[] = [];
+    const cx = (rm.cx + 0.5) * TS, cz = (rm.cz + 0.5) * TS;
+    for (const d of doorsOf(best)) {
+      const ax = d.axis === 'x' ? 1 : 0, az = d.axis === 'z' ? 1 : 0, sgn = ax ? Math.sign(cx - d.x) || 1 : Math.sign(cz - d.z) || 1;
+      for (const side of [-0.55, 0.55]) {
+        const px = d.x + ax * sgn * 1.3 + az * side, pz = d.z + az * sgn * 1.3 + ax * side;
+        posts.push({ x: px, y: 0, z: pz, yaw: Math.atan2(-(d.x - px), -(d.z - pz)), flow });
+      }
+    }
+    const guards = [...sv.enemies.values()].filter((e) => !e.def.civ && !e.def.leader && e.state === 'normal' && !e.down && onHull(e) && e.id !== M.camOp && !(M.gunners || []).includes(e.id) && !(M.cards.some((c) => c.eid === e.id)));
+    guards.sort((a, b) => Math.hypot(a.x - cx, a.z - cz) - Math.hypot(b.x - cx, b.z - cz));
+    guards.slice(0, Math.max(posts.length, 2) + 1).forEach((e, i) => { const p = posts[i] || Object.assign(spot(100 + i), { yaw: 0, flow }); e.post = p; e.home = { x: p.x, y: 0, z: p.z }; e.walkTo = null; e.bold = false; });
+    say(`Her crew are falling back to ${meta.roles[best] ? 'the ' + G.ShipGen.NAMES[meta.roles[best]!].toLowerCase() : 'one compartment'}, her guards on its doors.`);
+  }
+  // each ship-response tick (respondTick): what the cameras show, what her crew have seen, and her teams sent to it
+  function respondTick(dt: number) {
+    const sv = S(), M = st.M, map = sv.map; if (!M || !M.meta || !map || M.ms.obj === 'hostage') return;
+    M.respT = (M.respT || 0) - dt; if (M.respT > 0) return; M.respT = 1;
+    const meta = M.meta, alive = [...sv.players.values()].filter((p: any) => p.st && !p.st.dd);
+    // the alarm, if the breach didn't ring it: the first of her crew to see the squad
+    if (!M.alarm) { for (const e of sv.enemies.values()) if (!e.def.civ && e.alert && e.lastSeen) { alarm(e.lastSeen.x, e.lastSeen.z); break; } if (!M.alarm) return; }
+    // her cameras: someone at them, on their feet, not given up
+    const op = M.camOp != null ? sv.enemies.get(M.camOp) : null, opRoom = op ? G.ShipGen.roomAt(map, op.x, op.z, op.fl || 0) : -1;
+    const cam = !!op && !op.down && op.state === 'normal' && opRoom >= 0 && meta.roles[opRoom] === 'security';
+    if (cam !== !!M.camOn) { M.camOn = cam; if (cam) say('Her security office has you on camera: her teams know where you are.'); else if (M.camOp != null) say('Her cameras are out: her teams are guessing now.'); }
+    const hull0 = (x: number, z: number) => { const r = G.ShipGen.roomAt(map, x, z, 0); return r >= 0 ? meta.hullOf[r] : -1; };
+    // where they think the squad is
+    let B = M.belief || null;
+    if (cam && alive.length) {
+      const p = alive.reduce((a: any, q: any) => (!B || Math.hypot(q.st.p[0] - B.x, q.st.p[2] - B.z) < Math.hypot(a.st.p[0] - B.x, a.st.p[2] - B.z) ? q : a), alive[0]);
+      B = { x: p.st.p[0], y: p.st.p[1], z: p.st.p[2], room: G.ShipGen.roomAt(map, p.st.p[0], p.st.p[2], 0) };
+    } else {
+      let last: any = null;
+      for (const e of sv.enemies.values()) if (!e.def.civ && e.lastSeen && (e.sawAt || -1) > (last ? last.sawAt : -1)) last = e;
+      if (last && (last.sawAt || 0) > (M.sweepAt || -1e9)) B = { x: last.lastSeen.x, y: last.lastSeen.y || 0, z: last.lastSeen.z, room: G.ShipGen.roomAt(map, last.lastSeen.x, last.lastSeen.z, 0) };
+    }
+    if (!B) return;
+    const moved = !M.belief || M.belief.room !== B.room; M.belief = B;
+    const hull = hull0(B.x, B.z); if (hull < 0 || doctrine(hull) !== 'sweep') return;
+    // her teams: sent when the squad's in a new compartment, or again a while after the last
+    if (!moved && sv.clock - (M.sweepAt || -1e9) < 25) return;
+    const ids = new Set<number>([...M.resp.keys(), ...(M.squads || [])]);
+    const who = [...sv.enemies.values()].filter((e) => ids.has(e.id) && e.state === 'normal' && !e.down && !e.broken && !e.canSee && !e.post && hull0(e.x, e.z) === hull);
+    if (!who.length) return;
+    M.sweepAt = sv.clock;
+    sv.dispatchGroup({ x: B.x, y: B.y, z: B.z }, who, -1);
+    if (moved && M.camOn) say(`Her teams are moving on ${B.room >= 0 && meta.roles[B.room] ? 'the ' + G.ShipGen.NAMES[meta.roles[B.room]!].toLowerCase() : 'your position'}.`);
   }
   // the hull's been breached there: her response squads come to it (what they do when they've heard something and mean to look)
   function respond(x: number, z: number) {
@@ -274,7 +363,7 @@ const G_SpaceSv = (() => {
       const W = sv.map.W, TS = G.Level.TS, x = (M.site[0] % W + 0.5) * TS, z = (((M.site[0] / W) | 0) + 0.5) * TS;
       sv.hear(x, z, G.SpaceData.fitted(st.fleet, 'jammer') ? 14 : 45, 0); // (the whole ship rings with it)
       if (M.ms.obj === 'hostage' && !M.told) { M.told = true; const role = M.meta.roles[M.hold]; say(`The pirates are holding her people in ${role ? 'the ' + G.ShipGen.NAMES[role].toLowerCase() : 'one compartment'}. Clear the ship.`); }
-      if (!G.SpaceData.fitted(st.fleet, 'jammer')) respond(x - M.site[1] * 2 * TS, z - M.site[2] * 2 * TS);
+      if (!G.SpaceData.fitted(st.fleet, 'jammer')) alarm(x - M.site[1] * 2 * TS, z - M.site[2] * 2 * TS);
     } else if (!on && M.meta && sv.map && M.site) {
       // she's backed out of the hole: that compartment is open to space
       const W = sv.map.W, TS = G.Level.TS, x = (M.site[0] % W + 0.5 - M.site[1] * 1.5) * TS, z = (((M.site[0] / W) | 0) + 0.5 - M.site[2] * 1.5) * TS;
@@ -387,6 +476,7 @@ const G_SpaceSv = (() => {
     // a base on a planet: done when it's under control
     if (!M.meta) { if (!M.cleared && M.docked && sv.remaining(false) === 0) { M.cleared = true; M.done = true; say('The base is under control. Back to the ship.'); sync(); } return; }
     if (M.boom) return;
+    respondTick(dt);
     // her gun crew: told when there's one fewer (her guns stop with the last of them)
     const gl = gunnersLeft();
     if (M.gn == null) M.gn = gl;
