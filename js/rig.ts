@@ -105,8 +105,9 @@ const G_Rig = (() => {
 
   // ---------------------------------------------------------------- an officer's kit, as worn
   // k: { helmet, face, carrier, plate, sh (shoulder armour), gr (pelvis armour), cp (pouches on the carrier), belt, lg (leg
-  // armour), bp (on the belt), pack, ifak } (gear ids, or flags). Built from boxes in the chest / head / hips / limb frames:
-  // x right, y up, -z the front.
+  // armour), bp (on the belt), pack, ifak } (gear ids, or flags). Each piece the body's own, made on it in Blender (models/characters/kit_armour.py,
+  // kit_head.py) and skinned to its bones; pouches laid on their surface; night vision, the pack and the IFAK built here in the head's,
+  // the chest's and the hips' frames: x right, y up, -z the front.
   // An officer's own look (the main menu), and what they wear if they haven't picked; a look from anywhere (the network),
   // known options and colours only (js/sim.ts: the host's simulation cleans what it's told with the same)
   const OFFICER_LOOK = G.Sim.OFFICER_LOOK, LOOKS = G.Sim.LOOKS;
@@ -145,10 +146,12 @@ const G_Rig = (() => {
     }
     return pts;
   }
-  const MOLLE_Y: Record<string, number> = { pc: 1.225, heavy: 1.215, wrap: 1.105 }; // (the carriers' MOLLE: its top row's middle, model space: models/characters/kit_armour.py)
+  const MOLLE_Y: Record<string, number> = { pc: 1.225, heavy: 1.215, wrap: 1.105, recon: 1.285 }; // (the carriers' MOLLE: its top row's middle, model space: models/characters/kit_armour.py)
   const BELT_A = [78, 104, 130, 156, 180, -156, -130, -104]; // (a belt's columns round it: the right hip, round the back, to the left; the holster's at the left hip)
   const KM = (c: number, o?: Record<string, any>) => { const key = c + JSON.stringify(o || {}); if (!kitMat.has(key)) kitMat.set(key, new T.MeshLambertMaterial(Object.assign({ color: c }, o || {}))); return kitMat.get(key); };
-  const PACK: Record<string, number[]> = { 'k.sling': [0.22, 0.26, 0.09, 0.12], 'k.assault': [0.3, 0.36, 0.13, 0.14], 'k.ruck': [0.34, 0.5, 0.2, 0.2] };
+  const PACK: Record<string, string> = { 'k.sling': 'sling', 'k.assault': 'assault', 'k.ruck': 'ruck' };
+  // the body's own pack for what's worn (models/characters/kit_armour.py): clear of a plate carrier's back bag (c) or not
+  const packMesh = (pd: any, cd: any) => 'kitpack' + (PACK[pd.id] || 'assault') + (cd && !cd.thin && cd.id !== 'c.recon' ? 'c' : '');
   // the name patch, high on the back (rig.callsign: { id: their animal, name }): on the backpack if they wear
   // one, else on the carrier, else on the shirt
   function backPatch(rig: Rig, k: any) {
@@ -156,10 +159,18 @@ const G_Rig = (() => {
     if (!cs || !G.Callsigns) return;
     const D = (id: any) => (id && G.Gear && G.Gear.DEFS[id]) || null, cd = D(k && k.carrier), pd = D(k && k.pack);
     let y = 0.22, z = 0.128;
-    if (pd) { const [, h, d, py] = PACK[pd.id] || PACK['k.assault']; z = (cd && cd.id !== 'c.recon' ? 0.15 : 0.12) + d + 0.003; y = py + h / 2 - 0.05; }
-    else if (cd && cd.thin) z = 0.126;
-    else if (cd && cd.id !== 'c.recon') { y = 0.2; z = ((cd.id === 'c.heavy' ? 0.3 : 0.27) + (k.plate ? 0.03 : 0)) / 2 + 0.003; }
     const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.05), new T.MeshLambertMaterial({ map: G.Callsigns.backTex(cs.id, cs.name) }));
+    // on a pack: on its back face, near its top (where the body's own pack is: its outermost, model space y up, the back -z)
+    const pp = pd && rig.hPart && rig.hPart[packMesh(pd, cd)], hb = pp && rig.hBone && rig.hBone('chest');
+    if (pd) {
+      if (!pp || !hb) return;
+      const g = pp.geo; if (!g.boundingBox) g.computeBoundingBox();
+      const bb = g.boundingBox!, v = new T.Vector3(0, bb.max.y - 0.06, bb.min.z - 0.003);
+      rig.root.updateMatrixWorld(true); rig.chest.add(m); m.position.copy(rig.chest.worldToLocal(v.applyMatrix4(hb.inv).applyMatrix4(hb.b.matrixWorld)));
+      rig.kitParts.push(m); return;
+    }
+    if (cd && cd.thin) z = 0.126;
+    else if (cd && cd.id !== 'c.recon') { y = 0.2; z = ((cd.id === 'c.heavy' ? 0.3 : 0.27) + (k.plate ? 0.03 : 0)) / 2 + 0.003; }
     m.position.set(0, y, z);
     rig.chest.add(m); fitPart(rig, rig.chest, m); rig.kitParts.push(m);
   }
@@ -371,11 +382,10 @@ const G_Rig = (() => {
     if (!k) return;
     const D = (id: any) => (id && G.Gear && G.Gear.DEFS[id]) || null;
     let part: string | null = null; // (which piece of kit the parts being made are: the hangar shows each on its own)
-    const box = (parent: THREE.Object3D, w: number, h: number, d: number, c: number, x: number, y: number, z: number, o?: Record<string, any>) => { const m = new T.Mesh(new T.BoxGeometry(w, h, d), KM(c, o)); m.position.set(x, y, z); m.userData.part = part; parent.add(m); fitPart(rig, parent, m); rig.kitParts.push(m); return m; };
     const add = (parent: THREE.Object3D, m: THREE.Object3D, x: number, y: number, z: number) => { m.position.set(x, y, z); m.userData.part = part; parent.add(m); fitPart(rig, parent, m); rig.kitParts.push(m); return m; };
-    const pouches = (parent: THREE.Object3D, n: number, c: number, x0: number, y0: number, z: number, w = 0.07, h = 0.09) => { for (let i = 0; i < Math.min(n, 8); i++) box(parent, w, h, 0.05, c, x0 + (i % 4) * (w + 0.015), y0 - Math.floor(i / 4) * (h + 0.015), z); };
-    const C = rig.chest, Hd = rig.hat || rig.head, Hp = rig.hips; // (the head's things: on the hat, which is the head's fit)
-    // a piece of the body's own armour (made on it in Blender, skinned to its bones), if it has it: shown in colour c
+    const Hd = rig.hat || rig.head; // (the head's things: on the hat, which is the head's fit)
+    // a piece of the body's own armour (made on it in Blender, skinned to its bones), shown in colour c. Nothing's drawn until the body's
+    // in (its file still loading): setKit runs again when it is (attachHuman)
     const HK = rig.hKit && rig.hKit.kitpc ? rig.hKit : null;
     // MOLLE: what's mounted on a carrier or a belt (k.cq, k.bq: [kind, column, row, things in it] each; without them, k.cp or k.bp rifle
     // pouches in a row), each pouch on the surface of the body's own carrier or belt where its column is: across the carrier's front from
@@ -417,21 +427,20 @@ const G_Rig = (() => {
     rig.hatOn = !!hd || !rig.hairShown;
     if (rig.hairMesh) rig.hairMesh.visible = !rig.hatOn;
     const putHd = (m: THREE.Object3D) => add(Hd, m, m.position.x, m.position.y, m.position.z);
-    // the body's own helmet (models/characters/kit_head.py: its shell, rails, shroud, loop panels...) with the chinstrap; else drawn here (js/headgear.ts)
+    // the body's own helmet (models/characters/kit_head.py: its shell, rails, shroud, loop panels...) with the chinstrap
     const HELM: Record<string, string> = { 'h.bump': 'bump', 'h.fast': 'fast', 'h.ach': 'ach', 'h.rifle': 'rifle' }, hk = hd && HK && HK['kithelm' + HELM[hd.id]] ? HELM[hd.id] : null;
-    if (hd && hk) { own('kithelm' + hk, k.hc || G.Headgear.MODELS[hd.id].col!); if (!own('kitstrap', 0x18191a)) G.Headgear.strap(KM, putHd); }
-    else if (hd) G.Headgear.helmet(hd.id, KM, putHd, k.hc || undefined); // (its cut, rails, shroud and visor: js/headgear.ts)
+    if (hd && hk) { own('kithelm' + hk, k.hc || G.Headgear.MODELS[hd.id].col); own('kitstrap', 0x18191a); }
     // on the helmet's mount: a mandible round the jaw, or a shield over the face
     const fd = D(k.face);
     part = 'face';
     if (fd && hd && hk) {
       if (fd.id === 'f.mandible') { own('kitmandible', k.hc ? shade(k.hc, 0.9) : 0x50575e); own('kitmandarms' + (G.Headgear.MODELS[hd.id].cut === 'high' ? 'high' : 'mid'), 0x3c4248); }
       else { const rifle = fd.id === 'f.rifle'; own(rifle ? 'kitshieldrifle' : 'kitshield', rifle ? 0x3e4e56 : 0x8aaaba, { transparent: true, opacity: rifle ? 0.72 : 0.38, depthWrite: false }); own('kitshieldframe', 0x1c1e20); }
-    } else if (fd && hd) G.Headgear.face(fd.id, hd.id, KM, putHd);
+    }
     // night vision on its shroud: down in front of the eyes or swung up (nvK: as far as it's got, kept through a rebuild)
     const nd = D(k.nv);
     part = 'nvg';
-    if (nd && hd) {
+    if (nd && hk) {
       // (on the body's own helmet: hung from its mount, where the model has it (kitnv*), in the head's frame)
       let hinge: THREE.Vector3 | null = null;
       const ap = hk && rig.hPart && rig.hPart['kitnv' + hk], hb = ap && rig.hBone && rig.hBone('head');
@@ -447,81 +456,23 @@ const G_Rig = (() => {
     // the carrier: a soft vest, a slick plate carrier, a chest rig, or a full carrier with its pouches
     const cd = D(k.carrier), cc = k.cc || KIT_COL(cd); // (k.cc: the armour in one colour, js/loadout.ts COLOURS)
     part = 'carrier';
-    if (cd && HK && cd.id !== 'c.recon') {
-      // the body's own: a soft vest, the full wrap, a plate carrier or the heavy armour; its plate's outline, its pouches; the heavy armour's
+    if (cd && HK) {
+      // the body's own: a soft vest, the full wrap, a plate carrier, the heavy armour or a chest rig; its plate's outline, its pouches; the heavy armour's
       // pads, groin flap and thigh panels unless something else is worn there
-      const key = cd.thin ? 'soft' : cd.id === 'c.heavy' ? 'heavy' : cd.id === 'c.wrap' ? 'wrap' : 'pc', col = cd.thin ? k.cc || cd.col : cc;
+      const key = cd.thin ? 'soft' : cd.id === 'c.heavy' ? 'heavy' : cd.id === 'c.wrap' ? 'wrap' : cd.id === 'c.recon' ? 'recon' : 'pc', col = cd.thin ? k.cc || cd.col : cc;
       own('kit' + key, col);
       if (k.plate && !cd.thin) { part = 'plate'; own('kitplate' + key, col); part = 'carrier'; }
       if (key !== 'soft') molle('kit' + key, 'chest', MOLLE_Y[key], slots(k.cq, k.cp, cd), shade(cc, 0.8), null);
       if (key === 'heavy') { if (!k.sh) own('kitdelt', cc); if (!k.gr) { own('kitgflap', cc); own('kitgplate', 0x3d4044); } if (!k.lg) own('kitthigh', cc); }
-    } else if (cd) {
-      // Not a block round the chest: what a carrier is. A plate bag on the chest and one on the back (thicker with a plate in), joined round
-      // the ribs by the cummerbund, straps over the shoulders, pouches on the front; a soft vest thin panels wrapping the trunk. All in the
-      // chest's frame at its standard size (front and back 0.125 off its middle, 0.19 across), fitted to each body (fitPart).
-      const soft = !!cd.thin, heavy = cd.id === 'c.heavy', pd = soft ? 0.014 : k.plate ? (heavy ? 0.045 : 0.036) : 0.022, bd = soft ? 0.014 : heavy ? 0.045 : 0.03;
-      const pw = soft ? 0.3 : heavy ? 0.32 : 0.26, ph = soft ? 0.25 : heavy ? 0.33 : 0.29, py = soft ? 0.115 : 0.13, col = soft ? k.cc || cd.col : cc;
-      // the trunk's section in the chest's frame at its standard size (an ellipse, 0.165 across each way, 0.12 front and back): what the
-      // bags and the cummerbund curve round, a few millimetres off it
-      const A0 = 0.165, B0 = 0.12;
-      const shell = (parent: THREE.Object3D, side: number, a0: number, a1: number, h: number, t: number, y: number, c: number, gap = 0.004) => {
-        // a curved slab: round the ellipse (a, b) + gap from angle a0 to a1 (0 straight ahead, or behind with side = 1), t thick, h tall
-        const N = Math.max(4, Math.round((a1 - a0) / 0.12)), pos: number[] = [], idx: number[] = [], at = (u: number, off: number) => { const th = a0 + (a1 - a0) * u; return [Math.sin(th) * (A0 + gap + off), side * Math.cos(th) * (B0 + gap + off)]; };
-        for (let i = 0; i <= N; i++) for (const off of [0, t]) for (const yy of [-h / 2, h / 2]) { const [x, z] = at(i / N, off); pos.push(x, yy, z); }
-        const v = (i: number, o: number, top: number) => i * 4 + o * 2 + top, q = (a: number, b: number, c2: number, d: number) => idx.push(a, b, c2, a, c2, d);
-        for (let i = 0; i < N; i++) { q(v(i, 1, 0), v(i + 1, 1, 0), v(i + 1, 1, 1), v(i, 1, 1)); q(v(i, 0, 1), v(i + 1, 0, 1), v(i + 1, 0, 0), v(i, 0, 0)); q(v(i, 0, 1), v(i, 1, 1), v(i + 1, 1, 1), v(i + 1, 0, 1)); q(v(i + 1, 0, 0), v(i + 1, 1, 0), v(i, 1, 0), v(i, 0, 0)); }
-        q(v(0, 0, 0), v(0, 1, 0), v(0, 1, 1), v(0, 0, 1)); q(v(N, 0, 1), v(N, 1, 1), v(N, 1, 0), v(N, 0, 0));
-        const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
-        return add(parent, new T.Mesh(g, KM(c, { side: T.DoubleSide })), 0, y, 0);
-      };
-      const half = (w: number) => Math.asin(Math.min(0.99, w / 2 / A0)); // (the angle a bag's half-width takes round the trunk)
-      if (cd.id === 'c.recon') { // a chest rig: a panel of pouches across the front, straps over the shoulders
-        box(C, 0.36, 0.15, 0.06, cc, 0, 0.03, -0.13);
-        for (const x of [-1, 1]) box(C, 0.04, 0.26, 0.24, cc, x * 0.12, 0.17, 0);
-        pouches(C, Math.max(2, k.cp || 0), 0x23251f, -0.13, 0.04, -0.17);
-      } else {
-        // the front plate bag and the back, curved round the trunk and leant in at the top as the chest and the back are
-        const fa = half(pw), ba = half(pw + 0.01);
-        shell(C, -1, -fa, fa, ph, pd, py, col).rotation.x = 0.1;
-        shell(C, 1, -ba, ba, ph + 0.01, bd, py, col).rotation.x = -0.06;
-        if (k.plate && !soft) { part = 'plate'; shell(C, -1, -fa * 0.8, fa * 0.8, ph - 0.07, 0.005, py + 0.01, col, 0.004 + pd).rotation.x = 0.1; part = 'carrier'; } // the plate's outline, standing proud in the bag
-        // the cummerbund (a soft vest's sides): round each flank from the front bag's edge to the back's
-        const cy = soft ? py - 0.015 : py - 0.07, chh = soft ? ph - 0.07 : 0.14;
-        for (const sd of [-1, 1]) shell(C, -1, sd < 0 ? -Math.PI + ba - 0.05 : fa - 0.05, sd < 0 ? -fa + 0.05 : Math.PI - ba + 0.05, chh, soft ? 0.012 : 0.02, cy, col, soft ? 0.004 : 0.006);
-        // the shoulder straps, over each shoulder from the front bag's top to the back's
-        for (const x of [-1, 1]) box(C, 0.055, 0.02, 2 * B0 + 0.03, col, x * 0.085, py + ph / 2 + 0.004, 0);
-        if (!soft) pouches(C, k.cp || 0, 0x23251f, -0.11, py - 0.06, -B0 - pd - 0.03, 0.065, 0.09);
-        if (heavy) for (const x of [-1, 1]) box(C, 0.13, 0.07, 0.2, cc, x * 0.22, 0.3, 0); // shoulder armour
-        if (heavy) { box(C, 0.3, 0.07, 0.26, cc, 0, 0.32, 0.01); box(Hp, 0.2, 0.16, 0.04, cc, 0, -0.06, -0.12); } // collar, groin plate
-      }
-      // its soft armour reaches down over the belly to the belt, as it protects there (js/ballistics.ts covers: 'torso' is the chest and the
-      // abdomen): a flap in front and behind, and the cummerbund round the sides (the waist's frame: 0.105 front and back, 0.15 across)
-      if ((cd.prot || []).some((p: any) => p.at === 'torso')) {
-        // (a band right round the waist: an ellipse 0.15 across, 0.105 front and back, at its standard size; fitted as the waist is)
-        const t = soft ? 0.012 : 0.018, N = 20, pos: number[] = [], idx: number[] = [], h = 0.19;
-        for (let i = 0; i <= N; i++) for (const off of [0.004, 0.004 + t]) for (const yy of [-h / 2, h / 2]) { const th = (i / N) * Math.PI * 2; pos.push(Math.sin(th) * (0.15 + off), yy, -Math.cos(th) * (0.105 + off)); }
-        const v = (i: number, o: number, top: number) => i * 4 + o * 2 + top, q = (a2: number, b2: number, c2: number, d2: number) => idx.push(a2, b2, c2, a2, c2, d2);
-        for (let i = 0; i < N; i++) { q(v(i, 1, 0), v(i + 1, 1, 0), v(i + 1, 1, 1), v(i, 1, 1)); q(v(i, 0, 1), v(i, 1, 1), v(i + 1, 1, 1), v(i + 1, 0, 1)); q(v(i + 1, 0, 0), v(i + 1, 1, 0), v(i, 1, 0), v(i, 0, 0)); }
-        const bg = new T.BufferGeometry(); bg.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); bg.setIndex(idx); bg.computeVertexNormals();
-        add(rig.spine, new T.Mesh(bg, KM(col, { side: T.DoubleSide })), 0, 0.115, 0);
-      }
     }
     // what's mounted on the carrier and belt, on the limbs they cover: pads and caps round the top of each arm, a panel or a
     // wrap at the hips, panels, wraps and guards down the legs (each where its protection is: js/ballistics.ts covers)
-    const tube = (parent: THREE.Object3D, r0: number, r1: number, h: number, c: number, y: number, z = 0) => add(parent, new T.Mesh(new T.CylinderGeometry(r0, r1, h, 12), KM(c)), 0, y, z);
     const sd = D(k.sh);
     part = 'shoulder';
     if (sd && HK) {
       const c = k.cc || KIT_COL(sd);
       if (sd.id === 's.plate') own('kitshcap', 0x4a4438); else own('kitdelt', c);
       if (sd.id !== 's.deltoid') own('kitaxil', c);
-    } else if (sd) {
-      const hard = sd.id === 's.plate', c = KIT_COL(sd);
-      for (const arm of [rig.armL, rig.armR]) {
-        tube(arm.up, 0.066, 0.064, 0.13, hard ? 0x4a4438 : c, -0.065);
-        if (hard) add(arm.sh, new T.Mesh(new T.SphereGeometry(0.08, 10, 8), KM(0x4a4438)), 0, 0.005, 0);
-        else box(arm.sh, 0.1, 0.03, 0.1, c, 0, 0.055, 0);
-      }
     }
     const gd = D(k.gr);
     part = 'groin';
@@ -529,11 +480,6 @@ const G_Rig = (() => {
       const c = k.cc || (KIT_COL(gd) === 0x2e3236 ? 0x34383c : KIT_COL(gd));
       if (gd.id === 'g.pelvis') own('kitpelvis', c); else own('kitgflap', c);
       if (gd.id === 'g.plate') own('kitgplate', 0x3d4044);
-    } else if (gd) {
-      const c = KIT_COL(gd) === 0x2e3236 ? 0x34383c : KIT_COL(gd);
-      if (gd.id === 'g.pelvis') { const w = add(Hp, new T.Mesh(new T.CylinderGeometry(0.17, 0.175, 0.18, 12), KM(c)), 0, -0.02, 0); w.scale.z = 0.72; }
-      else box(Hp, 0.2, 0.17, 0.025, c, 0, -0.06, -0.122);
-      if (gd.id === 'g.plate') box(Hp, 0.15, 0.13, 0.015, 0x3d4044, 0, -0.06, -0.142);
     }
     const ld = D(k.lg);
     part = 'legs';
@@ -542,37 +488,21 @@ const G_Rig = (() => {
       if (ld.id === 'l.thigh') own('kitthigh', c);
       if (ld.id === 'l.wrap' || ld.id === 'l.full') own('kitlegwrap', c);
       if (ld.id === 'l.shin' || ld.id === 'l.full') own('kitshin', 0x4a4f55);
-    } else if (ld) {
-      const c = KIT_COL(ld) === 0x2e3236 ? 0x34383c : KIT_COL(ld), shin = ld.id === 'l.shin' || ld.id === 'l.full', wrap = ld.id === 'l.wrap' || ld.id === 'l.full';
-      for (const leg of [rig.legL, rig.legR]) {
-        if (ld.id === 'l.thigh') box(leg.th, 0.13, 0.22, 0.025, c, 0, -0.12, -0.088);
-        if (wrap) tube(leg.th, 0.096, 0.074, 0.34, c, -0.18);
-        if (shin) { box(leg.sh, 0.085, 0.31, 0.02, 0x4a4f55, 0, -0.21, -0.062); box(leg.sh, 0.1, 0.09, 0.03, 0x4a4f55, 0, -0.01, -0.066); }
-      }
     }
     // the belt and what's on it; the IFAK at the back
     const bd = D(k.belt);
     part = 'belt';
-    if (bd && HK && HK.kitbelt) {
+    if (bd && HK) {
       const bc = bd.id === 'b.war' ? 0x3b3528 : 0x232527;
       own(bd.id === 'b.duty' ? 'kitbelt' : 'kitbeltwide', bc);
       molle(bd.id === 'b.duty' ? 'kitbelt' : 'kitbeltwide', 'hips', 1.0, slots(k.bq, k.bp, bd), bd.id === 'b.war' ? 0x3b3528 : 0x2b2d2a, BELT_A);
-    } else if (bd) {
-      box(Hp, 0.35, 0.06, 0.25, bd.id === 'b.war' ? 0x3b3528 : 0x232527, 0, 0.06, 0);
-      const n = k.bp || 0;
-      for (let i = 0; i < Math.min(n, 6); i++) { const side = i % 2 ? 1 : -1, j = i >> 1; box(Hp, 0.05, 0.08, 0.07, 0x23251f, side * 0.18, 0.04, -0.06 + j * 0.08); }
     }
     part = 'ifak';
-    if (k.ifak) box(bd ? Hp : C, 0.12, 0.1, 0.06, 0x7a2420, 0, bd ? 0.04 : -0.02, bd ? 0.14 : 0.13);
-    // the backpack, by size
+    if (k.ifak && HK) own(bd ? 'kitifakb' : 'kitifak', 0x7a2420);
+    // the backpack, by size, and its shoulder straps (over a plate carrier's, or not)
     const pd = D(k.pack);
     part = 'pack';
-    if (pd) {
-      const [w, h, d, y] = PACK[pd.id] || PACK['k.assault'];
-      const back = (cd && cd.id !== 'c.recon' ? 0.15 : 0.12) + d / 2;
-      box(C, w, h, d, KIT_COL(pd), 0, y, back);
-      box(C, w * 0.8, h * 0.3, 0.04, 0x23251f, 0, y - h * 0.2, back + d / 2 + 0.02); // a pocket
-    }
+    if (pd && HK) { const pm = packMesh(pd, cd); own(pm, KIT_COL(pd)); own('kitpackstrap' + (pm.endsWith('c') ? 'c' : ''), 0x23251f); }
     for (const m of rig.kitParts) heatMark(m);
   }
   // the night vision as far down as it's got (nvK 1: down, the eyepieces lit once it's there)
@@ -585,9 +515,9 @@ const G_Rig = (() => {
   // A suspect's armour (G.ARMORS ids) as the gear an officer would wear: the same models for the same kit
   function armourKit(vest: string, helmet: string, armored: boolean, face?: any, ex?: any) {
     const V = ({ soft2: ['c.lite', 0, 0], soft: ['c.ghost', 0, 0], steel: ['c.patrol', 1, 2], ceramic: ['c.assault', 1, 3], assault: ['c.heavy', 1, 2] } as Record<string, (string | number)[]>)[vest] || (armored ? ['c.heavy', 1, 2] : null);
-    const H = ({ ach: 'h.ach', riflehelm: 'h.rifle', visor: 'h.visor' } as Record<string, string>)[helmet] || (armored ? 'h.rifle' : 0);
+    const H = ({ ach: 'h.ach', riflehelm: 'h.rifle', visor: 'h.rifle' } as Record<string, string>)[helmet] || (armored ? 'h.rifle' : 0);
     const X = (kind: string) => (ex || []).find((id: string) => G.Gear.DEFS[id] && G.Gear.DEFS[id].kind === kind) || 0;
-    return { helmet: H, face: (H && face) || 0, carrier: V ? V[0] : 0, plate: V ? V[1] : 0, sh: X('shoulder'), gr: X('groin'), cp: V ? V[2] : 0, belt: armored ? 'b.battle' : 0, lg: X('legs'), bp: armored ? 2 : 0, pack: 0, ifak: 0 };
+    return { helmet: H, face: helmet === 'visor' ? 'f.shield' : (H && face) || 0, carrier: V ? V[0] : 0, plate: V ? V[1] : 0, sh: X('shoulder'), gr: X('groin'), cp: V ? V[2] : 0, belt: armored ? 'b.battle' : 0, lg: X('legs'), bp: armored ? 2 : 0, pack: 0, ifak: 0 };
   }
   function create(o: any) {
     // whose body (js/humans.ts): its height is a scale of the whole figure, on top of the character's own
@@ -599,10 +529,9 @@ const G_Rig = (() => {
     const L = (c: number) => new T.MeshLambertMaterial({ color: c });
     // ---- what they're wearing: a look { top, topC, pants, pantsC, eyes, gloves }. Officers bring their own (the
     // main menu); everyone else is dressed for who they are.
-    let vestM = null, helmetM = null, headCover = null, hairM = null;
+    let headCover = null, hairM = null;
     const skin0 = o.mannequin || o.skinColor != null ? 0 : pick(PAL.skin);
     const skin = L(o.mannequin ? 0xa9afb5 : o.skinColor != null ? o.skinColor : hdef ? hdef.skin : skin0); // (a mannequin: plain grey, no face, no hair: see G.Hangar)
-    const gear = L(0x23251f);
     let look;
     if (style === 'tactical') look = Object.assign({}, OFFICER_LOOK, o.look || {});
     // everyone else, from the same wardrobe, by who they are: enforcers in combat clothes and balaclavas,
@@ -647,14 +576,11 @@ const G_Rig = (() => {
     const top = L(look.topC), bottom = L(look.pantsC);
     // a combat shirt: a light body (it's worn under armour) with the sleeves in its colour
     const torsoM = look.top === 'combat' ? L(new T.Color(look.topC).lerp(new T.Color(0xb8b0a0), 0.4).getHex()) : top;
-    if (style === 'tactical') { if (o.bare) hairM = o.mannequin ? null : L(pick(PAL.hair)); else { vestM = L(0x2a2c28); helmetM = L(0x26282a); } }
-    else if (style === 'armored') { if (!o.dressed) { vestM = L(o.boss ? 0x3a2f24 : 0x3b4232); helmetM = L(0x2a2d30); } headCover = L(0x161616); }
+    if (style === 'tactical') hairM = o.mannequin ? null : L(pick(PAL.hair));
+    else if (style === 'armored') headCover = L(0x161616);
     else if (style === 'suspect') { if (rnd() < 0.6) headCover = L(0x151515); else hairM = L(pick(PAL.hair)); }
     else hairM = L(pick(PAL.hair));
-    if (wear) { headCover = null; if (!hairM && !helmetM) hairM = L(pick(PAL.hair)); } // (a crew show their faces)
-    // armour worn over street clothes (o.vest: 'soft', 'soft2' or a plate carrier; o.helmet)
-    if (!o.dressed && o.vest && !vestM) vestM = L(o.vest === 'soft2' ? 0x5c5a50 : o.vest === 'soft' ? 0x34373b : 0x3b4232);
-    if (!o.dressed && o.helmet && !helmetM) { helmetM = L(0x2a2d30); hairM = null; }
+    if (wear) { headCover = null; if (!hairM) hairM = L(pick(PAL.hair)); } // (a crew show their faces)
     const gloveM = ({ tactical: L(0x1c1d1f), leather: L(0x5e3e24), fingerless: L(0x1c1d1f) } as Record<string, THREE.MeshLambertMaterial>)[look.gloves] || null;
     // (a civilian's shoes: white trainers, brown leather dress shoes, black everyday shoes; heard so too: js/footsteps.ts feetOf)
     const shoeC: number | null = style === 'civ' && wear !== 'navy' ? pick([0xeeeeee, 0x3a2a1a, 0x222222]) : null;
@@ -680,11 +606,6 @@ const G_Rig = (() => {
     const chest = joint(spine, 0, 0.19, 0);
     const torso = B_(cyl(0.2, 0.152, 0.33, 14), torsoM, 0, 0.14, 0, chest); torso.scale.z = 0.62;
     const traps = B_(cyl(0.075, 0.19, 0.07, 14), torsoM, 0, 0.34, 0, chest); traps.scale.z = 0.6; // neck down to the shoulders
-    if (vestM) {
-      M_(new T.BoxGeometry(0.41, 0.28, 0.28), vestM, 0, 0.12, 0, chest);
-      for (const x of [-0.12, 0, 0.12]) M_(new T.BoxGeometry(0.09, 0.09, 0.05), gear, x, 0.05, -0.16, chest);
-      if (style === 'armored') for (const x of [-0.22, 0.22]) M_(new T.BoxGeometry(0.13, 0.07, 0.2), vestM, x, 0.3, 0, chest);
-    }
     if (look.top === 'hoodie') { const hood = M_(new T.SphereGeometry(0.11, 12, 8), top, 0, 0.31, 0.1, chest); hood.scale.set(1.25, 0.55, 0.75); } // the hood, down
     const neck = joint(chest, 0, 0.3, 0);
     const faceM = headCover || skin;
@@ -724,7 +645,6 @@ const G_Rig = (() => {
       M_(new T.BoxGeometry(0.12, 0.036, 0.006), lens, 0, 0.137, -0.115, hat);
       const strap = M_(new T.TorusGeometry(0.1, 0.007, 4, 28), dark, 0, 0.14, 0.004, hat); strap.rotation.x = Math.PI / 2; strap.scale.set(0.95, 1.04, 1);
     }
-    if (helmetM) G.Headgear.helmet(style === 'tactical' ? 'h.fast' : 'generic', (c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => hat.add(m), helmetM.color.getHex()); // (js/headgear.ts)
     if (o.vex) { // Vex, as his portrait has him: a dark hood, a black visor with two orange eyes, a grey respirator, a gold strap
       const hoodM = new T.MeshLambertMaterial({ color: 0x1d1c18, side: T.DoubleSide });
       const hood = M_(new T.SphereGeometry(0.128, 18, 12, 5.58, 4.54, 0, Math.PI * 0.66), hoodM, 0, 0.125, 0.012, hat); hood.scale.set(0.98, 1.04, 1.06); // (open at the front)
@@ -770,7 +690,7 @@ const G_Rig = (() => {
     const handM = gloveM || skin, fingerM = look.gloves === 'fingerless' ? skin : handM;
     const mkArm = (side: number) => {
       const sh = joint(chest, side * 0.2, 0.225, 0); // (the middle of the shoulder, not its top: where the body's own joint is)
-      B_(new T.SphereGeometry(0.066, 10, 8), vestM || top, 0, 0, 0, sh);
+      B_(new T.SphereGeometry(0.066, 10, 8), top, 0, 0, 0, sh);
       const up = joint(sh, 0, 0, 0);
       if (longSleeves) B_(cyl(0.056, 0.047, UARM, 10), top, 0, -UARM / 2, 0, up);
       else { B_(cyl(0.06, 0.056, UARM * 0.45, 10), top, 0, -UARM * 0.22, 0, up); B_(cyl(0.05, 0.045, UARM * 0.7, 10), skin, 0, -UARM * 0.62, 0, up); }

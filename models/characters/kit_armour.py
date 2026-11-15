@@ -10,6 +10,9 @@
 #                      carriers; the heavy one larger and thicker, a collar round the neck and pads over the shoulders)
 #   kitplatepc, kitplateheavy        the plate in its bag: its outline standing proud of the front bag (only with a plate in)
 #   kitbelt, kitbeltwide            a duty belt; a padded battle or war belt
+#   kitrecon           a chest rig: a pouch panel across the front, straps over the shoulders, a strap round the back
+#   kitpack{sling,assault,ruck}[c]  a pack on the back, clear of a plate carrier (c) or not; kitpackstrap[c] its shoulder straps
+#   kitifak[b]         the IFAK at the back of the hips, on a belt (b) or not
 #   (the pouches on a carrier's or a belt's MOLLE aren't made here: js/rig.ts lays what's mounted onto these surfaces)
 import bpy, bmesh, math
 from mathutils import Vector as V, Matrix
@@ -114,6 +117,17 @@ def _box(name, c, size, rot=None):
     me = bpy.data.meshes.new(name); bm.to_mesh(me); bm.free()
     o = bpy.data.objects.new(name, me); bpy.context.scene.collection.objects.link(o); return o
 
+def _rbox(name, c, size, bev):
+    """a box with its edges rounded (a pack, a pouch): centre c, size across / deep / tall, its edges bev round"""
+    o = _box(name, c, size); md = o.modifiers.new('bv', 'BEVEL'); md.width = bev; md.segments = 3; md.limit_method = 'NONE'
+    dg = bpy.context.evaluated_depsgraph_get(); me = bpy.data.meshes.new_from_object(o.evaluated_get(dg)); old = o.data; o.modifiers.clear(); o.data = me; bpy.data.meshes.remove(old)
+    return o
+
+def _back(body, z0, z1, n=6):
+    """how far back the body's back reaches between z0 and z1 (the most, down its middle)"""
+    ys = [p.y for p in (_out(body, V((0, 0.0, z0 + (z1 - z0) * i / (n - 1))), V((0, 1, 0)), 0.0) for i in range(n)) if p is not None]
+    return max(ys) if ys else 0.12
+
 def _weigh(o, body, arm, only=None, allow=TRUNK):
     """each vertex the weights of the nearest point of the body's skin (its face's corners, as far as it's toward each), the trunk's
     bones only (an arm raised doesn't drag the armour after it); or all to one bone (only)"""
@@ -153,6 +167,7 @@ def build(body, arm):
     """every piece, on this body: a list of objects, each skinned to arm"""
     mats = {}
     out = []
+    B = lambda n: arm.matrix_world @ arm.data.bones[n].head_local
     # -- the concealable vest: thin, from the waist to the chest's top, front and back panels and its sides under the arms, straps
     parts = [_panel('sf', body, -1, -0.15, 0.15, 1.02, 1.44, 0.004, 0.012, cut=0.07), _panel('sb', body, 1, -0.155, 0.155, 1.02, 1.46, 0.004, 0.012, cut=0.04),
              _band('ss', body, 1.02, 1.27, 0.004, 0.012, a0=0.3 * math.pi, a1=0.7 * math.pi, seg=8, closed=False), _band('ss2', body, 1.02, 1.27, 0.004, 0.012, a0=1.3 * math.pi, a1=1.7 * math.pi, seg=8, closed=False)]
@@ -178,6 +193,24 @@ def build(body, arm):
     for x in (-0.09, 0.09): parts.append(_strap('st', body, x, 0.06, 0.006, 0.014))
     out.append(_done(_join(parts, 'kitwrap'), 'kitwrap', mats, body, arm))
     out.append(_done(_panel('pl', body, -1, -0.11, 0.11, 1.15, 1.43, 0.024, 0.005, cut=0.045), 'kitplatewrap', mats, body, arm))
+    # -- the chest rig: a panel of pouches across the front of the chest (no armour), straps over the shoulders, a strap round the back
+    parts = [_panel('rf', body, -1, -0.17, 0.17, 1.12, 1.31, 0.006, 0.022, step=0.04), _band('rb', body, 1.15, 1.185, 0.004, 0.006, a0=0.27 * math.pi, a1=1.73 * math.pi, seg=14, closed=False)]
+    for x in (-0.1, 0.1): parts.append(_strap('st', body, x, 0.045, 0.006, 0.01))
+    out.append(_done(_join(parts, 'kitrecon'), 'kitrecon', mats, body, arm))
+    # -- the packs on the back (their bottoms rest in the small of it), each in two fits: over a plate carrier (c) or not; their straps
+    # over the shoulders the same; the IFAK at the back of the hips, on a belt (b) or not
+    cz = B('chest').z if 'chest' in arm.data.bones else 1.2
+    for key, w, h, d, y in (('sling', 0.22, 0.26, 0.09, 0.12), ('assault', 0.3, 0.36, 0.13, 0.14), ('ruck', 0.34, 0.5, 0.2, 0.2)):
+        zc = cz + y
+        for suf, gap in (('', 0.022), ('c', 0.05)):
+            yb = _back(body, zc - h / 2, zc + h / 2) + gap
+            parts = [_rbox('pk', V((0, yb + d / 2, zc)), (w, d, h), min(0.035, d * 0.3)),
+                     _rbox('pp', V((0, yb + d + 0.016, zc - h * 0.2)), (w * 0.8, 0.045, h * 0.32), 0.014)]  # (its front pocket)
+            out.append(_done(_join(parts, 'kitpack' + key + suf), 'kitpack' + key + suf, mats, body, arm, only='chest'))
+    for suf, gap in (('', 0.016), ('c', 0.03)): out.append(_done(_join([_strap('ps', body, x, 0.05, gap, 0.012) for x in (-0.1, 0.1)], 'kitpackstrap' + suf), 'kitpackstrap' + suf, mats, body, arm))
+    for suf, gap in (('', 0.008), ('b', 0.032)):
+        yb = _back(body, 0.97, 1.03, 3) + gap
+        out.append(_done(_rbox('ifak', V((0, yb + 0.03, 1.0)), (0.13, 0.06, 0.1), 0.015), 'kitifak' + suf, mats, body, arm, only='hips'))
     # -- belts: a plain duty belt, and the padded battle/war belt (each on the hips alone: it rides them, it doesn't stretch)
     out.append(_done(_band('bl', body, 0.98, 1.025, 0.012, 0.008, seg=24), 'kitbelt', mats, body, arm, only='hips'))
     out.append(_done(_band('bw', body, 0.962, 1.042, 0.012, 0.018, seg=24), 'kitbeltwide', mats, body, arm, only='hips'))
