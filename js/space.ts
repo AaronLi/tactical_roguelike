@@ -471,7 +471,7 @@ const G_Space = (() => {
     // The anchor is a place in the zone, so it falls astern; the others out here hold their own courses.
     S.zone!.add(a); if (S.state && S.state.zt != null) { S.zt0 = S.state.zt; S.ztAt = performance.now(); } else S.zt0 = 0;
     // the zone's ships (js/spacedata.ts zone): the one this level is isn't drawn out there (she's here); each of the rest is, on
-    // her course, and is on the navigation screen: come up within 2 km of one and the squad's ship matches her course (zoneClose)
+    // her course, and is on the navigation screen: come up within 500 m of one and the squad's ship matches her course (zoneClose)
     const zi = S.zinfo;
     S.zdef = SD.zone(zi ? zi.ms : { seed: map.seed, size: sp.size, th: SD.themeIndex(map.theme), wing: !!sp.wing, name: (S.ms && S.ms.name) || '' }); S.zact = zi ? zi.act : 0;
     S.zC.set((sp.hull.x0 + sp.hull.x1) / 2, 0, (sp.hull.z0 + sp.hull.z1) / 2);
@@ -587,7 +587,7 @@ const G_Space = (() => {
   // (the zone's whole width: there are six of them at most, so what's made of each is kept while the squad's in it); to become
   // the level (zoneClose: once she's ready, or nearer than ZONE_NOW whether or not)
   const PAD_POINTS = 4; // (her own three lamps, and the artifact's glow)
-  const ZONE_REAL = 5000, ZONE_DROP = 60000, ZONE_TAKE = 2000, ZONE_NOW = 400;
+  const ZONE_REAL = 5000, ZONE_DROP = 60000, ZONE_TAKE = 500, ZONE_NOW = 400;
   function zoneReal(all: boolean) {
     if (S.kind !== 'board' || !S.zone) return;
     const zseed = S.zinfo ? S.zinfo.ms.seed : -2;
@@ -679,7 +679,7 @@ const G_Space = (() => {
     }
     prepStep(hit.map, lv.gen.obj === 'artifact' && hit.map.sp && hit.map.sp.artifact ? 1 : 0); // (the artifact's glow: things)
   }
-  // The squad's ship has come up with one of the zone's others (within 2 km, and well nearer her than the one that's the level), and
+  // The squad's ship has come up with one of the zone's others (within 500 m, and well nearer her than the one that's the level), and
   // she's ready (zonePrep: so nothing stops), or within 400 m anyway: the host is asked to make her the level (js/spaceserver.ts
   // 'tboard'). Whoever's flying asks.
   function zoneClose(dt: number) {

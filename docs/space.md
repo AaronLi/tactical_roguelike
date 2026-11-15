@@ -201,7 +201,7 @@ so the anchor to jump home by, which is a place in the zone, falls astern as the
 
 A mission's zone is vast, with only now and then someone else in it (`js/spacedata.ts` zone: the mission's ship, contact 0, and
 four or five others on wide loops; one comes within a few kilometres). Every one of them is a ship of her own class, theme and
-seed, on the navigation screen by name. Come up within 2 km of one, a fifth nearer her than the ship that's the level, once she's ready (every one within 5 km is laid out, drawn and sent to the graphics card in the background, nearest first, and kept while the squad's in the zone: zoneReal, zonePrep; her layout's made on another thread, js/prep.ts), or within 400 m whether or not, and the squad's ship matches her course:
+seed, on the navigation screen by name. Come up within 500 m of one, a fifth nearer her than the ship that's the level, once she's ready (every one within 5 km is laid out, drawn and sent to the graphics card in the background, nearest first, and kept while the squad's in the zone: zoneReal, zonePrep; her layout's made on another thread, js/prep.ts), or within 400 m whether or not, and the squad's ship matches her course:
 the host makes her the level (`tboard` in `js/spaceserver.ts`; the zone is then drawn from her, turning when she turns) and the
 ship left behind goes on her way as one of the zone's others. Nothing is drawn over this: no wipe, no loading screen. Within
 five kilometres a ship of the zone's is already drawn as her own hull (`zoneReal`: her level laid out from her seed, for its

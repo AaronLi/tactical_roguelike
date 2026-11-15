@@ -119,7 +119,8 @@ const G_SpaceData = (() => {
       // the stairs: their sides and roof, the wall between the two flights
       [-fw - W, 0, zk, -fw, CB, zr], [fw, 0, zk, fw + W, CB, zr], [-fw - W, CB, zk, fw + W, top, zr], [-0.06, 0, zk, 0.06, FB + 0.9, zr],
       // the crew deck: the hold under it, its sides, roof, the bulkhead at its front either side of the stairs (and over them), the ramp
-      [-hw - W, 0, zr, 0.06, FM, z1], [fw, 0, zr, hw + W, FM, z1], [0.06, 0, zr + rD / (nD - 1), fw, FM, z1], [0.06, 0, zr, fw, FM, zr + rD / (nD - 1), 'down'], [-hw - W, FM, zr, -hw, CM, z1], // (the hold; the strip at the down flight's head its last tread) [hw, FM, zr, hw + W, CM, z1], [-hw - W, CM, zr, hw + W, CM + W, z1],
+      [-hw - W, 0, zr, 0.06, FM, z1], [fw, 0, zr, hw + W, FM, z1], [0.06, 0, zr + rD / (nD - 1), fw, FM, z1], [0.06, 0, zr, fw, FM, zr + rD / (nD - 1), 'down'], // (the hold; the strip at the down flight's head its last tread)
+      [-hw - W, FM, zr, -hw, CM, z1], [hw, FM, zr, hw + W, CM, z1], [-hw - W, CM, zr, hw + W, CM + W, z1], // (the crew deck's sides and roof)
       [-hw, FM, zr - W, -fw, CM, zr], [fw, FM, zr - W, hw, CM, zr], [-fw, CM, zr - 0.05, fw, CB, zr + 0.05],
       [-hw, FM, z1, hw, CM, z1 + W, 'ramp'],
     ];
