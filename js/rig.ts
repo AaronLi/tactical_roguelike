@@ -30,7 +30,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   armL: RigArm; armR: RigArm; legL: RigLeg; legR: RigLeg; gunMount: THREE.Object3D; slingMount: THREE.Object3D; hipMount: THREE.Object3D; slung: boolean; mats: any[]; scale: number; style: string; shoe: FsSole | null;
   gun: THREE.Object3D | null; gunInfo: Record<string, any> | null; gunKey: string | null; phase: number; vel: THREE.Vector3; lastPos: THREE.Vector3 | null;
   crouchW: number; aimW: number; lean: number; kick: number; flinch: THREE.Vector3; throwT: number; state: string; deadT: number; fallX: number; fallZ: number; downW: number;
-  hb: any[] | null; dbg: THREE.Mesh[] | null; rd: Ragdoll;
+  hb: any[] | null; dbg: THREE.Mesh[] | null; rd: Ragdoll; hitKit?: THREE.Mesh[] | null; dbgKit?: THREE.Mesh[] | null;
   curl: number[]; fingers: { hand: number; thumb: boolean; bones: THREE.Bone[]; rest: THREE.Matrix4[]; step: THREE.Matrix4[] }[]; // (how closed each hand is, the right's then the left's: 0 open, 1 round a grip; and the body's fingers that show it: poseFingers)
   // (set by create)
   setGun(code: any, skin?: any): void; update(dt: number, p: any): void; hitboxes(): any[]; recoil(deg?: number): void; hit(dir: any, mv?: number): void; dropGun(): void; goLimp(): void;
@@ -380,7 +380,7 @@ const G_Rig = (() => {
     if (rig.kitKey === key) return;
     rig.kitKey = key; rig.kit = k;
     for (const m of rig.kitParts as THREE.Mesh[]) { if (m.parent) m.parent.remove(m); if (m.geometry && !m.userData.shared) m.geometry.dispose(); }
-    rig.kitParts = [];
+    rig.kitParts = []; kitHitboxes(rig); // (nothing worn to be struck, till it is)
     rig.nvPivot = null; rig.nvLit = [];
     backPatch(rig, k);
     if (!k) return;
@@ -509,6 +509,7 @@ const G_Rig = (() => {
     part = 'pack';
     if (pd && HK) { const pm = packMesh(pd, cd); own(pm, KIT_COL(pd)); own('kitpackstrap' + (pm.endsWith('c') ? 'c' : ''), 0x23251f); }
     for (const m of rig.kitParts) heatMark(m);
+    kitHitboxes(rig);
   }
   // the night vision as far down as it's got (nvK 1: down, the eyepieces lit once it's there)
   function nvPose(rig: Rig) {
@@ -2094,6 +2095,32 @@ const G_Rig = (() => {
   // Zones: head, chest (heart, lungs), abdomen (liver, gut, spine), upper arm, forearm, thigh, shin. These capsules
   // are what a round is checked against first; what it does inside is worked out on the body's real shape, organ by
   // organ (js/ballistics.ts).
+  // What's worn stands out past the body (a helmet's shell, a face piece, a carrier and its plate and pouches): a round that strikes
+  // only the kit still strikes the one wearing it. The pieces themselves are tested (raycast: their triangles, as they're posed), a
+  // hit on the head's things the head's, on the carrier's the chest's or the abdomen's (whichever's nearer). Put on: kept here (a
+  // pack and night vision aren't armour: not counted).
+  function kitHitboxes(rig: Rig) {
+    if (rig.dbgKit) { for (const m of rig.dbgKit) m.removeFromParent(); rig.dbgKit = null; } // (F9's, made again for what's on now)
+    rig.hitKit = rig.kitParts.filter((m: any) => m.isMesh && ['helmet', 'face', 'carrier', 'plate'].includes(m.userData.part)) as THREE.Mesh[];
+  }
+  const kitRay = new T.Raycaster();
+  // the nearest hit on what's worn, along ro + rd t up to maxT: { t, zone, b (that zone's capsule) } or null
+  function kitHit(rig: Rig, ro: THREE.Vector3, rd: THREE.Vector3, maxT: number, h: any[]) {
+    if (!rig.hitKit || !rig.hitKit.length || !rig.root.visible) return null;
+    kitRay.set(ro, rd); kitRay.far = maxT;
+    const now = performance.now();
+    let best: THREE.Intersection | null = null;
+    for (const m of rig.hitKit as any[]) {
+      if (!m.parent || !m.visible) continue;
+      if (m.isSkinnedMesh && !(now - (m.userData.bsT || 0) < 40)) { m.boundingSphere = null; m.boundingBox = null; m.userData.bsT = now; } // (where it is as it's posed now)
+      const hit = kitRay.intersectObject(m, false)[0];
+      if (hit && (!best || hit.distance < best.distance)) best = hit;
+    }
+    if (!best) return null;
+    const part = best.object.userData.part, p = best.point, near = (b: any) => { const s = new T.Line3(b.a, b.b), q = new T.Vector3(); s.closestPointToPoint(p, true, q); return p.distanceTo(q); };
+    const b = part === 'helmet' || part === 'face' ? h[0] : near(h[1]) <= near(h[2]) ? h[1] : h[2];
+    return { t: best.distance, zone: b.zone as string, b };
+  }
   function hitboxes(rig: Rig) {
     if (!rig.hb) {
       const mk = (zone: string, r: number, side?: string) => ({ zone, r, side, a: new T.Vector3(), b: new T.Vector3() });
@@ -2104,6 +2131,7 @@ const G_Rig = (() => {
     const W = (o: THREE.Object3D, x: number, y: number, z: number, out: THREE.Vector3) => o.localToWorld(out.set(x, y, z));
     const R = rig.fit && rig.fit.hbR; // (a body's own: js/humans.ts)
     if (R) { h[0].r = R[0]; h[1].r = R[1]; h[2].r = R[2]; for (const i of [3, 5]) { h[i].r = R[3]; h[i + 1].r = R[4]; } for (const i of [7, 9]) { h[i].r = R[5]; h[i + 1].r = R[6]; } }
+
     if (R) W(rig.head, 0, 0.075, -0.004, h[0].a); else W(rig.head, 0, 0.1, -0.01, h[0].a);
     h[0].b.copy(h[0].a);                                                       // head (sphere)
     W(rig.chest, 0, 0.05, 0, h[1].a); W(rig.chest, 0, 0.135, 0, h[1].b);        // chest (its rounded top stops at the chin)
@@ -2163,11 +2191,12 @@ const G_Rig = (() => {
   // A round that goes through an arm carries on into whatever's behind it: `behind` is the next part it hits
   // (an arm held across the chest doesn't stop a round reaching the chest).
   function raycast(rig: any, ro: THREE.Vector3, rd: THREE.Vector3, maxT: number) {
-    const hits: { t: number; zone: string; b: any; behind?: any }[] = [];
-    for (const b of hitboxes(rig)) {
+    const hits: { t: number; zone: string; b: any; behind?: any }[] = [], H = hitboxes(rig);
+    for (const b of H) {
       const t = rayCapsule(ro, rd, b.a, b.b, b.rs);
       if (t >= 0 && t < maxT) hits.push({ t, zone: b.zone, b });
     }
+    const kh = kitHit(rig, ro, rd, maxT, H); if (kh) hits.push(kh); // (what's worn: struck before the body under it)
     if (!hits.length) return null;
     hits.sort((p, q) => p.t - q.t);
     const fin = (h: any) => { h.c = Math.min(1, rayAxisDist(ro, rd, h.b.a, h.b.b) / h.b.rs); h.up = (ro.y + rd.y * h.t - h.b.a.y) / h.b.rs; h.side = h.b.side; delete h.b; return h; };
@@ -2181,12 +2210,19 @@ const G_Rig = (() => {
   dbgMat.uarm = dbgMat.farm = new T.MeshBasicMaterial({ color: 0x30ff60, wireframe: true });
   dbgMat.thigh = dbgMat.shin = new T.MeshBasicMaterial({ color: 0x30a0ff, wireframe: true });
   function drawDebug(rig: Rig) {
-    if (!debug) { if (rig.dbg) rig.dbg.forEach((m: THREE.Object3D) => (m.visible = false)); return; }
+    if (!debug) { if (rig.dbg) rig.dbg.forEach((m: THREE.Object3D) => (m.visible = false)); if (rig.dbgKit) rig.dbgKit.forEach((m) => (m.visible = false)); return; }
     const h = hitboxes(rig);
     const parent = rig.root.parent;
     if (!parent) return;
     // bones are rigid, so each capsule is built once at its exact radius and length
     if (!rig.dbg) rig.dbg = h.map((b: any) => { const m = new T.Mesh(new T.CapsuleGeometry(b.rs, Math.max(0.001, b.a.distanceTo(b.b)), 3, 8), dbgMat[b.zone]); parent.add(m); return m; });
+    if (!rig.dbgKit && rig.hitKit && rig.hitKit.length) rig.dbgKit = (rig.hitKit as any[]).map((k) => {
+      const zone = k.userData.part === 'helmet' || k.userData.part === 'face' ? 'head' : 'chest';
+      const w: any = k.isSkinnedMesh ? new T.SkinnedMesh(k.geometry, dbgMat[zone]) : new T.Mesh(k.geometry, dbgMat[zone]);
+      if (k.isSkinnedMesh) w.bind(k.skeleton, k.bindMatrix); else { w.position.copy(k.position); w.quaternion.copy(k.quaternion); w.scale.copy(k.scale); }
+      w.userData.shared = true; w.frustumCulled = false; w.renderOrder = 5; k.parent.add(w); return w;
+    });
+    for (const w of rig.dbgKit || []) w.visible = rig.state !== 'dead';
     h.forEach((b: any, i: any) => {
       const m = rig.dbg![i];
       m.visible = rig.state !== 'dead';
