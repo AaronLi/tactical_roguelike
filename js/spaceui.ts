@@ -139,7 +139,7 @@ const G_SpaceUI = (() => {
       const range = a.range, dx = a.dx, dy = a.dy, f = new T.Vector3(0, 0, -1).applyQuaternion(s.Q.clone().premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -(a.site.nz > 0 ? 0 : a.site.nz < 0 ? Math.PI : a.site.nx > 0 ? Math.PI / 2 : -Math.PI / 2)))), k = R / 8, close = a.close;
       for (const r of [R, R * 0.5, R * 0.2]) { c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke(); }
       c.beginPath(); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.moveTo(cx, cy - R); c.lineTo(cx, cy + R); c.stroke();
-      const ok = Math.abs(dy) < 1.6 && a.align > 0.8;
+      const ok = Math.abs(dy) < 1.6 && a.align > 0.5;
       c.fillStyle = ok ? '#7dff9a' : '#ffb020'; c.beginPath(); c.arc(cx + G.U.clamp(-dx * k, -R, R), cy + G.U.clamp(dy * k, -R, R), 6, 0, 7); c.fill();
       c.strokeStyle = '#8fd6ff'; c.beginPath(); const ax = cx + G.U.clamp(f.x * 160, -R, R), ay = cy - G.U.clamp(f.y * 160, -R, R); c.moveTo(ax - 9, ay); c.lineTo(ax + 9, ay); c.moveTo(ax, ay - 9); c.lineTo(ax, ay + 9); c.stroke();
       c.fillStyle = '#8fd6ff'; c.fillText('BREACH APPROACH', 196, 16);

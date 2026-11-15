@@ -241,13 +241,14 @@ const G_Space = (() => {
   function hullClear(s: ShSite) {
     if (!S.hull) return true;
     if (!clearFor || clearFor.hull !== S.hull || clearFor.def !== S.def.id) {
+      G.R.levelRoot.updateMatrixWorld(true); S.hull.group.updateMatrixWorld(true); // (where she's drawn now, whether or not she's been drawn yet)
       const tris: { v: THREE.Vector3[]; b: THREE.Box3 }[] = [], inv = new T.Matrix4().copy(G.R.levelRoot.matrixWorld).invert();
-      G.R.levelRoot.updateMatrixWorld(true);
       S.hull.group.traverse((o: any) => {
-        if (!o.isMesh || !o.visible || o.material.blending === T.AdditiveBlending) return; // (light's not in the way)
+        if (!o.isMesh || o.material.blending === T.AdditiveBlending) return; // (light's not in the way)
         const M = new T.Matrix4().multiplyMatrices(inv, o.matrixWorld), g = o.geometry, p = g.attributes.position, ix = g.index, n = ix ? ix.count : p.count;
         for (let i = 0; i + 2 < n; i += 3) { const v = [0, 1, 2].map((k) => new T.Vector3().fromBufferAttribute(p, ix ? ix.getX(i + k) : i + k).applyMatrix4(M)); if (v[0].equals(v[1]) && v[1].equals(v[2])) continue; tris.push({ v, b: new T.Box3().setFromPoints(v) }); }
       });
+      if (!tris.length) return true; // (not drawn yet: nothing to be in the way, and nothing kept)
       clearFor = { hull: S.hull, def: S.def.id, tris, ok: new Map() };
     }
     const key = s.c * 4 + (s.nx > 0 ? 0 : s.nx < 0 ? 1 : s.nz > 0 ? 2 : 3), had = clearFor.ok.get(key);
@@ -264,10 +265,12 @@ const G_Space = (() => {
     clearFor.ok.set(key, ok);
     return ok;
   }
-  function aim(maxT = 320, reach = 1.0) {
+  // (reach: how far to one side of a site her nose line may meet the hull and still be on for it; 3.5 m: the collar takes her onto
+  // the nearest, though the line meets a window or a bulkhead's end between sites)
+  function aim(maxT = 320, reach = 3.5) {
     if (S.kind !== 'board' || !S.map || !S.map.sp) return null;
     const L = SD.layout(S.def), zn = L.zc - 0.22, N = new T.Vector3(0, L.FB + 1.16, zn).applyQuaternion(S.Q).add(S.P), f = fwd(S.Q), TS = G.Level.TS; // (the collar's middle: 1.4 over the deck she breaches when she's level with it)
-    let best: ShSite | null = null, bo = reach, bt = 0; // (within a metre of a site's middle: the collar pulls her onto it. reach: further, for her squaring up to the hull)
+    let best: ShSite | null = null, bo = reach, bt = 0; // (the nearest site the line passes within reach of: the collar pulls her onto it)
     const raid: number[][] = (S.state && S.state.raid) || [], W0 = S.map.W, nearPod = (s: ShSite) => raid.some((q) => Math.hypot(s.c % W0 - q[0] % W0, ((s.c / W0) | 0) - ((q[0] / W0) | 0)) * G.Level.TS < 8);
     const list = G.ShipGen.sites(S.map).concat((S.map.sp.cuts || []).map(siteAt)).filter((s) => !nearPod(s)); // (and the holes already made; not where a pirate pod is)
     for (const s of list) {
@@ -774,7 +777,7 @@ const G_Space = (() => {
     S.P.y -= G.U.clamp(a.dy, -4, 4) * Math.min(1, dt * 2.5 * k);
     // (and within 8 m to one side of the stretch she's on for, drawn across onto it: the collar's middle onto the site's)
     const L = SD.layout(S.def), N = new T.Vector3(0, 0, L.zc - 0.22).applyQuaternion(S.Q).add(S.P), tx = -a.site.nz, tz = a.site.nx, off = (N.x - a.site.x) * tx + (N.z - a.site.z) * tz;
-    if (Math.abs(off) < 8) { const m = off * Math.min(1, dt * 2.5 * k); S.P.x -= tx * m; S.P.z -= tz * m; }
+    if (Math.abs(off) < 8) { const m = off * Math.min(1, dt * 4 * Math.max(k, G.U.clamp((40 - a.range) / 30, 0, 1))); S.P.x -= tx * m; S.P.z -= tz * m; } // (hard in the last 40 m, the pilot's hand or not)
   }
   // how far she is from anything big (no cruising close in)
   function clearOf() {
@@ -1340,7 +1343,7 @@ const G_Space = (() => {
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
   /** in a jump, aboard: what the screen shows is the pod and the tunnel, not a veil (js/game.ts) */
   const jumping = () => S.on && !!S.ftl && aboard();
-  return { sound, dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }

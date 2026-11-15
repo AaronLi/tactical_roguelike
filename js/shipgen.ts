@@ -44,7 +44,7 @@ const G_ShipGen = (() => {
     'capital:1': [['quarters', 0.05], ['armoury', 0.2], ['mess', 0.5], ['galley', 0.55], ['medbay', null], ['barracks', 0.8], ['pods', 0.4], ['quarters', 0.15], ['quarters', null], ['pods', 0.75], ['mess', null], ['barracks', null], ['quarters', null]],
   };
   const FILL: ShRole[] = ['cargo', 'quarters', 'mess', 'cargo', 'barracks'];
-  const MX = 12, MZ0 = 12, MZB = 12, GAP = 22; // (open space all round a hull, and between two)
+  const MX = 12, MZ0 = 12, MZB = 12, GAP = 36; // (open space all round a hull, and between two: room for the squad's ship to stand nose-on to either, js/shipgen.ts sites)
 
   // a hull's frame: the same for every deck of her
   function skeleton(r: LvRng, size: SpSize): ShSk {
@@ -310,7 +310,7 @@ const G_ShipGen = (() => {
         // prow, where a ram or a bow juts out under her deck: js/shipmodel.ts hull. The squad's ship would sit in them)
         if (ok) { const ix = x - nx, iz = z - nz; ok = !map.rooms.some((rm, i) => (rm.fl || 0) === 0 && ix >= rm.x && ix < rm.x + rm.w && iz >= rm.z && iz < rm.z + rm.h && (sp.roles[i] === 'engine' || (sp.roles[i] === 'bridge' && nx < 0))); }
         // (out there: the collar's width at the hull, her cabin's behind it, her engine pods' from ten metres out)
-        for (let d = 1; d <= 33 && ok; d++) for (let w = d <= 5 ? 3 : d <= 14 ? 5 : 7, k = -w; k <= w && ok; k++) ok = at(x + nx * d + ax * k, z + nz * d + az * k) === 5;
+        for (let d = 1; d <= 33 && ok; d++) for (let w = d <= 5 ? 3 : d <= 14 ? 5 : 7, k = -w; k <= w && ok; k++) { const o = at(x + nx * d + ax * k, z + nz * d + az * k); ok = o === 5 || o === -1; } // (past the map's edge: open space too)
         if (ok) out.push({ c: z * W + x, nx, nz, x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) });
       }
     }
