@@ -218,9 +218,14 @@ const G_Hangar = (() => {
   // set down where it hung. A plate isn't part of a carrier's model: it's drawn here, to stand beside it.
   const PLATE_COL: Record<string, number> = { 'p.soft': 0x5a6a78, 'p.steel': 0x3d4044, 'p.pe': 0xcfd2d6, 'p.ceramic': 0xb8a888, 'p.ceramic2': 0xd6cdb4 };
   function plateMesh(id: string, k = 1) {
-    const g = new T.Group(), c = PLATE_COL[id] || 0x4a4f55;
-    box(g, -0.14 * k, 0, -0.012 * k, 0.14 * k, 0.36 * k, 0.012 * k, M(c, { roughness: 0.5, metalness: 0.4 }));
-    box(g, -0.115 * k, 0.02 * k, 0.012 * k, 0.115 * k, 0.34 * k, 0.017 * k, M(c, { roughness: 0.9 })); // (its face: a raised panel)
+    // (the shared gear's plate: models/characters/build_gear.py, a SAPI cut, curved, its strike face raised; loaded with the bodies)
+    const g = new T.Group(), c = PLATE_COL[id] || 0x4a4f55, put = () => {
+      const s = G.Humans.gear('plate'); if (!s) return;
+      const p = s.clone(true); p.scale.setScalar(k);
+      p.traverse((o: any) => { if (o.isMesh) o.material = /plateface/.test(o.material.name || '') ? M(c, { roughness: 0.9 }) : M(c, { roughness: 0.5, metalness: 0.4 }); });
+      g.add(p);
+    };
+    if (G.Humans.gear('plate')) put(); else G.Humans.ensure('m01').then(put);
     return g;
   }
   const SHOW: Record<string, string[]> = { carrier: ['carrier'], helmet: ['helmet', 'face'], face: ['face'], shoulder: ['shoulder'], groin: ['groin'], legs: ['legs'], belt: ['belt'], pack: ['pack'] }, SCALE: Record<string, number> = { carrier: 1.45, helmet: 1.9, face: 2.1, shoulder: 1.5, groin: 2, legs: 1.1, belt: 1.7, pack: 1.5 };

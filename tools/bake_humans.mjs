@@ -15,6 +15,8 @@ const sourceOnly = process.argv.includes('--source'), checkOnly = sourceOnly || 
 const BONES = ['hips', 'spine', 'chest', 'clavicle.L', 'upperarm.L', 'forearm.L', 'hand.L', 'clavicle.R', 'upperarm.R', 'forearm.R', 'hand.R', 'neck', 'head', 'eye.L', 'eye.R', 'thigh.L', 'shin.L', 'foot.L', 'thigh.R', 'shin.R', 'foot.R',
   ...['thumb', 'index', 'middle', 'ring', 'pinky'].flatMap((f) => [1, 2, 3].flatMap((i) => [f + i + '.L', f + i + '.R']))]; // (the fingers: three bones each, the first off the hand; js/humans.ts keeps their digits)
 const MATS = new Set(['shirt', 'trousers', 'boots', 'neck', 'upsleeve', 'sleeve', 'hand', 'finger', 'front', 'lowleg', 'eye', 'iris', 'skin', 'hair', 'lip', 'brow', 'eyeskin', 'stubble']), NEED = ['shirt', 'trousers', 'boots', 'hand', 'skin', 'eye'];
+// the gear that's the same on every body (night vision, a plate: models/characters/build_gear.py), beside them in the baked tree
+const GEAR = path.join(ROOT, 'models/characters/gear/gear.glb');
 const errs = [], err = (id, m) => errs.push(id + ': ' + m);
 
 /** A .glb's JSON chunk, or null. */
@@ -55,11 +57,14 @@ for (const id of ids) {
   humans[id] = { file: id + '.glb', bytes: buf.length, sha1: crypto.createHash('sha1').update(buf).digest('hex'), ...st };
   if (checkOnly && !sourceOnly) { const o = path.join(OUT, id + '.glb'); if (!fs.existsSync(o)) err(id, 'not baked (npm run bake:humans)'); else if (!fs.readFileSync(o).equals(buf)) err(id, 'the baked file is not the model kept in the repo (npm run bake:humans)'); }
 }
+if (!fs.existsSync(GEAR) || !glbJson(fs.readFileSync(GEAR))) err('gear', 'no readable models/characters/gear/gear.glb (blender -b -P models/characters/build_gear.py)');
+else if (checkOnly && !sourceOnly) { const o = path.join(OUT, 'gear.glb'); if (!fs.existsSync(o) || !fs.readFileSync(o).equals(fs.readFileSync(GEAR))) err('gear', 'the baked gear.glb is not the one kept in the repo (npm run bake:humans)'); }
 if (errs.length) { for (const e of errs) console.error('HUMANS: ' + e); console.error(errs.length + ' problems with the human bodies'); process.exit(1); }
 if (checkOnly) { console.log('humans OK (' + ids.length + ' bodies: skeleton, materials, skinning, figures' + (sourceOnly ? '' : '; the baked tree is their copy') + ')'); process.exit(0); }
 fs.mkdirSync(OUT, { recursive: true });
-for (const f of fs.readdirSync(OUT)) if (f.endsWith('.glb') && !humans[f.slice(0, -4)]) fs.unlinkSync(path.join(OUT, f)); // (a body no longer made)
+for (const f of fs.readdirSync(OUT)) if (f.endsWith('.glb') && f !== 'gear.glb' && !humans[f.slice(0, -4)]) fs.unlinkSync(path.join(OUT, f)); // (a body no longer made)
 for (const id of ids) fs.copyFileSync(path.join(SRC, id + '.glb'), path.join(OUT, id + '.glb'));
+fs.copyFileSync(GEAR, path.join(OUT, 'gear.glb'));
 fs.writeFileSync(path.join(OUT, 'index.json'), JSON.stringify({ version: 1, humans }, null, 1) + '\n');
 const sum = (k) => Object.values(humans).reduce((a, h) => a + h[k], 0);
 console.log('humans: ' + ids.length + ' bodies, ' + sum('tris') + ' triangles, ' + sum('bytes') + ' B');

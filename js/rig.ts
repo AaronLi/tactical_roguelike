@@ -25,7 +25,7 @@ interface ZipSwing { th: number; w: number; v: number; a: number }
 interface RigLeg { th: THREE.Object3D; sh: THREE.Object3D }
 type RigState = 'alive' | 'down' | 'dead';
 interface Rig { // a character's skeleton and its meshes (what create makes, and what update, the hit and the zip tie add as they go)
-  hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; hKit?: Record<string, (m: THREE.Material) => THREE.SkinnedMesh>; hPart?: Record<string, HumanPart>; hBone?: (name: string) => { b: THREE.Bone; inv: THREE.Matrix4 } | null; kit: Record<string, any> | null;
+  hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; hKit?: Record<string, (m: THREE.Material) => THREE.SkinnedMesh>; hPart?: Record<string, HumanPart>; hBone?: (name: string) => { b: THREE.Bone; inv: THREE.Matrix4 } | null; kit: Record<string, any> | null; headWear?: { cap: number | null; bandana: number | null }; headWorn?: THREE.Object3D[];
   callsign: { id: string; name: string } | null; root: THREE.Object3D; body: THREE.Object3D; hips: THREE.Object3D; spine: THREE.Object3D; chest: THREE.Object3D; neck: THREE.Object3D; head: THREE.Object3D;
   armL: RigArm; armR: RigArm; legL: RigLeg; legR: RigLeg; gunMount: THREE.Object3D; slingMount: THREE.Object3D; hipMount: THREE.Object3D; slung: boolean; mats: any[]; scale: number; style: string; shoe: FsSole | null;
   gun: THREE.Object3D | null; gunInfo: Record<string, any> | null; gunKey: string | null; phase: number; vel: THREE.Vector3; lastPos: THREE.Vector3 | null;
@@ -350,6 +350,10 @@ const G_Rig = (() => {
     rig.hKit = {}; rig.hPart = {};
     for (const p of parts) if (p.mat.startsWith('kit')) { rig.hKit[p.mat] = (m: THREE.Material) => skin(p, m); rig.hPart[p.mat] = p; }
     // a bone of the body's, and its inverse bind (from the model space a piece is made in to the bone's): what a pouch is laid on
+    // a cap or a bandana, on this body's own head (off under a helmet: setKit)
+    rig.headWorn = [];
+    const hw = rig.headWear;
+    if (hw) for (const [k, c] of [['kitcap', hw.cap], ['kitbandana', hw.bandana]] as [string, number | null][]) if (c != null && rig.hKit[k]) { const m = rig.hKit[k](KM(c)); m.visible = !(rig.kit && rig.kit.helmet); rig.body.add(m); heatMark(m); rig.headWorn.push(m); }
     rig.hBone = (name: string) => { for (const p of parts) { const i = p.bones.indexOf(name); if (i >= 0) return { b: boneOf(name, p.inv[i]), inv: p.inv[i] }; } return null; };
     for (const p of parts) {
       if (p.mat.startsWith('kit')) continue;
@@ -425,6 +429,7 @@ const G_Rig = (() => {
     const hd = D(k.helmet);
     part = 'helmet';
     rig.hatOn = !!hd || !rig.hairShown;
+    for (const m of rig.headWorn || []) m.visible = !hd;
     if (rig.hairMesh) rig.hairMesh.visible = !rig.hatOn;
     const putHd = (m: THREE.Object3D) => add(Hd, m, m.position.x, m.position.y, m.position.z);
     // the body's own helmet (models/characters/kit_head.py: its shell, rails, shroud, loop panels...) with the chinstrap
@@ -659,7 +664,9 @@ const G_Rig = (() => {
       for (const x of [-0.03, 0, 0.03]) { const v = M_(new T.CylinderGeometry(0.0075, 0.0075, 0.006, 8), L(0x1b1b19), x, 0.05, -0.1105, hat); v.rotation.x = Math.PI / 2; }
       const strap = M_(new T.BoxGeometry(0.045, 0.34, 0.012), L(0xc9a227), -0.1, 0.12, -0.151, chest); strap.rotation.z = -0.5; // gold, across the chest
     }
-    if (style === 'suspect' && !headCover && rnd() < 0.5) { if (hairMesh) hairMesh.scale.y *= 0.9; G.Headgear.cap((c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => hat.add(m), pick(PAL.hoodie)); } // a baseball cap
+    // a cap or a bandana: the body's own (models/characters/kit_head.py), put on with it (attachHuman)
+    let capC: number | null = null;
+    if (style === 'suspect' && !headCover && rnd() < 0.5) { if (hairMesh) hairMesh.scale.y *= 0.9; capC = pick(PAL.hoodie); } // a baseball cap
 
     // a leader's radio kit (o.leader): a headset over the head (a band, an ear cup on the left with a boom mic curving to the mouth, a foam cup
     // on the right), and a radio set on the chest harness with its antenna up by the shoulder, a push-to-talk lead to the headset
@@ -677,11 +684,7 @@ const G_Rig = (() => {
     }
 
     // what goes with a ship's clothes (ex): a cap, a bandana tied at the back, a belt or a sash, an officer's boards
-    if (ex.cap != null) G.Headgear.cap((c: number, op?: Record<string, any>) => (op ? new T.MeshLambertMaterial(Object.assign({ color: c }, op)) : L(c)), (m: THREE.Object3D) => hat.add(m), ex.cap);
-    if (ex.bandana != null) {
-      const bm = L(ex.bandana), dome = M_(new T.SphereGeometry(0.106, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.4), bm, 0, 0.134, 0.004, hat); dome.scale.set(0.96, 1.05, 1.03);
-      M_(new T.BoxGeometry(0.035, 0.03, 0.03), bm, 0, 0.115, 0.108, hat); const tail = M_(new T.BoxGeometry(0.03, 0.08, 0.008), bm, 0.012, 0.07, 0.112, hat); tail.rotation.z = 0.25;
-    }
+    if (ex.cap != null) capC = ex.cap;
     if (ex.belt != null) M_(new T.BoxGeometry(0.33, 0.045, 0.235), L(ex.belt), 0, 0.075, 0, hips);
     if (ex.sash != null) { const sm = L(ex.sash); M_(new T.BoxGeometry(0.335, 0.075, 0.24), sm, 0, 0.07, 0, hips); M_(new T.BoxGeometry(0.05, 0.17, 0.018), sm, 0.12, -0.03, -0.112, hips); }
     if (ex.boards != null) for (const x of [-1, 1]) M_(new T.BoxGeometry(0.05, 0.012, 0.085), L(ex.boards), x * 0.165, 0.3, 0, chest);
@@ -734,7 +737,7 @@ const G_Rig = (() => {
 
     const rig = {
       human: hid, humanOn: false, fit: hdef ? fitOf(hdef) : null, hat, prims, wear,
-      hairShown: !!hairM && ex.bandana == null && !(ex.cap != null && hdef && /hightop|topbun|full/.test(hdef.hairStyle)), hatOn: !hairM || ex.bandana != null || !!(ex.cap != null && hdef && /hightop|topbun|full/.test(hdef.hairStyle)), // (hair that a cap or a bandana can't go over isn't shown under one)
+      headWear: { cap: ex.bandana != null ? null : capC, bandana: ex.bandana ?? null }, hairShown: !!hairM && ex.bandana == null && !(ex.cap != null && hdef && /hightop|topbun|full/.test(hdef.hairStyle)), hatOn: !hairM || ex.bandana != null || !!(ex.cap != null && hdef && /hightop|topbun|full/.test(hdef.hairStyle)), // (hair that a cap or a bandana can't go over isn't shown under one)
       hairMesh, look, pantsM: bottom, seat: null, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null, atakAlways: !!o.animal,
       root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style, shoe,
       gun: null, gunInfo: null, gunKey: null,

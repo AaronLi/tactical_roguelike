@@ -12,6 +12,8 @@
 //   G.Humans.ensure(id)          Promise<parts | null>: its file loaded and taken apart
 //   G.Humans.get(id)             the parts if they're loaded, else null
 //   G.Humans.boot()              every figure's file, loaded behind the menu
+//   G.Humans.gear(name)          a node of the gear that's the same on every body (assets/models/humans/gear.glb: night vision, a plate;
+//                                models/characters/build_gear.py), or null: loaded with the first body, so it's in before any body is
 //
 // A part is one material's faces: { geo (shared: never disposed with a body), mat (its material's name: shirt, upsleeve, sleeve,
 // trousers, boots, neck, hand, finger, skin, eyeskin, hair, brow, lip, stubble, eye, iris), color, head (it rides the head),
@@ -22,12 +24,16 @@ const G_Humans = (() => {
   const DATA = G.HumanData, ids = Object.keys(DATA);
   const loaded = new Map<string, HumanPart[]>(), loading = new Map<string, Promise<HumanPart[] | null>>();
   const HEAD = new Set(['skin', 'eyeskin', 'hair', 'brow', 'lip', 'stubble', 'eye', 'iris']);
+  // the shared gear: loaded once, with the bodies (a body isn't in till it is; a gear file that fails leaves its pieces undrawn)
+  const gearNodes = new Map<string, THREE.Object3D>();
+  let gearP: Promise<void> | null = null;
+  const gearLoad = () => gearP || (gearP = G.Models.loadFile(DIR + 'gear.glb').then((scene: any) => { for (const c of scene.children) gearNodes.set(c.name, c); }, (e: any) => { console.warn('[humans] gear.glb: ' + (e && e.message || e)); }));
   const letters = (s: string) => s.replace(/[^a-zA-Z]/g, ''), boneName = (s: string) => s.replace(/[^a-zA-Z0-9]/g, ''); // (a bone keeps its digits: index1L, index2L)
   function ensure(id: string): Promise<HumanPart[] | null> {
     if (!DATA[id]) return Promise.resolve(null);
     let p = loading.get(id);
     if (!p) {
-      p = G.Models.loadFile(DIR + id + '.glb').then((scene: any) => {
+      p = Promise.all([G.Models.loadFile(DIR + id + '.glb'), gearLoad()]).then(([scene]: any) => {
         const parts: HumanPart[] = [];
         scene.traverse((o: any) => {
           if (!o.isSkinnedMesh) return;
@@ -50,7 +56,7 @@ const G_Humans = (() => {
     return ids[mix(k) % ids.length];
   }
   const boot = () => { for (const id of ids) ensure(id); };
-  return { ids, pick, def: (id: string): HumanDef | null => DATA[id] || null, ensure, get: (id: string) => loaded.get(id) || null, boot };
+  return { ids, pick, def: (id: string): HumanDef | null => DATA[id] || null, ensure, get: (id: string) => loaded.get(id) || null, boot, gear: (name: string) => gearNodes.get(name) || null };
 })();
 G.Humans = G_Humans;
 interface GameModules { Humans: typeof G_Humans }

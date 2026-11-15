@@ -6,6 +6,7 @@
 #   the helmets as they are:   kithelmbump, kithelmfast, kithelmach, kithelmrifle   (shell, rails, shroud, loop panels, counterweight...)
 #   the face pieces:           kitmandible, kitshield, kitshieldrifle               (the shields' clear sheet; kitshieldframe their frames)
 #   the mandible's arms:       kitmandarmshigh, kitmandarmsmid                     (up to a high-cut's rails, or a mid-cut's)
+#   what isn't armour:         kitcap (a baseball cap), kitbandana (tied at the back) (over the hair, as far as it lies close)
 import bpy, bmesh, math
 from mathutils import Vector as V
 from mathutils.bvhtree import BVHTree
@@ -26,6 +27,7 @@ def build(head, arm):
     polys = [p for p in me.polygons if p.material_index not in hair]
     mw = head.matrix_world
     bvh = BVHTree.FromPolygons([mw @ v.co for v in me.vertices], [list(p.vertices) for p in polys])
+    bvhh = BVHTree.FromPolygons([mw @ v.co for v in me.vertices], [list(p.vertices) for p in me.polygons])  # (with the hair)
     skin = [mw @ me.vertices[i].co for p in polys for i in p.vertices]
     top = max(v.z for v in skin)
     up = [v for v in skin if v.z > top - 0.06]
@@ -35,13 +37,16 @@ def build(head, arm):
     # the skull's surface as a field of radii round C (a x th), each the farthest of it near that way plus gap, eased smooth and never
     # inside the head: what every shell is laid on
     NA, NT, TMAX = 64, 30, 0.86 * PI
-    def field(gap, smooth=6, shell=False, convex=None):
+    def field(gap, smooth=6, shell=False, convex=None, hair=0.0):
         R = [[0.0] * (NT + 1) for _ in range(NA)]
         for i in range(NA):
             for j in range(NT + 1):
                 a, th = -PI + 2 * PI * i / NA, TMAX * j / NT
-                hit = bvh.ray_cast(C, D(a, th), 0.4)[0]
-                R[i][j] = ((hit - C).length if hit else 0.1) + gap
+                hit = bvh.ray_cast(C, D(a, th), 0.4)[0]; r = (hit - C).length if hit else 0.1
+                if hair:  # (over the hair too, as far as hair out to `hair` beyond the skull: a big bun or a high top stays under it)
+                    hh = bvhh.ray_cast(C + D(a, th) * 0.4, -D(a, th), 0.4)[0]  # (from outside in: the outermost of hair and skin)
+                    if hh: r = max(r, min((hh - C).length, r + hair))
+                R[i][j] = r + gap
         need = [row[:] for row in R]
         # a shell's an egg round the head, not its every bump: the smallest egg (its own width, depth ahead and behind, and height, from
         # the head's) clear of the head over the dome (above the ears), then out further only where the head needs it below that
@@ -167,4 +172,30 @@ def build(head, arm):
     out.append(done(sheet('fs', vat, FS[0], FS[1], FS[2], FS[3], 0.007, cols=14, rows=7), 'kitshield'))
     out.append(done(sheet('fr', vat, FS[0], FS[1], FS[2], FS[3], 0.016, cols=14, rows=7), 'kitshieldrifle'))
     out.append(done(K._join([sheet('fb', vat, -1.22, 1.22, 0.36 * PI, 0.4 * PI, 0.012, off=0.002, cols=20, rows=1)] + [box('fa', at, s2 * 1.4, 0.42 * PI, (0.014, 0.05, 0.03), 0.012) for s2 in (-1, 1)], 'kitshieldframe'), 'kitshieldframe'))
+    # -- a baseball cap: a six-panel crown over the hair, level round the head a little above the brow, a peak out over the eyes, a
+    # button on top; a bandana: a cloth over the crown, lower at the back, its knot and tails at the back
+    cat = field(0.004, smooth=10, shell=True, hair=0.05)
+    edge = lambda a: PI * (0.44 + 0.07 * ease(a))
+    parts = [sheet('cr', cat, -PI, PI, 0.0, edge, 0.003, closed=True, cols=30, rows=8)]
+    for s in range(6):  # (its seams: thin ribs from the button down)
+        a = -PI + 2 * PI * (s + 0.5) / 6; parts.append(sheet('sm', cat, a - 0.02, a + 0.02, 0.02 * PI, edge, 0.0012, off=0.003, cols=1, rows=6))
+    parts.append(pod('bt', cat, 0.0, 0.0, 0.009, 0.005, 0.002))
+    rows = []
+    for j in range(5):
+        row = []
+        for i in range(13):
+            a = -0.95 + 1.9 * i / 12; b = cat(a, edge(a), 0.0015); d = b - C; d.z = 0; d.normalize()
+            L = 0.075 * math.cos(a * 1.25) ** 0.6; u = j / 4
+            row.append(b + d * L * u + V((0, 0, -0.016 * u * u - 0.006 * u)))
+        rows.append(row)
+    pk = K._grid('pk', rows)
+    md = pk.modifiers.new('so', 'SOLIDIFY'); md.thickness = 0.004; md.offset = 0; md.use_rim = True
+    dg = bpy.context.evaluated_depsgraph_get(); m2 = bpy.data.meshes.new_from_object(pk.evaluated_get(dg)); old = pk.data; pk.modifiers.clear(); pk.data = m2; bpy.data.meshes.remove(old)
+    parts.append(pk)
+    out.append(done(K._join(parts, 'kitcap'), 'kitcap'))
+    bat = field(0.003, smooth=8, shell=True, hair=0.04)
+    bedge = lambda a: PI * (0.4 + 0.12 * ease(a))
+    parts = [sheet('bd', bat, -PI, PI, 0.0, bedge, 0.0025, closed=True, cols=30, rows=8), box('kn', bat, PI, bedge(PI) - 0.03 * PI, (0.035, 0.03, 0.03), 0.002)]
+    p0 = bat(PI - 0.08, bedge(PI), 0.01); parts.append(strip('tl', p0, p0 + V((0.01, 0.012, -0.075)), 0.03, 0.004)); parts.append(strip('tr', p0, p0 + V((-0.02, 0.01, -0.065)), 0.026, 0.004))
+    out.append(done(K._join(parts, 'kitbandana'), 'kitbandana'))
     return out
