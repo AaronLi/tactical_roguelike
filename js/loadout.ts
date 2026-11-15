@@ -175,26 +175,28 @@ const G_Loadout = (() => {
   // what's in its boxes (up to two: [{ k, id }], k the gun's slot or the gear's mount), only what's still earned
   const boxes = (slot: string, id: string): { k: string; id: string }[] => (data().box[slot + ':' + id] || []).filter((b: any) => b && atts(slot, id, b.k).some((a) => a.id === b.id && a.open)).slice(0, BOXES);
   // a gun as it's taken: as it comes, with its boxes' parts (whatever no longer fits dropped)
-  function build(slot: string, gun: string) {
+  function build(slot: string, gun: string, bx = boxes(slot, gun)) {
     const GS = G.Gunsmith, b = GS.defaultBuild(gun);
-    for (const x of boxes(slot, gun)) b[x.k] = x.id;
+    for (const x of bx) b[x.k] = x.id;
     GS.prune(gun, b); return b;
   }
-  // put an attachment in a box (k, id), or empty it (null): one of a kind (a second sight replaces the first), two at most
+  // the boxes as they'd be with an attachment put in a box (k, id), or the box emptied (null): one of a kind (a second sight replaces
+  // the first), two at most. (Not kept: what fit does, and what the attachment view shows on hovering one, earned or not)
+  function boxesWith(slot: string, id: string, box: number, att: { k: string; id: string } | null) {
+    const cur = boxes(slot, id).slice();
+    if (att) { const same = cur.findIndex((b) => b.k === att.k); if (same >= 0) cur.splice(same, 1, att); else if (box < cur.length) cur[box] = att; else if (cur.length < BOXES) cur.push(att); }
+    else if (box < cur.length) cur.splice(box, 1);
+    return cur;
+  }
   function fit(slot: string, id: string, box: number, att: { k: string; id: string } | null) {
-    const d = data(), cur = boxes(slot, id).slice();
-    if (att) {
-      if (!atts(slot, id, att.k).some((a) => a.id === att.id && a.open)) return;
-      const same = cur.findIndex((b) => b.k === att.k);
-      if (same >= 0) cur.splice(same, 1, att); else if (box < cur.length) cur[box] = att; else if (cur.length < BOXES) cur.push(att);
-    } else if (box < cur.length) cur.splice(box, 1);
-    d.box[slot + ':' + id] = cur; keep();
+    if (att && !atts(slot, id, att.k).some((a) => a.id === att.id && a.open)) return;
+    data().box[slot + ':' + id] = boxesWith(slot, id, box, att); keep();
   }
   // ---- points: what it'd cost, about one a 400 credits (the issue kit, the bump helmet and the P9: nothing), its boxes' too
-  function cost(slot: string, id: string | null): number {
+  function cost(slot: string, id: string | null, bx?: { k: string; id: string }[]): number {
     if (!id) return 0;
     const q = slot === 's' ? null : node(slot, id), own = q && q.pts != null ? q.pts : isGun(slot) ? pts(G.WEAPONS[id].price) : pts(G.Gear.DEFS[id].price); // (a primary's its own, pts: about alike across the kinds)
-    return own + boxes(slot, id).reduce((n, b) => n + (atts(slot, id, b.k).find((a) => a.id === b.id)?.pts || 0), 0);
+    return own + (bx || boxes(slot, id)).reduce((n, b) => n + (atts(slot, id, b.k).find((a) => a.id === b.id)?.pts || 0), 0);
   }
   // ---- the loadout itself: what's picked for each slot (kept, so the next run starts with it), and putting it on you
   const sel = (slot: string): string | null => { const d = data().sel, id = slot in d ? d[slot] : TREES[slot].mid; return id && open(slot, id) ? id : null; }; // (never set: the tree's middle, once it's yours; set empty: empty)
@@ -218,7 +220,7 @@ const G_Loadout = (() => {
     }
   }
   function reload() { save = null; }
-  return { TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, fit, build, BUDGET, pts, cost, total };
+  return { TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, boxesWith, fit, build, BUDGET, pts, cost, total };
 })();
 G.Loadout = G_Loadout;
 interface GameModules { Loadout: typeof G_Loadout }

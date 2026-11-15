@@ -1302,6 +1302,14 @@ body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
 .lo-card.in { border-color: #9fd6ff; box-shadow: inset 0 0 0 1px #9fd6ff; cursor: default; }
 .lo-card.other { border-style: dashed; }
 .lo-card.locked { opacity: 0.45; cursor: default; }
+.lo-card[aria-disabled="true"]:hover { border-color: var(--ui-line); background: rgba(20, 24, 28, 0.92); }
+.lo-card.locked:hover { opacity: 0.7; }
+.lo-stats { margin: 8px 0 4px; display: flex; flex-direction: column; gap: 6px; }
+.lo-stats .gs-pe { display: flex; flex-wrap: wrap; gap: 4px 8px; font: 400 11.5px var(--ui-font); }
+.lo-stats .gs-pe .g { color: var(--good); }
+.lo-stats .gs-pe .b { color: #ff6b6b; }
+.cov tr.add td { color: var(--good); }
+.cov tr.gone td { color: #ff6b6b; text-decoration: line-through; opacity: 0.8; }
 .lo-empty { margin: 4px 0 6px; }
 
 /* the ranks' timeline (js/game.ts loRankView): a column a rank, what it opens, a line where you are */

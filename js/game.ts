@@ -1448,6 +1448,14 @@ const G_Game = {
       const w = el.querySelector('.web-world'); if (w) w.classList.remove('glide');
       this.armPlace();
     }) as EventListener, { passive: false });
+    // (the attachment view: hovering a card shows what it'd make of the piece; off it, the piece as it stands)
+    let prevAt: string | null = null;
+    el.addEventListener('pointerover', ((e: GmEvt) => {
+      if (!this.loAtt) return;
+      const c = e.target.closest<HTMLElement>('[data-loprev]'), v = c ? c.dataset.loprev! : null;
+      if (v === prevAt) return; prevAt = v;
+      const box = el.querySelector<HTMLElement>('[data-lostats]'); if (box) box.innerHTML = this.loAttStats(v);
+    }) as EventListener);
     el.addEventListener('click', ((e: GmEvt) => {
       const dragged = moved; moved = false;
       if (G.Me.sidearmChosen) return;
@@ -1575,14 +1583,43 @@ const G_Game = {
     const ks = [...new Set(all.map((a) => a.k))].sort((x, y) => all.filter((a) => a.k === y && a.open).length - all.filter((a) => a.k === x && a.open).length); // (the kinds with something earned first)
     const groups = ks.map((k) => `<section><h4>${G.U.esc(KIND(sl, k))}</h4><div class="lo-cards">${all.filter((a) => a.k === k).sort((x, y) => +y.open - +x.open).map((a) => {
       const inThis = cur && cur.id === a.id, other = !inThis && bx.some((b) => b.id === a.id), src = icon(a.id);
-      return `<button class="lo-card${a.open ? '' : ' locked'}${inThis ? ' in' : ''}${other ? ' other' : ''}" title="${gun || !G.Gear.DEFS[a.id] ? '' : G.U.esc(G.Ballistics.coverageText(G.Gear.DEFS[a.id]))}" ${a.open && !inThis ? `data-lopart="${a.k}|${a.id}"` : 'disabled'}>${src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>'}<b>${G.U.esc(a.name)}</b>${a.open ? `<i>${a.pts} pt${a.pts === 1 ? '' : 's'}${inThis ? ' · in this box' : other ? ' · in the other box' : ''}</i>` : `<small>${a.have}/${a.n} ${G.U.esc(a.what)}</small>`}</button>`;
+      return `<button class="lo-card${a.open ? '' : ' locked'}${inThis ? ' in' : ''}${other ? ' other' : ''}" data-loprev="${a.k}|${a.id}" ${a.open && !inThis ? `data-lopart="${a.k}|${a.id}"` : 'aria-disabled="true"'}>${src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>'}<b>${G.U.esc(a.name)}</b>${a.open ? `<i>${a.pts} pt${a.pts === 1 ? '' : 's'}${inThis ? ' · in this box' : other ? ' · in the other box' : ''}</i>` : `<small>${a.have}/${a.n} ${G.U.esc(a.what)}</small>`}</button>`;
     }).join('')}</div></section>`).join('');
     const one = bx.length && !cur ? bx.find((b) => b) : null, oneK = one ? KIND(sl, one.k) : '';
-    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>${G.U.esc(L.name(sl, id))} <span>— attachment ${A.box + 1} of 2</span></h2><p>${cur ? 'Pick another to put in its place, or empty the box.' : 'Pick what goes in this box.'} One of each kind: a second ${oneK ? oneK.toLowerCase() : 'sight'} takes the first one's place.</p></div>${cur ? '<button class="btn lo-empty" data-lopart="">Empty this box</button>' : ''}${groups}</div><button class="btn web-home" data-loback>Back to the tree</button></div>
-      <aside class="web-side"><img src="${whole()}" alt=""><h3>${G.U.esc(L.name(sl, id))}</h3><div class="lo-cost">${L.cost(sl, id)} point${L.cost(sl, id) === 1 ? '' : 's'} as it stands</div>${gun ? '' : ((pb) => G.Ballistics.coverageHTML(G.Gear.DEFS[id], pb ? G.Gear.DEFS[pb.id] : null))(bx.find((b) => b && G.Gear.DEFS[b.id] && G.Gear.DEFS[b.id].kind === 'plate'))}
+    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>${G.U.esc(L.name(sl, id))} <span>— attachment ${A.box + 1} of 2</span></h2><p>${cur ? 'Pick another to put in its place, or empty the box.' : 'Pick what goes in this box.'} One of each kind: a second ${oneK ? oneK.toLowerCase() : 'sight'} takes the first one's place.</p></div>${cur ? '<button class="btn lo-empty" data-lopart="" data-loprev="">Empty this box</button>' : ''}${groups}</div><button class="btn web-home" data-loback>Back to the tree</button></div>
+      <aside class="web-side"><img src="${whole()}" alt=""><h3>${G.U.esc(L.name(sl, id))}</h3><div class="lo-cost">${L.cost(sl, id)} point${L.cost(sl, id) === 1 ? '' : 's'} as it stands</div><div class="lo-stats" data-lostats>${this.loAttStats(null)}</div>
         <h4>In its boxes</h4><ul class="web-next">${[0, 1].map((i) => { const b = bx[i], a = b && all.find((t) => t.id === b.id); return `<li><b>${i + 1}.</b> ${a ? `${G.U.esc(a.name)} <span>${a.pts} pt</span>` : '<span>empty</span>'}</li>`; }).join('')}</ul>
         <p class="lo-note">${all.filter((a) => a.open).length} of ${all.length} earned with it. The rest come with what's asked of each, done with it.</p></aside></div>`;
     el.classList.remove('hidden');
+  },
+  // The attachment view's stats: the piece as it stands, its boxes as they are; with prev (the 'k|id' of a card hovered, '' for
+  // emptying the box), what that would make of it: a gun's whole stat card with the changes marked (js/gunsmith.ts statsHtml), the
+  // gear's mobility, durability and what it covers, how well (js/ballistics.ts coverage), what's new to it and what it'd lose
+  loAttStats(prev: string | null) {
+    const L = G.Loadout, A = this.loAtt; if (!A) return '';
+    const sl = A.sl, id = L.sel(sl); if (!id) return '';
+    const gun = sl === 'p' || sl === 's', bx = L.boxes(sl, id), all = L.atts(sl, id), E = G.U.esc;
+    const att = prev ? { k: prev.split('|')[0], id: prev.split('|')[1] } : null, nb = prev == null ? bx : L.boxesWith(sl, id, A.box, att);
+    const a = att ? all.find((t) => t.id === att.id) : null, c0 = L.cost(sl, id), c1 = L.cost(sl, id, nb);
+    const head = prev == null ? '' : `<div class="gs-change"><div class="gs-ch-h">${a ? `Fitting the ${E(a.name)}${a.open ? '' : ' <small>(not yet earned)</small>'}` : 'Emptying the box'}</div><div class="gs-pe">${c1 !== c0 ? `<span class="${c1 < c0 ? 'g' : 'b'}">Points ${c0} → ${c1}</span>` : ''}`;
+    if (gun) {
+      const def = (b: { k: string; id: string }[]) => G.Me.makeWeapon(id, L.build(sl, id, b)).def, d0 = def(bx);
+      if (prev == null) return `<div class="gs-stats">${G.GunsmithUI.statsHtml(d0)}</div>`;
+      const d1 = def(nb);
+      return `${head}${G.GunsmithUI.deltaHtml(d0, d1)}</div></div><div class="gs-stats">${G.GunsmithUI.statsHtml(d0, d1)}</div>`;
+    }
+    type Row = { where: string; best: string | null; more45: string[]; frag: number };
+    const D = G.Gear.DEFS, pieces = (b: { k: string; id: string }[]) => [D[id], ...b.map((x) => D[x.id]).filter(Boolean)];
+    const mob = (b: { k: string; id: string }[]) => pieces(b).reduce((m, d) => m * (d.speed || 1), 1) * 100;
+    const rows = (b: { k: string; id: string }[]): Row[] => { const pl = b.find((x) => D[x.id] && D[x.id].kind === 'plate'); return [...G.Ballistics.coverage(D[id], pl ? D[pl.id] : null), ...b.filter((x) => D[x.id] && D[x.id].kind !== 'plate').flatMap((x) => G.Ballistics.coverage(D[x.id]))]; };
+    const key = (r: Row) => r.where + '|' + r.best + '|' + r.more45.join() + '|' + r.frag;
+    const r0 = rows(bx), r1 = rows(nb), k0 = new Set(r0.map(key)), k1 = new Set(r1.map(key));
+    const stat = (name: string, v0: number, v1: number, fmt: (v: number) => string, better: number) => { const ch = fmt(v0) !== fmt(v1), good = !ch ? '' : (v1 > v0) === (better > 0) ? 'up' : 'down'; return `<div class="gs-stat ${good}"><span>${name}</span><div></div><b>${fmt(v1)}${ch ? ` <em>${v1 > v0 ? '▲' : '▼'} ${fmt(Math.abs(v1 - v0))}</em>` : ''}</b></div>`; };
+    const m0 = mob(bx), m1 = mob(nb), pct = (v: number) => v.toFixed(1) + '%';
+    const tr = (r: Row, cls: string) => `<tr class="${cls}"><td>${E(r.where)}</td><td>${E(r.best || 'nothing')}</td><td>${E(r.more45.join(', ') || '—')}</td><td class="${r.frag >= 1200 ? 'ok' : r.frag >= 700 ? 'mid' : 'no'}">${r.frag >= 300 ? 'to ' + r.frag + ' m/s' : 'no'}</td></tr>`;
+    const table = !r0.length && !r1.length ? '<p class="lo-note">It stops nothing by itself: a plate goes in it.</p>' : `<table class="cov"><thead><tr><th>Covers</th><th>Bullets head-on</th><th>Also at 45°</th><th>Fragments</th></tr></thead><tbody>${r1.map((r) => tr(r, prev != null && !k0.has(key(r)) ? 'add' : '')).join('')}${prev != null ? r0.filter((r) => !k1.has(key(r))).map((r) => tr(r, 'gone')).join('') : ''}</tbody></table>`;
+    const pe = prev == null ? '' : `${head}${pct(m1) !== pct(m0) ? `<span class="${m1 > m0 ? 'g' : 'b'}">Mobility ${pct(m0)} → ${pct(m1)}</span>` : ''}${r1.filter((r) => !k0.has(key(r))).map((r) => `<span class="g">${E(r.where)}: ${E(r.best || 'fragments only')}</span>`).join('')}${r0.filter((r) => !k1.has(key(r))).map((r) => `<span class="b">Loses: ${E(r.where)}</span>`).join('')}</div></div>`;
+    return `${pe}<div class="gs-stats">${stat('Mobility', m0, m1, pct, 1)}${stat('Durability', D[id].dur || 0, D[id].dur || 0, (v) => String(v), 1)}</div>${table}`;
   },
   // Deploy: the sidearm (told the squad: the host waits on everyone's), and the rest put on you (on the ground, the sidearm alone)
   loDeploy() {
