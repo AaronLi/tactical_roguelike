@@ -885,19 +885,22 @@ const G_Space = (() => {
     collide(dt);
     events();
   }
-  // Coming in on a stretch of hull she can breach (within 140 m of it, her nose on it within about 70 degrees), she squares herself
+  // Coming in on a stretch of hull she can breach (within 140 m of it, her nose on it within about 70 degrees, closing on it: the faster,
+  // the harder it takes her), she squares herself
   // up to it: her nose turned straight at it and level, her roll taken out, her collar eased to the height of the deck beyond (and
   // onto the nearest place it can go in, if that's within 8 m to one side). The
   // nearer, the harder; the pilot's own turning eases it off. (What the breach wants: js/space.ts events, square on, level, at height.)
   function squareUp(dt: number) {
     const a = aim(160, 25); if (!a || a.range > 140 || a.range < -0.5 || a.align < 0.34) return;
-    const k = G.U.clamp((140 - a.range) / 70, 0, 1) * (1 - 0.7 * Math.min(1, S.stick.length())); // (from 140 m out, full by 70 m)
+    // (only while she's closing on the hull, and as hard as she is: none standing off or backing away, full from 25 m/s in)
+    const v = G.U.clamp(a.close / 25, 0, 1); if (v <= 0) return;
+    const k = G.U.clamp((140 - a.range) / 70, 0, 1) * (1 - 0.7 * Math.min(1, S.stick.length())) * v; // (from 140 m out, full by 70 m)
     if (k <= 0) return;
     S.Q.slerp(lookQ(new T.Vector3(-a.site.nx, 0, -a.site.nz)), Math.min(1, dt * 5 * k)).normalize();
     S.P.y -= G.U.clamp(a.dy, -4, 4) * Math.min(1, dt * 2.5 * k);
     // (and within 8 m to one side of the stretch she's on for, drawn across onto it: the collar's middle onto the site's)
     const L = SD.layout(S.def), N = new T.Vector3(0, 0, L.zc - 0.22).applyQuaternion(S.Q).add(S.P), tx = -a.site.nz, tz = a.site.nx, off = (N.x - a.site.x) * tx + (N.z - a.site.z) * tz;
-    if (Math.abs(off) < 8) { const m = off * Math.min(1, dt * 4 * Math.max(k, G.U.clamp((40 - a.range) / 30, 0, 1))); S.P.x -= tx * m; S.P.z -= tz * m; } // (hard in the last 40 m, the pilot's hand or not)
+    if (Math.abs(off) < 8) { const m = off * Math.min(1, dt * 4 * Math.max(k, G.U.clamp((40 - a.range) / 30, 0, 1) * v)); S.P.x -= tx * m; S.P.z -= tz * m; } // (hard in the last 40 m, the pilot's hand or not: as she closes)
   }
   // how far she is from anything big (no cruising close in)
   function clearOf() {

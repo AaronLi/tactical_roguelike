@@ -1715,7 +1715,8 @@ const G_Game = {
     else { G.Landing.enter(this.map); G.Me.spawn(this.map.spawn.x, this.map.spawn.z); G.Landing.board(G.Me, Math.min(i, G.Hangar.HELI.seats - 1)); }
     this.screen(null);
     G.HUD.show(true);
-    if (sp) G.HUD.toast(G.U.esc(sp.ms.name), G.U.esc(sp.ms.where) + ' · ' + G.SpaceData.OBJ[sp.ms.obj as SpObj].name, 4.5);
+    const swap = !jump && !!(sp && sp.zone && sp.zone.near && G.Space.S.kind === 'board'); // (come up with another of the zone's ships: the level changing under you)
+    if (sp) { if (!swap) G.HUD.toast(G.U.esc(sp.ms.name), G.U.esc(sp.ms.where) + ' · ' + G.SpaceData.OBJ[sp.ms.obj as SpObj].name, 4.5); } // (not news then)
     else G.HUD.toast(`LEVEL ${level}`, this.map.theme.name + (G.Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
     if (!sp && G.Route.isBoss(level)) G.Audio.alarm();
     if (!this.locked && !seamless) this.$('clickToPlay').classList.remove('hidden');
