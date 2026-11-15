@@ -191,6 +191,15 @@ const G_Space = (() => {
   // a mission flown (done or not) is off the board (the host's: js/spaceserver.ts gone); on this screen once its debrief's closed
   let telling: number | null = null;
   const isGone = (i: number) => S.board.gone.includes(i) && telling !== i;
+  // your rank and how far into it, with what the mission added: the bar as it was, then filled to where it is now (a rank gained:
+  // full, and the new rank's from empty)
+  function xpBar(gain: number) {
+    const L = G.Loadout; if (!L) return '';
+    const x1 = L.xp(), x0 = Math.max(0, x1 - gain), r1 = L.rank(), r0 = (() => { let r = r1; while (r > 0 && L.rankAt(r) > x0) r--; return r; })();
+    const pc = (x: number, r: number) => G.U.clamp((x - L.rankAt(r)) / (L.rankAt(r + 1) - L.rankAt(r)), 0, 1) * 100, up = r1 > r0;
+    return `<div class="db-xp"><div class="db-xph"><b>Rank ${r1}</b>${up ? `<span class="up">Rank up from ${r0}</span>` : ''}<span>${G.U.fmt(x1)} / ${G.U.fmt(L.rankAt(r1 + 1))} XP${gain ? ` <em>+${G.U.fmt(gain)}</em>` : ''}</span></div>
+      <div class="db-bar"><i class="was" style="width:${up ? 0 : pc(x0, r1).toFixed(1)}%"></i><i class="now" style="width:${up ? 0 : pc(x0, r1).toFixed(1)}%" data-to="${pc(x1, r1).toFixed(1)}"></i></div></div>`;
+  }
   function debrief(m?: any) {
     if (m) { brief = m; if (m.i != null) telling = m.i; }
     if (!brief || !G.Game.hub) return; // (shown on the way in: enterShop calls again)
@@ -205,9 +214,11 @@ const G_Space = (() => {
       <div class="db-cols"><section><h4>Casualties</h4>${row('Hostiles killed', f(c.killed))}${row('Hostiles incapacitated', f(c.downed))}${row('Hostiles arrested', f(c.arrested))}${row('Squad lost', f(c.squadDead), c.squadDead ? 'bad' : '')}</section>
         <section><h4>Innocents</h4>${row('Civilians killed', f(c.civDead), c.civDead ? 'bad' : 'good')}${c.civDead ? row('… by the squad', f(c.civBySquad), c.civBySquad ? 'bad' : '') : ''}${row(ms.obj === 'hostage' ? 'Hostages alive' : 'Civilians unharmed', f(c.civSafe))}</section>
         <section><h4>Payout</h4>${ok ? row('Fee', '¢' + f(b.pay)) : ''}${ok && b.bonus ? row(E(bonusWhy), '+¢' + f(b.bonus)) : ''}${b.salv ? row('Salvage', '+¢' + f(b.salv)) : ''}${row('Total', '¢' + f(paid), 'total')}${row('XP', ok ? '+' + f(b.xp) : '0', ok ? 'xp' : '')}</section></div>
+      ${xpBar(ok ? b.xp || 0 : 0)}
       <button class="btn primary db-go" data-dbgo>Continue</button></div>`;
     if (!el.parentNode) document.body.appendChild(el);
     el.classList.remove('hidden');
+    { const bar = el.querySelector<HTMLElement>('.db-bar .now'); if (bar) requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = bar.dataset.to + '%'; })); } // (filled up to now, as it's shown)
     G.Game.unlock();
     const close = () => {
       el.classList.add('hidden'); window.removeEventListener('keydown', key, true);

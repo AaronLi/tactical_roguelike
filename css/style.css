@@ -1281,6 +1281,17 @@ body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
 #debrief .db-row.total b { font-size: 16px; color: #ffd24a; }
 #debrief .db-row.xp b { color: #9fd6ff; }
 #debrief .db-go { margin-top: 20px; float: right; }
+#debrief .db-xp { margin-top: 18px; }
+#debrief .db-xph { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+#debrief .db-xph b { font: 500 15px var(--ui-font); }
+#debrief .db-xph span { color: var(--ui-dim); }
+#debrief .db-xph span:last-child { margin-left: auto; }
+#debrief .db-xph .up { color: #ffd24a; font-weight: 500; }
+#debrief .db-xph em { font-style: normal; color: #9fd6ff; }
+#debrief .db-bar { position: relative; height: 8px; background: var(--ui-line-lo); border-radius: 4px; overflow: hidden; }
+#debrief .db-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+#debrief .db-bar .now { background: #9fd6ff; transition: width 1.1s ease-out 0.2s; }
+#debrief .db-bar .was { background: rgba(233, 237, 240, 0.55); z-index: 1; }
 .lo-swatches { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
 .lo-sw { width: 26px; height: 26px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.18); cursor: pointer; padding: 0; }
 .lo-sw.issue { width: auto; padding: 0 8px; background: transparent; color: var(--ui-dim); font: 500 10.5px var(--ui-font); }
