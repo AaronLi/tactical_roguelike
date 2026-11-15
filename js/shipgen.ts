@@ -303,8 +303,12 @@ const G_ShipGen = (() => {
       if (t[z * W + x] !== 1) continue;
       for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const ax = nz ? 1 : 0, az = nx ? 1 : 0; let ok = true;
-        // (hull with a compartment behind it. What's stood against it inside is no bar: a ram goes through that too, cut)
-        for (let k = -1; k <= 1 && ok; k++) { const cx = x + ax * k, cz = z + az * k, in1 = at(cx - nx, cz - nz); ok = at(cx, cz) === 1 && !(win && win.has(cz * W + cx)) && in1 !== 1 && in1 !== 5 && in1 !== 3 && in1 !== 7 && in1 !== 6 && at(cx + nx, cz + nz) === 5; }
+        // (hull with a compartment behind it. What's stood against it inside is no bar: a ram goes through that too, cut. Either side of
+        // the middle a bulkhead may meet the hull: the hole opens on two compartments, the bulkhead's end standing in it)
+        for (let k = -1; k <= 1 && ok; k++) { const cx = x + ax * k, cz = z + az * k, in1 = at(cx - nx, cz - nz); ok = at(cx, cz) === 1 && !(win && win.has(cz * W + cx)) && (in1 !== 1 || k !== 0) && in1 !== 5 && in1 !== 3 && in1 !== 7 && in1 !== 6 && at(cx + nx, cz + nz) === 5; }
+        // (not through an engine room's wall: her nozzles stand out of it, and her engine block over and under it; nor the bridge's
+        // prow, where a ram or a bow juts out under her deck: js/shipmodel.ts hull. The squad's ship would sit in them)
+        if (ok) { const ix = x - nx, iz = z - nz; ok = !map.rooms.some((rm, i) => (rm.fl || 0) === 0 && ix >= rm.x && ix < rm.x + rm.w && iz >= rm.z && iz < rm.z + rm.h && (sp.roles[i] === 'engine' || (sp.roles[i] === 'bridge' && nx < 0))); }
         // (out there: the collar's width at the hull, her cabin's behind it, her engine pods' from ten metres out)
         for (let d = 1; d <= 33 && ok; d++) for (let w = d <= 5 ? 3 : d <= 14 ? 5 : 7, k = -w; k <= w && ok; k++) ok = at(x + nx * d + ax * k, z + nz * d + az * k) === 5;
         if (ok) out.push({ c: z * W + x, nx, nz, x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) });
@@ -317,7 +321,7 @@ const G_ShipGen = (() => {
   // world's wall boxes that cross it are cut round the opening). The same on the host and on every screen.
   function cut(map: LvMap, s: ShSite) {
     const sp = map.sp!, TS = G.Level.TS, W = map.W, w = map.world, Wd = G.World;
-    if (sp.cuts.some((q) => q[0] === s.c && q[1] === s.nx)) return false;
+    if (sp.cuts.some((q) => q[0] === s.c && q[1] === s.nx && q[2] === s.nz)) return false;
     sp.cuts.push([s.c, s.nx, s.nz]); sp.sites = undefined;
     let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
     for (const c of s.cells) { map.t[c] = 0; const x = c % W, z = (c / W) | 0; x0 = Math.min(x0, x * TS); z0 = Math.min(z0, z * TS); x1 = Math.max(x1, (x + 1) * TS); z1 = Math.max(z1, (z + 1) * TS); }
