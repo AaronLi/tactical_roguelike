@@ -99,6 +99,8 @@ const G_Space = (() => {
     S.tunnel = G.ShipModel.tunnel(); S.tunnel.visible = false; m.group.add(S.tunnel);
     S.sun = new T.DirectionalLight(0xfff4e0, 0); G.R.scene.add(S.sun, S.sun.target);
     G.R.padTo = PAD_POINTS; // (as many point lights at the base, on the jump and aboard: nothing's shaders made again on the way, js/render.ts lightPad)
+    // (what she was steering for, as a zone's ship (its number) or her anchor: kept across a change of which ship's the level, js/space.ts setupBoard)
+    { const w = S.wps[S.tgt]; tgtWas = !w ? null : w.id === 'ship' ? S.zact : w.id === 'out' ? 'out' : /^t\d+$/.test(w.id) ? +w.id.slice(1) : null; }
     S.wps = []; S.anchors = []; S.boxes = []; S.floorAt = null; S.hull = null; S.planet = null; S.things = []; S.cardObjs = []; S.term = null;
     const docked = !sp || !sp.ship || !!sp.ship.docked;
     S.docked = docked; S.noseT = 0; S.rampT = docked && kind !== 'board' ? 1 : 0;
@@ -187,7 +189,7 @@ const G_Space = (() => {
   // ---- The debrief: what the mission was, what it cost (the hostiles killed, put down, taken; the civilians dead, by whose hand,
   // and safe; the squad's own), what it paid (its fee, the bonus, the salvage) and the XP. Told as the squad heads home ('mdone':
   // js/spaceserver.ts home), shown once you're back at the base (js/game.ts enterShop), until you close it.
-  let brief: any = null;
+  let brief: any = null, tgtWas: number | 'out' | null = null;
   // a mission flown (done or not) is off the board (the host's: js/spaceserver.ts gone); on this screen once its debrief's closed
   let telling: number | null = null;
   const isGone = (i: number) => S.board.gone.includes(i) && telling !== i;
@@ -473,8 +475,10 @@ const G_Space = (() => {
     }
     zoneStep(); if (zi && zi.near) for (let k = 0; k < S.traffic.length; k++) zoneReal(true); // (come up with her: the rest are made already, kept. Jumped in: a step a frame, in the tunnel)
     S.wps.push({ id: 'ship', name: (((S.zdef[S.zact] && S.zdef[S.zact].name) || (S.ms && S.ms.name)) || 'THE SHIP').toUpperCase(), sub: 'Ram her hull nose-on to board: anywhere along it', p: new T.Vector3(S.zC.x, 2, S.zC.z), kind: 'base' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 });
-    S.tgt = 0;
-    if (zi && zi.near) S.tgt = S.wps.findIndex((w) => w.id === 'ship'); // (come up with her: she's still the target)
+    // the target: come out of the jump, the mission's ship (the one marked at the anchor: the level's if she's it, else her out on her
+    // course); the level changed to another ship out here, whatever she was steering for still
+    const want = zi && zi.near && tgtWas != null ? tgtWas : 0;
+    S.tgt = Math.max(0, S.wps.findIndex((w) => w.id === (want === 'out' ? 'out' : want === S.zact ? 'ship' : 't' + want)));
     if (zi && zi.near) { // (come up with her: no jump. The squad's ship is where she was by her, heading as she was)
       const c = S.carry && S.carry.k === zi.act ? S.carry : null;
       if (c) { const rot = yawQ((sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0)) - c.yaw); S.P.copy(c.v).applyQuaternion(rot).add(S.zC); S.Q.copy(rot).multiply(c.Q); S.V.copy(c.V).applyQuaternion(rot); }
