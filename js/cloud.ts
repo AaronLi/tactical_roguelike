@@ -36,7 +36,7 @@ const G_Cloud = (() => {
     return { url: String(src.u || '').trim(), key: String(src.k || '').trim() };
   }
   const switchedOff = () => q.get('cloud') === '0';
-  const configured = () => { const c = config(); return !!(c.url && c.key); };
+  const configured = () => { const c = config(); return !!(c.url && c.key) && !G.U.NS; }; // (the copy at d5g.ca/space-experimental: saves in the browser only, so it never writes another version's progress to the account)
   const on = () => configured() && !switchedOff();
 
   // ------------------------------------------------------------- what's kept here about the cloud

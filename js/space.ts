@@ -478,7 +478,7 @@ const G_Space = (() => {
     for (const c of S.zdef) {
       if (c.k === S.zact) continue;
       const t = G.ShipModel.traffic(c.kind, c.seed); S.zone!.add(t.group);
-      const wp: SpWp = { id: 't' + c.k, name: c.k === 0 ? c.name + ' · THE MISSION' : c.name, sub: SD.SIZES[c.size].name + (c.wing ? ', a flying wing' : '') + ' · come up with her and ram her hull to board', p: new T.Vector3(), kind: 'base' };
+      const wp: SpWp = { id: 't' + c.k, name: c.k === 0 ? c.name + ' · THE MISSION' : c.name, sub: SD.SIZES[c.size].name + (c.wing ? ', a flying wing' : ''), p: new T.Vector3(), kind: 'base' };
       S.wps.push(wp); S.traffic.push({ obj: t.group, c, wp, ph: (c.seed % 30) / 10 });
     }
     zoneStep(); if (zi && zi.near) for (let k = 0; k < S.traffic.length; k++) zoneReal(true); // (come up with her: the rest are made already, kept. Jumped in: a step a frame, in the tunnel)

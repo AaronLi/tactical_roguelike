@@ -68,7 +68,8 @@ function makeBundle(cfg: BundleCfg) {
   // so a returning visitor fetches nothing while it is current. Every failure (no IndexedDB, private mode, quota, eviction, a corrupt record) falls back to
   // the network without a word; a stored copy that fails to parse is dropped and fetched again.
   interface Rec { hash: string; v?: number; buf: ArrayBuffer }
-  const DB = 'rt-model-bundles', TABLE = 'bundles', checking = typeof location !== 'undefined' && /[?&]checkModels/.test(location.search || '');
+  const NS = (typeof location !== 'undefined' && /^\/space-experimental(\/|$)/.test(location.pathname) ? 'space_' : ''); // (the copy at d5g.ca/space-experimental: its own cache, js/util.ts NS)
+  const DB = 'rt-model-bundles' + (NS ? '-' + NS.slice(0, -1) : ''), TABLE = 'bundles', checking = typeof location !== 'undefined' && /[?&]checkModels/.test(location.search || '');
   const log = (...a: any[]) => { if (checking) console.log('[bundles]', ...a); };
   let dbp: Promise<any | null> | null = null;
   const openDb = (): Promise<any | null> => dbp || (dbp = new Promise((res) => {
@@ -138,7 +139,7 @@ function makeBundle(cfg: BundleCfg) {
   }
   // localStorage remembers which hash the store holds (it can be read synchronously, IndexedDB cannot): no memory of one means a first visit, and its download is started
   // at once (below), without waiting for the manifest or for the main thread to be free.
-  const FLAG = cfg.flag;
+  const FLAG = cfg.flag + (NS ? '-' + NS.slice(0, -1) : '');
   const flagGet = (): string | null => { try { return localStorage.getItem(FLAG); } catch { return null; } };
   const flagSet = (h: string | null) => { try { if (h) localStorage.setItem(FLAG, h); else localStorage.removeItem(FLAG); } catch { /* */ } };
   let early: Promise<Response> | null = null;

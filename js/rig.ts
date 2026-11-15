@@ -36,6 +36,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   setGun(code: any, skin?: any): void; update(dt: number, p: any): void; hitboxes(): any[]; recoil(deg?: number): void; hit(dir: any, mv?: number): void; dropGun(): void; goLimp(): void;
   die(dir: any): void; throwNade(str?: number): void; setKit(k: any): void; setCallsign(id: string, name: string): void; holster(on: boolean, anim?: boolean): void; swap?: { on: boolean; t: number; Rs: THREE.Matrix4 } | null; slingWant?: boolean | null; zip(on: boolean, instant?: boolean): void;
   secure(t: number): void; settle(sec?: number): void; startle(): void; dispose(): void;
+  shield?: THREE.Object3D | null; shieldDropped?: THREE.Object3D | null; shieldMount?: THREE.Object3D; shieldW?: number; setShield(id: string | null): void; dropShield(): THREE.Object3D | null; // (a handheld ballistic shield on the left arm: setShield, its pose in update)
   // (what the animation keeps from frame to frame)
   powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; zipSw?: ZipSwing; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
   gunHold?: GunHolds; gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
@@ -730,7 +731,7 @@ const G_Rig = (() => {
     };
     const legL = mkLeg(-1), legR = mkLeg(1);
 
-    const gunMount = joint(chest, 0.12, 0.27, -0.16);
+    const gunMount = joint(chest, 0.12, 0.27, -0.16), shieldMount = joint(chest, -0.06, 0.13, -0.42);
     // where a weapon rides when it isn't in the hands: rifles slung across the back, pistols holstered at the hip
     // muzzle up and over one shoulder, diagonally across the back (Y before X so the tilt applies)
     const slingMount = joint(chest, 0.14, -0.22, 0.17); slingMount.rotation.set(Math.PI / 2, 0.6, 0);
@@ -740,7 +741,7 @@ const G_Rig = (() => {
       human: hid, humanOn: false, fit: hdef ? fitOf(hdef) : null, hat, prims, wear,
       headWear: { cap: ex.bandana != null ? null : capC, bandana: ex.bandana ?? null }, hairShown: !!hairM && ex.bandana == null && !(ex.cap != null && hdef && /hightop|topbun|full/.test(hdef.hairStyle)), hatOn: !hairM || ex.bandana != null || !!(ex.cap != null && hdef && /hightop|topbun|full/.test(hdef.hairStyle)), // (hair that a cap or a bandana can't go over isn't shown under one)
       hairMesh, look, pantsM: bottom, seat: null, kitParts: [], kitKey: null, kit: null, callsign: o.animal ? { id: o.animal, name: o.callName || '' } : null, atakAlways: !!o.animal,
-      root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, slingMount, hipMount, slung: false, mats, scale: s, style, shoe,
+      root, body, hips, spine, chest, neck, head, armL, armR, legL, legR, gunMount, shieldMount, slingMount, hipMount, slung: false, mats, scale: s, style, shoe,
       gun: null, gunInfo: null, gunKey: null,
       phase: rnd() * 10, vel: new T.Vector3(), lastPos: null,
       crouchW: 0, aimW: 0, lean: 0, kick: 0, flinch: new T.Vector3(), throwT: -1,
@@ -780,6 +781,8 @@ const G_Rig = (() => {
       };
     }
     rig.setGun = (code: any, skin: any) => setGun(rig, code, skin); // (skin: its stickers, js/stickers.ts)
+    rig.setShield = (id: string | null) => setShield(rig, id);
+    rig.dropShield = () => dropShield(rig);
     rig.update = (dt: number, p: any) => update(rig, dt, p);
     rig.hitboxes = () => hitboxes(rig);
     // a shot: the animation's kick, and on a powered body the gun's muzzle rise (deg, from the host's kickOf)
@@ -906,6 +909,35 @@ const G_Rig = (() => {
     return rig;
   }
 
+  // A handheld ballistic shield (js/data.ts G.SHIELDS): its face (a slab its own size and thickness, black), a rubber edge, the viewport
+  // if it has one, and behind it the handle the left hand closes round and the strap over the forearm. Its frame: x across, y up, the
+  // face toward -z; userData.shield its def (js/player.ts shieldHit tests a round against the slab in this frame).
+  const _shF = new T.Vector3(), _shQ = new T.Quaternion();
+  const SHM = { face: new T.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.85, metalness: 0.05 }), trim: new T.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.95 }), port: new T.MeshStandardMaterial({ color: 0x8aa6b8, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.45 }) };
+  function setShield(rig: Rig, id: string | null) {
+    if (rig.shield) { rig.shield.removeFromParent(); rig.shield = null; }
+    const d = id ? G.SHIELDS[id] : null; if (!d) return;
+    const g = new T.Group(), e = 0.012, box = (w: number, h: number, z: number, m: THREE.Material, x: number, y: number, zz: number) => { const o = new T.Mesh(new T.BoxGeometry(w, h, z), m); o.position.set(x, y, zz); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
+    box(d.w, d.h, d.th, SHM.face, 0, 0, 0);
+    box(d.w + e * 2, e * 2, d.th + 0.008, SHM.trim, 0, d.h / 2, 0); box(d.w + e * 2, e * 2, d.th + 0.008, SHM.trim, 0, -d.h / 2, 0);
+    box(e * 2, d.h, d.th + 0.008, SHM.trim, -d.w / 2, 0, 0); box(e * 2, d.h, d.th + 0.008, SHM.trim, d.w / 2, 0, 0);
+    if (d.port) box(d.port.w, d.port.h, d.th + 0.004, SHM.port, 0, d.h / 2 - d.port.down, 0);
+    box(0.03, 0.14, 0.03, SHM.trim, 0.04, -0.03, d.th / 2 + 0.05); // (the handle)
+    box(0.03, 0.03, 0.05, SHM.trim, 0.04, 0.05, d.th / 2 + 0.025); box(0.03, 0.03, 0.05, SHM.trim, 0.04, -0.11, d.th / 2 + 0.025);
+    box(0.12, 0.045, 0.01, SHM.trim, -0.1, 0.06, d.th / 2 + 0.01); // (the forearm strap)
+    g.userData.shield = d;
+    rig.shield = g; rig.shieldMount!.add(g); rig.shieldW = 0;
+  }
+  // let go of (surrendered, down): it's left lying face down at their feet, in the world; null if they had none
+  function dropShield(rig: Rig) {
+    const g = rig.shield; if (!g) return null;
+    rig.shield = null; rig.shieldDropped = g; g.updateMatrixWorld(true);
+    const d = g.userData.shield as ShieldDef, wp = g.getWorldPosition(new T.Vector3()), f = new T.Vector3(0, 0, -1).transformDirection(g.matrixWorld), map = G.Game && G.Game.map;
+    const fy = map ? G.Level.groundAt(map, wp.x, wp.z, 0.05, wp.y, 1.6) : 0;
+    g.removeFromParent();
+    g.position.set(wp.x + f.x * 0.2, fy + d.th / 2 + 0.006, wp.z + f.z * 0.2); g.rotation.set(-Math.PI / 2, Math.atan2(-f.x, -f.z), 0, 'YXZ');
+    return g;
+  }
   // code: a build code (or a plain weapon id for its factory build)
   function setGun(rig: Rig, code: any, skin: any) {
     const key = code ? code + (skin && skin.length ? '#' + G.Stickers.key(skin) : '') : null;
@@ -1131,6 +1163,31 @@ const G_Rig = (() => {
     if (rl >= 0) { const k = Math.sin(Math.PI * Math.min(1, rl)); mount.rotation.z += 0.5 * k; mount.rotation.x += 0.12 * k; mount.position.y -= 0.03 * k; }
     if (p.rack != null && p.rack >= 0) { const k = Math.sin(Math.PI * Math.min(1, p.rack)); mount.rotation.z += 0.3 * k; mount.rotation.x += 0.08 * k; mount.position.z += 0.03 * k; } // (a manual action worked by hand: bolt, pump, lever: the gun canted to the hand on it and drawn back a little)
     if (ins >= 0) { const k = U.smooth(0, 0.15, ins) * (1 - U.smooth(0.85, 1, ins)); mount.rotation.z -= 1.0 * k; mount.rotation.y += 0.55 * k; mount.position.y += 0.05 * k; mount.position.z += 0.06 * k; }
+    // a shield: up when they're alert (shieldUp: even reloading), square in front of them, the viewport at the eyes (one with none, its top at them: they look over
+    // it); otherwise down at the left side, turned out. A pistol up with it is held one-handed out past its right edge.
+    if (rig.shield) {
+      const d = rig.shield.userData.shield as ShieldDef, up = (p.shieldUp ?? p.alert) && !p.pose ? 1 : 0, sm = rig.shieldMount!;
+      rig.shieldW = U.lerp(rig.shieldW || 0, up, Math.min(1, dt * 5));
+      const w = rig.shieldW, cw = rig.crouchW || 0;
+      // (square to where they face, not to the chest: kneeling turns and bends the chest, the shield stays to the front)
+      rig.chest.updateWorldMatrix(true, false); root.updateWorldMatrix(false, false);
+      const cf = _shF.set(0, 0, -1).transformDirection(rig.chest.matrixWorld).applyQuaternion(_shQ.copy(root.getWorldQuaternion(_shQ)).invert());
+      const relYaw = Math.atan2(-cf.x, -cf.z), relPitch = Math.asin(U.clamp(cf.y, -1, 1));
+      if (d.port) { // (the viewport at the eyes, held square; the pistol out past its right edge)
+        const yUp = 0.42 + d.port.down - d.h / 2 - 0.06 * cw; // (crouched: down to the floor with them, the legs behind it)
+        sm.position.set(U.lerp(-0.3, -0.06, w), U.lerp(-0.3, yUp, w), U.lerp(-0.1, -0.42, w));
+        sm.rotation.set(U.lerp(0.12, 0, w), U.lerp(1.25, 0.06, w), U.lerp(0.06, 0, w));
+        if (pistol) mount.position.x = U.lerp(mount.position.x, -0.06 + d.w / 2 + 0.07, w * rig.aimW);
+      } else { // (no window: held lower and tilted back, its top edge under the sights as a rest, the pistol laid across it and aimed over it; it
+        // covers the body from the chin down, the head looks over it)
+        const TILT = 0.3, top = 0.22 - 0.04 * cw, yUp = top - (d.h / 2) * Math.cos(TILT), zTop = -0.42 + (d.h / 2) * Math.sin(TILT);
+        sm.position.set(U.lerp(-0.3, -0.03, w), U.lerp(-0.3, yUp, w), U.lerp(-0.1, -0.42, w));
+        sm.rotation.set(U.lerp(0.12, TILT, w), U.lerp(1.25, 0, w), U.lerp(0.06, 0, w));
+        if (pistol) { const k = w * rig.aimW; mount.position.x = U.lerp(mount.position.x, -0.03, k); mount.position.y = U.lerp(mount.position.y, top + 0.08, k); mount.position.z = U.lerp(mount.position.z, zTop - 0.1, k); }
+      }
+      sm.rotation.y -= relYaw * w; sm.rotation.x -= relPitch * w;
+      { const th = -relYaw * w, c = Math.cos(th), sn = Math.sin(th), px = sm.position.x, pz = sm.position.z; sm.position.x = px * c + pz * sn; sm.position.z = -px * sn + pz * c; } // (and where it's held: out in front of them)
+    }
     root.updateMatrixWorld(true);
 
     // legs: feet planted on a stepping cycle along the travel direction
@@ -1304,7 +1361,7 @@ const G_Rig = (() => {
     // the grenade itself, in their right hand until it's thrown
     if (p.hold || rig.handNade) {
       if (!rig.handNade) {
-        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })), tb: G.Views ? G.Views.tbMesh(0.033, 0.115) : new T.Mesh(new T.CylinderGeometry(0.033, 0.033, 0.115, 10), new T.MeshLambertMaterial({ color: 0x4c5634 })) }; // (the video's worker has no js/views.ts)
+        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })), tb: G.Views ? G.Views.tbMesh(0.033, 0.115) : new T.Mesh(new T.CylinderGeometry(0.033, 0.033, 0.115, 10), new T.MeshLambertMaterial({ color: 0x4c5634 })), sticky: G.Views ? G.Views.stickyMesh(0.042) : new T.Mesh(new T.SphereGeometry(0.042, 10, 8), new T.MeshLambertMaterial({ color: 0x9a8558 })) }; // (the video's worker has no js/views.ts)
         for (const m of Object.values(rig.handNade)) { m.position.set(-0.05, -0.075, -0.005); rig.armR.wr.add(m); } // (in the palm)
       }
       for (const [k, m] of Object.entries(rig.handNade)) m.visible = !!p.hold && p.hold.kind === k && !handThrow && !posed;
@@ -1415,6 +1472,11 @@ const G_Rig = (() => {
       const lag = U.clamp(-(rig.zipSw ? rig.zipSw.th : 0), 0, 0.6); // (the feet trail more the further back the swing)
       for (const [leg, side] of [[rig.legL, -1], [rig.legR, 1]] as [RigLeg, number][]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, rig.body.localToWorld(new T.Vector3(side * 0.07, 0.2 + lag * 0.15, -0.08 - side * 0.02)), rig.body.localToWorld(new T.Vector3(side * 0.1, 0.6, -0.9)));
     } else if (rig.zipKit) { rig.zipKit.visible = false; rig.zipT = 0; }
+    if (rig.shield && !p.zip) { // (the left hand closed round the shield's handle, the elbow out and down)
+      rig.shield.updateMatrixWorld(true);
+      const sw = rig.shield.matrixWorld, d = rig.shield.userData.shield as ShieldDef;
+      gripHand(rig, rig.armL, rig.shield.localToWorld(new T.Vector3(0.04, -0.03, d.th / 2 + 0.05)), new T.Vector3(1, 0, 0).transformDirection(sw), new T.Vector3(0, 0, -1).transformDirection(sw), rig.chest.localToWorld(new T.Vector3(-0.5, -0.2, 0.05)), HAND_GRIP, 1);
+    }
     if (rig.powered && p.str != null) powerStep(rig, dt, p.str, p.aimAt);
     else if (rig.powered) rig.rd = null!; // (far off: animated only; the body starts again from the pose when near)
     if (rig.dropped) dropGun(rig, dt);

@@ -286,6 +286,41 @@ const G_ShipGen = (() => {
     return map;
   }
   // which room of a ship a point is in (its walls with it) on deck fl, or -1
+  // Her fairings (streamlining: js/shipmodel.ts hull draws them). Where her side steps in or out (an inside corner of her plan, on the
+  // map's cells: t 5 is outside her) the corner's filled: a wedge from the step's full depth (short, along v) down to nothing along the
+  // longer wall (long, along u), from the corner (cx, cz).
+  function fairings(W: number, H: number, t: ArrayLike<number>) {
+    const TS = G.Level.TS, solid = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] !== 5, seen = new Set<string>();
+    const out: { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; short: number; long: number }[] = [];
+    for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
+      if (solid(x, z)) continue;
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        if (!solid(x + sx, z) || !solid(x, z + sz)) continue;
+        // (the wall across x there runs away along z, the wall across z along x: each as far as it's still her side)
+        let da = 0; while (da < 14 && solid(x + sx, z - da * sz) && !solid(x, z - da * sz)) da++;
+        let db = 0; while (db < 14 && solid(x - db * sx, z + sz) && !solid(x - db * sx, z)) db++;
+        if (da < 2 || db < 2) continue;
+        const cx = (sx > 0 ? x + 1 : x) * TS, cz = (sz > 0 ? z + 1 : z) * TS, key = cx.toFixed(2) + ',' + cz.toFixed(2); if (seen.has(key)) continue; seen.add(key);
+        const A = da * TS, B = db * TS, alongX = B >= A, short = Math.min(alongX ? A : B, 6), long = Math.min(alongX ? B : A, Math.max(3, 2.4 * short), 10);
+        out.push({ cx, cz, ux: alongX ? -sx : 0, uz: alongX ? 0 : -sz, vx: alongX ? 0 : -sx, vz: alongX ? -sz : 0, short, long });
+      }
+    }
+    return out;
+  }
+  // the cells outside her a fairing reaches into (what's against her side there is covered: no window in it, js/level.ts placeWindows)
+  function faired(W: number, H: number, t: ArrayLike<number>) {
+    const TS = G.Level.TS, cov = new Set<number>();
+    for (const f of fairings(W, H, t)) {
+      const x0 = Math.floor(Math.min(f.cx, f.cx + f.ux * f.long + f.vx * f.short) / TS) - 1, x1 = Math.ceil(Math.max(f.cx, f.cx + f.ux * f.long + f.vx * f.short) / TS) + 1;
+      const z0 = Math.floor(Math.min(f.cz, f.cz + f.uz * f.long + f.vz * f.short) / TS) - 1, z1 = Math.ceil(Math.max(f.cz, f.cz + f.uz * f.long + f.vz * f.short) / TS) + 1;
+      for (let z = Math.max(0, z0); z <= Math.min(H - 1, z1); z++) for (let x = Math.max(0, x0); x <= Math.min(W - 1, x1); x++) {
+        if (t[z * W + x] !== 5) continue;
+        const px = (x + 0.5) * TS - f.cx, pz = (z + 0.5) * TS - f.cz, a = px * f.ux + pz * f.uz, o = px * f.vx + pz * f.vz;
+        if (a > -TS / 2 && a < f.long && o > -TS / 2 && o - TS / 2 < f.short * (1 - Math.max(0, a) / f.long)) cov.add(z * W + x); // (any of the wedge in the cell)
+      }
+    }
+    return cov;
+  }
   function roomAt(map: LvMap, x: number, z: number, fl = 0) {
     const TS = G.Level.TS, cx = x / TS, cz = z / TS;
     let best = -1, bd = 1e9;
@@ -408,7 +443,7 @@ const G_ShipGen = (() => {
     }
   }
   const NAMES: Record<string, string> = { bridge: 'Bridge', security: 'Security', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell' };
-  return { lay, finish, roomAt, sites, siteOf, siteAt, cut, seal, NAMES, SPEC };
+  return { lay, finish, fairings, faired, roomAt, sites, siteOf, siteAt, cut, seal, NAMES, SPEC };
 })();
 G.ShipGen = G_ShipGen;
 interface GameModules { ShipGen: typeof G_ShipGen; }

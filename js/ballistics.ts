@@ -849,13 +849,13 @@ const G_Ballistics = (() => {
     return o;
   }
   // a suspect's (js/data.ts G.ARMORS; a mandible or face shield, and shoulder, pelvis and leg armour (d.ex), are an officer's,
-  // js/gear.ts), its condition kept on the view (ev.vc vest, ev.hc helmet, ev.fc face, ev.xc0.. each of d.ex)
+  // js/gear.ts), its condition kept on the view (ev.vc vest, ev.hc helmet, ev.fcc face, ev.xc0.. each of d.ex)
   function suspectArmour(ev: Record<string, any>) {
     const out: BArmour[] = [], d = ev.def;
     const ARM = G.ARMORS as Record<string, any>, v = ARM[d.vest], h = ARM[d.helmet], f = d.face && G.Gear.DEFS[d.face];
     if (v && v.prot) out.push({ def: v, cond: ev.vc == null ? 1 : ev.vc, ev, key: 'vc' });
     if (h && h.prot) out.push({ def: h, cond: ev.hc == null ? 1 : ev.hc, ev, key: 'hc' });
-    if (f && f.prot) out.push({ def: f, cond: ev.fc == null ? 1 : ev.fc, ev, key: 'fc' });
+    if (f && f.prot) out.push({ def: f, cond: ev.fcc == null ? 1 : ev.fcc, ev, key: 'fcc' }); // (fcc: ev.fc is a flashbang's state, js/views.ts)
     (d.ex || []).forEach((id: string, i: number) => { const x = G.Gear.DEFS[id], key = 'xc' + i; if (x && x.prot) out.push({ def: x, cond: ev[key] == null ? 1 : ev[key], ev, key }); });
     return out;
   }

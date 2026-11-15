@@ -1229,6 +1229,11 @@ body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
 .lo-tab small { font: 400 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1px; }
 .lo-tab b { font: 500 14px var(--ui-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .lo-tab:hover { border-color: var(--ui-line-hi); }
+.lo-slot.lo-thrs { flex-direction: row; gap: 6px; } /* (the throwables: two boxes side by side, each the bar's full height) */
+.lo-thrs > .lo-tab { flex: 1 1 0; height: 100%; }
+.lo-thrbox:not(.full) b { color: var(--ui-dim); font-weight: 400; }
+.lo-thrcard { max-width: 220px; } .lo-thrcard small { font: 400 11.5px/1.35 var(--ui-font); color: var(--ui-dim); text-align: left; }
+.lo-thrcard img { max-height: 64px; }
 .lo-tab.on { border-color: var(--ui-line-hi); background: var(--ui-fill-hi); box-shadow: inset 0 -2px 0 #9fd6ff; }
 .lo-go { align-self: center; padding: 10px 26px; }
 .lo-clear { margin-top: 6px; width: 100%; }

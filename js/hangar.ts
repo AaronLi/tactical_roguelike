@@ -1118,7 +1118,7 @@ const G_Hangar = (() => {
     // the gear and magazines Vex lists in his stock, that don't have a place on a shelf, are at his till
   }
 
-  // the vending machine's contents: field supplies (medical items, flashbangs, frags and thermobarics)
+  // the vending machine's contents: field supplies (medical items, flashbangs, frags, sticky grenades and thermobarics)
   function vendList(_id: string) {
     const Sh = G.Shop, Gr = G.Gear, out = [], sv = Sh.services();
     for (const s of sv) {
@@ -1126,6 +1126,7 @@ const G_Hangar = (() => {
       else if (s.id === 'flash') out.push({ k: 'svc', key: s.id, item: Gr.flashItem(), name: s.name, price: s.price, sold: false });
       else if (s.id === 'nade') out.push({ k: 'svc', key: s.id, item: Gr.fragItem(), name: s.name, price: s.price, sold: false });
       else if (s.id === 'tb') out.push({ k: 'svc', key: s.id, item: Gr.tbItem(), name: s.name, price: s.price, sold: false });
+      else if (s.id === 'sticky') out.push({ k: 'svc', key: s.id, item: Gr.stickyItem(), name: s.name, price: s.price, sold: false });
     }
     return out;
   }

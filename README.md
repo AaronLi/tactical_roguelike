@@ -594,11 +594,11 @@ says the same), but not whose: the shooter's name isn't shown.
     sees you) will often hide and peek exactly like a civilian, with the gun still holstered or slung, and
     draws the moment it sees an officer. Look at hands, clothes and what's on their back, or shout and see
     who complies.
-- **Civilians** pay out when restrained (hold F);
-  killing one costs the shooter. Killing a suspect who has surrendered or been cuffed is unauthorised force
-  and is penalised too.
+- **Civilians** pay out when restrained (hold F). Killing one costs no credits (it will cost reputation, still
+  to come), but it's counted and fails the rescue objective. Killing a suspect who has surrendered or been
+  cuffed is unauthorised force and costs the shooter.
 - The hangar shows an after-action report (arrests, kills, civilians secured, casualties) when you arrive. A
-  clean operation, with no civilian deaths and no unauthorised force, pays a bonus.
+  clean operation, with no unauthorised force, pays a bonus.
 - **First aid cabinets.** About a third of levels have a white cabinet with a red cross on an indoor wall,
   and some have two.
   - **Using one:** look at it (the crosshair on the cabinet itself, within arm's reach, nothing in between: not

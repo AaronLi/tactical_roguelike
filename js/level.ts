@@ -3,7 +3,7 @@
   case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
   grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
   above?: LvMap | null; voidAbove?: ArrayLike<number> | null; units?: number; navG?: any; lightT?: number; underground?: boolean; rollers?: number[][]; hub?: boolean; glassRuns?: any; fences: LvFence[]; doorVer?: number; cracked?: any; dmg?: any;
-  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux; desc?: LvDesc; sp?: ShMeta | null } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean; ship?: string; lootRoom?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
+  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux; desc?: LvDesc; sp?: ShMeta | null; aiNo?: (i: number, f: number) => boolean } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean; ship?: string; lootRoom?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
 type RoomType = 'security' | 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom' | 'terrace' | 'viewing' | 'bridge' | 'gunnery' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine';
 type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
 type LvDoorKind = 'stair' | 'fire' | 'vault' | 'slide' | 'blast'; // (a door that isn't the plain wooden one. slide, blast: a ship's, which slide into the wall: slides())
@@ -720,6 +720,7 @@ const G_Level = {
   //     outsideMaterial; high up in an apartment block). Rounds through it stop in the wall behind.
   // From the level's own random stream, so every peer has the same windows. map.windows[id], map.winAt: cell -> ray boxes.
   SILL: 0.95, TOP: 2.25,
+  CRACKS: 2, // (rounds that fracture a pane without bringing it down: the next one breaks it, js/player.ts roundPane)
   placeWindows(map: LvMap) {
     const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G.U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
     map.windows = []; map.winAt = new Map();
@@ -728,7 +729,9 @@ const G_Level = {
     const nearDoor = (x: number, z: number) => { for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
     const tall = (i: number) => { const p = map.props && map.props.get(i); return !!(p && p.boxes[0] && p.boxes[0].h > 1.0); };
     const inside = (x: number, z: number) => x > 0 && z > 0 && x < W - 1 && z < H - 1;
+    const faired = map.theme.layout === 'ship' ? G.ShipGen.faired(W, H, t) : null; // (a ship: none in her side where a fairing covers it, js/shipgen.ts)
     const add = (cells: number[], nx: number, nz: number, ext: boolean, kind?: Record<string, any>) => {
+      if (faired && cells.some((i) => faired.has(i + nx + nz * W) || faired.has(i - nx - nz * W))) return;
       const [a, b] = cells.map((i) => [i % W, (i / W) | 0]);
       const mx = ((a[0] + b[0]) / 2 + 0.5) * TS, mz = ((a[1] + b[1]) / 2 + 0.5) * TS, near = (o: LvPt | null) => o && Math.hypot(o.x - mx, o.z - mz) < 1.6;
       if (!kind && (near(map.case) || near(map.abox) || near(map.sbox) || (map.cabinets || []).some(near))) return; // (not through the wall a cabinet or the weapon case is against)
@@ -2137,7 +2140,7 @@ const G_Level = {
       if (!(t[i] === 0 || t[i] === 3) || dist[i] >= 0) continue;
       dist[i] = 0; q[qt++] = i;
     }
-    const ok = (j: number) => (t[j] === 0 || t[j] === 3) && dist[j] < 0;
+    const no = map.aiNo, ok = (j: number) => (t[j] === 0 || t[j] === 3) && dist[j] < 0 && !(no && no(j, 0));
     while (qh < qt) {
       const i = q[qh++], x = i % W, z = (i / W) | 0, d = dist[i] + 1;
       if (x > 0 && ok(i - 1)) { dist[i - 1] = d; q[qt++] = i - 1; }
@@ -2159,7 +2162,7 @@ const G_Level = {
     }
     while (qh < qt) {
       const n = q[qh++], i = n % WH, x = i % W, z = (i / W) | 0, d = dist[n] + 1;
-      const go = (m: number) => { if (dist[m] < 0 && walk(m) && this.navStep(g, n, m, W)) { dist[m] = d; q[qt++] = m; } };
+      const go = (m: number) => { if (dist[m] < 0 && walk(m) && !(map.aiNo && map.aiNo(m % WH, (m / WH) | 0)) && this.navStep(g, n, m, W)) { dist[m] = d; q[qt++] = m; } };
       if (x > 0) go(n - 1);
       if (x < W - 1) go(n + 1);
       if (z > 0) go(n - W);
@@ -2173,8 +2176,9 @@ const G_Level = {
   // or up or down a flight
   flowStep3(map: LvMap, dist: Int16Array, x: number, z: number, y: number, away: boolean) {
     const g = this.nav(map), W = map.W, WH = g.WH, n = this.navNode(map, x, y, z);
-    if (n < 0 || dist[n] < 0) return null;
-    let best = null, bd = dist[n];
+    const inNo = n >= 0 && !!map.aiNo && map.aiNo(n % WH, (n / WH) | 0);
+    if (n < 0 || (dist[n] < 0 && !inNo)) return null;
+    let best = null, bd = dist[n] < 0 ? (away ? -1 : 1e9) : dist[n];
     const i = n % WH, tx = i % W, tz = (i / W) | 0, base = n - i;
     const take = (m: number, score: number) => { if (dist[m] < 0) return; if (away ? score > bd : score < bd) { bd = score; best = m; } };
     for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
@@ -2200,16 +2204,17 @@ const G_Level = {
     if (map.floors) return this.flowStep3(map, dist, x, z, y, false);
     const TS = this.TS, W = map.W;
     const tx = Math.floor(x / TS), tz = Math.floor(z / TS);
+    const no = map.aiNo, inNo = !!no && tx >= 0 && tz >= 0 && tx < W && tz < map.H && no(tz * W + tx, 0);
     const here = dist[tz * W + tx];
-    if (here < 0) return null;
-    let best = null, bd = here;
+    if (here < 0 && !inNo) return null;
+    let best = null, bd = here < 0 ? 1e9 : here; // (standing somewhere their ways don't go, right up against something: out of it, the best way on)
     for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
       if (!ox && !oz) continue;
       const nx = tx + ox, nz = tz + oz;
       if (nx < 0 || nz < 0 || nx >= W || nz >= map.H) continue;
       const nd = dist[nz * W + nx];
       if (nd < 0) continue;
-      if (ox && oz && (map.t[tz * W + nx] !== 0 || map.t[nz * W + tx] !== 0)) continue; // no diagonal corner-cutting (or through door frames)
+      if (ox && oz && (map.t[tz * W + nx] !== 0 || map.t[nz * W + tx] !== 0 || (no && (no(tz * W + nx, 0) || no(nz * W + tx, 0))))) continue; // no diagonal corner-cutting (or through door frames, or round furniture)
       const score = nd + (ox && oz ? 0.4 : 0);
       if (score < bd) { bd = score; best = [nx, nz]; }
     }

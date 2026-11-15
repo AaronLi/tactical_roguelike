@@ -1,5 +1,6 @@
 'use strict';
-// Your loadout for a run in space (js/game.ts sidearmPick draws it, before the base): a primary, a sidearm, a helmet and body armour, each
+// Your loadout for a run in space (js/game.ts sidearmPick draws it, before the base): a sidearm, a helmet and body armour (the primary
+// tree's still here, but nothing picks from it: a run starts without one, sel), each
 // taken from a tree of its own (the sidearm's is js/arsenal.ts's, as it always was). Every tree starts from the piece in its middle and runs
 // out along paths; each piece on it is earned either by rank (XP, from the missions you complete: the harder the mission, the more) or by
 // a challenge done with the piece before it (so many kills of a kind with that gun, so many rounds stopped by that armour, so many
@@ -7,8 +8,9 @@
 //   rank: 0 to start; the Micro Uzi, the primary tree's middle, comes at rank 1 (your first mission does it).
 // Each piece takes up to two attachments (BOXES), earned with it: a gun's parts by challenges with that gun (ATT: each kind of part its
 // own, harder as the part's tier goes up); a helmet's face piece and a carrier's plate, shoulder and groin pieces by the missions flown
-// in it and the rounds it's stopped (GEAR_ATT). And all of it is costed (points: about one a 400 credits of what it'd cost, a primary its own (pts) and a plate one a 200; the issue
-// kit, the bump helmet and the P9 nothing): what you take into a run can't come to more than BUDGET.
+// in it and the rounds it's stopped (GEAR_ATT). And all of it is costed (points: about one a 400 credits of what it'd cost, a primary its own (pts), a plate one a 200, a sidearm one more
+// and an attachment at least one; the issue kit and the bump helmet nothing): what you take into a run can't come to more than BUDGET.
+// And two throwables (thr: a frag, a flashbang or a thermobaric each, or nothing), a point apiece.
 interface LoNode { pts?: number; id: string; from?: string; path?: string; ring: number; a?: number; r?: number; rank?: number; stat?: string; n?: number; what?: string; how?: string }
 interface LoTree { slot: string; title: string; mid: string; NODES: LoNode[]; PATHS: Record<string, { name: string; a: number }> }
 interface LoAtt { k: string; id: string; name: string; pts: number; open: boolean; stat: string; what: string; n: number; have: number }
@@ -146,8 +148,10 @@ const G_Loadout = (() => {
   };
   const isGun = (slot: string) => slot === 'p' || slot === 's';
   const LO_OFF = ['p.ceramic', 'p.ceramic2']; // (not to be had at the start of a run: the ceramic plates)
-  // (a plate comes dearer: a point a 200 credits; the rest a point a 400; a primary's set on its node, pts)
-  const BUDGET = 10, pts = (price: number, per = 400) => Math.round((price || 0) / per), PLATE_PER = 200;
+  // (a plate comes dearer: a point a 200 credits; the rest a point a 400; a primary's set on its node, pts; a sidearm a point on top
+  // of its price's, PISTOL_UP; an attachment never less than a point)
+  const BUDGET = 10, pts = (price: number, per = 400) => Math.round((price || 0) / per), PLATE_PER = 200, PISTOL_UP = 1;
+  const PISTOL_ATT_UP: Record<string, number> = { slide: 1, optic: 1, stock: 2 }; // (a sidearm's slide and sight a point dearer, its stock two: the Derringer's too, though it goes on as a grip)
   // every attachment it could take (of the kind k, or all), each with what it takes and whether it's earned
   function atts(slot: string, id: string, only?: string): LoAtt[] {
     const out: LoAtt[] = [];
@@ -158,7 +162,7 @@ const G_Loadout = (() => {
         for (const p of GS.LIST) {
           if (p.id === b[s.slot] || p.factory || p.retired || p.variant || p.becomes || GS.plainHere(p, id) || !GS.fitsSlot(s, p, id, b)) continue;
           const sup = k === 'muzzle' && /suppress|silenc/i.test(p.name), stat = sup ? 'sur' : A.stat, n = A.n[Math.min(3, Math.max(0, (p.tier || 1) - 1))], have = count(slot, id, stat);
-          out.push({ k: s.slot, id: p.id, name: p.name, pts: pts(GS.buyPrice(p)), open: open(slot, id) && have >= n, stat, what: sup ? 'kills on unaware suspects' : A.what, n, have: Math.min(n, have) });
+          out.push({ k: s.slot, id: p.id, name: p.name, pts: Math.max(1, pts(GS.buyPrice(p))) + (slot === 's' ? PISTOL_ATT_UP[p.id === 'gr.derringer.stock' ? 'stock' : k] || 0 : 0), open: open(slot, id) && have >= n, stat, what: sup ? 'kills on unaware suspects' : A.what, n, have: Math.min(n, have) });
         }
       }
     } else {
@@ -167,7 +171,7 @@ const G_Loadout = (() => {
         if (only && only !== k) continue;
         for (const g of G.Gear.LIST.filter((x) => x.kind === k && !LO_OFF.includes(x.id))) {
           const q = GEAR_ATT[k][Math.min(GEAR_ATT[k].length - 1, Math.max(0, (g.tier || 1) - 1))], have = count(slot, id, q.stat);
-          out.push({ k, id: g.id, name: g.name, pts: pts(g.price, k === 'plate' ? PLATE_PER : 400), open: open(slot, id) && have >= q.n, stat: q.stat, what: q.what, n: q.n, have: Math.min(q.n, have) });
+          out.push({ k, id: g.id, name: g.name, pts: Math.max(1, pts(g.price, k === 'plate' ? PLATE_PER : 400)), open: open(slot, id) && have >= q.n, stat: q.stat, what: q.what, n: q.n, have: Math.min(q.n, have) });
         }
       }
     }
@@ -193,16 +197,30 @@ const G_Loadout = (() => {
     if (att && !atts(slot, id, att.k).some((a) => a.id === att.id && a.open)) return;
     data().box[slot + ':' + id] = boxesWith(slot, id, box, att); keep();
   }
-  // ---- points: what it'd cost, about one a 400 credits (the issue kit, the bump helmet and the P9: nothing), its boxes' too
+  // ---- points: what it'd cost, about one a 400 credits (the issue kit and the bump helmet nothing; a sidearm one more), its boxes' too
   function cost(slot: string, id: string | null, bx?: { k: string; id: string }[]): number {
     if (!id) return 0;
-    const q = slot === 's' ? null : node(slot, id), own = q && q.pts != null ? q.pts : isGun(slot) ? pts(G.WEAPONS[id].price) : pts(G.Gear.DEFS[id].price); // (a primary's its own, pts: about alike across the kinds)
+    const q = slot === 's' ? null : node(slot, id), own = q && q.pts != null ? q.pts : isGun(slot) ? pts(G.WEAPONS[id].price) + (slot === 's' ? PISTOL_UP : 0) : pts(G.Gear.DEFS[id].price); // (a primary's its own, pts: about alike across the kinds)
     return own + (bx || boxes(slot, id)).reduce((n, b) => n + (atts(slot, id, b.k).find((a) => a.id === b.id)?.pts || 0), 0);
   }
   // ---- the loadout itself: what's picked for each slot (kept, so the next run starts with it), and putting it on you
-  const sel = (slot: string): string | null => { const d = data().sel, id = slot in d ? d[slot] : TREES[slot].mid; return id && open(slot, id) ? id : null; }; // (never set: the tree's middle, once it's yours; set empty: empty)
+  const sel = (slot: string): string | null => { if (slot === 'p') return null; const d = data().sel, id = slot in d ? d[slot] : TREES[slot].mid; return id && open(slot, id) ? id : null; }; // (never set: the tree's middle, once it's yours; set empty: empty. A primary's not taken: no run starts with one, whatever was picked before)
   const pick = (slot: string, id: string | null) => { if (id && !open(slot, id)) return; data().sel[slot] = id; keep(); };
-  const total = () => ['p', 's', 'h', 'a'].reduce((n, s) => n + cost(s, sel(s)), 0);
+  // ---- two throwables to start with (each its own slot: a frag, a flashbang or a thermobaric, or nothing), a point each
+  const THROWS = ['frag', 'flash', 'tb', 'sticky'], THROW_SLOTS = 2, THROW_PTS = 1;
+  const THROW_DESC: Record<string, string> = {
+    frag: 'Steel chips over the whole sphere: deadly a few metres out in the open, stopped by walls and cover. A 2.2 second fuse you can cook.',
+    flash: 'A blinding flash and a bang that deafens: whoever is near and looking is out of it for a while. Hurts nobody. A 1.5 second fuse.',
+    tb: 'A cloud of fuel, lit: a fireball that fills the room it lands in (out through an open door, not a shut one). A 2.6 second fuse.',
+    sticky: 'Holds to the first thing it hits, a wall, a door or a person, and goes off two seconds later. A few heavy fragments rather than a frag\'s many chips: fewer of them reach anyone, but each goes through soft armour and thin walls.',
+  };
+  const THROW_NAME: Record<string, string> = { frag: 'Frag grenade', flash: 'Flashbang', tb: 'Thermobaric', sticky: 'Sticky grenade' }, THROW_SHORT: Record<string, string> = { frag: 'Frag', flash: 'Flash', tb: 'Thermo', sticky: 'Sticky' }; // (short: as a box in the bar has room for)
+  const thr = (i: number): string | null => { const t = data().thr; const k = Array.isArray(t) ? t[i] : null; return THROWS.includes(k) ? k : null; };
+  function setThr(i: number, k: string | null) { const d = data(); if (!Array.isArray(d.thr)) d.thr = []; d.thr[i] = k && THROWS.includes(k) ? k : null; keep(); }
+  const nextThr = (i: number) => { const k = thr(i), j = k ? THROWS.indexOf(k) + 1 : 0; setThr(i, j < THROWS.length ? THROWS[j] : null); }; // (nothing, then each in turn, then nothing again)
+  const throwItem = (k: string) => (k === 'frag' ? G.Gear.fragItem() : k === 'flash' ? G.Gear.flashItem() : k === 'sticky' ? G.Gear.stickyItem() : G.Gear.tbItem());
+  const thrCost = () => { let n = 0; for (let i = 0; i < THROW_SLOTS; i++) if (thr(i)) n += THROW_PTS; return n; };
+  const total = () => ['p', 's', 'h', 'a'].reduce((n, s) => n + cost(s, sel(s)), 0) + thrCost();
   // Colours: a helmet (and its face piece) or the armour (the carrier, its pouches and what's mounted on it) in one solid colour of
   // these, kept with the loadout; null: each piece's own (its maker's)
   const COLOURS: [string, number | null][] = [['Issue', null], ['Black', 0x1d1f21], ['Coyote', 0x7a6748], ['Tan', 0x9a8a68], ['Ranger green', 0x3f4a35], ['Olive drab', 0x4f5236], ['Wolf grey', 0x585c5f], ['Navy', 0x242c3a]];
@@ -215,13 +233,15 @@ const G_Loadout = (() => {
     const tint = (it: any, c: number | null) => { if (c != null) it.col = c; return it; };
     if (H) { const it = tint(Gr.gearItem(H), col('h')); for (const b of boxes('h', H)) (it as any)[b.k] = tint(Gr.gearItem(b.id), col('h')); me.kit.helmet = it; }
     if (A) { const it = tint(Gr.gearItem(A), col('a')); for (const b of boxes('a', A)) (it as any)[b.k] = tint(Gr.gearItem(b.id), col('a')); me.kit.carrier = it; }
+    for (let i = 0; i < THROW_SLOTS; i++) { const k = thr(i); if (!k) continue; const it = throwItem(k); if (!Gr.stow(me, it)) G.HUD.toast('', `No room for the ${THROW_NAME[k].toLowerCase()}`, 2); } // (the throwables: wherever they fit on you)
+    for (let i = 0; i < THROW_SLOTS; i++) { const k = thr(i); if (!k || me.quick.includes(k)) continue; const j = me.quick.findIndex((q: string | null) => !q || !me.quickCount(q)); if (j >= 0) me.setQuick(j, k); } // (each on a key, 3 to 5: in place of one you carry none of)
     if (P) { // (after the armour: its spare loads go on what you're wearing now)
       const w = me.makeWeapon(P, build('p', P)); me.weapons.p = w;
       for (let i = 0; i < 3; i++) { const it = Gr.ammoItem(w.def, Gr.ammoFor(w.def).kind === 'mag' ? null : 12); if (!Gr.stow(me, it)) break; } // (three spare loads, wherever they fit)
     }
   }
   function reload() { save = null; }
-  return { TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, boxesWith, fit, build, BUDGET, pts, cost, total };
+  return { THROWS, THROW_SLOTS, THROW_PTS, THROW_NAME, THROW_SHORT, THROW_DESC, throwItem, thr, setThr, nextThr, thrCost, TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, boxesWith, fit, build, BUDGET, pts, cost, total };
 })();
 G.Loadout = G_Loadout;
 interface GameModules { Loadout: typeof G_Loadout }

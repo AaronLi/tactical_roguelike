@@ -222,6 +222,14 @@ const G_SpaceData = (() => {
   }
   /** What a ship's people wear, by her class (js/rig.ts create): a liner's are civilians, the big warships a navy's, the rest pirates'. */
   const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
+  /** What her armed people are called aboard a ship, by whose she is (wearOf) and where they stand in her (js/server.ts titleOf): the
+   *  officer the mission's after (hvt), her highest-ranked fighter (top, when that officer isn't aboard), a Leader (leader), anyone else
+   *  leading a fireteam (tl), and the rest by what they are, the strongest of them (vet: the prefix) a step up. */
+  const TITLES: Record<string, Record<string, string>> = {
+    civil: { hvt: "Ship's Officer", top: 'Chief of Security', leader: 'Head of Security', tl: 'Security Lead', vet: 'Senior', rating: 'Crewman', suspect: 'Security Guard', grunt: 'Security Officer', rusher: 'Security Officer', heavy: 'Security Officer', marksman: 'Security Marksman' },
+    pirate: { hvt: 'Pirate Captain', top: 'Pirate Captain', leader: 'First Mate', tl: 'Boatswain', vet: 'Veteran', rating: 'Deckhand', suspect: 'Pirate', grunt: 'Raider', rusher: 'Cutthroat', heavy: 'Brute', marksman: 'Sharpshooter' },
+    navy: { hvt: 'Captain', top: 'Commander', leader: 'Lieutenant', tl: 'Sergeant', vet: 'Senior', rating: 'Rating', suspect: 'Sentry', grunt: 'Marine', rusher: 'Breacher', heavy: 'Heavy Marine', marksman: 'Marine Sharpshooter' },
+  };
   /** ...aboard the ship being boarded now (null anywhere else). */
   const wearNow = (): string | null => { const g = (G as any).Game, sp = g && g.map && g.map.sp; return sp ? wearOf(sp.size, sp.obj) : null; };
   const SIZES: Record<SpSize, SpClass> = {
@@ -254,7 +262,8 @@ const G_SpaceData = (() => {
     for (let i = 0; i < OFFERS; i++) {
       // (the fifth is always a ship taken by pirates: a civilian transport, whatever else is about)
       const assault = i === 2 || (i === 5 && r() < 0.5), taken = i === 4, size = assault ? null : taken ? 'transport' : i === 0 ? sizes[0] : U.pick(r, sizes);
-      const obj: SpObj = assault ? 'assault' : taken ? 'hostage' : i === 0 ? 'artifact' : U.pick(r, ['artifact', 'hvt', 'destruct'] as SpObj[]);
+      // (scuttling's a job against a navy or a pirate: never a civilian transport)
+      const obj: SpObj = assault ? 'assault' : taken ? 'hostage' : i === 0 ? 'artifact' : U.pick(r, (size === 'transport' ? ['artifact', 'hvt'] : ['artifact', 'hvt', 'destruct']) as SpObj[]);
       const rth = TH0 + U.ri(r, 0, THEMES.length - 1), th = assault ? U.pick(r, planets) : size === 'transport' ? TH0 + U.ri(r, 0, 1) : size === 'capital' ? TH0 + 2 : rth, T = themeAt(th)!;
       void (!assault && size !== 'capital' && r() < 0.4 ? level >= 4 && r() < 0.35 : 0); const other: SpSize | null = null; // (no second ship lying off her any more: its draws kept, so every board's the same otherwise)
       const wing = (size === 'small' || size === 'medium') && r() < 0.3; // (some corvettes and frigates are flying wings: two arms swept back from a glazed corner)
@@ -268,6 +277,14 @@ const G_SpaceData = (() => {
     }
     return out;
   }
+  // How a ship answers being boarded, by her size (js/spaceserver.ts doctrine): a transport or a corvette's is informal (her people
+  // shelter, under guard), a frigate's and up practiced (her teams sweep for the squad); and as the mission board says it
+  const drill = (size: SpSize | null | undefined): 'informal' | 'practiced' => (!size || size === 'transport' || size === 'small' ? 'informal' : 'practiced');
+  const DRILL_LINE = {
+    informal: 'Her breach response is informal: her people shelter in her safest compartment, under guard, and nobody comes looking for you.',
+    practiced: 'Her breach response is practiced: her teams sweep the ship for you, on her security cameras while someone is at them.',
+  };
+  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' ? DRILL_LINE[drill(m.size)] : ''); // (a pirate-held ship answers nobody)
   // A distance, written: metres under a kilometre, then kilometres, megametres, light-seconds; a jump's in light-years.
   function dist(m: number): string {
     m = Math.abs(m);
@@ -279,7 +296,7 @@ const G_SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, dist, speed, eta, wearOf, wearNow, zone, zonePos };
+  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();
 G.SpaceData = G_SpaceData;
 interface GameModules { SpaceData: typeof G_SpaceData; }

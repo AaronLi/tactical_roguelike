@@ -209,6 +209,13 @@ const G_Icons = (() => {
     g.strokeStyle = '#8a8f94'; g.lineWidth = 3; g.beginPath(); g.moveTo(W * 0.56, H * 0.22); g.lineTo(W * 0.74, H * 0.52); g.stroke();
     g.beginPath(); g.arc(W * 0.36, H * 0.22, W * 0.07, 0, 7); g.stroke();
   }
+  // a sticky grenade: a squat steel body in a tan adhesive sock, its fuze on top
+  function drawSticky(g: CanvasRenderingContext2D, W: number, H: number) {
+    g.beginPath(); g.ellipse(W * 0.5, H * 0.6, W * 0.26, H * 0.24, 0, 0, 7); g.fillStyle = '#9a8558'; g.fill(); shade(g, W * 0.24, H * 0.36, W * 0.52, H * 0.48);
+    g.strokeStyle = 'rgba(60,48,28,0.55)'; g.lineWidth = 1.5; for (let i = -2; i <= 2; i++) { g.beginPath(); g.moveTo(W * (0.5 + i * 0.08), H * 0.38); g.lineTo(W * (0.5 + i * 0.1), H * 0.83); g.stroke(); } // (the sock's weave)
+    g.fillStyle = '#8a8f94'; g.fillRect(W * 0.43, H * 0.2, W * 0.14, H * 0.17);
+    g.strokeStyle = '#8a8f94'; g.lineWidth = 3; g.beginPath(); g.moveTo(W * 0.55, H * 0.24); g.lineTo(W * 0.72, H * 0.46); g.stroke();
+  }
   const GEAR_COL = (d: GearDef) => (d.brand && /Sable|Paragon/.test(d.brand) ? '#5a5240' : /Kestrel|Vantage/.test(d.brand || '') ? '#4d5639' : '#2e3236');
   function drawCarrier(g: CanvasRenderingContext2D, W: number, H: number, d: GearDef) {
     const col = d.id === 'c.lite' ? '#5c5a50' : d.id === 'c.ghost' ? '#3a3d40' : GEAR_COL(d);
@@ -450,6 +457,7 @@ const G_Icons = (() => {
     else if (it.k === 'frag') drawFrag(g, W, H);
     else if (it.k === 'flash') drawFlash(g, W, H);
     else if (it.k === 'tb') drawTB(g, W, H);
+    else if (it.k === 'sticky') drawSticky(g, W, H);
     else if (it.k === 'carrier') drawCarrier(g, W, H, d!);
     else if (it.k === 'plate') drawPlate(g, W, H, d!);
     else if (it.k === 'helmet') { drawHelmet(g, W, H, d!); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face) as GearDef, true); if (it.nvg) drawNvg(g, W, H, G.Gear.defOf(it.nvg) as GearDef, true); }

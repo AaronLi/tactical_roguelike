@@ -22,7 +22,7 @@ type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause' | 'ca
 // the sliders in the menu, and the keys they keep in storage
 type GmSetting = 'sens' | 'padSens' | 'touchSens' | 'fov' | 'vol' | 'loadKit' | 'scale';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
-type GmMsgKind = 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
+type GmMsgKind = 'stk' | 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
 type GmDmgMap = Parameters<typeof G.Damage.apply>[0];
 // the turning figure of you in the menu (lookPreview)
@@ -42,6 +42,7 @@ const G_Game = {
   enemiesLeft: 0,
   chatOpen: false,
   locked: false,
+  escHeld: false, escAt: -1e9, lockAt: -1e9, lockOnEscUp: false, pauseAt: -1e9, // (Esc down now, when it last went down, when the mouse was last captured, a capture waiting for Esc to come up: lock; when the pause menu last came up)
   softLocked: false, // (playing on a controller or a touch screen, with no pointer lock to be had: counts as locked; js/gamepad.ts, js/touch.ts)
   runStarted: false,
   // the rest of what it keeps, made as it goes (init and the methods below): all here, so its whole shape is in one place. Those marked (init)
@@ -77,7 +78,8 @@ const G_Game = {
   arms: undefined as Record<string, string> | undefined, // (each player's sidearm pick)
   armSel: undefined as string | null | undefined,
   armLook: undefined as string | null | undefined,
-  loTab: 'p' as string, loLook: {} as Record<string, string>, loAtt: null as null | { sl: string; box: number }, loRanks: false, // (loRanks: the ranks' timeline in the tree's place) // (loAtt: an attachment box being filled: its own view, in place of the tree) // (the loadout screen's tab, and what's looked at on each tree)
+  loThr: null as number | null, // (a throwable box being filled: the throwables' own view, in place of the tree)
+  loTab: 's' as string, loLook: {} as Record<string, string>, loAtt: null as null | { sl: string; box: number }, loRanks: false, // (loRanks: the ranks' timeline in the tree's place) // (loAtt: an attachment box being filled: its own view, in place of the tree) // (the loadout screen's tab, and what's looked at on each tree)
   routeWait: 0,
   armModels: undefined as Promise<unknown> | 'ready' | undefined, // (the sidearm web's guns, stock and pro, loading before it opens: sidearmPick)
   armView: undefined as unknown as GmArmView,
@@ -476,10 +478,21 @@ const G_Game = {
     G.R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked)) this.lock(); });
 
     document.addEventListener('pointerlockchange', () => this.lockChanged());
+    // Esc, held and let go: a menu shut with it takes the mouse back once it's up (lock), not while the browser's still treating the
+    // press as its own "let the mouse go"
+    window.addEventListener('keydown', (e) => { if (e.code === 'Escape') { this.escHeld = true; this.escAt = performance.now(); } }, true);
+    window.addEventListener('keyup', (e) => {
+      if (e.code !== 'Escape') return;
+      this.escHeld = false;
+      if (this.lockOnEscUp) { this.lockOnEscUp = false; if (this.phase === 'level' && !this.locked && !this.menuOpen()) this.lock(); }
+    }, true);
+    window.addEventListener('blur', () => { this.escHeld = false; });
 
     window.addEventListener('keydown', (e) => {
       if (this.phase !== 'level') return;
       if (e.code === 'Escape' && this.softLocked && !this.menuOpen()) { this.unlock(); return; } // (no pointer lock for the browser's own Esc to let go)
+      // the pause menu up: Esc puts it away and takes the mouse back (once it's let go: lock). Not the press that brought it up.
+      if (e.code === 'Escape' && !e.repeat && !this.locked && !this.menuOpen() && !this.$('pause').classList.contains('hidden') && performance.now() - this.pauseAt > 250) { this.lock(); return; }
       // in the hangar: Esc puts a shop panel away, and Tab is your stash and loadout (the panel's Kit tab), not the field kit
       if (this.hub) {
         if (e.code === 'Escape' && this.shopOpen) { this.closeShop(); return; }
@@ -578,8 +591,12 @@ const G_Game = {
     // a menu keeps the mouse, so let it straight go again
     if (this.locked && this.menuOpen()) { this.unlock(); return; }
     if (this.phase !== 'level') return;
+    const now = performance.now();
+    if (real) this.lockAt = now;
     if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
-    else if (!this.menuOpen()) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
+    // (the mouse taken back as a menu was shut with Esc, and let straight go again by the browser's own Esc: not a pause, a click to play on)
+    else if (!this.menuOpen() && now - this.lockAt < 600 && now - this.escAt < 600) this.$('clickToPlay').classList.remove('hidden');
+    else if (!this.menuOpen()) { this.pauseAt = now; this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
   },
   unlock() {
     if (this.softLocked) { this.softLocked = false; this.lockChanged(); }
@@ -588,6 +605,7 @@ const G_Game = {
   lock() {
     G.Audio.init();
     if (G.Pad.active() || G.Touch.active()) { if (!this.locked) { this.softLocked = true; this.lockChanged(); } return; }
+    if (this.escHeld) { this.lockOnEscUp = true; return; } // (a menu shut with Esc: once it's let go)
     const c = G.R.renderer.domElement;
     try {
       const p = c.requestPointerLock({ unadjustedMovement: true });
@@ -883,7 +901,8 @@ const G_Game = {
       case 'eround': if (this.phase === 'level' && G.Net.isHost) G.Me.enemyRounds(m); break; // (the host's: a suspect's rounds, flown here)
       case 'eInfo': G.HUD.eInfoGot(m); break; // (the host's: the F9 readout's look at a suspect)
       case 'shot': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.remoteShot(m); break;
-      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag'); if (G.Highlights) G.Highlights.nade(m.en ? 'e' + m.e : 'p' + m.id, new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
+      case 'stk': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.stuckAt(m); break; // (where someone's sticky grenade held: js/views.ts stickStep)
+      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag', m.nid, m.id); if (G.Highlights) G.Highlights.nade(m.en ? 'e' + m.e : 'p' + m.id, new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
       case 'boom': this.onBoom(m); break;
       case 'course': if (G.Course) G.Course.setCourse(m.seed); break;
       case 'crun': if (G.Course && m.s) G.Course.remoteRun(Object.assign({}, m.s, { who: m.by || m.s.who })); break;
@@ -984,7 +1003,7 @@ const G_Game = {
         if (ev) { ev.rig.zip(true); ev.arrested = true; } // living arrests are zip-tied too
         if (G.Highlights && !m.civ) G.Highlights.arrest(m); // (a clip for the highlights: nobody got hurt)
         // (one cuffed where they lay, down: already counted, incapacitated; securing them pays like securing a body)
-        G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> ${m.civ ? 'secured a civilian' : (m.dn ? 'secured ' : 'arrested ') + (def ? def.name : 'a suspect')}`);
+        G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> ${m.civ ? 'secured a civilian' : (m.dn ? 'secured ' : 'arrested ') + (m.nm || (def ? def.name : 'a suspect'))}`);
         if (m.by === G.Net.myId) {
           const cr = m.cr;
           G.Me.credits += cr;
@@ -1028,12 +1047,13 @@ const G_Game = {
       return;
     }
     if (m.id !== G.Net.myId) { G.R.explosion(p, m.r); G.Audio.boom(G.R.camera.position.distanceTo(p)); }
-    if (m.fr && m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s); // (a frag's burst, for the replays: yours is kept as it went off)
+    if (m.fr && m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s, m.sk ? 'sticky' : 'frag'); // (a frag's burst, for the replays: yours is kept as it went off)
     const Me = G.Me;
     if (m.fr && m.id !== G.Net.myId && Me.pos && Math.hypot(Me.pos.x - p.x, Me.pos.z - p.z) < Me.FRAG.RANGE) {
       // A frag grenade: a suspect's, its chips flown here for you alone (if you're up); anyone else's (a teammate's: its
       // wounds are theirs to work out), flown against the walls only, from its seed, to leave the same pocks and scorch.
-      if (m.en && !Me.down && !Me.dead) Me.fragBurst(p, 1, m.s); else Me.fragBurst(p, undefined, m.s, true);
+      const fk = m.sk ? 'sticky' : undefined; // (a sticky's: its own heavier fragments)
+      if (m.en && !Me.down && !Me.dead) Me.fragBurst(p, 1, m.s, false, fk); else Me.fragBurst(p, undefined, m.s, true, fk);
     }
     if (!Me.pos || Me.down || Me.dead) return;
     const cy = Me.pos.y + 1.0, d = Math.hypot(Me.pos.x - p.x, cy - p.y, Me.pos.z - p.z);
@@ -1066,7 +1086,7 @@ const G_Game = {
     if (G.Highlights) G.Highlights.kill(m);
     if (m.inc) { // (down already: counted then, js/server.ts incapacitate)
       const def = (G.ENEMIES as Record<string, any>)[m.ty];
-      if (m.bo || m.cz) G.HUD.feed(`<span class="dim">${def ? def.name : 'Suspect'} ${m.cz === 'burns' ? 'died of burns' : m.cz === 'blast' ? 'died of blast lung' : 'bled out'}</span>`);
+      if (m.bo || m.cz) G.HUD.feed(`<span class="dim">${m.nm || (def ? def.name : 'Suspect')} ${m.cz === 'burns' ? 'died of burns' : m.cz === 'blast' ? 'died of blast lung' : 'bled out'}</span>`);
       return;
     }
     this.credit(m, 'kill');
@@ -1082,15 +1102,17 @@ const G_Game = {
     const Me = G.Me, def = (G.ENEMIES as Record<string, any>)[m.ty];
     const killer = this.nameOf(m.by);
     const kc = m.by === G.Net.myId ? '#ffd24a' : this.roster[m.by] ? G.U.hex(this.roster[m.by].color) : '#fff';
-    G.HUD.feed(`<b style="color:${kc}">${G.U.esc(killer)}</b> ${m.h ? '<span class="hs">⌖</span>' : '✕'} ${def ? def.name : 'hostile'}`);
+    G.HUD.feed(`<b style="color:${kc}">${G.U.esc(killer)}</b> ${m.h ? '<span class="hs">⌖</span>' : '✕'} ${m.nm || (def ? def.name : 'hostile')}`);
     if (m.why) {
-      // a civilian, or someone who had already surrendered: that costs whoever pulled the trigger
+      // a civilian, or someone who had already surrendered: someone who'd given up costs whoever pulled the trigger; a civilian
+      // costs no credits (it'll be reputation: counted, in the career's tally, for that)
       G.HUD.feed(`<span class="bad">${m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED FORCE'}</span>`);
       if (m.by === G.Net.myId) {
-        Me.credits = Math.max(0, Me.credits + m.cr);
-        G.Career.ev(m.why === 'civ' ? 'civ' : 'unauth', m.cr);
-        G.HUD.feed(`<span class="bad">-¢${-m.cr}</span>`);
-        G.HUD.toast(m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED USE OF FORCE', `-¢${-m.cr}`, 2.5);
+        const cr = m.why === 'civ' ? 0 : m.cr || 0;
+        Me.credits = Math.max(0, Me.credits + cr);
+        G.Career.ev(m.why === 'civ' ? 'civ' : 'unauth', cr);
+        if (cr) G.HUD.feed(`<span class="bad">-¢${-cr}</span>`);
+        G.HUD.toast(m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED USE OF FORCE', cr ? `-¢${-cr}` : '', 2.5);
         G.Audio.deny();
       }
       return;
@@ -1462,11 +1484,15 @@ const G_Game = {
       const L = G.Loadout, sl = this.loTab, look = this.loLook[sl];
       const lt = e.target.closest<HTMLElement>('[data-lotab]'), ln = e.target.closest<HTMLElement>('[data-lonode]'), lb = e.target.closest<HTMLElement>('[data-lobox]'), lp = e.target.closest<HTMLElement>('[data-lopart]');
       // an attachment box (under a slot in the bar): its own view, of what can go in it; a part from it fitted, or the box emptied
-      if (lb) { const [bs, bi] = lb.dataset.lobox!.split(':'); if (L.sel(bs)) { this.loTab = bs; this.loAtt = { sl: bs, box: +bi }; this.loRanks = false; } G.Audio.click(); return this.sidearmPick(); }
+      if (lb) { const [bs, bi] = lb.dataset.lobox!.split(':'); if (L.sel(bs)) { this.loTab = bs; this.loAtt = { sl: bs, box: +bi }; this.loRanks = false; this.loThr = null; } G.Audio.click(); return this.sidearmPick(); }
       if (lp && this.loAtt) { const v = lp.dataset.lopart!, [k, id] = v.split('|'), A = this.loAtt, it = L.sel(A.sl); if (it) L.fit(A.sl, it, A.box, v ? { k, id } : null); this.loAtt = null; G.Audio.click(); return this.sidearmPick(); }
-      if (e.target.closest('[data-loranks]')) { this.loRanks = !this.loRanks; this.loAtt = null; G.Audio.click(); return this.sidearmPick(); }
-      if (e.target.closest('[data-loback]')) { this.loAtt = null; this.loRanks = false; G.Audio.click(); return this.sidearmPick(); }
-      if (lt) { this.loTab = lt.dataset.lotab!; this.loAtt = null; this.loRanks = false; this.armView = this.loCentre(this.loTab); G.Audio.click(); return this.sidearmPick(); }
+      const lth = e.target.closest<HTMLElement>('[data-lothr]');
+      if (lth) { this.loThr = +lth.dataset.lothr!; this.loAtt = null; this.loRanks = false; G.Audio.click(); return this.sidearmPick(); }
+      const ltp = e.target.closest<HTMLElement>('[data-lothrpick]');
+      if (ltp && this.loThr != null) { L.setThr(this.loThr, ltp.dataset.lothrpick || null); this.loThr = null; G.Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-loranks]')) { this.loRanks = !this.loRanks; this.loAtt = null; this.loThr = null; G.Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-loback]')) { this.loAtt = null; this.loRanks = false; this.loThr = null; G.Audio.click(); return this.sidearmPick(); }
+      if (lt) { this.loTab = lt.dataset.lotab!; this.loAtt = null; this.loRanks = false; this.loThr = null; this.armView = this.loCentre(this.loTab); G.Audio.click(); return this.sidearmPick(); }
       if (e.target.closest('[data-lodeploy]')) { G.Audio.click(); return this.loDeploy(); }
       if (e.target.closest('[data-armhome]')) { go(0, 0); G.Audio.click(); return this.sidearmPick(); }
       if (ln) {
@@ -1491,7 +1517,7 @@ const G_Game = {
   loBar() {
     if (!G.SpaceData.ON) return '';
     const L = G.Loadout, r = L.rank(), x = L.xp(), lo = L.rankAt(r), hi = L.rankAt(r + 1), pct = Math.round(((x - lo) / (hi - lo)) * 100);
-    const val = (sl: string) => { const id = L.sel(sl); return id ? L.name(sl, id) : sl === 'p' ? 'None' : 'Issue kit'; };
+    const val = (sl: string) => { const id = L.sel(sl); return id ? L.name(sl, id) : 'Issue kit'; };
     // a slot: its tab, and under it the two attachment boxes of what's taken in it (each opens its own view: loAttView)
     const tab = (sl: string, label: string) => {
       const c = L.cost(sl, L.sel(sl)), id = L.sel(sl), bx = id ? L.boxes(sl, id) : [], all = id ? L.atts(sl, id) : [];
@@ -1499,13 +1525,19 @@ const G_Game = {
         return `<button class="lo-tbox${a ? ' full' : ''}${on ? ' on' : ''}" data-lobox="${sl}:${i}" ${id && all.length ? '' : 'disabled'} title="${a ? G.U.esc(a.name) : 'An attachment'}">${a ? `<b>${G.U.esc(a.name)}</b><i>${a.pts}</i>` : `<small>${all.length ? '+ attachment' : '—'}</small>`}</button>`; };
       return `<div class="lo-slot${this.loTab === sl ? ' on' : ''}"><button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}<i>${c} pt${c === 1 ? '' : 's'}</i></small><b>${G.U.esc(val(sl))}</b></button><div class="lo-tboxes">${box(0)}${box(1)}</div></div>`;
     };
+    // the throwables: two boxes, each the full height of the bar, each opening the throwables' view (loThrView) to pick what's in it; a point each
+    const thrSlot = () => {
+      const box = (i: number) => { const k = L.thr(i), on = this.loThr === i; return `<button class="lo-tab lo-thrbox${k ? ' full' : ''}${on ? ' on' : ''}" data-lothr="${i}" title="${k ? G.U.esc(L.THROW_NAME[k]) : 'Pick a throwable'}"><small>Throw ${i + 1}<i>${k ? L.THROW_PTS + ' pt' : ''}</i></small><b>${k ? G.U.esc(L.THROW_SHORT[k]) : '+ Add'}</b></button>`; };
+      return `<div class="lo-slot lo-thrs">${box(0)}${box(1)}</div>`;
+    };
     const tot = L.total(), over = tot > L.BUDGET;
-    return `<div class="lo-bar"><button class="lo-rank${this.loRanks ? ' on' : ''}" data-loranks title="What each rank opens"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></button>${tab('p', 'Primary')}${tab('s', 'Sidearm')}${tab('h', 'Helmet')}${tab('a', 'Body armour')}<div class="lo-pts${over ? ' over' : ''}" title="What you take into a run can't cost more than ${L.BUDGET} points"><b>${tot} / ${L.BUDGET}</b><span>${over ? `${tot - L.BUDGET} over` : 'points'}</span></div><button class="btn primary lo-go" data-lodeploy ${over ? 'disabled' : ''}>Deploy</button></div>`;
+    return `<div class="lo-bar"><button class="lo-rank${this.loRanks ? ' on' : ''}" data-loranks title="What each rank opens"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></button>${tab('s', 'Sidearm')}${tab('h', 'Helmet')}${tab('a', 'Body armour')}${thrSlot()}<div class="lo-pts${over ? ' over' : ''}" title="What you take into a run can't cost more than ${L.BUDGET} points"><b>${tot} / ${L.BUDGET}</b><span>${over ? `${tot - L.BUDGET} over` : 'points'}</span></div><button class="btn primary lo-go" data-lodeploy ${over ? 'disabled' : ''}>Deploy</button></div>`;
   },
   // a slot's tree, drawn as a web: the piece in the middle, paths out from it; under the piece you're looking at (once it's yours), its two
   // attachment boxes; beside it all, what it is, what it takes, what's next
   loWeb(el: HTMLElement) {
     if (this.loRanks && G.SpaceData.ON) return this.loRankView(el);
+    if (this.loThr != null && G.SpaceData.ON) return this.loThrView(el);
     if (this.loAtt && G.Loadout.sel(this.loAtt.sl)) return this.loAttView(el);
     this.loAtt = null;
     const L = G.Loadout, sl = this.loTab, T = L.TREES[sl], BY = L.by(sl), gun = sl === 'p' || sl === 's';
@@ -1551,9 +1583,9 @@ const G_Game = {
   // what isn't yours yet: the rank not reached, or the piece before it not yet earned), and a line where you are, between your rank
   // and the next as far as your XP has got
   loRankView(el: HTMLElement) {
-    const L = G.Loadout, r = L.rank(), x = L.xp(), f = (x - L.rankAt(r)) / (L.rankAt(r + 1) - L.rankAt(r)), TITLE: Record<string, string> = { p: 'Primary', h: 'Helmet', a: 'Body armour' };
+    const L = G.Loadout, r = L.rank(), x = L.xp(), f = (x - L.rankAt(r)) / (L.rankAt(r + 1) - L.rankAt(r)), TITLE: Record<string, string> = { h: 'Helmet', a: 'Body armour' };
     const at: Record<number, { sl: string; id: string }[]> = {};
-    for (const sl of ['p', 'h', 'a']) for (const q of L.TREES[sl].NODES) if (q.rank != null) (at[q.rank] = at[q.rank] || []).push({ sl, id: q.id });
+    for (const sl of ['h', 'a']) for (const q of L.TREES[sl].NODES) if (q.rank != null) (at[q.rank] = at[q.rank] || []).push({ sl, id: q.id });
     const top = Math.max(r + 1, ...Object.keys(at).map(Number)), W = 190;
     const pic = (sl: string, id: string) => { const it = sl === 'p' ? G.Gear.gunItem(G.Me.makeWeapon(id)) : G.Gear.gearItem(id), [cw, ch] = G.Gear.size(it), url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
     const LOCK = '<svg class="lo-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="4.5" y="10" width="15" height="11" rx="2" fill="currentColor"/></svg>';
@@ -1576,6 +1608,16 @@ const G_Game = {
   },
   // An attachment box being filled, as a view of its own (in the tree's place, the bar over it): every part that can go in it, by kind, a
   // card each (its picture, its points; one not yet earned dimmed, with how far along it is); beside it, the piece as it'll be
+  // A throwable box's own view: each throwable as a card (what it is, what it does, a point), the one in the box marked, and the box emptied
+  loThrView(el: HTMLElement) {
+    const L = G.Loadout, i = this.loThr!, cur = L.thr(i), other = L.thr(1 - i), E = G.U.esc;
+    const icon = (k: string) => { const it = L.throwItem(k), [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
+    const cards = L.THROWS.map((k) => { const inThis = cur === k, src = icon(k);
+      return `<button class="lo-card lo-thrcard${inThis ? ' in' : ''}${other === k ? ' other' : ''}" ${inThis ? 'aria-disabled="true"' : `data-lothrpick="${k}"`}>${src ? `<img src="${src}" alt="" draggable="false">` : ''}<b>${E(L.THROW_NAME[k])}</b><i>${L.THROW_PTS} pt${inThis ? ' · in this box' : other === k ? ' · in the other box' : ''}</i><small>${E(L.THROW_DESC[k])}</small></button>`; }).join('');
+    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>Throwables <span>— box ${i + 1} of 2</span></h2><p>${cur ? 'Pick another to take in its place, or empty the box.' : 'Pick what you take in this box.'} A point each; on a key (3 to 5) as you deploy.</p></div>${cur ? '<button class="btn lo-empty" data-lothrpick="">Empty this box</button>' : ''}<section><div class="lo-cards">${cards}</div></section></div><button class="btn web-home" data-loback>Back</button></div>
+      <aside class="web-side">${cur ? `<img src="${icon(cur)}" alt=""><h3>${E(L.THROW_NAME[cur])}</h3><p class="lo-note">${E(L.THROW_DESC[cur])}</p>` : '<h3>Empty</h3><p class="lo-note">Nothing in this box.</p>'}<h4>Your throwables</h4><ul class="web-next">${[0, 1].map((j) => { const k = L.thr(j); return `<li><b>${j + 1}.</b> ${k ? `${E(L.THROW_NAME[k])} <span>${L.THROW_PTS} pt</span>` : '<span>empty</span>'}</li>`; }).join('')}</ul></aside></div>`;
+    el.classList.remove('hidden');
+  },
   loAttView(el: HTMLElement) {
     const L = G.Loadout, A = this.loAtt!, sl = A.sl, id = L.sel(sl)!, gun = sl === 'p' || sl === 's', all = L.atts(sl, id), bx = L.boxes(sl, id), cur = bx[A.box], KIND = this.loKinds();
     const icon = (pid: string) => { const it = gun ? G.Gear.partItem(pid) : G.Gear.gearItem(pid), [cw, ch] = G.Gear.size(it), url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
@@ -1628,7 +1670,7 @@ const G_Game = {
     L.apply(G.Me, !ON);
     const id = L.sel('s') || 'p9';
     G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)
-    G.HUD.toast(ON ? 'LOADOUT' : '', ON ? (['p', 's', 'h', 'a'].map((s) => L.sel(s) && L.name(s, L.sel(s)!)).filter(Boolean) as string[]).map((n) => G.U.esc(n)).join(' · ') : `Sidearm: ${G.U.esc(G.WEAPONS[id].name)}`, 2.4);
+    G.HUD.toast(ON ? 'LOADOUT' : '', ON ? (['p', 's', 'h', 'a'].map((s) => L.sel(s) && L.name(s, L.sel(s)!)).concat([0, 1].map((i) => L.thr(i) && L.THROW_NAME[L.thr(i)!])).filter(Boolean) as string[]).map((n) => G.U.esc(n)).join(' · ') : `Sidearm: ${G.U.esc(G.WEAPONS[id].name)}`, 2.4);
     this.loAtt = null; this.sidearmPick(); this.renderRoute();
   },
   // the route's state as the map draws it (js/route.ts svg, tip)
@@ -1738,7 +1780,7 @@ const G_Game = {
     let paid = 0;
     this.lastBonus = 0;
     if (G.Me.pos && !G.SpaceData.ON) { // (in space a mission's fee is what's paid, when it's done: js/space.ts mdone)
-      const clean = report && report.civKilled === 0 && report.unauth === 0;
+      const clean = report && report.unauth === 0; // (a civilian killed no longer costs the clean bonus: it'll cost reputation)
       const bonus = Math.round((250 + 75 * level + (clean ? 200 : 0) + (report && report.allRescued ? 150 + 50 * level : 0) + (report && report.stronghold ? G.Route.strongholdPay(level) : 0)));
       G.Me.credits += bonus;
       this.lastBonus = bonus; paid = bonus;

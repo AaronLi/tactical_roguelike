@@ -529,23 +529,13 @@ const G_ShipModel = (() => {
       // Streamlining. Where her side steps in or out (an inside corner of her plan) the corner's filled: a fairing from the step's
       // full depth down to nothing along the longer wall, keel to roof, in slices (it's smashed through like the rest: cutAt).
       {
-        const fairM = langOf(sp.size) === 'cutter' ? paint : dPlate, seen = new Set<string>();
-        for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
-          if (solid(x, z)) continue;
-          for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-            if (!solid(x + sx, z) || !solid(x, z + sz)) continue;
-            // (the wall across x there runs away along z, the wall across z along x: each as far as it's still her side)
-            let da = 0; while (da < 14 && solid(x + sx, z - da * sz) && !solid(x, z - da * sz)) da++;
-            let db = 0; while (db < 14 && solid(x - db * sx, z + sz) && !solid(x - db * sx, z)) db++;
-            if (da < 2 || db < 2) continue;
-            const cx = (sx > 0 ? x + 1 : x) * TS, cz = (sz > 0 ? z + 1 : z) * TS, key = cx.toFixed(2) + ',' + cz.toFixed(2); if (seen.has(key)) continue; seen.add(key);
-            const A = da * TS, B = db * TS, alongX = B >= A, short = Math.min(alongX ? A : B, 6), long = Math.min(alongX ? B : A, Math.max(3, 2.4 * short), 10);
-            const u = alongX ? V(-sx, 0, 0) : V(0, 0, -sz), v = alongX ? V(0, 0, -sz) : V(-sx, 0, 0), C0 = V(cx, 0, cz);
-            const hm = sp.hulls.find((q) => cx > q.x0 - 2 && cx < q.x1 + 2 && cz > q.z0 - 2 && cz < q.z1 + 2) || sp.hull, y0 = -1.0, y1 = (hm.main ? TOP : WH) + 0.5, n = Math.max(2, Math.ceil(long / (TS * 1.5)));
-            for (let k = 0; k < n; k++) {
-              const t0 = long * k / n, t1 = long * (k + 1) / n, P = (t: number, out: number, y: number) => C0.clone().addScaledVector(u, t).addScaledVector(v, out * short * (1 - t / long)).setY(y);
-              hexa(fairM, [P(t0, 0, y0), P(t1, 0, y0), P(t1, 1, y0), P(t0, 1, y0)], [P(t0, 0, y1), P(t1, 0, y1), P(t1, 1, y1), P(t0, 1, y1)]);
-            }
+        const fairM = langOf(sp.size) === 'cutter' ? paint : dPlate;
+        for (const f of G.ShipGen.fairings(W, H, t)) { // (where they are: js/shipgen.ts fairings; no window goes behind one)
+          const { cx, cz, short, long } = f, u = V(f.ux, 0, f.uz), v = V(f.vx, 0, f.vz), C0 = V(cx, 0, cz);
+          const hm = sp.hulls.find((q) => cx > q.x0 - 2 && cx < q.x1 + 2 && cz > q.z0 - 2 && cz < q.z1 + 2) || sp.hull, y0 = -1.0, y1 = (hm.main ? TOP : WH) + 0.5, n = Math.max(2, Math.ceil(long / (TS * 1.5)));
+          for (let k = 0; k < n; k++) {
+            const t0 = long * k / n, t1 = long * (k + 1) / n, P = (t: number, out: number, y: number) => C0.clone().addScaledVector(u, t).addScaledVector(v, out * short * (1 - t / long)).setY(y);
+            hexa(fairM, [P(t0, 0, y0), P(t1, 0, y0), P(t1, 1, y0), P(t0, 1, y0)], [P(t0, 0, y1), P(t1, 0, y1), P(t1, 1, y1), P(t0, 1, y1)]);
           }
         }
       }

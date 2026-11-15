@@ -97,10 +97,14 @@ const G_U = {
   // What's kept in this browser, under bp_<key>. set tells the cloud saves (js/cloud.ts sets onSet: the keys it syncs are marked
   // changed, and when) unless auto (a default written for you, not your choice: it doesn't outweigh what the account has). put
   // writes without telling anyone: the cloud's own writes, of what it merged in.
+  // The copy of the game at d5g.ca/space-experimental (another branch's, beside the main one: .github/workflows/pages.yml) saves in this browser only, under
+  // its own names (NS), so it never reads or writes the main copy's saves; and never to the account (js/cloud.ts). (Its models' cache is its
+  // own too: js/modelbundles.ts)
+  NS: (typeof location !== 'undefined' && /^\/space-experimental(\/|$)/.test(location.pathname) ? 'space_' : ''),
   store: {
     onSet: null as null | ((k: string, v: any, auto: boolean) => void),
-    get(k: string, d?: any) { try { const v = localStorage.getItem('bp_' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    put(k: string, v: any) { try { if (v === undefined) localStorage.removeItem('bp_' + k); else localStorage.setItem('bp_' + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    get(k: string, d?: any) { try { const v = localStorage.getItem('bp_' + G_U.NS + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    put(k: string, v: any) { try { if (v === undefined) localStorage.removeItem('bp_' + G_U.NS + k); else localStorage.setItem('bp_' + G_U.NS + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
     set(k: string, v: any, auto = false) { G_U.store.put(k, v); if (G_U.store.onSet) try { G_U.store.onSet(k, v, auto); } catch (e) { console.warn('store: onSet', e); } },
   },
 };
