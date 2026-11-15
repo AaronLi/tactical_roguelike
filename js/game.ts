@@ -550,7 +550,7 @@ const G_Game = {
   // Tab in a level: your kit and health (and the scoreboard), the mouse freed to move things about. You stand
   // still while it's open; the level doesn't stop.
   // a panel that takes the mouse is open: the field kit (Tab), the hangar's shop, the chat, the attachments box (no firing)
-  menuOpen(): boolean { return !!(this.invOpen || this.shopOpen || this.chatOpen || this.aboxOpen || G.Space.S.uiOpen); },
+  menuOpen(): boolean { return !!(this.invOpen || this.shopOpen || this.chatOpen || this.aboxOpen || G.Space.S.uiOpen || G.Space.debriefOpen()); },
   toggleInv(open: boolean, opts?: { patient?: string; cab?: number }) {
     if (!!open === !!this.invOpen) return;
     this.invOpen = !!open;
