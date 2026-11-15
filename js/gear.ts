@@ -240,7 +240,7 @@ const G_Gear = (() => {
   // compact, extended, drum...), by default the kind that's in that gun now, or its standard one.
   const magVid = (def: GDef, vid?: string) => vid || (def.build && def.build.mag) || G.Gunsmith.defaultBuild(def.id).mag || null;
   function ammoItem(def: GDef, n?: number | null, am?: string, vid?: string, rl?: string | null) {
-    const a = ammoFor(def), r = G.roundOf(def, rl), type = am || G.ballFor(r ? r.cal : G.calOf(def)); // (r: a gun of several barrels: the block's round type)
+    const a = ammoFor(def), r = G.roundOf(def, rl), type = am || (r ? G.ballFor(r.cal) : G.loadFor(def)); // (r: a gun of several barrels: the block's round type)
     if (a.kind !== 'mag') { const count = n == null ? a.cap : n; return item({ k: a.kind, key: a.key, wid: def.id, cap: Math.max(count, boxCap(a.key)), n: count, am: type }); }
     const v = magVid(def, vid), cap = r ? def.barrels.n * r.per : G.Gunsmith.magCap(def.id, v), count = Math.min(cap, n == null ? cap : n); // (a block's capacity is its round type's: n barrels of what each holds)
     const it = magItem({ k: 'mag', key: a.key, wid: def.id, cap, vid: v }, Array(count).fill(type));

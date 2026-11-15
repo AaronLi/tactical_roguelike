@@ -597,7 +597,7 @@ const G_Server = {
       const keys = Object.keys(w.barrels.rounds), rl = keys[Math.floor(r() * keys.length)], other = keys.filter((k) => k !== rl)[0], cap = (k: string) => w.barrels.n * w.barrels.rounds[k].per;
       return { code: G.Gunsmith.defaultCode(w.id), mag: cap(rl), reserve: cap(rl), rl, am: G.rollAmmo(w.barrels.rounds[rl].cal, r), alt: other ? { rl: other, n: cap(other), am: G.rollAmmo(w.barrels.rounds[other].cal, r) } : undefined };
     }
-    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: G.rollAmmo(G.calOf(w), r) };
+    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: w.am ? G.loadFor(w) : G.rollAmmo(G.calOf(w), r) }; // (a gun with its own load comes with it: the MP5SD's subsonic)
   },
   // Something lying in the world (G.Loot), and how it's sent
   lootAdd(x: number, y: number, z: number, item: any, yaw: number, fit?: number) {

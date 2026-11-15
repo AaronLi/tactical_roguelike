@@ -295,7 +295,7 @@ const G_Me = {
         if (!Gr.stow(this, m)) this.dropItem(m);
       } else Gr.unloadGun(this, w);
       if (w.chamber) { if (!Gr.stow(this, Gr.boxItem(G.calOf(old), w.chamber, 1))) { /* (a single round: let it go) */ } }
-      w.mag = 0; w.tube = []; w.ammo = G.ballFor(G.calOf(def)); w.chamber = null;
+      w.mag = 0; w.tube = []; w.ammo = G.loadFor(def); w.chamber = null;
       if (a1.kind === 'mag') w.noMag = true; else delete w.noMag;
     }
     w.def = def; w.sup = def.sup;
