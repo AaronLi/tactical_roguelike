@@ -189,6 +189,12 @@ const G_Space = (() => {
   // ---- The debrief: what the mission was, what it cost (the hostiles killed, put down, taken; the civilians dead, by whose hand,
   // and safe; the squad's own), what it paid (its fee, the bonus, the salvage) and the XP. Told as the squad heads home ('mdone':
   // js/spaceserver.ts home), shown once you're back at the base (js/game.ts enterShop), until you close it.
+  // a locked door opened from inside: not locked any more (its light green, off the scanner's locks)
+  function unlocked(i: number) {
+    const map = S.map, d = map && map.doors[i]; if (!map || !map.sp || !d) return;
+    delete map.sp.locks[i];
+    for (const q of S.things) if (q.k === 'lock' && Math.abs(q.x - d.x) < 1e-3 && Math.abs(q.z - d.z) < 1e-3) q.obj.userData.lock = '';
+  }
   let brief: any = null, tgtWas: number | 'out' | null = null;
   // a mission flown (done or not) is off the board (the host's: js/spaceserver.ts gone); on this screen once its debrief's closed
   let telling: number | null = null;
@@ -1161,7 +1167,7 @@ const G_Space = (() => {
     if (S.hull) { guns(dt); missiles(dt); }
     for (const q of S.things) {
       if (q.k === 'art') { const a = q.obj.userData.art as THREE.Mesh; a.rotation.y += dt * 1.5; a.position.y = 1.15 + Math.sin(S.t * 2) * 0.05; }
-      if (q.k === 'lock') (q.obj as THREE.Mesh).material = lockMat(!!(S.state && S.state.keys.includes(q.obj.userData.lock)));
+      if (q.k === 'lock') (q.obj as THREE.Mesh).material = lockMat(q.obj.userData.lock === '' || !!(S.state && S.state.keys.includes(q.obj.userData.lock)));
     }
     if (S.boomT >= 0) boomStep(dt);
     if (m.seat != null && (m.dead || m.down)) stand();
@@ -1390,9 +1396,11 @@ const G_Space = (() => {
       case 'spose': heardPose(m.a); S.ctl = m.by; return true;
       case 'sdock':
         if (S.on && m.on && m.site && S.kind === 'board') { if (m.by !== G.Net.myId) rebase(berthAt(siteAt(m.site))); cutHere(m.site); }
+        if (S.on && S.kind === 'board' && S.map && S.map.sp) G.ShipGen.seal(S.map, m.on ? m.site || null : null); // (the holes she isn't against: shut)
         if (S.on && m.by !== G.Net.myId) { S.auto = null; dockLocal(!!m.on); if (!m.on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); } }
         if (S.on && m.on && S.kind === 'board') { S.shake = 1; G.HUD.toast('BREACH', 'She\'s through the hull. Go.', 2.2); }
         return true;
+      case 'unlock': unlocked(m.i); G.Audio.click(); return true;
       case 'ms': if (m.zt != null && S.kind === 'board') { S.zt0 = m.zt; S.ztAt = performance.now(); } S.state = m; raidPods(m.raid); G.SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
       case 'mdone': {
         if (m.ok === 2) { me().credits += m.pay || 0; G.HUD.chat(null, 0, `Salvage: +¢${G.U.fmt(m.pay || 0)}`); G.HUD.feed(`<span class="cr">Salvage +¢${G.U.fmt(m.pay || 0)}</span>`); }
@@ -1441,7 +1449,7 @@ const G_Space = (() => {
     setup(map, sp.ms.kind === 'board' ? 'board' : 'assault', sp);
     cards(); G.SpaceUI.objDraw();
     // (joined late: the holes already in her, and the ship where she's against one)
-    if (sp.state && S.kind === 'board') { for (const c of sp.state.cuts || []) cutHere(c); if (sp.state.site) rebase(berthAt(siteAt(sp.state.site))); }
+    if (sp.state && S.kind === 'board') { for (const c of sp.state.cuts || []) cutHere(c); if (sp.state.site) rebase(berthAt(siteAt(sp.state.site))); if (map.sp) G.ShipGen.seal(map, sp.state.docked ? sp.state.site : null); for (const i of sp.state.unlocked || []) unlocked(i); }
     if (sp.state) raidPods(sp.state.raid);
     if (sp.state && sp.state.docked) dockLocal(true);
   }

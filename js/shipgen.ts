@@ -384,10 +384,31 @@ const G_ShipGen = (() => {
     }
     (sp as any).gone = boxes;
     map.doorVer = (map.doorVer || 0) + 1; // (sound gets through it now)
+    ((sp as any).cutCells || ((sp as any).cutCells = {}))[s.c + ',' + s.nx + ',' + s.nz] = cells;
     return { cells, walls, wins };
   }
+  // A site from a cut's record [cell, nx, nz] (what's been cut stays one, whatever the grid round it is now)
+  function siteAt(map: LvMap, a: number[]): ShSite {
+    const W = map.W, TS = G.Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0;
+    return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) };
+  }
+  // Every hole she's been breached through but the one the squad's ship is against (site, or none: she's away) shut by an unseen
+  // wall: open space past it, nothing to walk out into (what's out there isn't made yet). On the host and every screen alike.
+  function seal(map: LvMap, site: number[] | null) {
+    const sp = map.sp as any; if (!sp || !map.world) return;
+    const Wd = G.World, w = map.world, W = map.W, TS = G.Level.TS, H = G.Level.WALL_H;
+    for (const q of sp.seals || []) Wd.remove(w, q);
+    sp.seals = [];
+    for (const c of sp.cuts as number[][]) {
+      if (site && c[0] === site[0] && c[1] === site[1] && c[2] === site[2]) continue;
+      for (const cell of (sp.cutCells && sp.cutCells[c.join(',')]) || siteAt(map, c).cells) {
+        const x = (cell % W) * TS, z = ((cell / W) | 0) * TS;
+        sp.seals.push(Wd.add(w, Wd.box(x, -0.6, z, x + TS, H, z + TS, { kind: 'wall', seal: true })));
+      }
+    }
+  }
   const NAMES: Record<string, string> = { bridge: 'Bridge', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell' };
-  return { lay, finish, roomAt, sites, siteOf, cut, NAMES, SPEC };
+  return { lay, finish, roomAt, sites, siteOf, siteAt, cut, seal, NAMES, SPEC };
 })();
 G.ShipGen = G_ShipGen;
 interface GameModules { ShipGen: typeof G_ShipGen; }
