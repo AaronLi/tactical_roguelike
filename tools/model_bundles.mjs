@@ -99,10 +99,11 @@ export function check(models, B) {
   else { const px = JSON.parse(pi.toString('utf8')); named.add('props/index.json'); resolve('props/' + px.quarrel.file, 'props/index.json quarrel'); for (const [k, e] of Object.entries(px.keys)) resolve('props/' + e.file, `props/index.json ${k}`); }
   // the scenes (the hangar: tools/bake_hangar.mjs): scenes/index.json (beside the bundle, not in it) names each scene's glTF
   const sf = path.join(models, 'scenes/index.json');
-  if (fs.existsSync(shf)) { let sx = null; try { sx = JSON.parse(fs.readFileSync(shf, 'utf8')); } catch { errs.push('scenes/index.json is not JSON'); } if (sx) for (const [k, e] of Object.entries(sx.scenes || {})) if (e.file) resolve('scenes/' + e.file, `scenes/index.json ${k}`); }
+  if (fs.existsSync(sf)) { let sx = null; try { sx = JSON.parse(fs.readFileSync(sf, 'utf8')); } catch { errs.push('scenes/index.json is not JSON'); } if (sx) for (const [k, e] of Object.entries(sx.scenes || {})) if (e.file) resolve('scenes/' + e.file, `scenes/index.json ${k}`); }
   // the human bodies (tools/bake_humans.mjs): humans/index.json (beside the bundle, not in it) names each one's glTF
   const hf = path.join(models, 'humans/index.json');
   if (fs.existsSync(hf)) { let hx = null; try { hx = JSON.parse(fs.readFileSync(hf, 'utf8')); } catch { errs.push('humans/index.json is not JSON'); } if (hx) for (const [k, e] of Object.entries(hx.humans || {})) if (e.file) resolve('humans/' + e.file, `humans/index.json ${k}`); }
+  if (files.has('humans/gear.glb')) resolve('humans/gear.glb', 'the gear every body shares (tools/bake_humans.mjs, js/humans.ts gear)'); // (named by no index: it's always there)
   // the squad's ships (tools/bake_ships.mjs): ships/index.json names each one's glTF
   const shf = path.join(models, 'ships/index.json');
   if (fs.existsSync(shf)) { let sx = null; try { sx = JSON.parse(fs.readFileSync(shf, 'utf8')); } catch { errs.push('ships/index.json is not JSON'); } if (sx) for (const [k, e] of Object.entries(sx.ships || {})) if (e.file) resolve('ships/' + e.file, `ships/index.json ${k}`); }
