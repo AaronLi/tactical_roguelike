@@ -212,7 +212,7 @@ const G_Loadout = (() => {
     frag: 'Steel chips over the whole sphere: deadly a few metres out in the open, stopped by walls and cover. A 2.2 second fuse you can cook.',
     flash: 'A blinding flash and a bang that deafens: whoever is near and looking is out of it for a while. Hurts nobody. A 1.5 second fuse.',
     tb: 'A cloud of fuel, lit: a fireball that fills the room it lands in (out through an open door, not a shut one). A 2.6 second fuse.',
-    sticky: 'Holds to the first thing it hits, a wall, a door or a person, and goes off two seconds later. A few heavy fragments rather than a frag\'s many chips: fewer of them reach anyone, but each goes through soft armour and thin walls.',
+    sticky: 'Holds to the first thing it hits, a wall, a door or a person, and goes off two seconds later. A few heavy cubes of hardened steel rather than a frag\'s many chips: fewer of them reach anyone, but each goes through soft armour and thin walls (not a rifle plate).',
   };
   const THROW_NAME: Record<string, string> = { frag: 'Frag grenade', flash: 'Flashbang', tb: 'Thermobaric', sticky: 'Sticky grenade' }, THROW_SHORT: Record<string, string> = { frag: 'Frag', flash: 'Flash', tb: 'Thermo', sticky: 'Sticky' }; // (short: as a box in the bar has room for)
   const thr = (i: number): string | null => { const t = data().thr; const k = Array.isArray(t) ? t[i] : null; return THROWS.includes(k) ? k : null; };

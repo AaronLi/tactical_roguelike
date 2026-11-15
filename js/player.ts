@@ -1958,11 +1958,13 @@ const G_Me = {
   blastR(map: LvMap | null, p: THREE.Vector3) { return G.Sim.blastR(map, p); },
   FRAG: { N: 1200, V0: 1150, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 3, MIN_PER_FRAME: 40, M_MED: 0.00013, M_SD: 0.25, CD: 1.0, FLAKE: 1.5, SHOW: 26, PUFFS: 14, BLOOD: 24 },
   // A sticky grenade: a thick steel body in an adhesive sock, held to the first thing it hits (js/views.ts stickStep) and going off FUSE
-  // seconds after (MAX_FLY: one that's never hit anything goes off anyway). Its body breaks into far fewer, far heavier pieces than a
-  // frag's coil (about a gram each, some 500 J apiece against a frag chip's 86): a thinner hazard further out, but each one goes through
-  // soft armour, plasterboard and a car door that a frag chip stops in. The rest of a burst's sums are the frag's (FRAG).
-  STICKY: { FUSE: G_Sim.STICKY.FUSE, MAX_FLY: G_Sim.STICKY.MAX_FLY, N: 220, V0: 1000, M_MED: 0.0011, M_SD: 0.2, FLAKE: 1.3, CAP: 14 },
-  fragSpec(kind?: string) { return kind === 'sticky' ? Object.assign({}, this.FRAG, { N: this.STICKY.N, V0: this.STICKY.V0, M_MED: this.STICKY.M_MED, M_SD: this.STICKY.M_SD, FLAKE: this.STICKY.FLAKE, CAP: this.STICKY.CAP }) : this.FRAG; },
+  // seconds after (MAX_FLY: one that's never hit anything goes off anyway). Its body is lined with pre-formed cubes of hardened steel
+  // (CORE 'hard', FLAKE 1: a compact cube, not a frag coil's flat ragged chip) instead of a frag's notched coil: far fewer, far heavier
+  // pieces (about a gram each, some 800 J apiece against a frag chip's 86), a thinner hazard, but each one goes through IIIA soft armour
+  // out to 20 m and through plasterboard, plywood and a car door, where a frag chip stops in soft armour at any range. Rifle plates (III
+  // steel or polyethylene) still stop them. The rest of a burst's sums are the frag's (FRAG).
+  STICKY: { FUSE: G_Sim.STICKY.FUSE, MAX_FLY: G_Sim.STICKY.MAX_FLY, N: 220, V0: 1200, M_MED: 0.0011, M_SD: 0.12, FLAKE: 1.0, CORE: 'hard', CAP: 14 },
+  fragSpec(kind?: string): Record<string, any> { return kind === 'sticky' ? Object.assign({}, this.FRAG, { N: this.STICKY.N, V0: this.STICKY.V0, M_MED: this.STICKY.M_MED, M_SD: this.STICKY.M_SD, FLAKE: this.STICKY.FLAKE, CAP: this.STICKY.CAP, CORE: this.STICKY.CORE }) : this.FRAG; },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
   // p: where it went off. enemy: a suspect's (id): it is you it is meant for, and no one else it hurts here. seed: the
@@ -2040,7 +2042,7 @@ const G_Me = {
     // 55 J left at 5 m, 35 J at 10 m) and goes into things like a small blunt object (js/ballistics.ts vLimit: the wider, the harder)
     const A = F.FLAKE * Math.pow(m / 7850, 2 / 3), dia = Math.sqrt(4 * A / Math.PI);
     const d = new THREE.Vector3(q.dir[i * 3], q.dir[i * 3 + 1], q.dir[i * 3 + 2]), o = q.p.clone();
-    const proj: any = { m, d: dia, len: m / (7850 * A), core: 'mild', nose: 'ball', flat: true, d0: dia, m0: m, ang: 0 };
+    const proj: any = { m, d: dia, len: m / (7850 * A), core: F.CORE || 'mild', nose: 'ball', flat: true, d0: dia, m0: m, ang: 0 }; // (CORE: what the piece is: a frag's coil mild steel, a sticky's cubes hardened)
     const drag0 = (2 * m) / (F.CD * 1.2 * A); // (metres to lose a factor e of its speed in the air)
     let drag = drag0, v = q.v[i], rest = F.RANGE, hitSomething = false;
     const b: any = { hit: new Set(), enemy: q.enemy, events: 1 };
