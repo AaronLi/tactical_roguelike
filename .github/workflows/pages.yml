@@ -1,12 +1,19 @@
 # The game on GitHub Pages: its TypeScript compiled (npm run build: js/*.ts -> dist/js/), its gun models baked and
 # tested (npm run bake:models, test:models: assets/models/), then the site published as it is in the repo with dist/
-# and the model bundles (assets/models/bundles: the only form of the models the game loads) added. Pull requests and other branches build only (a check that it compiles, bakes and passes).
-# One-time setup: Settings -> Pages -> Source: GitHub Actions.
+# and the model bundles (assets/models/bundles: the only form of the models the game loads) added. Every push and pull request is
+# built and tested (build: a check that it compiles, bakes and passes).
+# The site (site, deploy): main at d5g.ca, and beside it the space branch (SPACE_BRANCH) at d5g.ca/space-experimental, built the same way into the
+# site's space-experimental/ folder. A push to either publishes both, each as its branch stands. The copy at /space-experimental keeps its own saves, in the browser only
+# (js/util.ts NS; no cloud saves: js/cloud.ts).
+# One-time setup: Settings -> Pages -> Source: GitHub Actions; and Settings -> Environments -> github-pages -> Deployment branches: main and
+# the space branch (a push to the space branch publishes too).
 name: pages
 on:
   push:
   pull_request:
   workflow_dispatch:
+env:
+  SPACE_BRANCH: feature/space-direction
 permissions:
   contents: read
   pages: write
@@ -51,17 +58,87 @@ jobs:
         if: steps.models.outputs.cache-hit != 'true'
         run: npm run bake:models -- -j 4
       - run: npm run test:models
+  # The site: main at the root, the space branch under space-experimental/ (each checked out, built and baked on its own), published together
+  site:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/space-direction') # (SPACE_BRANCH: a job's if can't read env)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: main
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SPACE_BRANCH }}
+          path: space
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            main/package-lock.json
+            space/package-lock.json
+      # ---- main (main/)
+      - run: npm ci
+        working-directory: main
+      - name: Baked audio, main (cache)
+        uses: actions/cache@v4
+        with:
+          path: |
+            main/assets/audio/handling
+            main/assets/audio/footsteps
+            main/assets/audio/bundles
+          key: audio-${{ hashFiles('main/tools/contact-synth/src/**', 'main/tools/contact-synth/scripts/**', 'main/tools/contact-synth/package.json', 'main/tools/bake_audio.mjs', 'main/package-lock.json') }}
+      - run: npm run build -- -j 4 # (main's build: it has no --no-models yet, and bakes no models itself)
+        working-directory: main
+      - name: Baked models, main (cache)
+        id: models_main
+        uses: actions/cache@v4
+        with:
+          path: main/assets/models
+          key: models-${{ hashFiles('main/tools/**', 'main/js/parts.ts', 'main/js/data.ts', 'main/js/glb.ts', 'main/js/modelbundles.ts', 'main/js/gunmaterials.ts', 'main/js/hangar.ts', 'main/js/range.ts', 'main/js/course.ts', 'main/js/level.ts', 'main/js/leveldesc.ts', 'main/js/levelview.ts', 'main/js/highlights.ts', 'main/js/furnspec.ts', 'main/js/furnmesh.ts', 'main/models/**', 'main/package-lock.json') }}
+      - name: Bake the models, main
+        if: steps.models_main.outputs.cache-hit != 'true'
+        run: npm run bake:models -- -j 4
+        working-directory: main
+      # ---- the space branch (space/)
+      - run: npm ci
+        working-directory: space
+      - name: Baked audio, the space branch (cache)
+        uses: actions/cache@v4
+        with:
+          path: |
+            space/assets/audio/handling
+            space/assets/audio/footsteps
+            space/assets/audio/bundles
+          key: audio-${{ hashFiles('space/tools/contact-synth/src/**', 'space/tools/contact-synth/scripts/**', 'space/tools/contact-synth/package.json', 'space/tools/bake_audio.mjs', 'space/package-lock.json') }}
+      - run: npm run build -- -j 4 --no-models
+        working-directory: space
+      - name: Baked models, the space branch (cache)
+        id: models_space
+        uses: actions/cache@v4
+        with:
+          path: space/assets/models
+          key: models-${{ hashFiles('space/tools/**', 'space/js/parts.ts', 'space/js/data.ts', 'space/js/glb.ts', 'space/js/modelbundles.ts', 'space/js/gunmaterials.ts', 'space/js/hangar.ts', 'space/js/range.ts', 'space/js/course.ts', 'space/js/level.ts', 'space/js/leveldesc.ts', 'space/js/levelview.ts', 'space/js/highlights.ts', 'space/js/furnspec.ts', 'space/js/furnmesh.ts', 'space/models/**', 'space/package-lock.json') }}
+      - name: Bake the models, the space branch
+        if: steps.models_space.outputs.cache-hit != 'true'
+        run: npm run bake:models -- -j 4
+        working-directory: space
       - name: The site
         run: |
-          mkdir -p _site
+          mkdir -p _site/space-experimental
           # the game loads the models only from assets/models/bundles (js/modelbundles.ts): the loose packs, props, scenes and whole-gun files are for the tools and tests, not shipped
-          rsync -a --exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props --exclude /assets/models/scenes ./ _site/
+          X="--exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props --exclude /assets/models/scenes"
+          rsync -a $X main/ _site/
+          rsync -a $X --exclude /CNAME space/ _site/space-experimental/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
   deploy:
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: build
+    needs: site
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: false
     runs-on: ubuntu-latest
     environment:
       name: github-pages
