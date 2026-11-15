@@ -565,7 +565,7 @@ const G_ShipModel = (() => {
         }
         if (ch) a.needsUpdate = true;
       }
-      for (const w of washes) { const al = nx ? w.position.z - z : w.position.x - x, out = (w.position.x - x) * nx + (w.position.z - z) * nz; if (Math.abs(al) < 1 + 1.7 && out > -0.5 && out < 2.4 && w.position.y < 3.5) w.visible = false; } // (any whose light falls on the hole: 3.4 wide)
+      for (const w of washes) { const al = nx ? w.position.z - z : w.position.x - x, out = (w.position.x - x) * nx + (w.position.z - z) * nz; if (Math.abs(al) < 1 + 1.7 && out > -0.5 && out < 2.4 && w.position.y < 3.5) w.removeFromParent(); } // (taken away, not hidden: what hides the level for a jump shows again all it hid) // (any whose light falls on the hole: 3.4 wide)
     };
     return { group: g, guns, marker: mk, cutAt };
   }

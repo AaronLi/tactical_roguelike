@@ -297,15 +297,16 @@ const G_ShipGen = (() => {
   // ship to stand nose-on. Worked out once.
   function sites(map: LvMap): ShSite[] {
     const sp = map.sp!; if (sp.sites) return sp.sites;
-    const { W, H, t } = map, TS = G.Level.TS, out: ShSite[] = [], win = map.winAt as Map<number, unknown> | undefined;
+    const { W, H, t } = map, TS = G.Level.TS, out: ShSite[] = [];
     const at = (x: number, z: number) => (x < 0 || z < 0 || x >= W || z >= H ? -1 : t[z * W + x]);
     for (let z = 2; z < H - 2; z++) for (let x = 2; x < W - 2; x++) {
       if (t[z * W + x] !== 1) continue;
       for (const [nx, nz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
         const ax = nz ? 1 : 0, az = nx ? 1 : 0; let ok = true;
-        // (hull with a compartment behind it. What's stood against it inside is no bar: a ram goes through that too, cut. Either side of
-        // the middle a bulkhead may meet the hull: the hole opens on two compartments, the bulkhead's end standing in it)
-        for (let k = -1; k <= 1 && ok; k++) { const cx = x + ax * k, cz = z + az * k, in1 = at(cx - nx, cz - nz); ok = at(cx, cz) === 1 && !(win && win.has(cz * W + cx)) && (in1 !== 1 || k !== 0) && in1 !== 5 && in1 !== 3 && in1 !== 7 && in1 !== 6 && at(cx + nx, cz + nz) === 5; }
+        // (any of her outside wall, windows and all, with her inside behind it: what's stood against it is no bar, nor a bulkhead that
+        // meets the hull there (a ram goes through those too: cut), nor a door. Not where her hull turns a corner behind the middle:
+        // no way in from it)
+        for (let k = -1; k <= 1 && ok; k++) { const cx = x + ax * k, cz = z + az * k, in1 = at(cx - nx, cz - nz); ok = at(cx, cz) === 1 && in1 !== 5 && in1 !== 7 && in1 !== 6 && in1 !== -1 && (in1 !== 1 || k !== 0 || bulkhead(map, cx - nx, cz - nz, nx, nz)) && at(cx + nx, cz + nz) === 5; }
         // (not through an engine room's wall: her nozzles stand out of it, and her engine block over and under it; nor the bridge's
         // prow, where a ram or a bow juts out under her deck: js/shipmodel.ts hull. The squad's ship would sit in them)
         if (ok) { const ix = x - nx, iz = z - nz; ok = !map.rooms.some((rm, i) => (rm.fl || 0) === 0 && ix >= rm.x && ix < rm.x + rm.w && iz >= rm.z && iz < rm.z + rm.h && (sp.roles[i] === 'engine' || (sp.roles[i] === 'bridge' && nx < 0))); }
@@ -316,25 +317,52 @@ const G_ShipGen = (() => {
     }
     return (sp.sites = out);
   }
+  // a bulkhead's end where it meets the hull: wall at (x, z), her inside to either side of it across the way in (nx, nz)
+  function bulkhead(map: LvMap, x: number, z: number, nx: number, nz: number) {
+    const { W, H, t } = map, inside = (q: number, r: number) => q >= 0 && r >= 0 && q < W && r < H && t[r * W + q] !== 1 && t[r * W + q] !== 5;
+    return x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] === 1 && inside(x + nz, z + nx) && inside(x - nz, z - nx);
+  }
   const siteOf = (map: LvMap, c: number, nx: number, nz: number) => sites(map).find((s) => s.c === c && s.nx === nx && s.nz === nz) || null;
   // The hull cut through at a site: its three cells are floor now, and the wall there is gone up to a door's height (the
-  // world's wall boxes that cross it are cut round the opening). The same on the host and on every screen.
-  function cut(map: LvMap, s: ShSite) {
+  // world's wall boxes that cross it are cut round the opening). A window any of it touches goes with it, all of it (its glass,
+  // its frame, its solids); a bulkhead that meets the hull behind it is broken through, two cells in, so the way in opens on
+  // both compartments. The same on the host and on every screen. Returns every cell it opened (the hull's, a window's beyond
+  // them, the bulkheads'), or null if it's been cut there already.
+  function cut(map: LvMap, s: ShSite): { cells: number[]; walls: number[]; wins: number[] } | null {
     const sp = map.sp!, TS = G.Level.TS, W = map.W, w = map.world, Wd = G.World;
-    if (sp.cuts.some((q) => q[0] === s.c && q[1] === s.nx && q[2] === s.nz)) return false;
+    if (sp.cuts.some((q) => q[0] === s.c && q[1] === s.nx && q[2] === s.nz)) return null;
     sp.cuts.push([s.c, s.nx, s.nz]); sp.sites = undefined;
-    let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9;
-    for (const c of s.cells) { map.t[c] = 0; const x = c % W, z = (c / W) | 0; x0 = Math.min(x0, x * TS); z0 = Math.min(z0, z * TS); x1 = Math.max(x1, (x + 1) * TS); z1 = Math.max(z1, (z + 1) * TS); }
-    const H0 = [x0, -0.6, z0], H1 = [x1, G.Level.DOOR_H + 0.1, z1], hit: any[] = [];
-    Wd.query(w, [x0 + 0.01, 0.1, z0 + 0.01], [x1 - 0.01, 2, z1 - 0.01], (q: any) => { if (q.kind === 'wall' && !q.edge) hit.push(q); });
-    for (const q of hit) {
-      const a = q.min as number[], b = q.max as number[]; Wd.remove(w, q);
-      const add = (m0: number[], m1: number[]) => { if (m1[0] - m0[0] > 1e-3 && m1[1] - m0[1] > 1e-3 && m1[2] - m0[2] > 1e-3) Wd.add(w, Wd.box(m0[0], m0[1], m0[2], m1[0], m1[1], m1[2], { kind: 'wall' })); };
-      const ix0 = Math.max(a[0], H0[0]), ix1 = Math.min(b[0], H1[0]), iz0 = Math.max(a[2], H0[2]), iz1 = Math.min(b[2], H1[2]);
-      add([a[0], a[1], a[2]], [ix0, b[1], b[2]]); add([ix1, a[1], a[2]], [b[0], b[1], b[2]]);
-      add([ix0, a[1], a[2]], [ix1, b[1], iz0]); add([ix0, a[1], iz1], [ix1, b[1], b[2]]);
-      add([ix0, a[1], iz0], [ix1, H0[1], iz1]); add([ix0, H1[1], iz0], [ix1, b[1], iz1]);
+    const cells = s.cells.slice(), walls: number[] = [], wins: number[] = [];
+    // (the windows it touches, and their cells beyond the hole: the hole takes them in)
+    const winAt = map.winAt as Map<number, { win: LvWin }> | undefined;
+    for (const c of s.cells) { const wa = winAt && winAt.get(c); if (wa && !wins.includes(wa.win.id)) wins.push(wa.win.id); }
+    for (const id of wins) {
+      const win = map.windows[id];
+      for (const q of win.solids || []) Wd.remove(w, q);
+      win.solids = []; win.broken = true; (win as any).gone = true;
+      for (const c of win.cells) { if (!cells.includes(c)) cells.push(c); if (winAt) winAt.delete(c); }
     }
+    // (the bulkheads behind it: each that meets the hull at one of its cells, two cells of it in from there)
+    for (const c of cells.slice()) {
+      const x = c % W, z = (c / W) | 0;
+      for (let j = 1; j <= 2; j++) { const bx = x - s.nx * j, bz = z - s.nz * j; if (!bulkhead(map, bx, bz, s.nx, s.nz)) break; const q = bz * W + bx; if (!walls.includes(q)) walls.push(q); }
+    }
+    const open = (list: number[], y1: number) => {
+      for (const c of list) {
+        map.t[c] = 0;
+        const x = c % W, z = (c / W) | 0, x0 = x * TS, z0 = z * TS, x1 = x0 + TS, z1 = z0 + TS, H0 = [x0, -0.6, z0], H1 = [x1, y1, z1], hit: any[] = [];
+        Wd.query(w, [x0 + 0.01, 0.1, z0 + 0.01], [x1 - 0.01, 2, z1 - 0.01], (q: any) => { if (q.kind === 'wall' && !q.edge) hit.push(q); });
+        for (const q of hit) {
+          const a = q.min as number[], b = q.max as number[]; Wd.remove(w, q);
+          const add = (m0: number[], m1: number[]) => { if (m1[0] - m0[0] > 1e-3 && m1[1] - m0[1] > 1e-3 && m1[2] - m0[2] > 1e-3) Wd.add(w, Wd.box(m0[0], m0[1], m0[2], m1[0], m1[1], m1[2], { kind: 'wall' })); };
+          const ix0 = Math.max(a[0], H0[0]), ix1 = Math.min(b[0], H1[0]), iz0 = Math.max(a[2], H0[2]), iz1 = Math.min(b[2], H1[2]);
+          add([a[0], a[1], a[2]], [ix0, b[1], b[2]]); add([ix1, a[1], a[2]], [b[0], b[1], b[2]]);
+          add([ix0, a[1], a[2]], [ix1, b[1], iz0]); add([ix0, a[1], iz1], [ix1, b[1], b[2]]);
+          add([ix0, a[1], iz0], [ix1, H0[1], iz1]); add([ix0, H1[1], iz0], [ix1, b[1], iz1]);
+        }
+      }
+    };
+    open(cells, G.Level.DOOR_H + 0.1); open(walls, G.Level.DOOR_H + 0.1);
     // What stood inside where she came through is gone with the plate: every piece of furniture any part of which is within
     // a couple of metres either side of the hole and three and a half in from it. Out of the world (nothing stops there now),
     // out of the grid (it's floor), out of the list; where each was is kept (sp.gone: boxes [x0, y0, z0, x1, y1, z1]) for the
@@ -356,7 +384,7 @@ const G_ShipGen = (() => {
     }
     (sp as any).gone = boxes;
     map.doorVer = (map.doorVer || 0) + 1; // (sound gets through it now)
-    return true;
+    return { cells, walls, wins };
   }
   const NAMES: Record<string, string> = { bridge: 'Bridge', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell' };
   return { lay, finish, roomAt, sites, siteOf, cut, NAMES, SPEC };

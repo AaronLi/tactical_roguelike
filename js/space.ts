@@ -157,17 +157,88 @@ const G_Space = (() => {
   // the hull cut through at a site, on this screen: the world and the grid (js/shipgen.ts cut), the wall's cubes out of sight
   // there, a lintel over the opening and a torn frame round it
   function cutHere(a: number[]) {
-    const map = S.map!, s = siteAt(a); if (!map.sp || !G.ShipGen.cut(map, s)) return;
+    const map = S.map!, s = siteAt(a); if (!map.sp) return;
+    const got = G.ShipGen.cut(map, s); if (!got) return;
     if (S.hull) S.hull.cutAt(s.x, s.z, s.nx, s.nz); // (what's over her plating there goes with it)
+    const TS = G.Level.TS, L = G.Level, f0 = map.floors ? map.floors[0] : map, wm = f0.wallMesh as THREE.InstancedMesh | undefined, zero = new T.Matrix4().makeScale(0, 0, 0), W = map.W;
+    // every cell it opened: its wall's cube out of sight, and out of the damage's reach (a hit there can't bring it back: js/damage.ts tileOf)
+    const dmg = (map as any).dmg;
+    if (wm && f0.wallIdx) { for (const c of [...got.cells, ...got.walls]) { const i = f0.wallIdx.get(c); if (i != null) { wm.setMatrixAt(i, zero); if (f0.wallBase) f0.wallBase.set(zero.elements, i * 16); f0.wallIdx.delete(c); } const k = (f0.fl || 0) + ':' + c, tl = dmg && dmg.tiles && dmg.tiles.get(k); if (tl) { tl.group.removeFromParent(); dmg.tiles.delete(k); } } wm.instanceMatrix.needsUpdate = true; }
+    // a window it took: its glass, and its frame and sill where the hole is (folded away with what stood there inside)
+    for (const id of got.wins) { const pane = map.winMeshes && map.winMeshes[id]; if (pane) pane.removeFromParent(); }
+    const hole = [...got.cells, ...got.walls].map((c) => { const x = (c % W) * TS, z = ((c / W) | 0) * TS; return [x - 0.06, 0.05, z - 0.06, x + TS + 0.06, L.DOOR_H + 0.1, z + TS + 0.06]; }); // (a little past its cells: the faces of the walls either side of them, on their edges)
+    carve(hole);
     wreck(((map.sp as any).gone || []) as number[][], s);
-    const TS = G.Level.TS, L = G.Level, f0 = map.floors ? map.floors[0] : map, wm = f0.wallMesh as THREE.InstancedMesh | undefined, zero = new T.Matrix4().makeScale(0, 0, 0);
-    if (wm && f0.wallIdx) { for (const c of s.cells) { const i = f0.wallIdx.get(c); if (i != null) { wm.setMatrixAt(i, zero); if (f0.wallBase) f0.wallBase.set(zero.elements, i * 16); } } wm.instanceMatrix.needsUpdate = true; }
     const g = new T.Group(), along = s.nz ? 1 : 0, wall = G.ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 }), torn = G.ShipModel.M(0x1a1c1f, { metalness: 0.6 }), hot = G.ShipModel.lit(0xff7a1a);
     const bx = (mt: THREE.Material, u0: number, y0: number, u1: number, y1: number, d0 = -TS / 2, d1 = TS / 2) => { const mm = new T.Mesh(new T.BoxGeometry(along ? u1 - u0 : d1 - d0, y1 - y0, along ? d1 - d0 : u1 - u0), mt); mm.position.set(along ? (u0 + u1) / 2 : (d0 + d1) / 2, (y0 + y1) / 2, along ? (d0 + d1) / 2 : (u0 + u1) / 2); g.add(mm); };
     bx(wall, -1.5 * TS, L.DOOR_H + 0.1, 1.5 * TS, L.WALL_H);
     for (const sd of [-1, 1]) { bx(torn, sd * 1.5 * TS - 0.06, 0, sd * 1.5 * TS + 0.06, L.DOOR_H + 0.1, -TS / 2 - 0.04, TS / 2 + 0.04); bx(hot, sd * 1.5 * TS - 0.02, 0.1, sd * 1.5 * TS + 0.02, L.DOOR_H, -TS / 2 - 0.06, -TS / 2 - 0.04); }
     bx(torn, -1.5 * TS, L.DOOR_H + 0.04, 1.5 * TS, L.DOOR_H + 0.16, -TS / 2 - 0.04, TS / 2 + 0.04);
     g.position.set(s.x, 0, s.z); G.R.levelRoot.add(g);
+    // each bulkhead it broke through: the wall over the gap, a torn edge under it, and its broken end where it stops
+    const bk = new T.Group(), bw = G.ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 });
+    for (const c of got.walls) {
+      const x = (c % W + 0.5) * TS, z = (((c / W) | 0) + 0.5) * TS, lin = new T.Mesh(new T.BoxGeometry(TS, L.WALL_H - L.DOOR_H - 0.1, TS), bw); lin.position.set(x, (L.WALL_H + L.DOOR_H + 0.1) / 2, z); bk.add(lin);
+      const e = new T.Mesh(new T.BoxGeometry(TS + 0.08, 0.12, TS + 0.08), torn); e.position.set(x, L.DOOR_H + 0.1, z); bk.add(e);
+      if (!got.walls.includes(c - s.nx - s.nz * W)) { const j = new T.Mesh(new T.BoxGeometry(s.nx ? 0.08 : TS + 0.06, L.DOOR_H + 0.1, s.nz ? 0.08 : TS + 0.06), torn); j.position.set(x - s.nx * TS / 2, (L.DOOR_H + 0.1) / 2, z - s.nz * TS / 2); bk.add(j); }
+    }
+    if (bk.children.length) G.R.levelRoot.add(bk);
+  }
+  // The hole cut out of what's drawn of her (boxes [x0, y0, z0, x1, y1, z1] in the level's frame): every triangle of the level's
+  // drawing (its walls' faces, their trim, a window's frame and sill: merged meshes, not the wall's own cubes, which cutHere
+  // hides) that reaches into one is split along the box's faces, and only what's outside it kept, every attribute carried
+  // across the split (its position, normal, uv, colour). Her hull's drawing and the squad's ship are not hers to carve.
+  function carve(hole: number[][]) {
+    if (!hole.length) return;
+    const skip = new Set<THREE.Object3D>(); if (S.hull) S.hull.group.traverse((o) => skip.add(o)); if (S.model) S.model.group.traverse((o) => skip.add(o));
+    G.R.levelRoot.updateMatrixWorld(true);
+    const inv = new T.Matrix4().copy(G.R.levelRoot.matrixWorld).invert(), M = new T.Matrix4(), E = 1e-5;
+    type Vx = { p: number[]; a: number[][] };
+    const lerp = (u: Vx, v: Vx, t: number): Vx => ({ p: u.p.map((x, i) => x + (v.p[i] - x) * t), a: u.a.map((arr, j) => arr.map((x, i) => x + (v.a[j][i] - x) * t)) });
+    // a polygon split by a plane (axis, at val): the part on the out side (side -1: below val; 1: above) and the rest
+    const split = (poly: Vx[], ax: number, val: number, side: number): [Vx[] | null, Vx[] | null] => {
+      const o: Vx[] = [], r: Vx[] = [], d = (v: Vx) => (v.p[ax] - val) * side;
+      for (let i = 0; i < poly.length; i++) {
+        const u = poly[i], v = poly[(i + 1) % poly.length], du = d(u), dv = d(v);
+        if (du > E) o.push(u); else if (du < -E) r.push(u); else { o.push(u); r.push(u); }
+        if ((du > E && dv < -E) || (du < -E && dv > E)) { const m = lerp(u, v, du / (du - dv)); o.push(m); r.push(m); }
+      }
+      return [o.length >= 3 ? o : null, r.length >= 3 ? r : null];
+    };
+    G.R.levelRoot.traverse((o: any) => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || skip.has(o) || !o.geometry.attributes.position) return;
+      let g = o.geometry as THREE.BufferGeometry;
+      if (!g.boundingBox) g.computeBoundingBox();
+      M.multiplyMatrices(inv, o.matrixWorld);
+      const bb = g.boundingBox!.clone().applyMatrix4(M), near = hole.filter((b) => bb.max.x > b[0] && bb.min.x < b[3] && bb.max.y > b[1] && bb.min.y < b[4] && bb.max.z > b[2] && bb.min.z < b[5]);
+      if (!near.length) return;
+      if (g.index) g = g.toNonIndexed(); // (a pane, a box: its own copy, unshared, to cut)
+      const names = Object.keys(g.attributes), atts = names.map((n) => g.attributes[n] as THREE.BufferAttribute), out: number[][] = names.map(() => []), pos = g.attributes.position as THREE.BufferAttribute, P = new T.Vector3();
+      let changed = false;
+      for (let i = 0; i + 2 < pos.count; i += 3) {
+        const tri: Vx[] = [0, 1, 2].map((k) => { P.fromBufferAttribute(pos, i + k).applyMatrix4(M); return { p: [P.x, P.y, P.z], a: atts.map((at) => Array.from({ length: at.itemSize }, (_, c) => at.getComponent(i + k, c))) }; });
+        let pieces: Vx[][] = [tri];
+        for (const b of near) {
+          const lo = [b[0], b[1], b[2]], hi = [b[3], b[4], b[5]];
+          if (!pieces.some((pc) => [0, 1, 2].every((ax) => Math.max(...pc.map((v) => v.p[ax])) > lo[ax] + E && Math.min(...pc.map((v) => v.p[ax])) < hi[ax] - E))) continue;
+          const next: Vx[][] = [];
+          for (const pc of pieces) {
+            let inside: Vx[] | null = pc;
+            for (const [ax, val, side] of [[0, lo[0], -1], [0, hi[0], 1], [2, lo[2], -1], [2, hi[2], 1], [1, lo[1], -1], [1, hi[1], 1]] as [number, number, number][]) {
+              const [ou, rest] = split(inside!, ax, val, side);
+              if (ou) next.push(ou);
+              inside = rest; if (!inside) break;
+            }
+            if (inside) changed = true; // (what was in the box: gone)
+          }
+          pieces = next;
+        }
+        for (const pc of pieces) for (let k = 1; k + 1 < pc.length; k++) for (const v of [pc[0], pc[k], pc[k + 1]]) v.a.forEach((arr, j) => out[j].push(...arr));
+      }
+      if (!changed) return;
+      names.forEach((n, j) => g.setAttribute(n, new T.Float32BufferAttribute(out[j], atts[j].itemSize, atts[j].normalized)));
+      g.computeBoundingBox(); g.computeBoundingSphere(); o.geometry = g;
+    });
   }
   // What the breach destroyed inside (js/shipgen.ts cut: sp.gone, a box round each piece that's gone): its picture cleared out of
   // the level's drawing (the furniture is merged into a few meshes: each triangle whose middle is in one of the boxes is

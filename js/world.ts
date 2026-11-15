@@ -560,6 +560,7 @@ const G_World = (() => {
   }
   // a window's solids: its wall cells' sill and head (and an outside window's view), and the pane while it's whole
   function windowSolids(w: WorldT, map: any, win: any) {
+    if (win.gone) { for (const s of win.solids || []) remove(w, s); win.solids = []; return; } // (a breach took it: js/shipgen.ts cut)
     if (win.door) return door(w, map, win.door); // (a glass door's pane: its door's solids)
     if (win.rail) { // a railing's glass: under its handrail, while it's whole (it never stopped anyone walking: the drop's edge does)
       for (const s of win.solids || []) remove(w, s);
