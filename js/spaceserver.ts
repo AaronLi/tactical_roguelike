@@ -22,7 +22,7 @@ interface SvMission {
 const G_SpaceSv = (() => {
   const SD = G.SpaceData;
   const st = {
-    board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[] },
+    board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[], gone: [] as number[] }, // (gone: flown, done or not: off the board)
     fleet: SD.fleet0(),
     seats: {} as Record<string, number>,
     ship: { docked: true, at: null as number | null, ctl: null as string | null, pose: null as any },
@@ -31,14 +31,27 @@ const G_SpaceSv = (() => {
   };
   const S = () => G.Server, net = () => G.Server.net;
   const offers = () => SD.offers(st.board.seed, st.board.level);
-  const boardMsg = () => ({ t: 'board', seed: st.board.seed, level: st.board.level, picked: st.board.picked, done: st.board.done });
+  const goneOf = (B: typeof st.board) => B.gone || (B.gone = B.done.slice()); // (a board kept from before there was gone: what's done is gone)
+  const boardMsg = () => ({ t: 'board', seed: st.board.seed, level: st.board.level, picked: st.board.picked, done: st.board.done, gone: goneOf(st.board) });
   const shipMsg = () => ({ docked: st.ship.docked ? 1 : 0, at: st.ship.at, ctl: st.ship.ctl, pose: st.ship.pose });
   // what a screen needs to be in the hangar (or the space round it), and to be in a mission's level
   const shopMsg = () => ({ board: boardMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg() });
   // The zone the squad is in (js/spacedata.ts zone): the mission it came for (ms), which of the zone's ships the level is now
   // (active: 0 the mission's), the mission's own state while the squad is aboard another (main), the zone's clock, and what's
   // been carried off the others (loot: paid with the salvage at home).
-  interface SvZone { ms: SpMission; active: number; main: SvMission | null; zt: number; loot: number }
+  interface SvZone { ms: SpMission; active: number; main: SvMission | null; zt: number; loot: number; cas?: SvCas }
+  // What a mission cost, for its debrief (js/space.ts debrief): the hostiles killed, put down (alive), in restraints; the civilians
+  // dead (all of them, and how many by the squad's hand), safe at the end; the squad's own dead. Counted off each ship as she's
+  // left (zone), and added up.
+  interface SvCas { killed: number; downed: number; arrested: number; civDead: number; civBySquad: number; civSafe: number; squadDead: number }
+  function casNow(): SvCas {
+    const sv = S() as any, c: SvCas = { killed: 0, downed: 0, arrested: 0, civDead: 0, civBySquad: (sv.report && sv.report.civKilled) || 0, civSafe: 0, squadDead: 0 };
+    for (const b of (sv.bodies || new Map()).values()) { if (b.civ) c.civDead++; else c.killed++; }
+    for (const e of sv.enemies.values()) { if (e.def.civ) c.civSafe++; else if (e.state === 'cuffed') c.arrested++; else if (e.down) c.downed++; }
+    for (const p of sv.players.values()) if (p.st && p.st.dd) c.squadDead++;
+    return c;
+  }
+  const casAdd = (a: SvCas | undefined, b: SvCas): SvCas => (a ? (Object.fromEntries(Object.keys(b).map((k) => [k, (a as any)[k] + (b as any)[k]])) as unknown as SvCas) : b);
   let Z: SvZone | null = null;
   // her gun crew still at their posts' work: standing, not cuffed, not given up (without them her guns don't fire: js/space.ts guns)
   function gunnersLeft() {
@@ -59,7 +72,7 @@ const G_SpaceSv = (() => {
   function startRun(fleet?: unknown, dbg?: boolean) {
     const sv = S();
     st.rank = 1; st.fleet = SD.cleanFleet(fleet || st.fleet); st.seats = {}; st.M = null;
-    st.board = { seed: (Math.random() * 2 ** 31) | 0, level: st.rank, picked: [], done: [] };
+    st.board = { seed: (Math.random() * 2 ** 31) | 0, level: st.rank, picked: [], done: [], gone: [] };
     st.ship = { docked: true, at: null, ctl: null, pose: null };
     sv.level = 1; sv.team = { ver: 0, items: [] }; sv.arms = {};
     net().broadcast({ t: 'newrun' });
@@ -75,10 +88,10 @@ const G_SpaceSv = (() => {
   // further on). With some still to fly, it stays as it is: what's done marked done, the rest still theirs
   function landed() {
     const B = st.board;
-    if (!B.done.length || B.picked.some((i) => !B.done.includes(i))) return;
+    if (!goneOf(B).length || B.picked.some((i) => !B.gone.includes(i))) return; // (every one taken flown, done or not)
     st.rank += st.board.done.length;
     S().level = st.rank;
-    st.board = { seed: (Math.random() * 2 ** 31) | 0, level: st.rank, picked: [], done: [] };
+    st.board = { seed: (Math.random() * 2 ** 31) | 0, level: st.rank, picked: [], done: [], gone: [] };
     net().broadcast(boardMsg());
     say('New contracts are on the missions board.');
   }
@@ -89,7 +102,7 @@ const G_SpaceSv = (() => {
     if (sv.leaving || !sv.players.has(from)) return;
     if (sv.phase === 'shop' && to >= 0) {
       const ms = offers()[to];
-      if (!ms || !st.board.picked.includes(to) || st.board.done.includes(to) || st.ship.docked) return;
+      if (!ms || !st.board.picked.includes(to) || goneOf(st.board).includes(to) || st.ship.docked) return;
       sv.overBlack(() => begin(ms), 'ftl');
     } else if (sv.phase === 'level' && to === -1 && st.M && !st.M.docked) {
       sv.overBlack(() => home(), 'ftl');
@@ -203,14 +216,17 @@ const G_SpaceSv = (() => {
     if (M) {
       const V = M.ms.obj === 'visit' && Z && Z.main ? M : null; // (jumped home from a ship that isn't the mission's)
       if (V) { M = Z!.main!; M.salv = M.salv.concat(V.salv.map((_, k) => 1000 + k)); }
-      const ok = finished(M), nSalv = M.salv.length + (Z ? Z.loot : 0);
+      const ok = finished(M), nSalv = M.salv.length + (Z ? Z.loot : 0), cas = casAdd(Z ? Z.cas : undefined, casNow());
       if (nSalv) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 2, pay: nSalv * (350 + 60 * M.ms.diff), name: 'Salvage' });
       if (ok && !st.board.done.includes(M.ms.i)) {
         st.board.done.push(M.ms.i);
         const freed = M.ms.obj === 'hostage' ? [...sv.enemies.values()].filter((e) => e.def.civ && e.state !== 'dead' && e.hp > 0).length : 0;
         const bonus = M.ms.obj === 'hvt' && M.hvtSt === 2 ? Math.round(M.ms.pay * 0.5) : freed * 120;
-        net().broadcast({ t: 'mdone', i: M.ms.i, ok: 1, pay: M.ms.pay, bonus, name: M.ms.name, diff: M.ms.diff });
-      } else if (!ok) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 0, pay: 0, name: M.ms.name });
+        net().broadcast({ t: 'mdone', i: M.ms.i, ok: 1, pay: M.ms.pay, bonus, name: M.ms.name, diff: M.ms.diff, ms: M.ms, cas, freed, salv: nSalv ? nSalv * (350 + 60 * M.ms.diff) : 0, hvt: M.ms.obj === 'hvt' ? M.hvtSt : undefined });
+      }
+      // flown: off the board, done or not (each screen keeps it till its debrief's closed: js/space.ts isGone)
+      if (M.ms.obj !== 'visit' && !goneOf(st.board).includes(M.ms.i)) { st.board.gone.push(M.ms.i); net().broadcast(boardMsg()); }
+      if (!ok) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 0, pay: 0, name: M.ms.name, diff: M.ms.diff, ms: M.ms, cas, salv: nSalv ? nSalv * (350 + 60 * M.ms.diff) : 0 });
       st.ship.at = M.ms.i;
     }
     st.M = null; Z = null; st.ship.docked = false; st.ship.pose = null;
@@ -414,10 +430,10 @@ const G_SpaceSv = (() => {
     switch (m.t) {
       case 'mpick': {
         const i = m.i | 0, B = st.board;
-        if (!p || sv.phase !== 'shop' || !st.ship.docked || !offers()[i] || B.done.includes(i)) break;
+        if (!p || sv.phase !== 'shop' || !st.ship.docked || !offers()[i] || goneOf(B).includes(i)) break;
         if (B.picked.includes(i)) B.picked = B.picked.filter((q) => q !== i); else if (B.picked.length < SD.PICKS) B.picked.push(i); else break;
         net().broadcast(boardMsg());
-        if (B.done.length && B.picked.every((q) => B.done.includes(q))) landed(); // (the last one still to fly let go of: the board turns over now)
+        if (B.gone.length && B.picked.every((q) => B.gone.includes(q))) landed(); // (the last one still to fly let go of: the board turns over now)
         break;
       }
       case 'jump': jump(m.to | 0, from); break;
@@ -430,6 +446,7 @@ const G_SpaceSv = (() => {
         const zz = Z;
         if (M.ms.obj === 'visit') zz.loot += M.salv.length; else { zz.main = M; M.cutsWas = M.meta.cuts.map((q) => q.slice()); }
         { // (at once: nothing's drawn over it. Each screen carries the squad's ship across as she is: js/space.ts carry)
+          zz.cas = casAdd(zz.cas, casNow()); // (what it cost aboard the ship being left)
           zz.active = k;
           if (k === 0 && zz.main) { const B = zz.main; zz.main = null; B.revisit = true; B.meta = null; B.docked = false; B.site = null; B.cards = []; B.resp = new Map(); B.hvt = null; st.M = B; st.ship.docked = false; sv.startLevel(B.ms); }
           else beginIn({ i: zz.ms.i, kind: 'board', obj: 'visit', size: c.size, th: c.th, seed: c.seed, diff: Math.max(1, zz.ms.diff - 1), pay: 0, name: c.name, brief: SD.OBJ.visit.line, where: SD.SIZES[c.size].name, night: false, ly: 0, anchor: [0, 0, 0], wing: c.wing });

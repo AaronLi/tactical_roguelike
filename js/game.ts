@@ -1769,6 +1769,7 @@ const G_Game = {
     if (this.lastBonus) G.HUD.chat(null, 0, `Mission bonus: +¢${this.lastBonus}`);
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
     this.veilSay('Placing everyone');
+    if (G.SpaceData.ON) G.Space.debrief(); // (the mission just flown, if there was one: js/space.ts)
   },
   // out of the hangar for good (a level, the lobby, the menu)
   leaveHub() {

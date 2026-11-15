@@ -237,8 +237,8 @@ const G_SpaceUI = (() => {
     c.fillStyle = '#060c11'; c.fillRect(0, 0, W, H);
     c.fillStyle = '#8fd6ff'; c.font = '600 34px sans-serif'; c.textBaseline = 'top'; c.fillText('MISSIONS', 28, 20);
     c.fillStyle = '#7f97a8'; c.font = '22px sans-serif'; c.fillText(`${s.board.picked.length} of ${SD.PICKS} taken · press F at the terminal`, 240, 28);
-    offers.forEach((m, i) => {
-      const y = 82 + i * 62, on = s.board.picked.includes(i), done = s.board.done.includes(i);
+    offers.map((m, i) => [m, i] as [typeof m, number]).filter(([, i]) => !G.Space.isGone(i)).forEach(([m, i], row) => { // (a mission done and debriefed: off it)
+      const y = 82 + row * 62, on = s.board.picked.includes(i), done = s.board.done.includes(i);
       c.fillStyle = done ? '#10161a' : on ? '#2a2a14' : '#0e1820'; c.fillRect(20, y, W - 40, 54);
       c.fillStyle = done ? '#55606a' : on ? '#ffd24a' : '#d7e6f2'; c.font = '600 24px sans-serif'; c.fillText((on ? '▶ ' : '') + m.name, 34, y + 6);
       c.font = '18px sans-serif'; c.fillStyle = done ? '#55606a' : '#8ea4b4'; c.fillText(`${SD.OBJ[m.obj].name} · ${m.where}`, 34, y + 32);
@@ -266,6 +266,7 @@ const G_SpaceUI = (() => {
     if (tab === 'missions') {
       const offers = SD.offers(s.board.seed, s.board.level), full = s.board.picked.length >= SD.PICKS;
       body = '<div class="grid">' + offers.map((m, i) => {
+        if (G.Space.isGone(i)) return '';
         const on = s.board.picked.includes(i), done = s.board.done.includes(i), d = Math.hypot(m.anchor[0], Math.max(m.anchor[1], 900), m.anchor[2]);
         return `<div class="card${on ? ' on' : ''}${done ? ' done' : ''}"><div class="row"><h3>${esc(m.name)}</h3><span class="pay">¢${G.U.fmt(m.pay)}</span></div>
           <div><span class="tag${m.kind === 'assault' ? ' r' : ''}">${m.kind === 'assault' ? 'PLANET ASSAULT' : 'BOARDING'}</span><span class="tag">${esc(SD.OBJ[m.obj].name.toUpperCase())}</span><span class="tag">THREAT ${m.diff}</span>${m.night ? '<span class="tag">NIGHT</span>' : ''}</div>

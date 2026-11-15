@@ -256,14 +256,14 @@ const G_SpaceData = (() => {
       const assault = i === 2 || (i === 5 && r() < 0.5), taken = i === 4, size = assault ? null : taken ? 'transport' : i === 0 ? sizes[0] : U.pick(r, sizes);
       const obj: SpObj = assault ? 'assault' : taken ? 'hostage' : i === 0 ? 'artifact' : U.pick(r, ['artifact', 'hvt', 'destruct'] as SpObj[]);
       const rth = TH0 + U.ri(r, 0, THEMES.length - 1), th = assault ? U.pick(r, planets) : size === 'transport' ? TH0 + U.ri(r, 0, 1) : size === 'capital' ? TH0 + 2 : rth, T = themeAt(th)!;
-      const other: SpSize | null = !assault && size !== 'capital' && r() < 0.4 ? (level >= 4 && r() < 0.35 ? 'small' : 'transport') : null;
+      void (!assault && size !== 'capital' && r() < 0.4 ? level >= 4 && r() < 0.35 : 0); const other: SpSize | null = null; // (no second ship lying off her any more: its draws kept, so every board's the same otherwise)
       const wing = (size === 'small' || size === 'medium') && r() < 0.3; // (some corvettes and frigates are flying wings: two arms swept back from a glazed corner)
       const diff = Math.max(1, level + (size ? SIZES[size].diff : 1) + (r() < 0.3 ? 1 : 0) - (i === 0 ? 1 : 0));
       const pay = Math.round(((size ? SIZES[size].pay : 1300) + OBJ[obj].pay + 160 * diff) / 50) * 50;
       // its anchor: a direction off the golden angle, a little above or below the plane, 7 to 13 km out
       const a = i * 2.39996 + r() * 0.5, el = (r() - 0.5) * 0.7, d = 7000 + r() * 6000;
       const name = assault ? U.pick(r, WORLDS) : (T.name === 'Navy warship' ? 'NSV ' : T.name === 'Freighter' ? 'MV ' : 'CSV ') + U.pick(r, SHIP_NAMES);
-      out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, wing, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name + (wing ? ' (a flying wing)' : ''), brief: OBJ[obj].line + (other ? ' A ' + SIZES[other].name + ' is lying off her: nothing to do with the job, but she can be boarded.' : ''), other, night: assault && !T.night && r() < 0.25,
+      out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, wing, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name + (wing ? ' (a flying wing)' : ''), brief: OBJ[obj].line, other, night: assault && !T.night && r() < 0.25,
         ly: Math.round((3 + r() * 40) * 10) / 10, anchor: [Math.cos(a) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(a) * Math.cos(el) * d] });
     }
     return out;

@@ -127,6 +127,7 @@ const G_Loadout = (() => {
     if (rank() > was) G.HUD.toast('RANK ' + rank(), 'New loadout pieces may be open: see them before your next run', 4.5);
     const w = worn(me);
     for (const s of ['p', 'h', 'a']) if (w[s]) tally(s, w[s]!, 'missions');
+    return g;
   }
   // ---- attachments. A gun's: each kind of part by its own challenge with the gun, a part of tier t when the count reaches the t-th of n
   const ATT: Record<string, { stat: string; what: string; n: number[] }> = {

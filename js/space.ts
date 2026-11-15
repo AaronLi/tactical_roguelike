@@ -27,7 +27,7 @@ const G_Space = (() => {
     root: null as THREE.Group | null, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null,
     hull: null as ReturnType<typeof G.ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3; p0?: THREE.Vector3 }[],
     ftl: null as null | { st: 'spool' | 'wait' | 'tunnel'; t: number; to: number; T: number; held?: number }, seats: {} as Record<string, number>, ctl: null as string | null,
-    hp: 100, hpMax: 100, ms: null as SpMission | null, state: null as SpMs | null, board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[] },
+    hp: 100, hpMax: 100, ms: null as SpMission | null, state: null as SpMs | null, board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[], gone: [] as number[] },
     auto: null as null | { t: number; T: number; P0: THREE.Vector3; Q0: THREE.Quaternion; P1: THREE.Vector3; Q1: THREE.Quaternion; mid: THREE.Vector3 | null; then: () => void },
     hidden: null as Map<THREE.Object3D, boolean> | null, net: null as null | { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3 }, sendT: 0, hold: 0, holdK: '', keep: null as null | { x: number; y: number; z: number; yaw: number },
     things: [] as { k: string; n?: number; x: number; z: number; y?: number; obj: THREE.Object3D }[], cardObjs: [] as THREE.Object3D[], term: null as null | { x: number; z: number }, t: 0, shake: 0, cruise: false,
@@ -183,6 +183,39 @@ const G_Space = (() => {
       if (!got.walls.includes(c - s.nx - s.nz * W)) { const j = new T.Mesh(new T.BoxGeometry(s.nx ? 0.08 : TS + 0.06, L.DOOR_H + 0.1, s.nz ? 0.08 : TS + 0.06), torn); j.position.set(x - s.nx * TS / 2, (L.DOOR_H + 0.1) / 2, z - s.nz * TS / 2); bk.add(j); }
     }
     if (bk.children.length) G.R.levelRoot.add(bk);
+  }
+  // ---- The debrief: what the mission was, what it cost (the hostiles killed, put down, taken; the civilians dead, by whose hand,
+  // and safe; the squad's own), what it paid (its fee, the bonus, the salvage) and the XP. Told as the squad heads home ('mdone':
+  // js/spaceserver.ts home), shown once you're back at the base (js/game.ts enterShop), until you close it.
+  let brief: any = null;
+  // a mission flown (done or not) is off the board (the host's: js/spaceserver.ts gone); on this screen once its debrief's closed
+  let telling: number | null = null;
+  const isGone = (i: number) => S.board.gone.includes(i) && telling !== i;
+  function debrief(m?: any) {
+    if (m) { brief = m; if (m.i != null) telling = m.i; }
+    if (!brief || !G.Game.hub) return; // (shown on the way in: enterShop calls again)
+    const b = brief; brief = null;
+    const E = G.U.esc, ms = b.ms || {}, c = b.cas || {}, ok = !!b.ok, o = (SD.OBJ as any)[ms.obj] || null, f = (v: number) => G.U.fmt(Math.round(v || 0));
+    const row = (k: string, v: string, cls = '') => `<div class="db-row${cls ? ' ' + cls : ''}"><span>${k}</span><b>${v}</b></div>`;
+    const bonusWhy = ms.obj === 'hvt' && b.hvt === 2 ? 'Taken alive' : ms.obj === 'hostage' && b.freed ? `${b.freed} hostage${b.freed === 1 ? '' : 's'} freed` : 'Bonus';
+    const paid = (ok ? (b.pay || 0) + (b.bonus || 0) : 0) + (b.salv || 0);
+    const el = document.getElementById('debrief') || Object.assign(document.createElement('div'), { id: 'debrief' });
+    el.innerHTML = `<div class="db-card"><div class="db-head ${ok ? 'ok' : 'fail'}"><small>${ok ? 'Mission complete' : 'Mission failed · nothing paid for it'}</small><h2>${E(b.name || ms.name || 'Mission')}</h2><span>${E(ms.where || '')}${o ? ' · ' + E(o.name) : ''}</span></div>
+      <p class="db-brief">${E(ms.brief || (o ? o.line : ''))}</p>
+      <div class="db-cols"><section><h4>Casualties</h4>${row('Hostiles killed', f(c.killed))}${row('Hostiles incapacitated', f(c.downed))}${row('Hostiles arrested', f(c.arrested))}${row('Squad lost', f(c.squadDead), c.squadDead ? 'bad' : '')}</section>
+        <section><h4>Innocents</h4>${row('Civilians killed', f(c.civDead), c.civDead ? 'bad' : 'good')}${c.civDead ? row('… by the squad', f(c.civBySquad), c.civBySquad ? 'bad' : '') : ''}${row(ms.obj === 'hostage' ? 'Hostages alive' : 'Civilians unharmed', f(c.civSafe))}</section>
+        <section><h4>Payout</h4>${ok ? row('Fee', '¢' + f(b.pay)) : ''}${ok && b.bonus ? row(E(bonusWhy), '+¢' + f(b.bonus)) : ''}${b.salv ? row('Salvage', '+¢' + f(b.salv)) : ''}${row('Total', '¢' + f(paid), 'total')}${row('XP', ok ? '+' + f(b.xp) : '0', ok ? 'xp' : '')}</section></div>
+      <button class="btn primary db-go" data-dbgo>Continue</button></div>`;
+    if (!el.parentNode) document.body.appendChild(el);
+    el.classList.remove('hidden');
+    G.Game.unlock();
+    const close = () => {
+      el.classList.add('hidden'); window.removeEventListener('keydown', key, true);
+      telling = null; placeAnchors(); G.SpaceUI.boardDraw(); G.SpaceUI.opsRender(); // (told: off the board)
+    };
+    const key = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
+    (el.querySelector('[data-dbgo]') as HTMLElement).onclick = (e) => { e.stopPropagation(); close(); };
+    window.addEventListener('keydown', key, true);
   }
   // The hole cut out of what's drawn of her (boxes [x0, y0, z0, x1, y1, z1] in the level's frame): every triangle of the level's
   // drawing (its walls' faces, their trim, a window's frame and sill: merged meshes, not the wall's own cubes, which cutHere
@@ -391,6 +424,7 @@ const G_Space = (() => {
     const offers = SD.offers(S.board.seed, S.board.level), base = new T.Vector3(S.berth.x, 0, S.berth.z);
     for (const i of S.board.picked) {
       const ms = offers[i]; if (!ms) continue;
+      if (isGone(i)) continue;
       const done = S.board.done.includes(i), p = new T.Vector3(...ms.anchor).add(base); p.y = Math.max(p.y, 900);
       const obj = addObj(G.ShipModel.anchor(done ? 0x55606a : ms.kind === 'assault' ? 0x9cff8a : 0x66c8ff), p); obj.lookAt(base);
       S.anchors.push({ i, obj, p });
@@ -587,7 +621,7 @@ const G_Space = (() => {
   function jumpDest() {
     if (S.kind !== 'hub' || !S.board) return null; // (home is the base: not made ahead)
     const idx = S.ftl ? S.ftl.to : (nearAnchor() || { i: -1 }).i;
-    if (idx < 0 || !S.board.picked.includes(idx) || S.board.done.includes(idx)) return null;
+    if (idx < 0 || !S.board.picked.includes(idx) || S.board.gone.includes(idx)) return null;
     const ms = SD.offers(S.board.seed, S.board.level)[idx] as any; if (!ms) return null;
     return { seed: ms.seed, level: ms.diff, th: ms.th, night: !!ms.night, gen: ms.kind === 'board' ? { size: ms.size, obj: ms.obj, ship: S.fleet.ship, other: ms.other || null, wing: !!ms.wing } : null };
   }
@@ -1319,7 +1353,7 @@ const G_Space = (() => {
   // ------------------------------------------------------------------ the host's word
   function veilKind(k: string | null | undefined) { const el = document.getElementById('veil'); if (el) { el.classList.toggle('ftl', k === 'ftl'); el.classList.toggle('cloud', k === 'cloud'); } }
   function setBoard(b: any) {
-    S.board = { seed: b.seed | 0, level: b.level | 0, picked: (b.picked || []).slice(), done: (b.done || []).slice() };
+    S.board = { seed: b.seed | 0, level: b.level | 0, picked: (b.picked || []).slice(), done: (b.done || []).slice(), gone: (b.gone || b.done || []).slice() };
     placeAnchors(); G.SpaceUI.boardDraw(); G.SpaceUI.opsRender();
   }
   function onMsg(m: any): boolean {
@@ -1344,8 +1378,8 @@ const G_Space = (() => {
       case 'ms': if (m.zt != null && S.kind === 'board') { S.zt0 = m.zt; S.ztAt = performance.now(); } S.state = m; raidPods(m.raid); G.SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
       case 'mdone': {
         if (m.ok === 2) { me().credits += m.pay || 0; G.HUD.chat(null, 0, `Salvage: +¢${G.U.fmt(m.pay || 0)}`); G.HUD.feed(`<span class="cr">Salvage +¢${G.U.fmt(m.pay || 0)}</span>`); }
-        else if (m.ok) { if (G.Loadout) G.Loadout.mission(me(), m.diff || 1); const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; G.HUD.toast('MISSION COMPLETE', `${G.U.esc(m.name)} · +¢${G.U.fmt(n)}${m.bonus ? ' (taken alive)' : ''}`, 5); G.HUD.chat(null, 0, `Mission complete: +¢${G.U.fmt(n)}`); G.Audio.extract(); if (G.Career.run) G.Career.ev('evidence', n); }
-        else G.HUD.toast('MISSION ABANDONED', G.U.esc(m.name) + ' · nothing paid', 4);
+        else if (m.ok) { const xp = G.Loadout ? G.Loadout.mission(me(), m.diff || 1) : 0; const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; G.HUD.chat(null, 0, `Mission complete: +¢${G.U.fmt(n)}`); G.Audio.extract(); if (G.Career.run) G.Career.ev('evidence', n); debrief(Object.assign({ xp }, m)); }
+        else debrief(Object.assign({ xp: 0 }, m));
         return true;
       }
       case 'locked': G.HUD.toast('LOCKED', m.k === 'bridge' ? 'It needs the bridge keycard: one of her officers has it' : 'It needs the armoury keycard: one of her crew has it', 2.4); G.Audio.deny(); return true;
@@ -1414,7 +1448,7 @@ const G_Space = (() => {
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
   /** in a jump, aboard: what the screen shows is the pod and the tunnel, not a veil (js/game.ts) */
   const jumping = () => S.on && !!S.ftl && aboard();
-  return { sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { debrief: () => debrief(), isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }
