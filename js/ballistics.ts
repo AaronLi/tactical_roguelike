@@ -96,7 +96,7 @@ export const Ballistics = (() => {
   // By caliber: [mass g, diameter mm, length mm, core, tissue yaw depth cm (0: stays nose-first), fragmentation speed m/s
   // (0: doesn't), pellets (0: a single bullet)]
   const CAL: Record<string, any[]> = {
-    '5.56/45': [4.0, 5.7, 23, 'mild', 12, 760], '7.62/39': [7.9, 7.9, 26.8, 'mild', 26, 0], '7/43': [8.7, 7.0, 34, 'mild', 11, 0], '10/31': [8.0, 10.0, 24, 'lead', 14, 0], '10/53': [9.8, 10.0, 36, 'lead', 15, 0], // (the Tempest's rounds: a full-bore 10 mm lead-cored bullet, 8 g and 9.8 g; the loads' own masses and the sabot's rod: G.CALIBERS loads)
+    '5.56/45': [4.0, 5.7, 23, 'mild', 12, 760], '7.62/39': [7.9, 7.9, 26.8, 'mild', 26, 0], '7/43': [8.7, 7.0, 34, 'mild', 11, 0], '10/31': [8.0, 10.0, 24, 'lead', 14, 0], '10/53': [9.8, 10.0, 36, 'lead', 15, 0], // (the Tempest's rounds: a full-bore 10 mm lead-cored bullet, 8 g and 9.8 g; the loads' own masses and the sabot's rod: CALIBERS loads)
     '7.62/51': [9.5, 7.82, 28.9, 'lead', 15, 790], '9/19': [8.0, 9.0, 15.5, 'lead', 0, 0], '5.7/29': [2.0, 5.7, 21.6, 'hard', 9, 0],
     '11.43/23': [14.9, 11.43, 16.5, 'lead', 0, 0], '18.5/70': [3.5, 8.4, 8.4, 'lead', 0, 0, 9], '7.62/54': [9.6, 7.92, 30, 'mild', 15, 0],
     '12.7/99': [42, 12.95, 58, 'mild', 25, 0], '7.65/17': [4.6, 7.9, 12, 'lead', 0, 0], '12.7/33': [19.4, 12.7, 20, 'lead', 0, 0],
@@ -852,7 +852,7 @@ export const Ballistics = (() => {
     for (const a of armour) if (a.wear) { o.wear[a.key] = Math.round(a.wear); a.wear = 0; }
     return o;
   }
-  // a suspect's (js/data.ts G.ARMORS; a mandible or face shield, and shoulder, pelvis and leg armour (d.ex), are an officer's,
+  // a suspect's (js/data.ts ARMORS; a mandible or face shield, and shoulder, pelvis and leg armour (d.ex), are an officer's,
   // js/gear.ts), its condition kept on the view (ev.vc vest, ev.hc helmet, ev.fcc face, ev.xc0.. each of d.ex)
   function suspectArmour(ev: Record<string, any>) {
     const out: BArmour[] = [], d = ev.def;
@@ -983,6 +983,4 @@ export const Ballistics = (() => {
 
   return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, rating, THREATS, coverage, coverageText, coverageHTML, fragLimit };
 })();
-G.Ballistics = Ballistics;
 
-declare global { interface GameModules { Ballistics: typeof Ballistics; } }

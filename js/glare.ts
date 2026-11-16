@@ -76,5 +76,3 @@ export const Glare = (() => {
   }
   return { begin, add, end, get level() { return level; } };
 })();
-G.Glare = Glare;
-declare global { interface GameModules { Glare: typeof Glare; } }

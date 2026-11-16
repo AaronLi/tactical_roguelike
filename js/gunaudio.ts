@@ -168,7 +168,7 @@ export const GunAudio = {
     }
     return out;
   },
-  // How long a buffer played at gain g stays above STOP_FLOOR (into G.Audio.master; its compressor and OUTPUT bring that
+  // How long a buffer played at gain g stays above STOP_FLOOR (into Audio.master; its compressor and OUTPUT bring that
   // to about -80 dBFS at most): from the buffer's decay, the loudest of what's left after each 256-sample block (kept per
   // buffer). A quiet echo or a far shot is stopped there instead of playing out what nobody hears, its nodes and its
   // MAX_VOICES slot freed sooner.
@@ -292,7 +292,7 @@ export const GunAudio = {
         if (tl > 0.3 && L.los(map, px, py, pz, lis.x, ly, lis.z)) {
           const spec = Math.max(0, (rx * tlx + ry * tly + rz * tlz) / tl); // 1 = mirror bounce straight at the listener
           const path = travelled + tl;
-          const amp = energy * rayNorm * (0.2 + 0.8 * Math.pow(spec, 8)) * Audio.far(path); // (its whole path's falloff: G.Audio.far)
+          const amp = energy * rayNorm * (0.2 + 0.8 * Math.pow(spec, 8)) * Audio.far(path); // (its whole path's falloff: Audio.far)
           add({ x: px, y: py, z: pz }, path, amp, order, hops.slice());
         }
         ox = px; oy = py; oz = pz; dx = rx; dy = ry; dz = rz;
@@ -372,7 +372,7 @@ export const GunAudio = {
     return v;
   },
   /** the shooter's room's response, set for how it reaches you now: returns its nodes (the shot's sent into .cv) */
-  // far: the source's distance falloff (G.Audio.far). Indoors a room's reverberation fills it, as loud wherever you stand in
+  // far: the source's distance falloff (Audio.far). Indoors a room's reverberation fills it, as loud wherever you stand in
   // it; out of doors there's no room, only what reflects off what's near the source, and that falls off with the distance
   // as the sound itself does.
   roomVerb(ctx: AudioContext, map: AcMap, src: EchoPt, heard: { k: number; lp: number; at: EchoPt; same: boolean } | null, far = 1) {
@@ -414,7 +414,7 @@ export const GunAudio = {
   },
   // pos = world position of the muzzle, or null for the local player's own gun. who: the shooter (for a can's first-round pop).
   // Returns false when no synth buffer exists yet so the caller can play a fallback.
-  play(id: string, pos: THREE.Vector3 | null, who?: string, vol = 1, aim?: EchoPt | null) { // (vol: this shot's own level: a gun of several barrels, each as loud as its effective length makes it, js/data.ts G.shotDef)
+  play(id: string, pos: THREE.Vector3 | null, who?: string, vol = 1, aim?: EchoPt | null) { // (vol: this shot's own level: a gun of several barrels, each as loud as its effective length makes it, js/data.ts shotDef)
     const A = Audio, ctx = A.ctx, map = AudioEnv.Game!.map;
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
     const cam = AudioEnv.R!.camera.position;
@@ -443,7 +443,7 @@ export const GunAudio = {
     if (this.debugEchoes) this.drawEchoes(taps, cam);
     if (pos) {
       d = cam.distanceTo(pos);
-      gain *= A.far(d); // (G.Audio.far: gently near, as sound does in the open past 15 m, no floor)
+      gain *= A.far(d); // (Audio.far: gently near, as sound does in the open past 15 m, no floor)
       // How it gets to you (js/acoustics.ts): in your own zone, straight (dulled a little behind shelves and pillars);
       // from another, by the strongest way through the openings: as loud and as bright as the doors and windows on it
       // let it be, and from the one it comes in by. (No acoustics: line of sight, and round a corner by its echoes.)
@@ -503,7 +503,7 @@ export const GunAudio = {
     // the echoes: the dry report (no baked reverb) replayed from each reflecting wall after its delay,
     // darker with every bounce. Under heavy fire only the two strongest are kept.
     const echoBuf = this.dry.get(id) || buf, now = ctx.currentTime;
-    // (under heavy fire only the two strongest; while the audio thread's behind, one, then none: G.Audio.load)
+    // (under heavy fire only the two strongest; while the audio thread's behind, one, then none: Audio.load)
     const ld = A.load(), n = Math.min(taps.length, ld > 0.5 ? 0 : ld > 0.15 ? 1 : this.voices > this.MAX_VOICES * 0.6 ? 2 : taps.length); // (there may be fewer than two)
     for (let i = 0; i < n; i++) {
       const tp = taps[i];
@@ -549,6 +549,4 @@ export const GunAudio = {
     }
   },
 };
-G.GunAudio = GunAudio;
 ReplayEnv.GunAudio = GunAudio; // (what the replay asks of it: js/replayenv.ts)
-declare global { interface GameModules { GunAudio: typeof GunAudio; } }

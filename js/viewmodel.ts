@@ -105,7 +105,7 @@ export const Viewmodel = (() => {
   }
 
   // ---------------------------------------------------------------- picture-in-picture scopes
-  // The ocular lens shows the world through the scope: G.R renders the scene from the lens along the scope's
+  // The ocular lens shows the world through the scope: R renders the scene from the lens along the scope's
   // axis with a field of view set by the magnification, into a texture this disk shows. The reticle is drawn
   // over it, and a dark crescent creeps in when your eye is off the scope's axis (the eyebox).
   // (dot, dotG, cdot and holo: a reflex sight's own reticle, seen through a magnifier)
@@ -114,7 +114,7 @@ export const Viewmodel = (() => {
   // The crossbow's reticle (first focal plane: js/render.ts _renderPip says how big a mil is at this power, so it grows with
   // the picture and the marks are true at any power). In mils, on a canvas BDC_R either side of the centre:
   //   - a lit dot and, to pick it up at low power, a lit horseshoe; fine wires with heavy posts outside, a tick every mil near the middle
-  //   - down the post, a rung for each distance, for a broadhead (the shots' own sums, G.flight, zeroed as it comes): hold it on the
+  //   - down the post, a rung for each distance, for a broadhead (the shots' own sums, flight, zeroed as it comes): hold it on the
   //     target at that range. Each rung's a man's shoulders wide (0.5 m) at its range. Ticks on the left: the same for a bodkin
   //   - standing on the left wire, a man 1.75 m tall at each range, nearest furthest out: stand him on the wire and match him
   const BDC_R = 170, BDC_TEX = new Map();
@@ -180,7 +180,7 @@ export const Viewmodel = (() => {
   //     1.8 m, a full standing figure: it is the figure a suspect is, and the bar stays long enough to read at 500 m. The torso, shoulder to hip (0.5 m, 0.95-1.45 m
   //     up), is the heavier part of each bar, for a target half behind cover (or a crouched man: his whole body is about this). A target of another size scales it.
   //   - HOLDOVER, under the middle: a tick for each of 100..500 m, at the drop of the round that fires next (the chambered one) from this gun's bore as the zeroing
-  //     table has it turned (G.flight and G.boreTip, the sums every round is flown by), numbered 1..5. It is rebuilt when the load or the zero changes.
+  //     table has it turned (flight and boreTip, the sums every round is flown by), numbered 1..5. It is rebuilt when the load or the zero changes.
   //   - FOCAL PLANE: first (ffp: the marks grow with the picture, true at any power) or second (sfp: they stay one size on the glass, true at one power only, the
   //     scope's top: js/render.ts _renderPip puts pmil there). Mils are drawn on RANGE_R either side of the middle.
   const RANGE_R = 44, RANGE_TEX = new Map<string, any>(), RANGES = [100, 200, 300, 400, 500];
@@ -360,7 +360,7 @@ export const Viewmodel = (() => {
   }
 
   // A digital thermal sight's eyepiece (op.th.0): a screen, not a lens. js/render.ts _renderPip draws its sensor's picture
-  // (heat: _heatPass, from the sight along its axis at its widest), and this shows it (G.R.thermalMaterial): zoomed in digitally
+  // (heat: _heatPass, from the sight along its axis at its widest), and this shows it (R.thermalMaterial): zoomed in digitally
   // to the power it's set to (the sensor's pixels growing as it does), in the palette picked (w.thPal: T or the comms wheel),
   // with its reticle and a readout of the power, the palette and the battery painted on a canvas over it.
   const TH_PAL = ['WH', 'BH', 'IRON'];
@@ -611,7 +611,7 @@ export const Viewmodel = (() => {
       }
       g.userData.xb.slack.visible = false;
     }
-    if (proto.legs.length) { // (the bipod: a node whose children are the legs, each at its hinge with its extras.leg; G.GunRig.bipodPose turns them)
+    if (proto.legs.length) { // (the bipod: a node whose children are the legs, each at its hinge with its extras.leg; GunRig.bipodPose turns them)
       const bp = new T.Group();
       for (const l of proto.legs) {
         const sub = new T.Group();
@@ -626,5 +626,3 @@ export const Viewmodel = (() => {
 
   return { assemble, reflex, pipLens, flash, surfaces, paintAmmo, paintRange, rangeText, worldProto, worldInstance, merge };
 })();
-G.Viewmodel = Viewmodel;
-declare global { interface GameModules { Viewmodel: typeof Viewmodel; } }

@@ -191,6 +191,4 @@ export const FurnMesh = (() => {
 
   return { build, realise, geometry, textures, outsideMaterial, packaging };
 })();
-G.FurnMesh = FurnMesh;
 
-declare global { interface GameModules { FurnMesh: typeof FurnMesh; } }

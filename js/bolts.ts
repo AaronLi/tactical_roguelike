@@ -6,7 +6,7 @@ import { R } from './render.js';
 import { Views } from './views.js';
 // Crossbow bolts that stayed where they hit: in a suspect (it follows the bone it's in), in a soft vest, or
 // in timber and plasterboard. Whoever fired it decides (js/player.ts roundSegment) and tells the squad; each machine draws
-// its own. The lit nock stays on, in the load's colour (G.AMMO glow), so you can see from across a room where one went.
+// its own. The lit nock stays on, in the load's colour (AMMO glow), so you can see from across a room where one went.
 interface BoltParts { shaft: THREE.BufferGeometry; vane: THREE.BufferGeometry; heads: Record<string, THREE.BufferGeometry>; nock: THREE.BufferGeometry; carbon: THREE.Material; steel: THREE.Material; }
 interface BoltOn { rig: Rig; bone: THREE.Object3D; p: THREE.Vector3; q: THREE.Quaternion; }
 interface BoltNet { am: string; at?: number[]; u?: number[]; e?: number; b?: string; l?: number[]; }
@@ -98,6 +98,4 @@ export const Bolts = (() => {
   const holds = (fx: string) => !HARD.has(fx);
   return { LEN, HARD, colour, inWorld, onBone, fromNet, update, clear, holds, get count() { return list.length; } };
 })();
-G.Bolts = Bolts;
 ReplayEnv.Bolts = Bolts; // (what the replay asks of it: js/replayenv.ts)
-declare global { interface GameModules { Bolts: typeof Bolts; } }

@@ -184,6 +184,4 @@ export const Materials = (() => {
   }
   return { MAT, TISSUE, CORE_E, PROPS, PARTS, WALLS, SHIP, of, outAt, built };
 })();
-G.Materials = Materials;
 
-declare global { interface GameModules { Materials: typeof Materials; } }

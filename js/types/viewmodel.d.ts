@@ -8,18 +8,18 @@ interface VmModel { group: THREE.Object3D; info: GunRigInfo & { muzzles: number[
 // `info`: docs/models.md), not to the recipes' internals. The recipes (js/gunmodels.ts) or a .glb (js/glb.ts) make the geometry;
 // js/gunrig.ts binds its animation; this file adds what only the first person (or only the far-off view) needs:
 //
-//   G.Viewmodel.assemble(def, models)   the first-person gun: each model (a { group, info } with its sight windows) in a holder with
+//   Viewmodel.assemble(def, models)   the first-person gun: each model (a { group, info } with its sight windows) in a holder with
 //                                       its muzzle flashes, a reflex sight's reticle, a scope's lens, its display surfaces; the
-//                                       arms and animation bound on top (G.GunRig.bind via js/vmanim.ts prepare)
-//   G.Viewmodel.reflex(group, o)        a reflex sight's collimated reticle behind its window (o: info.reflex)
-//   G.Viewmodel.pipLens(group, o, def)  a scope's picture-in-picture lens (o: info.pip)
-//   G.Viewmodel.flash(color)            a muzzle flash sprite
-//   G.Viewmodel.surfaces(group)         the model's display_<name> meshes, each given a CanvasTexture to paint: { name: { mesh, canvas, ctx, tex, width, height } }
-//   G.Viewmodel.paintAmmo(s, left, per) a multi-barrel gun's display_ammo: the rounds left in each barrel
-//   G.Viewmodel.paintRange(s, text)     a rail ballistic computer's display_range: its seven-segment readout (rangeText(metres) makes the text)
-//   G.Viewmodel.worldProto(group, info) the third-person model of a gun: its meshes merged one per material, the magazine, a
+//                                       arms and animation bound on top (GunRig.bind via js/vmanim.ts prepare)
+//   Viewmodel.reflex(group, o)        a reflex sight's collimated reticle behind its window (o: info.reflex)
+//   Viewmodel.pipLens(group, o, def)  a scope's picture-in-picture lens (o: info.pip)
+//   Viewmodel.flash(color)            a muzzle flash sprite
+//   Viewmodel.surfaces(group)         the model's display_<name> meshes, each given a CanvasTexture to paint: { name: { mesh, canvas, ctx, tex, width, height } }
+//   Viewmodel.paintAmmo(s, left, per) a multi-barrel gun's display_ammo: the rounds left in each barrel
+//   Viewmodel.paintRange(s, text)     a rail ballistic computer's display_range: its seven-segment readout (rangeText(metres) makes the text)
+//   Viewmodel.worldProto(group, info) the third-person model of a gun: its meshes merged one per material, the magazine, a
 //                                       crossbow's bolt and strings and a bipod's legs pulled out on their own (cache it)
-//   G.Viewmodel.worldInstance(proto)    a group of it, sharing the proto's geometry
+//   Viewmodel.worldInstance(proto)    a group of it, sharing the proto's geometry
 //
 // The sight windows (info.reflex, info.pip) and the display surfaces are in the model contract (docs/models.md); a recipe's model
 // gives its windows to assemble alongside, as the kit recorded them.

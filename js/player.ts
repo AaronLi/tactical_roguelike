@@ -119,7 +119,7 @@ export const Me = {
   credits: undefined as unknown as number,
   stk: undefined as any, // (the stickers you've found)
   weapons: undefined as unknown as Record<string, GWeapon>, // (cur() is the one in your hands, as a PWeapon)
-  stash: undefined as any, // (G.Gear.stashProxy: weapon parts owned but not fitted)
+  stash: undefined as any, // (Gear.stashProxy: weapon parts owned but not fitted)
   stats: undefined as unknown as PStats,
   rounds: undefined as unknown as PRound[],
   sidearmChosen: undefined as unknown as boolean,
@@ -183,7 +183,7 @@ export const Me = {
     this.credits = 500;
     this.stk = {}; // (the stickers you've found: yours for the run, js/stickers.ts)
     Gear.starter(this); // kit, pockets and locker (js/gear.ts)
-    this.weapons = {}; this.setSidearm('p9'); // just a sidearm: the first primary comes from the shop (G.Game's picker: what you've earned of js/arsenal.ts)
+    this.weapons = {}; this.setSidearm('p9'); // just a sidearm: the first primary comes from the shop (Game's picker: what you've earned of js/arsenal.ts)
     this.sidearmChosen = false;
     this.stash = Gear.stashProxy(this); // weapon parts owned but not fitted: items, read as { partId: count }
     this.stats = { kills: 0, dmg: 0, hs: 0, downs: 0, revives: 0 } as PStats;
@@ -211,7 +211,7 @@ export const Me = {
   helmCond() { return Gear.cond(this.kit.helmet); },
   maxHp() { return 100; },
   maxNades() { return 3; },
-  magSize(x: WeaponDef | { def: WeaponDef; rl?: string | null }) { return capOf(x); }, // (a weapon, or a def: a gun of several barrels holds what the round type in its block lets it, js/data.ts G.capOf)
+  magSize(x: WeaponDef | { def: WeaponDef; rl?: string | null }) { return capOf(x); }, // (a weapon, or a def: a gun of several barrels holds what the round type in its block lets it, js/data.ts capOf)
   reserveMax(def: WeaponDef) { return def.reserve; },
   // a weapon as built: def is the compiled build (stats changed by its parts), see js/parts.ts
   makeWeapon(id: string, build?: PBuild): PWeapon {
@@ -329,7 +329,7 @@ export const Me = {
     Gear.refitMags(this, def);
     if (w.tube) w.tube.length = Math.min(w.tube.length, w.mag);
   },
-  // Another gun's receiver kit went in: it's that gun now (G.Gunsmith.convert). The parts that came off go to
+  // Another gun's receiver kit went in: it's that gun now (Gunsmith.convert). The parts that came off go to
   // your locker (the old gun's own barrel and such go with its kit); what was loaded stays only if the new gun
   // takes the same rounds from the same magazines, otherwise the magazine comes out with its rounds (or the
   // loose rounds go back in boxes).
@@ -498,7 +498,7 @@ export const Me = {
     return t < MAX - 0.5 ? t : null;
   },
   // A ping: the spot you're looking at (on a wall, the floor, someone) marked for the whole squad, in your colour
-  // with your name, and nothing about what's there (G.Views.addPing). Not too often.
+  // with your name, and nothing about what's there (Views.addPing). Not too often.
   ping() {
     const now = performance.now();
     if (now - (this.pingAt || 0) < 400) return;
@@ -660,7 +660,7 @@ export const Me = {
     this.stepFrags(dt);
     G_R.fisheye = 0; // (spectating turns it on: js/player.ts spectate)
     G_R.nv = null; // (night vision: nvStep, while you're up and about)
-    if (this.dead) { if (G_R.vm) G_R.vm.visible = false; this.sendState(dt); return; } // (no gun of yours in the view of someone else's helmet; the camera's placed once their rigs are posed: G.Game.loop, spectate)
+    if (this.dead) { if (G_R.vm) G_R.vm.visible = false; this.sendState(dt); return; } // (no gun of yours in the view of someone else's helmet; the camera's placed once their rigs are posed: Game.loop, spectate)
 
     this.sinceHurt += dt; this.sinceFire += dt;
     this.pressBuf = Math.max(0, this.pressBuf - dt);
@@ -911,9 +911,9 @@ export const Me = {
     this.eyeH += (1.62 - this.eyeH) * Math.min(1, dt * 12);
   },
   // Your own arms while your hands are on something (the gun's away): a sleeved forearm and a glove each, in the world, from
-  // in front of your shoulder to where the hand is. On the ladder, where G.Level.ladderGrip has it on a rung (each one holding
+  // in front of your shoulder to where the hand is. On the ladder, where Level.ladderGrip has it on a rung (each one holding
   // as you rise past it, then reaching up two); on a zipline there are no arms to draw (the left hand's up on the trolley's
-  // handle, out of view, the right has the gun) but the trolley itself, on the cable over your head (G.LevelView.zipKit). Everyone
+  // handle, out of view, the right has the gun) but the trolley itself, on the cable over your head (LevelView.zipKit). Everyone
   // else sees the whole of you (js/rig.ts).
   holdArms(cam: THREE.Camera) {
     let A = this._climbArms;
@@ -983,7 +983,7 @@ export const Me = {
       up, side: up * sideK,
       rec: U.clamp((def.handling || 1) * (onehand ? 1.15 : 1), 0.55, 1.6), // spring strength: how fast it comes back
       capUp: up * 6 + 0.03, capSide: Math.max(0.025, up * sideK * 6),
-      sway: aim.sway, erratic: aim.erratic, // breathing, and the faster twitch that makes a pistol wander: with a stock or without (G.aimSway)
+      sway: aim.sway, erratic: aim.erratic, // breathing, and the faster twitch that makes a pistol wander: with a stock or without (aimSway)
     };
     this._rm.set(def, m);
     return m;
@@ -1210,7 +1210,7 @@ export const Me = {
   },
   reloadTime(def: WeaponDef) { return this.byHand && def.handReload ? def.handReload : def.reload; },
   // how many rounds the next step of a loose reload puts in: one, or with a loader several (a tube's push, the Hailstorm's Wolverine grip: three), fewer when
-  // fewer are empty or fewer are carried (of the type it takes: G.Gear takeRounds). js/vmanim.ts shows that many in the hand.
+  // fewer are empty or fewer are carried (of the type it takes: Gear takeRounds). js/vmanim.ts shows that many in the hand.
   loadCount(w: PWeapon, mag: number) {
     const per = w.def.perLoad || 1;
     if (per <= 1) return 1;
@@ -1220,7 +1220,7 @@ export const Me = {
   },
   // loaded a round (or a push of shells) at a time, this reload: a shell-fed gun, or a revolver topped up by hand
   loose(def: WeaponDef) { return def.shell || (!!this.byHand && revolver(def)); },
-  // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment (a falling block likewise: the block stays down till it's shut, js/data.ts G.fblock)
+  // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment (a falling block likewise: the block stays down till it's shut, js/data.ts fblock)
   revHand(def: WeaponDef) { return (revolver(def) || fblock(def)) && this.loose(def); },
   revShut(def: WeaponDef) { this.revClose = true; this.reloadT = this.reloadTotal = REV.close; Handling.shut(def); },
   ACT_T: { release: 0.4, rack: 0.6 },
@@ -1367,7 +1367,7 @@ export const Me = {
             if (went === 'floor') { const c = this.magDropped && this.magDropped !== true ? this.magDropped : Casings.dropMag(def, w.mag / Math.max(1, def.mag)); if (c && this.dumped) c.item = this.dumped; }
           } else if (Gear.ammoFor(def).kind === 'mag') Gear.swapMag(this, w, mag);
           else Gear.chamberIn(w, Gear.takeRounds(this, def, mag - w.mag, w.ammo));
-          this.reloading = false; // (a gun of several barrels: the new block's own counts are in G.Gear loadIn, or spread evenly: js/data.ts G.barrelsOf)
+          this.reloading = false; // (a gun of several barrels: the new block's own counts are in Gear loadIn, or spread evenly: js/data.ts barrelsOf)
           if (this.reloadAct) this.workAction(w, this.reloadAct, this.reloadSeat < 1 ? this.reloadSeat : null); // run dry: then the action, straight on
           else this.feed(w);
           if (!Audio.samples.insert_magazine) Audio.click();
@@ -1479,11 +1479,11 @@ export const Me = {
   // the fired case out of the port (at: how long from now)
   ejectSpent(w: GWeapon, at: number) { Casings.fired(w.def, true, null, null, w.spentCh, at); w.spentCh = null; },
 
-  // One pull of the trigger. barrels: a gun of several barrels (def.barrels) fires those (indices into its muzzles, G.pickBarrels): a round from each, each as its barrel's
-  // effective length makes it (G.shotDef) from its own muzzle, a report each (stacking), the recoil of all of them at once.
+  // One pull of the trigger. barrels: a gun of several barrels (def.barrels) fires those (indices into its muzzles, pickBarrels): a round from each, each as its barrel's
+  // effective length makes it (shotDef) from its own muzzle, a report each (stacking), the recoil of all of them at once.
   // A volley gun (def.volley: the Hailstorm) fires every loaded barrel at one pull, each round from its own barrel on its own path: the barrels' muzzles off the
   // bore line (info.muzzles), bored to meet at def.volleyZ metres, each straying on its own by def.volleySpread degrees round the one aim the whole volley shares;
-  // one report for all of them, as loud as the rounds in it make it (G.volleyVol). Its empties stay in the chambers till the block drops (w.spent).
+  // one report for all of them, as loud as the rounds in it make it (volleyVol). Its empties stay in the chambers till the block drops (w.spent).
   shoot(w: PWeapon, barrels: number[] | null = null) {
     const vol = !!w.def.volley && !barrels;
     if (vol) barrels = Array.from({ length: Math.max(1, Math.min(w.mag, w.def.volley)) }, (_, i) => i);
@@ -1504,13 +1504,13 @@ export const Me = {
     const origin = cam.position.clone();
     let def0: WeaponDef = w.def, round0 = '', firstShot: any = null;
     list.forEach((bi, n) => {
-      // the round being fired, and the gun as that round sees it (G.roundDef: hollow points, AP, slugs...)
+      // the round being fired, and the gun as that round sees it (roundDef: hollow points, AP, slugs...)
       const round = multi ? (w.tube && w.tube.length ? w.tube.pop()! : w.ammo) : chambered(w.def) && w.chamber ? w.chamber : w.tube && w.tube.length ? w.tube.pop()! : w.ammo; // (the chambered one, if it has a chamber)
       if (!chambered(w.def) && (!multi || vol)) { w.spent = w.spent || []; w.spent.unshift(round); w.spent.length = Math.min(w.spent.length, Math.max(8, w.def.volley || 0)); } // (the empties a revolver or break-action keeps till it's opened)
       if (vol) w.mag--;
       const sd = multi && !vol ? shotDef(w.def, w, bi) : null; // (a gun of several barrels: the gun as this barrel's round type and length make it; then as the load sees it)
       let def = roundDef(sd ? sd.def : w.def, round), eff = 0;
-      if (sd) { eff = sd.eff; barrelsOf(w)![bi]--; w.mag--; this.lastShot = { barrel: bi, mm: Math.round(eff), k: Math.round(sd.k * 1000) / 1000, rl: roundOf(w.def, w.rl)!.rl, am: round, left: w.bl!.slice(), mag: w.mag }; this.shotLog.push(this.lastShot); if (this.shotLog.length > 60) this.shotLog.shift(); } // (the barrel's rounds: js/data.ts G.barrelsOf)
+      if (sd) { eff = sd.eff; barrelsOf(w)![bi]--; w.mag--; this.lastShot = { barrel: bi, mm: Math.round(eff), k: Math.round(sd.k * 1000) / 1000, rl: roundOf(w.def, w.rl)!.rl, am: round, left: w.bl!.slice(), mag: w.mag }; this.shotLog.push(this.lastShot); if (this.shotLog.length > 60) this.shotLog.shift(); } // (the barrel's rounds: js/data.ts barrelsOf)
       if (n === 0) { def0 = def; round0 = round; }
       let side = 1;
       if (def.akimbo) { this.flashIdx = this.flashIdx ? 0 : 1; side = this.flashIdx ? 1 : -1; }
@@ -1585,10 +1585,10 @@ export const Me = {
   },
 
   // ---------------------------------------------------------------- rounds in flight
-  // Every round is a projectile. It leaves at its muzzle velocity (G.roundSpeed: the caliber, the barrel, the
+  // Every round is a projectile. It leaves at its muzzle velocity (roundSpeed: the caliber, the barrel, the
   // load), slows with drag and falls with gravity, and is stepped a frame at a time: each step is a short straight
   // segment, checked against the world and against everyone's hitboxes as they stand that frame (so someone can
-  // step out of its way, or into it). The sights are zeroed (G.zeroOf): it leaves a hair above the line of sight,
+  // step out of its way, or into it). The sights are zeroed (zeroOf): it leaves a hair above the line of sight,
   // crosses it at the zero and drops below it further out. What you see is a streak from the muzzle that closes
   // onto the round's true path (from your eye) over its first few metres: a faint one for ordinary rounds, a long
   // bright one for tracers.
@@ -1599,7 +1599,7 @@ export const Me = {
     const upP = new THREE.Vector3(0, 1, 0).addScaledVector(d, -d.y);
     if (!rail && upP.lengthSq() > 1e-6) {
       // it starts the sight height under your eye, the bore tipped up over the line of sight as the sights are set
-      // (G.boreTip: zeroed for the class's distance, then turned at the zeroing table; every load from the same tip)
+      // (boreTip: zeroed for the class's distance, then turned at the zeroing table; every load from the same tip)
       upP.normalize();
       const k = tip != null ? tip : zeroSlope(def, am, zeroOf(def)) || 0;
       start.addScaledVector(upP, -sightH(def));
@@ -1671,7 +1671,7 @@ export const Me = {
   // one round, one frame: true when it's done (stopped in something, spent, out of range)
   stepRound(b: PRound, dt: number) {
     const sp = b.v.length();
-    // where it gets to this frame: drag takes speed by the metre (G.dragOf), gravity pulls it down
+    // where it gets to this frame: drag takes speed by the metre (dragOf), gravity pulls it down
     const p1 = b.p.clone().addScaledVector(b.v, dt); p1.y -= 0.5 * b.grav * dt * dt;
     const seg = p1.clone().sub(b.p), len = seg.length();
     if (len < 1e-4) return true;
@@ -1703,8 +1703,8 @@ export const Me = {
   // on from there with what's left of the step. Returns where it stopped ({ p, t }), or null if it flies on (b.at, if it
   // was turned: where it's got to, and b.v what it's doing now).
   // The nearest suspect's handheld shield (js/rig.ts setShield) a round from o along unit d meets within tMax, as a world solid would be
-  // met (G.World.raycast's { t, n, solid }): a convex solid (hull: the slab's six faces, as it's held this frame) of the shield's own
-  // layers (its viewport's, struck there), for G.Ballistics crossSolid to take it through. Null: none.
+  // met (World.raycast's { t, n, solid }): a convex solid (hull: the slab's six faces, as it's held this frame) of the shield's own
+  // layers (its viewport's, struck there), for Ballistics crossSolid to take it through. Null: none.
   shieldHit(o: THREE.Vector3, d: THREE.Vector3, tMax: number): { t: number; n: number[]; solid: any; view?: any; pane?: any } | null {
     let best: any = null;
     for (const ev of Views.enemies.values()) {
@@ -1906,7 +1906,7 @@ export const Me = {
     (b.shot.fx = b.shot.fx || []).push(Ballistics.mark(p, n, fx, kind, o));
   },
   // a pane a round went through breaks (here at once, and for everyone through the host)
-  // The first round fractures it (G.Level.CRACKS), and it stays up; the second, or a blast (all), or someone walking into it once it's fractured, brings it down.
+  // The first round fractures it (Level.CRACKS), and it stays up; the second, or a blast (all), or someone walking into it once it's fractured, brings it down.
   roundPane(id: number, at: THREE.Vector3, dir: THREE.Vector3, all?: boolean) {
     const win = Game.map!.windows[id];
     if (!win || win.broken) return;
@@ -2208,7 +2208,7 @@ export const Me = {
   // of that energy stays in: the pressure builds up over the whole room (quasi-static: its energy over the room's volume) and
   // holds. In the open the cloud thins and rises, burns less of its fuel, and there's nothing to hold the pressure in: a far
   // smaller fireball and a short shove. Almost no fragments (a thin casing). Here:
-  //   the cloud: from where it went off, cell by cell through the room as gas spreads (G.Level.blastFill: walls and shut doors
+  //   the cloud: from where it went off, cell by cell through the room as gas spreads (Level.blastFill: walls and shut doors
   //   stop it, open doorways let it through), CLOUD cells of floor at most (a room of about 50 m²), fewer the more of it is open
   //   to the sky. Inside it: BURN and BLAST (a share of a life each), the blast by how confined it is (conf).
   //   the space: the same fill carried on to SPACE cells (the room and what's open onto it), its volume at a real room's height
@@ -2274,7 +2274,7 @@ export const Me = {
   },
   // ------------------------------------------------------------- quick slots: 3, 4 and 5
   // Each holds a kind of throwable: 'frag', 'flash' or 'tb' (or nothing). The key throws one from your kit. Bound by
-  // dragging a grenade onto the slot's box in the inventory (G.InvUI); kept between sessions.
+  // dragging a grenade onto the slot's box in the inventory (InvUI); kept between sessions.
   QUICK_DEFAULT: ['frag', 'flash', 'tb'] as (PHeldKind | null)[],
   get quick(): any[] { // (the slots' kinds, PHeldKind | null; wider for the HUD's and the inventory's callbacks)
     if (!this._quick) { const q = U.store.get('quick', null); this._quick = Array.isArray(q) && q.length === 3 ? q.slice() : this.QUICK_DEFAULT.slice(); }
@@ -2391,7 +2391,7 @@ export const Me = {
     if (this.dead || !Med.ITEMS[mt]) return;
     this.treating.set(by, { name, part, mt, t0: performance.now(), dur: Math.max(0.5, dur || Med.ITEMS[mt].time) });
   },
-  // how many of each medical item you carry (in the order of G.Med.ITEMS): what a teammate treating you may use of yours
+  // how many of each medical item you carry (in the order of Med.ITEMS): what a teammate treating you may use of yours
   medCounts() {
     const keys = Object.keys(Med.ITEMS), out = keys.map(() => 0);
     if (this.kit) Gear.each(Gear.body(this), (it) => { if (it.k === 'med') { const i = keys.indexOf(it.mt); if (i >= 0) out[i] += it.n || 1; } });
@@ -2844,7 +2844,7 @@ export const Me = {
     this.lowToggle = false; this.burstQ = 0;
     Audio.foley && Audio.foley('prone', 0, 1, 0);
   },
-  // the worse of two fates from G.Med.hit (null, 'down', 'out', 'dead')
+  // the worse of two fates from Med.hit (null, 'down', 'out', 'dead')
   worse(a: PFate | null, b: PFate | null) { const R: (PFate | null)[] = [null, 'down', 'out', 'dead']; return R.indexOf(b) > R.indexOf(a) ? b : a; },
   // the effect of being hit (the injuries are already on the body): flinch, the HUD, going down (fate: 'down', or
   // 'out' for blacking out)
@@ -2912,7 +2912,7 @@ export const Me = {
     if (!head) { cam.position.set(p.pos.x, p.pos.y + (p.st.dn ? 0.45 : p.st.cr ? 1.0 : 1.62), p.pos.z); cam.rotation.set(p.st.pt, p.st.yw, 0); return; }
     // An action camera on the right of their helmet, on the rail above the ear, hard-mounted: where it is and which
     // way it points come from their head's own pose, every frame, once their rig has been posed for it (this runs
-    // after G.Views.update). It looks a little down and in, so their arm and weapon are in the frame. Like a real
+    // after Views.update). It looks a little down and in, so their arm and weapon are in the frame. Like a real
     // one it stabilises electronically: it can't move the lens, only shift a cropped window over the frame, so it
     // smooths the turn (a low-pass on the rotation), mostly levels the horizon, and is never more than its crop
     // margin off where the mount actually points (a sharp turn drags it along). Wide, with a fisheye's barrel
@@ -3299,11 +3299,9 @@ export const Me = {
     };
   },
 };
-G.Me = Me;
 ReplayEnv.Me = Me; // (what the replay asks of it: js/replayenv.ts)
 AudioEnv.Me = Me; // (what sound asks of it: js/audioenv.ts)
 // (what the simulation's files ask of you: js/gear.ts unpack, js/stickers.ts)
 Hooks.makeWeapon = (id, build) => Me.makeWeapon(id, build);
 Hooks.myStickers = () => (Me.stk || (Me.stk = {}));
 
-declare global { interface GameModules { Me: typeof Me; } }

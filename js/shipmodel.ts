@@ -716,5 +716,3 @@ export const ShipModel = (() => {
   }
   return { boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
 })();
-G.ShipModel = ShipModel;
-declare global { interface GameModules { ShipModel: typeof ShipModel; } }

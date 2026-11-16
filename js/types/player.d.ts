@@ -12,4 +12,4 @@ type PHeldKind = 'frag' | 'flash' | 'tb' | 'sticky'; // (tb: a thermobaric grena
 interface PWeapon { def: WeaponDef; sup: boolean; mag: number; ammo: string; fm: FireMode; tube: string[]; chamber: string | null; spent?: string[]; spentCh?: string | null; noMag?: boolean; magI?: number; light?: boolean; laser?: boolean; stickers?: any; [k: string]: any }
 
 // a thermobaric's burst, worked out from where it went off (js/player.ts tbModel)
-interface PTbModel { map: LvMap; p: THREE.Vector3; fill: ReturnType<typeof G.Level.blastFill>; cloud: number; space: number; closed: boolean; conf: number; qs: number; rc: number; idx: Int32Array; outFrac: number; areaCloud: number; areaSpace: number; V: number }
+interface PTbModel { map: LvMap; p: THREE.Vector3; fill: ReturnType<typeof import('../level.js').Level.blastFill>; cloud: number; space: number; closed: boolean; conf: number; qs: number; rc: number; idx: Int32Array; outFrac: number; areaCloud: number; areaSpace: number; V: number }

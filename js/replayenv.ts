@@ -2,10 +2,10 @@
 // What the replay asks of the page: the highlights (the recording, and the export that draws it), the renderer, the rigs, the viewmodel's animation
 // and the level's view reach for the game's state (the game, the player, the net), for the page's screens (the views, the HUD, the hangar, the shop,
 // the range, the zip writer, the icons) and for sound, loot and casings (audio, footsteps, gun audio, bolts, casings, loot, the shot log). The
-// page's files set their field as they load (next to their `G.X = X`; `Shop` is set by js/shopui.ts, as js/shop.ts is the server thread's too), and the readers (js/highlights.ts, render.ts, rig.ts, vmanim.ts,
+// page's files set their field as they load (next to their `X = X`; `Shop` is set by js/shopui.ts, as js/shop.ts is the server thread's too), and the readers (js/highlights.ts, render.ts, rig.ts, vmanim.ts,
 // levelview.ts) read them here. The export worker (js/exportworker.ts) loads the readers and none of those, so there every field stays null,
 // except `Game` and `Net`, which it sets to its two stand-ins; the reads, which are guarded or reached only on the page, find what they found
-// through G.Game, G.Audio ... (nothing, or the stand-in). (This file imports the others only for their types: nothing of them runs, so the
+// through Game, Audio ... (nothing, or the stand-in). (This file imports the others only for their types: nothing of them runs, so the
 // export worker's modules stay as they were.)
 import type { Audio } from './audio.js';
 import type { Bolts } from './bolts.js';

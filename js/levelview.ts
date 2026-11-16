@@ -260,7 +260,7 @@ export const LevelView = {
         g2.textAlign = 'center'; g2.textBaseline = 'middle'; g2.font = 'bold 96px sans-serif'; g2.shadowColor = '#ffb040'; g2.shadowBlur = 24; g2.fillStyle = '#fff2d8'; g2.fillText('WELCOME', 512, 84);
         tx = new T.CanvasTexture(c as HTMLCanvasElement); break;
       }
-      case 'furn': { // one of js/furnspec.ts painters (G.FurnMesh.textures), from the festival's stream at draw sp.at (it counts what it draws: G.LevelDesc.TEX_DRAWS)
+      case 'furn': { // one of js/furnspec.ts painters (FurnMesh.textures), from the festival's stream at draw sp.at (it counts what it draws: LevelDesc.TEX_DRAWS)
         const r0 = LevelDesc.rngAt(sp.seed, sp.at); let n = 0;
         tx = (FurnMesh.textures(() => { n++; return r0(); }) as Record<string, any>)[sp.fn](...(sp.args || []));
         const want = LevelDesc.TEX_DRAWS[sp.fn](LevelDesc.rngAt(sp.seed, sp.at));
@@ -644,5 +644,3 @@ export const LevelView = {
     return merged.size;
   },
 };
-G.LevelView = LevelView;
-declare global { interface GameModules { LevelView: typeof LevelView; } }

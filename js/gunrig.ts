@@ -6,13 +6,13 @@ import { GunModels } from './gunmodels.js';
 // (a group of slot-tagged meshes, `part_<key>` nodes with their pivots, and `info`: docs/models.md), whether the recipes
 // (tools/models/recipes.ts, at bake time) built it or it came out of a .glb (js/glb.ts, js/gunmodels.ts: what the game does).
 //
-//   G.GunRig.bind(group, info, { def, side })   -> a GunRig: the live moving parts (an), the hand anchors in the gun's space (A),
+//   GunRig.bind(group, info, { def, side })   -> a GunRig: the live moving parts (an), the hand anchors in the gun's space (A),
 //                                                  where the parts sit at rest, the magazine-check data (chk)
-//   G.GunRig.magCheck(mag)                      -> the magazine-check data off a magazine part (the model's tags, or the recipe's refs)
-//   G.GunRig.describe(group)                    -> the recipe's refs written down as data on the nodes, for the baker (see below)
-//   G.GunRig.setLoaded(world, bolt, cocked)     -> a crossbow's bolt on the rail or not, its string cocked or not (a world model's)
-//   G.GunRig.bipodPose(bipod, k)                -> a bipod's legs (the children of part_bipod, each with extras.leg.deploy) swung down by k (0 folded .. 1 standing the gun up)
-//   G.GunRig.holds(def, info)                   -> how each hand takes the gun: the grip's and the support's frames in the gun's space (docs/models.md "Hand frames")
+//   GunRig.magCheck(mag)                      -> the magazine-check data off a magazine part (the model's tags, or the recipe's refs)
+//   GunRig.describe(group)                    -> the recipe's refs written down as data on the nodes, for the baker (see below)
+//   GunRig.setLoaded(world, bolt, cocked)     -> a crossbow's bolt on the rail or not, its string cocked or not (a world model's)
+//   GunRig.bipodPose(bipod, k)                -> a bipod's legs (the children of part_bipod, each with extras.leg.deploy) swung down by k (0 folded .. 1 standing the gun up)
+//   GunRig.holds(def, info)                   -> how each hand takes the gun: the grip's and the support's frames in the gun's space (docs/models.md "Hand frames")
 //
 // Nothing here knows how a gun was built: the parts are found by name (info.anim, whose values are the nodes themselves
 // for a recipe's model, or the node NAMES for one read from a file) and the anchors are info's numbers.
@@ -195,6 +195,4 @@ export const GunRig = (() => {
 
   return { bind, parts, magCheck, describe, setLoaded, bipodPose, v, holds, HOLD_FIX };
 })();
-G.GunRig = GunRig;
 
-declare global { interface GameModules { GunRig: typeof GunRig; } }

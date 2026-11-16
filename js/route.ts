@@ -2,7 +2,7 @@
 import { THEMES } from './data.js';
 import { U } from './util.js';
 // The route map. Each act is ten deployments, left to right: nine columns of choices, then the boss. A
-// node is an environment (one of G.THEMES); paths split and rejoin on the way and never cross. Picking the
+// node is an environment (one of THEMES); paths split and rejoin on the way and never cross. Picking the
 // next node picks where you fight next. Generated from a seed, so every peer draws the same map; the host
 // keeps where the squad is (route.path) and the votes.
 export const Route = (() => {
@@ -149,6 +149,4 @@ export const Route = (() => {
   }
   return { COLS, strongholdPay, gen, options, colOf, actOf, isBoss, svg, tip };
 })();
-G.Route = Route;
 
-declare global { interface GameModules { Route: typeof Route; } }

@@ -441,6 +441,4 @@ export const Range = (() => {
   }
   return { decorate, fixtures, build, update, leave, hit, markOn, on, reset, drawIpsc, zoneAt, S, FL, PIS, RIF };
 })();
-G.Range = Range;
 ReplayEnv.Range = Range; // (what the replay asks of it: js/replayenv.ts)
-declare global { interface GameModules { Range: typeof Range; } }

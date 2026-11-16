@@ -1,9 +1,9 @@
-// Types of G.Hooks (made in js/util.ts, so every file has it): what the simulation (the files the server's thread loads,
+// Types of Hooks (made in js/util.ts, so every file has it): what the simulation (the files the server's thread loads,
 // the ones js/serverhost.ts and js/prepentry.ts reach) may ask of the page. A simulation file never names a
-// page-only module (G.Audio, G.HUD, G.Me, G.Game...): it calls a hook, and the page file that owns the thing sets the hook
-// as it loads (G.Hooks.click = ... in js/audio.ts). The server's thread loads none of those files, so there each hook
-// stays unset; a call that was guarded before (G.Audio && ...) is guarded by the hook being set, and one that wasn't
-// (G.HUD.toast(...)) still throws there, as it did. (docs/modules-plan.md phase 3; tools/deps.mjs --check enforces it.)
+// page-only module (Audio, HUD, Me, Game...): it calls a hook, and the page file that owns the thing sets the hook
+// as it loads (Hooks.click = ... in js/audio.ts). The server's thread loads none of those files, so there each hook
+// stays unset; a call that was guarded before (Audio && ...) is guarded by the hook being set, and one that wasn't
+// (HUD.toast(...)) still throws there, as it did. (docs/modules-plan.md phase 3; tools/deps.mjs --check enforces it.)
 interface SimHooks {
   // --- js/arsenal.ts (the sidearm tree's progress)
   /** a gun's stat went up: the primary tree's challenges are the same kills, and a gun's attachments are earned with it (js/loadout.ts) */

@@ -1373,7 +1373,7 @@ export const Game = {
   },
   // ------------------------------------------------------------- first aid cabinets
   // each cabinet's grid here (3x2, medical gear only), kept as the host has it: you move things in and out of
-  // it in the field inventory, and the inventory tells the host what changed (G.InvUI)
+  // it in the field inventory, and the inventory tells the host what changed (InvUI)
   cabGrid(i: number) {
     this.cabGrids = this.cabGrids || [];
     if (!this.cabGrids[i]) { this.cabGrids[i] = Gear.grid(3, 2, ['med'], 'Cabinet'); this.cabGrids[i].cab = i; this.cabGridSet(i, this.cabs && this.cabs[i]); }
@@ -1474,7 +1474,7 @@ export const Game = {
     if (this.$('veil').classList.contains('on')) { this.veilN = this.VEIL_SMOOTH; this.veilWait = 0; } else this.veil(false);
     this.toggleInv(false);
     this.closeShop();
-    this.hub = false; // (the hangar stays up behind the map: G.Hangar.leave when the level replaces it)
+    this.hub = false; // (the hangar stays up behind the map: Hangar.leave when the level replaces it)
     this.phase = 'route';
     this.level = level;
     this.unlock();
@@ -1804,10 +1804,10 @@ export const Game = {
     this.map = pre || Level.generate(seed, level, th, night, sp ? sp.gen : null); // (laid out already, if she's been in sight or the jump's made her on the way: js/space.ts)
     if (Prep) (this.map as any).lgPre = Prep.take(seed, level, th, night, sp ? sp.gen : null); // (its light worked out ahead, if it was seen coming: js/prep.ts)
     Career.levelStart(level, th, night, this.stronghold()); // (your run's log: js/career.ts)
-    ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
+    ServerHost.born(this.map); // (as it was built: the host's simulation built it too, ServerLink.digest)
     Prof.reset(); // (the worst frames and totals: this level's)
     if (Highlights) { Highlights.drop(); Highlights.reset(); } // (last level's replays go; this one's start recording)
-    Views.warmed = seamless; Views.slowFill = seamless; // compile the new level's shaders once it's populated (G.R.warmup). (Come up with from outside: nothing stops for it. What she's made of was built and compiled on the way in, js/space.ts zonePrep; her people are made a few at a time)
+    Views.warmed = seamless; Views.slowFill = seamless; // compile the new level's shaders once it's populated (R.warmup). (Come up with from outside: nothing stops for it. What she's made of was built and compiled on the way in, js/space.ts zonePrep; her people are made a few at a time)
     this.cabGrids = [];
     Loot.clear();
     G_R.setLevel(this.map);
@@ -1971,13 +1971,11 @@ export const Game = {
   },
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };
-G.Game = Game;
 ReplayEnv.Game = Game; // (what the replay asks of it: js/replayenv.ts)
 AudioEnv.Game = Game; // (what sound asks of it: js/audioenv.ts)
 // (what the simulation's files ask of the game: js/gear.ts, js/damage.ts)
 Hooks.inField = () => !!(Game && Game.phase === 'level' && !Game.hub);
 Hooks.biteDebris = (map, rec, n) => { if ((map as unknown) === Game.map && G_R.debris) G_R.debris.burst(new THREE.Vector3(...rec.a), { m: rec.m, k: 'e', n, J: rec.J * 3, dir: new THREE.Vector3(...rec.u) }); };
-declare global { interface GameModules { Game: typeof Game; } }
 
 window.addEventListener('load', () => Game.init());
 // a gun's picture came in after the sidearm web was drawn (js/icons.ts): draw it again

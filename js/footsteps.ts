@@ -28,7 +28,7 @@ export const Footsteps = {
     if (this.started || !Audio.ctx) return;
     this.started = true;
     const ctx = Audio.ctx;
-    Audio.bankJson('footsteps/manifest.json').then((m) => { // (from the audio bundle: G.Audio.bankFile)
+    Audio.bankJson('footsteps/manifest.json').then((m) => { // (from the audio bundle: Audio.bankFile)
       this.man = m;
       // boots first (everyone on your side wears them), then the rest, a few at a time so the level's loading isn't held up
       const names = [...Object.entries(m.soles as Record<string, Record<string, unknown>>).flatMap(([s, c]) => Object.keys(c).map((n) => s + '/' + n)), ...Object.keys(m.kit).map((n) => 'kit/' + n)];
@@ -156,6 +156,4 @@ export const Footsteps = {
     this.step(this.selfFeet, me.pos, this.gaitOf(me.hspeed, me.crouch ? 1 : 0, !!me.steadying, !!me.lowReady), true);
   },
 };
-G.Footsteps = Footsteps;
 ReplayEnv.Footsteps = Footsteps; // (what the replay asks of it: js/replayenv.ts)
-declare global { interface GameModules { Footsteps: typeof Footsteps; } }

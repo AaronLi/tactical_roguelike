@@ -165,6 +165,4 @@ export const Career = (() => {
   return { COLS, init, runStart, runEnd, squad, levelStart, levelEnd, ev, mergeRuns, unsyncAll, onlyRuns, setStats, markSynced, reset, html, clean,
     stats: () => S(), runs: () => L(), get run() { return run; }, get level() { return lvl; } };
 })();
-G.Career = Career;
 
-declare global { interface GameModules { Career: typeof Career; } }

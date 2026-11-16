@@ -163,7 +163,7 @@ export const Rig = (() => {
   const live = new Set<Rig>();
   function heatMark(o: THREE.Object3D, skip?: THREE.Object3D | null) {
     if (o === skip) return;
-    if ((o as THREE.Mesh).isMesh) o.layers.enable(3); // (js/render.ts HEAT_LAYER: the video's worker has no G.R)
+    if ((o as THREE.Mesh).isMesh) o.layers.enable(3); // (js/render.ts HEAT_LAYER: the video's worker has no R)
     for (const c of o.children) heatMark(c, skip);
   }
   // ---------------------------------------------------------------- the body (js/humans.ts), and the fit of what's worn on it
@@ -491,7 +491,7 @@ export const Rig = (() => {
     rig.nvPivot.rotation.x = (1 - e) * Headgear.NV_UP;
     for (const m of rig.nvLit || []) m.visible = k > 0.97;
   }
-  // A suspect's armour (G.ARMORS ids) as the gear an officer would wear: the same models for the same kit
+  // A suspect's armour (ARMORS ids) as the gear an officer would wear: the same models for the same kit
   function armourKit(vest: string, helmet: string, armored: boolean, face?: any, ex?: any) {
     const V = ({ soft2: ['c.lite', 0, 0], soft: ['c.ghost', 0, 0], steel: ['c.patrol', 1, 2], ceramic: ['c.assault', 1, 3], assault: ['c.heavy', 1, 2] } as Record<string, (string | number)[]>)[vest] || (armored ? ['c.heavy', 1, 2] : null);
     const H = ({ ach: 'h.ach', riflehelm: 'h.rifle', visor: 'h.rifle' } as Record<string, string>)[helmet] || (armored ? 'h.rifle' : 0);
@@ -525,13 +525,13 @@ export const Rig = (() => {
       const tp = rnd();
       look = { top: tp < 0.5 ? 'tshirt' : tp < 0.85 ? 'longsleeve' : 'hoodie', topC: pick(PAL.shirt), pants: pick(['jeans', 'jeans', 'cargo']), pantsC: pick(PAL.pants), eyes: rnd() < 0.15 ? 'glasses' : 'none', gloves: 'none' };
     }
-    // Aboard a ship (docs/space.md) the crew wear what their ship's kind does (o.wear, or the ship being boarded: G.SpaceData.wearNow):
+    // Aboard a ship (docs/space.md) the crew wear what their ship's kind does (o.wear, or the ship being boarded: SpaceData.wearNow):
     //   navy    a crewman's dark blue coverall and cap; the guards' working uniform with a white belt; the squads' blue combat dress;
     //           an officer's white shirt, cap, gold shoulder boards and cuff rings
     //   pirate  a sleeveless vest, a T-shirt or an open jacket in faded colours, a bandana, a sash; whoever's with them in everyday clothes
     //   civil   a liner's people in everyday clothes, her guards in a security shirt and cap
     // ex: what goes with it (a cap, a bandana, a belt, a sash, boards, cuffs: made below, with the body)
-    const wear: string | null = o.wear !== undefined ? o.wear : style === 'tactical' || o.vex || o.mannequin || !SpaceData || !SpaceData.wearNow ? null : SpaceData.wearNow();
+    const wear: string | null = o.wear !== undefined ? o.wear : style === 'tactical' || o.vex || o.mannequin || !SpaceData || !SpaceData.wearNow ? null : SpaceData.wearNow(ReplayEnv.Game);
     const ex: Record<string, number | null> = {};
     if (wear) {
       const officer = !!(o.leader || o.boss), casual = () => { const tp = rnd(); return { top: tp < 0.35 ? 'tshirt' : tp < 0.6 ? 'longsleeve' : tp < 0.8 ? 'jacket' : 'hoodie', topC: pick(PAL.shirt), frontC: pick(PAL.shirt), pants: pick(['jeans', 'jeans', 'cargo', 'shorts']), pantsC: pick(PAL.pants), eyes: rnd() < 0.15 ? 'glasses' : 'none', gloves: 'none' }; };
@@ -881,7 +881,7 @@ export const Rig = (() => {
     return rig;
   }
 
-  // A handheld ballistic shield (js/data.ts G.SHIELDS): its face (a slab its own size and thickness, black), a rubber edge, the viewport
+  // A handheld ballistic shield (js/data.ts SHIELDS): its face (a slab its own size and thickness, black), a rubber edge, the viewport
   // if it has one, and behind it the handle the left hand closes round and the strap over the forearm. Its frame: x across, y up, the
   // face toward -z; userData.shield its def (js/player.ts shieldHit tests a round against the slab in this frame).
   const _shF = new T.Vector3(), _shQ = new T.Quaternion();
@@ -1285,7 +1285,7 @@ export const Rig = (() => {
       } else if (p.magChk != null && p.magChk >= 0) sp = well.clone().lerp(rig.chest.localToWorld(new T.Vector3(-0.04, 0.32, -0.4)), U.smooth(0.25, 1, p.magChk));
       const wL = 1 - U.smooth(0.02, 0.08, sp.distanceTo(supp) / s);
       if (wL < 0.01) { ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, sp, poleL); rig.curl[1] = 0.4; }
-      else { // (closed round a foregrip, over the firing hand on a pistol, the palm under a forend: G.GunRig.holds)
+      else { // (closed round a foregrip, over the firing hand on a pistol, the palm under a forend: GunRig.holds)
         const k = HD.support.kind, c = k === 'pistol' ? U.lerp(0.55, 0.9, wL) : k === 'fg' ? U.lerp(0.4, 1, wL) : U.lerp(0.4, 0.75, wL);
         gripHand(rig, rig.armL, sp, D(HD.support.palm), D(HD.support.fingers), poleL, HD.support.hold === 'closed' ? HAND_GRIP : HAND_PALM, c, wL, U.lerp(LOW.wrist, Math.PI, rig.aimW));
       }
@@ -1420,7 +1420,7 @@ export const Rig = (() => {
       ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rig.body.localToWorld(rh), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.2)));
       ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, rig.body.localToWorld(lh), rig.chest.localToWorld(new T.Vector3(-0.7, -0.3, 0.2)));
     }
-    // on a ladder (p.climb: the ladder, one of a level's crest.ladders): hands and feet on its rungs, where G.Level.ladderGrip has them
+    // on a ladder (p.climb: the ladder, one of a level's crest.ladders): hands and feet on its rungs, where Level.ladderGrip has them
     // for how high their feet are; the hips held off it a little and sat down into the lower foot (so it reaches its rung),
     // the knees and elbows out from it
     if (p.climb) {
@@ -2291,5 +2291,3 @@ export const Rig = (() => {
     toggleDebug() { debug = !debug; return debug; },
   };
 })();
-G.Rig = Rig;
-declare global { interface GameModules { Rig: typeof Rig; } }

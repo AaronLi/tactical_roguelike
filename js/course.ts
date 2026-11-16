@@ -11,7 +11,7 @@ import { Net } from './net.js';
 import { Range } from './range.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
-// A run (sent to the squad as it happens, G.Net 'crun'): hits are [target n, zone, seconds].
+// A run (sent to the squad as it happens, Net 'crun'): hits are [target n, zone, seconds].
 type CourseRunState = 'standby' | 'running' | 'done';
 interface CourseRun {
   who: string | null; name: string | null; seed: number; state: CourseRunState; t0: number; shots: number[]; hits: [number, string, number][]; end: number; dq?: string | null; el?: number;
@@ -369,5 +369,3 @@ export const Course = (() => {
   }
   return { fixtures, build, update, leave, hit, shot, remoteRun, setCourse, regenerate, start, inside, anyoneIn, score, A, S };
 })();
-G.Course = Course;
-declare global { interface GameModules { Course: typeof Course; } }

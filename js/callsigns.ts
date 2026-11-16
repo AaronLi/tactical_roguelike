@@ -3,7 +3,7 @@ import { U } from './util.js';
 // Squad callsigns: each officer is an animal (snake, seal, frog, cat, raccoon, hyrax), with its emblem and its
 // colour. The emblem goes on their left shoulder and, with their name, on a patch high on the back (js/rig.ts);
 // the menu, the lobby, the team list, the scoreboards and pings show it too. One of each animal to a squad: the
-// host gives anyone whose pick is taken the first one free (G.Server 'hello').
+// host gives anyone whose pick is taken the first one free (Server 'hello').
 export const Callsigns = (() => {
   const LIST = [
     { id: 'snake', name: 'Snake', color: 0xf2e94e },
@@ -136,5 +136,3 @@ export const Callsigns = (() => {
   }
   return { LIST, valid, of, draw, url, html, armTex, backTex };
 })();
-G.Callsigns = Callsigns;
-declare global { interface GameModules { Callsigns: typeof Callsigns; } }

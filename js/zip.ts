@@ -53,6 +53,4 @@ export const Zip = (() => {
   }
   return { write, read, crc32 };
 })();
-G.Zip = Zip;
 ReplayEnv.Zip = Zip; // (what the replay asks of it: js/replayenv.ts)
-declare global { interface GameModules { Zip: typeof Zip; } }

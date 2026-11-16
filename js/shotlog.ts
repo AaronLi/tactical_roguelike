@@ -304,7 +304,5 @@ export const ShotLog = (() => {
   }
   return { pose, remote, keep, keepAll, keepFill, clear, of, focus, frame, pickNade, select, nadeHtml, get selected() { return sel; } };
 })();
-G.ShotLog = ShotLog;
 ReplayEnv.ShotLog = ShotLog; // (what the replay asks of it: js/replayenv.ts)
 
-declare global { interface GameModules { ShotLog: typeof ShotLog; } }

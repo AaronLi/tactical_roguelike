@@ -47,7 +47,7 @@ interface HomeHung { name: string; x: number; z: number; q: number; v: number; s
 //       isn't there (a bathroom), cut from a corner: see cut(). If no corner will take it it's left out, not the home.
 //     tight: a room too small to keep its door approach clear: only the doorway's kept
 //     items: what goes in, in order: { id, piece, style?, at, hang?, need?, must?, pull?, swap? }
-//       piece: a name in G.Furniture.R; style: handed to its build
+//       piece: a name in Furniture.R; style: handed to its build
 //       at: 'long': the wall with the most free run of it. 'facing:id', 'cross:id': the wall opposite that item's, one
 //         across it. 'beside:id', 'away:id': as near to it, as far from it, as there's room. 'corner': in a corner.
 //         'middle': out on the floor. 'wall': anywhere, spread round the room
@@ -744,6 +744,4 @@ export const Homes = (() => {
   }
   return { RESIDENTS, start, fill, ceilings, paint };
 })();
-G.Homes = Homes;
 
-declare global { interface GameModules { Homes: typeof Homes; } }

@@ -28,7 +28,7 @@ interface ShopPending { key: string; buy: () => boolean | void; }
 interface ShopReport { arrests?: number; incap?: number; bleedouts?: number; rescued?: number; evidence?: number; bodies?: number; civKilled?: number; unauth?: number; allRescued?: boolean; stronghold?: boolean; }
 // a thing on the Supplies tab (services())
 interface ShopService { id: string; name: string; desc: string; price: number; disabled: boolean; apply: () => unknown; sel?: string; }
-// Vex's screen: the shop's tabs, its cards, buying and the squad's ready-up. What he stocks and the stock's count are js/shop.ts (G.Shop),
+// Vex's screen: the shop's tabs, its cards, buying and the squad's ready-up. What he stocks and the stock's count are js/shop.ts (Shop),
 // which the server's thread loads too; this is the page's.
 export const ShopUI = {
   tab: 'stock',
@@ -188,7 +188,7 @@ export const ShopUI = {
     out.push({ id: 'load', name: 'Load Magazines', desc: `${kitOnly ? 'Top up the magazines for your equipped guns, then those on your kit, and the equipped guns' : 'Top up every magazine you own (and your guns)'} from your loose rounds, same type first. ${loose} loose rounds, ${empty} empty places. <small>(${kitOnly ? 'Equipped and carried only' : 'Everything'}: change it in Settings &amp; controls.)</small>`, price: 0, disabled: !empty || !loose,
       apply: () => Gr.loadAll(Me, kitOnly) });
     // a box of any load for every caliber you own a gun in: the load picked on the card (loadSel), each priced by what
-    // it does (G.AMMO k: birdshot under buck, ball, tracer, subsonic, a slug, hollow points, AP, flechettes)
+    // it does (AMMO k: birdshot under buck, ball, tracer, subsonic, a slug, hollow points, AP, flechettes)
     const cals = [...new Set<string>(Gr.guns(Me).flatMap((w) => calsOf(w.def)))];
     this.loadSel = this.loadSel || {};
     for (const cal of cals) {
@@ -464,7 +464,5 @@ export const ShopUI = {
     </svg>`;
   },
 };
-G.ShopUI = ShopUI;
 ReplayEnv.Shop = Shop; // (what the replay asks of it: js/replayenv.ts; set here, not in js/shop.ts, which the server's thread loads and replayenv is the page's)
 window.addEventListener('gunicons', () => { const el = document.getElementById('shop'); if (el && !el.classList.contains('hidden') && Shop.offers) ShopUI.render(); }); // (a gun's picture came in after the screen was drawn: js/icons.ts)
-declare global { interface GameModules { ShopUI: typeof ShopUI; } }

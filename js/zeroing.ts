@@ -7,7 +7,7 @@ import { Me as G_Me } from './player.js';
 // below the line, climbs through it (the near zero), peaks, and falls back through it (the far zero). Every gun
 // comes zeroed for its class's distance with ball; each click (0.1 mil: a centimetre at 100 m) tips the bore that
 // much more (up: it strikes higher). Every load fires from the same tip, so a slower one drops more: pick one here
-// to see where it goes. The same sums fly every round (G.flight, G.boreTip, js/player.ts fly).
+// to see where it goes. The same sums fly every round (flight, boreTip, js/player.ts fly).
 export const ZeroUI = (() => {
   const MAXD = 500, ROWS = [25, 50, 100, 150, 200, 250, 300, 400, 500], MAXC = 150; // (±15 mil)
   const st = { wslot: 'p', am: null as string | null };
@@ -94,7 +94,7 @@ export const ZeroUI = (() => {
     g.fillStyle = '#9aa4ae'; g.textAlign = 'right'; g.fillText('bullet elevation vs line of sight', W - R - 6 * dpr, T + 8 * dpr);
   }
   function show(container: HTMLElement) {
-    container.classList.add('gs-host'); // (the whole panel: G.GunsmithUI.hide takes it off again)
+    container.classList.add('gs-host'); // (the whole panel: GunsmithUI.hide takes it off again)
     container.innerHTML = html();
     requestAnimationFrame(draw);
   }
@@ -113,6 +113,4 @@ export const ZeroUI = (() => {
   window.addEventListener('resize', () => { if (document.getElementById('zrCanvas')) draw(); });
   return { show, onClick, refresh, path, state: st };
 })();
-G.ZeroUI = ZeroUI;
 
-declare global { interface GameModules { ZeroUI: typeof ZeroUI; } }

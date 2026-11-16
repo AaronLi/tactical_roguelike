@@ -5,7 +5,7 @@ import { Hooks } from './util.js';
 // WHICH: whatever pictures are in assets/stickers/ (its index.json, a list of their file names, if it has one; else
 // the folder's listing, which serve.js and most static servers give). They're baked by `npm run build` from the originals in
 // assets/original_stickers (tools/bake_stickers.mjs: a quarter size, WebP), and the index with them. Found in levels (a small sticker box in about
-// one in ten: js/level.ts, the host's pick of what's in it: js/server.ts), kept for the run (G.Me.stk: owned / give /
+// one in ten: js/level.ts, the host's pick of what's in it: js/server.ts), kept for the run (Me.stk: owned / give /
 // use), each stuck on one gun used up.
 //
 // ON A GUN: w.stickers, a list of { s: file name, p: where on the gun, n: the surface's normal there (the gun's model
@@ -273,5 +273,3 @@ export const Stickers = (() => {
 
   return Object.assign(S, { load, url, owned, give, use, pic, provide, material, clean, decorate, ghost, key, share, of, learn, joined });
 })();
-G.Stickers = Stickers;
-declare global { interface GameModules { Stickers: typeof Stickers; } }

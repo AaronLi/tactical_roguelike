@@ -7,7 +7,7 @@ import { U } from './util.js';
 import { GunModels } from './gunmodels.js';
 import { R as G_R } from './render.js';
 // Item icons for the inventory and the shop: little drawings made on a canvas, cached as images.
-// G.Icons.of(item, w, h, rot) -> data URL for an item shown w x h cells (rot: shown turned, so the drawing is
+// Icons.of(item, w, h, rot) -> data URL for an item shown w x h cells (rot: shown turned, so the drawing is
 // turned with it). Magazines look like the gun's (curved rifle, straight pistol, drum, belt box,
 // en-bloc clip), ammo boxes carry their caliber and a stripe in the ammo type's colour, and gear is drawn by
 // kind (a soft vest, a plate carrier with its pouches, a chest rig, a plate, a helmet, a belt, a backpack).
@@ -568,6 +568,4 @@ export const Icons = (() => {
   const pending = () => gunWaits;
   return { of, pending, chamberPic, styleFor, gauge, chamberGauge, TYPE_COL, shellCol, tipCol };
 })();
-G.Icons = Icons;
 ReplayEnv.Icons = Icons; // (what the replay asks of it: js/replayenv.ts)
-declare global { interface GameModules { Icons: typeof Icons; } }

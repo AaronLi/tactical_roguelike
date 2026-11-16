@@ -9,7 +9,7 @@ interface Platform { id: string; arch: ArchKind; spec: ModelSpec; slots: Slot[];
 type RcvKit = [string, string, number, number, string]; // brand, name, price, tier, description
 export const Gunsmith = (() => {
   const PARTS: Record<string, Part> = {}, LIST: Part[] = [], PLATFORMS: Record<string, Platform> = {}, BY_MOUNT = new Map<string, Part[]>();
-  // Shared magazines (G.MAG_FAMILY): [capacity, drum?, price, stats, tier] for each, std the standard one
+  // Shared magazines (MAG_FAMILY): [capacity, drum?, price, stats, tier] for each, std the standard one
   const MAG_FAMS: Record<string, MagFam> = {
     stanag: { name: 'STANAG 5.56', brand: 'Graywater Arms', clear: 'Meridian Armor', std: 30, straightShort: true, model: { t: 'curved', len: 0.19, d: 0.066, c: 0.026, st: 0.28, ribs: 2, w: 0.024, well: 'black' }, desc: 'The NATO pattern: fits the Mk18, HK416, F2000, Tavor, SCAR-L, M27, MCX, G36 and AUG.',
       caps: [[20, false, 90, { reload: -12, ergo: 3, weight: -0.12 }, 1], [30, false, 60, {}, 1], [40, false, 220, { reload: 8, ergo: -2, weight: 0.15 }, 2], [100, true, 620, { reload: 45, ergo: -9, weight: 0.9 }, 3]] },
@@ -1050,7 +1050,7 @@ export const Gunsmith = (() => {
     if (gs.barrel && barrelIn) s.vel = (Math.pow(barrelIn / gs.barrel, 0.2) * d.velK - 1) * 100;
     if (d.integral && roundSpeed) { const v0 = roundSpeed(base); if (v0) s.vel = (Math.min(v0 * (1 + s.vel / 100), 310) / v0 - 1) * 100; } // (and what it really leaves at, capped)
     // braced: a stock to put to your shoulder (a folded or deleted one, or a bare buffer tube, isn't). Without a stock
-    // slot, a long gun's stock is part of it and a handgun has none. It decides how much the aim sways (G.aimSway).
+    // slot, a long gun's stock is part of it and a handgun has none. It decides how much the aim sways (aimSway).
     const stockSlots = slotsOf(id, build).filter((sl: Slot) => sl.slot === 'stock' || kindOf(sl.slot) === 'buttstock');
     if (stockSlots.length) { const sp = PARTS[build[stockSlots[stockSlots.length - 1].slot]]; d.braced = !!sp && sp.stype !== 'folded' && !isAdapter(sp); } // (the end of the chain's what meets your shoulder)
     else d.braced = !(base.cls === 'PST' || base.cls === 'MP');
@@ -1097,7 +1097,7 @@ export const Gunsmith = (() => {
     d.device = device;
     d.can = device === 'suppressor' ? can || 'full' : null; // which suppressor (the synth's)
     d.barrelIn = barrelIn;
-    // recoil from this build's weight and barrel (G.physRecoil), then what its parts do to it
+    // recoil from this build's weight and barrel (physRecoil), then what its parts do to it
     d.recoil = (physRecoil(d, d.weight) || base.recoil) * clamp(1 + s.recoil / 100, 0.3, 2);
     d.soundKey = gs.barrel ? `${id}:${(+barrelIn).toFixed(1)}:${device}${d.can ? ':' + d.can : ''}` : id;
     // (what the gun's worth: its price and what's been added; the gun's own part in another finish is still its own: a skin adds nothing)
@@ -1121,7 +1121,7 @@ export const Gunsmith = (() => {
   };
   // A volley (a gun with def.volley barrels fired together, the Hailstorm's) as the synth hears it: one report with the gas of several rounds behind it. Three rounds'
   // worth of bullet and charge (bulletWeight x 3, and pressure x 2 behind a bore of half as much area again: the same speed, three times the gas at the muzzle) is louder and a
-  // little lower than one round's, and still one crack: the barrels go off together, not one after another. How loud one pull is with fewer barrels loaded is G.volleyVol.
+  // little lower than one round's, and still one crack: the barrels go off together, not one after another. How loud one pull is with fewer barrels loaded is volleyVol.
   const volleySound = (g: any) => ({ bulletWeight: g.bulletWeight * 3, pressure: g.pressure * 2, caliber: g.caliber * Math.sqrt(1.5) });
   // the sound key for this gun firing a round of this type ("<soundKey>@<type>" when the load changes the report)
   const roundSoundKey = (def: Record<string, any>, am: string) => ((LOAD_SOUND[baseAm(am)] || (AMMO[am] && AMMO[am].plus)) && GUN_SPECS[def.id] ? `${def.soundKey}@${am}` : def.soundKey); // (a +P load's report: hotter, so louder: its own key)
@@ -1134,7 +1134,7 @@ export const Gunsmith = (() => {
     const g = GUN_SPECS[id];
     if (!g) return null;
     let s = inch === undefined ? g : Object.assign({}, g, { barrel: +inch, muzzleDevice: dev, suppressor: can || g.suppressor });
-    { // a gun of several barrels: a barrel's report is fuller the longer its effective length (the key's inches, js/data.ts G.shotSoundKey): more of the charge burnt and more pressure at the muzzle
+    { // a gun of several barrels: a barrel's report is fuller the longer its effective length (the key's inches, js/data.ts shotSoundKey): more of the charge burnt and more pressure at the muzzle
       const bd = (WEAPONS[id] || WEAPONS[id.split('.')[0]] || {}).barrels; // (id: the gun's, or a round type's own spec of it: tempest.rifle)
       if (bd && inch !== undefined) { const t = U.clamp((+inch * 25.4 - bd.mm0) / (bd.mm1 - bd.mm0), 0, 1); s = Object.assign({}, s, { pressure: s.pressure * (0.55 + 0.45 * t), grain: s.grain * (0.6 + 0.4 * t) }); }
     }
@@ -1356,7 +1356,7 @@ export const Gunsmith = (() => {
       desc: '1-12× variable: scroll while aiming to change power. First focal plane: the marks grow with the picture, so they\'re true at any power. Bolt-drop rungs out to 150 m, each as wide as a man\'s shoulders at that range; figures on the left arm to range him by.' });
     plat.defaults.optic = p.id; LATE.add('crossbow');
   }
-  // the belt boxes of G.BELT_FAMILY go in each other's guns
+  // the belt boxes of BELT_FAMILY go in each other's guns
   { const fam = Object.keys(BELT_FAMILY); for (const id of fam) for (const p of BY_MOUNT.get('mag:' + id)!) p.alsoMounts = fam.filter((o) => o !== id).map((o) => 'mag:' + o); }
   for (const id of LATE) { const plat = PLATFORMS[id]; plat.offset = {}; for (const k of STAT_KEYS) plat.offset[k] = -Object.values(plat.defaults).reduce((a, pid) => a + ((PARTS[pid] && PARTS[pid].st[k]) || 0), 0); }
   // ...and the long guns that take one: those with no way to a side rail otherwise (nothing that fits them has one)
@@ -1610,7 +1610,7 @@ export const Gunsmith = (() => {
     // the barrel block is the magazine: one per gun, a case-found rifle's whole barrel set, swapped on a reload
     { const mount = 'mag:' + id, cap = def.mag as number;
       slot('mag', mount, true);
-      factory('mag', mount, { name: `${def.name} ${cap}-round barrel block`, model: {}, set: { cap } }); // (cap: the standard round's; a block loaded with the rifle round holds fewer: G.capOf)
+      factory('mag', mount, { name: `${def.name} ${cap}-round barrel block`, model: {}, set: { cap } }); // (cap: the standard round's; a block loaded with the rifle round holds fewer: capOf)
       for (const p of BY_MOUNT.get(mount) || []) p.variant = true;
       plat.magVariants = true; }
     // the muzzle: the model's muzzle block (its front sight fin on it) or one of its own variants
@@ -1807,7 +1807,7 @@ export const Gunsmith = (() => {
     else if (vel) add(`Velocity ${pct(vel)}`, vel > 0);
     if (s.rpm) add(`Rate ${pct(s.rpm)}`, s.rpm > 0);
     if (s.spin) add(`Spin-up ${pct(s.spin)}`, s.spin < 0);
-    const hw = p.mount === 'hsload' && p.set && p.set.perLoad ? WEAPONS.hailstorm : null; // (the Wolverine grip: slower a grip, but fewer grips: what it does to filling the block from empty, G.fullReload)
+    const hw = p.mount === 'hsload' && p.set && p.set.perLoad ? WEAPONS.hailstorm : null; // (the Wolverine grip: slower a grip, but fewer grips: what it does to filling the block from empty, fullReload)
     if (hw) { const k = fullReload(Object.assign({}, hw, { reload: hw.reload * (1 + (s.reload || 0) / 100), perLoad: p.set.perLoad })) / fullReload(hw) - 1; add(`Full reload ${pct(k * 100)}`, k < 0); out.push(`<span>${(hw.reload * (1 + (s.reload || 0) / 100)).toFixed(2)} s a grip</span>`); }
     else if (s.reload) add(`Reload ${pct(s.reload)}`, s.reload < 0);
     if (p.slot === 'handguard' && p.model && p.model.hg && p.hgScale) out.push(`<span>${(p.model.hg.len! * 39.37).toFixed(1)}"</span>`); // (its length: it fits a barrel that leaves it that much)
@@ -1832,7 +1832,5 @@ export const Gunsmith = (() => {
     defaultCode: (id: string) => encode(id, defaultBuild(id)),
   };
 })();
-G.Gunsmith = Gunsmith;
 Hooks.platformOf = (id) => Gunsmith.PLATFORMS[id]; // (js/data.ts looks at a gun's build through these: it can't import this file, which reads it while loading)
 Hooks.roundSoundKey = Gunsmith.roundSoundKey;
-declare global { interface GameModules { Gunsmith: typeof Gunsmith; } }

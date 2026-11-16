@@ -10,12 +10,12 @@ interface RoomAcoustics { env: AcousticEnv; rt60: number; envReflect: number; en
 // Physics-synthesized gunshots, ported from tactical_game (src/gunAudio.ts + src/acoustics.ts).
 //
 // Every report comes from the gunshot synthesizer (js/gunshot-synth.ts, window.GunshotSynth).
-// Each weapon maps to interior-ballistics inputs (G.GUN_SPECS), and the room the shot is fired
+// Each weapon maps to interior-ballistics inputs (GUN_SPECS), and the room the shot is fired
 // in maps to the synth's environment controls via a ring of raycasts. Two-stage caching:
 //   precompute(source)  — dry per-layer stems (gun + ammo + mic). Cached per weapon.
 //   place(source, room) — room reverb + a fixed close-listener reference. Cached per
 //                         weapon + quantised room signature.
 // The placed buffer is then positioned in 3D (HRTF panner, distance gain, air absorption,
 // wall occlusion), so moving around never re-renders anything. Until a room render is ready
-// the dry render plays; until that exists, the old procedural shot (G.Audio.shot) plays.
+// the dry render plays; until that exists, the old procedural shot (Audio.shot) plays.
 type AcousticEnv = 'hall' | 'room' | 'concrete' | 'warehouse' | 'field' | 'urban' | 'canyon'; // a place's kind, from its shape (acousticsAt): the synth's own presets of that name (the last three out of doors)

@@ -30,7 +30,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
 //                                                             hips → thigh → shin
 // Legs use two-bone IK onto procedurally placed feet (no foot sliding, works for strafing and
 // backpedalling, and crouching just lowers the hips). Arms use two-bone IK onto the grip and
-// support-hand points of the carried gun (G.GunModels), so hands stay on any weapon.
+// support-hand points of the carried gun (GunModels), so hands stay on any weapon.
 // Upper body handles aim pitch, low-ready, corner leans, recoil, flinches and grenade throws.
 // Dead characters go to a Verlet ragdoll (see ragdollInit). Living suspects and civilians are the same ragdoll,
 // powered: muscles pull each joint toward the animation, as strong as the person is (see powerStep).

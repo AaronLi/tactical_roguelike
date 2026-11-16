@@ -2,11 +2,11 @@
 import { Net } from './net.js';
 import { ServerHost } from './serverhost.js';
 import { Game } from './game.js';
-// The page's end of the host's simulation (docs/threads.md). The simulation (G.Server, js/server.ts, run by js/serverhost.ts)
+// The page's end of the host's simulation (docs/threads.md). The simulation (Server, js/server.ts, run by js/serverhost.ts)
 // has a thread of its own, a worker (js/serverworker.ts); the page is a player like any other: it draws, and it sends what
 // you do. When the page hosts, its own player's messages go to the simulation on a MessagePort of their own (toServer) and
-// come back on it (to G.Net.onClient); the remote players' come in over PeerJS, which needs the page, so they're relayed
-// (fromPeer, join, leave), and what the simulation says to them is sent on from here (G.Net.relay, relayTo). The wire between
+// come back on it (to Net.onClient); the remote players' come in over PeerJS, which needs the page, so they're relayed
+// (fromPeer, join, leave), and what the simulation says to them is sent on from here (Net.relay, relayTo). The wire between
 // a host and the players who join it is what it was.
 // If a worker can't be had (none here, or it won't load), or with ?serverthread=0 in the URL, the simulation runs on the page
 // instead: the same code, on ports within the page (mode 'main').
@@ -144,5 +144,3 @@ export const ServerLink = {
   },
   stat() { return this.ask('stat'); },
 };
-G.ServerLink = ServerLink;
-declare global { interface GameModules { ServerLink: typeof ServerLink; } }

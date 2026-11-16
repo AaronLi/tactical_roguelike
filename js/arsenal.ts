@@ -5,7 +5,7 @@ import { Ballistics } from './ballistics.js';
 // The sidearm tree: what you can start a run with. Everyone starts with the P9 in the middle, and three paths run out from it, each a way of
 // fighting: full auto (volume of fire), heavy calibre (one round doing the work) and the modern classics (being where they aren't looking,
 // and hitting what you aim at). Each gun on a path is earned by doing what that path's about with the gun before it, and it's yours for
-// good: kept on this machine (G.U.store), between runs, whatever squad you're in. js/game.ts sidearmPick draws it.
+// good: kept on this machine (U.store), between runs, whatever squad you're in. js/game.ts sidearmPick draws it.
 // A kill's what it was as your rounds did it: js/player.ts hitEnemy keeps what they did to someone on them (ev.mine) and the host's word
 // that they're down (js/game.ts credit) brings it here. Only a gun you've earned counts: one that turned up in a case has its own path to come.
 // Each asks for more than a level has suspects (8 to 13, the act's last aside), so every gun takes several levels of play.
@@ -48,7 +48,7 @@ export const Arsenal = (() => {
   }
   const keep = () => U.store.set('arsenal', data());
   const has = (id: string) => BY.has(id);
-  // what it starts loaded with: tracers, or the node's own load (the USP's +P tracers); one its caliber can't take falls back as G.ammoOk does
+  // what it starts loaded with: tracers, or the node's own load (the USP's +P tracers); one its caliber can't take falls back as ammoOk does
   const startAm = (id: string) => { const q = BY.get(id), d = WEAPONS[id]; return ammoOk(calOf(d), (q && q.am) || 'tracer'); };
   const open = (id: string) => id === 'p9' || (has(id) && data().got.includes(id));
   const count = (id: string, stat: string) => (data().n[id] && data().n[id][stat]) || 0;
@@ -108,7 +108,7 @@ export const Arsenal = (() => {
     if (m.sur) tally(id, 'sur');
     if (m.ld) tally(id, 'lead'); // (one the others answered to: js/server.ts leadsMen)
     if (m.ld && m.h) tally(id, 'hslead');
-    if (ev.def && ev.def.shield) tally(id, 'shield'); // (carrying a handheld shield: js/data.ts G.SHIELDS)
+    if (ev.def && ev.def.shield) tally(id, 'shield'); // (carrying a handheld shield: js/data.ts SHIELDS)
   }
   // what a round of yours did to someone, for that
   function hit(ev: any, b: any) {
@@ -128,6 +128,4 @@ export const Arsenal = (() => {
   const reload = () => { save = null; };
   return { NODES, PATHS, RINGS, BY, along, has, startAm, open, count, name, at, left, tally, hit, kill, reload, get all() { return data(); } };
 })();
-G.Arsenal = Arsenal;
 
-declare global { interface GameModules { Arsenal: typeof Arsenal; } }

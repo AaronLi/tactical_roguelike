@@ -251,5 +251,3 @@ export const Scars = (() => {
   }
   return { plan, meshes, debris, flapMat };
 })();
-G.Scars = Scars;
-declare global { interface GameModules { Scars: typeof Scars; } }

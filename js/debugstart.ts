@@ -14,7 +14,7 @@ import { Views } from './views.js';
 // Debug start: open the game with a URL that goes straight to where you want to look, past the menu, the route map, the
 // sidearm picker and the helicopter. For testing by hand, and for tools driving the game (the browser checks agents run).
 //   ?play                 a solo level (the first route option); with a value, that kind of place: ?play=warehouse
-//                         (a theme's name, or part of it, or its index in G.THEMES: js/data.ts)
+//                         (a theme's name, or part of it, or its index in THEMES: js/data.ts)
 //   ?level=N              the level number (harder suspects, more of them: as the run would have it at N)
 //   ?gun=<weapon id>      your primary, its factory build; ?parts=slot:partId,slot:partId changes parts on it
 //                         (?gun=m4&parts=optic:op.bc.0,tacL:tac.bc.0)
@@ -34,7 +34,7 @@ import { Views } from './views.js';
 //   ?assault=<place>      straight to a planetary assault on that kind of place (&dock: set down on its pad)
 //   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
 // It plays as if the mouse were captured (no click-to-play screen). When it's there, window.__debugReady is true and
-// G.DebugStart.ready resolves: scripts wait on that. Add ?mute to keep it quiet.
+// DebugStart.ready resolves: scripts wait on that. Add ?mute to keep it quiet.
 export const DebugStart = (() => {
   const q = new URLSearchParams(location.search);
   const sleep = (s: number) => new Promise<void>((r) => setTimeout(r, s * 1000));
@@ -189,6 +189,4 @@ export const DebugStart = (() => {
   if (q.has('play') || q.has('hangar') || q.has('board') || q.has('assault') || q.has('fly')) window.addEventListener('load', () => setTimeout(() => { run().catch((e) => console.error('[debug start]', e)); }, 300));
   return { run, ready };
 })();
-G.DebugStart = DebugStart;
 
-declare global { interface GameModules { DebugStart: typeof DebugStart; } }

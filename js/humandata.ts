@@ -21,5 +21,3 @@ export const HumanData: Record<string, HumanDef> = {
   f09: { sex: 'f', name: 'short and stocky', scale: 0.8827, hairStyle: 'bob', skin: 0xd4b6aa, hair: 0xa25d38, fit: {"chest": [0.1682, 0.1585, 0.1094], "belt": [0.1682, 0.1081, 0.1241], "pelvis": [0.2005, 0.1152, 0.1392], "delt": 0.9, "arm": 0.924, "fore": 0.901, "thigh": 1.069, "calf": 0.986, "head_w": 1.03} },
   f10: { sex: 'f', name: 'slim', scale: 0.951, hairStyle: 'bun', skin: 0x655045, hair: 0x1d1b1d, fit: {"chest": [0.1665, 0.1429, 0.1027], "belt": [0.1479, 0.096, 0.112], "pelvis": [0.1903, 0.108, 0.132], "delt": 0.9, "arm": 0.806, "fore": 0.85, "thigh": 0.96, "calf": 0.93, "head_w": 1.0} },
 };
-G.HumanData = HumanData;
-declare global { interface GameModules { HumanData: typeof HumanData } }

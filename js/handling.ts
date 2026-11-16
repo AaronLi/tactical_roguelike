@@ -48,7 +48,7 @@ export const Handling = (() => {
     if (!manifest) {
       if (asked) return;
       asked = true;
-      Audio.bankJson('handling/manifest.json').then((m) => { manifest = m; want(f); }).catch(() => {}); // (from the audio bundle: G.Audio.bankFile)
+      Audio.bankJson('handling/manifest.json').then((m) => { manifest = m; want(f); }).catch(() => {}); // (from the audio bundle: Audio.bankFile)
       return;
     }
     if (loading.has(f) || !manifest.families[f]) return;
@@ -131,5 +131,3 @@ export const Handling = (() => {
   }
   return { fam, prewarm, lead, play, playF, LAND, rackClip, roundIn, drop, cues, open, shut };
 })();
-G.Handling = Handling;
-declare global { interface GameModules { Handling: typeof Handling; } }

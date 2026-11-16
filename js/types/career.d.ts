@@ -1,7 +1,7 @@
 // Types js/career.ts shares with the other files: declared here, globally, so any file can name them whether it's a
 // script or (docs/modules-plan.md) a module. What makes and uses them is in js/career.ts.
 
-// Your career: what you've done over every run, and a log of the runs themselves, kept in this browser (G.U.store 'career' and
+// Your career: what you've done over every run, and a log of the runs themselves, kept in this browser (U.store 'career' and
 // 'runs') and, with the cloud saves on, in your account (js/cloud.ts, docs/cloud.md). Only your own: each player keeps theirs,
 // host or not. It hears what your screen hears (js/game.ts: the host's word of kills, arrests, the phases; js/player.ts: you
 // going down, dying), never the simulation itself, which is in its own thread (docs/threads.md). Nothing here changes play.

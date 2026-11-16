@@ -90,5 +90,6 @@ import './game.js';
 import { Prof } from './profiler.js';
 import './demo.js';
 import './debugstart.js';
+import './debugglobals.js';
 // the profiler wraps the game's main pieces of work once they all exist (it did it as it loaded, as the last file but two)
 Prof.install();

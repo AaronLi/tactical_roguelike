@@ -15,7 +15,7 @@ import { ReplayEnv } from './replayenv.js';
 //
 // The viewmodel (js/gunmodels.ts, js/viewmodel.ts) is bound to its gun by js/gunrig.ts, which gives each gun its moving parts (magazine, charging handle, side bolt
 // handle, slide, pump, bolt, lever, belt cover, break-open barrels, revolver cylinder) and anchor points
-// (grip, support hand, magazine well, ports). Every frame G.VMAnim.update() samples the clip that's
+// (grip, support hand, magazine well, ports). Every frame VMAnim.update() samples the clip that's
 // playing for the current state (reloading, racking after the last shell, inspecting) and poses the parts
 // and both hands. The arms run from fixed shoulders just off-screen to wherever the hands are, so a hand
 // can leave the gun, go to a pouch for a magazine and come back.
@@ -1385,6 +1385,4 @@ export const VMAnim = (() => {
 
   return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap, hingeTimeline, hingeSteps, HINGE_EASE };
 })();
-G.VMAnim = VMAnim;
 
-declare global { interface GameModules { VMAnim: typeof VMAnim; } }

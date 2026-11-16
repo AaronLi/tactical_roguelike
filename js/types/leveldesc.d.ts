@@ -8,7 +8,7 @@
 //   the doors, windows (and glass doors' and railings' panes), stairs and railings, as they're placed and as they start;
 //   the lamps the light grid lights the level with, and the sky's share of it;
 //   where you come in, where suspects can start, what's furniture (the pieces as placed: their own shapes are js/furniture.ts');
-//   the solids: everything rays, sight and feet meet, as js/world.ts takes them (G.World.fromDesc builds the world from these);
+//   the solids: everything rays, sight and feet meet, as js/world.ts takes them (World.fromDesc builds the world from these);
 //   draw: everything the level draws, as a tree of nodes (boxes, planes, cylinders, profiles, buffers), each with a material
 //     id from draw.mats, a texture id from draw.tex, and where it goes. js/levelview.ts turns it into three.js meshes.
 // The tree is in the order the meshes were always made in (the screen merges them by material in that order), and its

@@ -5,7 +5,7 @@ import { Server } from './server.js';
 // It runs with the simulation, on the host only (js/serverhost.ts drives it): the host sees every officer's state ('st', 20 a
 // second) and every action they send, its own player's and the remote players' alike, so a host recording has the whole squad.
 // Off unless the page asks (?rec in the URL, or localStorage.rec = '1': js/serverlink.ts puts rec in the 'init' message).
-// A level's recording: its head (what level it was: G.Level.generate builds the same place from seed, level, theme and night),
+// A level's recording: its head (what level it was: Level.generate builds the same place from seed, level, theme and night),
 // frames RATE a second (each officer's last state, each suspect's and civilian's), and events (the officers' messages, as sent).
 // When the level's over it goes back to the page ({k:'rec', name, data}), which saves it.
 interface RecFrame { t: number; o: any[]; s: any[] }
@@ -96,5 +96,3 @@ export const Recorder = {
     if (this.out) this.out(name, c);
   },
 };
-G.Recorder = Recorder;
-declare global { interface GameModules { Recorder: typeof Recorder; } }

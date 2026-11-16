@@ -17,6 +17,11 @@
 // on runFile / runScripts. An import whose specifier is a key is answered with a module that exports the stub's names, whatever the importing file and
 // whether or not the real file is somewhere in the context; a value that is a function is called with the context first (when a stub needs something the
 // tool only has by then: `() => ({ GunModels: ctx.G.GunRecipes })`). A stub names every export the importers need: one it lacks is a link error.
+// The console's object G (js/debugglobals.ts builds window.G from the files' exports; nothing in the game reads it) is built here for the tools: after each
+// runFile, every file the context has loaded as a module that the debug module names gets its exports put on ctx.G (the names the debug module imports from
+// that file: dist/js/debugglobals.js, in the folder of the file, is read for them; no such file, no G: an older build puts its own), once per file, so a
+// tool's later write to ctx.G.X (a stand-in, a tool's own name) is not undone by the next runFile. The two bundles (js/modelbundles.ts, a classic script)
+// are on ctx.RTBundles, and G.Bundles / G.AudioBundle come from there. Tools made before G was retired read ctx.G.X as the files had registered it.
 // An import of `three` (nothing has one yet: the page's three.js is a global, js/threeboot.ts) is answered with the context's own
 // THREE, the copy the tool put there (ctx.THREE), so it would be the same object the global one is.
 import vm from 'node:vm'; import fs from 'node:fs'; import path from 'node:path'; import { spawnSync } from 'node:child_process';
@@ -61,15 +66,42 @@ function linkerFor(ctx, cache, stubs) {
   return linker;
 }
 
+const gNames = new Map(); // folder -> Map(file name -> the names the debug module imports from it) | null
+function namesOf(dir) {
+  if (gNames.has(dir)) return gNames.get(dir);
+  const f = path.join(dir, 'debugglobals.js'); let map = null;
+  if (fs.existsSync(f)) {
+    map = new Map();
+    for (const m of fs.readFileSync(f, 'utf8').matchAll(/^import \{([^}]*)\} from '\.\/([\w-]+)\.js';/gm)) if (m[2] !== 'bundlesenv') map.set(m[2], m[1].split(',').map((x) => x.trim()).filter(Boolean));
+  }
+  gNames.set(dir, map);
+  return map;
+}
+const filled = new WeakMap(); // context -> Set(what has been put on its G)
+function syncG(ctx) {
+  let done = filled.get(ctx); if (!done) filled.set(ctx, done = new Set());
+  const put = (k, v) => { if (!ctx.G) ctx.G = {}; ctx.G[k] = v; };
+  const cache = caches.get(ctx);
+  if (cache) for (const [file, m] of cache) {
+    if (!path.isAbsolute(file) || done.has(file) || m.status !== 'evaluated') continue;
+    const names = namesOf(path.dirname(file)), want = names && names.get(path.basename(file, '.js'));
+    if (!want) continue;
+    done.add(file);
+    for (const k of want) if (k in m.namespace) put(k, m.namespace[k]);
+  }
+  if (ctx.RTBundles && !done.has('RTBundles')) { done.add('RTBundles'); put('Bundles', ctx.RTBundles.Bundles); put('AudioBundle', ctx.RTBundles.AudioBundle); }
+}
+
 /** Runs one compiled file in the context: as an ES module (its imports from the same folder, in the same context) if it is one, else as a script. */
 export async function runFile(ctx, file, { stubs } = {}) {
   const src = fs.readFileSync(file, 'utf8');
-  if (!isModule(src)) { vm.runInContext(src, ctx, { filename: path.basename(file) }); return; }
+  if (!isModule(src)) { vm.runInContext(src, ctx, { filename: path.basename(file) }); syncG(ctx); return; }
   let cache = caches.get(ctx); if (!cache) caches.set(ctx, cache = new Map());
   const m = await load(ctx, file, cache);
   if (m.status === 'unlinked') await m.link(linkerFor(ctx, cache, stubs));
   if (m.status === 'linked') await m.evaluate();
   else if (m.status === 'errored') throw m.error;
+  syncG(ctx);
 }
 
 /** The exports (the namespace) of a file that runFile / runScripts has loaded as a module in this context: `(await moduleOf(ctx, DIST + 'util.js')).Hooks`. */

@@ -19,7 +19,7 @@ import { Stickers } from './stickers.js';
 // an LMG belt box 2x2. Items can be turned (1x2 <-> 2x1). Ammo isn't a number any more: it's the magazines
 // and boxes you carry for each gun, and a reload takes one of them. Medkits and grenades are items too.
 // Between levels everything you aren't carrying sits in your locker (a big grid) at the quartermaster's.
-type GMe = typeof G.Me;
+type GMe = typeof import('./player.js').Me;
 type GTbl = Record<string, any>; // a data table indexed by key (js/data.ts CALIBERS, AMMO)
 // a pouch's definition (POUCHES): w x h what it holds, mw x mh the MOLLE it takes, acc what it accepts (null: anything small)
 interface PouchDef { name: string; brand: string; w: number; h: number; mw: number; mh: number; acc: string[] | null; price: number; desc: string; split?: number; dump?: boolean; }
@@ -136,7 +136,7 @@ export const Gear = (() => {
   // ---------------------------------------------------------------- ammo items
   // What a gun reloads from: magazines (and en-bloc clips) for that gun, or loose rounds of
   // its caliber in a box. Magazines belong to one gun; boxes of a caliber feed every gun that takes it.
-  // Rounds come in types (G.AMMO): a box holds one type, and so does a magazine (loaded from a box).
+  // Rounds come in types (AMMO): a box holds one type, and so does a magazine (loaded from a box).
   const bigBox = (cal: string) => { const g = ((CALIBERS as GTbl)[cal] || {}).group; return g === 'grenade' || g === 'bolt'; };
   function ammoFor(def: GDef) {
     const loose = def.shell || def.mag <= 2 || revolver(def); // (a revolver's speed loader's a part: it's filled from loose rounds too)
@@ -216,7 +216,7 @@ export const Gear = (() => {
     const v = magVid(def, vid), cap = r ? def.barrels.n * r.per : Gunsmith.magCap(def.id, v), count = Math.min(cap, n == null ? cap : n); // (a block's capacity is its round type's: n barrels of what each holds)
     const it = magItem({ k: 'mag', key: a.key, wid: def.id, cap, vid: v }, Array(count).fill(type));
     it.base = type;
-    if (r) { (it as any).rl = r.rl; if (count === cap) (it as any).bl = Array(def.barrels.n).fill(r.per); } // (a full barrel block: every barrel full; a part-full one is spread evenly when it goes in, js/data.ts G.barrelsOf)
+    if (r) { (it as any).rl = r.rl; if (count === cap) (it as any).bl = Array(def.barrels.n).fill(r.per); } // (a full barrel block: every barrel full; a part-full one is spread evenly when it goes in, js/data.ts barrelsOf)
     return it;
   }
   // a magazine's shape in the grid, by what it holds
@@ -724,5 +724,3 @@ export const Gear = (() => {
     defOf, cond, piece, speed, label, price, sale,
   };
 })();
-G.Gear = Gear;
-declare global { interface GameModules { Gear: typeof Gear; } }

@@ -1,9 +1,9 @@
 'use strict';
 // The game's material catalogue (docs/models.md: the contract's material names): every gun model uses these shared materials by
-// NAME, so a baked glTF only says 'brass' or 'stipple' and the game puts its own material there (G.GunMaterials.M.<name>()).
-//   G.GunMaterials.M.<name>()        the shared material
-//   G.GunMaterials.std(key, ...)     a MeshStandardMaterial, made once per key
-//   G.GunMaterials.relief(kind, cell) the bump map of a stippled or chequered material (a canvas, rebuilt at load: not stored in a file)
+// NAME, so a baked glTF only says 'brass' or 'stipple' and the game puts its own material there (GunMaterials.M.<name>()).
+//   GunMaterials.M.<name>()        the shared material
+//   GunMaterials.std(key, ...)     a MeshStandardMaterial, made once per key
+//   GunMaterials.relief(kind, cell) the bump map of a stippled or chequered material (a canvas, rebuilt at load: not stored in a file)
 export const GunMaterials = (() => {
 const T = THREE;
 const cache: any = {};
@@ -75,5 +75,3 @@ const byName = (name: string | null | undefined): THREE.Material => {
 };
 return { M, std, relief, byName, ALIAS };
 })();
-G.GunMaterials = GunMaterials;
-declare global { interface GameModules { GunMaterials: typeof GunMaterials; } }

@@ -286,7 +286,7 @@ export const InvUI = (() => {
   }
   // a container's grids: a pouch's or pack's own, or a carrier's or belt's MOLLE and the pouches on it
   const isContainer = (it: Item) => !!(it.grids || it.molle);
-  // in the team locker: the host only hears where its items sit, not what's in them (G.Game.teamSync), so nothing
+  // in the team locker: the host only hears where its items sit, not what's in them (Game.teamSync), so nothing
   // there is opened or changed in place (or what you took out of a belt there would still be in it for everyone else)
   const inTeam = (src: Src | null) => !!(src && src.g && src.g.team);
   const TEAM_NO = 'Take it out of the team locker first';
@@ -1053,5 +1053,3 @@ export const InvUI = (() => {
     render,
   };
 })();
-G.InvUI = InvUI;
-declare global { interface GameModules { InvUI: typeof InvUI; } }

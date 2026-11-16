@@ -402,7 +402,7 @@ export const World = (() => {
   // the highest surface under someone at (x, z) with their feet at y: the top of anything under them no higher
   // than a step up (-Infinity: nothing, they're falling into the void)
   // smooth: a walker's ground (stairs as their slope, not their treads: rampAt)
-  // Rolling ground (a level's terrain: G.Level.crestGround): its height at (x, z), across a cell the two triangles between
+  // Rolling ground (a level's terrain: Level.crestGround): its height at (x, z), across a cell the two triangles between
   // its corners (corner 00 to 10 to 01, and 10 to 11 to 01), as it's drawn. 0 off it. (The ground floor of a level with it
   // is all of it: sloped, or level and built on, high or low.)
   function terrainAt(tr: any, x: number, z: number) {
@@ -449,7 +449,7 @@ export const World = (() => {
   // (each piece's boxes, shelving's open frames for rays), fences, doors (a closed leaf, or the lintel over an
   // open one and its leaf standing out into the room) and windows (sill, head and the pane, and an outside
   // window's view). map.world holds it; the door and window solids hang off their records for updates.
-  // A storey of a building (G.Level.stack): opts.world, the world it goes into; opts.y, its floor's height;
+  // A storey of a building (Level.stack): opts.world, the world it goes into; opts.y, its floor's height;
   // opts.skirt, how far its walls reach down past its floor (over the slab under it); opts.voidAbove, where the
   // floor above has a drop (no ceiling there); opts.ground: false for an upper floor (its floor only where it
   // has one: not over a drop).
@@ -481,7 +481,7 @@ export const World = (() => {
     };
     // rolling ground (map.terrain), on the ground floor: a cell's corners' heights, and the height it's built on (gb: the
     // lowest of them, in 5 cm steps, which is where its wall stands, and its ceiling over it). What's built is level ground
-    // (G.Level.crestGround), so that's its height all over.
+    // (Level.crestGround), so that's its height all over.
     const tr = o.ground !== false ? map.terrain : null, VW = tr ? tr.VW : 0;
     const corners = (i: number) => { const k = ((i / W) | 0) * VW + (i % W); return [tr.v[k], tr.v[k + 1], tr.v[k + VW], tr.v[k + VW + 1]]; };
     const gb = tr ? Int16Array.from({ length: W * H }, (_, i) => Math.round(Math.min(...corners(i)) / 0.05)) : null;
@@ -550,7 +550,7 @@ export const World = (() => {
   }
   // The world from a level's description alone (js/leveldesc.ts, docs/level-data.md): its solids, in their order (the same ids,
   // so the same hash), each hung back on what it belongs to in the generator's map: the piece of furniture (desc.props: the
-  // same list G.LevelDesc.propList makes from the map), the door, the window, the flight of stairs, what it's made of. The
+  // same list LevelDesc.propList makes from the map), the door, the window, the flight of stairs, what it's made of. The
   // doors' and windows' solids are theirs to change from there (door, windowSolids: as they open, shut and break). map.world
   // (and each floor's) is this world.
   function fromDesc(d: LvDesc, map: any) {
@@ -591,7 +591,7 @@ export const World = (() => {
     for (const m of map.floors || []) m.world = w;
     return w;
   }
-  // A flight of stairs (G.Level.stack's): steps as solids, each a block from the floor at its foot up to its tread,
+  // A flight of stairs (Level.stack's): steps as solids, each a block from the floor at its foot up to its tread,
   // climbing st.rise over its run in about 20 cm steps (low enough to walk up: STEP)
   function stairs(w: WorldT, st: LvStair) {
     const along = st.axis === 'z', len = along ? st.z1 - st.z0 : st.x1 - st.x0, n = Math.max(2, Math.round(st.rise! / 0.2)), run = len / n, rise = st.rise! / n;
@@ -649,6 +649,4 @@ export const World = (() => {
 
   return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, ybox, obox, hullOf, fitBoxes, touches, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, fromDesc, stairs, door, windowSolids };
 })();
-G.World = World;
 
-declare global { interface GameModules { World: typeof World; } }

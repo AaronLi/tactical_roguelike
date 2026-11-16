@@ -8,7 +8,7 @@ import { World } from './world.js';
 // What the simulation and the game on screen both work out, the same way: pure reckonings (no state, nothing drawn) that
 // used to live in the files that draw (js/player.ts, js/views.ts, js/rig.ts, js/game.ts) or in the host's own file
 // (js/server.ts). The host's simulation runs in a thread of its own (js/serverworker.ts, docs/threads.md) that loads none of
-// those files: it finds these here, and so do they (G.Me.tbModel, G.Views.predictNade, G.Rig.cleanLook... hand on to them).
+// those files: it finds these here, and so do they (Me.tbModel, Views.predictNade, Rig.cleanLook... hand on to them).
 export const Sim = {
   // ---------------------------------------------------------------- the loading veil (js/game.ts veil)
   // The wipe on (css/style.css veilIn 0.8 s, and a frame): the host waits this long after telling everyone (js/server.ts
@@ -51,7 +51,7 @@ export const Sim = {
     const w: any = { def, sup: def.sup, mag: def.mag, ammo: loadFor(def), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
     if (def.barrels) w.rl = def.barrels.default; // (a gun of several barrels: the round type its block holds, js/data.ts)
     w.tube = Array(w.mag).fill(w.ammo); // every gun: its rounds in order (a magazine's own stack, when it has one in)
-    w.chamber = chambered(def) ? w.ammo : null; // and the round in the chamber (G.chambered)
+    w.chamber = chambered(def) ? w.ammo : null; // and the round in the chamber (chambered)
     return w;
   },
 
@@ -200,5 +200,3 @@ export const Sim = {
     return { burn: 0, blast: 0, daze: r < reach ? 0.35 * (1 - r / reach) * (f === M.fill.f ? 1 : 0.5) : 0, at: r < reach ? 'wall' : 'none', d: r };
   },
 };
-G.Sim = Sim;
-declare global { interface GameModules { Sim: typeof Sim; } }

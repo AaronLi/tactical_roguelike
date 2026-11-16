@@ -91,6 +91,4 @@ export const MenuShow = (() => {
   }
   return { update, render, get live() { return !!(S && S.live); } };
 })();
-G.MenuShow = MenuShow;
 
-declare global { interface GameModules { MenuShow: typeof MenuShow; } }

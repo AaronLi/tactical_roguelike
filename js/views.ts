@@ -186,7 +186,7 @@ export const Views = {
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.ts powerStep)
         if (!def.civ) rig.setKit(G_Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face, def.ex)); // their armour, as an officer's would look
         if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); this.tacOnGun(rig, def.tac); }
-        if (def.shield && armed && !(scode >= 1 && scode <= 3) && !(fl & 8)) rig.setShield(def.shield); // (a handheld shield, js/data.ts G.SHIELDS)
+        if (def.shield && armed && !(scode >= 1 && scode <= 3) && !(fl & 8)) rig.setShield(def.shield); // (a handheld shield, js/data.ts SHIELDS)
         R.dynRoot.add(rig.root);
         ev = { id, type, def, rig, tac: def.tac || 0, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp, alive: true, deadT: 0, lean: 0 };
         this.enemies.set(id, ev);
@@ -268,7 +268,7 @@ export const Views = {
     const mesh = GunModels.world(wpn);
     mesh.position.set(x, y + 0.05, z);
     mesh.rotation.set(0, Math.random() * Math.PI * 2, Math.PI / 2); // lying on its side
-    // a glowing yellow outline until it's bagged, seen through anything but walls and floors (G.R.render)
+    // a glowing yellow outline until it's bagged, seen through anything but walls and floors (R.render)
     mesh.userData.outline = this.addOutline(mesh);
     R.dynRoot.add(mesh);
     this.evidence.set(i, { mesh, wpn, x, y, z });
@@ -276,7 +276,7 @@ export const Views = {
   // Outline: the gun's silhouette marks the stencil, then three shells pushed out along the surface normals
   // by a fixed number of pixels draw only outside it: a bright line fading out in two softer bands. Each band
   // draws a pixel once (it marks the stencil as it goes), so overlapping triangles don't stack up.
-  // (blue: the halo on what F would take: G.Views.setHalo)
+  // (blue: the halo on what F would take: Views.setHalo)
   outlineMats(blue?: boolean) {
     const key = blue ? '_haloMats' : '_outline';
     if (this[key]) return this[key];
@@ -374,7 +374,7 @@ export const Views = {
       cv.slots.forEach((s, k) => { s.visible = k < items.length; if (s.visible) s.material.color.setHex(COL[items[k][0]] || 0xffffff); });
     });
   },
-  // The weapon case's lid (what's in it is G.Loot's)
+  // The weapon case's lid (what's in it is Loot's)
   syncCase() {
     const map = Game.map, cv: VwLid | null = map && map.caseView;
     if (!cv || cv.synced) return;
@@ -437,7 +437,7 @@ export const Views = {
   // A window breaking: the pane goes, a burst of glass falls both sides of it, and it's heard. at, dir: where
   // the round went through (optional)
   // A pane that's taken a round short of breaking: fractured right across from where it was hit (js/damage.ts crack), still up
-  // (each of the first G.Level.CRACKS rounds fractures it; the next one brings it down: js/player.ts roundPane)
+  // (each of the first Level.CRACKS rounds fractures it; the next one brings it down: js/player.ts roundPane)
   crackGlass(id: number, at: THREE.Vector3, dir?: THREE.Vector3) {
     const map = Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor || (w.cracked || 0) >= Level.crackCap(w)) return;
@@ -590,8 +590,8 @@ export const Views = {
   },
 
   // ---------------------------------------------------------------- other people's rounds
-  // A round someone else fired, as you see it: from f straight to `to` at its speed (G.roundSpeed, slowing with
-  // drag), drawn like your own (G.R.bullet); arrive: what happens when it gets there.
+  // A round someone else fired, as you see it: from f straight to `to` at its speed (roundSpeed, slowing with
+  // drag), drawn like your own (R.bullet); arrive: what happens when it gets there.
   visRound(f: THREE.Vector3, to: THREE.Vector3, def: any, am: string, arrive: () => void) {
     const len = f.distanceTo(to);
     if (len < 0.05) { arrive(); return; }
@@ -1156,7 +1156,5 @@ export const Views = {
     this.pings = this.pings.filter((pg: { t: number }) => pg.t > 0);
   },
 };
-G.Views = Views;
 ReplayEnv.Views = Views; // (what the replay asks of it: js/replayenv.ts)
 Hooks.enemyView = (id) => Views.enemies.get(id); // (what your rounds did to a suspect: js/arsenal.ts kill)
-declare global { interface GameModules { Views: typeof Views; } }

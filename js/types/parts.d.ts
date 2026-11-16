@@ -28,7 +28,7 @@ interface Slot { // a slot on a weapon platform (a nested one also has the paren
 // rails a handguard provides, optics need the receiver's top rail, and so on. Every slot has the gun's
 // factory part plus aftermarket parts from (fictional) manufacturers.
 //
-// A build is { slot: partId }. G.Gunsmith.compile(id, build) turns it into an effective weapon def
+// A build is { slot: partId }. Gunsmith.compile(id, build) turns it into an effective weapon def
 // (stats changed by the parts) that the rest of the game uses exactly like the old weapon defs.
 // Builds travel over the network as short codes ("m4/1a.2f.7..."), part indices in base 36.
 //

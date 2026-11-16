@@ -2,14 +2,14 @@
 // script or (docs/modules-plan.md) a module. What makes and uses them is in js/hangar.ts.
 
 // The hangar: where the squad spends the time between levels. A real place on the same map machinery as a level
-// (G.Level.generateHub: walls, floor, lights, collision, rays), dressed by hand here:
+// (Level.generateHub: walls, floor, lights, collision, rays), dressed by hand here:
 //   the workshop (west): a bench for each officer, with a computer that opens the gunsmith, and a rack of the
 //     gunsmith's parts for sale;
 //   the store (middle): Vex at his counter (his till opens the whole stock), the kit for sale on pedestals,
 //     a shelf of pouches, and a vending machine (medical gear and grenades; ammunition's at his till);
 //   the stash (east, at the back, by the walkway to the lounge): your crates in a cage, and a console that opens your stash and loadout;
 //   Nightjar Optronics (east, at the back, where the warehouse was): a special-operations outfitter behind a glass front,
-//     night vision in glass cases (G.Shop.offers.nvg), a counter with their rep behind it;
+//     night vision in glass cases (Shop.offers.nvg), a counter with their rep behind it;
 //   the lounge (east, at the front, by the hangar door): sofas in front of a big screen showing the highlights of the
 //     level just played (js/highlights.ts);
 //   the helipad (out the front): hold F on the helicopter to climb in and ready up; hold F again to get out.

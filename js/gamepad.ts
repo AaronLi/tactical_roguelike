@@ -6,11 +6,11 @@ import { Touch } from './touch.js';
 import { InvUI } from './invui.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
-// A controller (the Gamepad API's standard mapping: an Xbox pad, a Steam Deck's own controls), polled once a frame by G.Game.loop. It's not a
+// A controller (the Gamepad API's standard mapping: an Xbox pad, a Steam Deck's own controls), polled once a frame by Game.loop. It's not a
 // control scheme of its own: in a level its buttons are the keys and mouse buttons they stand for, sent as those events down the same handlers
 // (js/player.ts bindInput, js/game.ts bindMenu); in a menu it drives a cursor that presses, drags and right-clicks what's on the screen with
 // pointer events, so a shop, the inventory's grids and the gunsmith's canvas all work as they do with a mouse. Only the sticks' fractions go in
-// direct (G.Me.padMove, G.Me.lookBy). A button press isn't a user gesture to a browser, so there's no pointer lock to be had from one: G.Game.softLocked
+// direct (Me.padMove, Me.lookBy). A button press isn't a user gesture to a browser, so there's no pointer lock to be had from one: Game.softLocked
 // stands in for it (js/game.ts lock).
 type PadBtn = 'A' | 'B' | 'X' | 'Y' | 'LB' | 'RB' | 'LT' | 'RT' | 'VIEW' | 'MENU' | 'L3' | 'R3' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type PadDir = [number, number];
@@ -417,5 +417,3 @@ export const Pad = (() => {
     text(html: string) { if (Touch.active()) return Touch.text(html); if (!on) return html; for (const [re, to] of SUBS) html = html.replace(re, to); return html; },
   };
 })();
-G.Pad = Pad;
-declare global { interface GameModules { Pad: typeof Pad; } }

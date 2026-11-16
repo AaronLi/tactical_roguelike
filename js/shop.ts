@@ -133,5 +133,3 @@ export const Shop = {
     return Gear.DEFS[id].price + (pl ? Gear.DEFS[pl].price : 0) + (fc ? Gear.DEFS[fc].price : 0);
   },
 };
-G.Shop = Shop;
-declare global { interface GameModules { Shop: typeof Shop; } }

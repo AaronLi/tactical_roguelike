@@ -248,5 +248,3 @@ export const Med = (() => {
   }
   return { PARTS, NAME, ITEMS, LIMBS, figure, isLimb, newBody, partOf, hit, wound, paralysed, tick, bleedOut, bleeding, aimPenalty, speedMult, cantTreat, treat, cantRevive, reviveWarn, downable, unconscious, DOWNABLE, UNCON, overall, encode, decode, describe };
 })();
-G.Med = Med;
-declare global { interface GameModules { Med: typeof Med; } }

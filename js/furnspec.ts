@@ -6,7 +6,7 @@ import { Furniture } from './furniture.js';
 type FdRng = (() => number) & { st(): number };
 export const FurnSpec = (() => {
   const VERSION = 1;
-  // G.U.rng's generator (mulberry32), its state readable: a texture's painting starts where the stream is (FdTex.s), and
+  // U.rng's generator (mulberry32), its state readable: a texture's painting starts where the stream is (FdTex.s), and
   // srng(s) carries on from there exactly as the stream would have
   const srng = (seed: number): FdRng => {
     let a = seed >>> 0;
@@ -364,7 +364,7 @@ export const FurnSpec = (() => {
     const pieceRng = (p: { v: number; x: number; z: number }) => srng((Math.floor((p.v || 0) * 4294967295) ^ Math.imul(cm(p.x), 0x9e3779b1) ^ Math.imul(cm(p.z), 0x85ebca6b)) >>> 0);
     const roomRng = (rm: any, salt: number) => srng((map.seed ^ salt ^ Math.imul(((rm.fl || 0) * map.H + rm.z) * W + rm.x + 1, 0x9e3779b1) ^ Math.imul(rm.w * 65536 + rm.h, 0x85ebca6b)) >>> 0);
     for (const p of map.propList || new Set(map.props.values())) {
-      // (gy: on rolling ground, a rock or a tree where it lies: G.Level.crestGround)
+      // (gy: on rolling ground, a rock or a tree where it lies: Level.crestGround)
       D.cur = pieceRng(p);
       D.begin([p.x, p.gy || 0, p.z], p.q, { piece: p.name, v: p.v, style: p.style, solids: opts.solids ? F.solids(R[p.name], p.v) : undefined });
       R[p.name].build(k, p.v, p.style);
@@ -549,6 +549,4 @@ export const FurnSpec = (() => {
 
   return { VERSION, srng, tint, painters, outsidePaint, packPaint, PACK_N, TEX_KINDS, piece, describe, fingerprint, hashOf };
 })();
-G.FurnSpec = FurnSpec;
 
-declare global { interface GameModules { FurnSpec: typeof FurnSpec; } }

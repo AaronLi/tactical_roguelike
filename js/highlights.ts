@@ -1480,7 +1480,7 @@ export const Highlights = (() => {
     // the gunfire, from the TV (in a video too)
     if (P.vol > 0.05 || AT.ctx || AT.rec) tvShot(sh, s);
   }
-  // A round's flight, from its gun and load (the game's own speed downrange: G.roundSpeed): from f to to (where it hit),
+  // A round's flight, from its gun and load (the game's own speed downrange: roundSpeed): from f to to (where it hit),
   // its speed and time at each step of the way, and how far gravity's pulled it below the bore line by then (cached on
   // the shot). xAt(t): how far it's gone t seconds after leaving the muzzle.
   function flightOf(sh: Shot) {
@@ -2146,7 +2146,7 @@ export const Highlights = (() => {
     put();
     if (gun.userData.pending) GunModels.whenReady(gun, (ok) => { if (ok && pivot.children.includes(gun)) put(); });
   }
-  // The tour's own model of the gun: every part as separate slot-tagged meshes (G.GunModels.display, in the same frame as the turntable's merged
+  // The tour's own model of the gun: every part as separate slot-tagged meshes (GunModels.display, in the same frame as the turntable's merged
   // one, which stands in for the overview), each part's box, and the materials of its meshes copied so one can be lit and the rest dimmed without
   // touching the shared ones. Hidden until the tour starts (gearTourView swaps it in).
   function gearTourSet(s: Seg, gun: THREE.Object3D) {
@@ -3433,5 +3433,3 @@ export const Highlights = (() => {
   // (step and draw: the broadcast moved on and drawn by hand, for checking a replay without standing at a TV)
   return { TVS, tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, stick, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, warm, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();
-G.Highlights = Highlights;
-declare global { interface GameModules { Highlights: typeof Highlights; } }

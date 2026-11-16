@@ -25,7 +25,7 @@ export const Demo = (() => {
     ['rev', 'Revolver: swing-out cylinder', 'semi'],
     ['dbl', 'Double barrel: break-action', 'semi'],
   ];
-  // timed on the game's own clock, and stepped from inside its frames (G.Me.update, hooked in run()): each wait
+  // timed on the game's own clock, and stepped from inside its frames (Me.update, hooked in run()): each wait
   // ends on the frame its time comes, so a slow or throttled tab slows the reel with it rather than skipping
   let clock = 0;
   const waiters: { t: number; r: () => void }[] = [];
@@ -111,6 +111,4 @@ export const Demo = (() => {
   if (new URLSearchParams(location.search).has('demo')) window.addEventListener('load', () => setTimeout(run, 300));
   return { REEL, run };
 })();
-G.Demo = Demo;
 
-declare global { interface GameModules { Demo: typeof Demo; } }

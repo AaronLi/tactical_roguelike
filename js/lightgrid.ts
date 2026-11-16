@@ -21,7 +21,7 @@ import { Level } from './level.js';
 //   - Walls hold no light: each tile also stores 1 if it's open, 0 if it's wall, the light premultiplied by it, so
 //     the texture's own filtering averages only the open tiles round a spot (the shader divides by the filtered
 //     weight). A thin wall's two sides never mix.
-//   - It's on only while the level itself is drawn (G.R.render): the gunsmith's and the icons' renderers share the
+//   - It's on only while the level itself is drawn (R.render): the gunsmith's and the icons' renderers share the
 //     materials, and don't want the level's lamps.
 // Dynamic lights (muzzle flashes, weapon lights, explosions) are still real lights.
 export const LightGrid = (() => {
@@ -361,7 +361,7 @@ export const LightGrid = (() => {
     G0!.hl[q] = h(Math.max(0, c[o]) * w); G0!.hl[q + 1] = h(Math.max(0, c[o + 1]) * w); G0!.hl[q + 2] = h(Math.max(0, c[o + 2]) * w); G0!.hl[q + 3] = h(w); // (a door's layer can take light away: never below none)
     G0!.hd[q] = h(c[o + 3] * s); G0!.hd[q + 1] = h(c[o + 4] * s); G0!.hd[q + 2] = h(c[o + 5] * s); G0!.hd[q + 3] = h(w);
   }
-  // how far a door's open (0 shut .. 1): its layer goes in by as much (G.Game.updateDoors, each frame)
+  // how far a door's open (0 shut .. 1): its layer goes in by as much (Game.updateDoors, each frame)
   function setDoor(id: number, k: number) {
     const ly = G0 && G0.layers[id];
     if (!ly) return;
@@ -404,9 +404,7 @@ export const LightGrid = (() => {
     if (w > 0.02) out.setRGB(r / w, g / w, b / w);
     return out;
   }
-  // on while the level's drawn (G.R.render), off for anything else drawn with the same materials
+  // on while the level's drawn (R.render), off for anything else drawn with the same materials
   const on = (v: boolean) => { U.lgGrid.value.w = v && built ? 1 : 0; };
   return { build, compute, dispose, on, at, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();
-G.LightGrid = LightGrid;
-declare global { interface GameModules { LightGrid: typeof LightGrid; } }

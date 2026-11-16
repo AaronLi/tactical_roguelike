@@ -8,13 +8,13 @@
 // size and its kit the right fit from the moment it's made, and the body itself is put on when its file has come (js/rig.ts
 // attachHuman: till then the old figure of boxes and tubes stands in).
 //
-//   G.Humans.ids                 every figure's id (m01..m10, f01..f10)
-//   G.Humans.pick(o)             whose body a character has: by their name and animal (an officer), or their seed
-//   G.Humans.def(id)             its HumanDef
-//   G.Humans.ensure(id)          Promise<parts | null>: its file loaded and taken apart
-//   G.Humans.get(id)             the parts if they're loaded, else null
-//   G.Humans.boot()              every figure's file, loaded behind the menu
-//   G.Humans.gear(name)          a node of the gear that's the same on every body (assets/models/humans/gear.glb: night vision, a plate;
+//   Humans.ids                 every figure's id (m01..m10, f01..f10)
+//   Humans.pick(o)             whose body a character has: by their name and animal (an officer), or their seed
+//   Humans.def(id)             its HumanDef
+//   Humans.ensure(id)          Promise<parts | null>: its file loaded and taken apart
+//   Humans.get(id)             the parts if they're loaded, else null
+//   Humans.boot()              every figure's file, loaded behind the menu
+//   Humans.gear(name)          a node of the gear that's the same on every body (assets/models/humans/gear.glb: night vision, a plate;
 //                                models/characters/build_gear.py), or null: loaded with the first body, so it's in before any body is
 //
 // A part is one material's faces: { geo (shared: never disposed with a body), mat (its material's name: shirt, upsleeve, sleeve,

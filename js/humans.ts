@@ -40,5 +40,3 @@ export const Humans = (() => {
   const boot = () => { for (const id of ids) ensure(id); };
   return { ids, pick, def: (id: string): HumanDef | null => DATA[id] || null, ensure, get: (id: string) => loaded.get(id) || null, boot, gear: (name: string) => gearNodes.get(name) || null };
 })();
-G.Humans = Humans;
-declare global { interface GameModules { Humans: typeof Humans } }

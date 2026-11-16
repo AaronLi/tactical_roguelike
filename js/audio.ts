@@ -514,7 +514,7 @@ export const Audio = {
   },
   // A shot's path from `from` to `to`: if it passes close to you (and goes past or near you, not just
   // toward you from far behind), the crack, but only if it's still supersonic where it passes (its speed
-  // from the gun, its load and how far it's come: G.roundSpeed); slower, a zip of air. am: the load.
+  // from the gun, its load and how far it's come: roundSpeed); slower, a zip of air. am: the load.
   flyby(from: THREE.Vector3, to: THREE.Vector3, def: WeaponDef, am: string) {
     if (!this.ctx || !def || def.explosive || def.cls === 'BOW' || def.cls === 'GL') return;
     const e = this._ear(from);
@@ -661,10 +661,8 @@ export const Audio = {
   tape(dist = 0) { const a = this._att(dist), t = this.ctx.currentTime; this._noise(t, 0.22, 1300, 2, 0.2 * a, 'bandpass', 5200); this._noise(t + 0.26, 0.06, 800, 1, 0.18 * a, 'lowpass'); },
   heal() { this.tone(600, 0.25, 'sine', 0.15, 900); },
 };
-G.Audio = Audio;
 ReplayEnv.Audio = Audio; // (what the replay asks of it: js/replayenv.ts)
 // (what the simulation's files may sound: js/arsenal.ts, js/damage.ts)
 Hooks.click = () => { if (Audio.click) Audio.click(); };
 Hooks.doorFallSound = (d) => { if (Audio.sampleAt) Audio.sampleAt('door_close', new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.5, 0.7); };
 Hooks.doorKick = (piv) => { if (Audio.kick) Audio.kick(AudioEnv.R!.camera.position.distanceTo(piv.position)); };
-declare global { interface GameModules { Audio: typeof Audio; } }

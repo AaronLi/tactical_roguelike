@@ -342,5 +342,3 @@ export const SpaceUI = (() => {
   }
   return { show, update, flash, openOps, closeOps, opsRender, boardTex, boardDraw, objDraw };
 })();
-G.SpaceUI = SpaceUI;
-declare global { interface GameModules { SpaceUI: typeof SpaceUI; } }

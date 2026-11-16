@@ -11,7 +11,7 @@ import { HUD } from './hud.js';
 // taken from a tree of its own (the sidearm's is js/arsenal.ts's, as it always was). Every tree starts from the piece in its middle and runs
 // out along paths; each piece on it is earned either by rank (XP, from the missions you complete: the harder the mission, the more) or by
 // a challenge done with the piece before it (so many kills of a kind with that gun, so many rounds stopped by that armour, so many
-// missions flown in it). What's earned stays yours, kept on this machine (G.U.store 'loadout') between runs, whatever squad you're in.
+// missions flown in it). What's earned stays yours, kept on this machine (U.store 'loadout') between runs, whatever squad you're in.
 //   rank: 0 to start; the Micro Uzi, the primary tree's middle, comes at rank 1 (your first mission does it).
 // Each piece takes up to two attachments (BOXES), earned with it: a gun's parts by challenges with that gun (ATT: each kind of part its
 // own, harder as the part's tier goes up); a helmet's face piece and a carrier's plate, shoulder and groin pieces by the missions flown
@@ -250,6 +250,4 @@ export const Loadout = (() => {
   function reload() { save = null; }
   return { THROWS, THROW_SLOTS, THROW_PTS, THROW_NAME, THROW_SHORT, THROW_DESC, throwItem, thr, setThr, nextThr, thrCost, TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, boxesWith, fit, build, BUDGET, pts, cost, total };
 })();
-G.Loadout = Loadout;
 Hooks.gunStat = (id, stat) => Loadout.gunStat(id, stat); // (the sidearm tree's kills count here too: js/arsenal.ts tally)
-declare global { interface GameModules { Loadout: typeof Loadout } }

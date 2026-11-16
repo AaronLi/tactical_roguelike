@@ -2,7 +2,7 @@
 // script or (docs/modules-plan.md) a module. What makes and uses them is in js/views.ts.
 
 // Client-side representations of networked things: remote players, enemies, grenades.
-// Characters are G.Rig skeletons; their hitboxes ride the animated bones (see js/rig.ts).
+// Characters are Rig skeletons; their hitboxes ride the animated bones (see js/rig.ts).
 // A remote officer, as drawn here: their rig, and the latest state the host sent (st: short keys, see js/server.ts snap)
 interface VwPlayer { id: string; name: string; color: number; animal: string; look: any; rig: Rig; tag: THREE.Object3D | null; st: any; pos: THREE.Vector3; yaw: number; pitch: number; first: boolean; dead?: boolean; deadAt?: number | null; lastAct?: string; lastAp?: number; [k: string]: any }
 

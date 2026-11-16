@@ -51,7 +51,7 @@ export const Hangar = (() => {
   const LOUNGE = { x0: 36, x1: 50, z0: 14.2, z1: 26, wall: 38, sofas: [{ x: 43.4, z0: 17.6, z1: 22.4 }, { x: 40.4, z0: 17.2, z1: 22.8 }], table: [45.0, 19.3, 46.0, 20.7, 0.42], bar: [37.0, 23.4, 38.0, 25.8, 1.0] };
   // the precision showcase: the front of the workshop side, by the hangar door, done up as a hunting superstore (Timberline
   // Outfitters): a plank floor inside log rails (a way in off the hall, and one from the workshop), six tree stumps (two rows of three) with the
-  // scopes, the bipod and the match barrels for sale turning on them (G.Gunsmith.rollPrecision), fibreglass rockwork along the
+  // scopes, the bipod and the match barrels for sale turning on them (Gunsmith.rollPrecision), fibreglass rockwork along the
   // front wall with a waterfall into a pond, a stuffed grizzly reared up on a boulder, pines, a canoe hung from the roof
   const OUT = { x0: 5.4, x1: 16.6, z0: 16.4, z1: 26, rows: [18.6, 21.6], xs: [7.6, 10.9, 14.2], top: 0.9, size: 0.9, rocks: 24.9, pond: [10.0, 23.0, 14.8, 25.4], bear: [7.0, 24.0], pines: [[15.9, 25.0], [6.1, 17.2]], door: [19.0, 21.2], back: 8.4 };
   const REACH = 3.2, HELI_REACH = 4.2, HOLD = 1.1;
@@ -330,7 +330,7 @@ export const Hangar = (() => {
     return (loadP = Models.loadFile(FILE).then((scene: THREE.Object3D) => { BAKED = prep(scene); loadMs = performance.now() - t0; S.loadMs = Math.round(loadMs); return true; },
       (e: any) => { console.error('[hangar] ' + FILE + ': ' + (e && e.message || e)); loadP = null; return false; }));
   }
-  // a quantised attribute (normals, UVs: tools/model_emit.mjs compression) as float32 (what G.LevelView.batchStatic batches)
+  // a quantised attribute (normals, UVs: tools/model_emit.mjs compression) as float32 (what LevelView.batchStatic batches)
   function floatAttr(a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute) {
     const n = a.count, s = a.itemSize, f = new Float32Array(n * s);
     for (let i = 0; i < n; i++) { f[i * s] = a.getX(i); if (s > 1) f[i * s + 1] = a.getY(i); if (s > 2) f[i * s + 2] = a.getZ(i); if (s > 3) f[i * s + 3] = a.getW(i); }
@@ -410,7 +410,7 @@ export const Hangar = (() => {
   // (js/levelview.ts batchStatic): about half the hangar's draw calls. Not anything that's kept hold of to be moved or changed
   // later, nor what's under it: what's on show and turning, its sign, the vending machines' slots, the pouch shelf, the
   // helicopter (its rotors), the people, the range's plates, carriers and screens, the course's stage, the TVs.
-  //   (G.LevelView.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
+  //   (LevelView.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
   function batch() {
     const keep = new Set<THREE.Object3D>(), hold = (o: unknown, d = 0) => {
       if (!o || typeof o !== 'object' || d > 2) return;
@@ -746,7 +746,7 @@ export const Hangar = (() => {
   // the brand on the back wall over two rows of glass cases (one for each set they make, the set turning inside on a
   // mannequin's head, its card on the case's face to the aisle), a counter at the far end with their rep behind it (a
   // panoramic set flipped up on the helmet), shelves of boxed stock, a keypad at the door and a camera dome over it.
-  // What's in stock this visit is the shop's (G.Shop.offers.nvg); a set not in this visit (or not yet: lv) says so on its card.
+  // What's in stock this visit is the shop's (Shop.offers.nvg); a set not in this visit (or not yet: lv) says so on its card.
   function nightjarFixed(r: THREE.Object3D) {
     const N = NJ, cx = (N.x0 + N.x1) / 2, cz = (N.z0 + N.z1) / 2;
     const black = M(0x121416, { roughness: 0.45, metalness: 0.3 }), panel = M(0x1b1f23, { roughness: 0.6, metalness: 0.2 }), steel = M(0x3a4046, { roughness: 0.35, metalness: 0.7 });
@@ -1274,8 +1274,6 @@ export const Hangar = (() => {
 
   return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, load, fixtures, at, baked: () => !!BAKED, FILE, S, HELI, HOLD, RZ };
 })();
-G.Hangar = Hangar;
 ReplayEnv.Hangar = Hangar; // (what the replay asks of it: js/replayenv.ts)
 Hooks.hangarDecorate = (map) => Hangar.decorate(map); // (a hangar's map gets its own fittings: js/level.ts generateHub)
 window.addEventListener('gunicons', () => { if (Hangar.S.root) Hangar.refresh(true); }); // (a gun's picture came in after its sign was drawn: js/icons.ts)
-declare global { interface GameModules { Hangar: typeof Hangar; } }

@@ -31,7 +31,7 @@ export const Level = {
   CRATE_HX: 0.8,
   DOOR_H: 2.3,
 
-  // th: the environment (index into G.THEMES) picked on the route map; by default they come round in turn. night: a night
+  // th: the environment (index into THEMES) picked on the route map; by default they come round in turn. night: a night
   // level (the route node's: js/route.ts), the same place with the lights out (nightify)
   // sp: what a mission's level is for besides (js/spacedata.ts SpGen: a ship's size and what's wanted aboard her)
   generate(seed: number, level: number, th?: number, night = false, sp?: SpGen | null) {
@@ -44,7 +44,7 @@ export const Level = {
   },
   // The level as data (js/leveldesc.ts, docs/level-data.md): map.desc, everything that's drawn and everything that's solid,
   // the same wherever it's made from the same seed. The light grid's lamps are its (map.lamps); the world everyone collides
-  // with, sees and shoots through is built from its solids alone (G.World.fromDesc: the planner's own, which the landing's
+  // with, sees and shoots through is built from its solids alone (World.fromDesc: the planner's own, which the landing's
   // sight lines were worked out in, is let go).
   described(map: LvMap) {
     const lampsOf = (m: LvMap) => m.lights.map((l) => this.lampOf(l, map.theme)).filter((l): l is LvLight => !!l);
@@ -225,7 +225,7 @@ export const Level = {
     return v;
   },
   // The hangar between levels (js/hangar.ts): the whole map is the same as any level's (the same walls, floor,
-  // lights, collision and rays), with nothing in it but what G.Hangar puts there.
+  // lights, collision and rays), with nothing in it but what Hangar puts there.
   generateHub(seed: number, level: number) {
     const r = G_U.rng(seed), lay = this.layHangar(r, level);
     const map = this.plan(lay, r, seed, level, HANGAR_THEME);
@@ -373,7 +373,7 @@ export const Level = {
           continue;
         }
         if (v === 5) { t[fi] = 5; out[fi] = c.out[ci] ? 1 : 0; continue; } // a drop: no floor (the floor below shows through), or upstairs, the open air outside
-        if (v === 6) { t[fi] = 7; continue; } // a flight of stairs (its steps are solids: G.Level.stack)
+        if (v === 6) { t[fi] = 7; continue; } // a flight of stairs (its steps are solids: Level.stack)
         t[fi] = 0; out[fi] = c.out[ci] ? 1 : 0; // floor (furniture is laid on it below)
         if (grate && cg[ci]) grate[fi] = 1;
       }
@@ -840,7 +840,7 @@ export const Level = {
   //    and along the north (cafes, stores, bars, each with a door onto the square), a fountain in the middle.
   //  - The car park along the south, where you come in: rows of parked cars, the festival's gate under its arch
   //    and the street into the square opening off it.
-  // (What goes where: G.Furniture.plan's festival(); the lights, sky and stage rig: buildFestival.)
+  // (What goes where: Furniture.plan's festival(); the lights, sky and stage rig: buildFestival.)
   layFestival(r: LvRng, level: number): LvLay {
     const U = G_U, W = 58 + Math.min(level, 4) * 2, H = 61, TX = 17, PZ = 42; // the town west of TX; the car park south of PZ, the overflow beyond it where the helicopter lands
     const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H).fill(1), rooms: LvRoom[] = [], doors: LvDoorSpec[] = [], fences: LvFence[] = [];
@@ -902,7 +902,7 @@ export const Level = {
   //    wall (the theme's fence) along every edge of it and round the map.
   // The outcrops (wall tiles, lay.crest.kind 1) are laid in blobs, each kept only if every bit of ground is still reached,
   // and never a tile thick (a wall that thick between two open spaces thins to a slab: refine).
-  // (What goes where: G.Furniture.plan's crest(); the sky, the mountain under it and the city below: buildCrest.)
+  // (What goes where: Furniture.plan's crest(); the sky, the mountain under it and the city below: buildCrest.)
   CHASM: 45,
   // The Sandia Crest's ground, not flat: map.terrain, a height at each corner of the fine grid (v, (W + 1) x (H + 1)), the
   // ground across a cell the two triangles between its corners (js/world.ts terrainAt; drawn the same: build). What it's
@@ -1045,7 +1045,7 @@ export const Level = {
   // The viewing building's roof as solids (after the rest of the level's: js/world.ts fromTileMap): its slab over the whole
   // of it (the ceilings stop at the walls' middle lines), the parapet round its edge; and the guard rail inside its front
   // glass (crest.guard: it stops you walking out where the glass is shot out; only its handrail stops a round, as a
-  // railing's: G.Level.stack)
+  // railing's: Level.stack)
   // The outcrops' rough tops (an icosahedron over each one's wall, sometimes a smaller one on that) and a lump or two at their
   // feet: each one's matrix (placed, turned, stretched) and its shade (p). From the seed alone, so the meshes (buildCrest) and
   // what rays meet (crestSolids: each its own convex shape, js/world.ts hullOf) are the same rocks.
@@ -1073,7 +1073,7 @@ export const Level = {
     const w = map.world, WH = this.WALL_H, P = this.PARAPET, gd = map.crest.guard;
     // the outcrops' tops and the lumps at their feet, as drawn: rays meet them (you never get up there, and the lumps are at the
     // walls' feet: what stops you is the walls)
-    // (the icosahedron's corners as three.js has them, and the matrix applied as it applies one: G.LevelDesc.ICO, apply)
+    // (the icosahedron's corners as three.js has them, and the matrix applied as it applies one: LevelDesc.ICO, apply)
     const D = LevelDesc, tri = D.ICO;
     for (const c of this.crestCaps(map)) {
       const t: number[] = []; for (let i = 0; i < tri.length; i += 3) t.push(...D.apply(c.m, tri[i], tri[i + 1], tri[i + 2]));
@@ -1299,7 +1299,7 @@ export const Level = {
   //   the front wall, glass either side of its double door, and the lot outside it (fenced), delivery trucks parked across
   //     it and the helicopter's pad behind them, where you come in.
   // The shelving is laid on the fine grid (js/furniture.ts plan, mart), not tile by tile: that's what makes the aisles narrow.
-  // Its weapon case, attachments box and first aid cabinet are always in the stockroom (G.THEMES starter).
+  // Its weapon case, attachments box and first aid cabinet are always in the stockroom (THEMES starter).
   layMart(r: LvRng, level: number): LvLay {
     const W = 10, B = 9, D = 10, H = B + D, U = G_U;
     const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences: LvFence[] = [], doors: LvDoorSpec[] = [];
@@ -1603,7 +1603,7 @@ export const Level = {
   },
   // What each room of a home is, so it's a home and not a deal of the cards: the front door opens into the kitchen, the
   // biggest room through it at the back of the home is the living room (a loft's already is), and the rest are a bedroom,
-  // the biggest, then whatever suits. Set here, the types don't come from G.Furniture.plan's deal.
+  // the biggest, then whatever suits. Set here, the types don't come from Furniture.plan's deal.
   _program(r: LvRng, mine: LvRoom[], doors: LvDoorSpec[], fr: LvRoom, back: (q: LvRoom) => boolean) {
     const U = G_U, size = (q: LvRoom) => q.w * q.h, big = (a: LvRoom, b: LvRoom) => size(b) - size(a), next = this._through(fr, mine, doors);
     const living = mine.find((q) => q.type === 'living') || (back(fr) ? null : next.filter(back).sort(big)[0]) || fr;
@@ -1678,8 +1678,8 @@ export const Level = {
       for (const w of m.wallSpots) map.wallSpots.push(Object.assign(w, { y: m.fy, fl: f }));
       for (const sp of m.enemySpots) map.enemySpots.push([sp[0], sp[1], f]);
     });
-    // a glass door's pane, counted with the windows (shot through and shot out the same way: G.Views.breakGlass,
-    // G.Server.breakGlass); its mesh is the door's leaf
+    // a glass door's pane, counted with the windows (shot through and shot out the same way: Views.breakGlass,
+    // Server.breakGlass); its mesh is the door's leaf
     for (const d of map.doors) if (d.kind === 'stair') { d.pane = { id: map.windows.length, door: d, x: d.x, z: d.z, fy: d.fy, fl: d.fl, broken: false, cells: [], len: d.w || TS }; map.windows.push(d.pane); }
     // the stairs, in metres: their footprint, the floor at their foot, which way they climb
     map.stairs = lay.stairs.map((st: LvStair) => ({ f: st.f, y0: fms[st.f].fy, rise: FH, axis: st.axis, up: st.up, x0: st.x0 * CTS, x1: (st.x1 + 1) * CTS, z0: st.z0 * CTS, z1: (st.z1 + 1) * CTS }));
@@ -1717,7 +1717,7 @@ export const Level = {
     for (const st of map.stairs) World.stairs(w, st);
     fms.forEach((m, f) => { const up = fms[f + 1]; if (up) for (let i = 0; i < m.W * m.H; i++) if (this._capped(m, up, i)) { const x = (i % m.W) * TS, z = Math.floor(i / m.W) * TS; World.add(w, World.box(x, m.fy + this.WALL_H, z, x + TS, up.fy, z + TS, { kind: 'floor' })); } });
     // a railing stops you walking off the drop (glass or not); only its steel handrail stops a round: under it, the
-    // glass is a pane (its solids: G.World.windowSolids), shot through and out
+    // glass is a pane (its solids: World.windowSolids), shot through and out
     for (const rl of map.rails) {
       World.add(w, World.box(rl.x0, rl.y, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', ray: false }));
       World.add(w, World.box(rl.x0, rl.y + this.RAIL_H - 0.05, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', move: false }));
@@ -1825,7 +1825,7 @@ export const Level = {
 
   // The hangar: one big hall (the workshop, the store and the warehouse side by side in it), a wide opening in its
   // front wall, and the helipad out in front of that, open to the sky and fenced. 52 x 42 m.
-  // Behind its north wall (a garage door in it) is the shooting range, in the first G.HANGAR_ROWS rows: a yard to stand in
+  // Behind its north wall (a garage door in it) is the shooting range, in the first HANGAR_ROWS rows: a yard to stand in
   // at the firing line, an IPSC course on the left, a pistol range (16 m) and a rifle range (300 m), walled between and open
   // to the sky, a backstop at the far end of each.
   layHangar(_r?: LvRng, _level?: number): LvLay {
@@ -2054,7 +2054,7 @@ export const Level = {
 
   // Circle-vs-tile collision. Boxes the entity is standing on top of (y >= box height) are ignored.
   // step: how high a thing can be and still be stepped up onto, not walked into (a stair's step is 0.2)
-  // smooth: someone walking (stairs are slopes for them: G.World.rampAt)
+  // smooth: someone walking (stairs are slopes for them: World.rampAt)
   // ---- Aboard a ship lying tilted against this one (a breach nose up or down: js/space.ts and js/spaceserver.ts setTilt), her own
   // gravity: her decks are level to whoever's aboard her. Anyone (and any grenade) there is moved in her own frame, where she lies level
   // (tilt.lm: this map with her own boxes and flights as she's built in place of its world: js/spacedata.ts frameWorld), and put back
@@ -2301,5 +2301,3 @@ export const Level = {
   // the middle (a parabola's near enough to the catenary)
   zipPoint(l: { a: number[]; b: number[]; sag: number }, s: number) { return [l.a[0] + (l.b[0] - l.a[0]) * s, l.a[1] + (l.b[1] - l.a[1]) * s - l.sag * 4 * s * (1 - s), l.a[2] + (l.b[2] - l.a[2]) * s]; },
 };
-G.Level = Level;
- declare global { interface GameModules { Level: typeof Level; } }

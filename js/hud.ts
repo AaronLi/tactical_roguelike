@@ -535,8 +535,6 @@ export const HUD = {
     return html;
   },
 };
-G.HUD = HUD;
 ReplayEnv.HUD = HUD; // (what the replay asks of it: js/replayenv.ts)
 Hooks.toast = (title, text, sec) => HUD.toast(title, text, sec); // (what the simulation's files may put on the screen: js/arsenal.ts)
 Hooks.feed = (html) => HUD.feed(html);
-declare global { interface GameModules { HUD: typeof HUD; } }

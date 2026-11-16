@@ -328,7 +328,7 @@ export const Casings = (() => {
 
   return {
     mode, fired, emptied, loose, dropMag, magMesh, takeMag, aimedMag, surface,
-    // for G.R.warmup: the cases' meshes in the scene now, and a sample magazine and box (not kept)
+    // for R.warmup: the cases' meshes in the scene now, and a sample magazine and box (not kept)
     warm() { attach(); const def = WEAPONS.m4; return [magMesh(def, null).mesh, magMesh(def, { k: 'ammo' }).mesh]; },
     get mags() { return mags; }, // for debugging
     get live() { return live; }, // for debugging
@@ -378,7 +378,5 @@ export const Casings = (() => {
     },
   };
 })();
-G.Casings = Casings;
 ReplayEnv.Casings = Casings; // (what the replay asks of it: js/replayenv.ts)
 AudioEnv.Casings = Casings; // (what sound asks of it: js/audioenv.ts)
-declare global { interface GameModules { Casings: typeof Casings; } }

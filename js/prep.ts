@@ -4,12 +4,12 @@ import { LightGrid } from './lightgrid.js';
 // js/space.ts) is asked for by its figures, worked on in another thread while the game goes on, and what was worked out is
 // taken when it's wanted, so the frame it's put up has little left to do. Nothing depends on it: a level that wasn't asked
 // for, or isn't ready, is worked out on the spot as before.
-//   G.Prep.want(seed, level, th, night, gen)   start on it (once)
-//   G.Prep.map(seed, level, th, night, gen)    the level laid out there (js/level.ts generate, as it would be here: a level
+//   Prep.want(seed, level, th, night, gen)   start on it (once)
+//   Prep.map(seed, level, th, night, gen)    the level laid out there (js/level.ts generate, as it would be here: a level
 //                                              has nothing in it of anything outside it, so it comes over whole), if it's
 //                                              come; asked for if it isn't on its way. null meanwhile; false if there's no
 //                                              other thread, so it's to be laid out here
-//   G.Prep.take(seed, level, th, night, gen)   its light grid's sums (map.lgPre), if they've come, else null
+//   Prep.take(seed, level, th, night, gen)   its light grid's sums (map.lgPre), if they've come, else null
 export const Prep = (() => {
   let w: Worker | null = null, dead = false;
   const got = new Map<string, any>(), maps = new Map<string, LvMap>(), flying = new Set<string>(), bad = new Set<string>();
@@ -54,5 +54,3 @@ export const Prep = (() => {
   }
   return { want, map, take, keyOf, boot: () => { worker(); } };
 })();
-G.Prep = Prep;
-declare global { interface GameModules { Prep: typeof Prep } }

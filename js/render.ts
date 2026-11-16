@@ -2065,9 +2065,7 @@ export const R = {
     u.map.value = B.b.texture; u.dir.value.set(0, 1 / B.b.height); u.fin.value = 1; r.setRenderTarget(null); r.render(B.scene, B.cam);
   },
 };
-G.R = R;
 AudioEnv.R = R; // (what sound asks of it: js/audioenv.ts)
 // (what the simulation's files ask of the renderer: js/damage.ts, js/scars.ts)
 Hooks.doorDust = (t, x, y, z) => { if (R.particles && t < 8) R.particles(new THREE.Vector3(x, y, z), 16, 0xa8a090, 1.4, 0.8, 1, 0.8); };
 Hooks.partLight = (p) => (R.partLight ? R.partLight(p) : 1);
-declare global { interface GameModules { R: typeof R; } }

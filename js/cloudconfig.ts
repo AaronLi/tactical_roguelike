@@ -7,6 +7,4 @@ export const CloudConfig = {
   SUPABASE_URL: 'https://gooxmxjvwfdocicxrsro.supabase.co',
   SUPABASE_ANON_KEY: 'sb_publishable_RkC5Wv2CKHTfClRhM2ejzw_J4hUNpb3', // (the publishable key: public by design)
 };
-G.CloudConfig = CloudConfig;
 
-declare global { interface GameModules { CloudConfig: typeof CloudConfig; } }

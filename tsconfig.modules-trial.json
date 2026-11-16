@@ -1,8 +1,0 @@
-{
-  // The trial for docs/modules-plan.md (tools/deps.mjs runs it): the project as it would check with every file a module
-  // (moduleDetection force), nothing written. Its errors are what phase 1 has to clear: the types and values one file names
-  // from another without G. (skipLibCheck off: the shared types are in declaration files, js/types, and must be checked;
-  // what that turns up in node_modules is left out by tools/deps.mjs.)
-  "extends": "./tsconfig.json",
-  "compilerOptions": { "moduleDetection": "force", "noEmit": true, "skipLibCheck": false }
-}

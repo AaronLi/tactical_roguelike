@@ -44,7 +44,7 @@ export const LevelDesc = (() => {
   const norm = (v: number[]) => { const l = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]) || 1; return [v[0] / l, v[1] / l, v[2] / l]; };
   const cross = (a: number[], b: number[]) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   // three's IcosahedronGeometry(1, 0), its triangles' corners (non-indexed, float32 as three makes them): the outcrops' rough
-  // tops are drawn from it and their solids cut from it (G.Level.crestSolids), so both take these
+  // tops are drawn from it and their solids cut from it (Level.crestSolids), so both take these
   const ICO: number[] = (() => {
     const A = 0.8506507873535156, B = 0.525731086730957;
     return [-A,0,B,0,B,A,-B,A,0,0,B,A,B,A,0,-B,A,0,B,A,0,0,B,-A,-B,A,0,0,B,-A,-A,0,-B,-B,A,0,-A,0,-B,-A,0,B,-B,A,0,0,B,A,A,0,B,B,A,0,-A,0,B,0,-B,A,0,B,A,-A,0,-B,-B,-A,0,-A,0,B,0,B,-A,0,-B,-A,-A,0,-B,B,A,0,A,0,-B,0,B,-A,A,0,B,0,-B,A,B,-A,0,0,-B,A,-B,-A,0,B,-A,0,-B,-A,0,0,-B,-A,B,-A,0,0,-B,-A,A,0,-B,B,-A,0,A,0,-B,A,0,B,B,-A,0,A,0,B,0,B,A,0,-B,A,0,-B,A,-A,0,B,-B,-A,0,-B,-A,0,-A,0,-B,0,-B,-A,0,-B,-A,0,B,-A,A,0,-B,A,0,-B,B,A,0,A,0,B];
@@ -393,7 +393,7 @@ export const LevelDesc = (() => {
   }
 
   // Steel grating (a foundry's catwalks: map.grate): bar grating, bearing bars a few centimetres apart and a cross bar every so
-  // often (the texture: G.Level.GRATE), seen through from above and below. Under it, a steel channel along every edge that's
+  // often (the texture: Level.GRATE), seen through from above and below. Under it, a steel channel along every edge that's
   // over the drop, and hanger rods up to the roof from them every few metres. Rounds meet the bars where they're drawn (onBar).
   function grate(map: LvMap, B: LdB): LdNode[] {
     const L = Level, TS = L.TS, { W, H, t, grate: gr } = map, out: LdNode[] = [];
@@ -458,7 +458,7 @@ export const LevelDesc = (() => {
   }
 
   // Doors: a lintel over the frame and a leaf on a hinge, its pivot (handle door:<id>) turned by how far open it is
-  // (G.Game.updateDoors): base the shut leaf's turn, sg which way it swings. The leaf (leaf), its knobs (knob) and hinges
+  // (Game.updateDoors): base the shut leaf's turn, sg which way it swings. The leaf (leaf), its knobs (knob) and hinges
   // (hk, hp: a knuckle and a leaf, shot out one by one: js/damage.ts).
   function doors(map: LvMap, B: LdB, wtex: number, paint: boolean): LdNode[] {
     const L = Level, TS = L.TS, th = map.theme, out: LdNode[] = [];
@@ -520,7 +520,7 @@ export const LevelDesc = (() => {
     return out;
   }
 
-  // The weapon case (a hard-shell long-gun case along the wall, its lid hinged at the back: G.Views.syncCase), the attachments
+  // The weapon case (a hard-shell long-gun case along the wall, its lid hinged at the back: Views.syncCase), the attachments
   // box, the sticker box and the first aid cabinets: groups with handles on what opens (case, case.lid, abox, abox.lid,
   // abox.lights, sbox, sbox.lid, sbox.card, cab:<n>, cab:<n>.door, cab:<n>.slot)
   function boxes(map: LvMap, B: LdB): LdNode[] {
@@ -546,7 +546,7 @@ export const LevelDesc = (() => {
       out.push(B.group(g, Object.assign(at(map.case), { h: 'case' })));
     }
     // the attachments box: a small hard case (black, a yellow band round it) on the floor, its lid hinged at the back, three
-    // cut-outs in the foam inside; a light on its front for each of the squad (G.Views)
+    // cut-outs in the foam inside; a light on its front for each of the squad (Views)
     if (map.abox) {
       const shell = M(0x17191b, 0.6), band = M(0xe0a020, 0.5), steel = M(0x9aa0a6, 0.3, 0.8), foam = M(0x2a2c30, 1), hole = M(0x0c0d0e, 1);
       const g: LdNode[] = [], lid: LdNode[] = [], Lb = 0.5, D = 0.34, H0 = 0.09, H1 = 0.05;
@@ -566,7 +566,7 @@ export const LevelDesc = (() => {
       out.push(B.group(g, Object.assign(at(map.abox), { h: 'abox' })));
     }
     // the sticker box: a little bright pink display box on the floor, a clear lid hinged at the back, the sticker lying on a
-    // white card inside (its picture and the lid: G.Views, once the host has said which it is)
+    // white card inside (its picture and the lid: Views, once the host has said which it is)
     if (map.sbox) {
       const pink = M(0xe8287a, 0.55), white = M(0xf2f0ea, 0.8), yel = M(0xffd23a, 0.5), g: LdNode[] = [], lid: LdNode[] = [], Lb = 0.24, D = 0.17, H0 = 0.05;
       bx(g, Lb, 0.008, D, pink, 0, 0.004, 0);
@@ -582,7 +582,7 @@ export const LevelDesc = (() => {
       out.push(B.group(g, Object.assign(at(map.sbox), { h: 'sbox' })));
     }
     // first aid cabinets: a white steel box on the wall with a red cross on its door (hinged on the left), two shelves inside
-    // with whatever's left in it (G.Views.syncCabs)
+    // with whatever's left in it (Views.syncCabs)
     (map.cabinets || []).forEach((c, n) => {
       const white = M(0xe9e7e2, 0.45, 0.3), inner = M(0xd6d3cc, 0.8), red = B.basic({ color: 0xc0201a }), g: LdNode[] = [], door: LdNode[] = [], Wd = 0.44, Hh = 0.52, D = 0.15, Y = 1.32;
       bx(g, Wd, Hh, 0.012, inner, 0, Y, -D / 2 + 0.006); // back
@@ -852,7 +852,7 @@ export const LevelDesc = (() => {
     throw new Error('level: no surface ' + (g as any).fn);
   }
   // The rolling ground (desc.terrain), on the ground floor: each cell off level at 0 that has a floor (not the open air of a
-  // gorge, not a catwalk's grating) as the two triangles G.World.terrainAt walks on (corners 00, 01, 10 and 10, 01, 11),
+  // gorge, not a catwalk's grating) as the two triangles World.terrainAt walks on (corners 00, 01, 10 and 10, 01, 11),
   // textured as a tile is, lit smooth (each corner's normal from the heights either side of it)
   function terrainSurface(d: LvDesc): LdGeo {
     const tr = d.terrain, TS = d.TS, W = d.W, H = d.H, t = d.floors[0].t as string, gr = d.floors[0].grate as string | null, V = tr.v, VW = tr.VW;
@@ -972,7 +972,7 @@ export const LevelDesc = (() => {
       out.push(B.mesh(B.geo('box', [9, 9, 13]), B.std({ color: 0xb4ab9e, roughness: 0.9 }), { p: [-6, -6.2, 52] }));
       out.push(B.mesh(B.geo('box', [9.1, 1.6, 13.1]), B.std({ color: 0x1c2228, roughness: 0.2, metalness: 0.5 }), { p: [-6, -3.4, 52] }));
     }
-    // ---- the outcrops' tops, rough (and a lump or two at their feet): granite like their walls (G.Level.crestCaps)
+    // ---- the outcrops' tops, rough (and a lump or two at their feet): granite like their walls (Level.crestCaps)
     {
       const capList = L.crestCaps(map);
       out.push({ t: 'i', g: B.geo('ico', [1, 0]), m: B.std({ color: 0xffffff, roughness: 0.95, flatShading: true }), n: Math.max(1, capList.length), cnt: capList.length, mx: capList.flatMap((c) => c.m), col: capList.flatMap((c) => linRGB(0.69 * c.p, 0.5 * c.p, 0.45 * c.p)), l1: 1 });
@@ -1004,7 +1004,7 @@ export const LevelDesc = (() => {
       out.push(B.mesh(B.geo('box', [R.x1 - R.x0, R.y - Bt, R.z1 - R.z0]), B.std({ color: 0x8a8580, roughness: 0.95 }), { p: [(R.x0 + R.x1) / 2, (Bt + R.y) / 2, (R.z0 + R.z1) / 2], l1: 1 }));
       out.push(B.mesh(B.geo('plane', [R.x1 - R.x0, R.z1 - R.z0]), B.std({ map: dt, roughness: 0.95 }), { r: [-PI / 2, 0, 0], p: [(R.x0 + R.x1) / 2, R.y + 0.004, (R.z0 + R.z1) / 2], l1: 1 }));
       if (!R.parapet) continue;
-      // (its railing: a concrete kerb, steel posts about every 1.3 m, a top rail and a mid rail, open between: G.Level.crestSolids)
+      // (its railing: a concrete kerb, steel posts about every 1.3 m, a top rail and a mid rail, open between: Level.crestSolids)
       const P = L.PARAPET, conc = B.std({ color: 0xa9a49c, roughness: 0.9 }), st = B.std({ color: 0x9aa0a4, roughness: 0.35, metalness: 0.8 });
       for (const [x0, z0, x1, z1] of L.parapetRuns(R)) {
         const along = x1 - x0 >= z1 - z0, len = along ? x1 - x0 : z1 - z0, cx2 = (x0 + x1) / 2, cz2 = (z0 + z1) / 2;
@@ -1082,5 +1082,3 @@ export const LevelDesc = (() => {
   }
   return { describe, propList, proc, fingerprint, canon, hash, PARTS, ICO, quatEuler, compose, apply, quatUnit, rngAt, TEX_DRAWS, lin, over };
 })();
-G.LevelDesc = LevelDesc;
-declare global { interface GameModules { LevelDesc: typeof LevelDesc; } }

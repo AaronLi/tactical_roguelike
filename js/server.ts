@@ -23,7 +23,7 @@ import { SpaceSv } from './spaceserver.js';
 // It talks to everyone, the host's own screen too, exclusively through SvNet (below), and reads nothing of what's on a screen.
 const STATE_CODE: Partial<Record<EnemyState, number>> = { normal: 0, flee: 0, surrender: 1, cuffed: 2, cower: 3 };
 interface Loose { [k: string]: any }
-// The kinds of message the host's handle() switches on (what an officer's game sends it with G.Net.toHost: the `t` field)
+// The kinds of message the host's handle() switches on (what an officer's game sends it with Net.toHost: the `t` field)
 type NetMsgKind = 'stk' | 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
 // A message off the wire: its kind, and whatever else that kind carries (dynamic: checked where it's read)
 interface NetMsg { t: NetMsgKind; [k: string]: any }
@@ -33,7 +33,7 @@ type CabLayout = any[][] & { left?: [string, number][] }; // (a cabinet's items,
 type MapCivSpots = LvMap & { civSpots?: { x: number; z: number; yaw: number }[] | null };
 type SvWin = LvWin & { cracked?: number; fy?: number }; // (a window, and how many rounds have fractured it, and the floor's height)
 type SvRoom = LvRoom & { out?: boolean };
-type ArmourKind = 'vest' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs'; // (G.ENEMY_GEAR.odds' keys)
+type ArmourKind = 'vest' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs'; // (ENEMY_GEAR.odds' keys)
 type ServerPhase = 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 interface Evidence { i: number; wpn: string; x: number; y: number; z: number; owner: number; secured: boolean; taken: boolean }
 interface Loot { id: number; x: number; y: number; z: number; item: any; yaw: number; fit?: number }
@@ -499,7 +499,7 @@ export const Server = {
     if (ms) { this.level = ms.diff; this.theme = ms.th; }
     this.night = ms ? ms.night : this.isNight();
     this.map = Level.generate(this.seed, this.level, this.theme as number, this.night, ms ? SpaceSv.genOf(ms) : null);
-    ServerHost.born(this.map); // (what it was built with: G.ServerLink.digest)
+    ServerHost.born(this.map); // (what it was built with: ServerLink.digest)
     this.aiMask(this.map);
     this.enemies.clear(); this.cleared = new Map();
     this.extract = { active: false, votes: new Set() };
@@ -545,7 +545,7 @@ export const Server = {
     return out;
   },
   // The weapon case's gun, magazines and rounds: drawn from the level's seed (salted, so it isn't the map's own draws), so a seed
-  // gives the same case every time it's played. G.Server.rollCase(seed, level) in the console says what a seed's case holds.
+  // gives the same case every time it's played. Server.rollCase(seed, level) in the console says what a seed's case holds.
   rollCase(seed?: number, level?: number) {
     if (seed == null) seed = this.seed; if (level == null) level = this.level;
     const r = G_U.rng((seed ^ 0x5ca5e) >>> 0);
@@ -559,13 +559,13 @@ export const Server = {
     // rounds to match.
     const kits = Gunsmith.kitsFor(w.id).filter((k) => obtainable(WEAPONS[Gunsmith.PARTS[k].becomes]));
     if (kits.length && r() < 0.35) w = WEAPONS[Gunsmith.PARTS[kits[Math.floor(r() * kits.length)]].becomes] || w;
-    if (w.barrels) { // a gun of several barrels (its round types are different lengths of round, G.roundOf): loaded with one, a spare block of the other, and a spare of the first: both turn up
+    if (w.barrels) { // a gun of several barrels (its round types are different lengths of round, roundOf): loaded with one, a spare block of the other, and a spare of the first: both turn up
       const keys = Object.keys(w.barrels.rounds), rl = keys[Math.floor(r() * keys.length)], other = keys.filter((k) => k !== rl)[0], cap = (k: string) => w.barrels.n * w.barrels.rounds[k].per;
       return { code: Gunsmith.defaultCode(w.id), mag: cap(rl), reserve: cap(rl), rl, am: rollAmmo(w.barrels.rounds[rl].cal, r), alt: other ? { rl: other, n: cap(other), am: rollAmmo(w.barrels.rounds[other].cal, r) } : undefined };
     }
     return { code: Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : Gear.boxCap(calOf(w)), am: w.am ? loadFor(w) : rollAmmo(calOf(w), r) }; // (a gun with its own load comes with it: the MP5SD's subsonic)
   },
-  // Something lying in the world (G.Loot), and how it's sent
+  // Something lying in the world (Loot), and how it's sent
   lootAdd(x: number, y: number, z: number, item: any, yaw: number, fit?: number) {
     const l = { id: (this.lootId = (this.lootId || 0) + 1), x, y, z, item, yaw, fit };
     this.loot.set(l.id, l);
@@ -693,7 +693,7 @@ export const Server = {
     return { deny, ret };
   },
   // An attachments box's three, rolled when it's opened: attachments that go straight onto the weapon in the opener's
-  // hands as it's built (G.Gunsmith.attachOptions), the lower tiers likelier; if that's fewer than three (or they had
+  // hands as it's built (Gunsmith.attachOptions), the lower tiers likelier; if that's fewer than three (or they had
   // nothing in their hands), the rest are attachments for anything, to carry
   rollAbox(code: string) {
     const GS = Gunsmith, def = code ? GS.fromCode(code) : null, out: string[] = [];
@@ -836,7 +836,7 @@ export const Server = {
       b.guard = true;
     }
   },
-  // The chance of each of a kind of armour (G.ENEMY_GEAR.odds) on someone dressed for level L, and one of them rolled (0: none)
+  // The chance of each of a kind of armour (ENEMY_GEAR.odds) on someone dressed for level L, and one of them rolled (0: none)
   armourRoll(kind: ArmourKind, L: number) {
     const G2 = ENEMY_GEAR, at = G2.at, o = (G2.odds as Tbl)[kind];
     let i = 0; while (i < at.length - 2 && L >= at[i + 1]) i++;
@@ -923,7 +923,7 @@ export const Server = {
   },
   // their turn among their point man's team (by id: steady from tick to tick)
   pointIdx(e: Enemy, pm: Enemy) { let k = 0; for (const o of this.enemies.values()) if (o !== e && o !== pm && o.team === pm.team && this.able(o) && o.id < e.id) k++; return k; },
-  // A handheld shield (js/data.ts G.SHIELDS) for e, their team's designated point man: on the left arm, a pistol in the right (a long gun
+  // A handheld shield (js/data.ts SHIELDS) for e, their team's designated point man: on the left arm, a pistol in the right (a long gun
   // swapped for one), slowed by its weight. He's first in his team's stack (dispatchGroup), leads them on the move with the rest in file
   // behind him (orderStep: follow), and in a fight they get in behind him (think: behindShield) and shoot over him as he kneels.
   giveShield(e: Enemy, id: string) {
@@ -1404,7 +1404,7 @@ export const Server = {
   // look round, till SEARCH_T seconds have gone or they've looked as far as RING metres out from it. A new noise sends it
   // there (RETARGET metres off, at most every RT_GAP seconds).
   NIGHT: { REACH0: 3, CLOSE: 4, ALERT: 1.4, LASER: 0.04, AIM: 0.3, LITK: 0.6, GUESS: 1.2, GUESS_T: 1.1, ACQ: 1.0, AIMT: 1, HOLD: 2.5, HOLD_B: 0.8, CREEP: 0.5, REST: 2.2, SEARCH_T: 60, RING: 21, RETARGET: 3, RT_GAP: 2 },
-  // The light where an officer stands: the level's (G.Level.luxAt), and a muzzle flash for a moment after they fire.
+  // The light where an officer stands: the level's (Level.luxAt), and a muzzle flash for a moment after they fire.
   // Kept for the tick: every suspect looking their way asks.
   officerLux(p: LivePlayer) {
     if (p.luxAt === this.clock) return p.lux!;
@@ -1450,7 +1450,7 @@ export const Server = {
   },
   // How much of officer st suspect e can see from (ax, ay, az): 0 .. 1. Sight lines to six points on them, each counting
   // its share of a body (head 0.25, chest 0.2, either shoulder 0.12, hips 0.16, knees 0.15) by how clear its line is
-  // (G.Level.see: through glass less). Behind a crate to the waist, about half; a head round a corner, a quarter.
+  // (Level.see: through glass less). Behind a crate to the waist, about half; a head round a corner, a quarter.
   // Shoulders: either side of them across the line of sight; lying down, the body runs back from the head along the ground.
   bodySeen(st: PState, ax: number, ay: number, az: number) {
     const L = Level, map = this.map!, [px, py, pz] = st.p, [hx, hz] = this.headXZ(st);
@@ -2348,7 +2348,7 @@ export const Server = {
       this.cleared.set(ri, c);
     }
   },
-  // Where the host's people can't go, for their ways about (G.Level.flow, map.aiNo): a cell furniture stands so far into that someone
+  // Where the host's people can't go, for their ways about (Level.flow, map.aiNo): a cell furniture stands so far into that someone
   // can't get through it (a box AI_GAP or less from its middle, tall enough to walk into), and a doorway they may not open (locked to
   // them, sealed). The level's own grid (map.t) blocks only the cells furniture covers the middle of: walls and the like for everyone.
   AI_GAP: 0.3,
@@ -3578,5 +3578,3 @@ export const Server = {
   BODY_R: 0.24,
 };
 // (what it gets as it runs: the dead, until secured)
-G.Server = Server;
-declare global { interface GameModules { Server: typeof Server; } }

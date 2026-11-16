@@ -8,7 +8,7 @@ import { Views } from './views.js';
 import { World } from './world.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
-// The helicopter that brings the squad in. Every level has a pad (G.Level.landing: map.lz), and you ride in on the same
+// The helicopter that brings the squad in. Every level has a pad (Level.landing: map.lz), and you ride in on the same
 // dropship you boarded at the hangar (js/hangar.ts ship): out of the distance, once round the site, spiralling in, a hover
 // over the pad, the turn onto its heading, down. Then hold F to get out. It waits a little, lifts off and flies away; anyone
 // still aboard then is put out on the pad.
@@ -238,5 +238,3 @@ export const Landing = (() => {
   }
   return { enter, board, interact, update, seatPos, exitPos, S };
 })();
-G.Landing = Landing;
-declare global { interface GameModules { Landing: typeof Landing; } }

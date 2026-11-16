@@ -562,5 +562,3 @@ export const Acoustics = (() => {
     },
   };
 })();
-G.Acoustics = Acoustics;
-declare global { interface GameModules { Acoustics: typeof Acoustics; } }

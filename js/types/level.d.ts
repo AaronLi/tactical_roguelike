@@ -2,7 +2,7 @@
 // script or (docs/modules-plan.md) a module. What makes and uses them is in js/level.ts.
 
 interface LvMap { W: number; H: number; t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: LvDoor[]; cover: LvPt[]; wallSpots: LvPt[]; lights: LvLight[]; lamps: LvLight[]; stairs: LvStair[]; windows: LvWin[]; cabinets: LvCab[]; fx: Record<string, any>[]; winMeshes: THREE.Object3D[]; lightPool: THREE.PointLight[]; enemySpots: number[][];
-  seed: number; level: number; theme: ThemeDef; TS?: number; world: ReturnType<typeof G.World.create>; crest?: any; chasm: number; floors: LvMap[]; props: Map<number, LvProp>; propList: LvProp[];
+  seed: number; level: number; theme: ThemeDef; TS?: number; world: ReturnType<typeof import('../world.js').World.create>; crest?: any; chasm: number; floors: LvMap[]; props: Map<number, LvProp>; propList: LvProp[];
   case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
   grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
   above?: LvMap | null; voidAbove?: ArrayLike<number> | null; units?: number; navG?: any; lightT?: number; underground?: boolean; rollers?: number[][]; hub?: boolean; glassRuns?: any; fences: LvFence[]; doorVer?: number; cracked?: any; dmg?: any;
@@ -22,7 +22,7 @@ type RoomType = 'security' | 'living' | 'kitchen' | 'dining' | 'bedroom' | 'offi
 
 type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
 
-// what a ray is asked to do (G.World.raycast, G.Level.raycast): through glass, a look not a round, bars, what stops people, solids to skip
+// what a ray is asked to do (World.raycast, Level.raycast): through glass, a look not a round, bars, what stops people, solids to skip
 interface LvRayOpts { glass?: boolean; sight?: boolean; bars?: boolean; move?: boolean; skip?: (s: any) => boolean }
 
 interface LvLay { W: number; H: number; t: Uint8Array; rooms: LvRoom[]; out?: Uint8Array; doors?: LvDoorSpec[]; fences?: LvFence[]; grate?: any; crest?: any; glass?: any[]; spawn?: any; lz?: LvLz | null; entries?: number[][] | null; units?: number; underground?: boolean; chasm?: number; rollers?: number[][]; ids?: Int16Array; homes?: any; ringDoors?: boolean; sp?: any }

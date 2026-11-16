@@ -266,7 +266,7 @@ export const GunsmithUI = (() => {
     if (v0 && v1 && Math.round(v0) !== Math.round(v1)) out.push(`<span class="${v1 > v0 ? 'g' : 'b'}">Muzzle ${Math.round(v0)} → ${Math.round(v1)} m/s</span>`);
     return out.length ? out.join('') : '<span>No change to the numbers</span>';
   }
-  // a part's figures as chips (js/parts.ts G.Gunsmith.partEffects: there so the highlights' video worker, which has no gunsmith screen, can word them too)
+  // a part's figures as chips (js/parts.ts Gunsmith.partEffects: there so the highlights' video worker, which has no gunsmith screen, can word them too)
   const partEffects = (p: Part, gid?: string | null) => GS.partEffects(p, gid);
 
   // what a part fits: its interface, how many weapons take it, and which of yours
@@ -561,5 +561,3 @@ export const GunsmithUI = (() => {
 
   return { show, hide, onClick, onChange, onHover, refresh, state: st, partEffects, statsHtml, deltaHtml, fitsLine, _setModel: (d: WeaponDef) => setModel(d), _view: view, _canvas: () => canvas, _model: () => model };
 })();
-G.GunsmithUI = GunsmithUI;
-declare global { interface GameModules { GunsmithUI: typeof GunsmithUI; } }

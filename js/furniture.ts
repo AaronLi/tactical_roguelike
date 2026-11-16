@@ -4,7 +4,7 @@ import { U as G_U } from './util.js';
 import { World } from './world.js';
 // Furnishing. Every room gets a purpose (living room, kitchen, bedroom, ...) and furniture to suit.
 //   plan()  - deterministic layout from the level seed: which tile holds what, and its collision boxes.
-//             Runs on every peer (host and clients) as part of G.Level.generate.
+//             Runs on every peer (host and clients) as part of Level.generate.
 //   R       - the pieces: each one's footprint, solids (solids(): what stops people, rounds and eyes) and its build(),
 //             what it's made of, handed a kit that records it (js/furnspec.ts: a piece's description, as data; the meshes
 //             are js/furnmesh.ts's, on the page: room floors, rugs, wall art and baseboards with them).
@@ -1407,7 +1407,7 @@ export const Furniture = (() => {
   // quarter-turns that put the back (-z) of a piece against the wall in direction (dx, dz)
   const facing = (dx: number, dz: number) => ((Math.round(Math.atan2(-dx, -dz) / (Math.PI / 2)) % 4) + 4) % 4;
 
-  // Runs on the coarse (2 m) grid; G.Level.refine then lays the pieces on the fine grid. wd: the wall(s) a
+  // Runs on the coarse (2 m) grid; Level.refine then lays the pieces on the fine grid. wd: the wall(s) a
   // piece is set against, so it can follow the wall when the wall is thinned.
   function plan(map: LvMap, r: () => number, spawnRoom: Room, exitRoom: Room, tryBlock: (x: number, z: number, n: number) => boolean) {
     // a night level's car parks: most have gone home (NIGHT_CARS of them stay), each kept or not by its own dice from the seed and
@@ -1817,6 +1817,4 @@ export const Furniture = (() => {
   }
   return { plan, R, ROOMS, solids, worldBoxes, facing };
 })();
-G.Furniture = Furniture;
 
-declare global { interface GameModules { Furniture: typeof Furniture; } }

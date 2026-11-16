@@ -10,8 +10,8 @@ import { Me } from './player.js';
 import { Shop } from './shop.js';
 // (tools/cloud.test.mjs loads util, cloudconfig, career and cloud and answers the imports of the page's other files with stand-ins: tools/vm_game.mjs `stubs`.)
 // Cloud saves (docs/cloud.md): your progress in a Supabase project, so it survives a cleared browser and follows you to another
-// device. What's kept: the sidearm tree (G.U.store 'arsenal'), your callsign, look and settings, the wishlist, the career and the
-// run log (js/career.ts). It all lives in this browser first, as it always has (G.U.store, under bp_); this copies it up and back.
+// device. What's kept: the sidearm tree (U.store 'arsenal'), your callsign, look and settings, the wishlist, the career and the
+// run log (js/career.ts). It all lives in this browser first, as it always has (U.store, under bp_); this copies it up and back.
 //   - Not set up (js/cloudconfig.ts empty) or ?cloud=0: nothing happens here past drawing the menu's Account box. No request.
 //   - Set up: until you sign in, nothing changes either: everything's saved in this browser, and the Supabase client isn't even
 //     loaded (it loads from the CDN when you open the Account box, or when there's a session to restore; never in the simulation's
@@ -69,7 +69,7 @@ export const Cloud = (() => {
   let BATCH = 50; // (runs sent at a time)
   const careerPending = (x: CloudQueue) => Object.keys(x.add).length + Object.keys(x.max).length + Object.keys(x.best).length > 0;
 
-  // a key of yours changed (G.U.store.set): when, and that it's to go up
+  // a key of yours changed (U.store.set): when, and that it's to go up
   function onSet(k: string, _v: unknown, auto: boolean) {
     if (!SYNCED.has(k)) return;
     const m = meta();
@@ -603,7 +603,5 @@ export const Cloud = (() => {
     on, configured, guest, queue: () => Q(), meta: () => meta(), fly: () => fly(), tune(o: { batch?: number }) { if (o.batch) BATCH = o.batch; },
     get state() { return state; }, get user() { return user; }, get client() { return client; } };
 })();
-G.Cloud = Cloud;
 Hooks.cloud = Cloud; // (js/career.ts tells it of what's counted: it imports this file's reader, so asks through this hook, set as this loads)
 
-declare global { interface GameModules { Cloud: typeof Cloud; } }

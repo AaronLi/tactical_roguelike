@@ -8,12 +8,12 @@ import { Viewmodel } from './viewmodel.js';
 // hands) is a baked glTF (docs/models.md): per-part packs the baker made from the recipes (tools/models/), assembled for any build by js/glb.ts.
 // There are no recipes here and no fallback to them. This file is the facade the rest of the game calls:
 //
-//   G.GunModels.display(def, skin)    -> { group, info }  every part as separate slot-tagged meshes (the gunsmith, the hangar, icons)
-//   G.GunModels.world(def, skin)      -> a group          the third-person gun, merged one mesh per material, shared geometry (rigs, loot, evidence)
-//   G.GunModels.viewmodel(def, skin)  -> a group | null   the first-person gun with its arms and animation (js/viewmodel.ts, js/vmanim.ts)
-//   G.GunModels.whenReady(group, fn)  runs fn(ok) once a display or world model's meshes have come in (at once if they are in)
-//   G.GunModels.roundDims / roundShape / roundProp / quarrel    the cartridges and the crossbow bolt (assets/models/props, tools/bake_props.mjs)
-//   G.GunModels.boot() / preload...   what to have loaded (below)
+//   GunModels.display(def, skin)    -> { group, info }  every part as separate slot-tagged meshes (the gunsmith, the hangar, icons)
+//   GunModels.world(def, skin)      -> a group          the third-person gun, merged one mesh per material, shared geometry (rigs, loot, evidence)
+//   GunModels.viewmodel(def, skin)  -> a group | null   the first-person gun with its arms and animation (js/viewmodel.ts, js/vmanim.ts)
+//   GunModels.whenReady(group, fn)  runs fn(ok) once a display or world model's meshes have come in (at once if they are in)
+//   GunModels.roundDims / roundShape / roundProp / quarrel    the cartridges and the crossbow bolt (assets/models/props, tools/bake_props.mjs)
+//   GunModels.boot() / preload...   what to have loaded (below)
 //
 // SYNCHRONOUS, FILLING IN. display() and world() return at once. If the build's packs are loaded the model is whole; if not, it is an EMPTY group that
 // carries `userData.pending = true` and the right `info` (anchors, muzzles, sight windows: from the platform's index, which boot() loads for every
@@ -203,5 +203,3 @@ export const GunModels = (() => {
 
   return { display, world, viewmodel, viewmodelReady, whenReady, roundDims, roundShape, roundProp, quarrel, boot, preload };
 })();
-G.GunModels = GunModels;
-declare global { interface GameModules { GunModels: typeof GunModels } }

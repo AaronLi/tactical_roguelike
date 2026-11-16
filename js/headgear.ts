@@ -24,7 +24,7 @@ export const Headgear = (() => {
   };
   const R0 = 0.125; // (the dome a mount's put on, without the body's own: where night vision hinges)
 
-  // Night vision on the helmet's mount ('n.mono', 'n.bino', 'n.pano', 'n.fuse'): the body's own gear (G.Humans.gear: made in Blender,
+  // Night vision on the helmet's mount ('n.mono', 'n.bino', 'n.pano', 'n.fuse'): the body's own gear (Humans.gear: made in Blender,
   // models/characters/build_gear.py). The mount stays put; what hangs from it (the arm, the bridge and the tubes, an eyecup at the back
   // of each and its objective lens in front) is in a pivot at the hinge, drawn down in front of the eyes. Its rotation.x swings it:
   // 0 down, NV_UP up over the brow, tubes pointing up. A panoramic's outer pair are canted out; a fused set has the thermal core on
@@ -57,5 +57,3 @@ export const Headgear = (() => {
   }
   return { nvg, NV_UP, MODELS };
 })();
-G.Headgear = Headgear;
-declare global { interface GameModules { Headgear: typeof Headgear; } }

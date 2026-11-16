@@ -190,7 +190,7 @@ export const Prof = (() => {
   function gpuHooks(r: THREE.WebGLRenderer) {
     const R = G_R;
     gpuWrap(r.shadowMap, 'render', 'shadow maps');
-    // (the gun in your hands and the fisheye are drawn straight from G.R.render: told apart by their scenes)
+    // (the gun in your hands and the fisheye are drawn straight from R.render: told apart by their scenes)
     const rr = r.render;
     r.render = function (this: any, sc: THREE.Object3D) {
       const lab = gpu.ext && gpu.stack[gpu.stack.length - 1] === 'level' ? (sc === R.vmScene ? 'gun in hand' : sc === R.fishScene ? 'fisheye' : null) : null;
@@ -286,5 +286,3 @@ export const Prof = (() => {
 
   return { install, save, report, summary, line, reset, wrap, sec, gpuSummary, get on() { return on; }, set on(v) { on = !!v; } };
 })();
-G.Prof = Prof;
-declare global { interface GameModules { Prof: typeof Prof; } }

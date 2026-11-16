@@ -1,7 +1,5 @@
 'use strict';
 
-self.G = self.G || ({} as GameNamespace); // (the page, or the highlights' export worker)
-
 // Colour, physically: every colour written down (a hex, a canvas, a picture) is sRGB, as a screen shows it; it's
 // turned linear before it's lit (light adds up in linear: twice the lamps, twice the light), and back to sRGB on its
 // way to the screen. (three's legacy mode lit the sRGB numbers as they were: a saturated colour went fluorescent
@@ -108,8 +106,5 @@ export const U = {
     set(k: string, v: any, auto = false) { U.store.put(k, v); if (U.store.onSet) try { U.store.onSet(k, v, auto); } catch (e) { console.warn('store: onSet', e); } },
   },
 };
-G.U = U;
 // What the simulation may ask of the page (types: js/types/hooks.d.ts): empty here, filled in by the page files as they load.
 export const Hooks: SimHooks = {};
-G.Hooks = Hooks;
-declare global { interface GameModules { U: typeof U; Hooks: SimHooks; } }

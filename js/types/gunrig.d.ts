@@ -23,5 +23,5 @@ interface GunRigChamberAt { side: VmChamberSide; n: number; r: number; R: number
 /** What a magazine shows when it is looked at: the top round (case, tip), witness holes (each with the count it stands for, once stamped), the rounds drawn through a clear body. */
 interface GunRigPoseMesh { mesh: THREE.Mesh; t: number; px: number; py: number; pz: number; rx: number }
 
-/** How a hand takes a gun (G.GunRig.holds): where, the way its palm faces and its fingers run, in the gun's space, and which point of the hand goes there. */
+/** How a hand takes a gun (GunRig.holds): where, the way its palm faces and its fingers run, in the gun's space, and which point of the hand goes there. */
 interface GunHold { kind: 'grip' | 'forend' | 'fg' | 'pistol'; hold: 'closed' | 'palm'; at: THREE.Vector3; palm: THREE.Vector3; fingers: THREE.Vector3 }

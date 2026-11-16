@@ -16,7 +16,7 @@ import { U } from './util.js';
 // Everything is split between what's heard indoors and what's heard outdoors: standing inside you hear the inside
 // layers and the outside ones muffled through the walls, and the other way about outside. Where you stand is from the
 // level's outdoor tiles (LvMap.out), averaged round you so the change happens as you come up to a door, not at it.
-// It renders into any audio context: the game's (G.Audio's, through its master and compressor) or an offline one
+// It renders into any audio context: the game's (Audio's, through its master and compressor) or an offline one
 // (render(): a place's first seconds as a buffer, to look at or to listen to: ambience.html auditions every place).
 type AmbBus = 'in' | 'out';
 interface AmbPt { x: number; y: number; z: number }
@@ -1241,7 +1241,7 @@ export const Ambience = (() => {
         track.forEach((_, i) => { if (i % 2) return; s.reach = reaches[i]; spotSet(sp, spotHeard(s, sp), ds[i], i * dt, 0.35); });
       }
       schedule(s, secs);
-      s.out.gain.value = vol; // (the ambience under the guns as the game has it: its bus at vol, the shots at G.GunAudio.GAIN)
+      s.out.gain.value = vol; // (the ambience under the guns as the game has it: its bus at vol, the shots at GunAudio.GAIN)
       for (const sh of shots) { if (doorsAt) doorsAt(sh.t); shotInto(s, map, sh, track, dt); }
       if (doorsAt) doorsAt(0);
       return c.startRendering();
@@ -1272,5 +1272,3 @@ export const Ambience = (() => {
     },
   };
 })();
-G.Ambience = Ambience;
-declare global { interface GameModules { Ambience: typeof Ambience; } }

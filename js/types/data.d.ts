@@ -26,7 +26,7 @@ interface ThemeDef { name: string; home: number; reflect: number; floor: string;
 interface CaliberDef { name: string; group: string; box: number; per: number; rimfire?: boolean; types?: string[]; loads?: Record<string, LoadDef>; }
 
 // Handheld ballistic shields (js/rig.ts setShield, js/player.ts shieldHit): carried on the left arm by a suspect fighting one-handed with a
-// pistol in the right. Rated as G.ARMORS are, by their layers (js/ballistics.ts rating): IIIA stops handguns, III rifle ball, IV armour-piercing
+// pistol in the right. Rated as ARMORS are, by their layers (js/ballistics.ts rating): IIIA stops handguns, III rifle ball, IV armour-piercing
 // rifle rounds. The higher the rating the heavier the stuff, so the smaller the shield a man can still carry: w, h its face in metres, th its
 // thickness; port: a viewport (its size, how far its middle is below the shield's top, and its glazing's layers); kg, and speed: how it
 // slows the one carrying it.

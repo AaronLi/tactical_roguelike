@@ -4,7 +4,7 @@
 // each run once, named in the order the worker's list used to load them (PREP_SCRIPTS: the page's order, index.html). A file runs when it
 // is first imported, so one that imports a file that comes later here (level imports homes) has it run first; what must hold is that a
 // file that reads another while it loads comes after it, and tools/deps.mjs checks that (npm run deps:check). The ones nothing imports
-// (residents registers itself and has no export) are why they are all named. The worker then asks G.Level and G.LightGrid.
+// (residents registers itself and has no export) are why they are all named. The worker then asks Level and LightGrid.
 import './util.js';
 import './medical.js';
 import './materials.js';

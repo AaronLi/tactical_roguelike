@@ -6,8 +6,8 @@ import { InvUI } from './invui.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
 // A touch screen. Like the controller (js/gamepad.ts) it's not a control scheme of its own: the on-screen buttons are the keys and mouse buttons they stand
-// for, sent as those events down the same handlers (js/player.ts bindInput, js/game.ts bindMenu); only the stick and the look drag go in direct (G.Me.padMove,
-// G.Me.lookBy). A touch screen has no pointer lock either, so G.Game.softLocked stands in for it (js/game.ts lock).
+// for, sent as those events down the same handlers (js/player.ts bindInput, js/game.ts bindMenu); only the stick and the look drag go in direct (Me.padMove,
+// Me.lookBy). A touch screen has no pointer lock either, so Game.softLocked stands in for it (js/game.ts lock).
 // Menus are the page's own pointer events, which a finger already sends; what a finger hasn't got is added here, once for every screen: a long press is the
 // right click (and shows a title="" text, which nothing else can), two quick taps are a double click, two fingers on the gunsmith or the sidearm web are the wheel.
 // Comes on at once on a phone or a tablet, or on a laptop's touch screen the first time it's touched; a real mouse or keyboard puts it away again. ?touch keeps it on.
@@ -272,5 +272,3 @@ export const Touch = (() => {
     dragEnd() { edge = null; },
   };
 })();
-G.Touch = Touch;
-declare global { interface GameModules { Touch: typeof Touch; } }

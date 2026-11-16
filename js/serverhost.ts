@@ -36,7 +36,7 @@ import { LevelDesc } from './leveldesc.js';
 import { Recorder } from './recorder.js';
 import { Server } from './server.js';
 import { Stickers } from './stickers.js';
-// The host's simulation (G.Server, js/server.ts) on a thread: what feeds it, ticks it and carries its word out. The same code
+// The host's simulation (Server, js/server.ts) on a thread: what feeds it, ticks it and carries its word out. The same code
 // in both places it can run (docs/threads.md): the server's own thread (js/serverworker.ts loads it there) or, as a fallback,
 // the page's (js/serverlink.ts starts it there when a worker can't be had, or with ?serverthread=0). Either way it's reached
 // only through two MessagePorts, so it can't tell which:
@@ -54,7 +54,7 @@ export const ServerHost = {
   TICK_MS: 1000 / 60,
   ctl: null as MessagePort | null,
   cli: null as MessagePort | null,
-  id: null as string | null, // (the host's own player: G.Server.net.myId)
+  id: null as string | null, // (the host's own player: Server.net.myId)
   on: false,
   remotes: new Set<string>(), // (remote players whose connections are open)
   timer: 0 as unknown as ReturnType<typeof setInterval>,
@@ -84,7 +84,7 @@ export const ServerHost = {
       case 'stat': this.ctl!.postMessage({ k: 'stat', q: c.q, clock: Server.clock || 0, ticks: this.ticks, phase: Server.phase, level: Server.level, enemies: Server.enemies.size, players: Server.players.size }); break;
     }
   },
-  // a session: the host's player (id) and their port; the simulation as it is when someone starts hosting (G.Server.reset)
+  // a session: the host's player (id) and their port; the simulation as it is when someone starts hosting (Server.reset)
   start(id: string, cli: MessagePort) {
     this.stop();
     this.id = Server.net.myId = id;
@@ -135,7 +135,7 @@ export const ServerHost = {
 
   // ---------------------------------------------------------------- is it the same place?
   // The level the simulation built from its seed (its description: js/leveldesc.ts) and every screen built again from it must
-  // be the same object (G.ServerLink.digest compares them): each part's fingerprint, and the whole of it as JSON (json: true).
+  // be the same object (ServerLink.digest compares them): each part's fingerprint, and the whole of it as JSON (json: true).
   // (What a screen adds after, the helicopter on the pad, js/landing.ts, goes in its world, not in the description.)
   born(_map: LvMap) {},
   digest(map: LvMap, parts?: Record<string, string>) {
@@ -145,5 +145,3 @@ export const ServerHost = {
     return fp.hash;
   },
 };
-G.ServerHost = ServerHost;
-declare global { interface GameModules { ServerHost: typeof ServerHost; } }

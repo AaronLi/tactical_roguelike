@@ -173,7 +173,7 @@ export const SpaceSv = (() => {
       const civAt = rooms('mess', 'galley', 'medbay', 'engine', 'quarters', 'bridge', 'cargo', 'reactor'), hands: EnemyKind = SD.wearOf(meta.hulls[h].size, M && M.ms.obj) === 'civil' ? 'civ' : 'rating';
       for (let k = 0; k < C.civ; k++) put(hands, civAt, k);
       const post = rooms('bridge', 'spine', 'engine', 'cargo', 'quarters', 'mess');
-      // handheld shields (js/data.ts G.SHIELDS): there's little cover aboard, so each of her fireteams has a point man who carries one
+      // handheld shields (js/data.ts SHIELDS): there's little cover aboard, so each of her fireteams has a point man who carries one
       // (js/server.ts giveShield: first in their stack, leading them on the move, the rest behind him in a fight). The better armed she
       // is (the level), the higher the rating, and so the smaller the shield
       const shieldId = () => { const r = Math.random(); return L <= 3 ? 'sh.3a' : L <= 6 ? (r < 0.6 ? 'sh.3a' : 'sh.3') : r < 0.5 ? 'sh.3' : 'sh.4'; };
@@ -807,5 +807,3 @@ export const SpaceSv = (() => {
   }
   return { st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
 })();
-G.SpaceSv = SpaceSv;
-declare global { interface GameModules { SpaceSv: typeof SpaceSv; } }

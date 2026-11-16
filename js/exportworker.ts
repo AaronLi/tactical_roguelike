@@ -17,7 +17,7 @@ const booted = import('./threeboot.js').then(async () => {
   // (each of these is the module that ran above, its exports)
   const [{ Hooks }, { Models }, { Stickers }, { Highlights }, { ReplayEnv }] = await Promise.all([import('./util.js'), import('./glb.js'), import('./stickers.js'), import('./highlights.js'), import('./replayenv.js')]);
   // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
-  // (on ReplayEnv, where highlights, render, rig, vmanim and levelview read them: js/replayenv.ts; the rest of its fields stay null here, as G.Audio ... were unset)
+  // (on ReplayEnv, where highlights, render, rig, vmanim and levelview read them: js/replayenv.ts; the rest of its fields stay null here, as Audio ... were unset)
   ReplayEnv.Game = { map: null, phase: 'level' } as any;
   ReplayEnv.Net = { myId: '' } as any;
   // (what those stand-ins answered the simulation's files before they asked through Hooks, js/types/hooks.d.ts: in a level,

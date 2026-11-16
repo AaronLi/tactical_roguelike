@@ -20,7 +20,7 @@ export const SpaceData = (() => {
   // The game plays in space (the hangar is the base, missions are flown to). Off, it is the game as it was: a route map and a
   // helicopter. A debug start's ?play goes the old way whatever this says (js/debugstart.ts).
   const ON = true;
-  const FLOOR = 0.24; // the deck of the squad's ship, over the ground it stands on (low enough to step up onto: G.World.STEP)
+  const FLOOR = 0.24; // the deck of the squad's ship, over the ground it stands on (low enough to step up onto: World.STEP)
   const HEAD = 2.4; // and its ceiling over that
   // The squad's ships. A ship is a deck: a nose airlock with the breaching door on its end (z0 - nose .. z0), the cockpit
   // behind it, the cabin, and the ramp at the back (z1). hw: half the cabin's width inside. Lengths in metres, the ship's own
@@ -144,8 +144,8 @@ export const SpaceData = (() => {
   }
   type Berth = { x: number; y: number; z: number; yaw: number; pt?: number };
   /** her solids in the world at berth b ([min x, y, z, max x, y, z] and the box's tag), those keep says */
-  // (yb: lying at an angle that isn't a quarter turn, each a box turned with her: its middle, her yaw, its half-widths, its height. G.World.ybox makes it)
-  // (ob: lying tilted, each a box turned and tilted with her: its middle, her yaw and pitch, its half-widths. G.World.obox makes it)
+  // (yb: lying at an angle that isn't a quarter turn, each a box turned with her: its middle, her yaw, its half-widths, its height. World.ybox makes it)
+  // (ob: lying tilted, each a box turned and tilted with her: its middle, her yaw and pitch, its half-widths. World.obox makes it)
   function worldBoxes(d: SpShipDef, b: Berth, keep: (tag?: string) => boolean = () => true) {
     const out: { b: number[]; tag?: string; yb?: { cx: number; cz: number; yaw: number; hx: number; hz: number; y0: number; y1: number }; ob?: number[] }[] = [];
     const turned = Math.abs(Math.sin(2 * b.yaw)) > 1e-6, L = layout(d), zN = L.zc - 0.22, tp = Math.tan(b.pt || 0);
@@ -265,7 +265,7 @@ export const SpaceData = (() => {
     navy: { hvt: 'Captain', top: 'Commander', leader: 'Lieutenant', tl: 'Sergeant', vet: 'Senior', rating: 'Rating', suspect: 'Sentry', grunt: 'Marine', rusher: 'Breacher', heavy: 'Heavy Marine', marksman: 'Marine Sharpshooter' },
   };
   /** ...aboard the ship being boarded now (null anywhere else). */
-  const wearNow = (): string | null => { const g = (G as any).Game, sp = g && g.map && g.map.sp; return sp ? wearOf(sp.size, sp.obj) : null; };
+  const wearNow = (g: { map?: { sp?: { size: string; obj?: string | null } | null } | null } | null | undefined): string | null => { const sp = g && g.map && g.map.sp; return sp ? wearOf(sp.size, sp.obj) : null; }; // (g: the game; the page's files ask with ReplayEnv.Game, the export worker's has no map)
   const SIZES: Record<SpSize, SpClass> = {
     transport: { name: 'civilian transport', tier: 1, pay: 600, diff: -1, guns: { pd: 0, cannon: 0, missile: 0 }, crew: { guard: 3, squads: 0, resp: 0, civ: 6 } },
     small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 1, cannon: 0, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
@@ -332,5 +332,3 @@ export const SpaceData = (() => {
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
   return { BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();
-G.SpaceData = SpaceData;
-declare global { interface GameModules { SpaceData: typeof SpaceData; } }

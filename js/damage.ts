@@ -871,6 +871,4 @@ export const Damage = (() => {
   }
   return { crack, HOLE, PARTS, HINGES, radius, hit, ofEvent, apply, clear, doorHole, onLeaf, partAt, fall, fallTrack, leafPose, setPose, partGone, update, reset, seenThrough, warm };
 })();
-G.Damage = Damage;
 
-declare global { interface GameModules { Damage: typeof Damage; } }

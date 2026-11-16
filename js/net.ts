@@ -104,7 +104,7 @@ export const Net = {
   // (Still through the PeerJS broker, like every connection: it needs the internet, but no server of our own.)
   noRoute: 'Found the game, but could not open a connection to the host: neither a direct path through your networks nor the relay worked. Two different browsers on one computer cannot always reach each other; a VPN or a strict firewall can block it too.',
   LAN_SLOTS: 6,
-  lanInfo: (() => null) as () => any, // what a host's beacon says about its game (set by G.Game)
+  lanInfo: (() => null) as () => any, // what a host's beacon says about its game (set by Game)
   beacon: null as any,
   _lanKey: undefined as string | null | undefined, // (this network's key, once worked out)
   async lanKey() {
@@ -188,9 +188,7 @@ export const Net = {
     this.isHost = false; this.solo = false; this.myId = null; this.code = null;
   },
 };
-G.Net = Net;
 ReplayEnv.Net = Net; // (what the replay asks of it: js/replayenv.ts)
 Hooks.online = () => !!Net.myId; // (whether there's a host to tell about your sticker skin: js/stickers.ts share)
 Hooks.toHost = (m) => Net.toHost(m);
 
-declare global { interface GameModules { Net: typeof Net; } }

@@ -11,8 +11,8 @@ import { Gunsmith } from './parts.js';
 import { R } from './render.js';
 import { Game } from './game.js';
 // Things lying in the world that you can pick up: anything you've dropped from your inventory (a magazine, a
-// bandage, a backpack with everything in it, a gun). The host keeps the list (G.Server.loot) and says who gets
-// what; this draws them and finds the one under your crosshair. Each is { id, x, y, z, item (packed: G.Gear.pack), mesh, box },
+// bandage, a backpack with everything in it, a gun). The host keeps the list (Server.loot) and says who gets
+// what; this draws them and finds the one under your crosshair. Each is { id, x, y, z, item (packed: Gear.pack), mesh, box },
 // box its own shape in its own frame: you have to aim at the thing itself to take it.
 export const Loot = (() => {
   const list = new Map();
@@ -143,7 +143,5 @@ export const Loot = (() => {
   }
   return { add, remove, clear, aimed, boxOf, rayHit, name, meshFor, get list() { return list; } };
 })();
-G.Loot = Loot;
 ReplayEnv.Loot = Loot; // (what the replay asks of it: js/replayenv.ts)
 
-declare global { interface GameModules { Loot: typeof Loot; } }
