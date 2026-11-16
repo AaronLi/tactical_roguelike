@@ -20,8 +20,6 @@
 type MuzzleDevice = 'none' | 'flash' | 'comp' | 'brake' | 'suppressor';
 type SuppressorKind = 'full' | 'compact' | 'long' | 'box' | 'integral' | 'integralX';
 type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
-type CaseMat = 'brass' | 'steel' | 'aluminum' | 'plastic';
-type SynthEnv = 'none' | 'field' | 'forest' | 'urban' | 'canyon' | 'room' | 'hall' | 'concrete' | 'warehouse';
 (function () {
   'use strict';
 

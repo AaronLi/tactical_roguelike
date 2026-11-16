@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: proposal, nothing started. Written 2026-11-15.
+Status: phases 0 and 1 done (2026-11-15); phase 2 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -18,7 +18,7 @@ sharing visible; untangling it is a later piece of work (see "After").
 | Source files (`js/*.ts`), all plain scripts | 83 register something on `G` |
 | References to `G.Something` | about 4,100 |
 | Script tags in `index.html` | 87, order kept by hand |
-| Other hand-kept load lists | `SERVER_SCRIPTS` (28 files, `js/serverworker.ts`), the prep worker's list (21, `js/prepworker.ts`), `LEVEL_SCRIPTS` (`tools/level_env.mjs`), `tools/model_env.mjs` |
+| Other hand-kept load lists | `SERVER_SCRIPTS` (28 files, `js/serverworker.ts`), the prep worker's (21, `js/prepworker.ts`), the highlights export worker's (37, `js/exportworker.ts`), `LEVEL_SCRIPTS` (`tools/level_env.mjs`), `tools/model_env.mjs` |
 | Node tools that run the compiled scripts inside a `vm` context | about 13 |
 | Types shared between files | global: an `interface LvMap` in one script is visible in all of them |
 | three.js | a global `THREE`, put there by `js/threeboot.ts` from the CDN |
@@ -39,7 +39,13 @@ modules without change. Only uses at load time need a fixed order.
 
 ## Phases
 
-Each phase ends with the game working and all three checks passing. Each can be committed and shipped alone.
+**No phase changes behaviour.** Every phase is a refactor: the same levels, AI, ballistics, sound and screens before and
+after. A change that would alter behaviour (a fix noticed on the way, a hook that can't reproduce what it replaces
+exactly) goes in a commit of its own, outside the phase, and says so.
+
+Each phase ends with the game working and every check passing: the typecheck, `test:level`, `test:models`, the smoke
+check (`npm run smoke`) and the determinism check (`npm run test:sim`: the host's simulation run from fixed seeds,
+its state compared with a saved fingerprint). Each phase can be committed and shipped alone.
 
 ### 0. Inventory (no behaviour change)
 
@@ -53,18 +59,55 @@ Each phase ends with the game working and all three checks passing. Each can be 
 
 Done when: the three lists exist and are checked in under `docs/`.
 
+#### Phase 0 results
+
+Run again with `npm run deps` (writes [modules-inventory.md](modules-inventory.md) and `modules-inventory.json`) and
+`npm run smoke` (the browser smoke check: needs a Chromium, or set `BROWSER`; `-- --list` prints its URLs).
+
+- **Load order is not a problem.** 103 of 5,683 uses of `G` run while a file loads, they form no cycle, and all six
+  hand-kept orders already satisfy them. One large cycle of calls (74 files) exists, which ES modules allow.
+- **The simulation reaches the page 133 times, never while loading.** 101 are unguarded. Most are in `js/shop.ts`
+  (about 80: the shop's sums and its screen are one file), then `damage`, `stickers`, `arsenal`, `ballistics`. Phase 3
+  should start by splitting `shop.ts` into its reckonings and its UI.
+- **Phase 1's work list:** 124 names, 885 uses, declared at the top of one file and named bare in others. Almost all
+  are types (`LvMap` alone has 161). Six are values, and some of those run at load (`G_Sim` in `game.ts` and
+  `player.ts`), so the load-order graph does not see them; they need exports in phase 4.
+- **THREE:** 43 files use it as a UMD global, which modules may not. Phase 2's import map has to cover this (or
+  `allowUmdGlobalAccess` as a stopgap).
+- **Smoke check baseline:** all ten cases ready with no errors (run by hand in the app's browser pane, since this
+  machine has no Chromium; `tools/smoke.mjs` itself has not yet run in a headless browser).
+- **Tooling:** TypeScript 7's package has no compiler API, so `tools/deps.mjs` parses with TypeScript 5.9.3, kept in
+  its own folder (`tools/deps/package.json`, installed on first run). As a root dependency its `tsc` replaced the
+  project's TypeScript 7 in `node_modules/.bin`, so it must stay out of the root `package.json`.
+
 ### 1. Shared types get a home
 
-- Move each shared interface into a `declare global { ... }` block in the file that owns it (or into
-  `js/types/*.d.ts` where no file clearly owns it). Nothing changes at runtime.
+- Move each shared interface and type alias into `js/types/<owner>.d.ts`, a global declaration file named after the
+  file that owns it. (`declare global { ... }` in the owner itself was the first idea, but a script may not contain
+  one: it only works once the file is a module.) Nothing changes at runtime.
 - After this, a file can become a module without breaking the files that name its types.
 
 Done when: the trial typecheck from phase 0 reports no type errors, only value references.
 
+#### Phase 1 results
+
+- 176 interfaces and type aliases moved, from 36 files into 36 `js/types/*.d.ts` files, each with the comments that
+  were attached to it. They were the 118 that other files name, plus 58 that those name in turn.
+- Types that named a module's value bare now go through `G` (`typeof G_World.add` is now `typeof G.World.add`: the
+  same type). Five places.
+- **No runtime change, checked three ways:**
+  - the compiled JavaScript of all 89 files, printed without comments, is identical before and after;
+  - the determinism check, `test:level` and `test:models` pass;
+  - the typecheck passes.
+- The trial typecheck (now checking the declaration files too: `skipLibCheck` off) reports no missing types. The
+  bare names left are three values, for phase 4: `G_Sim` (11 uses, at load, in `game`, `player`, `server` and
+  `views`), `SvNet` (3, in `serverhost`; it is `G.Server.net`) and `G_HANGAR_ROWS` (1, in `spacedata`).
+- Found on the way: `LvFxKind`, `HomeMat` and `RigState` are declared and used nowhere. Left as they are.
+
 ### 2. Loaders accept modules
 
 - Page: change the `defer` script tags to `type="module"`. Order is preserved, so behaviour is the same.
-- Workers: start them as module workers (`new Worker(url, { type: 'module' })`) and replace `importScripts` with a
+- Workers (all three: server, prep, highlights export): start them as module workers (`new Worker(url, { type: 'module' })`) and replace `importScripts` with a
   list of side-effect imports in the same order.
 - three.js: add an import map on the page pointing `three` at the pinned CDN build; keep the global `THREE` for now.
 - Node tools: replace the `vm` loaders in `tools/level_env.mjs` and `tools/model_env.mjs` with real imports of

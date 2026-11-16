@@ -66,7 +66,6 @@
 // about 33 cm, .32 ACP 45, 9 mm FMJ 65 and hollow point 35, .45 ACP FMJ 65 and hollow point 33, a 00 buck pellet 30, a
 // 12 gauge slug 35, 5.56 about 35, 7.62x39 55, 7.62x51 50.
 type BVec = THREE.Vector3;
-type BMat = Record<string, any>; // a material (js/materials.ts MAT, TISSUE): its constants differ by kind
 type BLayer = [MatKey | TissueKey, number]; // [material key, thickness in mm]
 type BNose = 'fmj' | 'hp' | 'ball' | 'dart' | 'broad'; // a round's nose: a full metal jacket, a hollow point, a ball (shot), a dart (flechette, bodkin), a broadhead
 interface BRound { // a round in flight (projectile); the rest is what it picks up on the way

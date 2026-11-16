@@ -2,9 +2,6 @@
 // The kit js/furniture.ts hands to a piece's build() (js/furnspec.ts FdKit: it records what the piece is made of), its
 // materials, a piece's style, and a floor spec.
 type HomeMat = FdMat;
-type HomeKit = FdKit;
-type HomeStyle = Record<string, any>; // (a piece's style: whatever its build reads)
-interface HomeFloor { kind: string; color: string; grout?: string; sound?: string }
 // A resident's data: see the notes below.
 interface HomeSwap { piece: string; style?: HomeStyle; at?: string }
 interface HomeItem extends HomeSwap { id: string; at: string; hang?: number; need?: number; must?: number; pull?: number; swap?: HomeSwap[] }

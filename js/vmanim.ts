@@ -17,8 +17,6 @@ type VmHold = VmAction | 'revolver' | 'break';
 type VmMagMode = 'in' | 'hand' | 'drop' | 'gone' | 'peek' | 'rise' | 'chk';
 /** Something the left hand carries. */
 type VmPropKind = 'shell' | 'case' | 'loader' | 'clip' | 'bolt' | 'claw';
-/** Where a gun's round shows when it is checked: at the back of the cylinder, the open breech, the ejection port, the top or right of the receiver. */
-type VmChamberSide = 'cyl' | 'breech' | 'face' | 'port' | 'top' | 'right';
 const G_VMAnim = (() => {
   const T = THREE;
   type V3 = THREE.Vector3;

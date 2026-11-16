@@ -5,19 +5,6 @@
 // range is the distance (m) where damage falloff starts, falloff is the min multiplier.
 // ---------------------------------------------------------------------------
 
-// The weapon table's rows. Only the fields every gun has are declared (the rest, which only some guns set, are the
-// index signature: pellets, mode, hyper, choke, explosive, akimbo, integral, velK, weight...).
-// a gun's class (its sound profile, CLASS_SND), which slot it's carried in (primary or sidearm) and a fire selector position
-type WeaponClass = 'AR' | 'BR' | 'SMG' | 'SG' | 'LMG' | 'DMR' | 'SNP' | 'GL' | 'RAIL' | 'PST' | 'MP' | 'BOW';
-type WeaponSlot = 'p' | 's';
-type FireMode = 'semi' | 'auto' | 'burst' | 'hyper' | 'low' | 'high' | 'double' | 'triple' | 'sextuple';
-interface WeaponDef {
-  id: string; slot: WeaponSlot; cls: WeaponClass; tier: number; price: number; name: string; rpm: number; mag: number; reserve: number;
-  reload: number; spread: number; ads: number; range: number; desc: string;
-  mode: FireMode; modes?: FireMode[];
-  manual?: boolean; // must be cycled by hand after every shot (bolt, pump, lever: the model's moving part says which, js/vmanim.ts): the case stays in and releasing the trigger works it (js/player.ts)
-  [field: string]: any;
-}
 interface GunSpec {
   barrel: number; caliber: number; muzzleDevice: string; pressure: number; grain: number; bulletWeight: number; boltMass: number;
   boltLoudness: number; actionType: string; caseMaterial: string; caseLength: number; shotCount: number; suppressor?: string;
@@ -26,12 +13,6 @@ interface ArmorDef {
   id: string; kind: string; name: string; tier: number; prot: { at: string; layers: [string, number][] }[]; dur: number; speed: number; price: number; desc: string;
   [field: string]: any;
 }
-// how an enemy looks and acts: a suspect, an armoured one (heavy, boss) or a civilian
-type EnemyStyle = 'suspect' | 'armored' | 'civ';
-interface EnemyDef { name: string; style: EnemyStyle; hp: number; speed: number; scale: number; headMult: number; cr: number; [field: string]: any; }
-interface ThemeDef { name: string; home: number; reflect: number; floor: string; wall: string; crate: string; fog: number; light: number; ceil: string; [field: string]: any; }
-interface LoadDef { g: number; lg?: number; v: number; n?: number; d?: number; len?: number; choke?: number; rangeK?: number; drag?: number } // a load's figures in a caliber that has its own: g: grams (a bullet; a pellet), v: m/s at the longest effective length, n: pellets, d/len: mm of the projectile, choke: degrees, rangeK
-interface CaliberDef { name: string; group: string; box: number; per: number; rimfire?: boolean; types?: string[]; loads?: Record<string, LoadDef>; }
 interface AmmoDef {
   name: string; tag: string; k: number; desc: string; dragK?: number; velK?: number; massK?: number; rangeK?: number; spreadK?: number;
   pelletsK?: number; tracer?: number; glow?: number; quiet?: boolean; slug?: boolean; plus?: boolean; base?: string;
@@ -504,12 +485,6 @@ const G_ARMOR_LIST: ArmorDef[] = [
     desc: 'Rifle-rated, with a visor that stops handgun rounds to the face.' },
 ];
 G.ARMOR_LIST = G_ARMOR_LIST;
-// Handheld ballistic shields (js/rig.ts setShield, js/player.ts shieldHit): carried on the left arm by a suspect fighting one-handed with a
-// pistol in the right. Rated as G.ARMORS are, by their layers (js/ballistics.ts rating): IIIA stops handguns, III rifle ball, IV armour-piercing
-// rifle rounds. The higher the rating the heavier the stuff, so the smaller the shield a man can still carry: w, h its face in metres, th its
-// thickness; port: a viewport (its size, how far its middle is below the shield's top, and its glazing's layers); kg, and speed: how it
-// slows the one carrying it.
-interface ShieldDef { id: string; name: string; nij: string; w: number; h: number; th: number; kg: number; speed: number; layers: [MatKey, number][]; port: { w: number; h: number; down: number; layers: [MatKey, number][] } | null }
 const G_SHIELD_LIST: ShieldDef[] = [
   { id: 'sh.3a', name: 'Ballistic Shield (IIIA)', nij: 'IIIA', w: 0.56, h: 0.92, th: 0.014, kg: 7.5, speed: 0.92, layers: [['pe', 10]], port: { w: 0.24, h: 0.09, down: 0.17, layers: [['pc', 12]] } },
   { id: 'sh.3', name: 'Ballistic Shield (III)', nij: 'III', w: 0.5, h: 0.76, th: 0.024, kg: 10, speed: 0.88, layers: [['pe', 20]], port: { w: 0.2, h: 0.07, down: 0.14, layers: [['bpglass', 40]] } },
@@ -521,7 +496,6 @@ G.SHIELDS = G_SHIELDS;
 const G_ARMORS: Record<string, ArmorDef> = {};
 G.ARMORS = G_ARMORS;
 G.ARMOR_LIST.forEach((a) => (G.ARMORS[a.id] = a));
-
 
 // Enemy archetypes. acc = base hit chance at close range
 // Opponents are what a police tactical team actually faces: armed suspects in street clothes, a few with

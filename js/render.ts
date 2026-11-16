@@ -5,8 +5,6 @@ const _bjc = new THREE.Color();
 const SCOPE_FAR = 600; // (how far a magnified scope's picture is drawn, m)
 // Three.js scene, character models, first-person viewmodels and particle effects.
 interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: PShot; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
-type ImpactKind = 'wall' | 'blood' | 'armor'; // what a round hit (impact)
-type ImpactFx = 'metal' | 'stone' | 'wood' | 'plaster' | 'soft' | 'glass' | 'soil' | 'plastic' | 'water'; // what it threw up (IMPACT), js/materials.ts fx
 type BloodKind = 'drop' | 'spatter' | 'pool';
 interface RBloodMats { [kind: string]: THREE.MeshStandardMaterial; drop: THREE.MeshStandardMaterial; spatter: THREE.MeshStandardMaterial; pool: THREE.MeshStandardMaterial; }
 type RMark = THREE.Mesh<THREE.BufferGeometry, THREE.Material>; // a pooled decal or blood mark
@@ -82,7 +80,7 @@ const G_R = {
   trails: undefined as Trail[] | undefined,
   lastShot: undefined as PShot | null | undefined,
   wounds: undefined as RWound[] | undefined,
-  debris: undefined as ReturnType<typeof G_Scars.debris> | undefined,
+  debris: undefined as ReturnType<typeof G.Scars.debris> | undefined,
   debrisT: undefined as number | undefined,
   trailDot: undefined as THREE.SphereGeometry | undefined,
   lastDecals: undefined as RMark[] | undefined,

@@ -1,8 +1,4 @@
 'use strict';
-// The human models' variants (assets/models/humans/<id>.glb): written by models/characters/build_variants.py, not by hand.
-// scale: the figure's height over the skeleton's own (1.756 m); skin, hair: colours; fit: the trunk's half-width, front and back
-// (metres from the spine's line) across the chest, the belt and the pelvis, and the limbs' girth against the base figure's.
-interface HumanDef { sex: string; name: string; scale: number; hairStyle: string; skin: number; hair: number; fit: { chest: number[]; belt: number[]; pelvis: number[]; delt: number; arm: number; fore: number; thigh: number; calf: number; head_w: number } }
 const G_HumanData: Record<string, HumanDef> = {
   m01: { sex: 'm', name: 'average', scale: 1.0, hairStyle: 'short', skin: 0xc4a490, hair: 0x3f3530, fit: {"chest": [0.172, 0.15, 0.118], "belt": [0.158, 0.104, 0.12], "pelvis": [0.194, 0.108, 0.132], "delt": 1.0, "arm": 1.0, "fore": 1.0, "thigh": 1.0, "calf": 1.0, "head_w": 1.0} },
   m02: { sex: 'm', name: 'heavy-set', scale: 1.0251, hairStyle: 'buzz', skin: 0xb8977e, hair: 0x1d1b1d, fit: {"chest": [0.1771, 0.1607, 0.1295], "belt": [0.174, 0.1195, 0.1341], "pelvis": [0.2015, 0.1152, 0.1392], "delt": 1.0, "arm": 1.1, "fore": 1.08, "thigh": 1.08, "calf": 1.05, "head_w": 1.03} },

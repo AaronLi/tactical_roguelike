@@ -2,23 +2,17 @@
 const _shC = new THREE.Vector3(), _shS = new THREE.Vector3(), _shA = new THREE.Vector3(); // (shieldHit's)
 // where a door stops being a kick and starts being a push: aim below this (m) to kick, above to open
 const KICK_H = 1.3;
-type PBuild = Record<string, string>;
-// what a shot's rounds share (the friendly fire to send, together, and where they end); the rest is set as it goes
-interface PShot { sid: number; ff: Map<any, any>; to?: THREE.Vector3; tos: THREE.Vector3[] | null; ghosts?: Map<string, ShotGhost>; n?: number; paths?: any[]; [k: string]: any }
 // a round in flight (Me.fly): its state, and what the stepping adds as it goes
 // the fire selector's positions, a reload's way of dealing with the old magazine, the action worked by hand, the throwable in your hand,
 // what a timed F action is (it drives the animation), the zipline's and the ladder's phases, and how a hit leaves you
 type PReloadMode = 'retain' | 'pouch' | 'floor' | 'plain';
 type PActKind = 'rack' | 'release';
-type PHeldKind = 'frag' | 'flash' | 'tb' | 'sticky'; // (tb: a thermobaric grenade; sticky: holds to what it hits, js/views.ts stickStep)
 type PActionKind = 'order' | 'zip' | 'bag' | 'open' | 'kick' | 'close' | 'case';
 type PZipPhase = 'up' | 'ride' | 'down';
 type PLadderPhase = 'on' | 'climb' | 'off';
 type PFate = 'down' | 'out' | 'dead';
 type PXZ = { x: number; z: number };
 type PYP = { y: number; p: number };
-// a weapon as carried (Me.makeWeapon): what's in it; the rest (a light, a laser, its stickers...) comes with the build
-interface PWeapon { def: WeaponDef; sup: boolean; mag: number; ammo: string; fm: FireMode; tube: string[]; chamber: string | null; spent?: string[]; spentCh?: string | null; noMag?: boolean; magI?: number; light?: boolean; laser?: boolean; stickers?: any; [k: string]: any }
 interface PStats { kills: number; dmg: number; hs: number; downs: number; revives: number; arrests: number }
 // recoil's aim offset and its momentum; a head hit's throw (and how quickly the neck brings it back)
 interface PRecoil { y: number; p: number; vy: number; vp: number }
@@ -42,8 +36,6 @@ interface PZip { l: any; ph: PZipPhase; t: number; s: number; from: THREE.Vector
 interface PClimb { l: any; up: boolean; ph: PLadderPhase; t: number; from: THREE.Vector3; was: boolean; y: number }
 // a throwable in your hand (keys 3, 4, 5): its kind, whether the pin's out, the strength picked, and the throw's timers
 interface PHeld { kind: PHeldKind; cock: boolean; str: number; readyT: number; throwT: number; lastL: boolean; lastR: boolean; queued?: boolean; cook?: number } // (cook: the spoon's gone, the fuse burning in your hand: what's left of it)
-// a thermobaric's burst, worked out from where it went off (js/player.ts tbModel)
-interface PTbModel { map: LvMap; p: THREE.Vector3; fill: ReturnType<typeof G_Level.blastFill>; cloud: number; space: number; closed: boolean; conf: number; qs: number; rc: number; idx: Int32Array; outFrac: number; areaCloud: number; areaSpace: number; V: number }
 interface PTreat { name: string; part: string; mt: string; t0: number; dur: number }
 // what's owed the host for one suspect this frame: plain damage, wounds (as a share of a life), a headshot, a kill, armour got through, the wounds' detail
 interface PHitQ { d: number; f: number; h: boolean; k: boolean; ap?: boolean; w?: any[]; gr?: number; tb?: number[] } // (gr: a frag grenade's, its seed: js/highlights.ts)
@@ -3221,7 +3213,6 @@ const G_Me = {
       cam.position.addScaledVector(new THREE.Vector3(-Math.sin(this.yaw), 0, -Math.cos(this.yaw)), 0.08 * thrust);
     }
   },
-
 
   sendState(dt: number) {
     this.stateT -= dt;

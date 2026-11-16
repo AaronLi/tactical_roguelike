@@ -4,7 +4,6 @@
 // Only runs on the hosting peer, in a thread of its own (js/serverworker.ts; or on the page's, js/serverhost.ts: docs/threads.md).
 // It talks to everyone, the host's own screen too, exclusively through SvNet (below), and reads nothing of what's on a screen.
 const STATE_CODE: Partial<Record<EnemyState, number>> = { normal: 0, flee: 0, surrender: 1, cuffed: 2, cower: 3 };
-type Tbl = Record<string, any>;
 interface Loose { [k: string]: any }
 // The kinds of message the host's handle() switches on (what an officer's game sends it with G.Net.toHost: the `t` field)
 type NetMsgKind = 'stk' | 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
@@ -16,12 +15,8 @@ type CabLayout = any[][] & { left?: [string, number][] }; // (a cabinet's items,
 type MapCivSpots = LvMap & { civSpots?: { x: number; z: number; yaw: number }[] | null };
 type SvWin = LvWin & { cracked?: number; fy?: number }; // (a window, and how many rounds have fractured it, and the floor's height)
 type SvRoom = LvRoom & { out?: boolean };
-type EnemyKind = 'suspect' | 'grunt' | 'rusher' | 'marksman' | 'heavy' | 'warden' | 'leader' | 'civ' | 'rating'; // (G.ENEMIES' keys)
 type ArmourKind = 'vest' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs'; // (G.ENEMY_GEAR.odds' keys)
 type ServerPhase = 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
-// What a suspect or civilian is doing ('hide': a civilian behind cover; 'dead' is only ever tested for)
-type EnemyState = 'normal' | 'flee' | 'surrender' | 'cuffed' | 'cower' | 'hide' | 'dead';
-interface Door extends LvDoor { fy?: number; fallen?: boolean; hp?: Tbl }
 interface Evidence { i: number; wpn: string; x: number; y: number; z: number; owner: number; secured: boolean; taken: boolean }
 interface Loot { id: number; x: number; y: number; z: number; item: any; yaw: number; fit?: number }
 interface Cab { open: boolean; ver: number; items: any[][] }
@@ -33,62 +28,6 @@ interface WeaponCase { code: string; mag: number; reserve: number; am: any; rl?:
 interface AttachBox { open: boolean; uses: Record<string, { items: string[]; taken: string | null }> }
 interface StickerBox { s: string; by: string | null }
 interface SoundCache { map: LvMap; cache: Map<string, Float32Array> }
-// A player's last state (position p: [x, y, z]); the rest is the client's short-keyed state (js/player.ts state())
-interface PState { [k: string]: any; p: number[]; dd: number; dn: number; pr: number; cr: number; sx: any; yw: number; mv: any; tl: number; ln: number; sd: number; se: number; lr: number }
-interface Player { id: string; name: string; color: any; animal: any; look: any; ready: boolean; st: PState | null; anon?: number; lux?: number; luxAt?: number; firedAt?: number; flashK?: number } // (lux: the light on them this tick, officerLux; firedAt: their last shot, the level's clock; flashK: how much flash it made, its muzzle's)
-type LivePlayer = Player & { st: PState }
-// A suspect or civilian (addEnemy makes them; think() and the hit/injury code grow the optional fields)
-interface EnemyCover { x: number; y: number; z: number; lean: number; px?: number; pz?: number; fl?: number; cx?: number; cz?: number }
-interface HideSpot { x: number; z: number; y?: number; lean: number; fl?: number; flow?: ReturnType<typeof G.Level.flow>; stuck?: number; [k: string]: any }
-interface Enemy {
-  id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; hp: number; maxHp: number;
-  clearOut?: { ux: number; uz: number; until: number } | null; clearT?: number; // (a civilian getting out of a shooter's way: clearLine)
-  alert: boolean; spot: number; tgt: string | null; tgtD: number; canSee: boolean; percT: number; cool: number; burstLeft: number; aiming: boolean; aimT: number;
-  strafe: number; strafeT: number; idleT: number; idleYaw: number; pendingAlert: number; lostT: number; lastHit: string | null;
-  cover: EnemyCover | null; inCover: boolean; peek: boolean; peekT: number; coverT: number; coverStuck: number; crouch: boolean; nadeT: number; nadeN?: number; pushing?: boolean; pushWait?: number;
-  lastSeen: { x: number; y: number; z: number } | null; morale: number; broken: boolean; noise: { x: number; z: number } | null; holding: boolean; bold: boolean;
-  mag: number; magMax: number; reloadT: number; bleedH: number; bleedL: number; wnd?: number[]; clotT: number; legs: number; arms: number; lung: boolean;
-  drawn: boolean; drawT: number; surprisedT: number; suspicious: boolean; calmT: number; state: EnemyState; armed: boolean; shouts: number; complyCd: number;
-  suppressT: number; doorWait: number; leanOut: number; runner: boolean; home: { x: number; y: number; z: number }; walkTo: { x: number; z: number } | null;
-  fleeT: number; fake: boolean; fakeT: number;
-  // grown as they go (think() and the hit and injury code set these)
-  lurk?: boolean; hide?: HideSpot | null; peeking?: boolean; relocate?: boolean; turnYaw?: number | null; ordered?: boolean; dragTo?: { x: number; z: number } | null;
-  guard?: boolean; dp?: DoorPeekSpot | null; dpT?: number; dpOk?: number; heard?: { x: number; y: number; z: number; at: number };
-  threat?: { x: number; z: number; y?: number; d?: number } | null; str?: number; collapsed?: boolean; down?: boolean; sup?: number; supAt?: number; supQ?: number[][];
-  flinchT?: number; flinchOk?: number; flashT?: number; flashRec?: number; flashRecLen?: number; flashK?: number; flashOn?: boolean; flashBy?: { x: number; y: number; z: number } | null; stumbleT?: number; stumbleYaw?: number; stumbleV?: number; peekDone?: boolean; peekOut?: number; organs?: Record<string, number>; broke?: Record<string, number>;
-  dodge?: { x: number; y: number; z: number; at: number; until: number; run?: boolean; ux?: number; uz?: number; clear?: number; from?: number[] } | null; // (a grenade they've seen land: when they move, and till when)
-  spine?: boolean; cardiac?: boolean; out?: boolean; incap?: { by: string | null; t: number }; lastHitAt?: number; lastH?: boolean; lastAp?: boolean; lastGr?: number; lastFb?: number; tb?: { burn: number; blast: number; n: number }; flashId?: number;
-  hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
-  firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeVis?: number; blind?: boolean; onWait?: number;
-  post?: { x: number; y: number; z: number; yaw: number; flow?: Int16Array } | null; shelter?: { x: number; y: number; z: number; flow?: Int16Array; room?: number } | null; // (a doorway to hold, a room to get to: a ship's response, js/spaceserver.ts)
-  order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
-  point?: boolean; // (their team's point man, with a shield: giveShield)
-  grade?: number; rank?: number; team?: number | null; stay?: boolean; wear?: string | null; title?: string; // (wear: whose ship they're aboard, civil, pirate or navy: what they're called, titleOf) // (grade: how strong they are within the level's gear tier, 0-1, their kit by it: equip; rank: grade, a Leader a whole rank up; team: their fireteam's leader's id, their own if they lead it; stay: at a station, in no team: teamForm)
-  coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
-  lowRun?: boolean;
-  artGuard?: boolean; // (posted with the artifact, aboard a ship carrying one: js/spaceserver.ts crew, shelter)
-  trv?: { g: object; best: number; at: number; side: number; sx: number; sz: number }; // (travel: how they're getting on toward where they're going, and a step aside when they aren't)
-  // (lowRun: running under an order, weapon lowered: orderStep)
-  visK?: number; noiseAt?: number; nsAt?: number; guess?: { x: number; y: number; z: number; until: number } | null; // (night: how well they see who they're on, lightK; when they last heard something; when their own search last started; where they think you are)
-}
-// A leader's order to a suspect (js/server.ts dispatch): get to the spot the police were last known at, by this way in (entry: a door, or a
-// point round it), and then search outward. role: 'push' goes in, 'hold' covers the way in from a little way off and goes in later; phase:
-// 'approach' (to the entry: at a door, to their place in its team's stack), 'stack' (on the wall beside the door, waiting for the go),
-// 'breach' (through the doorway, on their turn), 'clear' (sideways along the inside wall to their corner, facing into the room, till
-// the whole stack's in), 'hold', 'enter' (the entry to the spot), 'search' (spot to spot, outward from it).
-interface OrderSpot { x: number; y: number; z: number; flow: ReturnType<typeof G.Level.flow>; kind: 'door' | 'point'; n: number; grp?: StackGrp }
-// A team's stack on a door (dispatchGroup): who's in place yet, when they go, who's at their corner inside, and whether the room's
-// cleared (till then their leader takes no new word: callIn). by: the leader whose stack it is.
-interface StackGrp { by: number; ids: number[]; ready: Set<number>; first: number | null; go: number | null; at: number; inside: Set<number>; cleared: boolean; room: number; sync?: { grps: StackGrp[] }; said?: boolean; cps?: { x: number; z: number }[] } // (room: the one they're breaching; sync: the stacks on it, going together)
-interface Order {
-  by: number; role: 'push' | 'hold'; phase: 'approach' | 'stack' | 'breach' | 'clear' | 'hold' | 'enter' | 'search'; x: number; y: number; z: number; entry: OrderSpot; tflow: ReturnType<typeof G.Level.flow>;
-  at: number; until: number; holdUntil: number; rest: number; leg: 'cover' | 'run'; legT: number; cv: EnemyCover | null; cvFlow: ReturnType<typeof G.Level.flow> | null;
-  sp: { x: number; z: number; flow: ReturnType<typeof G.Level.flow> } | null; ring: number; done: [number, number][]; look: number; delay: number; rt: number;
-  own?: boolean; lookYaw?: number; // (own: a search of their own in the dark, no leader's: nightSearch)
-  slot?: { x: number; y: number; z: number; flow: ReturnType<typeof G.Level.flow>; yaw: number } | null; slotK?: number; stuck?: number; prog?: number; progT?: number; side?: number; sideYaw?: number;
-  inP?: { x: number; z: number; flow: ReturnType<typeof G.Level.flow> } | null; cp?: { x: number; z: number; yaw: number } | null; clrT?: number; resAt?: number; rush?: boolean; cordon?: 'exit' | 'cover'; face?: { x: number; z: number } | null; hc?: EnemyCover | null; // (cordon: a team with no door of its own left to stack on, holding the police's way out or a defensive spot: dispatchGroup's cordon; face: where they watch from it; hc: the cover they hold there) // (rush: reinforcing a fight: a run there, bounding only the last of it, orderStep) // (resAt: when they last went back to it after a fight) (just inside the doorway; their corner inside, and the way they face there) // (their place in a door's stack, and how far back in it: the first is the first through)
-}
-interface DoorPeekSpot { d: LvDoor; x: number; y: number; z: number; px: number; pz: number; lean: number; yaw: number; fl: number; phase: string; t: number; n: number; flow?: ReturnType<typeof G.Level.flow> }
 
 // The simulation's way out (js/serverhost.ts wires it): to everyone (but exceptId), or to one of them. myId: the host's own
 // player, whose screen is in the same browser (its messages come and go on a port of their own; everyone else's by way of
@@ -931,6 +870,34 @@ const G_Server = {
     const y = (pm.y || 0) + 1.0, L = G.Level, map = this.map!;
     if (!L.los(map, pm.x, y, pm.z, x, y, z)) { x = pm.x + ux * 0.6; z = pm.z + uz * 0.6; }
     return { x, z };
+  },
+  // A shield man near e (not their own team's), in a fight, that e could get in behind when there's no cover for them: on their floor,
+  // within 8 m and in sight, no nearer the police than e is by much, and with no more than two others in behind him already. Nearest.
+  shieldNear(e: Enemy, st: PState) {
+    const L = G.Level, map = this.map!, ey = (e.y || 0) + 1;
+    let best: Enemy | null = null, bd = 8;
+    const de = Math.hypot(e.x - st.p[0], e.z - st.p[2]);
+    for (const o of this.enemies.values()) {
+      if (o === e || !o.def.shield || (e.team != null && o.team === e.team) || !this.able(o) || !this.engaged(o) || Math.abs((o.y || 0) - (e.y || 0)) > 1.5) continue;
+      const d = Math.hypot(o.x - e.x, o.z - e.z);
+      if (d >= bd || Math.hypot(o.x - st.p[0], o.z - st.p[2]) < Math.min(4, de - 2)) continue;
+      let n = 0; for (const b of this.enemies.values()) if (b !== e && b.shieldBy === o.id && this.able(b)) n++;
+      if (n >= 2 || !L.los(map, e.x, ey, e.z, o.x, (o.y || 0) + 1, o.z)) continue;
+      if (G.SpaceData.ON && G.SpaceSv.offLimits(e, o.x, o.z)) continue;
+      best = o; bd = d;
+    }
+    return best;
+  },
+  // the shield man e has got in behind (shieldNear), while he's still fit, has a shield and is in the fight on their floor; else null
+  lentShield(e: Enemy) {
+    const o = e.shieldBy != null ? this.enemies.get(e.shieldBy) : undefined;
+    return o && o.def.shield && this.able(o) && this.engaged(o) && Math.abs((o.y || 0) - (e.y || 0)) < 1.5 ? o : null;
+  },
+  // e's turn behind a shield man pm they've borrowed: after his own team (pointIdx), then the others in behind him, by id
+  lentIdx(e: Enemy, pm: Enemy) {
+    let k = 0;
+    for (const o of this.enemies.values()) if (o !== e && o !== pm && this.able(o) && ((pm.team != null && o.team === pm.team) || (o.shieldBy === pm.id && o.id < e.id))) k++;
+    return k;
   },
   // their turn among their point man's team (by id: steady from tick to tick)
   pointIdx(e: Enemy, pm: Enemy) { let k = 0; for (const o of this.enemies.values()) if (o !== e && o !== pm && o.team === pm.team && this.able(o) && o.id < e.id) k++; return k; },
@@ -2067,13 +2034,20 @@ const G_Server = {
       if (e.lowRun) { e.lowRun = false; e.cool = Math.max(e.cool, this.RUN.RAISE); } // (running with it lowered: a moment to bring it up)
       // Their point man near, with his shield up: in behind him, standing, shooting over him as he kneels (not off to a crate)
       const pm = !bo && !po ? this.pointOf(e) : null, pmd = pm ? Math.hypot(pm.x - e.x, pm.z - e.z) : 99;
-      const bs = pm && pmd < 9 && this.engaged(pm) && L.los(map, e.x, (e.y || 0) + 1, e.z, pm.x, (pm.y || 0) + 1, pm.z) ? this.behind(e, pm, st.p[0], st.p[2], this.pointIdx(e, pm)) : null;
+      let bs = pm && pmd < 9 && this.engaged(pm) && L.los(map, e.x, (e.y || 0) + 1, e.z, pm.x, (pm.y || 0) + 1, pm.z) ? this.behind(e, pm, st.p[0], st.p[2], this.pointIdx(e, pm)) : null;
+      // Or someone else's shield man they got in behind, having no cover to go to (below): while he's near and still in the fight
+      const lent = !bs && !bo && !po && e.shieldBy != null ? this.lentShield(e) : null;
+      if (lent && Math.hypot(lent.x - e.x, lent.z - e.z) < 10) bs = this.behind(e, lent, st.p[0], st.p[2], this.lentIdx(e, lent));
+      else if (!bs || bo || po) e.shieldBy = undefined;
       if (bs) { e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; }
-      // Cover: move to a spot with a crate between us and the target, crouch, pop up to shoot.
-      if (!bo && !po && !bs && usesCover && !e.cover && e.coverT <= 0) {
+      // Cover: move to a spot with a crate between us and the target, crouch, pop up to shoot. (Behind a borrowed shield, still
+      // looking now and then: cover of their own found, they leave him for it.) None to be had: in behind a shield man near, if any
+      if (!bo && !po && (!bs || e.shieldBy != null) && usesCover && !e.cover && e.coverT <= 0) {
         e.coverT = 3 + Math.random() * 3;
         e.cover = this.findCover(e, st);
         e.coverStuck = 0;
+        if (e.cover) { e.shieldBy = undefined; bs = null; }
+        else if (!bs && !e.def.shield) { const o = this.shieldNear(e, st); if (o) { e.shieldBy = o.id; bs = this.behind(e, o, st.p[0], st.p[2], this.lentIdx(e, o)); } }
         // path there on a flow field seeded at the cover tile (routes through doorways)
         if (e.cover) e.coverFlow = L.flow(map, [L.src(map, e.cover.x, e.cover.y, e.cover.z)]);
       }

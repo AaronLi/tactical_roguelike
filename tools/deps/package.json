@@ -1,0 +1,6 @@
+{
+  "name": "breach-protocol-deps-tool",
+  "private": true,
+  "description": "What tools/deps.mjs parses the game with: TypeScript 5's compiler API (TypeScript 7's package, the game's compiler, has none). Its own folder so its tsc doesn't take the project's place in node_modules/.bin. Installed on first run of tools/deps.mjs (npm ci --prefix tools/deps).",
+  "devDependencies": { "typescript": "5.9.3" }
+}
