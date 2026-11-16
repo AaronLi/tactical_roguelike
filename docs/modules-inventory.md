@@ -8,13 +8,13 @@ nothing checks the module is there, **check** if it is the check itself (`G.X &&
 
 ## Summary
 
-- 90 files, 176 names on G, 5292 uses (88 while loading)
+- 90 files, 176 names on G, 5247 uses (88 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 5, the largest 43 files
 - hand-kept orders against the load-time needs: index.html 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, tools/level_env.mjs 0, tools/model_env.mjs 0
 - the simulation reaching page-only modules: 0 uses (0 unguarded, 0 of them while loading)
 - names used but defined nowhere: 0
-- trial module typecheck: 3450 errors; 0 bare names between files (0 uses), 65 G members lost, 194 others
+- trial module typecheck: 3326 errors; 0 bare names between files (0 uses), 62 G members lost, 188 others
 
 ## 1. Dependency graph
 
@@ -108,7 +108,7 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | headgear | Headgear | - | gear, humans |
 | rig | Rig | sim | callsigns, data, footsteps, game, gear, gunmodels, gunrig, headgear, humans, level, levelview, parts, spacedata, stickers, util, views, vmanim, world |
 | net | Net | util | serverlink |
-| recorder (sim) | Recorder | - | level |
+| recorder (sim) | Recorder | level | - |
 | server (sim) | Server | sim | arsenal, callsigns, damage, data, gear, level, medical, parts, route, serverhost, shipgen, shop, spacedata, spaceserver, stickers, util, world |
 | spaceserver (sim) | SpaceSv | spacedata | damage, data, level, materials, server, shipgen, world |
 | serverhost (sim) | ServerHost | - | leveldesc, recorder, server, stickers |
@@ -118,12 +118,12 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | casings | Casings | - | audio, data, furniture, game, gear, handling, icons, level, loot, parts, player, render, util, world |
 | icons | Icons | data | gear, gunmodels, parts, render, util |
 | hud | HUD | util | ballistics, callsigns, data, game, gamepad, gear, icons, level, medical, net, player, render, rig, shotlog, space, views |
-| shop (sim) | Shop | - | data, gear, parts, util |
+| shop (sim) | Shop | data, gear, parts, util | - |
 | shopui | ShopUI | - | audio, ballistics, callsigns, career, data, game, gear, gunaudio, gunsmith, hangar, hud, icons, invui, medical, net, parts, player, range, route, shop, util, zeroing |
 | invui | InvUI | - | audio, ballistics, callsigns, data, game, gamepad, gear, gunaudio, hud, icons, medical, net, parts, player, range, render, shopui, touch, util, views |
 | gunsmith | GunsmithUI | parts | audio, ballistics, data, gamepad, gunaudio, gunmodels, hud, player, render, shop, shopui, stickers, util |
 | zeroing | ZeroUI | - | audio, data, player |
-| route (sim) | Route | - | data, util |
+| route (sim) | Route | data, util | - |
 | loot | Loot | - | casings, data, game, gear, gunmodels, gunrig, icons, level, parts, render |
 | course | Course | - | audio, data, game, hud, lightgrid, net, player, range, render, util, views, world |
 | range | Range | data | audio, course, gear, hud, player, render, world |
@@ -159,9 +159,9 @@ None.
 `tsconfig.modules-trial.json`: the project with every file a module (`moduleDetection: force`). Phase 1 is done when
 the only errors left are G members (those go when the files are converted).
 
-3450 errors: TS2339 3159, TS7006 139, TS6196 64, TS2551 34, TS18047 14, TS7031 13, TS18048 10, TS7053 6, TS2531 5, TS2345 4, TS2322 2.
+3326 errors: TS2339 3000, TS7006 133, TS2551 78, TS6196 61, TS18047 14, TS7031 13, TS18048 10, TS7053 6, TS2531 5, TS2345 4, TS2322 2.
 
-**G members lost** (TS2339 on GameNamespace, 65 names): each file's `interface GameModules` no longer merges (and in 63 files it's reported unused). Expected; they go as the files are converted.
+**G members lost** (TS2339 on GameNamespace, 62 names): each file's `interface GameModules` no longer merges (and in 60 files it's reported unused). Expected; they go as the files are converted.
 
 **THREE as a global** (TS2686, in 0 files): three's types declare it a UMD global, which a module may not use without an import. Phase 2's import map, or `allowUmdGlobalAccess`, clears these.
 
@@ -170,7 +170,7 @@ the only errors left are G members (those go when the files are converted).
 | Name | Kind | Declared in | Uses | Used by |
 | --- | --- | --- | --- | --- |
 
-**Everything else** (194): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
+**Everything else** (188): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
 
 - js/ambience.ts:948 TS7006 Parameter 'q' implicitly has an 'any' type.
 - js/cloud.ts:304 TS7006 Parameter 'r' implicitly has an 'any' type.
@@ -232,4 +232,4 @@ the only errors left are G members (those go when the files are converted).
 - js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
 - js/game.ts:1623 TS2345 Argument of type 'unknown' is not assignable to parameter of type 'string'.
 - js/game.ts:1623 TS7006 Parameter 'a' implicitly has an 'any' type.
-- ... 134 more in the JSON
+- ... 128 more in the JSON

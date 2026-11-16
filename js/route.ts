@@ -1,9 +1,11 @@
 'use strict';
+import { THEMES } from './data.js';
+import { U } from './util.js';
 // The route map. Each act is ten deployments, left to right: nine columns of choices, then the boss. A
 // node is an environment (one of G.THEMES); paths split and rejoin on the way and never cross. Picking the
 // next node picks where you fight next. Generated from a seed, so every peer draws the same map; the host
 // keeps where the squad is (route.path) and the votes.
-const G_Route = (() => {
+export const Route = (() => {
   const COLS = 10, ROWS = 7, WALKS = 4;
   // which column a level is in, and which act; the last level of each act is the boss
   interface RNode { id: number; c: number; r: number; th: number; next: number[]; prev: number[]; boss: boolean; stronghold: boolean; night: boolean }
@@ -20,7 +22,7 @@ const G_Route = (() => {
 
   // { seed, act, cols: [[node]], nodes: Map id -> node }; node { id, c, r, th, next: [ids], boss }
   function gen(seed: number, act: number): RMap {
-    const r = G.U.rng(seed ^ (act * 0x9e3779b1)), nodes = new Map<number, RNode>(), edges: number[][] = [];
+    const r = U.rng(seed ^ (act * 0x9e3779b1)), nodes = new Map<number, RNode>(), edges: number[][] = [];
     const id = (c: number, row: number) => c * 10 + row;
     const node = (c: number, row: number): RNode => {
       const k = id(c, row);
@@ -34,7 +36,7 @@ const G_Route = (() => {
     const mid = (ROWS - 1) / 2, start = node(0, mid);
     // where each path goes first: one high, one low, the rest anywhere, all different
     const firsts = [Math.floor(r() * mid), mid + 1 + Math.floor(r() * mid)];
-    const rest = G.U.shuffle(r, [...Array(ROWS).keys()].filter((x) => !firsts.includes(x)));
+    const rest = U.shuffle(r, [...Array(ROWS).keys()].filter((x) => !firsts.includes(x)));
     while (firsts.length < WALKS) firsts.push(rest.pop()!);
     for (const first of firsts) {
       edges.push([0, start.r, first]);
@@ -42,7 +44,7 @@ const G_Route = (() => {
       let row = first;
       for (let c = 1; c < COLS - 2; c++) {
         const opts = [-1, 0, 1].map((d) => row + d).filter((b) => b >= 0 && b < ROWS && !crosses(c, row, b));
-        G.U.shuffle(r, opts);
+        U.shuffle(r, opts);
         const nb = opts.length ? opts[0] : row;
         if (!edges.some((e) => e[0] === c && e[1] === row && e[2] === nb)) edges.push([c, row, nb]);
         node(c + 1, nb);
@@ -56,10 +58,10 @@ const G_Route = (() => {
     // environments: no two in a row along a link where it can be helped, and each column a mix. (The starter, the
     // convenience store, is the first act's way in and nowhere else: the rest are drawn from the others, each from its
     // theme's `from`, the first level it can come up at: the Sandia Crest's after the third.)
-    const all = G.THEMES.map((T, i) => i).filter((i) => !G.THEMES[i].starter), starter = G.THEMES.findIndex((T) => T.starter);
+    const all = THEMES.map((T, i) => i).filter((i) => !THEMES[i].starter), starter = THEMES.findIndex((T) => T.starter);
     const order = [...nodes.values()].sort((a, b) => a.c - b.c || a.r - b.r);
     for (const n of order) {
-      const level = (act - 1) * COLS + n.c + 1, pool = all.filter((i) => !(G.THEMES[i].from! > level)), nT = pool.length;
+      const level = (act - 1) * COLS + n.c + 1, pool = all.filter((i) => !(THEMES[i].from! > level)), nT = pool.length;
       const avoid = new Set(n.prev.map((p) => nodes.get(p)!.th));
       for (const o of order) if (o.c === n.c && o !== n && o.r < n.r) avoid.add(o.th);
       let k0 = Math.floor(r() * nT);
@@ -69,14 +71,14 @@ const G_Route = (() => {
     // strongholds: about one level in twelve from level FROM is a suspects' stronghold (no civilians, a bigger crowd of suspects,
     // better pay). Never before it, the convenience store or a boss. Drawn from a generator of its own, so the map's shape and
     // environments are as they'd be without them.
-    const rs = G.U.rng(seed ^ (act * 0x2545f491) ^ 0x57c0);
+    const rs = U.rng(seed ^ (act * 0x2545f491) ^ 0x57c0);
     const lvlOf = (n: RNode) => (act - 1) * COLS + n.c + 1;
-    for (const n of order) if (rs() < STRONGHOLD && !n.boss && lvlOf(n) >= FROM && !G.THEMES[n.th].starter) n.stronghold = true;
+    for (const n of order) if (rs() < STRONGHOLD && !n.boss && lvlOf(n) >= FROM && !THEMES[n.th].starter) n.stronghold = true;
     // night levels: about one in ten from level FROM (never before it, nor the corner store),
     // nor a place that's outdoors at night already (the festival: th.night) or a mountain top at sundown (the Crest). From
     // a generator of their own too, so nothing else on the map changes.
-    const rn = G.U.rng(seed ^ (act * 0x6c8e9cf5) ^ 0x4e17);
-    for (const n of order) { const T = G.THEMES[n.th]; if (rn() < NIGHT && lvlOf(n) >= FROM && !T.starter && !T.night && !T.rock) n.night = true; }
+    const rn = U.rng(seed ^ (act * 0x6c8e9cf5) ^ 0x4e17);
+    for (const n of order) { const T = THEMES[n.th]; if (rn() < NIGHT && lvlOf(n) >= FROM && !T.starter && !T.night && !T.rock) n.night = true; }
     const cols = [];
     for (let c = 0; c < COLS; c++) cols.push(order.filter((n) => n.c === c));
     return { seed, act, cols, nodes };
@@ -100,7 +102,7 @@ const G_Route = (() => {
   const pos = (n: RNode) => [PADX + n.c * STEP, PADY + n.r * (H - 2 * PADY) / (ROWS - 1)];
   // the map as SVG. st: { path: [ids visited this act], opts: [ids], votes: { playerId: nodeId }, colors: { playerId: color }, mine }
   function svg(route: RMap, st: RState) {
-    const esc = G.U.esc, visited = new Set(st.path), last = st.path[st.path.length - 1];
+    const esc = U.esc, visited = new Set(st.path), last = st.path[st.path.length - 1];
     let lines = '', dots = '';
     for (const n of route.nodes.values()) {
       const [x1, y1] = pos(n);
@@ -112,7 +114,7 @@ const G_Route = (() => {
       }
     }
     for (const n of route.nodes.values()) {
-      const [x, y] = pos(n), th = G.THEMES[n.th], opt = st.opts.includes(n.id), here = n.id === last;
+      const [x, y] = pos(n), th = THEMES[n.th], opt = st.opts.includes(n.id), here = n.id === last;
       const cls = `rn${opt ? ' opt' : ''}${visited.has(n.id) ? ' done' : ''}${here ? ' here' : ''}${n.boss ? ' boss' : ''}${st.mine === n.id ? ' mine' : ''}`;
       const rad = n.boss ? 30 : 21;
       dots += `<g class="${cls}" data-node="${n.id}" transform="translate(${x},${y})" aria-label="${esc(th.name)}${n.boss ? ' (boss)' : ''}${n.stronghold ? ', stronghold' : ''}${n.night ? ', night' : ''}">`; // (what it is, on hover: tip)
@@ -126,7 +128,7 @@ const G_Route = (() => {
       dots += n.boss ? `<text y="${rad + 15}" class="rt">THE KINGPIN</text><text y="${rad + 28}" class="rt sub">${esc(th.name)}</text>` : `<text y="${rad + 15}" class="rt">${esc(th.name)}</text>`;
       // who's voted for it
       const vs = Object.entries(st.votes || {}).filter(([, v]) => v === n.id);
-      vs.forEach(([pid], i) => { dots += `<circle class="rv" r="5" cx="${-((vs.length - 1) * 6) + i * 12}" cy="${-rad - 9}" fill="${G.U.hex((st.colors || {})[pid] || 0xffffff)}"/>`; });
+      vs.forEach(([pid], i) => { dots += `<circle class="rv" r="5" cx="${-((vs.length - 1) * 6) + i * 12}" cy="${-rad - 9}" fill="${U.hex((st.colors || {})[pid] || 0xffffff)}"/>`; });
       dots += '</g>';
     }
     let cols = '';
@@ -137,7 +139,7 @@ const G_Route = (() => {
   // (a stronghold, a night level, the boss), each with the badge it wears on the map; and whether you can go there from here.
   function tip(route: RMap, id: number, st: RState) {
     const n = route.nodes.get(id); if (!n) return '';
-    const esc = G.U.esc, th = G.THEMES[n.th], lvl = (route.act - 1) * COLS + n.c + 1, rows: string[] = [];
+    const esc = U.esc, th = THEMES[n.th], lvl = (route.act - 1) * COLS + n.c + 1, rows: string[] = [];
     if (n.boss) rows.push(`<div class="tt-row boss"><i class="tt-badge"><svg viewBox="-12 -12 24 24"><path d="M-9 6H9 M-9 3L-10-7-4-2 0-9 4-2 10-7 9 3Z"/></svg></i><div><b>The Kingpin</b>The act's last level: the boss is in here</div></div>`);
     if (n.stronghold) rows.push(`<div class="tt-row sh"><i class="tt-badge"><svg viewBox="-9 -9 18 18"><circle r="8"/><path d="M0-4.5V1 M0 3.6V3.7"/></svg></i><div><b>Stronghold</b>No civilians, about half as many suspects again. <em>+¢${strongholdPay(lvl)}</em> for clearing it</div></div>`);
     if (n.night) rows.push(`<div class="tt-row nt"><i class="tt-badge"><svg viewBox="-9 -9 18 18"><circle r="8"/><path d="M1.6-4.6A5 5 0 1 0 1.6 4.6 4 4 0 1 1 1.6-4.6Z"/></svg></i><div><b>Night</b>The lights are out but for the emergency lights. Suspects can hardly see you in the dark, unless your weapon light gives you away</div></div>`);
@@ -147,6 +149,6 @@ const G_Route = (() => {
   }
   return { COLS, strongholdPay, gen, options, colOf, actOf, isBoss, svg, tip };
 })();
-G.Route = G_Route;
+G.Route = Route;
 
-interface GameModules { Route: typeof G_Route; }
+declare global { interface GameModules { Route: typeof Route; } }

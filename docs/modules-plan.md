@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2 and 3 done (phase 3: 2026-11-16); phase 4 started (part a, 2026-11-16: the node tools, the codemod, the first 11 leaves); the rest of phase 4 and 5 to 7 not started. Written 2026-11-15.
+Status: phases 0, 1, 2 and 3 done (phase 3: 2026-11-16); phase 4 started (part a, 2026-11-16: the node tools, the codemod, the first 11 leaves; part b, 2026-11-16: 14 more files, 25 in all); `server`, `spaceserver`, `serverhost`, the deletion of the lists, and 5 to 7 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -300,6 +300,33 @@ Run the codemod (`node tools/codemod_imports.mjs js/foo.ts`, usage at the top of
 - **Not reproduced exactly / noted:** nothing behavioural. `check_models.mjs` now loads the game once for its per-file authored
   checks (it loaded one per file). Stack traces from a tool's game show absolute file names, not `util.js`. The guard notes on
   `G.EXPLOSIVES_OFF && ...` in `data` are the codemod's heuristic (a boolean, not a presence check).
+
+#### Phase 4 results (part b)
+
+- **The lists first.** `medical` and `materials` need only `util`, so they now load right after it in every list (`index.html`,
+  `SERVER_SCRIPTS`, `PREP_SCRIPTS`, `EXPORT_SCRIPTS`, `LEVEL_SCRIPTS`, `tools/model_env.mjs`'s game list,
+  `tools/check_furniture_golden.mjs`); `gear`, `shipgen` and `spacedata` import them. Later, `world` before `ballistics` and
+  `leveldesc` before `level` (both read nothing of the files after them while loading), so `ballistics` and `level` import
+  them. `npm run deps`: six orders consistent, no load-time cycle. (`tools/bake_hangar.mjs` takes its order from `index.html`.)
+- **Converted, 14 more (25 in all):** `world`, `ballistics`, `leveldesc`, `level`, `furnspec`, `furniture`, `homes`, `scars`,
+  `damage`, `stickers`, `route`, `shop`, `recorder`; `residents` is an IIFE with nothing to export, so it is a module only by
+  importing `furniture` and `homes`. Then `--uses` was run again on every converted file, for the names that were new.
+- **Removed, because a module's unused locals are errors:** the type `LvFxKind` in `level.ts` and `HomeMat` in `homes.ts`
+  (both unused, noted in phase 1). No runtime change.
+- **Still read through `G` between converted files (the lists put the named file later, or it is the other half of a cycle
+  whose members call each other only inside functions):** `level` and `world` (read by `spacedata`, `materials`, `shipgen`, `sim`
+  and by each other: `world` reads `G.Level` and `G.LevelDesc`), `damage` (by `leveldesc`, `world`), `scars` (by `damage`),
+  `ballistics` (by `arsenal`, `medical`), `parts` (by `data`), `sim` and `stickers` (by `gear`), `homes` and `furniture` (by
+  `level`, `furnspec`), plus `data`'s optional `G.Gunsmith`. Importing any of these would run a file earlier, or close an import
+  cycle through a file that has a load-time use. They go when the lists are deleted and the order is the import graph's.
+- **Stand-ins checked:** none is bypassed. `tools/cloud.test.mjs` loads only `util`, `cloudconfig`, `career` and `cloud`, so its
+  `G.THEMES`, `G.Route`, `G.Arsenal`, `G.Callsigns` and `G.Net` are only read by files that still read `G`; `exportworker`'s
+  `G.Game`/`G.Net` and the hooks are not names of converted files; `tools/level_env.mjs` (`G.Range`) and the furniture golden (a hook)
+  likewise. `route` and `shop`, converted, are not read by `cloud` through an import.
+- **Next:** `server`, `spaceserver`, `serverhost`; then delete the lists (the workers import their entry file), and the page side.
+- **Checks:** typecheck, `deps:check`, `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:models`, `test:cloud` 21/21;
+  smoke 10/10 (one case per process); on the page `G.ServerLink.mode === 'worker'` with 17 hooks, the prep worker built a level and
+  its light grid, the export worker booted (a one-off script, not kept).
 
 ### 5. Convert the page side
 

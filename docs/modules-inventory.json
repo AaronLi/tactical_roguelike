@@ -23763,37 +23763,38 @@
   },
   "recorder": {
    "defs": {
-    "Recorder": 97
+    "Recorder": 98
    },
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "Level",
-     "line": 46,
-     "load": false,
-     "guard": "plain"
+     "from": "level",
+     "line": 2,
+     "names": [
+      "Level"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
     "RecFrame": {
      "kind": "type",
-     "line": 9
+     "line": 10
     },
     "RecEvent": {
      "kind": "type",
-     "line": 10
+     "line": 11
     },
     "RecFile": {
      "kind": "type",
-     "line": 11
+     "line": 12
     },
-    "G_Recorder": {
+    "Recorder": {
      "kind": "value",
-     "line": 17
+     "line": 18
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 98
+    "global": {
+     "kind": "value",
+     "line": 99
     }
    }
   },
@@ -25046,115 +25047,33 @@
   },
   "route": {
    "defs": {
-    "Route": 150
+    "Route": 152
    },
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "U",
-     "line": 23,
-     "load": false,
-     "guard": "plain"
+     "from": "data",
+     "line": 2,
+     "names": [
+      "THEMES"
+     ]
     },
     {
-     "x": "U",
-     "line": 37,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 45,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 59,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 59,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 59,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 62,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 72,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 74,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 78,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 79,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 103,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 115,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 129,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 140,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 140,
-     "load": false,
-     "guard": "plain"
+     "from": "util",
+     "line": 3,
+     "names": [
+      "U"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
-    "G_Route": {
+    "Route": {
      "kind": "value",
-     "line": 6
+     "line": 8
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 152
+    "global": {
+     "kind": "value",
+     "line": 154
     }
    }
   },
@@ -27493,187 +27412,49 @@
   },
   "shop": {
    "defs": {
-    "Shop": 132
+    "Shop": 136
    },
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "Shop",
-     "line": 17,
-     "load": false,
-     "guard": "plain"
+     "from": "data",
+     "line": 2,
+     "names": [
+      "MAG_FAMILY",
+      "obtainable",
+      "WEAPON_LIST"
+     ]
     },
     {
-     "x": "Gunsmith",
-     "line": 25,
-     "load": false,
-     "guard": "plain"
+     "from": "gear",
+     "line": 3,
+     "names": [
+      "Gear"
+     ]
     },
     {
-     "x": "Gunsmith",
-     "line": 26,
-     "load": false,
-     "guard": "plain"
+     "from": "parts",
+     "line": 4,
+     "names": [
+      "Gunsmith"
+     ]
     },
     {
-     "x": "U",
-     "line": 34,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 41,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 47,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 47,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 53,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPON_LIST",
-     "line": 65,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "obtainable",
-     "line": 65,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 71,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 80,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 82,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 82,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 91,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 92,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "MAG_FAMILY",
-     "line": 92,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 92,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 93,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 101,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 103,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 111,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 113,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 122,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 124,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 129,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 129,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 129,
-     "load": false,
-     "guard": "plain"
+     "from": "util",
+     "line": 5,
+     "names": [
+      "U"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
-    "G_Shop": {
+    "Shop": {
      "kind": "value",
-     "line": 6
+     "line": 10
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 133
+    "global": {
+     "kind": "value",
+     "line": 137
     }
    }
   },
@@ -40498,12 +40279,19 @@
   },
   "recorder": {
    "level": {
-    "load": 0,
-    "call": 1,
+    "load": 1,
+    "call": 0,
     "names": [
      "Level"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Level",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "render": {
@@ -40927,21 +40715,35 @@
    }
   },
   "route": {
-   "util": {
-    "load": 0,
-    "call": 8,
-    "names": [
-     "U"
-    ],
-    "loadAt": []
-   },
    "data": {
-    "load": 0,
-    "call": 8,
+    "load": 1,
+    "call": 0,
     "names": [
      "THEMES"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "THEMES",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "scars": {
@@ -41315,39 +41117,67 @@
    }
   },
   "shop": {
-   "parts": {
-    "load": 0,
-    "call": 8,
-    "names": [
-     "Gunsmith"
-    ],
-    "loadAt": []
-   },
-   "util": {
-    "load": 0,
-    "call": 3,
-    "names": [
-     "U"
-    ],
-    "loadAt": []
-   },
    "data": {
-    "load": 0,
-    "call": 3,
+    "load": 1,
+    "call": 0,
     "names": [
-     "WEAPON_LIST",
+     "MAG_FAMILY",
      "obtainable",
-     "MAG_FAMILY"
+     "WEAPON_LIST"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "MAG_FAMILY, obtainable, WEAPON_LIST",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    },
    "gear": {
-    "load": 0,
-    "call": 13,
+    "load": 1,
+    "call": 0,
     "names": [
      "Gear"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Gear",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "parts": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Gunsmith"
+    ],
+    "loadAt": [
+     {
+      "x": "Gunsmith",
+      "line": 4,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 5,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "shopui": {
@@ -42767,13 +42597,13 @@
  "reach": [],
  "undefined": {},
  "trial": {
-  "total": 3450,
+  "total": 3326,
   "byCode": {
-   "TS2339": 3159,
-   "TS6196": 64,
-   "TS7006": 139,
+   "TS2339": 3000,
+   "TS6196": 61,
+   "TS7006": 133,
    "TS18047": 14,
-   "TS2551": 34,
+   "TS2551": 78,
    "TS7031": 13,
    "TS2345": 4,
    "TS2531": 5,
@@ -42829,14 +42659,11 @@
    "Prof",
    "R",
    "Range",
-   "Recorder",
    "Rig",
-   "Route",
    "Server",
    "ServerHost",
    "ServerLink",
    "ShipModel",
-   "Shop",
    "ShopUI",
    "ShotLog",
    "Space",
@@ -42850,7 +42677,7 @@
    "Zip"
   ],
   "umd": [],
-  "unusedGM": 63,
+  "unusedGM": 60,
   "other": [
    {
     "file": "js/ambience.ts",
@@ -43259,18 +43086,6 @@
     "line": 1642,
     "code": "TS7006",
     "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1709,
-    "code": "TS7006",
-    "msg": "Parameter 'o' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1710,
-    "code": "TS7006",
-    "msg": "Parameter 'o' implicitly has an 'any' type."
    },
    {
     "file": "js/game.ts",
@@ -43711,18 +43526,6 @@
     "msg": "Parameter 'm' implicitly has an 'any' type."
    },
    {
-    "file": "js/serverhost.ts",
-    "line": 34,
-    "code": "TS7006",
-    "msg": "Parameter 'name' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/serverhost.ts",
-    "line": 34,
-    "code": "TS7006",
-    "msg": "Parameter 'data' implicitly has an 'any' type."
-   },
-   {
     "file": "js/shopui.ts",
     "line": 169,
     "code": "TS7006",
@@ -43769,18 +43572,6 @@
     "line": 264,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 333,
-    "code": "TS7006",
-    "msg": "Parameter 'o' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 334,
-    "code": "TS7006",
-    "msg": "Parameter 'n' implicitly has an 'any' type."
    },
    {
     "file": "js/space.ts",

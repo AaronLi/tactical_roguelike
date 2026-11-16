@@ -1,4 +1,5 @@
 'use strict';
+import { Level } from './level.js';
 // Recording what the officers do, one file a level, so the suspects' AI can later be taught how people play (docs/recording.md).
 // It runs with the simulation, on the host only (js/serverhost.ts drives it): the host sees every officer's state ('st', 20 a
 // second) and every action they send, its own player's and the remote players' alike, so a host recording has the whole squad.
@@ -14,7 +15,7 @@ interface RecFile {
   map: { W: number; H: number; TS: number; floors: number };
   frames: RecFrame[]; events: RecEvent[]; end?: string; dur?: number;
 }
-const G_Recorder = {
+export const Recorder = {
   RATE: 10,
   on: false,
   // the officers' state, as kept: js/player.ts state()'s keys (what they look like and what they're doing; not their kit, wounds or score)
@@ -43,7 +44,7 @@ const G_Recorder = {
     this.acc = 1 / this.RATE; // (the first frame at once)
     this.cur = {
       v: 1, seed: S.seed, level: S.level, theme: S.theme == null ? null : S.theme, night: !!S.night, at: new Date().toISOString(), rate: this.RATE,
-      officers: [], map: { W: m.W, H: m.H, TS: G.Level.TS, floors: m.NF || 1 }, frames: [], events: [],
+      officers: [], map: { W: m.W, H: m.H, TS: Level.TS, floors: m.NF || 1 }, frames: [], events: [],
     };
     for (const p of S.players.values()) this.officer(p);
   },
@@ -94,5 +95,5 @@ const G_Recorder = {
     if (this.out) this.out(name, c);
   },
 };
-G.Recorder = G_Recorder;
-interface GameModules { Recorder: typeof G_Recorder; }
+G.Recorder = Recorder;
+declare global { interface GameModules { Recorder: typeof Recorder; } }
