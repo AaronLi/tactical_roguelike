@@ -12,11 +12,12 @@ import { Career } from './career.js';
 import { Cloud } from './cloud.js';
 import { Course } from './course.js';
 import { Damage } from './damage.js';
-import { barrelMm, CALIBERS, calOf, ENEMIES, ENEMY_GEAR, gearTier, MODE_NAME, roundSpec, shotSoundKey, THEMES, WEAPONS } from './data.js';
+import { CALIBERS, calOf, ENEMIES, ENEMY_GEAR, gearTier, MODE_NAME, THEMES, WEAPONS } from './data.js';
 import { Pad } from './gamepad.js';
 import { Gear } from './gear.js';
 import { Models } from './glb.js';
 import { GunAudio } from './gunaudio.js';
+import { GunSounds } from './gunsounds.js';
 import { GunMaterials } from './gunmaterials.js';
 import { GunModels } from './gunmodels.js';
 import { GunsmithUI } from './gunsmith.js';
@@ -942,6 +943,7 @@ export const Game = {
       }
       case 'abox': {
         this.abox = m.a;
+        { const mine = this.aboxMine(); if (mine) GunSounds.offer(G_Me.cur(), mine[0]); } // (the reports the three would give the gun in your hands, made while you choose)
         if (m.opened === Net.myId) this.aboxShow(true); // (opened it: its wheels spin)
         if (m.by && m.got) {
           if (m.by === Net.myId) { this.aboxHide(); G_Me.takeAttachment(m.got, m.fit); }
@@ -1812,12 +1814,14 @@ export const Game = {
     Loot.clear();
     G_R.setLevel(this.map);
     Views.clearLevel();
-    const teamDefs = [...Views.players.values()].map((p) => p.st && p.st.w && Gunsmith.fromCode(p.st.w)).filter(Boolean), team = teamDefs.map((d) => d.soundKey);
+    const teamDefs = [...Views.players.values()].map((p) => p.st && p.st.w && Gunsmith.fromCode(p.st.w)).filter(Boolean);
     // the guns the level will show, fetched now: the squad's kits, the level's enemy weapon pool (every pack of each platform), the weapon case's gun and the loot (as it lands)
     const caseGun = typeof wc === 'string' ? Gunsmith.fromCode(wc) : null; // (the host says what's in the case: 'wc')
     GunModels.preload([...Object.values(G_Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level), false); // (the models are all in memory: this only schedules their parsing)
     Handling.prewarm([...Object.values(G_Me.weapons).map((w) => w.def), ...this.enemyGuns(level).map((id) => WEAPONS[id])]); // (the guns' handling sounds: js/handling.ts)
-    GunAudio.prewarm([...Object.values(G_Me.weapons).flatMap((w) => [w.def.soundKey, Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo), ...(w.def.barrels ? Object.keys(w.def.barrels.rounds).flatMap((k) => barrelMm(w.def, k).map((mm: number) => shotSoundKey(roundSpec(w.def, k), mm, w.ammo))) : [])]), ...this.enemyGuns(level), ...team], this.map);
+    // the guns' reports (js/gunsounds.ts): yours, the weapon case's, your teammates', the suspects' and every other load of them, rendered a few at a time behind the veil (it waits for the first two kinds: Views.applySnap)
+    GunSounds.levelStart({ weapons: Object.values(G_Me.weapons), pack: Gear.packGuns(G_Me).map(([it]) => it.w as GWeapon), team: teamDefs, caseGun: typeof wc === 'string' ? wc : null, enemies: this.enemyGuns(level), loading: !seamless });
+    GunAudio.prewarm([], this.map); // (the level's rooms, measured: js/acoustics.ts)
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
     const i = Math.max(0, Object.keys(this.roster).sort().indexOf(Net.myId!));
     if (sp) { G_Me.spawn(this.map.spawn.x, this.map.spawn.z); Space.enterLevel(this.map, sp); }

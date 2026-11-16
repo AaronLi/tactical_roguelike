@@ -5,7 +5,7 @@ import { Ballistics } from './ballistics.js';
 import { Callsigns } from './callsigns.js';
 import { AMMO, ammoTypes, asCal, ballFor, CALIBERS, calOf, calsOf, magFam, magFits, THEMES, TIER_COLORS, TIER_NAMES, VENDOR_QUIPS, WEAPON_LIST, WEAPONS } from './data.js';
 import { Gear } from './gear.js';
-import { GunAudio } from './gunaudio.js';
+import { GunSounds } from './gunsounds.js';
 import { HUD } from './hud.js';
 import { Icons } from './icons.js';
 import { Med } from './medical.js';
@@ -109,7 +109,7 @@ export const ShopUI = {
       const old = Me.weapons[slot];
       if (old) Gunsmith.strip(old.def, Me.stash); // aftermarket parts come off and go to your stash
       Me.weapons[slot] = Me.makeWeapon(id);
-      if (GunAudio.available()) GunAudio.buildDry(Me.weapons[slot].def.soundKey);
+      GunSounds.acquire(Me.weapons[slot]);
     } else if (kind === 'gear') {
       const d = Gear.DEFS[id], it = Gear.gearItem(id), pl = Shop.offers!.plates && Shop.offers!.plates[id];
       if (pl) it.plate = Gear.gearItem(pl); // fitted with its plate

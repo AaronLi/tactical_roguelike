@@ -7,6 +7,7 @@ import { Gunsmith } from './parts.js';
 import { U } from './util.js';
 import { Acoustics } from './acoustics.js';
 import { Ambience } from './ambience.js';
+import { GunSoundCache, SYNTH_REV, type CachedDry } from './gunsoundcache.js';
 interface RoomSig { env: SynthEnv; envSize: number; envReflect: number; envMix: number } // a room, rounded off (what a render is cached by)
 interface EchoTap { delay: number; amp: number; pos: EchoPt; order: number; hops: EchoPt[] } // an echo path: its extra delay, its level, the wall it comes from, the bounces
 export const GunAudio = {
@@ -27,9 +28,13 @@ export const GunAudio = {
   bufs: new Map<string, AudioBuffer>(),     // weapon|room key -> AudioBuffer
   dry: new Map<string, AudioBuffer>(),      // weapon id -> AudioBuffer
   pending: new Set<string>(),
-  queue: [] as { key: string; job: () => Promise<any> }[],
-  busy: false,
+  queue: [] as { key: string; job: () => Promise<any>; pri: number }[],
+  active: 0,          // renders going now
+  concurrency: 1,     // renders at once: one in play (the main thread stays smooth), a few while a level loads (GunSounds.levelStart)
   voices: 0,
+  // what the shots that found no report ready did (the caller played the generic sample): counted for the measurements (tools, ?gunstats)
+  stats: { fallbacks: 0, plays: 0, keys: {} as Record<string, number>, rendered: 0, fromCache: 0, renderedKeys: [] as string[] },
+  PRI: { background: 0, soon: 1, urgent: 2 }, // (a shot that found its report missing is the most urgent; then what a level's loading waits for; then the rest)
 
   available() { return !!(window.GunshotSynth && (window.OfflineAudioContext || window.webkitOfflineAudioContext)); },
 
@@ -108,23 +113,54 @@ export const GunAudio = {
   },
   sigKey(sig: RoomSig) { return `${sig.env}|${sig.envSize}|${sig.envReflect}|${sig.envMix}`; },
 
-  // ------------------------------------------------------------ rendering (serial queue)
-  // One render at a time keeps the main thread smooth while a level is being prewarmed.
-  enqueue(key: string, job: () => Promise<any>, urgent?: boolean) {
-    if (this.pending.has(key)) return;
+  // ------------------------------------------------------------ rendering (a queue, a few at a time)
+  // Each render is an OfflineAudioContext on a thread of its own; a few main-thread milliseconds set it up. One at a time keeps the
+  // main thread smooth in play; while a level loads a few go at once (concurrency). The queue is by priority (PRI), first come first
+  // served within one. Asked again for a key that's still waiting, a higher priority moves it up.
+  enqueue(key: string, job: () => Promise<any>, urgent?: boolean | number) {
+    const pri = urgent === true ? this.PRI.urgent : urgent ? urgent : this.PRI.background;
+    if (this.pending.has(key)) {
+      const at = this.queue.findIndex((q) => q.key === key);
+      if (at < 0 || this.queue[at].pri >= pri) return; // (running already, or as high as it's asked)
+      const [item] = this.queue.splice(at, 1);
+      item.pri = pri; this.insert(item);
+      return;
+    }
     this.pending.add(key);
-    const item = { key, job };
-    if (urgent) this.queue.unshift(item); else this.queue.push(item);
+    this.insert({ key, job, pri });
     this.pump();
   },
+  insert(item: { key: string; job: () => Promise<any>; pri: number }) {
+    let i = this.queue.length;
+    while (i > 0 && this.queue[i - 1].pri < item.pri) i--;
+    this.queue.splice(i, 0, item);
+  },
   pump() {
-    if (this.busy || !this.queue.length) return;
-    this.busy = true;
-    const { key, job } = this.queue.shift()!;
-    job().catch((e: any) => console.warn('gunshot render failed', key, e)).finally(() => {
-      this.pending.delete(key);
-      this.busy = false;
-      setTimeout(() => this.pump(), 0);
+    while (this.active < this.concurrency && this.queue.length) {
+      this.active++;
+      const { key, job } = this.queue.shift()!;
+      job().catch((e: any) => console.warn('gunshot render failed', key, e)).finally(() => {
+        this.pending.delete(key);
+        this.active--;
+        setTimeout(() => this.pump(), 0);
+      });
+    }
+  },
+  setConcurrency(n: number) { this.concurrency = Math.max(1, n | 0); this.pump(); },
+  // the dry reports are set here: whoever waits on a set of them (GunAudio.whenDry) is told
+  waiters: [] as { keys: string[]; done: () => void }[],
+  setDry(id: string, buf: AudioBuffer) {
+    this.dry.set(id, buf);
+    if (this.waiters.length) for (const w of this.waiters.slice()) if (w.keys.every((k) => this.dry.has(k))) w.done();
+  },
+  // resolves when every one of these keys has its dry report (or has none to wait for), or after capMs, whichever's first: true if they're all there
+  whenDry(keys: string[], capMs: number): Promise<boolean> {
+    const need = keys.filter((k) => this.spec(k));
+    if (!this.available() || need.every((k) => this.dry.has(k))) return Promise.resolve(true);
+    return new Promise<boolean>((resolve) => {
+      const w = { keys: need, done: () => { clearTimeout(t); this.waiters = this.waiters.filter((x) => x !== w); resolve(true); } };
+      const t = setTimeout(() => { this.waiters = this.waiters.filter((x) => x !== w); resolve(false); }, capMs);
+      this.waiters.push(w);
     });
   },
   // sound keys: "weaponId:barrelInches:muzzleDevice" from a build (js/parts.ts), or a plain weapon id
@@ -192,12 +228,50 @@ export const GunAudio = {
     while (lo < hi) { const mid = (lo + hi) >> 1; if (dec[mid] < lv) hi = mid; else lo = mid + 1; }
     return Math.min(buf.duration, (lo * 256) / buf.sampleRate + 0.005);
   },
-  buildDry(id: string, urgent?: boolean) {
+  // The key's report, as the cache knows it or as it's rendered: a stored one is current only for this synth (cacheVersion) and these parameters (paramHash)
+  _cacheVer: '',
+  cacheVersion(): string {
+    if (!this._cacheVer) {
+      const S = window.GunshotSynth as any;
+      this._cacheVer = SYNTH_REV + '.' + GunSoundCache.hash(String(S) + String(S.precompute) + String(S.place));
+      GunSoundCache.version = this._cacheVer;
+    }
+    return this._cacheVer;
+  },
+  DRY_PLACE: { env: 'none', envSize: 0, envReflect: 0, envMix: 0 } as RoomSig,
+  paramHash(id: string): string { return GunSoundCache.hash(JSON.stringify([this.sourceParams(id), this.placeParams(id, this.DRY_PLACE), this.TRIM_FLOOR])); },
+  _checked: new Set<string>(), // keys whose stored report has been asked for already (found, or not there)
+  buildDry(id: string, urgent?: boolean | number) {
     if (this.dry.has(id)) return;
-    const dryPlace: RoomSig = { env: 'none', envSize: 0, envReflect: 0, envMix: 0 };
-    this.enqueue('dry:' + id, () => this.getSource(id)
-      .then((src: unknown) => window.GunshotSynth.place(src, this.placeParams(id, dryPlace)))
-      .then((buf: AudioBuffer) => { this.dry.set(id, this.trim(buf)); }), urgent);
+    const hot = urgent === true || urgent === this.PRI.urgent; // (a shot is waiting for it: the cache gets only a moment to answer, a render's the sure thing)
+    this.enqueue('dry:' + id, async () => {
+      if (!this._checked.has(id) && GunSoundCache.available() && this.available()) { // (what was rendered on another visit, if it's still good)
+        this.cacheVersion(); this._checked.add(id);
+        const take = (got: Map<string, CachedDry> | null) => { const c = got && got.get(id); if (c && !this.dry.has(id)) { try { this.setDry(id, GunSoundCache.toBuffer(c)); this.stats.fromCache++; } catch (e) { /* rendered instead */ } } };
+        take(await GunSoundCache.within(GunSoundCache.getMany(new Map([[id, this.paramHash(id)]])), hot ? GunSoundCache.HOT_MS : GunSoundCache.WAIT_MS, null, take));
+        if (this.dry.has(id)) return;
+      }
+      const src = await this.getSource(id), buf: AudioBuffer = await window.GunshotSynth.place(src, this.placeParams(id, this.DRY_PLACE)), t = this.trim(buf);
+      if (this.dry.has(id)) return; // (the cache answered late)
+      this.stats.rendered++; this.stats.renderedKeys.push(id);
+      this.setDry(id, t);
+      if (GunSoundCache.available()) GunSoundCache.put(id, this.paramHash(id), t);
+    }, urgent);
+  },
+  // The stored reports for these keys, read in one go and put in dry (so none of them takes a place in the queue)
+  async preload(keys: string[]): Promise<void> {
+    if (!this.available() || !GunSoundCache.available()) return;
+    const need = [...new Set(keys)].filter((k) => !this.dry.has(k) && !this._checked.has(k) && this.spec(k));
+    if (!need.length) return;
+    this.cacheVersion();
+    for (const k of need) this._checked.add(k);
+    const take = (got: Map<string, CachedDry> | null) => { if (got) for (const [k, c] of got) { try { if (!this.dry.has(k)) { this.setDry(k, GunSoundCache.toBuffer(c)); this.stats.fromCache++; } } catch (e) { /* render it */ } } };
+    take(await GunSoundCache.within(GunSoundCache.getMany(new Map<string, string>(need.map((k): [string, string] => [k, this.paramHash(k)]))), GunSoundCache.WAIT_MS, null, take));
+  },
+  // Several reports wanted: the stored ones read (not for a shot that's waiting: it asks the cache itself, briefly), the others queued at that priority, in this order
+  async ensure(keys: string[], pri: boolean | number = false): Promise<void> {
+    if (!(pri === true || pri === this.PRI.urgent)) await this.preload(keys);
+    for (const k of keys) this.buildDry(k, pri);
   },
   build(id: string, sig: RoomSig, urgent?: boolean) {
     const key = id + '|' + this.sigKey(sig);
@@ -414,6 +488,7 @@ export const GunAudio = {
   },
   // pos = world position of the muzzle, or null for the local player's own gun. who: the shooter (for a can's first-round pop).
   // Returns false when no synth buffer exists yet so the caller can play a fallback.
+  missed(id: string) { this.stats.fallbacks++; this.stats.keys[id] = (this.stats.keys[id] || 0) + 1; return false; },
   play(id: string, pos: THREE.Vector3 | null, who?: string, vol = 1, aim?: EchoPt | null) { // (vol: this shot's own level: a gun of several barrels, each as loud as its effective length makes it, js/data.ts shotDef)
     const A = Audio, ctx = A.ctx, map = AudioEnv.Game!.map;
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
@@ -424,7 +499,8 @@ export const GunAudio = {
     // this one's kind (roomSig: a preset, picked by its shape).
     const measured = !!Acoustics;
     let buf: AudioBuffer | undefined;
-    if (measured) { buf = this.dry.get(id); if (!buf) { this.buildDry(id, true); return false; } }
+    this.stats.plays++;
+    if (measured) { buf = this.dry.get(id); if (!buf) { this.buildDry(id, true); return this.missed(id); } }
     else {
       const sig = this.roomSig(map, src.x, src.z, this.floorY(map, src));
       buf = this.bufs.get(id + '|' + this.sigKey(sig));
@@ -432,7 +508,7 @@ export const GunAudio = {
         buf = this.dry.get(id);
         if (!buf) this.buildDry(id, true);
         this.build(id, sig, true);
-        if (!buf) return false;
+        if (!buf) return this.missed(id);
       }
     }
 

@@ -70,6 +70,8 @@ jobs:
       - run: npm run test:models
       # the acoustic ray tracer in WebAssembly (assets/wasm/acoustics.wasm, built above by npm run build) against the JavaScript one, same seeds (docs/wasm.md)
       - run: npm run test:acoustics
+      # the gun sounds' prewarming: the sound keys a gun can have, the cache's synth hash against js/gunshot-synth.ts (docs/acoustics.md)
+      - run: npm run test:gunsounds
       # the release bundles build (and are not published from here: the site job does that)
       - run: node tools/bundle.mjs
   # The site: main at the root, the space branch under space-experimental/ (each checked out, built and baked on its own), published together

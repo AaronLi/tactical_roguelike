@@ -4,6 +4,7 @@ import { Casings } from './casings.js';
 import { loaded, WEAPONS } from './data.js';
 import { Gear } from './gear.js';
 import { GunModels } from './gunmodels.js';
+import { GunSounds } from './gunsounds.js';
 import { GunRig } from './gunrig.js';
 import { Icons } from './icons.js';
 import { Level } from './level.js';
@@ -116,6 +117,7 @@ export const Loot = (() => {
     mesh.position.set(x, y + 0.002, z); mesh.rotation.y = yaw != null ? yaw : Math.random() * Math.PI * 2;
     R.dynRoot.add(mesh);
     list.set(id, { id, x, y, z, item: packed, mesh, box: boxOf(mesh) });
+    GunSounds.lootGun(packed); // (a gun on the floor: its report made by the time somebody's got it)
     // a gun still loading has no shape yet to aim at: its box once it's in (else it couldn't be picked up)
     if (mesh.userData.gun) GunModels.whenReady(mesh.userData.gun, () => { const l = list.get(id); if (l && l.mesh === mesh) l.box = boxOf(mesh); });
   }

@@ -2,7 +2,6 @@
 import { Audio } from './audio.js';
 import { Ballistics } from './ballistics.js';
 import { aimSway, AMMO, ammoTypes, asCal, CALIBERS, calOf, calsOf, fullReload, MUZZLE_V, roundSpeed } from './data.js';
-import { GunAudio } from './gunaudio.js';
 import { GunModels } from './gunmodels.js';
 import { HUD } from './hud.js';
 import { Gunsmith } from './parts.js';
@@ -292,8 +291,7 @@ export const GunsmithUI = (() => {
     return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && !GS.sameFamily(p, GS.PARTS[w.def.build[slot]]) && GS.fitsLen(p, w.def.id, w.def.build) && forSale(p));
   }
   function apply(w: any, build: any) {
-    G_Me.refit(w, build);
-    if (GunAudio.available()) GunAudio.buildDry(w.def.soundKey);
+    G_Me.refit(w, build); // (which has its report made: GunSounds.acquire)
   }
   function install(slot: string, pid: string): void {
     const w = weapon(), build = Object.assign({}, w.def.build), p = GS.PARTS[pid];

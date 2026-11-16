@@ -8,7 +8,7 @@ nothing checks the module is there, **check** if it is the check itself (`X && .
 
 ## Summary
 
-- 98 files, 178 exported names, 5654 uses (101 while loading)
+- 102 files, 185 exported names, 5735 uses (103 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 6, the largest 27 files
 - load orders (from the imports and the lists) against the load-time needs: js/main.ts 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, ambience.html 0, tools/cloud.test.mjs 0, tools/level_env.mjs 0, tools/model_env.mjs 0
@@ -38,19 +38,19 @@ These are fine as ES modules (a module may call one that imports it, once both h
 Dependencies first, ties in the page's order (js/main.ts):
 
 ```
-modelbundles threeboot util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical replayenv zip callsigns arsenal bundlesenv audioenv acoustics ambience gunaudio footsteps audio gunmaterials glb gunrig humandata humans headgear furnspec furnmesh lightgrid levelview rig vmanim tone highlights render viewmodel gunmodels icons bolts residents route shop recorder spaceserver server serverhost serverlink net career cloudconfig handling loot casings range course gunsmith hangar zeroing shopui invui touch gamepad landing prep shipmodel spaceui space player cloud menushow profiler game glare views shotlog hud loadout gunshot-synth demo debugstart debugglobals exportentry exportworker main prepentry prepworker serverworker
+modelbundles threeboot util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical replayenv zip callsigns arsenal bundlesenv audioenv acousticswasm acoustics ambience gunsoundcache gunaudio footsteps audio gunmaterials glb gunrig humandata humans headgear furnspec furnmesh lightgrid levelview rig vmanim tone highlights render viewmodel gunmodels icons bolts residents route shop recorder spaceserver server serverhost serverlink net career cloudconfig gunkeys gunsounds handling loot casings range course gunsmith hangar zeroing shopui invui touch gamepad landing prep shipmodel spaceui space player cloud menushow profiler game glare views shotlog hud loadout gunshot-synth demo debugstart debugglobals exportentry exportworker main prepentry prepworker serverworker
 ```
 
 ### The load orders against the load-time needs
 
 The order each loader runs the files in, worked out from the imports (a file runs after what it imports; the two workers each import one entry file, js/serverhost.ts and js/prepentry.ts; the page, the export worker and the tools name a list of files). A file that uses another, unguarded, while loading, where that other is missing or comes after it.
 
-- **js/main.ts** (92 files): consistent
+- **js/main.ts** (96 files): consistent
 - **js/serverworker.ts** (28 files): consistent
 - **js/prepworker.ts** (25 files): consistent
 - **js/exportworker.ts** (42 files): consistent
-- **ambience.html** (21 files): consistent
-- **tools/cloud.test.mjs** (85 files): consistent
+- **ambience.html** (23 files): consistent
+- **tools/cloud.test.mjs** (89 files): consistent
 - **tools/level_env.mjs** (25 files): consistent
 - **tools/model_env.mjs** (21 files): consistent
 
@@ -84,9 +84,11 @@ The order each loader runs the files in, worked out from the imports (a file run
 | arsenal (sim) | Arsenal | - | ballistics, data, util |
 | bundlesenv | BundlesEnv | - | - |
 | audioenv | AudioEnv | - | - |
-| acoustics | Acoustics | - | audio, audioenv, level, materials, util |
+| acousticswasm | ZCOL, makeRng, AcWasm | - | - |
+| acoustics | Acoustics | acousticswasm | audio, audioenv, level, materials, util |
 | ambience | Ambience | - | acoustics, audio, audioenv, gunaudio, level, spacedata, util |
-| gunaudio | GunAudio | level, replayenv | acoustics, ambience, audio, audioenv, parts, util |
+| gunsoundcache | SYNTH_REV, GunSoundCache | - | - |
+| gunaudio | GunAudio | level, replayenv | acoustics, ambience, audio, audioenv, gunsoundcache, parts, util |
 | footsteps | Footsteps | replayenv | acoustics, audio, audioenv, gunaudio, level, util |
 | audio | Audio | replayenv, util | acoustics, audioenv, bundlesenv, data, footsteps, gunaudio, level |
 | gunmaterials | GunMaterials | - | - |
@@ -119,16 +121,18 @@ The order each loader runs the files in, worked out from the imports (a file run
 | net | Net | replayenv, util | serverlink |
 | career | Career | - | data, game, net, route, util |
 | cloudconfig | CloudConfig | - | - |
+| gunkeys | GunKeys | - | data, parts |
+| gunsounds | GunSounds | - | gunaudio, gunkeys, parts |
 | handling | Handling | - | audio, data, render, util, vmanim |
-| loot | Loot | replayenv | casings, data, game, gear, gunmodels, gunrig, icons, level, parts, render |
+| loot | Loot | replayenv | casings, data, game, gear, gunmodels, gunrig, gunsounds, icons, level, parts, render |
 | casings | Casings | audioenv, replayenv | audio, data, furniture, game, gear, handling, icons, level, loot, parts, player, render, util, world |
 | range | Range | data, replayenv | audio, course, gear, hud, player, render, world |
 | course | Course | - | audio, data, game, hud, lightgrid, net, player, range, render, util, views, world |
-| gunsmith | GunsmithUI | parts | audio, ballistics, data, gamepad, gunaudio, gunmodels, hud, player, render, shop, shopui, stickers, util |
+| gunsmith | GunsmithUI | parts | audio, ballistics, data, gamepad, gunmodels, hud, player, render, shop, shopui, stickers, util |
 | hangar | Hangar | data, replayenv, util | audio, course, game, gear, glb, gunmodels, highlights, hud, humans, icons, levelview, net, parts, player, range, render, rig, shop, shopui, spacedata, world |
 | zeroing | ZeroUI | - | audio, data, player |
-| shopui | ShopUI | replayenv, shop | audio, ballistics, callsigns, career, data, game, gear, gunaudio, gunsmith, hangar, hud, icons, invui, medical, net, parts, player, range, route, util, zeroing |
-| invui | InvUI | - | audio, ballistics, callsigns, data, game, gamepad, gear, gunaudio, hud, icons, medical, net, parts, player, range, render, shopui, touch, util, views |
+| shopui | ShopUI | replayenv, shop | audio, ballistics, callsigns, career, data, game, gear, gunsmith, gunsounds, hangar, hud, icons, invui, medical, net, parts, player, range, route, util, zeroing |
+| invui | InvUI | - | audio, ballistics, callsigns, data, game, gamepad, gear, gunsounds, hud, icons, medical, net, parts, player, range, render, shopui, touch, util, views |
 | touch | Touch | - | audio, game, gamepad, invui, player, util |
 | gamepad | Pad | - | audio, game, hud, invui, player, touch, util |
 | landing | Landing | - | audio, game, hangar, level, player, render, util, views, world |
@@ -136,13 +140,13 @@ The order each loader runs the files in, worked out from the imports (a file run
 | shipmodel | ShipModel | - | glb, level, shipgen, spacedata, util |
 | spaceui | SpaceUI | spacedata | audio, game, hud, level, net, player, render, shipgen, shipmodel, space, util, views |
 | space | Space | audioenv, spacedata | audio, career, game, hangar, hud, level, levelview, loadout, materials, net, player, prep, render, shipgen, shipmodel, spaceui, util, views, world |
-| player | Me | audioenv, level, replayenv, sim, util | arsenal, audio, ballistics, bolts, career, casings, course, damage, data, footsteps, game, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, handling, hangar, highlights, hud, invui, landing, levelview, loadout, loot, materials, medical, net, parts, range, render, rig, shotlog, space, stickers, viewmodel, views, vmanim, world |
+| player | Me | audioenv, level, replayenv, sim, util | arsenal, audio, ballistics, bolts, career, casings, course, damage, data, footsteps, game, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, gunsounds, handling, hangar, highlights, hud, invui, landing, levelview, loadout, loot, materials, medical, net, parts, range, render, rig, shotlog, space, stickers, viewmodel, views, vmanim, world |
 | cloud | Cloud | util | arsenal, callsigns, career, cloudconfig, game, net, player, shop |
 | menushow | MenuShow | - | data, gunmodels, highlights, parts, util |
 | profiler | Prof | - | casings, course, game, gunaudio, hangar, highlights, hud, invui, level, lightgrid, net, player, render, server, serverhost, serverlink, views, world |
-| game | Game | audioenv, replayenv, sim, util | ambience, arsenal, audio, ballistics, bolts, bundlesenv, callsigns, career, cloud, course, damage, data, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, gunsmith, handling, hangar, highlights, hud, humans, icons, invui, landing, level, lightgrid, loadout, loot, medical, menushow, net, parts, player, prep, profiler, range, render, rig, route, serverhost, serverlink, shipmodel, shopui, shotlog, space, spacedata, stickers, touch, views, world |
+| game | Game | audioenv, replayenv, sim, util | ambience, arsenal, audio, ballistics, bolts, bundlesenv, callsigns, career, cloud, course, damage, data, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, gunsmith, gunsounds, handling, hangar, highlights, hud, humans, icons, invui, landing, level, lightgrid, loadout, loot, medical, menushow, net, parts, player, prep, profiler, range, render, rig, route, serverhost, serverlink, shipmodel, shopui, shotlog, space, spacedata, stickers, touch, views, world |
 | glare | Glare | - | game, level, player, render, util |
-| views | Views | replayenv, sim, util | audio, ballistics, bolts, callsigns, casings, damage, data, footsteps, game, glare, gunaudio, gunmodels, handling, highlights, hud, level, levelview, net, parts, player, render, rig, stickers, world |
+| views | Views | replayenv, sim, util | audio, ballistics, bolts, callsigns, casings, damage, data, footsteps, game, glare, gunaudio, gunmodels, gunsounds, handling, highlights, hud, level, levelview, net, parts, player, render, rig, stickers, world |
 | shotlog | ShotLog | replayenv | data, hud, level, materials, net, player, render, rig, util, views |
 | hud | HUD | replayenv, util | ballistics, callsigns, data, game, gamepad, gear, icons, level, medical, net, player, render, rig, shotlog, space, views |
 | loadout | Loadout | util | arsenal, audio, data, gear, hud, parts |
@@ -152,7 +156,7 @@ The order each loader runs the files in, worked out from the imports (a file run
 | debugglobals |  | - | - |
 | exportentry |  | - | - |
 | exportworker |  | - | - |
-| main |  | profiler | - |
+| main |  | acousticswasm, profiler | - |
 | prepentry (sim) |  | - | - |
 | prepworker |  | - | - |
 | serverworker |  | - | - |
