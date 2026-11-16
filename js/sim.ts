@@ -42,7 +42,7 @@ const G_Sim = {
   // makeWeapon adds what you carry for it.)
   makeWeapon(id: string, build?: PBuild): PWeapon {
     const def = G.Gunsmith.compile(id, build!);
-    const w: any = { def, sup: def.sup, mag: def.mag, ammo: G.ballFor(G.calOf(def)), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
+    const w: any = { def, sup: def.sup, mag: def.mag, ammo: G.loadFor(def), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
     if (def.barrels) w.rl = def.barrels.default; // (a gun of several barrels: the round type its block holds, js/data.ts)
     w.tube = Array(w.mag).fill(w.ammo); // every gun: its rounds in order (a magazine's own stack, when it has one in)
     w.chamber = G.chambered(def) ? w.ammo : null; // and the round in the chamber (G.chambered)

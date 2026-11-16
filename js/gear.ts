@@ -209,7 +209,7 @@ const G_Gear = (() => {
   }
   function unpack(o: any) {
     if (o.k === 'gun' && o.w) {
-      const w = G.Me.makeWeapon(o.w.id, o.w.build);
+      const w = G.Me && G.Me.makeWeapon ? G.Me.makeWeapon(o.w.id, o.w.build) : G.Sim.makeWeapon(o.w.id, o.w.build); // (the host's worker has no Me: the gun as built, all the same)
       w.mag = o.w.mag; w.ammo = o.w.ammo; w.tube = (o.w.tube || []).slice(); if (o.w.noMag) w.noMag = true; if (o.w.fm) w.fm = o.w.fm; if (o.w.rl && w.def.barrels) { w.rl = o.w.rl; if (o.w.bl) w.bl = o.w.bl.slice(); } // (a gun of several barrels: its block's round type and the rounds in each barrel)
       if ('chamber' in o.w) w.chamber = o.w.chamber;
       if (o.w.spent) w.spent = o.w.spent.slice();
@@ -236,7 +236,7 @@ const G_Gear = (() => {
   // compact, extended, drum...), by default the kind that's in that gun now, or its standard one.
   const magVid = (def: GDef, vid?: string) => vid || (def.build && def.build.mag) || G.Gunsmith.defaultBuild(def.id).mag || null;
   function ammoItem(def: GDef, n?: number | null, am?: string, vid?: string, rl?: string | null) {
-    const a = ammoFor(def), r = G.roundOf(def, rl), type = am || G.ballFor(r ? r.cal : G.calOf(def)); // (r: a gun of several barrels: the block's round type)
+    const a = ammoFor(def), r = G.roundOf(def, rl), type = am || (r ? G.ballFor(r.cal) : G.loadFor(def)); // (r: a gun of several barrels: the block's round type)
     if (a.kind !== 'mag') { const count = n == null ? a.cap : n; return item({ k: a.kind, key: a.key, wid: def.id, cap: Math.max(count, boxCap(a.key)), n: count, am: type }); }
     const v = magVid(def, vid), cap = r ? def.barrels.n * r.per : G.Gunsmith.magCap(def.id, v), count = Math.min(cap, n == null ? cap : n); // (a block's capacity is its round type's: n barrels of what each holds)
     const it = magItem({ k: 'mag', key: a.key, wid: def.id, cap, vid: v }, Array(count).fill(type));

@@ -350,7 +350,13 @@ const G_GunAudio = {
   // placed (a mono share through a panner at the opening it comes in by). A panner collapses a stereo signal to the side
   // it's on, so only the placed share goes through one: in your own room all of it's wide; from another room most of it
   // still is (once it's through the door it fills yours), a third of its energy from the doorway.
-  verbs: new Map<AcTrace, { cv: ConvolverNode; lp: BiquadFilterNode; wide: GainNode; dg: GainNode; pan: PannerNode; g: GainNode; map: AcMap }>(),
+  // A room's convolver is in the graph only while something's sounding in it: once nothing's been sent into it for VERB_HOLD
+  // s and its own length (everything sent is a one-shot, the longest a few seconds: its tail's rung out), it's taken out
+  // (nothing's rendered for it, in any browser), and put back by the next sound in that room. Out, it's kept, its response
+  // loaded, for the next time; past VERB_KEEP of them, the one used longest ago is dropped (a room's response is another
+  // measurement each time its doors change: a long fight through a big building leaves hundreds).
+  VERB_HOLD: 10, VERB_KEEP: 24, _verbSweep: 0,
+  verbs: new Map<AcTrace, { cv: ConvolverNode; lp: BiquadFilterNode; wide: GainNode; dg: GainNode; pan: PannerNode; g: GainNode; map: AcMap; on: boolean; used: number; len: number }>(),
   verbOf(ctx: AudioContext, map: AcMap, tr: AcTrace) {
     for (const [k, v] of this.verbs) if (v.map !== map) { v.g.disconnect(); this.verbs.delete(k); } // (last level's)
     let v = this.verbs.get(tr);
@@ -358,8 +364,17 @@ const G_GunAudio = {
       const cv = ctx.createConvolver(), lp = ctx.createBiquadFilter(), wide = ctx.createGain(), dg = ctx.createGain(), pan = ctx.createPanner(), g = ctx.createGain();
       cv.normalize = false; cv.buffer = G.Acoustics.impulse(ctx, tr); lp.type = 'lowpass';
       pan.panningModel = 'equalpower'; pan.rolloffFactor = 0; dg.gain.value = 0;
-      cv.connect(lp); lp.connect(wide); wide.connect(g); lp.connect(dg); dg.connect(pan); pan.connect(g); g.connect(G.Audio.master);
-      v = { cv, lp, wide, dg, pan, g, map }; this.verbs.set(tr, v);
+      cv.connect(lp); lp.connect(wide); wide.connect(g); lp.connect(dg); dg.connect(pan); pan.connect(g);
+      v = { cv, lp, wide, dg, pan, g, map, on: false, used: 0, len: cv.buffer ? cv.buffer.duration : 4 }; this.verbs.set(tr, v);
+    }
+    const now = ctx.currentTime;
+    v.used = now;
+    if (!v.on) { v.on = true; v.g.connect(G.Audio.master); }
+    if (now - this._verbSweep > 1 || now < this._verbSweep) {
+      this._verbSweep = now;
+      let n = 0;
+      for (const o of this.verbs.values()) { if (o.on && now - o.used > this.VERB_HOLD + o.len) { o.on = false; o.g.disconnect(); } if (!o.on) n++; }
+      while (n > this.VERB_KEEP) { let ok: AcTrace | null = null, ot = Infinity; for (const [k, o] of this.verbs) if (!o.on && o.used < ot) { ot = o.used; ok = k; } if (!ok) break; this.verbs.delete(ok); n--; }
     }
     return v;
   },

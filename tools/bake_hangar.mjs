@@ -1,6 +1,8 @@
 // Bakes the hangar's fixed parts (docs/hangar-data.md) to glTF, from the game's own code: the hangar's builder (js/hangar.ts fixtures, js/range.ts and
-// js/course.ts fixtures) and the shell's fixed pieces (the level description's hf nodes, js/levelview.ts build hubFixed), run in a headless Chromium (Edge or Chrome) on the game's page,
-// so the signs' canvases are drawn by a browser, exported there with three's GLTFExporter, then compressed here as the packs are (tools/model_emit.mjs).
+// js/course.ts fixtures) and the shell's fixed pieces (the level description's hf nodes, js/levelview.ts build hubFixed), run here in node: the compiled
+// game in a vm on npm's three (as the guns are baked: tools/model_env.mjs), its canvases (the signs, screens and floors) drawn by Skia in WebAssembly
+// with fonts that come with npm (tools/node_canvas.mjs), exported with three's GLTFExporter, then compressed as the packs are (tools/model_emit.mjs).
+// No browser, and nothing of the machine's: the same file wherever it's baked.
 //   assets/models/scenes/hangar.glb    the scene: one root node `hangar` (translation z = RZ, the hall's coordinates under it), a group for each part of the
 //                                      hall (zones, workshop, outfitters, store, stash, nightjar, lounge, helipad, range, course, shell), their meshes, and the
 //                                      anchors (empties a_<kind>[_<i>], extras { anchor, i, ry, ... }) where the game adds what changes; the shell group (z = -RZ:
@@ -8,64 +10,36 @@
 //   assets/models/scenes/hangar.json   the same scene as data, for the Bevy port and the golden test: the anchors, the lights, the collision (the solids
 //                                      js/hangar.ts decorate adds to the hangar's map, in the map's coordinates), the counts
 //   assets/models/scenes/index.json    { version, scenes: { hangar: { file, data, bytes, tris, meshes, nodes, anchors } } }
-// The files go into the model bundle (tools/bundle_models.mjs; `npm run bake:hangar` runs both). Needs the compiled game (tsc) and a Chromium: the
-// BROWSER environment variable, or Edge / Chrome / Chromium where they usually are. The textures are drawn with the machine's fonts.
-//   node tools/bake_hangar.mjs [--port N] [--keep-raw]
-import fs from 'fs'; import path from 'path'; import http from 'http'; import os from 'os'; import { spawn, execSync } from 'child_process';
+// The files go into the model bundle (tools/bundle_models.mjs; `npm run bake:hangar` runs both). Needs the compiled game (tsc).
+//   node tools/bake_hangar.mjs [--keep-raw]
+import fs from 'fs'; import vm from 'vm'; import path from 'path'; import os from 'os';
+import * as THREE_NS from 'three';
+import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
 import { ROOT } from './model_env.mjs';
 import { makeIO, compression } from './model_emit.mjs';
+import { nodeCanvas } from './node_canvas.mjs';
 import { dedup } from '@gltf-transform/functions';
 
-const args = process.argv.slice(2), arg = (k) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : null; };
-const OUT = path.join(ROOT, 'assets/models/scenes/'), THREE_VER = JSON.parse(fs.readFileSync(path.join(ROOT, 'node_modules/three/package.json'), 'utf8')).version;
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-if (!fs.existsSync(path.join(ROOT, 'dist/js/hangar.js'))) { console.error('dist/js/hangar.js missing: run tsc first (npm run bake:hangar does)'); process.exit(1); }
+const args = process.argv.slice(2);
+const OUT = path.join(ROOT, 'assets/models/scenes/'), DIST = path.join(ROOT, 'dist/js/'), THREE_VER = JSON.parse(fs.readFileSync(path.join(ROOT, 'node_modules/three/package.json'), 'utf8')).version;
+if (!fs.existsSync(DIST + 'hangar.js')) { console.error('dist/js/hangar.js missing: run tsc first (npm run bake:hangar does)'); process.exit(1); }
 
-// ---- a static server for the page (the repo's folder)
-const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml', '.rtb': 'application/octet-stream', '.glb': 'model/gltf-binary', '.map': 'application/json', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav' };
-const server = http.createServer((req, res) => {
-  const url = decodeURIComponent(req.url.split('?')[0]), file = path.normalize(path.join(ROOT, url === '/' ? 'index.html' : url));
-  if (!file.startsWith(ROOT)) { res.writeHead(403); return res.end(); }
-  if (url !== '/' && url.endsWith('/')) { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end(''); } // (a folder: an empty listing, js/stickers.ts)
-  fs.readFile(file, (err, data) => { if (err) { res.writeHead(404); return res.end(); } res.writeHead(200, { 'Content-Type': TYPES[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Cache-Control': 'no-store' }); res.end(data); });
-});
-await new Promise((r) => server.listen(+(arg('--port') || process.env.HANGAR_BAKE_PORT || 0), '127.0.0.1', r));
-const base = `http://127.0.0.1:${server.address().port}`;
-
-// ---- a headless Chromium, driven over the DevTools protocol
-function browserPath() {
-  if (process.env.BROWSER && fs.existsSync(process.env.BROWSER)) return process.env.BROWSER;
-  const pf = [process.env['ProgramFiles(x86)'], process.env.ProgramFiles, process.env.LOCALAPPDATA].filter(Boolean);
-  const win = pf.flatMap((d) => [path.join(d, 'Microsoft/Edge/Application/msedge.exe'), path.join(d, 'Google/Chrome/Application/chrome.exe')]);
-  const mac = ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge', '/Applications/Chromium.app/Contents/MacOS/Chromium'];
-  for (const f of [...win, ...mac]) if (fs.existsSync(f)) return f;
-  for (const n of ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser', 'microsoft-edge']) { try { const p = execSync(`command -v ${n}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim(); if (p) return p; } catch { /* not there */ } }
-  return null;
-}
-const exe = browserPath();
-if (!exe) { console.error('bake_hangar: no Chromium found (set BROWSER to Edge, Chrome or Chromium)'); server.close(); process.exit(1); }
-const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'rt-bake-hangar-'));
-const proc = spawn(exe, ['--headless=new', ...(process.platform === 'linux' ? ['--no-sandbox'] : []), '--remote-debugging-port=0', `--user-data-dir=${prof}`, '--no-first-run', '--no-default-browser-check', '--mute-audio', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--window-size=800,600', 'about:blank'], { stdio: 'ignore' });
-let ws, seq = 0; const pend = new Map(), logs = [];
-const send = (method, params = {}) => { const id = ++seq; ws.send(JSON.stringify({ id, method, params })); return new Promise((res, rej) => pend.set(id, { res, rej })); };
-async function ev(expr, timeout = 120000) {
-  const r = await Promise.race([send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }), sleep(timeout).then(() => ({ timeout: true }))]);
-  if (r.timeout) throw new Error('timed out: ' + expr.slice(0, 80));
-  if (r.exceptionDetails) throw new Error((r.exceptionDetails.exception && r.exceptionDetails.exception.description) || JSON.stringify(r.exceptionDetails).slice(0, 800));
-  return r.result.value;
-}
-async function finish(code) {
-  try { if (ws) await Promise.race([send('Browser.close'), sleep(1500)]); } catch { /* gone */ }
-  proc.kill(); server.close(); await sleep(400);
-  try { fs.rmSync(prof, { recursive: true, force: true }); } catch { /* the browser may still hold it */ }
-  process.exit(code);
+// ---- the game, as much of it as draws the hangar: its scripts in the page's order (index.html), in a vm whose document makes node's canvases
+const WANT = new Set(['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'levelview', 'scars', 'damage', 'stickers', 'course', 'range', 'highlights', 'hangar']);
+async function loadGame() {
+  const NC = await nodeCanvas(), order = [...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/src="dist\/js\/([a-z-]+)\.js"/g)].map((m) => m[1]).filter((f) => WANT.has(f));
+  const ctx = { console, Math, JSON, Set, Map, WeakMap, WeakSet, Object, Array, Number, String, Boolean, Uint8Array, Uint8ClampedArray, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, ArrayBuffer, DataView, Infinity, NaN, isFinite, parseInt, parseFloat, Error, TypeError, RangeError, Symbol, Date, Proxy, Reflect, Promise, performance, THREE: { ...THREE_NS },
+    document: { body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {}, getElementById: () => null, querySelector: () => null }, location: { search: '' }, navigator: { userAgent: 'node' }, URLSearchParams, addEventListener() {}, setTimeout, clearTimeout, setInterval, clearInterval, requestAnimationFrame: () => 0 };
+  ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx; ctx.G = {};
+  NC.install(ctx); NC.install(globalThis); // (the game's canvases, and the exporter's)
+  vm.createContext(ctx);
+  for (const f of order) vm.runInContext(fs.readFileSync(DIST + f + '.js', 'utf8'), ctx, { filename: f + '.js' });
+  return { G: ctx.G, T: ctx.THREE };
 }
 
-// ---- what runs in the page: the hangar's map, its fixed parts drawn by the game's code, made ready for glTF, exported
-// (a function, sent as its source: it sees only the page's globals)
-async function inPage(threeVer) {
-  const T = THREE, G = window.G, RZ = G.Hangar.RZ, WALL_H = G.Level.WALL_H;
-  const { GLTFExporter } = await import(`https://cdn.jsdelivr.net/npm/three@${threeVer}/examples/jsm/exporters/GLTFExporter.js/+esm`);
+// ---- the hangar's map, its fixed parts drawn by the game's code, made ready for glTF, exported
+async function bake(G, T) {
+  const RZ = G.Hangar.RZ, WALL_H = G.Level.WALL_H;
   // the scene, for a map (Math.random seeded while it's drawn: the level's own textures' speckle, js/level.ts _tex, is random,
   // and a bake that came out the same twice would change the bundle for nothing)
   const build = (seed, level) => {
@@ -118,26 +92,12 @@ async function inPage(threeVer) {
   // export
   const scene = new T.Scene(); scene.add(root);
   const glb = await new GLTFExporter().parseAsync(scene, { binary: true, onlyVisible: false, maxTextureSize: 4096 });
-  let s = ''; const u8 = new Uint8Array(glb); for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
-  return { glb: btoa(s), anchors, lights, solids, rz: RZ, map: { W: map.W, H: map.H, TS: G.Level.TS } };
+  return { glb: Buffer.from(glb), anchors, lights, solids, rz: RZ, map: { W: map.W, H: map.H, TS: G.Level.TS } };
 }
 
 try {
-  for (let i = 0; i < 100 && !ws; i++) {
-    const f = path.join(prof, 'DevToolsActivePort');
-    if (fs.existsSync(f)) { const [port] = fs.readFileSync(f, 'utf8').split('\n'); try { const l = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json(); const p = l.find((t) => t.type === 'page'); if (p) { ws = new WebSocket(p.webSocketDebuggerUrl); await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; }); } } catch { /* not yet */ } }
-    if (!ws) await sleep(200);
-  }
-  if (!ws) throw new Error('the browser did not come up (' + exe + ')');
-  ws.onmessage = (m) => { const d = JSON.parse(m.data); if (d.id && pend.has(d.id)) { const p = pend.get(d.id); pend.delete(d.id); d.error ? p.rej(new Error(JSON.stringify(d.error))) : p.res(d.result); } else if (d.method === 'Runtime.exceptionThrown') logs.push(JSON.stringify(d.params.exceptionDetails).slice(0, 400)); };
-  await send('Runtime.enable'); await send('Page.enable');
-  await send('Page.navigate', { url: base + '/?mute&bake' });
-  for (let i = 0; i < 300; i++) { if (await ev('!!(window.G && G.Hangar && G.Hangar.fixtures && G.Level && G.Range && G.Course && G.Highlights && window.THREE && document.readyState === "complete")').catch(() => false)) break; await sleep(200); }
-  const state = await ev('JSON.stringify({ url: location.href, G: !!window.G, H: !!(window.G && G.Hangar), T: !!window.THREE, rs: document.readyState, n: document.scripts.length })').catch((e) => e.message);
-  if (!/"T":true/.test(state)) throw new Error('the page did not come up: ' + state + (logs.length ? '\n  ' + logs.slice(0, 5).join('\n  ') : ''));
-  const t0 = Date.now();
-  const r = await ev(`(${inPage.toString()})(${JSON.stringify(THREE_VER)})`, 300000);
-  const raw = Buffer.from(r.glb, 'base64');
+  const t0 = Date.now(), { G, T } = await loadGame();
+  const r = await bake(G, T), raw = r.glb;
   if (args.includes('--keep-raw')) fs.writeFileSync(path.join(os.tmpdir(), 'hangar-raw.glb'), raw);
   // compressed as the packs and props are (tools/model_emit.mjs: meshopt, int16 positions in each mesh's box, 10-bit normals, 12-bit UVs); identical
   // accessors, materials and pictures shared (dedup)
@@ -154,11 +114,8 @@ try {
   const data = { version: 1, about: 'the hangar scene as data (docs/hangar-data.md): anchors (hall and map coordinates), lights (map), solids (collision, map coordinates)', rz: r.rz, map: r.map, three: THREE_VER, stats, anchors: r.anchors, lights: r.lights, solids: r.solids };
   fs.writeFileSync(OUT + 'hangar.json', JSON.stringify(data));
   fs.writeFileSync(OUT + 'index.json', JSON.stringify({ version: 1, scenes: { hangar: { file: 'hangar.glb', data: 'hangar.json', ...stats } } }, null, 1) + '\n');
-  if (logs.length) console.log('page exceptions:\n  ' + logs.slice(0, 5).join('\n  '));
   console.log(`hangar: ${stats.meshes} meshes (${stats.tris} triangles), ${stats.materials} materials, ${stats.textures} textures, ${stats.anchors} anchors, ${stats.lights} lights, ${stats.solids} solids: ${buf.length} B (${raw.length} B as exported) in ${Date.now() - t0} ms (${OUT})`);
-  await finish(0);
 } catch (e) {
   console.error('bake_hangar failed: ' + (e && e.stack || e));
-  if (logs.length) console.error('page exceptions:\n  ' + logs.slice(0, 5).join('\n  '));
-  await finish(1);
+  process.exit(1);
 }
