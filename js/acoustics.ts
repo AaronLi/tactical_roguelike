@@ -290,22 +290,26 @@ const G_Acoustics = (() => {
     const u = Math.random(), v = Math.random() * Math.PI * 2, r = Math.sqrt(u), a = r * Math.cos(v), b = r * Math.sin(v), n = Math.sqrt(1 - u) * s;
     return axis === 0 ? [n, a, b] : axis === 1 ? [a, n, b] : [a, b, n];
   }
-  function trace(map: LvMap, f: number, x0: number, y0: number, z0: number, zi: number): AcTrace {
+  /** a measurement as a piece of work: rays(n) sends the next n (true once they've all gone), finish() makes the trace */
+  function tracer(map: LvMap, f: number, x0: number, y0: number, z0: number, zi: number): { rays: (n: number) => boolean; finish: () => AcTrace } {
     const d = of(map), fms = map.floors || [map], fm = fms[f], at = d.zoneAt[f], t = fm.t, W = map.W, H = map.H, ts = TS(), wh = WALL();
     const fy = fm.fy || 0, Z = d.zones, zone = Z[zi], NB = Math.ceil(TR.MAX_T / TR.BIN), hist = new Float64Array(NB), histL = new Float64Array(NB), early: [number, number][] = [];
     const doorAt = new Map<number, LvDoor>(); for (const dr of fm.doors || []) for (const c of dr.cells || [dr.tz * W + dr.tx]) doorAt.set(c, dr);
     const winAt = fm.winAt as { has?: (i: number) => boolean } | undefined, buildingTop = fy + wh * (fms.length - f);
     const mfp = zone.out ? 8 : 4 * zone.volume / zone.surface, R = G.U.clamp(0.3 * mfp, 0.6, 2.2), R2 = R * R;
-    const loss = (q: AcZone) => (q.out ? AIR_M : (q.content * q.area + 4 * AIR_M * q.volume) / (4 * q.volume)); // (energy lost per metre: what's in it, and the air)
-    const lossL = (q: AcZone) => (q.out ? AIR_M_LOW : (q.contentL * q.area + 4 * AIR_M_LOW * q.volume) / (4 * q.volume)); // (the lows: the air hardly takes any)
+    // (energy lost per metre in each zone: what's in it, and the air; the lows: the air hardly takes any. Worked out once a
+    // measurement, not at every leg of every ray)
+    const lossZ = new Float64Array(Z.length), lossLZ = new Float64Array(Z.length);
+    for (let k = 0; k < Z.length; k++) { const q = Z[k]; lossZ[k] = q.out ? AIR_M : (q.content * q.area + 4 * AIR_M * q.volume) / (4 * q.volume); lossLZ[k] = q.out ? AIR_M_LOW : (q.contentL * q.area + 4 * AIR_M_LOW * q.volume) / (4 * q.volume); }
     const outWallA = zone.out ? zone.aw : 0.03, outWallAL = zone.out ? zone.awL : 0.02;
-    for (let r = 0; r < TR.RAYS; r++) {
+    let sent = 0;
+    const rays = (n: number) => { for (const end = Math.min(TR.RAYS, sent + n); sent < end; sent++) {
       const u = 2 * Math.random() - 1, ph = Math.random() * Math.PI * 2, sq = Math.sqrt(1 - u * u);
       let dx = sq * Math.cos(ph), dy = u, dz = sq * Math.sin(ph), px = x0, py = y0, pz = z0, e = 1, eL = 1, path = 0;
       for (let ev = 0; ev < 600; ev++) {
         const tx = Math.floor(px / ts), tz = Math.floor(pz / ts);
         if (tx < 0 || tz < 0 || tx >= W || tz >= H) break; // (off the map: gone)
-        const i = tz * W + tx, zc = at[i], cz = zc >= 0 ? Z[zc] : zone, out = zc >= 0 && cz.out;
+        const i = tz * W + tx, zc = at[i], cz = zc >= 0 ? Z[zc] : zone, out = zc >= 0 && cz.out, zk = zc >= 0 ? zc : zi;
         const ceil = out ? Infinity : fy + cz.height, flo = fy;
         const sx = dx > 1e-9 ? ((tx + 1) * ts - px) / dx : dx < -1e-9 ? (tx * ts - px) / dx : Infinity;
         const sz = dz > 1e-9 ? ((tz + 1) * ts - pz) / dz : dz < -1e-9 ? (tz * ts - pz) / dz : Infinity;
@@ -325,7 +329,7 @@ const G_Acoustics = (() => {
             }
           }
         }
-        e *= Math.exp(-loss(cz) * s); eL *= Math.exp(-lossL(cz) * s); path += s; px += dx * s; py += dy * s; pz += dz * s;
+        e *= Math.exp(-lossZ[zk] * s); eL *= Math.exp(-lossLZ[zk] * s); path += s; px += dx * s; py += dy * s; pz += dz * s;
         if ((e < TR.MIN_E && eL < TR.MIN_E) || path > TR.C * TR.MAX_T) break;
         if (s === sy) { // the ceiling or the floor
           if (dy > 0 && out) break; // (out of doors: up into the sky)
@@ -348,7 +352,8 @@ const G_Acoustics = (() => {
         e *= 1 - a; eL *= 1 - aL;
         if (Math.random() < TR.SCATTER) [dx, dy, dz] = scatterDir(axis, -sg); else if (axis === 0) dx = -dx; else dz = -dz;
       }
-    }
+    } return sent >= TR.RAYS; };
+    const finish = (): AcTrace => {
     // per ray, and as a ratio to the direct sound's energy at 1 m (a sphere of radius R catches 3 Σ(e·chord) / (N R³) of it)
     let sum = 0; for (let b = 0; b < NB; b++) { hist[b] /= TR.RAYS; histL[b] /= TR.RAYS; sum += hist[b]; }
     const wet = (3 * sum) / (R2 * R);
@@ -363,6 +368,12 @@ const G_Acoustics = (() => {
     };
     for (const q of early) q[1] /= TR.RAYS;
     return { hist: Float32Array.from(hist), histL: Float32Array.from(histL), bin: TR.BIN, early, wet, rt60: rtOf(hist), rt60L: rtOf(histL), mfp, zone: zi };
+    };
+    return { rays, finish };
+  }
+  function trace(map: LvMap, f: number, x0: number, y0: number, z0: number, zi: number): AcTrace {
+    const j = tracer(map, f, x0, y0, z0, zi); j.rays(TR.RAYS);
+    return j.finish();
   }
   /** a zone's start point: its tile nearest its middle (an L-shaped room's middle can be outside it) */
   function startOf(map: LvMap, zi: number) {
@@ -384,7 +395,37 @@ const G_Acoustics = (() => {
    * echoes are all where the buildings are). Measured the first time it's asked for, kept for the level (re-measured when
    * the doors round a room open or shut).
    */
-  function roomAt(map: LvMap, x: number, y: number, z: number): AcTrace | null {
+  // When a door round a room opens or shuts, its response isn't measured there and then (several ms of work in the frame of
+  // the first sound made in it: with a building's worth of people walking through doors, a hitch each time): the sound has
+  // the room's last response (the same room, a door different), and the new one's measured a few rays at a time between
+  // frames (some tens of ms later), for the sounds after. A state of its doors met before is kept: nothing to measure.
+  // now: measured on the spot (a rendered walk, js/ambience.ts renderWalk, where there's no later).
+  const latest = new WeakMap<LvMap, Map<number, AcTrace>>();
+  const due: { map: LvMap; zi: number; key: string; job?: ReturnType<typeof tracer>; tr?: AcTrace; step?: number }[] = [];
+  let dueOn = false;
+  const DUE = { RAYS: 60, GAP: 6, KEEP: 600 };
+  function dueStep() {
+    const q = due[0];
+    if (!q) { dueOn = false; return; }
+    const m = traces.get(q.map), cur = !G.Game || G.Game.map === q.map || !G.Game.map;
+    if (!m || !cur || (!q.job && 'z' + q.zi + '|' + doorKey(q.map, q.zi) !== q.key)) due.shift(); // (the level's gone, or the door's moved again: that state's asked for when it's wanted)
+    else if (!q.tr) {
+      if (!q.job) { const p = startOf(q.map, q.zi); q.job = tracer(q.map, of(q.map).zones[q.zi].f, p.x, p.y, p.z, q.zi); }
+      if (q.job.rays(DUE.RAYS)) { q.tr = q.job.finish(); q.step = 0; }
+    } else {
+      // (and its impulse response made, a channel a turn, before it's the room's: the first sound in it needn't wait for that either)
+      const c = G.Audio && G.Audio.ctx;
+      if (c && q.step! < 2) shape(q.tr, c.sampleRate, q.step!++);
+      else { keep(m, q.key, q.tr); latest.get(q.map)!.set(q.zi, q.tr); of(q.map).zones[q.zi].rt60m = q.tr.rt60; due.shift(); }
+    }
+    setTimeout(dueStep, DUE.GAP);
+  }
+  /** a measurement kept (the oldest dropped past KEEP of them: a long level's doors in every state they've been in) */
+  function keep(m: Map<string, AcTrace>, key: string, tr: AcTrace) {
+    m.set(key, tr);
+    if (m.size > DUE.KEEP) for (const k of m.keys()) { m.delete(k); break; }
+  }
+  function roomAt(map: LvMap, x: number, y: number, z: number, now = false): AcTrace | null {
     const d = of(map), zi = zoneAt(map, x, y, z);
     if (zi < 0) return null;
     const zone = d.zones[zi];
@@ -396,8 +437,18 @@ const G_Acoustics = (() => {
       return tr;
     }
     const key = 'z' + zi + '|' + doorKey(map, zi);
+    let lm = latest.get(map); if (!lm) { lm = new Map(); latest.set(map, lm); }
     let tr = m.get(key);
-    if (!tr) { const p = startOf(map, zi); tr = trace(map, zone.f, p.x, p.y, p.z, zi); m.set(key, tr); zone.rt60m = tr.rt60; }
+    if (!tr) {
+      const was = now ? undefined : lm.get(zi);
+      if (was) { // (its last, while the new one's measured)
+        if (!due.some((q) => q.map === map && q.key === key)) due.push({ map, zi, key });
+        if (!dueOn) { dueOn = true; setTimeout(dueStep, DUE.GAP); }
+        return was;
+      }
+      const p = startOf(map, zi); tr = trace(map, zone.f, p.x, p.y, p.z, zi); keep(m, key, tr); zone.rt60m = tr.rt60;
+    }
+    lm.set(zi, tr);
     return tr;
   }
   /** measure every indoor room in idle time, one at a time, so the first shot in each needn't wait */
@@ -417,12 +468,18 @@ const G_Acoustics = (() => {
   // goes (the air, and soft things, take those first), and past where the trace's energy ran out, on down its slope to
   // -60 dB. Its total energy: energy (the trace's wet, for a gun's report heard against it; 1 for a send that sets its
   // own level). Per context, per measurement.
+  // Its shape's made once a measurement and sample rate (unit energy, either ear its own), and kept: a use at another
+  // level, or in the other audio context (the game's and the ambience's each have their own buffers), is a scaled copy.
+  // (The cutoff of the tail's falling low-pass is worked out once a bin, 2 ms, not once a sample: it moves under 2% in one.)
   const irs = new WeakMap<BaseAudioContext, WeakMap<AcTrace, Map<number, AudioBuffer>>>();
-  function impulse(c: BaseAudioContext, tr: AcTrace, energy = tr.wet) {
-    let m = irs.get(c); if (!m) { m = new WeakMap(); irs.set(c, m); }
-    let mm = m.get(tr); if (!mm) { mm = new Map(); m.set(tr, mm); }
-    const had = mm.get(energy); if (had) return had;
-    const sr = c.sampleRate, T = Math.min(4, Math.max(tr.rt60, tr.rt60L || 0) * 1.15 + 0.08), len = Math.ceil(sr * T), b = c.createBuffer(2, len, sr), NB = tr.hist.length;
+  const shapes = new WeakMap<AcTrace, Map<number, { len: number; ch: (Float32Array | undefined)[]; env?: Float64Array; envL?: Float64Array; lateE?: number }>>();
+  /** a measurement's response at a sample rate, channel ch (0, 1), unit energy: made the first time, then kept */
+  function shape(tr: AcTrace, sr: number, ch: number): Float32Array {
+    let m = shapes.get(tr); if (!m) { m = new Map(); shapes.set(tr, m); }
+    const T = Math.min(4, Math.max(tr.rt60, tr.rt60L || 0) * 1.15 + 0.08), NB = tr.hist.length;
+    let sh = m.get(sr); if (!sh) { sh = { len: Math.ceil(sr * T), ch: [] }; m.set(sr, sh); }
+    const had = sh.ch[ch]; if (had) return had;
+    const len = sh.len;
     // the envelope: the histogram smoothed, and past its last real energy, on down the measured slope
     const envOf = (h: Float32Array, rt: number) => {
       const env = new Float64Array(Math.ceil(T / tr.bin) + 1), sm = 4;
@@ -433,31 +490,48 @@ const G_Acoustics = (() => {
       }
       return env;
     };
-    const env = envOf(tr.hist, tr.rt60), envL = tr.histL ? envOf(tr.histL, tr.rt60L) : env;
-    const aL = Math.exp(-2 * Math.PI * 250 / sr); // (the split: under 250 Hz on the low band's envelope, the rest on the mid band's)
     // (the two parts keep the measured share each has of the whole: the late noise scaled to the energy the trace found
-    // past the early part, each early arrival as much as it brought; then the whole to `energy`)
+    // past the early part, each early arrival as much as it brought; then the whole to unit energy)
     const k0 = Math.floor(TR.EARLY * 0.75 / tr.bin);
-    let lateE = 0; for (let k = k0; k < env.length; k++) lateE += env[k];
-    for (let ch = 0; ch < 2; ch++) {
-      const d = b.getChannelData(ch);
-      let lpState = 0, lowS = 0, e = 0;
-      for (let i = 0; i < len; i++) {
-        const t = i / sr; if (t < TR.EARLY * 0.75) continue;
-        const k = Math.floor(t / tr.bin), fc = 9000 * Math.exp(-t / Math.max(0.25, tr.rt60 * 0.45)) + 600, a = Math.exp(-2 * Math.PI * fc / sr);
-        const w = Math.random() * 2 - 1; lowS = aL * lowS + (1 - aL) * w;
-        lpState = a * lpState + (1 - a) * (w - lowS);
-        const fade = Math.min(1, (t - TR.EARLY * 0.75) / (TR.EARLY * 0.25)); // (the late part comes up as the early arrivals thin out)
-        d[i] = (lpState * Math.sqrt(env[k] || 0) + lowS * Math.sqrt(envL[k] || 0)) * fade;
-        e += d[i] * d[i];
-      }
-      const kl = Math.sqrt(lateE / (e || 1)); for (let i = 0; i < len; i++) d[i] *= kl;
-      for (const [t, w] of tr.early) { const i = Math.floor((t + (ch ? 0.0003 : 0) * Math.random()) * sr); if (i < len) d[i] += (Math.random() < 0.5 ? -1 : 1) * Math.sqrt(w); }
-      let all = 0; for (let i = 0; i < len; i++) all += d[i] * d[i];
-      const k = Math.sqrt(energy / (all || 1)); for (let i = 0; i < len; i++) d[i] *= k;
+    if (!sh.env) {
+      sh.env = envOf(tr.hist, tr.rt60); sh.envL = tr.histL ? envOf(tr.histL, tr.rt60L) : sh.env;
+      let l = 0; for (let k = k0; k < sh.env.length; k++) l += sh.env[k];
+      sh.lateE = l;
     }
-    mm.set(energy, b);
-    return b;
+    const env = sh.env, envL = sh.envL!, lateE = sh.lateE!;
+    const aL = Math.exp(-2 * Math.PI * 250 / sr); // (the split: under 250 Hz on the low band's envelope, the rest on the mid band's)
+    const d = new Float32Array(len), i0 = Math.ceil(TR.EARLY * 0.75 * sr), tcut = Math.max(0.25, tr.rt60 * 0.45), fadeK = 1 / (TR.EARLY * 0.25 * sr);
+    let lpState = 0, lowS = 0, e = 0, kb = -1, a = 0, a1 = 1, ge = 0, gl = 0;
+    for (let i = i0; i < len; i++) {
+      const t = i / sr, k = Math.floor(t / tr.bin);
+      if (k !== kb) { kb = k; const fc = 9000 * Math.exp(-(k + 0.5) * tr.bin / tcut) + 600; a = Math.exp(-2 * Math.PI * fc / sr); a1 = 1 - a; ge = Math.sqrt(env[k] || 0); gl = Math.sqrt(envL[k] || 0); }
+      const w = Math.random() * 2 - 1; lowS = aL * lowS + (1 - aL) * w;
+      lpState = a * lpState + a1 * (w - lowS);
+      const fade = Math.min(1, (i - i0) * fadeK); // (the late part comes up as the early arrivals thin out)
+      const v = (lpState * ge + lowS * gl) * fade;
+      d[i] = v; e += v * v;
+    }
+    const kl = Math.sqrt(lateE / (e || 1)); for (let i = i0; i < len; i++) d[i] *= kl;
+    for (const [t, w] of tr.early) { const i = Math.floor((t + (ch ? 0.0003 : 0) * Math.random()) * sr); if (i < len) d[i] += (Math.random() < 0.5 ? -1 : 1) * Math.sqrt(w); }
+    let all = 0; for (let i = 0; i < len; i++) all += d[i] * d[i];
+    const k = Math.sqrt(1 / (all || 1)); for (let i = 0; i < len; i++) d[i] *= k;
+    sh.ch[ch] = d;
+    return d;
+  }
+  function impulse(c: BaseAudioContext, tr: AcTrace, energy = tr.wet) {
+    let m = irs.get(c); if (!m) { m = new WeakMap(); irs.set(c, m); }
+    let mm = m.get(tr); if (!mm) { mm = new Map(); m.set(tr, mm); }
+    const had = mm.get(energy); if (had) return had;
+    const sr = c.sampleRate, g = Math.sqrt(energy);
+    let b: AudioBuffer | null = null;
+    for (let ch = 0; ch < 2; ch++) {
+      const src = shape(tr, sr, ch);
+      if (!b) b = c.createBuffer(2, src.length, sr);
+      const d = b.getChannelData(ch);
+      for (let i = 0; i < src.length; i++) d[i] = src[i] * g;
+    }
+    mm.set(energy, b!);
+    return b!;
   }
 
   // (the last listen, kept a moment: a burst of fire, or every placed source in a frame, from the same place)

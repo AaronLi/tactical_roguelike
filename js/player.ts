@@ -1,4 +1,5 @@
 'use strict';
+const _shC = new THREE.Vector3(), _shS = new THREE.Vector3(), _shA = new THREE.Vector3(); // (shieldHit's)
 // where a door stops being a kick and starts being a push: aim below this (m) to kick, above to open
 const KICK_H = 1.3;
 type PBuild = Record<string, string>;
@@ -9,7 +10,7 @@ interface PShot { sid: number; ff: Map<any, any>; to?: THREE.Vector3; tos: THREE
 // what a timed F action is (it drives the animation), the zipline's and the ladder's phases, and how a hit leaves you
 type PReloadMode = 'retain' | 'pouch' | 'floor' | 'plain';
 type PActKind = 'rack' | 'release';
-type PHeldKind = 'frag' | 'flash' | 'tb'; // (tb: a thermobaric grenade)
+type PHeldKind = 'frag' | 'flash' | 'tb' | 'sticky'; // (tb: a thermobaric grenade; sticky: holds to what it hits, js/views.ts stickStep)
 type PActionKind = 'order' | 'zip' | 'bag' | 'open' | 'kick' | 'close' | 'case';
 type PZipPhase = 'up' | 'ride' | 'down';
 type PLadderPhase = 'on' | 'climb' | 'off';
@@ -294,7 +295,7 @@ const G_Me = {
         if (!Gr.stow(this, m)) this.dropItem(m);
       } else Gr.unloadGun(this, w);
       if (w.chamber) { if (!Gr.stow(this, Gr.boxItem(G.calOf(old), w.chamber, 1))) { /* (a single round: let it go) */ } }
-      w.mag = 0; w.tube = []; w.ammo = G.ballFor(G.calOf(def)); w.chamber = null;
+      w.mag = 0; w.tube = []; w.ammo = G.loadFor(def); w.chamber = null;
       if (a1.kind === 'mag') w.noMag = true; else delete w.noMag;
     }
     w.def = def; w.sup = def.sup;
@@ -546,7 +547,12 @@ const G_Me = {
   lookBy(dx: number, dy: number, sens: number) {
     if (!G.Game.locked || this.dead || this.out) return; // (out cold: no looking round)
     if (this.wheel) { this.wheelMove(dx, dy); return; } // (the comms wheel open: the mouse picks on it)
-    const z = this.viewer ? 1 / this.VIEWER.MAG : G.U.lerp(1, this.sight(this.cur()).zoom, this.adsT || 0); // (a viewer's magnification slows the view as much)
+    // Aiming, the view turns less for the same push, by as much as the picture is magnified: so what you're looking at crosses
+    // the screen at the rate it does from the hip, whatever the sight (it used to go by the sight's own figure, which for a
+    // scope was well short of its power: a 4x turned the picture at nearly twice the hip's rate). Irons and dots narrow the
+    // whole view (js/player.ts fov: by zoom); a scope narrows it to 0.8 and magnifies the picture in its lens by its power.
+    const sg = this.sight(this.cur()), hf = G.Game.settings.fov * Math.PI / 360, aimK = sg.scoped ? Math.tan(hf * 0.8) / Math.tan(hf) / Math.max(1, sg.mag) : Math.tan(hf * sg.zoom) / Math.tan(hf);
+    const z = this.viewer ? 1 / this.VIEWER.MAG : G.U.lerp(1, aimK, this.adsT || 0); // (a viewer's magnification slows the view as much)
     const s = sens * z;
     // a magazine in your hand, or the gun held open for a chamber check: the mouse turns that, not your view
     const mc = this.magChk;
@@ -1638,6 +1644,37 @@ const G_Me = {
   // or let it through, slower, off line and changed (b.proj, the round as it now is: its drag goes with it), and it goes
   // on from there with what's left of the step. Returns where it stopped ({ p, t }), or null if it flies on (b.at, if it
   // was turned: where it's got to, and b.v what it's doing now).
+  // The nearest suspect's handheld shield (js/rig.ts setShield) a round from o along unit d meets within tMax, as a world solid would be
+  // met (G.World.raycast's { t, n, solid }): a convex solid (hull: the slab's six faces, as it's held this frame) of the shield's own
+  // layers (its viewport's, struck there), for G.Ballistics crossSolid to take it through. Null: none.
+  shieldHit(o: THREE.Vector3, d: THREE.Vector3, tMax: number): { t: number; n: number[]; solid: any; view?: any; pane?: any } | null {
+    let best: any = null;
+    for (const ev of G.Views.enemies.values()) {
+      const g = ev.rig.shield; if (!g || !ev.alive || !ev.rig.root.visible) continue;
+      const c = g.getWorldPosition(_shC), tc = (c.x - o.x) * d.x + (c.y - o.y) * d.y + (c.z - o.z) * d.z;
+      if (tc < -0.8 || tc > tMax + 0.8 || Math.hypot(c.x - o.x - d.x * tc, c.y - o.y - d.y * tc, c.z - o.z - d.z * tc) > 0.8) continue; // (nowhere near the line)
+      g.updateMatrixWorld(true);
+      const sd = g.userData.shield as ShieldDef, sc = g.getWorldScale(_shS).x, half = [sd.w / 2 * sc, sd.h / 2 * sc, sd.th / 2 * sc], P: number[][] = [];
+      for (let a = 0; a < 3; a++) {
+        const ax = _shA.set(a === 0 ? 1 : 0, a === 1 ? 1 : 0, a === 2 ? 1 : 0).transformDirection(g.matrixWorld);
+        for (const sg of [1, -1]) { const n = [ax.x * sg, ax.y * sg, ax.z * sg]; P.push([n[0], n[1], n[2], n[0] * c.x + n[1] * c.y + n[2] * c.z + half[a]]); }
+      }
+      let t0 = -Infinity, t1 = Infinity, n0: number[] | null = null;
+      for (const q of P) {
+        const dn = q[0] * d.x + q[1] * d.y + q[2] * d.z, dist = q[3] - (q[0] * o.x + q[1] * o.y + q[2] * o.z);
+        if (Math.abs(dn) < 1e-12) { if (dist < 0) { t0 = Infinity; break; } continue; }
+        const t = dist / dn; if (dn < 0) { if (t > t0) { t0 = t; n0 = q; } } else if (t < t1) t1 = t;
+        if (t0 > t1) break;
+      }
+      if (!(t0 <= t1) || !n0 || t0 < 0 || t0 >= tMax || (best && t0 >= best.t)) continue;
+      const at = g.worldToLocal(_shA.set(o.x + d.x * t0, o.y + d.y * t0, o.z + d.z * t0)), pt = sd.port;
+      const layers = pt && Math.abs(at.x) < pt.w / 2 && Math.abs(at.y - (sd.h / 2 - pt.down)) < pt.h / 2 ? pt.layers : sd.layers;
+      const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+      for (let k = 0; k < 8; k++) { const q = g.localToWorld(_shA.set((k & 1 ? 1 : -1) * sd.w / 2, (k & 2 ? 1 : -1) * sd.h / 2, (k & 4 ? 1 : -1) * sd.th / 2)); for (let a = 0; a < 3; a++) { const v = a === 0 ? q.x : a === 1 ? q.y : q.z; if (v < min[a]) min[a] = v; if (v > max[a]) max[a] = v; } }
+      best = { t: t0, n: [n0[0], n0[1], n0[2]], solid: { kind: 'shield', shield: sd, ev, ray: true, min, max, hull: P, mat: { skin: layers, core: null, fill: 1, stud: null, one: true } } };
+    }
+    return best;
+  },
   roundSegment(b: PRound, a: THREE.Vector3, dir: THREE.Vector3, len: number): { p: THREE.Vector3; t: number; body?: boolean; v?: number } | null {
     const map = G.Game.map!, L = G.Level, def = b.def, B = G.Ballistics;
     if (def.explosive && !b.enemy) {
@@ -1653,7 +1690,8 @@ const G_Me = {
     const turn = (nd: THREE.Vector3, nv: number) => { d = nd; v = nv; turned = true; b.events = (b.events || 0) + 1; };
     const stopped = (p: THREE.Vector3, t: number, body: boolean, vs: number) => ({ p, t, body, v: vs });
     legs: for (let leg = 0; leg < 12 && rest > 1e-4 && v > G.ROUND_LIFE.v; leg++) {
-      const wall = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest, { bars: true }), hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
+      const wall0 = L.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, rest, { bars: true }), wall = (b.enemy ? null : this.shieldHit(o, d, wall0.solid ? Math.min(wall0.t, rest) : rest)) || wall0; // (a suspect's handheld shield in the way first: shieldHit)
+      const hitWall = !!wall.solid && wall.t < rest - 1e-4, wallT = Math.min(wall.t, rest);
       const look = hitWall ? wallT : rest + 0.8; // (a body that straddles the end of this step: all of it, now)
       for (const h of this.roundHits(b, o, d, wallT)) {
         const tr = [] as PTrack, ev = h.ev, mate = h.mate; // (F9: the track through them, a step at a time, for the trail, and its fragments)
@@ -1715,7 +1753,11 @@ const G_Me = {
       if (s.target) G.Range.hit(s, at, d, b.proj.m * vIn);
       const pane0 = wall.pane != null && !(s.win && s.win.armor) && !r.ric; // (glass shows what it took across the whole pane: no mark on it)
       if (wall.pane != null && !(s.win && s.win.armor)) this.roundPane(wall.pane, at, d);
-      if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: s.bars ? '' : r.mat, dir: d, stop: !r.ric && !r.v, cut: cut ? cut.r : pane0 ? 1 : 0, depth: r.depth });
+      if (s.shield) { // (no mark left in the world: it's moving. A spark and the sound of it, and its carrier rocked by it)
+        this.pathPt(b, at, vIn); if (b.trail) G.R.trailAdd(b.trail, at, true, vIn);
+        G.R.impact(at, null, 'armor'); if (G.Audio.armorHit) G.Audio.armorHit();
+        s.ev.rig.hit(d, b.proj.m * vIn * 0.4); s.ev.engagedT = performance.now();
+      } else if (!wall.view) this.roundMark(b, at, wall.n, r.fx, r.ric ? 'r' : 'e', vIn, s, r.name, { m: s.bars ? '' : r.mat, dir: d, stop: !r.ric && !r.v, cut: cut ? cut.r : pane0 ? 1 : 0, depth: r.depth });
       else { this.pathPt(b, at, vIn); if (b.trail) G.R.trailAdd(b.trail, at, true, vIn); }
       if (r.ric) {
         on(wall.t);
@@ -1725,11 +1767,11 @@ const G_Me = {
         continue;
       }
       if (cut && G.Damage.apply(map as unknown as Parameters<typeof G.Damage.apply>[0], cut.rec)) (b.shot.holes = b.shot.holes || []).push(cut.rec);
-      if (!r.v) { if (b.def.cls === 'BOW' && !s.door && !wall.view && G.Bolts.holds(r.fx)) this.boltStuck(at.clone().addScaledVector(d, Math.min(r.depth || 0, 0.08)), d, b.am); return stopped(at, done + wall.t, false, vIn); } // (v: how fast it struck)
+      if (!r.v) { if (b.def.cls === 'BOW' && !s.door && !wall.view && G.Bolts.holds(r.fx)) { const tip = at.clone().addScaledVector(d, Math.min(r.depth || 0, 0.08)); if (s.shield) this.boltShield(s.ev, tip, d, b.am); else this.boltStuck(tip, d, b.am); } return stopped(at, done + wall.t, false, vIn); } // (v: how fast it struck)
       if (wall.pane == null && !wall.view) b.walled = true; // (through something a person could hide behind)
       const n0 = wall.n;
       on(r.t);
-      if (!wall.view) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: s.bars ? '' : r.matOut, dir: d, cut: cut ? cut.rOut : pane0 ? 1 : 0 });
+      if (!wall.view && !s.shield) this.roundMark(b, o, r.nOut, r.fxOut, 'x', r.v, null, r.nameOut, { m: s.bars ? '' : r.matOut, dir: d, cut: cut ? cut.rOut : pane0 ? 1 : 0 });
       turn(B.deflect(d, r, n0), r.v);
       o.addScaledVector(d, 0.004);
     }
@@ -1751,6 +1793,12 @@ const G_Me = {
     if (!bone) return;
     const l = G.Bolts.onBone(ev.rig, bone, o.clone().addScaledVector(d, r.stopped ? r.entryT + 0.02 : r.exitT), d, am);
     G.Net.toHost({ t: 'bstk', e: ev.id, b: seg.bone, l, am });
+  },
+  // into a suspect's handheld shield: it goes with the shield (and stays in it if it's dropped)
+  boltShield(ev: VwEnemy, at: THREE.Vector3, d: THREE.Vector3, am: string) {
+    const g = ev.rig.shield; if (!g) return;
+    const l = G.Bolts.onBone(ev.rig, g, at, d, am);
+    G.Net.toHost({ t: 'bstk', e: ev.id, b: 'shield', l, am });
   },
   // into a wall, a target, a beam
   boltStuck(at: THREE.Vector3, d: THREE.Vector3, am: string) {
@@ -1800,11 +1848,11 @@ const G_Me = {
     (b.shot.fx = b.shot.fx || []).push(G.Ballistics.mark(p, n, fx, kind, o));
   },
   // a pane a round went through breaks (here at once, and for everyone through the host)
-  // The first round fractures it, and it stays up; the next one, or a blast (all), or someone walking into it, brings it down.
+  // The first two rounds fracture it (G.Level.CRACKS), and it stays up; the third, or a blast (all), or someone walking into it once it's fractured, brings it down.
   roundPane(id: number, at: THREE.Vector3, dir: THREE.Vector3, all?: boolean) {
     const win = G.Game.map!.windows[id];
     if (!win || win.broken) return;
-    if (!win.cracked && !all) { G.Views.crackGlass(id, at, dir); G.Net.toHost({ t: 'crack', id, p: [+at.x.toFixed(3), +at.y.toFixed(3), +at.z.toFixed(3)] }); return; }
+    if ((win.cracked || 0) < G.Level.CRACKS && !all) { G.Views.crackGlass(id, at, dir); G.Net.toHost({ t: 'crack', id, p: [+at.x.toFixed(3), +at.y.toFixed(3), +at.z.toFixed(3)] }); return; }
     G.Views.breakGlass(id, at, dir);
     G.Net.toHost({ t: 'glass', ids: [id] });
   },
@@ -1866,7 +1914,7 @@ const G_Me = {
     this.hitQ.clear();
   },
 
-  explode(p: THREE.Vector3, r: number, dmg: number, isNade?: boolean) {
+  explode(p: THREE.Vector3, r: number, dmg: number, isNade?: boolean, kind?: string) { // (kind 'sticky': its own fragments, fragSpec)
     G.R.explosion(p, r);
     G.Audio.boom(G.R.camera.position.distanceTo(p));
     const map = G.Game.map!;
@@ -1886,9 +1934,9 @@ const G_Me = {
       ev.selfHit = true;
     }
     const r2 = (v: number) => Math.round(v * 100) / 100;
-    if (isNade && G.Highlights) G.Highlights.boom('p' + G.Net.myId, p, seed); // (the replays: when and where, as it goes off here)
-    if (isNade) this.fragBurst(p, undefined, seed);
-    G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg), fr: isNade ? 1 : undefined, s: isNade ? seed : undefined });
+    if (isNade && G.Highlights) G.Highlights.boom('p' + G.Net.myId, p, seed, kind === 'sticky' ? 'sticky' : 'frag'); // (the replays: when and where, as it goes off here)
+    if (isNade) this.fragBurst(p, undefined, seed, false, kind);
+    G.Net.toHost({ t: 'boom', p: [r2(p.x), r2(p.y), r2(p.z)], r: r2(r), d: Math.round(dmg), fr: isNade ? 1 : undefined, s: isNade ? seed : undefined, sk: kind === 'sticky' ? 1 : undefined });
   },
 
   // ---------------------------------------------------------------- fragmentation
@@ -1908,13 +1956,21 @@ const G_Me = {
   // A burst lying on something hard pushes its whole blast into the half above it, and it carries further (js/sim.ts blastR)
   blastR(map: LvMap | null, p: THREE.Vector3) { return G.Sim.blastR(map, p); },
   FRAG: { N: 1200, V0: 1150, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 3, MIN_PER_FRAME: 40, M_MED: 0.00013, M_SD: 0.25, CD: 1.0, FLAKE: 1.5, SHOW: 26, PUFFS: 14, BLOOD: 24 },
+  // A sticky grenade: a thick steel body in an adhesive sock, held to the first thing it hits (js/views.ts stickStep) and going off FUSE
+  // seconds after (MAX_FLY: one that's never hit anything goes off anyway). Its body is lined with pre-formed cubes of hardened steel
+  // (CORE 'hard', FLAKE 1: a compact cube, not a frag coil's flat ragged chip) instead of a frag's notched coil: far fewer, far heavier
+  // pieces (about a gram each, some 800 J apiece against a frag chip's 86), a thinner hazard, but each one goes through IIIA soft armour
+  // out to 20 m and through plasterboard, plywood and a car door, where a frag chip stops in soft armour at any range. Rifle plates (III
+  // steel or polyethylene) still stop them. The rest of a burst's sums are the frag's (FRAG).
+  STICKY: { FUSE: G_Sim.STICKY.FUSE, MAX_FLY: G_Sim.STICKY.MAX_FLY, N: 220, V0: 1200, M_MED: 0.0011, M_SD: 0.12, FLAKE: 1.0, CORE: 'hard', CAP: 14 },
+  fragSpec(kind?: string): Record<string, any> { return kind === 'sticky' ? Object.assign({}, this.FRAG, { N: this.STICKY.N, V0: this.STICKY.V0, M_MED: this.STICKY.M_MED, M_SD: this.STICKY.M_SD, FLAKE: this.STICKY.FLAKE, CAP: this.STICKY.CAP, CORE: this.STICKY.CORE }) : this.FRAG; },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
   // p: where it went off. enemy: a suspect's (id): it is you it is meant for, and no one else it hurts here. seed: the
   // burst's (the same on every screen: the chips' directions, masses and speeds all come from it). marksOnly: someone
   // else's grenade, flown only against the walls, to leave the same pocks (no bodies, no streaks, no wounds)
-  fragBurst(p: THREE.Vector3, enemy?: number, seed?: number, marksOnly?: boolean) {
-    const F = this.FRAG, n = F.N, dir = new Float32Array(n * 3), m = new Float32Array(n), v = new Float32Array(n);
+  fragBurst(p: THREE.Vector3, enemy?: number, seed?: number, marksOnly?: boolean, kind?: string) {
+    const F = this.fragSpec(kind), n = F.N, dir = new Float32Array(n * 3), m = new Float32Array(n), v = new Float32Array(n);
     const rnd = seed ? G.U.rng(seed) : Math.random;
     this.scorchAt(p, rnd);
     const crater = this.craterAt(p, seed); // (its own dice, not rnd's: the chips fly as they always have from the seed)
@@ -1936,14 +1992,14 @@ const G_Me = {
       line = new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
       line.frustumCulled = false; G.R.dynRoot.add(line);
     }
-    const q = { p: p.clone(), crater, enemy, seed: seed || 0, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
+    const q = { F, p: p.clone(), crater, enemy, seed: seed || 0, marksOnly: !!marksOnly, n, i: 0, dir, m, v, pos, line, geo, shot: { sid: 0, ff: new Map(), f: 0, enemy: enemy || undefined } as any, per: new Map<string, any>(),
       ms: 0, maxMs: 0, frames: 0, walls: 0, mats: {} as Record<string, number[]>, escaped: 0, puffs: 0, blood: 0, fade: -1 };
     (this.fragQ = this.fragQ || []).push(q);
   },
   stepFrags(dt: number) {
     const Q = this.fragQ;
     if (!Q || !Q.length) return;
-    const F = this.FRAG, q = Q[0];
+    const q = Q[0], F = q.F || this.FRAG;
     if (q.i < q.n) {
       const t0 = performance.now();
       let k = 0;
@@ -1979,13 +2035,13 @@ const G_Me = {
   },
   // one chip, flown from the burst to wherever it ends
   fragOne(q: any, i: number) {
-    const F = this.FRAG, B = G.Ballistics, L = G.Level, map = G.Game.map!, m = q.m[i];
+    const F = q.F || this.FRAG, B = G.Ballistics, L = G.Level, map = G.Game.map!, m = q.m[i];
     // A chip of the coil is a short square bit of wire, not a ball: tumbling, it shows the air and whatever it strikes about one and a
     // half times the area of a cube of its steel (a 130 mg chip: about 3.5 mm across), so it slows by a factor e in about 22 m (some
     // 55 J left at 5 m, 35 J at 10 m) and goes into things like a small blunt object (js/ballistics.ts vLimit: the wider, the harder)
     const A = F.FLAKE * Math.pow(m / 7850, 2 / 3), dia = Math.sqrt(4 * A / Math.PI);
     const d = new THREE.Vector3(q.dir[i * 3], q.dir[i * 3 + 1], q.dir[i * 3 + 2]), o = q.p.clone();
-    const proj: any = { m, d: dia, len: m / (7850 * A), core: 'mild', nose: 'ball', flat: true, d0: dia, m0: m, ang: 0 };
+    const proj: any = { m, d: dia, len: m / (7850 * A), core: F.CORE || 'mild', nose: 'ball', flat: true, d0: dia, m0: m, ang: 0 }; // (CORE: what the piece is: a frag's coil mild steel, a sticky's cubes hardened)
     const drag0 = (2 * m) / (F.CD * 1.2 * A); // (metres to lose a factor e of its speed in the air)
     let drag = drag0, v = q.v[i], rest = F.RANGE, hitSomething = false;
     const b: any = { hit: new Set(), enemy: q.enemy, events: 1 };
@@ -2174,8 +2230,8 @@ const G_Me = {
   },
   // the kind of quick-slot gear an item is (null: not one)
   // the kind of quick-slot gear an item is: a throwable (null: not one; medical gear isn't)
-  quickKind(it: GItem | null) { return it && (it.k === 'frag' || it.k === 'flash' || it.k === 'tb') ? it.k : null; },
-  quickName(kind: string | null) { return kind === 'frag' ? 'Frag' : kind === 'flash' ? 'Flashbang' : kind === 'tb' ? 'Thermobaric' : '—'; },
+  quickKind(it: GItem | null) { return it && (it.k === 'frag' || it.k === 'flash' || it.k === 'tb' || it.k === 'sticky') ? it.k : null; },
+  quickName(kind: string | null) { return kind === 'frag' ? 'Frag' : kind === 'flash' ? 'Flashbang' : kind === 'tb' ? 'Thermobaric' : kind === 'sticky' ? 'Sticky' : '—'; },
   // how many of that kind you carry
   quickCount(kind: string | null) { return this.kit && kind ? G.Gear.count(this, kind) : 0; },
   // ------------------------------------------------------------- gear in hand (keys 3, 4, 5)
@@ -2192,7 +2248,7 @@ const G_Me = {
     if (this.dead || this.down || this.action || G.Game.hub || this.seat != null) return; // (no throwing in the hangar)
     if (!kind) { G.HUD.toast('', `Nothing on key ${i + 3}: drag a grenade onto its box in the inventory`, 1.6); return; }
     if (this.held && this.held.kind === kind) { if (this.held.throwT < 0 && !this.held.cock) this.unequip(); return; }
-    if (!this.quickCount(kind)) { G.HUD.toast('', kind === 'flash' ? 'No flashbangs' : kind === 'tb' ? 'No thermobarics' : 'No grenades', 1.2); G.Audio.deny(); return; }
+    if (!this.quickCount(kind)) { G.HUD.toast('', kind === 'flash' ? 'No flashbangs' : kind === 'tb' ? 'No thermobarics' : kind === 'sticky' ? 'No sticky grenades' : 'No grenades', 1.2); G.Audio.deny(); return; }
     this.held = { kind, cock: false, str: this.throwStr == null ? 2 : this.throwStr, readyT: 0.35, throwT: -1, lastL: true, lastR: true };
     this.reloading = false; this.burstQ = 0; this.inspectT = 0; this.magChk = null; this.rChk = null; this.rHeldAt = 0; this.lowToggle = false;
     G.Audio.click();
@@ -2204,13 +2260,13 @@ const G_Me = {
     this.raiseT = this.raiseMax = this.drawTime(); // (the weapon comes back up)
   },
   // the fuses: a flashbang's short (an M84's 1-2.3 s), a frag's and a thermobaric's a little longer (cook them to cut that)
-  fuseOf(kind: PHeldKind) { return kind === 'flash' ? 1.5 : kind === 'tb' ? this.TB.FUSE : 2.2; },
+  fuseOf(kind: PHeldKind) { return kind === 'flash' ? 1.5 : kind === 'tb' ? this.TB.FUSE : kind === 'sticky' ? this.STICKY.FUSE : 2.2; }, // (a sticky's from when it sticks: js/views.ts stickStep)
   // what's left of the fuse of the one in your hand (all of it, till the spoon's gone)
   fuseLeft(h: PHeld) { return h.cook != null ? Math.max(0.02, h.cook) : this.fuseOf(h.kind); },
   // R, drawn back: the spoon goes, and the fuse with it
   cookHeld() {
     const h = this.held;
-    if (!h || !h.cock || h.cook != null || h.throwT >= 0) return;
+    if (!h || !h.cock || h.cook != null || h.throwT >= 0 || h.kind === 'sticky') return; // (a sticky's fuse starts as it sticks: nothing to cook)
     h.cook = this.fuseOf(h.kind);
     G.Audio.spoon();
   },
@@ -2242,8 +2298,9 @@ const G_Me = {
     if (h.queued && !h.cock) { h.cock = true; h.queued = false; G.Audio.pin(); } // pin out, drawn back
     if (h.cook != null) { h.cook -= dt; if (h.cook <= 0) { h.cock = false; this.throwHeld(true); return; } } // (held too long: it goes off in your hand)
     if (h.cock && (!l || this.down)) { h.cock = false; this.throwHeld(this.down); } // let go: thrown (gone down: it falls from your hand)
-    if (!h.cock && !this.down) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseLeft(h), G.Game.map), false); }
-    else if (h.cock) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(G.Views.predictNade(p, v, this.fuseLeft(h), G.Game.map), true); }
+    const arc = (p: THREE.Vector3, v: THREE.Vector3) => (h.kind === 'sticky' ? G.Sim.predictSticky(p, v, G.Game.map, this.STICKY.MAX_FLY) : G.Views.predictNade(p, v, this.fuseLeft(h), G.Game.map)); // (a sticky's: to where it'll hold)
+    if (!h.cock && !this.down) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(arc(p, v), false); }
+    else if (h.cock) { const { p, v } = this.throwLaunch(h.str); G.R.throwArc(arc(p, v), true); }
   },
   // drop: not thrown but let fall where you stand (a cooked one put away, held too long, or you went down with it)
   throwHeld(drop = false) {
@@ -2251,11 +2308,12 @@ const G_Me = {
     h.cook = undefined;
     if (!G.Gear.take(this, kind)) { this.unequip(); return; }
     const { p, v } = drop ? { p: this.pos.clone().add(new THREE.Vector3(0, 0.9, 0)), v: new THREE.Vector3(this.vel.x * 0.3, -0.5, this.vel.z * 0.3) } : this.throwLaunch(h.str);
-    G.Views.addNade(p, v, fuse, true, false, kind);
+    const nid = (Math.random() * 1e9) >>> 0; // (a sticky's: so where it holds can be told, js/views.ts stickStep)
+    G.Views.addNade(p, v, fuse, true, false, kind, nid, G.Net.myId || undefined);
     if (G.Highlights) G.Highlights.nade('p' + G.Net.myId, p, v, fuse, kind); // (its flight, for the replays)
     h.throwT = 0;
     const r2 = (x: number) => Math.round(x * 100) / 100;
-    G.Net.toHost({ t: 'nade', p: [p.x, p.y, p.z].map(r2), v: [v.x, v.y, v.z].map(r2), fuse, k: kind, s: h.str });
+    G.Net.toHost({ t: 'nade', p: [p.x, p.y, p.z].map(r2), v: [v.x, v.y, v.z].map(r2), fuse, k: kind, s: h.str, nid });
   },
   shout() {
     if (this.dead || (this.shoutT || 0) > performance.now()) return;
@@ -2704,7 +2762,7 @@ const G_Me = {
     const B = G.Ballistics, frag = { m: 0.0003, d: 0.004, len: 0.004, core: 'mild', nose: 'ball' };
     let st = 0;
     const ka = B.kitArmour(this);
-    for (const a of ka) for (const pr of a.def.prot) if (pr.at === 'torso' || pr.at === 'plate') { const r = B.stack(Object.assign({}, frag), 900, pr.layers, a.cond, 1); if (!r.through) { st = Math.max(st, pr.at === 'torso' ? 0.85 : 0.5); a.wear = (a.wear || 0) + r.absorbed * 4; } }
+    for (const a of ka) for (const pr of a.def.prot) if (pr.at === 'torso' || pr.at === 'carrier' || pr.at === 'wrap' || pr.at === 'plate') { const r = B.stack(Object.assign({}, frag), 900, pr.layers, a.cond, 1); if (!r.through) { st = Math.max(st, pr.at === 'plate' ? 0.5 : 0.85); a.wear = (a.wear || 0) + r.absorbed * 4; } }
     if (st > 0) { B.wearOut(ka); G.Audio.armorHit(); }
     // fragments: spread over the body, the legs and lower body most
     const total = d * (1 - st * 0.4);
@@ -3157,7 +3215,7 @@ const G_Me = {
   // what you're wearing, as others see it (js/rig.ts setKit)
   kitLook() {
     const k = this.kit || {}, g = (it: GItem | null) => (it ? it.gid : 0), n = (it: GItem | null) => (it && it.molle ? it.molle.items.length : 0);
-    return { helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, nv: k.helmet && k.helmet.nvg ? k.helmet.nvg.gid : 0, nd: k.helmet && k.helmet.nvg && k.helmet.nvg.dn ? 1 : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, sh: k.carrier && k.carrier.shoulder ? k.carrier.shoulder.gid : 0, gr: k.carrier && k.carrier.groin ? k.carrier.groin.gid : 0, cp: n(k.carrier), belt: g(k.belt), lg: k.belt && k.belt.legs ? k.belt.legs.gid : 0, bp: n(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
+    return { hc: k.helmet && k.helmet.col || 0, cc: k.carrier && k.carrier.col || 0, helmet: g(k.helmet), face: k.helmet && k.helmet.face ? k.helmet.face.gid : 0, nv: k.helmet && k.helmet.nvg ? k.helmet.nvg.gid : 0, nd: k.helmet && k.helmet.nvg && k.helmet.nvg.dn ? 1 : 0, carrier: g(k.carrier), plate: k.carrier && k.carrier.plate ? 1 : 0, sh: k.carrier && k.carrier.shoulder ? k.carrier.shoulder.gid : 0, gr: k.carrier && k.carrier.groin ? k.carrier.groin.gid : 0, cp: n(k.carrier), cq: G.Gear.molleLook(k.carrier), belt: g(k.belt), lg: k.belt && k.belt.legs ? k.belt.legs.gid : 0, bp: n(k.belt), bq: G.Gear.molleLook(k.belt), pack: g(k.pack), ifak: k.ifak ? 1 : 0 };
   },
   menuLook(): boolean { const pz = document.getElementById('pause'); return G.Game.phase === 'level' && !this.dead && !this.down && (G.Game.menuOpen() || !!(pz && !pz.classList.contains('hidden'))); }, // (a screen is up: others see the ATAK)
   state() {
@@ -3167,7 +3225,7 @@ const G_Me = {
       hp: Math.ceil(this.hp), mhp: this.maxHp(), ar: Math.round(this.vestCond() * 100), amx: G.Gear.piece(this, 'chest') ? 100 : 0,
       pr: this.prone ? 1 : 0, bp: this.bipodT > 0.5 ? 1 : 0, cl: this.climb ? 1 : 0, zp: this.zipRide ? 1 : 0, se: this.seat != null ? 1 : 0, dn: this.down ? 1 : 0, uc: this.out ? 1 : 0, dd: this.dead ? 1 : 0, bl: this.down ? (this.bleed == null ? -1 : Math.ceil(this.bleed)) : 0, bd: this.body ? G.Med.encode(this.body) : null,
       w: this.cur().def.code, ac: G.Ballistics.armourState(this), sk: G.Stickers.share(this.cur().stickers) || undefined, tl: this.tacFlags(this.cur()), cr: this.crouch || this.down || this.prone ? 1 : 0, ln: r2(this.lean || 0), lr: this.lowReady ? 1 : 0, ad: this.zipRide && (this.ads || this.sinceShot < 0.9) ? 1 : 0, sd: this.steadying ? 1 : 0, sw: this.stowed || this.held || this.menuLook() ? 1 : 0, mn: this.menuLook() ? 1 : 0,
-      hk: this.held ? (this.held.kind === 'flash' ? 2 : this.held.kind === 'tb' ? 3 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
+      hk: this.held ? (this.held.kind === 'flash' ? 2 : this.held.kind === 'tb' ? 3 : this.held.kind === 'sticky' ? 4 : 1) : 0, hc: this.held && this.held.cock ? 1 : 0, hs: this.held ? this.held.str : 0,
       ra: this.act && this.cur().def.manual ? r2(Math.min(1, this.act.t)) : -1, ld: G.loaded(this.cur()) > 0 ? 1 : 0, nm: this.cur().noMag ? 1 : 0, rl: this.reloading && this.reloadTotal ? r2(G.U.clamp(1 - this.reloadT / this.reloadTotal, 0, 1)) : -1, in: this.inspectT > 0 && this.inspectDur ? r2(1 - this.inspectT / this.inspectDur) : this.rChk ? r2(0.58 + (G.VMAnim.INSPECT_HOLD - 0.58) * this.rChk.k) : -1,
       mc: this.magChk ? r2(this.magChk.back > 0 ? Math.max(0, 1 - this.magChk.back) : this.magChk.k) : -1,
       act: this.action && this.action.kind ? this.action.kind[0] : 0, ap: this.action ? r2(Math.min(1, this.action.t / this.action.dur)) : 0, zt: this.action && this.action.kind === 'zip' ? this.action.target : -1, bt: this.action && this.action.kind === 'bag' ? this.action.target : -1, pl: this.action && this.action.pull ? 1 : 0, mv: r2(this.hspeed || 0),

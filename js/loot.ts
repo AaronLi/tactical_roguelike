@@ -65,9 +65,29 @@ const G_Loot = (() => {
     }
     const it = G.Gear.unpack(packed), mdef = it.k === 'mag' && G.WEAPONS[it.wid];
     if (mdef) {
+      // its own model: the magazine off the gun it's for (that magazine in it: its variant), lying on its side; the plain one stands in
+      // till the gun's model is in, and stays if it can't be had
       const { mesh, r } = G.Casings.magMesh(mdef, it), g = new T.Group();
       mesh.rotation.z = Math.PI / 2; mesh.position.y = r;
       g.add(mesh);
+      try {
+        const b = G.Gunsmith.defaultBuild(mdef.id); if (it.vid && b.mag !== undefined) b.mag = it.vid;
+        const gun = G.GunModels.world(G.Gunsmith.encode(mdef.id, b));
+        const take = () => {
+          let src: THREE.Object3D | null = gun.userData.mag || null; // (the world model's magazine, kept apart for its checks: js/viewmodel.ts)
+          if (!src) gun.traverse((o: any) => { if (!src && (o.name === 'part_mag' || (o.userData && o.userData.part === 'mag'))) src = o; });
+          if (!src) return;
+          gun.updateMatrixWorld(true);
+          const m = (src as THREE.Object3D).clone(true), hold = new T.Group(), lie = new T.Group();
+          m.traverse((o: any) => { if (o.geometry) o.geometry = o.geometry.clone(); }); // (its own: what's dropped is disposed with it, the gun's isn't)
+          (src as THREE.Object3D).matrixWorld.decompose(m.position, m.quaternion, m.scale); // (where it sits in the gun: the gun's frame)
+          hold.add(m); hold.rotation.z = Math.PI / 2; lie.add(hold); lie.updateMatrixWorld(true);
+          const bb = new T.Box3().setFromObject(lie); if (bb.isEmpty()) return;
+          hold.position.set(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
+          g.remove(mesh); mesh.geometry.dispose(); g.add(lie);
+        };
+        if (gun.userData.pending) { g.userData.gun = gun; G.GunModels.whenReady(gun, (ok) => { if (ok) take(); }); } else take();
+      } catch (e) { /* the plain one, then */ }
       return g;
     }
     const [w, h] = G.Gear.size(it), sx = Math.max(0.06, w * 0.1), sz = Math.max(0.06, h * 0.1), sy = 0.04 + 0.02 * Math.min(w, h);

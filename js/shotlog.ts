@@ -36,9 +36,23 @@ const G_ShotLog = (() => {
     const grp = new T.Group() as ShotGhost, mat = new T.MeshBasicMaterial({ color: 0x66ccff, transparent: true, opacity: 0.34, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
     const shownBody = rig.body.visible; rig.body.visible = true; // (the F9 view shows it: frame())
     rig.root.updateMatrixWorld(true);
+    // (a body's own meshes are skinned: their geometry's at rest, posed by their bones as they're drawn. Each skeleton's bones are copied as
+    // they are this moment, held there, and the ghost's skinned to those: as they stood, not as they were made)
+    const held = new Map<THREE.Skeleton, THREE.Skeleton>();
+    const frozen = (sk: THREE.Skeleton) => {
+      let f = held.get(sk);
+      if (!f) {
+        const bones = sk.bones.map((b) => { const c = new T.Bone(); c.matrixAutoUpdate = false; c.matrixWorldAutoUpdate = false; c.matrixWorld.copy(b.matrixWorld); return c; });
+        f = new T.Skeleton(bones, sk.boneInverses); held.set(sk, f);
+      }
+      return f;
+    };
     rig.root.traverseVisible((o: THREE.Object3D & Record<string, any>) => {
       if (!o.isMesh || !o.geometry || o.material.depthTest === false) return; // (their x-ray's organs, the dots of a wound track)
-      const m = new T.Mesh(o.geometry, mat); m.matrixAutoUpdate = false; m.matrix.copy(o.matrixWorld); m.renderOrder = 996; m.frustumCulled = false; grp.add(m);
+      let m: THREE.Mesh;
+      if (o.isSkinnedMesh) { const s = new T.SkinnedMesh(o.geometry, mat); s.bind(frozen(o.skeleton), o.bindMatrix); m = s; }
+      else m = new T.Mesh(o.geometry, mat);
+      m.matrixAutoUpdate = false; m.matrix.copy(o.matrixWorld); m.renderOrder = 996; m.frustumCulled = false; grp.add(m);
     });
     rig.body.visible = shownBody;
     grp.visible = false; grp.mat = mat; grp.uses = 0;

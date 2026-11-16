@@ -16,7 +16,7 @@ interface VwEnemy {
 interface VwEvidence { mesh: THREE.Object3D; wpn: string; x: number; y: number; z: number; secured?: boolean; [k: string]: any }
 // a grenade in flight (the position and velocity are all nadeStep needs)
 interface VwNadeMotion { pos: THREE.Vector3; vel: THREE.Vector3; onGround?: boolean }
-interface VwNade extends VwNadeMotion { fuse: number; own: boolean; enemy: boolean; mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>; kind: VwNadeKind }
+interface VwNade extends VwNadeMotion { fuse: number; own: boolean; enemy: boolean; mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>; kind: VwNadeKind; nid?: number; from?: string; flyT?: number; stuck?: { rig?: Rig; bone?: THREE.Object3D | null; l?: THREE.Vector3; me?: THREE.Vector3 } | null } // (nid, from: a sticky's, so where it held can be told: 'stk')
 // the animated bits of a level (js/level.ts builds them): a first aid cabinet, and the lids of the weapon case, attachments box and sticker box
 interface VwCabView { key: string | null; open: number; slots: THREE.Mesh<THREE.BufferGeometry, THREE.MeshStandardMaterial>[]; door: THREE.Object3D }
 interface VwLid { synced: boolean; open: number; lid: THREE.Object3D; g: THREE.Object3D }
@@ -30,7 +30,7 @@ type VwActKind = 'open' | 'close' | 'kick' | 'zip' | 'bag';
 // an officer's action as drawn: how far along it is (0..1), the hand that opens a door, where the hands are on someone being tied (zip), whether they pull
 interface VwAct { kind: VwActKind; t: number; hand: 'L' | 'R'; pt?: THREE.Vector3; pull?: boolean }
 // a grenade: 'frag' (a sphere), 'flash' (a grey can) or 'tb' (a thermobaric: a fatter olive can)
-type VwNadeKind = 'frag' | 'flash' | 'tb';
+type VwNadeKind = 'frag' | 'flash' | 'tb' | 'sticky'; // (sticky: holds to what it hits first: stickStep)
 interface VwAboxView extends VwLid { key: string | null; lights: THREE.Group }
 interface VwSboxView extends VwLid { name: string | null; card: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> }
 const G_Views = {
@@ -38,6 +38,7 @@ const G_Views = {
   enemies: new Map<number, VwEnemy>(),
   nades: [] as VwNade[],
   pings: [] as { x: number; z: number; t: number }[],
+  shieldDrops: [] as THREE.Object3D[], // (shields let go of, lying where they fell: dropShield)
   evidence: new Map<number, VwEvidence>(), // id -> { mesh, wpn, x, z }
   laserBeep: 0,
   // made as it goes: the shaders compiled for the level (js/game.ts), the occlusion test's scratch vector and filter, your own body when you're dead,
@@ -121,6 +122,8 @@ const G_Views = {
     this.pings = [];
     for (const v of this.evidence.values()) G.R.dynRoot.remove(v.mesh);
     this.evidence.clear();
+    for (const g of this.shieldDrops) g.removeFromParent();
+    this.shieldDrops = [];
     for (const pv of this.players.values()) { if (pv.dead) this.resetPlayerRig(pv); pv.st = null; pv.rig.root.visible = false; }
     this.clearSelfBody();
   },
@@ -163,15 +166,18 @@ const G_Views = {
         if (!(G.ENEMIES as Record<string, any>)[type]) continue;
         // the type, with this suspect's kit (weapon | vest | helmet | face | tac | what's mounted) laid over it
         const def = Object.create((G.ENEMIES as Record<string, any>)[type]);
-        if (kit) { const [wpn, vest, helmet, face, tac, ex] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; }
+        if (kit) { const [wpn, vest, helmet, face, tac, ex, , shield] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; def.shield = shield || null; }
         const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true });
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.ts powerStep)
         if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face, def.ex)); // their armour, as an officer's would look
         if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); this.tacOnGun(rig, def.tac); }
+        if (def.shield && armed && !(scode >= 1 && scode <= 3) && !(fl & 8)) rig.setShield(def.shield); // (a handheld shield, js/data.ts G.SHIELDS)
         G.R.dynRoot.add(rig.root);
         ev = { id, type, def, rig, tac: def.tac || 0, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp, alive: true, deadT: 0, lean: 0 };
         this.enemies.set(id, ev);
       }
+      // what they're called aboard her (js/server.ts titleOf: by whose ship it is and where they stand in her), as it changes
+      if (kit && typeof kit === 'string') { const t = kit.split('|')[6]; if (t && ev.def.name !== t) ev.def.name = t; }
       if (!ev.alive) continue;
       // health dropped from someone else's shot: flinch away from the nearest player
       if (hp < ev.hp && !ev.selfHit) {
@@ -186,6 +192,7 @@ const G_Views = {
       ev.str = str == null ? 1 : str / 100; // what blood loss leaves them to stand with (js/rig.ts powered body)
       // weapon in hand follows the host: dropped on surrender, drawn again by a fake surrender
       if (!armed && ev.rig.gun) { ev.rig.dropGun(); this.discardDrop(ev.rig); }
+      if (ev.rig.shield && (!armed || (scode >= 1 && scode <= 3) || (fl & 8))) this.dropShield(ev); // (given up, cowering, down: it's let go)
       else if (armed && !ev.rig.gun && ev.def.wpn) ev.rig.setGun(ev.def.wpn);
       ev.armed = armed;
       if (ev.rig.gun) ev.rig.holster(armed === 1); // 1 = holstered/slung, 2 = in hand
@@ -235,9 +242,11 @@ const G_Views = {
     }
     ev.rig.die(dir);
     this.discardDrop(ev.rig);
+    this.dropShield(ev);
     G.R.impact(new THREE.Vector3(ev.pos.x, 1.2 * ev.def.scale, ev.pos.z), null, 'blood');
   },
 
+  dropShield(ev: VwEnemy) { const g = ev.rig.dropShield(); if (g) { G.R.dynRoot.add(g); this.shieldDrops.push(g); } },
   // evidence is drawn from the host's record; the rig's own falling gun is discarded so there's one copy
   addEvidence(i: number, wpn: string, x: number, z: number, y = 0) {
     if (this.evidence.has(i)) return;
@@ -410,11 +419,12 @@ const G_Views = {
   discardDrop(rig: Rig) { if (rig.dropped) { if (rig.dropped.g.parent) rig.dropped.g.parent.remove(rig.dropped.g); rig.dropped = null; } },
   // A window breaking: the pane goes, a burst of glass falls both sides of it, and it's heard. at, dir: where
   // the round went through (optional)
-  // A pane that's taken its first round: fractured right across from where it was hit (js/damage.ts crack), still up
+  // A pane that's taken a round short of breaking: fractured right across from where it was hit (js/damage.ts crack), still up
+  // (each of the first G.Level.CRACKS rounds fractures it; the next one brings it down: js/player.ts roundPane)
   crackGlass(id: number, at: THREE.Vector3, dir?: THREE.Vector3) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
-    if (!w || w.broken || w.armor || w.cracked) return;
-    w.cracked = true; map.cracked = true;
+    if (!w || w.broken || w.armor || (w.cracked || 0) >= G.Level.CRACKS) return;
+    w.cracked = (w.cracked || 0) + 1; map.cracked = true;
     if (G.Highlights) G.Highlights.crack(id, at);
     G.Damage.crack(map.winMeshes && map.winMeshes[id] as THREE.Mesh, at);
     G.R.particles(at, 8, 0xd8eef5, 1.2, 0.8, 9, 0.7, dir ? [dir.x, 0, dir.z] : null);
@@ -604,12 +614,65 @@ const G_Views = {
     const fuze = new T.Mesh(new T.CylinderGeometry(r * 0.38, r * 0.45, h * 0.24, 8), M(0x8a8f94)); fuze.position.y = h * 0.6; body.add(fuze);
     return body;
   },
-  addNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, own: boolean, enemy: boolean, kind: VwNadeKind = 'frag') {
+  // A sticky grenade's body: a squat steel can in a tan adhesive sock, its fuze on top
+  stickyMesh(r: number, std = false) {
+    const T = THREE, M = (c: number, o: Record<string, any> = {}) => std ? new T.MeshStandardMaterial(Object.assign({ color: c, roughness: 0.9 }, o)) : new T.MeshLambertMaterial(Object.assign({ color: c }, o));
+    const body = new T.Mesh(new T.SphereGeometry(r, 12, 8), M(0x9a8558, std ? {} : { emissive: 0x220000 })); body.scale.set(1, 0.82, 1);
+    const fuze = new T.Mesh(new T.CylinderGeometry(r * 0.32, r * 0.4, r * 0.7, 8), M(0x8a8f94)); fuze.position.y = r * 0.95; body.add(fuze);
+    return body;
+  },
+  addNade(p: THREE.Vector3, v: THREE.Vector3, fuse: number, own: boolean, enemy: boolean, kind: VwNadeKind = 'frag', nid?: number, from?: string) {
     const flash = kind === 'flash';
-    const mesh = kind === 'tb' ? this.tbMesh(0.045, 0.15) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial> : new THREE.Mesh(flash ? new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10) : new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshLambertMaterial({ color: flash ? 0x7d8388 : 0x3a4a2a, emissive: 0x220000 }));
+    const mesh = kind === 'sticky' ? this.stickyMesh(0.055) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial> : kind === 'tb' ? this.tbMesh(0.045, 0.15) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial> : new THREE.Mesh(flash ? new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10) : new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshLambertMaterial({ color: flash ? 0x7d8388 : 0x3a4a2a, emissive: 0x220000 }));
     mesh.position.copy(p);
     G.R.dynRoot.add(mesh);
-    this.nades.push({ pos: new THREE.Vector3().copy(p), vel: new THREE.Vector3().copy(v), fuse, own, enemy, mesh, kind });
+    this.nades.push({ pos: new THREE.Vector3().copy(p), vel: new THREE.Vector3().copy(v), fuse: kind === 'sticky' ? G.Me.STICKY.FUSE : fuse, own, enemy, mesh, kind, nid, from, flyT: 0, stuck: null });
+  },
+  // A sticky in the air: on till it meets something, and there it holds (its fuse burning from then: the update). The thrower's screen
+  // decides what it hit, people too (whoever's nearer along the way than the wall: the nearest of their bones it holds to, as a bolt
+  // does), and tells the squad ('stk'); everyone else's copy flies against the walls alone till that word comes.
+  stickStep(n: VwNade, dt: number, map: LvMap | null) {
+    const a = n.pos.clone(), v0 = n.vel.clone(), s = G.Sim.stickFly(n, dt, map), b = s ? s.at : n.pos, seg = b.clone().sub(a), len = seg.length();
+    if (n.own && len > 1e-4) { // (a person in the way first?)
+      const d = seg.clone().divideScalar(len); let best: { rig: Rig; t: number; e?: number; pl?: string } | null = null;
+      for (const ev of this.enemies.values()) { if (!ev.alive || !ev.rig || ev.pos.distanceTo(a) > len + 2) continue; const h = G.Rig.raycast(ev.rig, a, d, len); if (h && (!best || h.t < best.t)) best = { rig: ev.rig, t: h.t, e: ev.id }; }
+      for (const [id, pv] of this.players) { if (id === G.Net.myId || pv.dead || !pv.rig || !pv.rig.root.visible || pv.pos.distanceTo(a) > len + 2) continue; const h = G.Rig.raycast(pv.rig, a, d, len); if (h && (!best || h.t < best.t)) best = { rig: pv.rig, t: h.t, pl: id }; }
+      if (best) {
+        const at = a.clone().addScaledVector(d, best.t);
+        n.pos.copy(at); n.vel.set(0, 0, 0);
+        const bn = this.nearestBone(best.rig, at);
+        if (G.Highlights) G.Highlights.stick('p' + G.Net.myId, at, n.flyT || 0);
+        if (bn) { const l = bn.o.worldToLocal(at.clone()); n.stuck = { rig: best.rig, bone: bn.o, l }; G.Net.toHost({ t: 'stk', nid: n.nid, e: best.e, pl: best.pl, b: bn.name, l: l.toArray().map((x) => Math.round(x * 1000) / 1000) }); }
+        else { n.stuck = {}; G.Net.toHost({ t: 'stk', nid: n.nid, at: at.toArray().map((x) => Math.round(x * 1000) / 1000) }); }
+        if (G.Audio.click) G.Audio.click();
+        return;
+      }
+    }
+    if (!s) return;
+    if (n.own && G.Highlights) G.Highlights.stick('p' + G.Net.myId, s.at, (n.flyT || 0) + s.t); // (the replays: where it held)
+    n.pos.copy(s.at).addScaledVector(new THREE.Vector3(...(s.n as [number, number, number])), 0.035); n.vel.set(0, 0, 0); n.stuck = {}; // (held to its face, its middle a hand's width off it)
+    n.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(...(s.n as [number, number, number])).negate()); // (its sock to the surface)
+    if (n.own) G.Net.toHost({ t: 'stk', nid: n.nid, at: n.pos.toArray().map((x) => Math.round(x * 1000) / 1000) });
+    void v0;
+  },
+  // the bone of a body nearest a point on it (the bones a bolt rides: js/ballistics.ts segs), with its name
+  nearestBone(rig: Rig, at: THREE.Vector3) {
+    const B = G.Ballistics, seen = new Set<string>(); let best: { o: THREE.Object3D; name: string } | null = null, bd = 1e9;
+    for (const s of B.segs()) { if (seen.has(s.bone)) continue; seen.add(s.bone); const o = B.boneOf(rig, s.bone); if (!o) continue; o.updateWorldMatrix(true, false); const d = o.getWorldPosition(new THREE.Vector3()).distanceTo(at); if (d < bd) { bd = d; best = { o, name: s.bone }; } }
+    return best;
+  },
+  // the thrower's word on where their sticky held (js/game.ts 'stk'): this screen's copy of it put there
+  stuckAt(m: any) {
+    const n = this.nades.find((q) => q.kind === 'sticky' && q.nid === m.nid && q.from === m.id); if (!n) return;
+    n.vel.set(0, 0, 0);
+    if (G.Highlights) G.Highlights.stick('p' + m.id, Array.isArray(m.at) ? new THREE.Vector3(m.at[0], m.at[1], m.at[2]) : n.pos.clone(), n.flyT || 0); // (the replays: where it held, as they told it)
+    if (Array.isArray(m.at)) { n.pos.set(m.at[0], m.at[1], m.at[2]); n.stuck = {}; return; }
+    if (m.pl === G.Net.myId && G.Me.pos) { // (on you: it goes where you go)
+      const at = n.pos;
+      n.stuck = { me: new THREE.Vector3(G.U.clamp(at.x - G.Me.pos.x, -0.3, 0.3), G.U.clamp(at.y - G.Me.pos.y, 0.3, 1.6), G.U.clamp(at.z - G.Me.pos.z, -0.3, 0.3)) }; return;
+    }
+    const rig = m.e != null ? this.enemies.get(m.e)?.rig : m.pl ? this.players.get(m.pl)?.rig : null, bone = rig && Array.isArray(m.l) ? G.Ballistics.boneOf(rig, m.b) : null;
+    if (rig && bone) { n.stuck = { rig, bone, l: new THREE.Vector3(m.l[0], m.l[1], m.l[2]) }; } else n.stuck = {};
   },
 
   // ---------------------------------------------------------------- wound streams
@@ -827,7 +890,7 @@ const G_Views = {
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
       ev.aimP = aimed ? aimAt : null; // (who they're on: where their light and laser go)
-      ev.rig.update(dt, { feet: ev.alive && !ev.down ? (ev.feet ||= G.Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
+      ev.rig.update(dt, { feet: ev.alive && !ev.down ? (ev.feet ||= G.Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, shieldUp: !!ev.alert && ev.alive && !ev.down && !ev.surp, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
       // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
       // pieces a draw call. The body, not the root: the root's what a shot checks for (js/player.ts), and it still hits.
@@ -878,7 +941,7 @@ const G_Views = {
       if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = G.Gunsmith.fromCode(st.w), rp = pv.pos.clone().setY(pv.pos.y + 1.3); (rdef && G.Handling.play(rdef, G.Handling.rackClip(rdef, rdef.manual ? G.Me.MANUAL_T : 0.45), { land: G.Handling.LAND.rack, vol: 0.7, pos: rp })) || G.Audio.sampleAt('rack_slide', rp, 0.7, rdef && rdef.manual ? G.Me.MANUAL_PITCH : 1); } // (their bolt / pump / lever worked: heard from where they stand)
       pv.lastRa = st.ra == null ? -1 : st.ra;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
-      const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : st.hk === 3 ? 'tb' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
+      const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : st.hk === 3 ? 'tb' : st.hk === 4 ? 'sticky' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
       pv.rig.update(dt, { feet: st.dn || st.dd ? undefined : { sole: 'boot', kit: 'heavy', careful: !!st.sd, low: !!st.lr }, pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, bipod: !!st.bp, climb: st.cl ? G.Level.ladderAt(G.Game.map, pv.pos.x, pv.pos.z) : null, zip: !!st.zp, aim: !!st.ad, alert: !st.lr && !st.sw, atak: !!st.mn, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
         hold, rack: st.ra == null ? -1 : st.ra, reload: st.rl == null ? -1 : st.rl, loaded: st.ld == null ? null : !!st.ld, nomag: !!st.nm, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
       if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
@@ -1033,6 +1096,19 @@ const G_Views = {
 
     // grenades
     for (const n of [...this.nades]) {
+      if (n.kind === 'sticky') { // (flying till it holds; then held there, or to whoever it's on, its fuse burning)
+        if (!n.stuck) { this.stickStep(n, dt, map); n.flyT = (n.flyT || 0) + dt; if (!n.stuck && n.flyT > G.Me.STICKY.MAX_FLY) n.stuck = {}; }
+        else if (n.stuck.me && G.Me.pos) n.pos.copy(G.Me.pos).add(n.stuck.me);
+        else if (n.stuck.bone && n.stuck.rig) { if (n.stuck.rig.root.parent) { n.stuck.bone.updateWorldMatrix(true, false); n.pos.copy(n.stuck.l!).applyMatrix4(n.stuck.bone.matrixWorld); } else n.stuck.bone = null; }
+        n.mesh.position.copy(n.pos);
+        if (!n.stuck) continue;
+        n.fuse -= dt;
+        n.mesh.material.emissive.setHex(Math.floor(n.fuse * 8) % 2 ? 0xff2200 : 0x220000);
+        if (n.fuse > 0) continue;
+        G.R.dynRoot.remove(n.mesh); this.nades.splice(this.nades.indexOf(n), 1);
+        if (n.own) G.Me.explode(n.pos.clone(), G.Me.blastR(map, n.pos), G.Me.BLAST.dmg, true, 'sticky');
+        continue;
+      }
       const p = n.pos, was = p.clone();
       this.nadeStep(n, dt, map);
       // rolling: turned about the axis across its travel, as far as it's rolled

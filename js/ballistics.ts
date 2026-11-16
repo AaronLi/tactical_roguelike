@@ -291,36 +291,50 @@ const G_Ballistics = (() => {
 
   // Where armour is on a body: each piece's protection is a list of { at, layers: [[material, mm], ...] }, at one of
   //   'plate' (front and back of the chest, a SAPI-sized 25 x 32 cm plate), 'side' (the flanks under the arms),
-  //   'torso' (soft armour: chest and abdomen all round, except high under the arms), 'axilla' (that gap under the arms),
+  //   'torso' (soft armour: chest and abdomen all round, except high under the arms), 'carrier' (a plate carrier's soft backer: in its bags
+  //   and cummerbund, the chest and the top of the abdomen, not the belly below them), 'wrap' (the full-wrap vest: the torso's and on down
+  //   over the top of the pelvis), 'collar' (the base of the neck), 'axilla' (that gap under the arms),
   //   'groin' (the front of the pelvis), 'groinplate' (a hard plate on the middle of that), 'pelvis' (all round it),
-  //   'shoulder' (the upper arm's top half), 'thigh' (the front of the upper thigh), 'legwrap' (the thigh all round, near
-  //   to the knee), 'shin' (the front of the shin), 'helmet' (the skull above the brim: piece.cut 'high' or 'full'),
+  //   'shoulder' (the upper arm's top half), 'thigh' (a panel down the front of the upper thigh), 'legwrap' (the thigh all round, near
+  //   to the knee), 'shin' (the front of the shin), 'helmet' (the skull above the brim: piece.cut 'high', 'mid' or 'full': as it's drawn),
   //   'face' (the face below the brim: piece.lower for a mandible guard, just the jaw).
   // covers(at, seg, q): does that kind of protection cover segment seg at its local point q?
   function covers(at: string, piece: Record<string, any>, seg: BSeg, q: BVec) {
     const id = seg.id;
-    if (at === 'plate') return id === 'chest' && Math.abs(q.x) <= 0.125 && q.y >= -0.005 && q.y <= 0.3 && Math.abs(q.z) > 0.04;
+    // Each where it's drawn on the body (models/characters/kit_armour.py, as worn: measured by casting at bodies wearing it, every 2 cm
+    // up and every 15 degrees round, the drawn piece against this). A soft vest's or a carrier's chest: up to its neckline (higher at
+    // the back), its sides only as high as its side panels or cummerbund reach (above them, out past the front bag, is the armpit's gap)
+    const chestSoft = (yCut: number, xCut: number) => id === 'chest' && q.y <= (q.z > 0 ? 0.28 : 0.24) && !(q.y > yCut && Math.abs(q.x) > (q.z > 0 ? Math.min(xCut, 0.11) : xCut)); // (the back panel's narrower round the side)
+    if (at === 'plate') return id === 'chest' && Math.abs(q.x) <= 0.125 && q.y >= -0.03 && q.y <= (q.z > 0 ? 0.3 : 0.275) && Math.abs(q.z) > 0.04;
     if (at === 'side') return id === 'chest' && Math.abs(q.x) > seg.rx(q.y) * 0.72 && q.y >= 0.06 && q.y <= 0.22;
-    if (at === 'torso') return (id === 'chest' && !(q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8)) || id === 'abdomen';
-    if (at === 'axilla') return id === 'chest' && q.y > 0.18 && Math.abs(q.x) > seg.rx(q.y) * 0.8;
-    if (at === 'groin') return id === 'pelvis' && q.z < 0;
-    if (at === 'groinplate') return id === 'pelvis' && q.z < 0 && Math.abs(q.x) <= 0.09 && q.y <= 0.04;
-    if (at === 'pelvis') return id === 'pelvis';
-    if (at === 'shoulder') return id === 'uarm' && q.y > -0.13;
-    if (at === 'thigh') return id === 'thigh' && q.y > -0.22 && q.z < 0.01;
-    if (at === 'legwrap') return id === 'thigh' && q.y > -0.36;
+    if (at === 'torso') return chestSoft(0.085, 0.135) || id === 'abdomen' || (id === 'pelvis' && q.y >= 0.065);
+    if (at === 'carrier') return chestSoft(0.075, 0.11) || (id === 'abdomen' && q.y >= 0.12); // (the bags' and the cummerbund's bottom edge)
+    if (at === 'wrap') return chestSoft(0.14, 0.135) || id === 'abdomen' || (id === 'pelvis' && q.y >= 0.02);
+    if (at === 'collar') return id === 'neck' && q.y <= 0.025; // (the heavy armour's, round the base of the neck)
+    if (at === 'axilla') return id === 'chest' && q.y > 0.12 && q.y <= 0.26 && Math.abs(q.x) > 0.11;
+    if (at === 'groin') return id === 'pelvis' && q.z < 0 && Math.abs(q.x) <= 0.09 && q.y <= 0.045; // (the flap, down the front)
+    if (at === 'groinplate') return id === 'pelvis' && q.z < 0 && Math.abs(q.x) <= 0.07 && q.y <= 0.03 && q.y >= -0.07;
+    if (at === 'pelvis') return (id === 'pelvis' && q.y >= -0.07 && q.y <= 0.045) || (id === 'thigh' && q.y > -0.035); // (a band round the hips, over the tops of the thighs)
+    if (at === 'shoulder') return id === 'uarm' && q.y <= -0.008 && q.y >= -0.119;
+    if (at === 'thigh') return id === 'thigh' && q.y >= -0.21 && q.y <= -0.032 && q.z < -0.03 && Math.abs(q.x) <= 0.06; // (a panel down the front)
+    if (at === 'legwrap') return id === 'thigh' && q.y >= -0.305 && q.y <= -0.065;
     if (at === 'shin') return id === 'shin' && q.y < -0.04 && q.y > -0.38 && q.z < 0.01;
     if (at === 'helmet') return (id === 'cranium') && q.y >= brim(piece.cut, q);
     if (at === 'face') return (id === 'jaw' || (id === 'cranium' && q.y < brim('high', q) && q.z < -0.03)) && (!piece.lower || q.y < 0.1);
     return false;
   }
-  // a helmet's lower edge round the head (head frame): over the brows at the front, high over the ears (a high cut) or
-  // down over them (full cut), the nape at the back
+  // a helmet's lower edge round the head (head frame): where the shell drawn on the head ends (js/headgear.ts CUT, as it sits on
+  // every body: measured off them, every sixteenth of the way from the front round to the back), so a round that meets the
+  // helmet you see meets the helmet. A high cut over the brows and up over the ears; a mid cut lower all round, over them; a
+  // full cut (the visor helmet's) down over them and the nape
+  const BRIM: Record<string, number[]> = {
+    high: [0.143, 0.142, 0.139, 0.136, 0.132, 0.127, 0.113, 0.145, 0.142, 0.129, 0.113, 0.11, 0.098, 0.091, 0.087, 0.087, 0.087], // (the body's own helmets, models/characters/kit_head.py: measured off every other body)
+    mid: [0.138, 0.138, 0.133, 0.129, 0.125, 0.117, 0.101, 0.119, 0.114, 0.106, 0.094, 0.091, 0.085, 0.081, 0.079, 0.077, 0.078],
+    full: [0.12, 0.116, 0.112, 0.108, 0.104, 0.1, 0.096, 0.092, 0.088, 0.085, 0.082, 0.078, 0.074, 0.07, 0.066, 0.064, 0.062],
+  };
   function brim(cut: string, q: BVec) {
-    const a = Math.atan2(q.x, -(q.z)); // 0 front, ±π back
-    const [f, s, b] = cut === 'full' ? [0.16, 0.115, 0.07] : [0.162, 0.15, 0.095];
-    const k = Math.abs(a) / Math.PI; // 0 front .. 1 back
-    return k < 0.5 ? f + (s - f) * (k / 0.5) : s + (b - s) * ((k - 0.5) / 0.5);
+    const t = BRIM[cut] || BRIM.mid, k = Math.abs(Math.atan2(q.x, -(q.z))) / Math.PI * 16, i = Math.min(15, Math.floor(k)); // (0 front .. 16 back)
+    return t[i] + (t[i + 1] - t[i]) * (k - i);
   }
 
   // ---------------------------------------------------------------- the body, as the rigs are built
@@ -363,7 +377,24 @@ const G_Ballistics = (() => {
     chest: [[['skin', 2], ['fat', 8], ['muscle', 16], ['rib', 12]], 'viscera'], abdomen: [[['skin', 2], ['fat', 18], ['muscle', 12]], 'viscera'], pelvis: [[['skin', 2], ['fat', 18], ['muscle', 25]], 'viscera'],
     uarm: [[['skin', 2], ['fat', 4]], 'muscle'], farm: [[['skin', 2], ['fat', 3]], 'muscle'], thigh: [[['skin', 2], ['fat', 8]], 'muscle'], shin: [[['skin', 2], ['fat', 3]], 'muscle'],
   };
-  function segs() {
+  // The segments of a body (js/humans.ts): the trunk's reshaped to that body's own measure (rig.fit.shape: a segment's half-width
+  // and the depth it has for its width, and how much wider and deeper the organs in it sit and are), so a broad chest is broad
+  // and a deep one deep, in true metres. The head's and the limbs' are the same shapes, set by segFrame.
+  function segs(rig?: BRig): BSeg[] {
+    const f = rig && rig.fit;
+    if (f && f.shape) {
+      if (!rig!._segs) rig!._segs = segs().map((s) => {
+        const t = f.shape[s.id] as { rx0: number; rx1: number; kz: number; wx: number; dz: number } | undefined;
+        if (!t) return s;
+        const P = (c: number[]) => [c[0] * t.wx, c[1], c[2] * t.dz];
+        const organs = (s.organs || []).map(([id, sh]) => [id, sh[0] === 'ell' ? E_(P(sh[1]), P(sh[2])) : C_(P(sh[1]), P(sh[2]), sh[3] * Math.sqrt(t.wx * t.dz))]);
+        const n = cyl(s.id, s.bone, s.part, s.y0, s.y1, t.rx0, t.rx1, t.kz, { organs });
+        n.bb = bbox(n); for (const o of n.organs) o.push(shapeBox(o[1]));
+        n.wall = s.wall; n.fill = s.fill; n.wallT = s.wallT;
+        return n;
+      });
+      return rig!._segs;
+    }
     if ((segs as any).list) return (segs as any).list;
     const L = [];
     // the head: the cranium (skull shell 7 mm) and the jaw under it, as js/rig.ts shapes them
@@ -477,15 +508,34 @@ const G_Ballistics = (() => {
   // the crushed channel's radius, rT: the temporary cavity's, v, yawed, expanded }), and trace.frags with each fragment's
   // track ({ t: where it broke off, dir, len: how far through them, v0: its speed there, v: what it left them at (0: it stopped
   // in them), m, sp: a splinter of bone }): for showing it (js/highlights.ts, the x-ray breakdown; js/shotlog.ts, F9's record).
+  // A segment's frame on a body (js/humans.ts): the segments are the old figure's shapes, each in its bone's frame; on a body
+  // each is moved and scaled (evenly: its metres stay metres along a track) to that body's own measure (js/rig.ts fitOf seg:
+  // { k, o }), so the skull, the chest and each limb, with the organs in them, are where that body's are and as big.
+  function segFrame(rig: BRig, s: BSeg, bone: THREE.Object3D, inv: THREE.Matrix4) {
+    const f = rig.fit && rig.fit.seg[s.id];
+    inv.copy(bone.matrixWorld).invert();
+    let sc = _sv.setFromMatrixScale(bone.matrixWorld).x || 1;
+    if (f) { inv.premultiply(_sm.makeTranslation(-f.o[0], -f.o[1], -f.o[2])).premultiply(_sm.makeScale(1 / f.k, 1 / f.k, 1 / f.k)); sc *= f.k; }
+    return sc;
+  }
+  const _sv = new T.Vector3(), _sm = new T.Matrix4();
+  /** Where to hang a drawing of a segment's shapes (its organs) so they're where segFrame has them: the bone itself, or on a body a node in it set to that body's fit. */
+  function segNode(rig: BRig, s: BSeg, bone: THREE.Object3D): THREE.Object3D {
+    const f = rig.fit && rig.fit.seg[s.id]; if (!f) return bone;
+    const key = '_sn_' + s.id + (s.side || '');
+    let n = rig[key] as THREE.Object3D | undefined;
+    if (!n || n.parent !== bone) { n = new T.Group(); n.position.set(f.o[0], f.o[1], f.o[2]); n.scale.setScalar(f.k); bone.add(n); rig[key] = n; }
+    return n;
+  }
   function through(rig: BRig, o: BVec, u: BVec, v: number, p0: BRound, armour: BArmour[] | null, tMax = 3, trace: BTrace | null = null) {
-    const S = segs(), mats: BMat[] = [];
+    const S = segs(rig), mats: BMat[] = [];
     rig.root.updateMatrixWorld(true);
     // each segment's frame, the ray in it, and the stretch of the ray it can be in (its box)
     let tLo = Infinity, tHi = -Infinity;
     for (const s of S) {
       const bone = boneOf(rig, s.bone);
       if (!bone) continue;
-      const inv = new T.Matrix4().copy(bone.matrixWorld).invert(), lo = _o.copy(o).applyMatrix4(inv), ld = _ud.copy(u).transformDirection(inv), sc = new T.Vector3().setFromMatrixScale(bone.matrixWorld).x || 1;
+      const inv = new T.Matrix4(), sc = segFrame(rig, s, bone, inv), lo = _o.copy(o).applyMatrix4(inv), ld = _ud.copy(u).transformDirection(inv);
       const b = s.bb; let t0 = 0, t1 = tMax / sc, ok = true;
       for (let a = 0; a < 3; a++) {
         const oo = a === 0 ? lo.x : a === 1 ? lo.y : lo.z, dd = a === 0 ? ld.x : a === 1 ? ld.y : ld.z;
@@ -519,7 +569,8 @@ const G_Ballistics = (() => {
       // the layers that cover this point, outside in (plates, then the soft armour behind them)
       const out = [];
       for (const a of armour || []) for (const pr of a.def.prot || []) if (covers(pr.at, a.def, m.s, q)) out.push({ a, pr, L: entering ? G.Materials.built(pr) : G.Materials.built(pr).reverse() });
-      out.sort((x, y) => (x.pr.at === 'torso' ? 1 : 0) - (y.pr.at === 'torso' ? 1 : 0)); // (soft backers last)
+      const SOFT = (at: string) => (at === 'torso' || at === 'carrier' || at === 'wrap' ? 1 : 0);
+      out.sort((x, y) => SOFT(x.pr.at) - SOFT(y.pr.at)); // (soft backers last)
       if (!entering) out.reverse();
       return out;
     };
@@ -659,13 +710,13 @@ const G_Ballistics = (() => {
   // with the organs in it in the order the line reaches them. Just the shapes: no armour, no round. Returns
   // { t (metres to where it enters), path: [{ seg, part, side, t, organs: [id] }] } or null.
   function probe(rig: BRig, o: BVec, u: BVec, tMax = 3) {
-    const S = segs(), mats: BMat[] = [];
+    const S = segs(rig), mats: BMat[] = [];
     rig.root.updateMatrixWorld(true);
     let tLo = Infinity, tHi = -Infinity;
     for (const s of S) {
       const bone = boneOf(rig, s.bone);
       if (!bone) continue;
-      const inv = new T.Matrix4().copy(bone.matrixWorld).invert(), lo = _o.copy(o).applyMatrix4(inv), ld = _ud.copy(u).transformDirection(inv), sc = new T.Vector3().setFromMatrixScale(bone.matrixWorld).x || 1;
+      const inv = new T.Matrix4(), sc = segFrame(rig, s, bone, inv), lo = _o.copy(o).applyMatrix4(inv), ld = _ud.copy(u).transformDirection(inv);
       const b = s.bb; let t0 = 0, t1 = tMax / sc, ok = true;
       for (let a = 0; a < 3 && ok; a++) {
         const oo = a === 0 ? lo.x : a === 1 ? lo.y : lo.z, dd = a === 0 ? ld.x : a === 1 ? ld.y : ld.z;
@@ -798,13 +849,13 @@ const G_Ballistics = (() => {
     return o;
   }
   // a suspect's (js/data.ts G.ARMORS; a mandible or face shield, and shoulder, pelvis and leg armour (d.ex), are an officer's,
-  // js/gear.ts), its condition kept on the view (ev.vc vest, ev.hc helmet, ev.fc face, ev.xc0.. each of d.ex)
+  // js/gear.ts), its condition kept on the view (ev.vc vest, ev.hc helmet, ev.fcc face, ev.xc0.. each of d.ex)
   function suspectArmour(ev: Record<string, any>) {
     const out: BArmour[] = [], d = ev.def;
     const ARM = G.ARMORS as Record<string, any>, v = ARM[d.vest], h = ARM[d.helmet], f = d.face && G.Gear.DEFS[d.face];
     if (v && v.prot) out.push({ def: v, cond: ev.vc == null ? 1 : ev.vc, ev, key: 'vc' });
     if (h && h.prot) out.push({ def: h, cond: ev.hc == null ? 1 : ev.hc, ev, key: 'hc' });
-    if (f && f.prot) out.push({ def: f, cond: ev.fc == null ? 1 : ev.fc, ev, key: 'fc' });
+    if (f && f.prot) out.push({ def: f, cond: ev.fcc == null ? 1 : ev.fcc, ev, key: 'fcc' }); // (fcc: ev.fc is a flashbang's state, js/views.ts)
     (d.ex || []).forEach((id: string, i: number) => { const x = G.Gear.DEFS[id], key = 'xc' + i; if (x && x.prot) out.push({ def: x, cond: ev[key] == null ? 1 : ev[key], ev, key }); });
     return out;
   }
@@ -841,7 +892,7 @@ const G_Ballistics = (() => {
     if (!def) return null;
     return { p: projectile(def, am!), v: G.roundSpeed(def, am, 10) || 400 };
   }
-  const stopsRound = (r: { p: BRound; v: number }, layers: BLayer[]) => { let ok = 0; for (let i = 0; i < 5; i++) ok += layerStack(Object.assign({}, r.p), r.v, layers) ? 0 : 1; return ok >= 3; }; // (no glancing head-on)
+  const stopsRound = (r: { p: BRound; v: number }, layers: BLayer[], cosT = 1) => { let ok = 0; for (let i = 0; i < 5; i++) ok += layerStack(Object.assign({}, r.p), r.v, layers, cosT) ? 0 : 1; return ok >= 3; }; // (no glancing: the layers' own stopping)
   // how hard each threat is to stop: the thickness of steel, of aramid and of polyethylene it takes, each as a share of
   // what a .50's takes, added up (not its energy: a soft lead slug carries more than a 7.62x51 and a thin vest stops it)
   let HARD: Record<string, number> | null = null;
@@ -854,18 +905,57 @@ const G_Ballistics = (() => {
     for (const [name, r] of rs) HARD[name] = (['steel', 'aramid', 'pe'] as MatKey[]).reduce((a, mat, i) => a + need(r, mat) / top[i], 0);
     return HARD;
   }
-  // the threats a set of layers stops head-on, those it doesn't, and the hardest to stop of those it does (best)
-  function rating(layers: BLayer[]) {
+  // the threats a set of layers stops head-on (or struck at an angle: cosT, the cosine off square), those it doesn't, and the hardest
+  // to stop of those it does (best)
+  function rating(layers: BLayer[], cosT = 1) {
     const stops = [], fails = [], H = hardness();
     let best = null;
     for (const [name, cal, am, raw] of THREATS) {
       const r = refRound(cal, am, raw);
       if (!r) continue;
-      if (stopsRound(r, layers)) { stops.push(name); if (!best || H[name] > H[best]) best = name; } else fails.push(name);
+      if (stopsRound(r, layers, cosT)) { stops.push(name); if (!best || H[name] > H[best]) best = name; } else fails.push(name);
     }
     return { stops, fails, best };
   }
-  function layerStack(p: BRound, v: number, layers: BLayer[]) { for (const [mat, mm] of layers) { const r = layer(p, v, mat, mm, 1, 1); if (!r.through) return false; v = r.v; } return true; }
+  function layerStack(p: BRound, v: number, layers: BLayer[], cosT = 1) { for (const [mat, mm] of layers) { const r = layer(p, v, mat, mm, 1, cosT); if (!r.through) return false; v = r.v; } return true; }
+  // The fastest a grenade's fragment (a ragged 0.3 g steel chip: js/player.ts takeDamage) can be going and still be stopped, new: m/s
+  const FRAG = { m: 0.0003, d: 0.004, len: 0.004, core: 'mild', nose: 'ball' } as unknown as BRound;
+  function fragLimit(layers: BLayer[]) {
+    const stops = (v: number) => { let ok = 0; for (let i = 0; i < 3; i++) ok += layerStack(Object.assign({}, FRAG), v, layers) ? 0 : 1; return ok >= 2; };
+    let lo = 0, hi = 2400; if (stops(hi)) return hi;
+    while (hi - lo > 20) { const m = (lo + hi) / 2; if (stops(m)) lo = m; else hi = m; }
+    return Math.round(lo / 10) * 10;
+  }
+  // What a piece of armour covers, and how well (a card's, a tooltip's): each place its protection is (WHERE), the hardest round it
+  // stops there head-on and at 45 degrees (a layer's thicker along a slanting path: t / cos), and the fastest fragment it stops. A
+  // carrier with a plate in it: the plate's too (it's what's over the chest). Kept, a piece and its plate.
+  const WHERE: Record<string, string> = { plate: 'Chest, front and back (plate)', side: 'Sides, under the arms', torso: 'Chest and stomach, all round', carrier: 'Chest and upper stomach', wrap: 'Chest, stomach and top of the hips', collar: 'Base of the neck',
+    axilla: 'Armpits', groin: 'Front of the pelvis', groinplate: 'Middle of the groin (plate)', pelvis: 'Hips, all round', shoulder: 'Upper arms', thigh: 'Front of the thighs', legwrap: 'Thighs, all round', shin: 'Front of the shins', helmet: 'Top of the head', face: 'Face' };
+  const covCache = new Map<string, { where: string; best: string | null; more45: string[]; frag: number }[]>();
+  function coverage(d: Record<string, any>, plate?: Record<string, any> | null) {
+    const key = d.id + '|' + (plate ? plate.id : '');
+    let rows = covCache.get(key);
+    if (rows) return rows;
+    const prot = [...(plate && plate.prot ? plate.prot : []), ...(d.prot || [])];
+    rows = prot.map((pr: { at: string; layers: BLayer[] }) => {
+      const where = pr.at === 'face' && d.lower ? 'Jaw' : pr.at === 'helmet' ? 'Top of the head' + (d.cut === 'high' ? ' (above the ears)' : d.cut === 'full' ? ' (down over the ears and nape)' : ' (over the ears)') : WHERE[pr.at] || pr.at;
+      const r0 = rating(pr.layers), r45 = rating(pr.layers, Math.SQRT1_2);
+      return { where, best: r0.best, more45: r45.stops.filter((n) => !r0.stops.includes(n)), frag: fragLimit(pr.layers) }; // (more45: what it stops too, hit at 45 degrees)
+    });
+    covCache.set(key, rows);
+    return rows;
+  }
+  const fragWord = (v: number) => v >= 1200 ? `stops grenade fragments, even close in (to ${v} m/s)` : v >= 700 ? `stops grenade fragments but at point blank (to ${v} m/s)` : v >= 300 ? `stops spent fragments only (to ${v} m/s)` : 'not fragments';
+  function coverageText(d: Record<string, any>, plate?: Record<string, any> | null) {
+    const rows = coverage(d, plate);
+    return rows.length ? rows.map((r) => `${r.where}: stops ${r.best || 'nothing'} head-on${r.more45.length ? ', and ' + r.more45.join(', ') + ' at 45°' : ''}; ${fragWord(r.frag)}`).join('\n') : '';
+  }
+  function coverageHTML(d: Record<string, any>, plate?: Record<string, any> | null) {
+    const rows = coverage(d, plate), E = G.U.esc;
+    if (!rows.length) return '';
+    return `<table class="cov"><thead><tr><th>Covers</th><th>Bullets head-on</th><th>Also at 45°</th><th>Fragments</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${E(r.where)}</td><td>${E(r.best || 'nothing')}</td><td>${E(r.more45.join(', ') || '—')}</td><td class="${r.frag >= 1200 ? 'ok' : r.frag >= 700 ? 'mid' : 'no'}">${r.frag >= 300 ? 'to ' + r.frag + ' m/s' : 'no'}</td></tr>`).join('')}</tbody></table>
+      <p class="cov-note">The hardest round it stops, new; and what it stops besides when hit at 45°. Hit at an angle, a layer is thicker along the path (×1.4 at 45°), and a hard plate can turn a round past about 40°. Grenade fragments leave at about 1,500 m/s and slow fast: half that a few metres out.</p>`;
+  }
 
   // ---------------------------------------------------------------- for the shop and the gunsmith
   // a gun's round's energy (J, all its pellets) d metres out, with this load (ball by default)
@@ -893,13 +983,13 @@ const G_Ballistics = (() => {
   function mainLayers(d: Record<string, any>, plate?: Record<string, any> | null) {
     const pick = (at: string) => (d.prot || []).find((p: { at: string }) => p.at === at);
     if (plate && plate.prot) return plate.prot[0].layers;
-    const pr = pick('plate') || pick('helmet') || pick('face') || pick('torso') || (d.prot || [])[0];
+    const pr = pick('plate') || pick('helmet') || pick('face') || pick('torso') || pick('wrap') || pick('carrier') || (d.prot || [])[0];
     return pr ? pr.layers : null;
   }
-  const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
+  const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', carrier: 'chest and upper stomach', wrap: 'chest, stomach and hips', collar: 'neck', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
   const layersText = (L: BLayer[]) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS };
+  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS, coverage, coverageText, coverageHTML, fragLimit };
 })();
 G.Ballistics = G_Ballistics;
 

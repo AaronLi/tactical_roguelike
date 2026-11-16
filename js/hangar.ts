@@ -218,24 +218,45 @@ const G_Hangar = (() => {
   // set down where it hung. A plate isn't part of a carrier's model: it's drawn here, to stand beside it.
   const PLATE_COL: Record<string, number> = { 'p.soft': 0x5a6a78, 'p.steel': 0x3d4044, 'p.pe': 0xcfd2d6, 'p.ceramic': 0xb8a888, 'p.ceramic2': 0xd6cdb4 };
   function plateMesh(id: string, k = 1) {
-    const g = new T.Group(), c = PLATE_COL[id] || 0x4a4f55;
-    box(g, -0.14 * k, 0, -0.012 * k, 0.14 * k, 0.36 * k, 0.012 * k, M(c, { roughness: 0.5, metalness: 0.4 }));
-    box(g, -0.115 * k, 0.02 * k, 0.012 * k, 0.115 * k, 0.34 * k, 0.017 * k, M(c, { roughness: 0.9 })); // (its face: a raised panel)
+    // (the shared gear's plate: models/characters/build_gear.py, a SAPI cut, curved, its strike face raised; loaded with the bodies)
+    const g = new T.Group(), c = PLATE_COL[id] || 0x4a4f55, put = () => {
+      const s = G.Humans.gear('plate'); if (!s) return;
+      const p = s.clone(true); p.scale.setScalar(k);
+      p.traverse((o: any) => { if (o.isMesh) o.material = /plateface/.test(o.material.name || '') ? M(c, { roughness: 0.9 }) : M(c, { roughness: 0.5, metalness: 0.4 }); });
+      g.add(p);
+    };
+    if (G.Humans.gear('plate')) put(); else G.Humans.ensure('m01').then(put);
     return g;
   }
   const SHOW: Record<string, string[]> = { carrier: ['carrier'], helmet: ['helmet', 'face'], face: ['face'], shoulder: ['shoulder'], groin: ['groin'], legs: ['legs'], belt: ['belt'], pack: ['pack'] }, SCALE: Record<string, number> = { carrier: 1.45, helmet: 1.9, face: 2.1, shoulder: 1.5, groin: 2, legs: 1.1, belt: 1.7, pack: 1.5 };
+  // A mannequin to build a piece on, and f once its body's in (the pieces are its own: js/rig.ts setKit draws nothing before)
+  const MANNEQUIN = (top: number, pants: number) => G.Rig.create({ style: 'tactical', bare: true, mannequin: true, look: { top: 'tshirt', topC: top, pants: 'jeans', pantsC: pants, eyes: 'none', gloves: 'none' }, seed: 5 });
+  const onBody = (rig: any, f: () => void) => { if (rig.hKit) f(); else G.Humans.ensure(rig.human).then(() => { if (rig.hKit) f(); }); };
+  // a piece as it is on the body, standing on its own: a skinned piece's vertices where its bones have them now, a plain mesh
+  // (in world space, as m was)
+  function frozen(m: THREE.Mesh, mat?: THREE.Material) {
+    m.updateWorldMatrix(true, false);
+    let geo = (m as any).isSkinnedMesh ? m.geometry : m.geometry.clone();
+    if ((m as any).isSkinnedMesh) {
+      const sm = m as THREE.SkinnedMesh; sm.skeleton.update();
+      geo = new T.BufferGeometry(); const src = sm.geometry.getAttribute('position'), out = new Float32Array(src.count * 3), v = new T.Vector3();
+      for (let i = 0; i < src.count; i++) { v.fromBufferAttribute(src, i); sm.applyBoneTransform(i, v); out.set([v.x, v.y, v.z], i * 3); }
+      geo.setAttribute('position', new T.BufferAttribute(out, 3)); if (sm.geometry.index) geo.setIndex(sm.geometry.index); geo.computeVertexNormals();
+    }
+    const c = new T.Mesh(geo, mat || m.material); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); return c;
+  }
   function showPiece(id: string) {
     const d = gearOf(id), O = (G.Shop.offers || {}) as ShopOffers, np = (d.pouches || []).length, root = new T.Group();
     if (d.kind === 'plate') { const p = plateMesh(id, 2.3); p.position.y = STAND.top + 0.14; p.rotation.x = -0.14; root.add(p); return { root, spin: null }; }
+    const pivot = new T.Group(); pivot.scale.setScalar(SCALE[d.kind] || 1.5); pivot.position.y = STAND.top + 0.12; pivot.rotation.y = Math.PI; // (worn, its front's -z: turned to face the aisle)
+    root.add(pivot);
     const kit = d.kind === 'carrier' ? { carrier: id, plate: 0, cp: np } : d.kind === 'helmet' ? { helmet: id, face: O.faces && O.faces[id] || 0 }
       : d.kind === 'face' ? { helmet: 'h.fast', face: id } : d.kind === 'shoulder' ? { sh: id } : d.kind === 'groin' ? { gr: id } : d.kind === 'legs' ? { lg: id } : d.kind === 'belt' ? { belt: id, bp: np } : { pack: id };
-    const rig = G.Rig.create({ style: 'tactical', bare: true, mannequin: true, look: { top: 'tshirt', topC: 0xb4bac0, pants: 'jeans', pantsC: 0x9aa1a8, eyes: 'none', gloves: 'none' }, seed: 5 });
+    const rig = MANNEQUIN(0xb4bac0, 0x9aa1a8);
+    onBody(rig, () => {
     rig.setKit(kit); rig.root.updateMatrixWorld(true);
     const g = new T.Group();
-    for (const m of rig.kitParts) {
-      if (!SHOW[d.kind].includes(m.userData.part)) continue;
-      const c = new T.Mesh((m as THREE.Mesh).geometry, (m as THREE.Mesh).material); m.updateWorldMatrix(true, false); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); g.add(c);
-    }
+    for (const m of rig.kitParts) if (SHOW[d.kind].includes(m.userData.part) && (m as THREE.Mesh).isMesh) g.add(frozen(m as THREE.Mesh));
     // a plate that comes with a carrier stands beside it, in the same turning group (so they turn together)
     const pl = d.kind === 'carrier' && O.plates && O.plates[id];
     if (pl) {
@@ -246,8 +267,8 @@ const G_Hangar = (() => {
     }
     const bb = new T.Box3().setFromObject(g), ctr = bb.getCenter(new T.Vector3());
     g.position.set(-ctr.x, -bb.min.y, -ctr.z);
-    const pivot = new T.Group(); pivot.add(g); pivot.scale.setScalar(SCALE[d.kind] || 1.5); pivot.position.y = STAND.top + 0.12; pivot.rotation.y = Math.PI; // (worn, its front's -z: turned to face the aisle)
-    root.add(pivot);
+    pivot.add(g); rig.dispose(); // (the mannequin, done with: what was lifted off it its own geometry)
+    });
     return { root, spin: pivot };
   }
   // A gunsmith's part on show, on its own: built on a gun it fits (in a slot it takes there), all but the part left
@@ -856,20 +877,22 @@ const G_Hangar = (() => {
   // A set of night vision on show: on a mannequin's head (matte black) in a high-cut helmet, flipped down, as js/rig.ts
   // setKit makes it on a body (that body thrown away, the head and what's on it lifted out)
   function nvPiece(id: string) {
-    const root = new T.Group(), rig = G.Rig.create({ style: 'tactical', bare: true, mannequin: true, look: { top: 'tshirt', topC: 0x202326, pants: 'jeans', pantsC: 0x202326, eyes: 'none', gloves: 'none' }, seed: 5 });
+    const root = new T.Group(), rig = MANNEQUIN(0x202326, 0x202326), pivot = new T.Group();
+    pivot.scale.setScalar(1.75); pivot.position.y = NJ.top + 0.1; pivot.rotation.y = Math.PI; root.add(pivot);
+    onBody(rig, () => {
     rig.setKit({ helmet: 'h.fast', nv: id, nd: 1 }); rig.root.updateMatrixWorld(true);
     const g = new T.Group(), keep = ['helmet', 'nvg'];
     for (const m of rig.kitParts) {
       if (!keep.includes(m.userData.part)) continue;
-      const c = m.clone(true); m.updateWorldMatrix(true, false); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); g.add(c);
+      m.traverse((o: any) => { if (o.isMesh) g.add(frozen(o)); }); // (the night vision's a group of tubes)
     }
-    const head = new T.Mesh(new T.SphereGeometry(0.1, 18, 12), M(0x1a1c1f, { roughness: 0.85 })); head.scale.set(0.92, 1.18, 1.02);
-    rig.head.updateWorldMatrix(true, false); head.position.set(0, 0.12, 0).applyMatrix4(rig.head.matrixWorld); g.add(head);
-    const neck = new T.Mesh(new T.CylinderGeometry(0.05, 0.06, 0.12, 12), M(0x1a1c1f, { roughness: 0.85 })); neck.position.set(0, 0.01, 0.01).applyMatrix4(rig.head.matrixWorld); g.add(neck);
+    // the mannequin's own head under it (matte black), down to the collar
+    const black = M(0x1a1c1f, { roughness: 0.85 });
+    rig.head.traverse((o: any) => { if (o.isSkinnedMesh && o !== rig.hairMesh && o.visible) g.add(frozen(o, black)); });
     const bb = new T.Box3().setFromObject(g), ctr = bb.getCenter(new T.Vector3());
     g.position.set(-ctr.x, -bb.min.y, -ctr.z);
-    const pivot = new T.Group(); pivot.add(g); pivot.scale.setScalar(1.75); pivot.position.y = NJ.top + 0.1; pivot.rotation.y = Math.PI;
-    root.add(pivot);
+    pivot.add(g); rig.dispose(); // (the mannequin, done with: what was lifted off it its own geometry)
+    });
     return { root, spin: pivot };
   }
   // its card: the name, the price, what it is, and that the helmet's not in it (or why it's not on sale)
@@ -1093,7 +1116,7 @@ const G_Hangar = (() => {
     // the gear and magazines Vex lists in his stock, that don't have a place on a shelf, are at his till
   }
 
-  // the vending machine's contents: field supplies (medical items, flashbangs, frags and thermobarics)
+  // the vending machine's contents: field supplies (medical items, flashbangs, frags, sticky grenades and thermobarics)
   function vendList(_id: string) {
     const Sh = G.Shop, Gr = G.Gear, out = [], sv = Sh.services();
     for (const s of sv) {
@@ -1101,6 +1124,7 @@ const G_Hangar = (() => {
       else if (s.id === 'flash') out.push({ k: 'svc', key: s.id, item: Gr.flashItem(), name: s.name, price: s.price, sold: false });
       else if (s.id === 'nade') out.push({ k: 'svc', key: s.id, item: Gr.fragItem(), name: s.name, price: s.price, sold: false });
       else if (s.id === 'tb') out.push({ k: 'svc', key: s.id, item: Gr.tbItem(), name: s.name, price: s.price, sold: false });
+      else if (s.id === 'sticky') out.push({ k: 'svc', key: s.id, item: Gr.stickyItem(), name: s.name, price: s.price, sold: false });
     }
     return out;
   }

@@ -114,7 +114,7 @@ const G_WEAPON_LIST: WeaponDef[] = [
   // ----- PRIMARY: more SMGs
   W({ id: 'thompson', slot: 'p', cls: 'SMG', tier: 2, price: 1600, name: 'Thompson M1928', rpm: 700, mag: 50, reserve: 200, reload: 3.0, spread: 3.0, ads: 0.05, range: 18, falloff: 0.5, speed: 1.0, desc: 'Drum-fed .45. Chicago typewriter.' }),
   W({ id: 'ppsh', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'PPSh-41', rpm: 1000, mag: 71, reserve: 213, reload: 3.2, spread: 3.4, ads: 0.06667, range: 18, falloff: 0.5, speed: 1.0, desc: '71-round drum. Quantity has a quality all its own.' }),
-  W({ id: 'mp5sd', slot: 'p', cls: 'SMG', tier: 2, price: 1700, name: 'MP5SD', rpm: 750, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.02917, range: 18, falloff: 0.5, speed: 1.05, integral: true, desc: 'Integrally suppressed 9mm. Enemies barely hear it.' }),
+  W({ id: 'mp5sd', slot: 'p', cls: 'SMG', tier: 2, price: 1700, name: 'MP5SD', rpm: 750, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.02917, range: 18, falloff: 0.5, speed: 1.05, integral: true, am: 'subsonic', desc: 'Integrally suppressed 9mm. Enemies barely hear it.' }), // (am: what it comes loaded with: G.loadFor)
   // ----- PRIMARY: more shotguns
   W({ id: 'ksg', manual: true, slot: 'p', cls: 'SG', tier: 2, price: 1900, name: 'KSG', pellets: 8, rpm: 75, mode: 'semi', mag: 14, reserve: 42, reload: 0.45, shell: true, choke: 0.75, spread: 4.5, ads: 0.04167, range: 16, falloff: 0.25, speed: 0.98, desc: 'Bullpup pump with twin tubes. Fourteen shells before you reload.' }),
   W({ id: 'slug', slot: 'p', cls: 'SG', tier: 2, price: 1500, name: 'Slug Gun', pellets: 1, rpm: 220, mode: 'semi', mag: 7, reserve: 42, reload: 0.5, shell: true, spread: 2.2, ads: 0.02083, range: 30, falloff: 0.45, speed: 0.98, pen: 1, desc: 'Semi-auto 12-gauge loaded with solid slugs. A shotgun that reaches.' }),
@@ -480,7 +480,7 @@ G.SUPPRESSOR = G_SUPPRESSOR;
 // Body armour and helmets that suspects wear (the squad's kit, carriers, plates, helmets and belts, is in
 // js/gear.ts, and works the same way). Armour is material, so thick, where it is on the body (js/ballistics.ts):
 // prot is a list of { at, layers: [[material, mm], ...] }, at 'plate' (front and back of the chest), 'side', 'torso'
-// (soft armour, chest and stomach), 'groin', 'shoulder', 'thigh', 'helmet' (above its brim: cut 'high' or 'full'),
+// (soft armour, chest and stomach), 'groin', 'shoulder', 'thigh', 'helmet' (above its brim: cut 'high', 'mid' or 'full', as js/headgear.ts draws it),
 // 'face' (the rest of them: js/ballistics.ts covers). Whether a round gets through is worked out from the round and the layers; armour wears by the energy it
 // soaks up (dur: how much it takes), and a worn layer is thinner.
 const G_ARMOR_LIST: ArmorDef[] = [
@@ -489,21 +489,35 @@ const G_ARMOR_LIST: ArmorDef[] = [
     desc: 'Thin Kevlar panels. Stops 9 mm, .45 and buckshot, not a magnum, and it soon wears through.' },
   { id: 'soft', kind: 'vest', name: 'Soft Vest (IIIA)', tier: 1, prot: [{ at: 'torso', layers: [['aramid', 8]] }], dur: 6, speed: 1, price: 500,
     desc: 'Kevlar panels, chest and stomach. Stops handgun rounds and buckshot; rifle rounds go straight through.' },
-  { id: 'steel', kind: 'vest', name: 'Steel Plate Carrier (III)', tier: 2, prot: [{ at: 'plate', layers: [['steel', 6.35]] }, { at: 'torso', layers: [['aramid', 6]] }], dur: 6, speed: 0.95, price: 1300,
+  { id: 'steel', kind: 'vest', name: 'Steel Plate Carrier (III)', tier: 2, prot: [{ at: 'plate', layers: [['steel', 6.35]] }, { at: 'carrier', layers: [['aramid', 6]] }], dur: 6, speed: 0.95, price: 1300,
     desc: 'Steel plates over the heart and lungs, soft armour below. Stops most rifle rounds to the chest. Heavy.' },
-  { id: 'ceramic', kind: 'vest', name: 'Ceramic Plate Carrier (IV)', tier: 3, prot: [{ at: 'plate', layers: [['ceramic', 9], ['pe', 6]] }, { at: 'torso', layers: [['aramid', 6]] }], dur: 5, speed: 0.97, price: 2200,
+  { id: 'ceramic', kind: 'vest', name: 'Ceramic Plate Carrier (IV)', tier: 3, prot: [{ at: 'plate', layers: [['ceramic', 9], ['pe', 6]] }, { at: 'carrier', layers: [['aramid', 6]] }], dur: 5, speed: 0.97, price: 2200,
     desc: 'Ceramic plates: lighter, and they stop even armour-piercing rounds, but they crack as they do.' },
   { id: 'assault', kind: 'vest', name: 'Assault Armour', tier: 4, prot: [{ at: 'plate', layers: [['ceramic', 9], ['pe', 6]] }, { at: 'side', layers: [['steel', 5]] }, { at: 'torso', layers: [['aramid', 8]] }, { at: 'groin', layers: [['aramid', 8]] }, { at: 'shoulder', layers: [['aramid', 6]] }, { at: 'thigh', layers: [['aramid', 6]] }], dur: 8, speed: 0.88, price: 3200,
     desc: 'Plates front, back and sides, a groin plate, shoulder and thigh protection. Slow.' },
   { id: 'nohelm', kind: 'helmet', name: 'No Helmet', tier: 0, prot: [], dur: 0, speed: 1, price: 0, desc: '' },
-  { id: 'ach', kind: 'helmet', name: 'Ballistic Helmet (IIIA)', tier: 1, cut: 'full', prot: [{ at: 'helmet', layers: [['aramid', 8]] }], dur: 3, speed: 1, price: 600,
+  { id: 'ach', kind: 'helmet', name: 'Ballistic Helmet (IIIA)', tier: 1, cut: 'mid', prot: [{ at: 'helmet', layers: [['aramid', 8]] }], dur: 3, speed: 1, price: 600,
     desc: 'Stops handgun rounds to the top of the head. Not to your face.' },
-  { id: 'riflehelm', kind: 'helmet', name: 'Rifle-rated Helmet', tier: 3, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }], dur: 3, speed: 0.99, price: 1700,
+  { id: 'riflehelm', kind: 'helmet', name: 'Rifle-rated Helmet', tier: 3, cut: 'mid', prot: [{ at: 'helmet', layers: [['pe', 18]] }], dur: 3, speed: 0.99, price: 1700,
     desc: 'Turns some rifle rounds too. Still not your face.' },
-  { id: 'visor', kind: 'helmet', name: 'Helmet with Ballistic Visor', tier: 4, cut: 'high', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], dur: 4, speed: 0.97, price: 2800,
+  { id: 'visor', kind: 'helmet', name: 'Helmet with Ballistic Visor', tier: 4, cut: 'full', prot: [{ at: 'helmet', layers: [['pe', 18]] }, { at: 'face', layers: [['pc', 10]] }], dur: 4, speed: 0.97, price: 2800,
     desc: 'Rifle-rated, with a visor that stops handgun rounds to the face.' },
 ];
 G.ARMOR_LIST = G_ARMOR_LIST;
+// Handheld ballistic shields (js/rig.ts setShield, js/player.ts shieldHit): carried on the left arm by a suspect fighting one-handed with a
+// pistol in the right. Rated as G.ARMORS are, by their layers (js/ballistics.ts rating): IIIA stops handguns, III rifle ball, IV armour-piercing
+// rifle rounds. The higher the rating the heavier the stuff, so the smaller the shield a man can still carry: w, h its face in metres, th its
+// thickness; port: a viewport (its size, how far its middle is below the shield's top, and its glazing's layers); kg, and speed: how it
+// slows the one carrying it.
+interface ShieldDef { id: string; name: string; nij: string; w: number; h: number; th: number; kg: number; speed: number; layers: [MatKey, number][]; port: { w: number; h: number; down: number; layers: [MatKey, number][] } | null }
+const G_SHIELD_LIST: ShieldDef[] = [
+  { id: 'sh.3a', name: 'Ballistic Shield (IIIA)', nij: 'IIIA', w: 0.56, h: 0.92, th: 0.014, kg: 7.5, speed: 0.92, layers: [['pe', 10]], port: { w: 0.24, h: 0.09, down: 0.17, layers: [['pc', 12]] } },
+  { id: 'sh.3', name: 'Ballistic Shield (III)', nij: 'III', w: 0.5, h: 0.76, th: 0.024, kg: 10, speed: 0.88, layers: [['pe', 20]], port: { w: 0.2, h: 0.07, down: 0.14, layers: [['bpglass', 40]] } },
+  { id: 'sh.4', name: 'Ballistic Shield (IV)', nij: 'IV', w: 0.44, h: 0.62, th: 0.024, kg: 12, speed: 0.84, layers: [['ceramic', 9], ['pe', 8]], port: null },
+];
+const G_SHIELDS: Record<string, ShieldDef> = {};
+for (const d of G_SHIELD_LIST) G_SHIELDS[d.id] = d;
+G.SHIELDS = G_SHIELDS;
 const G_ARMORS: Record<string, ArmorDef> = {};
 G.ARMORS = G_ARMORS;
 G.ARMOR_LIST.forEach((a) => (G.ARMORS[a.id] = a));
@@ -853,6 +867,9 @@ const G_boreTip = (w: { def: Record<string, any>; clicks?: number }) => { const 
 G.boreTip = G_boreTip;
 const G_ballFor = (cal: string): string => G.ammoTypes(cal)[0];
 G.ballFor = G_ballFor;
+// What a gun comes loaded with, and its magazines filled with: its own load if it has one (am: the MP5SD's subsonic), otherwise its caliber's ball
+const G_loadFor = (def: Record<string, any>, cal = G.calOf(def as WeaponDef)): string => (def.am && G.ammoTypes(cal).includes(def.am) ? def.am : G.ballFor(cal));
+G.loadFor = G_loadFor;
 // how often each type turns up loaded in a found gun (relative): ball and buckshot mostly, AP and flechette rarely
 const G_AMMO_RARITY: Record<string, number> = { ball: 10, hp: 3, tracer: 3, subsonic: 2, ap: 1, buck: 10, slug: 4, birdshot: 3, flechette: 1, sabot: 1, he: 1, broadhead: 3, mechanical: 2, bodkin: 1, railslug: 1 };
 for (const id of Object.keys(G.AMMO)) if (G.AMMO[id].plus) G_AMMO_RARITY[id] = Math.max(0.3, (G_AMMO_RARITY[G.AMMO[id].base!] || 1) * 0.2); // (+P: a fifth as often as its base load)
@@ -930,4 +947,4 @@ const G_ENEMY_GEAR = {
 };
 G.ENEMY_GEAR = G_ENEMY_GEAR;
 
-interface GameModules { PLUSP: typeof G_PLUSP; baseAm: typeof G_baseAm; plusOf: typeof G_plusOf; TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; AKIMBO_OFF: typeof G_AKIMBO_OFF; OFF_GUNS: typeof G_OFF_GUNS; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; roundOf: typeof G_roundOf; perOf: typeof G_perOf; cartOf: typeof G_cartOf; calsOf: typeof G_calsOf; asCal: typeof G_asCal; roundSpec: typeof G_roundSpec; capOf: typeof G_capOf; ammoTypes: typeof G_ammoTypes; loadOf: typeof G_loadOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; barrelMm: typeof G_barrelMm; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fblock: typeof G_fblock; volleyVol: typeof G_volleyVol; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }
+interface GameModules { PLUSP: typeof G_PLUSP; baseAm: typeof G_baseAm; plusOf: typeof G_plusOf; TIER_NAMES: typeof G_TIER_NAMES; TIER_COLORS: typeof G_TIER_COLORS; CLASS_SND: typeof G_CLASS_SND; WEAPON_LIST: WeaponDef[]; WEAPONS: typeof G_WEAPONS; EXPLOSIVES_OFF: typeof G_EXPLOSIVES_OFF; AKIMBO_OFF: typeof G_AKIMBO_OFF; OFF_GUNS: typeof G_OFF_GUNS; obtainable: typeof G_obtainable; AUTO_ONLY: typeof G_AUTO_ONLY; FIRE_MODES: typeof G_FIRE_MODES; MODE_NAME: typeof G_MODE_NAME; MODE_INFO: typeof G_MODE_INFO; barrelsOf: typeof G_barrelsOf; roundOf: typeof G_roundOf; perOf: typeof G_perOf; cartOf: typeof G_cartOf; calsOf: typeof G_calsOf; asCal: typeof G_asCal; roundSpec: typeof G_roundSpec; capOf: typeof G_capOf; ammoTypes: typeof G_ammoTypes; loadOf: typeof G_loadOf; pickBarrels: typeof G_pickBarrels; shotDef: typeof G_shotDef; shotK: typeof G_shotK; barrelMm: typeof G_barrelMm; shotSoundKey: typeof G_shotSoundKey; OPEN_BOLT: typeof G_OPEN_BOLT; chambered: typeof G_chambered; revolver: typeof G_revolver; REV: typeof G_REV; fblock: typeof G_fblock; volleyVol: typeof G_volleyVol; fullReload: typeof G_fullReload; BOLT_HOLD: typeof G_BOLT_HOLD; boltHold: typeof G_boltHold; loaded: typeof G_loaded; MAG_FAMILY: typeof G_MAG_FAMILY; BELT_FAMILY: typeof G_BELT_FAMILY; magFam: typeof G_magFam; magFits: typeof G_magFits; beltFed: typeof G_beltFed; GUN_SPECS: typeof G_GUN_SPECS; SUPPRESSOR: typeof G_SUPPRESSOR; ARMOR_LIST: ArmorDef[]; ARMORS: typeof G_ARMORS; SHIELDS: typeof G_SHIELDS; ENEMIES: typeof G_ENEMIES; THEMES: typeof G_THEMES; HANGAR_ROWS: typeof G_HANGAR_ROWS; HANGAR_THEME: typeof G_HANGAR_THEME; PLAYER_COLORS: typeof G_PLAYER_COLORS; VENDOR_QUIPS: typeof G_VENDOR_QUIPS; CALIBERS: typeof G_CALIBERS; calOf: typeof G_calOf; stdMag: typeof G_stdMag; AMMO: typeof G_AMMO; AMMO_TYPES: typeof G_AMMO_TYPES; MUZZLE_V: typeof G_MUZZLE_V; SOUND_SPEED: typeof G_SOUND_SPEED; dragOf: typeof G_dragOf; roundSpeed: typeof G_roundSpeed; CHARGE_GR: typeof G_CHARGE_GR; GUN_KG: typeof G_GUN_KG; RECOIL_K: typeof G_RECOIL_K; RECOIL: typeof G_RECOIL; aimSway: typeof G_aimSway; recoilImpulse: typeof G_recoilImpulse; physRecoil: typeof G_physRecoil; GRAVITY: typeof G_GRAVITY; zeroOf: typeof G_zeroOf; sightH: typeof G_sightH; ROUND_LIFE: typeof G_ROUND_LIFE; ballistics: typeof G_ballistics; flight: typeof G_flight; zeroSlope: typeof G_zeroSlope; CLICK: typeof G_CLICK; boreTip: typeof G_boreTip; ballFor: typeof G_ballFor; loadFor: typeof G_loadFor; AMMO_RARITY: typeof G_AMMO_RARITY; rollAmmo: typeof G_rollAmmo; ammoOk: typeof G_ammoOk; roundDef: typeof G_roundDef; gearTier: typeof G_gearTier; ENEMY_GEAR: typeof G_ENEMY_GEAR; }

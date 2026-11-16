@@ -7,14 +7,14 @@ const STATE_CODE: Partial<Record<EnemyState, number>> = { normal: 0, flee: 0, su
 type Tbl = Record<string, any>;
 interface Loose { [k: string]: any }
 // The kinds of message the host's handle() switches on (what an officer's game sends it with G.Net.toHost: the `t` field)
-type NetMsgKind = 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
+type NetMsgKind = 'stk' | 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
 // A message off the wire: its kind, and whatever else that kind carries (dynamic: checked where it's read)
 interface NetMsg { t: NetMsgKind; [k: string]: any }
 type DamageMap = Parameters<typeof G.Damage.apply>[0]; // (what js/damage.ts takes for a map)
 type FlPt = LvPt & { fl?: number }; // (a cover or wall spot, and the floor it's on)
 type CabLayout = any[][] & { left?: [string, number][] }; // (a cabinet's items, and what didn't fit)
 type MapCivSpots = LvMap & { civSpots?: { x: number; z: number; yaw: number }[] | null };
-type SvWin = LvWin & { cracked?: boolean; fy?: number }; // (a window, and whether it's fractured, and the floor's height)
+type SvWin = LvWin & { cracked?: number; fy?: number }; // (a window, and how many rounds have fractured it, and the floor's height)
 type SvRoom = LvRoom & { out?: boolean };
 type EnemyKind = 'suspect' | 'grunt' | 'rusher' | 'marksman' | 'heavy' | 'warden' | 'leader' | 'civ'; // (G.ENEMIES' keys)
 type ArmourKind = 'vest' | 'helmet' | 'face' | 'shoulder' | 'groin' | 'legs'; // (G.ENEMY_GEAR.odds' keys)
@@ -45,6 +45,7 @@ interface Enemy {
   alert: boolean; spot: number; tgt: string | null; tgtD: number; canSee: boolean; percT: number; cool: number; burstLeft: number; aiming: boolean; aimT: number;
   strafe: number; strafeT: number; idleT: number; idleYaw: number; pendingAlert: number; lostT: number; lastHit: string | null;
   cover: EnemyCover | null; inCover: boolean; peek: boolean; peekT: number; coverT: number; coverStuck: number; crouch: boolean; nadeT: number; nadeN?: number; pushing?: boolean; pushWait?: number;
+  clearOut?: { ux: number; uz: number; until: number } | null; clearT?: number; // (a civilian getting out of a shooter's way: clearLine)
   lastSeen: { x: number; y: number; z: number } | null; morale: number; broken: boolean; noise: { x: number; z: number } | null; holding: boolean; bold: boolean;
   mag: number; magMax: number; reloadT: number; bleedH: number; bleedL: number; wnd?: number[]; clotT: number; legs: number; arms: number; lung: boolean;
   drawn: boolean; drawT: number; surprisedT: number; suspicious: boolean; calmT: number; state: EnemyState; armed: boolean; shouts: number; complyCd: number;
@@ -60,6 +61,7 @@ interface Enemy {
   hitState?: EnemyState; hitUnaware?: boolean; hitYield?: boolean; hitAt?: number; shock?: number; kick?: number; headDelay?: number; engAt?: number; engTgt?: string;
   firedAt?: number; sawAt?: number; engagedAt?: number; allyT?: number; allyN?: number; proof?: boolean; seeVis?: number; blind?: boolean; onWait?: number;
   order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
+  point?: boolean; shieldBy?: number; // (point: carrying a handheld shield, giveShield; shieldBy: the shield man they've got in behind, shieldNear)
   coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
   visK?: number; noiseAt?: number; nsAt?: number; guess?: { x: number; y: number; z: number; until: number } | null; // (night: how well they see who they're on, lightK; when they last heard something; when their own search last started; where they think you are)
 }
@@ -102,9 +104,10 @@ const G_Server = {
   wipeT: 0,
   summons: 0,
   accMult: 1,
+  forceShield: false as boolean, // (?shield: a shield man or two in the level for sure, js/debugstart.ts)
   forceLeader: false, // (a debug start: ?leader, js/debugstart.ts)
   dbgSeed: null as number | null,
-  dbgNext: null as { th?: number; lvl?: number; seed?: number; leader?: boolean; stronghold?: boolean; night?: boolean } | null, // (and the rest of what it asks of the next level)
+  dbgNext: null as { th?: number; lvl?: number; seed?: number; leader?: boolean; shield?: boolean; stronghold?: boolean; night?: boolean } | null, // (and the rest of what it asks of the next level)
   bores: new Map<number, number[]>(), // each suspect's gun as the host's screen last drew it: [muzzle x, y, z, bore x, y, z] (handle 'bores', onTarget)
   dmgMult: 1,
   skins: new Map<string, any>(), // the squad's guns' sticker lists by hash (js/stickers.ts share): kept for whoever joins
@@ -216,18 +219,24 @@ const G_Server = {
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
       case 'nade': {
-        const k = m.k === 'flash' ? 'flash' : m.k === 'tb' ? 'tb' : 'frag';
-        SvNet.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k, s: [0, 1, 2].includes(m.s) ? m.s : 2 }, from);
-        if (this.phase === 'level' && Array.isArray(m.p) && Array.isArray(m.v) && m.p.length === 3 && m.v.length === 3 && [...m.p, ...m.v].every(Number.isFinite) && Number.isFinite(m.fuse)) this.liveNade(m.p, m.v, Math.min(6, m.fuse), k);
+        const k = m.k === 'flash' ? 'flash' : m.k === 'tb' ? 'tb' : m.k === 'sticky' ? 'sticky' : 'frag', nid = Number.isInteger(m.nid) ? m.nid : undefined;
+        SvNet.broadcast({ t: 'nade', id: from, p: m.p, v: m.v, fuse: m.fuse, k, s: [0, 1, 2].includes(m.s) ? m.s : 2, nid }, from);
+        if (this.phase === 'level' && Array.isArray(m.p) && Array.isArray(m.v) && m.p.length === 3 && m.v.length === 3 && [...m.p, ...m.v].every(Number.isFinite) && Number.isFinite(m.fuse)) this.liveNade(m.p, m.v, Math.min(6, m.fuse), k, nid, from);
+        break;
+      }
+      case 'stk': { // (where an officer's sticky grenade held: passed on, and the suspects' idea of it put right: dodgeTick)
+        if (!Number.isInteger(m.nid) || (m.at && !(Array.isArray(m.at) && m.at.length === 3 && m.at.every(Number.isFinite))) || (m.l && !(Array.isArray(m.l) && m.l.length === 3 && m.l.every(Number.isFinite)))) break;
+        SvNet.broadcast({ t: 'stk', id: from, nid: m.nid, at: m.at, e: Number.isInteger(m.e) ? m.e : undefined, pl: typeof m.pl === 'string' ? m.pl : undefined, b: typeof m.b === 'string' ? m.b.slice(0, 24) : undefined, l: m.l }, from);
+        if (this.phase === 'level') this.stuckNade(m.nid, from, m.at || null, Number.isInteger(m.e) ? m.e : null);
         break;
       }
       case 'flash': if (this.phase === 'level' && Array.isArray(m.p) && m.p.length === 3 && m.p.every(Number.isFinite)) this.flashbang(m.p, p && p.st ? p.st.p : null, from); break;
       // an officer's round went through these windows
       case 'glass': if (this.phase === 'level' && Array.isArray(m.ids)) this.breakGlass(m.ids, m.p); break;
-      case 'crack': { // (a first round through a pane: it's fractured, and it's heard)
+      case 'crack': { // (a round through a pane that doesn't bring it down: it's fractured (more), and it's heard)
         const w = this.phase === 'level' && this.map && this.map.windows && (this.map.windows as SvWin[])[m.id];
-        if (!w || w.broken || w.armor || w.cracked || !Array.isArray(m.p)) break;
-        w.cracked = true; this.glassCracked.push([m.id, m.p]); this.hear(w.x, w.z, 10, w.fy || 0);
+        if (!w || w.broken || w.armor || (w.cracked || 0) >= G.Level.CRACKS || !Array.isArray(m.p)) break;
+        w.cracked = (w.cracked || 0) + 1; this.glassCracked.push([m.id, m.p]); this.hear(w.x, w.z, 10, w.fy || 0);
         SvNet.broadcast({ t: 'crack', id: m.id, p: m.p }, from);
         break;
       }
@@ -237,7 +246,7 @@ const G_Server = {
         if (this.phase === 'level' && this.map) this.blastDaze(m.p, m.tb ? 'tb' : m.fr ? 'frag' : null, p && p.st ? p.st.p : null);
         // the blast takes out the windows round it
         if (this.map && this.map.windows && Array.isArray(m.p)) this.breakGlass(this.map.windows.filter((w: SvWin) => !w.broken && Math.hypot(w.x - m.p[0], w.z - m.p[2]) < (+m.r || 4) * 1.3 && Math.abs((w.fy || 0) + 1.3 - (m.p[1] || 0)) < 2.5).map((w: SvWin) => w.id), m.p);
-        SvNet.broadcast({ t: 'boom', id: from, p: m.p, r: m.r, d: m.d, fr: m.fr ? 1 : undefined, tb: m.tb ? 1 : undefined, s: m.fr || m.tb ? m.s : undefined }); // (fr, s: a frag grenade, and its burst's seed: the pocks it leaves are the same on every screen; tb: a thermobaric's, the same fireball everywhere)
+        SvNet.broadcast({ t: 'boom', id: from, p: m.p, r: m.r, d: m.d, fr: m.fr ? 1 : undefined, tb: m.tb ? 1 : undefined, sk: m.sk ? 1 : undefined, s: m.fr || m.tb ? m.s : undefined }); // (fr, s: a frag grenade, and its burst's seed: the pocks it leaves are the same on every screen; tb: a thermobaric's, the same fireball everywhere)
         break;
       case 'revive': SvNet.broadcast({ t: 'revive', tg: m.tg, by: from, hp: m.hp }); break;
       // the range's IPSC course: a new stage laid (its seed), and a run as it happens (passed on to the others)
@@ -495,6 +504,7 @@ const G_Server = {
       if (typeof d.th === 'number' && Number.isInteger(d.th) && G.THEMES[d.th]) this.theme = d.th;
       if (typeof d.lvl === 'number' && Number.isInteger(d.lvl) && d.lvl >= 1) this.level = d.lvl;
       if (d.leader) this.forceLeader = true;
+      this.forceShield = !!d.shield;
       if (n && d.stronghold) n.stronghold = true;
       if (n && d.night) n.night = true;
       if (typeof d.seed === 'number' && Number.isInteger(d.seed)) this.dbgSeed = d.seed;
@@ -561,7 +571,7 @@ const G_Server = {
       const keys = Object.keys(w.barrels.rounds), rl = keys[Math.floor(r() * keys.length)], other = keys.filter((k) => k !== rl)[0], cap = (k: string) => w.barrels.n * w.barrels.rounds[k].per;
       return { code: G.Gunsmith.defaultCode(w.id), mag: cap(rl), reserve: cap(rl), rl, am: G.rollAmmo(w.barrels.rounds[rl].cal, r), alt: other ? { rl: other, n: cap(other), am: G.rollAmmo(w.barrels.rounds[other].cal, r) } : undefined };
     }
-    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: G.rollAmmo(G.calOf(w), r) };
+    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: w.am ? G.loadFor(w) : G.rollAmmo(G.calOf(w), r) }; // (a gun with its own load comes with it: the MP5SD's subsonic)
   },
   // Something lying in the world (G.Loot), and how it's sent
   lootAdd(x: number, y: number, z: number, item: any, yaw: number, fit?: number) {
@@ -798,6 +808,12 @@ const G_Server = {
       for (const o of this.enemies.values()) { const d = Math.hypot(o.x - sp.x, o.z - sp.z); if (!o.def.civ && !o.def.boss && d > fd) { fd = d; far = o; } }
       if (far) { this.enemies.delete(far.id); const le = this.addEnemy('leader', far.x, far.z, hpMult, far.y || 0); le.drawn = true; }
     }
+    // handheld shields (js/data.ts G.SHIELDS), from level 3: a few of the suspects and grunts carry one (giveShield), more as it goes on
+    if (L >= 3 || this.forceShield) {
+      const can = [...this.enemies.values()].filter((o) => (o.type === 'suspect' || o.type === 'grunt') && !o.def.boss && !o.def.civ);
+      let n = this.forceShield ? Math.max(1, Math.min(can.length, 2)) : Math.min(can.length, 1 + Math.floor(L / 4));
+      for (const o of U.shuffle(Math.random, can)) { if (n <= 0) break; if (this.forceShield || Math.random() < 0.35) { this.giveShield(o, this.shieldFor(L)); n--; } }
+    }
     // civilians caught up in it (more at a festival: some of them hiding behind the stalls' counters; the other
     // stalls were left as they ran)
     const crowd = this.map!.theme.crowd || 1, civs = hold ? 0 : Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8 * big), TS = G.Level.TS;
@@ -873,6 +889,58 @@ const G_Server = {
     }
     return d;
   },
+  // A handheld shield (js/data.ts G.SHIELDS) for e: on the left arm, a pistol in the right (a long gun swapped for one), slowed by its
+  // weight. In a fight he kneels behind it (think), and others with no cover of their own get in behind him and shoot over it (shieldNear).
+  giveShield(e: Enemy, id: string) {
+    const sd = G.SHIELDS[id]; if (!sd || e.def.civ) return;
+    const d = e.def;
+    if (!G.WEAPONS[d.wpn] || G.WEAPONS[d.wpn].slot !== 's') {
+      const id = G.WEAPONS.g19 ? 'g19' : 'p9', w = G.WEAPONS[id], base = Object.getPrototypeOf(d);
+      d.wpn = id; d.snd = w.cls; d.pellets = w.pellets;
+      d.rof = Math.max(base.rof || 0.3, 60 / w.rpm); d.burst = [1, 2]; // (a pistol's cadence, as equip gives a semi-auto: think reads both)
+    }
+    d.shield = id; d.speed = d.speed * sd.speed; e.point = true;
+    const w = G.WEAPONS[d.wpn]; if (w && w.mag > 0) { e.magMax = w.mag; e.mag = w.mag; }
+  },
+  // which shield a level's suspects carry: the higher the level, the higher the rating (and the smaller the shield)
+  shieldFor(L: number) { const r = Math.random(); return L <= 4 ? 'sh.3a' : L <= 7 ? (r < 0.6 ? 'sh.3a' : 'sh.3') : r < 0.5 ? 'sh.3' : 'sh.4'; },
+  // e's place behind a shield man pm (k: their turn among those with him), on the line from the danger at (tx, tz) through him: the
+  // first just behind his right shoulder, the next his left, the rest further back. Pulled in to him where a wall's in the way.
+  behind(e: Enemy, pm: Enemy, tx: number, tz: number, k: number) {
+    let ux = pm.x - tx, uz = pm.z - tz; const ud = Math.hypot(ux, uz) || 1; ux /= ud; uz /= ud;
+    const back = k < 2 ? 0.75 : 1.25 + 0.5 * (k - 2), side = k === 0 ? 0.32 : k === 1 ? -0.32 : 0;
+    let x = pm.x + ux * back - uz * side, z = pm.z + uz * back + ux * side;
+    const y = (pm.y || 0) + 1.0, L = G.Level, map = this.map!;
+    if (!L.los(map, pm.x, y, pm.z, x, y, z)) { x = pm.x + ux * 0.6; z = pm.z + uz * 0.6; }
+    return { x, z };
+  },
+  // A shield man near e, in a fight, that e could get in behind when there's no cover for them: on their floor, within 8 m and in sight,
+  // no nearer the police than e is by much, and with no more than two others in behind him already. Nearest.
+  shieldNear(e: Enemy, st: PState) {
+    const L = G.Level, map = this.map!, ey = (e.y || 0) + 1;
+    let best: Enemy | null = null, bd = 8;
+    const de = Math.hypot(e.x - st.p[0], e.z - st.p[2]);
+    for (const o of this.enemies.values()) {
+      if (o === e || !o.def.shield || !this.able(o) || !this.engaged(o) || Math.abs((o.y || 0) - (e.y || 0)) > 1.5) continue;
+      const d = Math.hypot(o.x - e.x, o.z - e.z);
+      if (d >= bd || Math.hypot(o.x - st.p[0], o.z - st.p[2]) < Math.min(4, de - 2)) continue;
+      let n = 0; for (const b of this.enemies.values()) if (b !== e && b.shieldBy === o.id && this.able(b)) n++;
+      if (n >= 2 || !L.los(map, e.x, ey, e.z, o.x, (o.y || 0) + 1, o.z)) continue;
+      best = o; bd = d;
+    }
+    return best;
+  },
+  // the shield man e has got in behind (shieldNear), while he's still fit, has a shield and is in the fight on their floor; else null
+  lentShield(e: Enemy) {
+    const o = e.shieldBy != null ? this.enemies.get(e.shieldBy) : undefined;
+    return o && o.def.shield && this.able(o) && this.engaged(o) && Math.abs((o.y || 0) - (e.y || 0)) < 1.5 ? o : null;
+  },
+  // e's turn behind a shield man pm they've got in behind: by id among the others there
+  lentIdx(e: Enemy, pm: Enemy) { let k = 0; for (const o of this.enemies.values()) if (o !== e && o !== pm && this.able(o) && o.shieldBy === pm.id && o.id < e.id) k++; return k; },
+  // in a fight: sees an officer, or did a moment ago
+  ENGAGED: 5,
+  engaged(e: Enemy) { return e.canSee || (this.clock || 0) - (e.sawAt ?? -99) < this.ENGAGED; },
+  able(e: Enemy) { return !e.down && !e.collapsed && e.state === 'normal' && !e.broken; },
   addEnemy(type: EnemyKind, x: number, z: number, hpMult: number, y = 0) {
     if (this.map && this.map.terrain) y = G.Level.groundHeight(this.map, x, z); // (on the ground where it rolls, high or low: the Sandia Crest's)
     const def = this.equip(type);
@@ -1544,6 +1612,20 @@ const G_Server = {
   // weakness is allowed for: they can't do better). On the host's own screen the suspect's body is simulated
   // (js/rig.ts powerStep), so where that gun's bore actually points has to agree too (the screen tells it: 'bores', the
   // muzzle and the bore's way as last drawn). Kept waiting too long, they snap a shot off anyway.
+  // A civilian between them and where they'd shoot (on their floor, past them and short of it, within SCREEN_R of the line): they won't
+  // fire through one. That civilian, or null.
+  SCREEN_R: 0.45,
+  screenedBy(e: Enemy, tx: number, tz: number, ty: number): Enemy | null {
+    const dx = tx - e.x, dz = tz - e.z, L2 = dx * dx + dz * dz; if (L2 < 0.25) return null;
+    const L = Math.sqrt(L2);
+    for (const c of this.enemies.values()) {
+      if (c === e || !c.def.civ || c.down || Math.abs((c.y || 0) - (e.y || 0)) > 1.5 || Math.abs((c.y || 0) - ty) > 2) continue;
+      const ox = c.x - e.x, oz = c.z - e.z, t = (ox * dx + oz * dz) / L2;
+      if (t <= 0 || t >= 1) continue;
+      if (Math.abs(ox * dz - oz * dx) / L < this.SCREEN_R) return c;
+    }
+    return null;
+  },
   onTarget(e: Enemy, st: PState, dt: number) {
     const tx = st.p[0], ty = st.p[1] + (st.pr ? 0.25 : st.cr ? 0.75 : 1.2), tz = st.p[2], s = e.str == null ? 1 : e.str;
     const sag = (1 - G.U.clamp(s / 0.6, 0, 1)) * 45;
@@ -1750,7 +1832,7 @@ const G_Server = {
       const r2 = (v: number) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}||${en.def.shield || ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
       }
       const p: Record<string, any> = {};
       for (const pl of all) p[pl.id] = pl.st;
@@ -1942,15 +2024,26 @@ const G_Server = {
       const toYaw = Math.atan2(-dx, -dz);
       e.yaw += U.angDiff(e.yaw, toYaw) * Math.min(1, dt * 8);
 
-      // Cover: move to a spot with a crate between us and the target, crouch, pop up to shoot.
+      // Someone's shield man they got in behind, having no cover to go to (below): while he's near and still in the fight
+      const lent = e.shieldBy != null ? this.lentShield(e) : null;
+      let bs = lent && Math.hypot(lent.x - e.x, lent.z - e.z) < 10 ? this.behind(e, lent, st.p[0], st.p[2], this.lentIdx(e, lent)) : null;
+      if (!bs) e.shieldBy = undefined;
+      if (bs) { e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; }
+      // Cover: move to a spot with a crate between us and the target, crouch, pop up to shoot. (Behind a borrowed shield, still
+      // looking now and then: cover of their own found, they leave him for it.) None to be had: in behind a shield man near, if any
       if (usesCover && !e.cover && e.coverT <= 0) {
         e.coverT = 3 + Math.random() * 3;
         e.cover = this.findCover(e, st);
         e.coverStuck = 0;
+        if (e.cover) { e.shieldBy = undefined; bs = null; }
+        else if (!bs && !e.def.shield) { const o = this.shieldNear(e, st); if (o) { e.shieldBy = o.id; bs = this.behind(e, o, st.p[0], st.p[2], this.lentIdx(e, o)); } }
         // path there on a flow field seeded at the cover tile (routes through doorways)
         if (e.cover) e.coverFlow = L.flow(map, [L.src(map, e.cover.x, e.cover.y, e.cover.z)]);
       }
-      if (e.cover) {
+      if (bs) {
+        const bd = Math.hypot(bs.x - e.x, bs.z - e.z);
+        if (bd > 0.25) { towards(bs.x, bs.z); sp = bd > 1.5 ? 0.8 : 0.45; } else { mx = 0; mz = 0; }
+      } else if (e.cover) {
         const cd = Math.hypot(e.cover.x - e.x, e.cover.z - e.z);
         if (cd > 0.25) {
           const step = cd > 1.6 && e.coverFlow ? L.flowStep(map, e.coverFlow, e.x, e.z, e.y) : null;
@@ -1974,9 +2067,18 @@ const G_Server = {
         if (e.strafeT <= 0) { e.strafeT = 0.7 + Math.random() * 1.6; e.strafe = [-1, 0, 1][Math.floor(Math.random() * 3)]; }
         mx = (-dz / d) * e.strafe; mz = (dx / d) * e.strafe; sp = 0.5;
       }
+      // a civilian in the way: no shot through them. They step out to the side the civilian isn't on (from cover too: it's no use
+      // to them now), and fire once the line's clear.
+      const scr = this.screenedBy(e, st.p[0], st.p[2], st.p[1]);
+      if (scr) {
+        const lx = -dz / d, lz = dx / d, on = (scr.x - e.x) * lx + (scr.z - e.z) * lz, side = on > 0.02 ? -1 : on < -0.02 ? 1 : e.id % 2 ? 1 : -1;
+        mx = lx * side; mz = lz * side; sp = 0.7; e.strafe = side; e.strafeT = 0.8;
+        if (e.cover) { e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.coverT = 1.5; }
+        e.shieldBy = undefined;
+      }
 
       // shooting: from cover, stand up first (a short window where the head is exposed)
-      if (d < def.range && e.drawT <= 0 && !e.flinchT) {
+      if (d < def.range && e.drawT <= 0 && !e.flinchT && !scr) {
         e.cool -= dt;
         const ready = def.aimTime ? e.aiming || e.cool <= 0 : e.cool <= 0;
         if (e.inCover && ready && !e.peek) { e.peek = true; e.peekT = this.PEEK.UP; e.peekOut = this.PEEK.MIN; e.peekDone = false; }
@@ -2009,7 +2111,7 @@ const G_Server = {
         if (e.order && e.lastSeen && (e.sawAt || -99) > e.order.at && this.clock - e.order.rt > 4) this.retarget(e, e.lastSeen); // (the search starts again from where they were seen)
       }
       e.lostT += dt;
-      if (e.blind && !e.flinchT && st && e.drawn && e.lastSeen && e.lostT < 1.1 && e.tgtD < def.range) {
+      if (e.blind && !e.flinchT && st && e.drawn && e.lastSeen && e.lostT < 1.1 && e.tgtD < def.range && !this.screenedBy(e, e.lastSeen.x, e.lastSeen.z, e.lastSeen.y || 0)) {
         e.cool -= dt;
         if (e.cool <= 0) { this.fire(e, p as LivePlayer, true); e.cool = U.rf(0.15, 0.4); }
       } else e.cool = Math.max(e.cool, 0.6);
@@ -2041,7 +2143,8 @@ const G_Server = {
     if (e.peek) { e.peekOut! -= dt; if (e.peekDone && e.peekOut! <= 0) e.peek = false; }
     const corner = e.cover && e.cover.lean;
     if (st && e.canSee) e.holding = false;
-    e.crouch = e.flinchT > 0 || (e.inCover && !e.peek && !corner) || (e.holding && !mx && !mz && !e.inCover) || (e.reloadT > 0 && e.inCover && !corner);
+    e.crouch = e.flinchT > 0 || (e.inCover && !e.peek && !corner) || (e.holding && !mx && !mz && !e.inCover) || (e.reloadT > 0 && e.inCover && !corner)
+      || (!!e.def.shield && this.engaged(e)); // (behind a shield in a fight: down behind it, the legs covered, the rest shooting over it)
     e.leanOut = e.inCover && e.peek && corner ? e.cover!.lean : 0;
 
     if ((mx || mz) && !e.flinchT) this.moveEntity(e, mx, mz, def.speed * sp, dt);
@@ -2434,7 +2537,7 @@ const G_Server = {
       e.yaw += U.angDiff(e.yaw, Math.atan2(-(st.p[0] - e.x), -(st.p[2] - e.z))) * Math.min(1, dt * 5);
       e.cool -= dt;
       // cornered with police in sight: fight back, not token shots
-      if (e.cool <= 0 && e.tgtD < e.def.range && this.onTarget(e, st, dt)) { this.fire(e, p); e.cool = U.rf(0.5, 1.2); }
+      if (e.cool <= 0 && e.tgtD < e.def.range && !this.screenedBy(e, st.p[0], st.p[2], st.p[1]) && this.onTarget(e, st, dt)) { this.fire(e, p); e.cool = U.rf(0.5, 1.2); }
     } else e.cool = Math.max(e.cool, 0.8);
     if (e.morale > 0.45) e.broken = false;
   },
@@ -2500,9 +2603,44 @@ const G_Server = {
   },
 
   // Civilians: mill about until something scares them, then cower or bolt away from the shooting.
+  // A civilian in the line between an armed suspect and the officer he's got in his sights (Server.screenedBy, from the civilian's side):
+  // they get out of it, sideways, the way that's further from the line, at a run. Looked for every so often; true while they're moving.
+  clearLine(e: Enemy, dt: number) {
+    const now = this.clock || 0;
+    if (e.clearOut && now < e.clearOut.until) {
+      const c = e.clearOut, bx = e.x, bz = e.z;
+      this.moveEntity(e, c.ux, c.uz, e.def.run, dt);
+      e.yaw += G.U.angDiff(e.yaw, Math.atan2(-c.ux, -c.uz)) * Math.min(1, dt * 8); e.crouch = true;
+      if (Math.hypot(e.x - bx, e.z - bz) < e.def.run * dt * 0.2) e.clearOut = null; // (into a wall: as far as they can go)
+      else return true;
+    }
+    e.clearOut = null;
+    e.clearT = (e.clearT || 0) - dt; if (e.clearT > 0) return false;
+    e.clearT = 0.2 + Math.random() * 0.1;
+    for (const s of this.enemies.values()) {
+      if (s.def.civ || !s.armed || !s.drawn || !s.canSee || !s.tgt || s.down || s.state !== 'normal') continue;
+      const p = this.players.get(s.tgt), st = p && p.st; if (!st) continue;
+      const dx = st.p[0] - s.x, dz = st.p[2] - s.z, L2 = dx * dx + dz * dz; if (L2 < 0.25) continue;
+      const ox = e.x - s.x, oz = e.z - s.z, t = (ox * dx + oz * dz) / L2;
+      if (t <= 0 || t >= 1 || Math.abs((e.y || 0) - (s.y || 0)) > 1.5) continue;
+      const L = Math.sqrt(L2), lx = -dz / L, lz = dx / L, off = ox * lx + oz * lz;
+      if (Math.abs(off) >= this.SCREEN_R + 0.15) continue;
+      // the side they're already on (or the one more open, standing on the line), and as far as gets them clear
+      const W = this.map && this.map.world, ey = (e.y || 0) + 1.0, open = (sg: number) => { const r = W ? G.World.raycast(W, e.x, ey, e.z, lx * sg, 0, lz * sg, 2, { move: true }) : null; return r && r.solid ? r.t : 2; };
+      let sg = off > 0.05 ? 1 : off < -0.05 ? -1 : open(1) >= open(-1) ? 1 : -1;
+      if (open(sg) < 0.4 && open(-sg) > open(sg)) sg = -sg; // (against a wall that way: the other)
+      const need = this.SCREEN_R + 0.45 - Math.abs(off) * Math.sign(off) * sg;
+      e.clearOut = { ux: lx * sg, uz: lz * sg, until: now + Math.min(1.5, need / e.def.run + 0.05) };
+      if (e.state === 'normal') e.walkTo = null;
+      return true;
+    }
+    return false;
+  },
   thinkCiv(e: Enemy, dt: number) {
     const def = e.def, U = G.U, L = G.Level;
-    if (e.state === 'cuffed' || e.state === 'surrender' || e.state === 'cower') return;
+    if (e.state === 'cuffed' || e.state === 'surrender') return;
+    if (!e.down && this.clearLine(e, dt)) return; // (out of a shooter's way, before anything else)
+    if (e.state === 'cower') return;
     if (e.state === 'hide') {
       if (!e.hide && !this.seekHide(e)) { e.state = 'cower'; e.crouch = false; e.leanOut = 0; return; }
       // an officer right on top of them: they give up and freeze
@@ -2543,6 +2681,7 @@ const G_Server = {
     return (tx * kx + tz * kz) / (td * kd) > 0.55;
   },
   findCover(e: Enemy, st: PState) {
+    if (e.def.shield) return null; // (a handheld shield is their cover: they stand behind it and fight)
     const L = G.Level, map = this.map!, def = e.def;
     let best: EnemyCover | null = null, bs = 1e9;
     const here = (q: { y?: number }) => Math.abs((q.y || 0) - (e.y || 0)) < 1.5; // (on their own floor)
@@ -2724,11 +2863,23 @@ const G_Server = {
   // down, till it's gone off. A cooked one, let go late, leaves them no time at all.
   DODGE: { R: 7, HEAR: 2.5, REACT: [[0.8, 1.3], [0.45, 0.8]], LOOK: -0.2, RUN: 1.25 },
   dodgeLog: [] as Record<string, any>[],
-  live: [] as { t0: number; fuse: number; pts: THREE.Vector3[]; kind: string; seen: Set<number> }[],
-  liveNade(p: number[], v: number[], fuse: number, kind: string) {
+  live: [] as { t0: number; fuse: number; pts: THREE.Vector3[]; kind: string; seen: Set<number>; nid?: number; from?: string }[],
+  liveNade(p: number[], v: number[], fuse: number, kind: string, nid?: number, from?: string) {
     if (!this.map) return;
-    const pts = G.Sim.predictNade(new THREE.Vector3(p[0], p[1], p[2]), new THREE.Vector3(v[0], v[1], v[2]), fuse, this.map);
-    this.live.push({ t0: this.clock || 0, fuse, pts, kind, seen: new Set() });
+    const P = new THREE.Vector3(p[0], p[1], p[2]), V = new THREE.Vector3(v[0], v[1], v[2]);
+    if (kind === 'sticky') { const S = G.Sim.STICKY, pts = G.Sim.predictSticky(P, V, this.map, S.MAX_FLY); this.live.push({ t0: this.clock || 0, fuse: pts.length / 60 + S.FUSE, pts, kind, seen: new Set(), nid, from }); return; } // (to where it'll hold, and its fuse from there)
+    const pts = G.Sim.predictNade(P, V, fuse, this.map);
+    this.live.push({ t0: this.clock || 0, fuse, pts, kind, seen: new Set(), nid, from });
+  },
+  // where a sticky held, as its thrower saw it (at: on a wall, the floor; e: on that suspect): it's there from now, and goes off in its
+  // fuse's time. Whoever it's on knows it at once.
+  stuckNade(nid: number, from: string, at: number[] | null, e: number | null) {
+    const n = this.live.find((q) => q.nid === nid && q.from === from); if (!n) return;
+    const now = this.clock || 0, age = now - n.t0, i = Math.min(n.pts.length - 1, Math.round(age * 60)), on = e != null ? this.enemies.get(e) : null;
+    const end = on ? new THREE.Vector3(on.x, (on.y || 0) + 1, on.z) : at ? new THREE.Vector3(at[0], at[1], at[2]) : n.pts[i];
+    n.pts = n.pts.slice(0, i + 1).concat(Array.from({ length: Math.ceil(G.Sim.STICKY.FUSE * 60) + 2 }, () => end.clone()));
+    n.fuse = age + G.Sim.STICKY.FUSE;
+    if (on && !on.def.civ && this.able(on)) { on.morale -= 0.3; if (on.morale < 0.25) { on.broken = true; on.fleeT = 2; } } // (stuck to them: they know)
   },
   dodgeTick() {
     const D = this.DODGE, L = G.Level, map = this.map!, now = this.clock || 0, U = G.U;

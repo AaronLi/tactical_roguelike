@@ -7,8 +7,9 @@ Every gun the game shows (first person, third person, the gunsmith, the hangar, 
 | | |
 | --- | --- |
 | `npm install` | installs three@0.186.1 (the exporter and loader for the node tools; the page loads the same version from the CDN, js/threeboot.ts; the recipes' extrusions are still made by r149's ExtrudeGeometry, `tools/extrude_r149.mjs`, whose caps some of the outlines depend on), gltf-transform and meshoptimizer (dev dependencies) |
+| `npm run build` | everything: the compile, the stickers, the audio, then all of `bake:models` (`tools/build.mjs`; `-- --no-models` stops before the models) |
 | `npm run bake:models` | `tsc`, then bakes every platform's pieces to `assets/models/parts/<id>/` and their index (learning the rules from a linear set of builds and checking every one of them and a random sample of others against the recipe: "Per-part bake"), validates each against the contract, and writes `assets/vendor/three-global.js`; then the props (`tools/bake_props.mjs`, unless `--no-props`), the hangar and, last, the bundles the game loads (`tools/bundle_models.mjs`, below; unless `--no-bundle`). `--guns` also bakes every platform's default build whole to `assets/models/guns/<id>.glb` + `index.json` (for the tools: the game loads none), `--parts` with it for both; ids restrict the bake, `--check` lists stale ones, `-j N` (or `MODEL_BAKE_JOBS`; default min(cores - 1, 8)) runs the per-platform work and the file writing in N worker threads with byte-identical output (`node tools/hash_tree.mjs assets/models` to compare), `--verbose` for each platform's detail (builds, pieces, where its time went) and gltf-transform logs; `MODELS_SAMPLE` the random builds a platform checked (5); ends with a per-phase time summary |
-| `npm run bake:hangar` | `tsc`, then bakes the hangar's fixed parts in a headless Chromium to `assets/models/scenes/` (`tools/bake_hangar.mjs`, also run by `bake:models` unless `--no-hangar`), then bundles: docs/hangar-data.md |
+| `npm run bake:hangar` | `tsc`, then bakes the hangar's fixed parts (in node, its pictures drawn by a WebAssembly canvas: no browser) to `assets/models/scenes/` (`tools/bake_hangar.mjs`, also run by `bake:models` unless `--no-hangar`), then bundles: docs/hangar-data.md |
 | `npm run bundle:models` | just the bundling step (`node tools/bundle_models.mjs`; `--check` checks the bundles against the loose tree and the indexes) |
 | `node tools/bake_models.mjs m4 g19` | bakes just those guns; `--check` lists the bakes that are stale against the current code |
 | `npm run check:models -- <file.glb ...>` | validates hand-made or edited models and prints what is missing or wrong (a `models/<id>/<id>.glb` with a `model.json` beside it is checked as an authored source) |
@@ -487,6 +488,36 @@ Every pack and prop (`tools/model_emit.mjs` `compression()`, after the weld on f
 | parse every pack and prop (1,730 loads, `preloadPlatform` of all 83) | ~455 ms | ~465 ms |
 | a level's loads (`?play=1&level=3`: ~385 packs and props) | 4.2-4.5 s from the first to the last, spread over the level build | the same |
 | GPU memory | float32 positions | the same (dequantised at load; no textures) |
+
+## Human bodies
+
+The twenty bodies (`js/humans.ts`) are made in Blender by a script (`models/characters/build_variants.py`, from
+`build_human.py` and the figures in `human_variants.py`) and kept in the repo as it exports them:
+`models/characters/human/variants/<id>.glb`, with `index.json` beside them and `js/humandata.ts` (what the game knows of each
+without its file). Blender is wanted only to change them. The bake's `humans` phase (`tools/bake_humans.mjs`, in
+`npm run bake:models`; `npm run bake:humans` alone) checks each and puts it in the baked tree, `assets/models/humans/<id>.glb`
+with `humans/index.json` (`{ version, humans: { <id>: { file, bytes, sha1, tris, prims, mats } } }`), and the bundling packs
+them with everything else.
+
+The fingers have bones of their own: three a finger and three for the thumb, each from one knuckle to the next (`index1` off the hand, `index3`
+to the tip), parented to the hand and rolled as it is, so a knuckle bends about the bone's x. `build_human.py` adds them after the body is
+skinned to the rest of the skeleton (whose weights are left as they were) and hands each finger vertex's hand weight on to the bones along that
+finger, eased across each knuckle (4.5 mm either side; 8 mm on the thumb). In the game a bone keeps its digits (`index1L`: js/humans.ts);
+the third-person rig lets them ride the hand, and the first-person arms (js/vmanim.ts) curl them round what each hand holds.
+
+What a body must be (a failure names the body and the rule):
+
+| Rule | Why |
+|---|---|
+| One skeleton, with exactly these bones: `hips spine chest neck head`, `clavicle upperarm forearm hand` `.L`/`.R`, `thigh shin foot` `.L`/`.R`, `eye.L eye.R`, and the fingers' `thumb1..3 index1..3 middle1..3 ring1..3 pinky1..3` `.L`/`.R` | `js/rig.ts` attachHuman hangs each on the rig's joint of that name (a finger's bones on its hand's); one it doesn't know would ride the hips |
+| Every mesh skinned (`JOINTS_0`, `WEIGHTS_0`) | an unskinned mesh is left out |
+| Every material named one of `shirt trousers boots neck upsleeve sleeve hand finger front lowleg skin eyeskin hair brow lip stubble eye iris` | the material's name is how `js/rig.ts` dresses it (hMat); another name is drawn as nothing |
+| `shirt trousers boots hand skin eye` all present | no body is without them |
+| In `index.json` and in `js/humandata.ts`, both ways | its size and the fit of its kit come from there before its file does |
+
+The same checks run in three places: when the bodies are made (`build_variants.py` ends with `bake_humans.mjs --source`),
+in the bake, and in `npm run test:models` (`--check`: the sources, and that the baked tree is their copy).
+
 
 
 ## Bundles

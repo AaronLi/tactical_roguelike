@@ -2,7 +2,7 @@
 // what the file holds, by part of the hall (its meshes, triangles, instances, the box round them), every named node (the parts, the anchors,
 // the lights, the named pieces), each anchor where it is and what its extras say, the lights, the collision (hangar.json's solids), and a hash
 // of all of it. The geometry is compared to the millimetre (the file's positions are int16 in each mesh's box: tools/model_emit.mjs), never the
-// pictures (a sign's text is drawn with the baking machine's fonts). The Bevy port checks itself against the same file.
+// pictures (a sign's text is the fonts' business: tools/node_canvas.mjs). The Bevy port checks itself against the same file.
 // Also checked: the collision in hangar.json is what the game's code says it is now (js/hangar.ts decorate, run here): a bake older than a
 // change to the hangar's solids fails.
 //   node tools/check_hangar_golden.mjs            compares with tests/hangar-golden.json

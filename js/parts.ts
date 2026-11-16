@@ -1127,7 +1127,7 @@ const G_Gunsmith = (() => {
     if (scoped && (reticle === 'cross' || reticle === 'lpvo') && Math.max(magnif, ...(levels || [0])) > 4) { d.reticle = 'range'; d.fp = ffp ? 'ffp' : 'sfp'; d.fpMag = Math.max(magnif, ...(levels || [0])); }
     // powers you can step through while aiming (scroll): a variable scope's, or 1× and a magnifier's behind a dot
     d.magnifier = !!magnifier && !scoped;
-    if (d.magnifier) { const om = (build.optic && PARTS[build.optic] && PARTS[build.optic].model) || {}; levels = [1, magnifier]; d.reticle = om.ret || (om.optic === 'holo' ? 'holo' : 'dot'); }
+    if (d.magnifier) { const om = (build.optic && PARTS[build.optic] && PARTS[build.optic].model) || {}; levels = [1, magnifier]; const oa = om as any; d.reticle = om.ret || oa.retWas || ((oa.was || om.optic) === 'holo' ? 'holo' : 'dot'); }
     d.magLevels = levels && levels.length > 1 ? levels : null;
     d.magDef = d.magLevels ? Math.max(0, d.magLevels.indexOf(d.magnifier ? 1 : magnif)) : 0;
     // a light and a laser (switched on in the field); the laser's hip-fire help only counts while it's on
@@ -1587,7 +1587,7 @@ const G_Gunsmith = (() => {
   for (const r of AUTHORED_REPLACES) if (r.apart.split('/')[0] === 'optic') for (const n of r.names) {
     const p = Object.values(PARTS).find((q) => q.name === n);
     if (!p || !p.model) throw new Error(`models/parts/${r.apart}/model.json replaces "${n}", which is not in the catalogue`);
-    const m = p.model as any; m.was = m.was || m.optic; m.optic = 'authored'; m.apart = r.apart; delete m.ret;
+    const m = p.model as any; m.was = m.was || m.optic; m.optic = 'authored'; m.apart = r.apart; if (m.ret) m.retWas = m.ret; delete m.ret; // (its reticle kept for what's seen of it through a magnifier: compile)
   }
   // ------------------------------------------------------------------ pistols modelled in Blender (models/<id>/, docs/models.md "Authored pistols")
   // (appended after the authored parts: a part's id in a code is its place in the list) Each is rcv 'authored' (its frame, slide, barrel / suppressor, grip and

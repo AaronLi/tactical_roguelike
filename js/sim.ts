@@ -42,7 +42,7 @@ const G_Sim = {
   // makeWeapon adds what you carry for it.)
   makeWeapon(id: string, build?: PBuild): PWeapon {
     const def = G.Gunsmith.compile(id, build!);
-    const w: any = { def, sup: def.sup, mag: def.mag, ammo: G.ballFor(G.calOf(def)), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
+    const w: any = { def, sup: def.sup, mag: def.mag, ammo: G.loadFor(def), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
     if (def.barrels) w.rl = def.barrels.default; // (a gun of several barrels: the round type its block holds, js/data.ts)
     w.tube = Array(w.mag).fill(w.ammo); // every gun: its rounds in order (a magazine's own stack, when it has one in)
     w.chamber = G.chambered(def) ? w.ammo : null; // and the round in the chamber (G.chambered)
@@ -73,6 +73,7 @@ const G_Sim = {
   // same steps for everyone's grenades and for the throw you're lining up (predictNade), so where the arc says it
   // ends up is where it does.
   NADE_R: 0.05, NADE_G: 14,
+  STICKY: { FUSE: 2, MAX_FLY: 6 }, // (a sticky grenade's fuse, from when it holds; and how long it may fly before it goes off anyway: js/player.ts STICKY)
   nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) {
     const R = this.NADE_R, w = map && map.world, p = n.pos, v = n.vel;
     const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if ((s.move || s.ray) && !(s.nostep && !s.ray) && (!s.hull || G.World.touches(s, [x0, y0, z0], [x1, y1, z1]))) h = true; }); return h; }; // (a rock: its own shape, not the boxes that stop people)
@@ -96,6 +97,27 @@ const G_Sim = {
       n.onGround = v.y === 0 && below(p.x, p.y - 0.02, p.z);
       if (n.onGround) { const f = Math.exp(-2.4 * h); v.x *= f; v.z *= f; if (Math.hypot(v.x, v.z) < 0.04) v.x = v.z = 0; }
     }
+  },
+  // A sticky grenade in the air: no bounces, it holds to the first solid it meets. One step of dt (in 1/120 s pieces); returns where it
+  // struck ({ at, n: the face's normal }) or null while it's still flying. (Bodies are the thrower's own test: js/views.ts stickStep)
+  stickFly(n: VwNadeMotion, dt: number, map: LvMap | null): { at: THREE.Vector3; n: number[]; t: number } | null {
+    const p = n.pos, v = n.vel, N = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / N;
+    for (let k = 0; k < N; k++) {
+      v.y -= this.NADE_G * h;
+      const len = v.length() * h; if (len < 1e-6) continue;
+      const dx = v.x / v.length(), dy = v.y / v.length(), dz = v.z / v.length();
+      const hit = map ? G.Level.raycast(map, p.x, p.y, p.z, dx, dy, dz, len + this.NADE_R) : null;
+      if (hit && hit.solid && hit.t < len + this.NADE_R) { const at = p.clone().addScaledVector(new THREE.Vector3(dx, dy, dz), Math.max(0, hit.t)); return { at, n: hit.n || [0, 1, 0], t: k * h }; }
+      if (!map && p.y + v.y * h < 0) return { at: new THREE.Vector3(p.x, 0, p.z), n: [0, 1, 0], t: k * h };
+      p.x += v.x * h; p.y += v.y * h; p.z += v.z * h;
+    }
+    return null;
+  },
+  // A sticky's path: as it flies (stickFly) to where it holds, up to tMax seconds. Returns the points along it, the last where it holds.
+  predictSticky(p: THREE.Vector3, v: THREE.Vector3, map: LvMap | null, tMax = 6) {
+    const n = { pos: p.clone(), vel: v.clone() }, pts = [n.pos.clone()], h = 1 / 60;
+    for (let t = 0; t < tMax; t += h) { const s = this.stickFly(n, h, map); if (s) { pts.push(s.at.clone()); break; } pts.push(n.pos.clone()); }
+    return pts;
   },
   // Where a throw goes: its path, stepped as a grenade flies (nadeStep) for as long as the fuse burns. Returns
   // the points along it (Vector3s) and where it goes off (the last).

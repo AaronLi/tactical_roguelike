@@ -9,6 +9,7 @@
 //   G.GunRig.describe(group)                    -> the recipe's refs written down as data on the nodes, for the baker (see below)
 //   G.GunRig.setLoaded(world, bolt, cocked)     -> a crossbow's bolt on the rail or not, its string cocked or not (a world model's)
 //   G.GunRig.bipodPose(bipod, k)                -> a bipod's legs (the children of part_bipod, each with extras.leg.deploy) swung down by k (0 folded .. 1 standing the gun up)
+//   G.GunRig.holds(def, info)                   -> how each hand takes the gun: the grip's and the support's frames in the gun's space (docs/models.md "Hand frames")
 //
 // Nothing here knows how a gun was built: the parts are found by name (info.anim, whose values are the nodes themselves
 // for a recipe's model, or the node NAMES for one read from a file) and the anchors are info's numbers.
@@ -157,7 +158,39 @@ const G_GunRig = (() => {
     for (const l of bipod.children) { const d: number[] | undefined = l.userData.leg && l.userData.leg.deploy; if (d) l.rotation.set(e * d[0], e * d[1], e * d[2]); }
   }
 
-  return { bind, parts, magCheck, describe, setLoaded, bipodPose, v };
+  /**
+   * How the hands take a gun (docs/models.md "Hand frames"): for the firing hand's grip and the support hand's hold, a point, the way the palm
+   * faces (a unit vector from the palm's face into what it holds) and the way the fingers run from the knuckles before they close round it
+   * (a unit vector square to the palm), all in the gun's space (x right, y up, z back), and which point of the hand goes on `at`: 'closed',
+   * the closed hand's hold (a grip's axis runs through it), or 'palm', the palm's face. For a right-handed shooter:
+   *   grip      the right hand: the palm on the grip's right side facing left (-x), the fingers forward along the bore (-z) and round
+   *             the grip's front (a raked grip runs back across the palm, as in a hand); a stock's wrist is taken the same way
+   *   support   on a forend: the left hand's palm under it, facing up and to the right, the fingers out to the right and forward and round
+   *             its far side ('forend'); on a vertical or stubby foregrip (the build's fg part, or HOLD_FIX): closed round it, its palm on
+   *             its left side facing right, the fingers forward ('fg', `at` that far down it); on a pistol: the palm on the grip's left
+   *             panel facing right, the fingers forward and down over the firing hand's ('pistol')
+   * Derived from what the build has (a pistol, its fg part) and the anchors info.grip and info.support; HOLD_FIX corrects a gun the
+   * rules get wrong. tools/check_holds.test.mjs checks every gun's.
+   */
+  function holds(def: { id: string; parts?: any[] } | null, info: GunRigInfo): GunHolds {
+    const fix = (def && HOLD_FIX[def.id]) || {}, n = (x: number, y: number, z: number) => new T.Vector3(x, y, z).normalize();
+    const fgPart = def && (def.parts || []).find((pt: any) => pt && pt.slot === 'fg'), fgT = fgPart && fgPart.model && fgPart.model.fg;
+    const drop = fix.fgDrop != null ? fix.fgDrop : fgT === 'vertical' ? 0.045 : fgT === 'stubby' ? 0.028 : 0;
+    const grip: GunHold = { kind: 'grip', hold: 'closed', at: v(info.grip || [0.05, -0.05, 0])!, palm: n(-1, 0, 0), fingers: n(0, 0, -1) };
+    const s0 = v(info.support || [0.3, -0.04, 0])!.add(new T.Vector3(-0.01, 0, 0)); // (a centimetre to the left: the palm under the forend's left side)
+    const support: GunHold = info.pistol ? { kind: 'pistol', hold: 'palm', at: s0, palm: n(1, 0, 0), fingers: n(0, -0.5, -0.85) }
+      : drop > 0 ? { kind: 'fg', hold: 'closed', at: s0.add(new T.Vector3(0, -drop, 0)), palm: n(1, 0, 0), fingers: n(0, -0.2, -1) }
+        : { kind: 'forend', hold: 'palm', at: s0, palm: n(0.5, 0.87, 0), fingers: n(0.74, -0.425, -0.53) };
+    for (const h of [grip, support]) h.fingers.addScaledVector(h.palm, -h.fingers.dot(h.palm)).normalize(); // (square to the palm)
+    return { grip, support };
+  }
+  // Where the rules for a gun's hand frames are wrong: fgDrop, a foregrip that's part of the gun (m down from info.support to where it's
+  // taken), with none fitted as a part
+  const HOLD_FIX: Record<string, { fgDrop?: number }> = {
+    aug: { fgDrop: 0.05 }, aug9: { fgDrop: 0.05 }, // (the AUG's folding front grip is its stock's)
+  };
+
+  return { bind, parts, magCheck, describe, setLoaded, bipodPose, v, holds, HOLD_FIX };
 })();
 G.GunRig = G_GunRig;
 
@@ -166,7 +199,7 @@ type GunRigParts = { mag?: THREE.Object3D; handle?: THREE.Object3D; ch?: THREE.O
 /** Where a gun's round shows when it is checked (docs/models.md info.chamberAt). */
 interface GunRigChamberAt { side: VmChamberSide; n: number; r: number; R: number; z: number; bore?: boolean; heads: number[][]; x: number; y: number; f: number; w: number }
 /** What a model says about its moving parts and anchor points (docs/models.md `info`): [forward, up, right] each. */
-interface GunRigInfo { magRake?: number | null; block?: { drop: number; lever: number } | null; modeDial?: { at: number[]; axis: number[]; modes: string[]; stepDeg: number } | null; hinge?: { sequence: { part: string; axis?: string | null; rotate_deg?: number | null; move?: number[] | null; frame?: string | null }[] } | null; anim?: Record<string, any>; grip?: number[]; support?: number[]; magAt?: number[]; port?: number[]; ch?: number[]; slide?: number[]; cylAt?: number[]; bolt?: number[]; boltTravel?: number; cup?: number[]; magTop?: boolean; recoilBarrel?: number; load?: { at: number[][]; pitch: number }; breech?: { at: number[]; pitch: number; long: string }; handle?: { grab?: number[]; f: number; y: number; x: number; travel: number; recip?: boolean; lock?: number }; chamberAt?: GunRigChamberAt; quarrelMats?: { nock?: THREE.MeshStandardMaterial } }
+interface GunRigInfo { pistol?: boolean; magRake?: number | null; block?: { drop: number; lever: number } | null; modeDial?: { at: number[]; axis: number[]; modes: string[]; stepDeg: number } | null; hinge?: { sequence: { part: string; axis?: string | null; rotate_deg?: number | null; move?: number[] | null; frame?: string | null }[] } | null; anim?: Record<string, any>; grip?: number[]; support?: number[]; magAt?: number[]; port?: number[]; ch?: number[]; slide?: number[]; cylAt?: number[]; bolt?: number[]; boltTravel?: number; cup?: number[]; magTop?: boolean; recoilBarrel?: number; load?: { at: number[][]; pitch: number }; breech?: { at: number[]; pitch: number; long: string }; handle?: { grab?: number[]; f: number; y: number; x: number; travel: number; recip?: boolean; lock?: number }; chamberAt?: GunRigChamberAt; quarrelMats?: { nock?: THREE.MeshStandardMaterial } }
 /** A hand's anchor points in the gun's space (null where the gun has none), and where its parts sit at rest. */
 interface GunRigAnchors { G: THREE.Vector3; S: THREE.Vector3; W: THREE.Vector3 | null; port: THREE.Vector3 | null; ch: THREE.Vector3 | null; slide: THREE.Vector3 | null; cyl: THREE.Vector3 | null; bolt: THREE.Vector3 | null; P: THREE.Vector3; F: THREE.Vector3; load?: { at: THREE.Vector3[]; pitch: number }; breech?: { at: THREE.Vector3; pitch: number; long: string; oal: number }; cup?: THREE.Vector3 | null; H?: THREE.Vector3 | null; WB: THREE.Vector3; magHome?: THREE.Vector3; magQ: THREE.Quaternion; magDn?: THREE.Vector3 /* (down the magazine's axis: straight down, or a raked well's, info.magRake) */; magGrab?: THREE.Vector3; handleHome?: THREE.Vector3; chHome?: THREE.Vector3; catchHome?: THREE.Vector3; cylHome?: THREE.Vector3; boltHome?: THREE.Vector3; barrelHome?: THREE.Vector3; brkHome?: THREE.Vector3; block?: { at: THREE.Vector3[]; oal: number } }
 /** What a magazine shows when it is looked at: the top round (case, tip), witness holes (each with the count it stands for, once stamped), the rounds drawn through a clear body. */
@@ -174,4 +207,7 @@ interface GunRigPoseMesh { mesh: THREE.Mesh; t: number; px: number; py: number; 
 interface GunRigMagChk { spine?: number[][]; follower?: GunRigPoseMesh; springs?: (GunRigPoseMesh & { u: number })[]; key: string; top: THREE.Mesh[]; holes: { n: number; t: number; i: number; side: number; mesh: THREE.Mesh; lab?: THREE.Mesh }[]; labCap?: number; w: number; rounds: { t: number; mesh: THREE.Mesh; tip?: THREE.Mesh }[] }
 /** One gun in the hands: its holder, its parts, its anchors, its magazine's check data. */
 interface GunRig { holder: THREE.Object3D; info: GunRigInfo; side: number; an: GunRigParts; A: GunRigAnchors; chk: GunRigMagChk | null; travel: number; lock: number; recip: boolean; open: boolean; boltAm?: string }
+/** How a hand takes a gun (G.GunRig.holds): where, the way its palm faces and its fingers run, in the gun's space, and which point of the hand goes there. */
+interface GunHold { kind: 'grip' | 'forend' | 'fg' | 'pistol'; hold: 'closed' | 'palm'; at: THREE.Vector3; palm: THREE.Vector3; fingers: THREE.Vector3 }
+interface GunHolds { grip: GunHold; support: GunHold }
 interface GameModules { GunRig: typeof G_GunRig; }
