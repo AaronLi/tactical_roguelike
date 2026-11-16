@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 under way (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files, 2026-11-16); 6 and 7 not started. Written 2026-11-15.
+Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 under way (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs: all 2026-11-16); 6 and 7 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -423,6 +423,34 @@ Phase 4 is done: the workers' lists are gone, the simulation's files import each
   `G.VMAnim`, `G.GunModels`, `G.HUD`. `js/gunshot-synth.ts` is a window-global IIFE (`window.GunshotSynth`, read by `gunaudio`), not a `G` file; it
   stays as it is, still a module tag in `index.html`.
 - **Next:** part b (models and rigs), c (views and rendering), d (player, game, space, the screens, `index.html` down to one tag).
+
+#### Phase 5 results (part b)
+
+- **Converted, 14 files (56 in all):** `prep`, `gunmaterials`, `gunmodels`, `glb`, `gunrig`, `bolts`, `viewmodel`, `vmanim`, `casings`,
+  `humandata`, `humans`, `headgear`, `rig`, `shipmodel`; their `index.html` tags are `type="module"` now. The codemod, then
+  `--uses --force-order` on all of them. `gunrig` and `rig` export a value named like a global type (`GunRig`, `Rig`): the codemod
+  refused, so the constant was renamed by hand (a module's local value shadows only the value, the type is still the global
+  interface). `RigState` of `rig.ts` was used nowhere and is removed (a module's unused locals are errors). `modelbundles` is still a
+  classic non-deferred script, `glb` still sets `G.Hooks.modelInfo`, and `glb`'s own `G.GLB` (made by it, replaced by the tools) is read through `G`.
+- **Left as `G.X`, on purpose (each has a comment in the file):**
+  - `gunrig` reads `G.GunModels`: the model tools set `G.GunModels = G.GunRecipes` after loading (`tools/model_env.mjs`), which an import
+    of `gunmodels` would bypass (and load the game's facade, `glb` and the viewmodel into the bake).
+  - `rig` reads `G.Footsteps`, `vmanim` reads `G.Bolts`, `G.Casings` and `G.Icons`: the export worker does not load them, and the
+    guard on `G.Footsteps` is real there (an import chain `vmanim` -> `casings` -> `audio` -> `footsteps` would make the exported
+    figures stride by `Footsteps.stride` and call `rigStep`, where they used the plain stride before). They go in part c or d with the worker's list.
+  - the page files not converted yet: `G.R`, `G.Game`, `G.Views`, `G.Me`, `G.Space`, `G.Net`... (`bolts`, `casings`, `vmanim`, `rig`).
+- **Stand-ins checked:** `tools/model_env.mjs`'s `G.GunModels` (above) and `G.GLB` (it replaces `glb`'s, which is read through `G`) stay
+  effective. One change to the tool: `loadModels()` runs `glb` in a bare context, and `glb` now imports `gunmaterials` (which builds
+  its materials as it loads), so that context gets `THREE`; its output is the same. `exportworker`'s `G.Game`, `G.Net`, hooks, `G.Models.setRoot`
+  are not names these files import (the worker still lists all of them, `modelbundles` included). `deps:check` is green with the `gunmodels` ->
+  `glb`/`viewmodel` -> `vmanim` -> `gunrig`/`humans`/`rig` imports (all reads inside functions); `ambience.html` loads none of these.
+- **Next:** part c (views and rendering), then d.
+- **Checks:** typecheck, `deps:check`, `deps` (orders consistent), `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:cloud` 21/21,
+  `test:models` all green (every golden unchanged, `bundle_models --check`, `bake_humans --check`, `bake_ships --check`, hangar golden hash
+  the same), `node tools/bake_hangar.mjs` re-baked with no byte changed; smoke 10/10 (one case per process); on the page
+  `G.ServerLink.mode === 'worker'` (17 hooks), the prep worker built a level and its light grid, the export worker booted (a one-off script;
+  a bad `go` fails in `exportHere` as before, not in the boot). Not exercised: the gunsmith, inventory and highlights export screens
+  beyond what the hangar and level cases load (guns, viewmodels, rigs).
 
 ### 5. Convert the page side
 
