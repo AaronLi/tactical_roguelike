@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 under way (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs; part c, views and rendering; part d, the screens and space: all 2026-11-16); 6 and 7 not started. Written 2026-11-15.
+Status: phases 0, 1, 2, 3, 4 and 5 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs; part c, views and rendering; part d, the screens and space; part e, `player`, `game`, `demo`, `debugstart`, `index.html` down to one module tag, the export worker's entry file: all 2026-11-16, phase 5 done); 6 and 7 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -506,13 +506,90 @@ Phase 4 is done: the workers' lists are gone, the simulation's files import each
 - **Next:** part e: `player`, `game`, `demo`, `debugstart`, then `index.html` to one tag and the export worker's list to an entry file.
 - **Checks:** typecheck, `deps:check`, `deps` (six orders consistent), `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:models` all green, `test:cloud` 21/21; smoke 10/10.
 
+#### Phase 5 results (part e)
+
+Phase 5 is done: every page file is an ES module (but `modelbundles` and `gunshot-synth`, see below), `index.html` loads one, and the export worker imports one entry file.
+
+- **Converted, 4 files (84 modules in all):** `player`, `game`, `demo`, `debugstart` (the codemod, then `--uses --force-order`). They keep every `G.X = X` (the console helpers and `?play` and friends read
+  `window.G`), `player` its two hooks (`Hooks.makeWeapon`, `Hooks.myStickers`) and `game` its two (`Hooks.inField`, `Hooks.biteDebris`). `--uses --force-order` then, file by file, on the converted page files that
+  read `Me` or `Game`: `casings`, `course`, `gamepad`, `glare`, `gunsmith`, `hangar`, `hud`, `invui`, `landing`, `range`, `shopui`, `shotlog`, `space`, `spaceui`, `touch`, `views`, `zeroing`, `loot`, `serverlink`, `profiler`;
+  and on `loadout`, `bolts`, `handling` and `icons`, whose reads of `HUD`, `R`, `Views`, `VMAnim` and `GunModels` had been left from earlier parts only because the target was not a module yet (checked: `deps:check` stays green, no tool
+  or page that loads them lacks the target). By hand, `rig` imports `LevelView` (left from part c; `levelview` already runs before it in the page and in the worker). `net` had no read of `Game` left to convert (a comment).
+  It was not run over `render`, `highlights`, `rig`, `vmanim`, `levelview` (the export worker's `G.Game`, `G.Me`, ... stay stand-ins), `audio`, `acoustics`, `ambience`, `footsteps`, `gunaudio` (`ambience.html`), `career`, `cloud` (the
+  cloud test's stand-ins), and not over `gunrig` (the model tools put the recipes at `G.GunModels`), so those keep their deliberate reads (the list is below).
+- **`game` does not import `profiler`.** `profiler` wraps `Game.loop` and the `Me` methods as it loads (`install()`), so it must run after both: it imports them (`--uses`), and `game` keeps `G.Prof` (4 reads, a comment says why).
+  The codemod had imported it; `deps:check` caught it (`profiler needs game while loading (later)`).
+- **What `game` and `player` do at load is the same, in the same order relative to what matters.** `game`'s only top-level effects are `window.addEventListener('load', () => Game.init())` and one `gunicons` listener; `debugstart` adds its
+  `load` listener (`?play` ...: `setTimeout(run, 300)`) and `demo` its own. `Game.init` runs on `load`, after every module of the graph has run (module scripts delay it, a single entry module as the many tags did), so the `requestAnimationFrame`
+  loop, `Net` and `Audio` start exactly when they did; `game` still evaluates before `demo` and `debugstart` (they import it), so the `load` listeners are registered in the same order. The three `gunicons` listeners (`hangar`, `shopui`, `game`) are
+  registered in the same order too. `player` sets its hooks as it loads, as before; no file reads `Hooks.makeWeapon`, `myStickers`, `inField` or `biteDebris` while loading. Observed, not just read (below): the smoke cases, which depend on all of it,
+  and the exercised screens.
+- **`index.html` ends with one game tag.** After `modelbundles` (a classic, non-deferred script, first: it must start the model download before three.js is fetched) and PeerJS (`defer`, from the CDN) it has
+  `<script type="module" src="dist/js/main.js">`. **`js/main.ts`** (new) imports `./threeboot.js` and then every file the tags loaded (85 of them), in the tags' order: side-effect imports, since the files register on `G`, and
+  `residents` and `gunshot-synth` export nothing. `gunshot-synth` (an IIFE, it was a `type="module"` tag already) stays as it is. `modelbundles` is not in `main.ts`: the classic tag stays.
+- **The page's evaluation order, before and after** (a one-off log appended to every compiled file, the page opened at `?play=warehouse&level=2` in headless Chromium, on the pre-change commit `18647c3` in a worktree and on this one; not kept):
+
+  | | order the files ran in |
+  | --- | --- |
+  | before (the tags) | modelbundles threeboot util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical zip callsigns arsenal acoustics ambience gunaudio footsteps audio loadout furnspec residents furnmesh gunshot-synth handling lightgrid levelview gunmaterials render glare icons glb gunrig humandata humans vmanim viewmodel gunmodels headgear rig bolts loot casings highlights route shop recorder spaceserver server serverhost serverlink net views career gunsmith range course hangar zeroing shopui invui touch gamepad prep shipmodel spaceui space hud shotlog player menushow landing cloudconfig cloud game profiler demo debugstart |
+  | after (`main.ts`) | modelbundles threeboot util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical zip callsigns arsenal acoustics ambience gunaudio footsteps audio gunmaterials glb gunrig humandata humans headgear furnspec furnmesh lightgrid levelview rig vmanim render viewmodel gunmodels icons bolts career cloudconfig cloud residents route shop recorder spaceserver server serverhost serverlink net handling loot casings gunsmith highlights hangar zeroing shopui invui touch gamepad landing prep shipmodel spaceui space player range course menushow game glare views shotlog hud loadout gunshot-synth profiler demo debugstart |
+
+  The log of the page is the order `tools/deps.mjs` works out (the inventory's `orders` entry for `js/main.ts`: identical, and the before is the inventory's `index.html` entry of phase 4d), so the check and the page agree.
+  **Why it differs:** a file runs when it is first imported, and the files now import `game` and `player` (they read them through `G` before). In the tags' order the first file that reaches `game` is `loadout` (it imports `hud` now, which imports `game`
+  and `player`, which import almost everything), so at `loadout`'s place the whole graph under it runs, each file's imports in that file's own order (the codemod writes them alphabetically), and the files after it in `main.ts` find theirs
+  done. What moved: `render`, `rig`, `vmanim`, `viewmodel`, `gunmodels`, `icons`, `bolts`, `career`, `cloud`, `net`, `highlights`, `hangar`, `player`, `views`, `hud` and the screens run in `game`'s depth-first order instead of the tags' (`glb`, `gunrig`, `humans`, `furnmesh`,
+  `lightgrid`, `levelview` earlier than `render`, as before, but `rig` and `vmanim` now before `render` and `viewmodel`, `loadout` and `glare` late, `residents` after `cloud`), and `game` runs after `menushow`, `glare` after it. `profiler`, `demo` and `debugstart` still run last, in that order.
+  **Why it is safe:** (1) everything a file reads while loading, of another file, runs before it: `deps:check` checks it against this order for the page, the three workers, `ambience.html`, the cloud test and the two tools that keep lists (0 problems); the one import the codemod made that
+  broke it, `game` -> `profiler`, was caught and undone. (2) The only top-level effects that depend on order are listeners: `load` (`game`, then `debugstart`, then `demo`'s, as in the tags: both import `game`) and `gunicons` (`hangar`, `shopui`, `game`: as in the tags); they do not touch each other. (3) No file draws a random number while loading
+  (no top-level `Math.random`), and none looks through `G` for what is registered (no `Object.keys(G)`), so the order files register in does not show. (4) `modelbundles` still runs first and `threeboot` second. Observed: 10/10 smoke cases, the exercised screens, the workers.
+- **The export worker has an entry file.** `js/exportentry.ts` (new) imports the 37 files `EXPORT_SCRIPTS` named, in its order (`modelbundles` among them, as a module there, the same IIFE as before); `EXPORT_SCRIPTS` is gone, and
+  `js/exportworker.ts` does `import('./threeboot.js').then(async () => { await import('./exportentry.js'); ...stand-ins... })`, as the server and prep workers do. It evaluates **the same 37 files in the same order** (the `orders` entry of
+  `docs/modules-inventory.json` for `js/exportworker.ts`, before and after: the same list, plus `exportentry` itself at the end). The stand-ins stay effective: `G.Game`, `G.Net`, `Hooks.inField` and `Hooks.biteDebris`, and the files' `G.Game`
+  / `G.Net` reads are untouched. None of the 37 imports `game` or `net` (`deps` would show it in the order).
+- **Tools.** `tools/deps.mjs` reads the page's roots from `js/main.ts` (its side-effect imports, plus index.html's classic script) and the export worker's from `exportworker.ts`'s `import()`s, as for the server and prep workers; it also
+  checks `ambience.html` (its inline module's imports) and `tools/cloud.test.mjs` (its `SRC`) as loaders now, so the two non-page consumers of page files are held to their load-time needs. `tools/codemod_imports.mjs` takes the order from
+  `main.ts` and `exportentry.ts`. `tools/bake_hangar.mjs` took the page's file order from `index.html`'s tags; it takes it from `main.ts`'s imports (the hangar bake rewrote `assets/models` with no byte changed: `test:models`' hangar golden is
+  green with the same hash). `tools/level_env.mjs` lists `prepentry` only (its two other names, `scars` and `stickers`, were reached by it already: the inventory's `orders` for the tool is the prep worker's, file for file; `test:level` 31/31).
+  `tools/model_env.mjs` keeps its lists: they are not what a page loads but staged subsets with stand-ins between the stages (`G.R` stubbed, `G.GunRecipes`, the authored parts, `G.GunModels = G.GunRecipes`, `G.GLB`), and no file reaches that
+  set by its imports; an entry for them would be a file only the tool uses. `tools/check_hangar_golden.mjs`, `bake_hangar.mjs`, `tools/check_furniture_golden.mjs`, `ship_layout.mjs` keep their lists of roots for the same reason.
+- **`npm run deps` lists what is left** (section 2b of the inventory, and one line in the summary: 297 cross-file reads through `G` in 71 pairs), each in the first category that fits. Phase 5's "Done when: no file reads another through `G`" is not
+  reached literally; what is left is deliberate, and phase 7 has to remove it (the tools and `ambience.html` first, the proposals are under each):
+  1. **The export worker (162 reads, 30 pairs): `highlights` (`game` 47, `player` 14, `audio` 10, `views` 7, `net` 4, `hud`, `zip`, `hangar`, `shop`, `icons`, `gunaudio`), `render` (`game`, `shotlog`, `player`, `audio`, `range`, `views`, `casings`, `loot`, `hud`, `bolts`), `rig`
+     (`game`, `footsteps`, `views`), `vmanim` (`game`, `icons`, `player`, `bolts`, `casings`), `levelview` (`hangar`).** The replay is drawn by the game's own renderer, which asks the page's objects what it may; the worker does not load them (and sets
+     `G.Game`, `G.Net` as stand-ins). Phase 7: a small module, `replayenv.ts` (what the renderer asks of the page: the map, the phase, `me`, a `shotlog`, an `audio` that is silent ...), with the page's files setting it and the worker setting its stand-in through a
+     setter (as `Hooks` does for the simulation), so the 37 files import that and nothing else. Or the narrower route: `highlights` is two things (recording, which the page does, and the exporter, which the worker does): split it, and the exporter imports only what it uses.
+  2. **`ambience.html` (51 reads, 13 pairs): `audio` (`render` 16, `game` 6, `casings`), `acoustics` (`game`, `space`), `ambience` (`space`, `player`), `footsteps` (`game`, `render`, `player`, `casings`), `gunaudio` (`render`, `game`).** The page loads `audio` and `ambience`
+     as modules and nothing of the game's state. Phase 7: the same seam as above in the other direction, an `audioenv.ts` with the few things sound asks of the game (the camera, the map, the phase, whether you are aboard, `me`'s place), set by `game`/`render`, left empty by
+     `ambience.html`; these reads are all guarded already.
+  3. **The cloud test (25 reads, 10 pairs): `career` (`net`, `game`, `data`'s `THEMES`, `route`), `cloud` (`net`, `game`, `callsigns`, `arsenal`, `shop`, `player`).** `tools/cloud.test.mjs` loads four files and puts the rest at `G.X`. Phase 7: `tools/vm_game.mjs`'s linker answers an
+     import with a module the tool gives it (its `ctx` today answers only `three`): the test names `./net.js`, `./route.js`... as stubs, and the files import them. The same takes `G.Range` and a hook out of `tools/level_env.mjs`, and `tools/check_furniture_golden.mjs`'s hook (those are `G.X =` writes now, which no `G` read in the game needs once the stubs are imports).
+  4. **`modelbundles` (15 reads: `game` 8, `glb` 6, `audio` 1).** A classic script by design (it starts the download before three.js is fetched, and a module would wait for the parse). Phase 6/7: index.html starts the fetch in a three-line inline script that
+     leaves the promise on `window`, and `modelbundles.ts` becomes a module `main.ts` imports and that takes the promise over; then `Bundles` and `AudioBundle` are imports.
+  5. **The workers' own files (10 reads): `exportworker` (`Hooks`, `Highlights`, `Models`, `Stickers`), `prepworker` (`LightGrid`, `Level`), `serverworker` (`ServerHost`).** They read what their entry file registered, after the dynamic `import()`. Phase 7: `const { Highlights } = await import('./exportentry.js')`
+     with the entry re-exporting what the worker uses (the namespace of a dynamic import is the module's exports), so no `G` is needed.
+  6. **Simulation to simulation (9 reads): `data` reads `G.Gunsmith`** (`parts` reads `data` while loading, so `data` cannot import it: phase 4c). Phase 7: move the five functions (`shotSoundKey`, `chambered`, `revolver`, `fblock`, `boltHold`) that look at the gun's build into `parts`, or register them from
+     `parts` on a hook, so `data` is a leaf.
+  7. **Other (25 reads, 7 pairs), each a cycle at load or a tool:** `career` reads `Cloud` (8; `cloud` imports `career` and reads it while loading, so `career` cannot import `cloud` first; phase 7: `career` emits an event that `cloud` listens to, or `cloud` passes itself in), `game` reads `Prof` (6, above:
+     `profiler` wraps `game` as it loads; phase 7: `profiler.install()` called from `main.ts`, so nothing wraps at load), `gunrig` reads `GunModels` (3: the model tools put the recipes there; the linker stubs of 3 cover it), `render` reads `Rig`, `Highlights`,
+     `GunModels`, `Viewmodel` (8: `viewmodel` reads `R.TONE` while loading, and `rig`/`highlights`/`gunmodels` reach `viewmodel`; phase 7: move `TONE` and the few constants read at load to a leaf both import, then `render` imports them).
+- **Stand-ins re-checked, none bypassed:** `exportworker`'s four (above); `tools/cloud.test.mjs` (21/21: `career` and `cloud` still read `G.Net`, `G.Game`, ...); `tools/level_env.mjs` (`G.Range`, the hook: nothing it loads imports `range`; 31/31); `tools/check_furniture_golden.mjs`'s hook;
+  `tools/model_env.mjs` (`G.GLB`, `G.GunModels`, `G.R`: `gunrig`, `glb` untouched). `ambience.html` loads `audio` and `ambience` as before: neither imports `game`, `player`, `render`, `space` or `casings` (`deps` checks it now).
+- **Exercised beyond the smoke cases** (one-off scripts from earlier parts, re-run): `exercise_d` on `?hangar` (every shop tab, the field inventory, the range and the IPSC course), `?fly`, `?board`, `?assault`, `?play` and `?play ... serverthread=0`; the highlights check (menu showcase live, a level, a
+  recording, `take`/`mount`, `renderPack`: the export worker booted and rendered to 8% when its 240 s limit ended, as in part c); the ambience page (`InvalidAccessError` from `A.master.connect` in a headless page, the same as on the pre-change commit, nothing new). The `?hangar` run throws
+  `WrongDocumentError ... pointer lock` from the script's own `toggleInv` in a headless page, identically on `18647c3` (a worktree, compiled, assets linked). One thing that looks different and is not: the exercise's "range on" after 2.5 s was `true` or `false` from run to run on both commits (a frame that takes seconds in
+  software GL decides whether `Range.update` has seen the new position yet), so it is a timing of the headless page, not a change.
+- **Checks:** typecheck, `deps:check` (eight orders consistent, 0 simulation uses of the page), `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:cloud` 21/21, `test:models` all green (the bake and the hangar golden included), smoke 10/10 (one case per process); on the page `G.ServerLink.mode === 'worker'` with
+  17 hooks, `main` with `serverthread=0`; the prep worker built a level and its light grid; the export worker booted.
+- **Not reproduced exactly:** the page's evaluation order (above), nothing else. No behaviour change found. Found on the way and left alone: nothing.
+- **Next:** phase 6 (bundling), then phase 7 (the proposals above).
+
 ### 5. Convert the page side
 
 Same steps, in this order: data-like files (`icons`, `callsigns`, `career`, `loadout`), then audio, then models and
 rigs, then views and rendering, then `player`, `game`, `space`, and the screens (`hangar`, `shop`, `gunsmith`,
 `invui`). `index.html` ends with one script tag.
 
-Done when: no file reads another through `G`.
+Done when: no file reads another through `G`. (Reached as far as the stand-ins, the export worker, `ambience.html` and the classic `modelbundles` allow: the rest is listed in the phase 5 results (part e) and by `npm run deps`, and is phase 7's.)
 
 ### 6. Bundle for release
 
