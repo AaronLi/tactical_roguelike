@@ -1,4 +1,5 @@
 'use strict';
+import { AudioEnv } from './audioenv.js';
 import { Arsenal } from './arsenal.js';
 import { Audio } from './audio.js';
 import { Ballistics } from './ballistics.js';
@@ -3298,6 +3299,7 @@ export const Me = {
   },
 };
 G.Me = Me;
+AudioEnv.Me = Me; // (what sound asks of it: js/audioenv.ts)
 // (what the simulation's files ask of you: js/gear.ts unpack, js/stickers.ts)
 Hooks.makeWeapon = (id, build) => Me.makeWeapon(id, build);
 Hooks.myStickers = () => (Me.stk || (Me.stk = {}));

@@ -1,4 +1,5 @@
 'use strict';
+import { AudioEnv } from './audioenv.js';
 import { Acoustics } from './acoustics.js';
 import { Audio } from './audio.js';
 import { GunAudio } from './gunaudio.js';
@@ -1196,7 +1197,7 @@ export const Ambience = (() => {
     update(dt: number, map: LvMap | null, cam: THREE.Camera | null) {
       const A = Audio;
       if (!A.ambCtx || A.ambCtx.state !== 'running') return;
-      shipUpdate(G.Space && G.Space.sound ? G.Space.sound(dt) : null); // (the squad's own ship, if there is one here)
+      shipUpdate(AudioEnv.Space && AudioEnv.Space.sound ? AudioEnv.Space.sound(dt) : null); // (the squad's own ship, if there is one here)
       if (map !== curMap) {
         curMap = map; wasAboard = false;
         this.play(map && map.theme ? map.theme.name : null, { night: !!map && !!map.night, hub: !!map && !!map.hub }, map);
@@ -1205,7 +1206,7 @@ export const Ambience = (() => {
       const c = A.ambCtx;
       // aboard the helicopter (in its seat, flying in or on the pad), nothing of the place outside: the rotors and the
       // cabin are all there is (out as you board, back as you step down)
-      const aboard = !!(G.Me && G.Me.seat != null) || !!(G.Space && G.Space.sealed()); // (or shut in the squad's ship, out in space: nothing carries)
+      const aboard = !!(AudioEnv.Me && AudioEnv.Me.seat != null) || !!(AudioEnv.Space && AudioEnv.Space.sealed()); // (or shut in the squad's ship, out in space: nothing carries)
       if (aboard !== wasAboard) { wasAboard = aboard; const g = cur.out.gain; g.cancelScheduledValues(c.currentTime); g.setValueAtTime(g.value, c.currentTime); g.setTargetAtTime(aboard ? 0 : 1, c.currentTime, aboard ? 0.3 : 0.8); }
       if (cam) { const p = cam.position; here = { x: p.x, y: p.y, z: p.z }; cur.lisAt = () => here; }
       if (cam && (outT -= dt) <= 0) { outT = 0.2; const p = cam.position; if (map) applyMix(cur, mixAt(cur, map, p.x, p.y, p.z), c.currentTime); placeRings(cur, here, c.currentTime); }

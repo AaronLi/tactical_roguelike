@@ -1,4 +1,5 @@
 'use strict';
+import { AudioEnv } from './audioenv.js';
 import { Audio } from './audio.js';
 import { GunAudio } from './gunaudio.js';
 import { Level } from './level.js';
@@ -53,7 +54,7 @@ export const Footsteps = {
   stride(speed: number, crouch = 0) { return (2 * Math.max(speed, 0.3)) / this.cadence(speed, crouch); },
   /** the synth's floor under a foot at p (feet height) */
   floorAt(map: LvMap, p: { x: number; y: number; z: number }) {
-    const s = G.Casings.surface(map, p.x, p.z, p.y + 0.01);
+    const s = AudioEnv.Casings!.surface(map, p.x, p.z, p.y + 0.01);
     return this.FLOOR[s] || 'concrete';
   },
   /** the gait from how they're moving: speed (m/s), how crouched (0..1), steadied (careful), weapon lowered (low) */
@@ -79,7 +80,7 @@ export const Footsteps = {
    * Returns false when nothing's loaded (yet) to play.
    */
   step(feet: FsFeet, pos: THREE.Vector3, gait: FsGait, self = false) {
-    const A = Audio, ctx = A.ctx, map = G.Game && G.Game.map, cam = G.R && G.R.camera;
+    const A = Audio, ctx = A.ctx, map = AudioEnv.Game && AudioEnv.Game.map, cam = AudioEnv.R && AudioEnv.R.camera;
     if (!ctx || !map || !cam) return false;
     if (!this.man) { this.init(); return false; }
     const cp = cam.position, d = self ? 0 : cp.distanceTo(pos);
@@ -115,7 +116,7 @@ export const Footsteps = {
       if (!self && GunAudio && Acoustics) {
         const rv = GunAudio.roomVerb(ctx, map, pos, heard);
         if (rv) { const sg = ctx.createGain(); sg.gain.value = this.GAIN * k * Math.min(1, 1.5 / Math.max(d, 1.5)) * 0.5; s.connect(sg); sg.connect(rv.cv); }
-      } else if (self && GunAudio && Acoustics && G.Game.phase === 'level') {
+      } else if (self && GunAudio && Acoustics && AudioEnv.Game!.phase === 'level') {
         // yours into the room you're in (as your own gun's handling is, js/audio.ts route): the step's level at 1 m
         // (its 1.5 m level, the others' baseline, scaled to 1 m), under you
         const lv = GunAudio.listenerVerb(ctx, map);
@@ -145,8 +146,8 @@ export const Footsteps = {
   selfIdx: null as number | null,
   selfFeet: { sole: 'boot', kit: 'heavy' } as FsFeet,
   self(_dt: number) {
-    const me = G.Me;
-    if (!me || !me.pos || me.dead || me.down || me.prone || me.climb || me.zipRide || me.seat != null || !me.onGround || G.Game.phase !== 'level' || (me.hspeed || 0) < 0.5) { this.selfIdx = null; return; }
+    const me = AudioEnv.Me;
+    if (!me || !me.pos || me.dead || me.down || me.prone || me.climb || me.zipRide || me.seat != null || !me.onGround || AudioEnv.Game!.phase !== 'level' || (me.hspeed || 0) < 0.5) { this.selfIdx = null; return; }
     const idx = Math.floor((me.bobT || 0) / Math.PI + 0.1);
     if (this.selfIdx == null) { this.selfIdx = idx; return; } // (setting off: the first step's at the first dip)
     if (idx === this.selfIdx) return;

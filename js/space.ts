@@ -1,4 +1,5 @@
 'use strict';
+import { AudioEnv } from './audioenv.js';
 import { Audio } from './audio.js';
 import { Hangar } from './hangar.js';
 import { HUD } from './hud.js';
@@ -1818,4 +1819,5 @@ export const Space = (() => {
   return { debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = Space;
+AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)
 declare global { interface GameModules { Space: typeof Space; } }

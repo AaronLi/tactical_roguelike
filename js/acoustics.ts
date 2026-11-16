@@ -1,4 +1,5 @@
 'use strict';
+import { AudioEnv } from './audioenv.js';
 import { Audio } from './audio.js';
 import { Level } from './level.js';
 import { Materials } from './materials.js';
@@ -391,7 +392,7 @@ export const Acoustics = (() => {
   function dueStep() {
     const q = due[0];
     if (!q) { dueOn = false; return; }
-    const m = traces.get(q.map), cur = !G.Game || G.Game.map === q.map || !G.Game.map;
+    const m = traces.get(q.map), cur = !AudioEnv.Game || AudioEnv.Game.map === q.map || !AudioEnv.Game.map;
     if (!m || !cur || (!q.job && 'z' + q.zi + '|' + doorKey(q.map, q.zi) !== q.key)) due.shift(); // (the level's gone, or the door's moved again: that state's asked for when it's wanted)
     else if (!q.tr) {
       if (!q.job) { const p = startOf(q.map, q.zi); q.job = tracer(q.map, of(q.map).zones[q.zi].f, p.x, p.y, p.z, q.zi); }
@@ -441,7 +442,7 @@ export const Acoustics = (() => {
     // its two responses built, the gun's, at its level, and the ambience's)
     let todo: number[] | null = null, more: (() => void)[] = [];
     const step = () => {
-      if (G.Game && G.Game.map !== map) return; // (a new level: its own)
+      if (AudioEnv.Game && AudioEnv.Game.map !== map) return; // (a new level: its own)
       if (!todo) todo = of(map).zones.filter((z) => !z.out && z.tiles > 3).map((z) => z.id);
       else if (more.length) more.shift()!();
       else {
@@ -449,7 +450,7 @@ export const Acoustics = (() => {
         const p = startOf(map, zi); const tr = roomAt(map, p.x, p.y, p.z), c = Audio && Audio.ctx;
         if (tr && c) more = [() => { impulse(c, tr); }, () => { impulse(c, tr, 1); }];
       }
-      setTimeout(step, G.Space && G.Space.S.on && !G.Space.S.docked ? 250 : 15); // (out flying, where a slow frame shows and none of it's wanted yet: a piece four times a second)
+      setTimeout(step, AudioEnv.Space && AudioEnv.Space.S.on && !AudioEnv.Space.S.docked ? 250 : 15); // (out flying, where a slow frame shows and none of it's wanted yet: a piece four times a second)
     };
     setTimeout(step, 500);
   }

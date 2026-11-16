@@ -1,4 +1,5 @@
 'use strict';
+import { AudioEnv } from './audioenv.js';
 import { Audio } from './audio.js';
 import { Level } from './level.js';
 import { Gunsmith } from './parts.js';
@@ -328,8 +329,8 @@ export const GunAudio = {
     const V = (p: { x: number; y: number; z: number }) => new THREE.Vector3(p.x, p.y, p.z);
     for (const tp of taps) {
       const col = tp.order === 1 ? 0x40c0ff : 0xb070ff;
-      for (let i = 0; i < tp.hops.length - 1; i++) G.R.tracer(V(tp.hops[i]), V(tp.hops[i + 1]), col, 0.012, 0.8);
-      G.R.tracer(V(tp.pos), new THREE.Vector3(lis.x, lis.y - 0.3, lis.z), col, 0.012, 0.8);
+      for (let i = 0; i < tp.hops.length - 1; i++) AudioEnv.R!.tracer(V(tp.hops[i]), V(tp.hops[i + 1]), col, 0.012, 0.8);
+      AudioEnv.R!.tracer(V(tp.pos), new THREE.Vector3(lis.x, lis.y - 0.3, lis.z), col, 0.012, 0.8);
     }
   },
 
@@ -385,7 +386,7 @@ export const GunAudio = {
   },
   /** your own room's response, all round you: what a sound coming in from another room fills it with */
   listenerVerb(ctx: AudioContext, map: AcMap) {
-    const cam = G.R.camera.position, tr = Acoustics.roomAt(map, cam.x, cam.y, cam.z);
+    const cam = AudioEnv.R!.camera.position, tr = Acoustics.roomAt(map, cam.x, cam.y, cam.z);
     if (!tr) return null;
     const v = this.verbOf(ctx, map, tr), t = ctx.currentTime;
     v.g.gain.setTargetAtTime(1, t, 0.02); v.lp.frequency.setTargetAtTime(20000, t, 0.02); v.wide.gain.setTargetAtTime(1, t, 0.02); v.dg.gain.setTargetAtTime(0, t, 0.02);
@@ -413,9 +414,9 @@ export const GunAudio = {
   // pos = world position of the muzzle, or null for the local player's own gun. who: the shooter (for a can's first-round pop).
   // Returns false when no synth buffer exists yet so the caller can play a fallback.
   play(id: string, pos: THREE.Vector3 | null, who?: string, vol = 1, aim?: EchoPt | null) { // (vol: this shot's own level: a gun of several barrels, each as loud as its effective length makes it, js/data.ts G.shotDef)
-    const A = Audio, ctx = A.ctx, map = G.Game.map;
+    const A = Audio, ctx = A.ctx, map = AudioEnv.Game!.map;
     if (!ctx || !map || !this.spec(id) || !this.available()) return false;
-    const cam = G.R.camera.position;
+    const cam = AudioEnv.R!.camera.position;
     const src = pos || cam;
     // With the level's acoustics the report's dry (the gun and the round, a metre off), and its room is the room's own,
     // measured (js/acoustics.ts roomAt: its traced response, convolved below). Without, the synth's render for a room of
