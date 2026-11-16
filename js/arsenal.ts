@@ -1,4 +1,6 @@
 'use strict';
+import { ammoOk, calOf, WEAPONS } from './data.js';
+import { Hooks, U } from './util.js';
 // The sidearm tree: what you can start a run with. Everyone starts with the P9 in the middle, and three paths run out from it, each a way of
 // fighting: full auto (volume of fire), heavy calibre (one round doing the work) and the modern classics (being where they aren't looking,
 // and hitting what you aim at). Each gun on a path is earned by doing what that path's about with the gun before it, and it's yours for
@@ -6,7 +8,7 @@
 // A kill's what it was as your rounds did it: js/player.ts hitEnemy keeps what they did to someone on them (ev.mine) and the host's word
 // that they're down (js/game.ts credit) brings it here. Only a gun you've earned counts: one that turned up in a case has its own path to come.
 // Each asks for more than a level has suspects (8 to 13, the act's last aside), so every gun takes several levels of play.
-const G_Arsenal = (() => {
+export const Arsenal = (() => {
   // id, what it's reached from, which path, how far out (a: a branch off its path: its own angle and r, its distance out); and what it takes: stat, how many, of what
   interface ArsenalNode { id: string; from?: string; path?: string; ring: number; stat?: string; n?: number; what?: string; how?: string; a?: number; r?: number; am?: string; }
   const NODES: ArsenalNode[] = [
@@ -36,20 +38,20 @@ const G_Arsenal = (() => {
   const PATHS: Record<string, { name: string; a: number; len: number }> = { auto: { name: 'Full auto', a: -90, len: 4 }, heavy: { name: 'Heavy calibre', a: 30, len: 4 }, modern: { name: 'Modern classics', a: 150, len: 5 } };
   const RINGS = [0, 440, 660, 880, 1100, 1320], BY = new Map(NODES.map((q) => [q.id, q])), TAP = 500, BURST = 5, BURST_MS = 1000, MULTI = 3000, CLOSE = 5, MID = 10, FAR = 20;
   let save: any = null;
-  const data = () => { if (!save) { const s = G.U.store.get('arsenal', null); save = s && s.got && s.n ? s : { got: [], n: {} }; save.pro = save.pro || {}; save.on = save.on || {}; migrate(save); } return save; };
+  const data = () => { if (!save) { const s = U.store.get('arsenal', null); save = s && s.got && s.n ? s : { got: [], n: {} }; save.pro = save.pro || {}; save.on = save.on || {}; migrate(save); } return save; };
   // the MAC-10's place on the web went to the Skorpion (now before the G18) (the MAC-10 switched off, js/data.ts OFF_GUNS): what was earned on it carries over
   function migrate(s: any) {
     if (s.got.includes('mac10') && !s.got.includes('skorp')) s.got.push('skorp');
     if (s.pro.mac10 && !s.pro.skorp) { s.pro.skorp = 1; if (s.on.mac10) s.on.skorp = true; }
     if (s.n.mac10 && !s.n.skorp) s.n.skorp = s.n.mac10;
   }
-  const keep = () => G.U.store.set('arsenal', data());
+  const keep = () => U.store.set('arsenal', data());
   const has = (id: string) => BY.has(id);
   // what it starts loaded with: tracers, or the node's own load (the USP's +P tracers); one its caliber can't take falls back as G.ammoOk does
-  const startAm = (id: string) => { const q = BY.get(id), d = G.WEAPONS[id]; return G.ammoOk(G.calOf(d), (q && q.am) || 'tracer'); };
+  const startAm = (id: string) => { const q = BY.get(id), d = WEAPONS[id]; return ammoOk(calOf(d), (q && q.am) || 'tracer'); };
   const open = (id: string) => id === 'p9' || (has(id) && data().got.includes(id));
   const count = (id: string, stat: string) => (data().n[id] && data().n[id][stat]) || 0;
-  const name = (id: string) => (G.WEAPONS[id] ? G.WEAPONS[id].name : id);
+  const name = (id: string) => (WEAPONS[id] ? WEAPONS[id].name : id);
   // where it goes on the map: [x, y] from the P9, in pixels at full size
   const polar = (deg: number, r: number) => { const a = (deg * Math.PI) / 180; return [Math.cos(a) * r, Math.sin(a) * r]; };
   const along = (path: string, r: number) => polar(PATHS[path].a, r);
@@ -58,18 +60,18 @@ const G_Arsenal = (() => {
   const left = (q: ArsenalNode) => Math.min(q.n!, count(q.from!, q.stat!));
   // one more of something, with that gun: what it's for, and whatever that's earned
   function tally(id: string, stat: string) {
-    if (G.Hooks.gunStat && !has(id)) G.Hooks.gunStat(id, stat); // (the primary tree's challenges are the same kills: js/loadout.ts)
+    if (Hooks.gunStat && !has(id)) Hooks.gunStat(id, stat); // (the primary tree's challenges are the same kills: js/loadout.ts)
     if (!open(id)) return;
     const d = data(), ns = d.n[id] || (d.n[id] = {});
     ns[stat] = (ns[stat] || 0) + 1;
-    if (G.Hooks.gunStat) G.Hooks.gunStat(id, stat); // (its attachments, earned with it: js/loadout.ts)
+    if (Hooks.gunStat) Hooks.gunStat(id, stat); // (its attachments, earned with it: js/loadout.ts)
     for (const q of NODES) {
       if (q.from !== id || q.stat !== stat || open(q.id)) continue;
       if (ns[stat] >= q.n!) {
         d.got.push(q.id);
-        G.Hooks.toast!('NEW SIDEARM', `${name(q.id)}: yours from your next run`, 3.5);
-        G.Hooks.click!();
-      } else G.Hooks.feed!(`<span class="cr">${G.U.esc(name(id))}: ${ns[stat]}/${q.n} ${G.U.esc(q.what!)}</span>`);
+        Hooks.toast!('NEW SIDEARM', `${name(q.id)}: yours from your next run`, 3.5);
+        Hooks.click!();
+      } else Hooks.feed!(`<span class="cr">${U.esc(name(id))}: ${ns[stat]}/${q.n} ${U.esc(q.what!)}</span>`);
     }
     keep();
   }
@@ -83,7 +85,7 @@ const G_Arsenal = (() => {
   // a kill of yours (m: the host's word of it; not a civilian or someone who'd given up: js/game.ts credit)
   let lastKill = new Map();
   function kill(m: any) {
-    const ev = G.Hooks.enemyView!(m.e), k = ev && ev.mine;
+    const ev = Hooks.enemyView!(m.e), k = ev && ev.mine;
     if (!k || k.done) return;
     k.done = true;
     if (m.gr) return; // (the grenade did it, frag or thermobaric: m.gr its seed, js/server.ts. Not the gun that hit them before)
@@ -125,6 +127,6 @@ const G_Arsenal = (() => {
   const reload = () => { save = null; };
   return { NODES, PATHS, RINGS, BY, along, has, startAm, open, count, name, at, left, tally, hit, kill, reload, get all() { return data(); } };
 })();
-G.Arsenal = G_Arsenal;
+G.Arsenal = Arsenal;
 
-interface GameModules { Arsenal: typeof G_Arsenal; }
+declare global { interface GameModules { Arsenal: typeof Arsenal; } }

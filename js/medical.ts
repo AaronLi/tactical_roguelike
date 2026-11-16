@@ -1,4 +1,5 @@
 'use strict';
+import { U } from './util.js';
 // the yes/no injuries a part can have (MedPart), in the order they're packed into the saved flags
 type MedFlag = 'light' | 'heavy' | 'frac' | 'tq' | 'lung' | 'gut' | 'massive' | 'spine';
 // what a medical item treats: light / heavy bleeding, a punctured lung, a fracture, blood loss, pain
@@ -6,7 +7,7 @@ type MedFix = 'light' | 'heavy' | 'lung' | 'frac' | 'blood' | 'pain';
 // where it works: anywhere, on an arm or a leg, or on the listed parts
 type MedWhere = 'any' | 'limb' | string[];
 interface MedItem { name: string; fixes: MedFix; where: MedWhere; time: number; size: number[]; price: number; stack?: number; desc: string; light?: boolean; }
-const G_Med = (() => {
+export const Med = (() => {
   const PARTS: [string, string, number][] = [
     ['head', 'Head', 35], ['thorax', 'Thorax', 85], ['stomach', 'Stomach', 70],
     ['armL', 'Left arm', 60], ['armR', 'Right arm', 60], ['legL', 'Left leg', 65], ['legR', 'Right leg', 65],
@@ -130,7 +131,7 @@ const G_Med = (() => {
     }
     if (b.pk > 0) pain *= 0.1;
     const lung = b.parts.thorax.lung || b.parts.thorax.hp <= 0 ? 0.3 : 0, blood = b.blood < 70 ? (70 - b.blood) / 70 * 0.6 : 0;
-    return G.U.clamp(pain + lung + blood, 0, 1);
+    return U.clamp(pain + lung + blood, 0, 1);
   }
   // how fast you can move (x walk speed)
   function speedMult(b: MedBody) {
@@ -246,5 +247,5 @@ const G_Med = (() => {
   }
   return { PARTS, NAME, ITEMS, LIMBS, figure, isLimb, newBody, partOf, hit, wound, paralysed, tick, bleedOut, bleeding, aimPenalty, speedMult, cantTreat, treat, cantRevive, reviveWarn, downable, unconscious, DOWNABLE, UNCON, overall, encode, decode, describe };
 })();
-G.Med = G_Med;
-interface GameModules { Med: typeof G_Med; }
+G.Med = Med;
+declare global { interface GameModules { Med: typeof Med; } }

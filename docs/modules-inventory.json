@@ -527,6 +527,7 @@
    "defs": {
     "Acoustics": 560
    },
+   "imports": [],
    "uses": [
     {
      "x": "Level",
@@ -684,6 +685,7 @@
    "defs": {
     "Ambience": 1268
    },
+   "imports": [],
    "uses": [
     {
      "x": "Audio",
@@ -975,126 +977,43 @@
   },
   "arsenal": {
    "defs": {
-    "Arsenal": 128
+    "Arsenal": 130
    },
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "ammoOk",
+      "calOf",
+      "WEAPONS"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "Hooks",
+      "U"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "U",
-     "line": 39,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 46,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 49,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ammoOk",
-     "line": 49,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 49,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 52,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 52,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Hooks",
-     "line": 61,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 61,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Hooks",
-     "line": 65,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 65,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Hooks",
-     "line": 70,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 71,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 72,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 72,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 72,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 86,
-     "load": false,
-     "guard": "plain"
-    },
-    {
      "x": "Ballistics",
-     "line": 99,
+     "line": 101,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Arsenal": {
+    "Arsenal": {
      "kind": "value",
-     "line": 9
+     "line": 11
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 130
+    "global": {
+     "kind": "value",
+     "line": 132
     }
    }
   },
@@ -1102,6 +1021,7 @@
    "defs": {
     "Audio": 655
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -1467,6 +1387,7 @@
    "defs": {
     "Ballistics": 981
    },
+   "imports": [],
    "uses": [
     {
      "x": "baseAm",
@@ -1776,6 +1697,7 @@
    "defs": {
     "Bolts": 96
    },
+   "imports": [],
    "uses": [
     {
      "x": "AMMO",
@@ -1845,24 +1767,26 @@
   },
   "callsigns": {
    "defs": {
-    "Callsigns": 138
+    "Callsigns": 139
    },
-   "uses": [
+   "imports": [
     {
-     "x": "U",
-     "line": 25,
-     "load": false,
-     "guard": "plain"
+     "from": "util",
+     "line": 2,
+     "names": [
+      "U"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
-    "G_Callsigns": {
+    "Callsigns": {
      "kind": "value",
-     "line": 6
+     "line": 7
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 139
+    "global": {
+     "kind": "value",
+     "line": 140
     }
    }
   },
@@ -1870,6 +1794,7 @@
    "defs": {
     "Career": 162
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -2013,6 +1938,7 @@
    "defs": {
     "Casings": 365
    },
+   "imports": [],
    "uses": [
     {
      "x": "R",
@@ -2300,6 +2226,7 @@
    "defs": {
     "Cloud": 596
    },
+   "imports": [],
    "uses": [
     {
      "x": "CloudConfig",
@@ -2617,6 +2544,7 @@
    "defs": {
     "CloudConfig": 10
    },
+   "imports": [],
    "uses": [],
    "decls": {
     "G_CloudConfig": {
@@ -2633,6 +2561,7 @@
    "defs": {
     "Course": 360
    },
+   "imports": [],
    "uses": [
     {
      "x": "Me",
@@ -2984,6 +2913,7 @@
    "defs": {
     "Damage": 870
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -3233,1323 +3163,559 @@
   },
   "data": {
    "defs": {
-    "TIER_NAMES": 22,
-    "TIER_COLORS": 24,
-    "CLASS_SND": 41,
-    "WEAPON_LIST": 166,
-    "WEAPONS": 168,
-    "EXPLOSIVES_OFF": 172,
-    "AKIMBO_OFF": 174,
-    "OFF_GUNS": 177,
-    "obtainable": 179,
-    "AUTO_ONLY": 187,
-    "FIRE_MODES": 189,
-    "MODE_NAME": 192,
-    "MODE_INFO": 198,
-    "roundOf": 210,
-    "perOf": 213,
-    "cartOf": 216,
-    "calsOf": 219,
-    "asCal": 222,
-    "capOf": 225,
-    "barrelsOf": 235,
-    "pickBarrels": 246,
-    "barrelMm": 258,
-    "shotK": 262,
-    "roundSpec": 265,
-    "shotDef": 274,
-    "shotSoundKey": 282,
-    "OPEN_BOLT": 291,
-    "chambered": 297,
-    "revolver": 301,
-    "REV": 303,
-    "fblock": 307,
-    "volleyVol": 310,
-    "fullReload": 314,
-    "BOLT_HOLD": 319,
-    "boltHold": 324,
-    "loaded": 327,
-    "MAG_FAMILY": 342,
-    "BELT_FAMILY": 346,
-    "magFam": 348,
-    "magFits": 351,
-    "beltFed": 354,
-    "GUN_SPECS": 453,
-    "SUPPRESSOR": 459,
-    "ARMOR_LIST": 487,
-    "SHIELDS": 495,
-    "ARMORS": 497,
-    "ENEMIES": 525,
-    "THEMES": 549,
-    "HANGAR_ROWS": 553,
-    "HANGAR_THEME": 555,
-    "PLAYER_COLORS": 558,
-    "VENDOR_QUIPS": 586,
-    "CALIBERS": 614,
-    "calOf": 622,
-    "stdMag": 630,
-    "PLUSP": 659,
-    "AMMO": 666,
-    "baseAm": 669,
-    "plusOf": 672,
-    "AMMO_TYPES": 675,
-    "ammoTypes": 678,
-    "loadOf": 681,
-    "MUZZLE_V": 698,
-    "SOUND_SPEED": 700,
-    "dragOf": 704,
-    "roundSpeed": 720,
-    "CHARGE_GR": 735,
-    "GUN_KG": 747,
-    "RECOIL_K": 760,
-    "RECOIL": 762,
-    "aimSway": 774,
-    "recoilImpulse": 784,
-    "physRecoil": 791,
-    "GRAVITY": 800,
-    "zeroOf": 802,
-    "sightH": 804,
-    "ROUND_LIFE": 809,
-    "ballistics": 811,
-    "flight": 823,
-    "zeroSlope": 838,
-    "CLICK": 843,
-    "boreTip": 845,
-    "ballFor": 847,
-    "loadFor": 850,
-    "AMMO_RARITY": 854,
-    "rollAmmo": 861,
-    "ammoOk": 864,
-    "roundDef": 881,
-    "gearTier": 888,
-    "ENEMY_GEAR": 927
+    "TIER_NAMES": 23,
+    "TIER_COLORS": 25,
+    "CLASS_SND": 42,
+    "WEAPON_LIST": 167,
+    "WEAPONS": 169,
+    "EXPLOSIVES_OFF": 173,
+    "AKIMBO_OFF": 175,
+    "OFF_GUNS": 178,
+    "obtainable": 180,
+    "AUTO_ONLY": 188,
+    "FIRE_MODES": 190,
+    "MODE_NAME": 193,
+    "MODE_INFO": 199,
+    "roundOf": 211,
+    "perOf": 214,
+    "cartOf": 217,
+    "calsOf": 220,
+    "asCal": 223,
+    "capOf": 226,
+    "barrelsOf": 236,
+    "pickBarrels": 247,
+    "barrelMm": 259,
+    "shotK": 263,
+    "roundSpec": 266,
+    "shotDef": 275,
+    "shotSoundKey": 283,
+    "OPEN_BOLT": 292,
+    "chambered": 298,
+    "revolver": 302,
+    "REV": 304,
+    "fblock": 308,
+    "volleyVol": 311,
+    "fullReload": 315,
+    "BOLT_HOLD": 320,
+    "boltHold": 325,
+    "loaded": 328,
+    "MAG_FAMILY": 343,
+    "BELT_FAMILY": 347,
+    "magFam": 349,
+    "magFits": 352,
+    "beltFed": 355,
+    "GUN_SPECS": 454,
+    "SUPPRESSOR": 460,
+    "ARMOR_LIST": 488,
+    "SHIELDS": 496,
+    "ARMORS": 498,
+    "ENEMIES": 526,
+    "THEMES": 550,
+    "HANGAR_ROWS": 554,
+    "HANGAR_THEME": 556,
+    "PLAYER_COLORS": 559,
+    "VENDOR_QUIPS": 587,
+    "CALIBERS": 615,
+    "calOf": 623,
+    "stdMag": 631,
+    "PLUSP": 660,
+    "AMMO": 667,
+    "baseAm": 670,
+    "plusOf": 673,
+    "AMMO_TYPES": 676,
+    "ammoTypes": 679,
+    "loadOf": 682,
+    "MUZZLE_V": 699,
+    "SOUND_SPEED": 701,
+    "dragOf": 705,
+    "roundSpeed": 721,
+    "CHARGE_GR": 736,
+    "GUN_KG": 748,
+    "RECOIL_K": 761,
+    "RECOIL": 763,
+    "aimSway": 775,
+    "recoilImpulse": 785,
+    "physRecoil": 792,
+    "GRAVITY": 801,
+    "zeroOf": 803,
+    "sightH": 805,
+    "ROUND_LIFE": 810,
+    "ballistics": 812,
+    "flight": 824,
+    "zeroSlope": 839,
+    "CLICK": 844,
+    "boreTip": 846,
+    "ballFor": 848,
+    "loadFor": 851,
+    "AMMO_RARITY": 855,
+    "rollAmmo": 862,
+    "ammoOk": 865,
+    "roundDef": 882,
+    "gearTier": 889,
+    "ENEMY_GEAR": 928
    },
+   "imports": [
+    {
+     "from": "util",
+     "line": 2,
+     "names": [
+      "Hooks",
+      "U"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "WEAPON_LIST",
-     "line": 169,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "CLASS_SND",
-     "line": 169,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 169,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "EXPLOSIVES_OFF",
-     "line": 178,
-     "load": false,
-     "guard": "check"
-    },
-    {
-     "x": "AKIMBO_OFF",
-     "line": 178,
-     "load": false,
-     "guard": "check"
-    },
-    {
-     "x": "WEAPON_LIST",
-     "line": 190,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "FIRE_MODES",
-     "line": 190,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "AUTO_ONLY",
-     "line": 190,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 212,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 215,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 215,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 215,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 218,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 221,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "perOf",
-     "line": 224,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "perOf",
-     "line": 231,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "barrelsOf",
-     "line": 240,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "MODE_INFO",
-     "line": 240,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 253,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 253,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 253,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "U",
-     "line": 261,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 264,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "barrelsOf",
-     "line": 267,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 267,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "barrelMm",
-     "line": 267,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "shotK",
-     "line": 268,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 268,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpec",
-     "line": 269,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "recoilImpulse",
-     "line": 271,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpec",
-     "line": 271,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "recoilImpulse",
-     "line": 271,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpec",
-     "line": 271,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "RECOIL",
-     "line": 271,
+     "x": "Gunsmith",
+     "line": 278,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 277,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "OPEN_BOLT",
-     "line": 293,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 294,
+     "line": 295,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Gunsmith",
-     "line": 294,
+     "line": 295,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 300,
+     "line": 301,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 300,
+     "line": 301,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 306,
+     "line": 307,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 306,
+     "line": 307,
      "load": false,
      "guard": "guarded"
     },
     {
-     "x": "revolver",
-     "line": 313,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "fblock",
-     "line": 313,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "REV",
-     "line": 313,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "REV",
-     "line": 313,
-     "load": false,
-     "guard": "plain"
-    },
-    {
      "x": "Gunsmith",
-     "line": 321,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 321,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "BOLT_HOLD",
      "line": 322,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "MAG_FAMILY",
-     "line": 347,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "BELT_FAMILY",
-     "line": 347,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "magFam",
-     "line": 350,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "magFam",
-     "line": 350,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "MAG_FAMILY",
-     "line": 353,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 455,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 455,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 455,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 455,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "ARMOR_LIST",
-     "line": 498,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "ARMORS",
-     "line": 498,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 619,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 626,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 626,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 626,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 628,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 671,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 677,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 677,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO_TYPES",
-     "line": 677,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 680,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "baseAm",
-     "line": 680,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "loadOf",
-     "line": 703,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 703,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "MUZZLE_V",
-     "line": 703,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 703,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "baseAm",
-     "line": 703,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 703,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 707,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "MUZZLE_V",
-     "line": 707,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 709,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "baseAm",
-     "line": 711,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "loadOf",
-     "line": 712,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 714,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 714,
+     "x": "Gunsmith",
+     "line": 322,
      "load": false,
      "guard": "guarded"
-    },
-    {
-     "x": "AMMO",
-     "line": 714,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "plusOf",
-     "line": 716,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "dragOf",
-     "line": 718,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_KG",
-     "line": 769,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 770,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 770,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 777,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 777,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CHARGE_GR",
-     "line": 777,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 779,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 779,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 781,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "loadOf",
-     "line": 781,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "plusOf",
-     "line": 781,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "RECOIL",
-     "line": 782,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_KG",
-     "line": 786,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "recoilImpulse",
-     "line": 787,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "RECOIL",
-     "line": 787,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "RECOIL_K",
-     "line": 789,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 792,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "physRecoil",
-     "line": 792,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 792,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 792,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 810,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "dragOf",
-     "line": 810,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GRAVITY",
-     "line": 810,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "sightH",
-     "line": 810,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballistics",
-     "line": 813,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ROUND_LIFE",
-     "line": 813,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "flight",
-     "line": 831,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "flight",
-     "line": 832,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "zeroSlope",
-     "line": 844,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 844,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 844,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "zeroOf",
-     "line": 844,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CLICK",
-     "line": 844,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ammoTypes",
-     "line": 846,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 849,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ammoTypes",
-     "line": 849,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 849,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 853,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 853,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 853,
-     "load": true,
-     "guard": "guarded"
-    },
-    {
-     "x": "ammoTypes",
-     "line": 856,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO_RARITY",
-     "line": 857,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO_RARITY",
-     "line": 858,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ammoTypes",
-     "line": 863,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 863,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 867,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "loadOf",
-     "line": 867,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 867,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "recoilImpulse",
-     "line": 878,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "recoilImpulse",
-     "line": 878,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "RECOIL",
-     "line": 878,
-     "load": false,
-     "guard": "plain"
     }
    ],
    "decls": {
     "GunSpec": {
      "kind": "type",
-     "line": 8
+     "line": 9
     },
     "ArmorDef": {
      "kind": "type",
-     "line": 12
+     "line": 13
     },
     "AmmoDef": {
      "kind": "type",
-     "line": 16
+     "line": 17
     },
-    "G_TIER_NAMES": {
+    "TIER_NAMES": {
      "kind": "value",
-     "line": 21
+     "line": 22
     },
-    "G_TIER_COLORS": {
+    "TIER_COLORS": {
      "kind": "value",
-     "line": 23
+     "line": 24
     },
-    "G_CLASS_SND": {
+    "CLASS_SND": {
      "kind": "value",
-     "line": 27
+     "line": 28
     },
     "W": {
      "kind": "value",
-     "line": 49
+     "line": 50
     },
-    "G_WEAPON_LIST": {
+    "WEAPON_LIST": {
      "kind": "value",
-     "line": 51
+     "line": 52
     },
-    "G_WEAPONS": {
+    "WEAPONS": {
      "kind": "value",
-     "line": 167
+     "line": 168
     },
-    "G_EXPLOSIVES_OFF": {
+    "EXPLOSIVES_OFF": {
      "kind": "value",
-     "line": 171
+     "line": 172
     },
-    "G_AKIMBO_OFF": {
+    "AKIMBO_OFF": {
      "kind": "value",
-     "line": 173
+     "line": 174
     },
-    "G_OFF_GUNS": {
+    "OFF_GUNS": {
      "kind": "value",
-     "line": 176
+     "line": 177
     },
-    "G_obtainable": {
+    "obtainable": {
      "kind": "value",
-     "line": 178
+     "line": 179
     },
-    "G_AUTO_ONLY": {
+    "AUTO_ONLY": {
      "kind": "value",
-     "line": 186
+     "line": 187
     },
-    "G_FIRE_MODES": {
+    "FIRE_MODES": {
      "kind": "value",
-     "line": 188
+     "line": 189
     },
-    "G_MODE_NAME": {
+    "MODE_NAME": {
      "kind": "value",
-     "line": 191
+     "line": 192
     },
-    "G_MODE_INFO": {
+    "MODE_INFO": {
      "kind": "value",
-     "line": 195
+     "line": 196
     },
-    "G_roundOf": {
+    "roundOf": {
      "kind": "value",
-     "line": 204
+     "line": 205
     },
-    "G_perOf": {
+    "perOf": {
      "kind": "value",
-     "line": 212
+     "line": 213
     },
-    "G_cartOf": {
+    "cartOf": {
      "kind": "value",
-     "line": 215
+     "line": 216
     },
-    "G_calsOf": {
+    "calsOf": {
      "kind": "value",
-     "line": 218
+     "line": 219
     },
-    "G_asCal": {
+    "asCal": {
      "kind": "value",
-     "line": 221
+     "line": 222
     },
-    "G_capOf": {
+    "capOf": {
      "kind": "value",
-     "line": 224
+     "line": 225
     },
-    "G_barrelsOf": {
+    "barrelsOf": {
      "kind": "value",
-     "line": 228
+     "line": 229
     },
-    "G_pickBarrels": {
+    "pickBarrels": {
      "kind": "value",
-     "line": 239
+     "line": 240
     },
-    "G_barrelMm": {
+    "barrelMm": {
      "kind": "value",
-     "line": 252
+     "line": 253
     },
-    "G_shotK": {
+    "shotK": {
      "kind": "value",
-     "line": 261
+     "line": 262
     },
-    "G_roundSpec": {
+    "roundSpec": {
      "kind": "value",
-     "line": 264
+     "line": 265
     },
-    "G_shotDef": {
+    "shotDef": {
      "kind": "value",
-     "line": 266
+     "line": 267
     },
-    "G_shotSoundKey": {
+    "shotSoundKey": {
      "kind": "value",
-     "line": 276
+     "line": 277
     },
-    "G_OPEN_BOLT": {
+    "OPEN_BOLT": {
      "kind": "value",
-     "line": 290
+     "line": 291
     },
-    "G_chambered": {
+    "chambered": {
      "kind": "value",
-     "line": 292
+     "line": 293
     },
-    "G_revolver": {
+    "revolver": {
      "kind": "value",
-     "line": 300
+     "line": 301
     },
-    "G_REV": {
+    "REV": {
      "kind": "value",
-     "line": 302
+     "line": 303
     },
-    "G_fblock": {
+    "fblock": {
      "kind": "value",
-     "line": 306
+     "line": 307
     },
-    "G_volleyVol": {
+    "volleyVol": {
      "kind": "value",
-     "line": 309
+     "line": 310
     },
-    "G_fullReload": {
+    "fullReload": {
      "kind": "value",
-     "line": 313
+     "line": 314
     },
-    "G_BOLT_HOLD": {
+    "BOLT_HOLD": {
      "kind": "value",
-     "line": 318
+     "line": 319
     },
-    "G_boltHold": {
+    "boltHold": {
      "kind": "value",
-     "line": 320
+     "line": 321
     },
-    "G_loaded": {
+    "loaded": {
      "kind": "value",
-     "line": 326
+     "line": 327
     },
-    "G_MAG_FAMILY": {
+    "MAG_FAMILY": {
      "kind": "value",
-     "line": 338
+     "line": 339
     },
-    "G_BELT_FAMILY": {
+    "BELT_FAMILY": {
      "kind": "value",
-     "line": 345
+     "line": 346
     },
-    "G_magFam": {
+    "magFam": {
      "kind": "value",
-     "line": 347
+     "line": 348
     },
-    "G_magFits": {
+    "magFits": {
      "kind": "value",
-     "line": 350
+     "line": 351
     },
-    "G_beltFed": {
+    "beltFed": {
      "kind": "value",
-     "line": 353
+     "line": 354
     },
     "GS": {
      "kind": "value",
-     "line": 359
+     "line": 360
     },
-    "G_GUN_SPECS": {
+    "GUN_SPECS": {
      "kind": "value",
-     "line": 361
+     "line": 362
     },
-    "G_SUPPRESSOR": {
+    "SUPPRESSOR": {
      "kind": "value",
-     "line": 458
+     "line": 459
     },
-    "G_ARMOR_LIST": {
+    "ARMOR_LIST": {
      "kind": "value",
-     "line": 467
+     "line": 468
     },
     "G_SHIELD_LIST": {
      "kind": "value",
-     "line": 488
+     "line": 489
     },
-    "G_SHIELDS": {
+    "SHIELDS": {
      "kind": "value",
-     "line": 493
+     "line": 494
     },
-    "G_ARMORS": {
+    "ARMORS": {
      "kind": "value",
-     "line": 496
+     "line": 497
     },
-    "G_ENEMIES": {
+    "ENEMIES": {
      "kind": "value",
-     "line": 508
+     "line": 509
     },
-    "G_THEMES": {
+    "THEMES": {
      "kind": "value",
-     "line": 530
+     "line": 531
     },
-    "G_HANGAR_ROWS": {
+    "HANGAR_ROWS": {
      "kind": "value",
-     "line": 552
+     "line": 553
     },
-    "G_HANGAR_THEME": {
+    "HANGAR_THEME": {
      "kind": "value",
-     "line": 554
+     "line": 555
     },
-    "G_PLAYER_COLORS": {
+    "PLAYER_COLORS": {
      "kind": "value",
-     "line": 557
+     "line": 558
     },
-    "G_VENDOR_QUIPS": {
+    "VENDOR_QUIPS": {
      "kind": "value",
-     "line": 560
+     "line": 561
     },
-    "G_CALIBERS": {
+    "CALIBERS": {
      "kind": "value",
-     "line": 596
+     "line": 597
     },
-    "G_calOf": {
+    "calOf": {
      "kind": "value",
-     "line": 615
+     "line": 616
     },
-    "G_stdMag": {
+    "stdMag": {
      "kind": "value",
-     "line": 624
+     "line": 625
     },
-    "G_AMMO": {
+    "AMMO": {
      "kind": "value",
-     "line": 635
+     "line": 636
     },
-    "G_PLUSP": {
+    "PLUSP": {
      "kind": "value",
-     "line": 658
+     "line": 659
     },
     "G_PLUSP_K": {
      "kind": "value",
-     "line": 660
+     "line": 661
     },
-    "G_baseAm": {
+    "baseAm": {
      "kind": "value",
-     "line": 668
+     "line": 669
     },
-    "G_plusOf": {
+    "plusOf": {
      "kind": "value",
-     "line": 671
+     "line": 672
     },
-    "G_AMMO_TYPES": {
+    "AMMO_TYPES": {
      "kind": "value",
-     "line": 673
+     "line": 674
     },
-    "G_ammoTypes": {
+    "ammoTypes": {
      "kind": "value",
-     "line": 677
+     "line": 678
     },
-    "G_loadOf": {
+    "loadOf": {
      "kind": "value",
-     "line": 680
+     "line": 681
     },
-    "G_MUZZLE_V": {
+    "MUZZLE_V": {
      "kind": "value",
-     "line": 685
+     "line": 686
     },
-    "G_SOUND_SPEED": {
+    "SOUND_SPEED": {
      "kind": "value",
-     "line": 699
+     "line": 700
     },
-    "G_dragOf": {
+    "dragOf": {
      "kind": "value",
-     "line": 703
+     "line": 704
     },
-    "G_roundSpeed": {
+    "roundSpeed": {
      "kind": "value",
-     "line": 706
+     "line": 707
     },
-    "G_CHARGE_GR": {
+    "CHARGE_GR": {
      "kind": "value",
-     "line": 729
+     "line": 730
     },
-    "G_GUN_KG": {
+    "GUN_KG": {
      "kind": "value",
-     "line": 736
+     "line": 737
     },
-    "G_RECOIL_K": {
+    "RECOIL_K": {
      "kind": "value",
-     "line": 748
+     "line": 749
     },
-    "G_RECOIL": {
+    "RECOIL": {
      "kind": "value",
-     "line": 761
+     "line": 762
     },
-    "G_aimSway": {
+    "aimSway": {
      "kind": "value",
-     "line": 768
+     "line": 769
     },
-    "G_recoilImpulse": {
+    "recoilImpulse": {
      "kind": "value",
-     "line": 776
+     "line": 777
     },
-    "G_physRecoil": {
+    "physRecoil": {
      "kind": "value",
-     "line": 786
+     "line": 787
     },
-    "G_GRAVITY": {
+    "GRAVITY": {
      "kind": "value",
-     "line": 799
+     "line": 800
     },
-    "G_zeroOf": {
+    "zeroOf": {
      "kind": "value",
-     "line": 801
+     "line": 802
     },
-    "G_sightH": {
+    "sightH": {
      "kind": "value",
-     "line": 803
+     "line": 804
     },
-    "G_ROUND_LIFE": {
+    "ROUND_LIFE": {
      "kind": "value",
-     "line": 808
+     "line": 809
     },
-    "G_ballistics": {
+    "ballistics": {
      "kind": "value",
-     "line": 810
+     "line": 811
     },
-    "G_flight": {
+    "flight": {
      "kind": "value",
-     "line": 812
+     "line": 813
     },
     "_zeroK": {
      "kind": "value",
-     "line": 826
-    },
-    "G_zeroSlope": {
-     "kind": "value",
      "line": 827
     },
-    "G_CLICK": {
+    "zeroSlope": {
      "kind": "value",
-     "line": 842
+     "line": 828
     },
-    "G_boreTip": {
+    "CLICK": {
      "kind": "value",
-     "line": 844
+     "line": 843
     },
-    "G_ballFor": {
+    "boreTip": {
      "kind": "value",
-     "line": 846
+     "line": 845
     },
-    "G_loadFor": {
+    "ballFor": {
      "kind": "value",
-     "line": 849
+     "line": 847
     },
-    "G_AMMO_RARITY": {
+    "loadFor": {
      "kind": "value",
-     "line": 852
+     "line": 850
     },
-    "G_rollAmmo": {
+    "AMMO_RARITY": {
      "kind": "value",
-     "line": 855
+     "line": 853
     },
-    "G_ammoOk": {
+    "rollAmmo": {
      "kind": "value",
-     "line": 863
+     "line": 856
     },
-    "G_roundDef": {
+    "ammoOk": {
      "kind": "value",
-     "line": 866
+     "line": 864
     },
-    "G_gearTier": {
+    "roundDef": {
      "kind": "value",
-     "line": 887
+     "line": 867
     },
-    "G_ENEMY_GEAR": {
+    "gearTier": {
      "kind": "value",
-     "line": 889
+     "line": 888
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 929
+    "ENEMY_GEAR": {
+     "kind": "value",
+     "line": 890
+    },
+    "global": {
+     "kind": "value",
+     "line": 930
     }
    }
   },
@@ -4557,6 +3723,7 @@
    "defs": {
     "DebugStart": 180
    },
+   "imports": [],
    "uses": [
     {
      "x": "THEMES",
@@ -4982,6 +4149,7 @@
    "defs": {
     "Demo": 106
    },
+   "imports": [],
    "uses": [
     {
      "x": "Me",
@@ -5123,28 +4291,41 @@
   },
   "exportworker": {
    "defs": {},
+   "imports": [],
    "uses": [
     {
+     "x": "Hooks",
+     "line": 23,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Hooks",
+     "line": 24,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Models",
-     "line": 21,
+     "line": 25,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Stickers",
-     "line": 22,
+     "line": 26,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Highlights",
-     "line": 27,
+     "line": 31,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Highlights",
-     "line": 29,
+     "line": 33,
      "load": false,
      "guard": "plain"
     }
@@ -5164,6 +4345,7 @@
    "defs": {
     "Footsteps": 152
    },
+   "imports": [],
    "uses": [
     {
      "x": "Audio",
@@ -5327,6 +4509,7 @@
    "defs": {
     "Furniture": 1817
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -5410,6 +4593,7 @@
    "defs": {
     "FurnMesh": 193
    },
+   "imports": [],
    "uses": [
     {
      "x": "FurnSpec",
@@ -5433,6 +4617,7 @@
    "defs": {
     "FurnSpec": 548
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -5484,6 +4669,7 @@
    "defs": {
     "Game": 1916
    },
+   "imports": [],
    "uses": [
     {
      "x": "ServerLink",
@@ -10441,6 +9627,7 @@
    "defs": {
     "Pad": 413
    },
+   "imports": [],
    "uses": [
     {
      "x": "HUD",
@@ -10674,474 +9861,179 @@
   },
   "gear": {
    "defs": {
-    "Gear": 721
+    "Gear": 723
    },
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "AMMO",
+      "ballFor",
+      "barrelsOf",
+      "beltFed",
+      "CALIBERS",
+      "calOf",
+      "capOf",
+      "cartOf",
+      "chambered",
+      "loadFor",
+      "magFits",
+      "revolver",
+      "roundOf",
+      "WEAPONS"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "Hooks"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "CALIBERS",
-     "line": 134,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "revolver",
-     "line": 136,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 138,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 138,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "beltFed",
-     "line": 141,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 181,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 181,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
      "x": "Sim",
-     "line": 181,
+     "line": 183,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Stickers",
-     "line": 185,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "revolver",
-     "line": 188,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 188,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 188,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 188,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "ballFor",
-     "line": 188,
+     "line": 187,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 206,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 208,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 208,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "loadFor",
      "line": 208,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 210,
+     "line": 212,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 218,
+     "line": 220,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 218,
+     "line": 220,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 218,
+     "line": 220,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 218,
+     "line": 220,
      "load": false,
      "guard": "guarded"
     },
     {
-     "x": "beltFed",
-     "line": 219,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 227,
+     "x": "Gunsmith",
+     "line": 229,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 227,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 230,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 230,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 235,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 278,
+     "line": 280,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 287,
+     "line": 289,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 287,
+     "line": 289,
      "load": false,
      "guard": "guarded"
     },
     {
-     "x": "WEAPONS",
-     "line": 310,
+     "x": "Med",
+     "line": 317,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 315,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Med",
-     "line": 315,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 383,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 383,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "calOf",
-     "line": 388,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "magFits",
-     "line": 388,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "revolver",
-     "line": 429,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 437,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "barrelsOf",
-     "line": 445,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 445,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "capOf",
-     "line": 447,
+     "line": 317,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 447,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 475,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "magFits",
-     "line": 489,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "chambered",
-     "line": 499,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 511,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 520,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "chambered",
-     "line": 521,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 554,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 565,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 572,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 581,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 587,
+     "line": 449,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 603,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundOf",
-     "line": 616,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 616,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 619,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 666,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 678,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 678,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "AMMO",
-     "line": 678,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 678,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "AMMO",
-     "line": 681,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 681,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 683,
+     "line": 605,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 684,
+     "line": 686,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 684,
+     "line": 686,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 691,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "cartOf",
-     "line": 696,
+     "line": 693,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 696,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Med",
      "line": 698,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 698,
+     "line": 700,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "WEAPONS",
-     "line": 703,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 705,
+     "x": "Med",
+     "line": 700,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 705,
+     "line": 707,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Gunsmith",
+     "line": 707,
      "load": false,
      "guard": "plain"
     }
@@ -11149,23 +10041,23 @@
    "decls": {
     "GMe": {
      "kind": "type",
-     "line": 16
+     "line": 18
     },
     "GTbl": {
      "kind": "type",
-     "line": 17
+     "line": 19
     },
     "PouchDef": {
      "kind": "type",
-     "line": 19
+     "line": 21
     },
-    "G_Gear": {
+    "Gear": {
      "kind": "value",
-     "line": 20
+     "line": 22
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 722
+    "global": {
+     "kind": "value",
+     "line": 724
     }
    }
   },
@@ -11173,6 +10065,7 @@
    "defs": {
     "Glare": 74
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -11239,6 +10132,7 @@
     "GLB": 1425,
     "Models": 1463
    },
+   "imports": [],
    "uses": [
     {
      "x": "GLB",
@@ -11368,6 +10262,7 @@
    "defs": {
     "GunAudio": 544
    },
+   "imports": [],
    "uses": [
     {
      "x": "Level",
@@ -11627,6 +10522,7 @@
    "defs": {
     "GunMaterials": 78
    },
+   "imports": [],
    "uses": [],
    "decls": {
     "G_GunMaterials": {
@@ -11643,6 +10539,7 @@
    "defs": {
     "GunModels": 201
    },
+   "imports": [],
    "uses": [
     {
      "x": "Models",
@@ -11798,6 +10695,7 @@
    "defs": {
     "GunRig": 195
    },
+   "imports": [],
    "uses": [
     {
      "x": "GunModels",
@@ -11837,6 +10735,7 @@
   },
   "gunshot-synth": {
    "defs": {},
+   "imports": [],
    "uses": [],
    "decls": {
     "MuzzleDevice": {
@@ -11857,6 +10756,7 @@
    "defs": {
     "GunsmithUI": 550
    },
+   "imports": [],
    "uses": [
     {
      "x": "Gunsmith",
@@ -12560,6 +11460,7 @@
    "defs": {
     "Handling": 129
    },
+   "imports": [],
    "uses": [
     {
      "x": "revolver",
@@ -12659,6 +11560,7 @@
    "defs": {
     "Hangar": 1253
    },
+   "imports": [],
    "uses": [
     {
      "x": "HANGAR_ROWS",
@@ -13390,6 +12292,7 @@
    "defs": {
     "Headgear": 58
    },
+   "imports": [],
    "uses": [
     {
      "x": "Gear",
@@ -13425,6 +12328,7 @@
    "defs": {
     "Highlights": 3412
    },
+   "imports": [],
    "uses": [
     {
      "x": "Game",
@@ -15026,6 +13930,7 @@
    "defs": {
     "Homes": 745
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -15143,6 +14048,7 @@
    "defs": {
     "HUD": 520
    },
+   "imports": [],
    "uses": [
     {
      "x": "Pad",
@@ -15810,6 +14716,7 @@
    "defs": {
     "HumanData": 24
    },
+   "imports": [],
    "uses": [],
    "decls": {
     "G_HumanData": {
@@ -15826,6 +14733,7 @@
    "defs": {
     "Humans": 41
    },
+   "imports": [],
    "uses": [
     {
      "x": "HumanData",
@@ -15861,6 +14769,7 @@
    "defs": {
     "Icons": 564
    },
+   "imports": [],
    "uses": [
     {
      "x": "baseAm",
@@ -16040,6 +14949,7 @@
    "defs": {
     "InvUI": 1036
    },
+   "imports": [],
    "uses": [
     {
      "x": "Touch",
@@ -17881,6 +16791,7 @@
    "defs": {
     "Landing": 232
    },
+   "imports": [],
    "uses": [
     {
      "x": "Hangar",
@@ -18090,6 +17001,7 @@
    "defs": {
     "Level": 2296
    },
+   "imports": [],
    "uses": [
     {
      "x": "LevelDesc",
@@ -18663,6 +17575,7 @@
    "defs": {
     "LevelDesc": 1080
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -18818,6 +17731,7 @@
    "defs": {
     "LevelView": 641
    },
+   "imports": [],
    "uses": [
     {
      "x": "LightGrid",
@@ -18947,6 +17861,7 @@
    "defs": {
     "LightGrid": 409
    },
+   "imports": [],
    "uses": [
     {
      "x": "Level",
@@ -18982,6 +17897,7 @@
    "defs": {
     "Loadout": 246
    },
+   "imports": [],
    "uses": [
     {
      "x": "Arsenal",
@@ -19227,6 +18143,7 @@
    "defs": {
     "Loot": 135
    },
+   "imports": [],
    "uses": [
     {
      "x": "Gear",
@@ -19394,6 +18311,7 @@
    "defs": {
     "Materials": 186
    },
+   "imports": [],
    "uses": [
     {
      "x": "Level",
@@ -19409,36 +18327,39 @@
     }
    ],
    "decls": {
-    "G_Materials": {
+    "Materials": {
      "kind": "value",
      "line": 2
     },
-    "GameModules": {
-     "kind": "type",
+    "global": {
+     "kind": "value",
      "line": 188
     }
    }
   },
   "medical": {
    "defs": {
-    "Med": 249
+    "Med": 250
    },
+   "imports": [
+    {
+     "from": "util",
+     "line": 2,
+     "names": [
+      "U"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "U",
-     "line": 133,
-     "load": false,
-     "guard": "plain"
-    },
-    {
      "x": "Ballistics",
-     "line": 212,
+     "line": 213,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Ballistics",
-     "line": 212,
+     "line": 213,
      "load": false,
      "guard": "guarded"
     }
@@ -19446,27 +18367,27 @@
    "decls": {
     "MedFlag": {
      "kind": "type",
-     "line": 3
+     "line": 4
     },
     "MedFix": {
      "kind": "type",
-     "line": 5
+     "line": 6
     },
     "MedWhere": {
      "kind": "type",
-     "line": 7
+     "line": 8
     },
     "MedItem": {
      "kind": "type",
-     "line": 8
-    },
-    "G_Med": {
-     "kind": "value",
      "line": 9
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 250
+    "Med": {
+     "kind": "value",
+     "line": 10
+    },
+    "global": {
+     "kind": "value",
+     "line": 251
     }
    }
   },
@@ -19474,6 +18395,7 @@
    "defs": {
     "MenuShow": 89
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -19558,6 +18480,7 @@
     "Bundles": 239,
     "AudioBundle": 240
    },
+   "imports": [],
    "uses": [],
    "decls": {
     "EXT": {
@@ -19602,6 +18525,7 @@
    "defs": {
     "Net": 188
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -19659,444 +18583,58 @@
   },
   "parts": {
    "defs": {
-    "Gunsmith": 1833
+    "Gunsmith": 1835
    },
-   "uses": [
-    {
-     "x": "GUN_SPECS",
-     "line": 134,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 184,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 184,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 190,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 436,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 436,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 437,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 488,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 488,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 476,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 476,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 476,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "MAG_FAMILY",
-     "line": 575,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "MAG_FAMILY",
-     "line": 575,
-     "load": true,
-     "guard": "guarded"
-    },
-    {
-     "x": "calOf",
-     "line": 666,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_KG",
-     "line": 710,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPON_LIST",
-     "line": 835,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 875,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 979,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 981,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1011,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 1011,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 1049,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 1049,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "physRecoil",
-     "line": 1099,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1106,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "baseAm",
-     "line": 1125,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 1125,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 1125,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 1125,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 1132,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1136,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1136,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1137,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "baseAm",
-     "line": 1139,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1139,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1139,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "plusOf",
-     "line": 1139,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 1139,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 1151,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 1153,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1153,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 1229,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 1241,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "BELT_FAMILY",
-     "line": 1358,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 1470,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1487,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1669,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1684,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1686,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1691,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 1691,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1691,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1691,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 1712,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1764,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 1764,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 1765,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 1765,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GUN_SPECS",
-     "line": 1801,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1804,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1808,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "fullReload",
-     "line": 1809,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "fullReload",
-     "line": 1809,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1813,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1813,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CALIBERS",
-     "line": 1813,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 1813,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 1813,
-     "load": false,
-     "guard": "plain"
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "AMMO",
+      "baseAm",
+      "BELT_FAMILY",
+      "CALIBERS",
+      "calOf",
+      "fullReload",
+      "GUN_KG",
+      "GUN_SPECS",
+      "MAG_FAMILY",
+      "physRecoil",
+      "plusOf",
+      "roundSpeed",
+      "WEAPON_LIST",
+      "WEAPONS"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "U"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
     "MagFam": {
      "kind": "type",
-     "line": 2
+     "line": 4
     },
     "Platform": {
      "kind": "type",
-     "line": 6
+     "line": 8
     },
     "RcvKit": {
      "kind": "type",
-     "line": 7
+     "line": 9
     },
-    "G_Gunsmith": {
+    "Gunsmith": {
      "kind": "value",
-     "line": 8
+     "line": 10
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 1834
+    "global": {
+     "kind": "value",
+     "line": 1836
     }
    }
   },
@@ -20104,6 +18642,7 @@
    "defs": {
     "Me": 3257
    },
+   "imports": [],
    "uses": [
     {
      "x": "Me",
@@ -25433,6 +23972,7 @@
    "defs": {
     "Prep": 56
    },
+   "imports": [],
    "uses": [
     {
      "x": "LightGrid",
@@ -25454,6 +23994,7 @@
   },
   "prepworker": {
    "defs": {},
+   "imports": [],
    "uses": [
     {
      "x": "LightGrid",
@@ -25489,6 +24030,7 @@
    "defs": {
     "Prof": 272
    },
+   "imports": [],
    "uses": [
     {
      "x": "R",
@@ -25914,6 +24456,7 @@
    "defs": {
     "Range": 435
    },
+   "imports": [],
    "uses": [
     {
      "x": "HANGAR_ROWS",
@@ -26163,6 +24706,7 @@
    "defs": {
     "Recorder": 97
    },
+   "imports": [],
    "uses": [
     {
      "x": "Level",
@@ -26198,6 +24742,7 @@
    "defs": {
     "R": 2047
    },
+   "imports": [],
    "uses": [
     {
      "x": "LevelView",
@@ -26829,6 +25374,7 @@
   },
   "residents": {
    "defs": {},
+   "imports": [],
    "uses": [
     {
      "x": "Furniture",
@@ -26849,6 +25395,7 @@
    "defs": {
     "Rig": 2277
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -27440,6 +25987,7 @@
    "defs": {
     "Route": 150
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -27553,6 +26101,7 @@
    "defs": {
     "Scars": 253
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -27588,6 +26137,7 @@
    "defs": {
     "Server": 3563
    },
+   "imports": [],
    "uses": [
     {
      "x": "Callsigns",
@@ -29339,6 +27889,7 @@
    "defs": {
     "ServerHost": 111
    },
+   "imports": [],
    "uses": [
     {
      "x": "Server",
@@ -29536,6 +28087,7 @@
    "defs": {
     "ServerLink": 144
    },
+   "imports": [],
    "uses": [
     {
      "x": "ServerHost",
@@ -29587,6 +28139,7 @@
   },
   "serverworker": {
    "defs": {},
+   "imports": [],
    "uses": [
     {
      "x": "ServerHost",
@@ -29608,156 +28161,135 @@
   },
   "shipgen": {
    "defs": {
-    "ShipGen": 482
+    "ShipGen": 483
    },
+   "imports": [
+    {
+     "from": "util",
+     "line": 2,
+     "names": [
+      "U"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "U",
-     "line": 30,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 47,
+     "x": "Level",
+     "line": 48,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 47,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 130,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 135,
+     "line": 136,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 135,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 181,
+     "line": 205,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 204,
+     "line": 276,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 275,
+     "line": 295,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 294,
+     "line": 308,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 307,
+     "line": 318,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 317,
+     "line": 359,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 358,
+     "line": 363,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 362,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 375,
+     "line": 376,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 387,
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
-     "line": 390,
+     "line": 391,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 398,
+     "line": 399,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 398,
+     "line": 399,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 432,
+     "line": 433,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 432,
+     "line": 433,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 461,
+     "line": 462,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 468,
+     "line": 469,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 468,
+     "line": 469,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 468,
+     "line": 469,
      "load": false,
      "guard": "plain"
     }
@@ -29765,27 +28297,27 @@
    "decls": {
     "ShSlot": {
      "kind": "type",
-     "line": 2
+     "line": 3
     },
     "ShSeg": {
      "kind": "type",
-     "line": 3
+     "line": 4
     },
     "ShWing": {
      "kind": "type",
-     "line": 4
+     "line": 5
     },
     "ShSk": {
      "kind": "type",
-     "line": 5
-    },
-    "G_ShipGen": {
-     "kind": "value",
      "line": 6
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 483
+    "ShipGen": {
+     "kind": "value",
+     "line": 7
+    },
+    "global": {
+     "kind": "value",
+     "line": 484
     }
    }
   },
@@ -29793,6 +28325,7 @@
    "defs": {
     "ShipModel": 714
    },
+   "imports": [],
    "uses": [
     {
      "x": "SpaceData",
@@ -29910,6 +28443,7 @@
    "defs": {
     "Shop": 132
    },
+   "imports": [],
    "uses": [
     {
      "x": "Shop",
@@ -30095,6 +28629,7 @@
    "defs": {
     "ShopUI": 444
    },
+   "imports": [],
    "uses": [
     {
      "x": "Shop",
@@ -31876,6 +30411,7 @@
    "defs": {
     "ShotLog": 296
    },
+   "imports": [],
    "uses": [
     {
      "x": "R",
@@ -32085,144 +30621,110 @@
   },
   "sim": {
    "defs": {
-    "Sim": 197
+    "Sim": 201
    },
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "chambered",
+      "loadFor",
+      "ROUND_LIFE"
+     ]
+    },
+    {
+     "from": "parts",
+     "line": 3,
+     "names": [
+      "Gunsmith"
+     ]
+    },
+    {
+     "from": "spacedata",
+     "line": 4,
+     "names": [
+      "SpaceData"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 5,
+     "names": [
+      "U"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "Gunsmith",
-     "line": 44,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "loadFor",
-     "line": 45,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "chambered",
-     "line": 48,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ROUND_LIFE",
-     "line": 57,
+     "x": "Level",
+     "line": 66,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 62,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 78,
+     "line": 82,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 83,
+     "line": 87,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 83,
+     "line": 87,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 108,
+     "line": 112,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 110,
+     "line": 114,
      "load": false,
      "guard": "guarded"
     },
     {
-     "x": "SpaceData",
-     "line": 111,
+     "x": "Level",
+     "line": 127,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 123,
+     "line": 157,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 153,
+     "line": 171,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 167,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 176,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 176,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 186,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 187,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 187,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 191,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 191,
+     "line": 190,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Sim": {
+    "Sim": {
      "kind": "value",
-     "line": 6
+     "line": 10
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 198
+    "global": {
+     "kind": "value",
+     "line": 202
     }
    }
   },
@@ -32230,6 +30732,7 @@
    "defs": {
     "Space": 1800
    },
+   "imports": [],
    "uses": [
     {
      "x": "SpaceData",
@@ -34027,102 +32530,65 @@
   },
   "spacedata": {
    "defs": {
-    "SpaceData": 330
+    "SpaceData": 332
    },
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "HANGAR_ROWS",
+      "THEMES"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "U"
+     ]
+    }
+   ],
    "uses": [
     {
      "x": "Level",
-     "line": 132,
+     "line": 134,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 155,
+     "line": 157,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 167,
+     "line": 169,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
-     "line": 167,
+     "line": 169,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 180,
+     "line": 182,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 181,
+     "line": 183,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 181,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "HANGAR_ROWS",
-     "line": 204,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 213,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 214,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 222,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 222,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 287,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 287,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 290,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 290,
+     "line": 183,
      "load": false,
      "guard": "plain"
     }
@@ -34130,23 +32596,23 @@
    "decls": {
     "SpClass": {
      "kind": "type",
-     "line": 4
+     "line": 6
     },
     "SpLayout": {
      "kind": "type",
-     "line": 6
+     "line": 8
     },
     "SpEquip": {
      "kind": "type",
-     "line": 13
+     "line": 15
     },
-    "G_SpaceData": {
+    "SpaceData": {
      "kind": "value",
-     "line": 14
+     "line": 16
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 331
+    "global": {
+     "kind": "value",
+     "line": 333
     }
    }
   },
@@ -34154,6 +32620,7 @@
    "defs": {
     "SpaceSv": 802
    },
+   "imports": [],
    "uses": [
     {
      "x": "SpaceData",
@@ -34621,6 +33088,7 @@
    "defs": {
     "SpaceUI": 332
    },
+   "imports": [],
    "uses": [
     {
      "x": "SpaceData",
@@ -35100,6 +33568,7 @@
    "defs": {
     "Stickers": 275
    },
+   "imports": [],
    "uses": [
     {
      "x": "Hooks",
@@ -35157,6 +33626,7 @@
   },
   "threeboot": {
    "defs": {},
+   "imports": [],
    "uses": [],
    "decls": {}
   },
@@ -35164,6 +33634,7 @@
    "defs": {
     "Touch": 269
    },
+   "imports": [],
    "uses": [
     {
      "x": "Pad",
@@ -35344,18 +33815,19 @@
     "U": 111,
     "Hooks": 114
    },
+   "imports": [],
    "uses": [],
    "decls": {
-    "G_U": {
+    "U": {
      "kind": "value",
      "line": 36
     },
-    "G_Hooks": {
+    "Hooks": {
      "kind": "value",
      "line": 113
     },
-    "GameModules": {
-     "kind": "type",
+    "global": {
+     "kind": "value",
      "line": 115
     }
    }
@@ -35364,6 +33836,7 @@
    "defs": {
     "Viewmodel": 625
    },
+   "imports": [],
    "uses": [
     {
      "x": "R",
@@ -35559,6 +34032,7 @@
    "defs": {
     "Views": 1132
    },
+   "imports": [],
    "uses": [
     {
      "x": "R",
@@ -37678,6 +36152,7 @@
    "defs": {
     "VMAnim": 1376
    },
+   "imports": [],
    "uses": [
     {
      "x": "U",
@@ -38075,6 +36550,7 @@
    "defs": {
     "World": 647
    },
+   "imports": [],
    "uses": [
     {
      "x": "Level",
@@ -38212,6 +36688,7 @@
    "defs": {
     "ZeroUI": 113
    },
+   "imports": [],
    "uses": [
     {
      "x": "Me",
@@ -38361,6 +36838,7 @@
    "defs": {
     "Zip": 55
    },
+   "imports": [],
    "uses": [],
    "decls": {
     "G_Zip": {
@@ -38492,25 +36970,6 @@
    }
   },
   "arsenal": {
-   "util": {
-    "load": 0,
-    "call": 12,
-    "names": [
-     "U",
-     "Hooks"
-    ],
-    "loadAt": []
-   },
-   "data": {
-    "load": 0,
-    "call": 5,
-    "names": [
-     "WEAPONS",
-     "ammoOk",
-     "calOf"
-    ],
-    "loadAt": []
-   },
    "ballistics": {
     "load": 0,
     "call": 1,
@@ -38518,6 +36977,39 @@
      "Ballistics"
     ],
     "loadAt": []
+   },
+   "data": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "ammoOk",
+     "calOf",
+     "WEAPONS"
+    ],
+    "loadAt": [
+     {
+      "x": "ammoOk, calOf, WEAPONS",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Hooks",
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "Hooks, U",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "audio": {
@@ -38717,12 +37209,19 @@
   },
   "callsigns": {
    "util": {
-    "load": 0,
-    "call": 1,
+    "load": 1,
+    "call": 0,
     "names": [
      "U"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "career": {
@@ -39106,15 +37605,6 @@
    }
   },
   "data": {
-   "util": {
-    "load": 0,
-    "call": 5,
-    "names": [
-     "Hooks",
-     "U"
-    ],
-    "loadAt": []
-   },
    "parts": {
     "load": 0,
     "call": 9,
@@ -39122,6 +37612,22 @@
      "Gunsmith"
     ],
     "loadAt": []
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Hooks",
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "Hooks, U",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "debugstart": {
@@ -39290,6 +37796,14 @@
    }
   },
   "exportworker": {
+   "util": {
+    "load": 0,
+    "call": 2,
+    "names": [
+     "Hooks"
+    ],
+    "loadAt": []
+   },
    "glb": {
     "load": 0,
     "call": 1,
@@ -39994,35 +38508,6 @@
    }
   },
   "gear": {
-   "data": {
-    "load": 0,
-    "call": 50,
-    "names": [
-     "CALIBERS",
-     "revolver",
-     "calOf",
-     "beltFed",
-     "WEAPONS",
-     "ballFor",
-     "roundOf",
-     "loadFor",
-     "cartOf",
-     "magFits",
-     "barrelsOf",
-     "capOf",
-     "chambered",
-     "AMMO"
-    ],
-    "loadAt": []
-   },
-   "util": {
-    "load": 0,
-    "call": 4,
-    "names": [
-     "Hooks"
-    ],
-    "loadAt": []
-   },
    "sim": {
     "load": 0,
     "call": 1,
@@ -40054,6 +38539,49 @@
      "Med"
     ],
     "loadAt": []
+   },
+   "data": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "AMMO",
+     "ballFor",
+     "barrelsOf",
+     "beltFed",
+     "CALIBERS",
+     "calOf",
+     "capOf",
+     "cartOf",
+     "chambered",
+     "loadFor",
+     "magFits",
+     "revolver",
+     "roundOf",
+     "WEAPONS"
+    ],
+    "loadAt": [
+     {
+      "x": "AMMO, ballFor, barrelsOf, beltFed, CALIBERS, calOf, capOf, cartOf, chambered, loadFor, magFits, revolver, roundOf, WEAPONS",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Hooks"
+    ],
+    "loadAt": [
+     {
+      "x": "Hooks",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "glare": {
@@ -41805,14 +40333,6 @@
    }
   },
   "medical": {
-   "util": {
-    "load": 0,
-    "call": 1,
-    "names": [
-     "U"
-    ],
-    "loadAt": []
-   },
    "ballistics": {
     "load": 0,
     "call": 2,
@@ -41820,6 +40340,21 @@
      "Ballistics"
     ],
     "loadAt": []
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "menushow": {
@@ -41897,134 +40432,47 @@
   },
   "parts": {
    "data": {
-    "load": 20,
-    "call": 44,
+    "load": 1,
+    "call": 0,
     "names": [
-     "GUN_SPECS",
-     "CALIBERS",
-     "WEAPONS",
-     "calOf",
-     "MAG_FAMILY",
-     "GUN_KG",
-     "WEAPON_LIST",
-     "roundSpeed",
-     "physRecoil",
-     "baseAm",
      "AMMO",
-     "plusOf",
+     "baseAm",
      "BELT_FAMILY",
-     "fullReload"
+     "CALIBERS",
+     "calOf",
+     "fullReload",
+     "GUN_KG",
+     "GUN_SPECS",
+     "MAG_FAMILY",
+     "physRecoil",
+     "plusOf",
+     "roundSpeed",
+     "WEAPON_LIST",
+     "WEAPONS"
     ],
     "loadAt": [
      {
-      "x": "WEAPONS",
-      "line": 488,
-      "guard": "plain"
-     },
-     {
-      "x": "GUN_SPECS",
-      "line": 488,
-      "guard": "plain"
-     },
-     {
-      "x": "calOf",
-      "line": 476,
-      "guard": "plain"
-     },
-     {
-      "x": "WEAPONS",
-      "line": 476,
-      "guard": "plain"
-     },
-     {
-      "x": "CALIBERS",
-      "line": 476,
-      "guard": "plain"
-     },
-     {
-      "x": "MAG_FAMILY",
-      "line": 575,
-      "guard": "plain"
-     },
-     {
-      "x": "MAG_FAMILY",
-      "line": 575,
-      "guard": "guarded"
-     },
-     {
-      "x": "calOf",
-      "line": 666,
-      "guard": "plain"
-     },
-     {
-      "x": "GUN_KG",
-      "line": 710,
-      "guard": "plain"
-     },
-     {
-      "x": "WEAPON_LIST",
-      "line": 835,
-      "guard": "plain"
-     },
-     {
-      "x": "CALIBERS",
-      "line": 1229,
-      "guard": "plain"
-     },
-     {
-      "x": "CALIBERS",
-      "line": 1241,
-      "guard": "plain"
-     },
-     {
-      "x": "BELT_FAMILY",
-      "line": 1358,
-      "guard": "plain"
-     },
-     {
-      "x": "CALIBERS",
-      "line": 1470,
-      "guard": "plain"
-     },
-     {
-      "x": "WEAPONS",
-      "line": 1487,
-      "guard": "plain"
-     },
-     {
-      "x": "GUN_SPECS",
-      "line": 1712,
-      "guard": "plain"
-     },
-     {
-      "x": "WEAPONS",
-      "line": 1764,
-      "guard": "plain"
-     },
-     {
-      "x": "GUN_SPECS",
-      "line": 1764,
-      "guard": "plain"
-     },
-     {
-      "x": "CALIBERS",
-      "line": 1765,
-      "guard": "plain"
-     },
-     {
-      "x": "calOf",
-      "line": 1765,
-      "guard": "plain"
+      "x": "AMMO, baseAm, BELT_FAMILY, CALIBERS, calOf, fullReload, GUN_KG, GUN_SPECS, MAG_FAMILY, physRecoil, plusOf, roundSpeed, WEAPON_LIST, WEAPONS",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
      }
     ]
    },
    "util": {
-    "load": 0,
-    "call": 5,
+    "load": 1,
+    "call": 0,
     "names": [
      "U"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "player": {
@@ -43629,14 +42077,6 @@
    }
   },
   "shipgen": {
-   "util": {
-    "load": 0,
-    "call": 5,
-    "names": [
-     "U"
-    ],
-    "loadAt": []
-   },
    "level": {
     "load": 0,
     "call": 16,
@@ -43660,6 +42100,21 @@
      "Materials"
     ],
     "loadAt": []
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "shipmodel": {
@@ -44015,24 +42470,6 @@
    }
   },
   "sim": {
-   "parts": {
-    "load": 0,
-    "call": 1,
-    "names": [
-     "Gunsmith"
-    ],
-    "loadAt": []
-   },
-   "data": {
-    "load": 0,
-    "call": 3,
-    "names": [
-     "loadFor",
-     "chambered",
-     "ROUND_LIFE"
-    ],
-    "loadAt": []
-   },
    "level": {
     "load": 0,
     "call": 8,
@@ -44049,21 +42486,67 @@
     ],
     "loadAt": []
    },
+   "data": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "chambered",
+     "loadFor",
+     "ROUND_LIFE"
+    ],
+    "loadAt": [
+     {
+      "x": "chambered, loadFor, ROUND_LIFE",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "parts": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Gunsmith"
+    ],
+    "loadAt": [
+     {
+      "x": "Gunsmith",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
    "spacedata": {
-    "load": 0,
-    "call": 1,
+    "load": 1,
+    "call": 0,
     "names": [
      "SpaceData"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "SpaceData",
+      "line": 4,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    },
    "util": {
-    "load": 0,
-    "call": 6,
+    "load": 1,
+    "call": 0,
     "names": [
      "U"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 5,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "space": {
@@ -44261,26 +42744,34 @@
    },
    "data": {
     "load": 1,
-    "call": 4,
+    "call": 0,
     "names": [
      "HANGAR_ROWS",
      "THEMES"
     ],
     "loadAt": [
      {
-      "x": "HANGAR_ROWS",
-      "line": 204,
-      "guard": "plain"
+      "x": "HANGAR_ROWS, THEMES",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
      }
     ]
    },
    "util": {
-    "load": 0,
-    "call": 4,
+    "load": 1,
+    "call": 0,
     "names": [
      "U"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "spaceserver": {
@@ -45093,46 +43584,31 @@
  "reach": [],
  "undefined": {},
  "trial": {
-  "total": 7151,
+  "total": 4085,
   "byCode": {
-   "TS2339": 6051,
-   "TS6196": 87,
-   "TS7006": 268,
-   "TS2686": 619,
+   "TS2339": 3693,
+   "TS6196": 76,
+   "TS7006": 155,
+   "TS2551": 73,
    "TS18047": 14,
-   "TS7031": 39,
-   "TS18049": 16,
-   "TS2345": 8,
+   "TS7031": 22,
+   "TS2345": 7,
    "TS2531": 11,
    "TS2322": 3,
-   "TS18048": 28,
+   "TS18048": 18,
    "TS2532": 2,
-   "TS7053": 5
+   "TS18049": 5,
+   "TS7053": 6
   },
   "bare": [],
   "gLost": [
-   "AKIMBO_OFF",
-   "AMMO",
-   "AMMO_RARITY",
-   "AMMO_TYPES",
-   "ARMORS",
-   "ARMOR_LIST",
-   "AUTO_ONLY",
    "Acoustics",
    "Ambience",
-   "Arsenal",
    "Audio",
    "AudioBundle",
-   "BELT_FAMILY",
-   "BOLT_HOLD",
    "Ballistics",
    "Bolts",
    "Bundles",
-   "CALIBERS",
-   "CHARGE_GR",
-   "CLASS_SND",
-   "CLICK",
-   "Callsigns",
    "Career",
    "Casings",
    "Cloud",
@@ -45141,36 +43617,24 @@
    "Damage",
    "DebugStart",
    "Demo",
-   "ENEMIES",
-   "ENEMY_GEAR",
-   "EXPLOSIVES_OFF",
-   "FIRE_MODES",
    "Footsteps",
    "FurnMesh",
    "FurnSpec",
    "Furniture",
    "GLB",
-   "GRAVITY",
-   "GUN_KG",
-   "GUN_SPECS",
    "Game",
-   "Gear",
    "Glare",
    "GunAudio",
    "GunMaterials",
    "GunModels",
    "GunRig",
-   "Gunsmith",
    "GunsmithUI",
-   "HANGAR_ROWS",
-   "HANGAR_THEME",
    "HUD",
    "Handling",
    "Hangar",
    "Headgear",
    "Highlights",
    "Homes",
-   "Hooks",
    "HumanData",
    "Humans",
    "Icons",
@@ -45182,158 +43646,40 @@
    "LightGrid",
    "Loadout",
    "Loot",
-   "MAG_FAMILY",
-   "MODE_INFO",
-   "MODE_NAME",
-   "MUZZLE_V",
-   "Materials",
    "Me",
-   "Med",
    "MenuShow",
    "Models",
    "Net",
-   "OFF_GUNS",
-   "OPEN_BOLT",
-   "PLAYER_COLORS",
-   "PLUSP",
    "Pad",
    "Prep",
    "Prof",
    "R",
-   "RECOIL",
-   "RECOIL_K",
-   "REV",
-   "ROUND_LIFE",
    "Range",
    "Recorder",
    "Rig",
    "Route",
-   "SHIELDS",
-   "SOUND_SPEED",
-   "SUPPRESSOR",
    "Scars",
    "Server",
    "ServerHost",
    "ServerLink",
-   "ShipGen",
    "ShipModel",
    "Shop",
    "ShopUI",
    "ShotLog",
-   "Sim",
    "Space",
-   "SpaceData",
    "SpaceSv",
    "SpaceUI",
    "Stickers",
-   "THEMES",
-   "TIER_COLORS",
-   "TIER_NAMES",
    "Touch",
-   "U",
-   "VENDOR_QUIPS",
    "VMAnim",
    "Viewmodel",
    "Views",
-   "WEAPONS",
-   "WEAPON_LIST",
    "World",
    "ZeroUI",
-   "Zip",
-   "aimSway",
-   "ammoOk",
-   "ammoTypes",
-   "asCal",
-   "ballFor",
-   "ballistics",
-   "barrelMm",
-   "barrelsOf",
-   "baseAm",
-   "beltFed",
-   "boltHold",
-   "boreTip",
-   "calOf",
-   "calsOf",
-   "capOf",
-   "cartOf",
-   "chambered",
-   "dragOf",
-   "fblock",
-   "flight",
-   "fullReload",
-   "gearTier",
-   "loadFor",
-   "loadOf",
-   "loaded",
-   "magFam",
-   "magFits",
-   "obtainable",
-   "perOf",
-   "physRecoil",
-   "pickBarrels",
-   "plusOf",
-   "recoilImpulse",
-   "revolver",
-   "rollAmmo",
-   "roundDef",
-   "roundOf",
-   "roundSpec",
-   "roundSpeed",
-   "shotDef",
-   "shotK",
-   "shotSoundKey",
-   "sightH",
-   "stdMag",
-   "volleyVol",
-   "zeroOf",
-   "zeroSlope"
+   "Zip"
   ],
-  "umd": [
-   "audio",
-   "ballistics",
-   "bolts",
-   "callsigns",
-   "casings",
-   "course",
-   "damage",
-   "furnmesh",
-   "game",
-   "glare",
-   "glb",
-   "gunaudio",
-   "gunmaterials",
-   "gunmodels",
-   "gunrig",
-   "gunsmith",
-   "hangar",
-   "headgear",
-   "highlights",
-   "homes",
-   "hud",
-   "icons",
-   "landing",
-   "level",
-   "levelview",
-   "lightgrid",
-   "loot",
-   "menushow",
-   "player",
-   "range",
-   "render",
-   "rig",
-   "scars",
-   "server",
-   "shipmodel",
-   "shotlog",
-   "sim",
-   "space",
-   "spaceui",
-   "stickers",
-   "viewmodel",
-   "views",
-   "vmanim"
-  ],
-  "unusedGM": 84,
+  "umd": [],
+  "unusedGM": 73,
   "other": [
    {
     "file": "js/ambience.ts",
@@ -45343,31 +43689,7 @@
    },
    {
     "file": "js/arsenal.ts",
-    "line": 99,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/audio.ts",
-    "line": 658,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/audio.ts",
-    "line": 659,
-    "code": "TS7006",
-    "msg": "Parameter 'piv' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/ballistics.ts",
-    "line": 878,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/cloud.ts",
-    "line": 227,
+    "line": 101,
     "code": "TS7006",
     "msg": "Parameter 'a' implicitly has an 'any' type."
    },
@@ -45406,48 +43728,6 @@
     "line": 400,
     "code": "TS7006",
     "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/data.ts",
-    "line": 169,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/data.ts",
-    "line": 190,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/data.ts",
-    "line": 498,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/data.ts",
-    "line": 677,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/data.ts",
-    "line": 677,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/data.ts",
-    "line": 857,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/data.ts",
-    "line": 857,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
    },
    {
     "file": "js/demo.ts",
@@ -45577,12 +43857,6 @@
    },
    {
     "file": "js/game.ts",
-    "line": 274,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
     "line": 654,
     "code": "TS7006",
     "msg": "Parameter 'err' implicitly has an 'any' type."
@@ -45640,90 +43914,6 @@
     "line": 770,
     "code": "TS7006",
     "msg": "Parameter 's' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1158,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1179,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1182,
-    "code": "TS7006",
-    "msg": "Parameter 'pid' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1348,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1349,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1350,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1350,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1350,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1351,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1351,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1351,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1353,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1353,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1353,
-    "code": "TS18049",
-    "msg": "'g' is possibly 'null' or 'undefined'."
    },
    {
     "file": "js/game.ts",
@@ -46008,26 +44198,8 @@
     "msg": "Object is possibly 'null'."
    },
    {
-    "file": "js/game.ts",
-    "line": 1919,
-    "code": "TS7006",
-    "msg": "Parameter 'map' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1919,
-    "code": "TS7006",
-    "msg": "Parameter 'rec' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1919,
-    "code": "TS7006",
-    "msg": "Parameter 'n' implicitly has an 'any' type."
-   },
-   {
     "file": "js/gear.ts",
-    "line": 489,
+    "line": 491,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
    },
@@ -46054,12 +44226,6 @@
     "line": 1427,
     "code": "TS7006",
     "msg": "Parameter 'b' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/glb.ts",
-    "line": 1464,
-    "code": "TS7006",
-    "msg": "Parameter 'def' implicitly has an 'any' type."
    },
    {
     "file": "js/gunaudio.ts",
@@ -46141,12 +44307,6 @@
    },
    {
     "file": "js/gunsmith.ts",
-    "line": 425,
-    "code": "TS2345",
-    "msg": "Argument of type 'string | null' is not assignable to parameter of type 'string'."
-   },
-   {
-    "file": "js/gunsmith.ts",
     "line": 426,
     "code": "TS7006",
     "msg": "Parameter 'a' implicitly has an 'any' type."
@@ -46183,27 +44343,9 @@
    },
    {
     "file": "js/hangar.ts",
-    "line": 1028,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hangar.ts",
-    "line": 1048,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hangar.ts",
     "line": 1187,
     "code": "TS7006",
     "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hangar.ts",
-    "line": 1254,
-    "code": "TS7006",
-    "msg": "Parameter 'map' implicitly has an 'any' type."
    },
    {
     "file": "js/highlights.ts",
@@ -46228,42 +44370,6 @@
     "line": 455,
     "code": "TS7006",
     "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1065,
-    "code": "TS7031",
-    "msg": "Binding element 'slot' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1065,
-    "code": "TS7031",
-    "msg": "Binding element 'id' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1065,
-    "code": "TS7031",
-    "msg": "Binding element 'slot' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1065,
-    "code": "TS7031",
-    "msg": "Binding element 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1066,
-    "code": "TS7031",
-    "msg": "Binding element 'slot' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1066,
-    "code": "TS7031",
-    "msg": "Binding element 'p' implicitly has an 'any' type."
    },
    {
     "file": "js/highlights.ts",
@@ -46351,18 +44457,6 @@
    },
    {
     "file": "js/hud.ts",
-    "line": 223,
-    "code": "TS7031",
-    "msg": "Binding element 'k' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
-    "line": 223,
-    "code": "TS7031",
-    "msg": "Binding element 'n' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
     "line": 229,
     "code": "TS7006",
     "msg": "Parameter 'h' implicitly has an 'any' type."
@@ -46380,90 +44474,6 @@
     "msg": "Parameter 'i' implicitly has an 'any' type."
    },
    {
-    "file": "js/hud.ts",
-    "line": 384,
-    "code": "TS7031",
-    "msg": "Binding element 'it' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
-    "line": 521,
-    "code": "TS7006",
-    "msg": "Parameter 'title' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
-    "line": 521,
-    "code": "TS7006",
-    "msg": "Parameter 'text' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
-    "line": 521,
-    "code": "TS7006",
-    "msg": "Parameter 'sec' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
-    "line": 522,
-    "code": "TS7006",
-    "msg": "Parameter 'html' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 288,
-    "code": "TS18048",
-    "msg": "'it' is possibly 'undefined'."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 288,
-    "code": "TS18048",
-    "msg": "'it' is possibly 'undefined'."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 288,
-    "code": "TS18048",
-    "msg": "'it' is possibly 'undefined'."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 288,
-    "code": "TS18048",
-    "msg": "'it' is possibly 'undefined'."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 288,
-    "code": "TS18048",
-    "msg": "'it' is possibly 'undefined'."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 340,
-    "code": "TS7006",
-    "msg": "Parameter 'g' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 541,
-    "code": "TS7006",
-    "msg": "Parameter 'g' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 541,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 541,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
     "file": "js/invui.ts",
     "line": 884,
     "code": "TS7006",
@@ -46477,12 +44487,6 @@
    },
    {
     "file": "js/invui.ts",
-    "line": 887,
-    "code": "TS7006",
-    "msg": "Parameter 'g' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/invui.ts",
     "line": 901,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
@@ -46492,12 +44496,6 @@
     "line": 901,
     "code": "TS7006",
     "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/invui.ts",
-    "line": 931,
-    "code": "TS7006",
-    "msg": "Parameter 'g' implicitly has an 'any' type."
    },
    {
     "file": "js/level.ts",
@@ -46518,24 +44516,6 @@
     "msg": "Parameter 'c' implicitly has an 'any' type."
    },
    {
-    "file": "js/loadout.ts",
-    "line": 172,
-    "code": "TS7006",
-    "msg": "Parameter 'x' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/loadout.ts",
-    "line": 247,
-    "code": "TS7006",
-    "msg": "Parameter 'id' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/loadout.ts",
-    "line": 247,
-    "code": "TS7006",
-    "msg": "Parameter 'stat' implicitly has an 'any' type."
-   },
-   {
     "file": "js/loot.ts",
     "line": 62,
     "code": "TS7006",
@@ -46548,76 +44528,10 @@
     "msg": "Parameter 'ok' implicitly has an 'any' type."
    },
    {
-    "file": "js/net.ts",
-    "line": 190,
-    "code": "TS7006",
-    "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/parts.ts",
-    "line": 1686,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 208,
-    "code": "TS7006",
-    "msg": "Parameter 'it' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 208,
-    "code": "TS7006",
-    "msg": "Parameter 'g' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 248,
-    "code": "TS7031",
-    "msg": "Binding element 'it' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 265,
-    "code": "TS7031",
-    "msg": "Binding element 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 386,
-    "code": "TS7006",
-    "msg": "Parameter 's' implicitly has an 'any' type."
-   },
-   {
     "file": "js/player.ts",
     "line": 716,
     "code": "TS7006",
     "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 1172,
-    "code": "TS7006",
-    "msg": "Parameter 'f' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 1173,
-    "code": "TS7006",
-    "msg": "Parameter 'f' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 1173,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 1173,
-    "code": "TS7006",
-    "msg": "Parameter 'f' implicitly has an 'any' type."
    },
    {
     "file": "js/player.ts",
@@ -46639,18 +44553,6 @@
    },
    {
     "file": "js/player.ts",
-    "line": 2352,
-    "code": "TS7006",
-    "msg": "Parameter 'it' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 2674,
-    "code": "TS7006",
-    "msg": "Parameter 'g' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
     "line": 2689,
     "code": "TS7006",
     "msg": "Parameter 'a' implicitly has an 'any' type."
@@ -46660,18 +44562,6 @@
     "line": 2689,
     "code": "TS7006",
     "msg": "Parameter 'e' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 3259,
-    "code": "TS7006",
-    "msg": "Parameter 'id' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 3259,
-    "code": "TS7006",
-    "msg": "Parameter 'build' implicitly has an 'any' type."
    },
    {
     "file": "js/range.ts",
@@ -46728,36 +44618,6 @@
     "msg": "Parameter 'over' implicitly has an 'any' type."
    },
    {
-    "file": "js/render.ts",
-    "line": 2049,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 2049,
-    "code": "TS7006",
-    "msg": "Parameter 'x' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 2049,
-    "code": "TS7006",
-    "msg": "Parameter 'y' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 2049,
-    "code": "TS7006",
-    "msg": "Parameter 'z' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 2050,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
     "file": "js/rig.ts",
     "line": 2,
     "code": "TS6196",
@@ -46774,36 +44634,6 @@
     "line": 909,
     "code": "TS2345",
     "msg": "Argument of type 'Object3D<Object3DEventMap> | null' is not assignable to parameter of type 'Object3D<Object3DEventMap>'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1134,
-    "code": "TS18048",
-    "msg": "'w' is possibly 'undefined'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1140,
-    "code": "TS18048",
-    "msg": "'w' is possibly 'undefined'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1142,
-    "code": "TS18048",
-    "msg": "'w' is possibly 'undefined'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1142,
-    "code": "TS18048",
-    "msg": "'w' is possibly 'undefined'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1143,
-    "code": "TS18048",
-    "msg": "'w' is possibly 'undefined'."
    },
    {
     "file": "js/rig.ts",
@@ -46840,42 +44670,6 @@
     "line": 2109,
     "code": "TS2532",
     "msg": "Object is possibly 'undefined'."
-   },
-   {
-    "file": "js/route.ts",
-    "line": 59,
-    "code": "TS7006",
-    "msg": "Parameter 'T' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/route.ts",
-    "line": 59,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/route.ts",
-    "line": 59,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/route.ts",
-    "line": 59,
-    "code": "TS7006",
-    "msg": "Parameter 'T' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/route.ts",
-    "line": 62,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 119,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
    },
    {
     "file": "js/server.ts",
@@ -46921,48 +44715,6 @@
    },
    {
     "file": "js/server.ts",
-    "line": 542,
-    "code": "TS7006",
-    "msg": "Parameter 'k' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 573,
-    "code": "TS7006",
-    "msg": "Parameter 'it' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 573,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 628,
-    "code": "TS7006",
-    "msg": "Parameter 'v' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 756,
-    "code": "TS7006",
-    "msg": "Parameter 'sp' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 762,
-    "code": "TS7006",
-    "msg": "Parameter 'sp' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 806,
-    "code": "TS7006",
-    "msg": "Parameter 'sp' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/server.ts",
     "line": 3072,
     "code": "TS7006",
     "msg": "Parameter 'map' implicitly has an 'any' type."
@@ -47004,192 +44756,6 @@
     "msg": "Parameter 'data' implicitly has an 'any' type."
    },
    {
-    "file": "js/shop.ts",
-    "line": 65,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 67,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 67,
-    "code": "TS2339",
-    "msg": "Property 'id' does not exist on type '{ tier: number; price: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 68,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 68,
-    "code": "TS2339",
-    "msg": "Property 'id' does not exist on type '{ tier: number; price: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 71,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 73,
-    "code": "TS7006",
-    "msg": "Parameter 'x' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 91,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 92,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 92,
-    "code": "TS2339",
-    "msg": "Property 'id' does not exist on type '{ tier: number; price: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 92,
-    "code": "TS2339",
-    "msg": "Property 'id' does not exist on type '{ tier: number; price: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 92,
-    "code": "TS2339",
-    "msg": "Property 'id' does not exist on type '{ tier: number; price: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 93,
-    "code": "TS2339",
-    "msg": "Property 'id' does not exist on type '{ tier: number; price: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 94,
-    "code": "TS2339",
-    "msg": "Property 'id' does not exist on type '{ tier: number; price: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 94,
-    "code": "TS2339",
-    "msg": "Property 'id' does not exist on type '{ tier: number; price: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 103,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 103,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 103,
-    "code": "TS7053",
-    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ 1: number; 2: number; 3: number; 4: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 104,
-    "code": "TS7006",
-    "msg": "Parameter 's' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 104,
-    "code": "TS7031",
-    "msg": "Binding element 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 113,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 113,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 113,
-    "code": "TS7053",
-    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ 1: number; 2: number; 3: number; }'."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 115,
-    "code": "TS7006",
-    "msg": "Parameter 's' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 115,
-    "code": "TS7031",
-    "msg": "Binding element 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 122,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 122,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 122,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 124,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shop.ts",
-    "line": 124,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 160,
-    "code": "TS7006",
-    "msg": "Parameter 'g' implicitly has an 'any' type."
-   },
-   {
     "file": "js/shopui.ts",
     "line": 169,
     "code": "TS7006",
@@ -47215,24 +44781,6 @@
    },
    {
     "file": "js/shopui.ts",
-    "line": 174,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 180,
-    "code": "TS7006",
-    "msg": "Parameter 'it' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 239,
-    "code": "TS7006",
-    "msg": "Parameter 'g' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
     "line": 250,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
@@ -47240,18 +44788,6 @@
    {
     "file": "js/shopui.ts",
     "line": 250,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 251,
-    "code": "TS7006",
-    "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 251,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
    },
@@ -47266,18 +44802,6 @@
     "line": 264,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 265,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/shopui.ts",
-    "line": 265,
-    "code": "TS7006",
-    "msg": "Parameter 'd' implicitly has an 'any' type."
    },
    {
     "file": "js/shopui.ts",
@@ -47292,26 +44816,20 @@
     "msg": "Parameter 'n' implicitly has an 'any' type."
    },
    {
-    "file": "js/shopui.ts",
-    "line": 390,
-    "code": "TS7031",
-    "msg": "Binding element 'it' implicitly has an 'any' type."
-   },
-   {
     "file": "js/sim.ts",
-    "line": 78,
+    "line": 82,
     "code": "TS7006",
     "msg": "Parameter 'm' implicitly has an 'any' type."
    },
    {
     "file": "js/sim.ts",
-    "line": 83,
+    "line": 87,
     "code": "TS7006",
     "msg": "Parameter 's' implicitly has an 'any' type."
    },
    {
     "file": "js/sim.ts",
-    "line": 110,
+    "line": 114,
     "code": "TS7006",
     "msg": "Parameter 'm' implicitly has an 'any' type."
    },
@@ -47320,12 +44838,6 @@
     "line": 107,
     "code": "TS18047",
     "msg": "'S.tunnel' is possibly 'null'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 151,
-    "code": "TS7006",
-    "msg": "Parameter 'fl' implicitly has an 'any' type."
    },
    {
     "file": "js/space.ts",
@@ -47338,12 +44850,6 @@
     "line": 333,
     "code": "TS7006",
     "msg": "Parameter 'o' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 448,
-    "code": "TS7006",
-    "msg": "Parameter 's' implicitly has an 'any' type."
    },
    {
     "file": "js/space.ts",
@@ -47449,63 +44955,9 @@
    },
    {
     "file": "js/space.ts",
-    "line": 1798,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 1798,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 1798,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spacedata.ts",
-    "line": 214,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spacedata.ts",
-    "line": 290,
-    "code": "TS7006",
-    "msg": "Parameter 'T' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spacedata.ts",
-    "line": 290,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spacedata.ts",
-    "line": 290,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spacedata.ts",
-    "line": 299,
+    "line": 1542,
     "code": "TS7053",
-    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<SpSize, SpClass>'."
-   },
-   {
-    "file": "js/spacedata.ts",
-    "line": 300,
-    "code": "TS7053",
-    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<SpSize, SpClass>'."
-   },
-   {
-    "file": "js/spacedata.ts",
-    "line": 304,
-    "code": "TS7053",
-    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<SpSize, SpClass>'."
+    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ pd: { range: number; cool: number[]; dmg: number; }; cannon: { range: number; cool: number[]; dmg: number; }; missile: { range: number; cool: number[]; dmg: number; speed: number; turn: number; life: number; }; }'."
    },
    {
     "file": "js/spaceserver.ts",
@@ -47527,6 +44979,12 @@
    },
    {
     "file": "js/spaceserver.ts",
+    "line": 146,
+    "code": "TS7053",
+    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<SpSize, SpClass>'."
+   },
+   {
+    "file": "js/spaceserver.ts",
     "line": 148,
     "code": "TS7006",
     "msg": "Parameter 'rm' implicitly has an 'any' type."
@@ -47536,6 +44994,12 @@
     "line": 148,
     "code": "TS7006",
     "msg": "Parameter 'i' implicitly has an 'any' type."
+   },
+   {
+    "file": "js/spaceserver.ts",
+    "line": 184,
+    "code": "TS7053",
+    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<SpSize, SpClass>'."
    },
    {
     "file": "js/spaceserver.ts",
@@ -47610,18 +45074,6 @@
     "msg": "Binding element 'f' implicitly has an 'any' type."
    },
    {
-    "file": "js/spaceserver.ts",
-    "line": 501,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceserver.ts",
-    "line": 501,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
     "file": "js/spaceui.ts",
     "line": 102,
     "code": "TS7006",
@@ -47671,83 +45123,29 @@
    },
    {
     "file": "js/spaceui.ts",
+    "line": 232,
+    "code": "TS7053",
+    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<SpObj, { name: string; pay: number; line: string; }>'."
+   },
+   {
+    "file": "js/spaceui.ts",
+    "line": 233,
+    "code": "TS7053",
+    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<SpSize, SpClass>'."
+   },
+   {
+    "file": "js/spaceui.ts",
+    "line": 233,
+    "code": "TS7053",
+    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type 'Record<SpSize, SpClass>'."
+   },
+   {
+    "file": "js/spaceui.ts",
     "line": 244,
     "code": "TS7006",
     "msg": "Parameter 'k' implicitly has an 'any' type."
    },
    {
-    "file": "js/spaceui.ts",
-    "line": 259,
-    "code": "TS7006",
-    "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 259,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 259,
-    "code": "TS7031",
-    "msg": "Binding element 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 259,
-    "code": "TS7031",
-    "msg": "Binding element 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 259,
-    "code": "TS7031",
-    "msg": "Binding element 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 259,
-    "code": "TS7006",
-    "msg": "Parameter 'row' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 287,
-    "code": "TS7006",
-    "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 287,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 298,
-    "code": "TS7006",
-    "msg": "Parameter 'sh' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 307,
-    "code": "TS7006",
-    "msg": "Parameter 'e' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/spaceui.ts",
-    "line": 309,
-    "code": "TS7006",
-    "msg": "Parameter 'e' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/viewmodel.ts",
-    "line": 146,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
     "file": "js/views.ts",
     "line": 806,
     "code": "TS7006",
@@ -47758,12 +45156,6 @@
     "line": 806,
     "code": "TS7006",
     "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/views.ts",
-    "line": 1133,
-    "code": "TS7006",
-    "msg": "Parameter 'id' implicitly has an 'any' type."
    }
   ]
  }

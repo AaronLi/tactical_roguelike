@@ -1,5 +1,5 @@
 'use strict';
-const G_Materials = (() => {
+export const Materials = (() => {
   const CORE_E: Record<MatCore, number> = { lead: 1, mild: 1.1, hard: 1.4, wc: 1.6 };
   const m = (name: string, K: number, rho: number, sig: number, fx: MatFx, o?: Partial<MatDef>): MatDef => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
   const MAT: Record<MatKey, MatDef> = {
@@ -183,6 +183,6 @@ const G_Materials = (() => {
   }
   return { MAT, TISSUE, CORE_E, PROPS, PARTS, WALLS, SHIP, of, outAt, built };
 })();
-G.Materials = G_Materials;
+G.Materials = Materials;
 
-interface GameModules { Materials: typeof G_Materials; }
+declare global { interface GameModules { Materials: typeof Materials; } }

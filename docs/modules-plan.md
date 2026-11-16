@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2 and 3 done (phase 3: 2026-11-16); phase 4 not started. Written 2026-11-15.
+Status: phases 0, 1, 2 and 3 done (phase 3: 2026-11-16); phase 4 started (part a, 2026-11-16: the node tools, the codemod, the first 11 leaves); the rest of phase 4 and 5 to 7 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -237,6 +237,69 @@ the first converted file, and with the import map for `three` (node needs `three
 
 Done when: the server worker and the prep worker import their entry file and nothing else, and both hand-kept lists
 are deleted, and the node tools import `dist/js`.
+
+#### Phase 4 results (part a)
+
+Run the codemod (`node tools/codemod_imports.mjs js/foo.ts`, usage at the top of the file), then `npm run typecheck`,
+`deps:check`, `test:sim`, `test:level`, and the smoke check, for each next file.
+
+- **The node tools** load the compiled game through `tools/vm_game.mjs`: `runScripts(ctx, dir, ['util', 'data', ...])` /
+  `runFile(ctx, file)`. A compiled file with an `import`/`export` is run as an ES module (`vm.SourceTextModule`) **inside the
+  tool's own vm context**, its imports resolved to the other files of the folder in the same context; one without is a script, as
+  before, so the two mix as they do on the page. Every tool keeps the context it always made (its own fake `document`, `THREE`,
+  seeded `Math.random`, fake timers, `G = {}`), so a context is a whole game of its own with its own module graph. This is
+  deliberately not "import `dist/js` into the tool's own process", which was the first idea: while `G` is still a global, two games in one process
+  share it (`loadModels()` next to `loadGame()` in `tools/check_models.mjs`, two "browsers" at once in `tools/cloud.test.mjs`,
+  the old and the new build in `tools/check_models_parity.mjs`), and a fresh instance per scenario has to be a fresh global too.
+  Importing the helper starts node again with `--experimental-vm-modules --no-warnings` if it isn't set (once; `node tools/x.mjs`
+  and every npm script work as they did), so it must be the first import of a tool. The cost: node 22's experimental
+  `vm.SourceTextModule` (the workflow's node 22 has it). When `G` is gone (phase 7) a plain `import()` per tool will do and this
+  file can go. The loaders became `async` (`loadLevel`, `loadGame`, `loadModels`, `loadGameWithModels`, `shipData`, and `browser()` in
+  the cloud test): callers `await` them (13 tools).
+  - `tools/check_sim_golden.mjs`: each run (a scenario, and its twin run to prove the check is deterministic) is a new context with
+    a new module graph in it, so nothing is shared between runs; `Math.random`, the timers and `performance` are the context's, set
+    before anything is loaded. **The fingerprints are identical: `test:sim` 4/4 against the same `tests/sim-golden.json`** (not
+    touched, not updated).
+  - Also moved: `level_env`, `model_env` (`loadModels`, `loadGame`; an `--old-dist` build of scripts still loads, in the same way),
+    `cloud.test` (util.js, a "browser" per call, each a context of its own), `bake_hangar`, `check_hangar_golden`,
+    `check_furniture_golden`, `ship_layout`. `tools/model_bundles.mjs` loads `modelbundles.js` alone and it is still a script.
+    `tools/deps.mjs` reads `tools/model_env.mjs`'s list from `runScripts(ctx, dist, [`; `LEVEL_SCRIPTS` is still a literal list.
+- **three.js: no import map yet.** Nothing imports `three`; the global `THREE` (js/threeboot.ts) stays, and the tools put their own
+  on the context. The TypeScript side needed `"allowUmdGlobalAccess": true` in `tsconfig.json` (a module naming the UMD global
+  `THREE` is error TS2686: `callsigns` and `sim` do). The loader answers an `import ... from 'three'` with the context's own
+  `THREE` (a synthetic module over `ctx.THREE`), untested since nothing does it; the page's import map goes in with the first file that imports it.
+- **The codemod, `tools/codemod_imports.mjs`** (TypeScript 5 parser, as `tools/deps.mjs`): converts a file written the way the
+  simulation's are (`const G_X = ...; G.X = G_X; interface GameModules {...}` becomes `export const X = ...; G.X = X; declare
+  global { interface GameModules {...} }`, every `G_X` in the file renamed; a file with many, `data.ts` ~90, exports them all under
+  their G names), and rewrites each `G.X` / `window.G.X` / `typeof G.X` of a converted file's name into the bare name with an
+  `import { X } from './file.js'` (aliased `X as G_X` if the file already has an `X`). `G.X = ...` definitions stay (the unconverted
+  files still read G). It **leaves as `G.X` a name of a file the hand-kept lists load after this one**, and says so: importing it
+  would run that file earlier and could make a cycle, which is where a load-time effect would break (`--force-order` imports anyway).
+  It also reports guards that are always true now, assignments of a converted name elsewhere, and a simulation file importing a page one.
+  Run it with `--dry` first. `--uses` re-runs the second half (for a converted file, after another has been converted).
+- **`tools/deps.mjs`** knows `import`: each is an edge at load (an import runs its target first), checked against the hand-kept
+  lists as a load-time need, and **`deps:check` fails for a simulation file importing a page-only file** (tried with an
+  `import` of `audio` in `scars`). `G.X = X` still counts as the definition.
+- **Converted, 11 files:** `util`, `data`, `spacedata`, `materials`, `medical`, `gear`, `arsenal`, `parts`, `sim`, `shipgen`,
+  `callsigns` (`G.U` is `U`, `G.Hooks` is `Hooks`; `data`'s 90 names are `WEAPONS`, `THEMES`...). All stay in every list (a listed converted
+  file runs once, in its place: the page's module tags, the workers' `import()`s).
+- **Left as `G.X` between converted files, because the lists load them later:** `gear` reads `G.Medical` (`medical` is listed
+  after it), `shipgen` and `spacedata` read `G.Materials` (`materials` is listed after both), and `data` reads `G.Gunsmith`
+  (a page file, `gunsmith.ts`, `typeof`-guarded, an optional reach that stays). `medical` and `materials` need only `util`, so
+  moving them up in the four lists (and `tools/level_env.mjs`) and re-running `--uses` finishes these.
+- **Next, in the plan's order:** `world`, `ballistics`, `leveldesc`, `level`, `furnspec`, `furniture`, `homes`, `residents`,
+  `scars`, `damage`, `stickers`, `route`, `shop`, `recorder`, then `server`, `spaceserver`, `serverhost`; then delete the
+  hand-kept lists (the workers import their entry file; `index.html` stays until phase 5). For each: the codemod, typecheck,
+  `test:sim` (still 4/4 against the same golden), `test:level`, `test:models`, `test:cloud`, the smoke check one case per process, and
+  `G.ServerLink.mode === 'worker'` plus a prep and an export worker boot (a one-off script over the DevTools protocol, not kept).
+  Anything with load-time uses (`inventory`: `G_Sim` in `game`/`player` is now `G.Sim`, `game`/`player`/`server`/`views` are later) needs the import order checked.
+- **Checks (after the 11 files):** typecheck, `deps:check`, `test:level` 31/31, `test:sim` 4/4 (golden unchanged), `test:models`
+  (all goldens), `test:cloud` 21/21; smoke 10/10 (one case per process); on the page `G.ServerLink.mode === 'worker'` with the
+  17 hooks set, and the prep worker built a level and its light grid, the export worker booted, all with the converted files
+  (a one-off script). `tools/bake_hangar.mjs` re-baked the scene byte for byte.
+- **Not reproduced exactly / noted:** nothing behavioural. `check_models.mjs` now loads the game once for its per-file authored
+  checks (it loaded one per file). Stack traces from a tool's game show absolute file names, not `util.js`. The guard notes on
+  `G.EXPLOSIVES_OFF && ...` in `data` are the codemod's heuristic (a boolean, not a presence check).
 
 ### 5. Convert the page side
 

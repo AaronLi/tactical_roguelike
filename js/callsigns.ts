@@ -1,9 +1,10 @@
 'use strict';
+import { U } from './util.js';
 // Squad callsigns: each officer is an animal (snake, seal, frog, cat, raccoon, hyrax), with its emblem and its
 // colour. The emblem goes on their left shoulder and, with their name, on a patch high on the back (js/rig.ts);
 // the menu, the lobby, the team list, the scoreboards and pings show it too. One of each animal to a squad: the
 // host gives anyone whose pick is taken the first one free (G.Server 'hello').
-const G_Callsigns = (() => {
+export const Callsigns = (() => {
   const LIST = [
     { id: 'snake', name: 'Snake', color: 0xf2e94e },
     { id: 'seal', name: 'Seal', color: 0x3fa9f5 },
@@ -22,7 +23,7 @@ const G_Callsigns = (() => {
     g.save();
     g.scale(s / 64, s / 64);
     g.lineCap = 'round'; g.lineJoin = 'round';
-    const C = typeof col === 'number' ? G.U.hex(col) : col;
+    const C = typeof col === 'number' ? U.hex(col) : col;
     const ell = (x: number, y: number, rx: number, ry: number, c: string) => { g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); g.fillStyle = c; g.fill(); };
     const poly = (pts: number[], c: string) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.closePath(); g.fillStyle = c; g.fill(); };
     const line = (pts: number[], c: string, w: number) => { g.beginPath(); g.moveTo(pts[0], pts[1]); for (let i = 2; i < pts.length; i += 2) g.lineTo(pts[i], pts[i + 1]); g.strokeStyle = c; g.lineWidth = w; g.stroke(); };
@@ -135,5 +136,5 @@ const G_Callsigns = (() => {
   }
   return { LIST, valid, of, draw, url, html, armTex, backTex };
 })();
-G.Callsigns = G_Callsigns;
-interface GameModules { Callsigns: typeof G_Callsigns; }
+G.Callsigns = Callsigns;
+declare global { interface GameModules { Callsigns: typeof Callsigns; } }

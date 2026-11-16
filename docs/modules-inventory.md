@@ -8,13 +8,13 @@ nothing checks the module is there, **check** if it is the check itself (`G.X &&
 
 ## Summary
 
-- 90 files, 176 names on G, 5803 uses (133 while loading)
+- 90 files, 176 names on G, 5509 uses (93 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 5, the largest 43 files
 - hand-kept orders against the load-time needs: index.html 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, tools/level_env.mjs 0, tools/model_env.mjs 0
 - the simulation reaching page-only modules: 0 uses (0 unguarded, 0 of them while loading)
 - names used but defined nowhere: 0
-- trial module typecheck: 7151 errors; 0 bare names between files (0 uses), 176 G members lost, 405 others
+- trial module typecheck: 4085 errors; 0 bare names between files (0 uses), 75 G members lost, 246 others
 
 ## 1. Dependency graph
 
@@ -60,16 +60,16 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | threeboot |  | - | - |
 | util (sim) | U, Hooks | - | - |
 | zip | Zip | - | - |
-| data (sim) | TIER_NAMES, TIER_COLORS, CLASS_SND, WEAPON_LIST, WEAPONS, EXPLOSIVES_OFF, AKIMBO_OFF, OFF_GUNS, +82 | - | parts, util |
-| spacedata (sim) | SpaceData | data | level, materials, util, world |
-| shipgen (sim) | ShipGen | - | level, materials, util, world |
-| callsigns (sim) | Callsigns | - | util |
-| arsenal (sim) | Arsenal | - | ballistics, data, util |
+| data (sim) | TIER_NAMES, TIER_COLORS, CLASS_SND, WEAPON_LIST, WEAPONS, EXPLOSIVES_OFF, AKIMBO_OFF, OFF_GUNS, +82 | util | parts |
+| spacedata (sim) | SpaceData | data, util | level, materials, world |
+| shipgen (sim) | ShipGen | util | level, materials, world |
+| callsigns (sim) | Callsigns | util | - |
+| arsenal (sim) | Arsenal | data, util | ballistics |
 | loadout | Loadout | util | arsenal, audio, data, gear, hud, parts |
-| parts (sim) | Gunsmith | data | util |
-| gear (sim) | Gear | - | data, medical, parts, sim, stickers, util |
-| medical (sim) | Med | - | ballistics, util |
-| sim (sim) | Sim | - | data, level, parts, spacedata, util, world |
+| parts (sim) | Gunsmith | data, util | - |
+| gear (sim) | Gear | data, util | medical, parts, sim, stickers |
+| medical (sim) | Med | util | ballistics |
+| sim (sim) | Sim | data, parts, spacedata, util | level, world |
 | materials (sim) | Materials | - | level |
 | ballistics (sim) | Ballistics | materials | data, gear, util, world |
 | audio | Audio | util | acoustics, casings, data, footsteps, game, gunaudio, level, modelbundles, render |
@@ -143,7 +143,7 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | profiler | Prof | casings, course (guarded), game, gunaudio, hangar, highlights (guarded), hud, invui, level, lightgrid, player, render, server, serverhost, views, world | net, serverlink |
 | demo | Demo | - | game, gear, net, player, render, route, vmanim, world |
 | debugstart | DebugStart | - | data, game, gear, landing, net, parts, player, render, route, space, spacedata, views |
-| exportworker |  | - | glb, highlights, stickers |
+| exportworker |  | - | glb, highlights, stickers, util |
 | prepworker |  | - | level, lightgrid |
 | serverworker |  | - | serverhost |
 
@@ -159,38 +159,27 @@ None.
 `tsconfig.modules-trial.json`: the project with every file a module (`moduleDetection: force`). Phase 1 is done when
 the only errors left are G members (those go when the files are converted).
 
-7151 errors: TS2339 6051, TS2686 619, TS7006 268, TS6196 87, TS7031 39, TS18048 28, TS18049 16, TS18047 14, TS2531 11, TS2345 8, TS7053 5, TS2322 3, TS2532 2.
+4085 errors: TS2339 3693, TS7006 155, TS6196 76, TS2551 73, TS7031 22, TS18048 18, TS18047 14, TS2531 11, TS2345 7, TS7053 6, TS18049 5, TS2322 3, TS2532 2.
 
-**G members lost** (TS2339 on GameNamespace, 176 names): each file's `interface GameModules` no longer merges (and in 84 files it's reported unused). Expected; they go as the files are converted.
+**G members lost** (TS2339 on GameNamespace, 75 names): each file's `interface GameModules` no longer merges (and in 73 files it's reported unused). Expected; they go as the files are converted.
 
-**THREE as a global** (TS2686, in 43 files): three's types declare it a UMD global, which a module may not use without an import. Phase 2's import map, or `allowUmdGlobalAccess`, clears these.
+**THREE as a global** (TS2686, in 0 files): three's types declare it a UMD global, which a module may not use without an import. Phase 2's import map, or `allowUmdGlobalAccess`, clears these.
 
 **Bare names between files** (TS2304 and the like): declared at the top of one file, named in others without G.
 
 | Name | Kind | Declared in | Uses | Used by |
 | --- | --- | --- | --- | --- |
 
-**Everything else** (405): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
+**Everything else** (246): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
 
 - js/ambience.ts:948 TS7006 Parameter 'q' implicitly has an 'any' type.
-- js/arsenal.ts:99 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/audio.ts:658 TS7006 Parameter 'd' implicitly has an 'any' type.
-- js/audio.ts:659 TS7006 Parameter 'piv' implicitly has an 'any' type.
-- js/ballistics.ts:878 TS7006 Parameter 'd' implicitly has an 'any' type.
-- js/cloud.ts:227 TS7006 Parameter 'a' implicitly has an 'any' type.
+- js/arsenal.ts:101 TS7006 Parameter 'a' implicitly has an 'any' type.
 - js/cloud.ts:304 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/cloud.ts:352 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/cloud.ts:376 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/cloud.ts:378 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/cloud.ts:380 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/cloud.ts:400 TS7006 Parameter 'r' implicitly has an 'any' type.
-- js/data.ts:169 TS7006 Parameter 'w' implicitly has an 'any' type.
-- js/data.ts:190 TS7006 Parameter 'w' implicitly has an 'any' type.
-- js/data.ts:498 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/data.ts:677 TS7006 Parameter 't' implicitly has an 'any' type.
-- js/data.ts:677 TS7006 Parameter 't' implicitly has an 'any' type.
-- js/data.ts:857 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/data.ts:857 TS7006 Parameter 't' implicitly has an 'any' type.
 - js/demo.ts:89 TS7006 Parameter 'dt' implicitly has an 'any' type.
 - js/footsteps.ts:24 TS7006 Parameter 'm' implicitly has an 'any' type.
 - js/footsteps.ts:32 TS7006 Parameter 'b' implicitly has an 'any' type.
@@ -212,7 +201,6 @@ the only errors left are G members (those go when the files are converted).
 - js/game.ts:130 TS7006 Parameter 'id' implicitly has an 'any' type.
 - js/game.ts:226 TS18047 'lp.rig' is possibly 'null'.
 - js/game.ts:227 TS18047 'lp.rig' is possibly 'null'.
-- js/game.ts:274 TS7006 Parameter 'a' implicitly has an 'any' type.
 - js/game.ts:654 TS7006 Parameter 'err' implicitly has an 'any' type.
 - js/game.ts:654 TS7006 Parameter 'code' implicitly has an 'any' type.
 - js/game.ts:672 TS7006 Parameter 'err' implicitly has an 'any' type.
@@ -223,13 +211,25 @@ the only errors left are G members (those go when the files are converted).
 - js/game.ts:716 TS7006 Parameter 't' implicitly has an 'any' type.
 - js/game.ts:716 TS7006 Parameter 'p' implicitly has an 'any' type.
 - js/game.ts:770 TS7006 Parameter 's' implicitly has an 'any' type.
-- js/game.ts:1158 TS7006 Parameter 'w' implicitly has an 'any' type.
-- js/game.ts:1179 TS7006 Parameter 'p' implicitly has an 'any' type.
-- js/game.ts:1182 TS7006 Parameter 'pid' implicitly has an 'any' type.
-- js/game.ts:1348 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1349 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1350 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1350 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1350 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1351 TS18049 'g' is possibly 'null' or 'undefined'.
-- ... 345 more in the JSON
+- js/game.ts:1521 TS7006 Parameter 't' implicitly has an 'any' type.
+- js/game.ts:1544 TS7006 Parameter 'q' implicitly has an 'any' type.
+- js/game.ts:1544 TS7006 Parameter 'r' implicitly has an 'any' type.
+- js/game.ts:1545 TS7006 Parameter 'r' implicitly has an 'any' type.
+- js/game.ts:1546 TS7006 Parameter 'q' implicitly has an 'any' type.
+- js/game.ts:1546 TS7006 Parameter 'q' implicitly has an 'any' type.
+- js/game.ts:1550 TS7006 Parameter 'q' implicitly has an 'any' type.
+- js/game.ts:1554 TS7031 Binding element 'k' implicitly has an 'any' type.
+- js/game.ts:1554 TS7031 Binding element 'pa' implicitly has an 'any' type.
+- js/game.ts:1559 TS7006 Parameter 'b' implicitly has an 'any' type.
+- js/game.ts:1559 TS7031 Binding element 'n' implicitly has an 'any' type.
+- js/game.ts:1559 TS7031 Binding element 'c' implicitly has an 'any' type.
+- js/game.ts:1562 TS7006 Parameter 'a' implicitly has an 'any' type.
+- js/game.ts:1562 TS7006 Parameter 'x' implicitly has an 'any' type.
+- js/game.ts:1562 TS7006 Parameter 'y' implicitly has an 'any' type.
+- js/game.ts:1562 TS7006 Parameter 'a' implicitly has an 'any' type.
+- js/game.ts:1562 TS7006 Parameter 'i' implicitly has an 'any' type.
+- js/game.ts:1562 TS7006 Parameter 'xs' implicitly has an 'any' type.
+- js/game.ts:1562 TS7006 Parameter 'b' implicitly has an 'any' type.
+- js/game.ts:1563 TS7006 Parameter 'a' implicitly has an 'any' type.
+- js/game.ts:1563 TS7006 Parameter 'a' implicitly has an 'any' type.
+- ... 186 more in the JSON

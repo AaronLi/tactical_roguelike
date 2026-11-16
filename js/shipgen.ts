@@ -1,9 +1,10 @@
 'use strict';
+import { U as G_U } from './util.js';
 interface ShSlot { rm: LvRoom; pos: number; side: number; deep: boolean; inner: LvRoom | null; door: number[]; x: number }
 interface ShSeg { x: number; w: number; d: number[]; split: boolean[]; stair: boolean }
 interface ShWing { dO: number; dI: number; ew: number; len: number }
 interface ShSk { wing?: ShWing; size: SpSize; len: number; sw: number; dmax: number; W: number; H: number; zc: number; segs: ShSeg[] }
-const G_ShipGen = (() => {
+export const ShipGen = (() => {
   // her frame by class: the spine's length (tiles), its width, how deep her sides are, the bow and stern rooms, how often a deep side is split
   const SPEC: Record<SpSize, { len: number[]; sw: number; dep: number[]; bw: number; bd: number; ew: number; ed: number; split: number; big: number; decks: number }> = {
     transport: { len: [7, 9], sw: 1, dep: [2, 2], bw: 2, bd: 1, ew: 2, ed: 1, split: 0, big: 1, decks: 1 },
@@ -27,7 +28,7 @@ const G_ShipGen = (() => {
 
   // a hull's frame: the same for every deck of her
   function skeleton(r: LvRng, size: SpSize): ShSk {
-    const U = G.U, S = SPEC[size], len = U.ri(r, S.len[0], S.len[1]), dmax = S.dep[1], sw = S.sw, segs: ShSeg[] = [];
+    const U = G_U, S = SPEC[size], len = U.ri(r, S.len[0], S.len[1]), dmax = S.dep[1], sw = S.sw, segs: ShSeg[] = [];
     const stairs = S.decks > 1 ? [Math.round(len * 0.28), Math.round(len * 0.68)] : [];
     for (let x = 0; x < len;) {
       const stair = stairs.length > 0 && x >= stairs[0] && len - x >= 6;
@@ -44,7 +45,7 @@ const G_ShipGen = (() => {
   interface Ctx { W: number; H: number; t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: LvDoorSpec[]; locks: [number, number, string][]; glass: any[]; entries: number[][] }
   // one deck of a hull, carved into the grid at (ox, oz). f: which deck, of n. hi: which hull (0 the mission's).
   function deck(c: Ctx, sk: ShSk, ox: number, oz: number, f: number, n: number, r: LvRng, hi: number, stairs: any[]) {
-    const U = G.U, L = G.Level, S = SPEC[sk.size], { W, t, out, rooms, doors, locks } = c, sw = sk.sw, zc = oz + sk.zc, top = f === n - 1;
+    const U = G_U, L = G.Level, S = SPEC[sk.size], { W, t, out, rooms, doors, locks } = c, sw = sk.sw, zc = oz + sk.zc, top = f === n - 1;
     const carve = (x: number, z: number, w: number, h: number, role: ShRole) => {
       for (let j = z - 1; j <= z + h; j++) for (let i = x - 1; i <= x + w; i++) {
         const k = j * W + i, inside = i >= x && i < x + w && j >= z && j < z + h;
@@ -127,12 +128,12 @@ const G_ShipGen = (() => {
   // an engine room across its end. The bridge is across the corner itself, glazed on both of its outer walls; the spines
   // meet behind it, and a compartment sits in the crook between the arms.
   function wingSkeleton(r: LvRng, size: SpSize): ShSk {
-    const U = G.U, S = SPEC[size], big = size !== 'small', dO = big ? 3 : 2, dI = big ? 3 : 2, ew = big ? 3 : 2, len = big ? U.ri(r, 14, 17) : U.ri(r, 9, 11), sw = S.sw;
+    const U = G_U, S = SPEC[size], big = size !== 'small', dO = big ? 3 : 2, dI = big ? 3 : 2, ew = big ? 3 : 2, len = big ? U.ri(r, 14, 17) : U.ri(r, 9, 11), sw = S.sw;
     const span = 1 + dO + 1 + sw + 1 + len + 1 + ew + 1;
     return { wing: { dO, dI, ew, len }, size, len, sw, dmax: dO, W: span, H: span, zc: 1 + dO + 1, segs: [] };
   }
   function wingDeck(c: Ctx, sk: ShSk, ox: number, oz: number, r: LvRng, hi: number) {
-    const U = G.U, L = G.Level, { W, t, out, rooms, doors, locks } = c, sw = sk.sw, { dO, dI, ew, len } = sk.wing!;
+    const U = G_U, L = G.Level, { W, t, out, rooms, doors, locks } = c, sw = sk.sw, { dO, dI, ew, len } = sk.wing!;
     const carve = (x: number, z: number, w: number, h: number, role: ShRole) => {
       for (let j = z - 1; j <= z + h; j++) for (let i = x - 1; i <= x + w; i++) {
         const k = j * W + i, inside = i >= x && i < x + w && j >= z && j < z + h;
@@ -178,7 +179,7 @@ const G_ShipGen = (() => {
   }
 
   function lay(r: LvRng, _level: number, sp: SpGen | null): LvLay {
-    const U = G.U, size: SpSize = (sp && sp.size && SPEC[sp.size] ? sp.size : 'small'), S = SPEC[size], wing = !!(sp && sp.wing) && (size === 'small' || size === 'medium'), main = wing ? wingSkeleton(r, size) : skeleton(r, size);
+    const U = G_U, size: SpSize = (sp && sp.size && SPEC[sp.size] ? sp.size : 'small'), S = SPEC[size], wing = !!(sp && sp.wing) && (size === 'small' || size === 'medium'), main = wing ? wingSkeleton(r, size) : skeleton(r, size);
     const osz = sp && sp.other && SPEC[sp.other] && S.decks === 1 ? sp.other : null, other = osz ? skeleton(r, osz) : null;
     const W = 2 * MX + Math.max(main.W, other ? other.W : 0), H = MZ0 + (other ? other.H + GAP : 0) + main.H + MZB;
     const mo = [MX, MZ0 + (other ? other.H + GAP : 0)], oo = other ? [MX + U.ri(r, 0, Math.max(0, main.W - other.W)), MZ0] : [0, 0];
@@ -479,5 +480,5 @@ const G_ShipGen = (() => {
   const NAMES: Record<string, string> = { bridge: 'Bridge', security: 'Security', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell' };
   return { lay, finish, fairings, faired, roomAt, sites, siteOf, siteAt, cut, seal, tunnelPath, bent, cutKey, TUN, NAMES, SPEC };
 })();
-G.ShipGen = G_ShipGen;
-interface GameModules { ShipGen: typeof G_ShipGen; }
+G.ShipGen = ShipGen;
+declare global { interface GameModules { ShipGen: typeof ShipGen; } }
