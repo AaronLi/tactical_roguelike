@@ -2,7 +2,7 @@
 // and from the same points, with the same random numbers (mulberry32: makeRng in js/acousticswasm.ts, the module's own), both make a trace; the
 // histograms, the early arrivals, wet and rt60 must agree to 1e-9 (relative). Rooms of indoor, outdoor and multi-floor levels, with the doors shut
 // and then all opened (the module's scene is kept between the two; only the doors' state is sent again), and the module's rays sent in pieces
-// as the game does. node tools/acoustics_wasm.test.mjs [--verbose]; build the module first if the Rust changed: npm run build:wasm
+// as the game does. node tools/acoustics_wasm.test.mjs [--verbose]; npm run test:acoustics builds the module first (tools/build_wasm.mjs: needs Rust; without it the module must already be there)
 import { moduleOf, runFile } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import { loadLevel, ROOT } from './level_env.mjs';
 import fs from 'node:fs'; import path from 'node:path';

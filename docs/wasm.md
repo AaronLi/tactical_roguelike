@@ -8,14 +8,14 @@ fallback and the reference. The game's behaviour doesn't change except in the tr
 
 | File | What |
 | --- | --- |
-| `wasm/acoustics/` | The crate: `Cargo.toml` (no dependencies; release profile `opt-level=3`, `lto`, `panic=abort`, `codegen-units=1`) and `src/lib.rs`, the loop line for line, with its own RNG. Plain `#[no_mangle] extern "C"` exports over linear memory (no wasm-bindgen). |
-| `assets/wasm/acoustics.wasm` | The built module, **committed**: neither CI nor the site build has Rust, and `assets/` is published as it is. |
+| `wasm/acoustics/` | The crate: `rust-toolchain.toml` (the compiler, pinned, with the `wasm32-unknown-unknown` target), `Cargo.toml` (no dependencies; release profile `opt-level=3`, `lto`, `panic=abort`, `codegen-units=1`) and `src/lib.rs`, the loop line for line, with its own RNG. Plain `#[no_mangle] extern "C"` exports over linear memory (no wasm-bindgen). |
+| `assets/wasm/acoustics.wasm` | The built module: a build output, **not kept in the repo** (`.gitignore`). `npm run build` makes it, and so does CI, which installs the pinned Rust (`.github/workflows/pages.yml`); the site publishes it with the rest of `assets/`. |
 | `js/acousticswasm.ts` | A leaf module: fetches and instantiates the module, copies a floor into its memory (a scene), makes traces of it. Also `makeRng(seed)`, the RNG. |
 | `js/acoustics.ts` | Flattens a floor (`sceneOf`), and `tracer()` uses WebAssembly when it is ready, the JS loop otherwise. `finish()` (the histograms into an `AcTrace`) is TypeScript for both. |
-| `tools/build_wasm.mjs` | `npm run build:wasm`: `cargo build --release --target wasm32-unknown-unknown` in the crate, then the copy to `assets/wasm/`. Rebuild and commit the `.wasm` whenever `lib.rs` changes. |
-| `tools/acoustics_wasm.test.mjs` | `npm run test:acoustics` (in CI, next to `test:models`). |
+| `tools/build_wasm.mjs` | `npm run build:wasm`: `cargo build --release --target wasm32-unknown-unknown` in the crate, then the copy to `assets/wasm/`. A step of `npm run build`. Without Rust it's skipped with a warning (the game uses the JavaScript tracer), except on CI (`CI` set), where it fails. |
+| `tools/acoustics_wasm.test.mjs` | `npm run test:acoustics` (in CI, next to `test:models`): builds the module first, then the comparison. |
 
-Needs Rust with the `wasm32-unknown-unknown` target (`rustup target add wasm32-unknown-unknown`), only to rebuild.
+Needs Rust ([rustup](https://rustup.rs)); `rustup toolchain install` in `wasm/acoustics` installs the pinned compiler and its target. Without it the game still runs, on the JavaScript tracer.
 
 ## How it runs
 

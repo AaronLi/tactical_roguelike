@@ -33,6 +33,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Rust, for the acoustic tracer's WebAssembly module (npm run build makes it, assets/wasm: not kept in the repo; docs/wasm.md): the
+      # runner has rustup, and this installs the compiler and target wasm/acoustics/rust-toolchain.toml pins
+      - name: Rust (the WebAssembly module's)
+        run: rustup toolchain install
+        working-directory: wasm/acoustics
       - run: npm run typecheck
       # the layering rule (docs/modules-plan.md, phase 3): no file the server's thread loads names a page-only module
       - run: npm run deps:check
@@ -63,7 +68,7 @@ jobs:
         if: steps.models.outputs.cache-hit != 'true'
         run: npm run bake:models -- -j 4
       - run: npm run test:models
-      # the acoustic ray tracer in WebAssembly (assets/wasm/acoustics.wasm, committed: no Rust here) against the JavaScript one, same seeds (docs/wasm.md)
+      # the acoustic ray tracer in WebAssembly (assets/wasm/acoustics.wasm, built above by npm run build) against the JavaScript one, same seeds (docs/wasm.md)
       - run: npm run test:acoustics
       # the release bundles build (and are not published from here: the site job does that)
       - run: node tools/bundle.mjs
@@ -90,6 +95,9 @@ jobs:
       # ---- main (main/)
       - run: npm ci
         working-directory: main
+      # (Rust for its WebAssembly module, when it has one: its npm run build makes it, and fails without Rust on CI)
+      - name: Rust, main (its WebAssembly module)
+        run: if [ -f main/wasm/acoustics/rust-toolchain.toml ]; then cd main/wasm/acoustics && rustup toolchain install; fi
       - name: Baked audio, main (cache)
         uses: actions/cache@v4
         with:
@@ -113,6 +121,9 @@ jobs:
       # ---- the space branch (space/)
       - run: npm ci
         working-directory: space
+      # (Rust for its WebAssembly module, when it has one: its npm run build makes it; a branch without wasm/acoustics needs none)
+      - name: Rust, the space branch (its WebAssembly module)
+        run: if [ -f space/wasm/acoustics/rust-toolchain.toml ]; then cd space/wasm/acoustics && rustup toolchain install; fi
       - name: Baked audio, the space branch (cache)
         uses: actions/cache@v4
         with:

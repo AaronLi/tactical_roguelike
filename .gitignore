@@ -25,3 +25,6 @@ recordings/
 
 # the Supabase CLI's local state (supabase link)
 supabase/.temp/
+
+# the acoustic tracer's WebAssembly module: built by npm run build from wasm/acoustics (tools/build_wasm.mjs, docs/wasm.md), and by CI
+assets/wasm/

@@ -1,0 +1,6 @@
+# The Rust the acoustic tracer's WebAssembly module is built with (docs/wasm.md): pinned, with its target, so a fresh machine or CI
+# gets the same compiler (`rustup toolchain install` in this folder installs it; cargo here uses it).
+[toolchain]
+channel = "1.97.0"
+targets = ["wasm32-unknown-unknown"]
+profile = "minimal"
