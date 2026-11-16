@@ -3,6 +3,8 @@ import { chambered, loadFor, ROUND_LIFE } from './data.js';
 import { Gunsmith } from './parts.js';
 import { SpaceData } from './spacedata.js';
 import { U } from './util.js';
+import { Level } from './level.js';
+import { World } from './world.js';
 // What the simulation and the game on screen both work out, the same way: pure reckonings (no state, nothing drawn) that
 // used to live in the files that draw (js/player.ts, js/views.ts, js/rig.ts, js/game.ts) or in the host's own file
 // (js/server.ts). The host's simulation runs in a thread of its own (js/serverworker.ts, docs/threads.md) that loads none of
@@ -63,7 +65,7 @@ export const Sim = {
       const seg = p1.clone().sub(p), len = seg.length();
       if (len < 1e-4) break;
       seg.divideScalar(len);
-      const h = G.Level.raycast(map, p.x, p.y, p.z, seg.x, seg.y, seg.z, len);
+      const h = Level.raycast(map, p.x, p.y, p.z, seg.x, seg.y, seg.z, len);
       if (h.t < len) return p.addScaledVector(seg, h.t);
       v.multiplyScalar(Math.exp(-len / drag)); v.y -= grav * dt;
       p.copy(p1); dist += len;
@@ -79,12 +81,12 @@ export const Sim = {
   NADE_R: 0.05, NADE_G: 14,
   STICKY: { FUSE: 2, MAX_FLY: 6 }, // (a sticky grenade's fuse, from when it holds; and how long it may fly before it goes off anyway: js/player.ts STICKY)
   nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) {
-    if (map && (map as any).tilt) { G.Level.inFrame(map, { p: n.pos, v: n.vel }, (m) => this.nadeIn(n, dt, m)); return; } // (aboard a ship lying tilted: it falls her way, js/level.ts)
+    if (map && (map as any).tilt) { Level.inFrame(map, { p: n.pos, v: n.vel }, (m) => this.nadeIn(n, dt, m)); return; } // (aboard a ship lying tilted: it falls her way, js/level.ts)
     this.nadeIn(n, dt, map);
   },
   nadeIn(n: VwNadeMotion, dt: number, map: LvMap | null) {
     const R = this.NADE_R, w = map && map.world, p = n.pos, v = n.vel;
-    const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if ((s.move || s.ray) && !(s.nostep && !s.ray) && (!s.hull || G.World.touches(s, [x0, y0, z0], [x1, y1, z1]))) h = true; }); return h; }; // (a rock: its own shape, not the boxes that stop people)
+    const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if ((s.move || s.ray) && !(s.nostep && !s.ray) && (!s.hull || World.touches(s, [x0, y0, z0], [x1, y1, z1]))) h = true; }); return h; }; // (a rock: its own shape, not the boxes that stop people)
     const side = (x: number, y: number, z: number) => hits(x - R, y - R + 0.03, z - R, x + R, y + R, z + R); // (clear of the floor it's on)
     const below = (x: number, y: number, z: number) => hits(x - R + 0.01, y - R, z - R + 0.01, x + R - 0.01, y + R - 0.02, z + R - 0.01);
     const N = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / N;
@@ -109,9 +111,9 @@ export const Sim = {
   // A sticky grenade in the air: no bounces, it holds to the first solid it meets. One step of dt (in 1/120 s pieces); returns where it
   // struck ({ at, n: the face's normal }) or null while it's still flying. (Bodies are the thrower's own test: js/views.ts stickStep)
   stickFly(n: VwNadeMotion, dt: number, map: LvMap | null): { at: THREE.Vector3; n: number[]; t: number } | null {
-    if (map && (map as any).tilt && G.Level.frameAt(map, n.pos.x, n.pos.y, n.pos.z)) { // (aboard a ship lying tilted: in her frame, where it holds put back in the world's)
+    if (map && (map as any).tilt && Level.frameAt(map, n.pos.x, n.pos.y, n.pos.z)) { // (aboard a ship lying tilted: in her frame, where it holds put back in the world's)
       let r: { at: THREE.Vector3; n: number[]; t: number } | null = null;
-      G.Level.inFrame(map, { p: n.pos, v: n.vel }, (m) => { r = this.stickIn(n, dt, m); });
+      Level.inFrame(map, { p: n.pos, v: n.vel }, (m) => { r = this.stickIn(n, dt, m); });
       const R = r as { at: THREE.Vector3; n: number[]; t: number } | null, t = (map as any).tilt.b, SD = SpaceData;
       if (R) { const w = SD.toWorld(t, R.at.x, R.at.y, R.at.z), nn = SD.toWorld({ x: 0, y: 0, z: 0, yaw: t.yaw, pt: t.pt }, R.n[0], R.n[1], R.n[2]); R.at.set(w.x, w.y, w.z); R.n = [nn.x, nn.y, nn.z]; }
       return R;
@@ -124,7 +126,7 @@ export const Sim = {
       v.y -= this.NADE_G * h;
       const len = v.length() * h; if (len < 1e-6) continue;
       const dx = v.x / v.length(), dy = v.y / v.length(), dz = v.z / v.length();
-      const hit = map ? G.Level.raycast(map, p.x, p.y, p.z, dx, dy, dz, len + this.NADE_R) : null;
+      const hit = map ? Level.raycast(map, p.x, p.y, p.z, dx, dy, dz, len + this.NADE_R) : null;
       if (hit && hit.solid && hit.t < len + this.NADE_R) { const at = p.clone().addScaledVector(new THREE.Vector3(dx, dy, dz), Math.max(0, hit.t)); return { at, n: hit.n || [0, 1, 0], t: k * h }; }
       if (!map && p.y + v.y * h < 0) return { at: new THREE.Vector3(p.x, 0, p.z), n: [0, 1, 0], t: k * h };
       p.x += v.x * h; p.y += v.y * h; p.z += v.z * h;
@@ -154,7 +156,7 @@ export const Sim = {
   // turns the downward ones itself, js/ballistics.ts glances.)
   blastR(map: LvMap | null, p: THREE.Vector3) {
     if (!map) return this.BLAST.r;
-    const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05);
+    const g = Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05);
     return g != null && p.y - g < 0.15 ? this.BLAST.r * this.BLAST.SURFACE : this.BLAST.r;
   },
   // A thermobaric's burst (js/player.ts thermobaric tells what it does; this is the reckoning): the fill of the space round it
@@ -168,7 +170,7 @@ export const Sim = {
   // same fireball and the F9 view shows the volume it filled.
   TB: { FUSE: 2.6, CLOUD: 110, SPACE: 900, ROOM_H: 2.7, E: 6.0e6, BURN: 0.45, BLAST: 0.9, QS0: 25, QS_K: 180, WALL_R: 3 },
   tbModel(map: LvMap, p: THREE.Vector3): PTbModel {
-    const T = this.TB, L = G.Level, TS = L.TS, cellA = TS * TS;
+    const T = this.TB, L = Level, TS = L.TS, cellA = TS * TS;
     const fill = L.blastFill(map, p.x, p.y, p.z, T.SPACE);
     // how much of the cloud's reach is open to the sky (counted over the first CLOUD cells): the cloud thins and rises there
     let outC = 0; const fm = L.floorMap(map, fill.f), out = fm.out || map.out, nC = Math.min(fill.n, T.CLOUD);
@@ -187,7 +189,7 @@ export const Sim = {
   },
   // what a thermobaric's burst does to someone at (x, y, z): burn and blast (shares of a life), daze (0..1), and where they were
   tbDose(M: PTbModel, x: number, y: number, z: number) {
-    const T = this.TB, L = G.Level, map = M.map, TS = L.TS, f = L.floorAt(map, x, y, z);
+    const T = this.TB, L = Level, map = M.map, TS = L.TS, f = L.floorAt(map, x, y, z);
     const i = U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + U.clamp(Math.floor(x / TS), 0, map.W - 1), k = f === M.fill.f ? M.idx[i] : -1;
     if (k >= 0 && k < M.cloud) return { burn: T.BURN, blast: T.BLAST * M.conf, daze: 1, at: 'cloud', d: M.fill.d[k] };
     if (k >= 0) { // in the space it filled, past the fireball: the long push of the pressure, and the front's last of it close to the edge

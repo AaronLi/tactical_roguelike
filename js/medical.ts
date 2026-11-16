@@ -1,5 +1,6 @@
 'use strict';
 import { U } from './util.js';
+import { Ballistics } from './ballistics.js';
 // the yes/no injuries a part can have (MedPart), in the order they're packed into the saved flags
 type MedFlag = 'light' | 'heavy' | 'frac' | 'tq' | 'lung' | 'gut' | 'massive' | 'spine';
 // what a medical item treats: light / heavy bleeding, a punctured lung, a fracture, blood loss, pain
@@ -210,7 +211,7 @@ export const Med = (() => {
     if (p.spine) out.push('spinal injury');
     if (p.tq) out.push('tourniquet on');
     // the organs it went through: grazed, or wrecked
-    for (const [id, f] of Object.entries(p.org || {})) { const O = G.Ballistics && (G.Ballistics.ORG as Record<string, any>)[id]; if (O && f > 0.02) out.push(`${O.label.toLowerCase()} ${f >= 1 ? 'destroyed' : f >= 0.5 ? 'badly hurt' : 'hit'}`); }
+    for (const [id, f] of Object.entries(p.org || {})) { const O = Ballistics && (Ballistics.ORG as Record<string, any>)[id]; if (O && f > 0.02) out.push(`${O.label.toLowerCase()} ${f >= 1 ? 'destroyed' : f >= 0.5 ? 'badly hurt' : 'hit'}`); }
     return out;
   }
   // ---------------------------------------------------------------- the body, drawn

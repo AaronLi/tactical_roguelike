@@ -5,11 +5,9 @@
 // handed over (not copied), and the level itself (copied: taken by js/space.ts for a ship seen from outside, then the level).
 (self as any).window = self;
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
-// (the scripts, in the page's order: index.html. Each is imported in turn; none has an import of its own yet)
-const PREP_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents', 'damage', 'furnmesh', 'lightgrid'];
-const prepBooted = import('./threeboot.js').then(async () => {
-  for (const f of PREP_SCRIPTS) await import('./' + f + '.js');
-});
+// (the files it works with are what js/prepentry.ts imports: the entry file. Imported here, after the globals above are set and three.js
+// is there, not at the top of this file: a static import would run first)
+const prepBooted = import('./threeboot.js').then(() => import('./prepentry.js'));
 self.onmessage = async (e) => {
   const m = e.data; if (!m || m.t !== 'prep') return;
   try {

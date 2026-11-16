@@ -1,6 +1,7 @@
 'use strict';
 import { ammoOk, calOf, WEAPONS } from './data.js';
 import { Hooks, U } from './util.js';
+import { Ballistics } from './ballistics.js';
 // The sidearm tree: what you can start a run with. Everyone starts with the P9 in the middle, and three paths run out from it, each a way of
 // fighting: full auto (volume of fire), heavy calibre (one round doing the work) and the modern classics (being where they aren't looking,
 // and hitting what you aim at). Each gun on a path is earned by doing what that path's about with the gun before it, and it's yours for
@@ -98,7 +99,7 @@ export const Arsenal = (() => {
     if (k.d <= CLOSE) tally(id, 'close');
     if (k.d >= FAR) tally(id, 'far');
     if (k.shots.size === 1) tally(id, 'one');
-    if (G.Ballistics.suspectArmour(ev).some((a) => a.def.prot.length)) tally(id, 'armed'); // (no pistol goes through a vest: this is what a heavy one does about it)
+    if (Ballistics.suspectArmour(ev).some((a) => a.def.prot.length)) tally(id, 'armed'); // (no pistol goes through a vest: this is what a heavy one does about it)
     if (k.wall) tally(id, 'wall');
     if (m.h) tally(id, 'hs');
     if (m.h && k.d >= MID) tally(id, 'hsfar');

@@ -2,6 +2,8 @@
 import { Materials } from './materials.js';
 import { U } from './util.js';
 import { World } from './world.js';
+import { Damage } from './damage.js';
+import { Level } from './level.js';
 
 export const LevelDesc = (() => {
   const PI = Math.PI;
@@ -75,7 +77,7 @@ export const LevelDesc = (() => {
 
   // ---------------------------------------------------------------- the whole level
   function describe(map: LvMap): LvDesc {
-    const L = G.Level, fms: LvMap[] = map.floors || [map], TS = L.TS;
+    const L = Level, fms: LvMap[] = map.floors || [map], TS = L.TS;
     const pt = (p: any) => (p ? { x: p.x, z: p.z } : null);
     const desc: LvDesc = {
       v: 1, seed: map.seed, level: map.level, theme: map.theme.name, night: !!map.night, hub: !!map.hub,
@@ -162,7 +164,7 @@ export const LevelDesc = (() => {
   }
   // A building of several floors: each floor's nodes as a storey's, raised to its height; the stairs' steps; the railings
   function stackNodes(map: LvMap, B: LdB) {
-    const L = G.Level, root = B.D.root;
+    const L = Level, root = B.D.root;
     for (const m of map.floors) root.push(B.group(floorNodes(m, B), { p: [0, m.fy, 0], fl: m.fl }));
     // the stairs: each step a block (stone treads, painted risers), and a stringer down the open side
     const tread = B.std(map.railSteel ? { color: 0x5a5e62, roughness: 0.45, metalness: 0.7 } : { color: 0x8a847a, roughness: 0.8 }), riser = B.std(map.railSteel ? { color: 0x34383c, roughness: 0.5, metalness: 0.6 } : { color: 0xcfc8bb, roughness: 0.9 });
@@ -186,7 +188,7 @@ export const LevelDesc = (() => {
   // order), windows, lamps' fittings, doors, a festival's or the Sandia Crest's dressing, what a foundry's machinery gives off,
   // the weapon case and the boxes and cabinets
   function floorNodes(map: LvMap, B: LdB): LdNode[] {
-    const L = G.Level, TS = L.TS, K = L.K, WALL_H = L.WALL_H, th = map.theme, root: LdNode[] = [];
+    const L = Level, TS = L.TS, K = L.K, WALL_H = L.WALL_H, th = map.theme, root: LdNode[] = [];
     const { W, H, t } = map, SK = map.skirt || 0, va = map.voidAbove, gr = map.grate;
     const ship = th.space ? ':' + (th.accent || '#e8922a') : ''; // (a ship: her own surfaces, js/levelview.ts _shipTex, in her colour)
     const cell = (i: number, y: number) => [((i % W) + 0.5) * TS, y, (Math.floor(i / W) + 0.5) * TS];
@@ -357,7 +359,7 @@ export const LevelDesc = (() => {
   // and a pipe along the top of each side, and a strip of her colour let into the deck along each edge, lit (dark on a night
   // level, with her power off). Only looked at: nothing here stops anyone or anything.
   function shipTrim(map: LvMap, B: LdB): LdNode[] {
-    const L = G.Level, TS = L.TS, WH = L.WALL_H, { W, H, t } = map, th = map.theme, out: LdNode[] = [];
+    const L = Level, TS = L.TS, WH = L.WALL_H, { W, H, t } = map, th = map.theme, out: LdNode[] = [];
     const acc = parseInt((th.accent || '#e8922a').slice(1), 16), wc = parseInt(th.wall.slice(1), 16), frame = B.std({ color: (Math.floor((wc >> 16 & 255) * 0.62) << 16) | (Math.floor((wc >> 8 & 255) * 0.62) << 8) | Math.floor((wc & 255) * 0.62), roughness: 0.6, metalness: 0.3 });
     const trunk = B.std({ color: 0x2a2e33, roughness: 0.55, metalness: 0.4 }), pipe = B.std({ color: 0x8a9096, roughness: 0.35, metalness: 0.7 }), strip = map.night ? B.std({ color: acc, roughness: 0.6 }) : B.basic({ color: acc });
     const wall = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] === 1;
@@ -394,7 +396,7 @@ export const LevelDesc = (() => {
   // often (the texture: G.Level.GRATE), seen through from above and below. Under it, a steel channel along every edge that's
   // over the drop, and hanger rods up to the roof from them every few metres. Rounds meet the bars where they're drawn (onBar).
   function grate(map: LvMap, B: LdB): LdNode[] {
-    const L = G.Level, TS = L.TS, { W, H, t, grate: gr } = map, out: LdNode[] = [];
+    const L = Level, TS = L.TS, { W, H, t, grate: gr } = map, out: LdNode[] = [];
     const cells: number[] = [];
     for (let i = 0; i < W * H; i++) if (gr[i] && t[i] !== 1 && t[i] !== 5) cells.push(i);
     out.push({ t: 'i', g: B.geo('plane', [TS, TS], [['rx', -PI / 2]]), m: B.std({ color: 0x7a7e80, map: B.tex('grate'), alphaTest: 0.5, roughness: 0.5, metalness: 0.7, side: 2 }), n: cells.length, tr: cells.flatMap((i) => [((i % W) + 0.5) * TS, -0.01, (Math.floor(i / W) + 0.5) * TS]) });
@@ -416,7 +418,7 @@ export const LevelDesc = (() => {
   // outside window the view behind the glass (js/furniture.ts outsideMaterial). First the roller doors, rolled up: the wall
   // over the opening, the shutter's drum under it and a guide down each side.
   function windows(map: LvMap, B: LdB, wallMat: number, hf: (n: LdNode) => LdNode = (n) => n): LdNode[] {
-    const L = G.Level, TS = L.TS, h = TS / 2, out: LdNode[] = [];
+    const L = Level, TS = L.TS, h = TS / 2, out: LdNode[] = [];
     let steel = -1;
     for (const [x0, x1, z] of map.rollers || []) {
       if (steel < 0) steel = B.std({ color: 0x5d6368, roughness: 0.5, metalness: 0.6 });
@@ -459,7 +461,7 @@ export const LevelDesc = (() => {
   // (G.Game.updateDoors): base the shut leaf's turn, sg which way it swings. The leaf (leaf), its knobs (knob) and hinges
   // (hk, hp: a knuckle and a leaf, shot out one by one: js/damage.ts).
   function doors(map: LvMap, B: LdB, wtex: number, paint: boolean): LdNode[] {
-    const L = G.Level, TS = L.TS, th = map.theme, out: LdNode[] = [];
+    const L = Level, TS = L.TS, th = map.theme, out: LdNode[] = [];
     if (!map.doors.length) return out;
     const metal = th.name === 'Bunker' || th.name === 'Research Lab' || th.name === 'Cold Storage' || th.name === 'Foundry' || th.name === 'Warehouse'; // (as js/materials.ts builds them)
     const leafMat = B.std({ color: metal ? 0x5d666e : 0x6e4a2c, roughness: metal ? 0.5 : 0.75, metalness: metal ? 0.5 : 0 });
@@ -506,7 +508,7 @@ export const LevelDesc = (() => {
       c.push(B.mesh(B.geo('box', [leafL, LH, vault ? 0.2 : slide ? 0.08 : 0.05]), vault ? vaultMat : glassDoor ? doorGlass : d.kind === 'fire' || slide ? fireMat : leafMat, { p: [leafL / 2 + 0.02, (L.DOOR_H - 0.04) / 2, 0], l1: 1, h: 'leaf' }));
       if (!glassDoor && !slide) for (const side of [-1, 1]) c.push(B.mesh(B.geo('sphere', [0.03, 8, 6]), knobMat, { p: [leafL - 0.08, 1.0, side * 0.045], h: 'knob' }));
       // its hinges, on the side it opens toward (shot out, they're gone, and when they all are so's the door: js/damage.ts)
-      if (!vault && !slide) for (const y of G.Damage.HINGES) {
+      if (!vault && !slide) for (const y of Damage.HINGES) {
         c.push(B.mesh(B.geo('cyl', [0.012, 0.012, 0.1, 8]), steelMat, { p: [0.005, y, -0.03], h: 'hk' }));
         c.push(B.mesh(B.geo('box', [0.05, 0.09, 0.004]), steelMat, { p: [0.04, y, -0.0275], h: 'hp' }));
       }
@@ -601,7 +603,7 @@ export const LevelDesc = (() => {
   // court, each with a soft glow; the real lights along them are lamps), the stage's truss with coloured lamps throwing beams,
   // its backdrop, and the arch over the gate. One random stream from the seed (the ground's textures first: TEX_DRAWS).
   function festival(map: LvMap, B: LdB): LdNode[] {
-    const L = G.Level, f = map.fest, TS = L.TS, S = (map.seed ^ 0xfe57) >>> 0, Wm = map.W * TS, Hm = map.H * TS, out: LdNode[] = [];
+    const L = Level, f = map.fest, TS = L.TS, S = (map.seed ^ 0xfe57) >>> 0, Wm = map.W * TS, Hm = map.H * TS, out: LdNode[] = [];
     // (a night level's festival is the small hours, everyone gone home and the power off: the bulbs, lanterns, street lamps, stage
     // lamps, the signs, the backdrop, the LED strip and the road paint are dead glass and paint, lit only by the moon, no glows or
     // beams; nightify has their lights off. Dead glass: the colour at dim (0.35) of its linear value, js/levelview.ts mat)
@@ -739,10 +741,10 @@ export const LevelDesc = (() => {
   // The Sandia Crest's surroundings, as functions of what the description holds of it (crestOf: the map's size, the gorge's
   // depth, where the gorge and the viewing site are, the rolling ground): the mountain's height round the map, its noise, how
   // a colour's lit at sundown
-  function crestOf(map: LvMap) { const cr = map.crest; return { W: map.W, H: map.H, TS: G.Level.TS, chasm: map.chasm, cr: { CX0: cr.CX0, CX1: cr.CX1, SZ: cr.SZ, site: cr.site }, terrain: map.terrain, t: map.t as ArrayLike<number>, fog: map.theme.fog }; }
+  function crestOf(map: LvMap) { const cr = map.crest; return { W: map.W, H: map.H, TS: Level.TS, chasm: map.chasm, cr: { CX0: cr.CX0, CX1: cr.CX1, SZ: cr.SZ, site: cr.site }, terrain: map.terrain, t: map.t as ArrayLike<number>, fog: map.theme.fog }; }
   function crestOfDesc(d: LvDesc) { const s = d.floors[0].t as string, t = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) t[i] = s.charCodeAt(i) - 48; return { W: d.W, H: d.H, TS: d.TS, chasm: d.chasm, cr: d.crest, terrain: d.terrain, t, fog: d.crest.fog }; }
   function crestEnv(o: ReturnType<typeof crestOf>) {
-    const L = G.Level, cr = o.cr, TS = o.TS, CS = L.CTS, Wm = o.W * TS, Hm = o.H * TS, D = o.chasm, cx = Wm / 2, cz = Hm / 2, f32 = Math.fround;
+    const L = Level, cr = o.cr, TS = o.TS, CS = L.CTS, Wm = o.W * TS, Hm = o.H * TS, D = o.chasm, cx = Wm / 2, cz = Hm / 2, f32 = Math.fround;
     const gh = (x: number, z: number) => (o.terrain ? World.terrainAt(o.terrain, x, z) : 0);
     const sun = norm([-1, 0.075, 0.32]);
     // a colour (sRGB) as it's lit facing (nx, ny, nz): the sky's blue from above, the sun's orange where it faces west, in linear. ao: how shut in
@@ -873,7 +875,7 @@ export const LevelDesc = (() => {
   // lights; the tramway; the outcrops' rough tops; the ziplines, the flat roofs and their ladders, the guard rail, the
   // greenhouse's glass roof. What's far off is unlit (its colours lit as at sundown, the sun low in the west, here).
   function crest(map: LvMap, B: LdB): LdNode[] {
-    const L = G.Level, cr = map.crest, TS = L.TS, CS = L.CTS, Wm = map.W * TS, Hm = map.H * TS, D = map.chasm, rnd = U.rng((map.seed ^ 0x5a7d1a) >>> 0), out: LdNode[] = [];
+    const L = Level, cr = map.crest, TS = L.TS, CS = L.CTS, Wm = map.W * TS, Hm = map.H * TS, D = map.chasm, rnd = U.rng((map.seed ^ 0x5a7d1a) >>> 0), out: LdNode[] = [];
     const E = crestEnv(crestOf(map)), { cx, cz, f32, sun, lit, vn, fbm, sm, height, c0, c1, zs } = E;
     // the ground: a 3 km square of the mountain round the map, and the gorge's cliffs (procedural surfaces, made from the
     // description: proc 'crest.ground' and 'crest.cliffs', crestGround and crestCliffs)

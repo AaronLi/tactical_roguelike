@@ -1,5 +1,5 @@
 // Types of G.Hooks (made in js/util.ts, so every file has it): what the simulation (the files the server's thread loads,
-// js/serverworker.ts SERVER_SCRIPTS, and the level preparation's) may ask of the page. A simulation file never names a
+// the ones js/serverhost.ts and js/prepentry.ts reach) may ask of the page. A simulation file never names a
 // page-only module (G.Audio, G.HUD, G.Me, G.Game...): it calls a hook, and the page file that owns the thing sets the hook
 // as it loads (G.Hooks.click = ... in js/audio.ts). The server's thread loads none of those files, so there each hook
 // stays unset; a call that was guarded before (G.Audio && ...) is guarded by the hook being set, and one that wasn't

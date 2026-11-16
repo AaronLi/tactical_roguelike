@@ -1,5 +1,6 @@
 'use strict';
 import { Level } from './level.js';
+import { Server } from './server.js';
 // Recording what the officers do, one file a level, so the suspects' AI can later be taught how people play (docs/recording.md).
 // It runs with the simulation, on the host only (js/serverhost.ts drives it): the host sees every officer's state ('st', 20 a
 // second) and every action they send, its own player's and the remote players' alike, so a host recording has the whole squad.
@@ -27,7 +28,7 @@ export const Recorder = {
   acc: 0,
   out: null as ((name: string, data: RecFile) => void) | null,
 
-  tick(S: typeof G.Server, dt: number) {
+  tick(S: typeof Server, dt: number) {
     if (!this.on) { if (this.cur) this.end('stop'); return; }
     const playing = S.phase === 'level' && !!S.map;
     if (this.cur && (!playing || S.seed !== this.cur.seed)) this.end(S.phase === 'level' ? 'next' : S.phase);
@@ -39,7 +40,7 @@ export const Recorder = {
     this.acc = Math.min(this.acc - 1 / this.RATE, 1 / this.RATE); // (a long stall doesn't make a burst of frames)
     this.frame(S);
   },
-  begin(S: typeof G.Server) {
+  begin(S: typeof Server) {
     const m = S.map!;
     this.acc = 1 / this.RATE; // (the first frame at once)
     this.cur = {
@@ -55,7 +56,7 @@ export const Recorder = {
     if (!o) c.officers.push((o = { id: p.id, name: p.name, gun: null }));
     if (o.gun == null && p.st && p.st.w) o.gun = String(p.st.w);
   },
-  frame(S: typeof G.Server) {
+  frame(S: typeof Server) {
     const r2 = (v: number) => Math.round(v * 100) / 100;
     const o: any[] = [];
     for (const p of S.players.values()) {
@@ -79,7 +80,7 @@ export const Recorder = {
     this.cur!.frames.push({ t: r2(S.clock), o, s });
   },
   // an officer's message, as it comes in (before the simulation handles it)
-  msg(S: typeof G.Server, m: any, from: string) {
+  msg(S: typeof Server, m: any, from: string) {
     if (!this.on || !this.cur || !m || typeof m !== 'object' || this.SKIP.has(m.t)) return;
     this.cur.events.push({ t: typeof S.clock === 'number' ? Math.round(S.clock * 100) / 100 : 0, by: from, m });
   },

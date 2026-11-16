@@ -2,6 +2,8 @@
 import { HANGAR_ROWS, THEMES as G_THEMES } from './data.js';
 import { U as G_U } from './util.js';
 import { Materials } from './materials.js';
+import { Level } from './level.js';
+import { World } from './world.js';
 // what a class carries on her hull, and who's aboard her: light guards posted singly, security squads (four, armed and armoured), breach
 // response squads (three, lighter: they come to where the hull is breached), and those who don't fight
 interface SpClass { name: string; tier: number; pay: number; diff: number; guns: { pd: number; cannon: number; missile: number }; crew: { guard: number; squads: number; resp: number; civ: number } }
@@ -132,7 +134,7 @@ export const SpaceData = (() => {
    * same place, a crumpled tunnel from it into the hull (js/shipgen.ts tunnel) */
   // s.pt: she came in that many degrees nose up (- down), up to BREACH_PITCH: she lies tilted so, about her collar's middle (pt on the berth, radians)
   function berthAt(d: SpShipDef, s: { x: number; z: number; nx: number; nz: number; ang?: number; pt?: number }) {
-    const TS = G.Level.TS, yaw = (s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2) + (s.ang || 0) * Math.PI / 180, L = layout(d), zN = L.zc - 0.22;
+    const TS = Level.TS, yaw = (s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2) + (s.ang || 0) * Math.PI / 180, L = layout(d), zN = L.zc - 0.22;
     const px = s.x + s.nx * (TS / 2 + 0.03), pz = s.z + s.nz * (TS / 2 + 0.03);
     const b = { x: px - zN * Math.sin(yaw), y: -L.lift, z: pz - zN * Math.cos(yaw), yaw, pt: (s.pt || 0) * Math.PI / 180 };
     if (!b.pt) return b;
@@ -155,7 +157,7 @@ export const SpaceData = (() => {
       const a = toWorld(b, q[0], q[1], q[2]), c = toWorld(b, q[3], q[4], q[5]);
       if (b.pt) {
         const m = toWorld(b, (q[0] + q[3]) / 2, (q[1] + q[4]) / 2, (q[2] + q[5]) / 2), hx = Math.abs(q[3] - q[0]) / 2, hy = Math.abs(q[4] - q[1]) / 2, hz = Math.abs(q[5] - q[2]) / 2;
-        const ob = [m.x, m.y, m.z, b.yaw, b.pt, hx, hy, hz], o = G.World.obox(ob[0], ob[1], ob[2], ob[3], ob[4], ob[5], ob[6], ob[7]);
+        const ob = [m.x, m.y, m.z, b.yaw, b.pt, hx, hy, hz], o = World.obox(ob[0], ob[1], ob[2], ob[3], ob[4], ob[5], ob[6], ob[7]);
         out.push({ tag: q[6], b: [...o.min, ...o.max], ob });
       } else if (turned) {
         const m = toWorld(b, (q[0] + q[3]) / 2, 0, (q[2] + q[5]) / 2), hx = Math.abs(q[3] - q[0]) / 2, hz = Math.abs(q[5] - q[2]) / 2, ex = Math.abs(hx * Math.cos(b.yaw)) + Math.abs(hz * Math.sin(b.yaw)), ez = Math.abs(hx * Math.sin(b.yaw)) + Math.abs(hz * Math.cos(b.yaw));
@@ -167,7 +169,7 @@ export const SpaceData = (() => {
   // her boxes and her flights as she's built, level and square (her own frame): a world for those aboard her while she lies tilted
   // (js/level.ts setTilt: they're moved in it), her nose shut behind her collar's mouth no more than it is docked (no nose, no steps out)
   function frameWorld(d: SpShipDef) {
-    const W = G.World, w = W.create(), mat = Materials.SHIP;
+    const W = World, w = W.create(), mat = Materials.SHIP;
     const fls = flights(d).map((fl) => ({ tag: fl.tag, axis: 'z', up: fl.zh > fl.zf ? 1 : -1, x0: Math.min(fl.x0, fl.x1), x1: Math.max(fl.x0, fl.x1), z0: Math.min(fl.zf, fl.zh), z1: Math.max(fl.zf, fl.zh), y0: fl.y0, rise: fl.rise, n: fl.n, f: 0, steps: [] as any[], on: true }));
     for (const q of boxes(d)) {
       if (q[6] === 'nose' || q[6] === 'steps') continue;
@@ -180,8 +182,8 @@ export const SpaceData = (() => {
   // the most a breach may be off square (js/space.ts events), degrees; and nose up or down
   const BREACH_ANG = 45, BREACH_PITCH = 30;
   // a solid of hers (worldBoxes) made in the world's terms, o its kind
-  const solidOf = (q: { b: number[]; yb?: any; ob?: number[] }, o: any) => q.ob ? G.World.obox(q.ob[0], q.ob[1], q.ob[2], q.ob[3], q.ob[4], q.ob[5], q.ob[6], q.ob[7], o)
-    : q.yb ? G.World.ybox(q.yb.cx, q.yb.cz, q.yb.yaw, q.yb.hx, q.yb.hz, q.yb.y0, q.yb.y1, o) : G.World.box(q.b[0], q.b[1], q.b[2], q.b[3], q.b[4], q.b[5], o);
+  const solidOf = (q: { b: number[]; yb?: any; ob?: number[] }, o: any) => q.ob ? World.obox(q.ob[0], q.ob[1], q.ob[2], q.ob[3], q.ob[4], q.ob[5], q.ob[6], q.ob[7], o)
+    : q.yb ? World.ybox(q.yb.cx, q.yb.cz, q.yb.yaw, q.yb.hx, q.yb.hz, q.yb.y0, q.yb.y1, o) : World.box(q.b[0], q.b[1], q.b[2], q.b[3], q.b[4], q.b[5], o);
   // a point of the ship's frame in the world, the ship standing at berth b ({ x, y, z, yaw }: yaw as an officer's, 0 facing -z)
   // (b.pt: tilted that much nose up about her own x, then turned)
   function toWorld(b: Berth, lx: number, ly: number, lz: number) {

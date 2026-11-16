@@ -8,12 +8,9 @@
 (self as any).window = self;
 // (what a file reaches for while it loads or builds a level: none of it is drawn here)
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
-// (the scripts, in the page's order: index.html. A literal list: tools/deps.mjs and tools/check_sim_golden.mjs read it)
-const SERVER_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents',
-  'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'spaceserver', 'serverhost'];
-const svBooted = import('./threeboot.js').then(async () => {
-  for (const f of SERVER_SCRIPTS) await import('./' + f + '.js'); // (one after the other: each is a module of its own that shares only G)
-});
+// (the simulation's files are what js/serverhost.ts imports: it is the entry file, and its imports are the rest. Imported here, after the
+// globals above are set and three.js is there, not at the top of this file: a static import would run first)
+const svBooted = import('./threeboot.js').then(() => import('./serverhost.js'));
 
 self.onmessage = async (e: MessageEvent) => {
   if (!e.data || e.data.k !== 'boot' || !e.data.ctl) return;

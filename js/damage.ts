@@ -1,6 +1,8 @@
 'use strict';
 import { Hooks, U } from './util.js';
 import { World } from './world.js';
+import { Level } from './level.js';
+import { Scars } from './scars.js';
 // What a round really does to a wall or a door: it takes the material away. js/scars.ts draws what's left round the damage; this cuts it.
 //   A hit's a record (rec, below) that means the same on every screen, told to the squad as the marks are ('hole'), and it's the
 //   same record in the replays (from a round's path). apply() takes one and:
@@ -169,7 +171,7 @@ export const Damage = (() => {
   }
   // the state of a level's damage (a map's: the host's has no meshes, only what rays need)
   const st = (map: DmgMap): DState => map.dmg || (map.dmg = { holes: [], bites: [], seen: new Set(), faces: new Map(), tiles: new Map(), mats: new Map(), falls: [] });
-  const floorOf = (map: DmgMap, y: number): FloorMap => (map.floors ? map.floors.find((f) => y >= (f.fy || 0) - 0.5 && y < (f.fy || 0) + G.Level.WALL_H + 0.3) || map.floors[0] : map);
+  const floorOf = (map: DmgMap, y: number): FloorMap => (map.floors ? map.floors.find((f) => y >= (f.fy || 0) - 0.5 && y < (f.fy || 0) + Level.WALL_H + 0.3) || map.floors[0] : map);
   const liningMat = (map: DmgMap, col: number) => {
     const D = st(map);
     if (!D.mats.has(col)) D.mats.set(col, new T.MeshLambertMaterial({ color: col, vertexColors: true, side: T.DoubleSide }));
@@ -196,7 +198,7 @@ export const Damage = (() => {
   };
 
   // ---------------------------------------------------------------- walls
-  const faceKey = (fm: FloorMap, ax: number, sg: number, c: number) => `${fm.fl || 0}:${ax}:${sg}:${Math.round(c / G.Level.TS)}`;
+  const faceKey = (fm: FloorMap, ax: number, sg: number, c: number) => `${fm.fl || 0}:${ax}:${sg}:${Math.round(c / Level.TS)}`;
   const axisOf = (n: number[]) => (Math.abs(n[0]) > 0.5 ? 0 : Math.abs(n[2]) > 0.5 ? 2 : -1);
   // a hole's outline in the face with normal n, at a point in it, with its place in the world
   function inFace(fm: FloorMap, m: string, a: number[], n: number[], rad: number[]): Face | null {
@@ -269,7 +271,7 @@ export const Damage = (() => {
   // the marks round a hole's edge (a face's, on its side of the wall): js/scars.ts's, less anything it'd stand up: rimFlaps has that
   function marksOf(F: Face, H: Hole, k: MarkSide, D: DState) {
     const h = HOLE[F.m] || H.look, dir = new T.Vector3(...H.u), n = new T.Vector3(...F.n), o = { m: F.m, k, n: F.n, dir, J: H.J, stop: k === 'e' && !H.fb, cal: H.c, fit: fitOf(F) }, ua = F.ax === 0 ? 2 : 0, sd = (F.v * 31 + Math.round(F.a[1] * 500)) | 0;
-    F.marks = (G.Scars.plan(o) as Mark[]).filter((c) => c.mat.map); F.clip = null;
+    F.marks = (Scars.plan(o) as Mark[]).filter((c) => c.mat.map); F.clip = null;
     F.flip = [Math.sign(dir.getComponent(ua)) || 1, sd & 1 ? 1 : -1];
     F.flap = !H.bite && h.flap && (k === 'x' || h.flap.in) ? { h: h.flap, geo: rimFlaps(ring3(F, 0.999), new T.Vector3(...F.a), k === 'x' ? n : n.clone().negate(), dir, H.R0 * h.flap.l, H.R0 * h.flap.h, sd, F.rad, F.core, (p: V3) => (D.faces.get(F.key) || []).some((f) => f !== F && inOutline(f, uvOf(f, [p.x, p.y, p.z]), 0.95))) } : null;
   }
@@ -299,7 +301,7 @@ export const Damage = (() => {
   }
   // how far a face's surface runs along the wall from a point on it: to the wall's ends (a doorway, a corner), a few tiles either way at most
   function spanOf(fm: FloorMap, F: Face) {
-    const TS = G.Level.TS, sg = Math.sign(F.n[F.ax]), back = Math.round(F.plane / TS) + (sg > 0 ? -1 : 0);
+    const TS = Level.TS, sg = Math.sign(F.n[F.ax]), back = Math.round(F.plane / TS) + (sg > 0 ? -1 : 0);
     const ok = (k: number) => { const x = F.ax === 0 ? back : k, z = F.ax === 0 ? k : back; return x >= 0 && z >= 0 && x < fm.W && z < fm.H && fm.t[z * fm.W + x] === 1; };
     let ut = Math.floor(F.c[0] / TS);
     if (!ok(ut)) ut = ok(ut - 1) ? ut - 1 : ok(ut + 1) ? ut + 1 : ut; // (a piece off a wall's end sits on the corner itself: the wall's the tile beside it)
@@ -307,12 +309,12 @@ export const Damage = (() => {
     while (lo > ut - 4 && ok(lo - 1)) lo--;
     while (hi < ut + 4 && ok(hi + 1)) hi++;
     const Y = fm.fy || 0;
-    return [lo * TS, (hi + 1) * TS, Y, Y + G.Level.WALL_H];
+    return [lo * TS, (hi + 1) * TS, Y, Y + Level.WALL_H];
   }
   // what's torn up, into a mesh a material
   function flapMeshes(faces: { flap?: FlapGeo | null }[], off?: V3) {
     const by = new Map<THREE.Material, FlapBuf>(), out: THREE.Mesh[] = [];
-    for (const F of faces) { if (!F.flap) continue; const mat = G.Scars.flapMat(F.flap.h.c, !!F.flap.h.m), b: FlapBuf = by.get(mat) || { pos: [], col: [] }; by.set(mat, b); for (const x of F.flap.geo.pos) b.pos.push(x); for (const x of F.flap.geo.col) b.col.push(x); }
+    for (const F of faces) { if (!F.flap) continue; const mat = Scars.flapMat(F.flap.h.c, !!F.flap.h.m), b: FlapBuf = by.get(mat) || { pos: [], col: [] }; by.set(mat, b); for (const x of F.flap.geo.pos) b.pos.push(x); for (const x of F.flap.geo.col) b.col.push(x); }
     for (const [mat, b] of by) { const m = lined(b.pos, b.col, mat, off); m.userData.keepMat = true; out.push(m); }
     return out;
   }
@@ -335,7 +337,7 @@ export const Damage = (() => {
   function tileMesh(map: DmgMap, fm: FloorMap, x: number, z: number) {
     const D = st(map), tile = tileOf(map, fm, x, z);
     if (!tile) return;
-    const TS = G.Level.TS, Y = fm.fy || 0, SK = fm.skirt || 0, WH = G.Level.WALL_H;
+    const TS = Level.TS, Y = fm.fy || 0, SK = fm.skirt || 0, WH = Level.WALL_H;
     for (const c of [...tile.group.children]) if (!c.userData.lining) { c.removeFromParent(); (c as THREE.Mesh).geometry.dispose(); }
     const pos = [], nor = [], uvs = [], x0 = x * TS, x1 = x0 + TS, z0 = z * TS, z1 = z0 + TS, v0 = -SK, v1 = WH;
     // (u along the face, v up it, and the texture across it as a BoxGeometry's runs: seen from outside, left to right)
@@ -383,7 +385,7 @@ export const Damage = (() => {
   }
   // every tile a hole touches: its outlines, and along its bore
   function touched(fm: FloorMap, H: Hole) {
-    const TS = G.Level.TS, out = new Set<number>(), add = (px: number, pz: number) => { const x = Math.floor(px / TS), z = Math.floor(pz / TS); if (x >= 0 && z >= 0 && x < fm.W && z < fm.H) out.add(z * fm.W + x); };
+    const TS = Level.TS, out = new Set<number>(), add = (px: number, pz: number) => { const x = Math.floor(px / TS), z = Math.floor(pz / TS); if (x >= 0 && z >= 0 && x < fm.W && z < fm.H) out.add(z * fm.W + x); };
     for (const F of [H.fa, H.fb]) if (F) for (const p of F.pts) { const e = 1e-3; if (F.ax === 0) { add(F.a[0] + e, p[0]); add(F.a[0] - e, p[0]); } else { add(p[0], F.a[2] + e); add(p[0], F.a[2] - e); } }
     const r = H.r;
     for (let s = 0; s <= H.len + 0.05; s += 0.1) for (const [ox, oz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) add(H.a[0] + H.u[0] * s + ox, H.a[2] + H.u[2] * s + oz);
@@ -398,7 +400,7 @@ export const Damage = (() => {
     const near = H.bite ? [] : neighbours(D, H);
     for (const o of near) { o.lined = false; if (o.look.flap) { marksOf(o.fa, o, 'e', D); if (o.fb) marksOf(o.fb, o, 'x', D); } }
     marksOf(H.fa, H, 'e', D); if (H.fb) marksOf(H.fb, H, 'x', D);
-    const TS = G.Level.TS, ts = touched(fm, H), home = Math.floor((H.a[2] + H.u[2] * 0.01) / TS) * fm.W + Math.floor((H.a[0] + H.u[0] * 0.01) / TS);
+    const TS = Level.TS, ts = touched(fm, H), home = Math.floor((H.a[2] + H.u[2] * 0.01) / TS) * fm.W + Math.floor((H.a[0] + H.u[0] * 0.01) / TS);
     for (const o of near) for (const i of touched(fm, o)) ts.add(i); // (it's been chipped, and its lining stops at this one now)
     // (the bore's mesh lives with a tile that's really there: the one it went in by, or the first along it that is)
     let owner = null as Tile | null;
@@ -417,14 +419,14 @@ export const Damage = (() => {
   // A bite's a wedge out of the corner: B.p the point on the corner, an outline in each face (fuse, as holes), and a rough fan of faces in from
   // them to the back of it, B.d in from each face; rays go into it as they do a bore.
   function edgeOf(fm: FloorMap, a: number[], n: number[]) {
-    const TS = G.Level.TS, ax = axisOf(n), ua = ax === 0 ? 2 : 0, c = a[ua], across = Math.floor((a[ax] - n[ax] * 0.02) / TS);
+    const TS = Level.TS, ax = axisOf(n), ua = ax === 0 ? 2 : 0, c = a[ua], across = Math.floor((a[ax] - n[ax] * 0.02) / TS);
     for (const dir of [1, -1]) {
       const b = (dir > 0 ? Math.ceil(c / TS - 1e-6) : Math.floor(c / TS + 1e-6)) * TS;
       if (Math.abs(b - c) > REACH) continue;
       const along = Math.floor((b + dir * 0.01) / TS), x = ax === 0 ? across : along, z = ax === 0 ? along : across;
       if (x < 0 || z < 0 || x >= fm.W || z >= fm.H) continue;
       const v = fm.t[z * fm.W + x];
-      if (v === 1 || (v === 3 && a[1] - (fm.fy || 0) > G.Level.DOOR_H)) continue;
+      if (v === 1 || (v === 3 && a[1] - (fm.fy || 0) > Level.DOOR_H)) continue;
       return { ua, b, dir };
     }
     return null;
@@ -521,7 +523,7 @@ export const Damage = (() => {
   // ---------------------------------------------------------------- doors
   // a point on a door in its leaf's own terms ([x from the hinge, y up], js/level.ts: pivot), shut or standing open
   function onLeaf(d: Door, p: number[]) {
-    const half = (d.w || G.Level.TS) / 2, m = d.mirror ? -1 : 1, y = p[1] - (d.fy || 0);
+    const half = (d.w || Level.TS) / 2, m = d.mirror ? -1 : 1, y = p[1] - (d.fy || 0);
     if (d.open) return [d.axis === 'x' ? p[0] - d.x : d.z - p[2], y];
     return [d.axis === 'x' ? (p[2] - (d.z - half * m)) * m : (p[0] - (d.x - half * m)) * m, y];
   }
@@ -531,7 +533,7 @@ export const Damage = (() => {
   // what of a door's a round struck there: 'h' its handle, 0 1 2 a hinge, or nothing
   function partAt(d: Door, p: number[]) {
     if (d.kind === 'vault') return null;
-    const q = onLeaf(d, p), L = (d.w || G.Level.TS) - 0.05;
+    const q = onLeaf(d, p), L = (d.w || Level.TS) - 0.05;
     if (Math.hypot(q[0] - (L - 0.08), q[1] - 1) < 0.085) return 'h';
     if (q[0] < 0.12) for (let i = 0; i < 3; i++) if (Math.abs(q[1] - HINGES[i]) < 0.09) return i;
     return null;
@@ -561,7 +563,7 @@ export const Damage = (() => {
       const look = HOLE[q.m], dir = q.dirL, mid = new T.Vector3(q.c[0] - cx, q.c[1] - cy, 0), sg = dir.z > 0 ? -1 : 1, flip = [Math.sign(dir.x) || 1, 1]; // (sg: the side it came in by)
       for (const [side, k] of [[sg, 'e'], [-sg, 'x']] as [number, MarkSide][]) {
         const n = [0, 0, side], put = (u: number, v: number) => [u - cx, v - cy, side * (t + 0.003)];
-        for (const c of (G.Scars.plan({ m: q.m, k, n, dir, J: q.J, cal: q.c0, fit: fitOf(q) }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, q.c[0], q.c[1], rect, polys, flip, put, n, side > 0 ? [0, 2, 4] : [0, 4, 2]);
+        for (const c of (Scars.plan({ m: q.m, k, n, dir, J: q.J, cal: q.c0, fit: fitOf(q) }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, q.c[0], q.c[1], rect, polys, flip, put, n, side > 0 ? [0, 2, 4] : [0, 4, 2]);
         if (look.flap && (k === 'x' || look.flap.in)) { const rim = q.core.map((r, i) => { const a = (i / N) * Math.PI * 2; return new T.Vector3(mid.x + Math.cos(a) * r, mid.y + Math.sin(a) * r, side * t); }); faces.push({ flap: { h: look.flap, geo: rimFlaps(rim, mid.clone().setZ(side * t), new T.Vector3(0, 0, k === 'x' ? side : -side), dir, q.R0 * look.flap.l, q.R0 * look.flap.h, (q.v * 31 + i0(q)) | 0, q.rad, q.core, (p: V3) => d.holes!.some((o) => o !== q && inOutline(o, [p.x + cx, p.y + cy], 0.95))) } }); }
       }
     }
@@ -616,7 +618,7 @@ export const Damage = (() => {
     if (door) {
       if (!rec.b) return false;
       const c = [(a[0] + rec.b[0]) / 2, (a[1] + rec.b[1]) / 2, (a[2] + rec.b[2]) / 2], q = onLeaf(door, c);
-      if (q[1] > G.Level.DOOR_H) return false;
+      if (q[1] > Level.DOOR_H) return false;
       const piv = map.doorMeshes && map.doorMeshes[door.id], leaf = piv && piv.userData.leaf, dirL = new T.Vector3(...rec.u);
       if (leaf) dirL.applyQuaternion(leaf.getWorldQuaternion(new T.Quaternion()).invert());
       const h = { lining: look.lining, m: rec.m, J: rec.J, c0: rec.c, R0: R, dirL } as DoorHole, rnd = rngOf(seed + 9);
@@ -697,7 +699,7 @@ export const Damage = (() => {
   // ---------------------------------------------------------------- a door falling
   // Where a leaf stands: its centre, and how it's turned (ang 0 shut, 1 open)
   function leafPose(d: Door, ang: number) {
-    const half = (d.w || G.Level.TS) / 2, m = d.mirror ? -1 : 1, Y = d.fy || 0, L = (d.w || G.Level.TS) - 0.05, LH = G.Level.DOOR_H - 0.04;
+    const half = (d.w || Level.TS) / 2, m = d.mirror ? -1 : 1, Y = d.fy || 0, L = (d.w || Level.TS) - 0.05, LH = Level.DOOR_H - 0.04;
     const base = d.axis === 'x' ? -Math.PI / 2 * m : d.mirror ? Math.PI : 0, yaw = base + ang * Math.PI / 2 * 0.95 * m;
     const px = d.axis === 'x' ? d.x : d.x - half * m, pz = d.axis === 'x' ? d.z - half * m : d.z;
     const q = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), yaw), c = new T.Vector3(L / 2 + 0.02, LH / 2, 0).applyQuaternion(q).add(new T.Vector3(px, Y, pz));
@@ -820,7 +822,7 @@ export const Damage = (() => {
   function warm(map: DmgMap) {
     const m = lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], liningMat(map, HOLE.concrete.lining)), n = [0, 0, 1], out: THREE.Mesh[] = [m];
     // (and the marks, the first time anything's cut)
-    for (const [mm, k] of [['concrete', 'e'], ['pine', 'x'], ['mild', 'x']] as [string, MarkSide][]) { const by = new Map<THREE.Material, MarkBuf>(); for (const c of (G.Scars.plan({ m: mm, k, n, dir: new T.Vector3(0, 0, 1), J: 800, cal: 8, fit: 0.03 }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, 0, 0, [-1, 1, -1, 1], [], [1, 1], (u: number, v: number) => [u, v, 0], n, [0, 2, 4]); out.push(...markMeshes(by)); const f = HOLE[mm].flap; if (f) out.push(lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], G.Scars.flapMat(f.c, !!f.m))); }
+    for (const [mm, k] of [['concrete', 'e'], ['pine', 'x'], ['mild', 'x']] as [string, MarkSide][]) { const by = new Map<THREE.Material, MarkBuf>(); for (const c of (Scars.plan({ m: mm, k, n, dir: new T.Vector3(0, 0, 1), J: 800, cal: 8, fit: 0.03 }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, 0, 0, [-1, 1, -1, 1], [], [1, 1], (u: number, v: number) => [u, v, 0], n, [0, 2, 4]); out.push(...markMeshes(by)); const f = HOLE[mm].flap; if (f) out.push(lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], Scars.flapMat(f.c, !!f.m))); }
     return out;
   }
   // ---------------------------------------------------------------- glass

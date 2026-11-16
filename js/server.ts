@@ -1,4 +1,22 @@
 'use strict';
+import { Arsenal } from './arsenal.js';
+import { Callsigns } from './callsigns.js';
+import { Damage } from './damage.js';
+import { AMMO, ammoOk, ballFor, calOf, capOf, cartOf, chambered, dragOf, ENEMIES, ENEMY_GEAR, gearTier, GRAVITY, loadFor, obtainable, rollAmmo, roundOf, roundSpeed, SHIELDS, THEMES, WEAPON_LIST, WEAPONS } from './data.js';
+import { Gear } from './gear.js';
+import { Level } from './level.js';
+import { Med } from './medical.js';
+import { Gunsmith } from './parts.js';
+import { Route } from './route.js';
+import { ShipGen } from './shipgen.js';
+import { Shop } from './shop.js';
+import { Sim } from './sim.js';
+import { SpaceData } from './spacedata.js';
+import { Stickers } from './stickers.js';
+import { U as G_U } from './util.js';
+import { World } from './world.js';
+import { ServerHost } from './serverhost.js';
+import { SpaceSv } from './spaceserver.js';
 // Host-authoritative simulation: lobby/phase flow, suspect + civilian AI, doors, compliance and arrests,
 // damage resolution, objectives and the vote to leave.
 // Only runs on the hosting peer, in a thread of its own (js/serverworker.ts; or on the page's, js/serverhost.ts: docs/threads.md).
@@ -9,7 +27,7 @@ interface Loose { [k: string]: any }
 type NetMsgKind = 'stk' | 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
 // A message off the wire: its kind, and whatever else that kind carries (dynamic: checked where it's read)
 interface NetMsg { t: NetMsgKind; [k: string]: any }
-type DamageMap = Parameters<typeof G.Damage.apply>[0]; // (what js/damage.ts takes for a map)
+type DamageMap = Parameters<typeof Damage.apply>[0]; // (what js/damage.ts takes for a map)
 type FlPt = LvPt & { fl?: number }; // (a cover or wall spot, and the floor it's on)
 type CabLayout = any[][] & { left?: [string, number][] }; // (a cabinet's items, and what didn't fit)
 type MapCivSpots = LvMap & { civSpots?: { x: number; z: number; yaw: number }[] | null };
@@ -38,7 +56,7 @@ const SvNet = {
   sendTo: ((_id: string, _msg: any) => {}) as (id: string, msg: any) => void,
 };
 
-const G_Server = {
+export const Server = {
   net: SvNet,
   players: new Map<string, Player>(),
   phase: 'lobby' as ServerPhase,
@@ -51,7 +69,7 @@ const G_Server = {
   cleared: new Map<number, number>(), // (rooms a stack has breached and cleared, by index in map.rooms, and when: a blind ship searches on from them, js/spaceserver.ts)
   nextEid: 1,
   extract: { active: false, votes: new Set<string>() }, // active: order restored (the required objective); votes: who's voted to leave
-  flow: null as ReturnType<typeof G.Level.flow> | null,
+  flow: null as ReturnType<typeof Level.flow> | null,
   flowT: 0,
   snapT: 0,
   wipeT: 0,
@@ -66,7 +84,7 @@ const G_Server = {
   // made as the run and the level go on (undefined until then)
   clock: undefined as unknown as number, // the level's time, in seconds (set by the level's first tick)
   route: undefined as ServerRoute | null | undefined,
-  routeMap: undefined as ReturnType<typeof G.Route.gen> | null | undefined,
+  routeMap: undefined as ReturnType<typeof Route.gen> | null | undefined,
   theme: undefined as number | null | undefined,
   leaving: undefined as object | null | undefined, // (set while the screens go black for the next place: overBlack)
   arms: undefined as Record<string, string> | undefined,
@@ -112,17 +130,17 @@ const G_Server = {
         const name = String(m.name || 'Operator').slice(0, 16);
         // their animal (one of each to a squad): the highest-ranked free one of their preference (prefs: known animals, no repeats, at most
         // as many as there are; a client before them sends only animal), else the first one free
-        const CS = G.Callsigns, taken = new Set([...this.players.values()].filter((q) => q.id !== from).map((q) => q.animal));
+        const CS = Callsigns, taken = new Set([...this.players.values()].filter((q) => q.id !== from).map((q) => q.animal));
         const prefs: string[] = [];
         for (const a of Array.isArray(m.prefs) ? m.prefs.slice(0, CS.LIST.length) : [m.animal]) if (typeof a === 'string' && CS.valid(a) && !prefs.includes(a)) prefs.push(a);
         let animal: string | null = prefs.find((a) => !taken.has(a)) || null;
         if (!animal) animal = (CS.LIST.find((a) => !taken.has(a.id)) || CS.of(prefs[0] || CS.LIST[0].id)).id;
         const color = CS.of(animal).color;
         // anon: signed in to the cloud saves as a guest (js/cloud.ts; optional: an older client sends nothing, and shows nothing)
-        this.players.set(from, { id: from, name, color, animal, look: G.Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });
+        this.players.set(from, { id: from, name, color, animal, look: Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });
         SvNet.sendTo(from, {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
-          sp: !G.SpaceData.ON ? undefined : this.phase === 'shop' ? G.SpaceSv.shopMsg() : this.phase === 'level' ? G.SpaceSv.levelMsg() : undefined, // (the game in space: js/spaceserver.ts)
+          sp: !SpaceData.ON ? undefined : this.phase === 'shop' ? SpaceSv.shopMsg() : this.phase === 'level' ? SpaceSv.levelMsg() : undefined, // (the game in space: js/spaceserver.ts)
           seed: this.seed, shopSeed: this.shopSeed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), stock: this.phase === 'shop' ? this.stock : null,
           doors: this.map && this.phase === 'level' ? this.map.doors.map((d: Door) => (d.open ? 1 : 0)) : null,
           holes: this.phase === 'level' ? this.holes || null : null, fallen: this.phase === 'level' ? this.fallen || null : null,
@@ -145,7 +163,7 @@ const G_Server = {
       case 'hole': // (what it took out of them, js/damage.ts: kept for whoever joins, and here for the suspects' eyes and rounds)
         if (p && Array.isArray(m.a) && this.map && this.phase === 'level') {
           const a = m.a.slice(0, 32); (this.holes = this.holes || []).push(...a);
-          for (const h of a) G.Damage.apply(this.map as unknown as DamageMap, h);
+          for (const h of a) Damage.apply(this.map as unknown as DamageMap, h);
           SvNet.broadcast({ t: 'hole', a }, from);
         }
         break;
@@ -156,7 +174,7 @@ const G_Server = {
       case 'skin': {
         if (!p || typeof m.h !== 'string' || m.h.length > 24 || this.skins.has(m.h)) break;
         if (this.skins.size > 300) this.skins.delete(this.skins.keys().next().value);
-        this.skins.set(m.h, G.Stickers.clean(m.l));
+        this.skins.set(m.h, Stickers.clean(m.l));
         SvNet.broadcast({ t: 'skin', h: m.h, l: this.skins.get(m.h) });
         break;
       }
@@ -167,9 +185,9 @@ const G_Server = {
       case 'shot':
         if (p && p.st && this.phase === 'level') this.hear(p.st.p[0], p.st.p[2], m.sil === 2 ? 2 : m.sil ? 6 : 28, p.st.p[1]); // (not at the range)
         // (the muzzle flash lights them up: officerLux; fl, how much flash its muzzle makes: js/player.ts flashOf)
-        if (p && this.phase === 'level' && m.sil !== 2) { p.firedAt = this.clock; p.flashK = Number.isFinite(m.fl) ? G.U.clamp(m.fl, 0, 1.5) : m.sil ? 0.1 : 1; }
-        if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to, G.Gunsmith.fromCode(m.w), (G.AMMO as Tbl)[m.am] ? m.am : undefined);
-        SvNet.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, rl: typeof m.rl === 'string' && m.rl.length < 12 ? m.rl : undefined, am: (G.AMMO as Tbl)[m.am] ? m.am : undefined, vi: Number.isInteger(m.vi) && m.vi >= 0 && m.vi < 16 ? m.vi : undefined, vn: Number.isInteger(m.vn) && m.vn > 0 && m.vn <= 16 ? m.vn : undefined, // (a volley's rounds: js/player.ts shoot)
+        if (p && this.phase === 'level' && m.sil !== 2) { p.firedAt = this.clock; p.flashK = Number.isFinite(m.fl) ? G_U.clamp(m.fl, 0, 1.5) : m.sil ? 0.1 : 1; }
+        if (m.f && m.to && this.phase === 'level') this.suppress(m.f, m.to, Gunsmith.fromCode(m.w), (AMMO as Tbl)[m.am] ? m.am : undefined);
+        SvNet.broadcast({ t: 'shot', id: from, sid: m.sid, f: m.f, to: m.to, w: m.w, sil: m.sil, bm: Number.isFinite(m.bm) ? m.bm : undefined, rl: typeof m.rl === 'string' && m.rl.length < 12 ? m.rl : undefined, am: (AMMO as Tbl)[m.am] ? m.am : undefined, vi: Number.isInteger(m.vi) && m.vi >= 0 && m.vi < 16 ? m.vi : undefined, vn: Number.isInteger(m.vn) && m.vn > 0 && m.vn <= 16 ? m.vn : undefined, // (a volley's rounds: js/player.ts shoot)
           tos: Array.isArray(m.tos) && m.tos.length <= 24 && m.tos.every((p: unknown) => Array.isArray(p) && p.length === 3 && p.every(Number.isFinite)) ? m.tos : undefined }, from); // (a shotgun's pellets: for the highlights)
         break;
       case 'nade': {
@@ -189,7 +207,7 @@ const G_Server = {
       case 'glass': if (this.phase === 'level' && Array.isArray(m.ids)) this.breakGlass(m.ids, m.p); break;
       case 'crack': { // (a round through a pane that doesn't bring it down: it's fractured (more), and it's heard)
         const w = this.phase === 'level' && this.map && this.map.windows && (this.map.windows as SvWin[])[m.id];
-        if (!w || w.broken || w.armor || (w.cracked || 0) >= G.Level.crackCap(w) || !Array.isArray(m.p)) break;
+        if (!w || w.broken || w.armor || (w.cracked || 0) >= Level.crackCap(w) || !Array.isArray(m.p)) break;
         w.cracked = (w.cracked || 0) + 1; this.glassCracked.push([m.id, m.p]); this.hear(w.x, w.z, 10, w.fy || 0);
         SvNet.broadcast({ t: 'crack', id: m.id, p: m.p }, from);
         break;
@@ -207,9 +225,9 @@ const G_Server = {
       case 'course': if (+m.seed > 0) SvNet.broadcast({ t: 'course', seed: Math.floor(+m.seed) }, from); break;
       case 'crun': if (m.s && typeof m.s === 'object') SvNet.broadcast({ t: 'crun', s: m.s, by: from }, from); break;
       // one officer's medical item on another: passed on to them (they apply it)
-      case 'treat': if ((G.Med.ITEMS as Tbl)[m.mt] && (G.Med.NAME as Tbl)[m.part]) SvNet.broadcast({ t: 'treat', tg: m.tg, by: from, part: m.part, mt: m.mt, th: m.th ? 1 : 0 }); break;
+      case 'treat': if ((Med.ITEMS as Tbl)[m.mt] && (Med.NAME as Tbl)[m.part]) SvNet.broadcast({ t: 'treat', tg: m.tg, by: from, part: m.part, mt: m.mt, th: m.th ? 1 : 0 }); break;
       // an officer has started (or stopped) putting a medical item on another: only the one it's going on hears of it
-      case 'applying': if (p && (G.Med.ITEMS as Tbl)[m.mt] && (G.Med.NAME as Tbl)[m.part] && this.players.has(m.tg)) SvNet.sendTo(m.tg, { t: 'applying', by: from, part: m.part, mt: m.mt, dur: G.U.clamp(+m.dur || 0, 0, 30), off: m.off ? 1 : 0 }); break;
+      case 'applying': if (p && (Med.ITEMS as Tbl)[m.mt] && (Med.NAME as Tbl)[m.part] && this.players.has(m.tg)) SvNet.sendTo(m.tg, { t: 'applying', by: from, part: m.part, mt: m.mt, dur: G_U.clamp(+m.dur || 0, 0, 30), off: m.off ? 1 : 0 }); break;
       // a vote to leave (or taking it back), once order's restored
       case 'vote':
         if (this.phase === 'level' && this.extract.active && p) { if (m.v) this.extract.votes.add(from); else this.extract.votes.delete(from); }
@@ -219,10 +237,10 @@ const G_Server = {
         break;
       // a vote on the route map for where to go next
       case 'arm': // a player's own sidearm for the run (not a vote: everyone's told who took what)
-        if (p && G.Arsenal.has(m.id)) { this.arms = this.arms || {}; this.arms[from] = m.id; SvNet.broadcast({ t: 'arms', a: this.arms }); this.checkArms(); }
+        if (p && Arsenal.has(m.id)) { this.arms = this.arms || {}; this.arms[from] = m.id; SvNet.broadcast({ t: 'arms', a: this.arms }); this.checkArms(); }
         break;
       case 'pick':
-        if (p && this.phase === 'route' && this.route && this.routeMap && G.Route.options(this.routeMap!, this.route!.path[this.route!.path.length - 1]).includes(m.n)) {
+        if (p && this.phase === 'route' && this.route && this.routeMap && Route.options(this.routeMap!, this.route!.path[this.route!.path.length - 1]).includes(m.n)) {
           this.route!.votes[from] = m.n;
           SvNet.broadcast({ t: 'rvotes', v: this.route!.votes });
           this.checkPicks();
@@ -242,7 +260,7 @@ const G_Server = {
         if (p.st && Math.hypot(x - p.st.p[0], z - p.st.p[2]) > 2.5) { x = p.st.p[0]; z = p.st.p[2]; }
         // (at: back where something else lay, a gun swapped for one in the weapon case, or what you'd no room for: its height, yaw and fit)
         const back = Array.isArray(m.at) && x === +m.x && z === +m.z ? m.at : null;
-        const l = this.lootAdd(x, back ? +back[0] || 0 : G.Level.groundAt(this.map!, x, z, 0.05, ((p.st && p.st.p[1]) || 0) + 1.2), z, m.item, back ? +back[1] || 0 : Math.random() * Math.PI * 2, back ? back[2] : undefined);
+        const l = this.lootAdd(x, back ? +back[0] || 0 : Level.groundAt(this.map!, x, z, 0.05, ((p.st && p.st.p[1]) || 0) + 1.2), z, m.item, back ? +back[1] || 0 : Math.random() * Math.PI * 2, back ? back[2] : undefined);
         SvNet.broadcast({ t: 'loot', a: [this.lootMsg(l)], by: from });
         break;
       }
@@ -256,9 +274,9 @@ const G_Server = {
       }
       case 'useDoor': {
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
-        if (d && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2 && G.SpaceSv.mayOpen(d, from)) {
+        if (d && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2 && SpaceSv.mayOpen(d, from)) {
           this.setDoor(d.id, !d.open);
-          if (d.kind === 'vault' || G.Level.slides(d)) { // both leaves together
+          if (d.kind === 'vault' || Level.slides(d)) { // both leaves together
             const partner = d.mirror ? this.map!.doors[d.id - 1] : this.map!.doors[d.id + 1] && this.map!.doors[d.id + 1].mirror ? this.map!.doors[d.id + 1] : null;
             if (partner) this.setDoor(partner.id, d.open);
           }
@@ -270,7 +288,7 @@ const G_Server = {
       case 'kickDoor': {
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
         if (d && !d.open) { this.kickAt = this.kickAt || {}; this.kickAt[from] = this.clock || 0; } // (a kill soon after: a breach, for the highlights)
-        if (d && !d.open && !G.Level.sturdy(d) && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2) this.kickDoor(d);
+        if (d && !d.open && !Level.sturdy(d) && p && p.st && Math.hypot(p.st.p[0] - d.x, p.st.p[2] - d.z) < 2.8 && Math.abs(p.st.p[1] - (d.fy || 0)) < 2) this.kickDoor(d);
         break;
       }
       case 'shout': if (p && p.st && this.phase === 'level') this.shout(p as LivePlayer, from); break;
@@ -371,7 +389,7 @@ const G_Server = {
       }
       // the F9 readout's look at a suspect (js/hud.ts): their record as it is here
       case 'eInfo': if (from === SvNet.myId) SvNet.sendTo(from, { t: 'eInfo', id: m.id, e: this.eInfo(m.id) }); break;
-      default: G.SpaceSv.handle(m, from, p); // (the missions board, the ship, a mission's own things: js/spaceserver.ts)
+      default: SpaceSv.handle(m, from, p); // (the missions board, the ship, a mission's own things: js/spaceserver.ts)
     }
   },
   // A suspect's record (or the dead one's, as they died) for the F9 readout: what it shows, as plain data
@@ -392,7 +410,7 @@ const G_Server = {
     SvNet.broadcast({ t: 'chat', id: null, m: p.name + ' left the squad.' });
     this.sendRoster();
     this.checkReady();
-    G.SpaceSv.left(id);
+    SpaceSv.left(id);
     if (this.route) { delete this.route.votes[id]; this.checkPicks(); }
     this.checkArms();
   },
@@ -400,7 +418,7 @@ const G_Server = {
   // --------------------------------------------------------------- phases
   startRun() {
     // (the game in space: the hangar first, missions off its board, js/spaceserver.ts; a debug start's ?play still goes the old way)
-    if (G.SpaceData.ON && !(this.dbgNext && this.dbgNext.classic)) { const dbg = !!this.dbgNext, f = this.dbgNext && this.dbgNext.fleet; this.dbgNext = null; G.SpaceSv.startRun(f, dbg); return; } // (a debug start: no sidearm picker, js/debugstart.ts)
+    if (SpaceData.ON && !(this.dbgNext && this.dbgNext.classic)) { const dbg = !!this.dbgNext, f = this.dbgNext && this.dbgNext.fleet; this.dbgNext = null; SpaceSv.startRun(f, dbg); return; } // (a debug start: no sidearm picker, js/debugstart.ts)
     this.level = 1;
     this.team = { ver: 0, items: [] };
     this.arms = {}; // (the sidearms picked: each player's own)
@@ -411,10 +429,10 @@ const G_Server = {
   // Before each level the squad picks where to go on the act's map (a new map every ten levels, the last
   // the boss). Everyone votes; when all have, the most votes wins (a tie is settled at random).
   toRoute() {
-    const act = G.Route.actOf(this.level);
+    const act = Route.actOf(this.level);
     if (!this.route || this.route.act !== act) {
       this.route = { seed: (Math.random() * 2 ** 31) | 0, act, path: [], votes: {} };
-      this.routeMap = G.Route.gen(this.route.seed, act);
+      this.routeMap = Route.gen(this.route.seed, act);
     }
     this.route.votes = {};
     this.phase = 'route';
@@ -426,7 +444,7 @@ const G_Server = {
   // The game in space: a run starts on the sidearm picker alone (js/spaceserver.ts startRun), and goes to the base once all the
   // squad have picked theirs.
   checkArms() {
-    if (!G.SpaceData.ON || this.phase !== 'route' || this.route || !this.players.size || this.leaving) return;
+    if (!SpaceData.ON || this.phase !== 'route' || this.route || !this.players.size || this.leaving) return;
     for (const id of this.players.keys()) if (!(this.arms && this.arms[id])) return;
     this.overBlack(() => this.toShop());
   },
@@ -451,7 +469,7 @@ const G_Server = {
       if (this.leaving !== run) return; // (gone back to the menu)
       this.leaving = null;
       if (this.phase === from) go();
-    }, G.Sim.VEIL_MS + 40);
+    }, Sim.VEIL_MS + 40);
   },
   // is the level being played a stronghold (a flag on its route node: js/route.ts)
   isStronghold() {
@@ -467,7 +485,7 @@ const G_Server = {
     if (this.dbgNext) { // (a debug start's: js/debugstart.ts, 'startRun')
       const d = this.dbgNext, n = this.routeMap && this.route ? this.routeMap.nodes.get(this.route.path[this.route.path.length - 1]) : null;
       this.dbgNext = null;
-      if (typeof d.th === 'number' && Number.isInteger(d.th) && G.THEMES[d.th]) this.theme = d.th;
+      if (typeof d.th === 'number' && Number.isInteger(d.th) && THEMES[d.th]) this.theme = d.th;
       if (typeof d.lvl === 'number' && Number.isInteger(d.lvl) && d.lvl >= 1) this.level = d.lvl;
       if (d.leader) this.forceLeader = true;
       if (n && d.stronghold) n.stronghold = true;
@@ -480,8 +498,8 @@ const G_Server = {
     this.seed = ms ? ms.seed : want != null ? want : (Math.random() * 2 ** 31) | 0;
     if (ms) { this.level = ms.diff; this.theme = ms.th; }
     this.night = ms ? ms.night : this.isNight();
-    this.map = G.Level.generate(this.seed, this.level, this.theme as number, this.night, ms ? G.SpaceSv.genOf(ms) : null);
-    G.ServerHost.born(this.map); // (what it was built with: G.ServerLink.digest)
+    this.map = Level.generate(this.seed, this.level, this.theme as number, this.night, ms ? SpaceSv.genOf(ms) : null);
+    ServerHost.born(this.map); // (what it was built with: G.ServerLink.digest)
     this.aiMask(this.map);
     this.enemies.clear(); this.cleared = new Map();
     this.extract = { active: false, votes: new Set() };
@@ -494,20 +512,20 @@ const G_Server = {
     this.bodies = new Map(); // the dead, until secured: id -> { id, type, x, z, yaw, civ, secured }
     for (const p of this.players.values()) { p.ready = false; p.st = null; }
     // (a ship has her own complement, by her class: js/spaceserver.ts crew)
-    if (ms && this.map.sp) G.SpaceSv.crew(); else this.spawnEnemies();
-    if (ms) G.SpaceSv.populate();
+    if (ms && this.map.sp) SpaceSv.crew(); else this.spawnEnemies();
+    if (ms) SpaceSv.populate();
     this.wcase = this.map.case ? this.rollCase() : null;
     this.cabs = (this.map.cabinets || []).map(() => ({ open: false, ver: 0, items: this.layCab(this.rollCab()) }));
     this.caseOpen = false;
     this.abox = this.map.abox ? { open: false, uses: {} } : null; // uses: player id -> { items, taken }
     // the sticker box's sticker: one of the host's (js/stickers.ts names; none, and the box isn't there)
-    const sn = G.Stickers.names;
+    const sn = Stickers.names;
     this.sbox = this.map.sbox && sn.length ? { s: sn[Math.floor(Math.random() * sn.length)], by: null } : null;
     // (a ship of the zone's come back to: as she was left, js/spaceserver.ts restore; and everyone's told all of it, as whoever joins is)
-    const kept = !!ms && G.SpaceSv.restore();
+    const kept = !!ms && SpaceSv.restore();
     const was = kept ? { doors: this.map.doors.map((d: Door) => (d.open ? 1 : 0)), holes: this.holes, fallen: this.fallen, evidence: this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]),
       loot: [...this.loot.values()].map((l) => this.lootMsg(l)), glass: [...this.glassBroken], cracked: this.glassCracked } : {};
-    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? G.SpaceSv.levelMsg() : undefined, ...was,
+    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? SpaceSv.levelMsg() : undefined, ...was,
       bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : undefined }); // (the dead she's come back to with: js/spaceserver.ts populate)
   },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
@@ -518,7 +536,7 @@ const G_Server = {
   CASE_RARITY: { 0: 5, 1: 25, 2: 45, 3: 15, 4: 3 } as Record<string, number>,
   caseOdds(level: number, slot: string) {
     const byTier: Record<string, any[]> = {};
-    for (const w of G.WEAPON_LIST) if (w.slot === slot && G.obtainable(w) && this.CASE_RARITY[w.tier] && !(w.tier === 4 && level < 3)) (byTier[w.tier] = byTier[w.tier] || []).push(w);
+    for (const w of WEAPON_LIST) if (w.slot === slot && obtainable(w) && this.CASE_RARITY[w.tier] && !(w.tier === 4 && level < 3)) (byTier[w.tier] = byTier[w.tier] || []).push(w);
     const out: [any, number][] = [];
     for (const [tier, list] of Object.entries(byTier)) {
       const share = this.CASE_RARITY[tier] * Math.pow(1 + 0.25 * (level - 1), +tier - 1);
@@ -530,7 +548,7 @@ const G_Server = {
   // gives the same case every time it's played. G.Server.rollCase(seed, level) in the console says what a seed's case holds.
   rollCase(seed?: number, level?: number) {
     if (seed == null) seed = this.seed; if (level == null) level = this.level;
-    const r = G.U.rng((seed ^ 0x5ca5e) >>> 0);
+    const r = G_U.rng((seed ^ 0x5ca5e) >>> 0);
     r(); const odds = this.caseOdds(level, 'p'); // (long guns only: the sidearms are earned on the sidearm web, js/arsenal.ts. The draw that picked the slot is still made, so a seed's later draws stay put)
     let x = r() * odds.reduce((a: number, [, wt]: [any, number]) => a + wt, 0), w = odds[0][0];
     for (const [cand, wt] of odds) { x -= wt; if (x <= 0) { w = cand; break; } }
@@ -539,13 +557,13 @@ const G_Server = {
     // A gun that takes other receiver groups (js/parts.ts RCV) now and then turns up built on one of them: an AUG
     // with the 9mm kit in it, an AK with the RPK's, fitted and working (its barrel and all), magazines and
     // rounds to match.
-    const kits = G.Gunsmith.kitsFor(w.id).filter((k) => G.obtainable(G.WEAPONS[G.Gunsmith.PARTS[k].becomes]));
-    if (kits.length && r() < 0.35) w = G.WEAPONS[G.Gunsmith.PARTS[kits[Math.floor(r() * kits.length)]].becomes] || w;
+    const kits = Gunsmith.kitsFor(w.id).filter((k) => obtainable(WEAPONS[Gunsmith.PARTS[k].becomes]));
+    if (kits.length && r() < 0.35) w = WEAPONS[Gunsmith.PARTS[kits[Math.floor(r() * kits.length)]].becomes] || w;
     if (w.barrels) { // a gun of several barrels (its round types are different lengths of round, G.roundOf): loaded with one, a spare block of the other, and a spare of the first: both turn up
       const keys = Object.keys(w.barrels.rounds), rl = keys[Math.floor(r() * keys.length)], other = keys.filter((k) => k !== rl)[0], cap = (k: string) => w.barrels.n * w.barrels.rounds[k].per;
-      return { code: G.Gunsmith.defaultCode(w.id), mag: cap(rl), reserve: cap(rl), rl, am: G.rollAmmo(w.barrels.rounds[rl].cal, r), alt: other ? { rl: other, n: cap(other), am: G.rollAmmo(w.barrels.rounds[other].cal, r) } : undefined };
+      return { code: Gunsmith.defaultCode(w.id), mag: cap(rl), reserve: cap(rl), rl, am: rollAmmo(w.barrels.rounds[rl].cal, r), alt: other ? { rl: other, n: cap(other), am: rollAmmo(w.barrels.rounds[other].cal, r) } : undefined };
     }
-    return { code: G.Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : G.Gear.boxCap(G.calOf(w)), am: w.am ? G.loadFor(w) : G.rollAmmo(G.calOf(w), r) }; // (a gun with its own load comes with it: the MP5SD's subsonic)
+    return { code: Gunsmith.defaultCode(w.id), mag: w.mag, reserve: w.mag > 2 ? w.mag * 2 : Gear.boxCap(calOf(w)), am: w.am ? loadFor(w) : rollAmmo(calOf(w), r) }; // (a gun with its own load comes with it: the MP5SD's subsonic)
   },
   // Something lying in the world (G.Loot), and how it's sent
   lootAdd(x: number, y: number, z: number, item: any, yaw: number, fit?: number) {
@@ -558,19 +576,19 @@ const G_Server = {
   // The case, opened: what's in it is loose in the foam, to be picked up like anything else lying about. The gun along
   // the back with its grip to the front, and its spares in a row along the front, by the muzzle.
   casePut() {
-    const c = this.map!.case, got = this.wcase, def = got && G.Gunsmith.fromCode(got.code);
+    const c = this.map!.case, got = this.wcase, def = got && Gunsmith.fromCode(got.code);
     if (!def) return;
     this.wcase = null;
-    const Gr = G.Gear, w = G.Sim.makeWeapon(def.id, def.build), ch = G.chambered(def) && got.mag > 0; // (the count is everything in it: one of them's in the chamber)
-    if (def.barrels && got.rl) w.rl = G.roundOf(def, got.rl)!.rl;
-    w.ammo = G.ammoOk(G.cartOf(w), got.am);
-    w.mag = Math.min(got.mag - (ch ? 1 : 0), G.capOf(w));
+    const Gr = Gear, w = Sim.makeWeapon(def.id, def.build), ch = chambered(def) && got.mag > 0; // (the count is everything in it: one of them's in the chamber)
+    if (def.barrels && got.rl) w.rl = roundOf(def, got.rl)!.rl;
+    w.ammo = ammoOk(cartOf(w), got.am);
+    w.mag = Math.min(got.mag - (ch ? 1 : 0), capOf(w));
     if (w.tube) w.tube = Array(w.mag).fill(w.ammo);
     w.chamber = ch ? w.ammo : null;
     // (on the foam: the case's own floor, which on ground that rolls is the ground under it, as js/level.ts draws it, not the map's zero)
     const cos = Math.cos(c.yaw), sin = Math.sin(c.yaw), FOAM = (this.map!.terrain ? c.fy || 0 : 0) + 0.032;
     const put = (it: any, lx: number, lz: number, turn: number, fit?: number) => this.lootMsg(this.lootAdd(c.x + lx * cos + lz * sin, FOAM, c.z - lx * sin + lz * cos, Gr.pack(it), c.yaw + turn, fit));
-    SvNet.broadcast({ t: 'loot', a: [put(Gr.gunItem(w), 0, -0.03, -Math.PI / 2, 1.28), ...Gr.spares(def, got.reserve, w.ammo, w.rl).concat(got.alt ? [Gr.ammoItem(def, got.alt.n, G.ammoOk(G.roundOf(def, got.alt.rl)!.cal, got.alt.am), undefined, got.alt.rl)] : []).map((it, i) => put(it, 0.55 - i * 0.2, 0.13, 0))] });
+    SvNet.broadcast({ t: 'loot', a: [put(Gr.gunItem(w), 0, -0.03, -Math.PI / 2, 1.28), ...Gr.spares(def, got.reserve, w.ammo, w.rl).concat(got.alt ? [Gr.ammoItem(def, got.alt.n, ammoOk(roundOf(def, got.alt.rl)!.cal, got.alt.am), undefined, got.alt.rl)] : []).map((it, i) => put(it, 0.55 - i * 0.2, 0.13, 0))] });
   },
   // A first aid cabinet's contents: one to three things, mostly bandages and painkillers, now and then a
   // tourniquet, gauze, a chest seal or a splint. [[mt, n], ...], like kinds stacked together.
@@ -581,22 +599,22 @@ const G_Server = {
       let x = Math.random() * total, mt = 'bandage';
       for (const [k, w] of this.CAB_ODDS) { x -= w; if (x <= 0) { mt = k; break; } }
       const k = (mt === 'bandage' || mt === 'pills') && Math.random() < 0.4 ? 2 : 1, have = out.find((o) => o[0] === mt);
-      if (have && have[1] + k <= ((G.Med.ITEMS as Tbl)[mt].stack || 1)) have[1] += k; else out.push([mt, k]);
+      if (have && have[1] + k <= ((Med.ITEMS as Tbl)[mt].stack || 1)) have[1] += k; else out.push([mt, k]);
     }
     return out;
   },
   // A cabinet is a CAB_W x CAB_H grid (medical gear only): items [[mt, n, x, y, rot], ...]. ver counts changes,
   // so an edit made against an older state is checked rather than taken as it is.
-  CAB_W: G.Sim.CAB_W, CAB_H: G.Sim.CAB_H, // (js/sim.ts: the screens draw them so)
+  CAB_W: Sim.CAB_W, CAB_H: Sim.CAB_H, // (js/sim.ts: the screens draw them so)
   cabGrid(items: any[][]) {
-    const Gr = G.Gear, g = Gr.grid(this.CAB_W, this.CAB_H, ['med']);
+    const Gr = Gear, g = Gr.grid(this.CAB_W, this.CAB_H, ['med']);
     for (const [mt, n, x, y, r] of items) Gr.put(g, Gr.medItem(mt, n), x, y, r);
     return g;
   },
   cabItems(g: { items: Loose[] }) { return g.items.map((p: Loose) => [p.it.mt, p.it.n || 1, p.x, p.y, p.r ? 1 : 0]); },
   // [[mt, n]] laid into the grid (stacks first); returns the items, and what didn't fit in .left
   layCab(list: [string, number][], items: any[][] = []) {
-    const Gr = G.Gear, g = this.cabGrid(items), left: [string, number][] = [];
+    const Gr = Gear, g = this.cabGrid(items), left: [string, number][] = [];
     for (const [mt, n] of list) {
       const it = Gr.medItem(mt, n);
       for (const p of g.items) if (it.n > 0) Gr.mergeMed(it, p.it);
@@ -606,10 +624,10 @@ const G_Server = {
     out.left = left;
     return out;
   },
-  cabCounts(items: any[][]) { return G.Sim.cabCounts(items); },
+  cabCounts(items: any[][]) { return Sim.cabCounts(items); },
   // an officer's edit: what they took out and put in, and how they left it laid out
   cabEdit(cab: Cab, m: any) {
-    const Gr = G.Gear, clean = (o: any): Record<string, number> => { const r: Record<string, number> = {}; for (const [k, v] of Object.entries(o || {})) if ((G.Med.ITEMS as Tbl)[k] && v > 0) r[k] = Math.min(20, Math.floor(+v) || 0); return r; };
+    const Gr = Gear, clean = (o: any): Record<string, number> => { const r: Record<string, number> = {}; for (const [k, v] of Object.entries(o || {})) if ((Med.ITEMS as Tbl)[k] && v > 0) r[k] = Math.min(20, Math.floor(+v) || 0); return r; };
     const take = clean(m.take), put = clean(m.put), have = this.cabCounts(cab.items), took: Record<string, number> = {}, deny: Record<string, number> = {};
     for (const [mt, n] of Object.entries(take)) { took[mt] = Math.min(n, have[mt] || 0); if (took[mt] < n) deny[mt] = n - took[mt]; }
     // the layout as they left it, if nothing changed under them and it adds up
@@ -621,7 +639,7 @@ const G_Server = {
       let ok = true;
       for (const e of m.lay) {
         const [mt, n, x, y, r] = Array.isArray(e) ? e : [];
-        const it = (G.Med.ITEMS as Tbl)[mt] && Gr.medItem(mt, Math.floor(+n));
+        const it = (Med.ITEMS as Tbl)[mt] && Gr.medItem(mt, Math.floor(+n));
         if (!it || !(it.n >= 1 && it.n <= Gr.medStack(it)) || !Gr.fits(g, it, x | 0, y | 0, r ? 1 : 0)) { ok = false; break; }
         Gr.put(g, it, x | 0, y | 0, r ? 1 : 0); want[mt] -= it.n;
       }
@@ -643,12 +661,12 @@ const G_Server = {
   // (the tids they took out), keep (where the rest now sit), put (what they put in, and where). Made against
   // the state as it is, it's taken as it is; against an older one, their takes and puts are merged into
   // what's there now (taking something already gone is denied, a put with no room left comes back).
-  TEAM_W: G.Sim.TEAM_W, TEAM_H: G.Sim.TEAM_H,
+  TEAM_W: Sim.TEAM_W, TEAM_H: Sim.TEAM_H,
   team: null as TeamLocker | null,
   teamMsg() { const t = this.team || { ver: 0, items: [] }; return { t: 'team', ver: t.ver, items: t.items }; },
-  teamGrid() { const g = G.Gear.grid(this.TEAM_W, this.TEAM_H, null, 'Team locker'); g.locker = true; return g; },
+  teamGrid() { const g = Gear.grid(this.TEAM_W, this.TEAM_H, null, 'Team locker'); g.locker = true; return g; },
   teamEdit(m: any) {
-    const Gr = G.Gear, t = this.team || (this.team = { ver: 0, items: [] }), have = new Map<any, any[]>(t.items.map((e: any[]): [any, any[]] => [e[0], e]));
+    const Gr = Gear, t = this.team || (this.team = { ver: 0, items: [] }), have = new Map<any, any[]>(t.items.map((e: any[]): [any, any[]] => [e[0], e]));
     const arr = (a: any) => (Array.isArray(a) ? a.slice(0, this.TEAM_W * this.TEAM_H) : []);
     const take = arr(m.take).map(String), keep = arr(m.keep).filter(Array.isArray), put = [];
     for (const e of arr(m.put)) { if (!Array.isArray(e)) continue; try { const it = Gr.unpack(e[4]); put.push([String(e[0]), e[1] | 0, e[2] | 0, e[3] ? 1 : 0, Gr.pack(it), it]); } catch (err) { /* not an item */ } }
@@ -678,7 +696,7 @@ const G_Server = {
   // hands as it's built (G.Gunsmith.attachOptions), the lower tiers likelier; if that's fewer than three (or they had
   // nothing in their hands), the rest are attachments for anything, to carry
   rollAbox(code: string) {
-    const GS = G.Gunsmith, def = code ? GS.fromCode(code) : null, out: string[] = [];
+    const GS = Gunsmith, def = code ? GS.fromCode(code) : null, out: string[] = [];
     const draw = (pool: Loose[]) => {
       while (out.length < 3 && pool.length) {
         let r = Math.random() * pool.reduce((a: number, p: Loose) => a + 1 / (p.tier || 1), 0), at = 0;
@@ -708,10 +726,10 @@ const G_Server = {
   toShop() {
     this.phase = 'shop';
     this.shopSeed = (Math.random() * 2 ** 31) | 0;
-    this.stock = G.Shop.scaleStock(G.Shop.baseStock(this.level, this.shopSeed), this.players.size); // (as many of each as there are of you)
+    this.stock = Shop.scaleStock(Shop.baseStock(this.level, this.shopSeed), this.players.size); // (as many of each as there are of you)
     this.liftT = null; this.snapT = 0;
     for (const p of this.players.values()) p.ready = false;
-    SvNet.broadcast({ t: 'phase', phase: 'shop', level: this.level, shopSeed: this.shopSeed, report: G.SpaceData.ON ? null : this.report, stock: this.stock, sp: G.SpaceData.ON ? G.SpaceSv.shopMsg() : undefined });
+    SvNet.broadcast({ t: 'phase', phase: 'shop', level: this.level, shopSeed: this.shopSeed, report: SpaceData.ON ? null : this.report, stock: this.stock, sp: SpaceData.ON ? SpaceSv.shopMsg() : undefined });
     SvNet.broadcast(this.teamMsg());
     this.sendRoster();
   },
@@ -740,7 +758,7 @@ const G_Server = {
 
   // --------------------------------------------------------------- enemies
   spawnEnemies() {
-    const L = this.level, np = Math.max(1, this.players.size), U = G.U;
+    const L = this.level, np = Math.max(1, this.players.size), U = G_U;
     const big = this.map!.theme.big || 1, hold = this.report.stronghold, count = Math.min(Math.round((4 + Math.floor(L * 1.5) + (np - 1) * 2) * (this.map!.theme.foes || 1) * (hold ? 1.5 : 1)), (hold ? 44 : 32) * big); // (a bigger map: more of them, and room for more)
     const hpMult = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     this.accMult = Math.min(1 + 0.03 * (L - 1), 1.5);
@@ -749,7 +767,7 @@ const G_Server = {
     const total = weights.reduce((a, w) => a + w[1], 0);
     // (a spot: [tx, tz] on the fine grid, and in a building of several floors its floor)
     let spots = U.shuffle(Math.random, this.map!.enemySpots.slice());
-    const W = this.map!.W, unitOf = (sp: number[]) => { const ua = G.Level.floorMap(this.map!, sp[2] || 0).unitAt; return ua ? ua[sp[1] * W + sp[0]] : -1; };
+    const W = this.map!.W, unitOf = (sp: number[]) => { const ua = Level.floorMap(this.map!, sp[2] || 0).unitAt; return ua ? ua[sp[1] * W + sp[0]] : -1; };
     if (this.map!.unitAt) { // apartments: a spot in each one goes to the front of the list
       const first: number[][] = [], seen = new Set();
       for (const sp of spots) { const u = unitOf(sp); if (u >= 0 && !seen.has(u)) { seen.add(u); first.push(sp); } }
@@ -762,15 +780,15 @@ const G_Server = {
       spots = first.concat(spots.filter((sp) => !first.includes(sp)));
     }
     this.unitsSeen = new Set(); // apartments an officer has been inside
-    const used: number[][] = [], fy = (f?: number) => G.Level.floorMap(this.map!, f || 0).fy || 0;
-    const close = (tx: number, tz: number, f?: number) => used.some(([ux, uz, uf]) => (uf || 0) === (f || 0) && Math.abs(ux - tx) + Math.abs(uz - tz) < 2 * G.Level.K);
+    const used: number[][] = [], fy = (f?: number) => Level.floorMap(this.map!, f || 0).fy || 0;
+    const close = (tx: number, tz: number, f?: number) => used.some(([ux, uz, uf]) => (uf || 0) === (f || 0) && Math.abs(ux - tx) + Math.abs(uz - tz) < 2 * Level.K);
     for (const [tx, tz, tf] of spots) {
       if (used.length >= count) break;
       if (close(tx, tz, tf)) continue;
       used.push([tx, tz, tf]);
       let roll = Math.random() * total, type: EnemyKind = 'grunt';
       for (const [ty, w] of weights) { if (roll < w) { type = ty; break; } roll -= w; }
-      const se = this.addEnemy(type, (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, hpMult, fy(tf));
+      const se = this.addEnemy(type, (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, hpMult, fy(tf));
       if (hold) se.drawn = true; // (a stronghold's suspects have their weapons out already, not holstered)
     }
     // a leader, one at most, from level 2: more likely the bigger the map and in a stronghold. He takes the place of the suspect furthest from the
@@ -784,7 +802,7 @@ const G_Server = {
     }
     // civilians caught up in it (more at a festival: some of them hiding behind the stalls' counters; the other
     // stalls were left as they ran)
-    const crowd = this.map!.theme.crowd || 1, civs = hold ? 0 : Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8 * big), TS = G.Level.TS;
+    const crowd = this.map!.theme.crowd || 1, civs = hold ? 0 : Math.min(Math.round((2 + Math.floor(L / 2)) * crowd), 8 * big), TS = Level.TS;
     let placed = 0;
     for (const s of hold ? [] : U.shuffle(Math.random, ((this.map as MapCivSpots).civSpots || []).slice())) {
       if (placed >= Math.ceil(civs * 0.6)) break;
@@ -809,20 +827,20 @@ const G_Server = {
       if (placed >= civs) break;
       if (close(tx, tz, tf)) continue;
       used.push([tx, tz, tf]);
-      this.addEnemy('civ', (tx + 0.5) * G.Level.TS, (tz + 0.5) * G.Level.TS, 1, fy(tf));
+      this.addEnemy('civ', (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, 1, fy(tf));
       placed++;
     }
-    if (G.Route.isBoss(L) && !G.SpaceSv.st.M) {
+    if (Route.isBoss(L) && !SpaceSv.st.M) {
       const ex = this.map!.extract;
-      const b = this.addEnemy('warden', ex.x, ex.z, (1 + 0.5 * (G.Route.actOf(L) - 1)) * (1 + 0.35 * (np - 1)));
+      const b = this.addEnemy('warden', ex.x, ex.z, (1 + 0.5 * (Route.actOf(L) - 1)) * (1 + 0.35 * (np - 1)));
       b.guard = true;
     }
   },
   // The chance of each of a kind of armour (G.ENEMY_GEAR.odds) on someone dressed for level L, and one of them rolled (0: none)
   armourRoll(kind: ArmourKind, L: number) {
-    const G2 = G.ENEMY_GEAR, at = G2.at, o = (G2.odds as Tbl)[kind];
+    const G2 = ENEMY_GEAR, at = G2.at, o = (G2.odds as Tbl)[kind];
     let i = 0; while (i < at.length - 2 && L >= at[i + 1]) i++;
-    const f = G.U.clamp((L - at[i]) / (at[i + 1] - at[i]), 0, 1);
+    const f = G_U.clamp((L - at[i]) / (at[i + 1] - at[i]), 0, 1);
     let x = Math.random();
     for (let k = 0; k < o.ids.length; k++) { x -= o.by[i][k] + (o.by[i + 1][k] - o.by[i][k]) * f; if (x < 0) return o.ids[k]; }
     return 0;
@@ -830,12 +848,12 @@ const G_Server = {
   // A suspect's kit for this level: a weapon from its type's pool and armour, at a gear tier around the level's.
   // The def is the type's, with the kit laid over it (weapon, its damage, pellets and rate of fire, armour).
   equip(type: EnemyKind) {
-    const base = (G.ENEMIES as Tbl)[type], G2 = G.ENEMY_GEAR;
+    const base = (ENEMIES as Tbl)[type], G2 = ENEMY_GEAR;
     if (base.civ || !(G2.weapons as Tbl)[type]) return base;
     // their grade: how strong they are within the level's tier (0-1). A low one is a tier down, a high one a tier up, and their armour's
     // as for a level or two back or on, by it (a smooth line, not just the tier's step); it ranks them too (addEnemy, teamForm)
-    const g = Math.random(), tier = base.boss ? G.gearTier(this.level) : G.U.clamp(G.gearTier(this.level) + (g < 0.2 ? -1 : g > 0.88 ? 1 : 0), 1, 4);
-    const pool = (G2.weapons as Tbl)[type][tier - 1], wpn = pool[Math.floor(Math.random() * pool.length)], w = G.WEAPONS[wpn];
+    const g = Math.random(), tier = base.boss ? gearTier(this.level) : G_U.clamp(gearTier(this.level) + (g < 0.2 ? -1 : g > 0.88 ? 1 : 0), 1, 4);
+    const pool = (G2.weapons as Tbl)[type][tier - 1], wpn = pool[Math.floor(Math.random() * pool.length)], w = WEAPONS[wpn];
     const kitL = Math.max(1, this.level + (base.boss ? 0 : (g - 0.54) * 5)); // (the weakest are dressed a couple of levels back, the strongest a couple on)
     const fixed = base.armor && (G2.fixed as Tbl)[base.armor];
     const d = Object.create(base);
@@ -871,14 +889,14 @@ const G_Server = {
     let ux = pm.x - tx, uz = pm.z - tz; const ud = Math.hypot(ux, uz) || 1; ux /= ud; uz /= ud;
     const back = k < 2 ? 0.75 : 1.25 + 0.5 * (k - 2), side = k === 0 ? 0.32 : k === 1 ? -0.32 : 0;
     let x = pm.x + ux * back - uz * side, z = pm.z + uz * back + ux * side;
-    const y = (pm.y || 0) + 1.0, L = G.Level, map = this.map!;
+    const y = (pm.y || 0) + 1.0, L = Level, map = this.map!;
     if (!L.los(map, pm.x, y, pm.z, x, y, z)) { x = pm.x + ux * 0.6; z = pm.z + uz * 0.6; }
     return { x, z };
   },
   // A shield man near e (not their own team's), in a fight, that e could get in behind when there's no cover for them: on their floor,
   // within 8 m and in sight, no nearer the police than e is by much, and with no more than two others in behind him already. Nearest.
   shieldNear(e: Enemy, st: PState) {
-    const L = G.Level, map = this.map!, ey = (e.y || 0) + 1;
+    const L = Level, map = this.map!, ey = (e.y || 0) + 1;
     let best: Enemy | null = null, bd = 8;
     const de = Math.hypot(e.x - st.p[0], e.z - st.p[2]);
     for (const o of this.enemies.values()) {
@@ -887,7 +905,7 @@ const G_Server = {
       if (d >= bd || Math.hypot(o.x - st.p[0], o.z - st.p[2]) < Math.min(4, de - 2)) continue;
       let n = 0; for (const b of this.enemies.values()) if (b !== e && b.shieldBy === o.id && this.able(b)) n++;
       if (n >= 2 || !L.los(map, e.x, ey, e.z, o.x, (o.y || 0) + 1, o.z)) continue;
-      if (G.SpaceData.ON && G.SpaceSv.offLimits(e, o.x, o.z)) continue;
+      if (SpaceData.ON && SpaceSv.offLimits(e, o.x, o.z)) continue;
       best = o; bd = d;
     }
     return best;
@@ -909,14 +927,14 @@ const G_Server = {
   // swapped for one), slowed by its weight. He's first in his team's stack (dispatchGroup), leads them on the move with the rest in file
   // behind him (orderStep: follow), and in a fight they get in behind him (think: behindShield) and shoot over him as he kneels.
   giveShield(e: Enemy, id: string) {
-    const sd = G.SHIELDS[id]; if (!sd || e.def.civ) return;
+    const sd = SHIELDS[id]; if (!sd || e.def.civ) return;
     const d = e.def;
-    if (!G.WEAPONS[d.wpn] || G.WEAPONS[d.wpn].slot !== 's') { const w = G.WEAPONS.g19 ? 'g19' : 'p9'; d.wpn = w; d.snd = G.WEAPONS[w].cls; d.pellets = G.WEAPONS[w].pellets; d.rof = undefined; d.burst = undefined; }
+    if (!WEAPONS[d.wpn] || WEAPONS[d.wpn].slot !== 's') { const w = WEAPONS.g19 ? 'g19' : 'p9'; d.wpn = w; d.snd = WEAPONS[w].cls; d.pellets = WEAPONS[w].pellets; d.rof = undefined; d.burst = undefined; }
     d.shield = id; d.speed = d.speed * sd.speed; e.point = true;
     if (e.wear === 'navy') d.tac = (d.tac || 0) | 2 | 4; // (a navy's: a green laser on the pistol)
   },
   addEnemy(type: EnemyKind, x: number, z: number, hpMult: number, y = 0) {
-    if (this.map && this.map.terrain) y = G.Level.groundHeight(this.map, x, z); // (on the ground where it rolls, high or low: the Sandia Crest's)
+    if (this.map && this.map.terrain) y = Level.groundHeight(this.map, x, z); // (on the ground where it rolls, high or low: the Sandia Crest's)
     const def = this.equip(type);
     const e: Enemy = {
       id: this.nextEid++, type, def, x, z, yaw: Math.random() * Math.PI * 2,
@@ -936,9 +954,9 @@ const G_Server = {
       y, // the floor under their feet (on the stairs: the step they're on)
     };
     if (!def.civ) { e.grade = def.grade != null ? def.grade : 0.5; e.rank = e.grade! + (def.leader ? 1 : 0); }
-    const w = !def.civ && G.WEAPONS[def.wpn];
+    const w = !def.civ && WEAPONS[def.wpn];
     if (w && w.mag > 0 && !w.explosive) { e.magMax = w.mag; e.mag = Math.random() < 0.25 ? Math.max(1, Math.ceil(w.mag * (0.3 + Math.random() * 0.6))) : w.mag; }
-    if (this.map) G.Level.resolve(this.map, e, 0.38 * def.scale, y, G.World.STEP); // (spots are cell centres: clear of the walls beside them)
+    if (this.map) Level.resolve(this.map, e, 0.38 * def.scale, y, World.STEP); // (spots are cell centres: clear of the walls beside them)
     if (this.map) e.yaw = this.openYaw(e, e.yaw); // (facing into the room, not the wall: a gun at the ready would go through it)
     this.enemies.set(e.id, e);
     return e;
@@ -949,7 +967,7 @@ const G_Server = {
     const w = this.map && this.map.world;
     if (!w) return max;
     const dx = -Math.sin(yaw), dz = -Math.cos(yaw), y = e.y || 0;
-    return Math.min(G.World.raycast(w, e.x, y + 0.5, e.z, dx, 0, dz, max, { move: true }).t, G.World.raycast(w, e.x, y + 1.3, e.z, dx, 0, dz, max, { move: true }).t);
+    return Math.min(World.raycast(w, e.x, y + 0.5, e.z, dx, 0, dz, max, { move: true }).t, World.raycast(w, e.x, y + 1.3, e.z, dx, 0, dz, max, { move: true }).t);
   },
   // A way to face with room in front (not nose to a wall, a gun held out through it): yaw itself if it has, else
   // the roomiest of a few tries within spread of it.
@@ -966,9 +984,9 @@ const G_Server = {
   // point behind a wall, to stand pressed against the wall till they give up), or null to stay put.
   // On the way to a spot (by a flow field to it, its own or one shared by everyone going to the same room): a step, true; there, false
   // nothing solid between someone's middle and a place at the same height (a wall, a shut door)
-  clearTo(e: Enemy, g: { x: number; y?: number; z: number }) { return G.Level.los(this.map!, e.x, (e.y || 0) + 1.0, e.z, g.x, (g.y || 0) + 1.0, g.z); },
+  clearTo(e: Enemy, g: { x: number; y?: number; z: number }) { return Level.los(this.map!, e.x, (e.y || 0) + 1.0, e.z, g.x, (g.y || 0) + 1.0, g.z); },
   travel(e: Enemy, g: { x: number; y: number; z: number; flow?: Int16Array }, speed: number, dt: number) {
-    const L = G.Level, U = G.U, map = this.map!, d = Math.hypot(g.x - e.x, g.z - e.z);
+    const L = Level, U = G_U, map = this.map!, d = Math.hypot(g.x - e.x, g.z - e.z);
     if (d < 0.4) return false;
     if (!g.flow) g.flow = L.flow(map, [L.src(map, g.x, g.y, g.z)]);
     // (straight there once it's near and nothing's in the way; else the way round: a post just through a wall from them is no nearer)
@@ -1023,8 +1041,8 @@ const G_Server = {
   // through a floor, heavily muffled (another 15 m: a shot overhead is heard, footsteps aren't). Cached per
   // source cell (and floor) + door state. y: the source's height.
   soundField(x: number, z: number, y = 0) {
-    const map = this.map!, L = G.Level, TS = L.TS, W = map.W, H = map.H, WH = W * H, floors = map.floors || [map], NF = floors.length;
-    const sx = G.U.clamp(Math.floor(x / TS), 0, W - 1), sz = G.U.clamp(Math.floor(z / TS), 0, H - 1), f0 = L.floorAt(map, x, y, z);
+    const map = this.map!, L = Level, TS = L.TS, W = map.W, H = map.H, WH = W * H, floors = map.floors || [map], NF = floors.length;
+    const sx = G_U.clamp(Math.floor(x / TS), 0, W - 1), sz = G_U.clamp(Math.floor(z / TS), 0, H - 1), f0 = L.floorAt(map, x, y, z);
     const key = f0 * WH + sz * W + sx + '|' + (map.doorVer || 0);
     if (!this._sound || this._sound.map !== map) this._sound = { map, cache: new Map() };
     const hit = this._sound.cache.get(key);
@@ -1062,8 +1080,8 @@ const G_Server = {
   },
   // how far (metres, through the building) a sound is from (x, y, z), from its field
   heardAt(field: Float32Array, x: number, z: number, y = 0) {
-    const L = G.Level, TS = L.TS, map = this.map!, f = map.floors ? L.floorAt(map, x, y, z) : 0;
-    return field[f * map.W * map.H + G.U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G.U.clamp(Math.floor(x / TS), 0, map.W - 1)] * TS;
+    const L = Level, TS = L.TS, map = this.map!, f = map.floors ? L.floorAt(map, x, y, z) : 0;
+    return field[f * map.W * map.H + G_U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G_U.clamp(Math.floor(x / TS), 0, map.W - 1)] * TS;
   },
   hear(x: number, z: number, radius: number, y = 0) {
     const field = this.soundField(x, z, y);
@@ -1089,13 +1107,13 @@ const G_Server = {
   SOUND: 343, REACT: [0.1, 0.2],
   suppress(f: number[], to: number[], def: any, am?: string) {
     const ax = f[0], ay = f[1], az = f[2], bx = to[0] - ax, by = to[1] - ay, bz = to[2] - az, len2 = bx * bx + by * by + bz * bz || 1;
-    const v0 = def ? G.roundSpeed(def, am) : 0;
+    const v0 = def ? roundSpeed(def, am) : 0;
     for (const e of this.enemies.values()) {
       if (e.def.civ || e.state !== 'normal') continue;
-      const ey = (e.y || 0) + 1.2 * e.def.scale, t = G.U.clamp(((e.x - ax) * bx + (ey - ay) * by + (e.z - az) * bz) / len2, 0, 1);
+      const ey = (e.y || 0) + 1.2 * e.def.scale, t = G_U.clamp(((e.x - ax) * bx + (ey - ay) * by + (e.z - az) * bz) / len2, 0, 1);
       const miss = Math.hypot(ax + bx * t - e.x, ay + by * t - ey, az + bz * t - e.z);
       if (miss >= 2.2) continue;
-      const d = t * Math.sqrt(len2), v = def ? (v0 + G.roundSpeed(def, am, d)) / 2 : 0; // (its average speed over the way there)
+      const d = t * Math.sqrt(len2), v = def ? (v0 + roundSpeed(def, am, d)) / 2 : 0; // (its average speed over the way there)
       const react = this.REACT[0] + (this.REACT[1] - this.REACT[0]) * (Math.random() + Math.random()) / 2;
       (e.supQ = e.supQ || []).push([(this.clock || 0) + d / Math.max(this.SOUND, v) + react, miss]);
     }
@@ -1168,10 +1186,10 @@ const G_Server = {
   // A spot out of sight of the danger: crouched behind furniture, or standing round a wall edge where
   // leaning out gives a look. Nobody shares a spot.
   findHide(e: Enemy, from: { x: number; y?: number; z: number }) {
-    const L = G.Level, map = this.map!, TS = L.TS;
+    const L = Level, map = this.map!, TS = L.TS;
     let best: HideSpot | null = null, bs = 1e9;
     const taken = (x: number, z: number) => { for (const o of this.enemies.values()) if (o !== e && ((o.hide && Math.hypot(o.hide.x - x, o.hide.z - z) < 1.1) || (o.cover && Math.hypot(o.cover.x - x, o.cover.z - z) < 1.1))) return true; return false; };
-    const ey = e.y || 0, fy = from.y || 0, here = (q: { x: number; y?: number; z: number }) => Math.abs((q.y || 0) - ey) < 1.5 && !(G.SpaceData.ON && G.SpaceSv.offLimits(e, q.x, q.z)); // (a spot on their own floor; not in the room a ship's people are sheltering in, unless they're one of them: js/spaceserver.ts)
+    const ey = e.y || 0, fy = from.y || 0, here = (q: { x: number; y?: number; z: number }) => Math.abs((q.y || 0) - ey) < 1.5 && !(SpaceData.ON && SpaceSv.offLimits(e, q.x, q.z)); // (a spot on their own floor; not in the room a ship's people are sheltering in, unless they're one of them: js/spaceserver.ts)
     for (const c of map.cover as FlPt[]) {
       const d = Math.hypot(c.x - e.x, c.z - e.z);
       if (d > 14 || !here(c)) continue;
@@ -1207,7 +1225,7 @@ const G_Server = {
   // Run to the spot; once there, stay down and every few seconds pop up (or lean out round the edge) to
   // look toward the danger, now and then moving somewhere else. Returns false if they can't get there.
   hideStep(e: Enemy, dt: number, speed: number) {
-    const h = e.hide!, U = G.U, L = G.Level;
+    const h = e.hide!, U = G_U, L = Level;
     const d = Math.hypot(h.x - e.x, h.z - e.z);
     if (d > 0.3) {
       if (!h.flow) h.flow = L.flow(this.map!, [L.src(this.map!, h.x, h.y!, h.z)]);
@@ -1236,8 +1254,8 @@ const G_Server = {
   // A round struck what holds a door. Its handle gone, the latch lets go and it swings open; all its hinges gone, nothing's holding
   // it up, and it falls (js/damage.ts: the same fall for everyone, from what's said here).
   doorHit(d: Door, pt: string | number, J: any, dir: any) {
-    if (d.fallen || G.Level.sturdy(d) || !(pt === 'h' || pt === 0 || pt === 1 || pt === 2) || !Array.isArray(dir)) return;
-    const hp = d.hp || (d.hp = { h: G.Damage.PARTS.handle, 0: G.Damage.PARTS.hinge, 1: G.Damage.PARTS.hinge, 2: G.Damage.PARTS.hinge });
+    if (d.fallen || Level.sturdy(d) || !(pt === 'h' || pt === 0 || pt === 1 || pt === 2) || !Array.isArray(dir)) return;
+    const hp = d.hp || (d.hp = { h: Damage.PARTS.handle, 0: Damage.PARTS.hinge, 1: Damage.PARTS.hinge, 2: Damage.PARTS.hinge });
     if (hp[pt] <= 0) return;
     hp[pt] -= Math.max(0, +J || 0);
     if (hp[pt] > 0) return;
@@ -1246,7 +1264,7 @@ const G_Server = {
     if (hp[0] <= 0 && hp[1] <= 0 && hp[2] <= 0) {
       const fall: [number, number[], number] = [d.open ? 1 : 0, [dir[0], dir[1]], (Math.random() * 1e9) | 0];
       (this.fallen = this.fallen || []).push([d.id, ...fall]);
-      G.Damage.fall(this.map as unknown as DamageMap, d as any, ...fall); // (server's door record: the same object damage.ts types as its Door)
+      Damage.fall(this.map as unknown as DamageMap, d as any, ...fall); // (server's door record: the same object damage.ts types as its Door)
       SvNet.broadcast({ t: 'dfall', i: d.id, f: fall });
     }
   },
@@ -1254,7 +1272,7 @@ const G_Server = {
     const d = this.map && this.map.doors[id];
     if (!d || d.open === open || d.fallen) return;
     d.open = open;
-    G.World.door(this.map!.world, this.map, d);
+    World.door(this.map!.world, this.map, d);
     this.map!.doorVer = (this.map!.doorVer || 0) + 1; // sound paths change
     SvNet.broadcast({ t: 'door', i: id, o: open ? 1 : 0, k: kicked ? 1 : 0 });
   },
@@ -1287,7 +1305,7 @@ const G_Server = {
   // restored the squad can vote to leave (Y); the level ends when every officer still alive has voted.
   checkClear() {
     const left = this.remaining(false);
-    if (G.SpaceSv.st.M) return; // (a mission isn't left by a vote: the ship leaves, js/spaceserver.ts)
+    if (SpaceSv.st.M) return; // (a mission isn't left by a vote: the ship leaves, js/spaceserver.ts)
     if (left === 0 && !this.extract.active) { this.extract.active = true; SvNet.broadcast({ t: 'clear' }); }
   },
   // every civilian secured, none killed
@@ -1295,7 +1313,7 @@ const G_Server = {
 
   // "POLICE! SHOW ME YOUR HANDS!" Everyone in earshot and sight rolls to comply.
   shout(p: LivePlayer, from: string) {
-    const [px, py, pz] = p.st.p, ey = py + (p.st.pr ? 0.36 : p.st.cr ? 1.0 : 1.6), map = this.map!, L = G.Level;
+    const [px, py, pz] = p.st.p, ey = py + (p.st.pr ? 0.36 : p.st.cr ? 1.0 : 1.6), map = this.map!, L = Level;
     const officers = [...this.players.values()].filter((q: Player) => q.st && !q.st.dn && !q.st.dd) as LivePlayer[];
     let complied = 0;
     for (const e of this.enemies.values()) {
@@ -1318,13 +1336,13 @@ const G_Server = {
           + 0.08 * Math.min(3, e.shouts) + 0.08 * Math.max(0, seen - 1) - (d > 10 ? 0.1 : 0) + (e.flashT! > 0 ? 0.35 : e.flashRec! > 0 ? 0.2 : 0) // (dazed by a flashbang: in no state to argue)
           - Math.max(0, e.morale - 0.5) * 0.8 - (e.def.hunt && e.drawn ? 0.15 : 0)
           + (this.clock - (e.noLead || -99) < 60 ? 0.15 : 0); // (their leader's down: no one's telling them what to do)
-        chance = e.def.comply ? G.U.clamp(chance, 0, e.collapsed ? 0.97 : 0.92) : 0; // never a sure thing
+        chance = e.def.comply ? G_U.clamp(chance, 0, e.collapsed ? 0.97 : 0.92) : 0; // never a sure thing
         // Braver together: with armed friends around who can see them, almost nobody gives up. And anyone
         // who's already been shooting at you, or who faked a surrender and went back for a weapon, is past
         // being talked down (unless they're breaking or badly weakened). Bleeding out on the floor, friends
         // count for little.
-        const weak = e.collapsed ? 1 : G.U.clamp(1 - (e.str == null ? 1 : e.str) / 0.6, 0, 1);
-        chance *= G.U.lerp([1, 0.3, 0.08, 0.03][Math.min(3, this.allies(e))], 1, weak * 0.85);
+        const weak = e.collapsed ? 1 : G_U.clamp(1 - (e.str == null ? 1 : e.str) / 0.6, 0, 1);
+        chance *= G_U.lerp([1, 0.3, 0.08, 0.03][Math.min(3, this.allies(e))], 1, weak * 0.85);
         const shaken = e.broken || e.collapsed || (e.str != null && e.str < 0.5) || e.flashT! > 0 || e.flashRec! > 0;
         if (!shaken && (this.clock - (e.firedAt || -99) < 30 || e.emboldened)) chance *= 0.1;
         e.shouts++;
@@ -1346,11 +1364,11 @@ const G_Server = {
   breakGlass(ids: number[], p: number[]) {
     const ws = this.map && (this.map.windows as SvWin[]);
     if (!ws) return;
-    const fresh = ids.filter((id: number) => Number.isInteger(id) && ws[id] && !ws[id].broken && !ws[id].armor && G.Level.paneBreaks(ws[id])).slice(0, 20); // (bulletproof glass doesn't break, nor a ship's)
+    const fresh = ids.filter((id: number) => Number.isInteger(id) && ws[id] && !ws[id].broken && !ws[id].armor && Level.paneBreaks(ws[id])).slice(0, 20); // (bulletproof glass doesn't break, nor a ship's)
     if (!fresh.length) return;
-    for (const id of fresh) { ws[id].broken = true; G.World.windowSolids(this.map!.world, this.map, ws[id]); this.glassBroken.add(id); this.hear(ws[id].x, ws[id].z, 16, ws[id].fy || 0); }
+    for (const id of fresh) { ws[id].broken = true; World.windowSolids(this.map!.world, this.map, ws[id]); this.glassBroken.add(id); this.hear(ws[id].x, ws[id].z, 16, ws[id].fy || 0); }
     SvNet.broadcast({ t: 'glass', ids: fresh });
-    G.SpaceSv.glass(fresh); // (a ship's hull window: the air goes)
+    SpaceSv.glass(fresh); // (a ship's hull window: the air goes)
   },
   // A weapon light in their eyes (the player they're shooting at has one on and pointed at them, close enough):
   // they can hardly see to aim. Returns a multiplier on their hit chance.
@@ -1391,7 +1409,7 @@ const G_Server = {
   officerLux(p: LivePlayer) {
     if (p.luxAt === this.clock) return p.lux!;
     const S = this.SIGHT, st = p.st;
-    let v = G.Level.luxAt(this.map!, st.p[0], st.p[1], st.p[2]);
+    let v = Level.luxAt(this.map!, st.p[0], st.p[1], st.p[2]);
     const since = this.clock - (p.firedAt == null ? -99 : p.firedAt);
     if (!this.night) { if (since < S.FLASH_T) v += S.FLASH; }
     else { const fk = p.flashK == null ? 1 : p.flashK; if (since < S.FLASH_T * Math.min(1, fk)) v += S.FLASH * fk * fk; } // (night: by the muzzle's flash, NIGHT)
@@ -1406,7 +1424,7 @@ const G_Server = {
     const cp = Math.cos(st.pt || 0), fx = -Math.sin(st.yw) * cp, fy = Math.sin(st.pt || 0), fz = -Math.cos(st.yw) * cp;
     const dx = e.x - st.p[0], dy = (e.y || 0) + 1.3 * e.def.scale - st.p[1] - 1.5, dz = e.z - st.p[2], dd = Math.hypot(dx, dy, dz) || 1;
     const c = (dx * fx + dy * fy + dz * fz) / dd;
-    return G.U.clamp((c - 0.9) / (0.955 - 0.9), 0, 1);
+    return G_U.clamp((c - 0.9) / (0.955 - 0.9), 0, 1);
   },
   // How well suspect e can make out officer p, d metres off, by the light on them: 0 (pitch dark) to 1 (a lit room, or better).
   //   L = the light where they stand (officerLux: the level's lamps, sky and bounce, and a muzzle flash)
@@ -1435,7 +1453,7 @@ const G_Server = {
   // (G.Level.see: through glass less). Behind a crate to the waist, about half; a head round a corner, a quarter.
   // Shoulders: either side of them across the line of sight; lying down, the body runs back from the head along the ground.
   bodySeen(st: PState, ax: number, ay: number, az: number) {
-    const L = G.Level, map = this.map!, [px, py, pz] = st.p, [hx, hz] = this.headXZ(st);
+    const L = Level, map = this.map!, [px, py, pz] = st.p, [hx, hz] = this.headXZ(st);
     const sx = px - ax, sz = pz - az, sd = Math.hypot(sx, sz) || 1, qx = -sz / sd * 0.22, qz = sx / sd * 0.22; // (across the line, a shoulder's width)
     const pts: number[][] = []; // [x, y, z, share]
     if (st.pr) {
@@ -1456,7 +1474,7 @@ const G_Server = {
     const eh = (e.y || 0) + 1.4 * e.def.scale;
     for (const o of this.enemies.values()) {
       if (o === e || o.def.civ || !o.armed || o.state !== 'normal' || Math.hypot(o.x - e.x, o.z - e.z) > 9) continue;
-      if (G.Level.los(this.map!, o.x, (o.y || 0) + 1.4 * o.def.scale, o.z, e.x, eh, e.z)) n++;
+      if (Level.los(this.map!, o.x, (o.y || 0) + 1.4 * o.def.scale, o.z, e.x, eh, e.z)) n++;
     }
     return n;
   },
@@ -1474,12 +1492,12 @@ const G_Server = {
     if (e.def.civ || !e.armed || !e.def.wpn) return;
     const a = Math.random() * Math.PI * 2;
     const v = { i: this.evidence.length, wpn: e.def.wpn, x: e.x + Math.cos(a) * 0.5, y: e.y || 0, z: e.z + Math.sin(a) * 0.5, owner: e.id, secured: false, taken: false };
-    G.Level.resolve(this.map!, v, 0.15, v.y, G.World.STEP);
-    v.y = G.Level.groundAt(this.map!, v.x, v.z, 0.05, v.y + 0.3, 0.05); // (on the floor where they were: upstairs or down)
+    Level.resolve(this.map!, v, 0.15, v.y, World.STEP);
+    v.y = Level.groundAt(this.map!, v.x, v.z, 0.05, v.y + 0.3, 0.05); // (on the floor where they were: upstairs or down)
     this.evidence.push(v);
     SvNet.broadcast({ t: 'evid', i: v.i, wpn: v.wpn, x: Math.round(v.x * 100) / 100, z: Math.round(v.z * 100) / 100, y: Math.round(v.y * 100) / 100 });
   },
-  evidenceValue(wpn: string) { return 60 + Math.round((G.WEAPONS[wpn] ? G.WEAPONS[wpn].price : 500) * 0.04) + 10 * this.level; },
+  evidenceValue(wpn: string) { return 60 + Math.round((WEAPONS[wpn] ? WEAPONS[wpn].price : 500) * 0.04) + 10 * this.level; },
   // A weapon's worth is split: half for bagging it, half for securing whoever carried it (arrest or body).
   carrierShare(def: any) { return def && !def.civ && def.wpn ? Math.round(this.evidenceValue(def.wpn) / 2) : 0; },
   secure(i: number, p: LivePlayer, from: string) {
@@ -1506,7 +1524,7 @@ const G_Server = {
       if (!b || b.secured || reach(b.x, b.z) > 2.6) return;
       b.secured = true;
       this.report.bodies++;
-      SvNet.broadcast({ t: 'cuffed', e: eid, by: from, cr: b.civ ? 0 : this.pay(this.carrierShare(b.def || (G.ENEMIES as Tbl)[b.type])), civ: b.civ, ty: b.type, body: true, nm: b.rec && b.rec.title });
+      SvNet.broadcast({ t: 'cuffed', e: eid, by: from, cr: b.civ ? 0 : this.pay(this.carrierShare(b.def || (ENEMIES as Tbl)[b.type])), civ: b.civ, ty: b.type, body: true, nm: b.rec && b.rec.title });
       this.checkClear();
       return;
     }
@@ -1529,7 +1547,7 @@ const G_Server = {
   // Bleeding drains their health and their nerve, and can kill them (credited to whoever shot them). Restraining
   // someone stops it: you treat them as you cuff them. organs: what was hit, kept for the record (id:% of it gone).
   injure(e: Enemy, part: string, effs: string, side: any, organs: string) {
-    if (!G.Med.NAME[part]) return;
+    if (!Med.NAME[part]) return;
     const person = e.maxHp * (100 / e.def.hp), E = new Set(effs.split(',').filter(Boolean));
     if (E.has('massive')) e.bleedH = (e.bleedH || 0) + person * 0.12;
     if (E.has('heavy')) e.bleedH = (e.bleedH || 0) + person * 0.02;
@@ -1537,7 +1555,7 @@ const G_Server = {
     // (a moderate or worse bleed also shows as a stream on the body, js/views.ts woundStreams: a wound is the part's index,
     // + 8 for an artery (it spurts), + 16 for a massive one; the last four kept)
     if (E.has('heavy') || E.has('massive') || E.has('cardiac')) {
-      const pi = G.Med.PARTS.findIndex((q: any) => q[0] === part);
+      const pi = Med.PARTS.findIndex((q: any) => q[0] === part);
       if (pi >= 0) { const w = e.wnd || (e.wnd = []); w.push(pi | (/carotid|brachial|femoral|iliac|aorta|heart/.test(organs || '') ? 8 : 0) | (E.has('massive') || E.has('cardiac') ? 16 : 0)); if (w.length > 4) w.shift(); }
     }
     if (E.has('frac')) {
@@ -1598,11 +1616,11 @@ const G_Server = {
   // other hand on the gun any more (it props them up instead) and shoot one-handed; below COLLAPSE (about 31%
   // health) their legs give out and they go down, still alive, until they bleed out. The weaker they are, the
   // more readily they give up.
-  COLLAPSE: 0.3, TWO_HAND: G.Sim.TWO_HAND,
+  COLLAPSE: 0.3, TWO_HAND: Sim.TWO_HAND,
   // A shot kicks the gun off target (degrees of muzzle rise: the weapon's recoil, worse one-handed and weak),
   // and the arms bring it back, faster with two hands and strength. They fire again once it's back on.
-  kickOf(e: Enemy, w: any) { return G.Sim.kickOf(e.str, w); }, // (js/sim.ts: every screen kicks the rig's gun as much)
-  kickBack(e: Enemy) { const s = e.str == null ? 1 : e.str; return (s >= this.TWO_HAND ? 7 : 4) * (0.4 + 0.6 * G.U.clamp(s / 0.6, 0, 1)); },
+  kickOf(e: Enemy, w: any) { return Sim.kickOf(e.str, w); }, // (js/sim.ts: every screen kicks the rig's gun as much)
+  kickBack(e: Enemy) { const s = e.str == null ? 1 : e.str; return (s >= this.TWO_HAND ? 7 : 4) * (0.4 + 0.6 * G_U.clamp(s / 0.6, 0, 1)); },
   // Is their gun on the target? Facing it, with the kick of the last shot settled (what sags off it from
   // weakness is allowed for: they can't do better). On the host's own screen the suspect's body is simulated
   // (js/rig.ts powerStep), so where that gun's bore actually points has to agree too (the screen tells it: 'bores', the
@@ -1623,19 +1641,19 @@ const G_Server = {
   },
   onTarget(e: Enemy, st: PState, dt: number) {
     const tx = st.p[0], ty = st.p[1] + (st.pr ? 0.25 : st.cr ? 0.75 : 1.2), tz = st.p[2], s = e.str == null ? 1 : e.str;
-    const sag = (1 - G.U.clamp(s / 0.6, 0, 1)) * 45;
-    let on = Math.abs(G.U.angDiff(e.yaw, Math.atan2(-(tx - e.x), -(tz - e.z)))) < 0.16 && (e.kick || 0) < 2.5;
+    const sag = (1 - G_U.clamp(s / 0.6, 0, 1)) * 45;
+    let on = Math.abs(G_U.angDiff(e.yaw, Math.atan2(-(tx - e.x), -(tz - e.z)))) < 0.16 && (e.kick || 0) < 2.5;
     const b = on && this.bores.get(e.id);
     if (b) {
       const to = new THREE.Vector3(tx - b[0], ty - b[1], tz - b[2]).normalize();
-      on = Math.acos(G.U.clamp(b[3] * to.x + b[4] * to.y + b[5] * to.z, -1, 1)) * 180 / Math.PI < 6 + sag * 1.1;
+      on = Math.acos(G_U.clamp(b[3] * to.x + b[4] * to.y + b[5] * to.z, -1, 1)) * 180 / Math.PI < 6 + sag * 1.1;
     }
     e.onWait = on ? 0 : (e.onWait || 0) + (dt || 0);
     return on || e.onWait > 0.8;
   },
   strength(e: Enemy) {
     const f = e.hp / e.maxHp;
-    return G.U.clamp((f - 0.15) / 0.55, 0, 1) * (e.legs ? (e.legs > 1 ? 0.6 : 0.85) : 1);
+    return G_U.clamp((f - 0.15) / 0.55, 0, 1) * (e.legs ? (e.legs > 1 ? 0.6 : 0.85) : 1);
   },
 
   // ---------------------------------------------------------------- suspects' reloads
@@ -1643,13 +1661,13 @@ const G_Server = {
   // shell, firing again from a part-loaded tube when they have to); with nobody in sight and the magazine
   // half spent, they top up. They duck while they do it if they're in cover, and it can be heard.
   startReload(e: Enemy) {
-    const w = G.WEAPONS[e.def.wpn];
+    const w = WEAPONS[e.def.wpn];
     if (!w || e.reloadT > 0) return;
     e.reloadT = w.shell ? w.reload : w.reload * (1 + Math.random() * 0.3);
     SvNet.broadcast({ t: 'ereload', e: e.id, n: w.shell ? Math.min(8, e.magMax - e.mag) : 0, dur: Math.round(e.reloadT * 100) / 100 });
   },
   reloadTick(e: Enemy, dt: number) {
-    const w = G.WEAPONS[e.def.wpn];
+    const w = WEAPONS[e.def.wpn];
     if (!w || !e.magMax) return;
     if (e.reloadT > 0) {
       e.reloadT -= dt;
@@ -1674,7 +1692,7 @@ const G_Server = {
     if (!(d > 0)) return;
     e.hp -= d;
     if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
-      if (Array.isArray(m.tb) && m.tb.length === 2 && m.tb.every(Number.isFinite)) { const t = e.tb || (e.tb = { burn: 0, blast: 0, n: 0 }); t.burn += G.U.clamp(m.tb[0], 0, 2); t.blast += G.U.clamp(m.tb[1], 0, 2); t.n++; } // (a thermobaric's burns and blast: injuries of their own, injuryTick; and for F9, js/hud.ts)
+      if (Array.isArray(m.tb) && m.tb.length === 2 && m.tb.every(Number.isFinite)) { const t = e.tb || (e.tb = { burn: 0, blast: 0, n: 0 }); t.burn += G_U.clamp(m.tb[0], 0, 2); t.blast += G_U.clamp(m.tb[1], 0, 2); t.n++; } // (a thermobaric's burns and blast: injuries of their own, injuryTick; and for F9, js/hud.ts)
       e.lastGr = Number.isFinite(m.gr) ? m.gr : 0; e.lastFb = e.flashT! > 0 ? e.flashId || 0 : 0; } // bleeding out is judged by what they were doing when shot (and for the highlights: a frag grenade's, gr its seed; blind from a flashbang, which)
     // Shock: being hit wrecks your aim for a moment (most of it, for a hard hit), throws off the shot you were
     // about to take, and starts your aim over from the body. It fades over a couple of seconds.
@@ -1737,7 +1755,7 @@ const G_Server = {
   // doing when shot). Lethal force pays least. If they bleed out afterwards, that's kept (report.bleedouts, and
   // bleedBy: by the officer who put them down), not counted again.
   // what's paid on the spot: nothing on a mission (its fee is paid when it's done, js/spaceserver.ts); what a wrong costs still is
-  pay(cr: number) { return G.SpaceSv.st.M && cr > 0 ? 0 : cr; },
+  pay(cr: number) { return SpaceSv.st.M && cr > 0 ? 0 : cr; },
   incapacitate(e: Enemy, by: string | null, st: string) {
     e.incap = { by: by || null, t: this.clock || 0 };
     if (st !== 'normal') { this.report.unauth++; return { cr: -Math.round(e.def.cr * 2), why: 'unauth' }; }
@@ -1768,7 +1786,7 @@ const G_Server = {
   unitsCleared() {
     const ua = this.map && this.map.unitAt;
     if (!ua) return 0;
-    const L = G.Level, TS = L.TS, W = this.map!.W, at = (x: number, y: number, z: number) => { const a = L.floorMap(this.map!, L.floorAt(this.map!, x, y, z)).unitAt; return a ? a[Math.floor(z / TS) * W + Math.floor(x / TS)] : -1; };
+    const L = Level, TS = L.TS, W = this.map!.W, at = (x: number, y: number, z: number) => { const a = L.floorMap(this.map!, L.floorAt(this.map!, x, y, z)).unitAt; return a ? a[Math.floor(z / TS) * W + Math.floor(x / TS)] : -1; };
     for (const p of this.players.values()) if (p.st && !p.st.dd) { const u = at(p.st.p[0], p.st.p[1], p.st.p[2]); if (u >= 0) this.unitsSeen.add(u); }
     const hot = new Set();
     for (const e of this.enemies.values()) if (!e.def.civ && e.state !== 'cuffed' && e.state !== 'surrender' && !e.down) { const u = at(e.x, e.y || 0, e.z); if (u >= 0) hot.add(u); }
@@ -1780,9 +1798,9 @@ const G_Server = {
     if (this.phase === 'shop') return this.updateHub(dt);
     if (this.phase !== 'level' || !this.map) return;
     this.clock = (this.clock || 0) + dt;
-    G.SpaceSv.tick(dt);
+    SpaceSv.tick(dt);
     if (this.phase !== 'level') return;
-    const map = this.map!, L = G.Level;
+    const map = this.map!, L = Level;
     const all = [...this.players.values()].filter((p) => p.st) as LivePlayer[];
     const alive = all.filter((p) => !p.st.dn && !p.st.dd);
 
@@ -1855,7 +1873,7 @@ const G_Server = {
   },
 
   think(e: Enemy, dt: number, alive: LivePlayer[]) {
-    const def = e.def, map = this.map!, L = G.Level, U = G.U, s = def.scale;
+    const def = e.def, map = this.map!, L = Level, U = G_U, s = def.scale;
     if (e.flashT! > 0) { e.flashT! -= dt; if (e.flashT! <= 0) { e.flashT = 0; this.flashEnd(e); } } else if (e.flashRec! > 0) e.flashRec! -= dt;
     e.complyCd = Math.max(0, e.complyCd - dt);
     e.suppressT = Math.max(0, e.suppressT - dt);
@@ -1928,7 +1946,7 @@ const G_Server = {
       // (only worked out for a suspect who's still to spot anyone: a few more sight lines, a few times a second)
       e.seeVis = best && bvis && !e.alert ? bk * this.bodySeen(best.st, lx, ey, lz) : 1;
       // seen behind bulletproof glass: they know where you are (and that shooting's no use): they come round for you
-      if (best && e.proof) { e.alert = true; e.lostT = G.U.clamp(e.lostT || 0, 0.01, 1); e.blind = false; e.lastSeen = { x: best.st.p[0], y: best.st.p[1], z: best.st.p[2] }; }
+      if (best && e.proof) { e.alert = true; e.lostT = G_U.clamp(e.lostT || 0, 0.01, 1); e.blind = false; e.lastSeen = { x: best.st.p[0], y: best.st.p[1], z: best.st.p[2] }; }
     }
     const p = e.tgt ? this.players.get(e.tgt) : null;
     const st = p && p.st && !p.st.dn && !p.st.dd ? p.st : null;
@@ -2147,7 +2165,7 @@ const G_Server = {
         if (os) { mx = os.mx; mz = os.mz; sp = os.sp; e.holding = false; if (os.yaw != null) faceTo = os.yaw; } else e.holding = true;
       } else if (e.post && !e.canSee && (!e.lastSeen || e.lostT > 5) && Math.hypot(e.post.x - e.x, e.post.z - e.z) > 0.6) {
         // posted (a ship's response) and lost them: back to the doorway they were put on
-        const L2 = G.Level, map2 = this.map!, g = e.post; if (!g.flow) g.flow = L2.flow(map2, [L2.src(map2, g.x, g.y, g.z)]);
+        const L2 = Level, map2 = this.map!, g = e.post; if (!g.flow) g.flow = L2.flow(map2, [L2.src(map2, g.x, g.y, g.z)]);
         const d = Math.hypot(g.x - e.x, g.z - e.z), step = d > 3 || !this.clearTo(e, g) ? L2.flowStep(map2, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dd = Math.hypot(tx - e.x, tz - e.z) || 1;
         mx = (tx - e.x) / dd; mz = (tz - e.z) / dd; sp = 0.8; e.cover = null; e.inCover = false; e.holding = false;
       } else if (this.brave(e) && !this.ground() && e.lastSeen && e.lostT < 12 && leash && Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z) > 2) { // (not on the ground: there they wait)
@@ -2201,7 +2219,7 @@ const G_Server = {
   noted(e: Enemy, x: number, y: number, z: number) { if (e.bold) e.heard = { x: x + (Math.random() - 0.5) * 1.5, y, z: z + (Math.random() - 0.5) * 1.5, at: this.clock }; },
   // the door with what they heard behind it, and the spot beside it to look from
   doorFor(e: Enemy) {
-    const L = G.Level, map = this.map!, P = this.DOORPEEK, h = e.heard!, field = this.soundField(h.x, h.z, h.y || 0), ey = 1.6 * e.def.scale;
+    const L = Level, map = this.map!, P = this.DOORPEEK, h = e.heard!, field = this.soundField(h.x, h.z, h.y || 0), ey = 1.6 * e.def.scale;
     let best: DoorPeekSpot | null = null, bs = 1e9;
     for (const d of map.doors) {
       const y = d.fy || 0, dist = Math.hypot(d.x - e.x, d.z - e.z);
@@ -2234,7 +2252,7 @@ const G_Server = {
   },
   // Returns true while it's what they're doing.
   doorPeek(e: Enemy, dt: number) {
-    const U = G.U, L = G.Level, P = this.DOORPEEK, def = e.def;
+    const U = G_U, L = Level, P = this.DOORPEEK, def = e.def;
     const rattled = e.flinchT! > 0 || e.suppressT > 0 || e.flashT! > 0 || e.flashRec! > 0 || e.morale < def.morale * 0.7 || (e.str != null && e.str < 0.6);
     const stop = () => { e.dp = null; e.leanOut = 0; e.crouch = false; e.dpOk = this.clock + 10 + Math.random() * 8; return false; };
     if (e.dp && rattled) return stop();
@@ -2266,7 +2284,7 @@ const G_Server = {
     if (q.phase === 'set') {
       turn(q.yaw, 5);
       if (q.t > 0) return true;
-      if (!q.d.open && !q.d.fallen && G.SpaceSv.crewMayOpen(q.d, e)) { this.setDoor(q.d.id, true); q.phase = 'open'; q.t = 0.5; return true; }
+      if (!q.d.open && !q.d.fallen && SpaceSv.crewMayOpen(q.d, e)) { this.setDoor(q.d.id, true); q.phase = 'open'; q.t = 0.5; return true; }
       q.phase = 'look'; q.t = 1.4 + Math.random();
     }
     if (q.phase === 'open') {
@@ -2306,7 +2324,7 @@ const G_Server = {
   // metres to a flow field's source from (x, y, z), -1: no way. (Right up against something, where their ways don't go: from the
   // nearest cell beside it that they do.)
   flowDist(flow: Int16Array, x: number, y: number, z: number) {
-    const map = this.map!, L = G.Level, TS = L.TS;
+    const map = this.map!, L = Level, TS = L.TS;
     let i;
     if (map.floors) i = L.navNode(map, x, y, z);
     else { const tx = Math.floor(x / TS), tz = Math.floor(z / TS); i = tx < 0 || tz < 0 || tx >= map.W || tz >= map.H ? -1 : tz * map.W + tx; }
@@ -2321,7 +2339,7 @@ const G_Server = {
   // Rooms her people have been well inside of (not just in the doorway) without seeing anyone there: searched, as much as if a stack
   // had cleared them (this.cleared). Every so often (js/spaceserver.ts respondTick).
   markSeen() {
-    const c = this.clock, TS = G.Level.TS, map = this.map!;
+    const c = this.clock, TS = Level.TS, map = this.map!;
     for (const e of this.enemies.values()) {
       if (e.def.civ || !this.able(e) || this.engaged(e)) continue;
       const ri = this.roomOf(e.x, e.y || 0, e.z); if (ri < 0) continue;
@@ -2336,7 +2354,7 @@ const G_Server = {
   AI_GAP: 0.3,
   aiProp: null as Uint8Array | null, // (the cells furniture stands too far into, every floor's: aiMask)
   aiMask(map: LvMap) {
-    const L = G.Level, TS = L.TS, W = map.W, WH = W * map.H, NF = map.floors ? map.floors.length : 1, R = this.AI_GAP;
+    const L = Level, TS = L.TS, W = map.W, WH = W * map.H, NF = map.floors ? map.floors.length : 1, R = this.AI_GAP;
     const mask = new Uint8Array(NF * WH), fys = Array.from({ length: NF }, (_, f) => L.floorMap(map, f).fy || 0);
     const tOf = (f: number) => (map.floors ? map.floors[f].t : map.t);
     for (const p of map.propList || []) for (const b of p.boxes || []) {
@@ -2355,12 +2373,12 @@ const G_Server = {
       const fm: any = f ? map.floors[f] : map;
       if (fm.t[i] !== 3) return false;
       const d = (fm.doorAt || map.doorAt) && (fm.doorAt || map.doorAt).get(i);
-      return !!d && !d.open && !G.SpaceSv.crewMayOpen(d);
+      return !!d && !d.open && !SpaceSv.crewMayOpen(d);
     };
   },
   // A flow field to a point and the cells beside it (the point itself may be under a crate or in a doorframe)
   flowTo(x: number, y: number, z: number) {
-    const L = G.Level, map = this.map!, [tx, tz, f] = L.src(map, x, y, z), src: number[][] = [];
+    const L = Level, map = this.map!, [tx, tz, f] = L.src(map, x, y, z), src: number[][] = [];
     for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) src.push([tx + dx, tz + dz, f]);
     return L.flow(map, src);
   },
@@ -2379,7 +2397,7 @@ const G_Server = {
   leaderTick(l: Enemy, dt: number) {
     if (!(l.radioT! > 0) || !l.callTgt) return false;
     l.radioT! -= dt;
-    l.yaw += G.U.angDiff(l.yaw, Math.atan2(-(l.callTgt.x - l.x), -(l.callTgt.z - l.z))) * Math.min(1, dt * 3);
+    l.yaw += G_U.angDiff(l.yaw, Math.atan2(-(l.callTgt.x - l.x), -(l.callTgt.z - l.z))) * Math.min(1, dt * 3);
     l.aiming = false; l.crouch = false; l.cool = Math.max(l.cool, 0.4);
     if (l.radioT! <= 0) { l.radioT = 0; this.dispatch(l); }
     return true;
@@ -2409,7 +2427,7 @@ const G_Server = {
   },
   // A group sent to clear round a spot (T): each by its own way in (the doors round it), pushing or holding, then searching outward (orderStep)
   dispatchGroup(T: { x: number; y: number; z: number }, who: Enemy[], by: number, log?: (m: string) => void) {
-    const c = this.clock, map = this.map!, L = G.Level, TS = L.TS, R = this.RADIO, fT = this.flowTo(T.x, T.y, T.z);
+    const c = this.clock, map = this.map!, L = Level, TS = L.TS, R = this.RADIO, fT = this.flowTo(T.x, T.y, T.z);
     // the ways in
     const entries: OrderSpot[] = [], want = Math.min(5, Math.max(2, Math.ceil(who.length / 2)));
     const mk = (x: number, y: number, z: number, kind: 'door' | 'point') => entries.push({ x, y, z, flow: this.flowTo(x, y, z), kind, n: 0 });
@@ -2423,7 +2441,7 @@ const G_Server = {
     for (const { d } of doors) { if (entries.length >= want) break; if (!entries.some((q) => Math.hypot(q.x - d.x, q.z - d.z) < 4)) mk(d.x, d.fy || 0, d.z, 'door'); }
     if (entries.length < Math.min(3, who.length)) { // not enough doors: points 7 to 20 m round it, one in each direction (eighths of a circle)
       const used = new Set(entries.map((q) => Math.floor(((Math.atan2(q.z - T.z, q.x - T.x) + Math.PI) / (Math.PI * 2)) * 8) % 8));
-      for (const sp of G.U.shuffle(Math.random, map.enemySpots.slice())) {
+      for (const sp of G_U.shuffle(Math.random, map.enemySpots.slice())) {
         if (entries.length >= want) break;
         const f = sp[2] || 0, x = (sp[0] + 0.5) * TS, z = (sp[1] + 0.5) * TS, y = L.spotY(map, x, z, f);
         if (Math.abs(y - T.y) > 1.5) continue;
@@ -2512,7 +2530,7 @@ const G_Server = {
   // the room). False: nowhere to hold (they stack behind the others after all).
   CORDON: { EXIT: [4, 30], COVER: [6, 16], ON_EXIT: 2 },
   cordon(T: { x: number; y: number; z: number }, fT: Int16Array, room: number, who: Enemy[], give: (e: Enemy, q: OrderSpot, hold: boolean, delay: number) => void) {
-    const map = this.map!, L = G.Level, K = this.CORDON, ex = map.extract;
+    const map = this.map!, L = Level, K = this.CORDON, ex = map.extract;
     const held = (x: number, z: number, r: number) => [...this.enemies.values()].some((o) => !who.includes(o) && this.able(o) && o.order && o.order.cordon && Math.hypot(o.order.entry.x - x, o.order.entry.z - z) < r);
     const claimed = (x: number, z: number) => [...this.enemies.values()].some((o) => !who.includes(o) && ((o.order && o.order.cv && Math.hypot(o.order.cv.x - x, o.order.cv.z - z) < 1.5) || (o.cover && Math.hypot(o.cover.x - x, o.cover.z - z) < 1.2)));
     const sameFl = (y: number) => Math.abs(y - T.y) < 1.5;
@@ -2555,7 +2573,7 @@ const G_Server = {
     }
     // defensive spots: cover round the room, a little way off, apart from each other
     const covers: EnemyCover[] = [];
-    for (const c of G.U.shuffle(Math.random, (map.cover as FlPt[]).slice())) {
+    for (const c of G_U.shuffle(Math.random, (map.cover as FlPt[]).slice())) {
       if (!sameFl(c.y || 0) || claimed(c.x, c.z) || held(c.x, c.z, 3)) continue;
       const g = this.flowDist(fT, c.x, c.y || 0, c.z); if (g < K.COVER[0] || g > K.COVER[1]) continue;
       if (exit && Math.hypot(c.x - exit.spot.x, c.z - exit.spot.z) < 3) continue;
@@ -2600,7 +2618,7 @@ const G_Server = {
   // wall to their own side (a one-sided stack: the first one way, the next the other), the first on each side to the corner and the
   // next halfway, a step further in, facing across the room: each out of the doorway for the next.
   stackSlot(e: Enemy, q: OrderSpot, k: number, i: number, fT: Int16Array) {
-    const o = e.order!, map = this.map!, TS = G.Level.TS;
+    const o = e.order!, map = this.map!, TS = Level.TS;
     const d = map.doors.find((dd) => Math.hypot(dd.x - q.x, dd.z - q.z) < 0.1); if (!d) return;
     const nx = d.axis === 'x' ? 1 : 0, nz = d.axis === 'x' ? 0 : 1, tx = nz, tz = nx; // (the doorway's normal: axis is the way through it; and along it)
     const y = d.fy || 0, ok = (x: number, z: number) => this.flowDist(fT, x, y, z) >= 0;
@@ -2638,9 +2656,9 @@ const G_Server = {
   // What they're called (js/spacedata.ts TITLES): aboard a ship, by whose she is and where they stand in her; anywhere else, their type's
   // name. Kept on them (e.title) for the feed once they're gone.
   titleOf(e: Enemy) {
-    const T = e.wear && !e.def.civ ? (G.SpaceData.TITLES as Record<string, Record<string, string>>)[e.wear] : null;
+    const T = e.wear && !e.def.civ ? (SpaceData.TITLES as Record<string, Record<string, string>>)[e.wear] : null;
     if (!T) return e.def.name;
-    const M = G.SpaceSv.st.M, lead = this.leads(e) && [...this.enemies.values()].some((o) => o !== e && o.team === e.id);
+    const M = SpaceSv.st.M, lead = this.leads(e) && [...this.enemies.values()].some((o) => o !== e && o.team === e.id);
     const t = M && M.hvt === e.id ? T.hvt : this.topId === e.id ? T.top : e.def.leader ? T.leader : lead ? T.tl
       : (e.grade || 0) >= 0.85 && !e.def.timid ? `${T.vet} ${T[e.type] || e.def.name}` : T[e.type] || e.def.name;
     return (e.title = t);
@@ -2653,8 +2671,8 @@ const G_Server = {
   engaged(e: Enemy) { return e.canSee || this.clock - (e.sawAt ?? -99) < this.ENGAGED; },
   // The room a spot's in (its index in map.rooms), or -1
   roomOf(x: number, y: number, z: number) {
-    const map = this.map!, TS = G.Level.TS;
-    return (map.rooms || []).findIndex((r: LvRoom) => x >= r.x * TS && x < (r.x + r.w) * TS && z >= r.z * TS && z < (r.z + r.h) * TS && Math.abs((G.Level.floorMap(map, r.fl || 0).fy || 0) - y) < 1.5);
+    const map = this.map!, TS = Level.TS;
+    return (map.rooms || []).findIndex((r: LvRoom) => x >= r.x * TS && x < (r.x + r.w) * TS && z >= r.z * TS && z < (r.z + r.h) * TS && Math.abs((Level.floorMap(map, r.fl || 0).fy || 0) - y) < 1.5);
   },
   // Stacks on the same room go together: their leaders tell each other when they're ready, and when the last of them is (or the
   // first's been waiting STACK.WAIT, or one's been at it STACK.MAX), the highest-ranked of them calls the go, for all of them at once.
@@ -2729,19 +2747,19 @@ const G_Server = {
   // someone the others answer to: a Leader, the gang's boss, the ship's top man or the officer she's boarded for, or a fireteam's
   // leader with anyone in it (for the sidearm challenges, js/arsenal.ts: leader kills)
   leadsMen(e: Enemy) {
-    const M = G.SpaceSv && G.SpaceSv.st.M;
+    const M = SpaceSv.st.M;
     return !e.def.civ && (!!e.def.leader || !!e.def.boss || this.topId === e.id || !!(M && M.hvt === e.id)
       || (this.leads(e) && [...this.enemies.values()].some((o) => o !== e && o.team === e.id)));
   },
   // the same side of the hull: aboard a ship, the same one of her hulls (a team doesn't span a docking)
   sameHull(a: Enemy, b: Enemy) {
     const map = this.map, sp = map && map.sp; if (!sp) return true;
-    const ra = G.ShipGen.roomAt(map!, a.x, a.z, a.fl || 0), rb = G.ShipGen.roomAt(map!, b.x, b.z, b.fl || 0);
+    const ra = ShipGen.roomAt(map!, a.x, a.z, a.fl || 0), rb = ShipGen.roomAt(map!, b.x, b.z, b.fl || 0);
     return ra < 0 || rb < 0 || sp.hullOf[ra] === sp.hullOf[rb];
   },
   teamForm() {
     const T = this.TEAM, all = [...this.enemies.values()].filter((e) => this.teamable(e) && this.able(e));
-    { const M = G.SpaceSv.st.M, hv = M && M.hvt != null ? this.enemies.get(M.hvt) : null; let top: Enemy | null = null; // (who's at the top of her)
+    { const M = SpaceSv.st.M, hv = M && M.hvt != null ? this.enemies.get(M.hvt) : null; let top: Enemy | null = null; // (who's at the top of her)
       if (!hv || !this.able(hv)) for (const e of this.enemies.values()) if (e.wear && !e.def.civ && !e.def.timid && this.able(e) && (!top || (e.rank || 0) > (top.rank || 0))) top = e; // (posted guards too: a liner's best guard is her chief)
       this.topId = top ? top.id : null; }
     const size = new Map<number, number>(), rank = (e: Enemy) => e.rank || 0;
@@ -2855,7 +2873,7 @@ const G_Server = {
   // bounds, or holding a way in). They go in bounds: to a cover spot a few metres on, down behind it a moment, to the next (a run for
   // a couple of seconds if there's none).
   orderStep(e: Enemy, dt: number): { mx: number; mz: number; sp: number; yaw?: number } | null {
-    const o = e.order!, L = G.Level, c = this.clock, rnd = Math.random;
+    const o = e.order!, L = Level, c = this.clock, rnd = Math.random;
     if (c > o.until) { this.endOrder(e); return null; }
     // on the move with their point man on the same word (not into a stack, not running to a fight): in file behind him, he leads
     const pm = !o.slot && !o.rush && !o.cordon && (o.phase === 'approach' || o.phase === 'enter' || o.phase === 'search') ? this.pointOf(e) : null;
@@ -2893,7 +2911,7 @@ const G_Server = {
       if (g && g.go == null) this.stackGo(g);
       if (!g || (g.go != null && c >= g.go + Math.max(0, g.ids.indexOf(e.id)) * S.GAP)) { o.phase = o.inP && o.cp ? 'breach' : 'enter'; o.rest = 0; o.legT = 0; o.cv = null; o.clrT = c; }
       else {
-        if (o.slot) { const sd = Math.hypot(o.slot.x - e.x, o.slot.z - e.z); e.yaw += G.U.angDiff(e.yaw, o.slot.yaw) * Math.min(1, dt * 4); if (sd > 0.3) return { mx: (o.slot.x - e.x) / sd, mz: (o.slot.z - e.z) / sd, sp: 0.4 }; }
+        if (o.slot) { const sd = Math.hypot(o.slot.x - e.x, o.slot.z - e.z); e.yaw += G_U.angDiff(e.yaw, o.slot.yaw) * Math.min(1, dt * 4); if (sd > 0.3) return { mx: (o.slot.x - e.x) / sd, mz: (o.slot.z - e.z) / sd, sp: 0.4 }; }
         return null;
       }
     }
@@ -2904,7 +2922,7 @@ const G_Server = {
     }
     if (o.phase === 'clear' && o.cp) { // sideways along the inside wall to their corner, facing across the room; there, they hold it
       const g = o.entry.grp, d = Math.hypot(o.cp.x - e.x, o.cp.z - e.z);
-      if (!e.canSee) e.yaw += G.U.angDiff(e.yaw, o.cp.yaw) * Math.min(1, dt * 6); // (on someone: the gun stays on them)
+      if (!e.canSee) e.yaw += G_U.angDiff(e.yaw, o.cp.yaw) * Math.min(1, dt * 6); // (on someone: the gun stays on them)
       const inRoom = (m: Enemy) => g!.room < 0 || this.roomOf(m.x, m.y || 0, m.z) === g!.room;
       if (g && inRoom(e) && (d < 0.4 || c - (o.clrT || c) > 8)) g.inside.add(e.id); // (at their corner, or long enough in the room: in place)
       if (g && !g.cleared) {
@@ -2928,7 +2946,7 @@ const G_Server = {
       if (c > o.holdUntil) { if (o.cordon) { this.endOrder(e); return null; } o.phase = 'enter'; o.role = 'push'; }
       else {
         const f = o.face || o.entry; // (a cordon: watching the way the police would come)
-        if (!o.face || Math.hypot(f.x - e.x, f.z - e.z) > 0.5) e.yaw += G.U.angDiff(e.yaw, Math.atan2(-(f.x - e.x), -(f.z - e.z))) * Math.min(1, dt * 4);
+        if (!o.face || Math.hypot(f.x - e.x, f.z - e.z) > 0.5) e.yaw += G_U.angDiff(e.yaw, Math.atan2(-(f.x - e.x), -(f.z - e.z))) * Math.min(1, dt * 4);
         return null;
       }
     }
@@ -2948,7 +2966,7 @@ const G_Server = {
       // (searching in the dark: stopped, listening, and looking round where there's room to look: the doorways, the room's corners)
       if (o.own) {
         if ((o.look -= dt) <= 0) { o.look = 0.8 + rnd() * 0.9; o.lookYaw = this.openYaw(e, e.yaw + (rnd() - 0.5) * 3.2, 3.2); }
-        if (o.lookYaw != null) e.yaw += G.U.angDiff(e.yaw, o.lookYaw) * Math.min(1, dt * 3);
+        if (o.lookYaw != null) e.yaw += G_U.angDiff(e.yaw, o.lookYaw) * Math.min(1, dt * 3);
       }
       return null;
     }
@@ -3008,7 +3026,7 @@ const G_Server = {
   // Where to look next: somewhere a suspect could stand, on the ring round the spot they've got to (o.ring metres from it by the
   // building's ways, nine metres wide), nearest to them, not looked at, not another's
   searchSpot(e: Enemy, o: Order) {
-    const map = this.map!, L = G.Level, TS = L.TS;
+    const map = this.map!, L = Level, TS = L.TS;
     for (let r = o.ring; r <= 70; r += 7) {
       let best: { x: number; z: number; y: number; f: number; tx: number; tz: number } | null = null, bd = 1e9;
       for (const sp of map.enemySpots) {
@@ -3030,7 +3048,7 @@ const G_Server = {
   // Broken: run from the police, then hide. Panicked, inaccurate shots only; a cornered suspect with
   // nothing left may give up without being told. Nerve comes back slowly.
   thinkBroken(e: Enemy, dt: number, p: LivePlayer, st: PState) {
-    const L = G.Level, U = G.U;
+    const L = Level, U = G_U;
     e.aiming = false; e.peek = false; e.leanOut = 0; e.cover = null; e.inCover = false; e.dp = null;
     if (e.fleeT > 0) {
       e.fleeT -= dt;
@@ -3057,9 +3075,9 @@ const G_Server = {
   moveEntity(e: Enemy, mx: number, mz: number, speed: number, dt: number) {
     const map = this.map!;
     if (e.doorWait > 0) { e.doorWait -= dt; return; }
-    const ahead = map.world && G.World.raycast(map.world, e.x, (e.y || 0) + 1.0, e.z, mx, 0, mz, 0.9, { move: true }); // (what they'd walk into)
+    const ahead = map.world && World.raycast(map.world, e.x, (e.y || 0) + 1.0, e.z, mx, 0, mz, 0.9, { move: true }); // (what they'd walk into)
     const d = ahead && ahead.solid && ahead.solid.kind === 'door' ? ahead.solid.door : null;
-    if (d && !d.open) { if (!G.SpaceSv.crewMayOpen(d, e)) return; this.setDoor(d.id, true); e.doorWait = 0.5; return; } // (a locked or sealed door: they hold where they are)
+    if (d && !d.open) { if (!SpaceSv.crewMayOpen(d, e)) return; this.setDoor(d.id, true); e.doorWait = 0.5; return; } // (a locked or sealed door: they hold where they are)
     if (e.collapsed) return; // legs gone: they're on the floor
     speed *= this.injSpeed(e) * (e.str == null || e.str >= 0.6 ? 1 : 0.3 + 0.7 * e.str / 0.6); // a broken leg limps; blood loss slows
     e.x += mx * speed * dt; e.z += mz * speed * dt;
@@ -3068,11 +3086,11 @@ const G_Server = {
   // someone who's moved: out of what they walked into (stepping up onto anything low), and onto the floor or step
   // under them
   settle(e: Enemy, r: number) {
-    const L = G.Level, q = { x: e.x, y: e.y || 0, z: e.z };
+    const L = Level, q = { x: e.x, y: e.y || 0, z: e.z };
     L.inFrame(this.map!, { p: q }, (map) => { // (aboard a ship lying tilted: in her frame, js/level.ts)
       const y = q.y;
-      L.resolve(map, q, r, y, G.World.STEP, true);
-      q.y = L.groundAt(map, q.x, q.z, r, y, G.World.STEP, true); // (stairs as slopes: no hopping from tread to tread)
+      L.resolve(map, q, r, y, World.STEP, true);
+      q.y = L.groundAt(map, q.x, q.z, r, y, World.STEP, true); // (stairs as slopes: no hopping from tread to tread)
     });
     e.x = q.x; e.y = q.y; e.z = q.z;
   },
@@ -3089,7 +3107,7 @@ const G_Server = {
       return true;
     }
     if (e.turnYaw != null) { // shuffling round on their knees
-      const da = G.U.angDiff(e.yaw, e.turnYaw), st = 2.2 * dt;
+      const da = G_U.angDiff(e.yaw, e.turnYaw), st = 2.2 * dt;
       if (Math.abs(da) <= st) { e.yaw = e.turnYaw; e.turnYaw = null; } else e.yaw += Math.sign(da) * st;
       return true;
     }
@@ -3101,7 +3119,7 @@ const G_Server = {
     const near = alive.reduce((b: { d: number; p: LivePlayer | null }, p: LivePlayer) => { const d = Math.hypot(p.st.p[0] - e.x, p.st.p[2] - e.z); return d < b.d ? { d, p } : b; }, { d: 1e9, p: null } as { d: number; p: LivePlayer | null });
     // they watch the police approach, then hold still as ordered once an officer is on top of them
     // (so you can walk round behind to restrain them)
-    if (near.p && near.d > 3 && !e.ordered) e.yaw += G.U.angDiff(e.yaw, Math.atan2(-(near.p.st.p[0] - e.x), -(near.p.st.p[2] - e.z))) * Math.min(1, dt * 3);
+    if (near.p && near.d > 3 && !e.ordered) e.yaw += G_U.angDiff(e.yaw, Math.atan2(-(near.p.st.p[0] - e.x), -(near.p.st.p[2] - e.z))) * Math.min(1, dt * 3);
     if (!e.fake) return;
     e.fakeT -= dt;
     if (e.fakeT <= 0 && near.d > 2.2) {
@@ -3125,7 +3143,7 @@ const G_Server = {
     if (e.clearOut && now < e.clearOut.until) {
       const c = e.clearOut, bx = e.x, bz = e.z;
       this.moveEntity(e, c.ux, c.uz, e.def.run, dt);
-      e.yaw += G.U.angDiff(e.yaw, Math.atan2(-c.ux, -c.uz)) * Math.min(1, dt * 8); e.crouch = true;
+      e.yaw += G_U.angDiff(e.yaw, Math.atan2(-c.ux, -c.uz)) * Math.min(1, dt * 8); e.crouch = true;
       if (Math.hypot(e.x - bx, e.z - bz) < e.def.run * dt * 0.2) e.clearOut = null; // (into a wall: as far as they can go)
       else return true;
     }
@@ -3141,7 +3159,7 @@ const G_Server = {
       const L = Math.sqrt(L2), lx = -dz / L, lz = dx / L, off = ox * lx + oz * lz;
       if (Math.abs(off) >= this.SCREEN_R + 0.15) continue;
       // the side they're already on (or the one more open, standing on the line), and as far as gets them clear
-      const W = this.map && this.map.world, ey = (e.y || 0) + 1.0, open = (sg: number) => { const r = W ? G.World.raycast(W, e.x, ey, e.z, lx * sg, 0, lz * sg, 2, { move: true }) : null; return r && r.solid ? r.t : 2; };
+      const W = this.map && this.map.world, ey = (e.y || 0) + 1.0, open = (sg: number) => { const r = W ? World.raycast(W, e.x, ey, e.z, lx * sg, 0, lz * sg, 2, { move: true }) : null; return r && r.solid ? r.t : 2; };
       let sg = off > 0.05 ? 1 : off < -0.05 ? -1 : open(1) >= open(-1) ? 1 : -1;
       if (open(sg) < 0.4 && open(-sg) > open(sg)) sg = -sg; // (against a wall that way: the other)
       const need = this.SCREEN_R + 0.45 - Math.abs(off) * Math.sign(off) * sg;
@@ -3152,7 +3170,7 @@ const G_Server = {
     return false;
   },
   thinkCiv(e: Enemy, dt: number) {
-    const def = e.def, U = G.U, L = G.Level;
+    const def = e.def, U = G_U, L = Level;
     if (e.state === 'cuffed' || e.state === 'surrender') return;
     if (!e.down && this.clearLine(e, dt)) return; // (out of a shooter's way, before anything else)
     // sent to shelter (a ship's response): fleeing, hiding or frozen, they make for it once there's no officer on top of them
@@ -3178,11 +3196,11 @@ const G_Server = {
       if (e.fleeT <= 0 || !step) e.state = Math.random() < 0.6 && this.seekHide(e) ? 'hide' : 'cower';
       return;
     }
-    if (e.shelter && (Math.hypot(e.x - e.shelter.x, e.z - e.shelter.z) > 1.2 || (e.shelter.room != null && G.ShipGen.roomAt(this.map!, e.x, e.z, e.fl || 0) !== e.shelter.room))) { // (there, and in the room: not just near it through its wall) // (sent to shelter: there first, at a hurry; in the room, there)
-      if (e.shelter.room != null && G.ShipGen.roomAt(this.map!, e.x, e.z, e.fl || 0) === e.shelter.room && !this.map!.doors.some((d) => Math.hypot(d.x - e.x, d.z - e.z) < 1.3)) { e.shelter.x = e.home.x = e.x; e.shelter.z = e.home.z = e.z; } // (in the room, and clear of its doorways: there. On its threshold: on in, out of the way of its door)
+    if (e.shelter && (Math.hypot(e.x - e.shelter.x, e.z - e.shelter.z) > 1.2 || (e.shelter.room != null && ShipGen.roomAt(this.map!, e.x, e.z, e.fl || 0) !== e.shelter.room))) { // (there, and in the room: not just near it through its wall) // (sent to shelter: there first, at a hurry; in the room, there)
+      if (e.shelter.room != null && ShipGen.roomAt(this.map!, e.x, e.z, e.fl || 0) === e.shelter.room && !this.map!.doors.some((d) => Math.hypot(d.x - e.x, d.z - e.z) < 1.3)) { e.shelter.x = e.home.x = e.x; e.shelter.z = e.home.z = e.z; } // (in the room, and clear of its doorways: there. On its threshold: on in, out of the way of its door)
       else {
         // (at their spot and still outside it: a spot on its wall's line, the wrong side of it: the middle of the room instead)
-        if (e.shelter.room != null && Math.hypot(e.x - e.shelter.x, e.z - e.shelter.z) < 1.2) { const rm = this.map!.rooms[e.shelter.room], TS = G.Level.TS; if (rm) { e.shelter = { x: (rm.cx + 0.5) * TS, y: e.shelter.y, z: (rm.cz + 0.5) * TS, room: e.shelter.room }; e.home = { x: e.shelter.x, y: 0, z: e.shelter.z }; } }
+        if (e.shelter.room != null && Math.hypot(e.x - e.shelter.x, e.z - e.shelter.z) < 1.2) { const rm = this.map!.rooms[e.shelter.room], TS = Level.TS; if (rm) { e.shelter = { x: (rm.cx + 0.5) * TS, y: e.shelter.y, z: (rm.cz + 0.5) * TS, room: e.shelter.room }; e.home = { x: e.shelter.x, y: 0, z: e.shelter.z }; } }
         e.walkTo = null; this.travel(e, e.shelter, def.speed * 1.4, dt); return;
       }
     }
@@ -3207,9 +3225,9 @@ const G_Server = {
   },
   findCover(e: Enemy, st: PState) {
     if (e.def.shield) return null; // (a handheld shield is their cover: they stand behind it and fight)
-    const L = G.Level, map = this.map!, def = e.def, ground = this.ground(), now = Math.hypot(e.x - st.p[0], e.z - st.p[2]); // (now: how far off the police are)
+    const L = Level, map = this.map!, def = e.def, ground = this.ground(), now = Math.hypot(e.x - st.p[0], e.z - st.p[2]); // (now: how far off the police are)
     let best: EnemyCover | null = null, bs = 1e9;
-    const here = (q: { x: number; y?: number; z: number }) => Math.abs((q.y || 0) - (e.y || 0)) < 1.5 && !(G.SpaceData.ON && G.SpaceSv.offLimits(e, q.x, q.z)); // (on their own floor; not in a ship's shelter unless they're of it)
+    const here = (q: { x: number; y?: number; z: number }) => Math.abs((q.y || 0) - (e.y || 0)) < 1.5 && !(SpaceData.ON && SpaceSv.offLimits(e, q.x, q.z)); // (on their own floor; not in a ship's shelter unless they're of it)
     for (const c of map.cover as FlPt[]) {
       const d = Math.hypot(c.x - e.x, c.z - e.z);
       if (d > 12 || !here(c)) continue;
@@ -3252,14 +3270,14 @@ const G_Server = {
   },
   coverValid(c: EnemyCover, st: PState, def: EnemyDef) {
     if (!c.lean) return this.coverProtects(c, st);
-    const L = G.Level, map = this.map!, ey = (c.y || 0) + 1.6 * def.scale, ty = st.p[1] + 1.4;
+    const L = Level, map = this.map!, ey = (c.y || 0) + 1.6 * def.scale, ty = st.p[1] + 1.4;
     return !L.los(map, c.x, ey, c.z, st.p[0], ty, st.p[2]) && this.leanClear(c.x, c.z, c.px!, c.pz!, ey, c.y || 0) && L.los(map, c.px!, ey, c.pz!, st.p[0], ty, st.p[2]);
   },
   // Can someone standing at (x, z) actually lean out to (px, pz)? Nothing solid between: a corner's edge, not a
   // door jamb, a door leaf or a thin wall to the next room (at chest and at eye height; and the way the head
   // goes, a little further out still)
   leanClear(x: number, z: number, px: number, pz: number, ey: number, y = 0) { // (ey: their eyes' height; y: the floor they stand on)
-    const L = G.Level, map = this.map!, ox = px + (px - x) * 0.3, oz = pz + (pz - z) * 0.3;
+    const L = Level, map = this.map!, ox = px + (px - x) * 0.3, oz = pz + (pz - z) * 0.3;
     return L.los(map, x, y + 1.1, z, px, y + 1.1, pz) && L.los(map, x, ey, z, px, ey, pz) && L.los(map, x, ey, z, ox, ey, oz);
   },
 
@@ -3271,7 +3289,7 @@ const G_Server = {
     this.nadeT = 10;
     const s = e.def.scale, p = [e.x, (e.y || 0) + 1.6 * s, e.z];
     const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz);
-    const T = G.U.clamp(d / 11, 0.6, 1.5), g = 18;
+    const T = G_U.clamp(d / 11, 0.6, 1.5), g = 18;
     const v = [dx / T, (0.3 - p[1] + 0.5 * g * T * T) / T, dz / T];
     const r2 = (x: number) => Math.round(x * 100) / 100;
     SvNet.broadcast({ t: 'nade', id: 'enemy', e: e.id, p: p.map(r2), v: v.map(r2), fuse: 2.6, en: 1 });
@@ -3296,7 +3314,7 @@ const G_Server = {
   flashLog: [] as Record<string, any>[],
   // how hard a flash at (x, y, z) hits e: { k (0..1), see (1 full, 0.6 partial, 0 none), face, d, path }
   flashDose(e: Enemy, x: number, y: number, z: number, field: Float32Array, yaw = e.yaw) {
-    const L = G.Level, map = this.map!, F = this.FLASH, s = e.def.scale, base = e.y || 0;
+    const L = Level, map = this.map!, F = this.FLASH, s = e.def.scale, base = e.y || 0;
     const d = Math.hypot(e.x - x, base + 1.55 * s - y, e.z - z);
     let see = 0;
     if (d <= F.RANGE) {
@@ -3305,7 +3323,7 @@ const G_Server = {
     }
     const flat = Math.hypot(x - e.x, z - e.z) || 1, look = (-Math.sin(yaw) * (x - e.x) + -Math.cos(yaw) * (z - e.z)) / flat;
     const face = d < 1 ? 1 : look > 0.3 ? F.FACE[0] : look > -0.3 ? F.FACE[1] : F.FACE[2];
-    const path = this.heardAt(field, e.x, e.z, e.y), TS = L.TS, cell = G.U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G.U.clamp(Math.floor(x / TS), 0, map.W - 1);
+    const path = this.heardAt(field, e.x, e.z, e.y), TS = L.TS, cell = G_U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G_U.clamp(Math.floor(x / TS), 0, map.W - 1);
     const roofed = !(L.floorMap(map, L.floorAt(map, x, y, z)).out || map.out)[cell];
     if (see < F.GLARE && roofed && path <= F.ROOM && d <= F.RANGE) see = F.GLARE; // (the room lit up round them: FLASH GLARE)
     const kv = see ? Math.pow(Math.max(0, 1 - d / F.RANGE), 0.6) * face * see : 0;
@@ -3316,7 +3334,7 @@ const G_Server = {
   // those it blinds (flashId), so a kill of one while they're still blind says which (js/highlights.ts: the bang shown before it)
   flashN: 0,
   flashbang(p: number[], by?: number[] | null, id?: string | null) {
-    const [x, y, z] = p, F = this.FLASH, U = G.U, n = ++this.flashN;
+    const [x, y, z] = p, F = this.FLASH, U = G_U, n = ++this.flashN;
     const field = this.soundField(x, z, y), yaws = new Map<Enemy, number>();
     for (const e of this.enemies.values()) yaws.set(e, e.yaw); // (which way they were facing as the flash went off: the bang's what turns them)
     this.hear(x, z, 30, y);
@@ -3363,15 +3381,15 @@ const G_Server = {
   blastLog: [] as Record<string, any>[],
   blastDaze(p: number[], kind: 'frag' | 'tb' | null, by?: number[] | null) {
     if (!kind) return;
-    const B = this.BLAST, U = G.U, L = G.Level, map = this.map!, at = new THREE.Vector3(p[0], p[1], p[2]);
+    const B = this.BLAST, U = G_U, L = Level, map = this.map!, at = new THREE.Vector3(p[0], p[1], p[2]);
     this.blastLog = [];
-    const M = kind === 'tb' ? G.Sim.tbModel(map, at) : null, fill = M ? null : L.blastFill(map, p[0], p[1], p[2], 400);
+    const M = kind === 'tb' ? Sim.tbModel(map, at) : null, fill = M ? null : L.blastFill(map, p[0], p[1], p[2], 400);
     const conf = fill && fill.n < 400 && fill.out < fill.n * 0.1 ? 1 : 0.5, idx = new Map<number, number>();
     if (fill) for (let i = 0; i < fill.n; i++) idx.set(fill.order[i], i);
     for (const e of this.enemies.values()) {
       if (e.state === 'cuffed' || e.state === 'dead' || e.collapsed) continue;
       let k = 0;
-      if (M) k = G.Sim.tbDose(M, e.x, (e.y || 0) + 1, e.z).daze;
+      if (M) k = Sim.tbDose(M, e.x, (e.y || 0) + 1, e.z).daze;
       else if (fill) {
         const c = U.clamp(Math.floor(e.z / L.TS), 0, map.H - 1) * map.W + U.clamp(Math.floor(e.x / L.TS), 0, map.W - 1), i = idx.get(c);
         if (i != null && L.floorAt(map, e.x, e.y || 0, e.z) === fill.f && fill.d[i] < B.FRAG_R) k = conf * (1 - fill.d[i] / B.FRAG_R);
@@ -3392,8 +3410,8 @@ const G_Server = {
   liveNade(p: number[], v: number[], fuse: number, kind: string, nid?: number, from?: string) {
     if (!this.map) return;
     const P = new THREE.Vector3(p[0], p[1], p[2]), V = new THREE.Vector3(v[0], v[1], v[2]);
-    if (kind === 'sticky') { const S = G.Sim.STICKY, pts = G.Sim.predictSticky(P, V, this.map, S.MAX_FLY); this.live.push({ t0: this.clock || 0, fuse: pts.length / 60 + S.FUSE, pts, kind, seen: new Set(), nid, from }); return; } // (to where it'll hold, and its fuse from there)
-    const pts = G.Sim.predictNade(P, V, fuse, this.map);
+    if (kind === 'sticky') { const S = Sim.STICKY, pts = Sim.predictSticky(P, V, this.map, S.MAX_FLY); this.live.push({ t0: this.clock || 0, fuse: pts.length / 60 + S.FUSE, pts, kind, seen: new Set(), nid, from }); return; } // (to where it'll hold, and its fuse from there)
+    const pts = Sim.predictNade(P, V, fuse, this.map);
     this.live.push({ t0: this.clock || 0, fuse, pts, kind, seen: new Set(), nid, from });
   },
   // where a sticky held, as its thrower saw it (at: on a wall, the floor; e: on that suspect): it's there from now, and goes off in its
@@ -3402,12 +3420,12 @@ const G_Server = {
     const n = this.live.find((q) => q.nid === nid && q.from === from); if (!n) return;
     const now = this.clock || 0, age = now - n.t0, i = Math.min(n.pts.length - 1, Math.round(age * 60)), on = e != null ? this.enemies.get(e) : null;
     const end = on ? new THREE.Vector3(on.x, (on.y || 0) + 1, on.z) : at ? new THREE.Vector3(at[0], at[1], at[2]) : n.pts[i];
-    n.pts = n.pts.slice(0, i + 1).concat(Array.from({ length: Math.ceil(G.Sim.STICKY.FUSE * 60) + 2 }, () => end.clone()));
-    n.fuse = age + G.Sim.STICKY.FUSE;
+    n.pts = n.pts.slice(0, i + 1).concat(Array.from({ length: Math.ceil(Sim.STICKY.FUSE * 60) + 2 }, () => end.clone()));
+    n.fuse = age + Sim.STICKY.FUSE;
     if (on && !on.def.civ && this.able(on)) { on.morale -= 0.3; if (on.morale < 0.25) { on.broken = true; on.fleeT = 2; } } // (stuck to them: they know)
   },
   dodgeTick() {
-    const D = this.DODGE, L = G.Level, map = this.map!, now = this.clock || 0, U = G.U;
+    const D = this.DODGE, L = Level, map = this.map!, now = this.clock || 0, U = G_U;
     this.live = this.live.filter((n) => now - n.t0 < n.fuse);
     for (const n of this.live) {
       const age = now - n.t0, q = n.pts[Math.min(n.pts.length - 1, Math.round(age * 60))], end = n.pts[n.pts.length - 1];
@@ -3444,7 +3462,7 @@ const G_Server = {
         let best = -Infinity;
         for (let k = 0; k < 12; k++) {
           const a = k * Math.PI / 6, ux = Math.sin(a), uz = Math.cos(a), away = (ux * (e.x - g.x) + uz * (e.z - g.z)) / (here || 1);
-          const r = W ? G.World.raycast(W, e.x, ey, e.z, ux, 0, uz, 4, { move: true }) : null, clear = r && r.solid ? r.t : 4, sc = Math.min(clear, 4) * (away + 1.2);
+          const r = W ? World.raycast(W, e.x, ey, e.z, ux, 0, uz, 4, { move: true }) : null, clear = r && r.solid ? r.t : 4, sc = Math.min(clear, 4) * (away + 1.2);
           if (sc > best) { best = sc; g.ux = ux; g.uz = uz; g.clear = clear; }
         }
         g.from = [e.x, e.z];
@@ -3454,7 +3472,7 @@ const G_Server = {
     if (e.hide && this.hideStep(e, dt, sp)) { e.crouch = true; return true; }
     e.hide = null;
     const gone = g.from ? Math.hypot(e.x - g.from[0], e.z - g.from[1]) : 0, d = Math.hypot(e.x - g.x, e.z - g.z);
-    if (g.ux != null && d < 6 && gone < (g.clear || 0) - 0.5) { this.moveEntity(e, g.ux, g.uz!, sp, dt); e.yaw += G.U.angDiff(e.yaw, Math.atan2(-g.ux, -g.uz!)) * Math.min(1, dt * 8); e.crouch = false; } // (facing the way they run)
+    if (g.ux != null && d < 6 && gone < (g.clear || 0) - 0.5) { this.moveEntity(e, g.ux, g.uz!, sp, dt); e.yaw += G_U.angDiff(e.yaw, Math.atan2(-g.ux, -g.uz!)) * Math.min(1, dt * 8); e.crouch = false; } // (facing the way they run)
     else e.crouch = true; // (clear of it, or as far as they can get: down)
     return true;
   },
@@ -3464,7 +3482,7 @@ const G_Server = {
     if (e.def.civ || e.state !== 'normal') return;
     const k = e.flashK || 0, near = this.nearestOfficer(e), eh = (e.y || 0) + 1.4 * e.def.scale;
     // eyes open on an officer a few metres off with a gun on them: most give up (nobody there, they only come round angry)
-    if (near && near.d < this.FLASH.GIVE_UP_R && !e.def.boss && e.def.comply != null && this.officerSees(e, eh) && Math.random() < G.U.clamp(e.def.comply * 0.8 + 0.4 * k + 0.15, 0, 0.92)) {
+    if (near && near.d < this.FLASH.GIVE_UP_R && !e.def.boss && e.def.comply != null && this.officerSees(e, eh) && Math.random() < G_U.clamp(e.def.comply * 0.8 + 0.4 * k + 0.15, 0, 0.92)) {
       this.surrender(e); e.flashRec = 0; this.flashLog.push({ id: e.id, gaveUp: 1 }); return;
     }
     e.alert = true;
@@ -3474,7 +3492,7 @@ const G_Server = {
   },
   // is any officer who isn't down in sight of this suspect (their head's height)?
   officerSees(e: Enemy, eh: number) {
-    for (const p of this.players.values()) if (p.st && !p.st.dn && !p.st.dd && G.Level.los(this.map!, p.st.p[0], p.st.p[1] + 1.5, p.st.p[2], e.x, eh, e.z)) return true;
+    for (const p of this.players.values()) if (p.st && !p.st.dn && !p.st.dd && Level.los(this.map!, p.st.p[0], p.st.p[1] + 1.5, p.st.p[2], e.x, eh, e.z)) return true;
     return false;
   },
   // the stun: they can't see, aim or fire; they cover their eyes and stagger about a step at a time
@@ -3489,7 +3507,7 @@ const G_Server = {
     const r2 = (x: number) => Math.round(x * 100) / 100;
     this.hear(p.x, p.z, 20, p.y || 0);
     this.blastDaze([p.x, p.y, p.z], 'frag'); // (their own, too, if they're close to it)
-    SvNet.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: Math.round(G.Sim.blastR(this.map, new THREE.Vector3(p.x, p.y, p.z)) * 100) / 100, d: Math.round(G.Sim.BLAST.dmg * this.dmgMult), en: 1, fr: 1, s: (Math.random() * 4294967296) >>> 0 });
+    SvNet.broadcast({ t: 'boom', id: 'enemy', p: [p.x, p.y, p.z].map(r2), r: Math.round(Sim.blastR(this.map, new THREE.Vector3(p.x, p.y, p.z)) * 100) / 100, d: Math.round(Sim.BLAST.dmg * this.dmgMult), en: 1, fr: 1, s: (Math.random() * 4294967296) >>> 0 });
   },
 
   // blind: firing at where the target was last seen, not at them
@@ -3507,11 +3525,11 @@ const G_Server = {
     // A string of fire: centre mass first, then, 0.3-0.5 s in, they walk their aim up to the head (over half a
     // second). A pause of over a second, or a new target, starts again from the body.
     if (blind || e.engTgt !== p.id || !(this.clock - (e.firedAt || -9) < 1.0)) { e.engAt = this.clock; e.engTgt = p.id; e.headDelay = 0.3 + Math.random() * 0.2; }
-    const up = blind ? 0 : G.U.clamp((this.clock - e.engAt! - e.headDelay!) / 0.5, 0, 1); // 0 body .. 1 head
+    const up = blind ? 0 : G_U.clamp((this.clock - e.engAt! - e.headDelay!) / 0.5, 0, 1); // 0 body .. 1 head
     e.firedAt = this.clock;
     const kickNow = e.kick || 0; // (still coming back from the last one: a snap shot)
-    e.kick = kickNow + this.kickOf(e, G.WEAPONS[e.def.wpn] || { recoil: 1 });
-    const def = e.def, s = def.scale, st = p.st, L = G.Level, map = this.map!;
+    e.kick = kickNow + this.kickOf(e, WEAPONS[e.def.wpn] || { recoil: 1 });
+    const def = e.def, s = def.scale, st = p.st, L = Level, map = this.map!;
     const fx = -Math.sin(e.yaw), fz = -Math.cos(e.yaw);
     const lc = e.leanOut && e.cover && e.cover.lean ? e.cover : null; // cover can be dropped earlier in the same tick
     const bx = lc ? lc.px! : e.x, bz = lc ? lc.pz! : e.z;
@@ -3533,7 +3551,7 @@ const G_Server = {
     }
     const dx = tx - from[0], dy = ty - from[1], dz = tz - from[2], d = Math.hypot(dx, dy, dz);
     // a bit worse up close, much worse at range: at their weapon's range they hit about a sixth as often
-    const distF = 0.9 * G.U.clamp(0.95 - 0.8 * Math.pow(d / def.range, 1.2), 0.12, 0.95);
+    const distF = 0.9 * G_U.clamp(0.95 - 0.8 * Math.pow(d / def.range, 1.2), 0.12, 0.95);
     const moveF = st.mv > 3 ? 0.72 : st.mv > 0.5 ? 0.88 : 1;
     const chance = (blind ? 0.15 : 1) * (1 - 0.2 * up) * this.injAim(e) * def.acc * distF * moveF * this.accMult * (1 - 0.6 * (e.sup || 0)) * (1 - 0.5 * Math.min(1, e.shock || 0)) * (e.collapsed ? 0.4 : 1) * (e.str != null && e.str < this.TWO_HAND ? 0.7 : 1) * (1 - Math.min(0.5, kickNow / 16)) * (e.broken ? (e.fleeT > 0 ? 0.4 : 0.8) : 1) * this.dazzle(e, st) * (e.flashRec! > 0 ? this.FLASH.AIM : 1) * (this.night ? this.NIGHT.AIM + (1 - this.NIGHT.AIM) * Math.sqrt(vk) : 1);
     // Their round is a round, flown as yours are (js/player.ts enemyRound) to whatever it meets: on the host's own screen, where
@@ -3541,11 +3559,11 @@ const G_Server = {
     // how well it's aimed: chance is the share that would land on a body a BODY_R across at that distance, so the aim's
     // error at the target is the spread that gives that (a two-dimensional normal: 1 - exp(-R²/2σ²)). The rest is what's
     // there: how much of you shows, what's in the way, what the round does.
-    const wdef = G.WEAPONS[def.wpn] || G.WEAPONS.p9, am = G.ballFor(G.calOf(wdef)), v0 = G.roundSpeed(wdef, am) || 400;
+    const wdef = WEAPONS[def.wpn] || WEAPONS.p9, am = ballFor(calOf(wdef)), v0 = roundSpeed(wdef, am) || 400;
     const norm = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
-    const sd = this.BODY_R / Math.sqrt(-2 * Math.log(1 - G.U.clamp(chance, 0.01, 0.97))), ex = norm() * sd, ey = norm() * sd;
+    const sd = this.BODY_R / Math.sqrt(-2 * Math.log(1 - G_U.clamp(chance, 0.01, 0.97))), ex = norm() * sd, ey = norm() * sd;
     const fv = new THREE.Vector3(...from), aim = new THREE.Vector3(tx + (-dz / d) * ex, ty + ey, tz + (dx / d) * ex).sub(fv), far = aim.length();
-    aim.divideScalar(far); aim.y += G.GRAVITY * far / (2 * v0 * v0); aim.normalize(); // (held up for the drop: they've used this gun before)
+    aim.divideScalar(far); aim.y += GRAVITY * far / (2 * v0 * v0); aim.normalize(); // (held up for the drop: they've used this gun before)
     const right = new THREE.Vector3(-aim.z, 0, aim.x).normalize(), upv = new THREE.Vector3().crossVectors(right, aim), pr = Math.tan(((wdef.choke || 0) * Math.PI) / 180), pellets = def.pellets || 1;
     const r2 = (v: number) => Math.round(v * 100) / 100, sid = (this.eSid = (this.eSid || 0) + 1), ds: number[][] = [];
     for (let i = 0; i < pellets; i++) {
@@ -3554,11 +3572,11 @@ const G_Server = {
       ds.push([dir.x, dir.y, dir.z]);
     }
     if (SvNet.myId) SvNet.sendTo(SvNet.myId, { t: 'eround', e: e.id, wp: def.wpn, am, sid, f: from, ds }); // (js/player.ts enemyRounds)
-    const to = G.Sim.predictEnd(fv, aim.clone().multiplyScalar(v0), G.dragOf(wdef, am), G.GRAVITY, map).toArray();
+    const to = Sim.predictEnd(fv, aim.clone().multiplyScalar(v0), dragOf(wdef, am), GRAVITY, map).toArray();
     SvNet.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, sid });
   },
   BODY_R: 0.24,
 };
 // (what it gets as it runs: the dead, until secured)
-G.Server = G_Server;
-interface GameModules { Server: typeof G_Server; }
+G.Server = Server;
+declare global { interface GameModules { Server: typeof Server; } }

@@ -1,6 +1,9 @@
 'use strict';
 import { Materials } from './materials.js';
 import { U } from './util.js';
+import { Damage } from './damage.js';
+import { Level } from './level.js';
+import { LevelDesc } from './leveldesc.js';
 // The world in three dimensions: everything solid in a level is a 3D shape (a solid), indexed in a 3D spatial
 // hash, and every question the game asks about space is answered from those shapes, at any height:
 //   raycast  (rounds, sight, sound): the nearest solid along a ray, through glass if asked
@@ -210,7 +213,7 @@ export const World = (() => {
   // (BAR_DEEP: as deep as the flat picture of them shows: a gap you can see is one you can shoot through.)
   const BAR_STEP = 0.003, BAR_MM = 4, BAR_DEEP = 0.012;
   function barHit(o: number[], d: number[], h: any, s: Solid) {
-    const L = G.Level, at = (t: number) => L.onBar(o[0] + d[0] * t, o[2] + d[2] * t), face = (b: number, g: number) => { const n = [0, 0, 0], a = b === 1 ? 0 : 2; n[a] = g * Math.sign(d[a] || 1); return n; };
+    const L = Level, at = (t: number) => L.onBar(o[0] + d[0] * t, o[2] + d[2] * t), face = (b: number, g: number) => { const n = [0, 0, 0], a = b === 1 ? 0 : 2; n[a] = g * Math.sign(d[a] || 1); return n; };
     const top = s.max[1], t1 = (top - o[1]) / d[1], t2 = (top - BAR_DEEP - o[1]) / d[1], flat = Math.abs(d[1]) < 1e-9;
     if (flat && (o[1] > top || o[1] < top - BAR_DEEP)) return false;
     const lo = flat ? h.t : Math.max(h.t, Math.min(t1, t2)), hi = flat ? h.out : Math.min(h.out, Math.max(t1, t2));
@@ -256,8 +259,8 @@ export const World = (() => {
         if (!h || h.t > maxT) continue;
         if (s.bars && !mv && (!barHit(o, d, h, s) || h.t > maxT)) continue;
         // (shot through: down a hole in it there's nothing to meet, and a blind hole's met at its floor: js/damage.ts)
-        if (!mv && s.holes && s.holes.length) { const c = G.Damage.clear(s, o, d, h.t, h.out); if (c >= h.out - 1e-3) continue; h.t = c; if (c > maxT) continue; }
-        if (!mv && s.door && s.door.holes && s.door.holes.length) { const q = (h.t + h.out) / 2; if (G.Damage.doorHole(s.door, [o[0] + d[0] * q, o[1] + d[1] * q, o[2] + d[2] * q])) continue; }
+        if (!mv && s.holes && s.holes.length) { const c = Damage.clear(s, o, d, h.t, h.out); if (c >= h.out - 1e-3) continue; h.t = c; if (c > maxT) continue; }
+        if (!mv && s.door && s.door.holes && s.door.holes.length) { const q = (h.t + h.out) / 2; if (Damage.doorHole(s.door, [o[0] + d[0] * q, o[1] + d[1] * q, o[2] + d[2] * q])) continue; }
         if (s.glass != null && pass && !(s.win && s.win.armor && !sight)) { if (!crossed!.some((q) => q[0] === s.glass)) crossed!.push([s.glass, h.t]); continue; } // (bulletproof glass: a round stops on it)
         if (s.clear && sight) { seenThru = true; continue; } // (a look through a glass door)
         if (!best || h.t < best.t) { best = h; best.solid = s; best.view = !!s.view; best.pane = s.glass != null ? s.glass : undefined; }
@@ -451,7 +454,7 @@ export const World = (() => {
   // floor above has a drop (no ceiling there); opts.ground: false for an upper floor (its floor only where it
   // has one: not over a drop).
   function fromTileMap(map: any, opts?: any) {
-    const o = opts || {}, L = G.Level, TS = L.TS, { W, H, t } = map, WH = L.WALL_H, w = o.world || create();
+    const o = opts || {}, L = Level, TS = L.TS, { W, H, t } = map, WH = L.WALL_H, w = o.world || create();
     const Y = o.y || 0, SK = o.skirt || 0, va = o.voidAbove;
     w.bounds = { min: [0, 0, 0], max: [W * TS, Y + WH, H * TS] };
     // runs of tiles merged into rectangles (greedy: along x, then down z while the whole run continues); by: only tiles
@@ -551,7 +554,7 @@ export const World = (() => {
   // doors' and windows' solids are theirs to change from there (door, windowSolids: as they open, shut and break). map.world
   // (and each floor's) is this world.
   function fromDesc(d: LvDesc, map: any) {
-    const w = create(), props = G.LevelDesc.propList(map), doors = map.doors || [], wins = map.windows || [], stairs = map.stairs || [];
+    const w = create(), props = LevelDesc.propList(map), doors = map.doors || [], wins = map.windows || [], stairs = map.stairs || [];
     const M: Record<string, any> = { props: Materials.PROPS, parts: Materials.PARTS };
     for (const q of doors) q.solids = [];
     for (const q of wins) q.solids = [];
@@ -603,7 +606,7 @@ export const World = (() => {
   // a door's solids as it stands: closed, a leaf across each of its cells; open, the lintel over each cell (you
   // walk under it) and the leaf standing out from its hinge (it stops rounds and sight, not people)
   function door(w: WorldT, map: any, d: any) {
-    const L = G.Level, TS = L.TS;
+    const L = Level, TS = L.TS;
     for (const s of d.solids || []) remove(w, s);
     d.solids = [];
     const Y = d.fy || 0;
@@ -631,13 +634,13 @@ export const World = (() => {
     if (win.door) return door(w, map, win.door); // (a glass door's pane: its door's solids)
     if (win.rail) { // a railing's glass: under its handrail, while it's whole (it never stopped anyone walking: the drop's edge does)
       for (const s of win.solids || []) remove(w, s);
-      const r = win.rail, Y = r.y, H = G.Level.RAIL_H;
+      const r = win.rail, Y = r.y, H = Level.RAIL_H;
       win.solids = win.broken ? [] : [add(w, box(r.x0, Y + 0.08, r.z0, r.x1, Y + H - 0.04, r.z1, { kind: 'glass', glass: win.id, move: false, win }))];
       return;
     }
     for (const s of win.solids || []) remove(w, s);
     win.solids = [];
-    const Y = win.fy || 0, fm = G.Level.floorMap(map, win.fl || 0);
+    const Y = win.fy || 0, fm = Level.floorMap(map, win.fl || 0);
     for (const i of win.cells) {
       const wa = fm.winAt.get(i);
       for (const b of win.broken ? wa.open : wa.shut) win.solids.push(add(w, box(b.cx - b.hx, Y + b.y0 - (b.y0 === 0 ? fm.skirt || 0 : 0), b.cz - b.hz, b.cx + b.hx, Y + b.h, b.cz + b.hz, { kind: b.glass != null ? 'glass' : b.view ? 'view' : 'wall', glass: b.glass != null ? win.id : undefined, view: !!b.view, win } /* (the pane is the level's window, not its floor's: a floor numbers its own from 0) */)));

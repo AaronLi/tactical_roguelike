@@ -6,6 +6,8 @@ import { SpaceData } from './spacedata.js';
 import { Hooks, U as G_U } from './util.js';
 import { World } from './world.js';
 import { LevelDesc } from './leveldesc.js';
+import { Furniture } from './furniture.js';
+import { Homes } from './homes.js';
 type LvDoorKind = 'stair' | 'fire' | 'vault' | 'slide' | 'blast'; // (a door that isn't the plain wooden one. slide, blast: a ship's, which slide into the wall: slides())
 interface LvBuilding { floors: LvLay[]; stairs: any; rail?: string; base?: number; units?: number; lz?: LvLz | null }
 interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[] }  type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; unit?: number; head?: number[]; drop?: number[] }  interface LvNav { stairOf: number[]; foot: Set<string>; WH: number }
@@ -80,7 +82,7 @@ export const Level = {
     // a building of several floors: each one planned as a storey, then stacked (stack: the stairs between them)
     if (lay.floors) {
       // (who lives where: nothing to do with the layout, and from the seed alone: js/homes.ts)
-      if (theme.residents) { const homes = G.Homes.start(seed); lay.floors.forEach((fl: LvLay) => { fl.homes = homes; }); }
+      if (theme.residents) { const homes = Homes.start(seed); lay.floors.forEach((fl: LvLay) => { fl.homes = homes; }); }
       return this.landing(this.stack(lay.floors.map((fl: LvLay) => this.plan(fl, r, seed, level, theme)), lay), lay.lz);
     }
     const map = this.plan(lay, r, seed, level, theme);
@@ -289,7 +291,7 @@ export const Level = {
       if (nr !== reach - 1) { t[i] = 0; return false; }
       reach = nr; return true;
     };
-    G.Furniture.plan(c, r, spawnRoom, exitRoom, tryBlock);
+    Furniture.plan(c, r, spawnRoom, exitRoom, tryBlock);
 
     // then the fine grid, and everything that's placed on it
     const map = this.refine(c);
@@ -315,7 +317,7 @@ export const Level = {
     if (map.crest) { const cr = map.crest, west = cr.CX0 * this.CTS, east = (cr.CX1 + 1) * this.CTS; map.enemySpots = map.enemySpots.filter(([x]: number[]) => { const m = (x + 0.5) * this.TS; return m >= east || r() < (m < west ? 0.2 : 0.4); }); }
     // the walls, the doors and everything else are done: now who lives here redoes the rooms they have (after all of
     // it, on its own random stream, so nothing else on the map moves for them)
-    if (lay.homes) G.Homes.fill(map, lay.homes);
+    if (lay.homes) Homes.fill(map, lay.homes);
     return map;
   },
 
@@ -418,7 +420,7 @@ export const Level = {
       return q;
     });
     // furniture: slid out to its wall's new face, then laid on the cells it covers
-    const R = G.Furniture.R, wb = G.Furniture.worldBoxes, props = new Map<number, LvProp>(), propList: LvProp[] = [];
+    const R = Furniture.R, wb = Furniture.worldBoxes, props = new Map<number, LvProp>(), propList: LvProp[] = [];
     for (const [ci, p0] of c.props) {
       if (fenceC.has(ci)) continue;
       const cx = ci % c.W, cz = (ci / c.W) | 0;
@@ -604,7 +606,7 @@ export const Level = {
     // (lighting the floor above too: up), and what it throws off (sparks, embers, smoke, steam: buildFx)
     map.fx = [];
     for (const p of map.propList || []) {
-      const rec = G.Furniture.R[p.name];
+      const rec = Furniture.R[p.name];
       if (!rec.glow && !rec.fx) continue;
       const s = Math.round(Math.sin(p.q * Math.PI / 2)), c = Math.round(Math.cos(p.q * Math.PI / 2)), at = (lx: number, lz: number) => [p.x + lx * c + lz * s, p.z - lx * s + lz * c];
       if (rec.glow) { const g = rec.glow, [x, z] = at(g.x || 0, g.z || 0); map.lights.push({ kind: 'string', x, z, y: g.y, color: g.color, i: g.i, d: g.d, up: 1, glow: 1 }); }
@@ -1276,10 +1278,10 @@ export const Level = {
   _pad(rm: LvRoom, W: number, x: number, z: number, kit: Record<string, any>, east?: boolean) {
     const c: any[][] = rm.cover = [], cs = this.CTS, GAP = 1.6, put = (name: string, px: number, pz: number, q: number) => c.push([name, px, pz, q, kit.style]);
     if (east) { const px = (x + this.LZ_W) * cs + 1; put(kit.long, px, (z + 2.5) * cs, 1); put(kit.short, px, (z + 0.6) * cs, 1); return { x, z }; }
-    const x0 = Math.max(3, (x - 1) * cs), x1 = Math.min(W * cs - 3, (x + this.LZ_W + 1) * cs), L = G.Furniture.R[kit.long].w, n = Math.max(1, Math.floor((x1 - x0 + GAP) / (L + GAP))), run = n * L + (n - 1) * GAP, a0 = (x0 + x1 - run) / 2, pz = (z - 0.5) * cs - 0.5;
+    const x0 = Math.max(3, (x - 1) * cs), x1 = Math.min(W * cs - 3, (x + this.LZ_W + 1) * cs), L = Furniture.R[kit.long].w, n = Math.max(1, Math.floor((x1 - x0 + GAP) / (L + GAP))), run = n * L + (n - 1) * GAP, a0 = (x0 + x1 - run) / 2, pz = (z - 0.5) * cs - 0.5;
     for (let i = 0; i < n; i++) put(kit.long, a0 + L / 2 + i * (L + GAP), pz, 0);
     // (a row that doesn't fill its side: the short thing either end of it, a step's gap off; else turned at the ends)
-    const S = G.Furniture.R[kit.short].w, side = a0 - x0;
+    const S = Furniture.R[kit.short].w, side = a0 - x0;
     for (const [px, sn] of [[a0, -1], [a0 + run, 1]]) {
       if (side >= S + 1) put(kit.short, px + sn * (1 + S / 2), pz, 0);
       if (px + sn * 2.4 > 2 && px + sn * 2.4 < W * cs - 2) put(kit.short, px + sn * (side >= S + 1 ? 2 + S : 1.2), z * cs + 1.6, 1);

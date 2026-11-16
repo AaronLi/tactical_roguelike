@@ -1,5 +1,5 @@
 // The determinism check (docs/modules-plan.md: no phase changes behaviour): the host's simulation (js/server.ts and what
-// the server's thread loads with it, js/serverworker.ts SERVER_SCRIPTS) run in node from fixed seeds, with a scripted
+// the server's thread loads with it: what js/serverhost.ts, its entry file, imports) run in node from fixed seeds, with a scripted
 // officer walking the level, shouting and firing, and what it does fingerprinted every second of the level's time: each
 // suspect's and civilian's state (where they are, which way they face, what they're doing, their health), the doors, and
 // every message the simulation sends. The same code gives the same fingerprints exactly; a refactor that changes
@@ -17,7 +17,7 @@ import * as THREE_NS from 'three';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), DIST = path.join(ROOT, 'dist/js/');
 const GOLDEN = path.join(ROOT, 'tests/sim-golden.json');
 const argv = process.argv.slice(2), UPDATE = argv.includes('--update'), ONLY = argv.includes('--only') ? argv[argv.indexOf('--only') + 1] : null;
-const SCRIPTS = (() => { const t = fs.readFileSync(path.join(ROOT, 'js/serverworker.ts'), 'utf8'), i = t.indexOf('SERVER_SCRIPTS ='), a = t.indexOf('[', i), b = t.indexOf(']', a); return [...t.slice(a, b).matchAll(/'([\w-]+)'/g)].map((m) => m[1]); })();
+const ENTRY = 'serverhost'; // (the server thread's entry file, what js/serverworker.ts imports: its imports are the rest of the simulation)
 
 // name, the level (theme by name, level number, night), the seed of the level and of Math.random, seconds to run
 const SCENARIOS = [
@@ -45,7 +45,7 @@ async function load(rndSeed) {
     performance: clock, THREE: { ...THREE_NS }, document, location: { search: '' }, URLSearchParams, addEventListener() {}, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, structuredClone, queueMicrotask, TextEncoder, TextDecoder, atob, btoa };
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx; ctx.G = {};
   vm.createContext(ctx);
-  await runScripts(ctx, DIST, SCRIPTS, { what: 'npm run test:sim does' });
+  await runScripts(ctx, DIST, [ENTRY], { what: 'npm run test:sim does' });
   const advance = (dt) => { now += dt; for (;;) { timers.sort((a, b) => a.at - b.at || a.id - b.id); const t = timers[0]; if (!t || t.at > now) break; timers.shift(); t.fn(); } };
   return { G: ctx.G, advance, time: () => now };
 }

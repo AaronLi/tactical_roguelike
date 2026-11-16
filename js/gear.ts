@@ -3,6 +3,8 @@ import { AMMO, ballFor, barrelsOf, beltFed, CALIBERS, calOf, capOf, cartOf, cham
 import { Hooks } from './util.js';
 import { Med } from './medical.js';
 import { Gunsmith } from './parts.js';
+import { Sim } from './sim.js';
+import { Stickers } from './stickers.js';
 // Personal kit and the grid inventory (Tarkov-style).
 //
 // Gear: helmets, plate carriers (and soft vests), armour plates and belts, each a named product from a brand.
@@ -182,11 +184,11 @@ export const Gear = (() => {
   }
   function unpack(o: any) {
     if (o.k === 'gun' && o.w) {
-      const w = Hooks.makeWeapon ? Hooks.makeWeapon(o.w.id, o.w.build) : G.Sim.makeWeapon(o.w.id, o.w.build); // (the host's worker has no Me: the gun as built, all the same)
+      const w = Hooks.makeWeapon ? Hooks.makeWeapon(o.w.id, o.w.build) : Sim.makeWeapon(o.w.id, o.w.build); // (the host's worker has no Me: the gun as built, all the same)
       w.mag = o.w.mag; w.ammo = o.w.ammo; w.tube = (o.w.tube || []).slice(); if (o.w.noMag) w.noMag = true; if (o.w.fm) w.fm = o.w.fm; if (o.w.rl && w.def.barrels) { w.rl = o.w.rl; if (o.w.bl) w.bl = o.w.bl.slice(); } // (a gun of several barrels: its block's round type and the rounds in each barrel)
       if ('chamber' in o.w) w.chamber = o.w.chamber;
       if (o.w.spent) w.spent = o.w.spent.slice();
-      if (o.w.sk && o.w.sk.length) w.stickers = G.Stickers.clean(o.w.sk);
+      if (o.w.sk && o.w.sk.length) w.stickers = Stickers.clean(o.w.sk);
       return gunItem(w);
     }
     if (o.k === 'mag' && revolver(WEAPONS[o.wid])) { const cal = calOf(WEAPONS[o.wid]), r = o.r || []; return boxItem(cal, r[r.length - 1] || o.am0 || ballFor(cal), r.length); } // (a save from when revolvers had loaders: the rounds in it, loose)

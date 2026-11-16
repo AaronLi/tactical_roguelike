@@ -1,14 +1,14 @@
 // The level generator in node (tools/check_level_golden.mjs, and anything else that wants a level's description without a
-// browser): the compiled game (dist/js, ES modules and scripts: tools/vm_game.mjs) in a vm, the files the host's simulation loads for a level (js/serverworker.ts
-// SERVER_SCRIPTS, as far as the level goes). three.js is there because some of those files reach for it as they load
-// (js/util.ts, js/damage.ts); generating a level doesn't: pure(G) swaps it for one that throws on any use, and says what did.
+// browser): the compiled game (dist/js, ES modules and scripts: tools/vm_game.mjs) in a vm, the files the level is laid out with: js/prepentry.ts,
+// the level preparation worker's entry file (its imports are the rest), and scars and stickers (which the list this replaced also had). three.js is there because some of those files reach for it as
+// they load (js/util.ts, js/damage.ts); generating a level doesn't: pure(G) swaps it for one that throws on any use, and says what did.
 import { runScripts } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import vm from 'vm'; import path from 'path'; import { fileURLToPath } from 'url';
 import * as THREE_NS from 'three';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist/js/');
-export const LEVEL_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers'];
+export const LEVEL_SCRIPTS = ['prepentry', 'scars', 'stickers'];
 
 export async function loadLevel() {
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });

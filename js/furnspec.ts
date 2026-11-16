@@ -2,6 +2,7 @@
 import { Level } from './level.js';
 import { U } from './util.js';
 import { World } from './world.js';
+import { Furniture } from './furniture.js';
 type FdRng = (() => number) & { st(): number };
 export const FurnSpec = (() => {
   const VERSION = 1;
@@ -344,7 +345,7 @@ export const FurnSpec = (() => {
   // One piece, on its own: as it's drawn wherever it stands (name: js/furniture.ts R; v: its own seed; style: what a
   // resident's or the plan's picked for it), its looks drawn on a stream from seed. With its solids.
   function piece(name: string, v: number, style?: any, seed = 1): FdLevel {
-    const F = G.Furniture, D = recorder(srng(seed));
+    const F = Furniture, D = recorder(srng(seed));
     D.begin([0, 0, 0], 0, { piece: name, v, style, solids: F.solids(F.R[name], v) });
     F.R[name].build(D.k, v, style);
     return D.done();
@@ -353,7 +354,7 @@ export const FurnSpec = (() => {
   // A level's furniture and the rooms' dressing, as js/furnmesh.ts draws it (solids: each piece's solids too, as the
   // golden test has them; the simulation has its own from the same pieces, js/furniture.ts worldBoxes).
   function describe(map: any, opts: { solids?: boolean } = {}): FdLevel {
-    const L = Level, F = G.Furniture, R = F.R, TS = L.TS, { W, t } = map;
+    const L = Level, F = Furniture, R = F.R, TS = L.TS, { W, t } = map;
     const D = recorder(srng((map.seed ^ 0x5eed1e) >>> 0)), k = D.k, mat = D.mat, rnd = D.rnd, pick = k.pick;
     // (every piece's looks draw on a stream of its own, seeded by its v and where it stands (in centimetres: fence panels
     // and the like share a few v's between them, js/level.ts refine), and every room's on one of its own, seeded by the

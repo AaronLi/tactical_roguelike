@@ -1,4 +1,5 @@
 'use strict';
+import { Level } from './level.js';
 export const Materials = (() => {
   const CORE_E: Record<MatCore, number> = { lead: 1, mild: 1.1, hard: 1.4, wc: 1.6 };
   const m = (name: string, K: number, rho: number, sig: number, fx: MatFx, o?: Partial<MatDef>): MatDef => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
@@ -144,7 +145,7 @@ export const Materials = (() => {
   const wallOf = (theme: any, out: any) => { const w = (WALLS as Record<string, any>)[theme.name] || WALLS.Apartment; return w[out ? 1 : 0]; };
   // is this point outdoors (on its floor's plan)?
   function outAt(map: any, p: any) {
-    const fl = map.floors ? map.floors.find((f: any) => p.y >= (f.fy || 0) - 0.02 && p.y < (f.fy || 0) + G.Level.WALL_H + 0.3) || map.floors[0] : map, TS = G.Level.TS, x = Math.floor(p.x / TS), z = Math.floor(p.z / TS);
+    const fl = map.floors ? map.floors.find((f: any) => p.y >= (f.fy || 0) - 0.02 && p.y < (f.fy || 0) + Level.WALL_H + 0.3) || map.floors[0] : map, TS = Level.TS, x = Math.floor(p.x / TS), z = Math.floor(p.z / TS);
     if (x < 0 || z < 0 || x >= fl.W || z >= fl.H) return true;
     return !!(fl.out && fl.out[z * fl.W + x]);
   }

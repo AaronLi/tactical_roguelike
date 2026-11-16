@@ -5,12 +5,13 @@
 //   node tools/ship_layout.mjs --print    print them instead
 import { runScripts } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import fs from 'node:fs'; import path from 'node:path'; import vm from 'node:vm'; import { fileURLToPath } from 'node:url';
+import * as THREE_NS from 'three';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), DIST = path.join(ROOT, 'dist/js/'), OUT = path.join(ROOT, 'models/ships');
 
-/** js/spacedata.ts, compiled, in a vm with what it leans on (js/util.ts, js/data.ts) */
+/** js/spacedata.ts, compiled, in a vm with what it leans on (js/util.ts, js/data.ts, and the files it imports: the level's, some of which reach for three.js as they load) */
 export async function shipData() {
   if (!fs.existsSync(DIST + 'spacedata.js')) throw new Error('dist/js/spacedata.js missing: run tsc first');
-  const ctx = { console, Math, JSON, Set, Map, Object, Array, Number, String, Boolean, Float32Array, Uint8Array, Uint32Array, Int32Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Date, Symbol, Promise,
+  const ctx = { THREE: { ...THREE_NS }, console, Math, JSON, Set, Map, Object, Array, Number, String, Boolean, Float32Array, Uint8Array, Uint32Array, Int32Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Date, Symbol, Promise,
     document: { addEventListener() {}, getElementById: () => null, querySelector: () => null, createElement: () => ({ getContext: () => null, style: {} }) }, location: { search: '' }, navigator: { userAgent: 'node' }, addEventListener() {}, localStorage: null, setTimeout, clearTimeout };
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx; ctx.G = {};
   vm.createContext(ctx);

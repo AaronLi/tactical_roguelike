@@ -1,6 +1,8 @@
 'use strict';
 import { U as G_U } from './util.js';
 import { Materials } from './materials.js';
+import { Level } from './level.js';
+import { World } from './world.js';
 interface ShSlot { rm: LvRoom; pos: number; side: number; deep: boolean; inner: LvRoom | null; door: number[]; x: number }
 interface ShSeg { x: number; w: number; d: number[]; split: boolean[]; stair: boolean }
 interface ShWing { dO: number; dI: number; ew: number; len: number }
@@ -46,7 +48,7 @@ export const ShipGen = (() => {
   interface Ctx { W: number; H: number; t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: LvDoorSpec[]; locks: [number, number, string][]; glass: any[]; entries: number[][] }
   // one deck of a hull, carved into the grid at (ox, oz). f: which deck, of n. hi: which hull (0 the mission's).
   function deck(c: Ctx, sk: ShSk, ox: number, oz: number, f: number, n: number, r: LvRng, hi: number, stairs: any[]) {
-    const U = G_U, L = G.Level, S = SPEC[sk.size], { W, t, out, rooms, doors, locks } = c, sw = sk.sw, zc = oz + sk.zc, top = f === n - 1;
+    const U = G_U, L = Level, S = SPEC[sk.size], { W, t, out, rooms, doors, locks } = c, sw = sk.sw, zc = oz + sk.zc, top = f === n - 1;
     const carve = (x: number, z: number, w: number, h: number, role: ShRole) => {
       for (let j = z - 1; j <= z + h; j++) for (let i = x - 1; i <= x + w; i++) {
         const k = j * W + i, inside = i >= x && i < x + w && j >= z && j < z + h;
@@ -134,7 +136,7 @@ export const ShipGen = (() => {
     return { wing: { dO, dI, ew, len }, size, len, sw, dmax: dO, W: span, H: span, zc: 1 + dO + 1, segs: [] };
   }
   function wingDeck(c: Ctx, sk: ShSk, ox: number, oz: number, r: LvRng, hi: number) {
-    const U = G_U, L = G.Level, { W, t, out, rooms, doors, locks } = c, sw = sk.sw, { dO, dI, ew, len } = sk.wing!;
+    const U = G_U, L = Level, { W, t, out, rooms, doors, locks } = c, sw = sk.sw, { dO, dI, ew, len } = sk.wing!;
     const carve = (x: number, z: number, w: number, h: number, role: ShRole) => {
       for (let j = z - 1; j <= z + h; j++) for (let i = x - 1; i <= x + w; i++) {
         const k = j * W + i, inside = i >= x && i < x + w && j >= z && j < z + h;
@@ -203,7 +205,7 @@ export const ShipGen = (() => {
   // After the plan (and the stacking of her decks): map.sp
   function finish(map: LvMap, lay: LvLay) {
     for (const w of map.windows || []) (w as any).ship = true; // (a ship's glass: rounds don't go through it and it never comes down, js/level.ts paneBreaks)
-    const L = G.Level, TS = L.TS, CT = L.CTS, src = (lay as any).sp, S = SPEC[src.size as SpSize], floors = map.floors || [map];
+    const L = Level, TS = L.TS, CT = L.CTS, src = (lay as any).sp, S = SPEC[src.size as SpSize], floors = map.floors || [map];
     const fl = (rm: { fl?: number }) => floors[rm.fl || 0], roles = map.rooms.map((rm) => (rm.ship as ShRole) || null), hullOf = map.rooms.map((rm) => (rm as any).hull || 0);
     const locks: Record<number, string> = {};
     for (const [f, x, z, key] of src.locks as [number, number, number, string][]) {
@@ -274,7 +276,7 @@ export const ShipGen = (() => {
   // map's cells: t 5 is outside her) the corner's filled: a wedge from the step's full depth (short, along v) down to nothing along the
   // longer wall (long, along u), from the corner (cx, cz).
   function fairings(W: number, H: number, t: ArrayLike<number>) {
-    const TS = G.Level.TS, solid = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] !== 5, seen = new Set<string>();
+    const TS = Level.TS, solid = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] !== 5, seen = new Set<string>();
     const out: { cx: number; cz: number; ux: number; uz: number; vx: number; vz: number; short: number; long: number }[] = [];
     for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) {
       if (solid(x, z)) continue;
@@ -293,7 +295,7 @@ export const ShipGen = (() => {
   }
   // the cells outside her a fairing reaches into (what's against her side there is covered: no window in it, js/level.ts placeWindows)
   function faired(W: number, H: number, t: ArrayLike<number>) {
-    const TS = G.Level.TS, cov = new Set<number>();
+    const TS = Level.TS, cov = new Set<number>();
     for (const f of fairings(W, H, t)) {
       const x0 = Math.floor(Math.min(f.cx, f.cx + f.ux * f.long + f.vx * f.short) / TS) - 1, x1 = Math.ceil(Math.max(f.cx, f.cx + f.ux * f.long + f.vx * f.short) / TS) + 1;
       const z0 = Math.floor(Math.min(f.cz, f.cz + f.uz * f.long + f.vz * f.short) / TS) - 1, z1 = Math.ceil(Math.max(f.cz, f.cz + f.uz * f.long + f.vz * f.short) / TS) + 1;
@@ -306,7 +308,7 @@ export const ShipGen = (() => {
     return cov;
   }
   function roomAt(map: LvMap, x: number, z: number, fl = 0) {
-    const TS = G.Level.TS, cx = x / TS, cz = z / TS;
+    const TS = Level.TS, cx = x / TS, cz = z / TS;
     let best = -1, bd = 1e9;
     map.rooms.forEach((rm, i) => { if ((rm.fl || 0) !== fl || cx < rm.x - 1 || cx > rm.x + rm.w + 1 || cz < rm.z - 1 || cz > rm.z + rm.h + 1) return; const d = Math.max(Math.abs(cx - (rm.x + rm.w / 2)) - rm.w / 2, Math.abs(cz - (rm.z + rm.h / 2)) - rm.h / 2); if (d < bd) { bd = d; best = i; } });
     return best;
@@ -316,7 +318,7 @@ export const ShipGen = (() => {
   // ship to stand nose-on. Worked out once.
   function sites(map: LvMap): ShSite[] {
     const sp = map.sp!; if (sp.sites) return sp.sites;
-    const { W, H, t } = map, TS = G.Level.TS, out: ShSite[] = [];
+    const { W, H, t } = map, TS = Level.TS, out: ShSite[] = [];
     const at = (x: number, z: number) => (x < 0 || z < 0 || x >= W || z >= H ? -1 : t[z * W + x]);
     for (let z = 2; z < H - 2; z++) for (let x = 2; x < W - 2; x++) {
       if (t[z * W + x] !== 1) continue;
@@ -357,11 +359,11 @@ export const ShipGen = (() => {
   const TUN = { HW: 0.85, H: 2.2, IN: 1.9, N: 9 };
   const bent = (s: ShSite) => !!s.ang;
   // how far in from the hull's face it comes out: through the wall (a cell) and a hand's breadth, more with the angle
-  const tunnelIn = (s: ShSite) => { const TS = G.Level.TS, k = Math.min(1, Math.abs(s.ang || 0) / 45), a = TS + 0.25; return a + (TUN.IN - a) * k; };
+  const tunnelIn = (s: ShSite) => { const TS = Level.TS, k = Math.min(1, Math.abs(s.ang || 0) / 45), a = TS + 0.25; return a + (TUN.IN - a) * k; };
   // a site's record as a cut's: [cell, nx, nz], and how far off square and nose up she came in when she did
   const cutKey = (s: ShSite) => s.pt ? [s.c, s.nx, s.nz, s.ang || 0, s.pt] : s.ang ? [s.c, s.nx, s.nz, s.ang] : [s.c, s.nx, s.nz];
   function tunnelPath(s: ShSite) {
-    const TS = G.Level.TS, nx = s.nx, nz = s.nz, yaw = (nz > 0 ? 0 : nz < 0 ? Math.PI : nx > 0 ? Math.PI / 2 : -Math.PI / 2) + (s.ang || 0) * Math.PI / 180;
+    const TS = Level.TS, nx = s.nx, nz = s.nz, yaw = (nz > 0 ? 0 : nz < 0 ? Math.PI : nx > 0 ? Math.PI / 2 : -Math.PI / 2) + (s.ang || 0) * Math.PI / 180;
     const fx = s.x + nx * TS / 2, fz = s.z + nz * TS / 2, mx = fx + nx * 0.03, mz = fz + nz * 0.03, dx = -Math.sin(yaw), dz = -Math.cos(yaw), IN = tunnelIn(s), ex = fx - nx * IN, ez = fz - nz * IN, H = IN * 0.4; // (H: the bend's handles, short of half its depth: no loop in it)
     const P = [[mx, mz], [mx + dx * H, mz + dz * H], [ex + nx * H, ez + nz * H], [ex, ez]], out: { x: number; z: number; tx: number; tz: number }[] = [];
     for (let i = 0; i <= TUN.N; i++) {
@@ -374,7 +376,7 @@ export const ShipGen = (() => {
   }
   // the grid's cells of wall (and of window) the tunnel goes through
   function tunnelCells(map: LvMap, s: ShSite) {
-    const TS = G.Level.TS, W = map.W, out: number[] = [], path = tunnelPath(s), winAt = map.winAt as Map<number, unknown> | undefined;
+    const TS = Level.TS, W = map.W, out: number[] = [], path = tunnelPath(s), winAt = map.winAt as Map<number, unknown> | undefined;
     for (let i = 0; i < path.length - 1; i++) for (let k = 0; k < 6; k++) {
       const u = k / 6, x = path[i].x + (path[i + 1].x - path[i].x) * u, z = path[i].z + (path[i + 1].z - path[i].z) * u, R = TUN.HW + 0.12;
       for (let cz = Math.floor((z - R) / TS); cz <= Math.floor((z + R) / TS); cz++) for (let cx = Math.floor((x - R) / TS); cx <= Math.floor((x + R) / TS); cx++) {
@@ -386,7 +388,7 @@ export const ShipGen = (() => {
   }
   // its plating in the world (on the host and every screen): a floor, the two sides and a roof for each stretch of it, turned with it
   function tunnelSolids(map: LvMap, s: ShSite) {
-    const Wd = G.World, w = map.world, path = tunnelPath(s), out: any[] = []; if (!w) return out;
+    const Wd = World, w = map.world, path = tunnelPath(s), out: any[] = []; if (!w) return out;
     for (let i = 0; i < path.length - 1; i++) {
       const a = path[i], b = path[i + 1], cx = (a.x + b.x) / 2, cz = (a.z + b.z) / 2, len = Math.hypot(b.x - a.x, b.z - a.z), yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z)), c = Math.cos(yaw), sn = Math.sin(yaw), hz = len / 2 + 0.06;
       const o = { kind: 'prop', mat: Materials.SHIP, tunnel: true };
@@ -397,7 +399,7 @@ export const ShipGen = (() => {
     return out;
   }
   function cut(map: LvMap, s: ShSite): { cells: number[]; walls: number[]; wins: number[] } | null {
-    const sp = map.sp!, TS = G.Level.TS, W = map.W, w = map.world, Wd = G.World;
+    const sp = map.sp!, TS = Level.TS, W = map.W, w = map.world, Wd = World;
     if (sp.cuts.some((q) => q[0] === s.c && q[1] === s.nx && q[2] === s.nz)) return null;
     sp.cuts.push(cutKey(s)); sp.sites = undefined;
     const cells = s.cells.slice(), walls: number[] = [], wins: number[] = [];
@@ -431,7 +433,7 @@ export const ShipGen = (() => {
         }
       }
     };
-    open(cells, G.Level.DOOR_H + 0.1); open(walls, G.Level.DOOR_H + 0.1);
+    open(cells, Level.DOOR_H + 0.1); open(walls, Level.DOOR_H + 0.1);
     // What stood inside where she came through is gone with the plate: every piece of furniture any part of which is within
     // a couple of metres either side of the hole and three and a half in from it. Out of the world (nothing stops there now),
     // out of the grid (it's floor), out of the list; where each was is kept (sp.gone: boxes [x0, y0, z0, x1, y1, z1]) for the
@@ -460,14 +462,14 @@ export const ShipGen = (() => {
   }
   // A site from a cut's record [cell, nx, nz] (what's been cut stays one, whatever the grid round it is now)
   function siteAt(map: LvMap, a: number[]): ShSite {
-    const W = map.W, TS = G.Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0;
+    const W = map.W, TS = Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0;
     return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k), ang: a[3] || 0, pt: a[4] || 0 };
   }
   // Every hole she's been breached through but the one the squad's ship is against (site, or none: she's away) shut by an unseen
   // wall: open space past it, nothing to walk out into (what's out there isn't made yet). On the host and every screen alike.
   function seal(map: LvMap, site: number[] | null) {
     const sp = map.sp as any; if (!sp || !map.world) return;
-    const Wd = G.World, w = map.world, W = map.W, TS = G.Level.TS, H = G.Level.WALL_H;
+    const Wd = World, w = map.world, W = map.W, TS = Level.TS, H = Level.WALL_H;
     for (const q of sp.seals || []) Wd.remove(w, q);
     sp.seals = [];
     for (const c of sp.cuts as number[][]) {

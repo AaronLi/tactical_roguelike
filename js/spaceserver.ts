@@ -1,4 +1,12 @@
 'use strict';
+import { Damage } from './damage.js';
+import { ENEMIES } from './data.js';
+import { Level } from './level.js';
+import { Materials } from './materials.js';
+import { Server } from './server.js';
+import { ShipGen } from './shipgen.js';
+import { SpaceData } from './spacedata.js';
+import { World } from './world.js';
 // The host's side of the space direction (docs/space.md), in the simulation's thread with js/server.ts and through its
 // SvNet: the missions board (what's offered this visit, which the squad has picked, which are done), the squad's fleet (the
 // ships it owns, the one in use, what's fitted), who's in which seat of the ship and where she is (her pilot's game flies
@@ -23,8 +31,8 @@ interface SvMission {
   resp: Map<number, number>; salv: number[]; // (resp: the breach response squads' people, and the hull each is aboard; salv: the salvage taken, by its number)
   vac: Set<number>; sealT: Map<number, number>; doorRooms: Map<number, number[]> | null; vacT: number; armSay: number;
 }
-const G_SpaceSv = (() => {
-  const SD = G.SpaceData;
+export const SpaceSv = (() => {
+  const SD = SpaceData;
   const st = {
     board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[], gone: [] as number[] }, // (gone: flown, done or not: off the board)
     fleet: SD.fleet0(),
@@ -33,7 +41,7 @@ const G_SpaceSv = (() => {
     M: null as SvMission | null,
     rank: 1, // how far the squad has got: what the board's missions are pitched at
   };
-  const S = () => G.Server, net = () => G.Server.net;
+  const S = () => Server, net = () => Server.net;
   const offers = () => SD.offers(st.board.seed, st.board.level);
   const goneOf = (B: typeof st.board) => B.gone || (B.gone = B.done.slice()); // (a board kept from before there was gone: what's done is gone)
   const boardMsg = () => ({ t: 'board', seed: st.board.seed, level: st.board.level, picked: st.board.picked, done: st.board.done, gone: goneOf(st.board) });
@@ -129,12 +137,12 @@ const G_SpaceSv = (() => {
   //   breach response squads of three, lighter, in the mess and the cabins: when the hull is breached they come to it (respond).
   // A ship that isn't the mission's has a few guards and her crew.
   function crew() {
-    const sv = S(), map = sv.map!, meta = map.sp!, M = st.M, TS = G.Level.TS, L = sv.level, np = Math.max(1, sv.players.size);
+    const sv = S(), map = sv.map!, meta = map.sp!, M = st.M, TS = Level.TS, L = sv.level, np = Math.max(1, sv.players.size);
     if (M && M.revisit && M.cleared) return; // (come back to, and already hers no longer: nobody's left to fight)
     const hp = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     sv.accMult = Math.min(1 + 0.03 * (L - 1), 1.5); sv.dmgMult = 1 + 0.07 * (L - 1); sv.unitsSeen = new Set();
     if (M && M.keep) return; // (come back to: her people are as they were left, restore)
-    const used = new Set<string>(), fy = (f: number) => G.Level.floorMap(map, f).fy || 0;
+    const used = new Set<string>(), fy = (f: number) => Level.floorMap(map, f).fy || 0;
     const spot = (ri: number) => {
       const rm = map.rooms[ri]; if (!rm) return null;
       const c = map.enemySpots.filter(([x, z, f]) => (f || 0) === (rm.fl || 0) && x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h && !used.has(x + ',' + z + ',' + (f || 0)) && ![...used].some((u) => { const [ux, uz, uf] = u.split(',').map(Number); return uf === (f || 0) && Math.abs(ux - x) + Math.abs(uz - z) < 3; }));
@@ -143,7 +151,7 @@ const G_SpaceSv = (() => {
       return { x: (s[0] + 0.5) * TS, z: (s[1] + 0.5) * TS, y: fy(s[2] || 0) };
     };
     for (let h = 0; h < meta.hulls.length; h++) {
-      const cls = G.SpaceData.SIZES[meta.hulls[h].size], C0 = h === 0 ? cls.crew : { guard: 2, squads: 0, resp: 0, civ: cls.crew.civ - 1 };
+      const cls = SpaceData.SIZES[meta.hulls[h].size], C0 = h === 0 ? cls.crew : { guard: 2, squads: 0, resp: 0, civ: cls.crew.civ - 1 };
       const artShip = h === 0 && !!M && M.ms.obj === 'artifact' && !!meta.artifact, C = artShip ? Object.assign({}, C0, { resp: C0.resp + 1 }) : C0; // (carrying the artifact: a response team more)
       const rooms = (...roles: string[]) => { const out: number[] = []; for (const role of roles) map.rooms.forEach((rm, i) => { if (meta.hullOf[i] === h && meta.roles[i] === role) out.push(i); }); return out; };
       const all = rooms('spine', 'cargo', 'quarters', 'mess', 'barracks', 'engine', 'magazine', 'galley', 'medbay', 'reactor', 'brig');
@@ -172,7 +180,7 @@ const G_SpaceSv = (() => {
       for (let k = 0; k < C.guard + (h === 0 ? np - 1 : 0); k++) { const e = put('suspect', post, k); if (e) e.stay = true; } // (each at a post of its own: no fireteam's)
       // carrying the artifact: her security with it, armed and armoured, weapons out, posted on it (in its compartment, and on its doors
       // when she's boarded: shelter); and more of them the more of the squad there are
-      if (artShip) { const ar = G.ShipGen.roomAt(map, meta.artifact!.x, meta.artifact!.z, 0); if (ar >= 0) for (const kd of ['grunt', 'grunt', 'suspect', ...(np > 1 ? ['grunt'] : [])] as EnemyKind[]) { const e = put(kd, [ar], 0); if (e) { e.stay = true; e.drawn = true; e.artGuard = true; } } }
+      if (artShip) { const ar = ShipGen.roomAt(map, meta.artifact!.x, meta.artifact!.z, 0); if (ar >= 0) for (const kd of ['grunt', 'grunt', 'suspect', ...(np > 1 ? ['grunt'] : [])] as EnemyKind[]) { const e = put(kd, [ar], 0); if (e) { e.stay = true; e.drawn = true; e.artGuard = true; } } }
       const sq = rooms('barracks', 'armoury', 'magazine', 'spine');
       for (let q = 0; q < C.squads; q++) {
         const kinds: EnemyKind[] = [q === 0 ? 'leader' : 'grunt', 'grunt', 'rusher', L >= 3 ? 'heavy' : 'grunt'];
@@ -181,7 +189,7 @@ const G_SpaceSv = (() => {
       // her security office (frigates and up): one on the cameras, watching the ship
       if (h === 0 && M) { const so = rooms('security'); if (so.length) { const e = put('suspect', so, 0); if (e) { M.camOp = e.id; e.stay = true; } } }
       // her gun crew: two at gun control for each hull that has guns (the boarded ship's are what her guns need: gunnersLeft)
-      const G0 = G.SpaceData.SIZES[meta.hulls[h].size].guns;
+      const G0 = SpaceData.SIZES[meta.hulls[h].size].guns;
       if (G0.pd + G0.cannon + G0.missile > 0) for (let k = 0; k < 2; k++) { const e = put('suspect', rooms('gunnery'), k); if (e) e.stay = true; if (e && M && h === 0) (M.gunners = M.gunners || []).push(e.id); }
       const rs = rooms('mess', 'quarters', 'spine', 'cargo');
       for (let q = 0; q < C.resp; q++) (['suspect', 'rusher', 'suspect'] as EnemyKind[]).forEach((kd, i) => { const e = put(kd, [rs[q % Math.max(1, rs.length)]].filter((v) => v != null), 0); if (e && M) M.resp.set(e.id, h); if (e && i === 0) sv.giveShield(e, shieldId()); }); // (the first of each with a shield: their point man)
@@ -196,18 +204,18 @@ const G_SpaceSv = (() => {
   //     a leader who's seen the squad himself in the last few seconds goes on that instead (his own calls: callIn). With someone at her security office's
   //     cameras that's where the squad is, as they move; without, the breach, then wherever one of her crew last saw them.
   // The alarm's the breach (unless the squad's ship jammed her: then the first of her crew to see them).
-  const doctrine = (h: number) => { const M = st.M, sz = M && M.meta && M.meta.hulls[h] ? M.meta.hulls[h].size : 'small'; return G.SpaceData.drill(sz, h === 0 && !!(M && M.meta && M.meta.wing)) === 'informal' ? 'shelter' : 'sweep'; }; // (informal, practiced: as the mission board has it, js/spacedata.ts drill)
+  const doctrine = (h: number) => { const M = st.M, sz = M && M.meta && M.meta.hulls[h] ? M.meta.hulls[h].size : 'small'; return SpaceData.drill(sz, h === 0 && !!(M && M.meta && M.meta.wing)) === 'informal' ? 'shelter' : 'sweep'; }; // (informal, practiced: as the mission board has it, js/spacedata.ts drill)
   function alarm(x: number, z: number) {
     const sv = S(), M = st.M, map = sv.map; if (!M || !M.meta || !map || M.alarm || M.ms.obj === 'hostage') return;
     M.alarm = true;
-    const ri = G.ShipGen.roomAt(map, x, z, 0), hull = ri >= 0 ? M.meta.hullOf[ri] : 0;
+    const ri = ShipGen.roomAt(map, x, z, 0), hull = ri >= 0 ? M.meta.hullOf[ri] : 0;
     M.belief = { x, y: 0, z, room: ri }; M.sweepAt = -1e9;
     if (doctrine(hull) === 'shelter') shelter(hull, x, z);
     else respond(x, z);
   }
   // her people to the safest compartment, her guards in its doorways
   function shelter(hull: number, x: number, z: number) {
-    const sv = S(), M = st.M!, map = sv.map!, meta = M.meta!, L = G.Level, TS = L.TS;
+    const sv = S(), M = st.M!, map = sv.map!, meta = M.meta!, L = Level, TS = L.TS;
     const from = sv.flowTo(x, 0, z), locked = (d: LvDoor) => !!meta.locks[d.id];
     const doorsOf = (i: number) => map.doors.filter((d) => { const rr = doorRooms(M).get(d.id) || []; return rr.includes(i); });
     let best = -1, bs = -1e9;
@@ -220,9 +228,9 @@ const G_SpaceSv = (() => {
     });
     if (best < 0) { respond(x, z); return; }
     M.safe = best;
-    const rm = map.rooms[best], flow = L.flow(map, [[rm.cx, rm.cz, 0]]), spots = map.enemySpots.filter(([sx, sz, f]) => (f || 0) === 0 && sx >= rm.x && sx < rm.x + rm.w && sz >= rm.z && sz < rm.z + rm.h && G.ShipGen.roomAt(map, (sx + 0.5) * TS, (sz + 0.5) * TS, 0) === best && !map.doors.some((d) => Math.hypot(d.x - (sx + 0.5) * TS, d.z - (sz + 0.5) * TS) < 1.6)); // (in it, not just in the box round it; and clear of its doorways, so its doors can be shut)
+    const rm = map.rooms[best], flow = L.flow(map, [[rm.cx, rm.cz, 0]]), spots = map.enemySpots.filter(([sx, sz, f]) => (f || 0) === 0 && sx >= rm.x && sx < rm.x + rm.w && sz >= rm.z && sz < rm.z + rm.h && ShipGen.roomAt(map, (sx + 0.5) * TS, (sz + 0.5) * TS, 0) === best && !map.doors.some((d) => Math.hypot(d.x - (sx + 0.5) * TS, d.z - (sz + 0.5) * TS) < 1.6)); // (in it, not just in the box round it; and clear of its doorways, so its doors can be shut)
     const spot = (k: number) => { const s = spots.length ? spots[k % spots.length] : [rm.cx, rm.cz]; return { x: (s[0] + 0.5) * TS + (Math.random() - 0.5) * 0.4, y: 0, z: (s[1] + 0.5) * TS + (Math.random() - 0.5) * 0.4 }; };
-    const onHull = (e: any) => { const r = G.ShipGen.roomAt(map, e.x, e.z, 0); return r >= 0 && meta.hullOf[r] === hull; };
+    const onHull = (e: any) => { const r = ShipGen.roomAt(map, e.x, e.z, 0); return r >= 0 && meta.hullOf[r] === hull; };
     let k = 0;
     const d0 = doorsOf(best)[0], dx0 = d0 ? d0.x : (rm.cx + 0.5) * TS, dz0 = d0 ? d0.z : (rm.cz + 0.5) * TS;
     for (const e of sv.enemies.values()) if (e.def.timid && e.state === 'normal' && !e.down && onHull(e)) { const p = spot(k++); e.post = Object.assign(p, { yaw: Math.atan2(-(dx0 - p.x), -(dz0 - p.z)), flow }); e.home = { x: p.x, y: 0, z: p.z }; e.walkTo = null; } // (her ratings: in with them, guns on the door)
@@ -233,7 +241,7 @@ const G_SpaceSv = (() => {
     const t0 = L.floorMap(map, 0).t, fl = (x: number, z: number) => L.flow(map, [[Math.floor(x / TS), Math.floor(z / TS), 0]]);
     const doorPosts = (ri: number) => {
       const r = map.rooms[ri], posts: Post[] = [], spare: Post[] = [], cx = (r.cx + 0.5) * TS, cz = (r.cz + 0.5) * TS;
-      const open = (x: number, z: number) => { const tx = Math.floor(x / TS), tz = Math.floor(z / TS); return tx >= 0 && tz >= 0 && tx < map.W && tz < map.H && t0[tz * map.W + tx] === 0 && G.ShipGen.roomAt(map, x, z, 0) !== ri && !(sv.aiProp && sv.aiProp[tz * map.W + tx]); };
+      const open = (x: number, z: number) => { const tx = Math.floor(x / TS), tz = Math.floor(z / TS); return tx >= 0 && tz >= 0 && tx < map.W && tz < map.H && t0[tz * map.W + tx] === 0 && ShipGen.roomAt(map, x, z, 0) !== ri && !(sv.aiProp && sv.aiProp[tz * map.W + tx]); };
       for (const d of doorsOf(ri)) {
         const ax = d.axis === 'x' ? 1 : 0, az = d.axis === 'z' ? 1 : 0, sgn = -(ax ? Math.sign(cx - d.x) || 1 : Math.sign(cz - d.z) || 1); // (sgn: out of the room)
         const yaw = Math.atan2(-(ax * sgn), -(az * sgn)); // (facing out)
@@ -250,7 +258,7 @@ const G_SpaceSv = (() => {
     const guards = [...sv.enemies.values()].filter((e) => !e.def.civ && !e.def.timid && !e.def.leader && e.state === 'normal' && !e.down && onHull(e) && e.id !== M.camOp && !(M.gunners || []).includes(e.id) && !(M.cards.some((c) => c.eid === e.id)));
     // (a ship carrying the artifact, still aboard her: her guards split between its compartment's doors and her people's, those posted
     // with it at its doors first, the rest by which they're nearer)
-    const ar = M.ms.obj === 'artifact' && M.art === 0 && meta.artifact ? G.ShipGen.roomAt(map, meta.artifact.x, meta.artifact.z, 0) : -1;
+    const ar = M.ms.obj === 'artifact' && M.art === 0 && meta.artifact ? ShipGen.roomAt(map, meta.artifact.x, meta.artifact.z, 0) : -1;
     const art = ar >= 0 && ar !== best && meta.hullOf[ar] === hull && doorsOf(ar).length ? doorPosts(ar) : null;
     const shel = doorPosts(best);
     const send = (e: Enemy, p: Post) => { e.post = p; e.home = { x: p.x, y: 0, z: p.z }; e.walkTo = null; e.bold = false; e.lurk = false; e.hide = null; }; // (to their posts, not hiding where they were)
@@ -264,24 +272,24 @@ const G_SpaceSv = (() => {
     }
     toShel.sort((a, b) => Math.hypot(a.x - shel.cx, a.z - shel.cz) - Math.hypot(b.x - shel.cx, b.z - shel.cz));
     toShel.slice(0, Math.max(shel.all.length, 2)).forEach((e, i) => send(e, shel.all[i] || Object.assign(spot(100 + i), { yaw: 0, flow })));
-    if (art) say(`Her guards are splitting: some to ${meta.roles[ar] ? 'the ' + G.ShipGen.NAMES[meta.roles[ar]!].toLowerCase() : 'the artifact'}, holding its doors.`);
-    say(`Her crew are falling back to ${meta.roles[best] ? 'the ' + G.ShipGen.NAMES[meta.roles[best]!].toLowerCase() : 'one compartment'}, her guards on its doors.`);
+    if (art) say(`Her guards are splitting: some to ${meta.roles[ar] ? 'the ' + ShipGen.NAMES[meta.roles[ar]!].toLowerCase() : 'the artifact'}, holding its doors.`);
+    say(`Her crew are falling back to ${meta.roles[best] ? 'the ' + ShipGen.NAMES[meta.roles[best]!].toLowerCase() : 'one compartment'}, her guards on its doors.`);
   }
   // A spot nobody but her sheltering people (and those posted inside with them) should go to hide in or take cover at: the safe
   // compartment, once there is one (js/server.ts findHide)
   function offLimits(e: any, x: number, z: number) {
     const M = st.M, sv = S(), map = sv.map; if (!M || M.safe == null || M.safe < 0 || !map) return false;
-    if (e.shelter || (e.post && G.ShipGen.roomAt(map, e.post.x, e.post.z, 0) === M.safe)) return false;
-    return G.ShipGen.roomAt(map, x, z, 0) === M.safe;
+    if (e.shelter || (e.post && ShipGen.roomAt(map, e.post.x, e.post.z, 0) === M.safe)) return false;
+    return ShipGen.roomAt(map, x, z, 0) === M.safe;
   }
   // The safe compartment's doors: a guard by one that's open (within 2 m: his post's beside it, clear of its mouth) shuts it as he passes, once her people are in (nobody sent there still
   // outside) and he's no threat on him (nobody in sight, none for a while, not shot at)
   function shut(room: number) {
     const sv = S(), M = st.M!, map = sv.map!, c = sv.clock || 0;
-    const out = [...sv.enemies.values()].some((e) => e.shelter && e.shelter.room === room && !e.down && e.state !== 'cuffed' && e.state !== 'surrender' && G.ShipGen.roomAt(map, e.x, e.z, 0) !== room);
+    const out = [...sv.enemies.values()].some((e) => e.shelter && e.shelter.room === room && !e.down && e.state !== 'cuffed' && e.state !== 'surrender' && ShipGen.roomAt(map, e.x, e.z, 0) !== room);
     if (out) return;
     // (nor while a guard who's posted outside is still in there: he'd shut himself in with them)
-    const inside = (x: number, z: number) => G.ShipGen.roomAt(map, x, z, 0) === room;
+    const inside = (x: number, z: number) => ShipGen.roomAt(map, x, z, 0) === room;
     // (nor while anyone posted inside, her ratings with them, is still on their way in)
     if ([...sv.enemies.values()].some((e) => e.post && sv.able(e) && inside(e.post.x, e.post.z) && !inside(e.x, e.z))) return;
     if ([...sv.enemies.values()].some((e) => e.post && !e.def.civ && sv.able(e) && !inside(e.post.x, e.post.z) && inside(e.x, e.z))) return;
@@ -303,21 +311,21 @@ const G_SpaceSv = (() => {
     sv.markSeen(); // (the rooms her people are in, and see there's nobody: searched)
     if (M.safe != null && M.safe >= 0) shut(M.safe);
     // her cameras: someone at them, on their feet, not given up
-    const op = M.camOp != null ? sv.enemies.get(M.camOp) : null, opRoom = op ? G.ShipGen.roomAt(map, op.x, op.z, op.fl || 0) : -1;
+    const op = M.camOp != null ? sv.enemies.get(M.camOp) : null, opRoom = op ? ShipGen.roomAt(map, op.x, op.z, op.fl || 0) : -1;
     const cam = !!op && !op.down && op.state === 'normal' && opRoom >= 0 && meta.roles[opRoom] === 'security';
     if (cam !== !!M.camOn) { M.camOn = cam; if (cam) say('Her security office has you on camera: her teams know where you are.'); else if (M.camOp != null) say('Her cameras are out: her teams are guessing now.'); }
-    const hull0 = (x: number, z: number) => { const r = G.ShipGen.roomAt(map, x, z, 0); return r >= 0 ? meta.hullOf[r] : -1; };
+    const hull0 = (x: number, z: number) => { const r = ShipGen.roomAt(map, x, z, 0); return r >= 0 ? meta.hullOf[r] : -1; };
     // where they think the squad is
     let B = M.belief || null;
     // (on her cameras: those of the squad inside her, not still aboard their own ship at the breach: till then, the breach is where they are)
     const aboard = alive.filter((p: any) => { const r = sv.roomOf(p.st.p[0], p.st.p[1] || 0, p.st.p[2]); return r >= 0 && meta.hullOf[r] != null; });
     if (cam && aboard.length) {
       const p = aboard.reduce((a: any, q: any) => (!B || Math.hypot(q.st.p[0] - B.x, q.st.p[2] - B.z) < Math.hypot(a.st.p[0] - B.x, a.st.p[2] - B.z) ? q : a), aboard[0]);
-      B = { x: p.st.p[0], y: p.st.p[1], z: p.st.p[2], room: G.ShipGen.roomAt(map, p.st.p[0], p.st.p[2], 0) }; M.beliefAt = sv.clock;
+      B = { x: p.st.p[0], y: p.st.p[1], z: p.st.p[2], room: ShipGen.roomAt(map, p.st.p[0], p.st.p[2], 0) }; M.beliefAt = sv.clock;
     } else {
       let last: any = null;
       for (const e of sv.enemies.values()) if (!e.def.civ && e.lastSeen && (e.sawAt || -1) > (last ? last.sawAt : -1)) last = e;
-      if (last && (last.sawAt || 0) > (M.sweepAt || -1e9) && (last.sawAt || 0) > (M.beliefAt ?? -1e9)) { B = { x: last.lastSeen.x, y: last.lastSeen.y || 0, z: last.lastSeen.z, room: G.ShipGen.roomAt(map, last.lastSeen.x, last.lastSeen.z, 0) }; M.beliefAt = last.sawAt; }
+      if (last && (last.sawAt || 0) > (M.sweepAt || -1e9) && (last.sawAt || 0) > (M.beliefAt ?? -1e9)) { B = { x: last.lastSeen.x, y: last.lastSeen.y || 0, z: last.lastSeen.z, room: ShipGen.roomAt(map, last.lastSeen.x, last.lastSeen.z, 0) }; M.beliefAt = last.sawAt; }
     }
     if (!B) return;
     const moved = !M.belief || M.belief.room !== B.room; M.belief = B;
@@ -331,7 +339,7 @@ const G_SpaceSv = (() => {
     // let go of them to take it; blind, every 25 s)
     if (!moved && sv.clock - (M.sweepAt || -1e9) < (cam ? 8 : 25)) return;
     if (moved && cam) for (const l of sv.enemies.values()) if (sv.leads(l) && !l.canSee && hull0(l.x, l.z) === hull) sv.dropStack(l);
-    const where = B.room >= 0 && meta.roles[B.room] ? 'the ' + G.ShipGen.NAMES[meta.roles[B.room]!].toLowerCase() : 'where they were seen';
+    const where = B.room >= 0 && meta.roles[B.room] ? 'the ' + ShipGen.NAMES[meta.roles[B.room]!].toLowerCase() : 'where they were seen';
     let told = 0;
     for (const l of sv.enemies.values()) {
       if (!sv.leads(l) || l.post || l.canSee || sv.clock - (l.sawAt ?? -99) < 8 || hull0(l.x, l.z) !== hull) continue;
@@ -339,13 +347,13 @@ const G_SpaceSv = (() => {
     }
     if (!told) return;
     M.sweepAt = sv.clock;
-    if (moved && M.camOn) say(`Her teams are moving on ${B.room >= 0 && meta.roles[B.room] ? 'the ' + G.ShipGen.NAMES[meta.roles[B.room]!].toLowerCase() : 'your position'}.`);
+    if (moved && M.camOn) say(`Her teams are moving on ${B.room >= 0 && meta.roles[B.room] ? 'the ' + ShipGen.NAMES[meta.roles[B.room]!].toLowerCase() : 'your position'}.`);
   }
   // Blind, and the last place they had the squad is empty: each of her fireteams' leaders with nothing on (not breaching a room, not in a
   // fight, not posted) is sent to the nearest room to it (along the ways through her) that nobody's cleared since, and nobody else is
   // on; so they work outward from it, a room each, till they find the squad or have been through her (and then round again).
   function search(B: { x: number; y: number; z: number; room: number }, hull: number) {
-    const sv = S(), M = st.M!, map = sv.map!, meta = M.meta!, TS = G.Level.TS, c = sv.clock, since = M.beliefAt ?? 0;
+    const sv = S(), M = st.M!, map = sv.map!, meta = M.meta!, TS = Level.TS, c = sv.clock, since = M.beliefAt ?? 0;
     if (!M.searching) { M.searching = true; M.searchTo = new Map(); say('Her teams have lost you: they are searching her, room by room.'); }
     const to = M.searchTo!, from = sv.flowTo(B.x, B.y, B.z);
     const claimed = new Set<number>();
@@ -366,15 +374,15 @@ const G_SpaceSv = (() => {
     for (const l of sv.enemies.values()) {
       if (!rooms.length) break;
       if (!sv.leads(l) || l.post || l.canSee || c - (l.sawAt ?? -99) < 8 || hull0of(l) !== hull || to.has(l.id) || sv.breaching(l) || (l.radioT || 0) > 0) continue;
-      const r = rooms[0], name = meta.roles[r.i] ? 'the ' + G.ShipGen.NAMES[meta.roles[r.i]!].toLowerCase() : 'the next compartment';
+      const r = rooms[0], name = meta.roles[r.i] ? 'the ' + ShipGen.NAMES[meta.roles[r.i]!].toLowerCase() : 'the next compartment';
       if (sv.command(l, r.p.x, 0, r.p.z, `the ship: search ${name}`)) { to.set(l.id, { ri: r.i, at: c }); claimed.add(r.i); rooms.shift(); M.sweepAt = c; }
     }
-    function hull0of(e: { x: number; z: number }) { const ri = G.ShipGen.roomAt(map, e.x, e.z, 0); return ri >= 0 ? meta.hullOf[ri] : -1; }
+    function hull0of(e: { x: number; z: number }) { const ri = ShipGen.roomAt(map, e.x, e.z, 0); return ri >= 0 ? meta.hullOf[ri] : -1; }
   }
   // the hull's been breached there: her response squads come to it (what they do when they've heard something and mean to look)
   function respond(x: number, z: number) {
     const sv = S(), M = st.M, map = sv.map; if (!M || !M.meta || !map) return;
-    const ri = G.ShipGen.roomAt(map, x, z, 0), hull = ri >= 0 ? M.meta.hullOf[ri] : 0;
+    const ri = ShipGen.roomAt(map, x, z, 0), hull = ri >= 0 ? M.meta.hullOf[ri] : 0;
     let n = 0;
     for (const [id, h] of M.resp) {
       const e = sv.enemies.get(id); if (!e || h !== hull || e.down || e.state !== 'normal') continue;
@@ -409,11 +417,11 @@ const G_SpaceSv = (() => {
     sv.cabs = k.cabs; sv.wcase = k.wcase; sv.caseOpen = k.caseOpen; sv.abox = k.abox; sv.sbox = k.sbox; sv.report = k.report;
     M.cards = k.cards; M.hvt = k.hvt; M.resp = k.resp;
     // her plating, doors and glass as the squad left them (the holes and fallen doors over again, as whoever joins has them)
-    k.doors.forEach(([o, hp], i) => { const d = map.doors[i]; if (!d) return; if (hp) d.hp = hp; if (d.open !== !!o) { d.open = !!o; G.World.door(map.world, map, d); } });
-    sv.holes = k.holes; for (const h of k.holes) G.Damage.apply(map, h);
-    sv.fallen = k.fallen; for (const [i, ...f] of k.fallen) { const d = map.doors[i]; if (d) G.Damage.fall(map, d, ...(f as [any, any, any])); }
+    k.doors.forEach(([o, hp], i) => { const d = map.doors[i]; if (!d) return; if (hp) d.hp = hp; if (d.open !== !!o) { d.open = !!o; World.door(map.world, map, d); } });
+    sv.holes = k.holes; for (const h of k.holes) Damage.apply(map, h);
+    sv.fallen = k.fallen; for (const [i, ...f] of k.fallen) { const d = map.doors[i]; if (d) Damage.fall(map, d, ...(f as [any, any, any])); }
     const ws = map.windows || [];
-    sv.glassBroken = new Set(k.glass); for (const id of k.glass) if (ws[id]) { ws[id].broken = true; G.World.windowSolids(map.world, map, ws[id]); }
+    sv.glassBroken = new Set(k.glass); for (const id of k.glass) if (ws[id]) { ws[id].broken = true; World.windowSolids(map.world, map, ws[id]); }
     sv.glassCracked = k.cracked; for (const [id] of k.cracked) if (ws[id]) ws[id].cracked = (ws[id].cracked || 0) + 1;
     map.doorVer = (map.doorVer || 0) + 1;
     return true;
@@ -421,17 +429,17 @@ const G_SpaceSv = (() => {
   function populate() {
     const M = st.M, sv = S(), map = sv.map;
     if (!M || !map) return;
-    const meta = M.meta = map.sp || null, TS = G.Level.TS;
+    const meta = M.meta = map.sp || null, TS = Level.TS;
     if (!meta) return; // (a base on a planet: nothing but the people in it)
-    const spotIn = (ri: number) => { const rm = map.rooms[ri]; if (!rm) return null; const c = map.enemySpots.filter(([x, z, f]) => (f || 0) === (rm.fl || 0) && x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h); const s = c.length ? c[Math.floor(Math.random() * c.length)] : [rm.cx, rm.cz]; return { x: (s[0] + 0.5) * TS, z: (s[1] + 0.5) * TS, y: G.Level.floorMap(map, rm.fl || 0).fy || 0 }; };
+    const spotIn = (ri: number) => { const rm = map.rooms[ri]; if (!rm) return null; const c = map.enemySpots.filter(([x, z, f]) => (f || 0) === (rm.fl || 0) && x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h); const s = c.length ? c[Math.floor(Math.random() * c.length)] : [rm.cx, rm.cz]; return { x: (s[0] + 0.5) * TS, z: (s[1] + 0.5) * TS, y: Level.floorMap(map, rm.fl || 0).fy || 0 }; };
     const hp = 1 + 0.04 * (sv.level - 1) + 0.1 * (Math.max(1, sv.players.size) - 1);
     // (come back to: the holes the squad left in her are still there)
-    for (const q of M.cutsWas || []) G.ShipGen.cut(map, G.ShipGen.siteAt(map, q));
+    for (const q of M.cutsWas || []) ShipGen.cut(map, ShipGen.siteAt(map, q));
     M.cutsWas = undefined;
-    G.ShipGen.seal(map, null);
+    ShipGen.seal(map, null);
     // the pirates' own pods, still in her hull where they came through: two or three, apart from each other (nobody else can come in there)
     if (M.ms.obj === 'hostage' && !M.raid.length) {
-      const W = map.W, want = Math.random() < 0.5 ? 2 : 3, by = Math.floor(meta.breach.z / TS) * W + Math.floor(meta.breach.x / TS), ss = G.ShipGen.sites(map).slice().sort(() => Math.random() - 0.5), far = (c: number, q: number[], m = 6.5) => Math.hypot(c % W - q[0] % W, ((c / W) | 0) - ((q[0] / W) | 0)) * TS > m; // (metres: a pod is four across, the squad's ship nine)
+      const W = map.W, want = Math.random() < 0.5 ? 2 : 3, by = Math.floor(meta.breach.z / TS) * W + Math.floor(meta.breach.x / TS), ss = ShipGen.sites(map).slice().sort(() => Math.random() - 0.5), far = (c: number, q: number[], m = 6.5) => Math.hypot(c % W - q[0] % W, ((c / W) | 0) - ((q[0] / W) | 0)) * TS > m; // (metres: a pod is four across, the squad's ship nine)
       for (const s of ss) { if (M.raid.length < want && M.raid.every((q) => far(s.c, q)) && far(s.c, [by], 9)) M.raid.push([s.c, s.nx, s.nz]); } // (and clear of the marked stretch: the squad's own way in)
     }
     if (M.keep) return; // (come back to: he and the keycards' carriers are where they were, restore)
@@ -444,7 +452,7 @@ const G_SpaceSv = (() => {
       const a = M.hvtAt;
       if (M.hvtSt === 2) { const e = sv.addEnemy('leader', a.x, a.z, hp * 1.4, a.y); e.state = 'cuffed'; e.armed = false; e.yaw = a.yaw; e.drawn = true; if (a.wear) e.wear = a.wear; M.hvt = e.id; }
       else { // (his body: kept under a number no one living has, as the dead are by their own)
-        const id = 900000 + M.ms.i; sv.bodies.set(id, { id, type: 'leader', def: (G.ENEMIES as any).leader, x: a.x, y: a.y, z: a.z, yaw: a.yaw, civ: false, secured: false, rec: null } as any); }
+        const id = 900000 + M.ms.i; sv.bodies.set(id, { id, type: 'leader', def: (ENEMIES as any).leader, x: a.x, y: a.y, z: a.z, yaw: a.yaw, civ: false, secured: false, rec: null } as any); }
     }
     // a keycard's carrier: someone armed already in (or nearest) the room they'd be in, else one more of the crew there
     for (const key of Object.keys(meta.cardRooms)) {
@@ -493,12 +501,12 @@ const G_SpaceSv = (() => {
   let hostShip: { w: any; s: any[] } | null = null;
   function shipSolids(on: boolean) {
     const sv = S(), M = st.M, w = sv.map && sv.map.world;
-    if (hostShip) { for (const s of hostShip.s) if (hostShip.w === w) G.World.remove(hostShip.w, s); hostShip = null; }
-    if (sv.map) G.Level.setTilt(sv.map, null, null);
+    if (hostShip) { for (const s of hostShip.s) if (hostShip.w === w) World.remove(hostShip.w, s); hostShip = null; }
+    if (sv.map) Level.setTilt(sv.map, null, null);
     if (!on || !M || !M.site || !w || !sv.map) return;
-    const W = sv.map.W, TS = G.Level.TS, a = M.site, site = { x: (a[0] % W + 0.5) * TS, z: (((a[0] / W) | 0) + 0.5) * TS, nx: a[1], nz: a[2], ang: a[3] || 0, pt: a[4] || 0 }, d = SD.SHIPS[st.fleet.ship]; // (ang: an angled breach's, degrees off square)
-    G.Level.setTilt(sv.map, d, SD.berthAt(d, site)); // (lying tilted: her own gravity aboard her)
-    hostShip = { w, s: SD.worldBoxes(d, SD.berthAt(d, site), (t) => t !== 'nose' && t !== 'steps').map((q) => G.World.add(w, SD.solidOf(q, { kind: 'prop', mat: G.Materials.SHIP }))) };
+    const W = sv.map.W, TS = Level.TS, a = M.site, site = { x: (a[0] % W + 0.5) * TS, z: (((a[0] / W) | 0) + 0.5) * TS, nx: a[1], nz: a[2], ang: a[3] || 0, pt: a[4] || 0 }, d = SD.SHIPS[st.fleet.ship]; // (ang: an angled breach's, degrees off square)
+    Level.setTilt(sv.map, d, SD.berthAt(d, site)); // (lying tilted: her own gravity aboard her)
+    hostShip = { w, s: SD.worldBoxes(d, SD.berthAt(d, site), (t) => t !== 'nose' && t !== 'steps').map((q) => World.add(w, SD.solidOf(q, { kind: 'prop', mat: Materials.SHIP }))) };
   }
   // ---- the ship: she's against the hull (the plate goes in), on the pad, or away again
   function dock(on: boolean, from: string, at?: unknown) {
@@ -508,29 +516,29 @@ const G_SpaceSv = (() => {
     // against her hull: at the site the pilot's game says she hit (any clear stretch of it), cut through there if it isn't already
     let site: ShSite | null = null;
     if (on && M.meta && sv.map) {
-      const a = Array.isArray(at) && at.length >= 3 && at.length <= 5 && (at[3] == null || Math.abs(at[3]) <= G.SpaceData.BREACH_ANG) && (at[4] == null || Math.abs(at[4]) <= G.SpaceData.BREACH_PITCH) && at.every(Number.isInteger) ? (at as number[]) : null; // (a[3]: an angled breach's, degrees off square)
-      if (a && M.raid.some((q) => Math.hypot(a[0] % sv.map!.W - q[0] % sv.map!.W, ((a[0] / sv.map!.W) | 0) - ((q[0] / sv.map!.W) | 0)) * G.Level.TS < 8)) return; // (a pirate pod's there)
-      site = a ? G.ShipGen.siteOf(sv.map, a[0], a[1], a[2]) : null;
+      const a = Array.isArray(at) && at.length >= 3 && at.length <= 5 && (at[3] == null || Math.abs(at[3]) <= SpaceData.BREACH_ANG) && (at[4] == null || Math.abs(at[4]) <= SpaceData.BREACH_PITCH) && at.every(Number.isInteger) ? (at as number[]) : null; // (a[3]: an angled breach's, degrees off square)
+      if (a && M.raid.some((q) => Math.hypot(a[0] % sv.map!.W - q[0] % sv.map!.W, ((a[0] / sv.map!.W) | 0) - ((q[0] / sv.map!.W) | 0)) * Level.TS < 8)) return; // (a pirate pod's there)
+      site = a ? ShipGen.siteOf(sv.map, a[0], a[1], a[2]) : null;
       if (site && a && (a[3] || a[4])) site = Object.assign({}, site, { ang: a[3] || 0, pt: a[4] || 0 }); // (the site's own record kept as it is)
       const was = a ? M.meta.cuts.find((q) => q[0] === a[0] && q[1] === a[1] && q[2] === a[2]) : null;
       if (!site && was) { M.site = was.slice(); } // (the hole she made before: at the angle it was made at)
       else if (!site) return;
-      else { G.ShipGen.cut(sv.map, site); M.site = G.ShipGen.cutKey(site); }
+      else { ShipGen.cut(sv.map, site); M.site = ShipGen.cutKey(site); }
     }
     if (on && M.meta && !M.breached) { M.breached = true; if (M.ms.obj === 'visit') say(`${M.ms.name} takes the breach for an attack: her crew are coming for you.`); }
     M.docked = on; st.ship.docked = on;
     shipSolids(on);
-    if (sv.map) G.ShipGen.seal(sv.map, on ? M.site : null); // (the holes she isn't against: shut)
+    if (sv.map) ShipGen.seal(sv.map, on ? M.site : null); // (the holes she isn't against: shut)
     net().broadcast({ t: 'sdock', on: on ? 1 : 0, by: from, site: on ? M.site : undefined });
     if (on && M.meta && sv.map && M.site) {
-      const W = sv.map.W, TS = G.Level.TS, x = (M.site[0] % W + 0.5) * TS, z = (((M.site[0] / W) | 0) + 0.5) * TS;
-      sv.hear(x, z, G.SpaceData.fitted(st.fleet, 'jammer') ? 14 : 45, 0); // (the whole ship rings with it)
-      if (M.ms.obj === 'hostage' && !M.told) { M.told = true; const role = M.meta.roles[M.hold]; say(`The pirates are holding her people in ${role ? 'the ' + G.ShipGen.NAMES[role].toLowerCase() : 'one compartment'}. Clear the ship.`); }
-      if (!G.SpaceData.fitted(st.fleet, 'jammer')) alarm(x - M.site[1] * 2 * TS, z - M.site[2] * 2 * TS);
+      const W = sv.map.W, TS = Level.TS, x = (M.site[0] % W + 0.5) * TS, z = (((M.site[0] / W) | 0) + 0.5) * TS;
+      sv.hear(x, z, SpaceData.fitted(st.fleet, 'jammer') ? 14 : 45, 0); // (the whole ship rings with it)
+      if (M.ms.obj === 'hostage' && !M.told) { M.told = true; const role = M.meta.roles[M.hold]; say(`The pirates are holding her people in ${role ? 'the ' + ShipGen.NAMES[role].toLowerCase() : 'one compartment'}. Clear the ship.`); }
+      if (!SpaceData.fitted(st.fleet, 'jammer')) alarm(x - M.site[1] * 2 * TS, z - M.site[2] * 2 * TS);
     } else if (!on && M.meta && sv.map && M.site) {
       // she's backed out of the hole: that compartment is open to space
-      const W = sv.map.W, TS = G.Level.TS, x = (M.site[0] % W + 0.5 - M.site[1] * 1.5) * TS, z = (((M.site[0] / W) | 0) + 0.5 - M.site[2] * 1.5) * TS;
-      vent(G.ShipGen.roomAt(sv.map, x, z), 'the breach');
+      const W = sv.map.W, TS = Level.TS, x = (M.site[0] % W + 0.5 - M.site[1] * 1.5) * TS, z = (((M.site[0] / W) | 0) + 0.5 - M.site[2] * 1.5) * TS;
+      vent(ShipGen.roomAt(sv.map, x, z), 'the breach');
     }
     sync();
   }
@@ -570,7 +578,7 @@ const G_SpaceSv = (() => {
     if (map && pos) {
       const [a, b] = doorRooms(M).get(d.id) || [-1, -1], role = (i: number) => (i >= 0 && M.meta ? M.meta.roles[i] : null);
       const inside = role(a) === k ? a : role(b) === k ? b : role(a) === 'spine' ? b : role(b) === 'spine' ? a : -1;
-      if (inside >= 0 && G.ShipGen.roomAt(map, pos[0], pos[2], d.fl || 0) === inside) {
+      if (inside >= 0 && ShipGen.roomAt(map, pos[0], pos[2], d.fl || 0) === inside) {
         delete M.meta!.locks[d.id]; (M.unlocked || (M.unlocked = [])).push(d.id);
         net().broadcast({ t: 'unlock', i: d.id });
         return true;
@@ -589,7 +597,7 @@ const G_SpaceSv = (() => {
     const M = st.M, sv = S(), map = sv.map; if (!M || M.safe == null || M.safe < 0 || !map || !M.alarm) return false;
     if (!(doorRooms(M).get(d.id) || []).includes(M.safe)) return false;
     if (!e) return !!M.shutDoors && M.shutDoors.has(d.id); // (the ways through her: only once it's been shut on them all, shut)
-    const inside = (x: number, z: number) => G.ShipGen.roomAt(map, x, z, 0) === M.safe;
+    const inside = (x: number, z: number) => ShipGen.roomAt(map, x, z, 0) === M.safe;
     if (e.shelter && e.shelter.room === M.safe) return false;
     if (e.post && inside(e.post.x, e.post.z) !== inside(e.x, e.z)) return false;
     return true;
@@ -600,8 +608,8 @@ const G_SpaceSv = (() => {
     const M = st.M, map = S().map; if (!M || !M.meta || !map) return false;
     const cuts = M.meta.cuts || [];
     if (breachedOf.M !== M || breachedOf.n !== cuts.length) {
-      const rooms = new Set<number>(), TS = G.Level.TS;
-      for (const q of cuts) { const t = G.ShipGen.siteAt(map, q); for (const k of [1, 2.5]) { const ri = G.ShipGen.roomAt(map, t.x - t.nx * (TS / 2 + k), t.z - t.nz * (TS / 2 + k), 0); if (ri >= 0) rooms.add(ri); } }
+      const rooms = new Set<number>(), TS = Level.TS;
+      for (const q of cuts) { const t = ShipGen.siteAt(map, q); for (const k of [1, 2.5]) { const ri = ShipGen.roomAt(map, t.x - t.nx * (TS / 2 + k), t.z - t.nz * (TS / 2 + k), 0); if (ri >= 0) rooms.add(ri); } }
       breachedOf = { n: cuts.length, M, rooms };
     }
     // (the room it locks: the key's own, else the side that isn't the spine, as mayOpen has it)
@@ -615,7 +623,7 @@ const G_SpaceSv = (() => {
     if (M.doorRooms) return M.doorRooms;
     const map = S().map!, out = new Map<number, number[]>();
     for (const d of map.doors) {
-      const ax = d.axis === 'x' ? 1 : 0, az = d.axis === 'z' ? 1 : 0, a = G.ShipGen.roomAt(map, d.x - ax * 1.4, d.z - az * 1.4, d.fl || 0), b = G.ShipGen.roomAt(map, d.x + ax * 1.4, d.z + az * 1.4, d.fl || 0);
+      const ax = d.axis === 'x' ? 1 : 0, az = d.axis === 'z' ? 1 : 0, a = ShipGen.roomAt(map, d.x - ax * 1.4, d.z - az * 1.4, d.fl || 0), b = ShipGen.roomAt(map, d.x + ax * 1.4, d.z + az * 1.4, d.fl || 0);
       out.set(d.id, [a, b]);
     }
     return (M.doorRooms = out);
@@ -625,8 +633,8 @@ const G_SpaceSv = (() => {
     M.vac.add(ri);
     const role = M.meta.roles[ri];
     net().broadcast({ t: 'vent', r: ri });
-    say(`${(role && G.ShipGen.NAMES[role]) || 'A compartment'} is open to space${why ? ' (' + why + ')' : ''}: the doors are sealing.`);
-    const rm = sv.map.rooms[ri]; if (rm) sv.hear((rm.cx + 0.5) * G.Level.TS, (rm.cz + 0.5) * G.Level.TS, 30, 0);
+    say(`${(role && ShipGen.NAMES[role]) || 'A compartment'} is open to space${why ? ' (' + why + ')' : ''}: the doors are sealing.`);
+    const rm = sv.map.rooms[ri]; if (rm) sv.hear((rm.cx + 0.5) * Level.TS, (rm.cz + 0.5) * Level.TS, 30, 0);
     sync();
   }
   // a pane's been broken (js/server.ts breakGlass): one in the hull lets the room's air out
@@ -654,7 +662,7 @@ const G_SpaceSv = (() => {
     // whoever's in there without a suit: about five seconds
     for (const e of [...sv.enemies.values()]) {
       if (e.state === 'dead' || e.hp <= 0) continue;
-      if (!M.vac.has(G.ShipGen.roomAt(map, e.x, e.z, G.Level.floorAt(map, e.x, e.y || 0, e.z)))) continue;
+      if (!M.vac.has(ShipGen.roomAt(map, e.x, e.z, Level.floorAt(map, e.x, e.y || 0, e.z)))) continue;
       e.hp -= e.maxHp * 0.2 * dt;
       if (e.hp <= 0) { e.hp = 0.01; sv.applyHit({ e: e.id, d: 1, bo: 1, cz: 'vacuum' }, e.lastHit); }
     }
@@ -799,5 +807,5 @@ const G_SpaceSv = (() => {
   }
   return { st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
 })();
-G.SpaceSv = G_SpaceSv;
-interface GameModules { SpaceSv: typeof G_SpaceSv; }
+G.SpaceSv = SpaceSv;
+declare global { interface GameModules { SpaceSv: typeof SpaceSv; } }

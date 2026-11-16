@@ -1,4 +1,6 @@
 'use strict';
+import { Homes } from './homes.js';
+import { Level } from './level.js';
 // The light grid: every lamp in the level lights its surroundings, at a fixed cost however many there are.
 //
 // A real THREE.PointLight costs every lit pixel a pass over it (three.js shades forward, with no culling per light),
@@ -22,7 +24,7 @@
 //   - It's on only while the level itself is drawn (G.R.render): the gunsmith's and the icons' renderers share the
 //     materials, and don't want the level's lamps.
 // Dynamic lights (muzzle flashes, weapon lights, explosions) are still real lights.
-const G_LightGrid = (() => {
+export const LightGrid = (() => {
   const T = THREE;
   const blank = new T.DataTexture(new Uint16Array(4), 1, 1, T.RGBAFormat, T.HalfFloatType); blank.needsUpdate = true;
   // the uniforms every patched material shares (one object: changing a value changes it everywhere)
@@ -140,7 +142,7 @@ const G_LightGrid = (() => {
     install(map, pre && pre.W === map.W && pre.H === map.H && pre.NF === floors.length && pre.layers.length === (map.doors || []).length ? pre : compute(map));
   }
   function compute(map: LvMap): LgData {
-    const L = G.Level, TS = L.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, N = W * H;
+    const L = Level, TS = L.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, N = W * H;
     const col = new T.Color(), DECAY = 1.6, t0 = performance.now();
     const cur = new Float32Array(N * NF * K), doors = map.doors || [], layers: (Map<number, Float32Array> | null)[] = doors.map(() => null), shutAt: Map<number, LvDoor>[] = [], winAt: Set<number>[] = [];
     // the sky: the theme's fill (as js/render.ts had it everywhere), on what's open to it (not the hangar's: its
@@ -327,7 +329,7 @@ const G_LightGrid = (() => {
       layers: layers.map((ly) => { if (!ly) return null; const at = Int32Array.from(ly.keys()), v = new Float32Array(at.length * K); let n = 0; for (const o of ly.values()) v.set(o, K * n++); return { at, v }; }) };
   }
   function install(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[] }, d: LgData) {
-    const L = G.Level, TS = L.TS, floors = map.floors || [map], doors = map.doors || [], { W, H, NF, cur } = d, N = W * H;
+    const L = Level, TS = L.TS, floors = map.floors || [map], doors = map.doors || [], { W, H, NF, cur } = d, N = W * H;
     dispose();
     const tex = (data: Uint16Array) => {
       const tx = new T.DataTexture(data as Uint16Array<ArrayBuffer>, W, H * NF, T.RGBAFormat, T.HalfFloatType);
@@ -340,7 +342,7 @@ const G_LightGrid = (() => {
     doors.forEach((d: LvDoor, i: number) => setDoor(i, d.open ? 1 : 0));
     flush();
     U.lgLight.value = G0.tl; U.lgDir.value = G0.td;
-    U.lgPaint.value = G.Homes.paint(map) || blank;
+    U.lgPaint.value = Homes.paint(map) || blank;
     U.lgGrid.value.set(0, 0, TS, 0);
     // a floor's layer: from just under its floor (the slab's edge round a drop) to just over its ceiling. (Not
     // higher: the top of a room's walls and its ceiling took the light of the floor above, and flickered with it.)
@@ -406,5 +408,5 @@ const G_LightGrid = (() => {
   const on = (v: boolean) => { U.lgGrid.value.w = v && built ? 1 : 0; };
   return { build, compute, dispose, on, at, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();
-G.LightGrid = G_LightGrid;
-interface GameModules { LightGrid: typeof G_LightGrid; }
+G.LightGrid = LightGrid;
+declare global { interface GameModules { LightGrid: typeof LightGrid; } }
