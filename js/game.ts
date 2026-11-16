@@ -798,16 +798,12 @@ const G_Game = {
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
         else if (m.phase === 'level') {
           this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp);
-          if (m.doors) m.doors.forEach((o: number, i: number) => { const d = this.map!.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map!.world, this.map!, d); } });
-          if (m.holes) for (const h of m.holes) G.Damage.apply(this.map as unknown as GmDmgMap, h); // (what's been shot out of the place)
-          if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map as unknown as GmDmgMap, this.map!.doors[i] as any, ang, dir, seed, true);
-          if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]: [number, string, number, number, number, number]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
+          this.levelWas(m);
           if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => G.Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
           this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
           this.cabs = m.cabs || []; G.Views.syncCabs();
           G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...(a as [any, any, any, any, any, any, any]));
-          for (const id of m.glass || []) G.Views.breakGlass(id); // windows already broken when we joined
-          for (const [id, p] of m.cracked || []) G.Views.crackGlass(id, new THREE.Vector3(...p));
+          this.glassWas(m);
         } else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, null, m.stock, m.sp);
         else this.enterLobby();
         break;
@@ -835,7 +831,8 @@ const G_Game = {
       case 'phase':
         if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined; // (none: the game in space's sidearm picker)
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => G.Views.addBody(id, type, x, z, yaw, sec, y, nm || null)); }
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => G.Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
+          if (m.doors) { this.levelWas(m); if (m.loot) { G.Loot.clear(); for (const a of m.loot) G.Loot.add(...(a as [any, any, any, any, any, any, any])); } this.glassWas(m); } } // (a ship come back to, as she was left: js/spaceserver.ts restore)
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock, m.sp);
         else if (m.phase === 'gameover') this.enterGameover(m);
         else if (m.phase === 'lobby') this.enterLobby();
@@ -1724,6 +1721,18 @@ const G_Game = {
   },
   // sp: a mission's level (js/spaceserver.ts levelMsg): what it's generated for, the mission, the ship. Then there's no helicopter:
   // you're aboard the squad's ship as she comes out of the jump (js/space.ts).
+  // what's been done to the place already (joined it under way, or a ship come back to): its doors, holes, fallen doors, the guns on its floors
+  levelWas(m: any) {
+    if (m.doors) m.doors.forEach((o: number, i: number) => { const d = this.map!.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map!.world, this.map!, d); } });
+    if (m.holes) for (const h of m.holes) G.Damage.apply(this.map as unknown as GmDmgMap, h); // (what's been shot out of the place)
+    if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map as unknown as GmDmgMap, this.map!.doors[i] as any, ang, dir, seed, true);
+    if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]: [number, string, number, number, number, number]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
+  },
+  // (and its glass: broken, or cracked)
+  glassWas(m: any) {
+    for (const id of m.glass || []) G.Views.breakGlass(id);
+    for (const [id, p] of m.cracked || []) G.Views.crackGlass(id, new THREE.Vector3(...p));
+  },
   enterLevel(level: number, seed: number, th?: number, night = false, wc?: string | null, sp?: any) {
     const pre = sp && G.Space.S.on ? G.Space.takeMap(seed, level, th as number, night, sp.gen) : null; // (made ahead: one of the zone's ships, or where a jump's going)
     const jump = G.Space.jumping(), seamless = !!pre || jump || !!(sp && sp.zone && sp.zone.near && G.Space.S.on && G.Space.S.kind === 'board'); // (come up with another of the zone's ships, or jumped here aboard: no wipe, js/space.ts)

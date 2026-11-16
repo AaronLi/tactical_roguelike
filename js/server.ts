@@ -503,7 +503,11 @@ const G_Server = {
     // the sticker box's sticker: one of the host's (js/stickers.ts names; none, and the box isn't there)
     const sn = G.Stickers.names;
     this.sbox = this.map.sbox && sn.length ? { s: sn[Math.floor(Math.random() * sn.length)], by: null } : null;
-    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? G.SpaceSv.levelMsg() : undefined,
+    // (a ship of the zone's come back to: as she was left, js/spaceserver.ts restore; and everyone's told all of it, as whoever joins is)
+    const kept = !!ms && G.SpaceSv.restore();
+    const was = kept ? { doors: this.map.doors.map((d: Door) => (d.open ? 1 : 0)), holes: this.holes, fallen: this.fallen, evidence: this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]),
+      loot: [...this.loot.values()].map((l) => this.lootMsg(l)), glass: [...this.glassBroken], cracked: this.glassCracked } : {};
+    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? G.SpaceSv.levelMsg() : undefined, ...was,
       bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : undefined }); // (the dead she's come back to with: js/spaceserver.ts populate)
   },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a

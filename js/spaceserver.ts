@@ -7,6 +7,9 @@
 // the compartments open to space (a hull window shot out: the air goes, the doors seal, whoever has no suit dies).
 // Money: nothing is paid for a kill, an arrest or evidence on a mission (js/server.ts pay); the mission's fee is paid to
 // every officer when it's done and the ship has left.
+// All that's happened aboard a ship the squad's left (keepOf), for coming back to her as she was (restore): her people where they were
+// and as they were (dead, hurt, in restraints, hiding), the dead, what's on her floors, her doors, glass, holes and cabinets
+interface SvKeep { enemies: Enemy[]; bodies: any[]; evidence: any[]; loot: any[]; glass: number[]; cracked: [number, number[]][]; holes: any[]; fallen: any[]; doors: [number, any][]; cabs: any; wcase: any; caseOpen: boolean; abox: any; sbox: any; report: any; cards: SvCard[]; hvt: number | null; resp: Map<number, number> }
 interface SvCard { key: string; eid: number; x: number; z: number; y: number; st: 0 | 1 | 2 } // (0 carried by one of the crew, 1 on the floor, 2 taken)
 interface SvMission {
   ms: SpMission; meta: ShMeta | null; docked: boolean; done: boolean; keys: Record<string, boolean>; cards: SvCard[];
@@ -14,7 +17,7 @@ interface SvMission {
   hvt: number | null; hvtSt: 0 | 1 | 2; hvtAt?: { x: number; y: number; z: number; yaw: number; wear: any } | null; // (0 at large, 1 dead, 2 in restraints; hvtAt: where he was left so)
   gunners?: number[]; gn?: number; // (her gun crew, the ids of those posted in her gun control; how many of them are still at it, last told)
   arm: number | null; boom: boolean; cleared: boolean; unlocked?: number[];
-  alarm?: boolean; camOp?: number | null; camOn?: boolean; belief?: { x: number; y: number; z: number; room: number } | null; beliefAt?: number; searchTo?: Map<number, { ri: number; at: number }>; searching?: boolean; sweepAt?: number; respT?: number; safe?: number; shutDoors?: Set<number>; zt: number; leftSaid?: number; revisit?: boolean; cutsWas?: number[][]; breached?: boolean; // (zt: the zone's clock, seconds since the squad came out of the jump: where everything that's under way out there is)
+  alarm?: boolean; camOp?: number | null; camOn?: boolean; belief?: { x: number; y: number; z: number; room: number } | null; beliefAt?: number; searchTo?: Map<number, { ri: number; at: number }>; searching?: boolean; sweepAt?: number; respT?: number; safe?: number; shutDoors?: Set<number>; zt: number; leftSaid?: number; revisit?: boolean; cutsWas?: number[][]; keep?: SvKeep | null; breached?: boolean; // (zt: the zone's clock, seconds since the squad came out of the jump: where everything that's under way out there is)
   site: number[] | null; raid: number[][]; hold: number; told?: boolean; // (raid: where the pirates' pods are in her hull, as sites; hold: the room their hostages are in)
   // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
   resp: Map<number, number>; salv: number[]; // (resp: the breach response squads' people, and the hull each is aboard; salv: the salvage taken, by its number)
@@ -40,7 +43,7 @@ const G_SpaceSv = (() => {
   // The zone the squad is in (js/spacedata.ts zone): the mission it came for (ms), which of the zone's ships the level is now
   // (active: 0 the mission's), the mission's own state while the squad is aboard another (main), the zone's clock, and what's
   // been carried off the others (loot: paid with the salvage at home).
-  interface SvZone { ms: SpMission; active: number; main: SvMission | null; zt: number; loot: number; cas?: SvCas }
+  interface SvZone { ms: SpMission; active: number; main: SvMission | null; zt: number; loot: number; cas?: SvCas; kept?: Map<number, SvMission>; casBy?: Record<number, SvCas> } // (kept: the others she's left, as they were left; casBy: what each ship's cost, as it stood when last left)
   // What a mission cost, for its debrief (js/space.ts debrief): the hostiles killed, put down (alive), in restraints; the civilians
   // dead (all of them, and how many by the squad's hand), safe at the end; the squad's own dead. Counted off each ship as she's
   // left (zone), and added up.
@@ -130,6 +133,7 @@ const G_SpaceSv = (() => {
     if (M && M.revisit && M.cleared) return; // (come back to, and already hers no longer: nobody's left to fight)
     const hp = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     sv.accMult = Math.min(1 + 0.03 * (L - 1), 1.5); sv.dmgMult = 1 + 0.07 * (L - 1); sv.unitsSeen = new Set();
+    if (M && M.keep) return; // (come back to: her people are as they were left, restore)
     const used = new Set<string>(), fy = (f: number) => G.Level.floorMap(map, f).fy || 0;
     const spot = (ri: number) => {
       const rm = map.rooms[ri]; if (!rm) return null;
@@ -379,6 +383,41 @@ const G_SpaceSv = (() => {
     if (n) say('Her breach response team is moving.');
   }
   // the level is built and the crew is aboard her (js/server.ts startLevel calls it before it tells anyone): the mission's own people
+  // A ship being left: all that's happened aboard her (SvKeep), her people as they are but with nothing in hand that's of this visit
+  // (where they were going and how, their orders, what they were shooting at), to be taken up afresh when she's come back to
+  function keepOf(): SvKeep {
+    const sv = S() as any, map = sv.map, M = st.M!;
+    const enemies = [...sv.enemies.values()].map((e: Enemy) => {
+      const o: any = e;
+      o.order = null; o.cover = null; o.inCover = false; o.coverFlow = null; o.dp = null; o.trv = undefined; o.dodge = null; o.walkTo = null; o.tgt = null; o.canSee = false; o.aiming = false; o.peek = false; o.peeking = false;
+      o.threat = null; o.callTgt = null; o.guess = null; o.shieldBy = undefined; o.clearOut = null; o.dragTo = null; o.pushing = false; o.relocate = false;
+      if (o.hide) delete o.hide.flow; if (o.post) o.post.flow = undefined; if (o.shelter) o.shelter.flow = undefined;
+      return e;
+    });
+    return { enemies, bodies: [...sv.bodies.values()], evidence: sv.evidence || [], loot: [...(sv.loot || new Map()).values()], glass: [...(sv.glassBroken || [])], cracked: sv.glassCracked || [], holes: sv.holes || [], fallen: sv.fallen || [],
+      doors: map ? map.doors.map((d: any) => [d.open ? 1 : 0, d.hp ? { ...d.hp } : null]) : [], cabs: sv.cabs, wcase: sv.wcase, caseOpen: !!sv.caseOpen, abox: sv.abox, sbox: sv.sbox, report: sv.report, cards: M.cards, hvt: M.hvt, resp: M.resp };
+  }
+  // Come back to a ship left before (js/server.ts startLevel, once she's laid out again from her seed): put back as she was left (keepOf).
+  // True if she was.
+  function restore() {
+    const sv = S() as any, M = st.M, k = M && M.keep, map = sv.map;
+    if (!M || !k || !map) return false;
+    M.keep = null;
+    sv.enemies.clear(); for (const e of k.enemies) sv.enemies.set(e.id, e);
+    sv.nextEid = Math.max(sv.nextEid || 0, ...k.enemies.map((e) => e.id + 1), ...k.bodies.map((b) => (b.id < 900000 ? b.id + 1 : 0)));
+    sv.bodies = new Map(k.bodies.map((b) => [b.id, b])); sv.evidence = k.evidence; sv.loot = new Map(k.loot.map((l) => [l.id, l]));
+    sv.cabs = k.cabs; sv.wcase = k.wcase; sv.caseOpen = k.caseOpen; sv.abox = k.abox; sv.sbox = k.sbox; sv.report = k.report;
+    M.cards = k.cards; M.hvt = k.hvt; M.resp = k.resp;
+    // her plating, doors and glass as the squad left them (the holes and fallen doors over again, as whoever joins has them)
+    k.doors.forEach(([o, hp], i) => { const d = map.doors[i]; if (!d) return; if (hp) d.hp = hp; if (d.open !== !!o) { d.open = !!o; G.World.door(map.world, map, d); } });
+    sv.holes = k.holes; for (const h of k.holes) G.Damage.apply(map, h);
+    sv.fallen = k.fallen; for (const [i, ...f] of k.fallen) { const d = map.doors[i]; if (d) G.Damage.fall(map, d, ...(f as [any, any, any])); }
+    const ws = map.windows || [];
+    sv.glassBroken = new Set(k.glass); for (const id of k.glass) if (ws[id]) { ws[id].broken = true; G.World.windowSolids(map.world, map, ws[id]); }
+    sv.glassCracked = k.cracked; for (const [id] of k.cracked) if (ws[id]) ws[id].cracked = (ws[id].cracked || 0) + 1;
+    map.doorVer = (map.doorVer || 0) + 1;
+    return true;
+  }
   function populate() {
     const M = st.M, sv = S(), map = sv.map;
     if (!M || !map) return;
@@ -395,6 +434,7 @@ const G_SpaceSv = (() => {
       const W = map.W, want = Math.random() < 0.5 ? 2 : 3, by = Math.floor(meta.breach.z / TS) * W + Math.floor(meta.breach.x / TS), ss = G.ShipGen.sites(map).slice().sort(() => Math.random() - 0.5), far = (c: number, q: number[], m = 6.5) => Math.hypot(c % W - q[0] % W, ((c / W) | 0) - ((q[0] / W) | 0)) * TS > m; // (metres: a pod is four across, the squad's ship nine)
       for (const s of ss) { if (M.raid.length < want && M.raid.every((q) => far(s.c, q)) && far(s.c, [by], 9)) M.raid.push([s.c, s.nx, s.nz]); } // (and clear of the marked stretch: the squad's own way in)
     }
+    if (M.keep) return; // (come back to: he and the keycards' carriers are where they were, restore)
     if (M.ms.obj === 'hvt' && M.hvtSt === 0) {
       const p = spotIn(meta.hvtRoom);
       if (p) { const e = sv.addEnemy('leader', p.x, p.z, hp * 1.4, p.y); e.guard = true; e.drawn = true; M.hvt = e.id; e.wear = SD.wearOf(meta.hulls[meta.hullOf[meta.hvtRoom] || 0].size, M.ms.obj); }
@@ -420,8 +460,12 @@ const G_SpaceSv = (() => {
     const sv = S(); let M = st.M;
     if (M) {
       const V = M.ms.obj === 'visit' && Z && Z.main ? M : null; // (jumped home from a ship that isn't the mission's)
-      if (V) { M = Z!.main!; M.salv = M.salv.concat(V.salv.map((_, k) => 1000 + k)); }
-      const ok = finished(M), nSalv = M.salv.length + (Z ? Z.loot : 0), cas = casAdd(Z ? Z.cas : undefined, casNow());
+      if (V) M = Z!.main!;
+      // (salvage off every ship but the mission's that she's been aboard, the one she's jumped from among them; and what each ship cost,
+      // as it stood when she last left her, this one as she is now)
+      const vis = Z ? [...(Z.kept || new Map()).values()].filter((q) => q.ms.obj === 'visit' && q !== V).concat(V ? [V] : []) : [];
+      if (Z) (Z.casBy = Z.casBy || {})[Z.active] = casNow();
+      const ok = finished(M), nSalv = M.salv.length + vis.reduce((a, q) => a + q.salv.length, 0), cas = Object.values((Z && Z.casBy) || { 0: casNow() }).reduce((a: SvCas | undefined, b) => casAdd(a, b), undefined as SvCas | undefined)!;
       if (nSalv) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 2, pay: nSalv * (350 + 60 * M.ms.diff), name: 'Salvage' });
       if (ok && !st.board.done.includes(M.ms.i)) {
         st.board.done.push(M.ms.i);
@@ -696,11 +740,15 @@ const G_SpaceSv = (() => {
         if (!p || sv.phase !== 'level' || sv.leaving || !M || !M.meta || M.docked || M.boom || !Z || k === Z.active) break;
         const c = SD.zone(Z.ms)[k]; if (!c) break;
         const zz = Z;
-        if (M.ms.obj === 'visit') zz.loot += M.salv.length; else { zz.main = M; M.cutsWas = M.meta.cuts.map((q) => q.slice()); }
+        // (the ship being left is kept as she is, the mission's or another, all that's happened aboard her: she's as she was left if
+        // the squad comes back to her)
+        M.cutsWas = M.meta.cuts.map((q) => q.slice()); M.keep = keepOf();
+        if (M.ms.obj === 'visit') (zz.kept = zz.kept || new Map()).set(zz.active, M); else zz.main = M;
         { // (at once: nothing's drawn over it. Each screen carries the squad's ship across as she is: js/space.ts carry)
-          zz.cas = casAdd(zz.cas, casNow()); // (what it cost aboard the ship being left)
+          (zz.casBy = zz.casBy || {})[zz.active] = casNow(); // (what it cost aboard the ship being left, as she's left)
           zz.active = k;
-          if (k === 0 && zz.main) { const B = zz.main; zz.main = null; B.revisit = true; B.meta = null; B.docked = false; B.site = null; B.cards = []; B.resp = new Map(); B.hvt = null; st.M = B; st.ship.docked = false; sv.startLevel(B.ms); }
+          const B = k === 0 ? zz.main : (zz.kept && zz.kept.get(k)) || null;
+          if (B) { if (k === 0) zz.main = null; else zz.kept!.delete(k); B.revisit = true; B.meta = null; B.docked = false; B.site = null; B.cards = []; B.resp = new Map(); B.hvt = null; st.M = B; st.ship.docked = false; sv.startLevel(B.ms); }
           else beginIn({ i: zz.ms.i, kind: 'board', obj: 'visit', size: c.size, th: c.th, seed: c.seed, diff: Math.max(1, zz.ms.diff - 1), pay: 0, name: c.name, brief: SD.OBJ.visit.line, where: SD.SIZES[c.size].name, night: false, ly: 0, anchor: [0, 0, 0], wing: c.wing });
         }
         break;
@@ -749,7 +797,7 @@ const G_SpaceSv = (() => {
     if (st.seats[id] != null) { delete st.seats[id]; net().broadcast({ t: 'seats', s: st.seats, ctl: st.ship.ctl }); }
     if (st.M && st.M.artBy === id) { st.M.art = 0; st.M.artBy = null; sync(); }
   }
-  return { st, offLimits, startRun, populate, crew, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
+  return { st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
 })();
 G.SpaceSv = G_SpaceSv;
 interface GameModules { SpaceSv: typeof G_SpaceSv; }
