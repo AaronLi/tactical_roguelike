@@ -18,6 +18,10 @@ const booted = import('./threeboot.js').then(async () => {
   // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
   (G as any).Game = { map: null, phase: 'level' };
   (G as any).Net = { myId: '' };
+  // (what those stand-ins answered the simulation's files before they asked through G.Hooks, js/types/hooks.d.ts: in a level,
+  // and no map of this replay is the game's, so a wall's bite is no debris; online stays unset: no host)
+  G.Hooks.inField = () => true;
+  G.Hooks.biteDebris = () => {};
   G.Models.setRoot('../../'); // (the game's folder, from here: assets/models, where the guns are)
   G.Stickers.base = '../../'; // (the game's folder, from here (dist/js/): its pictures, js/stickers.ts; a replay's file brings its own)
 });
