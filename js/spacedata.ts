@@ -1,6 +1,7 @@
 'use strict';
 import { HANGAR_ROWS, THEMES as G_THEMES } from './data.js';
 import { U as G_U } from './util.js';
+import { Materials } from './materials.js';
 // what a class carries on her hull, and who's aboard her: light guards posted singly, security squads (four, armed and armoured), breach
 // response squads (three, lighter: they come to where the hull is breached), and those who don't fight
 interface SpClass { name: string; tier: number; pay: number; diff: number; guns: { pd: number; cannon: number; missile: number }; crew: { guard: number; squads: number; resp: number; civ: number } }
@@ -166,7 +167,7 @@ export const SpaceData = (() => {
   // her boxes and her flights as she's built, level and square (her own frame): a world for those aboard her while she lies tilted
   // (js/level.ts setTilt: they're moved in it), her nose shut behind her collar's mouth no more than it is docked (no nose, no steps out)
   function frameWorld(d: SpShipDef) {
-    const W = G.World, w = W.create(), mat = G.Materials.SHIP;
+    const W = G.World, w = W.create(), mat = Materials.SHIP;
     const fls = flights(d).map((fl) => ({ tag: fl.tag, axis: 'z', up: fl.zh > fl.zf ? 1 : -1, x0: Math.min(fl.x0, fl.x1), x1: Math.max(fl.x0, fl.x1), z0: Math.min(fl.zf, fl.zh), z1: Math.max(fl.zf, fl.zh), y0: fl.y0, rise: fl.rise, n: fl.n, f: 0, steps: [] as any[], on: true }));
     for (const q of boxes(d)) {
       if (q[6] === 'nose' || q[6] === 'steps') continue;

@@ -1,5 +1,6 @@
 'use strict';
 import { U as G_U } from './util.js';
+import { Materials } from './materials.js';
 interface ShSlot { rm: LvRoom; pos: number; side: number; deep: boolean; inner: LvRoom | null; door: number[]; x: number }
 interface ShSeg { x: number; w: number; d: number[]; split: boolean[]; stair: boolean }
 interface ShWing { dO: number; dI: number; ew: number; len: number }
@@ -388,7 +389,7 @@ export const ShipGen = (() => {
     const Wd = G.World, w = map.world, path = tunnelPath(s), out: any[] = []; if (!w) return out;
     for (let i = 0; i < path.length - 1; i++) {
       const a = path[i], b = path[i + 1], cx = (a.x + b.x) / 2, cz = (a.z + b.z) / 2, len = Math.hypot(b.x - a.x, b.z - a.z), yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z)), c = Math.cos(yaw), sn = Math.sin(yaw), hz = len / 2 + 0.06;
-      const o = { kind: 'prop', mat: G.Materials.SHIP, tunnel: true };
+      const o = { kind: 'prop', mat: Materials.SHIP, tunnel: true };
       out.push(Wd.add(w, Wd.ybox(cx, cz, yaw, TUN.HW + 0.14, hz, -0.25, 0, o)));
       for (const sd of [-1, 1]) out.push(Wd.add(w, Wd.ybox(cx + sd * (TUN.HW + 0.07) * c, cz - sd * (TUN.HW + 0.07) * sn, yaw, 0.07, hz, 0, TUN.H, o)));
       out.push(Wd.add(w, Wd.ybox(cx, cz, yaw, TUN.HW + 0.14, hz, TUN.H, TUN.H + 0.14, o)));

@@ -28,7 +28,7 @@ export async function loadGame(withModels = false, extra = {}, { dist = DIST, re
   Object.assign(ctx, extra); ctx.window = ctx; ctx.self = ctx; ctx.G = { R: { flashTexture: () => null, _envMap: () => null } };
   vm.createContext(ctx);
   const WHAT = { what: 'npm run bake:models / check:models do: tsc -p . and tsc -p tsconfig.tools.json' };
-  await runScripts(ctx, dist, ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'materials', 'stickers', 'gunmaterials'], WHAT);
+  await runScripts(ctx, dist, ['util', 'medical', 'materials', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'stickers', 'gunmaterials'], WHAT);
   await runScripts(ctx, recipes, ['guntraces', 'authored', 'authoredparts', 'recipes'], WHAT); // (the recipes: G.GunRecipes, the bake's only; the game's runtime has none)
   loadAuthoredPartsInto(ctx.G); // (the sights etc. modelled in Blender: models/parts/<slot>/<id>/, tools/authored_parts.mjs)
   loadAuthoredInto(ctx.G); // (the guns modelled in Blender: models/<id>/, tools/bake_authored.mjs)

@@ -11,7 +11,7 @@
 };
 // three as the page has it (js/threeboot.ts: its module build, with the glTF loader, on the global THREE): a module, so it's
 // imported, and the game's own scripts after it, each imported in turn (none has an import of its own yet: each shares only G)
-const EXPORT_SCRIPTS = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'damage', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'lightgrid', 'levelview', 'render',
+const EXPORT_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'parts', 'gear', 'sim', 'ballistics', 'damage', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'lightgrid', 'levelview', 'render',
     'stickers', 'gunmaterials', 'gunmodels', 'modelbundles', 'glb', 'gunrig', 'viewmodel', 'vmanim', 'humandata', 'humans', 'headgear', 'rig', 'scars', 'highlights'];
 const booted = import('./threeboot.js').then(async () => {
   for (const f of EXPORT_SCRIPTS) await import('./' + f + '.js');

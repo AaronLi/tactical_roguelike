@@ -8,7 +8,7 @@ nothing checks the module is there, **check** if it is the check itself (`G.X &&
 
 ## Summary
 
-- 90 files, 176 names on G, 5509 uses (93 while loading)
+- 90 files, 176 names on G, 5485 uses (93 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 5, the largest 43 files
 - hand-kept orders against the load-time needs: index.html 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, tools/level_env.mjs 0, tools/model_env.mjs 0
@@ -38,7 +38,7 @@ These are fine as ES modules (a module may call one that imports it, once both h
 Dependencies first, ties in index.html's order:
 
 ```
-modelbundles threeboot util zip data spacedata shipgen callsigns arsenal loadout parts gear medical sim materials ballistics audio level leveldesc world furnspec furniture homes residents furnmesh gunshot-synth gunaudio footsteps acoustics ambience handling lightgrid levelview render scars damage glare shotlog stickers bolts gunmaterials gunmodels glb gunrig viewmodel vmanim prep humandata humans headgear rig net recorder server spaceserver serverhost serverlink player views casings icons hud shop shopui invui gunsmith zeroing route loot course range highlights menushow hangar landing shipmodel spaceui space cloudconfig career cloud gamepad touch game profiler demo debugstart exportworker prepworker serverworker
+modelbundles threeboot util medical materials zip data spacedata shipgen callsigns arsenal loadout parts gear sim ballistics audio level leveldesc world furnspec furniture homes residents furnmesh gunshot-synth gunaudio footsteps acoustics ambience handling lightgrid levelview render scars damage glare shotlog stickers bolts gunmaterials gunmodels glb gunrig viewmodel vmanim prep humandata humans headgear rig net recorder server spaceserver serverhost serverlink player views casings icons hud shop shopui invui gunsmith zeroing route loot course range highlights menushow hangar landing shipmodel spaceui space cloudconfig career cloud gamepad touch game profiler demo debugstart exportworker prepworker serverworker
 ```
 
 ### The hand-kept orders against the load-time needs
@@ -59,18 +59,18 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | modelbundles | Bundles, AudioBundle | - | - |
 | threeboot |  | - | - |
 | util (sim) | U, Hooks | - | - |
+| medical (sim) | Med | util | ballistics |
+| materials (sim) | Materials | - | level |
 | zip | Zip | - | - |
 | data (sim) | TIER_NAMES, TIER_COLORS, CLASS_SND, WEAPON_LIST, WEAPONS, EXPLOSIVES_OFF, AKIMBO_OFF, OFF_GUNS, +82 | util | parts |
-| spacedata (sim) | SpaceData | data, util | level, materials, world |
-| shipgen (sim) | ShipGen | util | level, materials, world |
+| spacedata (sim) | SpaceData | data, materials, util | level, world |
+| shipgen (sim) | ShipGen | materials, util | level, world |
 | callsigns (sim) | Callsigns | util | - |
 | arsenal (sim) | Arsenal | data, util | ballistics |
 | loadout | Loadout | util | arsenal, audio, data, gear, hud, parts |
 | parts (sim) | Gunsmith | data, util | - |
-| gear (sim) | Gear | data, util | medical, parts, sim, stickers |
-| medical (sim) | Med | util | ballistics |
+| gear (sim) | Gear | data, medical, parts, util | sim, stickers |
 | sim (sim) | Sim | data, parts, spacedata, util | level, world |
-| materials (sim) | Materials | - | level |
 | ballistics (sim) | Ballistics | materials | data, gear, util, world |
 | audio | Audio | util | acoustics, casings, data, footsteps, game, gunaudio, level, modelbundles, render |
 | level (sim) | Level | - | data, furniture, homes, leveldesc, materials, shipgen, spacedata, util, world |
