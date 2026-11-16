@@ -1,6 +1,8 @@
 # The game on GitHub Pages: its TypeScript compiled (npm run build -- --no-models: js/*.ts -> dist/js/), its gun models baked and
 # tested (npm run bake:models, test:models: assets/models/), then the site published as it is in the repo with dist/
-# and the model bundles (assets/models/bundles: the only form of the models the game loads) added. Every push and pull request is
+# and the model bundles (assets/models/bundles: the only form of the models the game loads) added, and with dist/js/ swapped for the release
+# bundles (tools/bundle.mjs: esbuild, minified; the page's main.js, the three workers' files and modelbundles.js: five files in place of about ninety, under the same
+# names, so index.html and the workers' URLs are the same as in development, which loads dist/js unbundled; docs/typescript.md). Every push and pull request is
 # built and tested (build: a check that it compiles, bakes and passes).
 # The site (site, deploy): main at d5g.ca, and beside it the space branch (SPACE_BRANCH) at d5g.ca/space-experimental, built the same way into the
 # site's space-experimental/ folder. A push to either publishes both, each as its branch stands. The copy at /space-experimental keeps its own saves, in the browser only
@@ -61,6 +63,8 @@ jobs:
         if: steps.models.outputs.cache-hit != 'true'
         run: npm run bake:models -- -j 4
       - run: npm run test:models
+      # the release bundles build (and are not published from here: the site job does that)
+      - run: node tools/bundle.mjs
   # The site: main at the root, the space branch under space-experimental/ (each checked out, built and baked on its own), published together
   site:
     if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/space-direction') # (SPACE_BRANCH: a job's if can't read env)
@@ -131,9 +135,12 @@ jobs:
         run: |
           mkdir -p _site/space-experimental
           # the game loads the models only from assets/models/bundles (js/modelbundles.ts): the loose packs, props, scenes and whole-gun files are for the tools and tests, not shipped
-          X="--exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props --exclude /assets/models/scenes"
+          X="--exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props --exclude /assets/models/scenes --exclude /dist/bundle"
           rsync -a $X main/ _site/
           rsync -a $X --exclude /CNAME space/ _site/space-experimental/
+          # the release: main's dist/js (the compiled game, ~90 files) replaced by its bundles, which are five files of the same names (tools/bundle.mjs).
+          # (the space branch's copy stays as it is: it is not made of modules yet)
+          node main/tools/bundle.mjs --site _site
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

@@ -5,6 +5,7 @@
 //   node tools/smoke.mjs                 all of them; serves the game itself (node serve.js on a free port)
 //   node tools/smoke.mjs warehouse fly   only the cases whose name has one of these in it
 //   node tools/smoke.mjs --port 8080     against a server already running
+//   node tools/smoke.mjs --site <dir>    serves that folder instead (the release: a copy of the site with `npm run bundle -- --site <dir>` done)
 //   node tools/smoke.mjs --list          the URLs, to open by hand or in another browser (no Chromium here: set BROWSER)
 // Exit 1 if any case fails, 2 if there's no browser to run them in.
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import net from 'node:net'; import { spawn } from 'node:child_process'; import { fileURLToPath } from 'node:url';
@@ -27,7 +28,7 @@ export const CASES = [
 ];
 const RUN_FOR = 4; // (s, after ready: a few seconds of the game's own loop)
 
-const want = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && argv[i - 1] === '--port'));
+const want = argv.filter((a, i) => !a.startsWith('--') && !(i > 0 && (argv[i - 1] === '--port' || argv[i - 1] === '--site')));
 const cases = CASES.filter(([n]) => !want.length || want.some((w) => n.includes(w)));
 if (argv.includes('--list')) { for (const [n, q] of cases) console.log(n.padEnd(28), '/?' + q + '&mute'); process.exit(0); }
 
@@ -48,7 +49,7 @@ if (!exe) {
 let port = +(arg('--port') || 0), server = null;
 if (!port) {
   port = await new Promise((r) => { const s = net.createServer(); s.listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
-  server = spawn(process.execPath, [path.join(ROOT, 'serve.js')], { cwd: ROOT, env: { ...process.env, PORT: String(port), HOST: '127.0.0.1' }, stdio: 'ignore' });
+  server = spawn(process.execPath, [path.join(ROOT, 'serve.js')], { cwd: ROOT, env: { ...process.env, PORT: String(port), HOST: '127.0.0.1', ...(arg('--site') ? { SITE_ROOT: path.resolve(arg('--site')) } : {}) }, stdio: 'ignore' });
   for (let i = 0; i < 50; i++) { await sleep(100); try { await fetch(`http://127.0.0.1:${port}/`); break; } catch { /* not yet */ } }
 }
 
