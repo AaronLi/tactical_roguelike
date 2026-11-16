@@ -8,8 +8,9 @@
 //   - every js/*.ts, parsed (TypeScript 5's API, tools/deps/package.json: TypeScript 7's package has no API):
 //     which G.X each file defines (`G.X = ...`) and uses, and for each use whether it runs while the file loads or only
 //     once something calls it (inside a function), and whether it's guarded (`G.X && ...`, `if (G.X)`, `G.X?.`)
-//   - the load orders: index.html's script tags, the export worker's list (EXPORT_SCRIPTS, js/exportworker.ts), the node tools' lists (tools/level_env.mjs,
-//     tools/model_env.mjs) and the two workers' entry files (js/serverhost.ts, js/prepentry.ts); what runs in what order is worked out from the imports
+//   - the load orders: the page's entry file (js/main.ts, with index.html's one classic script, js/modelbundles.ts), the three workers' entry files
+//     (js/serverhost.ts, js/prepentry.ts, js/exportentry.ts) and the node tools' lists (tools/level_env.mjs, tools/model_env.mjs); what runs in what
+//     order is worked out from the imports
 //   - the trial typecheck: tsconfig.modules-trial.json, every file a module (moduleDetection force). Its errors are the
 //     references between files that don't go through G: the types (interface LvMap in one file, used in forty) and the
 //     odd global value. What phase 1 has to give a home.
@@ -35,16 +36,21 @@ const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
 // ------------------------------------------------------------------ the load orders written by hand
 const listIn = (text, after) => { const i = text.indexOf(after); if (i < 0) return null; const a = text.indexOf('[', i), b = text.indexOf(']', a); return [...text.slice(a, b).matchAll(/'([\w-]+)'/g)].map((m) => m[1]); };
-// What loads what, as the loaders state it: index.html's script tags, the export worker's literal list (its page files are not modules
-// yet: phase 5), the node tools' lists, and the two workers' entry files (the server's and the level preparation's: each worker imports one
-// file, and that file's imports do the rest). A list is a sequence of roots; what actually runs, and in what order, is worked out
-// below from the imports (evalOrder), as an ES module loader would.
+// What loads what, as the loaders state it: the page's entry file (js/main.ts) and its classic script, the three workers' entry files (each worker
+// imports one file, and that file's imports do the rest: the server's, the level preparation's and the highlights export's), and the node tools'
+// lists. A list is a sequence of roots; what actually runs, and in what order, is worked out below from the imports (evalOrder), as an ES module
+// loader would.
 const dynImports = (text) => [...text.matchAll(/import\('\.\/([\w-]+)\.js'\)/g)].map((m) => m[1]);
+const sideImports = (text) => [...text.matchAll(/^import '\.\/([\w-]+)\.js';/gm)].map((m) => m[1]); // (an entry file's imports, in order)
 const ROOTS = {
-  'index.html': [...read('index.html').matchAll(/src="dist\/js\/([\w-]+)\.js"/g)].map((m) => m[1]),
+  // the page: index.html's classic script (js/modelbundles.ts, which runs first) and its one module, js/main.ts, whose imports are the rest
+  'js/main.ts': [...read('index.html').matchAll(/<script src="dist\/js\/([\w-]+)\.js"/g)].map((m) => m[1]).concat(sideImports(read('js/main.ts'))),
   'js/serverworker.ts': dynImports(read('js/serverworker.ts')).filter((n) => n !== 'threeboot'), // (threeboot: three.js, the page's)
   'js/prepworker.ts': dynImports(read('js/prepworker.ts')).filter((n) => n !== 'threeboot'),
-  'js/exportworker.ts': listIn(read('js/exportworker.ts'), 'EXPORT_SCRIPTS ='),
+  'js/exportworker.ts': dynImports(read('js/exportworker.ts')).filter((n) => n !== 'threeboot'),
+  // the other pages and tools that load some of the files: ambience.html (its inline module's imports), the cloud test (its SRC)
+  'ambience.html': [...read('ambience.html').matchAll(/from '\.\/dist\/js\/([\w-]+)\.js'/g)].map((m) => m[1]),
+  'tools/cloud.test.mjs': [...(read('tools/cloud.test.mjs').match(/const SRC = \[(.*?)\]/) || ['', ''])[1].matchAll(/'([\w-]+)\.js'/g)].map((m) => m[1]),
   'tools/level_env.mjs': listIn(read('tools/level_env.mjs'), 'LEVEL_SCRIPTS ='),
   'tools/model_env.mjs': listIn(read('tools/model_env.mjs'), 'runScripts(ctx, dist, ['),
 };
@@ -256,9 +262,9 @@ const anyLoad = (v) => Object.entries(edges[v]).filter(([, d]) => d.load).map(([
 const anyEdge = (v) => Object.keys(edges[v]);
 const loadCycles = sccs(hardLoad).filter((c) => c.length > 1);
 const allCycles = sccs(anyEdge).filter((c) => c.length > 1).sort((a, b) => b.length - a.length);
-// a load order from the hard load-time edges (dependencies first; ties kept in index.html's order)
+// a load order from the hard load-time edges (dependencies first; ties kept in the page's order (js/main.ts))
 const pos = (o) => new Map(o.map((n, k) => [n, k]));
-const htmlPos = pos(ORDERS['index.html']);
+const htmlPos = pos(ORDERS['js/main.ts']);
 function topo() {
   const done = new Set(), out = [], tmp = new Set();
   const go = (v) => { if (done.has(v) || tmp.has(v)) return; tmp.add(v); for (const w of hardLoad(v).sort((a, b) => (htmlPos.get(a) ?? 1e9) - (htmlPos.get(b) ?? 1e9))) go(w); tmp.delete(v); done.add(v); out.push(v); };
@@ -295,6 +301,24 @@ const reached = new Set([...ORDERS['js/serverworker.ts'], ...ORDERS['js/prepwork
 const simDrift = [...reached].filter((v) => !SIM.has(v)).map((v) => `${v} is reached by a worker's entry file but is not in SIMULATION (tools/deps.mjs): a page file imported by the simulation, or a new simulation file to add there`)
   .concat([...SIM].filter((v) => !reached.has(v)).map((v) => `${v} is in SIMULATION (tools/deps.mjs) but no worker's entry file reaches it`));
 
+// ------------------------------------------------------------------ what still reads another file through G
+// (docs/modules-plan.md phase 5 ends when none does; what is left is deliberate, and each read is put in the first category that fits)
+const LOADERS = ['js/exportworker.ts', 'ambience.html', 'tools/cloud.test.mjs'];
+const classify = (reader, owner, x) => {
+  if (/^(exportworker|serverworker|prepworker)$/.test(reader)) return 'a worker file reading what its entry file loaded (it sets the stand-ins and starts the work after the entry has run)';
+  if (owner === 'modelbundles') return 'js/modelbundles.ts, the classic script the page runs first (not a module: nothing to import)';
+  if (SIM.has(reader) && SIM.has(owner)) return 'simulation to simulation, where the target runs later (a load-time cycle if imported)';
+  if (SIM.has(reader)) return 'simulation to page (should be none: the layering rule)';
+  for (const l of LOADERS) { const o = ORDERS[l]; if (o && o.includes(reader) && !o.includes(owner)) return `${l}: it loads the reader and not the file read`; }
+  return 'other (a load-time cycle an import would make, or a tool\'s stand-in: each is said in the file and in the plan)';
+};
+const remaining = new Map(); // category -> "reader -> owner" -> { names: Set, n }
+for (const f of files) for (const u of F[f].uses) {
+  if (u.from) continue; const of = owner.get(u.x); if (!of || of === f) continue;
+  const cat = classify(base(f), base(of), u.x), k = `${base(f)} -> ${base(of)}`;
+  if (!remaining.has(cat)) remaining.set(cat, new Map()); const m = remaining.get(cat);
+  if (!m.has(k)) m.set(k, { names: new Set(), n: 0, guarded: 0 }); const r = m.get(k); r.names.add(u.x); r.n++; if (u.guard !== 'plain') r.guarded++;
+}
 // ------------------------------------------------------------------ the trial typecheck: every file a module
 let trial = null;
 if (!NO_TSC) {
@@ -324,6 +348,7 @@ const summary = [
   `cycles counting calls: ${allCycles.length}, the largest ${allCycles[0] ? allCycles[0].length : 0} files`,
   `load orders (from the imports and the lists) against the load-time needs: ${Object.entries(orderProblems).map(([k, v]) => `${k} ${v.length}`).join(', ')}`,
   `the simulation reaching page-only modules: ${reach.length} uses (${reach.filter((r) => r.guard === 'plain').length} unguarded, ${unguardedAtLoad.length} of them while loading)`,
+  `cross-file reads through G that remain: ${[...remaining.values()].reduce((a, m) => a + [...m.values()].reduce((b, r) => b + r.n, 0), 0)} (see 2b)`,
   `names used but defined nowhere: ${undefinedNames.size}`,
   trial ? `trial module typecheck: ${trial.total} errors; ${trial.bare.length} bare names between files (${trial.bare.reduce((a, b) => a + b.uses, 0)} uses), ${trial.gLost.length} G members lost, ${trial.other.length} others` : 'trial module typecheck: skipped',
 ];
@@ -350,7 +375,7 @@ if (!loadCycles.length) P('None: every unguarded use while loading can be satisf
 else for (const c of loadCycles) { P(`- ${c.join(', ')}`); for (const v of c) for (const w of c) if (edges[v][w]) for (const u of edges[v][w].loadAt.filter((q) => q.guard === 'plain').slice(0, 4)) P(`  - ${v} needs ${w} at load: ${fmtAt(u)}`); }
 P('', '### Cycles counting calls', '', 'These are fine as ES modules (a module may call one that imports it, once both have loaded). Listed for scale.', '');
 for (const c of allCycles) P(`- ${c.length} files: ${c.sort().join(', ')}`);
-P('', '### A load order the load-time needs allow', '', 'Dependencies first, ties in index.html\'s order:', '', '```', order.join(' '), '```', '');
+P('', '### A load order the load-time needs allow', '', 'Dependencies first, ties in the page\'s order (js/main.ts):', '', '```', order.join(' '), '```', '');
 P('### The load orders against the load-time needs', '', 'The order each loader runs the files in, worked out from the imports (a file runs after what it imports; the two workers each import one entry file, js/serverhost.ts and js/prepentry.ts; the page, the export worker and the tools name a list of files). A file that uses another, unguarded, while loading, where that other is missing or comes after it.', '');
 for (const [where, probs] of Object.entries(orderProblems)) {
   P(`- **${where}** (${ORDERS[where].length} files): ${probs.length ? probs.length + ' problems' : 'consistent'}`);
@@ -375,6 +400,12 @@ for (const [k, rs] of [...byPair].sort((a, b) => b[1].length - a[1].length)) {
   P(`| ${fr} | ${to} | ${rs.length} | ${rs.filter((r) => r.guard === 'plain').length} | ${rs.filter((r) => r.load).length} | ${rs.slice(0, 12).map((r) => `${r.x}:${r.line}${r.guard === 'plain' ? '' : '*'}`).join(' ')}${rs.length > 12 ? ' ...' : ''} |`);
 }
 if (reach.length) P('', '`*` checked or guarded. Plain uses are the ones that would throw in the server thread if reached there.', '');
+P('## 2b. Cross-file reads through G that remain', '', 'Every `G.X` in a file that is not X\'s own file (a read of a name some file defines), by what keeps it. Phase 5 is done when none is left that an import could replace.', '');
+for (const [cat, m] of [...remaining].sort((a, b) => b[1].size - a[1].size)) {
+  P(`- **${cat}** (${[...m.values()].reduce((a, r) => a + r.n, 0)} reads in ${m.size} pairs)`);
+  for (const [k, r] of [...m].sort((a, b) => b[1].n - a[1].n)) P(`  - ${k}: ${[...r.names].join(', ')} (${r.n}${r.guarded ? `, ${r.guarded} checked or guarded` : ''})`);
+}
+P('');
 P('## 3. Trial module typecheck', '');
 if (!trial) P('Skipped (--no-tsc).');
 else {

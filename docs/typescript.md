@@ -1,7 +1,8 @@
 # TypeScript
 
-The game is TypeScript: `js/*.ts`, compiled one-to-one to `dist/js/*.js` by `tsc` and loaded by `index.html` with
-`<script type="module">` tags, in order (the simulation's files import each other, the rest still share only `G`: docs/modules-plan.md). Three
+The game is TypeScript: `js/*.ts`, compiled one-to-one to `dist/js/*.js` by `tsc` and loaded by `index.html` as ONE module,
+`js/main.ts`, which imports every file of the page (and `js/modelbundles.ts`, the one classic script, first). The files import each other and also
+register themselves on `G` for the console and the browser checks (docs/modules-plan.md). Three
 workers load some of the same compiled files, as module workers: the host's simulation (`js/serverworker.ts`, the server's own thread: [threads.md](threads.md)) and the
 level-preparation worker (`js/prepworker.ts`) and the highlights' export worker (`js/exportworker.ts`).
 
@@ -43,9 +44,9 @@ interface GameModules { Level: typeof G_Level; }
 error, and every call from one file into another is checked against the callee's real signature. Fields a module
 gains at runtime go in a `NameFields` interface next to it (`typeof G_Me & MeFields`).
 
-Adding a file: create `js/<name>.ts`, add `<script type="module" src="dist/js/<name>.js">` to `index.html` in the right order,
-import it (if the host's simulation needs it: from `js/serverhost.ts`, the server thread's entry file, and from `js/prepentry.ts` if the level's preparation needs it, and add its name to `SIMULATION` in
-`tools/deps.mjs`; nothing that draws there, what both sides reckon goes in `js/sim.ts`), and add it to `js/exportworker.ts`'s `EXPORT_SCRIPTS` if the highlights' replay needs it.
+Adding a file: create `js/<name>.ts`, import it from `js/main.ts` in the right place (a file that reads another while it loads comes after it: `npm run deps:check`),
+import it also (if the host's simulation needs it: from `js/serverhost.ts`, the server thread's entry file, and from `js/prepentry.ts` if the level's preparation needs it, and add its name to `SIMULATION` in
+`tools/deps.mjs`; nothing that draws there, what both sides reckon goes in `js/sim.ts`), and from `js/exportentry.ts`, the export worker's entry file, if the highlights' replay needs it.
 
 ## Status
 

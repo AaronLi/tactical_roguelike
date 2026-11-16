@@ -1,6 +1,6 @@
-// What every file of the game shares. The game is plain scripts (no import/export: each js/*.ts compiles to a
-// dist/js/*.js that index.html loads with a <script> tag, in order), so everything a file makes for the others goes on
-// one global object, G (G.U, G.Level, G.Me...). Each file declares what it adds (GameModules, below; interfaces merge
+// What every file of the game shares. The game is ES modules (js/main.ts, which index.html loads, imports them all); each also
+// puts what it makes on one global object, G (G.U, G.Level, G.Me...), for the console and the browser checks and for the files that read through it
+// (docs/modules-plan.md). Each file declares what it adds (GameModules, below; interfaces merge
 // across the scripts), and G has nothing else: a name no file declares is an error.
 
 /** The game's namespace: each file's module, hung off one global. */

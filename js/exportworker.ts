@@ -10,11 +10,10 @@
   addEventListener() {},
 };
 // three as the page has it (js/threeboot.ts: its module build, with the glTF loader, on the global THREE): a module, so it's
-// imported, and the game's own scripts after it, each imported in turn (none has an import of its own yet: each shares only G)
-const EXPORT_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'parts', 'gear', 'sim', 'world', 'ballistics', 'damage', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'lightgrid', 'levelview', 'render',
-    'stickers', 'gunmaterials', 'gunmodels', 'modelbundles', 'glb', 'gunrig', 'viewmodel', 'vmanim', 'humandata', 'humans', 'headgear', 'rig', 'scars', 'highlights'];
+// imported, and the game's own files after it: js/exportentry.ts is the entry file, and its imports are the rest (imported here, after the globals
+// above are set and three.js is there, not at the top of this file: a static import would run first)
 const booted = import('./threeboot.js').then(async () => {
-  for (const f of EXPORT_SCRIPTS) await import('./' + f + '.js');
+  await import('./exportentry.js');
   // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
   (G as any).Game = { map: null, phase: 'level' };
   (G as any).Net = { myId: '' };

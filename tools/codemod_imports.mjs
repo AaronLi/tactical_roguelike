@@ -28,13 +28,13 @@
 // What it checks and says, and does not fix:
 //   - a use of a converted name that was a guard (`G.X && ...`, `if (G.X)`, `typeof G.X`): the import is always there now, so the check
 //     is always true; it is rewritten and listed, to be looked at.
-//   - a name of a file that the hand-kept load lists (index.html, EXPORT_SCRIPTS) put AFTER this one, or
+//   - a name of a file that the hand-kept load lists (js/main.ts, js/exportentry.ts) put AFTER this one, or
 //     don't list where this one is: left as G.X, and said. The module graph runs a file when it's first imported, so importing it would
 //     move its load-time effects earlier (and make a cycle with anything it needs back). Convert the files in the plan's order (leaves
 //     first), or --force-order to import regardless (then the "order:" lines say what moved).
 //   - a G.X = ... elsewhere that assigns a converted name at run time (a bare import would not see it).
 //   - the layering rule (docs/modules-plan.md phase 3): a simulation file importing a page-only file. tools/deps.mjs --check enforces it.
-// It does not touch: the lists (index.html, the export worker's: they stay, a converted file that is listed still runs once, in its place),
+// It does not touch: the lists (js/main.ts, js/exportentry.ts: they stay, a converted file that is listed still runs once, in its place),
 // the files that name an X without G (types: js/types/*.d.ts, `typeof G.X` in unconverted files works through GameModules).
 import fs from 'node:fs'; import path from 'node:path'; import { spawnSync } from 'node:child_process'; import { createRequire } from 'node:module'; import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), JS = path.join(ROOT, 'js');
@@ -89,8 +89,8 @@ function exportedOf(sf) {
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 const listIn = (text, after) => { const i = text.indexOf(after); if (i < 0) return null; const a = text.indexOf('[', i), b = text.indexOf(']', a); return [...text.slice(a, b).matchAll(/'([\w-]+)'/g)].map((m) => m[1]); };
 const ORDERS = {
-  'index.html': [...read('index.html').matchAll(/src="dist\/js\/([\w-]+)\.js"/g)].map((m) => m[1]),
-  'js/exportworker.ts': listIn(read('js/exportworker.ts'), 'EXPORT_SCRIPTS ='),
+  'js/main.ts': [...read('js/main.ts').matchAll(/^import '\.\/([\w-]+)\.js';/gm)].map((m) => m[1]), // (the page's entry file: its imports, in order)
+  'js/exportentry.ts': [...read('js/exportentry.ts').matchAll(/^import '\.\/([\w-]+)\.js';/gm)].map((m) => m[1]),
 };
 // (the workers of the simulation have no list any more: each imports an entry file, js/serverhost.ts and js/prepentry.ts; the simulation's files are tools/deps.mjs's SIMULATION)
 const SIM = new Set(listIn(read('tools/deps.mjs'), 'const SIMULATION =') || []);

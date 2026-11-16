@@ -25,10 +25,10 @@ const args = process.argv.slice(2);
 const OUT = path.join(ROOT, 'assets/models/scenes/'), DIST = path.join(ROOT, 'dist/js/'), THREE_VER = JSON.parse(fs.readFileSync(path.join(ROOT, 'node_modules/three/package.json'), 'utf8')).version;
 if (!fs.existsSync(DIST + 'hangar.js')) { console.error('dist/js/hangar.js missing: run tsc first (npm run bake:hangar does)'); process.exit(1); }
 
-// ---- the game, as much of it as draws the hangar: its scripts in the page's order (index.html), in a vm whose document makes node's canvases
+// ---- the game, as much of it as draws the hangar: its files in the page's order (the imports of js/main.ts, the page's entry file), in a vm whose document makes node's canvases
 const WANT = new Set(['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'levelview', 'scars', 'damage', 'stickers', 'course', 'range', 'highlights', 'hangar']);
 async function loadGame() {
-  const NC = await nodeCanvas(), order = [...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/src="dist\/js\/([a-z-]+)\.js"/g)].map((m) => m[1]).filter((f) => WANT.has(f));
+  const NC = await nodeCanvas(), order = [...fs.readFileSync(path.join(ROOT, 'js/main.ts'), 'utf8').matchAll(/^import '\.\/([a-z-]+)\.js';/gm)].map((m) => m[1]).filter((f) => WANT.has(f));
   const ctx = { console, Math, JSON, Set, Map, WeakMap, WeakSet, Object, Array, Number, String, Boolean, Uint8Array, Uint8ClampedArray, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, ArrayBuffer, DataView, Infinity, NaN, isFinite, parseInt, parseFloat, Error, TypeError, RangeError, Symbol, Date, Proxy, Reflect, Promise, performance, THREE: { ...THREE_NS },
     document: { body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {}, getElementById: () => null, querySelector: () => null }, location: { search: '' }, navigator: { userAgent: 'node' }, URLSearchParams, addEventListener() {}, setTimeout, clearTimeout, setInterval, clearInterval, requestAnimationFrame: () => 0 };
   // (js/hangar.ts imports the screens, which read these as they load; the hangar's drawing doesn't use them)
