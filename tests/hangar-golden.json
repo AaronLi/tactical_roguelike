@@ -9,7 +9,7 @@
   "textures": 71,
   "anchors": 81,
   "lights": 24,
-  "solids": 1197
+  "solids": 1199
  },
  "parts": {
   "zones": {
@@ -1489,8 +1489,8 @@
   ]
  },
  "solids": {
-  "count": 1197,
-  "hash": "16ff0ab7aea1e552"
+  "count": 1199,
+  "hash": "4496f524b0e9dbdc"
  },
- "hash": "2173099bafc03f10"
+ "hash": "9e2e2bb2778efbb5"
 }

@@ -49,7 +49,7 @@ const solids = data.solids.map(solidKey);
 {
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, performance, location: { search: '' }, URLSearchParams, THREE: { ...THREE_NS }, addEventListener() {} };
   ctx.window = ctx; ctx.self = ctx; ctx.G = {}; vm.createContext(ctx);
-  for (const f of ['util', 'data', 'spacedata', 'world', 'course', 'range', 'hangar']) { const file = DIST + f + '.js'; if (!fs.existsSync(file)) fail(`${path.relative(ROOT, file)} missing: run tsc first`); vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: f + '.js' }); }
+  for (const f of ['util', 'data', 'world', 'course', 'range', 'hangar']) { const file = DIST + f + '.js'; if (!fs.existsSync(file)) fail(`${path.relative(ROOT, file)} missing: run tsc first`); vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: f + '.js' }); }
   const G = ctx.G, world = G.World.create();
   G.Hangar.decorate({ world });
   const now = world.solids.filter(Boolean).map((s) => solidKey(JSON.parse(JSON.stringify(s, (k, v) => (k === 'id' || k === 'target' ? undefined : v)))));

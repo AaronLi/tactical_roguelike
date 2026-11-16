@@ -25,7 +25,7 @@ const OUT = path.join(ROOT, 'assets/models/scenes/'), DIST = path.join(ROOT, 'di
 if (!fs.existsSync(DIST + 'hangar.js')) { console.error('dist/js/hangar.js missing: run tsc first (npm run bake:hangar does)'); process.exit(1); }
 
 // ---- the game, as much of it as draws the hangar: its scripts in the page's order (index.html), in a vm whose document makes node's canvases
-const WANT = new Set(['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'levelview', 'scars', 'damage', 'stickers', 'course', 'range', 'highlights', 'hangar']);
+const WANT = new Set(['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'levelview', 'scars', 'damage', 'stickers', 'course', 'range', 'highlights', 'hangar']);
 async function loadGame() {
   const NC = await nodeCanvas(), order = [...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/src="dist\/js\/([a-z-]+)\.js"/g)].map((m) => m[1]).filter((f) => WANT.has(f));
   const ctx = { console, Math, JSON, Set, Map, WeakMap, WeakSet, Object, Array, Number, String, Boolean, Uint8Array, Uint8ClampedArray, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, ArrayBuffer, DataView, Infinity, NaN, isFinite, parseInt, parseFloat, Error, TypeError, RangeError, Symbol, Date, Proxy, Reflect, Promise, performance, THREE: { ...THREE_NS },
