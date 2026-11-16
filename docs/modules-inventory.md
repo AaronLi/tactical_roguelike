@@ -8,7 +8,7 @@ nothing checks the module is there, **check** if it is the check itself (`X && .
 
 ## Summary
 
-- 104 files, 185 exported names, 5879 uses (102 while loading)
+- 105 files, 188 exported names, 5897 uses (104 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 5, the largest 37 files
 - load orders (from the imports and the lists) against the load-time needs: js/main.ts 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, ambience.html 0, tools/cloud.test.mjs 0, tools/level_env.mjs 0, tools/model_env.mjs 0
@@ -37,19 +37,19 @@ These are fine as ES modules (a module may call one that imports it, once both h
 Dependencies first, ties in the page's order (js/main.ts):
 
 ```
-modelbundles threeboot util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical replayenv zip callsigns arsenal bundlesenv audioenv acoustics ambience gunsoundcache gunaudio footsteps audio gunmaterials glb gunrig humandata humans headgear furnspec furnmesh lightgrid levelview rig vmanim tone highlights gpuao wind render gunkeys gunsounds handling residents route shop recorder spaceserver server serverhost serverlink net shotlog career loot casings range course gunsmith hangar zeroing shopui invui touch gamepad landing prep gunao shipmodel spaceui space player glare views bolts cloudconfig cloud menushow profiler game viewmodel gunmodels icons hud loadout gunshot-synth demo debugstart debugglobals exportentry exportworker main prepentry prepworker serverworker
+modelbundles threeboot util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical replayenv zip callsigns arsenal bundlesenv audioenv acousticswasm acoustics ambience gunsoundcache gunaudio footsteps audio gunmaterials glb gunrig humandata humans headgear furnspec furnmesh lightgrid levelview rig vmanim tone highlights gpuao wind render gunkeys gunsounds handling residents route shop recorder spaceserver server serverhost serverlink net shotlog career loot casings range course gunsmith hangar zeroing shopui invui touch gamepad landing prep gunao shipmodel spaceui space player glare views bolts cloudconfig cloud menushow profiler game viewmodel gunmodels icons hud loadout gunshot-synth demo debugstart debugglobals exportentry exportworker main prepentry prepworker serverworker
 ```
 
 ### The load orders against the load-time needs
 
 The order each loader runs the files in, worked out from the imports (a file runs after what it imports; the two workers each import one entry file, js/serverhost.ts and js/prepentry.ts; the page, the export worker and the tools name a list of files). A file that uses another, unguarded, while loading, where that other is missing or comes after it.
 
-- **js/main.ts** (98 files): consistent
+- **js/main.ts** (99 files): consistent
 - **js/serverworker.ts** (28 files): consistent
 - **js/prepworker.ts** (25 files): consistent
-- **js/exportworker.ts** (93 files): consistent
-- **ambience.html** (22 files): consistent
-- **tools/cloud.test.mjs** (91 files): consistent
+- **js/exportworker.ts** (94 files): consistent
+- **ambience.html** (23 files): consistent
+- **tools/cloud.test.mjs** (92 files): consistent
 - **tools/level_env.mjs** (25 files): consistent
 - **tools/model_env.mjs** (21 files): consistent
 
@@ -83,7 +83,8 @@ The order each loader runs the files in, worked out from the imports (a file run
 | arsenal (sim) | Arsenal | - | ballistics, data, util |
 | bundlesenv | BundlesEnv | - | - |
 | audioenv | AudioEnv | - | - |
-| acoustics | Acoustics | - | audio, audioenv, level, materials, util |
+| acousticswasm | ZCOL, makeRng, AcWasm | - | - |
+| acoustics | Acoustics | acousticswasm | audio, audioenv, level, materials, util |
 | ambience | Ambience | - | acoustics, audio, audioenv, gunaudio, level, spacedata, util |
 | gunsoundcache | SYNTH_REV, GunSoundCache | - | - |
 | gunaudio | GunAudio | level, replayenv | acoustics, ambience, audio, audioenv, gunsoundcache, parts, util |
@@ -157,7 +158,7 @@ The order each loader runs the files in, worked out from the imports (a file run
 | debugglobals |  | - | - |
 | exportentry |  | - | - |
 | exportworker |  | - | - |
-| main |  | profiler | - |
+| main |  | acousticswasm, profiler | - |
 | prepentry (sim) |  | - | - |
 | prepworker |  | - | - |
 | serverworker |  | - | - |

@@ -61,6 +61,7 @@
    "arsenal",
    "bundlesenv",
    "audioenv",
+   "acousticswasm",
    "acoustics",
    "ambience",
    "gunsoundcache",
@@ -232,6 +233,7 @@
    "gunaudio",
    "footsteps",
    "audio",
+   "acousticswasm",
    "acoustics",
    "ambience",
    "arsenal",
@@ -302,6 +304,7 @@
    "furniture",
    "homes",
    "level",
+   "acousticswasm",
    "acoustics",
    "parts",
    "ambience",
@@ -332,6 +335,7 @@
    "gunaudio",
    "footsteps",
    "audio",
+   "acousticswasm",
    "acoustics",
    "ambience",
    "medical",
@@ -481,6 +485,7 @@
   "arsenal",
   "bundlesenv",
   "audioenv",
+  "acousticswasm",
   "acoustics",
   "ambience",
   "gunsoundcache",
@@ -562,6 +567,9 @@
  ],
  "owner": {
   "Acoustics": "acoustics",
+  "ZCOL": "acousticswasm",
+  "makeRng": "acousticswasm",
+  "AcWasm": "acousticswasm",
   "Ambience": "ambience",
   "Arsenal": "arsenal",
   "Audio": "audio",
@@ -750,7 +758,7 @@
  "files": {
   "acoustics": {
    "defs": {
-    "Acoustics": 20
+    "Acoustics": 21
    },
    "imports": [
     {
@@ -797,176 +805,268 @@
      ],
      "sideEffect": false,
      "kept": true
+    },
+    {
+     "from": "acousticswasm",
+     "line": 7,
+     "names": [
+      "AcWasm",
+      "ZCOL",
+      "WasmScene"
+     ],
+     "sideEffect": false,
+     "kept": true
     }
    ],
    "uses": [
     {
      "x": "Level",
      "from": "level",
-     "line": 22,
+     "line": 23,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 22,
+     "line": 23,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 64,
+     "line": 65,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
      "from": "materials",
-     "line": 130,
+     "line": 131,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 140,
+     "line": 141,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 210,
+     "line": 211,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 246,
+     "line": 247,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ZCOL",
+     "from": "acousticswasm",
+     "line": 289,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "AcWasm",
+     "from": "acousticswasm",
+     "line": 298,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 284,
+     "line": 312,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "AcWasm",
+     "from": "acousticswasm",
+     "line": 373,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "AcWasm",
+     "from": "acousticswasm",
+     "line": 378,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "AcWasm",
+     "from": "acousticswasm",
+     "line": 389,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 352,
+     "line": 405,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AudioEnv",
      "from": "audioenv",
-     "line": 395,
+     "line": 449,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AudioEnv",
      "from": "audioenv",
-     "line": 395,
+     "line": 449,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AudioEnv",
      "from": "audioenv",
-     "line": 395,
+     "line": 449,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
      "from": "audio",
-     "line": 402,
+     "line": 456,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Audio",
      "from": "audio",
-     "line": 402,
+     "line": 456,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "AudioEnv",
      "from": "audioenv",
-     "line": 445,
+     "line": 499,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AudioEnv",
      "from": "audioenv",
-     "line": 445,
+     "line": 499,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Audio",
      "from": "audio",
-     "line": 450,
+     "line": 504,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Audio",
      "from": "audio",
-     "line": 450,
+     "line": 504,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "AudioEnv",
      "from": "audioenv",
-     "line": 453,
+     "line": 507,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AudioEnv",
      "from": "audioenv",
-     "line": 453,
+     "line": 507,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "AudioEnv",
      "from": "audioenv",
-     "line": 453,
+     "line": 507,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 545,
+     "line": 599,
      "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "AcWasm",
+     "from": "acousticswasm",
+     "line": 607,
+     "load": true,
      "guard": "plain"
     }
    ],
    "decls": {
     "AcZone": {
      "kind": "type",
-     "line": 7
+     "line": 8
     },
     "AcMapData": {
      "kind": "type",
-     "line": 18
+     "line": 19
     },
     "Acoustics": {
      "kind": "value",
-     "line": 20
+     "line": 21
+    }
+   }
+  },
+  "acousticswasm": {
+   "defs": {
+    "ZCOL": 24,
+    "makeRng": 50,
+    "AcWasm": 60
+   },
+   "imports": [],
+   "uses": [],
+   "decls": {
+    "SceneSpec": {
+     "kind": "type",
+     "line": 12
+    },
+    "ZCOL": {
+     "kind": "value",
+     "line": 24
+    },
+    "WasmTrace": {
+     "kind": "type",
+     "line": 25
+    },
+    "WasmScene": {
+     "kind": "type",
+     "line": 32
+    },
+    "Exports": {
+     "kind": "type",
+     "line": 35
+    },
+    "makeRng": {
+     "kind": "value",
+     "line": 50
+    },
+    "AcWasm": {
+     "kind": "value",
+     "line": 60
     }
    }
   },
@@ -7599,70 +7699,70 @@
     {
      "x": "U",
      "from": "util",
-     "line": 1106,
+     "line": 1156,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1118,
+     "line": 1168,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1118,
+     "line": 1168,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1123,
+     "line": 1173,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 1425,
+     "line": 1478,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 1425,
+     "line": 1478,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1426,
+     "line": 1479,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1427,
+     "line": 1480,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 1427,
+     "line": 1480,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 1685,
+     "line": 1738,
      "load": false,
      "guard": "plain"
     }
@@ -25318,15 +25418,22 @@
      "guard": "plain"
     },
     {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 71,
+     "x": "SpaceData",
+     "from": "spacedata",
+     "line": 72,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "ShipGen",
-     "from": "shipgen",
+     "x": "SpaceData",
+     "from": "spacedata",
+     "line": 73,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "SpaceData",
+     "from": "spacedata",
      "line": 73,
      "load": false,
      "guard": "plain"
@@ -25339,288 +25446,274 @@
      "guard": "plain"
     },
     {
-     "x": "World",
-     "from": "world",
-     "line": 75,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Homes",
-     "from": "homes",
-     "line": 85,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 93,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 131,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 233,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "HANGAR_THEME",
-     "from": "data",
-     "line": 234,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 236,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "from": "util",
-     "line": 238,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Furniture",
-     "from": "furniture",
-     "line": 297,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Homes",
-     "from": "homes",
-     "line": 323,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Furniture",
-     "from": "furniture",
-     "line": 426,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Furniture",
-     "from": "furniture",
-     "line": 426,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 471,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Furniture",
-     "from": "furniture",
-     "line": 612,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 732,
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 76,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 739,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 848,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 925,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 938,
+     "line": 77,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 987,
+     "line": 78,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Homes",
+     "from": "homes",
+     "line": 88,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 96,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 999,
+     "line": 134,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 999,
+     "line": 236,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "HANGAR_THEME",
+     "from": "data",
+     "line": 237,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 239,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Hooks",
+     "from": "util",
+     "line": 241,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Furniture",
+     "from": "furniture",
+     "line": 300,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Homes",
+     "from": "homes",
+     "line": 326,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Furniture",
+     "from": "furniture",
+     "line": 429,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Furniture",
+     "from": "furniture",
+     "line": 429,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 474,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Furniture",
+     "from": "furniture",
+     "line": 629,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 749,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 756,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 865,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 942,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 955,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1004,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1016,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1016,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelDesc",
      "from": "leveldesc",
-     "line": 1058,
+     "line": 1075,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1058,
+     "line": 1075,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelDesc",
      "from": "leveldesc",
-     "line": 1080,
+     "line": 1097,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1083,
+     "line": 1100,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1083,
+     "line": 1100,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
      "from": "materials",
-     "line": 1083,
+     "line": 1100,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1087,
+     "line": 1104,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1087,
+     "line": 1104,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1088,
+     "line": 1105,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1088,
+     "line": 1105,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1092,
+     "line": 1109,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1092,
+     "line": 1109,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1096,
+     "line": 1113,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1096,
+     "line": 1113,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1097,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1097,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1098,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1098,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
      "line": 1114,
      "load": false,
      "guard": "plain"
@@ -25628,280 +25721,308 @@
     {
      "x": "World",
      "from": "world",
-     "line": 1120,
+     "line": 1114,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1115,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1115,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1130,
+     "line": 1131,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1137,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1147,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
      "from": "furniture",
-     "line": 1285,
+     "line": 1302,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
      "from": "furniture",
-     "line": 1288,
+     "line": 1305,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1308,
+     "line": 1325,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1412,
+     "line": 1429,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1463,
+     "line": 1480,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1474,
+     "line": 1491,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1517,
+     "line": 1534,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1612,
+     "line": 1629,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1719,
+     "line": 1736,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1720,
+     "line": 1737,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1721,
+     "line": 1738,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1722,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1722,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1726,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1726,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1727,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1727,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 1728,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
      "line": 1739,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "U",
-     "from": "util",
-     "line": 1754,
+     "x": "World",
+     "from": "world",
+     "line": 1739,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1743,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1743,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1744,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1744,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 1745,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1754,
+     "line": 1756,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1798,
+     "line": 1771,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1771,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1815,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "HANGAR_ROWS",
      "from": "data",
-     "line": 1836,
+     "line": 1853,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1874,
+     "line": 1891,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 1992,
+     "line": 2009,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 2067,
+     "line": 2084,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 2074,
+     "line": 2091,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 2074,
+     "line": 2091,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 2079,
+     "line": 2096,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 2080,
+     "line": 2097,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 2085,
+     "line": 2102,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 2085,
+     "line": 2102,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2086,
+     "line": 2103,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 2095,
+     "line": 2112,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 2106,
+     "line": 2123,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2114,
+     "line": 2131,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2114,
+     "line": 2131,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 2129,
+     "line": 2146,
      "load": false,
      "guard": "plain"
     }
@@ -26041,112 +26162,112 @@
     {
      "x": "Level",
      "from": "level",
-     "line": 362,
+     "line": 373,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 399,
+     "line": 410,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 421,
+     "line": 432,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 464,
+     "line": 475,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
      "from": "damage",
-     "line": 512,
+     "line": 523,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 607,
+     "line": 618,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 670,
+     "line": 681,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 745,
+     "line": 756,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 748,
+     "line": 759,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 749,
+     "line": 760,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 763,
+     "line": 774,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 773,
+     "line": 784,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 861,
+     "line": 872,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 861,
+     "line": 872,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 879,
+     "line": 890,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 879,
+     "line": 890,
      "load": false,
      "guard": "plain"
     }
@@ -26341,7 +26462,7 @@
     {
      "x": "Level",
      "from": "level",
-     "line": 485,
+     "line": 516,
      "load": false,
      "guard": "plain"
     }
@@ -27729,13 +27850,29 @@
      "names": [],
      "sideEffect": true,
      "kept": true
+    },
+    {
+     "from": "acousticswasm",
+     "line": 95,
+     "names": [
+      "AcWasm"
+     ],
+     "sideEffect": false,
+     "kept": true
     }
    ],
    "uses": [
     {
      "x": "Prof",
      "from": "profiler",
-     "line": 96,
+     "line": 97,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "AcWasm",
+     "from": "acousticswasm",
+     "line": 99,
      "load": true,
      "guard": "plain"
     }
@@ -40172,658 +40309,672 @@
     {
      "x": "Level",
      "from": "level",
-     "line": 1894,
+     "line": 1897,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1894,
+     "line": 1897,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 1967,
+     "line": 1970,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2186,
+     "line": 2189,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2240,
+     "line": 2243,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2273,
+     "line": 2276,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2273,
+     "line": 2276,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceSv",
      "from": "spaceserver",
-     "line": 2305,
+     "line": 2308,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2345,
+     "line": 2348,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2360,
+     "line": 2363,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2375,
+     "line": 2378,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceSv",
      "from": "spaceserver",
-     "line": 2394,
+     "line": 2397,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2399,
+     "line": 2402,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2418,
+     "line": 2421,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2448,
+     "line": 2451,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2462,
+     "line": 2465,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2551,
+     "line": 2554,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2594,
+     "line": 2597,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2639,
+     "line": 2642,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 2677,
+     "line": 2681,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceSv",
      "from": "spaceserver",
-     "line": 2679,
+     "line": 2683,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2692,
+     "line": 2696,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2693,
+     "line": 2697,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceSv",
      "from": "spaceserver",
-     "line": 2768,
+     "line": 2772,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 2775,
+     "line": 2779,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 2775,
+     "line": 2779,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceSv",
      "from": "spaceserver",
-     "line": 2780,
+     "line": 2784,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 2894,
+     "line": 2898,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2932,
+     "line": 2936,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2943,
+     "line": 2947,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2967,
+     "line": 2971,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 2987,
+     "line": 2991,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3047,
+     "line": 3051,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3069,
+     "line": 3073,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3069,
+     "line": 3073,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 3096,
+     "line": 3100,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceSv",
      "from": "spaceserver",
-     "line": 3098,
+     "line": 3102,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3107,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
-     "line": 3110,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "from": "world",
      "line": 3111,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "U",
-     "from": "util",
-     "line": 3128,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 3140,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 3164,
+     "x": "World",
+     "from": "world",
+     "line": 3114,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 3180,
+     "line": 3115,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3191,
+     "line": 3132,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 3144,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 3168,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 3184,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 3195,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3191,
+     "line": 3195,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 3217,
+     "line": 3221,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 3218,
+     "line": 3222,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3221,
+     "line": 3225,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3246,
+     "line": 3250,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 3248,
+     "line": 3252,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceSv",
      "from": "spaceserver",
-     "line": 3248,
+     "line": 3252,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3291,
+     "line": 3295,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3298,
+     "line": 3302,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3310,
+     "line": 3314,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3335,
+     "line": 3339,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3344,
+     "line": 3348,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3344,
+     "line": 3348,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3355,
+     "line": 3359,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3402,
+     "line": 3406,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3402,
+     "line": 3406,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3404,
+     "line": 3408,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3410,
+     "line": 3414,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3431,
+     "line": 3435,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3431,
+     "line": 3435,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3432,
+     "line": 3436,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3441,
+     "line": 3445,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3442,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "from": "level",
      "line": 3446,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Level",
+     "from": "level",
+     "line": 3450,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "U",
      "from": "util",
-     "line": 3446,
+     "line": 3450,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 3483,
+     "line": 3487,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3493,
+     "line": 3497,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3503,
+     "line": 3507,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 3513,
+     "line": 3517,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3528,
+     "line": 3532,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
      "from": "sim",
-     "line": 3528,
+     "line": 3532,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3546,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "from": "data",
-     "line": 3549,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "from": "level",
      "line": 3550,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "U",
-     "from": "util",
-     "line": 3572,
-     "load": false,
-     "guard": "plain"
-    },
-    {
      "x": "WEAPONS",
      "from": "data",
-     "line": 3580,
+     "line": 3553,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "WEAPONS",
-     "from": "data",
-     "line": 3580,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "from": "data",
-     "line": 3580,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "from": "data",
-     "line": 3580,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "from": "data",
-     "line": 3580,
+     "x": "Level",
+     "from": "level",
+     "line": 3554,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 3582,
+     "line": 3576,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "GRAVITY",
+     "x": "WEAPONS",
      "from": "data",
      "line": 3584,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "dragOf",
+     "x": "WEAPONS",
      "from": "data",
-     "line": 3585,
+     "line": 3584,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Sim",
-     "from": "sim",
+     "x": "ballFor",
+     "from": "data",
+     "line": 3584,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "calOf",
+     "from": "data",
+     "line": 3584,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "roundSpeed",
+     "from": "data",
+     "line": 3584,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
      "line": 3586,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "from": "sim",
-     "line": 3587,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Sim",
-     "from": "sim",
-     "line": 3588,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Sim",
-     "from": "sim",
-     "line": 3588,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Sim",
-     "from": "sim",
-     "line": 3599,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GRAVITY",
      "from": "data",
-     "line": 3599,
+     "line": 3588,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "dragOf",
+     "from": "data",
+     "line": 3589,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 3590,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 3591,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 3592,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 3592,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 3603,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "GRAVITY",
+     "from": "data",
+     "line": 3603,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 3611,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 3628,
      "load": false,
      "guard": "plain"
     }
@@ -41478,7 +41629,7 @@
   },
   "shipgen": {
    "defs": {
-    "ShipGen": 10
+    "ShipGen": 15
    },
    "imports": [
     {
@@ -41522,175 +41673,182 @@
     {
      "x": "U",
      "from": "util",
-     "line": 34,
+     "line": 66,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 51,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "from": "level",
-     "line": 51,
+     "line": 130,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 134,
+     "line": 151,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 151,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 139,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "from": "level",
-     "line": 139,
+     "line": 286,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 185,
+     "line": 291,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 208,
+     "line": 291,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 337,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 279,
+     "line": 361,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 298,
+     "line": 432,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 311,
+     "line": 451,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 321,
+     "line": 464,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 362,
+     "line": 474,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 366,
+     "line": 517,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 379,
+     "line": 521,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 534,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 391,
+     "line": 546,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
      "from": "materials",
-     "line": 394,
+     "line": 549,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 402,
+     "line": 557,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 402,
+     "line": 557,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 436,
+     "line": 591,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 436,
+     "line": 591,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 465,
+     "line": 620,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 472,
+     "line": 627,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 472,
+     "line": 627,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 472,
+     "line": 627,
      "load": false,
      "guard": "plain"
     }
@@ -41704,17 +41862,21 @@
      "kind": "type",
      "line": 7
     },
+    "ShHall": {
+     "kind": "type",
+     "line": 12
+    },
     "ShWing": {
      "kind": "type",
-     "line": 8
+     "line": 13
     },
     "ShSk": {
      "kind": "type",
-     "line": 9
+     "line": 14
     },
     "ShipGen": {
      "kind": "value",
-     "line": 10
+     "line": 15
     }
    }
   },
@@ -41845,63 +42007,70 @@
     {
      "x": "U",
      "from": "util",
-     "line": 251,
+     "line": 254,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 330,
+     "line": 333,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 409,
+     "line": 412,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 486,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 535,
+     "line": 563,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 569,
+     "line": 597,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 610,
+     "line": 638,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 610,
+     "line": 638,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 653,
+     "line": 681,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 669,
+     "line": 697,
      "load": false,
      "guard": "plain"
     }
@@ -47637,56 +47806,56 @@
     {
      "x": "THEMES",
      "from": "data",
-     "line": 229,
+     "line": 232,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "THEMES",
      "from": "data",
-     "line": 230,
+     "line": 233,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 238,
+     "line": 241,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 238,
+     "line": 241,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 303,
+     "line": 307,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 303,
+     "line": 307,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "THEMES",
      "from": "data",
-     "line": 306,
+     "line": 310,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "THEMES",
      "from": "data",
-     "line": 306,
+     "line": 310,
      "load": false,
      "guard": "plain"
     }
@@ -47712,7 +47881,7 @@
   },
   "spaceserver": {
    "defs": {
-    "SpaceSv": 34
+    "SpaceSv": 36
    },
    "imports": [
     {
@@ -47792,147 +47961,140 @@
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 35,
+     "line": 37,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "Server",
      "from": "server",
-     "line": 44,
+     "line": 46,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Server",
      "from": "server",
-     "line": 44,
+     "line": 46,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 140,
+     "line": 142,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 145,
+     "line": 147,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 154,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 183,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "from": "spacedata",
-     "line": 192,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "from": "spacedata",
-     "line": 207,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 211,
+     "line": 158,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 218,
+     "line": 180,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 231,
+     "line": 208,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "SpaceData",
+     "from": "spacedata",
+     "line": 217,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "SpaceData",
+     "from": "spacedata",
+     "line": 232,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 233,
+     "line": 236,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 243,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 244,
+     "line": 256,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 261,
+     "line": 258,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 275,
+     "line": 269,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 276,
+     "line": 286,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 282,
+     "line": 300,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 283,
+     "line": 301,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 289,
+     "line": 307,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 292,
+     "line": 308,
      "load": false,
      "guard": "plain"
     },
@@ -47953,14 +48115,7 @@
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 324,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 328,
+     "line": 339,
      "load": false,
      "guard": "plain"
     },
@@ -47974,286 +48129,279 @@
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 350,
+     "line": 349,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 353,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 367,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 375,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 356,
+     "line": 381,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 377,
+     "line": 402,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 380,
+     "line": 405,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 385,
+     "line": 410,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 420,
+     "line": 445,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
      "from": "damage",
-     "line": 421,
+     "line": 446,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
      "from": "damage",
-     "line": 422,
+     "line": 447,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 424,
+     "line": 449,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 432,
+     "line": 457,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 434,
+     "line": 459,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 437,
+     "line": 462,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 437,
+     "line": 462,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 439,
+     "line": 464,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 442,
+     "line": 467,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ENEMIES",
      "from": "data",
-     "line": 455,
+     "line": 480,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 529,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 536,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 544,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 504,
+     "line": 580,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 505,
+     "line": 581,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 507,
+     "line": 583,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 508,
+     "line": 584,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 509,
+     "line": 585,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
      "from": "materials",
-     "line": 509,
+     "line": 585,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 511,
+     "line": 587,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
      "from": "world",
-     "line": 517,
+     "line": 593,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 518,
+     "line": 594,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 529,
+     "line": 605,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 529,
+     "line": 605,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 530,
+     "line": 606,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 531,
+     "line": 607,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 536,
+     "line": 612,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 536,
+     "line": 612,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 542,
+     "line": 618,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 545,
+     "line": 621,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
      "from": "spacedata",
-     "line": 546,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 547,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "from": "spacedata",
-     "line": 548,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "from": "level",
-     "line": 551,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 552,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 592,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 611,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "from": "level",
      "line": 622,
      "load": false,
      "guard": "plain"
@@ -48266,58 +48414,107 @@
      "guard": "plain"
     },
     {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 623,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 637,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 637,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "from": "shipgen",
-     "line": 647,
+     "x": "SpaceData",
+     "from": "spacedata",
+     "line": 624,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 648,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "from": "level",
-     "line": 648,
+     "line": 627,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 676,
+     "line": 628,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 668,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 687,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 676,
+     "line": 698,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 699,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 699,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 713,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 713,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 724,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 725,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 725,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipGen",
+     "from": "shipgen",
+     "line": 753,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 753,
      "load": false,
      "guard": "plain"
     }
@@ -48337,7 +48534,7 @@
     },
     "SpaceSv": {
      "kind": "value",
-     "line": 34
+     "line": 36
     }
    }
   },
@@ -48657,135 +48854,100 @@
     {
      "x": "Net",
      "from": "net",
-     "line": 252,
+     "line": 253,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 252,
+     "line": 253,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
      "from": "game",
-     "line": 252,
+     "line": 253,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 255,
+     "line": 256,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
      "from": "game",
-     "line": 257,
+     "line": 271,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
      "from": "game",
-     "line": 257,
+     "line": 271,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 261,
+     "line": 275,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
      "from": "shipgen",
-     "line": 261,
+     "line": 275,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 261,
+     "line": 275,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 261,
+     "line": 275,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
      "from": "level",
-     "line": 261,
+     "line": 275,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 261,
+     "line": 275,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 261,
+     "line": 275,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 261,
+     "line": 275,
      "load": false,
      "guard": "guarded"
-    },
-    {
-     "x": "Space",
-     "from": "space",
-     "line": 261,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 262,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 262,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 262,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipModel",
-     "from": "shipmodel",
-     "line": 268,
-     "load": false,
-     "guard": "plain"
     },
     {
      "x": "Space",
@@ -48797,119 +48959,140 @@
     {
      "x": "U",
      "from": "util",
-     "line": 280,
+     "line": 276,
      "load": false,
      "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "from": "player",
-     "line": 288,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "from": "player",
-     "line": 288,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "from": "player",
-     "line": 288,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "from": "game",
-     "line": 290,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "HUD",
-     "from": "hud",
-     "line": 290,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "from": "game",
-     "line": 295,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "from": "game",
-     "line": 295,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "from": "game",
-     "line": 295,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "from": "game",
-     "line": 295,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "from": "game",
-     "line": 295,
-     "load": false,
-     "guard": "guarded"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 299,
+     "line": 276,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Me",
-     "from": "player",
-     "line": 299,
+     "x": "U",
+     "from": "util",
+     "line": 276,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShipModel",
+     "from": "shipmodel",
+     "line": 282,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Space",
      "from": "space",
-     "line": 305,
+     "line": 289,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 307,
+     "line": 294,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "from": "player",
+     "line": 302,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "from": "player",
+     "line": 302,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "from": "player",
+     "line": 302,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "from": "game",
+     "line": 304,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "HUD",
+     "from": "hud",
+     "line": 304,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "from": "game",
+     "line": 309,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "from": "game",
+     "line": 309,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "from": "game",
+     "line": 309,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "from": "game",
+     "line": 309,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "from": "game",
+     "line": 309,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 313,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "from": "player",
+     "line": 313,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Space",
+     "from": "space",
+     "line": 319,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
      "from": "util",
-     "line": 317,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "from": "util",
-     "line": 326,
+     "line": 321,
      "load": false,
      "guard": "plain"
     },
@@ -48921,86 +49104,100 @@
      "guard": "plain"
     },
     {
+     "x": "U",
+     "from": "util",
+     "line": 340,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 345,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Net",
      "from": "net",
-     "line": 338,
+     "line": 352,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
      "from": "audio",
-     "line": 338,
+     "line": 352,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 339,
+     "line": 353,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 339,
+     "line": 353,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Net",
      "from": "net",
-     "line": 339,
+     "line": 353,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
      "from": "audio",
-     "line": 339,
+     "line": 353,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
      "from": "net",
-     "line": 340,
+     "line": 354,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
      "from": "audio",
-     "line": 340,
+     "line": 354,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 344,
+     "line": 358,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
      "from": "player",
-     "line": 344,
+     "line": 358,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
      "from": "audio",
-     "line": 344,
+     "line": 358,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
      "from": "net",
-     "line": 345,
+     "line": 359,
      "load": false,
      "guard": "plain"
     }
@@ -53721,6 +53918,21 @@
     ],
     "loadAt": []
    },
+   "acousticswasm": {
+    "load": 1,
+    "call": 5,
+    "names": [
+     "ZCOL",
+     "AcWasm"
+    ],
+    "loadAt": [
+     {
+      "x": "AcWasm",
+      "line": 607,
+      "guard": "plain"
+     }
+    ]
+   },
    "audioenv": {
     "load": 0,
     "call": 8,
@@ -53738,6 +53950,7 @@
     "loadAt": []
    }
   },
+  "acousticswasm": {},
   "ambience": {
    "audio": {
     "load": 0,
@@ -56884,7 +57097,7 @@
    },
    "spacedata": {
     "load": 0,
-    "call": 6,
+    "call": 9,
     "names": [
      "SpaceData"
     ],
@@ -57228,7 +57441,21 @@
     "loadAt": [
      {
       "x": "Prof",
-      "line": 96,
+      "line": 97,
+      "guard": "plain"
+     }
+    ]
+   },
+   "acousticswasm": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "AcWasm"
+    ],
+    "loadAt": [
+     {
+      "x": "AcWasm",
+      "line": 99,
       "guard": "plain"
      }
     ]
@@ -58690,7 +58917,7 @@
    },
    "util": {
     "load": 0,
-    "call": 50,
+    "call": 51,
     "names": [
      "U"
     ],
@@ -58734,7 +58961,7 @@
    },
    "level": {
     "load": 0,
-    "call": 60,
+    "call": 61,
     "names": [
      "Level"
     ],
@@ -58869,7 +59096,7 @@
   "shipgen": {
    "util": {
     "load": 0,
-    "call": 5,
+    "call": 6,
     "names": [
      "U"
     ],
@@ -58927,7 +59154,7 @@
    },
    "level": {
     "load": 0,
-    "call": 3,
+    "call": 4,
     "names": [
      "Level"
     ],
@@ -59595,7 +59822,7 @@
     "loadAt": [
      {
       "x": "SpaceData",
-      "line": 35,
+      "line": 37,
       "guard": "plain"
      }
     ]
@@ -59610,7 +59837,7 @@
    },
    "level": {
     "load": 0,
-    "call": 18,
+    "call": 21,
     "names": [
      "Level"
     ],
@@ -59618,7 +59845,7 @@
    },
    "shipgen": {
     "load": 0,
-    "call": 39,
+    "call": 40,
     "names": [
      "ShipGen"
     ],
