@@ -45,6 +45,7 @@ interface Enemy {
   alert: boolean; spot: number; tgt: string | null; tgtD: number; canSee: boolean; percT: number; cool: number; burstLeft: number; aiming: boolean; aimT: number;
   strafe: number; strafeT: number; idleT: number; idleYaw: number; pendingAlert: number; lostT: number; lastHit: string | null;
   cover: EnemyCover | null; inCover: boolean; peek: boolean; peekT: number; coverT: number; coverStuck: number; crouch: boolean; nadeT: number; nadeN?: number; pushing?: boolean; pushWait?: number;
+  clearOut?: { ux: number; uz: number; until: number } | null; clearT?: number; // (a civilian getting out of a shooter's way: clearLine)
   lastSeen: { x: number; y: number; z: number } | null; morale: number; broken: boolean; noise: { x: number; z: number } | null; holding: boolean; bold: boolean;
   mag: number; magMax: number; reloadT: number; bleedH: number; bleedL: number; wnd?: number[]; clotT: number; legs: number; arms: number; lung: boolean;
   drawn: boolean; drawT: number; surprisedT: number; suspicious: boolean; calmT: number; state: EnemyState; armed: boolean; shouts: number; complyCd: number;
@@ -1611,6 +1612,20 @@ const G_Server = {
   // weakness is allowed for: they can't do better). On the host's own screen the suspect's body is simulated
   // (js/rig.ts powerStep), so where that gun's bore actually points has to agree too (the screen tells it: 'bores', the
   // muzzle and the bore's way as last drawn). Kept waiting too long, they snap a shot off anyway.
+  // A civilian between them and where they'd shoot (on their floor, past them and short of it, within SCREEN_R of the line): they won't
+  // fire through one. That civilian, or null.
+  SCREEN_R: 0.45,
+  screenedBy(e: Enemy, tx: number, tz: number, ty: number): Enemy | null {
+    const dx = tx - e.x, dz = tz - e.z, L2 = dx * dx + dz * dz; if (L2 < 0.25) return null;
+    const L = Math.sqrt(L2);
+    for (const c of this.enemies.values()) {
+      if (c === e || !c.def.civ || c.down || Math.abs((c.y || 0) - (e.y || 0)) > 1.5 || Math.abs((c.y || 0) - ty) > 2) continue;
+      const ox = c.x - e.x, oz = c.z - e.z, t = (ox * dx + oz * dz) / L2;
+      if (t <= 0 || t >= 1) continue;
+      if (Math.abs(ox * dz - oz * dx) / L < this.SCREEN_R) return c;
+    }
+    return null;
+  },
   onTarget(e: Enemy, st: PState, dt: number) {
     const tx = st.p[0], ty = st.p[1] + (st.pr ? 0.25 : st.cr ? 0.75 : 1.2), tz = st.p[2], s = e.str == null ? 1 : e.str;
     const sag = (1 - G.U.clamp(s / 0.6, 0, 1)) * 45;
@@ -2052,9 +2067,18 @@ const G_Server = {
         if (e.strafeT <= 0) { e.strafeT = 0.7 + Math.random() * 1.6; e.strafe = [-1, 0, 1][Math.floor(Math.random() * 3)]; }
         mx = (-dz / d) * e.strafe; mz = (dx / d) * e.strafe; sp = 0.5;
       }
+      // a civilian in the way: no shot through them. They step out to the side the civilian isn't on (from cover too: it's no use
+      // to them now), and fire once the line's clear.
+      const scr = this.screenedBy(e, st.p[0], st.p[2], st.p[1]);
+      if (scr) {
+        const lx = -dz / d, lz = dx / d, on = (scr.x - e.x) * lx + (scr.z - e.z) * lz, side = on > 0.02 ? -1 : on < -0.02 ? 1 : e.id % 2 ? 1 : -1;
+        mx = lx * side; mz = lz * side; sp = 0.7; e.strafe = side; e.strafeT = 0.8;
+        if (e.cover) { e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; e.coverT = 1.5; }
+        e.shieldBy = undefined;
+      }
 
       // shooting: from cover, stand up first (a short window where the head is exposed)
-      if (d < def.range && e.drawT <= 0 && !e.flinchT) {
+      if (d < def.range && e.drawT <= 0 && !e.flinchT && !scr) {
         e.cool -= dt;
         const ready = def.aimTime ? e.aiming || e.cool <= 0 : e.cool <= 0;
         if (e.inCover && ready && !e.peek) { e.peek = true; e.peekT = this.PEEK.UP; e.peekOut = this.PEEK.MIN; e.peekDone = false; }
@@ -2087,7 +2111,7 @@ const G_Server = {
         if (e.order && e.lastSeen && (e.sawAt || -99) > e.order.at && this.clock - e.order.rt > 4) this.retarget(e, e.lastSeen); // (the search starts again from where they were seen)
       }
       e.lostT += dt;
-      if (e.blind && !e.flinchT && st && e.drawn && e.lastSeen && e.lostT < 1.1 && e.tgtD < def.range) {
+      if (e.blind && !e.flinchT && st && e.drawn && e.lastSeen && e.lostT < 1.1 && e.tgtD < def.range && !this.screenedBy(e, e.lastSeen.x, e.lastSeen.z, e.lastSeen.y || 0)) {
         e.cool -= dt;
         if (e.cool <= 0) { this.fire(e, p as LivePlayer, true); e.cool = U.rf(0.15, 0.4); }
       } else e.cool = Math.max(e.cool, 0.6);
@@ -2513,7 +2537,7 @@ const G_Server = {
       e.yaw += U.angDiff(e.yaw, Math.atan2(-(st.p[0] - e.x), -(st.p[2] - e.z))) * Math.min(1, dt * 5);
       e.cool -= dt;
       // cornered with police in sight: fight back, not token shots
-      if (e.cool <= 0 && e.tgtD < e.def.range && this.onTarget(e, st, dt)) { this.fire(e, p); e.cool = U.rf(0.5, 1.2); }
+      if (e.cool <= 0 && e.tgtD < e.def.range && !this.screenedBy(e, st.p[0], st.p[2], st.p[1]) && this.onTarget(e, st, dt)) { this.fire(e, p); e.cool = U.rf(0.5, 1.2); }
     } else e.cool = Math.max(e.cool, 0.8);
     if (e.morale > 0.45) e.broken = false;
   },
@@ -2579,9 +2603,44 @@ const G_Server = {
   },
 
   // Civilians: mill about until something scares them, then cower or bolt away from the shooting.
+  // A civilian in the line between an armed suspect and the officer he's got in his sights (Server.screenedBy, from the civilian's side):
+  // they get out of it, sideways, the way that's further from the line, at a run. Looked for every so often; true while they're moving.
+  clearLine(e: Enemy, dt: number) {
+    const now = this.clock || 0;
+    if (e.clearOut && now < e.clearOut.until) {
+      const c = e.clearOut, bx = e.x, bz = e.z;
+      this.moveEntity(e, c.ux, c.uz, e.def.run, dt);
+      e.yaw += G.U.angDiff(e.yaw, Math.atan2(-c.ux, -c.uz)) * Math.min(1, dt * 8); e.crouch = true;
+      if (Math.hypot(e.x - bx, e.z - bz) < e.def.run * dt * 0.2) e.clearOut = null; // (into a wall: as far as they can go)
+      else return true;
+    }
+    e.clearOut = null;
+    e.clearT = (e.clearT || 0) - dt; if (e.clearT > 0) return false;
+    e.clearT = 0.2 + Math.random() * 0.1;
+    for (const s of this.enemies.values()) {
+      if (s.def.civ || !s.armed || !s.drawn || !s.canSee || !s.tgt || s.down || s.state !== 'normal') continue;
+      const p = this.players.get(s.tgt), st = p && p.st; if (!st) continue;
+      const dx = st.p[0] - s.x, dz = st.p[2] - s.z, L2 = dx * dx + dz * dz; if (L2 < 0.25) continue;
+      const ox = e.x - s.x, oz = e.z - s.z, t = (ox * dx + oz * dz) / L2;
+      if (t <= 0 || t >= 1 || Math.abs((e.y || 0) - (s.y || 0)) > 1.5) continue;
+      const L = Math.sqrt(L2), lx = -dz / L, lz = dx / L, off = ox * lx + oz * lz;
+      if (Math.abs(off) >= this.SCREEN_R + 0.15) continue;
+      // the side they're already on (or the one more open, standing on the line), and as far as gets them clear
+      const W = this.map && this.map.world, ey = (e.y || 0) + 1.0, open = (sg: number) => { const r = W ? G.World.raycast(W, e.x, ey, e.z, lx * sg, 0, lz * sg, 2, { move: true }) : null; return r && r.solid ? r.t : 2; };
+      let sg = off > 0.05 ? 1 : off < -0.05 ? -1 : open(1) >= open(-1) ? 1 : -1;
+      if (open(sg) < 0.4 && open(-sg) > open(sg)) sg = -sg; // (against a wall that way: the other)
+      const need = this.SCREEN_R + 0.45 - Math.abs(off) * Math.sign(off) * sg;
+      e.clearOut = { ux: lx * sg, uz: lz * sg, until: now + Math.min(1.5, need / e.def.run + 0.05) };
+      if (e.state === 'normal') e.walkTo = null;
+      return true;
+    }
+    return false;
+  },
   thinkCiv(e: Enemy, dt: number) {
     const def = e.def, U = G.U, L = G.Level;
-    if (e.state === 'cuffed' || e.state === 'surrender' || e.state === 'cower') return;
+    if (e.state === 'cuffed' || e.state === 'surrender') return;
+    if (!e.down && this.clearLine(e, dt)) return; // (out of a shooter's way, before anything else)
+    if (e.state === 'cower') return;
     if (e.state === 'hide') {
       if (!e.hide && !this.seekHide(e)) { e.state = 'cower'; e.crouch = false; e.leanOut = 0; return; }
       // an officer right on top of them: they give up and freeze
