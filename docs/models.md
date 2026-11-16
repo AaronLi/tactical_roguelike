@@ -489,6 +489,36 @@ Every pack and prop (`tools/model_emit.mjs` `compression()`, after the weld on f
 | a level's loads (`?play=1&level=3`: ~385 packs and props) | 4.2-4.5 s from the first to the last, spread over the level build | the same |
 | GPU memory | float32 positions | the same (dequantised at load; no textures) |
 
+## Human bodies
+
+The twenty bodies (`js/humans.ts`) are made in Blender by a script (`models/characters/build_variants.py`, from
+`build_human.py` and the figures in `human_variants.py`) and kept in the repo as it exports them:
+`models/characters/human/variants/<id>.glb`, with `index.json` beside them and `js/humandata.ts` (what the game knows of each
+without its file). Blender is wanted only to change them. The bake's `humans` phase (`tools/bake_humans.mjs`, in
+`npm run bake:models`; `npm run bake:humans` alone) checks each and puts it in the baked tree, `assets/models/humans/<id>.glb`
+with `humans/index.json` (`{ version, humans: { <id>: { file, bytes, sha1, tris, prims, mats } } }`), and the bundling packs
+them with everything else.
+
+The fingers have bones of their own: three a finger and three for the thumb, each from one knuckle to the next (`index1` off the hand, `index3`
+to the tip), parented to the hand and rolled as it is, so a knuckle bends about the bone's x. `build_human.py` adds them after the body is
+skinned to the rest of the skeleton (whose weights are left as they were) and hands each finger vertex's hand weight on to the bones along that
+finger, eased across each knuckle (4.5 mm either side; 8 mm on the thumb). In the game a bone keeps its digits (`index1L`: js/humans.ts);
+the third-person rig lets them ride the hand, and the first-person arms (js/vmanim.ts) curl them round what each hand holds.
+
+What a body must be (a failure names the body and the rule):
+
+| Rule | Why |
+|---|---|
+| One skeleton, with exactly these bones: `hips spine chest neck head`, `clavicle upperarm forearm hand` `.L`/`.R`, `thigh shin foot` `.L`/`.R`, `eye.L eye.R`, and the fingers' `thumb1..3 index1..3 middle1..3 ring1..3 pinky1..3` `.L`/`.R` | `js/rig.ts` attachHuman hangs each on the rig's joint of that name (a finger's bones on its hand's); one it doesn't know would ride the hips |
+| Every mesh skinned (`JOINTS_0`, `WEIGHTS_0`) | an unskinned mesh is left out |
+| Every material named one of `shirt trousers boots neck upsleeve sleeve hand finger front lowleg skin eyeskin hair brow lip stubble eye iris` | the material's name is how `js/rig.ts` dresses it (hMat); another name is drawn as nothing |
+| `shirt trousers boots hand skin eye` all present | no body is without them |
+| In `index.json` and in `js/humandata.ts`, both ways | its size and the fit of its kit come from there before its file does |
+
+The same checks run in three places: when the bodies are made (`build_variants.py` ends with `bake_humans.mjs --source`),
+in the bake, and in `npm run test:models` (`--check`: the sources, and that the baked tree is their copy).
+
+
 
 ## Bundles
 

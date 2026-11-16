@@ -12,6 +12,7 @@
 //                         put on if you've none, and whatever's in the way taken off): ?gear=n.pano for the panoramic night vision
 //                         on a high-cut helmet; ?nvg flips night vision down to start with
 //   ?leader               a leader in the level for sure (one is at random from level 2: js/server.ts spawnEnemies)
+//   ?shield               a suspect or two with a handheld shield for sure (a few are, at random, from level 3: spawnEnemies)
 //   ?nofoes               nobody in the level; ?stronghold makes it one (js/route.ts); ?night makes it a night level
 //                         (the lights out: js/level.ts nightify)
 //   ?hangar               the hangar between levels instead of a level (the shop, the gunsmith, the range)
@@ -109,7 +110,7 @@ const G_DebugStart = (() => {
       await until(() => G.Game.hub && G.Me.pos);
     } else {
       // the level the route would build: its place and number set as it starts (js/server.ts startLevel: dbg)
-      G.Net.toHost({ t: 'startRun', dbg: { th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), stronghold: q.has('stronghold'), night: q.has('night'), seed: q.has('seed') ? +q.get('seed')! : undefined } });
+      G.Net.toHost({ t: 'startRun', dbg: { th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), shield: q.has('shield'), stronghold: q.has('stronghold'), night: q.has('night'), seed: q.has('seed') ? +q.get('seed')! : undefined } });
       await until(() => G.Game.phase === 'route' && G.Game.routeMap);
       arm();
       const g0 = G.Game;

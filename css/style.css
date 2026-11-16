@@ -1217,3 +1217,10 @@ body.touch-on #scoreboard { top: 10%; }
 body.touch-on #fieldInv { background: rgba(7, 9, 11, 0.95); }
 @media (orientation: landscape) { body.touch-on .inv > .inv-col.eq { flex: 0 0 210px; } body.touch-on .inv > .inv-col:nth-child(2) { flex: 1 1 300px; max-width: none; } }
 body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
+/* what a piece of armour covers, and how well (js/ballistics.ts coverageHTML) */
+.cov { width: 100%; border-collapse: collapse; margin: 10px 0 4px; font: 400 11.5px var(--ui-font); }
+.cov th { font: 500 9.5px var(--ui-font); letter-spacing: 1.2px; text-transform: uppercase; color: var(--ui-dim); text-align: left; padding: 0 6px 4px 0; }
+.cov td { padding: 4px 6px 4px 0; border-top: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
+.cov td:first-child { color: var(--ui-dim); }
+.cov td.ok { color: #9fd18b; } .cov td.mid { color: #e4c56c; } .cov td.no { color: #d98a7a; }
+.cov-note { margin: 2px 0 6px; font: 400 10.5px var(--ui-font); color: var(--ui-dim); line-height: 1.4; }

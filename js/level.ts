@@ -705,6 +705,7 @@ const G_Level = {
   //     outsideMaterial; high up in an apartment block). Rounds through it stop in the wall behind.
   // From the level's own random stream, so every peer has the same windows. map.windows[id], map.winAt: cell -> ray boxes.
   SILL: 0.95, TOP: 2.25,
+  CRACKS: 2, // (rounds that fracture a pane without bringing it down: the next one breaks it, js/player.ts roundPane)
   placeWindows(map: LvMap) {
     const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G.U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
     map.windows = []; map.winAt = new Map();

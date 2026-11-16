@@ -1,0 +1,188 @@
+{
+ "triangles": {
+  "body": 3034,
+  "head": 1977,
+  "eyes": 200,
+  "total": 5211,
+  "kit": 20386
+ },
+ "vertices": {
+  "body": 1525,
+  "head": 1109
+ },
+ "bones": [
+  "hips",
+  "spine",
+  "chest",
+  "neck",
+  "head",
+  "clavicle.R",
+  "upperarm.R",
+  "forearm.R",
+  "hand.R",
+  "thigh.R",
+  "shin.R",
+  "foot.R",
+  "clavicle.L",
+  "upperarm.L",
+  "forearm.L",
+  "hand.L",
+  "thigh.L",
+  "shin.L",
+  "foot.L",
+  "eye.R",
+  "eye.L",
+  "index1.R",
+  "index2.R",
+  "index3.R",
+  "middle1.R",
+  "middle2.R",
+  "middle3.R",
+  "ring1.R",
+  "ring2.R",
+  "ring3.R",
+  "pinky1.R",
+  "pinky2.R",
+  "pinky3.R",
+  "thumb1.R",
+  "thumb2.R",
+  "thumb3.R",
+  "index1.L",
+  "index2.L",
+  "index3.L",
+  "middle1.L",
+  "middle2.L",
+  "middle3.L",
+  "ring1.L",
+  "ring2.L",
+  "ring3.L",
+  "pinky1.L",
+  "pinky2.L",
+  "pinky3.L",
+  "thumb1.L",
+  "thumb2.L",
+  "thumb3.L"
+ ],
+ "height": 1.756,
+ "poses": [
+  "rest",
+  "arms down",
+  "aiming",
+  "hands up",
+  "crouch",
+  "kneeling",
+  "stride",
+  "seated"
+ ],
+ "shots": [
+  [
+   "rest",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_rest_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_rest_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_rest_180.png"
+   ]
+  ],
+  [
+   "arms down",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_arms_down_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_arms_down_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_arms_down_180.png"
+   ]
+  ],
+  [
+   "aiming",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_aiming_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_aiming_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_aiming_180.png"
+   ]
+  ],
+  [
+   "hands up",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_hands_up_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_hands_up_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_hands_up_180.png"
+   ]
+  ],
+  [
+   "crouch",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_crouch_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_crouch_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_crouch_180.png"
+   ]
+  ],
+  [
+   "kneeling",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_kneeling_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_kneeling_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_kneeling_180.png"
+   ]
+  ],
+  [
+   "stride",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_stride_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_stride_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_stride_180.png"
+   ]
+  ],
+  [
+   "seated",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_seated_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_seated_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_seated_180.png"
+   ]
+  ],
+  [
+   "head (eyes turned)",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_head_0.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_head_32.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_head_90.png"
+   ]
+  ],
+  [
+   "elbows and shoulders, bent hard",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_elbow_20.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_elbow_110.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_elbow_180.png"
+   ]
+  ],
+  [
+   "hips and knees, bent hard",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_knee_30.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_knee_90.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_knee_180.png"
+   ]
+  ],
+  [
+   "shoulders and neck, arms down",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_arms_down_0.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_arms_down_55.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_arms_down_180.png"
+   ]
+  ],
+  [
+   "shoulders and neck, at rest",
+   [
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_at_rest_0.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_at_rest_55.png",
+    "F:\\workspace\\rt-space\\models\\characters\\human\\_shoulders_and_neck_at_rest_180.png"
+   ]
+  ]
+ ],
+ "wire": [
+  "F:\\workspace\\rt-space\\models\\characters\\human\\_wire_32.png",
+  "F:\\workspace\\rt-space\\models\\characters\\human\\_wire_90.png",
+  "F:\\workspace\\rt-space\\models\\characters\\human\\_wire_180.png"
+ ]
+}

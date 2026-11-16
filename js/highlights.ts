@@ -27,7 +27,7 @@ const G_Highlights = (() => {
   // a grenade thrown (nade): when, whose, from where and how fast, its fuse and kind; a frag's burst (boom): when, whose, where, its seed
   // (the same on every machine: js/player.ts fragBurst) and, from the thrower's machine, the paths of the chips that went into someone
   // (js/player.ts fragDone: [x, y, z, speed] points, and the hits as a round's are, less what only F9 reads)
-  interface HlNade { t: number; a: string | null; p: number[]; v: number[]; fuse: number; kind: string; arc?: number[][] } // (arc: its flight as worked out when it was thrown: arcOf)
+  interface HlNade { t: number; a: string | null; p: number[]; v: number[]; fuse: number; kind: string; arc?: number[][]; fly?: number; held?: boolean } // (a sticky's: fly, the seconds it flew before it held; held: where is known, stick) // (arc: its flight as worked out when it was thrown: arcOf)
   interface HlBoom { t: number; a: string | null; p: number[]; s: number; nade: HlNade | null; paths: ShotPath[]; kind?: string; cells?: number[][] } // (kind: 'frag', or 'tb' a thermobaric's; cells: the fireball's, [x, z, how far it spread], when it went off)
   // a flashbang going off: when, whose, where, the host's number for it (js/server.ts flashbang), the throw that took it there
   interface HlFlashFx { t: number; a: string | null; p: number[]; n: number; nade: HlNade | null }
@@ -444,14 +444,29 @@ const G_Highlights = (() => {
   // becomes (boom) to find. a: whose ('p' or 'e' and their id, or null)
   function nade(a: string | null, p: XYZ, v: XYZ, fuse: number, kind: string) {
     if (G.Game.phase !== 'level' || G.Game.hub) return;
-    const n: HlNade = { t: R.t, a, p: [p.x, p.y, p.z], v: [v.x, v.y, v.z], fuse, kind: kind === 'flash' || kind === 'tb' ? kind : 'frag' };
+    const n: HlNade = { t: R.t, a, p: [p.x, p.y, p.z], v: [v.x, v.y, v.z], fuse, kind: kind === 'flash' || kind === 'tb' || kind === 'sticky' ? kind : 'frag' };
     // its flight, worked out now against the level as it is (its doors as they are) and kept with it: the broadcast, the video's worker
-    // (which has no js/views.ts to work it out) and every machine draw the same arc. Every other point of it, to a centimetre.
+    // (which has no js/views.ts to work it out) and every machine draw the same arc. Every other point of it, to a centimetre. (A sticky's:
+    // to the wall it'll hold to, its fuse from there: put right if it held to someone first, stick)
     try {
-      const pts = G.Views.predictNade(new T.Vector3(p.x, p.y, p.z), new T.Vector3(v.x, v.y, v.z), fuse, G.Game.map), r = (x: number) => Math.round(x * 100) / 100;
+      const P0 = new T.Vector3(p.x, p.y, p.z), V0 = new T.Vector3(v.x, v.y, v.z), sticky = n.kind === 'sticky';
+      const pts = sticky ? G.Sim.predictSticky(P0, V0, G.Game.map, G.Sim.STICKY.MAX_FLY) : G.Views.predictNade(P0, V0, fuse, G.Game.map), r = (x: number) => Math.round(x * 100) / 100;
       n.arc = pts.filter((q, i) => i % 2 === 0 || i === pts.length - 1).map((q) => [r(q.x), r(q.y), r(q.z)]);
+      if (sticky) { n.fly = (pts.length - 1) / 60; n.fuse = n.fly + G.Sim.STICKY.FUSE; }
     } catch (e) { /* worked out when it's played, then */ }
     R.nades.push(n);
+  }
+  // Where a sticky held (js/views.ts stickStep, the thrower's; stuckAt, everyone else's from their word): its throw's arc cut there, after
+  // fly seconds in the air, and its fuse from then. a: whose; the latest of theirs not yet held.
+  function stick(a: string | null, at: XYZ, fly: number) {
+    if (G.Game.phase !== 'level' || G.Game.hub) return;
+    for (let i = R.nades.length - 1; i >= 0; i--) {
+      const n = R.nades[i]; if (n.kind !== 'sticky' || n.held || (a && n.a && n.a !== a)) continue;
+      const r = (x: number) => Math.round(x * 100) / 100, k = Math.max(1, Math.round(fly * 30));
+      n.arc = (n.arc || [n.p.slice()]).slice(0, k).concat([[r(at.x), r(at.y), r(at.z)]]);
+      n.fly = fly; n.fuse = fly + G.Sim.STICKY.FUSE; n.held = true;
+      return;
+    }
   }
   // the throw that went off at p: the latest of that kind (and thrower, if known) whose fuse has burnt, its arc ending within 2 m of it
   function throwOf(a: string | null, p: number[], kind: string) {
@@ -1533,8 +1548,8 @@ const G_Highlights = (() => {
   // a clip's grenade: where it went off, when, the throw that took it there, and whether it was a flashbang (a frag's kill: its boom; a
   // flashbang's own clip: its fx). Null for a clip without one.
   function burstOf(c: Clip) {
-    if (c.boom) return { p: new T.Vector3(...(c.boom.p as [number, number, number])), t: c.boom.t >= 0 ? c.boom.t : c.t, n: c.boom.nade, flash: false, tb: c.boom.kind === 'tb', s: c.boom.s, cells: c.boom.cells };
-    if (c.fx) return { p: new T.Vector3(...(c.fx.p as [number, number, number])), t: c.fx.t, n: c.fx.nade, flash: true, tb: false, s: c.fx.n * 2654435761, cells: undefined as number[][] | undefined };
+    if (c.boom) return { p: new T.Vector3(...(c.boom.p as [number, number, number])), t: c.boom.t >= 0 ? c.boom.t : c.t, n: c.boom.nade, flash: false, tb: c.boom.kind === 'tb', sticky: c.boom.kind === 'sticky', s: c.boom.s, cells: c.boom.cells };
+    if (c.fx) return { p: new T.Vector3(...(c.fx.p as [number, number, number])), t: c.fx.t, n: c.fx.nade, flash: true, tb: false, sticky: false, s: c.fx.n * 2654435761, cells: undefined as number[][] | undefined };
     return null;
   }
   // The throw's arc, as the grenade flew (js/views.ts predictNade, against the replayed level), bent the last of the way onto where it
@@ -1574,13 +1589,14 @@ const G_Highlights = (() => {
     const c = s.clip, B = burstOf(c);
     if (!B) return;
     if (!P.nx) {
-      const K = B.flash || B.tb ? 0 : 90, rr = G.U.rng((B.s >>> 0) || 1), dirs = new Float32Array(K * 3), lens = new Float32Array(K), vs = new Float32Array(K);
+      const K = B.flash || B.tb ? 0 : B.sticky ? 30 : 90, rr = G.U.rng((B.s >>> 0) || 1), dirs = new Float32Array(K * 3), lens = new Float32Array(K), vs = new Float32Array(K);
       for (let i = 0; i < K; i++) { // (the rest of the burst: a few of its chips each way, out to whatever stopped them)
         const cz = 2 * rr() - 1, r = Math.sqrt(1 - cz * cz), a = rr() * 6.283, x = Math.cos(a) * r, z = Math.sin(a) * r;
-        dirs[i * 3] = x; dirs[i * 3 + 1] = cz; dirs[i * 3 + 2] = z; vs[i] = 1350 * (0.85 + 0.3 * rr());
+        dirs[i * 3] = x; dirs[i * 3 + 1] = cz; dirs[i * 3 + 2] = z; vs[i] = (B.sticky ? 1000 : 1350) * (0.85 + 0.3 * rr());
         lens[i] = Math.min(14, G.Level.raycast(P.map, B.p.x, B.p.y, B.p.z, x, cz, z, 14).t);
       }
-      const mesh = new T.Mesh(B.flash ? new T.CylinderGeometry(0.035, 0.035, 0.13, 10) : B.tb ? new T.CylinderGeometry(0.045, 0.045, 0.15, 10) : new T.SphereGeometry(0.08, 10, 8), new T.MeshLambertMaterial({ color: B.flash ? 0x7d8388 : B.tb ? 0x4c5634 : 0x3a4a2a, emissive: 0x220000 }));
+      const mesh = new T.Mesh(B.flash ? new T.CylinderGeometry(0.035, 0.035, 0.13, 10) : B.tb ? new T.CylinderGeometry(0.045, 0.045, 0.15, 10) : B.sticky ? new T.SphereGeometry(0.055, 10, 8) : new T.SphereGeometry(0.08, 10, 8), new T.MeshLambertMaterial({ color: B.flash ? 0x7d8388 : B.tb ? 0x4c5634 : B.sticky ? 0x9a8558 : 0x3a4a2a, emissive: 0x220000 }));
+      if (B.sticky) mesh.scale.set(1, 0.82, 1); // (a sticky: its squat tan sock, js/views.ts stickyMesh)
       P.fxRoot.add(mesh);
       let streaks = null;
       if (K) {
@@ -1590,12 +1606,12 @@ const G_Highlights = (() => {
       }
       P.nx = { mesh, streaks, dirs, lens, vs, bang: false };
     }
-    const X = P.nx, tb = B.t, tau = s.tau, gp = B.p.clone().addScaledVector(_nUp, B.flash ? -0.1 : -0.25); // (it lies where it went off, a little lower)
+    const X = P.nx, tb = B.t, tau = s.tau, gp = B.sticky ? B.p.clone() : B.p.clone().addScaledVector(_nUp, B.flash ? -0.1 : -0.25); // (it lies where it went off, a little lower; a sticky, held where it went off)
     // the grenade: along its arc from the hand, or (no throw seen) where it went off, for the second before
     if (X.mesh) {
       const n = B.n, on = tau < tb && tau >= (n ? n.t : tb - 1.2);
       X.mesh.visible = on;
-      if (on && n) { const pts = arcOf(n, gp), u = G.U.clamp((tau - n.t) / Math.max(0.05, tb - n.t), 0, 1) * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(u)); X.mesh.position.copy(pts[i]).lerp(pts[i + 1], u - i); X.mesh.rotation.set(tau * 9, tau * 5, 0); }
+      if (on && n) { const fly = B.sticky && n.fly != null ? n.fly : tb - n.t, pts = arcOf(n, gp), u = G.U.clamp((tau - n.t) / Math.max(0.05, fly), 0, 1) * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(u)); X.mesh.position.copy(pts[i]).lerp(pts[i + 1], u - i); if (tau - n.t < fly) X.mesh.rotation.set(tau * 9, tau * 5, 0); } // (a sticky: along its flight, then held still where it went off)
       else if (on) X.mesh.position.copy(gp);
       (X.mesh.material as THREE.MeshLambertMaterial).emissive.setHex(Math.floor(tau * 8) % 2 ? 0xff2200 : 0x220000);
     }
@@ -2606,7 +2622,7 @@ const G_Highlights = (() => {
   function organsOn(rig: HlRig, O: Record<string, number>, overlay: boolean) {
     const B = G.Ballistics, ORG = B.ORG, all = [], hit = [];
     const bone = (n: string) => n.startsWith('up') || n.startsWith('lo') ? ((n.endsWith('L') ? rig.armL : rig.armR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : n.startsWith('th') || n.startsWith('sh') ? ((n.endsWith('L') ? rig.legL : rig.legR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : rig[n];
-    for (const s of B.segs()) {
+    for (const s of B.segs(rig as any)) {
       const b = bone(s.bone); if (!b) continue;
       for (const [id, sh] of s.organs || []) {
         const pct = O[id] || 0, col = pct >= 100 ? 0xff2a2a : pct > 0 ? 0xffb02a : ORG[id] && ORG[id].bone ? 0xe8e2c8 : 0x6fd08c;
@@ -2620,7 +2636,7 @@ const G_Highlights = (() => {
           mesh.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), bb.clone().sub(a).normalize());
         }
         if (overlay) mesh.renderOrder = 20 + (pct > 0 ? 1 : 0);
-        b.add(mesh); all.push(mesh);
+        B.segNode(rig as any, s, b).add(mesh); all.push(mesh);
         if (pct > 0) hit.push({ mesh, pct, id, col, base: mesh.scale.clone(), lit: false, pop: 0 });
       }
     }
@@ -3390,7 +3406,7 @@ const G_Highlights = (() => {
   }
 
   // (step and draw: the broadcast moved on and drawn by hand, for checking a replay without standing at a TV)
-  return { TVS, tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, warm, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
+  return { TVS, tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, stick, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, warm, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();
 G.Highlights = G_Highlights;
 interface GameModules { Highlights: typeof G_Highlights; }

@@ -22,7 +22,7 @@ type GmScreen = 'menu' | 'lobby' | 'shop' | 'route' | 'gameover' | 'pause' | 'ca
 // the sliders in the menu, and the keys they keep in storage
 type GmSetting = 'sens' | 'padSens' | 'touchSens' | 'fov' | 'vol' | 'loadKit';
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
-type GmMsgKind = 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
+type GmMsgKind = 'stk' | 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
 type GmDmgMap = Parameters<typeof G.Damage.apply>[0];
 // the turning figure of you in the menu (lookPreview)
@@ -97,6 +97,7 @@ const G_Game = {
     G.ServerLink.boot(); // (the host's simulation's thread, loading now so it's there when you host: js/serverlink.ts)
     G.Stickers.load().then((names) => G.ServerLink.stickers(names)); // (which stickers there are: js/stickers.ts; the sticker box hands out one of them)
     G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
+    G.Humans.boot(); // (every body's file, behind the menu: js/humans.ts)
     G.Hangar.load(); // (the hangar's baked scene, parsed as soon as the bundle's in: js/hangar.ts; what enters the game waits for it, needModels)
     this.settings = { sens: G.U.store.get('sens', 1), padSens: G.U.store.get('padSens', 1), touchSens: G.U.store.get('touchSens', 1), fov: G.U.store.get('fov', 80), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
     this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
@@ -878,7 +879,8 @@ const G_Game = {
       case 'eround': if (this.phase === 'level' && G.Net.isHost) G.Me.enemyRounds(m); break; // (the host's: a suspect's rounds, flown here)
       case 'eInfo': G.HUD.eInfoGot(m); break; // (the host's: the F9 readout's look at a suspect)
       case 'shot': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.remoteShot(m); break;
-      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag'); if (G.Highlights) G.Highlights.nade(m.en ? 'e' + m.e : 'p' + m.id, new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
+      case 'stk': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.stuckAt(m); break; // (where someone's sticky grenade held: js/views.ts stickStep)
+      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag', m.nid, m.id); if (G.Highlights) G.Highlights.nade(m.en ? 'e' + m.e : 'p' + m.id, new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
       case 'boom': this.onBoom(m); break;
       case 'course': if (G.Course) G.Course.setCourse(m.seed); break;
       case 'crun': if (G.Course && m.s) G.Course.remoteRun(Object.assign({}, m.s, { who: m.by || m.s.who })); break;
@@ -1022,12 +1024,13 @@ const G_Game = {
       return;
     }
     if (m.id !== G.Net.myId) { G.R.explosion(p, m.r); G.Audio.boom(G.R.camera.position.distanceTo(p)); }
-    if (m.fr && m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s); // (a frag's burst, for the replays: yours is kept as it went off)
+    if (m.fr && m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s, m.sk ? 'sticky' : 'frag'); // (a frag's burst, for the replays: yours is kept as it went off)
     const Me = G.Me;
     if (m.fr && m.id !== G.Net.myId && Me.pos && Math.hypot(Me.pos.x - p.x, Me.pos.z - p.z) < Me.FRAG.RANGE) {
       // A frag grenade: a suspect's, its chips flown here for you alone (if you're up); anyone else's (a teammate's: its
       // wounds are theirs to work out), flown against the walls only, from its seed, to leave the same pocks and scorch.
-      if (m.en && !Me.down && !Me.dead) Me.fragBurst(p, 1, m.s); else Me.fragBurst(p, undefined, m.s, true);
+      const fk = m.sk ? 'sticky' : undefined; // (a sticky's: its own heavier fragments)
+      if (m.en && !Me.down && !Me.dead) Me.fragBurst(p, 1, m.s, false, fk); else Me.fragBurst(p, undefined, m.s, true, fk);
     }
     if (!Me.pos || Me.down || Me.dead) return;
     const cy = Me.pos.y + 1.0, d = Math.hypot(Me.pos.x - p.x, cy - p.y, Me.pos.z - p.z);

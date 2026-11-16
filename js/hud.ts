@@ -281,7 +281,7 @@ const G_HUD = {
     const B = G.Ballistics, out = [];
     const bone = (n: string) => (n.startsWith('up') || n.startsWith('lo') ? ((n.endsWith('L') ? rig.armL : rig.armR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : n.startsWith('th') || n.startsWith('sh') ? ((n.endsWith('L') ? rig.legL : rig.legR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : rig[n]);
     const sph = this.xrSph || (this.xrSph = new THREE.SphereGeometry(1, 14, 10)), cyl = this.xrCyl || (this.xrCyl = new THREE.CylinderGeometry(1, 1, 1, 8));
-    for (const sg of B.segs()) {
+    for (const sg of B.segs(rig as any)) {
       const b = bone(sg.bone); if (!b) continue;
       for (const [id, sh] of sg.organs || []) {
         const m = new THREE.MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false });
@@ -293,7 +293,7 @@ const G_HUD = {
           mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), c.clone().sub(a).normalize());
         }
         mesh.userData.xr = true; mesh.visible = false; mesh.frustumCulled = false;
-        b.add(mesh); out.push({ id, mesh });
+        B.segNode(rig as any, sg, b).add(mesh); out.push({ id, mesh });
       }
     }
     return out;

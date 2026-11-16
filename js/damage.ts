@@ -822,11 +822,12 @@ const G_Damage = (() => {
     return out;
   }
   // ---------------------------------------------------------------- glass
-  // A pane that's taken a round fractures, all of it, from where it was hit: cracks running out to the frame and rings across them, a crushed
+  // A pane that's taken a round fractures, all of it, from where it was hit (each round its own fracture): cracks running out to the frame and rings across them, a crushed
   // white patch and a hole at the point of impact. It stays up, drawn over the pane, till something else breaks it (js/views.ts crackGlass, breakGlass).
   function crack(pane: THREE.Mesh | null | undefined, at: V3) {
     if (!pane) return null;
-    if (pane.userData.crack) return pane.userData.crack;
+    const key = [at.x, at.y, at.z].map((v) => v.toFixed(2)).join(','), cracks = (pane.userData.cracks = pane.userData.cracks || {}); // (one fracture for each point struck)
+    if (cracks[key]) return cracks[key];
     const g = pane.geometry; if (!g.boundingBox) g.computeBoundingBox();
     const b = g.boundingBox!, sx = b.max.x - b.min.x, sz = b.max.z - b.min.z, side = sx < sz && sx < 0.2, A = side ? sz : sx, H = b.max.y - b.min.y, l = pane.worldToLocal(at.clone()), lo = side ? b.min.z : b.min.x;
     const W = 512, Hp = Math.max(64, Math.min(1024, Math.round((W * H) / A))), cv = typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: W, height: Hp }) : new OffscreenCanvas(W, Hp), c = cv.getContext('2d')!;
@@ -861,7 +862,7 @@ const G_Damage = (() => {
     const tex = new T.CanvasTexture(cv);
     const m = new T.Mesh(new T.PlaneGeometry(A, H), new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: T.DoubleSide }));
     m.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2); if (side) m.rotation.y = Math.PI / 2;
-    m.renderOrder = 3; pane.add(m); pane.userData.crack = m;
+    m.renderOrder = 3; pane.add(m); cracks[key] = m;
     return m;
   }
   return { crack, HOLE, PARTS, HINGES, radius, hit, ofEvent, apply, clear, doorHole, onLeaf, partAt, fall, fallTrack, leafPose, setPose, partGone, update, reset, seenThrough, warm };

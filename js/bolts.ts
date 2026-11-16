@@ -86,7 +86,7 @@ const G_Bolts = (() => {
   function fromNet(m: BoltNet | null) {
     if (!m || !G.AMMO[m.am]) return;
     if (m.at) { inWorld(new T.Vector3(...(m.at as [number, number, number])), new T.Vector3(...(m.u as [number, number, number])).normalize(), m.am); return; }
-    const ev = G.Views.enemies.get(m.e!), bone = ev && ev.rig && G.Ballistics.boneOf(ev.rig, m.b!);
+    const ev = G.Views.enemies.get(m.e!), bone = ev && ev.rig && (m.b === 'shield' ? ev.rig.shield || ev.rig.shieldDropped || null : G.Ballistics.boneOf(ev.rig, m.b!)); // ('shield': in their handheld shield, js/player.ts boltShield)
     if (bone && Array.isArray(m.l)) follow(mesh(m.am), ev.rig, bone, m.l);
   }
   function clear() { for (const g of list) if (g.parent) g.parent.remove(g); list.length = 0; }
