@@ -12,6 +12,8 @@ import { Hooks, U } from './util.js';
 import { Views } from './views.js';
 import { Pad } from './gamepad.js';
 import { R } from './render.js';
+import { Net } from './net.js';
+import { Space } from './space.js';
 // In-game heads-up display (a DOM overlay).
 // the HUD's elements by id (init collects every id under #hud); the mask's canvas is the one that isn't a plain element
 interface HudEls { [id: string]: HTMLElement; maskFx: HTMLCanvasElement }
@@ -316,9 +318,9 @@ export const HUD = {
   // times a second while it's looked at, the last answer kept. Only the host has it (anyone else's readout is what the snapshots say).
   eInfos: new Map<number, { at: number; e: any }>(),
   eInfo(id: number) {
-    if (!G.Net.isHost) return null;
+    if (!Net.isHost) return null;
     const now = performance.now(), q = this.eInfos.get(id);
-    if (!q || now - q.at > 200) { this.eInfos.set(id, { at: now, e: q ? q.e : null }); G.Net.toHost({ t: 'eInfo', id }); }
+    if (!q || now - q.at > 200) { this.eInfos.set(id, { at: now, e: q ? q.e : null }); Net.toHost({ t: 'eInfo', id }); }
     return q ? q.e : null;
   },
   eInfoGot(m: any) { const q = this.eInfos.get(m.id); if (q) q.e = m.e || null; if (this.eInfos.size > 64) this.eInfos.delete(this.eInfos.keys().next().value!); },
@@ -425,8 +427,8 @@ export const HUD = {
       obj = `<b>Kit up, then hold <b>F</b> on the helicopter</b><br><span style="opacity:0.75">Tab: your stash and loadout · ${ready}/${ids.length} ready</span>`;
     }
     // the game in space (js/space.ts): the base, or a mission (whose own panel says what's wanted: js/spaceui.ts)
-    if (G.Space.on()) {
-      const s = G.Space.S;
+    if (Space.on()) {
+      const s = Space.S;
       this.set('levelInfo', Gm.hub ? `THE BASE <span>· ${s.docked ? 'ship on the pad' : 'under way'}</span>` : `${U.esc(s.ms ? s.ms.name : '')} <span>· ${Gm.map!.theme.name}</span>`);
       obj = !Gm.hub ? '' : s.board.picked.length ? `<b>${s.board.picked.length} mission${s.board.picked.length > 1 ? 's' : ''} taken</b><br><span style="opacity:0.75">Board the ship by her ramp, take the helm, fly to an anchor</span>` : '<b>Take a mission at the board by the pad</b><br><span style="opacity:0.75">Tab: your stash and loadout</span>';
     }
@@ -518,7 +520,7 @@ export const HUD = {
   scoreboardHTML() {
     const rows = [];
     const me = G.Me.state();
-    rows.push({ id: G.Net.myId, name: G.Game.myName, color: G.Game.myColor, animal: G.Game.myAnimal, st: me });
+    rows.push({ id: Net.myId, name: G.Game.myName, color: G.Game.myColor, animal: G.Game.myAnimal, st: me });
     for (const [id, pv] of Views.players) rows.push({ id, name: pv.name, color: pv.color, animal: pv.animal, st: pv.st });
     let html = '<table><tr><th>Operator</th><th>Incap.</th><th>HS</th><th>Damage</th><th>Downs</th><th>Revives</th><th>Credits</th></tr>';
     for (const r of rows) {
@@ -526,7 +528,7 @@ export const HUD = {
       html += `<tr><td style="color:${U.hex(r.color)}">${Callsigns.html(r.animal)}${U.esc(r.name)}${G.Game.guestMark(r.id)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td><td>${r.st ? U.fmt(r.st.cred) : '—'}</td></tr>`;
     }
     html += '</table>';
-    if (G.Net.code) html += `<div class="sb-perks">Room code: <b>${G.Net.code}</b></div>`;
+    if (Net.code) html += `<div class="sb-perks">Room code: <b>${Net.code}</b></div>`;
     return html;
   },
 };

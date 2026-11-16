@@ -1,6 +1,7 @@
 'use strict';
 import { AMMO, ammoTypes, asCal, ballFor, boreTip, calOf, cartOf, chambered, flight } from './data.js';
 import { VMAnim } from './vmanim.js';
+import { R } from './render.js';
 /** A display surface (display_<name>): the canvas the game draws on and the texture that shows it on the mesh. Draw, then set tex.needsUpdate. */
 interface VmSurface { mesh: THREE.Mesh; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; width: number; height: number }
 export const Viewmodel = (() => {
@@ -8,7 +9,7 @@ export const Viewmodel = (() => {
 
   // ---------------------------------------------------------------- muzzle flash sprite
   function flash(color: number) {
-    const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.2), new T.MeshBasicMaterial({ map: G.R.flashTexture(), transparent: true, blending: T.AdditiveBlending, depthWrite: false, color }));
+    const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.2), new T.MeshBasicMaterial({ map: R.flashTexture(), transparent: true, blending: T.AdditiveBlending, depthWrite: false, color }));
     m.visible = false;
     return m;
   }
@@ -96,7 +97,7 @@ export const Viewmodel = (() => {
     ret.onBeforeRender = (r: THREE.WebGLRenderer, _s: THREE.Scene, cam: THREE.Camera) => {
       const ppt = (r.getDrawingBufferSize(new T.Vector2()).y / 2) * (cam as THREE.PerspectiveCamera).projectionMatrix.elements[5];
       u.pxPerTan.value = ppt; u.t.value = performance.now() / 1000;
-      u.nvDim.value = G.R.nv && G.R.nv.k > 0.5 ? G.R.NV_DIM : 1; // (night vision down: its NV setting, a dot dim enough not to bloom the tubes)
+      u.nvDim.value = R.nv && R.nv.k > 0.5 ? R.NV_DIM : 1; // (night vision down: its NV setting, a dot dim enough not to bloom the tubes)
       u.spanPx.value = Math.max(k.ring * MOA * ppt * 1.3 + 16, 48);
     };
     g.add(ret);
@@ -251,7 +252,7 @@ export const Viewmodel = (() => {
   // the point of impact, where the next round strikes at a range, is one cell lit red on a coarse grid of faint grey cells (a cell is this many mils: the marker snaps from cell to cell)
   const POI_CELL = 0.5, POI_FAR = 560;
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-  const PIP_FS = G.R.TONE + `
+  const PIP_FS = R.TONE + `
     uniform sampler2D map; uniform float live; uniform vec2 eye; uniform int ret; uniform vec3 illum;
     uniform int calc; uniform sampler2D dmap; uniform vec3 poi; // (a ballistic computer: its readout's picture; the marker's cell, in cells from the middle, and whether there is one)
     uniform sampler2D rmap; uniform float pmil; // (a first-focal-plane reticle: its picture, and how much of the lens's radius a mil is at this power)
@@ -310,7 +311,7 @@ export const Viewmodel = (() => {
     const reticle = def.reticle || 'cross';
     if (reticle === 'thermal') return thermalLens(g, o, def);
     const mat = new T.ShaderMaterial({
-      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: ballFor(calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
+      uniforms: { map: { value: R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: ballFor(calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
       vertexShader: PIP_VS, fragmentShader: PIP_FS, toneMapped: false, // (it rolls off the picture itself: bpTone)
     });
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
@@ -364,7 +365,7 @@ export const Viewmodel = (() => {
   const TH_PAL = ['WH', 'BH', 'IRON'];
   function thermalLens(g: THREE.Object3D, o: VmPip, def: any) {
     const cv = document.createElement('canvas'); cv.width = cv.height = 256;
-    const osd = new T.CanvasTexture(cv), mat = G.R.thermalMaterial(osd), cx = cv.getContext('2d')!;
+    const osd = new T.CanvasTexture(cv), mat = R.thermalMaterial(osd), cx = cv.getContext('2d')!;
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
     disk.position.set(0, o.y, -o.f); g.add(disk);
     const L = def.magLevels || [def.magnif || 2], pip = { disk, r: o.r, mat, mag: L[0], mag0: L[0], fp: undefined as string | undefined, fpMag: L[0], thermal: true, heatRT: null as THREE.WebGLRenderTarget | null, sync: (w: any) => {} };

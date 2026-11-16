@@ -1,18 +1,27 @@
 'use strict';
+import { Casings } from './casings.js';
+import { loaded, WEAPONS } from './data.js';
+import { Gear } from './gear.js';
+import { GunModels } from './gunmodels.js';
+import { GunRig } from './gunrig.js';
+import { Icons } from './icons.js';
+import { Level } from './level.js';
+import { Gunsmith } from './parts.js';
+import { R } from './render.js';
 // Things lying in the world that you can pick up: anything you've dropped from your inventory (a magazine, a
 // bandage, a backpack with everything in it, a gun). The host keeps the list (G.Server.loot) and says who gets
 // what; this draws them and finds the one under your crosshair. Each is { id, x, y, z, item (packed: G.Gear.pack), mesh, box },
 // box its own shape in its own frame: you have to aim at the thing itself to take it.
-const G_Loot = (() => {
+export const Loot = (() => {
   const list = new Map();
   const T = THREE;
   const texCache = new Map();
   // the item's icon as a texture, for the top of its box
   function iconTex(it: any) {
-    const [w, h] = G.Gear.size(it);
+    const [w, h] = Gear.size(it);
     const key = `${it.k}|${it.mt || ''}|${it.gid || ''}|${it.pid || ''}|${it.wid || ''}|${it.vid || ''}|${it.key || ''}|${w}x${h}`;
     if (!texCache.has(key)) {
-      const url = G.Icons.of(it, w * 34, h * 34);
+      const url = Icons.of(it, w * 34, h * 34);
       const tex = new T.TextureLoader().load(url);
       texCache.set(key, tex);
     }
@@ -38,15 +47,15 @@ const G_Loot = (() => {
     if (!_ray.intersectBox(box, _p)) return Infinity;
     const t = _p.applyMatrix4(obj.matrixWorld).distanceTo(o);
     if (t > reach) return Infinity;
-    return G.Level.raycast(G.Game.map!, o.x, o.y, o.z, d.x, d.y, d.z, t, { move: true }).t < t - 0.02 ? Infinity : t;
+    return Level.raycast(G.Game.map!, o.x, o.y, o.z, d.x, d.y, d.z, t, { move: true }).t < t - 0.02 ? Infinity : t;
   }
   const COL = { mag: 0x2a2c2e, ammo: 0xb0915e, med: 0xd8d2c4, frag: 0x4a5a32, tb: 0x4c5634, carrier: 0x3a4148, plate: 0x4a4d52, helmet: 0x33393f, belt: 0x3b3528, pack: 0x4a4a38, pouch: 0x404636, ifak: 0x7a2420, part: 0x2c3136 };
   // A gun lies on its side (fit: shrunk to that length if it's longer, to lie in the weapon case), a magazine on
   // its flat as it would fall; anything else is a small box the size of its footprint (10 cm a cell), its icon on top.
   function meshFor(packed: any, fit?: number) {
     if (packed.k === 'gun' && packed.w) {
-      const code = G.Gunsmith.encode(packed.w.id, packed.w.build), gun = G.GunModels.world(code, packed.w.sk), wrap = new T.Group(), tmp = new T.Group();
-      G.GunRig.setLoaded(gun, G.loaded(packed.w) > 0); // (a crossbow lying there with its bolt on the rail or not)
+      const code = Gunsmith.encode(packed.w.id, packed.w.build), gun = GunModels.world(code, packed.w.sk), wrap = new T.Group(), tmp = new T.Group();
+      GunRig.setLoaded(gun, loaded(packed.w) > 0); // (a crossbow lying there with its bolt on the rail or not)
       const g = new T.Group();
       g.add(wrap);
       // (its place: lying on its side, shrunk to fit its case, its underside on the floor; done again when a gun that was still loading has come in: js/gunmodels.ts.
@@ -59,20 +68,20 @@ const G_Loot = (() => {
         wrap.position.set(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2);
         wrap.add(gun);
       };
-      if (gun.userData.pending) { wrap.add(gun); g.userData.gun = gun; G.GunModels.whenReady(gun, (ok) => { if (ok) lay(); }); } // (add() takes its box again then)
+      if (gun.userData.pending) { wrap.add(gun); g.userData.gun = gun; GunModels.whenReady(gun, (ok) => { if (ok) lay(); }); } // (add() takes its box again then)
       else lay();
       return g;
     }
-    const it = G.Gear.unpack(packed), mdef = it.k === 'mag' && G.WEAPONS[it.wid];
+    const it = Gear.unpack(packed), mdef = it.k === 'mag' && WEAPONS[it.wid];
     if (mdef) {
       // its own model: the magazine off the gun it's for (that magazine in it: its variant), lying on its side; the plain one stands in
       // till the gun's model is in, and stays if it can't be had
-      const { mesh, r } = G.Casings.magMesh(mdef, it), g = new T.Group();
+      const { mesh, r } = Casings.magMesh(mdef, it), g = new T.Group();
       mesh.rotation.z = Math.PI / 2; mesh.position.y = r;
       g.add(mesh);
       try {
-        const b = G.Gunsmith.defaultBuild(mdef.id); if (it.vid && b.mag !== undefined) b.mag = it.vid;
-        const gun = G.GunModels.world(G.Gunsmith.encode(mdef.id, b));
+        const b = Gunsmith.defaultBuild(mdef.id); if (it.vid && b.mag !== undefined) b.mag = it.vid;
+        const gun = GunModels.world(Gunsmith.encode(mdef.id, b));
         const take = () => {
           let src: THREE.Object3D | null = gun.userData.mag || null; // (the world model's magazine, kept apart for its checks: js/viewmodel.ts)
           if (!src) gun.traverse((o: any) => { if (!src && (o.name === 'part_mag' || (o.userData && o.userData.part === 'mag'))) src = o; });
@@ -86,11 +95,11 @@ const G_Loot = (() => {
           hold.position.set(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
           g.remove(mesh); mesh.geometry.dispose(); g.add(lie);
         };
-        if (gun.userData.pending) { g.userData.gun = gun; G.GunModels.whenReady(gun, (ok) => { if (ok) take(); }); } else take();
+        if (gun.userData.pending) { g.userData.gun = gun; GunModels.whenReady(gun, (ok) => { if (ok) take(); }); } else take();
       } catch (e) { /* the plain one, then */ }
       return g;
     }
-    const [w, h] = G.Gear.size(it), sx = Math.max(0.06, w * 0.1), sz = Math.max(0.06, h * 0.1), sy = 0.04 + 0.02 * Math.min(w, h);
+    const [w, h] = Gear.size(it), sx = Math.max(0.06, w * 0.1), sz = Math.max(0.06, h * 0.1), sy = 0.04 + 0.02 * Math.min(w, h);
     const side = new T.MeshStandardMaterial({ color: (COL as Record<string, number>)[packed.k] || 0x3a3d40, roughness: 0.8 });
     const top = new T.MeshStandardMaterial({ map: iconTex(it), roughness: 0.8, transparent: true });
     const m = new T.Mesh(new T.BoxGeometry(sx, sy, sz), [side, side, top, side, side, side]);
@@ -99,14 +108,14 @@ const G_Loot = (() => {
     return g;
   }
   function add(id: number, x: number, y: number, z: number, packed: any, yaw: number | null | undefined, fit?: number) {
-    if (list.has(id) || !G.R || !G.R.dynRoot) return;
+    if (list.has(id) || !R || !R.dynRoot) return;
     let mesh;
     try { mesh = meshFor(packed, fit); } catch (e) { console.warn('loot mesh', e); mesh = new T.Group(); }
     mesh.position.set(x, y + 0.002, z); mesh.rotation.y = yaw != null ? yaw : Math.random() * Math.PI * 2;
-    G.R.dynRoot.add(mesh);
+    R.dynRoot.add(mesh);
     list.set(id, { id, x, y, z, item: packed, mesh, box: boxOf(mesh) });
     // a gun still loading has no shape yet to aim at: its box once it's in (else it couldn't be picked up)
-    if (mesh.userData.gun) G.GunModels.whenReady(mesh.userData.gun, () => { const l = list.get(id); if (l && l.mesh === mesh) l.box = boxOf(mesh); });
+    if (mesh.userData.gun) GunModels.whenReady(mesh.userData.gun, () => { const l = list.get(id); if (l && l.mesh === mesh) l.box = boxOf(mesh); });
   }
   function remove(id: number) {
     const l = list.get(id);
@@ -127,11 +136,11 @@ const G_Loot = (() => {
   }
   // what something's called, for prompts
   function name(packed: any) {
-    if (packed.k === 'gun' && packed.w) return (G.WEAPONS[packed.w.id] || { name: 'gun' }).name;
-    try { const it = G.Gear.unpack(packed); return it.k === 'mag' ? G.Gear.magName(it) : G.Gear.label(it); } catch (e) { return 'item'; }
+    if (packed.k === 'gun' && packed.w) return (WEAPONS[packed.w.id] || { name: 'gun' }).name;
+    try { const it = Gear.unpack(packed); return it.k === 'mag' ? Gear.magName(it) : Gear.label(it); } catch (e) { return 'item'; }
   }
   return { add, remove, clear, aimed, boxOf, rayHit, name, meshFor, get list() { return list; } };
 })();
-G.Loot = G_Loot;
+G.Loot = Loot;
 
-interface GameModules { Loot: typeof G_Loot; }
+declare global { interface GameModules { Loot: typeof Loot; } }

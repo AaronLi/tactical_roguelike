@@ -1,11 +1,22 @@
 'use strict';
+import { Audio } from './audio.js';
+import { HUD } from './hud.js';
+import { Level } from './level.js';
+import { R as G_R } from './render.js';
+import { ShipGen } from './shipgen.js';
+import { ShipModel } from './shipmodel.js';
+import { SpaceData } from './spacedata.js';
+import { U } from './util.js';
+import { Views } from './views.js';
+import { Net } from './net.js';
+import { Space } from './space.js';
 // The space direction's panels (docs/space.md): the flight display (where she's going, how far in the right units, how
 // long), the waypoints marked on the view, the mission's objective, the sensor station's deck plan, the hangar's missions
 // board and shipyard, the light of a jump. All of it made here, on the page, the first time it's wanted.
-const G_SpaceUI = (() => {
-  const SD = G.SpaceData, T = THREE;
+export const SpaceUI = (() => {
+  const SD = SpaceData, T = THREE;
   let made = false, nav: HTMLCanvasElement, navT = 0, hud: HTMLElement, brMsg: HTMLElement, top: HTMLElement, helm: HTMLElement, marks: HTMLElement, obj: HTMLElement, ops: HTMLElement, fl: HTMLElement, plan: HTMLCanvasElement, tab = 'missions', planT = 0;
-  let board: ReturnType<typeof G.ShipModel.canvasTex> | null = null;
+  let board: ReturnType<typeof ShipModel.canvasTex> | null = null;
   const CSS = `
 #spHud { position: fixed; inset: 0; z-index: 40; pointer-events: none; font: 500 12px var(--ui-font, system-ui, sans-serif); color: #d7e6f2; letter-spacing: 0.5px; }
 #spHud.hidden, #spOps.hidden { display: none; }
@@ -68,9 +79,9 @@ const G_SpaceUI = (() => {
     fl = el('spFlash'); ops = el('spOps', 'hidden');
     ops.addEventListener('click', (e) => click(e.target as HTMLElement));
     ops.addEventListener('change', (e) => { const s = e.target as HTMLSelectElement; if (s.dataset.slot != null) fit(+s.dataset.slot, s.value || null); });
-    window.addEventListener('keydown', (e) => { if (G.Space.S.uiOpen && (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'Tab')) { e.preventDefault(); e.stopPropagation(); closeOps(); } }, true);
+    window.addEventListener('keydown', (e) => { if (Space.S.uiOpen && (e.code === 'Escape' || e.code === 'KeyF' || e.code === 'Tab')) { e.preventDefault(); e.stopPropagation(); closeOps(); } }, true);
   }
-  const S = () => G.Space.S;
+  const S = () => Space.S;
   function show(on: boolean) { make(); hud.classList.toggle('hidden', !on); if (!on) closeOps(); }
   function flash(k = 1) { make(); fl.classList.remove('go'); void fl.offsetWidth; fl.style.animationDuration = 0.9 * k + 's'; fl.classList.add('go'); }
 
@@ -79,7 +90,7 @@ const G_SpaceUI = (() => {
   function update(dt: number) {
     const s = S(); if (!s.on || !made) return;
     hud.style.visibility = G.Game.invOpen || G.Game.shopOpen ? 'hidden' : ''; // (under the Tab screen and the shop, as the rest of the HUD is: #hud holds them, and this isn't in it)
-    const seat = G.Space.mySeat(), flying = !s.docked || !!s.auto, aboard = G.Space.aboard(), wp = s.wps[s.tgt] && !s.wps[s.tgt].hide ? s.wps[s.tgt] : null;
+    const seat = Space.mySeat(), flying = !s.docked || !!s.auto, aboard = Space.aboard(), wp = s.wps[s.tgt] && !s.wps[s.tgt].hide ? s.wps[s.tgt] : null;
     const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(_v.copy(s.P).sub(wp.p).normalize()) : 0;
     // the line at the top: for everyone aboard while she's under way
     const showTop = aboard && (flying || !!s.ftl);
@@ -87,7 +98,7 @@ const G_SpaceUI = (() => {
     if (showTop) {
       const f = s.ftl;
       top.innerHTML = f ? (f.st === 'tunnel' ? `<b>IN TRANSIT</b> · dropping out in ${Math.max(0, f.T - f.t).toFixed(0)} s` : `<b>JUMP DRIVE</b> · ${f.st === 'spool' ? 'spooling ' + Math.round(Math.min(1, f.t / f.T) * 100) + '%' : 'engaged'}`)
-        : `<b>${s.warp ? 'WARP' : s.spin >= 1 ? 'WARP READY' : s.spin > 0 ? 'SPINNING UP ' + Math.round(s.spin * 100) + '%' : s.kind === 'assault' && s.stage === 'atmo' ? 'IN ATMOSPHERE' : 'UNDER WAY'}</b>` + (wp ? ` · ${G.U.esc(wp.name)} <b>${SD.dist(dist)}</b>${close > 2 ? ' · ETA ' + SD.eta(dist / close) : ''}` : '') + (s.hp < s.hpMax * 0.5 ? ` · <span class="warn">HULL ${Math.round(s.hp / s.hpMax * 100)}%</span>` : '');
+        : `<b>${s.warp ? 'WARP' : s.spin >= 1 ? 'WARP READY' : s.spin > 0 ? 'SPINNING UP ' + Math.round(s.spin * 100) + '%' : s.kind === 'assault' && s.stage === 'atmo' ? 'IN ATMOSPHERE' : 'UNDER WAY'}</b>` + (wp ? ` · ${U.esc(wp.name)} <b>${SD.dist(dist)}</b>${close > 2 ? ' · ETA ' + SD.eta(dist / close) : ''}` : '') + (s.hp < s.hpMax * 0.5 ? ` · <span class="warn">HULL ${Math.round(s.hp / s.hpMax * 100)}%</span>` : '');
     }
     // the helm's own instruments
     const atHelm = !!seat && seat.k === 'helm';
@@ -97,7 +108,7 @@ const G_SpaceUI = (() => {
     const showMarks = (!!seat && seat.k !== 'jump' || aboard) && flying && !s.ftl;
     marks.style.display = showMarks ? '' : 'none';
     if (showMarks) {
-      const cam = G.R.camera, W = window.innerWidth, H = window.innerHeight; let html = '';
+      const cam = G_R.camera, W = window.innerWidth, H = window.innerHeight; let html = '';
       _q.copy(s.Q).invert().premultiply(s.Dq);
       s.wps.forEach((w, i) => {
         if (w.hide) return;
@@ -106,7 +117,7 @@ const G_SpaceUI = (() => {
         let x = (_v.x * 0.5 + 0.5) * W, y = (-_v.y * 0.5 + 0.5) * H, off = behind;
         if (behind) { x = W - x; y = H - y; if (Math.hypot(x - W / 2, y - H / 2) < 60) y = H; } // (astern: its mark at the edge it's nearest round to)
         if (off || x < 40 || x > W - 40 || y < 40 || y > H - 60) { const a = Math.atan2(y - H / 2, x - W / 2); x = W / 2 + Math.cos(a) * (W / 2 - 60); y = H / 2 + Math.sin(a) * (H / 2 - 70); off = true; }
-        html += `<div class="sp-mark${i === s.tgt ? ' sel' : ''}${off ? ' off' : ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px"><i></i>${G.U.esc(w.name)} · ${SD.dist(d)}${i === s.tgt ? `<small>${G.U.esc(w.sub)}</small>` : ''}</div>`;
+        html += `<div class="sp-mark${i === s.tgt ? ' sel' : ''}${off ? ' off' : ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px"><i></i>${U.esc(w.name)} · ${SD.dist(d)}${i === s.tgt ? `<small>${U.esc(w.sub)}</small>` : ''}</div>`;
       });
       // at the helm: where her nose points, and where she's actually going
       if (atHelm) {
@@ -151,7 +162,7 @@ const G_SpaceUI = (() => {
     c.textBaseline = 'middle'; c.font = P.font; c.lineWidth = P.line; c.shadowColor = P.glow; c.shadowBlur = P.blur;
     if (hud) frame(c, W, H, P); // (corner brackets round it, in place of a box)
     const cx = 100, cy = 104, R = 82, inv = s.Q.clone().invert();
-    const a = s.kind === 'board' && !(s.state && s.state.boom) ? G.Space.aim(260) : null;
+    const a = s.kind === 'board' && !(s.state && s.state.boom) ? Space.aim(260) : null;
     c.strokeStyle = P.grid;
     if (a) {
       // the approach: to wherever on her hull the nose is pointed
@@ -159,12 +170,12 @@ const G_SpaceUI = (() => {
       for (const r of [R, R * 0.5, R * 0.2]) { c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke(); }
       c.beginPath(); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.moveTo(cx, cy - R); c.lineTo(cx, cy + R); c.stroke();
       const ok = Math.abs(dy) < 1.6 && a.align > 0.5;
-      c.fillStyle = ok ? P.ok : P.warn; c.beginPath(); c.arc(cx + G.U.clamp(-dx * k, -R, R), cy + G.U.clamp(dy * k, -R, R), 6, 0, 7); c.fill();
-      c.strokeStyle = P.accent; c.beginPath(); const ax = cx + G.U.clamp(f.x * 160, -R, R), ay = cy - G.U.clamp(f.y * 160, -R, R); c.moveTo(ax - 9, ay); c.lineTo(ax + 9, ay); c.moveTo(ax, ay - 9); c.lineTo(ax, ay + 9); c.stroke();
+      c.fillStyle = ok ? P.ok : P.warn; c.beginPath(); c.arc(cx + U.clamp(-dx * k, -R, R), cy + U.clamp(dy * k, -R, R), 6, 0, 7); c.fill();
+      c.strokeStyle = P.accent; c.beginPath(); const ax = cx + U.clamp(f.x * 160, -R, R), ay = cy - U.clamp(f.y * 160, -R, R); c.moveTo(ax - 9, ay); c.lineTo(ax + 9, ay); c.moveTo(ax, ay - 9); c.lineTo(ax, ay + 9); c.stroke();
       c.fillStyle = P.accent; c.fillText('BREACH APPROACH', 196, 16);
       c.fillStyle = P.text; c.fillText('range  ' + SD.dist(Math.max(0, range)), 196, 44); c.fillText('off line  ' + Math.hypot(dx, dy).toFixed(1) + ' m', 196, 62); c.fillText('closing  ' + close.toFixed(0) + ' m/s', 196, 80);
       c.fillStyle = close < 4 ? P.warn : P.ok; c.fillText(close < 4 ? 'TOO SLOW TO BREACH' : ok ? 'CLEAR HULL: GO' : 'SQUARE HER UP', 196, 104);
-      if (P.barBg) { c.fillStyle = P.barBg; c.fillRect(196, 122, 110, 8); } else { c.strokeStyle = P.grid; c.strokeRect(196.5, 122.5, 110, 8); } c.fillStyle = P.ok; c.fillRect(196, 122, G.U.clamp(close / 60, 0, 1) * 110, 8); c.fillStyle = P.text; c.fillRect(196 + 110 * 4 / 60, 119, 1, 14);
+      if (P.barBg) { c.fillStyle = P.barBg; c.fillRect(196, 122, 110, 8); } else { c.strokeStyle = P.grid; c.strokeRect(196.5, 122.5, 110, 8); } c.fillStyle = P.ok; c.fillRect(196, 122, U.clamp(close / 60, 0, 1) * 110, 8); c.fillStyle = P.text; c.fillRect(196 + 110 * 4 / 60, 119, 1, 14);
       c.fillStyle = P.dim; c.fillText('dot: nose · cross: heading', 196, 150);
       return;
     }
@@ -174,7 +185,7 @@ const G_SpaceUI = (() => {
     const wp = s.wps[s.tgt] && !s.wps[s.tgt].hide ? s.wps[s.tgt] : null;
     s.wps.forEach((w, i) => {
       if (w.hide) return;
-      const v = w.p.clone().sub(s.P).applyQuaternion(inv), d = v.length(), rr = G.U.clamp(Math.log10(Math.max(10, d)) - 1, 0, 3.4) / 3.4 * R, a = Math.atan2(v.x, -v.z);
+      const v = w.p.clone().sub(s.P).applyQuaternion(inv), d = v.length(), rr = U.clamp(Math.log10(Math.max(10, d)) - 1, 0, 3.4) / 3.4 * R, a = Math.atan2(v.x, -v.z);
       const x = cx + Math.sin(a) * rr, y = cy - Math.cos(a) * rr;
       c.fillStyle = c.strokeStyle = i === s.tgt ? P.tgt : P.accent; if (hud) c.strokeRect(x - 3, y - 3, 6, 6); else c.fillRect(x - 3, y - 3, 6, 6);
       c.fillStyle = v.y > d * 0.15 ? P.text : v.y < -d * 0.15 ? P.dim : 'rgba(0,0,0,0)'; c.fillText(v.y > 0 ? '▲' : '▼', x + 5, y);
@@ -184,8 +195,8 @@ const G_SpaceUI = (() => {
     const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(s.P.clone().sub(wp.p).normalize()) : 0;
     c.fillStyle = P.accent; c.fillText('NAV', 196, 16); c.fillStyle = P.tgt; c.fillText(wp ? wp.name.slice(0, 20) : 'no target', 196, 38);
     c.fillStyle = P.text; c.fillText('range  ' + (wp ? SD.dist(dist) : '—'), 196, 60); c.fillText('speed  ' + SD.speed(speed), 196, 78); c.fillText('closing  ' + SD.speed(Math.max(0, close)), 196, 96); c.fillText('ETA  ' + (wp && close > 2 ? SD.eta(dist / close) : '--:--'), 196, 114);
-    c.fillStyle = s.warp || s.spin >= 1 ? P.accent : P.dim; c.fillText(s.warp ? 'AT WARP' : s.spin >= 1 ? 'WARP READY: T' : s.spin > 0 ? 'WARP SPIN-UP ' + Math.round(s.spin * 100) + '%' : G.Space.warpGate() ? 'face the target to warp' : 'no warp target', 196, 138);
-    const na = G.Space.nearAnchor(); if (na) { c.fillStyle = P.ok; c.fillText('IN THE ANCHOR: jump ready', 196, 160); }
+    c.fillStyle = s.warp || s.spin >= 1 ? P.accent : P.dim; c.fillText(s.warp ? 'AT WARP' : s.spin >= 1 ? 'WARP READY: T' : s.spin > 0 ? 'WARP SPIN-UP ' + Math.round(s.spin * 100) + '%' : Space.warpGate() ? 'face the target to warp' : 'no warp target', 196, 138);
+    const na = Space.nearAnchor(); if (na) { c.fillStyle = P.ok; c.fillText('IN THE ANCHOR: jump ready', 196, 160); }
     c.fillStyle = s.hp < s.hpMax * 0.35 ? P.bad : P.dim; c.fillText('hull  ' + Math.round(s.hp / s.hpMax * 100) + '%', 196, 182);
   }
   // a boarded ship's deck, as the scanner has it: the compartments named, the doors (locked ones red), the breach; who's
@@ -195,17 +206,17 @@ const G_SpaceUI = (() => {
     c.fillStyle = '#04090d'; c.fillRect(0, 0, W, H);
     c.font = `${big ? 13 : 12}px sans-serif`; c.textBaseline = 'middle';
     if (!map || !map.sp || s.kind !== 'board' || !SD.fitted(s.fleet, 'sensors')) { c.fillStyle = '#3d6a80'; c.fillText(s.kind === 'board' ? 'NO SCANNER FITTED' : 'SCANNER: NOTHING IN RANGE', 14, H / 2); return; }
-    const sp = map.sp, TS = G.Level.TS, range = s.docked ? 0 : s.P.distanceTo(s.Dp), NF = map.floors ? map.floors.length : 1, FH = G.Level.FLOOR_H;
+    const sp = map.sp, TS = Level.TS, range = s.docked ? 0 : s.P.distanceTo(s.Dp), NF = map.floors ? map.floors.length : 1, FH = Level.FLOOR_H;
     if (range > 3000) { c.fillStyle = '#3d6a80'; c.fillText('SCANNER: OUT OF RANGE (' + SD.dist(range) + ')', 14, H / 2); return; }
     // every hull in the scan, her decks one under the other (the top deck first)
     let x0 = 1e9, z0 = 1e9, x1 = -1e9, z1 = -1e9; for (const hh of sp.hulls) { x0 = Math.min(x0, hh.x0); z0 = Math.min(z0, hh.z0); x1 = Math.max(x1, hh.x1); z1 = Math.max(z1, hh.z1); }
     const dz = z1 - z0 + 5, k = Math.min((W - 30) / (x1 - x0 + 8), (H - (big ? 60 : 30)) / (dz * NF)), ox = (W - (x1 - x0) * k) / 2 - x0 * k, oz = (big ? 40 : 18) - z0 * k;
-    const X = (x: number) => x * k + ox, Z = (z: number, f = 0) => (z + (NF - 1 - f) * dz) * k + oz, fOf = (y: number) => G.U.clamp(Math.floor((y + 0.6) / FH), 0, NF - 1);
+    const X = (x: number) => x * k + ox, Z = (z: number, f = 0) => (z + (NF - 1 - f) * dz) * k + oz, fOf = (y: number) => U.clamp(Math.floor((y + 0.6) / FH), 0, NF - 1);
     map.rooms.forEach((rm, i) => {
       const role = sp.roles[i], vac = !!(s.state && s.state.vac.includes(i)), f = rm.fl || 0, own = !sp.hullOf[i];
       c.fillStyle = vac ? '#3a1612' : !own ? '#16201a' : role === 'spine' ? '#10222c' : role === 'bridge' ? '#143246' : role === 'stairs' ? '#2a2a14' : '#0f2a36'; c.strokeStyle = vac ? '#ff6a50' : own ? '#3f88a8' : '#4a7a5a'; c.lineWidth = 1;
       c.fillRect(X(rm.x * TS), Z(rm.z * TS, f), rm.w * TS * k, rm.h * TS * k); c.strokeRect(X(rm.x * TS), Z(rm.z * TS, f), rm.w * TS * k, rm.h * TS * k);
-      if (big && role && role !== 'spine' && rm.w * TS * k > 44) { c.fillStyle = vac ? '#ff9a8a' : '#9fd0e6'; c.textAlign = 'center'; c.fillText((G.ShipGen.NAMES[role] || role).toUpperCase(), X((rm.x + rm.w / 2) * TS), Z((rm.z + rm.h / 2) * TS, f)); }
+      if (big && role && role !== 'spine' && rm.w * TS * k > 44) { c.fillStyle = vac ? '#ff9a8a' : '#9fd0e6'; c.textAlign = 'center'; c.fillText((ShipGen.NAMES[role] || role).toUpperCase(), X((rm.x + rm.w / 2) * TS), Z((rm.z + rm.h / 2) * TS, f)); }
     });
     for (const d of map.doors) { const lk = sp.locks[d.id]; c.fillStyle = lk ? (s.state && s.state.keys.includes(lk) ? '#7dff9a' : '#ff5a40') : d.open ? '#4a7f96' : '#c8e6f4'; const w = d.axis === 'x' ? 2 : 1.3 * k, hh = d.axis === 'x' ? 1.3 * k : 2; c.fillRect(X(d.x) - w / 2, Z(d.z, d.fl || 0) - hh / 2, w, hh); }
     c.fillStyle = '#ffb020'; for (const q of sp.cuts) { const x = (q[0] % map.W + 0.5) * TS, z = (((q[0] / map.W) | 0) + 0.5) * TS; c.beginPath(); c.arc(X(x), Z(z), big ? 6 : 4, 0, 7); c.fill(); if (big) { c.textAlign = 'center'; c.fillText('BREACH', X(x), Z(z) + 14); } }
@@ -215,8 +226,8 @@ const G_SpaceUI = (() => {
     if (o === 'destruct') dot(sp.console, '#ffd24a', 'SELF-DESTRUCT');
     for (const p of sp.pods) dot(p, '#7dff9a');
     sp.salvage.forEach((p, n) => { if (!(s.state && (s.state.salv || []).includes(n))) dot(p, '#9cff8a', 'SALVAGE'); });
-    if (range < 900) for (const e of G.Views.enemies.values()) { if (!e.alive) continue; c.fillStyle = e.def && e.def.civ ? '#8ea4b4' : s.state && s.state.hvtId === e.id ? '#ff40c0' : '#ff5a40'; c.fillRect(X(e.pos.x) - 2, Z(e.pos.z, fOf(e.pos.y)) - 2, 4, 4); }
-    for (const pv of G.Views.players.values()) if (pv.st && !G.SpaceData.aboard(s.def, s.berth, pv.st.p[0], pv.st.p[1], pv.st.p[2])) { c.fillStyle = '#7dff9a'; c.fillRect(X(pv.st.p[0]) - 3, Z(pv.st.p[2], fOf(pv.st.p[1])) - 3, 6, 6); }
+    if (range < 900) for (const e of Views.enemies.values()) { if (!e.alive) continue; c.fillStyle = e.def && e.def.civ ? '#8ea4b4' : s.state && s.state.hvtId === e.id ? '#ff40c0' : '#ff5a40'; c.fillRect(X(e.pos.x) - 2, Z(e.pos.z, fOf(e.pos.y)) - 2, 4, 4); }
+    for (const pv of Views.players.values()) if (pv.st && !SpaceData.aboard(s.def, s.berth, pv.st.p[0], pv.st.p[1], pv.st.p[2])) { c.fillStyle = '#7dff9a'; c.fillRect(X(pv.st.p[0]) - 3, Z(pv.st.p[2], fOf(pv.st.p[1])) - 3, 6, 6); }
     if (big && NF > 1) { c.textAlign = 'left'; c.fillStyle = '#7f97a8'; for (let f = 0; f < NF; f++) c.fillText(f === NF - 1 ? 'UPPER DECK' : 'LOWER DECK', 14, Z(z0, f) + 10); }
     if (big) { c.textAlign = 'left'; c.fillStyle = '#8fd6ff'; c.fillText(`DECK SCAN · ${s.ms ? s.ms.name : ''} · ${range < 900 ? 'life signs resolved' : 'close to 900 m for life signs (' + SD.dist(range) + ')'}`, 14, 18); }
   }
@@ -233,35 +244,35 @@ const G_SpaceUI = (() => {
     if (ms.size && ms.kind === 'board') lines.push(`<small>${SD.SIZES[ms.size].name}: ${meta && meta.decks > 1 ? 'two decks, ' : ''}${(() => { const g = SD.SIZES[ms.size!].guns, a = [g.pd ? g.pd + ' point defence' : '', g.cannon ? g.cannon + ' cannon' : '', g.missile ? g.missile + ' missile launcher' + (g.missile > 1 ? 's' : '') : ''].filter(Boolean); return a.length ? a.join(', ') : 'unarmed'; })()}</small>`);
     const needKey = (k: string) => !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k);
     if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Ram her hull nose-on to board, anywhere along it: what is inside there is destroyed.');
-    if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === G.Net.myId ? 'You have' : G.U.esc(G.Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
+    if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === Net.myId ? 'You have' : U.esc(G.Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
     if (ms.obj === 'hvt') lines.push(st.hvt === 1 ? '<span class="ok">Target dead.</span> Back to the ship and jump home.' : st.hvt === 2 ? '<span class="ok">Target in restraints.</span> Back to the ship and jump home.' : 'Find the target (the bridge): kill or restrain.');
     if (ms.obj === 'destruct') lines.push(st.boom ? '<span class="ok">She\'s gone.</span> Jump home.' : left != null ? `<span class="tm">${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</span><br>Get off her: your ship, or an escape pod. Then undock.` : 'Reach the bridge and start the self-destruct.');
-    if (ms.obj === 'hostage') lines.push(st.cleared ? '<span class="ok">She is clear of pirates.</span> Back to the ship and jump home.' : !s.docked ? 'Pirates hold her. Their pods are in her hull: board anywhere else.' : `Clear the pirates: ${st.left || 0} left.` + (meta && st.hold >= 0 && meta.roles[st.hold] ? ` <small>Her people are tied in the ${G.ShipGen.NAMES[meta.roles[st.hold]!].toLowerCase()}.</small>` : ''));
+    if (ms.obj === 'hostage') lines.push(st.cleared ? '<span class="ok">She is clear of pirates.</span> Back to the ship and jump home.' : !s.docked ? 'Pirates hold her. Their pods are in her hull: board anywhere else.' : `Clear the pirates: ${st.left || 0} left.` + (meta && st.hold >= 0 && meta.roles[st.hold] ? ` <small>Her people are tied in the ${ShipGen.NAMES[meta.roles[st.hold]!].toLowerCase()}.</small>` : ''));
     if (ms.obj === 'visit') lines.push('Not the mission: board her for what is in her holds, or fly on.' + (st.hostile ? ' <span class="bad">She is fighting you.</span>' : ' <small>A breach is an attack: she will fight.</small>'));
     if (ms.obj === 'assault') lines.push(st.cleared ? '<span class="ok">Base under control.</span> Back to the ship, up through the cloud and jump home.' : s.docked ? `Bring the base under control: ${G.Game.enemiesLeft || 0} hostile${G.Game.enemiesLeft === 1 ? '' : 's'} left.` : 'Take her down the descent corridor and set down on the pad.');
     if (needKey('bridge') && (ms.obj !== 'artifact' || (meta && meta.roles.includes('vault')))) lines.push('The bridge' + (meta && meta.roles.includes('vault') ? ' and the vault are' : ' is') + ' locked: an officer carries the card.');
     if (needKey('armory')) lines.push('<small>The armoury is locked: a keycard is with the crew.</small>');
     if (st.keys.length) lines.push('<small class="ok">Keycards: ' + st.keys.map((k) => (k === 'bridge' ? 'bridge' : 'armoury')).join(', ') + '</small>');
-    if (meta && G.Me.pos && st.vac.includes(G.ShipGen.roomAt(s.map!, G.Me.pos.x, G.Me.pos.z, G.Level.floorAt(s.map!, G.Me.pos.x, G.Me.pos.y, G.Me.pos.z))) && !G.Space.aboard()) lines.push('<span class="bad">VACUUM</span> · your suit is holding');
-    const html = `<h4>${G.U.esc(O.name.toUpperCase())}</h4><p><small>${G.U.esc(ms.name)} · ¢${G.U.fmt(ms.pay)}</small></p>` + lines.map((l) => `<p>${l}</p>`).join('');
+    if (meta && G.Me.pos && st.vac.includes(ShipGen.roomAt(s.map!, G.Me.pos.x, G.Me.pos.z, Level.floorAt(s.map!, G.Me.pos.x, G.Me.pos.y, G.Me.pos.z))) && !Space.aboard()) lines.push('<span class="bad">VACUUM</span> · your suit is holding');
+    const html = `<h4>${U.esc(O.name.toUpperCase())}</h4><p><small>${U.esc(ms.name)} · ¢${U.fmt(ms.pay)}</small></p>` + lines.map((l) => `<p>${l}</p>`).join('');
     if (force || html !== objKey) { objKey = html; obj.innerHTML = html; }
     obj.style.display = '';
   }
 
   // ------------------------------------------------------------------ the hangar's board (the picture over the terminal)
-  function boardTex() { if (!board) board = G.ShipModel.canvasTex(1024, 468); boardDraw(); return board.tex; }
+  function boardTex() { if (!board) board = ShipModel.canvasTex(1024, 468); boardDraw(); return board.tex; }
   function boardDraw() {
     if (!board) return;
     const s = S(), c = board.cv.getContext('2d')!, W = board.cv.width, H = board.cv.height, offers = SD.offers(s.board.seed, s.board.level);
     c.fillStyle = '#060c11'; c.fillRect(0, 0, W, H);
     c.fillStyle = '#8fd6ff'; c.font = '600 34px sans-serif'; c.textBaseline = 'top'; c.fillText('MISSIONS', 28, 20);
     c.fillStyle = '#7f97a8'; c.font = '22px sans-serif'; c.fillText(`${s.board.picked.length} of ${SD.PICKS} taken · press F at the terminal`, 240, 28);
-    offers.map((m, i) => [m, i] as [typeof m, number]).filter(([, i]) => !G.Space.isGone(i)).forEach(([m, i], row) => { // (a mission done and debriefed: off it)
+    offers.map((m, i) => [m, i] as [typeof m, number]).filter(([, i]) => !Space.isGone(i)).forEach(([m, i], row) => { // (a mission done and debriefed: off it)
       const y = 82 + row * 62, on = s.board.picked.includes(i), done = s.board.done.includes(i);
       c.fillStyle = done ? '#10161a' : on ? '#2a2a14' : '#0e1820'; c.fillRect(20, y, W - 40, 54);
       c.fillStyle = done ? '#55606a' : on ? '#ffd24a' : '#d7e6f2'; c.font = '600 24px sans-serif'; c.fillText((on ? '▶ ' : '') + m.name, 34, y + 6);
       c.font = '18px sans-serif'; c.fillStyle = done ? '#55606a' : '#8ea4b4'; c.fillText(`${SD.OBJ[m.obj].name} · ${m.where}`, 34, y + 32);
-      c.textAlign = 'right'; c.fillStyle = done ? '#55606a' : '#7dff9a'; c.font = '600 24px sans-serif'; c.fillText(done ? 'DONE' : '¢' + G.U.fmt(m.pay), W - 34, y + 14); c.textAlign = 'left';
+      c.textAlign = 'right'; c.fillStyle = done ? '#55606a' : '#7dff9a'; c.font = '600 24px sans-serif'; c.fillText(done ? 'DONE' : '¢' + U.fmt(m.pay), W - 34, y + 14); c.textAlign = 'left';
     });
     board.tex.needsUpdate = true;
   }
@@ -271,7 +282,7 @@ const G_SpaceUI = (() => {
     make(); const s = S(); if (s.uiOpen) return;
     s.uiOpen = true; G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
     document.getElementById('pause')!.classList.add('hidden'); document.getElementById('clickToPlay')!.classList.add('hidden');
-    G.Game.unlock(); ops.classList.remove('hidden'); opsRender(); G.HUD.setPrompt('');
+    G.Game.unlock(); ops.classList.remove('hidden'); opsRender(); HUD.setPrompt('');
   }
   function closeOps() {
     const s = S(); if (!made || !s.uiOpen) return;
@@ -280,14 +291,14 @@ const G_SpaceUI = (() => {
   }
   function opsRender() {
     if (!made || !S().uiOpen) return;
-    const s = S(), esc = G.U.esc, cr = G.Me.credits || 0;
+    const s = S(), esc = U.esc, cr = G.Me.credits || 0;
     let body = '';
     if (tab === 'missions') {
       const offers = SD.offers(s.board.seed, s.board.level), full = s.board.picked.length >= SD.PICKS;
       body = '<div class="grid">' + offers.map((m, i) => {
-        if (G.Space.isGone(i)) return '';
+        if (Space.isGone(i)) return '';
         const on = s.board.picked.includes(i), done = s.board.done.includes(i), d = Math.hypot(m.anchor[0], Math.max(m.anchor[1], 900), m.anchor[2]);
-        return `<div class="card${on ? ' on' : ''}${done ? ' done' : ''}"><div class="row"><h3>${esc(m.name)}</h3><span class="pay">¢${G.U.fmt(m.pay)}</span></div>
+        return `<div class="card${on ? ' on' : ''}${done ? ' done' : ''}"><div class="row"><h3>${esc(m.name)}</h3><span class="pay">¢${U.fmt(m.pay)}</span></div>
           <div><span class="tag${m.kind === 'assault' ? ' r' : ''}">${m.kind === 'assault' ? 'PLANET ASSAULT' : 'BOARDING'}</span><span class="tag">${esc(SD.OBJ[m.obj].name.toUpperCase())}</span><span class="tag">THREAT ${m.diff}</span>${m.night ? '<span class="tag">NIGHT</span>' : ''}</div>
           <small>${esc(m.where)} · anchor ${SD.dist(d)} out · jump ${m.ly.toFixed(1)} ly</small><p>${esc(m.brief)}${SD.drillLine(m) ? ' ' + esc(SD.drillLine(m)) : ''}</p>
           <div class="row"><small>${m.size === 'capital' ? 'Two decks, security squads, cannon and missiles on her hull: the hardest there is.' : m.size === 'large' ? 'Barracks, sick bay, magazines, a vault, a big bridge: a long fight.' : m.size === 'medium' ? 'An armoury and a locked bridge: find the keycards.' : m.size === 'small' ? 'A few compartments off one corridor, one gun on her hull.' : m.size === 'transport' ? 'Civilian: a few guards, no guns on her hull.' : 'Set down on the pad outside.'}</small>
@@ -297,7 +308,7 @@ const G_SpaceUI = (() => {
       const F = s.fleet, d = SD.SHIPS[F.ship], fitNow = F.fit[F.ship] || [];
       body = '<div class="grid">' + Object.values(SD.SHIPS).map((sh) => {
         const own = F.owned.includes(sh.id), use = F.ship === sh.id;
-        return `<div class="card${use ? ' on' : ''}"><div class="row"><h3>${esc(sh.name)}</h3><span class="pay">${own ? (use ? 'ON THE PAD' : 'OWNED') : '¢' + G.U.fmt(sh.price)}</span></div>
+        return `<div class="card${use ? ' on' : ''}"><div class="row"><h3>${esc(sh.name)}</h3><span class="pay">${own ? (use ? 'ON THE PAD' : 'OWNED') : '¢' + U.fmt(sh.price)}</span></div>
           <div><span class="tag">${esc(sh.cls.toUpperCase())}</span><span class="tag">${sh.turrets} HARDPOINT${sh.turrets > 1 ? 'S' : ''}</span><span class="tag">${sh.utils} BAY${sh.utils > 1 ? 'S' : ''}</span></div>
           <small>hull ${sh.hull} · ${sh.speed} m/s · warp ${(sh.cruise * 10 / 1000).toFixed(0)} km/s · ${2 + sh.turrets + sh.jump} seats</small><p>${esc(sh.blurb)}</p>
           <div class="row"><span></span>${use ? '' : own ? `<button class="b" data-use="${sh.id}"${s.docked ? '' : ' disabled'}>BRING HER OUT</button>` : `<button class="b" data-buy="${sh.id}"${cr >= sh.price ? '' : ' disabled'}>BUY</button>`}</div></div>`;
@@ -306,28 +317,28 @@ const G_SpaceUI = (() => {
         const slot = i < d.turrets ? 'turret' : 'util', cur = fitNow[i] || '';
         const opts = Object.values(SD.EQUIP).filter((e) => e.slot === slot && (e.id === cur || slot === 'turret' || !fitNow.includes(e.id)));
         body += `<div class="card"><div class="row"><h3>${slot === 'turret' ? 'Hardpoint ' + (i + 1) : 'Bay ' + (i - d.turrets + 1)}</h3></div>
-          <select data-slot="${i}"${s.docked ? '' : ' disabled'}><option value="">— empty —</option>${opts.map((e) => `<option value="${e.id}"${e.id === cur ? ' selected' : ''}${e.id !== cur && cr < e.price ? ' disabled' : ''}>${esc(e.name)}${e.id === cur || !e.price ? '' : ' · ¢' + G.U.fmt(e.price)}</option>`).join('')}</select>
+          <select data-slot="${i}"${s.docked ? '' : ' disabled'}><option value="">— empty —</option>${opts.map((e) => `<option value="${e.id}"${e.id === cur ? ' selected' : ''}${e.id !== cur && cr < e.price ? ' disabled' : ''}>${esc(e.name)}${e.id === cur || !e.price ? '' : ' · ¢' + U.fmt(e.price)}</option>`).join('')}</select>
           <p>${cur ? esc(SD.EQUIP[cur].blurb) : 'Nothing fitted.'}</p></div>`;
       }
       body += '</div><div class="foot"><span>What\'s fitted is paid for as it goes on. A hardpoint\'s gun is fired from the turret seat under it; the scanner is read at the sensor station.</span><span></span></div>';
     }
-    ops.innerHTML = `<div class="box"><div class="hd"><h2>OPERATIONS</h2><div class="tabs"><button data-tab="missions" class="${tab === 'missions' ? 'on' : ''}">MISSIONS</button> <button data-tab="yard" class="${tab === 'yard' ? 'on' : ''}">SHIPYARD</button></div><span style="flex:1"></span><span class="pay">¢${G.U.fmt(cr)}</span><button class="b" data-close="1">CLOSE</button></div>${body}</div>`;
+    ops.innerHTML = `<div class="box"><div class="hd"><h2>OPERATIONS</h2><div class="tabs"><button data-tab="missions" class="${tab === 'missions' ? 'on' : ''}">MISSIONS</button> <button data-tab="yard" class="${tab === 'yard' ? 'on' : ''}">SHIPYARD</button></div><span style="flex:1"></span><span class="pay">¢${U.fmt(cr)}</span><button class="b" data-close="1">CLOSE</button></div>${body}</div>`;
   }
   function click(t: HTMLElement) {
     const b = t.closest<HTMLElement>('button'); if (!b || (b as HTMLButtonElement).disabled) { if (t === ops) closeOps(); return; }
     const d = b.dataset;
     if (d.close) closeOps();
     else if (d.tab) { tab = d.tab; opsRender(); }
-    else if (d.pick != null) { G.Net.toHost({ t: 'mpick', i: +d.pick }); G.Audio.click(); }
-    else if (d.buy) { const sh = SD.SHIPS[d.buy]; if (sh && G.Me.credits >= sh.price) { G.Me.credits -= sh.price; G.Net.toHost({ t: 'fbuy', id: sh.id }); G.Audio.buy(); } }
-    else if (d.use) { G.Net.toHost({ t: 'fuse', id: d.use }); G.Audio.click(); }
+    else if (d.pick != null) { Net.toHost({ t: 'mpick', i: +d.pick }); Audio.click(); }
+    else if (d.buy) { const sh = SD.SHIPS[d.buy]; if (sh && G.Me.credits >= sh.price) { G.Me.credits -= sh.price; Net.toHost({ t: 'fbuy', id: sh.id }); Audio.buy(); } }
+    else if (d.use) { Net.toHost({ t: 'fuse', id: d.use }); Audio.click(); }
   }
   function fit(slot: number, id: string | null) {
     const e = id ? SD.EQUIP[id] : null;
-    if (e && e.price) { if (G.Me.credits < e.price) { opsRender(); return; } G.Me.credits -= e.price; G.Audio.buy(); }
-    G.Net.toHost({ t: 'ffit', s: slot, id });
+    if (e && e.price) { if (G.Me.credits < e.price) { opsRender(); return; } G.Me.credits -= e.price; Audio.buy(); }
+    Net.toHost({ t: 'ffit', s: slot, id });
   }
   return { show, update, flash, openOps, closeOps, opsRender, boardTex, boardDraw, objDraw };
 })();
-G.SpaceUI = G_SpaceUI;
-interface GameModules { SpaceUI: typeof G_SpaceUI; }
+G.SpaceUI = SpaceUI;
+declare global { interface GameModules { SpaceUI: typeof SpaceUI; } }

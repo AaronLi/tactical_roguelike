@@ -1,3 +1,10 @@
+import { Audio } from './audio.js';
+import { Course } from './course.js';
+import { HANGAR_ROWS } from './data.js';
+import { Gear } from './gear.js';
+import { HUD } from './hud.js';
+import { R as G_R } from './render.js';
+import { World } from './world.js';
 interface RangeSpec { x0: number; x1: number; lanes: number[]; len: number; marks: number[]; big?: number[]; steel?: number[]; }
 interface RifleSpec extends RangeSpec { big: number[]; steel: number[]; }
 // one lane of a range (made by lanes(); build() gives it its hits and last, laneConsole() its screen and buttons)
@@ -26,9 +33,9 @@ interface RangeState {
   root: THREE.Object3D | null; tg: RangeTarget[]; lanes: RangeLane[]; inside: boolean; snap: RangeSnap | null; ring: unknown[];
   laneList?: RangeLane[] | null; hangar?: HangarState; live?: THREE.Object3D[];
 }
-const G_Range = (() => {
+export const Range = (() => {
   const T = THREE;
-  const RZ = G.HANGAR_ROWS * 2;
+  const RZ = HANGAR_ROWS * 2;
   const FL = -6; // the firing line (z)
   const PIS: RangeSpec = { x0: 14, x1: 24, lanes: [15.67, 19.0, 22.33], len: 16, marks: [3, 5, 7, 10, 15] };
   const RIF: RifleSpec = { x0: 26, x1: 36, lanes: [27.25, 29.75, 32.25, 34.75], len: 300, marks: [10, 20, 25, 30, 40, 50, 60, 70, 75, 80, 90, 100, 125, 150, 175, 200, 250, 300], big: [25, 50, 75, 100, 150, 200, 250, 300], steel: [25, 50, 75, 100] };
@@ -124,14 +131,14 @@ const G_Range = (() => {
     // lanes: a console at the line, and the targets' posts down it
     lanes().forEach((L, k) => laneFixed(root, L, k));
     targets(root, true);
-    G.Course.fixtures(courseRoot, helpers); // the IPSC course, on the left
+    Course.fixtures(courseRoot, helpers); // the IPSC course, on the left
   }
   // what changes: the lanes' screens and buttons, the targets, the course (as the hangar's entered)
   function build(root: THREE.Object3D, hangarS: HangarState, helpers: RangeHelpers) {
     H = helpers; S.root = root; S.tg = []; S.hangar = hangarS; S.lanes = []; S.laneList = null; S.live = [];
     lanes().forEach((L, k) => { L.hits = 0; L.last = '—'; laneConsole(root, L, k); S.lanes.push(L); });
     targets(root, false);
-    G.Course.build(root, S.hangar, H); // the IPSC course, on the left
+    Course.build(root, S.hangar, H); // the IPSC course, on the left
   }
 
   // a console at the left of each lane: its hits, and F on its screen clears the targets. A rifle lane's has a row of
@@ -233,8 +240,8 @@ const G_Range = (() => {
   function place(q: IpscTarget, d: number) {
     q.d = d; q.z = FL - d;
     q.group.position.set(q.x, 0, q.z);
-    if (q.solid) G.World.remove(S.hangar!.map.world, q.solid);
-    q.solid = G.World.add(S.hangar!.map.world, G.World.box(q.x - q.w / 2, q.y0, q.z - 0.012 + RZ, q.x + q.w / 2, q.y0 + q.h, q.z + 0.012 + RZ, { kind: 'target', move: false, target: q }));
+    if (q.solid) World.remove(S.hangar!.map.world, q.solid);
+    q.solid = World.add(S.hangar!.map.world, World.box(q.x - q.w / 2, q.y0, q.z - 0.012 + RZ, q.x + q.w / 2, q.y0 + q.h, q.z + 0.012 + RZ, { kind: 'target', move: false, target: q }));
     for (const b of q.lane.btns || []) { b.mat.emissive.setHex(b.d === d ? 0x2a7a3a : 0x000000); b.mat.color.setHex(b.d === d ? 0x3a8a4a : 0x3a4a56); }
   }
   // a button pressed: the carrier runs it out (or in) to there, a fresh target on it
@@ -242,8 +249,8 @@ const G_Range = (() => {
     const q = L.ipsc;
     if (!q) return;
     q.hits = []; redrawIpsc(q); place(q, d);
-    L.last = '—'; paintLane(L); G.Audio.click();
-    G.HUD.toast('THE RANGE', `Lane ${L.n}: IPSC target at ${d} m`, 1.4);
+    L.last = '—'; paintLane(L); Audio.click();
+    HUD.toast('THE RANGE', `Lane ${L.n}: IPSC target at ${d} m`, 1.4);
   }
 
   // ---------------------------------------------------------------- targets
@@ -256,7 +263,7 @@ const G_Range = (() => {
     const plate = new T.Mesh(new T.BoxGeometry(size, size, 0.04), tg.mat); plate.position.set(0, -size / 2 - 0.05, 0.0); pivot.add(plate);
     const num = new T.Mesh(new T.PlaneGeometry(size * 0.8, size * 0.4), label(d + '', '#f4f4f0')); num.position.set(0, -size / 2 - 0.05, 0.022); pivot.add(num);
     tg.pivot = pivot;
-    const sol = G.World.add(S.hangar!.map.world, G.World.box(x - size / 2, top - size - 0.05, z - 0.03 + RZ, x + size / 2, top - 0.05, z + 0.03 + RZ, { kind: 'target', move: false, target: tg }));
+    const sol = World.add(S.hangar!.map.world, World.box(x - size / 2, top - size - 0.05, z - 0.03 + RZ, x + size / 2, top - 0.05, z + 0.03 + RZ, { kind: 'target', move: false, target: tg }));
     tg.solid = sol; S.tg.push(tg); return tg;
   }
   // (fx: its post and frame (fixed), and an anchor a_paper_<k> at its foot; else the paper in the frame)
@@ -278,7 +285,7 @@ const G_Range = (() => {
       g.font = 'bold 30px sans-serif'; g.fillText(d + ' m', W / 2, Hh - 22);
     });
     const m = new T.Mesh(new T.PlaneGeometry(w, h), new T.MeshBasicMaterial({ map: tg.tex })); m.position.set(x, y, z - 0.025); root.add(m); // (its face is toward the line)
-    const sol = G.World.add(S.hangar!.map.world, G.World.box(x - w / 2, y - h / 2, z - 0.04 + RZ, x + w / 2, y + h / 2, z - 0.02 + RZ, { kind: 'target', move: false, target: tg }));
+    const sol = World.add(S.hangar!.map.world, World.box(x - w / 2, y - h / 2, z - 0.04 + RZ, x + w / 2, y + h / 2, z - 0.02 + RZ, { kind: 'target', move: false, target: tg }));
     tg.solid = sol; S.tg.push(tg); return tg;
   }
   function targets(root: THREE.Object3D, fx: boolean) {
@@ -304,37 +311,37 @@ const G_Range = (() => {
   function hit(solid: RangeSolid | null, p: THREE.Vector3, dir: THREE.Vector3, mv = 4) {
     const t = solid && solid.target;
     if (!t || !S.root) return;
-    if (t.kind === 'course') return G.Course.hit(t, p, dir); // (the IPSC course: js/course.ts)
+    if (t.kind === 'course') return Course.hit(t, p, dir); // (the IPSC course: js/course.ts)
     if (t.kind === 'ipsc') {
       const x = (p.x - t.x) * 100, y = (p.y - t.y0) * 100, z = zoneAt(x, y);
       if (!z) return; // (through the gap beside the head, or past a corner: a miss)
       t.hits.push({ x, y, z }); t.lane.hits++; t.lane.last = `IPSC ${t.d} m: ${z}`;
-      redrawIpsc(t); G.Audio.hit(false); paintLane(t.lane);
+      redrawIpsc(t); Audio.hit(false); paintLane(t.lane);
       return;
     }
     t.hits++; t.lane.hits++; t.lane.last = `${t.kind} ${t.d} m`;
     if (t.kind === 'steel') {
       t.vel -= 1.4 * mv / (0.4 + t.size); t.flash = 0.25;
       // the ring arrives with the speed of sound
-      const cam = G.R.camera, dist = cam ? Math.hypot(cam.position.x - p.x, cam.position.z - p.z) : t.d;
-      setTimeout(() => { if (S.root && G.Audio.impact) G.Audio.impact('metal', Math.min(14, dist * 0.35), 0); }, Math.min(900, dist / 343 * 1000));
+      const cam = G_R.camera, dist = cam ? Math.hypot(cam.position.x - p.x, cam.position.z - p.z) : t.d;
+      setTimeout(() => { if (S.root && Audio.impact) Audio.impact('metal', Math.min(14, dist * 0.35), 0); }, Math.min(900, dist / 343 * 1000));
     } else {
       const u = (p.x - t.x) / t.w + 0.5, v = 0.5 - (p.y - t.y) / t.h, g = t.tex.userData.canvas.getContext('2d');
       g.fillStyle = '#17140f'; g.beginPath(); g.arc(u * 256, v * 410, HOLE_PX, 0, 7); g.fill(); t.tex.needsUpdate = true;
     }
-    G.Audio.hit(false);
+    Audio.hit(false);
     paintLane(t.lane);
   }
   function reset(L?: RangeLane) {
     for (const t of S.tg) {
       if (L && t.lane !== L) continue;
       if (t.kind === 'ipsc') { t.hits = []; redrawIpsc(t); continue; }
-      if (t.kind === 'steel') G.R.freeMarks(t.pivot); // (fresh paint)
+      if (t.kind === 'steel') G_R.freeMarks(t.pivot); // (fresh paint)
       t.hits = 0;
       if (t.kind === 'paper') { const g = t.tex.userData.canvas.getContext('2d'); g.fillStyle = '#e8e4d4'; g.fillRect(0, 0, 256, 410); redrawPaper(t); }
     }
     for (const q of S.lanes) if (!L || q === L) { q.hits = 0; q.last = '—'; paintLane(q); }
-    G.Audio.click();
+    Audio.click();
   }
   function redrawPaper(t: PaperTarget) {
     const g = t.tex.userData.canvas.getContext('2d'), W = 256, Hh = 410;
@@ -350,12 +357,12 @@ const G_Range = (() => {
   // where each sits in its pouch: as they are when you walk in, put back as they were when you walk out.
   function grids(me: typeof G.Me) {
     const seen = new Set<GGrid>(), list: GGrid[] = [], push = (g: GGrid | null | undefined) => { if (g && !seen.has(g)) { seen.add(g); list.push(g); } };
-    for (const g of G.Gear.all(me)) push(g);
+    for (const g of Gear.all(me)) push(g);
     for (let i = 0; i < list.length; i++) for (const p of list[i].items) { const it = p.it; (it.grids || []).forEach(push); push(it.molle); }
     return list;
   }
   function snapshot(me: typeof G.Me): RangeSnap {
-    const gs = grids(me), items = new Map<GItem, { r?: string[]; n?: number }>(), guns = G.Gear.guns(me).map((w) => ({ w, mag: w.mag, chamber: w.chamber, ammo: w.ammo, tube: w.tube && w.tube.slice(), spent: w.spent && w.spent.slice(), spentCh: w.spentCh }));
+    const gs = grids(me), items = new Map<GItem, { r?: string[]; n?: number }>(), guns = Gear.guns(me).map((w) => ({ w, mag: w.mag, chamber: w.chamber, ammo: w.ammo, tube: w.tube && w.tube.slice(), spent: w.spent && w.spent.slice(), spentCh: w.spentCh }));
     const layout = gs.map((g) => ({ g, ps: g.items.map((p) => ({ p, x: p.x, y: p.y, r: p.r, it: p.it })) }));
     for (const L of layout) for (const q of L.ps) { const it = q.it; if (it.k === 'mag') items.set(it, { r: it.r.slice() }); else if (typeof it.n === 'number') items.set(it, { n: it.n }); } // (boxes, and any other stack: bandages...)
     return { guns, layout, items, slot: me.slot };
@@ -376,13 +383,13 @@ const G_Range = (() => {
     if (inside && !S.inside) {
       S.inside = true;
       try { S.snap = snapshot(me); } catch (e) { S.snap = null; console.warn('range snapshot', e); }
-      G.HUD.toast('THE RANGE', 'Fire as much as you like: what you use here comes back when you leave', 3.2);
+      HUD.toast('THE RANGE', 'Fire as much as you like: what you use here comes back when you leave', 3.2);
     } else if (!inside && S.inside) {
       S.inside = false;
       back(me);
     }
     spotting(me, inside);
-    G.Course.update(dt);
+    Course.update(dt);
     // the plates swing on their hooks and settle
     for (const t of S.tg) {
       if (t.kind !== 'steel') continue;
@@ -414,14 +421,14 @@ const G_Range = (() => {
     drawIpsc(g, 6, 6, c.width - 12, c.height - 12, q.hits, false);
   }
   function back(me?: typeof G.Me) {
-    if (S.snap) { restore(me || G.Me, S.snap); S.snap = null; G.HUD.toast('THE RANGE', 'Your ammunition is back as it was', 2.4); }
+    if (S.snap) { restore(me || G.Me, S.snap); S.snap = null; HUD.toast('THE RANGE', 'Your ammunition is back as it was', 2.4); }
   }
   function leave() {
     if (S.snap && G.Me && G.Me.kit) { try { restore(G.Me, S.snap); } catch (e) { /* the kit changed under it */ } }
-    if (S.hangar && S.hangar.map) for (const t of S.tg) G.World.remove(S.hangar!.map.world, t.solid!);
+    if (S.hangar && S.hangar.map) for (const t of S.tg) World.remove(S.hangar!.map.world, t.solid!);
     S.snap = null; S.inside = false; S.root = null; S.tg = []; S.lanes = []; S.laneList = null; S.live = [];
     if (spot) { spot.remove(); spot = null; spotKey = ''; }
-    G.Course.leave();
+    Course.leave();
   }
 
   // what a mark from a round that hit target t should do: 'paper' (none: the target shows its own holes), or the
@@ -432,5 +439,5 @@ const G_Range = (() => {
   }
   return { decorate, fixtures, build, update, leave, hit, markOn, on, reset, drawIpsc, zoneAt, S, FL, PIS, RIF };
 })();
-G.Range = G_Range;
-interface GameModules { Range: typeof G_Range; }
+G.Range = Range;
+declare global { interface GameModules { Range: typeof Range; } }

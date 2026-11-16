@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 under way (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs; part c, views and rendering: all 2026-11-16); 6 and 7 not started. Written 2026-11-15.
+Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 under way (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs; part c, views and rendering; part d, the screens and space: all 2026-11-16); 6 and 7 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -474,6 +474,37 @@ Phase 4 is done: the workers' lists are gone, the simulation's files import each
 - **Checks:** typecheck, `deps:check`, `deps` (six orders consistent), `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:models` all green,
   `test:cloud` 21/21; smoke 10/10 (one case per process); on the page `G.ServerLink.mode === 'worker'`, the prep worker built a level, the export worker booted.
 - **Next:** part d (player, game, space, the screens, `index.html` down to one tag, the export worker's list to an entry file).
+
+#### Phase 5 results (part d)
+
+- **Converted, 13 files (80 in all):** `shopui`, `invui`, `gunsmith`, `zeroing`, `loot`, `course`, `range`, `hangar`, `landing`, `spaceui`, `space`, `net`, `serverlink`
+  (the codemod, then `--uses --force-order` on them). Then `--uses --force-order` again on the already converted page files that read the new names and are
+  neither simulation nor in the export worker: `hud` (`Net`, `Space`), `views` and `shotlog` (`Net`), `casings` (`Loot`, and `R` of `render`, which the codemod added too),
+  `profiler`, `gamepad` and `touch`. `index.html` is unchanged (its tags were modules already). `hangar` still sets `Hooks.hangarDecorate`, `net` `online` and `toHost`.
+- **`viewmodel` imports `render`.** It reads `G.R.TONE` while loading, and `hangar` now reaches it (by `icons`, `gunmodels`, `glb`) from a tool that loads only
+  `hangar`, so nothing ran `render` first. The import is the true need (`render` reaches neither `viewmodel` nor anything that does); in the export worker `render`
+  was already listed before it, so its 37 files and their order are unchanged (compared from the inventory json, `orders` of `js/exportworker.ts`).
+- **Tools that load `hangar`** now load the screens it imports, which read `document` and `matchMedia` as they load (`touch`, ...): `tools/check_hangar_golden.mjs` gets a
+  context whose `document` answers anything, and `tools/bake_hangar.mjs` gets `matchMedia` and a window size. Neither is used by what they run (`decorate`, `fixtures`):
+  the golden is `hangar golden OK ... the code's collision matches the bake`, the same hash, and `node tools/bake_hangar.mjs` rewrote `assets/models` with no byte changed.
+- **Left as `G.X` (on purpose):**
+  - `G.Net` in `career` and `cloud` (the cloud test's stand-in), in `server` and `serverhost` (simulation: a page file may not be imported), in `highlights`, `render`,
+    `levelview`, `rig` (export worker); `G.Range`, `G.Loot`, `G.Hangar` in `render`, `levelview`, `highlights`, `rig` (the export worker does not load them, the guards are real there);
+    `G.Space` in `acoustics` and `ambience` (`ambience.html` loads them, and not `space`); `G.ServerLink` and `G.Loot` in `server` and `serverhost` (simulation).
+  - `G.Me`, `G.Game`, `G.Hangar`, `G.Space`, `G.Landing`, `G.InvUI`, `G.Course`, `G.Range`, `G.Loot` read by `player`, `game`, `demo` and `debugstart` (part e).
+  - `G.Me`, `G.Game`: `player` and `game` are not modules yet (the 60-odd reads in these files). `hangar` reads `G.LevelView` twice in comments only.
+- **Stand-ins checked, none bypassed:** `tools/level_env.mjs` sets `G.Range = null` and nothing it loads imports `range` or reads it (only `render`, `game`, `player` read `G.Range`,
+  and `render` still does through `G`); `exportworker`'s `G.Net = { myId: '' }` is read by files that still read `G.Net`, and none of the 37 imports `net`; `tools/cloud.test.mjs`'s
+  `G.Net` likewise (`cloud` and `career` untouched). `serverlink` imports `serverhost`, which `index.html` loads anyway.
+- **Exercised beyond the smoke cases** (one-off headless scripts, from `?hangar`, `?fly`, `?board`, `?assault` and the level cases; each run alone, as a second page in one
+  process flakes): every shop tab (stock, route, kit = the inventory, gunsmith, zero = zeroing, svc, career) rendered, 13 services; the field inventory opened and
+  refreshed; the range entered (29 targets, 7 lanes, `Range.on()` true) and the IPSC course entered, started (state `running`), a shot, regenerated; `landing`
+  through `assault` (the `Landing` object there, `Game.phase` level), `spaceui` and `space` through `fly` and `board`. The page throws one error, `WrongDocumentError ... pointer
+  lock`, from the script's own `toggleInv` in a headless page, identically on the pre-change commit `930d048` (a worktree, compiled, served on another port). `G.ServerLink.mode`
+  is `worker` with 17 hooks, and `main` with `serverthread=0`; the prep worker built a level and its light grid; the export worker booted; `ambience.html` unchanged (the
+  same `InvalidAccessError` as before, none new).
+- **Next:** part e: `player`, `game`, `demo`, `debugstart`, then `index.html` to one tag and the export worker's list to an entry file.
+- **Checks:** typecheck, `deps:check`, `deps` (six orders consistent), `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:models` all green, `test:cloud` 21/21; smoke 10/10.
 
 ### 5. Convert the page side
 

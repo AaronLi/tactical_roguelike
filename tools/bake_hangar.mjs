@@ -31,6 +31,8 @@ async function loadGame() {
   const NC = await nodeCanvas(), order = [...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/src="dist\/js\/([a-z-]+)\.js"/g)].map((m) => m[1]).filter((f) => WANT.has(f));
   const ctx = { console, Math, JSON, Set, Map, WeakMap, WeakSet, Object, Array, Number, String, Boolean, Uint8Array, Uint8ClampedArray, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, ArrayBuffer, DataView, Infinity, NaN, isFinite, parseInt, parseFloat, Error, TypeError, RangeError, Symbol, Date, Proxy, Reflect, Promise, performance, THREE: { ...THREE_NS },
     document: { body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {}, getElementById: () => null, querySelector: () => null }, location: { search: '' }, navigator: { userAgent: 'node' }, URLSearchParams, addEventListener() {}, setTimeout, clearTimeout, setInterval, clearInterval, requestAnimationFrame: () => 0 };
+  // (js/hangar.ts imports the screens, which read these as they load; the hangar's drawing doesn't use them)
+  Object.assign(ctx, { matchMedia: () => ({ matches: false, addEventListener() {} }), devicePixelRatio: 1, innerWidth: 1280, innerHeight: 720 });
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx; ctx.G = {};
   NC.install(ctx); NC.install(globalThis); // (the game's canvases, and the exporter's)
   vm.createContext(ctx);

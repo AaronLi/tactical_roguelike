@@ -9,6 +9,8 @@ import { Gunsmith } from './parts.js';
 import { U } from './util.js';
 import { World } from './world.js';
 import { Icons } from './icons.js';
+import { Loot } from './loot.js';
+import { R } from './render.js';
 // Spent cases. Every gun that ejects throws its case out of the ejection port: flicked right and up, tumbling,
 // with the shooter's own movement. Cases fly under gravity, bounce off floors, furniture tops, walls and props,
 // and come to rest lying on their side, where they stay (the oldest are recycled). Each real impact makes its
@@ -47,7 +49,7 @@ export const Casings = (() => {
     for (let i = 0; i < MAX; i++) { metal.setColorAt(i, col.set(COLORS.brass)); hull.setColorAt(i, col.set(COLORS.plastic)); }
     free = [...Array(MAX).keys()];
   }
-  function attach() { meshes(); if (metal.parent !== G.R.dynRoot) { G.R.dynRoot.add(metal); G.R.dynRoot.add(hull); } }
+  function attach() { meshes(); if (metal.parent !== R.dynRoot) { R.dynRoot.add(metal); R.dynRoot.add(hull); } }
 
   // how a gun gets rid of its cases
   function mode(def: WeaponDef | null | undefined) {
@@ -67,7 +69,7 @@ export const Casings = (() => {
   // A case leaving the gun at pos, thrown along `right` and `up` (world vectors), plus the shooter's velocity.
   // drop: tipped out of a revolver or a break-action instead of flung.
   function spawn(def: CaseGun, pos: THREE.Vector3, right: THREE.Vector3, up: THREE.Vector3, fwd: THREE.Vector3, vel: THREE.Vector3 | null, drop: boolean, am?: string) {
-    if (!G.R || !G.R.camera || pos.distanceTo(G.R.camera.position) > 32) return;
+    if (!R || !R.camera || pos.distanceTo(R.camera.position) > 32) return;
     attach();
     const k = kind(def);
     if (!free.length) recycle();
@@ -91,7 +93,7 @@ export const Casings = (() => {
   const V = () => new T.Vector3();
   // your own gun: the ejection port of the first-person model, at the moment it ejects
   function fromView(def: WeaponDef, drop: boolean, n = 1, am?: string | string[]) {
-    const vm = G.R.vm, h = vm && vm.userData.holders && vm.userData.holders[0];
+    const vm = R.vm, h = vm && vm.userData.holders && vm.userData.holders[0];
     if (!h) return;
     const info = vm.userData.info, port = info.port || (info.pistol ? [0.075, 0.022, 0] : [0.12, 0.02, 0]);
     h.holder.updateMatrixWorld(true);
@@ -147,19 +149,19 @@ export const Casings = (() => {
   }
   // (fill: how full it was, 0..1: its fall's sound, js/handling.ts drop)
   function dropMag(def: WeaponDef, fill = 0) {
-    const vm = G.R.vm, a = vm && vm.userData.vma, h = vm && vm.userData.holders && vm.userData.holders[0];
-    if (!h || !G.R.dynRoot) return undefined;
+    const vm = R.vm, a = vm && vm.userData.vma, h = vm && vm.userData.holders && vm.userData.holders[0];
+    if (!h || !R.dynRoot) return undefined;
     const { mesh, r } = magMesh(def, null);
     h.holder.updateMatrixWorld(true);
     const home = a && a.hs[0] && a.hs[0].A.magHome ? a.hs[0].A.magHome.clone() : V().set(0, -0.06, -0.12);
-    const p = h.holder.localToWorld(home), q = new T.Quaternion(), cam = G.R.camera.position, map = G.Game.map;
+    const p = h.holder.localToWorld(home), q = new T.Quaternion(), cam = R.camera.position, map = G.Game.map;
     // (up against a wall the gun, and the magazine in it, can be half through it: then it falls from where you stand, not from the far side)
     if (map && !Level.los(map, cam.x, cam.y, cam.z, p.x, p.y, p.z)) { p.x = cam.x; p.z = cam.z; }
     h.holder.getWorldQuaternion(q);
     const v = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : V();
     v.y -= 0.6;
     const c: Spent = { mesh, p, q, v, w: new T.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6), rest: false, age: 0, k: { mat: 'steel', len: 120, r }, drop: { def, fill } };
-    G.R.dynRoot.add(mesh);
+    R.dynRoot.add(mesh);
     mags.push(c);
     // too many lying about: the oldest one that nobody can pick up goes
     while (mags.length > MAX_MAGS) { const i = Math.max(0, mags.findIndex((o) => !o.item)); takeMag(mags[i]); }
@@ -178,7 +180,7 @@ export const Casings = (() => {
     let best: Spent | null = null, bd = reach;
     for (const c of mags) {
       if (!c.item) continue;
-      const t = G.Loot.rayHit(o, d, c.mesh!, c.box || (c.box = G.Loot.boxOf(c.mesh!)), bd);
+      const t = Loot.rayHit(o, d, c.mesh!, c.box || (c.box = Loot.boxOf(c.mesh!)), bd);
       if (t < bd) { bd = t; best = c; }
     }
     return best;
@@ -229,7 +231,7 @@ export const Casings = (() => {
   }
   function impact(c: Spent, speed: number, map: any) {
     if (c.quiet || speed < 0.35 || sounds > 5) return;
-    const cam = G.R.camera, d = c.p.distanceTo(cam.position);
+    const cam = R.camera, d = c.p.distanceTo(cam.position);
     if (d > 26) return;
     sounds++;
     // a magazine of yours on a hard floor: its own fall (js/handling.ts: that gun's magazine simulated landing, every

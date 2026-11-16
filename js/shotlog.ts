@@ -6,6 +6,7 @@ import { HUD } from './hud.js';
 import { R } from './render.js';
 import { Rig as G_Rig } from './rig.js';
 import { Views } from './views.js';
+import { Net } from './net.js';
 interface ShotRow { key: string; n: number; burst?: boolean; name: string; range: number; muzzle: number; vIn: number; J: number; frags?: string; stop?: string; post?: number; out?: number; }
 interface ShotHolder { ghosts?: Map<string, ShotGhost>; }
 interface ShotInfo { holder: ShotHolder; name: string; burst?: boolean; }
@@ -201,7 +202,7 @@ export const ShotLog = (() => {
     return best;
   }
   const select = (r: ShotRec | null) => { sel = r; };
-  const nameOf = (key: string) => { if (key[0] === 'e') { const ev = Views.enemies.get(+key.slice(1)); return `${ev && ev.def && ev.def.name ? ev.def.name : 'Suspect'} #${key.slice(1)}`; } const id = key.slice(1); return id === G.Net.myId ? 'You' : ((Views.players.get(id) || {} as { name?: string }).name || 'Officer'); };
+  const nameOf = (key: string) => { if (key[0] === 'e') { const ev = Views.enemies.get(+key.slice(1)); return `${ev && ev.def && ev.def.name ? ev.def.name : 'Suspect'} #${key.slice(1)}`; } const id = key.slice(1); return id === Net.myId ? 'You' : ((Views.players.get(id) || {} as { name?: string }).name || 'Officer'); };
   // the readout for the grenade picked out: who its fragments hit, how many and how hard, and what stopped them
   function nadeHtml() {
     if (!sel) return '';
@@ -247,7 +248,7 @@ export const ShotLog = (() => {
   // the shots that hit someone, oldest first (js/hud.ts debugTarget's readout)
   const of = (key: string) => recs.flatMap((r) => r.hits.filter((h) => h.key === key));
   // whose shots are shown: whoever's picked out, or you if nobody is (you can't put the crosshair on yourself)
-  const focus = () => { const L = HUD.hbLast; return L ? (L.kind === 'e' ? 'e' + L.who.id : 'p' + L.id) : 'p' + G.Net.myId; };
+  const focus = () => { const L = HUD.hbLast; return L ? (L.kind === 'e' ? 'e' + L.who.id : 'p' + L.id) : 'p' + Net.myId; };
 
   // Each frame the hitboxes are shown: what's lit, and the markers, laid out so they don't sit on each other: a dot on the trail
   // where it happened, its label beside it, or up the line from it if that's taken. (A round through two people: its trail, and

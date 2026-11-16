@@ -2,6 +2,7 @@
 import { Audio } from './audio.js';
 import { Pad } from './gamepad.js';
 import { U } from './util.js';
+import { InvUI } from './invui.js';
 // A touch screen. Like the controller (js/gamepad.ts) it's not a control scheme of its own: the on-screen buttons are the keys and mouse buttons they stand
 // for, sent as those events down the same handlers (js/player.ts bindInput, js/game.ts bindMenu); only the stick and the look drag go in direct (G.Me.padMove,
 // G.Me.lookBy). A touch screen has no pointer lock either, so G.Game.softLocked stands in for it (js/game.ts lock).
@@ -36,7 +37,7 @@ export const Touch = (() => {
     if (FORCED) v = true;
     if (on === v) return;
     on = v; document.body.classList.toggle('touch-on', v);
-    if (G.InvUI && G.Game && G.Game.settings) G.InvUI.scaleUI();
+    if (InvUI && G.Game && G.Game.settings) InvUI.scaleUI();
     if (!v) { hideUi(); if (G.Game && G.Game.softLocked && !Pad.active()) G.Game.unlock(); } // (no way of playing on: the pause menu, and its Resume takes the mouse)
   }
   function hideUi() { releaseAll(); if (uiEl) { uiEl.classList.add('hidden'); closeEl.classList.add('hidden'); turnEl.classList.add('hidden'); } wasPlay = false; }
@@ -142,7 +143,7 @@ export const Touch = (() => {
     lp = null; lastTap = null; longDone = true;
     if (!t) return;
     if (navigator.vibrate) navigator.vibrate(12);
-    G.InvUI.cancelDrag(); // (the press that started it was the start of a drag, as far as the inventory knew)
+    InvUI.cancelDrag(); // (the press that started it was the start of a drag, as far as the inventory knew)
     t.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 2 }));
     if (t.closest('.inv-item')) return; // (the item's menu says it)
     const tt = t.closest<HTMLElement>('[title]');
@@ -256,7 +257,7 @@ export const Touch = (() => {
     }, true);
     document.addEventListener('gesturestart', (e) => { if (on) e.preventDefault(); }, { passive: false }); // (Safari's pinch: the page isn't to zoom under the controls)
     setOn(PHONE);
-    if (PHONE) G.InvUI.scaleUI();
+    if (PHONE) InvUI.scaleUI();
   }
 
   return {

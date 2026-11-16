@@ -3,6 +3,7 @@ import { Audio } from './audio.js';
 import { HUD } from './hud.js';
 import { U } from './util.js';
 import { Touch } from './touch.js';
+import { InvUI } from './invui.js';
 // A controller (the Gamepad API's standard mapping: an Xbox pad, a Steam Deck's own controls), polled once a frame by G.Game.loop. It's not a
 // control scheme of its own: in a level its buttons are the keys and mouse buttons they stand for, sent as those events down the same handlers
 // (js/player.ts bindInput, js/game.ts bindMenu); in a menu it drives a cursor that presses, drags and right-clicks what's on the screen with
@@ -264,7 +265,7 @@ export const Pad = (() => {
     const f = focus && !free ? focus : null;
     if (dx && f instanceof HTMLInputElement && f.type === 'range') return nudge(f, dx);
     if (dx && f instanceof HTMLSelectElement) return cycle(f, dx);
-    const cell = press ? G.InvUI.dragCell : 0; // (carrying something: a cell at a time, to put it down exactly)
+    const cell = press ? InvUI.dragCell : 0; // (carrying something: a cell at a time, to put it down exactly)
     if (cell) { cx = U.clamp(cx + dx * cell, 0, innerWidth - 1); cy = U.clamp(cy + dy * cell, 0, innerHeight - 1); free = true; focus = null; moved = true; return; }
     snap([dx, dy]);
   }

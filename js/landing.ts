@@ -1,4 +1,11 @@
 'use strict';
+import { Audio } from './audio.js';
+import { Hangar } from './hangar.js';
+import { Level } from './level.js';
+import { R as G_R } from './render.js';
+import { U } from './util.js';
+import { Views } from './views.js';
+import { World } from './world.js';
 // The helicopter that brings the squad in. Every level has a pad (G.Level.landing: map.lz), and you ride in on the same
 // dropship you boarded at the hangar (js/hangar.ts ship): out of the distance, once round the site, spiralling in, a hover
 // over the pad, the turn onto its heading, down. Then hold F to get out. It waits a little, lifts off and flies away; anyone
@@ -9,7 +16,7 @@
 // The flight is worked out once, as a real thing's would be: a path, the speed along it limited by how hard it can brake and
 // bank, and from how that moves, the attitude: the rotors' thrust has to hold it up (g), push it where it's accelerating and
 // overcome the drag, so the ship leans that way: nose down at speed, over in a turn, nose up in the flare.
-const G_Landing = (() => {
+export const Landing = (() => {
   const T = THREE, STAY = 14, // the longest it sits on the pad, in seconds
     AFTER = 2.5, // (flying alone: how soon after you're out it goes)
     HOLD = 0.45, GONE = 9;
@@ -22,14 +29,14 @@ const G_Landing = (() => {
   interface Rider { seat: number | null; pos: THREE.Vector3; vel: THREE.Vector3; yaw: number; pitch: number; crouch: boolean; stowed?: boolean; fLatch?: boolean; mouse: { l: boolean; r: boolean }; }
   const S: LandingState = { root: null, ship: null, cloud: null, lz: null, map: null, fly: null, ft: 0, t: 0, out: -1, up: -1, hold: 0, solids: [], fog: null, landed: false };
 
-  const seatPos = (i: number) => { const h = G.Hangar.HELI, z = S.lz!; return { x: z.x - 1.3 + i * 0.5, y: z.y! + h.floor, z: z.z + 0.85, yaw: 0 }; };
+  const seatPos = (i: number) => { const h = Hangar.HELI, z = S.lz!; return { x: z.x - 1.3 + i * 0.5, y: z.y! + h.floor, z: z.z + 0.85, yaw: 0 }; };
   const exitPos = (i: number) => { const z = S.lz!; return { x: z.x - 1.3 + i * 0.5, y: z.y!, z: z.z - 2.6 }; };
 
   // The ground track, a point every half metre: a straight run in, tangent to a circle round the site, a turn round it,
   // then the same turn tightening, its centre sliding over to the pad, until it's there.
   function track(map: LvMap) {
-    const lz = map.lz, Wm = map.W * G.Level.TS, Hm = map.H * G.Level.TS, cx = Wm / 2, cz = Hm / 2;
-    const r0 = G.U.clamp(0.42 * Math.max(Wm, Hm), 26, 48), turn = 1.4 * Math.PI, spiral = Math.PI, dir = (map.seed & 1) ? 1 : -1;
+    const lz = map.lz, Wm = map.W * Level.TS, Hm = map.H * Level.TS, cx = Wm / 2, cz = Hm / 2;
+    const r0 = U.clamp(0.42 * Math.max(Wm, Hm), 26, 48), turn = 1.4 * Math.PI, spiral = Math.PI, dir = (map.seed & 1) ? 1 : -1;
     const a0 = Math.atan2(lz.z - cz, lz.x - cx) + dir * 0.6, pts = [], step = 0.5 / r0;
     const tx = -Math.sin(a0) * dir, tz = Math.cos(a0) * dir, sx = cx + Math.cos(a0) * r0, sz = cz + Math.sin(a0) * r0;
     for (let d = 120; d > 0; d -= 0.5) pts.push([sx - tx * d, sz - tz * d]);
@@ -50,7 +57,7 @@ const G_Landing = (() => {
     for (let i = 0; i < n; i++) {
       v[i] = i < start ? CRUISE : orbit;
       if (i > 8 && i < n - 8) {
-        const [ax, az] = pts[i - 8], [bx, bz] = pts[i], [cx, cz] = pts[i + 8], a = Math.atan2(bz - az, bx - ax), b = Math.atan2(cz - bz, cx - bx), da = Math.abs(G.U.angDiff(a, b)), len = Math.hypot(cx - ax, cz - az) || 1;
+        const [ax, az] = pts[i - 8], [bx, bz] = pts[i], [cx, cz] = pts[i + 8], a = Math.atan2(bz - az, bx - ax), b = Math.atan2(cz - bz, cx - bx), da = Math.abs(U.angDiff(a, b)), len = Math.hypot(cx - ax, cz - az) || 1;
         if (i >= start && da > 1e-4) v[i] = Math.min(v[i], Math.sqrt(GRAV * Math.tan(BANK) * len / da));
       }
     }
@@ -76,15 +83,15 @@ const G_Landing = (() => {
     ease('y', HZ);
     // attitude: yaw along the way it's going, held once it's slow; the thrust's lean on top
     const up = new T.Vector3(0, 1, 0), nv = new T.Vector3(), qa = new T.Quaternion(), qy = new T.Quaternion(), W = Math.round(0.5 * HZ);
-    const vel = (j: number) => { const i0 = G.U.clamp(j - W, 0, N - 2), i1 = G.U.clamp(j + W, i0 + 1, N - 1), a = smp[i0], b = smp[i1], s = (i1 - i0) * dt; return [(b.x - a.x) / s, (b.y - a.y) / s, (b.z - a.z) / s]; };
+    const vel = (j: number) => { const i0 = U.clamp(j - W, 0, N - 2), i1 = U.clamp(j + W, i0 + 1, N - 1), a = smp[i0], b = smp[i1], s = (i1 - i0) * dt; return [(b.x - a.x) / s, (b.y - a.y) / s, (b.z - a.z) / s]; };
     let yaw: number | null = null;
     for (let j = 0; j < N; j++) {
       const [vx, vy, vz] = vel(j), j0 = Math.max(W, j - W), j1 = Math.min(N - 1 - W, j + W), [ax0, ay0, az0] = vel(j0), [ax1, ay1, az1] = vel(j1), s = Math.max(1, j1 - j0) * dt, sp = Math.hypot(vx, vz);
       const want: number = j >= arrive ? 0 : sp > 3 ? Math.atan2(vz, -vx) : yaw!; // (the ship's nose is -x)
       if (yaw == null) yaw = want;
-      yaw += G.U.clamp(G.U.angDiff(yaw, want) * (j >= arrive ? 1 : 0.12), -1.1 * dt, 1.1 * dt); // (no faster than it can turn: slow, the nose lags the way it's drifting; in the hover, a pedal turn)
+      yaw += U.clamp(U.angDiff(yaw, want) * (j >= arrive ? 1 : 0.12), -1.1 * dt, 1.1 * dt); // (no faster than it can turn: slow, the nose lags the way it's drifting; in the hover, a pedal turn)
       nv.set((ax1 - ax0) / s + vx * DRAG, GRAV + (ay1 - ay0) / s + vy * DRAG, (az1 - az0) / s + vz * DRAG).normalize();
-      const tilt = Math.acos(G.U.clamp(nv.y, -1, 1));
+      const tilt = Math.acos(U.clamp(nv.y, -1, 1));
       if (tilt > LEAN) { const h = Math.sin(LEAN) / Math.hypot(nv.x, nv.z); nv.set(nv.x * h, Math.cos(LEAN), nv.z * h); }
       qa.setFromUnitVectors(up, nv); qy.setFromAxisAngle(up, yaw);
       smp[j].q = qa.clone().multiply(qy);
@@ -101,23 +108,23 @@ const G_Landing = (() => {
   }
   // what the seat sees: the camera's where it'd be on the pad, carried along with the ship
   function ride() {
-    const cam = G.R.camera, lz = S.lz!;
+    const cam = G_R.camera, lz = S.lz!;
     _c.set(cam.position.x - lz.x, cam.position.y - lz.y!, cam.position.z - lz.z).applyQuaternion(_q).add(_p);
     cam.position.copy(_c); cam.quaternion.premultiply(_q); cam.updateMatrixWorld();
   }
   // the air's clearer from up there (the theme's fog's for rooms and streets), coming back as you come down
   function air(k: number) {
-    const f = G.R.scene.fog as THREE.Fog, b = S.fog;
+    const f = G_R.scene.fog as THREE.Fog, b = S.fog;
     if (!b || b[1] > 300) return;
     f.near = b[0] + (90 - b[0]) * k; f.far = b[1] + (320 - b[1]) * k;
   }
   // (and as far as the clouds, while you're up there)
-  function reach(far: number) { const c = G.R.camera; if (c.far !== far) { c.far = far; c.updateProjectionMatrix(); } }
+  function reach(far: number) { const c = G_R.camera; if (c.far !== far) { c.far = far; c.updateProjectionMatrix(); } }
 
   // What's round the level, seen from the air (from the ground, past the fences, dark shapes at most): streets, and blocks
   // with a few windows lit, from the level's seed. Nothing to hit or see from: not in the world.
   function town(root: THREE.Group, map: LvMap) {
-    const r = G.U.rng((map.seed ^ 0x70e4a) >>> 0), Wm = map.W * G.Level.TS, Hm = map.H * G.Level.TS, CELL = 38, R = 300, spots = [];
+    const r = U.rng((map.seed ^ 0x70e4a) >>> 0), Wm = map.W * Level.TS, Hm = map.H * Level.TS, CELL = 38, R = 300, spots = [];
     const tex = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d') as CanvasRenderingContext2D, w, h); const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; return t; };
     const ground = tex(256, 256, (g, w) => {
       g.fillStyle = '#0d0f11'; g.fillRect(0, 0, w, w); g.fillStyle = '#17191c'; g.fillRect(0, 0, w, 44); g.fillRect(0, 0, 44, w);
@@ -159,23 +166,23 @@ const G_Landing = (() => {
   function enter(map: LvMap) {
     S.map = map; S.lz = map.lz; S.t = 0; S.ft = 0; S.out = -1; S.up = -1; S.hold = 0; S.solids = []; S.landed = false;
     const { x, y, z } = S.lz! as Required<LvLz>, root = S.root = new T.Group();
-    const pad = G.Hangar.padMesh(); pad.position.set(x + 0.4, y + 0.02, z); root.add(pad);
+    const pad = Hangar.padMesh(); pad.position.set(x + 0.4, y + 0.02, z); root.add(pad);
     town(root, map);
-    const sh = S.ship = G.Hangar.ship();
+    const sh = S.ship = Hangar.ship();
     root.add(sh.group);
     sh.glow.color.setRGB(0.1, 0.9, 0.3); sh.thrust.opacity = 0.3;
-    G.R.levelRoot.add(root);
+    G_R.levelRoot.add(root);
     S.fly = plan(map);
-    S.fog = [(G.R.scene.fog as THREE.Fog).near, (G.R.scene.fog as THREE.Fog).far];
+    S.fog = [(G_R.scene.fog as THREE.Fog).near, (G_R.scene.fog as THREE.Fog).far];
     pose(0); air(1); reach(Math.max(620, map.theme.far || 0));
   }
   function touchdown() {
     S.landed = true; S.t = 0; air(0); reach(S.map!.theme.far || 280); S.ship!.group.quaternion.identity(); S.ship!.group.position.set(S.lz!.x, S.lz!.y!, S.lz!.z);
     // the cabin and the boom, while it's there (as in the hangar's)
-    const { x, y, z } = S.lz! as Required<LvLz>, w = S.map!.world, add = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => S.solids.push(G.World.add(w, G.World.box(x + x0, y + y0, z + z0, x + x1, y + y1, z + z1, { kind: 'prop' })));
+    const { x, y, z } = S.lz! as Required<LvLz>, w = S.map!.world, add = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => S.solids.push(World.add(w, World.box(x + x0, y + y0, z + z0, x + x1, y + y1, z + z1, { kind: 'prop' })));
     add(-3.4, 0, -1.35, 2.4, 2.8, 1.35);
     add(2.4, 1.5, -0.3, 8.3, 2.5, 0.3);
-    for (const pv of G.Views.players.values()) if (pv.rig) pv.rig.root.visible = true;
+    for (const pv of Views.players.values()) if (pv.rig) pv.rig.root.visible = true;
   }
   function board(me: Rider, i: number) {
     const p = seatPos(i);
@@ -185,7 +192,7 @@ const G_Landing = (() => {
     const p = exitPos(me.seat!);
     me.seat = null; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.crouch = false; me.stowed = false;
     if (S.out < 0) S.out = S.t;
-    G.Audio.click();
+    Audio.click();
   }
   // F, while you're in it (from the player's interact()): in the air, it skips the rest of the flight
   function interact(me: Rider, dt: number, held: boolean) {
@@ -205,8 +212,8 @@ const G_Landing = (() => {
       if (!G.Game.$('veil').classList.contains('on')) S.ft += dt; // (it waits for you to see it)
       if (S.ft < S.fly!.dur) {
         pose(S.ft); ride();
-        air(G.U.clamp((S.fly!.dur - S.ft - 3) / 6, 0, 1));
-        for (const pv of G.Views.players.values()) if (pv.rig) pv.rig.root.visible = false; // (their seats, on the pad as far as anyone's concerned: they're up here with you)
+        air(U.clamp((S.fly!.dur - S.ft - 3) / 6, 0, 1));
+        for (const pv of Views.players.values()) if (pv.rig) pv.rig.root.visible = false; // (their seats, on the pad as far as anyone's concerned: they're up here with you)
         return;
       }
       touchdown();
@@ -216,7 +223,7 @@ const G_Landing = (() => {
       const alone = Object.keys(G.Game.roster || {}).length < 2;
       if (S.t < STAY && !(alone && S.out >= 0 && S.t > S.out + AFTER)) return;
       if (me.seat != null) getOut(me);
-      for (const s of S.solids) G.World.remove(S.map!.world, s);
+      for (const s of S.solids) World.remove(S.map!.world, s);
       S.solids = []; S.up = 0;
     }
     // up, nose down, away to the west
@@ -229,5 +236,5 @@ const G_Landing = (() => {
   }
   return { enter, board, interact, update, seatPos, exitPos, S };
 })();
-G.Landing = G_Landing;
-interface GameModules { Landing: typeof G_Landing; }
+G.Landing = Landing;
+declare global { interface GameModules { Landing: typeof Landing; } }

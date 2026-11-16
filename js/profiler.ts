@@ -10,6 +10,11 @@ import { ServerHost } from './serverhost.js';
 import { Views } from './views.js';
 import { World } from './world.js';
 import { R as G_R } from './render.js';
+import { Course } from './course.js';
+import { Hangar } from './hangar.js';
+import { InvUI } from './invui.js';
+import { Net } from './net.js';
+import { ServerLink } from './serverlink.js';
 // The profiler: where each frame's time goes, kept for the last stretch of play and saved from the pause menu (Esc,
 // "Save performance profile") as a JSON file.
 //
@@ -119,13 +124,13 @@ export const Prof = (() => {
     const g: any = G.Game || {}, m = g.map, info = G_R && G_R.renderer && G_R.renderer.info;
     return {
       saved: new Date().toISOString(), recordingSince: since, userAgent: navigator.userAgent, screen: [innerWidth, innerHeight, devicePixelRatio],
-      level: g.level, phase: g.phase, hub: !!g.hub, host: !!(G.Net && G.Net.isHost), players: g.roster ? Object.keys(g.roster).length : 1,
+      level: g.level, phase: g.phase, hub: !!g.hub, host: !!(Net && Net.isHost), players: g.roster ? Object.keys(g.roster).length : 1,
       map: m ? { theme: m.theme && m.theme.name, W: m.W, H: m.H, floors: m.NF || 1, solids: m.world ? m.world.solids.filter(Boolean).length : 0, lights: (m.lights || []).length, props: m.props ? m.props.size : 0, windows: (m.windows || []).length, doors: (m.doors || []).length } : null,
       enemies: Views && Views.enemies ? Views.enemies.size : 0, scene: G_R && G_R.scene ? countObjects(G_R.scene) : 0,
       renderer: info ? { calls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, programs: info.programs ? info.programs.length : 0 } : null,
       heapMB: performance.memory ? r2(performance.memory.usedJSHeapSize / 1048576) : null,
       settings: g.settings || null,
-      serverThread: G.ServerLink ? { mode: G.ServerLink.mode, lastSecond: G.ServerLink.prof } : null, // (where the host's simulation runs, and its ticks' time there)
+      serverThread: ServerLink ? { mode: ServerLink.mode, lastSecond: ServerLink.prof } : null, // (where the host's simulation runs, and its ticks' time there)
     };
   }
   function countObjects(o: THREE.Object3D) { let n = 0; o.traverse(() => n++); return n; }
@@ -247,8 +252,8 @@ export const Prof = (() => {
     wrap(G.Me, 'update', 'Me.update'); wrap(G.Me, 'move', 'Me.move'); wrap(G.Me, 'weaponUpdate', 'Me.weapon'); wrap(G.Me, 'interact', 'Me.interact');
     wrap(G.Me, 'updateCamera', 'Me.camera'); wrap(G.Me, 'stepRounds', 'Me.rounds'); wrap(G.Me, 'sendState', 'Me.sendState'); wrap(G.Me, 'spectate', 'Me.spectate'); wrap(G.Me, 'flushHits', 'Me.flushHits');
     wrap(Views, 'update', 'Views.update');
-    wrap(G.Hangar, 'update', 'Hangar.update');
-    wrap(G.InvUI, 'update', 'InvUI.update'); wrap(G.InvUI, 'tick', 'InvUI.tick');
+    wrap(Hangar, 'update', 'Hangar.update');
+    wrap(InvUI, 'update', 'InvUI.update'); wrap(InvUI, 'tick', 'InvUI.tick');
     wrap(GunAudio, 'updateListener', 'audio listener');
     wrap(G_R, 'update', 'R.update (effects)'); wrap(G_R, 'render', 'R.render');
     wrap(HUD, 'update', 'HUD.update');
@@ -274,7 +279,7 @@ export const Prof = (() => {
     };
     (LG.flush as any).__prof = true;
     if (Highlights) gpuWrap(Highlights, 'update', 'hangar TVs'); // (what it draws, the picture on the TVs, is drawn as it's updated)
-    if (G.Course) gpuWrap(G.Course, 'update', 'course cameras');
+    if (Course) gpuWrap(Course, 'update', 'course cameras');
   }
   install();
 

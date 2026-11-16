@@ -22,6 +22,7 @@ import { Casings } from './casings.js';
 import { Highlights } from './highlights.js';
 import { HUD } from './hud.js';
 import { R } from './render.js';
+import { Net } from './net.js';
 const WP = new THREE.Vector3(), WD = new THREE.Vector3(); // (a wound's place and direction: woundStreams)
 interface VwEvidence { mesh: THREE.Object3D; wpn: string; x: number; y: number; z: number; secured?: boolean; [k: string]: any }
 interface VwNade extends VwNadeMotion { fuse: number; own: boolean; enemy: boolean; mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>; kind: VwNadeKind; nid?: number; from?: string; flyT?: number; stuck?: { rig?: Rig; bone?: THREE.Object3D | null; l?: THREE.Vector3; me?: THREE.Vector3 } | null } // (nid, from: a sticky's, so where it held can be told: 'stk')
@@ -102,7 +103,7 @@ export const Views = {
   spawnSelfBody() {
     this.clearSelfBody();
     const me = G.Me, g = G.Game, wasDown = !!me.down;
-    const rig = this.newPlayerRig({ color: g.myColor, animal: g.myAnimal, name: g.myName, look: g.myLook }, G.Net.myId || 'me');
+    const rig = this.newPlayerRig({ color: g.myColor, animal: g.myAnimal, name: g.myName, look: g.myLook }, Net.myId || 'me');
     rig.setKit(me.kitLook());
     rig.setGun(me.cur().def.code, me.cur().stickers);
     rig.root.visible = true;
@@ -143,7 +144,7 @@ export const Views = {
 
   syncRoster(roster: Record<string, any>) {
     for (const [id, info] of Object.entries(roster)) {
-      if (id === G.Net.myId) continue;
+      if (id === Net.myId) continue;
       let pv: VwPlayer | null | undefined = this.players.get(id);
       if (pv && (pv.color !== info.color || pv.animal !== info.animal)) { this.removeRig(pv.rig); this.players.delete(id); pv = null; }
       if (!pv) {
@@ -214,7 +215,7 @@ export const Views = {
     }
     for (const ev of this.enemies.values()) if (ev.alive && !seen.has(ev.id)) this.kill({ e: ev.id });
     for (const [id, st] of Object.entries(m.p)) {
-      if (id === G.Net.myId) continue;
+      if (id === Net.myId) continue;
       const pv = this.players.get(id);
       if (!pv) continue;
       pv.st = st;
@@ -223,7 +224,7 @@ export const Views = {
     }
     G.Game.extract.active = !!m.x[0];
     G.Game.extract.votes = m.x[1] || 0; G.Game.extract.need = m.x[2] || 0; G.Game.extract.civDead = m.x[3] || 0;
-    G.Game.extract.voted = (m.x[4] || []).includes(G.Net.myId);
+    G.Game.extract.voted = (m.x[4] || []).includes(Net.myId);
     G.Game.unitsCleared = m.x[5] || 0;
     G.Game.enemiesLeft = m.n;
     G.Game.civsLeft = m.c || 0;
@@ -248,7 +249,7 @@ export const Views = {
     ev.alive = false; ev.deadT = 0; ev.wnd = m.bo ? null : Array.isArray(m.wd) ? m.wd : ev.wnd; // (the wounds go on a while after: woundStreams)
     let dir = ev.lastHitDir;
     if (!dir) {
-      const killer = m.by && m.by !== G.Net.myId && this.players.get(m.by) ? this.players.get(m.by)!.pos : this.nearestPlayer(ev.pos);
+      const killer = m.by && m.by !== Net.myId && this.players.get(m.by) ? this.players.get(m.by)!.pos : this.nearestPlayer(ev.pos);
       if (killer) dir = ev.pos.clone().sub(killer).setY(0).normalize();
     }
     ev.rig.die(dir);
@@ -523,7 +524,7 @@ export const Views = {
       const b = v.set(0, 0, -1).transformDirection(rig.gun.matrixWorld);
       a.push(b.x, b.y, b.z);
     }
-    G.Net.toHost({ t: 'bores', a });
+    Net.toHost({ t: 'bores', a });
   },
   enemyShot(m: any) {
     let to = new THREE.Vector3(m.to[0], m.to[1], m.to[2]);
@@ -649,23 +650,23 @@ export const Views = {
     if (n.own && len > 1e-4) { // (a person in the way first?)
       const d = seg.clone().divideScalar(len); let best: { rig: Rig; t: number; e?: number; pl?: string } | null = null;
       for (const ev of this.enemies.values()) { if (!ev.alive || !ev.rig || ev.pos.distanceTo(a) > len + 2) continue; const h = G_Rig.raycast(ev.rig, a, d, len); if (h && (!best || h.t < best.t)) best = { rig: ev.rig, t: h.t, e: ev.id }; }
-      for (const [id, pv] of this.players) { if (id === G.Net.myId || pv.dead || !pv.rig || !pv.rig.root.visible || pv.pos.distanceTo(a) > len + 2) continue; const h = G_Rig.raycast(pv.rig, a, d, len); if (h && (!best || h.t < best.t)) best = { rig: pv.rig, t: h.t, pl: id }; }
+      for (const [id, pv] of this.players) { if (id === Net.myId || pv.dead || !pv.rig || !pv.rig.root.visible || pv.pos.distanceTo(a) > len + 2) continue; const h = G_Rig.raycast(pv.rig, a, d, len); if (h && (!best || h.t < best.t)) best = { rig: pv.rig, t: h.t, pl: id }; }
       if (best) {
         const at = a.clone().addScaledVector(d, best.t);
         n.pos.copy(at); n.vel.set(0, 0, 0);
         const bn = this.nearestBone(best.rig, at);
-        if (Highlights) Highlights.stick('p' + G.Net.myId, at, n.flyT || 0);
-        if (bn) { const l = bn.o.worldToLocal(at.clone()); n.stuck = { rig: best.rig, bone: bn.o, l }; G.Net.toHost({ t: 'stk', nid: n.nid, e: best.e, pl: best.pl, b: bn.name, l: l.toArray().map((x) => Math.round(x * 1000) / 1000) }); }
-        else { n.stuck = {}; G.Net.toHost({ t: 'stk', nid: n.nid, at: at.toArray().map((x) => Math.round(x * 1000) / 1000) }); }
+        if (Highlights) Highlights.stick('p' + Net.myId, at, n.flyT || 0);
+        if (bn) { const l = bn.o.worldToLocal(at.clone()); n.stuck = { rig: best.rig, bone: bn.o, l }; Net.toHost({ t: 'stk', nid: n.nid, e: best.e, pl: best.pl, b: bn.name, l: l.toArray().map((x) => Math.round(x * 1000) / 1000) }); }
+        else { n.stuck = {}; Net.toHost({ t: 'stk', nid: n.nid, at: at.toArray().map((x) => Math.round(x * 1000) / 1000) }); }
         if (Audio.click) Audio.click();
         return;
       }
     }
     if (!s) return;
-    if (n.own && Highlights) Highlights.stick('p' + G.Net.myId, s.at, (n.flyT || 0) + s.t); // (the replays: where it held)
+    if (n.own && Highlights) Highlights.stick('p' + Net.myId, s.at, (n.flyT || 0) + s.t); // (the replays: where it held)
     n.pos.copy(s.at).addScaledVector(new THREE.Vector3(...(s.n as [number, number, number])), 0.035); n.vel.set(0, 0, 0); n.stuck = {}; // (held to its face, its middle a hand's width off it)
     n.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), new THREE.Vector3(...(s.n as [number, number, number])).negate()); // (its sock to the surface)
-    if (n.own) G.Net.toHost({ t: 'stk', nid: n.nid, at: n.pos.toArray().map((x) => Math.round(x * 1000) / 1000) });
+    if (n.own) Net.toHost({ t: 'stk', nid: n.nid, at: n.pos.toArray().map((x) => Math.round(x * 1000) / 1000) });
     void v0;
   },
   // the bone of a body nearest a point on it (the bones a bolt rides: js/ballistics.ts segs), with its name
@@ -680,7 +681,7 @@ export const Views = {
     n.vel.set(0, 0, 0);
     if (Highlights) Highlights.stick('p' + m.id, Array.isArray(m.at) ? new THREE.Vector3(m.at[0], m.at[1], m.at[2]) : n.pos.clone(), n.flyT || 0); // (the replays: where it held, as they told it)
     if (Array.isArray(m.at)) { n.pos.set(m.at[0], m.at[1], m.at[2]); n.stuck = {}; return; }
-    if (m.pl === G.Net.myId && G.Me.pos) { // (on you: it goes where you go)
+    if (m.pl === Net.myId && G.Me.pos) { // (on you: it goes where you go)
       const at = n.pos;
       n.stuck = { me: new THREE.Vector3(U.clamp(at.x - G.Me.pos.x, -0.3, 0.3), U.clamp(at.y - G.Me.pos.y, 0.3, 1.6), U.clamp(at.z - G.Me.pos.z, -0.3, 0.3)) }; return;
     }
@@ -777,7 +778,7 @@ export const Views = {
   // the same size on screen however far off, gone after a few seconds. One per player: a new one replaces it.
   PING_T: 6,
   addPing(id: string, p: number[]) {
-    const me = id === G.Net.myId, r = G.Game.roster && G.Game.roster[id], name = me ? G.Game.myName : r ? r.name : '?', color = me ? G.Game.myColor : r ? r.color : 0xffffff, animal = me ? G.Game.myAnimal : r ? r.animal : null;
+    const me = id === Net.myId, r = G.Game.roster && G.Game.roster[id], name = me ? G.Game.myName : r ? r.name : '?', color = me ? G.Game.myColor : r ? r.color : 0xffffff, animal = me ? G.Game.myAnimal : r ? r.animal : null;
     this.pings2 = this.pings2 || new Map();
     const old = this.pings2.get(id);
     if (old) { R.dynRoot.remove(old.s); old.s.material.map!.dispose(); old.s.material.dispose(); }
@@ -850,7 +851,7 @@ export const Views = {
       }
       // aim pitch toward whoever they're engaging
       let pitch = 0;
-      const aimed = ev.aim === G.Net.myId ? G.Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
+      const aimed = ev.aim === Net.myId ? G.Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
       const tgt = aimed || (ev.alert ? this.nearestPlayer(ev.pos) : null);
       if (tgt) pitch = Math.atan2(tgt.y + 1.2 - (ev.pos.y + 1.4 * ev.def.scale), Math.max(1, Math.hypot(tgt.x - ev.pos.x, tgt.z - ev.pos.z))); // (from their own height: upstairs, level)
       ev.recPitch = pitch; // (for the highlights: js/highlights.ts)
@@ -967,7 +968,7 @@ export const Views = {
       if (!ev.alive || !ev.aim || !ev.rig.gun || ev.rig.slung) continue;
       const a = ev.rig.head.localToWorld(new THREE.Vector3(0, 0.08, -0.12));
       let b;
-      if (ev.aim === G.Net.myId) { b = R.camera.position.clone(); b.y -= 0.25; aimedAtMe = true; }
+      if (ev.aim === Net.myId) { b = R.camera.position.clone(); b.y -= 0.25; aimedAtMe = true; }
       else { const pv = this.players.get(ev.aim); if (!pv) continue; b = pv.pos.clone(); b.y += 1.3; }
       if (!(ev.tac & 2)) R.laser(a, b); // (one on their gun shows for itself, below)
     }
@@ -1139,7 +1140,7 @@ export const Views = {
         if (n.own && n.kind === 'flash') G.Me.flashBang(p.clone().add(new THREE.Vector3(0, 0.1, 0)));
         else if (n.own && n.kind === 'tb') G.Me.thermobaric(p.clone());
         else if (n.own) G.Me.explode(p.clone(), G.Me.blastR(map, p), G.Me.BLAST.dmg, true);
-        else if (n.enemy && G.Net.isHost) G.Net.toHost({ t: 'eboom', p: [p.x, p.y, p.z] }); // (a suspect's: where it went off on the host's screen is where it goes off, js/server.ts enemyBoom)
+        else if (n.enemy && Net.isHost) Net.toHost({ t: 'eboom', p: [p.x, p.y, p.z] }); // (a suspect's: where it went off on the host's screen is where it goes off, js/server.ts enemyBoom)
       }
     }
 
