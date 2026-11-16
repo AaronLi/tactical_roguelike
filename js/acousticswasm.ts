@@ -96,25 +96,25 @@ export const AcWasm = (() => {
       return loading;
     },
     /** gives up the module (a trap in it): the JavaScript tracer from now on */
-    fail(why: string) { failed = why; X = null; },
+    fail(why: string) { failed = why; X = null; console.warn('acoustics.wasm: given up (' + why + '): the JavaScript tracer from now on'); },
     /** copies a floor into the module's memory */
     scene(s: SceneSpec): WasmScene {
       const x = X!, sp = x.scene_new(s.flags.length, s.nz, s.nd, s.w, s.h, s.f, s.ts, s.fy, s.buildingTop);
       const put = <T extends Uint8Array | Int32Array | Float64Array>(k: number, a: T) => { new (a.constructor as { new (b: ArrayBuffer, o: number, n: number): T })(x.memory.buffer, x.scene_ptr(sp, k), a.length).set(a as never); };
       put(0, s.flags); put(1, s.zoneAt); put(2, s.doorAt); put(3, s.zones);
-      const doorsPtr = x.scene_ptr(sp, 4), nd = s.nd, self = {};
-      sceneGone && sceneGone.register(self, sp);
-      return {
+      // (a trace reads the scene's memory: it holds the scene object, which the registry frees the module's copy of once none is left. What a trace
+      // reads through `sc` is what keeps it: a bare mention would be dropped by the release bundle's minifier, and the scene freed under a trace)
+      const sc: WasmScene & { sp: number; doorsPtr: number; nd: number } = {
+        sp, doorsPtr: x.scene_ptr(sp, 4), nd: s.nd,
         trace(x0, y0, z0, zi, R2, owa, owal, seed): WasmTrace {
-          void self; // (the scene lives as long as a trace of it)
-          const tp = x.trace_new(sp, x0, y0, z0, zi, R2, owa, owal, seed >>> 0), tok = {};
+          const tp = x.trace_new(sc.sp, x0, y0, z0, zi, R2, owa, owal, seed >>> 0), tok = {};
           traceGone && traceGone.register(tok, tp, tok);
           let freed = false;
           const free = () => { if (!freed) { freed = true; traceGone && traceGone.unregister(tok); x.trace_free(tp); } };
           return {
             rays(n, doors) {
-              const dv = new Uint8Array(x.memory.buffer, doorsPtr, nd);
-              for (let i = 0; i < nd; i++) dv[i] = doors[i] ? 1 : 0;
+              const dv = new Uint8Array(x.memory.buffer, sc.doorsPtr, sc.nd);
+              for (let i = 0; i < sc.nd; i++) dv[i] = doors[i] ? 1 : 0;
               return x.trace_rays(tp, n) !== 0;
             },
             take() {
@@ -129,6 +129,8 @@ export const AcWasm = (() => {
           };
         },
       };
+      sceneGone && sceneGone.register(sc, sp);
+      return sc;
     },
   };
   return A;

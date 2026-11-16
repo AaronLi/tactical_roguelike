@@ -48,3 +48,30 @@ and makes each trace in the JS tracer (in the vm, `tools/vm_game.mjs`) and in th
 seed, with every door shut and then every door open (the scene is reused; only the doors are sent again), the module's rays sent in pieces of
 500, 60, 37 or 1. Histograms, early arrivals, `wet`, `rt60`, `rt60L` and `mfp` must agree to 1e-9 relative. The differences
 are the last bits of `exp`, `sin` and `cos` (different libms), nothing in which tile a ray goes through.
+
+## Speed
+
+Per full trace (500 rays, `finish()` included, and for the module the copying of the doors' state; the flattened floor is kept, so
+that cost comes once per map and floor, a few ms), headless Chromium, the level as the game builds it (`?play=warehouse&level=4&nofoes&mute`,
+`?play=suburbs&level=2&nofoes&mute`), median of 25 after warming up:
+
+| Room | JS | WASM |
+| --- | --- | --- |
+| Warehouse L4, 3484 tiles | 24.9 ms | 12.3 ms |
+| Warehouse L4, 260 / 208 / 169 tiles | 15.3 / 19.1 / 14.1 ms | 8.1 / 10.0 / 7.3 ms |
+| Warehouse L4, outdoor 8 m cell | 3.5 ms | 1.8 ms |
+| Suburbs L2, 400 / 398 / 160 / 126 tiles | 11.0 / 16.1 / 6.0 / 16.4 ms | 5.6 / 8.5 / 3.4 / 9.4 ms |
+| Suburbs L2, outdoor 8 m cell | 3.1 ms | 1.7 ms |
+
+About 1.7 to 2.0 times faster in the browser, the same in the release bundle. Not a large factor: V8's JIT does this scalar float loop well
+(about 40 % of the loop is `exp`, `sin`, `cos` and `sqrt`), and it is no tuned port (the rays make the same draws and the same arithmetic as the JS
+ones, which the equivalence test needs). The difference is in the frame budget: a measurement of a big room that took 25 ms takes 12.
+
+In node the numbers aren't a browser's: the tools run the game in a `vm` context, where the JS loop is far slower (`Math` is looked up on the context's
+global) than in a page, 100 to 240 ms a room against the module's 7 to 14 ms; the browser's are the ones to go by.
+
+## Memory
+
+The module's copy of a scene is freed (by a `FinalizationRegistry`) once nothing holds the scene's JS object, a trace's own the same. A trace must really
+read the scene object (`sc.sp`, `sc.doorsPtr`): a bare mention is dropped by the release bundle's minifier, and the scene was then freed under a running trace (the module
+panicked in the bundled site, not in development). The first version had exactly that.
