@@ -590,7 +590,7 @@ const G_Views = {
   // rolling along the floor, slowed by friction, till it stops. n: { pos, vel } (and n.onGround, set here). The
   // same steps for everyone's grenades and for the throw you're lining up (predictNade), so where the arc says it
   // ends up is where it does.
-  NADE_R: G_Sim.NADE_R, NADE_G: G_Sim.NADE_G, // (js/sim.ts: the flight itself, the same for the host's simulation)
+  NADE_R: G.Sim.NADE_R, NADE_G: G.Sim.NADE_G, // (js/sim.ts: the flight itself, the same for the host's simulation)
   nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) { G.Sim.nadeStep(n, dt, map); },
   // Where a throw goes: its path, stepped as a grenade flies (nadeStep) for as long as the fuse burns. Returns
   // the points along it (Vector3s) and where it goes off (the last).

@@ -17,7 +17,7 @@ const G_ServerHost = {
   TICK_MS: 1000 / 60,
   ctl: null as MessagePort | null,
   cli: null as MessagePort | null,
-  id: null as string | null, // (the host's own player: SvNet.myId)
+  id: null as string | null, // (the host's own player: G.Server.net.myId)
   on: false,
   remotes: new Set<string>(), // (remote players whose connections are open)
   timer: 0 as unknown as ReturnType<typeof setInterval>,
@@ -29,8 +29,8 @@ const G_ServerHost = {
   attach(ctl: MessagePort) {
     this.ctl = ctl;
     ctl.onmessage = (e: MessageEvent) => this.control(e.data);
-    SvNet.broadcast = (m, x) => this.broadcast(m, x);
-    SvNet.sendTo = (id, m) => this.sendTo(id, m);
+    G.Server.net.broadcast = (m, x) => this.broadcast(m, x);
+    G.Server.net.sendTo = (id, m) => this.sendTo(id, m);
     G.Recorder.out = (name, data) => this.ctl!.postMessage({ k: 'rec', name, data }); // (a level's recording: js/recorder.ts)
     ctl.postMessage({ k: 'ready' });
   },
@@ -50,7 +50,7 @@ const G_ServerHost = {
   // a session: the host's player (id) and their port; the simulation as it is when someone starts hosting (G.Server.reset)
   start(id: string, cli: MessagePort) {
     this.stop();
-    this.id = SvNet.myId = id;
+    this.id = G.Server.net.myId = id;
     this.cli = cli;
     cli.onmessage = (e: MessageEvent) => { if (this.on && e.data && typeof e.data === 'object') { G.Recorder.msg(G.Server, e.data, this.id!); G.Server.handle(e.data, this.id!); } };
     G.Server.reset();

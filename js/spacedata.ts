@@ -201,7 +201,7 @@ const G_SpaceData = (() => {
     return p.z < L.zr ? p.y < L.CB + 0.4 && Math.abs(p.x) < (p.y > L.CC - 0.1 ? (p.z < L.zt ? L.tw : L.sw) : L.fw) + 0.1 : p.y < L.CM + 0.4 && Math.abs(p.x) < L.hw + 0.05;
   }
   // Where the ship stands in the hangar (the pad in front of the hall: js/hangar.ts), nose to the west.
-  const HUB_BERTH = { x: 27, y: 0, z: G_HANGAR_ROWS * 2 + 35, yaw: Math.PI / 2 };
+  const HUB_BERTH = { x: 27, y: 0, z: G.HANGAR_ROWS * 2 + 35, yaw: Math.PI / 2 };
 
   // ---- the places missions go to (the level's theme: js/level.ts generate, th from 1000 up)
   const THEMES: ThemeDef[] = [

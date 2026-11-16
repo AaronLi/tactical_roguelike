@@ -832,7 +832,7 @@ const G_Highlights = (() => {
   // at the end; then mux() gives it the mixed sound and gets back the file
   function viaWorker(X: HlExport, vc: { id: string; cfg: VideoEncoderConfig }, data: Rec, stickers: Record<string, ImageBitmap>) {
     return new Promise<any>((ok, fail) => {
-      const w = new Worker('dist/js/exportworker.js');
+      const w = new Worker('dist/js/exportworker.js', { type: 'module' });
       let file: any = null;
       X.worker = w;
       const end = () => { w.terminate(); X.abort = null; X.worker = null; };

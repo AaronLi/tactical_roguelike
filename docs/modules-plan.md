@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0 and 1 done (2026-11-15); phase 2 not started. Written 2026-11-15.
+Status: phases 0, 1 and 2 done (2026-11-15); phase 3 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -109,13 +109,36 @@ Done when: the trial typecheck from phase 0 reports no type errors, only value r
 - Page: change the `defer` script tags to `type="module"`. Order is preserved, so behaviour is the same.
 - Workers (all three: server, prep, highlights export): start them as module workers (`new Worker(url, { type: 'module' })`) and replace `importScripts` with a
   list of side-effect imports in the same order.
-- three.js: add an import map on the page pointing `three` at the pinned CDN build; keep the global `THREE` for now.
-- Node tools: replace the `vm` loaders in `tools/level_env.mjs` and `tools/model_env.mjs` with real imports of
-  `dist/js`.
+- Before that, the three bare cross-file values (`G_Sim`, `SvNet`, `G_HANGAR_ROWS`) go through `G`, since a module's top-level names are no longer shared.
+- three.js: the import map moves to phase 4 (nothing imports `three` until a file does); the global `THREE` stays.
+- Node tools: **moved to phase 4** (see there).
 
 No source file has an `import` yet. This phase only proves every loader can take one.
 
-Done when: all loaders are module-based and the load lists still exist but are plain import lists.
+Done when: the page and all three workers load modules and the load lists still exist, as literal lists the workers `import()` in turn.
+
+#### Phase 2 results
+
+- **Bare values:** `G_Sim.X` is now `G.Sim.X` (11 uses, `game`, `player`, `server`, `views`), `SvNet.X` in `serverhost` is
+  `G.Server.net.X` (the same object: `net: SvNet`), `G_HANGAR_ROWS` in `spacedata` is `G.HANGAR_ROWS` (`data.ts` sets it,
+  and loads first). `npm run deps` reports 0 bare names between files.
+- **Page:** the 85 `defer` game scripts in `index.html` are `type="module"`, same order; the CDN PeerJS tag stays
+  `defer`. `dist/js/modelbundles.js` stays a classic, non-deferred script: it must run first so the model download starts
+  before three.js is fetched, and a module would wait for the parse. The page has no inline scripts or `on...=`
+  attributes naming a game name. `ambience.html` has no `defer` tags (its classic scripts feed an inline script that runs
+  at once), so it is unchanged. The files were already strict (`alwaysStrict`), so module strictness changes nothing.
+- **Workers:** all three start with `{ type: 'module' }`, and `importScripts(...)` became `for (const f of LIST) await
+  import('./' + f + '.js')`. The lists are literal arrays (`SERVER_SCRIPTS`, and new `PREP_SCRIPTS`, `EXPORT_SCRIPTS`, which
+  `tools/deps.mjs` now reads by those names): 28, 21 and 37 files, as before. Module workers need Firefox 114+ and Safari
+  15+ (agreed).
+- **Fallback checked:** with the server worker made to fail (a missing file in its list; a top-level throw) the page falls
+  back to the simulation on the main thread (`G.ServerLink.mode === 'main'`) and the level plays.
+- **Checks:** typecheck, `test:level` (31/31), `test:sim` (golden unchanged), `test:models`, `deps` (six orders consistent,
+  28/21/37/86 files) pass; the ten smoke URLs all reach `__debugReady` with no errors, and the server ran in its worker
+  in the six without `serverthread=0`.
+- Found on the way, not changed: the prep worker's list has no `damage`, and `js/leveldesc.ts` reads `G.Damage.HINGES`, so
+  every level the prep worker builds fails with a TypeError (the page then makes the level itself, as without the
+  worker). The same list and code are in phase 1's commit, so it predates this phase.
 
 ### 3. The layering rule and the hooks
 
@@ -140,8 +163,13 @@ For each file:
 2. Replace its own `G.X` uses with imports, by script (`tools/codemod_imports.mjs`), for every `X` already converted.
 3. Typecheck, golden tests, smoke check.
 
+Node tools (moved here from phase 2): replace the `vm` loaders in `tools/level_env.mjs`, `tools/model_env.mjs` and
+`tools/check_sim_golden.mjs` with real imports of `dist/js`. They evaluate the compiled files in a `vm` context, which
+still works while no file has an `import`; it stops working with the first one, so it has to change together with
+the first converted file, and with the import map for `three` (node needs `three` resolvable there too).
+
 Done when: the server worker and the prep worker import their entry file and nothing else, and both hand-kept lists
-are deleted.
+are deleted, and the node tools import `dist/js`.
 
 ### 5. Convert the page side
 

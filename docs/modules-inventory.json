@@ -5121,33 +5121,37 @@
    "uses": [
     {
      "x": "Models",
-     "line": 20,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Stickers",
      "line": 21,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Highlights",
-     "line": 26,
+     "x": "Stickers",
+     "line": 22,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Highlights",
-     "line": 28,
+     "line": 27,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Highlights",
+     "line": 29,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "booted": {
+    "EXPORT_SCRIPTS": {
      "kind": "value",
      "line": 14
+    },
+    "booted": {
+     "kind": "value",
+     "line": 16
     }
    }
   },
@@ -5708,6 +5712,12 @@
      "x": "HUD",
      "line": 143,
      "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 149,
+     "load": true,
      "guard": "plain"
     },
     {
@@ -23236,8 +23246,26 @@
     },
     {
      "x": "Sim",
+     "line": 1957,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
      "line": 1959,
      "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 1967,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 1967,
+     "load": true,
      "guard": "plain"
     },
     {
@@ -23406,6 +23434,12 @@
      "x": "R",
      "line": 2136,
      "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 2163,
+     "load": true,
      "guard": "plain"
     },
     {
@@ -25218,27 +25252,31 @@
    "uses": [
     {
      "x": "LightGrid",
-     "line": 15,
+     "line": 17,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 16,
+     "line": 18,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LightGrid",
-     "line": 18,
+     "line": 20,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
+    "PREP_SCRIPTS": {
+     "kind": "value",
+     "line": 9
+    },
     "prepBooted": {
      "kind": "value",
-     "line": 8
+     "line": 10
     }
    }
   },
@@ -27725,6 +27763,18 @@
      "guard": "plain"
     },
     {
+     "x": "Sim",
+     "line": 586,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 586,
+     "load": true,
+     "guard": "plain"
+    },
+    {
      "x": "Gear",
      "line": 588,
      "load": false,
@@ -27758,6 +27808,18 @@
      "x": "Med",
      "line": 620,
      "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 642,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 642,
+     "load": true,
      "guard": "plain"
     },
     {
@@ -28286,6 +28348,12 @@
      "x": "Med",
      "line": 1536,
      "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 1597,
+     "load": true,
      "guard": "plain"
     },
     {
@@ -29032,6 +29100,18 @@
    },
    "uses": [
     {
+     "x": "Server",
+     "line": 32,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Server",
+     "line": 33,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Recorder",
      "line": 34,
      "load": false,
@@ -29130,6 +29210,12 @@
     {
      "x": "Server",
      "line": 47,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Server",
+     "line": 53,
      "load": false,
      "guard": "plain"
     },
@@ -33381,6 +33467,12 @@
      "guard": "plain"
     },
     {
+     "x": "HANGAR_ROWS",
+     "line": 204,
+     "load": true,
+     "guard": "plain"
+    },
+    {
      "x": "THEMES",
      "line": 213,
      "load": false,
@@ -35709,6 +35801,18 @@
      "x": "R",
      "line": 583,
      "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 593,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "line": 593,
+     "load": true,
      "guard": "plain"
     },
     {
@@ -38921,6 +39025,20 @@
     ],
     "loadAt": []
    },
+   "sim": {
+    "load": 1,
+    "call": 3,
+    "names": [
+     "Sim"
+    ],
+    "loadAt": [
+     {
+      "x": "Sim",
+      "line": 149,
+      "guard": "plain"
+     }
+    ]
+   },
    "gunmaterials": {
     "load": 0,
     "call": 2,
@@ -39128,14 +39246,6 @@
     "call": 9,
     "names": [
      "Icons"
-    ],
-    "loadAt": []
-   },
-   "sim": {
-    "load": 0,
-    "call": 3,
-    "names": [
-     "Sim"
     ],
     "loadAt": []
    },
@@ -41328,12 +41438,33 @@
     "loadAt": []
    },
    "sim": {
-    "load": 0,
+    "load": 4,
     "call": 6,
     "names": [
      "Sim"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Sim",
+      "line": 1957,
+      "guard": "plain"
+     },
+     {
+      "x": "Sim",
+      "line": 1967,
+      "guard": "plain"
+     },
+     {
+      "x": "Sim",
+      "line": 1967,
+      "guard": "plain"
+     },
+     {
+      "x": "Sim",
+      "line": 2163,
+      "guard": "plain"
+     }
+    ]
    },
    "loot": {
     "load": 0,
@@ -42578,12 +42709,38 @@
     "loadAt": []
    },
    "sim": {
-    "load": 0,
+    "load": 5,
     "call": 15,
     "names": [
      "Sim"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Sim",
+      "line": 586,
+      "guard": "plain"
+     },
+     {
+      "x": "Sim",
+      "line": 586,
+      "guard": "plain"
+     },
+     {
+      "x": "Sim",
+      "line": 642,
+      "guard": "plain"
+     },
+     {
+      "x": "Sim",
+      "line": 642,
+      "guard": "plain"
+     },
+     {
+      "x": "Sim",
+      "line": 1597,
+      "guard": "plain"
+     }
+    ]
    },
    "spacedata": {
     "load": 0,
@@ -42735,19 +42892,19 @@
    }
   },
   "serverhost": {
+   "server": {
+    "load": 0,
+    "call": 22,
+    "names": [
+     "Server"
+    ],
+    "loadAt": []
+   },
    "recorder": {
     "load": 0,
     "call": 6,
     "names": [
      "Recorder"
-    ],
-    "loadAt": []
-   },
-   "server": {
-    "load": 0,
-    "call": 19,
-    "names": [
-     "Server"
     ],
     "loadAt": []
    },
@@ -43394,12 +43551,19 @@
     "loadAt": []
    },
    "data": {
-    "load": 0,
+    "load": 1,
     "call": 4,
     "names": [
+     "HANGAR_ROWS",
      "THEMES"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "HANGAR_ROWS",
+      "line": 204,
+      "guard": "plain"
+     }
+    ]
    },
    "util": {
     "load": 0,
@@ -43846,12 +44010,23 @@
     "loadAt": []
    },
    "sim": {
-    "load": 0,
+    "load": 2,
     "call": 4,
     "names": [
      "Sim"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Sim",
+      "line": 593,
+      "guard": "plain"
+     },
+     {
+      "x": "Sim",
+      "line": 593,
+      "guard": "plain"
+     }
+    ]
    },
    "parts": {
     "load": 0,
@@ -45275,63 +45450,21 @@
  "trial": {
   "total": 7019,
   "byCode": {
-   "TS2339": 5931,
+   "TS2339": 5947,
    "TS6196": 86,
    "TS7006": 246,
    "TS2686": 615,
    "TS18047": 14,
    "TS7031": 39,
-   "TS2304": 13,
    "TS18049": 16,
    "TS2345": 8,
    "TS2531": 10,
    "TS2322": 3,
    "TS18048": 28,
    "TS2532": 2,
-   "TS2552": 3,
    "TS7053": 5
   },
-  "bare": [
-   {
-    "name": "G_Sim",
-    "decl": {
-     "file": "sim",
-     "kind": "value",
-     "line": 6
-    },
-    "users": {
-     "game": 1,
-     "player": 4,
-     "server": 5,
-     "views": 2
-    },
-    "uses": 12
-   },
-   {
-    "name": "SvNet",
-    "decl": {
-     "file": "server",
-     "kind": "value",
-     "line": 35
-    },
-    "users": {
-     "serverhost": 3
-    },
-    "uses": 3
-   },
-   {
-    "name": "G_HANGAR_ROWS",
-    "decl": {
-     "file": "data",
-     "kind": "value",
-     "line": 552
-    },
-    "users": {
-     "spacedata": 1
-    },
-    "uses": 1
-   }
-  ],
+  "bare": [],
   "gLost": [
    "AKIMBO_OFF",
    "AMMO",

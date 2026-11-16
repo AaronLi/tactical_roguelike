@@ -146,7 +146,7 @@ const G_Game = {
   // level's built, and its shaders compiled, in one go on the main thread, and the picture stands still while that's
   // done. So the host sends the panel across first (js/server.ts overBlack) and does it there, and the panel wipes on off
   // the bottom once the new place has drawn a few frames (js/views.ts applySnap).
-  VEIL_MS: G_Sim.VEIL_MS, VEIL_OUT: 650, VEIL_SMOOTH: 6, // (VEIL_MS: the wipe on, css/style.css veilIn 0.8 s, and a frame: the work waits until it's all the way down, or it freezes the wipe halfway)
+  VEIL_MS: G.Sim.VEIL_MS, VEIL_OUT: 650, VEIL_SMOOTH: 6, // (VEIL_MS: the wipe on, css/style.css veilIn 0.8 s, and a frame: the work waits until it's all the way down, or it freezes the wipe halfway)
   veil(on: boolean, instant?: boolean) {
     const el = this.$('veil'), was = el.classList.contains('on');
     if (!on && !was && !instant) return; // (not up, or already on its way off)

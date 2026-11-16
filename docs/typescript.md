@@ -1,9 +1,9 @@
 # TypeScript
 
 The game is TypeScript: `js/*.ts`, compiled one-to-one to `dist/js/*.js` by `tsc` and loaded by `index.html` with
-plain `<script>` tags, in order, as the JavaScript was. Two workers load some of the same compiled files with
-`importScripts`: the host's simulation (`js/serverworker.ts`, the server's own thread: [threads.md](threads.md)) and the
-highlights' export worker (`js/exportworker.ts`).
+`<script type="module">` tags, in order (no file has an `import` yet: each is a module that shares only `G`). Three
+workers load some of the same compiled files, as module workers, one `import()` after another: the host's simulation (`js/serverworker.ts`, the server's own thread: [threads.md](threads.md)) and the
+level-preparation worker (`js/prepworker.ts`) and the highlights' export worker (`js/exportworker.ts`).
 
 | Command | What it does |
 | --- | --- |
@@ -29,7 +29,7 @@ before. `js/types/globals.d.ts` declares what all of them share:
 `THREE` (value and types) comes from `@types/three` 0.186.0, for the game's three r186.1, as the global `THREE`
 namespace (`js/types/three-global.d.ts`: the types no longer declare it themselves). On the page it's put there by the
 one module, `js/threeboot.ts` (three's ES module build and its glTF loader, from jsDelivr, pinned), which runs before
-the game's scripts: they're all `defer`, and deferred and module scripts run in the order they're written.
+the game's scripts: they're all `type="module"` (deferred), and module scripts run in the order they're written. (`dist/js/modelbundles.js` stays a classic script ahead of them, so the model download starts first.)
 
 Each file declares what it puts on `G` (interfaces merge across scripts):
 
@@ -43,9 +43,9 @@ interface GameModules { Level: typeof G_Level; }
 error, and every call from one file into another is checked against the callee's real signature. Fields a module
 gains at runtime go in a `NameFields` interface next to it (`typeof G_Me & MeFields`).
 
-Adding a file: create `js/<name>.ts`, add `<script defer src="dist/js/<name>.js">` to `index.html` in the right order,
-to `js/serverworker.ts`'s `SERVER_SCRIPTS` if the host's simulation needs it (nothing that draws there: what both sides
-reckon goes in `js/sim.ts`), and to `js/exportworker.ts`'s list if the highlights' replay needs it.
+Adding a file: create `js/<name>.ts`, add `<script type="module" src="dist/js/<name>.js">` to `index.html` in the right order,
+to `js/serverworker.ts`'s `SERVER_SCRIPTS` (and `js/prepworker.ts`'s `PREP_SCRIPTS`) if the host's simulation needs it (nothing that draws there: what both sides
+reckon goes in `js/sim.ts`), and to `js/exportworker.ts`'s `EXPORT_SCRIPTS` if the highlights' replay needs it.
 
 ## Status
 

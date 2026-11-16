@@ -1,6 +1,6 @@
 {
-  // The game's TypeScript: every js/*.ts compiles to dist/js/*.js (same name), loaded by index.html with plain <script>
-  // tags in order. They're scripts, not modules: no import/export, everything shared through the global G
+  // The game's TypeScript: every js/*.ts compiles to dist/js/*.js (same name), loaded by index.html with <script type="module">
+  // tags in order (and by the workers, one import() after another). No file has an import/export yet: everything shared through the global G
   // (js/types/globals.d.ts).
   "compilerOptions": {
     "target": "ES2022",

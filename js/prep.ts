@@ -17,7 +17,7 @@ const G_Prep = (() => {
   function worker() {
     if (w || dead) return w;
     try {
-      w = new Worker('dist/js/prepworker.js');
+      w = new Worker('dist/js/prepworker.js', { type: 'module' });
       w.onmessage = (e) => {
         const m = e.data; if (!m || m.t !== 'prep') return;
         if (m.err) { bad.add(m.key); console.warn('prep', m.err); }

@@ -1,5 +1,5 @@
 'use strict';
-// The host's simulation in a thread of its own (docs/threads.md): js/serverlink.ts starts it on the page, as a classic worker,
+// The host's simulation in a thread of its own (docs/threads.md): js/serverlink.ts starts it on the page, as a module worker,
 // and hands it its control port ({k:'boot', ctl}); js/serverhost.ts does the rest. It loads only what the simulation works
 // with (the data, the guns' and gear's rules, the level as it's built and walked and seen through, the medical and the shop's
 // reckonings), and nothing that draws or plays: no renderer, no rigs, no views, no sound, no DOM. three.js comes too, for its
@@ -8,11 +8,11 @@
 (self as any).window = self;
 // (what a file reaches for while it loads or builds a level: none of it is drawn here)
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
-// (the scripts, in the page's order: index.html)
+// (the scripts, in the page's order: index.html. A literal list: tools/deps.mjs and tools/check_sim_golden.mjs read it)
 const SERVER_SCRIPTS = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents',
   'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'spaceserver', 'serverhost'];
-const svBooted = import('./threeboot.js').then(() => {
-  importScripts(...SERVER_SCRIPTS.map((f) => f + '.js'));
+const svBooted = import('./threeboot.js').then(async () => {
+  for (const f of SERVER_SCRIPTS) await import('./' + f + '.js'); // (one after the other: each is a module of its own that shares only G)
 });
 
 self.onmessage = async (e: MessageEvent) => {

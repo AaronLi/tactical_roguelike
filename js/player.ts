@@ -1954,7 +1954,7 @@ const G_Me = {
   // a time budget a frame (FRAG.BUDGET_MS, at least FRAG.MIN_PER_FRAME chips): a few frames at most. A chip that has
   // flown is flown at once (at a kilometre a second the air time is nothing). A body takes at most FRAG.CAP of them
   // through the full wound sums (the rest pass it by) so a crowd of chips on one man costs no more than that.
-  BLAST: G_Sim.BLAST, // (the burst's own push of air, close in: the chips are the rest. js/sim.ts)
+  BLAST: G.Sim.BLAST, // (the burst's own push of air, close in: the chips are the rest. js/sim.ts)
   // A burst lying on something hard pushes its whole blast into the half above it, and it carries further (js/sim.ts blastR)
   blastR(map: LvMap | null, p: THREE.Vector3) { return G.Sim.blastR(map, p); },
   FRAG: { N: 1200, V0: 1150, VMIN: 70, RANGE: 70, CAP: 28, BUDGET_MS: 3, MIN_PER_FRAME: 40, M_MED: 0.00013, M_SD: 0.25, CD: 1.0, FLAKE: 1.5, SHOW: 26, PUFFS: 14, BLOOD: 24 },
@@ -1964,7 +1964,7 @@ const G_Me = {
   // pieces (about a gram each, some 800 J apiece against a frag chip's 86), a thinner hazard, but each one goes through IIIA soft armour
   // out to 20 m and through plasterboard, plywood and a car door, where a frag chip stops in soft armour at any range. Rifle plates (III
   // steel or polyethylene) still stop them. The rest of a burst's sums are the frag's (FRAG).
-  STICKY: { FUSE: G_Sim.STICKY.FUSE, MAX_FLY: G_Sim.STICKY.MAX_FLY, N: 220, V0: 1200, M_MED: 0.0011, M_SD: 0.12, FLAKE: 1.0, CORE: 'hard', CAP: 14 },
+  STICKY: { FUSE: G.Sim.STICKY.FUSE, MAX_FLY: G.Sim.STICKY.MAX_FLY, N: 220, V0: 1200, M_MED: 0.0011, M_SD: 0.12, FLAKE: 1.0, CORE: 'hard', CAP: 14 },
   fragSpec(kind?: string): Record<string, any> { return kind === 'sticky' ? Object.assign({}, this.FRAG, { N: this.STICKY.N, V0: this.STICKY.V0, M_MED: this.STICKY.M_MED, M_SD: this.STICKY.M_SD, FLAKE: this.STICKY.FLAKE, CAP: this.STICKY.CAP, CORE: this.STICKY.CORE }) : this.FRAG; },
   fragQ: null as null | any[],
   fragLogs: [] as any[],
@@ -2160,7 +2160,7 @@ const G_Me = {
   //   through a wall or a shut door: a thump, no harm: dazed a little, close by.
   // The same everywhere from where it went off (the map and its doors), so every machine draws the same fireball and the F9
   // view shows the volume it filled.
-  TB: G_Sim.TB, // (the reckoning: js/sim.ts tbModel, tbDose)
+  TB: G.Sim.TB, // (the reckoning: js/sim.ts tbModel, tbDose)
   tbModel(map: LvMap, p: THREE.Vector3): PTbModel { return G.Sim.tbModel(map, p); },
   // what a thermobaric's burst does to someone at (x, y, z): burn and blast (shares of a life), daze (0..1), and where they were
   tbDose(M: PTbModel, x: number, y: number, z: number) { return G.Sim.tbDose(M, x, y, z); },

@@ -1,12 +1,14 @@
 'use strict';
-// A level got ready ahead, off the main thread (js/prep.ts starts this, a classic worker): the level laid out from its figures
+// A level got ready ahead, off the main thread (js/prep.ts starts this, a module worker): the level laid out from its figures
 // here as it is on the page (js/level.ts generate: the same level, as on the host), and the slow part of putting it on screen
 // worked out, its light grid's sums (js/lightgrid.ts compute). Nothing's drawn here. What goes back is the sums, plain arrays
 // handed over (not copied), and the level itself (copied: taken by js/space.ts for a ship seen from outside, then the level).
 (self as any).window = self;
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
-const prepBooted = import('./threeboot.js').then(() => {
-  importScripts(...['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'lightgrid'].map((f) => f + '.js'));
+// (the scripts, in the page's order: index.html. Each is imported in turn; none has an import of its own yet)
+const PREP_SCRIPTS = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'lightgrid'];
+const prepBooted = import('./threeboot.js').then(async () => {
+  for (const f of PREP_SCRIPTS) await import('./' + f + '.js');
 });
 self.onmessage = async (e) => {
   const m = e.data; if (!m || m.t !== 'prep') return;

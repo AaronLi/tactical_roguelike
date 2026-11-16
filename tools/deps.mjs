@@ -8,7 +8,7 @@
 //   - every js/*.ts, parsed (TypeScript 5's API, tools/deps/package.json: TypeScript 7's package has no API):
 //     which G.X each file defines (`G.X = ...`) and uses, and for each use whether it runs while the file loads or only
 //     once something calls it (inside a function), and whether it's guarded (`G.X && ...`, `if (G.X)`, `G.X?.`)
-//   - the load orders written by hand: index.html's script tags, the workers' importScripts lists (js/serverworker.ts,
+//   - the load orders written by hand: index.html's script tags, the workers' script lists (SERVER_SCRIPTS, PREP_SCRIPTS, EXPORT_SCRIPTS) (js/serverworker.ts,
 //     js/prepworker.ts, js/exportworker.ts) and the node tools' (tools/level_env.mjs, tools/model_env.mjs)
 //   - the trial typecheck: tsconfig.modules-trial.json, every file a module (moduleDetection force). Its errors are the
 //     references between files that don't go through G: the types (interface LvMap in one file, used in forty) and the
@@ -38,8 +38,8 @@ const listIn = (text, after) => { const i = text.indexOf(after); if (i < 0) retu
 const ORDERS = {
   'index.html': [...read('index.html').matchAll(/src="dist\/js\/([\w-]+)\.js"/g)].map((m) => m[1]),
   'js/serverworker.ts': listIn(read('js/serverworker.ts'), 'SERVER_SCRIPTS ='),
-  'js/prepworker.ts': listIn(read('js/prepworker.ts'), 'importScripts('),
-  'js/exportworker.ts': listIn(read('js/exportworker.ts'), 'importScripts('),
+  'js/prepworker.ts': listIn(read('js/prepworker.ts'), 'PREP_SCRIPTS ='),
+  'js/exportworker.ts': listIn(read('js/exportworker.ts'), 'EXPORT_SCRIPTS ='),
   'tools/level_env.mjs': listIn(read('tools/level_env.mjs'), 'LEVEL_SCRIPTS ='),
   'tools/model_env.mjs': listIn(read('tools/model_env.mjs'), 'for (const f of ['),
 };

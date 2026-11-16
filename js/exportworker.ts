@@ -10,10 +10,11 @@
   addEventListener() {},
 };
 // three as the page has it (js/threeboot.ts: its module build, with the glTF loader, on the global THREE): a module, so it's
-// imported (a classic worker can), and the game's own scripts, classic as on the page, after it
-const booted = import('./threeboot.js').then(() => {
-  importScripts(...['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'damage', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'lightgrid', 'levelview', 'render',
-    'stickers', 'gunmaterials', 'gunmodels', 'modelbundles', 'glb', 'gunrig', 'viewmodel', 'vmanim', 'humandata', 'humans', 'headgear', 'rig', 'scars', 'highlights'].map((f) => f + '.js'));
+// imported, and the game's own scripts after it, each imported in turn (none has an import of its own yet: each shares only G)
+const EXPORT_SCRIPTS = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'damage', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'lightgrid', 'levelview', 'render',
+    'stickers', 'gunmaterials', 'gunmodels', 'modelbundles', 'glb', 'gunrig', 'viewmodel', 'vmanim', 'humandata', 'humans', 'headgear', 'rig', 'scars', 'highlights'];
+const booted = import('./threeboot.js').then(async () => {
+  for (const f of EXPORT_SCRIPTS) await import('./' + f + '.js');
   // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
   (G as any).Game = { map: null, phase: 'level' };
   (G as any).Net = { myId: '' };

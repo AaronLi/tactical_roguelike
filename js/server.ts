@@ -583,7 +583,7 @@ const G_Server = {
   },
   // A cabinet is a CAB_W x CAB_H grid (medical gear only): items [[mt, n, x, y, rot], ...]. ver counts changes,
   // so an edit made against an older state is checked rather than taken as it is.
-  CAB_W: G_Sim.CAB_W, CAB_H: G_Sim.CAB_H, // (js/sim.ts: the screens draw them so)
+  CAB_W: G.Sim.CAB_W, CAB_H: G.Sim.CAB_H, // (js/sim.ts: the screens draw them so)
   cabGrid(items: any[][]) {
     const Gr = G.Gear, g = Gr.grid(this.CAB_W, this.CAB_H, ['med']);
     for (const [mt, n, x, y, r] of items) Gr.put(g, Gr.medItem(mt, n), x, y, r);
@@ -639,7 +639,7 @@ const G_Server = {
   // (the tids they took out), keep (where the rest now sit), put (what they put in, and where). Made against
   // the state as it is, it's taken as it is; against an older one, their takes and puts are merged into
   // what's there now (taking something already gone is denied, a put with no room left comes back).
-  TEAM_W: G_Sim.TEAM_W, TEAM_H: G_Sim.TEAM_H,
+  TEAM_W: G.Sim.TEAM_W, TEAM_H: G.Sim.TEAM_H,
   team: null as TeamLocker | null,
   teamMsg() { const t = this.team || { ver: 0, items: [] }; return { t: 'team', ver: t.ver, items: t.items }; },
   teamGrid() { const g = G.Gear.grid(this.TEAM_W, this.TEAM_H, null, 'Team locker'); g.locker = true; return g; },
@@ -1594,7 +1594,7 @@ const G_Server = {
   // other hand on the gun any more (it props them up instead) and shoot one-handed; below COLLAPSE (about 31%
   // health) their legs give out and they go down, still alive, until they bleed out. The weaker they are, the
   // more readily they give up.
-  COLLAPSE: 0.3, TWO_HAND: G_Sim.TWO_HAND,
+  COLLAPSE: 0.3, TWO_HAND: G.Sim.TWO_HAND,
   // A shot kicks the gun off target (degrees of muzzle rise: the weapon's recoil, worse one-handed and weak),
   // and the arms bring it back, faster with two hands and strength. They fire again once it's back on.
   kickOf(e: Enemy, w: any) { return G.Sim.kickOf(e.str, w); }, // (js/sim.ts: every screen kicks the rig's gun as much)

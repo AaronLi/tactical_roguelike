@@ -55,7 +55,7 @@ const G_ServerLink = {
       if (!this.wanted()) return here(null);
       if (typeof Worker !== 'function') return here('this browser has no workers');
       let w: Worker;
-      try { w = new Worker('dist/js/serverworker.js'); } catch (e) { return here('the worker could not be made (' + e + ')'); }
+      try { w = new Worker('dist/js/serverworker.js', { type: 'module' }); } catch (e) { return here('the worker could not be made (' + e + ')'); }
       const ch = new MessageChannel();
       let settled = false;
       const timer = setTimeout(() => fail('the worker had not started after 30 s'), 30000);

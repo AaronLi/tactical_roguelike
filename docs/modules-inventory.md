@@ -8,13 +8,13 @@ nothing checks the module is there, **check** if it is the check itself (`G.X &&
 
 ## Summary
 
-- 89 files, 174 names on G, 5686 uses (103 while loading)
+- 89 files, 174 names on G, 5702 uses (116 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 1, the largest 74 files
 - hand-kept orders against the load-time needs: index.html 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, tools/level_env.mjs 0, tools/model_env.mjs 0
 - the simulation reaching page-only modules: 133 uses (101 unguarded, 0 of them while loading)
 - names used but defined nowhere: 0
-- trial module typecheck: 7019 errors; 3 bare names between files (16 uses), 174 G members lost, 382 others
+- trial module typecheck: 7019 errors; 0 bare names between files (0 uses), 174 G members lost, 382 others
 
 ## 1. Dependency graph
 
@@ -57,7 +57,7 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | util (sim) | U | - | - |
 | zip | Zip | - | - |
 | data (sim) | TIER_NAMES, TIER_COLORS, CLASS_SND, WEAPON_LIST, WEAPONS, EXPLOSIVES_OFF, AKIMBO_OFF, OFF_GUNS, +82 | - | glb, parts, util |
-| spacedata (sim) | SpaceData | - | data, level, materials, util, world |
+| spacedata (sim) | SpaceData | data | level, materials, util, world |
 | shipgen (sim) | ShipGen | - | level, materials, util, world |
 | callsigns (sim) | Callsigns | - | util |
 | arsenal (sim) | Arsenal | - | audio, ballistics, data, hud, loadout, util, views |
@@ -105,12 +105,12 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | rig | Rig | sim | callsigns, data, footsteps, game, gear, gunmodels, gunrig, headgear, humans, level, levelview, parts, spacedata, stickers, util, views, vmanim, world |
 | net | Net | - | serverlink, util |
 | recorder (sim) | Recorder | - | level |
-| server (sim) | Server | - | arsenal, callsigns, damage, data, gear, level, medical, parts, route, serverhost, shipgen, shop, sim, spacedata, spaceserver, stickers, util, world |
+| server (sim) | Server | sim | arsenal, callsigns, damage, data, gear, level, medical, parts, route, serverhost, shipgen, shop, spacedata, spaceserver, stickers, util, world |
 | spaceserver (sim) | SpaceSv | spacedata | data, level, materials, server, shipgen, world |
 | serverhost (sim) | ServerHost | - | leveldesc, recorder, server, stickers |
 | serverlink | ServerLink | - | game, net, serverhost |
-| player | Me | level | arsenal, audio, ballistics, bolts, career, casings, course, damage, data, footsteps, game, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, handling, hangar, highlights, hud, invui, landing, levelview, loadout, loot, materials, medical, net, parts, range, render, rig, shotlog, sim, space, stickers, util, viewmodel, views, vmanim, world |
-| views | Views | - | audio, ballistics, bolts, callsigns, casings, damage, data, footsteps, game, glare, gunaudio, gunmodels, handling, highlights, hud, level, levelview, net, parts, player, render, rig, sim, stickers, util, world |
+| player | Me | level, sim | arsenal, audio, ballistics, bolts, career, casings, course, damage, data, footsteps, game, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, handling, hangar, highlights, hud, invui, landing, levelview, loadout, loot, materials, medical, net, parts, range, render, rig, shotlog, space, stickers, util, viewmodel, views, vmanim, world |
+| views | Views | sim | audio, ballistics, bolts, callsigns, casings, damage, data, footsteps, game, glare, gunaudio, gunmodels, handling, highlights, hud, level, levelview, net, parts, player, render, rig, stickers, util, world |
 | casings | Casings | - | audio, data, furniture, game, gear, handling, icons, level, loot, parts, player, render, util, world |
 | icons | Icons | data | gear, gunmodels, parts, render, util |
 | hud | HUD | - | ballistics, callsigns, data, game, gamepad, gear, icons, level, medical, net, player, render, rig, shotlog, space, util, views |
@@ -134,7 +134,7 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | cloud | Cloud | util | arsenal, callsigns, career, cloudconfig, game, net, player, shop |
 | gamepad | Pad | - | audio, game, hud, invui, player, touch, util |
 | touch | Touch | - | audio, game, gamepad, invui, player, util |
-| game | Game | - | ambience, arsenal, audio, ballistics, bolts, callsigns, career, cloud, course, damage, data, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, gunsmith, handling, hangar, highlights, hud, humans, icons, invui, landing, level, lightgrid, loadout, loot, medical, menushow, modelbundles, net, parts, player, prep, profiler, range, render, rig, route, serverhost, serverlink, shipmodel, shop, shotlog, sim, space, spacedata, stickers, touch, util, views, world |
+| game | Game | sim | ambience, arsenal, audio, ballistics, bolts, callsigns, career, cloud, course, damage, data, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, gunsmith, handling, hangar, highlights, hud, humans, icons, invui, landing, level, lightgrid, loadout, loot, medical, menushow, modelbundles, net, parts, player, prep, profiler, range, render, rig, route, serverhost, serverlink, shipmodel, shop, shotlog, space, spacedata, stickers, touch, util, views, world |
 | profiler | Prof | casings, course (guarded), game, gunaudio, hangar, highlights (guarded), hud, invui, level, lightgrid, player, render, server, serverhost, views, world | net, serverlink |
 | demo | Demo | - | game, gear, net, player, render, route, vmanim, world |
 | debugstart | DebugStart | - | data, game, gear, landing, net, parts, player, render, route, space, spacedata, views |
@@ -186,7 +186,7 @@ the page has and the server thread does not. Phase 3 replaces each with a hook t
 `tsconfig.modules-trial.json`: the project with every file a module (`moduleDetection: force`). Phase 1 is done when
 the only errors left are G members (those go when the files are converted).
 
-7019 errors: TS2339 5931, TS2686 615, TS7006 246, TS6196 86, TS7031 39, TS18048 28, TS18049 16, TS18047 14, TS2304 13, TS2531 10, TS2345 8, TS7053 5, TS2322 3, TS2552 3, TS2532 2.
+7019 errors: TS2339 5947, TS2686 615, TS7006 246, TS6196 86, TS7031 39, TS18048 28, TS18049 16, TS18047 14, TS2531 10, TS2345 8, TS7053 5, TS2322 3, TS2532 2.
 
 **G members lost** (TS2339 on GameNamespace, 174 names): each file's `interface GameModules` no longer merges (and in 83 files it's reported unused). Expected; they go as the files are converted.
 
@@ -196,11 +196,6 @@ the only errors left are G members (those go when the files are converted).
 
 | Name | Kind | Declared in | Uses | Used by |
 | --- | --- | --- | --- | --- |
-| G_Sim | value | sim:6 | 12 | server 5, player 4, views 2, game 1 |
-| SvNet | value | server:35 | 3 | serverhost 3 |
-| G_HANGAR_ROWS | value | data:552 | 1 | spacedata 1 |
-
-**Bare values** (3): named across files without G, some only in types (`typeof G_World.add`), some at runtime and even at load (`G_Sim.VEIL_MS` in game.ts's object literal): the graph above doesn't see those, so each needs an export and an import, not only a home for its type: G_Sim (sim), SvNet (server), G_HANGAR_ROWS (data).
 
 **Everything else** (382): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
 
