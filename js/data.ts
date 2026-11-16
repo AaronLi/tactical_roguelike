@@ -831,7 +831,7 @@ G.sightH = G_sightH;
 // sight; level ground, the line of sight level), v (m/s), t (s), lag (s: t less the time it'd take with no drag, the
 // lag time: a crosswind of w m/s carries the round w * lag metres sideways by then, js/sim.ts windAt). Stops where a
 // round's spent (ROUND_LIFE).
-const G_ROUND_LIFE = { t: 4, dist: 700, v: 30 }; // (in the air past any of these, it's gone: past the far side of the Sandia Crest's gorge, 500 m off)
+const G_ROUND_LIFE = { t: 4, dist: 1200, v: 30 }; // (in the air past any of these, it's gone: far enough for the range reticle's last holdover row, 1100 m: js/viewmodel.ts HOLDS)
 G.ROUND_LIFE = G_ROUND_LIFE;
 const G_ballistics = (def: Record<string, any>, am?: string | null) => { const rail = def.cls === 'RAIL'; return { v0: rail ? 3000 : Math.max(40, G.roundSpeed(def, am) || 400), drag: rail ? 1e9 : G.dragOf(def, am), g: rail ? 0 : G.GRAVITY, sh: G.sightH(def) }; };
 G.ballistics = G_ballistics;
