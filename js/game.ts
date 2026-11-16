@@ -1,4 +1,5 @@
 'use strict';
+import { BundlesEnv } from './bundlesenv.js';
 import { ReplayEnv } from './replayenv.js';
 import { AudioEnv } from './audioenv.js';
 import { Ambience } from './ambience.js';
@@ -676,7 +677,7 @@ export const Game = {
   modelStatus() {
     const box = this.$('modelLoad'), txt = this.$('modelTxt'), bar = this.$('modelBar'), retry = this.$('modelRetry');
     const mb = (n: number) => (n / 1048576).toFixed(1);
-    const upd = (s: ReturnType<typeof G.Bundles.state>) => {
+    const upd = (s: ReturnType<typeof BundlesEnv.Bundles.state>) => {
       box.classList.toggle('bad', s.phase === 'failed'); retry.classList.toggle('hidden', s.phase !== 'failed');
       if (s.phase === 'ready') {
         txt.textContent = 'Models ready'; (bar as HTMLElement).style.width = '100%'; (bar.parentElement as HTMLElement).classList.add('hidden'); box.classList.add('ok');
@@ -692,15 +693,15 @@ export const Game = {
         txt.textContent = 'Downloading models ' + (s.total ? mb(s.loaded) + ' / ' + mb(s.total) + ' MB' : '...');
       }
     };
-    G.Bundles.onChange(upd); upd(G.Bundles.state());
-    retry.onclick = () => { G.Bundles.start(); upd(G.Bundles.state()); };
+    BundlesEnv.Bundles.onChange(upd); upd(BundlesEnv.Bundles.state());
+    retry.onclick = () => { BundlesEnv.Bundles.start(); upd(BundlesEnv.Bundles.state()); };
   },
   /** Runs fn now if the models are in; otherwise when they arrive (the menu says so meanwhile). */
   needModels(fn0: () => void) {
-    const s = G.Bundles.state(), fn = () => { Hangar.load().then(() => fn0()); }; // (and the hangar's scene parsed: a few hundred ms after the bundle; js/hangar.ts)
+    const s = BundlesEnv.Bundles.state(), fn = () => { Hangar.load().then(() => fn0()); }; // (and the hangar's scene parsed: a few hundred ms after the bundle; js/hangar.ts)
     if (s.phase === 'ready') { fn(); return; }
     this.waitingModels = fn; this.msg('menuMsg', 'Waiting for the models to finish downloading...');
-    if (s.phase === 'failed' || s.phase === 'idle') G.Bundles.start();
+    if (s.phase === 'failed' || s.phase === 'idle') BundlesEnv.Bundles.start();
   },
   msg(id: string, text: string, err?: boolean) { const el = this.$(id); el.textContent = text; el.classList.toggle('err', !!err); },
 
@@ -823,8 +824,8 @@ export const Game = {
       }, 0);
     };
     requestAnimationFrame(() => {
-      if (G.Bundles.state().phase !== 'loading') return go();
-      G.Bundles.onChange((s) => { if (s.phase !== 'loading') go(); });
+      if (BundlesEnv.Bundles.state().phase !== 'loading') return go();
+      BundlesEnv.Bundles.onChange((s) => { if (s.phase !== 'loading') go(); });
       setTimeout(go, 1200);
     });
   },

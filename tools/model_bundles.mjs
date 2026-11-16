@@ -11,9 +11,9 @@ export const MODELS = path.join(ROOT, 'assets/models');
 export function loadBundles() {
   const f = DIST + 'modelbundles.js';
   if (!fs.existsSync(f)) { console.error('dist/js/modelbundles.js missing: run tsc first (npm run bake:models / test:models do)'); process.exit(1); }
-  const ctx = { console, JSON, Object, Array, Number, String, Map, Set, Error, Promise, Uint8Array, DataView, TextDecoder, setTimeout, G: {}, fetch: () => Promise.reject(new Error('no fetch')) };
+  const ctx = { console, JSON, Object, Array, Number, String, Map, Set, Error, Promise, Uint8Array, DataView, TextDecoder, setTimeout, fetch: () => Promise.reject(new Error('no fetch')) };
   vm.createContext(ctx); vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: 'modelbundles.js' });
-  return ctx.G.Bundles;
+  return ctx.RTBundles.Bundles;
 }
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);

@@ -4,12 +4,12 @@
 // model requests after that and nothing waits on a fetch later. Nothing is parsed at boot: a glTF is parsed when a model is first shown (js/glb.ts).
 // There is no fallback to the loose files: a path that belongs to the bundle comes from it or fails.
 //
-//   G.Bundles.start()               Promise<boolean>: begin (or retry) the download; true once the bundle is in memory (it retries by itself first, then gives false)
-//   G.Bundles.state()               { phase: 'idle'|'loading'|'ready'|'failed', loaded, total, from: 'store'|'net'|null }   (bytes, for a progress line)
-//   G.Bundles.onChange(fn)          fn(state) on every progress step and phase change
-//   G.Bundles.getFile(path)         Promise<ArrayBuffer>: the file's bytes (waits for the bundle; starts it if nothing has)
-//   G.Bundles.getJson(path)         Promise<any | null>: the file parsed (null if the bundle or the file is missing)
-//   G.Bundles.bundleOf(path)        'models' if the path is in the bundle, null if not (guns/*.glb, the scenes' data, the bake reports)
+//   RTBundles.Bundles.start()               Promise<boolean>: begin (or retry) the download; true once the bundle is in memory (it retries by itself first, then gives false)
+//   RTBundles.Bundles.state()               { phase: 'idle'|'loading'|'ready'|'failed', loaded, total, from: 'store'|'net'|null }   (bytes, for a progress line)
+//   RTBundles.Bundles.onChange(fn)          fn(state) on every progress step and phase change
+//   RTBundles.Bundles.getFile(path)         Promise<ArrayBuffer>: the file's bytes (waits for the bundle; starts it if nothing has)
+//   RTBundles.Bundles.getJson(path)         Promise<any | null>: the file parsed (null if the bundle or the file is missing)
+//   RTBundles.Bundles.bundleOf(path)        'models' if the path is in the bundle, null if not (guns/*.glb, the scenes' data, the bake reports)
 //
 // Returning visitors: bundles/manifest.json ({ v: 3, hash, size }, fetched with no-cache at boot, ~100 bytes) says which bundle is current; the one hash is
 // compared with the stored copy (IndexedDB), which is used with no request if it matches and is of this format (FORMAT: 3 since the packs' positions are int16); otherwise models.rtb?h=<hash> is fetched and replaces it.
@@ -18,14 +18,12 @@
 // multiple of 4, then the files back to back (offsets count from the start of that data, paths are relative to assets/models/, sorted). The file on disk is that
 // container gzipped (the web server cannot be trusted to compress an unknown type): it is unpacked with DecompressionStream (off the main thread); a raw one is read as it is.
 
-(globalThis as any).G = (globalThis as any).G || {}; // (the page, the export worker, the tools: on the page this file runs before util.js)
-
-// The same machinery serves more than one bundle (makeBundle): the models (G.Bundles, as above) and the synthesized audio
-// (G.AudioBundle: assets/audio/bundles/audio.rtb, the handling and footstep banks, packed by tools/bake_audio.mjs). Each has its own
+// The same machinery serves more than one bundle (makeBundle): the models (RTBundles.Bundles, as above) and the synthesized audio
+// (RTBundles.AudioBundle: assets/audio/bundles/audio.rtb, the handling and footstep banks, packed by tools/bake_audio.mjs). Each has its own
 // manifest, its own copy in the local store and its own download; the audio's waits for the models' to finish (it isn't needed
 // till a level, and mustn't hold up the boot).
 const EXT = '.rtb', MAGIC = 'RTB1';
-const R_BUNDLES = { base: '' }; // (where the page's folder is from here: '' on the page, '../../' in the export worker: G.Models.setRoot)
+const R_BUNDLES = { base: '' }; // (where the page's folder is from here: '' on the page, '../../' in the export worker: Models.setRoot)
 const KNOWN_BUNDLES = new Set<string>(); // (the store's records of any other name are stale: sweep)
 interface BundleCfg { name: string; dir: string; root: string; format: number; flag: string; bundleOf: (rel: string) => boolean }
 function makeBundle(cfg: BundleCfg) {
@@ -236,6 +234,6 @@ if (typeof document !== 'undefined' && typeof fetch === 'function') {
   const audioNext = (s: { phase: string }) => { if ((s.phase === 'ready' || s.phase === 'failed') && G_AudioBundle.state().phase === 'idle') G_AudioBundle.boot(); };
   G_Bundles.onChange(audioNext); audioNext(G_Bundles.state());
 }
-G.Bundles = G_Bundles;
-G.AudioBundle = G_AudioBundle;
-interface GameModules { Bundles: typeof G_Bundles; AudioBundle: typeof G_AudioBundle }
+// The two bundles, on a global of their own (this is a classic script on the page and nothing imports it: the files that read them
+// ask js/bundlesenv.ts, which reads this; the page's own debug object G has them too: js/debugglobals.ts).
+(globalThis as any).RTBundles = { Bundles: G_Bundles, AudioBundle: G_AudioBundle };

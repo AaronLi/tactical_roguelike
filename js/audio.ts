@@ -1,4 +1,5 @@
 'use strict';
+import { BundlesEnv } from './bundlesenv.js';
 import { ReplayEnv } from './replayenv.js';
 import { AudioEnv } from './audioenv.js';
 import { baseAm, CALIBERS, calOf, CLASS_SND, roundSpeed, SOUND_SPEED } from './data.js';
@@ -51,10 +52,10 @@ export const Audio = {
   },
 
   // A file of the synthesized audio (path below assets/audio/: 'handling/ar15/rack-45.ogg', 'footsteps/manifest.json'): from the
-  // audio bundle (js/modelbundles.ts G.AudioBundle: one download, kept in the local store), or, if it didn't load, the loose file.
+  // audio bundle (js/modelbundles.ts, js/bundlesenv.ts: one download, kept in the local store), or, if it didn't load, the loose file.
   bankFile(path: string): Promise<ArrayBuffer> {
     const loose = () => fetch('assets/audio/' + path).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
-    const B = G.AudioBundle;
+    const B = BundlesEnv.AudioBundle;
     if (!B || B.state().phase === 'failed') return loose();
     return B.getFile('assets/audio/' + path).catch(loose);
   },
