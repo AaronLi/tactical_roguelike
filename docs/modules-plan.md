@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2, 3, 4, 5 and 6 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs; part c, views and rendering; part d, the screens and space; part e, `player`, `game`, `demo`, `debugstart`, `index.html` down to one module tag, the export worker's entry file: all 2026-11-16, phase 5 done); phase 6 (the release bundles: 2026-11-16); 7 not started. Written 2026-11-15.
+Status: phases 0, 1, 2, 3, 4, 5 and 6 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs; part c, views and rendering; part d, the screens and space; part e, `player`, `game`, `demo`, `debugstart`, `index.html` down to one module tag, the export worker's entry file: all 2026-11-16, phase 5 done); phase 6 (the release bundles: 2026-11-16); phase 7 part a (the seams for every `G` read but the export worker's and `modelbundles`'s: 2026-11-16), parts b and c not started. Written 2026-11-15.
 
 ## Goal
 
@@ -643,6 +643,39 @@ Done when: the published site loads a handful of files instead of about 90.
   helpers and the browser checks depend on it.
 
 Done when: `grep "G\." js/` finds only the debug module.
+
+#### Phase 7 results (part a: the seams)
+
+Part a gives the 120 deliberate reads of phase 5's list that are not the export worker's (162, part b) or `modelbundles`'s (15) a way to reach what they read other than `G`. Every `G.X = X` is still there (part c deletes them). `npm run deps`: **297 reads through `G` before, 177 after**, which are exactly the export worker's 162 and `modelbundles`'s 15.
+
+| Category (phase 5 results, part e) | Before | After | How |
+| --- | --- | --- | --- |
+| 1. The export worker | 162 | 162 | part b |
+| 2. `ambience.html` | 51 | 0 | `js/audioenv.ts` |
+| 3. The cloud test, `level_env`, the furniture golden, `model_env` | 25 (+ the tools' own writes) | 0 | `stubs` in `tools/vm_game.mjs`, `moduleOf` |
+| 4. `modelbundles` | 15 | 15 | kept (below) |
+| 5. The workers' own files | 10 | 0 | the dynamic imports' namespaces |
+| 6. `data` -> `Gunsmith` | 9 | 0 | two hooks, set by `parts` |
+| 7. Other | 25 | 0 | see below |
+
+- **3, the tools' stand-ins.** `tools/vm_game.mjs`'s linker answers an import with a stub module the tool supplies: `runFile(ctx, file, { stubs })` / `runScripts(ctx, dir, names, { stubs })`, `stubs` a map from the import's specifier (`'./net.js'`) to an object of exports, or to a function of the context that returns one (for a stub that needs what the tool has only by then). A stub that lacks a name an importer takes is a link error. `moduleOf(ctx, file)` returns the exports of a loaded module, so a tool reaches `Hooks` or a seam without `G`.
+  - `tools/cloud.test.mjs`: `career` and `cloud` now import `Net`, `Game`, `data`'s `THEMES`, `Route`, `Callsigns`, `Arsenal`, `Shop` and `Me`, and the test answers those eight imports: the same `THEMES`, `Route`, `Net`, `Arsenal`, `Callsigns` as before, and `Game`, `Shop`, `Me` as empty objects (they were absent, so the guards `Game && Game.roster`, `Shop`, `Me`, `Game.applyStored` read them as nothing; `Net.peer` is null, so `tellHost`'s `Game.phase` is never reached). 21/21.
+  - `tools/level_env.mjs`, `tools/check_furniture_golden.mjs`: the hangar hook is set on `moduleOf(ctx, util.js).Hooks`. `level_env`'s `G.Range = null` is gone: nothing it loads reads `Range` (only `render` does, and `render` is not in the level's files). `test:level` 31/31, the furniture golden unchanged.
+  - `tools/model_env.mjs`: `gunrig` imports `GunModels`, and `loadGame` answers `./gunmodels.js` with the recipes (`G.GunRecipes`: the baker's `.display`, `.build`, ...); `G.GunModels` stays as the tools' own name for them (`check_holds.test.mjs`, `model_compare.mjs`). The `G.R` stand-in (`flashTexture`, `_envMap`) is gone: nothing it loads reads it. `G.GLB`, the glTF loader a tool replaces `glb`'s own with, was a read and write of `glb.ts` itself: it is `GLB.loader` now (`export const GLB` in `js/glb.ts`), set by `moduleOf(ctx, glb.js)`; `G.GLB` is still put there for `check_model_cases.mjs`. `test:models` green (the bake check, the hangar golden, 2702 builds, `GOLDEN: 0 cases differ`).
+  - `tools/deps.mjs` ignores `import type` (it runs nothing). It still works out the cloud test's order from the real graph, not the stubbed one (a stubbed file is not run there, so what it says of that tool is stricter, not looser).
+- **2, `ambience.html`.** `js/audioenv.ts` (new, a leaf: it imports the others only as types) holds `AudioEnv.R`, `.Game`, `.Space`, `.Me`, `.Casings`, all `null`. `render`, `game`, `space`, `player`, `casings` set their field next to their `G.X = X`; `audio`, `acoustics`, `ambience`, `footsteps`, `gunaudio` read `AudioEnv.X` where they read `G.X`. `ambience.html` loads none of those files, so the fields stay `null`, as `G.R`, `G.Game`... were `undefined`, and the guards (`AudioEnv.R && ...`) read the same. The reads that were not guarded (`G.R.tracer`, `G.Game.map`, `G.Casings.surface`) are `AudioEnv.X!.`: a `null` throws a `TypeError` where `undefined` did. The export worker never loads these five files, so its `G.Game` stand-in did not reach them. 51 -> 0.
+- **5, the workers.** `serverworker`: `({ ServerHost } = await svBooted)`, `prepworker`: `import('./level.js')` and `import('./lightgrid.js')` after the entry (the same module the entry ran: one instance per specifier), `exportworker`: `Hooks`, `Models`, `Stickers`, `Highlights` the same way (`Highlights` is what `booted` resolves to). Its `Game`/`Net` stand-ins are still written on `G`: part b. The entry files need no re-export. 10 -> 0.
+- **6, `data` -> `Gunsmith`.** `parts` sets two hooks as it loads (`Hooks.platformOf(id)`: `Gunsmith.PLATFORMS[id]`, and `Hooks.roundSoundKey`), and `data`'s `shotSoundKey`, `chambered`, `revolver`, `fblock`, `boltHold` ask them (`js/types/hooks.d.ts`). The guard `G.Gunsmith && ...PLATFORMS[id]` is `Hooks.platformOf && Hooks.platformOf(id)`: the same when `parts` is not loaded, and `shotSoundKey` throws as before. (Moving the five functions into `parts` would have had every importer of them change.) 9 -> 0.
+- **7, other.**
+  - `career` -> `Cloud` (8): `cloud` sets `Hooks.cloud = Cloud` as it loads, `career` calls `Hooks.cloud.add(...)` where it called `G.Cloud.add(...)` (the same guard). `career` itself then imports `Net`, `Game`, `THEMES`, `Route` (the cloud test's stubs, above).
+  - `game` -> `Prof` (6): `profiler.install()` is called from `js/main.ts`, after every file has run, instead of as `profiler` loads (before `demo` and `debugstart`, which add only `load` listeners); `game` imports `Prof` for `line`, `save`, `reset` (the `if (G.Prof)` guards are gone: the profiler is always in the page). `main.ts` imports it by name, so `deps` no longer lists it as a side-effect import (it is reached through `game`).
+  - `gunrig` -> `GunModels` (3): imported (the model tools' stub, above).
+  - `render` -> `Rig`, `Highlights`, `GunModels`, `Viewmodel` (8): `TONE` (the shader's tone roll-off, read while loading by `viewmodel`) is `js/tone.ts` (new, a leaf), imported by `viewmodel`, `highlights` and `render` (`R.TONE` is the same string); `render` imports the four. The export worker loaded all four already. `render` still reaches `ShotLog`, `HUD`, `Bolts`, `Audio`, `Views`, `Casings`, `Range`, `Loot`, `Game`, `Me` through `G`: they are category 1.
+  - 25 -> 0.
+- **4, `modelbundles`: kept as a known exception (15 reads: `game` 8, `glb` 6, `audio` 1).** It is a classic script so that its download starts before three.js is fetched; making it a module the page imports would start it when the module graph has been fetched and parsed, which is not before three.js. The proposal in phase 5 (a three-line inline script in `index.html` that starts the fetch and leaves the promise on `window`, then `modelbundles.ts` as a module that takes it over) is part c's, since it changes `index.html` and how the page starts.
+- **Order.** `deps:check`: all eight orders consistent. What moved: `career`, `cloud` (they import `game`, `net`, `player`... so they now run where the graph reaches them, not at their place in `main.ts`), `render` (its four imports now run before it), `gunrig` (after `gunmodels`), `profiler` (before `game`, doing nothing at load). No file draws a random number or looks through `G` while loading, as in phase 5e.
+- **Checks:** typecheck, `deps:check`, `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:cloud` 21/21, `test:models` all green; smoke 10/10 (`smoke_each.sh`); `ambience.html` headless (only the known `InvalidAccessError` from `A.master.connect`); the workers (`G.ServerLink.mode === 'worker'`, the prep worker builds a level, the export worker boots); `npm run bundle` builds; the bundled site smoked.
+- **Next:** part b (the export worker's 162), part c (delete `G`, the debug module that builds `window.G`, `modelbundles`).
 
 ## Size of each phase
 
