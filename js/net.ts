@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { Hooks, U } from './util.js';
 import { ServerLink } from './serverlink.js';
 // Peer-to-peer transport (WebRTC via PeerJS). Star topology: the host is the authority,
@@ -188,6 +189,7 @@ export const Net = {
   },
 };
 G.Net = Net;
+ReplayEnv.Net = Net; // (what the replay asks of it: js/replayenv.ts)
 Hooks.online = () => !!Net.myId; // (whether there's a host to tell about your sticker skin: js/stickers.ts share)
 Hooks.toHost = (m) => Net.toHost(m);
 

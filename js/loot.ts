@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { Casings } from './casings.js';
 import { loaded, WEAPONS } from './data.js';
 import { Gear } from './gear.js';
@@ -143,5 +144,6 @@ export const Loot = (() => {
   return { add, remove, clear, aimed, boxOf, rayHit, name, meshFor, get list() { return list; } };
 })();
 G.Loot = Loot;
+ReplayEnv.Loot = Loot; // (what the replay asks of it: js/replayenv.ts)
 
 declare global { interface GameModules { Loot: typeof Loot; } }

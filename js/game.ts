@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { AudioEnv } from './audioenv.js';
 import { Ambience } from './ambience.js';
 import { Arsenal } from './arsenal.js';
@@ -1970,6 +1971,7 @@ export const Game = {
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };
 G.Game = Game;
+ReplayEnv.Game = Game; // (what the replay asks of it: js/replayenv.ts)
 AudioEnv.Game = Game; // (what sound asks of it: js/audioenv.ts)
 // (what the simulation's files ask of the game: js/gear.ts, js/damage.ts)
 Hooks.inField = () => !!(Game && Game.phase === 'level' && !Game.hub);

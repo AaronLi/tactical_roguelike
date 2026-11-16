@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { AudioEnv } from './audioenv.js';
 import { Arsenal } from './arsenal.js';
 import { Audio } from './audio.js';
@@ -3299,6 +3300,7 @@ export const Me = {
   },
 };
 G.Me = Me;
+ReplayEnv.Me = Me; // (what the replay asks of it: js/replayenv.ts)
 AudioEnv.Me = Me; // (what sound asks of it: js/audioenv.ts)
 // (what the simulation's files ask of you: js/gear.ts unpack, js/stickers.ts)
 Hooks.makeWeapon = (id, build) => Me.makeWeapon(id, build);

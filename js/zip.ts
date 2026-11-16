@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 // .zip files, written and read (the highlights' recordings: js/highlights.ts). Each file deflated by the browser's own
 // compressor (CompressionStream 'deflate-raw') when it has one and that makes it smaller, else stored as it is; a
 // CRC-32 for each, the central directory at the end. No ZIP64: a file and the whole of it under 4 GB.
@@ -53,4 +54,5 @@ export const Zip = (() => {
   return { write, read, crc32 };
 })();
 G.Zip = Zip;
+ReplayEnv.Zip = Zip; // (what the replay asks of it: js/replayenv.ts)
 declare global { interface GameModules { Zip: typeof Zip; } }

@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { Audio } from './audio.js';
 import { Ballistics } from './ballistics.js';
 import { Bolts } from './bolts.js';
@@ -1156,5 +1157,6 @@ export const Views = {
   },
 };
 G.Views = Views;
+ReplayEnv.Views = Views; // (what the replay asks of it: js/replayenv.ts)
 Hooks.enemyView = (id) => Views.enemies.get(id); // (what your rounds did to a suspect: js/arsenal.ts kill)
 declare global { interface GameModules { Views: typeof Views; } }

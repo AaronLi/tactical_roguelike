@@ -1,3 +1,4 @@
+import { ReplayEnv } from './replayenv.js';
 import { SOUND_SPEED } from './data.js';
 import { Level } from './level.js';
 import { Materials } from './materials.js';
@@ -304,5 +305,6 @@ export const ShotLog = (() => {
   return { pose, remote, keep, keepAll, keepFill, clear, of, focus, frame, pickNade, select, nadeHtml, get selected() { return sel; } };
 })();
 G.ShotLog = ShotLog;
+ReplayEnv.ShotLog = ShotLog; // (what the replay asks of it: js/replayenv.ts)
 
 declare global { interface GameModules { ShotLog: typeof ShotLog; } }

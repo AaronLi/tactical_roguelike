@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { AudioEnv } from './audioenv.js';
 import { Audio } from './audio.js';
 import { Level } from './level.js';
@@ -549,4 +550,5 @@ export const GunAudio = {
   },
 };
 G.GunAudio = GunAudio;
+ReplayEnv.GunAudio = GunAudio; // (what the replay asks of it: js/replayenv.ts)
 declare global { interface GameModules { GunAudio: typeof GunAudio; } }

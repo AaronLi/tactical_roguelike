@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { Audio } from './audio.js';
 import { Course } from './course.js';
 import { HANGAR_ROWS, VENDOR_QUIPS } from './data.js';
@@ -1274,6 +1275,7 @@ export const Hangar = (() => {
   return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, load, fixtures, at, baked: () => !!BAKED, FILE, S, HELI, HOLD, RZ };
 })();
 G.Hangar = Hangar;
+ReplayEnv.Hangar = Hangar; // (what the replay asks of it: js/replayenv.ts)
 Hooks.hangarDecorate = (map) => Hangar.decorate(map); // (a hangar's map gets its own fittings: js/level.ts generateHub)
 window.addEventListener('gunicons', () => { if (Hangar.S.root) Hangar.refresh(true); }); // (a gun's picture came in after its sign was drawn: js/icons.ts)
 declare global { interface GameModules { Hangar: typeof Hangar; } }

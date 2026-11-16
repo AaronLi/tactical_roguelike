@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { Audio } from './audio.js';
 import { Ballistics } from './ballistics.js';
 import { Callsigns } from './callsigns.js';
@@ -464,5 +465,6 @@ export const ShopUI = {
   },
 };
 G.ShopUI = ShopUI;
+ReplayEnv.Shop = Shop; // (what the replay asks of it: js/replayenv.ts; set here, not in js/shop.ts, which the server's thread loads and replayenv is the page's)
 window.addEventListener('gunicons', () => { const el = document.getElementById('shop'); if (el && !el.classList.contains('hidden') && Shop.offers) ShopUI.render(); }); // (a gun's picture came in after the screen was drawn: js/icons.ts)
 declare global { interface GameModules { ShopUI: typeof ShopUI; } }

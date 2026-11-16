@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { AudioEnv } from './audioenv.js';
 import { baseAm, CALIBERS, calOf, CLASS_SND, roundSpeed, SOUND_SPEED } from './data.js';
 import { Hooks, U } from './util.js';
@@ -660,6 +661,7 @@ export const Audio = {
   heal() { this.tone(600, 0.25, 'sine', 0.15, 900); },
 };
 G.Audio = Audio;
+ReplayEnv.Audio = Audio; // (what the replay asks of it: js/replayenv.ts)
 // (what the simulation's files may sound: js/arsenal.ts, js/damage.ts)
 Hooks.click = () => { if (Audio.click) Audio.click(); };
 Hooks.doorFallSound = (d) => { if (Audio.sampleAt) Audio.sampleAt('door_close', new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.5, 0.7); };

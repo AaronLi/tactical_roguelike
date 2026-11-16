@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { AMMO, baseAm, beltFed, CALIBERS, calOf, WEAPONS } from './data.js';
 import { Gear } from './gear.js';
 import { Gunsmith } from './parts.js';
@@ -568,4 +569,5 @@ export const Icons = (() => {
   return { of, pending, chamberPic, styleFor, gauge, chamberGauge, TYPE_COL, shellCol, tipCol };
 })();
 G.Icons = Icons;
+ReplayEnv.Icons = Icons; // (what the replay asks of it: js/replayenv.ts)
 declare global { interface GameModules { Icons: typeof Icons; } }

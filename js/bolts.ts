@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { Ballistics } from './ballistics.js';
 import { AMMO } from './data.js';
 import { R } from './render.js';
@@ -98,4 +99,5 @@ export const Bolts = (() => {
   return { LEN, HARD, colour, inWorld, onBone, fromNet, update, clear, holds, get count() { return list.length; } };
 })();
 G.Bolts = Bolts;
+ReplayEnv.Bolts = Bolts; // (what the replay asks of it: js/replayenv.ts)
 declare global { interface GameModules { Bolts: typeof Bolts; } }

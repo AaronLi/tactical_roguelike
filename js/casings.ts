@@ -1,4 +1,5 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
 import { AudioEnv } from './audioenv.js';
 import { Audio } from './audio.js';
 import { beltFed, GUN_SPECS, WEAPONS } from './data.js';
@@ -378,5 +379,6 @@ export const Casings = (() => {
   };
 })();
 G.Casings = Casings;
+ReplayEnv.Casings = Casings; // (what the replay asks of it: js/replayenv.ts)
 AudioEnv.Casings = Casings; // (what sound asks of it: js/audioenv.ts)
 declare global { interface GameModules { Casings: typeof Casings; } }
