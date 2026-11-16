@@ -1,4 +1,5 @@
 'use strict';
+import { AudioEnv } from './audioenv.js';
 import { Ambience } from './ambience.js';
 import { Arsenal } from './arsenal.js';
 import { Audio } from './audio.js';
@@ -34,6 +35,7 @@ import { MenuShow } from './menushow.js';
 import { Net } from './net.js';
 import { Gunsmith } from './parts.js';
 import { Me as G_Me } from './player.js';
+import { Prof } from './profiler.js';
 import { Prep } from './prep.js';
 import { Range } from './range.js';
 import { R as G_R } from './render.js';
@@ -52,7 +54,7 @@ import { Touch } from './touch.js';
 import { Hooks, U } from './util.js';
 import { Views } from './views.js';
 import { World } from './world.js';
-// (G.Prof stays a read through G: js/profiler.ts wraps Game.loop and the Me methods as it loads, so it must run after this file and player; it imports them)
+// (js/profiler.ts wraps Game.loop and the Me methods when js/main.ts calls Prof.install(), after every file has run; this file imports it only for line/save/reset)
 // Glue: menus, lobby, phase transitions, message dispatch, pointer lock, main loop.
 // a DOM event whose target is known to be an element of type T (the handlers below are bound on a container, and read what was clicked)
 type GmEvt<T extends Element = HTMLElement> = Event & { target: T };
@@ -525,7 +527,7 @@ export const Game = {
     this.$('btnCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(Net.code || ''); this.$('btnCopy').textContent = 'Copied'; setTimeout(() => (this.$('btnCopy').textContent = 'Copy'), 1200); };
     this.$('btnResume').onclick = () => this.lock();
     this.$('btnQuit').onclick = () => this.toMenu();
-    this.$('btnProf').onclick = () => { G.Prof.save(); this.$('profLine').textContent = 'Saved: ' + G.Prof.line(); };
+    this.$('btnProf').onclick = () => { Prof.save(); this.$('profLine').textContent = 'Saved: ' + Prof.line(); };
     this.$('btnNewRun').onclick = () => { if (Net.isHost) Net.toHost({ t: 'toLobby' }); };
     this.$('btnMenu').onclick = () => this.toMenu();
     this.$('clickToPlay').onclick = () => this.lock();
@@ -650,7 +652,7 @@ export const Game = {
     if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
     // (the mouse taken back as a menu was shut with Esc, and let straight go again by the browser's own Esc: not a pause, a click to play on)
     else if (!this.menuOpen() && now - this.lockAt < 600 && now - this.escAt < 600) this.$('clickToPlay').classList.remove('hidden');
-    else if (!this.menuOpen()) { this.pauseAt = now; this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = Net.code ? 'Room code: ' + Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
+    else if (!this.menuOpen()) { this.pauseAt = now; this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = Net.code ? 'Room code: ' + Net.code : ''; this.$('profLine').textContent = Prof.line(); }
   },
   unlock() {
     if (this.softLocked) { this.softLocked = false; this.lockChanged(); }
@@ -1801,7 +1803,7 @@ export const Game = {
     if (Prep) (this.map as any).lgPre = Prep.take(seed, level, th, night, sp ? sp.gen : null); // (its light worked out ahead, if it was seen coming: js/prep.ts)
     Career.levelStart(level, th, night, this.stronghold()); // (your run's log: js/career.ts)
     ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
-    if (G.Prof) G.Prof.reset(); // (the worst frames and totals: this level's)
+    Prof.reset(); // (the worst frames and totals: this level's)
     if (Highlights) { Highlights.drop(); Highlights.reset(); } // (last level's replays go; this one's start recording)
     Views.warmed = seamless; Views.slowFill = seamless; // compile the new level's shaders once it's populated (G.R.warmup). (Come up with from outside: nothing stops for it. What she's made of was built and compiled on the way in, js/space.ts zonePrep; her people are made a few at a time)
     this.cabGrids = [];
@@ -1968,6 +1970,7 @@ export const Game = {
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };
 G.Game = Game;
+AudioEnv.Game = Game; // (what sound asks of it: js/audioenv.ts)
 // (what the simulation's files ask of the game: js/gear.ts, js/damage.ts)
 Hooks.inField = () => !!(Game && Game.phase === 'level' && !Game.hub);
 Hooks.biteDebris = (map, rec, n) => { if ((map as unknown) === Game.map && G_R.debris) G_R.debris.burst(new THREE.Vector3(...rec.a), { m: rec.m, k: 'e', n, J: rec.J * 3, dir: new THREE.Vector3(...rec.u) }); };

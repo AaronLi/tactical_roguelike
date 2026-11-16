@@ -10,10 +10,11 @@
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
 // (the simulation's files are what js/serverhost.ts imports: it is the entry file, and its imports are the rest. Imported here, after the
 // globals above are set and three.js is there, not at the top of this file: a static import would run first)
-const svBooted = import('./threeboot.js').then(() => import('./serverhost.js'));
+const svBooted = import('./threeboot.js').then(() => import('./serverhost.js')); // (resolves to the module's exports: ServerHost)
 
 self.onmessage = async (e: MessageEvent) => {
   if (!e.data || e.data.k !== 'boot' || !e.data.ctl) return;
-  try { await svBooted; } catch (err: any) { self.postMessage({ k: 'err', err: 'loading the server thread: ' + String((err && err.stack) || err).slice(0, 2000) }); return; }
-  G.ServerHost.attach(e.data.ctl as MessagePort);
+  let ServerHost: typeof import('./serverhost.js').ServerHost;
+  try { ({ ServerHost } = await svBooted); } catch (err: any) { self.postMessage({ k: 'err', err: 'loading the server thread: ' + String((err && err.stack) || err).slice(0, 2000) }); return; }
+  ServerHost.attach(e.data.ctl as MessagePort);
 };

@@ -1,11 +1,17 @@
 'use strict';
+import { AudioEnv } from './audioenv.js';
 import { Ballistics } from './ballistics.js';
 import { Callsigns } from './callsigns.js';
 import { AMMO, ENEMIES } from './data.js';
 import { Gear } from './gear.js';
 import { Level } from './level.js';
 import { LevelView } from './levelview.js';
+import { GunModels } from './gunmodels.js';
+import { Highlights } from './highlights.js';
 import { LightGrid } from './lightgrid.js';
+import { Rig } from './rig.js';
+import { TONE } from './tone.js';
+import { Viewmodel } from './viewmodel.js';
 import { Hooks, U } from './util.js';
 import { Damage } from './damage.js';
 import { GunMaterials } from './gunmaterials.js';
@@ -15,9 +21,8 @@ const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
 const _fq = new THREE.Quaternion(), _fq2 = new THREE.Quaternion(), _fz = new THREE.Vector3(0, 0, 1), _fn = new THREE.Vector3(), _fp = new THREE.Vector3(), _fs = new THREE.Vector3(), _fm = new THREE.Matrix4(), _fc = new THREE.Color();
 const _bjc = new THREE.Color();
 const SCOPE_FAR = 600; // (how far a magnified scope's picture is drawn, m)
-// Left as G.X on purpose (the export worker, js/exportworker.ts, loads this file but not these, and must not grow; and a cycle through
-// js/viewmodel.ts, which reads G.R.TONE while loading, would run it before this file): G.ShotLog, G.HUD, G.Bolts, G.Audio, G.Views, G.Casings,
-// G.Highlights (guarded or used only on the page), G.Rig, G.GunModels and G.Viewmodel (rig -> gunmodels -> viewmodel).
+// Left as G.X on purpose (the export worker, js/exportworker.ts, loads this file but not these, and must not grow): G.ShotLog, G.HUD, G.Bolts,
+// G.Audio, G.Views, G.Casings, G.Range, G.Loot, G.Game, G.Me (the page's; the replay's seam takes them, phase 7).
 // Three.js scene, character models, first-person viewmodels and particle effects.
 interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: PShot; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
 type BloodKind = 'drop' | 'spatter' | 'pool';
@@ -157,7 +162,7 @@ export const R = {
     });
     this.muzzleIdx = 0;
 
-    // G.Viewmodel is drawn in its own pass after clearing depth, so guns never clip into walls
+    // the viewmodel is drawn in its own pass after clearing depth, so guns never clip into walls
     r.autoClear = false;
     this.vmScene = new THREE.Scene();
     this.vmHolder = new THREE.Group();
@@ -212,7 +217,7 @@ export const R = {
   // toward 1, the colour scaled with it, and toward white by how much was taken off (desaturation 0.15). (Not its toe:
   // taking the same off every channel near black saturates the dark, and most of a level is dark: a dim brown wall went
   // orange.)
-  TONE: 'vec3 bpTone( vec3 c ) { float m = max( c.r, max( c.g, c.b ) ); const float k = 0.76, d = 0.24; if ( m < k ) return c; float f = 1.0 - d * d / ( m + d - k ); c *= f / m; return mix( c, vec3( f ), 1.0 - 1.0 / ( 0.15 * ( m - f ) + 1.0 ) ); }',
+  TONE,
   // A soft studio-style environment (gradient dome + a few softboxes) baked with PMREM.
   _envMap(r: THREE.WebGLRenderer) {
     const env = new THREE.Scene();
@@ -427,7 +432,7 @@ export const R = {
   setViewmodel(def: any, skin?: any) {
     if (skin === undefined) { const w = G.Me && G.Me.cur && G.Me.cur(); skin = w && w.def === def ? w.stickers : null; }
     if (this.vm) { this.vmRoot.remove(this.vm); this.vm.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
-    this.vm = def ? G.GunModels.viewmodel(def, skin) : null;
+    this.vm = def ? GunModels.viewmodel(def, skin) : null;
     if (this.vm) this.clearStockNearEye(this.vm);
     if (this.vm) { this.vm.userData.code = def.code; this.vm.userData.key = this.vmKey(def, skin); this.vmRoot.add(this.vm); } // (code: which build it shows; key: and its stickers)
   },
@@ -800,7 +805,7 @@ export const R = {
     (this.wounds = this.wounds || []).push(...objs);
   },
   trailsUpdate() {
-    const on = G.Rig.debug;
+    const on = Rig.debug;
     if (G.ShotLog) G.ShotLog.frame(); // (the shots that hit someone: their ghosts, trails and markers)
     const L = G.ShotLog && G.HUD.hbLast, fk = G.ShotLog ? G.ShotLog.focus() : null;
     for (const o of this.wounds || []) o.visible = !!on && !!L && o.onRig === L.who.rig; // (the tracks kept on bodies: with the hitboxes, on whoever you've picked out)
@@ -1485,7 +1490,7 @@ export const R = {
     // the warm: each body's meshes on the heat layer drawn in its warmth (a living body 1, a dead one cooling to the room's over minutes)
     sw.length = 0;
     const HL = this.HEAT_LAYER;
-    for (const rig of G.Rig.live) {
+    for (const rig of Rig.live) {
       if (rig.cold || !rig.root.visible) continue;
       const w = rig.state === 'dead' ? Math.max(0.35, 1 - (rig.deadT || 0) / 420) : 1, mat = H.warm[Math.round(w * 10)];
       rig.root.traverse((o: any) => { if (o.isMesh && o.layers.isEnabled(HL)) { sw.push(o, o.material); o.material = mat; } });
@@ -1686,7 +1691,7 @@ export const R = {
     // the gun in your hands' own pieces (js/viewmodel.ts): a reflex sight's window and reticle, a scope's lens, a muzzle
     // flash, a display surface, a fire-mode dial's marker
     try {
-      const V = G.Viewmodel, g = new T.Group();
+      const V = Viewmodel, g = new T.Group();
       V.reflex(g, { f: 0.1, y: 0, w: 0.02, h: 0.02, kind: 'dot' });
       V.pipLens(g, { f: 0.1, y: 0, r: 0.02 }, { reticle: 'cross' });
       g.add(V.flash(0xffc070));
@@ -1698,7 +1703,7 @@ export const R = {
     // with a gun; every kind of suspect, a few of each (what they wear is picked by their seed), in the armour they come
     // in; civilians
     try {
-      const RG = G.Rig, byKind: Record<string, string[]> = {};
+      const RG = Rig, byKind: Record<string, string[]> = {};
       for (const d of Object.values(Gear.DEFS) as any[]) (byKind[d.kind] || (byKind[d.kind] = [])).push(d.id);
       const looks = RG.LOOKS as Record<string, string[]>, of = (k: string, i: number) => { const a = byKind[k] || []; return a.length ? a[i % a.length] : 0; };
       const n = Math.max(...['helmet', 'face', 'carrier', 'plate', 'shoulder', 'groin', 'belt', 'legs', 'pack'].map((k) => (byKind[k] || []).length), ...Object.values(looks).map((v) => v.length));
@@ -1884,7 +1889,7 @@ export const R = {
     compile(this.vmScene, this.camera, nvT, 0, H.near, false, heatOnly);
     compile(this.vmScene, this.camera, nvT, 0, H.far, false, heatOnly);
     compile(nvq, this.fishCam!, nvT); compile(nvq, this.fishCam!, null);
-    if (G.Highlights && G.Highlights.warm) G.Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, true));
+    if (Highlights.warm) Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, true));
     G.Game.veilSay('Compiling shaders');
   },
   // A frame of the warmup (from the game's loop): true while it's going, and nothing should be drawn. The compiles, as many
@@ -2060,6 +2065,7 @@ export const R = {
   },
 };
 G.R = R;
+AudioEnv.R = R; // (what sound asks of it: js/audioenv.ts)
 // (what the simulation's files ask of the renderer: js/damage.ts, js/scars.ts)
 Hooks.doorDust = (t, x, y, z) => { if (R.particles && t < 8) R.particles(new THREE.Vector3(x, y, z), 16, 0xa8a090, 1.4, 0.8, 1, 0.8); };
 Hooks.partLight = (p) => (R.partLight ? R.partLight(p) : 1);

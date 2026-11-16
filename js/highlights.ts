@@ -16,6 +16,7 @@ import { Rig as G_Rig } from './rig.js';
 import { Scars } from './scars.js';
 import { Sim } from './sim.js';
 import { Stickers } from './stickers.js';
+import { TONE } from './tone.js';
 import { U as G_U } from './util.js';
 import { World } from './world.js';
 // Left as G.X on purpose: G.Audio, G.GunAudio, G.HUD, G.Icons, G.Shop, G.Views and G.Zip. The export worker (js/exportworker.ts) loads this file, and
@@ -637,7 +638,7 @@ export const Highlights = (() => {
     P.ov = new T.CanvasTexture(P.cv); P.ov.minFilter = T.LinearFilter;
     const mat = new T.ShaderMaterial({ toneMapped: false, uniforms: { sc: { value: P.rt.texture }, ov: { value: P.ov }, live: { value: 0 }, time: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: G_R.TONE + `uniform sampler2D sc; uniform sampler2D ov; uniform float live; uniform float time; varying vec2 vUv;
+      fragmentShader: TONE + `uniform sampler2D sc; uniform sampler2D ov; uniform float live; uniform float time; varying vec2 vUv;
         void main(){ vec3 c = bpTone(texture2D(sc, vUv).rgb) * live; vec4 o = texture2D(ov, vUv); c = mix(c, o.rgb, o.a);
           c *= 0.93 + 0.07 * sin(vUv.y * 900.0 + time * 3.0); vec2 d = vUv - 0.5; c *= 1.0 - dot(d, d) * 0.6; gl_FragColor = linearToOutputTexel(vec4(c * 1.08, 1.0)); }` });
     P.mat = mat;
@@ -933,7 +934,7 @@ export const Highlights = (() => {
     P.ov = new T.CanvasTexture(P.cv); P.ov.minFilter = T.LinearFilter;
     P.mat = new T.ShaderMaterial({ toneMapped: false, depthTest: false, uniforms: { sc: { value: P.rt.texture }, ov: { value: P.ov }, live: { value: 0 }, time: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-      fragmentShader: G_R.TONE + ' uniform sampler2D sc; uniform sampler2D ov; uniform float live; varying vec2 vUv; void main(){ vec3 c = bpTone(texture2D(sc, vUv).rgb) * live; vec4 o = texture2D(ov, vUv); gl_FragColor = linearToOutputTexel(vec4(mix(c, o.rgb, o.a), 1.0)); }' });
+      fragmentShader: TONE + ' uniform sampler2D sc; uniform sampler2D ov; uniform float live; varying vec2 vUv; void main(){ vec3 c = bpTone(texture2D(sc, vUv).rgb) * live; vec4 o = texture2D(ov, vUv); gl_FragColor = linearToOutputTexel(vec4(mix(c, o.rgb, o.a), 1.0)); }' });
     const quad = new T.Mesh(new T.PlaneGeometry(2, 2), P.mat), qs = new T.Scene(), qc = new T.Camera(); quad.frustumCulled = false; qs.add(quad);
     await loadGuns();
     stage();

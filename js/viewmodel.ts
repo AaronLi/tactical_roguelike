@@ -2,6 +2,7 @@
 import { AMMO, ammoTypes, asCal, ballFor, boreTip, calOf, cartOf, chambered, flight } from './data.js';
 import { VMAnim } from './vmanim.js';
 import { R } from './render.js';
+import { TONE } from './tone.js';
 /** A display surface (display_<name>): the canvas the game draws on and the texture that shows it on the mesh. Draw, then set tex.needsUpdate. */
 interface VmSurface { mesh: THREE.Mesh; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; width: number; height: number }
 export const Viewmodel = (() => {
@@ -252,7 +253,7 @@ export const Viewmodel = (() => {
   // the point of impact, where the next round strikes at a range, is one cell lit red on a coarse grid of faint grey cells (a cell is this many mils: the marker snaps from cell to cell)
   const POI_CELL = 0.5, POI_FAR = 560;
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-  const PIP_FS = R.TONE + `
+  const PIP_FS = TONE + `
     uniform sampler2D map; uniform float live; uniform vec2 eye; uniform int ret; uniform vec3 illum;
     uniform int calc; uniform sampler2D dmap; uniform vec3 poi; // (a ballistic computer: its readout's picture; the marker's cell, in cells from the middle, and whether there is one)
     uniform sampler2D rmap; uniform float pmil; // (a first-focal-plane reticle: its picture, and how much of the lens's radius a mil is at this power)

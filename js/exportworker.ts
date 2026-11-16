@@ -14,21 +14,25 @@
 // above are set and three.js is there, not at the top of this file: a static import would run first)
 const booted = import('./threeboot.js').then(async () => {
   await import('./exportentry.js');
+  // (each of these is the module that ran above, its exports)
+  const [{ Hooks }, { Models }, { Stickers }, { Highlights }] = await Promise.all([import('./util.js'), import('./glb.js'), import('./stickers.js'), import('./highlights.js')]);
   // (the game the replay borrows from: the map the bodies fall on, and nobody's id)
   (G as any).Game = { map: null, phase: 'level' };
   (G as any).Net = { myId: '' };
-  // (what those stand-ins answered the simulation's files before they asked through G.Hooks, js/types/hooks.d.ts: in a level,
+  // (what those stand-ins answered the simulation's files before they asked through Hooks, js/types/hooks.d.ts: in a level,
   // and no map of this replay is the game's, so a wall's bite is no debris; online stays unset: no host)
-  G.Hooks.inField = () => true;
-  G.Hooks.biteDebris = () => {};
-  G.Models.setRoot('../../'); // (the game's folder, from here: assets/models, where the guns are)
-  G.Stickers.base = '../../'; // (the game's folder, from here (dist/js/): its pictures, js/stickers.ts; a replay's file brings its own)
+  Hooks.inField = () => true;
+  Hooks.biteDebris = () => {};
+  Models.setRoot('../../'); // (the game's folder, from here: assets/models, where the guns are)
+  Stickers.base = '../../'; // (the game's folder, from here (dist/js/): its pictures, js/stickers.ts; a replay's file brings its own)
+  return Highlights;
 });
 
 self.onmessage = async (e) => {
-  try { await booted; } catch (err: any) { self.postMessage({ t: 'err', err: 'loading three.js: ' + String((err && err.stack) || err).slice(0, 2000) }); return; }
-  if (e.data && e.data.t === 'mux') { try { G.Highlights.muxHere(e.data, (m: any) => self.postMessage(m)); } catch (err: any) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); } return; }
+  let Highlights: Awaited<typeof booted>;
+  try { Highlights = await booted; } catch (err: any) { self.postMessage({ t: 'err', err: 'loading three.js: ' + String((err && err.stack) || err).slice(0, 2000) }); return; }
+  if (e.data && e.data.t === 'mux') { try { Highlights.muxHere(e.data, (m: any) => self.postMessage(m)); } catch (err: any) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); } return; }
   if (!e.data || e.data.t !== 'go') return;
-  try { await G.Highlights.exportHere(e.data, (m: any, tr?: any) => self.postMessage(m, tr || [])); }
+  try { await Highlights.exportHere(e.data, (m: any, tr?: any) => self.postMessage(m, tr || [])); }
   catch (err: any) { self.postMessage({ t: 'err', err: String((err && err.stack) || err).slice(0, 2000) }); }
 };

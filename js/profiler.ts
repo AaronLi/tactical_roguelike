@@ -283,9 +283,8 @@ export const Prof = (() => {
     if (Highlights) gpuWrap(Highlights, 'update', 'hangar TVs'); // (what it draws, the picture on the TVs, is drawn as it's updated)
     if (Course) gpuWrap(Course, 'update', 'course cameras');
   }
-  install();
 
-  return { save, report, summary, line, reset, wrap, sec, gpuSummary, get on() { return on; }, set on(v) { on = !!v; } };
+  return { install, save, report, summary, line, reset, wrap, sec, gpuSummary, get on() { return on; }, set on(v) { on = !!v; } };
 })();
 G.Prof = Prof;
 declare global { interface GameModules { Prof: typeof Prof; } }
