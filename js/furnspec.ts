@@ -1,6 +1,9 @@
 'use strict';
+import { Level } from './level.js';
+import { U } from './util.js';
+import { World } from './world.js';
 type FdRng = (() => number) & { st(): number };
-const G_FurnSpec = (() => {
+export const FurnSpec = (() => {
   const VERSION = 1;
   // G.U.rng's generator (mulberry32), its state readable: a texture's painting starts where the stream is (FdTex.s), and
   // srng(s) carries on from there exactly as the stream would have
@@ -36,7 +39,7 @@ const G_FurnSpec = (() => {
   function packPaint<R>(mk: FdMk<R>): R {
     const S = 128;
     return mk(S * PACK_N, S * PACK_N, (g) => {
-    const rnd = G.U.rng(0x9ac4a6e);
+    const rnd = U.rng(0x9ac4a6e);
     const INK = ['#b8392e', '#d8a632', '#2c5aa6', '#2f8a48', '#d0702c', '#6c3a9a', '#26262a', '#b8386e', '#3a9a9e', '#9a7238', '#e8e2d2', '#5a2a22', '#c8c03a', '#1e3a5e', '#e6d9b8', '#8a1e24'];
     const pick = <T,>(a: T[]): T => a[Math.floor(rnd() * a.length)];
     for (let ty = 0; ty < PACK_N; ty++) for (let tx = 0; tx < PACK_N; tx++) {
@@ -350,7 +353,7 @@ const G_FurnSpec = (() => {
   // A level's furniture and the rooms' dressing, as js/furnmesh.ts draws it (solids: each piece's solids too, as the
   // golden test has them; the simulation has its own from the same pieces, js/furniture.ts worldBoxes).
   function describe(map: any, opts: { solids?: boolean } = {}): FdLevel {
-    const L = G.Level, F = G.Furniture, R = F.R, TS = L.TS, { W, t } = map;
+    const L = Level, F = G.Furniture, R = F.R, TS = L.TS, { W, t } = map;
     const D = recorder(srng((map.seed ^ 0x5eed1e) >>> 0)), k = D.k, mat = D.mat, rnd = D.rnd, pick = k.pick;
     // (every piece's looks draw on a stream of its own, seeded by its v and where it stands (in centimetres: fence panels
     // and the like share a few v's between them, js/level.ts refine), and every room's on one of its own, seeded by the
@@ -402,7 +405,7 @@ const G_FurnSpec = (() => {
         let hilly = false;
         for (let z = rm.z; z <= rm.z + rm.h && !hilly; z++) for (let x = rm.x; x <= rm.x + rm.w; x++) if (Math.abs(tr.v[z * tr.VW + x]) > 1e-3) { hilly = true; break; }
         if (hilly) {
-          const z = gridZ(w, d, rm.w, rm.h, (gx, gy) => G.World.terrainAt(tr, x0 + w / 2 + gx, z0 + d / 2 - gy)); // (the plane's z is up once it's laid flat)
+          const z = gridZ(w, d, rm.w, rm.h, (gx, gy) => World.terrainAt(tr, x0 + w / 2 + gx, z0 + d / 2 - gy)); // (the plane's z is up once it's laid flat)
           D.push({ t: 'grid', m: fm, s: [w, d], seg: [rm.w, rm.h], z, p: [x0 + w / 2, y, z0 + d / 2], r: rot(0, -PI / 2) });
           return;
         }
@@ -545,6 +548,6 @@ const G_FurnSpec = (() => {
 
   return { VERSION, srng, tint, painters, outsidePaint, packPaint, PACK_N, TEX_KINDS, piece, describe, fingerprint, hashOf };
 })();
-G.FurnSpec = G_FurnSpec;
+G.FurnSpec = FurnSpec;
 
-interface GameModules { FurnSpec: typeof G_FurnSpec; }
+declare global { interface GameModules { FurnSpec: typeof FurnSpec; } }

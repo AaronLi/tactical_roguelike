@@ -1,4 +1,7 @@
 'use strict';
+import { Level } from './level.js';
+import { U as G_U } from './util.js';
+import { World } from './world.js';
 // Furnishing. Every room gets a purpose (living room, kitchen, bedroom, ...) and furniture to suit.
 //   plan()  - deterministic layout from the level seed: which tile holds what, and its collision boxes.
 //             Runs on every peer (host and clients) as part of G.Level.generate.
@@ -8,7 +11,7 @@
 // Furniture tiles: 2 = furniture you can take cover behind (sofa, counter, dresser, crates), 4 = other
 // furniture (beds, tables, shelves, wardrobes). Small things in corners (plants, lamps) leave the tile as
 // floor (0) but still carry a collision box. map.props: tile index -> { name, q, x, z, v, boxes }.
-const G_Furniture = (() => {
+export const Furniture = (() => {
   // Local frame of a piece: footprint centred on the origin, back at -z (against the wall), front +z.
   // boxes: [x, z, w, d, h] in that frame (all from the floor up).
   // The kit handed to every piece's build(): box/cyl/mat/pick/rnd/... It records what the piece is made of (js/furnspec.ts:
@@ -262,7 +265,7 @@ const G_Furniture = (() => {
   // what that part's made of (js/materials.ts PARTS).
   const RACK_Y = [0.12, 0.7, 1.3, 1.9];
   const rackLoad = (v: number) => {
-    const r = G.U.rng(Math.floor(v * 4294967295)), out = [];
+    const r = G_U.rng(Math.floor(v * 4294967295)), out = [];
     for (const y of RACK_Y) {
       if (y > 1.8) continue;
       let x = -0.88;
@@ -437,7 +440,7 @@ const G_Furniture = (() => {
   const PRACK_Y = [0.12, 1.0, 1.9];
   // each level's load: [y, kind (0 empty, 1 shrink-wrapped stack, 2 cartons, 3 drums), heights]
   const prackLoad = (v: number): any[][] => {
-    const r = G.U.rng(Math.floor(v * 4294967295));
+    const r = G_U.rng(Math.floor(v * 4294967295));
     return PRACK_Y.map((y) => {
       if (r() < 0.15) return [y, 0]; // an empty bay
       const kind = r();
@@ -1100,7 +1103,7 @@ const G_Furniture = (() => {
   const ICO_N = ICO_F.map(([i, j, k]) => { const n = [0, 1, 2].map((c) => ICO_V[i][c] + ICO_V[j][c] + ICO_V[k][c]), l = Math.hypot(n[0], n[1], n[2]); return n.map((c) => c / l); });
   interface Lump { r: number; x: number; y: number; z: number; ry: number }
   const boulderLumps = (v: number): Lump[] => {
-    const r = G.U.rng(Math.floor(v * 4294967295)), s = r() < 0.5 ? -1 : 1;
+    const r = G_U.rng(Math.floor(v * 4294967295)), s = r() < 0.5 ? -1 : 1;
     return [
       { r: 0.72, x: (r() - 0.5) * 0.2, y: 0.38, z: (r() - 0.5) * 0.15, ry: r() * 6 },
       { r: 0.42 + r() * 0.12, x: 0.45 * s, y: 0.28, z: 0.25 * (r() - 0.5), ry: r() * 6 },
@@ -1112,12 +1115,12 @@ const G_Furniture = (() => {
   // its triangles, nine numbers to a face, as it's drawn
   const lumpTris = (l: Lump) => ICO_F.flatMap((f) => f.flatMap((i) => lumpAt(l, ICO_V[i])));
   // the boxes filling a lump, [x, z, w, d, top, bottom] (from the floor up: the part below it is under the ground)
-  const lumpBoxes = (l: Lump) => G.World.fitBoxes(G.World.hullOf(lumpTris(l)), 0).map(([x0, y0, z0, x1, y1, z1]) => [(x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, y1, y0]);
+  const lumpBoxes = (l: Lump) => World.fitBoxes(World.hullOf(lumpTris(l)), 0).map(([x0, y0, z0, x1, y1, z1]) => [(x0 + x1) / 2, (z0 + z1) / 2, x1 - x0, z1 - z0, y1, y0]);
   // the lichen: three crusts on the big lump's upper faces, each a little icosahedron sunk most of the way into it (a skin of it
   // shows), from the piece's seed as the lumps are, so rounds meet them too
   const UP_F = ICO_F.filter((_, i) => ICO_N[i][1] > 0.3);
   const boulderLichen = (v: number): Lump[] => {
-    const r = G.U.rng((Math.floor(v * 4294967295) ^ 0x1c4e7) >>> 0), L0 = boulderLumps(v)[0], out: Lump[] = [];
+    const r = G_U.rng((Math.floor(v * 4294967295) ^ 0x1c4e7) >>> 0), L0 = boulderLumps(v)[0], out: Lump[] = [];
     for (let i = 0; i < 3; i++) {
       const s = 0.08 + r() * 0.06, f = UP_F[Math.floor(r() * UP_F.length)].map((j) => lumpAt(L0, ICO_V[j]));
       let a = r(), b = r(); if (a + b > 1) { a = 1 - a; b = 1 - b; }
@@ -1409,9 +1412,9 @@ const G_Furniture = (() => {
   function plan(map: LvMap, r: () => number, spawnRoom: Room, exitRoom: Room, tryBlock: (x: number, z: number, n: number) => boolean) {
     // a night level's car parks: most have gone home (NIGHT_CARS of them stay), each kept or not by its own dice from the seed and
     // its bay, apart from the plan's own, so the rest of the place is the day's (js/level.ts generate: genNight)
-    const NIGHT_CARS = 0.3, night = !!(G.Level && (G.Level as any).genNight), seed0 = ((map as any).seed || 0) >>> 0;
-    const nightCar = (x: number, z: number) => !night || G.U.rng(((seed0 ^ 0x5ca7) + x * 7919 + z * 104729) >>> 0)() < NIGHT_CARS;
-    const U = G.U, { W, t, rooms } = map, TS = map.TS || G.Level.TS, home = map.theme.home == null ? 1 : map.theme.home;
+    const NIGHT_CARS = 0.3, night = !!(Level && (Level as any).genNight), seed0 = ((map as any).seed || 0) >>> 0;
+    const nightCar = (x: number, z: number) => !night || G_U.rng(((seed0 ^ 0x5ca7) + x * 7919 + z * 104729) >>> 0)() < NIGHT_CARS;
+    const U = G_U, { W, t, rooms } = map, TS = map.TS || Level.TS, home = map.theme.home == null ? 1 : map.theme.home;
     map.props = new Map();
     const homes = U.shuffle(r, HOME.slice());
     let hi = 0, wi = Math.floor(r() * WORK.length);
@@ -1814,6 +1817,6 @@ const G_Furniture = (() => {
   }
   return { plan, R, ROOMS, solids, worldBoxes, facing };
 })();
-G.Furniture = G_Furniture;
+G.Furniture = Furniture;
 
-interface GameModules { Furniture: typeof G_Furniture; }
+declare global { interface GameModules { Furniture: typeof Furniture; } }

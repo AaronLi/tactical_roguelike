@@ -1,4 +1,5 @@
 'use strict';
+import { Hooks } from './util.js';
 // Stickers: pictures you stick on your guns, for good.
 //
 // WHICH: whatever pictures are in assets/stickers/ (its index.json, a list of their file names, if it has one; else
@@ -16,7 +17,7 @@
 //
 // THE SQUAD: a gun's list is sent once (to the host, who passes it on and keeps it for anyone joining later: share),
 // then only its hash, in your state (st.sk: js/player.ts state), which everyone looks up (of).
-const G_Stickers = (() => {
+export const Stickers = (() => {
   const DIR = 'assets/stickers/', EXT = /\.(png|webp|jpe?g|gif|avif)$/i;
   interface Skin { s: string; p: number[]; n: number[]; r: number; k: number; f: number | boolean }
   interface Pic { bm: ImageBitmap | null; w: number; h: number; bad: boolean; tex: THREE.Texture | null; mat: THREE.MeshStandardMaterial | null; ghost: THREE.MeshStandardMaterial | null; ready: Promise<Pic> }
@@ -43,7 +44,7 @@ const G_Stickers = (() => {
   const url = (name: string) => S.base + DIR + encodeURIComponent(file(name));
 
   // ---------------------------------------------------------------- your collection (name -> how many)
-  const owned = () => G.Hooks.myStickers!();
+  const owned = () => Hooks.myStickers!();
   function give(name: string) { if (!ok(name)) return; const o = owned(); o[name] = (o[name] || 0) + 1; }
   function use(name: string) { const o = owned(); if (!o[name]) return false; if (--o[name] <= 0) delete o[name]; return true; }
 
@@ -254,7 +255,7 @@ const G_Stickers = (() => {
   // yours: told to the squad (once), its hash for your state
   function share(skin: any) {
     const h = key(skin);
-    if (h && !sent.has(h) && G.Hooks.online && G.Hooks.online()) { sent.add(h); reg.set(h, clean(skin)); G.Hooks.toHost!({ t: 'skin', h, l: clean(skin) }); }
+    if (h && !sent.has(h) && Hooks.online && Hooks.online()) { sent.add(h); reg.set(h, clean(skin)); Hooks.toHost!({ t: 'skin', h, l: clean(skin) }); }
     return h;
   }
   // someone's, by its hash (null till it's known: asked for, now and then)
@@ -263,7 +264,7 @@ const G_Stickers = (() => {
     const l = reg.get(h);
     if (l) return l;
     const t = performance.now();
-    if (!((asked.get(h) || 0) > t - 3000) && G.Hooks.online && G.Hooks.online()) { asked.set(h, t); G.Hooks.toHost!({ t: 'skinReq', h }); }
+    if (!((asked.get(h) || 0) > t - 3000) && Hooks.online && Hooks.online()) { asked.set(h, t); Hooks.toHost!({ t: 'skinReq', h }); }
     return null;
   }
   function learn(h: unknown, l: any) { if (typeof h === 'string' && h.length < 24) reg.set(h, clean(l)); }
@@ -272,5 +273,5 @@ const G_Stickers = (() => {
 
   return Object.assign(S, { load, url, owned, give, use, pic, provide, material, clean, decorate, ghost, key, share, of, learn, joined });
 })();
-G.Stickers = G_Stickers;
-interface GameModules { Stickers: typeof G_Stickers; }
+G.Stickers = Stickers;
+declare global { interface GameModules { Stickers: typeof Stickers; } }

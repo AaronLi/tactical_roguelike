@@ -1,4 +1,6 @@
 'use strict';
+import { Hooks, U } from './util.js';
+import { World } from './world.js';
 // What a round really does to a wall or a door: it takes the material away. js/scars.ts draws what's left round the damage; this cuts it.
 //   A hit's a record (rec, below) that means the same on every screen, told to the squad as the marks are ('hole'), and it's the
 //   same record in the replays (from a round's path). apply() takes one and:
@@ -16,7 +18,7 @@
 //   the latch lets go and it swings open; shoot out all the hinges and nothing's holding it, and it falls (fallTrack: worked out once, in
 //   full, so everyone and every replay sees the same fall). The host keeps the score (js/server.ts doorHit).
 //   Furniture, floors, ceilings, lintels and the wall round a window aren't cut: they keep their marks.
-const G_Damage = (() => {
+export const Damage = (() => {
   const T = THREE, N = 36, MAX = 900, BORE = 0.85, REACH = 0.17, THIN = 0.012; // (N: the points round a hole. MAX: holes in a level; after that, marks only. BORE: how wide it is past its mouth, as a share of its radius. REACH: how near a wall's end a hit breaks a piece off it. THIN: narrower than this, what's left between two holes has crumbled)
   type V3 = THREE.Vector3;
   type WMat = THREE.MeshLambertMaterial & { defines?: Record<string, any> };
@@ -44,7 +46,7 @@ const G_Damage = (() => {
   interface DoorHole extends Shape { lining: number; m: string; J: number; c0: number; R0: number; dirL: V3 }
   interface Door { id: number; x: number; z: number; w?: number; fy?: number; axis: 'x' | 'z'; mirror?: boolean; open?: boolean; kind?: string; holes: DoorHole[] | null; gone: Record<string, number> | null; fallen?: boolean; rest?: number[] | null }
   interface Solid { kind?: string; edge?: boolean; win?: boolean; glass?: any; door?: Door; move?: boolean; min: number[]; max: number[]; holes?: Hole[] | null }
-  type WorldT = Parameters<typeof G.World.query>[0];
+  type WorldT = Parameters<typeof World.query>[0];
   // a floor of the level (or the level, when it has one floor)
   interface FloorMap { W: number; H: number; t: ArrayLike<number>; fy?: number; fl?: number; skirt?: number; wallMesh?: THREE.InstancedMesh; wallIdx?: Map<number, number>; wallBase?: ArrayLike<number>; winAt?: Set<number> }
   interface DmgMap extends FloorMap { dmg?: DState | null; floors?: FloorMap[]; world?: WorldT; doorMeshes?: Record<string, THREE.Object3D>; doors?: Door[]; doorVer?: number }
@@ -68,7 +70,7 @@ const G_Damage = (() => {
   const rngOf = (s: number) => () => { s = (Math.imul(s, 1597334677) + 12345) | 0; return ((s ^ (s >>> 15)) >>> 0) / 4294967296; };
   const seedOf = (a: number[]) => (Math.round(a[0] * 997) * 31 + Math.round(a[1] * 991) * 17 + Math.round(a[2] * 983)) | 0;
   HOLE.sheet = HOLE.mild;
-  const radius = (m: string, J?: number, cal?: number) => { const h = HOLE[m]; return h ? h.r * G.U.clamp(Math.sqrt((J || 800) / 800), 0.7, 1.35) * G.U.clamp((cal || 8) / 8, 0.8, 1.3) : 0; };
+  const radius = (m: string, J?: number, cal?: number) => { const h = HOLE[m]; return h ? h.r * U.clamp(Math.sqrt((J || 800) / 800), 0.7, 1.35) * U.clamp((cal || 8) / 8, 0.8, 1.3) : 0; };
   // a hole's outline: how far out it is at each of N angles (m), rough all round, with spikes that run out of it (cracks, splinters),
   // long up the grain
   function outline(seed: number, h: Look, r: number, wide = 1) {
@@ -429,7 +431,7 @@ const G_Damage = (() => {
   }
   const inBite = (B: Bite, x: number, y: number, z: number, pad = 0) => {
     const dx = x - B.p[0], dy = y - B.p[1], dz = z - B.p[2], a = dx * B.in1[0] + dz * B.in1[2], b = dx * B.in2[0] + dz * B.in2[2];
-    return a > -0.03 - pad && b > -0.03 - pad && a + b < B.d * 1.1 + pad && Math.abs(dy) < Math.max(B.fa.max, B.fb.max) * (1 - G.U.clamp((a + b) / (B.d * 1.3), 0, 1)) + pad;
+    return a > -0.03 - pad && b > -0.03 - pad && a + b < B.d * 1.1 + pad && Math.abs(dy) < Math.max(B.fa.max, B.fb.max) * (1 - U.clamp((a + b) / (B.d * 1.3), 0, 1)) + pad;
   };
   // What's left of the wall round a bite: one surface from the edge of the break in to the back of it. The break's edge is one loop round the corner, over
   // one face and back over the other: an outline's middle is on the corner, so its half on the wall runs from straight up to straight down of it, and nothing's
@@ -439,7 +441,7 @@ const G_Damage = (() => {
     const half = (F: Face, ownUp: number) => { // (top to bottom)
       const [lo, hi] = spanOf(fm, F), lim = F.c[0], out = [];
       for (let i = N / 4; i <= (3 * N) / 4; i++) {
-        const [u, v] = F.pts[ownUp > 0 ? i : ((3 * N) / 4 + (i - N / 4)) % N], k = G.U.clamp(ownUp > 0 ? Math.min(u, lim) : Math.max(u, lim), lo, hi);
+        const [u, v] = F.pts[ownUp > 0 ? i : ((3 * N) / 4 + (i - N / 4)) % N], k = U.clamp(ownUp > 0 ? Math.min(u, lim) : Math.max(u, lim), lo, hi);
         out.push(F.ax === 0 ? new T.Vector3(F.plane, v, k) : new T.Vector3(k, v, F.plane));
       }
       return ownUp > 0 ? out : out.reverse();
@@ -480,13 +482,13 @@ const G_Damage = (() => {
     }
     B.a = B.p;
     biteSolids(map, B); redraw(map, fm, B);
-    if (fm.wallMesh) G.Hooks.biteDebris!(map, rec, n); // (a piece of it, not a chip: as debris, if this is the level on the screen)
+    if (fm.wallMesh) Hooks.biteDebris!(map, rec, n); // (a piece of it, not a chip: as debris, if this is the level on the screen)
   }
   function biteSolids(map: DmgMap, B: Bite) {
     const w = map.world, x = B.p[0] + (B.in1[0] + B.in2[0]) * 0.05, y = B.p[1], z = B.p[2] + (B.in1[2] + B.in2[2]) * 0.05, k = B.d + 0.02;
     for (const s of B.solids || []) s.holes!.splice(s.holes!.indexOf(B), 1);
     B.solids = [];
-    G.World.query(w!, [x - k, y - k, z - k], [x + k, y + k, z + k], (s: Solid) => { if (s.kind === 'wall' && !s.edge && !s.win) { (s.holes = s.holes || []).push(B); B.solids!.push(s); } });
+    World.query(w!, [x - k, y - k, z - k], [x + k, y + k, z + k], (s: Solid) => { if (s.kind === 'wall' && !s.edge && !s.win) { (s.holes = s.holes || []).push(B); B.solids!.push(s); } });
   }
   // the solids along a bore have it, for rays
   function onSolids(map: DmgMap, H: Hole) {
@@ -495,7 +497,7 @@ const G_Damage = (() => {
     H.solids = [];
     for (let t = 0; t <= H.len + 0.01; t += 0.05) {
       const x = H.a[0] + u[0] * t, y = H.a[1] + u[1] * t, z = H.a[2] + u[2] * t, k = 0.002;
-      G.World.query(w!, [x - k, y - k, z - k], [x + k, y + k, z + k], (s: Solid) => { if (s.kind === 'wall' && !H.solids!.includes(s)) { (s.holes = s.holes || []).push(H); H.solids!.push(s); } });
+      World.query(w!, [x - k, y - k, z - k], [x + k, y + k, z + k], (s: Solid) => { if (s.kind === 'wall' && !H.solids!.includes(s)) { (s.holes = s.holes || []).push(H); H.solids!.push(s); } });
     }
   }
   // how far along a ray (from t0, into a solid it leaves at t1) it stays in a bore: t0 if it doesn't go down it
@@ -609,7 +611,7 @@ const G_Damage = (() => {
     D.seen.add(rec.id);
     const a = rec.a, n = rec.n, in0 = [a[0] - n[0] * 0.01, a[1] - n[1] * 0.01, a[2] - n[2] * 0.01];
     let door = null as Door | null, wall = false as false | Solid; // (set in the query's callback)
-    G.World.query(w, in0.map((v) => v - 0.02), in0.map((v) => v + 0.02), (s: Solid) => { if (s.door && (s.kind === 'door' || s.kind === 'leaf') && s.glass == null) door = s.door; else if (s.kind === 'wall' && !s.edge && !s.win) wall = s; });
+    World.query(w, in0.map((v) => v - 0.02), in0.map((v) => v + 0.02), (s: Solid) => { if (s.door && (s.kind === 'door' || s.kind === 'leaf') && s.glass == null) door = s.door; else if (s.kind === 'wall' && !s.edge && !s.win) wall = s; });
     const look = HOLE[rec.m] || HOLE.concrete, R = radius(rec.m, rec.J, rec.c), seed = seedOf(a);
     if (door) {
       if (!rec.b) return false;
@@ -687,7 +689,7 @@ const G_Damage = (() => {
       const ux = dx / d, uy = dy / d, uz = dz / d, tx = p.x - c.x, ty = p.y - c.y, tz = p.z - c.z, along = tx * ux + ty * uy + tz * uz;
       if (along < d) continue;
       const cx = tx - ux * along, cy = ty - uy * along, cz = tz - uz * along;
-      if (cx * cx + cy * cy + cz * cz < 0.8 && G.World.raycast(map.world!, c.x, c.y, c.z, ux, uy, uz, along).t >= along - 0.3) return true;
+      if (cx * cx + cy * cy + cz * cz < 0.8 && World.raycast(map.world!, c.x, c.y, c.z, ux, uy, uz, along).t >= along - 0.3) return true;
     }
     return false;
   }
@@ -707,7 +709,7 @@ const G_Damage = (() => {
     const w = map.world!, P0 = leafPose(d, ang), rnd = rngOf(seed), hw = P0.L / 2, hh = P0.LH / 2, ht = 0.025, M = 22;
     const ib = new T.Vector3(3 * 1 / (M * (hh * hh + ht * ht)), 3 * 1 / (M * (hw * hw + ht * ht)), 3 * 1 / (M * (hw * hw + hh * hh)));
     const solids: Solid[] = [];
-    G.World.query(w, [P0.c.x - 3.5, P0.c.y - 3, P0.c.z - 3.5], [P0.c.x + 3.5, P0.c.y + 3, P0.c.z + 3.5], (s: Solid) => { if (s.move && s.door !== d) solids.push(s); });
+    World.query(w, [P0.c.x - 3.5, P0.c.y - 3, P0.c.z - 3.5], [P0.c.x + 3.5, P0.c.y + 3, P0.c.z + 3.5], (s: Solid) => { if (s.move && s.door !== d) solids.push(s); });
     const c = P0.c.clone(), q = P0.q.clone(), up = new T.Vector3(0, 1, 0), dh = new T.Vector3(dir[0], 0, dir[1]);
     if (dh.lengthSq() < 1e-4) dh.set(1, 0, 0);
     dh.normalize();
@@ -773,14 +775,14 @@ const G_Damage = (() => {
     d.fallen = true; d.open = true;
     const tr = fallTrack(map, d, ang, dir, seed);
     d.rest = restBox(d, tr);
-    G.World.door(map.world!, map, d);
+    World.door(map.world!, map, d);
     map.doorVer = (map.doorVer || 0) + 1;
     const piv = map.doorMeshes && map.doorMeshes[d.id];
     if (!piv) return;
     piv.userData.fallen = true;
     const u = piv.userData; u.centre = tr.centre;
     st(map).falls.push({ piv, tr, t: snap ? 1e3 : 0, Y: d.fy || 0, d, thud: false });
-    if (!snap && G.Hooks.doorFallSound) G.Hooks.doorFallSound(d); // (a door_close sample on its own floor)
+    if (!snap && Hooks.doorFallSound) Hooks.doorFallSound(d); // (a door_close sample on its own floor)
   }
   function update(map: DmgMap, dt: number) {
     const D = map && map.dmg;
@@ -791,8 +793,8 @@ const G_Damage = (() => {
       setPose(F.piv, F.piv.userData as { centre: V3; p0?: V3 }, fr[i], F.Y);
       if (!F.thud && F.tr.thud >= 0 && F.t >= F.tr.thud) {
         F.thud = true;
-        if (F.t < 8 && G.Hooks.doorKick) G.Hooks.doorKick(F.piv);
-        G.Hooks.doorDust!(F.t, fr[i][1], (F.Y || 0) + 0.05, fr[i][3]);
+        if (F.t < 8 && Hooks.doorKick) Hooks.doorKick(F.piv);
+        Hooks.doorDust!(F.t, fr[i][1], (F.Y || 0) + 0.05, fr[i][3]);
       }
       return i < fr.length - 1;
     });
@@ -831,7 +833,7 @@ const G_Damage = (() => {
     const g = pane.geometry; if (!g.boundingBox) g.computeBoundingBox();
     const b = g.boundingBox!, sx = b.max.x - b.min.x, sz = b.max.z - b.min.z, side = sx < sz && sx < 0.2, A = side ? sz : sx, H = b.max.y - b.min.y, l = pane.worldToLocal(at.clone()), lo = side ? b.min.z : b.min.x;
     const W = 512, Hp = Math.max(64, Math.min(1024, Math.round((W * H) / A))), cv = typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: W, height: Hp }) : new OffscreenCanvas(W, Hp), c = cv.getContext('2d')!;
-    const hx = G.U.clamp(((side ? l.z : l.x) - lo) / A, 0.02, 0.98) * W, hy = (1 - G.U.clamp((l.y - b.min.y) / H, 0.02, 0.98)) * Hp, rnd = rngOf(seedOf([at.x, at.y, at.z])), R = Math.hypot(W, Hp) * 1.1, n = 15 + Math.floor(rnd() * 6), arms = [];
+    const hx = U.clamp(((side ? l.z : l.x) - lo) / A, 0.02, 0.98) * W, hy = (1 - U.clamp((l.y - b.min.y) / H, 0.02, 0.98)) * Hp, rnd = rngOf(seedOf([at.x, at.y, at.z])), R = Math.hypot(W, Hp) * 1.1, n = 15 + Math.floor(rnd() * 6), arms = [];
     c.fillStyle = 'rgba(214,230,238,0.07)'; c.fillRect(0, 0, W, Hp);
     c.lineCap = 'round'; c.lineJoin = 'round';
     const pen = (w: number, col: string) => { c.lineWidth = w; c.strokeStyle = col; c.stroke(); };
@@ -867,6 +869,6 @@ const G_Damage = (() => {
   }
   return { crack, HOLE, PARTS, HINGES, radius, hit, ofEvent, apply, clear, doorHole, onLeaf, partAt, fall, fallTrack, leafPose, setPose, partGone, update, reset, seenThrough, warm };
 })();
-G.Damage = G_Damage;
+G.Damage = Damage;
 
-interface GameModules { Damage: typeof G_Damage; }
+declare global { interface GameModules { Damage: typeof Damage; } }

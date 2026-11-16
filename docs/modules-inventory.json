@@ -2727,253 +2727,161 @@
   },
   "damage": {
    "defs": {
-    "Damage": 870
+    "Damage": 872
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "util",
+     "line": 2,
+     "names": [
+      "Hooks",
+      "U"
+     ]
+    },
+    {
+     "from": "world",
+     "line": 3,
+     "names": [
+      "World"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "U",
-     "line": 71,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 71,
+     "x": "Level",
+     "line": 172,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 170,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 197,
+     "line": 199,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Scars",
-     "line": 270,
+     "line": 272,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 300,
+     "line": 302,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 308,
+     "line": 310,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Scars",
-     "line": 313,
+     "line": 315,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 336,
+     "line": 338,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 336,
+     "line": 338,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 384,
+     "line": 386,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 399,
+     "line": 401,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 418,
+     "line": 420,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 425,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 432,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 442,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 483,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 489,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 498,
+     "line": 427,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 522,
+     "line": 524,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 532,
+     "line": 534,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Scars",
-     "line": 562,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 612,
+     "line": 564,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 617,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 690,
+     "line": 619,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 698,
+     "line": 700,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 698,
+     "line": 700,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 698,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 710,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 776,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 783,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 783,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Hooks",
-     "line": 794,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 794,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Hooks",
-     "line": 795,
+     "line": 700,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Scars",
-     "line": 821,
+     "line": 823,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Scars",
-     "line": 821,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 834,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 834,
+     "line": 823,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Damage": {
+    "Damage": {
      "kind": "value",
-     "line": 19
+     "line": 21
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 872
+    "global": {
+     "kind": "value",
+     "line": 874
     }
    }
   },
@@ -4323,85 +4231,40 @@
   },
   "furniture": {
    "defs": {
-    "Furniture": 1817
+    "Furniture": 1820
    },
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "U",
-     "line": 265,
-     "load": false,
-     "guard": "plain"
+     "from": "level",
+     "line": 2,
+     "names": [
+      "Level"
+     ]
     },
     {
-     "x": "U",
-     "line": 440,
-     "load": false,
-     "guard": "plain"
+     "from": "util",
+     "line": 3,
+     "names": [
+      "U"
+     ]
     },
     {
-     "x": "U",
-     "line": 1103,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1115,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1115,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1120,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 1412,
-     "load": false,
-     "guard": "check"
-    },
-    {
-     "x": "Level",
-     "line": 1412,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "U",
-     "line": 1413,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1414,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 1414,
-     "load": false,
-     "guard": "plain"
+     "from": "world",
+     "line": 4,
+     "names": [
+      "World"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
-    "G_Furniture": {
+    "Furniture": {
      "kind": "value",
-     "line": 11
+     "line": 14
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 1819
+    "global": {
+     "kind": "value",
+     "line": 1822
     }
    }
   },
@@ -4431,37 +4294,41 @@
   },
   "furnspec": {
    "defs": {
-    "FurnSpec": 548
+    "FurnSpec": 551
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "level",
+     "line": 2,
+     "names": [
+      "Level"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "U"
+     ]
+    },
+    {
+     "from": "world",
+     "line": 4,
+     "names": [
+      "World"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "U",
-     "line": 39,
+     "x": "Furniture",
+     "line": 347,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
-     "line": 344,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 353,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Furniture",
-     "line": 353,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 405,
+     "line": 356,
      "load": false,
      "guard": "plain"
     }
@@ -4469,15 +4336,15 @@
    "decls": {
     "FdRng": {
      "kind": "type",
-     "line": 2
+     "line": 5
     },
-    "G_FurnSpec": {
+    "FurnSpec": {
      "kind": "value",
-     "line": 3
+     "line": 6
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 550
+    "global": {
+     "kind": "value",
+     "line": 553
     }
    }
   },
@@ -13626,119 +13493,88 @@
   },
   "homes": {
    "defs": {
-    "Homes": 745
+    "Homes": 747
    },
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "U",
-     "line": 62,
-     "load": true,
-     "guard": "plain"
+     "from": "furniture",
+     "line": 2,
+     "names": [
+      "Furniture"
+     ]
     },
     {
-     "x": "Furniture",
-     "line": 62,
-     "load": true,
-     "guard": "plain"
+     "from": "level",
+     "line": 3,
+     "names": [
+      "Level"
+     ]
     },
     {
-     "x": "Level",
-     "line": 446,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 453,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 516,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 540,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 552,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 585,
-     "load": false,
-     "guard": "plain"
+     "from": "util",
+     "line": 4,
+     "names": [
+      "U"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
-    "HomeMat": {
-     "kind": "type",
-     "line": 4
-    },
     "HomeSwap": {
-     "kind": "type",
-     "line": 6
-    },
-    "HomeItem": {
-     "kind": "type",
-     "line": 7
-    },
-    "HomeCarve": {
      "kind": "type",
      "line": 8
     },
-    "HomeRest": {
+    "HomeItem": {
      "kind": "type",
      "line": 9
     },
-    "HomeRoomSpec": {
+    "HomeCarve": {
      "kind": "type",
      "line": 10
     },
-    "HomeResident": {
+    "HomeRest": {
      "kind": "type",
      "line": 11
     },
-    "HomePlan": {
+    "HomeRoomSpec": {
+     "kind": "type",
+     "line": 12
+    },
+    "HomeResident": {
      "kind": "type",
      "line": 13
     },
-    "HomeLevel": {
+    "HomePlan": {
      "kind": "type",
      "line": 15
     },
-    "HomeState": {
+    "HomeLevel": {
      "kind": "type",
      "line": 17
     },
-    "HomeSide": {
+    "HomeState": {
      "kind": "type",
      "line": 19
     },
-    "HomePlaced": {
-     "kind": "type",
-     "line": 20
-    },
-    "HomeHung": {
+    "HomeSide": {
      "kind": "type",
      "line": 21
     },
-    "G_Homes": {
-     "kind": "value",
-     "line": 61
-    },
-    "GameModules": {
+    "HomePlaced": {
      "kind": "type",
-     "line": 747
+     "line": 22
+    },
+    "HomeHung": {
+     "kind": "type",
+     "line": 23
+    },
+    "Homes": {
+     "kind": "value",
+     "line": 63
+    },
+    "global": {
+     "kind": "value",
+     "line": 749
     }
    }
   },
@@ -24597,21 +24433,23 @@
   },
   "residents": {
    "defs": {},
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "Furniture",
-     "line": 6,
-     "load": true,
-     "guard": "plain"
+     "from": "furniture",
+     "line": 2,
+     "names": [
+      "Furniture"
+     ]
     },
     {
-     "x": "Homes",
-     "line": 208,
-     "load": true,
-     "guard": "plain"
+     "from": "homes",
+     "line": 3,
+     "names": [
+      "Homes"
+     ]
     }
    ],
+   "uses": [],
    "decls": {}
   },
   "rig": {
@@ -25322,37 +25160,27 @@
   },
   "scars": {
    "defs": {
-    "Scars": 253
+    "Scars": 254
    },
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "U",
-     "line": 151,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 205,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 224,
-     "load": false,
-     "guard": "plain"
+     "from": "util",
+     "line": 2,
+     "names": [
+      "Hooks",
+      "U"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
-    "G_Scars": {
+    "Scars": {
      "kind": "value",
-     "line": 2
+     "line": 3
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 254
+    "global": {
+     "kind": "value",
+     "line": 255
     }
    }
   },
@@ -32791,61 +32619,26 @@
   },
   "stickers": {
    "defs": {
-    "Stickers": 275
+    "Stickers": 276
    },
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "Hooks",
-     "line": 46,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 257,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 257,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Hooks",
-     "line": 257,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Hooks",
-     "line": 266,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 266,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Hooks",
-     "line": 266,
-     "load": false,
-     "guard": "guarded"
+     "from": "util",
+     "line": 2,
+     "names": [
+      "Hooks"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
-    "G_Stickers": {
+    "Stickers": {
      "kind": "value",
-     "line": 19
+     "line": 20
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 276
+    "global": {
+     "kind": "value",
+     "line": 277
     }
    }
   },
@@ -36767,15 +36560,6 @@
    }
   },
   "damage": {
-   "util": {
-    "load": 0,
-    "call": 12,
-    "names": [
-     "U",
-     "Hooks"
-    ],
-    "loadAt": []
-   },
    "level": {
     "load": 0,
     "call": 16,
@@ -36792,13 +36576,36 @@
     ],
     "loadAt": []
    },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Hooks",
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "Hooks, U",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
    "world": {
-    "load": 0,
-    "call": 6,
+    "load": 1,
+    "call": 0,
     "names": [
      "World"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "World",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "data": {
@@ -37101,29 +36908,50 @@
    }
   },
   "furniture": {
-   "util": {
-    "load": 0,
-    "call": 6,
-    "names": [
-     "U"
-    ],
-    "loadAt": []
-   },
-   "world": {
-    "load": 0,
-    "call": 2,
-    "names": [
-     "World"
-    ],
-    "loadAt": []
-   },
    "level": {
-    "load": 0,
-    "call": 3,
+    "load": 1,
+    "call": 0,
     "names": [
      "Level"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Level",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "world": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "World"
+    ],
+    "loadAt": [
+     {
+      "x": "World",
+      "line": 4,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "furnmesh": {
@@ -37143,14 +36971,6 @@
    }
   },
   "furnspec": {
-   "util": {
-    "load": 0,
-    "call": 1,
-    "names": [
-     "U"
-    ],
-    "loadAt": []
-   },
    "furniture": {
     "load": 0,
     "call": 2,
@@ -37160,20 +36980,49 @@
     "loadAt": []
    },
    "level": {
-    "load": 0,
-    "call": 1,
+    "load": 1,
+    "call": 0,
     "names": [
      "Level"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Level",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    },
    "world": {
-    "load": 0,
-    "call": 1,
+    "load": 1,
+    "call": 0,
     "names": [
      "World"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "World",
+      "line": 4,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "game": {
@@ -38660,20 +38509,6 @@
    }
   },
   "homes": {
-   "util": {
-    "load": 1,
-    "call": 0,
-    "names": [
-     "U"
-    ],
-    "loadAt": [
-     {
-      "x": "U",
-      "line": 62,
-      "guard": "plain"
-     }
-    ]
-   },
    "furniture": {
     "load": 1,
     "call": 0,
@@ -38683,18 +38518,41 @@
     "loadAt": [
      {
       "x": "Furniture",
-      "line": 62,
-      "guard": "plain"
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
      }
     ]
    },
    "level": {
-    "load": 0,
-    "call": 6,
+    "load": 1,
+    "call": 0,
     "names": [
      "Level"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Level",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 4,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "hud": {
@@ -40881,8 +40739,9 @@
     "loadAt": [
      {
       "x": "Furniture",
-      "line": 6,
-      "guard": "plain"
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
      }
     ]
    },
@@ -40895,8 +40754,9 @@
     "loadAt": [
      {
       "x": "Homes",
-      "line": 208,
-      "guard": "plain"
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
      }
     ]
    }
@@ -41086,13 +40946,20 @@
   },
   "scars": {
    "util": {
-    "load": 0,
-    "call": 3,
+    "load": 1,
+    "call": 0,
     "names": [
-     "U",
-     "Hooks"
+     "Hooks",
+     "U"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Hooks, U",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "server": {
@@ -42255,12 +42122,19 @@
   },
   "stickers": {
    "util": {
-    "load": 0,
-    "call": 7,
+    "load": 1,
+    "call": 0,
     "names": [
      "Hooks"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Hooks",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "threeboot": {},
@@ -42893,11 +42767,11 @@
  "reach": [],
  "undefined": {},
  "trial": {
-  "total": 3561,
+  "total": 3450,
   "byCode": {
-   "TS2339": 3257,
-   "TS6196": 71,
-   "TS7006": 145,
+   "TS2339": 3159,
+   "TS6196": 64,
+   "TS7006": 139,
    "TS18047": 14,
    "TS2551": 34,
    "TS7031": 13,
@@ -42920,13 +42794,10 @@
    "Cloud",
    "CloudConfig",
    "Course",
-   "Damage",
    "DebugStart",
    "Demo",
    "Footsteps",
    "FurnMesh",
-   "FurnSpec",
-   "Furniture",
    "GLB",
    "Game",
    "Glare",
@@ -42940,7 +42811,6 @@
    "Hangar",
    "Headgear",
    "Highlights",
-   "Homes",
    "HumanData",
    "Humans",
    "Icons",
@@ -42962,7 +42832,6 @@
    "Recorder",
    "Rig",
    "Route",
-   "Scars",
    "Server",
    "ServerHost",
    "ServerLink",
@@ -42973,7 +42842,6 @@
    "Space",
    "SpaceSv",
    "SpaceUI",
-   "Stickers",
    "Touch",
    "VMAnim",
    "Viewmodel",
@@ -42982,7 +42850,7 @@
    "Zip"
   ],
   "umd": [],
-  "unusedGM": 69,
+  "unusedGM": 63,
   "other": [
    {
     "file": "js/ambience.ts",
@@ -43067,12 +42935,6 @@
     "line": 96,
     "code": "TS18047",
     "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 101,
-    "code": "TS7006",
-    "msg": "Parameter 'names' implicitly has an 'any' type."
    },
    {
     "file": "js/game.ts",
@@ -43567,18 +43429,6 @@
     "msg": "Parameter 'w' implicitly has an 'any' type."
    },
    {
-    "file": "js/gunsmith.ts",
-    "line": 426,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/gunsmith.ts",
-    "line": 426,
-    "code": "TS7006",
-    "msg": "Parameter 'n' implicitly has an 'any' type."
-   },
-   {
     "file": "js/handling.ts",
     "line": 46,
     "code": "TS7006",
@@ -43699,12 +43549,6 @@
     "msg": "Parameter 'ok' implicitly has an 'any' type."
    },
    {
-    "file": "js/homes.ts",
-    "line": 4,
-    "code": "TS6196",
-    "msg": "'HomeMat' is declared but never used."
-   },
-   {
     "file": "js/hud.ts",
     "line": 229,
     "code": "TS7006",
@@ -43775,24 +43619,6 @@
     "line": 358,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 373,
-    "code": "TS7006",
-    "msg": "Parameter 'x' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 373,
-    "code": "TS7006",
-    "msg": "Parameter 'z' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 373,
-    "code": "TS7006",
-    "msg": "Parameter 'y' implicitly has an 'any' type."
    },
    {
     "file": "js/render.ts",

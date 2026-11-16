@@ -1,5 +1,6 @@
 'use strict';
-const G_Scars = (() => {
+import { Hooks, U } from './util.js';
+export const Scars = (() => {
   const T = THREE, CELLS = 4, PX = 256;
   type Rnd = () => number;
   type ChipShape = 'chunk' | 'sliver' | 'flake';
@@ -148,7 +149,7 @@ const G_Scars = (() => {
       const y = new T.Vector3().crossVectors(z, x);
       return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z));
     };
-    const J = o.J == null ? 800 : o.J, sz = G.U.clamp(Math.sqrt(J / 1000), 0.55, 1.7), cal = (o.cal || 8) / 8, tint = L.tint, out: Piece[] = [];
+    const J = o.J == null ? 800 : o.J, sz = U.clamp(Math.sqrt(J / 1000), 0.55, 1.7), cal = (o.cal || 8) / 8, tint = L.tint, out: Piece[] = [];
     const decal = (cell: number, r0: number, spin = true, sy = 1, t = tint) => { const r = o.fit || r0; out.push({ geo: cellGeo(cell), mat: decalMat(t), s: [r * 2, r * 2 * sy, 1], q: q(spin), off: 0.004 }); }; // (o.fit: this wide: round a hole, js/damage.ts: the hole sets it)
     const look = L.look, x = o.k === 'x', v = Math.floor(Math.random() * 3);
     if (o.k === 'r') { // (a skid: along the way it was going, as long as it was shallow)
@@ -202,7 +203,7 @@ const G_Scars = (() => {
     // o as plan's, at p
     function burst(p: THREE.Vector3, o: MarkOpts) {
       const L = LOOK[o.m || BY_FX[o.fx!] || 'concrete'] || LOOK.concrete, ch = L.chips, n0 = o.n ? new T.Vector3(o.n[0], o.n[1], o.n[2]) : new T.Vector3(0, 1, 0), dir = o.dir ? new T.Vector3(o.dir.x != null ? o.dir.x : o.dir[0], o.dir.y != null ? o.dir.y : o.dir[1], o.dir.z != null ? o.dir.z : o.dir[2]) : null;
-      const k = G.U.clamp(Math.sqrt((o.J == null ? 800 : o.J) / 800), 0.5, 1.6), out = o.k === 'x' && dir ? dir : o.k === 'r' && dir ? dir.clone().addScaledVector(n0, 0.5).normalize() : n0;
+      const k = U.clamp(Math.sqrt((o.J == null ? 800 : o.J) / 800), 0.5, 1.6), out = o.k === 'x' && dir ? dir : o.k === 'r' && dir ? dir.clone().addScaledVector(n0, 0.5).normalize() : n0;
       if (ch) {
         const n = Math.round(ch.n * k * (o.k === 'x' ? 1.5 : 1));
         for (let i = 0; i < n; i++) {
@@ -221,7 +222,7 @@ const G_Scars = (() => {
       if (L.dust != null) {
         const u = puffs[puffI], m = u.obj; puffI = (puffI + 1) % puffs.length;
         u.t = 0; u.life = 1.6 + Math.random() * 1.2; u.k = 0.22 * k * (o.k === 'x' ? 1.5 : 1); u.v.copy(out).multiplyScalar(0.7 * k);
-        m.position.copy(p).addScaledVector(n0, 0.03); m.material.color.setHex(L.dust).multiplyScalar(G.Hooks.partLight!(p)); m.material.opacity = 0.7; // (unlit: as lit as where it is, js/render.ts partLight) m.scale.setScalar(u.k); m.visible = true;
+        m.position.copy(p).addScaledVector(n0, 0.03); m.material.color.setHex(L.dust).multiplyScalar(Hooks.partLight!(p)); m.material.opacity = 0.7; // (unlit: as lit as where it is, js/render.ts partLight) m.scale.setScalar(u.k); m.visible = true;
       }
     }
     function update(dt: number) {
@@ -250,5 +251,5 @@ const G_Scars = (() => {
   }
   return { plan, meshes, debris, flapMat };
 })();
-G.Scars = G_Scars;
-interface GameModules { Scars: typeof G_Scars; }
+G.Scars = Scars;
+declare global { interface GameModules { Scars: typeof Scars; } }

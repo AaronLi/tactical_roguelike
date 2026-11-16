@@ -8,13 +8,13 @@ nothing checks the module is there, **check** if it is the check itself (`G.X &&
 
 ## Summary
 
-- 90 files, 176 names on G, 5344 uses (92 while loading)
+- 90 files, 176 names on G, 5292 uses (88 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 5, the largest 43 files
 - hand-kept orders against the load-time needs: index.html 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, tools/level_env.mjs 0, tools/model_env.mjs 0
 - the simulation reaching page-only modules: 0 uses (0 unguarded, 0 of them while loading)
 - names used but defined nowhere: 0
-- trial module typecheck: 3561 errors; 0 bare names between files (0 uses), 71 G members lost, 201 others
+- trial module typecheck: 3450 errors; 0 bare names between files (0 uses), 65 G members lost, 194 others
 
 ## 1. Dependency graph
 
@@ -76,9 +76,9 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | audio | Audio | util | acoustics, casings, data, footsteps, game, gunaudio, level, modelbundles, render |
 | leveldesc (sim) | LevelDesc | materials, util, world | damage, level |
 | level (sim) | Level | data, leveldesc, materials, shipgen, spacedata, util, world | furniture, homes |
-| furnspec (sim) | FurnSpec | - | furniture, level, util, world |
-| furniture (sim) | Furniture | - | level, util, world |
-| homes (sim) | Homes | furniture, util | level |
+| furnspec (sim) | FurnSpec | level, util, world | furniture |
+| furniture (sim) | Furniture | level, util, world | - |
+| homes (sim) | Homes | furniture, level, util | - |
 | residents (sim) |  | furniture, homes | - |
 | furnmesh (sim) | FurnMesh | furnspec | - |
 | gunshot-synth |  | - | - |
@@ -90,11 +90,11 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | lightgrid (sim) | LightGrid | - | homes, level |
 | levelview | LevelView | - | furnmesh, hangar, level, leveldesc, lightgrid, util |
 | render | R | util | audio, ballistics, bolts, callsigns, casings, damage, data, game, gear, gunmaterials, gunmodels, highlights, hud, level, levelview, lightgrid, loot, player, range, rig, scars, shotlog, stickers, viewmodel, views |
-| scars (sim) | Scars | - | util |
-| damage (sim) | Damage | - | level, scars, util, world |
+| scars (sim) | Scars | util | - |
+| damage (sim) | Damage | util, world | level, scars |
 | glare | Glare | - | game, level, player, render, util |
 | shotlog | ShotLog | - | data, hud, level, materials, net, player, render, rig, util, views |
-| stickers (sim) | Stickers | - | util |
+| stickers (sim) | Stickers | util | - |
 | bolts | Bolts | - | ballistics, data, render, views |
 | gunmaterials | GunMaterials | - | - |
 | gunmodels | GunModels | - | glb, gunmaterials, parts, stickers, viewmodel |
@@ -159,9 +159,9 @@ None.
 `tsconfig.modules-trial.json`: the project with every file a module (`moduleDetection: force`). Phase 1 is done when
 the only errors left are G members (those go when the files are converted).
 
-3561 errors: TS2339 3257, TS7006 145, TS6196 71, TS2551 34, TS18047 14, TS7031 13, TS18048 10, TS7053 6, TS2531 5, TS2345 4, TS2322 2.
+3450 errors: TS2339 3159, TS7006 139, TS6196 64, TS2551 34, TS18047 14, TS7031 13, TS18048 10, TS7053 6, TS2531 5, TS2345 4, TS2322 2.
 
-**G members lost** (TS2339 on GameNamespace, 71 names): each file's `interface GameModules` no longer merges (and in 69 files it's reported unused). Expected; they go as the files are converted.
+**G members lost** (TS2339 on GameNamespace, 65 names): each file's `interface GameModules` no longer merges (and in 63 files it's reported unused). Expected; they go as the files are converted.
 
 **THREE as a global** (TS2686, in 0 files): three's types declare it a UMD global, which a module may not use without an import. Phase 2's import map, or `allowUmdGlobalAccess`, clears these.
 
@@ -170,7 +170,7 @@ the only errors left are G members (those go when the files are converted).
 | Name | Kind | Declared in | Uses | Used by |
 | --- | --- | --- | --- | --- |
 
-**Everything else** (201): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
+**Everything else** (194): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
 
 - js/ambience.ts:948 TS7006 Parameter 'q' implicitly has an 'any' type.
 - js/cloud.ts:304 TS7006 Parameter 'r' implicitly has an 'any' type.
@@ -186,7 +186,6 @@ the only errors left are G members (those go when the files are converted).
 - js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
 - js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
 - js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
-- js/game.ts:101 TS7006 Parameter 'names' implicitly has an 'any' type.
 - js/game.ts:127 TS7006 Parameter 'm' implicitly has an 'any' type.
 - js/game.ts:127 TS7006 Parameter 'from' implicitly has an 'any' type.
 - js/game.ts:128 TS7006 Parameter 'm' implicitly has an 'any' type.
@@ -232,4 +231,5 @@ the only errors left are G members (those go when the files are converted).
 - js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
 - js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
 - js/game.ts:1623 TS2345 Argument of type 'unknown' is not assignable to parameter of type 'string'.
-- ... 141 more in the JSON
+- js/game.ts:1623 TS7006 Parameter 'a' implicitly has an 'any' type.
+- ... 134 more in the JSON
