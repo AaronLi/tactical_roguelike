@@ -479,6 +479,20 @@ label.check input { width: auto; accent-color: var(--ui-text); }
 
 /* ---------------------------------------------------------------- gunsmith */
 #shopItems.gs-host { display: block; overflow-y: auto; }
+/* the gunsmith fills the column below the tabs and holds still: only its attachments list (and, if it runs long, the
+   build's side column) scrolls. Stacked to one column, narrow or on touch, the whole of it scrolls as before */
+@media (min-width: 901px) {
+  #shopItems.gs-host { flex: 1 1 auto; min-height: 0; }
+  body:not(.touch-on) .gs-wrap { height: 100%; min-height: 0; }
+  body:not(.touch-on) .gs-wrap > .gs-tabs { flex: 0 0 auto; }
+  body:not(.touch-on) .gs-main { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  body:not(.touch-on) .gs-left { min-height: 0; }
+  /* (on a short window the view gives up height, down to 160 px, before the list goes under about 200 px: js/gunsmith.ts
+     fits the picture to whatever box it has) */
+  body:not(.touch-on) .gs-left > .gs-view { flex: 0 1 calc(340px * var(--ik, 1)); height: auto; min-height: calc(160px * var(--ik, 1)); }
+  body:not(.touch-on) .gs-left > .gs-list { flex: 1 1 0; min-height: calc(200px * var(--ik, 1)); overflow-y: auto; padding-right: calc(4px * var(--ik, 1)); }
+  body:not(.touch-on) .gs-side { min-height: 0; overflow-y: auto; }
+}
 .gs-wrap { display: flex; flex-direction: column; gap: calc(10px * var(--ik, 1)); }
 .gs-tabs { display: flex; gap: calc(4px * var(--ik, 1)); flex-wrap: wrap; }
 .gs-main { display: grid; grid-template-columns: minmax(0, 1fr) calc(300px * var(--ik, 1)); gap: calc(10px * var(--ik, 1)); }

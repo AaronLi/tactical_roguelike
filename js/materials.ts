@@ -213,7 +213,7 @@ const G_Materials = (() => {
         if (d.kind === 'fire') return C([['sheet', 1.5]], 'wool', 0.5); // (a roof's)
         return theme.name === 'Bunker' || theme.name === 'Foundry' || theme.name === 'Warehouse' ? C([['sheet', 1.5]], 'wool', 0.5) : theme.name === 'Cold Storage' || theme.name === 'Research Lab' ? C([['sheet', 1]], 'pur') : C([['hardwood', 4]]); // (hollow-core timber, or a steel fire door)
       }
-      case 'glass': return s.win && s.win.armor ? ONE([['bpglass', 40]]) : ONE([['glass', 5]]);
+      case 'glass': return s.win && (s.win.armor || s.win.ship) ? ONE([['bpglass', 40]]) : ONE([['glass', 5]]); // (a ship's glass stops rounds as armour glass does: js/level.ts paneBreaks)
       case 'rail': return RAIL;
       case 'grate': return GRATE;
       case 'view': return SOLID('soil');

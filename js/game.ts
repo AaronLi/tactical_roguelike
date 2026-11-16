@@ -802,7 +802,7 @@ const G_Game = {
           if (m.holes) for (const h of m.holes) G.Damage.apply(this.map as unknown as GmDmgMap, h); // (what's been shot out of the place)
           if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map as unknown as GmDmgMap, this.map!.doors[i] as any, ang, dir, seed, true);
           if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]: [number, string, number, number, number, number]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
-          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y]: [number, string, number, number, number, number, number]) => G.Views.addBody(id, type, x, z, yaw, sec, y));
+          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => G.Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
           this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
           this.cabs = m.cabs || []; G.Views.syncCabs();
           G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...(a as [any, any, any, any, any, any, any]));
@@ -835,7 +835,7 @@ const G_Game = {
       case 'phase':
         if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined; // (none: the game in space's sidearm picker)
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); }
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => G.Views.addBody(id, type, x, z, yaw, sec, y, nm || null)); }
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock, m.sp);
         else if (m.phase === 'gameover') this.enterGameover(m);
         else if (m.phase === 'lobby') this.enterLobby();

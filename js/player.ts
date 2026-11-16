@@ -126,7 +126,7 @@ const G_Me = {
   _quick: undefined as (PHeldKind | null)[] | undefined, _rm: undefined as WeakMap<WeaponDef, PRecoilModel> | undefined,
   _climbArms: undefined as { g: THREE.Group; arms: { s: THREE.Mesh; h: THREE.Mesh }[] } | undefined, _zipKit: undefined as THREE.Object3D | undefined,
   _specQ: undefined as THREE.Quaternion | null | undefined, _look: undefined as THREE.Vector3 | undefined, _lookW: undefined as unknown as number,
-  _lyaw: undefined as number | undefined, _lpitch: undefined as number | undefined, _dtCam: undefined as unknown as number,
+  _lyaw: undefined as number | undefined, _lpitch: undefined as number | undefined, _dtCam: undefined as unknown as number, _tq: null as THREE.Quaternion | null, _camRoll: 0, // (_tq: her tilt, aboard a ship lying tilted: js/level.ts tiltQ; _camRoll: the view's roll before it)
   _hp: undefined as number[] | null | undefined, _hpL: undefined as number[] | null | undefined, _limbs: undefined as PLimbs | undefined,
 
   // ------------------------------------------------------------- run state
@@ -469,7 +469,8 @@ const G_Me = {
   // the way the bore points now (your aim, plus recoil and sway): where rounds, and the laser, go
   boreDir() {
     const off = this.aimOffset(), cam = G.R.camera;
-    return new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.pitch + off.p, this.yaw + off.y, cam.rotation.z, 'YXZ'));
+    const d = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(this.pitch + off.p, this.yaw + off.y, this._tq ? this._camRoll : cam.rotation.z, 'YXZ'));
+    return this._tq ? d.applyQuaternion(this._tq) : d; // (aboard a ship lying tilted: turned with her, as your view is)
   },
 
   // ------------------------------------------------------------- input
@@ -707,6 +708,12 @@ const G_Me = {
       if (k.KeyW || k.KeyA || k.KeyS || k.KeyD || this.padMove || this.down || this.dead) this.viewerOff();
       else { this.vel.set(0, 0, 0); this.hspeed = 0; return; }
     }
+    // aboard a ship lying tilted (a breach nose up or down): walked in her own frame, where her decks are level (js/level.ts inFrame)
+    if ((map as any).tilt) { const yw = { v: this.yaw }; G.Level.inFrame(map, { p: this.pos, v: this.vel, yaw: yw }, (m) => { this.yaw = yw.v; this.stride(dt, m); yw.v = this.yaw; }); this.yaw = yw.v; return; }
+    this.stride(dt, map);
+  },
+  // walking, running, crouching, falling: a step of it (move)
+  stride(dt: number, map: LvMap) {
     const k = this.keys, blocked = this.down || G.Game.chatOpen || !G.Game.locked || !!(this.action && (this.action.kind === 'zip' || this.action.kind === 'bag'));
     let fw = blocked ? 0 : (k.KeyW ? 1 : 0) - (k.KeyS ? 1 : 0);
     let st = blocked ? 0 : (k.KeyD ? 1 : 0) - (k.KeyA ? 1 : 0);
@@ -1440,7 +1447,8 @@ const G_Me = {
     this.sinceFire = 0; this.flashBarrels = multi ? list : null;
     // the round leaves along the gun's bore: your aim plus the gun's offset (recoil, sway), not the camera
     const off = this.aimOffset();
-    const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch + off.p, this.yaw + off.y, cam.rotation.z, 'YXZ'));
+    const aq = new THREE.Quaternion().setFromEuler(new THREE.Euler(this.pitch + off.p, this.yaw + off.y, this._tq ? this._camRoll : cam.rotation.z, 'YXZ'));
+    if (this._tq) aq.premultiply(this._tq); // (aboard a ship lying tilted: turned with her, as your view is)
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(aq);
     const right = new THREE.Vector3(1, 0, 0).applyQuaternion(aq);
     const up = new THREE.Vector3(0, 1, 0).applyQuaternion(aq);
@@ -1849,10 +1857,11 @@ const G_Me = {
     (b.shot.fx = b.shot.fx || []).push(G.Ballistics.mark(p, n, fx, kind, o));
   },
   // a pane a round went through breaks (here at once, and for everyone through the host)
-  // The first two rounds fracture it (G.Level.CRACKS), and it stays up; the third, or a blast (all), or someone walking into it once it's fractured, brings it down.
+  // The first round fractures it (G.Level.CRACKS), and it stays up; the second, or a blast (all), or someone walking into it once it's fractured, brings it down.
   roundPane(id: number, at: THREE.Vector3, dir: THREE.Vector3, all?: boolean) {
     const win = G.Game.map!.windows[id];
     if (!win || win.broken) return;
+    if (!G.Level.paneBreaks(win)) { if (!all && (win.cracked || 0) < G.Level.CRACK_MAX) { G.Views.crackGlass(id, at, dir); G.Net.toHost({ t: 'crack', id, p: [+at.x.toFixed(3), +at.y.toFixed(3), +at.z.toFixed(3)] }); } return; } // (a ship's glass never comes down: a round fractures it more, nothing else does anything)
     if ((win.cracked || 0) < G.Level.CRACKS && !all) { G.Views.crackGlass(id, at, dir); G.Net.toHost({ t: 'crack', id, p: [+at.x.toFixed(3), +at.y.toFixed(3), +at.z.toFixed(3)] }); return; }
     G.Views.breakGlass(id, at, dir);
     G.Net.toHost({ t: 'glass', ids: [id] });
@@ -2926,6 +2935,9 @@ const G_Me = {
     cam.rotation.x += punch;
     cam.rotation.y += punchY;
     cam.rotation.z += this.hk.r - this.rc.y * R.ROLL;
+    // aboard a ship lying tilted: your view turns with her (her decks level to you), about your feet (js/level.ts tiltQ)
+    this._camRoll = cam.rotation.z; this._tq = G.Game.map ? G.Level.tiltQ(G.Game.map, this.pos.x, this.pos.y, this.pos.z) : null;
+    if (this._tq) { cam.position.sub(this.pos).applyQuaternion(this._tq).add(this.pos); cam.quaternion.premultiply(this._tq); }
     // magnified optics are picture-in-picture: the view itself only tightens a little, like any other sight
     const sg = this.sight(this.cur());
     const fov = G.Game.settings.fov * G.U.lerp(1, sg.scoped ? 0.8 : sg.zoom, this.adsT);

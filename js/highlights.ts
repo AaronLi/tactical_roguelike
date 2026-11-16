@@ -166,7 +166,8 @@ const G_Highlights = (() => {
     const a: Record<string, any[]> = {};
     for (const ev of G.Views.enemies.values()) {
       const k = 'e' + ev.id;
-      if (!R.actors.has(k)) R.actors.set(k, { kind: 'e', id: ev.id, type: ev.type, wpn: ev.def.wpn, vest: ev.def.vest, helmet: ev.def.helmet, face: ev.def.face || 0, ex: ev.def.ex || [], civ: !!ev.def.civ, scale: ev.def.scale || 1, boss: !!ev.def.boss, style: ev.def.style });
+      if (!R.actors.has(k)) R.actors.set(k, { kind: 'e', id: ev.id, type: ev.type, name: ev.def.name, wpn: ev.def.wpn, vest: ev.def.vest, helmet: ev.def.helmet, face: ev.def.face || 0, ex: ev.def.ex || [], civ: !!ev.def.civ, scale: ev.def.scale || 1, boss: !!ev.def.boss, style: ev.def.style });
+      else if (ev.alive) R.actors.get(k)!.name = ev.def.name; // (what they're called as it changes: a man who takes over his fireteam, js/server.ts titleOf)
       // (where their body is drawn, which is what rounds hit: out at the lean point leaning round a corner, slid back
       // from a wall lying prone, js/views.ts; and crouched as drawn, weakened ones too)
       const at = ev.rig && ev.rig.root ? ev.rig.root.position : ev.pos, cr = ev.crouch || (ev.str != null && ev.str < 0.4);
@@ -2777,7 +2778,7 @@ const G_Highlights = (() => {
 
   // ================================================================ motion graphics
   const ease = (x: number) => 1 - Math.pow(1 - G.U.clamp(x, 0, 1), 3);
-  const nameOf = (k: string | null) => { const A = k && P.actors.get(k); return !A ? 'UNKNOWN' : A.kind === 'p' ? (A.name || 'OFFICER') : (G.ENEMIES[A.type!] || {}).name || 'SUSPECT'; };
+  const nameOf = (k: string | null) => { const A = k && P.actors.get(k); return !A ? 'UNKNOWN' : A.kind === 'p' ? (A.name || 'OFFICER') : A.name || (G.ENEMIES[A.type!] || {}).name || 'SUSPECT'; };
   const colOf = (k: string | null) => { const A = k && P.actors.get(k); return A && A.kind === 'p' && A.color != null ? G.U.hex(A.color) : '#ff4a3a'; };
   const HYPE = ['THE DOOR-KICKING', 'THE UNSTOPPABLE', 'THE MAGNIFICENT', 'THE BUTCHER OF BLOCK C', 'THE HALLWAY HURRICANE', 'THE CERTIFIED', 'THE STAIRWELL STALLION', 'THE LEGAL', 'THE ABSOLUTELY JUSTIFIED'];
   const hype = (k: string) => { const A = P.actors.get(k), n = (A && A.name) || ''; let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const an = A && A.animal ? G.Callsigns.of(A.animal).name.toUpperCase() : 'OFFICER'; return `${HYPE[h % HYPE.length]} ${an}`; };

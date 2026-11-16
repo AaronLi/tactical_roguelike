@@ -140,33 +140,77 @@ const G_SpaceData = (() => {
       { tag: 'steps', x0: -hw + 0.3, x1: hw - 0.3, zf: z1 + W + 1.52, zh: z1 + W + 1.52 - 5 * 0.38, y0: 0, rise: FM, n: 5 }, // (off the open ramp)
     ];
   }
-  /** where she stands against a stretch of a ship's hull (js/shipgen.ts site: its middle, the way out of it), nose-on: her collar in the hole, her breach deck level with that deck */
-  function berthAt(d: SpShipDef, s: { x: number; z: number; nx: number; nz: number }) {
-    const TS = G.Level.TS, yaw = s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2, L = layout(d), zN = L.zc - 0.22;
+  /** where she stands against a stretch of a ship's hull (js/shipgen.ts site: its middle, the way out of it), nose-on: her collar in the hole, her breach deck level with that deck.
+   * s.ang: she came in that many degrees off square (an angled breach, up to BREACH_ANG): she lies at that angle, her collar's middle at the
+   * same place, a crumpled tunnel from it into the hull (js/shipgen.ts tunnel) */
+  // s.pt: she came in that many degrees nose up (- down), up to BREACH_PITCH: she lies tilted so, about her collar's middle (pt on the berth, radians)
+  function berthAt(d: SpShipDef, s: { x: number; z: number; nx: number; nz: number; ang?: number; pt?: number }) {
+    const TS = G.Level.TS, yaw = (s.nz > 0 ? 0 : s.nz < 0 ? Math.PI : s.nx > 0 ? Math.PI / 2 : -Math.PI / 2) + (s.ang || 0) * Math.PI / 180, L = layout(d), zN = L.zc - 0.22;
     const px = s.x + s.nx * (TS / 2 + 0.03), pz = s.z + s.nz * (TS / 2 + 0.03);
-    return { x: px - zN * Math.sin(yaw), y: -L.lift, z: pz - zN * Math.cos(yaw), yaw };
+    const b = { x: px - zN * Math.sin(yaw), y: -L.lift, z: pz - zN * Math.cos(yaw), yaw, pt: (s.pt || 0) * Math.PI / 180 };
+    if (!b.pt) return b;
+    const yc = L.FB + 1.16, a = toWorld({ ...b, pt: 0 }, 0, yc, zN), t = toWorld(b, 0, yc, zN); // (her collar's middle where it'd be level: tilted, put back there)
+    b.x += a.x - t.x; b.y += a.y - t.y; b.z += a.z - t.z;
+    return b;
   }
+  type Berth = { x: number; y: number; z: number; yaw: number; pt?: number };
   /** her solids in the world at berth b ([min x, y, z, max x, y, z] and the box's tag), those keep says */
-  function worldBoxes(d: SpShipDef, b: { x: number; y: number; z: number; yaw: number }, keep: (tag?: string) => boolean = () => true) {
-    const out: { b: number[]; tag?: string }[] = [];
-    for (const q of boxes(d)) {
+  // (yb: lying at an angle that isn't a quarter turn, each a box turned with her: its middle, her yaw, its half-widths, its height. G.World.ybox makes it)
+  // (ob: lying tilted, each a box turned and tilted with her: its middle, her yaw and pitch, its half-widths. G.World.obox makes it)
+  function worldBoxes(d: SpShipDef, b: Berth, keep: (tag?: string) => boolean = () => true) {
+    const out: { b: number[]; tag?: string; yb?: { cx: number; cz: number; yaw: number; hx: number; hz: number; y0: number; y1: number }; ob?: number[] }[] = [];
+    const turned = Math.abs(Math.sin(2 * b.yaw)) > 1e-6, L = layout(d), zN = L.zc - 0.22, tp = Math.tan(b.pt || 0);
+    for (let q of boxes(d)) {
       if (!keep(q[6])) continue;
+      // (lying tilted: her collar's floor to just where it meets the hull's face, and its sides and roof on to the face wherever they cross it,
+      // so there's no gap to step out of at the mouth, and no ledge into it)
+      if (b.pt && q[2] === L.zc && q[5] === L.zt && q[6] === undefined) { q = q.slice() as ShipBox; q[2] = q[4] === L.FB ? zN + 1.16 * tp : Math.min(L.zc, zN - 1.3 * Math.abs(tp) - 0.1); }
       const a = toWorld(b, q[0], q[1], q[2]), c = toWorld(b, q[3], q[4], q[5]);
-      out.push({ tag: q[6], b: [Math.min(a.x, c.x), Math.min(a.y, c.y), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.y, c.y), Math.max(a.z, c.z)] });
+      if (b.pt) {
+        const m = toWorld(b, (q[0] + q[3]) / 2, (q[1] + q[4]) / 2, (q[2] + q[5]) / 2), hx = Math.abs(q[3] - q[0]) / 2, hy = Math.abs(q[4] - q[1]) / 2, hz = Math.abs(q[5] - q[2]) / 2;
+        const ob = [m.x, m.y, m.z, b.yaw, b.pt, hx, hy, hz], o = G.World.obox(ob[0], ob[1], ob[2], ob[3], ob[4], ob[5], ob[6], ob[7]);
+        out.push({ tag: q[6], b: [...o.min, ...o.max], ob });
+      } else if (turned) {
+        const m = toWorld(b, (q[0] + q[3]) / 2, 0, (q[2] + q[5]) / 2), hx = Math.abs(q[3] - q[0]) / 2, hz = Math.abs(q[5] - q[2]) / 2, ex = Math.abs(hx * Math.cos(b.yaw)) + Math.abs(hz * Math.sin(b.yaw)), ez = Math.abs(hx * Math.sin(b.yaw)) + Math.abs(hz * Math.cos(b.yaw));
+        out.push({ tag: q[6], b: [m.x - ex, Math.min(a.y, c.y), m.z - ez, m.x + ex, Math.max(a.y, c.y), m.z + ez], yb: { cx: m.x, cz: m.z, yaw: b.yaw, hx, hz, y0: Math.min(a.y, c.y), y1: Math.max(a.y, c.y) } });
+      } else out.push({ tag: q[6], b: [Math.min(a.x, c.x), Math.min(a.y, c.y), Math.min(a.z, c.z), Math.max(a.x, c.x), Math.max(a.y, c.y), Math.max(a.z, c.z)] });
     }
     return out;
   }
+  // her boxes and her flights as she's built, level and square (her own frame): a world for those aboard her while she lies tilted
+  // (js/level.ts setTilt: they're moved in it), her nose shut behind her collar's mouth no more than it is docked (no nose, no steps out)
+  function frameWorld(d: SpShipDef) {
+    const W = G.World, w = W.create(), mat = G.Materials.SHIP;
+    const fls = flights(d).map((fl) => ({ tag: fl.tag, axis: 'z', up: fl.zh > fl.zf ? 1 : -1, x0: Math.min(fl.x0, fl.x1), x1: Math.max(fl.x0, fl.x1), z0: Math.min(fl.zf, fl.zh), z1: Math.max(fl.zf, fl.zh), y0: fl.y0, rise: fl.rise, n: fl.n, f: 0, steps: [] as any[], on: true }));
+    for (const q of boxes(d)) {
+      if (q[6] === 'nose' || q[6] === 'steps') continue;
+      const fl = fls.find((f) => f.tag === q[6]), s = W.add(w, W.box(q[0], q[1], q[2], q[3], q[4], q[5], fl ? { kind: 'step', stair: fl, mat } : { kind: 'prop', mat }));
+      if (fl) fl.steps.push(s);
+    }
+    (w as any).ramps = fls.filter((f) => f.steps.length);
+    return w;
+  }
+  // the most a breach may be off square (js/space.ts events), degrees; and nose up or down
+  const BREACH_ANG = 45, BREACH_PITCH = 30;
+  // a solid of hers (worldBoxes) made in the world's terms, o its kind
+  const solidOf = (q: { b: number[]; yb?: any; ob?: number[] }, o: any) => q.ob ? G.World.obox(q.ob[0], q.ob[1], q.ob[2], q.ob[3], q.ob[4], q.ob[5], q.ob[6], q.ob[7], o)
+    : q.yb ? G.World.ybox(q.yb.cx, q.yb.cz, q.yb.yaw, q.yb.hx, q.yb.hz, q.yb.y0, q.yb.y1, o) : G.World.box(q.b[0], q.b[1], q.b[2], q.b[3], q.b[4], q.b[5], o);
   // a point of the ship's frame in the world, the ship standing at berth b ({ x, y, z, yaw }: yaw as an officer's, 0 facing -z)
-  function toWorld(b: { x: number; y: number; z: number; yaw: number }, lx: number, ly: number, lz: number) {
+  // (b.pt: tilted that much nose up about her own x, then turned)
+  function toWorld(b: Berth, lx: number, ly: number, lz: number) {
     const c = Math.cos(b.yaw), s = Math.sin(b.yaw);
+    if (b.pt) { const cp = Math.cos(b.pt), sp = Math.sin(b.pt), y = ly * cp - lz * sp; lz = ly * sp + lz * cp; ly = y; }
     return { x: b.x + lx * c + lz * s, y: b.y + ly, z: b.z - lx * s + lz * c };
   }
-  function toShip(b: { x: number; y: number; z: number; yaw: number }, wx: number, wy: number, wz: number) {
+  function toShip(b: Berth, wx: number, wy: number, wz: number) {
     const c = Math.cos(b.yaw), s = Math.sin(b.yaw), dx = wx - b.x, dz = wz - b.z;
-    return { x: dx * c - dz * s, y: wy - b.y, z: dx * s + dz * c };
+    const x = dx * c - dz * s, y = wy - b.y, z = dx * s + dz * c;
+    if (!b.pt) return { x, y, z };
+    const cp = Math.cos(b.pt), sp = Math.sin(b.pt);
+    return { x, y: y * cp + z * sp, z: -y * sp + z * cp };
   }
   // is this point of the world aboard (inside the hull's box)
-  function aboard(d: SpShipDef, b: { x: number; y: number; z: number; yaw: number }, wx: number, wy: number, wz: number) {
+  function aboard(d: SpShipDef, b: Berth, wx: number, wy: number, wz: number) {
     const p = toShip(b, wx, wy, wz);
     const L = layout(d);
     if (p.y < -0.2 || p.z < L.zc - 0.3 || p.z > L.z1 + 0.1) return false;
@@ -280,12 +324,12 @@ const G_SpaceData = (() => {
   }
   // How a ship answers being boarded, by her size (js/spaceserver.ts doctrine): a transport or a corvette's is informal (her people
   // shelter, under guard), a frigate's and up practiced (her teams sweep for the squad); and as the mission board says it
-  const drill = (size: SpSize | null | undefined): 'informal' | 'practiced' => (!size || size === 'transport' || size === 'small' ? 'informal' : 'practiced');
+  const drill = (size: SpSize | null | undefined, wing = false): 'informal' | 'practiced' => (!wing && (!size || size === 'transport' || size === 'small') ? 'informal' : 'practiced'); // (a flying wing: a warship's crew, even a corvette's, with her own security office: js/shipgen.ts wingDeck)
   const DRILL_LINE = {
     informal: 'Her breach response is informal: her people shelter in her safest compartment, under guard, and nobody comes looking for you.',
     practiced: 'Her breach response is practiced: her teams sweep the ship for you, on her security cameras while someone is at them.',
   };
-  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' ? DRILL_LINE[drill(m.size)] : ''); // (a pirate-held ship answers nobody)
+  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' ? DRILL_LINE[drill(m.size, !!m.wing)] : ''); // (a pirate-held ship answers nobody)
   // A distance, written: metres under a kilometre, then kilometres, megametres, light-seconds; a jump's in light-years.
   function dist(m: number): string {
     m = Math.abs(m);
@@ -297,7 +341,7 @@ const G_SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
+  return { BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();
 G.SpaceData = G_SpaceData;
 interface GameModules { SpaceData: typeof G_SpaceData; }

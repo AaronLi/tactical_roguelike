@@ -61,6 +61,39 @@ const G_World = (() => {
   // a solid's new shape (a door swinging, say)
   function reshape(w: WorldT, s: Solid, min: number[], max: number[]) { unlink(w, s); s.min = min; s.max = max; insert(w, s); }
   const box = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: any) => Object.assign({ min: [x0, y0, z0], max: [x1, y1, z1] }, o || {});
+  // A box turned about the vertical (a ship lying against another at an angle: js/space.ts, js/spacedata.ts worldBoxes): its middle
+  // (cx, cz), its turn (yaw, as a ship's berth: its own x along (cos, -sin), its z along (sin, cos)), its half-widths along those, from y0
+  // up to y1. Its aabb for finding it; its six faces (hull) for rays and overlaps; yb for people walking into it and standing on it
+  // (resolve, groundAt, ceilingAt: in its own frame).
+  function ybox(cx: number, cz: number, yaw: number, hx: number, hz: number, y0: number, y1: number, o?: any): Solid {
+    const c = Math.cos(yaw), sn = Math.sin(yaw), ex = Math.abs(hx * c) + Math.abs(hz * sn), ez = Math.abs(hx * sn) + Math.abs(hz * c);
+    const ux = [c, 0, -sn], uz = [sn, 0, c], dx = ux[0] * cx + ux[2] * cz, dz = uz[0] * cx + uz[2] * cz;
+    const hull = [[ux[0], 0, ux[2], dx + hx], [-ux[0], 0, -ux[2], -dx + hx], [uz[0], 0, uz[2], dz + hz], [-uz[0], 0, -uz[2], -dz + hz], [0, 1, 0, y1], [0, -1, 0, -y0]];
+    return Object.assign({ min: [cx - ex, y0, cz - ez], max: [cx + ex, y1, cz + ez], hull, yb: { cx, cz, c, s: sn, hx, hz } }, o || {});
+  }
+  // A box turned and tilted (a ship lying against another nose-up or nose-down as well as at an angle: js/spacedata.ts worldBoxes): its
+  // middle, its turn (yaw, as ybox) and its tilt (pitch about its own x: + nose up, its own -z rising), its half-widths along its own
+  // axes. Its aabb for finding it; its six faces (hull) for rays and overlaps; ob for people: walked into where it cuts the heights of
+  // their body (resolve), stood on its tilted top (groundAt), its underside over their head (ceilingAt).
+  function obox(cx: number, cy: number, cz: number, yaw: number, pitch: number, hx: number, hy: number, hz: number, o?: any): Solid {
+    const c = Math.cos(yaw), sn = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+    const ex = [c, 0, -sn], ey = [sp * sn, cp, sp * c], ez = [cp * sn, -sp, cp * c], H = [hx, hy, hz], E = [ex, ey, ez], C = [cx, cy, cz];
+    const hull: number[][] = [], ext = [0, 0, 0];
+    E.forEach((e, i) => { const d = e[0] * cx + e[1] * cy + e[2] * cz; hull.push([e[0], e[1], e[2], d + H[i]], [-e[0], -e[1], -e[2], -d + H[i]]); for (let k = 0; k < 3; k++) ext[k] += Math.abs(e[k]) * H[i]; });
+    return Object.assign({ min: [cx - ext[0], cy - ext[1], cz - ext[2]], max: [cx + ext[0], cy + ext[1], cz + ext[2]], hull, ob: { cx, cy, cz, c, s: sn, cp, sp, hx, hy, hz } }, o || {}, { C });
+  }
+  // a point's level coordinates against a tilted box: across it, and back along its heading, from its middle
+  const obLevel = (b: any, x: number, z: number) => { const dx = x - b.cx, dz = z - b.cz; return [dx * b.c - dz * b.s, dx * b.s + dz * b.c]; };
+  // its top face's height over (x, z) (its bottom's: bottom), or null off it (k: as far as that past its edges)
+  const obFace = (b: any, x: number, z: number, k: number, bottom = false) => {
+    const [lx, u] = obLevel(b, x, z); if (Math.abs(lx) > b.hx + k) return null;
+    const dy = ((bottom ? -b.hy : b.hy) - u * b.sp) / b.cp, lz = -dy * b.sp + u * b.cp;
+    return Math.abs(lz) <= b.hz + k ? b.cy + dy : null;
+  };
+  // a point in a turned box's own frame (its x, its z, from its middle)
+  const ybLocal = (yb: any, x: number, z: number) => { const dx = x - yb.cx, dz = z - yb.cz; return [dx * yb.c - dz * yb.s, dx * yb.s + dz * yb.c]; };
+  // is (x, z) within k of a solid's footprint (a turned box's own, or its aabb's)
+  const over = (s: Solid, x: number, z: number, k: number) => { if (!s.yb) return true; const [lx, lz] = ybLocal(s.yb, x, z); return Math.abs(lx) <= s.yb.hx + k && Math.abs(lz) <= s.yb.hz + k; };
 
   // A convex solid (a rock): its faces' planes, [nx, ny, nz, d] (inside where n.p <= d), from its triangles (flat
   // [x, y, z] corners, nine to a face, as a mesh draws them) and any planes more (cut: a floor it's cut off at). Its box is round
@@ -296,6 +329,7 @@ const G_World = (() => {
   // themselves. Returns the slope's height at (x, z), how far up the flight that is (u, 0 at its foot), and
   // whether (x, z) is across its width.
   function rampAt(st: any, x: number, z: number) {
+    if (st.yb) { const dx = x - st.yb.x, dz = z - st.yb.z; x = dx * st.yb.c - dz * st.yb.s; z = dx * st.yb.s + dz * st.yb.c; } // (a turned ship's flight: its x0..z1 in her own frame, yb her berth)
     const along = st.axis === 'z', a = along ? z : x, lat = along ? x : z, lo = along ? st.z0 : st.x0, hi = along ? st.z1 : st.x1;
     const u = st.up < 0 ? hi - a : a - lo, len = hi - lo, n = st.n ? st.n : st.steps ? st.steps.length : Math.round(st.rise / 0.2), rn = st.rise / n, run = len / n;
     return { u, len, across: lat > (along ? st.x0 : st.z0) && lat < (along ? st.x1 : st.z1), h: st.y0 + G.U.clamp((u / run + 0.5 * G.U.clamp(u / run, 0, 1)) * rn, 0, st.rise) }; // (the half step eased in over the first tread: no bump onto it)
@@ -326,6 +360,29 @@ const G_World = (() => {
       query(w, [p.x - r, p.y + Math.min(step, NOSTEP), p.z - r], [p.x + r, p.y + h, p.z + r], (s: Solid) => {
         if (!s.move || (pass && s.stair && pass.has(s.stair))) return;
         if (s.max[1] <= p.y + (s.nostep ? NOSTEP : step)) return; // (low enough to step up onto; a rock's never is: only what you're stood on)
+        if (s.ob) { // (a tilted box, her own (js/spacedata.ts worldBoxes): they stand on her decks as her crew, square to them, so their body's a column up from their feet along her own up: walked into where that meets it, in her own frame)
+          const b = s.ob, dx = p.x - b.cx, dz = p.z - b.cz, u = dx * b.s + dz * b.c, lx = dx * b.c - dz * b.s, dy = p.y - b.cy;
+          const fy = u * b.sp + dy * b.cp, lz = u * b.cp - dy * b.sp; // (their feet in her frame)
+          if (Math.abs(lx) >= b.hx + r || Math.abs(lz) >= b.hz + r) return;
+          if (!(fy + h - 0.1 >= -b.hy && fy + step + 0.05 <= b.hy)) return; // (her box under their knees or over their head)
+          const qx = G.U.clamp(lx, -b.hx, b.hx), qz = G.U.clamp(lz, -b.hz, b.hz);
+          let ox = lx - qx, oz = lz - qz; const d = Math.hypot(ox, oz);
+          if (d >= r) return;
+          if (d > 1e-5) { ox = (ox / d) * (r - d); oz = (oz / d) * (r - d); }
+          else if (b.hx - Math.abs(lx) < b.hz - Math.abs(lz)) { ox = Math.sign(lx || 1) * (b.hx - Math.abs(lx) + r); oz = 0; } else { ox = 0; oz = Math.sign(lz || 1) * (b.hz - Math.abs(lz) + r); }
+          const ou = oz / b.cp; // (along her length, level: as far as takes them that far along her tilted frame)
+          p.x += ox * b.c + ou * b.s; p.z += -ox * b.s + ou * b.c;
+          return;
+        }
+        if (s.yb) { // (a turned box: the same, in its own frame)
+          const b = s.yb, [lx, lz] = ybLocal(b, p.x, p.z), qx = G.U.clamp(lx, -b.hx, b.hx), qz = G.U.clamp(lz, -b.hz, b.hz);
+          let ox = lx - qx, oz = lz - qz; const d = Math.hypot(ox, oz);
+          if (d >= r) return;
+          if (d > 1e-5) { ox = (ox / d) * (r - d); oz = (oz / d) * (r - d); }
+          else if (b.hx - Math.abs(lx) < b.hz - Math.abs(lz)) { ox = Math.sign(lx || 1) * (b.hx - Math.abs(lx) + r); oz = 0; } else { ox = 0; oz = Math.sign(lz || 1) * (b.hz - Math.abs(lz) + r); }
+          p.x += ox * b.c + oz * b.s; p.z += -ox * b.s + oz * b.c;
+          return;
+        }
         const qx = G.U.clamp(p.x, s.min[0], s.max[0]), qz = G.U.clamp(p.z, s.min[2], s.max[2]);
         const ddx = p.x - qx, ddz = p.z - qz, d = Math.hypot(ddx, ddz);
         if (d >= r) return;
@@ -358,7 +415,11 @@ const G_World = (() => {
   function groundAt(w: WorldT, x: number, z: number, r: number, y: number, step = STEP, smooth = false) {
     let g = -Infinity;
     const k = r * 0.6;
-    query(w, [x - k, y - 50, z - k], [x + k, y + step, z + k], (s) => { if (s.move && !(smooth && s.stair) && s.max[1] <= y + (s.nostep ? NOSTEP : step) + 1e-6 && s.max[1] > g) g = s.max[1]; });
+    query(w, [x - k, y - 50, z - k], [x + k, y + step, z + k], (s) => {
+      if (!s.move || (smooth && s.stair)) return;
+      if (s.ob) { const t = obFace(s.ob, x, z, k); if (t != null && t <= y + (s.nostep ? NOSTEP : step) + 1e-6 && t > g) g = t; return; } // (a tilted box: its top where they stand)
+      if (s.max[1] <= y + (s.nostep ? NOSTEP : step) + 1e-6 && s.max[1] > g && over(s, x, z, k)) g = s.max[1];
+    });
     if (w.terrain) { const th = terrainUnder(w.terrain, x, z); if (th > g) g = th; } // (walked on as it lies: its blocks are for rays. There's nothing under it: anyone who's got under it is back up on it, not falling through it to the gorge's floor)
     if (smooth) for (const st of w.ramps || []) {
       const q = rampAt(st, x, z);
@@ -369,7 +430,11 @@ const G_World = (() => {
   // the lowest surface over someone at (x, z) whose head is at y (Infinity: open sky)
   function ceilingAt(w: WorldT, x: number, z: number, r: number, y: number) {
     let c = Infinity;
-    query(w, [x - r, y - 0.2, z - r], [x + r, y + 50, z + r], (s) => { if (s.move && s.min[1] >= y - 0.2 && s.min[1] < c) c = s.min[1]; });
+    query(w, [x - r, y - 0.2, z - r], [x + r, y + 50, z + r], (s) => {
+      if (!s.move) return;
+      if (s.ob) { const t = obFace(s.ob, x, z, r, true); if (t != null && t >= y - 0.2 && t < c) c = t; return; }
+      if (s.min[1] >= y - 0.2 && s.min[1] < c && over(s, x, z, r)) c = s.min[1];
+    });
     return c;
   }
 
@@ -577,7 +642,7 @@ const G_World = (() => {
     }
   }
 
-  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, hullOf, fitBoxes, touches, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, fromDesc, stairs, door, windowSolids };
+  return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, ybox, obox, hullOf, fitBoxes, touches, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, fromDesc, stairs, door, windowSolids };
 })();
 G.World = G_World;
 

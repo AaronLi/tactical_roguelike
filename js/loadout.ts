@@ -161,8 +161,8 @@ const G_Loadout = (() => {
         const k = GS.kindOf(s.slot), A = ATT[k]; if (!A || (only && only !== s.slot)) continue;
         for (const p of GS.LIST) {
           if (p.id === b[s.slot] || p.factory || p.retired || p.variant || p.becomes || GS.plainHere(p, id) || !GS.fitsSlot(s, p, id, b)) continue;
-          const sup = k === 'muzzle' && /suppress|silenc/i.test(p.name), stat = sup ? 'sur' : A.stat, n = A.n[Math.min(3, Math.max(0, (p.tier || 1) - 1))], have = count(slot, id, stat);
-          out.push({ k: s.slot, id: p.id, name: p.name, pts: Math.max(1, pts(GS.buyPrice(p))) + (slot === 's' ? PISTOL_ATT_UP[p.id === 'gr.derringer.stock' ? 'stock' : k] || 0 : 0), open: open(slot, id) && have >= n, stat, what: sup ? 'kills on unaware suspects' : A.what, n, have: Math.min(n, have) });
+          const stat = A.stat, n = A.n[Math.min(3, Math.max(0, (p.tier || 1) - 1))], have = count(slot, id, stat);
+          out.push({ k: s.slot, id: p.id, name: p.name, pts: Math.max(1, pts(GS.buyPrice(p))) + (slot === 's' ? PISTOL_ATT_UP[p.id === 'gr.derringer.stock' ? 'stock' : k] || 0 : 0), open: open(slot, id) && have >= n, stat, what: A.what, n, have: Math.min(n, have) });
         }
       }
     } else {

@@ -4,7 +4,7 @@
 // board and shipyard, the light of a jump. All of it made here, on the page, the first time it's wanted.
 const G_SpaceUI = (() => {
   const SD = G.SpaceData, T = THREE;
-  let made = false, nav: HTMLCanvasElement, navT = 0, hud: HTMLElement, top: HTMLElement, helm: HTMLElement, marks: HTMLElement, obj: HTMLElement, ops: HTMLElement, fl: HTMLElement, plan: HTMLCanvasElement, tab = 'missions', planT = 0;
+  let made = false, nav: HTMLCanvasElement, navT = 0, hud: HTMLElement, brMsg: HTMLElement, top: HTMLElement, helm: HTMLElement, marks: HTMLElement, obj: HTMLElement, ops: HTMLElement, fl: HTMLElement, plan: HTMLCanvasElement, tab = 'missions', planT = 0;
   let board: ReturnType<typeof G.ShipModel.canvasTex> | null = null;
   const CSS = `
 #spHud { position: fixed; inset: 0; z-index: 40; pointer-events: none; font: 500 12px var(--ui-font, system-ui, sans-serif); color: #d7e6f2; letter-spacing: 0.5px; }
@@ -21,7 +21,10 @@ const G_SpaceUI = (() => {
 #spObj { position: absolute; right: 18px; top: 150px; width: 250px; padding: 9px 12px; background: rgba(6, 12, 18, 0.55); border-left: 2px solid #8fd6ff; }
 #spObj h4 { margin: 0 0 4px; font: 600 12px var(--ui-font, system-ui, sans-serif); letter-spacing: 2px; color: #8fd6ff; } #spObj p { margin: 3px 0; line-height: 1.35; }
 #spObj .ok { color: #7dff9a; } #spObj .bad { color: #ff6a50; } #spObj .tm { font: 600 20px var(--ui-font, system-ui, sans-serif); color: #ffd24a; }
-#spNav { position: absolute; left: 18px; bottom: 214px; width: 288px; border: 1px solid rgba(120, 190, 230, 0.35); background: rgba(3, 8, 12, 0.7); }
+#spBr { position: absolute; left: 0; right: 0; top: 50%; height: 0; pointer-events: none; }
+#spBr b { position: absolute; left: 50%; transform: translateX(-50%); color: #ff4a3a; font: 700 15px ui-monospace, Menlo, Consolas, monospace; letter-spacing: 3px; text-shadow: 0 0 6px rgba(255, 60, 40, 0.7), 0 0 2px #000; white-space: nowrap; }
+#spBr .up { bottom: 70px; } #spBr .dn { top: 70px; } /* (over and under the middle of the view) */
+#spNav { position: absolute; left: 18px; bottom: 214px; width: 288px; pointer-events: none; }
 .sp-bore { position: absolute; width: 26px; height: 26px; margin: -13px 0 0 -13px; border: 1px solid rgba(143, 214, 255, 0.8); border-radius: 50%; } .sp-bore::after { content: ''; position: absolute; left: 11px; top: 11px; width: 2px; height: 2px; background: #8fd6ff; }
 .sp-vel { position: absolute; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid #7dff9a; border-radius: 50%; box-sizing: border-box; }
 #spPlan { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -54%); width: min(72vw, 900px); border: 1px solid rgba(120, 190, 230, 0.4); background: rgba(3, 8, 12, 0.82); }
@@ -59,7 +62,8 @@ const G_SpaceUI = (() => {
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
     const el = (id: string, cls?: string, parent: HTMLElement = document.body) => { const e = document.createElement('div'); e.id = id; if (cls) e.className = cls; parent.appendChild(e); return e; };
     hud = el('spHud', 'hidden'); top = el('spTop', '', hud); helm = el('spHelm', '', hud); marks = el('spMarks', '', hud); obj = el('spObj', '', hud);
-    nav = document.createElement('canvas'); nav.id = 'spNav'; nav.width = 320; nav.height = 200; hud.appendChild(nav);
+    brMsg = el('spBr', '', hud); brMsg.innerHTML = '<b class="up">BREACH ACTION CONTROL OVERRIDE</b><b class="dn">ACCELERATE FOR BREACH</b>'; brMsg.style.display = 'none';
+    nav = document.createElement('canvas'); nav.id = 'spNav'; { const k = Math.min(3, Math.max(2, Math.ceil(window.devicePixelRatio || 1))); nav.width = 320 * k; nav.height = 200 * k; } hud.appendChild(nav); // (sharp: drawn at the screen's own pixels)
     plan = document.createElement('canvas'); plan.id = 'spPlan'; plan.width = 900; plan.height = 520; hud.appendChild(plan);
     fl = el('spFlash'); ops = el('spOps', 'hidden');
     ops.addEventListener('click', (e) => click(e.target as HTMLElement));
@@ -115,8 +119,10 @@ const G_SpaceUI = (() => {
     }
     // the navigation screen: on the helm's console, and on the glass for whoever has the helm
     nav.style.display = atHelm && !s.docked ? '' : 'none';
+    // (the breach assist has her: lined up on a stretch of hull, js/space.ts squareUp)
+    brMsg.style.display = atHelm && !s.docked && !s.auto && s.kind === 'board' && (s.brLock || s.brRound) ? '' : 'none';
     navT -= dt;
-    if (navT <= 0 && s.model && (atHelm || aboard)) { navT = atHelm ? 0.05 : 0.5; drawNav(nav); const c2 = s.model.nav.cv.getContext('2d')!; c2.drawImage(nav, 0, 0); s.model.nav.tex.needsUpdate = true; }
+    if (navT <= 0 && s.model && (atHelm || aboard)) { navT = atHelm ? 0.05 : 0.5; if (atHelm && !s.docked) drawNav(nav, true); drawNav(s.model.nav.cv); s.model.nav.tex.needsUpdate = true; } // (the HUD's, and the screen's own)
     // the sensor station's deck plan: on its screen aboard, and large for whoever sits at it
     const atSens = !!seat && seat.k === 'sensors' && SD.fitted(s.fleet, 'sensors') && s.kind === 'board';
     plan.style.display = atSens ? '' : 'none';
@@ -128,46 +134,59 @@ const G_SpaceUI = (() => {
   // one that's the target ringed. Right: the figures. Close to a breach it's the approach instead: the plate dead ahead is
   // the middle of the rings, the dot her nose's offset from the line into it, the bar her closing speed against what a
   // breach wants (5 m/s or more: none is too fast).
-  function drawNav(cv: HTMLCanvasElement) {
-    const s = S(), c = cv.getContext('2d')!, W = cv.width, H = cv.height;
-    c.fillStyle = '#04090d'; c.fillRect(0, 0, W, H); c.textBaseline = 'middle'; c.font = '11px sans-serif'; c.lineWidth = 1;
+  // How it's drawn: on the helm's screen in the cockpit (a lit panel), and over the view for whoever has the helm (HUD: lines and
+  // figures alone, glowing faintly, nothing behind them but what's outside)
+  const NAV_SCR = { bg: '#04090d' as string | null, grid: '#1f4a5e', accent: '#8fd6ff', text: '#d7e6f2', dim: '#7f97a8', tgt: '#ffd24a', ok: '#7dff9a', warn: '#ffb020', bad: '#ff5a40', barBg: '#12303e' as string | null, glow: 'rgba(0,0,0,0)', blur: 0, line: 1, font: '11px sans-serif' };
+  const NAV_HUD = { bg: null as string | null, grid: 'rgba(143, 214, 255, 0.38)', accent: 'rgba(160, 222, 255, 0.95)', text: 'rgba(228, 242, 252, 0.95)', dim: 'rgba(170, 200, 220, 0.75)', tgt: 'rgba(255, 214, 90, 0.95)', ok: 'rgba(130, 255, 160, 0.95)', warn: 'rgba(255, 180, 50, 0.95)', bad: 'rgba(255, 100, 70, 0.95)', barBg: null as string | null, glow: 'rgba(90, 190, 255, 0.55)', blur: 4, line: 1, font: '500 11px ui-monospace, Menlo, Consolas, monospace' };
+  // corner brackets round the HUD's panel
+  function frame(c: CanvasRenderingContext2D, W: number, H: number, P: typeof NAV_HUD) {
+    c.strokeStyle = P.grid; c.beginPath();
+    for (const [x, y, dx, dy] of [[1.5, 1.5, 1, 1], [W - 1.5, 1.5, -1, 1], [1.5, H - 1.5, 1, -1], [W - 1.5, H - 1.5, -1, -1]]) { c.moveTo(x + dx * 14, y); c.lineTo(x, y); c.lineTo(x, y + dy * 14); }
+    c.stroke();
+  }
+  function drawNav(cv: HTMLCanvasElement, hud = false) {
+    const s = S(), c = cv.getContext('2d')!, P = hud ? NAV_HUD : NAV_SCR, k0 = cv.width / 320, W = 320, H = 200;
+    c.setTransform(k0, 0, 0, k0, 0, 0);
+    if (P.bg) { c.fillStyle = P.bg; c.fillRect(0, 0, W, H); } else c.clearRect(0, 0, W, H);
+    c.textBaseline = 'middle'; c.font = P.font; c.lineWidth = P.line; c.shadowColor = P.glow; c.shadowBlur = P.blur;
+    if (hud) frame(c, W, H, P); // (corner brackets round it, in place of a box)
     const cx = 100, cy = 104, R = 82, inv = s.Q.clone().invert();
     const a = s.kind === 'board' && !(s.state && s.state.boom) ? G.Space.aim(260) : null;
-    c.strokeStyle = '#1f4a5e';
+    c.strokeStyle = P.grid;
     if (a) {
       // the approach: to wherever on her hull the nose is pointed
       const range = a.range, dx = a.dx, dy = a.dy, f = new T.Vector3(0, 0, -1).applyQuaternion(s.Q.clone().premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -(a.site.nz > 0 ? 0 : a.site.nz < 0 ? Math.PI : a.site.nx > 0 ? Math.PI / 2 : -Math.PI / 2)))), k = R / 8, close = a.close;
       for (const r of [R, R * 0.5, R * 0.2]) { c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke(); }
       c.beginPath(); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.moveTo(cx, cy - R); c.lineTo(cx, cy + R); c.stroke();
       const ok = Math.abs(dy) < 1.6 && a.align > 0.5;
-      c.fillStyle = ok ? '#7dff9a' : '#ffb020'; c.beginPath(); c.arc(cx + G.U.clamp(-dx * k, -R, R), cy + G.U.clamp(dy * k, -R, R), 6, 0, 7); c.fill();
-      c.strokeStyle = '#8fd6ff'; c.beginPath(); const ax = cx + G.U.clamp(f.x * 160, -R, R), ay = cy - G.U.clamp(f.y * 160, -R, R); c.moveTo(ax - 9, ay); c.lineTo(ax + 9, ay); c.moveTo(ax, ay - 9); c.lineTo(ax, ay + 9); c.stroke();
-      c.fillStyle = '#8fd6ff'; c.fillText('BREACH APPROACH', 196, 16);
-      c.fillStyle = '#d7e6f2'; c.fillText('range  ' + SD.dist(Math.max(0, range)), 196, 44); c.fillText('off line  ' + Math.hypot(dx, dy).toFixed(1) + ' m', 196, 62); c.fillText('closing  ' + close.toFixed(0) + ' m/s', 196, 80);
-      c.fillStyle = close < 4 ? '#ffb020' : '#7dff9a'; c.fillText(close < 4 ? 'TOO SLOW TO BREACH' : ok ? 'CLEAR HULL: GO' : 'SQUARE HER UP', 196, 104);
-      c.fillStyle = '#12303e'; c.fillRect(196, 122, 110, 8); c.fillStyle = '#7dff9a'; c.fillRect(196, 122, G.U.clamp(close / 60, 0, 1) * 110, 8); c.fillStyle = '#d7e6f2'; c.fillRect(196 + 110 * 4 / 60, 119, 1, 14);
-      c.fillStyle = '#7f97a8'; c.fillText('dot: nose · cross: heading', 196, 150);
+      c.fillStyle = ok ? P.ok : P.warn; c.beginPath(); c.arc(cx + G.U.clamp(-dx * k, -R, R), cy + G.U.clamp(dy * k, -R, R), 6, 0, 7); c.fill();
+      c.strokeStyle = P.accent; c.beginPath(); const ax = cx + G.U.clamp(f.x * 160, -R, R), ay = cy - G.U.clamp(f.y * 160, -R, R); c.moveTo(ax - 9, ay); c.lineTo(ax + 9, ay); c.moveTo(ax, ay - 9); c.lineTo(ax, ay + 9); c.stroke();
+      c.fillStyle = P.accent; c.fillText('BREACH APPROACH', 196, 16);
+      c.fillStyle = P.text; c.fillText('range  ' + SD.dist(Math.max(0, range)), 196, 44); c.fillText('off line  ' + Math.hypot(dx, dy).toFixed(1) + ' m', 196, 62); c.fillText('closing  ' + close.toFixed(0) + ' m/s', 196, 80);
+      c.fillStyle = close < 4 ? P.warn : P.ok; c.fillText(close < 4 ? 'TOO SLOW TO BREACH' : ok ? 'CLEAR HULL: GO' : 'SQUARE HER UP', 196, 104);
+      if (P.barBg) { c.fillStyle = P.barBg; c.fillRect(196, 122, 110, 8); } else { c.strokeStyle = P.grid; c.strokeRect(196.5, 122.5, 110, 8); } c.fillStyle = P.ok; c.fillRect(196, 122, G.U.clamp(close / 60, 0, 1) * 110, 8); c.fillStyle = P.text; c.fillRect(196 + 110 * 4 / 60, 119, 1, 14);
+      c.fillStyle = P.dim; c.fillText('dot: nose · cross: heading', 196, 150);
       return;
     }
     for (const r of [R, R * 0.66, R * 0.33]) { c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke(); }
     c.beginPath(); c.moveTo(cx, cy - R); c.lineTo(cx, cy + R); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.stroke();
-    c.fillStyle = '#8fd6ff'; c.beginPath(); c.moveTo(cx, cy - 6); c.lineTo(cx + 4, cy + 5); c.lineTo(cx - 4, cy + 5); c.fill();
+    c.fillStyle = P.accent; c.beginPath(); c.moveTo(cx, cy - 6); c.lineTo(cx + 4, cy + 5); c.lineTo(cx - 4, cy + 5); c.fill();
     const wp = s.wps[s.tgt] && !s.wps[s.tgt].hide ? s.wps[s.tgt] : null;
     s.wps.forEach((w, i) => {
       if (w.hide) return;
       const v = w.p.clone().sub(s.P).applyQuaternion(inv), d = v.length(), rr = G.U.clamp(Math.log10(Math.max(10, d)) - 1, 0, 3.4) / 3.4 * R, a = Math.atan2(v.x, -v.z);
       const x = cx + Math.sin(a) * rr, y = cy - Math.cos(a) * rr;
-      c.fillStyle = i === s.tgt ? '#ffd24a' : '#8fd6ff'; c.fillRect(x - 3, y - 3, 6, 6);
-      c.fillStyle = v.y > d * 0.15 ? '#d7e6f2' : v.y < -d * 0.15 ? '#7f97a8' : 'rgba(0,0,0,0)'; c.fillText(v.y > 0 ? '▲' : '▼', x + 5, y);
-      if (i === s.tgt) { c.strokeStyle = '#ffd24a'; c.beginPath(); c.arc(x, y, 8, 0, 7); c.stroke(); c.strokeStyle = '#1f4a5e'; }
+      c.fillStyle = c.strokeStyle = i === s.tgt ? P.tgt : P.accent; if (hud) c.strokeRect(x - 3, y - 3, 6, 6); else c.fillRect(x - 3, y - 3, 6, 6);
+      c.fillStyle = v.y > d * 0.15 ? P.text : v.y < -d * 0.15 ? P.dim : 'rgba(0,0,0,0)'; c.fillText(v.y > 0 ? '▲' : '▼', x + 5, y);
+      if (i === s.tgt) { c.strokeStyle = P.tgt; c.beginPath(); c.arc(x, y, 8, 0, 7); c.stroke(); } c.strokeStyle = P.grid;
     });
-    c.fillStyle = '#7f97a8'; c.fillText('100 m', cx + 3, cy - R * 0.33 + 7); c.fillText('1 km', cx + 3, cy - R * 0.62 + 7); c.fillText('10 km', cx + 3, cy - R * 0.91 + 7);
+    c.fillStyle = P.dim; c.fillText('100 m', cx + 3, cy - R * 0.33 + 7); c.fillText('1 km', cx + 3, cy - R * 0.62 + 7); c.fillText('10 km', cx + 3, cy - R * 0.91 + 7);
     const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(s.P.clone().sub(wp.p).normalize()) : 0;
-    c.fillStyle = '#8fd6ff'; c.fillText('NAV', 196, 16); c.fillStyle = '#ffd24a'; c.fillText(wp ? wp.name.slice(0, 20) : 'no target', 196, 38);
-    c.fillStyle = '#d7e6f2'; c.fillText('range  ' + (wp ? SD.dist(dist) : '—'), 196, 60); c.fillText('speed  ' + SD.speed(speed), 196, 78); c.fillText('closing  ' + SD.speed(Math.max(0, close)), 196, 96); c.fillText('ETA  ' + (wp && close > 2 ? SD.eta(dist / close) : '--:--'), 196, 114);
-    c.fillStyle = s.warp || s.spin >= 1 ? '#8fd6ff' : '#7f97a8'; c.fillText(s.warp ? 'AT WARP' : s.spin >= 1 ? 'WARP READY: T' : s.spin > 0 ? 'WARP SPIN-UP ' + Math.round(s.spin * 100) + '%' : G.Space.warpGate() ? 'face the target to warp' : 'no warp target', 196, 138);
-    const na = G.Space.nearAnchor(); if (na) { c.fillStyle = '#7dff9a'; c.fillText('IN THE ANCHOR: jump ready', 196, 160); }
-    c.fillStyle = s.hp < s.hpMax * 0.35 ? '#ff5a40' : '#7f97a8'; c.fillText('hull  ' + Math.round(s.hp / s.hpMax * 100) + '%', 196, 182);
+    c.fillStyle = P.accent; c.fillText('NAV', 196, 16); c.fillStyle = P.tgt; c.fillText(wp ? wp.name.slice(0, 20) : 'no target', 196, 38);
+    c.fillStyle = P.text; c.fillText('range  ' + (wp ? SD.dist(dist) : '—'), 196, 60); c.fillText('speed  ' + SD.speed(speed), 196, 78); c.fillText('closing  ' + SD.speed(Math.max(0, close)), 196, 96); c.fillText('ETA  ' + (wp && close > 2 ? SD.eta(dist / close) : '--:--'), 196, 114);
+    c.fillStyle = s.warp || s.spin >= 1 ? P.accent : P.dim; c.fillText(s.warp ? 'AT WARP' : s.spin >= 1 ? 'WARP READY: T' : s.spin > 0 ? 'WARP SPIN-UP ' + Math.round(s.spin * 100) + '%' : G.Space.warpGate() ? 'face the target to warp' : 'no warp target', 196, 138);
+    const na = G.Space.nearAnchor(); if (na) { c.fillStyle = P.ok; c.fillText('IN THE ANCHOR: jump ready', 196, 160); }
+    c.fillStyle = s.hp < s.hpMax * 0.35 ? P.bad : P.dim; c.fillText('hull  ' + Math.round(s.hp / s.hpMax * 100) + '%', 196, 182);
   }
   // a boarded ship's deck, as the scanner has it: the compartments named, the doors (locked ones red), the breach; who's
   // aboard her once the squad's ship is within 900 m

@@ -32,7 +32,7 @@ interface AmbScene {
   /** each bus's way to you: along the openings (lp, g) and through the walls (wg) */
   inW: AmbWay; outW: AmbWay;
   /** the send to the reverbs, and a reverb per zone you've been in (only the one you're in at any level) */
-  verbIn: GainNode; verbs: Map<string, { g: GainNode; cv: ConvolverNode; wide: GainNode; dg: GainNode; pan: PannerNode }>;
+  verbIn: GainNode; verbs: Map<string, { g: GainNode; cv: ConvolverNode; wide: GainNode; dg: GainNode; pan: PannerNode; on: boolean; left: number }>;
   /** what reaches you, from your last listen (js/acoustics.ts), and your zone */
   reach?: Map<number, AcReach>; zone?: number;
   /** where the listener is at time t (the context's): for placing one-shots round them as they play */
@@ -911,10 +911,25 @@ const G_Ambience = (() => {
       const c = s.c, cv = c.createConvolver(), g = gain(c, 0), wide = gain(c, 1), dg = gain(c, 0), pan = c.createPanner();
       cv.normalize = false; cv.buffer = tr ? G.Acoustics.impulse(c, tr, 1) : impulse(c, rt60, mfp);
       pan.panningModel = 'equalpower'; pan.rolloffFactor = 0;
-      chain(s.verbIn, cv, g); chain(g, wide, s.out); chain(g, dg, pan, s.out);
-      v = { g, cv, wide, dg, pan }; s.verbs.set(key, v);
+      chain(cv, g); chain(wide, s.out); chain(dg, pan, s.out);
+      v = { g, cv, wide, dg, pan, on: false, left: -1 }; s.verbs.set(key, v);
+      verbOn(s, v, true);
     }
     return v;
+  }
+  // A reverb's in the graph only while it's heard. The whole of the place's sound goes into the send all the time, and a
+  // convolver that's fed works whether or not anything of it's let out (about 1% of a core each): one left in for every
+  // room you'd stood in, and every state its doors had been in, was dozens by the end of a big building, the audio thread
+  // behind. So a room's is taken out once you've left it and it's faded away (VERB_OFF s on, its level 70 dB down by
+  // then), and put back when you're in it again (it comes up under the fade in). Out of the graph it's kept, made and its
+  // response loaded, for coming back to (the last VERB_KEEP of them).
+  // (Only live: a rendered walk's mix is all scheduled before any of it's rendered, so its reverbs stay in throughout.)
+  const VERB_OFF = 5, VERB_KEEP = 12;
+  function verbOn(s: AmbScene, v: NonNullable<ReturnType<AmbScene['verbs']['get']>>, on: boolean) {
+    if (v.on === on) return;
+    v.on = on;
+    if (on) { s.verbIn.connect(v.cv); v.g.connect(v.wide); v.g.connect(v.dg); }
+    else { try { s.verbIn.disconnect(v.cv); } catch { /* (not in) */ } v.g.disconnect(); }
   }
 
   // ---- where you are: what reaches you, how ----
@@ -935,7 +950,7 @@ const G_Ambience = (() => {
     // (how much of a way comes from its opening: none standing in it, most of it from across a room)
     const dir = (v: AcPortal | null) => (v ? G.U.clamp((Math.hypot(v.x - x, v.z - z) - 1) / 5, 0, 0.85) : 0);
     const anyIn = d.zones.some((q) => !q.out);
-    const mfp = zone.out ? 20 : 4 * zone.volume / zone.surface, tr = zone.out ? null : Ac.roomAt(map, x, y, z);
+    const mfp = zone.out ? 20 : 4 * zone.volume / zone.surface, tr = zone.out ? null : Ac.roomAt(map, x, y, z, !(typeof AudioContext !== 'undefined' && s.c instanceof AudioContext));
     let tk = tr ? trKeys.get(tr) : undefined; if (tr && tk === undefined) { tk = trKeys.size + 1; trKeys.set(tr, tk); }
     return zone.out
       ? { inLvl: Math.sqrt(bi.level), inLp: bi.lp, inWall: anyIn ? 0.04 : 0, outLvl: 1, outLp: 20000, outWall: 0, key: 'out', rt60: 0.25, mfp, wet: 0.04, inAt: bi.via, inDir: dir(bi.via) }
@@ -961,7 +976,17 @@ const G_Ambience = (() => {
     const cur = verbFor(s, m.key, m.rt60, m.mfp, m.tr), dk = m.mid ? m.midDir || 0 : 0;
     cur.wide.gain.setTargetAtTime(Math.sqrt(1 - dk), t, tc); cur.dg.gain.setTargetAtTime(Math.sqrt(dk), t, tc);
     if (m.mid) { cur.pan.positionX.setTargetAtTime(m.mid.x, t, tc); cur.pan.positionY.setTargetAtTime(m.mid.y, t, tc); cur.pan.positionZ.setTargetAtTime(m.mid.z, t, tc); }
-    for (const [k, v] of s.verbs) v.g.gain.setTargetAtTime(k === m.key ? m.wet : 0, t, Math.max(tc, 0.4));
+    const live = typeof AudioContext !== 'undefined' && s.c instanceof AudioContext;
+    let off = 0;
+    for (const [k, v] of s.verbs) {
+      const mine = k === m.key;
+      if (mine) { v.left = -1; verbOn(s, v, true); } else if (v.left < 0) v.left = t;
+      v.g.gain.setTargetAtTime(mine ? m.wet : 0, t, Math.max(tc, 0.4));
+      if (live && !mine && v.on && t - v.left > VERB_OFF) verbOn(s, v, false);
+      if (!v.on) off++;
+    }
+    // (more kept out of the graph than VERB_KEEP: the one left longest ago goes)
+    while (off > VERB_KEEP) { let ok = '', ot = Infinity; for (const [k, v] of s.verbs) if (!v.on && v.left < ot) { ot = v.left; ok = k; } s.verbs.delete(ok); off--; }
   }
   /** a spot as you hear it: how loud (amplitude), how bright, from where (the opening it comes in by, if it's not in your zone) */
   function spotHeard(s: AmbScene, sp: AmbSpot) {
@@ -1029,7 +1054,7 @@ const G_Ambience = (() => {
     };
     play(buf, sh.t, base * k * (sh.own ? 1 : near), lpHz, sh.own ? null : at, 0);
     // its room: the shooter's room's measured response at its measured level, heard by the way that room reaches you
-    const tr = G.Acoustics.roomAt(map, src.x, src.y, src.z);
+    const tr = G.Acoustics.roomAt(map, src.x, src.y, src.z, true);
     if (tr) {
       const n = c.createBufferSource(), cv = c.createConvolver(), lp = filt(c, 'lowpass', h.same ? 20000 : h.lp), g = gain(c, base * (h.same ? 1 : h.k));
       cv.normalize = false; cv.buffer = G.Acoustics.impulse(c, tr); n.buffer = dry;
@@ -1039,7 +1064,7 @@ const G_Ambience = (() => {
       n.start(sh.t);
     }
     // a shot from another room, come in, fills yours: your room's response to it, all round you, at the level it reaches you at
-    const lt = h.same ? null : G.Acoustics.roomAt(map, lis.x, lis.y, lis.z);
+    const lt = h.same ? null : G.Acoustics.roomAt(map, lis.x, lis.y, lis.z, true);
     if (lt && lt !== tr) {
       const n = c.createBufferSource(), cv = c.createConvolver(), g = gain(c, base * k * near), lp = filt(c, 'lowpass', lpHz);
       cv.normalize = false; cv.buffer = G.Acoustics.impulse(c, lt); n.buffer = dry; chain(n, lp, cv, g, c.destination); n.start(sh.t);

@@ -20,7 +20,7 @@ interface ShWing { dO: number; dI: number; ew: number; len: number }
 interface ShSk { wing?: ShWing; size: SpSize; len: number; sw: number; dmax: number; W: number; H: number; zc: number; segs: ShSeg[] }
 interface ShPt { x: number; z: number; y: number }
 // a stretch of hull a ship can breach: three cells of its wall (c the middle one), the way out of her (nx, nz), the wall's middle there
-interface ShSite { c: number; nx: number; nz: number; x: number; z: number; cells: number[] }
+interface ShSite { c: number; nx: number; nz: number; x: number; z: number; cells: number[]; ang?: number; pt?: number } // (ang: an angled breach's, degrees off square: tunnel; pt: degrees nose up, - down)
 interface ShHull { x0: number; z0: number; x1: number; z1: number; zc: number; main: boolean; size: SpSize }
 interface ShMeta { size: SpSize; obj: SpObj | null; decks: number; other: SpSize | null; breach: { x: number; z: number; face: number; door: number; room: number }; sites?: ShSite[]; cuts: number[][]; locks: Record<number, string>; roles: (ShRole | null)[];
   hullOf: number[]; console: ShPt | null; artifact: ShPt | null; pods: ShPt[]; salvage: ShPt[]; hullWin: Record<number, number>; wing?: boolean; hvtRoom: number; cardRooms: Record<string, number>; hull: ShHull; hulls: ShHull[] }
@@ -184,7 +184,9 @@ const G_ShipGen = (() => {
     const free = slots.slice(), take = (s: WSlot, role: ShRole) => { free.splice(free.indexOf(s), 1); s.rm.type = role as RoomType; s.rm.ship = role; if (role === 'armoury') s.rm.lootRoom = true; };
     const hold = slots.filter((s) => holds.includes(s.rm)).sort((a, b) => Math.abs(a.pos - 0.65) - Math.abs(b.pos - 0.65))[0] || slots[0];
     take(hold, 'cargo');
-    for (const [role, pref] of PROGRAM[sk.size + ':0']) {
+    // (a flying wing is a warship, a corvette's too: her security office second only to her guns, her cameras running her crew's response, js/spaceserver.ts)
+    const prog = PROGRAM[sk.size + ':0'].some(([ro]) => ro === 'security') ? PROGRAM[sk.size + ':0'] : [PROGRAM[sk.size + ':0'][0], ['security', 0.55] as [ShRole, number], ...PROGRAM[sk.size + ':0'].slice(1)];
+    for (const [role, pref] of prog) {
       if (!free.length) break;
       const sc = (s: WSlot) => (pref == null ? 0 : Math.abs(s.pos - pref) * 2) + r() * 0.5;
       take(free.map((s) => [sc(s), s] as [number, WSlot]).sort((a, b) => a[0] - b[0])[0][1], role);
@@ -219,6 +221,7 @@ const G_ShipGen = (() => {
 
   // After the plan (and the stacking of her decks): map.sp
   function finish(map: LvMap, lay: LvLay) {
+    for (const w of map.windows || []) (w as any).ship = true; // (a ship's glass: rounds don't go through it and it never comes down, js/level.ts paneBreaks)
     const L = G.Level, TS = L.TS, CT = L.CTS, src = (lay as any).sp, S = SPEC[src.size as SpSize], floors = map.floors || [map];
     const fl = (rm: { fl?: number }) => floors[rm.fl || 0], roles = map.rooms.map((rm) => (rm.ship as ShRole) || null), hullOf = map.rooms.map((rm) => (rm as any).hull || 0);
     const locks: Record<number, string> = {};
@@ -363,14 +366,64 @@ const G_ShipGen = (() => {
   // its frame, its solids); a bulkhead that meets the hull behind it is broken through, two cells in, so the way in opens on
   // both compartments. The same on the host and on every screen. Returns every cell it opened (the hull's, a window's beyond
   // them, the bulkheads'), or null if it's been cut there already.
+  // ---- An angled breach (s.ang: the squad's ship came in that many degrees off square, up to SpaceData.BREACH_ANG). Her collar's against
+  // the hull at the site, at her angle; what she drove in is a tunnel of torn, crumpled plating from her collar's mouth, curving round
+  // to come out square inside, as wide and as high as her own (TUN.HW either side, TUN.H high): only as far in as gets it through the
+  // hull's wall, a little more the further off square she came (room for the bend), TUN.IN at BREACH_ANG (tunnelIn). The same on every
+  // machine from the site and the angle. Its line: points along it, each with which way it runs there (a curve from her heading to
+  // straight in). (A breach nose up or down but square across has none: her deck where it meets the hull is within a step of the deck
+  // inside at any pitch she can come in at, and the hole's square to the wall)
+  const TUN = { HW: 0.85, H: 2.2, IN: 1.9, N: 9 };
+  const bent = (s: ShSite) => !!s.ang;
+  // how far in from the hull's face it comes out: through the wall (a cell) and a hand's breadth, more with the angle
+  const tunnelIn = (s: ShSite) => { const TS = G.Level.TS, k = Math.min(1, Math.abs(s.ang || 0) / 45), a = TS + 0.25; return a + (TUN.IN - a) * k; };
+  // a site's record as a cut's: [cell, nx, nz], and how far off square and nose up she came in when she did
+  const cutKey = (s: ShSite) => s.pt ? [s.c, s.nx, s.nz, s.ang || 0, s.pt] : s.ang ? [s.c, s.nx, s.nz, s.ang] : [s.c, s.nx, s.nz];
+  function tunnelPath(s: ShSite) {
+    const TS = G.Level.TS, nx = s.nx, nz = s.nz, yaw = (nz > 0 ? 0 : nz < 0 ? Math.PI : nx > 0 ? Math.PI / 2 : -Math.PI / 2) + (s.ang || 0) * Math.PI / 180;
+    const fx = s.x + nx * TS / 2, fz = s.z + nz * TS / 2, mx = fx + nx * 0.03, mz = fz + nz * 0.03, dx = -Math.sin(yaw), dz = -Math.cos(yaw), IN = tunnelIn(s), ex = fx - nx * IN, ez = fz - nz * IN, H = IN * 0.4; // (H: the bend's handles, short of half its depth: no loop in it)
+    const P = [[mx, mz], [mx + dx * H, mz + dz * H], [ex + nx * H, ez + nz * H], [ex, ez]], out: { x: number; z: number; tx: number; tz: number }[] = [];
+    for (let i = 0; i <= TUN.N; i++) {
+      const t = i / TUN.N, u = 1 - t, b = [u * u * u, 3 * u * u * t, 3 * u * t * t, t * t * t], db = [-3 * u * u, 3 * u * u - 6 * u * t, 6 * u * t - 3 * t * t, 3 * t * t];
+      const x = b.reduce((a, k, j) => a + k * P[j][0], 0), z = b.reduce((a, k, j) => a + k * P[j][1], 0); let tx = db.reduce((a, k, j) => a + k * P[j][0], 0), tz = db.reduce((a, k, j) => a + k * P[j][1], 0);
+      const l = Math.hypot(tx, tz) || 1; tx /= l; tz /= l;
+      out.push({ x, z, tx, tz });
+    }
+    return out;
+  }
+  // the grid's cells of wall (and of window) the tunnel goes through
+  function tunnelCells(map: LvMap, s: ShSite) {
+    const TS = G.Level.TS, W = map.W, out: number[] = [], path = tunnelPath(s), winAt = map.winAt as Map<number, unknown> | undefined;
+    for (let i = 0; i < path.length - 1; i++) for (let k = 0; k < 6; k++) {
+      const u = k / 6, x = path[i].x + (path[i + 1].x - path[i].x) * u, z = path[i].z + (path[i + 1].z - path[i].z) * u, R = TUN.HW + 0.12;
+      for (let cz = Math.floor((z - R) / TS); cz <= Math.floor((z + R) / TS); cz++) for (let cx = Math.floor((x - R) / TS); cx <= Math.floor((x + R) / TS); cx++) {
+        if (cx < 0 || cz < 0 || cx >= W || cz >= map.H || Math.hypot((cx + 0.5) * TS - x, (cz + 0.5) * TS - z) > R + TS * 0.35) continue;
+        const c = cz * W + cx; if ((map.t[c] === 1 || (winAt && winAt.has(c))) && !out.includes(c)) out.push(c);
+      }
+    }
+    return out;
+  }
+  // its plating in the world (on the host and every screen): a floor, the two sides and a roof for each stretch of it, turned with it
+  function tunnelSolids(map: LvMap, s: ShSite) {
+    const Wd = G.World, w = map.world, path = tunnelPath(s), out: any[] = []; if (!w) return out;
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i], b = path[i + 1], cx = (a.x + b.x) / 2, cz = (a.z + b.z) / 2, len = Math.hypot(b.x - a.x, b.z - a.z), yaw = Math.atan2(-(b.x - a.x), -(b.z - a.z)), c = Math.cos(yaw), sn = Math.sin(yaw), hz = len / 2 + 0.06;
+      const o = { kind: 'prop', mat: G.Materials.SHIP, tunnel: true };
+      out.push(Wd.add(w, Wd.ybox(cx, cz, yaw, TUN.HW + 0.14, hz, -0.25, 0, o)));
+      for (const sd of [-1, 1]) out.push(Wd.add(w, Wd.ybox(cx + sd * (TUN.HW + 0.07) * c, cz - sd * (TUN.HW + 0.07) * sn, yaw, 0.07, hz, 0, TUN.H, o)));
+      out.push(Wd.add(w, Wd.ybox(cx, cz, yaw, TUN.HW + 0.14, hz, TUN.H, TUN.H + 0.14, o)));
+    }
+    return out;
+  }
   function cut(map: LvMap, s: ShSite): { cells: number[]; walls: number[]; wins: number[] } | null {
     const sp = map.sp!, TS = G.Level.TS, W = map.W, w = map.world, Wd = G.World;
     if (sp.cuts.some((q) => q[0] === s.c && q[1] === s.nx && q[2] === s.nz)) return null;
-    sp.cuts.push([s.c, s.nx, s.nz]); sp.sites = undefined;
+    sp.cuts.push(cutKey(s)); sp.sites = undefined;
     const cells = s.cells.slice(), walls: number[] = [], wins: number[] = [];
+    if (bent(s)) for (const c of tunnelCells(map, s)) if (!cells.includes(c)) cells.push(c); // (an angled breach: the walls the tunnel goes through too)
     // (the windows it touches, and their cells beyond the hole: the hole takes them in)
     const winAt = map.winAt as Map<number, { win: LvWin }> | undefined;
-    for (const c of s.cells) { const wa = winAt && winAt.get(c); if (wa && !wins.includes(wa.win.id)) wins.push(wa.win.id); }
+    for (const c of cells.slice()) { const wa = winAt && winAt.get(c); if (wa && !wins.includes(wa.win.id)) wins.push(wa.win.id); }
     for (const id of wins) {
       const win = map.windows[id];
       for (const q of win.solids || []) Wd.remove(w, q);
@@ -404,6 +457,7 @@ const G_ShipGen = (() => {
     // screens to clear its picture away (js/space.ts cutHere).
     const D = 1.75, cxm = s.x - s.nx * (TS / 2 + D), czm = s.z - s.nz * (TS / 2 + D), hx = s.nx ? D : 2.3, hz = s.nz ? D : 2.3, gone = new Set<LvProp>();
     Wd.query(w, [cxm - hx, 0.05, czm - hz], [cxm + hx, 2.8, czm + hz], (q: any) => { if (q.kind === 'prop' && q.prop) gone.add(q.prop); });
+    if (bent(s)) for (const p of tunnelPath(s)) Wd.query(w, [p.x - 1.3, 0.05, p.z - 1.3], [p.x + 1.3, 2.8, p.z + 1.3], (q: any) => { if (q.kind === 'prop' && q.prop) gone.add(q.prop); }); // (and along the tunnel)
     const boxes: number[][] = [];
     if (gone.size) {
       const gb = new Set<LvBox>();
@@ -420,12 +474,13 @@ const G_ShipGen = (() => {
     (sp as any).gone = boxes;
     map.doorVer = (map.doorVer || 0) + 1; // (sound gets through it now)
     ((sp as any).cutCells || ((sp as any).cutCells = {}))[s.c + ',' + s.nx + ',' + s.nz] = cells;
+    if (bent(s)) tunnelSolids(map, s);
     return { cells, walls, wins };
   }
   // A site from a cut's record [cell, nx, nz] (what's been cut stays one, whatever the grid round it is now)
   function siteAt(map: LvMap, a: number[]): ShSite {
     const W = map.W, TS = G.Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0;
-    return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) };
+    return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k), ang: a[3] || 0, pt: a[4] || 0 };
   }
   // Every hole she's been breached through but the one the squad's ship is against (site, or none: she's away) shut by an unseen
   // wall: open space past it, nothing to walk out into (what's out there isn't made yet). On the host and every screen alike.
@@ -436,14 +491,14 @@ const G_ShipGen = (() => {
     sp.seals = [];
     for (const c of sp.cuts as number[][]) {
       if (site && c[0] === site[0] && c[1] === site[1] && c[2] === site[2]) continue;
-      for (const cell of (sp.cutCells && sp.cutCells[c.join(',')]) || siteAt(map, c).cells) {
+      for (const cell of (sp.cutCells && sp.cutCells[c.slice(0, 3).join(',')]) || siteAt(map, c).cells) {
         const x = (cell % W) * TS, z = ((cell / W) | 0) * TS;
         sp.seals.push(Wd.add(w, Wd.box(x, -0.6, z, x + TS, H, z + TS, { kind: 'wall', seal: true })));
       }
     }
   }
   const NAMES: Record<string, string> = { bridge: 'Bridge', security: 'Security', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell' };
-  return { lay, finish, fairings, faired, roomAt, sites, siteOf, siteAt, cut, seal, NAMES, SPEC };
+  return { lay, finish, fairings, faired, roomAt, sites, siteOf, siteAt, cut, seal, tunnelPath, bent, cutKey, TUN, NAMES, SPEC };
 })();
 G.ShipGen = G_ShipGen;
 interface GameModules { ShipGen: typeof G_ShipGen; }

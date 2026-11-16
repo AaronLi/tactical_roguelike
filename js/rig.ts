@@ -1036,7 +1036,7 @@ const G_Rig = (() => {
     root.position.copy(p.pos);
     // (on a zipline: facing the way they're carried, as they've been moving; lifted straight up onto it, the way they faced)
     if (p.zip) { if (rig.zipYaw == null) rig.zipYaw = p.yaw; if (Math.hypot(rig.vel.x, rig.vel.z) > 1.5) rig.zipYaw = Math.atan2(-rig.vel.x, -rig.vel.z); } else rig.zipYaw = null;
-    root.rotation.y = p.climb ? p.climb.yaw : p.zip ? rig.zipYaw : p.yaw; // (on a ladder: facing it, wherever they're looking)
+    root.rotation.set(0, p.climb ? p.climb.yaw : p.zip ? rig.zipYaw : p.yaw, 0); // (on a ladder: facing it, wherever they're looking. Level: her tilt, aboard a ship lying tilted, is put on last)
     if (rig.state !== 'dead' && !rig.limp) gunHome(rig); // (before the hands reach for it: the right hand may have turned it, below)
     // night vision flipping down or up (a third of a second, as the wearer's own: js/player.ts nvFlip)
     if (rig.nvPivot && rig.nvK !== rig.nvWant) { const w = rig.nvWant || 0; rig.nvK = (rig.nvK || 0) + Math.sign(w - (rig.nvK || 0)) * Math.min(Math.abs(w - (rig.nvK || 0)), dt / 0.32); nvPose(rig); }
@@ -1480,6 +1480,8 @@ const G_Rig = (() => {
     if (rig.powered && p.str != null) powerStep(rig, dt, p.str, p.aimAt);
     else if (rig.powered) rig.rd = null!; // (far off: animated only; the body starts again from the pose when near)
     if (rig.dropped) dropGun(rig, dt);
+    // aboard a ship lying tilted (a breach nose up or down): standing square to her decks, turned with her about their feet (js/level.ts tiltQ)
+    if (rig.state !== 'dead' && !rig.limp && !p.zip && !p.climb && G.Game && G.Game.map) { const tq = G.Level.tiltQ(G.Game.map, p.pos.x, p.pos.y, p.pos.z); if (tq) root.quaternion.premultiply(tq); }
     poseFingers(rig);
     drawDebug(rig);
   }

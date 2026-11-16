@@ -370,10 +370,12 @@ const G_Views = {
     if (G.Game.caseOpen) cv.open = 1; // joined with it already open
   },
   // a body that died before we joined: lay it out where it fell
-  addBody(id: number, type: string, x: number, z: number, yaw: number, secured: number, y = 0) {
+  addBody(id: number, type: string, x: number, z: number, yaw: number, secured: number, y = 0, nm: string | null = null) {
     if (this.enemies.has(id)) return;
-    const def = (G.ENEMIES as Record<string, any>)[type];
-    if (!def) return;
+    const def0 = (G.ENEMIES as Record<string, any>)[type];
+    if (!def0) return;
+    const def = Object.create(def0); // (their own: what they were called aboard her, nm, js/server.ts titleOf)
+    if (nm) def.name = nm;
     const rig = G.Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true });
     if (!def.civ) rig.setKit(G.Rig.armourKit(def.vest, def.helmet, def.style === 'armored'));
     G.R.dynRoot.add(rig.root);
@@ -426,7 +428,7 @@ const G_Views = {
   // (each of the first G.Level.CRACKS rounds fractures it; the next one brings it down: js/player.ts roundPane)
   crackGlass(id: number, at: THREE.Vector3, dir?: THREE.Vector3) {
     const map = G.Game.map, w = map && map.windows && map.windows[id];
-    if (!w || w.broken || w.armor || (w.cracked || 0) >= G.Level.CRACKS) return;
+    if (!w || w.broken || w.armor || (w.cracked || 0) >= G.Level.crackCap(w)) return;
     w.cracked = (w.cracked || 0) + 1; map.cracked = true;
     if (G.Highlights) G.Highlights.crack(id, at);
     G.Damage.crack(map.winMeshes && map.winMeshes[id] as THREE.Mesh, at);

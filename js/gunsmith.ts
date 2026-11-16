@@ -488,7 +488,12 @@ const G_GunsmithUI = (() => {
   function show(container: HTMLElement) {
     if (!renderer) init();
     container.classList.add('gs-host');
+    // (the list and side column scroll on their own, css .gs-list: kept where they were across a redraw of the same slot's list)
+    const key = `${st.wslot}|${st.slot}|${st.stk ? 1 : 0}`, l0 = container.querySelector('.gs-list'), s0 = container.querySelector('.gs-side');
+    const keep = container.dataset.gsKey === key && l0 ? [l0.scrollTop, s0 ? s0.scrollTop : 0] : null;
     container.innerHTML = html();
+    container.dataset.gsKey = key;
+    if (keep) { const l1 = container.querySelector('.gs-list'), s1 = container.querySelector('.gs-side'); if (l1) l1.scrollTop = keep[0]; if (s1) s1.scrollTop = keep[1]; }
     const w = weapon();
     if (!container.dataset.gsInput) { container.dataset.gsInput = 1 as any; container.addEventListener('input', (e: Event) => { if (container.classList.contains('gs-host')) stkInput(e); }); } // (the sticker tool's sliders)
     if (w) {

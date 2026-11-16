@@ -3,7 +3,7 @@
   case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
   grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
   above?: LvMap | null; voidAbove?: ArrayLike<number> | null; units?: number; navG?: any; lightT?: number; underground?: boolean; rollers?: number[][]; hub?: boolean; glassRuns?: any; fences: LvFence[]; doorVer?: number; cracked?: any; dmg?: any;
-  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux; desc?: LvDesc; sp?: ShMeta | null; aiNo?: (i: number, f: number) => boolean } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean; ship?: string; lootRoom?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
+  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux; desc?: LvDesc; sp?: ShMeta | null; aiNo?: (i: number, f: number) => boolean } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { ship?: boolean; solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean; ship?: string; lootRoom?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
 type RoomType = 'security' | 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom' | 'terrace' | 'viewing' | 'bridge' | 'gunnery' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine';
 type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
 type LvDoorKind = 'stair' | 'fire' | 'vault' | 'slide' | 'blast'; // (a door that isn't the plain wooden one. slide, blast: a ship's, which slide into the wall: slides())
@@ -720,7 +720,14 @@ const G_Level = {
   //     outsideMaterial; high up in an apartment block). Rounds through it stop in the wall behind.
   // From the level's own random stream, so every peer has the same windows. map.windows[id], map.winAt: cell -> ray boxes.
   SILL: 0.95, TOP: 2.25,
-  CRACKS: 2, // (rounds that fracture a pane without bringing it down: the next one breaks it, js/player.ts roundPane)
+  CRACKS: 1, // (rounds that fracture a pane without bringing it down: the next one breaks it, js/player.ts roundPane. One: a second round brings it down)
+  // A ship's glass (w.ship: js/shipgen.ts finish) never comes down: rounds don't go through it (its material's armour glass's, js/materials.ts),
+  // each one fractures it more, up to CRACK_MAX cracks drawn, and nothing breaks it (rounds, blasts, someone walking into it fractured).
+  // Anywhere else glass is as it was: CRACKS rounds fracture a pane, the next one, a blast, or walking into it fractured brings it down.
+  CRACK_MAX: 6,
+  paneBreaks(w: { ship?: boolean } | null | undefined) { return !(w && w.ship); },
+  // how many cracks a pane can take
+  crackCap(w: { ship?: boolean } | null | undefined) { return this.paneBreaks(w) ? this.CRACKS : this.CRACK_MAX; },
   placeWindows(map: LvMap) {
     const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G.U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
     map.windows = []; map.winAt = new Map();
@@ -2051,6 +2058,43 @@ const G_Level = {
   // Circle-vs-tile collision. Boxes the entity is standing on top of (y >= box height) are ignored.
   // step: how high a thing can be and still be stepped up onto, not walked into (a stair's step is 0.2)
   // smooth: someone walking (stairs are slopes for them: G.World.rampAt)
+  // ---- Aboard a ship lying tilted against this one (a breach nose up or down: js/space.ts and js/spaceserver.ts setTilt), her own
+  // gravity: her decks are level to whoever's aboard her. Anyone (and any grenade) there is moved in her own frame, where she lies level
+  // (tilt.lm: this map with her own boxes and flights as she's built in place of its world: js/spacedata.ts frameWorld), and put back
+  // (inFrame). The view and the bodies drawn turn with her (tiltQ), eased out along the tunnel she drove in.
+  setTilt(map: LvMap, d: SpShipDef | null, b: { x: number; y: number; z: number; yaw: number; pt?: number } | null) {
+    const SD = G.SpaceData;
+    (map as any).tilt = d && b && b.pt ? { b, d, L: SD.layout(d), lm: Object.assign(Object.create(map), { tilt: null, world: SD.frameWorld(d), cracked: null }) } : null;
+  },
+  // her, if (x, y, z) is aboard her (aft of where her floor meets the hull), else null
+  frameAt(map: LvMap | null, x: number, y: number, z: number): any {
+    const t = map && (map as any).tilt; if (!t) return null;
+    const l = G.SpaceData.toShip(t.b, x, y, z);
+    return l.z > Math.max(t.L.zc, t.L.zc - 0.22 + 1.16 * Math.tan(t.b.pt)) && G.SpaceData.aboard(t.d, t.b, x, y, z) ? t : null; // (from where her floor meets the hull's face: js/spacedata.ts worldBoxes)
+  },
+  // how her tilt turns someone standing at (x, y, z): all of it aboard, easing to none along the tunnel to its far end (null: none)
+  tiltQ(map: LvMap | null, x: number, y: number, z: number): THREE.Quaternion | null {
+    const t = map && (map as any).tilt; if (!t) return null;
+    const SD = G.SpaceData, l = SD.toShip(t.b, x, y, z), z0 = t.L.zc - 0.22 - G.ShipGen.TUN.IN - 0.6;
+    const k = SD.aboard(t.d, t.b, x, y, z) ? 1 : Math.abs(l.x) < 1.6 && l.z > z0 && l.z < t.L.zc + 0.5 && l.y > t.L.FB - 1.5 && l.y < t.L.CB + 0.5 ? G.U.smooth(z0, t.L.zc, l.z) : 0;
+    if (k <= 0) return null;
+    return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(t.b.yaw), 0, -Math.sin(t.b.yaw)), t.b.pt * k);
+  },
+  // run fn on a thing at p moving at v (and facing yaw, if it has one) in her frame if it's aboard her (fn given her frame's map), else as
+  // it is (fn given map). Its place, way and heading are hers while fn runs, the world's again after
+  inFrame(map: LvMap, o: { p: LvPt & { y: number }; v?: { x: number; y: number; z: number }; yaw?: { v: number } }, fn: (m: LvMap) => void) {
+    const t = this.frameAt(map, o.p.x, o.p.y, o.p.z);
+    if (!t) { fn(map); return; }
+    const SD = G.SpaceData, b = t.b, l = SD.toShip(b, o.p.x, o.p.y, o.p.z), v = o.v, b0 = { x: 0, y: 0, z: 0, yaw: b.yaw, pt: b.pt };
+    o.p.x = l.x; o.p.y = l.y; o.p.z = l.z;
+    if (v) { const lv = SD.toShip(b0, v.x, v.y, v.z); v.x = lv.x; v.y = lv.y; v.z = lv.z; }
+    if (o.yaw) o.yaw.v -= b.yaw;
+    try { fn(t.lm); } finally {
+      const w = SD.toWorld(b, o.p.x, o.p.y, o.p.z); o.p.x = w.x; o.p.y = w.y; o.p.z = w.z;
+      if (v) { const wv = SD.toWorld(b0, v.x, v.y, v.z); v.x = wv.x; v.y = wv.y; v.z = wv.z; }
+      if (o.yaw) o.yaw.v += b.yaw;
+    }
+  },
   resolve(map: LvMap, p: LvPt, r: number, y = 0, step = 0.02, smooth = false) {
     if (map.world) { const q = { x: p.x, y, z: p.z }; G.World.resolve(map.world, q, r, 1.9, step, smooth); p.x = q.x; p.z = q.z; return; }
     const TS = this.TS;

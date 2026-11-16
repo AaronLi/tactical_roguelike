@@ -75,6 +75,10 @@ const G_Sim = {
   NADE_R: 0.05, NADE_G: 14,
   STICKY: { FUSE: 2, MAX_FLY: 6 }, // (a sticky grenade's fuse, from when it holds; and how long it may fly before it goes off anyway: js/player.ts STICKY)
   nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) {
+    if (map && (map as any).tilt) { G.Level.inFrame(map, { p: n.pos, v: n.vel }, (m) => this.nadeIn(n, dt, m)); return; } // (aboard a ship lying tilted: it falls her way, js/level.ts)
+    this.nadeIn(n, dt, map);
+  },
+  nadeIn(n: VwNadeMotion, dt: number, map: LvMap | null) {
     const R = this.NADE_R, w = map && map.world, p = n.pos, v = n.vel;
     const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if ((s.move || s.ray) && !(s.nostep && !s.ray) && (!s.hull || G.World.touches(s, [x0, y0, z0], [x1, y1, z1]))) h = true; }); return h; }; // (a rock: its own shape, not the boxes that stop people)
     const side = (x: number, y: number, z: number) => hits(x - R, y - R + 0.03, z - R, x + R, y + R, z + R); // (clear of the floor it's on)
@@ -101,6 +105,16 @@ const G_Sim = {
   // A sticky grenade in the air: no bounces, it holds to the first solid it meets. One step of dt (in 1/120 s pieces); returns where it
   // struck ({ at, n: the face's normal }) or null while it's still flying. (Bodies are the thrower's own test: js/views.ts stickStep)
   stickFly(n: VwNadeMotion, dt: number, map: LvMap | null): { at: THREE.Vector3; n: number[]; t: number } | null {
+    if (map && (map as any).tilt && G.Level.frameAt(map, n.pos.x, n.pos.y, n.pos.z)) { // (aboard a ship lying tilted: in her frame, where it holds put back in the world's)
+      let r: { at: THREE.Vector3; n: number[]; t: number } | null = null;
+      G.Level.inFrame(map, { p: n.pos, v: n.vel }, (m) => { r = this.stickIn(n, dt, m); });
+      const R = r as { at: THREE.Vector3; n: number[]; t: number } | null, t = (map as any).tilt.b, SD = G.SpaceData;
+      if (R) { const w = SD.toWorld(t, R.at.x, R.at.y, R.at.z), nn = SD.toWorld({ x: 0, y: 0, z: 0, yaw: t.yaw, pt: t.pt }, R.n[0], R.n[1], R.n[2]); R.at.set(w.x, w.y, w.z); R.n = [nn.x, nn.y, nn.z]; }
+      return R;
+    }
+    return this.stickIn(n, dt, map);
+  },
+  stickIn(n: VwNadeMotion, dt: number, map: LvMap | null): { at: THREE.Vector3; n: number[]; t: number } | null {
     const p = n.pos, v = n.vel, N = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / N;
     for (let k = 0; k < N; k++) {
       v.y -= this.NADE_G * h;

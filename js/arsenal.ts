@@ -23,10 +23,10 @@ const G_Arsenal = (() => {
     { id: 'hc500', from: 'deagle', path: 'heavy', ring: 4, a: 41, r: 1100, stat: 'far', n: 12, what: 'kills past 20 m', how: 'A revolver, further out than a revolver has any business reaching.' },
     { id: 'deagle', from: 'rev', path: 'heavy', ring: 3, stat: 'armed', n: 15, what: 'kills on armoured suspects', how: "A vest or a helmet: it doesn't save them. Pick your spot, or hit them hard enough." },
     { id: 'thor', from: 'deagle', path: 'heavy', ring: 4, a: 19, r: 1100, stat: 'wall', n: 15, what: 'wall-bang kills', how: 'Through a wall, a door or whatever they thought was cover.' },
-    { id: 'ppk', from: 'p9', path: 'modern', ring: 1, stat: 'sur', n: 15, what: 'kills on unaware suspects', how: 'Down a suspect before they react. If they have seen you or heard gunfire, it does not count.' },
+    { id: 'ppk', from: 'p9', path: 'modern', ring: 1, stat: 'lead', n: 10, what: 'leader kills', how: 'Down a suspect the others answer to: a fireteam leader, a Leader or a ship\'s officer. Their title says who.' },
     { id: 'g19', from: 'ppk', path: 'modern', ring: 2, a: 176, r: 660, stat: 'kills', n: 20, what: 'kills', how: 'Twenty down with the PPK. Nothing clever: the everyday carry, earned the everyday way.' },
-    { id: 'welrod', from: 'ppk', path: 'modern', ring: 2, a: 124, r: 660, stat: 'holster', n: 15, what: 'kills on suspects with their weapon holstered', how: 'Down a suspect with the PPK while their weapon is still holstered or slung. Once it is in their hands, it does not count.' },
-    { id: 'maxim9', from: 'welrod', path: 'modern', ring: 3, a: 124, r: 880, stat: 'hsback', n: 15, what: 'kills to the back of the head', how: 'Come up behind a suspect and put the Welrod to the back of their head. A shot from the front or the side does not count.' },
+    { id: 'welrod', from: 'ppk', path: 'modern', ring: 2, a: 124, r: 660, stat: 'shield', n: 8, what: 'kills on shield carriers', how: 'Down a suspect carrying a handheld shield with the PPK: round it, under it or over it. Boarding crews bring them.' },
+    { id: 'maxim9', from: 'welrod', path: 'modern', ring: 3, a: 124, r: 880, stat: 'hslead', n: 8, what: 'leader headshot kills', how: 'A headshot with the Welrod on a suspect the others answer to. Take the head off the team.' },
     { id: 'm1911', from: 'ppk', path: 'modern', ring: 2, stat: 'hs', n: 15, what: 'headshot kills', how: 'Put it where it counts.' },
     { id: 'p2011', from: 'm1911', path: 'modern', ring: 3, a: 168, r: 880, stat: 'tap', n: 15, what: 'double-tap kills', how: 'Two hits inside half a second: a competition pair.' },
     { id: 'usp', from: 'm1911', path: 'modern', ring: 3, am: 'tracer_p', stat: 'hsfar', n: 15, what: 'headshot kills past 10 m', how: 'A headshot, from further off than a pistol wants to be.' },
@@ -103,6 +103,9 @@ const G_Arsenal = (() => {
     if (m.h && k.back) tally(id, 'hsback');
     if (k.holster) tally(id, 'holster');
     if (m.sur) tally(id, 'sur');
+    if (m.ld) tally(id, 'lead'); // (one the others answered to: js/server.ts leadsMen)
+    if (m.ld && m.h) tally(id, 'hslead');
+    if (ev.def && ev.def.shield) tally(id, 'shield'); // (carrying a handheld shield: js/data.ts G.SHIELDS)
   }
   // what a round of yours did to someone, for that
   function hit(ev: any, b: any) {

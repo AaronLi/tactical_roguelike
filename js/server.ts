@@ -65,6 +65,10 @@ interface Enemy {
   point?: boolean; // (their team's point man, with a shield: giveShield)
   grade?: number; rank?: number; team?: number | null; stay?: boolean; wear?: string | null; title?: string; // (wear: whose ship they're aboard, civil, pirate or navy: what they're called, titleOf) // (grade: how strong they are within the level's gear tier, 0-1, their kit by it: equip; rank: grade, a Leader a whole rank up; team: their fireteam's leader's id, their own if they lead it; stay: at a station, in no team: teamForm)
   coverFlow?: ReturnType<typeof G.Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
+  lowRun?: boolean;
+  artGuard?: boolean; // (posted with the artifact, aboard a ship carrying one: js/spaceserver.ts crew, shelter)
+  trv?: { g: object; best: number; at: number; side: number; sx: number; sz: number }; // (travel: how they're getting on toward where they're going, and a step aside when they aren't)
+  // (lowRun: running under an order, weapon lowered: orderStep)
   visK?: number; noiseAt?: number; nsAt?: number; guess?: { x: number; y: number; z: number; until: number } | null; // (night: how well they see who they're on, lightK; when they last heard something; when their own search last started; where they think you are)
 }
 // A leader's order to a suspect (js/server.ts dispatch): get to the spot the police were last known at, by this way in (entry: a door, or a
@@ -184,7 +188,7 @@ const G_Server = {
           doors: this.map && this.phase === 'level' ? this.map.doors.map((d: Door) => (d.open ? 1 : 0)) : null,
           holes: this.phase === 'level' ? this.holes || null : null, fallen: this.phase === 'level' ? this.fallen || null : null,
           evidence: this.phase === 'level' && this.evidence ? this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]) : null,
-          bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0]) : null,
+          bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : null,
           wcase: this.phase === 'level' ? this.caseMsg() : null, wc: this.phase === 'level' ? this.caseGun() : null, cabs: this.phase === 'level' ? this.cabMsg() : null, abox: this.phase === 'level' ? this.aboxMsg() : null,
           loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => this.lootMsg(l)) : null,
           glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null, cracked: this.phase === 'level' ? this.glassCracked || null : null,
@@ -246,7 +250,7 @@ const G_Server = {
       case 'glass': if (this.phase === 'level' && Array.isArray(m.ids)) this.breakGlass(m.ids, m.p); break;
       case 'crack': { // (a round through a pane that doesn't bring it down: it's fractured (more), and it's heard)
         const w = this.phase === 'level' && this.map && this.map.windows && (this.map.windows as SvWin[])[m.id];
-        if (!w || w.broken || w.armor || (w.cracked || 0) >= G.Level.CRACKS || !Array.isArray(m.p)) break;
+        if (!w || w.broken || w.armor || (w.cracked || 0) >= G.Level.crackCap(w) || !Array.isArray(m.p)) break;
         w.cracked = (w.cracked || 0) + 1; this.glassCracked.push([m.id, m.p]); this.hear(w.x, w.z, 10, w.fy || 0);
         SvNet.broadcast({ t: 'crack', id: m.id, p: m.p }, from);
         break;
@@ -560,7 +564,8 @@ const G_Server = {
     // the sticker box's sticker: one of the host's (js/stickers.ts names; none, and the box isn't there)
     const sn = G.Stickers.names;
     this.sbox = this.map.sbox && sn.length ? { s: sn[Math.floor(Math.random() * sn.length)], by: null } : null;
-    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? G.SpaceSv.levelMsg() : undefined });
+    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? G.SpaceSv.levelMsg() : undefined,
+      bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : undefined }); // (the dead she's come back to with: js/spaceserver.ts populate)
   },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
@@ -989,12 +994,20 @@ const G_Server = {
   // Somewhere to amble to, near where they started: a few steps along a way with room to walk it (not toward a
   // point behind a wall, to stand pressed against the wall till they give up), or null to stay put.
   // On the way to a spot (by a flow field to it, its own or one shared by everyone going to the same room): a step, true; there, false
+  // nothing solid between someone's middle and a place at the same height (a wall, a shut door)
+  clearTo(e: Enemy, g: { x: number; y?: number; z: number }) { return G.Level.los(this.map!, e.x, (e.y || 0) + 1.0, e.z, g.x, (g.y || 0) + 1.0, g.z); },
   travel(e: Enemy, g: { x: number; y: number; z: number; flow?: Int16Array }, speed: number, dt: number) {
     const L = G.Level, U = G.U, map = this.map!, d = Math.hypot(g.x - e.x, g.z - e.z);
     if (d < 0.4) return false;
     if (!g.flow) g.flow = L.flow(map, [L.src(map, g.x, g.y, g.z)]);
-    const step = d > 3 ? L.flowStep(map, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dx = tx - e.x, dz = tz - e.z, dd = Math.hypot(dx, dz) || 1;
+    // (straight there once it's near and nothing's in the way; else the way round: a post just through a wall from them is no nearer)
+    const step = d > 3 || !this.clearTo(e, g) ? L.flowStep(map, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dx = tx - e.x, dz = tz - e.z, dd = Math.hypot(dx, dz) || 1;
     e.idleYaw = Math.atan2(-dx, -dz); e.yaw += U.angDiff(e.yaw, e.idleYaw) * Math.min(1, dt * 6);
+    // (no nearer in a second and a half: someone's in the way, say in a doorway they both want through: a step aside, and on again)
+    const c = this.clock, tp = e.trv && e.trv.g === g ? e.trv : (e.trv = { g, best: d, at: c, side: 0, sx: 0, sz: 0 });
+    if (d < tp.best - 0.3) { tp.best = d; tp.at = c; }
+    else if (c - tp.at > 1.5) { const k = Math.random() < 0.5 ? 1 : -1; tp.sx = -dz / dd * k; tp.sz = dx / dd * k; tp.side = c + 0.7; tp.at = c; tp.best = d; }
+    if (tp.side > c) { this.moveEntity(e, tp.sx, tp.sz, speed * 0.7, dt); return true; }
     this.moveEntity(e, dx / dd, dz / dd, speed, dt);
     return true;
   },
@@ -1015,7 +1028,7 @@ const G_Server = {
   },
   alertEnemy(e: Enemy, spread: boolean, heardOnly?: boolean) {
     const was = e.alert;
-    if (heardOnly && !e.alert && !e.def.ready && !e.def.boss && Math.random() < 0.55) e.lurk = true; // hides first, draws when it sees you
+    if (heardOnly && !e.alert && !e.def.ready && !e.def.boss && !e.post && Math.random() < 0.55) e.lurk = true; // hides first, draws when it sees you (not someone posted: they hold their post)
     else { e.lurk = false; this.draw(e); }
     if (!e.alert) {
       e.alert = true;
@@ -1187,7 +1200,7 @@ const G_Server = {
     const L = G.Level, map = this.map!, TS = L.TS;
     let best: HideSpot | null = null, bs = 1e9;
     const taken = (x: number, z: number) => { for (const o of this.enemies.values()) if (o !== e && ((o.hide && Math.hypot(o.hide.x - x, o.hide.z - z) < 1.1) || (o.cover && Math.hypot(o.cover.x - x, o.cover.z - z) < 1.1))) return true; return false; };
-    const ey = e.y || 0, fy = from.y || 0, here = (q: { y?: number }) => Math.abs((q.y || 0) - ey) < 1.5; // (a spot on their own floor)
+    const ey = e.y || 0, fy = from.y || 0, here = (q: { x: number; y?: number; z: number }) => Math.abs((q.y || 0) - ey) < 1.5 && !(G.SpaceData.ON && G.SpaceSv.offLimits(e, q.x, q.z)); // (a spot on their own floor; not in the room a ship's people are sheltering in, unless they're one of them: js/spaceserver.ts)
     for (const c of map.cover as FlPt[]) {
       const d = Math.hypot(c.x - e.x, c.z - e.z);
       if (d > 14 || !here(c)) continue;
@@ -1362,7 +1375,7 @@ const G_Server = {
   breakGlass(ids: number[], p: number[]) {
     const ws = this.map && (this.map.windows as SvWin[]);
     if (!ws) return;
-    const fresh = ids.filter((id: number) => Number.isInteger(id) && ws[id] && !ws[id].broken && !ws[id].armor).slice(0, 20); // (bulletproof glass doesn't break)
+    const fresh = ids.filter((id: number) => Number.isInteger(id) && ws[id] && !ws[id].broken && !ws[id].armor && G.Level.paneBreaks(ws[id])).slice(0, 20); // (bulletproof glass doesn't break, nor a ship's)
     if (!fresh.length) return;
     for (const id of fresh) { ws[id].broken = true; G.World.windowSolids(this.map!.world, this.map, ws[id]); this.glassBroken.add(id); this.hear(ws[id].x, ws[id].z, 16, ws[id].fy || 0); }
     SvNet.broadcast({ t: 'glass', ids: fresh });
@@ -1743,7 +1756,7 @@ const G_Server = {
       if (!hl.bo && e.lastGr) hl.gr = e.lastGr; // (a frag grenade did it: which)
       if (!hl.bo && e.lastFb) hl.fb = e.lastFb; // (blind from a flashbang when it was done: which)
       if (m.cz === 'burns' || m.cz === 'blast') { hl.cz = m.cz; if (e.lastGr) hl.gr = e.lastGr; } // (died of a thermobaric's burns or blast lung: injuryTick; the grenade's)
-      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr: this.pay(cr), h: !!m.h, ty: e.type, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
+      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr: this.pay(cr), h: !!m.h, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
       this.checkClear();
     }
   },
@@ -1764,7 +1777,7 @@ const G_Server = {
   incapMsg(e: Enemy) {
     if (e.def.civ || e.incap) return; // (a civilian down still needs rescuing)
     const { cr, why } = this.incapacitate(e, e.lastHit, e.hitState || e.state);
-    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr: this.pay(cr), h: !!e.lastH, ty: e.type, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
+    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr: this.pay(cr), h: !!e.lastH, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
   },
   // A suspect down for good, for the highlights (js/highlights.ts suspectDown): incapacitated, their clip. The round
   // that put them down, with what a kill of it would carry; or, more than 4 s after a round last hit them, a bleed-out
@@ -1824,6 +1837,7 @@ const G_Server = {
       if (d < min && d > 1e-4 && Math.abs((a.y || 0) - (b.y || 0)) < 1.5) { // (one upstairs and one down don't get in each other's way)
         const push = (min - d) / 2;
         a.x -= (dx / d) * push; a.z -= (dz / d) * push; b.x += (dx / d) * push; b.z += (dz / d) * push;
+        this.settle(a, 0.38 * a.def.scale); this.settle(b, 0.38 * b.def.scale); // (never into a wall or a door's frame: crowded in a doorway, someone could be shoved off the floor and have no way on)
       }
     }
 
@@ -1848,7 +1862,7 @@ const G_Server = {
       const r2 = (v: number) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}|${en.wear ? this.titleOf(en) : ''}|${en.def.shield || ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert && !en.lowRun ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}|${en.wear ? this.titleOf(en) : ''}|${en.def.shield || ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
       }
       const p: Record<string, any> = {};
       for (const pl of all) p[pl.id] = pl.st;
@@ -2046,12 +2060,17 @@ const G_Server = {
 
       // Going through a door in a stack (breach, clear): on to their corner, shooting as they go, not off to cover
       const bo = e.order && (e.order.phase === 'breach' || e.order.phase === 'clear') ? e.order : null;
+      // Sent in under an order (pushing, not holding a cordon or covering the way in): on to where they were sent, shooting as they go,
+      // not stopped where they first saw them (nor off to cover: the ones behind them in file would stop too). Within a few metres of
+      // them, a fight like any other
+      const po = !bo && e.order && e.order.role === 'push' && !e.order.cordon && (e.order.phase === 'approach' || e.order.phase === 'enter') && d > this.PUSH_NEAR ? e.order : null;
+      if (e.lowRun) { e.lowRun = false; e.cool = Math.max(e.cool, this.RUN.RAISE); } // (running with it lowered: a moment to bring it up)
       // Their point man near, with his shield up: in behind him, standing, shooting over him as he kneels (not off to a crate)
-      const pm = !bo ? this.pointOf(e) : null, pmd = pm ? Math.hypot(pm.x - e.x, pm.z - e.z) : 99;
+      const pm = !bo && !po ? this.pointOf(e) : null, pmd = pm ? Math.hypot(pm.x - e.x, pm.z - e.z) : 99;
       const bs = pm && pmd < 9 && this.engaged(pm) && L.los(map, e.x, (e.y || 0) + 1, e.z, pm.x, (pm.y || 0) + 1, pm.z) ? this.behind(e, pm, st.p[0], st.p[2], this.pointIdx(e, pm)) : null;
       if (bs) { e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; }
       // Cover: move to a spot with a crate between us and the target, crouch, pop up to shoot.
-      if (!bo && !bs && usesCover && !e.cover && e.coverT <= 0) {
+      if (!bo && !po && !bs && usesCover && !e.cover && e.coverT <= 0) {
         e.coverT = 3 + Math.random() * 3;
         e.cover = this.findCover(e, st);
         e.coverStuck = 0;
@@ -2061,6 +2080,10 @@ const G_Server = {
       if (bo) {
         const os = this.orderStep(e, dt);
         if (os) { mx = os.mx; mz = os.mz; sp = Math.min(os.sp, 0.55); }
+        e.cover = null; e.inCover = false; e.peek = false;
+      } else if (po) {
+        const os = this.orderStep(e, dt); e.lowRun = false; // (weapon up while they can see them)
+        if (os) { mx = os.mx; mz = os.mz; sp = Math.min(os.sp, 0.7); } else { mx = 0; mz = 0; }
         e.cover = null; e.inCover = false; e.peek = false;
       } else if (bs) {
         const bd = Math.hypot(bs.x - e.x, bs.z - e.z);
@@ -2141,12 +2164,13 @@ const G_Server = {
       if (this.night && !e.order) this.nightSearch(e); // (in the dark they go and look for themselves)
       if (e.order) {
         // under a leader's order (callIn): to the spot by its own way in, and then searching outward from it
+        e.lowRun = false; // (orderStep says if they're running)
         const os = this.orderStep(e, dt);
         if (os) { mx = os.mx; mz = os.mz; sp = os.sp; e.holding = false; if (os.yaw != null) faceTo = os.yaw; } else e.holding = true;
       } else if (e.post && !e.canSee && (!e.lastSeen || e.lostT > 5) && Math.hypot(e.post.x - e.x, e.post.z - e.z) > 0.6) {
         // posted (a ship's response) and lost them: back to the doorway they were put on
         const L2 = G.Level, map2 = this.map!, g = e.post; if (!g.flow) g.flow = L2.flow(map2, [L2.src(map2, g.x, g.y, g.z)]);
-        const d = Math.hypot(g.x - e.x, g.z - e.z), step = d > 3 ? L2.flowStep(map2, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dd = Math.hypot(tx - e.x, tz - e.z) || 1;
+        const d = Math.hypot(g.x - e.x, g.z - e.z), step = d > 3 || !this.clearTo(e, g) ? L2.flowStep(map2, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dd = Math.hypot(tx - e.x, tz - e.z) || 1;
         mx = (tx - e.x) / dd; mz = (tz - e.z) / dd; sp = 0.8; e.cover = null; e.inCover = false; e.holding = false;
       } else if (this.brave(e) && !this.ground() && e.lastSeen && e.lostT < 12 && leash && Math.hypot(e.lastSeen.x - e.x, e.lastSeen.z - e.z) > 2) { // (not on the ground: there they wait)
         // a push on where police were last seen. A grenade goes first, if they have one and it's far enough off to be safe (5-20 m;
@@ -2264,7 +2288,7 @@ const G_Server = {
     if (q.phase === 'set') {
       turn(q.yaw, 5);
       if (q.t > 0) return true;
-      if (!q.d.open && !q.d.fallen && G.SpaceSv.crewMayOpen(q.d)) { this.setDoor(q.d.id, true); q.phase = 'open'; q.t = 0.5; return true; }
+      if (!q.d.open && !q.d.fallen && G.SpaceSv.crewMayOpen(q.d, e)) { this.setDoor(q.d.id, true); q.phase = 'open'; q.t = 0.5; return true; }
       q.phase = 'look'; q.t = 1.4 + Math.random();
     }
     if (q.phase === 'open') {
@@ -2579,6 +2603,18 @@ const G_Server = {
   // A stack: WAIT seconds at most for the rest once the first is in place (MAX from the word), then in one after another, GAP apart;
   // CLEAR seconds at most from the go for the room to be called clear (all of them at their corners, or as long as that takes).
   STACK: { WAIT: 15, MAX: 45, GAP: 0.9, CLEAR: 14 },
+  // Running under an order (orderStep): PACE m/s (a squad member's with his weapon lowered, js/player.ts SPEED.low), weapon down;
+  // up again NEAR metres from their place in a stack, and RAISE seconds before they can fire if they see someone while running.
+  // PUSH_NEAR: how close a man pushing under an order gets to whoever he can see before he stops to fight it out
+  RUN: { PACE: 3.0, NEAR: 4, RAISE: 0.5 },
+  PUSH_NEAR: 4,
+  // The ship's moved her teams on (her cameras have the squad somewhere else): a leader's stack that hasn't gone in yet is let go, so
+  // he can take the new word (callIn holds off a leader whose team is on a room). True if there was one
+  dropStack(l: Enemy) {
+    let n = 0;
+    for (const e of this.enemies.values()) { const g = e.order && e.order.entry.grp; if (g && g.by === l.id && g.go == null && !g.cleared) { this.endOrder(e); n++; } }
+    return n > 0;
+  },
   // Their place in the stack (k: their place at the door, after anyone else's there; i: their turn in their own team's). A split stack:
   // just outside the doorway, against the wall beside it and out of its line, the first on the side with more room inside, the next
   // across from him, and so on, each side filling outward; all on one side if the other's walled, straight back from the door if both
@@ -2712,6 +2748,13 @@ const G_Server = {
   teamable(e: Enemy) { return !e.def.civ && !e.def.boss && !e.def.timid && !e.guard && !e.stay; },
   able(e: Enemy) { return !e.down && !e.collapsed && e.state === 'normal' && !e.broken; },
   leads(e: Enemy) { return e.team === e.id; },
+  // someone the others answer to: a Leader, the gang's boss, the ship's top man or the officer she's boarded for, or a fireteam's
+  // leader with anyone in it (for the sidearm challenges, js/arsenal.ts: leader kills)
+  leadsMen(e: Enemy) {
+    const M = G.SpaceSv && G.SpaceSv.st.M;
+    return !e.def.civ && (!!e.def.leader || !!e.def.boss || this.topId === e.id || !!(M && M.hvt === e.id)
+      || (this.leads(e) && [...this.enemies.values()].some((o) => o !== e && o.team === e.id)));
+  },
   // the same side of the hull: aboard a ship, the same one of her hulls (a team doesn't span a docking)
   sameHull(a: Enemy, b: Enemy) {
     const map = this.map, sp = map && map.sp; if (!sp) return true;
@@ -2844,6 +2887,7 @@ const G_Server = {
       if (!L.los(this.map!, pm.x, (pm.y || 0) + 1, pm.z, gx, (pm.y || 0) + 1, gz)) { gx = pm.x - fx * 0.9; gz = pm.z - fz * 0.9; } // (a corner behind him: close up)
       const dd = Math.hypot(gx - e.x, gz - e.z);
       if (dd < 0.4) return null;
+      if (pm.lowRun && dd > 1) { e.lowRun = true; return { mx: (gx - e.x) / dd, mz: (gz - e.z) / dd, sp: this.RUN.PACE / Math.max(0.5, e.def.speed) }; } // (he's running: so do they)
       return { mx: (gx - e.x) / dd, mz: (gz - e.z) / dd, sp: dd > 2.5 ? 0.9 : 0.5 };
     }
     const at = (fl: Int16Array) => this.flowDist(fl, e.x, e.y || 0, e.z);
@@ -2959,6 +3003,9 @@ const G_Server = {
       if (st) { tx = st.x; tz = st.z; }
     }
     const dx = tx - e.x, dz = tz - e.z, d = Math.hypot(dx, dz) || 1;
+    // (to a stack's place a way off, or a run to a fight: running, weapon lowered (RUN), up again the last RUN.NEAR metres)
+    const run = !o.own && ((o.phase === 'approach' && !!o.slot && Math.hypot(o.slot.x - e.x, o.slot.z - e.z) > this.RUN.NEAR) || rushing);
+    if (run) { e.lowRun = true; return { mx: dx / d, mz: dz / d, sp: this.RUN.PACE / Math.max(0.5, e.def.speed) }; }
     return { mx: dx / d, mz: dz / d, sp: o.own ? this.NIGHT.CREEP : rushing ? 1 : 0.9 };
   },
   // The cover spot a bound away that gets them most of the way on: 3 to 10 m off, at least 2.5 m closer to where they're going, no one else's
@@ -3034,7 +3081,7 @@ const G_Server = {
     if (e.doorWait > 0) { e.doorWait -= dt; return; }
     const ahead = map.world && G.World.raycast(map.world, e.x, (e.y || 0) + 1.0, e.z, mx, 0, mz, 0.9, { move: true }); // (what they'd walk into)
     const d = ahead && ahead.solid && ahead.solid.kind === 'door' ? ahead.solid.door : null;
-    if (d && !d.open) { if (!G.SpaceSv.crewMayOpen(d)) return; this.setDoor(d.id, true); e.doorWait = 0.5; return; } // (a locked or sealed door: they hold where they are)
+    if (d && !d.open) { if (!G.SpaceSv.crewMayOpen(d, e)) return; this.setDoor(d.id, true); e.doorWait = 0.5; return; } // (a locked or sealed door: they hold where they are)
     if (e.collapsed) return; // legs gone: they're on the floor
     speed *= this.injSpeed(e) * (e.str == null || e.str >= 0.6 ? 1 : 0.3 + 0.7 * e.str / 0.6); // a broken leg limps; blood loss slows
     e.x += mx * speed * dt; e.z += mz * speed * dt;
@@ -3043,9 +3090,13 @@ const G_Server = {
   // someone who's moved: out of what they walked into (stepping up onto anything low), and onto the floor or step
   // under them
   settle(e: Enemy, r: number) {
-    const L = G.Level, map = this.map!, y = e.y || 0;
-    L.resolve(map, e, r, y, G.World.STEP, true);
-    e.y = L.groundAt(map, e.x, e.z, r, y, G.World.STEP, true); // (stairs as slopes: no hopping from tread to tread)
+    const L = G.Level, q = { x: e.x, y: e.y || 0, z: e.z };
+    L.inFrame(this.map!, { p: q }, (map) => { // (aboard a ship lying tilted: in her frame, js/level.ts)
+      const y = q.y;
+      L.resolve(map, q, r, y, G.World.STEP, true);
+      q.y = L.groundAt(map, q.x, q.z, r, y, G.World.STEP, true); // (stairs as slopes: no hopping from tread to tread)
+    });
+    e.x = q.x; e.y = q.y; e.z = q.z;
   },
 
   // Someone on their knees (surrendered, or a cowering civilian) does what the police tell them.
@@ -3149,9 +3200,13 @@ const G_Server = {
       if (e.fleeT <= 0 || !step) e.state = Math.random() < 0.6 && this.seekHide(e) ? 'hide' : 'cower';
       return;
     }
-    if (e.shelter && Math.hypot(e.x - e.shelter.x, e.z - e.shelter.z) > 1.2) { // (sent to shelter: there first, at a hurry; in the room, there)
-      if (e.shelter.room != null && G.ShipGen.roomAt(this.map!, e.x, e.z, e.fl || 0) === e.shelter.room) { e.shelter.x = e.home.x = e.x; e.shelter.z = e.home.z = e.z; }
-      else { e.walkTo = null; this.travel(e, e.shelter, def.speed * 1.4, dt); return; }
+    if (e.shelter && (Math.hypot(e.x - e.shelter.x, e.z - e.shelter.z) > 1.2 || (e.shelter.room != null && G.ShipGen.roomAt(this.map!, e.x, e.z, e.fl || 0) !== e.shelter.room))) { // (there, and in the room: not just near it through its wall) // (sent to shelter: there first, at a hurry; in the room, there)
+      if (e.shelter.room != null && G.ShipGen.roomAt(this.map!, e.x, e.z, e.fl || 0) === e.shelter.room && !this.map!.doors.some((d) => Math.hypot(d.x - e.x, d.z - e.z) < 1.3)) { e.shelter.x = e.home.x = e.x; e.shelter.z = e.home.z = e.z; } // (in the room, and clear of its doorways: there. On its threshold: on in, out of the way of its door)
+      else {
+        // (at their spot and still outside it: a spot on its wall's line, the wrong side of it: the middle of the room instead)
+        if (e.shelter.room != null && Math.hypot(e.x - e.shelter.x, e.z - e.shelter.z) < 1.2) { const rm = this.map!.rooms[e.shelter.room], TS = G.Level.TS; if (rm) { e.shelter = { x: (rm.cx + 0.5) * TS, y: e.shelter.y, z: (rm.cz + 0.5) * TS, room: e.shelter.room }; e.home = { x: e.shelter.x, y: 0, z: e.shelter.z }; } }
+        e.walkTo = null; this.travel(e, e.shelter, def.speed * 1.4, dt); return;
+      }
     }
     e.idleT -= dt;
     if (e.idleT <= 0) {
@@ -3176,7 +3231,7 @@ const G_Server = {
     if (e.def.shield) return null; // (a handheld shield is their cover: they stand behind it and fight)
     const L = G.Level, map = this.map!, def = e.def, ground = this.ground(), now = Math.hypot(e.x - st.p[0], e.z - st.p[2]); // (now: how far off the police are)
     let best: EnemyCover | null = null, bs = 1e9;
-    const here = (q: { y?: number }) => Math.abs((q.y || 0) - (e.y || 0)) < 1.5; // (on their own floor)
+    const here = (q: { x: number; y?: number; z: number }) => Math.abs((q.y || 0) - (e.y || 0)) < 1.5 && !(G.SpaceData.ON && G.SpaceSv.offLimits(e, q.x, q.z)); // (on their own floor; not in a ship's shelter unless they're of it)
     for (const c of map.cover as FlPt[]) {
       const d = Math.hypot(c.x - e.x, c.z - e.z);
       if (d > 12 || !here(c)) continue;

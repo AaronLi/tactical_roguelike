@@ -18,13 +18,16 @@ const G_Space = (() => {
   const T = THREE, SD = G.SpaceData;
   const S = {
     on: false, kind: 'hub' as SpKind, stage: 'space' as 'space' | 'orbit' | 'atmo', map: null as LvMap | null,
-    def: SD.SHIPS.kestrel, fleet: SD.fleet0(), seatsDef: [] as SpSeat[], berth: { x: 0, y: 0, z: 0, yaw: 0 }, Dp: new T.Vector3(), Dq: new T.Quaternion(),
-    model: null as SmShip | null, solids: [] as { s: any; tag?: string; ship?: boolean; on: boolean; b: number[]; fl?: any }[], flights: [] as any[], noseT: 0, rampT: 0,
+    def: SD.SHIPS.kestrel, fleet: SD.fleet0(), seatsDef: [] as SpSeat[], berth: { x: 0, y: 0, z: 0, yaw: 0 } as { x: number; y: number; z: number; yaw: number; pt?: number }, Dp: new T.Vector3(), Dq: new T.Quaternion(),
+    model: null as SmShip | null, solids: [] as { s: any; tag?: string; ship?: boolean; on: boolean; b: number[]; fl?: any; yb?: any; ob?: number[] }[], flights: [] as any[], noseT: 0, rampT: 0,
     docked: true, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(),
+    roundBrake: false, brRound: null as null | { site: ShSite; face: THREE.Vector3; E: THREE.Vector3; hard: number; map: LvMap; way: THREE.Vector3[]; ra?: THREE.Vector3 },
+    brLock: null as null | { site: ShSite; map: LvMap; hard: number; fa?: number; q0?: THREE.Quaternion; T0?: number; rp?: number; ra?: THREE.Vector3 }, // (the breach site the approach is steering her onto: squareUp)
+    brThrust: false, // (the approach is flying her on her main engine this frame: squareUp; her own assist stands down: fly)
     zone: null as THREE.Group | null, zoneV: new T.Vector3(), zt0: 0, ztAt: 0, traffic: [] as { obj: THREE.Object3D; c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number; k?: number; name?: string }; wp: SpWp | null; ph: number; real?: boolean; bow?: number; pend?: LvMap | null }[],
-    carry: null as null | { k: number; v: THREE.Vector3; yaw: number; Q: THREE.Quaternion; V: THREE.Vector3 },
+    look: null as null | { yaw: number; pitch: number; eyeH: number; stowW: number; crouch: boolean; stowed: boolean }, carry: null as null | { k: number; v: THREE.Vector3; yaw: number; Q: THREE.Quaternion; V: THREE.Vector3 },
     zdef: [] as SpContact[], zact: 0, zC: new T.Vector3(), zinfo: null as null | { ms: any; act: number; near: boolean }, tclose: null as null | { k: number; t: number; sent?: boolean; name: string },
-    root: null as THREE.Group | null, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null,
+    root: null as THREE.Group | null, plan: null as null | { line: THREE.Line; gates: THREE.LineSegments; end: THREE.LineSegments }, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null,
     hull: null as ReturnType<typeof G.ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3; p0?: THREE.Vector3 }[],
     ftl: null as null | { st: 'spool' | 'wait' | 'tunnel'; t: number; to: number; T: number; held?: number }, seats: {} as Record<string, number>, ctl: null as string | null,
     hp: 100, hpMax: 100, ms: null as SpMission | null, state: null as SpMs | null, board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[], gone: [] as number[] },
@@ -41,6 +44,8 @@ const G_Space = (() => {
   const mySeat = () => (S.on && me().seat != null ? S.seatsDef[me().seat as number] || null : null);
   const fwd = (q: THREE.Quaternion) => new T.Vector3(0, 0, -1).applyQuaternion(q);
   const yawQ = (yaw: number) => new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), yaw);
+  // a berth's turn: its yaw, then its tilt nose up (pt) about her own x
+  const berthQ = (b: { yaw: number; pt?: number }) => b.pt ? yawQ(b.yaw).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), b.pt)) : yawQ(b.yaw);
   const aboardAt = (x: number, y: number, z: number) => SD.aboard(S.def, S.berth, x, y, z);
   const aboard = () => S.on && !!me().pos && aboardAt(me().pos.x, me().pos.y, me().pos.z);
   // sealed in: aboard a ship that isn't against anything (nobody outside can see or shoot you: js/player.ts state's se)
@@ -61,6 +66,9 @@ const G_Space = (() => {
       zoneHulls.set(S.zinfo.ms.seed + ':' + S.zact, { holder, h, bow: S.map.sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0), map: null, key: '' });
     }
     if (S.on && me().pos && aboard()) { const p = SD.toShip(S.berth, me().pos.x, me().pos.y, me().pos.z); S.keep = { x: p.x, y: p.y, z: p.z, yaw: me().yaw - S.berth.yaw }; } else S.keep = null;
+    // (and how you're looking, crouched and holding your gun, for coming up with another of the zone's ships: nothing of your view
+    // changes when she becomes the level, enterLevel)
+    { const m = me(); S.look = S.on && S.kind === 'board' && S.tclose && m.pos ? { yaw: m.yaw - S.berth.yaw, pitch: m.pitch, eyeH: m.eyeH, stowW: m.stowW || 0, crouch: m.crouch, stowed: !!m.stowed } : null; }
     unhide();
     for (const o of [S.model && S.model.group, S.root, S.stars, S.tunnel, S.sun]) if (o && o.parent) o.parent.remove(o);
     litSeat = -1;
@@ -88,7 +96,7 @@ const G_Space = (() => {
     if (kind === 'hub') S.berth = Object.assign({}, SD.HUB_BERTH);
     else if (kind === 'board') { const b = map.sp!.breach, L = SD.layout(d); S.berth = { x: b.x, y: -L.lift, z: b.face + 0.03 - (L.zc - 0.22), yaw: 0 }; } // (her breach deck level with the hull's: the rest of her below it)
     else { const lz = map.lz || { x: map.spawn.x, y: 0, z: map.spawn.z }; S.berth = { x: lz.x + 3.2 + Math.max(0, d.z1 - 5) * 0.5, y: lz.y || 0, z: lz.z, yaw: Math.PI / 2 }; }
-    S.Dp.set(S.berth.x, S.berth.y, S.berth.z); S.Dq.copy(yawQ(S.berth.yaw));
+    S.Dp.set(S.berth.x, S.berth.y, S.berth.z); S.Dq.copy(berthQ(S.berth));
     // the ship herself, and her deck in the world
     const m = S.model = G.ShipModel.ship(d, S.fleet);
     m.group.position.copy(S.Dp); m.group.quaternion.copy(S.Dq); G.R.scene.add(m.group);
@@ -135,26 +143,48 @@ const G_Space = (() => {
   // her deck's boxes, where she's berthed (in the world once syncSolids has put them there)
   function deck() {
     const w = S.map && S.map.world;
+    if (S.map) G.Level.setTilt(S.map, S.def, S.berth); // (lying tilted: her own gravity aboard her, js/level.ts)
     S.solids = S.solids.filter((q) => { if (q.tag === undefined && !q.ship) return true; if (q.on && w) G.World.remove(w, q.s); return false; });
     if (w && w.ramps) w.ramps = w.ramps.filter((st: any) => !S.flights.includes(st));
     // her flights of stairs as a level's are: slopes to walk up (js/world.ts rampAt), their steps theirs
     const B = S.berth, alongX = Math.abs(Math.sin(B.yaw)) > 0.5;
-    S.flights = SD.flights(S.def).map((fl) => {
+    S.flights = B.pt ? [] : SD.flights(S.def).map((fl) => { // (lying tilted: no slopes, her treads steps to climb)
+      if (Math.abs(Math.sin(2 * B.yaw)) > 1e-6) // (lying at an angle: the flight in her own frame, js/world.ts rampAt turns into it)
+        return { tag: fl.tag, yb: { x: B.x, z: B.z, c: Math.cos(B.yaw), s: Math.sin(B.yaw) }, axis: 'z', up: fl.zh > fl.zf ? 1 : -1, x0: Math.min(fl.x0, fl.x1), x1: Math.max(fl.x0, fl.x1), z0: Math.min(fl.zf, fl.zh), z1: Math.max(fl.zf, fl.zh), y0: B.y + fl.y0, rise: fl.rise, n: fl.n, f: 0, steps: [] as any[], on: false };
       const a = SD.toWorld(B, fl.x0, 0, fl.zf), c = SD.toWorld(B, fl.x1, 0, fl.zh), foot = alongX ? a.x : a.z, head = alongX ? c.x : c.z;
       return { tag: fl.tag, axis: alongX ? 'x' : 'z', up: head > foot ? 1 : -1, x0: Math.min(a.x, c.x), x1: Math.max(a.x, c.x), z0: Math.min(a.z, c.z), z1: Math.max(a.z, c.z), y0: B.y + fl.y0, rise: fl.rise, n: fl.n, f: 0, steps: [] as any[], on: false };
     });
-    for (const q of SD.worldBoxes(S.def, S.berth)) S.solids.push({ s: null, tag: q.tag, ship: true, on: false, fl: S.flights.find((f) => f.tag === q.tag), b: q.b });
+    for (const q of SD.worldBoxes(S.def, S.berth)) S.solids.push({ s: null, tag: q.tag, ship: true, on: false, fl: S.flights.find((f) => f.tag === q.tag), b: q.b, yb: q.yb, ob: q.ob });
   }
   // ---- breaching her anywhere (js/shipgen.ts sites, cut). The berth goes to the site: nose-on to that stretch of hull.
-  const berthAt = (s: { x: number; z: number; nx: number; nz: number }) => SD.berthAt(S.def, s);
-  const siteAt = (a: number[]) => { const map = S.map!, W = map.W, TS = G.Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0; return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k) } as ShSite; };
+  const berthAt = (s: { x: number; z: number; nx: number; nz: number; ang?: number; pt?: number }) => SD.berthAt(S.def, s);
+  const siteAt = (a: number[]) => { const map = S.map!, W = map.W, TS = G.Level.TS, x = a[0] % W, z = (a[0] / W) | 0, ax = a[2] ? 1 : 0, az = a[1] ? 1 : 0; return { c: a[0], nx: a[1], nz: a[2], x: (x + 0.5) * TS, z: (z + 0.5) * TS, cells: [-1, 0, 1].map((k) => (z + az * k) * W + x + ax * k), ang: a[3] || 0, pt: a[4] || 0 } as ShSite; }; // (a[3]: an angled breach's, degrees off square; a[4]: nose up)
   // she stands somewhere else now: her deck with her, and you if you're aboard (her pose in the level is what it was)
-  function rebase(b: { x: number; y: number; z: number; yaw: number }) {
+  function rebase(b: { x: number; y: number; z: number; yaw: number; pt?: number }) {
     const m = me(), was = S.berth, ab = !!m.pos && aboard(), loc = ab ? SD.toShip(was, m.pos.x, m.pos.y, m.pos.z) : null;
-    S.berth = b; S.Dp.set(b.x, b.y, b.z); S.Dq.copy(yawQ(b.yaw));
+    S.berth = b; S.Dp.set(b.x, b.y, b.z); S.Dq.copy(berthQ(b));
     if (S.model) { S.model.group.position.copy(S.Dp); S.model.group.quaternion.copy(S.Dq); }
     deck(); syncSolids();
     if (loc && m.seat == null) { const w = SD.toWorld(b, loc.x, loc.y, loc.z); m.pos.set(w.x, w.y, w.z); m.yaw += b.yaw - was.yaw; }
+  }
+  // An angled breach's tunnel (js/shipgen.ts tunnelPath: from her collar, curving round to straight in), as torn plating: a floor plate,
+  // each side in two buckled panels, a sagging roof and a rib at each joint, more crumpled toward the hull where it took the blow. Its
+  // own dice from the site, so it looks the same on every screen.
+  function tunnelMesh(s: ShSite) {
+    const path = G.ShipGen.tunnelPath(s), TN = G.ShipGen.TUN, g = new T.Group(), rnd = G.U.rng(s.c * 7 + 13);
+    const plate = G.ShipModel.M(0x5d6266, { metalness: 0.7, roughness: 0.45 }), dark = G.ShipModel.M(0x24272b, { metalness: 0.6, roughness: 0.7 }), hot = G.ShipModel.M(0x4a2c18, { roughness: 0.85 });
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i], b = path[i + 1], len = Math.hypot(b.x - a.x, b.z - a.z), seg = new T.Group(), k = 0.15 + 0.5 * (1 - i / (path.length - 1)), j = () => (rnd() - 0.5) * k;
+      seg.position.set((a.x + b.x) / 2, 0, (a.z + b.z) / 2); seg.rotation.y = Math.atan2(-(b.x - a.x), -(b.z - a.z));
+      const add = (w: number, h: number, d: number, x: number, y: number, z: number, m: THREE.Material, rx = 0, ry = 0, rz = 0) => { const o = new T.Mesh(new T.BoxGeometry(w, h, d), m); o.position.set(x, y, z); o.rotation.set(rx, ry, rz); o.castShadow = true; o.receiveShadow = true; seg.add(o); };
+      add(TN.HW * 2 + 0.2, 0.06, len + 0.1, 0, 0.03, 0, dark, j() * 0.1, 0, j() * 0.1); // (the floor plate)
+      for (const sd of [-1, 1]) for (let q = 0; q < 2; q++) add(0.05, TN.H / 2 + 0.05, len + 0.12, sd * (TN.HW + 0.05 - Math.abs(j()) * 0.15), TN.H * (q + 0.5) / 2, 0, i === 0 ? hot : plate, j() * 0.4, j() * 0.25, sd * j() * 0.5);
+      add(TN.HW * 2 + 0.2, 0.05, len + 0.12, 0, TN.H + 0.03 - Math.abs(j()) * 0.15, 0, plate, j() * 0.3, 0, j() * 0.4); // (the roof, sagging)
+      add(TN.HW * 2 + 0.3, 0.12, 0.08, 0, TN.H, len / 2, dark);
+      for (const sd of [-1, 1]) add(0.1, TN.H, 0.08, sd * (TN.HW + 0.08), TN.H / 2, len / 2, dark, 0, 0, j() * 0.3);
+      g.add(seg);
+    }
+    return g;
   }
   // the hull cut through at a site, on this screen: the world and the grid (js/shipgen.ts cut), the wall's cubes out of sight
   // there, a lintel over the opening and a torn frame round it
@@ -177,6 +207,7 @@ const G_Space = (() => {
     for (const sd of [-1, 1]) { bx(torn, sd * 1.5 * TS - 0.06, 0, sd * 1.5 * TS + 0.06, L.DOOR_H + 0.1, -TS / 2 - 0.04, TS / 2 + 0.04); bx(hot, sd * 1.5 * TS - 0.02, 0.1, sd * 1.5 * TS + 0.02, L.DOOR_H, -TS / 2 - 0.06, -TS / 2 - 0.04); }
     bx(torn, -1.5 * TS, L.DOOR_H + 0.04, 1.5 * TS, L.DOOR_H + 0.16, -TS / 2 - 0.04, TS / 2 + 0.04);
     g.position.set(s.x, 0, s.z); G.R.levelRoot.add(g);
+    if (G.ShipGen.bent(s)) G.R.levelRoot.add(tunnelMesh(s)); // (an angled breach: the crumpled tunnel she drove in)
     // each bulkhead it broke through: the wall over the gap, a torn edge under it, and its broken end where it stops
     const bk = new T.Group(), bw = G.ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 });
     for (const c of got.walls) {
@@ -392,22 +423,29 @@ const G_Space = (() => {
   }
   // (reach: how far to one side of a site her nose line may meet the hull and still be on for it; 3.5 m: the collar takes her onto
   // the nearest, though the line meets a window or a bulkhead's end between sites)
-  function aim(maxT = 320, reach = 3.5) {
+  // (dir: along that line instead of her nose's: her course, js/space.ts squareUp)
+  function aim(maxT = 320, reach = 3.5, dir?: THREE.Vector3) {
     if (S.kind !== 'board' || !S.map || !S.map.sp) return null;
-    const L = SD.layout(S.def), zn = L.zc - 0.22, N = new T.Vector3(0, L.FB + 1.16, zn).applyQuaternion(S.Q).add(S.P), f = fwd(S.Q), TS = G.Level.TS; // (the collar's middle: 1.4 over the deck she breaches when she's level with it)
+    const L = SD.layout(S.def), zn = L.zc - 0.22, N = new T.Vector3(0, L.FB + 1.16, zn).applyQuaternion(S.Q).add(S.P), f = dir ? dir.clone().normalize() : fwd(S.Q), TS = G.Level.TS; // (the collar's middle: 1.4 over the deck she breaches when she's level with it)
     let best: ShSite | null = null, bo = reach, bt = 0; // (the nearest site the line passes within reach of: the collar pulls her onto it)
-    const raid: number[][] = (S.state && S.state.raid) || [], W0 = S.map.W, nearPod = (s: ShSite) => raid.some((q) => Math.hypot(s.c % W0 - q[0] % W0, ((s.c / W0) | 0) - ((q[0] / W0) | 0)) * G.Level.TS < 8);
-    const list = G.ShipGen.sites(S.map).concat((S.map.sp.cuts || []).map(siteAt)).filter((s) => !nearPod(s)); // (and the holes already made; not where a pirate pod is)
+    const list = siteList();
     for (const s of list) {
       const dn = f.x * s.nx + f.z * s.nz; if (dn > -0.34) continue; // (her nose on it within 70 degrees)
       const px = s.x + s.nx * TS / 2, pz = s.z + s.nz * TS / 2, t = ((px - N.x) * s.nx + (pz - N.z) * s.nz) / dn;
       if (t < -1 || t > maxT) continue;
       const off = Math.abs(s.nz ? N.x + f.x * t - px : N.z + f.z * t - pz);
-      if (off < bo && hullClear(s)) { bo = off; best = s; bt = t; }
+      if (off < bo) { bo = off; best = s; bt = t; }
     }
     if (!best) return null;
     const lat = best.nz ? (N.x - best.x) * -best.nz : (N.z - best.z) * best.nx, range = (N.x - best.x) * best.nx + (N.z - best.z) * best.nz - TS / 2;
     return { site: best, t: bt, range, dx: lat, dy: N.y - 1.4, align: -(f.x * best.nx + f.z * best.nz), close: -(S.V.x * best.nx + S.V.z * best.nz) };
+  }
+  // every stretch of her hull she could be breached through: the sites, and the holes already made; not where a pirate pod is, nor
+  // where anything stands out over her plating in the way (hullClear)
+  function siteList() {
+    if (!S.map || !S.map.sp) return [];
+    const raid: number[][] = (S.state && S.state.raid) || [], W0 = S.map.W, nearPod = (s: ShSite) => raid.some((q) => Math.hypot(s.c % W0 - q[0] % W0, ((s.c / W0) | 0) - ((q[0] / W0) | 0)) * G.Level.TS < 8);
+    return G.ShipGen.sites(S.map).concat((S.map.sp.cuts || []).map(siteAt)).filter((s) => !nearPod(s) && hullClear(s));
   }
   const addObj = (o: THREE.Object3D, p?: THREE.Vector3) => { if (p) o.position.copy(p); S.root!.add(o); return o; };
 
@@ -578,6 +616,7 @@ const G_Space = (() => {
   type ZHull = { holder: THREE.Group; h: ReturnType<typeof G.ShipModel.hull>; bow: number; map: LvMap | null; key: string; up?: ((ms: number) => boolean) | null };
   const viewDrop = (map: LvMap | null) => { // (what was made of her ahead, not wanted after all)
     const p = map && (map as any).viewPre as LvViewPre | null; if (!p) return;
+    p.root.removeFromParent(); // (shown on her hull out in the zone, zoneShow)
     p.root.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) { if (m.map) m.map.dispose(); m.dispose(); } });
     (map as any).viewPre = null;
   };
@@ -659,7 +698,20 @@ const G_Space = (() => {
   }
   /** one of the zone's ships ready to be the level: laid out, drawn and sent to the graphics card (or there's no taking what's made: takeMap) */
   function zoneReady(h: ZHull | undefined) { if (!h) return false; if (!h.key && h.map) return true; const p = h.map && (h.map as any).viewPre as LvViewPre | null; return !!(p && p.done && p.up === true && G.R.progsReady()); }
+  // Her own drawing, once it's made ahead and on the graphics card (zoneReady), is shown on her hull out in the zone: her walls, her
+  // windows and what's behind them, as they'll be when she's the level (js/game.ts enterLevel takes the same drawing: takeMap). Till
+  // then her hull alone is seen, from further off.
+  function zoneShow() {
+    if (!S.zinfo) return;
+    for (const [id, h] of zoneHulls) {
+      const p = h.map && (h.map as any).viewPre as LvViewPre | null;
+      if (!p || p.root.parent || !zoneReady(h) || !id.startsWith(S.zinfo.ms.seed + ':')) continue;
+      h.h.group.add(p.root); // (her drawing's in the level's own frame, as her hull is)
+      if (hid) p.root.traverse((o: any) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; hid!.push(o); } });
+    }
+  }
   function zonePrep() { // (from the game's loop, once the frame's drawn: the scene lit as it's drawn, which is what the shaders are found for)
+    zoneShow();
     if (!S.on || S.kind !== 'board' || !S.zone || !S.zinfo || S.docked || S.ftl || S.warp || zoneHullsOf !== S.zinfo.ms.seed) return;
     let best: typeof S.traffic[0] | null = null, bd = ZONE_REAL + 1;
     for (const q of S.traffic) {
@@ -748,7 +800,7 @@ const G_Space = (() => {
     const noseOpen = S.docked && S.kind === 'board', rampOpen = S.docked && S.kind !== 'board';
     for (const q of S.solids) {
       const want = q.tag === 'nose' ? !noseOpen : q.tag === 'ramp' ? !rampOpen : q.tag === 'steps' ? rampOpen : true;
-      if (want && !q.on) { q.s = G.World.add(w, G.World.box(q.b[0], q.b[1], q.b[2], q.b[3], q.b[4], q.b[5], q.fl ? { kind: 'step', stair: q.fl, mat: G.Materials.SHIP } : { kind: 'prop', mat: G.Materials.SHIP })); q.on = true; if (q.fl) q.fl.steps.push(q.s); }
+      if (want && !q.on) { const o = q.fl ? { kind: 'step', stair: q.fl, mat: G.Materials.SHIP } : { kind: 'prop', mat: G.Materials.SHIP }; q.s = G.World.add(w, SD.solidOf(q, o)); q.on = true; if (q.fl) q.fl.steps.push(q.s); }
       else if (!want && q.on) { G.World.remove(w, q.s); q.on = false; if (q.fl) q.fl.steps = q.fl.steps.filter((s: any) => s !== q.s); }
     }
     for (const fl of S.flights) { // (a flight's slope there while its steps are)
@@ -774,7 +826,7 @@ const G_Space = (() => {
     const cam = G.R.camera;
     if (S.stars) { S.stars.position.copy(cam.position); S.stars.quaternion.copy(_r); if (S.zone) S.stars.quaternion.multiply(S.zone.quaternion); } // (the stars are the zone's: they turn when the ship the level is turns)
     if (S.sun) {
-      const d = new T.Vector3(0.5, 0.62, 0.6).normalize().applyQuaternion(_r);
+      const d = new T.Vector3(0.5, 0.62, 0.6).normalize(); if (S.zone) d.applyQuaternion(S.zone.quaternion); d.applyQuaternion(_r); // (the zone's sun, as the stars are the zone's: it stays where it is when the level changes to another of her ships)
       S.sun.position.copy(cam.position).addScaledVector(d, 200); S.sun.target.position.copy(cam.position);
       const want = S.docked && !S.auto ? 0 : S.ftl ? 0.4 : 2.4; S.sun.intensity += (want - S.sun.intensity) * 0.08;
     }
@@ -887,28 +939,270 @@ const G_Space = (() => {
     // in air she rights herself (no rolling over above a base)
     if (S.stage === 'atmo' && S.kind === 'assault') { const up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), fix = new T.Quaternion().setFromUnitVectors(up, new T.Vector3(up.x * 0.5, Math.max(0.6, up.y), up.z * 0.5).normalize()); S.Q.premultiply(new T.Quaternion().slerp(fix, Math.min(1, dt * 1.5))).normalize(); }
     want.applyQuaternion(S.Q);
-    const dv = want.sub(S.V), l = dv.length(), step = acc * dt * (S.V.length() > d.speed * 1.2 ? 6 : 1);
+    const dv = want.sub(S.V);
+    if (helm && (S.brLock || S.brRound) && !K('KeyA') && !K('KeyD') && !K('Space') && !K('KeyC') && !K('KeyS') && !K('KeyX')) { const f = fwd(S.Q), k = S.brRound && S.roundBrake ? 0 : Math.max(0, dv.dot(f)); dv.copy(f).multiplyScalar(k); } // (and the throttle's yours on top of what the approach's engine gives: open it, and she goes in at her top speed) // (lined up on a site: her assist only ever speeds her along her nose, never brakes her, and stands down while the approach has her engine)
+    const l = dv.length(), step = acc * dt * (S.V.length() > d.speed * 1.2 ? 6 : 1) * (helm && S.brLock && S.brLock.rp != null ? S.brLock.rp : 1); // (handed on from being brought round: her throttle comes in over a second)
     if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, step / l));
     S.P.addScaledVector(S.V, dt);
     collide(dt);
     events();
   }
-  // Coming in on a stretch of hull she can breach (within 140 m of it, her nose on it within about 70 degrees, closing on it: the faster,
-  // the harder it takes her), she squares herself
-  // up to it: her nose turned straight at it and level, her roll taken out, her collar eased to the height of the deck beyond (and
-  // onto the nearest place it can go in, if that's within 8 m to one side). The
-  // nearer, the harder; the pilot's own turning eases it off. (What the breach wants: js/space.ts events, square on, level, at height.)
+  // Coming in on a stretch of hull she can breach, she's brought onto it on a curve. The site's the one her nose line meets (aim: within
+  // 300 m of it, her nose on it within about 70 degrees, closing), and once it's chosen it's held (brLock) while she comes in. She's
+  // taken across with as little acceleration across as can do it, to meet the hull at the site itself: the plan worked out afresh every
+  // frame for the time she'll take to get there (the minimum-energy one: a = -3 (y + v t) / t², y her distance from the line straight out
+  // from the site, v her drift across it, t the time to go, counting her speeding up on the way). She isn't squared up: she may still be
+  // drifting across as she hits, and meets the hull at whatever angle that makes (an angled breach, up to SpaceData.BREACH_ANG: events).
+  // The last COAST seconds she coasts. Her nose is kept level, her roll taken out, her collar eased to the height of the deck beyond by
+  // the same kind of plan, up or down. The plan across is flown by her main engine, not her side thrusters: her nose is turned toward
+  // where the plan wants her pushed, up to PHI degrees off straight in, and she thrusts along it, so the push across comes with as much
+  // forward (at up to ENG_MAX, and never back: nothing brakes her while she's lined up). What the engine can't give across at that, her
+  // side thrusters do, square across her nose; and a plan wanting more across than ENG_HARD gets no forward at all, its time being what
+  // it's short of. It's as strong as she's closing (full from 25 m/s), and the pilot's own turning eases it off; turning hard for a
+  // moment, or standing off, lets the site go (a new one's taken from her nose line). (FREE false, from the console (dbgBr): the older
+  // plan, side thrusters, squared up, on the line and no longer drifting LINE_ON metres out.)
+  let NOSE_RATE = 25, LINE_ON = 12, SIDE_MAX = 75, FREE = true, FREE_ON = 0, COAST = 0.35, PHI = 45, ENG_MAX = 60, ENG_HARD = 30, UP_MAX = 30;
+  const dbgBr = (o: { on?: number; max?: number; free?: boolean; freeOn?: number; phi?: number; eng?: number }) => { if (o.on != null) LINE_ON = o.on; if (o.max != null) SIDE_MAX = o.max; if (o.free != null) FREE = o.free; if (o.freeOn != null) FREE_ON = o.freeOn; if (o.phi != null) PHI = o.phi; if (o.eng != null) ENG_MAX = o.eng; if ((o as any).hard != null) ENG_HARD = (o as any).hard; if ((o as any).coast != null) COAST = (o as any).coast; return { LINE_ON, SIDE_MAX, FREE, FREE_ON, PHI, ENG_MAX, ENG_HARD }; }; // (dbgBr: for tuning, from the console)
+  // (handed on from being brought round: for its first second what the breach assist does to her way is blended in from what bringing
+  // her round was doing, so neither her turn nor her push changes all at once)
   function squareUp(dt: number) {
-    const a = aim(160, 25); if (!a || a.range > 140 || a.range < -0.5 || a.align < 0.34) return;
-    // (only while she's closing on the hull, and as hard as she is: none standing off or backing away, full from 25 m/s in)
-    const v = G.U.clamp(a.close / 25, 0, 1); if (v <= 0) return;
-    const k = G.U.clamp((140 - a.range) / 70, 0, 1) * (1 - 0.7 * Math.min(1, S.stick.length())) * v; // (from 140 m out, full by 70 m)
+    const v0 = S.V.clone(); squareUp0(dt);
+    const lk = S.brLock;
+    if (lk && lk.rp != null && lk.rp < 1 && lk.ra) { const w = lk.rp * lk.rp * (3 - 2 * lk.rp); S.V.sub(v0).multiplyScalar(w).add(v0).addScaledVector(lk.ra, (1 - w) * dt); }
+  }
+  function squareUp0(dt: number) {
+    S.brThrust = false;
+    const TS = G.Level.TS, L = SD.layout(S.def), lk = S.brLock && S.brLock.map === S.map ? S.brLock : null;
+    // (the stretch of hull her course already takes her to, if it takes her to one: least to put right, least turning; else the one her nose is on)
+    if (!lk && S.brRound && S.brRound.map === S.map) { roundUp(dt); if (!S.brLock) return; } // (being brought round: it hands her to this itself, on its own site, once she's on the line in)
+    if (!S.brLock || S.brLock.map !== S.map) { const ok = (a: ReturnType<typeof aim>) => !!a && a.range <= 300 && a.range >= -0.5 && a.align >= 0.34 && a.close > 0, a = (S.V.length() > 5 && [aim(320, 25, S.V)].find(ok)) || [aim(320, 25)].find(ok); if (!a) { roundUp(dt); return; } S.brLock = { site: a.site, map: S.map!, hard: 0, q0: S.Q.clone() }; S.brRound = null; } // (none on her way or her nose's: brought round to one, roundUp)
+    const lock = S.brLock!, st = lock.site, nx = st.nx, nz = st.nz, tx = -nz, tz = nx;
+    const N = new T.Vector3(0, L.FB + 1.16, L.zc - 0.22).applyQuaternion(S.Q).add(S.P), fx = st.x + nx * TS / 2, fz = st.z + nz * TS / 2;
+    const out = (N.x - fx) * nx + (N.z - fz) * nz, side = (N.x - fx) * tx + (N.z - fz) * tz, close = -(S.V.x * nx + S.V.z * nz);
+    lock.hard = S.stick.length() > 0.6 ? lock.hard + dt : 0;
+    // (handed on from being brought round: the throttle she'd been kept off comes in over a second, not all at once)
+    if (lock.rp != null) lock.rp = Math.min(1, lock.rp + dt);
+    if (out > 320 || out < -1 || close <= 0 || lock.hard > 0.5) { S.brLock = null; return; } // (standing off, past it, or the pilot's taken her elsewhere)
+    const k = G.U.clamp(close / 25, 0, 1) * (1 - 0.7 * Math.min(1, S.stick.length()));
     if (k <= 0) return;
-    S.Q.slerp(lookQ(new T.Vector3(-a.site.nx, 0, -a.site.nz)), Math.min(1, dt * 5 * k)).normalize();
-    S.P.y -= G.U.clamp(a.dy, -4, 4) * Math.min(1, dt * 2.5 * k);
-    // (and within 8 m to one side of the stretch she's on for, drawn across onto it: the collar's middle onto the site's)
-    const L = SD.layout(S.def), N = new T.Vector3(0, 0, L.zc - 0.22).applyQuaternion(S.Q).add(S.P), tx = -a.site.nz, tz = a.site.nx, off = (N.x - a.site.x) * tx + (N.z - a.site.z) * tz;
-    if (Math.abs(off) < 8) { const m = off * Math.min(1, dt * 4 * Math.max(k, G.U.clamp((40 - a.range) / 30, 0, 1) * v)); S.P.x -= tx * m; S.P.z -= tz * m; } // (hard in the last 40 m, the pilot's hand or not: as she closes)
+    // across: the least-acceleration plan for the time she'll take at the speed she's closing (replanned every frame, so what the engine
+    // adds forward shortens it as it goes)
+    // (the time to go counts her speeding up on the way in: the engine's forward push as it was last frame while the approach has it, or
+    // her own throttle, open, to her top speed. Reckoned at her speed now it'd be too long: the plan would push too little early, and
+    // have to push back later to take out the drift that built)
+    const vs = S.V.x * tx + S.V.z * tz, dist = Math.max(0, out - (FREE ? FREE_ON : LINE_ON)), v0 = Math.max(close, 5);
+    const eF = lock.fa && lock.fa > 0.5 ? lock.fa : 0, aF = eF + (K('KeyW') && v0 < S.def.speed ? 30 * (lock.rp != null ? lock.rp : 1) : 0), vm = eF ? Infinity : S.def.speed; // (the engine's push and the throttle's together)
+    let tgo = dist / v0;
+    if (aF > 0) { const t1 = (vm - v0) / aF, d1 = v0 * t1 + aF * t1 * t1 / 2; tgo = dist <= d1 ? (-v0 + Math.sqrt(v0 * v0 + 2 * aF * dist)) / aF : t1 + (dist - d1) / vm; }
+    // (the last COAST seconds she's left to coast: a miss of a metre over a time that small would take a slam across to put right, and
+    // the plan would only chase its own noise)
+    const coast = FREE && tgo < COAST;
+    tgo = Math.max(0.3, tgo);
+    const a = G.U.clamp(FREE ? (out > FREE_ON && !coast ? -3 * (side + vs * tgo) / (tgo * tgo) : 0) : out > LINE_ON ? -6 * side / (tgo * tgo) - 4 * vs / tgo : -12 * side - 7 * vs, -SIDE_MAX, SIDE_MAX) * k;
+    // (her nose first, as it'll be this frame: what pushes her is set against it)
+    const vdir = () => (Math.hypot(S.V.x, S.V.z) > 5 ? new T.Vector3(S.V.x, 0, S.V.z).normalize() : new T.Vector3(-nx, 0, -nz));
+    const ph = PHI * Math.PI / 180, eng = FREE && out > FREE_ON && !coast && Math.abs(a) > 0.05;
+    // (her engine at up to ENG_MAX, its nose PHI off straight in: what it gives across, and with it forward. A plan wanting more across than
+    // ENG_HARD gets none of it (no forward: speeding up would take away the time it's short of): her side thrusters do it all, nose on her way)
+    const T0 = eng && Math.abs(a) <= ENG_HARD ? Math.min(ENG_MAX, Math.abs(a) / Math.sin(ph)) : 0, ea = Math.sign(a) * T0 * Math.sin(ph), fa = T0 * Math.cos(ph);
+    const th = new T.Vector3(-nx * fa + tx * ea, 0, -nz * fa + tz * ea), dir = FREE ? vdir() : T0 > 0 ? th.clone().normalize() : out <= LINE_ON ? new T.Vector3(-nx, 0, -nz) : vdir(); // (her nose on her way, whatever the plan's pushing: turned to the push, it swung back and forth each time the engine came on or went off)
+    // (nose up or down with her way, climbing or diving onto the site: no more than BREACH_PITCH, and level with the older plan)
+    if (FREE) { const hv = Math.max(5, Math.hypot(S.V.x, S.V.z)), pm = SD.BREACH_PITCH * Math.PI / 180, pa = G.U.clamp(Math.atan2(S.V.y, hv), -pm, pm); dir.multiplyScalar(Math.cos(pa)).setY(Math.sin(pa)); }
+    if (FREE) {
+      // (her nose brought round from where it was when she locked on to her way by the hull, a little at a time as she closes (by the time
+      // to go), and never faster than NOSE_RATE: turning spread over the whole approach, not swung round at the start)
+      // (handed on from being brought round, her nose already on her way: it stays on it, as quick as it was turning)
+      if (lock.T0 == null || tgo > lock.T0) lock.T0 = tgo;
+      const sP = lock.rp != null ? 1 : G.U.clamp(1 - tgo / lock.T0, 0, 1), want = (lock.q0 || S.Q).clone().slerp(lookQ(dir), sP * sP * (3 - 2 * sP));
+      S.Q.rotateTowards(want, (lock.rp != null ? ROUND.RATE : NOSE_RATE) * Math.PI / 180 * dt * (1 - 0.7 * Math.min(1, S.stick.length()))).normalize();
+    } else S.Q.slerp(lookQ(dir), Math.min(1, dt * 30 * (1 - 0.7 * Math.min(1, S.stick.length())))).normalize();
+    if (T0 > 0) { S.V.addScaledVector(th, dt); S.brThrust = true; }
+    lock.fa = (lock.fa || 0) + ((T0 > 0 ? fa : 0) - (lock.fa || 0)) * Math.min(1, dt * 2); // (for the time to go: eased, so the plan and the push it sets don't chase each other frame to frame)
+    const rest = FREE ? (eng ? a - ea : 0) : a;
+    if (Math.abs(rest) > 1e-3) { // (her side thrusters, square across her nose as it is, never back along it: as much as gives the plan's push along the hull)
+      const f = fwd(S.Q); f.y = 0; f.normalize(); let px = f.z, pz = -f.x; if (px * tx + pz * tz < 0) { px = -px; pz = -pz; }
+      const c = px * tx + pz * tz; if (c > 0.3) { S.V.x += px * rest / c * dt; S.V.z += pz * rest / c * dt; } else { S.V.x += tx * rest * dt; S.V.z += tz * rest * dt; }
+    }
+    // up or down: for her collar to meet its mark (1.4 m over the deck beyond) at the hull. As across, the least-acceleration plan, not
+    // levelled off: she may meet it climbing or diving (a breach nose up or down, SpaceData.BREACH_PITCH), so long as the way she'd be going
+    // as she hit is within BREACH_PITCH less 5 degrees of level; a plan that would have her steeper squares her up as the older one does
+    const dy = N.y - 1.4, vy = S.V.y, ty0 = Math.max(0.3, Math.max(0, out) / Math.max(close, 5));
+    const vf = -2 * vy - 3 * dy / tgo, steep = Math.abs(vf) > Math.tan((SD.BREACH_PITCH - 5) * Math.PI / 180) * Math.max(close, 5);
+    const ay = G.U.clamp(FREE && !steep ? (out > FREE_ON && !coast ? -3 * (dy + vy * tgo) / (tgo * tgo) : 0) : out > 1 ? -6 * dy / (ty0 * ty0) - 4 * vy / ty0 : -8 * dy - 6 * vy, -UP_MAX, UP_MAX) * k;
+    S.V.y += ay * dt;
+    planDraw({ fx, fz, nx, nz, tx, tz, out, side, vs, dy, vy, T: tgo, v0, aF, vm, coast, a0: FREE && !coast ? -3 * (side + vs * tgo) / (tgo * tgo) : null, ay0: FREE && !steep && !coast ? -3 * (dy + vy * tgo) / (tgo * tgo) : null });
+  }
+  // The plan she's flying, drawn for her pilot: her breaching door's way from where it is to where it meets the hull, as the outline
+  // of the door itself every PLAN_GAP metres along it, counted back out from the hull (gates: they stay where they are on her way in,
+  // so she flies through them one after another, each gone as she passes it), square to the way she's going there, a faint line down
+  // their middle; at the hull the one she'll cut, brighter. The plan
+  // as it stands this frame (squareUp): across and up or down, the least-acceleration one (its push falling off evenly to nothing at
+  // the hull: y = y0 + v t + a0 (t²/2 - t³/6T)), or none in the last COAST seconds; the older plans drawn as levelling off; forward,
+  // at her speed now, speeding up as the time to go was reckoned. Shown only while she's lined up.
+  const PLAN_N = 64, PLAN_G = 16, PLAN_GAP = 20;
+  // her door's outline round its middle (x across, y up), its corners cut
+  const DOOR = (() => { const hw = 0.85, hh = 1.1, k = 0.28; return [[-hw + k, -hh], [hw - k, -hh], [hw, -hh + k], [hw, hh - k], [hw - k, hh], [-hw + k, hh], [-hw, hh - k], [-hw, -hh + k]]; })();
+  function planDraw(p: { fx: number; fz: number; nx: number; nz: number; tx: number; tz: number; out: number; side: number; vs: number; dy: number; vy: number; T: number; v0: number; aF: number; vm: number; coast: boolean; a0: number | null; ay0: number | null }) {
+    const Tt = p.T, dist = Math.max(0, p.out);
+    const along = (t: number) => { if (p.aF <= 0) return p.v0 * t; const t1 = (p.vm - p.v0) / p.aF; return t <= t1 ? p.v0 * t + p.aF * t * t / 2 : p.v0 * t1 + p.aF * t1 * t1 / 2 + p.vm * (t - t1); };
+    const ease = (y0: number, v: number, a0: number | null, t: number) => { const s = t / Tt; return a0 == null ? y0 * (1 - 3 * s * s + 2 * s * s * s) + v * Tt * (s - 2 * s * s + s * s * s) : y0 + v * t + a0 * (t * t / 2 - t * t * t / (6 * Tt)); };
+    const at = (t: number, last = false) => { const out = last ? 0 : Math.max(0, dist - along(t)), sd = ease(p.side, p.vs, p.coast ? 0 : p.a0, t), up = 1.4 + ease(p.dy, p.vy, p.coast ? 0 : p.ay0, t); return new T.Vector3(p.fx + p.nx * out + p.tx * sd, up, p.fz + p.nz * out + p.tz * sd); };
+    const pts: THREE.Vector3[] = []; for (let i = 0; i <= PLAN_N; i++) pts.push(at(Tt * i / PLAN_N, i === PLAN_N));
+    routeDraw(pts, new T.Vector3(-p.nx, 0, -p.nz));
+  }
+  // A way in drawn for her pilot (planDraw's, or the way round to a side she can breach: roundUp): PLAN_N + 1 points of it from her
+  // collar to the hull, the way she'll meet the hull there (into it)
+  function routeDraw(pts: THREE.Vector3[], into: THREE.Vector3) {
+    if (!S.root) return;
+    let o = S.plan;
+    if (!o || o.line.parent !== S.root) {
+      const seg = (n: number) => new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(n * DOOR.length * 6), 3));
+      const line = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array((PLAN_N + 1) * 3), 3)), new T.LineBasicMaterial({ color: 0x6fe3ff, transparent: true, opacity: 0.3, depthTest: false }));
+      const gates = new T.LineSegments(seg(PLAN_G), new T.LineBasicMaterial({ color: 0x6fe3ff, transparent: true, opacity: 0.7, depthTest: false }));
+      const end = new T.LineSegments(seg(1), new T.LineBasicMaterial({ color: 0xbff4ff, transparent: true, opacity: 1, depthTest: false }));
+      line.renderOrder = gates.renderOrder = end.renderOrder = 999; line.frustumCulled = gates.frustumCulled = end.frustumCulled = false;
+      S.root.add(line, gates, end); o = S.plan = { line, gates, end };
+    }
+    const pos = o.line.geometry.getAttribute('position') as THREE.BufferAttribute;
+    for (let i = 0; i <= PLAN_N; i++) { const q = pts[Math.min(i, pts.length - 1)]; pos.setXYZ(i, q.x, q.y, q.z); }
+    pos.needsUpdate = true; o.line.geometry.computeBoundingSphere();
+    // (a door's outline at a point of it, square to the way it's going there; at the hull, square to the hull's face)
+    const f = new T.Vector3(), r = new T.Vector3(), u = new T.Vector3(), W = new T.Vector3(0, 1, 0);
+    const door = (ga: THREE.BufferAttribute, n: number, c: THREE.Vector3, dir: THREE.Vector3) => {
+      f.copy(dir).normalize(); r.crossVectors(f, W); if (r.lengthSq() < 1e-6) r.set(1, 0, 0); r.normalize(); u.crossVectors(r, f).normalize();
+      for (let e = 0; e < DOOR.length; e++) {
+        const a = DOOR[e], b = DOOR[(e + 1) % DOOR.length], k = (n * DOOR.length + e) * 2;
+        ga.setXYZ(k, c.x + r.x * a[0] + u.x * a[1], c.y + r.y * a[0] + u.y * a[1], c.z + r.z * a[0] + u.z * a[1]);
+        ga.setXYZ(k + 1, c.x + r.x * b[0] + u.x * b[1], c.y + r.y * b[0] + u.y * b[1], c.z + r.z * b[0] + u.z * b[1]);
+      }
+    };
+    // (the way back out from the hull, a point at a time (pos, last first), and how far along it each is: a gate every PLAN_GAP metres of
+    // it, where it falls between two of them; none past her)
+    const gp = o.gates.geometry.getAttribute('position') as THREE.BufferAttribute, P = (i: number) => new T.Vector3(pos.getX(i), pos.getY(i), pos.getZ(i));
+    let g = 0, run = 0, want = PLAN_GAP;
+    for (let i = PLAN_N; i > 0 && g < PLAN_G; i--) {
+      const a = P(i), b = P(i - 1), len = a.distanceTo(b);
+      while (g < PLAN_G && run + len >= want && len > 1e-6) { const c = a.clone().lerp(b, (want - run) / len); door(gp, g++, c, a.clone().sub(b)); want += PLAN_GAP; }
+      run += len;
+    }
+    for (; g < PLAN_G; g++) for (let k = 0; k < DOOR.length * 2; k++) gp.setXYZ((g * DOOR.length) * 2 + k, 0, 0, 0); // (none left: folded away to nothing)
+    gp.needsUpdate = true; o.gates.geometry.computeBoundingSphere();
+    door(o.end.geometry.getAttribute('position') as THREE.BufferAttribute, 0, pts[pts.length - 1], into);
+    (o.end.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true; o.end.geometry.computeBoundingSphere();
+    o.line.visible = o.gates.visible = o.end.visible = true;
+  }
+  // ---- Coming round to a side she can breach. Closing on the ship (her way running into the box round one of her hulls, within ROUND.R)
+  // with no stretch she can breach on her course or her nose's line (her bow or her stern, mostly): the one she can get to with least
+  // going round and least turning is picked, and she's flown to the line straight out from it, ROUND.OUT off her plating: round the
+  // corner of the hull first if the way there would cross it (a corner of the box round each of her hulls, ROUND.MARGIN off her), then
+  // onto that line, a point ROUND.LOOK ahead along it chased, so she joins it heading in. Her course turned with up to ROUND.A across
+  // it, and held to ROUND.VMAX (braked at up to ROUND.BRAKE, the throttle not hers), or no ship that size could be got round at all.
+  // Her nose level, on her way, turned no faster than ROUND.RATE. Once she's on the line, heading in, at her collar's height and far
+  // enough out to get up to speed on it (ROUND.IN or more), the breach assist has her, on that site (squareUp). Turning hard, slowing
+  // to nothing, standing well off, or getting past the hull's face without lining up lets it go.
+  const ROUND = { R: 450, MARGIN: 22, OUT: 280, LOOK: 60, A: 40, RATE: 50, VMAX: 55, BRAKE: 30, IN: 90 };
+  type Box2 = { x0: number; x1: number; z0: number; z1: number };
+  const inBox = (p: THREE.Vector3, b: Box2) => p.x > b.x0 && p.x < b.x1 && p.z > b.z0 && p.z < b.z1;
+  // (where along a-b (0..1) it enters a box, Infinity if it doesn't)
+  const segBox = (a: THREE.Vector3, b: THREE.Vector3, bx: Box2) => {
+    let t0 = 0, t1 = 1; const d = [b.x - a.x, b.z - a.z], o = [a.x, a.z], lo = [bx.x0, bx.z0], hi = [bx.x1, bx.z1];
+    for (let k = 0; k < 2; k++) {
+      if (Math.abs(d[k]) < 1e-9) { if (o[k] <= lo[k] || o[k] >= hi[k]) return Infinity; continue; }
+      let u = (lo[k] - o[k]) / d[k], w = (hi[k] - o[k]) / d[k]; if (u > w) [u, w] = [w, u];
+      t0 = Math.max(t0, u); t1 = Math.min(t1, w); if (t0 >= t1) return Infinity;
+    }
+    return t0;
+  };
+  const boxDist = (p: THREE.Vector3, b: Box2) => Math.hypot(Math.max(b.x0 - p.x, 0, p.x - b.x1), Math.max(b.z0 - p.z, 0, p.z - b.z1));
+  // the way from a to b round her hulls (hard: the boxes it mustn't cross; corners: just outside them, where it may turn): b alone if
+  // nothing's in the way, else by one corner, or two of the same box; a box she's already inside isn't in her way (she's close in)
+  function roundRoute(a: THREE.Vector3, b: THREE.Vector3, hard: Box2[], soft: Box2[]) {
+    const hb = hard.filter((bx) => !inBox(a, bx)), clear = (p: THREE.Vector3, q: THREE.Vector3) => hb.every((bx) => segBox(p, q, bx) === Infinity);
+    if (clear(a, b)) return [b];
+    const cs: THREE.Vector3[][] = soft.map((bx) => [[bx.x0, bx.z0], [bx.x1, bx.z0], [bx.x1, bx.z1], [bx.x0, bx.z1]].map(([x, z]) => new T.Vector3(x, b.y, z)));
+    let best: THREE.Vector3[] | null = null, bl = Infinity;
+    const len = (w: THREE.Vector3[]) => { let l = 0, p = a; for (const q of w) { l += Math.hypot(q.x - p.x, q.z - p.z); p = q; } return l; };
+    for (const box of cs) for (let i = 0; i < 4; i++) {
+      const c = box[i];
+      if (clear(a, c) && clear(c, b)) { const w = [c, b]; if (len(w) < bl) { bl = len(w); best = w; } }
+      for (const j of [(i + 1) % 4, (i + 3) % 4]) { const c2 = box[j]; if (clear(a, c) && clear(c, c2) && clear(c2, b)) { const w = [c, c2, b]; if (len(w) < bl) { bl = len(w); best = w; } } }
+    }
+    return best || [b];
+  }
+  function roundUp(dt: number) {
+    const sp = S.map && S.map.sp; if (!sp) { S.brRound = null; return; }
+    const L = SD.layout(S.def), TS = G.Level.TS, N = new T.Vector3(0, L.FB + 1.16, L.zc - 0.22).applyQuaternion(S.Q).add(S.P), v = S.V.length();
+    const hb = sp.hulls && sp.hulls.length ? sp.hulls : [sp.hull], grow = (m: number) => hb.map((h) => ({ x0: h.x0 - m, x1: h.x1 + m, z0: h.z0 - m, z1: h.z1 + m }));
+    const hard = grow(ROUND.MARGIN * 0.6), soft = grow(ROUND.MARGIN), near = Math.min(...hard.map((bx) => boxDist(N, bx)));
+    let R = S.brRound && S.brRound.map === S.map ? S.brRound : null;
+    if (R) { R.hard = S.stick.length() > 0.6 ? R.hard + dt : 0; if (R.hard > 0.5 || v < 3 || near > ROUND.R * 1.3) { S.brRound = null; return; } }
+    if (!R) {
+      if (v < 5 || near > ROUND.R) return;
+      const dir = S.V.clone().setY(0).normalize(), far = N.clone().addScaledVector(dir, ROUND.R);
+      if (!hard.some((bx) => segBox(N, far, bx) !== Infinity)) return; // (not flying at her)
+      // (a side she can breach already on her way or her nose's, only too far out yet for the breach assist to have her: left to it)
+      const ok = (a: ReturnType<typeof aim>) => !!a && a.range >= -0.5 && a.align >= 0.34 && a.close > 0;
+      if ([aim(ROUND.R + 20, 25, S.V)].find(ok) || [aim(ROUND.R + 20, 25)].find(ok)) return;
+      let pick: { site: ShSite; face: THREE.Vector3; E: THREE.Vector3 } | null = null, bc = Infinity;
+      for (const st of siteList()) {
+        // (the point she turns in from: out on the line, and off it to her side by her turning circle's width, so she's still short of the
+        // line when the turn in starts and comes out of it on the line, not swung across it)
+        const face = new T.Vector3(st.x + st.nx * TS / 2, 1.4, st.z + st.nz * TS / 2), sg = Math.sign((N.x - face.x) * -st.nz + (N.z - face.z) * st.nx) || 1;
+        const E = face.clone().add(new T.Vector3(st.nx * ROUND.OUT - st.nz * sg * 2 * ROUND.VMAX * ROUND.VMAX / (0.9 * ROUND.A), 0, st.nz * ROUND.OUT + st.nx * sg * 2 * ROUND.VMAX * ROUND.VMAX / (0.9 * ROUND.A)));
+        const way = roundRoute(N, E, hard, soft); let l = 0, p = N; for (const q of way) { l += Math.hypot(q.x - p.x, q.z - p.z); p = q; }
+        const d0 = way[0].clone().sub(N).setY(0).normalize(), c = l + ROUND.OUT + dir.angleTo(d0) * 40; // (the way there, and in, and how far round she has to turn at the start)
+        if (c < bc) { bc = c; pick = { site: st, face, E }; }
+      }
+      if (!pick) return;
+      R = S.brRound = { ...pick, hard: 0, map: S.map!, way: roundRoute(N, pick.E, hard, soft) }; // (the corners she goes round, in order, and the point out on the line she turns in from: worked out once)
+    }
+    // where she's making for: the corner she's going round, else a point on the line ahead of where she is along it
+    const n = new T.Vector3(R.site.nx, 0, R.site.nz), t = new T.Vector3(-n.z, 0, n.x), out = N.clone().sub(R.face).dot(n), side = N.clone().sub(R.face).dot(t);
+    // (a corner reached, or one she can see past to the next (or to the line): on to the next)
+    // (a corner reached, or one she can see past to the next: on to the next; the point out on the line reached, or she's well out
+    // along the line already: onto the line)
+    while (R.way.length > 1 && (Math.hypot(R.way[0].x - N.x, R.way[0].z - N.z) < 25 || roundRoute(N, R.way[1], hard, soft).length === 1)) R.way.shift();
+    if (R.way.length === 1 && (Math.hypot(R.way[0].x - N.x, R.way[0].z - N.z) < 40 || (out > ROUND.OUT * 0.7 && Math.abs(side) < ROUND.OUT))) R.way.shift();
+    if (!R.way.length && out < ROUND.IN * 0.5) { S.brRound = null; S.roundBrake = false; return; } // (in close without lining up: it's let go)
+    const goal = R.way.length ? R.way[0] : R.face.clone().addScaledVector(n, Math.max(20, out - ROUND.LOOK));
+    // turned in toward it, near enough the line, and far enough out: the breach assist has her, on this site. Handed on as soon as she's
+    // turned in, not once she's on the line: its plan puts right what's left over the whole run in, gently (lined up first by this, then
+    // handed on close in, it had a second or two to take out what was left, and slammed her across)
+    const Vd = S.V.clone().setY(0).normalize();
+    if (!R.way.length && Math.abs(side) < Math.max(12, out * 0.15) && Vd.dot(n.clone().negate()) > Math.cos(20 * Math.PI / 180) && out > ROUND.IN && Math.abs(N.y - 1.4) < 3) {
+      S.brLock = { site: R.site, map: S.map!, hard: 0, q0: S.Q.clone(), rp: 0, ra: R.ra }; S.brRound = null; S.roundBrake = false; return;
+    }
+    // her course turned toward it (across her way, and down to her collar's height at the hull), never braked
+    // (onto the line: not a point on it ahead of her, which at her speed she turned past and swung back across, again and again, but a way
+    // to head that leans in toward the line by how far off it she is, over a distance her turning circle can follow without overshooting)
+    const Vh = S.V.clone().setY(0), vh = Vh.length() || 1, Lk = Math.max(80, 1.2 * vh * vh / ROUND.A);
+    let gd = R.way.length ? goal.clone().sub(N).setY(0).normalize() : n.clone().multiplyScalar(-Lk).addScaledVector(t, -side).normalize();
+    if (!R.way.length) {
+      // (still turned well away from the way in: the turn in starts when a turn begun now, as tight as she can, comes out on the line; till
+      // then she holds her heading toward it)
+      const ut = Vh.dot(t) / vh, un = Vh.dot(n) / vh; let e = -Math.PI / 2 - Math.atan2(un, ut); e = Math.atan2(Math.sin(e), Math.cos(e));
+      if (Math.abs(e) > Math.PI / 3) {
+        // (turned the way that comes out nearest the line, not the shorter way round: headed out and drifting off it, that's the long way)
+        const r = vh * vh / (0.9 * ROUND.A), sAt = (g: number) => side + g * r * (-un - 1), sg = Math.abs(sAt(1)) < Math.abs(sAt(-1)) ? 1 : -1, sEnd = sAt(sg);
+        const early = Math.sign(sEnd) === Math.sign(side) && Math.abs(sEnd) > 10 && ut * side < 0;
+        gd = early ? Vh.clone().normalize() : t.clone().multiplyScalar(-sg * un).addScaledVector(n, sg * ut); // (square across her way, to the side she turns)
+      }
+    }
+    const want = gd.clone().multiplyScalar(vh), dv = want.sub(Vh).multiplyScalar(2);
+    const along = dv.dot(Vh) / vh; if (along < 0) dv.addScaledVector(Vh, -along / vh);
+    if (dv.length() > ROUND.A) dv.setLength(ROUND.A);
+    R.ra = (R.ra || new T.Vector3()).lerp(dv, Math.min(1, dt * 5)); // (eased in and out: a turn begun or ended at once is a kick)
+    S.V.addScaledVector(R.ra, dt);
+    S.roundBrake = true; // (the throttle's not hers till she's lined up: speeding up between turns, she'd go round in ever wider loops)
+    if (vh > ROUND.VMAX) S.V.multiplyScalar(Math.max(ROUND.VMAX, vh - ROUND.BRAKE * dt) / vh); // (too fast to get round: down to a speed she can turn at)
+    S.V.y += G.U.clamp(-(N.y - 1.4) * 0.6 - S.V.y * 1.2, -10, 10) * dt; // (her collar to its height at the hull)
+    S.Q.rotateTowards(lookQ(S.V.clone().setY(0).normalize()), ROUND.RATE * Math.PI / 180 * dt * (1 - 0.7 * Math.min(1, S.stick.length()))).normalize(); // (level: nothing she does pushes her up or down off her collar's height)
+    // the way drawn: from her collar round the corners to the line, along it in to her plating
+    const poly = [N.clone(), ...(R.way.length ? R.way : [goal]), R.face.clone()].map((q, i) => (i ? q.clone().setY(1.4) : q));
+    const cum = [0]; for (let i = 1; i < poly.length; i++) cum.push(cum[i - 1] + poly[i].distanceTo(poly[i - 1]));
+    const tot = cum[cum.length - 1] || 1, pts: THREE.Vector3[] = [];
+    for (let i = 0, j = 1; i <= PLAN_N; i++) { const d = tot * i / PLAN_N; while (j < poly.length - 1 && cum[j] < d) j++; const k = (d - cum[j - 1]) / Math.max(1e-6, cum[j] - cum[j - 1]); pts.push(poly[j - 1].clone().lerp(poly[j], G.U.clamp(k, 0, 1))); }
+    routeDraw(pts, n.clone().negate());
   }
   // how far she is from anything big (no cruising close in)
   function clearOf() {
@@ -1020,12 +1314,18 @@ const G_Space = (() => {
       // her nose into the hull, within 60 degrees of square and fast enough: she's through, wherever that is along it; the collar
       // pulls her square as it seals (the further off she came in, the longer that takes)
       // (no speed is too high for it: the collar takes it. Fast, she covers metres a frame, so the plate's looked for that much further ahead)
-      const lead = S.V.length() * 0.05, a = aim(6 + lead), up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q);
-      if (a && a.range < 2.6 + lead && a.align > 0.5 && up.y > 0.8 && a.close > 3.5 * a.align && Math.abs(a.dy) < 1.6) {
+      const lead = S.V.length() * 0.05, a = aim(6 + lead), up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), cosMax = Math.cos(SD.BREACH_ANG * Math.PI / 180), fh = fwd(S.Q), hl = Math.hypot(fh.x, fh.z) || 1;
+      const pitchOk = Math.abs(Math.asin(G.U.clamp(fh.y, -1, 1))) <= (SD.BREACH_PITCH + 2) * Math.PI / 180; // (her heading's square-ness reckoned level, and her nose no steeper than BREACH_PITCH)
+      if (a && a.range < 2.6 + lead && a.align / hl > cosMax - 1e-3 && pitchOk && up.y > 0.8 && a.close > 3.5 * a.align && Math.abs(a.dy + S.V.y / Math.max(a.close, 1) * Math.max(0, a.range)) < 1.6) { // (her collar's height as it'll meet the hull, climbing or diving)
         S.shake = 1;
-        const at = [a.site.c, a.site.nx, a.site.nz];
-        rebase(berthAt(a.site));
-        auto(S.Dp, S.Dq, 0.35 + 0.9 * (1 - a.align), null, () => { G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); dockLocal(true); });
+        // (off square: she stays at the angle she hit at, and drives a crumpled tunnel in at it: js/shipgen.ts tunnel)
+        const f = fwd(S.Q), yaw0 = a.site.nz > 0 ? 0 : a.site.nz < 0 ? Math.PI : a.site.nx > 0 ? Math.PI / 2 : -Math.PI / 2, ang = Math.round(G.U.clamp(G.U.angDiff(yaw0, Math.atan2(-f.x, -f.z)) * 180 / Math.PI, -SD.BREACH_ANG, SD.BREACH_ANG));
+        const was = ((S.map.sp && S.map.sp.cuts) || []).find((q: number[]) => q[0] === a.site.c && q[1] === a.site.nx && q[2] === a.site.nz); // (a hole she made before: she lies in it as it was made)
+        // (and nose up or down: she stays tilted as she hit, about her collar)
+        const pt = Math.round(G.U.clamp(Math.asin(G.U.clamp(f.y, -1, 1)) * 180 / Math.PI, -SD.BREACH_PITCH, SD.BREACH_PITCH));
+        const at = was ? was.slice() : G.ShipGen.cutKey({ ...a.site, ang: Math.abs(ang) >= 3 ? ang : 0, pt: Math.abs(pt) >= 3 ? pt : 0 });
+        rebase(berthAt(siteAt(at)));
+        auto(S.Dp, S.Dq, 0.35, null, () => { G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); dockLocal(true); });
         G.Audio.kick(2);
       }
     }
@@ -1047,6 +1347,7 @@ const G_Space = (() => {
   }
   // she's against it (or off it) on this screen
   function dockLocal(on: boolean) {
+    S.brLock = null; S.brRound = null;
     S.docked = on;
     if (on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); S.V.set(0, 0, 0); S.net = null; unhide(); }
     syncSolids();
@@ -1147,6 +1448,7 @@ const G_Space = (() => {
   function update(dt: number) {
     if (!S.on || !S.model || G.Game.map !== S.map) return;
     S.t += dt;
+    if (S.plan) S.plan.line.visible = S.plan.gates.visible = S.plan.end.visible = false; // (her plan's drawn again below while she's lined up: planDraw)
     zoneStep();
     tgtTrack(dt);
     const m = me();
@@ -1319,7 +1621,7 @@ const G_Space = (() => {
           const g = warpGate();
           if (g) lines.push(S.spin >= 1 ? hint('T', 'to warp to ' + G.U.esc(g.w.name)) : S.spin > 0 ? `Warp drive spinning up · ${Math.round(S.spin * 100)}% <small>(keep her on ${G.U.esc(g.w.name)})</small>` : `<small>Turn her nose onto ${G.U.esc(g.w.name)} to spin up the warp drive</small>`);
           if (S.tclose) lines.push(`Matching course with ${G.U.esc(S.tclose.name)}…`);
-          if (S.kind === 'board' && !(S.state && S.state.boom)) { const a = aim(120); if (a) lines.push(a.close < 4 ? 'Ram the hull: nose on, 5 m/s or more' : 'Hold her square to the hull'); }
+          if (S.kind === 'board' && !(S.state && S.state.boom)) { const a = aim(300); if (a) lines.push(a.close < 4 ? 'Ram the hull: nose on, 5 m/s or more' : `Ram her: within ${SD.BREACH_ANG}° of square`); }
         }
         if (ctl && !S.docked && !S.ftl && S.t - S.helpAt < 20) lines.push('<small><b>W S A D</b> thrust · <b>Space C</b> up down · <b>Q E</b> roll · <b>X</b> brake · <b>T</b> target, then face it to spin up the warp drive and <b>T</b> to warp · <b>right mouse</b> look about</small>');
       } else if (seat.k === 'turret') {
@@ -1454,6 +1756,14 @@ const G_Space = (() => {
     if (sp.state && S.kind === 'board') { for (const c of sp.state.cuts || []) cutHere(c); if (sp.state.site) rebase(berthAt(siteAt(sp.state.site))); if (map.sp) G.ShipGen.seal(map, sp.state.docked ? sp.state.site : null); for (const i of sp.state.unlocked || []) unlocked(i); }
     if (sp.state) raidPods(sp.state.raid);
     if (sp.state && sp.state.docked) dockLocal(true);
+    // (come up with another of the zone's ships: the frame she's taken in is drawn as the one before it was, so nothing jumps. The
+    // zone where it is now, what's outside placed by her pose as it's been carried across, and you in your seat at her new berth)
+    if (S.zinfo && S.zinfo.near && S.on) {
+      zoneStep(); outside();
+      const m = me(), lk = S.look; S.look = null;
+      if (m.pos && lk) { m.yaw = S.berth.yaw + lk.yaw; m.pitch = lk.pitch; m.eyeH = lk.eyeH; m.stowW = lk.stowW; m.crouch = lk.crouch; m.stowed = lk.stowed; }
+      if (m.pos) { if (m.seat != null) m.move(0, map); G.Me.updateCamera(1 / 60); }
+    }
   }
   // How she's flying, for her sound (js/ambience.ts shipVoice), each frame: null with no ship here. Aboard her you hear all of
   // her; off her (the hangar's floor, the deck of what she's against) less with distance, and dulled.
@@ -1476,7 +1786,7 @@ const G_Space = (() => {
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
   /** in a jump, aboard: what the screen shows is the pod and the tunnel, not a veil (js/game.ts) */
   const jumping = () => S.on && !!S.ftl && aboard();
-  return { debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = G.ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); G.Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 G.Space = G_Space;
 interface GameModules { Space: typeof G_Space; }
