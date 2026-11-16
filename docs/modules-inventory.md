@@ -43,7 +43,7 @@ A file that uses another, unguarded, while loading, where that other is missing 
 
 - **index.html** (86 files): consistent
 - **js/serverworker.ts** (28 files): consistent
-- **js/prepworker.ts** (21 files): consistent
+- **js/prepworker.ts** (22 files): consistent
 - **js/exportworker.ts** (37 files): consistent
 - **tools/level_env.mjs** (22 files): consistent
 - **tools/model_env.mjs** (10 files): consistent

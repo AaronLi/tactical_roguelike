@@ -136,9 +136,10 @@ Done when: the page and all three workers load modules and the load lists still 
 - **Checks:** typecheck, `test:level` (31/31), `test:sim` (golden unchanged), `test:models`, `deps` (six orders consistent,
   28/21/37/86 files) pass; the ten smoke URLs all reach `__debugReady` with no errors, and the server ran in its worker
   in the six without `serverthread=0`.
-- Found on the way, not changed: the prep worker's list has no `damage`, and `js/leveldesc.ts` reads `G.Damage.HINGES`, so
-  every level the prep worker builds fails with a TypeError (the page then makes the level itself, as without the
-  worker). The same list and code are in phase 1's commit, so it predates this phase.
+- Found on the way: the prep worker's list had no `damage`, and `js/leveldesc.ts` reads `G.Damage.HINGES`, so every level
+  the prep worker built failed with a TypeError (the page then made the level itself). It has been that way since the
+  worker was added (d9cdeb4). Fixed in a commit of its own, after this phase: `damage` added to `PREP_SCRIPTS`. This is the
+  one behaviour change on the branch: the prep worker now delivers its levels and light grids.
 
 ### 3. The layering rule and the hooks
 

@@ -6,7 +6,7 @@
 (self as any).window = self;
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
 // (the scripts, in the page's order: index.html. Each is imported in turn; none has an import of its own yet)
-const PREP_SCRIPTS = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'lightgrid'];
+const PREP_SCRIPTS = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'damage', 'furnmesh', 'lightgrid'];
 const prepBooted = import('./threeboot.js').then(async () => {
   for (const f of PREP_SCRIPTS) await import('./' + f + '.js');
 });
