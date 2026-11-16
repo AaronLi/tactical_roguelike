@@ -8,8 +8,8 @@
 //   - every js/*.ts, parsed (TypeScript 5's API, tools/deps/package.json: TypeScript 7's package has no API):
 //     which G.X each file defines (`G.X = ...`) and uses, and for each use whether it runs while the file loads or only
 //     once something calls it (inside a function), and whether it's guarded (`G.X && ...`, `if (G.X)`, `G.X?.`)
-//   - the load orders written by hand: index.html's script tags, the workers' script lists (SERVER_SCRIPTS, PREP_SCRIPTS, EXPORT_SCRIPTS) (js/serverworker.ts,
-//     js/prepworker.ts, js/exportworker.ts) and the node tools' (tools/level_env.mjs, tools/model_env.mjs)
+//   - the load orders: index.html's script tags, the export worker's list (EXPORT_SCRIPTS, js/exportworker.ts), the node tools' lists (tools/level_env.mjs,
+//     tools/model_env.mjs) and the two workers' entry files (js/serverhost.ts, js/prepentry.ts); what runs in what order is worked out from the imports
 //   - the trial typecheck: tsconfig.modules-trial.json, every file a module (moduleDetection force). Its errors are the
 //     references between files that don't go through G: the types (interface LvMap in one file, used in forty) and the
 //     odd global value. What phase 1 has to give a home.
@@ -35,16 +35,24 @@ const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
 // ------------------------------------------------------------------ the load orders written by hand
 const listIn = (text, after) => { const i = text.indexOf(after); if (i < 0) return null; const a = text.indexOf('[', i), b = text.indexOf(']', a); return [...text.slice(a, b).matchAll(/'([\w-]+)'/g)].map((m) => m[1]); };
-const ORDERS = {
+// What loads what, as the loaders state it: index.html's script tags, the export worker's literal list (its page files are not modules
+// yet: phase 5), the node tools' lists, and the two workers' entry files (the server's and the level preparation's: each worker imports one
+// file, and that file's imports do the rest). A list is a sequence of roots; what actually runs, and in what order, is worked out
+// below from the imports (evalOrder), as an ES module loader would.
+const dynImports = (text) => [...text.matchAll(/import\('\.\/([\w-]+)\.js'\)/g)].map((m) => m[1]);
+const ROOTS = {
   'index.html': [...read('index.html').matchAll(/src="dist\/js\/([\w-]+)\.js"/g)].map((m) => m[1]),
-  'js/serverworker.ts': listIn(read('js/serverworker.ts'), 'SERVER_SCRIPTS ='),
-  'js/prepworker.ts': listIn(read('js/prepworker.ts'), 'PREP_SCRIPTS ='),
+  'js/serverworker.ts': dynImports(read('js/serverworker.ts')).filter((n) => n !== 'threeboot'), // (threeboot: three.js, the page's)
+  'js/prepworker.ts': dynImports(read('js/prepworker.ts')).filter((n) => n !== 'threeboot'),
   'js/exportworker.ts': listIn(read('js/exportworker.ts'), 'EXPORT_SCRIPTS ='),
   'tools/level_env.mjs': listIn(read('tools/level_env.mjs'), 'LEVEL_SCRIPTS ='),
-  'tools/model_env.mjs': listIn(read('tools/model_env.mjs'), "runScripts(ctx, dist, ["),
+  'tools/model_env.mjs': listIn(read('tools/model_env.mjs'), 'runScripts(ctx, dist, ['),
 };
-// The simulation side: what the server's thread and the level's preparation load (nothing that draws or plays)
-const SIM = new Set([...ORDERS['js/serverworker.ts'], ...ORDERS['js/prepworker.ts']]);
+// The simulation's files, stated: the layering rule needs them named (a simulation file importing a page file would otherwise make that
+// file part of the simulation, quietly). They must be exactly what the two workers' entry files reach (js/serverhost.ts, js/prepentry.ts):
+// checked below, so a file added to the simulation is added here on purpose.
+const SIMULATION = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'spaceserver', 'serverhost', 'furnmesh', 'lightgrid', 'prepentry'];
+const SIM = new Set(SIMULATION);
 
 // ------------------------------------------------------------------ parsing
 const files = fs.readdirSync(JS).filter((f) => f.endsWith('.ts') && !f.endsWith('.d.ts')).sort();
@@ -62,7 +70,13 @@ for (const f of files) {
   const text = fs.readFileSync(path.join(JS, f), 'utf8'), sf = ts.createSourceFile(f, text, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
   const line = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
   const defs = new Map(), uses = [], decls = new Map(), imports = []; // (imports: what the file takes from another by `import`, once it's a module: docs/modules-plan.md phase 4)
-  for (const s of sf.statements) if (ts.isImportDeclaration(s) && ts.isStringLiteral(s.moduleSpecifier) && /^\.\.?\//.test(s.moduleSpecifier.text)) imports.push({ from: path.basename(s.moduleSpecifier.text).replace(/\.js$/, ''), line: line(s), names: s.importClause && s.importClause.namedBindings && ts.isNamedImports(s.importClause.namedBindings) ? s.importClause.namedBindings.elements.map((e) => (e.propertyName || e.name).text) : [] });
+  const importLocals = new Map(); // (local name -> its import: what a bare name in the file refers to)
+  for (const s of sf.statements) if (ts.isImportDeclaration(s) && ts.isStringLiteral(s.moduleSpecifier) && /^\.\.?\//.test(s.moduleSpecifier.text)) {
+    const els = s.importClause && s.importClause.namedBindings && ts.isNamedImports(s.importClause.namedBindings) ? s.importClause.namedBindings.elements : [];
+    const im = { from: path.basename(s.moduleSpecifier.text).replace(/\.js$/, ''), line: line(s), names: els.map((e) => (e.propertyName || e.name).text), sideEffect: !s.importClause, kept: !s.importClause };
+    imports.push(im);
+    for (const e of els) importLocals.set(e.name.text, { im, name: (e.propertyName || e.name).text });
+  }
   // names bound to functions, and objects' members bound to functions (for "called at load")
   const fnsByName = new Map(), objMembers = new Map(); // name -> [fn], objName -> Map(member -> [fn])
   const addFn = (m, k, fn) => { if (!m.has(k)) m.set(k, []); m.get(k).push(fn); };
@@ -113,6 +127,15 @@ for (const f of files) {
   // the walk: each G.X use, at load or not, guarded or not; a function's body is walked when it's reached as "at load"
   // (an IIFE, a sync callback, a local function or member called at load), and again (deferred) on its own otherwise
   const loadFns = new Set(), crossCalls = []; // [module, member, line] called at load
+  // a bare name that is an import's (not a member, not the import's own specifier): a use of the module it comes from, as G.X is
+  const importRef = (n) => {
+    if (!ts.isIdentifier(n) || !importLocals.has(n.text)) return null;
+    const p = n.parent; if (!p) return null;
+    if (ts.isImportSpecifier(p) || ts.isImportClause(p) || ts.isNamespaceImport(p)) return null;
+    if ((ts.isPropertyAccessExpression(p) && p.name === n) || (ts.isPropertyAssignment(p) && p.name === n) || ((ts.isMethodDeclaration(p) || ts.isPropertyDeclaration(p) || ts.isPropertySignature(p) || ts.isMethodSignature(p)) && p.name === n) || (ts.isQualifiedName(p) && p.right === n)) return null;
+    return importLocals.get(n.text);
+  };
+  const refName = (n) => { const g = gName(n); if (g) return g; const r = importRef(n); return r ? r.name : null; };
   const guardOf = (n, x) => {
     // the use itself as a check: G.X && .., G.X ? .., if (G.X), !G.X, G.X || .., typeof G.X, G.X?.y
     const o = outerParen(n), p = o.parent;
@@ -123,7 +146,7 @@ for (const f of files) {
     if (p && ts.isTypeOfExpression(p)) return 'check';
     if (p && (ts.isPropertyAccessExpression(p) || ts.isElementAccessExpression(p) || ts.isCallExpression(p)) && p.questionDotToken) return 'check';
     // inside what a check of it protects: the right of G.X && .., the branch of if (G.X) / G.X ? ..
-    const mentions = (e) => { let hit = false; const v = (k) => { if (hit) return; if (gName(k) === x) { hit = true; return; } ts.forEachChild(k, v); }; v(e); return hit; };
+    const mentions = (e) => { let hit = false; const v = (k) => { if (hit) return; if (refName(k) === x) { hit = true; return; } ts.forEachChild(k, v); }; v(e); return hit; };
     for (let c = n, a = n.parent; a; c = a, a = a.parent) {
       if (ts.isBinaryExpression(a) && a.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken && a.right === c && mentions(a.left)) return 'guarded';
       if (ts.isConditionalExpression(a) && a.whenTrue === c && mentions(a.condition)) return 'guarded';
@@ -151,10 +174,11 @@ for (const f of files) {
     }
     // types aren't run
     if (ts.isTypeNode(n) || ts.isInterfaceDeclaration(n) || ts.isTypeAliasDeclaration(n)) return;
-    const x = gName(n);
+    const ir = importRef(n), x = ir ? ir.name : gName(n);
     if (x) {
-      const p = outerParen(n).parent, isDef = p && ts.isBinaryExpression(p) && p.left === outerParen(n) && p.operatorToken.kind === ts.SyntaxKind.EqualsToken;
-      if (!isDef) uses.push({ x, line: line(n), load: atLoad, guard: guardOf(n, x), via: via || undefined });
+      if (ir) ir.im.kept = true; // (a name used as a value: the import stays in the compiled file; used only in types, tsc drops it)
+      const p = outerParen(n).parent, isDef = !ir && p && ts.isBinaryExpression(p) && p.left === outerParen(n) && p.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+      if (!isDef) uses.push({ x, from: ir ? ir.im.from : undefined, line: line(n), load: atLoad, guard: guardOf(n, x), via: via || undefined });
       // G.X.m() at load: m's body (in X's file) is run at load too: seen once every file's parsed
       if (atLoad && p && ts.isPropertyAccessExpression(p) && p.expression === outerParen(n) && p.parent && ts.isCallExpression(p.parent) && p.parent.expression === p) crossCalls.push([x, p.name.text, line(n)]);
     }
@@ -193,25 +217,30 @@ for (const f of files) for (const [x, m, ln] of F[f].crossCalls) {
   for (const fn of fns) for (const u of F[of].walkMember(fn, `G.${x}.${m}() at ${base(f)}:${ln}`)) if (owner.get(u.x) !== f) F[f].uses.push({ ...u, line: ln, via: `G.${x}.${m}() (${base(of)}:${u.line})` });
 }
 const undefinedNames = new Map();
-for (const f of files) for (const u of F[f].uses) if (!owner.has(u.x)) { if (!undefinedNames.has(u.x)) undefinedNames.set(u.x, new Set()); undefinedNames.get(u.x).add(base(f)); }
+for (const f of files) for (const u of F[f].uses) if (!u.from && !owner.has(u.x)) { if (!undefinedNames.has(u.x)) undefinedNames.set(u.x, new Set()); undefinedNames.get(u.x).add(base(f)); }
 
 // ------------------------------------------------------------------ the graph
 const edges = {}; // file -> dep file -> { load: n, call: n, lines: [] }
 for (const f of files) {
   const e = (edges[base(f)] = {});
   for (const u of F[f].uses) {
-    const of = owner.get(u.x); if (!of || of === f) continue;
+    const of = u.from ? u.from + '.ts' : owner.get(u.x); if (!of || of === f) continue; // (a use of an imported name: the file it is imported from)
     const d = (e[base(of)] ||= { load: 0, call: 0, names: new Set(), loadAt: [] });
     d[u.load ? 'load' : 'call']++; d.names.add(u.x);
     if (u.load) d.loadAt.push({ x: u.x, line: u.line, guard: u.guard, via: u.via });
   }
 }
-// imports (a converted file names the others by `import`, not G.X): an edge that runs at load, as the module graph runs a file's imports first
-for (const f of files) for (const im of F[f].imports) {
-  if (!edges[base(f)] || im.from === base(f)) continue;
-  const d = (edges[base(f)][im.from] ||= { load: 0, call: 0, names: new Set(), loadAt: [] });
-  d.load++; for (const n of im.names) d.names.add(n); d.loadAt.push({ x: im.names.join(', ') || '(side effects)', line: im.line, guard: 'plain', via: 'import' });
+// What an `import` does to the order is not an edge of need (a need is a use while loading, above: G.X or an imported name): it makes
+// the module graph run the imported file first. That is what evalOrder simulates, and the orders are checked against the needs.
+/** the files in the order they run when `roots` are imported one after another: depth first, an import before its importer, each once
+ *  (a cycle's second visit does nothing, as in the ES module loader); an import only of types is dropped by tsc, so it is not followed */
+function evalOrder(roots) {
+  const done = new Set(), out = [];
+  const go = (v) => { if (done.has(v)) return; done.add(v); const f = F[v + '.ts']; if (f) for (const im of f.imports) if (im.kept && F[im.from + '.ts']) go(im.from); out.push(v); };
+  for (const r of roots) go(r);
+  return out;
 }
+const ORDERS = Object.fromEntries(Object.entries(ROOTS).map(([k, r]) => [k, r && evalOrder(r)]));
 const names = files.map(base);
 function sccs(adj) { // Tarjan
   let i = 0; const idx = new Map(), low = new Map(), st = [], on = new Set(), out = [];
@@ -257,10 +286,14 @@ const page = (x) => owner.has(x) && !SIM.has(base(owner.get(x)));
 const reach = [];
 for (const f of files) {
   if (!SIM.has(base(f))) continue;
-  for (const u of F[f].uses) if (page(u.x)) reach.push({ file: base(f), x: u.x, owner: base(owner.get(u.x)), line: u.line, load: u.load, guard: u.guard, via: u.via });
+  for (const u of F[f].uses) if (!u.from && page(u.x)) reach.push({ file: base(f), x: u.x, owner: base(owner.get(u.x)), line: u.line, load: u.load, guard: u.guard, via: u.via });
 }
 for (const f of files) if (SIM.has(base(f))) for (const im of F[f].imports) if (!SIM.has(im.from) && files.includes(im.from + '.ts')) reach.push({ file: base(f), x: im.names.join(', ') || '*', owner: im.from, line: im.line, load: true, guard: 'plain', import: true });
 const unguardedAtLoad = reach.filter((r) => r.load && r.guard === 'plain');
+// the simulation as stated (SIMULATION) is what the two entry files reach, no more and no less
+const reached = new Set([...ORDERS['js/serverworker.ts'], ...ORDERS['js/prepworker.ts']]);
+const simDrift = [...reached].filter((v) => !SIM.has(v)).map((v) => `${v} is reached by a worker's entry file but is not in SIMULATION (tools/deps.mjs): a page file imported by the simulation, or a new simulation file to add there`)
+  .concat([...SIM].filter((v) => !reached.has(v)).map((v) => `${v} is in SIMULATION (tools/deps.mjs) but no worker's entry file reaches it`));
 
 // ------------------------------------------------------------------ the trial typecheck: every file a module
 let trial = null;
@@ -283,12 +316,13 @@ if (!NO_TSC) {
 }
 
 // ------------------------------------------------------------------ the summary, the doc, the data
+const fmtAt = (u) => `${u.x}:${u.line}${u.guard !== 'plain' ? ` (${u.guard})` : ''}${u.via ? ` via ${u.via}` : ''}`;
 const totalUses = files.reduce((a, f) => a + F[f].uses.length, 0), loadUses = files.reduce((a, f) => a + F[f].uses.filter((u) => u.load).length, 0);
 const summary = [
   `${files.length} files, ${owner.size} names on G, ${totalUses} uses (${loadUses} while loading)`,
   `load-time cycles (unguarded): ${loadCycles.length}${loadCycles.length ? ': ' + loadCycles.map((c) => c.join(' <-> ')).join('; ') : ''}`,
   `cycles counting calls: ${allCycles.length}, the largest ${allCycles[0] ? allCycles[0].length : 0} files`,
-  `hand-kept orders against the load-time needs: ${Object.entries(orderProblems).map(([k, v]) => `${k} ${v.length}`).join(', ')}`,
+  `load orders (from the imports and the lists) against the load-time needs: ${Object.entries(orderProblems).map(([k, v]) => `${k} ${v.length}`).join(', ')}`,
   `the simulation reaching page-only modules: ${reach.length} uses (${reach.filter((r) => r.guard === 'plain').length} unguarded, ${unguardedAtLoad.length} of them while loading)`,
   `names used but defined nowhere: ${undefinedNames.size}`,
   trial ? `trial module typecheck: ${trial.total} errors; ${trial.bare.length} bare names between files (${trial.bare.reduce((a, b) => a + b.uses, 0)} uses), ${trial.gLost.length} G members lost, ${trial.other.length} others` : 'trial module typecheck: skipped',
@@ -298,14 +332,16 @@ console.log(summary.join('\n'));
 // through G.Hooks (js/types/hooks.d.ts), which the page fills in. Any G.X of a page-only module in a simulation file, guarded or not, fails.
 if (CHECK) {
   for (const r of reach) console.error(r.import ? `layering: js/${r.file}.ts:${r.line} imports ${r.x} from ${r.owner}.ts (page-only): ask through a G.Hooks hook the page fills in` : `layering: js/${r.file}.ts:${r.line} uses G.${r.x} (${r.owner}.ts is page-only): ask through a G.Hooks hook the page fills in`);
-  if (reach.length) console.error(`${reach.length} use(s) of a page-only module in the simulation's files (${[...SIM].length} files: SERVER_SCRIPTS in js/serverworker.ts, PREP_SCRIPTS in js/prepworker.ts)`);
-  else console.log('layering ok: no simulation file names a page-only module');
-  process.exit(reach.length ? 1 : 0);
+  for (const d of simDrift) console.error('layering: ' + d);
+  const badOrder = Object.entries(orderProblems).flatMap(([where, ps]) => ps.map((q) => `order: ${where}: ${q.file} needs ${q.needs} while loading (${q.kind}): ${q.at.map(fmtAt).join(', ')}`));
+  for (const b of badOrder) console.error(b);
+  if (reach.length) console.error(`${reach.length} use(s) of a page-only module in the simulation's files (${[...SIM].length} files: what js/serverhost.ts and js/prepentry.ts reach)`);
+  else if (!simDrift.length && !badOrder.length) console.log('layering ok: no simulation file names a page-only module; every order consistent with the load-time needs');
+  process.exit(reach.length || simDrift.length || badOrder.length ? 1 : 0);
 }
 
 const md = [];
 const P = (...l) => md.push(...l);
-const fmtAt = (u) => `${u.x}:${u.line}${u.guard !== 'plain' ? ` (${u.guard})` : ''}${u.via ? ` via ${u.via}` : ''}`;
 P('# Modules inventory', '', 'Generated by `node tools/deps.mjs` (docs/modules-plan.md, phase 0). Do not edit by hand: run it again.', 'The same data, complete, is in `docs/modules-inventory.json`.', '',
   '"While loading" is worked out statically, not run (the rules are at the top of `tools/deps.mjs`). A use is **plain** if', 'nothing checks the module is there, **check** if it is the check itself (`G.X && ...`), **guarded** if a check of it protects it.', '',
   '## Summary', '', ...summary.map((s) => '- ' + s), '');
@@ -315,7 +351,7 @@ else for (const c of loadCycles) { P(`- ${c.join(', ')}`); for (const v of c) fo
 P('', '### Cycles counting calls', '', 'These are fine as ES modules (a module may call one that imports it, once both have loaded). Listed for scale.', '');
 for (const c of allCycles) P(`- ${c.length} files: ${c.sort().join(', ')}`);
 P('', '### A load order the load-time needs allow', '', 'Dependencies first, ties in index.html\'s order:', '', '```', order.join(' '), '```', '');
-P('### The hand-kept orders against the load-time needs', '', 'A file that uses another, unguarded, while loading, where that other is missing from the list or comes after it.', '');
+P('### The load orders against the load-time needs', '', 'The order each loader runs the files in, worked out from the imports (a file runs after what it imports; the two workers each import one entry file, js/serverhost.ts and js/prepentry.ts; the page, the export worker and the tools name a list of files). A file that uses another, unguarded, while loading, where that other is missing or comes after it.', '');
 for (const [where, probs] of Object.entries(orderProblems)) {
   P(`- **${where}** (${ORDERS[where].length} files): ${probs.length ? probs.length + ' problems' : 'consistent'}`);
   for (const q of probs) P(`  - ${q.file} needs ${q.needs} (${q.kind}): ${q.at.map(fmtAt).join(', ')}`);
@@ -330,7 +366,7 @@ for (const v of order) {
 if (undefinedNames.size) { P('', '### Names used but defined nowhere', '', 'Stubs some loader puts there, or leftovers.', ''); for (const [x, us] of undefinedNames) P(`- G.${x}: used in ${[...us].join(', ')}`); }
 if (owner.dup && owner.dup.length) { P('', '### Names defined in more than one file', ''); for (const [x, a, b] of owner.dup) P(`- G.${x}: ${base(a)} and ${base(b)}`); }
 P('', '## 2. The simulation reaching page-only modules', '',
-  `The simulation side is what js/serverworker.ts and js/prepworker.ts load (${SIM.size} files). Each use below names a module`, 'the page has and the server thread does not. The layering rule (phase 3; `npm run deps:check`, run in CI) allows none: what the simulation needs of the page it asks through `G.Hooks` (js/types/hooks.d.ts), which the page files fill in as they load.', '');
+  `The simulation side is what js/serverhost.ts and js/prepentry.ts, the two workers' entry files, reach (${SIM.size} files, stated as SIMULATION in tools/deps.mjs). Each use below names a module`, 'the page has and the server thread does not. The layering rule (phase 3; `npm run deps:check`, run in CI) allows none: what the simulation needs of the page it asks through `G.Hooks` (js/types/hooks.d.ts), which the page files fill in as they load.', '');
 if (!reach.length) P('None.', '');
 const byPair = new Map(); for (const r of reach) { const k = r.file + ' -> ' + r.owner; if (!byPair.has(k)) byPair.set(k, []); byPair.get(k).push(r); }
 if (reach.length) P('| From | To | Uses | Plain | At load | Where |', '| --- | --- | --- | --- | --- | --- |');
