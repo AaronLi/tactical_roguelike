@@ -186,5 +186,7 @@ const G_Net = {
   },
 };
 G.Net = G_Net;
+G.Hooks.online = () => !!G.Net.myId; // (whether there's a host to tell about your sticker skin: js/stickers.ts share)
+G.Hooks.toHost = (m) => G.Net.toHost(m);
 
 interface GameModules { Net: typeof G_Net; }

@@ -244,4 +244,5 @@ const G_Loadout = (() => {
   return { THROWS, THROW_SLOTS, THROW_PTS, THROW_NAME, THROW_SHORT, THROW_DESC, throwItem, thr, setThr, nextThr, thrCost, TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, boxesWith, fit, build, BUDGET, pts, cost, total };
 })();
 G.Loadout = G_Loadout;
+G.Hooks.gunStat = (id, stat) => G.Loadout.gunStat(id, stat); // (the sidearm tree's kills count here too: js/arsenal.ts tally)
 interface GameModules { Loadout: typeof G_Loadout }

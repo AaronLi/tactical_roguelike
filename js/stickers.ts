@@ -43,7 +43,7 @@ const G_Stickers = (() => {
   const url = (name: string) => S.base + DIR + encodeURIComponent(file(name));
 
   // ---------------------------------------------------------------- your collection (name -> how many)
-  const owned = () => (G.Me.stk || (G.Me.stk = {}));
+  const owned = () => G.Hooks.myStickers!();
   function give(name: string) { if (!ok(name)) return; const o = owned(); o[name] = (o[name] || 0) + 1; }
   function use(name: string) { const o = owned(); if (!o[name]) return false; if (--o[name] <= 0) delete o[name]; return true; }
 
@@ -254,7 +254,7 @@ const G_Stickers = (() => {
   // yours: told to the squad (once), its hash for your state
   function share(skin: any) {
     const h = key(skin);
-    if (h && !sent.has(h) && G.Net && G.Net.myId) { sent.add(h); reg.set(h, clean(skin)); G.Net.toHost({ t: 'skin', h, l: clean(skin) }); }
+    if (h && !sent.has(h) && G.Hooks.online && G.Hooks.online()) { sent.add(h); reg.set(h, clean(skin)); G.Hooks.toHost!({ t: 'skin', h, l: clean(skin) }); }
     return h;
   }
   // someone's, by its hash (null till it's known: asked for, now and then)
@@ -263,7 +263,7 @@ const G_Stickers = (() => {
     const l = reg.get(h);
     if (l) return l;
     const t = performance.now();
-    if (!((asked.get(h) || 0) > t - 3000) && G.Net && G.Net.myId) { asked.set(h, t); G.Net.toHost({ t: 'skinReq', h }); }
+    if (!((asked.get(h) || 0) > t - 3000) && G.Hooks.online && G.Hooks.online()) { asked.set(h, t); G.Hooks.toHost!({ t: 'skinReq', h }); }
     return null;
   }
   function learn(h: unknown, l: any) { if (typeof h === 'string' && h.length < 24) reg.set(h, clean(l)); }

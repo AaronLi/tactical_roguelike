@@ -109,4 +109,7 @@ const G_U = {
   },
 };
 G.U = G_U;
-interface GameModules { U: typeof G_U; }
+// What the simulation may ask of the page (types: js/types/hooks.d.ts): empty here, filled in by the page files as they load.
+const G_Hooks: SimHooks = {};
+G.Hooks = G_Hooks;
+interface GameModules { U: typeof G_U; Hooks: SimHooks; }

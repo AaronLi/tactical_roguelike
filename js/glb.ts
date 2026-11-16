@@ -1461,6 +1461,7 @@ function contractMarkdown(): string {
   };
 })();
 G.Models = G_Models;
+G.Hooks.modelInfo = (def) => (G.Models.infoOf ? G.Models.infoOf(def) : null); // (a barrel's effective lengths from the model: js/data.ts barrelMm)
 /** G.GLB: the glTF loader (made from three's GLTFLoader in js/glb.ts; tools replace it with their own). */
 interface GlbModuleApi { ready: Promise<boolean>; load(url: string): Promise<any> }
 interface GameModules { Models: typeof G_Models; GLB?: GlbModuleApi }

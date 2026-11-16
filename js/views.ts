@@ -1130,4 +1130,5 @@ const G_Views = {
   },
 };
 G.Views = G_Views;
+G.Hooks.enemyView = (id) => G.Views.enemies.get(id); // (what your rounds did to a suspect: js/arsenal.ts kill)
 interface GameModules { Views: typeof G_Views; }

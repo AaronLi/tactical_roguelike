@@ -224,7 +224,7 @@ const G_Level = {
     map.case = null; map.abox = null; map.sbox = null; map.cabinets = []; map.enemySpots = []; map.hub = true;
     G.World.fromTileMap(map);
     this.described(map); // (the hall as any level's: its own fittings are js/hangar.ts', added to the world after)
-    G.Hangar.decorate(map);
+    G.Hooks.hangarDecorate!(map);
     return map;
   },
   // One storey, from its layout: doors, furniture, the fine grid and everything placed on it

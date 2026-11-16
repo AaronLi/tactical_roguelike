@@ -18,13 +18,14 @@ const GOLDEN = path.join(ROOT, 'tests/furniture-golden.json');
 const FILES = ['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers'];
 function loadLevelGame() {
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Uint8ClampedArray, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, TextEncoder, performance, location: { search: '' }, URLSearchParams, THREE: { ...THREE_NS } };
-  ctx.window = ctx; ctx.self = ctx; ctx.G = { Hangar: { decorate() {} } }; // (the hangar's solids: js/hangar.ts, page-side; nothing it does is furniture)
+  ctx.window = ctx; ctx.self = ctx; ctx.G = {};
   vm.createContext(ctx);
   for (const f of FILES) {
     const file = DIST + f + '.js';
     if (!fs.existsSync(file)) { console.error(`${path.relative(ROOT, file)} missing: run tsc first (npm run test:models does)`); process.exit(1); }
     vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: f + '.js' });
   }
+  ctx.G.Hooks.hangarDecorate = () => {}; // (the hangar's solids: js/hangar.ts, page-side, which sets this hook; nothing it does is furniture)
   return ctx.G;
 }
 const G = loadLevelGame(), FS = G.FurnSpec;

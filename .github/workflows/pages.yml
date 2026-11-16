@@ -32,6 +32,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run typecheck
+      # the layering rule (docs/modules-plan.md, phase 3): no file the server's thread loads names a page-only module
+      - run: npm run deps:check
       # The synthesized audio (assets/audio/handling, assets/audio/footsteps, git-ignored): npm run build bakes them
       # (tools/bake_audio.mjs; Ogg Vorbis by a WebAssembly encoder, no ffmpeg), again only when the contact synth they're baked from has changed, and packs
       # them into the one bundle the game loads (assets/audio/bundles/audio.rtb). Cached on it.

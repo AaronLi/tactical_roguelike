@@ -117,7 +117,7 @@ const G_Game = {
     G.Me.bindInput();
     G.Pad.init();
     G.Touch.init();
-    G.Shop.bind();
+    G.ShopUI.bind();
     G.Audio.vol = this.settings.vol;
     G.Audio.muted = new URLSearchParams(location.search).has('mute') || G.U.store.get('muted', false);
     this.bindMenu();
@@ -443,7 +443,7 @@ const G_Game = {
 
     const loadKit = this.$<HTMLSelectElement>('loadKit');
     loadKit.value = String(this.settings.loadKit);
-    loadKit.addEventListener('change', () => { this.settings.loadKit = +loadKit.value; G.U.store.set('loadKit', +loadKit.value); if (G.Shop.tab === 'svc') G.Shop.render(); });
+    loadKit.addEventListener('change', () => { this.settings.loadKit = +loadKit.value; G.U.store.set('loadKit', +loadKit.value); if (G.ShopUI.tab === 'svc') G.ShopUI.render(); });
 
     const mute = this.$<HTMLInputElement>('mute');
     mute.checked = G.Audio.muted;
@@ -523,11 +523,11 @@ const G_Game = {
     if (G.Range && G.Range.on()) { G.HUD.toast('THE RANGE', "Your kit stays as it is in here: shop and sort it out once you're back in the hangar", 2); return; } // (js/range.ts puts it back as it was when you leave)
     this.shopOpen = true;
     G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
-    G.Shop.tab = tab || 'stock'; G.Shop.title = title || null;
+    G.ShopUI.tab = tab || 'stock'; G.ShopUI.title = title || null;
     this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
     this.unlock();
     this.screen('shop');
-    G.Shop.render();
+    G.ShopUI.render();
     G.HUD.setPrompt('');
   },
   closeShop() {
@@ -816,7 +816,7 @@ const G_Game = {
         G.Views.syncRoster(this.roster);
         G.Career.squad(Object.keys(this.roster).length);
         if (this.phase === 'lobby') this.renderLobby();
-        if (this.hub) { G.Shop.render(); G.Hangar.refresh(); }
+        if (this.hub) { G.ShopUI.render(); G.Hangar.refresh(); }
         if (this.phase === 'route') this.renderRoute();
         break;
       }
@@ -908,8 +908,8 @@ const G_Game = {
       case 'incap': this.onIncap(m); break; // (a suspect down for good: counted as one incapacitated)
       case 'edown': if (G.Highlights) G.Highlights.suspectDown(m); break; // (a suspect down for good: js/highlights.ts)
       case 'saved': if (G.Highlights) G.Highlights.saved(m); break; // (an officer's armour stopped rounds: js/highlights.ts)
-      case 'stock': G.Shop.setStock(m.s); break; // (the store's shared stock: js/shop.ts)
-      case 'took': G.Shop.took(m.q, m.ok); break;
+      case 'stock': G.ShopUI.setStock(m.s); break; // (the store's shared stock: js/shop.ts)
+      case 'took': G.ShopUI.took(m.q, m.ok); break;
       case 'ereload': if (this.phase === 'level') G.Views.enemyReload(m); break;
       case 'clear':
         G.Audio.extract();
@@ -1013,7 +1013,7 @@ const G_Game = {
       }
       case 'refund':
         G.Me.credits += m.amt;
-        if (this.hub) G.Shop.render();
+        if (this.hub) G.ShopUI.render();
         break;
       default: G.Space.onMsg(m); // (the missions board, the ship, a mission's own things: js/space.ts)
     }
@@ -1785,7 +1785,7 @@ const G_Game = {
     this.hub = true; this.shopOpen = false;
     this.phase = 'level';
     if (G.Me.navRearm) G.Me.navRearm();
-    G.Shop.report = report || null;
+    G.ShopUI.report = report || null;
     let paid = 0;
     this.lastBonus = 0;
     if (G.Me.pos && !G.SpaceData.ON) { // (in space a mission's fee is what's paid, when it's done: js/space.ts mdone)
@@ -1806,7 +1806,7 @@ const G_Game = {
     G.R.setLevel(this.map);
     G.Views.clearLevel();
     G.Me.dead = false; G.Me.down = false;
-    G.Shop.open(level, seed, stock); // (his stock this visit: the whole squad's, shared)
+    G.ShopUI.open(level, seed, stock); // (his stock this visit: the whole squad's, shared)
     G.Hangar.enter(this.map);
     // each officer a spot of their own on the pad, in front of the opening
     const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!)), sp = G.Hangar.spawnAt(i);
@@ -1817,7 +1817,7 @@ const G_Game = {
     G.HUD.show(true);
     if (G.SpaceData.ON) { if (!spc || !spc.ship || spc.ship.docked) G.HUD.toast('THE BASE', 'The missions board is by the pad · your ship is on it', 4); }
     else G.HUD.toast('THE HANGAR', `Level ${level} cleared · look at what you want and press <b>F</b>`, 4);
-    G.Shop.wishNotice(); // (starred parts in this visit's stock)
+    G.ShopUI.wishNotice(); // (starred parts in this visit's stock)
     if (this.lastBonus) G.HUD.chat(null, 0, `Mission bonus: +¢${this.lastBonus}`);
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
     this.veilSay('Placing everyone');
@@ -1914,6 +1914,9 @@ const G_Game = {
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };
 G.Game = G_Game;
+// (what the simulation's files ask of the game: js/gear.ts, js/damage.ts)
+G.Hooks.inField = () => !!(G.Game && G.Game.phase === 'level' && !G.Game.hub);
+G.Hooks.biteDebris = (map, rec, n) => { if ((map as unknown) === G.Game.map && G.R.debris) G.R.debris.burst(new THREE.Vector3(...rec.a), { m: rec.m, k: 'e', n, J: rec.J * 3, dir: new THREE.Vector3(...rec.u) }); };
 interface GameModules { Game: typeof G_Game; }
 
 window.addEventListener('load', () => G.Game.init());

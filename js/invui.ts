@@ -55,7 +55,7 @@ const G_InvUI = (() => {
     if (performance.now() - frozenAt > 1500) { frozenAt = performance.now(); G.HUD.toast('THE RANGE', 'Your kit stays as it is in here: sort it out once you\'re back in the hangar', 2); }
     return true;
   };
-  const locked = () => (!field && G.Shop.ready) || inRange();
+  const locked = () => (!field && G.ShopUI.ready) || inRange();
   // ---------------------------------------------------------------- field jobs (timed ammo handling)
   // a job: { label, per (s per step), t, step(me) -> 'more' | 'done', prog() -> text, end(me) }
   let jobs: Job[] = [];
@@ -243,7 +243,7 @@ const G_InvUI = (() => {
   }
   // after a change: redraw (the shop, or the field screen), and if the gun in your hands changed, show it
   function rerender() {
-    if (!field) return G.Shop.render();
+    if (!field) return G.ShopUI.render();
     render();
     const w = G.Me.cur();
     if (w && G.R.vm && G.R.vm.userData.key !== G.R.vmKey(w.def, w.stickers)) G.R.setViewmodel(w.def);

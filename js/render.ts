@@ -2045,4 +2045,7 @@ const G_R = {
   },
 };
 G.R = G_R;
+// (what the simulation's files ask of the renderer: js/damage.ts, js/scars.ts)
+G.Hooks.doorDust = (t, x, y, z) => { if (G.R.particles && t < 8) G.R.particles(new THREE.Vector3(x, y, z), 16, 0xa8a090, 1.4, 0.8, 1, 0.8); };
+G.Hooks.partLight = (p) => (G.R.partLight ? G.R.partLight(p) : 1);
 interface GameModules { R: typeof G_R; }

@@ -1,8 +1,8 @@
 // The inventory for moving from the global G to ES modules (docs/modules-plan.md, phase 0): who uses what, and when.
 //   node tools/deps.mjs            writes docs/modules-inventory.md (to read) and docs/modules-inventory.json (for the
 //                                  later phases' scripts), and prints a summary
-//   node tools/deps.mjs --check    the same summary, nothing written; exit 1 if a simulation file reaches a page-only
-//                                  module without a guard while loading (what phase 3 has to clear first)
+//   node tools/deps.mjs --check    the same summary, nothing written; exit 1 if a simulation file names a page-only module
+//                                  through G, guarded or not (the layering rule, phase 3; run in CI: npm run deps:check)
 //   node tools/deps.mjs --no-tsc   without the trial module typecheck (it takes a few seconds)
 // What it reads:
 //   - every js/*.ts, parsed (TypeScript 5's API, tools/deps/package.json: TypeScript 7's package has no API):
@@ -286,7 +286,14 @@ const summary = [
   trial ? `trial module typecheck: ${trial.total} errors; ${trial.bare.length} bare names between files (${trial.bare.reduce((a, b) => a + b.uses, 0)} uses), ${trial.gLost.length} G members lost, ${trial.other.length} others` : 'trial module typecheck: skipped',
 ];
 console.log(summary.join('\n'));
-if (CHECK) process.exit(unguardedAtLoad.length ? 1 : 0);
+// The layering rule (docs/modules-plan.md, phase 3): a simulation file names only simulation modules; what it needs of the page it asks
+// through G.Hooks (js/types/hooks.d.ts), which the page fills in. Any G.X of a page-only module in a simulation file, guarded or not, fails.
+if (CHECK) {
+  for (const r of reach) console.error(`layering: js/${r.file}.ts:${r.line} uses G.${r.x} (${r.owner}.ts is page-only): ask through a G.Hooks hook the page fills in`);
+  if (reach.length) console.error(`${reach.length} use(s) of a page-only module in the simulation's files (${[...SIM].length} files: SERVER_SCRIPTS in js/serverworker.ts, PREP_SCRIPTS in js/prepworker.ts)`);
+  else console.log('layering ok: no simulation file names a page-only module');
+  process.exit(reach.length ? 1 : 0);
+}
 
 const md = [];
 const P = (...l) => md.push(...l);
@@ -315,14 +322,15 @@ for (const v of order) {
 if (undefinedNames.size) { P('', '### Names used but defined nowhere', '', 'Stubs some loader puts there, or leftovers.', ''); for (const [x, us] of undefinedNames) P(`- G.${x}: used in ${[...us].join(', ')}`); }
 if (owner.dup && owner.dup.length) { P('', '### Names defined in more than one file', ''); for (const [x, a, b] of owner.dup) P(`- G.${x}: ${base(a)} and ${base(b)}`); }
 P('', '## 2. The simulation reaching page-only modules', '',
-  `The simulation side is what js/serverworker.ts and js/prepworker.ts load (${SIM.size} files). Each use below names a module`, 'the page has and the server thread does not. Phase 3 replaces each with a hook the page fills in.', '');
+  `The simulation side is what js/serverworker.ts and js/prepworker.ts load (${SIM.size} files). Each use below names a module`, 'the page has and the server thread does not. The layering rule (phase 3; `npm run deps:check`, run in CI) allows none: what the simulation needs of the page it asks through `G.Hooks` (js/types/hooks.d.ts), which the page files fill in as they load.', '');
+if (!reach.length) P('None.', '');
 const byPair = new Map(); for (const r of reach) { const k = r.file + ' -> ' + r.owner; if (!byPair.has(k)) byPair.set(k, []); byPair.get(k).push(r); }
-P('| From | To | Uses | Plain | At load | Where |', '| --- | --- | --- | --- | --- | --- |');
+if (reach.length) P('| From | To | Uses | Plain | At load | Where |', '| --- | --- | --- | --- | --- | --- |');
 for (const [k, rs] of [...byPair].sort((a, b) => b[1].length - a[1].length)) {
   const [fr, to] = k.split(' -> ');
   P(`| ${fr} | ${to} | ${rs.length} | ${rs.filter((r) => r.guard === 'plain').length} | ${rs.filter((r) => r.load).length} | ${rs.slice(0, 12).map((r) => `${r.x}:${r.line}${r.guard === 'plain' ? '' : '*'}`).join(' ')}${rs.length > 12 ? ' ...' : ''} |`);
 }
-P('', '`*` checked or guarded. Plain uses are the ones that would throw in the server thread if reached there.', '');
+if (reach.length) P('', '`*` checked or guarded. Plain uses are the ones that would throw in the server thread if reached there.', '');
 P('## 3. Trial module typecheck', '');
 if (!trial) P('Skipped (--no-tsc).');
 else {

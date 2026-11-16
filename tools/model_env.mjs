@@ -17,7 +17,8 @@ function readDist(f, dir = DIST) {
 /** js/glb.ts on its own (it needs nothing from the game to describe and check a model): { G.Models: contract, validate, ... }. */
 export function loadModels() {
   const ctx = { console, JSON, Object, Array, Number, String, Boolean, Math, Map, Set, Error, RegExp, Uint8Array, DataView, TextDecoder, URLSearchParams, Promise, G: {} };
-  ctx.window = ctx; vm.createContext(ctx);
+  ctx.window = ctx; ctx.self = ctx; vm.createContext(ctx);
+  vm.runInContext(readDist('util'), ctx, { filename: 'util.js' }); // (glb.js sets a hook on G.Hooks, which util.js makes)
   vm.runInContext(readDist('glb'), ctx, { filename: 'glb.js' });
   return ctx.G.Models;
 }

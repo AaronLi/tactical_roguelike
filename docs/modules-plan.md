@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1 and 2 done (2026-11-15); phase 3 not started. Written 2026-11-15.
+Status: phases 0, 1, 2 and 3 done (phase 3: 2026-11-16); phase 4 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -149,6 +149,72 @@ Done when: the page and all three workers load modules and the load lists still 
 - Enforce the rule in `tools/deps.mjs` and run it in CI.
 
 Done when: no simulation file mentions a page-only module.
+
+#### Phase 3 results
+
+- **The rule, enforced.** The simulation files are the 30 the server worker and the prep worker load (the same set
+  `tools/deps.mjs` has used since phase 0). `npm run deps:check` (`node tools/deps.mjs --check --no-tsc`) exits 1 for any
+  `G.X` of a page-only module in one of them, guarded or not, and names the file and line; it passes now, and it runs in
+  `.github/workflows/pages.yml` right after the typecheck. (Checked by putting a `G.Audio` in `js/scars.ts`: exit 1.)
+  The inventory's section 2 is empty: the 133 uses (101 unguarded) are 0.
+- **`js/shop.ts` split first**, as planned: `js/shop.ts` (566 lines) is now the reckonings, 133 lines, no page name in it: what
+  Vex stocks (`genOffers`, `baseStock`, `scaleStock`), the squad's count (`count`, `inStock`, `stock`), this visit's
+  `offers`, `partStock`, `precStock` and `level`, what a piece of kit costs as offered (`gearPrice`) and the wishlist. The
+  server's thread loads it, as before, and calls the same two functions. The screen is the new `js/shopui.ts` (445 lines,
+  `G.ShopUI`): the tabs, the cards, buying, ready-up, the hangar's menu. Its state (`tab`, `ready`, `loadSel`, `title`,
+  `report`, `pend`, `qn`) moved with it; the methods' bodies are the same text, with `this.offers` and the other shared members
+  now `G.Shop.offers`. Who owns the state is as it was (the UI still writes `G.Shop.level`, `.stock` and so on): changing
+  that is not this plan. The call sites outside the two files (`game`, `gunsmith`, `hangar`, `invui`) say `G.ShopUI.render()`,
+  `.buy()`, `.ready` and the rest; what's the stock's (`offers`, `partStock`, `inStock`, `gearPrice`, `wished`...) stays
+  `G.Shop`. The new file is a script tag in `index.html` after `shop`; no worker or tool loaded the screen, so no other list
+  has it (`shop` is only in `index.html` and `SERVER_SCRIPTS`).
+- **The hooks: `G.Hooks`** (made in `js/util.ts`, the first file of every list, empty; typed in `js/types/hooks.d.ts`). One
+  central object rather than one per module, because the page file that fills a hook often loads before the simulation file
+  that calls it (`audio` loads before `damage`). Each is set by the page file that owns the thing, as it loads, so a worker
+  that doesn't load that file leaves it unset. 17 of them:
+
+  | Hook | Called by | Set by | Replaces |
+  | --- | --- | --- | --- |
+  | `gunStat` | `arsenal` tally (twice, guarded) | `loadout` | `G.Loadout &&` |
+  | `toast`, `feed` | `arsenal` tally | `hud` | `G.HUD.toast`, `G.HUD.feed` |
+  | `click` | `arsenal` tally | `audio` | `G.Audio.click` (still checked there) |
+  | `enemyView` | `arsenal` kill | `views` | `G.Views.enemies.get` |
+  | `biteDebris` | `damage` bite | `game` | `G.Game.map`, `G.R.debris` |
+  | `doorFallSound`, `doorKick` | `damage` fall, update (guarded) | `audio` | `G.Audio.sampleAt`, `.kick` |
+  | `doorDust` | `damage` update | `render` | `G.R.particles` |
+  | `modelInfo` | `data` barrelMm (guarded) | `glb` | `G.Models.infoOf` |
+  | `makeWeapon` | `gear` unpack (guarded) | `player` | `G.Me.makeWeapon` |
+  | `inField` | `gear` all (guarded) | `game` | `G.Game.phase` / `.hub` |
+  | `hangarDecorate` | `level` generateHub | `hangar` | `G.Hangar.decorate` |
+  | `partLight` | `scars` | `render` | `G.R.partLight` |
+  | `myStickers` | `stickers` owned | `player` | `G.Me.stk` |
+  | `online`, `toHost` | `stickers` share, of (guarded) | `net` | `G.Net.myId`, `G.Net.toHost` |
+
+  A call that was guarded (`G.Audio && ...`) is guarded by the hook being set (`if (G.Hooks.doorKick) ...`); one that wasn't
+  (`G.HUD.toast(...)`) is `G.Hooks.toast!(...)`, which throws in a thread that never set it, as `G.HUD` being undefined did.
+  The guards inside the page (`G.Audio.click` existing) moved into the hook, so the same checks run at the same moment. A
+  condition that wasn't about the page (`!snap`, `F.t < 8`, `fm.wallMesh`) stays in the simulation, before the call.
+- **One function moved instead of hooked:** `Ballistics.self()` (a reference body posed as you, from `G.Me` and `G.Rig`) was
+  called only by `js/player.ts`; it is now `selfRig()` in `player.ts`, same text.
+- **The hand-kept lists:** nothing to add to them (`util` is first in all six, and nothing new is loaded by the workers). The
+  tools that stood in for the hangar changed with the hook: `tools/level_env.mjs` and `tools/check_furniture_golden.mjs` set
+  `G.Hooks.hangarDecorate = () => {}` where they had `G.Hangar = { decorate() {} }`, and `loadModels()` in
+  `tools/model_env.mjs` (`glb.js` on its own) now loads `util.js` first, since `glb.js` sets a hook.
+- **Graph afterwards:** 90 files, 176 names on G (`Hooks`, `ShopUI`), 133 uses while loading (116 before: the 17 hook
+  settings, each a use of `util`), still no load-time cycle, the six hand-kept orders still consistent. The one 74-file cycle
+  of calls is now 5 cycles, the largest 43 files: the page no longer calls into the simulation's files and back.
+- **Checks:** typecheck, `test:level` (31/31), `test:sim` (4/4, golden unchanged), `test:models` (including the hangar and
+  furniture goldens), `deps` and `deps:check` pass; the ten smoke URLs reach `__debugReady` with no errors (each in its own
+  process). On the page, `G.Hooks` has all 17 hooks set, and every tab of the shop screen (route, stock, kit, gunsmith, zeroing,
+  supplies, career) renders in the hangar, `wishNotice`, `services` and `nvField` included (a one-off script, not kept).
+- **Not reproduced exactly (none reachable):** with a hook unset, a guarded call is skipped and an unguarded one throws a
+  TypeError, as before, but the message differs ("not a function" for "undefined"), and the arguments are evaluated before it
+  throws, not after (they have no effects). In `damage`'s `update`, `G.R.particles && F.t < 8` read `G.R` first even when `F.t`
+  was 8 or more; the hook is given `F.t` and checks both, so that order stays.
+- Found on the way, not touched: in `js/scars.ts` (a puff of dust being placed) the line `m.material.opacity = 0.7; // (unlit: ...)
+  m.scale.setScalar(u.k); m.visible = true;` has two statements after the `//`, which makes them part of the comment. The puffs'
+  update skips any that aren't `visible`, so it looks as if the dust puffs never show. It was so before this phase (the hook
+  changes only the code before the comment); it wants a look and its own commit.
 
 ### 4. Convert the simulation side, leaves first
 

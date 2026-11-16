@@ -772,7 +772,7 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Under it** it's an ordinary level with a flag (`G.Game.hub`; the phase is still `'level'`, which is why
     movement, other players, collision and sound all work). The host's phase stays `'shop'` and only carries
     the squad about (`G.Server.updateHub`) and times the helicopter. What's on the shelves is the same
-    stock `js/shop.ts` always had, drawn from it (`G.Hangar.refresh`), and a purchase is `G.Shop.buy`.
+    stock `js/shop.ts` always had, drawn from it (`G.Hangar.refresh`), and a purchase is `G.ShopUI.buy`.
 - **Shared magazines.** Guns built round the same magazine take each other's (`G.MAG_FAMILY` in `data.js`,
   the magazines in `parts.js` `MAG_FAMS`):
 
@@ -2481,7 +2481,8 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/gunsmith.ts` | The gunsmith: 3D weapon view, part fitting and the sticker tool |
 | `js/stickers.ts` | Stickers: which there are, your collection, decals on guns, the squad's lists by hash |
 | `js/zip.ts` | Writing and reading .zip files (the highlights' recordings) |
-| `js/hud.ts`, `js/shop.ts` | UI; the shop's stock and its buying |
+| `js/hud.ts`, `js/shopui.ts` | UI; the shop's screen and its buying |
+| `js/shop.ts` | The shop's reckonings (what Vex stocks this visit, the squad's count of it, the wishlist): no screen, the server's thread loads it |
 | `js/hangar.ts` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
 | `js/profiler.ts` | The profiler: frame timings by piece of work, saved from the pause menu |
 | `js/damage.ts` | What a round takes out of walls and doors: holes cut in their geometry, bores rays go down, doors shot off their hinges and falling |

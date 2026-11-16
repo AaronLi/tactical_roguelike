@@ -58,18 +58,18 @@ const G_Arsenal = (() => {
   const left = (q: ArsenalNode) => Math.min(q.n!, count(q.from!, q.stat!));
   // one more of something, with that gun: what it's for, and whatever that's earned
   function tally(id: string, stat: string) {
-    if (G.Loadout && !has(id)) G.Loadout.gunStat(id, stat); // (the primary tree's challenges are the same kills: js/loadout.ts)
+    if (G.Hooks.gunStat && !has(id)) G.Hooks.gunStat(id, stat); // (the primary tree's challenges are the same kills: js/loadout.ts)
     if (!open(id)) return;
     const d = data(), ns = d.n[id] || (d.n[id] = {});
     ns[stat] = (ns[stat] || 0) + 1;
-    if (G.Loadout) G.Loadout.gunStat(id, stat); // (its attachments, earned with it: js/loadout.ts)
+    if (G.Hooks.gunStat) G.Hooks.gunStat(id, stat); // (its attachments, earned with it: js/loadout.ts)
     for (const q of NODES) {
       if (q.from !== id || q.stat !== stat || open(q.id)) continue;
       if (ns[stat] >= q.n!) {
         d.got.push(q.id);
-        G.HUD.toast('NEW SIDEARM', `${name(q.id)}: yours from your next run`, 3.5);
-        if (G.Audio.click) G.Audio.click();
-      } else G.HUD.feed(`<span class="cr">${G.U.esc(name(id))}: ${ns[stat]}/${q.n} ${G.U.esc(q.what!)}</span>`);
+        G.Hooks.toast!('NEW SIDEARM', `${name(q.id)}: yours from your next run`, 3.5);
+        G.Hooks.click!();
+      } else G.Hooks.feed!(`<span class="cr">${G.U.esc(name(id))}: ${ns[stat]}/${q.n} ${G.U.esc(q.what!)}</span>`);
     }
     keep();
   }
@@ -83,7 +83,7 @@ const G_Arsenal = (() => {
   // a kill of yours (m: the host's word of it; not a civilian or someone who'd given up: js/game.ts credit)
   let lastKill = new Map();
   function kill(m: any) {
-    const ev = G.Views.enemies.get(m.e), k = ev && ev.mine;
+    const ev = G.Hooks.enemyView!(m.e), k = ev && ev.mine;
     if (!k || k.done) return;
     k.done = true;
     if (m.gr) return; // (the grenade did it, frag or thermobaric: m.gr its seed, js/server.ts. Not the gun that hit them before)

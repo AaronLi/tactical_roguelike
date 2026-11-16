@@ -518,4 +518,6 @@ const G_HUD = {
   },
 };
 G.HUD = G_HUD;
+G.Hooks.toast = (title, text, sec) => G.HUD.toast(title, text, sec); // (what the simulation's files may put on the screen: js/arsenal.ts)
+G.Hooks.feed = (html) => G.HUD.feed(html);
 interface GameModules { HUD: typeof G_HUD; }

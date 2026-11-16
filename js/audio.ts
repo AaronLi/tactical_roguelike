@@ -653,4 +653,8 @@ const G_Audio = {
   heal() { this.tone(600, 0.25, 'sine', 0.15, 900); },
 };
 G.Audio = G_Audio;
+// (what the simulation's files may sound: js/arsenal.ts, js/damage.ts)
+G.Hooks.click = () => { if (G.Audio.click) G.Audio.click(); };
+G.Hooks.doorFallSound = (d) => { if (G.Audio.sampleAt) G.Audio.sampleAt('door_close', new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.5, 0.7); };
+G.Hooks.doorKick = (piv) => { if (G.Audio.kick) G.Audio.kick(G.R.camera.position.distanceTo(piv.position)); };
 interface GameModules { Audio: typeof G_Audio; }

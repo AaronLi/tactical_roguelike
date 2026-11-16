@@ -250,7 +250,7 @@ G.pickBarrels = G_pickBarrels;
 // The effective barrel lengths (mm) of a round type of a gun of several barrels, one per round of a barrel, shortest first: the model's own (info.barrels.rounds[type].effective_mm, as soon as the gun's
 // platform index is loaded: the game reads it there and nowhere else) or, until then, the same count spread evenly from the table's mm0 (the default type) or the type's own first length (rounds.<type>.mm0) to mm1, evenly (a stand-in with the same ends: the baker checks them against the model).
 const G_barrelMm = (def: Record<string, any>, rl?: string | null): number[] => {
-  const b = def.barrels, r = G.roundOf(def, rl)!, info = G.Models && G.Models.infoOf ? G.Models.infoOf(def) : null, list = info && info.barrels && info.barrels.rounds && info.barrels.rounds[r.rl] && info.barrels.rounds[r.rl].effective_mm;
+  const b = def.barrels, r = G.roundOf(def, rl)!, info = G.Hooks.modelInfo ? G.Hooks.modelInfo(def) : null, list = info && info.barrels && info.barrels.rounds && info.barrels.rounds[r.rl] && info.barrels.rounds[r.rl].effective_mm;
   if (list && list.length === r.per) return list;
   const lo = b.rounds[r.rl].mm0;
   return Array.from({ length: r.per }, (_, i) => lo + ((b.mm1 - lo) * i) / Math.max(1, r.per - 1));

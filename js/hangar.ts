@@ -277,11 +277,11 @@ const G_Hangar = (() => {
     if (sold) return L;
     const pl = O.plates && O.plates[id] && gearOf(O.plates[id]), fc = O.faces && O.faces[id] && gearOf(O.faces[id]);
     if (d.kind === 'carrier') {
-      if (d.molle) L.push('comes with: ' + Sh.issued(d));
+      if (d.molle) L.push('comes with: ' + G.ShopUI.issued(d));
       if (pl) L.push('plate included: ' + pl.name); else if (d.plate) L.push('!plate pocket: plate not included');
     } else if (d.kind === 'helmet') {
       if (fc) L.push('face guard included: ' + fc.name); else if (d.face) L.push('!face guard not included');
-    } else if (d.kind === 'belt') L.push('comes with: ' + Sh.issued(d));
+    } else if (d.kind === 'belt') L.push('comes with: ' + G.ShopUI.issued(d));
     else if (d.kind === 'pack') { const [w, h] = d.grids![0]; L.push(`holds ${w}×${h}`); }
     else if (needs(d)) L.push('!' + needs(d));
     return L;
@@ -860,8 +860,8 @@ const G_Hangar = (() => {
   // its card: the name, the price, what it is, and that the helmet's not in it (or why it's not on sale)
   function njSign(id: string, sold: boolean, out: string | null) {
     const d = gearOf(id), L = [d.name, out ? out : sold ? 'SOLD' : money(G.Shop.gearPrice(id))];
-    if (!out && !sold) { L.push(G.Shop.nvField(d)); L.push('!helmet not included'); }
-    else if (out) L.push(G.Shop.nvField(d));
+    if (!out && !sold) { L.push(G.ShopUI.nvField(d)); L.push('!helmet not included'); }
+    else if (out) L.push(G.ShopUI.nvField(d));
     return L;
   }
 
@@ -1080,7 +1080,7 @@ const G_Hangar = (() => {
 
   // the vending machine's contents: field supplies (medical items, flashbangs, frags, sticky grenades and thermobarics)
   function vendList(_id: string) {
-    const Sh = G.Shop, Gr = G.Gear, out = [], sv = Sh.services();
+    const Gr = G.Gear, out = [], sv = G.ShopUI.services();
     for (const s of sv) {
       if (s.id.startsWith('med.')) out.push({ k: 'svc', key: s.id, item: Gr.medItem(s.id.slice(4)), name: s.name, price: s.price, sold: false });
       else if (s.id === 'flash') out.push({ k: 'svc', key: s.id, item: Gr.flashItem(), name: s.name, price: s.price, sold: false });
@@ -1184,14 +1184,14 @@ const G_Hangar = (() => {
     else if (t.what === 'part') { if (!t.key) return { html: '' }; const p = G.Gunsmith.PARTS[t.key]; name = p.name; price = p.price; sold = !Sh.inStock('part:' + t.key); extra = ' <small>(to your stash)</small>'; buy = ['part', t.key]; }
     else if (t.what === 'pouch') { if (!t.key) return { html: '' }; const P = G.Gear.POUCHES[t.key]; name = P.name; price = P.price; sold = !Sh.inStock('pouch:' + t.key); buy = ['pouch', t.key]; }
     else if (t.what === 'ammo') { name = t.name!; price = t.price!; sold = !Sh.inStock('ammo:' + t.key); buy = ['ammo', t.key!]; }
-    else if (t.what === 'svc') { const s = Sh.services().find((q) => q.id === t.key); if (!s) return { html: '' }; name = s.name; price = s.price; sold = !!s.disabled; extra = s.disabled ? ' <small>(no room, or nothing to do)</small>' : ''; buy = ['svc', t.key]; }
+    else if (t.what === 'svc') { const s = G.ShopUI.services().find((q) => q.id === t.key); if (!s) return { html: '' }; name = s.name; price = s.price; sold = !!s.disabled; extra = s.disabled ? ' <small>(no room, or nothing to do)</small>' : ''; buy = ['svc', t.key]; }
     if (!buy) return { html: '' };
     if (sold) return { html: `<b>${G.U.esc(name!)}</b> <small>sold out${t.what === 'gear' ? '' : extra}</small>` };
     return { html: `Press <b>F</b> to buy <b>${G.U.esc(name!)}</b>${extra} — <b${afford(price) ? '' : ' style="color:#ff6a5a"'}>${money(price)}</b>`, act: () => purchase(buy[0]!, buy[1]!, name!) };
   }
   function purchase(kind: string, key: string, name: string) {
     const Me = G.Me, before = Me.credits;
-    G.Shop.buy(kind, key);
+    G.ShopUI.buy(kind, key);
     if (Me.credits < before) G.HUD.toast('', `Bought ${G.U.esc(name)} <small>−${money(before - Me.credits)}</small>`, 1.4);
     refresh();
   }
@@ -1227,13 +1227,13 @@ const G_Hangar = (() => {
   function seat(me: typeof G.Me) {
     const i = mySeat(), p = seatPos(i);
     me.seat = i; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.yaw = p.yaw; me.pitch = 0; me.crouch = true; me.stowed = true; me.mouse.l = me.mouse.r = false;
-    G.Shop.setReady(true);
+    G.ShopUI.setReady(true);
     G.Audio.click();
   }
   function unseat(me: typeof G.Me) {
     const p = exitPos(me.seat!);
     me.seat = null; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.crouch = false; me.stowed = false; me.yaw = Math.PI;
-    G.Shop.setReady(false);
+    G.ShopUI.setReady(false);
     G.Audio.click();
   }
   // the highlight round what you're looking at (called once a frame from the player's camera update)
@@ -1251,5 +1251,6 @@ const G_Hangar = (() => {
   return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, load, fixtures, at, baked: () => !!BAKED, FILE, S, HELI, HOLD, RZ };
 })();
 G.Hangar = G_Hangar;
+G.Hooks.hangarDecorate = (map) => G.Hangar.decorate(map); // (a hangar's map gets its own fittings: js/level.ts generateHub)
 window.addEventListener('gunicons', () => { if (G_Hangar.S.root) G_Hangar.refresh(true); }); // (a gun's picture came in after its sign was drawn: js/icons.ts)
 interface GameModules { Hangar: typeof G_Hangar; }

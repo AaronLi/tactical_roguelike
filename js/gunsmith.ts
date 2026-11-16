@@ -283,51 +283,51 @@ const G_GunsmithUI = (() => {
   }
   function install(slot: string, pid: string): void {
     const w = weapon(), build = Object.assign({}, w.def.build), p = GS.PARTS[pid];
-    if (!p || build[slot] === pid || G.Shop.ready) return;
+    if (!p || build[slot] === pid || G.ShopUI.ready) return;
     if (!fromStash(pid)) {
-      if (!forSale(p) || !G.Shop.afford(GS.buyPrice(p))) return;
+      if (!forSale(p) || !G.ShopUI.afford(GS.buyPrice(p))) return;
       // from his stock (the squad's: the host's count, js/shop.ts take), unless it's the core part the gun needs
-      if (!needed(p)) { G.Shop.take('part:' + pid, () => { if (weapon() !== w || !G.Shop.spend(GS.buyPrice(p))) return false; toStash(pid); install(slot, pid); return undefined; }); return; }
-      if (!G.Shop.spend(GS.buyPrice(p))) return;
+      if (!needed(p)) { G.ShopUI.take('part:' + pid, () => { if (weapon() !== w || !G.ShopUI.spend(GS.buyPrice(p))) return false; toStash(pid); install(slot, pid); return undefined; }); return; }
+      if (!G.ShopUI.spend(GS.buyPrice(p))) return;
     } else G.Audio.pickup();
     if (build[slot]) toStash(build[slot]);
     build[slot] = pid;
     for (const r of GS.prune(w.def.id, build)) toStash(r);
     apply(w, build);
     st.hoverPart = null;
-    G.Shop.render();
+    G.ShopUI.render();
   }
   function remove(slot: string) {
     const w = weapon(), build = Object.assign({}, w.def.build);
     const sl = GS.slotsOf(w.def.id, build).find((s: Slot) => s.slot === slot);
-    if (!sl || sl.req || !build[slot] || G.Shop.ready) return;
+    if (!sl || sl.req || !build[slot] || G.ShopUI.ready) return;
     toStash(build[slot]); delete build[slot];
     for (const r of GS.prune(w.def.id, build)) toStash(r);
     apply(w, build); G.Audio.click();
-    G.Shop.render();
+    G.ShopUI.render();
   }
   // the part on the picked slot in another finish (the gun's stock grip, or a part with a skin family: GS.skinsOf): it's the same part,
   // so it costs nothing and goes on as it is
   function reskin(pid: string) {
     const w = weapon(), build = Object.assign({}, w.def.build), slot = st.slot;
-    if (!slot || !build[slot] || !GS.skinsOf(w.def.id, GS.PARTS[build[slot]]).some((p: Part) => p.id === pid) || G.Shop.ready) return;
+    if (!slot || !build[slot] || !GS.skinsOf(w.def.id, GS.PARTS[build[slot]]).some((p: Part) => p.id === pid) || G.ShopUI.ready) return;
     build[slot] = pid;
     apply(w, build); G.Audio.click();
-    G.Shop.render();
+    G.ShopUI.render();
   }
   // one in the stash, in another finish: the item becomes that one (a part's worth is the same in any: nothing's gained)
   function restash(from: string, to: string) {
     const w = weapon(), a = GS.PARTS[from], b = GS.PARTS[to];
-    if (!w || !a || !b || a === b || !GS.sameFamily(a, b) || !GS.skinsOf(w.def.id, a).includes(b) || G.Shop.ready || !fromStash(from)) return;
+    if (!w || !a || !b || a === b || !GS.sameFamily(a, b) || !GS.skinsOf(w.def.id, a).includes(b) || G.ShopUI.ready || !fromStash(from)) return;
     toStash(to); G.Audio.click();
-    G.Shop.render();
+    G.ShopUI.render();
   }
   function sell(pid: string) {
     const p = GS.PARTS[pid];
-    if (!p || G.Shop.ready || !fromStash(pid)) return;
+    if (!p || G.ShopUI.ready || !fromStash(pid)) return;
     G.Me.credits += GS.sellPrice(p);
     G.Audio.buy();
-    G.Shop.render();
+    G.ShopUI.render();
   }
 
   // ------------------------------------------------------------------ stickers (js/stickers.ts)
@@ -391,7 +391,7 @@ const G_GunsmithUI = (() => {
   // on, for good: one of yours used up
   function stickOn() {
     const w = weapon(), s = stkTry();
-    if (!w || !s || !st.stkAt || G.Shop.ready || (w.stickers || []).length >= SK().MAX || !SK().use(s.s)) return;
+    if (!w || !s || !st.stkAt || G.ShopUI.ready || (w.stickers || []).length >= SK().MAX || !SK().use(s.s)) return;
     w.stickers = SK().clean([...(w.stickers || []), s]);
     st.stkAt = null; st.stkHover = null;
     if (!SK().owned()[st.stkPick!]) st.stkPick = null; // (that was the last of them)
@@ -411,7 +411,7 @@ const G_GunsmithUI = (() => {
         <label>Turn <input type="range" data-gstkrot min="-180" max="180" step="1" value="${deg}"><span>${deg}°</span></label>
         <label class="stk-flip"><input type="checkbox" data-gstkflip ${st.stkF ? 'checked' : ''}> Mirror</label>
       </div>
-      <div class="stk-act">${st.stkAt ? `<button class="btn small buy" data-gstkapply ${G.Shop.ready ? 'disabled' : ''}>Stick it on <small>(for good)</small></button> <button class="btn small" data-gstkmove>Move it</button>`
+      <div class="stk-act">${st.stkAt ? `<button class="btn small buy" data-gstkapply ${G.ShopUI.ready ? 'disabled' : ''}>Stick it on <small>(for good)</small></button> <button class="btn small" data-gstkmove>Move it</button>`
         : `<span>${G.Pad.text(full ? 'This gun has all the stickers it can take.' : st.stkPick ? 'Click the gun where it goes.' : names.length ? 'Pick a sticker, then click the gun where it goes.' : '')}</span>`}</div>
       <p class="stk-hint">Shift + scroll: size · Ctrl + scroll: turn · a sticker's on its gun for good, wherever the gun goes</p>`;
   }
@@ -456,12 +456,12 @@ const G_GunsmithUI = (() => {
         }
         let action;
         if (r === 0 && !(skinned && skins.length > 1)) action = cur.req ? '<span class="tag">Fitted</span>' : `<button class="btn small" data-gremove="${cur.slot}">Remove</button>`;
-        else if (r === 0) action = `<select class="gs-skin" data-gskin ${G.Shop.ready ? 'disabled' : ''}>${skins.map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>`;
-        else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(GS.sellPrice(p))}</button>${p.skin && GS.skinsOf(def.id, p).length > 1 ? ` <select class="gs-skin" data-gskinstash="${p.id}" ${G.Shop.ready ? 'disabled' : ''}>${GS.skinsOf(def.id, p).map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>` : ''}`;
+        else if (r === 0) action = `<select class="gs-skin" data-gskin ${G.ShopUI.ready ? 'disabled' : ''}>${skins.map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>`;
+        else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(GS.sellPrice(p))}</button>${p.skin && GS.skinsOf(def.id, p).length > 1 ? ` <select class="gs-skin" data-gskinstash="${p.id}" ${G.ShopUI.ready ? 'disabled' : ''}>${GS.skinsOf(def.id, p).map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>` : ''}`;
         else if (r === 2 || r === 3) action = `<button class="btn small buy" data-ginstall="${p.id}" ${Me.credits < GS.buyPrice(p) ? 'disabled' : ''}>¢${G.U.fmt(GS.buyPrice(p))}</button>`;
         else action = `<span class="tag">${factoryHere ? 'Comes with the gun' : p.tier > Math.min(3, 1 + Math.floor((G.Shop.level || 1) / 2)) ? 'Available later' : 'Out of stock'}</span>`;
         list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 4 ? ' na' : ''}${G.Shop.wished(p.id) ? ' wished' : ''}" data-gpart="${p.id}">
-          <div class="gs-pn">${G.Shop.star(p.id)}<small>${G.U.esc(p.brand)}</small>${G.U.esc(p.name)}${fitsLine(p, def.id)}</div>
+          <div class="gs-pn">${G.ShopUI.star(p.id)}<small>${G.U.esc(p.brand)}</small>${G.U.esc(p.name)}${fitsLine(p, def.id)}</div>
           <div class="gs-pe">${partEffects(p, def.id) || '<span>—</span>'}</div>
           <div class="gs-pa">${action}</div></div>`;
       }

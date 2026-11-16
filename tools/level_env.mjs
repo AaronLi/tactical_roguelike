@@ -20,7 +20,7 @@ export function loadLevel() {
     if (!fs.existsSync(file)) { console.error(`${path.relative(ROOT, file)} missing: run tsc first (npm run test:level does)`); process.exit(1); }
     vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: f + '.js' });
   }
-  ctx.G.Hangar = { decorate() {} }; // (the hangar's own fittings: js/hangar.ts, the screen's; its map is the level's)
+  ctx.G.Hooks.hangarDecorate = () => {}; // (the hangar's own fittings: js/hangar.ts, the screen's, which sets this hook; its map is the level's)
   ctx.G.Range = null;
   return { G: ctx.G, ctx };
 }

@@ -480,7 +480,7 @@ const G_Damage = (() => {
     }
     B.a = B.p;
     biteSolids(map, B); redraw(map, fm, B);
-    if (fm.wallMesh && (map as unknown) === G.Game.map && G.R.debris) G.R.debris.burst(new T.Vector3(...rec.a), { m: rec.m, k: 'e', n, J: rec.J * 3, dir: new T.Vector3(...rec.u) }); // (a piece of it, not a chip)
+    if (fm.wallMesh) G.Hooks.biteDebris!(map, rec, n); // (a piece of it, not a chip: as debris, if this is the level on the screen)
   }
   function biteSolids(map: DmgMap, B: Bite) {
     const w = map.world, x = B.p[0] + (B.in1[0] + B.in2[0]) * 0.05, y = B.p[1], z = B.p[2] + (B.in1[2] + B.in2[2]) * 0.05, k = B.d + 0.02;
@@ -780,7 +780,7 @@ const G_Damage = (() => {
     piv.userData.fallen = true;
     const u = piv.userData; u.centre = tr.centre;
     st(map).falls.push({ piv, tr, t: snap ? 1e3 : 0, Y: d.fy || 0, d, thud: false });
-    if (!snap && G.Audio && G.Audio.sampleAt) G.Audio.sampleAt('door_close', new T.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.5, 0.7); // (on its own floor)
+    if (!snap && G.Hooks.doorFallSound) G.Hooks.doorFallSound(d); // (a door_close sample on its own floor)
   }
   function update(map: DmgMap, dt: number) {
     const D = map && map.dmg;
@@ -791,8 +791,8 @@ const G_Damage = (() => {
       setPose(F.piv, F.piv.userData as { centre: V3; p0?: V3 }, fr[i], F.Y);
       if (!F.thud && F.tr.thud >= 0 && F.t >= F.tr.thud) {
         F.thud = true;
-        if (F.t < 8 && G.Audio && G.Audio.kick) G.Audio.kick(G.R.camera.position.distanceTo(F.piv.position));
-        if (G.R.particles && F.t < 8) G.R.particles(new T.Vector3(fr[i][1], (F.Y || 0) + 0.05, fr[i][3]), 16, 0xa8a090, 1.4, 0.8, 1, 0.8);
+        if (F.t < 8 && G.Hooks.doorKick) G.Hooks.doorKick(F.piv);
+        G.Hooks.doorDust!(F.t, fr[i][1], (F.Y || 0) + 0.05, fr[i][3]);
       }
       return i < fr.length - 1;
     });

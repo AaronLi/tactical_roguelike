@@ -869,18 +869,6 @@ const G_Ballistics = (() => {
     }
   }
 
-  // ---------------------------------------------------------------- a reference body for hits you take
-  // Rounds that hit you are worked out on your own machine, through a body posed as you are (js/rig.ts: the same one
-  // your teammates see), from where the shooter was to the part the host says it hit.
-  let selfRig: BRig | null = null;
-  function self() {
-    const me = G.Me;
-    if (!selfRig) { selfRig = G.Rig.create({ style: 'tactical', bare: true, seed: 1 }); selfRig!.root.visible = false; }
-    const st = { pos: me.pos.clone(), yaw: me.yaw, pitch: me.pitch, crouch: !!me.crouch, alert: true, lean: me.lean || 0, state: me.down ? 'down' : 'alive', prone: !!me.prone };
-    for (let i = 0; i < 8; i++) selfRig!.update(0.05, st);
-    selfRig!.root.updateMatrixWorld(true);
-    return selfRig!;
-  }
   // ---------------------------------------------------------------- what armour is rated for (head-on, at 10 m)
   const THREATS: [string, string | null, string | null, any?][] = [['.22 LR', '5.6/15', 'ball'], ['9 mm', '9/19', 'ball'], ['.45 ACP', '11.43/23', 'ball'], ['.44 Magnum', null, null, [15.6, 10.9, 'lead', 436]],
     ['5.7x28', '5.7/29', 'ball'], ['00 buck', '18.5/70', 'buck'], ['12 ga slug', '18.5/70', 'slug'], ['7.62x39', '7.62/39', 'ball'], ['5.56', '5.56/45', 'ball'],
@@ -988,7 +976,7 @@ const G_Ballistics = (() => {
   const AT_NAME: Record<string, string> = { plate: 'chest plate', side: 'sides', torso: 'chest and stomach', carrier: 'chest and upper stomach', wrap: 'chest, stomach and hips', collar: 'neck', groin: 'groin', groinplate: 'groin', pelvis: 'pelvis', shoulder: 'shoulders', axilla: 'armpits', thigh: 'thighs', legwrap: 'thighs', shin: 'shins', helmet: 'head', face: 'face' };
   const layersText = (L: BLayer[]) => L.map(([m, mm]) => `${mm} mm ${MAT[m].name}`).join(' + ');
 
-  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, self, rating, THREATS, coverage, coverageText, coverageHTML, fragLimit };
+  return { CAL, MAT, ORG, EFFECT, PERSON_J, energy, flightDrag, snap, unsnap, strike, crossSolid, deflect, mark, armourState, stateArmour, outcome, armourLog, loadNotes, mainLayers, AT_NAME, layersText, projectile, layer, stack, through, probe, boneOf, segNode, effects, segs, covers, brim, kitArmour, suspectArmour, wearOut, rating, THREATS, coverage, coverageText, coverageHTML, fragLimit };
 })();
 G.Ballistics = G_Ballistics;
 

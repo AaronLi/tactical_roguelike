@@ -8,13 +8,13 @@ nothing checks the module is there, **check** if it is the check itself (`G.X &&
 
 ## Summary
 
-- 89 files, 174 names on G, 5702 uses (116 while loading)
+- 90 files, 176 names on G, 5803 uses (133 while loading)
 - load-time cycles (unguarded): 0
-- cycles counting calls: 1, the largest 74 files
+- cycles counting calls: 5, the largest 43 files
 - hand-kept orders against the load-time needs: index.html 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, tools/level_env.mjs 0, tools/model_env.mjs 0
-- the simulation reaching page-only modules: 133 uses (101 unguarded, 0 of them while loading)
+- the simulation reaching page-only modules: 0 uses (0 unguarded, 0 of them while loading)
 - names used but defined nowhere: 0
-- trial module typecheck: 7019 errors; 0 bare names between files (0 uses), 174 G members lost, 382 others
+- trial module typecheck: 7151 errors; 0 bare names between files (0 uses), 176 G members lost, 405 others
 
 ## 1. Dependency graph
 
@@ -27,21 +27,25 @@ None: every unguarded use while loading can be satisfied by some order.
 
 These are fine as ES modules (a module may call one that imports it, once both have loaded). Listed for scale.
 
-- 74 files: acoustics, ambience, arsenal, audio, ballistics, bolts, career, casings, cloud, course, damage, data, footsteps, furniture, furnmesh, furnspec, game, gamepad, gear, glare, glb, gunaudio, gunmodels, gunrig, gunsmith, handling, hangar, headgear, highlights, homes, hud, humans, icons, invui, landing, level, leveldesc, levelview, lightgrid, loadout, loot, materials, medical, menushow, net, parts, player, prep, profiler, range, recorder, render, rig, route, scars, server, serverhost, serverlink, shipgen, shipmodel, shop, shotlog, sim, space, spacedata, spaceserver, spaceui, stickers, touch, viewmodel, views, vmanim, world, zeroing
+- 43 files: acoustics, ambience, audio, bolts, career, casings, cloud, course, footsteps, game, gamepad, glare, gunaudio, gunmodels, gunrig, gunsmith, handling, hangar, highlights, hud, icons, invui, landing, levelview, loadout, loot, menushow, net, player, profiler, range, render, rig, serverlink, shopui, shotlog, space, spaceui, touch, viewmodel, views, vmanim, zeroing
+- 9 files: damage, furniture, homes, level, leveldesc, materials, shipgen, spacedata, world
+- 3 files: ballistics, gear, medical
+- 3 files: server, serverhost, spaceserver
+- 2 files: data, parts
 
 ### A load order the load-time needs allow
 
 Dependencies first, ties in index.html's order:
 
 ```
-modelbundles threeboot util zip data spacedata shipgen callsigns arsenal loadout parts gear medical sim materials ballistics audio level leveldesc world furnspec furniture homes residents furnmesh gunshot-synth gunaudio footsteps acoustics ambience handling lightgrid levelview render scars damage glare shotlog stickers bolts gunmaterials gunmodels glb gunrig viewmodel vmanim prep humandata humans headgear rig net recorder server spaceserver serverhost serverlink player views casings icons hud shop invui gunsmith zeroing route loot course range highlights menushow hangar landing shipmodel spaceui space cloudconfig career cloud gamepad touch game profiler demo debugstart exportworker prepworker serverworker
+modelbundles threeboot util zip data spacedata shipgen callsigns arsenal loadout parts gear medical sim materials ballistics audio level leveldesc world furnspec furniture homes residents furnmesh gunshot-synth gunaudio footsteps acoustics ambience handling lightgrid levelview render scars damage glare shotlog stickers bolts gunmaterials gunmodels glb gunrig viewmodel vmanim prep humandata humans headgear rig net recorder server spaceserver serverhost serverlink player views casings icons hud shop shopui invui gunsmith zeroing route loot course range highlights menushow hangar landing shipmodel spaceui space cloudconfig career cloud gamepad touch game profiler demo debugstart exportworker prepworker serverworker
 ```
 
 ### The hand-kept orders against the load-time needs
 
 A file that uses another, unguarded, while loading, where that other is missing from the list or comes after it.
 
-- **index.html** (86 files): consistent
+- **index.html** (87 files): consistent
 - **js/serverworker.ts** (28 files): consistent
 - **js/prepworker.ts** (22 files): consistent
 - **js/exportworker.ts** (37 files): consistent
@@ -54,22 +58,22 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | --- | --- | --- | --- |
 | modelbundles | Bundles, AudioBundle | - | - |
 | threeboot |  | - | - |
-| util (sim) | U | - | - |
+| util (sim) | U, Hooks | - | - |
 | zip | Zip | - | - |
-| data (sim) | TIER_NAMES, TIER_COLORS, CLASS_SND, WEAPON_LIST, WEAPONS, EXPLOSIVES_OFF, AKIMBO_OFF, OFF_GUNS, +82 | - | glb, parts, util |
+| data (sim) | TIER_NAMES, TIER_COLORS, CLASS_SND, WEAPON_LIST, WEAPONS, EXPLOSIVES_OFF, AKIMBO_OFF, OFF_GUNS, +82 | - | parts, util |
 | spacedata (sim) | SpaceData | data | level, materials, util, world |
 | shipgen (sim) | ShipGen | - | level, materials, util, world |
 | callsigns (sim) | Callsigns | - | util |
-| arsenal (sim) | Arsenal | - | audio, ballistics, data, hud, loadout, util, views |
-| loadout | Loadout | - | arsenal, audio, data, gear, hud, parts, util |
+| arsenal (sim) | Arsenal | - | ballistics, data, util |
+| loadout | Loadout | util | arsenal, audio, data, gear, hud, parts |
 | parts (sim) | Gunsmith | data | util |
-| gear (sim) | Gear | - | data, game, medical, parts, player, sim, stickers |
+| gear (sim) | Gear | - | data, medical, parts, sim, stickers, util |
 | medical (sim) | Med | - | ballistics, util |
 | sim (sim) | Sim | - | data, level, parts, spacedata, util, world |
 | materials (sim) | Materials | - | level |
-| ballistics (sim) | Ballistics | materials | data, gear, player, rig, util, world |
-| audio | Audio | - | acoustics, casings, data, footsteps, game, gunaudio, level, modelbundles, render, util |
-| level (sim) | Level | - | data, furniture, hangar, homes, leveldesc, materials, shipgen, spacedata, util, world |
+| ballistics (sim) | Ballistics | materials | data, gear, util, world |
+| audio | Audio | util | acoustics, casings, data, footsteps, game, gunaudio, level, modelbundles, render |
+| level (sim) | Level | - | data, furniture, homes, leveldesc, materials, shipgen, spacedata, util, world |
 | leveldesc (sim) | LevelDesc | - | damage, level, materials, util, world |
 | world (sim) | World | - | damage, level, leveldesc, materials, util |
 | furnspec (sim) | FurnSpec | - | furniture, level, util, world |
@@ -85,16 +89,16 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | handling | Handling | - | audio, data, render, util, vmanim |
 | lightgrid (sim) | LightGrid | - | homes, level |
 | levelview | LevelView | - | furnmesh, hangar, level, leveldesc, lightgrid, util |
-| render | R | - | audio, ballistics, bolts, callsigns, casings, damage, data, game, gear, gunmaterials, gunmodels, highlights, hud, level, levelview, lightgrid, loot, player, range, rig, scars, shotlog, stickers, util, viewmodel, views |
-| scars (sim) | Scars | - | render, util |
-| damage (sim) | Damage | - | audio, game, level, render, scars, util, world |
+| render | R | util | audio, ballistics, bolts, callsigns, casings, damage, data, game, gear, gunmaterials, gunmodels, highlights, hud, level, levelview, lightgrid, loot, player, range, rig, scars, shotlog, stickers, viewmodel, views |
+| scars (sim) | Scars | - | util |
+| damage (sim) | Damage | - | level, scars, util, world |
 | glare | Glare | - | game, level, player, render, util |
 | shotlog | ShotLog | - | data, hud, level, materials, net, player, render, rig, util, views |
-| stickers (sim) | Stickers | - | net, player |
+| stickers (sim) | Stickers | - | util |
 | bolts | Bolts | - | ballistics, data, render, views |
 | gunmaterials | GunMaterials | - | - |
 | gunmodels | GunModels | - | glb, gunmaterials, parts, stickers, viewmodel |
-| glb | GLB, Models | - | gunmaterials, modelbundles, parts, stickers |
+| glb | GLB, Models | util | gunmaterials, modelbundles, parts, stickers |
 | gunrig | GunRig | - | data, gunmodels |
 | viewmodel | Viewmodel | render | data, vmanim |
 | vmanim | VMAnim | - | bolts, casings, data, game, glb, gunmaterials, gunmodels, gunrig, humans, icons, parts, player, rig, util |
@@ -103,20 +107,21 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | humans | Humans | humandata | glb |
 | headgear | Headgear | - | gear, humans |
 | rig | Rig | sim | callsigns, data, footsteps, game, gear, gunmodels, gunrig, headgear, humans, level, levelview, parts, spacedata, stickers, util, views, vmanim, world |
-| net | Net | - | serverlink, util |
+| net | Net | util | serverlink |
 | recorder (sim) | Recorder | - | level |
 | server (sim) | Server | sim | arsenal, callsigns, damage, data, gear, level, medical, parts, route, serverhost, shipgen, shop, spacedata, spaceserver, stickers, util, world |
-| spaceserver (sim) | SpaceSv | spacedata | data, level, materials, server, shipgen, world |
+| spaceserver (sim) | SpaceSv | spacedata | damage, data, level, materials, server, shipgen, world |
 | serverhost (sim) | ServerHost | - | leveldesc, recorder, server, stickers |
 | serverlink | ServerLink | - | game, net, serverhost |
-| player | Me | level, sim | arsenal, audio, ballistics, bolts, career, casings, course, damage, data, footsteps, game, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, handling, hangar, highlights, hud, invui, landing, levelview, loadout, loot, materials, medical, net, parts, range, render, rig, shotlog, space, stickers, util, viewmodel, views, vmanim, world |
-| views | Views | sim | audio, ballistics, bolts, callsigns, casings, damage, data, footsteps, game, glare, gunaudio, gunmodels, handling, highlights, hud, level, levelview, net, parts, player, render, rig, stickers, util, world |
+| player | Me | level, sim, util | arsenal, audio, ballistics, bolts, career, casings, course, damage, data, footsteps, game, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, handling, hangar, highlights, hud, invui, landing, levelview, loadout, loot, materials, medical, net, parts, range, render, rig, shotlog, space, stickers, viewmodel, views, vmanim, world |
+| views | Views | sim, util | audio, ballistics, bolts, callsigns, casings, damage, data, footsteps, game, glare, gunaudio, gunmodels, handling, highlights, hud, level, levelview, net, parts, player, render, rig, stickers, world |
 | casings | Casings | - | audio, data, furniture, game, gear, handling, icons, level, loot, parts, player, render, util, world |
 | icons | Icons | data | gear, gunmodels, parts, render, util |
-| hud | HUD | - | ballistics, callsigns, data, game, gamepad, gear, icons, level, medical, net, player, render, rig, shotlog, space, util, views |
-| shop (sim) | Shop | - | audio, ballistics, callsigns, career, data, game, gear, gunaudio, gunsmith, hangar, hud, icons, invui, medical, net, parts, player, range, route, util, zeroing |
-| invui | InvUI | - | audio, ballistics, callsigns, data, game, gamepad, gear, gunaudio, hud, icons, medical, net, parts, player, range, render, shop, touch, util, views |
-| gunsmith | GunsmithUI | parts | audio, ballistics, data, gamepad, gunaudio, gunmodels, hud, player, render, shop, stickers, util |
+| hud | HUD | util | ballistics, callsigns, data, game, gamepad, gear, icons, level, medical, net, player, render, rig, shotlog, space, views |
+| shop (sim) | Shop | - | data, gear, parts, util |
+| shopui | ShopUI | - | audio, ballistics, callsigns, career, data, game, gear, gunaudio, gunsmith, hangar, hud, icons, invui, medical, net, parts, player, range, route, shop, util, zeroing |
+| invui | InvUI | - | audio, ballistics, callsigns, data, game, gamepad, gear, gunaudio, hud, icons, medical, net, parts, player, range, render, shopui, touch, util, views |
+| gunsmith | GunsmithUI | parts | audio, ballistics, data, gamepad, gunaudio, gunmodels, hud, player, render, shop, shopui, stickers, util |
 | zeroing | ZeroUI | - | audio, data, player |
 | route (sim) | Route | - | data, util |
 | loot | Loot | - | casings, data, game, gear, gunmodels, gunrig, icons, level, parts, render |
@@ -124,7 +129,7 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | range | Range | data | audio, course, gear, hud, player, render, world |
 | highlights | Highlights | - | audio, ballistics, callsigns, damage, data, game, gear, glb, gunaudio, gunmodels, hangar, hud, icons, level, levelview, lightgrid, materials, net, parts, player, render, rig, scars, shop, sim, stickers, util, views, world, zip |
 | menushow | MenuShow | - | data, gunmodels, highlights, parts, util |
-| hangar | Hangar | data | audio, course, game, gear, glb, gunmodels, highlights, hud, humans, icons, levelview, net, parts, player, range, render, rig, shop, spacedata, util, world |
+| hangar | Hangar | data, util | audio, course, game, gear, glb, gunmodels, highlights, hud, humans, icons, levelview, net, parts, player, range, render, rig, shop, shopui, spacedata, world |
 | landing | Landing | - | audio, game, hangar, level, player, render, util, views, world |
 | shipmodel | ShipModel | - | glb, level, shipgen, spacedata, util |
 | spaceui | SpaceUI | spacedata | audio, game, hud, level, net, player, render, shipgen, shipmodel, space, util, views |
@@ -134,7 +139,7 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | cloud | Cloud | util | arsenal, callsigns, career, cloudconfig, game, net, player, shop |
 | gamepad | Pad | - | audio, game, hud, invui, player, touch, util |
 | touch | Touch | - | audio, game, gamepad, invui, player, util |
-| game | Game | sim | ambience, arsenal, audio, ballistics, bolts, callsigns, career, cloud, course, damage, data, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, gunsmith, handling, hangar, highlights, hud, humans, icons, invui, landing, level, lightgrid, loadout, loot, medical, menushow, modelbundles, net, parts, player, prep, profiler, range, render, rig, route, serverhost, serverlink, shipmodel, shop, shotlog, space, spacedata, stickers, touch, util, views, world |
+| game | Game | sim, util | ambience, arsenal, audio, ballistics, bolts, callsigns, career, cloud, course, damage, data, gamepad, gear, glb, gunaudio, gunmaterials, gunmodels, gunsmith, handling, hangar, highlights, hud, humans, icons, invui, landing, level, lightgrid, loadout, loot, medical, menushow, modelbundles, net, parts, player, prep, profiler, range, render, rig, route, serverhost, serverlink, shipmodel, shopui, shotlog, space, spacedata, stickers, touch, views, world |
 | profiler | Prof | casings, course (guarded), game, gunaudio, hangar, highlights (guarded), hud, invui, level, lightgrid, player, render, server, serverhost, views, world | net, serverlink |
 | demo | Demo | - | game, gear, net, player, render, route, vmanim, world |
 | debugstart | DebugStart | - | data, game, gear, landing, net, parts, player, render, route, space, spacedata, views |
@@ -145,50 +150,18 @@ A file that uses another, unguarded, while loading, where that other is missing 
 ## 2. The simulation reaching page-only modules
 
 The simulation side is what js/serverworker.ts and js/prepworker.ts load (30 files). Each use below names a module
-the page has and the server thread does not. Phase 3 replaces each with a hook the page fills in.
+the page has and the server thread does not. The layering rule (phase 3; `npm run deps:check`, run in CI) allows none: what the simulation needs of the page it asks through `G.Hooks` (js/types/hooks.d.ts), which the page files fill in as they load.
 
-| From | To | Uses | Plain | At load | Where |
-| --- | --- | --- | --- | --- | --- |
-| shop | player | 21 | 19 | 0 | Me:99 Me:186 Me:187 Me:192 Me:195 Me:270 Me:275 Me:277 Me:298 Me:298* Me:299 Me:299* ... |
-| shop | audio | 16 | 16 | 0 | Audio:94 Audio:99 Audio:185 Audio:186 Audio:188 Audio:210 Audio:214 Audio:228 Audio:235 Audio:236 Audio:248 Audio:249 ... |
-| shop | game | 12 | 11 | 0 | Game:30 Game:179 Game:185 Game:279 Game:449 Game:461 Game:515 Game:516 Game:520 Game:522 Game:542 Game:542* |
-| shop | hud | 9 | 9 | 0 | HUD:77 HUD:94 HUD:179 HUD:185 HUD:214 HUD:221 HUD:236 HUD:242 HUD:249 |
-| shop | gunsmith | 9 | 9 | 0 | GunsmithUI:345 GunsmithUI:367 GunsmithUI:499 GunsmithUI:500 GunsmithUI:501 GunsmithUI:502 GunsmithUI:532 GunsmithUI:539 GunsmithUI:540 |
-| damage | audio | 6 | 2 | 0 | Audio:783 Audio:783* Audio:783* Audio:794 Audio:794* Audio:794* |
-| shop | invui | 6 | 5 | 0 | InvUI:467 InvUI:467* InvUI:499 InvUI:500 InvUI:501 InvUI:502 |
-| stickers | net | 6 | 2 | 0 | Net:257 Net:257* Net:257* Net:266 Net:266* Net:266* |
-| damage | render | 5 | 3 | 0 | R:483 R:483* R:794 R:795 R:795* |
-| arsenal | loadout | 4 | 0 | 0 | Loadout:61* Loadout:61* Loadout:65* Loadout:65* |
-| shop | net | 4 | 4 | 0 | Net:88 Net:95 Net:308 Net:516 |
-| shop | icons | 4 | 4 | 0 | Icons:356 Icons:369 Icons:383 Icons:437 |
-| data | glb | 3 | 0 | 0 | Models:253* Models:253* Models:253* |
-| gear | player | 3 | 0 | 0 | Me:181* Me:181* Me:181* |
-| gear | game | 3 | 0 | 0 | Game:383* Game:383* Game:383* |
-| arsenal | hud | 2 | 2 | 0 | HUD:70 HUD:72 |
-| arsenal | audio | 2 | 1 | 0 | Audio:71 Audio:71* |
-| scars | render | 2 | 1 | 0 | R:224 R:224* |
-| shop | range | 2 | 1 | 0 | Range:185 Range:185* |
-| shop | gunaudio | 2 | 1 | 0 | GunAudio:204 GunAudio:204* |
-| shop | zeroing | 2 | 2 | 0 | ZeroUI:501 ZeroUI:533 |
-| shop | hangar | 2 | 1 | 0 | Hangar:522 Hangar:522* |
-| stickers | player | 2 | 2 | 0 | Me:46 Me:46 |
-| arsenal | views | 1 | 1 | 0 | Views:86 |
-| ballistics | player | 1 | 1 | 0 | Me:877 |
-| ballistics | rig | 1 | 1 | 0 | Rig:878 |
-| damage | game | 1 | 1 | 0 | Game:483 |
-| level | hangar | 1 | 1 | 0 | Hangar:227 |
-| shop | career | 1 | 1 | 0 | Career:494 |
-
-`*` checked or guarded. Plain uses are the ones that would throw in the server thread if reached there.
+None.
 
 ## 3. Trial module typecheck
 
 `tsconfig.modules-trial.json`: the project with every file a module (`moduleDetection: force`). Phase 1 is done when
 the only errors left are G members (those go when the files are converted).
 
-7019 errors: TS2339 5947, TS2686 615, TS7006 246, TS6196 86, TS7031 39, TS18048 28, TS18049 16, TS18047 14, TS2531 10, TS2345 8, TS7053 5, TS2322 3, TS2532 2.
+7151 errors: TS2339 6051, TS2686 619, TS7006 268, TS6196 87, TS7031 39, TS18048 28, TS18049 16, TS18047 14, TS2531 11, TS2345 8, TS7053 5, TS2322 3, TS2532 2.
 
-**G members lost** (TS2339 on GameNamespace, 174 names): each file's `interface GameModules` no longer merges (and in 83 files it's reported unused). Expected; they go as the files are converted.
+**G members lost** (TS2339 on GameNamespace, 176 names): each file's `interface GameModules` no longer merges (and in 84 files it's reported unused). Expected; they go as the files are converted.
 
 **THREE as a global** (TS2686, in 43 files): three's types declare it a UMD global, which a module may not use without an import. Phase 2's import map, or `allowUmdGlobalAccess`, clears these.
 
@@ -197,11 +170,13 @@ the only errors left are G members (those go when the files are converted).
 | Name | Kind | Declared in | Uses | Used by |
 | --- | --- | --- | --- | --- |
 
-**Everything else** (382): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
+**Everything else** (405): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
 
 - js/ambience.ts:948 TS7006 Parameter 'q' implicitly has an 'any' type.
 - js/arsenal.ts:99 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/ballistics.ts:890 TS7006 Parameter 'd' implicitly has an 'any' type.
+- js/audio.ts:658 TS7006 Parameter 'd' implicitly has an 'any' type.
+- js/audio.ts:659 TS7006 Parameter 'piv' implicitly has an 'any' type.
+- js/ballistics.ts:878 TS7006 Parameter 'd' implicitly has an 'any' type.
 - js/cloud.ts:227 TS7006 Parameter 'a' implicitly has an 'any' type.
 - js/cloud.ts:304 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/cloud.ts:352 TS7006 Parameter 'r' implicitly has an 'any' type.
@@ -248,15 +223,13 @@ the only errors left are G members (those go when the files are converted).
 - js/game.ts:716 TS7006 Parameter 't' implicitly has an 'any' type.
 - js/game.ts:716 TS7006 Parameter 'p' implicitly has an 'any' type.
 - js/game.ts:770 TS7006 Parameter 's' implicitly has an 'any' type.
-- js/game.ts:1161 TS7006 Parameter 'w' implicitly has an 'any' type.
-- js/game.ts:1182 TS7006 Parameter 'p' implicitly has an 'any' type.
-- js/game.ts:1185 TS7006 Parameter 'pid' implicitly has an 'any' type.
+- js/game.ts:1158 TS7006 Parameter 'w' implicitly has an 'any' type.
+- js/game.ts:1179 TS7006 Parameter 'p' implicitly has an 'any' type.
+- js/game.ts:1182 TS7006 Parameter 'pid' implicitly has an 'any' type.
+- js/game.ts:1348 TS18049 'g' is possibly 'null' or 'undefined'.
+- js/game.ts:1349 TS18049 'g' is possibly 'null' or 'undefined'.
+- js/game.ts:1350 TS18049 'g' is possibly 'null' or 'undefined'.
+- js/game.ts:1350 TS18049 'g' is possibly 'null' or 'undefined'.
+- js/game.ts:1350 TS18049 'g' is possibly 'null' or 'undefined'.
 - js/game.ts:1351 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1352 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1353 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1353 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1353 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1354 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1354 TS18049 'g' is possibly 'null' or 'undefined'.
-- js/game.ts:1354 TS18049 'g' is possibly 'null' or 'undefined'.
-- ... 322 more in the JSON
+- ... 345 more in the JSON

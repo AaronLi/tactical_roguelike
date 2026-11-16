@@ -2,6 +2,18 @@
 const _shC = new THREE.Vector3(), _shS = new THREE.Vector3(), _shA = new THREE.Vector3(); // (shieldHit's)
 // where a door stops being a kick and starts being a push: aim below this (m) to kick, above to open
 const KICK_H = 1.3;
+// A reference body for hits you take. Rounds that hit you are worked out on your own machine, through a body posed as you are (js/rig.ts: the
+// same one your teammates see), from where the shooter was to the part the host says it hit. (It was js/ballistics.ts', which the server's
+// thread loads; it reads you, so it's here.)
+let _selfRig: ReturnType<typeof G.Rig.create> | null = null;
+function selfRig() {
+  const me = G.Me;
+  if (!_selfRig) { _selfRig = G.Rig.create({ style: 'tactical', bare: true, seed: 1 }); _selfRig!.root.visible = false; }
+  const st = { pos: me.pos.clone(), yaw: me.yaw, pitch: me.pitch, crouch: !!me.crouch, alert: true, lean: me.lean || 0, state: me.down ? 'down' : 'alive', prone: !!me.prone };
+  for (let i = 0; i < 8; i++) _selfRig!.update(0.05, st);
+  _selfRig!.root.updateMatrixWorld(true);
+  return _selfRig!;
+}
 // a round in flight (Me.fly): its state, and what the stepping adds as it goes
 // the fire selector's positions, a reload's way of dealing with the old magazine, the action worked by hand, the throwable in your hand,
 // what a timed F action is (it drives the animation), the zipline's and the ladder's phases, and how a hit leaves you
@@ -1833,7 +1845,7 @@ const G_Me = {
     if ((b.events || b.enemy) && !G.Game.hub && !b.hit.has(this) && !this.down && !this.dead) {
       const cx = this.pos.x - a.x, cy = this.pos.y + 1 - a.y, cz = this.pos.z - a.z, along = cx * dir.x + cy * dir.y + cz * dir.z;
       if (along > -1 && along < wallT + 1 && Math.hypot(cx - dir.x * along, cy - dir.y * along, cz - dir.z * along) < 1.3) {
-        const rig = G.Ballistics.self(), h = G.Rig.raycast(rig, a, dir, wallT);
+        const rig = selfRig(), h = G.Rig.raycast(rig, a, dir, wallT);
         if (h) hits.push({ t: h.t, zone: h.zone, c: h.c, side: h.side, self: true, rig });
       }
     }
@@ -3243,5 +3255,8 @@ const G_Me = {
   },
 };
 G.Me = G_Me;
+// (what the simulation's files ask of you: js/gear.ts unpack, js/stickers.ts)
+G.Hooks.makeWeapon = (id, build) => G.Me.makeWeapon(id, build);
+G.Hooks.myStickers = () => (G.Me.stk || (G.Me.stk = {}));
 
 interface GameModules { Me: typeof G_Me; }

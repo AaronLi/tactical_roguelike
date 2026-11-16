@@ -178,7 +178,7 @@ const G_Gear = (() => {
   }
   function unpack(o: any) {
     if (o.k === 'gun' && o.w) {
-      const w = G.Me && G.Me.makeWeapon ? G.Me.makeWeapon(o.w.id, o.w.build) : G.Sim.makeWeapon(o.w.id, o.w.build); // (the host's worker has no Me: the gun as built, all the same)
+      const w = G.Hooks.makeWeapon ? G.Hooks.makeWeapon(o.w.id, o.w.build) : G.Sim.makeWeapon(o.w.id, o.w.build); // (the host's worker has no Me: the gun as built, all the same)
       w.mag = o.w.mag; w.ammo = o.w.ammo; w.tube = (o.w.tube || []).slice(); if (o.w.noMag) w.noMag = true; if (o.w.fm) w.fm = o.w.fm; if (o.w.rl && w.def.barrels) { w.rl = o.w.rl; if (o.w.bl) w.bl = o.w.bl.slice(); } // (a gun of several barrels: its block's round type and the rounds in each barrel)
       if ('chamber' in o.w) w.chamber = o.w.chamber;
       if (o.w.spent) w.spent = o.w.spent.slice();
@@ -380,7 +380,7 @@ const G_Gear = (() => {
   // the guns in your backpack, as [item, grid]
   function packGuns(me: GMe) { const out: [GItem, GGrid][] = []; if (me.kit.pack) each(me.kit.pack.grids, (it: GItem, g: GGrid) => { if (it.k === 'gun') out.push([it, g]); }); return out; }
   // In a level you only have what you carry: the locker is back at the quartermaster's.
-  const inField = () => !!(G.Game && G.Game.phase === 'level' && !G.Game.hub); // (the hangar's between levels: your stash is there)
+  const inField = () => !!(G.Hooks.inField && G.Hooks.inField()); // (the hangar's between levels: your stash is there)
   function all(me: GMe) { return inField() ? [...body(me), ...molles(me)] : [...body(me), ...molles(me), me.locker]; }
   function each(grids: GGrid[], fn: (it: GItem, g: GGrid, p: GCell) => void) { for (const g of grids) for (const p of [...g.items]) fn(p.it, g, p); }
   // what a gun can reload from, on you
