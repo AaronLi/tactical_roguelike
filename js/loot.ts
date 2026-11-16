@@ -8,6 +8,7 @@ import { Icons } from './icons.js';
 import { Level } from './level.js';
 import { Gunsmith } from './parts.js';
 import { R } from './render.js';
+import { Game } from './game.js';
 // Things lying in the world that you can pick up: anything you've dropped from your inventory (a magazine, a
 // bandage, a backpack with everything in it, a gun). The host keeps the list (G.Server.loot) and says who gets
 // what; this draws them and finds the one under your crosshair. Each is { id, x, y, z, item (packed: G.Gear.pack), mesh, box },
@@ -47,7 +48,7 @@ export const Loot = (() => {
     if (!_ray.intersectBox(box, _p)) return Infinity;
     const t = _p.applyMatrix4(obj.matrixWorld).distanceTo(o);
     if (t > reach) return Infinity;
-    return Level.raycast(G.Game.map!, o.x, o.y, o.z, d.x, d.y, d.z, t, { move: true }).t < t - 0.02 ? Infinity : t;
+    return Level.raycast(Game.map!, o.x, o.y, o.z, d.x, d.y, d.z, t, { move: true }).t < t - 0.02 ? Infinity : t;
   }
   const COL = { mag: 0x2a2c2e, ammo: 0xb0915e, med: 0xd8d2c4, frag: 0x4a5a32, tb: 0x4c5634, carrier: 0x3a4148, plate: 0x4a4d52, helmet: 0x33393f, belt: 0x3b3528, pack: 0x4a4a38, pouch: 0x404636, ifak: 0x7a2420, part: 0x2c3136 };
   // A gun lies on its side (fit: shrunk to that length if it's longer, to lie in the weapon case), a magazine on

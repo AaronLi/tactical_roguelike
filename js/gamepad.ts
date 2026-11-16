@@ -4,6 +4,8 @@ import { HUD } from './hud.js';
 import { U } from './util.js';
 import { Touch } from './touch.js';
 import { InvUI } from './invui.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // A controller (the Gamepad API's standard mapping: an Xbox pad, a Steam Deck's own controls), polled once a frame by G.Game.loop. It's not a
 // control scheme of its own: in a level its buttons are the keys and mouse buttons they stand for, sent as those events down the same handlers
 // (js/player.ts bindInput, js/game.ts bindMenu); in a menu it drives a cursor that presses, drags and right-clicks what's on the screen with
@@ -74,7 +76,7 @@ export const Pad = (() => {
     releaseAll(); wasPlay = false; setOn(false); closeOsk(false);
     if (!was) return;
     HUD.toast('', 'Controller disconnected', 3);
-    if (playing && G.Game.softLocked) G.Game.unlock(); // (no way of playing on: the pause menu, and a mouse or the next controller takes it from there)
+    if (playing && Game.softLocked) Game.unlock(); // (no way of playing on: the pause menu, and a mouse or the next controller takes it from there)
   }
 
   function update(dt: number) {
@@ -86,7 +88,7 @@ export const Pad = (() => {
     prev = cur; cur = {};
     BTNS.forEach((b, i) => { cur[b] = !!value(gp, i); });
     if (!on) return;
-    const g = G.Game, level = g.phase === 'level';
+    const g = Game, level = g.phase === 'level';
     if (level && !g.locked && !g.menuOpen() && g.$('pause').classList.contains('hidden')) g.lock(); // (nothing to click: straight in)
     const play = level && g.locked && !g.menuOpen() && g.$('pause').classList.contains('hidden') && !osk;
     if (wasPlay && !play) releaseAll();
@@ -105,25 +107,25 @@ export const Pad = (() => {
   function releaseAll() {
     for (const b of BTNS) letGo(b);
     if (steady) { steady = false; key('keyup', 'ShiftLeft'); }
-    if (G.Me) G.Me.padMove = null;
+    if (Me) Me.padMove = null;
     chordUsed = false; rbAt = bAt = 0; bDone = false;
   }
   // Y: the mouse wheel: the other weapon, or aiming through a scope with steps, the next one (round to the lowest again)
   function wheelStep() {
-    const me = G.Me, w = me.cur(), L = w && w.def.magLevels;
+    const me = Me, w = me.cur(), L = w && w.def.magLevels;
     const top = L && me.ads && me.adsT > 0.5 && me.sight(w).i >= L.length - 1;
     for (let i = 0; i < (top ? L.length - 1 : 1); i++) fire(window, new WheelEvent('wheel', { deltaY: top ? 100 : -100 }));
   }
   // RB tapped: a grenade into your hand, the next kind each tap, and past the last one back to the gun (the number keys' own path: the same key again puts it away)
   function nextGrenade() {
-    const me = G.Me, q = me.quick as (string | null | undefined)[], slots = [0, 1, 2].filter((i) => q[i]);
+    const me = Me, q = me.quick as (string | null | undefined)[], slots = [0, 1, 2].filter((i) => q[i]);
     if (!slots.length) return tap('Digit3');
     const at = me.held ? slots.findIndex((i) => q[i] === me.held!.kind) : -1;
     tap('Digit' + (slots[at >= 0 && at + 1 >= slots.length ? at : at + 1] + 3));
   }
   function gameplay(gp: Gamepad, dt: number) {
-    const now = performance.now(), me = G.Me;
-    if (hit('MENU')) { G.Game.unlock(); return; }
+    const now = performance.now(), me = Me;
+    if (hit('MENU')) { Game.unlock(); return; }
     for (const b of BTNS) if (lift(b)) letGo(b);
     if (hit('RB')) { rbAt = now; chordUsed = false; }
     if (lift('RB')) { if (!chordUsed && now - rbAt < HOLD * 1000) nextGrenade(); rbAt = 0; }
@@ -144,7 +146,7 @@ export const Pad = (() => {
     const [mx, my, mk] = stick(gp, 0, DEAD_MOVE, 1);
     me.padMove = mk ? { st: mx, fw: -my, k: Math.max(0.3, mk) } : null;
     const [lx, ly, lk] = stick(gp, 2, DEAD_LOOK, LOOK_CURVE);
-    if (lk) me.lookBy(lx * LOOK_UNITS * dt, ly * LOOK_UNITS * dt * (LOOK_PITCH / LOOK_YAW), (LOOK_YAW / LOOK_UNITS) * G.Game.settings.padSens);
+    if (lk) me.lookBy(lx * LOOK_UNITS * dt, ly * LOOK_UNITS * dt * (LOOK_PITCH / LOOK_YAW), (LOOK_YAW / LOOK_UNITS) * Game.settings.padSens);
   }
 
   // ------------------------------------------------------------- in a menu
@@ -271,7 +273,7 @@ export const Pad = (() => {
   }
   function back() {
     if (osk) { if (osk.input.value) oskKey('back'); else closeOsk(false); return; }
-    const g = G.Game, hid = (id: string) => g.$(id).classList.contains('hidden'), r = root && root.id;
+    const g = Game, hid = (id: string) => g.$(id).classList.contains('hidden'), r = root && root.id;
     if (root && root.classList.contains('inv-menu')) { pointer('pointerdown', document.body, 1); pointer('pointerup', document.body, 0); return; }
     if (focus) { const d = focus.closest('details'); if (d && d.open) { d.open = false; setFocus(d.querySelector('summary')); return; } }
     if (r === 'pause') g.$('btnResume').click();
@@ -288,7 +290,7 @@ export const Pad = (() => {
     fire(t, new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: cx, clientY: cy, button: 2 }));
   }
   function menus(gp: Gamepad, dt: number) {
-    const g = G.Game;
+    const g = Game;
     if (g.chatOpen && !osk) openOsk(g.$<HTMLInputElement>('chatInput'));
     if (osk && osk.input.id === 'chatInput' && !g.chatOpen) closeOsk(false);
     const r = findRoot();

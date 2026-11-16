@@ -1,6 +1,7 @@
 'use strict';
 import { Net } from './net.js';
 import { ServerHost } from './serverhost.js';
+import { Game } from './game.js';
 // The page's end of the host's simulation (docs/threads.md). The simulation (G.Server, js/server.ts, run by js/serverhost.ts)
 // has a thread of its own, a worker (js/serverworker.ts); the page is a player like any other: it draws, and it sends what
 // you do. When the page hosts, its own player's messages go to the simulation on a MessagePort of their own (toServer) and
@@ -136,7 +137,7 @@ export const ServerLink = {
   // the simulation's level against the one on this screen: built from the same seed, they must be the same place
   // (same: the two descriptions are equal, the whole of them as JSON; differ: the parts whose fingerprints differ)
   async digest() {
-    const s = await this.ask('digest', { json: true }), m = G.Game.map, parts: Record<string, string> = {};
+    const s = await this.ask('digest', { json: true }), m = Game.map, parts: Record<string, string> = {};
     const mine = m && !m.hub ? ServerHost.digest(m, parts) : null, differ = Object.keys(parts).filter((k) => !s.parts || s.parts[k] !== parts[k]);
     const same = !!s.json && !!m && !!m.desc && s.json === JSON.stringify(m.desc);
     return { server: s.d, client: mine, same, bytes: s.json ? s.json.length : 0, differ, seed: s.seed, level: s.level, th: s.th, night: s.night };

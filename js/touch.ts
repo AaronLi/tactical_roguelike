@@ -3,6 +3,8 @@ import { Audio } from './audio.js';
 import { Pad } from './gamepad.js';
 import { U } from './util.js';
 import { InvUI } from './invui.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // A touch screen. Like the controller (js/gamepad.ts) it's not a control scheme of its own: the on-screen buttons are the keys and mouse buttons they stand
 // for, sent as those events down the same handlers (js/player.ts bindInput, js/game.ts bindMenu); only the stick and the look drag go in direct (G.Me.padMove,
 // G.Me.lookBy). A touch screen has no pointer lock either, so G.Game.softLocked stands in for it (js/game.ts lock).
@@ -37,14 +39,14 @@ export const Touch = (() => {
     if (FORCED) v = true;
     if (on === v) return;
     on = v; document.body.classList.toggle('touch-on', v);
-    if (InvUI && G.Game && G.Game.settings) InvUI.scaleUI();
-    if (!v) { hideUi(); if (G.Game && G.Game.softLocked && !Pad.active()) G.Game.unlock(); } // (no way of playing on: the pause menu, and its Resume takes the mouse)
+    if (InvUI && Game && Game.settings) InvUI.scaleUI();
+    if (!v) { hideUi(); if (Game && Game.softLocked && !Pad.active()) Game.unlock(); } // (no way of playing on: the pause menu, and its Resume takes the mouse)
   }
   function hideUi() { releaseAll(); if (uiEl) { uiEl.classList.add('hidden'); closeEl.classList.add('hidden'); turnEl.classList.add('hidden'); } wasPlay = false; }
 
   // ------------------------------------------------------------- in a level
   function press(t: string, el: HTMLElement, id: number) {
-    const me = G.Me, s = S();
+    const me = Me, s = S();
     el.classList.add('held');
     if (KEYS[t]) { const [c, sh] = KEYS[t]; s.key('keydown', c, !!sh); off[id] = () => s.key('keyup', c, !!sh); return; }
     switch (t) {
@@ -64,12 +66,12 @@ export const Touch = (() => {
   function letGo(id: number, f: Finger) {
     if (f.el) f.el.classList.remove('held');
     const o = off[id]; if (o) { delete off[id]; o(); }
-    if (f.kind === 'stick') { sx = sy = 0; stickEl.classList.remove('live', 'slow', 'fast'); knobEl.style.transform = ''; if (G.Me) G.Me.padMove = null; }
+    if (f.kind === 'stick') { sx = sy = 0; stickEl.classList.remove('live', 'slow', 'fast'); knobEl.style.transform = ''; if (Me) Me.padMove = null; }
     fingers.delete(id);
   }
   function releaseAll() {
     for (const [id, f] of [...fingers]) letGo(id, f);
-    const me = G.Me;
+    const me = Me;
     if (me && me.mouse && me.mouse.r && on) mouse('mouseup', 2);
     if (me && me.keys && me.keys.ShiftLeft && on) S().key('keyup', 'ShiftLeft');
     if (me) me.padMove = null;
@@ -97,14 +99,14 @@ export const Touch = (() => {
       if (r > STICK_R) { ax = (ax / r) * STICK_R; ay = (ay / r) * STICK_R; r = STICK_R; } // (a finger gone past the edge: the stick stays where it was put down, its knob held at the rim in the finger's direction)
       sx = ax / STICK_R; sy = ay / STICK_R;
       knobEl.style.transform = `translate(${ax}px, ${ay}px)`;
-    } else if ((f.kind === 'look' || LOOK_THROUGH.has(f.t!)) && (dx || dy)) G.Me.lookBy(dx, dy, LOOK * G.Game.settings.touchSens);
+    } else if ((f.kind === 'look' || LOOK_THROUGH.has(f.t!)) && (dx || dy)) Me.lookBy(dx, dy, LOOK * Game.settings.touchSens);
   }
   function onUp(e: PointerEvent) { const f = fingers.get(e.pointerId); if (f) letGo(e.pointerId, f); }
 
   function update(_dt: number) {
     if (!on) return;
     if (Pad.active()) { hideUi(); return; }
-    const g = G.Game, level = g.phase === 'level', pauseHid = g.$('pause').classList.contains('hidden');
+    const g = Game, level = g.phase === 'level', pauseHid = g.$('pause').classList.contains('hidden');
     if (level && !g.locked && !g.menuOpen() && pauseHid) g.lock(); // (nothing to click: straight in)
     const play = level && g.locked && !g.menuOpen() && pauseHid && !g.$('hud').classList.contains('hidden');
     closeEl.classList.toggle('hidden', !(g.invOpen || g.aboxOpen || (g.shopOpen && g.hub)));
@@ -113,7 +115,7 @@ export const Touch = (() => {
     if (!play) { if (wasPlay) { releaseAll(); moreEl.classList.add('hidden'); uiEl.classList.add('hidden'); } wasPlay = false; return; }
     if (!wasPlay) uiEl.classList.remove('hidden');
     wasPlay = true;
-    const me = G.Me;
+    const me = Me;
     if (crouchAt && !crouchDone && performance.now() - crouchAt > HOLD_MS) { crouchDone = true; S().tap('KeyZ'); }
     const r = Math.min(1, Math.hypot(sx, sy));
     // how far it's pushed picks the pace, as the keys do: a little is Shift's creep, most of the way a walk, and all the way forward Space's low-ready run
@@ -215,7 +217,7 @@ export const Touch = (() => {
     });
     // the chat, closed by the phone's own "done" or a tap elsewhere: there's no Esc to press, and no controls to play on with till it's shut
     const chat = document.getElementById('chatInput') as HTMLInputElement;
-    chat.addEventListener('blur', () => { if (on && G.Game.chatOpen) setTimeout(() => { if (G.Game.chatOpen && document.activeElement !== chat) G.Game.closeChat(); }, 120); });
+    chat.addEventListener('blur', () => { if (on && Game.chatOpen) setTimeout(() => { if (Game.chatOpen && document.activeElement !== chat) Game.closeChat(); }, 120); });
   }
 
   function init() {
@@ -250,7 +252,7 @@ export const Touch = (() => {
     window.addEventListener('keydown', (e) => { if (e.isTrusted && on && e.code && !(e.target instanceof HTMLInputElement)) setOn(false); }, true); // (a phone's own keyboard: into a box, or no code at all)
     // the browser's bars out of the way, in a level (a phone only allows it inside a tap; an iPhone not at all: there it's the Home Screen, manifest.json)
     window.addEventListener('pointerup', (e) => {
-      if (!on || fsTried || !e.isTrusted || !G.Game || G.Game.phase !== 'level' || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+      if (!on || fsTried || !e.isTrusted || !Game || Game.phase !== 'level' || document.fullscreenElement || !document.documentElement.requestFullscreen) return;
       fsTried = true;
       const p = document.documentElement.requestFullscreen({ navigationUI: 'hide' });
       if (p && p.catch) p.catch(() => {});

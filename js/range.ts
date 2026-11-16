@@ -5,6 +5,7 @@ import { Gear } from './gear.js';
 import { HUD } from './hud.js';
 import { R as G_R } from './render.js';
 import { World } from './world.js';
+import { Me } from './player.js';
 interface RangeSpec { x0: number; x1: number; lanes: number[]; len: number; marks: number[]; big?: number[]; steel?: number[]; }
 interface RifleSpec extends RangeSpec { big: number[]; steel: number[]; }
 // one lane of a range (made by lanes(); build() gives it its hits and last, laneConsole() its screen and buttons)
@@ -27,7 +28,7 @@ type RangeHitTarget = RangeTarget | { kind: 'course'; q: CourseTarget }; // (wha
 interface RangeSnap {
   guns: { w: GWeapon; mag: GWeapon['mag']; chamber: GWeapon['chamber']; ammo: GWeapon['ammo']; tube: GWeapon['tube'] | undefined; spent: GWeapon['spent']; spentCh: GWeapon['spentCh'] }[];
   layout: { g: GGrid; ps: { p: GCell; x: number; y: number; r: number; it: GItem }[] }[];
-  items: Map<GItem, { r?: string[]; n?: number }>; slot: typeof G.Me.slot;
+  items: Map<GItem, { r?: string[]; n?: number }>; slot: typeof Me.slot;
 }
 interface RangeState {
   root: THREE.Object3D | null; tg: RangeTarget[]; lanes: RangeLane[]; inside: boolean; snap: RangeSnap | null; ring: unknown[];
@@ -355,19 +356,19 @@ export const Range = (() => {
   // ---------------------------------------------------------------- ammunition: used here, given back on the way out
   // Every gun you have (what's in your hands, your pack, your locker), every magazine and box in everything you carry, and
   // where each sits in its pouch: as they are when you walk in, put back as they were when you walk out.
-  function grids(me: typeof G.Me) {
+  function grids(me: typeof Me) {
     const seen = new Set<GGrid>(), list: GGrid[] = [], push = (g: GGrid | null | undefined) => { if (g && !seen.has(g)) { seen.add(g); list.push(g); } };
     for (const g of Gear.all(me)) push(g);
     for (let i = 0; i < list.length; i++) for (const p of list[i].items) { const it = p.it; (it.grids || []).forEach(push); push(it.molle); }
     return list;
   }
-  function snapshot(me: typeof G.Me): RangeSnap {
+  function snapshot(me: typeof Me): RangeSnap {
     const gs = grids(me), items = new Map<GItem, { r?: string[]; n?: number }>(), guns = Gear.guns(me).map((w) => ({ w, mag: w.mag, chamber: w.chamber, ammo: w.ammo, tube: w.tube && w.tube.slice(), spent: w.spent && w.spent.slice(), spentCh: w.spentCh }));
     const layout = gs.map((g) => ({ g, ps: g.items.map((p) => ({ p, x: p.x, y: p.y, r: p.r, it: p.it })) }));
     for (const L of layout) for (const q of L.ps) { const it = q.it; if (it.k === 'mag') items.set(it, { r: it.r.slice() }); else if (typeof it.n === 'number') items.set(it, { n: it.n }); } // (boxes, and any other stack: bandages...)
     return { guns, layout, items, slot: me.slot };
   }
-  function restore(me: typeof G.Me, s: RangeSnap) {
+  function restore(me: typeof Me, s: RangeSnap) {
     for (const q of s.guns) { const w = q.w; w.mag = q.mag; w.chamber = q.chamber; w.ammo = q.ammo; if (q.tube) w.tube = q.tube.slice(); if (q.spent) w.spent = q.spent.slice(); else delete w.spent; w.spentCh = q.spentCh; }
     for (const L of s.layout) { L.g.items.length = 0; for (const q of L.ps) { q.p.x = q.x; q.p.y = q.y; q.p.r = q.r; q.p.it = q.it; L.g.items.push(q.p); } }
     for (const [it, v] of s.items) { if (v.r) { it.r.length = 0; it.r.push(...v.r); } else it.n = v.n!; }
@@ -377,7 +378,7 @@ export const Range = (() => {
   // ---------------------------------------------------------------- every frame
   const on = () => S.inside;
   function update(dt: number) {
-    const me = G.Me;
+    const me = Me;
     if (!S.root || !me || !me.pos || me.seat != null) return;
     const inside = me.pos.z - RZ < -0.4; // (past the garage door's threshold)
     if (inside && !S.inside) {
@@ -401,7 +402,7 @@ export const Range = (() => {
   // The spotting view: standing at a rifle lane's line, a picture of its IPSC target in the corner of your screen,
   // every hit on it and the last one ringed (at 300 m you won't see them from the line).
   let spot: HTMLDivElement | null = null, spotKey = '';
-  function spotting(me: typeof G.Me, inside: boolean) {
+  function spotting(me: typeof Me, inside: boolean) {
     const hx = me.pos.x, hz = me.pos.z - RZ;
     const L = inside && hz > FL - 1.5 && hz < FL + 4 ? S.lanes.find((q) => q.ipsc && Math.abs(hx - q.cx) <= q.w / 2) : null;
     if (!L) { if (spot) spot.style.display = 'none'; spotKey = ''; return; }
@@ -420,11 +421,11 @@ export const Range = (() => {
     g.clearRect(0, 0, c.width, c.height);
     drawIpsc(g, 6, 6, c.width - 12, c.height - 12, q.hits, false);
   }
-  function back(me?: typeof G.Me) {
-    if (S.snap) { restore(me || G.Me, S.snap); S.snap = null; HUD.toast('THE RANGE', 'Your ammunition is back as it was', 2.4); }
+  function back(me?: typeof Me) {
+    if (S.snap) { restore(me || Me, S.snap); S.snap = null; HUD.toast('THE RANGE', 'Your ammunition is back as it was', 2.4); }
   }
   function leave() {
-    if (S.snap && G.Me && G.Me.kit) { try { restore(G.Me, S.snap); } catch (e) { /* the kit changed under it */ } }
+    if (S.snap && Me && Me.kit) { try { restore(Me, S.snap); } catch (e) { /* the kit changed under it */ } }
     if (S.hangar && S.hangar.map) for (const t of S.tg) World.remove(S.hangar!.map.world, t.solid!);
     S.snap = null; S.inside = false; S.root = null; S.tg = []; S.lanes = []; S.laneList = null; S.live = [];
     if (spot) { spot.remove(); spot = null; spotKey = ''; }

@@ -3,6 +3,8 @@ import { AMMO, baseAm, beltFed, CALIBERS, calOf, WEAPONS } from './data.js';
 import { Gear } from './gear.js';
 import { Gunsmith } from './parts.js';
 import { U } from './util.js';
+import { GunModels } from './gunmodels.js';
+import { R as G_R } from './render.js';
 // Item icons for the inventory and the shop: little drawings made on a canvas, cached as images.
 // G.Icons.of(item, w, h, rot) -> data URL for an item shown w x h cells (rot: shown turned, so the drawing is
 // turned with it). Magazines look like the gun's (curved rifle, straight pistol, drum, belt box,
@@ -419,18 +421,18 @@ export const Icons = (() => {
   const iconsReady = () => { if (iconsQueued) return; iconsQueued = true; setTimeout(() => { iconsQueued = false; window.dispatchEvent(new Event('gunicons')); }, 30); };
   function gunImage(def: WeaponDef, W: number, H: number, noMag = false): HTMLCanvasElement | null {
     const T = THREE;
-    const m = G.GunModels.display(def);
+    const m = GunModels.display(def);
     if (noMag && m.info.anim && m.info.anim.mag) m.info.anim.mag.visible = false; // (a gun with its magazine out: none on it)
     if (m.group.userData.pending) {
       gunWaits = true;
       const k = def.code || def.id;
-      if (!waiting.has(k)) { waiting.add(k); G.GunModels.whenReady(m.group, () => { waiting.delete(k); m.group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); iconsReady(); }); }
+      if (!waiting.has(k)) { waiting.add(k); GunModels.whenReady(m.group, () => { waiting.delete(k); m.group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); iconsReady(); }); }
       return null;
     }
     if (!gR) {
       gR = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       gScene = new T.Scene();
-      gScene.environment = G.R._envMap(gR);
+      gScene.environment = G_R._envMap(gR);
       gScene.add(new T.HemisphereLight(0xe8eef5, 0x2a2622, Math.PI * 0.7));
       const key = new T.DirectionalLight(0xffffff, Math.PI * 0.9); key.position.set(1.5, 2, 0.5); gScene.add(key);
       const fill = new T.DirectionalLight(0xffffff, Math.PI * 0.35); fill.position.set(1, -0.5, -1); gScene.add(fill);

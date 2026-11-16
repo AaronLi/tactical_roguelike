@@ -6,6 +6,8 @@ import { R as G_R } from './render.js';
 import { U } from './util.js';
 import { Views } from './views.js';
 import { World } from './world.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // The helicopter that brings the squad in. Every level has a pad (G.Level.landing: map.lz), and you ride in on the same
 // dropship you boarded at the hangar (js/hangar.ts ship): out of the distance, once round the site, spiralling in, a hover
 // over the pad, the turn onto its heading, down. Then hold F to get out. It waits a little, lifts off and flies away; anyone
@@ -204,12 +206,12 @@ export const Landing = (() => {
     return o;
   }
   function update(dt: number) {
-    const sh = S.ship, me = G.Me;
-    if (!sh || G.Game.map !== S.map) return;
+    const sh = S.ship, me = Me;
+    if (!sh || Game.map !== S.map) return;
     sh.rotors.forEach((o, i) => { o.rotation.y += (i ? -1 : 1) * 38 * dt; }); sh.tail.rotation.z += 60 * dt;
     if (S.cloud) S.cloud.position.x += 1.4 * dt;
     if (!S.landed) {
-      if (!G.Game.$('veil').classList.contains('on')) S.ft += dt; // (it waits for you to see it)
+      if (!Game.$('veil').classList.contains('on')) S.ft += dt; // (it waits for you to see it)
       if (S.ft < S.fly!.dur) {
         pose(S.ft); ride();
         air(U.clamp((S.fly!.dur - S.ft - 3) / 6, 0, 1));
@@ -220,7 +222,7 @@ export const Landing = (() => {
     }
     S.t += dt;
     if (S.up < 0) {
-      const alone = Object.keys(G.Game.roster || {}).length < 2;
+      const alone = Object.keys(Game.roster || {}).length < 2;
       if (S.t < STAY && !(alone && S.out >= 0 && S.t > S.out + AFTER)) return;
       if (me.seat != null) getOut(me);
       for (const s of S.solids) World.remove(S.map!.world, s);

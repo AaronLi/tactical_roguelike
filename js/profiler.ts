@@ -15,6 +15,8 @@ import { Hangar } from './hangar.js';
 import { InvUI } from './invui.js';
 import { Net } from './net.js';
 import { ServerLink } from './serverlink.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // The profiler: where each frame's time goes, kept for the last stretch of play and saved from the pause menu (Esc,
 // "Save performance profile") as a JSON file.
 //
@@ -83,7 +85,7 @@ export const Prof = (() => {
     if ((frames & 31) === 0 && performance.memory) heap = performance.memory.usedJSHeapSize / 1048576; // (Chrome only)
     const info = G_R && G_R.renderer ? G_R.renderer.info : null, o = head * stride;
     const fix = [(loopStart - t0) / 1000, frame, cpu, info ? info.render.calls : 0, info ? info.render.triangles : 0, info ? info.memory.geometries : 0, info ? info.memory.textures : 0,
-      info && info.programs ? info.programs.length : 0, heap, G.Me && G.Me.rounds ? G.Me.rounds.length : 0, Views && Views.enemies ? Views.enemies.size : 0];
+      info && info.programs ? info.programs.length : 0, heap, Me && Me.rounds ? Me.rounds.length : 0, Views && Views.enemies ? Views.enemies.size : 0];
     for (let k = 0; k < NF; k++) ring[o + k] = fix[k];
     for (let i = 0; i < names.length; i++) {
       ring[o + NF + i * 2] = acc[i]; ring[o + NF + i * 2 + 1] = cnt[i];
@@ -121,7 +123,7 @@ export const Prof = (() => {
     return { frames: filled, seconds: filled ? r2(series(0)[filled - 1] - series(0)[0]) : 0, frame: stats(frame), cpu: stats(cpu), sections: Object.fromEntries(order.map((k) => [k, sections[k]])) };
   }
   function context() {
-    const g: any = G.Game || {}, m = g.map, info = G_R && G_R.renderer && G_R.renderer.info;
+    const g: any = Game || {}, m = g.map, info = G_R && G_R.renderer && G_R.renderer.info;
     return {
       saved: new Date().toISOString(), recordingSince: since, userAgent: navigator.userAgent, screen: [innerWidth, innerHeight, devicePixelRatio],
       level: g.level, phase: g.phase, hub: !!g.hub, host: !!(Net && Net.isHost), players: g.roster ? Object.keys(g.roster).length : 1,
@@ -244,13 +246,13 @@ export const Prof = (() => {
 
   // ---------------------------------------------------------------- what's timed
   function install() {
-    const Gm = G.Game;
+    const Gm = Game;
     const loop = Gm.loop;
     Gm.loop = function () { frameBegin(); try { return loop.apply(this, arguments as any); } finally { frameEnd(); } };
     wrap(ServerHost, 'tick', 'host: server tick'); // (on the page only when the simulation runs there: ?serverthread=0, js/serverlink.ts)
     wrap(Gm, 'updateDoors', 'doors');
-    wrap(G.Me, 'update', 'Me.update'); wrap(G.Me, 'move', 'Me.move'); wrap(G.Me, 'weaponUpdate', 'Me.weapon'); wrap(G.Me, 'interact', 'Me.interact');
-    wrap(G.Me, 'updateCamera', 'Me.camera'); wrap(G.Me, 'stepRounds', 'Me.rounds'); wrap(G.Me, 'sendState', 'Me.sendState'); wrap(G.Me, 'spectate', 'Me.spectate'); wrap(G.Me, 'flushHits', 'Me.flushHits');
+    wrap(Me, 'update', 'Me.update'); wrap(Me, 'move', 'Me.move'); wrap(Me, 'weaponUpdate', 'Me.weapon'); wrap(Me, 'interact', 'Me.interact');
+    wrap(Me, 'updateCamera', 'Me.camera'); wrap(Me, 'stepRounds', 'Me.rounds'); wrap(Me, 'sendState', 'Me.sendState'); wrap(Me, 'spectate', 'Me.spectate'); wrap(Me, 'flushHits', 'Me.flushHits');
     wrap(Views, 'update', 'Views.update');
     wrap(Hangar, 'update', 'Hangar.update');
     wrap(InvUI, 'update', 'InvUI.update'); wrap(InvUI, 'tick', 'InvUI.tick');

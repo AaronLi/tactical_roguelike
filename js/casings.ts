@@ -11,6 +11,8 @@ import { World } from './world.js';
 import { Icons } from './icons.js';
 import { Loot } from './loot.js';
 import { R } from './render.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // Spent cases. Every gun that ejects throws its case out of the ejection port: flicked right and up, tumbling,
 // with the shooter's own movement. Cases fly under gravity, bounce off floors, furniture tops, walls and props,
 // and come to rest lying on their side, where they stay (the oldest are recycled). Each real impact makes its
@@ -99,7 +101,7 @@ export const Casings = (() => {
     h.holder.updateMatrixWorld(true);
     const m = h.holder.matrixWorld;
     const right = V().setFromMatrixColumn(m, 0).normalize(), up = V().setFromMatrixColumn(m, 1).normalize(), fwd = V().setFromMatrixColumn(m, 2).normalize().negate();
-    const vel = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : null;
+    const vel = Me.vel ? V().set(Me.vel.x, 0, Me.vel.z) : null;
     for (let i = 0; i < n; i++) spawn(def, h.holder.localToWorld(V().set(drop ? 0 : 0.022, port[1] + 0.006, -port[0])), right, up, fwd, vel, drop, Array.isArray(am) ? am[i] : am);
   }
   // someone else's gun, from where its round left and where it went
@@ -124,7 +126,7 @@ export const Casings = (() => {
   function loose(def: CaseGun, pos: THREE.Vector3, holder: THREE.Object3D, am?: string) {
     holder.updateMatrixWorld(true);
     const m = holder.matrixWorld, right = V().setFromMatrixColumn(m, 0).normalize(), up = V().setFromMatrixColumn(m, 1).normalize(), fwd = V().setFromMatrixColumn(m, 2).normalize().negate();
-    spawn(def, pos, right, up, fwd, G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : null, true, am);
+    spawn(def, pos, right, up, fwd, Me.vel ? V().set(Me.vel.x, 0, Me.vel.z) : null, true, am);
   }
 
   // ---------------------------------------------------------------- dropped magazines
@@ -154,11 +156,11 @@ export const Casings = (() => {
     const { mesh, r } = magMesh(def, null);
     h.holder.updateMatrixWorld(true);
     const home = a && a.hs[0] && a.hs[0].A.magHome ? a.hs[0].A.magHome.clone() : V().set(0, -0.06, -0.12);
-    const p = h.holder.localToWorld(home), q = new T.Quaternion(), cam = R.camera.position, map = G.Game.map;
+    const p = h.holder.localToWorld(home), q = new T.Quaternion(), cam = R.camera.position, map = Game.map;
     // (up against a wall the gun, and the magazine in it, can be half through it: then it falls from where you stand, not from the far side)
     if (map && !Level.los(map, cam.x, cam.y, cam.z, p.x, p.y, p.z)) { p.x = cam.x; p.z = cam.z; }
     h.holder.getWorldQuaternion(q);
-    const v = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : V();
+    const v = Me.vel ? V().set(Me.vel.x, 0, Me.vel.z) : V();
     v.y -= 0.6;
     const c: Spent = { mesh, p, q, v, w: new T.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6), rest: false, age: 0, k: { mat: 'steel', len: 120, r }, drop: { def, fill } };
     R.dynRoot.add(mesh);
@@ -297,7 +299,7 @@ export const Casings = (() => {
     const X1 = map.W * L.TS - c.k.r, Z1 = map.H * L.TS - c.k.r;
     if (c.p.x < c.k.r || c.p.x > X1) { c.p.x = Math.min(X1, Math.max(c.k.r, c.p.x)); c.v.x *= -0.3; }
     if (c.p.z < c.k.r || c.p.z > Z1) { c.p.z = Math.min(Z1, Math.max(c.k.r, c.p.z)); c.v.z *= -0.3; }
-    const floor = (G.Game.map && G.Game.map.minY) || 0;
+    const floor = (Game.map && Game.map.minY) || 0;
     if (c.p.y < floor - 1) settle(c, floor); // (a basement's floor is below the ground)
   }
   // lying on its side, wherever it stopped
@@ -329,7 +331,7 @@ export const Casings = (() => {
     get mags() { return mags; }, // for debugging
     get live() { return live; }, // for debugging
     update(dt: number) {
-      const map = G.Game.map;
+      const map = Game.map;
       if (!map) return;
       sounds = 0;
       for (const c of mags) {

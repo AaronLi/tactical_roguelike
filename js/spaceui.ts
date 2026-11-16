@@ -10,6 +10,8 @@ import { U } from './util.js';
 import { Views } from './views.js';
 import { Net } from './net.js';
 import { Space } from './space.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // The space direction's panels (docs/space.md): the flight display (where she's going, how far in the right units, how
 // long), the waypoints marked on the view, the mission's objective, the sensor station's deck plan, the hangar's missions
 // board and shipyard, the light of a jump. All of it made here, on the page, the first time it's wanted.
@@ -89,7 +91,7 @@ export const SpaceUI = (() => {
   const _v = new T.Vector3(), _q = new T.Quaternion();
   function update(dt: number) {
     const s = S(); if (!s.on || !made) return;
-    hud.style.visibility = G.Game.invOpen || G.Game.shopOpen ? 'hidden' : ''; // (under the Tab screen and the shop, as the rest of the HUD is: #hud holds them, and this isn't in it)
+    hud.style.visibility = Game.invOpen || Game.shopOpen ? 'hidden' : ''; // (under the Tab screen and the shop, as the rest of the HUD is: #hud holds them, and this isn't in it)
     const seat = Space.mySeat(), flying = !s.docked || !!s.auto, aboard = Space.aboard(), wp = s.wps[s.tgt] && !s.wps[s.tgt].hide ? s.wps[s.tgt] : null;
     const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(_v.copy(s.P).sub(wp.p).normalize()) : 0;
     // the line at the top: for everyone aboard while she's under way
@@ -244,16 +246,16 @@ export const SpaceUI = (() => {
     if (ms.size && ms.kind === 'board') lines.push(`<small>${SD.SIZES[ms.size].name}: ${meta && meta.decks > 1 ? 'two decks, ' : ''}${(() => { const g = SD.SIZES[ms.size!].guns, a = [g.pd ? g.pd + ' point defence' : '', g.cannon ? g.cannon + ' cannon' : '', g.missile ? g.missile + ' missile launcher' + (g.missile > 1 ? 's' : '') : ''].filter(Boolean); return a.length ? a.join(', ') : 'unarmed'; })()}</small>`);
     const needKey = (k: string) => !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k);
     if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Ram her hull nose-on to board, anywhere along it: what is inside there is destroyed.');
-    if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === Net.myId ? 'You have' : U.esc(G.Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
+    if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === Net.myId ? 'You have' : U.esc(Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
     if (ms.obj === 'hvt') lines.push(st.hvt === 1 ? '<span class="ok">Target dead.</span> Back to the ship and jump home.' : st.hvt === 2 ? '<span class="ok">Target in restraints.</span> Back to the ship and jump home.' : 'Find the target (the bridge): kill or restrain.');
     if (ms.obj === 'destruct') lines.push(st.boom ? '<span class="ok">She\'s gone.</span> Jump home.' : left != null ? `<span class="tm">${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</span><br>Get off her: your ship, or an escape pod. Then undock.` : 'Reach the bridge and start the self-destruct.');
     if (ms.obj === 'hostage') lines.push(st.cleared ? '<span class="ok">She is clear of pirates.</span> Back to the ship and jump home.' : !s.docked ? 'Pirates hold her. Their pods are in her hull: board anywhere else.' : `Clear the pirates: ${st.left || 0} left.` + (meta && st.hold >= 0 && meta.roles[st.hold] ? ` <small>Her people are tied in the ${ShipGen.NAMES[meta.roles[st.hold]!].toLowerCase()}.</small>` : ''));
     if (ms.obj === 'visit') lines.push('Not the mission: board her for what is in her holds, or fly on.' + (st.hostile ? ' <span class="bad">She is fighting you.</span>' : ' <small>A breach is an attack: she will fight.</small>'));
-    if (ms.obj === 'assault') lines.push(st.cleared ? '<span class="ok">Base under control.</span> Back to the ship, up through the cloud and jump home.' : s.docked ? `Bring the base under control: ${G.Game.enemiesLeft || 0} hostile${G.Game.enemiesLeft === 1 ? '' : 's'} left.` : 'Take her down the descent corridor and set down on the pad.');
+    if (ms.obj === 'assault') lines.push(st.cleared ? '<span class="ok">Base under control.</span> Back to the ship, up through the cloud and jump home.' : s.docked ? `Bring the base under control: ${Game.enemiesLeft || 0} hostile${Game.enemiesLeft === 1 ? '' : 's'} left.` : 'Take her down the descent corridor and set down on the pad.');
     if (needKey('bridge') && (ms.obj !== 'artifact' || (meta && meta.roles.includes('vault')))) lines.push('The bridge' + (meta && meta.roles.includes('vault') ? ' and the vault are' : ' is') + ' locked: an officer carries the card.');
     if (needKey('armory')) lines.push('<small>The armoury is locked: a keycard is with the crew.</small>');
     if (st.keys.length) lines.push('<small class="ok">Keycards: ' + st.keys.map((k) => (k === 'bridge' ? 'bridge' : 'armoury')).join(', ') + '</small>');
-    if (meta && G.Me.pos && st.vac.includes(ShipGen.roomAt(s.map!, G.Me.pos.x, G.Me.pos.z, Level.floorAt(s.map!, G.Me.pos.x, G.Me.pos.y, G.Me.pos.z))) && !Space.aboard()) lines.push('<span class="bad">VACUUM</span> · your suit is holding');
+    if (meta && Me.pos && st.vac.includes(ShipGen.roomAt(s.map!, Me.pos.x, Me.pos.z, Level.floorAt(s.map!, Me.pos.x, Me.pos.y, Me.pos.z))) && !Space.aboard()) lines.push('<span class="bad">VACUUM</span> · your suit is holding');
     const html = `<h4>${U.esc(O.name.toUpperCase())}</h4><p><small>${U.esc(ms.name)} · ¢${U.fmt(ms.pay)}</small></p>` + lines.map((l) => `<p>${l}</p>`).join('');
     if (force || html !== objKey) { objKey = html; obj.innerHTML = html; }
     obj.style.display = '';
@@ -280,18 +282,18 @@ export const SpaceUI = (() => {
   // ------------------------------------------------------------------ the terminal: missions and shipyard
   function openOps() {
     make(); const s = S(); if (s.uiOpen) return;
-    s.uiOpen = true; G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
+    s.uiOpen = true; Me.keys = {}; Me.mouse.l = Me.mouse.r = false;
     document.getElementById('pause')!.classList.add('hidden'); document.getElementById('clickToPlay')!.classList.add('hidden');
-    G.Game.unlock(); ops.classList.remove('hidden'); opsRender(); HUD.setPrompt('');
+    Game.unlock(); ops.classList.remove('hidden'); opsRender(); HUD.setPrompt('');
   }
   function closeOps() {
     const s = S(); if (!made || !s.uiOpen) return;
     s.uiOpen = false; ops.classList.add('hidden');
-    if (G.Game.phase === 'level') { G.Game.lock(); setTimeout(() => { if (!G.Game.locked && !G.Game.menuOpen() && G.Game.phase === 'level') document.getElementById('clickToPlay')!.classList.remove('hidden'); }, 300); }
+    if (Game.phase === 'level') { Game.lock(); setTimeout(() => { if (!Game.locked && !Game.menuOpen() && Game.phase === 'level') document.getElementById('clickToPlay')!.classList.remove('hidden'); }, 300); }
   }
   function opsRender() {
     if (!made || !S().uiOpen) return;
-    const s = S(), esc = U.esc, cr = G.Me.credits || 0;
+    const s = S(), esc = U.esc, cr = Me.credits || 0;
     let body = '';
     if (tab === 'missions') {
       const offers = SD.offers(s.board.seed, s.board.level), full = s.board.picked.length >= SD.PICKS;
@@ -330,12 +332,12 @@ export const SpaceUI = (() => {
     if (d.close) closeOps();
     else if (d.tab) { tab = d.tab; opsRender(); }
     else if (d.pick != null) { Net.toHost({ t: 'mpick', i: +d.pick }); Audio.click(); }
-    else if (d.buy) { const sh = SD.SHIPS[d.buy]; if (sh && G.Me.credits >= sh.price) { G.Me.credits -= sh.price; Net.toHost({ t: 'fbuy', id: sh.id }); Audio.buy(); } }
+    else if (d.buy) { const sh = SD.SHIPS[d.buy]; if (sh && Me.credits >= sh.price) { Me.credits -= sh.price; Net.toHost({ t: 'fbuy', id: sh.id }); Audio.buy(); } }
     else if (d.use) { Net.toHost({ t: 'fuse', id: d.use }); Audio.click(); }
   }
   function fit(slot: number, id: string | null) {
     const e = id ? SD.EQUIP[id] : null;
-    if (e && e.price) { if (G.Me.credits < e.price) { opsRender(); return; } G.Me.credits -= e.price; Audio.buy(); }
+    if (e && e.price) { if (Me.credits < e.price) { opsRender(); return; } Me.credits -= e.price; Audio.buy(); }
     Net.toHost({ t: 'ffit', s: slot, id });
   }
   return { show, update, flash, openOps, closeOps, opsRender, boardTex, boardDraw, objDraw };

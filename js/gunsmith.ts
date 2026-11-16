@@ -12,6 +12,7 @@ import { ShopUI } from './shopui.js';
 import { Stickers } from './stickers.js';
 import { U } from './util.js';
 import { Pad } from './gamepad.js';
+import { Me as G_Me } from './player.js';
 // The gunsmith (a tab in the between-level shop): rebuild your weapons part by part on a 3D model.
 // Drag to orbit, scroll to zoom, hover to see what a piece is, click it (or a slot in the list) to pick
 // that slot. Hovering a part in the list previews it on the gun with its stat changes; clicking fits
@@ -70,7 +71,7 @@ export const GunsmithUI = (() => {
   }
 
   // ------------------------------------------------------------------ model
-  function weapon() { const Me = G.Me; return Me.weapons[st.wslot] || Me.weapons.s || Me.weapons.p; }
+  function weapon() { const Me = G_Me; return Me.weapons[st.wslot] || Me.weapons.s || Me.weapons.p; }
   // (skin: the stickers shown on it, the gun's own by default)
   function setModel(def: WeaponDef, skin = (weapon() || {} as any).stickers) {
     const key = def.code + '#' + Stickers.key(skin);
@@ -270,12 +271,12 @@ export const GunsmithUI = (() => {
 
   // what a part fits: its interface, how many weapons take it, and which of yours
   function fitsLine(p: Part, exceptId: string) {
-    const ids = GS.fitsPart(p), mine = Object.values(G.Me.weapons).filter((w) => w && w.def.id !== exceptId && ids.includes(w.def.id));
+    const ids = GS.fitsPart(p), mine = Object.values(G_Me.weapons).filter((w) => w && w.def.id !== exceptId && ids.includes(w.def.id));
     return `<em class="gs-fit">${U.esc(GS.ifaceName(p.mount))}${ids.length > 1 ? ` · fits ${ids.length} weapons` : ''}${mine.length ? ` · also your ${mine.map((w) => w.def.name).join(', ')}` : ''}</em>`;
   }
 
   // ------------------------------------------------------------------ build changes
-  const stash = () => G.Me.stash || (G.Me.stash = {});
+  const stash = () => G_Me.stash || (G_Me.stash = {});
   const toStash = (pid: string) => { const s = stash(); s[pid] = (s[pid] || 0) + 1; };
   const fromStash = (pid: string) => { const s = stash(); if (!s[pid]) return false; if (--s[pid] <= 0) delete s[pid]; return true; };
   // for sale: what he has in stock, and always the right core part for a gun that's missing one or has one
@@ -291,7 +292,7 @@ export const GunsmithUI = (() => {
     return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && !GS.sameFamily(p, GS.PARTS[w.def.build[slot]]) && GS.fitsLen(p, w.def.id, w.def.build) && forSale(p));
   }
   function apply(w: any, build: any) {
-    G.Me.refit(w, build);
+    G_Me.refit(w, build);
     if (GunAudio.available()) GunAudio.buildDry(w.def.soundKey);
   }
   function install(slot: string, pid: string): void {
@@ -338,7 +339,7 @@ export const GunsmithUI = (() => {
   function sell(pid: string) {
     const p = GS.PARTS[pid];
     if (!p || ShopUI.ready || !fromStash(pid)) return;
-    G.Me.credits += GS.sellPrice(p);
+    G_Me.credits += GS.sellPrice(p);
     Audio.buy();
     ShopUI.render();
   }
@@ -431,7 +432,7 @@ export const GunsmithUI = (() => {
 
   // ------------------------------------------------------------------ html
   function html() {
-    const Me = G.Me, w = weapon();
+    const Me = G_Me, w = weapon();
     if (!w) return '<div class="gs-empty">No weapon to work on.</div>';
     const def = w.def, build = def.build, slots = GS.visibleSlots(def.id, build);
     if (!st.slot || !slots.some((s: Slot) => s.slot === st.slot)) st.slot = slots[0] && slots[0].slot;

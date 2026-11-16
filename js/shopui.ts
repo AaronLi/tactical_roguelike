@@ -19,6 +19,8 @@ import { Net } from './net.js';
 import { Range } from './range.js';
 import { Route } from './route.js';
 import { ZeroUI } from './zeroing.js';
+import { Game } from './game.js';
+import { Me as G_Me } from './player.js';
 // a purchase waiting on the host's say-so (take / took)
 interface ShopPending { key: string; buy: () => boolean | void; }
 // the level's report (js/game.ts shop)
@@ -43,7 +45,7 @@ export const ShopUI = {
     Shop.partStock = Gunsmith.rollStock(level, seed); // the gunsmith's parts this visit (same for the whole squad)
     Shop.precStock = Gunsmith.rollPrecision(level, seed); // and the precision showcase's (js/hangar.ts)
     // the shared stock: the host's count when it's come, until then what it starts at (the same reckoning the host's)
-    Shop.stock = stock || Shop.scaleStock(Shop.baseStock(level, seed), Object.keys(G.Game.roster || {}).length || 1);
+    Shop.stock = stock || Shop.scaleStock(Shop.baseStock(level, seed), Object.keys(Game.roster || {}).length || 1);
     this.pend = new Map(); this.qn = 0;
     document.getElementById('vendorArt')!.innerHTML = this.portrait();
     this.quip('hello');
@@ -75,29 +77,29 @@ export const ShopUI = {
     this.render();
   },
   // enough credits for it (and a word from Vex if not), before asking for it
-  afford(price: number) { if (G.Me.credits >= price) return true; Audio.deny(); this.quip('broke'); return false; },
+  afford(price: number) { if (G_Me.credits >= price) return true; Audio.deny(); this.quip('broke'); return false; },
 
 
   quip(kind: string) {
     const list = VENDOR_QUIPS[kind], text = list[Math.floor(Math.random() * list.length)];
     document.getElementById('vendorQuip')!.textContent = '"' + text + '"';
-    if (G.Game.hub && kind !== 'hello' && kind !== 'ready') HUD.toast('VEX', text, 2);
+    if (Game.hub && kind !== 'hello' && kind !== 'ready') HUD.toast('VEX', text, 2);
   },
 
   // (in the range nothing is bought: your kit there is put back as it was when you leave, js/range.ts, so what you bought would
   // vanish with the money spent on it)
   spend(price: number) {
-    if (G.Game.hub && Range && Range.on()) { Audio.deny(); HUD.toast('THE RANGE', "Nothing's for sale in here: shop once you're back in the hangar", 2); return false; }
-    if (G.Me.credits < price) { Audio.deny(); this.quip('broke'); return false; }
-    G.Me.credits -= price;
+    if (Game.hub && Range && Range.on()) { Audio.deny(); HUD.toast('THE RANGE', "Nothing's for sale in here: shop once you're back in the hangar", 2); return false; }
+    if (G_Me.credits < price) { Audio.deny(); this.quip('broke'); return false; }
+    G_Me.credits -= price;
     Audio.buy();
     this.quip('buy');
     return true;
   },
-  tradeIn(slot: string) { const w = G.Me.weapons[slot]; return w ? Math.floor(w.def.price * 0.25) : 0; },
+  tradeIn(slot: string) { const w = G_Me.weapons[slot]; return w ? Math.floor(w.def.price * 0.25) : 0; },
 
   buy(kind: string, id: string) {
-    const Me = G.Me;
+    const Me = G_Me;
     if (this.ready) return;
     if (kind === 'weapon') {
       const def = WEAPONS[id], slot = def.slot;
@@ -172,16 +174,16 @@ export const ShopUI = {
 
   // An item bought from supplies: on you if a pouch or pocket takes it, otherwise into the locker.
   stow(it: GItem) {
-    const Gr = Gear, Me = G.Me;
+    const Gr = Gear, Me = G_Me;
     Gr.absorb(it, [...Gr.body(Me), Me.locker]); // rounds top up the boxes you have first
     if ((it.k === 'ammo' || it.k === 'med') && it.n <= 0) return true;
     return !!(Gr.place(Gr.body(Me), it) || Gr.place([Me.locker], it));
   },
-  room(it: GItem) { const Gr = Gear; return Gr.all(G.Me).some((g) => Gr.findSpot(g, it)); },
+  room(it: GItem) { const Gr = Gear; return Gr.all(G_Me).some((g) => Gr.findSpot(g, it)); },
   services() {
-    const Me = G.Me, Gr = Gear, out = [];
+    const Me = G_Me, Gr = Gear, out = [];
     // load magazines from the loose rounds you own: free, it's just your time. Which ones: the setting (Settings & controls)
-    const kitOnly = !!G.Game.settings.loadKit, { empty, loose } = Gr.loadNeed(Me, kitOnly);
+    const kitOnly = !!Game.settings.loadKit, { empty, loose } = Gr.loadNeed(Me, kitOnly);
     out.push({ id: 'load', name: 'Load Magazines', desc: `${kitOnly ? 'Top up the magazines for your equipped guns, then those on your kit, and the equipped guns' : 'Top up every magazine you own (and your guns)'} from your loose rounds, same type first. ${loose} loose rounds, ${empty} empty places. <small>(${kitOnly ? 'Equipped and carried only' : 'Everything'}: change it in Settings &amp; controls.)</small>`, price: 0, disabled: !empty || !loose,
       apply: () => Gr.loadAll(Me, kitOnly) });
     // a box of any load for every caliber you own a gun in: the load picked on the card (loadSel), each priced by what
@@ -200,11 +202,11 @@ export const ShopUI = {
       let have = 0; Gr.each(Gr.all(Me), (it) => { if (it.k === 'med' && it.mt === mt) have += it.n || 1; });
       out.push({ id: 'med.' + mt, name: I.name, desc: `${I.desc} ${I.time} s to apply. ${I.size.join('×')}${I.stack ? `, ${I.stack} to a stack` : ''}. You have ${have}.`, price: I.price, disabled: !this.room(Gr.medItem(mt)), apply: () => this.stow(Gr.medItem(mt)) });
     }
-    out.push({ id: 'flash', name: 'Flashbang', desc: `Blinds whoever's looking when it goes off, and in a room the glare off the walls and the bang stun everyone in it for a few seconds (1.5 s fuse), hurts nobody: go in at once and they're yours to cuff or talk down. Key ${G.Me.quick.indexOf('flash') >= 0 ? G.Me.quick.indexOf('flash') + 3 : '3, 4 or 5'}. 1×1. You carry ${Gear.count(Me, 'flash')}.`, price: 150, disabled: !this.room(Gr.flashItem()), apply: () => this.stow(Gr.flashItem()) });
-    const key = (k: string) => G.Me.quick.indexOf(k) >= 0 ? G.Me.quick.indexOf(k) + 3 : '3, 4 or 5';
+    out.push({ id: 'flash', name: 'Flashbang', desc: `Blinds whoever's looking when it goes off, and in a room the glare off the walls and the bang stun everyone in it for a few seconds (1.5 s fuse), hurts nobody: go in at once and they're yours to cuff or talk down. Key ${G_Me.quick.indexOf('flash') >= 0 ? G_Me.quick.indexOf('flash') + 3 : '3, 4 or 5'}. 1×1. You carry ${Gear.count(Me, 'flash')}.`, price: 150, disabled: !this.room(Gr.flashItem()), apply: () => this.stow(Gr.flashItem()) });
+    const key = (k: string) => G_Me.quick.indexOf(k) >= 0 ? G_Me.quick.indexOf(k) + 3 : '3, 4 or 5';
     out.push({ id: 'nade', name: 'Frag Grenade', desc: `Steel chips over the whole sphere: deadly a few metres out in the open, stopped by walls and cover, and the blast dazes whoever's left in a small room. Pull the pin (left click), R to let the spoon go and cook it, let go to throw. Key ${key('frag')}. 1×1. You carry ${Me.nades}.`, price: 200, disabled: !this.room(Gr.fragItem()), apply: () => this.stow(Gr.fragItem()) });
-    out.push({ id: 'sticky', name: 'Sticky Grenade', desc: `Holds to the first thing it hits, a wall, a door or a person, and goes off ${G.Me.STICKY.FUSE} s later (no cooking it: the fuse starts as it sticks). A few heavy cubes of hardened steel rather than a frag's many chips: fewer reach anyone further out, but each goes through soft armour and thin walls (not a rifle plate). Key ${key('sticky')}. 1×1. You carry ${Gear.count(Me, 'sticky')}.`, price: 350, disabled: !this.room(Gr.stickyItem()), apply: () => this.stow(Gr.stickyItem()) });
-    out.push({ id: 'tb', name: 'Thermobaric Grenade', desc: `Throws out a cloud of fuel and lights it: a fireball that fills the room it lands in (out through an open door, not a shut one) and a long blast wave that's deadly in a closed room, far weaker in the open or a room with its windows out. Burns and blast, no fragments. ${G.Me.TB.FUSE} s fuse. Key ${key('tb')}. 1×1. You carry ${Gear.count(Me, 'tb')}.`, price: 450, disabled: !this.room(Gr.tbItem()), apply: () => this.stow(Gr.tbItem()) });
+    out.push({ id: 'sticky', name: 'Sticky Grenade', desc: `Holds to the first thing it hits, a wall, a door or a person, and goes off ${G_Me.STICKY.FUSE} s later (no cooking it: the fuse starts as it sticks). A few heavy cubes of hardened steel rather than a frag's many chips: fewer reach anyone further out, but each goes through soft armour and thin walls (not a rifle plate). Key ${key('sticky')}. 1×1. You carry ${Gear.count(Me, 'sticky')}.`, price: 350, disabled: !this.room(Gr.stickyItem()), apply: () => this.stow(Gr.stickyItem()) });
+    out.push({ id: 'tb', name: 'Thermobaric Grenade', desc: `Throws out a cloud of fuel and lights it: a fireball that fills the room it lands in (out through an open door, not a shut one) and a long blast wave that's deadly in a closed room, far weaker in the open or a room with its windows out. Burns and blast, no fragments. ${G_Me.TB.FUSE} s fuse. Key ${key('tb')}. 1×1. You carry ${Gear.count(Me, 'tb')}.`, price: 450, disabled: !this.room(Gr.tbItem()), apply: () => this.stow(Gr.tbItem()) });
     return out;
   },
 
@@ -219,7 +221,7 @@ export const ShopUI = {
     return `<div class="sbar"><span>${label}</span><div><i style="width:${Math.round(U.clamp(v, 0.03, 1) * 100)}%"></i></div><b>${txt}</b></div>`;
   },
   weaponCard(def: WeaponDef) {
-    const Me = G.Me, cur = Me.weapons[def.slot], owned = cur && cur.def.id === def.id;
+    const Me = G_Me, cur = Me.weapons[def.slot], owned = cur && cur.def.id === def.id;
     const price = Math.max(0, def.price - this.tradeIn(def.slot));
     const rpm = def.mode === 'burst' ? (def.burst / ((def.burst * 60) / (def.burstRpm || def.rpm) + 0.24)) * 60 : def.rpm;
     // (what it hits with is physical, js/ballistics.ts: the energy of its round at 10 m with ball)
@@ -241,7 +243,7 @@ export const ShopUI = {
   // a weapon part from the gunsmith: bought into your stash, fitted in the Gunsmith tab
   partCard(p: Part | null | undefined) {
     if (!p) return '';
-    const Me = G.Me, GS = Gunsmith, ids = GS.fitsPart(p);
+    const Me = G_Me, GS = Gunsmith, ids = GS.fitsPart(p);
     const yours = ['p', 's'].map((k) => Me.weapons[k]).filter(Boolean)
       .map((w) => `<span class="${ids.includes(w.def.id) ? 'fit-y' : 'fit-n'}">${ids.includes(w.def.id) ? '✓' : '✗'} ${w.def.name}</span>`).join(' ');
     return `<div class="card part${Shop.wished(p.id) ? ' wished' : ''}">
@@ -255,7 +257,7 @@ export const ShopUI = {
   },
   // a MOLLE pouch: always in stock
   pouchCard(pid: string) {
-    const Me = G.Me, P = Gear.POUCHES[pid], it = Gear.pouchItem(pid), left = Shop.count('pouch:' + pid);
+    const Me = G_Me, P = Gear.POUCHES[pid], it = Gear.pouchItem(pid), left = Shop.count('pouch:' + pid);
     const free = Gear.molles(Me).some((g) => Gear.findSpot(g, it));
     return `<div class="card pouch">
       <div class="ch"><img class="ci" src="${Icons.of(it, P.w, P.h, false)}"><span class="cn">${U.esc(P.name)}</span><span class="tier">HOLDS ${P.w}×${P.h} · ${P.mw || P.w}×${P.mh || P.h} MOLLE</span></div>
@@ -266,7 +268,7 @@ export const ShopUI = {
   },
   // empty magazines for a gun
   magCard(key: string) {
-    const [wid, vid] = key.split('|'), Me = G.Me, def = WEAPONS[wid], a = Gear.ammoFor(def), it = Gear.ammoItem(def, 0, null as any, vid), price = Gear.price(it), left = Shop.count('mag:' + key);
+    const [wid, vid] = key.split('|'), Me = G_Me, def = WEAPONS[wid], a = Gear.ammoFor(def), it = Gear.ammoItem(def, 0, null as any, vid), price = Gear.price(it), left = Shop.count('mag:' + key);
     const takers = Gear.guns(Me).filter((w) => magFits(wid, w.def.id)).map((w) => w.def.name), [sw, sh] = Gear.size(it), p = Gunsmith.PARTS[vid];
     const family = magFam(wid) !== wid ? WEAPON_LIST.filter((w) => magFits(wid, w.id)).map((w) => w.name) : null;
     const fx = p && !p.factory ? GunsmithUI.partEffects(p) : 'The standard magazine.';
@@ -280,7 +282,7 @@ export const ShopUI = {
   },
   // the special load in stock this visit
   ammoCard(o: ShopAmmo) {
-    const Me = G.Me, A = AMMO[o.am], C = CALIBERS[o.cal], it = Gear.boxItem(o.cal, o.am, o.n), price = Gear.price(it);
+    const Me = G_Me, A = AMMO[o.am], C = CALIBERS[o.cal], it = Gear.boxItem(o.cal, o.am, o.n), price = Gear.price(it);
     const guns = Gear.guns(Me).filter((w) => calsOf(w.def).includes(o.cal)).map((w) => w.def.name);
     const gdef = Object.values(WEAPONS).filter((d) => calsOf(d).includes(o.cal)).map((d) => asCal(d, o.cal))[0];
     const fx = [...(gdef ? Ballistics.loadNotes(gdef, o.am) : []), A.rangeK ? `range ×${A.rangeK}` : '', A.quiet ? 'near-silent suppressed' : '', A.tracer ? 'visible tracer' : '', A.slug ? 'single slug' : '', A.pelletsK ? `pellets ×${A.pelletsK}` : ''].filter(Boolean).join(' · ');
@@ -313,7 +315,7 @@ export const ShopUI = {
   },
   gearCard(d: GDef) {
     const sold = !Shop.inStock('gear:' + d.id), pl = Shop.offers && Shop.offers.plates && Gear.DEFS[Shop.offers.plates[d.id]], price = Shop.gearPrice(d.id);
-    const Me = G.Me;
+    const Me = G_Me;
     const KN: Record<string, string> = { carrier: d.dur ? (d.plate ? 'PLATE CARRIER' : 'SOFT VEST') : 'CHEST RIG', plate: 'PLATE', helmet: 'HELMET', nvg: 'NIGHT VISION', face: d.cover < 0.9 ? 'MANDIBLE' : 'FACE SHIELD', shoulder: 'SHOULDER ARMOUR', groin: 'PELVIS ARMOUR', legs: 'LEG ARMOUR', belt: 'BELT', pack: 'BACKPACK' };
     const fc = Shop.offers && Shop.offers.faces && Gear.DEFS[Shop.offers.faces[d.id]];
     const cardIt = Gear.gearItem(d.id); if (fc) cardIt.face = Gear.gearItem(fc.id); // (its icon shows what's fitted)
@@ -346,7 +348,7 @@ export const ShopUI = {
   // been, the levels it can go to next, every node's card on hover (strongholds, night, the boss). Picking is the route
   // screen's, once you've boarded the helicopter.
   routeHtml() {
-    const g = G.Game, rm = g.routeMap, st = g.routeSt;
+    const g = Game, rm = g.routeMap, st = g.routeSt;
     if (!rm || !st) return '<div class="shop-route-empty dim">No route yet: it is drawn when the run starts.</div>';
     const at = st.path[st.path.length - 1], opts = Route.options(rm, at), colors: Record<string, number> = {};
     for (const [id, p] of Object.entries(g.roster || {})) colors[id] = (p as any).color;
@@ -358,7 +360,7 @@ export const ShopUI = {
   routeWire(items: HTMLElement) {
     const box = items.querySelector<HTMLElement>('.shop-route');
     if (!box) return;
-    G.Game.routeHover(box, true);
+    Game.routeHover(box, true);
     box.addEventListener('wheel', (e: WheelEvent) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) { box.scrollLeft += e.deltaY; e.preventDefault(); } }, { passive: false });
     const here = box.querySelector('.rn.here') || box.querySelector('.rn.opt');
     if (here) { const r = here.getBoundingClientRect(), b = box.getBoundingClientRect(); box.scrollLeft += r.left + r.width / 2 - (b.left + b.width * 0.35); }
@@ -366,7 +368,7 @@ export const ShopUI = {
   render() {
     if (InvUI.scaleUI) InvUI.scaleUI(); // (the shop's sizes scale with the window too: --ik)
     if (!Shop.offers) return;
-    const Me = G.Me;
+    const Me = G_Me;
     document.getElementById('shopCredits')!.textContent = '¢ ' + U.fmt(Me.credits);
     const rp = this.report;
     const rep = rp ? `<div class="report">${rp.arrests} arrested · ${rp.incap || 0} incapacitated${rp.bleedouts ? ` (${rp.bleedouts} bled out)` : ''} · ${rp.rescued} civilians secured · ${rp.evidence || 0} weapons bagged · ${rp.bodies || 0} bodies secured` +
@@ -412,14 +414,14 @@ export const ShopUI = {
       `<div class="lo"><span>${kitName(Me.kit.helmet)}</span><small>${Me.kit.helmet ? Math.round(Me.helmCond() * 100) + '%' : ''}</small></div>` +
       `<div class="lo"><span>Frags ${Me.nades} · Medical items ${Me.meds}</span></div>`;
     let roster = '';
-    for (const [id, p] of Object.entries(G.Game.roster)) {
-      roster += `<div class="lo"><span style="color:${U.hex(p.color)}">${Callsigns.html(p.animal)}${U.esc(p.name)}${G.Game.guestMark(id)}${id === Net.myId ? ' (you)' : ''}</span><small class="${p.ready ? 'rdy' : ''}">${p.ready ? 'READY' : 'shopping'}</small></div>`;
+    for (const [id, p] of Object.entries(Game.roster)) {
+      roster += `<div class="lo"><span style="color:${U.hex(p.color)}">${Callsigns.html(p.animal)}${U.esc(p.name)}${Game.guestMark(id)}${id === Net.myId ? ' (you)' : ''}</span><small class="${p.ready ? 'rdy' : ''}">${p.ready ? 'READY' : 'shopping'}</small></div>`;
     }
     document.getElementById('shopRoster')!.innerHTML = roster;
     const rb = document.getElementById('btnReady')!;
-    if (G.Game.hub) { rb.textContent = 'Back to the hangar'; rb.classList.add('primary'); } // (readying up is the helicopter's)
+    if (Game.hub) { rb.textContent = 'Back to the hangar'; rb.classList.add('primary'); } // (readying up is the helicopter's)
     else { rb.textContent = this.ready ? 'Not ready' : 'Ready up'; rb.classList.toggle('primary', !this.ready); }
-    if (G.Game.hub && Hangar.S.root) Hangar.refresh(); // (what's on the shelves follows what's in stock)
+    if (Game.hub && Hangar.S.root) Hangar.refresh(); // (what's on the shelves follows what's in stock)
   },
 
   bind() {
@@ -439,7 +441,7 @@ export const ShopUI = {
     items.addEventListener('mouseover', (e) => { if (this.tab === 'gunsmith') GunsmithUI.onHover(e); });
     items.addEventListener('change', (e) => { if (this.tab === 'gunsmith') GunsmithUI.onChange(e); });
     items.addEventListener('change', (e) => { const s = (e.target as Element).closest<HTMLSelectElement>('.load-sel'); if (s) { this.loadSel[s.dataset.cal!] = s.value; Audio.click(); this.render(); } }); // (the load a box on Supplies is of)
-    document.getElementById('btnReady')!.addEventListener('click', () => (G.Game.hub ? G.Game.closeShop() : this.setReady(!this.ready)));
+    document.getElementById('btnReady')!.addEventListener('click', () => (Game.hub ? Game.closeShop() : this.setReady(!this.ready)));
   },
 
   portrait() {

@@ -5,6 +5,7 @@ import { Hooks, U } from './util.js';
 import { Gear } from './gear.js';
 import { Gunsmith } from './parts.js';
 import { Audio } from './audio.js';
+import { HUD } from './hud.js';
 // Your loadout for a run in space (js/game.ts sidearmPick draws it, before the base): a sidearm, a helmet and body armour (the primary
 // tree's still here, but nothing picks from it: a run starts without one, sel), each
 // taken from a tree of its own (the sidearm's is js/arsenal.ts's, as it always was). Every tree starts from the piece in its middle and runs
@@ -103,8 +104,8 @@ export const Loadout = (() => {
     ns[stat] = (ns[stat] || 0) + 1;
     for (const q of TREES[slot].NODES) {
       if (q.from !== id || q.stat !== stat || d.got.includes(slot + ':' + q.id)) continue;
-      if (ns[stat] >= q.n!) { d.got.push(slot + ':' + q.id); G.HUD.toast('NEW ' + TREES[slot].title.toUpperCase(), `${name(slot, q.id)}: yours from your next run`, 3.5); if (Audio.click) Audio.click(); }
-      else G.HUD.feed(`<span class="cr">${U.esc(name(slot, id))}: ${ns[stat]}/${q.n} ${U.esc(q.what!)}</span>`);
+      if (ns[stat] >= q.n!) { d.got.push(slot + ':' + q.id); HUD.toast('NEW ' + TREES[slot].title.toUpperCase(), `${name(slot, q.id)}: yours from your next run`, 3.5); if (Audio.click) Audio.click(); }
+      else HUD.feed(`<span class="cr">${U.esc(name(slot, id))}: ${ns[stat]}/${q.n} ${U.esc(q.what!)}</span>`);
     }
     attNews(slot, id, stat, ns[stat]);
     keep();
@@ -112,7 +113,7 @@ export const Loadout = (() => {
   // an attachment just earned with it: said
   function attNews(slot: string, id: string, stat: string, n: number) {
     const got = atts(slot, id).filter((a) => a.stat === stat && a.n === n);
-    if (got.length) G.HUD.toast('NEW ATTACHMENT' + (got.length > 1 ? 'S' : ''), `${got.length > 1 ? got.length + ' parts' : got[0].name}, for the ${name(slot, id)}`, 3.5);
+    if (got.length) HUD.toast('NEW ATTACHMENT' + (got.length > 1 ? 'S' : ''), `${got.length > 1 ? got.length + ' parts' : got[0].name}, for the ${name(slot, id)}`, 3.5);
   }
   // the node of each tree that's what you have on now (your primary's gun, your helmet, your carrier)
   function worn(me: any) {
@@ -131,8 +132,8 @@ export const Loadout = (() => {
   function mission(me: any, diff: number) {
     const was = rank(), d = data(), g = xpOf(diff);
     d.xp += g; keep();
-    G.HUD.feed(`<span class="cr">+${g} XP</span>`);
-    if (rank() > was) G.HUD.toast('RANK ' + rank(), 'New loadout pieces may be open: see them before your next run', 4.5);
+    HUD.feed(`<span class="cr">+${g} XP</span>`);
+    if (rank() > was) HUD.toast('RANK ' + rank(), 'New loadout pieces may be open: see them before your next run', 4.5);
     const w = worn(me);
     for (const s of ['p', 'h', 'a']) if (w[s]) tally(s, w[s]!, 'missions');
     return g;
@@ -239,7 +240,7 @@ export const Loadout = (() => {
     const tint = (it: any, c: number | null) => { if (c != null) it.col = c; return it; };
     if (H) { const it = tint(Gr.gearItem(H), col('h')); for (const b of boxes('h', H)) (it as any)[b.k] = tint(Gr.gearItem(b.id), col('h')); me.kit.helmet = it; }
     if (A) { const it = tint(Gr.gearItem(A), col('a')); for (const b of boxes('a', A)) (it as any)[b.k] = tint(Gr.gearItem(b.id), col('a')); me.kit.carrier = it; }
-    for (let i = 0; i < THROW_SLOTS; i++) { const k = thr(i); if (!k) continue; const it = throwItem(k); if (!Gr.stow(me, it)) G.HUD.toast('', `No room for the ${THROW_NAME[k].toLowerCase()}`, 2); } // (the throwables: wherever they fit on you)
+    for (let i = 0; i < THROW_SLOTS; i++) { const k = thr(i); if (!k) continue; const it = throwItem(k); if (!Gr.stow(me, it)) HUD.toast('', `No room for the ${THROW_NAME[k].toLowerCase()}`, 2); } // (the throwables: wherever they fit on you)
     for (let i = 0; i < THROW_SLOTS; i++) { const k = thr(i); if (!k || me.quick.includes(k)) continue; const j = me.quick.findIndex((q: string | null) => !q || !me.quickCount(q)); if (j >= 0) me.setQuick(j, k); } // (each on a key, 3 to 5: in place of one you carry none of)
     if (P) { // (after the armour: its spare loads go on what you're wearing now)
       const w = me.makeWeapon(P, build('p', P)); me.weapons.p = w;

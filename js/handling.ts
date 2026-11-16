@@ -2,6 +2,8 @@
 import { Audio } from './audio.js';
 import { beltFed, REV, revolver } from './data.js';
 import { U } from './util.js';
+import { R } from './render.js';
+import { VMAnim } from './vmanim.js';
 // The guns' handling sounds, synthesized: tools/contact-synth simulates each part of the action and the magazine (its
 // materials, its contacts, the air inside it) and scripts/game-bank.mjs bakes them, dry, into assets/audio/handling/
 // (a folder per family of guns, manifest.json: each clip's anchor, the moment into it that the game's cue lines up
@@ -79,7 +81,7 @@ export const Handling = (() => {
     const now = ctx.currentTime, when = now + (o.land != null ? o.land : c.anchor) - c.anchor;
     const s = ctx.createBufferSource(); s.buffer = c.buf;
     s.playbackRate.value = 0.98 + Math.random() * 0.04; // (no two quite alike)
-    const v = (o.vol != null ? o.vol : 0.7) * c.gain * A.HANDLING, cam = G.R && G.R.camera; // (A.HANDLING: the handling sounds' trim)
+    const v = (o.vol != null ? o.vol : 0.7) * c.gain * A.HANDLING, cam = R && R.camera; // (A.HANDLING: the handling sounds' trim)
     if (o.pos && cam) A.route(s, o.pos, v * A.far(cam.position.distanceTo(o.pos as THREE.Vector3)), v * A.NEAR_PLACED);
     else A.route(s, null, v * A.HANDLING_OWN, v * A.HANDLING_OWN * A.NEAR_HANDS); // (your own: A.HANDLING_OWN up)
     if (when >= now) s.start(when); else s.start(now, Math.min(now - when, c.buf.duration));
@@ -111,7 +113,7 @@ export const Handling = (() => {
   const LAND = { magIn: 0.19, magOut: 0, rack: 0.15, home: 0.09, roundIn: 0.19 };
   /** the action worked by hand: which of the family's clips (a manual action's bolt or pump; else by its clock) */
   function rackClip(def: WeaponDef, dur: number) {
-    if (def.manual) return G.VMAnim.kinds(def).action === 'pump' ? 'pump' : 'bolt';
+    if (def.manual) return VMAnim.kinds(def).action === 'pump' ? 'pump' : 'bolt';
     return dur < 0.52 ? 'rack-45' : 'rack-60';
   }
   /** a round loaded by hand (a shell into a tube, a cartridge into a chamber or a magazine) */

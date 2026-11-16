@@ -20,6 +20,8 @@ import { SpaceData } from './spacedata.js';
 import { Hooks, U } from './util.js';
 import { World } from './world.js';
 import { Net } from './net.js';
+import { Game } from './game.js';
+import { Me as G_Me } from './player.js';
 
 export const Hangar = (() => {
   const T = THREE;
@@ -428,7 +430,7 @@ export const Hangar = (() => {
     if (S.root && S.root.parent) S.root.parent.remove(S.root);
     S.root = null as unknown as THREE.Group; S.map = null as unknown as LvMap; S.targets = []; S.items = []; S.rigs = []; S.heli = null; S.hover = null; S.njStands = []; S.njPart = null; S.anchors = null; S.live = [];
   }
-  const rosterKey = () => Object.keys(G.Game.roster || {}).sort().join(',');
+  const rosterKey = () => Object.keys(Game.roster || {}).sort().join(',');
   // what the live parts added that nothing else keeps hold of (batch: not to be batched)
   const live = <O extends THREE.Object3D>(o: O) => { (S.live || (S.live = [])).push(o); return o; };
 
@@ -506,9 +508,9 @@ export const Hangar = (() => {
     }
   }
   function workshop() {
-    const r = S.root, ids = Object.keys(G.Game.roster || {}).sort();
+    const r = S.root, ids = Object.keys(Game.roster || {}).sort();
     for (let i = 0; i < 6; i++) {
-      const a = at('bench', i), x = a.position.x, z = a.position.z, x1 = a.userData.x1 as number, owner = ids[i] ? G.Game.roster[ids[i]] : null, mine = ids[i] === Net.myId;
+      const a = at('bench', i), x = a.position.x, z = a.position.z, x1 = a.userData.x1 as number, owner = ids[i] ? Game.roster[ids[i]] : null, mine = ids[i] === Net.myId;
       const scr = new T.Mesh(new T.PlaneGeometry(0.62, 0.3), screenMat('GUNSMITH', [owner ? owner.name.toUpperCase() : 'FREE BENCH', mine ? 'F: work on your guns' : owner ? 'their bench' : ''], 256, 124));
       scr.rotation.y = Math.PI / 2; scr.position.set(x + 0.385, 1.26, z); r.add(live(scr));
       // the nameplate on the front edge
@@ -1139,7 +1141,7 @@ export const Hangar = (() => {
   function update(dt: number) {
     if (!S.root) return;
     S.t += dt;
-    const me = G.Me;
+    const me = G_Me;
     // the kit on show, turning
     for (const tg of S.stands) if (tg.spin) tg.spin.rotation.y += dt * 0.5;
     for (const tg of (S.partStands || []).concat(S.precStands || [])) if (tg.spin) tg.spin.rotation.y += dt * 0.6;
@@ -1153,7 +1155,7 @@ export const Hangar = (() => {
     // the helicopter's rotor: slow at rest, faster the more of the squad are in their seats
     const H = S.heli;
     if (H) {
-      const ids = Object.keys(G.Game.roster || {}), ready = ids.filter((id) => G.Game.roster[id].ready).length;
+      const ids = Object.keys(Game.roster || {}), ready = ids.filter((id) => Game.roster[id].ready).length;
       const target = ids.length && ready === ids.length ? 38 : 2 + 14 * (ids.length ? ready / ids.length : 0);
       H.spin += (target - H.spin) * Math.min(1, dt * 0.8);
       H.rotors.forEach((o: THREE.Object3D, i: number) => { o.rotation.y += (i ? -1 : 1) * H.spin * dt; }); H.tail.rotation.z += H.spin * 1.6 * dt;
@@ -1163,7 +1165,7 @@ export const Hangar = (() => {
     if (Range) Range.update(dt);
     if (Highlights) Highlights.update(dt);
     // a word from Vex now and then, when you're in the store
-    if (me.pos && me.pos.x > 16 && me.pos.x < 36 && me.pos.z - RZ < 26 && me.pos.z - RZ > 0 && (S.vexQuip -= dt) <= 0) { S.vexQuip = 40 + Math.random() * 30; if (!G.Game.shopOpen && Math.hypot(me.pos.x - VEX.x, me.pos.z - RZ - VEX.z) < 9) HUD.toast('VEX', VENDOR_QUIPS.hello[Math.floor(Math.random() * VENDOR_QUIPS.hello.length)], 2.4); }
+    if (me.pos && me.pos.x > 16 && me.pos.x < 36 && me.pos.z - RZ < 26 && me.pos.z - RZ > 0 && (S.vexQuip -= dt) <= 0) { S.vexQuip = 40 + Math.random() * 30; if (!Game.shopOpen && Math.hypot(me.pos.x - VEX.x, me.pos.z - RZ - VEX.z) < 9) HUD.toast('VEX', VENDOR_QUIPS.hello[Math.floor(Math.random() * VENDOR_QUIPS.hello.length)], 2.4); }
   }
   // ------------------------------------------------------------------------ looking and pressing F
   const _o = new T.Vector3(), _d = new T.Vector3();
@@ -1189,7 +1191,7 @@ export const Hangar = (() => {
     }
     return best;
   }
-  const afford = (price: number) => G.Me.credits >= price;
+  const afford = (price: number) => G_Me.credits >= price;
   // what a thing says when you look at it, and what F does
   function describe(t: HangarTarget) {
     const Sh = Shop;
@@ -1211,20 +1213,20 @@ export const Hangar = (() => {
     return { html: `Press <b>F</b> to buy <b>${U.esc(name!)}</b>${extra} — <b${afford(price) ? '' : ' style="color:#ff6a5a"'}>${money(price)}</b>`, act: () => purchase(buy[0]!, buy[1]!, name!) };
   }
   function purchase(kind: string, key: string, name: string) {
-    const Me = G.Me, before = Me.credits;
+    const Me = G_Me, before = Me.credits;
     ShopUI.buy(kind, key);
     if (Me.credits < before) HUD.toast('', `Bought ${U.esc(name)} <small>−${money(before - Me.credits)}</small>`, 1.4);
     refresh();
   }
   function open(t: HangarTarget) {
-    G.Game.openShop(t.tab, t.title);
+    Game.openShop(t.tab, t.title);
   }
   // seated: which seat is mine (the same on every machine: by position in the sorted roster)
-  function mySeat() { const ids = Object.keys(G.Game.roster || {}).sort(); return Math.max(0, Math.min(HELI.seats - 1, ids.indexOf(Net.myId!))); }
+  function mySeat() { const ids = Object.keys(Game.roster || {}).sort(); return Math.max(0, Math.min(HELI.seats - 1, ids.indexOf(Net.myId!))); }
   // F, from the player's interact(): returns { prompt, prog, label }; walking up to a thing and pressing F
-  function interact(me: typeof G.Me, dt: number, held: boolean, edge: boolean) {
+  function interact(me: typeof G_Me, dt: number, held: boolean, edge: boolean) {
     const out = { prompt: '', prog: -1, label: '' };
-    if (G.Game.shopOpen) return out;
+    if (Game.shopOpen) return out;
     // seated in the helicopter: hold F to get out
     if (me.seat != null) {
       out.prompt = 'Hold <b>F</b> to leave your seat <small>(you\'re ready: the helicopter goes when everyone is)</small>';
@@ -1245,13 +1247,13 @@ export const Hangar = (() => {
     if (edge && d.act) { me.fLatch = true; d.act(); }
     return out;
   }
-  function seat(me: typeof G.Me) {
+  function seat(me: typeof G_Me) {
     const i = mySeat(), p = seatPos(i);
     me.seat = i; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.yaw = p.yaw; me.pitch = 0; me.crouch = true; me.stowed = true; me.mouse.l = me.mouse.r = false;
     ShopUI.setReady(true);
     Audio.click();
   }
-  function unseat(me: typeof G.Me) {
+  function unseat(me: typeof G_Me) {
     const p = exitPos(me.seat!);
     me.seat = null; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.crouch = false; me.stowed = false; me.yaw = Math.PI;
     ShopUI.setReady(false);
@@ -1261,7 +1263,7 @@ export const Hangar = (() => {
   function mark() {
     const hl = S.hl;
     if (!hl) return;
-    const t = G.Game.shopOpen || (G.Me && G.Me.seat != null) ? null : S.hover;
+    const t = Game.shopOpen || (G_Me && G_Me.seat != null) ? null : S.hover;
     if (!t || t.kind === 'heli' || (t.kind === 'buy' && !describe(t).act)) { hl.visible = false; return; }
     const b = t.box;
     hl.visible = true; hl.position.set((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 - RZ); hl.scale.set(b[3] - b[0], b[4] - b[1], b[5] - b[2]);

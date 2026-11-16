@@ -1,4 +1,58 @@
 'use strict';
+import { Ambience } from './ambience.js';
+import { Arsenal } from './arsenal.js';
+import { Audio } from './audio.js';
+import { Ballistics } from './ballistics.js';
+import { Bolts } from './bolts.js';
+import { Callsigns } from './callsigns.js';
+import { Career } from './career.js';
+import { Cloud } from './cloud.js';
+import { Course } from './course.js';
+import { Damage } from './damage.js';
+import { barrelMm, CALIBERS, calOf, ENEMIES, ENEMY_GEAR, gearTier, MODE_NAME, roundSpec, shotSoundKey, THEMES, WEAPONS } from './data.js';
+import { Pad } from './gamepad.js';
+import { Gear } from './gear.js';
+import { Models } from './glb.js';
+import { GunAudio } from './gunaudio.js';
+import { GunMaterials } from './gunmaterials.js';
+import { GunModels } from './gunmodels.js';
+import { GunsmithUI } from './gunsmith.js';
+import { Handling } from './handling.js';
+import { Hangar } from './hangar.js';
+import { Highlights } from './highlights.js';
+import { HUD } from './hud.js';
+import { Humans } from './humans.js';
+import { Icons } from './icons.js';
+import { InvUI } from './invui.js';
+import { Landing } from './landing.js';
+import { Level } from './level.js';
+import { LightGrid } from './lightgrid.js';
+import { Loadout } from './loadout.js';
+import { Loot } from './loot.js';
+import { Med } from './medical.js';
+import { MenuShow } from './menushow.js';
+import { Net } from './net.js';
+import { Gunsmith } from './parts.js';
+import { Me as G_Me } from './player.js';
+import { Prep } from './prep.js';
+import { Range } from './range.js';
+import { R as G_R } from './render.js';
+import { Rig as G_Rig } from './rig.js';
+import { Route } from './route.js';
+import { ServerHost } from './serverhost.js';
+import { ServerLink } from './serverlink.js';
+import { ShipModel } from './shipmodel.js';
+import { ShopUI } from './shopui.js';
+import { ShotLog } from './shotlog.js';
+import { Sim } from './sim.js';
+import { Space } from './space.js';
+import { SpaceData } from './spacedata.js';
+import { Stickers } from './stickers.js';
+import { Touch } from './touch.js';
+import { Hooks, U } from './util.js';
+import { Views } from './views.js';
+import { World } from './world.js';
+// (G.Prof stays a read through G: js/profiler.ts wraps Game.loop and the Me methods as it loads, so it must run after this file and player; it imports them)
 // Glue: menus, lobby, phase transitions, message dispatch, pointer lock, main loop.
 // a DOM event whose target is known to be an element of type T (the handlers below are bound on a container, and read what was clicked)
 type GmEvt<T extends Element = HTMLElement> = Event & { target: T };
@@ -24,7 +78,7 @@ type GmSetting = 'sens' | 'padSens' | 'touchSens' | 'fov' | 'vol' | 'loadKit' | 
 // what the host tells the clients (js/server.ts), by t: onMsg dispatches on it
 type GmMsgKind = 'stk' | 'eround' | 'eInfo' | 'welcome' | 'roster' | 'arms' | 'rvotes' | 'newrun' | 'veil' | 'phase' | 'snap' | 'rfx' | 'bstk' | 'hole' | 'dpart' | 'dfall' | 'rpath' | 'npath' | 'skin' | 'loot' | 'lootRm' | 'glass' | 'crack' | 'lootGot' | 'team' | 'cab' | 'sbox' | 'abox' | 'wcase' | 'eshot' | 'shot' | 'nade' | 'boom' | 'course' | 'crun' | 'flash' | 'kill' | 'incap' | 'edown' | 'saved' | 'stock' | 'took' | 'ereload' | 'clear' | 'treat' | 'applying' | 'revive' | 'chat' | 'ping' | 'ffhit' | 'left' | 'door' | 'order' | 'shout' | 'radio' | 'evid' | 'evtake' | 'evsec' | 'cuffed' | 'refund';
 // the map as js/damage.ts takes it (its own cut-down shape of a level's)
-type GmDmgMap = Parameters<typeof G.Damage.apply>[0];
+type GmDmgMap = Parameters<typeof Damage.apply>[0];
 // the turning figure of you in the menu (lookPreview)
 interface GmPreview { r: THREE.WebGLRenderer; sc: THREE.Scene; cam: THREE.PerspectiveCamera; rig: Rig | null; yaw: number }
 // the attachments box as the host sends it: [open, { player id: [their three part ids, the one they took] }]
@@ -33,7 +87,7 @@ type GmAbox = [number, Record<string, [string[], (string | null)?]>];
 type GmSbox = [string, string | 0];
 // where the sidearm web is panned and zoomed to
 interface GmArmView { x: number; y: number; z: number }
-const G_Game = {
+export const Game = {
   phase: 'menu' as GmPhase,
   map: null as LvMap | null,
   level: 0,
@@ -52,7 +106,7 @@ const G_Game = {
   myAnimal: undefined as unknown as string,
   prefAnimals: [] as string[], // (your callsign preference: every animal, ranked: init)
   myColor: undefined as unknown as number,
-  myLook: undefined as unknown as ReturnType<typeof G.Rig.cleanLook>,
+  myLook: undefined as unknown as ReturnType<typeof G_Rig.cleanLook>,
   last: undefined as unknown as number, // (init: the clock of the last frame)
   veilT: undefined as ReturnType<typeof setTimeout> | undefined,
   veilWait: 0,
@@ -93,44 +147,44 @@ const G_Game = {
   tGrid: undefined as GGrid | null | undefined,
   teamBusy: undefined as boolean | undefined,
   tidN: undefined as number | undefined,
-  routeMap: undefined as ReturnType<typeof G.Route.gen> | undefined,
+  routeMap: undefined as ReturnType<typeof Route.gen> | undefined,
   routeSt: undefined as { path: number[]; votes: Record<string, number> } | undefined,
 
   init() {
-    G.ServerLink.boot(); // (the host's simulation's thread, loading now so it's there when you host: js/serverlink.ts)
-    G.Stickers.load().then((names) => G.ServerLink.stickers(names)); // (which stickers there are: js/stickers.ts; the sticker box hands out one of them)
-    G.GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
-    G.Humans.boot(); // (every body's file, behind the menu: js/humans.ts)
-    G.ShipModel.boot(); // (the squad's ships as made in Blender, the same: js/shipmodel.ts)
-    G.Hangar.load(); // (the hangar's baked scene, parsed as soon as the bundle's in: js/hangar.ts; what enters the game waits for it, needModels)
-    this.settings = { sens: G.U.store.get('sens', 1), padSens: G.U.store.get('padSens', 1), touchSens: G.U.store.get('touchSens', 1), fov: G.U.store.get('fov', 80), scale: G.U.store.get('scale', 100), vol: G.U.store.get('vol', 0.6), loadKit: G.U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
-    this.myName = G.U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
-    G.U.store.set('name', this.myName, true); // (kept: the same name after a refresh, so the squad knows who's back. auto: a made-up one doesn't outweigh an account's, js/cloud.ts)
+    ServerLink.boot(); // (the host's simulation's thread, loading now so it's there when you host: js/serverlink.ts)
+    Stickers.load().then((names) => ServerLink.stickers(names)); // (which stickers there are: js/stickers.ts; the sticker box hands out one of them)
+    GunModels.boot(); // (every platform's model index and the props; the packs themselves as they are needed: js/gunmodels.ts)
+    Humans.boot(); // (every body's file, behind the menu: js/humans.ts)
+    ShipModel.boot(); // (the squad's ships as made in Blender, the same: js/shipmodel.ts)
+    Hangar.load(); // (the hangar's baked scene, parsed as soon as the bundle's in: js/hangar.ts; what enters the game waits for it, needModels)
+    this.settings = { sens: U.store.get('sens', 1), padSens: U.store.get('padSens', 1), touchSens: U.store.get('touchSens', 1), fov: U.store.get('fov', 80), scale: U.store.get('scale', 100), vol: U.store.get('vol', 0.6), loadKit: U.store.get('loadKit', 1) }; // (loadKit: the hangar's Load Magazines tops up the equipped guns' and the kit's magazines only (1), or everything (0))
+    this.myName = U.store.get('name', 'Operator' + Math.floor(Math.random() * 90 + 10));
+    U.store.set('name', this.myName, true); // (kept: the same name after a refresh, so the squad knows who's back. auto: a made-up one doesn't outweigh an account's, js/cloud.ts)
     // your callsign: an animal (its emblem and colour mark you out to the squad; js/callsigns.ts). prefAnimals is your preference, every
     // animal ranked, asked of the host in that order (one of each to a squad); myAnimal is the one you have this session
     this.prefAnimals = this.animalPrefs(true);
     this.myAnimal = this.prefAnimals[0];
-    this.myColor = G.Callsigns.of(this.myAnimal).color;
-    this.myLook = G.Rig.cleanLook(G.U.store.get('look', null)); // top, pants, eyewear, gloves (the menu)
-    G.R.init();
-    G.HUD.init();
-    G.Me.bindInput();
-    G.Pad.init();
-    G.Touch.init();
-    G.ShopUI.bind();
-    G.Audio.vol = this.settings.vol;
-    G.Audio.muted = new URLSearchParams(location.search).has('mute') || G.U.store.get('muted', false);
+    this.myColor = Callsigns.of(this.myAnimal).color;
+    this.myLook = G_Rig.cleanLook(U.store.get('look', null)); // top, pants, eyewear, gloves (the menu)
+    G_R.init();
+    HUD.init();
+    G_Me.bindInput();
+    Pad.init();
+    Touch.init();
+    ShopUI.bind();
+    Audio.vol = this.settings.vol;
+    Audio.muted = new URLSearchParams(location.search).has('mute') || U.store.get('muted', false);
     this.bindMenu();
-    G.Cloud.boot(); // (the cloud saves, if they're set up: js/cloud.ts; and the career's record here, js/career.ts)
+    Cloud.boot(); // (the cloud saves, if they're set up: js/cloud.ts; and the career's record here, js/career.ts)
     // hosting: the remote players' messages to the simulation's thread, and their comings and goings (js/serverlink.ts); everyone's
     // game (the host's own too) hears the host's word in onMsg
-    G.Net.onServer = (m, from) => G.ServerLink.fromPeer(m, from);
-    G.Net.onClient = (m) => this.onMsg(m);
-    G.Net.onPeerJoin = (id) => G.ServerLink.join(id);
-    G.Net.onPeerLeave = (id) => G.ServerLink.leave(id);
+    Net.onServer = (m, from) => ServerLink.fromPeer(m, from);
+    Net.onClient = (m) => this.onMsg(m);
+    Net.onPeerJoin = (id) => ServerLink.join(id);
+    Net.onPeerLeave = (id) => ServerLink.leave(id);
     // lost the host (they refreshed, or dropped): back to the menu, trying the same code again for a minute, so
     // as soon as they're hosting again you're back in
-    G.Net.onHostLost = () => { const code = G.Net.code; this.toMenu('Lost connection to the host. Reconnecting...'); this.rejoin(code, Date.now() + 60000); };
+    Net.onHostLost = () => { const code = Net.code; this.toMenu('Lost connection to the host. Reconnecting...'); this.rejoin(code, Date.now() + 60000); };
     this.menuBackdropSoon(); // (the menu is already on the page: it is painted and answers clicks before the backdrop is built)
     this.last = performance.now();
     requestAnimationFrame(() => this.loop()); // (the host's simulation ticks on its own, in its thread: js/serverhost.ts)
@@ -140,13 +194,13 @@ const G_Game = {
   $<T extends HTMLElement = HTMLElement>(id: string) { return document.getElementById(id) as T; },
   screen(id: GmScreen | null) {
     for (const s of ['menu', 'lobby', 'shop', 'route', 'gameover', 'pause', 'career']) this.$(s).classList.toggle('hidden', s !== id);
-    G.HUD.show(this.phase === 'level');
+    HUD.show(this.phase === 'level');
   },
   // The loading veil: a change of scene goes behind a black panel, wobbled down the screen on a slant (css/style.css #veil). A
   // level's built, and its shaders compiled, in one go on the main thread, and the picture stands still while that's
   // done. So the host sends the panel across first (js/server.ts overBlack) and does it there, and the panel wipes on off
   // the bottom once the new place has drawn a few frames (js/views.ts applySnap).
-  VEIL_MS: G.Sim.VEIL_MS, VEIL_OUT: 650, VEIL_SMOOTH: 6, // (VEIL_MS: the wipe on, css/style.css veilIn 0.8 s, and a frame: the work waits until it's all the way down, or it freezes the wipe halfway)
+  VEIL_MS: Sim.VEIL_MS, VEIL_OUT: 650, VEIL_SMOOTH: 6, // (VEIL_MS: the wipe on, css/style.css veilIn 0.8 s, and a frame: the work waits until it's all the way down, or it freezes the wipe halfway)
   veil(on: boolean, instant?: boolean) {
     const el = this.$('veil'), was = el.classList.contains('on');
     if (!on && !was && !instant) return; // (not up, or already on its way off)
@@ -156,7 +210,7 @@ const G_Game = {
     if (!on && was) this.veilSay(null); // (done: the line turns away as it goes)
     el.classList.toggle('now', !!instant);
     el.classList.toggle('on', !!on);
-    G.Audio.hush(!!on); // (no sound while it's up: js/audio.ts hush)
+    Audio.hush(!!on); // (no sound while it's up: js/audio.ts hush)
     el.classList.toggle('out', !on && was && !instant);
     if (on) { this.$('veilStatus').textContent = ''; this.veilSay('Building the map'); }
     else if (el.classList.contains('out')) this.veilT = setTimeout(() => el.classList.remove('out'), this.VEIL_OUT + 50); // (back above the screen for next time)
@@ -175,7 +229,7 @@ const G_Game = {
   // the menu's options, a preview of you, and your own arms in first person
   bindLook() {
     this.bindLookBox();
-    const save = () => { G.U.store.set('look', this.myLook); this.lookPreview(); this.applyLook(); };
+    const save = () => { U.store.set('look', this.myLook); this.lookPreview(); this.applyLook(); };
     this.$('lookBox').addEventListener('change', ((e: GmEvt<HTMLSelectElement>) => { const k = e.target.dataset.look; if (k) { this.myLook[k] = e.target.value; save(); } }) as EventListener);
     this.$('lookBox').addEventListener('click', ((e: GmEvt) => {
       const b = e.target.closest<HTMLElement>('[data-lookc]'); if (!b) return;
@@ -186,10 +240,10 @@ const G_Game = {
   },
   // the look's options, as they're set now (and the figure, and your arms)
   bindLookBox() {
-    const L = this.myLook, O = G.Rig.LOOKS as Record<string, string[]>, NAMES: Record<string, string> = { combat: 'Combat', longsleeve: 'Long-sleeve', tshirt: 'T-shirt', hoodie: 'Hoodie', cargo: 'Cargo', jeans: 'Jeans', none: 'None', glasses: 'Glasses', shooting: 'Shooting glasses', goggles: 'Goggles', tactical: 'Tactical', leather: 'Leather', fingerless: 'Fingerless' };
+    const L = this.myLook, O = G_Rig.LOOKS as Record<string, string[]>, NAMES: Record<string, string> = { combat: 'Combat', longsleeve: 'Long-sleeve', tshirt: 'T-shirt', hoodie: 'Hoodie', cargo: 'Cargo', jeans: 'Jeans', none: 'None', glasses: 'Glasses', shooting: 'Shooting glasses', goggles: 'Goggles', tactical: 'Tactical', leather: 'Leather', fingerless: 'Fingerless' };
     const TOPC = [0x3a4048, 0x4d5639, 0x5a5240, 0x26282c, 0x2e3a52, 0x6a6e70, 0x7a2e2a, 0xb8b0a0], PANTC = [0x2e3238, 0x4d5639, 0x5a5240, 0x1f2226, 0x2b3550, 0x6b5b45, 0x3a3a3c];
     const sel = (k: string, label: string) => `<label>${label}<select data-look="${k}">${O[k].map((v) => `<option value="${v}"${L[k] === v ? ' selected' : ''}>${NAMES[v] || v}</option>`).join('')}</select></label>`;
-    const sw = (k: string, cols: number[]) => `<div class="color-row look-row">${cols.map((c) => `<button class="sw${L[k] === c ? ' on' : ''}" data-lookc="${k}" data-c="${c}" style="background:${G.U.hex(c)}"></button>`).join('')}</div>`;
+    const sw = (k: string, cols: number[]) => `<div class="color-row look-row">${cols.map((c) => `<button class="sw${L[k] === c ? ' on' : ''}" data-lookc="${k}" data-c="${c}" style="background:${U.hex(c)}"></button>`).join('')}</div>`;
     // (the figure's canvas is kept: its renderer draws on it)
     const box = this.$('lookBox'), cv = box.querySelector('#lookPreview');
     box.innerHTML = `<div class="look-grid"><div>${sel('top', 'Top')}${sw('topC', TOPC)}${sel('pants', 'Pants')}${sw('pantsC', PANTC)}${sel('eyes', 'Eyewear')}${sel('gloves', 'Gloves')}</div><canvas id="lookPreview" width="150" height="230"></canvas></div>`;
@@ -222,16 +276,16 @@ const G_Game = {
     }
     const lp = this._lp;
     if (lp.rig) lp.sc.remove(lp.rig.root);
-    lp.rig = G.Rig.create({ style: 'tactical', color: this.myColor, animal: this.myAnimal, callName: this.myName, bare: true, seed: 977, look: this.myLook });
+    lp.rig = G_Rig.create({ style: 'tactical', color: this.myColor, animal: this.myAnimal, callName: this.myName, bare: true, seed: 977, look: this.myLook });
     lp.rig.setKit({ helmet: 0, carrier: 'c.patrol', plate: 1, cp: 3, belt: 'b.battle', bp: 2, ifak: 1 });
     lp.sc.add(lp.rig.root);
   },
   // your callsign (picked in the menu, or the host's pick for you when yours was taken)
   // (in the menu, your 1st preference; in a game, the host's pick for this session)
   setAnimal(id: string) {
-    if (!G.Callsigns.valid(id)) return;
+    if (!Callsigns.valid(id)) return;
     if (id !== this.myAnimal) {
-      this.myAnimal = id; this.myColor = G.Callsigns.of(id).color;
+      this.myAnimal = id; this.myColor = Callsigns.of(id).color;
       if (this._lp && this._lp.rig) this.lookPreview(); // (the officer in the menu, in the new patches)
     }
     this.animalNote();
@@ -239,7 +293,7 @@ const G_Game = {
   // the note under the menu's animals (and in the lobby): the host gave you another one this session, yours being taken
   animalNote() {
     const el = document.getElementById('animalNote');
-    const P = this.prefAnimals, rank = P.indexOf(this.myAnimal), N = (id: string) => G.Callsigns.of(id).name;
+    const P = this.prefAnimals, rank = P.indexOf(this.myAnimal), N = (id: string) => Callsigns.of(id).name;
     const txt = this.phase === 'menu' || rank === 0 ? '' : rank > 0 ? `The ${N(P[0])} was taken: you're the ${N(this.myAnimal)} this session, your ${this.ordinal(rank + 1)} choice.`
       : `The ${N(P[0])} was taken: the host gave you the ${N(this.myAnimal)} this session.`; // (an older host, which knows only your 1st)
     if (el) el.textContent = txt;
@@ -253,25 +307,25 @@ const G_Game = {
   },
   // what's kept changed under the game (the cloud saves merged an account's in: js/cloud.ts): read again, the menu's controls with it
   applyStored(keys: string[]) {
-    const S = G.U.store, has = (k: string) => keys.includes(k);
+    const S = U.store, has = (k: string) => keys.includes(k);
     for (const k of ['sens', 'padSens', 'touchSens', 'fov', 'vol', 'loadKit'] as GmSetting[]) if (has(k)) {
       const v = +S.get(k, this.settings[k]); if (!isFinite(v)) continue;
       this.settings[k] = v;
       for (const id of [k, k + '2']) { const el = this.$<HTMLInputElement>(id); if (el) el.value = String(v); }
       const lab = this.$(k + 'Val'); if (lab) lab.textContent = k === 'sens' || k === 'padSens' || k === 'touchSens' ? v.toFixed(2) : k === 'fov' ? v + '°' : k === 'vol' ? Math.round(v * 100) + '%' : lab.textContent;
-      if (k === 'vol') G.Audio.setVolume(v);
+      if (k === 'vol') Audio.setVolume(v);
     }
-    if (has('muted') && !new URLSearchParams(location.search).has('mute')) { const m = !!S.get('muted', false); G.Audio.setMuted(m); this.$<HTMLInputElement>('mute').checked = m; }
+    if (has('muted') && !new URLSearchParams(location.search).has('mute')) { const m = !!S.get('muted', false); Audio.setMuted(m); this.$<HTMLInputElement>('mute').checked = m; }
     if (has('name')) { const n = String(S.get('name', this.myName) || '').trim().slice(0, 16); if (n) { this.myName = n; this.$<HTMLInputElement>('nameInput').value = n; if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, n); } }
     if (has('animals')) { this.prefAnimals = this.animalPrefs(false); if (this.phase === 'menu') this.setAnimal(this.prefAnimals[0]); this.animalPicks(); }
-    if (has('look')) { this.myLook = G.Rig.cleanLook(S.get('look', null)); this.bindLookBox(); }
+    if (has('look')) { this.myLook = G_Rig.cleanLook(S.get('look', null)); this.bindLookBox(); }
     if (has('turn')) { const t = S.get('turn', {}) || {}; this.$<HTMLInputElement>('turnUrl').value = t.url || ''; this.$<HTMLInputElement>('turnUser').value = t.user || ''; this.$<HTMLInputElement>('turnPass').value = t.pass || ''; }
   },
   // Your callsign preference, as kept ('animals': every animal, ranked, no repeats), made whole: from the single 'animal' (and its
   // 'animal2' second choice) an older version kept, or a top-three list, the missing ones appended in their usual order (a new player's
   // 1st made up at random). init: what's made up is kept (not a choice: it doesn't outweigh an account's), the old keys dropped.
   animalPrefs(init: boolean): string[] {
-    const S = G.U.store, CS = G.Callsigns, ids = CS.LIST.map((a) => a.id), kept = S.get('animals', null);
+    const S = U.store, CS = Callsigns, ids = CS.LIST.map((a) => a.id), kept = S.get('animals', null);
     const src: unknown[] = Array.isArray(kept) ? kept : [S.get('animal', null), S.get('animal2', null)];
     const out: string[] = [];
     for (const a of src) if (typeof a === 'string' && CS.valid(a) && !out.includes(a)) out.push(a);
@@ -285,9 +339,9 @@ const G_Game = {
   get animalOrder() { return this.prefAnimals; },
   animalPicks() {
     this.$('colorRow').innerHTML = this.prefAnimals.map((id, i) => {
-      const a = G.Callsigns.of(id);
-      return `<button class="sw animal rank-chip on${i === 0 ? ' first' : ''}" data-a="${id}" data-i="${i}" role="listitem" aria-label="${G.U.esc(a.name)}: ${this.ordinal(i + 1)} choice"
-        title="${G.U.esc(a.name)}: drag to rank, click for 1st, arrow keys to move"><i class="rk">${i + 1}</i>${G.Callsigns.html(id)}<span style="color:${G.U.hex(a.color)}">${G.U.esc(a.name)}</span></button>`;
+      const a = Callsigns.of(id);
+      return `<button class="sw animal rank-chip on${i === 0 ? ' first' : ''}" data-a="${id}" data-i="${i}" role="listitem" aria-label="${U.esc(a.name)}: ${this.ordinal(i + 1)} choice"
+        title="${U.esc(a.name)}: drag to rank, click for 1st, arrow keys to move"><i class="rk">${i + 1}</i>${Callsigns.html(id)}<span style="color:${U.hex(a.color)}">${U.esc(a.name)}</span></button>`;
     }).join('');
   },
   // a new order: kept and synced as 'animals' (js/cloud.ts), the 1st your animal in the menu; said aloud for a screen reader (where the
@@ -295,13 +349,13 @@ const G_Game = {
   rankAnimals(order: string[], moved?: string, focus = false) {
     if (JSON.stringify(order) !== JSON.stringify(this.prefAnimals)) {
       this.prefAnimals = order;
-      G.U.store.set('animals', order);
+      U.store.set('animals', order);
       if (this.phase === 'menu') this.setAnimal(order[0]);
     }
     this.animalPicks();
     if (!moved) return;
     const i = order.indexOf(moved), live = document.getElementById('animalLive');
-    if (live) live.textContent = `${G.Callsigns.of(moved).name}: ${this.ordinal(i + 1)} choice`;
+    if (live) live.textContent = `${Callsigns.of(moved).name}: ${this.ordinal(i + 1)} choice`;
     if (focus) { const b = this.$('colorRow').querySelector<HTMLElement>(`[data-a="${moved}"]`); if (b) b.focus(); }
   },
   // Dragging (pointer events: mouse and touch alike): a ghost of the chip follows the pointer, a marker shows where it lands; a press
@@ -324,7 +378,7 @@ const G_Game = {
       const cur = d; d = null;
       if (cur.ghost) cur.ghost.remove();
       row.classList.remove('ranking');
-      if (!cur.drag) { if (drop) { const o = this.animalOrder.filter((id) => id !== cur.id); this.rankAnimals([cur.id, ...o], cur.id); G.Audio.click && G.Audio.click(); } return; }
+      if (!cur.drag) { if (drop) { const o = this.animalOrder.filter((id) => id !== cur.id); this.rankAnimals([cur.id, ...o], cur.id); Audio.click && Audio.click(); } return; }
       if (!drop) { this.animalPicks(); return; }
       const o = this.animalOrder.filter((id) => id !== cur.id); o.splice(cur.at, 0, cur.id);
       this.rankAnimals(o, cur.id);
@@ -366,7 +420,7 @@ const G_Game = {
   },
   // your own arms in first person: sleeves in your top's colour (bare forearms in a T-shirt), your gloves
   applyLook() {
-    const L = this.myLook, M = G.GunMaterials && G.GunMaterials.M;
+    const L = this.myLook, M = GunMaterials && GunMaterials.M;
     if (!M) return;
     const SKIN = 0xc89a78;
     M.fabric().color.setHex(L.top === 'tshirt' ? SKIN : L.topC);
@@ -392,19 +446,19 @@ const G_Game = {
       const g = (e.target as HTMLElement).closest<HTMLElement>('[data-node]');
       if (!g || !this.routeMap || !this.routeSt) { tipEl.classList.add('hidden'); tipOn = null; return; }
       const id = +g.dataset.node!;
-      if (id !== tipOn) { tipOn = id; tipEl.innerHTML = G.Route.tip(this.routeMap, id, Object.assign(this.routeTipSt(), { view })); }
+      if (id !== tipOn) { tipOn = id; tipEl.innerHTML = Route.tip(this.routeMap, id, Object.assign(this.routeTipSt(), { view })); }
       tipEl.classList.remove('hidden');
       tipAt(e.clientX, e.clientY);
     }) as EventListener);
     el.addEventListener('pointerleave', ((e: PointerEvent) => { if (e.pointerType === 'touch') return; tipEl.classList.add('hidden'); tipOn = null; }) as EventListener);
     // a finger has no hovering: the first tap on a node is its card, the second is the click (off the map: the card goes)
     el.addEventListener('click', ((e: MouseEvent) => {
-      if (!G.Touch.active()) return;
+      if (!Touch.active()) return;
       const g = (e.target as HTMLElement).closest<HTMLElement>('[data-node]'), id = g ? +g.dataset.node! : null;
       if (id == null || !this.routeMap || !this.routeSt || id === tipHeld) { tipEl.classList.add('hidden'); tipOn = tipHeld = null; return; }
       e.stopPropagation();
       tipOn = tipHeld = id;
-      tipEl.innerHTML = G.Pad.text(G.Route.tip(this.routeMap, id, Object.assign(this.routeTipSt(), { view })));
+      tipEl.innerHTML = Pad.text(Route.tip(this.routeMap, id, Object.assign(this.routeTipSt(), { view })));
       tipEl.classList.remove('hidden');
       const r = g!.getBoundingClientRect(); tipAt(r.left + r.width / 2, r.top + r.height / 2);
     }) as EventListener, true);
@@ -413,10 +467,10 @@ const G_Game = {
     this.$('routeMap').addEventListener('click', ((e: GmEvt) => { const g = e.target.closest<HTMLElement>('[data-node]'); if (g) this.pickRoute(+g.dataset.node!); }) as EventListener);
     const name = this.$<HTMLInputElement>('nameInput');
     name.value = this.myName;
-    name.addEventListener('input', () => { this.myName = name.value.trim().slice(0, 16) || 'Operator'; G.U.store.set('name', this.myName); if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, this.myName); });
+    name.addEventListener('input', () => { this.myName = name.value.trim().slice(0, 16) || 'Operator'; U.store.set('name', this.myName); if (this._lp && this._lp.rig) this._lp.rig.setCallsign(this.myAnimal, this.myName); });
     const row = this.$('colorRow');
     // your career (js/career.ts), from the menu
-    this.$('btnCareer').onclick = () => { this.$('careerBody').innerHTML = G.Career.html(); this.screen('career'); };
+    this.$('btnCareer').onclick = () => { this.$('careerBody').innerHTML = Career.html(); this.screen('career'); };
     this.$('btnCareerBack').onclick = () => this.screen('menu');
     this.animalPicks();
     this.bindAnimalRank(row);
@@ -426,7 +480,7 @@ const G_Game = {
         const el = this.$<HTMLInputElement>(id);
         el.value = this.settings[key] as unknown as string;
         el.addEventListener('input', () => {
-          this.settings[key] = +el.value; G.U.store.set(key, +el.value);
+          this.settings[key] = +el.value; U.store.set(key, +el.value);
           ids.forEach((o) => { if (o !== id) this.$<HTMLInputElement>(o).value = el.value; });
           if (this.$(key + 'Val')) this.$(key + 'Val').textContent = fmt(+el.value);
           if (apply) apply(+el.value);
@@ -438,44 +492,44 @@ const G_Game = {
     bindRange(['padSens', 'padSens2'], 'padSens', (v) => v.toFixed(2));
     bindRange(['touchSens', 'touchSens2'], 'touchSens', (v) => v.toFixed(2));
     bindRange(['fov', 'fov2'], 'fov', (v) => v + '°');
-    bindRange(['scale', 'scale2'], 'scale', (v) => v + '%', (v) => G.R.setScale(v)); G.R.setScale(this.settings.scale); // (this screen's own: not kept with the account, js/cloud.ts)
-    bindRange(['vol', 'vol2'], 'vol', (v) => Math.round(v * 100) + '%', (v) => G.Audio.setVolume(v));
+    bindRange(['scale', 'scale2'], 'scale', (v) => v + '%', (v) => G_R.setScale(v)); G_R.setScale(this.settings.scale); // (this screen's own: not kept with the account, js/cloud.ts)
+    bindRange(['vol', 'vol2'], 'vol', (v) => Math.round(v * 100) + '%', (v) => Audio.setVolume(v));
 
     const loadKit = this.$<HTMLSelectElement>('loadKit');
     loadKit.value = String(this.settings.loadKit);
-    loadKit.addEventListener('change', () => { this.settings.loadKit = +loadKit.value; G.U.store.set('loadKit', +loadKit.value); if (G.ShopUI.tab === 'svc') G.ShopUI.render(); });
+    loadKit.addEventListener('change', () => { this.settings.loadKit = +loadKit.value; U.store.set('loadKit', +loadKit.value); if (ShopUI.tab === 'svc') ShopUI.render(); });
 
     const mute = this.$<HTMLInputElement>('mute');
-    mute.checked = G.Audio.muted;
+    mute.checked = Audio.muted;
     mute.addEventListener('change', () => this.setMuted(mute.checked));
     this.modelStatus();
     this.$('btnHost').onclick = () => this.needModels(() => this.host());
     this.$('btnSolo').onclick = () => this.needModels(() => this.solo());
     this.$('btnJoin').onclick = () => this.needModels(() => this.join());
     this.$('joinCode').addEventListener('keydown', (e: KeyboardEvent) => { if (e.key === 'Enter') this.needModels(() => this.join()); });
-    this.$<HTMLInputElement>('joinCode').value = G.U.store.get('lastCode', ''); // (the last game you joined)
+    this.$<HTMLInputElement>('joinCode').value = U.store.get('lastCode', ''); // (the last game you joined)
     this.$('btnLan').onclick = () => this.lanScan();
     // a highlights recording (a .zip the hangar's TVs saved) made into a video, here (js/highlights.ts renderPack)
     this.$('btnRender').onclick = () => this.$('hlFile').click();
     this.$('hlFile').onchange = ((e: GmEvt<HTMLInputElement>) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) this.needModels(() => this.renderHighlights(f)); }) as EventListener;
-    this.$('btnRenderStop').onclick = () => G.Highlights.cancelRender();
+    this.$('btnRenderStop').onclick = () => Highlights.cancelRender();
     // your own relay server, if you have one (used for every connection from now on: js/net.ts opts)
-    { const t = G.U.store.get('turn', {}) || {}, save = () => G.U.store.set('turn', { url: this.$<HTMLInputElement>('turnUrl').value.trim(), user: this.$<HTMLInputElement>('turnUser').value.trim(), pass: this.$<HTMLInputElement>('turnPass').value });
+    { const t = U.store.get('turn', {}) || {}, save = () => U.store.set('turn', { url: this.$<HTMLInputElement>('turnUrl').value.trim(), user: this.$<HTMLInputElement>('turnUser').value.trim(), pass: this.$<HTMLInputElement>('turnPass').value });
       this.$<HTMLInputElement>('turnUrl').value = t.url || ''; this.$<HTMLInputElement>('turnUser').value = t.user || ''; this.$<HTMLInputElement>('turnPass').value = t.pass || '';
       for (const id of ['turnUrl', 'turnUser', 'turnPass']) this.$(id).addEventListener('change', save); }
     // what a host's LAN beacon tells whoever's looking
-    G.Net.lanInfo = () => ({ name: this.myName, players: Object.keys(this.roster || {}).length || 1, phase: this.phase });
-    this.$('btnStart').onclick = () => { if (G.Net.isHost) { G.Net.toHost({ t: 'finit', f: G.U.store.get('fleet', null) }); G.Net.toHost({ t: 'startRun' }); } }; // (finit: the squad's ships, as this host kept them: js/space.ts)
+    Net.lanInfo = () => ({ name: this.myName, players: Object.keys(this.roster || {}).length || 1, phase: this.phase });
+    this.$('btnStart').onclick = () => { if (Net.isHost) { Net.toHost({ t: 'finit', f: U.store.get('fleet', null) }); Net.toHost({ t: 'startRun' }); } }; // (finit: the squad's ships, as this host kept them: js/space.ts)
     this.$('btnLeave').onclick = () => this.toMenu();
     this.$('btnNewCode').onclick = () => this.newCode();
-    this.$('btnCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(G.Net.code || ''); this.$('btnCopy').textContent = 'Copied'; setTimeout(() => (this.$('btnCopy').textContent = 'Copy'), 1200); };
+    this.$('btnCopy').onclick = () => { navigator.clipboard && navigator.clipboard.writeText(Net.code || ''); this.$('btnCopy').textContent = 'Copied'; setTimeout(() => (this.$('btnCopy').textContent = 'Copy'), 1200); };
     this.$('btnResume').onclick = () => this.lock();
     this.$('btnQuit').onclick = () => this.toMenu();
     this.$('btnProf').onclick = () => { G.Prof.save(); this.$('profLine').textContent = 'Saved: ' + G.Prof.line(); };
-    this.$('btnNewRun').onclick = () => { if (G.Net.isHost) G.Net.toHost({ t: 'toLobby' }); };
+    this.$('btnNewRun').onclick = () => { if (Net.isHost) Net.toHost({ t: 'toLobby' }); };
     this.$('btnMenu').onclick = () => this.toMenu();
     this.$('clickToPlay').onclick = () => this.lock();
-    G.R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked)) this.lock(); });
+    G_R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked)) this.lock(); });
 
     document.addEventListener('pointerlockchange', () => this.lockChanged());
     // Esc, held and let go: a menu shut with it takes the mouse back once it's up (lock), not while the browser's still treating the
@@ -496,19 +550,19 @@ const G_Game = {
       // in the hangar: Esc puts a shop panel away, and Tab is your stash and loadout (the panel's Kit tab), not the field kit
       if (this.hub) {
         if (e.code === 'Escape' && this.shopOpen) { this.closeShop(); return; }
-        if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat) { if (this.shopOpen) this.closeShop(); else if (G.Me.seat == null) this.openShop('kit', 'your stash and loadout'); } return; }
+        if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat) { if (this.shopOpen) this.closeShop(); else if (G_Me.seat == null) this.openShop('kit', 'your stash and loadout'); } return; }
       }
-      if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat && !(G.Me.out && !this.invOpen)) this.toggleInv(!this.invOpen); return; } // (out cold: nothing to do but wait)
+      if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat && !(G_Me.out && !this.invOpen)) this.toggleInv(!this.invOpen); return; } // (out cold: nothing to do but wait)
       if (e.code === 'Escape' && this.invOpen) { this.toggleInv(false); return; }
       if (e.code === 'Escape' && this.aboxOpen) { this.aboxHide(); return; }
       if (e.code === 'KeyY' && !this.chatOpen && !e.repeat && !this.hub) this.vote();
       if (e.code === 'Enter' || e.key === 'Enter') { // (a phone's own keyboard has a key but no code)
         const inp = this.$<HTMLInputElement>('chatInput');
-        if (!this.chatOpen) { this.chatOpen = true; inp.classList.remove('hidden'); inp.value = ''; setTimeout(() => inp.focus(), 0); G.Me.keys = {}; }
+        if (!this.chatOpen) { this.chatOpen = true; inp.classList.remove('hidden'); inp.value = ''; setTimeout(() => inp.focus(), 0); G_Me.keys = {}; }
         else {
           const t = inp.value.trim();
-          if (t && !G.Net.solo) G.Net.toHost({ t: 'chat', m: t });
-          else if (t) G.HUD.chat(this.myName, this.myColor, t);
+          if (t && !Net.solo) Net.toHost({ t: 'chat', m: t });
+          else if (t) HUD.chat(this.myName, this.myColor, t);
           this.closeChat();
         }
       }
@@ -520,29 +574,29 @@ const G_Game = {
   // from a point of sale in the hangar. The world carries on behind it; you stand where you are.
   openShop(tab?: string, title?: string) {
     if (!this.hub || this.shopOpen) return;
-    if (G.Range && G.Range.on()) { G.HUD.toast('THE RANGE', "Your kit stays as it is in here: shop and sort it out once you're back in the hangar", 2); return; } // (js/range.ts puts it back as it was when you leave)
+    if (Range && Range.on()) { HUD.toast('THE RANGE', "Your kit stays as it is in here: shop and sort it out once you're back in the hangar", 2); return; } // (js/range.ts puts it back as it was when you leave)
     this.shopOpen = true;
-    G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
-    G.ShopUI.tab = tab || 'stock'; G.ShopUI.title = title || null;
+    G_Me.keys = {}; G_Me.mouse.l = G_Me.mouse.r = false;
+    ShopUI.tab = tab || 'stock'; ShopUI.title = title || null;
     this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
     this.unlock();
     this.screen('shop');
-    G.ShopUI.render();
-    G.HUD.setPrompt('');
+    ShopUI.render();
+    HUD.setPrompt('');
   },
   closeShop() {
     if (!this.shopOpen) return;
     this.shopOpen = false;
-    G.GunsmithUI.hide(); G.InvUI.hide();
+    GunsmithUI.hide(); InvUI.hide();
     this.screen(null);
-    G.HUD.show(true);
-    G.Hangar.refresh();
+    HUD.show(true);
+    Hangar.refresh();
     this.lock();
     setTimeout(() => { if (!this.locked && !this.shopOpen && this.phase === 'level') this.$('clickToPlay').classList.remove('hidden'); }, 300);
   },
   setMuted(m: boolean) {
-    G.Audio.setMuted(m);
-    G.U.store.set('muted', m);
+    Audio.setMuted(m);
+    U.store.set('muted', m);
     this.$<HTMLInputElement>('mute').checked = m;
   },
   closeChat() {
@@ -553,29 +607,29 @@ const G_Game = {
   },
   // Y, once order's restored: vote to leave (again to take it back)
   vote() {
-    if (!this.extract.active || G.Me.dead) { if (!this.extract.active) G.HUD.toast('', 'Bring order to chaos first: every suspect arrested or down', 1.6); return; }
+    if (!this.extract.active || G_Me.dead) { if (!this.extract.active) HUD.toast('', 'Bring order to chaos first: every suspect arrested or down', 1.6); return; }
     const v = !this.extract.voted;
     this.extract.voted = v;
-    G.Net.toHost({ t: 'vote', v });
-    G.Audio.click();
-    G.HUD.toast('', v ? 'You voted to leave' : 'You took your vote back', 1.2);
+    Net.toHost({ t: 'vote', v });
+    Audio.click();
+    HUD.toast('', v ? 'You voted to leave' : 'You took your vote back', 1.2);
   },
   // Tab in a level: your kit and health (and the scoreboard), the mouse freed to move things about. You stand
   // still while it's open; the level doesn't stop.
   // a panel that takes the mouse is open: the field kit (Tab), the hangar's shop, the chat, the attachments box (no firing)
-  menuOpen(): boolean { return !!(this.invOpen || this.shopOpen || this.chatOpen || this.aboxOpen || G.Space.S.uiOpen || G.Space.debriefOpen()); },
+  menuOpen(): boolean { return !!(this.invOpen || this.shopOpen || this.chatOpen || this.aboxOpen || Space.S.uiOpen || Space.debriefOpen()); },
   toggleInv(open: boolean, opts?: { patient?: string; cab?: number }) {
     if (!!open === !!this.invOpen) return;
     this.invOpen = !!open;
     this.$('fieldInv').classList.toggle('hidden', !open);
     if (open) {
-      G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
-      this.$('fiScore').innerHTML = G.HUD.scoreboardHTML();
-      G.InvUI.show(this.$('fiBody'), { field: true, patient: opts && opts.patient, cab: opts && opts.cab });
+      G_Me.keys = {}; G_Me.mouse.l = G_Me.mouse.r = false;
+      this.$('fiScore').innerHTML = HUD.scoreboardHTML();
+      InvUI.show(this.$('fiBody'), { field: true, patient: opts && opts.patient, cab: opts && opts.cab });
       this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
       this.unlock();
     } else {
-      G.InvUI.hide();
+      InvUI.hide();
       if (this.phase !== 'level') return;
       this.lock();
       // if the browser wouldn't take the mouse back from a key press, a click will
@@ -584,7 +638,7 @@ const G_Game = {
   },
   // the mouse captured or let go (or the controller's stand-in for that): into the game, or the pause menu
   lockChanged() {
-    const real = document.pointerLockElement === G.R.renderer.domElement;
+    const real = document.pointerLockElement === G_R.renderer.domElement;
     if (real) this.softLocked = false;
     this.locked = real || this.softLocked;
     // a lock asked for a moment ago (closing a menu, a click) can land after another menu has opened (Tab, Tab):
@@ -596,17 +650,17 @@ const G_Game = {
     if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
     // (the mouse taken back as a menu was shut with Esc, and let straight go again by the browser's own Esc: not a pause, a click to play on)
     else if (!this.menuOpen() && now - this.lockAt < 600 && now - this.escAt < 600) this.$('clickToPlay').classList.remove('hidden');
-    else if (!this.menuOpen()) { this.pauseAt = now; this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
+    else if (!this.menuOpen()) { this.pauseAt = now; this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = Net.code ? 'Room code: ' + Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
   },
   unlock() {
     if (this.softLocked) { this.softLocked = false; this.lockChanged(); }
     if (document.pointerLockElement) document.exitPointerLock();
   },
   lock() {
-    G.Audio.init();
-    if (G.Pad.active() || G.Touch.active()) { if (!this.locked) { this.softLocked = true; this.lockChanged(); } return; }
+    Audio.init();
+    if (Pad.active() || Touch.active()) { if (!this.locked) { this.softLocked = true; this.lockChanged(); } return; }
     if (this.escHeld) { this.lockOnEscUp = true; return; } // (a menu shut with Esc: once it's let go)
-    const c = G.R.renderer.domElement;
+    const c = G_R.renderer.domElement;
     try {
       const p = c.requestPointerLock({ unadjustedMovement: true });
       if (p && p.catch) p.catch(() => { try { c.requestPointerLock(); } catch (e) { /* ignore */ } });
@@ -640,7 +694,7 @@ const G_Game = {
   },
   /** Runs fn now if the models are in; otherwise when they arrive (the menu says so meanwhile). */
   needModels(fn0: () => void) {
-    const s = G.Bundles.state(), fn = () => { G.Hangar.load().then(() => fn0()); }; // (and the hangar's scene parsed: a few hundred ms after the bundle; js/hangar.ts)
+    const s = G.Bundles.state(), fn = () => { Hangar.load().then(() => fn0()); }; // (and the hangar's scene parsed: a few hundred ms after the bundle; js/hangar.ts)
     if (s.phase === 'ready') { fn(); return; }
     this.waitingModels = fn; this.msg('menuMsg', 'Waiting for the models to finish downloading...');
     if (s.phase === 'failed' || s.phase === 'idle') G.Bundles.start();
@@ -648,41 +702,41 @@ const G_Game = {
   msg(id: string, text: string, err?: boolean) { const el = this.$(id); el.textContent = text; el.classList.toggle('err', !!err); },
 
   host() {
-    G.Audio.init();
+    Audio.init();
     this.msg('menuMsg', 'Contacting matchmaking server...');
     this.setBusy(true);
-    G.Net.host((err, code) => {
+    Net.host((err, code) => {
       this.setBusy(false);
-      if (err) { this.msg('menuMsg', err + ' — you can still Play Solo.', true); G.Net.leave(); return; }
+      if (err) { this.msg('menuMsg', err + ' — you can still Play Solo.', true); Net.leave(); return; }
       this.afterConnect();
     });
   },
   solo() {
-    G.Audio.init();
-    G.Net.hostSolo();
+    Audio.init();
+    Net.hostSolo();
     this.afterConnect();
   },
   join() {
     const code = this.$<HTMLInputElement>('joinCode').value.trim().toUpperCase();
-    G.U.store.set('lastCode', code);
+    U.store.set('lastCode', code);
     if (code.length < 4) { this.msg('menuMsg', 'Enter the room code from your host.', true); return; }
-    G.Audio.init();
+    Audio.init();
     this.msg('menuMsg', 'Connecting to ' + code + '...');
     this.setBusy(true);
-    G.Net.join(code, (err) => {
+    Net.join(code, (err) => {
       this.setBusy(false);
-      if (err) { this.msg('menuMsg', err, true); G.Net.leave(); return; }
+      if (err) { this.msg('menuMsg', err, true); Net.leave(); return; }
       this.afterConnect();
     });
   },
   // the host, in the lobby: start over under a fresh room code (the kept one's dropped; anyone already in the lobby
   // is dropped too and needs the new code)
   newCode() {
-    if (!G.Net.isHost || G.Net.solo || this.phase !== 'lobby') return;
+    if (!Net.isHost || Net.solo || this.phase !== 'lobby') return;
     try { sessionStorage.removeItem('bp_hostCode'); } catch (e) { /* storage unavailable */ }
-    G.Net.leave();
+    Net.leave();
     this.$('lobbyCode').textContent = '-----';
-    G.Net.host((err) => {
+    Net.host((err) => {
       if (err) { this.toMenu(err); return; }
       this.afterConnect();
     });
@@ -691,21 +745,21 @@ const G_Game = {
   lanScan() {
     const list = this.$('lanList'), btn = this.$<HTMLButtonElement>('btnLan');
     btn.disabled = true; btn.textContent = 'Looking...'; list.innerHTML = '';
-    G.Net.lanScan().then((games) => {
+    Net.lanScan().then((games) => {
       btn.disabled = false; btn.textContent = 'Find LAN games';
       if (games == null) { list.innerHTML = '<small class="dim">Could not tell which network you are on (offline, or WebRTC blocked).</small>'; return; }
       if (!games.length) { list.innerHTML = '<small class="dim">No games hosted on your network.</small>'; return; }
       const PH: Record<string, string> = { lobby: 'in the lobby', route: 'picking a route', level: 'mid-level', shop: 'in the shop' };
-      list.innerHTML = games.map((g) => `<button class="btn small lan-game" data-code="${G.U.esc(g.code)}"><b>${G.U.esc(g.name)}</b> · ${g.players} in squad${PH[g.phase] ? ' · ' + PH[g.phase] : ''} <span class="dim">${G.U.esc(g.code)}</span></button>`).join('');
+      list.innerHTML = games.map((g) => `<button class="btn small lan-game" data-code="${U.esc(g.code)}"><b>${U.esc(g.name)}</b> · ${g.players} in squad${PH[g.phase] ? ' · ' + PH[g.phase] : ''} <span class="dim">${U.esc(g.code)}</span></button>`).join('');
       list.querySelectorAll<HTMLElement>('[data-code]').forEach((b: HTMLElement) => (b.onclick = () => { this.$<HTMLInputElement>('joinCode').value = b.dataset.code!; this.join(); }));
     });
   },
   rejoin(code: string | null, until: number) {
-    if (!code || this.phase !== 'menu' || G.Net.peer || Date.now() > until) { if (this.phase === 'menu' && !G.Net.peer && code) this.msg('menuMsg', 'Lost connection to the host.', true); return; }
+    if (!code || this.phase !== 'menu' || Net.peer || Date.now() > until) { if (this.phase === 'menu' && !Net.peer && code) this.msg('menuMsg', 'Lost connection to the host.', true); return; }
     this.$<HTMLInputElement>('joinCode').value = code;
-    G.Net.join(code, (err) => {
+    Net.join(code, (err) => {
       if (!err) { this.afterConnect(); return; }
-      G.Net.leave();
+      Net.leave();
       if (this.phase === 'menu') { this.msg('menuMsg', 'Lost connection to the host. Reconnecting...'); setTimeout(() => this.rejoin(code, until), 3000); }
     });
   },
@@ -713,7 +767,7 @@ const G_Game = {
     const msg = this.$('hlMsg'), btn = this.$<HTMLButtonElement>('btnRender'), stop = this.$('btnRenderStop'), bar = this.$('hlBar'), prog = bar.parentElement!;
     btn.disabled = true; stop.classList.remove('hidden'); prog.classList.remove('hidden'); bar.style.width = '0%'; msg.classList.remove('bad');
     try {
-      await G.Highlights.renderPack(file, (t, p) => { msg.textContent = t; if (p != null) bar.style.width = Math.round(p * 100) + '%'; });
+      await Highlights.renderPack(file, (t, p) => { msg.textContent = t; if (p != null) bar.style.width = Math.round(p * 100) + '%'; });
     } catch (e: any) {
       const why = (e && e.message) || String(e);
       msg.textContent = why === 'cancelled' ? 'Cancelled' : 'The video couldn\'t be made: ' + why; msg.classList.toggle('bad', why !== 'cancelled');
@@ -724,23 +778,23 @@ const G_Game = {
   setBusy(b: boolean) { ['btnHost', 'btnSolo', 'btnJoin'].forEach((id) => (this.$<HTMLButtonElement>(id).disabled = b)); },
   afterConnect() {
     this.msg('menuMsg', '');
-    if (G.Net.isHost) G.ServerLink.start(G.Net.myId!); // (a session of the simulation, as everyone starts hosting it)
-    if (G.Net.isHost && !G.Net.solo) G.Net.startBeacon(); // (findable from the same network)
-    G.Me.newRun();
+    if (Net.isHost) ServerLink.start(Net.myId!); // (a session of the simulation, as everyone starts hosting it)
+    if (Net.isHost && !Net.solo) Net.startBeacon(); // (findable from the same network)
+    G_Me.newRun();
     this.runStarted = false;
     // (anon: you're a cloud saves guest, for the GUEST mark: js/server.ts hello)
     // (prefs: every animal, your order, walked by the host; animal, the first, for a host before them)
-    G.Net.toHost({ t: 'hello', name: this.myName, animal: this.prefAnimals[0], prefs: this.prefAnimals.slice(), look: this.myLook, ...(G.Cloud.guest() ? { anon: 1 } : {}) });
+    Net.toHost({ t: 'hello', name: this.myName, animal: this.prefAnimals[0], prefs: this.prefAnimals.slice(), look: this.myLook, ...(Cloud.guest() ? { anon: 1 } : {}) });
   },
   toMenu(reason?: string) {
-    if (G.Career.run) G.Career.runEnd('left'); // (a run you walked out of, or lost the host in)
-    G.Net.leave();
-    G.ServerLink.stop();
-    G.Views.clearAll();
-    G.Space.reset();
+    if (Career.run) Career.runEnd('left'); // (a run you walked out of, or lost the host in)
+    Net.leave();
+    ServerLink.stop();
+    Views.clearAll();
+    Space.reset();
     this.leaveHub();
-    G.R.clearLevel();
-    G.R.setViewmodel(null);
+    G_R.clearLevel();
+    G_R.setViewmodel(null);
     this.map = null;
     this.phase = 'menu';
     this.setAnimal(this.prefAnimals[0]); // (back to yours: the host's pick was for that session)
@@ -761,8 +815,8 @@ const G_Game = {
       if (started) return; started = true;
       setTimeout(() => {
         if (this.map) return;
-        const map = G.Level.generate(1234, 3);
-        setTimeout(() => { if (this.map) return; this.map = this.backdropMap = map; G.R.setLevel(map); this.backdropT = 0; }, 0);
+        const map = Level.generate(1234, 3);
+        setTimeout(() => { if (this.map) return; this.map = this.backdropMap = map; G_R.setLevel(map); this.backdropT = 0; }, 0);
       }, 0);
     };
     requestAnimationFrame(() => {
@@ -776,11 +830,11 @@ const G_Game = {
   // aren't up yet (their models still coming), so its shaders aren't compiled on the spot the first time a menu shows it.
   showcaseBehind() {
     const p = this.phase;
-    return !!G.MenuShow && (p === 'menu' || p === 'lobby' || (p === 'route' && (!this.map || this.map === this.backdropMap)));
+    return !!MenuShow && (p === 'menu' || p === 'lobby' || (p === 'route' && (!this.map || this.map === this.backdropMap)));
   },
   menuBackdrop() {
-    this.map = this.backdropMap = G.Level.generate(1234, 3);
-    G.R.setLevel(this.map);
+    this.map = this.backdropMap = Level.generate(1234, 3);
+    G_R.setLevel(this.map);
     this.backdropT = 0;
   },
 
@@ -788,21 +842,21 @@ const G_Game = {
   onMsg(m: any) { // (m: straight off the wire, so as dynamic as the host's word: its kind is checked, below)
     switch (m.t as GmMsgKind) {
       case 'welcome':
-        G.Stickers.joined(m.skins); // (the stickers on the squad's guns: js/stickers.ts)
+        Stickers.joined(m.skins); // (the stickers on the squad's guns: js/stickers.ts)
         this.roster = m.roster;
-        if (this.roster[G.Net.myId!]) this.setAnimal(this.roster[G.Net.myId!].animal);
-        G.Views.syncRoster(this.roster);
+        if (this.roster[Net.myId!]) this.setAnimal(this.roster[Net.myId!].animal);
+        Views.syncRoster(this.roster);
         if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined;
-        if ((m.phase === 'route' || m.phase === 'level' || m.phase === 'shop') && !G.Career.run) G.Career.runStart(m.level || 1); // (joined a run already going: yours from here)
-        G.Career.squad(Object.keys(this.roster).length);
+        if ((m.phase === 'route' || m.phase === 'level' || m.phase === 'shop') && !Career.run) Career.runStart(m.level || 1); // (joined a run already going: yours from here)
+        Career.squad(Object.keys(this.roster).length);
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
         else if (m.phase === 'level') {
           this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp);
           this.levelWas(m);
-          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => G.Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
+          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
           this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
-          this.cabs = m.cabs || []; G.Views.syncCabs();
-          G.Loot.clear(); for (const a of m.loot || []) G.Loot.add(...(a as [any, any, any, any, any, any, any]));
+          this.cabs = m.cabs || []; Views.syncCabs();
+          Loot.clear(); for (const a of m.loot || []) Loot.add(...(a as [any, any, any, any, any, any, any]));
           this.glassWas(m);
         } else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, null, m.stock, m.sp);
         else this.enterLobby();
@@ -811,64 +865,64 @@ const G_Game = {
         // someone else just readied up: a chime and a line saying so
         const prev = this.roster || {};
         this.roster = m.roster;
-        if (this.roster[G.Net.myId!]) this.setAnimal(this.roster[G.Net.myId!].animal); // (yours was taken: the host's pick)
-        for (const [id, r] of Object.entries(this.roster)) if (id !== G.Net.myId && r.ready && prev[id] && !prev[id].ready) this.readyNote(r);
-        G.Views.syncRoster(this.roster);
-        G.Career.squad(Object.keys(this.roster).length);
+        if (this.roster[Net.myId!]) this.setAnimal(this.roster[Net.myId!].animal); // (yours was taken: the host's pick)
+        for (const [id, r] of Object.entries(this.roster)) if (id !== Net.myId && r.ready && prev[id] && !prev[id].ready) this.readyNote(r);
+        Views.syncRoster(this.roster);
+        Career.squad(Object.keys(this.roster).length);
         if (this.phase === 'lobby') this.renderLobby();
-        if (this.hub) { G.ShopUI.render(); G.Hangar.refresh(); }
+        if (this.hub) { ShopUI.render(); Hangar.refresh(); }
         if (this.phase === 'route') this.renderRoute();
         break;
       }
       case 'arms': this.arms = m.a || {}; if (this.phase === 'route') { this.sidearmPick(); this.renderRoute(); } break;
       case 'rvotes': if (this.routeSt) { this.routeSt.votes = m.v || {}; if (this.phase === 'route') this.renderRoute(); } break;
       case 'newrun':
-        G.Career.runStart(); // (your career's record of it: js/career.ts)
+        Career.runStart(); // (your career's record of it: js/career.ts)
         this.tGrid = null; this.arms = {}; this.armSel = null;
-        G.Me.newRun();
+        G_Me.newRun();
             break;
-      case 'veil': if (m.k === 'ftl' && G.Space.jumping()) break; G.Space.veilKind(m.k); this.veil(true); break; // (a jump with you aboard: the pod and the tunnel, no veil: js/space.ts) // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
+      case 'veil': if (m.k === 'ftl' && Space.jumping()) break; Space.veilKind(m.k); this.veil(true); break; // (a jump with you aboard: the pod and the tunnel, no veil: js/space.ts) // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
       case 'phase':
         if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined; // (none: the game in space's sidearm picker)
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; G.Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => G.Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
-          if (m.doors) { this.levelWas(m); if (m.loot) { G.Loot.clear(); for (const a of m.loot) G.Loot.add(...(a as [any, any, any, any, any, any, any])); } this.glassWas(m); } } // (a ship come back to, as she was left: js/spaceserver.ts restore)
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
+          if (m.doors) { this.levelWas(m); if (m.loot) { Loot.clear(); for (const a of m.loot) Loot.add(...(a as [any, any, any, any, any, any, any])); } this.glassWas(m); } } // (a ship come back to, as she was left: js/spaceserver.ts restore)
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock, m.sp);
         else if (m.phase === 'gameover') this.enterGameover(m);
         else if (m.phase === 'lobby') this.enterLobby();
         break;
-      case 'snap': if (this.phase === 'level') G.Views.applySnap(m); break;
-      case 'rfx': if (this.phase === 'level') G.Views.roundFx(m.a); break;
-      case 'bstk': if (this.phase === 'level') G.Bolts.fromNet(m); break;
-      case 'hole': if (this.phase === 'level') for (const h of m.a || []) G.Damage.apply(this.map as unknown as GmDmgMap, h); break;
-      case 'dpart': if (this.phase === 'level' && this.map!.doors[m.i]) G.Damage.partGone(this.map as unknown as GmDmgMap, this.map!.doors[m.i] as any, m.pt); break;
+      case 'snap': if (this.phase === 'level') Views.applySnap(m); break;
+      case 'rfx': if (this.phase === 'level') Views.roundFx(m.a); break;
+      case 'bstk': if (this.phase === 'level') Bolts.fromNet(m); break;
+      case 'hole': if (this.phase === 'level') for (const h of m.a || []) Damage.apply(this.map as unknown as GmDmgMap, h); break;
+      case 'dpart': if (this.phase === 'level' && this.map!.doors[m.i]) Damage.partGone(this.map as unknown as GmDmgMap, this.map!.doors[m.i] as any, m.pt); break;
       case 'dfall': { // (shot off its hinges)
         const d = this.map && this.phase === 'level' ? this.map.doors[m.i] : null;
         if (!d) break;
-        if (G.Highlights) G.Highlights.door(m.i, 1 as unknown as boolean, 0 as unknown as boolean, m.f);
-        G.Damage.fall(this.map as unknown as GmDmgMap, d as any, ...(m.f as [any, any, any, any]));
+        if (Highlights) Highlights.door(m.i, 1 as unknown as boolean, 0 as unknown as boolean, m.f);
+        Damage.fall(this.map as unknown as GmDmgMap, d as any, ...(m.f as [any, any, any, any]));
         break;
       }
-      case 'rpath': for (const [i, path] of m.ps || []) { const s = G.Highlights && G.Highlights.roundPath(m.k, m.sid, i, path), def = s && (G.WEAPONS[s.code] || G.Gunsmith.fromCode(s.code)); if (G.ShotLog) G.ShotLog.keep(path, { holder: G.ShotLog.remote(m.k, m.sid), name: def ? def.name : '' }); } break;
-      case 'npath': if (G.Highlights) G.Highlights.fragPaths(m.s, m.ps); break; // (a squadmate's grenade: its chips that hit someone, for the replays)
-      case 'skin': G.Stickers.learn(m.h, m.l); break; // (a gun's stickers, by their hash: js/stickers.ts)
+      case 'rpath': for (const [i, path] of m.ps || []) { const s = Highlights && Highlights.roundPath(m.k, m.sid, i, path), def = s && (WEAPONS[s.code] || Gunsmith.fromCode(s.code)); if (ShotLog) ShotLog.keep(path, { holder: ShotLog.remote(m.k, m.sid), name: def ? def.name : '' }); } break;
+      case 'npath': if (Highlights) Highlights.fragPaths(m.s, m.ps); break; // (a squadmate's grenade: its chips that hit someone, for the replays)
+      case 'skin': Stickers.learn(m.h, m.l); break; // (a gun's stickers, by their hash: js/stickers.ts)
       // a first aid cabinet opened, emptied a bit, or put back into
       // things lying about: put down, picked up, and what you picked up
-      case 'loot': if (this.phase === 'level') for (const a of m.a || []) G.Loot.add(...(a as [any, any, any, any, any, any, any])); break;
-      case 'lootRm': G.Loot.remove(m.id); break;
-      case 'glass': if (this.phase === 'level') for (const id of m.ids || []) G.Views.breakGlass(id); break;
-      case 'crack': if (this.phase === 'level') G.Views.crackGlass(m.id, new THREE.Vector3(...m.p)); break;
-      case 'lootGot': G.Me.lootGot(m.item, m.x, m.z, m.at); break;
+      case 'loot': if (this.phase === 'level') for (const a of m.a || []) Loot.add(...(a as [any, any, any, any, any, any, any])); break;
+      case 'lootRm': Loot.remove(m.id); break;
+      case 'glass': if (this.phase === 'level') for (const id of m.ids || []) Views.breakGlass(id); break;
+      case 'crack': if (this.phase === 'level') Views.crackGlass(m.id, new THREE.Vector3(...m.p)); break;
+      case 'lootGot': G_Me.lootGot(m.item, m.x, m.z, m.at); break;
       case 'team': this.teamSet(m); break;
       case 'cab': {
         if (this.phase !== 'level' || !this.cabs) break;
         this.cabs[m.i] = m.c;
         this.cabGridSet(m.i, m.c);
-        G.Views.syncCabs();
-        if (m.by === G.Net.myId) G.Me.cabSettle(m.deny, m.ret);
+        Views.syncCabs();
+        if (m.by === Net.myId) G_Me.cabSettle(m.deny, m.ret);
         const took = Object.entries(m.took || {}).filter(([, n]) => n > 0);
-        if (m.by && m.by !== G.Net.myId && took.length) G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> took ${took.map(([mt, n]) => (n > 1 ? n + ' ' : '') + G.Med.ITEMS[mt].name.toLowerCase()).join(', ')} from a first aid cabinet`);
-        if (G.InvUI.field && G.InvUI.cab === m.i) G.InvUI.render();
+        if (m.by && m.by !== Net.myId && took.length) HUD.feed(`<b>${U.esc(this.nameOf(m.by))}</b> took ${took.map(([mt, n]) => (n > 1 ? n + ' ' : '') + Med.ITEMS[mt].name.toLowerCase()).join(', ')} from a first aid cabinet`);
+        if (InvUI.field && InvUI.cab === m.i) InvUI.render();
         break;
       }
       // the sticker box opened: the sticker's whoever's opened it (yours: into your collection, js/stickers.ts)
@@ -877,155 +931,155 @@ const G_Game = {
         this.sbox = m.s || null;
         const [name, by] = this.sbox || [];
         if (!name || !by || had) break;
-        const nice = G.U.esc(name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' '));
-        if (by === G.Net.myId) { G.Stickers.give(name); G.Audio.pickup(); G.HUD.toast('STICKER', `<img class="stk-toast" src="${G.Stickers.url(name)}"> Found a sticker: <b>${nice}</b> <small>(stick it on a gun in the gunsmith)</small>`, 3.5); }
-        else G.HUD.feed(`<b>${G.U.esc(this.nameOf(by))}</b> found a sticker: ${nice}`);
+        const nice = U.esc(name.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' '));
+        if (by === Net.myId) { Stickers.give(name); Audio.pickup(); HUD.toast('STICKER', `<img class="stk-toast" src="${Stickers.url(name)}"> Found a sticker: <b>${nice}</b> <small>(stick it on a gun in the gunsmith)</small>`, 3.5); }
+        else HUD.feed(`<b>${U.esc(this.nameOf(by))}</b> found a sticker: ${nice}`);
         break;
       }
       case 'abox': {
         this.abox = m.a;
-        if (m.opened === G.Net.myId) this.aboxShow(true); // (opened it: its wheels spin)
+        if (m.opened === Net.myId) this.aboxShow(true); // (opened it: its wheels spin)
         if (m.by && m.got) {
-          if (m.by === G.Net.myId) { this.aboxHide(); G.Me.takeAttachment(m.got, m.fit); }
-          else { const pt = G.Gunsmith.PARTS[m.got]; if (pt) G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> took the ${G.U.esc(pt.name!)} from the attachments box`); }
+          if (m.by === Net.myId) { this.aboxHide(); G_Me.takeAttachment(m.got, m.fit); }
+          else { const pt = Gunsmith.PARTS[m.got]; if (pt) HUD.feed(`<b>${U.esc(this.nameOf(m.by))}</b> took the ${U.esc(pt.name!)} from the attachments box`); }
         }
         break;
       }
       case 'wcase':
         this.setCase(m.c);
         break;
-      case 'eshot': if (this.phase === 'level') G.Views.enemyShot(m); break;
-      case 'eround': if (this.phase === 'level' && G.Net.isHost) G.Me.enemyRounds(m); break; // (the host's: a suspect's rounds, flown here)
-      case 'eInfo': G.HUD.eInfoGot(m); break; // (the host's: the F9 readout's look at a suspect)
-      case 'shot': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.remoteShot(m); break;
-      case 'stk': if (this.phase === 'level' && m.id !== G.Net.myId) G.Views.stuckAt(m); break; // (where someone's sticky grenade held: js/views.ts stickStep)
-      case 'nade': if (this.phase === 'level' && m.id !== G.Net.myId) { G.Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag', m.nid, m.id); if (G.Highlights) G.Highlights.nade(m.en ? 'e' + m.e : 'p' + m.id, new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, m.k || 'frag'); const tp = !m.en && G.Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) G.Views.enemyThrow(m.e); } break;
+      case 'eshot': if (this.phase === 'level') Views.enemyShot(m); break;
+      case 'eround': if (this.phase === 'level' && Net.isHost) G_Me.enemyRounds(m); break; // (the host's: a suspect's rounds, flown here)
+      case 'eInfo': HUD.eInfoGot(m); break; // (the host's: the F9 readout's look at a suspect)
+      case 'shot': if (this.phase === 'level' && m.id !== Net.myId) Views.remoteShot(m); break;
+      case 'stk': if (this.phase === 'level' && m.id !== Net.myId) Views.stuckAt(m); break; // (where someone's sticky grenade held: js/views.ts stickStep)
+      case 'nade': if (this.phase === 'level' && m.id !== Net.myId) { Views.addNade(new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, false, !!m.en, m.k || 'frag', m.nid, m.id); if (Highlights) Highlights.nade(m.en ? 'e' + m.e : 'p' + m.id, new THREE.Vector3(...m.p), new THREE.Vector3(...m.v), m.fuse, m.k || 'frag'); const tp = !m.en && Views.players.get(m.id); if (tp) tp.rig.throwNade(m.s == null ? 2 : m.s); /* (their arm throws it) */ if (m.en) Views.enemyThrow(m.e); } break;
       case 'boom': this.onBoom(m); break;
-      case 'course': if (G.Course) G.Course.setCourse(m.seed); break;
-      case 'crun': if (G.Course && m.s) G.Course.remoteRun(Object.assign({}, m.s, { who: m.by || m.s.who })); break;
+      case 'course': if (Course) Course.setCourse(m.seed); break;
+      case 'crun': if (Course && m.s) Course.remoteRun(Object.assign({}, m.s, { who: m.by || m.s.who })); break;
       case 'flash': this.onFlash(m); break;
       case 'kill': this.onKill(m); break;
       case 'incap': this.onIncap(m); break; // (a suspect down for good: counted as one incapacitated)
-      case 'edown': if (G.Highlights) G.Highlights.suspectDown(m); break; // (a suspect down for good: js/highlights.ts)
-      case 'saved': if (G.Highlights) G.Highlights.saved(m); break; // (an officer's armour stopped rounds: js/highlights.ts)
-      case 'stock': G.ShopUI.setStock(m.s); break; // (the store's shared stock: js/shop.ts)
-      case 'took': G.ShopUI.took(m.q, m.ok); break;
-      case 'ereload': if (this.phase === 'level') G.Views.enemyReload(m); break;
+      case 'edown': if (Highlights) Highlights.suspectDown(m); break; // (a suspect down for good: js/highlights.ts)
+      case 'saved': if (Highlights) Highlights.saved(m); break; // (an officer's armour stopped rounds: js/highlights.ts)
+      case 'stock': ShopUI.setStock(m.s); break; // (the store's shared stock: js/shop.ts)
+      case 'took': ShopUI.took(m.q, m.ok); break;
+      case 'ereload': if (this.phase === 'level') Views.enemyReload(m); break;
       case 'clear':
-        G.Audio.extract();
-        G.HUD.toast('ORDER RESTORED', 'Press Y to vote to leave', 3.5);
+        Audio.extract();
+        HUD.toast('ORDER RESTORED', 'Press Y to vote to leave', 3.5);
         break;
-      case 'treat': if (m.tg === G.Net.myId && this.phase === 'level') G.Me.treated(m.part, m.mt, this.nameOf(m.by), m.by, !!m.th); break;
-      case 'applying': if (this.phase === 'level') G.Me.beingTreated(m.by, this.nameOf(m.by), m.part, m.mt, m.dur, !!m.off); break;
+      case 'treat': if (m.tg === Net.myId && this.phase === 'level') G_Me.treated(m.part, m.mt, this.nameOf(m.by), m.by, !!m.th); break;
+      case 'applying': if (this.phase === 'level') G_Me.beingTreated(m.by, this.nameOf(m.by), m.part, m.mt, m.dur, !!m.off); break;
       case 'revive': {
-        if (m.tg === G.Net.myId) G.Me.revived(m.hp);
-        if (m.by === G.Net.myId && m.tg !== G.Net.myId) G.Career.ev('revive');
+        if (m.tg === Net.myId) G_Me.revived(m.hp);
+        if (m.by === Net.myId && m.tg !== Net.myId) Career.ev('revive');
         const by = this.nameOf(m.by), tg = this.nameOf(m.tg);
-        G.HUD.feed(`<b>${G.U.esc(by)}</b> revived <b>${G.U.esc(tg)}</b>`);
+        HUD.feed(`<b>${U.esc(by)}</b> revived <b>${U.esc(tg)}</b>`);
         break;
       }
       case 'chat': {
         const r = m.id ? this.roster[m.id] : null;
-        if (r) G.HUD.chat(r.name, r.color, m.m); else G.HUD.chat(null, 0, m.m);
+        if (r) HUD.chat(r.name, r.color, m.m); else HUD.chat(null, 0, m.m);
         if (this.phase === 'shop' || this.phase === 'lobby') this.lobbyChat(r ? r.name + ': ' + m.m : m.m);
-        G.Audio.chat();
+        Audio.chat();
         break;
       }
-      case 'ping': if (this.phase === 'level') G.Views.addPing(m.id, m.p); break;
+      case 'ping': if (this.phase === 'level') Views.addPing(m.id, m.p); break;
       case 'ffhit': { // a teammate's rounds in you (or, seen from outside, in someone else)
         if (this.phase !== 'level') break;
         const f = new THREE.Vector3(m.f[0], m.f[1], m.f[2]);
-        if (m.e && G.Highlights) G.Highlights.hitBy(m.tg, m.e);
-        if (m.tg === G.Net.myId) { G.Me.applyWounds(m, f, !m.e); if (!m.e) G.HUD.toast('', 'Friendly fire', 1.6); } // (you're told it was friendly, not whose)
-        else if (m.by !== G.Net.myId && m.at) G.R.impact(new THREE.Vector3(...m.at), null, 'blood');
+        if (m.e && Highlights) Highlights.hitBy(m.tg, m.e);
+        if (m.tg === Net.myId) { G_Me.applyWounds(m, f, !m.e); if (!m.e) HUD.toast('', 'Friendly fire', 1.6); } // (you're told it was friendly, not whose)
+        else if (m.by !== Net.myId && m.at) G_R.impact(new THREE.Vector3(...m.at), null, 'blood');
         break;
       }
-      case 'left': G.Views.removePlayer(m.id); break;
+      case 'left': Views.removePlayer(m.id); break;
       case 'door': {
         const d = this.map && this.map.doors[m.i];
         if (!d || this.phase !== 'level') break;
         d.open = !!m.o;
-        if (G.Highlights) G.Highlights.door(m.i, m.o, m.k);
-        G.World.door(this.map!.world, this.map!, d);
+        if (Highlights) Highlights.door(m.i, m.o, m.k);
+        World.door(this.map!.world, this.map!, d);
         this.map!.doorVer = (this.map!.doorVer || 0) + 1; // echo paths change
-        const dd = G.R.camera.position.distanceTo(new THREE.Vector3(d.x, 1.2, d.z));
+        const dd = G_R.camera.position.distanceTo(new THREE.Vector3(d.x, 1.2, d.z));
         if (m.k) {
-          G.Audio.kick(dd);
+          Audio.kick(dd);
           const piv = this.map!.doorMeshes && this.map!.doorMeshes[m.i];
           if (piv) { piv.userData.ang = 0.75; piv.userData.rate = 16; } // slammed: most of the swing happens at once
         } else {
           const piv = this.map!.doorMeshes && this.map!.doorMeshes[m.i];
           if (piv) piv.userData.rate = d.open ? 2.6 : 5; // pushed open gently, pulled shut a bit quicker
         }
-        if (!m.k) G.Audio.sampleAt(d.open ? 'door_open' : 'door_close', new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.6, 1); // from the door (at its handle, on its own floor)
+        if (!m.k) Audio.sampleAt(d.open ? 'door_open' : 'door_close', new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.6, 1); // from the door (at its handle, on its own floor)
         break;
       }
-      case 'order': if (m.id !== G.Net.myId) G.Audio.order(this.playerPos(m.id)!); break;
-      case 'radio': { const ev = G.Views.enemies.get(m.e); G.Audio.radio(ev ? ev.pos : null); break; }
+      case 'order': if (m.id !== Net.myId) Audio.order(this.playerPos(m.id)!); break;
+      case 'radio': { const ev = Views.enemies.get(m.e); Audio.radio(ev ? ev.pos : null); break; }
       case 'shout': {
-        if (m.id !== G.Net.myId) G.Audio.shout(this.playerPos(m.id)!);
-        if (m.n > 0) G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.id))}</b>: ${m.n} complying`);
+        if (m.id !== Net.myId) Audio.shout(this.playerPos(m.id)!);
+        if (m.n > 0) HUD.feed(`<b>${U.esc(this.nameOf(m.id))}</b>: ${m.n} complying`);
         break;
       }
-      case 'evid': if (this.phase === 'level') G.Views.addEvidence(m.i, m.wpn, m.x, m.z, m.y); break;
-      case 'evtake': G.Views.removeEvidence(m.i); break;
+      case 'evid': if (this.phase === 'level') Views.addEvidence(m.i, m.wpn, m.x, m.z, m.y); break;
+      case 'evtake': Views.removeEvidence(m.i); break;
       case 'evsec': {
-        G.Views.secureEvidence(m.i); // weapon goes into an evidence envelope
-        const w = G.WEAPONS[m.wpn];
-        G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> secured evidence: ${w ? w.name : 'weapon'}`);
-        if (m.by === G.Net.myId) {
+        Views.secureEvidence(m.i); // weapon goes into an evidence envelope
+        const w = WEAPONS[m.wpn];
+        HUD.feed(`<b>${U.esc(this.nameOf(m.by))}</b> secured evidence: ${w ? w.name : 'weapon'}`);
+        if (m.by === Net.myId) {
           const cr = m.cr;
-          G.Me.credits += cr;
-          G.Career.ev('evidence', cr);
-          G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
-          G.Audio.pickup();
+          G_Me.credits += cr;
+          Career.ev('evidence', cr);
+          HUD.feed(`<span class="cr">+¢${cr}</span>`);
+          Audio.pickup();
         }
         break;
       }
       case 'cuffed': {
-        const def = (G.ENEMIES as Record<string, any>)[m.ty];
-        const ev = G.Views.enemies.get(m.e);
+        const def = (ENEMIES as Record<string, any>)[m.ty];
+        const ev = Views.enemies.get(m.e);
         if (m.body) {
           if (ev) { ev.bodySecured = true; ev.rig.zip(!m.civ); }
-          G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> ${m.civ ? 'reported a civilian casualty' : 'secured a body'}`);
-          if (m.by === G.Net.myId && m.cr > 0) {
+          HUD.feed(`<b>${U.esc(this.nameOf(m.by))}</b> ${m.civ ? 'reported a civilian casualty' : 'secured a body'}`);
+          if (m.by === Net.myId && m.cr > 0) {
             const cr = m.cr;
-            G.Me.credits += cr;
-            G.Career.ev('body', cr);
-            G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
-            G.Audio.pickup();
+            G_Me.credits += cr;
+            Career.ev('body', cr);
+            HUD.feed(`<span class="cr">+¢${cr}</span>`);
+            Audio.pickup();
           }
           break;
         }
         if (ev) { ev.rig.zip(true); ev.arrested = true; } // living arrests are zip-tied too
-        if (G.Highlights && !m.civ) G.Highlights.arrest(m); // (a clip for the highlights: nobody got hurt)
+        if (Highlights && !m.civ) Highlights.arrest(m); // (a clip for the highlights: nobody got hurt)
         // (one cuffed where they lay, down: already counted, incapacitated; securing them pays like securing a body)
-        G.HUD.feed(`<b>${G.U.esc(this.nameOf(m.by))}</b> ${m.civ ? 'secured a civilian' : (m.dn ? 'secured ' : 'arrested ') + (m.nm || (def ? def.name : 'a suspect'))}`);
-        if (m.by === G.Net.myId) {
+        HUD.feed(`<b>${U.esc(this.nameOf(m.by))}</b> ${m.civ ? 'secured a civilian' : (m.dn ? 'secured ' : 'arrested ') + (m.nm || (def ? def.name : 'a suspect'))}`);
+        if (m.by === Net.myId) {
           const cr = m.cr;
-          G.Me.credits += cr;
-          if (!m.civ && !m.dn) G.Me.stats.arrests = (G.Me.stats.arrests || 0) + 1;
-          G.Career.ev(m.civ ? 'rescue' : m.dn ? 'body' : 'arrest', cr); // (one secured where they lay was counted when they went down)
-          G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
-          G.Audio.pickup();
+          G_Me.credits += cr;
+          if (!m.civ && !m.dn) G_Me.stats.arrests = (G_Me.stats.arrests || 0) + 1;
+          Career.ev(m.civ ? 'rescue' : m.dn ? 'body' : 'arrest', cr); // (one secured where they lay was counted when they went down)
+          HUD.feed(`<span class="cr">+¢${cr}</span>`);
+          Audio.pickup();
         }
         break;
       }
       case 'refund':
-        G.Me.credits += m.amt;
-        if (this.hub) G.ShopUI.render();
+        G_Me.credits += m.amt;
+        if (this.hub) ShopUI.render();
         break;
-      default: G.Space.onMsg(m); // (the missions board, the ship, a mission's own things: js/space.ts)
+      default: Space.onMsg(m); // (the missions board, the ship, a mission's own things: js/space.ts)
     }
   },
   playerPos(id: string) {
-    const pv = G.Views.players.get(id);
+    const pv = Views.players.get(id);
     return pv ? pv.pos.clone().setY(1.6) : null;
   },
-  nameOf(id: string): string { return id === G.Net.myId ? this.myName : this.roster[id] ? this.roster[id].name : '???'; },
+  nameOf(id: string): string { return id === Net.myId ? this.myName : this.roster[id] ? this.roster[id].name : '???'; },
   readyNote(r: { name: string }) {
-    G.Audio.tone(660, 0.08, 'sine', 0.09); G.Audio.tone(990, 0.12, 'sine', 0.09, undefined, 0.09); // (a rising two-note chime)
-    G.HUD.chat(null, 0, `${r.name} is ready`);
+    Audio.tone(660, 0.08, 'sine', 0.09); Audio.tone(990, 0.12, 'sine', 0.09, undefined, 0.09); // (a rising two-note chime)
+    HUD.chat(null, 0, `${r.name} is ready`);
     this.lobbyChat(`${r.name} is ready`);
   },
   lobbyChat(text: string) {
@@ -1037,16 +1091,16 @@ const G_Game = {
     if (this.phase !== 'level') return;
     const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]);
     if (m.tb) { // a thermobaric: the same fireball on every screen, from where it went off (the thrower's drew its own as it went)
-      const Me = G.Me, M = Me.tbModel(this.map!, p);
-      if (m.id !== G.Net.myId) { G.R.fireball(M); G.Audio.thermobaric(G.R.camera.position.distanceTo(p)); if (G.ShotLog) G.ShotLog.keepFill(M, null, m.en ? "Suspect's thermobaric" : 'Thermobaric'); }
-      if (m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s, 'tb');
+      const Me = G_Me, M = Me.tbModel(this.map!, p);
+      if (m.id !== Net.myId) { G_R.fireball(M); Audio.thermobaric(G_R.camera.position.distanceTo(p)); if (ShotLog) ShotLog.keepFill(M, null, m.en ? "Suspect's thermobaric" : 'Thermobaric'); }
+      if (m.s && Highlights) Highlights.boom(m.en ? null : 'p' + m.id, p, m.s, 'tb');
       Me.tbOnMe(M, !m.en);
       return;
     }
-    if (m.id !== G.Net.myId) { G.R.explosion(p, m.r); G.Audio.boom(G.R.camera.position.distanceTo(p)); }
-    if (m.fr && m.s && G.Highlights) G.Highlights.boom(m.en ? null : 'p' + m.id, p, m.s, m.sk ? 'sticky' : 'frag'); // (a frag's burst, for the replays: yours is kept as it went off)
-    const Me = G.Me;
-    if (m.fr && m.id !== G.Net.myId && Me.pos && Math.hypot(Me.pos.x - p.x, Me.pos.z - p.z) < Me.FRAG.RANGE) {
+    if (m.id !== Net.myId) { G_R.explosion(p, m.r); Audio.boom(G_R.camera.position.distanceTo(p)); }
+    if (m.fr && m.s && Highlights) Highlights.boom(m.en ? null : 'p' + m.id, p, m.s, m.sk ? 'sticky' : 'frag'); // (a frag's burst, for the replays: yours is kept as it went off)
+    const Me = G_Me;
+    if (m.fr && m.id !== Net.myId && Me.pos && Math.hypot(Me.pos.x - p.x, Me.pos.z - p.z) < Me.FRAG.RANGE) {
       // A frag grenade: a suspect's, its chips flown here for you alone (if you're up); anyone else's (a teammate's: its
       // wounds are theirs to work out), flown against the walls only, from its seed, to leave the same pocks and scorch.
       const fk = m.sk ? 'sticky' : undefined; // (a sticky's: its own heavier fragments)
@@ -1054,7 +1108,7 @@ const G_Game = {
     }
     if (!Me.pos || Me.down || Me.dead) return;
     const cy = Me.pos.y + 1.0, d = Math.hypot(Me.pos.x - p.x, cy - p.y, Me.pos.z - p.z);
-    if (d < m.r && G.Level.los(this.map!, p.x, p.y + 0.2, p.z, Me.pos.x, cy, Me.pos.z)) {
+    if (d < m.r && Level.los(this.map!, p.x, p.y + 0.2, p.z, Me.pos.x, cy, Me.pos.z)) {
       Me.takeDamage(m.d * (1 - (d / m.r) * 0.6) * (m.en ? 1 : 0.4), p); // friendly blasts do 40%
     }
   },
@@ -1062,28 +1116,28 @@ const G_Game = {
   // how squarely you were looking at it (with it out of sight, not at all); deafened by how close, wall or no wall.
   onFlash(m: any) {
     if (this.phase !== 'level' || !Array.isArray(m.p)) return;
-    const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]), cam = G.R.camera, eye = cam.position, d = eye.distanceTo(p);
-    G.R.flashAt(p);
-    G.Audio.flashbang(d);
-    if (G.Highlights) G.Highlights.flash(m); // (for the replays of the kills of those it blinds)
-    const Me = G.Me;
+    const p = new THREE.Vector3(m.p[0], m.p[1], m.p[2]), cam = G_R.camera, eye = cam.position, d = eye.distanceTo(p);
+    G_R.flashAt(p);
+    Audio.flashbang(d);
+    if (Highlights) Highlights.flash(m); // (for the replays of the kills of those it blinds)
+    const Me = G_Me;
     if (!Me.pos || (Me.dead && !Me.spectating)) return; // (dead, on someone's helmet cam: it's them it blinds and deafens, as you see and hear it)
-    const seen = G.Level.los(this.map!, p.x, p.y, p.z, eye.x, eye.y, eye.z);
+    const seen = Level.los(this.map!, p.x, p.y, p.z, eye.x, eye.y, eye.z);
     const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), to = p.clone().sub(eye).normalize(), look = fwd.dot(to);
-    const near = G.U.clamp(1 - d / 16, 0, 1), blind = seen ? near * (look > 0.5 ? 1 : look > 0 ? 0.65 : 0.3) : 0;
-    const deaf = G.U.clamp(1 - d / 22, 0, 1) * (seen ? 1 : 0.6);
-    if (blind > 0.03) G.HUD.flash(blind);
-    if (deaf > 0.03) G.Audio.deafen(deaf);
+    const near = U.clamp(1 - d / 16, 0, 1), blind = seen ? near * (look > 0.5 ? 1 : look > 0 ? 0.65 : 0.3) : 0;
+    const deaf = U.clamp(1 - d / 22, 0, 1) * (seen ? 1 : 0.6);
+    if (blind > 0.03) HUD.flash(blind);
+    if (deaf > 0.03) Audio.deafen(deaf);
     // through night vision: the tubes whited out by the glare, the room's if not the flash itself (js/render.ts flashOver)
-    G.R.flashOver(G.U.clamp(1.25 - d / 24, 0, 1) * (seen ? (look > 0 ? 1 : 0.7) : 0.45));
+    G_R.flashOver(U.clamp(1.25 - d / 24, 0, 1) * (seen ? (look > 0 ? 1 : 0.7) : 0.45));
   },
   onKill(m: any) {
     if (this.phase !== 'level') return;
-    G.Views.kill(m);
-    if (G.Highlights) G.Highlights.kill(m);
+    Views.kill(m);
+    if (Highlights) Highlights.kill(m);
     if (m.inc) { // (down already: counted then, js/server.ts incapacitate)
-      const def = (G.ENEMIES as Record<string, any>)[m.ty];
-      if (m.bo || m.cz) G.HUD.feed(`<span class="dim">${m.nm || (def ? def.name : 'Suspect')} ${m.cz === 'burns' ? 'died of burns' : m.cz === 'blast' ? 'died of blast lung' : 'bled out'}</span>`);
+      const def = (ENEMIES as Record<string, any>)[m.ty];
+      if (m.bo || m.cz) HUD.feed(`<span class="dim">${m.nm || (def ? def.name : 'Suspect')} ${m.cz === 'burns' ? 'died of burns' : m.cz === 'blast' ? 'died of blast lung' : 'bled out'}</span>`);
       return;
     }
     this.credit(m, 'kill');
@@ -1091,77 +1145,77 @@ const G_Game = {
   // A suspect incapacitated (down for good): counted now, the same as a kill
   onIncap(m: any) {
     if (this.phase !== 'level') return;
-    if (G.Highlights) G.Highlights.incap(m);
+    if (Highlights) Highlights.incap(m);
     this.credit(m, 'incap');
   },
   // the feed and, for whoever did it, the credits and their tally: a kill, or a suspect incapacitated
   credit(m: any, kind: 'kill' | 'incap' = 'kill') {
-    const Me = G.Me, def = (G.ENEMIES as Record<string, any>)[m.ty];
+    const Me = G_Me, def = (ENEMIES as Record<string, any>)[m.ty];
     const killer = this.nameOf(m.by);
-    const kc = m.by === G.Net.myId ? '#ffd24a' : this.roster[m.by] ? G.U.hex(this.roster[m.by].color) : '#fff';
-    G.HUD.feed(`<b style="color:${kc}">${G.U.esc(killer)}</b> ${m.h ? '<span class="hs">⌖</span>' : '✕'} ${m.nm || (def ? def.name : 'hostile')}`);
+    const kc = m.by === Net.myId ? '#ffd24a' : this.roster[m.by] ? U.hex(this.roster[m.by].color) : '#fff';
+    HUD.feed(`<b style="color:${kc}">${U.esc(killer)}</b> ${m.h ? '<span class="hs">⌖</span>' : '✕'} ${m.nm || (def ? def.name : 'hostile')}`);
     if (m.why) {
       // a civilian, or someone who had already surrendered: someone who'd given up costs whoever pulled the trigger; a civilian
       // costs no credits (it'll be reputation: counted, in the career's tally, for that)
-      G.HUD.feed(`<span class="bad">${m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED FORCE'}</span>`);
-      if (m.by === G.Net.myId) {
+      HUD.feed(`<span class="bad">${m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED FORCE'}</span>`);
+      if (m.by === Net.myId) {
         const cr = m.why === 'civ' ? 0 : m.cr || 0;
         Me.credits = Math.max(0, Me.credits + cr);
-        G.Career.ev(m.why === 'civ' ? 'civ' : 'unauth', cr);
-        if (cr) G.HUD.feed(`<span class="bad">-¢${-cr}</span>`);
-        G.HUD.toast(m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED USE OF FORCE', cr ? `-¢${-cr}` : '', 2.5);
-        G.Audio.deny();
+        Career.ev(m.why === 'civ' ? 'civ' : 'unauth', cr);
+        if (cr) HUD.feed(`<span class="bad">-¢${-cr}</span>`);
+        HUD.toast(m.why === 'civ' ? 'CIVILIAN KILLED' : 'UNAUTHORISED USE OF FORCE', cr ? `-¢${-cr}` : '', 2.5);
+        Audio.deny();
       }
       return;
     }
-    if (m.by === G.Net.myId) {
+    if (m.by === Net.myId) {
       const cr = m.cr;
       Me.credits += cr;
       Me.stats.kills++;
       if (m.h) Me.stats.hs++;
-      if (G.Arsenal) G.Arsenal.kill(m);
-      G.Career.ev(kind, cr, !!m.h); // (your career: js/career.ts)
-      G.HUD.feed(`<span class="cr">+¢${cr}</span>`);
+      if (Arsenal) Arsenal.kill(m);
+      Career.ev(kind, cr, !!m.h); // (your career: js/career.ts)
+      HUD.feed(`<span class="cr">+¢${cr}</span>`);
     }
   },
 
   // ------------------------------------------------------------- phases
   enterLobby() {
     this.toggleInv(false);
-    G.Space.reset();
+    Space.reset();
     this.leaveHub();
     this.phase = 'lobby';
     this.unlock();
-    G.Views.clearLevel();
-    if (!this.map && !(G.MenuShow && G.MenuShow.live)) this.menuBackdrop(); // (the menu's guns go on behind the lobby too: showcaseBehind; the level's only built for it if they're not up yet)
+    Views.clearLevel();
+    if (!this.map && !(MenuShow && MenuShow.live)) this.menuBackdrop(); // (the menu's guns go on behind the lobby too: showcaseBehind; the level's only built for it if they're not up yet)
     this.screen('lobby');
     this.renderLobby();
   },
   renderLobby() {
-    this.$('codeBlock').classList.toggle('hidden', !G.Net.code);
-    this.$('lobbyCode').textContent = G.Net.code || '';
+    this.$('codeBlock').classList.toggle('hidden', !Net.code);
+    this.$('lobbyCode').textContent = Net.code || '';
     let html = '';
     for (const [id, p] of Object.entries(this.roster)) {
-      html += `<div class="lp">${G.Callsigns.html(p.animal)}<span style="color:${G.U.hex(p.color)}">${G.U.esc(p.name)}</span>${this.guestMark(id)}${p.host ? ' <small>HOST</small>' : ''}${id === G.Net.myId ? ' <small>YOU</small>' : ''}</div>`;
+      html += `<div class="lp">${Callsigns.html(p.animal)}<span style="color:${U.hex(p.color)}">${U.esc(p.name)}</span>${this.guestMark(id)}${p.host ? ' <small>HOST</small>' : ''}${id === Net.myId ? ' <small>YOU</small>' : ''}</div>`;
     }
     this.$('lobbyPlayers').innerHTML = html;
     this.animalNote();
-    this.$('btnStart').classList.toggle('hidden', !G.Net.isHost);
-    this.$('btnNewCode').classList.toggle('hidden', !G.Net.isHost || G.Net.solo); // (the host's: a fresh code)
-    if (!G.Net.isHost) this.$('lobbyMsg').textContent = 'Waiting for the host to deploy...';
-    else if (G.Net.solo) this.$('lobbyMsg').textContent = 'Solo run. Enemy count and health scale with squad size.';
+    this.$('btnStart').classList.toggle('hidden', !Net.isHost);
+    this.$('btnNewCode').classList.toggle('hidden', !Net.isHost || Net.solo); // (the host's: a fresh code)
+    if (!Net.isHost) this.$('lobbyMsg').textContent = 'Waiting for the host to deploy...';
+    else if (Net.solo) this.$('lobbyMsg').textContent = 'Solo run. Enemy count and health scale with squad size.';
     else this.$('lobbyMsg').textContent = 'Share the code. Friends can also join between levels.';
   },
   // the guns this level's suspects could be carrying (its gear tier and one either side)
   enemyGuns(level: number) {
-    const t = G.gearTier(level), out = new Set<string>();
-    for (const pools of Object.values(G.ENEMY_GEAR.weapons)) for (let i = Math.max(1, t - 1); i <= Math.min(4, t + 1); i++) pools[i - 1].forEach((w) => out.add(w));
+    const t = gearTier(level), out = new Set<string>();
+    for (const pools of Object.values(ENEMY_GEAR.weapons)) for (let i = Math.max(1, t - 1); i <= Math.min(4, t + 1); i++) pools[i - 1].forEach((w) => out.add(w));
     return [...out];
   },
   // whether the level's weapon case has been opened
   setCase(open: boolean) {
     this.caseOpen = !!open;
-    G.Views.syncCase();
+    Views.syncCase();
   },
   // ------------------------------------------------------------- the attachments box
   // One use each (this.abox: [open, { player id: [their three part ids, the one they took] }]): your three, as three
@@ -1169,14 +1223,14 @@ const G_Game = {
   // slows and lands on what the host rolled (the result's the host's: stopping only shows it); looking again, they've
   // landed. A landed one can be fitted straight to the weapon in your hands (if it goes on it as it's built) or carried:
   // one of your three.
-  aboxMine() { return this.abox && this.abox[1] && this.abox[1][G.Net.myId!] || null; },
+  aboxMine() { return this.abox && this.abox[1] && this.abox[1][Net.myId!] || null; },
   aboxShow(spin: boolean) {
     const mine = this.aboxMine();
     if (this.phase !== 'level' || !mine) return;
     const key = mine[0].join(','), ui = this.aboxUI && this.aboxUI.key === key ? this.aboxUI : null;
     this.aboxUI = ui || { key, wheels: mine[0].map(() => ({ landed: !spin, stop: null, off: 0, strip: null })) };
     if (spin && !ui) {
-      const w = G.Me.cur(), GS = G.Gunsmith, pool = (w ? GS.attachOptions(w.def.id, w.def.build) : []).map((p) => p.id);
+      const w = G_Me.cur(), GS = Gunsmith, pool = (w ? GS.attachOptions(w.def.id, w.def.build) : []).map((p) => p.id);
       for (const pid of mine[0]) if (!pool.includes(pid)) pool.push(pid);
       while (pool.length < 6) pool.push(GS.LIST[(Math.random() * GS.LIST.length) | 0].id); // (something to spin through)
       const live = pool.filter((pid) => GS.PARTS[pid] && !GS.PARTS[pid].retired), R = this.REEL;
@@ -1187,7 +1241,7 @@ const G_Game = {
       }
     }
     this.aboxOpen = true;
-    G.Me.keys = {}; G.Me.mouse.l = G.Me.mouse.r = false;
+    G_Me.keys = {}; G_Me.mouse.l = G_Me.mouse.r = false;
     this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden');
     this.unlock();
     const el = this.$('aboxPick');
@@ -1196,7 +1250,7 @@ const G_Game = {
     this.aboxRender();
     cancelAnimationFrame(this.aboxRaf); this.aboxT = 0;
     if (this.aboxUI.wheels.some((wh: GmWheel) => !wh.landed)) this.aboxRaf = requestAnimationFrame((t) => this.aboxSpin(t));
-    if (spin) G.Audio.click();
+    if (spin) Audio.click();
   },
   // a reel: faces H px tall, M to a turn, scrolling down at V px/s, the window WH tall (the faces either side peek in);
   // a stop eases out over the next few faces, starting at the reel's own speed
@@ -1212,30 +1266,30 @@ const G_Game = {
   },
   // a part's face in a wheel: its picture, its name, the slot it goes in
   aboxFace(pid: string) {
-    const GS = G.Gunsmith, p = GS.PARTS[pid], it = G.Gear.partItem(pid), [cw, ch] = G.Gear.size(it);
+    const GS = Gunsmith, p = GS.PARTS[pid], it = Gear.partItem(pid), [cw, ch] = Gear.size(it);
     this.aboxIcons = this.aboxIcons || {};
-    const img = this.aboxIcons[pid] || (this.aboxIcons[pid] = G.Icons.of(it, cw, ch, false));
-    return `<img src="${img}" alt=""><b>${G.U.esc(p ? p.name! : pid)}</b><small>${G.U.esc(p ? GS.SLOT_LABEL[p.slot] || p.slot : '')}</small>`;
+    const img = this.aboxIcons[pid] || (this.aboxIcons[pid] = Icons.of(it, cw, ch, false));
+    return `<img src="${img}" alt=""><b>${U.esc(p ? p.name! : pid)}</b><small>${U.esc(p ? GS.SLOT_LABEL[p.slot] || p.slot : '')}</small>`;
   },
   // which slot of the weapon in your hands a part goes straight into (as it's built), or null
   aboxSlot(pid: string) {
-    const GS = G.Gunsmith, p = GS.PARTS[pid], w = G.Me.cur();
+    const GS = Gunsmith, p = GS.PARTS[pid], w = G_Me.cur();
     return p && w ? GS.slotsOf(w.def.id, w.def.build).find((sl: ReturnType<typeof GS.slotsOf>[number]) => GS.fitsSlot(sl, p, w.def.id, w.def.build)) || null : null;
   },
   aboxRender() {
     const el = this.$('aboxPick'), mine = this.aboxMine(), ui: GmAboxUI | undefined = this.aboxUI;
     if (!el || !mine || !ui) return;
-    const w = G.Me.cur(), taken = mine[1], spinning = ui.wheels.some((wh) => !wh.landed);
+    const w = G_Me.cur(), taken = mine[1], spinning = ui.wheels.some((wh) => !wh.landed);
     const card = (pid: string, i: number) => {
-      const wh = ui.wheels[i], p = G.Gunsmith.PARTS[pid], landed = wh.landed;
+      const wh = ui.wheels[i], p = Gunsmith.PARTS[pid], landed = wh.landed;
       const sl = landed && this.aboxSlot(pid);
       const acts = taken ? (taken === pid ? '<small>Taken</small>' : '')
         : !landed ? `<button class="btn primary" data-stop="${i}" ${wh.stop ? 'disabled' : ''}>${wh.stop ? 'Stopping...' : 'Stop'}</button>`
-          : `${sl ? `<button class="btn primary" data-fit="${i}">Fit to your ${G.U.esc(w.def.name)}</button>` : ''}<button class="btn" data-take="${i}">Put in your inventory</button>`;
+          : `${sl ? `<button class="btn primary" data-fit="${i}">Fit to your ${U.esc(w.def.name)}</button>` : ''}<button class="btn" data-take="${i}">Put in your inventory</button>`;
       const R = this.REEL, win = landed || !wh.strip ? `<div class="abox-win">${this.aboxFace(pid)}</div>`
         : `<div class="abox-reel" style="height:${R.WH}px"><div class="abox-strip">${wh.strip.map((q) => `<div class="abox-face" style="height:${R.H}px">${this.aboxFace(q)}</div>`).join('')}</div></div>`;
       return `<div class="arm${landed ? '' : ' spinning'}${taken === pid ? ' taken' : taken ? ' gone' : ''}" data-wheel="${i}">${win}
-        <em>${landed && p ? G.U.esc(p.desc || '') : ''}</em><div class="abox-acts">${acts}</div></div>`;
+        <em>${landed && p ? U.esc(p.desc || '') : ''}</em><div class="abox-acts">${acts}</div></div>`;
     };
     const how = 'Take <b>one</b> of the three: fitted to the weapon in your hands, or into your inventory. Fitting it puts whatever it replaces in your inventory (on the floor if there\'s no room).';
     el.innerHTML = `<div class="arm-box"><h2>Attachments box</h2><p>${taken ? 'You\'ve had your pick.' : spinning ? 'Stop each wheel. ' + how : how}</p>
@@ -1252,15 +1306,15 @@ const G_Game = {
     const box = this.$('aboxPick').querySelector('.abox-stats'); if (box) box.innerHTML = this.aboxStatsFor(pid); // (the box is drawn afresh as its wheels land: not a kept element)
   },
   aboxStatsFor(pid: string | undefined) {
-    const GS = G.Gunsmith, p = pid && GS.PARTS[pid], w = G.Me.cur();
+    const GS = Gunsmith, p = pid && GS.PARTS[pid], w = G_Me.cur();
     if (!p || !w) return '<p class="abox-hint">Hover over a pick to see what it does to your gun.</p>';
-    const fx = G.GunsmithUI.partEffects(p, w.def.id), sl = this.aboxSlot(pid), name = G.U.esc(w.def.name);
-    if (!sl) return `<h4>${G.U.esc(p.name!)}</h4><div class="gs-pe">${fx || ''}</div><p class="abox-hint">Doesn't fit your ${name} as it's built: it goes in your inventory.</p>`;
+    const fx = GunsmithUI.partEffects(p, w.def.id), sl = this.aboxSlot(pid), name = U.esc(w.def.name);
+    if (!sl) return `<h4>${U.esc(p.name!)}</h4><div class="gs-pe">${fx || ''}</div><p class="abox-hint">Doesn't fit your ${name} as it's built: it goes in your inventory.</p>`;
     const build = Object.assign({}, w.def.build), off = build[sl.slot];
     build[sl.slot] = pid; GS.prune(w.def.id, build);
-    if (GS.convert(w.def.id, build)) return `<h4>${G.U.esc(p.name!)}</h4><p class="abox-hint">Fitted, it makes your ${name} into another gun.</p>`;
+    if (GS.convert(w.def.id, build)) return `<h4>${U.esc(p.name!)}</h4><p class="abox-hint">Fitted, it makes your ${name} into another gun.</p>`;
     const after = GS.compile(w.def.id, build), was = off && GS.PARTS[off];
-    return `<h4>Fitted to your ${name}${was ? ` <small>in place of the ${G.U.esc(was.name)}</small>` : ''}</h4><div class="gs-pe">${fx || ''}</div><div class="gs-stats">${G.GunsmithUI.statsHtml(w.def, after)}</div>`;
+    return `<h4>Fitted to your ${name}${was ? ` <small>in place of the ${U.esc(was.name)}</small>` : ''}</h4><div class="gs-pe">${fx || ''}</div><div class="gs-stats">${GunsmithUI.statsHtml(w.def, after)}</div>`;
   },
   // where each spinning reel's strip is: off (0..M*H while it spins) scrolls it down; the face centred in the window
   // is the one at 2M - off/H (in the middle copy)
@@ -1284,7 +1338,7 @@ const G_Game = {
       if (wh.stop) {
         const s = wh.stop, u = Math.min(1, (t - s.t0) / s.T);
         wh.off = s.o0 + (s.o1 - s.o0) * (1 - Math.pow(1 - u, 3));
-        if (u >= 1) { wh.landed = true; wh.stop = null; changed = true; G.Audio.click(); }
+        if (u >= 1) { wh.landed = true; wh.stop = null; changed = true; Audio.click(); }
       } else wh.off = (wh.off + R.V * dt) % (R.M * R.H);
     }
     if (changed) this.aboxRender(); else this.aboxPlace();
@@ -1304,13 +1358,13 @@ const G_Game = {
       const c = 2 * R.M - wh.off / R.H, k = Math.floor(c - (R.V * 1.2 / 3) / R.H), dist = (c - k) * R.H;
       wh.strip![k] = mine[0][i];
       wh.stop = { t0: performance.now(), o0: wh.off, o1: wh.off + dist, T: (3 * dist / R.V) * 1000 };
-      G.Audio.click();
+      Audio.click();
       return this.aboxRender();
     }
     const i = t.dataset.fit != null ? +t.dataset.fit : t.dataset.take != null ? +t.dataset.take : -1;
     if (i < 0 || mine[1] || !mine[0][i]) return;
     const fit = t.dataset.fit != null && !!this.aboxSlot(mine[0][i]);
-    G.Net.toHost({ t: 'takeAbox', i, fit });
+    Net.toHost({ t: 'takeAbox', i, fit });
     for (const b of this.$('aboxPick').querySelectorAll<HTMLButtonElement>('[data-fit],[data-take]')) b.disabled = true;
   },
   // ------------------------------------------------------------- first aid cabinets
@@ -1318,7 +1372,7 @@ const G_Game = {
   // it in the field inventory, and the inventory tells the host what changed (G.InvUI)
   cabGrid(i: number) {
     this.cabGrids = this.cabGrids || [];
-    if (!this.cabGrids[i]) { this.cabGrids[i] = G.Gear.grid(3, 2, ['med'], 'Cabinet'); this.cabGrids[i].cab = i; this.cabGridSet(i, this.cabs && this.cabs[i]); }
+    if (!this.cabGrids[i]) { this.cabGrids[i] = Gear.grid(3, 2, ['med'], 'Cabinet'); this.cabGrids[i].cab = i; this.cabGridSet(i, this.cabs && this.cabs[i]); }
     return this.cabGrids[i];
   },
   cabLay(items: (string | number)[][]) { return items.map((e) => e.join(':')).sort().join('|'); },
@@ -1328,9 +1382,9 @@ const G_Game = {
     g.ver = c[2] || 0;
     const lay = this.cabLay(c[1]);
     if (lay === g.lay) return; // as you left it
-    g.items = c[1].map(([mt, n, x, y, r]) => ({ it: G.Gear.medItem(mt, n), x, y, r }));
+    g.items = c[1].map(([mt, n, x, y, r]) => ({ it: Gear.medItem(mt, n), x, y, r }));
     g.lay = lay;
-    g.counts = G.Sim.cabCounts(c[1] as any);
+    g.counts = Sim.cabCounts(c[1] as any);
   },
   // ------------------------------------------------------------- the team locker
   // the squad's shared locker at the quartermaster's (js/server.ts teamEdit), kept as the host has it. Its items
@@ -1338,27 +1392,27 @@ const G_Game = {
   // host what changed. base: the tids the host has; gone: those you've taken out (and not had back yet);
   // sent: what you've put in that the host hasn't answered yet.
   teamGrid() {
-    if (!this.tGrid) Object.assign((this.tGrid = G.Gear.grid(G.Sim.TEAM_W, G.Sim.TEAM_H, null, 'Team locker')), { locker: true, team: true, ver: 0, lay: '', base: new Set(), gone: new Set(), sent: new Set() });
+    if (!this.tGrid) Object.assign((this.tGrid = Gear.grid(Sim.TEAM_W, Sim.TEAM_H, null, 'Team locker')), { locker: true, team: true, ver: 0, lay: '', base: new Set(), gone: new Set(), sent: new Set() });
     return this.tGrid;
   },
   teamLay(items: (string | number)[][]) { return items.map((e) => e.slice(0, 4).join(':')).sort().join('|'); },
   teamSet(m: any) {
-    const g = this.teamGrid(), me = G.Me;
+    const g = this.teamGrid(), me = G_Me;
     if (!this.teamBusy) this.teamSync(); // (anything you've moved that the host hasn't heard about yet goes first)
     g.ver = m.ver;
     g.base = new Set(m.items.map((e: GmTeamItem) => e[0]));
     for (const tid of g.gone) if (!g.base.has(tid)) g.gone.delete(tid);
     for (const tid of g.sent) if (g.base.has(tid)) g.sent.delete(tid);
     const lay = this.teamLay(m.items);
-    if (lay !== g.lay) { g.items = m.items.map(([tid, x, y, r, pk]: GmTeamItem) => ({ it: Object.assign(G.Gear.unpack(pk), { tid }), x, y, r })); g.lay = lay; }
-    if (m.by === G.Net.myId) {
+    if (lay !== g.lay) { g.items = m.items.map(([tid, x, y, r, pk]: GmTeamItem) => ({ it: Object.assign(Gear.unpack(pk), { tid }), x, y, r })); g.lay = lay; }
+    if (m.by === Net.myId) {
       // taken by someone else first: it was never yours; and what didn't fit comes back to your locker
-      for (const tid of m.deny || []) G.InvUI.lose(tid);
-      for (const pk of m.ret || []) G.Gear.place([me.locker, ...G.Gear.body(me)], G.Gear.unpack(pk));
-      if ((m.deny || []).length) G.HUD.toast('', 'Someone took that from the team locker first', 1.8);
-      if ((m.ret || []).length) G.HUD.toast('', 'The team locker filled up: it went back to your locker', 1.8);
+      for (const tid of m.deny || []) InvUI.lose(tid);
+      for (const pk of m.ret || []) Gear.place([me.locker, ...Gear.body(me)], Gear.unpack(pk));
+      if ((m.deny || []).length) HUD.toast('', 'Someone took that from the team locker first', 1.8);
+      if ((m.ret || []).length) HUD.toast('', 'The team locker filled up: it went back to your locker', 1.8);
     }
-    if (this.hub) G.InvUI.refresh();
+    if (this.hub) InvUI.refresh();
   },
   // after a change in the stash: how you left the team locker, to the host
   teamSync() {
@@ -1369,7 +1423,7 @@ const G_Game = {
       const r = p.r ? 1 : 0;
       const tid = p.it.tid;
       if (tid && (g.base.has(tid) || g.sent.has(tid)) && !g.gone.has(tid) && !here.has(tid)) { keep.push([tid, p.x, p.y, r]); here.add(tid); }
-      else { p.it.tid = `${G.Net.myId}.${(this.tidN = (this.tidN || 0) + 1)}` as unknown as number; g.sent.add(p.it.tid); here.add(p.it.tid); put.push([p.it.tid, p.x, p.y, r, G.Gear.pack(p.it)]); }
+      else { p.it.tid = `${Net.myId}.${(this.tidN = (this.tidN || 0) + 1)}` as unknown as number; g.sent.add(p.it.tid); here.add(p.it.tid); put.push([p.it.tid, p.x, p.y, r, Gear.pack(p.it)]); }
     }
     const lay = this.teamLay([...keep, ...put]);
     if (lay === g.lay) return;
@@ -1377,7 +1431,7 @@ const G_Game = {
     for (const tid of take) g.gone.add(tid);
     g.lay = lay; // (before sending: the host's own answer comes straight back)
     this.teamBusy = true;
-    try { G.Net.toHost({ t: 'teamEdit', ver: g.ver, take, keep: keep.filter((e) => g.base.has(e[0])), put }); } finally { this.teamBusy = false; }
+    try { Net.toHost({ t: 'teamEdit', ver: g.ver, take, keep: keep.filter((e) => g.base.has(e[0])), put }); } finally { this.teamBusy = false; }
   },
   // ------------------------------------------------------------- the route map
   // the host's route: { seed, act, path, votes }, with the act's map rebuilt from its seed
@@ -1388,24 +1442,24 @@ const G_Game = {
   },
   setRoute(r: GmRoute | null) {
     if (!r) return;
-    if (!this.routeMap || this.routeMap.seed !== r.seed || this.routeMap.act !== r.act) this.routeMap = G.Route.gen(r.seed, r.act);
+    if (!this.routeMap || this.routeMap.seed !== r.seed || this.routeMap.act !== r.act) this.routeMap = Route.gen(r.seed, r.act);
     this.routeSt = { path: r.path || [], votes: r.votes || {} };
   },
   // The models of every gun on the sidearm web, stock and pro builds (models parse on first show: js/glb.ts), counted on the loading veil's line.
   armLoad(): Promise<unknown> {
     if (this.armModels === 'ready') return Promise.resolve();
     if (this.armModels) return this.armModels;
-    const A = G.Arsenal, defs: any[] = [];
-    for (const q of A.NODES) defs.push(G.Me.makeWeapon(q.id).def);
-    if (G.Loadout) for (const q of G.Loadout.TREES.p.NODES) defs.push(G.Me.makeWeapon(q.id).def); // (and the primary tree's)
+    const A = Arsenal, defs: any[] = [];
+    for (const q of A.NODES) defs.push(G_Me.makeWeapon(q.id).def);
+    if (Loadout) for (const q of Loadout.TREES.p.NODES) defs.push(G_Me.makeWeapon(q.id).def); // (and the primary tree's)
     let n = 0; const say = () => this.veilSay(`Loading the arsenal ${n} / ${defs.length}`); say();
-    const each = (d: any) => G.Models.ensure(d, 0).catch(() => false).then(() => { n++; say(); });
+    const each = (d: any) => Models.ensure(d, 0).catch(() => false).then(() => { n++; say(); });
     return (this.armModels = Promise.all(defs.map(each)).then(() => { this.armModels = 'ready'; }));
   },
   enterRoute(level: number) {
     // the sidearm web comes up with every picture drawn: the screen goes behind the loading veil FIRST (all the way down, so nothing of the map shows),
     // the arsenal loads there, and the route and the web are built behind it as it wipes off
-    if (this.armModels !== 'ready' && !G.Me.sidearmChosen) {
+    if (this.armModels !== 'ready' && !G_Me.sidearmChosen) {
       const veil = this.$('veil'), up = veil.classList.contains('on') && !veil.classList.contains('out');
       if (!up) this.veil(true);
       const at = this.routeWait = (this.routeWait || 0) + 1;
@@ -1421,8 +1475,8 @@ const G_Game = {
     this.level = level;
     this.unlock();
     this.$('clickToPlay').classList.add('hidden');
-    G.Views.clearLevel();
-    if (!this.map && !(G.MenuShow && G.MenuShow.live)) this.menuBackdrop();
+    Views.clearLevel();
+    if (!this.map && !(MenuShow && MenuShow.live)) this.menuBackdrop();
     this.screen('route');
     this.renderRoute();
     this.sidearmPick();
@@ -1432,11 +1486,11 @@ const G_Game = {
   // gun you click on comes to the middle. A strand fills as you get on with what it asks.
   sidearmPick() {
     const el = this.$('sidearmPick');
-    if (G.Me.sidearmChosen) { el.classList.add('hidden'); return; }
+    if (G_Me.sidearmChosen) { el.classList.add('hidden'); return; }
     // First the models of every gun on the trees (models parse on first show: js/glb.ts), behind a loading screen, so the web opens with every
     // picture drawn; anything still missing after that shows a spinner until it comes in ('gunicons')
     if (this.armModels !== 'ready') { el.classList.add('hidden'); this.armLoad().then(() => { if (this.phase === 'route') this.sidearmPick(); }); return; }
-    if (!G.SpaceData.ON) this.loTab = 's'; // (a run on the ground: the sidearm alone, taken at once)
+    if (!SpaceData.ON) this.loTab = 's'; // (a run on the ground: the sidearm alone, taken at once)
     if (!this.armView) this.armView = this.loCentre(this.loTab);
     this.loWeb(el); this.armBind(el);
   },
@@ -1455,14 +1509,14 @@ const G_Game = {
       if (!drag || !e.isPrimary) return;
       const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
       if (Math.hypot(dx, dy) > 5) moved = true;
-      if (moved) { const v = this.armView, R = 1050 * v.z; v.x = G.U.clamp(drag.vx + dx, -R, R); v.y = G.U.clamp(drag.vy + dy, -R, R); this.armPlace(); }
+      if (moved) { const v = this.armView, R = 1050 * v.z; v.x = U.clamp(drag.vx + dx, -R, R); v.y = U.clamp(drag.vy + dy, -R, R); this.armPlace(); }
     });
     window.addEventListener('pointerup', () => { drag = null; });
     el.addEventListener('wheel', ((e: GmEvt & WheelEvent) => {
       const view = e.target.closest('.web-view');
       if (!view || view.classList.contains('lo-attview')) return; // (the attachment view scrolls as a page does)
       e.preventDefault();
-      const v = this.armView, r = view.getBoundingClientRect(), z = G.U.clamp(v.z * Math.exp(-e.deltaY * 0.0012), 0.4, 1.5), k = z / v.z, cx = e.clientX - r.left - r.width / 2, cy = e.clientY - r.top - r.height / 2; // (about the cursor: what's under it stays there)
+      const v = this.armView, r = view.getBoundingClientRect(), z = U.clamp(v.z * Math.exp(-e.deltaY * 0.0012), 0.4, 1.5), k = z / v.z, cx = e.clientX - r.left - r.width / 2, cy = e.clientY - r.top - r.height / 2; // (about the cursor: what's under it stays there)
       v.x = cx - (cx - v.x) * k; v.y = cy - (cy - v.y) * k; v.z = z;
       const w = el.querySelector('.web-world'); if (w) w.classList.remove('glide');
       this.armPlace();
@@ -1477,70 +1531,70 @@ const G_Game = {
     }) as EventListener);
     el.addEventListener('click', ((e: GmEvt) => {
       const dragged = moved; moved = false;
-      if (G.Me.sidearmChosen) return;
-      const L = G.Loadout, sl = this.loTab, look = this.loLook[sl];
+      if (G_Me.sidearmChosen) return;
+      const L = Loadout, sl = this.loTab, look = this.loLook[sl];
       const lt = e.target.closest<HTMLElement>('[data-lotab]'), ln = e.target.closest<HTMLElement>('[data-lonode]'), lb = e.target.closest<HTMLElement>('[data-lobox]'), lp = e.target.closest<HTMLElement>('[data-lopart]');
       // an attachment box (under a slot in the bar): its own view, of what can go in it; a part from it fitted, or the box emptied
-      if (lb) { const [bs, bi] = lb.dataset.lobox!.split(':'); if (L.sel(bs)) { this.loTab = bs; this.loAtt = { sl: bs, box: +bi }; this.loRanks = false; this.loThr = null; } G.Audio.click(); return this.sidearmPick(); }
-      if (lp && this.loAtt) { const v = lp.dataset.lopart!, [k, id] = v.split('|'), A = this.loAtt, it = L.sel(A.sl); if (it) L.fit(A.sl, it, A.box, v ? { k, id } : null); this.loAtt = null; G.Audio.click(); return this.sidearmPick(); }
+      if (lb) { const [bs, bi] = lb.dataset.lobox!.split(':'); if (L.sel(bs)) { this.loTab = bs; this.loAtt = { sl: bs, box: +bi }; this.loRanks = false; this.loThr = null; } Audio.click(); return this.sidearmPick(); }
+      if (lp && this.loAtt) { const v = lp.dataset.lopart!, [k, id] = v.split('|'), A = this.loAtt, it = L.sel(A.sl); if (it) L.fit(A.sl, it, A.box, v ? { k, id } : null); this.loAtt = null; Audio.click(); return this.sidearmPick(); }
       const lth = e.target.closest<HTMLElement>('[data-lothr]');
-      if (lth) { this.loThr = +lth.dataset.lothr!; this.loAtt = null; this.loRanks = false; G.Audio.click(); return this.sidearmPick(); }
+      if (lth) { this.loThr = +lth.dataset.lothr!; this.loAtt = null; this.loRanks = false; Audio.click(); return this.sidearmPick(); }
       const ltp = e.target.closest<HTMLElement>('[data-lothrpick]');
-      if (ltp && this.loThr != null) { L.setThr(this.loThr, ltp.dataset.lothrpick || null); this.loThr = null; G.Audio.click(); return this.sidearmPick(); }
-      if (e.target.closest('[data-loranks]')) { this.loRanks = !this.loRanks; this.loAtt = null; this.loThr = null; G.Audio.click(); return this.sidearmPick(); }
-      if (e.target.closest('[data-loback]')) { this.loAtt = null; this.loRanks = false; this.loThr = null; G.Audio.click(); return this.sidearmPick(); }
-      if (lt) { this.loTab = lt.dataset.lotab!; this.loAtt = null; this.loRanks = false; this.loThr = null; this.armView = this.loCentre(this.loTab); G.Audio.click(); return this.sidearmPick(); }
-      if (e.target.closest('[data-lodeploy]')) { G.Audio.click(); return this.loDeploy(); }
-      if (e.target.closest('[data-armhome]')) { go(0, 0); G.Audio.click(); return this.sidearmPick(); }
+      if (ltp && this.loThr != null) { L.setThr(this.loThr, ltp.dataset.lothrpick || null); this.loThr = null; Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-loranks]')) { this.loRanks = !this.loRanks; this.loAtt = null; this.loThr = null; Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-loback]')) { this.loAtt = null; this.loRanks = false; this.loThr = null; Audio.click(); return this.sidearmPick(); }
+      if (lt) { this.loTab = lt.dataset.lotab!; this.loAtt = null; this.loRanks = false; this.loThr = null; this.armView = this.loCentre(this.loTab); Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-lodeploy]')) { Audio.click(); return this.loDeploy(); }
+      if (e.target.closest('[data-armhome]')) { go(0, 0); Audio.click(); return this.sidearmPick(); }
       if (ln) {
         if (dragged) return; // (it was a drag that started on it)
         const q = L.by(sl).get(ln.dataset.lonode!)!; this.loLook[sl] = q.id;
-        const [x, y] = L.at(sl, q); go(-x, -y); G.Audio.click(); return this.sidearmPick();
+        const [x, y] = L.at(sl, q); go(-x, -y); Audio.click(); return this.sidearmPick();
       }
-      if (e.target.closest('[data-lotake]')) { L.pick(sl, look); G.Audio.click(); if (!G.SpaceData.ON) return this.loDeploy(); return this.sidearmPick(); } // (on the ground, taken at once)
-      if (e.target.closest('[data-loclear]')) { L.pick(sl, null); G.Audio.click(); return this.sidearmPick(); }
+      if (e.target.closest('[data-lotake]')) { L.pick(sl, look); Audio.click(); if (!SpaceData.ON) return this.loDeploy(); return this.sidearmPick(); } // (on the ground, taken at once)
+      if (e.target.closest('[data-loclear]')) { L.pick(sl, null); Audio.click(); return this.sidearmPick(); }
       const cb = e.target.closest('[data-locol]') as HTMLElement | null;
-      if (cb) { const v = cb.dataset.locol; L.setCol(sl, v ? +v : null); G.Audio.click(); return this.sidearmPick(); }
+      if (cb) { const v = cb.dataset.locol; L.setCol(sl, v ? +v : null); Audio.click(); return this.sidearmPick(); }
     }) as EventListener);
   },
   // where a tab's web opens: on what's taken (or the middle), a little above it so its boxes show
   loCentre(sl: string) {
-    const L = G.Loadout, id = this.loLook[sl] || L.sel(sl) || L.TREES[sl].mid, q = L.by(sl).get(id), [x, y] = q ? L.at(sl, q) : [0, 0], z = 0.85;
+    const L = Loadout, id = this.loLook[sl] || L.sel(sl) || L.TREES[sl].mid, q = L.by(sl).get(id), [x, y] = q ? L.at(sl, q) : [0, 0], z = 0.85;
     return { x: -x * z, y: (-y - 60) * z, z };
   },
   // ---- The loadout screen (a run in space, before the base): a bar across the top, your rank and its XP, the four slots (each a tab with
   // what's in it and its points), the points against the budget and Deploy; under it the slot's tree (loWeb). On the ground, the sidearm's
   // tree alone.
   loBar() {
-    if (!G.SpaceData.ON) return '';
-    const L = G.Loadout, r = L.rank(), x = L.xp(), lo = L.rankAt(r), hi = L.rankAt(r + 1), pct = Math.round(((x - lo) / (hi - lo)) * 100);
+    if (!SpaceData.ON) return '';
+    const L = Loadout, r = L.rank(), x = L.xp(), lo = L.rankAt(r), hi = L.rankAt(r + 1), pct = Math.round(((x - lo) / (hi - lo)) * 100);
     const val = (sl: string) => { const id = L.sel(sl); return id ? L.name(sl, id) : 'Issue kit'; };
     // a slot: its tab, and under it the two attachment boxes of what's taken in it (each opens its own view: loAttView)
     const tab = (sl: string, label: string) => {
       const c = L.cost(sl, L.sel(sl)), id = L.sel(sl), bx = id ? L.boxes(sl, id) : [], all = id ? L.atts(sl, id) : [];
       const box = (i: number) => { const b = bx[i], a = b && all.find((t) => t.id === b.id), on = this.loAtt && this.loAtt.sl === sl && this.loAtt.box === i;
-        return `<button class="lo-tbox${a ? ' full' : ''}${on ? ' on' : ''}" data-lobox="${sl}:${i}" ${id && all.length ? '' : 'disabled'} title="${a ? G.U.esc(a.name) : 'An attachment'}">${a ? `<b>${G.U.esc(a.name)}</b><i>${a.pts}</i>` : `<small>${all.length ? '+ attachment' : '—'}</small>`}</button>`; };
-      return `<div class="lo-slot${this.loTab === sl ? ' on' : ''}"><button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}<i>${c} pt${c === 1 ? '' : 's'}</i></small><b>${G.U.esc(val(sl))}</b></button><div class="lo-tboxes">${box(0)}${box(1)}</div></div>`;
+        return `<button class="lo-tbox${a ? ' full' : ''}${on ? ' on' : ''}" data-lobox="${sl}:${i}" ${id && all.length ? '' : 'disabled'} title="${a ? U.esc(a.name) : 'An attachment'}">${a ? `<b>${U.esc(a.name)}</b><i>${a.pts}</i>` : `<small>${all.length ? '+ attachment' : '—'}</small>`}</button>`; };
+      return `<div class="lo-slot${this.loTab === sl ? ' on' : ''}"><button class="lo-tab${this.loTab === sl ? ' on' : ''}" data-lotab="${sl}"><small>${label}<i>${c} pt${c === 1 ? '' : 's'}</i></small><b>${U.esc(val(sl))}</b></button><div class="lo-tboxes">${box(0)}${box(1)}</div></div>`;
     };
     // the throwables: two boxes, each the full height of the bar, each opening the throwables' view (loThrView) to pick what's in it; a point each
     const thrSlot = () => {
-      const box = (i: number) => { const k = L.thr(i), on = this.loThr === i; return `<button class="lo-tab lo-thrbox${k ? ' full' : ''}${on ? ' on' : ''}" data-lothr="${i}" title="${k ? G.U.esc(L.THROW_NAME[k]) : 'Pick a throwable'}"><small>Throw ${i + 1}<i>${k ? L.THROW_PTS + ' pt' : ''}</i></small><b>${k ? G.U.esc(L.THROW_SHORT[k]) : '+ Add'}</b></button>`; };
+      const box = (i: number) => { const k = L.thr(i), on = this.loThr === i; return `<button class="lo-tab lo-thrbox${k ? ' full' : ''}${on ? ' on' : ''}" data-lothr="${i}" title="${k ? U.esc(L.THROW_NAME[k]) : 'Pick a throwable'}"><small>Throw ${i + 1}<i>${k ? L.THROW_PTS + ' pt' : ''}</i></small><b>${k ? U.esc(L.THROW_SHORT[k]) : '+ Add'}</b></button>`; };
       return `<div class="lo-slot lo-thrs">${box(0)}${box(1)}</div>`;
     };
     const tot = L.total(), over = tot > L.BUDGET;
-    return `<div class="lo-bar"><button class="lo-rank${this.loRanks ? ' on' : ''}" data-loranks title="What each rank opens"><b>Rank ${r}</b><span>${G.U.fmt(x)} / ${G.U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></button>${tab('s', 'Sidearm')}${tab('h', 'Helmet')}${tab('a', 'Body armour')}${thrSlot()}<div class="lo-pts${over ? ' over' : ''}" title="What you take into a run can't cost more than ${L.BUDGET} points"><b>${tot} / ${L.BUDGET}</b><span>${over ? `${tot - L.BUDGET} over` : 'points'}</span></div><button class="btn primary lo-go" data-lodeploy ${over ? 'disabled' : ''}>Deploy</button></div>`;
+    return `<div class="lo-bar"><button class="lo-rank${this.loRanks ? ' on' : ''}" data-loranks title="What each rank opens"><b>Rank ${r}</b><span>${U.fmt(x)} / ${U.fmt(hi)} XP</span><i><em style="width:${pct}%"></em></i></button>${tab('s', 'Sidearm')}${tab('h', 'Helmet')}${tab('a', 'Body armour')}${thrSlot()}<div class="lo-pts${over ? ' over' : ''}" title="What you take into a run can't cost more than ${L.BUDGET} points"><b>${tot} / ${L.BUDGET}</b><span>${over ? `${tot - L.BUDGET} over` : 'points'}</span></div><button class="btn primary lo-go" data-lodeploy ${over ? 'disabled' : ''}>Deploy</button></div>`;
   },
   // a slot's tree, drawn as a web: the piece in the middle, paths out from it; under the piece you're looking at (once it's yours), its two
   // attachment boxes; beside it all, what it is, what it takes, what's next
   loWeb(el: HTMLElement) {
-    if (this.loRanks && G.SpaceData.ON) return this.loRankView(el);
-    if (this.loThr != null && G.SpaceData.ON) return this.loThrView(el);
-    if (this.loAtt && G.Loadout.sel(this.loAtt.sl)) return this.loAttView(el);
+    if (this.loRanks && SpaceData.ON) return this.loRankView(el);
+    if (this.loThr != null && SpaceData.ON) return this.loThrView(el);
+    if (this.loAtt && Loadout.sel(this.loAtt.sl)) return this.loAttView(el);
     this.loAtt = null;
-    const L = G.Loadout, sl = this.loTab, T = L.TREES[sl], BY = L.by(sl), gun = sl === 'p' || sl === 's';
+    const L = Loadout, sl = this.loTab, T = L.TREES[sl], BY = L.by(sl), gun = sl === 'p' || sl === 's';
     const look = this.loLook[sl] = this.loLook[sl] && BY.has(this.loLook[sl]) ? this.loLook[sl] : L.sel(sl) || T.mid;
-    const item = (id: string) => { if (gun) return G.Gear.gunItem(G.Me.makeWeapon(id, L.build(sl, id))); const it = G.Gear.gearItem(id); for (const b of L.boxes(sl, id)) (it as any)[b.k] = G.Gear.gearItem(b.id); return it; };
-    const pic = (id: string) => { const it = item(id), [cw, ch] = G.Gear.size(it), url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
+    const item = (id: string) => { if (gun) return Gear.gunItem(G_Me.makeWeapon(id, L.build(sl, id))); const it = Gear.gearItem(id); for (const b of L.boxes(sl, id)) (it as any)[b.k] = Gear.gearItem(b.id); return it; };
+    const pic = (id: string) => { const it = item(id), [cw, ch] = Gear.size(it), url = Icons.of(it, cw, ch, false); return Icons.pending() ? '' : url; };
     const W = 1500, spokes = [...Array(6)].map((_, i) => ((-90 + i * 60) * Math.PI) / 180), spot = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r], far = Math.max(...T.NODES.map((q) => Math.hypot(...L.at(sl, q)))), rings = L.RINGS.slice(1).filter((r) => r <= far + 230);
     const web = rings.map((r) => `<polygon points="${spokes.map((a) => spot(a, r).map((v) => v.toFixed(1)).join()).join(' ')}"/>`).join('') + spokes.map((a) => { const [x, y] = spot(a, rings[rings.length - 1]); return `<line x1="0" y1="0" x2="${x.toFixed(1)}" y2="${y.toFixed(1)}"/>`; }).join('');
     const strands = T.NODES.filter((q) => q.from).map((q) => {
@@ -1548,27 +1602,27 @@ const G_Game = {
       return `<line class="strand" x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}"/>${f > 0 ? `<line class="strand on" x1="${x0}" y1="${y0}" x2="${(x0 + (x1 - x0) * f).toFixed(1)}" y2="${(y0 + (y1 - y0) * f).toFixed(1)}"/>` : ''}`;
     }).join('');
     const nodes = T.NODES.map((q) => {
-      const [x, y] = L.at(sl, q), st = L.open(sl, q.id) ? 'got' : !q.from || L.open(sl, q.from) ? 'next' : 'far', tip = st === 'got' ? '' : st === 'far' ? '<small>Locked</small>' : `<small>${G.U.esc(L.need(sl, q))}</small>`;
-      return `<button class="web-node ${st}${look === q.id ? ' look' : ''}${L.sel(sl) === q.id ? ' sel' : ''}" data-lonode="${q.id}"${gun ? '' : ` title="${G.U.esc(G.Gear.DEFS[q.id].name + '\n' + G.Ballistics.coverageText(G.Gear.DEFS[q.id]))}"`} style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${((src) => src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>')(pic(q.id))}<b>${G.U.esc(L.name(sl, q.id))}</b>${tip}</button>`;
+      const [x, y] = L.at(sl, q), st = L.open(sl, q.id) ? 'got' : !q.from || L.open(sl, q.from) ? 'next' : 'far', tip = st === 'got' ? '' : st === 'far' ? '<small>Locked</small>' : `<small>${U.esc(L.need(sl, q))}</small>`;
+      return `<button class="web-node ${st}${look === q.id ? ' look' : ''}${L.sel(sl) === q.id ? ' sel' : ''}" data-lonode="${q.id}"${gun ? '' : ` title="${U.esc(Gear.DEFS[q.id].name + '\n' + Ballistics.coverageText(Gear.DEFS[q.id]))}"`} style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${((src) => src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>')(pic(q.id))}<b>${U.esc(L.name(sl, q.id))}</b>${tip}</button>`;
     }).join('');
     const paths = Object.entries(T.PATHS).map(([k, pa]) => { const [x, y] = L.along(sl, k, L.RINGS[1] / 2); return `<span class="web-path" style="left:${x.toFixed(1)}px;top:${y.toFixed(1)}px">${pa.name}</span>`; }).join('');
     const q = BY.get(look)!, got = L.open(sl, look), mine = L.sel(sl) === look, all = got ? L.atts(sl, look) : [];
     // what you're looking at: what it is, what it takes, what's next from it
     let about = '';
-    if (gun) { const d = G.Me.makeWeapon(look, L.build(sl, look)).def, cal = G.CALIBERS[G.calOf(d)], modes = (d.modes || [d.mode]).map((m: string) => G.MODE_NAME[m]).join(' / '); about = `<div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${d.rpm} rpm</span></div><em>${G.U.esc(G.WEAPONS[look].desc)}</em>`; }
-    else { const d = G.Gear.DEFS[look], pb = L.sel(sl) === look ? L.boxes(sl, look).find((b) => G.Gear.DEFS[b.id] && G.Gear.DEFS[b.id].kind === 'plate') : null; const cur = L.col(sl), sw = mine ? `<h4>Colour</h4><div class="lo-swatches">${L.COLOURS.map(([n, c]) => `<button class="lo-sw${cur === c ? ' on' : ''}${c == null ? ' issue' : ''}" data-locol="${c == null ? '' : c}" title="${n}" style="${c == null ? '' : 'background:#' + c.toString(16).padStart(6, '0')}">${c == null ? 'Issue' : ''}</button>`).join('')}</div>` : '';
-      about = `<em>${G.U.esc(d.desc || '')}</em>${sw}${G.Ballistics.coverageHTML(d, pb ? G.Gear.DEFS[pb.id] : null)}`; }
-    const ask = got ? '' : !q.from || L.open(sl, q.from) ? `<div class="web-ask"><b>${G.U.esc(L.need(sl, q))}</b>${q.how ? `<small>${G.U.esc(q.how)}</small>` : q.rank != null ? '<small>XP comes from the missions you complete: the higher the threat, the more.</small>' : ''}</div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${G.U.esc(L.name(sl, q.from))} first.</div>`;
+    if (gun) { const d = G_Me.makeWeapon(look, L.build(sl, look)).def, cal = CALIBERS[calOf(d)], modes = (d.modes || [d.mode]).map((m: string) => MODE_NAME[m]).join(' / '); about = `<div class="arm-stats"><span>${cal ? cal.name : ''}</span><span>${d.mag} round${d.mag === 1 ? '' : 's'}</span><span>${modes}</span><span>${d.rpm} rpm</span></div><em>${U.esc(WEAPONS[look].desc)}</em>`; }
+    else { const d = Gear.DEFS[look], pb = L.sel(sl) === look ? L.boxes(sl, look).find((b) => Gear.DEFS[b.id] && Gear.DEFS[b.id].kind === 'plate') : null; const cur = L.col(sl), sw = mine ? `<h4>Colour</h4><div class="lo-swatches">${L.COLOURS.map(([n, c]) => `<button class="lo-sw${cur === c ? ' on' : ''}${c == null ? ' issue' : ''}" data-locol="${c == null ? '' : c}" title="${n}" style="${c == null ? '' : 'background:#' + c.toString(16).padStart(6, '0')}">${c == null ? 'Issue' : ''}</button>`).join('')}</div>` : '';
+      about = `<em>${U.esc(d.desc || '')}</em>${sw}${Ballistics.coverageHTML(d, pb ? Gear.DEFS[pb.id] : null)}`; }
+    const ask = got ? '' : !q.from || L.open(sl, q.from) ? `<div class="web-ask"><b>${U.esc(L.need(sl, q))}</b>${q.how ? `<small>${U.esc(q.how)}</small>` : q.rank != null ? '<small>XP comes from the missions you complete: the higher the threat, the more.</small>' : ''}</div>` : `<div class="web-ask far"><b>Locked</b> Earn the ${U.esc(L.name(sl, q.from))} first.</div>`;
     const soon = all.filter((a) => !a.open).sort((x, y) => (y.have / y.n) - (x.have / x.n)).filter((a, i, xs) => xs.findIndex((b) => b.k === a.k) === i).slice(0, 4); // (the nearest to earn, one of a kind)
-    const attInfo = got && all.length ? `<h4>Attachments</h4><p class="lo-note">Up to two, in its boxes in the bar above (once it's taken). ${all.filter((a) => a.open).length} of ${all.length} earned with it.</p>${soon.length ? `<ul class="web-next">${soon.map((a) => `<li><b>${G.U.esc(a.name)}</b> ${a.have}/${a.n} ${G.U.esc(a.what)}</li>`).join('')}</ul>` : ''}` : '';
-    const nextOn = T.NODES.filter((c) => c.from === look && !L.open(sl, c.id)).map((c) => `<li><b>${G.U.esc(L.name(sl, c.id))}</b> ${G.U.esc(L.need(sl, c))}${c.how ? `<small>${G.U.esc(c.how)}</small>` : ''}</li>`).join('');
-    const roster = this.roster || {}, others = Object.keys(roster).filter((pid) => pid !== G.Net.myId), waiting = others.filter((pid) => !(this.arms || {})[pid]).length, c = L.cost(sl, look);
+    const attInfo = got && all.length ? `<h4>Attachments</h4><p class="lo-note">Up to two, in its boxes in the bar above (once it's taken). ${all.filter((a) => a.open).length} of ${all.length} earned with it.</p>${soon.length ? `<ul class="web-next">${soon.map((a) => `<li><b>${U.esc(a.name)}</b> ${a.have}/${a.n} ${U.esc(a.what)}</li>`).join('')}</ul>` : ''}` : '';
+    const nextOn = T.NODES.filter((c) => c.from === look && !L.open(sl, c.id)).map((c) => `<li><b>${U.esc(L.name(sl, c.id))}</b> ${U.esc(L.need(sl, c))}${c.how ? `<small>${U.esc(c.how)}</small>` : ''}</li>`).join('');
+    const roster = this.roster || {}, others = Object.keys(roster).filter((pid) => pid !== Net.myId), waiting = others.filter((pid) => !(this.arms || {})[pid]).length, c = L.cost(sl, look);
     const was = el.querySelector('.web-world');
     el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view"><div class="web-world"><svg viewBox="${-W} ${-W} ${W * 2} ${W * 2}" style="left:${-W}px;top:${-W}px;width:${W * 2}px;height:${W * 2}px" aria-hidden="true"><g class="web-lines">${web}</g>${strands}</svg>${paths}${nodes}</div>
-        <div class="web-head"><h2>Your ${T.title.toLowerCase()}</h2><p>${G.Pad.text('Drag to move · scroll to zoom · click to look')}</p></div><button class="btn web-home" data-armhome>Back to the middle</button></div>
-      <aside class="web-side"><img src="${pic(look)}" alt=""><h3>${G.U.esc(L.name(sl, look))}</h3>${G.SpaceData.ON ? `<div class="lo-cost">${c} point${c === 1 ? '' : 's'}</div>` : ''}${about}${ask}${attInfo}${nextOn ? `<h4>From here</h4><ul class="web-next">${nextOn}</ul>` : ''}
+        <div class="web-head"><h2>Your ${T.title.toLowerCase()}</h2><p>${Pad.text('Drag to move · scroll to zoom · click to look')}</p></div><button class="btn web-home" data-armhome>Back to the middle</button></div>
+      <aside class="web-side"><img src="${pic(look)}" alt=""><h3>${U.esc(L.name(sl, look))}</h3>${SpaceData.ON ? `<div class="lo-cost">${c} point${c === 1 ? '' : 's'}</div>` : ''}${about}${ask}${attInfo}${nextOn ? `<h4>From here</h4><ul class="web-next">${nextOn}</ul>` : ''}
         <div class="web-foot"><p>Earned for good: kept between runs, whatever squad you're in.${sl === 'h' || sl === 'a' ? ' With nothing taken you wear the issue kit: a worn bump helmet and concealable vest.' : ''}</p>${others.length ? `<p class="arm-note">${waiting ? `${waiting} of the squad still choosing.` : 'The squad have all chosen.'}</p>` : ''}
-        <button class="btn primary arm-ok" data-lotake ${got && (!mine || !G.SpaceData.ON) ? '' : 'disabled'}>${!got ? 'Not yet yours' : !G.SpaceData.ON ? `Take the ${G.U.esc(L.name(sl, look))}` : mine ? 'In your loadout' : 'Take it'}</button>${G.SpaceData.ON && sl !== 's' && L.sel(sl) ? `<button class="btn lo-clear" data-loclear>${sl === 'p' ? 'Go without a primary' : 'Use the issue kit'}</button>` : ''}</div></aside></div>`;
+        <button class="btn primary arm-ok" data-lotake ${got && (!mine || !SpaceData.ON) ? '' : 'disabled'}>${!got ? 'Not yet yours' : !SpaceData.ON ? `Take the ${U.esc(L.name(sl, look))}` : mine ? 'In your loadout' : 'Take it'}</button>${SpaceData.ON && sl !== 's' && L.sel(sl) ? `<button class="btn lo-clear" data-loclear>${sl === 'p' ? 'Go without a primary' : 'Use the issue kit'}</button>` : ''}</div></aside></div>`;
     el.classList.remove('hidden');
     const place = () => { const v = this.armView, w = el.querySelector<HTMLElement>('.web-world'); if (w) w.style.transform = `translate(${v.x.toFixed(1)}px, ${v.y.toFixed(1)}px) scale(${v.z.toFixed(3)})`; };
     this.armPlace = place;
@@ -1580,35 +1634,35 @@ const G_Game = {
   // what isn't yours yet: the rank not reached, or the piece before it not yet earned), and a line where you are, between your rank
   // and the next as far as your XP has got
   loRankView(el: HTMLElement) {
-    const L = G.Loadout, r = L.rank(), x = L.xp(), f = (x - L.rankAt(r)) / (L.rankAt(r + 1) - L.rankAt(r)), TITLE: Record<string, string> = { h: 'Helmet', a: 'Body armour' };
+    const L = Loadout, r = L.rank(), x = L.xp(), f = (x - L.rankAt(r)) / (L.rankAt(r + 1) - L.rankAt(r)), TITLE: Record<string, string> = { h: 'Helmet', a: 'Body armour' };
     const at: Record<number, { sl: string; id: string }[]> = {};
     for (const sl of ['h', 'a']) for (const q of L.TREES[sl].NODES) if (q.rank != null) (at[q.rank] = at[q.rank] || []).push({ sl, id: q.id });
     const top = Math.max(r + 1, ...Object.keys(at).map(Number)), W = 190;
-    const pic = (sl: string, id: string) => { const it = sl === 'p' ? G.Gear.gunItem(G.Me.makeWeapon(id)) : G.Gear.gearItem(id), [cw, ch] = G.Gear.size(it), url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
+    const pic = (sl: string, id: string) => { const it = sl === 'p' ? Gear.gunItem(G_Me.makeWeapon(id)) : Gear.gearItem(id), [cw, ch] = Gear.size(it), url = Icons.of(it, cw, ch, false); return Icons.pending() ? '' : url; };
     const LOCK = '<svg class="lo-lock" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10V7a5 5 0 0 1 10 0v3" fill="none" stroke="currentColor" stroke-width="2.2"/><rect x="4.5" y="10" width="15" height="11" rx="2" fill="currentColor"/></svg>';
-    const cols = [...Array(top + 1).keys()].map((k) => `<div class="lo-rcol${k <= r ? ' got' : ''}" style="left:${k * W}px;width:${W}px"><div class="lo-rhead"><b>Rank ${k}</b><small>${G.U.fmt(L.rankAt(k))} XP</small></div>${(at[k] || []).map(({ sl, id }) => {
+    const cols = [...Array(top + 1).keys()].map((k) => `<div class="lo-rcol${k <= r ? ' got' : ''}" style="left:${k * W}px;width:${W}px"><div class="lo-rhead"><b>Rank ${k}</b><small>${U.fmt(L.rankAt(k))} XP</small></div>${(at[k] || []).map(({ sl, id }) => {
       const mine = L.open(sl, id), src = pic(sl, id), q = L.by(sl).get(id)!, why = mine ? '' : k > r ? `Rank ${k}` : `Earn the ${L.name(sl, q.from!)} first`;
-      return `<div class="lo-ritem${mine ? '' : ' locked'}" title="${G.U.esc(why)}">${src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>'}${mine ? '' : LOCK}<b>${G.U.esc(L.name(sl, id))}</b><small>${TITLE[sl]}${mine ? '' : ' · ' + G.U.esc(why)}</small></div>`;
+      return `<div class="lo-ritem${mine ? '' : ' locked'}" title="${U.esc(why)}">${src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>'}${mine ? '' : LOCK}<b>${U.esc(L.name(sl, id))}</b><small>${TITLE[sl]}${mine ? '' : ' · ' + U.esc(why)}</small></div>`;
     }).join('') || '<p class="lo-rnone">Nothing new</p>'}</div>`).join('');
     const now = (r + Math.min(1, Math.max(0, f))) * W + W / 2;
     el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>Ranks <span>— what each opens</span></h2><p>XP comes from the missions you complete: 150 for each, and 100 more for each step of its threat. Some pieces are earned by challenges instead: those are on the trees.</p></div>
-        <div class="lo-tscroll"><div class="lo-timeline" style="width:${(top + 1) * W}px"><div class="lo-rtrack"></div>${cols}<div class="lo-rnow" style="left:${now.toFixed(0)}px"><span>You · ${G.U.fmt(x)} XP</span></div></div></div></div><button class="btn web-home" data-loback>Back to the tree</button></div>
-      <aside class="web-side"><h3>Rank ${r}</h3><div class="lo-cost">${G.U.fmt(x)} XP</div><p class="lo-note">${G.U.fmt(L.rankAt(r + 1) - x)} XP to rank ${r + 1}: a threat-${Math.max(1, Math.ceil((L.rankAt(r + 1) - x - 150) / 100))} mission would do it.</p>
-        <h4>Next up</h4><ul class="web-next">${(at[r + 1] || []).map(({ sl, id }) => `<li><b>${G.U.esc(L.name(sl, id))}</b> ${TITLE[sl]}</li>`).join('') || '<li>Nothing new at the next rank</li>'}</ul></aside></div>`;
+        <div class="lo-tscroll"><div class="lo-timeline" style="width:${(top + 1) * W}px"><div class="lo-rtrack"></div>${cols}<div class="lo-rnow" style="left:${now.toFixed(0)}px"><span>You · ${U.fmt(x)} XP</span></div></div></div></div><button class="btn web-home" data-loback>Back to the tree</button></div>
+      <aside class="web-side"><h3>Rank ${r}</h3><div class="lo-cost">${U.fmt(x)} XP</div><p class="lo-note">${U.fmt(L.rankAt(r + 1) - x)} XP to rank ${r + 1}: a threat-${Math.max(1, Math.ceil((L.rankAt(r + 1) - x - 150) / 100))} mission would do it.</p>
+        <h4>Next up</h4><ul class="web-next">${(at[r + 1] || []).map(({ sl, id }) => `<li><b>${U.esc(L.name(sl, id))}</b> ${TITLE[sl]}</li>`).join('') || '<li>Nothing new at the next rank</li>'}</ul></aside></div>`;
     el.classList.remove('hidden');
     const sc = el.querySelector<HTMLElement>('.lo-tscroll'); if (sc) sc.scrollLeft = Math.max(0, now - sc.clientWidth / 2); // (where you are, in view)
   },
   // the kinds of attachment, by name (a gun's by its part's kind; the gear's by the mount)
   loKinds() {
     const KIND: Record<string, string> = { optic: 'Sight', muzzle: 'Muzzle', barrel: 'Barrel', handguard: 'Handguard', tac: 'Tactical', fg: 'Foregrip', grip: 'Grip', stock: 'Stock', charging: 'Charging handle', loader: 'Loader', railmount: 'Rail mount', slide: 'Slide', face: 'Face piece', plate: 'Plate', shoulder: 'Shoulders', groin: 'Groin' };
-    return (sl: string, k: string) => KIND[sl === 'p' || sl === 's' ? G.Gunsmith.kindOf(k) : k] || k;
+    return (sl: string, k: string) => KIND[sl === 'p' || sl === 's' ? Gunsmith.kindOf(k) : k] || k;
   },
   // An attachment box being filled, as a view of its own (in the tree's place, the bar over it): every part that can go in it, by kind, a
   // card each (its picture, its points; one not yet earned dimmed, with how far along it is); beside it, the piece as it'll be
   // A throwable box's own view: each throwable as a card (what it is, what it does, a point), the one in the box marked, and the box emptied
   loThrView(el: HTMLElement) {
-    const L = G.Loadout, i = this.loThr!, cur = L.thr(i), other = L.thr(1 - i), E = G.U.esc;
-    const icon = (k: string) => { const it = L.throwItem(k), [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
+    const L = Loadout, i = this.loThr!, cur = L.thr(i), other = L.thr(1 - i), E = U.esc;
+    const icon = (k: string) => { const it = L.throwItem(k), [cw, ch] = Gear.size(it); return Icons.of(it, cw, ch, false); };
     const cards = L.THROWS.map((k) => { const inThis = cur === k, src = icon(k);
       return `<button class="lo-card lo-thrcard${inThis ? ' in' : ''}${other === k ? ' other' : ''}" ${inThis ? 'aria-disabled="true"' : `data-lothrpick="${k}"`}>${src ? `<img src="${src}" alt="" draggable="false">` : ''}<b>${E(L.THROW_NAME[k])}</b><i>${L.THROW_PTS} pt${inThis ? ' · in this box' : other === k ? ' · in the other box' : ''}</i><small>${E(L.THROW_DESC[k])}</small></button>`; }).join('');
     el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>Throwables <span>— box ${i + 1} of 2</span></h2><p>${cur ? 'Pick another to take in its place, or empty the box.' : 'Pick what you take in this box.'} A point each; on a key (3 to 5) as you deploy.</p></div>${cur ? '<button class="btn lo-empty" data-lothrpick="">Empty this box</button>' : ''}<section><div class="lo-cards">${cards}</div></section></div><button class="btn web-home" data-loback>Back</button></div>
@@ -1616,18 +1670,18 @@ const G_Game = {
     el.classList.remove('hidden');
   },
   loAttView(el: HTMLElement) {
-    const L = G.Loadout, A = this.loAtt!, sl = A.sl, id = L.sel(sl)!, gun = sl === 'p' || sl === 's', all = L.atts(sl, id), bx = L.boxes(sl, id), cur = bx[A.box], KIND = this.loKinds();
-    const icon = (pid: string) => { const it = gun ? G.Gear.partItem(pid) : G.Gear.gearItem(pid), [cw, ch] = G.Gear.size(it), url = G.Icons.of(it, cw, ch, false); return G.Icons.pending() ? '' : url; };
-    const whole = () => { const it = gun ? G.Gear.gunItem(G.Me.makeWeapon(id, L.build(sl, id))) : G.Gear.gearItem(id); if (!gun) for (const b of bx) (it as any)[b.k] = G.Gear.gearItem(b.id); const [cw, ch] = G.Gear.size(it); return G.Icons.of(it, cw, ch, false); };
+    const L = Loadout, A = this.loAtt!, sl = A.sl, id = L.sel(sl)!, gun = sl === 'p' || sl === 's', all = L.atts(sl, id), bx = L.boxes(sl, id), cur = bx[A.box], KIND = this.loKinds();
+    const icon = (pid: string) => { const it = gun ? Gear.partItem(pid) : Gear.gearItem(pid), [cw, ch] = Gear.size(it), url = Icons.of(it, cw, ch, false); return Icons.pending() ? '' : url; };
+    const whole = () => { const it = gun ? Gear.gunItem(G_Me.makeWeapon(id, L.build(sl, id))) : Gear.gearItem(id); if (!gun) for (const b of bx) (it as any)[b.k] = Gear.gearItem(b.id); const [cw, ch] = Gear.size(it); return Icons.of(it, cw, ch, false); };
     const ks = [...new Set(all.map((a) => a.k))].sort((x, y) => all.filter((a) => a.k === y && a.open).length - all.filter((a) => a.k === x && a.open).length); // (the kinds with something earned first)
-    const groups = ks.map((k) => `<section><h4>${G.U.esc(KIND(sl, k))}</h4><div class="lo-cards">${all.filter((a) => a.k === k).sort((x, y) => +y.open - +x.open).map((a) => {
+    const groups = ks.map((k) => `<section><h4>${U.esc(KIND(sl, k))}</h4><div class="lo-cards">${all.filter((a) => a.k === k).sort((x, y) => +y.open - +x.open).map((a) => {
       const inThis = cur && cur.id === a.id, other = !inThis && bx.some((b) => b.id === a.id), src = icon(a.id);
-      return `<button class="lo-card${a.open ? '' : ' locked'}${inThis ? ' in' : ''}${other ? ' other' : ''}" data-loprev="${a.k}|${a.id}" ${a.open && !inThis ? `data-lopart="${a.k}|${a.id}"` : 'aria-disabled="true"'}>${src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>'}<b>${G.U.esc(a.name)}</b>${a.open ? `<i>${a.pts} pt${a.pts === 1 ? '' : 's'}${inThis ? ' · in this box' : other ? ' · in the other box' : ''}</i>` : `<small>${a.have}/${a.n} ${G.U.esc(a.what)}</small>`}</button>`;
+      return `<button class="lo-card${a.open ? '' : ' locked'}${inThis ? ' in' : ''}${other ? ' other' : ''}" data-loprev="${a.k}|${a.id}" ${a.open && !inThis ? `data-lopart="${a.k}|${a.id}"` : 'aria-disabled="true"'}>${src ? `<img src="${src}" alt="" draggable="false">` : '<span class="icon-wait"><span class="spin"></span></span>'}<b>${U.esc(a.name)}</b>${a.open ? `<i>${a.pts} pt${a.pts === 1 ? '' : 's'}${inThis ? ' · in this box' : other ? ' · in the other box' : ''}</i>` : `<small>${a.have}/${a.n} ${U.esc(a.what)}</small>`}</button>`;
     }).join('')}</div></section>`).join('');
     const one = bx.length && !cur ? bx.find((b) => b) : null, oneK = one ? KIND(sl, one.k) : '';
-    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>${G.U.esc(L.name(sl, id))} <span>— attachment ${A.box + 1} of 2</span></h2><p>${cur ? 'Pick another to put in its place, or empty the box.' : 'Pick what goes in this box.'} One of each kind: a second ${oneK ? oneK.toLowerCase() : 'sight'} takes the first one's place.</p></div>${cur ? '<button class="btn lo-empty" data-lopart="" data-loprev="">Empty this box</button>' : ''}${groups}</div><button class="btn web-home" data-loback>Back to the tree</button></div>
-      <aside class="web-side"><img src="${whole()}" alt=""><h3>${G.U.esc(L.name(sl, id))}</h3><div class="lo-cost">${L.cost(sl, id)} point${L.cost(sl, id) === 1 ? '' : 's'} as it stands</div><div class="lo-stats" data-lostats>${this.loAttStats(null)}</div>
-        <h4>In its boxes</h4><ul class="web-next">${[0, 1].map((i) => { const b = bx[i], a = b && all.find((t) => t.id === b.id); return `<li><b>${i + 1}.</b> ${a ? `${G.U.esc(a.name)} <span>${a.pts} pt</span>` : '<span>empty</span>'}</li>`; }).join('')}</ul>
+    el.innerHTML = `<div class="web-full">${this.loBar()}<div class="web-view lo-attview"><div class="lo-attscroll"><div class="lo-atthead"><h2>${U.esc(L.name(sl, id))} <span>— attachment ${A.box + 1} of 2</span></h2><p>${cur ? 'Pick another to put in its place, or empty the box.' : 'Pick what goes in this box.'} One of each kind: a second ${oneK ? oneK.toLowerCase() : 'sight'} takes the first one's place.</p></div>${cur ? '<button class="btn lo-empty" data-lopart="" data-loprev="">Empty this box</button>' : ''}${groups}</div><button class="btn web-home" data-loback>Back to the tree</button></div>
+      <aside class="web-side"><img src="${whole()}" alt=""><h3>${U.esc(L.name(sl, id))}</h3><div class="lo-cost">${L.cost(sl, id)} point${L.cost(sl, id) === 1 ? '' : 's'} as it stands</div><div class="lo-stats" data-lostats>${this.loAttStats(null)}</div>
+        <h4>In its boxes</h4><ul class="web-next">${[0, 1].map((i) => { const b = bx[i], a = b && all.find((t) => t.id === b.id); return `<li><b>${i + 1}.</b> ${a ? `${U.esc(a.name)} <span>${a.pts} pt</span>` : '<span>empty</span>'}</li>`; }).join('')}</ul>
         <p class="lo-note">${all.filter((a) => a.open).length} of ${all.length} earned with it. The rest come with what's asked of each, done with it.</p></aside></div>`;
     el.classList.remove('hidden');
   },
@@ -1635,22 +1689,22 @@ const G_Game = {
   // emptying the box), what that would make of it: a gun's whole stat card with the changes marked (js/gunsmith.ts statsHtml), the
   // gear's mobility, durability and what it covers, how well (js/ballistics.ts coverage), what's new to it and what it'd lose
   loAttStats(prev: string | null) {
-    const L = G.Loadout, A = this.loAtt; if (!A) return '';
+    const L = Loadout, A = this.loAtt; if (!A) return '';
     const sl = A.sl, id = L.sel(sl); if (!id) return '';
-    const gun = sl === 'p' || sl === 's', bx = L.boxes(sl, id), all = L.atts(sl, id), E = G.U.esc;
+    const gun = sl === 'p' || sl === 's', bx = L.boxes(sl, id), all = L.atts(sl, id), E = U.esc;
     const att = prev ? { k: prev.split('|')[0], id: prev.split('|')[1] } : null, nb = prev == null ? bx : L.boxesWith(sl, id, A.box, att);
     const a = att ? all.find((t) => t.id === att.id) : null, c0 = L.cost(sl, id), c1 = L.cost(sl, id, nb);
     const head = prev == null ? '' : `<div class="gs-change"><div class="gs-ch-h">${a ? `Fitting the ${E(a.name)}${a.open ? '' : ' <small>(not yet earned)</small>'}` : 'Emptying the box'}</div><div class="gs-pe">${c1 !== c0 ? `<span class="${c1 < c0 ? 'g' : 'b'}">Points ${c0} → ${c1}</span>` : ''}`;
     if (gun) {
-      const def = (b: { k: string; id: string }[]) => G.Me.makeWeapon(id, L.build(sl, id, b)).def, d0 = def(bx);
-      if (prev == null) return `<div class="gs-stats">${G.GunsmithUI.statsHtml(d0)}</div>`;
+      const def = (b: { k: string; id: string }[]) => G_Me.makeWeapon(id, L.build(sl, id, b)).def, d0 = def(bx);
+      if (prev == null) return `<div class="gs-stats">${GunsmithUI.statsHtml(d0)}</div>`;
       const d1 = def(nb);
-      return `${head}${G.GunsmithUI.deltaHtml(d0, d1)}</div></div><div class="gs-stats">${G.GunsmithUI.statsHtml(d0, d1)}</div>`;
+      return `${head}${GunsmithUI.deltaHtml(d0, d1)}</div></div><div class="gs-stats">${GunsmithUI.statsHtml(d0, d1)}</div>`;
     }
     type Row = { where: string; best: string | null; more45: string[]; frag: number };
-    const D = G.Gear.DEFS, pieces = (b: { k: string; id: string }[]) => [D[id], ...b.map((x) => D[x.id]).filter(Boolean)];
+    const D = Gear.DEFS, pieces = (b: { k: string; id: string }[]) => [D[id], ...b.map((x) => D[x.id]).filter(Boolean)];
     const mob = (b: { k: string; id: string }[]) => pieces(b).reduce((m, d) => m * (d.speed || 1), 1) * 100;
-    const rows = (b: { k: string; id: string }[]): Row[] => { const pl = b.find((x) => D[x.id] && D[x.id].kind === 'plate'); return [...G.Ballistics.coverage(D[id], pl ? D[pl.id] : null), ...b.filter((x) => D[x.id] && D[x.id].kind !== 'plate').flatMap((x) => G.Ballistics.coverage(D[x.id]))]; };
+    const rows = (b: { k: string; id: string }[]): Row[] => { const pl = b.find((x) => D[x.id] && D[x.id].kind === 'plate'); return [...Ballistics.coverage(D[id], pl ? D[pl.id] : null), ...b.filter((x) => D[x.id] && D[x.id].kind !== 'plate').flatMap((x) => Ballistics.coverage(D[x.id]))]; };
     const key = (r: Row) => r.where + '|' + r.best + '|' + r.more45.join() + '|' + r.frag;
     const r0 = rows(bx), r1 = rows(nb), k0 = new Set(r0.map(key)), k1 = new Set(r1.map(key));
     const stat = (name: string, v0: number, v1: number, fmt: (v: number) => string, better: number) => { const ch = fmt(v0) !== fmt(v1), good = !ch ? '' : (v1 > v0) === (better > 0) ? 'up' : 'down'; return `<div class="gs-stat ${good}"><span>${name}</span><div></div><b>${fmt(v1)}${ch ? ` <em>${v1 > v0 ? '▲' : '▼'} ${fmt(Math.abs(v1 - v0))}</em>` : ''}</b></div>`; };
@@ -1662,36 +1716,36 @@ const G_Game = {
   },
   // Deploy: the sidearm (told the squad: the host waits on everyone's), and the rest put on you (on the ground, the sidearm alone)
   loDeploy() {
-    const L = G.Loadout, ON = !!G.SpaceData.ON;
-    if (ON && L.total() > L.BUDGET) { G.Audio.deny(); return; }
-    L.apply(G.Me, !ON);
+    const L = Loadout, ON = !!SpaceData.ON;
+    if (ON && L.total() > L.BUDGET) { Audio.deny(); return; }
+    L.apply(G_Me, !ON);
     const id = L.sel('s') || 'p9';
-    G.Net.toHost({ t: 'arm', id }); // (so the squad sees it)
-    G.HUD.toast(ON ? 'LOADOUT' : '', ON ? (['p', 's', 'h', 'a'].map((s) => L.sel(s) && L.name(s, L.sel(s)!)).concat([0, 1].map((i) => L.thr(i) && L.THROW_NAME[L.thr(i)!])).filter(Boolean) as string[]).map((n) => G.U.esc(n)).join(' · ') : `Sidearm: ${G.U.esc(G.WEAPONS[id].name)}`, 2.4);
+    Net.toHost({ t: 'arm', id }); // (so the squad sees it)
+    HUD.toast(ON ? 'LOADOUT' : '', ON ? (['p', 's', 'h', 'a'].map((s) => L.sel(s) && L.name(s, L.sel(s)!)).concat([0, 1].map((i) => L.thr(i) && L.THROW_NAME[L.thr(i)!])).filter(Boolean) as string[]).map((n) => U.esc(n)).join(' · ') : `Sidearm: ${U.esc(WEAPONS[id].name)}`, 2.4);
     this.loAtt = null; this.sidearmPick(); this.renderRoute();
   },
   // the route's state as the map draws it (js/route.ts svg, tip)
 
   routeTipSt() {
     const st = this.routeSt!, rm = this.routeMap!;
-    return { path: st.path, opts: G.Route.options(rm, st.path[st.path.length - 1]), votes: st.votes, mine: st.votes[G.Net.myId!] };
+    return { path: st.path, opts: Route.options(rm, st.path[st.path.length - 1]), votes: st.votes, mine: st.votes[Net.myId!] };
   },
   renderRoute() {
     if (this.armsOnly()) { // (the game in space: the picker alone, before the base)
       const ids = Object.keys(this.roster || {}), arms = this.arms || {}, roster = this.roster || {}, got = ids.filter((id) => arms[id]).length;
       this.$('routeMap').innerHTML = '';
       this.$('routeTitle').innerHTML = 'A new run <span>— your sidearm</span>';
-      this.$('routeMsg').innerHTML = !G.Me.sidearmChosen ? 'Choose the sidearm you start with.' : got < ids.length ? `Waiting for the squad to choose (${got}/${ids.length})…` : 'To the base...';
-      if (ids.length > 1) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${G.U.hex(roster[id].color)}">${G.U.esc(roster[id].name)}</i> ${arms[id] ? G.U.esc(G.WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
+      this.$('routeMsg').innerHTML = !G_Me.sidearmChosen ? 'Choose the sidearm you start with.' : got < ids.length ? `Waiting for the squad to choose (${got}/${ids.length})…` : 'To the base...';
+      if (ids.length > 1) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${U.hex(roster[id].color)}">${U.esc(roster[id].name)}</i> ${arms[id] ? U.esc(WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
       return;
     }
     const rm = this.routeMap, st = this.routeSt;
     if (!rm || !st) return;
-    const opts = G.Route.options(rm, st.path[st.path.length - 1]), colors: Record<string, number> = {};
+    const opts = Route.options(rm, st.path[st.path.length - 1]), colors: Record<string, number> = {};
     for (const [id, p] of Object.entries(this.roster || {})) colors[id] = p.color;
-    const mine = st.votes[G.Net.myId!];
+    const mine = st.votes[Net.myId!];
     const box = this.$('routeMap'), first = !box.firstChild;
-    box.innerHTML = G.Route.svg(rm, { path: st.path, opts, votes: st.votes, colors, mine });
+    box.innerHTML = Route.svg(rm, { path: st.path, opts, votes: st.votes, colors, mine });
     const tip = document.getElementById('routeTip'); if (tip) tip.classList.add('hidden'); // (the map redrawn: its card goes until the pointer moves)
     // the map is wider than the screen: bring where you are (and what's next) into view, and let the wheel scroll it
     const at = box.querySelector('.rn.here') || box.querySelector('.rn.opt');
@@ -1704,72 +1758,72 @@ const G_Game = {
     const boss = opts.length === 1 && rm.nodes.get(opts[0])!.boss;
     this.$('routeTitle').innerHTML = `Act ${rm.act} <span>— level ${this.level}${boss ? ' <b class="red">(BOSS)</b>' : ''}</span>`;
     const ids = Object.keys(this.roster || {}), voted = ids.filter((id) => st.votes[id] != null).length;
-    this.$('routeMsg').innerHTML = mine == null ? G.Pad.text(boss ? 'The Kingpin is waiting. Click the node to go in.' : !st.path.length ? `The way in: ${G.U.esc(G.THEMES[rm.nodes.get(opts[0])!.th].name)}. Click it to deploy; the routes split after it.` : 'Pick where to deploy next: click one of the lit nodes. Each path decides the environments ahead.')
+    this.$('routeMsg').innerHTML = mine == null ? Pad.text(boss ? 'The Kingpin is waiting. Click the node to go in.' : !st.path.length ? `The way in: ${U.esc(THEMES[rm.nodes.get(opts[0])!.th].name)}. Click it to deploy; the routes split after it.` : 'Pick where to deploy next: click one of the lit nodes. Each path decides the environments ahead.')
       : ids.length > 1 ? `Voted. Waiting for the squad (${voted}/${ids.length}); most votes wins, ties are a coin toss.` : 'Deploying...';
-    if (opts.some((o) => rm.nodes.get(o)!.stronghold)) this.$('routeMsg').innerHTML += `<div class="arm-squad"><b class="red">! Stronghold</b> (red badge): no civilians, about half as many suspects again, +¢${G.Route.strongholdPay(this.level)} for clearing it.</div>`;
+    if (opts.some((o) => rm.nodes.get(o)!.stronghold)) this.$('routeMsg').innerHTML += `<div class="arm-squad"><b class="red">! Stronghold</b> (red badge): no civilians, about half as many suspects again, +¢${Route.strongholdPay(this.level)} for clearing it.</div>`;
     if (opts.some((o) => rm.nodes.get(o)!.night)) this.$('routeMsg').innerHTML += `<div class="arm-squad"><b>☾ Night</b> (moon badge): the lights are out bar the emergency lights. Suspects can hardly see you in the dark, unless you show a light; you'll want yours.</div>`;
     const arms = this.arms || {}, roster = this.roster || {};
-    if (this.level === 1 && ids.length > 1 && G.Me.sidearmChosen) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${G.U.hex(roster[id].color)}">${G.U.esc(roster[id].name)}</i> ${arms[id] ? G.U.esc(G.WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
+    if (this.level === 1 && ids.length > 1 && G_Me.sidearmChosen) this.$('routeMsg').innerHTML += `<div class="arm-squad">Sidearms (each your own): ${ids.map((id) => `<i style="color:${U.hex(roster[id].color)}">${U.esc(roster[id].name)}</i> ${arms[id] ? U.esc(WEAPONS[arms[id]].name) : '<small>choosing…</small>'}`).join(' · ')}</div>`;
   },
   // the route screen is only the sidearm picker: a run in space starting (js/spaceserver.ts startRun sends no route)
-  armsOnly(): boolean { return this.phase === 'route' && !!G.SpaceData.ON && !this.routeSt; },
+  armsOnly(): boolean { return this.phase === 'route' && !!SpaceData.ON && !this.routeSt; },
   pickRoute(n: number) {
-    if (!G.Me.sidearmChosen) return; // (pick your sidearm first)
-    if (this.phase !== 'route' || !this.routeMap || !G.Route.options(this.routeMap, this.routeSt!.path[this.routeSt!.path.length - 1]).includes(n)) return;
-    G.Audio.click();
-    G.Net.toHost({ t: 'pick', n });
+    if (!G_Me.sidearmChosen) return; // (pick your sidearm first)
+    if (this.phase !== 'route' || !this.routeMap || !Route.options(this.routeMap, this.routeSt!.path[this.routeSt!.path.length - 1]).includes(n)) return;
+    Audio.click();
+    Net.toHost({ t: 'pick', n });
   },
   // sp: a mission's level (js/spaceserver.ts levelMsg): what it's generated for, the mission, the ship. Then there's no helicopter:
   // you're aboard the squad's ship as she comes out of the jump (js/space.ts).
   // what's been done to the place already (joined it under way, or a ship come back to): its doors, holes, fallen doors, the guns on its floors
   levelWas(m: any) {
-    if (m.doors) m.doors.forEach((o: number, i: number) => { const d = this.map!.doors[i]; if (d && d.open !== !!o) { d.open = !!o; G.World.door(this.map!.world, this.map!, d); } });
-    if (m.holes) for (const h of m.holes) G.Damage.apply(this.map as unknown as GmDmgMap, h); // (what's been shot out of the place)
-    if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) G.Damage.fall(this.map as unknown as GmDmgMap, this.map!.doors[i] as any, ang, dir, seed, true);
-    if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]: [number, string, number, number, number, number]) => { G.Views.addEvidence(i, wpn, x, z, y); if (sec) G.Views.secureEvidence(i); });
+    if (m.doors) m.doors.forEach((o: number, i: number) => { const d = this.map!.doors[i]; if (d && d.open !== !!o) { d.open = !!o; World.door(this.map!.world, this.map!, d); } });
+    if (m.holes) for (const h of m.holes) Damage.apply(this.map as unknown as GmDmgMap, h); // (what's been shot out of the place)
+    if (m.fallen) for (const [i, ang, dir, seed] of m.fallen) Damage.fall(this.map as unknown as GmDmgMap, this.map!.doors[i] as any, ang, dir, seed, true);
+    if (m.evidence) m.evidence.forEach(([i, wpn, x, z, sec, y]: [number, string, number, number, number, number]) => { Views.addEvidence(i, wpn, x, z, y); if (sec) Views.secureEvidence(i); });
   },
   // (and its glass: broken, or cracked)
   glassWas(m: any) {
-    for (const id of m.glass || []) G.Views.breakGlass(id);
-    for (const [id, p] of m.cracked || []) G.Views.crackGlass(id, new THREE.Vector3(...p));
+    for (const id of m.glass || []) Views.breakGlass(id);
+    for (const [id, p] of m.cracked || []) Views.crackGlass(id, new THREE.Vector3(...p));
   },
   enterLevel(level: number, seed: number, th?: number, night = false, wc?: string | null, sp?: any) {
-    const pre = sp && G.Space.S.on ? G.Space.takeMap(seed, level, th as number, night, sp.gen) : null; // (made ahead: one of the zone's ships, or where a jump's going)
-    const jump = G.Space.jumping(), seamless = !!pre || jump || !!(sp && sp.zone && sp.zone.near && G.Space.S.on && G.Space.S.kind === 'board'); // (come up with another of the zone's ships, or jumped here aboard: no wipe, js/space.ts)
+    const pre = sp && Space.S.on ? Space.takeMap(seed, level, th as number, night, sp.gen) : null; // (made ahead: one of the zone's ships, or where a jump's going)
+    const jump = Space.jumping(), seamless = !!pre || jump || !!(sp && sp.zone && sp.zone.near && Space.S.on && Space.S.kind === 'board'); // (come up with another of the zone's ships, or jumped here aboard: no wipe, js/space.ts)
     if (!seamless) this.veil(true, true); // (already black, unless you've just joined)
-    G.Space.leave(); if (!sp) G.Space.S.keep = null;
+    Space.leave(); if (!sp) Space.S.keep = null;
     this.leaveHub();
     this.phase = 'level';
     this.level = level;
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0;
-    this.map = pre || G.Level.generate(seed, level, th, night, sp ? sp.gen : null); // (laid out already, if she's been in sight or the jump's made her on the way: js/space.ts)
-    if (G.Prep) (this.map as any).lgPre = G.Prep.take(seed, level, th, night, sp ? sp.gen : null); // (its light worked out ahead, if it was seen coming: js/prep.ts)
-    G.Career.levelStart(level, th, night, this.stronghold()); // (your run's log: js/career.ts)
-    G.ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
+    this.map = pre || Level.generate(seed, level, th, night, sp ? sp.gen : null); // (laid out already, if she's been in sight or the jump's made her on the way: js/space.ts)
+    if (Prep) (this.map as any).lgPre = Prep.take(seed, level, th, night, sp ? sp.gen : null); // (its light worked out ahead, if it was seen coming: js/prep.ts)
+    Career.levelStart(level, th, night, this.stronghold()); // (your run's log: js/career.ts)
+    ServerHost.born(this.map); // (as it was built: the host's simulation built it too, G.ServerLink.digest)
     if (G.Prof) G.Prof.reset(); // (the worst frames and totals: this level's)
-    if (G.Highlights) { G.Highlights.drop(); G.Highlights.reset(); } // (last level's replays go; this one's start recording)
-    G.Views.warmed = seamless; G.Views.slowFill = seamless; // compile the new level's shaders once it's populated (G.R.warmup). (Come up with from outside: nothing stops for it. What she's made of was built and compiled on the way in, js/space.ts zonePrep; her people are made a few at a time)
+    if (Highlights) { Highlights.drop(); Highlights.reset(); } // (last level's replays go; this one's start recording)
+    Views.warmed = seamless; Views.slowFill = seamless; // compile the new level's shaders once it's populated (G.R.warmup). (Come up with from outside: nothing stops for it. What she's made of was built and compiled on the way in, js/space.ts zonePrep; her people are made a few at a time)
     this.cabGrids = [];
-    G.Loot.clear();
-    G.R.setLevel(this.map);
-    G.Views.clearLevel();
-    const teamDefs = [...G.Views.players.values()].map((p) => p.st && p.st.w && G.Gunsmith.fromCode(p.st.w)).filter(Boolean), team = teamDefs.map((d) => d.soundKey);
+    Loot.clear();
+    G_R.setLevel(this.map);
+    Views.clearLevel();
+    const teamDefs = [...Views.players.values()].map((p) => p.st && p.st.w && Gunsmith.fromCode(p.st.w)).filter(Boolean), team = teamDefs.map((d) => d.soundKey);
     // the guns the level will show, fetched now: the squad's kits, the level's enemy weapon pool (every pack of each platform), the weapon case's gun and the loot (as it lands)
-    const caseGun = typeof wc === 'string' ? G.Gunsmith.fromCode(wc) : null; // (the host says what's in the case: 'wc')
-    G.GunModels.preload([...Object.values(G.Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level), false); // (the models are all in memory: this only schedules their parsing)
-    G.Handling.prewarm([...Object.values(G.Me.weapons).map((w) => w.def), ...this.enemyGuns(level).map((id) => G.WEAPONS[id])]); // (the guns' handling sounds: js/handling.ts)
-    G.GunAudio.prewarm([...Object.values(G.Me.weapons).flatMap((w) => [w.def.soundKey, G.Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo), ...(w.def.barrels ? Object.keys(w.def.barrels.rounds).flatMap((k) => G.barrelMm(w.def, k).map((mm: number) => G.shotSoundKey(G.roundSpec(w.def, k), mm, w.ammo))) : [])]), ...this.enemyGuns(level), ...team], this.map);
+    const caseGun = typeof wc === 'string' ? Gunsmith.fromCode(wc) : null; // (the host says what's in the case: 'wc')
+    GunModels.preload([...Object.values(G_Me.weapons).map((w) => w.def), ...teamDefs, ...(caseGun ? [caseGun] : [])], this.enemyGuns(level), false); // (the models are all in memory: this only schedules their parsing)
+    Handling.prewarm([...Object.values(G_Me.weapons).map((w) => w.def), ...this.enemyGuns(level).map((id) => WEAPONS[id])]); // (the guns' handling sounds: js/handling.ts)
+    GunAudio.prewarm([...Object.values(G_Me.weapons).flatMap((w) => [w.def.soundKey, Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo), ...(w.def.barrels ? Object.keys(w.def.barrels.rounds).flatMap((k) => barrelMm(w.def, k).map((mm: number) => shotSoundKey(roundSpec(w.def, k), mm, w.ammo))) : [])]), ...this.enemyGuns(level), ...team], this.map);
     // everyone in a seat of their own in the helicopter, on the pad (the same on every machine: by the sorted roster)
-    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!));
-    if (sp) { G.Me.spawn(this.map.spawn.x, this.map.spawn.z); G.Space.enterLevel(this.map, sp); }
-    else { G.Landing.enter(this.map); G.Me.spawn(this.map.spawn.x, this.map.spawn.z); G.Landing.board(G.Me, Math.min(i, G.Hangar.HELI.seats - 1)); }
+    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(Net.myId!));
+    if (sp) { G_Me.spawn(this.map.spawn.x, this.map.spawn.z); Space.enterLevel(this.map, sp); }
+    else { Landing.enter(this.map); G_Me.spawn(this.map.spawn.x, this.map.spawn.z); Landing.board(G_Me, Math.min(i, Hangar.HELI.seats - 1)); }
     this.screen(null);
-    G.HUD.show(true);
-    const swap = !jump && !!(sp && sp.zone && sp.zone.near && G.Space.S.kind === 'board'); // (come up with another of the zone's ships: the level changing under you)
-    if (sp) { if (!swap) G.HUD.toast(G.U.esc(sp.ms.name), G.U.esc(sp.ms.where) + ' · ' + G.SpaceData.OBJ[sp.ms.obj as SpObj].name, 4.5); } // (not news then)
-    else G.HUD.toast(`LEVEL ${level}`, this.map.theme.name + (G.Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
-    if (!sp && G.Route.isBoss(level)) G.Audio.alarm();
+    HUD.show(true);
+    const swap = !jump && !!(sp && sp.zone && sp.zone.near && Space.S.kind === 'board'); // (come up with another of the zone's ships: the level changing under you)
+    if (sp) { if (!swap) HUD.toast(U.esc(sp.ms.name), U.esc(sp.ms.where) + ' · ' + SpaceData.OBJ[sp.ms.obj as SpObj].name, 4.5); } // (not news then)
+    else HUD.toast(`LEVEL ${level}`, this.map.theme.name + (Route.isBoss(level) ? ' — <b class="red">THE WARDEN AWAITS</b>' : ''), 3.5);
+    if (!sp && Route.isBoss(level)) Audio.alarm();
     if (!this.locked && !seamless) this.$('clickToPlay').classList.remove('hidden');
     if (!seamless) this.veilSay('Placing everyone');
   },
@@ -1777,57 +1831,57 @@ const G_Game = {
   // about it, the squad is there, and rays, steps and sound are all the ordinary ones; the host just doesn't send
   // enemies. this.hub marks it (the phase is still 'level' here).
   enterShop(level: number, seed: number, report: GmReport | null, stock: any, spc?: any) { // (spc: the game in space, js/spaceserver.ts shopMsg: the board, the fleet, where the ship is)
-    const jump = G.SpaceData.ON && G.Space.jumping(); // (home by the jump, aboard: the pod and the tunnel, no veil)
+    const jump = SpaceData.ON && Space.jumping(); // (home by the jump, aboard: the pod and the tunnel, no veil)
     if (!jump) this.veil(true, true);
-    G.Space.leave();
+    Space.leave();
     this.toggleInv(false);
     this.closeShop();
     this.hub = true; this.shopOpen = false;
     this.phase = 'level';
-    if (G.Me.navRearm) G.Me.navRearm();
-    G.ShopUI.report = report || null;
+    if (G_Me.navRearm) G_Me.navRearm();
+    ShopUI.report = report || null;
     let paid = 0;
     this.lastBonus = 0;
-    if (G.Me.pos && !G.SpaceData.ON) { // (in space a mission's fee is what's paid, when it's done: js/space.ts mdone)
+    if (G_Me.pos && !SpaceData.ON) { // (in space a mission's fee is what's paid, when it's done: js/space.ts mdone)
       const clean = report && report.unauth === 0; // (a civilian killed no longer costs the clean bonus: it'll cost reputation)
-      const bonus = Math.round((250 + 75 * level + (clean ? 200 : 0) + (report && report.allRescued ? 150 + 50 * level : 0) + (report && report.stronghold ? G.Route.strongholdPay(level) : 0)));
-      G.Me.credits += bonus;
+      const bonus = Math.round((250 + 75 * level + (clean ? 200 : 0) + (report && report.allRescued ? 150 + 50 * level : 0) + (report && report.stronghold ? Route.strongholdPay(level) : 0)));
+      G_Me.credits += bonus;
       this.lastBonus = bonus; paid = bonus;
     }
-    if (report) G.Career.levelEnd(report, paid); // (extracted: the level's report, into your run's log)
+    if (report) Career.levelEnd(report, paid); // (extracted: the level's report, into your run's log)
     this.level = level;
     this.extract = { active: false, votes: 0, need: 0, civDead: 0, voted: false };
     this.enemiesLeft = 0; this.civsLeft = 0; this.bodiesLeft = 0; this.weaponsLeft = 0; this.unitsCleared = 0;
     // the level just played stays, out of sight, for the highlights on the hangar's TVs (js/highlights.ts)
-    if (G.Highlights && this.map && !this.map.hub) G.Highlights.take(this.map, G.R.detachLevel());
-    this.map = G.Level.generateHub(seed, level);
-    G.Views.warmed = jump; // (compiled under the veil too, and what lifts it; in a jump, as it's drawn)
-    G.Loot.clear();
-    G.R.setLevel(this.map);
-    G.Views.clearLevel();
-    G.Me.dead = false; G.Me.down = false;
-    G.ShopUI.open(level, seed, stock); // (his stock this visit: the whole squad's, shared)
-    G.Hangar.enter(this.map);
+    if (Highlights && this.map && !this.map.hub) Highlights.take(this.map, G_R.detachLevel());
+    this.map = Level.generateHub(seed, level);
+    Views.warmed = jump; // (compiled under the veil too, and what lifts it; in a jump, as it's drawn)
+    Loot.clear();
+    G_R.setLevel(this.map);
+    Views.clearLevel();
+    G_Me.dead = false; G_Me.down = false;
+    ShopUI.open(level, seed, stock); // (his stock this visit: the whole squad's, shared)
+    Hangar.enter(this.map);
     // each officer a spot of their own on the pad, in front of the opening
-    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(G.Net.myId!)), sp = G.Hangar.spawnAt(i);
-    G.Me.spawn(sp.x, sp.z);
-    G.Me.yaw = 0; // (facing the hall)
-    if (G.SpaceData.ON) G.Space.enterHub(this.map, spc); // (the squad's ship on the pad, or out by an anchor with you aboard; the rock round the base)
+    const i = Math.max(0, Object.keys(this.roster).sort().indexOf(Net.myId!)), sp = Hangar.spawnAt(i);
+    G_Me.spawn(sp.x, sp.z);
+    G_Me.yaw = 0; // (facing the hall)
+    if (SpaceData.ON) Space.enterHub(this.map, spc); // (the squad's ship on the pad, or out by an anchor with you aboard; the rock round the base)
     this.screen(null);
-    G.HUD.show(true);
-    if (G.SpaceData.ON) { if (!spc || !spc.ship || spc.ship.docked) G.HUD.toast('THE BASE', 'The missions board is by the pad · your ship is on it', 4); }
-    else G.HUD.toast('THE HANGAR', `Level ${level} cleared · look at what you want and press <b>F</b>`, 4);
-    G.ShopUI.wishNotice(); // (starred parts in this visit's stock)
-    if (this.lastBonus) G.HUD.chat(null, 0, `Mission bonus: +¢${this.lastBonus}`);
+    HUD.show(true);
+    if (SpaceData.ON) { if (!spc || !spc.ship || spc.ship.docked) HUD.toast('THE BASE', 'The missions board is by the pad · your ship is on it', 4); }
+    else HUD.toast('THE HANGAR', `Level ${level} cleared · look at what you want and press <b>F</b>`, 4);
+    ShopUI.wishNotice(); // (starred parts in this visit's stock)
+    if (this.lastBonus) HUD.chat(null, 0, `Mission bonus: +¢${this.lastBonus}`);
     if (!this.locked) this.$('clickToPlay').classList.remove('hidden');
     this.veilSay('Placing everyone');
-    if (G.SpaceData.ON) G.Space.debrief(); // (the mission just flown, if there was one: js/space.ts)
+    if (SpaceData.ON) Space.debrief(); // (the mission just flown, if there was one: js/space.ts)
   },
   // out of the hangar for good (a level, the lobby, the menu)
   leaveHub() {
     this.closeShop();
     this.hub = false;
-    G.Hangar.leave();
+    Hangar.leave();
   },
   enterGameover(m: any) {
     this.veil(false);
@@ -1839,15 +1893,15 @@ const G_Game = {
     this.$('clickToPlay').classList.add('hidden');
     this.screen('gameover');
     this.$('goSub').textContent = `Your squad fell on level ${m.level}.`;
-    G.Career.runEnd('wiped');
+    Career.runEnd('wiped');
     let html = '<table><tr><th>Operator</th><th>Incapacitated</th><th>Headshots</th><th>Damage</th><th>Downs</th><th>Revives</th></tr>';
     for (const [, s] of Object.entries(m.stats || {})) {
       const sx = s.sx || [0, 0, 0, 0, 0];
-      html += `<tr><td style="color:${G.U.hex(s.color)}">${G.Callsigns.html(s.animal)}${G.U.esc(s.name)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${G.U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td></tr>`;
+      html += `<tr><td style="color:${U.hex(s.color)}">${Callsigns.html(s.animal)}${U.esc(s.name)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td></tr>`;
     }
     this.$('goStats').innerHTML = html + '</table>';
-    this.$('btnNewRun').classList.toggle('hidden', !G.Net.isHost);
-    this.$('goMsg').textContent = G.Net.isHost ? '' : 'Waiting for the host to start a new run...';
+    this.$('btnNewRun').classList.toggle('hidden', !Net.isHost);
+    this.$('goMsg').textContent = Net.isHost ? '' : 'Waiting for the host to start a new run...';
   },
 
   // ------------------------------------------------------------- loop
@@ -1856,37 +1910,37 @@ const G_Game = {
     const now = performance.now();
     const raw = now - this.last, dt = Math.min(raw / 1000, 0.05);
     this.last = now;
-    G.Pad.update(dt); // (before anything reads the controls this frame)
-    G.Touch.update(dt);
-    G.Ambience.update(dt, this.phase === 'level' ? this.map : null, G.R.camera); // the place's own sound (js/ambience.ts), for where you are in it
+    Pad.update(dt); // (before anything reads the controls this frame)
+    Touch.update(dt);
+    Ambience.update(dt, this.phase === 'level' ? this.map : null, G_R.camera); // the place's own sound (js/ambience.ts), for where you are in it
     if (this.phase === 'level') {
-      if (G.Net.isHost && !this.hub) G.Views.boresOut(); // (the suspects' guns as they were last drawn, to the simulation: before anything moves this frame)
-      if (this.invOpen) G.InvUI.update(dt);
-      if (this.invOpen && (this.invT = (this.invT || 0) + dt) > 0.25) { this.invT = 0; G.InvUI.tick(); this.$('fiScore').innerHTML = G.HUD.scoreboardHTML(); }
-      G.Me.update(dt);
-      if (G.Highlights && !this.hub) G.Highlights.tick(dt); // (recording the level, for the hangar's TVs)
-      if (this.hub) { G.Hangar.update(dt); G.Hangar.mark(); }
-      G.Views.update(dt);
-      if (!this.hub) G.Landing.update(dt); // (after everyone's posed: in the air it moves the camera, and hides who's riding with you)
-      G.Space.update(dt); // (the squad's ship: flown, and what's outside her moved: js/space.ts)
-      if (G.Me.dead) G.Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
-      G.GunAudio.updateListener(G.R.camera); // (after that: dead, you hear from where the camera is, not where you fell)
-      G.Me.flushHits();
+      if (Net.isHost && !this.hub) Views.boresOut(); // (the suspects' guns as they were last drawn, to the simulation: before anything moves this frame)
+      if (this.invOpen) InvUI.update(dt);
+      if (this.invOpen && (this.invT = (this.invT || 0) + dt) > 0.25) { this.invT = 0; InvUI.tick(); this.$('fiScore').innerHTML = HUD.scoreboardHTML(); }
+      G_Me.update(dt);
+      if (Highlights && !this.hub) Highlights.tick(dt); // (recording the level, for the hangar's TVs)
+      if (this.hub) { Hangar.update(dt); Hangar.mark(); }
+      Views.update(dt);
+      if (!this.hub) Landing.update(dt); // (after everyone's posed: in the air it moves the camera, and hides who's riding with you)
+      Space.update(dt); // (the squad's ship: flown, and what's outside her moved: js/space.ts)
+      if (G_Me.dead) G_Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
+      GunAudio.updateListener(G_R.camera); // (after that: dead, you hear from where the camera is, not where you fell)
+      G_Me.flushHits();
       this.updateZone();
       this.updateDoors(dt);
-    } else if (this.showcaseBehind() && G.MenuShow.update(dt)) {
+    } else if (this.showcaseBehind() && MenuShow.update(dt)) {
       // the main menu, the lobby and a run's first route: the guns one after another (js/menushow.ts), drawn below instead of the level
     } else if (this.map) {
       // menu / shop backdrop camera
       this.backdropT = (this.backdropT || 0) + dt * 0.08;
-      const c = G.R.camera, m = this.map, cx = m.spawn.x, cz = m.spawn.z;
+      const c = G_R.camera, m = this.map, cx = m.spawn.x, cz = m.spawn.z;
       c.position.set(cx + Math.sin(this.backdropT) * 6, 2.2, cz + Math.cos(this.backdropT) * 6);
       c.rotation.set(-0.1, this.backdropT + Math.PI, 0);
       if (c.fov !== 75) { c.fov = 75; c.updateProjectionMatrix(); }
     }
-    G.R.update(dt);
-    G.HUD.update(dt);
-    if (this.showcaseBehind() && G.MenuShow.live) G.MenuShow.render(G.R.renderer); else if (!G.R.warmStep()) { G.R.render(); G.Space.prep(); } // (the shaders being built under the veil: nothing drawn till they are, js/render.ts warmup)
+    G_R.update(dt);
+    HUD.update(dt);
+    if (this.showcaseBehind() && MenuShow.live) MenuShow.render(G_R.renderer); else if (!G_R.warmStep()) { G_R.render(); Space.prep(); } // (the shaders being built under the veil: nothing drawn till they are, js/render.ts warmup)
     // the veil lifts once the new place has drawn veilN SMOOTH frames in a row (the first ones after a build upload textures and collect garbage: lifting
     // on those makes the wipe stutter off), or after 90 frames whatever they took (a slow machine still gets in)
     if (this.veilN > 0) {
@@ -1901,24 +1955,24 @@ const G_Game = {
     if (!m || !m.doorMeshes) return;
     m.doors.forEach((d: LvDoor, i: number) => {
       const piv = m.doorMeshes[i], u = piv.userData;
-      if (u.fallen) { G.LightGrid.setDoor(i, 1); return; } // (off its hinges: js/damage.ts has it)
+      if (u.fallen) { LightGrid.setDoor(i, 1); return; } // (off its hinges: js/damage.ts has it)
       u.ang += ((d.open ? 1 : 0) - u.ang) * Math.min(1, dt * (u.rate || 7));
       if (u.slide) { const k = u.ang * u.w * 0.97; piv.position.x = u.px - Math.cos(u.base) * k; piv.position.z = u.pz + Math.sin(u.base) * k; } // (a ship's door: along the wall, into it)
       else piv.rotation.y = u.base + u.ang * Math.PI / 2 * 0.95 * (u.sign || 1);
       const k = Math.min(1, u.ang * 2.5); // (the lamps' light past it: all in by the time it's well ajar)
-      G.LightGrid.setDoor(i, k < 0.01 ? 0 : k > 0.99 ? 1 : k);
+      LightGrid.setDoor(i, k < 0.01 ? 0 : k > 0.99 ? 1 : k);
     });
-    G.LightGrid.flush();
-    G.Damage.update(m as unknown as GmDmgMap, dt);
+    LightGrid.flush();
+    Damage.update(m as unknown as GmDmgMap, dt);
   },
   updateZone() { /* no exit zone: the squad votes to leave (Y) once order's restored */ },
 };
-G.Game = G_Game;
+G.Game = Game;
 // (what the simulation's files ask of the game: js/gear.ts, js/damage.ts)
-G.Hooks.inField = () => !!(G.Game && G.Game.phase === 'level' && !G.Game.hub);
-G.Hooks.biteDebris = (map, rec, n) => { if ((map as unknown) === G.Game.map && G.R.debris) G.R.debris.burst(new THREE.Vector3(...rec.a), { m: rec.m, k: 'e', n, J: rec.J * 3, dir: new THREE.Vector3(...rec.u) }); };
-interface GameModules { Game: typeof G_Game; }
+Hooks.inField = () => !!(Game && Game.phase === 'level' && !Game.hub);
+Hooks.biteDebris = (map, rec, n) => { if ((map as unknown) === Game.map && G_R.debris) G_R.debris.burst(new THREE.Vector3(...rec.a), { m: rec.m, k: 'e', n, J: rec.J * 3, dir: new THREE.Vector3(...rec.u) }); };
+declare global { interface GameModules { Game: typeof Game; } }
 
-window.addEventListener('load', () => G.Game.init());
+window.addEventListener('load', () => Game.init());
 // a gun's picture came in after the sidearm web was drawn (js/icons.ts): draw it again
-window.addEventListener('gunicons', () => { const el = G.Game.$('sidearmPick'); if (el && !el.classList.contains('hidden') && !G.Me.sidearmChosen) G.Game.sidearmPick(); });
+window.addEventListener('gunicons', () => { const el = Game.$('sidearmPick'); if (el && !el.classList.contains('hidden') && !G_Me.sidearmChosen) Game.sidearmPick(); });

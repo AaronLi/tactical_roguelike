@@ -14,6 +14,8 @@ import { Pad } from './gamepad.js';
 import { R } from './render.js';
 import { Net } from './net.js';
 import { Space } from './space.js';
+import { Game } from './game.js';
+import { Me as G_Me } from './player.js';
 // In-game heads-up display (a DOM overlay).
 // the HUD's elements by id (init collects every id under #hud); the mask's canvas is the one that isn't a plain element
 interface HudEls { [id: string]: HTMLElement; maskFx: HTMLCanvasElement }
@@ -99,7 +101,7 @@ export const HUD = {
   // Your face shield catching a round: where it struck, on your view through it, and it stays that way (list: [x, y, what it did: 0
   // stopped, 1 through, 2 glanced], in the head's frame: js/ballistics.ts). Kept on the shield, so it goes where the shield goes.
   maskHit(list: [number, number, number][]) {
-    const k = G.Me.kit, it = k && k.helmet && (k.helmet.face || k.helmet);
+    const k = G_Me.kit, it = k && k.helmet && (k.helmet.face || k.helmet);
     if (!it) return;
     const cr = it.cracks || (it.cracks = []);
     for (const [x, y, st] of list) cr.push([U.clamp(0.5 + x / 0.1 * 0.4, 0.06, 0.94), U.clamp(0.5 - (y - 0.05) / 0.1 * 0.4, 0.06, 0.94), st, (Math.random() * 1e9) | 0]);
@@ -108,9 +110,9 @@ export const HUD = {
   },
   // what's on the shield you're wearing, drawn when it changes
   maskDraw(dt: number) {
-    const k = G.Me.kit, it = k && k.helmet && (k.helmet.face || k.helmet), cr = (it && it.cracks) || [], cv = this.el.maskFx, W = window.innerWidth, H = window.innerHeight, key = `${cr.length}|${cr.length ? cr[cr.length - 1][3] : 0}|${W}x${H}`;
+    const k = G_Me.kit, it = k && k.helmet && (k.helmet.face || k.helmet), cr = (it && it.cracks) || [], cv = this.el.maskFx, W = window.innerWidth, H = window.innerHeight, key = `${cr.length}|${cr.length ? cr[cr.length - 1][3] : 0}|${W}x${H}`;
     if (this.maskPop > 0) { this.maskPop = Math.max(0, this.maskPop - dt * 3.5); cv.style.filter = `brightness(${(1 + this.maskPop * 1.6).toFixed(2)})`; } else if (cv.style.filter) cv.style.filter = '';
-    cv.classList.toggle('hidden', !cr.length || G.Me.dead); // (not while you're watching someone else)
+    cv.classList.toggle('hidden', !cr.length || G_Me.dead); // (not while you're watching someone else)
     if (key === this.maskKey) return;
     this.maskKey = key;
     cv.width = W; cv.height = H;
@@ -138,7 +140,7 @@ export const HUD = {
     const el = this.el.nadeWarn;
     el.classList.toggle('hidden', !n);
     if (!n) return;
-    const Me = G.Me, ang = Math.atan2(-(n.pos.x - Me.pos.x), -(n.pos.z - Me.pos.z));
+    const Me = G_Me, ang = Math.atan2(-(n.pos.x - Me.pos.x), -(n.pos.z - Me.pos.z));
     (el.firstChild as HTMLElement).style.transform = `rotate(${-U.angDiff(Me.yaw, ang)}rad)`;
   },
   sniperWarn(on: boolean) { this.el.vignette.classList.toggle('sniper', on); },
@@ -158,7 +160,7 @@ export const HUD = {
     if (!on) { if (this.xrOn) this.xray(null); return; }
     if ((this.hbT = (this.hbT || 0) - dt) > 0) return;
     this.hbT = 0.1;
-    const cam = R.camera, o = cam.position.clone(), d = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), map = G.Game.map;
+    const cam = R.camera, o = cam.position.clone(), d = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion), map = Game.map;
     const wall = map ? Level.raycast(map, o.x, o.y, o.z, d.x, d.y, d.z, 300) : null, maxT = wall && wall.t != null ? wall.t + 0.05 : 300;
     let best = null as HbTarget | null;
     const test = (who: VwEnemy | VwPlayer, kind: HbKind) => { if (!who.rig || !who.rig.root.visible) return; const h = G_Rig.raycast(who.rig, o, d, maxT); if (h && (!best || h.t < best.h.t)) best = { who, kind, h } as HbTarget; };
@@ -268,7 +270,7 @@ export const HUD = {
       for (const ev of Views.enemies.values()) if (ev.rig) rigs.push([ev.rig, ev, 'e']);
       for (const pv of Views.players.values()) if (pv.rig && pv.st) rigs.push([pv.rig, pv, 'p']);
     }
-    const cam = R.camera.position, map = G.Game.map, keep = new Set<Rig>();
+    const cam = R.camera.position, map = Game.map, keep = new Set<Rig>();
     for (const [rig, who, kind] of rigs) {
       if (!rig.root.visible) continue;
       const at = rig.hips ? rig.hips.getWorldPosition(new THREE.Vector3()) : rig.root.position.clone(), d = at.distanceTo(cam), me = who === target;
@@ -348,7 +350,7 @@ export const HUD = {
   },
 
   update(dt: number) {
-    const Me = G.Me, Gm = G.Game;
+    const Me = G_Me, Gm = Game;
     if (Gm.phase !== 'level' || !Me.pos) return;
     const w = Me.cur(), def = w.def, maxHp = Me.maxHp(), chest = Gear.piece(Me, 'chest');
     this.debugTarget(dt);
@@ -519,13 +521,13 @@ export const HUD = {
   },
   scoreboardHTML() {
     const rows = [];
-    const me = G.Me.state();
-    rows.push({ id: Net.myId, name: G.Game.myName, color: G.Game.myColor, animal: G.Game.myAnimal, st: me });
+    const me = G_Me.state();
+    rows.push({ id: Net.myId, name: Game.myName, color: Game.myColor, animal: Game.myAnimal, st: me });
     for (const [id, pv] of Views.players) rows.push({ id, name: pv.name, color: pv.color, animal: pv.animal, st: pv.st });
     let html = '<table><tr><th>Operator</th><th>Incap.</th><th>HS</th><th>Damage</th><th>Downs</th><th>Revives</th><th>Credits</th></tr>';
     for (const r of rows) {
       const sx = (r.st && r.st.sx) || [0, 0, 0, 0, 0];
-      html += `<tr><td style="color:${U.hex(r.color)}">${Callsigns.html(r.animal)}${U.esc(r.name)}${G.Game.guestMark(r.id)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td><td>${r.st ? U.fmt(r.st.cred) : '—'}</td></tr>`;
+      html += `<tr><td style="color:${U.hex(r.color)}">${Callsigns.html(r.animal)}${U.esc(r.name)}${Game.guestMark(r.id)}</td><td>${sx[0]}</td><td>${sx[2]}</td><td>${U.fmt(sx[1])}</td><td>${sx[3]}</td><td>${sx[4]}</td><td>${r.st ? U.fmt(r.st.cred) : '—'}</td></tr>`;
     }
     html += '</table>';
     if (Net.code) html += `<div class="sb-perks">Room code: <b>${Net.code}</b></div>`;

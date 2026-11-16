@@ -6,6 +6,7 @@ import { GunModels } from './gunmodels.js';
 import { Headgear } from './headgear.js';
 import { Humans } from './humans.js';
 import { Level } from './level.js';
+import { LevelView } from './levelview.js';
 import { Gunsmith } from './parts.js';
 import { Sim } from './sim.js';
 import { SpaceData } from './spacedata.js';
@@ -1429,12 +1430,12 @@ export const Rig = (() => {
       const fwd = new T.Vector3(0, 0, -1).transformDirection(root.matrixWorld); // (closed round the rung: the palm to the ladder, the fingers up and over)
       for (const [arm, side, k] of [[rig.armL, -1, 'hL'], [rig.armR, 1, 'hR']] as [RigArm, number, string][]) gripHand(rig, arm, at(k), fwd, UP, new T.Vector3(l.x + 0.5, y + 1.0, l.z - side * 0.7), HAND_GRIP, 1);
     }
-    // on a zipline (p.zip): hanging by the left hand from the handle of a trolley on the line (G.LevelView.zipKit, the cable ZIP_HANG over
+    // on a zipline (p.zip): hanging by the left hand from the handle of a trolley on the line (LevelView.zipKit, the cable ZIP_HANG over
     // their feet), the right hand with the gun (above); the body swings under it (above), the legs together, a little bent, the feet
     // kicked up and trailing the swing
     if (p.zip) {
       const L = Level;
-      if (!rig.zipKit) { rig.zipKit = G.LevelView.zipKit(); root.add(rig.zipKit); }
+      if (!rig.zipKit) { rig.zipKit = LevelView.zipKit(); root.add(rig.zipKit); }
       rig.zipKit.visible = true; rig.zipKit.position.set(0, L.ZIP_HANG, 0);
       root.updateMatrixWorld(true);
       gripHand(rig, rig.armL, root.localToWorld(new T.Vector3(0, L.ZIP_HANG - L.ZIP_BAR, 0)), new T.Vector3(0, 0, -1).transformDirection(root.matrixWorld), UP, rig.chest.localToWorld(new T.Vector3(-0.55, 0.15, 0.1)), HAND_GRIP, 1); // (closed round the handle, the palm forward)

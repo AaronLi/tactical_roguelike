@@ -17,6 +17,8 @@ import { Views } from './views.js';
 import { World } from './world.js';
 import { Career } from './career.js';
 import { Net } from './net.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -57,7 +59,7 @@ export const Space = (() => {
     spin: 0, warp: null as null | { j: number; u: number; t: number; top: number }, tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1, match: null as null | string,
     boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], fireT: 0,
   };
-  const me = () => G.Me, on = () => S.on;
+  const me = () => Me, on = () => S.on;
   const isCtl = () => S.ctl === Net.myId;
   const mySeat = () => (S.on && me().seat != null ? S.seatsDef[me().seat as number] || null : null);
   const fwd = (q: THREE.Quaternion) => new T.Vector3(0, 0, -1).applyQuaternion(q);
@@ -259,7 +261,7 @@ export const Space = (() => {
   }
   function debrief(m?: any) {
     if (m) { brief = m; if (m.i != null) telling = m.i; }
-    if (!brief || !G.Game.hub) return; // (shown on the way in: enterShop calls again)
+    if (!brief || !Game.hub) return; // (shown on the way in: enterShop calls again)
     const b = brief; brief = null;
     const E = U.esc, ms = b.ms || {}, c = b.cas || {}, ok = !!b.ok, o = (SD.OBJ as any)[ms.obj] || null, f = (v: number) => U.fmt(Math.round(v || 0));
     const row = (k: string, v: string, cls = '') => `<div class="db-row${cls ? ' ' + cls : ''}"><span>${k}</span><b>${v}</b></div>`;
@@ -277,10 +279,10 @@ export const Space = (() => {
     el.classList.remove('hidden');
     for (const id of ['pause', 'clickToPlay']) { const o = document.getElementById(id); if (o) o.classList.add('hidden'); } // (the debrief's up: not the pause menu, nor the click to play behind it)
     { const bar = el.querySelector<HTMLElement>('.db-bar .now'); if (bar) requestAnimationFrame(() => requestAnimationFrame(() => { bar.style.width = bar.dataset.to + '%'; })); } // (filled up to now, as it's shown)
-    G.Game.unlock();
+    Game.unlock();
     const close = () => {
       el.classList.add('hidden'); window.removeEventListener('keydown', key, true);
-      if (G.Game.phase === 'level') { G.Game.lock(); setTimeout(() => { if (!G.Game.locked && !G.Game.menuOpen() && G.Game.phase === 'level') document.getElementById('clickToPlay')!.classList.remove('hidden'); }, 300); } // (back to the game: the mouse, or the click to have it)
+      if (Game.phase === 'level') { Game.lock(); setTimeout(() => { if (!Game.locked && !Game.menuOpen() && Game.phase === 'level') document.getElementById('clickToPlay')!.classList.remove('hidden'); }, 300); } // (back to the game: the mouse, or the click to have it)
       telling = null; placeAnchors(); SpaceUI.boardDraw(); SpaceUI.opsRender(); // (told: off the board)
     };
     const key = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); } };
@@ -623,7 +625,7 @@ export const Space = (() => {
   }
   // (the figures the host will make her level with, should the squad's ship come up with her: js/spaceserver.ts 'tboard', genOf)
   function zoneLevel(c: SpContact) {
-    const zi = S.zinfo, zm = zi ? zi.ms : null, main = c.k === 0 && zm ? zm : null, diff = zm && zm.diff ? zm.diff : G.Game.level;
+    const zi = S.zinfo, zm = zi ? zi.ms : null, main = c.k === 0 && zm ? zm : null, diff = zm && zm.diff ? zm.diff : Game.level;
     return { seed: c.seed, level: main ? diff : Math.max(1, diff - 1), th: c.th, night: main ? !!main.night : false, gen: { size: c.size, obj: main ? main.obj : 'visit', ship: S.fleet.ship, other: main ? main.other : null, wing: !!c.wing } };
   }
   /** a level laid out: on the other thread if there's one (null till it's come: js/prep.ts map), else here and now */
@@ -792,7 +794,7 @@ export const Space = (() => {
   // down through the cloud (or up out of it): the screen clouds over, the other place is put there, it clears
   function through(to: 'orbit' | 'atmo') {
     if (S.stage === to) return;
-    veilKind('cloud'); G.Game.veil(true);
+    veilKind('cloud'); Game.veil(true);
     const map = S.map;
     setTimeout(() => {
       if (S.map !== map || !S.on) return;
@@ -802,8 +804,8 @@ export const Space = (() => {
         else { const o = S.wps.find((w) => w.id === 'entry')!.p; S.P.copy(o).lerp(S.anchors[0].p, 0.25); const d = S.anchors[0].p.clone().sub(S.P).normalize(); S.Q.copy(lookQ(d)); S.V.copy(d).multiplyScalar(120); }
       }
       S.net = null;
-      G.Game.veilN = G.Game.VEIL_SMOOTH;
-    }, G.Game.VEIL_MS + 250);
+      Game.veilN = Game.VEIL_SMOOTH;
+    }, Game.VEIL_MS + 250);
   }
   function lookQ(dir: THREE.Vector3) { const m = new T.Matrix4().lookAt(new T.Vector3(), dir, new T.Vector3(0, 1, 0)); return new T.Quaternion().setFromRotationMatrix(m); }
   // out of a jump here: in the tunnel a few seconds more (the place is built already: this is the last of the trip)
@@ -924,7 +926,7 @@ export const Space = (() => {
   }
 
   // ------------------------------------------------------------------ flying her
-  const K = (c: string) => !!me().keys[c] && !G.Game.chatOpen && !G.Game.menuOpen();
+  const K = (c: string) => !!me().keys[c] && !Game.chatOpen && !Game.menuOpen();
   function fly(dt: number) {
     const d = S.def, seat = mySeat(), helm = !!seat && seat.k === 'helm' && isCtl() && !me().dead && !me().down;
     // the mouse: what it's turned your view by since the last frame is the stick's push (it springs back)
@@ -1471,13 +1473,13 @@ export const Space = (() => {
 
   // ------------------------------------------------------------------ the frame
   function update(dt: number) {
-    if (!S.on || !S.model || G.Game.map !== S.map) return;
+    if (!S.on || !S.model || Game.map !== S.map) return;
     S.t += dt;
     if (S.plan) S.plan.line.visible = S.plan.gates.visible = S.plan.end.visible = false; // (her plan's drawn again below while she's lined up: planDraw)
     zoneStep();
     tgtTrack(dt);
     const m = me();
-    if (isCtl() || (!S.ctl && Object.keys(G.Game.roster || {}).length < 2)) { fly(dt); if (!S.docked) sendPose(); zoneClose(dt); } else { if (S.auto) S.auto = null; follow(dt); S.stick.multiplyScalar(Math.exp(-dt * 2.2)); }
+    if (isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2)) { fly(dt); if (!S.docked) sendPose(); zoneClose(dt); } else { if (S.auto) S.auto = null; follow(dt); S.stick.multiplyScalar(Math.exp(-dt * 2.2)); }
     ftlStep(dt);
     doors(dt);
     turrets(dt);
@@ -1521,7 +1523,7 @@ export const Space = (() => {
     for (let i = S.tracers.length - 1; i >= 0; i--) { const tr = S.tracers[i]; tr.t -= dt; (tr.m.material as THREE.MeshBasicMaterial).opacity = Math.max(0, tr.t / 0.12); if (tr.t <= 0) { tr.m.parent && tr.m.parent.remove(tr.m); S.tracers.splice(i, 1); } }
     if (!seat || seat.k !== 'turret' || S.docked) return;
     const e = SD.EQUIP[(S.fleet.fit[S.def.id] || [])[seat.n || 0] || ''], tu = S.model!.turrets[seat.n || 0];
-    if (!e || !tu || !me().mouse.l || S.fireT > 0 || G.Game.menuOpen()) return;
+    if (!e || !tu || !me().mouse.l || S.fireT > 0 || Game.menuOpen()) return;
     S.fireT = e.rof || 0.2;
     // from the muzzle along the gun, in the level's own coordinates (where a hull's guns are)
     const mw = tu.muzzle.getWorldPosition(new T.Vector3()), dw = new T.Vector3(0, 0, -1).applyQuaternion(tu.gun.getWorldQuaternion(new T.Quaternion()));
@@ -1614,7 +1616,7 @@ export const Space = (() => {
     if (S.hold >= need) { S.hold = -1e9; done(); return -1; }
     return Math.max(0, S.hold / need);
   }
-  function interact(m: typeof G.Me, dt: number, held: boolean, F: boolean): { prompt: string; prog: number; label: string } | null {
+  function interact(m: typeof Me, dt: number, held: boolean, F: boolean): { prompt: string; prog: number; label: string } | null {
     if (!S.on) return null;
     const out = { prompt: '', prog: -1, label: '' };
     if (m.seat != null || !aboard()) seatLit(-1);
@@ -1667,7 +1669,7 @@ export const Space = (() => {
       const best = seatLooked();
       seatLit(best);
       if (best >= 0) {
-        const s = S.seatsDef[best], taken = Object.keys(S.seats).some((id) => id !== Net.myId && S.seats[id] === best && G.Game.roster[id]);
+        const s = S.seatsDef[best], taken = Object.keys(S.seats).some((id) => id !== Net.myId && S.seats[id] === best && Game.roster[id]);
         const what = s.k === 'helm' ? 'take the helm' : s.k === 'sensors' ? 'sit at the sensor station' : s.k === 'turret' ? 'man the turret' : 'sit down';
         if (taken) { out.prompt = 'Taken'; return out; }
         const p = holdFor('F', held && !m.fLatch, dt, 0.4, () => { m.fLatch = true; sit(best); });
@@ -1717,7 +1719,7 @@ export const Space = (() => {
       case 'fleet': {
         const was = S.fleet.ship; S.fleet = SD.cleanFleet(m.f);
         if (Net.isHost) store().set('fleet', S.fleet);
-        if (m.got && SD.SHIPS[m.got]) HUD.feed(`<b>${U.esc(G.Game.nameOf(m.by))}</b> bought the ${SD.SHIPS[m.got].name}`);
+        if (m.got && SD.SHIPS[m.got]) HUD.feed(`<b>${U.esc(Game.nameOf(m.by))}</b> bought the ${SD.SHIPS[m.got].name}`);
         // another ship on the pad, or other guns on her: she's drawn again
         if (S.on && S.kind === 'hub' && S.docked && S.map) { const sp = { fleet: S.fleet, seats: was === S.fleet.ship ? S.seats : {}, ship: { docked: 1, ctl: S.ctl }, board: S.board }; setup(S.map, 'hub', sp); }
         SpaceUI.opsRender();
@@ -1789,7 +1791,7 @@ export const Space = (() => {
       zoneStep(); outside();
       const m = me(), lk = S.look; S.look = null;
       if (m.pos && lk) { m.yaw = S.berth.yaw + lk.yaw; m.pitch = lk.pitch; m.eyeH = lk.eyeH; m.stowW = lk.stowW; m.crouch = lk.crouch; m.stowed = lk.stowed; }
-      if (m.pos) { if (m.seat != null) m.move(0, map); G.Me.updateCamera(1 / 60); }
+      if (m.pos) { if (m.seat != null) m.move(0, map); Me.updateCamera(1 / 60); }
     }
   }
   // How she's flying, for her sound (js/ambience.ts shipVoice), each frame: null with no ship here. Aboard her you hear all of

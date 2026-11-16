@@ -23,6 +23,8 @@ import { Highlights } from './highlights.js';
 import { HUD } from './hud.js';
 import { R } from './render.js';
 import { Net } from './net.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 const WP = new THREE.Vector3(), WD = new THREE.Vector3(); // (a wound's place and direction: woundStreams)
 interface VwEvidence { mesh: THREE.Object3D; wpn: string; x: number; y: number; z: number; secured?: boolean; [k: string]: any }
 interface VwNade extends VwNadeMotion { fuse: number; own: boolean; enemy: boolean; mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>; kind: VwNadeKind; nid?: number; from?: string; flyT?: number; stuck?: { rig?: Rig; bone?: THREE.Object3D | null; l?: THREE.Vector3; me?: THREE.Vector3 } | null } // (nid, from: a sticky's, so where it held can be told: 'stk')
@@ -75,7 +77,7 @@ export const Views = {
   // drawn: the hips, wherever a fall's taken them), stopped only by walls, floors and ceilings. A look that starts in
   // one (the camera pressed to a wall) starts again past it.
   inSight(rig: Rig, at: THREE.Vector3) {
-    const map = G.Game.map, w = map && map.world, c = R.camera.position;
+    const map = Game.map, w = map && map.world, c = R.camera.position;
     if (!w) return true;
     const hp = rig.hips.getWorldPosition(this._sp || (this._sp = new THREE.Vector3())), y = at.y;
     if (Math.hypot(hp.x - c.x, hp.z - c.z) < 2.5) return true;
@@ -102,7 +104,7 @@ export const Views = {
   // were (what a teammate sees on their screen; now you see it too, from the camera on theirs)
   spawnSelfBody() {
     this.clearSelfBody();
-    const me = G.Me, g = G.Game, wasDown = !!me.down;
+    const me = Me, g = Game, wasDown = !!me.down;
     const rig = this.newPlayerRig({ color: g.myColor, animal: g.myAnimal, name: g.myName, look: g.myLook }, Net.myId || 'me');
     rig.setKit(me.kitLook());
     rig.setGun(me.cur().def.code, me.cur().stickers);
@@ -168,7 +170,7 @@ export const Views = {
   slowFill: false, // (a level come up with from outside, with no veil: its people are made a few a snapshot, not all in one frame. js/game.ts enterLevel)
   applySnap(m: any) {
     const fillT = performance.now();
-    if (!this.warmed) { this.warmed = true; G.Game.veilSay('Compiling shaders'); setTimeout(() => R.warmup(() => { G.Game.veilN = G.Game.VEIL_SMOOTH; G.Game.veilWait = 0; }), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
+    if (!this.warmed) { this.warmed = true; Game.veilSay('Compiling shaders'); setTimeout(() => R.warmup(() => { Game.veilN = Game.VEIL_SMOOTH; Game.veilWait = 0; }), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
     for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd, fc = 0, rd = 0] of m.e) {
       seen.add(id);
@@ -222,19 +224,19 @@ export const Views = {
       if (pv.first) { pv.pos.set(st.p[0], st.p[1], st.p[2]); pv.yaw = st.yw; pv.first = false; }
       if (st.kt) pv.rig.setKit(st.kt); // their helmet, carrier, belt, pack... as they're wearing them
     }
-    G.Game.extract.active = !!m.x[0];
-    G.Game.extract.votes = m.x[1] || 0; G.Game.extract.need = m.x[2] || 0; G.Game.extract.civDead = m.x[3] || 0;
-    G.Game.extract.voted = (m.x[4] || []).includes(Net.myId);
-    G.Game.unitsCleared = m.x[5] || 0;
-    G.Game.enemiesLeft = m.n;
-    G.Game.civsLeft = m.c || 0;
-    G.Game.bodiesLeft = m.b || 0;
-    G.Game.weaponsLeft = m.w || 0;
+    Game.extract.active = !!m.x[0];
+    Game.extract.votes = m.x[1] || 0; Game.extract.need = m.x[2] || 0; Game.extract.civDead = m.x[3] || 0;
+    Game.extract.voted = (m.x[4] || []).includes(Net.myId);
+    Game.unitsCleared = m.x[5] || 0;
+    Game.enemiesLeft = m.n;
+    Game.civsLeft = m.c || 0;
+    Game.bodiesLeft = m.b || 0;
+    Game.weaponsLeft = m.w || 0;
   },
   // world position of the closest living player (including you)
   nearestPlayer(p: THREE.Vector3) {
     let best: THREE.Vector3 | null = null, bd = 1e9;
-    if (G.Me.pos && !G.Me.dead && !G.Me.down) { bd = G.Me.pos.distanceTo(p); best = G.Me.pos; }
+    if (Me.pos && !Me.dead && !Me.down) { bd = Me.pos.distanceTo(p); best = Me.pos; }
     for (const pv of this.players.values()) {
       if (!pv.st || pv.st.dd || pv.st.dn) continue;
       const d = pv.pos.distanceTo(p);
@@ -361,7 +363,7 @@ export const Views = {
   },
   // First aid cabinets: what's on the shelves (a box per stack, in its item's colour), and the door
   syncCabs() {
-    const map = G.Game.map, cvs: VwCabView[] | null = map && map.cabViews, cabs = G.Game.cabs || [];
+    const map = Game.map, cvs: VwCabView[] | null = map && map.cabViews, cabs = Game.cabs || [];
     if (!cvs) return;
     const COL: Record<string, number> = { bandage: 0xe8e2d0, pills: 0xe8c040, tourniquet: 0x2a2a2a, gauze: 0x4a7ab0, seal: 0xb03a3a, splint: 0xd27b4b, bloodbag: 0x7a0d12 };
     cvs.forEach((cv, i) => {
@@ -373,10 +375,10 @@ export const Views = {
   },
   // The weapon case's lid (what's in it is G.Loot's)
   syncCase() {
-    const map = G.Game.map, cv: VwLid | null = map && map.caseView;
+    const map = Game.map, cv: VwLid | null = map && map.caseView;
     if (!cv || cv.synced) return;
     cv.synced = true;
-    if (G.Game.caseOpen) cv.open = 1; // joined with it already open
+    if (Game.caseOpen) cv.open = 1; // joined with it already open
   },
   // a body that died before we joined: lay it out where it fell
   addBody(id: number, type: string, x: number, z: number, yaw: number, secured: number, y = 0, nm: string | null = null) {
@@ -436,7 +438,7 @@ export const Views = {
   // A pane that's taken a round short of breaking: fractured right across from where it was hit (js/damage.ts crack), still up
   // (each of the first G.Level.CRACKS rounds fractures it; the next one brings it down: js/player.ts roundPane)
   crackGlass(id: number, at: THREE.Vector3, dir?: THREE.Vector3) {
-    const map = G.Game.map, w = map && map.windows && map.windows[id];
+    const map = Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor || (w.cracked || 0) >= Level.crackCap(w)) return;
     w.cracked = (w.cracked || 0) + 1; map.cracked = true;
     if (Highlights) Highlights.crack(id, at);
@@ -445,7 +447,7 @@ export const Views = {
     Audio.glass(Math.hypot(w.x - R.camera.position.x, w.z - R.camera.position.z) + 10); // (from the camera: on a helmet cam, what they hear)
   },
   breakGlass(id: number, at?: THREE.Vector3, dir?: THREE.Vector3) {
-    const map = G.Game.map, w = map && map.windows && map.windows[id];
+    const map = Game.map, w = map && map.windows && map.windows[id];
     if (!w || w.broken || w.armor) return; // (bulletproof glass doesn't break)
     w.broken = true;
     if (Highlights) Highlights.glass(id);
@@ -464,7 +466,7 @@ export const Views = {
   // person in its way (a person as a rough column: standing up to 1.8 m, 0.25 m round). skip: whose it is.
   // (selfEv: a suspect's own: their body doesn't stop their laser.) Anyone else's light can dazzle you: js/glare.ts.
   tacBeam(from: THREE.Vector3, dir: THREE.Vector3, fl: number, skip: string | null, drawFrom?: THREE.Vector3 | null, selfEv?: VwEnemy) {
-    const map = G.Game.map;
+    const map = Game.map;
     if (!map) return;
     const src = drawFrom || from; // (where the light and the beam visibly come from)
     if (fl & 1) { R.tacLight(src, dir, fl & 8 ? 1.6 : 1, skip != null, skip == null && !!map.night); // (your own beam in the air: only in the dark of a night level)
@@ -482,7 +484,7 @@ export const Views = {
     };
     for (const ev of this.enemies.values()) if (ev.alive && ev !== selfEv) body(ev.pos, ev.crouch ? 1.2 : 1.8);
     for (const [id, pv] of this.players) if (id !== skip && pv.st && !pv.st.dd) body(pv.pos, pv.st.cr ? 1.2 : 1.8);
-    if (skip != null) body(G.Me.pos, G.Me.crouch ? 1.2 : 1.8);
+    if (skip != null) body(Me.pos, Me.crouch ? 1.2 : 1.8);
     const end = from.clone().addScaledVector(dir, t - 0.01);
     R.tacLaser(src, end, !!(fl & 4));
     if (Highlights) Highlights.laser(selfEv ? skip : skip == null ? null : 'p' + skip, end, !!(fl & 4)); // (where it landed: the replays show it)
@@ -640,7 +642,7 @@ export const Views = {
     const mesh = kind === 'sticky' ? this.stickyMesh(0.055) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial> : kind === 'tb' ? this.tbMesh(0.045, 0.15) as THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial> : new THREE.Mesh(flash ? new THREE.CylinderGeometry(0.035, 0.035, 0.13, 10) : new THREE.SphereGeometry(0.08, 8, 6), new THREE.MeshLambertMaterial({ color: flash ? 0x7d8388 : 0x3a4a2a, emissive: 0x220000 }));
     mesh.position.copy(p);
     R.dynRoot.add(mesh);
-    this.nades.push({ pos: new THREE.Vector3().copy(p), vel: new THREE.Vector3().copy(v), fuse: kind === 'sticky' ? G.Me.STICKY.FUSE : fuse, own, enemy, mesh, kind, nid, from, flyT: 0, stuck: null });
+    this.nades.push({ pos: new THREE.Vector3().copy(p), vel: new THREE.Vector3().copy(v), fuse: kind === 'sticky' ? Me.STICKY.FUSE : fuse, own, enemy, mesh, kind, nid, from, flyT: 0, stuck: null });
   },
   // A sticky in the air: on till it meets something, and there it holds (its fuse burning from then: the update). The thrower's screen
   // decides what it hit, people too (whoever's nearer along the way than the wall: the nearest of their bones it holds to, as a bolt
@@ -681,9 +683,9 @@ export const Views = {
     n.vel.set(0, 0, 0);
     if (Highlights) Highlights.stick('p' + m.id, Array.isArray(m.at) ? new THREE.Vector3(m.at[0], m.at[1], m.at[2]) : n.pos.clone(), n.flyT || 0); // (the replays: where it held, as they told it)
     if (Array.isArray(m.at)) { n.pos.set(m.at[0], m.at[1], m.at[2]); n.stuck = {}; return; }
-    if (m.pl === Net.myId && G.Me.pos) { // (on you: it goes where you go)
+    if (m.pl === Net.myId && Me.pos) { // (on you: it goes where you go)
       const at = n.pos;
-      n.stuck = { me: new THREE.Vector3(U.clamp(at.x - G.Me.pos.x, -0.3, 0.3), U.clamp(at.y - G.Me.pos.y, 0.3, 1.6), U.clamp(at.z - G.Me.pos.z, -0.3, 0.3)) }; return;
+      n.stuck = { me: new THREE.Vector3(U.clamp(at.x - Me.pos.x, -0.3, 0.3), U.clamp(at.y - Me.pos.y, 0.3, 1.6), U.clamp(at.z - Me.pos.z, -0.3, 0.3)) }; return;
     }
     const rig = m.e != null ? this.enemies.get(m.e)?.rig : m.pl ? this.players.get(m.pl)?.rig : null, bone = rig && Array.isArray(m.l) ? Ballistics.boneOf(rig, m.b) : null;
     if (rig && bone) { n.stuck = { rig, bone, l: new THREE.Vector3(m.l[0], m.l[1], m.l[2]) }; } else n.stuck = {};
@@ -764,11 +766,11 @@ export const Views = {
   // under them when they're down or dead. who: the owner key, pos: their feet, bl: 0 none, 1 light, 2 heavy.
   officerBlood(who: { _drip?: number; [k: string]: any }, pos: THREE.Vector3, bl: number, down: boolean, dt: number) {
     if (!bl) return;
-    const k = who === G.Me ? (this._myDrip = (this._myDrip || 0) - dt) : (who._drip = (who._drip || 0) - dt);
+    const k = who === Me ? (this._myDrip = (this._myDrip || 0) - dt) : (who._drip = (who._drip || 0) - dt);
     if (down) R.bloodPool(who, pos.x, pos.z, bl > 1 ? 1.0 : 0.5, bl > 1 ? 30 : 60, pos.y);
     else if (k <= 0) {
       const next = bl > 1 ? 0.12 + Math.random() * 0.12 : 0.6 + Math.random() * 0.6;
-      if (who === G.Me) this._myDrip = next; else who._drip = next;
+      if (who === Me) this._myDrip = next; else who._drip = next;
       R.particles(new THREE.Vector3(pos.x + (Math.random() - 0.5) * 0.35, 0.9, pos.z + (Math.random() - 0.5) * 0.35), 1, 0x7a0808, 0.2, 0.8, 9, 0.1, null, true);
     }
   },
@@ -778,7 +780,7 @@ export const Views = {
   // the same size on screen however far off, gone after a few seconds. One per player: a new one replaces it.
   PING_T: 6,
   addPing(id: string, p: number[]) {
-    const me = id === Net.myId, r = G.Game.roster && G.Game.roster[id], name = me ? G.Game.myName : r ? r.name : '?', color = me ? G.Game.myColor : r ? r.color : 0xffffff, animal = me ? G.Game.myAnimal : r ? r.animal : null;
+    const me = id === Net.myId, r = Game.roster && Game.roster[id], name = me ? Game.myName : r ? r.name : '?', color = me ? Game.myColor : r ? r.color : 0xffffff, animal = me ? Game.myAnimal : r ? r.animal : null;
     this.pings2 = this.pings2 || new Map();
     const old = this.pings2.get(id);
     if (old) { R.dynRoot.remove(old.s); old.s.material.map!.dispose(); old.s.material.dispose(); }
@@ -817,25 +819,25 @@ export const Views = {
     Bolts.update();
     this.updatePings(dt);
     this.stepRounds(dt);
-    if (G.Game.map && R.camera) { // the lights follow you (and, aiming, what you're aiming at)
+    if (Game.map && R.camera) { // the lights follow you (and, aiming, what you're aiming at)
       let focus = null;
-      if (G.Me.adsT > 0.5 && G.Game.map.theme.layout === 'festival') {
-        const c = R.camera, f = new THREE.Vector3(0, 0, -1).applyQuaternion(c.quaternion), h = Level.raycast(G.Game.map, c.position.x, c.position.y, c.position.z, f.x, f.y, f.z, 120);
+      if (Me.adsT > 0.5 && Game.map.theme.layout === 'festival') {
+        const c = R.camera, f = new THREE.Vector3(0, 0, -1).applyQuaternion(c.quaternion), h = Level.raycast(Game.map, c.position.x, c.position.y, c.position.z, f.x, f.y, f.z, 120);
         focus = c.position.clone().addScaledVector(f, h.t);
       }
-      LevelView.updateLights(G.Game.map, R.camera.position, false, focus);
+      LevelView.updateLights(Game.map, R.camera.position, false, focus);
     }
     // officers bleeding: you, and your teammates from what their bodies report
-    if (G.Game.phase === 'level' && G.Me.body && G.Me.pos) {
-      const parts = Object.values(G.Me.body.parts), bl = parts.some((q) => q.heavy) ? 2 : parts.some((q) => q.light) ? 1 : 0;
-      this.officerBlood(G.Me, G.Me.pos, bl, G.Me.down || G.Me.dead, dt);
+    if (Game.phase === 'level' && Me.body && Me.pos) {
+      const parts = Object.values(Me.body.parts), bl = parts.some((q) => q.heavy) ? 2 : parts.some((q) => q.light) ? 1 : 0;
+      this.officerBlood(Me, Me.pos, bl, Me.down || Me.dead, dt);
       for (const pv of this.players.values()) {
         if (!pv.st || !pv.st.bd || !pv.pos) continue;
         const b = pv.st.bd.p || [], bl2 = b.some((q: number[]) => q[1] & 2) ? 2 : b.some((q: number[]) => q[1] & 1) ? 1 : 0;
         this.officerBlood(pv, pv.pos, bl2, pv.st.dn || pv.st.dd, dt);
       }
     }
-    const map = G.Game.map, L = Level;
+    const map = Game.map, L = Level;
     // enemies
     for (const ev of [...this.enemies.values()]) {
       if (ev.alive) {
@@ -851,14 +853,14 @@ export const Views = {
       }
       // aim pitch toward whoever they're engaging
       let pitch = 0;
-      const aimed = ev.aim === Net.myId ? G.Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
+      const aimed = ev.aim === Net.myId ? Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
       const tgt = aimed || (ev.alert ? this.nearestPlayer(ev.pos) : null);
       if (tgt) pitch = Math.atan2(tgt.y + 1.2 - (ev.pos.y + 1.4 * ev.def.scale), Math.max(1, Math.hypot(tgt.x - ev.pos.x, tgt.z - ev.pos.z))); // (from their own height: upstairs, level)
       ev.recPitch = pitch; // (for the highlights: js/highlights.ts)
       let pose: VwPose | null = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 ? 'cower' : null;
       // being taken down and zip-tied by an officer (me or a teammate)
       let tk = -1;
-      const ma = G.Me.action;
+      const ma = Me.action;
       if (ma && ma.kind === 'zip' && ma.target === ev.id) tk = ma.t / ma.dur;
       for (const pv of this.players.values()) if (pv.st && pv.st.act === 'z' && pv.st.zt === ev.id) tk = pv.st.ap || 0;
       ev.recTk = tk; // (for the highlights: js/highlights.ts)
@@ -882,7 +884,7 @@ export const Views = {
       if (Math.abs(ev.leanS) > 0.01) {
         at = ev.pos.clone().add(new THREE.Vector3(Math.cos(ev.yaw), 0, -Math.sin(ev.yaw)).multiplyScalar(ev.leanS * 0.45 * (ev.def.scale || 1)));
         // (the lean point is checked for sight, not for room: by a wall's corner the body would be drawn into it, so it leans only as far as the wall allows)
-        const lm = G.Game.map; if (lm && lm.world) Level.resolve(lm, at, 0.22 * (ev.def.scale || 1), at.y, World.STEP, true);
+        const lm = Game.map; if (lm && lm.world) Level.resolve(lm, at, 0.22 * (ev.def.scale || 1), at.y, World.STEP, true);
       }
       if (ev.alive && (pose === 'cuffed' || pose === 'takedown')) {
         const key = `${ev.pos.x.toFixed(2)},${ev.pos.z.toFixed(2)},${ev.yaw.toFixed(2)}`;
@@ -952,11 +954,11 @@ export const Views = {
       // their restraining / bagging sounds, as they reach each step
       if (act && pv.lastAct === st.act) Audio.foley(act.kind, pv.lastAp || 0, act.t, pv.pos.distanceTo(R.camera.position));
       pv.lastAct = st.act; pv.lastAp = act ? act.t : 0;
-      if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = Gunsmith.fromCode(st.w), rp = pv.pos.clone().setY(pv.pos.y + 1.3); (rdef && Handling.play(rdef, Handling.rackClip(rdef, rdef.manual ? G.Me.MANUAL_T : 0.45), { land: Handling.LAND.rack, vol: 0.7, pos: rp })) || Audio.sampleAt('rack_slide', rp, 0.7, rdef && rdef.manual ? G.Me.MANUAL_PITCH : 1); } // (their bolt / pump / lever worked: heard from where they stand)
+      if (st.ra != null && st.ra >= 0 && !(pv.lastRa >= 0) && !st.sw) { const rdef = Gunsmith.fromCode(st.w), rp = pv.pos.clone().setY(pv.pos.y + 1.3); (rdef && Handling.play(rdef, Handling.rackClip(rdef, rdef.manual ? Me.MANUAL_T : 0.45), { land: Handling.LAND.rack, vol: 0.7, pos: rp })) || Audio.sampleAt('rack_slide', rp, 0.7, rdef && rdef.manual ? Me.MANUAL_PITCH : 1); } // (their bolt / pump / lever worked: heard from where they stand)
       pv.lastRa = st.ra == null ? -1 : st.ra;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : st.hk === 3 ? 'tb' : st.hk === 4 ? 'sticky' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
-      pv.rig.update(dt, { feet: st.dn || st.dd ? undefined : { sole: 'boot', kit: 'heavy', careful: !!st.sd, low: !!st.lr }, pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, bipod: !!st.bp, climb: st.cl ? Level.ladderAt(G.Game.map, pv.pos.x, pv.pos.z) : null, zip: !!st.zp, aim: !!st.ad, alert: !st.lr && !st.sw, atak: !!st.mn, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
+      pv.rig.update(dt, { feet: st.dn || st.dd ? undefined : { sole: 'boot', kit: 'heavy', careful: !!st.sd, low: !!st.lr }, pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, bipod: !!st.bp, climb: st.cl ? Level.ladderAt(Game.map, pv.pos.x, pv.pos.z) : null, zip: !!st.zp, aim: !!st.ad, alert: !st.lr && !st.sw, atak: !!st.mn, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
         hold, rack: st.ra == null ? -1 : st.ra, reload: st.rl == null ? -1 : st.rl, loaded: st.ld == null ? null : !!st.ld, nomag: !!st.nm, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
       if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
     }
@@ -980,7 +982,7 @@ export const Views = {
     // weapon lights and lasers: yours (from the gun in your hands, along its bore) and your squad's (flags in
     // their state: 1 light, 2 laser, 4 the laser's green, 8 a bright light)
     R.tacBegin(); Glare.begin();
-    const me = G.Me, mw = G.Game.phase === 'level' && me.cur ? me.cur() : null, mf = mw && !me.dead ? me.tacFlags(mw) : 0;
+    const me = Me, mw = Game.phase === 'level' && me.cur ? me.cur() : null, mf = mw && !me.dead ? me.tacFlags(mw) : 0;
     if (mf) {
       // the gun points them, always: along its barrel as you see it (sway, bob, a turn's lag, the kick: the dot goes
       // with it), drawn from the gun in your hands. With the gun up that line runs from your eye (where the rounds
@@ -1008,7 +1010,7 @@ export const Views = {
     }
     // and suspects': the light's on with the gun out, the laser once they're alert; the nearest get what's left of the pool
     const tac: [number, VwEnemy, number][] = [];
-    if (G.Game.phase === 'level') for (const ev of this.enemies.values()) {
+    if (Game.phase === 'level') for (const ev of this.enemies.values()) {
       if (!ev.tac || !ev.alive || ev.down || ev.scode || !ev.rig.gun || ev.rig.slung) continue;
       const d = ev.pos.distanceToSquared(R.camera.position), f = ev.tac & (ev.alert ? 15 : 9);
       if (f && d < 2500) tac.push([d, ev, f]);
@@ -1022,17 +1024,17 @@ export const Views = {
     R.tacEnd(); Glare.end(dt);
 
     // first aid cabinet doors swinging open
-    const cabV: VwCabView[] | null = G.Game.map && G.Game.map.cabViews;
+    const cabV: VwCabView[] | null = Game.map && Game.map.cabViews;
     if (cabV) cabV.forEach((cv, i) => {
-      const want = G.Game.cabs && G.Game.cabs[i] && G.Game.cabs[i][0] ? 1 : 0;
-      if (want && cv.open === 0) { const c = G.Game.map!.cabinets[i]; Audio.clink(Math.hypot(c.x - R.camera.position.x, c.z - R.camera.position.z)); }
+      const want = Game.cabs && Game.cabs[i] && Game.cabs[i][0] ? 1 : 0;
+      if (want && cv.open === 0) { const c = Game.map!.cabinets[i]; Audio.clink(Math.hypot(c.x - R.camera.position.x, c.z - R.camera.position.z)); }
       cv.open = want ? Math.min(1, cv.open + dt / 0.5) : 0;
       cv.door.rotation.y = -1.9 * (1 - Math.pow(1 - cv.open, 3));
     });
     // the sticker box: its sticker on the card (once the host's said which), the lid up and the card gone once it's taken
-    const sv: VwSboxView | null = G.Game.map && G.Game.map.sboxView;
+    const sv: VwSboxView | null = Game.map && Game.map.sboxView;
     if (sv) {
-      const sb = G.Game.sbox, name = sb && sb[0], taken = !!(sb && sb[1]);
+      const sb = Game.sbox, name = sb && sb[0], taken = !!(sb && sb[1]);
       if (!sv.synced) { sv.synced = true; if (taken) sv.open = 1; } // (joined with it opened)
       sv.g.visible = !!name;
       if (name && sv.name !== name) {
@@ -1040,21 +1042,21 @@ export const Views = {
         if (p.bm) { sv.name = name; const k = 0.12 / Math.max(p.w, p.h); sv.card.scale.set(p.w * k, p.h * k, 1); sv.card.material.map = Stickers.material(name).map; sv.card.material.needsUpdate = true; }
       }
       sv.card.visible = sv.name === name && !taken;
-      if (taken && sv.open === 0) { const b = G.Game.map!.sbox; Audio.clink(Math.hypot(b.x - R.camera.position.x, b.z - R.camera.position.z)); }
+      if (taken && sv.open === 0) { const b = Game.map!.sbox; Audio.clink(Math.hypot(b.x - R.camera.position.x, b.z - R.camera.position.z)); }
       sv.open = taken ? Math.min(1, sv.open + dt / 0.5) : 0;
       sv.lid.rotation.x = -1.8 * (1 - Math.pow(1 - sv.open, 3));
     }
     // the attachments box lid: up and back on its hinge once it's been opened
-    const av: VwAboxView | null = G.Game.map && G.Game.map.aboxView;
+    const av: VwAboxView | null = Game.map && Game.map.aboxView;
     if (av) {
-      const want = G.Game.abox && G.Game.abox[0] ? 1 : 0;
+      const want = Game.abox && Game.abox[0] ? 1 : 0;
       if (!av.synced) { av.synced = true; if (want) av.open = 1; } // (joined with it already open)
-      if (want && av.open === 0) { const ab = G.Game.map!.abox; Audio.clink(Math.hypot(ab.x - R.camera.position.x, ab.z - R.camera.position.z)); }
+      if (want && av.open === 0) { const ab = Game.map!.abox; Audio.clink(Math.hypot(ab.x - R.camera.position.x, ab.z - R.camera.position.z)); }
       av.open = want ? Math.min(1, av.open + dt / 0.6) : 0;
       av.lid.rotation.x = -1.9 * (1 - Math.pow(1 - av.open, 3));
       // its lights: one for each of the squad, lit in their colour till they've had their pick, then dark
-      const ids = Object.keys(G.Game.roster || {}).sort(), uses = (G.Game.abox && G.Game.abox[1]) || {};
-      const key = ids.map((id) => `${id}:${(G.Game.roster[id] || {}).color}:${uses[id] && uses[id][1] ? 1 : 0}`).join('|');
+      const ids = Object.keys(Game.roster || {}).sort(), uses = (Game.abox && Game.abox[1]) || {};
+      const key = ids.map((id) => `${id}:${(Game.roster[id] || {}).color}:${uses[id] && uses[id][1] ? 1 : 0}`).join('|');
       if (key !== av.key) {
         av.key = key;
         for (const c of av.lights.children as THREE.Mesh<THREE.BufferGeometry, THREE.Material>[]) { c.geometry.dispose(); c.material.dispose(); }
@@ -1064,17 +1066,17 @@ export const Views = {
           const used = uses[id] && uses[id][1], x = (i - (ids.length - 1) / 2) * gap;
           const bezel = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.04, gap - 0.006), 0.03, 0.004), new THREE.MeshStandardMaterial({ color: 0x0c0c0c, roughness: 0.6 }));
           bezel.position.set(x, 0, 0);
-          const lens = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.032, gap - 0.014), 0.022, 0.004), new THREE.MeshBasicMaterial({ color: used ? 0x1c1c1c : (G.Game.roster[id] || {}).color || 0x44ff66 }));
+          const lens = new THREE.Mesh(new THREE.BoxGeometry(Math.min(0.032, gap - 0.014), 0.022, 0.004), new THREE.MeshBasicMaterial({ color: used ? 0x1c1c1c : (Game.roster[id] || {}).color || 0x44ff66 }));
           lens.position.set(x, 0, 0.002);
           av.lights.add(bezel, lens);
         });
       }
     }
     // the weapon case lid: latches clack, then it swings up and back against the wall
-    const cv: VwLid | null = G.Game.map && G.Game.map.caseView;
+    const cv: VwLid | null = Game.map && Game.map.caseView;
     if (cv) {
-      const want = G.Game.caseOpen ? 1 : 0;
-      if (want && cv.open === 0) { const mc = G.Game.map!.case; Audio.clink(Math.hypot(mc.x - R.camera.position.x, mc.z - R.camera.position.z)); }
+      const want = Game.caseOpen ? 1 : 0;
+      if (want && cv.open === 0) { const mc = Game.map!.case; Audio.clink(Math.hypot(mc.x - R.camera.position.x, mc.z - R.camera.position.z)); }
       cv.open = want ? Math.min(1, cv.open + dt / 0.8) : 0;
       cv.lid.rotation.x = -1.78 * (1 - Math.pow(1 - cv.open, 3));
     }
@@ -1094,7 +1096,7 @@ export const Views = {
     for (const [i, v] of this.evidence) {
       if (v.secured) continue;
       let t = -1, who: 'me' | VwPlayer | null = null;
-      const ma = G.Me.action;
+      const ma = Me.action;
       if (ma && ma.kind === 'bag' && ma.target === i) { t = ma.t / ma.dur; who = 'me'; }
       for (const pv of this.players.values()) if (pv.st && pv.st.act === 'b' && pv.st.bt === i) { t = pv.st.ap || 0; who = pv; }
       const m = v.mesh;
@@ -1111,8 +1113,8 @@ export const Views = {
     // grenades
     for (const n of [...this.nades]) {
       if (n.kind === 'sticky') { // (flying till it holds; then held there, or to whoever it's on, its fuse burning)
-        if (!n.stuck) { this.stickStep(n, dt, map); n.flyT = (n.flyT || 0) + dt; if (!n.stuck && n.flyT > G.Me.STICKY.MAX_FLY) n.stuck = {}; }
-        else if (n.stuck.me && G.Me.pos) n.pos.copy(G.Me.pos).add(n.stuck.me);
+        if (!n.stuck) { this.stickStep(n, dt, map); n.flyT = (n.flyT || 0) + dt; if (!n.stuck && n.flyT > Me.STICKY.MAX_FLY) n.stuck = {}; }
+        else if (n.stuck.me && Me.pos) n.pos.copy(Me.pos).add(n.stuck.me);
         else if (n.stuck.bone && n.stuck.rig) { if (n.stuck.rig.root.parent) { n.stuck.bone.updateWorldMatrix(true, false); n.pos.copy(n.stuck.l!).applyMatrix4(n.stuck.bone.matrixWorld); } else n.stuck.bone = null; }
         n.mesh.position.copy(n.pos);
         if (!n.stuck) continue;
@@ -1120,7 +1122,7 @@ export const Views = {
         n.mesh.material.emissive.setHex(Math.floor(n.fuse * 8) % 2 ? 0xff2200 : 0x220000);
         if (n.fuse > 0) continue;
         R.dynRoot.remove(n.mesh); this.nades.splice(this.nades.indexOf(n), 1);
-        if (n.own) G.Me.explode(n.pos.clone(), G.Me.blastR(map, n.pos), G.Me.BLAST.dmg, true, 'sticky');
+        if (n.own) Me.explode(n.pos.clone(), Me.blastR(map, n.pos), Me.BLAST.dmg, true, 'sticky');
         continue;
       }
       const p = n.pos, was = p.clone();
@@ -1137,16 +1139,16 @@ export const Views = {
         this.nades.splice(this.nades.indexOf(n), 1);
         // (a frag or a thermobaric goes off where it is: at its own middle, NADE_R off whatever it's lying on, so its downward chips meet
         // that floor a hand's breadth out and its blast is a surface burst's: js/player.ts blastR. A flashbang's flash a little above it.)
-        if (n.own && n.kind === 'flash') G.Me.flashBang(p.clone().add(new THREE.Vector3(0, 0.1, 0)));
-        else if (n.own && n.kind === 'tb') G.Me.thermobaric(p.clone());
-        else if (n.own) G.Me.explode(p.clone(), G.Me.blastR(map, p), G.Me.BLAST.dmg, true);
+        if (n.own && n.kind === 'flash') Me.flashBang(p.clone().add(new THREE.Vector3(0, 0.1, 0)));
+        else if (n.own && n.kind === 'tb') Me.thermobaric(p.clone());
+        else if (n.own) Me.explode(p.clone(), Me.blastR(map, p), Me.BLAST.dmg, true);
         else if (n.enemy && Net.isHost) Net.toHost({ t: 'eboom', p: [p.x, p.y, p.z] }); // (a suspect's: where it went off on the host's screen is where it goes off, js/server.ts enemyBoom)
       }
     }
 
     // warn about any live grenade nearby (yours hurt too)
     let near = null, nd = 7;
-    if (G.Me.pos && !G.Me.dead) for (const n of this.nades) { const d = n.pos.distanceTo(G.Me.pos); if (d < nd) { nd = d; near = n; } }
+    if (Me.pos && !Me.dead) for (const n of this.nades) { const d = n.pos.distanceTo(Me.pos); if (d < nd) { nd = d; near = n; } }
     HUD.nadeWarn(near);
 
     for (const pg of this.pings) pg.t -= dt;

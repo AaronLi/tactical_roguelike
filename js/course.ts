@@ -9,6 +9,8 @@ import { Views } from './views.js';
 import { World } from './world.js';
 import { Net } from './net.js';
 import { Range } from './range.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // A run (sent to the squad as it happens, G.Net 'crun'): hits are [target n, zone, seconds].
 type CourseRunState = 'standby' | 'running' | 'done';
 interface CourseRun {
@@ -29,13 +31,13 @@ export const Course = (() => {
   const inside = (x: number, z: number) => x > A.x0 && x < A.x1 && z < A.z0 && z > A.z1; // (hall coordinates)
   function anyoneIn() {
     const RZ = S.RZ, ps: THREE.Vector3[] = [];
-    if (G.Me.pos && !G.Me.dead) ps.push(G.Me.pos);
+    if (Me.pos && !Me.dead) ps.push(Me.pos);
     for (const pv of Views.players.values()) if (pv.st && !pv.st.dd) ps.push(pv.pos);
     return ps.some((p) => inside(p.x, p.z - RZ));
   }
   function shooterPos() { // the one in the course (you, or a teammate), for the screens to follow
     const RZ = S.RZ;
-    if (G.Me.pos && !G.Me.dead && inside(G.Me.pos.x, G.Me.pos.z - RZ)) return { p: G.Me.pos, yaw: G.Me.yaw, me: true };
+    if (Me.pos && !Me.dead && inside(Me.pos.x, Me.pos.z - RZ)) return { p: Me.pos, yaw: Me.yaw, me: true };
     for (const pv of Views.players.values()) if (pv.st && !pv.st.dd && inside(pv.pos.x, pv.pos.z - RZ)) return { p: pv.pos, yaw: pv.yaw };
     return null;
   }
@@ -186,11 +188,11 @@ export const Course = (() => {
   // ---------------------------------------------------------------- a run
   // run: { who, state: 'standby' | 'running' | 'done', t0 (performance.now at the beep), shots: [s], hits: [[n, zone, s]], end: s }
   function start() {
-    const me = G.Me;
+    const me = Me;
     if (!inside(me.pos.x, me.pos.z - S.RZ)) return HUD.toast('THE COURSE', 'Start from inside the course, in the first box', 1.6);
     if (S.run && S.run.state !== 'done' && S.run.who !== Net.myId) return HUD.toast('THE COURSE', 'Someone else is shooting it', 1.4);
     resetTargets();
-    S.run = { who: Net.myId, name: G.Game.myName, seed: S.seed, state: 'standby', t0: 0, shots: [], hits: [], end: 0 };
+    S.run = { who: Net.myId, name: Game.myName, seed: S.seed, state: 'standby', t0: 0, shots: [], hits: [], end: 0 };
     HUD.toast('THE COURSE', 'Shooter ready… standby', 1.4);
     Audio.click();
     const run = S.run!, wait = 1.5 + Math.random() * 2.5;
@@ -329,7 +331,7 @@ export const Course = (() => {
   // ---------------------------------------------------------------- every frame
   function update(dt: number) {
     if (!S.root) return;
-    const me = G.Me, RZ = S.RZ;
+    const me = Me, RZ = S.RZ;
     // poppers fall back on their hinges
     for (const q of S.tg) if (q.kind === 'steel' && q.down && q.hinge.rotation.x > -1.45) { q.vel = (q.vel || 0) - 14 * dt; q.hinge.rotation.x = Math.max(-1.45, q.hinge.rotation.x + q.vel * dt); }
     const run = S.run;

@@ -2,6 +2,8 @@
 import { Level } from './level.js';
 import { U } from './util.js';
 import { R } from './render.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // Looking into someone's weapon light: anyone's, a suspect's or your squad's. It takes a light pointing near you, that you're
 // looking near, with nothing between you, and the closer the worse. The bloom opens round the lamp where you see it, wider and
 // whiter the more of it you're taking, washing out the screen when it's bad, with streaks across it. Your eyes take a moment to
@@ -31,7 +33,7 @@ export const Glare = (() => {
     return aim * look * q.k / (1 + (d / 6) * (d / 6));
   }
   function end(dt: number) {
-    const cam = R.camera, map = G.Game.map, playing = G.Game.phase === 'level' && !G.Me.dead;
+    const cam = R.camera, map = Game.map, playing = Game.phase === 'level' && !Me.dead;
     fwd.set(0, 0, -1).applyQuaternion(cam.quaternion);
     for (const q of now) {
       const t = playing ? taken(q, cam, map) : 0;

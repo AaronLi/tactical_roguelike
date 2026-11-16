@@ -7,6 +7,7 @@ import { R } from './render.js';
 import { Rig as G_Rig } from './rig.js';
 import { Views } from './views.js';
 import { Net } from './net.js';
+import { Me } from './player.js';
 interface ShotRow { key: string; n: number; burst?: boolean; name: string; range: number; muzzle: number; vIn: number; J: number; frags?: string; stop?: string; post?: number; out?: number; }
 interface ShotHolder { ghosts?: Map<string, ShotGhost>; }
 interface ShotInfo { holder: ShotHolder; name: string; burst?: boolean; }
@@ -237,7 +238,7 @@ export const ShotLog = (() => {
     cells(M.cloud, M.space, 0.04, 0x4aa8ff, 0.3); // (the rest of the space its pressure filled: on the floor)
     g.visible = false; R.scene.add(g);
     const pct = (v: number) => Math.round(v * 100) + '%';
-    labels.push({ p: M.p.clone().setY(gy + 2.2), t: `${name}: fireball ${M.areaCloud.toFixed(0)} m² of floor (${(M.areaCloud * G.Me.TB.ROOM_H).toFixed(0)} m³)${M.outFrac > 0.05 ? `, ${pct(M.outFrac)} under the sky` : ''}`, c: '#ffb070', pri: 6 });
+    labels.push({ p: M.p.clone().setY(gy + 2.2), t: `${name}: fireball ${M.areaCloud.toFixed(0)} m² of floor (${(M.areaCloud * Me.TB.ROOM_H).toFixed(0)} m³)${M.outFrac > 0.05 ? `, ${pct(M.outFrac)} under the sky` : ''}`, c: '#ffb070', pri: 6 });
     labels.push({ p: M.p.clone().setY(gy + 1.6), t: `Space ${M.areaSpace.toFixed(0)} m²${M.closed ? ' (closed)' : ' or more (open onto the rest)'}, ${M.fill.vents} way${M.fill.vents === 1 ? '' : 's'} out · confinement ${pct(M.conf)} · ${M.qs.toFixed(0)} kPa held`, c: '#8fc8ff', pri: 6 });
     for (const q of log || []) if (q.at !== 'none' && q.p) labels.push({ p: new T.Vector3(q.p[0], q.p[1] + 1.9, q.p[2]), t: `#${q.id} ${q.at === 'cloud' ? 'in the fireball' : q.at === 'space' ? 'in its space' : 'through a wall'} · burn ${pct(q.burn)} blast ${pct(q.blast)} of a life · dazed ${pct(q.daze)}`, c: q.at === 'cloud' ? '#ff9a50' : q.at === 'space' ? '#8fc8ff' : '#c0c0c0', pri: 5 });
     fills.push({ g, labels });

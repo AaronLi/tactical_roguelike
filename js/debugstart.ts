@@ -1,4 +1,16 @@
 'use strict';
+import { THEMES, WEAPONS } from './data.js';
+import { Game } from './game.js';
+import { Gear } from './gear.js';
+import { Landing } from './landing.js';
+import { Net } from './net.js';
+import { Gunsmith } from './parts.js';
+import { Me as G_Me } from './player.js';
+import { R } from './render.js';
+import { Route } from './route.js';
+import { Space } from './space.js';
+import { SpaceData } from './spacedata.js';
+import { Views } from './views.js';
 // Debug start: open the game with a URL that goes straight to where you want to look, past the menu, the route map, the
 // sidearm picker and the helicopter. For testing by hand, and for tools driving the game (the browser checks agents run).
 //   ?play                 a solo level (the first route option); with a value, that kind of place: ?play=warehouse
@@ -23,7 +35,7 @@
 //   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
 // It plays as if the mouse were captured (no click-to-play screen). When it's there, window.__debugReady is true and
 // G.DebugStart.ready resolves: scripts wait on that. Add ?mute to keep it quiet.
-const G_DebugStart = (() => {
+export const DebugStart = (() => {
   const q = new URLSearchParams(location.search);
   const sleep = (s: number) => new Promise<void>((r) => setTimeout(r, s * 1000));
   const until = async (f: () => unknown, max = 60) => { const t0 = performance.now(); while (!f() && performance.now() - t0 < max * 1000) await sleep(0.1); return !!f(); };
@@ -41,13 +53,13 @@ const G_DebugStart = (() => {
   function themeOf(v: string | null): number | null {
     if (v == null || v === '') return null;
     if (/^\d+$/.test(v)) return +v;
-    const k = v.toLowerCase(), i = (G.THEMES as { name: string }[]).findIndex((t) => t.name.toLowerCase().includes(k));
-    if (i < 0) say(`no place called "${v}": ${(G.THEMES as { name: string }[]).map((t) => t.name).join(', ')}`);
+    const k = v.toLowerCase(), i = (THEMES as { name: string }[]).findIndex((t) => t.name.toLowerCase().includes(k));
+    if (i < 0) say(`no place called "${v}": ${(THEMES as { name: string }[]).map((t) => t.name).join(', ')}`);
     return i < 0 ? null : i;
   }
   // the build: the gun's factory build with ?parts changed on it
   function buildOf(id: string) {
-    const b: Record<string, string> = Object.assign({}, G.Gunsmith.defaultBuild(id));
+    const b: Record<string, string> = Object.assign({}, Gunsmith.defaultBuild(id));
     for (const kv of (q.get('parts') || '').split(',').filter(Boolean)) {
       const [slot, pid] = kv.split(':');
       if (!slot) continue;
@@ -56,23 +68,23 @@ const G_DebugStart = (() => {
     return b;
   }
   function arm() {
-    const side = q.get('side'), gun = q.get('gun'), Me = G.Me;
-    if (side && G.WEAPONS[side]) Me.setSidearm(side);
+    const side = q.get('side'), gun = q.get('gun'), Me = G_Me;
+    if (side && WEAPONS[side]) Me.setSidearm(side);
     Me.sidearmChosen = true; // (no picker)
     if (gun) {
-      if (!G.WEAPONS[gun]) { say(`no weapon "${gun}"`); return; }
+      if (!WEAPONS[gun]) { say(`no weapon "${gun}"`); return; }
       const w = Me.makeWeapon(gun, buildOf(gun) as any);
       Me.weapons[w.def.slot] = w;
       say(`${w.def.name}: ${JSON.stringify(w.def.build || {})}`);
       // and spare loads for it (?mags=N, 3 if not given; 0 for none): full magazines, or boxes of rounds for a tube or a cylinder,
       // wherever they fit on you
-      const nm = Math.max(0, Math.min(12, q.has('mags') ? +(q.get('mags') || 0) : 3)), mag = G.Gear.ammoFor(w.def).kind === 'mag';
+      const nm = Math.max(0, Math.min(12, q.has('mags') ? +(q.get('mags') || 0) : 3)), mag = Gear.ammoFor(w.def).kind === 'mag';
       let got = 0;
-      for (let i = 0; i < nm; i++) if (G.Gear.stow(Me, G.Gear.ammoItem(w.def, mag ? null : 12, w.ammo))) got++;
+      for (let i = 0; i < nm; i++) if (Gear.stow(Me, Gear.ammoItem(w.def, mag ? null : 12, w.ammo))) got++;
       if (nm) say(`${got} spare ${mag ? 'magazine' : 'load'}${got === 1 ? '' : 's'}${got < nm ? ` (no room for ${nm - got})` : ''}`);
     }
     for (const id of (q.get('gear') || '').split(',').filter(Boolean)) {
-      const Gr = G.Gear, d = Gr.DEFS[id];
+      const Gr = Gear, d = Gr.DEFS[id];
       if (!d) { say(`no gear "${id}"`); continue; }
       const it = Gr.gearItem(id), on = Gr.MOUNTS[d.kind];
       if (on) {
@@ -89,7 +101,7 @@ const G_DebugStart = (() => {
   // someone really clicks. Then the first click captures the mouse (and isn't a shot), and from then on it's the real state
   // (Esc lets it go and pauses, as ever).
   function captured() {
-    const g = G.Game, cv = G.R.renderer.domElement;
+    const g = Game, cv = R.renderer.domElement;
     let real = false;
     Object.defineProperty(g, 'locked', { get: () => (real ? document.pointerLockElement === cv : true), set: () => {}, configurable: true });
     document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement === cv) real = true; });
@@ -103,57 +115,57 @@ const G_DebugStart = (() => {
 
   async function run() {
     const th = themeOf(q.get('play')), lvl = q.has('level') ? Math.max(1, +q.get('level')! || 1) : null;
-    G.Game.solo(); await sleep(0.8);
+    Game.solo(); await sleep(0.8);
     // (the host's simulation is in its own thread, js/serverlink.ts: what's wanted of it is asked, as the lobby and the menus ask)
     const space = q.has('board') || q.has('assault') || q.has('fly');
     if (q.has('hangar') || space) {
       // (the game in space starts in the hangar: js/spaceserver.ts startRun)
-      G.Net.toHost({ t: 'startRun', dbg: q.has('ship') ? { fleet: { owned: [q.get('ship')], ship: q.get('ship') } } : {} }); // (dbg: a debug start's, so no sidearm picker)
-      if (!G.SpaceData.ON) { await until(() => G.Game.phase === 'route'); arm(); G.Net.toHost({ t: 'toShop' }); }
-      await until(() => G.Game.hub && G.Me.pos && !G.Game.$('veil').classList.contains('on'), 30);
-      if (G.SpaceData.ON) arm();
-      const Sp = G.Space, helm = () => { (G.Me as any).fLatch = false; const m = G.Me as any, p = Sp.seatPos(0); m.seat = 0; m.pos.set(p.x, p.y, p.z); m.yaw = p.yaw; m.pitch = 0; m.crouch = true; m.stowed = true; Sp.S.ctl = G.Net.myId; G.Net.toHost({ t: 'seat', s: 0 }); };
+      Net.toHost({ t: 'startRun', dbg: q.has('ship') ? { fleet: { owned: [q.get('ship')], ship: q.get('ship') } } : {} }); // (dbg: a debug start's, so no sidearm picker)
+      if (!SpaceData.ON) { await until(() => Game.phase === 'route'); arm(); Net.toHost({ t: 'toShop' }); }
+      await until(() => Game.hub && G_Me.pos && !Game.$('veil').classList.contains('on'), 30);
+      if (SpaceData.ON) arm();
+      const Sp = Space, helm = () => { (G_Me as any).fLatch = false; const m = G_Me as any, p = Sp.seatPos(0); m.seat = 0; m.pos.set(p.x, p.y, p.z); m.yaw = p.yaw; m.pitch = 0; m.crouch = true; m.stowed = true; Sp.S.ctl = Net.myId; Net.toHost({ t: 'seat', s: 0 }); };
       if (q.has('board') || q.has('assault')) {
         // straight to a mission: a ship to board (?board=small|medium|large, &obj=artifact|hvt|destruct) or a base (?assault=<place>), at
         // the helm as she comes out of the jump; &dock: against the hull (or on the pad) already
-        const size = (G.SpaceData.SIZES as Record<string, unknown>)[q.get('board') || ''] ? q.get('board') : 'small', pth = themeOf(q.get('assault'));
+        const size = (SpaceData.SIZES as Record<string, unknown>)[q.get('board') || ''] ? q.get('board') : 'small', pth = themeOf(q.get('assault'));
         helm();
-        G.Net.toHost({ t: 'dbgMs', ms: { kind: q.has('assault') ? 'assault' : 'board', size, other: q.get('other'), wing: q.has('wing'), obj: q.get('obj'), th: q.has('assault') ? pth : q.has('hull') ? G.SpaceData.TH0 + (+q.get('hull')! || 0) : undefined, seed: q.has('seed') ? +q.get('seed')! : undefined, diff: lvl || 1, night: q.has('night'), fuse: q.has('fuse') ? +q.get('fuse')! : undefined } });
-        await until(() => !G.Game.hub && G.Game.phase === 'level' && Sp.S.on && Sp.S.kind !== 'hub' && !G.Game.$('veil').classList.contains('on'), 40);
+        Net.toHost({ t: 'dbgMs', ms: { kind: q.has('assault') ? 'assault' : 'board', size, other: q.get('other'), wing: q.has('wing'), obj: q.get('obj'), th: q.has('assault') ? pth : q.has('hull') ? SpaceData.TH0 + (+q.get('hull')! || 0) : undefined, seed: q.has('seed') ? +q.get('seed')! : undefined, diff: lvl || 1, night: q.has('night'), fuse: q.has('fuse') ? +q.get('fuse')! : undefined } });
+        await until(() => !Game.hub && Game.phase === 'level' && Sp.S.on && Sp.S.kind !== 'hub' && !Game.$('veil').classList.contains('on'), 40);
         if (q.get('gun') || q.get('gear')) arm();
         if (q.has('dock')) {
           await until(() => !Sp.S.ftl, 12);
           if (Sp.S.kind === 'assault') { Sp.S.stage = 'atmo'; (Sp as any).dbgStage('atmo'); }
-          if (Sp.S.kind !== 'board') G.Net.toHost({ t: 'sdock', on: 1 });
+          if (Sp.S.kind !== 'board') Net.toHost({ t: 'sdock', on: 1 });
           (Sp as any).dbgDock();
-          await sleep(0.6); (G.Me as any).seat = null; G.Me.crouch = false; G.Me.stowed = false; G.Net.toHost({ t: 'seat', s: -1 });
-          const L = G.SpaceData.layout(Sp.S.def), w = Sp.S.kind === 'board' ? G.SpaceData.toWorld(Sp.S.berth, 0, L.FB + 0.02, L.zw + 0.7) : G.SpaceData.toWorld(Sp.S.berth, 0, L.FM + 0.02, L.z1 - 1.5); G.Me.pos.set(w.x, w.y, w.z); G.Me.yaw = Sp.S.berth.yaw + (Sp.S.kind === 'board' ? 0 : Math.PI); // (breaching: behind the low wall)
+          await sleep(0.6); (G_Me as any).seat = null; G_Me.crouch = false; G_Me.stowed = false; Net.toHost({ t: 'seat', s: -1 });
+          const L = SpaceData.layout(Sp.S.def), w = Sp.S.kind === 'board' ? SpaceData.toWorld(Sp.S.berth, 0, L.FB + 0.02, L.zw + 0.7) : SpaceData.toWorld(Sp.S.berth, 0, L.FM + 0.02, L.z1 - 1.5); G_Me.pos.set(w.x, w.y, w.z); G_Me.yaw = Sp.S.berth.yaw + (Sp.S.kind === 'board' ? 0 : Math.PI); // (breaching: behind the low wall)
         }
-        if (q.has('nofoes')) { G.Net.toHost({ t: 'noFoes' }); await sleep(0.5); }
+        if (q.has('nofoes')) { Net.toHost({ t: 'noFoes' }); await sleep(0.5); }
       } else if (q.has('fly')) { helm(); await sleep(0.3); (Sp as any).dbgLaunch(); }
     } else {
       // the level the route would build: its place and number set as it starts (js/server.ts startLevel: dbg)
-      G.Net.toHost({ t: 'startRun', dbg: { classic: true, th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), stronghold: q.has('stronghold'), night: q.has('night'), seed: q.has('seed') ? +q.get('seed')! : undefined } });
-      await until(() => G.Game.phase === 'route' && G.Game.routeMap);
+      Net.toHost({ t: 'startRun', dbg: { classic: true, th: th == null ? undefined : th, lvl: lvl == null ? undefined : lvl, leader: q.has('leader'), stronghold: q.has('stronghold'), night: q.has('night'), seed: q.has('seed') ? +q.get('seed')! : undefined } });
+      await until(() => Game.phase === 'route' && Game.routeMap);
       arm();
-      const g0 = G.Game;
-      g0.pickRoute(G.Route.options(g0.routeMap!, g0.routeSt!.path[g0.routeSt!.path.length - 1])[0]);
-      await until(() => G.Game.phase === 'level' && G.Me.pos && G.Game.map);
+      const g0 = Game;
+      g0.pickRoute(Route.options(g0.routeMap!, g0.routeSt!.path[g0.routeSt!.path.length - 1])[0]);
+      await until(() => Game.phase === 'level' && G_Me.pos && Game.map);
       if (q.get('gun') || q.get('gear')) arm(); // (the level's kit is dealt as it starts: the gun and gear again on top of it)
       // out of the helicopter: the flight skipped, then out of the seat (js/landing.ts interact: F held long enough)
-      const L = G.Landing;
+      const L = Landing;
       // (until out: a slow level, shaders still compiling, may take a while to touch down, and the seat can't be left before it has)
-      if (L && G.Me.seat != null) {
+      if (L && G_Me.seat != null) {
         const t0 = performance.now();
-        while (G.Me.seat != null && performance.now() - t0 < 15000) { (G.Me as any).fLatch = false; L.interact(G.Me, 10, true); await sleep(0.3); }
-        if (G.Me.seat != null) say('still in the helicopter after 15 s');
+        while (G_Me.seat != null && performance.now() - t0 < 15000) { (G_Me as any).fLatch = false; L.interact(G_Me, 10, true); await sleep(0.3); }
+        if (G_Me.seat != null) say('still in the helicopter after 15 s');
       }
-      await until(() => !G.Game.$('veil').classList.contains('on'), 15); // (and the loading screen gone)
-      if (q.has('nofoes')) { G.Net.toHost({ t: 'noFoes' }); await until(() => ![...G.Views.enemies.values()].some((e) => e.alive), 5); }
+      await until(() => !Game.$('veil').classList.contains('on'), 15); // (and the loading screen gone)
+      if (q.has('nofoes')) { Net.toHost({ t: 'noFoes' }); await until(() => ![...Views.enemies.values()].some((e) => e.alive), 5); }
     }
     captured();
     (window as any).__debugReady = true;
-    say(`ready: ${G.Game.hub ? 'the hangar' : `level ${G.Game.level}, ${(G.Game.map && G.Game.map.theme && G.Game.map.theme.name) || '?'}`}`);
+    say(`ready: ${Game.hub ? 'the hangar' : `level ${Game.level}, ${(Game.map && Game.map.theme && Game.map.theme.name) || '?'}`}`);
     done();
   }
   // ?mousedbg: what the browser says the mouse moved, with no button held and with one held, side by side: the events a second,
@@ -171,12 +183,12 @@ const G_DebugStart = (() => {
     setInterval(() => {
       const now = performance.now(); while (ev.length && now - ev[0].t > 3000) ev.shift();
       for (const b of [0, 1]) { const l = ev.filter((q2) => q2.b === b); if (l.length > 20) { const span = Math.max(0.2, (l[l.length - 1].t - l[0].t) / 1000), sum = l.reduce((a2, q2) => a2 + q2.d, 0); last[b] = `${(l.length / span).toFixed(0).padStart(4)} events/s   ${(sum / l.length).toFixed(2).padStart(6)} px/event   ${(sum / span).toFixed(0).padStart(6)} px/s`; } }
-      el.textContent = `mouse, as the browser reports it (devicePixelRatio ${window.devicePixelRatio})\nno button: ${last[0] || 'move the mouse'}\nbutton held: ${last[1] || 'hold a button and move it'}\nsensitivity setting ${G.Game && G.Game.settings ? G.Game.settings.sens : '?'}, raw movement ${raw}`;
+      el.textContent = `mouse, as the browser reports it (devicePixelRatio ${window.devicePixelRatio})\nno button: ${last[0] || 'move the mouse'}\nbutton held: ${last[1] || 'hold a button and move it'}\nsensitivity setting ${Game && Game.settings ? Game.settings.sens : '?'}, raw movement ${raw}`;
     }, 300);
   });
   if (q.has('play') || q.has('hangar') || q.has('board') || q.has('assault') || q.has('fly')) window.addEventListener('load', () => setTimeout(() => { run().catch((e) => console.error('[debug start]', e)); }, 300));
   return { run, ready };
 })();
-G.DebugStart = G_DebugStart;
+G.DebugStart = DebugStart;
 
-interface GameModules { DebugStart: typeof G_DebugStart; }
+declare global { interface GameModules { DebugStart: typeof DebugStart; } }

@@ -1,6 +1,7 @@
 'use strict';
 import { Audio } from './audio.js';
 import { AMMO, ammoTypes, asCal, ballFor, boreTip, cartOf, chambered, flight, zeroOf } from './data.js';
+import { Me as G_Me } from './player.js';
 // The zeroing table (a shop tab; a table in the hangar's workshop): turn each gun's elevation a click at a time and
 // see the round's path against the line of sight out to 500 m. The sights sit above the bore, so a round leaves
 // below the line, climbs through it (the near zero), peaks, and falls back through it (the far zero). Every gun
@@ -11,7 +12,7 @@ export const ZeroUI = (() => {
   const MAXD = 500, ROWS = [25, 50, 100, 150, 200, 250, 300, 400, 500], MAXC = 150; // (±15 mil)
   const st = { wslot: 'p', am: null as string | null };
   interface Pt { d: number; h: number; v: number; t: number }
-  const weapon = () => G.Me.weapons[st.wslot] || G.Me.weapons.p || G.Me.weapons.s;
+  const weapon = () => G_Me.weapons[st.wslot] || G_Me.weapons.p || G_Me.weapons.s;
   const loads = (w: GWeapon): string[] => ammoTypes(cartOf(w)) || [];
   // the path of `am` from this gun with its sights as set (or with `clicks` of elevation instead)
   const path = (w: GWeapon, am: string, clicks = w.clicks || 0): Pt[] => flight(asCal(w.def, cartOf(w)), am, boreTip(Object.assign({}, w, { clicks })), MAXD);
@@ -32,7 +33,7 @@ export const ZeroUI = (() => {
     return `<div class="zr-note zr-scope">Scope marks: this scope's holdover marks (1-5, for 100-500 m) are worked out from the zero set here and the round that fires next, <b>${nm(next)}</b>${next === viewed ? '' : `. You are looking at ${nm(viewed)}: load it to get its marks`}. Change the elevation or the load and they follow. Its brackets (1.8 m man, 100-500 m) are true ${d.fp === 'ffp' ? 'at any power' : `at ${d.fpMag}×`}.</div>`;
   }
   function html() {
-    const Me = G.Me, w = weapon();
+    const Me = G_Me, w = weapon();
     if (!w) return '<div class="gs-empty">No weapon to zero.</div>';
     const def = w.def, clicks = w.clicks || 0, std = zeroOf(def), ball = ballFor(cartOf(w))!;
     if (!st.am || !loads(w).includes(st.am)) st.am = w.ammo && loads(w).includes(w.ammo) ? w.ammo : ball!;

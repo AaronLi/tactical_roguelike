@@ -1,6 +1,8 @@
 'use strict';
 import { Ballistics } from './ballistics.js';
 import { AMMO } from './data.js';
+import { R } from './render.js';
+import { Views } from './views.js';
 // Crossbow bolts that stayed where they hit: in a suspect (it follows the bone it's in), in a soft vest, or
 // in timber and plasterboard. Whoever fired it decides (js/player.ts roundSegment) and tells the squad; each machine draws
 // its own. The lit nock stays on, in the load's colour (G.AMMO glow), so you can see from across a room where one went.
@@ -51,7 +53,7 @@ export const Bolts = (() => {
   function keep(g: THREE.Group) { list.push(g); if (list.length > MAX) { const old = list.shift()!; if (old.parent) old.parent.remove(old); } }
   // Following a bone by hand, not as its child: the rig's bones are scaled unevenly, which would shear a bolt
   const _p = new T.Vector3(), _q = new T.Quaternion(), _s = new T.Vector3();
-  function follow(g: THREE.Group, rig: Rig, bone: THREE.Object3D, l: number[]) { g.userData.on = { rig, bone, p: new T.Vector3(l[0], l[1], l[2]), q: new T.Quaternion(l[3], l[4], l[5], l[6]) }; G.R.dynRoot.add(g); keep(g); place(g); }
+  function follow(g: THREE.Group, rig: Rig, bone: THREE.Object3D, l: number[]) { g.userData.on = { rig, bone, p: new T.Vector3(l[0], l[1], l[2]), q: new T.Quaternion(l[3], l[4], l[5], l[6]) }; R.dynRoot.add(g); keep(g); place(g); }
   function place(g: THREE.Group) {
     const on = g.userData.on as BoltOn;
     on.bone.updateWorldMatrix(true, false);
@@ -73,7 +75,7 @@ export const Bolts = (() => {
   function inWorld(at: THREE.Vector3, dir: THREE.Vector3, am: string) {
     const g = mesh(am);
     g.position.copy(at); g.quaternion.setFromUnitVectors(FWD, dir);
-    G.R.dynRoot.add(g); keep(g);
+    R.dynRoot.add(g); keep(g);
   }
   // into someone, where it is now in the world: returns where that is on the bone, for the squad
   function onBone(rig: Rig, bone: THREE.Object3D, at: THREE.Vector3, dir: THREE.Vector3, am: string) {
@@ -88,7 +90,7 @@ export const Bolts = (() => {
   function fromNet(m: BoltNet | null) {
     if (!m || !AMMO[m.am]) return;
     if (m.at) { inWorld(new T.Vector3(...(m.at as [number, number, number])), new T.Vector3(...(m.u as [number, number, number])).normalize(), m.am); return; }
-    const ev = G.Views.enemies.get(m.e!), bone = ev && ev.rig && (m.b === 'shield' ? ev.rig.shield || ev.rig.shieldDropped || null : Ballistics.boneOf(ev.rig, m.b!)); // ('shield': in their handheld shield, js/player.ts boltShield)
+    const ev = Views.enemies.get(m.e!), bone = ev && ev.rig && (m.b === 'shield' ? ev.rig.shield || ev.rig.shieldDropped || null : Ballistics.boneOf(ev.rig, m.b!)); // ('shield': in their handheld shield, js/player.ts boltShield)
     if (bone && Array.isArray(m.l)) follow(mesh(m.am), ev.rig, bone, m.l);
   }
   function clear() { for (const g of list) if (g.parent) g.parent.remove(g); list.length = 0; }
