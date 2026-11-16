@@ -9,6 +9,7 @@ import { LevelView } from './levelview.js';
 import { GunModels } from './gunmodels.js';
 import { Highlights } from './highlights.js';
 import { LightGrid } from './lightgrid.js';
+import { ReplayEnv } from './replayenv.js';
 import { Rig } from './rig.js';
 import { TONE } from './tone.js';
 import { Viewmodel } from './viewmodel.js';
@@ -21,8 +22,8 @@ const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
 const _fq = new THREE.Quaternion(), _fq2 = new THREE.Quaternion(), _fz = new THREE.Vector3(0, 0, 1), _fn = new THREE.Vector3(), _fp = new THREE.Vector3(), _fs = new THREE.Vector3(), _fm = new THREE.Matrix4(), _fc = new THREE.Color();
 const _bjc = new THREE.Color();
 const SCOPE_FAR = 600; // (how far a magnified scope's picture is drawn, m)
-// Left as G.X on purpose (the export worker, js/exportworker.ts, loads this file but not these, and must not grow): G.ShotLog, G.HUD, G.Bolts,
-// G.Audio, G.Views, G.Casings, G.Range, G.Loot, G.Game, G.Me (the page's; the replay's seam takes them, phase 7).
+// The page's objects (ShotLog, HUD, Bolts, Audio, Views, Casings, Range, Loot, Game, Me) are read through ReplayEnv (js/replayenv.ts), not imported: the export worker
+// (js/exportworker.ts) loads this file but not them, and must not grow.
 // Three.js scene, character models, first-person viewmodels and particle effects.
 interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: PShot; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
 type BloodKind = 'drop' | 'spatter' | 'pool';
@@ -125,7 +126,7 @@ export const R = {
   init() {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance', reversedDepthBuffer: true }));
     this.reverseDepth(r);
-    // (a phone's screen is 2 to 3 device pixels to the point, and its GPU isn't a desktop's: the G.HUD is the page's own, sharp at any ratio, so only the 3D is softer)
+    // (a phone's screen is 2 to 3 device pixels to the point, and its GPU isn't a desktop's: the ReplayEnv.HUD is the page's own, sharp at any ratio, so only the 3D is softer)
     const coarse = matchMedia('(hover: none) and (pointer: coarse)').matches;
     this.basePR = Math.min(window.devicePixelRatio, coarse ? (Math.min(screen.width, screen.height) < 600 ? 1 : 1.25) : 1.5);
     r.setPixelRatio(this.basePR * this.scalePct / 100);
@@ -250,7 +251,7 @@ export const R = {
     return (this._bloodMats = { drop: bmat('drop'), spatter: bmat('spatter'), pool: bmat('pool') });
   },
   // How finely the 3D is drawn: a percentage (33 to 100) of the screen's own resolution, each way. The picture is stretched
-  // to the window; the G.HUD and the menus are the page's own and stay sharp. (The settings' "Render resolution": js/game.ts)
+  // to the window; the ReplayEnv.HUD and the menus are the page's own and stay sharp. (The settings' "Render resolution": js/game.ts)
   basePR: 1, scalePct: 100,
   setScale(pct: number) {
     this.scalePct = Math.max(33, Math.min(100, Math.round(pct) || 100));
@@ -307,7 +308,7 @@ export const R = {
   EYE_FULL: 0.15, EYE_BOUNCE: 0.25, SPOT_BOUNCE: 0.045,
   _eye: new THREE.Color(), _eyeC: new THREE.Color(), _eyeT: new THREE.Color(), _eyeV: new THREE.Vector3(), _eyeD: new THREE.Vector3(), _vmSky: new THREE.Color(0xdde6f0), _vmGround: new THREE.Color(0x2a2622),
   eyeLight(): number {
-    const map = G.Game && G.Game.map, cam = this.camera, E = this._eye, C = this._eyeC, p = cam.position, L = Level;
+    const map = ReplayEnv.Game && ReplayEnv.Game.map, cam = this.camera, E = this._eye, C = this._eyeC, p = cam.position, L = Level;
     for (const l of this.vmPts) l.intensity = 0;
     for (const s of this.vmSpots) s.intensity = 0;
     if (!this.vmDark || !map) return 1;
@@ -368,7 +369,7 @@ export const R = {
   clearLevel() {
     for (const tr of this.trails || []) this.trailDrop(tr);
     this.trails = []; this.lastShot = null;
-    if (G.ShotLog) G.ShotLog.clear();
+    if (ReplayEnv.ShotLog) ReplayEnv.ShotLog.clear();
     if (this.debris) this.debris.clear();
     for (const o of this.wounds || []) { o.removeFromParent(); if (o.geometry !== this.trailDot) o.geometry.dispose(); o.material.dispose(); }
     this.wounds = [];
@@ -390,11 +391,11 @@ export const R = {
   // the chips and dust a round throws out of what it hits (js/scars.ts): made once, the first time something's hit or the
   // shaders are compiled (warmup)
   debrisFx() {
-    return this.debris || (this.debris = Scars.debris(this.scene, (x, z, y) => { const map = G.Game.map; return map ? Level.groundAt(map, x, z, 0.01, y) : 0; }));
+    return this.debris || (this.debris = Scars.debris(this.scene, (x, z, y) => { const map = ReplayEnv.Game!.map; return map ? Level.groundAt(map, x, z, 0.01, y) : 0; }));
   },
   // ------------------------------------------------------------ blood on the environment
   // the surface under (x, z) at or below height y: the floor, or the top of a piece of furniture
-  bloodFloor(x: number, z: number, y: number) { const map = G.Game && G.Game.map; return map ? Level.groundAt(map, x, z, 0.01, y) : 0; },
+  bloodFloor(x: number, z: number, y: number) { const map = ReplayEnv.Game && ReplayEnv.Game.map; return map ? Level.groundAt(map, x, z, 0.01, y) : 0; },
   // a drop (or a smear, if it came in fast) lying where it landed
   bloodDrop(x: number, y: number, z: number, size = 0.06, kind: BloodKind = 'drop') {
     const m = this.bloodMarks[this.bloodIdx]; this.bloodIdx = (this.bloodIdx + 1) % this.bloodMarks.length;
@@ -430,7 +431,7 @@ export const R = {
   // ------------------------------------------------------------ viewmodels
   // (skin: its stickers, js/stickers.ts; by default the gun in your hands', if that's this build)
   setViewmodel(def: any, skin?: any) {
-    if (skin === undefined) { const w = G.Me && G.Me.cur && G.Me.cur(); skin = w && w.def === def ? w.stickers : null; }
+    if (skin === undefined) { const w = ReplayEnv.Me && ReplayEnv.Me.cur && ReplayEnv.Me.cur(); skin = w && w.def === def ? w.stickers : null; }
     if (this.vm) { this.vmRoot.remove(this.vm); this.vm.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); }
     this.vm = def ? GunModels.viewmodel(def, skin) : null;
     if (this.vm) this.clearStockNearEye(this.vm);
@@ -806,8 +807,8 @@ export const R = {
   },
   trailsUpdate() {
     const on = Rig.debug;
-    if (G.ShotLog) G.ShotLog.frame(); // (the shots that hit someone: their ghosts, trails and markers)
-    const L = G.ShotLog && G.HUD.hbLast, fk = G.ShotLog ? G.ShotLog.focus() : null;
+    if (ReplayEnv.ShotLog) ReplayEnv.ShotLog.frame(); // (the shots that hit someone: their ghosts, trails and markers)
+    const L = ReplayEnv.ShotLog && ReplayEnv.HUD!.hbLast, fk = ReplayEnv.ShotLog ? ReplayEnv.ShotLog.focus() : null;
     for (const o of this.wounds || []) o.visible = !!on && !!L && o.onRig === L.who.rig; // (the tracks kept on bodies: with the hitboxes, on whoever you've picked out)
     if (!this.trails || !this.trails.length) return;
     const now = performance.now();
@@ -835,7 +836,7 @@ export const R = {
       if (came > 4) { this.glow(tail, head, col, 0.18, 1, 24); this.flare(head, col, 0.2, 1, 18); }
     } else if (rail) { this.streak(tail, head, col, 0.02, 1, false, 2); this.glow(tail, head, col, 0.25, 0.7, 20); }
     else if (bolt) { // solid, its lit nock on the tail, and a faint line of it behind (js/bolts.ts)
-      const nock = G.Bolts.colour(am);
+      const nock = ReplayEnv.Bolts!.colour(am);
       this.streak(tail, head, 0x24262a, 0.012, 1, true, 1.5);
       this.flare(tail, nock, 0.06, 1, 7);
       this.glow(tail.clone().addScaledVector(dir, -Math.min(2.5, came - lead)), tail, nock, 0.02, 0.5, 2);
@@ -913,7 +914,7 @@ export const R = {
     soft: { s: null, d: [0xcfc8b8, 6, 1] }, glass: { s: null, d: [0xcfe6f0, 8, 2.5] }, soil: { s: null, d: [0x6a5238, 10, 2] }, plastic: { s: null, d: [0x77787a, 5, 2] }, water: { s: null, d: [0xa8c8d8, 8, 2.5] },
   },
   impact(p: THREE.Vector3, n: number[] | null, kind: ImpactKind, fx?: ImpactFx, o?: MarkOpts) {
-    if (G.Audio && G.Audio.impactAt) G.Audio.impactAt(p, kind, fx); // heard when it's close
+    if (ReplayEnv.Audio && ReplayEnv.Audio.impactAt) ReplayEnv.Audio.impactAt(p, kind, fx); // heard when it's close
     if (kind === 'blood') { this.particles(p, 8, 0x8a0a0a, 2.5, 1.2, 9, 0.8, n, true); return; } // (each leaves a drop where it lands)
     if (kind === 'armor') { this.particles(p, 6, 0x9fd8ff, 3, 0.25, 6, 1); return; }
     const fxs = (this.IMPACT as Record<string, any>)[fx!] || this.IMPACT.stone;
@@ -938,7 +939,7 @@ export const R = {
   // A round's mark where it stopped in something solid (a wall, a door, or a target on the range): paper targets show
   // their holes in their own picture (no mark on top); a steel plate keeps its mark as it swings or falls.
   impactOn(p: THREE.Vector3, n: number[] | null, solid: any, fx?: string, o?: MarkOpts) {
-    const t = solid && solid.target, on = t && G.Range ? G.Range.markOn(t) : null;
+    const t = solid && solid.target, on = t && ReplayEnv.Range ? ReplayEnv.Range.markOn(t) : null;
     this.lastDecals = [];
     this.impact(p, on === 'paper' ? null : n, 'wall', fx as ImpactFx | undefined, o);
     if (on && on !== 'paper') for (const d of this.lastDecals) on.attach(d);
@@ -951,7 +952,7 @@ export const R = {
   // A mark that landed on a door's leaf becomes part of the leaf, so it swings with the door. (Marks are pooled:
   // each is put back in the scene before it's used again, and before a level's meshes are thrown away.)
   onDoor(m: THREE.Object3D) {
-    const map = G.Game && G.Game.map, doors = map && map.doorMeshes;
+    const map = ReplayEnv.Game && ReplayEnv.Game.map, doors = map && map.doorMeshes;
     if (!doors) return;
     m.updateMatrixWorld(true);
     const p = m.getWorldPosition(new THREE.Vector3());
@@ -1153,7 +1154,7 @@ export const R = {
       }
     }
   },
-  // The throw you're lining up: a dotted arc to where it goes off (G.Views.predictNade), and a ring there. Drawn
+  // The throw you're lining up: a dotted arc to where it goes off (ReplayEnv.Views.predictNade), and a ring there. Drawn
   // the frames it's called; cocked (pin out), brighter.
   throwArc(pts: THREE.Vector3[], cocked: boolean) {
     if (!this._arc) {
@@ -1711,7 +1712,7 @@ export const R = {
       for (let i = 0; i < n; i++) {
         const look: Record<string, string> = {};
         for (const [k, v] of Object.entries(looks)) look[k] = v[i % v.length];
-        const rig = G.Views.newPlayerRig({ color: [0x4080ff, 0xff5040, 0x40d060, 0xffc030][i % 4], animal: animals[i % animals.length].id, name: 'Warm', look }, 'warm' + i);
+        const rig = ReplayEnv.Views!.newPlayerRig({ color: [0x4080ff, 0xff5040, 0x40d060, 0xffc030][i % 4], animal: animals[i % animals.length].id, name: 'Warm', look }, 'warm' + i);
         rig.setKit({ helmet: of('helmet', i), face: of('face', i), carrier: of('carrier', i), plate: of('plate', i) ? 1 : 0, sh: of('shoulder', i), gr: of('groin', i), cp: 4, belt: of('belt', i), lg: of('legs', i), bp: 2, pack: of('pack', i), ifak: of('ifak', i) });
         rig.setGun('m4');
         rig.root.removeFromParent(); rig.root.visible = true; world.add(rig.root);
@@ -1729,7 +1730,7 @@ export const R = {
     // what's drawn over the evidence and what F would take (js/views.ts outlineMats: layer 2), and a few plain kinds the
     // replays' and the reports' sets use (ghosts, rings, guides, sprites, particles)
     try {
-      for (const blue of [false, true]) { const o = G.Views.outlineMats(blue); for (const m of [o.silhouette, ...o.bands]) { const x = new T.Mesh(geo, m); x.layers.set(2); world.add(x); } }
+      for (const blue of [false, true]) { const o = ReplayEnv.Views!.outlineMats(blue); for (const m of [o.silhouette, ...o.bands]) { const x = new T.Mesh(geo, m); x.layers.set(2); world.add(x); } }
     } catch (e) { console.warn('warm kit', e); }
     const pts = new T.BufferGeometry(); pts.setAttribute('position', new T.Float32BufferAttribute([0, 0, 0, 0.01, 0, 0], 3)); pts.setAttribute('color', new T.Float32BufferAttribute([1, 1, 1, 1, 1, 1], 3));
     // (and the marks a round leaves, as the replays put them back: js/scars.ts, js/damage.ts)
@@ -1805,10 +1806,10 @@ export const R = {
     const extras: THREE.Object3D[] = [];
     const put = (m: THREE.Object3D | null | undefined) => { if (m) { m.position.set(0, -50, 0); this.dynRoot.add(m); extras.push(m); } };
     try {
-      if (G.Casings.warm) for (const m of G.Casings.warm()) put(m);
-      if (G.Loot.meshFor) { put(G.Loot.meshFor(Gear.pack(Gear.medItem('bandage')))); }
+      { const CA = ReplayEnv.Casings!; if (CA.warm) for (const m of CA.warm()) put(m); }
+      { const LO = ReplayEnv.Loot!; if (LO.meshFor) { put(LO.meshFor(Gear.pack(Gear.medItem('bandage')))); } }
       put(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.bloodMats.spatter));
-      if (G.Game.map) for (const m of Damage.warm(G.Game.map as unknown as Parameters<typeof Damage.warm>[0])) put(m);
+      if (ReplayEnv.Game!.map) for (const m of Damage.warm(ReplayEnv.Game!.map as unknown as Parameters<typeof Damage.warm>[0])) put(m);
       this.debrisFx(); this.fishSetup(); this.pipTexture();
       if (!this._arc) this.throwArc([], false); // (a throw's arc: its dots and the ring where it lands)
       r.localClippingEnabled = true; // (as it is once there's a gun in your hands: clearStockNearEye)
@@ -1890,7 +1891,7 @@ export const R = {
     compile(this.vmScene, this.camera, nvT, 0, H.far, false, heatOnly);
     compile(nvq, this.fishCam!, nvT); compile(nvq, this.fishCam!, null);
     if (Highlights.warm) Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, true));
-    G.Game.veilSay('Compiling shaders');
+    ReplayEnv.Game!.veilSay('Compiling shaders');
   },
   // A frame of the warmup (from the game's loop): true while it's going, and nothing should be drawn. The compiles, as many
   // as fit in a frame; then waiting for the driver to finish them; then the real frames, and the scene put back.
@@ -1909,7 +1910,7 @@ export const R = {
       // (every program built since it began, a material's for the scope's picture or the TVs' as well as its last one, which
       // is all compileAsync would wait for: so the first frame that draws one doesn't stand and wait)
       const progs = ((r.info.programs || []) as any[]).filter((p) => !W.had.has(p)), left = progs.filter((p) => !p.isReady()).length;
-      if (left && performance.now() - W.tWait < 20000) { G.Game.veilSay(`Compiling shaders ${progs.length - left} / ${progs.length}`); return true; }
+      if (left && performance.now() - W.tWait < 20000) { ReplayEnv.Game!.veilSay(`Compiling shaders ${progs.length - left} / ${progs.length}`); return true; }
       // (built: then what three asks of a program the first time it's used, whether it linked and where its inputs are, a
       // few dozen calls that each wait on the driver: asked here, 50 ms of them a frame, not in the first frame that
       // looks through a scope)
@@ -1973,7 +1974,7 @@ export const R = {
     this.vmHolder.matrixWorldNeedsUpdate = true;
     // night vision down (or on its way): the frame goes into a texture for its pass (nvMaterial), the goggles' IR illuminator on
     // in it if it's switched on (js/lightgrid.ts: from before the scope's picture is drawn, which is seen through them too)
-    const dbs = r.getDrawingBufferSize(this._fsz || (this._fsz = new THREE.Vector2())), nv = this.nv && this.nv.k > 0.01 && G.Game && G.Game.phase === 'level' && dbs.x >= 16 && dbs.y >= 16 ? this.nv : null, // (not into a window that isn't shown: nothing to draw into)
+    const dbs = r.getDrawingBufferSize(this._fsz || (this._fsz = new THREE.Vector2())), nv = this.nv && this.nv.k > 0.01 && ReplayEnv.Game && ReplayEnv.Game.phase === 'level' && dbs.x >= 16 && dbs.y >= 16 ? this.nv : null, // (not into a window that isn't shown: nothing to draw into)
       LU = LightGrid.U;
     if (nv) {
       const cp = this.camera.position, fw = this._eyeD.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
@@ -1989,7 +1990,7 @@ export const R = {
       if (live > 0.35) this._renderPip(pip);
     }
     // a fisheye (the death camera): the scene goes into a texture, then to the screen through a barrel distortion
-    this.fk = (this.fk || 0) + ((this.fisheye && G.Game && G.Game.phase === 'level' ? 1 : 0) - (this.fk || 0)) * 0.12;
+    this.fk = (this.fk || 0) + ((this.fisheye && ReplayEnv.Game && ReplayEnv.Game.phase === 'level' ? 1 : 0) - (this.fk || 0)) * 0.12;
     const fish = this.fk > 0.01 && !nv;
     if (fish) {
       const sz = r.getDrawingBufferSize(this._fsz || (this._fsz = new THREE.Vector2()));
@@ -2001,7 +2002,7 @@ export const R = {
     }
     // a full-screen menu up (the Tab screen, the shop): the frame drawn at half the render resolution and blurred here, behind it,
     // rather than by the page (a backdrop-filter is done at the screen's own resolution, every frame)
-    const blur = !nv && !fish && G.Game && (G.Game.invOpen || G.Game.shopOpen) && dbs.x >= 16 && dbs.y >= 16;
+    const blur = !nv && !fish && ReplayEnv.Game && (ReplayEnv.Game.invOpen || ReplayEnv.Game.shopOpen) && dbs.x >= 16 && dbs.y >= 16;
     if (blur) r.setRenderTarget(this._blurTargets(Math.max(1, dbs.x >> 1), Math.max(1, dbs.y >> 1))[0]);
     if (nv) r.setRenderTarget(this.nvRT!);
     r.clear();

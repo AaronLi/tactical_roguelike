@@ -8,7 +8,9 @@ import { U } from './util.js';
 import { GunRig as G_GunRig } from './gunrig.js';
 import { Humans } from './humans.js';
 import { Rig as G_Rig } from './rig.js';
-// (G.Bolts, G.Casings and G.Icons stay reads through G: the export worker does not load them, and importing casings would bring audio, footsteps and the level into it)
+import type { Me } from './player.js';
+import { ReplayEnv } from './replayenv.js';
+// (ReplayEnv.Bolts, ReplayEnv.Casings and ReplayEnv.Icons are read, not imported: the export worker does not load them, and importing casings would bring audio, footsteps and the level into it)
 // First-person weapon handling: the arms, reloads, racking and inspecting.
 //
 // The viewmodel (js/gunmodels.ts, js/viewmodel.ts) is bound to its gun by js/gunrig.ts, which gives each gun its moving parts (magazine, charging handle, side bolt
@@ -32,7 +34,7 @@ export const VMAnim = (() => {
   type V3 = THREE.Vector3;
   type Mats = typeof GunMaterials.M;
   type Def = WeaponDef; // a gun's definition (js/data.ts WEAPONS)
-  type Pl = typeof G.Me; // the player (js/player.ts)
+  type Pl = typeof Me; // the player (js/player.ts)
   // what a gun model says about its moving parts and anchor points (js/gunrig.ts): [forward, up, right] each
   type Info = GunRigInfo;
   type Anchors = GunRigAnchors; // (a hand's anchor points in the gun's space, and where its parts sit at rest: js/gunrig.ts)
@@ -439,7 +441,7 @@ export const VMAnim = (() => {
     }
     return lead;
   }
-  const pl0 = () => G.Me;
+  const pl0 = () => ReplayEnv.Me!;
   const hingeNode = (h: Rig, k: string) => (h.an as Record<string, THREE.Object3D | undefined>)[k.replace(/^part_/, '')];
   // whether a hold is on the block (the magazine part, or inside it): with no block in the gun, the hand goes to the pouch for one instead
   const onBlock = (h: Rig, r: HingeRef | null) => { if (!r || r instanceof T.Vector3 || !h.an.mag) return false; for (let o: THREE.Object3D | null | undefined = hingeNode(h, r.part); o; o = o.parent) if (o === h.an.mag) return true; return false; };
@@ -809,7 +811,7 @@ export const VMAnim = (() => {
         const ld = G_loaded(w) > 0, rt = a.reloadT == null ? -1 : a.reloadT;
         an.quarrel.visible = ld || rt >= BOW_LOAD; an.stringCocked!.visible = ld || rt >= BOW_COCK; an.stringSlack!.visible = !an.stringCocked!.visible;
         const am = (w.tube && w.tube.length && w.tube[w.tube.length - 1]) || w.ammo, N = h.info.quarrelMats && h.info.quarrelMats.nock; // (its lit nock, in the load's colour: js/bolts.ts)
-        if (N && h.boltAm !== am) { h.boltAm = am; const c = G.Bolts.colour(am); N.color.setHex(c); if (N.emissive) N.emissive.setHex(c); }
+        if (N && h.boltAm !== am) { h.boltAm = am; const c = ReplayEnv.Bolts!.colour(am); N.color.setHex(c); if (N.emissive) N.emissive.setHex(c); }
       }
       // magazine
       if (an.mag && A.magHome) {
@@ -931,7 +933,7 @@ export const VMAnim = (() => {
           if (rd) chv.face.material = chv.shot ? shellMat(rd) : tipMat(rd);
         }
         // something in the left hand
-        if (pose && pose.dropCase && pl.handCase && !pl.handOut) { pl.handOut = true; G.Casings.loose(a.def, h.holder.localToWorld(a.props.case.position.clone()), h.holder, pl.handCase); } // (a real case now, falling from where the hand had it)
+        if (pose && pose.dropCase && pl.handCase && !pl.handOut) { pl.handOut = true; ReplayEnv.Casings!.loose(a.def, h.holder.localToWorld(a.props.case.position.clone()), h.holder, pl.handCase); } // (a real case now, falling from where the hand had it)
         if (a.L.fist) { const fist = !!(pose && pose.prop && pose.prop.kind === 'claw'); a.L.fist.visible = fist && !a.L.hum; a.L.glove.children[1].visible = !fist && !a.L.hum; if (fist && a.L.hum) a.L.hum.F = FP.fist; if (fist && pose!.prop!.up) a.L.glove.quaternion.slerp(CLAW_UP, pose!.prop!.up); } // (the Wolverine grip's fist, in place of the flat fingers (a body's own, curled right in); turned up to show the rounds)
         for (const [kind, obj] of Object.entries(a.props)) {
           obj.visible = !!(pose && pose.prop && pose.prop.kind === kind);
@@ -973,9 +975,9 @@ export const VMAnim = (() => {
   const PRIMER = new T.MeshStandardMaterial({ color: 0xc9c2b4, roughness: 0.4, metalness: 0.6 }), DENT = new T.MeshStandardMaterial({ color: 0x26211b, roughness: 0.8 }); // (a primer, and the firing pin's dent in it)
   const NUMS = new Map<number, THREE.Material>(), SHELLS = new Map<string, THREE.Material>(), TIPS = new Map<string, THREE.Material>(), LICKS = new Map<string, THREE.Material>();
   // the colour code (js/icons.ts): a shell's hull for its load, a bullet's tip for its type
-  function shellMat(am: string) { if (!SHELLS.has(am)) SHELLS.set(am, new T.MeshStandardMaterial({ color: G.Icons.shellCol(am), roughness: 0.55 })); return SHELLS.get(am)!; }
-  function lickMat(am: string) { if (!LICKS.has(am)) LICKS.set(am, new T.MeshStandardMaterial({ color: baseAm(am) === 'hp' ? 0xf2efe6 : G.Icons.tipCol(am), roughness: 0.75 })); return LICKS.get(am)!; } // (hollow point's own tan is lost on brass)
-  function tipMat(am: string) { if (!TIPS.has(am)) TIPS.set(am, new T.MeshStandardMaterial({ color: G.Icons.tipCol(am), roughness: 0.4, metalness: 0.6 })); return TIPS.get(am)!; }
+  function shellMat(am: string) { if (!SHELLS.has(am)) SHELLS.set(am, new T.MeshStandardMaterial({ color: ReplayEnv.Icons!.shellCol(am), roughness: 0.55 })); return SHELLS.get(am)!; }
+  function lickMat(am: string) { if (!LICKS.has(am)) LICKS.set(am, new T.MeshStandardMaterial({ color: baseAm(am) === 'hp' ? 0xf2efe6 : ReplayEnv.Icons!.tipCol(am), roughness: 0.75 })); return LICKS.get(am)!; } // (hollow point's own tan is lost on brass)
+  function tipMat(am: string) { if (!TIPS.has(am)) TIPS.set(am, new T.MeshStandardMaterial({ color: ReplayEnv.Icons!.tipCol(am), roughness: 0.4, metalness: 0.6 })); return TIPS.get(am)!; }
   function numMat(n: number) { // a count stamped beside a witness hole, white on the polymer
     if (NUMS.has(n)) return NUMS.get(n)!;
     const c = document.createElement('canvas'); c.width = 64; c.height = 48;
@@ -1110,8 +1112,8 @@ export const VMAnim = (() => {
   }
   // your arms, on a viewmodel: now if your body's file is in, else when it comes
   function dressArms(root: THREE.Object3D, a: Vma) {
-    if (!Humans || !G_Rig || !G.Game) return;
-    const lk = G_Rig.armLook({ animal: G.Game.myAnimal, callName: G.Game.myName, seed: 977, look: G.Game.myLook });
+    if (!Humans || !G_Rig || !ReplayEnv.Game) return;
+    const lk = G_Rig.armLook({ animal: ReplayEnv.Game.myAnimal, callName: ReplayEnv.Game.myName, seed: 977, look: ReplayEnv.Game.myLook });
     const go = () => { const parts = Humans.get(lk.human); if (!parts || root.userData.vma !== a || a.R.hum) return; a.R.hum = humArm(root, a.R, parts, 'L', lk.col); a.L.hum = humArm(root, a.L, parts, 'R', lk.col); };
     if (Humans.get(lk.human)) go(); else Humans.ensure(lk.human).then(go);
   }

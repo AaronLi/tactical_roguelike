@@ -8,6 +8,7 @@ import { Humans } from './humans.js';
 import { Level } from './level.js';
 import { LevelView } from './levelview.js';
 import { Gunsmith } from './parts.js';
+import { ReplayEnv } from './replayenv.js';
 import { Sim } from './sim.js';
 import { SpaceData } from './spacedata.js';
 import { Stickers } from './stickers.js';
@@ -15,7 +16,7 @@ import { U as G_U } from './util.js';
 import { VMAnim } from './vmanim.js';
 import { World } from './world.js';
 import { GunRig } from './gunrig.js';
-// (G.Footsteps stays a read through G, and its guards mean it: the export worker does not load it, and its figures stride and step without it)
+// (ReplayEnv.Footsteps is read, not imported, and its guards mean it: the export worker does not load it, and its figures stride and step without it)
 export const Rig = (() => {
   const T = THREE;
   const UP = new T.Vector3(0, 1, 0);
@@ -509,7 +510,7 @@ export const Rig = (() => {
     // main menu); everyone else is dressed for who they are.
     let headCover = null, hairM = null;
     const skin0 = o.mannequin || o.skinColor != null ? 0 : pick(PAL.skin);
-    const skin = L(o.mannequin ? 0xa9afb5 : o.skinColor != null ? o.skinColor : hdef ? hdef.skin : skin0); // (a mannequin: plain grey, no face, no hair: see G.Hangar)
+    const skin = L(o.mannequin ? 0xa9afb5 : o.skinColor != null ? o.skinColor : hdef ? hdef.skin : skin0); // (a mannequin: plain grey, no face, no hair: see ReplayEnv.Hangar)
     let look;
     if (style === 'tactical') look = Object.assign({}, OFFICER_LOOK, o.look || {});
     // everyone else, from the same wardrobe, by who they are: enforcers in combat clothes and balaclavas,
@@ -903,7 +904,7 @@ export const Rig = (() => {
   function dropShield(rig: Rig) {
     const g = rig.shield; if (!g) return null;
     rig.shield = null; rig.shieldDropped = g; g.updateMatrixWorld(true);
-    const d = g.userData.shield as ShieldDef, wp = g.getWorldPosition(new T.Vector3()), f = new T.Vector3(0, 0, -1).transformDirection(g.matrixWorld), map = G.Game && G.Game.map;
+    const d = g.userData.shield as ShieldDef, wp = g.getWorldPosition(new T.Vector3()), f = new T.Vector3(0, 0, -1).transformDirection(g.matrixWorld), map = ReplayEnv.Game && ReplayEnv.Game.map;
     const fy = map ? Level.groundAt(map, wp.x, wp.z, 0.05, wp.y, 1.6) : 0;
     g.removeFromParent();
     g.position.set(wp.x + f.x * 0.2, fy + d.th / 2 + 0.006, wp.z + f.z * 0.2); g.rotation.set(-Math.PI / 2, Math.atan2(-f.x, -f.z), 0, 'YXZ');
@@ -1056,12 +1057,12 @@ export const Rig = (() => {
     if (rig.throwT >= 0) { rig.throwT += dt; if (rig.throwT > 0.9) rig.throwT = -1; }
 
     // gait: one full cycle = two steps, at a walker's cadence for the speed (js/footsteps.ts: longer and quicker strides as it rises)
-    const stride = G.Footsteps ? G.Footsteps.stride(speed * s, rig.crouchW) / s : U.lerp(1.1, 1.8, U.clamp(speed / 6, 0, 1)) * (1 - rig.crouchW * 0.35);
+    const stride = ReplayEnv.Footsteps ? ReplayEnv.Footsteps.stride(speed * s, rig.crouchW) / s : U.lerp(1.1, 1.8, U.clamp(speed / 6, 0, 1)) * (1 - rig.crouchW * 0.35);
     const ph0 = rig.phase;
     rig.phase += (speed * dt / stride) * Math.PI * 2;
     // a foot comes down where its lift (below) runs out: the left at phase π/2, the right at 3π/2 (js/footsteps.ts)
-    if (p.feet && moving > 0.6 && !p.zip && !p.climb && p.state !== 'down' && rig.proneS < 0.3 && !posed && G.Footsteps
-      && Math.floor((rig.phase - Math.PI / 2) / Math.PI) > Math.floor((ph0 - Math.PI / 2) / Math.PI)) G.Footsteps.rigStep(rig, p, speed * s);
+    if (p.feet && moving > 0.6 && !p.zip && !p.climb && p.state !== 'down' && rig.proneS < 0.3 && !posed && ReplayEnv.Footsteps
+      && Math.floor((rig.phase - Math.PI / 2) / Math.PI) > Math.floor((ph0 - Math.PI / 2) / Math.PI)) ReplayEnv.Footsteps.rigStep(rig, p, speed * s);
     const bob = Math.abs(Math.sin(rig.phase)) * 0.035 * moving;
 
     // body: hips height, lean, downed pose
@@ -1331,7 +1332,7 @@ export const Rig = (() => {
     // the grenade itself, in their right hand until it's thrown
     if (p.hold || rig.handNade) {
       if (!rig.handNade) {
-        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })), tb: G.Views ? G.Views.tbMesh(0.033, 0.115) : new T.Mesh(new T.CylinderGeometry(0.033, 0.033, 0.115, 10), new T.MeshLambertMaterial({ color: 0x4c5634 })), sticky: G.Views ? G.Views.stickyMesh(0.042) : new T.Mesh(new T.SphereGeometry(0.042, 10, 8), new T.MeshLambertMaterial({ color: 0x9a8558 })) }; // (the video's worker has no js/views.ts)
+        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })), tb: ReplayEnv.Views ? ReplayEnv.Views.tbMesh(0.033, 0.115) : new T.Mesh(new T.CylinderGeometry(0.033, 0.033, 0.115, 10), new T.MeshLambertMaterial({ color: 0x4c5634 })), sticky: ReplayEnv.Views ? ReplayEnv.Views.stickyMesh(0.042) : new T.Mesh(new T.SphereGeometry(0.042, 10, 8), new T.MeshLambertMaterial({ color: 0x9a8558 })) }; // (the video's worker has no js/views.ts)
         for (const m of Object.values(rig.handNade)) { m.position.set(-0.05, -0.075, -0.005); rig.armR.wr.add(m); } // (in the palm)
       }
       for (const [k, m] of Object.entries(rig.handNade)) m.visible = !!p.hold && p.hold.kind === k && !handThrow && !posed;
@@ -1451,7 +1452,7 @@ export const Rig = (() => {
     else if (rig.powered) rig.rd = null!; // (far off: animated only; the body starts again from the pose when near)
     if (rig.dropped) dropGun(rig, dt);
     // aboard a ship lying tilted (a breach nose up or down): standing square to her decks, turned with her about their feet (js/level.ts tiltQ)
-    if (rig.state !== 'dead' && !rig.limp && !p.zip && !p.climb && G.Game && G.Game.map) { const tq = Level.tiltQ(G.Game.map, p.pos.x, p.pos.y, p.pos.z); if (tq) root.quaternion.premultiply(tq); }
+    if (rig.state !== 'dead' && !rig.limp && !p.zip && !p.climb && ReplayEnv.Game && ReplayEnv.Game.map) { const tq = Level.tiltQ(ReplayEnv.Game.map, p.pos.x, p.pos.y, p.pos.z); if (tq) root.quaternion.premultiply(tq); }
     poseFingers(rig);
     drawDebug(rig);
   }
@@ -1810,7 +1811,7 @@ export const Rig = (() => {
   // The level's solids around a body, gathered once a step: a body's sixteen joints are each tested six or ten times a step,
   // and every one of those goes through this short list instead of the world's grid.
   function gather(rd: Ragdoll) {
-    const map: any = G.Game && G.Game.map;
+    const map: any = ReplayEnv.Game && ReplayEnv.Game.map;
     if (!map || !map.world) { rd.near = null; return; }
     let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
     for (const p of rd.P) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; }
@@ -1821,7 +1822,7 @@ export const Rig = (() => {
   }
   // roll: a body being turned over by hand, out of a wall at once (not PUSH a pass)
   function collide(rd: Ragdoll, i: number, roll = false) {
-    const p = rd.P[i], q = rd.prev[i], r = rd.r[i], L = Level, map: any = G.Game && G.Game.map;
+    const p = rd.P[i], q = rd.prev[i], r = rd.r[i], L = Level, map: any = ReplayEnv.Game && ReplayEnv.Game.map;
     if (map && map.world) { // out of whatever solid it's in (the world's: any floor, a step, a sofa), the shallowest way
       if (!rd.near) gather(rd);
       const list = rd.near!, qx = q.x, qz = q.z; // (where it was: which face of a wall it came in by)
@@ -2116,7 +2117,7 @@ export const Rig = (() => {
     if (instant) ragdollStep(rig, 0);
   }
   function dropGun(rig: Rig, dt: number) {
-    const d = rig.dropped, g = d!.g, map = G.Game && G.Game.map;
+    const d = rig.dropped, g = d!.g, map = ReplayEnv.Game && ReplayEnv.Game.map;
     if (d!.floor == null) d!.floor = (map ? Level.groundAt(map, g.position.x, g.position.z, 0.05, g.position.y, 0.05) : 0) + 0.05; // (the floor it falls to: upstairs or down)
     if (g.position.y <= d!.floor) return;
     d!.vy -= 12 * dt;

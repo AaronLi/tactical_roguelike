@@ -12,6 +12,8 @@ import { LightGrid } from './lightgrid.js';
 import { Materials } from './materials.js';
 import { Gunsmith } from './parts.js';
 import { R as G_R } from './render.js';
+import type { Me } from './player.js';
+import { ReplayEnv } from './replayenv.js';
 import { Rig as G_Rig } from './rig.js';
 import { Scars } from './scars.js';
 import { Sim } from './sim.js';
@@ -19,8 +21,8 @@ import { Stickers } from './stickers.js';
 import { TONE } from './tone.js';
 import { U as G_U } from './util.js';
 import { World } from './world.js';
-// Left as G.X on purpose: G.Audio, G.GunAudio, G.HUD, G.Icons, G.Shop, G.Views and G.Zip. The export worker (js/exportworker.ts) loads this file, and
-// importing any of these would load them there (audio, footsteps, the HUD, the shop...) and change what it does; they are page-only reads.
+// The page's objects (the game, the player, audio, the views, the HUD, the shop...) are read through ReplayEnv (js/replayenv.ts), not imported: the export worker
+// (js/exportworker.ts) loads this file, and importing them would load them there (audio, footsteps, the HUD, the shop...) and change what it does.
 // After-action highlights: the level just played, as a sports broadcast on the TVs in Vex's hangar.
 //
 // RECORDING (in a level): ten times a second every suspect, civilian and officer is written down as they are (where,
@@ -102,7 +104,7 @@ export const Highlights = (() => {
   }
   // someone in the recording: an officer (kind 'p') or a suspect ('e')
   interface Actor {
-    kind: HlActorKind; id: any; name?: string; animal?: string; color?: number; look?: ReturnType<typeof G_Rig.cleanLook>; kt?: ReturnType<typeof G.Me.kitLook> | null; gun?: string | null;
+    kind: HlActorKind; id: any; name?: string; animal?: string; color?: number; look?: ReturnType<typeof G_Rig.cleanLook>; kt?: ReturnType<typeof Me.kitLook> | null; gun?: string | null;
     sk?: ReturnType<typeof Stickers.clean> | null; skins?: Record<string, ReturnType<typeof Stickers.clean>>; type?: string; wpn?: EnemyDef['wpn']; vest?: EnemyDef['vest']; helmet?: EnemyDef['helmet']; face?: number; ex?: any[]; civ?: boolean; scale?: number; boss?: boolean; style?: EnemyStyle;
   }
   // a stop on the gear room's tour: a fitted part, the slot it's in, and the mesh slot its model's meshes are tagged with
@@ -161,15 +163,15 @@ export const Highlights = (() => {
   function reset() {
     R.t = 0; R.acc = 0; R.ring = []; R.shots = []; R.doors = []; R.glass = []; R.clips = []; R.open = []; R.surs.clear(); R.actors.clear(); R.downs.clear(); R.lastHit.clear(); R.stats.clear(); R.fired.clear(); R.kgun.clear(); R.streaks.clear(); R.killN = 0;
     R.nades = []; R.booms.clear(); R.flashes.clear();
-    R.level = G.Game.level || 0; R.theme = G.Game.map && G.Game.map.theme ? G.Game.map.theme.name : '';
+    R.level = ReplayEnv.Game!.level || 0; R.theme = ReplayEnv.Game!.map && ReplayEnv.Game!.map.theme ? ReplayEnv.Game!.map.theme.name : '';
   }
-  const myKey = () => 'p' + G.Net.myId;
+  const myKey = () => 'p' + ReplayEnv.Net!.myId;
   const stat = (k: string) => { let s = R.stats.get(k); if (!s) R.stats.set(k, (s = { kills: 0, hs: 0, fouls: 0, downs: 0, breach: 0, arrests: 0 })); return s; };
   function officerInfo(id: string | null, pv?: any) {
-    const me = id === G.Net.myId, g = G.Game, ro = (g.roster || {})[id!] || {};
+    const me = id === ReplayEnv.Net!.myId, g = ReplayEnv.Game!, ro = (g.roster || {})[id!] || {};
     return { kind: 'p', id, name: me ? g.myName : (pv && pv.name) || ro.name || 'Officer', color: me ? g.myColor : (pv && pv.color) != null ? pv.color : ro.color, animal: me ? g.myAnimal : (pv && pv.animal) || ro.animal,
-      look: me ? g.myLook : (pv && pv.look) || ro.look, kt: me ? G.Me.kitLook() : pv && pv.st ? pv.st.kt : null, gun: me ? G.Me.cur().def.code : pv && pv.st ? pv.st.w : null,
-      sk: me ? G.Me.cur().stickers || null : pv && pv.st ? Stickers.of(pv.st.sk) : null };
+      look: me ? g.myLook : (pv && pv.look) || ro.look, kt: me ? ReplayEnv.Me!.kitLook() : pv && pv.st ? pv.st.kt : null, gun: me ? ReplayEnv.Me!.cur().def.code : pv && pv.st ? pv.st.w : null,
+      sk: me ? ReplayEnv.Me!.cur().stickers || null : pv && pv.st ? Stickers.of(pv.st.sk) : null };
   }
   // an officer's record, now: as they are, and the stickers on each gun they've been seen with (skins: code -> list)
   function officer(k: string, id: string | null, pv?: any) {
@@ -183,10 +185,10 @@ export const Highlights = (() => {
   // -1 not) and then whether they've still a gun in hand (0 dropped, 1 slung, 2 in hand); for an officer how far
   // through zip-tying someone (-1 not), then whose ('e' id) and whether pulling them up. [10]: how far through a
   // reload (-1 not), everyone's. [11]: their laser, if it's on: where it landed and whether it's green ([x, y, z, green])
-  const zipOf = (a: typeof G.Me.action) => (a && a.kind === 'zip' ? [Math.min(1, a.t / a.dur), a.target, a.pull ? 1 : 0] : [-1, -1, 0]);
+  const zipOf = (a: typeof Me.action) => (a && a.kind === 'zip' ? [Math.min(1, a.t / a.dur), a.target, a.pull ? 1 : 0] : [-1, -1, 0]);
   function frame() {
     const a: Record<string, any[]> = {};
-    for (const ev of G.Views.enemies.values()) {
+    for (const ev of ReplayEnv.Views!.enemies.values()) {
       const k = 'e' + ev.id;
       if (!R.actors.has(k)) R.actors.set(k, { kind: 'e', id: ev.id, type: ev.type, name: ev.def.name, wpn: ev.def.wpn, vest: ev.def.vest, helmet: ev.def.helmet, face: ev.def.face || 0, ex: ev.def.ex || [], civ: !!ev.def.civ, scale: ev.def.scale || 1, boss: !!ev.def.boss, style: ev.def.style });
       else if (ev.alive) R.actors.get(k)!.name = ev.def.name; // (what they're called as it changes: a man who takes over his fireteam, js/server.ts titleOf)
@@ -198,16 +200,16 @@ export const Highlights = (() => {
       const rl = ev.reloadAt && ev.reloading && ev.alive ? (performance.now() - ev.reloadAt) / ev.reloadDur! : -1; // (as js/views.ts has it)
       a[k] = [at.x, at.y, at.z, ev.yaw, ev.recPitch || 0, fl, ev.lean || 0, ev.recTk == null ? -1 : ev.recTk, ev.armed == null ? 2 : ev.armed, 0, rl >= 0 && rl < 1 ? rl : -1];
     }
-    for (const pv of G.Views.players.values()) {
+    for (const pv of ReplayEnv.Views!.players.values()) {
       if (!pv.st) continue;
       const st = pv.st, k = 'p' + pv.id;
       officer(k, pv.id, pv);
       a[k] = [pv.pos.x, pv.pos.y, pv.pos.z, pv.yaw, pv.pitch, (st.cr ? 1 : 0) | (st.pr ? 2 : 0) | (st.lr ? 0 : 4) | (st.dn ? 8 : 0) | (st.dd ? 16 : 0) | (st.cl ? 256 : 0) | (st.zp ? 512 : 0), st.ln || 0,
         st.act === 'z' ? st.ap || 0 : -1, st.act === 'z' ? st.zt : -1, st.pl ? 1 : 0, st.rl == null ? -1 : st.rl];
     }
-    const me = G.Me, k = myKey();
+    const me = ReplayEnv.Me, k = myKey();
     if (me && me.pos) {
-      officer(k, G.Net.myId);
+      officer(k, ReplayEnv.Net!.myId);
       a[k] = [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch ? 1 : 0) | (me.prone ? 2 : 0) | (me.lowReady ? 0 : 4) | (me.down ? 8 : 0) | (me.dead ? 16 : 0) | (me.climb ? 256 : 0) | (me.zipRide ? 512 : 0), me.lean || 0, ...zipOf(me.action),
         me.reloading && me.reloadTotal ? G_U.clamp(1 - me.reloadT / me.reloadTotal, 0, 1) : -1];
     }
@@ -220,14 +222,14 @@ export const Highlights = (() => {
   const lasers = new Map();
   function laser(key: string | null, p: XYZ, green: boolean | number) { lasers.set(key || myKey(), [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2), green ? 1 : 0, performance.now()]); }
   function tick(dt: number) {
-    const g = G.Game;
+    const g = ReplayEnv.Game!;
     if (g.phase !== 'level' || g.hub || !g.map) return;
     if (R.level !== g.level) reset();
     R.t += dt; R.acc += dt;
     // officers going down
     const downNow = new Map();
-    if (G.Me && G.Me.pos) downNow.set(G.Net.myId, !!(G.Me.down || G.Me.dead));
-    for (const pv of G.Views.players.values()) if (pv.st) downNow.set(pv.id, !!(pv.st.dn || pv.st.dd));
+    if (ReplayEnv.Me && ReplayEnv.Me.pos) downNow.set(ReplayEnv.Net!.myId, !!(ReplayEnv.Me.down || ReplayEnv.Me.dead));
+    for (const pv of ReplayEnv.Views!.players.values()) if (pv.st) downNow.set(pv.id, !!(pv.st.dn || pv.st.dd));
     for (const [id, d] of downNow) {
       if (d && !R.downs.get(id)) {
         // (their armour stopping rounds a moment ago wasn't the save it looked like)
@@ -319,7 +321,7 @@ export const Highlights = (() => {
   const jitter = (str: string) => { let h = 2166136261; for (const ch of String(str)) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
   // something worth showing: the seconds before it (and the next few) of everyone near it become a clip
   function clip(kind: HlClipKind, a: string | null, v: string, fl: HlFlags) {
-    const g = G.Game;
+    const g = ReplayEnv.Game!;
     if (g.phase !== 'level' || g.hub) return;
     const c0 = posOf(v) || posOf(a!) || new T.Vector3();
     const keys = new Set([a, v].filter(Boolean) as string[]);
@@ -368,7 +370,7 @@ export const Highlights = (() => {
   // every door's state at clip time t0: as they are now, with the door events since then undone (a door's first event
   // after t0 says what it became, so before it, it was the other way)
   function doorsThen(t0: number) {
-    const map = G.Game.map, out: Record<string, any> = {};
+    const map = ReplayEnv.Game!.map, out: Record<string, any> = {};
     if (!map || !map.doors) return out;
     map.doors.forEach((d, i: number) => { out[i] = !!d.open; });
     for (let j = R.doors.length - 1; j >= 0 && R.doors[j].t >= t0; j--) out[R.doors[j].i] = !R.doors[j].open;
@@ -379,7 +381,7 @@ export const Highlights = (() => {
   // a round fired (by an actor key): where from, where to, the gun; a shotgun's, every pellet's end (tos: [[x, y, z]],
   // from the shooter; a suspect's, the host sends only one, so the rest are spread round it by the gun's choke)
   function shot(a: string, f: XYZ, to: XYZ, code: string, am: string, tos: XYZ[], sid: number) {
-    if (G.Game.phase !== 'level' || G.Game.hub) return;
+    if (ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub) return;
     const s: any = { t: R.t, a, f: [f.x, f.y, f.z], to: [to.x, to.y, to.z], code, am, sid };
     if (Array.isArray(tos) && tos.length > 1) s.tos = tos.map((p) => (Array.isArray(p) ? p.slice(0, 3) : [p.x, p.y, p.z]));
     else { const def = defOf(code); if (def && def.pellets > 1) s.tos = spread(s.f, s.to, def.pellets, def.choke || 3, G_U.rng(((sid | 0) ^ 0x5be11e7) >>> 0)); } // (by the shot's id: the same spread on every machine)
@@ -409,9 +411,9 @@ export const Highlights = (() => {
     return Object.assign({}, sh, { path: { p: P0, ev: q.ev.filter((e: any[]) => e[0] <= h[0]), hit: [h] }, to: into.slice(0, 3), tos: undefined, paths: undefined, fl: undefined, _pel: undefined });
   }
   // a pane shot out
-  function glass(id: number) { if (G.Game.phase === 'level' && !G.Game.hub) R.glass.push({ t: R.t, id }); }
+  function glass(id: number) { if (ReplayEnv.Game!.phase === 'level' && !ReplayEnv.Game!.hub) R.glass.push({ t: R.t, id }); }
   // (a pane fractured, and where: p)
-  function crack(id: number, p: XYZ) { if (G.Game.phase === 'level' && !G.Game.hub) R.glass.push({ t: R.t, id, p: [p.x, p.y, p.z] }); }
+  function crack(id: number, p: XYZ) { if (ReplayEnv.Game!.phase === 'level' && !ReplayEnv.Game!.hub) R.glass.push({ t: R.t, id, p: [p.x, p.y, p.z] }); }
   // pellets round one end: a cone of the choke's half-angle (degrees), denser in the middle, as the guns throw them
   function spread(f: number[], to: number[], n: number, choke: number, rnd: () => number = Math.random) {
     const F0 = new T.Vector3(...f), d = new T.Vector3(...to).sub(F0), len = d.length(); d.divideScalar(len || 1);
@@ -440,7 +442,7 @@ export const Highlights = (() => {
   }
   // (fall: shot off its hinges, as js/damage.ts fall takes it)
   function door(i: number, open: boolean, kicked: boolean, fall?: boolean) {
-    if (G.Game.phase !== 'level' || G.Game.hub) return;
+    if (ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub) return;
     const d = { t: R.t, i, open: !!open, kicked: !!kicked, fall };
     R.doors.push(d);
     for (const c of R.open) c.doors.push(d);
@@ -453,7 +455,7 @@ export const Highlights = (() => {
   // then: down for good, the round that put them down; down from the blood loss, long after the last round (bo), the
   // bleed-out camera, on them going down. Whatever comes after (dying, finished off, cuffed where they lie) is neither
   // counted again nor shown. A suspect who bleeds to death on their feet is incapacitated by it: the bleed-out camera.
-  const tally = (by: string, m: HlKillMsg) => { if (!by || G.Game.phase !== 'level' || G.Game.hub) return; const s = stat(by); if (m.why) s.fouls++; else { s.kills++; if (m.h) s.hs++; if (m.br) s.breach++; } };
+  const tally = (by: string, m: HlKillMsg) => { if (!by || ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub) return; const s = stat(by); if (m.why) s.fouls++; else { s.kills++; if (m.h) s.hs++; if (m.br) s.breach++; } };
   const clipOf = (e: number | string) => R.clips.find((x) => x.kind === 'kill' && (x.v === 'e' + e || (x.vs && x.vs.some((q) => q.v === 'e' + e))));
   function suspectDown(m: HlKillMsg) {
     if (nadeKill(m)) return;
@@ -466,14 +468,14 @@ export const Highlights = (() => {
   // A grenade thrown (js/player.ts throwHeld, and everyone else's from the host: js/game.ts 'nade'): kept a few seconds, for the burst it
   // becomes (boom) to find. a: whose ('p' or 'e' and their id, or null)
   function nade(a: string | null, p: XYZ, v: XYZ, fuse: number, kind: string) {
-    if (G.Game.phase !== 'level' || G.Game.hub) return;
+    if (ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub) return;
     const n: HlNade = { t: R.t, a, p: [p.x, p.y, p.z], v: [v.x, v.y, v.z], fuse, kind: kind === 'flash' || kind === 'tb' || kind === 'sticky' ? kind : 'frag' };
     // its flight, worked out now against the level as it is (its doors as they are) and kept with it: the broadcast, the video's worker
     // (which has no js/views.ts to work it out) and every machine draw the same arc. Every other point of it, to a centimetre. (A sticky's:
     // to the wall it'll hold to, its fuse from there: put right if it held to someone first, stick)
     try {
       const P0 = new T.Vector3(p.x, p.y, p.z), V0 = new T.Vector3(v.x, v.y, v.z), sticky = n.kind === 'sticky';
-      const pts = sticky ? Sim.predictSticky(P0, V0, G.Game.map, Sim.STICKY.MAX_FLY) : G.Views.predictNade(P0, V0, fuse, G.Game.map), r = (x: number) => Math.round(x * 100) / 100;
+      const pts = sticky ? Sim.predictSticky(P0, V0, ReplayEnv.Game!.map, Sim.STICKY.MAX_FLY) : ReplayEnv.Views!.predictNade(P0, V0, fuse, ReplayEnv.Game!.map), r = (x: number) => Math.round(x * 100) / 100;
       n.arc = pts.filter((q, i) => i % 2 === 0 || i === pts.length - 1).map((q) => [r(q.x), r(q.y), r(q.z)]);
       if (sticky) { n.fly = (pts.length - 1) / 60; n.fuse = n.fly + Sim.STICKY.FUSE; }
     } catch (e) { /* worked out when it's played, then */ }
@@ -482,7 +484,7 @@ export const Highlights = (() => {
   // Where a sticky held (js/views.ts stickStep, the thrower's; stuckAt, everyone else's from their word): its throw's arc cut there, after
   // fly seconds in the air, and its fuse from then. a: whose; the latest of theirs not yet held.
   function stick(a: string | null, at: XYZ, fly: number) {
-    if (G.Game.phase !== 'level' || G.Game.hub) return;
+    if (ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub) return;
     for (let i = R.nades.length - 1; i >= 0; i--) {
       const n = R.nades[i]; if (n.kind !== 'sticky' || n.held || (a && n.a && n.a !== a)) continue;
       const r = (x: number) => Math.round(x * 100) / 100, k = Math.max(1, Math.round(fly * 30));
@@ -496,7 +498,7 @@ export const Highlights = (() => {
     for (let i = R.nades.length - 1; i >= 0; i--) {
       const n = R.nades[i], age = R.t - n.t;
       if (n.kind !== kind || (a && n.a && n.a !== a) || age < n.fuse - 0.6 || age > n.fuse + 1.5) continue;
-      const e = n.arc && n.arc.length ? n.arc[n.arc.length - 1] : (() => { const q = G.Views.predictNade(new T.Vector3(...(n.p as [number, number, number])), new T.Vector3(...(n.v as [number, number, number])), n.fuse, G.Game.map); const l = q[q.length - 1]; return [l.x, l.y, l.z]; })();
+      const e = n.arc && n.arc.length ? n.arc[n.arc.length - 1] : (() => { const q = ReplayEnv.Views!.predictNade(new T.Vector3(...(n.p as [number, number, number])), new T.Vector3(...(n.v as [number, number, number])), n.fuse, ReplayEnv.Game!.map); const l = q[q.length - 1]; return [l.x, l.y, l.z]; })();
       if (Math.hypot(e[0] - p[0], e[1] - p[1], e[2] - p[2]) < 2) return n;
     }
     return null;
@@ -506,16 +508,16 @@ export const Highlights = (() => {
   // (js/server.ts kill gr) name it by, so a thermobaric's kills are one moment a grenade as a frag's are. The same burst told twice (the
   // thrower's, then the host's echo) is the one.
   function boom(a: string | null, p: XYZ, s: number, kind = 'frag') {
-    if (G.Game.phase !== 'level' || G.Game.hub || !s) return;
+    if (ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub || !s) return;
     let b = R.booms.get(s);
     if (!b) R.booms.set(s, (b = { t: R.t, a, p: [p.x, p.y, p.z], s, nade: null, paths: [], kind }));
     else if (b.t < 0) { b.t = R.t; b.p = [p.x, p.y, p.z]; }
     b.kind = kind;
     // a thermobaric's fireball, the room it filled as it was then (its doors open or shut then): kept with it, so the replay shows that
     // room filling, on every machine and in the video (whose worker has no js/player.ts to work it out)
-    if (kind === 'tb' && !b.cells && G.Me && G.Me.tbModel && G.Game.map) {
+    if (kind === 'tb' && !b.cells && ReplayEnv.Me && ReplayEnv.Me.tbModel && ReplayEnv.Game!.map) {
       try {
-        const M = G.Me.tbModel(G.Game.map, new T.Vector3(p.x, p.y, p.z)), W = G.Game.map.W, TS = Level.TS, cells: number[][] = [];
+        const M = ReplayEnv.Me.tbModel(ReplayEnv.Game!.map, new T.Vector3(p.x, p.y, p.z)), W = ReplayEnv.Game!.map.W, TS = Level.TS, cells: number[][] = [];
         for (let i = 0; i < M.cloud && cells.length < 60; i += 2) { const c = M.fill.order[i]; cells.push([((c % W) + 0.5) * TS, ((c / W | 0) + 0.5) * TS, M.fill.d[i]]); }
         b.cells = cells;
       } catch (e) { /* worked out when it's played, then */ }
@@ -525,7 +527,7 @@ export const Highlights = (() => {
   }
   // The paths of a burst's chips that went into someone (js/player.ts fragDone, sent on to the squad: js/game.ts 'npath'), at most 48
   function fragPaths(s: number, ps: ShotPath[]) {
-    if (G.Game.phase !== 'level' || G.Game.hub || !s || !Array.isArray(ps)) return;
+    if (ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub || !s || !Array.isArray(ps)) return;
     let b = R.booms.get(s);
     if (!b) R.booms.set(s, (b = { t: -1, a: null, p: ps[0] && Array.isArray(ps[0].p) && ps[0].p[0] ? ps[0].p[0].slice(0, 3) : [0, 0, 0], s, nade: null, paths: [] })); // (its boom yet to come: when, from that)
     for (const q of ps) if (b.paths.length < 48 && q && Array.isArray(q.p) && q.p.length > 1 && Array.isArray(q.hit)) b.paths.push({ p: q.p, ev: [], hit: q.hit } as ShotPath);
@@ -535,7 +537,7 @@ export const Highlights = (() => {
   // counted, its frames carried on, and the clip a multi-kill (fl.multi) once there are two. True when it was one.
   function nadeKill(m: HlKillMsg) {
     const s = m.gr, b = s ? R.booms.get(s) : null, v = 'e' + m.e;
-    if (!b || G.Game.phase !== 'level' || G.Game.hub) return false;
+    if (!b || ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub) return false;
     const by = b.a || 'p' + m.by, d = b.t >= 0 && R.t - b.t < 1.5 ? b.t + 0.004 : R.t; // (dead as the chips get there: they take milliseconds)
     let c = R.clips.find((x) => x.boom === b);
     if (c) {
@@ -559,7 +561,7 @@ export const Highlights = (() => {
   // A flashbang went off (the host's word, js/game.ts onFlash: n, its number; by, whose): kept, as a clip of its own (not one to show by
   // itself: the seconds before it and the couple after, of everyone near), for the kills of those it blinded to open with
   function flash(m: { p: number[]; n?: number; by?: string | null }) {
-    if (G.Game.phase !== 'level' || G.Game.hub || !m.n || !Array.isArray(m.p) || R.flashes.has(m.n)) return;
+    if (ReplayEnv.Game!.phase !== 'level' || ReplayEnv.Game!.hub || !m.n || !Array.isArray(m.p) || R.flashes.has(m.n)) return;
     const p = new T.Vector3(m.p[0], m.p[1], m.p[2]), a = m.by ? 'p' + m.by : null, keys = new Set<string>(a ? [a] : []), from = R.t - 1.6, last = R.ring[R.ring.length - 1];
     if (last) for (const [j, q] of Object.entries(last.a)) if (Math.hypot(q[0] - p.x, q[2] - p.z) < NEAR) keys.add(j);
     const fx: HlFlashFx = { t: R.t, a, p: m.p.slice(0, 3), n: m.n, nade: throwOf(a, m.p, 'flash') };
@@ -644,7 +646,7 @@ export const Highlights = (() => {
     P.mat = mat;
     const dark = new T.MeshStandardMaterial({ color: 0x0c0d0f, roughness: 0.4, metalness: 0.3 }), steel = new T.MeshStandardMaterial({ color: 0x3a3e44, roughness: 0.5, metalness: 0.6 });
     const at = helpers && helpers.at, tvs = at ? TVS.map((_, i) => { const a = at('tv', i); return [a.position.x, a.position.y, a.position.z, (a.userData.ry as number) || 0, a.userData.w as number]; }) : TVS;
-    for (const [x, y, z, ry, w, cab] of tvs.concat([cabinTv(G.Hangar.HELI)])) {
+    for (const [x, y, z, ry, w, cab] of tvs.concat([cabinTv(ReplayEnv.Hangar!.HELI)])) {
       // tipped forward to face the eyes (1.6 m up) of someone standing about one and a third of its widths out, where it's
       // best watched: hinged at its bottom edge against the wall, its top held out by a strut
       const h = w * 9 / 16, tilt = cab ? Math.atan2(y - cab.eye[0], cab.eye[1]) : Math.atan2(y - 1.6, w * 1.33), g = new T.Group(), out = (h + 0.1) * Math.sin(tilt), top = y - h / 2 - 0.05 + (h + 0.1) * Math.cos(tilt);
@@ -711,7 +713,7 @@ export const Highlights = (() => {
     return null;
   }
   const canWorker = () => !!(window.Worker && window.OffscreenCanvas && window.VideoEncoder && window.VideoFrame);
-  const say = (t: string) => { if (G.HUD) G.HUD.toast('HIGHLIGHTS', t, 3); };
+  const say = (t: string) => { if (ReplayEnv.HUD) ReplayEnv.HUD.toast('HIGHLIGHTS', t, 3); };
   function save(blob: Blob, name: string) {
     const url = URL.createObjectURL(blob), a = document.createElement('a');
     a.href = url; a.download = name; document.body.append(a); a.click(); a.remove();
@@ -746,7 +748,7 @@ export const Highlights = (() => {
       for (const n of packStickers(P.actors)) { // (their pictures with it: the replay's guns as they were, wherever it's rendered)
         try { const r = await fetch(Stickers.url(n)); if (r.ok) files.push({ name: 'stickers/' + n, data: new Uint8Array(await r.arrayBuffer()) }); } catch (e) { /* that one's left out */ }
       }
-      const blob = await G.Zip.write(files), name = packName() + '.zip';
+      const blob = await ReplayEnv.Zip!.write(files), name = packName() + '.zip';
       save(blob, name);
       say(`Saved ${name} (${Math.max(1, Math.round(blob.size / 1024))} kB): render it to a video from the main menu`);
     } catch (e) { console.warn('highlights: the recording couldn\'t be saved', e); say('The recording couldn\'t be saved'); }
@@ -810,7 +812,7 @@ export const Highlights = (() => {
     if (P.exporting) throw new Error('A video is already being made');
     if (!canWorker() || !window.Worker) throw new Error('This browser can\'t make video files (it needs WebCodecs and OffscreenCanvas: a recent Chrome, Edge or Firefox)');
     report('Reading the recording...', null);
-    const files = await G.Zip.read(file), json = files.get('highlights.json');
+    const files = await ReplayEnv.Zip!.read(file), json = files.get('highlights.json');
     if (!json) throw new Error('That isn\'t a highlights recording (no highlights.json in it)');
     const data = fromJSON(new TextDecoder().decode(json));
     if (!data || !data.gen || !Array.isArray(data.prog)) throw new Error('That recording is damaged');
@@ -825,7 +827,7 @@ export const Highlights = (() => {
     const vc = await videoCodec();
     if (!vc) throw new Error('No video encoder available');
     const X: any = P.exporting = { p: 0, cancel: false };
-    if (G.Audio.init) G.Audio.init(); // (the crowd's sounds: mixed offline, but from the samples the game's loaded)
+    { const AU = ReplayEnv.Audio!; if (AU.init) AU.init(); } // (the crowd's sounds: mixed offline, but from the samples the game's loaded)
     const hadAu = !!P.au; audio(true); if (P.au && !hadAu) P.au.out.gain.value = 0;
     const tick = setInterval(() => report(X.stage === 'audio' || X.stage === 'mix' || X.stage === 'opus' || X.stage === 'flush' ? 'Mixing the sound...' : X.p >= 0.97 ? 'Putting the file together...' : `Rendering: ${Math.round(X.p / 0.9 * 100)}%`, Math.min(1, X.p)), 250);
     try {
@@ -918,7 +920,7 @@ export const Highlights = (() => {
     const d = revive(m.data);
     for (const [n, bm] of Object.entries(m.stickers || {})) Stickers.provide(n, bm); // (the stickers' pictures, from the file)
     const map = Level.generate(d.gen.seed, d.gen.level, d.gen.th, !!d.gen.night);
-    G.Game.map = map;
+    ReplayEnv.Game!.map = map;
     P.map = map; P.level = new T.Group(); P.level.add(LevelView.build(map));
     Object.assign(P, { clips: d.clips, stats: d.stats, actors: d.actors, fired: d.fired, kgun: d.kgun, glass: d.glass, levelN: d.levelN, theme: d.theme });
     P.prog = [];
@@ -973,11 +975,11 @@ export const Highlights = (() => {
   // can: otherwise the video goes without)
   async function mixAudio(events: any[][], dur: number, X: Partial<HlExport> = {}) {
     const audio: HlChunk[] = []; let head: any = null;
-    if (!P.au || !G.Audio.ctx || !window.OfflineAudioContext || !window.AudioEncoder) return { audio, head };
+    if (!P.au || !ReplayEnv.Audio!.ctx || !window.OfflineAudioContext || !window.AudioEncoder) return { audio, head };
     try {
       const off = new OfflineAudioContext(2, Math.ceil(48000 * (dur + 0.5)), 48000);
       const dest = off.createGain(); dest.connect(off.destination);
-      const bed = G.Audio.samples.crowd_bed;
+      const bed = ReplayEnv.Audio!.samples.crowd_bed;
       if (bed) { const b = off.createBufferSource(), g = off.createGain(); b.buffer = bed; b.loop = true; g.gain.value = 0.12; b.connect(g); g.connect(dest); b.start(0); }
       Object.assign(AT, { ctx: off, dest, t: 0, d: 0 });
       try {
@@ -1064,9 +1066,9 @@ export const Highlights = (() => {
     ammo: 'Loaded with bad news.', part: 'Bolt it on. Feel better instantly.', mag: 'More rounds between awkward pauses.', pouch: 'A place for everything. Everything in its place.',
   };
   function storeProducts() {
-    const S = G.Shop, O = S && S.offers, out: HlProduct[] = [];
+    const S = ReplayEnv.Shop, O = S && S.offers, out: HlProduct[] = [];
     if (!O) return out;
-    const pic = (it: Parameters<typeof Gear.size>[0]) => { try { const [w, h] = Gear.size(it), im = new Image(); im.src = G.Icons.of(it, w, h, false); return { im, w, h }; } catch (e) { return null; } };
+    const pic = (it: Parameters<typeof Gear.size>[0]) => { try { const [w, h] = Gear.size(it), im = new Image(); im.src = ReplayEnv.Icons!.of(it, w, h, false); return { im, w, h }; } catch (e) { return null; } };
     const add = (o: HlProduct) => { try { out.push(o); } catch (e) { /* skip it */ } };
     for (const id of O.gear || []) { const d = Gear.DEFS[id]; if (d) add({ kind: d.kind, name: d.name, brand: d.brand, price: S.gearPrice(id), pic: pic(Gear.gearItem(id)), left: () => S.count('gear:' + id) }); }
     for (const o of O.ammo || []) { const A = (AMMO as Record<string, any>)[o.am], C = (CALIBERS as Record<string, any>)[o.cal], it = Gear.boxItem(o.cal, o.am, o.n); if (A && C) add({ kind: 'ammo', name: `${C.name} ${A.name}`, brand: 'VEX\'S AMMO BIN', price: Gear.price(it), pic: pic(it), left: () => S.count('ammo:' + o.cal) * o.n, unit: 'rounds' }); }
@@ -1381,8 +1383,8 @@ export const Highlights = (() => {
     s.tau += dt * s.rate;
     // (the bodies fall onto the replayed level's floors and furniture: js/rig.ts collides with the game's map, the
     // hangar's while this plays, so it's this level's for the moment)
-    const gm = G.Game.map; G.Game.map = P.map;
-    try { actRigs(s, c, dt); } finally { G.Game.map = gm; }
+    const gm = ReplayEnv.Game!.map; ReplayEnv.Game!.map = P.map;
+    try { actRigs(s, c, dt); } finally { ReplayEnv.Game!.map = gm; }
     // the rounds fired in that stretch, and (slowed down) those in the air
     for (const sh of c.shots) if (sh.t > prev && sh.t <= s.tau) fire(sh, s);
     nadesAt(s, prev);
@@ -1581,16 +1583,16 @@ export const Highlights = (() => {
   function arcOf(n: HlNade, end: THREE.Vector3) {
     let pts = arcs.get(n);
     if (pts) return pts;
-    const gm = G.Game.map; G.Game.map = P.map;
+    const gm = ReplayEnv.Game!.map; ReplayEnv.Game!.map = P.map;
     try {
       const p0 = new T.Vector3(...(n.p as [number, number, number])), v0 = new T.Vector3(...(n.v as [number, number, number]));
       if (n.arc && n.arc.length > 1) pts = n.arc.map((q) => new T.Vector3(q[0], q[1], q[2])); // (as it flew: kept when it was thrown, nade)
-      else if (G.Views) pts = G.Views.predictNade(p0, v0, n.fuse, P.map);
+      else if (ReplayEnv.Views) pts = ReplayEnv.Views.predictNade(p0, v0, n.fuse, P.map);
       else { // (the video's worker has no js/views.ts: the same fall, with only the floor it lands on to stop it)
         pts = [p0.clone()];
         for (let t = 0, h = 1 / 60; t < n.fuse; t += h) { v0.y -= 14 * h; p0.addScaledVector(v0, h); if (p0.y < end.y) { p0.y = end.y; v0.y = 0; v0.x *= 0.9; v0.z *= 0.9; } pts.push(p0.clone()); }
       }
-    } finally { G.Game.map = gm; }
+    } finally { ReplayEnv.Game!.map = gm; }
     const d = end.clone().sub(pts[pts.length - 1]), N = Math.max(1, pts.length - 1);
     pts.forEach((q, i) => q.addScaledVector(d, i / N));
     arcs.set(n, pts);
@@ -1648,7 +1650,7 @@ export const Highlights = (() => {
       else if (B.tb) { // a thermobaric: its fireball through the room it filled (js/player.ts tbModel, against the replayed level), and the soot after
         let cells: number[][] = [];
         if (B.cells && B.cells.length) cells = B.cells.map((c) => c.slice()); // (as it went off: boom)
-        else try { const M = G.Me && G.Me.tbModel ? G.Me.tbModel(P.map, B.p) : null; if (M) for (let i = 0; i < M.cloud; i += 2) { const c = M.fill.order[i]; cells.push([((c % P.map.W) + 0.5) * Level.TS, ((c / P.map.W | 0) + 0.5) * Level.TS, M.fill.d[i]]); } } catch (e) { cells = []; }
+        else try { const M = ReplayEnv.Me && ReplayEnv.Me.tbModel ? ReplayEnv.Me.tbModel(P.map, B.p) : null; if (M) for (let i = 0; i < M.cloud; i += 2) { const c = M.fill.order[i]; cells.push([((c % P.map.W) + 0.5) * Level.TS, ((c / P.map.W | 0) + 0.5) * Level.TS, M.fill.d[i]]); } } catch (e) { cells = []; }
         if (!cells.length) cells = [[B.p.x, B.p.z, 0]];
         puff(0xffffff, 1.4, 0.02, 1, true);
         for (const [x, z, d] of cells.slice(0, 60)) {
@@ -1726,7 +1728,7 @@ export const Highlights = (() => {
     if (AT.rec) { AT.rec.push([AT.t + AT.d, 'g', { code: sh.code, am: sh.am }, { slow: !!s.slow, rate: s.rate }]); return; }
     const def = defOf(sh.code);
     if (!def || !P.au) return;
-    const c = actx(), t = anow(), GA = G.GunAudio, rate = s.slow ? G_U.clamp(0.45 + s.rate * 0.5, 0.45, 1) : 1;
+    const c = actx(), t = anow(), GA = ReplayEnv.GunAudio, rate = s.slow ? G_U.clamp(0.45 + s.rate * 0.5, 0.45, 1) : 1;
     let key = null; try { key = Gunsmith.roundSoundKey(def, sh.am || ballFor(calOf(def))); } catch (e) { /* no key */ }
     const spec = key && GA && GA.spec(key), buf = key && GA && GA.dry.get(key);
     if (!buf && spec && GA.available()) GA.buildDry(key);
@@ -2358,10 +2360,10 @@ export const Highlights = (() => {
     const dt = L.fallP ? G_U.clamp(tau - (L.lastTau == null ? tau : L.lastTau), 0.001, 0.05) : L.lastSt == null ? 0.05 : G_U.clamp(st - L.lastSt, 0.001, 0.1);
     L.lastSt = st; L.lastTau = tau;
     // (no level here to land on: the ground they stood on, at the floor of the picture)
-    const gm = G.Game.map; G.Game.map = null;
+    const gm = ReplayEnv.Game!.map; ReplayEnv.Game!.map = null;
     try {
       rig.update(dt, { pos: new T.Vector3(), yaw: 0, pitch: +p[4] || 0, crouch: !!(fl & 1), prone: !!(fl & 2), alert: !!(fl & 4) && !dead, lean: +p[6] || 0, pose: fl & 32 ? 'handsup' : fl & 64 ? 'cuffed' : fl & 128 ? 'cower' : null, state: dead ? 'dead' : fl & 8 ? 'down' : 'alive' });
-    } finally { G.Game.map = gm; }
+    } finally { ReplayEnv.Game!.map = gm; }
     rig.xkey = null;
   }
   function xrayFor(c: Clip, s: Seg) {
@@ -2698,7 +2700,7 @@ export const Highlights = (() => {
       const n = _b.set(0, 0, 1).applyQuaternion(tv.scr.getWorldQuaternion(new T.Quaternion())), v = cp.clone().sub(p), front = v.dot(n) / Math.max(1e-3, d);
       let k = G_U.clamp((tv.w * 3 - d) / (tv.w * 1.5), 0, 1) * G_U.clamp((front - 0.25) / 0.35, 0, 1);
       if (k > 0) {
-        if (P.losT <= 0 || tv.los == null) tv.los = Level.los(G.Game.map!, cp.x, cp.y, cp.z, p.x + n.x * 0.3, p.y, p.z + n.z * 0.3); // (a few times a second)
+        if (P.losT <= 0 || tv.los == null) tv.los = Level.los(ReplayEnv.Game!.map!, cp.x, cp.y, cp.z, p.x + n.x * 0.3, p.y, p.z + n.z * 0.3); // (a few times a second)
         if (!tv.los) k = 0;
       }
       vol = Math.max(vol, k);
@@ -3310,7 +3312,7 @@ export const Highlights = (() => {
 
   // ================================================================ sound: the crowd, the stingers, the presenters
   function audio(on: boolean) {
-    const A = G.Audio, c = A.ctx;
+    const A = ReplayEnv.Audio!, c = A.ctx;
     if (!on) { if (P.au) { try { P.au.bed!.stop(); } catch (e) { /* stopped */ } P.au.out.disconnect(); P.au.mix.disconnect(); P.au = null; } return; }
     if (!c || P.au) return;
     const out = c.createGain(); out.gain.value = 0; out.connect(A.master);
@@ -3323,17 +3325,17 @@ export const Highlights = (() => {
   }
   // under it all, a stadium's murmur on a loop (a recording: js/audio.ts crowd_bed), once it's loaded
   function bedOn() {
-    const A = G.Audio, buf = A.samples.crowd_bed;
+    const A = ReplayEnv.Audio!, buf = A.samples.crowd_bed;
     if (!P.au || P.au.bed || !buf) return;
     const bed = A.ctx.createBufferSource(), g = A.ctx.createGain(); bed.buffer = buf; bed.loop = true; g.gain.value = 0.12;
     bed.connect(g); g.connect(P.au.mix); bed.start(0, Math.random() * buf.duration);
     P.au.bed = bed;
   }
-  function audioLevel(v: number) { if (P.au) { bedOn(); P.au.out.gain.setTargetAtTime(v * 0.9, G.Audio.ctx.currentTime, 0.25); } }
+  function audioLevel(v: number) { if (P.au) { bedOn(); P.au.out.gain.setTargetAtTime(v * 0.9, ReplayEnv.Audio!.ctx.currentTime, 0.25); } }
   // Where a sound goes: live, into the TVs' mix now; or, while a video's being made, into its offline context at the
   // export's clock (AT.t; AT.d: how far ahead, for the reactions that come a moment later)
   const AT: any = { ctx: null, dest: null, t: 0, d: 0 };
-  const actx = () => AT.ctx || G.Audio.ctx, anow = () => (AT.ctx ? AT.t : G.Audio.ctx.currentTime) + AT.d, adest = () => AT.dest || P.au!.mix;
+  const actx = () => AT.ctx || ReplayEnv.Audio!.ctx, anow = () => (AT.ctx ? AT.t : ReplayEnv.Audio!.ctx.currentTime) + AT.d, adest = () => AT.dest || P.au!.mix;
   function later(d: number, f: () => void) { if (AT.ctx || AT.rec) { AT.d += d; try { f(); } finally { AT.d -= d; } } else setTimeout(f, d * 1000); }
   // a recorded crowd sound (js/audio.ts samples), into the TVs' sound; rate glides to rateEnd over the clip if given.
   // False when it isn't loaded (the synthesised one stands in)
@@ -3341,7 +3343,7 @@ export const Highlights = (() => {
   // `len` seconds of it; a synthesised sound no longer than SHORT)
   const QUIET = 0.35, SHORT = 0.8;
   function rec(name: string, gain = 1, rate = 1, rateEnd: number | null = null, delay = 0, len = 1.2) {
-    const A = G.Audio, buf = A.samples[name];
+    const A = ReplayEnv.Audio!, buf = A.samples[name];
     if (!buf || !P.au) return false;
     const c = actx(), t = anow() + delay, s = c.createBufferSource(), g = c.createGain(), end = Math.min(len, buf.duration);
     s.buffer = buf; s.playbackRate.setValueAtTime(rate * (0.97 + Math.random() * 0.06), t);

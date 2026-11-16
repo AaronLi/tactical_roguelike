@@ -3,8 +3,8 @@
 // drawn with, the files the worker's list (EXPORT_SCRIPTS) used to load, each run once, named in that list's order. A file runs when it is first imported,
 // so one that imports a file that comes later here has it run first; what must hold is that a file that reads another while it loads comes after it,
 // and tools/deps.mjs checks that (npm run deps:check). js/modelbundles.ts, which the page loads as a classic script, runs here as a module (the
-// same IIFE). The files that read another this worker does not load (js/highlights.ts, js/render.ts ...) still do it through G, as they did. The worker
-// sets its stand-ins (G.Game, G.Net, two hooks) once this has loaded, which an import of the page's own files would have bypassed.
+// same IIFE). The files that read another this worker does not load (js/highlights.ts, js/render.ts ...) read them through ReplayEnv (js/replayenv.ts), which the page's files set and this worker leaves empty. The worker
+// sets its stand-ins (ReplayEnv.Game, ReplayEnv.Net, two hooks) once this has loaded, which an import of the page's own files would have bypassed.
 import './util.js';
 import './medical.js';
 import './materials.js';

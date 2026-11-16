@@ -3,6 +3,7 @@ import { FurnMesh } from './furnmesh.js';
 import { Level } from './level.js';
 import { LevelDesc } from './leveldesc.js';
 import { LightGrid } from './lightgrid.js';
+import { ReplayEnv } from './replayenv.js';
 import { U } from './util.js';
 interface LvViewCtx { fm: LvMap; reg: Map<string, LvObj[]>; door: Record<string, LvObj[]> | null; geos: Map<LdGeo, THREE.BufferGeometry>; mats: (THREE.Material | null)[]; texs: (THREE.Texture | null)[]; D: LdDraw; map: LvMap }
 export const LevelView = {
@@ -32,7 +33,7 @@ export const LevelView = {
     const pool = !opts || opts.pool !== false;
     if (pool) { map.dmg = null; for (const d of map.doors || []) { d.holes = null; d.gone = null; d.fallen = false; d.rest = null; } } // (a fresh start: js/damage.ts)
     this.markHf = !!map.hub && !!opts && !!opts.hubFixed;
-    this.skipHf = !!map.hub && !this.markHf && !!(G.Hangar && G.Hangar.baked());
+    this.skipHf = !!map.hub && !this.markHf && !!(ReplayEnv.Hangar && ReplayEnv.Hangar.baked());
     const desc = map.desc!, D = desc.draw;
     const mats: (THREE.Material | null)[] = D.mats.map(() => null), texs: (THREE.Texture | null)[] = D.tex.map(() => null), geos = new Map<LdGeo, THREE.BufferGeometry>();
     const fms: LvMap[] = map.floors || [map];
@@ -117,7 +118,7 @@ export const LevelView = {
       if (isDoor) ctx.door = {};
       for (const c of n.c) this.node(c, o, ctx);
       if (isDoor) {
-        // a door's pivot: turned by how far open the door is (G.Game.updateDoors), its leaf, knobs and hinges for what hits them
+        // a door's pivot: turned by how far open the door is (ReplayEnv.Game.updateDoors), its leaf, knobs and hinges for what hits them
         const d = ctx.map.doors[+n.h!.slice(5)], H = ctx.door!, k = H.hk || [], p = H.hp || [];
         o.userData = { base: o.rotation.y, ang: d && d.open ? 1 : 0, sign: n.sg || 1, leaf: (H.leaf || [])[0], knobs: H.knob || [], hinges: k.map((q, i) => [q, p[i]]), slide: !!d && Level.slides(d), px: o.position.x, pz: o.position.z, w: (d && d.w) || Level.TS };
         if (!o.userData.slide) o.rotation.y = o.userData.base + (d && d.open ? Math.PI / 2 * 0.95 * (n.sg || 1) : 0);
