@@ -6,11 +6,12 @@ import { Audio } from './audio.js';
 import { Ballistics } from './ballistics.js';
 import { Bolts } from './bolts.js';
 import { Damage } from './damage.js';
-import { aimSway, AMMO, ammoOk, barrelMm, barrelsOf, boltHold, boreTip, calOf, capOf, chambered, dragOf, fblock, GRAVITY, loaded, loadFor, magFits, MODE_INFO, MODE_NAME, perOf, pickBarrels, REV, revolver, ROUND_LIFE, roundDef, roundOf, roundSpec, roundSpeed, shotDef, shotK, shotSoundKey, sightH, SUPPRESSOR, volleyVol, WEAPONS, zeroOf, zeroSlope } from './data.js';
+import { aimSway, AMMO, ammoOk, barrelsOf, boltHold, boreTip, calOf, capOf, chambered, dragOf, fblock, GRAVITY, loaded, loadFor, magFits, MODE_INFO, MODE_NAME, perOf, pickBarrels, REV, revolver, ROUND_LIFE, roundDef, roundOf, roundSpeed, shotDef, shotK, shotSoundKey, sightH, SUPPRESSOR, volleyVol, WEAPONS, zeroOf, zeroSlope } from './data.js';
 import { Footsteps } from './footsteps.js';
 import { Gear } from './gear.js';
 import { Models } from './glb.js';
 import { GunAudio } from './gunaudio.js';
+import { GunSounds } from './gunsounds.js';
 import { GunMaterials } from './gunmaterials.js';
 import { GunModels } from './gunmodels.js';
 import { Handling } from './handling.js';
@@ -286,7 +287,7 @@ export const Me = {
     this.slot = slot; this.reloading = false; this.inspectT = 0; this.burstQ = 0;
     G_R.setViewmodel(w.def);
     this.raiseT = this.raiseMax = this.drawTime();
-    if (GunAudio.available()) { GunAudio.buildDry(w.def.soundKey); GunAudio.buildDry(Gunsmith.roundSoundKey(w.def, w.chamber || w.ammo)); if (w.def.barrels) for (const k of Object.keys(w.def.barrels.rounds)) { const sd = roundSpec(w.def, k); for (const mm of barrelMm(w.def, k)) GunAudio.buildDry(shotSoundKey(sd, mm, w.ammo)); } } // (a gun of several barrels: a report for each effective length)
+    GunSounds.acquire(w); // (its reports: the round in it now at once, its other loads behind; a gun of several barrels has one for each effective length)
     Audio.pickup();
     HUD.toast('', msg, 2);
   },
@@ -332,6 +333,7 @@ export const Me = {
     w.mag = Math.min(w.mag, this.magSize(w));
     Gear.refitMags(this, def);
     if (w.tube) w.tube.length = Math.min(w.tube.length, w.mag);
+    GunSounds.acquire(w); // (a part fitted or taken off can change its report: a muzzle device, a barrel)
   },
   // Another gun's receiver kit went in: it's that gun now (Gunsmith.convert). The parts that came off go to
   // your locker (the old gun's own barrel and such go with its kit); what was loaded stays only if the new gun
@@ -355,6 +357,7 @@ export const Me = {
     if (keep) { w.mag = Math.min(w.mag, this.magSize(w)); if (w.tube) w.tube.length = Math.min(w.tube.length, w.mag); }
     if (!chambered(def)) { if (w.chamber) { w.tube.push(w.chamber); w.mag++; } w.chamber = null; } // (no chamber of its own: into the magazine)
     if (this.cur && this.cur() === w && G_R && G_R.vm && Game.phase === 'level') G_R.setViewmodel(def);
+    GunSounds.acquire(w); // (another gun now: its reports)
     const misfit = (def.misfit || []).map((s: string) => GS.PARTS[def.build[s]].name);
     if (HUD) HUD.toast('', `Your ${old.name} is now a ${def.name}${keep ? '' : a0.kind === 'mag' && a1.kind === 'mag' ? ', its magazine out' : ''}${misfit.length ? `. It won't fire until you replace: ${misfit.join(', ')}` : ''}`, 3.5);
   },
@@ -1491,7 +1494,7 @@ export const Me = {
     if (!chambered(w.def) || w.chamber || w.mag <= 0) return false;
     w.chamber = w.tube && w.tube.length ? w.tube.pop()! : w.ammo;
     w.mag--;
-    if (GunAudio.available()) GunAudio.buildDry(Gunsmith.roundSoundKey(w.def, w.chamber)); // (its report ready for the shot: a no-op once it is)
+    GunSounds.chambered(w.def, w.chamber); // (its report ready for the shot: a no-op once it is, first in line if it's waiting)
     return true;
   },
   // working the action by hand: a round from the magazine into the chamber (a moment, both hands; a bolt gun's

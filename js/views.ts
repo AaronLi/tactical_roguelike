@@ -9,6 +9,7 @@ import { AMMO, ballFor, calOf, CLASS_SND, dragOf, ENEMIES, roundSpec, roundSpeed
 import { Footsteps } from './footsteps.js';
 import { Glare } from './glare.js';
 import { GunAudio } from './gunaudio.js';
+import { GunSounds } from './gunsounds.js';
 import { GunModels } from './gunmodels.js';
 import { Handling } from './handling.js';
 import { Level } from './level.js';
@@ -177,7 +178,7 @@ export const Views = {
   applySnap(m: any) {
     const fillT = performance.now();
     if (this._invWarm !== Game.map) { this._invWarm = Game.map; setTimeout(() => InvUI.warm(), 30); } // (the Tab screen's pictures, once a level however it came up: InvUI.warm)
-    if (!this.warmed) { this.warmed = true; Game.veilSay('Compiling shaders'); setTimeout(() => R.warmup(() => { Game.veilN = Game.VEIL_SMOOTH; Game.veilWait = 0; }), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
+    if (!this.warmed) { this.warmed = true; Game.veilSay('Compiling shaders'); setTimeout(() => R.warmup(() => GunSounds.hold((t) => Game.veilSay(t)).then(() => { Game.veilN = Game.VEIL_SMOOTH; Game.veilWait = 0; })), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
     for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd, fc = 0, rd = 0] of m.e) {
       seen.add(id);
@@ -227,6 +228,7 @@ export const Views = {
       if (id === Net.myId) continue;
       const pv = this.players.get(id);
       if (!pv) continue;
+      if (st.w && st.w !== (pv.st && pv.st.w)) GunSounds.acquireCode(st.w); // (another gun in their hands: its report ready before the first shot)
       pv.st = st;
       if (pv.first) { pv.pos.set(st.p[0], st.p[1], st.p[2]); pv.yaw = st.yw; pv.first = false; }
       if (st.kt) pv.rig.setKit(st.kt); // their helmet, carrier, belt, pack... as they're wearing them

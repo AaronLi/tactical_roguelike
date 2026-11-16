@@ -4,7 +4,7 @@ import { Ballistics } from './ballistics.js';
 import { Callsigns } from './callsigns.js';
 import { AMMO, barrelsOf, beltFed, calOf, cartOf, chambered, loaded, magFits, roundOf, WEAPONS } from './data.js';
 import { Gear } from './gear.js';
-import { GunAudio } from './gunaudio.js';
+import { GunSounds } from './gunsounds.js';
 import { HUD } from './hud.js';
 import { Icons } from './icons.js';
 import { Med } from './medical.js';
@@ -345,8 +345,7 @@ export const InvUI = (() => {
   // a part off a gun: the parts that hung off it come off too (to your locker)
   function setBuild(me: Me, w: Wpn, build: Record<string, string>) {
     for (const r of GS().prune(w.def.id, build)) me.stash[r] = (me.stash[r] || 0) + 1;
-    me.refit(w, build);
-    if (GunAudio.available()) GunAudio.buildDry(w.def.soundKey);
+    me.refit(w, build); // (which has its report made: GunSounds.acquire)
   }
   // why it can't come off (a required part), or null
   function cantDetach(src?: Src): any;
@@ -660,7 +659,7 @@ export const InvUI = (() => {
     return true;
   }
   function setSlot(me: Me, s: string, it: Item) {
-    if (WSLOT[s]) { me.weapons[WSLOT[s]] = it.w; if (!me.weapons[me.slot]) me.slot = WSLOT[s]; }
+    if (WSLOT[s]) { me.weapons[WSLOT[s]] = it.w; if (!me.weapons[me.slot]) me.slot = WSLOT[s]; GunSounds.acquire(it.w); } // (a gun into your hands: its reports)
     else if ((GG().MOUNTS as Rec)[s]) GG().mountOn(me, s)[s] = it; else me.kit[s] = it;
   }
   function unbindDrag() { window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', drop); window.removeEventListener('pointercancel', cancelDrag); window.removeEventListener('pointerdown', onFinger, true); window.removeEventListener('keydown', onKey); Touch.dragEnd(); }
