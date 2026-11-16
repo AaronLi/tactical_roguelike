@@ -20,14 +20,14 @@ to the simulation the way a remote player's does, with the same messages; it rea
 
 | File | Where it runs | What it does |
 | --- | --- | --- |
-| `js/serverworker.ts` | worker | The worker's entry: loads three.js (`js/threeboot.ts`, as the page does) and the simulation's scripts with one `import()` after another (a module worker, `js/serverlink.ts`), then hands its control port to `G.ServerHost`. |
+| `js/serverworker.ts` | worker | The worker's entry: loads three.js (`js/threeboot.ts`, as the page does) and then imports one file, `js/serverhost.ts` (a module worker, `js/serverlink.ts`): the simulation's files are its imports, run in the order the module graph gives, then it hands its control port to `G.ServerHost`. |
 | `js/serverhost.ts` | worker (or page) | `G.ServerHost`: feeds the simulation what comes in on its two ports, ticks it, carries its word out (it wires `SvNet`, the simulation's only way out). |
 | `js/serverlink.ts` | page | `G.ServerLink`: starts the worker as the page loads, opens a session when you host (`start`) and closes it (`stop`), sends your game's messages to it (`toServer`), relays the remote players' both ways. |
 | `js/sim.ts` | both | `G.Sim`: pure reckonings both sides need (a grenade's flight, a round's arc, a blast's reach and a thermobaric's dose, a weapon as built, an officer's look cleaned, the cabinet and locker grids, the veil's time). They used to live in files that draw; those hand on to it. |
 
-The worker loads `util, data, callsigns, arsenal, parts, gear, medical, sim, materials, ballistics, level, leveldesc, world,
-furnspec, furniture, homes, residents, scars, damage, stickers, route, shop, recorder, server, serverhost` (`SERVER_SCRIPTS` in
-`js/serverworker.ts`): the data, the rules of guns, gear and medicine, the level as it's generated, collided with and seen
+The worker loads `util, medical, materials, data, spacedata, shipgen, callsigns, arsenal, parts, gear, sim, world, ballistics, leveldesc, level,
+furnspec, furniture, homes, residents, scars, damage, stickers, route, shop, recorder, server, spaceserver, serverhost` (what `js/serverhost.ts`, its entry
+file, imports: there is no list of them any more): the data, the rules of guns, gear and medicine, the level as it's generated, collided with and seen
 through, the shop's stock reckoning, the recorder. Nothing that draws or plays loads there (no renderer, rigs, views, viewmodel, HUD,
 icons, sound, PeerJS); the furniture's solids come from its pieces (`js/furniture.ts solids`), and what the pieces look
 like (`js/furnspec.ts`, [furniture-data.md](furniture-data.md)) is only described where it's drawn. three.js still loads, because a

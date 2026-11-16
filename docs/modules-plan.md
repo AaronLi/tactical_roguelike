@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2 and 3 done (phase 3: 2026-11-16); phase 4 started (part a, 2026-11-16: the node tools, the codemod, the first 11 leaves; part b, 2026-11-16: 14 more files, 25 in all); `server`, `spaceserver`, `serverhost`, the deletion of the lists, and 5 to 7 not started. Written 2026-11-15.
+Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); 5 to 7 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -327,6 +327,77 @@ Run the codemod (`node tools/codemod_imports.mjs js/foo.ts`, usage at the top of
 - **Checks:** typecheck, `deps:check`, `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:models`, `test:cloud` 21/21;
   smoke 10/10 (one case per process); on the page `G.ServerLink.mode === 'worker'` with 17 hooks, the prep worker built a level and
   its light grid, the export worker booted (a one-off script, not kept).
+
+#### Phase 4 results (part c)
+
+Phase 4 is done: the workers' lists are gone, the simulation's files import each other, the tools load the entry files.
+
+- **Converted, 5 more (30 in all, and `residents` by its imports):** `server`, `spaceserver`, `serverhost`, and `furnmesh` and
+  `lightgrid` (not in the plan's order, but the prep worker loaded them: a module's reads of `G.FurnSpec`, `G.Level` and `G.Homes`
+  became imports). The codemod, then `--uses --force-order` on every converted file, since with the lists gone "the lists load it
+  later" is no reason to leave a `G.X`.
+- **The workers import one file each, and nothing else but three.js.** `js/serverworker.ts` is `import('./threeboot.js').then(() =>
+  import('./serverhost.js'))`; `js/prepworker.ts` the same with `./prepentry.js`, a new file of side-effect imports (the prep worker has no
+  file of its own to be the entry, as the server has `serverhost`). They are `import()`s, not static imports, because a static import
+  runs before the worker has set `window` and `document` (files read them as they load). `SERVER_SCRIPTS` and `PREP_SCRIPTS` are deleted. Each
+  entry file names every file its list had, in the list's order (27 in `serverhost.ts`, `serverhost` itself being the 28th; 22 in `prepentry.ts`), so nothing dropped out and
+  `residents` (an IIFE with no export, which nothing imports) still runs. `EXPORT_SCRIPTS`, `index.html` and the tools' own lists stay
+  lists (they name page files that are not modules yet: phase 5) and are checked the same way.
+- **Evaluation order is not the list's any more, on purpose, and is checked.** A module runs when it is first imported (depth first), so
+  where `level` imports `homes` and `furniture` the two run before `level`. Observed with a one-off log at the top of every compiled file
+  (not kept; the page's and the worker's graph is the same one):
+
+  | | order the server worker (and node's `test:sim`) ran the files in |
+  | --- | --- |
+  | before (the list) | util medical materials data spacedata shipgen callsigns arsenal parts gear sim world ballistics leveldesc level furnspec furniture homes residents scars damage stickers route shop recorder server spaceserver serverhost |
+  | after | util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical callsigns arsenal furnspec residents route shop recorder spaceserver server serverhost |
+
+  The prep worker's is the same with `furnmesh lightgrid prepentry` after `residents` and without the rest. The forward imports that
+  cause it (a file imports one the list had later): `medical` and `arsenal` import `ballistics`; `materials`, `spacedata`, `shipgen` and
+  `sim` import `level` (the last three `world` too); `gear` imports `sim` and `stickers`; `world` and `leveldesc` import `damage`, `level`
+  and each other; `level` imports `furniture` and `homes`; `furnspec` imports `furniture`; `recorder` imports `server`; `server` imports
+  `spaceserver` and `serverhost`. Every one of those uses is inside a function. **Why the new order is safe:**
+  - the only things a file reads from another *while loading* are these (besides `util`), and each target runs first (checked by `tools/deps.mjs`,
+    which now counts the use of an imported name as a use, not only `G.X`): `ballistics`<-`materials`, `furnmesh`<-`furnspec`,
+    `homes`<-`furniture`, `parts`<-`data`, `residents`<-`furniture` and `homes`, `server`<-`sim`, `spacedata`<-`data`,
+    `spaceserver`<-`spacedata`. The one import that would have broken a need was `data` importing `parts` (parts reads `data` while
+    loading, so `parts` would run first): that was tried, caught by the order check, and put back as `G.Gunsmith`.
+  - no file draws a random number while loading (every `Math.random` in the simulation is inside a function), so the stream a run
+    starts from is the same; `test:sim` (4/4, the same untouched golden: bit-identical fingerprints) and `test:level` (31/31) agree.
+  - no file looks through `G` for what is registered (`Object.keys(G)` and the like: none), so the order files register in does not show.
+  - the one file that adds to another's tables as it loads, `residents` (to `furniture`'s `R` and `homes`' `RESIDENTS`), still runs after
+    both, and the files that read those tables read them when a level is made.
+- **`G.X` reads left between simulation files: one.** `data` reads `G.Gunsmith` (`parts`) in `shotSoundKey`, `chambered`, `revolver`,
+  `fblock` and `boltHold` (all but the first already `G.Gunsmith &&`-guarded): `parts` reads `data` while it loads, so `data` cannot import `parts`.
+  Between the simulation and the page there is none (the hooks). The workers read `G.ServerHost`, `G.Level` and `G.LightGrid` after
+  the entry file has loaded (they cannot import them: see above). `gear`'s `typeof G.Me` is a type of a page file.
+- **The tools find the files by the entry file.**
+  - `tools/check_sim_golden.mjs` runs `serverhost` (the rest follows its imports) instead of parsing `SERVER_SCRIPTS`.
+  - `tools/level_env.mjs`'s `LEVEL_SCRIPTS` is `prepentry`, `scars`, `stickers` (the 22 of before).
+  - `tools/ship_layout.mjs` (it loaded `util`, `data`, `spacedata`) needed `THREE` in its context: `spacedata` imports `level`, which
+    reaches `damage`, which reads it while loading.
+  - `tools/codemod_imports.mjs` no longer reads the worker lists (the simulation's files are `SIMULATION` in `deps.mjs`).
+  - `tools/vm_game.mjs` stays: each tool still makes a game of its own, with its own `G`.
+- **`tools/deps.mjs`** works the order out instead of reading it. An `import` no longer counts as "needed at load" (that made every
+  cycle a load cycle); what counts is a use while loading, of `G.X` or of an imported name (a bare `Level` in a top-level
+  statement or in a function called at load). For each loader it runs the module graph (`evalOrder`: depth first, once each, an
+  import of only types dropped as `tsc` drops it) from the loader's roots (index.html's tags, `EXPORT_SCRIPTS`, the tools' lists, and
+  the workers' entry files, read from their `import()`s), and checks every load-time need against that order, as before. The layering
+  check needs the simulation named now that no list does: it is `SIMULATION`, in the file, and the check fails if what the two entry
+  files reach is not exactly that (so a page file imported by a simulation file is an error, not a quiet new simulation file; tried
+  with `import ... from './audio.js'` in `scars`). The inventory is regenerated: 91 files, six orders consistent, no load-time cycle.
+- **Stand-ins re-checked, none bypassed:** `exportworker`'s `G.Game`, `G.Net` and its two hooks (`Hooks` is the one object the files import,
+  and `G.Stickers.base` / `G.Models.setRoot` set properties on the objects they hold); `tools/cloud.test.mjs`'s `G.THEMES`, `G.Route`, `G.Net`,
+  `G.Arsenal`, `G.Callsigns` (it loads only `util`, `cloudconfig`, `career` and `cloud`, none of which imports); `tools/level_env.mjs`'s
+  `G.Range` and hook, `tools/check_furniture_golden.mjs`'s hook (only page files read `G.Range`). `index.html` and `tools/model_env.mjs`
+  still load their lists of modules and the page files that are not, in an order the check passes.
+- **Checks:** typecheck, `deps:check`, `deps` (six orders consistent), `test:level` 31/31, `test:sim` 4/4 (golden untouched),
+  `test:models` (every golden, including the hangar and furniture ones and `bake_ships --check`), `test:cloud` 21/21; smoke 10/10 (one
+  case per process). On the page `G.ServerLink.mode === 'worker'` (the server's thread really runs in its worker, 17 hooks set), the prep
+  worker built a level and its light grid, the export worker booted (a one-off script, not kept).
+- **Not reproduced exactly / noted:** nothing behavioural. The files evaluate in another order (above).  `lightgrid` and `furnmesh` are modules now, so the page's
+  `G.LightGrid` and `G.FurnMesh` are the same objects as the exports. Left for phase 5: the page files that still read the simulation
+  through `G.X` (`G.Level`, `G.Server`, ... in `game`, `render`, `hud`...), the three lists that are left, and `index.html`.
 
 ### 5. Convert the page side
 
