@@ -23,6 +23,8 @@
     "test:models:full": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_model_cases.mjs --quiet --sweep --held 10000",
     "test:level": "tsc -p . && node tools/check_level_golden.mjs --quiet",
     "test:sim": "tsc -p . && node tools/check_sim_golden.mjs",
+    "build:wasm": "node tools/build_wasm.mjs",
+    "test:acoustics": "tsc -p . && node tools/acoustics_wasm.test.mjs",
     "deps": "node tools/deps.mjs",
     "deps:check": "node tools/deps.mjs --check",
     "smoke": "node tools/smoke.mjs",

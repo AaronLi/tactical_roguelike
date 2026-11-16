@@ -1,0 +1,17 @@
+[package]
+name = "acoustics"
+version = "0.1.0"
+edition = "2021"
+description = "The acoustic ray tracer's hot loop (js/acoustics.ts, tracer().rays), for js/acousticswasm.ts. No dependencies."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
+panic = "abort"
+codegen-units = 1

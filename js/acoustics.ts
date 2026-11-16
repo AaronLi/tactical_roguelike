@@ -4,6 +4,7 @@ import { Audio } from './audio.js';
 import { Level } from './level.js';
 import { Materials } from './materials.js';
 import { U } from './util.js';
+import { AcWasm, ZCOL, type WasmScene } from './acousticswasm.js';
 interface AcZone {
   id: number; f: number; out: boolean; tiles: number; area: number; height: number; volume: number; surface: number;
   /** how much of what strikes its surfaces they take (0..1): from what its rooms are (ROOM_ALPHA), area-weighted */
@@ -271,12 +272,39 @@ export const Acoustics = (() => {
   const TR = { RAYS: 500, BIN: 0.002, MAX_T: 3.5, MIN_E: 2e-4, SCATTER: 0.35, C: 343, EARLY: 0.08, DOOR_H: 2.1, WIN_A: 0.04, DOOR_A: 0.1 };
   const traces = new WeakMap<LvMap, Map<string, AcTrace>>();
   /** cosine-weighted scatter round a face's normal (axis 0 x, 1 y, 2 z; sign s) */
-  function scatterDir(axis: number, s: number): [number, number, number] {
-    const u = Math.random(), v = Math.random() * Math.PI * 2, r = Math.sqrt(u), a = r * Math.cos(v), b = r * Math.sin(v), n = Math.sqrt(1 - u) * s;
+  function scatterDir(rnd: () => number, axis: number, s: number): [number, number, number] {
+    const u = rnd(), v = rnd() * Math.PI * 2, r = Math.sqrt(u), a = r * Math.cos(v), b = r * Math.sin(v), n = Math.sqrt(1 - u) * s;
     return axis === 0 ? [n, a, b] : axis === 1 ? [a, n, b] : [a, b, n];
   }
-  /** a measurement as a piece of work: rays(n) sends the next n (true once they've all gone), finish() makes the trace */
-  function tracer(map: LvMap, f: number, x0: number, y0: number, z0: number, zi: number): { rays: (n: number) => boolean; finish: () => AcTrace } {
+  /**
+   * A floor flattened for the WebAssembly tracer (js/acousticswasm.ts), kept for the map and floor: the tiles, the zones, the doors' cells
+   * and the windows. What changes between traces is only which doors are open (read at each rays(n)); a floor whose door count
+   * has changed is flattened again.
+   */
+  const scenes = new WeakMap<AcMapData, Map<number, { sc: WasmScene; doors: LvDoor[] }>>();
+  function sceneOf(map: LvMap, d: AcMapData, f: number) {
+    let m = scenes.get(d); if (!m) { m = new Map(); scenes.set(d, m); }
+    const fms = map.floors || [map], fm = fms[f], W = map.W, N = W * map.H, doors = fm.doors || [], hit = m.get(f);
+    if (hit && hit.doors.length === doors.length) return hit;
+    const Z = d.zones, nz = Z.length, zones = new Float64Array(ZCOL.length * nz), flags = new Uint8Array(N), doorAt = new Int32Array(N).fill(-1);
+    for (let k = 0; k < nz; k++) {
+      const q = Z[k], col = [q.out ? 1 : 0, q.height, q.ac, q.af, q.acL, q.afL, q.aw, q.awL, lossOf(q, false), lossOf(q, true)];
+      for (let c = 0; c < col.length; c++) zones[c * nz + k] = col[c];
+    }
+    for (let i = 0; i < N; i++) if (fm.t[i] === 5) flags[i] = 1;
+    const winAt = fm.winAt as { has?: (i: number) => boolean; keys?: () => Iterable<number> } | undefined;
+    if (winAt && winAt.has) { if (winAt.keys) { for (const i of winAt.keys()) if (i >= 0 && i < N) flags[i] |= 2; } else for (let i = 0; i < N; i++) if (winAt.has(i)) flags[i] |= 2; }
+    doors.forEach((dr, k) => { for (const c of dr.cells || [dr.tz * W + dr.tx]) doorAt[c] = k; });
+    const sc = AcWasm.scene({ w: W, h: map.H, f, ts: TS(), fy: fm.fy || 0, buildingTop: (fm.fy || 0) + WALL() * (fms.length - f), flags, zoneAt: d.zoneAt[f], doorAt, zones, nz, nd: doors.length });
+    const e = { sc, doors: doors.slice() }; m.set(f, e);
+    return e;
+  }
+  /** energy lost per metre in a zone: what's in it, and the air (the lows: the air hardly takes any) */
+  const lossOf = (q: AcZone, low: boolean) => low ? (q.out ? AIR_M_LOW : (q.contentL * q.area + 4 * AIR_M_LOW * q.volume) / (4 * q.volume)) : (q.out ? AIR_M : (q.content * q.area + 4 * AIR_M * q.volume) / (4 * q.volume));
+  /** what a test can ask of a measurement: its random numbers (the JavaScript tracer's; Math.random in the game), the module's seed for the same draws, or the JavaScript tracer whatever AcWasm says */
+  interface TraceOpts { rng?: () => number; seed?: number; js?: boolean; raw?: { hist?: Float64Array; histL?: Float64Array } }
+  /** a measurement as a piece of work: rays(n) sends the next n (true once they've all gone), finish() makes the trace. WebAssembly does the rays when it's there (AcWasm.ready), else the loop below. */
+  function tracer(map: LvMap, f: number, x0: number, y0: number, z0: number, zi: number, opt?: TraceOpts): { rays: (n: number) => boolean; finish: () => AcTrace; wasm: boolean } {
     const d = of(map), fms = map.floors || [map], fm = fms[f], at = d.zoneAt[f], t = fm.t, W = map.W, H = map.H, ts = TS(), wh = WALL();
     const fy = fm.fy || 0, Z = d.zones, zone = Z[zi], NB = Math.ceil(TR.MAX_T / TR.BIN), hist = new Float64Array(NB), histL = new Float64Array(NB), early: [number, number][] = [];
     const doorAt = new Map<number, LvDoor>(); for (const dr of fm.doors || []) for (const c of dr.cells || [dr.tz * W + dr.tx]) doorAt.set(c, dr);
@@ -285,11 +313,12 @@ export const Acoustics = (() => {
     // (energy lost per metre in each zone: what's in it, and the air; the lows: the air hardly takes any. Worked out once a
     // measurement, not at every leg of every ray)
     const lossZ = new Float64Array(Z.length), lossLZ = new Float64Array(Z.length);
-    for (let k = 0; k < Z.length; k++) { const q = Z[k]; lossZ[k] = q.out ? AIR_M : (q.content * q.area + 4 * AIR_M * q.volume) / (4 * q.volume); lossLZ[k] = q.out ? AIR_M_LOW : (q.contentL * q.area + 4 * AIR_M_LOW * q.volume) / (4 * q.volume); }
+    for (let k = 0; k < Z.length; k++) { lossZ[k] = lossOf(Z[k], false); lossLZ[k] = lossOf(Z[k], true); }
     const outWallA = zone.out ? zone.aw : 0.03, outWallAL = zone.out ? zone.awL : 0.02;
+    const rnd = (opt && opt.rng) || Math.random;
     let sent = 0;
-    const rays = (n: number) => { for (const end = Math.min(TR.RAYS, sent + n); sent < end; sent++) {
-      const u = 2 * Math.random() - 1, ph = Math.random() * Math.PI * 2, sq = Math.sqrt(1 - u * u);
+    const jsRays = (n: number) => { for (const end = Math.min(TR.RAYS, sent + n); sent < end; sent++) {
+      const u = 2 * rnd() - 1, ph = rnd() * Math.PI * 2, sq = Math.sqrt(1 - u * u);
       let dx = sq * Math.cos(ph), dy = u, dz = sq * Math.sin(ph), px = x0, py = y0, pz = z0, e = 1, eL = 1, path = 0;
       for (let ev = 0; ev < 600; ev++) {
         const tx = Math.floor(px / ts), tz = Math.floor(pz / ts);
@@ -320,7 +349,7 @@ export const Acoustics = (() => {
           if (dy > 0 && out) break; // (out of doors: up into the sky)
           if (dy < 0 && f > 0 && t[i] === 5) break; // (a drop in the floor: down into the room below, out of this one)
           e *= 1 - (dy > 0 ? cz.ac : cz.af); eL *= 1 - (dy > 0 ? cz.acL : cz.afL);
-          if (Math.random() < TR.SCATTER) [dx, dy, dz] = scatterDir(1, dy > 0 ? -1 : 1); else dy = -dy;
+          if (rnd() < TR.SCATTER) [dx, dy, dz] = scatterDir(rnd, 1, dy > 0 ? -1 : 1); else dy = -dy;
           continue;
         }
         // into the next tile across: air (this zone's, another's: through an opening, or an open door), or a wall
@@ -335,9 +364,33 @@ export const Acoustics = (() => {
         else if (out) { a = outWallA; aL = outWallAL; }
         if (pass) { px += (axis === 0 ? sg : 0) * 1e-4; pz += (axis === 2 ? sg : 0) * 1e-4; continue; }
         e *= 1 - a; eL *= 1 - aL;
-        if (Math.random() < TR.SCATTER) [dx, dy, dz] = scatterDir(axis, -sg); else if (axis === 0) dx = -dx; else dz = -dz;
+        if (rnd() < TR.SCATTER) [dx, dy, dz] = scatterDir(rnd, axis, -sg); else if (axis === 0) dx = -dx; else dz = -dz;
       }
     } return sent >= TR.RAYS; };
+    // (the same rays in WebAssembly: its histograms are copied into hist, histL and early when the last has gone, and finish() is the same for both.
+    // If the module traps, it's given up and this measurement starts again in JavaScript)
+    let wt: ReturnType<WasmScene['trace']> | null = null, doorList: LvDoor[] = [], doorOn: Uint8Array | null = null;
+    if (!(opt && opt.js) && AcWasm.ready) {
+      try {
+        const e = sceneOf(map, d, f);
+        doorList = e.doors; doorOn = new Uint8Array(doorList.length);
+        wt = e.sc.trace(x0, y0, z0, zi, R2, outWallA, outWallAL, opt && opt.seed !== undefined ? opt.seed : (Math.random() * 4294967296) >>> 0);
+      } catch (err) { AcWasm.fail(String((err as Error)?.message || err)); wt = null; }
+    }
+    let viaWasm = !!wt;
+    const rays = (n: number): boolean => {
+      if (!wt) return jsRays(n);
+      try {
+        for (let k = 0; k < doorList.length; k++) { const dr = doorList[k]; doorOn![k] = dr.open || dr.fallen || dr.gone ? 1 : 0; }
+        const end = Math.min(TR.RAYS, sent + n), done = wt.rays(n, doorOn!); sent = end;
+        if (done) { const r = wt.take(); wt = null; hist.set(r.hist); histL.set(r.histL); for (const q of r.early) early.push(q); }
+        return done;
+      } catch (err) {
+        AcWasm.fail(String((err as Error)?.message || err)); try { wt!.free(); } catch { /* gone with the module */ }
+        wt = null; viaWasm = false; sent = 0; hist.fill(0); histL.fill(0); early.length = 0;
+        return jsRays(n);
+      }
+    };
     const finish = (): AcTrace => {
     // per ray, and as a ratio to the direct sound's energy at 1 m (a sphere of radius R catches 3 Σ(e·chord) / (N R³) of it)
     let sum = 0; for (let b = 0; b < NB; b++) { hist[b] /= TR.RAYS; histL[b] /= TR.RAYS; sum += hist[b]; }
@@ -354,7 +407,8 @@ export const Acoustics = (() => {
     for (const q of early) q[1] /= TR.RAYS;
     return { hist: Float32Array.from(hist), histL: Float32Array.from(histL), bin: TR.BIN, early, wet, rt60: rtOf(hist), rt60L: rtOf(histL), mfp, zone: zi };
     };
-    return { rays, finish };
+    if (opt && opt.raw) { opt.raw.hist = hist; opt.raw.histL = histL; } // (the histograms before they're made Float32: finish() leaves them, per ray, in these)
+    return { rays, finish, get wasm() { return viaWasm; } };
   }
   function trace(map: LvMap, f: number, x0: number, y0: number, z0: number, zi: number): AcTrace {
     const j = tracer(map, f, x0, y0, z0, zi); j.rays(TR.RAYS);
@@ -550,7 +604,7 @@ export const Acoustics = (() => {
     return { k: Math.sqrt(r.level), lp: r.lp, at: r.via ? { x: r.via.x, y: r.via.y, z: r.via.z } : src, same: false };
   }
   return {
-    of, zoneAt, listen, through, hear, roomAt, impulse, prewarm,
+    of, zoneAt, listen, through, hear, roomAt, impulse, prewarm, tracer, startOf, TR, wasm: AcWasm,
     /** the zones and portals as a summary, to look at in the console */
     describe(map: LvMap) {
       const d = of(map), n = (k: AcPortalKind) => d.portals.filter((p) => p.kind === k).length;

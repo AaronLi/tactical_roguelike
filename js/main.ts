@@ -91,5 +91,8 @@ import { Prof } from './profiler.js';
 import './demo.js';
 import './debugstart.js';
 import './debugglobals.js';
+import { AcWasm } from './acousticswasm.js';
 // the profiler wraps the game's main pieces of work once they all exist (it did it as it loaded, as the last file but two)
 Prof.install();
+// the acoustic ray tracer's WebAssembly module (js/acousticswasm.ts, docs/wasm.md): fetched without anything waiting for it; the JavaScript tracer works till it's there
+AcWasm.start();
