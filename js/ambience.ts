@@ -1,4 +1,10 @@
 'use strict';
+import { Acoustics } from './acoustics.js';
+import { Audio } from './audio.js';
+import { GunAudio } from './gunaudio.js';
+import { Level } from './level.js';
+import { SpaceData } from './spacedata.js';
+import { U } from './util.js';
 // Ambience: each place's background sound, synthesized as it plays (no recordings): the room tone and the machines of
 // the place, the weather and the town outside, and the odd sound now and then (a drip, a car going by, a dog, a pipe
 // knocking). A place is a recipe (RECIPES, below, by the theme's name: js/data.ts THEMES, and the hangar's) built from
@@ -59,7 +65,7 @@ interface AmbBedOpts {
 }
 type AmbRecipe = (s: AmbScene, o: AmbOpts, map: LvMap | null) => void;
 
-const G_Ambience = (() => {
+export const Ambience = (() => {
   const rnd = (a: number, b: number) => a + Math.random() * (b - a);
   const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)];
 
@@ -253,8 +259,8 @@ const G_Ambience = (() => {
     crowd(vol: number, busy = 1): AmbLoop {
       return (c, dest) => {
         const g = gain(c, vol), srcs: AudioScheduledSourceNode[] = [];
-        const rec = G.Audio && G.Audio.samples && G.Audio.samples.crowd_bed;
-        if (rec && (c === (G.Audio.ambCtx as BaseAudioContext) || c === (G.Audio.ctx as BaseAudioContext))) { // (a decoded buffer plays in either of the game's contexts)
+        const rec = Audio && Audio.samples && Audio.samples.crowd_bed;
+        if (rec && (c === (Audio.ambCtx as BaseAudioContext) || c === (Audio.ctx as BaseAudioContext))) { // (a decoded buffer plays in either of the game's contexts)
           const s = c.createBufferSource(); s.buffer = rec; s.loop = true; s.start(c.currentTime, Math.random() * rec.duration);
           const lp = filt(c, 'lowpass', 2600); chain(s, lp, g); srcs.push(s);
         } else {
@@ -729,7 +735,7 @@ const G_Ambience = (() => {
     },
     // the hangar between levels: a huge hall's air, its doors open on the airfield (jets, the wind), the PA's chime, the tools
     Hangar(s) {
-      if (G.SpaceData && G.SpaceData.ON) { // (the base is a hall cut into a rock, in space: no weather and nothing outside it to hear)
+      if (SpaceData && SpaceData.ON) { // (the base is a hall cut into a rock, in space: no weather and nothing outside it to hear)
         s.loop('in', L.air(0.09, 520));
         s.loop('in', L.reactor(41, 0.06));
         s.loop('in', L.motor(19, 0.035, 0.7, 500));
@@ -782,7 +788,7 @@ const G_Ambience = (() => {
   };
   /** the ones a level's sound comes from as well: things in it (rooms of a type) */
   function spots(s: AmbScene, map: LvMap) {
-    const TS = G.Level ? G.Level.TS : 2 / 3, fms = map.floors || [map];
+    const TS = Level ? Level.TS : 2 / 3, fms = map.floors || [map];
     fms.forEach((fm, f) => {
       const y = (fm.fy || 0) + 1.2;
       for (const r of fm.rooms || []) {
@@ -859,7 +865,7 @@ const G_Ambience = (() => {
       hum(bus, f0, parts, vol, ho) { this.loop(bus, L.hum(f0, parts, vol, ho)); },
       loop(bus, f, vol = 1) { if (!plays(f)) return; const g = gain(c, vol); g.connect(bus === 'in' ? inBus : outBus); this.stops.push(f(c, g)); },
       every(bus, rate, ename, play, vol = 1) { if (ONLY && !ONLY.has('events') && !ONLY.has('event:' + EVENT_NAME.get(play))) return; this.events.push({ name: ename, bus, rate, play, vol, next: c.currentTime + wait(rate) * Math.random() }); },
-      spot(sname, x, y, z, r, loop, vol = 1) { if (!plays(loop)) return; this.spots.push({ name: sname, x, y, z, r, loop, vol, on: false, seen: 1, zone: map ? G.Acoustics.zoneAt(map, x, y, z) : -1 }); },
+      spot(sname, x, y, z, r, loop, vol = 1) { if (!plays(loop)) return; this.spots.push({ name: sname, x, y, z, r, loop, vol, on: false, seen: 1, zone: map ? Acoustics.zoneAt(map, x, y, z) : -1 }); },
     };
     const rec = R[name] || R.Warehouse;
     rec(s, o, map);
@@ -905,7 +911,7 @@ const G_Ambience = (() => {
     let v = s.verbs.get(key);
     if (!v) {
       const c = s.c, cv = c.createConvolver(), g = gain(c, 0), wide = gain(c, 1), dg = gain(c, 0), pan = c.createPanner();
-      cv.normalize = false; cv.buffer = tr ? G.Acoustics.impulse(c, tr, 1) : impulse(c, rt60, mfp);
+      cv.normalize = false; cv.buffer = tr ? Acoustics.impulse(c, tr, 1) : impulse(c, rt60, mfp);
       pan.panningModel = 'equalpower'; pan.rolloffFactor = 0;
       chain(cv, g); chain(wide, s.out); chain(dg, pan, s.out);
       v = { g, cv, wide, dg, pan, on: false, left: -1 }; s.verbs.set(key, v);
@@ -938,20 +944,20 @@ const G_Ambience = (() => {
   }
   /** the mix for someone at (x, y, z) in a level: the paths to the inside and to out of doors, and the room's reverb */
   function mixAt(s: AmbScene, map: LvMap, x: number, y: number, z: number): AmbMix {
-    const Ac = G.Acoustics, d = Ac.of(map), { zone, reach } = Ac.listen(map, x, y, z);
+    const Ac = Acoustics, d = Ac.of(map), { zone, reach } = Ac.listen(map, x, y, z);
     s.reach = reach; s.zone = zone ? zone.id : -1;
     if (!zone) return mixByHand(1);
     const bi = { level: 0, lp: 300, via: null as AcPortal | null }, bo = { level: 0, lp: 300, via: null as AcPortal | null };
     for (const [zi, r] of reach) { const b = d.zones[zi].out ? bo : bi; if (r.level > b.level) { b.level = r.level; b.lp = r.lp; b.via = r.via; } }
     // (how much of a way comes from its opening: none standing in it, most of it from across a room)
-    const dir = (v: AcPortal | null) => (v ? G.U.clamp((Math.hypot(v.x - x, v.z - z) - 1) / 5, 0, 0.85) : 0);
+    const dir = (v: AcPortal | null) => (v ? U.clamp((Math.hypot(v.x - x, v.z - z) - 1) / 5, 0, 0.85) : 0);
     const anyIn = d.zones.some((q) => !q.out);
     const mfp = zone.out ? 20 : 4 * zone.volume / zone.surface, tr = zone.out ? null : Ac.roomAt(map, x, y, z, !(typeof AudioContext !== 'undefined' && s.c instanceof AudioContext));
     let tk = tr ? trKeys.get(tr) : undefined; if (tr && tk === undefined) { tk = trKeys.size + 1; trKeys.set(tr, tk); }
     return zone.out
       ? { inLvl: Math.sqrt(bi.level), inLp: bi.lp, inWall: anyIn ? 0.04 : 0, outLvl: 1, outLp: 20000, outWall: 0, key: 'out', rt60: 0.25, mfp, wet: 0.04, inAt: bi.via, inDir: dir(bi.via) }
-      : { inLvl: 1, inLp: 20000, inWall: 0, outLvl: Math.sqrt(bo.level), outLp: bo.lp, outWall: 0.06, key: 'z' + zone.id + '|' + (tk || ''), rt60: tr ? tr.rt60 : zone.rt60, mfp, tr, wet: G.U.clamp(0.1 + 0.12 * (tr ? tr.rt60 : zone.rt60), 0.1, 0.42), outAt: bo.via, outDir: dir(bo.via),
-        mid: { x: zone.cx, y: zone.y, z: zone.cz }, midDir: G.U.clamp((Math.hypot(zone.cx - x, zone.cz - z) - 2) / Math.max(4, Math.sqrt(zone.area)), 0, 0.3) }; // (no more than 0.3: a tail's mostly all round you)
+      : { inLvl: 1, inLp: 20000, inWall: 0, outLvl: Math.sqrt(bo.level), outLp: bo.lp, outWall: 0.06, key: 'z' + zone.id + '|' + (tk || ''), rt60: tr ? tr.rt60 : zone.rt60, mfp, tr, wet: U.clamp(0.1 + 0.12 * (tr ? tr.rt60 : zone.rt60), 0.1, 0.42), outAt: bo.via, outDir: dir(bo.via),
+        mid: { x: zone.cx, y: zone.y, z: zone.cz }, midDir: U.clamp((Math.hypot(zone.cx - x, zone.cz - z) - 2) / Math.max(4, Math.sqrt(zone.area)), 0, 0.3) }; // (no more than 0.3: a tail's mostly all round you)
   }
   /** the rings round where the listener is: west, north, east, south, 6 m off (they follow you, not your facing) */
   function placeRings(s: AmbScene, p: AmbPt, t: number, tc = 0.2) {
@@ -990,7 +996,7 @@ const G_Ambience = (() => {
     if (!r) {
       // not by any opening: through a wall on your own floor, faintly and dull; through a floor or a ceiling (a neighbour's
       // fridge upstairs), nothing: a slab's too much for a hum
-      const d = s.map && G.Acoustics.of(s.map), mine = d && s.zone !== undefined && s.zone >= 0 ? d.zones[s.zone].f : -1, its = d && sp.zone >= 0 ? d.zones[sp.zone].f : -1;
+      const d = s.map && Acoustics.of(s.map), mine = d && s.zone !== undefined && s.zone >= 0 ? d.zones[s.zone].f : -1, its = d && sp.zone >= 0 ? d.zones[sp.zone].f : -1;
       return { k: mine >= 0 && its >= 0 && mine !== its ? 0 : 0.12, lp: 300, at: { x: sp.x, y: sp.y, z: sp.z } };
     }
     const at = r.via ? { x: r.via.x, y: r.via.y, z: r.via.z } : { x: sp.x, y: sp.y, z: sp.z };
@@ -1033,13 +1039,13 @@ const G_Ambience = (() => {
   // path through the openings (its level, how dull, and from the opening it comes in by), then ringing in your room
   // (the scene's reverb send); and the walls' echoes (js/gunaudio.ts echoTaps: the dry report replayed from each).
   function shotInto(s: AmbScene, map: LvMap, sh: AmbShot, track: { x: number; y: number; z: number; yaw: number }[], dt: number) {
-    const GA = G.GunAudio, c = s.c, i = Math.min(track.length - 1, Math.max(0, Math.round(sh.t / dt))), lis = track[i];
+    const GA = GunAudio, c = s.c, i = Math.min(track.length - 1, Math.max(0, Math.round(sh.t / dt))), lis = track[i];
     const src = sh.own ? { x: lis.x - Math.sin(lis.yaw) * 0.5, y: lis.y - 0.15, z: lis.z - Math.cos(lis.yaw) * 0.5 } : { x: sh.x, y: sh.y, z: sh.z };
     const dry = GA.dry.get(sh.id), buf = dry;
     if (!buf) return;
-    const h = sh.own ? { k: 1, lp: 20000, at: src, same: true } : G.Acoustics.hear(map, src, lis); // (as js/gunaudio.ts play hears it)
-    const d = Math.hypot(src.x - lis.x, src.y - lis.y, src.z - lis.z), near = G.U.clamp(Math.pow(2 / Math.max(d, 2), 0.6), 0.05, 1);
-    const k = h.k, lpHz = Math.min(h.lp, G.U.clamp(18000 * Math.pow(0.5, d / 35), 1200, 19000)), at = h.at, base = GA.GAIN * (sh.vol || 1);
+    const h = sh.own ? { k: 1, lp: 20000, at: src, same: true } : Acoustics.hear(map, src, lis); // (as js/gunaudio.ts play hears it)
+    const d = Math.hypot(src.x - lis.x, src.y - lis.y, src.z - lis.z), near = U.clamp(Math.pow(2 / Math.max(d, 2), 0.6), 0.05, 1);
+    const k = h.k, lpHz = Math.min(h.lp, U.clamp(18000 * Math.pow(0.5, d / 35), 1200, 19000)), at = h.at, base = GA.GAIN * (sh.vol || 1);
     const play = (b: AudioBuffer, when: number, amp: number, hz: number, p: { x: number; y: number; z: number } | null, send: number) => {
       const n = c.createBufferSource(), lp = filt(c, 'lowpass', hz), g = gain(c, amp);
       n.buffer = b; n.playbackRate.value = 0.97 + Math.random() * 0.06;
@@ -1050,20 +1056,20 @@ const G_Ambience = (() => {
     };
     play(buf, sh.t, base * k * (sh.own ? 1 : near), lpHz, sh.own ? null : at, 0);
     // its room: the shooter's room's measured response at its measured level, heard by the way that room reaches you
-    const tr = G.Acoustics.roomAt(map, src.x, src.y, src.z, true);
+    const tr = Acoustics.roomAt(map, src.x, src.y, src.z, true);
     if (tr) {
       const n = c.createBufferSource(), cv = c.createConvolver(), lp = filt(c, 'lowpass', h.same ? 20000 : h.lp), g = gain(c, base * (h.same ? 1 : h.k));
-      cv.normalize = false; cv.buffer = G.Acoustics.impulse(c, tr); n.buffer = dry;
+      cv.normalize = false; cv.buffer = Acoustics.impulse(c, tr); n.buffer = dry;
       // (as js/gunaudio.ts: wide, and from another room a third of it placed at the opening it comes in by)
       chain(n, cv, lp); const wide = gain(c, h.same ? 1 : Math.sqrt(0.67)); chain(lp, wide, g, c.destination);
       if (!h.same) { const pan = c.createPanner(), dg = gain(c, Math.sqrt(0.33)); pan.panningModel = 'equalpower'; pan.rolloffFactor = 0; pan.positionX.value = at.x; pan.positionY.value = at.y; pan.positionZ.value = at.z; chain(lp, dg, pan, g); }
       n.start(sh.t);
     }
     // a shot from another room, come in, fills yours: your room's response to it, all round you, at the level it reaches you at
-    const lt = h.same ? null : G.Acoustics.roomAt(map, lis.x, lis.y, lis.z, true);
+    const lt = h.same ? null : Acoustics.roomAt(map, lis.x, lis.y, lis.z, true);
     if (lt && lt !== tr) {
       const n = c.createBufferSource(), cv = c.createConvolver(), g = gain(c, base * k * near), lp = filt(c, 'lowpass', lpHz);
-      cv.normalize = false; cv.buffer = G.Acoustics.impulse(c, lt); n.buffer = dry; chain(n, lp, cv, g, c.destination); n.start(sh.t);
+      cv.normalize = false; cv.buffer = Acoustics.impulse(c, lt); n.buffer = dry; chain(n, lp, cv, g, c.destination); n.start(sh.t);
     }
     // the echoes: only off walls the shot reaches you from (your zone's, or the one it comes in by)
     if (dry) for (const tp of GA.echoTaps(map as AcMap, src, lis).slice(0, 4)) play(dry, sh.t + tp.delay, base * tp.amp * k, tp.order === 1 ? 5000 : 2800, tp.pos, 0.3);
@@ -1142,7 +1148,7 @@ const G_Ambience = (() => {
   const SHIP_VOL = 0.5; // (her level under the master volume: over the places' own, vol)
   let shipLive: ReturnType<typeof shipVoice> | null = null, shipBus: GainNode | null = null;
   function shipUpdate(st: AmbShipState | null) {
-    const A = G.Audio, c = A.ambCtx;
+    const A = Audio, c = A.ambCtx;
     if (!st) { if (shipLive) { shipLive.stop(c.currentTime); shipLive = null; } return; }
     if (!shipBus) { shipBus = gain(c, SHIP_VOL); shipBus.connect(A.ambMaster); }
     if (!shipLive) shipLive = shipVoice(c, shipBus);
@@ -1173,14 +1179,14 @@ const G_Ambience = (() => {
     /** start a place by name (or stop, with null): what the game calls through update(), and the audition page directly */
     play(name: string | null, o: AmbOpts = { night: false, hub: false }, map: LvMap | null = null) {
       // (in the ambience's own audio context, its own render thread: js/audio.ts ambCtx)
-      const A = G.Audio;
+      const A = Audio;
       if (!A.ambCtx || !A.ambMaster) return null;
       const c = A.ambCtx;
       if (!bus) { bus = gain(c, vol); bus.connect(A.ambMaster); }
       if (cur) { stopScene(cur, c.currentTime); cur = null; }
       if (!name) return null;
       cur = scene(c, bus, name, o, map);
-      if (map && G.Acoustics) G.Acoustics.prewarm(map); // (its rooms measured in idle time: js/acoustics.ts)
+      if (map && Acoustics) Acoustics.prewarm(map); // (its rooms measured in idle time: js/acoustics.ts)
       cur.out.gain.setTargetAtTime(1, c.currentTime, 1.2); // (fades in)
       applyMix(cur, mixByHand(map ? 0 : 1), c.currentTime, 0.01); placeRings(cur, here, c.currentTime, 0.01);
       schedule(cur, c.currentTime + 1);
@@ -1188,7 +1194,7 @@ const G_Ambience = (() => {
     },
     /** each frame: the place that's up (a level's, the hangar's; none on the menu), where you are in it, the next events */
     update(dt: number, map: LvMap | null, cam: THREE.Camera | null) {
-      const A = G.Audio;
+      const A = Audio;
       if (!A.ambCtx || A.ambCtx.state !== 'running') return;
       shipUpdate(G.Space && G.Space.sound ? G.Space.sound(dt) : null); // (the squad's own ship, if there is one here)
       if (map !== curMap) {
@@ -1265,5 +1271,5 @@ const G_Ambience = (() => {
     },
   };
 })();
-G.Ambience = G_Ambience;
-interface GameModules { Ambience: typeof G_Ambience; }
+G.Ambience = Ambience;
+declare global { interface GameModules { Ambience: typeof Ambience; } }

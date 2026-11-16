@@ -8,13 +8,13 @@ nothing checks the module is there, **check** if it is the check itself (`G.X &&
 
 ## Summary
 
-- 91 files, 176 names on G, 5679 uses (114 while loading)
+- 91 files, 176 names on G, 5671 uses (114 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 5, the largest 43 files
 - load orders (from the imports and the lists) against the load-time needs: index.html 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, tools/level_env.mjs 0, tools/model_env.mjs 0
 - the simulation reaching page-only modules: 0 uses (0 unguarded, 0 of them while loading)
 - names used but defined nowhere: 0
-- trial module typecheck: 3203 errors; 0 bare names between files (0 uses), 57 G members lost, 166 others
+- trial module typecheck: 2559 errors; 0 bare names between files (0 uses), 45 G members lost, 107 others
 
 ## 1. Dependency graph
 
@@ -38,7 +38,7 @@ These are fine as ES modules (a module may call one that imports it, once both h
 Dependencies first, ties in index.html's order:
 
 ```
-modelbundles threeboot util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical zip callsigns arsenal loadout audio furnspec residents furnmesh gunshot-synth gunaudio footsteps acoustics ambience handling lightgrid levelview render glare shotlog bolts gunmaterials gunmodels glb gunrig viewmodel vmanim prep humandata humans headgear rig net recorder route shop spaceserver serverhost server serverlink player views casings icons hud shopui invui gunsmith zeroing loot course range highlights menushow hangar landing shipmodel spaceui space cloudconfig career cloud gamepad touch game profiler demo debugstart exportworker prepentry prepworker serverworker
+modelbundles threeboot util data parts scars damage leveldesc world shipgen furniture homes level materials spacedata sim stickers gear ballistics medical zip callsigns arsenal acoustics ambience gunaudio footsteps audio loadout furnspec residents furnmesh gunshot-synth handling lightgrid levelview render glare shotlog bolts gunmaterials gunmodels glb gunrig viewmodel vmanim prep humandata humans headgear rig net recorder route shop spaceserver serverhost server serverlink player views casings icons hud shopui invui gunsmith zeroing loot course range highlights menushow hangar landing shipmodel spaceui space cloudconfig career cloud gamepad touch game profiler demo debugstart exportworker prepentry prepworker serverworker
 ```
 
 ### The load orders against the load-time needs
@@ -79,16 +79,16 @@ The order each loader runs the files in, worked out from the imports (a file run
 | zip | Zip | - | - |
 | callsigns (sim) | Callsigns | - | util |
 | arsenal (sim) | Arsenal | - | ballistics, data, util |
-| loadout | Loadout | util | arsenal, audio, data, gear, hud, parts |
+| acoustics | Acoustics | - | audio, game, level, materials, space, util |
+| ambience | Ambience | - | acoustics, audio, gunaudio, level, player, space, spacedata, util |
+| gunaudio | GunAudio | level | acoustics, ambience, audio, game, parts, render, util |
+| footsteps | Footsteps | - | acoustics, audio, casings, game, gunaudio, level, player, render, util |
 | audio | Audio | util | acoustics, casings, data, footsteps, game, gunaudio, level, modelbundles, render |
+| loadout | Loadout | util | arsenal, audio, data, gear, hud, parts |
 | furnspec (sim) | FurnSpec | - | furniture, level, util, world |
 | residents (sim) |  | furniture, homes | - |
 | furnmesh (sim) | FurnMesh | furnspec | - |
 | gunshot-synth |  | - | - |
-| gunaudio | GunAudio | level | acoustics, ambience, audio, game, parts, render, util |
-| footsteps | Footsteps | - | acoustics, audio, casings, game, gunaudio, level, player, render, util |
-| acoustics | Acoustics | - | audio, game, level, materials, space, util |
-| ambience | Ambience | - | acoustics, audio, gunaudio, level, player, space, spacedata, util |
 | handling | Handling | - | audio, data, render, util, vmanim |
 | lightgrid (sim) | LightGrid | - | homes, level |
 | levelview | LevelView | - | furnmesh, hangar, level, leveldesc, lightgrid, util |
@@ -160,9 +160,9 @@ None.
 `tsconfig.modules-trial.json`: the project with every file a module (`moduleDetection: force`). Phase 1 is done when
 the only errors left are G members (those go when the files are converted).
 
-3203 errors: TS2339 2855, TS2551 127, TS7006 121, TS6196 56, TS18047 14, TS18048 10, TS2345 5, TS2531 5, TS7031 4, TS7053 4, TS2322 2.
+2559 errors: TS2339 2282, TS2551 127, TS7006 76, TS6196 44, TS18048 10, TS2345 5, TS2531 5, TS18047 4, TS7053 4, TS2322 2.
 
-**G members lost** (TS2339 on GameNamespace, 57 names): each file's `interface GameModules` no longer merges (and in 55 files it's reported unused). Expected; they go as the files are converted.
+**G members lost** (TS2339 on GameNamespace, 45 names): each file's `interface GameModules` no longer merges (and in 43 files it's reported unused). Expected; they go as the files are converted.
 
 **THREE as a global** (TS2686, in 0 files): three's types declare it a UMD global, which a module may not use without an import. Phase 2's import map, or `allowUmdGlobalAccess`, clears these.
 
@@ -171,22 +171,9 @@ the only errors left are G members (those go when the files are converted).
 | Name | Kind | Declared in | Uses | Used by |
 | --- | --- | --- | --- | --- |
 
-**Everything else** (166): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
+**Everything else** (107): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
 
-- js/ambience.ts:948 TS7006 Parameter 'q' implicitly has an 'any' type.
-- js/cloud.ts:304 TS7006 Parameter 'r' implicitly has an 'any' type.
-- js/cloud.ts:352 TS7006 Parameter 'r' implicitly has an 'any' type.
-- js/cloud.ts:376 TS7006 Parameter 'r' implicitly has an 'any' type.
-- js/cloud.ts:378 TS7006 Parameter 'r' implicitly has an 'any' type.
-- js/cloud.ts:380 TS7006 Parameter 'r' implicitly has an 'any' type.
-- js/cloud.ts:400 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/demo.ts:89 TS7006 Parameter 'dt' implicitly has an 'any' type.
-- js/footsteps.ts:24 TS7006 Parameter 'm' implicitly has an 'any' type.
-- js/footsteps.ts:32 TS7006 Parameter 'b' implicitly has an 'any' type.
-- js/footsteps.ts:32 TS7006 Parameter 'buf' implicitly has an 'any' type.
-- js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
-- js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
-- js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
 - js/game.ts:127 TS7006 Parameter 'm' implicitly has an 'any' type.
 - js/game.ts:127 TS7006 Parameter 'from' implicitly has an 'any' type.
 - js/game.ts:128 TS7006 Parameter 'm' implicitly has an 'any' type.
@@ -204,33 +191,46 @@ the only errors left are G members (those go when the files are converted).
 - js/game.ts:716 TS7006 Parameter 't' implicitly has an 'any' type.
 - js/game.ts:716 TS7006 Parameter 'p' implicitly has an 'any' type.
 - js/game.ts:770 TS7006 Parameter 's' implicitly has an 'any' type.
-- js/game.ts:1521 TS7006 Parameter 't' implicitly has an 'any' type.
-- js/game.ts:1544 TS7006 Parameter 'q' implicitly has an 'any' type.
-- js/game.ts:1544 TS7006 Parameter 'r' implicitly has an 'any' type.
-- js/game.ts:1545 TS7006 Parameter 'r' implicitly has an 'any' type.
-- js/game.ts:1546 TS7006 Parameter 'q' implicitly has an 'any' type.
-- js/game.ts:1546 TS7006 Parameter 'q' implicitly has an 'any' type.
-- js/game.ts:1550 TS7006 Parameter 'q' implicitly has an 'any' type.
-- js/game.ts:1554 TS7031 Binding element 'k' implicitly has an 'any' type.
-- js/game.ts:1554 TS7031 Binding element 'pa' implicitly has an 'any' type.
-- js/game.ts:1559 TS7006 Parameter 'b' implicitly has an 'any' type.
-- js/game.ts:1559 TS7031 Binding element 'n' implicitly has an 'any' type.
-- js/game.ts:1559 TS7031 Binding element 'c' implicitly has an 'any' type.
-- js/game.ts:1562 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/game.ts:1562 TS7006 Parameter 'x' implicitly has an 'any' type.
-- js/game.ts:1562 TS7006 Parameter 'y' implicitly has an 'any' type.
-- js/game.ts:1562 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/game.ts:1562 TS7006 Parameter 'i' implicitly has an 'any' type.
-- js/game.ts:1562 TS7006 Parameter 'xs' implicitly has an 'any' type.
-- js/game.ts:1562 TS7006 Parameter 'b' implicitly has an 'any' type.
-- js/game.ts:1563 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/game.ts:1563 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/game.ts:1564 TS7006 Parameter 'c' implicitly has an 'any' type.
-- js/game.ts:1564 TS7006 Parameter 'c' implicitly has an 'any' type.
-- js/game.ts:1612 TS7006 Parameter 'k' implicitly has an 'any' type.
-- js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
-- js/game.ts:1623 TS2345 Argument of type 'unknown' is not assignable to parameter of type 'string'.
-- js/game.ts:1623 TS7006 Parameter 'a' implicitly has an 'any' type.
-- ... 106 more in the JSON
+- js/game.ts:1749 TS2345 Argument of type 'LvMap | null' is not assignable to parameter of type 'LvMap'.
+- js/game.ts:1760 TS7006 Parameter 'w' implicitly has an 'any' type.
+- js/game.ts:1761 TS7006 Parameter 'w' implicitly has an 'any' type.
+- js/game.ts:1762 TS7006 Parameter 'w' implicitly has an 'any' type.
+- js/game.ts:1762 TS2345 Argument of type 'LvMap | null' is not assignable to parameter of type 'AcMap | undefined'.
+- js/game.ts:1765 TS2531 Object is possibly 'null'.
+- js/game.ts:1765 TS2531 Object is possibly 'null'.
+- js/game.ts:1766 TS2531 Object is possibly 'null'.
+- js/game.ts:1766 TS2531 Object is possibly 'null'.
+- js/game.ts:1771 TS2531 Object is possibly 'null'.
+- js/gear.ts:495 TS7006 Parameter 'w' implicitly has an 'any' type.
+- js/glb.ts:1233 TS7006 Parameter 'x' implicitly has an 'any' type.
+- js/glb.ts:1245 TS2322 Type 'Promise<PartsIndex | null> | undefined' is not assignable to type 'Promise<PartsIndex | null>'.
+- js/glb.ts:1274 TS7006 Parameter 'scene' implicitly has an 'any' type.
+- js/glb.ts:1427 TS7006 Parameter 'b' implicitly has an 'any' type.
+- js/gunmodels.ts:42 TS7006 Parameter 'e' implicitly has an 'any' type.
+- js/gunmodels.ts:98 TS7006 Parameter 'ok' implicitly has an 'any' type.
+- js/gunmodels.ts:103 TS2322 Type 'Promise<boolean> | undefined' is not assignable to type 'Promise<boolean>'.
+- js/gunsmith.ts:68 TS7006 Parameter 'ok' implicitly has an 'any' type.
+- js/gunsmith.ts:260 TS7006 Parameter 'w' implicitly has an 'any' type.
+- js/gunsmith.ts:261 TS7006 Parameter 'w' implicitly has an 'any' type.
+- js/hangar.ts:253 TS7006 Parameter 'ok' implicitly has an 'any' type.
+- js/hangar.ts:1187 TS7006 Parameter 'q' implicitly has an 'any' type.
+- js/highlights.ts:351 TS7006 Parameter 'd' implicitly has an 'any' type.
+- js/highlights.ts:455 TS7006 Parameter 'q' implicitly has an 'any' type.
+- js/highlights.ts:455 TS7006 Parameter 'i' implicitly has an 'any' type.
+- js/highlights.ts:455 TS7006 Parameter 'q' implicitly has an 'any' type.
+- js/highlights.ts:1572 TS18048 'pts' is possibly 'undefined'.
+- js/highlights.ts:1572 TS18048 'pts' is possibly 'undefined'.
+- js/highlights.ts:1572 TS18048 'pts' is possibly 'undefined'.
+- js/highlights.ts:1573 TS18048 'pts' is possibly 'undefined'.
+- js/highlights.ts:1574 TS2345 Argument of type 'Vector3[] | undefined' is not assignable to parameter of type 'Vector3[]'.
+- js/highlights.ts:1615 TS18048 'pts' is possibly 'undefined'.
+- js/highlights.ts:1615 TS18048 'pts' is possibly 'undefined'.
+- js/highlights.ts:1615 TS18048 'pts' is possibly 'undefined'.
+- js/highlights.ts:1615 TS18048 'pts' is possibly 'undefined'.
+- js/highlights.ts:2123 TS7006 Parameter 'ok' implicitly has an 'any' type.
+- js/highlights.ts:2147 TS7006 Parameter 'ok' implicitly has an 'any' type.
+- js/hud.ts:229 TS7006 Parameter 'h' implicitly has an 'any' type.
+- js/hud.ts:368 TS7006 Parameter 't' implicitly has an 'any' type.
+- js/hud.ts:368 TS7006 Parameter 'i' implicitly has an 'any' type.
+- js/invui.ts:884 TS7006 Parameter 'w' implicitly has an 'any' type.
+- ... 47 more in the JSON

@@ -1,7 +1,12 @@
 'use strict';
+import { Audio } from './audio.js';
+import { GunAudio } from './gunaudio.js';
+import { Level } from './level.js';
+import { U } from './util.js';
+import { Acoustics } from './acoustics.js';
 type FsGait = 'creep' | 'crouch' | 'walk' | 'run';
 type FsClip = { buf: AudioBuffer; anchor: number };
-const G_Footsteps = {
+export const Footsteps = {
   BASE: 'assets/audio/footsteps/',
   /** level trim against the other effects: a boot walking on concrete peaks about 0.3 at 1 m */
   GAIN: 2,
@@ -18,10 +23,10 @@ const G_Footsteps = {
   FLOOR: { concrete: 'concrete', hard: 'wood', tile: 'tile', pave: 'pave', flag: 'pave', carpet: 'carpet', wood: 'wood', parquet: 'wood', lino: 'lino', dirt: 'dirt', soil: 'dirt', grass: 'grass', gravel: 'gravel', leaves: 'leaves', metal: 'metal' } as Record<string, string>,
 
   init() {
-    if (this.started || !G.Audio.ctx) return;
+    if (this.started || !Audio.ctx) return;
     this.started = true;
-    const ctx = G.Audio.ctx;
-    G.Audio.bankJson('footsteps/manifest.json').then((m) => { // (from the audio bundle: G.Audio.bankFile)
+    const ctx = Audio.ctx;
+    Audio.bankJson('footsteps/manifest.json').then((m) => { // (from the audio bundle: G.Audio.bankFile)
       this.man = m;
       // boots first (everyone on your side wears them), then the rest, a few at a time so the level's loading isn't held up
       const names = [...Object.entries(m.soles as Record<string, Record<string, unknown>>).flatMap(([s, c]) => Object.keys(c).map((n) => s + '/' + n)), ...Object.keys(m.kit).map((n) => 'kit/' + n)];
@@ -29,7 +34,7 @@ const G_Footsteps = {
       const next = (): void => {
         const n = names[i++];
         if (!n) return;
-        G.Audio.bankFile('footsteps/' + n + '.ogg').then((b) => ctx.decodeAudioData(b)).then((buf) => { this.bufs[n] = buf; }).catch(() => {}).then(next);
+        Audio.bankFile('footsteps/' + n + '.ogg').then((b) => ctx.decodeAudioData(b)).then((buf) => { this.bufs[n] = buf; }).catch(() => {}).then(next);
       };
       for (let k = 0; k < 6; k++) next();
     }).catch(() => { this.started = false; });
@@ -43,7 +48,7 @@ const G_Footsteps = {
    * at a brisk 1.9 (the game's walk), ~2.65 jogging at 3, ~3 sprinting. Crouched, a little quicker and shorter. Your
    * steps, everyone's legs (js/rig.ts) and your view's bob (js/player.ts bobT) all keep to it.
    */
-  cadence(speed: number, crouch = 0) { return G.U.clamp(1.15 + 0.5 * speed, 1.5, 3) * (1 + 0.1 * crouch); },
+  cadence(speed: number, crouch = 0) { return U.clamp(1.15 + 0.5 * speed, 1.5, 3) * (1 + 0.1 * crouch); },
   /** a full stride (two steps) at a speed, m */
   stride(speed: number, crouch = 0) { return (2 * Math.max(speed, 0.3)) / this.cadence(speed, crouch); },
   /** the synth's floor under a foot at p (feet height) */
@@ -74,7 +79,7 @@ const G_Footsteps = {
    * Returns false when nothing's loaded (yet) to play.
    */
   step(feet: FsFeet, pos: THREE.Vector3, gait: FsGait, self = false) {
-    const A = G.Audio, ctx = A.ctx, map = G.Game && G.Game.map, cam = G.R && G.R.camera;
+    const A = Audio, ctx = A.ctx, map = G.Game && G.Game.map, cam = G.R && G.R.camera;
     if (!ctx || !map || !cam) return false;
     if (!this.man) { this.init(); return false; }
     const cp = cam.position, d = self ? 0 : cp.distanceTo(pos);
@@ -91,11 +96,11 @@ const G_Footsteps = {
     if (!c) return false;
     let gain = this.GAIN * (self ? this.SELF : Math.min(1, 1.5 / Math.max(d, 1.5))), lp = 20000, at: { x: number; y: number; z: number } = pos;
     let heard: { k: number; lp: number; at: EchoPt; same: boolean } | null = null;
-    if (!self && G.Acoustics) {
-      heard = G.Acoustics.hear(map, pos, cp);
+    if (!self && Acoustics) {
+      heard = Acoustics.hear(map, pos, cp);
       gain *= heard.k; lp = heard.lp; at = heard.at;
       if (gain < 0.004) return false; // (nothing of it gets to you)
-    } else if (!self && !G.Level.los(map, cp.x, cp.y, cp.z, pos.x, pos.y + 0.2, pos.z)) { gain *= 0.4; lp = 900; }
+    } else if (!self && !Level.los(map, cp.x, cp.y, cp.z, pos.x, pos.y + 0.2, pos.z)) { gain *= 0.4; lp = 900; }
     const t = ctx.currentTime, start = (b: AudioBuffer, anchor: number, k: number) => {
       const s = ctx.createBufferSource(), gn = ctx.createGain(), f = ctx.createBiquadFilter(), pan = ctx.createPanner();
       s.buffer = b; s.playbackRate.value = 0.96 + Math.random() * 0.08;
@@ -107,13 +112,13 @@ const G_Footsteps = {
       gn.gain.value = gain * k;
       s.connect(f).connect(pan).connect(gn).connect(A.master);
       // into the walker's room: its measured response (js/gunaudio.ts roomVerb), heard the way that room reaches you
-      if (!self && G.GunAudio && G.Acoustics) {
-        const rv = G.GunAudio.roomVerb(ctx, map, pos, heard);
+      if (!self && GunAudio && Acoustics) {
+        const rv = GunAudio.roomVerb(ctx, map, pos, heard);
         if (rv) { const sg = ctx.createGain(); sg.gain.value = this.GAIN * k * Math.min(1, 1.5 / Math.max(d, 1.5)) * 0.5; s.connect(sg); sg.connect(rv.cv); }
-      } else if (self && G.GunAudio && G.Acoustics && G.Game.phase === 'level') {
+      } else if (self && GunAudio && Acoustics && G.Game.phase === 'level') {
         // yours into the room you're in (as your own gun's handling is, js/audio.ts route): the step's level at 1 m
         // (its 1.5 m level, the others' baseline, scaled to 1 m), under you
-        const lv = G.GunAudio.listenerVerb(ctx, map);
+        const lv = GunAudio.listenerVerb(ctx, map);
         if (lv) { const sg = ctx.createGain(); sg.gain.value = this.GAIN * k * 0.5 * this.SELF / 1.5; s.connect(sg); sg.connect(lv.cv); }
       }
       this.voices++;
@@ -149,5 +154,5 @@ const G_Footsteps = {
     this.step(this.selfFeet, me.pos, this.gaitOf(me.hspeed, me.crouch ? 1 : 0, !!me.steadying, !!me.lowReady), true);
   },
 };
-G.Footsteps = G_Footsteps;
-interface GameModules { Footsteps: typeof G_Footsteps; }
+G.Footsteps = Footsteps;
+declare global { interface GameModules { Footsteps: typeof Footsteps; } }

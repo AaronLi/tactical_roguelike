@@ -4,6 +4,7 @@ import { WEAPONS } from './data.js';
 import { Hooks, U } from './util.js';
 import { Gear } from './gear.js';
 import { Gunsmith } from './parts.js';
+import { Audio } from './audio.js';
 // Your loadout for a run in space (js/game.ts sidearmPick draws it, before the base): a sidearm, a helmet and body armour (the primary
 // tree's still here, but nothing picks from it: a run starts without one, sel), each
 // taken from a tree of its own (the sidearm's is js/arsenal.ts's, as it always was). Every tree starts from the piece in its middle and runs
@@ -102,7 +103,7 @@ export const Loadout = (() => {
     ns[stat] = (ns[stat] || 0) + 1;
     for (const q of TREES[slot].NODES) {
       if (q.from !== id || q.stat !== stat || d.got.includes(slot + ':' + q.id)) continue;
-      if (ns[stat] >= q.n!) { d.got.push(slot + ':' + q.id); G.HUD.toast('NEW ' + TREES[slot].title.toUpperCase(), `${name(slot, q.id)}: yours from your next run`, 3.5); if (G.Audio.click) G.Audio.click(); }
+      if (ns[stat] >= q.n!) { d.got.push(slot + ':' + q.id); G.HUD.toast('NEW ' + TREES[slot].title.toUpperCase(), `${name(slot, q.id)}: yours from your next run`, 3.5); if (Audio.click) Audio.click(); }
       else G.HUD.feed(`<span class="cr">${U.esc(name(slot, id))}: ${ns[stat]}/${q.n} ${U.esc(q.what!)}</span>`);
     }
     attNews(slot, id, stat, ns[stat]);

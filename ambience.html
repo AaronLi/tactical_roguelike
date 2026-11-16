@@ -44,12 +44,14 @@
   <section><h2>Every event</h2><div class="row ev" id="all"></div></section>
   <section><h2>Output</h2><canvas id="spec" width="960" height="120"></canvas><div id="meter">—</div></section>
 </main>
-<script>self.G = {};</script>
-<script src="dist/js/audio.js"></script>
-<script src="dist/js/ambience.js"></script>
-<script>
+<!-- ES modules: three.js first (the game's files read the global THREE while they load), then the two this page plays through
+     (audio and ambience pull in the rest of what they import). Module scripts run in the order written. -->
+<script type="module" src="dist/js/threeboot.js"></script>
+<script type="module">
+import { Audio as A } from './dist/js/audio.js';
+import { Ambience as M } from './dist/js/ambience.js';
 (() => {
-  const A = G.Audio, M = G.Ambience, $ = (id) => document.getElementById(id);
+  const $ = (id) => document.getElementById(id);
   let place = null, an = null;
   const opts = () => ({ night: $('night').checked, hub: place === 'Hangar' });
   function ensure() {

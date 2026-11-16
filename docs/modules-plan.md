@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); 5 to 7 not started. Written 2026-11-15.
+Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 under way (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files, 2026-11-16); 6 and 7 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -398,6 +398,31 @@ Phase 4 is done: the workers' lists are gone, the simulation's files import each
 - **Not reproduced exactly / noted:** nothing behavioural. The files evaluate in another order (above).  `lightgrid` and `furnmesh` are modules now, so the page's
   `G.LightGrid` and `G.FurnMesh` are the same objects as the exports. Left for phase 5: the page files that still read the simulation
   through `G.X` (`G.Level`, `G.Server`, ... in `game`, `render`, `hud`...), the three lists that are left, and `index.html`.
+
+#### Phase 5 results (part a)
+
+- **Converted, 12 files (42 in all, `callsigns` having been done in phase 4):** `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`,
+  then the audio files `audio`, `gunaudio`, `footsteps`, `acoustics`, `ambience`, `handling`. The codemod, then `--uses --force-order`
+  on all of them (the lists no longer decide: `npm run deps` checks the real order). `deps:check` is green with every one of the new
+  forward imports (`audio` imports `gunaudio`, `footsteps`, `acoustics` and `level`; `gunaudio` imports `acoustics` and `ambience`; `loadout`
+  imports `gear`, `parts` and `audio`; `icons` imports `data`, `gear`, `parts`): each reads the other only inside functions, and the guards
+  the codemod listed (`G.Audio && ...`, `G.Acoustics ? ...`, `G.Level ? G.Level.TS : 2`) are always true now and left as they are.
+- **Stand-ins, not bypassed.** `tools/cloud.test.mjs` loads only `util`, `cloudconfig`, `career` and `cloud`, and puts `G.THEMES`, `G.Route`,
+  `G.Net`, `G.Arsenal`, `G.Callsigns` on after. The codemod's imports in `career` (`THEMES`, `Route`) and `cloud` (`Callsigns`, `Arsenal`,
+  `Shop`) would have loaded the real `data`, `route`, `arsenal`, `shop` (and their graph) into those "browsers" and ignored the stand-ins,
+  so those reads stay `G.X`, each with a comment (`G.Net` is not read by either). `career` and `cloud` import `util`, `cloudconfig` and each
+  other, which the test loads anyway. `test:cloud` is 21/21 with the same meaning.
+- **`ambience.html`** loaded `audio.js` and `ambience.js` as classic scripts after `self.G = {}`. They are modules now and import more
+  (`level`, which reads `THREE` while loading), so the page loads `threeboot.js` and then runs its inline script as a module that
+  imports `Audio` and `Ambience`. Exercised headlessly (a one-off DevTools script, not kept): it builds 14 places and 29 events, Start
+  builds the audio graph and plays Apartment, an event and another place play, Stop, no console errors from the modules. Before the
+  change the same script also showed `audio.js: Cannot set properties of undefined (setting 'click')` (`G.Hooks` was not there, on that
+  page); that error is gone. The script's last step fires an event's button after another place has been picked and gets `InvalidAccessError: cannot connect to
+  an AudioNode belonging to a different audio context`, the same before and after (the page's own, not looked into).
+- **Left as `G.X`:** the page files that are not converted yet: `G.Game`, `G.Space`, `G.Me`, `G.Casings`, `G.R`, `G.AudioBundle`,
+  `G.VMAnim`, `G.GunModels`, `G.HUD`. `js/gunshot-synth.ts` is a window-global IIFE (`window.GunshotSynth`, read by `gunaudio`), not a `G` file; it
+  stays as it is, still a module tag in `index.html`.
+- **Next:** part b (models and rigs), c (views and rendering), d (player, game, space, the screens, `index.html` down to one tag).
 
 ### 5. Convert the page side
 

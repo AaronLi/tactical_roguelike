@@ -1,4 +1,8 @@
 'use strict';
+import { Audio } from './audio.js';
+import { Level } from './level.js';
+import { Materials } from './materials.js';
+import { U } from './util.js';
 interface AcZone {
   id: number; f: number; out: boolean; tiles: number; area: number; height: number; volume: number; surface: number;
   /** how much of what strikes its surfaces they take (0..1): from what its rooms are (ROOM_ALPHA), area-weighted */
@@ -12,9 +16,9 @@ interface AcZone {
 }
 interface AcMapData { zones: AcZone[]; portals: AcPortal[]; zoneAt: Int32Array[]; NF: number }
 
-const G_Acoustics = (() => {
+export const Acoustics = (() => {
   const data = new WeakMap<LvMap, AcMapData>();
-  const TS = () => G.Level.TS, WALL = () => G.Level.WALL_H || 4;
+  const TS = () => Level.TS, WALL = () => Level.WALL_H || 4;
   // What the surfaces take of the sound that strikes them (α, mid frequencies), by what their face is: the walls', the
   // floor's and the ceiling's construction as js/materials.ts has it for the place (a flat's plasterboard on studs, the
   // foundry's brick, the bunker's concrete, cold storage's steel-skinned panels), its first layer facing the room.
@@ -56,7 +60,7 @@ const G_Acoustics = (() => {
   const AIR_M = 0.003, AIR_M_LOW = 0.0003; // (the air takes the highs, hardly the lows)
   /** how hard the place's surfaces are (the theme's reflect) -> their absorption, α: for floor in no room */
   // (bare plaster, concrete and steel take 2-15% of what strikes them: reflect 0.3 -> α 0.14, 0.4 -> 0.08; till each surface's own material counts)
-  const alphaOf = (map: LvMap) => G.U.clamp(0.32 - 0.6 * ((map.theme && map.theme.reflect) || 0.32), 0.06, 0.35);
+  const alphaOf = (map: LvMap) => U.clamp(0.32 - 0.6 * ((map.theme && map.theme.reflect) || 0.32), 0.06, 0.35);
   /** air for sound: a wall, a door's own tiles (a portal), nothing else */
   const solid = (v: number) => v === 1;
 
@@ -122,7 +126,7 @@ const G_Acoustics = (() => {
         const wallA = edges * ts * (z.out ? wh : z.height);
         z.surface = 2 * z.area + wallA;
         // its faces: the walls' (the construction the place's walls have, faced this side), its floor's and its ceiling's
-        const p = { x: z.cx, y: (fm.fy || 0) + 1.5, z: z.cz }, M = G.Materials;
+        const p = { x: z.cx, y: (fm.fy || 0) + 1.5, z: z.cz }, M = Materials;
         const aw = M ? faceAlpha(M.of(map, { kind: 'wall' }, p)) : alpha, af = M ? faceAlpha(M.of(map, { kind: 'floor', min: [0, (fm.fy || 0) - 0.5, 0], max: [0, (fm.fy || 0) + 0.01, 0] }, p)) : alpha;
         const wb = M ? M.of(map, { kind: 'wall' }, p) : null, fb = M ? M.of(map, { kind: 'floor', min: [0, (fm.fy || 0) - 0.5, 0], max: [0, (fm.fy || 0) + 0.01, 0] }, p) : null, cb = M ? M.of(map, { kind: 'ceil', min: [0, 0, 0], max: [0, 1, 0] }, p) : null;
         const ac0 = cb ? faceAlpha(cb) : alpha, tf = o ? Math.min(1, o.tiled / z.tiles) : 0;
@@ -132,7 +136,7 @@ const G_Acoustics = (() => {
         z.aw = aw; z.af = z.out ? 0.3 : af; z.ac = ac; z.content = content; z.contentL = content * LOW_CONTENT; // (out of doors the ground's earth and growth: soft)
         const A = wallA * aw + z.area * (af + ac) + content * z.area + 4 * AIR_M * z.volume;
         z.alpha = A / z.surface;
-        z.rt60 = z.out ? 0.25 : G.U.clamp((0.161 * z.volume) / Math.max(A, 1e-3), 0.15, 3);
+        z.rt60 = z.out ? 0.25 : U.clamp((0.161 * z.volume) / Math.max(A, 1e-3), 0.15, 3);
       }
     });
     const portal = (kind: AcPortalKind, a: number, b: number, cells: number, x: number, y: number, z: number, extra: Partial<AcPortal> = {}) => {
@@ -202,7 +206,7 @@ const G_Acoustics = (() => {
   }
   /** the zone at a place (and its floor), or -1 in a wall */
   function zoneAt(map: LvMap, x: number, y: number, z: number) {
-    const d = of(map), L = G.Level, f = map.floors ? (L.floorAt(map, x, y, z) || 0) : 0, at = d.zoneAt[Math.min(f, d.NF - 1)];
+    const d = of(map), L = Level, f = map.floors ? (L.floorAt(map, x, y, z) || 0) : 0, at = d.zoneAt[Math.min(f, d.NF - 1)];
     const tx = Math.floor(x / TS()), tz = Math.floor(z / TS());
     if (tx < 0 || tz < 0 || tx >= map.W || tz >= map.H) return -1;
     let zi = at[tz * map.W + tx];
@@ -238,7 +242,7 @@ const G_Acoustics = (() => {
       for (const pi of d.zones[zi].portals) {
         const p = d.portals[pi], nz = p.a === zi ? p.b : p.a, th = through(p);
         const dist = Math.hypot(p.x - pt.x, p.y - pt.y, p.z - pt.z), size = p.cells * TS();
-        const spread = G.U.clamp((size + 1) / (size + 1 + dist * 0.6), 0.04, 1);
+        const spread = U.clamp((size + 1) / (size + 1 + dist * 0.6), 0.04, 1);
         const level = here.level * th.k * spread;
         if (level < 1e-4) continue;
         const c = -Math.log(level);
@@ -276,7 +280,7 @@ const G_Acoustics = (() => {
     const fy = fm.fy || 0, Z = d.zones, zone = Z[zi], NB = Math.ceil(TR.MAX_T / TR.BIN), hist = new Float64Array(NB), histL = new Float64Array(NB), early: [number, number][] = [];
     const doorAt = new Map<number, LvDoor>(); for (const dr of fm.doors || []) for (const c of dr.cells || [dr.tz * W + dr.tx]) doorAt.set(c, dr);
     const winAt = fm.winAt as { has?: (i: number) => boolean } | undefined, buildingTop = fy + wh * (fms.length - f);
-    const mfp = zone.out ? 8 : 4 * zone.volume / zone.surface, R = G.U.clamp(0.3 * mfp, 0.6, 2.2), R2 = R * R;
+    const mfp = zone.out ? 8 : 4 * zone.volume / zone.surface, R = U.clamp(0.3 * mfp, 0.6, 2.2), R2 = R * R;
     // (energy lost per metre in each zone: what's in it, and the air; the lows: the air hardly takes any. Worked out once a
     // measurement, not at every leg of every ray)
     const lossZ = new Float64Array(Z.length), lossLZ = new Float64Array(Z.length);
@@ -344,7 +348,7 @@ const G_Acoustics = (() => {
       let b5 = -1, b25 = -1, b15 = -1;
       for (let b = 0; b < NB; b++) { const v = dB(b); if (b5 < 0 && v <= -5) b5 = b; if (b15 < 0 && v <= -15) b15 = b; if (b25 < 0 && v <= -25) { b25 = b; break; } }
       const e2 = b25 > b5 ? b25 : b15 > b5 ? b15 : -1, fall = b25 > b5 ? 20 : 10;
-      return e2 > 0 ? G.U.clamp((60 / fall) * (e2 - b5) * TR.BIN, 0.1, 6) : zone.out ? 0.3 : zone.rt60;
+      return e2 > 0 ? U.clamp((60 / fall) * (e2 - b5) * TR.BIN, 0.1, 6) : zone.out ? 0.3 : zone.rt60;
     };
     for (const q of early) q[1] /= TR.RAYS;
     return { hist: Float32Array.from(hist), histL: Float32Array.from(histL), bin: TR.BIN, early, wet, rt60: rtOf(hist), rt60L: rtOf(histL), mfp, zone: zi };
@@ -394,7 +398,7 @@ const G_Acoustics = (() => {
       if (q.job.rays(DUE.RAYS)) { q.tr = q.job.finish(); q.step = 0; }
     } else {
       // (and its impulse response made, a channel a turn, before it's the room's: the first sound in it needn't wait for that either)
-      const c = G.Audio && G.Audio.ctx;
+      const c = Audio && Audio.ctx;
       if (c && q.step! < 2) shape(q.tr, c.sampleRate, q.step!++);
       else { keep(m, q.key, q.tr); latest.get(q.map)!.set(q.zi, q.tr); of(q.map).zones[q.zi].rt60m = q.tr.rt60; due.shift(); }
     }
@@ -442,7 +446,7 @@ const G_Acoustics = (() => {
       else if (more.length) more.shift()!();
       else {
         const zi = todo.shift(); if (zi === undefined) return;
-        const p = startOf(map, zi); const tr = roomAt(map, p.x, p.y, p.z), c = G.Audio && G.Audio.ctx;
+        const p = startOf(map, zi); const tr = roomAt(map, p.x, p.y, p.z), c = Audio && Audio.ctx;
         if (tr && c) more = [() => { impulse(c, tr); }, () => { impulse(c, tr, 1); }];
       }
       setTimeout(step, G.Space && G.Space.S.on && !G.Space.S.docked ? 250 : 15); // (out flying, where a slow frame shows and none of it's wanted yet: a piece four times a second)
@@ -537,7 +541,7 @@ const G_Acoustics = (() => {
     const zs = zoneAt(map, src.x, src.y, src.z), zl = zoneAt(map, lis.x, lis.y, lis.z);
     if (zs < 0 || zl < 0) return { k: 1, lp: 20000, at: src, same: true };
     if (zs === zl) {
-      const seen = G.Level.los(map, lis.x, lis.y, lis.z, src.x, src.y, src.z);
+      const seen = Level.los(map, lis.x, lis.y, lis.z, src.x, src.y, src.z);
       return { k: seen ? 1 : 0.8, lp: seen ? 20000 : 4000, at: src, same: true };
     }
     const r = listenNear(map, lis.x, lis.y, lis.z).reach.get(zs);
@@ -557,5 +561,5 @@ const G_Acoustics = (() => {
     },
   };
 })();
-G.Acoustics = G_Acoustics;
-interface GameModules { Acoustics: typeof G_Acoustics; }
+G.Acoustics = Acoustics;
+declare global { interface GameModules { Acoustics: typeof Acoustics; } }

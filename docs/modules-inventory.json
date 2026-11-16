@@ -58,16 +58,16 @@
    "zip",
    "callsigns",
    "arsenal",
-   "loadout",
+   "acoustics",
+   "ambience",
+   "gunaudio",
+   "footsteps",
    "audio",
+   "loadout",
    "furnspec",
    "residents",
    "furnmesh",
    "gunshot-synth",
-   "gunaudio",
-   "footsteps",
-   "acoustics",
-   "ambience",
    "handling",
    "lightgrid",
    "levelview",
@@ -294,16 +294,16 @@
   "zip",
   "callsigns",
   "arsenal",
-  "loadout",
+  "acoustics",
+  "ambience",
+  "gunaudio",
+  "footsteps",
   "audio",
+  "loadout",
   "furnspec",
   "residents",
   "furnmesh",
   "gunshot-synth",
-  "gunaudio",
-  "footsteps",
-  "acoustics",
-  "ambience",
   "handling",
   "lightgrid",
   "levelview",
@@ -544,139 +544,190 @@
  "files": {
   "acoustics": {
    "defs": {
-    "Acoustics": 560
+    "Acoustics": 564
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "audio",
+     "line": 2,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 3,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "materials",
+     "line": 4,
+     "names": [
+      "Materials"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 5,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Level",
-     "line": 17,
+     "from": "level",
+     "line": 21,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 17,
+     "from": "level",
+     "line": 21,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 59,
+     "from": "util",
+     "line": 63,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
-     "line": 125,
+     "from": "materials",
+     "line": 129,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 135,
+     "from": "util",
+     "line": 139,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 205,
+     "from": "level",
+     "line": 209,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 241,
+     "from": "util",
+     "line": 245,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 279,
+     "from": "util",
+     "line": 283,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 347,
+     "from": "util",
+     "line": 351,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 390,
+     "line": 394,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 390,
+     "line": 394,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 390,
+     "line": 394,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 397,
+     "from": "audio",
+     "line": 401,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Audio",
-     "line": 397,
+     "from": "audio",
+     "line": 401,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 440,
+     "line": 444,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 440,
+     "line": 444,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Audio",
-     "line": 445,
+     "from": "audio",
+     "line": 449,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Audio",
-     "line": 445,
+     "from": "audio",
+     "line": 449,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Space",
-     "line": 448,
+     "line": 452,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Space",
-     "line": 448,
+     "line": 452,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Space",
-     "line": 448,
+     "line": 452,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 540,
+     "from": "level",
+     "line": 544,
      "load": false,
      "guard": "plain"
     }
@@ -684,241 +735,325 @@
    "decls": {
     "AcZone": {
      "kind": "type",
-     "line": 2
+     "line": 6
     },
     "AcMapData": {
      "kind": "type",
-     "line": 13
+     "line": 17
     },
-    "G_Acoustics": {
+    "Acoustics": {
      "kind": "value",
-     "line": 15
+     "line": 19
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 561
+    "global": {
+     "kind": "value",
+     "line": 565
     }
    }
   },
   "ambience": {
    "defs": {
-    "Ambience": 1268
+    "Ambience": 1274
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "acoustics",
+     "line": 2,
+     "names": [
+      "Acoustics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "audio",
+     "line": 3,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunaudio",
+     "line": 4,
+     "names": [
+      "GunAudio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 5,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "spacedata",
+     "line": 6,
+     "names": [
+      "SpaceData"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 7,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Audio",
-     "line": 256,
+     "from": "audio",
+     "line": 262,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Audio",
-     "line": 256,
+     "from": "audio",
+     "line": 262,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Audio",
-     "line": 256,
+     "from": "audio",
+     "line": 262,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Audio",
-     "line": 257,
+     "from": "audio",
+     "line": 263,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 257,
+     "from": "audio",
+     "line": 263,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
-     "line": 732,
+     "from": "spacedata",
+     "line": 738,
      "load": false,
      "guard": "check"
     },
     {
      "x": "SpaceData",
-     "line": 732,
+     "from": "spacedata",
+     "line": 738,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 785,
+     "from": "level",
+     "line": 791,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Level",
-     "line": 785,
+     "from": "level",
+     "line": 791,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Acoustics",
-     "line": 862,
+     "from": "acoustics",
+     "line": 868,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 908,
+     "from": "acoustics",
+     "line": 914,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 941,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
+     "from": "acoustics",
      "line": 947,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
+     "from": "util",
      "line": 953,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 954,
+     "from": "util",
+     "line": 959,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 960,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 993,
+     "from": "acoustics",
+     "line": 999,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunAudio",
-     "line": 1036,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Acoustics",
-     "line": 1040,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1041,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
+     "from": "gunaudio",
      "line": 1042,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 1053,
+     "from": "acoustics",
+     "line": 1046,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1047,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1048,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 1056,
+     "from": "acoustics",
+     "line": 1059,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 1063,
+     "from": "acoustics",
+     "line": 1062,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 1066,
+     "from": "acoustics",
+     "line": 1069,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Acoustics",
+     "from": "acoustics",
+     "line": 1072,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 1145,
+     "from": "audio",
+     "line": 1151,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 1176,
+     "from": "audio",
+     "line": 1182,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 1183,
+     "from": "acoustics",
+     "line": 1189,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 1183,
+     "from": "acoustics",
+     "line": 1189,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Audio",
-     "line": 1191,
+     "from": "audio",
+     "line": 1197,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Space",
-     "line": 1193,
+     "line": 1199,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Space",
-     "line": 1193,
+     "line": 1199,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Space",
-     "line": 1193,
+     "line": 1199,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 1202,
+     "line": 1208,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Me",
-     "line": 1202,
+     "line": 1208,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Space",
-     "line": 1202,
+     "line": 1208,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Space",
-     "line": 1202,
+     "line": 1208,
      "load": false,
      "guard": "guarded"
     }
@@ -926,71 +1061,71 @@
    "decls": {
     "AmbBus": {
      "kind": "type",
-     "line": 14
+     "line": 20
     },
     "AmbPt": {
      "kind": "type",
-     "line": 15
+     "line": 21
     },
     "AmbNoise": {
      "kind": "type",
-     "line": 16
+     "line": 22
     },
     "AmbPlay": {
      "kind": "type",
-     "line": 18
+     "line": 24
     },
     "AmbLoop": {
      "kind": "type",
-     "line": 20
+     "line": 26
     },
     "AmbEvent": {
      "kind": "type",
-     "line": 21
+     "line": 27
     },
     "AmbSpotDef": {
      "kind": "type",
-     "line": 22
+     "line": 28
     },
     "AmbSpot": {
      "kind": "type",
-     "line": 23
+     "line": 29
     },
     "AmbWay": {
      "kind": "type",
-     "line": 24
+     "line": 30
     },
     "AmbRing": {
      "kind": "type",
-     "line": 25
+     "line": 31
     },
     "AmbShot": {
      "kind": "type",
-     "line": 27
+     "line": 33
     },
     "AmbOpts": {
      "kind": "type",
-     "line": 28
+     "line": 34
     },
     "AmbScene": {
      "kind": "type",
-     "line": 30
+     "line": 36
     },
     "AmbBedOpts": {
      "kind": "type",
-     "line": 52
+     "line": 58
     },
     "AmbRecipe": {
      "kind": "type",
-     "line": 60
+     "line": 66
     },
-    "G_Ambience": {
+    "Ambience": {
      "kind": "value",
-     "line": 62
+     "line": 68
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 1269
+    "global": {
+     "kind": "value",
+     "line": 1275
     }
    }
   },
@@ -1171,343 +1306,387 @@
   },
   "audio": {
    "defs": {
-    "Audio": 655
+    "Audio": 661
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "baseAm",
+      "CALIBERS",
+      "calOf",
+      "CLASS_SND",
+      "roundSpeed",
+      "SOUND_SPEED"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "Hooks",
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "acoustics",
+     "line": 4,
+     "names": [
+      "Acoustics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "footsteps",
+     "line": 5,
+     "names": [
+      "Footsteps"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunaudio",
+     "line": 6,
+     "names": [
+      "GunAudio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 7,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "U",
-     "line": 38,
+     "from": "util",
+     "line": 44,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AudioBundle",
-     "line": 49,
+     "line": 55,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunAudio",
-     "line": 115,
+     "from": "gunaudio",
+     "line": 121,
      "load": false,
      "guard": "check"
     },
     {
      "x": "GunAudio",
-     "line": 115,
+     "from": "gunaudio",
+     "line": 121,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Footsteps",
-     "line": 115,
+     "from": "footsteps",
+     "line": 121,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Footsteps",
-     "line": 115,
+     "from": "footsteps",
+     "line": 121,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Footsteps",
-     "line": 156,
+     "from": "footsteps",
+     "line": 162,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Footsteps",
-     "line": 156,
+     "from": "footsteps",
+     "line": 162,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 177,
+     "line": 183,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 177,
+     "line": 183,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 210,
+     "line": 216,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 210,
+     "line": 216,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 210,
+     "line": 216,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 210,
+     "line": 216,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 210,
+     "line": 216,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "GunAudio",
-     "line": 210,
+     "from": "gunaudio",
+     "line": 216,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 212,
+     "from": "acoustics",
+     "line": 218,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 212,
+     "line": 218,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 226,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
+     "from": "acoustics",
      "line": 232,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Level",
+     "from": "level",
+     "line": 238,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "CLASS_SND",
-     "line": 336,
+     "from": "data",
+     "line": 342,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 380,
+     "line": 386,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 380,
+     "line": 386,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 392,
+     "line": 398,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 392,
+     "line": 398,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 405,
+     "line": 411,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 405,
+     "line": 411,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 454,
+     "from": "util",
+     "line": 460,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 501,
+     "line": 507,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 501,
+     "line": 507,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 515,
+     "from": "util",
+     "line": 521,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 518,
+     "from": "data",
+     "line": 524,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "roundSpeed",
-     "line": 518,
+     "from": "data",
+     "line": 524,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SOUND_SPEED",
-     "line": 520,
+     "from": "data",
+     "line": 526,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "baseAm",
-     "line": 522,
+     "from": "data",
+     "line": 528,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "CALIBERS",
-     "line": 522,
+     "from": "data",
+     "line": 528,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 523,
+     "from": "util",
+     "line": 529,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SOUND_SPEED",
-     "line": 523,
+     "from": "data",
+     "line": 529,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 533,
+     "line": 539,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 533,
+     "line": 539,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 534,
+     "line": 540,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 534,
+     "from": "level",
+     "line": 540,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Casings",
-     "line": 535,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 535,
+     "line": 541,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 601,
+     "line": 607,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 601,
+     "line": 607,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Hooks",
-     "line": 657,
+     "from": "util",
+     "line": 663,
      "load": true,
      "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 657,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 657,
-     "load": false,
-     "guard": "guarded"
     },
     {
      "x": "Hooks",
-     "line": 658,
+     "from": "util",
+     "line": 664,
      "load": true,
      "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 658,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 658,
-     "load": false,
-     "guard": "guarded"
     },
     {
      "x": "Hooks",
-     "line": 659,
+     "from": "util",
+     "line": 665,
      "load": true,
      "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 659,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 659,
-     "load": false,
-     "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 659,
+     "line": 665,
      "load": false,
      "guard": "plain"
     }
@@ -1515,23 +1694,23 @@
    "decls": {
     "FoleyKind": {
      "kind": "type",
-     "line": 3
+     "line": 9
     },
     "FoleySound": {
      "kind": "type",
-     "line": 4
+     "line": 10
     },
     "ImpactMat": {
      "kind": "type",
-     "line": 5
+     "line": 11
     },
-    "G_Audio": {
+    "Audio": {
      "kind": "value",
-     "line": 6
+     "line": 12
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 660
+    "global": {
+     "kind": "value",
+     "line": 666
     }
    }
   },
@@ -2047,145 +2226,161 @@
   },
   "career": {
    "defs": {
-    "Career": 162
+    "Career": 164
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "util",
+     "line": 2,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "U",
-     "line": 19,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 20,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
+     "from": "util",
      "line": 21,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 27,
+     "from": "util",
+     "line": 22,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 23,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 29,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Cloud",
-     "line": 34,
+     "line": 36,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Cloud",
-     "line": 34,
+     "line": 36,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Cloud",
-     "line": 37,
+     "line": 39,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Cloud",
-     "line": 37,
+     "line": 39,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Cloud",
-     "line": 45,
+     "line": 47,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Cloud",
-     "line": 45,
+     "line": 47,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Net",
-     "line": 52,
+     "line": 54,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 53,
+     "line": 55,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 53,
+     "line": 55,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Cloud",
-     "line": 70,
+     "line": 72,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Cloud",
-     "line": 70,
+     "line": 72,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "THEMES",
-     "line": 79,
+     "line": 81,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "THEMES",
-     "line": 79,
+     "line": 81,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Route",
-     "line": 80,
+     "line": 82,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Route",
-     "line": 80,
+     "line": 82,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 143,
+     "from": "util",
+     "line": 145,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 143,
+     "from": "util",
+     "line": 145,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Career": {
+    "Career": {
      "kind": "value",
-     "line": 2
+     "line": 4
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 164
+    "global": {
+     "kind": "value",
+     "line": 166
     }
    }
   },
@@ -2479,283 +2674,339 @@
   },
   "cloud": {
    "defs": {
-    "Cloud": 596
+    "Cloud": 600
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "career",
+     "line": 2,
+     "names": [
+      "Career"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "cloudconfig",
+     "line": 3,
+     "names": [
+      "CloudConfig"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 4,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "CloudConfig",
-     "line": 34,
+     "from": "cloudconfig",
+     "line": 38,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 39,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
+     "from": "util",
      "line": 43,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 47,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 130,
+     "from": "career",
+     "line": 134,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 132,
+     "from": "career",
+     "line": 136,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 138,
+     "from": "career",
+     "line": 142,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 147,
+     "from": "career",
+     "line": 151,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 155,
+     "from": "career",
+     "line": 159,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 155,
+     "from": "career",
+     "line": 159,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Net",
-     "line": 205,
+     "line": 209,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Net",
-     "line": 205,
+     "line": 209,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 205,
+     "line": 209,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 205,
+     "line": 209,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Net",
-     "line": 205,
+     "line": 209,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Callsigns",
-     "line": 227,
+     "line": 231,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Callsigns",
-     "line": 227,
+     "line": 231,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Callsigns",
-     "line": 228,
+     "line": 232,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Callsigns",
-     "line": 228,
+     "line": 232,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Arsenal",
-     "line": 259,
+     "line": 263,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Arsenal",
-     "line": 259,
+     "line": 263,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Shop",
-     "line": 260,
+     "line": 264,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Shop",
-     "line": 260,
+     "line": 264,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 261,
+     "line": 265,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 261,
+     "line": 265,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 262,
+     "line": 266,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 262,
+     "line": 266,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 262,
+     "line": 266,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Career",
-     "line": 280,
+     "from": "career",
+     "line": 284,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 282,
+     "from": "career",
+     "line": 286,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 282,
+     "from": "career",
+     "line": 286,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 295,
+     "from": "career",
+     "line": 299,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 304,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Career",
+     "from": "career",
      "line": 308,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 311,
+     "from": "career",
+     "line": 312,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 318,
+     "from": "career",
+     "line": 315,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 318,
+     "from": "career",
+     "line": 322,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 324,
+     "from": "career",
+     "line": 322,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 337,
+     "from": "career",
+     "line": 328,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 352,
+     "from": "career",
+     "line": 341,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 376,
+     "from": "career",
+     "line": 356,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 381,
+     "from": "career",
+     "line": 380,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 400,
+     "from": "career",
+     "line": 385,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 443,
+     "from": "career",
+     "line": 404,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Career",
+     "from": "career",
+     "line": 447,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 454,
+     "from": "util",
+     "line": 458,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 481,
+     "from": "util",
+     "line": 485,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Career",
-     "line": 571,
+     "from": "career",
+     "line": 575,
      "load": false,
      "guard": "plain"
     }
@@ -2763,35 +3014,35 @@
    "decls": {
     "CloudState": {
      "kind": "type",
-     "line": 12
+     "line": 16
     },
     "SbClient": {
      "kind": "type",
-     "line": 13
+     "line": 17
     },
     "SbUser": {
      "kind": "type",
-     "line": 14
+     "line": 18
     },
     "CloudMeta": {
      "kind": "type",
-     "line": 17
+     "line": 21
     },
     "CloudFly": {
      "kind": "type",
-     "line": 19
+     "line": 23
     },
     "CloudQueue": {
      "kind": "type",
-     "line": 20
+     "line": 24
     },
-    "G_Cloud": {
+    "Cloud": {
      "kind": "value",
-     "line": 21
+     "line": 25
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 598
+    "global": {
+     "kind": "value",
+     "line": 602
     }
    }
   },
@@ -2802,12 +3053,12 @@
    "imports": [],
    "uses": [],
    "decls": {
-    "G_CloudConfig": {
+    "CloudConfig": {
      "kind": "value",
      "line": 6
     },
-    "GameModules": {
-     "kind": "type",
+    "global": {
+     "kind": "value",
      "line": 12
     }
    }
@@ -4712,145 +4963,206 @@
   },
   "footsteps": {
    "defs": {
-    "Footsteps": 152
+    "Footsteps": 157
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "audio",
+     "line": 2,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunaudio",
+     "line": 3,
+     "names": [
+      "GunAudio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 4,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 5,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "acoustics",
+     "line": 6,
+     "names": [
+      "Acoustics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Audio",
-     "line": 21,
+     "from": "audio",
+     "line": 26,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 23,
+     "from": "audio",
+     "line": 28,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 24,
+     "from": "audio",
+     "line": 29,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 32,
+     "from": "audio",
+     "line": 37,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 46,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Casings",
+     "from": "util",
      "line": 51,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Casings",
+     "line": 56,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Audio",
-     "line": 77,
+     "from": "audio",
+     "line": 82,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 77,
+     "line": 82,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 77,
+     "line": 82,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 77,
+     "line": 82,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 77,
+     "line": 82,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Acoustics",
-     "line": 94,
+     "from": "acoustics",
+     "line": 99,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 95,
+     "from": "acoustics",
+     "line": 100,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 98,
+     "from": "level",
+     "line": 103,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunAudio",
-     "line": 110,
+     "from": "gunaudio",
+     "line": 115,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 110,
+     "from": "acoustics",
+     "line": 115,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunAudio",
-     "line": 111,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "GunAudio",
-     "line": 113,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Acoustics",
-     "line": 113,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 113,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GunAudio",
+     "from": "gunaudio",
      "line": 116,
      "load": false,
      "guard": "guarded"
     },
     {
-     "x": "Me",
-     "line": 143,
+     "x": "GunAudio",
+     "from": "gunaudio",
+     "line": 118,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Acoustics",
+     "from": "acoustics",
+     "line": 118,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 144,
+     "line": 118,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "GunAudio",
+     "from": "gunaudio",
+     "line": 121,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 148,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 149,
      "load": false,
      "guard": "plain"
     }
@@ -4858,19 +5170,19 @@
    "decls": {
     "FsGait": {
      "kind": "type",
-     "line": 2
+     "line": 7
     },
     "FsClip": {
      "kind": "type",
-     "line": 3
+     "line": 8
     },
-    "G_Footsteps": {
+    "Footsteps": {
      "kind": "value",
-     "line": 4
+     "line": 9
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 153
+    "global": {
+     "kind": "value",
+     "line": 158
     }
    }
   },
@@ -11163,241 +11475,330 @@
   },
   "gunaudio": {
    "defs": {
-    "GunAudio": 544
+    "GunAudio": 550
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "audio",
+     "line": 2,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 3,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 4,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 5,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "acoustics",
+     "line": 6,
+     "names": [
+      "Acoustics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "ambience",
+     "line": 7,
+     "names": [
+      "Ambience"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Level",
-     "line": 16,
+     "from": "level",
+     "line": 22,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 33,
+     "from": "level",
+     "line": 39,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 42,
+     "from": "util",
+     "line": 48,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 63,
+     "from": "acoustics",
+     "line": 69,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 91,
+     "from": "level",
+     "line": 97,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 91,
+     "from": "level",
+     "line": 97,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 95,
+     "from": "util",
+     "line": 101,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 123,
+     "from": "parts",
+     "line": 129,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 208,
+     "from": "acoustics",
+     "line": 214,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Acoustics",
-     "line": 208,
+     "from": "acoustics",
+     "line": 214,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 210,
+     "from": "level",
+     "line": 216,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 213,
+     "from": "level",
+     "line": 219,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 213,
+     "from": "level",
+     "line": 219,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 238,
+     "from": "level",
+     "line": 244,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 240,
+     "from": "util",
+     "line": 246,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 258,
+     "from": "acoustics",
+     "line": 264,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Acoustics",
-     "line": 258,
+     "from": "acoustics",
+     "line": 264,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 258,
+     "from": "acoustics",
+     "line": 264,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 287,
+     "from": "audio",
+     "line": 293,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 297,
+     "from": "level",
+     "line": 303,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 325,
+     "line": 331,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 326,
+     "line": 332,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 350,
+     "from": "acoustics",
+     "line": 356,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 357,
+     "from": "audio",
+     "line": 363,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 371,
+     "from": "acoustics",
+     "line": 377,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 373,
+     "from": "acoustics",
+     "line": 379,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 382,
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 382,
+     "from": "acoustics",
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 410,
+     "from": "audio",
+     "line": 416,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 410,
+     "line": 416,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 412,
+     "line": 418,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Acoustics",
-     "line": 417,
+     "from": "acoustics",
+     "line": 423,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Acoustics",
-     "line": 442,
+     "from": "acoustics",
+     "line": 448,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Acoustics",
-     "line": 443,
+     "from": "acoustics",
+     "line": 449,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 447,
+     "from": "level",
+     "line": 453,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 464,
+     "from": "util",
+     "line": 470,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Ambience",
-     "line": 486,
+     "from": "ambience",
+     "line": 492,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Ambience",
-     "line": 486,
+     "from": "ambience",
+     "line": 492,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Audio",
-     "line": 529,
+     "from": "audio",
+     "line": 535,
      "load": false,
      "guard": "plain"
     }
@@ -11405,19 +11806,19 @@
    "decls": {
     "RoomSig": {
      "kind": "type",
-     "line": 2
+     "line": 8
     },
     "EchoTap": {
      "kind": "type",
-     "line": 3
+     "line": 9
     },
-    "G_GunAudio": {
+    "GunAudio": {
      "kind": "value",
-     "line": 4
+     "line": 10
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 545
+    "global": {
+     "kind": "value",
+     "line": 551
     }
    }
   },
@@ -12361,85 +12762,125 @@
   },
   "handling": {
    "defs": {
-    "Handling": 129
+    "Handling": 132
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "audio",
+     "line": 2,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 3,
+     "names": [
+      "beltFed",
+      "REV",
+      "revolver"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 4,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "revolver",
-     "line": 36,
+     "from": "data",
+     "line": 39,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "beltFed",
-     "line": 36,
+     "from": "data",
+     "line": 39,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 41,
+     "from": "audio",
+     "line": 44,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 46,
+     "from": "audio",
+     "line": 49,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 52,
+     "from": "audio",
+     "line": 55,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 74,
+     "from": "audio",
+     "line": 77,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 79,
+     "line": 82,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 79,
+     "line": 82,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "REV",
-     "line": 104,
+     "from": "data",
+     "line": 107,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "REV",
-     "line": 105,
+     "from": "data",
+     "line": 108,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "VMAnim",
-     "line": 111,
+     "line": 114,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "revolver",
-     "line": 116,
+     "from": "data",
+     "line": 119,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 124,
+     "from": "util",
+     "line": 127,
      "load": false,
      "guard": "plain"
     }
@@ -12447,15 +12888,15 @@
    "decls": {
     "HandEntry": {
      "kind": "type",
-     "line": 9
+     "line": 12
     },
-    "G_Handling": {
+    "Handling": {
      "kind": "value",
-     "line": 10
+     "line": 13
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 130
+    "global": {
+     "kind": "value",
+     "line": 133
     }
    }
   },
@@ -15702,181 +16143,247 @@
   },
   "icons": {
    "defs": {
-    "Icons": 564
+    "Icons": 568
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "AMMO",
+      "baseAm",
+      "beltFed",
+      "CALIBERS",
+      "calOf",
+      "WEAPONS"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gear",
+     "line": 3,
+     "names": [
+      "Gear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 4,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 5,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "baseAm",
-     "line": 12,
+     "from": "data",
+     "line": 16,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "baseAm",
-     "line": 13,
+     "from": "data",
+     "line": 17,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 17,
+     "from": "data",
+     "line": 21,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 17,
+     "from": "data",
+     "line": 21,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 17,
+     "from": "data",
+     "line": 21,
      "load": true,
      "guard": "guarded"
     },
     {
      "x": "AMMO",
-     "line": 17,
+     "from": "data",
+     "line": 21,
      "load": true,
      "guard": "guarded"
     },
     {
      "x": "calOf",
-     "line": 29,
+     "from": "data",
+     "line": 33,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "beltFed",
-     "line": 30,
+     "from": "data",
+     "line": 34,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 40,
+     "from": "util",
+     "line": 44,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 45,
+     "from": "data",
+     "line": 49,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 47,
+     "from": "parts",
+     "line": 51,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "CALIBERS",
-     "line": 114,
+     "from": "data",
+     "line": 118,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "CALIBERS",
-     "line": 137,
+     "from": "data",
+     "line": 141,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "CALIBERS",
-     "line": 145,
+     "from": "data",
+     "line": 149,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 304,
+     "from": "gear",
+     "line": 308,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 313,
+     "from": "gear",
+     "line": 317,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 418,
+     "line": 422,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 423,
+     "line": 427,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 429,
+     "line": 433,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 452,
+     "from": "gear",
+     "line": 456,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 463,
+     "from": "gear",
+     "line": 467,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 463,
+     "from": "gear",
+     "line": 467,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 475,
+     "from": "parts",
+     "line": 479,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 482,
+     "from": "util",
+     "line": 486,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 499,
+     "from": "gear",
+     "line": 503,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 501,
+     "from": "parts",
+     "line": 505,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 508,
+     "from": "util",
+     "line": 512,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Icons": {
+    "Icons": {
      "kind": "value",
-     "line": 8
+     "line": 12
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 565
+    "global": {
+     "kind": "value",
+     "line": 569
     }
    }
   },
@@ -19090,247 +19597,326 @@
   },
   "loadout": {
    "defs": {
-    "Loadout": 246
+    "Loadout": 252
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "arsenal",
+     "line": 2,
+     "names": [
+      "Arsenal"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 3,
+     "names": [
+      "WEAPONS"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 4,
+     "names": [
+      "Hooks",
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gear",
+     "line": 5,
+     "names": [
+      "Gear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 6,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "audio",
+     "line": 7,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Arsenal",
-     "line": 63,
+     "from": "arsenal",
+     "line": 69,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Arsenal",
-     "line": 63,
+     "from": "arsenal",
+     "line": 69,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 71,
+     "from": "util",
+     "line": 77,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 72,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Arsenal",
+     "from": "util",
      "line": 78,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Arsenal",
-     "line": 85,
+     "from": "arsenal",
+     "line": 84,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Arsenal",
+     "from": "arsenal",
+     "line": 91,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 87,
+     "from": "data",
+     "line": 93,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 87,
+     "from": "data",
+     "line": 93,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gear",
-     "line": 87,
+     "from": "gear",
+     "line": 93,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 87,
+     "from": "gear",
+     "line": 93,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "HUD",
-     "line": 100,
+     "line": 106,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 100,
+     "from": "audio",
+     "line": 106,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 100,
+     "from": "audio",
+     "line": 106,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "HUD",
-     "line": 101,
+     "line": 107,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 101,
+     "from": "util",
+     "line": 107,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 101,
+     "from": "util",
+     "line": 107,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "HUD",
-     "line": 109,
+     "line": 115,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Arsenal",
-     "line": 117,
+     "from": "arsenal",
+     "line": 123,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Arsenal",
-     "line": 117,
+     "from": "arsenal",
+     "line": 123,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Arsenal",
-     "line": 117,
+     "from": "arsenal",
+     "line": 123,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "HUD",
-     "line": 128,
+     "line": 134,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "HUD",
-     "line": 129,
+     "line": 135,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 159,
+     "from": "parts",
+     "line": 165,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 169,
+     "from": "gear",
+     "line": 175,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 172,
+     "from": "gear",
+     "line": 178,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 184,
+     "from": "parts",
+     "line": 190,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 203,
+     "from": "data",
+     "line": 209,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 203,
+     "from": "gear",
+     "line": 209,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 221,
+     "from": "gear",
+     "line": 227,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 221,
+     "from": "gear",
+     "line": 227,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 221,
+     "from": "gear",
+     "line": 227,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 221,
+     "from": "gear",
+     "line": 227,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 230,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "HUD",
+     "from": "gear",
      "line": 236,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Hooks",
-     "line": 247,
-     "load": true,
+     "x": "HUD",
+     "line": 242,
+     "load": false,
      "guard": "plain"
     },
     {
-     "x": "Loadout",
-     "line": 247,
-     "load": false,
+     "x": "Hooks",
+     "from": "util",
+     "line": 253,
+     "load": true,
      "guard": "plain"
     }
    ],
    "decls": {
     "LoNode": {
      "kind": "type",
-     "line": 14
+     "line": 20
     },
     "LoTree": {
      "kind": "type",
-     "line": 15
+     "line": 21
     },
     "LoAtt": {
      "kind": "type",
-     "line": 16
+     "line": 22
     },
-    "G_Loadout": {
+    "Loadout": {
      "kind": "value",
-     "line": 17
+     "line": 23
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 248
+    "global": {
+     "kind": "value",
+     "line": 254
     }
    }
   },
@@ -40091,12 +40677,12 @@
    "imports": [],
    "uses": [],
    "decls": {
-    "G_Zip": {
+    "Zip": {
      "kind": "value",
      "line": 5
     },
-    "GameModules": {
-     "kind": "type",
+    "global": {
+     "kind": "value",
      "line": 56
     }
    }
@@ -40259,17 +40845,17 @@
     "loadAt": [
      {
       "x": "Hooks",
-      "line": 657,
+      "line": 663,
       "guard": "plain"
      },
      {
       "x": "Hooks",
-      "line": 658,
+      "line": 664,
       "guard": "plain"
      },
      {
       "x": "Hooks",
-      "line": 659,
+      "line": 665,
       "guard": "plain"
      }
     ]
@@ -40637,7 +41223,7 @@
     "loadAt": [
      {
       "x": "U",
-      "line": 43,
+      "line": 47,
       "guard": "plain"
      }
     ]
@@ -41892,7 +42478,7 @@
     "loadAt": [
      {
       "x": "Level",
-      "line": 16,
+      "line": 22,
       "guard": "plain"
      }
     ]
@@ -42889,22 +43475,22 @@
     "loadAt": [
      {
       "x": "AMMO",
-      "line": 17,
+      "line": 21,
       "guard": "plain"
      },
      {
       "x": "AMMO",
-      "line": 17,
+      "line": 21,
       "guard": "plain"
      },
      {
       "x": "AMMO",
-      "line": 17,
+      "line": 21,
       "guard": "guarded"
      },
      {
       "x": "AMMO",
-      "line": 17,
+      "line": 21,
       "guard": "guarded"
      }
     ]
@@ -43401,7 +43987,7 @@
     "loadAt": [
      {
       "x": "Hooks",
-      "line": 247,
+      "line": 253,
       "guard": "plain"
      }
     ]
@@ -46830,14 +47416,13 @@
  "reach": [],
  "undefined": {},
  "trial": {
-  "total": 3203,
+  "total": 2559,
   "byCode": {
-   "TS2339": 2855,
+   "TS2339": 2282,
    "TS2551": 127,
-   "TS6196": 56,
-   "TS7006": 121,
-   "TS18047": 14,
-   "TS7031": 4,
+   "TS6196": 44,
+   "TS7006": 76,
+   "TS18047": 4,
    "TS2345": 5,
    "TS2531": 5,
    "TS2322": 2,
@@ -46846,40 +47431,29 @@
   },
   "bare": [],
   "gLost": [
-   "Acoustics",
-   "Ambience",
-   "Audio",
    "AudioBundle",
    "Bolts",
    "Bundles",
-   "Career",
    "Casings",
-   "Cloud",
-   "CloudConfig",
    "Course",
    "DebugStart",
    "Demo",
-   "Footsteps",
    "GLB",
    "Game",
    "Glare",
-   "GunAudio",
    "GunMaterials",
    "GunModels",
    "GunRig",
    "GunsmithUI",
    "HUD",
-   "Handling",
    "Hangar",
    "Headgear",
    "Highlights",
    "HumanData",
    "Humans",
-   "Icons",
    "InvUI",
    "Landing",
    "LevelView",
-   "Loadout",
    "Loot",
    "Me",
    "MenuShow",
@@ -46901,95 +47475,16 @@
    "VMAnim",
    "Viewmodel",
    "Views",
-   "ZeroUI",
-   "Zip"
+   "ZeroUI"
   ],
   "umd": [],
-  "unusedGM": 55,
+  "unusedGM": 43,
   "other": [
-   {
-    "file": "js/ambience.ts",
-    "line": 948,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/cloud.ts",
-    "line": 304,
-    "code": "TS7006",
-    "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/cloud.ts",
-    "line": 352,
-    "code": "TS7006",
-    "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/cloud.ts",
-    "line": 376,
-    "code": "TS7006",
-    "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/cloud.ts",
-    "line": 378,
-    "code": "TS7006",
-    "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/cloud.ts",
-    "line": 380,
-    "code": "TS7006",
-    "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/cloud.ts",
-    "line": 400,
-    "code": "TS7006",
-    "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
    {
     "file": "js/demo.ts",
     "line": 89,
     "code": "TS7006",
     "msg": "Parameter 'dt' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/footsteps.ts",
-    "line": 24,
-    "code": "TS7006",
-    "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/footsteps.ts",
-    "line": 32,
-    "code": "TS7006",
-    "msg": "Parameter 'b' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/footsteps.ts",
-    "line": 32,
-    "code": "TS7006",
-    "msg": "Parameter 'buf' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/footsteps.ts",
-    "line": 96,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/footsteps.ts",
-    "line": 96,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/footsteps.ts",
-    "line": 96,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
    },
    {
     "file": "js/game.ts",
@@ -47095,228 +47590,6 @@
    },
    {
     "file": "js/game.ts",
-    "line": 1521,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1544,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1544,
-    "code": "TS7006",
-    "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1545,
-    "code": "TS7006",
-    "msg": "Parameter 'r' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1546,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1546,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1550,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1554,
-    "code": "TS7031",
-    "msg": "Binding element 'k' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1554,
-    "code": "TS7031",
-    "msg": "Binding element 'pa' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1559,
-    "code": "TS7006",
-    "msg": "Parameter 'b' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1559,
-    "code": "TS7031",
-    "msg": "Binding element 'n' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1559,
-    "code": "TS7031",
-    "msg": "Binding element 'c' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1562,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1562,
-    "code": "TS7006",
-    "msg": "Parameter 'x' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1562,
-    "code": "TS7006",
-    "msg": "Parameter 'y' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1562,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1562,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1562,
-    "code": "TS7006",
-    "msg": "Parameter 'xs' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1562,
-    "code": "TS7006",
-    "msg": "Parameter 'b' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1563,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1563,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1564,
-    "code": "TS7006",
-    "msg": "Parameter 'c' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1564,
-    "code": "TS7006",
-    "msg": "Parameter 'c' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1612,
-    "code": "TS7006",
-    "msg": "Parameter 'k' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1622,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1622,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1622,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1623,
-    "code": "TS2345",
-    "msg": "Argument of type 'unknown' is not assignable to parameter of type 'string'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1623,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1623,
-    "code": "TS7006",
-    "msg": "Parameter 'x' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1623,
-    "code": "TS7006",
-    "msg": "Parameter 'y' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1623,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1624,
-    "code": "TS7006",
-    "msg": "Parameter 'b' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1627,
-    "code": "TS7006",
-    "msg": "Parameter 'b' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1630,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1631,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 1642,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
     "line": 1749,
     "code": "TS2345",
     "msg": "Argument of type 'LvMap | null' is not assignable to parameter of type 'LvMap'."
@@ -47338,6 +47611,12 @@
     "line": 1762,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
+   },
+   {
+    "file": "js/game.ts",
+    "line": 1762,
+    "code": "TS2345",
+    "msg": "Argument of type 'LvMap | null' is not assignable to parameter of type 'AcMap | undefined'."
    },
    {
     "file": "js/game.ts",
@@ -47400,48 +47679,6 @@
     "msg": "Parameter 'b' implicitly has an 'any' type."
    },
    {
-    "file": "js/gunaudio.ts",
-    "line": 444,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/gunaudio.ts",
-    "line": 444,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/gunaudio.ts",
-    "line": 444,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/gunaudio.ts",
-    "line": 444,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/gunaudio.ts",
-    "line": 445,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/gunaudio.ts",
-    "line": 445,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/gunaudio.ts",
-    "line": 445,
-    "code": "TS18047",
-    "msg": "'heard' is possibly 'null'."
-   },
-   {
     "file": "js/gunmodels.ts",
     "line": 42,
     "code": "TS7006",
@@ -47476,24 +47713,6 @@
     "line": 261,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/handling.ts",
-    "line": 46,
-    "code": "TS7006",
-    "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/handling.ts",
-    "line": 52,
-    "code": "TS7006",
-    "msg": "Parameter 'b' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/handling.ts",
-    "line": 53,
-    "code": "TS7006",
-    "msg": "Parameter 'buf' implicitly has an 'any' type."
    },
    {
     "file": "js/hangar.ts",
