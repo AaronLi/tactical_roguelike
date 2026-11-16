@@ -138,10 +138,11 @@ jobs:
           X="--exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props --exclude /assets/models/scenes --exclude /dist/bundle"
           rsync -a $X main/ _site/
           rsync -a $X --exclude /CNAME space/ _site/space-experimental/
-          # the release: five files of main's dist/js (the compiled game, ~90 files) replaced by its bundles, which have the same names (tools/bundle.mjs);
+          # the release: five files of a copy's dist/js (the compiled game, ~90 files) replaced by its bundles, which have the same names (tools/bundle.mjs);
           # the game loads those five and nothing else (the other compiled files stay for ambience.html, which imports audio.js and ambience.js).
-          # (the space branch's copy stays as it is: it is not made of modules yet)
-          node main/tools/bundle.mjs --site _site
+          # (each branch's copy is bundled by its own tools/bundle.mjs, if it has one: a branch whose files aren't modules yet has none and is published as it is)
+          if [ -f main/tools/bundle.mjs ]; then node main/tools/bundle.mjs --site _site; fi
+          if [ -f space/tools/bundle.mjs ]; then node space/tools/bundle.mjs --site _site/space-experimental; fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
