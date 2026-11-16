@@ -42,6 +42,7 @@ const G_Game = {
   enemiesLeft: 0,
   chatOpen: false,
   locked: false,
+  escHeld: false, escAt: -1e9, lockAt: -1e9, lockOnEscUp: false, pauseAt: -1e9, // (Esc down now, when it last went down, when the mouse was last captured, a capture waiting for Esc to come up: lock; when the pause menu last came up)
   softLocked: false, // (playing on a controller or a touch screen, with no pointer lock to be had: counts as locked; js/gamepad.ts, js/touch.ts)
   runStarted: false,
   // the rest of what it keeps, made as it goes (init and the methods below): all here, so its whole shape is in one place. Those marked (init)
@@ -473,10 +474,21 @@ const G_Game = {
     G.R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked)) this.lock(); });
 
     document.addEventListener('pointerlockchange', () => this.lockChanged());
+    // Esc, held and let go: a menu shut with it takes the mouse back once it's up (lock), not while the browser's still treating the
+    // press as its own "let the mouse go"
+    window.addEventListener('keydown', (e) => { if (e.code === 'Escape') { this.escHeld = true; this.escAt = performance.now(); } }, true);
+    window.addEventListener('keyup', (e) => {
+      if (e.code !== 'Escape') return;
+      this.escHeld = false;
+      if (this.lockOnEscUp) { this.lockOnEscUp = false; if (this.phase === 'level' && !this.locked && !this.menuOpen()) this.lock(); }
+    }, true);
+    window.addEventListener('blur', () => { this.escHeld = false; });
 
     window.addEventListener('keydown', (e) => {
       if (this.phase !== 'level') return;
       if (e.code === 'Escape' && this.softLocked && !this.menuOpen()) { this.unlock(); return; } // (no pointer lock for the browser's own Esc to let go)
+      // the pause menu up: Esc puts it away and takes the mouse back (once it's let go: lock). Not the press that brought it up.
+      if (e.code === 'Escape' && !e.repeat && !this.locked && !this.menuOpen() && !this.$('pause').classList.contains('hidden') && performance.now() - this.pauseAt > 250) { this.lock(); return; }
       // in the hangar: Esc puts a shop panel away, and Tab is your stash and loadout (the panel's Kit tab), not the field kit
       if (this.hub) {
         if (e.code === 'Escape' && this.shopOpen) { this.closeShop(); return; }
@@ -575,8 +587,12 @@ const G_Game = {
     // a menu keeps the mouse, so let it straight go again
     if (this.locked && this.menuOpen()) { this.unlock(); return; }
     if (this.phase !== 'level') return;
+    const now = performance.now();
+    if (real) this.lockAt = now;
     if (this.locked) { this.$('pause').classList.add('hidden'); this.$('clickToPlay').classList.add('hidden'); }
-    else if (!this.chatOpen && !this.invOpen && !this.shopOpen && !this.aboxOpen) { this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
+    // (the mouse taken back as a menu was shut with Esc, and let straight go again by the browser's own Esc: not a pause, a click to play on)
+    else if (!this.menuOpen() && now - this.lockAt < 600 && now - this.escAt < 600) this.$('clickToPlay').classList.remove('hidden');
+    else if (!this.chatOpen && !this.invOpen && !this.shopOpen && !this.aboxOpen) { this.pauseAt = now; this.$('pause').classList.remove('hidden'); this.$('pauseCode').textContent = G.Net.code ? 'Room code: ' + G.Net.code : ''; if (G.Prof) this.$('profLine').textContent = G.Prof.line(); }
   },
   unlock() {
     if (this.softLocked) { this.softLocked = false; this.lockChanged(); }
@@ -585,6 +601,7 @@ const G_Game = {
   lock() {
     G.Audio.init();
     if (G.Pad.active() || G.Touch.active()) { if (!this.locked) { this.softLocked = true; this.lockChanged(); } return; }
+    if (this.escHeld) { this.lockOnEscUp = true; return; } // (a menu shut with Esc: once it's let go)
     const c = G.R.renderer.domElement;
     try {
       const p = c.requestPointerLock({ unadjustedMovement: true });
