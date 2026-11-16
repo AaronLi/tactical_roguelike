@@ -27,7 +27,7 @@ const HELD = +opt('--held', 0), SEED = +opt('--seed', 99001), TOL = +opt('--tol'
 const SWEEP = args.includes('--sweep'), CASES = !args.includes('--no-cases'), GOLD = !args.includes('--no-golden'), UPDATE = args.includes('--update-golden');
 const ids = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && ['--held', '--seed', '--tol', '--report'].includes(args[i - 1])));
 const t0 = Date.now();
-const G = await loadGameWithModels(), GS = G.Gunsmith, M = G.Models, Models = loadModels();
+const G = await loadGameWithModels(), GS = G.Gunsmith, M = G.Models, Models = await loadModels();
 const { compare, procedural, fingerprint } = makeComparer(G, Models, TOL);
 const plats = Object.keys(GS.PLATFORMS).filter((id) => G.WEAPONS[id] && (!ids.length || ids.includes(id)));
 

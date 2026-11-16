@@ -33,7 +33,7 @@ if (window.THREE) {
 `);
 }
 
-const G_U = {
+export const U = {
   // mulberry32 — small deterministic PRNG so every peer generates the same level from a seed
   rng(seed: number) {
     let a = seed >>> 0;
@@ -75,22 +75,22 @@ const G_U = {
   smooth: (a: number, b: number, t: number) => { t = Math.min(1, Math.max(0, (t - a) / (b - a))); return t * t * (3 - 2 * t); },
   // hand on the handle: reach, turn the handle, push the door away
   openHand(t: number) {
-    const S = window.G.U.smooth, reach = S(0, 0.35, t), push = S(0.5, 1, t);
+    const S = U.smooth, reach = S(0, 0.35, t), push = S(0.5, 1, t);
     return { x: 0.26 - 0.08 * reach - 0.06 * push, y: 0.98, z: -0.15 - 0.4 * reach - 0.28 * push, twist: S(0.35, 0.5, t) * (1 - push * 0.6) };
   },
   // hand on the door's edge: reach for it, then pull it shut
   closeHand(t: number) {
-    const S = window.G.U.smooth, reach = S(0, 0.45, t), pull = S(0.45, 1, t);
+    const S = U.smooth, reach = S(0, 0.45, t), pull = S(0.45, 1, t);
     return { x: 0.26 + 0.06 * reach - 0.04 * pull, y: 1.0, z: -0.15 - 0.55 * reach + 0.42 * pull, twist: 0 };
   },
   // front kick: chamber the knee, drive the heel through, recover
   kickFoot(t: number) {
-    const S = window.G.U.smooth, ch = S(0, 0.35, t), th = S(0.35, 0.58, t), back = S(0.72, 1, t);
+    const S = U.smooth, ch = S(0, 0.35, t), th = S(0.35, 0.58, t), back = S(0.72, 1, t);
     return { y: 0.06 + (0.42 * ch + 0.08 * th) * (1 - back), z: (0.06 * ch - 0.82 * th) * (1 - back), thrust: th * (1 - back) };
   },
   // bagging evidence: reach for it, lift it, envelope up, slide it in, seal, then set it down unhurried
   bagPhases(t: number) {
-    const S = window.G.U.smooth;
+    const S = U.smooth;
     return { reach: S(0.03, 0.2, t), lift: S(0.22, 0.38, t), envUp: S(0.3, 0.42, t), insert: S(0.44, 0.6, t), seal: S(0.6, 0.7, t), down: S(0.72, 0.95, t) };
   },
   hex: (n: number) => '#' + (n >>> 0).toString(16).padStart(6, '0'),
@@ -103,13 +103,13 @@ const G_U = {
   NS: (typeof location !== 'undefined' && /^\/space-experimental(\/|$)/.test(location.pathname) ? 'space_' : ''),
   store: {
     onSet: null as null | ((k: string, v: any, auto: boolean) => void),
-    get(k: string, d?: any) { try { const v = localStorage.getItem('bp_' + G_U.NS + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
-    put(k: string, v: any) { try { if (v === undefined) localStorage.removeItem('bp_' + G_U.NS + k); else localStorage.setItem('bp_' + G_U.NS + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
-    set(k: string, v: any, auto = false) { G_U.store.put(k, v); if (G_U.store.onSet) try { G_U.store.onSet(k, v, auto); } catch (e) { console.warn('store: onSet', e); } },
+    get(k: string, d?: any) { try { const v = localStorage.getItem('bp_' + U.NS + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    put(k: string, v: any) { try { if (v === undefined) localStorage.removeItem('bp_' + U.NS + k); else localStorage.setItem('bp_' + U.NS + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+    set(k: string, v: any, auto = false) { U.store.put(k, v); if (U.store.onSet) try { U.store.onSet(k, v, auto); } catch (e) { console.warn('store: onSet', e); } },
   },
 };
-G.U = G_U;
+G.U = U;
 // What the simulation may ask of the page (types: js/types/hooks.d.ts): empty here, filled in by the page files as they load.
-const G_Hooks: SimHooks = {};
-G.Hooks = G_Hooks;
-interface GameModules { U: typeof G_U; Hooks: SimHooks; }
+export const Hooks: SimHooks = {};
+G.Hooks = Hooks;
+declare global { interface GameModules { U: typeof U; Hooks: SimHooks; } }

@@ -8,7 +8,8 @@ interface GameNamespace extends GameModules {}
 
 /**
  * What each file puts on G, by name, as it's made. A file declares its own: `const G_Level = { ... }; G.Level = G_Level;`
- * and `interface GameModules { Level: typeof G_Level }` (interfaces merge across the scripts).
+ * and `interface GameModules { Level: typeof G_Level }` (interfaces merge across the scripts). A file that has become a module
+ * (`export const Level = ...; G.Level = Level;`, tools/codemod_imports.mjs) says `declare global { interface GameModules { ... } }`.
  */
 interface GameModules {}
 

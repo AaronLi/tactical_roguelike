@@ -1,7 +1,7 @@
 // Prints a generated ship's deck plans (js/shipgen.ts) as text:
 //   node tools/ship_dump.mjs [transport|small|medium|large|capital] [seed] [level] [obj] [other class]
 import { loadLevel } from './level_env.mjs';
-const { G } = loadLevel();
+const { G } = await loadLevel();
 const size = process.argv[2] || 'small', seed = +(process.argv[3] || 7), level = +(process.argv[4] || 2), other = process.argv[6] || null;
 const t0 = performance.now();
 const map = G.Level.generate(seed, level, G.SpaceData.TH0, false, { size, obj: process.argv[5] || 'artifact', other, wing: process.argv.includes('--wing') });

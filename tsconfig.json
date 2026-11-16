@@ -1,11 +1,13 @@
 {
   // The game's TypeScript: every js/*.ts compiles to dist/js/*.js (same name), loaded by index.html with <script type="module">
-  // tags in order (and by the workers, one import() after another). No file has an import/export yet: everything shared through the global G
-  // (js/types/globals.d.ts).
+  // tags in order (and by the workers, one import() after another). Files are becoming ES modules, leaves first (docs/modules-plan.md phase 4: a
+  // file with an `export` is one, the rest still share through the global G, js/types/globals.d.ts).
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2023", "DOM", "DOM.Iterable", "WebWorker.ImportScripts"],
     "moduleDetection": "legacy",
+    // (a file that is a module may still name the global THREE the page's js/threeboot.ts makes, until the files import three: docs/modules-plan.md phase 4)
+    "allowUmdGlobalAccess": true,
     "rootDir": ".",
     "outDir": "./dist",
     "sourceMap": true,

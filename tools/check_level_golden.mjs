@@ -10,7 +10,7 @@ import fs from 'fs'; import path from 'path';
 import { loadLevel, pure, ROOT } from './level_env.mjs';
 
 const FILE = path.join(ROOT, 'tests/level-golden.json'), write = process.argv.includes('--write'), quiet = process.argv.includes('--quiet');
-const env = loadLevel(), G = env.G, used = pure(env), D = G.LevelDesc;
+const env = await loadLevel(), G = env.G, used = pure(env), D = G.LevelDesc;
 const T = (name) => G.THEMES.findIndex((t) => t.name === name);
 const cases = [];
 for (let th = 0; th < G.THEMES.length; th++) for (const night of [false, true]) cases.push({ key: `${G.THEMES[th].name} ${night ? 'night' : 'day'}`, seed: 424242, level: 3, th, night });

@@ -3,6 +3,7 @@
 // cloud.js, as the page runs them) driven against a stand-in for supabase-js over that database (tools/cloud_fake.mjs), in "browsers"
 // that are each a fresh script context with their own localStorage (a reload: a new context on the same storage).
 //   npm run test:cloud
+import { runFile } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -12,8 +13,7 @@ import { openDb } from './cloud_db.mjs';
 import { fakeServer } from './cloud_fake.mjs';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
-const JS = (f) => fs.readFileSync(path.join(ROOT, 'dist', 'js', f), 'utf8');
-const SRC = ['util.js', 'cloudconfig.js', 'career.js', 'cloud.js'].map((f) => [f, JS(f)]);
+const SRC = ['util.js', 'cloudconfig.js', 'career.js', 'cloud.js'].map((f) => path.join(ROOT, 'dist', 'js', f)); // (ES modules or scripts: tools/vm_game.mjs; each browser loads them afresh in its own context)
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let failed = 0, passed = 0;
 async function test(name, fn) {
@@ -23,7 +23,7 @@ function storage(map = new Map()) {
   return { map, getItem: (k) => (map.has(k) ? map.get(k) : null), setItem: (k, v) => map.set(k, String(v)), removeItem: (k) => map.delete(k), key: (i) => [...map.keys()][i] ?? null, get length() { return map.size; } };
 }
 // a browser: the game's scripts in a context of their own, on this storage, with the project set up (or not: cfg null)
-function browser(server, store, { cfg = { url: 'http://fake.supabase', key: 'anon' }, search = '' } = {}) {
+async function browser(server, store, { cfg = { url: 'http://fake.supabase', key: 'anon' }, search = '' } = {}) {
   const listeners = {};
   const win = {
     localStorage: store, sessionStorage: storage(), console, setTimeout, clearTimeout, setInterval, clearInterval, crypto, URLSearchParams, performance,
@@ -37,7 +37,7 @@ function browser(server, store, { cfg = { url: 'http://fake.supabase', key: 'ano
   };
   win.window = win; win.self = win; win.globalThis = win;
   const ctx = vm.createContext(win);
-  for (const [f, s] of SRC) vm.runInContext(s, ctx, { filename: f });
+  for (const f of SRC) await runFile(ctx, f);
   const G = win.G;
   // what the page's other files would have put there, as far as these touch it
   G.THEMES = [{ name: 'Warehouse' }, { name: 'Apartments' }];
@@ -111,7 +111,7 @@ await test('guest cleanup: anonymous users idle 90 days go, with their rows; act
 
 // ---------------------------------------------------------------- the game's client against the stand-in
 await test('merge rules (pure functions)', async () => {
-  const w = browser(null, storage(), { cfg: null }), C = w.G.Cloud;
+  const w = await browser(null, storage(), { cfg: null }), C = w.G.Cloud;
   const m = C.mergePrefs(['a', 'b', 'c', 'd'], { a: 1, b: 2, c: 3 }, { a: 10, b: 5, c: 0 }, { a: 9, b: 8, d: 4 }, { a: 5, b: 20 });
   assert.deepEqual({ ...m.vals }, { a: 1, b: 8, c: 3, d: 4 }); assert.deepEqual([...m.toLocal], ['b', 'd']); assert.equal(m.toCloud, true);
   const t = C.mergePrefs(['n'], { n: 'Operator12' }, { n: 0 }, { n: 'Hawk' }, { n: 0 });
@@ -121,11 +121,11 @@ await test('merge rules (pure functions)', async () => {
 });
 
 await test('not set up: no client made, nothing queued, the Account box says so', async () => {
-  const server = fakeServer(D), st = storage(), w = browser(server, st, { cfg: { url: '', key: '' } });
+  const server = fakeServer(D), st = storage(), w = await browser(server, st, { cfg: { url: '', key: '' } });
   w.G.Cloud.boot(); w.G.U.store.set('sens', 2); w.G.Career.runStart();
   await sleep(1700);
   assert.equal(w.G.Cloud.state, 'off'); assert.equal(server.calls.length, 0); assert.equal(st.getItem('bp_cloudq'), null);
-  const off = browser(server, storage(), { search: '?cloud=0' }); off.G.Cloud.boot(); off.G.U.store.set('sens', 2); await sleep(1700);
+  const off = await browser(server, storage(), { search: '?cloud=0' }); off.G.Cloud.boot(); off.G.U.store.set('sens', 2); await sleep(1700);
   assert.equal(off.G.Cloud.state, 'off'); assert.equal(server.calls.length, 0);
 });
 
@@ -142,7 +142,7 @@ async function signIn(w, email) {
   await until(() => w.G.Cloud.user && w.G.Cloud.user.email === email && w.G.Cloud.state === 'ok', 10000);
 }
 await test('not signed in: playing and changing settings, with the project set up, make no request and no account; GUEST to the squad', async () => {
-  const pre = browser(server, stA); pre.G.Cloud.boot();
+  const pre = await browser(server, stA); pre.G.Cloud.boot();
   pre.G.U.store.set('arsenal', { got: ['tx22'], n: { p9: { kills: 31 } }, pro: { p9: 1 }, on: {} });
   pre.G.U.store.set('name', 'Hawkeye'); pre.G.U.store.set('sens', 1.4);
   const C = pre.G.Career; C.runStart(); C.levelStart(1, 0, false, false); C.ev('kill', 60, true); C.ev('arrest', 120); C.levelEnd({ arrests: 1, incap: 1, civKilled: 0 }, 400); C.runEnd('left');
@@ -165,7 +165,7 @@ await test('first sign-in with an email: the account is made, and everything her
   const runs = await D.admin('select * from public.runs where user_id = $1', [uidA]);
   assert.equal(runs.length, 1); assert.equal(runs[0].outcome, 'left'); assert.equal(runs[0].levels[0].report.arrests, 1);
 });await test('reload: the session is restored, nothing counted twice; a change while playing goes up after the debounce', async () => {
-  A = browser(server, stA); A.G.Cloud.boot();
+  A = await browser(server, stA); A.G.Cloud.boot();
   await until(() => A.G.Cloud.state === 'ok' && A.G.Cloud.user);
   assert.equal(A.G.Cloud.user.id, uidA);
   assert.equal((await careerRow(D, uidA)).kills, 1);
@@ -182,7 +182,7 @@ await test('offline: writes queue while the network is down, and go up once it i
   assert.equal(q.add.kills, 1); assert.equal(q.add.rescued, 1); assert.equal(q.profile, 1);
   assert.equal((await careerRow(D, uidA)).kills, 2, 'nothing reached the server');
   // a reload while still offline keeps the queue
-  A = browser(server, stA); A.navigator.onLine = false; A.G.Cloud.boot(); await sleep(1800);
+  A = await browser(server, stA); A.navigator.onLine = false; A.G.Cloud.boot(); await sleep(1800);
   assert.equal(JSON.parse(stA.getItem('bp_cloudq')).add.kills, 1);
   server.offline = false; A.navigator.onLine = true; A.fire('online');
   await until(async () => (await careerRow(D, uidA)).kills === 3 && A.G.Cloud.state === 'ok', 15000);
@@ -230,7 +230,7 @@ await test('callsign preference: an older row\'s animal and second choice, or a 
 });
 await test('two accounts: RLS keeps them apart through the API too', async () => {
   server.offline = false; // (whatever the last test left)
-  const O = browser(server, storage()); O.G.Cloud.boot(); O.G.U.store.set('vol', 0.5);
+  const O = await browser(server, storage()); O.G.Cloud.boot(); O.G.U.store.set('vol', 0.5);
   await signIn(O, 'other@example.com');
   const cl = O.G.Cloud.client;
   assert.notEqual(O.G.Cloud.user.id, uidA);
@@ -246,7 +246,7 @@ await test('two accounts: RLS keeps them apart through the API too', async () =>
 const stB = storage();
 let B;
 await test('sign in on another browser: what it has, never signed in, merges into the account (unions, maxima, newer settings, career added)', async () => {
-  B = browser(server, stB); B.G.Cloud.boot();
+  B = await browser(server, stB); B.G.Cloud.boot();
   B.G.U.store.set('arsenal', { got: ['derringer'], n: { p9: { kills: 12, close: 7 } }, pro: {}, on: {} });
   B.G.U.store.set('fov', 70); B.G.U.store.set('vol', 0.3); // (newer than A's 95; one A never set)
   const C = B.G.Career; C.runStart(); C.levelStart(1, 0, false, false); C.ev('kill', 50); C.ev('kill', 50); C.ev('down'); C.levelEnd({ arrests: 0 }, 300); C.runEnd('left');
@@ -266,7 +266,7 @@ await test('sign in on another browser: what it has, never signed in, merges int
   assert.equal(JSON.parse(stB.getItem('bp_name')), 'Hawkeye');
 });
 await test('the other browser picks up the merged progress on its next sync', async () => {
-  A = browser(server, stA); A.G.Cloud.boot();
+  A = await browser(server, stA); A.G.Cloud.boot();
   await until(() => A.G.Cloud.state === 'ok' && A.G.Cloud.user);
   assert.deepEqual([...JSON.parse(stA.getItem('bp_arsenal')).got].sort(), ['derringer', 'tx22']);
   assert.equal(JSON.parse(stA.getItem('bp_fov')), 70);
@@ -291,7 +291,7 @@ await test('sign out, play, sign in again: the account\'s progress left and come
 await test('an anonymous session an earlier version made is let go of; its progress stays here and merges in on signing in', async () => {
   const st = storage();
   await server.client('u', 'k', {}, st).auth.signInAnonymously(); // (as the earlier version left it)
-  const E = browser(server, st); E.G.U.store.set('arsenal', { got: ['ppk'], n: {}, pro: {}, on: {} }); E.G.Career.runStart(); E.G.Career.ev('kill', 50);
+  const E = await browser(server, st); E.G.U.store.set('arsenal', { got: ['ppk'], n: {}, pro: {}, on: {} }); E.G.Career.runStart(); E.G.Career.ev('kill', 50);
   E.G.Cloud.boot();
   await until(() => E.G.Cloud.client && E.G.Cloud.state === 'idle', 8000);
   assert.equal(E.G.Cloud.user, null); assert.equal(E.G.Cloud.guest(), true); assert.equal(JSON.parse(st.getItem('bp_arsenal')).got[0], 'ppk');
@@ -319,10 +319,10 @@ async function signInOnly(w, email) {
   const mail = [...server.mail].reverse().find((m) => m.to === email && m.type === 'email' && !m.used);
   await w.G.Cloud.verifyCode(mail.token);
 }
-const reopen = () => { const w = browser(server, stM); w.G.Cloud.tune({ batch: 3 }); w.G.Cloud.boot(); return w; };
+const reopen = async () => { const w = await browser(server, stM); w.G.Cloud.tune({ batch: 3 }); w.G.Cloud.boot(); return w; };
 await test('a move interrupted after the profile, after the career request (its reply lost) and mid-runs, then finished after a reload: exact totals, no duplicate runs, the guest save gone', async () => {
   server.faults = []; server.offline = false;
-  M = browser(server, stM); M.G.Cloud.tune({ batch: 3 }); M.G.Cloud.boot();
+  M = await browser(server, stM); M.G.Cloud.tune({ batch: 3 }); M.G.Cloud.boot();
   M.G.U.store.set('arsenal', { got: ['ppk'], n: { ppk: { sur: 4 } }, pro: {}, on: {} }); M.G.U.store.set('fov', 101);
   const C = M.G.Career;
   for (let i = 0; i < 7; i++) { C.runStart(); C.levelStart(i + 1, 0, false, false); C.ev('kill', 50); C.runEnd('left'); }
@@ -338,21 +338,21 @@ await test('a move interrupted after the profile, after the career request (its 
   assert.ok(!(await careerRow(D, uidM)), 'no career yet');
   // 2. after a reload: the career request reaches the server, its reply is lost
   kill(M); server.faults = [{ what: 'rpc career_add', when: 'after', n: 1 }];
-  M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'offline', 8000);
+  M = await reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'offline', 8000);
   assert.equal((await careerRow(D, uidM)).kills, 7, 'applied on the server');
   assert.equal(M.G.Cloud.fly().length, 1, 'and kept here, in flight'); assert.equal(M.G.Career.stats().kills, 7);
   // played on, still a guest save: one more kill
   M.G.Career.ev('kill', 50);
   // 3. after a reload: the addition re-sent (skipped: applied), the rest of the kill added, the runs' second batch fails
   kill(M); server.faults = [{ what: 'upsert runs', when: 'before', n: 1, skip: 1 }];
-  M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'offline', 8000);
+  M = await reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'offline', 8000);
   assert.equal((await careerRow(D, uidM)).kills, 8, 'the re-sent addition not counted twice, the new kill once');
   assert.equal(M.G.Cloud.fly().length, 0);
   assert.equal(+(await D.admin('select count(*) n from public.runs where user_id = $1', [uidM]))[0].n, 3, 'one batch of three');
   assert.equal(M.G.Cloud.meta().owner, null); assert.equal(JSON.parse(stM.getItem('bp_arsenal')).got[0], 'ppk');
   // 4. after a reload: the rest, then the guest save wiped and the account's copy in its place
   kill(M); server.faults = [];
-  M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok' && M.G.Cloud.meta().owner === uidM, 10000);
+  M = await reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok' && M.G.Cloud.meta().owner === uidM, 10000);
   const c = await careerRow(D, uidM), runs = await D.admin('select id from public.runs where user_id = $1', [uidM]), prog = (await D.admin('select * from public.progress where user_id = $1', [uidM]))[0];
   assert.equal(c.kills, 8); assert.equal(c.runs, 7);
   assert.equal(runs.length, 7); assert.equal(new Set(runs.map((r) => r.id)).size, 7);
@@ -361,7 +361,7 @@ await test('a move interrupted after the profile, after the career request (its 
   assert.equal(M.G.Career.stats().kills, 8); assert.ok(M.G.Career.runs().every((r) => runs.some((q) => q.id === r.id)));
   assert.equal(JSON.parse(stM.getItem('bp_fov')), 101, 'preferences stay');
   // and a reload adds nothing more
-  kill(M); M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok', 8000); await sleep(300);
+  kill(M); M = await reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok', 8000); await sleep(300);
   assert.equal((await careerRow(D, uidM)).kills, 8);
 });
 await test('signed in, an addition whose reply was lost is re-sent after a reload and counted once', async () => {
@@ -370,7 +370,7 @@ await test('signed in, an addition whose reply was lost is re-sent after a reloa
   await M.G.Cloud.flush();
   assert.equal((await careerRow(D, uidM)).kills, 9); assert.equal(M.G.Cloud.fly().length, 1);
   kill(M); server.faults = [];
-  M = reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok' && M.G.Cloud.fly().length === 0, 8000);
+  M = await reopen(); await until(() => M.G.Cloud.user && M.G.Cloud.state === 'ok' && M.G.Cloud.fly().length === 0, 8000);
   assert.equal((await careerRow(D, uidM)).kills, 9); assert.equal(M.G.Career.stats().kills, 9);
 });
 await test('after a move, signing out leaves an empty guest save, and a second email gets nothing of the first guest\'s', async () => {
@@ -384,7 +384,7 @@ await test('after a move, signing out leaves an empty guest save, and a second e
 });
 await test('a rapid sign-out and sign-in with another email, with a debounced write and a retry pending: none of it goes to the new account, it\'s kept for the old one, no write refused', async () => {
   server.faults = []; server.offline = false;
-  const st = storage(), P = browser(server, st); P.G.Cloud.boot();
+  const st = storage(), P = await browser(server, st); P.G.Cloud.boot();
   await signIn(P, 'pend-a@example.com'); const ua = P.G.Cloud.user.id;
   P.G.U.store.set('arsenal', { got: ['usp'], n: { usp: { hs: 3 } }, pro: {}, on: {} }); await P.G.Cloud.flush();
   const k0 = (await careerRow(D, ua) || { kills: 0 }).kills;

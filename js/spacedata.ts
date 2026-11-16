@@ -1,4 +1,6 @@
 'use strict';
+import { HANGAR_ROWS, THEMES as G_THEMES } from './data.js';
+import { U as G_U } from './util.js';
 // what a class carries on her hull, and who's aboard her: light guards posted singly, security squads (four, armed and armoured), breach
 // response squads (three, lighter: they come to where the hull is breached), and those who don't fight
 interface SpClass { name: string; tier: number; pay: number; diff: number; guns: { pd: number; cannon: number; missile: number }; crew: { guard: number; squads: number; resp: number; civ: number } }
@@ -11,7 +13,7 @@ interface SpLayout {
   lift: number; // how far over her keel the breach deck's floor is above a deck she's breaching (her keel sits that much lower)
 }
 interface SpEquip { id: string; name: string; slot: 'turret' | 'util'; price: number; blurb: string; dmg?: number; rof?: number; range?: number }
-const G_SpaceData = (() => {
+export const SpaceData = (() => {
   // The game plays in space (the hangar is the base, missions are flown to). Off, it is the game as it was: a route map and a
   // helicopter. A debug start's ?play goes the old way whatever this says (js/debugstart.ts).
   const ON = true;
@@ -201,7 +203,7 @@ const G_SpaceData = (() => {
     return p.z < L.zr ? p.y < L.CB + 0.4 && Math.abs(p.x) < (p.y > L.CC - 0.1 ? (p.z < L.zt ? L.tw : L.sw) : L.fw) + 0.1 : p.y < L.CM + 0.4 && Math.abs(p.x) < L.hw + 0.05;
   }
   // Where the ship stands in the hangar (the pad in front of the hall: js/hangar.ts), nose to the west.
-  const HUB_BERTH = { x: 27, y: 0, z: G.HANGAR_ROWS * 2 + 35, yaw: Math.PI / 2 };
+  const HUB_BERTH = { x: 27, y: 0, z: HANGAR_ROWS * 2 + 35, yaw: Math.PI / 2 };
 
   // ---- the places missions go to (the level's theme: js/level.ts generate, th from 1000 up)
   const THEMES: ThemeDef[] = [
@@ -210,8 +212,8 @@ const G_SpaceData = (() => {
     { name: 'Navy warship', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.07, foes: 1.35, crowd: 0.4, home: 0, reflect: 0.3, floor: '#3a4149', wall: '#65717b', crate: '#566650', accent: '#d23a30', fog: 0x020306, light: 0xdfe8ff, ceil: '#4a525b', hemi: 0x8fa6c8, hemiI: 0.3, far: 30000 },
   ];
   const TH0 = 1000;
-  const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G.THEMES[th] || null);
-  const themeIndex = (T: ThemeDef | null | undefined) => { if (!T) return -1; const i = G.THEMES.findIndex((q) => q.name === T.name); return i >= 0 ? i : THEMES.findIndex((q) => q.name === T.name) >= 0 ? TH0 + THEMES.findIndex((q) => q.name === T.name) : -1; };
+  const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G_THEMES[th] || null);
+  const themeIndex = (T: ThemeDef | null | undefined) => { if (!T) return -1; const i = G_THEMES.findIndex((q) => q.name === T.name); return i >= 0 ? i : THEMES.findIndex((q) => q.name === T.name) >= 0 ? TH0 + THEMES.findIndex((q) => q.name === T.name) : -1; };
 
   // ---- A mission's zone: a vast stretch of open space with the ship the mission is about under way in it (contact 0: bow
   // first, in a straight line, slowly) and now and then someone else passing (the rest: four or five, each on a wide loop of
@@ -219,7 +221,7 @@ const G_SpaceData = (() => {
   // 'tboard'): each is a ship of her own class, theme and seed, so she's the same ship whenever she's looked at.
   // The zone's frame: the mission ship's own at the moment the squad came out of the jump, its middle the origin.
   function zone(ms: { seed: number; size: SpSize | null; th: number; wing?: boolean; name: string }): SpContact[] {
-    const r = G.U.rng((ms.seed ^ 0x20e5) >>> 0), U = G.U, out: SpContact[] = [];
+    const r = G_U.rng((ms.seed ^ 0x20e5) >>> 0), U = G_U, out: SpContact[] = [];
     const mk = (kind: string, size: SpSize, th: number, seed: number, wing: boolean, name: string, pts: number[][], speed: number, off: number) => {
       const lens = pts.map((p, i) => { const q = pts[(i + 1) % pts.length]; return Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]); });
       out.push({ k: out.length, kind, size, th, seed, wing, name, pts, lens, total: lens.reduce((a, b) => a + b, 0), speed, off });
@@ -284,10 +286,10 @@ const G_SpaceData = (() => {
   // lets the squad take up to PICKS of them out together.
   const OFFERS = 6, PICKS = 3;
   function offers(seed: number, level: number): SpMission[] {
-    const r = G.U.rng((seed ^ 0x5bace) >>> 0), U = G.U, out: SpMission[] = [];
+    const r = G_U.rng((seed ^ 0x5bace) >>> 0), U = G_U, out: SpMission[] = [];
     // what's about goes by how far the squad has got: transports and corvettes first, capital ships late
     const sizes: SpSize[] = level < 2 ? ['transport', 'transport', 'small'] : level < 3 ? ['transport', 'small', 'small', 'medium'] : level < 5 ? ['small', 'medium', 'medium', 'large'] : level < 7 ? ['medium', 'large', 'large', 'capital'] : ['large', 'capital', 'capital'];
-    const planets = G.THEMES.map((T, i) => i).filter((i) => { const T = G.THEMES[i]; return !T.starter && !T.residents && !T.rock && T.layout !== 'festival' && T.layout !== 'houses' && !(T.from! > level + 1); });
+    const planets = G_THEMES.map((T, i) => i).filter((i) => { const T = G_THEMES[i]; return !T.starter && !T.residents && !T.rock && T.layout !== 'festival' && T.layout !== 'houses' && !(T.from! > level + 1); });
     for (let i = 0; i < OFFERS; i++) {
       // (the fifth is always a ship taken by pirates: a civilian transport, whatever else is about)
       const assault = i === 2 || (i === 5 && r() < 0.5), taken = i === 4, size = assault ? null : taken ? 'transport' : i === 0 ? sizes[0] : U.pick(r, sizes);
@@ -327,5 +329,5 @@ const G_SpaceData = (() => {
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
   return { BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();
-G.SpaceData = G_SpaceData;
-interface GameModules { SpaceData: typeof G_SpaceData; }
+G.SpaceData = SpaceData;
+declare global { interface GameModules { SpaceData: typeof SpaceData; } }

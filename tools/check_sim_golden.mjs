@@ -8,8 +8,10 @@
 //   node tools/check_sim_golden.mjs --update   write it (after a change that's meant to change the simulation)
 //   node tools/check_sim_golden.mjs --only warehouse   one scenario
 // Math.random is a seeded generator here (the simulation's own randomness: a suspect's choices, its aim), timers run on
-// the level's clock (G.Server.overBlack's wait), and three.js is node's copy (some files use its maths). Run `tsc` first
-// (npm run test:sim does).
+// the level's clock (G.Server.overBlack's wait), and three.js is node's copy (some files use its maths). Each run is a vm context of its
+// own with the compiled files (ES modules and scripts: tools/vm_game.mjs) loaded in it afresh, so a run shares nothing with the one before.
+// Run `tsc` first (npm run test:sim does).
+import { runScripts } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import fs from 'node:fs'; import vm from 'node:vm'; import path from 'node:path'; import crypto from 'node:crypto'; import { fileURLToPath } from 'node:url';
 import * as THREE_NS from 'three';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), DIST = path.join(ROOT, 'dist/js/');
@@ -30,8 +32,8 @@ const DT = 1 / 60;
 function mulberry(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
 const hash = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 12);
 
-/** the simulation, fresh, in a context of its own: its randomness seeded, its timers on a clock we move */
-function load(rndSeed) {
+/** the simulation, fresh, in a context of its own (a whole new module graph in it: tools/vm_game.mjs, so nothing is shared between two runs): its randomness seeded, its timers on a clock we move */
+async function load(rndSeed) {
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });
   const document = { createElement: () => ({ width: 1, height: 1, getContext: () => ctx2d, style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
   const M = Object.create(Math); M.random = mulberry(rndSeed);
@@ -43,11 +45,7 @@ function load(rndSeed) {
     performance: clock, THREE: { ...THREE_NS }, document, location: { search: '' }, URLSearchParams, addEventListener() {}, setTimeout, clearTimeout, setInterval: () => 0, clearInterval() {}, structuredClone, queueMicrotask, TextEncoder, TextDecoder, atob, btoa };
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx; ctx.G = {};
   vm.createContext(ctx);
-  for (const f of SCRIPTS) {
-    const file = DIST + f + '.js';
-    if (!fs.existsSync(file)) { console.error(`${path.relative(ROOT, file)} missing: run tsc first (npm run test:sim does)`); process.exit(1); }
-    vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: f + '.js' });
-  }
+  await runScripts(ctx, DIST, SCRIPTS, { what: 'npm run test:sim does' });
   const advance = (dt) => { now += dt; for (;;) { timers.sort((a, b) => a.at - b.at || a.id - b.id); const t = timers[0]; if (!t || t.at > now) break; timers.shift(); t.fn(); } };
   return { G: ctx.G, advance, time: () => now };
 }
@@ -57,8 +55,8 @@ const r6 = (v) => (typeof v === 'number' && Number.isFinite(v) ? Math.round(v * 
 function enemyDigest(e) {
   return [e.id, e.type, e.state, r6(e.x), r6(e.y || 0), r6(e.z), r6(e.yaw), r6(e.hp), e.alert ? 1 : 0, e.tgt || 0, e.canSee ? 1 : 0, e.mag, e.crouch ? 1 : 0, e.inCover ? 1 : 0, e.order ? e.order.phase : 0, e.down ? 1 : 0, r6(e.morale)];
 }
-function run(sc) {
-  const { G, advance } = load(sc.rnd), S = G.Server, out = [];
+async function run(sc) {
+  const { G, advance } = await load(sc.rnd), S = G.Server, out = [];
   // what the simulation says, in order: every message, as JSON (Maps and Sets as their entries)
   const enc = (m) => JSON.stringify(m, (_k, v) => (v instanceof Map ? ['Map', [...v]] : v instanceof Set ? ['Set', [...v]] : ArrayBuffer.isView(v) ? ['TA', Array.from(v)] : v));
   const kinds = {};
@@ -133,9 +131,9 @@ const t0 = Date.now(), res = {};
 for (const sc of SCENARIOS.filter((s) => !ONLY || s.name.includes(ONLY))) {
   const t = Date.now();
   let r;
-  try { r = run(sc); } catch (e) { console.log(`FAIL ${sc.name}: ${e.stack || e}`); bad++; continue; }
+  try { r = await run(sc); } catch (e) { console.log(`FAIL ${sc.name}: ${e.stack || e}`); bad++; continue; }
   // twice in a row must agree, or the check itself isn't deterministic
-  const again = run(sc);
+  const again = await run(sc);
   if (again.final !== r.final) { console.log(`FAIL ${sc.name}: two runs of the same code differ (from second ${again.seconds.findIndex((h, i) => h !== r.seconds[i]) + 1}): the check isn't deterministic`); bad++; continue; }
   res[sc.name] = { final: r.final, seconds: r.seconds, enemies: r.enemies, states: r.states, msgs: r.msgs, kinds: r.kinds, reached: `${r.reached}/${r.rooms}` };
   const g = golden[sc.name], tag = `${sc.name.padEnd(18)} ${((Date.now() - t) / 1000).toFixed(1)} s, ${r.enemies} left ${JSON.stringify(r.states)}, ${r.msgs} messages, rooms ${r.reached}/${r.rooms}`;

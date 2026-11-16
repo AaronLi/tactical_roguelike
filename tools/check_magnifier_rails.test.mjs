@@ -34,7 +34,7 @@ const run = (feet, waivers = {}) => judge([{ id: 'gun', sight: 'dot', magnifier:
 
 // the recipe: the MP5's every reflex sight and magnifier on its claw mount's rail; with optFMag moved back 3 cm the magnifier is caught
 {
-  const G = loadGame(), GS = G.Gunsmith, bs = magnifierBuilds(GS, 'mp5', loadedBuild, buildKey);
+  const G = await loadGame(), GS = G.Gunsmith, bs = magnifierBuilds(GS, 'mp5', loadedBuild, buildKey);
   ok('the MP5 has magnifier builds', bs.length >= 8, String(bs.length));
   const res = bs.map((b) => ({ id: 'mp5', sight: b.sight, magnifier: b.magnifier, ev: evaluate(G.GunRecipes.feet(defOf(G, 'mp5', b.build)).feet) }));
   ok('the MP5: every foot on the rail', res.every((r) => r.ev.rail && !r.ev.over.length && !r.ev.problem), JSON.stringify(res.filter((r) => r.ev.over.length || r.ev.problem).slice(0, 2)));

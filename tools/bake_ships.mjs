@@ -19,7 +19,7 @@ function glbJson(buf) {
   if (buf.length < 20 || buf.toString('latin1', 0, 4) !== 'glTF' || buf.readUInt32LE(16) !== 0x4e4f534a) return null;
   try { return JSON.parse(buf.toString('utf8', 20, 20 + buf.readUInt32LE(12))); } catch { return null; }
 }
-let data; try { data = shipData(); } catch (e) { console.error('bake_ships: ' + e.message); process.exit(1); }
+let data; try { data = await shipData(); } catch (e) { console.error('bake_ships: ' + e.message); process.exit(1); }
 const ships = {};
 for (const f of fs.existsSync(SRC) ? fs.readdirSync(SRC) : []) {
   if (!f.endsWith('.glb')) continue;

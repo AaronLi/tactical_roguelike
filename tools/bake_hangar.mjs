@@ -12,6 +12,7 @@
 //   assets/models/scenes/index.json    { version, scenes: { hangar: { file, data, bytes, tris, meshes, nodes, anchors } } }
 // The files go into the model bundle (tools/bundle_models.mjs; `npm run bake:hangar` runs both). Needs the compiled game (tsc).
 //   node tools/bake_hangar.mjs [--keep-raw]
+import { runScripts } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import fs from 'fs'; import vm from 'vm'; import path from 'path'; import os from 'os';
 import * as THREE_NS from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
@@ -33,7 +34,7 @@ async function loadGame() {
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx; ctx.G = {};
   NC.install(ctx); NC.install(globalThis); // (the game's canvases, and the exporter's)
   vm.createContext(ctx);
-  for (const f of order) vm.runInContext(fs.readFileSync(DIST + f + '.js', 'utf8'), ctx, { filename: f + '.js' });
+  await runScripts(ctx, DIST, order);
   return { G: ctx.G, T: ctx.THREE };
 }
 

@@ -41,7 +41,7 @@ const ORDERS = {
   'js/prepworker.ts': listIn(read('js/prepworker.ts'), 'PREP_SCRIPTS ='),
   'js/exportworker.ts': listIn(read('js/exportworker.ts'), 'EXPORT_SCRIPTS ='),
   'tools/level_env.mjs': listIn(read('tools/level_env.mjs'), 'LEVEL_SCRIPTS ='),
-  'tools/model_env.mjs': listIn(read('tools/model_env.mjs'), 'for (const f of ['),
+  'tools/model_env.mjs': listIn(read('tools/model_env.mjs'), "runScripts(ctx, dist, ["),
 };
 // The simulation side: what the server's thread and the level's preparation load (nothing that draws or plays)
 const SIM = new Set([...ORDERS['js/serverworker.ts'], ...ORDERS['js/prepworker.ts']]);
@@ -61,7 +61,8 @@ const F = {}; // per file: defs, uses, top-level declarations, and the methods o
 for (const f of files) {
   const text = fs.readFileSync(path.join(JS, f), 'utf8'), sf = ts.createSourceFile(f, text, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
   const line = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
-  const defs = new Map(), uses = [], decls = new Map();
+  const defs = new Map(), uses = [], decls = new Map(), imports = []; // (imports: what the file takes from another by `import`, once it's a module: docs/modules-plan.md phase 4)
+  for (const s of sf.statements) if (ts.isImportDeclaration(s) && ts.isStringLiteral(s.moduleSpecifier) && /^\.\.?\//.test(s.moduleSpecifier.text)) imports.push({ from: path.basename(s.moduleSpecifier.text).replace(/\.js$/, ''), line: line(s), names: s.importClause && s.importClause.namedBindings && ts.isNamedImports(s.importClause.namedBindings) ? s.importClause.namedBindings.elements.map((e) => (e.propertyName || e.name).text) : [] });
   // names bound to functions, and objects' members bound to functions (for "called at load")
   const fnsByName = new Map(), objMembers = new Map(); // name -> [fn], objName -> Map(member -> [fn])
   const addFn = (m, k, fn) => { if (!m.has(k)) m.set(k, []); m.get(k).push(fn); };
@@ -174,7 +175,7 @@ for (const f of files) {
   // nodes already counted at load)
   walk(sf, true, null);
   const atLoadUse = new Set(uses.map((u) => u.x + ':' + u.line + ':' + u.load));
-  F[f] = { defs, uses, decls, gMembers, crossCalls, sf, line, walkMember: (fn, via) => { const before = uses.length; walk(fn.body || fn, true, via); return uses.slice(before); }, atLoadUse };
+  F[f] = { defs, uses, decls, imports, gMembers, crossCalls, sf, line, walkMember: (fn, via) => { const before = uses.length; walk(fn.body || fn, true, via); return uses.slice(before); }, atLoadUse };
 }
 // (a use counted both at load and deferred, the same place: at load wins)
 for (const f of files) {
@@ -204,6 +205,12 @@ for (const f of files) {
     d[u.load ? 'load' : 'call']++; d.names.add(u.x);
     if (u.load) d.loadAt.push({ x: u.x, line: u.line, guard: u.guard, via: u.via });
   }
+}
+// imports (a converted file names the others by `import`, not G.X): an edge that runs at load, as the module graph runs a file's imports first
+for (const f of files) for (const im of F[f].imports) {
+  if (!edges[base(f)] || im.from === base(f)) continue;
+  const d = (edges[base(f)][im.from] ||= { load: 0, call: 0, names: new Set(), loadAt: [] });
+  d.load++; for (const n of im.names) d.names.add(n); d.loadAt.push({ x: im.names.join(', ') || '(side effects)', line: im.line, guard: 'plain', via: 'import' });
 }
 const names = files.map(base);
 function sccs(adj) { // Tarjan
@@ -252,6 +259,7 @@ for (const f of files) {
   if (!SIM.has(base(f))) continue;
   for (const u of F[f].uses) if (page(u.x)) reach.push({ file: base(f), x: u.x, owner: base(owner.get(u.x)), line: u.line, load: u.load, guard: u.guard, via: u.via });
 }
+for (const f of files) if (SIM.has(base(f))) for (const im of F[f].imports) if (!SIM.has(im.from) && files.includes(im.from + '.ts')) reach.push({ file: base(f), x: im.names.join(', ') || '*', owner: im.from, line: im.line, load: true, guard: 'plain', import: true });
 const unguardedAtLoad = reach.filter((r) => r.load && r.guard === 'plain');
 
 // ------------------------------------------------------------------ the trial typecheck: every file a module
@@ -289,7 +297,7 @@ console.log(summary.join('\n'));
 // The layering rule (docs/modules-plan.md, phase 3): a simulation file names only simulation modules; what it needs of the page it asks
 // through G.Hooks (js/types/hooks.d.ts), which the page fills in. Any G.X of a page-only module in a simulation file, guarded or not, fails.
 if (CHECK) {
-  for (const r of reach) console.error(`layering: js/${r.file}.ts:${r.line} uses G.${r.x} (${r.owner}.ts is page-only): ask through a G.Hooks hook the page fills in`);
+  for (const r of reach) console.error(r.import ? `layering: js/${r.file}.ts:${r.line} imports ${r.x} from ${r.owner}.ts (page-only): ask through a G.Hooks hook the page fills in` : `layering: js/${r.file}.ts:${r.line} uses G.${r.x} (${r.owner}.ts is page-only): ask through a G.Hooks hook the page fills in`);
   if (reach.length) console.error(`${reach.length} use(s) of a page-only module in the simulation's files (${[...SIM].length} files: SERVER_SCRIPTS in js/serverworker.ts, PREP_SCRIPTS in js/prepworker.ts)`);
   else console.log('layering ok: no simulation file names a page-only module');
   process.exit(reach.length ? 1 : 0);
@@ -349,7 +357,7 @@ fs.writeFileSync(path.join(ROOT, 'docs/modules-inventory.md'), md.join('\n') + '
 const json = {
   note: 'Generated by node tools/deps.mjs. See docs/modules-plan.md.',
   sim: [...SIM], orders: ORDERS, order, owner: Object.fromEntries([...owner].map(([x, f]) => [x, base(f)])),
-  files: Object.fromEntries(files.map((f) => [base(f), { defs: Object.fromEntries(F[f].defs), uses: F[f].uses, decls: Object.fromEntries(F[f].decls) }])),
+  files: Object.fromEntries(files.map((f) => [base(f), { defs: Object.fromEntries(F[f].defs), imports: F[f].imports, uses: F[f].uses, decls: Object.fromEntries(F[f].decls) }])),
   edges: Object.fromEntries(Object.entries(edges).map(([v, e]) => [v, Object.fromEntries(Object.entries(e).map(([w, d]) => [w, { load: d.load, call: d.call, names: [...d.names], loadAt: d.loadAt }]))])),
   loadCycles, allCycles, orderProblems, reach, undefined: Object.fromEntries([...undefinedNames].map(([x, s]) => [x, [...s]])), trial,
 };
