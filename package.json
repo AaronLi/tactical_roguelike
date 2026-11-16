@@ -24,7 +24,7 @@
     "test:level": "tsc -p . && node tools/check_level_golden.mjs --quiet",
     "test:sim": "tsc -p . && node tools/check_sim_golden.mjs",
     "deps": "node tools/deps.mjs",
-    "deps:check": "node tools/deps.mjs --check --no-tsc",
+    "deps:check": "node tools/deps.mjs --check",
     "smoke": "node tools/smoke.mjs",
     "test": "npm run test:models && npm run test:level && npm run test:sim",
     "test:cloud": "tsc -p . && node tools/cloud.test.mjs",

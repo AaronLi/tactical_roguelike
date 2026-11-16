@@ -1,23 +1,22 @@
-// The inventory for moving from the global G to ES modules (docs/modules-plan.md, phase 0): who uses what, and when.
+// The inventory of what the game's files use of each other (docs/modules-plan.md, phase 0: who uses what, and when; first written for the move from the global G to
+// ES modules, which is done: no file has a G any more, js/debugglobals.ts builds the console's from the exports).
 //   node tools/deps.mjs            writes docs/modules-inventory.md (to read) and docs/modules-inventory.json (for the
 //                                  later phases' scripts), and prints a summary
 //   node tools/deps.mjs --check    the same summary, nothing written; exit 1 if a simulation file names a page-only module
-//                                  through G, guarded or not (the layering rule, phase 3; run in CI: npm run deps:check)
-//   node tools/deps.mjs --no-tsc   without the trial module typecheck (it takes a few seconds)
+//                                  by import, guarded or not (the layering rule, phase 3), or if a file reads or writes the global G (it has
+//                                  none: only js/debugglobals.ts builds one) or a load order is wrong; run in CI: npm run deps:check
 // What it reads:
 //   - every js/*.ts, parsed (TypeScript 5's API, tools/deps/package.json: TypeScript 7's package has no API):
-//     which G.X each file defines (`G.X = ...`) and uses, and for each use whether it runs while the file loads or only
-//     once something calls it (inside a function), and whether it's guarded (`G.X && ...`, `if (G.X)`, `G.X?.`)
+//     which names each file exports and uses (a name imported from another file, or, if one came back, a read of the global G),
+//     and for each use whether it runs while the file loads or only once something calls it (inside a function), and whether
+//     it's guarded (`X && ...`, `if (X)`, `X?.`). js/debugglobals.ts, which names everything to build the console's G, is not read for uses
 //   - the load orders: the page's entry file (js/main.ts, with index.html's one classic script, js/modelbundles.ts), the three workers' entry files
 //     (js/serverhost.ts, js/prepentry.ts, js/exportentry.ts) and the node tools' lists (tools/level_env.mjs, tools/model_env.mjs); what runs in what
 //     order is worked out from the imports
-//   - the trial typecheck: tsconfig.modules-trial.json, every file a module (moduleDetection force). Its errors are the
-//     references between files that don't go through G: the types (interface LvMap in one file, used in forty) and the
-//     odd global value. What phase 1 has to give a home.
 // "While loading" is worked out, not run: a function's body is taken as run at load when the function's called at once
 // (an IIFE, `(() => {...})()`), when it's a callback of an array method called at load (`.map(...)` in a constant's
 // initializer), when it's a function or an object's method of the same file called at load, or (one step across files)
-// when it's a method of another module called at load (`G.Level.foo()` at the top of a file makes what foo uses at load
+// when it's a method of another module called at load (`Level.foo()` at the top of a file makes what foo uses at load
 // part of that file's load). Anything subtler (a function handed to another file and called there at once) isn't seen.
 import fs from 'node:fs'; import path from 'node:path'; import { spawnSync } from 'node:child_process'; import { createRequire } from 'node:module'; import { fileURLToPath } from 'node:url';
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'), JS = path.join(ROOT, 'js');
@@ -30,7 +29,7 @@ if (!fs.existsSync(path.join(TOOL, 'node_modules/typescript'))) {
   if (r.status !== 0) { console.error('could not install it: run npm ci --prefix tools/deps'); process.exit(1); }
 }
 const ts = createRequire(path.join(TOOL, 'package.json'))('typescript');
-const argv = process.argv.slice(2), CHECK = argv.includes('--check'), NO_TSC = argv.includes('--no-tsc');
+const argv = process.argv.slice(2), CHECK = argv.includes('--check');
 const rel = (f) => path.relative(ROOT, f).split(path.sep).join('/');
 const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8');
 
@@ -67,11 +66,11 @@ const SYNC = new Set(['map', 'forEach', 'filter', 'reduce', 'reduceRight', 'some
 const isFn = (n) => ts.isFunctionDeclaration(n) || ts.isFunctionExpression(n) || ts.isArrowFunction(n) || ts.isMethodDeclaration(n) || ts.isGetAccessorDeclaration(n) || ts.isSetAccessorDeclaration(n) || ts.isConstructorDeclaration(n);
 const unparen = (n) => { while (n && ts.isParenthesizedExpression(n)) n = n.expression; return n; };
 const outerParen = (n) => { while (n.parent && ts.isParenthesizedExpression(n.parent)) n = n.parent; return n; };
-/** G.X: the X, or null */
+/** G.X: the X, or null (no file has a G now: any one is reported) */
 const gName = (n) => (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'G' ? n.name.text
   : ts.isElementAccessExpression(n) && ts.isIdentifier(n.expression) && n.expression.text === 'G' && ts.isStringLiteral(n.argumentExpression) ? n.argumentExpression.text : null);
 
-const F = {}; // per file: defs, uses, top-level declarations, and the methods of what it puts on G
+const F = {}; // per file: defs (its exports), uses, top-level declarations, and the members of what it exports
 for (const f of files) {
   const text = fs.readFileSync(path.join(JS, f), 'utf8'), sf = ts.createSourceFile(f, text, ts.ScriptTarget.ES2022, true, ts.ScriptKind.TS);
   const line = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
@@ -115,17 +114,17 @@ for (const f of files) {
     if (kind === 'var') { for (const d of s.declarationList.declarations) if (ts.isIdentifier(d.name)) decls.set(d.name.text, { kind: 'value', line: line(d) }); }
     else if (s.name && ts.isIdentifier(s.name)) decls.set(s.name.text, { kind: kind === 'interface' || kind === 'type' ? 'type' : kind === 'class' || kind === 'enum' ? 'both' : 'value', line: line(s) });
   }
-  // what the file puts on G: G.X = <name> (its members, for another file calling G.X.m() at load), or G.X = <object>
-  const gMembers = new Map();
+  // what the file exports (its members, for another file calling X.m() at load), and any G.X = ... (there are none: each is reported)
+  const gMembers = new Map(), gWrites = [];
+  const exported = (s) => (s.modifiers || []).some((m) => m.kind === ts.SyntaxKind.ExportKeyword);
+  for (const s of sf.statements) {
+    const def = (name, nameNode) => { if (!defs.has(name)) defs.set(name, line(nameNode || s)); const o = objMembers.get(name); if (o) gMembers.set(name, o); };
+    if (ts.isVariableStatement(s) && exported(s)) { for (const d of s.declarationList.declarations) if (ts.isIdentifier(d.name)) def(d.name.text, d); }
+    else if ((ts.isFunctionDeclaration(s) || ts.isClassDeclaration(s)) && s.name && exported(s)) def(s.name.text, s);
+    else if (ts.isExportDeclaration(s) && !s.isTypeOnly && !s.moduleSpecifier && s.exportClause && ts.isNamedExports(s.exportClause)) for (const e of s.exportClause.elements) if (!e.isTypeOnly) def(e.name.text, e);
+  }
   const visitDefs = (n) => {
-    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
-      const x = gName(n.left);
-      if (x) {
-        if (!defs.has(x)) defs.set(x, line(n));
-        const r = unparen(n.right), o = ts.isIdentifier(r) ? objMembers.get(r.text) : objOf(r) ? membersOf(objOf(r)) : null;
-        if (o) gMembers.set(x, o);
-      }
-    }
+    if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.EqualsToken) { const x = gName(n.left); if (x) gWrites.push({ x, line: line(n) }); }
     ts.forEachChild(n, visitDefs);
   };
   visitDefs(sf);
@@ -203,9 +202,9 @@ for (const f of files) {
   };
   // (a function's body walked at load must not be counted again as deferred: walk at load first, then deferred skips
   // nodes already counted at load)
-  walk(sf, true, null);
+  if (f !== 'debugglobals.ts') walk(sf, true, null); // (the console's G names every export, at load: not a use the game has)
   const atLoadUse = new Set(uses.map((u) => u.x + ':' + u.line + ':' + u.load));
-  F[f] = { defs, uses, decls, imports, gMembers, crossCalls, sf, line, walkMember: (fn, via) => { const before = uses.length; walk(fn.body || fn, true, via); return uses.slice(before); }, atLoadUse };
+  F[f] = { defs, uses, decls, imports, gMembers, gWrites, crossCalls, sf, line, walkMember: (fn, via) => { const before = uses.length; walk(fn.body || fn, true, via); return uses.slice(before); }, atLoadUse };
 }
 // (a use counted both at load and deferred, the same place: at load wins)
 for (const f of files) {
@@ -214,16 +213,14 @@ for (const f of files) {
 }
 
 // ------------------------------------------------------------------ who defines what
-const owner = new Map(); // X -> file
+const owner = new Map(); // X (an export) -> file
 for (const f of files) for (const [x] of F[f].defs) if (!owner.has(x)) owner.set(x, f); else if (owner.get(x) !== f) (owner.dup ||= []).push([x, owner.get(x), f]);
-// one step across files: G.X.m() at load runs m at load, in X's file: what m uses becomes a load-time use of the caller
+// one step across files: X.m() at load runs m at load, in X's file: what m uses becomes a load-time use of the caller
 for (const f of files) for (const [x, m, ln] of F[f].crossCalls) {
   const of = owner.get(x); if (!of || of === f) continue;
   const fns = F[of].gMembers.get(x) && F[of].gMembers.get(x).get(m); if (!fns) continue;
-  for (const fn of fns) for (const u of F[of].walkMember(fn, `G.${x}.${m}() at ${base(f)}:${ln}`)) if (owner.get(u.x) !== f) F[f].uses.push({ ...u, line: ln, via: `G.${x}.${m}() (${base(of)}:${u.line})` });
+  for (const fn of fns) for (const u of F[of].walkMember(fn, `${x}.${m}() at ${base(f)}:${ln}`)) if (owner.get(u.x) !== f) F[f].uses.push({ ...u, line: ln, via: `${x}.${m}() (${base(of)}:${u.line})` });
 }
-const undefinedNames = new Map();
-for (const f of files) for (const u of F[f].uses) if (!u.from && !owner.has(u.x)) { if (!undefinedNames.has(u.x)) undefinedNames.set(u.x, new Set()); undefinedNames.get(u.x).add(base(f)); }
 
 // ------------------------------------------------------------------ the graph
 const edges = {}; // file -> dep file -> { load: n, call: n, lines: [] }
@@ -301,74 +298,44 @@ const reached = new Set([...ORDERS['js/serverworker.ts'], ...ORDERS['js/prepwork
 const simDrift = [...reached].filter((v) => !SIM.has(v)).map((v) => `${v} is reached by a worker's entry file but is not in SIMULATION (tools/deps.mjs): a page file imported by the simulation, or a new simulation file to add there`)
   .concat([...SIM].filter((v) => !reached.has(v)).map((v) => `${v} is in SIMULATION (tools/deps.mjs) but no worker's entry file reaches it`));
 
-// ------------------------------------------------------------------ what still reads another file through G
-// (docs/modules-plan.md phase 5 ends when none does; what is left is deliberate, and each read is put in the first category that fits)
-const LOADERS = ['js/exportworker.ts', 'ambience.html', 'tools/cloud.test.mjs'];
-const classify = (reader, owner, x) => {
-  if (/^(exportworker|serverworker|prepworker)$/.test(reader)) return 'a worker file reading what its entry file loaded (it sets the stand-ins and starts the work after the entry has run)';
-  if (owner === 'modelbundles') return 'js/modelbundles.ts, the classic script the page runs first (not a module: nothing to import)';
-  if (SIM.has(reader) && SIM.has(owner)) return 'simulation to simulation, where the target runs later (a load-time cycle if imported)';
-  if (SIM.has(reader)) return 'simulation to page (should be none: the layering rule)';
-  for (const l of LOADERS) { const o = ORDERS[l]; if (o && o.includes(reader) && !o.includes(owner)) return `${l}: it loads the reader and not the file read`; }
-  return 'other (a load-time cycle an import would make, or a tool\'s stand-in: each is said in the file and in the plan)';
-};
-const remaining = new Map(); // category -> "reader -> owner" -> { names: Set, n }
-for (const f of files) for (const u of F[f].uses) {
-  if (u.from) continue; const of = owner.get(u.x); if (!of || of === f) continue;
-  const cat = classify(base(f), base(of), u.x), k = `${base(f)} -> ${base(of)}`;
-  if (!remaining.has(cat)) remaining.set(cat, new Map()); const m = remaining.get(cat);
-  if (!m.has(k)) m.set(k, { names: new Set(), n: 0, guarded: 0 }); const r = m.get(k); r.names.add(u.x); r.n++; if (u.guard !== 'plain') r.guarded++;
+// ------------------------------------------------------------------ a global G
+// (docs/modules-plan.md phase 7: the files reach each other by import; the only G is the console's, built by js/debugglobals.ts, which reads every export and
+// is read by none. A `G.X` read or written anywhere else is the old way back in.)
+const gReads = []; // { file, x, line, write }
+for (const f of files) {
+  for (const u of F[f].uses) if (!u.from) gReads.push({ file: base(f), x: u.x, line: u.line, write: false });
+  for (const w of F[f].gWrites) gReads.push({ file: base(f), x: w.x, line: w.line, write: true });
 }
-// ------------------------------------------------------------------ the trial typecheck: every file a module
-let trial = null;
-if (!NO_TSC) {
-  const r = spawnSync(process.execPath, [path.join(ROOT, 'node_modules/typescript/bin/tsc'), '-p', 'tsconfig.modules-trial.json', '--pretty', 'false'], { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 });
-  const lines = (r.stdout + r.stderr).split('\n').map((l) => l.match(/^(.+?)\((\d+),(\d+)\): error (TS\d+): (.*)$/)).filter(Boolean);
-  const declAt = new Map(); for (const f of files) for (const [n, d] of F[f].decls) if (!declAt.has(n)) declAt.set(n, { file: base(f), ...d });
-  const byCode = {}, bare = new Map(), gLost = new Set(), other = [], umd = new Set(), unusedGM = new Set();
-  for (const [, file, ln, , code, msg] of lines.filter((l) => l[1].startsWith('js/'))) { // (not node_modules': skipLibCheck is off)
-    byCode[code] = (byCode[code] || 0) + 1;
-    const nm = msg.match(/^Cannot find (?:name|namespace) '([^']+)'/);
-    const gp = msg.match(/^Property '([^']+)' does not exist on type 'GameNamespace'/);
-    if (nm) { const k = nm[1]; if (!bare.has(k)) bare.set(k, { name: k, decl: declAt.get(k) || null, users: new Map() }); const b = bare.get(k), u = base(path.basename(file)); b.users.set(u, (b.users.get(u) || 0) + 1); }
-    else if (gp) gLost.add(gp[1]);
-    else if (code === 'TS2686') umd.add(base(path.basename(file))); // ('THREE' refers to a UMD global: three's types, js/types/three-global.d.ts)
-    else if (code === 'TS6196' && /'GameModules'/.test(msg)) unusedGM.add(base(path.basename(file)));
-    else other.push({ file, line: +ln, code, msg });
-  }
-  trial = { total: lines.filter((l) => l[1].startsWith('js/')).length, byCode, bare: [...bare.values()].map((b) => ({ ...b, users: Object.fromEntries(b.users), uses: [...b.users.values()].reduce((a, c) => a + c, 0) })).sort((a, b) => b.uses - a.uses), gLost: [...gLost].sort(), umd: [...umd].sort(), unusedGM: unusedGM.size, other };
-}
-
 // ------------------------------------------------------------------ the summary, the doc, the data
 const fmtAt = (u) => `${u.x}:${u.line}${u.guard !== 'plain' ? ` (${u.guard})` : ''}${u.via ? ` via ${u.via}` : ''}`;
 const totalUses = files.reduce((a, f) => a + F[f].uses.length, 0), loadUses = files.reduce((a, f) => a + F[f].uses.filter((u) => u.load).length, 0);
 const summary = [
-  `${files.length} files, ${owner.size} names on G, ${totalUses} uses (${loadUses} while loading)`,
+  `${files.length} files, ${owner.size} exported names, ${totalUses} uses (${loadUses} while loading)`,
   `load-time cycles (unguarded): ${loadCycles.length}${loadCycles.length ? ': ' + loadCycles.map((c) => c.join(' <-> ')).join('; ') : ''}`,
   `cycles counting calls: ${allCycles.length}, the largest ${allCycles[0] ? allCycles[0].length : 0} files`,
   `load orders (from the imports and the lists) against the load-time needs: ${Object.entries(orderProblems).map(([k, v]) => `${k} ${v.length}`).join(', ')}`,
   `the simulation reaching page-only modules: ${reach.length} uses (${reach.filter((r) => r.guard === 'plain').length} unguarded, ${unguardedAtLoad.length} of them while loading)`,
-  `cross-file reads through G that remain: ${[...remaining.values()].reduce((a, m) => a + [...m.values()].reduce((b, r) => b + r.n, 0), 0)} (see 2b)`,
-  `names used but defined nowhere: ${undefinedNames.size}`,
-  trial ? `trial module typecheck: ${trial.total} errors; ${trial.bare.length} bare names between files (${trial.bare.reduce((a, b) => a + b.uses, 0)} uses), ${trial.gLost.length} G members lost, ${trial.other.length} others` : 'trial module typecheck: skipped',
+  `reads and writes of the global G (only js/debugglobals.ts builds one, and reads none): ${gReads.length} (see 2b)`,
 ];
 console.log(summary.join('\n'));
 // The layering rule (docs/modules-plan.md, phase 3): a simulation file names only simulation modules; what it needs of the page it asks
-// through G.Hooks (js/types/hooks.d.ts), which the page fills in. Any G.X of a page-only module in a simulation file, guarded or not, fails.
+// through Hooks (js/types/hooks.d.ts), which the page fills in. Any import of a page-only module in a simulation file, guarded or not, fails; so does
+// any use of the global G (there is none: the console's is built by js/debugglobals.ts).
 if (CHECK) {
-  for (const r of reach) console.error(r.import ? `layering: js/${r.file}.ts:${r.line} imports ${r.x} from ${r.owner}.ts (page-only): ask through a G.Hooks hook the page fills in` : `layering: js/${r.file}.ts:${r.line} uses G.${r.x} (${r.owner}.ts is page-only): ask through a G.Hooks hook the page fills in`);
+  for (const r of reach) console.error(r.import ? `layering: js/${r.file}.ts:${r.line} imports ${r.x} from ${r.owner}.ts (page-only): ask through a Hooks hook the page fills in` : `layering: js/${r.file}.ts:${r.line} uses G.${r.x} (${r.owner}.ts is page-only): ask through a Hooks hook the page fills in`);
+  for (const g of gReads) console.error(`G: js/${g.file}.ts:${g.line} ${g.write ? 'writes' : 'reads'} G.${g.x}: the files import each other; only js/debugglobals.ts builds a G`);
   for (const d of simDrift) console.error('layering: ' + d);
   const badOrder = Object.entries(orderProblems).flatMap(([where, ps]) => ps.map((q) => `order: ${where}: ${q.file} needs ${q.needs} while loading (${q.kind}): ${q.at.map(fmtAt).join(', ')}`));
   for (const b of badOrder) console.error(b);
   if (reach.length) console.error(`${reach.length} use(s) of a page-only module in the simulation's files (${[...SIM].length} files: what js/serverhost.ts and js/prepentry.ts reach)`);
-  else if (!simDrift.length && !badOrder.length) console.log('layering ok: no simulation file names a page-only module; every order consistent with the load-time needs');
-  process.exit(reach.length || simDrift.length || badOrder.length ? 1 : 0);
+  else if (!simDrift.length && !badOrder.length && !gReads.length) console.log('layering ok: no simulation file names a page-only module; every order consistent with the load-time needs; no use of G');
+  process.exit(reach.length || simDrift.length || badOrder.length || gReads.length ? 1 : 0);
 }
 
 const md = [];
 const P = (...l) => md.push(...l);
 P('# Modules inventory', '', 'Generated by `node tools/deps.mjs` (docs/modules-plan.md, phase 0). Do not edit by hand: run it again.', 'The same data, complete, is in `docs/modules-inventory.json`.', '',
-  '"While loading" is worked out statically, not run (the rules are at the top of `tools/deps.mjs`). A use is **plain** if', 'nothing checks the module is there, **check** if it is the check itself (`G.X && ...`), **guarded** if a check of it protects it.', '',
+  '"While loading" is worked out statically, not run (the rules are at the top of `tools/deps.mjs`). A use is **plain** if', 'nothing checks the module is there, **check** if it is the check itself (`X && ...`), **guarded** if a check of it protects it.', '',
   '## Summary', '', ...summary.map((s) => '- ' + s), '');
 P('## 1. Dependency graph', '', '### Load-time cycles', '');
 if (!loadCycles.length) P('None: every unguarded use while loading can be satisfied by some order.', '');
@@ -388,8 +355,7 @@ for (const v of order) {
   const cl = Object.entries(edges[v]).filter(([, d]) => !d.load).map(([w]) => w).sort();
   P(`| ${v}${SIM.has(v) ? ' (sim)' : ''} | ${defsOf.slice(0, 8).join(', ')}${defsOf.length > 8 ? `, +${defsOf.length - 8}` : ''} | ${ld.join(', ') || '-'} | ${cl.join(', ') || '-'} |`);
 }
-if (undefinedNames.size) { P('', '### Names used but defined nowhere', '', 'Stubs some loader puts there, or leftovers.', ''); for (const [x, us] of undefinedNames) P(`- G.${x}: used in ${[...us].join(', ')}`); }
-if (owner.dup && owner.dup.length) { P('', '### Names defined in more than one file', ''); for (const [x, a, b] of owner.dup) P(`- G.${x}: ${base(a)} and ${base(b)}`); }
+if (owner.dup && owner.dup.length) { P('', '### Names exported by more than one file', ''); for (const [x, a, b] of owner.dup) P(`- ${x}: ${base(a)} and ${base(b)}`); }
 P('', '## 2. The simulation reaching page-only modules', '',
   `The simulation side is what js/serverhost.ts and js/prepentry.ts, the two workers' entry files, reach (${SIM.size} files, stated as SIMULATION in tools/deps.mjs). Each use below names a module`, 'the page has and the server thread does not. The layering rule (phase 3; `npm run deps:check`, run in CI) allows none: what the simulation needs of the page it asks through `G.Hooks` (js/types/hooks.d.ts), which the page files fill in as they load.', '');
 if (!reach.length) P('None.', '');
@@ -400,33 +366,17 @@ for (const [k, rs] of [...byPair].sort((a, b) => b[1].length - a[1].length)) {
   P(`| ${fr} | ${to} | ${rs.length} | ${rs.filter((r) => r.guard === 'plain').length} | ${rs.filter((r) => r.load).length} | ${rs.slice(0, 12).map((r) => `${r.x}:${r.line}${r.guard === 'plain' ? '' : '*'}`).join(' ')}${rs.length > 12 ? ' ...' : ''} |`);
 }
 if (reach.length) P('', '`*` checked or guarded. Plain uses are the ones that would throw in the server thread if reached there.', '');
-P('## 2b. Cross-file reads through G that remain', '', 'Every `G.X` in a file that is not X\'s own file (a read of a name some file defines), by what keeps it. Phase 5 is done when none is left that an import could replace.', '');
-for (const [cat, m] of [...remaining].sort((a, b) => b[1].size - a[1].size)) {
-  P(`- **${cat}** (${[...m.values()].reduce((a, r) => a + r.n, 0)} reads in ${m.size} pairs)`);
-  for (const [k, r] of [...m].sort((a, b) => b[1].n - a[1].n)) P(`  - ${k}: ${[...r.names].join(', ')} (${r.n}${r.guarded ? `, ${r.guarded} checked or guarded` : ''})`);
-}
+P('## 2b. The global G', '', 'No file reads or writes `G`: they import each other (phase 7). `js/debugglobals.ts` builds `window.G` for the console and the browser checks from every export, at the end of `js/main.ts`, and is not read for uses here. `npm run deps:check` fails on any other `G.X`.', '');
+if (!gReads.length) P('None.', '');
+else for (const g of gReads) P(`- js/${g.file}.ts:${g.line} ${g.write ? 'writes' : 'reads'} G.${g.x}`);
 P('');
-P('## 3. Trial module typecheck', '');
-if (!trial) P('Skipped (--no-tsc).');
-else {
-  P('`tsconfig.modules-trial.json`: the project with every file a module (`moduleDetection: force`). Phase 1 is done when', 'the only errors left are G members (those go when the files are converted).', '',
-    `${trial.total} errors: ${Object.entries(trial.byCode).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c} ${n}`).join(', ')}.`, '',
-    `**G members lost** (TS2339 on GameNamespace, ${trial.gLost.length} names): each file's \`interface GameModules\` no longer merges (and in ${trial.unusedGM} files it's reported unused). Expected; they go as the files are converted.`, '',
-    `**THREE as a global** (TS2686, in ${trial.umd.length} files): three's types declare it a UMD global, which a module may not use without an import. Phase 2's import map, or \`allowUmdGlobalAccess\`, clears these.`, '',
-    '**Bare names between files** (TS2304 and the like): declared at the top of one file, named in others without G.', '',
-    '| Name | Kind | Declared in | Uses | Used by |', '| --- | --- | --- | --- | --- |');
-  for (const b of trial.bare) P(`| ${b.name} | ${b.decl ? b.decl.kind : '?'} | ${b.decl ? `${b.decl.file}:${b.decl.line}` : '(not a top-level declaration)'} | ${b.uses} | ${Object.entries(b.users).sort((a, c) => c[1] - a[1]).map(([u, n]) => `${u} ${n}`).join(', ')} |`);
-  const vals = trial.bare.filter((b) => b.decl && b.decl.kind !== 'type');
-  if (vals.length) { P('', `**Bare values** (${vals.length}): named across files without G, some only in types (\`typeof G_World.add\`), some at runtime and even at load (\`G_Sim.VEIL_MS\` in game.ts's object literal): the graph above doesn't see those, so each needs an export and an import, not only a home for its type: ${vals.map((b) => `${b.name} (${b.decl.file})`).join(', ')}.`); }
-  if (trial.other.length) { P('', `**Everything else** (${trial.other.length}): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.`, ''); for (const o of trial.other.slice(0, 60)) P(`- ${o.file}:${o.line} ${o.code} ${o.msg}`); if (trial.other.length > 60) P(`- ... ${trial.other.length - 60} more in the JSON`); }
-}
 fs.writeFileSync(path.join(ROOT, 'docs/modules-inventory.md'), md.join('\n') + '\n');
 const json = {
   note: 'Generated by node tools/deps.mjs. See docs/modules-plan.md.',
   sim: [...SIM], orders: ORDERS, order, owner: Object.fromEntries([...owner].map(([x, f]) => [x, base(f)])),
   files: Object.fromEntries(files.map((f) => [base(f), { defs: Object.fromEntries(F[f].defs), imports: F[f].imports, uses: F[f].uses, decls: Object.fromEntries(F[f].decls) }])),
   edges: Object.fromEntries(Object.entries(edges).map(([v, e]) => [v, Object.fromEntries(Object.entries(e).map(([w, d]) => [w, { load: d.load, call: d.call, names: [...d.names], loadAt: d.loadAt }]))])),
-  loadCycles, allCycles, orderProblems, reach, undefined: Object.fromEntries([...undefinedNames].map(([x, s]) => [x, [...s]])), trial,
+  loadCycles, allCycles, orderProblems, reach, gReads,
 };
 fs.writeFileSync(path.join(ROOT, 'docs/modules-inventory.json'), JSON.stringify(json, null, 1) + '\n');
 console.log('wrote docs/modules-inventory.md and docs/modules-inventory.json');
