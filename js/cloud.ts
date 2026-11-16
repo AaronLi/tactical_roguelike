@@ -1,4 +1,8 @@
 'use strict';
+import { Career } from './career.js';
+import { CloudConfig } from './cloudconfig.js';
+import { U } from './util.js';
+// G.Callsigns, G.Arsenal and G.Shop stay reads through G (each guarded): tools/cloud.test.mjs loads only util, cloudconfig, career and cloud, and stands Callsigns and Arsenal in (an import would load the real ones).
 // Cloud saves (docs/cloud.md): your progress in a Supabase project, so it survives a cleared browser and follows you to another
 // device. What's kept: the sidearm tree (G.U.store 'arsenal'), your callsign, look and settings, the wishlist, the career and the
 // run log (js/career.ts). It all lives in this browser first, as it always has (G.U.store, under bp_); this copies it up and back.
@@ -18,7 +22,7 @@ interface CloudMeta { v: number; owner: string | null; ownerAnon: boolean; mt: R
 // a career addition sent and not yet confirmed (bp_cloudfly): re-sent, by its id, until it is (career_add skips an id it's applied)
 interface CloudFly { id: string; uid: string; d: CloudQueue; mig: boolean }
 interface CloudQueue { add: Record<string, number>; max: Record<string, number>; best: Record<string, CareerBest>; profile: number; progress: number }
-const G_Cloud = (() => {
+export const Cloud = (() => {
   const V = 1; // (the data's shape: schema_version in every row. The client's version is in load's import, and js/types/supabase-cdn.d.ts)
   // what's synced, by where it goes (never the TURN relay's settings, 'turn': a connection's credentials stay in this browser): the profile row's columns, its settings (jsonb), and the progress row
   const PROFILE = ['name', 'look'], SETTINGS = ['animals', 'sens', 'padSens', 'touchSens', 'fov', 'vol', 'loadKit', 'muted', 'quick'], PROGRESS = ['arsenal', 'wishlist'];
@@ -31,16 +35,16 @@ const G_Cloud = (() => {
 
   // ------------------------------------------------------------- config
   function config() {
-    const o = (window as any).__bpCloudConfig, C = G.CloudConfig;
+    const o = (window as any).__bpCloudConfig, C = CloudConfig;
     const src = o && typeof o === 'object' ? { u: o.url, k: o.key } : { u: C && C.SUPABASE_URL, k: C && C.SUPABASE_ANON_KEY }; // (a test's stand-in project, wholly, if it set one)
     return { url: String(src.u || '').trim(), key: String(src.k || '').trim() };
   }
   const switchedOff = () => q.get('cloud') === '0';
-  const configured = () => { const c = config(); return !!(c.url && c.key) && !G.U.NS; }; // (the copy at d5g.ca/space-experimental: saves in the browser only, so it never writes another version's progress to the account)
+  const configured = () => { const c = config(); return !!(c.url && c.key) && !U.NS; }; // (the copy at d5g.ca/space-experimental: saves in the browser only, so it never writes another version's progress to the account)
   const on = () => configured() && !switchedOff();
 
   // ------------------------------------------------------------- what's kept here about the cloud
-  const S = G.U.store;
+  const S = U.store;
   let metaV: CloudMeta | null = null, queueV: CloudQueue | null = null;
   function meta(): CloudMeta {
     if (!metaV) { const m = S.get('cloudmeta', null); metaV = { v: V, owner: m && typeof m.owner === 'string' ? m.owner : null, ownerAnon: !!(m && m.ownerAnon), mt: (m && m.mt && typeof m.mt === 'object') ? m.mt : {}, mig: m && typeof m.mig === 'string' ? m.mig : null, migSent: (m && m.migSent) || {} }; }
@@ -127,15 +131,15 @@ const G_Cloud = (() => {
   }
   // the career: the account's counters plus what's here that it hasn't had (d.add), the maxima the higher, the best runs the better
   function careerFrom(row: any): CareerStats {
-    const s: any = G.Career.clean(null);
+    const s: any = Career.clean(null);
     if (!row) return s;
-    for (const [k, col] of Object.entries(G.Career.COLS)) s[k] = +row[col] || 0;
+    for (const [k, col] of Object.entries(Career.COLS)) s[k] = +row[col] || 0;
     s.deepest = +row.deepest || 0; s.bestLevel = row.best_level || null; s.bestCredits = row.best_credits || null;
     return s;
   }
   function careerPlus(c: CareerStats, d: CloudQueue): CareerStats {
     const s: any = Object.assign({}, c);
-    for (const [k, n] of Object.entries(d.add)) if (k in G.Career.COLS) s[k] = (s[k] || 0) + n;
+    for (const [k, n] of Object.entries(d.add)) if (k in Career.COLS) s[k] = (s[k] || 0) + n;
     s.deepest = Math.max(s.deepest, d.max.deepest || 0);
     if (d.best.best_level && (!s.bestLevel || d.best.best_level.lvl > s.bestLevel.lvl)) s.bestLevel = d.best.best_level;
     if (d.best.best_credits && (!s.bestCredits || d.best.best_credits.credits > s.bestCredits.credits)) s.bestCredits = d.best.best_credits;
@@ -144,7 +148,7 @@ const G_Cloud = (() => {
   // everything here, as a delta to add to an account that's never had it
   function careerAsDelta(s: CareerStats): CloudQueue {
     const d: CloudQueue = { add: {}, max: {}, best: {}, profile: 0, progress: 0 };
-    for (const k of Object.keys(G.Career.COLS)) if ((s as any)[k]) d.add[k] = (s as any)[k];
+    for (const k of Object.keys(Career.COLS)) if ((s as any)[k]) d.add[k] = (s as any)[k];
     if (s.deepest) d.max.deepest = s.deepest;
     if (s.bestLevel) d.best.best_level = s.bestLevel;
     if (s.bestCredits) d.best.best_credits = s.bestCredits;
@@ -152,7 +156,7 @@ const G_Cloud = (() => {
   }
   const rpcDelta = (d: CloudQueue) => {
     const a: Record<string, number> = {};
-    for (const [k, n] of Object.entries(d.add)) if (G.Career.COLS[k] && n > 0) a[G.Career.COLS[k]] = Math.round(n);
+    for (const [k, n] of Object.entries(d.add)) if (Career.COLS[k] && n > 0) a[Career.COLS[k]] = Math.round(n);
     return { add: a, max: d.max, best_level: d.best.best_level || null, best_credits: d.best.best_credits || null };
   };
   // a run, as its row (and back)
@@ -277,9 +281,9 @@ const G_Cloud = (() => {
       await syncDoc('progress', uid, mode);
       alive(uid);
       if (mode === 'replace') stash(m.owner); // (the other account's unsent work: kept for it, not sent to this one)
-      G.Career.setStats(careerPlus(careerFrom(crow), pendingOf(uid)));
+      Career.setStats(careerPlus(careerFrom(crow), pendingOf(uid)));
       const recs = (runs as any[]).map(runFrom);
-      if (mode === 'replace') G.Career.onlyRuns(recs); else G.Career.mergeRuns(recs);
+      if (mode === 'replace') Career.onlyRuns(recs); else Career.mergeRuns(recs);
       m.owner = uid; m.ownerAnon = isAnon(user); keepMeta();
       await sendCareer(uid);
       await pushRuns(uid);
@@ -292,7 +296,7 @@ const G_Cloud = (() => {
   // that fails (offline, an error, a closed tab) is taken up again where it stopped.
   async function migrate(uid: string) {
     const m = meta();
-    if (m.mig !== uid) { m.mig = uid; m.migSent = {}; keepMeta(); G.Career.unsyncAll(); }
+    if (m.mig !== uid) { m.mig = uid; m.migSent = {}; keepMeta(); Career.unsyncAll(); }
     render();
     await sendFlying(uid); // (an addition sent before a reload, its reply never seen)
     for (let pass = 0; pass < 4; pass++) {
@@ -301,27 +305,27 @@ const G_Cloud = (() => {
       const d = migDelta(uid);
       if (d) { const rec: CloudFly = { id: uuid(), uid, d, mig: true }; fly().push(rec); keepFly(); await sendRec(rec); }
       await pushRuns(uid);
-      const y = Q(); if (!y.profile && !y.progress && !migDelta(uid) && !G.Career.runs().some((r) => r.sy !== r.u)) break;
+      const y = Q(); if (!y.profile && !y.progress && !migDelta(uid) && !Career.runs().some((r) => r.sy !== r.u)) break;
     }
     alive(uid);
     // all confirmed: the account's copy, read back, in place of the guest save
-    const snap = G.Career.stats(), snapA = careerAsDelta(snap).add;
+    const snap = Career.stats(), snapA = careerAsDelta(snap).add;
     const [crow, prow, runs] = await Promise.all([one('career', uid), one('progress', uid), must(client!.from('runs').select('*').eq('user_id', uid).order('started_at', { ascending: false }).limit(20))]);
     alive(uid);
-    const now = careerAsDelta(G.Career.stats()).add, extra: Record<string, number> = {}; // (played while it was read back: still to add)
+    const now = careerAsDelta(Career.stats()).add, extra: Record<string, number> = {}; // (played while it was read back: still to add)
     for (const [k, n] of Object.entries(now)) if (n - (snapA[k] || 0) > 0) extra[k] = n - (snapA[k] || 0);
     const pr: any = prow || {};
     S.put('arsenal', pr.arsenal && pr.arsenal.got ? pr.arsenal : undefined); S.put('wishlist', Array.isArray(pr.wishlist) ? pr.wishlist : undefined);
     m.mt.arsenal = (pr.mt && pr.mt.arsenal) || 0; m.mt.wishlist = (pr.mt && pr.mt.wishlist) || 0;
     m.owner = uid; m.ownerAnon = false; m.mig = null; m.migSent = {}; keepMeta();
     queueV = { add: {}, max: {}, best: {}, profile: 0, progress: 0 }; keepQ();
-    G.Career.setStats(careerFrom(crow)); G.Career.onlyRuns((runs as any[]).map(runFrom));
+    Career.setStats(careerFrom(crow)); Career.onlyRuns((runs as any[]).map(runFrom));
     if (Object.keys(extra).length) add(extra);
     applyLive(['arsenal', 'wishlist']);
   }
   // what of the guest's career the account hasn't had yet: its totals, less what's confirmed and what's in flight
   function migDelta(uid: string): CloudQueue | null {
-    const all = careerAsDelta(G.Career.stats()), sent: Record<string, number> = Object.assign({}, meta().migSent);
+    const all = careerAsDelta(Career.stats()), sent: Record<string, number> = Object.assign({}, meta().migSent);
     for (const r of fly()) if (r.mig && r.uid === uid) for (const [k, n] of Object.entries(r.d.add)) sent[k] = (sent[k] || 0) + n;
     const d: CloudQueue = { add: {}, max: all.max, best: all.best, profile: 0, progress: 0 };
     for (const [k, n] of Object.entries(all.add)) if (n - (sent[k] || 0) > 0) d.add[k] = n - (sent[k] || 0);
@@ -334,7 +338,7 @@ const G_Cloud = (() => {
     const row = await must(client!.rpc('career_add', { d: Object.assign(rpcDelta(rec.d), { id: rec.id }) }));
     const l = fly(), i = l.findIndex((r) => r.id === rec.id); if (i >= 0) { l.splice(i, 1); keepFly(); }
     if (rec.mig) { const m = meta(); for (const [k, n] of Object.entries(rec.d.add)) m.migSent[k] = (m.migSent[k] || 0) + n; m.migSent.__max = 1; keepMeta(); }
-    else if (meta().owner === rec.uid) G.Career.setStats(careerPlus(careerFrom(Array.isArray(row) ? row[0] : row), pendingOf(rec.uid))); // (the account's, and what's still to come; not into a guest save being moved, whose career is its own)
+    else if (meta().owner === rec.uid) Career.setStats(careerPlus(careerFrom(Array.isArray(row) ? row[0] : row), pendingOf(rec.uid))); // (the account's, and what's still to come; not into a guest save being moved, whose career is its own)
   }
   async function sendFlying(uid: string) { for (const r of fly().filter((q) => q.uid === uid)) await sendRec(r); }
   // the queue's additions into flight (persisted first, then sent), and everything in flight for this account
@@ -349,7 +353,7 @@ const G_Cloud = (() => {
     if (!uid) return;
     const x = Q();
     if (careerPending(x)) { fly().push({ id: uuid(), uid, d: { add: x.add, max: x.max, best: x.best, profile: 0, progress: 0 }, mig: false }); keepFly(); }
-    const runs = G.Career.runs().filter((r) => r.sy !== r.u), st = S.get('cloudstash', {}) || {};
+    const runs = Career.runs().filter((r) => r.sy !== r.u), st = S.get('cloudstash', {}) || {};
     if (x.progress || runs.length) { const o = st[uid] || {}; st[uid] = { arsenal: x.progress ? S.get('arsenal', null) : o.arsenal || null, wishlist: x.progress ? S.get('wishlist', null) : o.wishlist || null, runs: [...(o.runs || []), ...runs].slice(-200) }; S.put('cloudstash', st); }
     queueV = { add: {}, max: {}, best: {}, profile: 0, progress: 0 }; keepQ();
   }
@@ -373,12 +377,12 @@ const G_Cloud = (() => {
   }
   async function pushRuns(uid: string) {
     for (let i = 0; i < 40; i++) {
-      const dirty = G.Career.runs().filter((r) => r.sy !== r.u).slice(0, BATCH);
+      const dirty = Career.runs().filter((r) => r.sy !== r.u).slice(0, BATCH);
       if (!dirty.length) return;
       const ver = dirty.map((r) => [r.id, r.u] as [string, number]);
         alive(uid);
       await must(client!.from('runs').upsert(dirty.map((r) => runRow(r, uid)), { onConflict: 'user_id,id' }));
-      for (const [id, u] of ver) G.Career.markSynced(id, u);
+      for (const [id, u] of ver) Career.markSynced(id, u);
     }
   }
   // the queue, sent: the changed rows (pulled and merged first, so another device's changes aren't written over), the career's
@@ -397,7 +401,7 @@ const G_Cloud = (() => {
       await pushRuns(uid);
       ok();
     } catch (e) { if (e !== SWITCHED && user && user.id === uid) fail(e, 'flush'); } finally { busy = false; if (again) { again = false; schedule(500); } }
-  }  function ok() { retryMs = RETRY0; lastOk = Date.now(); why = ''; setState('ok'); const x = Q(); if (x.profile || x.progress || careerPending(x) || (user && fly().some((r) => r.uid === user!.id)) || G.Career.runs().some((r) => r.sy !== r.u)) schedule(); }
+  }  function ok() { retryMs = RETRY0; lastOk = Date.now(); why = ''; setState('ok'); const x = Q(); if (x.profile || x.progress || careerPending(x) || (user && fly().some((r) => r.uid === user!.id)) || Career.runs().some((r) => r.sy !== r.u)) schedule(); }
   function fail(e: any, where: string) {
     const msg = (e && (e.message || e.error_description || e.msg)) || String(e);
     const net = navigator.onLine === false || /fetch|network|load failed|timed? ?out|ECONN|offline/i.test(msg) || (e && (e.status === 0 || e.name === 'AuthRetryableFetchError'));
@@ -440,7 +444,7 @@ const G_Cloud = (() => {
     // to the same account again)
     if (m.owner !== was) { setState('idle'); tellHost(); return; }
     // this browser's copy of the account's progress goes (the account keeps it): an empty guest save; your preferences stay
-    S.put('arsenal', undefined); S.put('wishlist', undefined); G.Career.reset();
+    S.put('arsenal', undefined); S.put('wishlist', undefined); Career.reset();
     queueV = { add: {}, max: {}, best: {}, profile: 0, progress: 0 }; keepQ();
     m.owner = null; m.ownerAnon = false; m.mig = null; m.migSent = {}; delete m.mt.arsenal; delete m.mt.wishlist; keepMeta();
     applyLive(['arsenal', 'wishlist']);
@@ -451,7 +455,7 @@ const G_Cloud = (() => {
   function render() {
     const sum = document.getElementById('acctSum'), body = document.getElementById('acctBody');
     if (!sum || !body) return;
-    const esc = G.U.esc, st = statusLine();
+    const esc = U.esc, st = statusLine();
     let s = '', b = '';
     if (!configured()) { s = 'Not set up'; b = `<p>Cloud saves aren't set up for this copy of the game. Your progress is saved in this browser.</p>`; }
     else if (switchedOff()) { s = 'Off'; b = `<p>Cloud saves are off for this visit (<code>?cloud=0</code>). Your progress is saved in this browser.</p>`; }
@@ -478,7 +482,7 @@ const G_Cloud = (() => {
     for (const [id, v, had] of keep) { const i = el.querySelector<HTMLInputElement>('#' + id); if (!i) continue; i.value = v; if (had) i.focus(); }
   }
   function emailForm(p = 'acct') {
-    if (mail) return `<p class="acct-sent"><b>Check your email.</b> We've sent a link to <b>${G.U.esc(mail.email)}</b>. Open it in this browser, or enter the code from the email:</p>
+    if (mail) return `<p class="acct-sent"><b>Check your email.</b> We've sent a link to <b>${U.esc(mail.email)}</b>. Open it in this browser, or enter the code from the email:</p>
       <div class="acct-row"><input id="${p}Code" maxlength="10" placeholder="Code" autocomplete="one-time-code" inputmode="numeric"><button class="btn small" data-acct="code">Confirm</button><button class="btn small" data-acct="cancel">Back</button></div>`;
     return `<div class="acct-row"><input id="${p}Email" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email"><button class="btn small" data-acct="signin">Sign in with email</button></div>
       <small class="dim">A link (and a code) by email, no password. A new email makes your account, and what's on this device goes into it.</small>`;
@@ -568,7 +572,7 @@ const G_Cloud = (() => {
   function boot() {
     S.onSet = onSet;
     { const m = meta(); if (m.mt.animal != null || m.mt.animal2 != null) { m.mt.animals = Math.max(m.mt.animals || 0, m.mt.animal || 0, m.mt.animal2 || 0); delete m.mt.animal; delete m.mt.animal2; keepMeta(); } } // (an older version's one animal and second choice: now the list, js/game.ts animalPrefs)
-    G.Career.init();
+    Career.init();
     bindUI(); render();
     if (!on()) { state = 'off'; render(); return; }
     state = 'idle';
@@ -593,6 +597,6 @@ const G_Cloud = (() => {
     on, configured, guest, queue: () => Q(), meta: () => meta(), fly: () => fly(), tune(o: { batch?: number }) { if (o.batch) BATCH = o.batch; },
     get state() { return state; }, get user() { return user; }, get client() { return client; } };
 })();
-G.Cloud = G_Cloud;
+G.Cloud = Cloud;
 
-interface GameModules { Cloud: typeof G_Cloud; }
+declare global { interface GameModules { Cloud: typeof Cloud; } }

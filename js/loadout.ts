@@ -1,4 +1,9 @@
 'use strict';
+import { Arsenal } from './arsenal.js';
+import { WEAPONS } from './data.js';
+import { Hooks, U } from './util.js';
+import { Gear } from './gear.js';
+import { Gunsmith } from './parts.js';
 // Your loadout for a run in space (js/game.ts sidearmPick draws it, before the base): a sidearm, a helmet and body armour (the primary
 // tree's still here, but nothing picks from it: a run starts without one, sel), each
 // taken from a tree of its own (the sidearm's is js/arsenal.ts's, as it always was). Every tree starts from the piece in its middle and runs
@@ -14,7 +19,7 @@
 interface LoNode { pts?: number; id: string; from?: string; path?: string; ring: number; a?: number; r?: number; rank?: number; stat?: string; n?: number; what?: string; how?: string }
 interface LoTree { slot: string; title: string; mid: string; NODES: LoNode[]; PATHS: Record<string, { name: string; a: number }> }
 interface LoAtt { k: string; id: string; name: string; pts: number; open: boolean; stat: string; what: string; n: number; have: number }
-const G_Loadout = (() => {
+export const Loadout = (() => {
   const RINGS = [0, 440, 660, 880, 1100, 1320], BOXES = 2;
   // ---- the trees. A node's id is the gun's or the piece of gear's. rank: earned at that rank; stat/n: earned by doing n of that with
   // the piece it's reached from.
@@ -60,7 +65,7 @@ const G_Loadout = (() => {
     },
   };
   // the sidearm's tree is the arsenal's (js/arsenal.ts): its guns, its paths, its challenges, what's earned of it
-  Object.defineProperty(TREES, 's', { enumerable: true, get: () => ({ slot: 's', title: 'Sidearm', mid: 'p9', PATHS: G.Arsenal.PATHS, NODES: G.Arsenal.NODES as LoNode[] }) });
+  Object.defineProperty(TREES, 's', { enumerable: true, get: () => ({ slot: 's', title: 'Sidearm', mid: 'p9', PATHS: Arsenal.PATHS, NODES: Arsenal.NODES as LoNode[] }) });
   const BY: Record<string, Map<string, LoNode>> = {};
   const by = (slot: string) => BY[slot] || (BY[slot] = new Map(TREES[slot].NODES.map((q) => [q.id, q])));
   // ---- XP and rank. A mission completed is 150 XP and 100 more for each step of its threat; the ranks come further apart as they go
@@ -68,23 +73,23 @@ const G_Loadout = (() => {
   const xpOf = (diff: number) => 150 + 100 * Math.max(1, diff | 0);
   const rankAt = (r: number) => (250 * r * (r + 1)) / 2;
   let save: any = null;
-  const data = () => { if (!save) { const s = G.U.store.get('loadout', null); save = s && typeof s === 'object' ? s : {}; save.xp = Math.max(0, +save.xp || 0); save.n = save.n || {}; save.got = save.got || []; save.sel = save.sel || {}; save.box = save.box || {}; save.col = save.col || {}; } return save; };
-  const keep = () => G.U.store.set('loadout', data());
+  const data = () => { if (!save) { const s = U.store.get('loadout', null); save = s && typeof s === 'object' ? s : {}; save.xp = Math.max(0, +save.xp || 0); save.n = save.n || {}; save.got = save.got || []; save.sel = save.sel || {}; save.box = save.box || {}; save.col = save.col || {}; } return save; };
+  const keep = () => U.store.set('loadout', data());
   const xp = () => data().xp;
   const rank = () => { let r = 0; while (xp() >= rankAt(r + 1)) r++; return r; };
   // ---- what's yours: a rank node at its rank (with the one before it yours), a challenge node once it's done
   const node = (slot: string, id: string) => by(slot).get(id);
   function open(slot: string, id: string): boolean {
-    if (slot === 's') return G.Arsenal.open(id);
+    if (slot === 's') return Arsenal.open(id);
     const q = node(slot, id); if (!q) return false;
     if (q.from && !open(slot, q.from)) return false;
     if (q.rank != null) return rank() >= q.rank;
     return data().got.includes(slot + ':' + id);
   }
   // a count of something done with a piece (the sidearm's: the arsenal's own)
-  const count = (slot: string, id: string, stat: string): number => (slot === 's' ? G.Arsenal.count(id, stat) : (data().n[slot + ':' + id] && data().n[slot + ':' + id][stat]) || 0);
+  const count = (slot: string, id: string, stat: string): number => (slot === 's' ? Arsenal.count(id, stat) : (data().n[slot + ':' + id] && data().n[slot + ':' + id][stat]) || 0);
   const left = (slot: string, q: LoNode) => Math.min(q.n || 0, count(slot, q.from!, q.stat!));
-  const name = (slot: string, id: string) => (slot === 'p' || slot === 's' ? (G.WEAPONS[id] ? G.WEAPONS[id].name : id) : G.Gear.DEFS[id] ? G.Gear.DEFS[id].name : id);
+  const name = (slot: string, id: string) => (slot === 'p' || slot === 's' ? (WEAPONS[id] ? WEAPONS[id].name : id) : Gear.DEFS[id] ? Gear.DEFS[id].name : id);
   // what it takes, said: 'Rank 3', or the challenge
   const need = (slot: string, q: LoNode) => (q.rank != null ? `Rank ${q.rank}` : `${left(slot, q)}/${q.n} ${q.what} with the ${name(slot, q.from!)}`);
   const polar = (deg: number, r: number) => { const a = (deg * Math.PI) / 180; return [Math.cos(a) * r, Math.sin(a) * r]; };
@@ -98,7 +103,7 @@ const G_Loadout = (() => {
     for (const q of TREES[slot].NODES) {
       if (q.from !== id || q.stat !== stat || d.got.includes(slot + ':' + q.id)) continue;
       if (ns[stat] >= q.n!) { d.got.push(slot + ':' + q.id); G.HUD.toast('NEW ' + TREES[slot].title.toUpperCase(), `${name(slot, q.id)}: yours from your next run`, 3.5); if (G.Audio.click) G.Audio.click(); }
-      else G.HUD.feed(`<span class="cr">${G.U.esc(name(slot, id))}: ${ns[stat]}/${q.n} ${G.U.esc(q.what!)}</span>`);
+      else G.HUD.feed(`<span class="cr">${U.esc(name(slot, id))}: ${ns[stat]}/${q.n} ${U.esc(q.what!)}</span>`);
     }
     attNews(slot, id, stat, ns[stat]);
     keep();
@@ -114,7 +119,7 @@ const G_Loadout = (() => {
     return { p: me.weapons && me.weapons.p ? me.weapons.p.def.id : null, h: k.helmet ? k.helmet.gid : null, a: k.carrier ? k.carrier.gid : null } as Record<string, string | null>;
   }
   // a kill with a gun (js/arsenal.ts kill passes its stats on): the primary tree's; the sidearm's the arsenal counts itself (its parts said here)
-  const gunStat = (id: string, stat: string) => { if (node('p', id)) tally('p', id, stat); else if (G.Arsenal.has(id) && G.Arsenal.open(id)) attNews('s', id, stat, G.Arsenal.count(id, stat)); };
+  const gunStat = (id: string, stat: string) => { if (node('p', id)) tally('p', id, stat); else if (Arsenal.has(id) && Arsenal.open(id)) attNews('s', id, stat, Arsenal.count(id, stat)); };
   // your armour stopped a round (js/player.ts): the helmet's if it was the helmet or its face piece, the body armour's otherwise
   function stopped(me: any, keys: string[]) {
     const w = worn(me);
@@ -156,7 +161,7 @@ const G_Loadout = (() => {
   function atts(slot: string, id: string, only?: string): LoAtt[] {
     const out: LoAtt[] = [];
     if (isGun(slot)) {
-      const GS = G.Gunsmith, b = GS.defaultBuild(id);
+      const GS = Gunsmith, b = GS.defaultBuild(id);
       for (const s of GS.visibleSlots(id, b)) {
         const k = GS.kindOf(s.slot), A = ATT[k]; if (!A || (only && only !== s.slot)) continue;
         for (const p of GS.LIST) {
@@ -166,10 +171,10 @@ const G_Loadout = (() => {
         }
       }
     } else {
-      const d = G.Gear.DEFS[id], mounts = slot === 'h' ? (d.face ? ['face'] : []) : [d.plate ? 'plate' : '', d.shoulder ? 'shoulder' : '', d.groin ? 'groin' : ''].filter(Boolean);
+      const d = Gear.DEFS[id], mounts = slot === 'h' ? (d.face ? ['face'] : []) : [d.plate ? 'plate' : '', d.shoulder ? 'shoulder' : '', d.groin ? 'groin' : ''].filter(Boolean);
       for (const k of mounts) {
         if (only && only !== k) continue;
-        for (const g of G.Gear.LIST.filter((x) => x.kind === k && !LO_OFF.includes(x.id))) {
+        for (const g of Gear.LIST.filter((x) => x.kind === k && !LO_OFF.includes(x.id))) {
           const q = GEAR_ATT[k][Math.min(GEAR_ATT[k].length - 1, Math.max(0, (g.tier || 1) - 1))], have = count(slot, id, q.stat);
           out.push({ k, id: g.id, name: g.name, pts: Math.max(1, pts(g.price, k === 'plate' ? PLATE_PER : 400)), open: open(slot, id) && have >= q.n, stat: q.stat, what: q.what, n: q.n, have: Math.min(q.n, have) });
         }
@@ -181,7 +186,7 @@ const G_Loadout = (() => {
   const boxes = (slot: string, id: string): { k: string; id: string }[] => (data().box[slot + ':' + id] || []).filter((b: any) => b && atts(slot, id, b.k).some((a) => a.id === b.id && a.open)).slice(0, BOXES);
   // a gun as it's taken: as it comes, with its boxes' parts (whatever no longer fits dropped)
   function build(slot: string, gun: string, bx = boxes(slot, gun)) {
-    const GS = G.Gunsmith, b = GS.defaultBuild(gun);
+    const GS = Gunsmith, b = GS.defaultBuild(gun);
     for (const x of bx) b[x.k] = x.id;
     GS.prune(gun, b); return b;
   }
@@ -200,7 +205,7 @@ const G_Loadout = (() => {
   // ---- points: what it'd cost, about one a 400 credits (the issue kit and the bump helmet nothing; a sidearm one more), its boxes' too
   function cost(slot: string, id: string | null, bx?: { k: string; id: string }[]): number {
     if (!id) return 0;
-    const q = slot === 's' ? null : node(slot, id), own = q && q.pts != null ? q.pts : isGun(slot) ? pts(G.WEAPONS[id].price) + (slot === 's' ? PISTOL_UP : 0) : pts(G.Gear.DEFS[id].price); // (a primary's its own, pts: about alike across the kinds)
+    const q = slot === 's' ? null : node(slot, id), own = q && q.pts != null ? q.pts : isGun(slot) ? pts(WEAPONS[id].price) + (slot === 's' ? PISTOL_UP : 0) : pts(Gear.DEFS[id].price); // (a primary's its own, pts: about alike across the kinds)
     return own + (bx || boxes(slot, id)).reduce((n, b) => n + (atts(slot, id, b.k).find((a) => a.id === b.id)?.pts || 0), 0);
   }
   // ---- the loadout itself: what's picked for each slot (kept, so the next run starts with it), and putting it on you
@@ -218,7 +223,7 @@ const G_Loadout = (() => {
   const thr = (i: number): string | null => { const t = data().thr; const k = Array.isArray(t) ? t[i] : null; return THROWS.includes(k) ? k : null; };
   function setThr(i: number, k: string | null) { const d = data(); if (!Array.isArray(d.thr)) d.thr = []; d.thr[i] = k && THROWS.includes(k) ? k : null; keep(); }
   const nextThr = (i: number) => { const k = thr(i), j = k ? THROWS.indexOf(k) + 1 : 0; setThr(i, j < THROWS.length ? THROWS[j] : null); }; // (nothing, then each in turn, then nothing again)
-  const throwItem = (k: string) => (k === 'frag' ? G.Gear.fragItem() : k === 'flash' ? G.Gear.flashItem() : k === 'sticky' ? G.Gear.stickyItem() : G.Gear.tbItem());
+  const throwItem = (k: string) => (k === 'frag' ? Gear.fragItem() : k === 'flash' ? Gear.flashItem() : k === 'sticky' ? Gear.stickyItem() : Gear.tbItem());
   const thrCost = () => { let n = 0; for (let i = 0; i < THROW_SLOTS; i++) if (thr(i)) n += THROW_PTS; return n; };
   const total = () => ['p', 's', 'h', 'a'].reduce((n, s) => n + cost(s, sel(s)), 0) + thrCost();
   // Colours: a helmet (and its face piece) or the armour (the carrier, its pouches and what's mounted on it) in one solid colour of
@@ -227,7 +232,7 @@ const G_Loadout = (() => {
   const col = (slot: string): number | null => { const c = data().col[slot]; return typeof c === 'number' ? c : null; };
   function setCol(slot: string, c: number | null) { if (c == null) delete data().col[slot]; else data().col[slot] = c; keep(); }
   function apply(me: any, sidearmOnly = false) {
-    const P = sel('p'), S = sel('s') || 'p9', H = sel('h'), A = sel('a'), Gr = G.Gear;
+    const P = sel('p'), S = sel('s') || 'p9', H = sel('h'), A = sel('a'), Gr = Gear;
     me.setSidearm(S, build('s', S));
     if (sidearmOnly) return;
     const tint = (it: any, c: number | null) => { if (c != null) it.col = c; return it; };
@@ -243,6 +248,6 @@ const G_Loadout = (() => {
   function reload() { save = null; }
   return { THROWS, THROW_SLOTS, THROW_PTS, THROW_NAME, THROW_SHORT, THROW_DESC, throwItem, thr, setThr, nextThr, thrCost, TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, boxesWith, fit, build, BUDGET, pts, cost, total };
 })();
-G.Loadout = G_Loadout;
-G.Hooks.gunStat = (id, stat) => G.Loadout.gunStat(id, stat); // (the sidearm tree's kills count here too: js/arsenal.ts tally)
-interface GameModules { Loadout: typeof G_Loadout }
+G.Loadout = Loadout;
+Hooks.gunStat = (id, stat) => Loadout.gunStat(id, stat); // (the sidearm tree's kills count here too: js/arsenal.ts tally)
+declare global { interface GameModules { Loadout: typeof Loadout } }

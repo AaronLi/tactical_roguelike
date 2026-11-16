@@ -1,5 +1,7 @@
 'use strict';
-const G_Career = (() => {
+import { U } from './util.js';
+// G.THEMES and G.Route stay reads through G: tools/cloud.test.mjs loads only util, cloudconfig, career and cloud and stands these two in (an import would load the real data and route).
+export const Career = (() => {
   const V = 1, KEEP = 50;
   // the counters, and their columns in the career table (supabase/migrations)
   const COLS: Record<string, string> = { runs: 'runs', runsDone: 'runs_done', acts: 'acts', levels: 'levels', kills: 'kills', incaps: 'incaps', headshots: 'headshots', arrests: 'arrests', rescued: 'rescued', civKilled: 'civ_killed', unauth: 'unauth', deaths: 'deaths', downs: 'downs', revives: 'revives', evidence: 'evidence', credits: 'credits' };
@@ -16,15 +18,15 @@ const G_Career = (() => {
     return z;
   }
   let stats: CareerStats | null = null, list: CareerRun[] | null = null, run: CareerRun | null = null, lvl: CareerLevel | null = null;
-  const S = () => stats || (stats = clean(G.U.store.get('career', null)));
-  const L = (): CareerRun[] => list || (list = (G.U.store.get('runs', []) || []).filter((r: any) => r && typeof r.id === 'string' && Array.isArray(r.levels)));
-  const keepStats = () => G.U.store.put('career', S());
+  const S = () => stats || (stats = clean(U.store.get('career', null)));
+  const L = (): CareerRun[] => list || (list = (U.store.get('runs', []) || []).filter((r: any) => r && typeof r.id === 'string' && Array.isArray(r.levels)));
+  const keepStats = () => U.store.put('career', S());
   function keepRuns() {
     const l = L();
     l.sort((a, b) => b.start - a.start);
     // the newest KEEP (the cloud keeps the rest); the ones the cloud hasn't got yet go last
     while (l.length > KEEP) { let i = l.length - 1; for (let j = l.length - 1; j >= 0; j--) if (l[j].sy === l[j].u && l[j] !== run) { i = j; break; } l.splice(i, 1); }
-    G.U.store.put('runs', l);
+    U.store.put('runs', l);
   }
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); }));
   // one more of something: here, and to the account (js/cloud.ts add: queued till it's sent)
@@ -140,7 +142,7 @@ const G_Career = (() => {
 
   // ------------------------------------------------------------- the career screen (main menu) and the hangar's Career tab
   function html(): string {
-    const s = S(), f = G.U.fmt, esc = G.U.esc;
+    const s = S(), f = U.fmt, esc = U.esc;
     const tile = (label: string, v: string | number, sub = '') => `<div class="cr-tile"><b>${v}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
     const day = (t: number) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + new Date(t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     const OUT: Record<string, string> = { playing: 'In progress', wiped: 'Squad wiped', left: 'Left', abandoned: 'Abandoned' };
@@ -159,6 +161,6 @@ const G_Career = (() => {
   return { COLS, init, runStart, runEnd, squad, levelStart, levelEnd, ev, mergeRuns, unsyncAll, onlyRuns, setStats, markSynced, reset, html, clean,
     stats: () => S(), runs: () => L(), get run() { return run; }, get level() { return lvl; } };
 })();
-G.Career = G_Career;
+G.Career = Career;
 
-interface GameModules { Career: typeof G_Career; }
+declare global { interface GameModules { Career: typeof Career; } }
