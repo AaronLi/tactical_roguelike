@@ -481,6 +481,7 @@ const G_Game = {
         if (e.code === 'Escape' && this.shopOpen) { this.closeShop(); return; }
         if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat) { if (this.shopOpen) this.closeShop(); else if (G.Me.seat == null) this.openShop('kit', 'your stash and loadout'); } return; }
       }
+      if (e.code === 'Tab' && this.aboxOpen) { e.preventDefault(); if (!this.chatOpen && !e.repeat) this.aboxHide(); return; } // (the attachment box open: Tab shuts it, like Esc, not the inventory under it)
       if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat && !(G.Me.out && !this.invOpen)) this.toggleInv(!this.invOpen); return; } // (out cold: nothing to do but wait)
       if (e.code === 'Escape' && this.invOpen) { this.toggleInv(false); return; }
       if (e.code === 'Escape' && this.aboxOpen) { this.aboxHide(); return; }
