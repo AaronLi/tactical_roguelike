@@ -1000,7 +1000,7 @@ const G_Me = {
   // crouched or standing with something in front to stand it on (a counter crouched; a sill, a wall's top or a tall crate
   // standing): a top from 35 cm under the gun to 10 cm over it (you come up onto it), 30 to 80 cm out, nothing in the way over it. Held still and not aimed steeply. bipodT: how far down it is (the legs: js/vmanim.ts; what it
   // does to the sway and kick: swayStep, recoilKick). BIPOD: what's left of the sway and the twitch, and of the kick.
-  BIPOD: { SWAY: 0.12, ERRATIC: 0.1, KICK: 0.55, RATE: 4 },
+  BIPOD: { SWAY: 0.12, ERRATIC: 0.1, KICK: 0.2, RATE: 4 },
   bipodStep(dt: number) {
     const a = G.R.vm && G.R.vm.userData.vma, has = !!(a && a.hs[0].an.bipod);
     let on = false;
