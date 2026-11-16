@@ -1,10 +1,10 @@
 // The release bundles (docs/modules-plan.md phase 6): the compiled game (dist/js, what `tsc` writes and what development runs, unbundled, as native
 // modules) bundled and minified by esbuild into dist/bundle/: one self-contained file for the page (main.js) and one for each worker (serverworker.js,
 // prepworker.js, exportworker.js), and modelbundles.js on its own (a classic, non-deferred script: it must run first, before three.js is fetched). The files
-// have the names the unbundled ones have, so a release is the unbundled build with dist/js swapped for dist/bundle: index.html and the workers' URLs
+// have the names the unbundled ones have, so a release is the unbundled build with those five files replaced by the bundle's: index.html and the workers' URLs
 // are the same in both.
 //   npm run bundle                     dist/js (compiled first) -> dist/bundle
-//   npm run bundle -- --site <dir>     and then <dir>/dist/js is replaced by the bundle (<dir> a copy of the site: the workflow's _site)
+//   npm run bundle -- --site <dir>     and then the bundle's files are laid over <dir>/dist/js (<dir> a copy of the site: the workflow's _site)
 //   npm run bundle -- --no-minify      readable, for looking at what the bundle is
 // What it keeps, on purpose:
 //   - three.js (the https URLs of js/threeboot.ts, the supabase client of js/cloud.ts) stays outside, imported from the CDN as it is unbundled;
@@ -36,7 +36,9 @@ let total = 0; for (const f of files) { const n = fs.statSync(path.join(OUT, f))
 console.log(`${files.length} files, ${total} B in dist/bundle` + (minify ? '' : ' (not minified)'));
 if (site) {
   const dest = path.join(site, 'dist', 'js');
-  fs.rmSync(dest, { recursive: true, force: true }); fs.mkdirSync(dest, { recursive: true });
+  // (laid over dist/js, not in place of it: the rest of the compiled files stay, for ambience.html, a page of its own that imports audio.js and ambience.js, as the page
+  // before this did. Nothing the game loads is in them: the five files below have their names)
+  fs.mkdirSync(dest, { recursive: true });
   for (const f of fs.readdirSync(OUT)) if (f !== 'meta.json') fs.copyFileSync(path.join(OUT, f), path.join(dest, f));
-  console.log('bundle in place of ' + path.relative(process.cwd(), dest));
+  console.log('bundle laid over ' + path.relative(process.cwd(), dest));
 }

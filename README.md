@@ -15,6 +15,8 @@ npm run dev
 Then open http://localhost:8080. `npm run dev` compiles the TypeScript into `dist/js/` and keeps recompiling as you
 save, and serves the game. To build once and serve the folder some other way: `npm run build`, then `node serve.js`
 (or any static file server, e.g. `python -m http.server 8080`). The page loads `dist/js/`, so it needs a build first.
+That's the development build: about 90 unbundled modules. The published site loads five files instead (`npm run bundle`, `tools/bundle.mjs`; the GitHub
+Pages workflow lays them over five files of `dist/js`), see [docs/typescript.md](docs/typescript.md).
 See [docs/typescript.md](docs/typescript.md) for how the code is organised and the type-checking status.
 
 **Weapon demo reel:** http://localhost:8080/?demo plays itself (`js/demo.ts`). It starts a solo level with

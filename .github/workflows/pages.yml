@@ -1,6 +1,6 @@
 # The game on GitHub Pages: its TypeScript compiled (npm run build -- --no-models: js/*.ts -> dist/js/), its gun models baked and
 # tested (npm run bake:models, test:models: assets/models/), then the site published as it is in the repo with dist/
-# and the model bundles (assets/models/bundles: the only form of the models the game loads) added, and with dist/js/ swapped for the release
+# and the model bundles (assets/models/bundles: the only form of the models the game loads) added, and with five files of dist/js/ replaced by the release
 # bundles (tools/bundle.mjs: esbuild, minified; the page's main.js, the three workers' files and modelbundles.js: five files in place of about ninety, under the same
 # names, so index.html and the workers' URLs are the same as in development, which loads dist/js unbundled; docs/typescript.md). Every push and pull request is
 # built and tested (build: a check that it compiles, bakes and passes).
@@ -138,7 +138,8 @@ jobs:
           X="--exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props --exclude /assets/models/scenes --exclude /dist/bundle"
           rsync -a $X main/ _site/
           rsync -a $X --exclude /CNAME space/ _site/space-experimental/
-          # the release: main's dist/js (the compiled game, ~90 files) replaced by its bundles, which are five files of the same names (tools/bundle.mjs).
+          # the release: five files of main's dist/js (the compiled game, ~90 files) replaced by its bundles, which have the same names (tools/bundle.mjs);
+          # the game loads those five and nothing else (the other compiled files stay for ambience.html, which imports audio.js and ambience.js).
           # (the space branch's copy stays as it is: it is not made of modules yet)
           node main/tools/bundle.mjs --site _site
       - uses: actions/upload-pages-artifact@v3

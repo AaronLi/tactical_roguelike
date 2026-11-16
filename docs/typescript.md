@@ -11,12 +11,28 @@ level-preparation worker (`js/prepworker.ts`) and the highlights' export worker 
 | `npm run dev` | Compiles, keeps compiling as you save (`tsc --watch`), and serves the game on :8080 (`tools/dev.js`). |
 | `npm run build` | Everything a fresh clone needs (`tools/build.mjs`): compiles into `dist/`, bakes the stickers and the audio, bakes and bundles the models (a minute or two; `-- --no-models` leaves them out). All git-ignored. Needs node and nothing else: no Blender, no browser. |
 | `npm run compile` | Compiles once into `dist/` and nothing else. |
+| `npm run bundle` | Compiles, then bundles the game for release into `dist/bundle/` (`tools/bundle.mjs`: esbuild, minified). Development never uses it; see below. |
 | `npm run typecheck` | Checks the types without writing anything. CI runs it. |
 | `npm run typecheck:strict` | The same with `--strict`: how far the code is from full strictness. |
 
 Type errors never stop the build: the game runs on whatever compiled. The CI (`.github/workflows/pages.yml`)
 fails a push only if `npm run typecheck` fails, then publishes the site with `dist/` to GitHub Pages
 (Settings → Pages → Source: **GitHub Actions**).
+
+## Development and release load the game differently
+
+- **Development** (`npm run dev`, or `node serve.js` after a build) is unbundled: `index.html` loads `dist/js/main.js`, a native module that imports the ~90
+  files `tsc` wrote, and the workers import theirs the same way. Editing needs no step beyond `tsc --watch`.
+- **The release** (the published site) loads five files in place of those: `tools/bundle.mjs` runs esbuild over the compiled `dist/js` and writes `main.js`
+  (the page), `serverworker.js`, `prepworker.js`, `exportworker.js` (one self-contained bundle each) and `modelbundles.js` (the classic script, on its own),
+  minified, with source maps that point back to `js/*.ts`. They have the names of the unbundled files, so the workflow just lays them over those five files of `dist/js` in the
+  published copy (the rest of the compiled files stay there, for `ambience.html`, a page of its own that imports `audio.js` and `ambience.js`; the game loads none of them) (`node tools/bundle.mjs --site _site`) and `index.html` and the workers' URLs are the same in both. three.js stays on the CDN (the bundles import it from
+  jsDelivr as `js/threeboot.ts` does), nothing is tree-shaken (files register on `G` as they load) and there is no code splitting: each bundle runs the modules in the order the
+  unbundled build does (the page's and the workers' `Object.keys(G)` are identical), and each worker's file sets `window` and `document` before its game code runs.
+- **To try the release locally:** `npm run bundle`, then make a copy of the site's folder with the five files replaced (`node tools/bundle.mjs --site <dir>` does it in a copy
+  you made of the repo's files; symlinks to everything but `dist/` will do), serve it with `SITE_ROOT=<dir> node serve.js`, and run the smoke check against it with
+  `node tools/smoke.mjs --site <dir>`.
+- A new file needs nothing for the release: it is bundled because an entry file imports it.
 
 ## How the code fits together
 
