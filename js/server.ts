@@ -41,6 +41,7 @@ type LivePlayer = Player & { st: PState }
 interface EnemyCover { x: number; y: number; z: number; lean: number; px?: number; pz?: number; fl?: number; cx?: number; cz?: number }
 interface HideSpot { x: number; z: number; y?: number; lean: number; fl?: number; flow?: ReturnType<typeof G.Level.flow>; stuck?: number; [k: string]: any }
 interface Enemy {
+  windErr?: number; // (how it misjudges the wind: G.Sim.windJudge)
   id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; hp: number; maxHp: number;
   alert: boolean; spot: number; tgt: string | null; tgtD: number; canSee: boolean; percT: number; cool: number; burstLeft: number; aiming: boolean; aimT: number;
   strafe: number; strafeT: number; idleT: number; idleYaw: number; pendingAlert: number; lostT: number; lastHit: string | null;
@@ -519,6 +520,7 @@ const G_Server = {
     this.enemies.clear();
     this.extract = { active: false, votes: new Set() };
     this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8; this.live = [];
+    this.windT = 0; this.windSend = 0; // (the wind's own clock, from the level's start: windTick)
     this.report = { incap: 0, bleedouts: 0, bleedBy: {}, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0, stronghold: this.isStronghold() };
     this.evidence = []; // weapons on the floor: { i, wpn, x, z, owner, secured, taken }
     this.loot = new Map(); // things officers have put down: id -> { id, x, y, z, item (packed), yaw }
@@ -1779,10 +1781,27 @@ const G_Server = {
     for (const u of this.unitsSeen) if (!hot.has(u)) n++;
     return n;
   },
+  // The level's wind (js/sim.ts windAt: from the seed and the theme's mean speed, on windT, the level's own clock). The
+  // host owns it: every SEND seconds it tells everyone, its own screen too, where it is now and where it'll be SEND on
+  // ('wind': w [x, z, x1, z1], m/s), and each screen eases from what it shows to the second over the next SEND (js/wind.ts),
+  // so a round anyone fires, a flag, a scope's marker all go by the same wind, within a message. None on a calm map.
+  windT: 0, windSend: 0,
+  windMean() { const th = this.map && this.map.theme; return th && th.wind > 0 ? +th.wind : 0; },
+  windNow() { const m = this.windMean(); return m ? G.Sim.windAt(this.seed, m, this.windT) : null; },
+  windTick(dt: number) {
+    const m = this.windMean();
+    if (!m) return;
+    this.windT += dt; this.windSend -= dt;
+    if (this.windSend > 0) return;
+    this.windSend = G.Sim.WIND.SEND;
+    const a = G.Sim.windAt(this.seed, m, this.windT), b = G.Sim.windAt(this.seed, m, this.windT + G.Sim.WIND.SEND), r3 = (v: number) => Math.round(v * 1000) / 1000;
+    SvNet.broadcast({ t: 'wind', w: [r3(a.x), r3(a.z), r3(b.x), r3(b.z)] });
+  },
   update(dt: number) {
     if (this.phase === 'shop') return this.updateHub(dt);
     if (this.phase !== 'level' || !this.map) return;
     this.clock = (this.clock || 0) + dt;
+    this.windTick(dt);
     const map = this.map!, L = G.Level;
     const all = [...this.players.values()].filter((p) => p.st) as LivePlayer[];
     const alive = all.filter((p) => !p.st.dn && !p.st.dd);
@@ -3020,7 +3039,13 @@ const G_Server = {
     const norm = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
     const sd = this.BODY_R / Math.sqrt(-2 * Math.log(1 - G.U.clamp(chance, 0.01, 0.97))), ex = norm() * sd, ey = norm() * sd;
     const fv = new THREE.Vector3(...from), aim = new THREE.Vector3(tx + (-dz / d) * ex, ty + ey, tz + (dx / d) * ex).sub(fv), far = aim.length();
-    aim.divideScalar(far); aim.y += G.GRAVITY * far / (2 * v0 * v0); aim.normalize(); // (held up for the drop: they've used this gun before)
+    aim.divideScalar(far); aim.y += G.GRAVITY * far / (2 * v0 * v0); // (held up for the drop: they've used this gun before)
+    const wind = this.windNow(), wdrag = G.dragOf(wdef, am);
+    if (wind && G.Sim.windy(map, from[0], from[1], from[2])) { // (and off into the wind: they feel it on their face, and misjudge it: each their own way, a little more or less each shot)
+      if (e.windErr == null) e.windErr = G.Sim.windJudge(def.acc);
+      const lag = G.Sim.lagAt(v0, wdrag, far) / far * G.Sim.windShot(e.windErr); aim.x -= wind.x * lag; aim.z -= wind.z * lag;
+    }
+    aim.normalize();
     const right = new THREE.Vector3(-aim.z, 0, aim.x).normalize(), upv = new THREE.Vector3().crossVectors(right, aim), pr = Math.tan(((wdef.choke || 0) * Math.PI) / 180), pellets = def.pellets || 1;
     const r2 = (v: number) => Math.round(v * 100) / 100, sid = (this.eSid = (this.eSid || 0) + 1), ds: number[][] = [];
     for (let i = 0; i < pellets; i++) {
@@ -3029,7 +3054,7 @@ const G_Server = {
       ds.push([dir.x, dir.y, dir.z]);
     }
     if (SvNet.myId) SvNet.sendTo(SvNet.myId, { t: 'eround', e: e.id, wp: def.wpn, am, sid, f: from, ds }); // (js/player.ts enemyRounds)
-    const to = G.Sim.predictEnd(fv, aim.clone().multiplyScalar(v0), G.dragOf(wdef, am), G.GRAVITY, map).toArray();
+    const to = G.Sim.predictEnd(fv, aim.clone().multiplyScalar(v0), wdrag, G.GRAVITY, map, wind).toArray();
     SvNet.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, sid });
   },
   BODY_R: 0.24,

@@ -159,7 +159,7 @@ const G_Viewmodel = (() => {
     g.fillStyle = lit; g.beginPath(); g.arc(0, 0, 0.32, 0, 7); g.fill();
     line(0.95, lit, () => { g.arc(0, 0, 15, Math.PI * 0.62, Math.PI * 2.38); });
     // the rungs (20 m: the middle itself)
-    const TH = 2.3;
+    const TH = 1.6;
     label('20', 1.2, -TH * 0.72, TH);
     for (const d of [30, 40, 50, 60, 70, 80, 100, 120, 150]) {
       const y = hold(ball, d), hw = 250 / d;
@@ -196,15 +196,23 @@ const G_Viewmodel = (() => {
     return t;
   }
   // The range-finding reticle of every scope that goes above 4x (parts.ts sets d.reticle = 'range'), in mils like the BDC's:
-  //   - STADIA, left of the middle, standing on the horizontal wire (the ground line): for each of 100..500 m (numerals 1..5) a thin bar as tall as a man 1.8 m
+  //   - STADIA, left of the middle, standing just over the horizontal wire (STADIA_UP: their feet on a short ground line each): for each of 100..500 m (numerals 1..5, 500 m nearest the middle) a thin bar as tall as a man 1.8 m
   //     is at that range (1800 / range mils: 18, 9, 6, 4.5, 3.6). Stand the target's feet on the wire, slide him along to the bar he fits: that is his range.
   //     1.8 m, a full standing figure: it is the figure a suspect is, and the bar stays long enough to read at 500 m. The torso, shoulder to hip (0.5 m, 0.95-1.45 m
   //     up), is the heavier part of each bar, for a target half behind cover (or a crouched man: his whole body is about this). A target of another size scales it.
-  //   - HOLDOVER, under the middle: a tick for each of 100..500 m, at the drop of the round that fires next (the chambered one) from this gun's bore as the zeroing
-  //     table has it turned (G.flight and G.boreTip, the sums every round is flown by), numbered 1..5. It is rebuilt when the load or the zero changes.
+  //   - HOLDOVER, under the middle: a tick every 100 m from 200 to 1100 (HOLDS), the odd hundreds numbered and longer (HOLD_LABEL), at the drop of the round that fires next (the chambered one) from this gun's bore as the zeroing
+  //     table has it turned (G.flight and G.boreTip, the sums every round is flown by), numbered 3, 5, 7, 9, 11. It is rebuilt when the load or the zero changes.
+  //   - WINDAGE: ticks under the horizontal wire every half mil (the ballistic computer's cells), longer every 2.5, out to 10; and windage dots a mil apart on
+  //     the 300 m and 500 m holdover rows (WIND_ROWS), 4 and 6 either side, those rows' numbers past them. Hold the dot for the wind's drift.
   //   - FOCAL PLANE: first (ffp: the marks grow with the picture, true at any power) or second (sfp: they stay one size on the glass, true at one power only, the
   //     scope's top: js/render.ts _renderPip puts pmil there). Mils are drawn on RANGE_R either side of the middle.
+  // a stadia bar's place left of the middle, in mils: the furthest range nearest the middle, as the power goes up the near ones go out of the lens first
+  const STADIA_UP = 2, stadiaX = (i: number) => -3.2 - (RANGES.length - 1 - i) * 3.2;
   const RANGE_R = 44, RANGE_TEX = new Map<string, any>(), RANGES = [100, 200, 300, 400, 500];
+  // the holdover rows drawn under the middle, every 100 m from 200 to 1100 (HOLDS); the odd hundreds from 300 numbered (HOLD_LABEL: 3, 5, 7, 9, 11) with a longer
+  // tick, the even ones between them a short notch, no number; and the rows carrying windage dots, how many either side: 4 at 300, 6 at 500
+  const HOLDS = [200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100], HOLD_LABEL = [300, 500, 700, 900, 1100];
+  const WIND_ROWS = [300, 500], dotsOf = (i: number) => (WIND_ROWS.includes(HOLDS[i]) ? 1 + HOLDS[i] / 100 : 0);
   function nextRound(def: any, w: any) {
     const cdef = G.asCal(def, G.cartOf(w.def ? w : { def, rl: w.rl }) || G.calOf(def));
     const am = (G.chambered(def) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || G.ballFor(G.calOf(def));
@@ -212,9 +220,9 @@ const G_Viewmodel = (() => {
   }
   function rangeHolds(def: any, w: any): { am: string; holds: (number | null)[] } {
     const { cdef, am } = nextRound(def, w);
-    if (def.cls === 'RAIL') return { am, holds: RANGES.map(() => null) }; // (a slug that flies flat: nothing to hold over)
-    const p = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), 500);
-    return { am, holds: RANGES.map((d) => (p[d] ? (-p[d].h / d) * 1000 : null)) };
+    if (def.cls === 'RAIL') return { am, holds: HOLDS.map(() => null) }; // (a slug that flies flat: nothing to hold over)
+    const p = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), HOLDS[HOLDS.length - 1]);
+    return { am, holds: HOLDS.map((d) => (p[d] ? (-p[d].h / d) * 1000 : null)) };
   }
   function rangeTex(holds: (number | null)[]) {
     const key = holds.map((h) => (h == null ? '-' : h.toFixed(2))).join();
@@ -225,21 +233,36 @@ const G_Viewmodel = (() => {
     const g = c.getContext('2d')!, line = (w: number, f: () => void) => { g.lineWidth = w; g.strokeStyle = '#000'; g.beginPath(); f(); g.stroke(); };
     const label = (txt: string, x: number, y: number, h: number, al: CanvasTextAlign = 'left') => { g.fillStyle = '#000'; g.font = `600 ${h}px Arial, sans-serif`; g.textAlign = al; g.textBaseline = 'middle'; g.fillText(txt, x, y); };
     g.translate(S0 / 2, S0 / 2); g.scale(S0 / (2 * RANGE_R), S0 / (2 * RANGE_R)); g.lineCap = 'butt';
-    const TH = 1.8, W = 0.07;
-    // the stadia: 1.8 m men, 100 m nearest the middle; the torso (0.95-1.45 m up) is bold with a cross-tick at each end
+    const TH = 1.2, W = 0.07;
+    // the stadia: 1.8 m men, 500 m nearest the middle (the far ones stay in the lens at full power: stadiaX); the torso (0.95-1.45 m up) is bold with a cross-tick at each end
+    // (STADIA_UP mil over the horizontal wire, its numbers too, so it's clear of the wire and the windage ticks: a foot under each bar to stand him on)
     RANGES.forEach((d, i) => {
-      const x = -3.2 - i * 3.2, top = -1800 / d, hip = -950 / d, sh = -1450 / d;
-      line(W, () => { g.moveTo(x, 0); g.lineTo(x, top); g.moveTo(x - 0.5, top); g.lineTo(x + 0.5, top); }); // (the man's height, a cap at his head)
+      const x = stadiaX(i), b = -STADIA_UP, top = b - 1800 / d, hip = b - 950 / d, sh = b - 1450 / d;
+      line(W, () => { g.moveTo(x - 0.5, b); g.lineTo(x + 0.5, b); g.moveTo(x, b); g.lineTo(x, top); g.moveTo(x - 0.5, top); g.lineTo(x + 0.5, top); }); // (the man's height, a cap at his head)
       line(W * 3, () => { g.moveTo(x, hip); g.lineTo(x, sh); }); // (his torso)
       line(W, () => { g.moveTo(x, hip); g.lineTo(x + 0.4, hip); g.moveTo(x, sh); g.lineTo(x + 0.4, sh); });
-      label(String(i + 1), x, TH * 0.95, TH, 'center');
+      label(String(i + 1), x, b + TH * 0.95, TH, 'center');
     });
-    // the holdover marks, down the vertical wire: a tick for each hundred metres and its number; the wire's mil ticks, finer, between
-    line(W * 0.7, () => { for (let m = 1; m <= 30; m++) { const h = m % 5 ? 0.3 : 0.55; g.moveTo(-h, m); g.lineTo(h, m); } });
+    // the holdover marks, down the vertical wire: a tick for each row and its number (no mil ticks between: the rows are the marks)
     holds.forEach((y, i) => {
       if (y == null) return;
+      if (!HOLD_LABEL.includes(HOLDS[i])) { line(W * 1.2, () => { g.moveTo(-0.6, y); g.lineTo(0.6, y); }); return; } // (an even hundred: a notch, no number)
       line(W * 1.5, () => { g.moveTo(-1.1, y); g.lineTo(1.1, y); });
-      label(String(i + 1), 1.5, y, TH);
+      label(String(HOLDS[i] / 100), dotsOf(i) ? dotsOf(i) + 0.7 : 1.5, y, TH); // (its number past the row's windage dots, if it has them)
+    });
+    // WINDAGE: under the horizontal wire, a tick every half mil (the ballistic computer's cells), longer every 2.5 mil, out to 10 either
+    // side; and on the 300 m and 500 m holdover rows (WIND_ROWS), dots a mil apart either side of the vertical wire, 4 and 6,
+    // wide enough to hold off for a strong crosswind there. Faint, so the stadia and the holds read first.
+    line(W * 0.6, () => { for (let k = 1; k * WIND_STEP <= WIND_MAX; k++) { const x = k * WIND_STEP, h = k % WIND_MAJOR ? 0.25 : 0.6; for (const sx of [x, -x]) { g.moveTo(sx, 0); g.lineTo(sx, h); } } });
+    g.fillStyle = '#000';
+    const labels: number[][] = RANGES.map((_, i) => [stadiaX(i), TH * 0.95 - STADIA_UP]); // (the numbers' middles: the stadia's, and the rows')
+    holds.forEach((y, i) => { if (y != null && HOLD_LABEL.includes(HOLDS[i])) labels.push([(dotsOf(i) ? dotsOf(i) + 0.7 : 1.5) + 0.5, y]); });
+    holds.forEach((y, i) => {
+      if (y == null) return;
+      for (let k = 1; k <= dotsOf(i); k++) for (const sx of [k, -k]) {
+        if (labels.some(([lx, ly]) => Math.abs(sx - lx) < 0.75 && Math.abs(y - ly) < 1.0)) continue; // (not over a number: a flat round's rows are close together)
+        g.beginPath(); g.arc(sx, y, k % 5 ? 0.09 : 0.13, 0, 7); g.fill();
+      }
     });
     const t = new T.CanvasTexture(c);
     t.generateMipmaps = true; t.minFilter = T.LinearMipmapLinearFilter; t.anisotropy = 8;
@@ -273,6 +296,8 @@ const G_Viewmodel = (() => {
   const rangeText = (r: number | null) => (r == null ? '----' : String(Math.min(9999, Math.round(r))).padStart(4, ' '));
   // the point of impact, where the next round strikes at a range, is one cell lit red on a coarse grid of faint grey cells (a cell is this many mils: the marker snaps from cell to cell)
   const POI_CELL = 0.5, POI_FAR = 560;
+  // windage marks (every scope over 4×: docs/level-data.md "Wind"): a mark every WIND_STEP mil (a computer's cell), a longer one every WIND_MAJOR of them, out to WIND_MAX mil
+  const WIND_STEP = POI_CELL, WIND_MAJOR = 5, WIND_MAX = 10;
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
   const PIP_FS = G.R.TONE + `
     uniform sampler2D map; uniform float live; uniform vec2 eye; uniform int ret; uniform vec3 illum;
@@ -281,6 +306,15 @@ const G_Viewmodel = (() => {
     varying vec2 vUv;
     float seg(vec2 p, vec2 a, vec2 b) { vec2 pa = p - a, ba = b - a; float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0); return length(pa - ba * h); }
     float ink(float d, float w) { float aa = fwidth(d) * 0.75; return 1.0 - smoothstep(w - aa, w + aa, d); }
+    // windage marks on the horizontal wire, in mils (pm: a mil's share of the lens's radius, so they're true where the scope's
+    // marks are): a tick under the wire every ${WIND_STEP} mil (the computer's cells), longer every ${WIND_STEP * WIND_MAJOR} mil, out to
+    // ${WIND_MAX} mil each way, faded out when they'd crowd (a low power on a first focal plane); none inside the wire's gap (gap)
+    float windage(vec2 p, float pm, float w, float gap) {
+      float s = ${WIND_STEP.toFixed(2)} * pm, k = floor(p.x / s + 0.5), ak = abs(k), big = step(abs(mod(k, ${WIND_MAJOR.toFixed(1)})), 0.5);
+      if (ak < 0.5 || ak * ${WIND_STEP.toFixed(2)} > ${WIND_MAX.toFixed(1)} + 0.01 || abs(k * s) < gap) return 0.0;
+      float h = (big > 0.5 ? 0.7 : 0.3) * pm;
+      return ink(seg(p, vec2(k * s, 0.0), vec2(k * s, -h)), w) * smoothstep(0.008, 0.02, s) * mix(0.85, 1.0, big);
+    }
     void main() {
       vec2 p = vUv * 2.0 - 1.0; float r = length(p);
       vec3 img = bpTone(texture2D(map, vUv).rgb); // (the scene through it, rolled off as the screen's is: js/render.ts)
@@ -301,6 +335,7 @@ const G_Viewmodel = (() => {
       } else if (ret == 8) { // a ballistic computer scope's: fine duplex wires, a lit dot (the computer's marks are drawn below)
         float tw = abs(p.x) > 0.5 ? 0.02 : 0.0035, th = abs(p.y) > 0.5 ? 0.02 : 0.0035;
         black = max(ink(abs(p.y), tw), ink(abs(p.x), th)) * step(0.025, max(abs(p.x), abs(p.y)));
+        black = max(black, windage(p, pmil, 0.003, 0.025) * step(abs(p.x), 0.5)); // (windage ticks along the fine wire, under it)
         glow = ink(r, 0.012);
       } else if (ret >= 6) { // drawn in mils, looked up in mils: it grows with the picture (a second focal plane: pmil is held at its true power)
         float rr = ret == 7 ? ${RANGE_R.toFixed(1)} : ${BDC_R.toFixed(1)};
@@ -314,7 +349,7 @@ const G_Viewmodel = (() => {
       }
       vec3 col = img * (1.0 - black * 0.94) + illum * glow * 1.5;
       if (calc > 0) { // the range readout, low on the right: a dark panel with a green seven-segment LCD
-        vec2 u = (p - vec2(0.08, -0.62)) / vec2(0.54, 0.14);
+        vec2 u = (p - vec2(0.22, -0.62)) / vec2(0.38, 0.10);
         if (u.x > 0.0 && u.y > 0.0 && u.x < 1.0 && u.y < 1.0) { float a = texture2D(dmap, u).a; col = mix(col, vec3(0.01, 0.03, 0.02), 0.72); col += vec3(0.25, 1.0, 0.3) * a * 1.3; }
       }
       if (calc > 1) { // the point of impact: a coarse LCD grid (cells of ${POI_CELL} mil) over the whole picture, every cell a faint translucent grey, and the one cell the round will strike lit red
@@ -348,8 +383,9 @@ const G_Viewmodel = (() => {
     else { disk.position.set(0, o.y, -o.f); g.add(disk); }
     let sig = '';
     // a ballistic computer (def.calc: 1 a rangefinder's readout only, 2 with the point-of-impact marker): a few times a second it asks range() how far it is to what's under the crosshair, paints it and, from the
-    // flight of the round that fires next (the holdover marks' own sums), puts the marker where that round arrives at that range (below the crosshair, in mils)
-    let lcd: CanvasRenderingContext2D | null = null, lcdTex: any = null, lcdT = 0, lcdText = '', pathK = '', path: { h: number }[] = [];
+    // flight of the round that fires next (the holdover marks' own sums), puts the marker where that round arrives at that range (below the crosshair, in mils;
+    // and to the side the wind carries it)
+    let lcd: CanvasRenderingContext2D | null = null, lcdTex: any = null, lcdT = 0, lcdText = '', pathK = '', path: { h: number; lag: number }[] = [];
     if (def.calc) {
       const cv = document.createElement('canvas'); cv.width = LCD_W; cv.height = LCD_H; lcd = cv.getContext('2d');
       lcdTex = new T.CanvasTexture(cv); mat.uniforms.dmap.value = lcdTex; paintLcd(lcd!, '----'); lcdText = '----';
@@ -366,7 +402,17 @@ const G_Viewmodel = (() => {
       if (k !== pathK) { pathK = k; path = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), POI_FAR); }
       const q = path[Math.round(r)]; // (past the round's reach there is no impact to show)
       if (!q) { poi.z = 0; return; }
-      poi.set(0, Math.round(((q.h / r) * 1000) / POI_CELL), 1);
+      // and off sideways with the wind (js/wind.ts: the level's, as the host last said): the crosswind across the line of sight
+      // times the round's lag time at that range (G.flight's lag; js/sim.ts windStep), by how much of the way there is out in
+      // it (eight points along the line: from a room out through a window, only the part outside; into a room, none of it)
+      let side = 0;
+      if (G.Wind && G.Wind.mean && q.lag) {
+        const cam = G.R.scopeCam || G.R.camera, f = cam.getWorldDirection(new T.Vector3()), o = cam.getWorldPosition(new T.Vector3()), wv = G.Wind.vec(), rl = Math.hypot(f.x, f.z), map = G.Game.map;
+        let out = 0;
+        for (let i = 0; i < 8; i++) { const s = r * (i + 0.5) / 8; if (G.Sim.windy(map, o.x + f.x * s, o.y + f.y * s, o.z + f.z * s)) out++; }
+        if (out && rl > 1e-3) side = ((wv.x * -f.z + wv.z * f.x) / rl) * q.lag * out / 8; // (metres to the right: the wind's part along the right of the line, -f.z, f.x)
+      }
+      poi.set(Math.round(((side / r) * 1000) / POI_CELL), Math.round(((q.h / r) * 1000) / POI_CELL), 1);
     };
     // the range-finding reticle's holdover marks follow the weapon in the hands: called each frame with it; they are rebuilt when its round or its zero changes
     const sync = (w: any, range?: () => number | null) => {
@@ -398,11 +444,11 @@ const G_Viewmodel = (() => {
       mat.uniforms.pal.value = pal; mat.uniforms.zoom.value = pip.mag / pip.mag0;
       if (k === shown) return;
       shown = k;
-      cx.clearRect(0, 0, 256, 256); cx.font = 'bold 19px monospace'; cx.fillStyle = 'rgba(230,240,255,0.92)'; cx.textBaseline = 'top';
-      cx.textAlign = 'left'; cx.fillText(`${pip.mag.toFixed(1)}×`, 52, 44);
-      cx.textAlign = 'right'; cx.fillText(TH_PAL[pal], 204, 44);
+      cx.clearRect(0, 0, 256, 256); cx.font = 'bold 14px monospace'; cx.fillStyle = 'rgba(230,240,255,0.92)'; cx.textBaseline = 'top';
+      cx.textAlign = 'left'; cx.fillText(`${pip.mag.toFixed(1)}×`, 58, 48);
+      cx.textAlign = 'right'; cx.fillText(TH_PAL[pal], 198, 48);
       cx.strokeStyle = 'rgba(230,240,255,0.92)'; cx.lineWidth = 2; cx.strokeRect(160, 200, 30, 13); cx.fillRect(190, 204, 3, 5); for (let i = 0; i < 3; i++) cx.fillRect(163 + i * 9, 203, 7, 7); // (the battery, three bars of four)
-      cx.textAlign = 'left'; cx.font = '13px monospace'; cx.fillText('NJ TS-35', 66, 201);
+      cx.textAlign = 'left'; cx.font = '10px monospace'; cx.fillText('NJ TS-35', 80, 202);
       osd.needsUpdate = true;
     };
     return pip;

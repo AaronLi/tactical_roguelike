@@ -7,6 +7,7 @@
 //   ?gun=<weapon id>      your primary, its factory build; ?parts=slot:partId,slot:partId changes parts on it
 //                         (?gun=m4&parts=optic:op.bc.0,tacL:tac.bc.0)
 //   ?mags=<n>             spare magazines (or loads) for that gun, wherever they fit on you: 3 if not given, 0 for none
+//   ?ammo=<type>          that gun (and its spare loads) loaded with that ammo: ?ammo=tracer (js/data.ts G_AMMO)
 //   ?side=<weapon id>     your sidearm (the P9 otherwise)
 //   ?gear=<id>,<id>       gear put on you (js/gear.ts ids): worn, or fitted to what it goes on (a helmet, a carrier, a belt: one's
 //                         put on if you've none, and whatever's in the way taken off): ?gear=n.pano for the panoramic night vision
@@ -61,6 +62,8 @@ const G_DebugStart = (() => {
       const w = Me.makeWeapon(gun, buildOf(gun) as any);
       Me.weapons[w.def.slot] = w;
       say(`${w.def.name}: ${JSON.stringify(w.def.build || {})}`);
+      const amq = q.get('ammo'); // (?ammo=tracer: the gun and its spares loaded with that, if its calibre takes it)
+      if (amq) { const am = G.ammoOk(G.calOf(w.def), amq); if (am === amq) { w.ammo = am; w.tube = w.tube.map(() => am); if (w.chamber) w.chamber = am; } else say(`no ${amq} for ${w.def.name}`); }
       // and spare loads for it (?mags=N, 3 if not given; 0 for none): full magazines, or boxes of rounds for a tube or a cylinder,
       // wherever they fit on you
       const nm = Math.max(0, Math.min(12, q.has('mags') ? +(q.get('mags') || 0) : 3)), mag = G.Gear.ammoFor(w.def).kind === 'mag';

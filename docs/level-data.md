@@ -165,11 +165,73 @@ Handles (`h`), what the game changes later: `walls` (the wall instances, `cells`
 (each hinge's knuckle and leaf), `pane:<window id>`, `case` / `case.lid`, `abox` / `abox.lid` / `abox.lights`, `sbox` /
 `sbox.lid` / `sbox.card`, `cab:<n>` / `cab:<n>.door` / `cab:<n>.slot`.
 
+## Wind
+
+Out in the open a level can have wind: a horizontal vector `{ x, z }` in m/s (where the air blows to) that drifts rounds
+and blows the flags.
+
+- **Strength, per theme**: `wind` in `G.THEMES` (js/data.ts), the mean speed. Sandia Crest 6.5 m/s (gusting to about
+  9.5, easing to about 3.5), Festival 1.5, Suburbs 1.2, everything else none (no wind field at all: nothing runs).
+- **The model** (`G.Sim.windAt(seed, mean, t)`, js/sim.ts): from the level's seed, a base direction, then three smooth
+  noise terms (each three sines, their rates and phases from the seed): the direction wanders up to `WIND.DIR` (1.1 rad)
+  either side of the base over about `DIR_T` (300 s), the speed swells and eases by `SPD` (30%) over about 90 s, and gusts
+  add `GUST` (20%) over about 8 s. It's smooth in `t` (a 50 ms tick changes it by under 10 cm/s; it turns at most about
+  20 degrees in 10 s) and the same for the same seed and `t`.
+- **Sync**: the host owns it. The simulation (js/server.ts `windTick`) keeps `windT`, the level's own clock from its
+  start, and every `WIND.SEND` (0.5 s) broadcasts `{ t: 'wind', w: [x, z, x1, z1] }`: the wind now and half a second on
+  (16 numbers' worth of JSON, 2 Hz, only on a level with wind). Every screen, the host's own too (it hears its simulation
+  the same way), eases from what it shows to `[x1, z1]` over the next half second (js/wind.ts `vec`), so nothing steps and
+  everyone is within one message (plus latency) of the host. The first message of a level is taken as it is; before it,
+  calm. Clocks never have to agree.
+- **Indoors**: the wind reaches a point only where it's open to the sky on the floor it's on (`G.Sim.windy`: the floor's
+  `out`, `G.Level.floorAt`); off the map, it's open air. Under a roof or inside a building, none. (A round over a flat roof
+  is counted as under it: a few metres at the start of a shot from a roof, nothing that shows.)
+- **Rounds**: each shooter flies its own rounds (js/player.ts `stepRound`; the suspects' on the host's screen), so the
+  drift is worked out where the hits are. Drag works on the round's speed through the air, so a step whose drag leaves
+  `k` of the speed takes the velocity to `k v + (1 - k) w` (`G.Sim.windStep`), where the round is windy. For this game's
+  drag (speed falling off exponentially with distance, `G.dragOf`) that comes out to the lag-time rule exactly:
+  drift = w (t - s / v0), `G.Sim.lagAt`. A tailwind or headwind changes the round's speed the same way, lightly. The arc
+  the squad's told a round took (`G.Sim.predictEnd`, its end the other screens draw the streak to) is flown in the same
+  wind, and the suspects aim off for it as they hold up for the drop (js/server.ts fire). At 20 m in 5 m/s a 5.56 drifts
+  about a millimetre; at 600 m about 1.4 m (tools/wind.test.mjs).
+- **The ballistic computer** (op.bc.0, `def.calc` 2: js/viewmodel.ts `calcStep`, still 5 Hz): `G.flight` samples carry
+  `lag`; the marker moves sideways by the crosswind across the line of sight times the lag at that range, times the share
+  of eight points along the line that are out in the wind (from a room out a window, the part outside), in 0.5 mil cells. The BC-1 rail module shows range only: unchanged.
+- **Windage marks**: every scope over 4× (the ones that get the range-finding reticle: op.pic.7 LV-6, op.pic.8 3-9×, op.pic.9 5-25×,
+  oem.op.pic.20/21 5×, oem.op.pic.22/23 6×; the ballistic computer op.bc.0; the thermal op.th.0) has windage marks in mils, a mark every
+  0.5 mil (one of the computer's cells), longer every 2.5 mil, out to 10 mil, under the horizontal wire (js/viewmodel.ts `windage`,
+  `WIND_STEP`; the thermal's screen, js/render.ts, has a tick a mil, longer every 5, as half-mil ones would be too fine at its 8×). The range reticle also has windage dots a mil apart on its
+  300 m and 500 m holdover rows (`WIND_ROWS`), 4 and 6 either side, those rows' numbers moved past them. The holdover has a row every 100 m from 200 to 1100 (`HOLDS`): the odd hundreds numbered 3, 5, 7, 9, 11 (`HOLD_LABEL`), the even ones a short unnumbered notch. They're drawn in the reticle's mils (`pmil`), so they follow
+  its focal plane like the rest of its marks. The crossbow's 1-12× bolt-drop reticle already had a tick every mil on its wire: unchanged.
+  4× and under (prisms, the ACOG, dots, the AUG's ring) unchanged.
+- **Glass roofs**: a layout can put glass roofs over rooms it leaves open to the sky (`lay.glassRoofs`: coarse tiles and the
+  roof's height; the Sandia Crest's greenhouse). `G.Level.generate` turns them into `map.glassRoofs` ([x0, z0, x1, z1, the
+  roof's top], metres), and the description carries them (`glassRoofs`, only where there are any). The sky's light comes
+  through (`out` is unchanged), its wind doesn't: under one, `G.Sim.windy` is false, so rounds and the scope's outdoor share
+  treat it as indoors.
+- **Suspects misjudge it**: each holds off for the wind as they hold over for drop, but wrong by their own bias for the level
+  (`G.Sim.windJudge`: 20-35% of the drift, over or under, the better shot the less: a lookout about 20%, a gunman about a
+  third) and a little more each shot (`windShot`, 6% spread). A third of the drift at 300 m in 6.5 m/s is about 14 cm for a
+  7.62x39; at 20 m it's half a millimetre.
+- **The scope's picture**: the gun's turn in the hands is split in two (js/player.ts updateCamera): where the bore points (the
+  aim offset: sway, recoil, the arms' lag) is taken as it is each frame, and only the rest (raising, lowering, reloads, the
+  draw) is eased in. So the scope's picture is where the round goes, sway and all, frame by frame.
+- **Flags**: the `flagpole` piece (js/furniture.ts: a footing, a 7.2 m pole, a ball; solids are the footing and the pole)
+  is ordinary furniture, so it's in the description's `props` and the Bevy port places it as any piece. The Sandia Crest
+  gets one by a wall of each building (the Crest House, the viewing site, the greenhouse) and one each at the parking lot
+  and the antenna farm, from their own random stream after everything else is placed. The cloth isn't in the description:
+  js/wind.ts hoists a `R.flagpole.flag.w` x `.h` (1.5 x 1 m) New Mexico flag at the top of each pole (its top edge
+  `.top` under the pole's top, which is 0.3 + `.pole` over the ground), turns it downwind and moves its vertices in the
+  shader: turned out from the pole from 0.22 rad (hanging) to straight out at 9 m/s (eased over about 0.6 s), with a wave
+  running down it from the hoist, faster and bigger the stronger the wind. One material for every flag.
+
 ## Checking it
 
 - `npm run test:level`: the golden. Each case's description, part by part (fingerprints: FNV-1a over the canonical JSON,
   keys sorted, numbers rounded to 1e-4; `count`s of what each part lists), its procedural surfaces, that no three.js was
   touched making it, that it survives JSON unchanged, and that the map described again (its world now built from the
   description) gives the same description. `--write` writes it afresh after a change that's meant.
+- `node tools/wind.test.mjs` (after `tsc -p .`): the wind's drift against the lag-time rule for a few calibres, the wind
+  field smooth and the same on two loaded games, the Sandia Crest's flagpoles, no wind indoors.
 - `await G.ServerLink.digest()` (hosting): the simulation's description against the screen's — `same` is the whole of them
   equal as JSON, `differ` the parts whose fingerprints differ.

@@ -873,10 +873,10 @@
     "th": 9,
     "night": false
    },
-   "hash": "395e3bef",
+   "hash": "8605ccab",
    "parts": {
     "floors": "6afcfd77",
-    "terrain": "489f512f",
+    "terrain": "e1294ddf",
     "rooms": "ec1ad106",
     "doors": "a3858f25",
     "windows": "395e4088",
@@ -884,16 +884,16 @@
     "rails": "741638a5",
     "lamps": "14aa2434",
     "light": "c4fdb76c",
-    "spots": "f9709749",
-    "props": "6e596cb6",
+    "spots": "1889ab3b",
+    "props": "78c157ea",
     "boxes": "44795bff",
     "crest": "564401a8",
     "fx": "741638a5",
-    "solids": "8cb426f6",
+    "solids": "6a9330e5",
     "mats": "4711cdda",
     "tex": "5dee7a00",
-    "nodes": "7d4123da",
-    "all": "395e3bef"
+    "nodes": "ea5a98b0",
+    "all": "8605ccab"
    },
    "count": {
     "floors": 1,
@@ -903,17 +903,17 @@
     "stairs": 0,
     "rails": 0,
     "lamps": 8,
-    "props": 2678,
+    "props": 2683,
     "fx": 0,
-    "solids": 17725,
+    "solids": 17743,
     "mats": 77,
     "tex": 6,
     "nodes": 1065
    },
    "proc": {
     "terrain": {
-     "hash": "c8e9a5a8",
-     "verts": 176634
+     "hash": "40f104f6",
+     "verts": 176580
     },
     "crest.ground": {
      "hash": "886134ab",
@@ -924,7 +924,7 @@
      "verts": 68772
     }
    },
-   "bytes": 8064970
+   "bytes": 8066213
   },
   "Sandia Crest night": {
    "args": {
@@ -934,10 +934,10 @@
     "th": 9,
     "night": true
    },
-   "hash": "d7d7f072",
+   "hash": "c487d529",
    "parts": {
     "floors": "6afcfd77",
-    "terrain": "489f512f",
+    "terrain": "e1294ddf",
     "rooms": "ec1ad106",
     "doors": "a3858f25",
     "windows": "395e4088",
@@ -945,16 +945,16 @@
     "rails": "741638a5",
     "lamps": "84f4de86",
     "light": "cbf66674",
-    "spots": "f9709749",
-    "props": "6e596cb6",
+    "spots": "1889ab3b",
+    "props": "78c157ea",
     "boxes": "44795bff",
     "crest": "5bb4e47c",
     "fx": "741638a5",
-    "solids": "8cb426f6",
+    "solids": "6a9330e5",
     "mats": "2002152e",
     "tex": "5dee7a00",
-    "nodes": "13080f4f",
-    "all": "d7d7f072"
+    "nodes": "d1b9301d",
+    "all": "c487d529"
    },
    "count": {
     "floors": 1,
@@ -964,17 +964,17 @@
     "stairs": 0,
     "rails": 0,
     "lamps": 3,
-    "props": 2678,
+    "props": 2683,
     "fx": 0,
-    "solids": 17725,
+    "solids": 17743,
     "mats": 78,
     "tex": 6,
     "nodes": 1068
    },
    "proc": {
     "terrain": {
-     "hash": "c8e9a5a8",
-     "verts": 176634
+     "hash": "40f104f6",
+     "verts": 176580
     },
     "crest.ground": {
      "hash": "886134ab",
@@ -985,7 +985,7 @@
      "verts": 68772
     }
    },
-   "bytes": 8074079
+   "bytes": 8075322
   },
   "Apartment (multi-floor, lofts) L6": {
    "args": {
@@ -1187,10 +1187,10 @@
     "th": 9,
     "night": false
    },
-   "hash": "13d6e401",
+   "hash": "802a8e45",
    "parts": {
     "floors": "855d6645",
-    "terrain": "d845fdc4",
+    "terrain": "10690d02",
     "rooms": "7f1239b6",
     "doors": "a3858f25",
     "windows": "832717b0",
@@ -1198,16 +1198,16 @@
     "rails": "741638a5",
     "lamps": "14aa2434",
     "light": "c4fdb76c",
-    "spots": "a2306272",
-    "props": "886132ec",
+    "spots": "f6b21463",
+    "props": "b5dd5e7e",
     "boxes": "1f4fa9e3",
     "crest": "2bf3ef10",
     "fx": "741638a5",
-    "solids": "92e6a2ed",
+    "solids": "27e1819d",
     "mats": "89a7d936",
     "tex": "5dee7a00",
-    "nodes": "cc8f5159",
-    "all": "13d6e401"
+    "nodes": "db12239f",
+    "all": "802a8e45"
    },
    "count": {
     "floors": 1,
@@ -1217,17 +1217,17 @@
     "stairs": 0,
     "rails": 0,
     "lamps": 8,
-    "props": 2659,
+    "props": 2664,
     "fx": 0,
-    "solids": 16411,
+    "solids": 16427,
     "mats": 67,
     "tex": 6,
     "nodes": 1038
    },
    "proc": {
     "terrain": {
-     "hash": "d115c368",
-     "verts": 175242
+     "hash": "fae60ab8",
+     "verts": 175224
     },
     "crest.ground": {
      "hash": "886134ab",
@@ -1238,7 +1238,7 @@
      "verts": 68772
     }
    },
-   "bytes": 7851108
+   "bytes": 7852828
   },
   "Sandia Crest seed 31 L6 night": {
    "args": {
@@ -1248,10 +1248,10 @@
     "th": 9,
     "night": true
    },
-   "hash": "1ec49f00",
+   "hash": "db104a01",
    "parts": {
     "floors": "855d6645",
-    "terrain": "d845fdc4",
+    "terrain": "10690d02",
     "rooms": "7f1239b6",
     "doors": "a3858f25",
     "windows": "832717b0",
@@ -1259,16 +1259,16 @@
     "rails": "741638a5",
     "lamps": "5f27a0b2",
     "light": "cbf66674",
-    "spots": "a2306272",
-    "props": "886132ec",
+    "spots": "f6b21463",
+    "props": "b5dd5e7e",
     "boxes": "1f4fa9e3",
     "crest": "ca0065ac",
     "fx": "741638a5",
-    "solids": "92e6a2ed",
+    "solids": "27e1819d",
     "mats": "29d9e08b",
     "tex": "5dee7a00",
-    "nodes": "b3a6c3d7",
-    "all": "1ec49f00"
+    "nodes": "4f89275d",
+    "all": "db104a01"
    },
    "count": {
     "floors": 1,
@@ -1278,17 +1278,17 @@
     "stairs": 0,
     "rails": 0,
     "lamps": 6,
-    "props": 2659,
+    "props": 2664,
     "fx": 0,
-    "solids": 16411,
+    "solids": 16427,
     "mats": 69,
     "tex": 6,
     "nodes": 1044
    },
    "proc": {
     "terrain": {
-     "hash": "d115c368",
-     "verts": 175242
+     "hash": "fae60ab8",
+     "verts": 175224
     },
     "crest.ground": {
      "hash": "886134ab",
@@ -1299,7 +1299,7 @@
      "verts": 68772
     }
    },
-   "bytes": 7860950
+   "bytes": 7862670
   },
   "stronghold: Bunker L8": {
    "args": {
