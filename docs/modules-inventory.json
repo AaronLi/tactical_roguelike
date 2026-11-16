@@ -71,20 +71,27 @@
    "handling",
    "lightgrid",
    "levelview",
+   "gunmaterials",
    "render",
    "glare",
-   "shotlog",
-   "bolts",
-   "gunmaterials",
+   "icons",
    "glb",
    "gunrig",
    "humandata",
    "humans",
-   "headgear",
-   "rig",
    "vmanim",
    "viewmodel",
    "gunmodels",
+   "headgear",
+   "rig",
+   "bolts",
+   "casings",
+   "highlights",
+   "views",
+   "touch",
+   "gamepad",
+   "hud",
+   "shotlog",
    "prep",
    "net",
    "recorder",
@@ -95,10 +102,6 @@
    "server",
    "serverlink",
    "player",
-   "views",
-   "icons",
-   "casings",
-   "hud",
    "shopui",
    "invui",
    "gunsmith",
@@ -106,7 +109,6 @@
    "loot",
    "course",
    "range",
-   "highlights",
    "menushow",
    "hangar",
    "landing",
@@ -116,8 +118,6 @@
    "cloudconfig",
    "career",
    "cloud",
-   "gamepad",
-   "touch",
    "game",
    "profiler",
    "demo",
@@ -205,8 +205,8 @@
    "furnmesh",
    "lightgrid",
    "levelview",
-   "render",
    "gunmaterials",
+   "render",
    "glb",
    "gunrig",
    "humandata",
@@ -307,20 +307,27 @@
   "handling",
   "lightgrid",
   "levelview",
+  "gunmaterials",
   "render",
   "glare",
-  "shotlog",
-  "bolts",
-  "gunmaterials",
+  "icons",
   "glb",
   "gunrig",
   "humandata",
   "humans",
-  "headgear",
-  "rig",
   "vmanim",
   "viewmodel",
   "gunmodels",
+  "headgear",
+  "rig",
+  "bolts",
+  "casings",
+  "highlights",
+  "views",
+  "touch",
+  "gamepad",
+  "hud",
+  "shotlog",
   "prep",
   "net",
   "recorder",
@@ -331,10 +338,6 @@
   "server",
   "serverlink",
   "player",
-  "views",
-  "icons",
-  "casings",
-  "hud",
   "shopui",
   "invui",
   "gunsmith",
@@ -342,7 +345,6 @@
   "loot",
   "course",
   "range",
-  "highlights",
   "menushow",
   "hangar",
   "landing",
@@ -352,8 +354,6 @@
   "cloudconfig",
   "career",
   "cloud",
-  "gamepad",
-  "touch",
   "game",
   "profiler",
   "demo",
@@ -10532,217 +10532,276 @@
   },
   "gamepad": {
    "defs": {
-    "Pad": 413
+    "Pad": 417
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "audio",
+     "line": 2,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "hud",
+     "line": 3,
+     "names": [
+      "HUD"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 4,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "touch",
+     "line": 5,
+     "names": [
+      "Touch"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "HUD",
-     "line": 49,
+     "from": "hud",
+     "line": 53,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "HUD",
-     "line": 71,
+     "from": "hud",
+     "line": 75,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 72,
+     "line": 76,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 72,
+     "line": 76,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "HUD",
-     "line": 78,
+     "from": "hud",
+     "line": 82,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 84,
+     "line": 88,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 103,
+     "line": 107,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Me",
-     "line": 103,
+     "line": 107,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 108,
+     "line": 112,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 114,
+     "line": 118,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 120,
+     "line": 124,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 121,
+     "line": 125,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 142,
+     "line": 146,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 199,
+     "from": "audio",
+     "line": 203,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 246,
+     "from": "audio",
+     "line": 250,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "InvUI",
-     "line": 263,
+     "line": 267,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 264,
+     "from": "util",
+     "line": 268,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 264,
+     "from": "util",
+     "line": 268,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 269,
+     "line": 273,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 279,
+     "from": "audio",
+     "line": 283,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 286,
+     "line": 290,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 296,
+     "from": "util",
+     "line": 300,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 296,
+     "from": "util",
+     "line": 300,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 336,
+     "from": "audio",
+     "line": 340,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 336,
+     "from": "audio",
+     "line": 340,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 357,
+     "from": "util",
+     "line": 361,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 357,
+     "from": "util",
+     "line": 361,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 358,
+     "from": "util",
+     "line": 362,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 358,
+     "from": "util",
+     "line": 362,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 390,
+     "from": "audio",
+     "line": 394,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 399,
+     "from": "audio",
+     "line": 403,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 399,
+     "from": "audio",
+     "line": 403,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Audio",
-     "line": 399,
+     "from": "audio",
+     "line": 403,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Touch",
-     "line": 410,
+     "from": "touch",
+     "line": 414,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Touch",
-     "line": 410,
+     "from": "touch",
+     "line": 414,
      "load": false,
      "guard": "guarded"
     }
@@ -10750,19 +10809,19 @@
    "decls": {
     "PadBtn": {
      "kind": "type",
-     "line": 8
+     "line": 12
     },
     "PadDir": {
      "kind": "type",
-     "line": 9
+     "line": 13
     },
-    "G_Pad": {
+    "Pad": {
      "kind": "value",
-     "line": 10
+     "line": 14
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 414
+    "global": {
+     "kind": "value",
+     "line": 418
     }
    }
   },
@@ -11412,43 +11471,74 @@
   },
   "glare": {
    "defs": {
-    "Glare": 74
+    "Glare": 77
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "level",
+     "line": 2,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "render",
+     "line": 4,
+     "names": [
+      "R"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "U",
-     "line": 15,
+     "from": "util",
+     "line": 18,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 27,
+     "from": "level",
+     "line": 30,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 31,
+     "from": "render",
+     "line": 34,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 31,
+     "line": 34,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 31,
+     "line": 34,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 31,
+     "line": 34,
      "load": false,
      "guard": "plain"
     }
@@ -11456,23 +11546,23 @@
    "decls": {
     "GlareLight": {
      "kind": "type",
-     "line": 8
+     "line": 11
     },
     "GlareId": {
      "kind": "type",
-     "line": 9
+     "line": 12
     },
     "GlareState": {
      "kind": "type",
-     "line": 10
+     "line": 13
     },
-    "G_Glare": {
+    "Glare": {
      "kind": "value",
-     "line": 11
+     "line": 14
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 75
+    "global": {
+     "kind": "value",
+     "line": 78
     }
    }
   },
@@ -13936,1603 +14026,1956 @@
   },
   "highlights": {
    "defs": {
-    "Highlights": 3412
+    "Highlights": 3433
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "ballistics",
+     "line": 2,
+     "names": [
+      "Ballistics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "callsigns",
+     "line": 3,
+     "names": [
+      "Callsigns"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "damage",
+     "line": 4,
+     "names": [
+      "Damage"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 5,
+     "names": [
+      "AMMO",
+      "ballFor",
+      "CALIBERS",
+      "calOf",
+      "ENEMIES",
+      "roundSpeed",
+      "THEMES",
+      "WEAPONS"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gear",
+     "line": 6,
+     "names": [
+      "Gear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "glb",
+     "line": 7,
+     "names": [
+      "Models"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunmodels",
+     "line": 8,
+     "names": [
+      "GunModels"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 9,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "levelview",
+     "line": 10,
+     "names": [
+      "LevelView"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "lightgrid",
+     "line": 11,
+     "names": [
+      "LightGrid"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "materials",
+     "line": 12,
+     "names": [
+      "Materials"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 13,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "render",
+     "line": 14,
+     "names": [
+      "R"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "rig",
+     "line": 15,
+     "names": [
+      "Rig"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "scars",
+     "line": 16,
+     "names": [
+      "Scars"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "sim",
+     "line": 17,
+     "names": [
+      "Sim"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "stickers",
+     "line": 18,
+     "names": [
+      "Stickers"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 19,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "world",
+     "line": 20,
+     "names": [
+      "World"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Game",
-     "line": 142,
+     "line": 163,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 142,
+     "line": 163,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 142,
+     "line": 163,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 142,
+     "line": 163,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Net",
-     "line": 144,
+     "line": 165,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 147,
+     "line": 168,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 147,
+     "line": 168,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 149,
+     "line": 170,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 149,
+     "line": 170,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 150,
+     "line": 171,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Stickers",
-     "line": 150,
+     "from": "stickers",
+     "line": 171,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 167,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Views",
-     "line": 179,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 186,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Net",
      "line": 188,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Views",
+     "line": 200,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 207,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Net",
+     "line": 209,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "U",
-     "line": 190,
+     "from": "util",
+     "line": 211,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 201,
+     "line": 222,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 207,
+     "line": 228,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Me",
-     "line": 207,
+     "line": 228,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Net",
-     "line": 207,
+     "line": 228,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 207,
+     "line": 228,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 207,
+     "line": 228,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Views",
-     "line": 208,
+     "line": 229,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 300,
+     "line": 321,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 349,
+     "line": 370,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 360,
+     "line": 381,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 360,
+     "line": 381,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 363,
+     "from": "util",
+     "line": 384,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 390,
+     "line": 411,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 390,
+     "line": 411,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 392,
+     "line": 413,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 392,
+     "line": 413,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 408,
+     "from": "util",
+     "line": 429,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 421,
+     "line": 442,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 421,
+     "line": 442,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 434,
+     "line": 455,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 434,
+     "line": 455,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 447,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 447,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 454,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 454,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 454,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Views",
-     "line": 454,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 454,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 456,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 463,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 463,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
      "line": 468,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Game",
+     "line": 468,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 475,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 475,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 475,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Views",
+     "line": 475,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 475,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
      "line": 477,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 477,
+     "line": 484,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 487,
+     "line": 484,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 489,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Views",
+     "line": 498,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 487,
+     "line": 498,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 508,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 508,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 494,
+     "line": 515,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 494,
+     "line": 515,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 494,
+     "line": 515,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 496,
+     "line": 517,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 496,
+     "line": 517,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 496,
+     "line": 517,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 496,
+     "from": "level",
+     "line": 517,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 506,
+     "line": 527,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 506,
+     "line": 527,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 516,
+     "line": 537,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 516,
+     "line": 537,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 540,
+     "line": 561,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 540,
+     "line": 561,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 577,
+     "from": "data",
+     "line": 598,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 577,
+     "from": "parts",
+     "line": 598,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "THEMES",
-     "line": 587,
+     "from": "data",
+     "line": 608,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 619,
+     "from": "render",
+     "line": 640,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Hangar",
-     "line": 625,
+     "line": 646,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Scars",
-     "line": 661,
+     "from": "scars",
+     "line": 682,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "HUD",
-     "line": 692,
+     "line": 713,
      "load": false,
      "guard": "check"
     },
     {
      "x": "HUD",
-     "line": 692,
+     "line": 713,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Stickers",
-     "line": 725,
+     "from": "stickers",
+     "line": 746,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Zip",
-     "line": 727,
+     "line": 748,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Zip",
-     "line": 791,
+     "line": 812,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 806,
+     "line": 827,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 806,
+     "line": 827,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 889,
+     "from": "parts",
+     "line": 910,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 892,
+     "from": "gunmodels",
+     "line": 913,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 893,
+     "from": "parts",
+     "line": 914,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 893,
+     "from": "glb",
+     "line": 914,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Stickers",
-     "line": 897,
+     "from": "stickers",
+     "line": 918,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 898,
+     "from": "level",
+     "line": 919,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 899,
+     "line": 920,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelView",
-     "line": 900,
+     "from": "levelview",
+     "line": 921,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 909,
+     "from": "render",
+     "line": 930,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 915,
+     "from": "render",
+     "line": 936,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 954,
+     "line": 975,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 958,
+     "line": 979,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Shop",
-     "line": 1045,
+     "line": 1066,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1047,
+     "from": "gear",
+     "line": 1068,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Icons",
-     "line": 1047,
+     "line": 1068,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1049,
+     "from": "gear",
+     "line": 1070,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1049,
+     "from": "gear",
+     "line": 1070,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 1050,
+     "from": "data",
+     "line": 1071,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "CALIBERS",
-     "line": 1050,
+     "from": "data",
+     "line": 1071,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1050,
+     "from": "gear",
+     "line": 1071,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1050,
+     "from": "gear",
+     "line": 1071,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 1051,
+     "from": "parts",
+     "line": 1072,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 1051,
+     "from": "parts",
+     "line": 1072,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 1052,
+     "from": "data",
+     "line": 1073,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1052,
+     "from": "gear",
+     "line": 1073,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1052,
+     "from": "gear",
+     "line": 1073,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1052,
+     "from": "gear",
+     "line": 1073,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1053,
+     "from": "gear",
+     "line": 1074,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1053,
+     "from": "gear",
+     "line": 1074,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1053,
+     "from": "gear",
+     "line": 1074,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1054,
+     "from": "util",
+     "line": 1075,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 1065,
+     "from": "parts",
+     "line": 1086,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 1065,
+     "from": "parts",
+     "line": 1086,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 1066,
+     "from": "parts",
+     "line": 1087,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 1066,
+     "from": "parts",
+     "line": 1087,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1067,
+     "from": "gear",
+     "line": 1088,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1067,
+     "from": "gear",
+     "line": 1088,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 1074,
+     "from": "data",
+     "line": 1095,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 1074,
+     "from": "data",
+     "line": 1095,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 1125,
+     "from": "util",
+     "line": 1146,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1126,
+     "from": "util",
+     "line": 1147,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1140,
+     "from": "util",
+     "line": 1161,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1145,
+     "from": "util",
+     "line": 1166,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1261,
+     "from": "util",
+     "line": 1282,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 1305,
+     "from": "damage",
+     "line": 1326,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ENEMIES",
-     "line": 1317,
+     "from": "data",
+     "line": 1338,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 1318,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 1319,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 1322,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
+     "from": "rig",
      "line": 1339,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "U",
-     "line": 1341,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1362,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1362,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1363,
+     "x": "Rig",
+     "from": "rig",
+     "line": 1340,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 1411,
+     "from": "rig",
+     "line": 1343,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1360,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1362,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1383,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1383,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1384,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Rig",
+     "from": "rig",
+     "line": 1432,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1420,
+     "from": "level",
+     "line": 1441,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ballFor",
-     "line": 1465,
+     "from": "data",
+     "line": 1486,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 1465,
+     "from": "data",
+     "line": 1486,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Ballistics",
-     "line": 1466,
+     "from": "ballistics",
+     "line": 1487,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "roundSpeed",
-     "line": 1484,
+     "from": "data",
+     "line": 1505,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 1510,
+     "from": "render",
+     "line": 1531,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 1510,
+     "from": "render",
+     "line": 1531,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 1512,
+     "from": "damage",
+     "line": 1533,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 1512,
+     "from": "damage",
+     "line": 1533,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 1512,
+     "from": "damage",
+     "line": 1533,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Scars",
-     "line": 1515,
+     "from": "scars",
+     "line": 1536,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1562,
+     "line": 1583,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1562,
+     "line": 1583,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 1566,
+     "line": 1587,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Views",
-     "line": 1566,
+     "line": 1587,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 1571,
+     "line": 1592,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1593,
+     "from": "util",
+     "line": 1614,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1597,
+     "from": "level",
+     "line": 1618,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1615,
+     "from": "util",
+     "line": 1636,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1629,
+     "line": 1650,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Me",
-     "line": 1629,
+     "line": 1650,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 1629,
+     "line": 1650,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 1629,
+     "from": "level",
+     "line": 1650,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1629,
+     "from": "level",
+     "line": 1650,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1686,
+     "from": "level",
+     "line": 1707,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunAudio",
-     "line": 1707,
+     "line": 1728,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1707,
+     "from": "util",
+     "line": 1728,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 1708,
+     "from": "parts",
+     "line": 1729,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ballFor",
-     "line": 1708,
+     "from": "data",
+     "line": 1729,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 1708,
+     "from": "data",
+     "line": 1729,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1735,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1738,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1738,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1748,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
+     "from": "util",
      "line": 1756,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "U",
+     "from": "util",
+     "line": 1759,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1759,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1769,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Level",
-     "line": 1773,
+     "from": "level",
+     "line": 1777,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 1794,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 1808,
+     "from": "damage",
+     "line": 1829,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 1821,
+     "from": "damage",
+     "line": 1842,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 1822,
+     "from": "damage",
+     "line": 1843,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 1832,
+     "from": "world",
+     "line": 1853,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1860,
+     "from": "level",
+     "line": 1881,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1863,
+     "from": "level",
+     "line": 1884,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1897,
+     "from": "level",
+     "line": 1918,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1902,
+     "from": "util",
+     "line": 1923,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1908,
+     "from": "level",
+     "line": 1929,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1911,
+     "from": "level",
+     "line": 1932,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1941,
+     "from": "level",
+     "line": 1962,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1947,
+     "from": "util",
+     "line": 1968,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1950,
+     "from": "util",
+     "line": 1971,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 2030,
+     "from": "level",
+     "line": 2051,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 2048,
+     "from": "level",
+     "line": 2069,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 2060,
+     "from": "level",
+     "line": 2081,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 2110,
+     "from": "gunmodels",
+     "line": 2131,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 2123,
+     "from": "gunmodels",
+     "line": 2144,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 2132,
+     "from": "gunmodels",
+     "line": 2153,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 2147,
+     "from": "gunmodels",
+     "line": 2168,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2166,
+     "from": "util",
+     "line": 2187,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2176,
+     "from": "util",
+     "line": 2197,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2177,
+     "from": "util",
+     "line": 2198,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2191,
+     "from": "util",
+     "line": 2212,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2191,
+     "from": "util",
+     "line": 2212,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2194,
+     "from": "util",
+     "line": 2215,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Ballistics",
-     "line": 2221,
+     "from": "ballistics",
+     "line": 2242,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2288,
+     "from": "util",
+     "line": 2309,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2330,
+     "from": "util",
+     "line": 2351,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2335,
+     "from": "util",
+     "line": 2356,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2336,
+     "from": "util",
+     "line": 2357,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2336,
+     "from": "util",
+     "line": 2357,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 2339,
+     "line": 2360,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 2339,
+     "line": 2360,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 2342,
+     "line": 2363,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 2352,
+     "from": "rig",
+     "line": 2373,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ENEMIES",
-     "line": 2352,
+     "from": "data",
+     "line": 2373,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2368,
+     "from": "util",
+     "line": 2389,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2372,
+     "from": "util",
+     "line": 2393,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
-     "line": 2395,
+     "from": "materials",
+     "line": 2416,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2404,
+     "from": "util",
+     "line": 2425,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2471,
+     "from": "util",
+     "line": 2492,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2494,
+     "from": "util",
+     "line": 2515,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2517,
+     "from": "util",
+     "line": 2538,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2527,
+     "from": "util",
+     "line": 2548,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2566,
+     "from": "util",
+     "line": 2587,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 2566,
+     "from": "data",
+     "line": 2587,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 2566,
+     "from": "data",
+     "line": 2587,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 2568,
+     "from": "util",
+     "line": 2589,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2569,
+     "from": "util",
+     "line": 2590,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2572,
+     "from": "util",
+     "line": 2593,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2578,
+     "from": "util",
+     "line": 2599,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2578,
+     "from": "util",
+     "line": 2599,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Ballistics",
-     "line": 2624,
+     "from": "ballistics",
+     "line": 2645,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 2670,
+     "from": "render",
+     "line": 2691,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2677,
+     "from": "util",
+     "line": 2698,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2677,
+     "from": "util",
+     "line": 2698,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 2679,
+     "from": "level",
+     "line": 2700,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 2679,
+     "line": 2700,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 2690,
+     "from": "render",
+     "line": 2711,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 2723,
+     "from": "render",
+     "line": 2744,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LightGrid",
-     "line": 2723,
+     "from": "lightgrid",
+     "line": 2744,
      "load": false,
      "guard": "check"
     },
     {
      "x": "LightGrid",
-     "line": 2723,
+     "from": "lightgrid",
+     "line": 2744,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 2780,
+     "from": "util",
+     "line": 2801,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ENEMIES",
-     "line": 2781,
+     "from": "data",
+     "line": 2802,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2782,
+     "from": "util",
+     "line": 2803,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 2784,
+     "from": "callsigns",
+     "line": 2805,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2815,
+     "from": "util",
+     "line": 2836,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 2828,
+     "from": "callsigns",
+     "line": 2849,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 2885,
+     "from": "callsigns",
+     "line": 2906,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2894,
+     "from": "util",
+     "line": 2915,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 2922,
+     "from": "callsigns",
+     "line": 2943,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Ballistics",
-     "line": 2933,
+     "from": "ballistics",
+     "line": 2954,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 2948,
+     "from": "data",
+     "line": 2969,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 2948,
+     "from": "data",
+     "line": 2969,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Ballistics",
-     "line": 2979,
+     "from": "ballistics",
+     "line": 3000,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 3105,
+     "from": "util",
+     "line": 3126,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 3138,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 3158,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 3158,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "U",
+     "from": "util",
      "line": 3159,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 3178,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 3180,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 3180,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Callsigns",
-     "line": 3201,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 3204,
+     "x": "AMMO",
+     "from": "data",
+     "line": 3179,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 3204,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 3204,
+     "from": "data",
+     "line": 3179,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 3252,
+     "from": "util",
+     "line": 3180,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 3199,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 3201,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 3201,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Callsigns",
+     "from": "callsigns",
+     "line": 3222,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "calOf",
+     "from": "data",
+     "line": 3225,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "AMMO",
+     "from": "data",
+     "line": 3225,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "AMMO",
+     "from": "data",
+     "line": 3225,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 3273,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 3291,
+     "line": 3312,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 3304,
+     "line": 3325,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 3310,
+     "line": 3331,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 3314,
+     "line": 3335,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 3314,
+     "line": 3335,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 3322,
+     "line": 3343,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Highlights": {
+    "Highlights": {
      "kind": "value",
-     "line": 19
+     "line": 40
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 3413
+    "global": {
+     "kind": "value",
+     "line": 3434
     }
    }
   },
@@ -15688,669 +16131,864 @@
   },
   "hud": {
    "defs": {
-    "HUD": 520
+    "HUD": 533
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "ballistics",
+     "line": 2,
+     "names": [
+      "Ballistics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "callsigns",
+     "line": 3,
+     "names": [
+      "Callsigns"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 4,
+     "names": [
+      "AMMO",
+      "chambered",
+      "fblock",
+      "MODE_NAME",
+      "TIER_COLORS",
+      "WEAPONS"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gear",
+     "line": 5,
+     "names": [
+      "Gear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "icons",
+     "line": 6,
+     "names": [
+      "Icons"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 7,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "medical",
+     "line": 8,
+     "names": [
+      "Med"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "rig",
+     "line": 9,
+     "names": [
+      "Rig"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "shotlog",
+     "line": 10,
+     "names": [
+      "ShotLog"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 11,
+     "names": [
+      "Hooks",
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "views",
+     "line": 12,
+     "names": [
+      "Views"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gamepad",
+     "line": 13,
+     "names": [
+      "Pad"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "render",
+     "line": 14,
+     "names": [
+      "R"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Pad",
-     "line": 37,
+     "from": "gamepad",
+     "line": 50,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Pad",
-     "line": 53,
+     "from": "gamepad",
+     "line": 66,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 67,
+     "from": "util",
+     "line": 80,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 67,
+     "from": "util",
+     "line": 80,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 67,
+     "from": "util",
+     "line": 80,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 67,
+     "from": "util",
+     "line": 80,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 87,
+     "line": 100,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 90,
+     "from": "util",
+     "line": 103,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 90,
+     "from": "util",
+     "line": 103,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 96,
+     "line": 109,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 98,
+     "line": 111,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 126,
+     "line": 139,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 127,
+     "from": "util",
+     "line": 140,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 141,
+     "from": "rig",
+     "line": 154,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 146,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 146,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 147,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 149,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Views",
-     "line": 150,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Views",
-     "line": 151,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 152,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Ballistics",
-     "line": 152,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShotLog",
+     "from": "render",
      "line": 159,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Views",
-     "line": 162,
+     "x": "Game",
+     "line": 159,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Views",
-     "line": 162,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Views",
-     "line": 172,
+     "x": "Level",
+     "from": "level",
+     "line": 160,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 176,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 212,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Med",
-     "line": 219,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Med",
-     "line": 223,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Med",
-     "line": 223,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShotLog",
-     "line": 228,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 229,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 239,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 239,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 240,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 240,
+     "from": "rig",
+     "line": 162,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
+     "from": "views",
+     "line": 163,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Views",
+     "from": "views",
+     "line": 164,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 165,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Ballistics",
+     "from": "ballistics",
+     "line": 165,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShotLog",
+     "from": "shotlog",
+     "line": 172,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Views",
+     "from": "views",
+     "line": 175,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Views",
+     "from": "views",
+     "line": 175,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Views",
+     "from": "views",
+     "line": 185,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Rig",
+     "from": "rig",
+     "line": 189,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "WEAPONS",
+     "from": "data",
+     "line": 225,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Med",
+     "from": "medical",
+     "line": 232,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Med",
+     "from": "medical",
+     "line": 236,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Med",
+     "from": "medical",
+     "line": 236,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ShotLog",
+     "from": "shotlog",
+     "line": 241,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 242,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 252,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 252,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 253,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
      "line": 253,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 254,
+     "from": "views",
+     "line": 266,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Views",
+     "from": "views",
+     "line": 267,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 256,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 256,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 262,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Ballistics",
+     "from": "render",
      "line": 269,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Game",
+     "line": 269,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 275,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Ballistics",
+     "from": "ballistics",
      "line": 282,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Net",
-     "line": 306,
+     "x": "Ballistics",
+     "from": "ballistics",
+     "line": 295,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 308,
+     "line": 319,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Net",
+     "line": 321,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 316,
+     "from": "medical",
+     "line": 329,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 336,
+     "line": 349,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 336,
+     "line": 349,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 338,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Med",
-     "line": 348,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Med",
-     "line": 348,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
+     "from": "gear",
      "line": 351,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Med",
+     "from": "medical",
+     "line": 361,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Med",
+     "from": "medical",
+     "line": 361,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Gear",
-     "line": 351,
+     "from": "gear",
+     "line": 364,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Gear",
+     "from": "gear",
+     "line": 364,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 355,
+     "from": "util",
+     "line": 368,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 355,
+     "from": "util",
+     "line": 368,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "TIER_COLORS",
-     "line": 373,
+     "from": "data",
+     "line": 386,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "MODE_NAME",
-     "line": 373,
+     "from": "data",
+     "line": 386,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "fblock",
-     "line": 373,
+     "from": "data",
+     "line": 386,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "chambered",
-     "line": 375,
+     "from": "data",
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 375,
+     "from": "gear",
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 377,
+     "from": "data",
+     "line": 390,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Icons",
-     "line": 380,
+     "from": "icons",
+     "line": 393,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Icons",
-     "line": 381,
+     "from": "icons",
+     "line": 394,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 384,
+     "from": "gear",
+     "line": 397,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 387,
+     "from": "util",
+     "line": 400,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 405,
+     "from": "views",
+     "line": 418,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Space",
-     "line": 415,
+     "line": 428,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Space",
-     "line": 416,
+     "line": 429,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 417,
+     "from": "util",
+     "line": 430,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 423,
+     "from": "render",
+     "line": 436,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 424,
+     "from": "util",
+     "line": 437,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 440,
+     "from": "medical",
+     "line": 453,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 449,
+     "from": "util",
+     "line": 462,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 460,
+     "from": "util",
+     "line": 473,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 460,
+     "from": "util",
+     "line": 473,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 460,
+     "from": "medical",
+     "line": 473,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 460,
+     "from": "medical",
+     "line": 473,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 460,
+     "from": "util",
+     "line": 473,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 470,
+     "from": "medical",
+     "line": 483,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 471,
+     "from": "medical",
+     "line": 484,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Med",
-     "line": 471,
+     "from": "medical",
+     "line": 484,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Views",
-     "line": 477,
+     "from": "views",
+     "line": 490,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 486,
+     "from": "views",
+     "line": 499,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 494,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Callsigns",
-     "line": 494,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 494,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
+     "from": "util",
      "line": 507,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Callsigns",
+     "from": "callsigns",
+     "line": 507,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 507,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 520,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Net",
-     "line": 508,
+     "line": 521,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 508,
+     "line": 521,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 508,
+     "line": 521,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 508,
+     "line": 521,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 509,
+     "from": "views",
+     "line": 522,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 513,
+     "from": "util",
+     "line": 526,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 513,
+     "from": "callsigns",
+     "line": 526,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 513,
+     "from": "util",
+     "line": 526,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 513,
+     "line": 526,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 513,
+     "from": "util",
+     "line": 526,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 513,
+     "from": "util",
+     "line": 526,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 516,
+     "line": 529,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 516,
+     "line": 529,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Hooks",
-     "line": 521,
+     "from": "util",
+     "line": 534,
      "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "HUD",
-     "line": 521,
-     "load": false,
      "guard": "plain"
     },
     {
      "x": "Hooks",
-     "line": 522,
+     "from": "util",
+     "line": 535,
      "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "HUD",
-     "line": 522,
-     "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
     "HudEls": {
      "kind": "type",
-     "line": 4
+     "line": 17
     },
     "HbKind": {
      "kind": "type",
-     "line": 6
+     "line": 19
     },
     "HbHit": {
      "kind": "type",
-     "line": 7
+     "line": 20
     },
     "HbTarget": {
      "kind": "type",
-     "line": 8
+     "line": 21
     },
     "HbLast": {
      "kind": "type",
-     "line": 10
+     "line": 23
     },
-    "G_HUD": {
+    "HUD": {
      "kind": "value",
-     "line": 11
+     "line": 24
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 523
+    "global": {
+     "kind": "value",
+     "line": 536
     }
    }
   },
@@ -19697,115 +20335,177 @@
   },
   "levelview": {
    "defs": {
-    "LevelView": 641
+    "LevelView": 646
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "furnmesh",
+     "line": 2,
+     "names": [
+      "FurnMesh"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 3,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "leveldesc",
+     "line": 4,
+     "names": [
+      "LevelDesc"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "lightgrid",
+     "line": 5,
+     "names": [
+      "LightGrid"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 6,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "LightGrid",
-     "line": 14,
+     "from": "lightgrid",
+     "line": 19,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Hangar",
-     "line": 30,
+     "line": 35,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Hangar",
-     "line": 30,
+     "line": 35,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "LightGrid",
-     "line": 73,
+     "from": "lightgrid",
+     "line": 78,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 117,
+     "from": "level",
+     "line": 122,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 117,
+     "from": "level",
+     "line": 122,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "FurnMesh",
-     "line": 138,
+     "from": "furnmesh",
+     "line": 143,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelDesc",
-     "line": 147,
+     "from": "leveldesc",
+     "line": 152,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "FurnMesh",
-     "line": 206,
+     "from": "furnmesh",
+     "line": 211,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 206,
+     "from": "util",
+     "line": 211,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 215,
+     "from": "level",
+     "line": 220,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelDesc",
-     "line": 244,
+     "from": "leveldesc",
+     "line": 249,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelDesc",
-     "line": 258,
+     "from": "leveldesc",
+     "line": 263,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "FurnMesh",
-     "line": 259,
+     "from": "furnmesh",
+     "line": 264,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelDesc",
-     "line": 260,
+     "from": "leveldesc",
+     "line": 265,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelDesc",
-     "line": 260,
+     "from": "leveldesc",
+     "line": 265,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 281,
+     "from": "level",
+     "line": 286,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 479,
+     "from": "level",
+     "line": 484,
      "load": false,
      "guard": "plain"
     }
@@ -19813,15 +20513,15 @@
    "decls": {
     "LvViewCtx": {
      "kind": "type",
-     "line": 2
+     "line": 7
     },
-    "G_LevelView": {
+    "LevelView": {
      "kind": "value",
-     "line": 3
+     "line": 8
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 642
+    "global": {
+     "kind": "value",
+     "line": 647
     }
    }
   },
@@ -20494,85 +21194,142 @@
   },
   "menushow": {
    "defs": {
-    "MenuShow": 89
+    "MenuShow": 94
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "WEAPONS"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunmodels",
+     "line": 3,
+     "names": [
+      "GunModels"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 4,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 5,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "highlights",
+     "line": 6,
+     "names": [
+      "Highlights"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "U",
-     "line": 23,
+     "from": "util",
+     "line": 28,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 23,
+     "from": "data",
+     "line": 28,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 32,
+     "from": "gunmodels",
+     "line": 37,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 32,
+     "from": "parts",
+     "line": 37,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 32,
+     "from": "parts",
+     "line": 37,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 35,
+     "from": "gunmodels",
+     "line": 40,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Highlights",
-     "line": 52,
+     "from": "highlights",
+     "line": 57,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 53,
+     "from": "util",
+     "line": 58,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 73,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Highlights",
-     "line": 74,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
+     "from": "util",
      "line": 78,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 79,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 83,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_MenuShow": {
+    "MenuShow": {
      "kind": "value",
-     "line": 6
+     "line": 11
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 91
+    "global": {
+     "kind": "value",
+     "line": 96
     }
    }
   },
@@ -26785,427 +27542,571 @@
   },
   "profiler": {
    "defs": {
-    "Prof": 272
+    "Prof": 283
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "casings",
+     "line": 2,
+     "names": [
+      "Casings"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunaudio",
+     "line": 3,
+     "names": [
+      "GunAudio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "highlights",
+     "line": 4,
+     "names": [
+      "Highlights"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "hud",
+     "line": 5,
+     "names": [
+      "HUD"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 6,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "lightgrid",
+     "line": 7,
+     "names": [
+      "LightGrid"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "server",
+     "line": 8,
+     "names": [
+      "Server"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "serverhost",
+     "line": 9,
+     "names": [
+      "ServerHost"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "views",
+     "line": 10,
+     "names": [
+      "Views"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "world",
+     "line": 11,
+     "names": [
+      "World"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "render",
+     "line": 12,
+     "names": [
+      "R"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "R",
-     "line": 68,
+     "from": "render",
+     "line": 79,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 68,
+     "from": "render",
+     "line": 79,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 68,
+     "from": "render",
+     "line": 79,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 70,
+     "line": 81,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Me",
-     "line": 70,
+     "line": 81,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 70,
+     "line": 81,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Views",
-     "line": 70,
+     "from": "views",
+     "line": 81,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Views",
-     "line": 70,
+     "from": "views",
+     "line": 81,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Views",
-     "line": 70,
+     "from": "views",
+     "line": 81,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 108,
+     "line": 119,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 108,
+     "from": "render",
+     "line": 119,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 108,
+     "from": "render",
+     "line": 119,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 108,
+     "from": "render",
+     "line": 119,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Net",
-     "line": 111,
+     "line": 122,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Net",
-     "line": 111,
+     "line": 122,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Views",
-     "line": 113,
+     "from": "views",
+     "line": 124,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Views",
-     "line": 113,
+     "from": "views",
+     "line": 124,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Views",
-     "line": 113,
+     "from": "views",
+     "line": 124,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 113,
+     "from": "render",
+     "line": 124,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 113,
+     "from": "render",
+     "line": 124,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 113,
+     "from": "render",
+     "line": 124,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "ServerLink",
-     "line": 117,
+     "line": 128,
      "load": false,
      "guard": "check"
     },
     {
      "x": "ServerLink",
-     "line": 117,
+     "line": 128,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "ServerLink",
-     "line": 117,
+     "line": 128,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 164,
+     "from": "render",
+     "line": 175,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 164,
+     "from": "render",
+     "line": 175,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 173,
+     "from": "render",
+     "line": 184,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 257,
+     "from": "render",
+     "line": 268,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 231,
+     "line": 242,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "ServerHost",
-     "line": 234,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 236,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 236,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 236,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 236,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 237,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 237,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 237,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 237,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 237,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Views",
-     "line": 238,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Hangar",
-     "line": 239,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "InvUI",
-     "line": 240,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "InvUI",
-     "line": 240,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "GunAudio",
-     "line": 241,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 242,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 242,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "HUD",
-     "line": 243,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "LightGrid",
-     "line": 244,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Casings",
+     "from": "serverhost",
      "line": 245,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "Server",
+     "x": "Me",
      "line": 247,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "Server",
+     "x": "Me",
      "line": 247,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "Server",
+     "x": "Me",
      "line": 247,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "Server",
+     "x": "Me",
      "line": 247,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "Level",
+     "x": "Me",
      "line": 248,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "Level",
+     "x": "Me",
      "line": 248,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "World",
+     "x": "Me",
+     "line": 248,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 248,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 248,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Views",
+     "from": "views",
      "line": 249,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "World",
-     "line": 249,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 249,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Server",
+     "x": "Hangar",
      "line": 250,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "R",
+     "x": "InvUI",
+     "line": 251,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "InvUI",
+     "line": 251,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "GunAudio",
+     "from": "gunaudio",
      "line": 252,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 252,
+     "from": "render",
+     "line": 253,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 252,
+     "from": "render",
+     "line": 253,
      "load": true,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 252,
+     "x": "HUD",
+     "from": "hud",
+     "line": 254,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "LightGrid",
+     "from": "lightgrid",
      "line": 255,
      "load": true,
      "guard": "plain"
     },
     {
+     "x": "Casings",
+     "from": "casings",
+     "line": 256,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Server",
+     "from": "server",
+     "line": 258,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Server",
+     "from": "server",
+     "line": 258,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Server",
+     "from": "server",
+     "line": 258,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Server",
+     "from": "server",
+     "line": 258,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 259,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 259,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 260,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 260,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 260,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Server",
+     "from": "server",
+     "line": 261,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 263,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 263,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 263,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 263,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "LightGrid",
+     "from": "lightgrid",
+     "line": 266,
+     "load": true,
+     "guard": "plain"
+    },
+    {
      "x": "Highlights",
-     "line": 265,
+     "from": "highlights",
+     "line": 276,
      "load": true,
      "guard": "check"
     },
     {
      "x": "Highlights",
-     "line": 265,
+     "from": "highlights",
+     "line": 276,
      "load": true,
      "guard": "guarded"
     },
     {
      "x": "Course",
-     "line": 266,
+     "line": 277,
      "load": true,
      "guard": "check"
     },
     {
      "x": "Course",
-     "line": 266,
+     "line": 277,
      "load": true,
      "guard": "guarded"
     }
    ],
    "decls": {
-    "G_Prof": {
+    "Prof": {
      "kind": "value",
-     "line": 14
+     "line": 25
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 273
+    "global": {
+     "kind": "value",
+     "line": 284
     }
    }
   },
@@ -27517,635 +28418,759 @@
   },
   "render": {
    "defs": {
-    "R": 2047
+    "R": 2062
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "ballistics",
+     "line": 2,
+     "names": [
+      "Ballistics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "callsigns",
+     "line": 3,
+     "names": [
+      "Callsigns"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 4,
+     "names": [
+      "AMMO",
+      "ENEMIES"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gear",
+     "line": 5,
+     "names": [
+      "Gear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 6,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "levelview",
+     "line": 7,
+     "names": [
+      "LevelView"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "lightgrid",
+     "line": 8,
+     "names": [
+      "LightGrid"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 9,
+     "names": [
+      "Hooks",
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "damage",
+     "line": 10,
+     "names": [
+      "Damage"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunmaterials",
+     "line": 11,
+     "names": [
+      "GunMaterials"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "scars",
+     "line": 12,
+     "names": [
+      "Scars"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "stickers",
+     "line": 13,
+     "names": [
+      "Stickers"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "LevelView",
-     "line": 248,
+     "from": "levelview",
+     "line": 263,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LightGrid",
-     "line": 264,
+     "from": "lightgrid",
+     "line": 279,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LightGrid",
-     "line": 266,
+     "from": "lightgrid",
+     "line": 281,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 290,
+     "line": 305,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 290,
+     "line": 305,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 290,
+     "from": "level",
+     "line": 305,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LightGrid",
-     "line": 294,
+     "from": "lightgrid",
+     "line": 309,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShotLog",
-     "line": 351,
+     "line": 366,
      "load": false,
      "guard": "check"
     },
     {
      "x": "ShotLog",
-     "line": 351,
+     "line": 366,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Scars",
-     "line": 373,
+     "from": "scars",
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 373,
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 373,
+     "from": "level",
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 377,
+     "line": 392,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 377,
+     "line": 392,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 377,
+     "from": "level",
+     "line": 392,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 413,
+     "line": 428,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Me",
-     "line": 413,
+     "line": 428,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 413,
+     "line": 428,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "GunModels",
-     "line": 415,
+     "line": 430,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Stickers",
-     "line": 434,
+     "from": "stickers",
+     "line": 449,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 729,
+     "from": "util",
+     "line": 744,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Ballistics",
-     "line": 761,
+     "from": "ballistics",
+     "line": 776,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 788,
+     "line": 803,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShotLog",
-     "line": 789,
+     "line": 804,
      "load": false,
      "guard": "check"
     },
     {
      "x": "ShotLog",
-     "line": 789,
+     "line": 804,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "ShotLog",
-     "line": 790,
+     "line": 805,
      "load": false,
      "guard": "check"
     },
     {
      "x": "HUD",
-     "line": 790,
+     "line": 805,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShotLog",
-     "line": 790,
+     "line": 805,
      "load": false,
      "guard": "check"
     },
     {
      "x": "ShotLog",
-     "line": 790,
+     "line": 805,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 808,
+     "from": "util",
+     "line": 823,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 808,
+     "from": "util",
+     "line": 823,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 811,
+     "from": "data",
+     "line": 826,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Bolts",
-     "line": 818,
+     "line": 833,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LightGrid",
-     "line": 858,
+     "from": "lightgrid",
+     "line": 873,
      "load": false,
      "guard": "check"
     },
     {
      "x": "LightGrid",
-     "line": 859,
+     "from": "lightgrid",
+     "line": 874,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 861,
+     "from": "util",
+     "line": 876,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 896,
+     "line": 911,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Audio",
-     "line": 896,
+     "line": 911,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Audio",
-     "line": 896,
+     "line": 911,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Scars",
-     "line": 908,
+     "from": "scars",
+     "line": 923,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Range",
-     "line": 921,
+     "line": 936,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Range",
-     "line": 921,
+     "line": 936,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 934,
+     "line": 949,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 934,
+     "line": 949,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 969,
+     "from": "util",
+     "line": 984,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 991,
+     "from": "util",
+     "line": 1006,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1064,
+     "from": "level",
+     "line": 1079,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1066,
+     "from": "util",
+     "line": 1081,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1067,
+     "from": "util",
+     "line": 1082,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1125,
+     "from": "util",
+     "line": 1140,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1249,
+     "from": "util",
+     "line": 1264,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 1473,
+     "line": 1488,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunMaterials",
-     "line": 1663,
+     "from": "gunmaterials",
+     "line": 1678,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Viewmodel",
-     "line": 1674,
+     "line": 1689,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 1686,
+     "line": 1701,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1687,
+     "from": "gear",
+     "line": 1702,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 1690,
+     "from": "callsigns",
+     "line": 1705,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 1694,
+     "line": 1709,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ENEMIES",
-     "line": 1700,
+     "from": "data",
+     "line": 1715,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 1712,
+     "line": 1727,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Casings",
-     "line": 1788,
+     "line": 1803,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Casings",
-     "line": 1788,
+     "line": 1803,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Loot",
-     "line": 1789,
+     "line": 1804,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Loot",
-     "line": 1789,
+     "line": 1804,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gear",
-     "line": 1789,
+     "from": "gear",
+     "line": 1804,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 1789,
+     "from": "gear",
+     "line": 1804,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1791,
+     "line": 1806,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 1791,
+     "from": "damage",
+     "line": 1806,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1791,
+     "line": 1806,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Highlights",
-     "line": 1872,
+     "line": 1887,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Highlights",
-     "line": 1872,
+     "line": 1887,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Highlights",
-     "line": 1872,
+     "line": 1887,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 1873,
+     "line": 1888,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1892,
+     "line": 1907,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LightGrid",
-     "line": 1945,
+     "from": "lightgrid",
+     "line": 1960,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1956,
+     "line": 1971,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1956,
+     "line": 1971,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "LightGrid",
-     "line": 1957,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
+     "from": "lightgrid",
      "line": 1972,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1972,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1984,
+     "line": 1987,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1984,
+     "line": 1987,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 1984,
+     "line": 1999,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1999,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1999,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "LightGrid",
-     "line": 2019,
+     "from": "lightgrid",
+     "line": 2034,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Hooks",
-     "line": 2049,
+     "from": "util",
+     "line": 2064,
      "load": true,
      "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 2049,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 2049,
-     "load": false,
-     "guard": "guarded"
     },
     {
      "x": "Hooks",
-     "line": 2050,
+     "from": "util",
+     "line": 2065,
      "load": true,
      "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 2050,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 2050,
-     "load": false,
-     "guard": "guarded"
     }
    ],
    "decls": {
     "_tv": {
      "kind": "value",
-     "line": 2
+     "line": 14
     },
     "_tv2": {
      "kind": "value",
-     "line": 2
+     "line": 14
     },
     "_fq": {
      "kind": "value",
-     "line": 3
+     "line": 15
     },
     "_fq2": {
      "kind": "value",
-     "line": 3
+     "line": 15
     },
     "_fz": {
      "kind": "value",
-     "line": 3
+     "line": 15
     },
     "_fn": {
      "kind": "value",
-     "line": 3
+     "line": 15
     },
     "_fp": {
      "kind": "value",
-     "line": 3
+     "line": 15
     },
     "_fs": {
      "kind": "value",
-     "line": 3
+     "line": 15
     },
     "_fm": {
      "kind": "value",
-     "line": 3
+     "line": 15
     },
     "_fc": {
      "kind": "value",
-     "line": 3
+     "line": 15
     },
     "_bjc": {
      "kind": "value",
-     "line": 4
+     "line": 16
     },
     "SCOPE_FAR": {
      "kind": "value",
-     "line": 5
+     "line": 17
     },
     "Trail": {
      "kind": "type",
-     "line": 7
+     "line": 22
     },
     "BloodKind": {
      "kind": "type",
-     "line": 8
+     "line": 23
     },
     "RBloodMats": {
      "kind": "type",
-     "line": 9
+     "line": 24
     },
     "RMark": {
      "kind": "type",
-     "line": 10
+     "line": 25
     },
     "RWound": {
      "kind": "type",
-     "line": 11
+     "line": 26
     },
     "RWarm": {
      "kind": "type",
-     "line": 12
+     "line": 27
     },
     "RArc": {
      "kind": "type",
-     "line": 13
+     "line": 28
     },
-    "G_R": {
+    "R": {
      "kind": "value",
-     "line": 14
+     "line": 29
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 2051
+    "global": {
+     "kind": "value",
+     "line": 2066
     }
    }
   },
@@ -34370,169 +35395,266 @@
   },
   "shotlog": {
    "defs": {
-    "ShotLog": 296
+    "ShotLog": 304
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "data",
+     "line": 1,
+     "names": [
+      "SOUND_SPEED"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 2,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "materials",
+     "line": 3,
+     "names": [
+      "Materials"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 4,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "hud",
+     "line": 5,
+     "names": [
+      "HUD"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "render",
+     "line": 6,
+     "names": [
+      "R"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "rig",
+     "line": 7,
+     "names": [
+      "Rig"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "views",
+     "line": 8,
+     "names": [
+      "Views"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "R",
-     "line": 12,
+     "from": "render",
+     "line": 20,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SOUND_SPEED",
-     "line": 12,
+     "from": "data",
+     "line": 20,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 13,
+     "from": "views",
+     "line": 21,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 13,
+     "from": "views",
+     "line": 21,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 41,
+     "from": "render",
+     "line": 49,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SOUND_SPEED",
-     "line": 82,
+     "from": "data",
+     "line": 90,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 114,
+     "from": "render",
+     "line": 122,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 117,
+     "from": "render",
+     "line": 125,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 133,
+     "from": "render",
+     "line": 141,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 133,
+     "from": "render",
+     "line": 141,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 154,
+     "from": "util",
+     "line": 162,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Materials",
-     "line": 157,
+     "from": "materials",
+     "line": 165,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 179,
+     "from": "render",
+     "line": 187,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 196,
+     "from": "views",
+     "line": 204,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 196,
+     "line": 204,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 196,
+     "from": "views",
+     "line": 204,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 200,
+     "from": "util",
+     "line": 208,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 202,
+     "from": "render",
+     "line": 210,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 205,
+     "from": "util",
+     "line": 213,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 220,
+     "from": "level",
+     "line": 228,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 229,
+     "from": "render",
+     "line": 237,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 231,
+     "line": 239,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "HUD",
-     "line": 242,
+     "from": "hud",
+     "line": 250,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 242,
+     "line": 250,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 249,
+     "from": "rig",
+     "line": 257,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 263,
+     "from": "render",
+     "line": 271,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 276,
+     "from": "render",
+     "line": 284,
      "load": false,
      "guard": "plain"
     }
@@ -34540,43 +35662,43 @@
    "decls": {
     "ShotRow": {
      "kind": "type",
-     "line": 1
+     "line": 9
     },
     "ShotHolder": {
      "kind": "type",
-     "line": 2
+     "line": 10
     },
     "ShotInfo": {
      "kind": "type",
-     "line": 3
+     "line": 11
     },
     "ShotLabel": {
      "kind": "type",
-     "line": 4
+     "line": 12
     },
     "ShotVert": {
      "kind": "type",
-     "line": 5
+     "line": 13
     },
     "ShotRec": {
      "kind": "type",
-     "line": 6
+     "line": 14
     },
     "ShotArmour": {
      "kind": "type",
-     "line": 7
+     "line": 15
     },
     "ShotMark": {
      "kind": "type",
-     "line": 8
+     "line": 16
     },
-    "G_ShotLog": {
+    "ShotLog": {
      "kind": "value",
-     "line": 9
+     "line": 17
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 298
+    "global": {
+     "kind": "value",
+     "line": 306
     }
    }
   },
@@ -37970,181 +39092,214 @@
   },
   "touch": {
    "defs": {
-    "Touch": 269
+    "Touch": 272
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "audio",
+     "line": 2,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gamepad",
+     "line": 3,
+     "names": [
+      "Pad"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 4,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Pad",
-     "line": 28,
+     "from": "gamepad",
+     "line": 31,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "InvUI",
-     "line": 36,
+     "line": 39,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 36,
+     "line": 39,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 36,
+     "line": 39,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "InvUI",
-     "line": 36,
+     "line": 39,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 37,
+     "line": 40,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 37,
+     "line": 40,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Pad",
-     "line": 37,
+     "from": "gamepad",
+     "line": 40,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 37,
+     "line": 40,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 43,
+     "line": 46,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 57,
+     "from": "audio",
+     "line": 60,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 63,
+     "line": 66,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Me",
-     "line": 63,
+     "line": 66,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 68,
+     "line": 71,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 96,
+     "line": 99,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 96,
+     "line": 99,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Pad",
-     "line": 102,
+     "from": "gamepad",
+     "line": 105,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 103,
+     "line": 106,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 112,
+     "line": 115,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 133,
+     "from": "util",
+     "line": 136,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "InvUI",
-     "line": 142,
+     "line": 145,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 214,
+     "line": 217,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 214,
+     "line": 217,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 214,
+     "line": 217,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Game",
-     "line": 249,
+     "line": 252,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 249,
+     "line": 252,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "InvUI",
-     "line": 256,
+     "line": 259,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Touch": {
+    "Touch": {
      "kind": "value",
-     "line": 8
+     "line": 11
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 270
+    "global": {
+     "kind": "value",
+     "line": 273
     }
    }
   },
@@ -38417,2121 +39572,2553 @@
   },
   "views": {
    "defs": {
-    "Views": 1132
+    "Views": 1155
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "audio",
+     "line": 2,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "ballistics",
+     "line": 3,
+     "names": [
+      "Ballistics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "bolts",
+     "line": 4,
+     "names": [
+      "Bolts"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "callsigns",
+     "line": 5,
+     "names": [
+      "Callsigns"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "damage",
+     "line": 6,
+     "names": [
+      "Damage"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 7,
+     "names": [
+      "AMMO",
+      "ballFor",
+      "calOf",
+      "CLASS_SND",
+      "dragOf",
+      "ENEMIES",
+      "roundSpec",
+      "roundSpeed",
+      "shotK",
+      "shotSoundKey",
+      "SUPPRESSOR",
+      "volleyVol",
+      "WEAPONS"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "footsteps",
+     "line": 8,
+     "names": [
+      "Footsteps"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "glare",
+     "line": 9,
+     "names": [
+      "Glare"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunaudio",
+     "line": 10,
+     "names": [
+      "GunAudio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunmodels",
+     "line": 11,
+     "names": [
+      "GunModels"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "handling",
+     "line": 12,
+     "names": [
+      "Handling"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 13,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "levelview",
+     "line": 14,
+     "names": [
+      "LevelView"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 15,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "rig",
+     "line": 16,
+     "names": [
+      "Rig"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "sim",
+     "line": 17,
+     "names": [
+      "Sim"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "stickers",
+     "line": 18,
+     "names": [
+      "Stickers"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 19,
+     "names": [
+      "Hooks",
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "world",
+     "line": 20,
+     "names": [
+      "World"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "casings",
+     "line": 21,
+     "names": [
+      "Casings"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "highlights",
+     "line": 22,
+     "names": [
+      "Highlights"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "hud",
+     "line": 23,
+     "names": [
+      "HUD"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "render",
+     "line": 24,
+     "names": [
+      "R"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "R",
-     "line": 49,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 54,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 54,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 64,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 65,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Damage",
-     "line": 68,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
+     "from": "render",
      "line": 72,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Game",
+     "line": 77,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "R",
-     "line": 74,
+     "from": "render",
+     "line": 77,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 87,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 88,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Damage",
+     "from": "damage",
+     "line": 91,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Rig",
+     "from": "rig",
+     "line": 95,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 97,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 81,
+     "line": 104,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 81,
+     "line": 104,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 82,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Casings",
-     "line": 100,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Bolts",
-     "line": 101,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 102,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
      "line": 105,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 108,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Net",
+     "x": "Casings",
+     "from": "casings",
      "line": 123,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Game",
-     "line": 147,
+     "x": "Bolts",
+     "from": "bolts",
+     "line": 124,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 147,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 147,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 147,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 147,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ENEMIES",
-     "line": 153,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ENEMIES",
-     "line": 156,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 158,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 160,
+     "from": "render",
+     "line": 125,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 163,
+     "from": "render",
+     "line": 128,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 131,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 194,
+     "line": 146,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 201,
+     "line": 170,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 170,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 202,
+     "line": 170,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 202,
+     "line": 170,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 202,
+     "line": 170,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Game",
-     "line": 203,
+     "x": "ENEMIES",
+     "from": "data",
+     "line": 176,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ENEMIES",
+     "from": "data",
+     "line": 179,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Rig",
+     "from": "rig",
+     "line": 181,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Rig",
+     "from": "rig",
+     "line": 183,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 186,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 203,
+     "line": 217,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 204,
+     "line": 224,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 205,
+     "line": 225,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 206,
+     "line": 225,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 207,
+     "line": 225,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 208,
+     "line": 226,
      "load": false,
      "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 213,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 213,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 213,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 213,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 213,
-     "load": false,
-     "guard": "guarded"
     },
     {
      "x": "Net",
+     "line": 226,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 227,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
      "line": 228,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 234,
+     "x": "Game",
+     "line": 229,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 230,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 231,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 236,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 236,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 236,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 236,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 236,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Net",
+     "line": 251,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 237,
+     "from": "render",
+     "line": 257,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 260,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 241,
+     "from": "gunmodels",
+     "line": 264,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 246,
+     "from": "render",
+     "line": 269,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 306,
+     "from": "gunmodels",
+     "line": 329,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 340,
+     "line": 363,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 340,
+     "line": 363,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 352,
+     "line": 375,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 355,
+     "line": 378,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ENEMIES",
-     "line": 360,
+     "from": "data",
+     "line": 383,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 364,
+     "from": "rig",
+     "line": 387,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Rig",
-     "line": 365,
+     "from": "rig",
+     "line": 388,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 366,
+     "from": "render",
+     "line": 389,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 393,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 397,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 403,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 408,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 415,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
+     "from": "render",
      "line": 416,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Highlights",
-     "line": 418,
-     "load": false,
-     "guard": "check"
-    },
-    {
-     "x": "Highlights",
-     "line": 418,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Damage",
-     "line": 419,
-     "load": false,
-     "guard": "plain"
-    },
-    {
      "x": "R",
+     "from": "render",
      "line": 420,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Audio",
-     "line": 421,
+     "x": "R",
+     "from": "render",
+     "line": 426,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 421,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 421,
+     "x": "Rig",
+     "from": "rig",
+     "line": 431,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 424,
+     "line": 438,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 439,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Highlights",
-     "line": 427,
+     "from": "highlights",
+     "line": 441,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Highlights",
-     "line": 427,
+     "from": "highlights",
+     "line": 441,
      "load": false,
      "guard": "guarded"
     },
     {
-     "x": "World",
-     "line": 428,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 431,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 431,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 431,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 431,
+     "x": "Damage",
+     "from": "damage",
+     "line": 442,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 435,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 437,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 437,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 437,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
+     "from": "render",
      "line": 443,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 446,
+     "x": "Audio",
+     "from": "audio",
+     "line": 444,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Glare",
+     "x": "R",
+     "from": "render",
+     "line": 444,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 444,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
      "line": 447,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Level",
-     "line": 449,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 461,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 461,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 463,
-     "load": false,
-     "guard": "plain"
-    },
-    {
      "x": "Highlights",
-     "line": 464,
+     "from": "highlights",
+     "line": 450,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Highlights",
-     "line": 464,
+     "from": "highlights",
+     "line": 450,
      "load": false,
      "guard": "guarded"
     },
     {
+     "x": "World",
+     "from": "world",
+     "line": 451,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 454,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 454,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 454,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 454,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "R",
-     "line": 477,
+     "from": "render",
+     "line": 458,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 478,
+     "from": "audio",
+     "line": 460,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 460,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 460,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 466,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 469,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Glare",
+     "from": "glare",
+     "line": 470,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 472,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 484,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 484,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 486,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 487,
+     "load": false,
+     "guard": "check"
+    },
+    {
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 487,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 500,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 501,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Handling",
-     "line": 483,
+     "from": "handling",
+     "line": 506,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 483,
+     "from": "data",
+     "line": 506,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 503,
+     "line": 526,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 515,
+     "from": "render",
+     "line": 538,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 516,
+     "from": "render",
+     "line": 539,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 517,
+     "from": "data",
+     "line": 540,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 517,
+     "from": "data",
+     "line": 540,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ENEMIES",
-     "line": 517,
+     "from": "data",
+     "line": 540,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Highlights",
-     "line": 521,
+     "from": "highlights",
+     "line": 544,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Highlights",
-     "line": 521,
+     "from": "highlights",
+     "line": 544,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "ballFor",
-     "line": 522,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 522,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Casings",
-     "line": 523,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GunAudio",
-     "line": 524,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 524,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CLASS_SND",
-     "line": 524,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "CLASS_SND",
-     "line": 524,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 525,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 525,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 525,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 528,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 536,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 537,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 538,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 538,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Gunsmith",
+     "from": "data",
      "line": 545,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Highlights",
-     "line": 549,
-     "load": false,
-     "guard": "check"
-    },
-    {
-     "x": "Highlights",
-     "line": 549,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Audio",
-     "line": 550,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 550,
-     "load": false,
-     "guard": "plain"
-    },
-    {
      "x": "calOf",
-     "line": 550,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 552,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 552,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 554,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 557,
+     "from": "data",
+     "line": 545,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Casings",
-     "line": 558,
+     "from": "casings",
+     "line": 546,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 559,
+     "x": "GunAudio",
+     "from": "gunaudio",
+     "line": 547,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
+     "from": "audio",
+     "line": 547,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "CLASS_SND",
+     "from": "data",
+     "line": 547,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "CLASS_SND",
+     "from": "data",
+     "line": 547,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 548,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "ballFor",
+     "from": "data",
+     "line": 548,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "calOf",
+     "from": "data",
+     "line": 548,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 551,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 559,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
      "line": 560,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
+     "from": "audio",
      "line": 561,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "GunAudio",
-     "line": 562,
+     "x": "Audio",
+     "from": "audio",
+     "line": 561,
      "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "shotSoundKey",
-     "line": 562,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpec",
-     "line": 562,
-     "load": false,
-     "guard": "plain"
+     "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 562,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "shotK",
-     "line": 562,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "volleyVol",
-     "line": 562,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 562,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SUPPRESSOR",
-     "line": 562,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 573,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "dragOf",
-     "line": 573,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 573,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "AMMO",
-     "line": 573,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "R",
-     "line": 583,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 593,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 593,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 594,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 597,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 618,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 619,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Sim",
-     "line": 625,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 628,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Net",
-     "line": 629,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 629,
+     "from": "parts",
+     "line": 568,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Highlights",
-     "line": 634,
+     "from": "highlights",
+     "line": 572,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Highlights",
-     "line": 634,
+     "from": "highlights",
+     "line": 572,
      "load": false,
      "guard": "guarded"
-    },
-    {
-     "x": "Net",
-     "line": 634,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Net",
-     "line": 635,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Net",
-     "line": 636,
-     "load": false,
-     "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 637,
+     "from": "audio",
+     "line": 573,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Audio",
-     "line": 637,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Highlights",
-     "line": 642,
+     "x": "ballFor",
+     "from": "data",
+     "line": 573,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Highlights",
-     "line": 642,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Net",
-     "line": 642,
+     "x": "calOf",
+     "from": "data",
+     "line": 573,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Net",
-     "line": 645,
+     "x": "ballFor",
+     "from": "data",
+     "line": 575,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Ballistics",
-     "line": 650,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Highlights",
-     "line": 658,
-     "load": false,
-     "guard": "check"
-    },
-    {
-     "x": "Highlights",
-     "line": 658,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Net",
-     "line": 660,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 660,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 662,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 662,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "U",
-     "line": 662,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 662,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "U",
-     "line": 662,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 662,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Ballistics",
-     "line": 664,
+     "x": "calOf",
+     "from": "data",
+     "line": 575,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 696,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 708,
+     "from": "render",
+     "line": 577,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 728,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Rig",
-     "line": 734,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 735,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 743,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 744,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 747,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 748,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Net",
-     "line": 757,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 757,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 757,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 757,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 757,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 757,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 760,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 762,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Callsigns",
-     "line": 769,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 776,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 778,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 778,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "R",
-     "line": 782,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 785,
+     "from": "render",
+     "line": 580,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Casings",
-     "line": 792,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Bolts",
-     "line": 793,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 796,
+     "from": "casings",
+     "line": 581,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 796,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 798,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 798,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "R",
-     "line": 799,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Level",
-     "line": 799,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 799,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "LevelView",
-     "line": 802,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 802,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "R",
-     "line": 802,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 805,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 805,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 805,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 806,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 807,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 807,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 807,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 807,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 814,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 814,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 821,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 822,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 826,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Net",
-     "line": 830,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 830,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 837,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 861,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 861,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 861,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 877,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Footsteps",
-     "line": 883,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 889,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 889,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 893,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 893,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "R",
-     "line": 893,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "R",
-     "line": 893,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 893,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Rig",
-     "line": 900,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 901,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 915,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 922,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Stickers",
-     "line": 924,
+     "from": "render",
+     "line": 582,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 929,
+     "from": "audio",
+     "line": 583,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 929,
+     "x": "Audio",
+     "from": "audio",
+     "line": 584,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "GunAudio",
+     "from": "gunaudio",
+     "line": 585,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "shotSoundKey",
+     "from": "data",
+     "line": 585,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "roundSpec",
+     "from": "data",
+     "line": 585,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 931,
+     "from": "parts",
+     "line": 585,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Handling",
-     "line": 931,
+     "x": "shotK",
+     "from": "data",
+     "line": 585,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Handling",
-     "line": 931,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 931,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Handling",
-     "line": 931,
+     "x": "volleyVol",
+     "from": "data",
+     "line": 585,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 931,
+     "from": "audio",
+     "line": 585,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Me",
-     "line": 931,
+     "x": "SUPPRESSOR",
+     "from": "data",
+     "line": 585,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Level",
-     "line": 935,
+     "x": "roundSpeed",
+     "from": "data",
+     "line": 596,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Game",
-     "line": 935,
+     "x": "dragOf",
+     "from": "data",
+     "line": 596,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "AMMO",
+     "from": "data",
+     "line": 596,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "AMMO",
+     "from": "data",
+     "line": 596,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 606,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 616,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 616,
+     "load": true,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 617,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 620,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 941,
+     "from": "render",
+     "line": 641,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 642,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Sim",
+     "from": "sim",
+     "line": 648,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Rig",
+     "from": "rig",
+     "line": 651,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 947,
+     "line": 652,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 947,
+     "x": "Rig",
+     "from": "rig",
+     "line": 652,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 949,
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 657,
+     "load": false,
+     "guard": "check"
+    },
+    {
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 657,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Net",
+     "line": 657,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 951,
+     "x": "Net",
+     "line": 658,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Net",
+     "line": 659,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 953,
+     "from": "audio",
+     "line": 660,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "HUD",
-     "line": 954,
+     "x": "Audio",
+     "from": "audio",
+     "line": 660,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 665,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 958,
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 665,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Net",
+     "line": 665,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Glare",
-     "line": 958,
+     "x": "Net",
+     "line": 668,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Ballistics",
+     "from": "ballistics",
+     "line": 673,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 681,
+     "load": false,
+     "guard": "check"
+    },
+    {
+     "x": "Highlights",
+     "from": "highlights",
+     "line": 681,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Net",
+     "line": 683,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 959,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 959,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 965,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 966,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 968,
+     "line": 683,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 971,
+     "from": "util",
+     "line": 685,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "Game",
-     "line": 987,
+     "x": "Me",
+     "line": 685,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 685,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 685,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 685,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 685,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Ballistics",
+     "from": "ballistics",
+     "line": 687,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
+     "from": "render",
+     "line": 719,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 731,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 751,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Rig",
+     "from": "rig",
+     "line": 757,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 758,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 766,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 767,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 770,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 771,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Net",
+     "line": 780,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 780,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 780,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 780,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 780,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 780,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 783,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 785,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Callsigns",
+     "from": "callsigns",
+     "line": 792,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 799,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 801,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 801,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 805,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 808,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Casings",
+     "from": "casings",
+     "line": 815,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Bolts",
+     "from": "bolts",
+     "line": 816,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 819,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 819,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 821,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 821,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 822,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 822,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 822,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "LevelView",
+     "from": "levelview",
+     "line": 825,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 825,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 825,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 828,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 828,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 828,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 829,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 830,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 830,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 830,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 830,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 837,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 837,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 844,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 845,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 849,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Net",
+     "line": 853,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 853,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 860,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 884,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 884,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "World",
+     "from": "world",
+     "line": 884,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 900,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Footsteps",
+     "from": "footsteps",
+     "line": 906,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 912,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 912,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 916,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 916,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 916,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 916,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 916,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Rig",
+     "from": "rig",
+     "line": 923,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 924,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 938,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 945,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Stickers",
+     "from": "stickers",
+     "line": 947,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 952,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 952,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Gunsmith",
+     "from": "parts",
+     "line": 954,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Handling",
+     "from": "handling",
+     "line": 954,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Handling",
+     "from": "handling",
+     "line": 954,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 954,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Handling",
+     "from": "handling",
+     "line": 954,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 954,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 954,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 958,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 958,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 964,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Net",
+     "line": 970,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 970,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 972,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 974,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 976,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "HUD",
+     "from": "hud",
+     "line": 977,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 981,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Glare",
+     "from": "glare",
+     "line": 981,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 982,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 982,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 988,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
      "line": 989,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 998,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Glare",
-     "line": 998,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1001,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1001,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1003,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1003,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1003,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1004,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 1004,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1004,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1004,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1009,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1009,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1011,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Stickers",
-     "line": 1015,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Stickers",
-     "line": 1016,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1019,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 1019,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1019,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1019,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1024,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1024,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1026,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1026,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1028,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 1028,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1028,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1028,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1032,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1032,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1032,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1033,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1043,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1050,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1050,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Game",
-     "line": 1052,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Game",
-     "line": 1053,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Audio",
-     "line": 1053,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1053,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1053,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1061,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "R",
-     "line": 1063,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 1073,
+     "from": "render",
+     "line": 991,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1080,
+     "from": "util",
+     "line": 994,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1010,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1012,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1021,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Glare",
+     "from": "glare",
+     "line": 1021,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1024,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1024,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1026,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1026,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1026,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1027,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 1027,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1027,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1027,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1032,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1032,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1034,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Stickers",
+     "from": "stickers",
+     "line": 1038,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Stickers",
+     "from": "stickers",
+     "line": 1039,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1042,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 1042,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1042,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1042,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1047,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1047,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1049,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1049,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1051,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 1051,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1051,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1051,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1055,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1055,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1055,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1056,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1066,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1073,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1073,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Game",
+     "line": 1075,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Game",
+     "line": 1076,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Audio",
+     "from": "audio",
+     "line": 1076,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1076,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1076,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1084,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "from": "render",
+     "line": 1086,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1090,
+     "line": 1096,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 1103,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1091,
+     "line": 1113,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1091,
+     "line": 1114,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Me",
+     "line": 1114,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 1098,
+     "from": "render",
+     "line": 1121,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1099,
+     "line": 1122,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1099,
+     "line": 1122,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1099,
+     "line": 1122,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 1111,
+     "from": "render",
+     "line": 1134,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 1112,
+     "from": "render",
+     "line": 1135,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1116,
+     "line": 1139,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1117,
+     "line": 1140,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1118,
+     "line": 1141,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1118,
+     "line": 1141,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1118,
+     "line": 1141,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 1119,
+     "line": 1142,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Net",
-     "line": 1119,
+     "line": 1142,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 1125,
+     "line": 1148,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 1125,
+     "line": 1148,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 1125,
+     "line": 1148,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "HUD",
-     "line": 1126,
+     "from": "hud",
+     "line": 1149,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Hooks",
-     "line": 1133,
+     "from": "util",
+     "line": 1156,
      "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "Views",
-     "line": 1133,
-     "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
     "WP": {
      "kind": "value",
-     "line": 2
+     "line": 25
     },
     "WD": {
      "kind": "value",
-     "line": 2
+     "line": 25
     },
     "VwEvidence": {
      "kind": "type",
-     "line": 3
+     "line": 26
     },
     "VwNade": {
      "kind": "type",
-     "line": 4
+     "line": 27
     },
     "VwCabView": {
      "kind": "type",
-     "line": 6
+     "line": 29
     },
     "VwLid": {
      "kind": "type",
-     "line": 7
+     "line": 30
     },
     "VwRound": {
      "kind": "type",
-     "line": 9
+     "line": 32
     },
     "VwOutline": {
      "kind": "type",
-     "line": 11
+     "line": 34
     },
     "VwPose": {
      "kind": "type",
-     "line": 13
+     "line": 36
     },
     "VwActKind": {
      "kind": "type",
-     "line": 14
+     "line": 37
     },
     "VwAct": {
      "kind": "type",
-     "line": 16
+     "line": 39
     },
     "VwNadeKind": {
      "kind": "type",
-     "line": 18
+     "line": 41
     },
     "VwAboxView": {
      "kind": "type",
-     "line": 19
+     "line": 42
     },
     "VwSboxView": {
      "kind": "type",
-     "line": 20
+     "line": 43
     },
-    "G_Views": {
+    "Views": {
      "kind": "value",
-     "line": 21
+     "line": 44
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 1134
+    "global": {
+     "kind": "value",
+     "line": 1157
     }
    }
   },
@@ -44056,12 +45643,12 @@
     "loadAt": [
      {
       "x": "Hooks",
-      "line": 521,
+      "line": 534,
       "guard": "plain"
      },
      {
       "x": "Hooks",
-      "line": 522,
+      "line": 535,
       "guard": "plain"
      }
     ]
@@ -45565,32 +47152,32 @@
     "loadAt": [
      {
       "x": "R",
-      "line": 242,
+      "line": 253,
       "guard": "plain"
      },
      {
       "x": "R",
-      "line": 242,
+      "line": 253,
       "guard": "plain"
      },
      {
       "x": "R",
-      "line": 252,
+      "line": 263,
       "guard": "plain"
      },
      {
       "x": "R",
-      "line": 252,
+      "line": 263,
       "guard": "plain"
      },
      {
       "x": "R",
-      "line": 252,
+      "line": 263,
       "guard": "plain"
      },
      {
       "x": "R",
-      "line": 252,
+      "line": 263,
       "guard": "plain"
      }
     ]
@@ -45604,47 +47191,47 @@
     "loadAt": [
      {
       "x": "Me",
-      "line": 236,
+      "line": 247,
       "guard": "plain"
      },
      {
       "x": "Me",
-      "line": 236,
+      "line": 247,
       "guard": "plain"
      },
      {
       "x": "Me",
-      "line": 236,
+      "line": 247,
       "guard": "plain"
      },
      {
       "x": "Me",
-      "line": 236,
+      "line": 247,
       "guard": "plain"
      },
      {
       "x": "Me",
-      "line": 237,
+      "line": 248,
       "guard": "plain"
      },
      {
       "x": "Me",
-      "line": 237,
+      "line": 248,
       "guard": "plain"
      },
      {
       "x": "Me",
-      "line": 237,
+      "line": 248,
       "guard": "plain"
      },
      {
       "x": "Me",
-      "line": 237,
+      "line": 248,
       "guard": "plain"
      },
      {
       "x": "Me",
-      "line": 237,
+      "line": 248,
       "guard": "plain"
      }
     ]
@@ -45658,7 +47245,7 @@
     "loadAt": [
      {
       "x": "Views",
-      "line": 238,
+      "line": 249,
       "guard": "plain"
      }
     ]
@@ -45672,7 +47259,7 @@
     "loadAt": [
      {
       "x": "Game",
-      "line": 231,
+      "line": 242,
       "guard": "plain"
      }
     ]
@@ -45702,7 +47289,7 @@
     "loadAt": [
      {
       "x": "ServerHost",
-      "line": 234,
+      "line": 245,
       "guard": "plain"
      }
     ]
@@ -45716,7 +47303,7 @@
     "loadAt": [
      {
       "x": "Hangar",
-      "line": 239,
+      "line": 250,
       "guard": "plain"
      }
     ]
@@ -45730,12 +47317,12 @@
     "loadAt": [
      {
       "x": "InvUI",
-      "line": 240,
+      "line": 251,
       "guard": "plain"
      },
      {
       "x": "InvUI",
-      "line": 240,
+      "line": 251,
       "guard": "plain"
      }
     ]
@@ -45749,7 +47336,7 @@
     "loadAt": [
      {
       "x": "GunAudio",
-      "line": 241,
+      "line": 252,
       "guard": "plain"
      }
     ]
@@ -45763,7 +47350,7 @@
     "loadAt": [
      {
       "x": "HUD",
-      "line": 243,
+      "line": 254,
       "guard": "plain"
      }
     ]
@@ -45777,12 +47364,12 @@
     "loadAt": [
      {
       "x": "LightGrid",
-      "line": 244,
+      "line": 255,
       "guard": "plain"
      },
      {
       "x": "LightGrid",
-      "line": 255,
+      "line": 266,
       "guard": "plain"
      }
     ]
@@ -45796,7 +47383,7 @@
     "loadAt": [
      {
       "x": "Casings",
-      "line": 245,
+      "line": 256,
       "guard": "plain"
      }
     ]
@@ -45810,27 +47397,27 @@
     "loadAt": [
      {
       "x": "Server",
-      "line": 247,
+      "line": 258,
       "guard": "plain"
      },
      {
       "x": "Server",
-      "line": 247,
+      "line": 258,
       "guard": "plain"
      },
      {
       "x": "Server",
-      "line": 247,
+      "line": 258,
       "guard": "plain"
      },
      {
       "x": "Server",
-      "line": 247,
+      "line": 258,
       "guard": "plain"
      },
      {
       "x": "Server",
-      "line": 250,
+      "line": 261,
       "guard": "plain"
      }
     ]
@@ -45844,12 +47431,12 @@
     "loadAt": [
      {
       "x": "Level",
-      "line": 248,
+      "line": 259,
       "guard": "plain"
      },
      {
       "x": "Level",
-      "line": 248,
+      "line": 259,
       "guard": "plain"
      }
     ]
@@ -45863,17 +47450,17 @@
     "loadAt": [
      {
       "x": "World",
-      "line": 249,
+      "line": 260,
       "guard": "plain"
      },
      {
       "x": "World",
-      "line": 249,
+      "line": 260,
       "guard": "plain"
      },
      {
       "x": "World",
-      "line": 249,
+      "line": 260,
       "guard": "plain"
      }
     ]
@@ -45887,12 +47474,12 @@
     "loadAt": [
      {
       "x": "Highlights",
-      "line": 265,
+      "line": 276,
       "guard": "check"
      },
      {
       "x": "Highlights",
-      "line": 265,
+      "line": 276,
       "guard": "guarded"
      }
     ]
@@ -45906,12 +47493,12 @@
     "loadAt": [
      {
       "x": "Course",
-      "line": 266,
+      "line": 277,
       "guard": "check"
      },
      {
       "x": "Course",
-      "line": 266,
+      "line": 277,
       "guard": "guarded"
      }
     ]
@@ -46082,12 +47669,12 @@
     "loadAt": [
      {
       "x": "Hooks",
-      "line": 2049,
+      "line": 2064,
       "guard": "plain"
      },
      {
       "x": "Hooks",
-      "line": 2050,
+      "line": 2065,
       "guard": "plain"
      }
     ]
@@ -47807,12 +49394,12 @@
     "loadAt": [
      {
       "x": "Sim",
-      "line": 593,
+      "line": 616,
       "guard": "plain"
      },
      {
       "x": "Sim",
-      "line": 593,
+      "line": 616,
       "guard": "plain"
      }
     ]
@@ -47843,7 +49430,7 @@
     "loadAt": [
      {
       "x": "Hooks",
-      "line": 1133,
+      "line": 1156,
       "guard": "plain"
      }
     ]
@@ -48173,16 +49760,15 @@
  "reach": [],
  "undefined": {},
  "trial": {
-  "total": 2256,
+  "total": 1330,
   "byCode": {
-   "TS2339": 2026,
-   "TS2551": 116,
-   "TS6196": 29,
-   "TS7006": 62,
-   "TS2345": 4,
+   "TS2339": 1140,
+   "TS2551": 109,
+   "TS6196": 18,
+   "TS7006": 51,
+   "TS2345": 3,
    "TS2531": 5,
    "TS2322": 1,
-   "TS18048": 10,
    "TS7053": 3
   },
   "bare": [],
@@ -48193,33 +49779,22 @@
    "DebugStart",
    "Demo",
    "Game",
-   "Glare",
    "GunsmithUI",
-   "HUD",
    "Hangar",
-   "Highlights",
    "InvUI",
    "Landing",
-   "LevelView",
    "Loot",
    "Me",
-   "MenuShow",
    "Net",
-   "Pad",
-   "Prof",
-   "R",
    "Range",
    "ServerLink",
    "ShopUI",
-   "ShotLog",
    "Space",
    "SpaceUI",
-   "Touch",
-   "Views",
    "ZeroUI"
   ],
   "umd": [],
-  "unusedGM": 29,
+  "unusedGM": 18,
   "other": [
    {
     "file": "js/demo.ts",
@@ -48301,18 +49876,6 @@
    },
    {
     "file": "js/game.ts",
-    "line": 716,
-    "code": "TS7006",
-    "msg": "Parameter 't' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 716,
-    "code": "TS7006",
-    "msg": "Parameter 'p' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
     "line": 770,
     "code": "TS7006",
     "msg": "Parameter 's' implicitly has an 'any' type."
@@ -48320,6 +49883,12 @@
    {
     "file": "js/game.ts",
     "line": 1749,
+    "code": "TS2345",
+    "msg": "Argument of type 'LvMap | null' is not assignable to parameter of type 'LvMap'."
+   },
+   {
+    "file": "js/game.ts",
+    "line": 1755,
     "code": "TS2345",
     "msg": "Argument of type 'LvMap | null' is not assignable to parameter of type 'LvMap'."
    },
@@ -48415,97 +49984,19 @@
    },
    {
     "file": "js/highlights.ts",
-    "line": 351,
+    "line": 372,
     "code": "TS7006",
     "msg": "Parameter 'd' implicitly has an 'any' type."
    },
    {
-    "file": "js/highlights.ts",
-    "line": 455,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 455,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 455,
-    "code": "TS7006",
-    "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1572,
-    "code": "TS18048",
-    "msg": "'pts' is possibly 'undefined'."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1572,
-    "code": "TS18048",
-    "msg": "'pts' is possibly 'undefined'."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1572,
-    "code": "TS18048",
-    "msg": "'pts' is possibly 'undefined'."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1573,
-    "code": "TS18048",
-    "msg": "'pts' is possibly 'undefined'."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1574,
-    "code": "TS2345",
-    "msg": "Argument of type 'Vector3[] | undefined' is not assignable to parameter of type 'Vector3[]'."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1615,
-    "code": "TS18048",
-    "msg": "'pts' is possibly 'undefined'."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1615,
-    "code": "TS18048",
-    "msg": "'pts' is possibly 'undefined'."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1615,
-    "code": "TS18048",
-    "msg": "'pts' is possibly 'undefined'."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 1615,
-    "code": "TS18048",
-    "msg": "'pts' is possibly 'undefined'."
-   },
-   {
     "file": "js/hud.ts",
-    "line": 229,
-    "code": "TS7006",
-    "msg": "Parameter 'h' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
-    "line": 368,
+    "line": 381,
     "code": "TS7006",
     "msg": "Parameter 't' implicitly has an 'any' type."
    },
    {
     "file": "js/hud.ts",
-    "line": 368,
+    "line": 381,
     "code": "TS7006",
     "msg": "Parameter 'i' implicitly has an 'any' type."
    },
@@ -48550,54 +50041,6 @@
     "line": 358,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 1872,
-    "code": "TS7006",
-    "msg": "Parameter 'scene' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 1872,
-    "code": "TS7006",
-    "msg": "Parameter 'cam' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 1872,
-    "code": "TS7006",
-    "msg": "Parameter 'target' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 1872,
-    "code": "TS7006",
-    "msg": "Parameter 'layer' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/render.ts",
-    "line": 1872,
-    "code": "TS7006",
-    "msg": "Parameter 'over' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1437,
-    "code": "TS2345",
-    "msg": "Argument of type 'Object3D<Object3DEventMap> | undefined' is not assignable to parameter of type 'Object3D<Object3DEventMap>'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1438,
-    "code": "TS18048",
-    "msg": "'rig.zipKit' is possibly 'undefined'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1438,
-    "code": "TS18048",
-    "msg": "'rig.zipKit' is possibly 'undefined'."
    },
    {
     "file": "js/shopui.ts",
@@ -48721,13 +50164,13 @@
    },
    {
     "file": "js/views.ts",
-    "line": 806,
+    "line": 829,
     "code": "TS7006",
     "msg": "Parameter 'q' implicitly has an 'any' type."
    },
    {
     "file": "js/views.ts",
-    "line": 806,
+    "line": 829,
     "code": "TS7006",
     "msg": "Parameter 'q' implicitly has an 'any' type."
    }

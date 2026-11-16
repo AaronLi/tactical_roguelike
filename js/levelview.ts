@@ -1,6 +1,11 @@
 'use strict';
+import { FurnMesh } from './furnmesh.js';
+import { Level } from './level.js';
+import { LevelDesc } from './leveldesc.js';
+import { LightGrid } from './lightgrid.js';
+import { U } from './util.js';
 interface LvViewCtx { fm: LvMap; reg: Map<string, LvObj[]>; door: Record<string, LvObj[]> | null; geos: Map<LdGeo, THREE.BufferGeometry>; mats: (THREE.Material | null)[]; texs: (THREE.Texture | null)[]; D: LdDraw; map: LvMap }
-const G_LevelView = {
+export const LevelView = {
   warned: new Set<string>(),
   // opts.pool false: no light grid and nothing merged (the hangar's bake); opts.hubFixed: the hangar's bake (tools/bake_hangar.mjs),
   // the nodes it bakes (hf) drawn and marked userData.hubFixed. Otherwise, with the baked hangar loaded, they're left out.
@@ -11,7 +16,7 @@ const G_LevelView = {
   // scene and the light grid is left alone (it's the level on the screen's till build).
   build(map: LvMap, opts?: { pool?: boolean; hubFixed?: boolean }) {
     const pre = (map as any).viewPre as LvViewPre | null | undefined; (map as any).viewPre = null;
-    if (pre && !opts) { this.markHf = this.skipHf = false; while (!pre.done) pre.done = !!pre.it.next().done; G.LightGrid.build(map); return pre.root; }
+    if (pre && !opts) { this.markHf = this.skipHf = false; while (!pre.done) pre.done = !!pre.it.next().done; LightGrid.build(map); return pre.root; }
     const root = new THREE.Group(), it = this.steps(map, root, opts, false);
     while (!it.next().done) { /* (all of it) */ }
     return root;
@@ -70,7 +75,7 @@ const G_LevelView = {
       for (const d of map.doors) if (d.pane) map.winMeshes[d.pane.id] = map.doorMeshes[d.id].userData.leaf; // (a glass door's pane: its leaf)
     } else yield* floor(map, root, D.root);
     map.lightPool = [];
-    if (pool && !ahead) G.LightGrid.build(map); // every lamp, on every floor: js/lightgrid.ts
+    if (pool && !ahead) LightGrid.build(map); // every lamp, on every floor: js/lightgrid.ts
     if (pool) yield* this.mergeSteps(root, map);
   },
   wallNode(nodes: LdNode[]) { return nodes.find((n) => n.h === 'walls') || null; },
@@ -114,7 +119,7 @@ const G_LevelView = {
       if (isDoor) {
         // a door's pivot: turned by how far open the door is (G.Game.updateDoors), its leaf, knobs and hinges for what hits them
         const d = ctx.map.doors[+n.h!.slice(5)], H = ctx.door!, k = H.hk || [], p = H.hp || [];
-        o.userData = { base: o.rotation.y, ang: d && d.open ? 1 : 0, sign: n.sg || 1, leaf: (H.leaf || [])[0], knobs: H.knob || [], hinges: k.map((q, i) => [q, p[i]]), slide: !!d && G.Level.slides(d), px: o.position.x, pz: o.position.z, w: (d && d.w) || G.Level.TS };
+        o.userData = { base: o.rotation.y, ang: d && d.open ? 1 : 0, sign: n.sg || 1, leaf: (H.leaf || [])[0], knobs: H.knob || [], hinges: k.map((q, i) => [q, p[i]]), slide: !!d && Level.slides(d), px: o.position.x, pz: o.position.z, w: (d && d.w) || Level.TS };
         if (!o.userData.slide) o.rotation.y = o.userData.base + (d && d.open ? Math.PI / 2 * 0.95 * (n.sg || 1) : 0);
       }
       ctx.door = outer;
@@ -135,7 +140,7 @@ const G_LevelView = {
     if (n.hid) o.visible = false;
   },
   hook(n: LdNode, parent: THREE.Object3D, ctx: LvViewCtx) {
-    if (n.k === 'furniture') G.FurnMesh.build(ctx.fm, parent, this.tex(n.tex!, ctx));
+    if (n.k === 'furniture') FurnMesh.build(ctx.fm, parent, this.tex(n.tex!, ctx));
     else if (n.k === 'fx') this.fx(ctx.fm, parent);
     else if (n.k === 'zipkit') { const kit = this.zipKit(); kit.position.set(n.p![0], n.p![1], n.p![2]); kit.rotation.y = n.r![1]; parent.add(kit); }
   },
@@ -144,7 +149,7 @@ const G_LevelView = {
     if (had) return had;
     const a = g.a || [];
     let G0: THREE.BufferGeometry;
-    if (g.k === 'proc') { G0 = this.geo(G.LevelDesc.proc(ctx.map.desc!, g), ctx); ctx.geos.set(g, G0); return G0; } // (a procedural surface: made from the description)
+    if (g.k === 'proc') { G0 = this.geo(LevelDesc.proc(ctx.map.desc!, g), ctx); ctx.geos.set(g, G0); return G0; } // (a procedural surface: made from the description)
     switch (g.k) {
       case 'box': G0 = new T.BoxGeometry(a[0], a[1], a[2]); break;
       case 'plane': G0 = new T.PlaneGeometry(a[0], a[1], a[2], a[3]); break;
@@ -203,7 +208,7 @@ const G_LevelView = {
       case 'basic': m = new T.MeshBasicMaterial(o); break;
       case 'points': m = new T.PointsMaterial(o); break;
       case 'line': m = new T.LineBasicMaterial(o); break;
-      case 'outside': m = G.FurnMesh.outsideMaterial(G.U.rng(sp.seed), sp.drop); break; // (the city past an outside window: js/furnmesh.ts)
+      case 'outside': m = FurnMesh.outsideMaterial(U.rng(sp.seed), sp.drop); break; // (the city past an outside window: js/furnmesh.ts)
       default: throw new Error('level: no material ' + sp.k);
     }
     if (sp.dim != null) (m as THREE.MeshStandardMaterial).color.multiplyScalar(sp.dim); // (dead glass: its colour dimmed in linear light, as three's Color(hex).multiplyScalar)
@@ -212,7 +217,7 @@ const G_LevelView = {
   tex(i: number, ctx: LvViewCtx): THREE.Texture {
     const had = ctx.texs[i];
     if (had) return had;
-    const T = THREE, sp = ctx.D.tex[i], L = G.Level;
+    const T = THREE, sp = ctx.D.tex[i], L = Level;
     const canvas = (w: number, h: number) => { const c = typeof document !== 'undefined' ? document.createElement('canvas') : new OffscreenCanvas(w, h); c.width = w; c.height = h; return c; }; // (the highlights' export rebuilds the level in a worker)
     let tx: THREE.Texture;
     switch (sp.k) {
@@ -241,7 +246,7 @@ const G_LevelView = {
         tx = new T.CanvasTexture(c as HTMLCanvasElement); break;
       }
       case 'backdrop': { // the festival stage's backdrop, its name lit up (its spots from the festival's stream, at draw sp.at)
-        const rnd = G.LevelDesc.rngAt(sp.seed, sp.at), c = canvas(1024, 384), g = c.getContext('2d')! as CanvasRenderingContext2D, gr = g.createLinearGradient(0, 0, 0, 384);
+        const rnd = LevelDesc.rngAt(sp.seed, sp.at), c = canvas(1024, 384), g = c.getContext('2d')! as CanvasRenderingContext2D, gr = g.createLinearGradient(0, 0, 0, 384);
         gr.addColorStop(0, '#120a2a'); gr.addColorStop(1, '#3a0f3a'); g.fillStyle = gr; g.fillRect(0, 0, 1024, 384);
         for (let k = 0; k < 40; k++) { g.fillStyle = `rgba(255,${120 + rnd() * 120},${150 + rnd() * 100},${0.15 + rnd() * 0.3})`; g.beginPath(); g.arc(rnd() * 1024, rnd() * 384, 4 + rnd() * 30, 0, 7); g.fill(); }
         g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = 'bold 110px sans-serif';
@@ -255,9 +260,9 @@ const G_LevelView = {
         tx = new T.CanvasTexture(c as HTMLCanvasElement); break;
       }
       case 'furn': { // one of js/furnspec.ts painters (G.FurnMesh.textures), from the festival's stream at draw sp.at (it counts what it draws: G.LevelDesc.TEX_DRAWS)
-        const r0 = G.LevelDesc.rngAt(sp.seed, sp.at); let n = 0;
-        tx = (G.FurnMesh.textures(() => { n++; return r0(); }) as Record<string, any>)[sp.fn](...(sp.args || []));
-        const want = G.LevelDesc.TEX_DRAWS[sp.fn](G.LevelDesc.rngAt(sp.seed, sp.at));
+        const r0 = LevelDesc.rngAt(sp.seed, sp.at); let n = 0;
+        tx = (FurnMesh.textures(() => { n++; return r0(); }) as Record<string, any>)[sp.fn](...(sp.args || []));
+        const want = LevelDesc.TEX_DRAWS[sp.fn](LevelDesc.rngAt(sp.seed, sp.at));
         if (n !== want && !this.warned.has(sp.fn)) { this.warned.add(sp.fn); console.warn(`level: js/furnspec.ts painters().${sp.fn} drew ${n} times, js/leveldesc.ts TEX_DRAWS counts ${want}: what's drawn after it on the festival has moved`); }
         break;
       }
@@ -278,7 +283,7 @@ const G_LevelView = {
     // (a building of several floors: the lamps on your own floor first, by a long way. The lights cast no shadows,
     // so a lamp downstairs would light the walls and furniture upstairs through the floor; only when there
     // aren't enough on yours, or you're right by a drop, do the nearest from another floor get one.)
-    const L = G.Level, qf = (q: LvPt) => (map.floors ? L.floorAt(map, q.x, (q.y || 0) - 1.5, q.z) : 0);
+    const L = Level, qf = (q: LvPt) => (map.floors ? L.floorAt(map, q.x, (q.y || 0) - 1.5, q.z) : 0);
     const by = (q: LvPt) => { const f = qf(q); return map.lamps.map((l): [LvLight, number] => [l, (l.x - q.x) * (l.x - q.x) + (l.z - q.z) * (l.z - q.z) + (map.floors && (l.fl || 0) !== f ? 900 : 0)]).sort((a, b) => a[1] - b[1]); };
     let near = by(p);
     if (focus && map.theme.layout === 'festival' && Math.hypot(focus.x - p.x, focus.z - p.z) > 20) {
@@ -476,7 +481,7 @@ const G_LevelView = {
   _zipMats: undefined as { steel: THREE.MeshStandardMaterial; yel: THREE.MeshStandardMaterial } | undefined,
   zipKit() {
     const T = THREE, M = this._zipMats || (this._zipMats = { steel: new T.MeshStandardMaterial({ color: 0x4a4e52, roughness: 0.5, metalness: 0.6 }), yel: new T.MeshStandardMaterial({ color: 0xe0b020, roughness: 0.5 }) });
-    const g = new T.Group(), B = G.Level.ZIP_BAR;
+    const g = new T.Group(), B = Level.ZIP_BAR;
     const tro = new T.Mesh(new T.BoxGeometry(0.12, 0.16, 0.28), M.yel); tro.position.y = -0.13; g.add(tro);
     const strap = new T.Mesh(new T.BoxGeometry(0.03, B - 0.2, 0.03), M.steel); strap.position.y = -(0.2 + B) / 2; g.add(strap);
     const bar = new T.Mesh(new T.CylinderGeometry(0.022, 0.022, 0.2, 6), M.steel); bar.rotation.z = Math.PI / 2; bar.position.y = -B; g.add(bar); // (the handle: one hand's width)
@@ -638,5 +643,5 @@ const G_LevelView = {
     return merged.size;
   },
 };
-G.LevelView = G_LevelView;
-interface GameModules { LevelView: typeof G_LevelView; }
+G.LevelView = LevelView;
+declare global { interface GameModules { LevelView: typeof LevelView; } }

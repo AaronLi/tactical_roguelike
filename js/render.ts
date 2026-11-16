@@ -1,8 +1,23 @@
 'use strict';
+import { Ballistics } from './ballistics.js';
+import { Callsigns } from './callsigns.js';
+import { AMMO, ENEMIES } from './data.js';
+import { Gear } from './gear.js';
+import { Level } from './level.js';
+import { LevelView } from './levelview.js';
+import { LightGrid } from './lightgrid.js';
+import { Hooks, U } from './util.js';
+import { Damage } from './damage.js';
+import { GunMaterials } from './gunmaterials.js';
+import { Scars } from './scars.js';
+import { Stickers } from './stickers.js';
 const _tv = new THREE.Vector3(), _tv2 = new THREE.Vector3();
 const _fq = new THREE.Quaternion(), _fq2 = new THREE.Quaternion(), _fz = new THREE.Vector3(0, 0, 1), _fn = new THREE.Vector3(), _fp = new THREE.Vector3(), _fs = new THREE.Vector3(), _fm = new THREE.Matrix4(), _fc = new THREE.Color();
 const _bjc = new THREE.Color();
 const SCOPE_FAR = 600; // (how far a magnified scope's picture is drawn, m)
+// Left as G.X on purpose (the export worker, js/exportworker.ts, loads this file but not these, and must not grow; and a cycle through
+// js/viewmodel.ts, which reads G.R.TONE while loading, would run it before this file): G.ShotLog, G.HUD, G.Bolts, G.Audio, G.Views, G.Casings,
+// G.Highlights (guarded or used only on the page), G.Rig, G.GunModels and G.Viewmodel (rig -> gunmodels -> viewmodel).
 // Three.js scene, character models, first-person viewmodels and particle effects.
 interface Trail { line: THREE.Line<THREE.BufferGeometry, THREE.LineBasicMaterial>; mat: THREE.LineBasicMaterial; n: number; N: number; shot: PShot; old: number | null; marks: THREE.Mesh<THREE.SphereGeometry, THREE.MeshBasicMaterial>[]; keys?: Set<any>; }
 type BloodKind = 'drop' | 'spatter' | 'pool';
@@ -11,7 +26,7 @@ type RMark = THREE.Mesh<THREE.BufferGeometry, THREE.Material>; // a pooled decal
 type RWound = (THREE.Mesh<THREE.BufferGeometry, THREE.Material> | THREE.Line<THREE.BufferGeometry, THREE.Material>) & { onRig?: any }; // a track kept on a body
 interface RWarm { t0: number; tWait: number; waitMs?: number; done: (() => void) | null; tasks: (() => void)[]; stage: number; frames: number; undo: (() => void)[]; had: Set<any>; ask?: any[] } // (js/render.ts warmup)
 interface RArc { dots: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial>; ring: THREE.Mesh<THREE.RingGeometry, THREE.MeshBasicMaterial>; N: number; f?: number; }
-const G_R = {
+export const R = {
   // (set in init / _initFx before anything uses them: they hold undefined till then, as before)
   renderer: undefined as unknown as THREE.WebGLRenderer,
   scene: undefined as unknown as THREE.Scene,
@@ -80,7 +95,7 @@ const G_R = {
   trails: undefined as Trail[] | undefined,
   lastShot: undefined as PShot | null | undefined,
   wounds: undefined as RWound[] | undefined,
-  debris: undefined as ReturnType<typeof G.Scars.debris> | undefined,
+  debris: undefined as ReturnType<typeof Scars.debris> | undefined,
   debrisT: undefined as number | undefined,
   trailDot: undefined as THREE.SphereGeometry | undefined,
   lastDecals: undefined as RMark[] | undefined,
@@ -105,7 +120,7 @@ const G_R = {
   init() {
     const r = (this.renderer = new THREE.WebGLRenderer({ antialias: true, stencil: true, powerPreference: 'high-performance', reversedDepthBuffer: true }));
     this.reverseDepth(r);
-    // (a phone's screen is 2 to 3 device pixels to the point, and its GPU isn't a desktop's: the HUD is the page's own, sharp at any ratio, so only the 3D is softer)
+    // (a phone's screen is 2 to 3 device pixels to the point, and its GPU isn't a desktop's: the G.HUD is the page's own, sharp at any ratio, so only the 3D is softer)
     const coarse = matchMedia('(hover: none) and (pointer: coarse)').matches;
     this.basePR = Math.min(window.devicePixelRatio, coarse ? (Math.min(screen.width, screen.height) < 600 ? 1 : 1.25) : 1.5);
     r.setPixelRatio(this.basePR * this.scalePct / 100);
@@ -142,7 +157,7 @@ const G_R = {
     });
     this.muzzleIdx = 0;
 
-    // Viewmodel is drawn in its own pass after clearing depth, so guns never clip into walls
+    // G.Viewmodel is drawn in its own pass after clearing depth, so guns never clip into walls
     r.autoClear = false;
     this.vmScene = new THREE.Scene();
     this.vmHolder = new THREE.Group();
@@ -230,7 +245,7 @@ const G_R = {
     return (this._bloodMats = { drop: bmat('drop'), spatter: bmat('spatter'), pool: bmat('pool') });
   },
   // How finely the 3D is drawn: a percentage (33 to 100) of the screen's own resolution, each way. The picture is stretched
-  // to the window; the HUD and the menus are the page's own and stay sharp. (The settings' "Render resolution": js/game.ts)
+  // to the window; the G.HUD and the menus are the page's own and stay sharp. (The settings' "Render resolution": js/game.ts)
   basePR: 1, scalePct: 100,
   setScale(pct: number) {
     this.scalePct = Math.max(33, Math.min(100, Math.round(pct) || 100));
@@ -245,7 +260,7 @@ const G_R = {
   },
   setLevel(map: LvMap) {
     this.clearLevel();
-    this.levelRoot.add(G.LevelView.build(map));
+    this.levelRoot.add(LevelView.build(map));
     // what stops a weapon light: the level, bar what you can see through (glass, a grating)
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
@@ -261,9 +276,9 @@ const G_R = {
     // daylit)
     // On a night level (js/level.ts nightify) there's none of that: with the power off, a room with no window is black but
     // for what the emergency lights, the moon through a doorway, a weapon light or a flash actually reach.
-    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = map.night ? 0 : Math.PI * (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : G.LightGrid.opts.fill);
+    this.hemi.color.setHex(th.hemi || th.light, THREE.LinearSRGBColorSpace); this.hemi.intensity = map.night ? 0 : Math.PI * (th.hemiI || 0.26) ** 2 * (th.hub ? 1 : LightGrid.opts.fill);
     // the gun in your hands: lit by what's lit where you stand (eyeLight), on a level with its lamps in the light grid
-    this.vmDark = !th.hub && G.LightGrid.built;
+    this.vmDark = !th.hub && LightGrid.built;
     for (const [l, k] of this.vmLights) l.intensity = k;
   },
   // The light where you stand, for the gun in your hands (drawn in a scene of its own, js/render.ts render: so the level's
@@ -287,11 +302,11 @@ const G_R = {
   EYE_FULL: 0.15, EYE_BOUNCE: 0.25, SPOT_BOUNCE: 0.045,
   _eye: new THREE.Color(), _eyeC: new THREE.Color(), _eyeT: new THREE.Color(), _eyeV: new THREE.Vector3(), _eyeD: new THREE.Vector3(), _vmSky: new THREE.Color(0xdde6f0), _vmGround: new THREE.Color(0x2a2622),
   eyeLight(): number {
-    const map = G.Game && G.Game.map, cam = this.camera, E = this._eye, C = this._eyeC, p = cam.position, L = G.Level;
+    const map = G.Game && G.Game.map, cam = this.camera, E = this._eye, C = this._eyeC, p = cam.position, L = Level;
     for (const l of this.vmPts) l.intensity = 0;
     for (const s of this.vmSpots) s.intensity = 0;
     if (!this.vmDark || !map) return 1;
-    G.LightGrid.at(p.x, p.y, p.z, E, 0.7);
+    LightGrid.at(p.x, p.y, p.z, E, 0.7);
     const hk = this.hemi.intensity / Math.PI; // (the lights' figures in r149's units, as the light grid's are: js/util.ts)
     E.r += this.hemi.color.r * hk; E.g += this.hemi.color.g * hk; E.b += this.hemi.color.b * hk;
     const fall = (d: number, r: number, decay: number) => (r > 0 ? Math.pow(Math.max(0, 1 - d / r), decay) : 1 / (1 + d * d)); // (three.js' own, with a reach)
@@ -370,11 +385,11 @@ const G_R = {
   // the chips and dust a round throws out of what it hits (js/scars.ts): made once, the first time something's hit or the
   // shaders are compiled (warmup)
   debrisFx() {
-    return this.debris || (this.debris = G.Scars.debris(this.scene, (x, z, y) => { const map = G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; }));
+    return this.debris || (this.debris = Scars.debris(this.scene, (x, z, y) => { const map = G.Game.map; return map ? Level.groundAt(map, x, z, 0.01, y) : 0; }));
   },
   // ------------------------------------------------------------ blood on the environment
   // the surface under (x, z) at or below height y: the floor, or the top of a piece of furniture
-  bloodFloor(x: number, z: number, y: number) { const map = G.Game && G.Game.map; return map ? G.Level.groundAt(map, x, z, 0.01, y) : 0; },
+  bloodFloor(x: number, z: number, y: number) { const map = G.Game && G.Game.map; return map ? Level.groundAt(map, x, z, 0.01, y) : 0; },
   // a drop (or a smear, if it came in fast) lying where it landed
   bloodDrop(x: number, y: number, z: number, size = 0.06, kind: BloodKind = 'drop') {
     const m = this.bloodMarks[this.bloodIdx]; this.bloodIdx = (this.bloodIdx + 1) % this.bloodMarks.length;
@@ -431,7 +446,7 @@ const G_R = {
       o.onBeforeRender = (_r: any, _s: any, cam: THREE.Camera) => { cam.getWorldDirection(fwd); eye.setFromMatrixPosition(cam.matrixWorld); plane.setFromNormalAndCoplanarPoint(fwd, eye.addScaledVector(fwd, clear)); };
     });
   },
-  vmKey(def: any, skin: any) { return def ? def.code + '#' + G.Stickers.key(skin) : ''; },
+  vmKey(def: any, skin: any) { return def ? def.code + '#' + Stickers.key(skin) : ''; },
 
   // the muzzle flash's star (made once: the highlights' export worker, which never runs init, asks for it too)
   flashTexture(): THREE.CanvasTexture {
@@ -726,7 +741,7 @@ const G_R = {
   // fire again; older ones fade out over the 3 s after a newer shot takes over. Drawn over everything, so a path through
   // a body shows.
   TRAIL_FADE: 3, TRAIL_VMAX: 686,
-  trailColour(v: number, out: THREE.Color) { return out.setHSL(0.78 * (1 - G.U.clamp(v / this.TRAIL_VMAX, 0, 1)), 1, 0.55); },
+  trailColour(v: number, out: THREE.Color) { return out.setHSL(0.78 * (1 - U.clamp(v / this.TRAIL_VMAX, 0, 1)), 1, 0.55); },
   trailStart(shot: PShot, p: THREE.Vector3, v: number) {
     const N = 2400, geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(N * 3), 3)); geo.setDrawRange(0, 0);
@@ -758,7 +773,7 @@ const G_R = {
   // so it goes where they go: turning, falling, carried off as a ragdoll. pts: [{ p (world), v, bone (a segment's bone
   // name, js/ballistics.ts), mark }]
   woundTrack(rig: any, pts: { p: THREE.Vector3; v: number; bone: string; mark?: boolean }[]) {
-    const B = G.Ballistics, c = new THREE.Color(), objs: RWound[] = [];
+    const B = Ballistics, c = new THREE.Color(), objs: RWound[] = [];
     rig.root.updateMatrixWorld(true);
     let i = 0;
     while (i < pts.length) {
@@ -805,10 +820,10 @@ const G_R = {
   trailDrop(tr: Trail) { tr.line.removeFromParent(); tr.line.geometry.dispose(); tr.mat.dispose(); for (const m of tr.marks) { m.removeFromParent(); m.material.dispose(); } },
   bullet(head: THREE.Vector3, dir: THREE.Vector3, came: number, def: any, tracer: boolean, sp: number, am: any) {
     const rail = def.cls === 'RAIL', bolt = def.cls === 'BOW', gren = !!def.explosive;
-    const L = rail ? 60 : bolt ? 0.7 : gren ? 0.25 : tracer ? G.U.clamp(sp * 0.03, 3, 24) : G.U.clamp(sp * 0.008, 0.6, 5);
+    const L = rail ? 60 : bolt ? 0.7 : gren ? 0.25 : tracer ? U.clamp(sp * 0.03, 3, 24) : U.clamp(sp * 0.008, 0.6, 5);
     const lead = bolt || gren ? 0.3 : 2; // (nothing shows in the first couple of metres: it's still in the muzzle's flash)
     if (came <= lead) return;
-    const tail = head.clone().addScaledVector(dir, -Math.min(L, came - lead)), col = (tracer && G.AMMO.tracer.tracer) || def.tracer || 0xffd080;
+    const tail = head.clone().addScaledVector(dir, -Math.min(L, came - lead)), col = (tracer && AMMO.tracer.tracer) || def.tracer || 0xffd080;
     if (tracer) { // a normal-sized, white-hot core and its bloom
       const hot = new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.35).getHex();
       this.streak(tail, head, hot, 0.008, 1, false, 1.5);
@@ -855,10 +870,10 @@ const G_R = {
   // (bright under night vision's gain otherwise) and as they were in the light. 1 where there's no grid (the menus' scenes).
   PART_LIT: 0.35, PART_MIN: 0.03, _partC: new THREE.Color(),
   partLight(p: THREE.Vector3) {
-    if (!this.vmDark || !G.LightGrid) return 1;
-    const E = G.LightGrid.at(p.x, p.y, p.z, this._partC, 0.4), h = this.hemi, hk = h.intensity / Math.PI; // (the fill in r149's units, as the grid's: eyeLight)
+    if (!this.vmDark || !LightGrid) return 1;
+    const E = LightGrid.at(p.x, p.y, p.z, this._partC, 0.4), h = this.hemi, hk = h.intensity / Math.PI; // (the fill in r149's units, as the grid's: eyeLight)
     const l = 0.2126 * (E.r + h.color.r * hk) + 0.7152 * (E.g + h.color.g * hk) + 0.0722 * (E.b + h.color.b * hk);
-    return G.U.clamp(l / this.PART_LIT, this.PART_MIN, 1);
+    return U.clamp(l / this.PART_LIT, this.PART_MIN, 1);
   },
   // (glow: what gives off its own light, sparks, fire, embers, a flash: not dimmed by the dark)
   particles(p: THREE.Vector3, n: number, color: number, speed: number, life: number, grav = 9, spread = 1, dir?: ArrayLike<number> | null, blood?: boolean, glow = false) {
@@ -905,7 +920,7 @@ const G_R = {
     const q = Object.assign({ fx, k: 'e', n }, o, { n });
     this.debrisFx().burst(p, q);
     if (!n || q.cut) return; // (what's been cut has its marks with the cut: js/damage.ts)
-    for (const c of G.Scars.plan(q)) {
+    for (const c of Scars.plan(q)) {
       const d = this.decals[this.decalIdx]; this.decalIdx = (this.decalIdx + 1) % this.decals.length;
       if (d.parent !== this.scene) this.scene.add(d);
       d.geometry = c.geo; d.material = c.mat; d.quaternion.copy(c.q); d.scale.set(c.s[0], c.s[1], c.s[2]);
@@ -966,7 +981,7 @@ const G_R = {
   // streaks reaching out further in places
   scorchTexture() {
     const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
-    const g = c.getContext('2d') as CanvasRenderingContext2D, rnd = G.U.rng(7741);
+    const g = c.getContext('2d') as CanvasRenderingContext2D, rnd = U.rng(7741);
     g.translate(S / 2, S / 2);
     const gr = g.createRadialGradient(0, 0, 0, 0, 0, S * 0.36);
     gr.addColorStop(0, 'rgba(8,7,6,0.92)'); gr.addColorStop(0.35, 'rgba(14,13,12,0.8)'); gr.addColorStop(0.7, 'rgba(40,38,35,0.35)'); gr.addColorStop(1, 'rgba(60,58,55,0)');
@@ -988,7 +1003,7 @@ const G_R = {
   // read as a sieve, not as a hole. The texture's edge is the patch it covers (crater: d across).
   craterTexture(seed: number) {
     const S = 256, c = document.createElement('canvas'); c.width = c.height = S;
-    const g = c.getContext('2d') as CanvasRenderingContext2D, rnd = G.U.rng(seed), H = S / 2, PIT = H * 0.3;
+    const g = c.getContext('2d') as CanvasRenderingContext2D, rnd = U.rng(seed), H = S / 2, PIT = H * 0.3;
     g.translate(H, H);
     // the torn-up ground: dust and grit, fading out to the edge
     const dust = g.createRadialGradient(0, 0, PIT, 0, 0, H * 0.98);
@@ -1061,10 +1076,10 @@ const G_R = {
   fires: [] as any[], _fireGeo: null as THREE.PlaneGeometry | null, _fireTex: null as THREE.Texture | null,
   FIRE: { LAYERS: 2, FRONT: 24, LIFE: 1.35, SMOKE: 6 },
   fireball(M: any) {
-    const T = THREE, L = G.Level, TS = L.TS, F = this.FIRE, map = M.map as LvMap, W = map.W, n = M.cloud;
+    const T = THREE, L = Level, TS = L.TS, F = this.FIRE, map = M.map as LvMap, W = map.W, n = M.cloud;
     if (!n) return;
-    if (M.p && M.p.distanceTo) this.flashOver(G.U.clamp(1.3 - M.p.distanceTo(this.camera.position) / 20, 0, 1)); // (the tubes whited out by it: night vision)
-    const geo = this._fireGeo || (this._fireGeo = new T.PlaneGeometry(2, 2)), rnd = G.U.rng(((M.p.x * 7919 + M.p.z * 104729) | 0) >>> 0 || 1);
+    if (M.p && M.p.distanceTo) this.flashOver(U.clamp(1.3 - M.p.distanceTo(this.camera.position) / 20, 0, 1)); // (the tubes whited out by it: night vision)
+    const geo = this._fireGeo || (this._fireGeo = new T.PlaneGeometry(2, 2)), rnd = U.rng(((M.p.x * 7919 + M.p.z * 104729) | 0) >>> 0 || 1);
     const N = n * F.LAYERS, tex = this.fireTex(), flame = new T.InstancedMesh(geo, new T.MeshBasicMaterial({ map: tex, transparent: true, blending: T.AdditiveBlending, depthWrite: false }), N);
     const smoke = new T.InstancedMesh(geo, new T.MeshBasicMaterial({ map: tex, color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false }), n);
     flame.frustumCulled = smoke.frustumCulled = false; flame.renderOrder = 3; smoke.renderOrder = 2;
@@ -1122,7 +1137,7 @@ const G_R = {
         r.smoke.setMatrixAt(i, m);
       }
       r.smoke.instanceMatrix.needsUpdate = true;
-      (r.smoke.material as THREE.MeshBasicMaterial).opacity = 0.75 * G.U.clamp(1 - (t - 2) / (F.SMOKE - 2), 0, 1);
+      (r.smoke.material as THREE.MeshBasicMaterial).opacity = 0.75 * U.clamp(1 - (t - 2) / (F.SMOKE - 2), 0, 1);
       const l = r.light;
       if (l.userData.by === r) l.intensity = Math.PI * (t < 0.15 ? 14 * t / 0.15 : t < 0.55 ? 14 : Math.max(0, 14 * (1 - (t - 0.55) / 0.9)));
       if (t > F.SMOKE + 0.2) {
@@ -1246,7 +1261,7 @@ const G_R = {
   // ------------------------------------------------------------ night vision
   // A flashbang or a fireball where the tubes can take it in (js/game.ts onFlash, fireball): k 1 is a whiteout; the tubes'
   // bright-source protection cuts in and the picture comes back over a second or two.
-  flashOver(k: number) { if (this.nv && this.nv.k > 0.9) this.nvOver = Math.max(this.nvOver, G.U.clamp(k, 0, 1)); },
+  flashOver(k: number) { if (this.nv && this.nv.k > 0.9) this.nvOver = Math.max(this.nvOver, U.clamp(k, 0, 1)); },
   // Night vision is image intensification: it amplifies the light there is (moonlight through a window, a streetlamp down
   // the road, an exit sign, a lamp left on), and makes none: a sealed room with the power off stays black, but for the
   // goggles' own IR illuminator if it's switched on (js/lightgrid.ts lgNv: a cone of light from the head that only this
@@ -1660,7 +1675,7 @@ const G_R = {
   warmKit() {
     if (this._kit) return this._kit;
     const T = THREE, geo = new T.BoxGeometry(0.02, 0.02, 0.02), world = new T.Group(), vm = new T.Group(), vmClip = new T.Group();
-    const M = G.GunMaterials.M as Record<string, () => THREE.Material>, tex = this.flashTexture();
+    const M = GunMaterials.M as Record<string, () => THREE.Material>, tex = this.flashTexture();
     // every gun's surfaces: the catalogue's materials (a baked gun only names them: js/gunmaterials.ts), and a sticker on one
     // (js/stickers.ts), in the world and in your hands
     const sticker = new T.MeshStandardMaterial({ map: tex, transparent: true, alphaTest: 0.03, depthWrite: false, roughness: 0.45, metalness: 0, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
@@ -1683,11 +1698,11 @@ const G_R = {
     // with a gun; every kind of suspect, a few of each (what they wear is picked by their seed), in the armour they come
     // in; civilians
     try {
-      const R = G.Rig, byKind: Record<string, string[]> = {};
-      for (const d of Object.values(G.Gear.DEFS) as any[]) (byKind[d.kind] || (byKind[d.kind] = [])).push(d.id);
-      const looks = R.LOOKS as Record<string, string[]>, of = (k: string, i: number) => { const a = byKind[k] || []; return a.length ? a[i % a.length] : 0; };
+      const RG = G.Rig, byKind: Record<string, string[]> = {};
+      for (const d of Object.values(Gear.DEFS) as any[]) (byKind[d.kind] || (byKind[d.kind] = [])).push(d.id);
+      const looks = RG.LOOKS as Record<string, string[]>, of = (k: string, i: number) => { const a = byKind[k] || []; return a.length ? a[i % a.length] : 0; };
       const n = Math.max(...['helmet', 'face', 'carrier', 'plate', 'shoulder', 'groin', 'belt', 'legs', 'pack'].map((k) => (byKind[k] || []).length), ...Object.values(looks).map((v) => v.length));
-      const animals = G.Callsigns.LIST as { id: string }[];
+      const animals = Callsigns.LIST as { id: string }[];
       for (let i = 0; i < n; i++) {
         const look: Record<string, string> = {};
         for (const [k, v] of Object.entries(looks)) look[k] = v[i % v.length];
@@ -1697,10 +1712,10 @@ const G_R = {
         rig.root.removeFromParent(); rig.root.visible = true; world.add(rig.root);
       }
       const vests = ['soft2', 'soft', 'steel', 'ceramic', 'assault', ''], helms = ['ach', 'riflehelm', 'visor', ''];
-      Object.values(G.ENEMIES as Record<string, any>).forEach((def, j) => {
+      Object.values(ENEMIES as Record<string, any>).forEach((def, j) => {
         for (let s = 0; s < 3; s++) {
-          const rig = R.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: j * 7919 + s * 131 + 13, dressed: true });
-          if (!def.civ) rig.setKit(R.armourKit(vests[(j + s) % vests.length], helms[(j + s) % helms.length], def.style === 'armored', s % 2, []));
+          const rig = RG.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: j * 7919 + s * 131 + 13, dressed: true });
+          if (!def.civ) rig.setKit(RG.armourKit(vests[(j + s) % vests.length], helms[(j + s) % helms.length], def.style === 'armored', s % 2, []));
           if (def.wpn) rig.setGun(def.wpn);
           world.add(rig.root);
         }
@@ -1786,9 +1801,9 @@ const G_R = {
     const put = (m: THREE.Object3D | null | undefined) => { if (m) { m.position.set(0, -50, 0); this.dynRoot.add(m); extras.push(m); } };
     try {
       if (G.Casings.warm) for (const m of G.Casings.warm()) put(m);
-      if (G.Loot.meshFor) { put(G.Loot.meshFor(G.Gear.pack(G.Gear.medItem('bandage')))); }
+      if (G.Loot.meshFor) { put(G.Loot.meshFor(Gear.pack(Gear.medItem('bandage')))); }
       put(new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.bloodMats.spatter));
-      if (G.Game.map) for (const m of G.Damage.warm(G.Game.map as unknown as Parameters<typeof G.Damage.warm>[0])) put(m);
+      if (G.Game.map) for (const m of Damage.warm(G.Game.map as unknown as Parameters<typeof Damage.warm>[0])) put(m);
       this.debrisFx(); this.fishSetup(); this.pipTexture();
       if (!this._arc) this.throwArc([], false); // (a throw's arc: its dots and the ring where it lands)
       r.localClippingEnabled = true; // (as it is once there's a gun in your hands: clearStockNearEye)
@@ -1942,7 +1957,7 @@ const G_R = {
     // (the draw calls and triangles counted over the whole frame, every pass: js/profiler.ts reads them after)
     r.info.autoReset = false; r.info.reset();
     this.lightPad();
-    G.LightGrid.on(true); // (the lamps' light: only for the level's own frame)
+    LightGrid.on(true); // (the lamps' light: only for the level's own frame)
     for (const m of this.streaks) if (m.visible && m.userData.f !== this.frameNo) m.visible = false; // (rounds that stopped)
     for (const m of this.glows) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
     for (const m of this.flares) if (m.visible && m.userData.f !== this.frameNo) m.visible = false;
@@ -1954,7 +1969,7 @@ const G_R = {
     // night vision down (or on its way): the frame goes into a texture for its pass (nvMaterial), the goggles' IR illuminator on
     // in it if it's switched on (js/lightgrid.ts: from before the scope's picture is drawn, which is seen through them too)
     const dbs = r.getDrawingBufferSize(this._fsz || (this._fsz = new THREE.Vector2())), nv = this.nv && this.nv.k > 0.01 && G.Game && G.Game.phase === 'level' && dbs.x >= 16 && dbs.y >= 16 ? this.nv : null, // (not into a window that isn't shown: nothing to draw into)
-      LU = G.LightGrid.U;
+      LU = LightGrid.U;
     if (nv) {
       const cp = this.camera.position, fw = this._eyeD.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
       LU.lgNv.value.set(cp.x, cp.y, cp.z, nv.ir ? nv.spec.ir * THREE.MathUtils.smoothstep(nv.k, 0.75, 1) : 0); LU.lgNvD.value.set(fw.x, fw.y, fw.z, Math.cos(0.5));
@@ -2016,7 +2031,7 @@ const G_R = {
     r.render(this.vmScene, this.camera);
     if (nv) { LU.lgNv.value.w = 0; this._nvComposite(); }
     if (blur) this._blurPasses();
-    G.LightGrid.on(false);
+    LightGrid.on(false);
     r.info.autoReset = true;
   },
   // ---- the menus' blur: the frame (half size) blurred across into a second target, then down onto the screen
@@ -2044,8 +2059,8 @@ const G_R = {
     u.map.value = B.b.texture; u.dir.value.set(0, 1 / B.b.height); u.fin.value = 1; r.setRenderTarget(null); r.render(B.scene, B.cam);
   },
 };
-G.R = G_R;
+G.R = R;
 // (what the simulation's files ask of the renderer: js/damage.ts, js/scars.ts)
-G.Hooks.doorDust = (t, x, y, z) => { if (G.R.particles && t < 8) G.R.particles(new THREE.Vector3(x, y, z), 16, 0xa8a090, 1.4, 0.8, 1, 0.8); };
-G.Hooks.partLight = (p) => (G.R.partLight ? G.R.partLight(p) : 1);
-interface GameModules { R: typeof G_R; }
+Hooks.doorDust = (t, x, y, z) => { if (R.particles && t < 8) R.particles(new THREE.Vector3(x, y, z), 16, 0xa8a090, 1.4, 0.8, 1, 0.8); };
+Hooks.partLight = (p) => (R.partLight ? R.partLight(p) : 1);
+declare global { interface GameModules { R: typeof R; } }

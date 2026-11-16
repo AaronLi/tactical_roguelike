@@ -1,6 +1,6 @@
 # Plan: from the global `G` to ES modules
 
-Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 under way (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs: all 2026-11-16); 6 and 7 not started. Written 2026-11-15.
+Status: phases 0, 1, 2, 3 and 4 done (phase 3: 2026-11-16; phase 4: part a, the node tools, the codemod, the first 11 leaves; part b, 14 more files; part c, `server`, `spaceserver`, `serverhost`, `furnmesh`, `lightgrid`, and the workers' lists deleted: all 2026-11-16); phase 5 under way (part a: `zip`, `icons`, `cloudconfig`, `career`, `cloud`, `loadout`, and the audio files; part b, the models and rigs; part c, views and rendering: all 2026-11-16); 6 and 7 not started. Written 2026-11-15.
 
 ## Goal
 
@@ -451,6 +451,29 @@ Phase 4 is done: the workers' lists are gone, the simulation's files import each
   `G.ServerLink.mode === 'worker'` (17 hooks), the prep worker built a level and its light grid, the export worker booted (a one-off script;
   a bad `go` fails in `exportHere` as before, not in the boot). Not exercised: the gunsmith, inventory and highlights export screens
   beyond what the hangar and level cases load (guns, viewmodels, rigs).
+
+#### Phase 5 results (part c)
+
+- **Converted, 11 files (67 in all):** `levelview`, `glare`, `shotlog`, `render`, `views`, `hud`, `menushow`, `highlights`, `profiler`, `gamepad`, `touch`
+  (their `index.html` tags are modules now: the codemod, then `--uses --force-order`). `render` exports `R` and had a local `R` (a `const R = G.Rig`
+  in its warm-up), renamed `RG` by hand. The hooks stay: `render` sets `Hooks.doorDust` and `partLight`, `views` `enemyView`, `hud` `toast` and `feed`.
+  `profiler`, `gamepad` and `touch` register no listener while loading (their `init`s do, called by `game`), so the order and number of registrations are unchanged.
+- **The export worker's set did not change:** its 37 evaluated files before and after (the `evalOrder` of `tools/deps.mjs`, compared from the
+  inventory json) are the same files; the only difference is that `gunmaterials` now runs just before `render` (which imports it) instead of after it.
+  So the codemod's imports were undone, with a comment in the file, for what the worker does not load: `render` reads `G.ShotLog`, `G.HUD`,
+  `G.Bolts`, `G.Audio`, `G.Views`, `G.Casings`, `G.Highlights` (several are guards that are real there: `G.ShotLog`, `G.Audio`, `G.Highlights`), and `highlights` reads `G.Audio`,
+  `G.GunAudio`, `G.HUD`, `G.Icons`, `G.Shop`, `G.Views`, `G.Zip`. The earlier `rig`/`vmanim` reads stay as they are.
+- **A cycle avoided:** `viewmodel` reads `G.R.TONE` while loading, so `render` must run before it; `render` imports neither `viewmodel` nor `gunmodels` nor
+  `rig` (each reaches `viewmodel`), so those three are `G.X` reads in `render` (`highlights` imports `render` before `rig` for the same reason).
+- **Left as `G.X`:** the unconverted page files (`G.Game`, `G.Me`, `G.Net`, `G.Space`, `G.Hangar`, `G.Loot`, `G.Range`, `G.Course`, `G.InvUI`, `G.ServerLink`) and the lines above.
+  `G.X = X` for every file stays.
+- **Exercised beyond the smoke cases (one-off scripts, not kept):** the main menu (`G.MenuShow.live` true, no console errors); a warehouse level, a
+  recording of it (ticks and a kill fed to `G.Highlights`), `take`, `mount`, `exportPack` (a .zip, 2.4 kB), then `renderPack` of that .zip: the export worker
+  booted, ran `exportHere` with the converted `levelview`, `render` and `highlights`, and reported "Rendering 8%" when the 240 s limit ended the run (software GL
+  here: the whole video would take much longer). No errors on the page or in the workers. `ambience.html` unchanged (the same `InvalidAccessError` as before, none new).
+- **Checks:** typecheck, `deps:check`, `deps` (six orders consistent), `test:level` 31/31, `test:sim` 4/4 (golden untouched), `test:models` all green,
+  `test:cloud` 21/21; smoke 10/10 (one case per process); on the page `G.ServerLink.mode === 'worker'`, the prep worker built a level, the export worker booted.
+- **Next:** part d (player, game, space, the screens, `index.html` down to one tag, the export worker's list to an entry file).
 
 ### 5. Convert the page side
 

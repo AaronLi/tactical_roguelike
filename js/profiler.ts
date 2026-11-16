@@ -1,4 +1,15 @@
 'use strict';
+import { Casings } from './casings.js';
+import { GunAudio } from './gunaudio.js';
+import { Highlights } from './highlights.js';
+import { HUD } from './hud.js';
+import { Level } from './level.js';
+import { LightGrid } from './lightgrid.js';
+import { Server } from './server.js';
+import { ServerHost } from './serverhost.js';
+import { Views } from './views.js';
+import { World } from './world.js';
+import { R as G_R } from './render.js';
 // The profiler: where each frame's time goes, kept for the last stretch of play and saved from the pause menu (Esc,
 // "Save performance profile") as a JSON file.
 //
@@ -11,7 +22,7 @@
 //
 // Times are inclusive (Me.update includes Me.move, which is listed too); "frame" is the time from one animation frame
 // to the next (what you feel: it includes the GPU and the browser), "cpu" is the time spent in the game's loop.
-const G_Prof = (() => {
+export const Prof = (() => {
   interface Spike { t: number; frame: number; cpu: number; calls: number; tris: number; progs: number; heap: number; parts: Record<string, { ms: number; n: number }> }
   const CAP = 3600, MAX_SEC = 48, SPIKES = 40, MSG_TYPES = 64, SPIKE_MS = 33;
   const FIX = ['t', 'frame', 'cpu', 'calls', 'tris', 'geoms', 'texs', 'progs', 'heap', 'rounds', 'enemies'];
@@ -65,9 +76,9 @@ const G_Prof = (() => {
     if (!on) { acc.fill(0); cnt.fill(0); return; }
     frames++;
     if ((frames & 31) === 0 && performance.memory) heap = performance.memory.usedJSHeapSize / 1048576; // (Chrome only)
-    const info = G.R && G.R.renderer ? G.R.renderer.info : null, o = head * stride;
+    const info = G_R && G_R.renderer ? G_R.renderer.info : null, o = head * stride;
     const fix = [(loopStart - t0) / 1000, frame, cpu, info ? info.render.calls : 0, info ? info.render.triangles : 0, info ? info.memory.geometries : 0, info ? info.memory.textures : 0,
-      info && info.programs ? info.programs.length : 0, heap, G.Me && G.Me.rounds ? G.Me.rounds.length : 0, G.Views && G.Views.enemies ? G.Views.enemies.size : 0];
+      info && info.programs ? info.programs.length : 0, heap, G.Me && G.Me.rounds ? G.Me.rounds.length : 0, Views && Views.enemies ? Views.enemies.size : 0];
     for (let k = 0; k < NF; k++) ring[o + k] = fix[k];
     for (let i = 0; i < names.length; i++) {
       ring[o + NF + i * 2] = acc[i]; ring[o + NF + i * 2 + 1] = cnt[i];
@@ -105,12 +116,12 @@ const G_Prof = (() => {
     return { frames: filled, seconds: filled ? r2(series(0)[filled - 1] - series(0)[0]) : 0, frame: stats(frame), cpu: stats(cpu), sections: Object.fromEntries(order.map((k) => [k, sections[k]])) };
   }
   function context() {
-    const g: any = G.Game || {}, m = g.map, info = G.R && G.R.renderer && G.R.renderer.info;
+    const g: any = G.Game || {}, m = g.map, info = G_R && G_R.renderer && G_R.renderer.info;
     return {
       saved: new Date().toISOString(), recordingSince: since, userAgent: navigator.userAgent, screen: [innerWidth, innerHeight, devicePixelRatio],
       level: g.level, phase: g.phase, hub: !!g.hub, host: !!(G.Net && G.Net.isHost), players: g.roster ? Object.keys(g.roster).length : 1,
       map: m ? { theme: m.theme && m.theme.name, W: m.W, H: m.H, floors: m.NF || 1, solids: m.world ? m.world.solids.filter(Boolean).length : 0, lights: (m.lights || []).length, props: m.props ? m.props.size : 0, windows: (m.windows || []).length, doors: (m.doors || []).length } : null,
-      enemies: G.Views && G.Views.enemies ? G.Views.enemies.size : 0, scene: G.R && G.R.scene ? countObjects(G.R.scene) : 0,
+      enemies: Views && Views.enemies ? Views.enemies.size : 0, scene: G_R && G_R.scene ? countObjects(G_R.scene) : 0,
       renderer: info ? { calls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, programs: info.programs ? info.programs.length : 0 } : null,
       heapMB: performance.memory ? r2(performance.memory.usedJSHeapSize / 1048576) : null,
       settings: g.settings || null,
@@ -161,7 +172,7 @@ const G_Prof = (() => {
   function gpuOn() {
     if (!on) return false;
     if (!gpu.tried) {
-      const r = G.R && G.R.renderer; if (!r) return false;
+      const r = G_R && G_R.renderer; if (!r) return false;
       gpu.tried = true;
       const gl = r.getContext() as WebGL2RenderingContext, ext = gl.getExtension && gl.getExtension('EXT_disjoint_timer_query_webgl2');
       if (ext) { gpu.gl = gl; gpu.ext = ext; gpuHooks(r); }
@@ -170,7 +181,7 @@ const G_Prof = (() => {
   }
   // (what needs the renderer, which is made once the page has loaded: hooked when the first pass is timed)
   function gpuHooks(r: THREE.WebGLRenderer) {
-    const R = G.R;
+    const R = G_R;
     gpuWrap(r.shadowMap, 'render', 'shadow maps');
     // (the gun in your hands and the fisheye are drawn straight from G.R.render: told apart by their scenes)
     const rr = r.render;
@@ -231,30 +242,30 @@ const G_Prof = (() => {
     const Gm = G.Game;
     const loop = Gm.loop;
     Gm.loop = function () { frameBegin(); try { return loop.apply(this, arguments as any); } finally { frameEnd(); } };
-    wrap(G.ServerHost, 'tick', 'host: server tick'); // (on the page only when the simulation runs there: ?serverthread=0, js/serverlink.ts)
+    wrap(ServerHost, 'tick', 'host: server tick'); // (on the page only when the simulation runs there: ?serverthread=0, js/serverlink.ts)
     wrap(Gm, 'updateDoors', 'doors');
     wrap(G.Me, 'update', 'Me.update'); wrap(G.Me, 'move', 'Me.move'); wrap(G.Me, 'weaponUpdate', 'Me.weapon'); wrap(G.Me, 'interact', 'Me.interact');
     wrap(G.Me, 'updateCamera', 'Me.camera'); wrap(G.Me, 'stepRounds', 'Me.rounds'); wrap(G.Me, 'sendState', 'Me.sendState'); wrap(G.Me, 'spectate', 'Me.spectate'); wrap(G.Me, 'flushHits', 'Me.flushHits');
-    wrap(G.Views, 'update', 'Views.update');
+    wrap(Views, 'update', 'Views.update');
     wrap(G.Hangar, 'update', 'Hangar.update');
     wrap(G.InvUI, 'update', 'InvUI.update'); wrap(G.InvUI, 'tick', 'InvUI.tick');
-    wrap(G.GunAudio, 'updateListener', 'audio listener');
-    wrap(G.R, 'update', 'R.update (effects)'); wrap(G.R, 'render', 'R.render');
-    wrap(G.HUD, 'update', 'HUD.update');
-    wrap(G.LightGrid, 'flush', 'LightGrid.flush');
-    wrap(G.Casings, 'update', 'Casings.update');
+    wrap(GunAudio, 'updateListener', 'audio listener');
+    wrap(G_R, 'update', 'R.update (effects)'); wrap(G_R, 'render', 'R.render');
+    wrap(HUD, 'update', 'HUD.update');
+    wrap(LightGrid, 'flush', 'LightGrid.flush');
+    wrap(Casings, 'update', 'Casings.update');
     // the host's AI and the world (inside the server tick, and inside other things: their own lines; the AI's only when it runs on the page)
-    wrap(G.Server, 'update', 'host: update'); wrap(G.Server, 'think', 'host: enemy AI'); wrap(G.Server, 'footsteps', 'host: footsteps'); wrap(G.Server, 'snapshot', 'host: snapshot');
-    wrap(G.Level, 'flow', 'pathfinding (flow)'); wrap(G.Level, 'los', 'line of sight');
-    wrap(G.World, 'raycast', 'World.raycast'); wrap(G.World, 'resolve', 'World.resolve'); wrap(G.World, 'query', 'World.query');
-    wrapMsg(Gm, 'onMsg', 'client'); wrapMsg(G.Server, 'handle', 'host');
+    wrap(Server, 'update', 'host: update'); wrap(Server, 'think', 'host: enemy AI'); wrap(Server, 'footsteps', 'host: footsteps'); wrap(Server, 'snapshot', 'host: snapshot');
+    wrap(Level, 'flow', 'pathfinding (flow)'); wrap(Level, 'los', 'line of sight');
+    wrap(World, 'raycast', 'World.raycast'); wrap(World, 'resolve', 'World.resolve'); wrap(World, 'query', 'World.query');
+    wrapMsg(Gm, 'onMsg', 'client'); wrapMsg(Server, 'handle', 'host');
     // the GPU's passes (above): the frame's own render the level's, and inside it the passes of their own
-    gpuWrap(G.R, 'render', 'level'); gpuWrap(G.R, '_renderPip', 'scope'); gpuWrap(G.R, '_heatPass', 'heat picture'); gpuWrap(G.R, '_nvComposite', 'night vision');
+    gpuWrap(G_R, 'render', 'level'); gpuWrap(G_R, '_renderPip', 'scope'); gpuWrap(G_R, '_heatPass', 'heat picture'); gpuWrap(G_R, '_nvComposite', 'night vision');
     // the light grid's upload: its textures sent as it's flushed, when they've changed (three would send them as the level's
     // first drawn: the same frame), so its time is its own
-    const LG = G.LightGrid, flush = LG.flush, sent = new Map<THREE.Texture, number>();
+    const LG = LightGrid, flush = LG.flush, sent = new Map<THREE.Texture, number>();
     LG.flush = function () {
-      const k = flush.apply(this, arguments as any), r = G.R.renderer, ts = [LG.U.lgLight.value, LG.U.lgDir.value];
+      const k = flush.apply(this, arguments as any), r = G_R.renderer, ts = [LG.U.lgLight.value, LG.U.lgDir.value];
       if (on && r && ts.some((t) => sent.get(t) !== t.version) && gpuOn()) {
         gpuPush('light grid');
         try { for (const t of ts) { r.initTexture(t); sent.set(t, t.version); } } finally { gpuPop(); }
@@ -262,12 +273,12 @@ const G_Prof = (() => {
       return k;
     };
     (LG.flush as any).__prof = true;
-    if (G.Highlights) gpuWrap(G.Highlights, 'update', 'hangar TVs'); // (what it draws, the picture on the TVs, is drawn as it's updated)
+    if (Highlights) gpuWrap(Highlights, 'update', 'hangar TVs'); // (what it draws, the picture on the TVs, is drawn as it's updated)
     if (G.Course) gpuWrap(G.Course, 'update', 'course cameras');
   }
   install();
 
   return { save, report, summary, line, reset, wrap, sec, gpuSummary, get on() { return on; }, set on(v) { on = !!v; } };
 })();
-G.Prof = G_Prof;
-interface GameModules { Prof: typeof G_Prof; }
+G.Prof = Prof;
+declare global { interface GameModules { Prof: typeof Prof; } }

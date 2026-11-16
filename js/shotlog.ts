@@ -1,3 +1,11 @@
+import { SOUND_SPEED } from './data.js';
+import { Level } from './level.js';
+import { Materials } from './materials.js';
+import { U } from './util.js';
+import { HUD } from './hud.js';
+import { R } from './render.js';
+import { Rig as G_Rig } from './rig.js';
+import { Views } from './views.js';
 interface ShotRow { key: string; n: number; burst?: boolean; name: string; range: number; muzzle: number; vIn: number; J: number; frags?: string; stop?: string; post?: number; out?: number; }
 interface ShotHolder { ghosts?: Map<string, ShotGhost>; }
 interface ShotInfo { holder: ShotHolder; name: string; burst?: boolean; }
@@ -6,11 +14,11 @@ interface ShotVert { p: THREE.Vector3; v: number; }
 interface ShotRec { keys: Set<string>; hits: ShotRow[]; line: THREE.Line; frags: THREE.LineSegments | null; labels: ShotLabel[]; ghosts: Map<string, ShotGhost>; nade?: THREE.Object3D; }
 interface ShotArmour { e: string; b: number; r: { k: MatKey; o: number; un?: boolean }[]; }
 type ShotMark = (p: THREE.Vector3, t: string, c: string, pri: number, key?: string) => void;
-const G_ShotLog = (() => {
+export const ShotLog = (() => {
   const T = THREE, MAX = 32, MACHS = [3, 2.5, 2, 1.5, 1, 0.5], RANGE = 90, LH = 15; // (RANGE: markers further than this aren't labelled)
   let recs: ShotRec[] = [], count = new Map<string, number>(), far = new Map<string, ShotHolder>(), shown = false, cv: HTMLCanvasElement = null!, g: CanvasRenderingContext2D = null!; // (cv, g: made on the first frame)
-  const css = (v: number) => '#' + G.R.trailColour(v, new T.Color()).getHexString(), mach = (v: number) => (v / G.SOUND_SPEED).toFixed(2);
-  const rigOf = (key: string) => { const v = key[0] === 'e' ? G.Views.enemies.get(+key.slice(1)) : G.Views.players.get(key.slice(1)); return v && v.rig; };
+  const css = (v: number) => '#' + R.trailColour(v, new T.Color()).getHexString(), mach = (v: number) => (v / SOUND_SPEED).toFixed(2);
+  const rigOf = (key: string) => { const v = key[0] === 'e' ? Views.enemies.get(+key.slice(1)) : Views.players.get(key.slice(1)); return v && v.rig; };
 
   // who it hit, as they stand now: a copy of their meshes where they are this moment (the geometry's theirs: nothing of it to free).
   // (Out of your sight their body's hidden, js/views.ts: someone shot through a wall is, and still has to show.)
@@ -38,7 +46,7 @@ const G_ShotLog = (() => {
     });
     rig.body.visible = shownBody;
     grp.visible = false; grp.mat = mat; grp.uses = 0;
-    G.R.scene.add(grp);
+    R.scene.add(grp);
     return grp;
   }
   // holder: what a shot's ghosts are kept on, one for each person whatever number of its pellets hit them
@@ -79,7 +87,7 @@ const G_ShotLog = (() => {
   }
   function build(path: ShotPath | null | undefined, info: ShotInfo): ShotRec | null {
     if (!path || !path.hit.length) return null;
-    const P = path.p.map((a) => ({ p: new T.Vector3(a[0], a[1], a[2]), v: a[3] })), xs = [0], A = G.SOUND_SPEED, inside = new Set<number>(), labels: ShotLabel[] = [], verts: ShotVert[] = [];
+    const P = path.p.map((a) => ({ p: new T.Vector3(a[0], a[1], a[2]), v: a[3] })), xs = [0], A = SOUND_SPEED, inside = new Set<number>(), labels: ShotLabel[] = [], verts: ShotVert[] = [];
     for (let i = 1; i < P.length; i++) xs.push(xs[i - 1] + P[i].p.distanceTo(P[i - 1].p));
     for (const e of path.ev) if (e[1] === 'e') { const x = path.ev.find((q) => q[1] === 'x' && q[0] > e[0]); if (x) for (let k = e[0]; k < x[0]; k++) inside.add(k); }
     for (const h of path.hit) if (h[7]) inside.add(h[0]);
@@ -111,10 +119,10 @@ const G_ShotLog = (() => {
     const end = path.hit[path.hit.length - 1];
     if (!end[7] && end[0] === P.length - 1 && end[9] && end[9][0] > 0) { const q = P[end[0]].p.clone().add(new T.Vector3(end[4], end[5], end[6]).multiplyScalar(end[9][0])); add(q, 0); mark(q, `Stopped in ${end[9][1]} · ${Math.round(end[9][0] * 100)} cm in`, css(0), 4, end[1]); }
     const pos = new Float32Array(verts.length * 3), col = new Float32Array(verts.length * 3), c = new T.Color();
-    verts.forEach((q, i) => { pos.set([q.p.x, q.p.y, q.p.z], i * 3); G.R.trailColour(q.v, c); col.set([c.r, c.g, c.b], i * 3); });
+    verts.forEach((q, i) => { pos.set([q.p.x, q.p.y, q.p.z], i * 3); R.trailColour(q.v, c); col.set([c.r, c.g, c.b], i * 3); });
     const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
     const mat = new T.LineBasicMaterial({ vertexColors: true, transparent: true, depthTest: false, depthWrite: false }), line = new T.Line(geo, mat);
-    line.frustumCulled = false; line.renderOrder = 998; line.visible = false; G.R.scene.add(line);
+    line.frustumCulled = false; line.renderOrder = 998; line.visible = false; R.scene.add(line);
     const frags = fragLines(path, mark);
     if (frags) line.add(frags);
     const ghosts = new Map<string, ShotGhost>(), m = info.holder.ghosts;
@@ -130,7 +138,7 @@ const G_ShotLog = (() => {
       const breaks = new Map<string, { f: number[]; n: number; deep: number }>();
       for (const f of h[10] || []) {
         pos.push(...f.slice(0, 6));
-        col.push(...G.R.trailColour(f[6], c).toArray(), ...G.R.trailColour(f[7], c).toArray());
+        col.push(...R.trailColour(f[6], c).toArray(), ...R.trailColour(f[7], c).toArray());
         const at = f.slice(0, 3).join() + f[9], len = Math.round(Math.hypot(f[3] - f[0], f[4] - f[1], f[5] - f[2]) * 100);
         if (!breaks.has(at)) breaks.set(at, { f, n: 0, deep: 0 });
         const b = breaks.get(at)!; b.n++; b.deep = Math.max(b.deep, len);
@@ -151,10 +159,10 @@ const G_ShotLog = (() => {
       count.set(key, n);
       const fr: number[][] = h[10] || [], ns = fr.filter((f) => f[9]).length;
       row.frags = [fr.length > ns && `${fr.length - ns} fragments`, ns && `${ns} bone splinters`].filter(Boolean).join(', ');
-      mark(q.p, `Entry ${v} m/s · M${mach(v)} · ${G.U.fmt(row.J)} J`, css(v), 5, key);
+      mark(q.p, `Entry ${v} m/s · M${mach(v)} · ${U.fmt(row.J)} J`, css(v), 5, key);
       if (a) { // (what armour was hit before the body, and what it left)
         const front = rows.slice(0, rows.findIndex((r) => !r.k) < 0 ? rows.length : rows.findIndex((r) => !r.k)), last = front[front.length - 1];
-        if (a.e === 'armour') { row.stop = `${last ? G.Materials.MAT[last.k].name : 'armour'}, ${a.b} J to the body`; mark(q.p, `Stopped by ${row.stop}`, '#9fe8ff', 5, key); } else if (a.e === 'glance') { row.stop = 'glanced off their armour'; mark(q.p, 'Glanced off their armour', '#9fe8ff', 5, key); } else if (last) {
+        if (a.e === 'armour') { row.stop = `${last ? Materials.MAT[last.k].name : 'armour'}, ${a.b} J to the body`; mark(q.p, `Stopped by ${row.stop}`, '#9fe8ff', 5, key); } else if (a.e === 'glance') { row.stop = 'glanced off their armour'; mark(q.p, 'Glanced off their armour', '#9fe8ff', 5, key); } else if (last) {
           row.post = last.o; after.set(h[0], last.o);
           mark(q.p, `Past armour ${last.o} m/s · ${Math.round((1 - (last.o * last.o) / (v * v)) * 100)}% of its energy gone`, css(last.o), 5, key);
         }
@@ -176,7 +184,7 @@ const G_ShotLog = (() => {
     const g = new T.Group(), mat = new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.6, depthTest: false, depthWrite: false, blending: T.AdditiveBlending });
     for (const geo of nadeGeo) { const m = new T.Mesh(geo, mat); m.renderOrder = 997; m.frustumCulled = false; g.add(m); }
     g.position.set(at[0], at[1], at[2]); g.scale.setScalar(1.6); g.visible = false; // (a little larger than life: it has to be found)
-    G.R.scene.add(g);
+    R.scene.add(g);
     return g;
   }
   // ---- picking a grenade out: its ghost in the crosshair (within 25 cm of the line, nearer than any wall or body)
@@ -193,16 +201,16 @@ const G_ShotLog = (() => {
     return best;
   }
   const select = (r: ShotRec | null) => { sel = r; };
-  const nameOf = (key: string) => { if (key[0] === 'e') { const ev = G.Views.enemies.get(+key.slice(1)); return `${ev && ev.def && ev.def.name ? ev.def.name : 'Suspect'} #${key.slice(1)}`; } const id = key.slice(1); return id === G.Net.myId ? 'You' : ((G.Views.players.get(id) || {} as { name?: string }).name || 'Officer'); };
+  const nameOf = (key: string) => { if (key[0] === 'e') { const ev = Views.enemies.get(+key.slice(1)); return `${ev && ev.def && ev.def.name ? ev.def.name : 'Suspect'} #${key.slice(1)}`; } const id = key.slice(1); return id === G.Net.myId ? 'You' : ((Views.players.get(id) || {} as { name?: string }).name || 'Officer'); };
   // the readout for the grenade picked out: who its fragments hit, how many and how hard, and what stopped them
   function nadeHtml() {
     if (!sel) return '';
-    const esc = G.U.esc, by = new Map<string, ShotRow[]>();
+    const esc = U.esc, by = new Map<string, ShotRow[]>();
     for (const h of sel.hits) { if (!by.has(h.key)) by.set(h.key, []); by.get(h.key)!.push(h); }
-    const at = sel.nade!.position, me = G.R.camera.position;
+    const at = sel.nade!.position, me = R.camera.position;
     const rows = [...by].map(([k, hs]) => {
       const J = hs.reduce((a, h) => a + h.J, 0), through = hs.filter((h) => h.out != null).length, armour = hs.filter((h) => h.stop && /armour|plate|Stopped by|J to the body/.test(h.stop)).length;
-      return `<div class="hb-shot"><b>${esc(nameOf(k))}</b> <span class="hb-k">· ${hs[0].range} m from it</span><br>${hs.length} fragment${hs.length > 1 ? 's' : ''} · ${G.U.fmt(J)} J in all · fastest in ${Math.max(...hs.map((h) => h.vIn))} m/s${through ? ` · ${through} through` : ''}${armour ? ` <span class="warn">· ${armour} stopped by armour</span>` : ''}</div>`;
+      return `<div class="hb-shot"><b>${esc(nameOf(k))}</b> <span class="hb-k">· ${hs[0].range} m from it</span><br>${hs.length} fragment${hs.length > 1 ? 's' : ''} · ${U.fmt(J)} J in all · fastest in ${Math.max(...hs.map((h) => h.vIn))} m/s${through ? ` · ${through} through` : ''}${armour ? ` <span class="warn">· ${armour} stopped by armour</span>` : ''}</div>`;
     });
     return `<h4>${esc(sel.hits[0] ? sel.hits[0].name : 'Grenade')} <small>${Math.hypot(at.x - me.x, at.z - me.z).toFixed(1)} m · picked out</small></h4><div class="hb-sec"><span class="hb-k">Fragments that hit someone: ${sel.hits.length}, ${by.size} ${by.size > 1 ? 'people' : 'person'}</span>${rows.join('')}</div><div class="hb-k">Look at someone to pick them out instead.</div>`;
   }
@@ -217,7 +225,7 @@ const G_ShotLog = (() => {
   interface FillRec { g: THREE.Group; labels: ShotLabel[] }
   let fills: FillRec[] = [];
   function keepFill(M: any, log: any[] | null, name: string) {
-    const L = G.Level, TS = L.TS, W = M.map.W, g = new T.Group(), gy = M.p.y - 0.25, labels: ShotLabel[] = [];
+    const L = Level, TS = L.TS, W = M.map.W, g = new T.Group(), gy = M.p.y - 0.25, labels: ShotLabel[] = [];
     const cells = (from: number, to: number, h: number, col: number, op: number) => {
       const n = Math.max(0, to - from); if (!n) return;
       const im = new T.InstancedMesh(new T.BoxGeometry(TS * 0.94, h, TS * 0.94), new T.MeshBasicMaterial({ color: col, transparent: true, opacity: op, depthTest: false, depthWrite: false, blending: T.AdditiveBlending }), n), m = new T.Matrix4();
@@ -226,7 +234,7 @@ const G_ShotLog = (() => {
     };
     cells(0, M.cloud, L.WALL_H - 0.1, 0xff7a30, 0.07); // (the fireball: floor to ceiling)
     cells(M.cloud, M.space, 0.04, 0x4aa8ff, 0.3); // (the rest of the space its pressure filled: on the floor)
-    g.visible = false; G.R.scene.add(g);
+    g.visible = false; R.scene.add(g);
     const pct = (v: number) => Math.round(v * 100) + '%';
     labels.push({ p: M.p.clone().setY(gy + 2.2), t: `${name}: fireball ${M.areaCloud.toFixed(0)} m² of floor (${(M.areaCloud * G.Me.TB.ROOM_H).toFixed(0)} m³)${M.outFrac > 0.05 ? `, ${pct(M.outFrac)} under the sky` : ''}`, c: '#ffb070', pri: 6 });
     labels.push({ p: M.p.clone().setY(gy + 1.6), t: `Space ${M.areaSpace.toFixed(0)} m²${M.closed ? ' (closed)' : ' or more (open onto the rest)'}, ${M.fill.vents} way${M.fill.vents === 1 ? '' : 's'} out · confinement ${pct(M.conf)} · ${M.qs.toFixed(0)} kPa held`, c: '#8fc8ff', pri: 6 });
@@ -239,14 +247,14 @@ const G_ShotLog = (() => {
   // the shots that hit someone, oldest first (js/hud.ts debugTarget's readout)
   const of = (key: string) => recs.flatMap((r) => r.hits.filter((h) => h.key === key));
   // whose shots are shown: whoever's picked out, or you if nobody is (you can't put the crosshair on yourself)
-  const focus = () => { const L = G.HUD.hbLast; return L ? (L.kind === 'e' ? 'e' + L.who.id : 'p' + L.id) : 'p' + G.Net.myId; };
+  const focus = () => { const L = HUD.hbLast; return L ? (L.kind === 'e' ? 'e' + L.who.id : 'p' + L.id) : 'p' + G.Net.myId; };
 
   // Each frame the hitboxes are shown: what's lit, and the markers, laid out so they don't sit on each other: a dot on the trail
   // where it happened, its label beside it, or up the line from it if that's taken. (A round through two people: its trail, and
   // the ghost and markers of the one picked out.) The most important and the latest
   // shot's first: a label with nowhere to go is left out (the readout has the numbers).
   function frame() {
-    const on = !!G.Rig.debug;
+    const on = !!G_Rig.debug;
     if (!cv) { cv = document.getElementById('hbMarks') as HTMLCanvasElement; if (!cv) return; g = cv.getContext('2d')!; }
     if (!on || (!recs.length && !fills.length)) {
       if (shown) { for (const r of recs) { r.line.visible = false; if (r.nade) r.nade.visible = false; for (const gh of r.ghosts.values()) gh.visible = false; } for (const f of fills) f.g.visible = false; cv.classList.add('hidden'); shown = false; }
@@ -260,7 +268,7 @@ const G_ShotLog = (() => {
     // a grenade picked out (its ghost in the crosshair: js/hud.ts debugTarget): its fragments' trails and everyone they hit, alone;
     // otherwise whoever's picked out and the shots that hit them. Every grenade's ghost shows either way, to be found and picked.
     if (sel && !recs.includes(sel)) sel = null;
-    const fk = focus(), mine = sel ? [sel] : recs.filter((r) => r.keys.has(fk)), cam = G.R.camera, v = new T.Vector3();
+    const fk = focus(), mine = sel ? [sel] : recs.filter((r) => r.keys.has(fk)), cam = R.camera, v = new T.Vector3();
     for (const r of recs) {
       const on = sel ? r === sel : r.keys.has(fk);
       r.line.visible = on;
@@ -273,7 +281,7 @@ const G_ShotLog = (() => {
     const list = [...mine].reverse().flatMap((r, i) => r.labels.filter((l) => !l.key || l.key === fk || sel).map((l) => ({ l, rank: l.pri * 2 - i }))).concat([...fills].reverse().flatMap((f, i) => f.labels.map((l) => ({ l, rank: l.pri * 2 - i })))).sort((a, b) => b.rank - a.rank), seen = new Set<string>();
     for (const { l } of list) {
       v.copy(l.p).project(cam);
-      if (G.R.behind(v, cam) || Math.abs(v.x) > 1 || Math.abs(v.y) > 1 || l.p.distanceTo(cam.position) > RANGE) continue;
+      if (R.behind(v, cam) || Math.abs(v.x) > 1 || Math.abs(v.y) > 1 || l.p.distanceTo(cam.position) > RANGE) continue;
       const x = (v.x + 1) / 2 * W, y = (1 - v.y) / 2 * H, id = l.t + '@' + Math.round(x / 6) + ',' + Math.round(y / 6);
       if (seen.has(id)) continue; // (the same thing, from the same spot: rounds fired from where you stood)
       seen.add(id);
@@ -293,6 +301,6 @@ const G_ShotLog = (() => {
   }
   return { pose, remote, keep, keepAll, keepFill, clear, of, focus, frame, pickNade, select, nadeHtml, get selected() { return sel; } };
 })();
-G.ShotLog = G_ShotLog;
+G.ShotLog = ShotLog;
 
-interface GameModules { ShotLog: typeof G_ShotLog; }
+declare global { interface GameModules { ShotLog: typeof ShotLog; } }

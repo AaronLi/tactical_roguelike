@@ -1,4 +1,25 @@
 'use strict';
+import { Ballistics } from './ballistics.js';
+import { Callsigns } from './callsigns.js';
+import { Damage } from './damage.js';
+import { AMMO, ballFor, CALIBERS, calOf, ENEMIES, roundSpeed, THEMES, WEAPONS } from './data.js';
+import { Gear } from './gear.js';
+import { Models } from './glb.js';
+import { GunModels } from './gunmodels.js';
+import { Level } from './level.js';
+import { LevelView } from './levelview.js';
+import { LightGrid } from './lightgrid.js';
+import { Materials } from './materials.js';
+import { Gunsmith } from './parts.js';
+import { R as G_R } from './render.js';
+import { Rig as G_Rig } from './rig.js';
+import { Scars } from './scars.js';
+import { Sim } from './sim.js';
+import { Stickers } from './stickers.js';
+import { U as G_U } from './util.js';
+import { World } from './world.js';
+// Left as G.X on purpose: G.Audio, G.GunAudio, G.HUD, G.Icons, G.Shop, G.Views and G.Zip. The export worker (js/exportworker.ts) loads this file, and
+// importing any of these would load them there (audio, footsteps, the HUD, the shop...) and change what it does; they are page-only reads.
 // After-action highlights: the level just played, as a sports broadcast on the TVs in Vex's hangar.
 //
 // RECORDING (in a level): ten times a second every suspect, civilian and officer is written down as they are (where,
@@ -16,7 +37,7 @@
 // rounds did to them. Between them: a cold open with the squad's starting line-up, sponsored segments, fake adverts,
 // presenters reacting like a game show's, motion graphics everywhere and a scoreboard at the end. Near a TV you hear it:
 // the crowd (cheers, a laugh track, a sad "aww"), stingers, the presenters' excited babble, the gunfire.
-const G_Highlights = (() => {
+export const Highlights = (() => {
   const T = THREE, HZ = 10, PRE = 5, POST = 3, MAX = 36, NEAR = 34, W = 960, H = 540, KEEP = 7; // (KEEP: what the ring holds, s)
 
   // (shapes used throughout: records are kept loose, with the fields that matter named)
@@ -80,8 +101,8 @@ const G_Highlights = (() => {
   }
   // someone in the recording: an officer (kind 'p') or a suspect ('e')
   interface Actor {
-    kind: HlActorKind; id: any; name?: string; animal?: string; color?: number; look?: ReturnType<typeof G.Rig.cleanLook>; kt?: ReturnType<typeof G.Me.kitLook> | null; gun?: string | null;
-    sk?: ReturnType<typeof G.Stickers.clean> | null; skins?: Record<string, ReturnType<typeof G.Stickers.clean>>; type?: string; wpn?: EnemyDef['wpn']; vest?: EnemyDef['vest']; helmet?: EnemyDef['helmet']; face?: number; ex?: any[]; civ?: boolean; scale?: number; boss?: boolean; style?: EnemyStyle;
+    kind: HlActorKind; id: any; name?: string; animal?: string; color?: number; look?: ReturnType<typeof G_Rig.cleanLook>; kt?: ReturnType<typeof G.Me.kitLook> | null; gun?: string | null;
+    sk?: ReturnType<typeof Stickers.clean> | null; skins?: Record<string, ReturnType<typeof Stickers.clean>>; type?: string; wpn?: EnemyDef['wpn']; vest?: EnemyDef['vest']; helmet?: EnemyDef['helmet']; face?: number; ex?: any[]; civ?: boolean; scale?: number; boss?: boolean; style?: EnemyStyle;
   }
   // a stop on the gear room's tour: a fitted part, the slot it's in, and the mesh slot its model's meshes are tagged with
   interface GearShot { at: [number, number]; dir: [number, number, number]; d: number; roll: number } // (a camera pose of the gear room's tour, as fractions of the gun: GT_MOVES)
@@ -123,10 +144,10 @@ const G_Highlights = (() => {
   interface HlExport { p: number; cancel: boolean; audioErr?: unknown; stage?: string; abort?: (() => void) | null; worker?: Worker | null }
   interface PState {
     map: LvMap; level: THREE.Group | null; tvs: HlTv[]; seg: number; st: number; prog: Seg[]; rigs: Map<string, HlRigRec>; fx: HlFx[]; drops: { m: THREE.Mesh; v: THREE.Vector3; life: number }[]; marks: THREE.Mesh[]; clips: Clip[]; actors: Map<string, Actor>; stats: Map<string, HlStat>;
-    ac: HlAc; au: HlAudio | null; bullets: HlBullet[]; cam: THREE.PerspectiveCamera; cv: HTMLCanvasElement; debris: ReturnType<typeof G.Scars.debris>; esc: THREE.Vector3; exporting: HlExport | null; fired: RState['fired']; frameT: number; fxRoot: THREE.Group;
+    ac: HlAc; au: HlAudio | null; bullets: HlBullet[]; cam: THREE.PerspectiveCamera; cv: HTMLCanvasElement; debris: ReturnType<typeof Scars.debris>; esc: THREE.Vector3; exporting: HlExport | null; fired: RState['fired']; frameT: number; fxRoot: THREE.Group;
     g: CanvasRenderingContext2D; gcam: THREE.PerspectiveCamera; gt: any; gen: { seed: number; level: number; th: number; night?: boolean }; glass: HlGlass[]; gpiv: THREE.Group; gs: THREE.Scene; hide: THREE.Object3D[]; holeMat: THREE.MeshBasicMaterial; kgun: RState['kgun'];
     las: { root: THREE.Group; pool: HlLaser[] }; lastVideo: { name: string; size: number; dur: number; ms: number; audio: boolean; frames: number } | null; levelN: number; losT: number; mat: THREE.ShaderMaterial; outVideo: HlChunk[] | null; ov: THREE.CanvasTexture;
-    packing: boolean; ready: boolean; rnd: ReturnType<typeof G.U.rng>; rt: THREE.WebGLRenderTarget | null; scene: THREE.Scene; theme: string | undefined; thruMat: THREE.MeshBasicMaterial; time: number; tvShots: number; vol: number; xcam: THREE.PerspectiveCamera;
+    packing: boolean; ready: boolean; rnd: ReturnType<typeof G_U.rng>; rt: THREE.WebGLRenderTarget | null; scene: THREE.Scene; theme: string | undefined; thruMat: THREE.MeshBasicMaterial; time: number; tvShots: number; vol: number; xcam: THREE.PerspectiveCamera;
     xlook: THREE.Vector3; xo: HlXo | null; nx: HlNadeFx | null; xorg: HlOrgan[]; xrig: HlRig | null; xs: THREE.Scene; xtl: HlXtl | null; xtracks: HlXtracks; xview: { mid: THREE.Vector3; r: number } | null;
   }
 
@@ -147,7 +168,7 @@ const G_Highlights = (() => {
     const me = id === G.Net.myId, g = G.Game, ro = (g.roster || {})[id!] || {};
     return { kind: 'p', id, name: me ? g.myName : (pv && pv.name) || ro.name || 'Officer', color: me ? g.myColor : (pv && pv.color) != null ? pv.color : ro.color, animal: me ? g.myAnimal : (pv && pv.animal) || ro.animal,
       look: me ? g.myLook : (pv && pv.look) || ro.look, kt: me ? G.Me.kitLook() : pv && pv.st ? pv.st.kt : null, gun: me ? G.Me.cur().def.code : pv && pv.st ? pv.st.w : null,
-      sk: me ? G.Me.cur().stickers || null : pv && pv.st ? G.Stickers.of(pv.st.sk) : null };
+      sk: me ? G.Me.cur().stickers || null : pv && pv.st ? Stickers.of(pv.st.sk) : null };
   }
   // an officer's record, now: as they are, and the stickers on each gun they've been seen with (skins: code -> list)
   function officer(k: string, id: string | null, pv?: any) {
@@ -187,7 +208,7 @@ const G_Highlights = (() => {
     if (me && me.pos) {
       officer(k, G.Net.myId);
       a[k] = [me.pos.x, me.pos.y, me.pos.z, me.yaw, me.pitch, (me.crouch ? 1 : 0) | (me.prone ? 2 : 0) | (me.lowReady ? 0 : 4) | (me.down ? 8 : 0) | (me.dead ? 16 : 0) | (me.climb ? 256 : 0) | (me.zipRide ? 512 : 0), me.lean || 0, ...zipOf(me.action),
-        me.reloading && me.reloadTotal ? G.U.clamp(1 - me.reloadT / me.reloadTotal, 0, 1) : -1];
+        me.reloading && me.reloadTotal ? G_U.clamp(1 - me.reloadT / me.reloadTotal, 0, 1) : -1];
     }
     const now = performance.now();
     for (const [key, L] of lasers) if (a[key] && now - L[4] < 400) a[key][11] = L.slice(0, 4);
@@ -360,7 +381,7 @@ const G_Highlights = (() => {
     if (G.Game.phase !== 'level' || G.Game.hub) return;
     const s: any = { t: R.t, a, f: [f.x, f.y, f.z], to: [to.x, to.y, to.z], code, am, sid };
     if (Array.isArray(tos) && tos.length > 1) s.tos = tos.map((p) => (Array.isArray(p) ? p.slice(0, 3) : [p.x, p.y, p.z]));
-    else { const def = defOf(code); if (def && def.pellets > 1) s.tos = spread(s.f, s.to, def.pellets, def.choke || 3, G.U.rng(((sid | 0) ^ 0x5be11e7) >>> 0)); } // (by the shot's id: the same spread on every machine)
+    else { const def = defOf(code); if (def && def.pellets > 1) s.tos = spread(s.f, s.to, def.pellets, def.choke || 3, G_U.rng(((sid | 0) ^ 0x5be11e7) >>> 0)); } // (by the shot's id: the same spread on every machine)
     R.shots.push(s);
     if (a[0] === 'p' && code) { // (an officer's rounds, by gun and load: for the gear room)
       let m = R.fired.get(a); if (!m) R.fired.set(a, (m = new Map()));
@@ -405,7 +426,7 @@ const G_Highlights = (() => {
     let best = { dist: 1e9, x: len };
     const n = Math.min(1500, Math.ceil(len / 0.03));
     for (let i = 0; i <= n; i++) {
-      const x = len * i / n, p = F0.clone().addScaledVector(d, x), y = G.U.clamp(p.y, pos.y + 0.15, pos.y + 1.75), dist = Math.hypot(p.x - pos.x, p.y - y, p.z - pos.z);
+      const x = len * i / n, p = F0.clone().addScaledVector(d, x), y = G_U.clamp(p.y, pos.y + 0.15, pos.y + 1.75), dist = Math.hypot(p.x - pos.x, p.y - y, p.z - pos.z);
       if (dist < best.dist) best = { dist, x };
     }
     return best;
@@ -451,9 +472,9 @@ const G_Highlights = (() => {
     // to the wall it'll hold to, its fuse from there: put right if it held to someone first, stick)
     try {
       const P0 = new T.Vector3(p.x, p.y, p.z), V0 = new T.Vector3(v.x, v.y, v.z), sticky = n.kind === 'sticky';
-      const pts = sticky ? G.Sim.predictSticky(P0, V0, G.Game.map, G.Sim.STICKY.MAX_FLY) : G.Views.predictNade(P0, V0, fuse, G.Game.map), r = (x: number) => Math.round(x * 100) / 100;
+      const pts = sticky ? Sim.predictSticky(P0, V0, G.Game.map, Sim.STICKY.MAX_FLY) : G.Views.predictNade(P0, V0, fuse, G.Game.map), r = (x: number) => Math.round(x * 100) / 100;
       n.arc = pts.filter((q, i) => i % 2 === 0 || i === pts.length - 1).map((q) => [r(q.x), r(q.y), r(q.z)]);
-      if (sticky) { n.fly = (pts.length - 1) / 60; n.fuse = n.fly + G.Sim.STICKY.FUSE; }
+      if (sticky) { n.fly = (pts.length - 1) / 60; n.fuse = n.fly + Sim.STICKY.FUSE; }
     } catch (e) { /* worked out when it's played, then */ }
     R.nades.push(n);
   }
@@ -465,7 +486,7 @@ const G_Highlights = (() => {
       const n = R.nades[i]; if (n.kind !== 'sticky' || n.held || (a && n.a && n.a !== a)) continue;
       const r = (x: number) => Math.round(x * 100) / 100, k = Math.max(1, Math.round(fly * 30));
       n.arc = (n.arc || [n.p.slice()]).slice(0, k).concat([[r(at.x), r(at.y), r(at.z)]]);
-      n.fly = fly; n.fuse = fly + G.Sim.STICKY.FUSE; n.held = true;
+      n.fly = fly; n.fuse = fly + Sim.STICKY.FUSE; n.held = true;
       return;
     }
   }
@@ -493,7 +514,7 @@ const G_Highlights = (() => {
     // room filling, on every machine and in the video (whose worker has no js/player.ts to work it out)
     if (kind === 'tb' && !b.cells && G.Me && G.Me.tbModel && G.Game.map) {
       try {
-        const M = G.Me.tbModel(G.Game.map, new T.Vector3(p.x, p.y, p.z)), W = G.Game.map.W, TS = G.Level.TS, cells: number[][] = [];
+        const M = G.Me.tbModel(G.Game.map, new T.Vector3(p.x, p.y, p.z)), W = G.Game.map.W, TS = Level.TS, cells: number[][] = [];
         for (let i = 0; i < M.cloud && cells.length < 60; i += 2) { const c = M.fill.order[i]; cells.push([((c % W) + 0.5) * TS, ((c / W | 0) + 0.5) * TS, M.fill.d[i]]); }
         b.cells = cells;
       } catch (e) { /* worked out when it's played, then */ }
@@ -574,7 +595,7 @@ const G_Highlights = (() => {
     if (c && s && c.t - s.t > 4) { s.a = c.a; s.n = c.n; c.sur = s; } // (their hands went up a while before: that first)
   }
   // a weapon's definition from its code (a build's code, or a plain weapon id), or null
-  function defOf(code: string | null | undefined) { if (!code) return null; try { return G.WEAPONS[code] || G.Gunsmith.fromCode(code); } catch (e) { return null; } }
+  function defOf(code: string | null | undefined) { if (!code) return null; try { return WEAPONS[code] || Gunsmith.fromCode(code); } catch (e) { return null; } }
 
   // ================================================================ the kept level
   const P: PState = { map: null, level: null, tvs: [], seg: -1, st: 0, prog: [], rigs: new Map(), fx: [], drops: [], marks: [], rt: null, cv: null, g: null, ov: null, scene: null, cam: null, xs: null, frameT: 0, ready: false, au: null } as unknown as PState;
@@ -584,7 +605,7 @@ const G_Highlights = (() => {
     for (const c of R.open) closed(c); R.open = []; // (clips cut short by the level ending)
     if (!map || !nodes || !nodes.length || !R.clips.length && !R.stats.size) { disposeNodes(nodes); return; }
     P.map = map; P.level = new T.Group(); for (const n of nodes) P.level.add(n);
-    P.gen = { seed: map.seed, level: map.level, th: G.THEMES.indexOf(map.theme), night: !!map.night }; // (to build it again: js/exportworker.ts; a night level's lights out as they were)
+    P.gen = { seed: map.seed, level: map.level, th: THEMES.indexOf(map.theme), night: !!map.night }; // (to build it again: js/exportworker.ts; a night level's lights out as they were)
     P.clips = R.clips.slice().sort((a, b) => a.t - b.t); P.stats = new Map(R.stats); P.actors = new Map(R.actors); P.levelN = R.level; P.theme = R.theme;
     P.fired = new Map(R.fired); P.kgun = new Map(R.kgun); P.glass = R.glass.slice();
   }
@@ -616,7 +637,7 @@ const G_Highlights = (() => {
     P.ov = new T.CanvasTexture(P.cv); P.ov.minFilter = T.LinearFilter;
     const mat = new T.ShaderMaterial({ toneMapped: false, uniforms: { sc: { value: P.rt.texture }, ov: { value: P.ov }, live: { value: 0 }, time: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: G.R.TONE + `uniform sampler2D sc; uniform sampler2D ov; uniform float live; uniform float time; varying vec2 vUv;
+      fragmentShader: G_R.TONE + `uniform sampler2D sc; uniform sampler2D ov; uniform float live; uniform float time; varying vec2 vUv;
         void main(){ vec3 c = bpTone(texture2D(sc, vUv).rgb) * live; vec4 o = texture2D(ov, vUv); c = mix(c, o.rgb, o.a);
           c *= 0.93 + 0.07 * sin(vUv.y * 900.0 + time * 3.0); vec2 d = vUv - 0.5; c *= 1.0 - dot(d, d) * 0.6; gl_FragColor = linearToOutputTexel(vec4(c * 1.08, 1.0)); }` });
     P.mat = mat;
@@ -658,7 +679,7 @@ const G_Highlights = (() => {
     const dl = new T.DirectionalLight(0xffffff, Math.PI * 0.55); dl.position.set(0.4, 1, 0.3); P.scene.add(dl);
     P.cam = new T.PerspectiveCamera(60, 16 / 9, 0.05, 200);
     P.scene.add(P.fxRoot = new T.Group());
-    P.debris = G.Scars.debris(P.scene, (x: number, z: number, y: number) => floorAt(x, z, y));
+    P.debris = Scars.debris(P.scene, (x: number, z: number, y: number) => floorAt(x, z, y));
     buildXray();
   }
   function unmount() {
@@ -722,7 +743,7 @@ const G_Highlights = (() => {
       const data = packData(), files: any[] = [{ name: 'highlights.json', data: toJSON(data) }];
       files.push({ name: 'info.txt', data: `Breach Protocol highlights: level ${P.levelN}${P.theme ? ` (${P.theme})` : ''}, recorded ${new Date().toISOString()}.\nOpen the game, and on the main menu use "Render highlights video" with this file to make the video.\n` });
       for (const n of packStickers(P.actors)) { // (their pictures with it: the replay's guns as they were, wherever it's rendered)
-        try { const r = await fetch(G.Stickers.url(n)); if (r.ok) files.push({ name: 'stickers/' + n, data: new Uint8Array(await r.arrayBuffer()) }); } catch (e) { /* that one's left out */ }
+        try { const r = await fetch(Stickers.url(n)); if (r.ok) files.push({ name: 'stickers/' + n, data: new Uint8Array(await r.arrayBuffer()) }); } catch (e) { /* that one's left out */ }
       }
       const blob = await G.Zip.write(files), name = packName() + '.zip';
       save(blob, name);
@@ -886,18 +907,18 @@ const G_Highlights = (() => {
   // when asked for (js/gunmodels.ts), and the export draws its frames in one go, not waiting for them
   async function loadGuns() {
     const codes = new Set<string>();
-    for (const A of P.actors.values()) { if (A.gun) codes.add(A.gun); if (A.wpn) codes.add(G.Gunsmith.defaultCode(A.wpn)); }
+    for (const A of P.actors.values()) { if (A.gun) codes.add(A.gun); if (A.wpn) codes.add(Gunsmith.defaultCode(A.wpn)); }
     for (const c of ((P.clips || []) as any[]).flatMap((x) => (x.flash ? [x, x.flash] : [x]))) { for (const s of c.shots || []) if (s.code) codes.add(s.code); for (const v of Object.values(c.guns || {})) if (v) codes.add(v as string); }
     for (const s of P.prog as any[]) if (s.code) codes.add(s.code);
-    await G.GunModels.boot();
-    await Promise.all([...codes].map((code) => { try { const def = G.Gunsmith.fromCode(code); return def ? G.Models.ensure(def) : null; } catch (e) { return null; } }));
+    await GunModels.boot();
+    await Promise.all([...codes].map((code) => { try { const def = Gunsmith.fromCode(code); return def ? Models.ensure(def) : null; } catch (e) { return null; } }));
   }
   async function exportHere(m: Rec, post: (...a: any[]) => void) {
     const d = revive(m.data);
-    for (const [n, bm] of Object.entries(m.stickers || {})) G.Stickers.provide(n, bm); // (the stickers' pictures, from the file)
-    const map = G.Level.generate(d.gen.seed, d.gen.level, d.gen.th, !!d.gen.night);
+    for (const [n, bm] of Object.entries(m.stickers || {})) Stickers.provide(n, bm); // (the stickers' pictures, from the file)
+    const map = Level.generate(d.gen.seed, d.gen.level, d.gen.th, !!d.gen.night);
     G.Game.map = map;
-    P.map = map; P.level = new T.Group(); P.level.add(G.LevelView.build(map));
+    P.map = map; P.level = new T.Group(); P.level.add(LevelView.build(map));
     Object.assign(P, { clips: d.clips, stats: d.stats, actors: d.actors, fired: d.fired, kgun: d.kgun, glass: d.glass, levelN: d.levelN, theme: d.theme });
     P.prog = [];
     for (const s of d.prog) {
@@ -906,13 +927,13 @@ const G_Highlights = (() => {
       P.prog.push(s);
     }
     const cv = new OffscreenCanvas(W, H), R2 = new T.WebGLRenderer({ canvas: cv, antialias: false, stencil: true, preserveDrawingBuffer: false });
-    G.R.renderer = R2;
+    G_R.renderer = R2;
     P.rt = new T.WebGLRenderTarget(W, H, { samples: 2 });
     P.cv = new OffscreenCanvas(W, H) as unknown as HTMLCanvasElement; P.g = P.cv.getContext('2d')!;
     P.ov = new T.CanvasTexture(P.cv); P.ov.minFilter = T.LinearFilter;
     P.mat = new T.ShaderMaterial({ toneMapped: false, depthTest: false, uniforms: { sc: { value: P.rt.texture }, ov: { value: P.ov }, live: { value: 0 }, time: { value: 0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }',
-      fragmentShader: G.R.TONE + ' uniform sampler2D sc; uniform sampler2D ov; uniform float live; varying vec2 vUv; void main(){ vec3 c = bpTone(texture2D(sc, vUv).rgb) * live; vec4 o = texture2D(ov, vUv); gl_FragColor = linearToOutputTexel(vec4(mix(c, o.rgb, o.a), 1.0)); }' });
+      fragmentShader: G_R.TONE + ' uniform sampler2D sc; uniform sampler2D ov; uniform float live; varying vec2 vUv; void main(){ vec3 c = bpTone(texture2D(sc, vUv).rgb) * live; vec4 o = texture2D(ov, vUv); gl_FragColor = linearToOutputTexel(vec4(mix(c, o.rgb, o.a), 1.0)); }' });
     const quad = new T.Mesh(new T.PlaneGeometry(2, 2), P.mat), qs = new T.Scene(), qc = new T.Camera(); quad.frustumCulled = false; qs.add(quad);
     await loadGuns();
     stage();
@@ -1044,14 +1065,14 @@ const G_Highlights = (() => {
   function storeProducts() {
     const S = G.Shop, O = S && S.offers, out: HlProduct[] = [];
     if (!O) return out;
-    const pic = (it: Parameters<typeof G.Gear.size>[0]) => { try { const [w, h] = G.Gear.size(it), im = new Image(); im.src = G.Icons.of(it, w, h, false); return { im, w, h }; } catch (e) { return null; } };
+    const pic = (it: Parameters<typeof Gear.size>[0]) => { try { const [w, h] = Gear.size(it), im = new Image(); im.src = G.Icons.of(it, w, h, false); return { im, w, h }; } catch (e) { return null; } };
     const add = (o: HlProduct) => { try { out.push(o); } catch (e) { /* skip it */ } };
-    for (const id of O.gear || []) { const d = G.Gear.DEFS[id]; if (d) add({ kind: d.kind, name: d.name, brand: d.brand, price: S.gearPrice(id), pic: pic(G.Gear.gearItem(id)), left: () => S.count('gear:' + id) }); }
-    for (const o of O.ammo || []) { const A = (G.AMMO as Record<string, any>)[o.am], C = (G.CALIBERS as Record<string, any>)[o.cal], it = G.Gear.boxItem(o.cal, o.am, o.n); if (A && C) add({ kind: 'ammo', name: `${C.name} ${A.name}`, brand: 'VEX\'S AMMO BIN', price: G.Gear.price(it), pic: pic(it), left: () => S.count('ammo:' + o.cal) * o.n, unit: 'rounds' }); }
-    for (const id of (S.partStock || []) as Iterable<string>) { const p = G.Gunsmith.PARTS[id]; if (p) add({ kind: 'part', name: p.name, brand: p.brand || 'VEX', price: p.price, pic: null, slot: ((G.Gunsmith.SLOT_LABEL as Record<string, any>)[p.slot] || p.slot || '').toUpperCase(), left: () => S.count('part:' + id) }); }
-    for (const o of O.mags || []) { const [wid, vid] = o.id.split('|'), def = G.WEAPONS[wid]; if (!def) continue; const it = G.Gear.ammoItem(def, 0, null!, vid); add({ kind: 'mag', name: G.Gear.magName(it), brand: def.name.toUpperCase() + ' FAMILY', price: G.Gear.price(it), pic: pic(it), left: () => S.count('mag:' + o.id) }); }
-    for (const o of O.pouches || []) { const P0 = G.Gear.POUCHES[o.id], it = G.Gear.pouchItem(o.id); if (P0) add({ kind: 'pouch', name: P0.name, brand: P0.brand, price: G.Gear.price(it), pic: pic(it), left: () => S.count('pouch:' + o.id) }); }
-    return G.U.shuffle(P.rnd, out);
+    for (const id of O.gear || []) { const d = Gear.DEFS[id]; if (d) add({ kind: d.kind, name: d.name, brand: d.brand, price: S.gearPrice(id), pic: pic(Gear.gearItem(id)), left: () => S.count('gear:' + id) }); }
+    for (const o of O.ammo || []) { const A = (AMMO as Record<string, any>)[o.am], C = (CALIBERS as Record<string, any>)[o.cal], it = Gear.boxItem(o.cal, o.am, o.n); if (A && C) add({ kind: 'ammo', name: `${C.name} ${A.name}`, brand: 'VEX\'S AMMO BIN', price: Gear.price(it), pic: pic(it), left: () => S.count('ammo:' + o.cal) * o.n, unit: 'rounds' }); }
+    for (const id of (S.partStock || []) as Iterable<string>) { const p = Gunsmith.PARTS[id]; if (p) add({ kind: 'part', name: p.name, brand: p.brand || 'VEX', price: p.price, pic: null, slot: ((Gunsmith.SLOT_LABEL as Record<string, any>)[p.slot] || p.slot || '').toUpperCase(), left: () => S.count('part:' + id) }); }
+    for (const o of O.mags || []) { const [wid, vid] = o.id.split('|'), def = WEAPONS[wid]; if (!def) continue; const it = Gear.ammoItem(def, 0, null!, vid); add({ kind: 'mag', name: Gear.magName(it), brand: def.name.toUpperCase() + ' FAMILY', price: Gear.price(it), pic: pic(it), left: () => S.count('mag:' + o.id) }); }
+    for (const o of O.pouches || []) { const P0 = Gear.POUCHES[o.id], it = Gear.pouchItem(o.id); if (P0) add({ kind: 'pouch', name: P0.name, brand: P0.brand, price: Gear.price(it), pic: pic(it), left: () => S.count('pouch:' + o.id) }); }
+    return G_U.shuffle(P.rnd, out);
   }
   // The gear room: an officer's main gun (the one they fired most) turning on a stand, what it's built from and fed with,
   // what it did (rounds, kills, rounds a kill, headshots, longest), their other guns, their kit, and the pundits' verdict
@@ -1062,16 +1083,16 @@ const G_Highlights = (() => {
     if (!def) return null;
     const kg = P.kgun.get(k) || new Map(), kx = kg.get(code) || { kills: 0, hs: 0, d: 0 }, am = Object.entries(e.am).sort((a, b) => b[1] - a[1])[0];
     const A = (P.actors.get(k) || {}) as Actor, kt = (A.kt || {}) as NonNullable<Actor['kt']>;
-    const parts = Object.entries(def.build || {}).map(([slot, id]): [string, Part] => [slot, G.Gunsmith.PARTS[id as string]]).filter(([slot, p]) => p && !p.factory && ['optic', 'riserdot', 'magnifier', 'muzzle', 'barrel', 'stock', 'buttstock', 'handguard', 'fg', 'tac', 'tacL', 'mag', 'grip'].includes(G.Gunsmith.kindOf(slot)))
-      .map(([slot, p]) => [((G.Gunsmith.SLOT_LABEL as Record<string, any>)[G.Gunsmith.kindOf(slot)] || slot).replace(/ \(.*\)/, '').toUpperCase(), p.name]);
-    const kit = [['HELMET', kt.helmet], ['FACE', kt.face], ['CARRIER', kt.carrier], ['SHOULDERS', kt.sh], ['PELVIS', kt.gr], ['BELT', kt.belt], ['LEGS', kt.lg], ['PACK', kt.pack]].filter(([, id]) => id && G.Gear.DEFS[id]).map(([n, id]) => [n, G.Gear.DEFS[id].name + (n === 'CARRIER' && kt.plate ? ' + plate' : '')]);
+    const parts = Object.entries(def.build || {}).map(([slot, id]): [string, Part] => [slot, Gunsmith.PARTS[id as string]]).filter(([slot, p]) => p && !p.factory && ['optic', 'riserdot', 'magnifier', 'muzzle', 'barrel', 'stock', 'buttstock', 'handguard', 'fg', 'tac', 'tacL', 'mag', 'grip'].includes(Gunsmith.kindOf(slot)))
+      .map(([slot, p]) => [((Gunsmith.SLOT_LABEL as Record<string, any>)[Gunsmith.kindOf(slot)] || slot).replace(/ \(.*\)/, '').toUpperCase(), p.name]);
+    const kit = [['HELMET', kt.helmet], ['FACE', kt.face], ['CARRIER', kt.carrier], ['SHOULDERS', kt.sh], ['PELVIS', kt.gr], ['BELT', kt.belt], ['LEGS', kt.lg], ['PACK', kt.pack]].filter(([, id]) => id && Gear.DEFS[id]).map(([n, id]) => [n, Gear.DEFS[id].name + (n === 'CARRIER' && kt.plate ? ' + plate' : '')]);
     // the verdicts: what the numbers say about them (two of them, the strongest first)
     const rpk = kx.kills ? e.n / kx.kills : Infinity, v = [];
     if (kx.kills && rpk <= 2) v.push(['SURGICAL', 'One round, one problem solved.']);
     if (kx.kills && rpk >= 12) v.push(['SPRAY & PRAY', `${Math.round(rpk)} rounds a kill. The ammo budget weeps.`]);
     if (kx.hs && kx.hs / Math.max(1, kx.kills) >= 0.5) v.push(['HEADHUNTER', `${kx.hs} of ${kx.kills} through the head.`]);
     if (def.sup) v.push(['QUIET PROFESSIONAL', 'Suppressed. The neighbours thank you.']);
-    if (am && am[0] !== 'ball' && (G.AMMO as Record<string, any>)[am[0]]) v.push(['SPECIAL SAUCE', `Running ${(G.AMMO as Record<string, any>)[am[0]].name}. Fancy.`]);
+    if (am && am[0] !== 'ball' && (AMMO as Record<string, any>)[am[0]]) v.push(['SPECIAL SAUCE', `Running ${(AMMO as Record<string, any>)[am[0]].name}. Fancy.`]);
     if (!kt.carrier) v.push(['BRAVE OR STUPID?', 'No body armour. Bold.']);
     else if (kt.plate) v.push(['WALKING TANK', 'Plated up and proud of it.']);
     if (!kx.kills) v.push(['ALL BARK', `${e.n} rounds fired. Zero kills. Suppressive fire, we're told.`]);
@@ -1122,8 +1143,8 @@ const G_Highlights = (() => {
   const GT_LEN = 14.5, GT_ORDER: ('fast' | 'slow')[] = ['slow', 'fast', 'fast', 'slow', 'fast', 'fast', 'slow'];
   function gearTour(def: any): GearStop[] {
     let h = 2166136261; for (const ch of String((def && (def.code || def.id)) || '')) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
-    const rnd = G.U.rng(h >>> 0), pool = { fast: GT_MOVES.filter((m) => m.tempo === 'fast'), slow: GT_MOVES.filter((m) => m.tempo === 'slow') };
-    for (const k of ['fast', 'slow'] as const) G.U.shuffle(rnd, pool[k]);
+    const rnd = G_U.rng(h >>> 0), pool = { fast: GT_MOVES.filter((m) => m.tempo === 'fast'), slow: GT_MOVES.filter((m) => m.tempo === 'slow') };
+    for (const k of ['fast', 'slow'] as const) G_U.shuffle(rnd, pool[k]);
     const out: GearStop[] = [], zones = new Set<string>(); let t = 0;
     for (const tempo of GT_ORDER) {
       const at = pool[tempo].findIndex((m) => !zones.has(m.zone)); if (at < 0) continue;
@@ -1137,12 +1158,12 @@ const G_Highlights = (() => {
 
   function program() {
     // (the edit's dice: seeded from the level, so the host and every client cut the same broadcast)
-    P.rnd = G.U.rng(((P.gen ? P.gen.seed : 0) ^ 0xb40adca5 ^ (P.levelN | 0) * 2654435761) >>> 0);
+    P.rnd = G_U.rng(((P.gen ? P.gen.seed : 0) ^ 0xb40adca5 ^ (P.levelN | 0) * 2654435761) >>> 0);
     const segs: any[] = [{ kind: 'open', dur: 7 }], clips = (P.clips || []).filter((c) => !c.inSeq || c.fl.wb || c.fl.ric || c.fl.ap); // (kills in a sequence: shown in it, unless they've something of their own to show)
     if (!clips.length) segs.push({ kind: 'quiet', dur: 6 });
     let best = null; for (const c of clips) if (c.kind === 'kill' && c.fl.hs && !c.fl.why && (!best || c.score > best.score)) best = c;
     // the ad breaks: mostly what Vex has in this visit (js/shop.ts), shuffled, now and then someone else's
-    const store = storeProducts(), fake = G.U.shuffle(P.rnd, ADS.slice());
+    const store = storeProducts(), fake = G_U.shuffle(P.rnd, ADS.slice());
     let adI = 0, stI = 0;
     const ad = () => (store.length && (P.rnd() < 0.65 || !fake.length) ? { kind: 'ad', store: store[stI++ % store.length], dur: 6 } : { kind: 'ad', ad: fake[adI++ % fake.length], dur: 6 });
     const bangs = new Set<Clip>(); // (the flashbangs shown so far: each once, before the first of its kills)
@@ -1258,7 +1279,7 @@ const G_Highlights = (() => {
     clearRigs();
     P.seg = (P.seg + 1) % P.prog.length; P.st = 0;
     const s = P.prog[P.seg];
-    fxr = G.U.rng(((s.seed | 0) ^ 0xb100d) >>> 0);
+    fxr = G_U.rng(((s.seed | 0) ^ 0xb100d) >>> 0);
     s.react = null; s.fired = false; s.kn = 0; s.mSt = null; s.snapDoors = true; s.prevTau = null; s.xp = null; s.frz = null; s.frzCand = null; s.look = null; s.lookT = null; s.fq = null; s.fp = null; if (s.cam === 'wide') { s.pos = null; s.shot = null; } s.cp = null; if (s.rates) s.rate = s.rates[0][1];
     acClear();
     if (s.kind === 'clip') {
@@ -1302,7 +1323,7 @@ const G_Highlights = (() => {
     for (const d of P.drops) if (d.m.parent) d.m.parent.remove(d.m);
     for (const m of P.marks) if (m.parent) m.parent.remove(m);
     if (P.debris) P.debris.clear();
-    if (P.map) G.Damage.reset(P.map); // (the walls whole again: the clip's rounds will cut them)
+    if (P.map) Damage.reset(P.map); // (the walls whole again: the clip's rounds will cut them)
     P.drops = []; P.marks = [];
     if (P.xo) { for (const m of P.xo.all) { m.geometry.dispose(); m.material.dispose(); } P.xo = null; }
     if (P.nx) { for (const o of [P.nx.mesh, P.nx.streaks]) if (o) { if (o.parent) o.parent.remove(o); o.geometry.dispose(); (o.material as THREE.Material).dispose(); } P.nx = null; }
@@ -1314,12 +1335,12 @@ const G_Highlights = (() => {
     const sh = c && c.shots.find((s) => s.a === k && s.code), A = A0.kind === 'p' && c ? Object.assign({}, A0, { gun: (sh && sh.code) || (c.guns && c.guns[k]) || A0.gun, kt: (c.kits && c.kits[k]) || A0.kt }) : A0;
     let rig: HlRig;
     if (A.kind === 'e') {
-      const def = G.ENEMIES[A.type!] || {};
-      rig = G.Rig.create({ style: A.style || def.style, scale: A.scale, boss: A.boss, leader: A.type === 'leader', seed: A.id * 7919 + 13, dressed: true }) as HlRig;
-      if (!A.civ) rig.setKit(G.Rig.armourKit(A.vest, A.helmet, (A.style || def.style) === 'armored', A.face, A.ex));
+      const def = ENEMIES[A.type!] || {};
+      rig = G_Rig.create({ style: A.style || def.style, scale: A.scale, boss: A.boss, leader: A.type === 'leader', seed: A.id * 7919 + 13, dressed: true }) as HlRig;
+      if (!A.civ) rig.setKit(G_Rig.armourKit(A.vest, A.helmet, (A.style || def.style) === 'armored', A.face, A.ex));
       if (A.wpn && !A.civ) rig.setGun(A.wpn);
     } else {
-      rig = G.Rig.create({ style: 'tactical', color: A.color, animal: A.animal, callName: A.name, seed: String(A.id).length * 977, bare: true, look: A.look }) as HlRig;
+      rig = G_Rig.create({ style: 'tactical', color: A.color, animal: A.animal, callName: A.name, seed: String(A.id).length * 977, bare: true, look: A.look }) as HlRig;
       if (A.kt) rig.setKit(A.kt);
       if (A.gun) rig.setGun(A.gun, (A0.skins || {})[A.gun]); // (its stickers, as it had them)
     }
@@ -1336,9 +1357,9 @@ const G_Highlights = (() => {
     const a = F[i] && F[i].a[k], b = F[i + 1] && F[i + 1].a[k];
     if (!a) return b ? b.slice() : null;
     if (!b) return a.slice();
-    const u = G.U.clamp((tau - F[i].t) / Math.max(1e-3, F[i + 1].t - F[i].t), 0, 1), o = a.slice();
+    const u = G_U.clamp((tau - F[i].t) / Math.max(1e-3, F[i + 1].t - F[i].t), 0, 1), o = a.slice();
     for (const j of [0, 1, 2, 4, 6]) o[j] = a[j] + (b[j] - a[j]) * u;
-    o[3] = a[3] + G.U.angDiff(a[3], b[3]) * u;
+    o[3] = a[3] + G_U.angDiff(a[3], b[3]) * u;
     if (a[7] >= 0 && b[7] >= 0) o[7] = a[7] + (b[7] - a[7]) * u;
     if (a[10] >= 0 && b[10] >= a[10]) o[10] = a[10] + (b[10] - a[10]) * u; // (one reload going on: not one ending and the next starting)
     if (a[11] && b[11]) o[11] = [0, 1, 2].map((j) => a[11][j] + (b[11][j] - a[11][j]) * u).concat(a[11][3]);
@@ -1408,7 +1429,7 @@ const G_Highlights = (() => {
         // an officer zip-tying someone: weapon away, down on a knee, hands on them (js/rig.ts zipPoint)
         const tr = P.rigs.get('e' + p[8]);
         act = { kind: 'zip', t: zt, hand: 'R', pull: !!p[9] };
-        if (tr && tr.rig.root.visible) (act as Rec).pt = G.Rig.zipPoint(tr.rig, zt, !tr.died);
+        if (tr && tr.rig.root.visible) (act as Rec).pt = G_Rig.zipPoint(tr.rig, zt, !tr.died);
         crouch = crouch || zt > 0.3;
         r.rig.holster(true); r.zipping = true;
       } else if (r.zipping) { r.zipping = false; r.rig.holster(false); }
@@ -1417,7 +1438,7 @@ const G_Highlights = (() => {
       if (k[0] === 'e' && fl & 8 && !r.died) { r.rig.goLimp(); pool(r); } // (a suspect down for good: limp, bleeding out)
       const reload = !r.died && !act && p[10] != null && p[10] >= 0 && p[10] < 1 ? p[10] : -1; // (a magazine change, as it was played)
       const blind = k[0] === 'e' && !r.died ? (fl & 1024 ? 1 : fl & 2048 ? 2 : 0) : 0; // (a flashbang's dazzle: hands to the eyes, reeling)
-      r.rig.update(Math.max(0.001, dt * s.rate), { pos: new T.Vector3(p[0], p[1], p[2]), yaw: p[3], pitch: p[4], crouch, prone: !!(fl & 2), climb: fl & 256 ? G.Level.ladderAt(P.map, p[0], p[2]) : null, zip: !!(fl & 512), alert: !!(fl & 4) && !act && reload < 0 && !(fl & 768) && !blind, lean: p[6], pose, tk, act, reload, blind, state: r.died ? 'dead' : fl & 8 ? 'down' : 'alive' });
+      r.rig.update(Math.max(0.001, dt * s.rate), { pos: new T.Vector3(p[0], p[1], p[2]), yaw: p[3], pitch: p[4], crouch, prone: !!(fl & 2), climb: fl & 256 ? Level.ladderAt(P.map, p[0], p[2]) : null, zip: !!(fl & 512), alert: !!(fl & 4) && !act && reload < 0 && !(fl & 768) && !blind, lean: p[6], pose, tk, act, reload, blind, state: r.died ? 'dead' : fl & 8 ? 'down' : 'alive' });
     }
   }
   // Lasers, as they were: from the gun in their hands to where it landed then (frame [11]): the line and a glowing dot, from a pool
@@ -1462,8 +1483,8 @@ const G_Highlights = (() => {
   function flightOf(sh: Shot) {
     if (sh.fl) return sh.fl;
     const def = defOf(sh.code);
-    let am = sh.am; try { if (!am && def) am = G.ballFor(G.calOf(def)); } catch (e) { /* no caliber */ }
-    let m = 0; try { m = def ? G.Ballistics.projectile(def, am || 'ball').m : 0; } catch (e) { /* no projectile */ }
+    let am = sh.am; try { if (!am && def) am = ballFor(calOf(def)); } catch (e) { /* no caliber */ }
+    let m = 0; try { m = def ? Ballistics.projectile(def, am || 'ball').m : 0; } catch (e) { /* no projectile */ }
     const q = pathOf(sh);
     if (q && q.p.length > 1) { // (its real way, as it was recorded: legs, the speed it had at each point of them)
       const verts = q.p.map((a: number[]) => new T.Vector3(a[0], a[1], a[2])), xs = [0], pts = [{ x: 0, t: 0, v: Math.max(30, q.p[0][3]), drop: 0 }];
@@ -1481,7 +1502,7 @@ const G_Highlights = (() => {
         events: linked(q.ev.map((e: any[]): HlFlightEv => ({ i: e[0], x: xs[e[0]], p: verts[e[0]], k: e[1], fx: e[2], n: [e[3], e[4], e[5]], name: e[6], m: e[7], J: e[8], stop: !!e[9], depth: e[10] || 0, cal: e[11] || 8, dir: dirs[Math.max(0, Math.min(N - 1, e[0] - 1))] }))), at: (t: any) => along('t', t), atX: (x: any) => along('x', x), xAt: (t: any) => along('t', Math.min(t, pts[N].t)).x });
     }
     const f = new T.Vector3(...sh.f), to = new T.Vector3(...sh.to), len = Math.max(0.1, f.distanceTo(to));
-    const vAt = (x: number) => { let v = 0; try { v = def ? G.roundSpeed(def, am || 'ball', x) : 0; } catch (e) { /* no speed */ } return v > 30 ? v : 380; };
+    const vAt = (x: number) => { let v = 0; try { v = def ? roundSpeed(def, am || 'ball', x) : 0; } catch (e) { /* no speed */ } return v > 30 ? v : 380; };
     const N = 24, pts = [{ x: 0, t: 0, v: vAt(0), drop: 0 }];
     for (let i = 1; i <= N; i++) { const x = len * i / N, v = vAt(x), t = pts[i - 1].t + (len / N) / ((v + pts[i - 1].v) / 2); pts.push({ x, t, v, drop: 0.5 * 9.81 * t * t }); }
     const tof = pts[N].t, dir0 = to.clone().sub(f).divideScalar(len);
@@ -1507,12 +1528,12 @@ const G_Highlights = (() => {
   // (each way in with the way out of the same thing, if it came out: e.then)
   function linked(evs: HlFlightEv[]) { evs.forEach((e, i) => { if (e.k === 'e' && evs[i + 1] && evs[i + 1].k === 'x') e.then = evs[i + 1]; }); return evs; }
   function struck(e: any) {
-    const fxs = (G.R.IMPACT as Record<string, any>)[e.fx] || G.R.IMPACT.stone, col = e.k === 'r' ? 0xfff0c0 : (fxs.s || fxs.d)[0];
+    const fxs = (G_R.IMPACT as Record<string, any>)[e.fx] || G_R.IMPACT.stone, col = e.k === 'r' ? 0xfff0c0 : (fxs.s || fxs.d)[0];
     if (e.m !== '' && e.name !== 'armour') {
-      const rec = e.k === 'e' && P.map ? G.Damage.ofEvent(e, e.then) : null, cut = rec && G.Damage.apply(P.map, rec) ? G.Damage.radius(e.m, e.J, e.cal) : e.k === 'x' && e.cutBy ? e.cutBy : 0; // (what it took out of the wall, as it did in the game)
+      const rec = e.k === 'e' && P.map ? Damage.ofEvent(e, e.then) : null, cut = rec && Damage.apply(P.map, rec) ? Damage.radius(e.m, e.J, e.cal) : e.k === 'x' && e.cutBy ? e.cutBy : 0; // (what it took out of the wall, as it did in the game)
       if (e.then && e.k === 'e') e.then.cutBy = cut * 1.25;
       const o = { m: e.m, fx: e.fx, k: e.k, n: e.n, dir: e.dir, J: e.J, stop: e.stop, cut };
-      if (!cut && e.m !== 'glass') for (const m of G.Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift()!; if (q.parent) q.parent.remove(q); } }
+      if (!cut && e.m !== 'glass') for (const m of Scars.meshes(o, e.p, P.fxRoot)) { P.marks.push(m); if (P.marks.length > 160) { const q = P.marks.shift()!; if (q.parent) q.parent.remove(q); } }
       if (P.debris) P.debris.burst(e.p, o);
     }
     const sp = new T.Mesh(new T.SphereGeometry(e.k === 'r' ? 0.09 : 0.06, 8, 6), new T.MeshBasicMaterial({ color: col, transparent: true, blending: T.AdditiveBlending, depthWrite: false })); sp.position.copy(e.p); P.fxRoot.add(sp);
@@ -1590,11 +1611,11 @@ const G_Highlights = (() => {
     const c = s.clip, B = burstOf(c);
     if (!B) return;
     if (!P.nx) {
-      const K = B.flash || B.tb ? 0 : B.sticky ? 30 : 90, rr = G.U.rng((B.s >>> 0) || 1), dirs = new Float32Array(K * 3), lens = new Float32Array(K), vs = new Float32Array(K);
+      const K = B.flash || B.tb ? 0 : B.sticky ? 30 : 90, rr = G_U.rng((B.s >>> 0) || 1), dirs = new Float32Array(K * 3), lens = new Float32Array(K), vs = new Float32Array(K);
       for (let i = 0; i < K; i++) { // (the rest of the burst: a few of its chips each way, out to whatever stopped them)
         const cz = 2 * rr() - 1, r = Math.sqrt(1 - cz * cz), a = rr() * 6.283, x = Math.cos(a) * r, z = Math.sin(a) * r;
         dirs[i * 3] = x; dirs[i * 3 + 1] = cz; dirs[i * 3 + 2] = z; vs[i] = (B.sticky ? 1000 : 1350) * (0.85 + 0.3 * rr());
-        lens[i] = Math.min(14, G.Level.raycast(P.map, B.p.x, B.p.y, B.p.z, x, cz, z, 14).t);
+        lens[i] = Math.min(14, Level.raycast(P.map, B.p.x, B.p.y, B.p.z, x, cz, z, 14).t);
       }
       const mesh = new T.Mesh(B.flash ? new T.CylinderGeometry(0.035, 0.035, 0.13, 10) : B.tb ? new T.CylinderGeometry(0.045, 0.045, 0.15, 10) : B.sticky ? new T.SphereGeometry(0.055, 10, 8) : new T.SphereGeometry(0.08, 10, 8), new T.MeshLambertMaterial({ color: B.flash ? 0x7d8388 : B.tb ? 0x4c5634 : B.sticky ? 0x9a8558 : 0x3a4a2a, emissive: 0x220000 }));
       if (B.sticky) mesh.scale.set(1, 0.82, 1); // (a sticky: its squat tan sock, js/views.ts stickyMesh)
@@ -1612,7 +1633,7 @@ const G_Highlights = (() => {
     if (X.mesh) {
       const n = B.n, on = tau < tb && tau >= (n ? n.t : tb - 1.2);
       X.mesh.visible = on;
-      if (on && n) { const fly = B.sticky && n.fly != null ? n.fly : tb - n.t, pts = arcOf(n, gp), u = G.U.clamp((tau - n.t) / Math.max(0.05, fly), 0, 1) * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(u)); X.mesh.position.copy(pts[i]).lerp(pts[i + 1], u - i); if (tau - n.t < fly) X.mesh.rotation.set(tau * 9, tau * 5, 0); } // (a sticky: along its flight, then held still where it went off)
+      if (on && n) { const fly = B.sticky && n.fly != null ? n.fly : tb - n.t, pts = arcOf(n, gp), u = G_U.clamp((tau - n.t) / Math.max(0.05, fly), 0, 1) * (pts.length - 1), i = Math.min(pts.length - 2, Math.floor(u)); X.mesh.position.copy(pts[i]).lerp(pts[i + 1], u - i); if (tau - n.t < fly) X.mesh.rotation.set(tau * 9, tau * 5, 0); } // (a sticky: along its flight, then held still where it went off)
       else if (on) X.mesh.position.copy(gp);
       (X.mesh.material as THREE.MeshLambertMaterial).emissive.setHex(Math.floor(tau * 8) % 2 ? 0xff2200 : 0x220000);
     }
@@ -1626,7 +1647,7 @@ const G_Highlights = (() => {
       else if (B.tb) { // a thermobaric: its fireball through the room it filled (js/player.ts tbModel, against the replayed level), and the soot after
         let cells: number[][] = [];
         if (B.cells && B.cells.length) cells = B.cells.map((c) => c.slice()); // (as it went off: boom)
-        else try { const M = G.Me && G.Me.tbModel ? G.Me.tbModel(P.map, B.p) : null; if (M) for (let i = 0; i < M.cloud; i += 2) { const c = M.fill.order[i]; cells.push([((c % P.map.W) + 0.5) * G.Level.TS, ((c / P.map.W | 0) + 0.5) * G.Level.TS, M.fill.d[i]]); } } catch (e) { cells = []; }
+        else try { const M = G.Me && G.Me.tbModel ? G.Me.tbModel(P.map, B.p) : null; if (M) for (let i = 0; i < M.cloud; i += 2) { const c = M.fill.order[i]; cells.push([((c % P.map.W) + 0.5) * Level.TS, ((c / P.map.W | 0) + 0.5) * Level.TS, M.fill.d[i]]); } } catch (e) { cells = []; }
         if (!cells.length) cells = [[B.p.x, B.p.z, 0]];
         puff(0xffffff, 1.4, 0.02, 1, true);
         for (const [x, z, d] of cells.slice(0, 60)) {
@@ -1683,7 +1704,7 @@ const G_Highlights = (() => {
     found: for (const ang of [0, 0.4, -0.4, 0.8, -0.8, 1.2, -1.2]) for (const back of [0.9, 1.3, 1.8, 2.5, 3.3, 4.2]) tries: for (const hi of [0, 1]) {
       const w = d.clone().applyAxisAngle(_nUp, ang).multiplyScalar(-back); w.y = hi ? 1.1 + back * 0.3 : 0.4 + back * 0.22;
       const l = w.length(); w.divideScalar(l);
-      const room = G.Level.raycast(P.map, o.x, o.y, o.z, w.x, w.y, w.z, l + 0.3).t - 0.25;
+      const room = Level.raycast(P.map, o.x, o.y, o.z, w.x, w.y, w.z, l + 0.3).t - 0.25;
       if (room < l) { if (room > 0.6 && !near) near = { p: o.clone().addScaledVector(w, room), fov: 100 }; continue; } // (a wall in the way: the nearest spot short of it, if nothing better)
       const p = o.clone().addScaledVector(w, l);
       _pc.position.copy(p); _pc.lookAt(look); _pc.updateMatrixWorld();
@@ -1704,8 +1725,8 @@ const G_Highlights = (() => {
     if (AT.rec) { AT.rec.push([AT.t + AT.d, 'g', { code: sh.code, am: sh.am }, { slow: !!s.slow, rate: s.rate }]); return; }
     const def = defOf(sh.code);
     if (!def || !P.au) return;
-    const c = actx(), t = anow(), GA = G.GunAudio, rate = s.slow ? G.U.clamp(0.45 + s.rate * 0.5, 0.45, 1) : 1;
-    let key = null; try { key = G.Gunsmith.roundSoundKey(def, sh.am || G.ballFor(G.calOf(def))); } catch (e) { /* no key */ }
+    const c = actx(), t = anow(), GA = G.GunAudio, rate = s.slow ? G_U.clamp(0.45 + s.rate * 0.5, 0.45, 1) : 1;
+    let key = null; try { key = Gunsmith.roundSoundKey(def, sh.am || ballFor(calOf(def))); } catch (e) { /* no key */ }
     const spec = key && GA && GA.spec(key), buf = key && GA && GA.dry.get(key);
     if (!buf && spec && GA.available()) GA.buildDry(key);
     const g = c.createGain(), lp = c.createBiquadFilter();
@@ -1732,10 +1753,10 @@ const G_Highlights = (() => {
       let x = 0, d;
       if (r.died || r.rig.limp) {
         if (r.rig.hips) r.rig.hips.getWorldPosition(c); else c.copy(base);
-        x = G.U.clamp(w.copy(c).sub(f).dot(dir), 0, len); q.copy(f).addScaledVector(dir, x); d = q.distanceTo(c) - 0.3;
+        x = G_U.clamp(w.copy(c).sub(f).dot(dir), 0, len); q.copy(f).addScaledVector(dir, x); d = q.distanceTo(c) - 0.3;
       } else {
         c.set(base.x, base.y + 1.0, base.z);
-        for (let i = 0; i < 3; i++) { x = G.U.clamp(w.copy(c).sub(f).dot(dir), 0, len); q.copy(f).addScaledVector(dir, x); c.y = G.U.clamp(q.y, base.y + 0.3, base.y + 1.6); }
+        for (let i = 0; i < 3; i++) { x = G_U.clamp(w.copy(c).sub(f).dot(dir), 0, len); q.copy(f).addScaledVector(dir, x); c.y = G_U.clamp(q.y, base.y + 0.3, base.y + 1.6); }
         d = q.distanceTo(c) - 0.2;
       }
       if (d < 0) out.push({ x, p: q.clone(), k });
@@ -1745,7 +1766,7 @@ const G_Highlights = (() => {
   // the blood's dice (its drops, the spatter's turn and size): the segment's own (next), so the broadcast, the video and every machine splash the same
   let fxr: () => number = Math.random;
   function mark(kind: string, p: THREE.Vector3, size: number, n?: number[]) {
-    const m = kind === 'hole' ? new T.Mesh(holeGeo, P.holeMat || (P.holeMat = new T.MeshBasicMaterial({ color: 0x0c0b0a }))) : new T.Mesh(markGeo, G.R.bloodMaterials()[kind]); m.renderOrder = 1;
+    const m = kind === 'hole' ? new T.Mesh(holeGeo, P.holeMat || (P.holeMat = new T.MeshBasicMaterial({ color: 0x0c0b0a }))) : new T.Mesh(markGeo, G_R.bloodMaterials()[kind]); m.renderOrder = 1;
     if (n) { m.position.set(p.x + n[0] * 0.012, p.y + n[1] * 0.012, p.z + n[2] * 0.012); m.lookAt(p.x + n[0], p.y + n[1], p.z + n[2]); m.rotation.z = fxr() * 6.28; }
     else { m.position.set(p.x, p.y + 0.004, p.z); m.rotation.set(-Math.PI / 2, 0, fxr() * 6.28); }
     m.scale.set(size * (0.8 + fxr() * 0.5), size * (0.8 + fxr() * 0.5), 1);
@@ -1753,7 +1774,7 @@ const G_Highlights = (() => {
     if (P.marks.length > 160) { const o = P.marks.shift()!; if (o.parent) o.parent.remove(o); }
     return m;
   }
-  const floorAt = (x: number, z: number, y: number) => G.Level.groundAt(P.map, x, z, 0.01, y);
+  const floorAt = (x: number, z: number, y: number) => Level.groundAt(P.map, x, z, 0.01, y);
   function bleed(p: THREE.Vector3, dir: THREE.Vector3, through: boolean) {
     const rnd = (a: number) => (fxr() - 0.5) * a;
     const n = through ? 18 : 7;
@@ -1770,7 +1791,7 @@ const G_Highlights = (() => {
       P.fx.push({ obj: mist, life: 0.3, max: 0.3, op: 0.5, mist: true, noGeo: true });
     }
     if (through && P.map) { // (spatter on a wall close behind them)
-      const o = p.clone().addScaledVector(dir, 0.3), hit = G.Level.raycast(P.map, o.x, o.y, o.z, dir.x, dir.y, dir.z, 2.2);
+      const o = p.clone().addScaledVector(dir, 0.3), hit = Level.raycast(P.map, o.x, o.y, o.z, dir.x, dir.y, dir.z, 2.2);
       if (hit && hit.t < 2.2 && hit.n) mark('spatter', o.addScaledVector(dir, hit.t), 0.3 + fxr() * 0.25 * (1 - hit.t / 2.2), Array.isArray(hit.n) ? hit.n : [hit.n.x, hit.n.y, hit.n.z]);
     }
   }
@@ -1805,7 +1826,7 @@ const G_Highlights = (() => {
   // door events have them, swinging (snapped at a segment's first frame, not swung over from the last clip's). The
   // replayed level's door solids follow (js/world.ts door), so the cameras' sight lines and the falling bodies see them.
   // the panes as they were: whole till they were shot out
-  function glassAt(tau: number) { for (const g of P.glass || []) { const pane = P.map && P.map.winMeshes && P.map.winMeshes[g.id]; if (!pane) continue; if (g.p) { const m = G.Damage.crack(pane as THREE.Mesh, new T.Vector3(...(g.p as [number, number, number]))); if (m) m.visible = tau >= g.t; } else pane.visible = tau < g.t; } }
+  function glassAt(tau: number) { for (const g of P.glass || []) { const pane = P.map && P.map.winMeshes && P.map.winMeshes[g.id]; if (!pane) continue; if (g.p) { const m = Damage.crack(pane as THREE.Mesh, new T.Vector3(...(g.p as [number, number, number]))); if (m) m.visible = tau >= g.t; } else pane.visible = tau < g.t; } }
   function doorsAt(c: Clip, tau: number, snap: boolean) {
     const map = P.map, dm = map && map.doorMeshes;
     if (!dm) return;
@@ -1818,8 +1839,8 @@ const G_Highlights = (() => {
       const fell = init['f' + i] ? { t: -1e3, fall: init['f' + i] } : l && l.find((d) => d.fall && d.t <= tau);
       if (fell) {
         const dd = map.doors[i], u = piv.userData;
-        u.track = u.track && u.trackOf === fell ? u.track : G.Damage.fallTrack(map, dd, fell.fall[0], fell.fall[1], fell.fall[2]); u.trackOf = fell; u.centre = u.track.centre;
-        const fr = u.track.frames; G.Damage.setPose(piv, u, fr[Math.min(fr.length - 1, Math.floor((tau - fell.t) * 60))], dd.fy || 0);
+        u.track = u.track && u.trackOf === fell ? u.track : Damage.fallTrack(map, dd, fell.fall[0], fell.fall[1], fell.fall[2]); u.trackOf = fell; u.centre = u.track.centre;
+        const fr = u.track.frames; Damage.setPose(piv, u, fr[Math.min(fr.length - 1, Math.floor((tau - fell.t) * 60))], dd.fy || 0);
         continue;
       }
       if (piv.userData.track) { const u = piv.userData; u.track = null; piv.quaternion.identity(); piv.rotation.y = u.base; piv.position.copy(u.p0); }
@@ -1829,7 +1850,7 @@ const G_Highlights = (() => {
       u.rAng = snap || u.rAng == null ? tgt : u.rAng + (tgt - u.rAng) * Math.min(1, (kicked ? 0.6 : 0.12));
       piv.rotation.y = u.base + u.rAng * Math.PI / 2 * 0.95 * (u.sign || 1);
       const d = map.doors && map.doors[i];
-      if (d && !!d.open !== open && map.world) { d.open = open; try { G.World.door(map.world, map, d); } catch (e) { /* no solid for it */ } }
+      if (d && !!d.open !== open && map.world) { d.open = open; try { World.door(map.world, map, d); } catch (e) { /* no solid for it */ } }
     }
   }
 
@@ -1857,10 +1878,10 @@ const G_Highlights = (() => {
   // up to 30 cm while it's inside someone; whatever it's still inside isn't drawn for that frame
   function clearance(s: Seg, safe: THREE.Vector3) {
     const cam = P.cam, p = cam.position, map = P.map, d = _a.copy(p).sub(safe), len = d.length();
-    const wall = (q: THREE.Vector3) => { const v = q.clone().sub(safe), l = v.length(); if (l < 1e-3) return l; v.divideScalar(l); return Math.min(l, G.Level.raycast(map, safe.x, safe.y, safe.z, v.x, v.y, v.z, l + 0.15).t - 0.15); };
+    const wall = (q: THREE.Vector3) => { const v = q.clone().sub(safe), l = v.length(); if (l < 1e-3) return l; v.divideScalar(l); return Math.min(l, Level.raycast(map, safe.x, safe.y, safe.z, v.x, v.y, v.z, l + 0.15).t - 0.15); };
     if (len > 1e-3) { const t = wall(p); if (t < len) p.copy(safe).addScaledVector(d.normalize(), Math.max(0, t)); }
     // (and off any wall, floor or ceiling beside it, which the line from the head doesn't see)
-    for (const [x, y, z] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) { const t = G.Level.raycast(map, p.x, p.y, p.z, x, y, z, 0.12).t; if (t < 0.12) p.set(p.x - x * (0.12 - t), p.y - y * (0.12 - t), p.z - z * (0.12 - t)); }
+    for (const [x, y, z] of [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]) { const t = Level.raycast(map, p.x, p.y, p.z, x, y, z, 0.12).t; if (t < 0.12) p.set(p.x - x * (0.12 - t), p.y - y * (0.12 - t), p.z - z * (0.12 - t)); }
     for (let i = 0; i < 15 && blocking(p).length; i++) {
       const q = p.clone().addScaledVector(P.esc, 0.02);
       if (wall(q) < q.distanceTo(safe) - 1e-3) break;
@@ -1894,21 +1915,21 @@ const G_Highlights = (() => {
       const fl = st[5] || 0, k = fl & 2 ? 0.2 : fl & 1 ? 0.7 : 1, f = new T.Vector3(st[0], st[1], st[2]), sd = _b.set(p.z - f.z, 0, f.x - p.x).normalize().multiplyScalar(0.18);
       const q = [0.45, 0.85, 1.2, 1.55].map((y) => f.clone().setY(f.y + Math.max(0.15, y * k)));
       q.push(q[2].clone().add(sd), q[2].clone().sub(sd));
-      let n = 0; for (const x of q) if (G.Level.los(map, p.x, p.y, p.z, x.x, x.y, x.z)) n++;
+      let n = 0; for (const x of q) if (Level.los(map, p.x, p.y, p.z, x.x, x.y, x.z)) n++;
       return n / q.length;
     };
     const inFrame = (p: THREE.Vector3, q: THREE.Vector3, fov: number) => { _pc.fov = fov; _pc.updateProjectionMatrix(); _pc.position.copy(p); _pc.lookAt(mid); _pc.updateMatrixWorld(); const v = q.clone().project(_pc); return v.z < 1 && Math.abs(v.x) < 0.85 && Math.abs(v.y) < 0.8; };
     let best = null;
-    const rr = G.U.rng(s.seed >>> 0); // (the segment's own dice: the same tries, so the same angle, everywhere)
+    const rr = G_U.rng(s.seed >>> 0); // (the segment's own dice: the same tries, so the same angle, everywhere)
     for (let i = 0; i < 40; i++) {
       // round the side of the line between them (either side), up to 50 degrees off square; back as far as they're apart
       const ang = (i % 2 ? 1 : -1) * Math.PI / 2 + (rr() - 0.5) * 1.75, od = line.clone().applyAxisAngle(new T.Vector3(0, 1, 0), ang);
       let r = Math.max(2.8, sep * 0.7 + 1.6) * (0.85 + rr() * 0.45);
       const h = 0.5 + rr() * 0.9;
-      const dir = od.clone().add(new T.Vector3(0, h / r, 0)).normalize(), wall = G.Level.raycast(map, mid.x, mid.y, mid.z, dir.x, dir.y, dir.z, r + 0.4).t;
+      const dir = od.clone().add(new T.Vector3(0, h / r, 0)).normalize(), wall = Level.raycast(map, mid.x, mid.y, mid.z, dir.x, dir.y, dir.z, r + 0.4).t;
       if (wall < r + 0.3) { if (wall < 1.6) continue; r = wall - 0.35; } // (in the room: short of the wall behind it)
       const p = mid.clone().addScaledVector(dir, r);
-      for (const [x, y, z] of [[0, 1, 0], [0, -1, 0]]) { const t = G.Level.raycast(map, p.x, p.y, p.z, x, y, z, 0.3).t; if (t < 0.3) p.y -= y * (0.3 - t); } // (under the ceiling, off the floor)
+      for (const [x, y, z] of [[0, 1, 0], [0, -1, 0]]) { const t = Level.raycast(map, p.x, p.y, p.z, x, y, z, 0.3).t; if (t < 0.3) p.y -= y * (0.3 - t); } // (under the ceiling, off the floor)
       let sc = 0, fovNeed = 58;
       for (const [a, b, sa, sb] of pts) {
         const va = seen(p, sa), vb = seen(p, sb), la = va >= 0.67, lb = vb >= 0.67;
@@ -1938,16 +1959,16 @@ const G_Highlights = (() => {
       let best = null;
       for (const sg of [1, -1]) for (const back of [1.6, 0.6]) {
         const p = h.clone().addScaledVector(side, 2.6 * sg).addScaledVector(d, -back).add(new T.Vector3(0, 0.35, 0)), v = p.clone().sub(h), l = v.length();
-        const room = G.Level.raycast(P.map, h.x, h.y, h.z, v.x / l, v.y / l, v.z / l, l + 0.3).t; // (a clear line from the shooter to it: not in a wall or over the drop)
+        const room = Level.raycast(P.map, h.x, h.y, h.z, v.x / l, v.y / l, v.z / l, l + 0.3).t; // (a clear line from the shooter to it: not in a wall or over the drop)
         if (!best || room > best.room) best = { p: room >= l + 0.2 ? p : h.clone().addScaledVector(v, Math.max(0.4, room - 0.3) / l), room };
         if (room >= l + 0.2) break;
       }
       s.pos = best!.p;
     }
-    const k = G.U.clamp((s.tau - s.shot) / Math.max(0.5, s.imp - s.shot), 0, 1);
+    const k = G_U.clamp((s.tau - s.shot) / Math.max(0.5, s.imp - s.shot), 0, 1);
     const e = k * k * (3 - 2 * k), look = W0.clone().lerp(A0, e), far = s.pos.distanceTo(A0);
     cam.position.copy(s.pos); cam.lookAt(look);
-    const tele = G.U.clamp(2 * Math.atan(2.4 / far) * 180 / Math.PI, 2.5, 55); // (a person, and some of the ground round them)
+    const tele = G_U.clamp(2 * Math.atan(2.4 / far) * 180 / Math.PI, 2.5, 55); // (a person, and some of the ground round them)
     return 55 + (tele - 55) * e;
   }
   function headOf(k: string) { const r = P.rigs.get(k); return r && r.rig.head ? r.rig.head.getWorldPosition(new T.Vector3()) : null; }
@@ -2027,7 +2048,7 @@ const G_Highlights = (() => {
         const a = fl.dirAt(Math.max(0, e.x - 0.05)), b = fl.dirAt(e.x + 0.05), bounce = e.k === 'r', n = new T.Vector3(...e.n), side = new T.Vector3(-a.z, 0, a.x).normalize();
         const safe = bounce ? e.p.clone().addScaledVector(n, 0.15) : e.p.clone().addScaledVector(b, 0.35), V3 = (x: number, y: number) => n.clone().multiplyScalar(x).addScaledVector(side, y);
         const way = bounce ? [...(Math.abs(n.y) < 0.7 ? [V3(1.9, 0)] : []), V3(1.3, 1.3), V3(1.3, -1.3)] : [side.clone().multiplyScalar(1.2).addScaledVector(b, 1.1), side.clone().multiplyScalar(-1.2).addScaledVector(b, 1.1)];
-        const best = way.map((q) => { q.y += 0.2; const l = q.length(); q.divideScalar(l); return { q, t: Math.min(l, G.Level.raycast(P.map, safe.x, safe.y, safe.z, q.x, q.y, q.z, l + 0.15).t - 0.15) }; }).sort((x, y) => y.t - x.t)[0];
+        const best = way.map((q) => { q.y += 0.2; const l = q.length(); q.divideScalar(l); return { q, t: Math.min(l, Level.raycast(P.map, safe.x, safe.y, safe.z, q.x, q.y, q.z, l + 0.15).t - 0.15) }; }).sort((x, y) => y.t - x.t)[0];
         s.cp = safe.clone().addScaledVector(best.q, Math.max(0.35, best.t)); s.look = e.p.clone(); P.esc.copy(best.q);
       }
       const tgt = el < fl.pts[e.i].t ? e.p : el < fl.tof ? fl.pos(fl.xAt(el)) : hipsOf(c.v) || fl.to;
@@ -2045,7 +2066,7 @@ const G_Highlights = (() => {
       if (!s.cp) {
         const q = stateAt(c, s.at, c.t) || [W0.x, W0.y, W0.z, 0], fwd = new T.Vector3(-Math.sin(q[3]), 0, -Math.cos(q[3])), side = new T.Vector3(-fwd.z, 0, fwd.x);
         const mid = new T.Vector3(q[0], q[1] + 0.35, q[2]).addScaledVector(fwd, 0.8);
-        const room = (sg: number) => { const v = side.clone().multiplyScalar(sg).addScaledVector(fwd, -0.25).add(new T.Vector3(0, 0.55, 0)).normalize(); return { v, t: Math.min(2.5, G.Level.raycast(P.map, mid.x, mid.y, mid.z, v.x, v.y, v.z, 2.7).t - 0.2) }; };
+        const room = (sg: number) => { const v = side.clone().multiplyScalar(sg).addScaledVector(fwd, -0.25).add(new T.Vector3(0, 0.55, 0)).normalize(); return { v, t: Math.min(2.5, Level.raycast(P.map, mid.x, mid.y, mid.z, v.x, v.y, v.z, 2.7).t - 0.2) }; };
         const a = room(1), b = room(-1), best = a.t >= b.t ? a : b;
         s.cp = mid.clone().addScaledVector(best.v, Math.max(0.6, best.t)); s.cmid = mid; s.look = mid.clone();
         P.esc.copy(best.v);
@@ -2057,7 +2078,7 @@ const G_Highlights = (() => {
       // (the right shoulder, or the left if a wall's in the way of the right: picked once a shot, so it doesn't jump)
       const h = headOf(s.who) || W0, d = A0.clone().sub(h).setY(0).normalize(), side = new T.Vector3(-d.z, 0, d.x);
       const spot = (sg: number) => h.clone().addScaledVector(d, -0.75).addScaledVector(side, 0.42 * sg).add(new T.Vector3(0, 0.18, 0));
-      const room = (q: THREE.Vector3) => { const v = q.clone().sub(h), l = v.length(); v.divideScalar(l); return Math.min(l, G.Level.raycast(P.map, h.x, h.y, h.z, v.x, v.y, v.z, l + 0.15).t - 0.15) / l; };
+      const room = (q: THREE.Vector3) => { const v = q.clone().sub(h), l = v.length(); v.divideScalar(l); return Math.min(l, Level.raycast(P.map, h.x, h.y, h.z, v.x, v.y, v.z, l + 0.15).t - 0.15) / l; };
       if (!s.shoulder) s.shoulder = room(spot(1)) >= 0.98 || room(spot(1)) >= room(spot(-1)) ? 1 : -1;
       cam.position.copy(spot(s.shoulder)); cam.lookAt(A0); fov = 55;
       P.esc.copy(side).multiplyScalar(s.shoulder);
@@ -2107,7 +2128,7 @@ const G_Highlights = (() => {
     gearScene();
     while (P.gpiv.children.length) P.gpiv.remove(P.gpiv.children[0]);
     P.gt = null; // (the last stage's tour: gearTourSet)
-    let g = null; try { g = G.GunModels.world(s.code, (((P.actors.get(s.k) || {}) as Actor).skins || {})[s.code]); } catch (e) { /* no model */ }
+    let g = null; try { g = GunModels.world(s.code, (((P.actors.get(s.k) || {}) as Actor).skins || {})[s.code]); } catch (e) { /* no model */ }
     if (!g) return;
     const gun = g, pivot = P.gpiv;
 
@@ -2120,7 +2141,7 @@ const G_Highlights = (() => {
       if (s.tour && s.tour.length) gearTourSet(s, gun);
     };
     put();
-    if (gun.userData.pending) G.GunModels.whenReady(gun, (ok) => { if (ok && pivot.children.includes(gun)) put(); });
+    if (gun.userData.pending) GunModels.whenReady(gun, (ok) => { if (ok && pivot.children.includes(gun)) put(); });
   }
   // The tour's own model of the gun: every part as separate slot-tagged meshes (G.GunModels.display, in the same frame as the turntable's merged
   // one, which stands in for the overview), each part's box, and the materials of its meshes copied so one can be lit and the rest dimmed without
@@ -2129,7 +2150,7 @@ const G_Highlights = (() => {
     const pivot = P.gpiv, old = P.gt;
     if (old && old.dg.parent) old.dg.parent.remove(old.dg);
     if (old && old.box.parent) old.box.parent.remove(old.box);
-    let dg: THREE.Group | null = null, info: any = null; try { const d = G.GunModels.display(s.def, (((P.actors.get(s.k) || {}) as Actor).skins || {})[s.code]); dg = d.group; info = d.info; } catch (e) { /* no model */ }
+    let dg: THREE.Group | null = null, info: any = null; try { const d = GunModels.display(s.def, (((P.actors.get(s.k) || {}) as Actor).skins || {})[s.code]); dg = d.group; info = d.info; } catch (e) { /* no model */ }
     if (!dg) return;
     const gt: any = P.gt = { dg, info, world: gun, poses: null as any, stops: [] as any[], meshes: [] as any[], box: new T.Box3Helper(new T.Box3(), new T.Color(0xffb21a)), ov: { pos: P.gcam.position.clone(), look: new T.Vector3(0, -0.03, 0) }, built: false };
     gt.box.visible = false; dg.visible = false; dg.position.copy(gun.position); pivot.add(dg); pivot.add(gt.box);
@@ -2144,7 +2165,7 @@ const G_Highlights = (() => {
       gt.stops = s.tour!.slice();
       gt.gb = gb; gt.built = true;
     };
-    if (dg.userData.pending) G.GunModels.whenReady(dg, (ok) => { if (ok && P.gt === gt) build(); }); else build();
+    if (dg.userData.pending) GunModels.whenReady(dg, (ok) => { if (ok && P.gt === gt) build(); }); else build();
   }
   // Where the camera stands for each shot (worked out once, the gun still at R0): the point it looks at from the shot's fractions of the gun's box
   // (glTF axes: the muzzle towards -z, up y, the gun's right +x), the direction to the camera from its [forward, up, side] (side: the side the
@@ -2163,7 +2184,7 @@ const G_Highlights = (() => {
   // the camera between two poses: the centre slid across, the direction swung round (the distance swelling a little on the way, so it goes round the gun, not through it)
   function gearMix(a: any, b: any, k: number, ad: number, bd: number, swell = 0.45) {
     const rot = (d: THREE.Vector3, ang: number) => d.clone().applyAxisAngle(_gq.set(0, 1, 0), ang);
-    const da = rot(a.dir, ad), db = rot(b.dir, bd), dot = G.U.clamp(da.dot(db), -1, 1), an = Math.acos(dot), sn = Math.sin(an);
+    const da = rot(a.dir, ad), db = rot(b.dir, bd), dot = G_U.clamp(da.dot(db), -1, 1), an = Math.acos(dot), sn = Math.sin(an);
     const dir = sn < 1e-3 ? db.clone() : da.clone().multiplyScalar(Math.sin((1 - k) * an) / sn).addScaledVector(db, Math.sin(k * an) / sn);
     const tw = a.tw.clone().lerp(b.tw, k), dist = (a.dist + (b.dist - a.dist) * k) * (1 + swell * Math.sin(Math.PI * k) * an / Math.PI);
     return { tw, pos: tw.clone().addScaledVector(dir.normalize(), dist) };
@@ -2173,8 +2194,8 @@ const G_Highlights = (() => {
   function gearPath(keys: any[], k: number) {
     const n = keys.length;
     if (n < 2) return { tw: keys[0].tw.clone(), pos: keys[0].tw.clone().addScaledVector(keys[0].dir, keys[0].dist), roll: keys[0].roll };
-    const f = G.U.clamp(k, 0, 1) * (n - 1), i = Math.min(n - 2, Math.floor(f)), u = f - i;
-    const K = (j: number) => keys[G.U.clamp(j, 0, n - 1)], cr = (a: number, b: number, c: number, d: number) => 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
+    const f = G_U.clamp(k, 0, 1) * (n - 1), i = Math.min(n - 2, Math.floor(f)), u = f - i;
+    const K = (j: number) => keys[G_U.clamp(j, 0, n - 1)], cr = (a: number, b: number, c: number, d: number) => 0.5 * (2 * b + (c - a) * u + (2 * a - 5 * b + 4 * c - d) * u * u + (3 * b - a - 3 * c + d) * u * u * u);
     const v3 = (get: (q: any) => THREE.Vector3) => { const [a, b, c, d] = [K(i - 1), K(i), K(i + 1), K(i + 2)].map(get); return new T.Vector3(cr(a.x, b.x, c.x, d.x), cr(a.y, b.y, c.y, d.y), cr(a.z, b.z, c.z, d.z)); };
     const sc = (get: (q: any) => number) => cr(get(K(i - 1)), get(K(i)), get(K(i + 1)), get(K(i + 2)));
     const tw = v3((q) => q.tw), dir = v3((q) => q.dir).normalize(), dist = sc((q) => q.dist), roll = sc((q) => q.roll);
@@ -2188,10 +2209,10 @@ const G_Highlights = (() => {
     P.gpiv.rotation.y = R0; P.gpiv.updateMatrixWorld(true);
     gt.world.visible = false; gt.dg.visible = true;
     if (!gt.poses) gt.poses = gearTourPoses(gt, R0);
-    const ps = gt.poses.stops, ov = gt.poses.ov, snap = (x: number) => 1 - Math.pow(1 - G.U.clamp(x, 0, 1), 3), glide = (x: number) => { x = G.U.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
+    const ps = gt.poses.stops, ov = gt.poses.ov, snap = (x: number) => 1 - Math.pow(1 - G_U.clamp(x, 0, 1), 3), glide = (x: number) => { x = G_U.clamp(x, 0, 1); return x * x * (3 - 2 * x); };
     const along = (i: number, p: number) => { // (where move i's camera is at p through it)
       const m = gt.stops[i], q = ps[i];
-      if (m.tempo === 'slow') return gearPath(q.keys, 0.5 - 0.5 * Math.cos(Math.PI * G.U.clamp(p, 0, 1)));
+      if (m.tempo === 'slow') return gearPath(q.keys, 0.5 - 0.5 * Math.cos(Math.PI * G_U.clamp(p, 0, 1)));
       return Object.assign(gearMix(q.a, q.a, 0, (p - 0.5) * 0.12, (p - 0.5) * 0.12, 0), { roll: q.a.roll });
     };
     const asPose = (c: any) => ({ tw: c.tw, dir: c.pos.clone().sub(c.tw).normalize(), dist: c.pos.distanceTo(c.tw), roll: c.roll });
@@ -2218,7 +2239,7 @@ const G_Highlights = (() => {
   // stopped. (A round that misses the body as it's posed here, standing, they having been crouched or turning, goes
   // through the middle of the chest the same way instead.)
   function xrayTracks(c: Clip, rig: HlRig, A: Actor | undefined) {
-    const B = G.Ballistics, out: any = [], up = new T.Vector3(0, 1, 0), dT = deathT(c, c.v)! + 0.05;
+    const B = Ballistics, out: any = [], up = new T.Vector3(0, 1, 0), dT = deathT(c, c.v)! + 0.05;
     rig.root.updateMatrixWorld(true);
     let g = -1;
     out.groups = []; out.gt = []; // (each shot's: how they were when it hit them, and when, in clip time)
@@ -2285,7 +2306,7 @@ const G_Highlights = (() => {
   function xrayPlay(st: number) {
     xrayBody(st);
     (P.xtracks || []).forEach((k) => {
-      const m = k.m, u = G.U.clamp((st - XT0 - k.g * XT) / 1.0, 0, 1), t = m.end * u, live = u > 0 && u < 1;
+      const m = k.m, u = G_U.clamp((st - XT0 - k.g * XT) / 1.0, 0, 1), t = m.end * u, live = u > 0 && u < 1;
       m.b.visible = m.glow.visible = live; m.b.position.copy(k.o).addScaledVector(k.u, t); m.glow.position.copy(m.b.position);
       for (const p of m.parts) {
         p.obj.visible = u > 0 && t >= p.t;
@@ -2327,13 +2348,13 @@ const G_Highlights = (() => {
     const dead = (dT != null && tau >= dT) || !!(fl & 16) || !!(fl & 8); // (down for good: limp from there, as dead)
     if (dead && !L.fallP) {
       L.fallP = p;
-      L.holder.position.copy(L.place(p)); L.holder.rotation.y = G.U.angDiff(L.kst[3], p[3]);
+      L.holder.position.copy(L.place(p)); L.holder.rotation.y = G_U.angDiff(L.kst[3], p[3]);
       const ks = L.c.killShot, Y = new T.Vector3(0, 1, 0);
       const dir = ks ? new T.Vector3(ks.to[0] - ks.f[0], 0, ks.to[2] - ks.f[2]).normalize().applyAxisAngle(Y, -L.kst[3]).applyAxisAngle(Y, -L.holder.rotation.y) : null;
       rig.die(dir);
     }
-    if (!L.fallP) { L.holder.position.copy(L.place(p)); L.holder.rotation.y = G.U.angDiff(L.kst[3], p[3]); }
-    const dt = L.fallP ? G.U.clamp(tau - (L.lastTau == null ? tau : L.lastTau), 0.001, 0.05) : L.lastSt == null ? 0.05 : G.U.clamp(st - L.lastSt, 0.001, 0.1);
+    if (!L.fallP) { L.holder.position.copy(L.place(p)); L.holder.rotation.y = G_U.angDiff(L.kst[3], p[3]); }
+    const dt = L.fallP ? G_U.clamp(tau - (L.lastTau == null ? tau : L.lastTau), 0.001, 0.05) : L.lastSt == null ? 0.05 : G_U.clamp(st - L.lastSt, 0.001, 0.1);
     L.lastSt = st; L.lastTau = tau;
     // (no level here to land on: the ground they stood on, at the floor of the picture)
     const gm = G.Game.map; G.Game.map = null;
@@ -2349,7 +2370,7 @@ const G_Highlights = (() => {
     for (const k of P.xtracks || []) { if (k.m.grp.parent) k.m.grp.parent.remove(k.m.grp); k.m.grp.traverse((o: any) => { if (o.geometry && o.geometry !== bulletGeo && o.geometry !== glowGeo) o.geometry.dispose(); if (o.material && o.material !== bulletMat && o.material !== glowMat) o.material.dispose(); }); }
     P.xtracks = [];
     const A = P.actors.get(c.v); if (!A) return;
-    const rig = G.Rig.create({ style: A.style || (G.ENEMIES[A.type!] || {}).style, scale: A.scale, boss: A.boss, leader: A.type === 'leader', seed: A.id * 7919 + 13, dressed: true });
+    const rig = G_Rig.create({ style: A.style || (ENEMIES[A.type!] || {}).style, scale: A.scale, boss: A.boss, leader: A.type === 'leader', seed: A.id * 7919 + 13, dressed: true });
     const ghost = new T.MeshBasicMaterial({ color: 0x5ab8ff, transparent: true, opacity: 0.14, depthWrite: false, blending: T.AdditiveBlending });
     rig.root.traverse((o: any) => { if (o.isMesh) o.material = ghost; });
     // (posed as they were at the killing round: crouched, hands up, cowering...)
@@ -2365,11 +2386,11 @@ const G_Highlights = (() => {
     // which is where the body will be as it goes in (js/highlights.ts xrayBody)
     const Y = new T.Vector3(0, 1, 0), kp = new T.Vector3(kst[0], kst[1], kst[2]);
     const place = (p: number[]) => new T.Vector3(p[0] - kp.x, p[1] - kp.y, p[2] - kp.z).applyAxisAngle(Y, -kst[3]);
-    const holders = (P.xtracks.groups || []).map((st: number[] | null) => { const h = new T.Group(); if (st) { h.position.copy(place(st)); h.rotation.y = G.U.angDiff(kst[3], st[3]); } P.xs.add(h); return h; });
+    const holders = (P.xtracks.groups || []).map((st: number[] | null) => { const h = new T.Group(); if (st) { h.position.copy(place(st)); h.rotation.y = G_U.angDiff(kst[3], st[3]); } P.xs.add(h); return h; });
     for (const k of P.xtracks) { k.m = xrayTrackMeshes(k); (holders[k.g] || P.xs).add(k.m.grp); }
     const holder = new T.Group(); holder.add(rig.root); P.xs.add(holder);
     // (when each round meets the body on screen: its second of flight, as far in as its track reaches the skin)
-    const keys = (P.xtracks.gt || []).map((t: any, g: number) => { const k = P.xtracks.find((q) => q.g === g); return [XT0 + g * XT + (k ? G.U.clamp(k.entryT / Math.max(1e-3, k.m.end), 0, 1) : 0.5), t]; }).filter(([, t]: any[]) => t != null);
+    const keys = (P.xtracks.gt || []).map((t: any, g: number) => { const k = P.xtracks.find((q) => q.g === g); return [XT0 + g * XT + (k ? G_U.clamp(k.entryT / Math.max(1e-3, k.m.end), 0, 1) : 0.5), t]; }).filter(([, t]: any[]) => t != null);
     P.xtl = { c, kst, tk: c.killShot ? c.killShot.t + flightOf(c.killShot).tof : c.t, keys, holder, holders, place, lastSt: null };
     if (keys.length) { const p0 = stateAt(c, c.v, keys[0][1] - 0.5) || kst; xrayPose(rig, p0); }
     xrayBody(0);
@@ -2392,7 +2413,7 @@ const G_Highlights = (() => {
   // the plan: each layer's place and moment, the end of it. Rows the round never reached stay in the picture, unlit; a round
   // stopped in armour has the body it was protecting behind it. Not all of a body: six layers of it.
   function acPlan(ar: HlArmourRound) {
-    const a = ar.a, rows = [], MAT = G.Materials.MAT;
+    const a = ar.a, rows = [], MAT = Materials.MAT;
     let x = 0, t = AC_INTRO + AC_IN, tis = 0, cut = false, d = ar.snap ? ar.snap[1] * 1000 : 7.8, l = ar.snap ? ar.snap[2] * 1000 : 28, g = ar.snap ? ar.snap[0] * 1000 : 8, ang = ar.snap ? ar.snap[3] : 0;
     const list = a.r.slice();
     if (a.e === 'armour') list.push({ n: 'skin', mm: 2, un: 1, body: 1 }, { n: 'fat', mm: 8, un: 1, body: 1 }, { n: 'muscle', mm: 30, un: 1, body: 1 });
@@ -2401,7 +2422,7 @@ const G_Highlights = (() => {
       const w = acW(q.mm), name = q.k ? ((MAT as Record<string, any>)[q.k] ? (MAT as Record<string, any>)[q.k].name : q.k) : q.n, r: any = { key: q.k || null, name, mm: q.mm, vi: q.v, vo: q.o, un: !!q.un, body: !!q.body, pc: q.pc, x0: x, x1: x + w, col: q.k ? AC_COL[q.k] || 0x808890 : AC_TIS[q.n] || 0xa04848, d0: d, l0: l, g0: g, a0: ang };
       if (!q.un) {
         const lost = q.vi ? 1 - (q.o * q.o) / (q.vi * q.vi) : 1;
-        r.lost = lost; r.xe = q.o ? r.x1 : x + w * G.U.clamp(q.s == null ? 0.7 : q.s, 0.15, 1);
+        r.lost = lost; r.xe = q.o ? r.x1 : x + w * G_U.clamp(q.s == null ? 0.7 : q.s, 0.15, 1);
         r.t0 = t; r.t1 = t + 0.24 + 1.0 * Math.sqrt(lost); t = r.t1;
         if (q.d) { d = q.d; l = q.l; g = q.g; ang = q.a; }
       }
@@ -2468,7 +2489,7 @@ const G_Highlights = (() => {
     const line = new T.Line(new T.BufferGeometry().setFromPoints([at.clone().addScaledVector(u, -2.5), at]), new T.LineBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0.8 })); A.body.add(line);
     A.scene.add(A.body);
     // the stack, cut through along the round's line: the round runs along z = 0, the cut face
-    const grp = A.stack = new T.Group(), rnd = G.U.rng((s.seed | 0) ^ 0x51ab);
+    const grp = A.stack = new T.Group(), rnd = G_U.rng((s.seed | 0) ^ 0x51ab);
     pl.rows.forEach((r, i) => {
       const w = r.x1 - r.x0, geo = new T.BoxGeometry(w, 1.16, 0.9, 1, 28, 14); geo.translate(r.x0 + w / 2, 0, -0.45);
       const tissue = !r.key, mat = new T.MeshStandardMaterial({ color: r.col, roughness: tissue ? 0.55 : r.key === 'steel' ? 0.35 : 0.75, metalness: r.key === 'steel' ? 0.55 : 0, emissive: r.col, emissiveIntensity: 0 });
@@ -2491,7 +2512,7 @@ const G_Highlights = (() => {
       if (r.key === 'ceramic' || r.key === 'pc') {
         for (let j = 0; j < 9; j++) {
           const pts = [new T.Vector3(r.x0 + 0.01, (j - 4) * 0.012, 0)], th = (j - 4) * 0.34 + (rnd() - 0.5) * 0.2, L = 0.2 + rnd() * 0.42;
-          for (let q = 1; q <= 5; q++) { const e = L * q / 5; pts.push(new T.Vector3(Math.min(r.x1 - 0.004, r.x0 + 0.01 + Math.abs(Math.cos(th)) * e * 0.5 + (rnd() - 0.5) * 0.01), G.U.clamp(Math.sin(th) * e + (rnd() - 0.5) * 0.03, -0.57, 0.57), 0)); }
+          for (let q = 1; q <= 5; q++) { const e = L * q / 5; pts.push(new T.Vector3(Math.min(r.x1 - 0.004, r.x0 + 0.01 + Math.abs(Math.cos(th)) * e * 0.5 + (rnd() - 0.5) * 0.01), G_U.clamp(Math.sin(th) * e + (rnd() - 0.5) * 0.03, -0.57, 0.57), 0)); }
           const l = seg(pts, 0x201c18, 0.8); l.visible = false; r.fx.push(l);
         }
       }
@@ -2514,7 +2535,7 @@ const G_Highlights = (() => {
       const p = 1 + 0.35 * Math.sin(st * 9); A.ring!.scale.set(p, p, 1);
       return;
     }
-    const b = acRound(pl, st), xs = (acRound(pl, st - 0.3).x + acRound(pl, st - 0.15).x + b.x) / 3, cx = G.U.clamp(xs, 0.1, Math.max(0.1, pl.w - 0.3));
+    const b = acRound(pl, st), xs = (acRound(pl, st - 0.3).x + acRound(pl, st - 0.15).x + b.x) / 3, cx = G_U.clamp(xs, 0.1, Math.max(0.1, pl.w - 0.3));
     cam.fov = 30; cam.setViewOffset(W, H, -W * 0.15, H * 0.02, W, H);
     cam.position.set(cx + 0.55, 0.32, 3.15); cam.lookAt(cx + 0.05, 0, -0.1);
     // the round, its shape as it now is
@@ -2524,7 +2545,7 @@ const G_Highlights = (() => {
     // the layers: lit while it's in them, marked once it's been
     for (const r of pl.rows) {
       if (r.un) continue;
-      const seen = st >= r.t0, u = G.U.clamp((st - r.t0) / (r.t1 - r.t0), 0, 1), k = 1 - (1 - u) * (1 - u), x = (r.xe - r.x0) * k;
+      const seen = st >= r.t0, u = G_U.clamp((st - r.t0) / (r.t1 - r.t0), 0, 1), k = 1 - (1 - u) * (1 - u), x = (r.xe - r.x0) * k;
       r.mesh.material.emissiveIntensity = st >= r.t0 && st < r.t1 ? 0.28 : 0.28 * Math.max(0, 1 - (st - r.t1) * 3) * (st >= r.t1 ? 1 : 0);
       r.ch.visible = r.hot.visible = seen && x > 1e-3;
       if (seen && x > 1e-3) {
@@ -2563,19 +2584,19 @@ const G_Highlights = (() => {
     if (!pl) return;
     bug(g); slowmo(g);
     g.fillStyle = 'rgba(20,90,140,0.8)'; g.fillRect(18, 104, 200, 24); text(g, 'ARMOUR CAM', 28, 116, 12, '#fff', 'left', '800');
-    const piece = (a.r.find((q: Rec) => q.pc) || {}).pc || 'ARMOUR', off = Math.round(Math.acos(G.U.clamp(a.cos, 0, 1)) * 180 / Math.PI), def = defOf(ar.code), am = ar.am && (G.AMMO as Record<string, any>)[ar.am] ? (G.AMMO as Record<string, any>)[ar.am].name : '';
+    const piece = (a.r.find((q: Rec) => q.pc) || {}).pc || 'ARMOUR', off = Math.round(Math.acos(G_U.clamp(a.cos, 0, 1)) * 180 / Math.PI), def = defOf(ar.code), am = ar.am && (AMMO as Record<string, any>)[ar.am] ? (AMMO as Record<string, any>)[ar.am].name : '';
     if (t < AC_INTRO) {
-      lowerThird(g, c.v, `${nameOf(c.v).toUpperCase()} · ${piece.toUpperCase()}`, `${def ? def.name : 'a round'}${am ? ' ' + am : ''} · ${off}° off square · ${G.U.fmt(ar.J)} J on arrival`, t, '#58b8ff');
-      const f = G.U.clamp((t - AC_INTRO + 0.22) / 0.22, 0, 1); if (f > 0) { g.fillStyle = `rgba(190,235,255,${f * 0.9})`; g.fillRect(0, 0, W, H); }
+      lowerThird(g, c.v, `${nameOf(c.v).toUpperCase()} · ${piece.toUpperCase()}`, `${def ? def.name : 'a round'}${am ? ' ' + am : ''} · ${off}° off square · ${G_U.fmt(ar.J)} J on arrival`, t, '#58b8ff');
+      const f = G_U.clamp((t - AC_INTRO + 0.22) / 0.22, 0, 1); if (f > 0) { g.fillStyle = `rgba(190,235,255,${f * 0.9})`; g.fillRect(0, 0, W, H); }
       return;
     }
-    const b = acRound(pl, t), f0 = 1 - G.U.clamp((t - AC_INTRO) / 0.3, 0, 1);
+    const b = acRound(pl, t), f0 = 1 - G_U.clamp((t - AC_INTRO) / 0.3, 0, 1);
     // the round, as it is now
     const J = 0.5 * b.g * 0.001 * b.v * b.v, pw = 214, px = W - pw - 18, py = 72, g0 = pl.hit[0].g0, d0 = pl.hit[0].d0;
     g.fillStyle = 'rgba(4,12,24,0.86)'; g.fillRect(px, py, pw, 106); g.fillStyle = '#ffb21a'; g.fillRect(px, py, pw, 4);
     fit(g, `${def ? def.name : 'ROUND'}${am ? ' · ' + am : ''}`.toUpperCase(), px + 10, py + 17, pw - 20, 11, '#ffd24a', 'left', '800');
     text(g, `${Math.round(b.v)} M/S`, px + 10, py + 44, 25, b.v > 0 ? '#fff' : '#ff5a4a');
-    fit(g, `${G.U.fmt(Math.round(J))} J LEFT OF ${G.U.fmt(ar.J)} J`, px + 10, py + 66, pw - 20, 11, '#9fdcff', 'left', '800');
+    fit(g, `${G_U.fmt(Math.round(J))} J LEFT OF ${G_U.fmt(ar.J)} J`, px + 10, py + 66, pw - 20, 11, '#9fdcff', 'left', '800');
     fit(g, `WIDTH ${d0.toFixed(1)} → ${b.d.toFixed(1)} MM · MASS ${g0.toFixed(1)} → ${b.g.toFixed(1)} G`, px + 10, py + 86, pw - 20, 11, b.d > d0 * 1.06 || b.g < g0 * 0.95 ? '#ffb02a' : '#c8d8e4', 'left', '800');
     // the layers, as it reaches them
     const rows = pl.rows.filter((r) => !r.body), H0 = 26, n = rows.length, show = Math.min(n, 11), now = b.r ? rows.indexOf(b.r) : b.i < 0 ? 0 : rows.indexOf(pl.hit[pl.hit.length - 1]), top = Math.max(0, Math.min(n - show, now - show + 2)), x0 = 24, y0 = 138, w0 = 322;
@@ -2621,7 +2642,7 @@ const G_Highlights = (() => {
   // the organs, in the bones of a body (js/ballistics.ts), coloured by what was done to them; over a replay (overlay)
   // they're drawn through the body, the hit ones dim until the round that hit them arrives (js/highlights.ts lightOrgan)
   function organsOn(rig: HlRig, O: Record<string, number>, overlay: boolean) {
-    const B = G.Ballistics, ORG = B.ORG, all = [], hit = [];
+    const B = Ballistics, ORG = B.ORG, all = [], hit = [];
     const bone = (n: string) => n.startsWith('up') || n.startsWith('lo') ? ((n.endsWith('L') ? rig.armL : rig.armR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : n.startsWith('th') || n.startsWith('sh') ? ((n.endsWith('L') ? rig.legL : rig.legR) as unknown as Record<string, THREE.Object3D>)[n.slice(0, 2)] : rig[n];
     for (const s of B.segs(rig as any)) {
       const b = bone(s.bone); if (!b) continue;
@@ -2667,16 +2688,16 @@ const G_Highlights = (() => {
     if (!P.ready || !P.prog.length) return;
     // whether any screen is in view (for the picture), and the sound: only where you'd stand to watch one (in front of it,
     // within about one and a half of its widths at full and three at none, the screen not edge-on, nothing in between)
-    const cam = G.R.camera, cp = cam.position; let seen = false, vol = 0;
+    const cam = G_R.camera, cp = cam.position; let seen = false, vol = 0;
     P.losT = (P.losT || 0) - dt;
     for (const tv of P.tvs) {
       const p = tv.scr.getWorldPosition(_a), d = p.distanceTo(cp);
       if (d < (tv.cab ? 6 : 45)) { const f = _b.set(0, 0, -1).applyQuaternion(cam.quaternion); if (f.dot(p.clone().sub(cp).normalize()) > 0.2) seen = true; }
       if (tv.cab) continue; // (muted: no sound of its own)
       const n = _b.set(0, 0, 1).applyQuaternion(tv.scr.getWorldQuaternion(new T.Quaternion())), v = cp.clone().sub(p), front = v.dot(n) / Math.max(1e-3, d);
-      let k = G.U.clamp((tv.w * 3 - d) / (tv.w * 1.5), 0, 1) * G.U.clamp((front - 0.25) / 0.35, 0, 1);
+      let k = G_U.clamp((tv.w * 3 - d) / (tv.w * 1.5), 0, 1) * G_U.clamp((front - 0.25) / 0.35, 0, 1);
       if (k > 0) {
-        if (P.losT <= 0 || tv.los == null) tv.los = G.Level.los(G.Game.map!, cp.x, cp.y, cp.z, p.x + n.x * 0.3, p.y, p.z + n.z * 0.3); // (a few times a second)
+        if (P.losT <= 0 || tv.los == null) tv.los = Level.los(G.Game.map!, cp.x, cp.y, cp.z, p.x + n.x * 0.3, p.y, p.z + n.z * 0.3); // (a few times a second)
         if (!tv.los) k = 0;
       }
       vol = Math.max(vol, k);
@@ -2687,7 +2708,7 @@ const G_Highlights = (() => {
     if (step(dt)) return;
     // the picture, twenty times a second while someone can see it
     P.frameT -= dt;
-    if (!seen || P.frameT > 0 || G.R._warm) return; // (not while the shaders are being built under the veil: js/render.ts warmup)
+    if (!seen || P.frameT > 0 || G_R._warm) return; // (not while the shaders are being built under the veil: js/render.ts warmup)
     P.frameT = 0.05;
     draw();
   }
@@ -2720,7 +2741,7 @@ const G_Highlights = (() => {
   }
   // a frame of it: the picture into the render target, the graphics over it (true when there's a picture under them)
   function draw() {
-    const s = P.prog[P.seg], R2 = G.R.renderer, U = G.LightGrid && G.LightGrid.U, gridW = U ? U.lgGrid.value.w : 0;
+    const s = P.prog[P.seg], R2 = G_R.renderer, U = LightGrid && LightGrid.U, gridW = U ? U.lgGrid.value.w : 0;
     let live = 0;
     if (s.kind === 'clip') {
       camFor(s);
@@ -2777,11 +2798,11 @@ const G_Highlights = (() => {
   }
 
   // ================================================================ motion graphics
-  const ease = (x: number) => 1 - Math.pow(1 - G.U.clamp(x, 0, 1), 3);
-  const nameOf = (k: string | null) => { const A = k && P.actors.get(k); return !A ? 'UNKNOWN' : A.kind === 'p' ? (A.name || 'OFFICER') : A.name || (G.ENEMIES[A.type!] || {}).name || 'SUSPECT'; };
-  const colOf = (k: string | null) => { const A = k && P.actors.get(k); return A && A.kind === 'p' && A.color != null ? G.U.hex(A.color) : '#ff4a3a'; };
+  const ease = (x: number) => 1 - Math.pow(1 - G_U.clamp(x, 0, 1), 3);
+  const nameOf = (k: string | null) => { const A = k && P.actors.get(k); return !A ? 'UNKNOWN' : A.kind === 'p' ? (A.name || 'OFFICER') : A.name || (ENEMIES[A.type!] || {}).name || 'SUSPECT'; };
+  const colOf = (k: string | null) => { const A = k && P.actors.get(k); return A && A.kind === 'p' && A.color != null ? G_U.hex(A.color) : '#ff4a3a'; };
   const HYPE = ['THE DOOR-KICKING', 'THE UNSTOPPABLE', 'THE MAGNIFICENT', 'THE BUTCHER OF BLOCK C', 'THE HALLWAY HURRICANE', 'THE CERTIFIED', 'THE STAIRWELL STALLION', 'THE LEGAL', 'THE ABSOLUTELY JUSTIFIED'];
-  const hype = (k: string) => { const A = P.actors.get(k), n = (A && A.name) || ''; let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const an = A && A.animal ? G.Callsigns.of(A.animal).name.toUpperCase() : 'OFFICER'; return `${HYPE[h % HYPE.length]} ${an}`; };
+  const hype = (k: string) => { const A = P.actors.get(k), n = (A && A.name) || ''; let h = 0; for (const ch of n) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const an = A && A.animal ? Callsigns.of(A.animal).name.toUpperCase() : 'OFFICER'; return `${HYPE[h % HYPE.length]} ${an}`; };
   function text(g: CanvasRenderingContext2D, s: string, x: number, y: number, size: number, col: string, align: CanvasTextAlign = 'left', weight = '900', stroke: string | null = null) {
     g.font = `${weight} ${size}px "Arial Black", Impact, sans-serif`; g.textAlign = align; g.textBaseline = 'middle';
     if (stroke) { g.lineWidth = size * 0.14; g.strokeStyle = stroke; g.strokeText(s, x, y); }
@@ -2812,7 +2833,7 @@ const G_Highlights = (() => {
   }
   // How long the big tagline waits after the moment, on screen, so the kill itself is seen before it's covered: up to
   // 1.2 s, less if the shot ends sooner (it keeps 1.3 s for itself), never under 0.3
-  const tagWait = (s: Seg) => G.U.clamp(s.dur - (s.mSt || 0) - 1.3, 0.3, 1.2);
+  const tagWait = (s: Seg) => G_U.clamp(s.dur - (s.mSt || 0) - 1.3, 0.3, 1.2);
   function bigText(g: CanvasRenderingContext2D, s: string, col: string, t: number, y = H * 0.42, x = W / 2, size = 74) {
     const k = ease(t * 3), sc = 0.4 + 0.6 * k + Math.sin(t * 14) * 0.03 * (1 - Math.min(1, t));
     g.save(); g.translate(x, y); g.scale(sc, sc); g.rotate(-0.06);
@@ -2825,7 +2846,7 @@ const G_Highlights = (() => {
     g.fillStyle = col || colOf(k); g.fillRect(x, H - 150, 500, 8);
     g.fillStyle = 'rgba(8,12,20,0.88)'; g.fillRect(x, H - 142, 500, 84);
     const A = P.actors.get(k);
-    if (A && A.kind === 'p' && A.animal) { g.save(); g.translate(x + 14, H - 134); G.Callsigns.draw(g, A.animal, 68, A.color!); g.restore(); }
+    if (A && A.kind === 'p' && A.animal) { g.save(); g.translate(x + 14, H - 134); Callsigns.draw(g, A.animal, 68, A.color!); g.restore(); }
     fit(g, title, x + 94, H - 118, 396, 26, '#fff'); fit(g, sub, x + 94, H - 84, 396, 15, '#cfe2ff', 'left', '700');
   }
   // the presenters, in their box: two hosts, reacting like a game show's
@@ -2882,7 +2903,7 @@ const G_Highlights = (() => {
       offs.forEach(([k, A], i) => {
         const n = offs.length, cw = Math.min(210, (W - 80) / Math.max(1, n)), x = W / 2 - (n * cw) / 2 + i * cw + cw / 2, y = 340 + (1 - ease(t * 2 - i * 0.25)) * 300;
         g.fillStyle = 'rgba(8,12,24,0.85)'; g.fillRect(x - cw / 2 + 8, y - 90, cw - 16, 190); g.fillStyle = colOf(k); g.fillRect(x - cw / 2 + 8, y - 90, cw - 16, 8);
-        if (A.animal) { g.save(); g.translate(x - 40, y - 74); G.Callsigns.draw(g, A.animal, 80, A.color!); g.restore(); }
+        if (A.animal) { g.save(); g.translate(x - 40, y - 74); Callsigns.draw(g, A.animal, 80, A.color!); g.restore(); }
         text(g, (A.name || '').toUpperCase(), x, y + 26, 20, '#fff', 'center');
         text(g, hype(k), x, y + 50, 10, '#ffd24a', 'center', '800');
         const st = (P.stats.get(k) || {}) as Partial<HlStat>; text(g, `${st.kills || 0} KILLS · ${st.hs || 0} HS`, x, y + 76, 13, '#9fdcff', 'center', '800');
@@ -2891,7 +2912,7 @@ const G_Highlights = (() => {
       return;
     }
     if (s.kind === 'card') { // between a surrender and its arrest: the time skipped, on a sweep of pink
-      const k = ease(t * 3), out = G.U.clamp((t - s.dur + 0.35) / 0.35, 0, 1), x = -W + (k - out) * W;
+      const k = ease(t * 3), out = G_U.clamp((t - s.dur + 0.35) / 0.35, 0, 1), x = -W + (k - out) * W;
       const gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, '#ff9ad2'); gr.addColorStop(1, '#9a7aff');
       g.save(); g.translate(x, 0); g.fillStyle = gr; g.fillRect(0, 0, W, H); hearts(g, t, 8);
       text(g, 'MOMENTS LATER...', W / 2, H / 2 - 16, 58, '#fff', 'center', '900', '#3a1030');
@@ -2919,7 +2940,7 @@ const G_Highlights = (() => {
         const y = 175 + i * 64, x0 = -900 + ease(t * 2 - i * 0.2) * 900;
         g.save(); g.translate(x0, 0);
         g.fillStyle = i === 0 ? 'rgba(255,210,40,0.25)' : 'rgba(255,255,255,0.06)'; g.fillRect(90, y - 26, 820, 54); g.fillStyle = colOf(k); g.fillRect(90, y - 26, 8, 54);
-        const A = P.actors.get(k); if (A && A.animal) { g.save(); g.translate(108, y - 22); G.Callsigns.draw(g, A.animal, 44, A.color!); g.restore(); }
+        const A = P.actors.get(k); if (A && A.animal) { g.save(); g.translate(108, y - 22); Callsigns.draw(g, A.animal, 44, A.color!); g.restore(); }
         text(g, (nameOf(k)).toUpperCase() + (i === 0 ? '  ★ MVP' : ''), 160, y, 22, '#fff');
         for (const [x, v] of [[470, st.kills], [550, st.hs], [630, st.breach], [710, st.arrests], [790, st.fouls], [870, st.downs]]) text(g, String(v || 0), x, y, 24, '#fff', 'center');
         g.restore();
@@ -2930,7 +2951,7 @@ const G_Highlights = (() => {
     const c = s.clip;
     if (s.kind === 'armour') { armourGraphics(g, s, t); return; }
     if (s.kind === 'xray') {
-      const O = c.fl.o || {}, ORG = G.Ballistics.ORG, list = Object.entries(O).sort((a, b) => b[1] - a[1]);
+      const O = c.fl.o || {}, ORG = Ballistics.ORG, list = Object.entries(O).sort((a, b) => b[1] - a[1]);
       g.fillStyle = 'rgba(0,0,0,0)'; bug(g);
       g.fillStyle = 'rgba(4,16,30,0.85)'; g.fillRect(24, 90, 330, 60 + list.length * 34);
       text(g, 'KILL BREAKDOWN', 40, 112, 22, '#5ad8ff'); text(g, `${nameOf(c.v).toUpperCase()} · ${c.fl.d ? c.fl.d + ' M' : ''}`, 40, 136, 13, '#cfe2ff', 'left', '700');
@@ -2945,7 +2966,7 @@ const G_Highlights = (() => {
       const groups: HlXtrack[][] = []; for (const k of P.xtracks || []) (groups[k.g] = groups[k.g] || []).push(k);
       groups.slice(0, 4).forEach((ks, i) => {
         const shown = t >= XT0 + i * XT + 0.5; if (!shown || !ks) return;
-        const k = ks[0], r = k.r, tr = ks.flatMap((q) => q.trace), yawed = tr.some((q: any) => q.yawed), exp = tr.some((q: any) => q.expanded), am = k.fl.am && (G.AMMO as Record<string, any>)[k.fl.am] ? (G.AMMO as Record<string, any>)[k.fl.am].name : 'round', frags = ks.reduce((a: number, q: Rec) => a + q.frags.length, 0);
+        const k = ks[0], r = k.r, tr = ks.flatMap((q) => q.trace), yawed = tr.some((q: any) => q.yawed), exp = tr.some((q: any) => q.expanded), am = k.fl.am && (AMMO as Record<string, any>)[k.fl.am] ? (AMMO as Record<string, any>)[k.fl.am].name : 'round', frags = ks.reduce((a: number, q: Rec) => a + q.frags.length, 0);
         const thru = ks.filter((q) => q.r.exitV > 0).length, armd = ks.filter((q) => q.r.stopped && !q.trace.length).length;
         const what = k.n > 1 ? `${k.n} PELLETS · ${ks.length} IN THEM · ${thru} THROUGH${armd ? ` · ${armd} ON ARMOUR` : ''}`
           : r.stopped && !k.trace.length ? 'STOPPED BY ARMOUR' : r.exitV > 0 ? `THROUGH, ${Math.round(r.exitV)} m/s out` : `STOPPED ${Math.round((k.endT - k.entryT) * 100)} cm in`;
@@ -2976,7 +2997,7 @@ const G_Highlights = (() => {
     // the x-ray cam's read-out: each organ as a round reaches it, sliding in on the right (under the slow-motion tag,
     // above the presenters: four rows, then how many more)
     if (s.xr && P.xo && P.xo.lit.length) {
-      const ORG = G.Ballistics.ORG, rows = P.xo.lit.slice(0, 4), more = P.xo.lit.length - rows.length;
+      const ORG = Ballistics.ORG, rows = P.xo.lit.slice(0, 4), more = P.xo.lit.length - rows.length;
       if (more > 0) { g.fillStyle = 'rgba(4,16,30,0.85)'; g.fillRect(W - 268, 118 + 4 * 30, 250, 20); text(g, `+${more} MORE`, W - 28, 128 + 4 * 30, 12, '#ffd27a', 'right', '900'); }
       rows.forEach(({ o, t: lt }, i: number) => {
         const y = 118 + i * 30, k = ease((P.st - lt) * 4), x = W - 18 - 250 * k;
@@ -3102,7 +3123,7 @@ const G_Highlights = (() => {
   // covering their eyes
   function flashGraphics(g: CanvasRenderingContext2D, s: Seg, c: Clip) {
     const fx = c.fx!, k0 = fx.a, n = (s.vs || []).length, el = s.tau - fx.t;
-    if (el >= 0) { g.fillStyle = `rgba(255,255,250,${G.U.clamp(1 - el / 0.45, 0, 1) * 0.92})`; g.fillRect(0, 0, W, H); } // (the flash, in clip time)
+    if (el >= 0) { g.fillStyle = `rgba(255,255,250,${G_U.clamp(1 - el / 0.45, 0, 1) * 0.92})`; g.fillRect(0, 0, W, H); } // (the flash, in clip time)
     bug(g); slowmo(g);
     g.fillStyle = 'rgba(0,0,0,0.6)'; g.fillRect(18, 104, 200, 24); text(g, 'FLASH CAM', 28, 116, 12, '#fff', 'left', '800');
     lowerThird(g, k0 || '', `${k0 ? nameOf(k0).toUpperCase() + ' · ' : ''}FLASHBANG`, `${k0 ? hype(k0) + ' · ' : ''}${n > 1 ? n + ' SUSPECTS' : 'A SUSPECT'} BLINDED · WHAT HAPPENS NEXT...`, P.st);
@@ -3135,7 +3156,7 @@ const G_Highlights = (() => {
   // top, and the trajectory, drawn: its drop below the bore line (gravity, over its time of flight) and its speed bleeding
   // off, the whole way to where it hit, a dot moving along it; under it what it was carrying when it got there
   function bulletGraphics(g: CanvasRenderingContext2D, s: Seg, c: Clip) {
-    const fl = flightOf(c.killShot!), el = G.U.clamp(s.tau - c.killShot!.t, 0, fl.tof), now = fl.at(el), x = el >= fl.tof ? fl.len : now.x;
+    const fl = flightOf(c.killShot!), el = G_U.clamp(s.tau - c.killShot!.t, 0, fl.tof), now = fl.at(el), x = el >= fl.tof ? fl.len : now.x;
     // (top right, under the slow-motion tag, compact enough to end above the presenters' speech bubble: the left and the
     // middle are the bullet's)
     const bx = W - 300, by = 112, bw = 282, bh = 156;
@@ -3155,8 +3176,8 @@ const G_Highlights = (() => {
     if (el >= fl.tof) { g.fillStyle = '#ff3a3a'; g.beginPath(); g.arc(X(fl.len), Yd(fl.pts[fl.pts.length - 1].drop), 6, 0, 7); g.fill(); }
     text(g, 'DROP', px0 + 4, py0 + ph - 7, 8, '#ffd24a', 'left', '900'); text(g, 'SPEED', px0 + pw - 4, Yv(fl.v0) + 9, 8, '#5ab8ff', 'right', '900');
     // what it carried there
-    const end = fl.pts[fl.pts.length - 1], J = 0.5 * fl.m * end.v * end.v, am = fl.am && (G.AMMO as Record<string, any>)[fl.am] ? (G.AMMO as Record<string, any>)[fl.am].name : '';
-    fit(g, `${fl.def ? fl.def.name : ''}${am ? ' · ' + am : ''}${J > 0 ? ' · ' + G.U.fmt(Math.round(J)) + ' J on arrival' : ''}`, bx + 10, by + bh - 28, bw - 20, 11, '#ffd24a', 'left', '800');
+    const end = fl.pts[fl.pts.length - 1], J = 0.5 * fl.m * end.v * end.v, am = fl.am && (AMMO as Record<string, any>)[fl.am] ? (AMMO as Record<string, any>)[fl.am].name : '';
+    fit(g, `${fl.def ? fl.def.name : ''}${am ? ' · ' + am : ''}${J > 0 ? ' · ' + G_U.fmt(Math.round(J)) + ' J on arrival' : ''}`, bx + 10, by + bh - 28, bw - 20, 11, '#ffd24a', 'left', '800');
     fit(g, `${Math.round(fl.v0)} → ${Math.round(end.v)} m/s · ${(fl.tof * 1000).toFixed(0)} ms · drop ${(end.drop * 100).toFixed(1)} cm`, bx + 10, by + bh - 11, bw - 20, 11, '#fff', 'left', '800');
     // what it went through and off on the way
     const met = fl.events.filter((e) => e.k !== 'x' && e.x <= x + 0.01).map((e) => (e.k === 'r' ? 'OFF ' : 'THROUGH ') + e.name.toUpperCase());
@@ -3175,9 +3196,9 @@ const G_Highlights = (() => {
     fl.events.forEach((e, i: number) => {
       if (e.k === 'x' || e.x > x + 0.01 || !e.name) return;
       v.copy(e.p).project(P.cam);
-      if (G.R.behind(v, P.cam)) return;
+      if (G_R.behind(v, P.cam)) return;
       const out = fl.events.slice(i + 1).find((q) => q.k === 'x'), vIn = fl.pts[e.i].v, vOut = e.k === 'r' ? (fl.pts[e.i + 1] || fl.pts[e.i]).v : out ? fl.pts[out.i].v : vIn;
-      const px = G.U.clamp((v.x + 1) / 2 * W, 150, W - 150), py = G.U.clamp((1 - v.y) / 2 * H - 44, 130, H - 130), ice = e.k === 'r';
+      const px = G_U.clamp((v.x + 1) / 2 * W, 150, W - 150), py = G_U.clamp((1 - v.y) / 2 * H - 44, 130, H - 130), ice = e.k === 'r';
       const inc = ice ? Math.round(Math.asin(Math.min(1, Math.abs(fl.dirAt(Math.max(0, e.x - 0.05)).dot(new T.Vector3(...e.n))))) * 180 / Math.PI) : 0;
       g.strokeStyle = ice ? '#ffd24a' : '#9fdcff'; g.lineWidth = 2; g.beginPath(); g.moveTo(px, py + 20); g.lineTo((v.x + 1) / 2 * W, (1 - v.y) / 2 * H); g.stroke();
       g.fillStyle = 'rgba(4,12,24,0.88)'; g.fillRect(px - 130, py - 20, 260, 40); g.fillStyle = ice ? '#ffd24a' : '#9fdcff'; g.fillRect(px - 130, py - 20, 4, 40);
@@ -3198,10 +3219,10 @@ const G_Highlights = (() => {
     text(g, 'presented by IRONVALE ARMS', 22, 112, 11, '#ffd24a', 'left', '800');
     g.save(); g.translate(slide, 0);
     g.fillStyle = 'rgba(6,10,18,0.88)'; g.fillRect(x0, 70, W - x0 - 18, H - 140); g.fillStyle = colOf(k); g.fillRect(x0, 70, W - x0 - 18, 6);
-    if (A.animal) { g.save(); g.translate(x0 + 12, 86); G.Callsigns.draw(g, A.animal, 44, A.color!); g.restore(); }
+    if (A.animal) { g.save(); g.translate(x0 + 12, 86); Callsigns.draw(g, A.animal, 44, A.color!); g.restore(); }
     fit(g, nameOf(k).toUpperCase() + '\'S LOADOUT', x0 + 64, 108, W - x0 - 100, 20, '#fff');
     fit(g, def.name.toUpperCase(), x0 + 16, 150, W - x0 - 50, 28, '#ffd24a', 'left', '900', '#14080a');
-    const cal = G.calOf(def), amN = s.am && (G.AMMO as Record<string, any>)[s.am] ? (G.AMMO as Record<string, any>)[s.am].name : null;
+    const cal = calOf(def), amN = s.am && (AMMO as Record<string, any>)[s.am] ? (AMMO as Record<string, any>)[s.am].name : null;
     text(g, `${cal || ''}${amN ? ' · ' + amN : ''}${def.rpm ? ' · ' + def.rpm + ' RPM' : ''}${def.weight ? ' · ' + def.weight.toFixed(1) + ' KG' : ''}`, x0 + 16, 176, 12, '#9fdcff', 'left', '800');
     // the numbers, counting up
     const cnt = (v: number) => Math.round(v * ease(t * 1.2 - 0.3));
@@ -3249,7 +3270,7 @@ const G_Highlights = (() => {
     fit(g, PITCH[p.kind] || 'You need this. Probably.', tx, 232, 470, 19, '#fff', 'center', '800', 'rgba(0,0,0,0.5)');
     // the price, and then how many are left (live)
     g.save(); g.translate(tx - 90, 330); g.rotate(-0.1); g.scale(ease(t * 2 - 0.7), ease(t * 2 - 0.7));
-    burst(g, 0, 0, 92, '#ffd24a', P.time * 0.8); text(g, '¢' + G.U.fmt(p.price), 0, 2, 30, '#e8202a', 'center', '900'); g.restore();
+    burst(g, 0, 0, 92, '#ffd24a', P.time * 0.8); text(g, '¢' + G_U.fmt(p.price), 0, 2, 30, '#e8202a', 'center', '900'); g.restore();
     if (t > dur * 0.4) {
       const left = p.left(), k3 = ease((t - dur * 0.4) * 3);
       g.save(); g.translate(tx + 110, 330); g.rotate(left ? 0.06 : -0.18); g.scale(k3, k3);
@@ -3409,5 +3430,5 @@ const G_Highlights = (() => {
   // (step and draw: the broadcast moved on and drawn by hand, for checking a replay without standing at a TV)
   return { TVS, tourMoves: GT_MOVES, tourPath: gearPath, tick, shot, roundPath, glass, crack, door, laser, hitBy, kill, suspectDown, saved, incap, arrest, nade, stick, boom, fragPaths, flash, take, drop, mount, unmount, update, step, draw, warm, gearFor, reset, exportPack, renderPack, cancelRender, exportHere, muxHere, toJSON, fromJSON, R, P };
 })();
-G.Highlights = G_Highlights;
-interface GameModules { Highlights: typeof G_Highlights; }
+G.Highlights = Highlights;
+declare global { interface GameModules { Highlights: typeof Highlights; } }

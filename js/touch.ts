@@ -1,11 +1,14 @@
 'use strict';
+import { Audio } from './audio.js';
+import { Pad } from './gamepad.js';
+import { U } from './util.js';
 // A touch screen. Like the controller (js/gamepad.ts) it's not a control scheme of its own: the on-screen buttons are the keys and mouse buttons they stand
 // for, sent as those events down the same handlers (js/player.ts bindInput, js/game.ts bindMenu); only the stick and the look drag go in direct (G.Me.padMove,
 // G.Me.lookBy). A touch screen has no pointer lock either, so G.Game.softLocked stands in for it (js/game.ts lock).
 // Menus are the page's own pointer events, which a finger already sends; what a finger hasn't got is added here, once for every screen: a long press is the
 // right click (and shows a title="" text, which nothing else can), two quick taps are a double click, two fingers on the gunsmith or the sidearm web are the wheel.
 // Comes on at once on a phone or a tablet, or on a laptop's touch screen the first time it's touched; a real mouse or keyboard puts it away again. ?touch keeps it on.
-const G_Touch = (() => {
+export const Touch = (() => {
   const FORCED = new URLSearchParams(location.search).has('touch'), PHONE = FORCED || matchMedia('(hover: none) and (pointer: coarse)').matches;
   const STICK_R = 56, DEAD = 0.14, SLOW_R = 0.5, FAST_R = 0.92, FAST_FW = 0.75, LOOK = 0.0048, HOLD_MS = 350, AIM_TAP_MS = 220, LONG_MS = 500, SLOP = 10, DBL_MS = 320, EDGE = 56, EDGE_SPEED = 14;
   // a key held for as long as the button is (so R's tap, double tap and hold all still work): [code, with shift]
@@ -25,7 +28,7 @@ const G_Touch = (() => {
   const fingers = new Map<number, Finger>(), off: Record<number, () => void> = {}, btn: Record<string, HTMLElement> = {};
   let sx = 0, sy = 0, crouchAt = 0, crouchDone = false, aimWas = false, aimAt = 0, fires = 0, fsTried = false;
 
-  const S = () => G.Pad.synth;
+  const S = () => Pad.synth;
   const mouse = (type: 'mousedown' | 'mouseup', n: number) => S().fire(window, new MouseEvent(type, { button: n }));
   const portrait = () => innerHeight > innerWidth;
 
@@ -34,7 +37,7 @@ const G_Touch = (() => {
     if (on === v) return;
     on = v; document.body.classList.toggle('touch-on', v);
     if (G.InvUI && G.Game && G.Game.settings) G.InvUI.scaleUI();
-    if (!v) { hideUi(); if (G.Game && G.Game.softLocked && !G.Pad.active()) G.Game.unlock(); } // (no way of playing on: the pause menu, and its Resume takes the mouse)
+    if (!v) { hideUi(); if (G.Game && G.Game.softLocked && !Pad.active()) G.Game.unlock(); } // (no way of playing on: the pause menu, and its Resume takes the mouse)
   }
   function hideUi() { releaseAll(); if (uiEl) { uiEl.classList.add('hidden'); closeEl.classList.add('hidden'); turnEl.classList.add('hidden'); } wasPlay = false; }
 
@@ -54,7 +57,7 @@ const G_Touch = (() => {
       case 'swap': s.wheelStep(); break;
       case 'nade': s.nextGrenade(); break;
       case 'steady': s.key(me.keys.ShiftLeft ? 'keyup' : 'keydown', 'ShiftLeft'); break;
-      case 'more': moreEl.classList.toggle('hidden'); G.Audio.click(); break;
+      case 'more': moreEl.classList.toggle('hidden'); Audio.click(); break;
     }
   }
   function letGo(id: number, f: Finger) {
@@ -99,7 +102,7 @@ const G_Touch = (() => {
 
   function update(_dt: number) {
     if (!on) return;
-    if (G.Pad.active()) { hideUi(); return; }
+    if (Pad.active()) { hideUi(); return; }
     const g = G.Game, level = g.phase === 'level', pauseHid = g.$('pause').classList.contains('hidden');
     if (level && !g.locked && !g.menuOpen() && pauseHid) g.lock(); // (nothing to click: straight in)
     const play = level && g.locked && !g.menuOpen() && pauseHid && !g.$('hud').classList.contains('hidden');
@@ -130,7 +133,7 @@ const G_Touch = (() => {
   function showTip(text: string, x: number, y: number) {
     tipEl.textContent = text; tipEl.classList.remove('hidden');
     const w = tipEl.offsetWidth, h = tipEl.offsetHeight;
-    tipEl.style.left = G.U.clamp(x - w / 2, 8, Math.max(8, innerWidth - w - 8)) + 'px';
+    tipEl.style.left = U.clamp(x - w / 2, 8, Math.max(8, innerWidth - w - 8)) + 'px';
     tipEl.style.top = (y - h - 24 > 8 ? y - h - 24 : Math.min(y + 24, Math.max(8, innerHeight - h - 8))) + 'px';
   }
   function longPress() {
@@ -266,5 +269,5 @@ const G_Touch = (() => {
     dragEnd() { edge = null; },
   };
 })();
-G.Touch = G_Touch;
-interface GameModules { Touch: typeof G_Touch; }
+G.Touch = Touch;
+declare global { interface GameModules { Touch: typeof Touch; } }

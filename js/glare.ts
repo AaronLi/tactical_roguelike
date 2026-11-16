@@ -1,4 +1,7 @@
 'use strict';
+import { Level } from './level.js';
+import { U } from './util.js';
+import { R } from './render.js';
 // Looking into someone's weapon light: anyone's, a suspect's or your squad's. It takes a light pointing near you, that you're
 // looking near, with nothing between you, and the closer the worse. The bloom opens round the lamp where you see it, wider and
 // whiter the more of it you're taking, washing out the screen when it's bad, with streaks across it. Your eyes take a moment to
@@ -8,11 +11,11 @@
 interface GlareLight { id: GlareId; p: THREE.Vector3; dir: THREE.Vector3; k: number; }
 type GlareId = string | number; // whose light (the shooter)
 interface GlareState { g: number; peak: number; x: number; y: number; t: number; seen: boolean; }
-const G_Glare = (() => {
+export const Glare = (() => {
   const T = THREE, RISE = 5, FALL = 1.1, W = 384, H = 216, RANGE = 40;
   const lit = new Map<GlareId, GlareState>(), now: GlareLight[] = [], fwd = new T.Vector3(), to = new T.Vector3(), v = new T.Vector3();
   let cv: HTMLCanvasElement | null = null, g = null as unknown as CanvasRenderingContext2D, shown = false, level = 0;
-  const sm = (a: number, b: number, x: number) => { const t = G.U.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+  const sm = (a: number, b: number, x: number) => { const t = U.clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
   function begin() { now.length = 0; }
   function add(id: GlareId, p: THREE.Vector3, dir: THREE.Vector3, k: number) { now.push({ id, p: p.clone(), dir: dir.clone(), k }); }
   // how much of this light is getting to your eye: pointing at you (well within its beam), you looking toward it (at it most,
@@ -24,11 +27,11 @@ const G_Glare = (() => {
     to.divideScalar(d);
     const aim = sm(Math.cos(0.45), Math.cos(0.08), -to.dot(q.dir)), look = sm(Math.cos(1.1), Math.cos(0.1), to.dot(fwd));
     if (aim <= 0 || look <= 0) return 0;
-    if (map && !G.Level.los(map, cam.position.x, cam.position.y, cam.position.z, q.p.x, q.p.y, q.p.z)) return 0;
+    if (map && !Level.los(map, cam.position.x, cam.position.y, cam.position.z, q.p.x, q.p.y, q.p.z)) return 0;
     return aim * look * q.k / (1 + (d / 6) * (d / 6));
   }
   function end(dt: number) {
-    const cam = G.R.camera, map = G.Game.map, playing = G.Game.phase === 'level' && !G.Me.dead;
+    const cam = R.camera, map = G.Game.map, playing = G.Game.phase === 'level' && !G.Me.dead;
     fwd.set(0, 0, -1).applyQuaternion(cam.quaternion);
     for (const q of now) {
       const t = playing ? taken(q, cam, map) : 0;
@@ -71,5 +74,5 @@ const G_Glare = (() => {
   }
   return { begin, add, end, get level() { return level; } };
 })();
-G.Glare = G_Glare;
-interface GameModules { Glare: typeof G_Glare; }
+G.Glare = Glare;
+declare global { interface GameModules { Glare: typeof Glare; } }
