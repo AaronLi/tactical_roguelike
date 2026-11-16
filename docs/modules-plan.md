@@ -455,7 +455,7 @@ Phase 4 is done: the workers' lists are gone, the simulation's files import each
 #### Phase 5 results (part c)
 
 - **Converted, 11 files (67 in all):** `levelview`, `glare`, `shotlog`, `render`, `views`, `hud`, `menushow`, `highlights`, `profiler`, `gamepad`, `touch`
-  (their `index.html` tags are modules now: the codemod, then `--uses --force-order`). `render` exports `R` and had a local `R` (a `const R = G.Rig`
+  (the codemod, then `--uses --force-order`). `render` exports `R` and had a local `R` (a `const R = G.Rig`
   in its warm-up), renamed `RG` by hand. The hooks stay: `render` sets `Hooks.doorDust` and `partLight`, `views` `enemyView`, `hud` `toast` and `feed`.
   `profiler`, `gamepad` and `touch` register no listener while loading (their `init`s do, called by `game`), so the order and number of registrations are unchanged.
 - **The export worker's set did not change:** its 37 evaluated files before and after (the `evalOrder` of `tools/deps.mjs`, compared from the
