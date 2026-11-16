@@ -2,7 +2,7 @@
 // browser): the compiled game (dist/js, ES modules and scripts: tools/vm_game.mjs) in a vm, the files the level is laid out with: js/prepentry.ts,
 // the level preparation worker's entry file (its imports are the rest). three.js is there because some of those files reach for it as
 // they load (js/util.ts, js/damage.ts); generating a level doesn't: pure(G) swaps it for one that throws on any use, and says what did.
-import { runScripts } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
+import { runScripts, moduleOf } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import vm from 'vm'; import path from 'path'; import { fileURLToPath } from 'url';
 import * as THREE_NS from 'three';
 
@@ -17,8 +17,7 @@ export async function loadLevel() {
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx; ctx.G = {};
   vm.createContext(ctx);
   await runScripts(ctx, DIST, LEVEL_SCRIPTS, { what: 'npm run test:level does' });
-  ctx.G.Hooks.hangarDecorate = () => {}; // (the hangar's own fittings: js/hangar.ts, the screen's, which sets this hook; its map is the level's)
-  ctx.G.Range = null;
+  moduleOf(ctx, DIST + 'util.js').Hooks.hangarDecorate = () => {}; // (the hangar's own fittings: js/hangar.ts, the screen's, which sets this hook; its map is the level's)
   return { G: ctx.G, ctx };
 }
 

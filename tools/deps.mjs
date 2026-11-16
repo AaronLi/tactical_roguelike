@@ -77,7 +77,7 @@ for (const f of files) {
   const line = (n) => sf.getLineAndCharacterOfPosition(n.getStart(sf)).line + 1;
   const defs = new Map(), uses = [], decls = new Map(), imports = []; // (imports: what the file takes from another by `import`, once it's a module: docs/modules-plan.md phase 4)
   const importLocals = new Map(); // (local name -> its import: what a bare name in the file refers to)
-  for (const s of sf.statements) if (ts.isImportDeclaration(s) && ts.isStringLiteral(s.moduleSpecifier) && /^\.\.?\//.test(s.moduleSpecifier.text)) {
+  for (const s of sf.statements) if (ts.isImportDeclaration(s) && !(s.importClause && s.importClause.isTypeOnly) && ts.isStringLiteral(s.moduleSpecifier) && /^\.\.?\//.test(s.moduleSpecifier.text)) { // (an `import type` runs nothing and is no edge)
     const els = s.importClause && s.importClause.namedBindings && ts.isNamedImports(s.importClause.namedBindings) ? s.importClause.namedBindings.elements : [];
     const im = { from: path.basename(s.moduleSpecifier.text).replace(/\.js$/, ''), line: line(s), names: els.map((e) => (e.propertyName || e.name).text), sideEffect: !s.importClause, kept: !s.importClause };
     imports.push(im);

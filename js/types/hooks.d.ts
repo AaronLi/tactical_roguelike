@@ -28,6 +28,12 @@ interface SimHooks {
   // --- js/data.ts
   /** a gun's model's own figures (js/glb.ts infoOf), once the model's platform index is loaded; null until then */
   modelInfo?: (def: Record<string, any>) => any;
+  /** a gun's platform (arch, spec ...) by its id, once the build tables are loaded (js/parts.ts: Gunsmith.PLATFORMS) */
+  platformOf?: (id: string) => any;
+  /** the sound key of a round in a gun (js/parts.ts: Gunsmith.roundSoundKey) */
+  roundSoundKey?: (def: Record<string, any>, am: string) => string;
+  /** the account's side of the career counters (js/cloud.ts): what Career adds up is queued for it; unset where js/cloud.ts isn't loaded */
+  cloud?: { add(d: Record<string, number>, mx?: Record<string, number>, best?: Record<string, CareerBest>): void; runChanged(): void };
   // --- js/gear.ts
   /** your own gun as built, when there's a you (js/player.ts); without it the gun's made as the simulation makes it */
   makeWeapon?: (id: string, build: any) => GWeapon;

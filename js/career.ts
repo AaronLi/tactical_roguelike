@@ -1,6 +1,10 @@
 'use strict';
-import { U } from './util.js';
-// G.THEMES and G.Route stay reads through G: tools/cloud.test.mjs loads only util, cloudconfig, career and cloud and stands these two in (an import would load the real data and route).
+import { Hooks, U } from './util.js';
+import { THEMES } from './data.js';
+import { Game } from './game.js';
+import { Net } from './net.js';
+import { Route } from './route.js';
+// (tools/cloud.test.mjs loads util, cloudconfig, career and cloud and answers the imports of the page's other files with stand-ins: tools/vm_game.mjs `stubs`.)
 export const Career = (() => {
   const V = 1, KEEP = 50;
   // the counters, and their columns in the career table (supabase/migrations)
@@ -33,10 +37,10 @@ export const Career = (() => {
   function bump(k: string, n = 1) {
     if (!n) return;
     (S() as any)[k] += n; keepStats();
-    if (G.Cloud) G.Cloud.add({ [k]: n });
+    if (Hooks.cloud) Hooks.cloud.add({ [k]: n });
   }
   function deepest(n: number) {
-    if (n > S().deepest) { S().deepest = n; keepStats(); if (G.Cloud) G.Cloud.add({}, { deepest: n }); }
+    if (n > S().deepest) { S().deepest = n; keepStats(); if (Hooks.cloud) Hooks.cloud.add({}, { deepest: n }); }
   }
   function touch(push = false) {
     if (!run) return;
@@ -44,15 +48,15 @@ export const Career = (() => {
     if (push) run.u++;
     if (!L().includes(run)) L().unshift(run);
     keepRuns();
-    if (push && G.Cloud) G.Cloud.runChanged();
+    if (push && Hooks.cloud) Hooks.cloud.runChanged();
   }
   const summary = (r: CareerRun): CareerBest => ({ id: r.id, start: r.start, lvl: r.deepest, credits: r.credits, squad: r.squad, outcome: r.outcome });
 
   // ------------------------------------------------------------- runs
   function runStart(joined: number | null = null) {
     if (run) runEnd('left');
-    const net = G.Net;
-    run = { id: uuid(), v: V, start: Date.now(), end: null, solo: !!net.solo, host: !!net.isHost, squad: Math.max(1, Object.keys((G.Game && G.Game.roster) || {}).length), joined,
+    const net = Net;
+    run = { id: uuid(), v: V, start: Date.now(), end: null, solo: !!net.solo, host: !!net.isHost, squad: Math.max(1, Object.keys((Game && Game.roster) || {}).length), joined,
       outcome: 'playing', deepest: 0, credits: 0, kills: 0, arrests: 0, levels: [], t: Date.now(), u: 1, sy: 0 };
     lvl = null;
     bump('runs');
@@ -69,7 +73,7 @@ export const Career = (() => {
     if (run.deepest > 0 && (!s.bestLevel || run.deepest > s.bestLevel.lvl)) { s.bestLevel = b; (best = best || ({} as Best)).best_level = b; }
     if (run.credits > 0 && (!s.bestCredits || run.credits > s.bestCredits.credits)) { s.bestCredits = b; (best = best || ({} as Best)).best_credits = b; }
     keepStats();
-    if (best && G.Cloud) G.Cloud.add({}, {}, best);
+    if (best && Hooks.cloud) Hooks.cloud.add({}, {}, best);
     touch(true);
     run = null;
   }
@@ -78,8 +82,8 @@ export const Career = (() => {
   function levelStart(n: number, th: number | undefined, night: boolean, stronghold: boolean) {
     if (!run) runStart(n); // (joined a run already going)
     if (lvl) run!.levels.push(lvl); // (a level never seen to its end: the next one's begun)
-    const T = th != null && G.THEMES[th] ? G.THEMES[th] : null;
-    lvl = { n, th: th == null ? -1 : th, theme: T ? T.name : '', night: !!night, stronghold: !!stronghold, boss: !!(G.Route && G.Route.isBoss(n)), cleared: false,
+    const T = th != null && THEMES[th] ? THEMES[th] : null;
+    lvl = { n, th: th == null ? -1 : th, theme: T ? T.name : '', night: !!night, stronghold: !!stronghold, boss: !!(Route && Route.isBoss(n)), cleared: false,
       kills: 0, incaps: 0, headshots: 0, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, downs: 0, deaths: 0, revives: 0, credits: 0, report: null };
     run!.deepest = Math.max(run!.deepest, n);
     deepest(n);

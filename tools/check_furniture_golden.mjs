@@ -8,7 +8,7 @@
 //   node tools/check_furniture_golden.mjs --update     rewrites it (review the diff: it's the change in what the levels look like)
 //   node tools/check_furniture_golden.mjs --dump DIR   also writes each level's description (and the pieces') as JSON into DIR
 // (Needs the compiled game: npm run test:models compiles it first.)
-import { runScripts } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
+import { runScripts, moduleOf } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import fs from 'fs'; import vm from 'vm'; import path from 'path';
 import * as THREE_NS from 'three';
 import { ROOT, DIST } from './model_env.mjs';
@@ -22,7 +22,7 @@ async function loadLevelGame() {
   ctx.window = ctx; ctx.self = ctx; ctx.G = {};
   vm.createContext(ctx);
   await runScripts(ctx, DIST, FILES, { what: 'npm run test:models does' });
-  ctx.G.Hooks.hangarDecorate = () => {}; // (the hangar's solids: js/hangar.ts, page-side, which sets this hook; nothing it does is furniture)
+  moduleOf(ctx, path.join(DIST, 'util.js')).Hooks.hangarDecorate = () => {}; // (the hangar's solids: js/hangar.ts, page-side, which sets this hook; nothing it does is furniture)
   return ctx.G;
 }
 const G = await loadLevelGame(), FS = G.FurnSpec;

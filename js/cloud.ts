@@ -1,8 +1,14 @@
 'use strict';
 import { Career } from './career.js';
 import { CloudConfig } from './cloudconfig.js';
-import { U } from './util.js';
-// G.Callsigns, G.Arsenal and G.Shop stay reads through G (each guarded): tools/cloud.test.mjs loads only util, cloudconfig, career and cloud, and stands Callsigns and Arsenal in (an import would load the real ones).
+import { Hooks, U } from './util.js';
+import { Arsenal } from './arsenal.js';
+import { Callsigns } from './callsigns.js';
+import { Game } from './game.js';
+import { Net } from './net.js';
+import { Me } from './player.js';
+import { Shop } from './shop.js';
+// (tools/cloud.test.mjs loads util, cloudconfig, career and cloud and answers the imports of the page's other files with stand-ins: tools/vm_game.mjs `stubs`.)
 // Cloud saves (docs/cloud.md): your progress in a Supabase project, so it survives a cleared browser and follows you to another
 // device. What's kept: the sidearm tree (G.U.store 'arsenal'), your callsign, look and settings, the wishlist, the career and the
 // run log (js/career.ts). It all lives in this browser first, as it always has (G.U.store, under bp_); this copies it up and back.
@@ -206,7 +212,7 @@ export const Cloud = (() => {
     if (u) { const was = user && user.email; user = u; if (u.email !== was) { render(); tellHost(); } }
   }
   // the guest mark the squad sees (js/server.ts 'acct'), if you're in a game
-  function tellHost() { render(); if (G.Net && G.Net.peer && G.Game && G.Game.phase !== 'menu') G.Net.toHost({ t: 'acct', anon: guest() ? 1 : 0 }); }
+  function tellHost() { render(); if (Net && Net.peer && Game && Game.phase !== 'menu') Net.toHost({ t: 'acct', anon: guest() ? 1 : 0 }); }
   // (GUEST, to the squad: cloud saves on, and not signed in. Off or not set up: nothing to say)
   const guest = () => on() && !(user && !isAnon(user));
 
@@ -228,8 +234,8 @@ export const Cloud = (() => {
       const oldAnimals = !!row && !Array.isArray(cv.animals) && (typeof row.animal === 'string' || typeof cv.animal2 === 'string');
       if (oldAnimals) { cv.animals = [row.animal, cv.animal2].filter((a, i, l) => typeof a === 'string' && a && l.indexOf(a) === i); cmt.animals = Math.max(cmt.animal || 0, cmt.animal2 || 0); }
       // (a shorter list, an older one or a top three: the missing animals appended in their usual order, and written up whole)
-      const ids: string[] = G.Callsigns ? G.Callsigns.LIST.map((a) => a.id) : Array.isArray(local.animals) ? local.animals : [];
-      const whole = (l: unknown) => { if (!Array.isArray(l)) return l; const o = l.filter((a, i) => typeof a === 'string' && l.indexOf(a) === i && (!G.Callsigns || G.Callsigns.valid(a))); for (const id of ids) if (!o.includes(id)) o.push(id); return o; };
+      const ids: string[] = Callsigns ? Callsigns.LIST.map((a) => a.id) : Array.isArray(local.animals) ? local.animals : [];
+      const whole = (l: unknown) => { if (!Array.isArray(l)) return l; const o = l.filter((a, i) => typeof a === 'string' && l.indexOf(a) === i && (!Callsigns || Callsigns.valid(a))); for (const id of ids) if (!o.includes(id)) o.push(id); return o; };
       const shortCloud = Array.isArray(cv.animals) && JSON.stringify(whole(cv.animals)) !== JSON.stringify(cv.animals);
       if (shortCloud) cv.animals = whole(cv.animals);
       if (Array.isArray(local.animals)) local.animals = whole(local.animals);
@@ -260,10 +266,10 @@ export const Cloud = (() => {
   }
   // what's merged in, into the game as it is now (the menu's controls, the arsenal's copy, the wishlist, the quick slots)
   function applyLive(keys: string[]) {
-    if (keys.includes('arsenal') && G.Arsenal) G.Arsenal.reload();
-    if (keys.includes('wishlist') && G.Shop) G.Shop.wishSet = null;
-    if (keys.includes('quick') && G.Me) (G.Me as any)._quick = null;
-    if (G.Game && G.Game.applyStored) G.Game.applyStored(keys);
+    if (keys.includes('arsenal') && Arsenal) Arsenal.reload();
+    if (keys.includes('wishlist') && Shop) Shop.wishSet = null;
+    if (keys.includes('quick') && Me) (Me as any)._quick = null;
+    if (Game && Game.applyStored) Game.applyStored(keys);
   }
   // Signing in. A copy of this account: pulled, merged, pushed. A copy of no account (a guest save, or an anonymous user's from an
   // earlier build): moved into the account (migrate). A copy of another email account: replaced by this one's.
@@ -598,5 +604,6 @@ export const Cloud = (() => {
     get state() { return state; }, get user() { return user; }, get client() { return client; } };
 })();
 G.Cloud = Cloud;
+Hooks.cloud = Cloud; // (js/career.ts tells it of what's counted: it imports this file's reader, so asks through this hook, set as this loads)
 
 declare global { interface GameModules { Cloud: typeof Cloud; } }

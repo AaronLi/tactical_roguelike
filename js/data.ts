@@ -275,7 +275,7 @@ export const shotDef = (def: Record<string, any>, w: { def: Record<string, any>;
 G.shotDef = shotDef;
 // the sound key of that shot: the gun's own, with the barrel length of the effective one (the synth's barrel length changes the report: longer is fuller and louder)
 export const shotSoundKey = (def: Record<string, any>, eff: number, am: string): string => {
-  const key = G.Gunsmith.roundSoundKey(def, am), [base, load] = key.split('@'), p = base.split(':');
+  const key = Hooks.roundSoundKey!(def, am), [base, load] = key.split('@'), p = base.split(':');
   if (p.length < 3) return key;
   p[1] = (eff / 25.4).toFixed(1);
   return p.join(':') + (load ? '@' + load : '');
@@ -292,19 +292,19 @@ export const OPEN_BOLT = ['uzi', 'mac10', 'ppsh', 'thompson', 'aa12', 'm249', 'p
 G.OPEN_BOLT = OPEN_BOLT;
 export const chambered = (def: Record<string, any> | null | undefined) => {
   if (!def || OPEN_BOLT.includes(def.id) || def.enbloc || def.akimbo || def.barrels || ['GL', 'BOW', 'RAIL'].includes(def.cls)) return false;
-  const P = G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
+  const P = Hooks.platformOf && Hooks.platformOf(def.id);
   return !(P && (P.arch === 'revolver' || P.arch === 'derringer' || P.arch === 'pepperbox' || (P.spec && P.spec.rcv === 'break')));
 };
 G.chambered = chambered;
 // A revolver takes loose rounds, a round at a time (its reload figure's a round's), with the cylinder swung out first
 // and shut after; a speed loader or moon clips fill it all at once (loadFull, before the part's own figure: js/parts.ts).
-export const revolver = (def: Record<string, any> | null | undefined) => { const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id]; return !!P && P.arch === 'revolver'; };
+export const revolver = (def: Record<string, any> | null | undefined) => { const P = def && Hooks.platformOf && Hooks.platformOf(def.id); return !!P && P.arch === 'revolver'; };
 G.revolver = revolver;
 export const REV = { open: 0.55, close: 0.35 };
 G.REV = REV;
 // A falling-block breech (the Hailstorm's: a pepperbox platform) is loaded the same way: the block dropped first (its lever swung down), a round into each
 // chamber, the block up after; the times are the revolver's (G.REV), and a pull of the trigger with the block down shuts it first.
-export const fblock = (def: Record<string, any> | null | undefined) => { const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id]; return !!P && P.arch === 'pepperbox'; };
+export const fblock = (def: Record<string, any> | null | undefined) => { const P = def && Hooks.platformOf && Hooks.platformOf(def.id); return !!P && P.arch === 'pepperbox'; };
 G.fblock = fblock;
 // how loud a volley is, as a share of a full one (every barrel): n rounds of def.volley at once (each round's blast adds to the others': the energy, not the pressure)
 export const volleyVol = (def: Record<string, any>, n: number) => Math.sqrt(Math.max(1, n) / (def.volley || 1));
@@ -319,7 +319,7 @@ G.fullReload = fullReload;
 export const BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192', 'm4', 'mcx']); // (m4: the Mk18, authored in Blender, so no longer rcv 'ar' below; mcx: SIG's own lower, which locks back too)
 G.BOLT_HOLD = BOLT_HOLD;
 export const boltHold = (def: Record<string, any>) => {
-  const P = def && G.Gunsmith && G.Gunsmith.PLATFORMS[def.id];
+  const P = def && Hooks.platformOf && Hooks.platformOf(def.id);
   return !!P && ((P.arch === 'pistol' && !def.manual) || BOLT_HOLD.has(def.id) || (P.arch === 'rifle' && (P.spec.rcv || 'ar') === 'ar')); // (the AR-15 pattern: a bolt catch over the well)
 };
 G.boltHold = boltHold;

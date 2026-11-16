@@ -37,14 +37,19 @@ async function browser(server, store, { cfg = { url: 'http://fake.supabase', key
   };
   win.window = win; win.self = win; win.globalThis = win;
   const ctx = vm.createContext(win);
-  for (const f of SRC) await runFile(ctx, f);
+  // what the page's other files are, as far as these touch them: the imports of career and cloud answered with stand-ins (tools/vm_game.mjs `stubs`);
+  // there is no game, no shop and no player here (empty objects: the guards in js/cloud.ts and js/career.ts read them as absent)
+  const LIST = ['snake', 'seal', 'frog', 'cat', 'raccoon', 'hyrax'].map((id) => ({ id }));
+  const stubs = {
+    './data.js': { THEMES: [{ name: 'Warehouse' }, { name: 'Apartments' }] },
+    './route.js': { Route: { isBoss: (n) => n % 10 === 0 } },
+    './net.js': { Net: { solo: true, isHost: true, peer: null } },
+    './arsenal.js': { Arsenal: { reload() {} } },
+    './callsigns.js': { Callsigns: { LIST, valid: (a) => LIST.some((x) => x.id === a) } },
+    './game.js': { Game: {} }, './shop.js': { Shop: {} }, './player.js': { Me: {} },
+  };
+  for (const f of SRC) await runFile(ctx, f, { stubs });
   const G = win.G;
-  // what the page's other files would have put there, as far as these touch it
-  G.THEMES = [{ name: 'Warehouse' }, { name: 'Apartments' }];
-  G.Route = { isBoss: (n) => n % 10 === 0 };
-  G.Net = { solo: true, isHost: true, peer: null };
-  G.Arsenal = { reload() {} };
-  { const LIST = ['snake', 'seal', 'frog', 'cat', 'raccoon', 'hyrax'].map((id) => ({ id })); G.Callsigns = { LIST, valid: (a) => LIST.some((x) => x.id === a) }; }
   win.fire = (ev) => (listeners[ev] || []).forEach((f) => f());
   win.G = G;
   return win;

@@ -19,6 +19,9 @@ import { Hooks } from './util.js';
 // ===================================================================================================================
 
 // (Scripts share one global scope: all of it lives inside one function, so its short names don't collide with the others'.)
+/** The glTF loader (made from three's GLTFLoader below, when the page has it; the tools put their own: tools/model_env.mjs). */
+interface GlbModuleApi { ready: Promise<boolean>; load(url: string): Promise<any> }
+export const GLB: { loader: GlbModuleApi | null } = { loader: null };
 export const Models = (() => {
 /** The `slot` a mesh belongs to (glTF node extras `slot`): which gunsmith part it is, so the gunsmith can highlight and pick it. */
 const SLOTS = {
@@ -1234,7 +1237,7 @@ function contractMarkdown(): string {
   /** ?checkModels: validate each model as it loads. (Every gun the game shows comes from these files: there is no flag and no procedural fallback.) */
   const on = true, checking = qs.has('checkModels');
   const R = { base: '' }; // (R.base: where the page's folder is from here: '' on the page, '../../' in the export worker, js/exportworker.ts)
-  const glbReady = (): Promise<boolean> => (G.GLB ? G.GLB.ready.then((x) => x, () => false) : Promise.resolve(false));
+  const glbReady = (): Promise<boolean> => (GLB.loader ? GLB.loader.ready.then((x) => x, () => false) : Promise.resolve(false));
 
   // ---- per-part packs: loading, and assembling any build from them ----
   const PARTS_BASE = 'assets/models/parts/', SHARED_DIR = '_shared/';
@@ -1275,7 +1278,7 @@ function contractMarkdown(): string {
   }
   const loadPack = (id: string, file: string, pri = 0): Promise<boolean> => {
     const url = packUrl(id, file); if (packRoots.has(url)) return Promise.resolve(true);
-    return enqueue(url, pri, () => G.GLB!.load(url).then((scene) => {
+    return enqueue(url, pri, () => GLB.loader!.load(url).then((scene) => {
       if (checking) { const r = validatePack(describeScene(scene)); for (const e of r.errors) console.error(`[checkModels] ${url}: ${e}`); for (const w of r.warnings) console.warn(`[checkModels] ${url}: ${w}`); }
       const root = scene.children[0]; if (root) packRoots.set(url, root); return !!root;
     }, (e: any) => { console.warn('[baked guns] ' + url + ': ' + (e && e.message || e)); return false; }));
@@ -1424,9 +1427,9 @@ function contractMarkdown(): string {
     return scene;
   }
   const GL = (globalThis as any).ThreeAddons;
-  if (GL && !G.GLB) {
+  if (GL && !GLB.loader) {
     const loader = new GL.GLTFLoader().setMeshoptDecoder(GL.MeshoptDecoder), cache = new Map<string, Promise<any>>();
-    G.GLB = {
+    GLB.loader = {
       ready: Promise.resolve(GL.MeshoptDecoder.ready).then(() => true, () => false),
       load: (url: string) => { const hit = cache.get(url); if (hit) return hit; const p: Promise<any> = (G.Bundles.bundleOf(url) ? G.Bundles.getFile(url).then((b) => loader.parseAsync(b, '')) : loader.loadAsync(R.base + url)).then((g: any) => dequantize(g.scene), (e: any) => { cache.delete(url); throw e; }); cache.set(url, p); return p; },
     };
@@ -1434,7 +1437,7 @@ function contractMarkdown(): string {
   /** Where the page's folder is from here (the export worker's scripts are two folders down: js/exportworker.ts sets '../../'). */
   const setRoot = (base: string) => { R.base = base; G.Bundles.setRoot(base); };
   /** A .glb or JSON of the game's assets (assets/models/...), by the loader above: for the props (js/gunmodels.ts). */
-  const loadFile = (url: string): Promise<any> => glbReady().then((ok) => { if (!ok) throw new Error('no glTF loader'); return G.GLB!.load(url); });
+  const loadFile = (url: string): Promise<any> => glbReady().then((ok) => { if (!ok) throw new Error('no glTF loader'); return GLB.loader!.load(url); });
   const fetchJson = (url: string): Promise<any> => (G.Bundles.bundleOf(url) ? G.Bundles.getJson(url) : fetch(R.base + url, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null));
 
   /** Every platform's index (assets/models/parts/<id>/index.json: ~0.24 MB gzipped for all): what boot() waits on. */
@@ -1466,6 +1469,4 @@ function contractMarkdown(): string {
 })();
 G.Models = Models;
 Hooks.modelInfo = (def) => (Models.infoOf ? Models.infoOf(def) : null); // (a barrel's effective lengths from the model: js/data.ts barrelMm)
-/** G.GLB: the glTF loader (made from three's GLTFLoader in js/glb.ts; tools replace it with their own). */
-interface GlbModuleApi { ready: Promise<boolean>; load(url: string): Promise<any> }
-declare global { interface GameModules { Models: typeof Models; GLB?: GlbModuleApi } }
+declare global { interface GameModules { Models: typeof Models } }

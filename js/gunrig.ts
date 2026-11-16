@@ -1,6 +1,7 @@
 'use strict';
 import { OPEN_BOLT } from './data.js';
-// (G.GunModels stays a read through G: the model tools put the recipes there (tools/model_env.mjs), and importing js/gunmodels.ts would load the game's facade over them)
+import { GunModels } from './gunmodels.js';
+// (the model tools answer the import of js/gunmodels.ts with the recipes: tools/vm_game.mjs `stubs`, tools/model_env.mjs)
 // Binding animation to a gun model: what js/vmanim.ts needs to move a gun's parts and put hands on it, found on a MODEL
 // (a group of slot-tagged meshes, `part_<key>` nodes with their pivots, and `info`: docs/models.md), whether the recipes
 // (tools/models/recipes.ts, at bake time) built it or it came out of a .glb (js/glb.ts, js/gunmodels.ts: what the game does).
@@ -96,9 +97,9 @@ export const GunRig = (() => {
     const def = o.def, an = parts(group, info);
     const A = { G: v(info.grip), S: v(info.support), W: v(info.magAt), port: v(info.port), ch: v(info.ch), slide: v(info.slide), cyl: v(info.cylAt), bolt: v(info.bolt) } as GunRigAnchors;
     if (info.load) A.load = { at: info.load.at.map(([f, y]) => v([f, y, 0])!), pitch: info.load.pitch }; // (a derringer: its open breeches, and how far its barrels tip)
-    if (info.breech) { const rs = G.GunModels.roundShape(def as { id: string }), rd = G.GunModels.roundDims(def as { id: string }); A.breech = { at: v([info.breech.at[0], info.breech.at[1], 0])!, pitch: info.breech.pitch, long: info.breech.long, oal: rs ? rs.oal : rd ? rd.cs + (rd.pistol || rd.bd >= 0.01 ? rd.bd * 1.1 : rd.bl) : 0.05 }; } // (a Thor's: where its open breech is, and how long a round is to go in it)
+    if (info.breech) { const rs = GunModels.roundShape(def as { id: string }), rd = GunModels.roundDims(def as { id: string }); A.breech = { at: v([info.breech.at[0], info.breech.at[1], 0])!, pitch: info.breech.pitch, long: info.breech.long, oal: rs ? rs.oal : rd ? rd.cs + (rd.pistol || rd.bd >= 0.01 ? rd.bd * 1.1 : rd.bl) : 0.05 }; } // (a Thor's: where its open breech is, and how long a round is to go in it)
     if (info.block && info.chamberAt && info.chamberAt.side === 'face') { // (a falling block: its chambers, where each round goes in, and how long a round is)
-      const c = info.chamberAt, rd = G.GunModels.roundDims(def as { id: string });
+      const c = info.chamberAt, rd = GunModels.roundDims(def as { id: string });
       A.block = { at: c.heads.map(([x, y]) => new T.Vector3(x, y, -c.f)), oal: rd ? rd.cs + (rd.pistol || rd.bd >= 0.01 ? rd.bd * 1.1 : rd.bl) : 0.025 };
     }
     if (info.cup) A.cup = v(info.cup); // (a derringer: the left hand cupped under the frame, clear of the barrels as they tip)

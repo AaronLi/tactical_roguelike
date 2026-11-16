@@ -1,6 +1,6 @@
 'use strict';
 import { AMMO, baseAm, BELT_FAMILY, CALIBERS, calOf, fullReload, GUN_KG, GUN_SPECS, MAG_FAMILY, physRecoil, plusOf, roundSpeed, WEAPON_LIST, WEAPONS } from './data.js';
-import { U } from './util.js';
+import { Hooks, U } from './util.js';
 interface MagFam {
   name: string; brand: string; clear?: string; std: number; straightShort?: boolean; model: Record<string, any>; desc: string;
   caps: [number, boolean, number, Record<string, number>, number][];
@@ -1833,4 +1833,6 @@ export const Gunsmith = (() => {
   };
 })();
 G.Gunsmith = Gunsmith;
+Hooks.platformOf = (id) => Gunsmith.PLATFORMS[id]; // (js/data.ts looks at a gun's build through these: it can't import this file, which reads it while loading)
+Hooks.roundSoundKey = Gunsmith.roundSoundKey;
 declare global { interface GameModules { Gunsmith: typeof Gunsmith; } }
