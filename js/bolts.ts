@@ -1,11 +1,13 @@
 'use strict';
+import { Ballistics } from './ballistics.js';
+import { AMMO } from './data.js';
 // Crossbow bolts that stayed where they hit: in a suspect (it follows the bone it's in), in a soft vest, or
 // in timber and plasterboard. Whoever fired it decides (js/player.ts roundSegment) and tells the squad; each machine draws
 // its own. The lit nock stays on, in the load's colour (G.AMMO glow), so you can see from across a room where one went.
 interface BoltParts { shaft: THREE.BufferGeometry; vane: THREE.BufferGeometry; heads: Record<string, THREE.BufferGeometry>; nock: THREE.BufferGeometry; carbon: THREE.Material; steel: THREE.Material; }
 interface BoltOn { rig: Rig; bone: THREE.Object3D; p: THREE.Vector3; q: THREE.Quaternion; }
 interface BoltNet { am: string; at?: number[]; u?: number[]; e?: number; b?: string; l?: number[]; }
-const G_Bolts = (() => {
+export const Bolts = (() => {
   const T = THREE, LEN = 0.4, MAX = 40, list: THREE.Group[] = [];
   // what won't hold a bolt: it glances or breaks on these, and drops
   const HARD = new Set(['metal', 'stone', 'glass', 'concrete', 'brick']);
@@ -28,7 +30,7 @@ const G_Bolts = (() => {
     g.fillStyle = r; g.fillRect(0, 0, 64, 64);
     glowTex = new T.CanvasTexture(c);
   }
-  const colour = (am: string): number => (G.AMMO[am] && G.AMMO[am].glow) || 0x39ff5a;
+  const colour = (am: string): number => (AMMO[am] && AMMO[am].glow) || 0x39ff5a;
   function nockMat(am: string) {
     const col = colour(am);
     if (!nockMats.has(col)) nockMats.set(col, { lit: new T.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.2, roughness: 0.4 }),
@@ -84,14 +86,14 @@ const G_Bolts = (() => {
   }
   // the squad's: what the shooter's machine decided (e, the suspect; b, the bone; l, where on it; or at, u: in the world)
   function fromNet(m: BoltNet | null) {
-    if (!m || !G.AMMO[m.am]) return;
+    if (!m || !AMMO[m.am]) return;
     if (m.at) { inWorld(new T.Vector3(...(m.at as [number, number, number])), new T.Vector3(...(m.u as [number, number, number])).normalize(), m.am); return; }
-    const ev = G.Views.enemies.get(m.e!), bone = ev && ev.rig && (m.b === 'shield' ? ev.rig.shield || ev.rig.shieldDropped || null : G.Ballistics.boneOf(ev.rig, m.b!)); // ('shield': in their handheld shield, js/player.ts boltShield)
+    const ev = G.Views.enemies.get(m.e!), bone = ev && ev.rig && (m.b === 'shield' ? ev.rig.shield || ev.rig.shieldDropped || null : Ballistics.boneOf(ev.rig, m.b!)); // ('shield': in their handheld shield, js/player.ts boltShield)
     if (bone && Array.isArray(m.l)) follow(mesh(m.am), ev.rig, bone, m.l);
   }
   function clear() { for (const g of list) if (g.parent) g.parent.remove(g); list.length = 0; }
   const holds = (fx: string) => !HARD.has(fx);
   return { LEN, HARD, colour, inWorld, onBone, fromNet, update, clear, holds, get count() { return list.length; } };
 })();
-G.Bolts = G_Bolts;
-interface GameModules { Bolts: typeof G_Bolts; }
+G.Bolts = Bolts;
+declare global { interface GameModules { Bolts: typeof Bolts; } }

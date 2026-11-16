@@ -1,4 +1,5 @@
 'use strict';
+import { LightGrid } from './lightgrid.js';
 // Levels got ready ahead (js/prepworker.ts): a level that's coming (a ship of the zone's the squad's ship is drawing near to:
 // js/space.ts) is asked for by its figures, worked on in another thread while the game goes on, and what was worked out is
 // taken when it's wanted, so the frame it's put up has little left to do. Nothing depends on it: a level that wasn't asked
@@ -9,7 +10,7 @@
 //                                              come; asked for if it isn't on its way. null meanwhile; false if there's no
 //                                              other thread, so it's to be laid out here
 //   G.Prep.take(seed, level, th, night, gen)   its light grid's sums (map.lgPre), if they've come, else null
-const G_Prep = (() => {
+export const Prep = (() => {
   let w: Worker | null = null, dead = false;
   const got = new Map<string, any>(), maps = new Map<string, LvMap>(), flying = new Set<string>(), bad = new Set<string>();
   const keyOf = (seed: number, level: number, th: number | undefined, night: boolean, gen: any) => JSON.stringify([seed, level, th, !!night, gen ? Object.keys(gen).sort().map((k) => [k, gen[k] == null ? null : gen[k]]) : null]);
@@ -32,7 +33,7 @@ const G_Prep = (() => {
   function ask(key: string, seed: number, level: number, th: number | undefined, night: boolean, gen: any) {
     const ww = worker(); if (!ww || flying.has(key)) return;
     flying.add(key);
-    ww.postMessage({ t: 'prep', key, seed, level, th, night: !!night, gen, opts: Object.assign({}, G.LightGrid.opts) });
+    ww.postMessage({ t: 'prep', key, seed, level, th, night: !!night, gen, opts: Object.assign({}, LightGrid.opts) });
   }
   function want(seed: number, level: number, th: number | undefined, night: boolean, gen: any) {
     const key = keyOf(seed, level, th, night, gen); if (got.has(key) || maps.has(key)) return;
@@ -53,5 +54,5 @@ const G_Prep = (() => {
   }
   return { want, map, take, keyOf, boot: () => { worker(); } };
 })();
-G.Prep = G_Prep;
-interface GameModules { Prep: typeof G_Prep }
+G.Prep = Prep;
+declare global { interface GameModules { Prep: typeof Prep } }

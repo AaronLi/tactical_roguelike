@@ -1,4 +1,6 @@
 'use strict';
+import { OPEN_BOLT } from './data.js';
+// (G.GunModels stays a read through G: the model tools put the recipes there (tools/model_env.mjs), and importing js/gunmodels.ts would load the game's facade over them)
 // Binding animation to a gun model: what js/vmanim.ts needs to move a gun's parts and put hands on it, found on a MODEL
 // (a group of slot-tagged meshes, `part_<key>` nodes with their pivots, and `info`: docs/models.md), whether the recipes
 // (tools/models/recipes.ts, at bake time) built it or it came out of a .glb (js/glb.ts, js/gunmodels.ts: what the game does).
@@ -23,7 +25,7 @@
 //                                                           side 1: on the back face (toward the shooter; the front has none); the mesh node's rotation is the face's tilt there
 //                                                           role 'round': the i-th drawn round, t how far down; role 'tip': the tip of round i
 // A recipe's model carries the same as live references (part.userData.chk = { w, top, holes, rounds }); magCheck reads either.
-const G_GunRig = (() => {
+export const GunRig = (() => {
   const T = THREE;
   /** The moving parts of a gun, by `info.anim` key: the live nodes (a crossbow's quarrel and strings too). */
   type Parts = GunRigParts;
@@ -134,7 +136,7 @@ const G_GunRig = (() => {
     if (an.brk) A.brkHome = an.brk.position.clone(); // (a falling block's: where it sits shut, info.block)
     // recip: the handle rides the bolt (it jumps back each shot); open: an open-bolt gun, whose bolt (and a
     // riding handle with it) sits back, cocked, while there's a round to fire
-    return { holder: group, info, side: o.side || 1, an, A, chk: magCheck(an.mag), travel: info.handle ? info.handle.travel : 0.07, lock: info.handle && info.handle.lock || 0, recip: !!(info.handle && info.handle.recip), open: G.OPEN_BOLT.includes(def.id) };
+    return { holder: group, info, side: o.side || 1, an, A, chk: magCheck(an.mag), travel: info.handle ? info.handle.travel : 0.07, lock: info.handle && info.handle.lock || 0, recip: !!(info.handle && info.handle.recip), open: OPEN_BOLT.includes(def.id) };
   }
 
   /**
@@ -192,6 +194,6 @@ const G_GunRig = (() => {
 
   return { bind, parts, magCheck, describe, setLoaded, bipodPose, v, holds, HOLD_FIX };
 })();
-G.GunRig = G_GunRig;
+G.GunRig = GunRig;
 
-interface GameModules { GunRig: typeof G_GunRig; }
+declare global { interface GameModules { GunRig: typeof GunRig; } }

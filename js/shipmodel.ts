@@ -1,6 +1,11 @@
 'use strict';
+import { Models } from './glb.js';
+import { Level } from './level.js';
+import { ShipGen } from './shipgen.js';
+import { SpaceData } from './spacedata.js';
+import { U as G_U } from './util.js';
 interface SmGun { k: 'pd' | 'cannon' | 'missile'; x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
-const G_ShipModel = (() => {
+export const ShipModel = (() => {
   const T = THREE;
   // boxes gathered by material, then merged
   class Kit {
@@ -46,14 +51,14 @@ const G_ShipModel = (() => {
   // (docs/models.md "The squad's ship").
   const MODELS = new Map<string, THREE.Object3D>();
   function boot() {
-    for (const id of Object.keys(G.SpaceData.SHIPS)) G.Models.loadFile('assets/models/ships/' + id + '.glb').then((sc: any) => { if (sc) MODELS.set(id, sc); }, () => { /* (none made for her yet: the recipe) */ });
+    for (const id of Object.keys(SpaceData.SHIPS)) Models.loadFile('assets/models/ships/' + id + '.glb').then((sc: any) => { if (sc) MODELS.set(id, sc); }, () => { /* (none made for her yet: the recipe) */ });
   }
   function ship(d: SpShipDef, fleet: SpFleet): SmShip {
     const src = MODELS.get(d.id);
     return src ? fromModel(src, d, fleet) : shipRecipe(d, fleet);
   }
   function fromModel(src: THREE.Object3D, d: SpShipDef, fleet: SpFleet): SmShip {
-    const SD = G.SpaceData, L = SD.layout(d), g = new T.Group();
+    const SD = SpaceData, L = SD.layout(d), g = new T.Group();
     const [c0, c1, c2] = PAINT[d.id] || PAINT.kestrel, DS = { side: T.DoubleSide, flatShading: true };
     const glow = lit(0x2a8a5a), hot = lit(c2), thrust = new T.MeshBasicMaterial({ color: 0x66c8ff, transparent: true, opacity: 0.0, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
     const mats: Record<string, THREE.Material> = {
@@ -100,7 +105,7 @@ const G_ShipModel = (() => {
     return { group: g, nose, ramp, turrets, thrust, glow, screen: scr, nav, lights, seats };
   }
   function shipRecipe(d: SpShipDef, fleet: SpFleet): SmShip {
-    const SD = G.SpaceData, L = SD.layout(d), { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, W = 0.22, g = new T.Group(), K = new Kit(), X = hw + W, top = CB + 0.2;
+    const SD = SpaceData, L = SD.layout(d), { fw, tw, sw, hw, zc, zt, zw, zk, zr, z1, FC, FB, FM, CC, CB, CM } = L, W = 0.22, g = new T.Group(), K = new Kit(), X = hw + W, top = CB + 0.2;
     const [c0, c1, c2] = PAINT[d.id] || PAINT.kestrel, DS = { side: T.DoubleSide, flatShading: true };
     const hull = M(c0, Object.assign({ emissive: 0x101316, metalness: 0.45, roughness: 0.55 }, DS)), armor = M(c1, Object.assign({ emissive: 0x08090b, metalness: 0.55, roughness: 0.5 }, DS)), accent = M(c2, { emissive: new T.Color(c2).multiplyScalar(0.35).getHex() });
     const deck = M(0x2b2f34, { roughness: 0.85, emissive: 0x08090a }), inner = M(0x5d656e, { emissive: 0x15181b }), dark = M(0x15171a, { metalness: 0.5 }), seatM = M(0x3d444d, { emissive: 0x101216 });
@@ -234,14 +239,14 @@ const G_ShipModel = (() => {
   // ---- the outside of a ship that's boarded, from her deck plan (the level's own walls are her sides: this is what's
   // over and under them, and what each compartment shows of itself)
   function hull(map: LvMap): { group: THREE.Group; guns: SmGun[]; marker: THREE.Object3D; cutAt: (x: number, z: number, nx: number, nz: number) => void } {
-    const g = new T.Group(), K = new Kit(), TS = G.Level.TS, { W, H, t } = map, sp = map.sp!, th = map.theme, WH = G.Level.WALL_H, FH = G.Level.FLOOR_H, NF = map.floors ? map.floors.length : 1, TOP = (NF - 1) * FH + WH;
+    const g = new T.Group(), K = new Kit(), TS = Level.TS, { W, H, t } = map, sp = map.sp!, th = map.theme, WH = Level.WALL_H, FH = Level.FLOOR_H, NF = map.floors ? map.floors.length : 1, TOP = (NF - 1) * FH + WH;
     // Whose lines she has (her design language), by what she is: a freighter's (containers, tanks and gantries on a blunt hull), a
     // corporate cutter's (a needle bow, rounded shoulders, fins and nacelles), a pirate's (a toothed ram, scrap plates, spikes and
     // a boom, strapped-on engines, nothing matching) or a navy's (a long wedge bow, sloped armour over her roof and under her keel,
     // a citadel with masts, tail fins). Pirates' plating is dark and rusted whatever she was built as.
     const langOf = (size: SpSize): string => (size === 'transport' ? (th.name === 'Corporate cutter' ? 'cutter' : 'freighter') : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
     const decor: THREE.Mesh[] = [], washes: THREE.Mesh[] = []; // (what's cut away where she's rammed: cutAt)
-    const base = new T.Color(th.wall as string), r = G.U.rng((map.seed ^ 0x4a11) >>> 0);
+    const base = new T.Color(th.wall as string), r = G_U.rng((map.seed ^ 0x4a11) >>> 0);
     if (langOf(sp.size) === 'pirate') base.multiplyScalar(0.62).lerp(new T.Color(0x5a3222), 0.3);
     const shade = (k: number, o?: Record<string, any>) => M(base.clone().multiplyScalar(k).getHex(), Object.assign({ emissive: base.clone().multiplyScalar(k * 0.16).getHex() }, o || {}));
     const plate = shade(0.62), dark = shade(0.36, { metalness: 0.5 }), light = shade(0.85), trim = M(0xb8862a, { emissive: 0x2a1c06 }), win = lit(0xffe2a8), nav = lit(0xff4030), eng = lit(0x7fd0ff);
@@ -320,7 +325,7 @@ const G_ShipModel = (() => {
       guns.push({ k, x, y: y + (k === 'cannon' ? 2.1 : 1.1), z, hp: k === 'pd' ? 100 : k === 'cannon' ? 320 : 180, obj: o, gun: gn, cool: 1 + r() * 3 });
     };
     {
-      const C = G.SpaceData.SIZES[sp.size].guns, list: ('pd' | 'cannon' | 'missile')[] = [], hm = sp.hull;
+      const C = SpaceData.SIZES[sp.size].guns, list: ('pd' | 'cannon' | 'missile')[] = [], hm = sp.hull;
       for (let k = 0; k < Math.max(C.pd, C.cannon, C.missile); k++) { if (k < C.cannon) list.push('cannon'); if (k < C.pd) list.push('pd'); if (k < C.missile) list.push('missile'); }
       for (let k = C.pd; k > 0 && list.filter((q) => q === 'pd').length < C.pd; k--) list.push('pd');
       list.forEach((k, n) => { const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * (k === 'cannon' ? 0 : 3.4); K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); });
@@ -399,7 +404,7 @@ const G_ShipModel = (() => {
       const CONT = [0xb5651d, 0x2d5f8a, 0x4f7a3a, 0x8a8f94, 0x9a2f25, 0xc9a227].map((c) => DM(c, 0.8));
       const ti = (m: number) => Math.max(0, Math.min(W - 1, Math.floor(m / TS))), tj = (m: number) => Math.max(0, Math.min(H - 1, Math.floor(m / TS)));
       sp.hulls.forEach((hm, h) => {
-        const lang = hm.main && sp.wing ? 'wing' : langOf(hm.size), top = hm.main ? TOP : WH, RY = top + 0.3, rr = G.U.rng((map.seed ^ (0x51ed + h * 977)) >>> 0), R = (a: number, b: number) => a + rr() * (b - a);
+        const lang = hm.main && sp.wing ? 'wing' : langOf(hm.size), top = hm.main ? TOP : WH, RY = top + 0.3, rr = G_U.rng((map.seed ^ (0x51ed + h * 977)) >>> 0), R = (a: number, b: number) => a + rr() * (b - a);
         // her side at a station down her length (the outer face of her wall, +z or -z), her bow's face and her stern's
         const side = (xm: number, sg: number) => { const x = ti(xm); let z = tj(hm.zc); if (!solid(x, z)) return null; while (solid(x, z + sg)) z += sg; return (z + (sg > 0 ? 1 : 0)) * TS; };
         const end = (sg: number) => { let x = ti((hm.x0 + hm.x1) / 2); const z = tj(hm.zc); if (!solid(x, z)) return sg < 0 ? hm.x0 : hm.x1; while (solid(x + sg, z)) x += sg; return (x + (sg > 0 ? 1 : 0)) * TS; };
@@ -525,7 +530,7 @@ const G_ShipModel = (() => {
       // full depth down to nothing along the longer wall, keel to roof, in slices (it's smashed through like the rest: cutAt).
       {
         const fairM = langOf(sp.size) === 'cutter' ? paint : dPlate;
-        for (const f of G.ShipGen.fairings(W, H, t)) { // (where they are: js/shipgen.ts fairings; no window goes behind one)
+        for (const f of ShipGen.fairings(W, H, t)) { // (where they are: js/shipgen.ts fairings; no window goes behind one)
           const { cx, cz, short, long } = f, u = V(f.ux, 0, f.uz), v = V(f.vx, 0, f.vz), C0 = V(cx, 0, cz);
           const hm = sp.hulls.find((q) => cx > q.x0 - 2 && cx < q.x1 + 2 && cz > q.z0 - 2 && cz < q.z1 + 2) || sp.hull, y0 = -1.0, y1 = (hm.main ? TOP : WH) + 0.5, n = Math.max(2, Math.ceil(long / (TS * 1.5)));
           for (let k = 0; k < n; k++) {
@@ -559,7 +564,7 @@ const G_ShipModel = (() => {
   // origin: a hull by her kind (freighter, cutter, pirate, navy, wing: the same lines as the ships that are boarded, in little),
   // engines alight, navigation lights, a strobe that shows a long way off.
   function traffic(kind: string, seed: number): { group: THREE.Group; len: number } {
-    const r = G.U.rng(seed >>> 0), R = (a: number, b: number) => a + r() * (b - a), K = new Kit(), g = new T.Group();
+    const r = G_U.rng(seed >>> 0), R = (a: number, b: number) => a + r() * (b - a), K = new Kit(), g = new T.Group();
     const pal = ({ freighter: [0x8b8f8e, 0x3a3d42], cutter: [0xdfe3e4, 0x7f8a94], pirate: [0x4a3a32, 0x241c1a], navy: [0x69757f, 0x2c3238], wing: [0x59626c, 0x23272c] } as Record<string, number[]>)[kind] || [0x8b8f8e, 0x3a3d42];
     const E = (c: number, k: number) => new T.Color(c).multiplyScalar(k).getHex(), body = M(pal[0], { emissive: E(pal[0], 0.16) }), dark = M(pal[1], { emissive: E(pal[1], 0.16) }), eng = lit(0x7fd0ff), win = lit(0xffe2a8);
     const L = kind === 'navy' ? R(120, 200) : kind === 'freighter' ? R(70, 130) : kind === 'cutter' ? R(40, 65) : R(45, 85), w = L * R(0.16, 0.22), h = L * R(0.07, 0.095);
@@ -600,7 +605,7 @@ const G_ShipModel = (() => {
   // ---- the asteroid the base is cut into: a rock three kilometres through, a hollow planed into its top for the hangar
   // (flat for 70 m round the level, then walls 90 m high, then the rock's own curve). height(x, z): its surface there.
   function asteroid(Wm: number, Hm: number, seed: number) {
-    const R = 1500, r = G.U.rng(seed), cx = Wm / 2, cz = Hm / 2, U = G.U;
+    const R = 1500, r = G_U.rng(seed), cx = Wm / 2, cz = Hm / 2, U = G_U;
     const waves = Array.from({ length: 7 }, () => ({ d: new T.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize(), f: 1.5 + r() * 5, a: 30 + r() * 90, ph: r() * 6 }));
     const lump = (n: THREE.Vector3) => { let h = 0; for (const w of waves) h += Math.sin(n.dot(w.d) * w.f + w.ph) * w.a; return h * 0.5; };
     const height = (x: number, z: number) => {
@@ -643,7 +648,7 @@ const G_ShipModel = (() => {
   }
   // ---- a planet, seen from orbit: a sphere of its ground's colour under cloud, a rim of air
   function planet(th: ThemeDef, seed: number, R: number) {
-    const r = G.U.rng(seed), cv = canvasTex(512, 256, (c, w, h) => {
+    const r = G_U.rng(seed), cv = canvasTex(512, 256, (c, w, h) => {
       const base = new T.Color(th.floor as string), sky = new T.Color(th.fog as number);
       c.fillStyle = '#' + base.clone().multiplyScalar(0.8).getHexString(); c.fillRect(0, 0, w, h);
       for (let i = 0; i < 260; i++) { const k = 0.5 + r() * 0.9; c.fillStyle = '#' + base.clone().multiplyScalar(k).lerp(sky, r() * 0.25).getHexString(); c.globalAlpha = 0.5; c.beginPath(); c.ellipse(r() * w, r() * h, 8 + r() * 46, 4 + r() * 18, r() * 3, 0, 7); c.fill(); }
@@ -659,7 +664,7 @@ const G_ShipModel = (() => {
   // ---- the stars (points on a far sphere, kept round the camera) and the tunnel of a jump (streaks rushing past)
   const RUSH = 320; // (the box round her the motes going by are in: js/space.ts smear)
   function stars(seed: number) {
-    const r = G.U.rng(seed), n = 2600, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+    const r = G_U.rng(seed), n = 2600, pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) {
       const u = r() * 2 - 1, a = r() * Math.PI * 2, s = Math.sqrt(1 - u * u), k = 0.35 + r() * r() * 0.65, w = r();
       pos.set([s * Math.cos(a) * 900, u * 900, s * Math.sin(a) * 900], i * 3); col.set([k * (0.85 + 0.15 * w), k * 0.92, k * (1 - 0.2 * w)], i * 3);
@@ -711,5 +716,5 @@ const G_ShipModel = (() => {
   }
   return { boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
 })();
-G.ShipModel = G_ShipModel;
-interface GameModules { ShipModel: typeof G_ShipModel; }
+G.ShipModel = ShipModel;
+declare global { interface GameModules { ShipModel: typeof ShipModel; } }

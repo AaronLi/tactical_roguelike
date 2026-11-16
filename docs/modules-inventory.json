@@ -76,16 +76,16 @@
    "shotlog",
    "bolts",
    "gunmaterials",
-   "gunmodels",
    "glb",
    "gunrig",
-   "viewmodel",
-   "vmanim",
-   "prep",
    "humandata",
    "humans",
    "headgear",
    "rig",
+   "vmanim",
+   "viewmodel",
+   "gunmodels",
+   "prep",
    "net",
    "recorder",
    "route",
@@ -96,8 +96,8 @@
    "serverlink",
    "player",
    "views",
-   "casings",
    "icons",
+   "casings",
    "hud",
    "shopui",
    "invui",
@@ -207,16 +207,16 @@
    "levelview",
    "render",
    "gunmaterials",
-   "gunmodels",
-   "modelbundles",
    "glb",
    "gunrig",
-   "viewmodel",
-   "vmanim",
    "humandata",
    "humans",
    "headgear",
    "rig",
+   "vmanim",
+   "viewmodel",
+   "gunmodels",
+   "modelbundles",
    "highlights"
   ],
   "tools/level_env.mjs": [
@@ -312,16 +312,16 @@
   "shotlog",
   "bolts",
   "gunmaterials",
-  "gunmodels",
   "glb",
   "gunrig",
-  "viewmodel",
-  "vmanim",
-  "prep",
   "humandata",
   "humans",
   "headgear",
   "rig",
+  "vmanim",
+  "viewmodel",
+  "gunmodels",
+  "prep",
   "net",
   "recorder",
   "route",
@@ -332,8 +332,8 @@
   "serverlink",
   "player",
   "views",
-  "casings",
   "icons",
+  "casings",
   "hud",
   "shopui",
   "invui",
@@ -2119,49 +2119,72 @@
   },
   "bolts": {
    "defs": {
-    "Bolts": 96
+    "Bolts": 98
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "ballistics",
+     "line": 2,
+     "names": [
+      "Ballistics"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 3,
+     "names": [
+      "AMMO"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "AMMO",
-     "line": 31,
+     "from": "data",
+     "line": 33,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 31,
+     "from": "data",
+     "line": 33,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 52,
+     "line": 54,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 74,
+     "line": 76,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 87,
+     "from": "data",
+     "line": 89,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 89,
+     "line": 91,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Ballistics",
-     "line": 89,
+     "from": "ballistics",
+     "line": 91,
      "load": false,
      "guard": "plain"
     }
@@ -2169,23 +2192,23 @@
    "decls": {
     "BoltParts": {
      "kind": "type",
-     "line": 5
+     "line": 7
     },
     "BoltOn": {
      "kind": "type",
-     "line": 6
+     "line": 8
     },
     "BoltNet": {
      "kind": "type",
-     "line": 7
+     "line": 9
     },
-    "G_Bolts": {
+    "Bolts": {
      "kind": "value",
-     "line": 8
+     "line": 10
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 97
+    "global": {
+     "kind": "value",
+     "line": 99
     }
    }
   },
@@ -2386,289 +2409,400 @@
   },
   "casings": {
    "defs": {
-    "Casings": 365
+    "Casings": 375
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "audio",
+     "line": 2,
+     "names": [
+      "Audio"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 3,
+     "names": [
+      "beltFed",
+      "GUN_SPECS",
+      "WEAPONS"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "furniture",
+     "line": 4,
+     "names": [
+      "Furniture"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gear",
+     "line": 5,
+     "names": [
+      "Gear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "handling",
+     "line": 6,
+     "names": [
+      "Handling"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 7,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 8,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 9,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "world",
+     "line": 10,
+     "names": [
+      "World"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "icons",
+     "line": 11,
+     "names": [
+      "Icons"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "R",
-     "line": 40,
+     "line": 50,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 40,
+     "line": 50,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 40,
+     "line": 50,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 45,
+     "from": "parts",
+     "line": 55,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GUN_SPECS",
-     "line": 52,
+     "from": "data",
+     "line": 62,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 60,
+     "line": 70,
      "load": false,
      "guard": "check"
     },
     {
      "x": "R",
-     "line": 60,
+     "line": 70,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 60,
+     "line": 70,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 84,
+     "line": 94,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 90,
+     "line": 100,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 90,
+     "line": 100,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 90,
+     "line": 100,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 115,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Me",
-     "line": 115,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Me",
-     "line": 115,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Gear",
-     "line": 123,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
      "line": 125,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "beltFed",
+     "x": "Me",
+     "line": 125,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Me",
+     "line": 125,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Gear",
+     "from": "gear",
      "line": 133,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "R",
-     "line": 140,
+     "x": "Gunsmith",
+     "from": "parts",
+     "line": 135,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "beltFed",
+     "from": "data",
+     "line": 143,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 141,
+     "line": 150,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 145,
+     "line": 151,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "R",
+     "line": 155,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 145,
+     "line": 155,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 147,
+     "from": "level",
+     "line": 157,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 149,
+     "line": 159,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 149,
+     "line": 159,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Me",
-     "line": 149,
+     "line": 159,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 152,
+     "line": 162,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Loot",
-     "line": 171,
+     "line": 181,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Loot",
-     "line": 171,
+     "line": 181,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 179,
+     "from": "level",
+     "line": 189,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
-     "line": 187,
+     "from": "furniture",
+     "line": 197,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 222,
+     "line": 232,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 230,
+     "from": "audio",
+     "line": 240,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Handling",
-     "line": 230,
+     "from": "handling",
+     "line": 240,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Audio",
-     "line": 234,
+     "from": "audio",
+     "line": 244,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 234,
+     "from": "util",
+     "line": 244,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 237,
+     "from": "level",
+     "line": 247,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "World",
-     "line": 260,
+     "from": "world",
+     "line": 270,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 288,
+     "line": 298,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 288,
+     "line": 298,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Icons",
-     "line": 303,
+     "from": "icons",
+     "line": 313,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "WEAPONS",
-     "line": 316,
+     "from": "data",
+     "line": 326,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 320,
+     "line": 330,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 328,
+     "from": "level",
+     "line": 338,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 347,
+     "from": "level",
+     "line": 357,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Casings": {
+    "Casings": {
      "kind": "value",
-     "line": 17
+     "line": 27
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 366
+    "global": {
+     "kind": "value",
+     "line": 376
     }
    }
   },
@@ -11344,70 +11478,98 @@
   },
   "glb": {
    "defs": {
-    "GLB": 1425,
-    "Models": 1463
+    "GLB": 1429,
+    "Models": 1467
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "gunmaterials",
+     "line": 1,
+     "names": [
+      "GunMaterials"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 2,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "stickers",
+     "line": 3,
+     "names": [
+      "Stickers"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 4,
+     "names": [
+      "Hooks"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "GLB",
-     "line": 1233,
+     "line": 1237,
      "load": false,
      "guard": "check"
     },
     {
      "x": "GLB",
-     "line": 1233,
+     "line": 1237,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Bundles",
-     "line": 1241,
+     "line": 1245,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GLB",
-     "line": 1274,
+     "line": 1278,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 1279,
+     "from": "parts",
+     "line": 1283,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunMaterials",
-     "line": 1303,
+     "from": "gunmaterials",
+     "line": 1307,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Stickers",
-     "line": 1359,
+     "from": "stickers",
+     "line": 1363,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GLB",
-     "line": 1423,
+     "line": 1427,
      "load": true,
      "guard": "check"
-    },
-    {
-     "x": "Bundles",
-     "line": 1427,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Bundles",
-     "line": 1427,
-     "load": false,
-     "guard": "guarded"
     },
     {
      "x": "Bundles",
@@ -11416,60 +11578,62 @@
      "guard": "plain"
     },
     {
+     "x": "Bundles",
+     "line": 1431,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Bundles",
+     "line": 1435,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "GLB",
-     "line": 1433,
+     "line": 1437,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Bundles",
-     "line": 1434,
+     "line": 1438,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Bundles",
-     "line": 1434,
+     "line": 1438,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 1441,
+     "from": "parts",
+     "line": 1445,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Hooks",
-     "line": 1464,
+     "from": "util",
+     "line": 1468,
      "load": true,
      "guard": "plain"
-    },
-    {
-     "x": "Models",
-     "line": 1464,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Models",
-     "line": 1464,
-     "load": false,
-     "guard": "guarded"
     }
    ],
    "decls": {
-    "G_Models": {
+    "Models": {
      "kind": "value",
-     "line": 18
+     "line": 22
     },
     "GlbModuleApi": {
      "kind": "type",
-     "line": 1466
+     "line": 1470
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 1467
+    "global": {
+     "kind": "value",
+     "line": 1471
     }
    }
   },
@@ -11829,187 +11993,260 @@
    "imports": [],
    "uses": [],
    "decls": {
-    "G_GunMaterials": {
+    "GunMaterials": {
      "kind": "value",
      "line": 7
     },
-    "GameModules": {
-     "kind": "type",
+    "global": {
+     "kind": "value",
      "line": 79
     }
    }
   },
   "gunmodels": {
    "defs": {
-    "GunModels": 201
+    "GunModels": 206
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "gunmaterials",
+     "line": 2,
+     "names": [
+      "GunMaterials"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 3,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "stickers",
+     "line": 4,
+     "names": [
+      "Stickers"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "glb",
+     "line": 5,
+     "names": [
+      "Models"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "viewmodel",
+     "line": 6,
+     "names": [
+      "Viewmodel"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Models",
-     "line": 36,
+     "from": "glb",
+     "line": 41,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 40,
+     "from": "glb",
+     "line": 45,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunMaterials",
-     "line": 46,
+     "from": "gunmaterials",
+     "line": 51,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 98,
+     "from": "glb",
+     "line": 103,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 107,
+     "from": "glb",
+     "line": 112,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 118,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Models",
+     "from": "glb",
      "line": 123,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 135,
+     "from": "glb",
+     "line": 128,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Models",
+     "from": "glb",
+     "line": 140,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Viewmodel",
-     "line": 137,
+     "from": "viewmodel",
+     "line": 142,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 143,
+     "from": "parts",
+     "line": 148,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Viewmodel",
-     "line": 145,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Stickers",
-     "line": 145,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Viewmodel",
+     "from": "viewmodel",
      "line": 150,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Stickers",
+     "from": "stickers",
      "line": 150,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Viewmodel",
+     "from": "viewmodel",
+     "line": 155,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Stickers",
+     "from": "stickers",
+     "line": 155,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "Models",
-     "line": 172,
+     "from": "glb",
+     "line": 177,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Viewmodel",
-     "line": 176,
+     "from": "viewmodel",
+     "line": 181,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 179,
+     "from": "glb",
+     "line": 184,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 183,
+     "from": "glb",
+     "line": 188,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 193,
+     "from": "glb",
+     "line": 198,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 194,
+     "from": "parts",
+     "line": 199,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gunsmith",
-     "line": 194,
+     "from": "parts",
+     "line": 199,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Gunsmith",
-     "line": 194,
+     "from": "parts",
+     "line": 199,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Models",
-     "line": 194,
+     "from": "glb",
+     "line": 199,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_GunModels": {
+    "GunModels": {
      "kind": "value",
-     "line": 24
+     "line": 29
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 202
+    "global": {
+     "kind": "value",
+     "line": 207
     }
    }
   },
   "gunrig": {
    "defs": {
-    "GunRig": 195
+    "GunRig": 197
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "OPEN_BOLT"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "GunModels",
-     "line": 97,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GunModels",
-     "line": 97,
+     "line": 99,
      "load": false,
      "guard": "plain"
     },
@@ -12020,20 +12257,27 @@
      "guard": "plain"
     },
     {
+     "x": "GunModels",
+     "line": 101,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "OPEN_BOLT",
-     "line": 137,
+     "from": "data",
+     "line": 139,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_GunRig": {
+    "GunRig": {
      "kind": "value",
-     "line": 26
+     "line": 28
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 197
+    "global": {
+     "kind": "value",
+     "line": 199
     }
    }
   },
@@ -13634,37 +13878,59 @@
   },
   "headgear": {
    "defs": {
-    "Headgear": 58
+    "Headgear": 60
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "gear",
+     "line": 2,
+     "names": [
+      "Gear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "humans",
+     "line": 3,
+     "names": [
+      "Humans"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "Gear",
-     "line": 34,
+     "from": "gear",
+     "line": 36,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Gear",
-     "line": 34,
+     "from": "gear",
+     "line": 36,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Humans",
-     "line": 40,
+     "from": "humans",
+     "line": 42,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Headgear": {
+    "Headgear": {
      "kind": "value",
-     "line": 6
+     "line": 8
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 59
+    "global": {
+     "kind": "value",
+     "line": 61
     }
    }
   },
@@ -16095,49 +16361,71 @@
    "imports": [],
    "uses": [],
    "decls": {
-    "G_HumanData": {
+    "HumanData": {
      "kind": "value",
      "line": 2
     },
-    "GameModules": {
-     "kind": "type",
+    "global": {
+     "kind": "value",
      "line": 25
     }
    }
   },
   "humans": {
    "defs": {
-    "Humans": 41
+    "Humans": 43
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "glb",
+     "line": 2,
+     "names": [
+      "Models"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "humandata",
+     "line": 3,
+     "names": [
+      "HumanData"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "HumanData",
-     "line": 4,
+     "from": "humandata",
+     "line": 6,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 10,
+     "from": "glb",
+     "line": 12,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 16,
+     "from": "glb",
+     "line": 18,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Humans": {
+    "Humans": {
      "kind": "value",
-     "line": 2
+     "line": 4
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 42
+    "global": {
+     "kind": "value",
+     "line": 44
     }
    }
   },
@@ -26271,25 +26559,36 @@
   },
   "prep": {
    "defs": {
-    "Prep": 56
+    "Prep": 57
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "lightgrid",
+     "line": 2,
+     "names": [
+      "LightGrid"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "LightGrid",
-     "line": 35,
+     "from": "lightgrid",
+     "line": 36,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_Prep": {
+    "Prep": {
      "kind": "value",
-     "line": 12
+     "line": 13
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 57
+    "global": {
+     "kind": "value",
+     "line": 58
     }
    }
   },
@@ -27892,593 +28191,800 @@
   },
   "rig": {
    "defs": {
-    "Rig": 2277
+    "Rig": 2292
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "callsigns",
+     "line": 2,
+     "names": [
+      "Callsigns"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "data",
+     "line": 3,
+     "names": [
+      "SHIELDS"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gear",
+     "line": 4,
+     "names": [
+      "Gear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunmodels",
+     "line": 5,
+     "names": [
+      "GunModels"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "headgear",
+     "line": 6,
+     "names": [
+      "Headgear"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "humans",
+     "line": 7,
+     "names": [
+      "Humans"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 8,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 9,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "sim",
+     "line": 10,
+     "names": [
+      "Sim"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "spacedata",
+     "line": 11,
+     "names": [
+      "SpaceData"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "stickers",
+     "line": 12,
+     "names": [
+      "Stickers"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 13,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "vmanim",
+     "line": 14,
+     "names": [
+      "VMAnim"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "world",
+     "line": 15,
+     "names": [
+      "World"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunrig",
+     "line": 16,
+     "names": [
+      "GunRig"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "U",
-     "line": 36,
+     "from": "util",
+     "line": 51,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 38,
+     "from": "util",
+     "line": 53,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Sim",
-     "line": 69,
+     "from": "sim",
+     "line": 84,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "Sim",
-     "line": 69,
+     "from": "sim",
+     "line": 84,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "Sim",
-     "line": 70,
+     "from": "sim",
+     "line": 85,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 115,
+     "from": "callsigns",
+     "line": 130,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Gear",
-     "line": 116,
+     "from": "gear",
+     "line": 131,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 116,
+     "from": "gear",
+     "line": 131,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Callsigns",
-     "line": 118,
+     "from": "callsigns",
+     "line": 133,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Humans",
-     "line": 280,
+     "from": "humans",
+     "line": 295,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 343,
+     "from": "gear",
+     "line": 358,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 343,
+     "from": "gear",
+     "line": 358,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Headgear",
-     "line": 393,
+     "from": "headgear",
+     "line": 408,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Headgear",
-     "line": 398,
+     "from": "headgear",
+     "line": 413,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Headgear",
-     "line": 412,
+     "from": "headgear",
+     "line": 427,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Headgear",
-     "line": 474,
+     "from": "headgear",
+     "line": 489,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 481,
+     "from": "gear",
+     "line": 496,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Gear",
-     "line": 481,
+     "from": "gear",
+     "line": 496,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Humans",
-     "line": 486,
+     "from": "humans",
+     "line": 501,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Humans",
-     "line": 486,
+     "from": "humans",
+     "line": 501,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Humans",
-     "line": 486,
+     "from": "humans",
+     "line": 501,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
-     "line": 517,
+     "from": "spacedata",
+     "line": 532,
      "load": false,
      "guard": "check"
     },
     {
      "x": "SpaceData",
-     "line": 517,
+     "from": "spacedata",
+     "line": 532,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
-     "line": 517,
+     "from": "spacedata",
+     "line": 532,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 657,
+     "from": "callsigns",
+     "line": 672,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Callsigns",
-     "line": 658,
+     "from": "callsigns",
+     "line": 673,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Humans",
-     "line": 809,
+     "from": "humans",
+     "line": 824,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Humans",
-     "line": 809,
+     "from": "humans",
+     "line": 824,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 846,
+     "from": "util",
+     "line": 861,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SHIELDS",
-     "line": 874,
+     "from": "data",
+     "line": 889,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 890,
+     "line": 905,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 890,
+     "line": 905,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 891,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Stickers",
-     "line": 898,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 904,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GunModels",
+     "from": "level",
      "line": 906,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Stickers",
+     "from": "stickers",
+     "line": 913,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Gunsmith",
+     "from": "parts",
+     "line": 919,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "GunModels",
+     "from": "gunmodels",
+     "line": 921,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "GunRig",
-     "line": 908,
+     "from": "gunrig",
+     "line": 923,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 980,
+     "from": "util",
+     "line": 995,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 984,
+     "from": "util",
+     "line": 999,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunRig",
-     "line": 1003,
+     "from": "gunrig",
+     "line": 1018,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Footsteps",
-     "line": 1043,
-     "load": false,
-     "guard": "check"
-    },
-    {
-     "x": "Footsteps",
-     "line": 1043,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Footsteps",
-     "line": 1047,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Footsteps",
-     "line": 1048,
-     "load": false,
-     "guard": "guarded"
-    },
-    {
-     "x": "Level",
      "line": 1058,
      "load": false,
+     "guard": "check"
+    },
+    {
+     "x": "Footsteps",
+     "line": 1058,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Footsteps",
+     "line": 1062,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Footsteps",
+     "line": 1063,
+     "load": false,
+     "guard": "guarded"
+    },
+    {
+     "x": "Level",
+     "from": "level",
+     "line": 1073,
+     "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1165,
+     "from": "util",
+     "line": 1180,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "VMAnim",
-     "line": 1255,
+     "from": "vmanim",
+     "line": 1270,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "VMAnim",
-     "line": 1255,
+     "from": "vmanim",
+     "line": 1270,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunRig",
-     "line": 1291,
+     "from": "gunrig",
+     "line": 1306,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Views",
-     "line": 1318,
+     "line": 1333,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Views",
-     "line": 1318,
+     "line": 1333,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Views",
-     "line": 1318,
+     "line": 1333,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Views",
-     "line": 1318,
+     "line": 1333,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 1383,
+     "from": "util",
+     "line": 1398,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1383,
+     "from": "util",
+     "line": 1398,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1410,
+     "from": "level",
+     "line": 1425,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1421,
+     "from": "level",
+     "line": 1436,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelView",
-     "line": 1422,
+     "line": 1437,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1438,
+     "line": 1453,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1438,
+     "line": 1453,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 1438,
+     "from": "level",
+     "line": 1453,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1438,
+     "line": 1453,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "U",
-     "line": 1494,
+     "from": "util",
+     "line": 1509,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1510,
+     "from": "util",
+     "line": 1525,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1510,
+     "from": "util",
+     "line": 1525,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1512,
+     "from": "util",
+     "line": 1527,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1558,
+     "from": "util",
+     "line": 1573,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1601,
+     "from": "util",
+     "line": 1616,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1604,
+     "from": "util",
+     "line": 1619,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1609,
+     "from": "util",
+     "line": 1624,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1644,
+     "from": "util",
+     "line": 1659,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1715,
+     "from": "util",
+     "line": 1730,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1716,
+     "from": "util",
+     "line": 1731,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1717,
+     "from": "util",
+     "line": 1732,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1718,
+     "from": "util",
+     "line": 1733,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1718,
+     "from": "util",
+     "line": 1733,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1797,
+     "line": 1812,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 1797,
+     "line": 1812,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "World",
-     "line": 1803,
+     "from": "world",
+     "line": 1818,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 1808,
+     "from": "level",
+     "line": 1823,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1808,
+     "line": 1823,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 1808,
+     "line": 1823,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "World",
-     "line": 1838,
+     "from": "world",
+     "line": 1853,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1865,
+     "from": "util",
+     "line": 1880,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1881,
+     "from": "util",
+     "line": 1896,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1881,
+     "from": "util",
+     "line": 1896,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1951,
+     "from": "util",
+     "line": 1966,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2062,
+     "from": "util",
+     "line": 2077,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 2103,
+     "line": 2118,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 2103,
+     "line": 2118,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "Level",
-     "line": 2104,
+     "from": "level",
+     "line": 2119,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2257,
+     "from": "util",
+     "line": 2272,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 2258,
+     "from": "util",
+     "line": 2273,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Humans",
-     "line": 2266,
+     "from": "humans",
+     "line": 2281,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Humans",
-     "line": 2266,
+     "from": "humans",
+     "line": 2281,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "RigState": {
-     "kind": "type",
-     "line": 2
-    },
-    "G_Rig": {
+    "Rig": {
      "kind": "value",
-     "line": 3
+     "line": 18
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 2278
+    "global": {
+     "kind": "value",
+     "line": 2293
     }
    }
   },
@@ -31656,103 +32162,165 @@
   },
   "shipmodel": {
    "defs": {
-    "ShipModel": 714
+    "ShipModel": 719
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "glb",
+     "line": 2,
+     "names": [
+      "Models"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "level",
+     "line": 3,
+     "names": [
+      "Level"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "shipgen",
+     "line": 4,
+     "names": [
+      "ShipGen"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "spacedata",
+     "line": 5,
+     "names": [
+      "SpaceData"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 6,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "SpaceData",
-     "line": 49,
+     "from": "spacedata",
+     "line": 54,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 49,
+     "from": "glb",
+     "line": 54,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
-     "line": 56,
+     "from": "spacedata",
+     "line": 61,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
-     "line": 103,
+     "from": "spacedata",
+     "line": 108,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 237,
+     "from": "level",
+     "line": 242,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 237,
+     "from": "level",
+     "line": 242,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 237,
+     "from": "level",
+     "line": 242,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 244,
+     "from": "util",
+     "line": 249,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "SpaceData",
-     "line": 323,
+     "from": "spacedata",
+     "line": 328,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 402,
+     "from": "util",
+     "line": 407,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ShipGen",
-     "line": 528,
+     "from": "shipgen",
+     "line": 533,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 562,
+     "from": "util",
+     "line": 567,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 603,
+     "from": "util",
+     "line": 608,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 603,
+     "from": "util",
+     "line": 608,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 646,
+     "from": "util",
+     "line": 651,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 662,
+     "from": "util",
+     "line": 667,
      "load": false,
      "guard": "plain"
     }
@@ -31760,15 +32328,15 @@
    "decls": {
     "SmGun": {
      "kind": "type",
-     "line": 2
+     "line": 7
     },
-    "G_ShipModel": {
+    "ShipModel": {
      "kind": "value",
-     "line": 3
+     "line": 8
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 715
+    "global": {
+     "kind": "value",
+     "line": 720
     }
    }
   },
@@ -37604,181 +38172,230 @@
   },
   "viewmodel": {
    "defs": {
-    "Viewmodel": 625
+    "Viewmodel": 627
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "AMMO",
+      "ammoTypes",
+      "asCal",
+      "ballFor",
+      "boreTip",
+      "calOf",
+      "cartOf",
+      "chambered",
+      "flight"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "vmanim",
+     "line": 3,
+     "names": [
+      "VMAnim"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "R",
-     "line": 9,
+     "line": 11,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 97,
+     "line": 99,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 97,
+     "line": 99,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "R",
-     "line": 97,
+     "line": 99,
      "load": false,
      "guard": "guarded"
     },
     {
      "x": "ballFor",
-     "line": 118,
+     "from": "data",
+     "line": 120,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 118,
+     "from": "data",
+     "line": 120,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "boreTip",
-     "line": 118,
+     "from": "data",
+     "line": 120,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "flight",
-     "line": 118,
+     "from": "data",
+     "line": 120,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ammoTypes",
-     "line": 146,
+     "from": "data",
+     "line": 148,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 146,
+     "from": "data",
+     "line": 148,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 146,
+     "from": "data",
+     "line": 148,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "AMMO",
-     "line": 154,
+     "from": "data",
+     "line": 156,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "asCal",
-     "line": 184,
+     "from": "data",
+     "line": 186,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "cartOf",
-     "line": 184,
+     "from": "data",
+     "line": 186,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 184,
+     "from": "data",
+     "line": 186,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "chambered",
-     "line": 185,
+     "from": "data",
+     "line": 187,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ballFor",
-     "line": 185,
+     "from": "data",
+     "line": 187,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 185,
+     "from": "data",
+     "line": 187,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "flight",
-     "line": 191,
+     "from": "data",
+     "line": 193,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "boreTip",
-     "line": 191,
+     "from": "data",
+     "line": 193,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 252,
+     "line": 254,
      "load": true,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 311,
+     "line": 313,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ballFor",
-     "line": 311,
+     "from": "data",
+     "line": 313,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 311,
+     "from": "data",
+     "line": 313,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "flight",
-     "line": 341,
+     "from": "data",
+     "line": 343,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "boreTip",
-     "line": 341,
+     "from": "data",
+     "line": 343,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "chambered",
-     "line": 351,
+     "from": "data",
+     "line": 353,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "R",
-     "line": 365,
+     "line": 367,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "VMAnim",
-     "line": 472,
+     "from": "vmanim",
+     "line": 474,
      "load": false,
      "guard": "plain"
     }
@@ -37786,15 +38403,15 @@
    "decls": {
     "VmSurface": {
      "kind": "type",
-     "line": 3
+     "line": 5
     },
-    "G_Viewmodel": {
+    "Viewmodel": {
      "kind": "value",
-     "line": 4
+     "line": 6
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 626
+    "global": {
+     "kind": "value",
+     "line": 628
     }
    }
   },
@@ -39920,367 +40537,507 @@
   },
   "vmanim": {
    "defs": {
-    "VMAnim": 1376
+    "VMAnim": 1386
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "ballFor",
+      "baseAm",
+      "boltHold",
+      "CALIBERS",
+      "calOf",
+      "chambered",
+      "loaded",
+      "OPEN_BOLT",
+      "REV"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "glb",
+     "line": 3,
+     "names": [
+      "Models"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunmaterials",
+     "line": 4,
+     "names": [
+      "GunMaterials"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunmodels",
+     "line": 5,
+     "names": [
+      "GunModels"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "parts",
+     "line": 6,
+     "names": [
+      "Gunsmith"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "util",
+     "line": 7,
+     "names": [
+      "U"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "gunrig",
+     "line": 8,
+     "names": [
+      "GunRig"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "humans",
+     "line": 9,
+     "names": [
+      "Humans"
+     ],
+     "sideEffect": false,
+     "kept": true
+    },
+    {
+     "from": "rig",
+     "line": 10,
+     "names": [
+      "Rig"
+     ],
+     "sideEffect": false,
+     "kept": true
+    }
+   ],
    "uses": [
     {
      "x": "U",
-     "line": 43,
+     "from": "util",
+     "line": 53,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunModels",
-     "line": 75,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
-     "line": 76,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GunModels",
-     "line": 78,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "GunModels",
-     "line": 79,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gunsmith",
+     "from": "gunmodels",
      "line": 85,
      "load": false,
      "guard": "plain"
     },
     {
+     "x": "Gunsmith",
+     "from": "parts",
+     "line": 86,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "GunModels",
+     "from": "gunmodels",
+     "line": 88,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "GunModels",
+     "from": "gunmodels",
+     "line": 89,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Gunsmith",
+     "from": "parts",
+     "line": 95,
+     "load": false,
+     "guard": "plain"
+    },
+    {
      "x": "GunMaterials",
-     "line": 105,
+     "from": "gunmaterials",
+     "line": 115,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunRig",
-     "line": 107,
+     "from": "gunrig",
+     "line": 117,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "CALIBERS",
-     "line": 144,
+     "from": "data",
+     "line": 154,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 144,
+     "from": "data",
+     "line": 154,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 233,
+     "from": "util",
+     "line": 243,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 238,
+     "from": "util",
+     "line": 248,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 238,
+     "from": "util",
+     "line": 248,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Models",
-     "line": 295,
+     "from": "glb",
+     "line": 305,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 307,
+     "from": "util",
+     "line": 317,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 377,
+     "from": "util",
+     "line": 387,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Me",
-     "line": 432,
+     "line": 442,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "REV",
-     "line": 561,
+     "from": "data",
+     "line": 571,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "REV",
-     "line": 585,
+     "from": "data",
+     "line": 595,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 696,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "loaded",
+     "from": "util",
      "line": 706,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "U",
-     "line": 755,
+     "x": "loaded",
+     "from": "data",
+     "line": 716,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 768,
+     "from": "util",
+     "line": 765,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "U",
+     "from": "util",
+     "line": 778,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "loaded",
-     "line": 799,
+     "from": "data",
+     "line": 809,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Bolts",
-     "line": 802,
+     "line": 812,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "loaded",
-     "line": 830,
+     "from": "data",
+     "line": 840,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "boltHold",
-     "line": 830,
+     "from": "data",
+     "line": 840,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "loaded",
-     "line": 836,
+     "from": "data",
+     "line": 846,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunRig",
-     "line": 855,
+     "from": "gunrig",
+     "line": 865,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "ballFor",
-     "line": 905,
+     "from": "data",
+     "line": 915,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 905,
+     "from": "data",
+     "line": 915,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "loaded",
-     "line": 914,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "boltHold",
-     "line": 914,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "chambered",
-     "line": 919,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "OPEN_BOLT",
-     "line": 919,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Casings",
+     "from": "data",
      "line": 924,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "CALIBERS",
+     "x": "boltHold",
+     "from": "data",
+     "line": 924,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "chambered",
+     "from": "data",
+     "line": 929,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "OPEN_BOLT",
+     "from": "data",
+     "line": 929,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "Casings",
      "line": 934,
+     "load": false,
+     "guard": "plain"
+    },
+    {
+     "x": "CALIBERS",
+     "from": "data",
+     "line": 944,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 934,
+     "from": "data",
+     "line": 944,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunMaterials",
-     "line": 935,
+     "from": "gunmaterials",
+     "line": 945,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Icons",
-     "line": 966,
+     "line": 976,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "baseAm",
-     "line": 967,
+     "from": "data",
+     "line": 977,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Icons",
-     "line": 967,
+     "line": 977,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Icons",
-     "line": 968,
+     "line": 978,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "CALIBERS",
-     "line": 983,
+     "from": "data",
+     "line": 993,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "calOf",
-     "line": 983,
+     "from": "data",
+     "line": 993,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "GunMaterials",
-     "line": 983,
+     "from": "gunmaterials",
+     "line": 993,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Humans",
-     "line": 1103,
+     "from": "humans",
+     "line": 1113,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Rig",
-     "line": 1103,
+     "from": "rig",
+     "line": 1113,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Game",
-     "line": 1103,
+     "line": 1113,
      "load": false,
      "guard": "check"
     },
     {
      "x": "Rig",
-     "line": 1104,
+     "from": "rig",
+     "line": 1114,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1104,
+     "line": 1114,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1104,
+     "line": 1114,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Game",
-     "line": 1104,
+     "line": 1114,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Humans",
-     "line": 1105,
+     "from": "humans",
+     "line": 1115,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Humans",
-     "line": 1106,
+     "from": "humans",
+     "line": 1116,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Humans",
-     "line": 1106,
+     "from": "humans",
+     "line": 1116,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1282,
+     "from": "util",
+     "line": 1292,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1299,
+     "from": "util",
+     "line": 1309,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1329,
+     "from": "util",
+     "line": 1339,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "U",
-     "line": 1332,
+     "from": "util",
+     "line": 1342,
      "load": false,
      "guard": "plain"
     }
@@ -40288,31 +41045,31 @@
    "decls": {
     "VmReload": {
      "kind": "type",
-     "line": 11
+     "line": 21
     },
     "VmAction": {
      "kind": "type",
-     "line": 13
+     "line": 23
     },
     "VmHold": {
      "kind": "type",
-     "line": 15
+     "line": 25
     },
     "VmMagMode": {
      "kind": "type",
-     "line": 17
+     "line": 27
     },
     "VmPropKind": {
      "kind": "type",
-     "line": 19
+     "line": 29
     },
-    "G_VMAnim": {
+    "VMAnim": {
      "kind": "value",
-     "line": 20
+     "line": 30
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 1378
+    "global": {
+     "kind": "value",
+     "line": 1388
     }
    }
   },
@@ -42462,7 +43219,7 @@
     "loadAt": [
      {
       "x": "Hooks",
-      "line": 1464,
+      "line": 1468,
       "guard": "plain"
      }
     ]
@@ -43446,7 +44203,7 @@
     "loadAt": [
      {
       "x": "HumanData",
-      "line": 4,
+      "line": 6,
       "guard": "plain"
      }
     ]
@@ -45513,12 +46270,12 @@
     "loadAt": [
      {
       "x": "Sim",
-      "line": 69,
+      "line": 84,
       "guard": "plain"
      },
      {
       "x": "Sim",
-      "line": 69,
+      "line": 84,
       "guard": "plain"
      }
     ]
@@ -46862,7 +47619,7 @@
     "loadAt": [
      {
       "x": "R",
-      "line": 252,
+      "line": 254,
       "guard": "plain"
      }
     ]
@@ -47416,69 +48173,53 @@
  "reach": [],
  "undefined": {},
  "trial": {
-  "total": 2559,
+  "total": 2256,
   "byCode": {
-   "TS2339": 2282,
-   "TS2551": 127,
-   "TS6196": 44,
-   "TS7006": 76,
-   "TS18047": 4,
-   "TS2345": 5,
+   "TS2339": 2026,
+   "TS2551": 116,
+   "TS6196": 29,
+   "TS7006": 62,
+   "TS2345": 4,
    "TS2531": 5,
-   "TS2322": 2,
+   "TS2322": 1,
    "TS18048": 10,
-   "TS7053": 4
+   "TS7053": 3
   },
   "bare": [],
   "gLost": [
    "AudioBundle",
-   "Bolts",
    "Bundles",
-   "Casings",
    "Course",
    "DebugStart",
    "Demo",
-   "GLB",
    "Game",
    "Glare",
-   "GunMaterials",
-   "GunModels",
-   "GunRig",
    "GunsmithUI",
    "HUD",
    "Hangar",
-   "Headgear",
    "Highlights",
-   "HumanData",
-   "Humans",
    "InvUI",
    "Landing",
    "LevelView",
    "Loot",
    "Me",
    "MenuShow",
-   "Models",
    "Net",
    "Pad",
-   "Prep",
    "Prof",
    "R",
    "Range",
-   "Rig",
    "ServerLink",
-   "ShipModel",
    "ShopUI",
    "ShotLog",
    "Space",
    "SpaceUI",
    "Touch",
-   "VMAnim",
-   "Viewmodel",
    "Views",
    "ZeroUI"
   ],
   "umd": [],
-  "unusedGM": 43,
+  "unusedGM": 29,
   "other": [
    {
     "file": "js/demo.ts",
@@ -47515,18 +48256,6 @@
     "line": 130,
     "code": "TS7006",
     "msg": "Parameter 'id' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 226,
-    "code": "TS18047",
-    "msg": "'lp.rig' is possibly 'null'."
-   },
-   {
-    "file": "js/game.ts",
-    "line": 227,
-    "code": "TS18047",
-    "msg": "'lp.rig' is possibly 'null'."
    },
    {
     "file": "js/game.ts",
@@ -47656,51 +48385,15 @@
    },
    {
     "file": "js/glb.ts",
-    "line": 1233,
-    "code": "TS7006",
-    "msg": "Parameter 'x' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/glb.ts",
-    "line": 1245,
+    "line": 1249,
     "code": "TS2322",
     "msg": "Type 'Promise<PartsIndex | null> | undefined' is not assignable to type 'Promise<PartsIndex | null>'."
    },
    {
     "file": "js/glb.ts",
-    "line": 1274,
-    "code": "TS7006",
-    "msg": "Parameter 'scene' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/glb.ts",
-    "line": 1427,
+    "line": 1431,
     "code": "TS7006",
     "msg": "Parameter 'b' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/gunmodels.ts",
-    "line": 42,
-    "code": "TS7006",
-    "msg": "Parameter 'e' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/gunmodels.ts",
-    "line": 98,
-    "code": "TS7006",
-    "msg": "Parameter 'ok' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/gunmodels.ts",
-    "line": 103,
-    "code": "TS2322",
-    "msg": "Type 'Promise<boolean> | undefined' is not assignable to type 'Promise<boolean>'."
-   },
-   {
-    "file": "js/gunsmith.ts",
-    "line": 68,
-    "code": "TS7006",
-    "msg": "Parameter 'ok' implicitly has an 'any' type."
    },
    {
     "file": "js/gunsmith.ts",
@@ -47713,12 +48406,6 @@
     "line": 261,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hangar.ts",
-    "line": 253,
-    "code": "TS7006",
-    "msg": "Parameter 'ok' implicitly has an 'any' type."
    },
    {
     "file": "js/hangar.ts",
@@ -47805,18 +48492,6 @@
     "msg": "'pts' is possibly 'undefined'."
    },
    {
-    "file": "js/highlights.ts",
-    "line": 2123,
-    "code": "TS7006",
-    "msg": "Parameter 'ok' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/highlights.ts",
-    "line": 2147,
-    "code": "TS7006",
-    "msg": "Parameter 'ok' implicitly has an 'any' type."
-   },
-   {
     "file": "js/hud.ts",
     "line": 229,
     "code": "TS7006",
@@ -47857,18 +48532,6 @@
     "line": 901,
     "code": "TS7006",
     "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/loot.ts",
-    "line": 62,
-    "code": "TS7006",
-    "msg": "Parameter 'ok' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/loot.ts",
-    "line": 89,
-    "code": "TS7006",
-    "msg": "Parameter 'ok' implicitly has an 'any' type."
    },
    {
     "file": "js/player.ts",
@@ -47920,37 +48583,19 @@
    },
    {
     "file": "js/rig.ts",
-    "line": 2,
-    "code": "TS6196",
-    "msg": "'RigState' is declared but never used."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 907,
-    "code": "TS18047",
-    "msg": "'rig.gun' is possibly 'null'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 909,
-    "code": "TS2345",
-    "msg": "Argument of type 'Object3D<Object3DEventMap> | null' is not assignable to parameter of type 'Object3D<Object3DEventMap>'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 1422,
+    "line": 1437,
     "code": "TS2345",
     "msg": "Argument of type 'Object3D<Object3DEventMap> | undefined' is not assignable to parameter of type 'Object3D<Object3DEventMap>'."
    },
    {
     "file": "js/rig.ts",
-    "line": 1423,
+    "line": 1438,
     "code": "TS18048",
     "msg": "'rig.zipKit' is possibly 'undefined'."
    },
    {
     "file": "js/rig.ts",
-    "line": 1423,
+    "line": 1438,
     "code": "TS18048",
     "msg": "'rig.zipKit' is possibly 'undefined'."
    },
@@ -48001,42 +48646,6 @@
     "line": 264,
     "code": "TS7006",
     "msg": "Parameter 'w' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 107,
-    "code": "TS18047",
-    "msg": "'S.tunnel' is possibly 'null'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 278,
-    "code": "TS7006",
-    "msg": "Parameter 'o' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 333,
-    "code": "TS7006",
-    "msg": "Parameter 'o' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 1512,
-    "code": "TS7006",
-    "msg": "Parameter 'gn' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 1512,
-    "code": "TS7006",
-    "msg": "Parameter 'i' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 1542,
-    "code": "TS7053",
-    "msg": "Element implicitly has an 'any' type because expression of type 'any' can't be used to index type '{ pd: { range: number; cool: number[]; dmg: number; }; cannon: { range: number; cool: number[]; dmg: number; }; missile: { range: number; cool: number[]; dmg: number; speed: number; turn: number; life: number; }; }'."
    },
    {
     "file": "js/spaceui.ts",

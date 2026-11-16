@@ -12,7 +12,7 @@ export const DIST = path.join(ROOT, 'dist/js/'), DIST_RECIPES = path.join(ROOT, 
 
 /** js/glb.ts on its own (it needs nothing from the game to describe and check a model): { G.Models: contract, validate, ... }. */
 export async function loadModels() {
-  const ctx = { console, JSON, Object, Array, Number, String, Boolean, Math, Map, Set, Error, RegExp, Uint8Array, DataView, TextDecoder, URLSearchParams, Promise, G: {} };
+  const ctx = { console, JSON, Object, Array, Number, String, Boolean, Math, Map, Set, Error, RegExp, Uint8Array, DataView, TextDecoder, URLSearchParams, Promise, THREE: { ...THREE_NS }, G: {} }; // (THREE: glb.js imports gunmaterials, which builds its materials as it loads)
   ctx.window = ctx; ctx.self = ctx; vm.createContext(ctx);
   await runScripts(ctx, DIST, ['util', 'glb'], { what: 'npm run bake:models / check:models do: tsc -p . and tsc -p tsconfig.tools.json' }); // (glb.js sets a hook on G.Hooks, which util.js makes)
   return ctx.G.Models;

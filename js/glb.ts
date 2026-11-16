@@ -1,3 +1,7 @@
+import { GunMaterials } from './gunmaterials.js';
+import { Gunsmith } from './parts.js';
+import { Stickers } from './stickers.js';
+import { Hooks } from './util.js';
 // glTF gun models: the CONTRACT a 3D model must meet to be supported, one validator generated from it, and the loader.
 //
 // Everything a model author (Blender export script, hand edit, a Rust/Bevy loader) needs to know is in THIS file's first
@@ -15,7 +19,7 @@
 // ===================================================================================================================
 
 // (Scripts share one global scope: all of it lives inside one function, so its short names don't collide with the others'.)
-const G_Models = (() => {
+export const Models = (() => {
 /** The `slot` a mesh belongs to (glTF node extras `slot`): which gunsmith part it is, so the gunsmith can highlight and pick it. */
 const SLOTS = {
   base: 'base', grip: 'grip', stock: 'stock', mag: 'mag', barrel: 'barrel', handguard: 'handguard', muzzle: 'muzzle', optic: 'optic',
@@ -1276,7 +1280,7 @@ function contractMarkdown(): string {
       const root = scene.children[0]; if (root) packRoots.set(url, root); return !!root;
     }, (e: any) => { console.warn('[baked guns] ' + url + ': ' + (e && e.message || e)); return false; }));
   };
-  const buildOf = (def: any): Record<string, string> => def.build || G.Gunsmith.defaultBuild(def.id);
+  const buildOf = (def: any): Record<string, string> => def.build || Gunsmith.defaultBuild(def.id);
   const pool = async <X,>(items: X[], n: number, fn: (x: X) => Promise<unknown>) => { let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); })); };
   /** Loads the platform's index and the packs this build needs; resolves to whether `assemble(def)` can now work. */
   async function ensure(def: any, pri = 0): Promise<boolean> {
@@ -1300,7 +1304,7 @@ function contractMarkdown(): string {
   }
   /** Own geometry for a mesh and the catalogue's material by name: what the whole-gun path does to every mesh (the gunsmith and icons dispose geometry; the game's materials are shared). */
   function finishMeshes(group: THREE.Object3D) {
-    const M = G.GunMaterials.M as Record<string, () => THREE.Material>;
+    const M = GunMaterials.M as Record<string, () => THREE.Material>;
     group.traverse((o: any) => {
       if (!o.isMesh) return;
       if (!o.userData.own) o.geometry = o.geometry.clone();
@@ -1356,7 +1360,7 @@ function contractMarkdown(): string {
     finishMeshes(group);
     const info = plan.info; info.anim = {}; // (the tables' and the anchors' info: the same as infoOf(def) gives, with the live nodes in anim)
     for (const [name, node] of nodes) if (name.startsWith(NAMES.partPrefix) && node.userData[NAMES.extras.part]) info.anim[node.userData[NAMES.extras.part]] = node;
-    if (skin && skin.length) G.Stickers.decorate(group, skin);
+    if (skin && skin.length) Stickers.decorate(group, skin);
     return plan.approx ? { group, info, approx: plan.approx } : { group, info };
   }
   /**
@@ -1438,7 +1442,7 @@ function contractMarkdown(): string {
   function boot(): Promise<number> {
     return booting || (booting = glbReady().then(async (ok) => {
       if (!ok) return 0;
-      const ids = Object.keys(G.Gunsmith.PLATFORMS); let n = 0;
+      const ids = Object.keys(Gunsmith.PLATFORMS); let n = 0;
       await pool(ids, 8, async (id) => { if (await platformIndex(id)) n++; });
       return n;
     }));
@@ -1460,8 +1464,8 @@ function contractMarkdown(): string {
     planBuild, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,
   };
 })();
-G.Models = G_Models;
-G.Hooks.modelInfo = (def) => (G.Models.infoOf ? G.Models.infoOf(def) : null); // (a barrel's effective lengths from the model: js/data.ts barrelMm)
+G.Models = Models;
+Hooks.modelInfo = (def) => (Models.infoOf ? Models.infoOf(def) : null); // (a barrel's effective lengths from the model: js/data.ts barrelMm)
 /** G.GLB: the glTF loader (made from three's GLTFLoader in js/glb.ts; tools replace it with their own). */
 interface GlbModuleApi { ready: Promise<boolean>; load(url: string): Promise<any> }
-interface GameModules { Models: typeof G_Models; GLB?: GlbModuleApi }
+declare global { interface GameModules { Models: typeof Models; GLB?: GlbModuleApi } }

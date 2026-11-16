@@ -4,7 +4,7 @@
 //   G.GunMaterials.M.<name>()        the shared material
 //   G.GunMaterials.std(key, ...)     a MeshStandardMaterial, made once per key
 //   G.GunMaterials.relief(kind, cell) the bump map of a stippled or chequered material (a canvas, rebuilt at load: not stored in a file)
-const G_GunMaterials = (() => {
+export const GunMaterials = (() => {
 const T = THREE;
 const cache: any = {};
 const std = (key: string, color: number, roughness: number, metalness: number, extra?: any) =>
@@ -75,5 +75,5 @@ const byName = (name: string | null | undefined): THREE.Material => {
 };
 return { M, std, relief, byName, ALIAS };
 })();
-G.GunMaterials = G_GunMaterials;
-interface GameModules { GunMaterials: typeof G_GunMaterials; }
+G.GunMaterials = GunMaterials;
+declare global { interface GameModules { GunMaterials: typeof GunMaterials; } }

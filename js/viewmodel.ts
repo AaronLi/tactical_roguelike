@@ -1,7 +1,9 @@
 'use strict';
+import { AMMO, ammoTypes, asCal, ballFor, boreTip, calOf, cartOf, chambered, flight } from './data.js';
+import { VMAnim } from './vmanim.js';
 /** A display surface (display_<name>): the canvas the game draws on and the texture that shows it on the mesh. Draw, then set tex.needsUpdate. */
 interface VmSurface { mesh: THREE.Mesh; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; width: number; height: number }
-const G_Viewmodel = (() => {
+export const Viewmodel = (() => {
   const T = THREE;
 
   // ---------------------------------------------------------------- muzzle flash sprite
@@ -115,7 +117,7 @@ const G_Viewmodel = (() => {
   //   - standing on the left wire, a man 1.75 m tall at each range, nearest furthest out: stand him on the wire and match him
   const BDC_R = 170, BDC_TEX = new Map();
   function bdcTex(def: any) {
-    const ball = G.ballFor(G.calOf(def)), tip = G.boreTip({ def }), hold = (am: string, d: number) => { const q = G.flight(def, am, tip, d)[d]; return q ? (-q.h / d) * 1000 : null; }, key = [10, 30, 100].map((d) => (hold(ball, d) || 0).toFixed(2)).join();
+    const ball = ballFor(calOf(def)), tip = boreTip({ def }), hold = (am: string, d: number) => { const q = flight(def, am, tip, d)[d]; return q ? (-q.h / d) * 1000 : null; }, key = [10, 30, 100].map((d) => (hold(ball, d) || 0).toFixed(2)).join();
     if (BDC_TEX.has(key)) return BDC_TEX.get(key);
     const S0 = 4096, s = S0 / (2 * BDC_R), c = document.createElement('canvas');
     c.width = c.height = S0;
@@ -143,7 +145,7 @@ const G_Viewmodel = (() => {
       label(String(d), hw + 0.9, y, TH);
     }
     // a bodkin's
-    const heavy = G.ammoTypes(G.calOf(def)).find((a) => a !== ball && (G.AMMO as Record<string, any>)[a].velK);
+    const heavy = ammoTypes(calOf(def)).find((a) => a !== ball && (AMMO as Record<string, any>)[a].velK);
     if (heavy) {
       for (const d of [20, 30, 40, 50, 60, 70, 80, 100]) {
         const y = hold(heavy, d);
@@ -151,7 +153,7 @@ const G_Viewmodel = (() => {
         line(0.16, ink, () => { g.moveTo(-1.8, y); g.lineTo(0, y); });
         if (d % 20 === 0 || d < 40 || d === 50 || d === 70) label(String(d), -2.3, y, TH * 0.72, 'right');
       }
-      label((G.AMMO as Record<string, any>)[heavy].tag, -2.3, hold(heavy, 20)! - TH * 0.95, TH * 0.6, 'right');
+      label((AMMO as Record<string, any>)[heavy].tag, -2.3, hold(heavy, 20)! - TH * 0.95, TH * 0.6, 'right');
     }
     // the men on the wire: 150 m nearest the middle, 20 m furthest out
     let x = -7.5;
@@ -181,14 +183,14 @@ const G_Viewmodel = (() => {
   //     scope's top: js/render.ts _renderPip puts pmil there). Mils are drawn on RANGE_R either side of the middle.
   const RANGE_R = 44, RANGE_TEX = new Map<string, any>(), RANGES = [100, 200, 300, 400, 500];
   function nextRound(def: any, w: any) {
-    const cdef = G.asCal(def, G.cartOf(w.def ? w : { def, rl: w.rl }) || G.calOf(def));
-    const am = (G.chambered(def) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || G.ballFor(G.calOf(def));
+    const cdef = asCal(def, cartOf(w.def ? w : { def, rl: w.rl }) || calOf(def));
+    const am = (chambered(def) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || ballFor(calOf(def));
     return { cdef, am };
   }
   function rangeHolds(def: any, w: any): { am: string; holds: (number | null)[] } {
     const { cdef, am } = nextRound(def, w);
     if (def.cls === 'RAIL') return { am, holds: RANGES.map(() => null) }; // (a slug that flies flat: nothing to hold over)
-    const p = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), 500);
+    const p = flight(cdef, am, boreTip({ def: cdef, clicks: w.clicks || 0 }), 500);
     return { am, holds: RANGES.map((d) => (p[d] ? (-p[d].h / d) * 1000 : null)) };
   }
   function rangeTex(holds: (number | null)[]) {
@@ -308,7 +310,7 @@ const G_Viewmodel = (() => {
     const reticle = def.reticle || 'cross';
     if (reticle === 'thermal') return thermalLens(g, o, def);
     const mat = new T.ShaderMaterial({
-      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: G.ballFor(G.calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
+      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: ballFor(calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
       vertexShader: PIP_VS, fragmentShader: PIP_FS, toneMapped: false, // (it rolls off the picture itself: bpTone)
     });
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
@@ -338,7 +340,7 @@ const G_Viewmodel = (() => {
       const poi = mat.uniforms.poi.value;
       if (def.calc < 2 || r == null || r < 1) { poi.z = 0; return; }
       const { cdef, am } = nextRound(def, w), k = `${cdef.id}|${am}|${w.clicks || 0}`;
-      if (k !== pathK) { pathK = k; path = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), POI_FAR); }
+      if (k !== pathK) { pathK = k; path = flight(cdef, am, boreTip({ def: cdef, clicks: w.clicks || 0 }), POI_FAR); }
       const q = path[Math.round(r)]; // (past the round's reach there is no impact to show)
       if (!q) { poi.z = 0; return; }
       poi.set(0, Math.round(((q.h / r) * 1000) / POI_CELL), 1);
@@ -348,7 +350,7 @@ const G_Viewmodel = (() => {
       if (!w) return;
       if (def.calc && range) calcStep(w, range);
       if (reticle !== 'range') return;
-      const k = `${(G.chambered(w.def) && w.chamber) || (w.tube && w.tube[w.tube.length - 1]) || w.ammo}|${w.clicks || 0}`;
+      const k = `${(chambered(w.def) && w.chamber) || (w.tube && w.tube[w.tube.length - 1]) || w.ammo}|${w.clicks || 0}`;
       if (k === sig) return;
       sig = k; mat.uniforms.rmap.value = rangeTex(rangeHolds(def, w).holds);
     };
@@ -469,7 +471,7 @@ const G_Viewmodel = (() => {
     const hip = def.akimbo ? new T.Vector3(0, -0.15, -0.34) : info.pistol ? new T.Vector3(0.1, -0.1 - info.sy, -0.32) : new T.Vector3(0.1, -0.1 - info.sy * 0.6, adsZ - 0.1);
     root.userData = { flash: flashes[0], flashes, dial: dials[0] || null, sightY: info.sy, hip, ads, anim: info.anim, info, holders, pip };
     if (Object.keys(displays).length) root.userData.displays = displays;
-    G.VMAnim.prepare(root, def); // arms, reload and inspect animation (js/vmanim.ts), bound to the parts by js/gunrig.ts
+    VMAnim.prepare(root, def); // arms, reload and inspect animation (js/vmanim.ts), bound to the parts by js/gunrig.ts
     return root;
   }
 
@@ -622,5 +624,5 @@ const G_Viewmodel = (() => {
 
   return { assemble, reflex, pipLens, flash, surfaces, paintAmmo, paintRange, rangeText, worldProto, worldInstance, merge };
 })();
-G.Viewmodel = G_Viewmodel;
-interface GameModules { Viewmodel: typeof G_Viewmodel; }
+G.Viewmodel = Viewmodel;
+declare global { interface GameModules { Viewmodel: typeof Viewmodel; } }

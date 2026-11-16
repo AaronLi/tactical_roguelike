@@ -1,4 +1,9 @@
 'use strict';
+import { GunMaterials } from './gunmaterials.js';
+import { Gunsmith } from './parts.js';
+import { Stickers } from './stickers.js';
+import { Models } from './glb.js';
+import { Viewmodel } from './viewmodel.js';
 // The game's gun models: every gun it shows (the gunsmith, the hangar, icons, the loot on the floor, everyone's gun in third person, the one in your
 // hands) is a baked glTF (docs/models.md): per-part packs the baker made from the recipes (tools/models/), assembled for any build by js/glb.ts.
 // There are no recipes here and no fallback to them. This file is the facade the rest of the game calls:
@@ -21,7 +26,7 @@
 // LOADING. Every model file is already in memory: the page downloads ONE bundle at start, beside the main menu (js/modelbundles.ts). What is left is parsing, when
 // a model is first shown. boot(): every platform's index (parsed) and the props. preload(defs, platforms): a level's start parses the squad's kits, the level's enemy
 // weapon pool, the loot (js/game.ts startLevel) ahead of need. Anything else is parsed when it is first asked for.
-const G_GunModels = (() => {
+export const GunModels = (() => {
   const T = THREE;
 
   // ---------------------------------------------------------------- props: the cartridges and the crossbow bolt
@@ -33,17 +38,17 @@ const G_GunModels = (() => {
   const propScene = new Map<string, THREE.Object3D>();
   /** The props' index and every prop file (tiny: ~15 files, a few hundred bytes each). Resolves once they are all in, or have failed (they are then just not drawn). */
   function loadProps(): Promise<void> {
-    return propsP || (propsP = G.Models.fetchJson(PROPS + 'index.json').then(async (ix: PropsIndex | null) => {
+    return propsP || (propsP = Models.fetchJson(PROPS + 'index.json').then(async (ix: PropsIndex | null) => {
       if (!ix) return;
       const files = new Set<string>([ix.quarrel.file]);
       for (const e of Object.values(ix.keys)) files.add(e.file);
-      await Promise.all([...files].map((f) => G.Models.loadFile(PROPS + f).then((s: THREE.Object3D) => { propScene.set(f, s); }, (e: any) => { console.warn('[props] ' + f + ': ' + (e && e.message || e)); })));
+      await Promise.all([...files].map((f) => Models.loadFile(PROPS + f).then((s: THREE.Object3D) => { propScene.set(f, s); }, (e: any) => { console.warn('[props] ' + f + ': ' + (e && e.message || e)); })));
       pix = ix;
     }).catch((e) => { console.warn('[props] ' + (e && e.message || e)); }).then(() => { propsDone = true; }));
   }
   /** A baked prop's nodes copied into a group: own geometry (the viewmodel's disposes it), the catalogue's material where the file names one. */
   function propGroup(scene: THREE.Object3D, only?: (name: string) => boolean): THREE.Group {
-    const g = new T.Group(), M = G.GunMaterials.M as Record<string, () => THREE.Material>;
+    const g = new T.Group(), M = GunMaterials.M as Record<string, () => THREE.Material>;
     for (const c of scene.children) {
       if (only && !only(c.name)) continue;
       const n = c.clone(true);
@@ -95,7 +100,7 @@ const G_GunModels = (() => {
   /** Fetches the packs a build needs (once at a time per build); resolves to whether it can be assembled now. */
   function request(def: any): Promise<boolean> {
     let p = asked.get(def.code);
-    if (!p) asked.set(def.code, (p = G.Models.ensure(def).then((ok) => {
+    if (!p) asked.set(def.code, (p = Models.ensure(def).then((ok) => {
       asked.delete(def.code);
       if (!ok && !warned.has(def.code)) { warned.add(def.code); console.warn('[gun models] no baked model for ' + def.id + ' ' + def.code + ' (its packs or index did not load, or the baker has not covered this build)'); }
       return ok;
@@ -104,7 +109,7 @@ const G_GunModels = (() => {
   }
   /** What a gun's info says before its packs are in: from the platform's index (anchors, muzzles, sight windows, mounts); else the barest of guesses, filled over when they are. */
   function infoBefore(def: any): any {
-    const M = G.Models as any, info = (M.infoOf ? M.infoOf(def) : M.infoFromIndex(def));
+    const M = Models as any, info = (M.infoOf ? M.infoOf(def) : M.infoFromIndex(def));
     return info || { sy: 0.06, fSight: 0.2, relief: 0.1, muzzles: [[0.5, 0, 0]], grip: [0.05, -0.05, 0], support: [0.3, -0.04, 0], anim: {} };
   }
   /** Moves an assembled model's nodes into the group that stood in for it. */
@@ -115,12 +120,12 @@ const G_GunModels = (() => {
 
   // ---------------------------------------------------------------- display: every part separate (the gunsmith, the hangar, icons)
   function display(def: any, skin?: any): { group: THREE.Group; info: any } {
-    const a = G.Models.assemble(def, skin);
+    const a = Models.assemble(def, skin);
     if (a) return a;
     const group = new T.Group(), info = infoBefore(def);
     group.userData.pending = true;
     request(def).then((ok) => {
-      const b = ok ? G.Models.assemble(def, skin) : null;
+      const b = ok ? Models.assemble(def, skin) : null;
       if (b) { adopt(group, b.group); Object.assign(info, b.info); }
       filled(group, !!b);
     });
@@ -128,26 +133,26 @@ const G_GunModels = (() => {
   }
 
   // ---------------------------------------------------------------- world: the third-person gun, merged and shared (cached per build)
-  const worldCache = new Map<string, ReturnType<typeof G.Viewmodel.worldProto>>();
+  const worldCache = new Map<string, ReturnType<typeof Viewmodel.worldProto>>();
   function worldProtoOf(def: any) {
     let proto = worldCache.get(def.code);
     if (!proto) {
-      const a = G.Models.assemble(def);
+      const a = Models.assemble(def);
       if (!a) return null;
-      proto = G.Viewmodel.worldProto(a.group, a.info); // (takes the assembled model apart: nothing else holds it)
+      proto = Viewmodel.worldProto(a.group, a.info); // (takes the assembled model apart: nothing else holds it)
       worldCache.set(def.code, proto);
     }
     return proto;
   }
   function world(def: any, skin?: any): THREE.Group {
-    if (typeof def === 'string') def = G.Gunsmith.fromCode(def);
+    if (typeof def === 'string') def = Gunsmith.fromCode(def);
     const proto = worldProtoOf(def);
-    if (proto) { const g = G.Viewmodel.worldInstance(proto); if (skin && skin.length) G.Stickers.decorate(g, skin); return g; }
+    if (proto) { const g = Viewmodel.worldInstance(proto); if (skin && skin.length) Stickers.decorate(g, skin); return g; }
     const g = new T.Group(), info = infoBefore(def);
     g.userData.info = info; g.userData.pending = true;
     request(def).then((ok) => {
       const p = ok ? worldProtoOf(def) : null;
-      if (p) { adopt(g, G.Viewmodel.worldInstance(p), ['info']); Object.assign(info, p.info); if (skin && skin.length) G.Stickers.decorate(g, skin); }
+      if (p) { adopt(g, Viewmodel.worldInstance(p), ['info']); Object.assign(info, p.info); if (skin && skin.length) Stickers.decorate(g, skin); }
       filled(g, !!p);
     });
     return g;
@@ -169,18 +174,18 @@ const G_GunModels = (() => {
     if (!propsDone) { loadProps(); return null; }
     const models: VmModel[] = [];
     for (let i = 0; i < (def.akimbo ? 2 : 1); i++) {
-      const a = G.Models.assemble(def, skin);
+      const a = Models.assemble(def, skin);
       if (!a) { request(def); return null; }
       models.push(vmModel(a));
     }
-    return G.Viewmodel.assemble(def, models) as THREE.Group;
+    return Viewmodel.assemble(def, models) as THREE.Group;
   }
   /** Whether viewmodel(def) would give a gun now. */
-  const viewmodelReady = (def: any) => propsDone && G.Models.ready(def);
+  const viewmodelReady = (def: any) => propsDone && Models.ready(def);
 
   // ---------------------------------------------------------------- what to have loaded
   /** Game start: every platform's index and the props. Resolves when they are in. */
-  const boot = (): Promise<void> => Promise.all([G.Models.boot(), loadProps()]).then(() => undefined);
+  const boot = (): Promise<void> => Promise.all([Models.boot(), loadProps()]).then(() => undefined);
   /**
    * Fetches what is about to be shown, most urgent first (the queue is in js/glb.ts): the builds in these defs at once (priority 0); then, `wholePlatforms`
    * (the gunsmith: a part swap should show at once) every pack of their platforms; and for the gun ids in `platforms` (a level's enemy pool) the default
@@ -190,13 +195,13 @@ const G_GunModels = (() => {
   function preload(defs: any[], platforms: string[] = [], wholePlatforms = true): Promise<void> {
     return boot().then(() => {
       const all: Promise<unknown>[] = [];
-      for (const d of defs) if (d && d.id) { all.push(request(d)); if (wholePlatforms && !platformsAsked.has(d.id)) { platformsAsked.add(d.id); all.push(G.Models.preloadPlatform(d.id)); } }
-      for (const id of platforms) { const d = G.Gunsmith.PLATFORMS[id] && G.Gunsmith.fromCode(G.Gunsmith.defaultCode(id)); if (d) all.push(G.Models.ensure(d, 1)); }
+      for (const d of defs) if (d && d.id) { all.push(request(d)); if (wholePlatforms && !platformsAsked.has(d.id)) { platformsAsked.add(d.id); all.push(Models.preloadPlatform(d.id)); } }
+      for (const id of platforms) { const d = Gunsmith.PLATFORMS[id] && Gunsmith.fromCode(Gunsmith.defaultCode(id)); if (d) all.push(Models.ensure(d, 1)); }
       return Promise.all(all).then(() => undefined);
     });
   }
 
   return { display, world, viewmodel, viewmodelReady, whenReady, roundDims, roundShape, roundProp, quarrel, boot, preload };
 })();
-G.GunModels = G_GunModels;
-interface GameModules { GunModels: typeof G_GunModels }
+G.GunModels = GunModels;
+declare global { interface GameModules { GunModels: typeof GunModels } }
