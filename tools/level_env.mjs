@@ -8,7 +8,7 @@ import * as THREE_NS from 'three';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST = path.join(ROOT, 'dist/js/');
-export const LEVEL_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers'];
+export const LEVEL_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers'];
 
 export async function loadLevel() {
   const ctx2d = new Proxy({}, { get: (t, k) => (k in t ? t[k] : () => ({ addColorStop() {} })), set: (t, k, v) => { t[k] = v; return true; } });

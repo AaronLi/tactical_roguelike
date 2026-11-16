@@ -9,7 +9,7 @@
 // (what a file reaches for while it loads or builds a level: none of it is drawn here)
 (self as any).document = { createElement: (t: string) => (t === 'canvas' ? new OffscreenCanvas(1, 1) : { style: {} }), body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {} };
 // (the scripts, in the page's order: index.html. A literal list: tools/deps.mjs and tools/check_sim_golden.mjs read it)
-const SERVER_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents',
+const SERVER_SCRIPTS = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents',
   'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'spaceserver', 'serverhost'];
 const svBooted = import('./threeboot.js').then(async () => {
   for (const f of SERVER_SCRIPTS) await import('./' + f + '.js'); // (one after the other: each is a module of its own that shares only G)

@@ -12,10 +12,10 @@
   "parts",
   "gear",
   "sim",
-  "ballistics",
-  "level",
-  "leveldesc",
   "world",
+  "ballistics",
+  "leveldesc",
+  "level",
   "furnspec",
   "furniture",
   "homes",
@@ -49,11 +49,11 @@
    "parts",
    "gear",
    "sim",
+   "world",
    "ballistics",
    "audio",
-   "level",
    "leveldesc",
-   "world",
+   "level",
    "furnspec",
    "furniture",
    "homes",
@@ -134,10 +134,10 @@
    "parts",
    "gear",
    "sim",
-   "ballistics",
-   "level",
-   "leveldesc",
    "world",
+   "ballistics",
+   "leveldesc",
+   "level",
    "furnspec",
    "furniture",
    "homes",
@@ -164,10 +164,10 @@
    "parts",
    "gear",
    "sim",
-   "ballistics",
-   "level",
-   "leveldesc",
    "world",
+   "ballistics",
+   "leveldesc",
+   "level",
    "furnspec",
    "furniture",
    "homes",
@@ -187,11 +187,11 @@
    "parts",
    "gear",
    "sim",
+   "world",
    "ballistics",
    "damage",
-   "level",
    "leveldesc",
-   "world",
+   "level",
    "furnspec",
    "furniture",
    "homes",
@@ -227,10 +227,10 @@
    "parts",
    "gear",
    "sim",
-   "ballistics",
-   "level",
-   "leveldesc",
    "world",
+   "ballistics",
+   "leveldesc",
+   "level",
    "furnspec",
    "furniture",
    "homes",
@@ -268,11 +268,11 @@
   "parts",
   "gear",
   "sim",
+  "world",
   "ballistics",
   "audio",
-  "level",
   "leveldesc",
-  "world",
+  "level",
   "furnspec",
   "furniture",
   "homes",
@@ -1385,311 +1385,127 @@
   },
   "ballistics": {
    "defs": {
-    "Ballistics": 981
+    "Ballistics": 986
    },
-   "imports": [],
-   "uses": [
+   "imports": [
     {
-     "x": "baseAm",
-     "line": 106,
-     "load": false,
-     "guard": "plain"
+     "from": "data",
+     "line": 2,
+     "names": [
+      "ARMORS",
+      "ballFor",
+      "baseAm",
+      "CALIBERS",
+      "calOf",
+      "loadOf",
+      "plusOf",
+      "roundDef",
+      "roundSpeed",
+      "WEAPONS"
+     ]
     },
     {
-     "x": "calOf",
-     "line": 107,
-     "load": false,
-     "guard": "plain"
+     "from": "gear",
+     "line": 3,
+     "names": [
+      "Gear"
+     ]
     },
     {
-     "x": "CALIBERS",
-     "line": 107,
-     "load": false,
-     "guard": "plain"
+     "from": "materials",
+     "line": 4,
+     "names": [
+      "Materials"
+     ]
     },
     {
-     "x": "roundSpeed",
-     "line": 109,
-     "load": false,
-     "guard": "plain"
+     "from": "util",
+     "line": 5,
+     "names": [
+      "U"
+     ]
     },
     {
-     "x": "loadOf",
-     "line": 126,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 144,
-     "load": true,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 155,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 253,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 254,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 269,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 343,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 478,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 570,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 570,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 645,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 652,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 678,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 760,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 809,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 809,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 834,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ARMORS",
-     "line": 854,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 854,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Gear",
-     "line": 858,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "WEAPONS",
-     "line": 878,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 878,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 880,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 941,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ballFor",
-     "line": 951,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 951,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 951,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "baseAm",
-     "line": 952,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundDef",
-     "line": 952,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundDef",
-     "line": 957,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "baseAm",
-     "line": 958,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "roundSpeed",
-     "line": 965,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "plusOf",
-     "line": 966,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "calOf",
-     "line": 966,
-     "load": false,
-     "guard": "plain"
+     "from": "world",
+     "line": 6,
+     "names": [
+      "World"
+     ]
     }
    ],
+   "uses": [],
    "decls": {
     "BVec": {
      "kind": "type",
-     "line": 68
+     "line": 73
     },
     "BLayer": {
      "kind": "type",
-     "line": 69
+     "line": 74
     },
     "BNose": {
      "kind": "type",
-     "line": 70
+     "line": 75
     },
     "BRound": {
      "kind": "type",
-     "line": 71
+     "line": 76
     },
     "BStrike": {
      "kind": "type",
-     "line": 76
+     "line": 81
     },
     "BArmourHit": {
      "kind": "type",
-     "line": 77
+     "line": 82
     },
     "BHit": {
      "kind": "type",
-     "line": 78
+     "line": 83
     },
     "BResult": {
      "kind": "type",
-     "line": 79
+     "line": 84
     },
     "BStack": {
      "kind": "type",
-     "line": 80
+     "line": 85
     },
     "BRoundIn": {
      "kind": "type",
-     "line": 81
+     "line": 86
     },
     "BCross": {
      "kind": "type",
-     "line": 82
+     "line": 87
     },
     "BShape": {
      "kind": "type",
-     "line": 83
+     "line": 88
     },
     "BSeg": {
      "kind": "type",
-     "line": 84
+     "line": 89
     },
     "BRig": {
      "kind": "type",
-     "line": 85
+     "line": 90
     },
     "BTrace": {
      "kind": "type",
-     "line": 86
+     "line": 91
     },
     "BArmour": {
      "kind": "type",
-     "line": 87
+     "line": 92
     },
-    "G_Ballistics": {
+    "Ballistics": {
      "kind": "value",
-     "line": 88
+     "line": 93
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 983
+    "global": {
+     "kind": "value",
+     "line": 988
     }
    }
   },
@@ -16881,535 +16697,108 @@
   },
   "level": {
    "defs": {
-    "Level": 2296
+    "Level": 2302
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "data",
+     "line": 2,
+     "names": [
+      "HANGAR_ROWS",
+      "HANGAR_THEME",
+      "THEMES"
+     ]
+    },
+    {
+     "from": "materials",
+     "line": 3,
+     "names": [
+      "Materials"
+     ]
+    },
+    {
+     "from": "shipgen",
+     "line": 4,
+     "names": [
+      "ShipGen"
+     ]
+    },
+    {
+     "from": "spacedata",
+     "line": 5,
+     "names": [
+      "SpaceData"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 6,
+     "names": [
+      "Hooks",
+      "U"
+     ]
+    },
+    {
+     "from": "world",
+     "line": 7,
+     "names": [
+      "World"
+     ]
+    },
+    {
+     "from": "leveldesc",
+     "line": 8,
+     "names": [
+      "LevelDesc"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "LevelDesc",
-     "line": 47,
+     "x": "Homes",
+     "line": 83,
      "load": false,
      "guard": "plain"
     },
     {
-     "x": "World",
-     "line": 48,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 58,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "line": 59,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 59,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "THEMES",
-     "line": 59,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "line": 63,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "line": 65,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "line": 66,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 67,
+     "x": "Furniture",
+     "line": 292,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Homes",
-     "line": 77,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 82,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 120,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 222,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "HANGAR_THEME",
-     "line": 223,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 225,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Hooks",
-     "line": 227,
+     "line": 318,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
-     "line": 286,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Homes",
-     "line": 312,
+     "line": 421,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
-     "line": 415,
+     "line": 421,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
-     "line": 415,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 460,
+     "line": 607,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
-     "line": 601,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 721,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "line": 728,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 837,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 914,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 927,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 976,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 988,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 988,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "LevelDesc",
-     "line": 1047,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1047,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "LevelDesc",
-     "line": 1069,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1072,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1072,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 1072,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1076,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1076,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1077,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1077,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1081,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1081,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1085,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1085,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1086,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1086,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1087,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1087,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1103,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1109,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1119,
+     "line": 1279,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Furniture",
-     "line": 1273,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Furniture",
-     "line": 1276,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1296,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1400,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1451,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1462,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1505,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1600,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1707,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1708,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1709,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1710,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1710,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1714,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1714,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1715,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1715,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1716,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1727,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1742,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1742,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1786,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "HANGAR_ROWS",
-     "line": 1824,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 1862,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 1980,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "line": 2055,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "line": 2061,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "line": 2062,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "line": 2067,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "ShipGen",
-     "line": 2067,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 2068,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "SpaceData",
-     "line": 2077,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 2088,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 2096,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 2096,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "World",
-     "line": 2111,
+     "line": 1282,
      "load": false,
      "guard": "plain"
     }
@@ -17417,135 +16806,117 @@
    "decls": {
     "LvDoorKind": {
      "kind": "type",
-     "line": 2
-    },
-    "LvFxKind": {
-     "kind": "type",
-     "line": 3
+     "line": 9
     },
     "LvBuilding": {
      "kind": "type",
-     "line": 4
+     "line": 10
     },
     "LvFl": {
      "kind": "type",
-     "line": 5
+     "line": 11
     },
     "LvTheme": {
      "kind": "type",
-     "line": 5
+     "line": 11
     },
     "LvUnit": {
      "kind": "type",
-     "line": 5
+     "line": 11
     },
     "LvNav": {
      "kind": "type",
-     "line": 5
+     "line": 11
     },
-    "G_Level": {
+    "Level": {
      "kind": "value",
-     "line": 9
+     "line": 15
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 2297
+    "global": {
+     "kind": "value",
+     "line": 2303
     }
    }
   },
   "leveldesc": {
    "defs": {
-    "LevelDesc": 1080
+    "LevelDesc": 1083
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "materials",
+     "line": 2,
+     "names": [
+      "Materials"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "U"
+     ]
+    },
+    {
+     "from": "world",
+     "line": 4,
+     "names": [
+      "World"
+     ]
+    }
+   ],
    "uses": [
     {
-     "x": "U",
-     "line": 48,
+     "x": "Level",
+     "line": 78,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 75,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 129,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 130,
+     "line": 165,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 162,
+     "line": 189,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 186,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 259,
+     "line": 360,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 357,
+     "line": 397,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 394,
+     "line": 419,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 416,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 459,
+     "line": 462,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 506,
+     "line": 509,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 601,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 664,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Level",
-     "line": 739,
+     "line": 604,
      "load": false,
      "guard": "plain"
     },
@@ -17556,56 +16927,26 @@
      "guard": "plain"
     },
     {
-     "x": "World",
-     "line": 743,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 757,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 767,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 855,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 855,
+     "x": "Level",
+     "line": 745,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 873,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 873,
+     "line": 876,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_LevelDesc": {
+    "LevelDesc": {
      "kind": "value",
-     "line": 3
+     "line": 6
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 1081
+    "global": {
+     "kind": "value",
+     "line": 1084
     }
    }
   },
@@ -36432,139 +35773,82 @@
   },
   "world": {
    "defs": {
-    "World": 647
+    "World": 649
    },
-   "imports": [],
+   "imports": [
+    {
+     "from": "materials",
+     "line": 2,
+     "names": [
+      "Materials"
+     ]
+    },
+    {
+     "from": "util",
+     "line": 3,
+     "names": [
+      "U"
+     ]
+    }
+   ],
    "uses": [
     {
      "x": "Level",
-     "line": 211,
+     "line": 213,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 257,
+     "line": 259,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Damage",
-     "line": 258,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 335,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 335,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 368,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 368,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 378,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 378,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 386,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "U",
-     "line": 386,
+     "line": 260,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 452,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 529,
+     "line": 454,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "LevelDesc",
-     "line": 552,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 553,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 553,
+     "line": 554,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 604,
-     "load": false,
-     "guard": "plain"
-    },
-    {
-     "x": "Materials",
-     "line": 620,
+     "line": 606,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 632,
+     "line": 634,
      "load": false,
      "guard": "plain"
     },
     {
      "x": "Level",
-     "line": 638,
+     "line": 640,
      "load": false,
      "guard": "plain"
     }
    ],
    "decls": {
-    "G_World": {
+    "World": {
      "kind": "value",
-     "line": 15
+     "line": 17
     },
-    "GameModules": {
-     "kind": "type",
-     "line": 649
+    "global": {
+     "kind": "value",
+     "line": 651
     }
    }
   },
@@ -37002,59 +36286,88 @@
   },
   "ballistics": {
    "data": {
-    "load": 0,
-    "call": 19,
+    "load": 1,
+    "call": 0,
     "names": [
-     "baseAm",
-     "calOf",
-     "CALIBERS",
-     "roundSpeed",
-     "loadOf",
      "ARMORS",
-     "WEAPONS",
      "ballFor",
+     "baseAm",
+     "CALIBERS",
+     "calOf",
+     "loadOf",
+     "plusOf",
      "roundDef",
-     "plusOf"
+     "roundSpeed",
+     "WEAPONS"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "ARMORS, ballFor, baseAm, CALIBERS, calOf, loadOf, plusOf, roundDef, roundSpeed, WEAPONS",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "gear": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Gear"
+    ],
+    "loadAt": [
+     {
+      "x": "Gear",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    },
    "materials": {
     "load": 1,
-    "call": 6,
+    "call": 0,
     "names": [
      "Materials"
     ],
     "loadAt": [
      {
       "x": "Materials",
-      "line": 144,
-      "guard": "plain"
+      "line": 4,
+      "guard": "plain",
+      "via": "import"
      }
     ]
    },
    "util": {
-    "load": 0,
-    "call": 6,
+    "load": 1,
+    "call": 0,
     "names": [
      "U"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 5,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    },
    "world": {
-    "load": 0,
-    "call": 1,
+    "load": 1,
+    "call": 0,
     "names": [
      "World"
     ],
-    "loadAt": []
-   },
-   "gear": {
-    "load": 0,
-    "call": 5,
-    "names": [
-     "Gear"
-    ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "World",
+      "line": 6,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "bolts": {
@@ -39886,57 +39199,6 @@
    }
   },
   "level": {
-   "leveldesc": {
-    "load": 0,
-    "call": 3,
-    "names": [
-     "LevelDesc"
-    ],
-    "loadAt": []
-   },
-   "world": {
-    "load": 0,
-    "call": 33,
-    "names": [
-     "World"
-    ],
-    "loadAt": []
-   },
-   "util": {
-    "load": 0,
-    "call": 28,
-    "names": [
-     "U",
-     "Hooks"
-    ],
-    "loadAt": []
-   },
-   "spacedata": {
-    "load": 0,
-    "call": 6,
-    "names": [
-     "SpaceData"
-    ],
-    "loadAt": []
-   },
-   "data": {
-    "load": 0,
-    "call": 4,
-    "names": [
-     "THEMES",
-     "HANGAR_THEME",
-     "HANGAR_ROWS"
-    ],
-    "loadAt": []
-   },
-   "shipgen": {
-    "load": 0,
-    "call": 5,
-    "names": [
-     "ShipGen"
-    ],
-    "loadAt": []
-   },
    "homes": {
     "load": 0,
     "call": 2,
@@ -39953,37 +39215,121 @@
     ],
     "loadAt": []
    },
+   "data": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "HANGAR_ROWS",
+     "HANGAR_THEME",
+     "THEMES"
+    ],
+    "loadAt": [
+     {
+      "x": "HANGAR_ROWS, HANGAR_THEME, THEMES",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
    "materials": {
-    "load": 0,
-    "call": 1,
+    "load": 1,
+    "call": 0,
     "names": [
      "Materials"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "Materials",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "shipgen": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "ShipGen"
+    ],
+    "loadAt": [
+     {
+      "x": "ShipGen",
+      "line": 4,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "spacedata": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "SpaceData"
+    ],
+    "loadAt": [
+     {
+      "x": "SpaceData",
+      "line": 5,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Hooks",
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "Hooks, U",
+      "line": 6,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "world": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "World"
+    ],
+    "loadAt": [
+     {
+      "x": "World",
+      "line": 7,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "leveldesc": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "LevelDesc"
+    ],
+    "loadAt": [
+     {
+      "x": "LevelDesc",
+      "line": 8,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "leveldesc": {
-   "util": {
-    "load": 0,
-    "call": 8,
-    "names": [
-     "U"
-    ],
-    "loadAt": []
-   },
    "level": {
     "load": 0,
     "call": 11,
     "names": [
      "Level"
-    ],
-    "loadAt": []
-   },
-   "materials": {
-    "load": 0,
-    "call": 2,
-    "names": [
-     "Materials"
     ],
     "loadAt": []
    },
@@ -39995,13 +39341,50 @@
     ],
     "loadAt": []
    },
+   "materials": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Materials"
+    ],
+    "loadAt": [
+     {
+      "x": "Materials",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
    "world": {
-    "load": 0,
-    "call": 1,
+    "load": 1,
+    "call": 0,
     "names": [
      "World"
     ],
-    "loadAt": []
+    "loadAt": [
+     {
+      "x": "World",
+      "line": 4,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "levelview": {
@@ -43351,22 +42734,6 @@
     ],
     "loadAt": []
    },
-   "util": {
-    "load": 0,
-    "call": 8,
-    "names": [
-     "U"
-    ],
-    "loadAt": []
-   },
-   "materials": {
-    "load": 0,
-    "call": 4,
-    "names": [
-     "Materials"
-    ],
-    "loadAt": []
-   },
    "leveldesc": {
     "load": 0,
     "call": 1,
@@ -43374,6 +42741,36 @@
      "LevelDesc"
     ],
     "loadAt": []
+   },
+   "materials": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "Materials"
+    ],
+    "loadAt": [
+     {
+      "x": "Materials",
+      "line": 2,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
+   },
+   "util": {
+    "load": 1,
+    "call": 0,
+    "names": [
+     "U"
+    ],
+    "loadAt": [
+     {
+      "x": "U",
+      "line": 3,
+      "guard": "plain",
+      "via": "import"
+     }
+    ]
    }
   },
   "zeroing": {
@@ -43496,20 +42893,18 @@
  "reach": [],
  "undefined": {},
  "trial": {
-  "total": 4085,
+  "total": 3561,
   "byCode": {
-   "TS2339": 3693,
-   "TS6196": 76,
-   "TS7006": 155,
-   "TS2551": 73,
+   "TS2339": 3257,
+   "TS6196": 71,
+   "TS7006": 145,
    "TS18047": 14,
-   "TS7031": 22,
-   "TS2345": 7,
-   "TS2531": 11,
-   "TS2322": 3,
-   "TS18048": 18,
-   "TS2532": 2,
-   "TS18049": 5,
+   "TS2551": 34,
+   "TS7031": 13,
+   "TS2345": 4,
+   "TS2531": 5,
+   "TS2322": 2,
+   "TS18048": 10,
    "TS7053": 6
   },
   "bare": [],
@@ -43518,7 +42913,6 @@
    "Ambience",
    "Audio",
    "AudioBundle",
-   "Ballistics",
    "Bolts",
    "Bundles",
    "Career",
@@ -43552,8 +42946,6 @@
    "Icons",
    "InvUI",
    "Landing",
-   "Level",
-   "LevelDesc",
    "LevelView",
    "LightGrid",
    "Loadout",
@@ -43586,24 +42978,17 @@
    "VMAnim",
    "Viewmodel",
    "Views",
-   "World",
    "ZeroUI",
    "Zip"
   ],
   "umd": [],
-  "unusedGM": 73,
+  "unusedGM": 69,
   "other": [
    {
     "file": "js/ambience.ts",
     "line": 948,
     "code": "TS7006",
     "msg": "Parameter 'q' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/arsenal.ts",
-    "line": 101,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
    },
    {
     "file": "js/cloud.ts",
@@ -43682,42 +43067,6 @@
     "line": 96,
     "code": "TS18047",
     "msg": "'heard' is possibly 'null'."
-   },
-   {
-    "file": "js/furniture.ts",
-    "line": 1115,
-    "code": "TS7031",
-    "msg": "Binding element 'x0' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/furniture.ts",
-    "line": 1115,
-    "code": "TS7031",
-    "msg": "Binding element 'y0' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/furniture.ts",
-    "line": 1115,
-    "code": "TS7031",
-    "msg": "Binding element 'z0' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/furniture.ts",
-    "line": 1115,
-    "code": "TS7031",
-    "msg": "Binding element 'x1' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/furniture.ts",
-    "line": 1115,
-    "code": "TS7031",
-    "msg": "Binding element 'y1' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/furniture.ts",
-    "line": 1115,
-    "code": "TS7031",
-    "msg": "Binding element 'z1' implicitly has an 'any' type."
    },
    {
     "file": "js/game.ts",
@@ -44357,18 +43706,6 @@
    },
    {
     "file": "js/hud.ts",
-    "line": 211,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
-    "line": 211,
-    "code": "TS7006",
-    "msg": "Parameter 'a' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/hud.ts",
     "line": 229,
     "code": "TS7006",
     "msg": "Parameter 'h' implicitly has an 'any' type."
@@ -44410,24 +43747,6 @@
     "msg": "Parameter 'i' implicitly has an 'any' type."
    },
    {
-    "file": "js/level.ts",
-    "line": 3,
-    "code": "TS6196",
-    "msg": "'LvFxKind' is declared but never used."
-   },
-   {
-    "file": "js/leveldesc.ts",
-    "line": 973,
-    "code": "TS7006",
-    "msg": "Parameter 'c' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/leveldesc.ts",
-    "line": 973,
-    "code": "TS7006",
-    "msg": "Parameter 'c' implicitly has an 'any' type."
-   },
-   {
     "file": "js/loot.ts",
     "line": 62,
     "code": "TS7006",
@@ -44438,30 +43757,6 @@
     "line": 89,
     "code": "TS7006",
     "msg": "Parameter 'ok' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 716,
-    "code": "TS7006",
-    "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 1910,
-    "code": "TS7031",
-    "msg": "Binding element 'id' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 1910,
-    "code": "TS7031",
-    "msg": "Binding element 'd' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/player.ts",
-    "line": 1910,
-    "code": "TS7031",
-    "msg": "Binding element 'hp' implicitly has an 'any' type."
    },
    {
     "file": "js/player.ts",
@@ -44566,72 +43861,6 @@
     "msg": "'rig.zipKit' is possibly 'undefined'."
    },
    {
-    "file": "js/rig.ts",
-    "line": 2105,
-    "code": "TS2532",
-    "msg": "Object is possibly 'undefined'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 2107,
-    "code": "TS2345",
-    "msg": "Argument of type 'number | undefined' is not assignable to parameter of type 'number'."
-   },
-   {
-    "file": "js/rig.ts",
-    "line": 2109,
-    "code": "TS2532",
-    "msg": "Object is possibly 'undefined'."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 485,
-    "code": "TS2345",
-    "msg": "Argument of type 'LvMap | null' is not assignable to parameter of type 'LvMap'."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 497,
-    "code": "TS2531",
-    "msg": "Object is possibly 'null'."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 499,
-    "code": "TS2531",
-    "msg": "Object is possibly 'null'."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 500,
-    "code": "TS2531",
-    "msg": "Object is possibly 'null'."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 502,
-    "code": "TS2531",
-    "msg": "Object is possibly 'null'."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 505,
-    "code": "TS2531",
-    "msg": "Object is possibly 'null'."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 508,
-    "code": "TS2531",
-    "msg": "Object is possibly 'null'."
-   },
-   {
-    "file": "js/server.ts",
-    "line": 3072,
-    "code": "TS7006",
-    "msg": "Parameter 'map' implicitly has an 'any' type."
-   },
-   {
     "file": "js/serverhost.ts",
     "line": 32,
     "code": "TS7006",
@@ -44728,24 +43957,6 @@
     "msg": "Parameter 'n' implicitly has an 'any' type."
    },
    {
-    "file": "js/sim.ts",
-    "line": 82,
-    "code": "TS7006",
-    "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/sim.ts",
-    "line": 87,
-    "code": "TS7006",
-    "msg": "Parameter 's' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/sim.ts",
-    "line": 114,
-    "code": "TS7006",
-    "msg": "Parameter 'm' implicitly has an 'any' type."
-   },
-   {
     "file": "js/space.ts",
     "line": 107,
     "code": "TS18047",
@@ -44762,96 +43973,6 @@
     "line": 333,
     "code": "TS7006",
     "msg": "Parameter 'o' implicitly has an 'any' type."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 648,
-    "code": "TS18049",
-    "msg": "'map' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 648,
-    "code": "TS18049",
-    "msg": "'map' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 648,
-    "code": "TS18049",
-    "msg": "'map' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 648,
-    "code": "TS18049",
-    "msg": "'map' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 649,
-    "code": "TS18049",
-    "msg": "'map' is possibly 'null' or 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 649,
-    "code": "TS2322",
-    "msg": "Type 'LvMap | null | undefined' is not assignable to type 'LvMap | null'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 650,
-    "code": "TS2345",
-    "msg": "Argument of type 'ZHull | undefined' is not assignable to parameter of type 'ZHull'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 653,
-    "code": "TS18048",
-    "msg": "'hit' is possibly 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 653,
-    "code": "TS18048",
-    "msg": "'hit' is possibly 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 653,
-    "code": "TS18048",
-    "msg": "'hit' is possibly 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 655,
-    "code": "TS18048",
-    "msg": "'hit' is possibly 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 655,
-    "code": "TS18048",
-    "msg": "'hit' is possibly 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 656,
-    "code": "TS18048",
-    "msg": "'hit' is possibly 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 656,
-    "code": "TS18048",
-    "msg": "'hit' is possibly 'undefined'."
-   },
-   {
-    "file": "js/space.ts",
-    "line": 657,
-    "code": "TS18048",
-    "msg": "'hit' is possibly 'undefined'."
    },
    {
     "file": "js/space.ts",

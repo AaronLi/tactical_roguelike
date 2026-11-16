@@ -8,13 +8,13 @@ nothing checks the module is there, **check** if it is the check itself (`G.X &&
 
 ## Summary
 
-- 90 files, 176 names on G, 5485 uses (93 while loading)
+- 90 files, 176 names on G, 5344 uses (92 while loading)
 - load-time cycles (unguarded): 0
 - cycles counting calls: 5, the largest 43 files
 - hand-kept orders against the load-time needs: index.html 0, js/serverworker.ts 0, js/prepworker.ts 0, js/exportworker.ts 0, tools/level_env.mjs 0, tools/model_env.mjs 0
 - the simulation reaching page-only modules: 0 uses (0 unguarded, 0 of them while loading)
 - names used but defined nowhere: 0
-- trial module typecheck: 4085 errors; 0 bare names between files (0 uses), 75 G members lost, 246 others
+- trial module typecheck: 3561 errors; 0 bare names between files (0 uses), 71 G members lost, 201 others
 
 ## 1. Dependency graph
 
@@ -38,7 +38,7 @@ These are fine as ES modules (a module may call one that imports it, once both h
 Dependencies first, ties in index.html's order:
 
 ```
-modelbundles threeboot util medical materials zip data spacedata shipgen callsigns arsenal loadout parts gear sim ballistics audio level leveldesc world furnspec furniture homes residents furnmesh gunshot-synth gunaudio footsteps acoustics ambience handling lightgrid levelview render scars damage glare shotlog stickers bolts gunmaterials gunmodels glb gunrig viewmodel vmanim prep humandata humans headgear rig net recorder server spaceserver serverhost serverlink player views casings icons hud shop shopui invui gunsmith zeroing route loot course range highlights menushow hangar landing shipmodel spaceui space cloudconfig career cloud gamepad touch game profiler demo debugstart exportworker prepworker serverworker
+modelbundles threeboot util medical materials zip data spacedata shipgen callsigns arsenal loadout parts gear sim world ballistics audio leveldesc level furnspec furniture homes residents furnmesh gunshot-synth gunaudio footsteps acoustics ambience handling lightgrid levelview render scars damage glare shotlog stickers bolts gunmaterials gunmodels glb gunrig viewmodel vmanim prep humandata humans headgear rig net recorder server spaceserver serverhost serverlink player views casings icons hud shop shopui invui gunsmith zeroing route loot course range highlights menushow hangar landing shipmodel spaceui space cloudconfig career cloud gamepad touch game profiler demo debugstart exportworker prepworker serverworker
 ```
 
 ### The hand-kept orders against the load-time needs
@@ -71,11 +71,11 @@ A file that uses another, unguarded, while loading, where that other is missing 
 | parts (sim) | Gunsmith | data, util | - |
 | gear (sim) | Gear | data, medical, parts, util | sim, stickers |
 | sim (sim) | Sim | data, parts, spacedata, util | level, world |
-| ballistics (sim) | Ballistics | materials | data, gear, util, world |
+| world (sim) | World | materials, util | damage, level, leveldesc |
+| ballistics (sim) | Ballistics | data, gear, materials, util, world | - |
 | audio | Audio | util | acoustics, casings, data, footsteps, game, gunaudio, level, modelbundles, render |
-| level (sim) | Level | - | data, furniture, homes, leveldesc, materials, shipgen, spacedata, util, world |
-| leveldesc (sim) | LevelDesc | - | damage, level, materials, util, world |
-| world (sim) | World | - | damage, level, leveldesc, materials, util |
+| leveldesc (sim) | LevelDesc | materials, util, world | damage, level |
+| level (sim) | Level | data, leveldesc, materials, shipgen, spacedata, util, world | furniture, homes |
 | furnspec (sim) | FurnSpec | - | furniture, level, util, world |
 | furniture (sim) | Furniture | - | level, util, world |
 | homes (sim) | Homes | furniture, util | level |
@@ -159,9 +159,9 @@ None.
 `tsconfig.modules-trial.json`: the project with every file a module (`moduleDetection: force`). Phase 1 is done when
 the only errors left are G members (those go when the files are converted).
 
-4085 errors: TS2339 3693, TS7006 155, TS6196 76, TS2551 73, TS7031 22, TS18048 18, TS18047 14, TS2531 11, TS2345 7, TS7053 6, TS18049 5, TS2322 3, TS2532 2.
+3561 errors: TS2339 3257, TS7006 145, TS6196 71, TS2551 34, TS18047 14, TS7031 13, TS18048 10, TS7053 6, TS2531 5, TS2345 4, TS2322 2.
 
-**G members lost** (TS2339 on GameNamespace, 75 names): each file's `interface GameModules` no longer merges (and in 73 files it's reported unused). Expected; they go as the files are converted.
+**G members lost** (TS2339 on GameNamespace, 71 names): each file's `interface GameModules` no longer merges (and in 69 files it's reported unused). Expected; they go as the files are converted.
 
 **THREE as a global** (TS2686, in 0 files): three's types declare it a UMD global, which a module may not use without an import. Phase 2's import map, or `allowUmdGlobalAccess`, clears these.
 
@@ -170,10 +170,9 @@ the only errors left are G members (those go when the files are converted).
 | Name | Kind | Declared in | Uses | Used by |
 | --- | --- | --- | --- | --- |
 
-**Everything else** (246): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
+**Everything else** (201): almost all follow on from the lost G members (a callback's parameter loses its type with the module it came from: TS7006, TS7031, TS18047...). They should go with the rest; any left after phase 1 is real.
 
 - js/ambience.ts:948 TS7006 Parameter 'q' implicitly has an 'any' type.
-- js/arsenal.ts:101 TS7006 Parameter 'a' implicitly has an 'any' type.
 - js/cloud.ts:304 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/cloud.ts:352 TS7006 Parameter 'r' implicitly has an 'any' type.
 - js/cloud.ts:376 TS7006 Parameter 'r' implicitly has an 'any' type.
@@ -187,12 +186,6 @@ the only errors left are G members (those go when the files are converted).
 - js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
 - js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
 - js/footsteps.ts:96 TS18047 'heard' is possibly 'null'.
-- js/furniture.ts:1115 TS7031 Binding element 'x0' implicitly has an 'any' type.
-- js/furniture.ts:1115 TS7031 Binding element 'y0' implicitly has an 'any' type.
-- js/furniture.ts:1115 TS7031 Binding element 'z0' implicitly has an 'any' type.
-- js/furniture.ts:1115 TS7031 Binding element 'x1' implicitly has an 'any' type.
-- js/furniture.ts:1115 TS7031 Binding element 'y1' implicitly has an 'any' type.
-- js/furniture.ts:1115 TS7031 Binding element 'z1' implicitly has an 'any' type.
 - js/game.ts:101 TS7006 Parameter 'names' implicitly has an 'any' type.
 - js/game.ts:127 TS7006 Parameter 'm' implicitly has an 'any' type.
 - js/game.ts:127 TS7006 Parameter 'from' implicitly has an 'any' type.
@@ -232,4 +225,11 @@ the only errors left are G members (those go when the files are converted).
 - js/game.ts:1562 TS7006 Parameter 'b' implicitly has an 'any' type.
 - js/game.ts:1563 TS7006 Parameter 'a' implicitly has an 'any' type.
 - js/game.ts:1563 TS7006 Parameter 'a' implicitly has an 'any' type.
-- ... 186 more in the JSON
+- js/game.ts:1564 TS7006 Parameter 'c' implicitly has an 'any' type.
+- js/game.ts:1564 TS7006 Parameter 'c' implicitly has an 'any' type.
+- js/game.ts:1612 TS7006 Parameter 'k' implicitly has an 'any' type.
+- js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
+- js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
+- js/game.ts:1622 TS7006 Parameter 'a' implicitly has an 'any' type.
+- js/game.ts:1623 TS2345 Argument of type 'unknown' is not assignable to parameter of type 'string'.
+- ... 141 more in the JSON

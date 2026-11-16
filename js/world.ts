@@ -1,4 +1,6 @@
 'use strict';
+import { Materials } from './materials.js';
+import { U } from './util.js';
 // The world in three dimensions: everything solid in a level is a 3D shape (a solid), indexed in a 3D spatial
 // hash, and every question the game asks about space is answered from those shapes, at any height:
 //   raycast  (rounds, sight, sound): the nearest solid along a ray, through glass if asked
@@ -12,7 +14,7 @@
 // their solids change as they open, close and break.
 // Levels are still planned on grids by the generators (js/level.ts); fromTileMap turns a planned level into
 // solids. Nothing here knows about tiles.
-const G_World = (() => {
+export const World = (() => {
   const CELL = 2; // the hash's cells, metres on a side (x, y and z)
   const key = (ix: number, iy: number, iz: number) => ((ix + 2048) * 4096 + (iy + 2048)) * 4096 + (iz + 2048);
 
@@ -332,7 +334,7 @@ const G_World = (() => {
     if (st.yb) { const dx = x - st.yb.x, dz = z - st.yb.z; x = dx * st.yb.c - dz * st.yb.s; z = dx * st.yb.s + dz * st.yb.c; } // (a turned ship's flight: its x0..z1 in her own frame, yb her berth)
     const along = st.axis === 'z', a = along ? z : x, lat = along ? x : z, lo = along ? st.z0 : st.x0, hi = along ? st.z1 : st.x1;
     const u = st.up < 0 ? hi - a : a - lo, len = hi - lo, n = st.n ? st.n : st.steps ? st.steps.length : Math.round(st.rise / 0.2), rn = st.rise / n, run = len / n;
-    return { u, len, across: lat > (along ? st.x0 : st.z0) && lat < (along ? st.x1 : st.z1), h: st.y0 + G.U.clamp((u / run + 0.5 * G.U.clamp(u / run, 0, 1)) * rn, 0, st.rise) }; // (the half step eased in over the first tread: no bump onto it)
+    return { u, len, across: lat > (along ? st.x0 : st.z0) && lat < (along ? st.x1 : st.z1), h: st.y0 + U.clamp((u / run + 0.5 * U.clamp(u / run, 0, 1)) * rn, 0, st.rise) }; // (the half step eased in over the first tread: no bump onto it)
   }
   // the flights someone at p can walk onto (or is on): across one's width, at its foot, on it or at its head,
   // and level with the slope there (not standing under its high end)
@@ -365,7 +367,7 @@ const G_World = (() => {
           const fy = u * b.sp + dy * b.cp, lz = u * b.cp - dy * b.sp; // (their feet in her frame)
           if (Math.abs(lx) >= b.hx + r || Math.abs(lz) >= b.hz + r) return;
           if (!(fy + h - 0.1 >= -b.hy && fy + step + 0.05 <= b.hy)) return; // (her box under their knees or over their head)
-          const qx = G.U.clamp(lx, -b.hx, b.hx), qz = G.U.clamp(lz, -b.hz, b.hz);
+          const qx = U.clamp(lx, -b.hx, b.hx), qz = U.clamp(lz, -b.hz, b.hz);
           let ox = lx - qx, oz = lz - qz; const d = Math.hypot(ox, oz);
           if (d >= r) return;
           if (d > 1e-5) { ox = (ox / d) * (r - d); oz = (oz / d) * (r - d); }
@@ -375,7 +377,7 @@ const G_World = (() => {
           return;
         }
         if (s.yb) { // (a turned box: the same, in its own frame)
-          const b = s.yb, [lx, lz] = ybLocal(b, p.x, p.z), qx = G.U.clamp(lx, -b.hx, b.hx), qz = G.U.clamp(lz, -b.hz, b.hz);
+          const b = s.yb, [lx, lz] = ybLocal(b, p.x, p.z), qx = U.clamp(lx, -b.hx, b.hx), qz = U.clamp(lz, -b.hz, b.hz);
           let ox = lx - qx, oz = lz - qz; const d = Math.hypot(ox, oz);
           if (d >= r) return;
           if (d > 1e-5) { ox = (ox / d) * (r - d); oz = (oz / d) * (r - d); }
@@ -383,7 +385,7 @@ const G_World = (() => {
           p.x += ox * b.c + oz * b.s; p.z += -ox * b.s + oz * b.c;
           return;
         }
-        const qx = G.U.clamp(p.x, s.min[0], s.max[0]), qz = G.U.clamp(p.z, s.min[2], s.max[2]);
+        const qx = U.clamp(p.x, s.min[0], s.max[0]), qz = U.clamp(p.z, s.min[2], s.max[2]);
         const ddx = p.x - qx, ddz = p.z - qz, d = Math.hypot(ddx, ddz);
         if (d >= r) return;
         if (d > 1e-5) { p.x += (ddx / d) * (r - d); p.z += (ddz / d) * (r - d); return; }
@@ -526,7 +528,7 @@ const G_World = (() => {
         seenB.add(b);
         // (open pieces: their ray boxes; a rock: its own shapes for rays, and for people boxes fitted inside them, b.walk)
         const walk = b.walk ? { ray: false, nostep: true } : null;
-        if (b.ray) { add(w, fromB(b, Object.assign({ kind: 'prop', prop: p, ray: false }, walk))); for (const q of b.ray) add(w, q.hull ? hullAt(q.hull, Y + (b.gy || 0), { kind: 'prop', prop: p, move: false }) : fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: (G.Materials.PARTS as Record<string, any>)[q.m] } : null), b.gy || 0)); }
+        if (b.ray) { add(w, fromB(b, Object.assign({ kind: 'prop', prop: p, ray: false }, walk))); for (const q of b.ray) add(w, q.hull ? hullAt(q.hull, Y + (b.gy || 0), { kind: 'prop', prop: p, move: false }) : fromB(q, Object.assign({ kind: 'prop', prop: p, move: false }, q.m ? { mat: (Materials.PARTS as Record<string, any>)[q.m] } : null), b.gy || 0)); }
         else add(w, fromB(b, Object.assign({ kind: 'prop', prop: p }, walk)));
       }
     }
@@ -550,7 +552,7 @@ const G_World = (() => {
   // (and each floor's) is this world.
   function fromDesc(d: LvDesc, map: any) {
     const w = create(), props = G.LevelDesc.propList(map), doors = map.doors || [], wins = map.windows || [], stairs = map.stairs || [];
-    const M: Record<string, any> = { props: G.Materials.PROPS, parts: G.Materials.PARTS };
+    const M: Record<string, any> = { props: Materials.PROPS, parts: Materials.PARTS };
     for (const q of doors) q.solids = [];
     for (const q of wins) q.solids = [];
     for (const st of stairs) st.steps = [];
@@ -617,7 +619,7 @@ const G_World = (() => {
         } else d.solids.push(add(w, box(cx - hx, Y, cz - hz, cx + hx, Y + L.WALL_H, cz + hz, { kind: 'door', door: d })));
       }
     }
-    if (d.rest) d.solids.push(add(w, box(...(d.rest as [number, number, number, number, number, number]), { kind: 'prop', move: false, mat: G.Materials.of(map, { kind: 'door', door: d }) }))); // (shot off its hinges, lying where it fell: js/damage.ts)
+    if (d.rest) d.solids.push(add(w, box(...(d.rest as [number, number, number, number, number, number]), { kind: 'prop', move: false, mat: Materials.of(map, { kind: 'door', door: d }) }))); // (shot off its hinges, lying where it fell: js/damage.ts)
     if (d.open && d.leaf && !d.fallen && !(d.pane && d.pane.broken)) { // (a glass leaf standing open: glass too; shot out, nothing much to stop anything)
       const b = d.leaf;
       d.solids.push(add(w, box(b.cx - b.hx, Y + b.y0, b.cz - b.hz, b.cx + b.hx, Y + b.h, b.cz + b.hz, { kind: 'leaf', door: d, move: false, glass: d.pane ? d.pane.id : undefined })));
@@ -644,6 +646,6 @@ const G_World = (() => {
 
   return { CELL, STEP, HEIGHT, GLASS_SEE, create, add, remove, reshape, box, ybox, obox, hullOf, fitBoxes, touches, raycast, span, los, see, query, resolve, groundAt, terrainAt, terrainUnder, rampAt, ceilingAt, fromTileMap, fromDesc, stairs, door, windowSolids };
 })();
-G.World = G_World;
+G.World = World;
 
-interface GameModules { World: typeof G_World; }
+declare global { interface GameModules { World: typeof World; } }

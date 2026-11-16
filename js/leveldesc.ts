@@ -1,6 +1,9 @@
 'use strict';
+import { Materials } from './materials.js';
+import { U } from './util.js';
+import { World } from './world.js';
 
-const G_LevelDesc = (() => {
+export const LevelDesc = (() => {
   const PI = Math.PI;
   // ---------------------------------------------------------------- colour, as three.js reckons it (r186, colour management on)
   const s2l = (c: number) => (c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4));
@@ -45,7 +48,7 @@ const G_LevelDesc = (() => {
     return [-A,0,B,0,B,A,-B,A,0,0,B,A,B,A,0,-B,A,0,B,A,0,0,B,-A,-B,A,0,0,B,-A,-A,0,-B,-B,A,0,-A,0,-B,-A,0,B,-B,A,0,0,B,A,A,0,B,B,A,0,-A,0,B,0,-B,A,0,B,A,-A,0,-B,-B,-A,0,-A,0,B,0,B,-A,0,-B,-A,-A,0,-B,B,A,0,A,0,-B,0,B,-A,A,0,B,0,-B,A,B,-A,0,0,-B,A,-B,-A,0,B,-A,0,-B,-A,0,0,-B,-A,B,-A,0,0,-B,-A,A,0,-B,B,-A,0,A,0,-B,A,0,B,B,-A,0,A,0,B,0,B,A,0,-B,A,0,-B,A,-A,0,B,-B,-A,0,-B,-A,0,-A,0,-B,0,-B,-A,0,-B,-A,0,B,-A,A,0,-B,A,0,-B,B,A,0,A,0,B];
   })();
   // mulberry32 at its k-th draw (js/util.ts rng: each draw steps its state by the same constant)
-  const rngAt = (seed: number, k: number) => G.U.rng((seed + Math.imul(k, 0x6d2b79f5)) >>> 0);
+  const rngAt = (seed: number, k: number) => U.rng((seed + Math.imul(k, 0x6d2b79f5)) >>> 0);
   const str = (a: ArrayLike<number> | null | undefined) => { if (!a) return null; let s = ''; for (let i = 0; i < a.length; i++) s += String.fromCharCode(48 + a[i]); return s; };
   // how many draws js/furniture.ts textures(rnd) makes for each of the festival's ground textures (they share the festival's
   // random stream with what's drawn after them: so the stars and the bulbs are where they always were). js/levelview.ts makes
@@ -126,8 +129,8 @@ const G_LevelDesc = (() => {
   function solidsOf(map: LvMap) {
     const w = map.world, props = propList(map), pi = new Map<LvProp, number>(props.map((p, i) => [p, i])), stairs = map.stairs || [];
     const matKey = new Map<any, string>();
-    for (const [k, v] of Object.entries(G.Materials.PROPS)) matKey.set(v, 'props:' + k);
-    for (const [k, v] of Object.entries(G.Materials.PARTS)) if (!matKey.has(v)) matKey.set(v, 'parts:' + k);
+    for (const [k, v] of Object.entries(Materials.PROPS)) matKey.set(v, 'props:' + k);
+    for (const [k, v] of Object.entries(Materials.PARTS)) if (!matKey.has(v)) matKey.set(v, 'parts:' + k);
     const out: any[] = [];
     for (const s of w ? w.solids : []) {
       if (!s) { out.push(null); continue; }
@@ -256,7 +259,7 @@ const G_LevelDesc = (() => {
     const wtex = ship ? lvTex(B, 'bulkhead' + ship, th.wall, [1, 1]) : lvTex(B, heads || th.home >= 1 ? 'plaster' : th.rock ? 'rock' : 'wall', heads ? '#7f807c' : th.wall, [1, 2]);
     const paintWalls = map.rooms.some((rm) => rm.dress);
     const wallMat = B.std(Object.assign({ map: wtex, roughness: 0.85 }, paintWalls ? { paint: 1 } : {})); // (paint: a resident's wallpaper, js/homes.ts paint)
-    const rs = G.U.rng((map.seed ^ 0x3a11c0 ^ Math.imul((map.fl || 0) + 1, 0x9e3779b1)) >>> 0), wcol: number[] = [];
+    const rs = U.rng((map.seed ^ 0x3a11c0 ^ Math.imul((map.fl || 0) + 1, 0x9e3779b1)) >>> 0), wcol: number[] = [];
     for (const i of walls) {
       const s = ship ? 0.93 + rs() * 0.1 : 0.85 + rs() * 0.2, rk = rockAt(i); // (a ship's panels: nearer alike)
       if (rk === 1) { const p = 0.92 + rs() * 0.1; wcol.push(s * 0.86, s * 0.62 * p, s * 0.57 * p); } else if (rk === 2) wcol.push(s * 0.78, s * 0.74, s * 0.7); else wcol.push(s, s, s);
@@ -661,7 +664,7 @@ const G_LevelDesc = (() => {
     const poleMat = B.std({ color: 0x2a2c2e, roughness: 0.6, metalness: 0.4 });
     for (const s of f.strings) {
       for (const [p, has] of [[s.a, s.pa], [s.b, s.pb]]) if (has) poles.set(p[0].toFixed(1) + ',' + p[2].toFixed(1), p);
-      const len = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1], s.b[2] - s.a[2]), sag = G.U.clamp(len * 0.07, 0.25, 1.3);
+      const len = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1], s.b[2] - s.a[2]), sag = U.clamp(len * 0.07, 0.25, 1.3);
       const at = (u: number) => [s.a[0] + (s.b[0] - s.a[0]) * u, s.a[1] + (s.b[1] - s.a[1]) * u - sag * 4 * u * (1 - u), s.a[2] + (s.b[2] - s.a[2]) * u];
       for (let i = 0; i < 16; i++) wire.push(...at(i / 16), ...at((i + 1) / 16));
       const lan = s.kind === 'lantern', step = lan ? 1.3 : 0.55, n = Math.max(2, Math.floor(len / step));
@@ -740,7 +743,7 @@ const G_LevelDesc = (() => {
   function crestOfDesc(d: LvDesc) { const s = d.floors[0].t as string, t = new Uint8Array(s.length); for (let i = 0; i < s.length; i++) t[i] = s.charCodeAt(i) - 48; return { W: d.W, H: d.H, TS: d.TS, chasm: d.chasm, cr: d.crest, terrain: d.terrain, t, fog: d.crest.fog }; }
   function crestEnv(o: ReturnType<typeof crestOf>) {
     const L = G.Level, cr = o.cr, TS = o.TS, CS = L.CTS, Wm = o.W * TS, Hm = o.H * TS, D = o.chasm, cx = Wm / 2, cz = Hm / 2, f32 = Math.fround;
-    const gh = (x: number, z: number) => (o.terrain ? G.World.terrainAt(o.terrain, x, z) : 0);
+    const gh = (x: number, z: number) => (o.terrain ? World.terrainAt(o.terrain, x, z) : 0);
     const sun = norm([-1, 0.075, 0.32]);
     // a colour (sRGB) as it's lit facing (nx, ny, nz): the sky's blue from above, the sun's orange where it faces west, in linear. ao: how shut in
     const lit = (r: number, g: number, b: number, nx: number, ny: number, nz: number, ao = 1) => {
@@ -754,7 +757,7 @@ const G_LevelDesc = (() => {
       return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
     };
     const fbm = (x: number, z: number) => vn(x, z) * 0.5 + vn(x * 2.1 + 5, z * 2.1) * 0.25 + vn(x * 4.3, z * 4.3 + 9) * 0.125 - 0.4375;
-    const sm = (a: number, b: number, x: number) => { const k = G.U.clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); }; // (smoothstep)
+    const sm = (a: number, b: number, x: number) => { const k = U.clamp((x - a) / (b - a), 0, 1); return k * k * (3 - 2 * k); }; // (smoothstep)
     // ---- the mountain: the height of the ground at (x, z), metres from the summits' (fallen with them along the saddle: crestFall)
     const c0 = cr.CX0 * CS, c1 = (cr.CX1 + 1) * CS, zs = (cr.SZ + 1) * CS, STEP = 10;
     const height = (x: number, z: number) => {
@@ -764,7 +767,7 @@ const G_LevelDesc = (() => {
       let h = w > 0 ? -Math.min(170, 1.1 * w + 0.004 * w * w) - Math.max(0, w - 140) * 0.05 : e > 0 ? -Math.min(300, 0.5 * e + 0.0012 * e * e) : -0.6;
       h -= 0.1 * along + 0.0003 * along * along; // (the crest falling away north and south)
       h += L.crestFall(cr, x);
-      h += fbm(x * 0.012, z * 0.012) * Math.min(1, off / 30) * (5 + 26 * (x < 0 ? G.U.clamp((h + 165) / 40, 0, 1) : 1)); // (rough on the mountain, flat on the plain)
+      h += fbm(x * 0.012, z * 0.012) * Math.min(1, off / 30) * (5 + 26 * (x < 0 ? U.clamp((h + 165) / 40, 0, 1) : 1)); // (rough on the mountain, flat on the plain)
       // the gorge, on under the rims a step (their cliffs hide that) and on south past the map, deeper and wider as it goes
       const sp = Math.max(0, s), half = (c1 - c0) / 2 + STEP + sp * 0.2, gx = half - Math.abs(x - (c0 + c1) / 2);
       if (gx > 0 && z > zs - STEP) {
@@ -852,7 +855,7 @@ const G_LevelDesc = (() => {
   function terrainSurface(d: LvDesc): LdGeo {
     const tr = d.terrain, TS = d.TS, W = d.W, H = d.H, t = d.floors[0].t as string, gr = d.floors[0].grate as string | null, V = tr.v, VW = tr.VW;
     const raised = (i: number) => { const k = ((i / W) | 0) * VW + (i % W); return Math.abs(V[k]) > 1e-3 || Math.abs(V[k + 1]) > 1e-3 || Math.abs(V[k + VW]) > 1e-3 || Math.abs(V[k + VW + 1]) > 1e-3; };
-    const hv = (x: number, z: number) => V[G.U.clamp(z, 0, tr.VH - 1) * VW + G.U.clamp(x, 0, VW - 1)];
+    const hv = (x: number, z: number) => V[U.clamp(z, 0, tr.VH - 1) * VW + U.clamp(x, 0, VW - 1)];
     const nOf = (x: number, z: number) => { const nx = (hv(x - 1, z) - hv(x + 1, z)) / (2 * TS), nz = (hv(x, z - 1) - hv(x, z + 1)) / (2 * TS), l = Math.hypot(nx, 1, nz); return [nx / l, 1 / l, nz / l]; };
     const UV = [[0, 1], [1, 1], [0, 0], [1, 0]]; // (a cell's corners 00, 10, 01, 11, as a tile's are)
     const pos: number[] = [], nrm: number[] = [], uv: number[] = [];
@@ -870,7 +873,7 @@ const G_LevelDesc = (() => {
   // lights; the tramway; the outcrops' rough tops; the ziplines, the flat roofs and their ladders, the guard rail, the
   // greenhouse's glass roof. What's far off is unlit (its colours lit as at sundown, the sun low in the west, here).
   function crest(map: LvMap, B: LdB): LdNode[] {
-    const L = G.Level, cr = map.crest, TS = L.TS, CS = L.CTS, Wm = map.W * TS, Hm = map.H * TS, D = map.chasm, rnd = G.U.rng((map.seed ^ 0x5a7d1a) >>> 0), out: LdNode[] = [];
+    const L = G.Level, cr = map.crest, TS = L.TS, CS = L.CTS, Wm = map.W * TS, Hm = map.H * TS, D = map.chasm, rnd = U.rng((map.seed ^ 0x5a7d1a) >>> 0), out: LdNode[] = [];
     const E = crestEnv(crestOf(map)), { cx, cz, f32, sun, lit, vn, fbm, sm, height, c0, c1, zs } = E;
     // the ground: a 3 km square of the mountain round the map, and the gorge's cliffs (procedural surfaces, made from the
     // description: proc 'crest.ground' and 'crest.cliffs', crestGround and crestCliffs)
@@ -1077,5 +1080,5 @@ const G_LevelDesc = (() => {
   }
   return { describe, propList, proc, fingerprint, canon, hash, PARTS, ICO, quatEuler, compose, apply, quatUnit, rngAt, TEX_DRAWS, lin, over };
 })();
-G.LevelDesc = G_LevelDesc;
-interface GameModules { LevelDesc: typeof G_LevelDesc; }
+G.LevelDesc = LevelDesc;
+declare global { interface GameModules { LevelDesc: typeof LevelDesc; } }
