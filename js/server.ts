@@ -929,7 +929,7 @@ export const Server = {
   giveShield(e: Enemy, id: string) {
     const sd = SHIELDS[id]; if (!sd || e.def.civ) return;
     const d = e.def;
-    if (!WEAPONS[d.wpn] || WEAPONS[d.wpn].slot !== 's') { const w = WEAPONS.g19 ? 'g19' : 'p9'; d.wpn = w; d.snd = WEAPONS[w].cls; d.pellets = WEAPONS[w].pellets; d.rof = undefined; d.burst = undefined; }
+    if (!WEAPONS[d.wpn] || WEAPONS[d.wpn].slot !== 's') { const w = WEAPONS.g19 ? 'g19' : 'p9'; d.wpn = w; d.snd = WEAPONS[w].cls; d.pellets = WEAPONS[w].pellets; d.rof = ENEMIES.suspect.rof; d.burst = ENEMIES.suspect.burst; } // (a pistol's cadence, the armed suspect's: d is over the archetype, so an undefined here would hide its own, not fall back to it)
     d.shield = id; d.speed = d.speed * sd.speed; e.point = true;
     if (e.wear === 'navy') d.tac = (d.tac || 0) | 2 | 4; // (a navy's: a green laser on the pistol)
   },
