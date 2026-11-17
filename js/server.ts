@@ -1835,7 +1835,9 @@ export const Server = {
     const onFoot = alive.filter((p) => !p.st.se); // (se: still in the helicopter that brought them: nobody's to aim at yet, js/landing.ts)
     this.teamCheck();
     this.teamT = (this.teamT || 0) - dt; if (this.teamT <= 0) { this.teamT = this.TEAM.T; this.teamForm(); this.pointSwap(); }
-    for (const e of this.enemies.values()) this.think(e, dt, onFoot);
+    // (pirates aboard with anyone they'd fight: each of them has the other's people to pick out and shoot as well as the squad, npcFoes)
+    const foes = this.npcFoes();
+    for (const e of this.enemies.values()) this.think(e, dt, foes ? this.foesOf(e, onFoot, foes) : onFoot);
 
     // keep enemies from stacking
     const es = [...this.enemies.values()];
@@ -1956,7 +1958,7 @@ export const Server = {
         // (through a window: k < 1; through bulletproof glass, seen but not to be shot: no round gets through it)
         let proof = false;
         if (k > 0 && k < 1) { const dx = hx - lx, dy = hy - ey, dz = hz - lz, dd = Math.hypot(dx, dy, dz) || 1; proof = L.raycast(map, lx, ey, lz, dx / dd, dy / dd, dz / dd, dd, { glass: true }).t < dd - 0.1; }
-        const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0);
+        const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0) + ((p as any).npc && (p as any).npc.def.civ ? 6 : 0); // (someone unarmed: after anyone with a gun as near)
         if (score < bs) { bs = score; best = p; bvis = vis; bd = d; bk = lk; e.proof = proof; }
       }
       e.tgt = best ? best.id : null; e.canSee = bvis; e.tgtD = bd; e.visK = best && bvis ? bk : 0;
@@ -1966,7 +1968,7 @@ export const Server = {
       // seen behind bulletproof glass: they know where you are (and that shooting's no use): they come round for you
       if (best && e.proof) { e.alert = true; e.lostT = G_U.clamp(e.lostT || 0, 0.01, 1); e.blind = false; e.lastSeen = { x: best.st.p[0], y: best.st.p[1], z: best.st.p[2] }; }
     }
-    const p = e.tgt ? this.players.get(e.tgt) : null;
+    const p = e.tgt ? this.players.get(e.tgt) || (this.proxies && this.proxies.get(e.tgt)) || null : null; // (an officer, or someone of another side's: npcFoes)
     const st = p && p.st && !p.st.dn && !p.st.dd ? p.st : null;
     if (!st) { e.canSee = false; e.aiming = false; }
 
@@ -3598,6 +3600,43 @@ export const Server = {
     if (SvNet.myId) SvNet.sendTo(SvNet.myId, { t: 'eround', e: e.id, wp: def.wpn, am, sid, f: from, ds }); // (js/player.ts enemyRounds)
     const to = Sim.predictEnd(fv, aim.clone().multiplyScalar(v0), wdrag, GRAVITY, map, wind).toArray();
     SvNet.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, sid });
+    // At one of another side's (npcFoes), not an officer: nobody's screen flies that round into them (a suspect's round goes by
+    // suspects and civilians there), so it's settled here. Each pellet lands with the chance worked out above, if the way from the
+    // muzzle to their chest is clear; a hit is a share of a person's life: a rifle's or a submachine gun's round near half, a
+    // pistol's a third, a pellet a seventh.
+    const npc = (p as any).npc as Enemy | undefined;
+    if (npc) {
+      const c = G_U.clamp(chance, 0.01, 0.97) * (pellets > 1 ? 0.6 : 1); let n = 0; for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
+      if (n && L.los(map, from[0], from[1], from[2], npc.x, (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), npc.z)) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)) }, null);
+    }
+  },
+  // ---- Sides (a ship's people: js/spaceserver.ts, who each is dressed as, wear). Pirates fight everyone: a navy's people, a
+  // civilian ship's own armed hands, and the unarmed (her passengers and crew, unless tied: hostages are worth more alive). A navy's
+  // people and a civilian ship's fight pirates and nobody else of a ship's: never each other, never the unarmed. Everyone armed still
+  // fights the squad. Who's on no side (a building's suspects) is as ever.
+  facOf(e: Enemy): 'civ' | 'pirate' | 'navy' | 'civil' | null { return e.def.civ ? 'civ' : e.wear === 'pirate' ? 'pirate' : e.wear === 'navy' ? 'navy' : e.wear === 'civil' ? 'civil' : null; },
+  proxies: null as Map<string, any> | null,
+  // Everyone aboard who could be a target for another side, each as an officer is to the one looking (where they are, how they
+  // stand: what think and fire read of a player's state), under an id of their own; null unless pirates and someone they'd fight
+  // are aboard together (so nothing changes anywhere else). Made afresh every tick.
+  npcFoes() {
+    let pir = false, oth = false;
+    for (const e of this.enemies.values()) { const f = this.facOf(e); if (f === 'pirate') pir = true; else if (f) oth = true; }
+    if (!pir || !oth) { this.proxies = null; return null; }
+    const m = new Map<string, any>();
+    for (const e of this.enemies.values()) {
+      if (!this.facOf(e) || e.down || e.hp <= 0 || e.state === 'cuffed' || e.state === 'surrender' || e.state === 'dead') continue;
+      const id = 'npc:' + e.id;
+      m.set(id, { id, name: '', npc: e, st: { p: [e.x, e.y || 0, e.z], yw: e.yaw, pt: 0, cr: e.crouch ? 1 : 0, pr: 0, ln: 0, sd: 0, se: 0, lr: 0, dd: 0, dn: 0, mv: 0, tl: 0, w: e.def.wpn || '', hp: e.hp, mhp: e.maxHp } });
+    }
+    return (this.proxies = m);
+  },
+  // who e has to pick a target from: the squad, and (armed, and of a side) those of the other side's within 45 m on its deck or the next
+  foesOf(e: Enemy, onFoot: LivePlayer[], prox: Map<string, any>): LivePlayer[] {
+    const f = this.facOf(e); if (!f || f === 'civ' || !e.armed) return onFoot;
+    const out = onFoot.slice();
+    for (const q of prox.values()) { const o = q.npc as Enemy, g = this.facOf(o); if (o === e || !(f === 'pirate' ? g !== 'pirate' : g === 'pirate')) continue; if (Math.hypot(o.x - e.x, o.z - e.z) < 45 && Math.abs((o.y || 0) - (e.y || 0)) < 6) out.push(q); }
+    return out;
   },
   BODY_R: 0.24,
 };

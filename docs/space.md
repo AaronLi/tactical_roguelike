@@ -230,14 +230,35 @@ people tied in her court) or **hold her** (`defend`, `js/spaceserver.ts` defendT
   or so), a pirate pod comes through her hull on her lower deck, clear of the squad's ship and of the pods already in her. Its
   boarders (three, one more for every three levels of the mission's danger and for each officer past the first) come out inside her
   and make for the shelter, fighting whoever they meet. From her hull to the shelter's door is about forty seconds unopposed.
-- A pirate on his feet inside the shelter kills a passenger every four seconds.
-- When the time is up and the last pirate aboard is dead, down or tied, she's held: the fee, and 120 for each of her people alive.
-  If her last passenger dies first the job has failed.
-- The objective's panel counts the time down and shows the pods come, the pirates aboard and the passengers alive.
+- Pirates shoot her passengers as they'd shoot anyone not their own (Sides, below). One shot down is a casualty, living or not:
+  what counts is how many are still on their feet.
+- When the time is up and the last pirate aboard is dead, down or tied, she's held: the fee, and 120 for each of her people unhurt.
+  If the last of them is shot down first the job has failed.
+- The objective's panel counts the time down and shows the pods come, the pirates aboard and the passengers unhurt.
 
 `?board=large&seed=9&obj=defend&dock` starts one aboard. `node tools/defend_sim.mjs [passive|win] [seed]` runs one in node (the
 simulation alone): passive, the officer stands where he came aboard and the pirates reach the shelter; win, every boarder dies
 twelve seconds after he comes aboard and she's held.
+
+## Sides (`js/server.ts` facOf, npcFoes)
+
+A ship's people are of a side, by how they're dressed (`wear`): **pirates**, a **navy's**, a **civilian ship's** armed hands, and
+the **unarmed** (passengers, crew who don't fight).
+
+| | fights |
+| --- | --- |
+| pirates | a navy's people, a civilian ship's armed hands, and the unarmed (not those tied: hostages are worth more alive) |
+| a navy's people, a civilian ship's armed hands | pirates. Never each other, never the unarmed |
+| the unarmed | nobody |
+
+Everyone armed still fights the squad, and a building's suspects are of no side: nothing there has changed. It only comes into it
+when pirates are aboard with someone they'd fight (so every other level runs exactly as before): then each of them has the other
+side's people within 45 m to pick a target from as well as the squad, by the same eyes and the same rules (nearest in sight first,
+the unarmed after anyone with a gun as near), takes cover from them and shoots at them as at an officer. A shot at one of another
+side is settled by the host: each round lands with the chance its aim gives it if the way from the muzzle is clear, and takes
+near half of a person's life (a pistol's a third, a pellet a seventh). They fight where they meet: nobody goes hunting another
+side through the ship. Checked in the simulation: eight pirates put in a navy cruiser's busiest compartment left five of hers
+down and one dead for one of theirs in the first quarter of a minute, and nobody picked a target on their own side.
 
 ## A flying wing (`sp.wing`)
 

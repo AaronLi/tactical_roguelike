@@ -266,7 +266,7 @@ export const Space = (() => {
     const b = brief; brief = null;
     const E = U.esc, ms = b.ms || {}, c = b.cas || {}, ok = !!b.ok, o = (SD.OBJ as any)[ms.obj] || null, f = (v: number) => U.fmt(Math.round(v || 0));
     const row = (k: string, v: string, cls = '') => `<div class="db-row${cls ? ' ' + cls : ''}"><span>${k}</span><b>${v}</b></div>`;
-    const bonusWhy = ms.obj === 'hvt' && b.hvt === 2 ? 'Taken alive' : ms.obj === 'hostage' && b.freed ? `${b.freed} hostage${b.freed === 1 ? '' : 's'} freed` : ms.obj === 'defend' && b.freed ? `${b.freed} passenger${b.freed === 1 ? '' : 's'} alive` : 'Bonus';
+    const bonusWhy = ms.obj === 'hvt' && b.hvt === 2 ? 'Taken alive' : ms.obj === 'hostage' && b.freed ? `${b.freed} hostage${b.freed === 1 ? '' : 's'} freed` : ms.obj === 'defend' && b.freed ? `${b.freed} passenger${b.freed === 1 ? '' : 's'} unhurt` : 'Bonus';
     const paid = (ok ? (b.pay || 0) + (b.bonus || 0) : 0) + (b.salv || 0);
     const el = document.getElementById('debrief') || Object.assign(document.createElement('div'), { id: 'debrief' });
     el.innerHTML = `<div class="db-card"><div class="db-head ${ok ? 'ok' : 'fail'}"><small>${ok ? 'Mission complete' : 'Mission failed · nothing paid for it'}</small><h2>${E(b.name || ms.name || 'Mission')}</h2><span>${E(ms.where || '')}${o ? ' · ' + E(o.name) : ''}</span></div>

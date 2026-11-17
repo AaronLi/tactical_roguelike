@@ -26,7 +26,7 @@ interface SvMission {
   gunners?: number[]; gn?: number; // (her gun crew, the ids of those posted in her gun control; how many of them are still at it, last told)
   arm: number | null; boom: boolean; cleared: boolean; unlocked?: number[];
   alarm?: boolean; camOp?: number | null; camOn?: boolean; belief?: { x: number; y: number; z: number; room: number } | null; beliefAt?: number; searchTo?: Map<number, { ri: number; at: number }>; searching?: boolean; sweepAt?: number; respT?: number; safe?: number; shutDoors?: Set<number>; zt: number; leftSaid?: number; revisit?: boolean; cutsWas?: number[][]; keep?: SvKeep | null; breached?: boolean; // (zt: the zone's clock, seconds since the squad came out of the jump: where everything that's under way out there is)
-  def?: { on: boolean; t: number; pods: number; kill: number; lost: boolean; said: number } | null; // (holding a liner, obj defend: begun, seconds left, pods come, the clock on her passengers with a pirate in among them, all of them dead, what was last told)
+  def?: { on: boolean; t: number; pods: number; lost: boolean; said: number } | null; // (holding a liner, obj defend: begun, seconds left, pods come, all of her passengers dead, what was last told)
   site: number[] | null; raid: number[][]; hold: number; told?: boolean; // (raid: where the pirates' pods are in her hull, as sites; hold: the room their hostages are in)
   // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
   resp: Map<number, number>; salv: number[]; // (resp: the breach response squads' people, and the hull each is aboard; salv: the salvage taken, by its number)
@@ -74,7 +74,7 @@ export const SpaceSv = (() => {
   function msMsg() {
     const M = st.M; if (!M) return null;
     return { t: 'ms', i: M.ms.i, docked: M.docked ? 1 : 0, done: M.done ? 1 : 0, keys: Object.keys(M.keys).filter((k) => M.keys[k]), cards: M.cards.filter((c) => c.st === 1).map((c) => [c.key, c.x, c.z, c.y]),
-      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, unlocked: M.unlocked || [], salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj !== 'visit' || M.breached ? 1 : 0, gn: gunnersLeft(), left: M.ms.obj === 'hostage' || M.ms.obj === 'defend' ? S().remaining(false) : 0, def: M.def ? { on: M.def.on ? 1 : 0, t: Math.ceil(M.def.t), pods: M.def.pods, lost: M.def.lost ? 1 : 0, civ: S().remaining(true) } : null };
+      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, unlocked: M.unlocked || [], salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj !== 'visit' || M.breached ? 1 : 0, gn: gunnersLeft(), left: M.ms.obj === 'hostage' || M.ms.obj === 'defend' ? S().remaining(false) : 0, def: M.def ? { on: M.def.on ? 1 : 0, t: Math.ceil(M.def.t), pods: M.def.pods, lost: M.def.lost ? 1 : 0, civ: civUp() } : null };
   }
   const levelMsg = () => (st.M ? { zone: Z ? { ms: { seed: Z.ms.seed, size: Z.ms.size, th: Z.ms.th, wing: !!Z.ms.wing, name: Z.ms.name, obj: Z.ms.obj, other: Z.ms.other || null, diff: Z.ms.diff, night: !!Z.ms.night }, act: Z.active, near: Z.active !== 0 || !!st.M.revisit } : null, ms: st.M.ms, gen: genOf(st.M.ms), state: msMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg(), board: boardMsg() } : null);
   const genOf = (ms: SpMission): SpGen | null => (ms.kind === 'board' ? { size: ms.size!, obj: ms.obj, ship: st.fleet.ship, other: ms.other || null, wing: !!ms.wing } : null);
@@ -487,7 +487,7 @@ export const SpaceSv = (() => {
       if (nSalv) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 2, pay: nSalv * (350 + 60 * M.ms.diff), name: 'Salvage', ships: vis.filter((q) => q.salv.length).length });
       if (ok && !st.board.done.includes(M.ms.i)) {
         st.board.done.push(M.ms.i);
-        const freed = M.ms.obj === 'hostage' || M.ms.obj === 'defend' ? [...sv.enemies.values()].filter((e) => e.def.civ && e.state !== 'dead' && e.hp > 0).length : 0;
+        const freed = M.ms.obj === 'defend' ? civUp() : M.ms.obj === 'hostage' ? [...sv.enemies.values()].filter((e) => e.def.civ && e.state !== 'dead' && e.hp > 0).length : 0;
         const bonus = M.ms.obj === 'hvt' && M.hvtSt === 2 ? Math.round(M.ms.pay * 0.5) : freed * 120;
         net().broadcast({ t: 'mdone', i: M.ms.i, ok: 1, pay: M.ms.pay, bonus, name: M.ms.name, diff: M.ms.diff, ms: M.ms, cas, freed, salv: nSalv ? nSalv * (350 + 60 * M.ms.diff) : 0, hvt: M.ms.obj === 'hvt' ? M.hvtSt : undefined });
       }
@@ -505,16 +505,16 @@ export const SpaceSv = (() => {
   // a pirate pod comes through her hull every so often (DEFEND.pods of them in that time, the first after DEFEND.first seconds),
   // anywhere along her lowest deck that's clear of the squad's own ship and of the pods already in her, and its boarders come
   // out of it inside her: three, more with her class's danger and with the squad's numbers. They make for the shelter (posts in
-  // it), fighting whoever they meet. A pirate on his feet in among her passengers kills one of them every four seconds. When the
+  // it), fighting whoever they meet. Pirates shoot her passengers as they'd shoot anyone not their own (js/server.ts npcFoes). When the
   // time's up and the last pirate aboard is dead, down or tied, she's held; if her last passenger dies first, the job's failed
   // (nothing to stay for). Returns whether there's anything new to tell.
+  const civUp = () => { let n = 0; for (const e of S().enemies.values()) if (e.def.civ && !e.down && e.hp > 0 && e.state !== 'dead') n++; return n; };
   function defendTick(dt: number) {
     const sv = S(), M = st.M!, map = sv.map!, TS = Level.TS, C = SD.DEFEND; let ch = false;
-    const D = M.def || (M.def = { on: false, t: C.secs, pods: 0, kill: 0, lost: false, said: -1 });
+    const D = M.def || (M.def = { on: false, t: C.secs, pods: 0, lost: false, said: -1 });
     if (M.cleared || D.lost) return false;
     if (!D.on) { if (!M.docked) return false; D.on = true; say('Pirates inbound. Her passengers are in the shelter behind the mezzanine: hold it for three minutes.'); return true; }
     const rm = map.rooms[M.hold], fl = rm ? rm.fl || 0 : 0, fy = Level.floorMap(map, fl).fy || 0;
-    const inShelter = (e: { x: number; y?: number; z: number }) => Math.abs((e.y || 0) - fy) < 1.5 && ShipGen.roomAt(map, e.x, e.z, fl) === M.hold;
     if (D.t > 0) {
       D.t = Math.max(0, D.t - dt);
       const gone = C.secs - D.t, gap = (C.secs - C.first - 22) / Math.max(1, C.pods - 1);
@@ -539,15 +539,9 @@ export const SpaceSv = (() => {
       }
       if (D.t === 0) { say('No more pods. Clear the pirates still aboard.'); ch = true; }
     }
-    // her passengers: one dies every four seconds a pirate's on his feet in among them
-    const civs = [...sv.enemies.values()].filter((e) => e.def.civ && e.hp > 0 && e.state !== 'dead');
-    if ([...sv.enemies.values()].some((e) => !e.def.civ && sv.able(e) && inShelter(e))) {
-      D.kill += dt;
-      if (D.kill >= 4) { D.kill = 0; const v = civs.find((e) => inShelter(e)) || civs[0]; if (v) { v.hp = 0.01; sv.applyHit({ e: v.id, d: 1, bo: 1, cz: 'shot' }, null); ch = true; } }
-    } else D.kill = 0;
-    const alive = sv.remaining(true), left = sv.remaining(false);
-    if (alive === 0) { D.lost = true; say('Her passengers are dead. Nothing left to hold: back to the ship.'); return true; }
-    if (D.t === 0 && left === 0) { M.cleared = true; say(`She is held: ${alive} of her people alive. Back to the ship and jump home.`); return true; }
+    const alive = civUp(), left = sv.remaining(false); // (her passengers still on their feet: one shot down is a casualty, living or not)
+    if (alive === 0) { D.lost = true; say('Her passengers are all shot down. Nothing left to hold: back to the ship.'); return true; }
+    if (D.t === 0 && left === 0) { M.cleared = true; say(`She is held: ${alive} of her people unhurt. Back to the ship and jump home.`); return true; }
     const key = Math.ceil(D.t / 10) * 1000 + left * 30 + alive; if (key !== D.said) { D.said = key; ch = true; }
     return ch;
   }
