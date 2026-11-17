@@ -50,7 +50,7 @@ export const VMAnim = (() => {
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
   // the arms and props of a viewmodel (its userData.vma)
-  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number; clear?: number; lw?: V3; lt?: number; t1?: number; wp?: V3; fq?: THREE.Quaternion; lq?: THREE.Quaternion; v0?: V3; out?: { p: V3; q: THREE.Quaternion; v: V3 } } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion; magOut?: boolean; magDrop?: boolean }
+  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number; clear?: number; cen?: V3; mp?: V3; mt?: number; mv?: V3; mq?: THREE.Quaternion; lw?: V3; lt?: number; t1?: number; wp?: V3; fq?: THREE.Quaternion; lq?: THREE.Quaternion; v0?: V3; out?: boolean } | null; dropOut?: { p: V3; q: THREE.Quaternion; v: V3 } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion; magOut?: boolean; magDrop?: boolean }
   type MagChk = GunRigMagChk;
   const S = (a: number, b: number, t: number) => U.smooth(a, b, t);
   const lerpV = (a: V3, b: V3, k: number) => a.clone().lerp(b, k);
@@ -848,7 +848,8 @@ export const VMAnim = (() => {
             const bb = new T.Box3(), inv = new T.Matrix4().copy(an.mag.matrixWorld).invert();
             an.mag.traverse((o: any) => { if (o.isMesh && o.visible !== false) { if (!o.geometry.boundingBox) o.geometry.computeBoundingBox(); bb.union(o.geometry.boundingBox.clone().applyMatrix4(inv.clone().multiply(o.matrixWorld))); } });
             const clear = bb.isEmpty() ? 0.1 : bb.getSize(new T.Vector3()).y * an.mag.scale.y;
-            a.drop = { idx, at: mg.at, from: an.mag.position.clone(), t0: now, clear, lq: an.mag.quaternion.clone() };
+            if (idx === 0) a.dropOut = null; // (none left over from another reload)
+            a.drop = { idx, at: mg.at, from: an.mag.position.clone(), t0: now, clear, lq: an.mag.quaternion.clone(), cen: bb.isEmpty() ? new T.Vector3() : bb.getCenter(new T.Vector3()) }; // (cen: the middle of it, its own frame: where the world's is centred)
           }
           const D = a.drop;
           if (!D.wp) { // sliding out
@@ -871,18 +872,23 @@ export const VMAnim = (() => {
           // then (once it's fallen out of sight below the view, so the change isn't seen; no sooner than DROP_MIN, no later than DROP_MAX)
           // it's the one in the world (js/casings.ts dropMag, held back till now), carrying on from where it is, turned as the gun was as
           // it let go (the frame the world's is drawn in), at its speed. One magazine, not two.
+          // its middle as it's drawn now (the world's is centred on its middle), and how fast that's going: what's handed over, whenever it is
+          an.mag.updateWorldMatrix(true, false);
+          const mid = an.mag.localToWorld(D.cen!.clone()), mdt = D.mt ? (now - D.mt) / 1000 : 0;
+          const mv = D.wp ? D.v0!.clone().setY(D.v0!.y - 9.8 * (now - D.t1!) / 1000) : D.mp && mdt > 0 ? mid.clone().sub(D.mp).divideScalar(mdt) : new T.Vector3(0, -9.8 * tt, 0);
+          D.mp = mid; D.mt = now; D.mv = mv; D.mq = (D.fq || pq).clone();
           if (idx === 0 && !D.out && tt >= DROP_MIN) {
             let cam: THREE.Object3D | null = h.holder; while (cam && cam.userData.tanV == null) cam = cam.parent;
             const c = cam ? cam.worldToLocal(wp.clone()) : null, gone = !!c && c.z < 0 && c.y + DROP_TOP < -cam!.userData.tanV * -c.z;
-            if (gone || tt >= DROP_MAX) {
-              if (!D.wp) { D.wp = wp; D.fq = pq.clone(); D.v0 = new T.Vector3(0, -9.8 * tt, 0).applyQuaternion(pq); D.t1 = now; } // (handed over still in the well's guide: as it is)
-              const tf = (now - D.t1!) / 1000;
-              D.out = { p: wp, q: D.fq!.clone(), v: D.v0!.clone().setY(D.v0!.y - 9.8 * tf) };
-            }
+            if (gone || tt >= DROP_MAX) { D.out = true; a.dropOut = { p: mid, q: D.mq, v: mv }; }
           }
           an.mag.visible = idx === 0 ? !D.out : tt < 0.5;
         }
-        if (mg.mode !== 'drop' && a.drop && a.drop.idx === idx) a.drop = null;
+        if (mg.mode !== 'drop' && a.drop && a.drop.idx === idx) {
+          // (the clip's moved on before it was handed over, still in view: handed over as it last was, not lost)
+          if (idx === 0 && !a.drop.out && a.drop.mp) a.dropOut = { p: a.drop.mp, q: a.drop.mq!, v: a.drop.mv! };
+          a.drop = null;
+        }
       }
       // handles and slides
       if (an.ch && A.chHome) an.ch.position.copy(A.chHome).z += (pose ? pose.ch : 0) * CH;

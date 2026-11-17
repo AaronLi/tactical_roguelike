@@ -132,7 +132,7 @@ export const Casings = (() => {
   }
 
   // ---------------------------------------------------------------- dropped magazines
-  const MAX_MAGS = 40, WAIT_MAX = 600; // (ms a dropped magazine waits for the view's to hand it over)
+  const MAX_MAGS = 40, WAIT_MAX = 1500; // (ms a dropped magazine waits for the view's to hand it over)
   let mags: Spent[] = [], magMat: THREE.MeshStandardMaterial = null!, unseen: THREE.Material | null = null;
   let boxMat: THREE.MeshStandardMaterial = null!;
   function magMesh(def: WeaponDef, item: any) {
@@ -352,8 +352,8 @@ export const Casings = (() => {
       for (const c of mags) {
         if (c.rest) continue;
         if (c.wait) { // (the view's falling magazine handing over: js/vmanim.ts, once it's out of sight below the view)
-          const vma = R.vm && R.vm.userData.vma, out = vma && vma.drop && vma.drop.out;
-          if (out) { c.p.copy(out.p); c.q.copy(out.q); c.v.copy(out.v); c.w.multiplyScalar(0.4); } // (its speed has the shooter's in it: vmanim)
+          const vma = R.vm && R.vm.userData.vma, out = vma && vma.dropOut;
+          if (out) { vma.dropOut = null; c.p.copy(out.p); c.q.copy(out.q); c.v.copy(out.v); c.w.set(0, 0, 0); } // (where its middle was, at its speed (the shooter's in it), not turning, as the view's was: vmanim. It turns when it hits something)
           else if (performance.now() - c.wait < WAIT_MAX) continue;
           c.wait = 0; c.mesh!.visible = true; draw(c);
         }
