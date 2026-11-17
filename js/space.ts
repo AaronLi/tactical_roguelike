@@ -97,7 +97,7 @@ export const Space = (() => {
     G_R.levelRoot.position.set(0, 0, 0); G_R.levelRoot.quaternion.identity(); G_R.levelRoot.visible = true;
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
     if (hid) { for (const o of hid) o.visible = true; hid = null; } tunUp = null;
-    G_R.padTo = 0;
+    G_R.padTo = G_R.PAD_BASE;
     S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.mis = [];
     if (me().seat != null) me().seat = null;
     SpaceUI.show(false);

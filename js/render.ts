@@ -381,7 +381,10 @@ export const R = {
       o.traverse((c: any) => {
         if (c.isBatchedMesh && c._matricesTexture) c.dispose(); // (its geometry, and the textures of its instances' matrices)
         if (c.geometry) c.geometry.dispose();
-        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); m.dispose(); }); // (keepMat: shared, js/scars.ts's)
+        // (its textures freed, not the material: disposing one has three drop its shader once nothing else uses it, and the next
+        // level, drawn with the same lights and materials of the same kinds, would build the same shader again. Kept, every
+        // shader's built once a session: lightPad)
+        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
     };
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
@@ -1759,13 +1762,19 @@ export const R = {
   // every material drawn is made again, in the frame it changes: a stop of a few hundred milliseconds. Where the scene goes
   // from one place to the next without a stop (space: the base, the jump, the ship boarded), padTo is how many point lights
   // it always has: those it hasn't are made up with dark ones (lightPad, before each frame and each shader found ahead).
-  padTo: 0, _pads: [] as THREE.PointLight[],
+  // The same everywhere (PAD_BASE: space's count, a ship's three lamps and an artifact's glow), classic levels too, and a dark
+  // directional light where there's no sun: every place has the same lights for its shaders, so a shader built for one level
+  // is the one every other level draws with (and they're kept between levels: clearLevel), not one made again for each.
+  PAD_BASE: 4,
+  padTo: 4, _pads: [] as THREE.PointLight[], _dirPad: null as THREE.DirectionalLight | null,
   lightPad() {
-    const want = this.padTo;
-    if (!want) { for (const l of this._pads) l.visible = false; return; }
-    let n = 0; this.scene.traverseVisible((o: any) => { if (o.isPointLight && !o.userData.pad && !o.userData.pool) n++; }); // (the muzzle flashes' and blasts' pools are always there: padTo is on top of them)
+    const want = Math.max(this.padTo, this.PAD_BASE);
+    let n = 0, dirs = 0; this.scene.traverseVisible((o: any) => { if (o.isPointLight && !o.userData.pad && !o.userData.pool) n++; else if (o.isDirectionalLight && !o.userData.pad) dirs++; }); // (the muzzle flashes' and blasts' pools are always there: padTo is on top of them)
     while (this._pads.length < want) { const l = new THREE.PointLight(0x000000, 0, 0.01); l.position.set(0, -1e5, 0); l.userData.pad = true; l.visible = false; this.scene.add(l); this._pads.push(l); }
     this._pads.forEach((l, i) => { l.visible = i < want - n; if (!l.parent) this.scene.add(l); });
+    if (!this._dirPad) { const d = this._dirPad = new THREE.DirectionalLight(0x000000, 0); d.userData.pad = true; d.castShadow = false; }
+    if (!this._dirPad.parent) this.scene.add(this._dirPad);
+    this._dirPad.visible = dirs === 0;
   },
   /** every shader asked for has been made (on the driver's own threads, KHR_parallel_shader_compile): drawing with any of them won't stop to wait */
   progsReady() { for (const p of (this.renderer.info.programs || []) as any[]) if (p.isReady && !p.isReady()) return false; return true; },
