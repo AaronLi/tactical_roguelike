@@ -248,8 +248,8 @@ or **hold her** (`defend`, `js/spaceserver.ts` defendTick):
 - **Her court, its mezzanine and her shelter are armoured**: no breach site opens into the court or within a cell of it along her
   side (`G.ShipGen.sites`: the squad's ship and the pirates' pods both come through her forward and after compartments or her
   cross passage; 85 to 102 sites a liner), and none of the three ever loses its air (`vent`).
-- From when the squad is aboard, for three minutes (`G.SpaceData.DEFEND`: 180 s, 5 pods, the first after 8 s, then every 37 s
-  or so), a pirate pod comes through her hull on her lower deck, clear of the squad's ship and of the pods already in her. Its
+- From when the squad is aboard there are **20 seconds** before anything comes (`G.SpaceData.DEFEND.lead`: counted down in the
+  panel, to get to her court in). Then, for three minutes (180 s, 5 pods, the first 2 s in, then every 39 s or so), a pirate pod comes through her hull on her lower deck, clear of the squad's ship and of the pods already in her. Its
   boarders (three, one more for every three levels of the mission's danger and for each officer past the first) come out inside her
   and make for the shelter, fighting whoever they meet. From her hull to the shelter's door is about forty seconds unopposed.
 - Pirates shoot her passengers as they'd shoot anyone not their own (Sides, below). One shot down is a casualty, living or not:

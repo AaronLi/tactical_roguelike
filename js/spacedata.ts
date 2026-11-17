@@ -348,8 +348,8 @@ export const SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  // Holding a liner (obj defend, js/spaceserver.ts defendTick): how long, how many pods in that time, the first of them after how long
-  const DEFEND = { secs: 180, pods: 5, first: 8 };
+  // Holding a liner (obj defend, js/spaceserver.ts defendTick): how long the squad has to get to her court, how long she's then to be held, how many pods in that time, the first of them after how long
+  const DEFEND = { lead: 20, secs: 180, pods: 5, first: 2 }; // (lead: from the squad coming aboard to the first pod, to get to her court in; then secs, the first pod first seconds into it)
   // A luxury cruiser (a cruiser with a promenade court): what she's called, and no guns on her hull. guns, className: any ship's, by her
   // class and whether she's one. STAFF: the family names of her security, for those who fight beside the squad (js/spaceserver.ts).
   const NOGUNS = { pd: 0, cannon: 0, missile: 0 };

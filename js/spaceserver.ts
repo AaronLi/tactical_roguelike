@@ -27,7 +27,7 @@ interface SvMission {
   arm: number | null; boom: boolean; cleared: boolean; unlocked?: number[];
   alarm?: boolean; camOp?: number | null; camOn?: boolean; belief?: { x: number; y: number; z: number; room: number } | null; beliefAt?: number; searchTo?: Map<number, { ri: number; at: number }>; searching?: boolean; sweepAt?: number; respT?: number; safe?: number; shutDoors?: Set<number>; zt: number; leftSaid?: number; revisit?: boolean; cutsWas?: number[][]; keep?: SvKeep | null; breached?: boolean; // (zt: the zone's clock, seconds since the squad came out of the jump: where everything that's under way out there is)
   staff?: string[]; // (holding a liner: her security with the squad, by rank and name)
-  def?: { on: boolean; t: number; pods: number; lost: boolean; said: number } | null; // (holding a liner, obj defend: begun, seconds left, pods come, all of her passengers dead, what was last told)
+  def?: { on: boolean; lead: number; t: number; pods: number; lost: boolean; said: number } | null; // (holding a liner, obj defend: begun, seconds left, pods come, all of her passengers dead, what was last told)
   site: number[] | null; raid: number[][]; hold: number; told?: boolean; // (raid: where the pirates' pods are in her hull, as sites; hold: the room their hostages are in)
   // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
   resp: Map<number, number>; salv: number[]; // (resp: the breach response squads' people, and the hull each is aboard; salv: the salvage taken, by its number)
@@ -75,7 +75,7 @@ export const SpaceSv = (() => {
   function msMsg() {
     const M = st.M; if (!M) return null;
     return { t: 'ms', i: M.ms.i, docked: M.docked ? 1 : 0, done: M.done ? 1 : 0, keys: Object.keys(M.keys).filter((k) => M.keys[k]), cards: M.cards.filter((c) => c.st === 1).map((c) => [c.key, c.x, c.z, c.y]),
-      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, unlocked: M.unlocked || [], salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj === 'defend' ? 0 : M.ms.obj !== 'visit' || M.breached ? 1 : 0, gn: gunnersLeft(), left: M.ms.obj === 'hostage' || M.ms.obj === 'defend' ? S().remaining(false) : 0, def: M.def ? { on: M.def.on ? 1 : 0, t: Math.ceil(M.def.t), pods: M.def.pods, lost: M.def.lost ? 1 : 0, civ: civUp() } : null };
+      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, unlocked: M.unlocked || [], salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj === 'defend' ? 0 : M.ms.obj !== 'visit' || M.breached ? 1 : 0, gn: gunnersLeft(), left: M.ms.obj === 'hostage' || M.ms.obj === 'defend' ? S().remaining(false) : 0, def: M.def ? { on: M.def.on ? 1 : 0, lead: Math.ceil(M.def.lead), t: Math.ceil(M.def.t), pods: M.def.pods, lost: M.def.lost ? 1 : 0, civ: civUp() } : null };
   }
   const levelMsg = () => (st.M ? { zone: Z ? { ms: { seed: Z.ms.seed, size: Z.ms.size, th: Z.ms.th, wing: !!Z.ms.wing, name: Z.ms.name, obj: Z.ms.obj, other: Z.ms.other || null, diff: Z.ms.diff, night: !!Z.ms.night }, act: Z.active, near: Z.active !== 0 || !!st.M.revisit } : null, ms: st.M.ms, gen: genOf(st.M.ms), state: msMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg(), board: boardMsg() } : null);
   const genOf = (ms: SpMission): SpGen | null => (ms.kind === 'board' ? { size: ms.size!, obj: ms.obj, ship: st.fleet.ship, other: ms.other || null, wing: !!ms.wing } : null);
@@ -516,7 +516,8 @@ export const SpaceSv = (() => {
     sv.level = st.rank;
     sv.toShop();
   }
-  // ---- Holding a liner (obj defend). Her passengers are in her shelter (M.hold). From when the squad's aboard, for DEFEND.secs:
+  // ---- Holding a liner (obj defend). Her passengers are in her shelter (M.hold). From when the squad's aboard there are DEFEND.lead
+  // seconds before anything happens (to get to her court in); then, for DEFEND.secs:
   // a pirate pod comes through her hull every so often (DEFEND.pods of them in that time, the first after DEFEND.first seconds),
   // anywhere along her lowest deck that's clear of the squad's own ship and of the pods already in her, and its boarders come
   // out of it inside her: three, more with her class's danger and with the squad's numbers. They make for the shelter (posts in
@@ -526,10 +527,12 @@ export const SpaceSv = (() => {
   const civUp = () => { let n = 0; for (const e of S().enemies.values()) if (e.def.civ && !e.down && e.hp > 0 && e.state !== 'dead') n++; return n; };
   function defendTick(dt: number) {
     const sv = S(), M = st.M!, map = sv.map!, TS = Level.TS, C = SD.DEFEND; let ch = false;
-    const D = M.def || (M.def = { on: false, t: C.secs, pods: 0, lost: false, said: -1 });
+    const D = M.def || (M.def = { on: false, lead: C.lead, t: C.secs, pods: 0, lost: false, said: -1 });
     if (M.cleared || D.lost) return false;
     if (!D.on) { if (!M.docked) return false; D.on = true; for (const e of sv.enemies.values()) if (e.ally) { e.alert = true; e.drawn = true; } // (her security: told, and ready for them)
-      say(`More pirates inbound. Her passengers are in the shelter behind the mezzanine. With you in the court: ${(M.staff || []).join(', ') || 'what is left of her security'}. Hold for three minutes.`); return true; }
+      say(`More pirates inbound: ${C.lead} seconds out. Her passengers are in the shelter behind the mezzanine. Waiting for you in the court: ${(M.staff || []).join(', ') || 'what is left of her security'}.`); return true; }
+    // (the lead: the squad's time to get to her court. Nothing comes through her hull, and the clock she's to be held by hasn't started)
+    if (D.lead > 0) { D.lead = Math.max(0, D.lead - dt); if (D.lead > 0) return false; say('Their pods are on her. Hold for three minutes.'); return true; }
     const rm = map.rooms[M.hold], fl = rm ? rm.fl || 0 : 0, fy = Level.floorMap(map, fl).fy || 0;
     if (D.t > 0) {
       D.t = Math.max(0, D.t - dt);

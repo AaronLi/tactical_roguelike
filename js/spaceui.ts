@@ -237,7 +237,7 @@ export const SpaceUI = (() => {
   // ------------------------------------------------------------------ the mission's objective
   function objDraw() { make(); objTick(true); }
   let armAt = 0, armLeft = 0, objKey = '';
-  let defLeft = -1, defAt = 0;
+  let defLeft = -1, defAt = 0, leadLeft = -1, leadAt = 0;
   function objTick(force?: boolean) {
     const s = S(), ms = s.ms, st = s.state;
     if (!ms || !st || !s.on || s.kind === 'hub') { if (obj.style.display !== 'none') obj.style.display = 'none'; objKey = ''; return; }
@@ -255,9 +255,12 @@ export const SpaceUI = (() => {
     if (ms.obj === 'defend') {
       const d = st.def;
       if (d && d.t !== defLeft) { defLeft = d.t; defAt = performance.now(); }
+      if (d && d.on && d.lead !== leadLeft) { leadLeft = d.lead; leadAt = performance.now(); }
+      const ll = d && d.on && d.lead > 0 ? Math.max(0, d.lead - (performance.now() - leadAt) / 1000) : 0; // (the lead: the time to get to her court in, before the first pod)
       const tl = d && d.on ? Math.max(0, d.t - (performance.now() - defAt) / 1000) : null, who = d ? `${d.civ} passenger${d.civ === 1 ? '' : 's'} unhurt` : '';
       lines.push(st.cleared ? `<span class="ok">She is held.</span> ${who}. Back to the ship and jump home.` : d && d.lost ? '<span class="bad">Her passengers are all shot down.</span> Back to the ship.'
         : !d || !d.on ? 'Board her, anywhere along her hull. Her passengers are in the shelter at the back of her upper deck, behind the mezzanine: the pirates\' pods come once you are aboard.'
+        : ll > 0 ? `<span class="tm">0:${String(Math.ceil(ll)).padStart(2, '0')}</span><br>Pirates inbound. Get to her court: her security is waiting there. <small>${who}.</small>`
         : tl! > 0 ? `<span class="tm">${Math.floor(tl! / 60)}:${String(Math.floor(tl! % 60)).padStart(2, '0')}</span><br>Hold the shelter (upper deck, behind the mezzanine). Pods through her hull: ${d.pods} of ${SD.DEFEND.pods}. Pirates aboard: ${st.left || 0}. <small>${who}.</small>`
         : `No more pods. Clear the pirates still aboard: ${st.left || 0} left. <small>${who}.</small>`);
     }
