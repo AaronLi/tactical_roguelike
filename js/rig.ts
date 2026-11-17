@@ -1041,6 +1041,15 @@ export const Rig = (() => {
     const dv = _a.subVectors(p.pos, rig.lastPos!);
     rig.lastPos!.copy(p.pos);
     if (dt > 0) rig.vel.lerp(dv.multiplyScalar(1 / dt), Math.min(1, dt * 10));
+    // A body lying still: its ragdoll asleep and its last step taken, so the pose it was drawn in is the pose it would be given
+    // again (ragdollPose: between the last two steps, which are the same points). Where it was and turned as it was, nothing's
+    // posed again (half a living body's cost a frame, a cleared ship's twenty-five of them about 2-3 ms). What moves it wakes it
+    // first (rd.asleep false: a push, being handled or rolled, going limp) or moves its root, and it's posed as before.
+    if (rig.frozen) {
+      const rd = rig.rd, yaw = p.climb ? p.climb.yaw : p.zip ? rig.zipYaw : p.yaw;
+      if ((rig.state === 'dead' || rig.limp) && rd && rd.asleep && !rd.roll && !rd.handled && root.position.equals(p.pos) && root.rotation.y === yaw && (rig.nvK || 0) === (rig.nvWant || 0)) { rig.deadT += dt; return; }
+      rig.frozen = false;
+    }
     root.position.copy(p.pos);
     // (on a zipline: facing the way they're carried, as they've been moving; lifted straight up onto it, the way they faced)
     if (p.zip) { if (rig.zipYaw == null) rig.zipYaw = p.yaw; if (Math.hypot(rig.vel.x, rig.vel.z) > 1.5) rig.zipYaw = Math.atan2(-rig.vel.x, -rig.vel.z); } else rig.zipYaw = null;
@@ -1056,7 +1065,7 @@ export const Rig = (() => {
       GunRig.setLoaded(rig.gun, ld || rl >= 0.72, ld || rl >= 0.3);
     }
 
-    if (rig.state === 'dead' || rig.limp) { animateDeath(rig, dt); drawDebug(rig); return; }
+    if (rig.state === 'dead' || rig.limp) { animateDeath(rig, dt); drawDebug(rig); rig.frozen = canFreeze(rig); return; }
 
     const sy = Math.sin(p.yaw), cy = Math.cos(p.yaw);
     const vx = rig.vel.x, vz = rig.vel.z;
@@ -2122,6 +2131,14 @@ export const Rig = (() => {
     limb(rig.armL.up, rig.armL.lo, 8, 10); limb(rig.armR.up, rig.armR.lo, 9, 11);
     limb(rig.legL.th, rig.legL.sh, 12, 14); limb(rig.legR.th, rig.legR.sh, 13, 15);
     root.updateMatrixWorld(true);
+  }
+  // (still enough that its next frames would pose it the same: above, update)
+  function canFreeze(rig: Rig) {
+    const rd = rig.rd, d = rig.dropped;
+    if (!rd || !rd.asleep || rd.roll || rd.handled || !rd.Pold || (rig.nvK || 0) !== (rig.nvWant || 0)) return false; // (goggles flipping: none is null or 0)
+    if (d && (d.floor == null || d.g.position.y > d.floor)) return false; // (its gun still falling)
+    for (let i = 0; i < rd.P.length; i++) if (!rd.Pold[i].equals(rd.P[i])) return false;
+    return true;
   }
   function animateDeath(rig: Rig, dt: number) {
     rig.deadT += dt;
