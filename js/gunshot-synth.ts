@@ -539,8 +539,15 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
     const drive = new Float32Array(1024);
     for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; drive[i] = Math.tanh(x * 3.5); }
 
+    // How big the blast is, apart from how loud: the gas let go at the muzzle (gasLoad: 1 for a 5.56 from a 14.5"
+    // barrel, 0.8 from a 10.3", 2.8 a .308 from 20"). A blast's duration and the depth of its thump go with the
+    // cube root of its energy (blast scaling), so two rounds as loud as each other at the muzzle (a 10.3" 5.56 and a
+    // 20" .308 are, as measured) still differ in weight: the bigger charge lasts longer, sits lower and thumps
+    // harder. (gasLoad puts a 9 mm pistol at 0.76 and an MP5 at 1.3, well over their real share of a rifle's
+    // charge: the ballistics model is generous to pistols. So this tells rifle rounds apart, and pistols hardly move.)
+    const gw = Math.cbrt(clamp(gasLoad(p, b), 0.15, 6));
     // Blast spectral centroid — device tilt baked, listener directivity NOT.
-    let fc = 2600 * Math.pow(5.56 / p.caliber, 0.55);
+    let fc = 2600 * Math.pow(5.56 / p.caliber, 0.55) * Math.pow(gw, -0.35);
     fc *= (1 - 0.12 * smoothstep(4, 20, p.barrel));
     fc *= (0.80 + 0.55 * smoothstep(20000, 62000, p.pressure));
     fc = clamp(fc * dev.lp * (can ? 1.25 - 0.22 * can.vol : 1), 500, 6500); // (a bigger can, a darker report)
@@ -552,7 +559,7 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
       0.05, 2.0
     );
     // (a can blows down: the more volume, the longer the gas takes to leave it)
-    const tau = (0.010 + 0.02 * (p.caliber / 9)) * (can ? 1 + 0.75 * can.vol : dev.decay) * (1 + 0.35 * (1 - b.burn));
+    const tau = (0.010 + 0.02 * (p.caliber / 9)) * gw * (can ? 1 + 0.75 * can.vol : dev.decay) * (1 + 0.35 * (1 - b.burn));
     const g0 = dbToGain(sup ? sup.db : dev.level);   // device level baked into blast + tang
     // The action and the crack aren't suppressed: they stay at their own level (the bolt a little harder, with the
     // can's back pressure driving it), so next to the quieted blast they come forward.
@@ -577,7 +584,7 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
     const bSrc = ctx.createBufferSource(); bSrc.buffer = noiseBuffer(ctx, 0.4);
     const bLp = ctx.createBiquadFilter();
     bLp.type = 'lowpass'; bLp.frequency.value = fc; bLp.Q.value = 0.5;
-    const bHp = ctx.createBiquadFilter(); bHp.type = 'highpass'; bHp.frequency.value = can ? SUP_HP : 90; // (a can takes the low end most: SUP_HP)
+    const bHp = ctx.createBiquadFilter(); bHp.type = 'highpass'; bHp.frequency.value = can ? clamp(SUP_HP / gw, 110, 300) : 90; // (a can takes the low end most: SUP_HP, lower for a bigger charge)
     const bSat = ctx.createWaveShaper(); bSat.curve = drive; bSat.oversample = '4x';
     const bEnv = percEnv(ctx, t0, blastAmp * g0, can ? 0.0012 : 0.0004, tau);
     bSrc.connect(bHp).connect(bLp).connect(bSat); add(bSat, bEnv, 0);
@@ -586,9 +593,9 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
     // (c) concussion rumble
     const rum = ctx.createBufferSource(); rum.buffer = noiseBuffer(ctx, 0.4);
     const rLp = ctx.createBiquadFilter();
-    rLp.type = 'lowpass'; rLp.frequency.value = clamp(240 * Math.pow(9 / p.caliber, 0.4), 90, 360);
+    rLp.type = 'lowpass'; rLp.frequency.value = clamp(240 * Math.pow(9 / p.caliber, 0.4) / Math.sqrt(gw), 80, 360);
     rLp.Q.value = 0.7;
-    const rEnv = percEnv(ctx, t0, 0.8 * blastAmp * g0 * (can ? SUP_RUMBLE : 1), 0.0015, tau * 1.9); // (the thump: what a can takes most of)
+    const rEnv = percEnv(ctx, t0, 0.8 * blastAmp * g0 * clamp(Math.pow(gw, 1.5), 0.5, 2.2) * (can ? SUP_RUMBLE : 1), 0.0015, tau * 1.9); // (the thump: what a can takes most of)
     rum.connect(rLp); add(rLp, rEnv, 0);
     rum.start(t0); rum.stop(t0 + tau * 12);
 
