@@ -24,7 +24,7 @@ type VmReload = 'mag' | 'akimbo' | 'revolver' | 'break' | 'enbloc' | 'bow' | 'sh
 /** Which part of a gun the hand works to rack it. */
 type VmAction = 'ar' | 'pistol' | 'bolt' | 'pump' | 'lever' | 'handle';
 /** What the hand works: a gun's action, or the cylinder or barrels it opens (an inspection). */
-type VmHold = VmAction | 'revolver' | 'break';
+type VmHold = VmAction | 'revolver' | 'break' | 'palm'; // (palm: the left hand open on its side, the palm to the gun: a slap on the bolt catch)
 /** What the magazine is doing in a pose. */
 type VmMagMode = 'in' | 'hand' | 'drop' | 'gone' | 'peek' | 'rise' | 'chk';
 /** Something the left hand carries. */
@@ -41,7 +41,7 @@ export const VMAnim = (() => {
   type Rig = GunRig; // (one gun in the hands: its holder, its parts, its anchors, its magazine's check data: js/gunrig.ts)
   interface MagState { mode: VmMagMode; at?: number; d?: number; k?: number; q?: THREE.Quaternion }
   // one frame of a clip: the gun's offset and what each part and hand is doing (null: left alone)
-  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; hsteps?: number[] | null; Lon?: HingeHold | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean; Lk?: number; Rk?: number; Lkind?: VmHold } // (Lk, Rk: how far a hand is on an action's control, Lkind which one, for how it holds it: holdSupport)
+  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; hsteps?: number[] | null; Lon?: HingeHold | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean; Lk?: number; Rk?: number; Lkind?: VmHold; Lelbow?: number } // (Lk, Rk: how far a hand is on an action's control, Lkind which one, for how it holds it: holdSupport)
   // the support hand during a reload sequence (hingeClip): between a and b (k: 0..1), each a point in the gun's space or ON a part_ node (it moves with it: resolved in apply, once the
   // sequence has posed the parts); lead: how far it presses ahead of that point, down (m); carry: the block (part_mag) goes where the hand takes it
   type HingeRef = V3 | { part: string; at: number[] };
@@ -260,7 +260,7 @@ export const VMAnim = (() => {
   }
   // Racking: the action pulled through and let go (a riding open bolt's left back: cocked). c: 0..1 over it; from:
   // where the left hand starts, if not on the handguard (the magazine it's just seated)
-  function rack(c: number, h: Rig, kind: VmAction, pose: Pose, from: V3 | null) {
+  function rack(c: number, h: Rig, kind: VmAction, pose: Pose, from: V3 | null, down = false) { // (down: a pistol's arm lowered to get at the slide, not the wrist turned (a release's rack))
     const A = h.A, stay = kind === 'handle' && h.open && h.recip;
     let pull: number, on: number;
     if (kind === 'bolt') { pull = S(0.25, 0.6, c) * (1 - S(0.6, 0.85, c)); on = S(0.08, 0.25, c) * (1 - S(0.85, 1, c)); } // (the right hand: up, back, the case flies, forward, down)
@@ -270,7 +270,10 @@ export const VMAnim = (() => {
     if (from && kind === 'bolt') pose.L = path(c, [[0, from], [0.3, A.S], [1, A.S]]); // (the left hand back to the handguard)
     // the gun turned to get at it
     const r = S(0.05, 0.3, c) * (1 - S(0.7, 1, c));
-    if (kind === 'pistol') { pose.gun[5] -= 0.35 * r; pose.gun[0] -= 0.05 * r; pose.gun[1] += 0.03 * r; pose.gun[3] += 0.15 * r; }
+    if (kind === 'pistol') {
+      if (down) { pose.gun[1] -= 0.015 * r; pose.gun[2] += 0.07 * r; pose.gun[0] -= 0.1 * r; pose.gun[4] += 0.5 * r; pose.gun[5] -= 0.08 * r; } // (the gun brought in sideways across the chest, the arms spread, and turned to the left (its muzzle), so the left hand runs straight across the top of the slide with its wrist straight; the gun kept level: its wrist is not turned)
+      else { pose.gun[5] -= 0.35 * r; pose.gun[0] -= 0.05 * r; pose.gun[1] += 0.03 * r; pose.gun[3] += 0.15 * r; }
+    }
     else if (kind === 'ar') { pose.gun[3] += 0.35 * r; pose.gun[2] -= 0.1 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r; }
     else if (kind === 'handle' && A.H) {
       const side = Math.abs(A.H.x) > 0.005 ? Math.sign(A.H.x) : 0; // (turn the handle side toward you; one on top: tip it up)
@@ -281,16 +284,37 @@ export const VMAnim = (() => {
   // on the bolt catch over the magazine well (a rifle); the slide (or bolt) slams forward and the gun jumps.
   const CATCH_LOCK = 0.14, CATCH_HAND = [-0.012, 0.012, -0.03]; // (the bolt catch's turn about its pin with the bolt held open, radians; where the hand rests on it, from the pin: forward, up, right)
   function release(c: number, h: Rig, kind: VmAction, pose: Pose, from: V3 | null) {
-    const A = h.A;
-    // (a rifle with a bolt catch of its own, part_catch: the hand takes the catch's upper paddle, where the model has it; any other, over the well)
-    const at = kind === 'pistol' ? off(A.G, 0.035, 0.045, -0.02) : A.catchHome ? off(A.catchHome, CATCH_HAND[0], CATCH_HAND[1], CATCH_HAND[2]) : off(A.W || A.WB || A.S, 0.01, 0.045, -0.03);
-    pose.L = path(c, [[0, from || A.S], [0.28, at], [0.4, off(at, 0, -0.008)], [0.68, A.S], [1, A.S]]);
-    const k = 1 - S(0.34, 0.4, c);
-    pose.catch = 1 - S(0.31, 0.37, c); // (the paddle pressed in just ahead of the bolt: it drops, the carrier runs home)
-    if (kind === 'pistol') pose.slide = k;
+    const A = h.A, SLAM = 0.38; // (SLAM: when the bolt (or slide) is home: what the sound and the feed land on)
+    // the hit as it stops: the gun taken back and its muzzle thrown up at once, settling back (one hit, no ringing: a second swing reads as a bounce)
+    const hit = (t: number) => { const j = t > 0 && t < 0.3 ? Math.exp(-t / 0.04) : 0; pose.gun[2] += 0.022 * j; pose.gun[3] += 0.05 * j; pose.gun[1] -= 0.004 * j; };
+    if (kind === 'pistol') {
+      // a slide rack: the slide drawn back to let the stop go and let go, as any rack, its strokes squeezed into the release's own time (the slam on SLAM, not at 0.6)
+      const cc = c < SLAM ? c * 0.6 / SLAM : 0.6 + (c - SLAM) * 0.4 / (1 - SLAM);
+      rack(cc, h, kind, pose, from, true);
+      // the slide is locked open at the start, so it stays back until the hand has it and lets it go: it runs home at the slam, not before the hand has pulled it
+      const sl = 1 - S(SLAM - 0.025, SLAM, c);
+      pose.slide = sl; pose.open = sl * actTravel(h, kind);
+      if (A.slide) {
+        // the hand takes the slide where it is locked (at the rear), draws it back a little more to free the stop, and lets go: it comes off and goes back to where it rests, it does not follow the slide forward
+        const on = S(0.05, 0.25, c) * (1 - S(SLAM - 0.02, SLAM + 0.12, c)), more = 0.14 * S(0.24, 0.33, c) * (1 - S(0.33, SLAM - 0.01, c));
+        pose.L = lerpV(from && c < 0.2 ? from : A.S, off(off(A.slide, 0.03, 0.012), -SLIDE * (1 + more)), on); // (A.slide's anchor is toward the back of the slide: 3 cm on from it is about the middle)
+        // the cocking arm comes in from the left, across the gun, not from out in front: out to the side at first, in to the slide as it lands on it, and the elbow brought up and out so the wrist is not bent hard
+        const w = S(0, 0.1, cc) * (1 - S(0.1, 0.3, cc));
+        pose.L = pose.L.clone(); pose.L.x -= 0.1 * w;
+        pose.Lelbow = on; // (the elbow raised and out to the side, the wrist straight: not the hand lifted)
+      }
+      pose.Lk = (pose.Lk || 0) * S(0.1, 0.3, c); // (the cocking hand keeps its straight wrist (the grip's turn) until it is on the slide)
+      hit(c - SLAM);
+      return;
+    }
+    // a rifle: a slap of the palm on the bolt catch (the model's own paddle where it has one, else over the well): the hand lifted a little off the well and straight down on it (one stroke: a strike, not a press), staying on it a beat while the bolt hits, then off
+    const at = A.catchHome ? off(A.catchHome, CATCH_HAND[0], CATCH_HAND[1], CATCH_HAND[2]) : off(A.W || A.WB || A.S, 0.01, 0.045, -0.03);
+    pose.L = path(c, [[0, from || A.S], [0.2, off(at, 0, 0.035, -0.015)], [0.34, off(at, 0, -0.016, 0)], [0.54, off(at, 0, -0.014, 0)], [0.62, off(at, 0, 0.014, -0.004)], [0.8, A.S], [1, A.S]]);
+    const k = 1 - S(SLAM - 0.025, SLAM, c); // (the bolt runs home in a few frames and stops dead)
+    pose.Lk = S(0.06, 0.2, c) * (1 - S(0.7, 0.88, c)); pose.Lkind = 'palm'; // (the open hand turned to put its palm to the catch, and kept so through the slap)
+    pose.catch = 1 - S(0.335, 0.35, c); // (the paddle struck: it drops, the carrier runs home)
     pose.open = k * actTravel(h, kind);
-    const j = c > 0.36 && c < 0.56 ? Math.sin(Math.PI * (c - 0.36) / 0.2) : 0;
-    pose.gun[2] += 0.012 * j; pose.gun[3] += 0.03 * j;
+    hit(c - SLAM);
     const r = S(0, 0.3, c) * (1 - S(0.7, 1, c)); pose.gun[5] -= 0.25 * r; pose.gun[3] += 0.12 * r; // (turned a little to get at it)
   }
 
@@ -780,7 +804,7 @@ export const VMAnim = (() => {
       const ac = pl.act, c = U.clamp(ac.t, 0, 1), kind = actKind(a, h), from = ac.seat && h.A.WB ? off(h.A.WB, 0, 0.012) : null;
       pose = base();
       if (ac.kind === 'release') release(c, h, kind, pose, from); else rack(c, h, kind, pose, from);
-      if (ac.seat) tiltPose(pose, magTilt(ac.seat) * (1 - S(0, 0.45, c))); // (the gun comes back from the magazine change's turn)
+      if (ac.seat) tiltPose(pose, magTilt(ac.seat) * (1 - S(0, ac.kind === 'release' ? 0.27 : 0.45, c))); // (the gun comes back from the magazine change's turn: a release has it level before the hand presses the catch, so the hit lands on a gun that is still)
     } else if (pl.magChk && canMagCheck(vm)) {
       const Qh = new T.Quaternion(); _m.copy(vm.matrix).multiply(h.holder.matrix).decompose(new T.Vector3(), Qh, new T.Vector3());
       pose = magCheckClip(pl.magChk, h, Qh);
@@ -1001,6 +1025,7 @@ export const VMAnim = (() => {
             hull.material = shot ? shellMat(w.ammo) : GunMaterials.M.brass(); hull.scale.set(s, 1, s); base.scale.set(s, 1, s);
           }
         }
+        _elbow[0] = 0; _elbow[1] = (pose && pose.Lelbow) || 0;
         if (a.R.hum) humSolve(a.R, 0);
         if (a.L.hum) humSolve(a.L, 1);
       }
@@ -1120,6 +1145,8 @@ export const VMAnim = (() => {
   // have bones of their own (three a finger, and the thumb's): each hold poses them (the fingers section below), closed round what it holds. (The model's L is your right: it faces +z, so its -x side turns to your right.)
   const HUM_SH = [new T.Vector3(0.17, -0.2, 0.12), new T.Vector3(-0.16, -0.22, 0.06)]; // (the shoulders, camera space: right, left)
   const HUM_POLE = [new T.Vector3(0.75, -1, 0.3).normalize(), new T.Vector3(-0.45, -1, 0.2).normalize()]; // (where the elbows go, camera space)
+  const HUM_POLE_OUT = [new T.Vector3(1, -0.05, 0.15).normalize(), new T.Vector3(-1, -0.05, 0.15).normalize()]; // (raised and out to the side: pose.Lelbow, a hand working across the gun with its wrist straight)
+  const _elbow = [0, 0]; // (how far each elbow is brought out: HUM_POLE to HUM_POLE_OUT, set from the pose each frame)
   const HUM_MAGCHK = 0.003; // (the left hand's hold on a magazine it's looking over: a little up its body from the floorplate)
   interface HumArm {
     meshes: THREE.SkinnedMesh[]; bones: Record<string, THREE.Bone>; bindW: Record<string, THREE.Matrix4>; s: string; th: number;
@@ -1250,6 +1277,7 @@ export const VMAnim = (() => {
   const fp = (fi: number[], mi: number[], ri: number[], pi: number[], tb: number[]): FPose => [[0, ...fi], [0, ...mi], [0, ...ri], [0, ...pi], tb];
   const FP: Record<string, FPose> = {
     open: fp([0.35, 0.45, 0.3], [0.4, 0.5, 0.3], [0.45, 0.5, 0.3], [0.5, 0.55, 0.3], [0.45, 0.1, 0.2, 0.2]), // (carrying: a magazine by its floorplate, a round in the palm)
+    flat: fp([0.05, 0.08, 0.04], [0.03, 0.06, 0.03], [0.05, 0.08, 0.04], [0.08, 0.1, 0.05], [0.15, 0.05, 0.05, 0.05]), // (a flat hand, the fingers together and straight: a slap)
     top: fp([0.45, 0.7, 0.45], [0.5, 0.75, 0.45], [0.9, 1.1, 0.7], [1.0, 1.2, 0.7], [0.75, 0.2, 0.35, 0.3]), // (a round or a clip pinched, pressed in from above)
     rack: fp([0.55, 1.0, 0.65], [0.6, 1.05, 0.65], [0.65, 1.1, 0.7], [0.7, 1.1, 0.7], [0.65, 0.2, 0.3, 0.2]), // (over a slide, or round a handle)
     hook: fp([0.3, 1.35, 0.9], [0.3, 1.4, 0.9], [0.6, 1.5, 1.0], [0.7, 1.5, 1.0], [0.5, 0.1, 0.2, 0.2]), // (an AR's charging handle, hooked from in front)
@@ -1359,7 +1387,7 @@ export const VMAnim = (() => {
   function holdSupport(arm: HumArm, h: Rig, pose: Pose | null | undefined, Lt: V3, pistol: boolean): HumHoldT {
     const on = 1 - S(0.02, 0.09, Lt.distanceTo(h.A.S)), k = (pose && pose.Lk) || 0;
     const up = S(0.0, 0.035, Lt.y) * (1 - on), q = Q_FREE.clone().slerp(pose && pose.prop && pose.prop.kind !== 'clip' ? Q_HL : Q_TOP, up).slerp(pistol ? Q_PSUP : Q_SUP, on), lk = pose && pose.Lkind, left = lk === 'handle' && h.A.H && h.A.H.x < -0.005; // (up: over the gun, putting something in from above: a clip pressed down, a round or a bolt from the left, clear of a sight over it)
-    if (k) q.slerp(lk === 'ar' ? Q_CH : left ? Q_HL : lk === 'handle' && h.A.H && h.A.H.x > 0.005 ? Q_UNDER : Q_RACK, k);
+    if (k) q.slerp(lk === 'ar' ? Q_CH : left || lk === 'palm' ? Q_HL : lk === 'handle' && h.A.H && h.A.H.x > 0.005 ? Q_UNDER : Q_RACK, k);
     let c = arm.cache.sup;
     if (!c) {
       const qs = pistol ? Q_PSUP : Q_SUP, o = holdObj(h, pistol ? 'grip' : 'sup'), n = new T.Vector3(0, 1, 0).applyQuaternion(qs);
@@ -1368,8 +1396,8 @@ export const VMAnim = (() => {
       arm.cache.sup = c;
     }
     let F = fmix(fmix(FP.open, FP.top, up), c.F, on);
-    if (k) F = fmix(F, lk === 'ar' ? FP.hook : FP.rack, k);
-    return { q, r: U.lerp(0.012, c.r, on) * (1 - k) + 0.01 * k, fz: k * (lk === 'ar' ? 0.05 : lk === 'pistol' ? 0.01 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
+    if (k) F = fmix(F, lk === 'ar' ? FP.hook : lk === 'palm' ? FP.flat : FP.rack, k);
+    return { q, r: U.lerp(0.012, c.r, on) * (1 - k) + 0.01 * k, fz: k * (lk === 'ar' ? 0.05 : lk === 'pistol' ? 0.01 : lk === 'palm' ? 0 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
   }
   // the hand set at a hold: its frame (Arm.glove: where vmanim's clips and turns can move it on), the palm's reach, the fingers
   function humHold(arm: Arm, h: Rig, at: V3, o: HumHoldT) {
@@ -1395,7 +1423,7 @@ export const VMAnim = (() => {
     Mh.compose(_hd.copy(g.position).addScaledVector(_hp, -h.r).addScaledVector(_v2.set(0, 0, 1).applyQuaternion(g.quaternion), h.fz), g.quaternion, _hone).multiply(h.Cinv);
     _hW.copy(h.W).applyMatrix4(Mh);
     _hS.copy(HUM_SH[i]).applyMatrix4(_inv);
-    const pole = HUM_POLE[i].clone().transformDirection(_inv);
+    const pole = (_elbow[i] > 0 ? HUM_POLE[i].clone().lerp(HUM_POLE_OUT[i], _elbow[i]).normalize() : HUM_POLE[i].clone()).transformDirection(_inv);
     // (out of reach: the arm a little longer, up to HUM_STRETCH, and then the shoulder brought forward along the line to the wrist)
     _hd.subVectors(_hW, _hS);
     let d = _hd.length();
