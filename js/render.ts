@@ -1899,7 +1899,8 @@ export const R = {
     compile(nvq, this.fishCam!, nvT); compile(nvq, this.fishCam!, null);
     // (the menus' blur, behind the Tab screen and the shop: _blurPasses, its pass into a target and its pass onto the screen. The
     // level under it is drawn into a target as the scope's picture is, built above)
-    { if (!this._blur) this._blurTargets(16, 16); const B = this._blur!; compile(B.scene, B.cam, B.a); compile(B.scene, B.cam, null); }
+    // (and its targets at the size the frame will want, half the drawing buffer's, so the first Tab doesn't make them over)
+    { const d = r.getDrawingBufferSize(new THREE.Vector2()); this._blurTargets(Math.max(1, d.x >> 1), Math.max(1, d.y >> 1)); const B = this._blur!; compile(B.scene, B.cam, B.a); compile(B.scene, B.cam, null); }
     if (Highlights.warm) Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, true));
     ReplayEnv.Game!.veilSay('Compiling shaders');
   },
