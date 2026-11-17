@@ -53,6 +53,9 @@ export const Views = {
   pings: [] as { x: number; z: number; t: number }[],
   shieldDrops: [] as THREE.Object3D[], // (shields let go of, lying where they fell: dropShield)
   evidence: new Map<number, VwEvidence>(), // id -> { mesh, wpn, x, z }
+  // what's outlined in yellow (addOutline) and on show while it's in the scene: keycards on a ship's floor (js/space.ts cards).
+  // While anything here is, the frame has the outline's two passes (R.render hasGlow); weapons on the floor aren't outlined
+  glow: new Set<THREE.Object3D>(),
   laserBeep: 0,
   // made as it goes: the shaders compiled for the level (js/game.ts), the occlusion test's scratch vector and filter, your own body when you're dead,
   // the rounds in flight, the pings by player, the evidence outline's and the halo's materials (and their shared resolution, and smoothed geometry),
@@ -269,8 +272,6 @@ export const Views = {
     const mesh = GunModels.world(wpn);
     mesh.position.set(x, y + 0.05, z);
     mesh.rotation.set(0, Math.random() * Math.PI * 2, Math.PI / 2); // lying on its side
-    // a glowing yellow outline until it's bagged, seen through anything but walls and floors (R.render)
-    mesh.userData.outline = this.addOutline(mesh);
     R.dynRoot.add(mesh);
     this.evidence.set(i, { mesh, wpn, x, y, z });
   },
@@ -1083,9 +1084,9 @@ export const Views = {
       cv.lid.rotation.x = -1.78 * (1 - Math.pow(1 - cv.open, 3));
     }
 
-    // evidence outline: on while any weapon is still to be bagged, gently pulsing
+    // the yellow outline (keycards: glow), gently pulsing, while anything that has it is in the scene
     let glowing = false;
-    for (const v of this.evidence.values()) if (!v.secured && v.mesh.visible) { glowing = true; break; }
+    for (const o of this.glow) if (o.parent && o.visible) { glowing = true; break; }
     R.hasGlow = glowing || !!this._haloOn;
     if (this._haloMats) for (const m of this._haloMats.bands) m.uniforms.opacity.value = m.userData.base;
     if (R.hasGlow) this._outRes!.value.set(window.innerWidth, window.innerHeight);
