@@ -37,7 +37,7 @@ export const Casings = (() => {
   type CaseGun = Record<string, any>; // a gun, as far as a case is concerned (its id)
   interface CaseKind { mat: CaseMat; len: number; r: number; h?: number }
   // one thing falling: a spent case (slots in the instanced meshes, am: its load) or a dropped magazine (mesh, item: what it carries, box: its pick-up box)
-  interface Spent { k: CaseKind; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; rest: boolean; age: number; slots?: number[]; am?: string; mesh?: THREE.Mesh; item?: any; box?: any; drop?: { def: WeaponDef; fill: number } | null; quiet?: boolean }
+  interface Spent { k: CaseKind; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; rest: boolean; age: number; slots?: number[]; am?: string; mesh?: THREE.Mesh; item?: any; box?: any; drop?: { def: WeaponDef; fill: number } | null; quiet?: boolean; wait?: number }
   // a case or some cases due out of a gun, in t seconds
   interface Pending { t: number; def: WeaponDef; local: boolean; from?: THREE.Vector3 | null; to?: THREE.Vector3 | null; am?: string | string[]; drop?: boolean; n?: number }
   let metal: THREE.InstancedMesh = null!, hull: THREE.InstancedMesh = null!, live: Spent[] = [], queue: Pending[] = [], free: number[] = [], sounds = 0;
@@ -132,7 +132,7 @@ export const Casings = (() => {
   }
 
   // ---------------------------------------------------------------- dropped magazines
-  const MAX_MAGS = 40;
+  const MAX_MAGS = 40, WAIT_MAX = 600; // (ms a dropped magazine waits for the view's to hand it over)
   let mags: Spent[] = [], magMat: THREE.MeshStandardMaterial = null!;
   let boxMat: THREE.MeshStandardMaterial = null!;
   function magMesh(def: WeaponDef, item: any) {
@@ -165,6 +165,9 @@ export const Casings = (() => {
     const v = Me.vel ? V().set(Me.vel.x, 0, Me.vel.z) : V();
     v.y -= 0.6;
     const c: Spent = { mesh, p, q, v, w: new T.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6), rest: false, age: 0, k: { mat: 'steel', len: 120, r }, drop: { def, fill } };
+    // (held back, unseen, while the gun's own magazine falls out of the well in the view: it carries on from there, update. Without
+    // that fall to take over from, as it was here, after WAIT_MAX)
+    c.wait = performance.now(); mesh.visible = false;
     R.dynRoot.add(mesh);
     mags.push(c);
     // too many lying about: the oldest one that nobody can pick up goes
@@ -338,6 +341,12 @@ export const Casings = (() => {
       sounds = 0;
       for (const c of mags) {
         if (c.rest) continue;
+        if (c.wait) { // (the view's falling magazine handing over: js/vmanim.ts DROP_HAND)
+          const vma = R.vm && R.vm.userData.vma, out = vma && vma.drop && vma.drop.out;
+          if (out) { c.p.copy(out.p); c.q.copy(out.q); c.v.copy(out.v); if (Me.vel) { c.v.x += Me.vel.x; c.v.z += Me.vel.z; } c.w.multiplyScalar(0.4); }
+          else if (performance.now() - c.wait < WAIT_MAX) continue;
+          c.wait = 0; c.mesh!.visible = true; draw(c);
+        }
         const h = Math.min(dt, 0.05), n = Math.ceil(h / 0.006);
         c.age += h;
         for (let i = 0; i < n && !c.rest; i++) step(c, h / n, map);
