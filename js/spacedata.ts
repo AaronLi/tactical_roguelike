@@ -258,7 +258,7 @@ export const SpaceData = (() => {
     return { p: [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u], d };
   }
   /** What a ship's people wear, by her class (js/rig.ts create): a liner's are civilians, the big warships a navy's, the rest pirates'. */
-  const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
+  const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : obj === 'defend' ? 'civil' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
   /** What her armed people are called aboard a ship, by whose she is (wearOf) and where they stand in her (js/server.ts titleOf): the
    *  officer the mission's after (hvt), her highest-ranked fighter (top, when that officer isn't aboard), a Leader (leader), anyone else
    *  leading a fireteam (tl), and the rest by what they are, the strongest of them (vet: the prefix) a step up. */
@@ -283,6 +283,7 @@ export const SpaceData = (() => {
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },
     destruct: { name: 'Scuttle her', pay: 700, line: 'Reach the bridge, start the self-destruct, and be off the ship (yours, or one of her escape pods) before it runs out.' },
     hostage: { name: 'Retake the ship', pay: 600, line: 'Pirates have boarded her (their pods are still in her hull) and hold her people tied in one compartment. Clear every pirate off her: dead, down or in restraints. Each hostage alive at the end pays.' },
+    defend: { name: 'Hold the liner', pay: 900, line: 'Pirates are closing on a cruise liner. Her passengers are shut in the shelter at the back of her upper deck, behind the mezzanine. Board her and hold it: for three minutes their pods will come through her hull, one after another. Every passenger alive at the end pays.' },
     visit: { name: 'Unlisted ship', pay: 0, line: 'Not the mission: a ship that happened to be passing. What is in her hold is worth carrying off. A breach is an attack: she will fight.' },
     assault: { name: 'Planetary assault', pay: 300, line: 'Land at the pad outside the base and bring it under control: every hostile down or in restraints.' },
   };
@@ -312,7 +313,8 @@ export const SpaceData = (() => {
       // (a cruiser with a promenade court is a cruise liner, a civilian ship in her own livery, LINER: below, once her seed's drawn)
       out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, wing, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name + (wing ? ' (a flying wing)' : ''), brief: OBJ[obj].line, other, night: assault && !T.night && r() < 0.25,
         ly: Math.round((3 + r() * 40) * 10) / 10, anchor: [Math.cos(a) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(a) * Math.cos(el) * d] });
-      { const o = out[out.length - 1]; if (o.kind === 'board' && hallOf(o.seed, o.size) === 'mall') { o.th = LINER; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Cruise liner'; } }
+      { const o = out[out.length - 1]; if (o.kind === 'board' && hallOf(o.seed, o.size) === 'mall') { // (and what's wanted of the squad aboard her is one of two things, by her seed: she's been taken by pirates, or they're on their way)
+        o.th = LINER; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Cruise liner'; o.obj = (o.seed >>> 4) & 1 ? 'hostage' : 'defend'; o.brief = OBJ[o.obj].line; o.pay = Math.round((SIZES.large.pay + OBJ[o.obj].pay + 160 * o.diff) / 50) * 50; } }
     }
     return out;
   }
@@ -334,7 +336,7 @@ export const SpaceData = (() => {
     informal: 'Her breach response is informal: her people shelter in her safest compartment, under guard, and nobody comes looking for you.',
     practiced: 'Her breach response is practiced: her teams sweep the ship for you, on her security cameras while someone is at them.',
   };
-  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' ? DRILL_LINE[drill(m.size, !!m.wing)] : ''); // (a pirate-held ship answers nobody)
+  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' && m.obj !== 'defend' ? DRILL_LINE[drill(m.size, !!m.wing)] : ''); // (a pirate-held ship answers nobody)
   // A distance, written: metres under a kilometre, then kilometres, megametres, light-seconds; a jump's in light-years.
   function dist(m: number): string {
     m = Math.abs(m);
@@ -346,5 +348,7 @@ export const SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
+  // Holding a liner (obj defend, js/spaceserver.ts defendTick): how long, how many pods in that time, the first of them after how long
+  const DEFEND = { secs: 180, pods: 5, first: 8 };
+  return { DEFEND, LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();

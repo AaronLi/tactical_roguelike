@@ -1427,6 +1427,7 @@ export const Furniture = (() => {
     vault: { must: 'srack', wall: ['lockers', 'srack'], center: [], small: ['bin'], floor: null, noArt: 1 },
     brig: { must: 'sbench', wall: ['sbench', 'lockers'], center: [], small: ['bin'], floor: null, noArt: 1 },
     pods: { floor: null, bare: 1, noArt: 1 }, spine: { floor: null, bare: 1, noArt: 1 },
+    shelter: { must: 'sbench', wall: ['sbench', 'lockers', 'sbench', 'dispenser'], center: [], small: ['bin', 'canister'], floor: null, noArt: 1 }, // (a liner's: benches round its walls, the floor clear for those who crowd into it)
     // (a cruiser's halls, two decks high: furnished by shipHalls, below; their galleries are catwalks)
     mall: { floor: 'tile', bare: 1, noArt: 1 }, mezz: { floor: null, bare: 1, noArt: 1 }, bay: { floor: null, bare: 1, noArt: 1 }, grove: { floor: null, bare: 1, noArt: 1 }, works: { floor: null, bare: 1, noArt: 1 },
   };

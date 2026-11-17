@@ -5,7 +5,7 @@
 // what fits on their hardpoints, the kinds of place a mission goes to (a ship to board, a base on a planet to assault), the
 // missions a visit to the base offers (from the visit's seed, so nobody has to be sent the list), where each one's anchor
 // is in the space round the base, and how a distance is written. Nothing here draws.
-type SpObj = 'artifact' | 'hvt' | 'destruct' | 'assault' | 'hostage' | 'visit';
+type SpObj = 'artifact' | 'hvt' | 'destruct' | 'assault' | 'hostage' | 'visit' | 'defend'; // (defend: a liner's passengers in her shelter, held against pirates' pods: js/spaceserver.ts defendTick)
 
 // a ship under way in a mission's zone (zone): what she is (kind: her lines; size, th, seed, wing: the level she is when she's boarded), her course (a loop of points, metres in the zone's frame), her pace and where on it she started
 interface SpContact { k: number; kind: string; size: SpSize; th: number; seed: number; wing: boolean; name: string; pts: number[][]; lens: number[]; total: number; speed: number; off: number }

@@ -4,7 +4,7 @@
 // a stretch of hull a ship can breach: three cells of its wall (c the middle one), the way out of her (nx, nz), the wall's middle there
 interface ShSite { c: number; nx: number; nz: number; x: number; z: number; cells: number[]; ang?: number; pt?: number } // (ang: an angled breach's, degrees off square: tunnel; pt: degrees nose up, - down)
 
-interface ShMeta { hall?: ShHallKind | null; size: SpSize; obj: SpObj | null; decks: number; other: SpSize | null; breach: { x: number; z: number; face: number; door: number; room: number }; sites?: ShSite[]; cuts: number[][]; locks: Record<number, string>; roles: (ShRole | null)[];
+interface ShMeta { shelter?: number; hall?: ShHallKind | null; size: SpSize; obj: SpObj | null; decks: number; other: SpSize | null; breach: { x: number; z: number; face: number; door: number; room: number }; sites?: ShSite[]; cuts: number[][]; locks: Record<number, string>; roles: (ShRole | null)[];
   hullOf: number[]; console: ShPt | null; artifact: ShPt | null; pods: ShPt[]; salvage: ShPt[]; hullWin: Record<number, number>; wing?: boolean; hvtRoom: number; cardRooms: Record<string, number>; hull: ShHull; hulls: ShHull[] }
 
 // Ships to board, as a level's layout (js/level.ts plan takes it as it takes a warehouse's or a house's): decks on the
@@ -21,7 +21,7 @@ interface ShMeta { hall?: ShHallKind | null; size: SpSize; obj: SpObj | null; de
 // A level can hold a second ship, nothing to do with the mission (sp.other: a transport or a corvette lying off the
 // target's port side), to be boarded or left alone.
 // finish(map, lay), after the plan: what the mission needs of the finished map (map.sp).
-type ShRole = 'bridge' | 'security' | 'gunnery' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine' | 'stairs' | ShHallKind | 'gallery' | 'passage';
+type ShRole = 'bridge' | 'security' | 'gunnery' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine' | 'stairs' | ShHallKind | 'gallery' | 'passage' | 'shelter';
 type ShHallKind = 'bay' | 'grove' | 'works' | 'mall'; // (a cruiser's hall two decks high: js/shipgen.ts HALLS)
 
 interface ShPt { x: number; z: number; y: number }

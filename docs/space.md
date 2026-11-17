@@ -216,6 +216,29 @@ band of lit windows round each, a raked blue funnel, a wheelhouse tier over her 
 `?board=large&seed=11` is a hangar bay, `&seed=6` an arboretum, `&seed=1` machinery halls, `&seed=9` a liner's court, `&seed=3` none;
 `node tools/ship_dump.mjs large 7 2 artifact --hall=bay` prints one of any seed (`--hall=` for none).
 
+## A liner's shelter, and holding her (`obj: 'defend'`)
+
+On a cruise liner's upper deck the compartment aft of her court to port is her **shelter** (`meta.shelter`, role `shelter`): one
+door, through the court's after wall at the back of the mezzanine; none onto the spine. Benches round its walls.
+
+A liner on the board is always one of two jobs, by her seed (`G.SpaceData.offers`): **retake her** (`hostage`: pirates hold her, her
+people tied in her court) or **hold her** (`defend`, `js/spaceserver.ts` defendTick):
+
+- Nobody of hers fights, and nobody carries a keycard. Her passengers and hands (her class's civilians and four more) are in the
+  shelter from the start and stay there.
+- From when the squad is aboard, for three minutes (`G.SpaceData.DEFEND`: 180 s, 5 pods, the first after 8 s, then every 37 s
+  or so), a pirate pod comes through her hull on her lower deck, clear of the squad's ship and of the pods already in her. Its
+  boarders (three, one more for every three levels of the mission's danger and for each officer past the first) come out inside her
+  and make for the shelter, fighting whoever they meet. From her hull to the shelter's door is about forty seconds unopposed.
+- A pirate on his feet inside the shelter kills a passenger every four seconds.
+- When the time is up and the last pirate aboard is dead, down or tied, she's held: the fee, and 120 for each of her people alive.
+  If her last passenger dies first the job has failed.
+- The objective's panel counts the time down and shows the pods come, the pirates aboard and the passengers alive.
+
+`?board=large&seed=9&obj=defend&dock` starts one aboard. `node tools/defend_sim.mjs [passive|win] [seed]` runs one in node (the
+simulation alone): passive, the officer stands where he came aboard and the pirates reach the shelter; win, every boarder dies
+twelve seconds after he comes aboard and she's held.
+
 ## A flying wing (`sp.wing`)
 
 Some corvettes and frigates (three in ten on the board; `?board=small&wing`) fly corner first: two arms swept back from her bow

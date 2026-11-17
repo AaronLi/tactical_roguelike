@@ -237,6 +237,7 @@ export const SpaceUI = (() => {
   // ------------------------------------------------------------------ the mission's objective
   function objDraw() { make(); objTick(true); }
   let armAt = 0, armLeft = 0, objKey = '';
+  let defLeft = -1, defAt = 0;
   function objTick(force?: boolean) {
     const s = S(), ms = s.ms, st = s.state;
     if (!ms || !st || !s.on || s.kind === 'hub') { if (obj.style.display !== 'none') obj.style.display = 'none'; objKey = ''; return; }
@@ -244,12 +245,22 @@ export const SpaceUI = (() => {
     const left = st.arm != null ? Math.max(0, st.arm - (performance.now() - armAt) / 1000) : null;
     const O = SD.OBJ[ms.obj], lines: string[] = [], meta = s.map && s.map.sp;
     if (ms.size && ms.kind === 'board') lines.push(`<small>${SD.SIZES[ms.size].name}: ${meta && meta.decks > 1 ? 'two decks, ' : ''}${meta && meta.hall ? SD.HALL_LINE[meta.hall].brief + ', ' : ''}${(() => { const g = SD.SIZES[ms.size!].guns, a = [g.pd ? g.pd + ' point defence' : '', g.cannon ? g.cannon + ' cannon' : '', g.missile ? g.missile + ' missile launcher' + (g.missile > 1 ? 's' : '') : ''].filter(Boolean); return a.length ? a.join(', ') : 'unarmed'; })()}</small>`);
-    const needKey = (k: string) => !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k);
+    const needKey = (k: string) => ms.obj !== 'defend' && !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k); // (holding a liner: nobody aboard carries a card, and nothing behind her locks is wanted)
     if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Ram her hull nose-on to board, anywhere along it: what is inside there is destroyed.');
     if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === Net.myId ? 'You have' : U.esc(Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
     if (ms.obj === 'hvt') lines.push(st.hvt === 1 ? '<span class="ok">Target dead.</span> Back to the ship and jump home.' : st.hvt === 2 ? '<span class="ok">Target in restraints.</span> Back to the ship and jump home.' : 'Find the target (the bridge): kill or restrain.');
     if (ms.obj === 'destruct') lines.push(st.boom ? '<span class="ok">She\'s gone.</span> Jump home.' : left != null ? `<span class="tm">${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</span><br>Get off her: your ship, or an escape pod. Then undock.` : 'Reach the bridge and start the self-destruct.');
     if (ms.obj === 'hostage') lines.push(st.cleared ? '<span class="ok">She is clear of pirates.</span> Back to the ship and jump home.' : !s.docked ? 'Pirates hold her. Their pods are in her hull: board anywhere else.' : `Clear the pirates: ${st.left || 0} left.` + (meta && st.hold >= 0 && meta.roles[st.hold] ? ` <small>Her people are tied in the ${ShipGen.NAMES[meta.roles[st.hold]!].toLowerCase()}.</small>` : ''));
+    // (holding a liner: the time left counted down here between the host's tellings, as the self-destruct's is)
+    if (ms.obj === 'defend') {
+      const d = st.def;
+      if (d && d.t !== defLeft) { defLeft = d.t; defAt = performance.now(); }
+      const tl = d && d.on ? Math.max(0, d.t - (performance.now() - defAt) / 1000) : null, who = d ? `${d.civ} passenger${d.civ === 1 ? '' : 's'} alive` : '';
+      lines.push(st.cleared ? `<span class="ok">She is held.</span> ${who}. Back to the ship and jump home.` : d && d.lost ? '<span class="bad">Her passengers are dead.</span> Back to the ship.'
+        : !d || !d.on ? 'Board her, anywhere along her hull. Her passengers are in the shelter at the back of her upper deck, behind the mezzanine: the pirates\' pods come once you are aboard.'
+        : tl! > 0 ? `<span class="tm">${Math.floor(tl! / 60)}:${String(Math.floor(tl! % 60)).padStart(2, '0')}</span><br>Hold the shelter (upper deck, behind the mezzanine). Pods through her hull: ${d.pods} of ${SD.DEFEND.pods}. Pirates aboard: ${st.left || 0}. <small>${who}.</small>`
+        : `No more pods. Clear the pirates still aboard: ${st.left || 0} left. <small>${who}.</small>`);
+    }
     if (ms.obj === 'visit') lines.push('Not the mission: board her for what is in her holds, or fly on.' + (st.hostile ? ' <span class="bad">She is fighting you.</span>' : ' <small>A breach is an attack: she will fight.</small>'));
     if (ms.obj === 'assault') lines.push(st.cleared ? '<span class="ok">Base under control.</span> Back to the ship, up through the cloud and jump home.' : s.docked ? `Bring the base under control: ${Game.enemiesLeft || 0} hostile${Game.enemiesLeft === 1 ? '' : 's'} left.` : 'Take her down the descent corridor and set down on the pad.');
     if (needKey('bridge') && (ms.obj !== 'artifact' || (meta && meta.roles.includes('vault')))) lines.push('The bridge' + (meta && meta.roles.includes('vault') ? ' and the vault are' : ' is') + ' locked: an officer carries the card.');

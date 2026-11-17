@@ -127,7 +127,7 @@ export const ShipGen = (() => {
     const U = G_U, S = SPEC[size], len0 = U.ri(r, S.len[0], S.len[1]), len = hall === 'mall' ? 33 + (len0 % 3) : len0, dmax = S.dep[1], sw = S.sw, segs: ShSeg[] = [], decks = hall ? 2 : S.decks;
     const stairs = hall ? HALLS[hall].stairs.map((q) => Math.round(len * q)) : decks > 1 ? [Math.round(len * 0.28), Math.round(len * 0.68)] : [];
     // (a liner: a compartment's length forward of her court and one aft of it, and the court (with its cross passage) all of her between)
-    if (hall === 'mall') { const fw = U.ri(r, 3, 4), aw = U.ri(r, 4, 5); for (const [x, w, end] of [[0, fw, 1], [fw + 1, len - fw - aw - 2, 0], [len - aw, aw, 1]]) { const d = [0, 1].map(() => Math.max(2, U.ri(r, S.dep[0], S.dep[1]) - end)); segs.push({ x, w, d, split: d.map((q) => q >= 5 && r() < S.split), stair: false }); } }
+    if (hall === 'mall') { const fw = U.ri(r, 3, 4), aw = U.ri(r, 4, 5); for (const [x, w, end] of [[0, fw, 1], [fw + 1, len - fw - aw - 2, 0], [len - aw, aw, 1]]) { const d = [0, 1].map(() => Math.max(2, U.ri(r, S.dep[0], S.dep[1]) - end)); segs.push({ x, w, d, split: d.map((q, k) => q >= 5 && !(x > fw && k === 0) && r() < S.split), stair: false }); } } // (her after compartment to port isn't split: on the upper deck it's her shelter)
     else for (let x = 0; x < len;) {
       const stair = stairs.length > 0 && x >= stairs[0] && len - x >= 6;
       if (stair) stairs.shift();
@@ -228,6 +228,9 @@ export const ShipGen = (() => {
     const free = slots.slice(), take = (s: ShSlot, role: ShRole) => { free.splice(free.indexOf(s), 1); s.rm.type = role as RoomType; s.rm.ship = role; if (role === 'armoury') s.rm.lootRoom = true; return s; };
     let hold: ShSlot | null = null;
     if (f === 0) hold = take(free.filter((s) => s.side > 0 && !slots.some((o) => o.inner === s.rm)).sort((a, b) => Math.abs(a.pos - 0.5) - Math.abs(b.pos - 0.5) || rooms.indexOf(a.rm) - rooms.indexOf(b.rm))[0], 'cargo');
+    // A liner's shelter: on her upper deck, the compartment aft of her court to port. Its only door is through the court's after wall,
+    // at the back of the mezzanine (the side doors, below): none onto the spine. Where her passengers are got to when she's boarded.
+    if (f > 0) for (const h of sk.halls) if (h.kind === 'mall') { const s = free.find((q) => q.side < 0 && q.x > sx0 + h.x + h.w && !q.deep && !slots.some((o) => o.inner === q.rm)); if (s) take(s, 'shelter'); }
     for (const [role, pref] of PROGRAM[sk.size + (sk.halls.length ? '+' : '') + ':' + f] || PROGRAM[sk.size + ':' + f] || PROGRAM[sk.size + ':0']) {
       if (!free.length) break;
       const deepWant = role === 'vault' || role === 'reactor' || role === 'magazine';
@@ -236,7 +239,7 @@ export const ShipGen = (() => {
     }
     for (const s of free.slice()) take(s, U.pick(r, FILL));
     const locked = (rm: LvRoom) => rm.ship === 'armoury' || rm.ship === 'vault';
-    for (const s of slots) door(s.door[0], s.door[1], 'z', s.rm.ship === 'armoury' ? 'armory' : s.rm.ship === 'vault' ? 'bridge' : null);
+    for (const s of slots) if (s.rm.ship !== 'shelter') door(s.door[0], s.door[1], 'z', s.rm.ship === 'armoury' ? 'armory' : s.rm.ship === 'vault' ? 'bridge' : null);
     // A liner's court: besides the spine's, a door through its after wall to port and to starboard of it, into whatever compartment is the
     // other side there (locked as that compartment's own door is, an armoury's or a vault's); and the same forward out of its cross
     // passage, into the compartments forward of that.
@@ -409,7 +412,7 @@ export const ShipGen = (() => {
     const cardRooms: Record<string, number> = {};
     if (Object.values(locks).includes('bridge')) cardRooms.bridge = room('quarters', at) >= 0 ? room('quarters', at) : room('mess', at);
     if (Object.values(locks).includes('armory')) cardRooms.armory = room('barracks', at) >= 0 ? room('barracks', at) : room('mess', at);
-    const sp: ShMeta = { wing: !!src.wing, hall: src.hall || null, size: src.size, obj: src.obj, decks: src.decks, other: src.other, breach, cuts: [], locks, roles, hullOf, console: cons, artifact: ar >= 0 ? clearIn(ar) : null, pods, salvage, hullWin, hvtRoom: bridge, cardRooms, hull: hulls[0], hulls };
+    const sp: ShMeta = { shelter: room('shelter'), wing: !!src.wing, hall: src.hall || null, size: src.size, obj: src.obj, decks: src.decks, other: src.other, breach, cuts: [], locks, roles, hullOf, console: cons, artifact: ar >= 0 ? clearIn(ar) : null, pods, salvage, hullWin, hvtRoom: bridge, cardRooms, hull: hulls[0], hulls };
     map.sp = sp;
     // (sp.breach: a stretch of the hold's hull she can be breached at, nothing more than a point to reckon from: where the squad's
     // ship comes out of the jump lying off, what the pirates' pods keep clear of. Nothing marks it: she's breached wherever she's rammed)
@@ -626,6 +629,6 @@ export const ShipGen = (() => {
       }
     }
   }
-  const NAMES: Record<string, string> = { bridge: 'Bridge', security: 'Security', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell', bay: 'Hangar bay', grove: 'Arboretum', works: 'Machinery hall', mall: 'Promenade court', gallery: 'Gallery', passage: 'Cross passage' };
+  const NAMES: Record<string, string> = { bridge: 'Bridge', security: 'Security', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell', bay: 'Hangar bay', grove: 'Arboretum', works: 'Machinery hall', mall: 'Promenade court', gallery: 'Gallery', passage: 'Cross passage', shelter: 'Shelter' };
   return { lay, finish, fairings, faired, roomAt, sites, siteOf, siteAt, cut, seal, tunnelPath, bent, cutKey, TUN, NAMES, SPEC, HALLS };
 })();
