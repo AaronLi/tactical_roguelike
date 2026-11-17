@@ -35,6 +35,8 @@ export const T0 = 0.03; // pre-roll before the gesture starts, s
 const K_TEXTURE = 6e-8;
 const K_HISS = 1e-8;
 const K_STICK = 7.5e-6;
+/** the lubrication the scenes' sliding parts were authored at: neutral. Above it they're oiled, below it dry. */
+export const LUBE_REF = 0.6;
 const K_CREAK = 2.5e-7;
 const K_SNAP = 0.02;
 const K_TOOTH = 0.006;
@@ -110,9 +112,15 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
         const n0 = Math.round(T0 * sr);
         const len = Math.min(N - n0, Math.round(fr.duration * sr));
         const depth = Math.max(0, fr.roughness) * 1e-6; // m
-        const grain = Math.max(0.005, fr.grain) * 1e-3; // m
+        const grain = Math.max(0.005, fr.grain / (1 + 0.9 * Math.max(0, (LUBE_REF - clamp(fr.lubrication ?? LUBE_REF, 0, 1)) / LUBE_REF))) * 1e-3; // m (drier: a finer scratch)
         const P = clamp(fr.periodicity, 0, 1);
-        const ss = clamp(fr.stickSlip, 0, 1);
+        // Lubrication: LUBE_REF (what the parts are authored at: the scenes' rubs were tuned as greased parts, before there was
+        // a control) is left as it is; above it oil takes the grit out (L, 0..1), below it the surfaces are drier and catch
+        // (dr, 0..1): scratchy: more grit and hiss, a finer, brighter texture and sharper teeth, only a little stick-slip.
+        const lub = clamp(fr.lubrication ?? LUBE_REF, 0, 1);
+        const L = Math.max(0, (lub - LUBE_REF) / (1 - LUBE_REF)), dr = Math.max(0, (LUBE_REF - lub) / LUBE_REF);
+        const catchPitch = fr.stickSlip > 0 ? fr.stickPitch : 220; // (a part that has no stick-slip of its own gets a faint, low chatter, not a squeal)
+        const ss = clamp(fr.stickSlip + 0.08 * dr, 0, 1) * (1 - L);
         const seed = Math.floor(rng() * 1e9);
         const width = Math.max(0.001, fr.contactWidth) * 1e-3;
         const speed = Math.max(0.001, fr.speed);
@@ -143,7 +151,7 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
         const texture2 = (x) => texture(x) * (P > 0 ? 1 - P + P * ridgeScrape : 1);
         // Teeth: with a regular, deep texture, the follower (pawl, tongue, ridge) drops off
         // each tooth and its spring slams it into the next one: a discrete click per tooth.
-        const toothAmt = P * P * smoothstep(15, 150, fr.roughness);
+        const toothAmt = P * P * smoothstep(15, 150, fr.roughness) * (1 - 0.6 * L) * (1 + 0.6 * dr);
         // The tooth clicks carry the drops; keep only a little of the continuous ridge scrape.
         const ridgeScrape = 1 - 0.85 * toothAmt;
         let lastTooth = Math.floor(0 / grain);
@@ -154,6 +162,7 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
         let lp2 = 0;
         let ssPhase = 0;
         let ssThr = 1;
+        let visc = 0; // (the film's shear: noise kept low and slow)
         for (let i = 0; i < len; i++) {
             const n = n0 + i;
             const u = i / len;
@@ -177,11 +186,16 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
             }
             const dhdt = (hNow - hPrev) * sr;
             hPrev = hNow;
-            let f = K_TEXTURE * Fn * (dhdt / 0.001);
-            f += K_HISS * Fn * Math.sqrt(av) * Math.sqrt(1 + fr.roughness) * (rng() * 2 - 1);
+            let f = K_TEXTURE * (1 - 0.97 * L) * (1 + 2.4 * dr) * Fn * (dhdt / 0.001);
+            const hiss = K_HISS * Fn * Math.sqrt(av) * Math.sqrt(1 + fr.roughness);
+            f += hiss * (1 - 0.98 * L) * (1 + 2.6 * dr) * (rng() * 2 - 1);
+            if (L > 0) { // oil: the grit's gone, a smooth low shear in its place, swelling a little with the speed and the film's thickness
+                visc += 0.16 * ((rng() * 2 - 1) - visc); // (a smooth, even whisper: no crackle in it, the grit's gone)
+                f += hiss * L * 1.1 * visc * (0.8 + 0.2 * valueNoise(x / (grain * 12), seed + 11));
+            }
             // Stick-slip: force builds while stuck, drops when it slips. Its rate follows speed.
             if (ss > 0 && av > 1e-4) {
-                ssPhase += (fr.stickPitch * Math.sqrt(av / speed)) / sr;
+                ssPhase += (catchPitch * Math.sqrt(av / speed)) / sr;
                 if (ssPhase >= ssThr) {
                     ssPhase -= ssThr;
                     ssThr = 1 + (1 - ss) * 0.9 * (rng() - 0.3);
@@ -189,7 +203,7 @@ export function buildExcitation(p, A, contact, sr, N, rng) {
                 f += K_STICK * ss * Fn * (ssPhase / ssThr - 0.5) * (0.5 + 0.5 * ss);
             }
             // Texture finer than the micro-contacts averages out; soft materials can't follow fast detail.
-            const fc = clamp((3 * av) / width, 150, lowpassCeil);
+            const fc = clamp(((3 * av) / width) * (1 - 0.55 * L) * (1 + 1.6 * dr), 150, lowpassCeil);
             const a = 1 - Math.exp((-2 * Math.PI * fc) / sr);
             lp1 += a * (f - lp1);
             lp2 += a * (lp1 - lp2);

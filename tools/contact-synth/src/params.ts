@@ -86,6 +86,10 @@ export interface FrictionParams {
   stickPitch: number;
   /** Size of the micro-contacts, mm. Larger averages the texture out (duller). */
   contactWidth: number;
+  /** 0 = dry metal on metal (catchy: grit, a grabbing stick-slip, a bright contact), 0.6 = as authored (the scenes'
+   *  parts were tuned as lightly greased), 1 = well greased: the dry hiss and the texture fall away, what's left is a low,
+   *  smooth, fluid glide (a film of oil), and stick-slip and the teeth's clicks are softened. */
+  lubrication: number;
 }
 
 export interface SnapParams {
@@ -206,7 +210,7 @@ export function defaultParams(): Params {
     impact: { velocity: 1.5, restitution: 0.4, scatter: 0.4, contactRadius: 3, click: 0.25, sharpness: 0.6 },
     friction: {
       force: 0, duration: 1, speed: 0.3, profile: 'steady', strokes: 2, roughness: 10, grain: 0.5,
-      periodicity: 0, stickSlip: 0, stickPitch: 600, contactWidth: 0.05,
+      periodicity: 0, stickSlip: 0, stickPitch: 600, contactWidth: 0.05, lubrication: 0.6,
     },
     snap: { count: 0, strength: 0.6, spacing: 150, preload: 80, creak: 0.3, seat: 0.5, seatDelay: 12 },
     bodyA: {

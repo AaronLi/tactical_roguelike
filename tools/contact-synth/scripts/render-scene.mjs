@@ -5,9 +5,11 @@ import { SCENES, renderScene, encodeWav } from '../dist/index.js';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const argv = process.argv.slice(2), dry = argv.includes('--dry');
+const argv0 = process.argv.slice(2), lubeI = argv0.indexOf('--lube'), argv = lubeI >= 0 ? argv0.filter((_, i) => i !== lubeI && i !== lubeI + 1) : argv0, dry = argv.includes('--dry');
 const [id, outDir = `out/${id}`, seedArg = '1'] = argv.filter((a) => a !== '--dry');
 const scene = SCENES.find((s) => s.id === id);
+const lube = lubeI >= 0 ? Number(argv0[lubeI + 1]) : null; // (--lube <0..1>: every sliding element of the scene greased by that much)
+if (lube != null && scene) for (const t of scene.tracks) for (const e of t.elements) { const p = e.sound && e.sound.patch; if (p && p.friction) p.friction = { ...p.friction, lubrication: lube }; }
 if (!scene) {
   console.error(`Unknown scene "${id}". Available: ${SCENES.map((s) => s.id).join(', ')}`);
   process.exit(1);

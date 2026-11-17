@@ -16,6 +16,7 @@ import { render } from './render.js';
 import { T0 } from './excitation.js';
 import { applyRoom } from './room.js';
 import { clamp, dbToGain, makeRng, peak } from './dsp.js';
+import { LUBE_REF } from './excitation.js';
 /**
  * Several scenes played one after another as one scene (e.g. a full reload: mag in, charge, mag
  * out). Each part's elements move to its start time, its tracks are kept (named `<label>.<track>`),
@@ -149,6 +150,51 @@ function renderElement(el, sr, seed, housing, enclosure) {
  * Render a scene's tracks and their mix. `dry`: no room at all (the scene's own room is left out), so the sound can
  * go through a game's own real-time acoustics. What stays is the object itself, the air spaces inside it included.
  */
+/**
+ * What lubrication does to a part that only slides (a rub: no impact, no snap) beyond the sliding's own texture
+ * (excitation.ts): each element is normalised, so oil's quieter, softer running is applied here. Above the level the
+ * parts were authored at it's up to 10 dB down and dulled (a lowpass from open to ~2 kHz); below it's drier, up to 3 dB up.
+ */
+function lubeOf(el) {
+    const p = el.sound.kind === 'contact' ? el.sound.patch : null;
+    const fr = p && p.friction;
+    if (!fr || !(fr.force > 0) || fr.lubrication == null || (p.snap && (p.snap.count ?? 0) > 0) || (p.impact && (p.impact.velocity ?? 0) > 0.01))
+        return { db: 0, fc: 0, smooth: 0 };
+    const l = fr.lubrication;
+    if (l >= LUBE_REF) {
+        const g = (l - LUBE_REF) / (1 - LUBE_REF);
+        return { db: -10 * g, fc: g > 0 ? 16000 * Math.pow(2000 / 16000, g) : 0, smooth: g };
+    }
+    return { db: 3 * (LUBE_REF - l) / LUBE_REF, fc: 0, smooth: 0 };
+}
+/**
+ * Smoothness: sliding noise is grainy because its level jumps about from moment to moment (crackle, grit). A film of oil
+ * holds the level steady: each sample's level is drawn toward the slow swell (the ~50 ms envelope) from the fast one (~2 ms),
+ * by `amount` (0..1): 1 leaves only the swell, a steady, even glide.
+ */
+function flatten(x, amount, sr) {
+    if (amount <= 0)
+        return;
+    const af = 1 - Math.exp(-1 / (0.002 * sr)), as = 1 - Math.exp(-1 / (0.05 * sr));
+    let ef = 0, es = 0;
+    const k = 0.95 * amount;
+    for (let i = 0; i < x.length; i++) {
+        const a = Math.abs(x[i]);
+        ef += af * (a - ef);
+        es += as * (a - es);
+        const r = (es + 1e-6) / (ef + 1e-6);
+        x[i] *= Math.pow(clamp(r, 0.2, 5), k);
+    }
+}
+function smooth(x, fc, sr) {
+    const a = 1 - Math.exp((-2 * Math.PI * fc) / sr);
+    let y1 = 0, y2 = 0;
+    for (let i = 0; i < x.length; i++) {
+        y1 += a * (x[i] - y1);
+        y2 += a * (y1 - y2);
+        x[i] = y2;
+    }
+}
 export function renderScene(scene, sr = 48000, seed = 1, opts = {}) {
     const raw = [];
     let k = 0;
@@ -159,7 +205,12 @@ export function renderScene(scene, sr = 48000, seed = 1, opts = {}) {
         const tail = scene.room > 0 && !opts.dry ? 0.25 + 0.5 * scene.roomSize : 0;
         let buf = new Float32Array(Math.ceil((end - start + tail) * sr));
         for (const p of parts) {
-            const g = dbToGain(p.el.gainDb);
+            const lube = lubeOf(p.el);
+            const g = dbToGain(p.el.gainDb + lube.db);
+            if (lube.fc) {
+                smooth(p.samples, lube.fc, sr);
+                flatten(p.samples, lube.smooth, sr);
+            }
             const o = Math.round((p.offset - start) * sr);
             for (let i = 0; i < p.samples.length; i++)
                 if (o + i >= 0 && o + i < buf.length)

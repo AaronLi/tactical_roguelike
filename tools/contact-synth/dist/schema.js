@@ -51,6 +51,7 @@ export const SECTIONS = [
             { kind: 'range', path: 'friction.periodicity', label: 'Periodicity', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = random grit, 1 = regular teeth that click one by one.' },
             { kind: 'range', path: 'friction.stickSlip', label: 'Stick-slip', min: 0, max: 1, step: 0.01, digits: 2, hint: 'Grab-and-release: low = chatter / creak, high = a pitched squeal.' },
             { kind: 'range', path: 'friction.stickPitch', label: 'Stick-slip rate', min: 10, max: 4000, log: true, unit: 'Hz', digits: 0, hint: 'Squeak pitch at full speed. It follows the speed, so it drops as the motion slows.' },
+            { kind: 'range', path: 'friction.lubrication', label: 'Lubrication', min: 0, max: 1, step: 0.01, digits: 2, hint: '0 = dry metal: gritty, catching; 0.6 = as the parts were authored; 1 = well greased: less hiss and grit, a low smooth glide, no squeal.' },
             { kind: 'range', path: 'friction.contactWidth', label: 'Contact softness', min: 0.002, max: 5, log: true, unit: 'mm', digits: 3, hint: 'Size of the micro-contacts. A sharp hard edge is fine (bright); a soft broad pad smears the texture (dull).' },
         ],
     },

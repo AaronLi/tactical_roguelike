@@ -10,12 +10,13 @@
 //        (the game built and its models baked: npm run build && npm run bake:models)
 //        cd tools/contact-synth && npm run build && node scripts/game-reload-video.mjs <out.mp4> [--gun m4|ak|mp5|g19] [--url http://127.0.0.1:8080/]
 import { createRequire } from 'node:module';
-const { chromium } = createRequire(import.meta.url)('playwright'); // (the globally installed one)
+const { chromium } = process.env.PW_SHIM ? await import(pathToFileURL(process.env.PW_SHIM).href) : createRequire(import.meta.url)('playwright'); // (the globally installed one; PW_SHIM: a stand-in on the machine's own Chrome over the DevTools protocol)
 import { spawn } from 'node:child_process';
 import { writeFileSync, readFileSync, copyFileSync, mkdtempSync, rmSync, renameSync } from 'node:fs';
 import { speakerMaster } from './speaker-master.mjs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { SCENES, renderScene, encodeWav, arChargeScene, chargeScene, magDropScene } from '../dist/index.js';
 import { T0 } from '../dist/excitation.js';
 
@@ -32,6 +33,8 @@ const WET = args.includes('--wet'), SPACE = !args.includes('--no-space');
 const FORWARD = +opt('forward', '0.5');
 // --no-shots: no gunshots (they're there for a loudness reference: the game's own reports, at the game's own levels)
 const SHOTS = !args.includes('--no-shots');
+// --lube <0..1>: every sliding part's lubrication (0.6: as the scenes were authored; 1: heavy oil: quieter, duller, even)
+const LUBE = opt('lube', null);
 // Each gun: its caption, how it's charged, how its action is worked after a run-dry reload ('release': a bolt
 // catch or slide stop, 'rack': the handle again), and which sound goes on which moment.
 const GUNS = {
@@ -64,11 +67,12 @@ const page = await browser.newPage({ viewport: { width: W, height: H } });
 page.on('pageerror', (e) => console.error('page error:', e.message));
 await page.addInitScript(() => {
   const realNow = performance.now.bind(performance), realRaf = window.requestAnimationFrame.bind(window), realDate = Date.now;
-  let fake = false, base = 0, dateBase = 0, off = 0, q = [];
+  let fake = false, base = 0, dateBase = 0, off = 0, w0 = 0, q = [];
   window.__clock = {
     on() { base = realNow(); dateBase = realDate(); off = 0; fake = true; },
     step(ms) { off += ms; const cbs = q; q = []; for (const cb of cbs) { try { cb(base + off); } catch (e) { console.error(e); } } },
-    t: () => off / 1000,
+    mark() { w0 = off; }, // (times from here: the recording's start, after the level's fade-in has been stepped through)
+    t: () => (off - w0) / 1000,
   };
   performance.now = () => (fake ? base + off : realNow());
   Date.now = () => (fake ? dateBase + off : realDate());
@@ -82,6 +86,9 @@ await page.waitForFunction(() => window.G && G.Game && G.Me, null, { timeout: 60
 await page.evaluate(async () => {
   const sleep = (s) => new Promise((r) => setTimeout(r, s * 1000));
   const until = async (f) => { while (!f()) await sleep(0.1); };
+  const dbg = /[?&]play/.test(location.search); // (a debug-start URL, js/debugstart.ts: the level's started for us)
+  if (dbg) await until(() => window.__debugReady);
+  else {
   // (the game waits for the gun models to load before a solo run)
   if (G.Game.needModels) await new Promise((r) => G.Game.needModels(() => { G.Game.solo(); r(); })); else G.Game.solo();
   await sleep(0.8);
@@ -91,12 +98,13 @@ await page.evaluate(async () => {
   const g0 = G.Game; g0.pickRoute(G.Route.options(g0.routeMap, g0.routeSt.path[g0.routeSt.path.length - 1])[0]);
   await until(() => G.Game.phase === 'level' && G.Me.kit);
   await sleep(1.0);
+  }
   // the loading veil (shaders compiling) has to lift first: the game waits for it, in real time
   const veiled = () => { const v = G.Game.$('veil'); return !!v && v.classList.contains('on'); };
   await until(() => !veiled());
   // The level opens with the insertion flight (js/landing.ts): skip it as holding F does, and get out on the pad.
   const Ld = G.Landing;
-  if (Ld && Ld.S) {
+  if (!dbg && Ld && Ld.S) {
     await until(() => Ld.S.fly || Ld.S.landed);
     if (!Ld.S.landed) { Ld.S.ft = Ld.S.fly.dur; await until(() => Ld.S.landed); }
     for (let i = 0; i < 20 && Ld.S.landed && G.Me.seat != null; i++) { G.Me.fLatch = false; Ld.interact(G.Me, 10, true); await sleep(0.2); }
@@ -146,6 +154,9 @@ await page.evaluate(async () => {
   G.GunAudio.play = (id, pos, who, vol = 1) => { if (!pos) window.__log.push({ ev: 'shot', t: window.__clock.t(), id, vol }); return gplay(id, pos, who, vol); };
   const sample = G.Audio.sample.bind(G.Audio);
   G.Audio.sample = (name, ...r) => { window.__log.push({ ev: name, t: window.__clock.t() }); return sample(name, ...r); };
+  // the game's own recorded handling (js/handling.ts) plays these in place of the recordings above: logged as the moments they stand for
+  const hmap = (n) => /^(pull|rack)/.test(n) ? (window.__gun === 'g19' ? 'drop_slide' : 'rack_slide') : n === 'release' || n === 'home' ? 'drop_slide' : n === 'mag-in' ? 'insert_magazine' : null;
+  const hplay = G.Handling.play; G.Handling.play = (def, name, o) => { const r = hplay(def, name, o); const ev = r && hmap(name); if (ev) window.__log.push({ ev, t: window.__clock.t() + (o && o.land != null ? o.land : 0) }); return r; }; // (its cue lands `land` s on)
   window.__prevM = -1;
   const FPS = window.__fps;
   let lastAct = null;
@@ -184,6 +195,7 @@ if (opt('still', null) !== null) {
 }
 
 // ---------- the sequence, frame by frame (or a recording made earlier) ----------
+if (!opt('redub', null)) { for (let i = 0; i < 240; i++) await page.evaluate(() => window.__step()); await page.evaluate(() => window.__clock.mark()); } // (the level's fade-in, on the stepped clock, over before the first frame; the logged times start at the first frame)
 let frames = 0, videoPath, log;
 if (REDUB) {
   videoPath = REDUB;
@@ -267,6 +279,7 @@ function place(id, what, at, tracks = null, gainDb = 0, part = 'port', keep = nu
   const sc = keep ? { ...sc0, tracks: sc0.tracks.map((t) => ({ ...t, elements: t.elements.filter(keep) })).filter((t) => t.elements.length) } : sc0;
   const els = sc.tracks.flatMap((t) => t.elements);
   if (!els.length) return;
+  if (LUBE != null) for (const e of els) { const f = e.sound.kind === 'contact' && e.sound.patch.friction; if (f) f.lubrication = +LUBE; }
   const r = renderScene(sc, sr, 1, { dry: !WET });
   // the mix's sample 0 is at scene time (earliest element start - T0); stems start `start` s after it
   const origin = Math.min(...els.map((e) => e.at - (e.sound.kind === 'contact' ? T0 : 0)));
@@ -415,6 +428,7 @@ if (SPACE) {
   for (const s of sources) if (s.part !== 'floor') { const r = (partsAt(s.t)[s.part] || DEFAULT[s.part]).map((v) => v.toFixed(2)).join(', '); seen[s.part] = r; }
   console.log(`  ${sources.length} sounds placed at their parts (camera-relative x, y, z m: ${Object.entries(seen).map(([k, v]) => `${k} ${v}`).join('; ')}), ${echoes} echo paths`);
 }
+{ let pk = 0, nonzero = 0; for (let i = 0; i < L.length; i++) { const v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > pk) pk = v; if (v > 1e-4) nonzero++; } console.log(`  mix: peak ${pk.toFixed(4)}, ${nonzero} samples above -80 dB of ${L.length}; ${sources.length} sources`); }
 await browser.close();
 // a 16-bit stereo WAV
 const n = L.length, wavBuf = Buffer.alloc(44 + n * 4);
