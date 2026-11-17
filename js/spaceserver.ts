@@ -37,7 +37,7 @@ export const SpaceSv = (() => {
     board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[], gone: [] as number[] }, // (gone: flown, done or not: off the board)
     fleet: SD.fleet0(),
     seats: {} as Record<string, number>,
-    ship: { docked: true, at: null as number | null, ctl: null as string | null, pose: null as any },
+    ship: { docked: true, at: null as number | null, ctl: null as string | null, pose: null as any, hatch: true }, // (hatch: her inner door open; a breach shuts it, its button opens it)
     M: null as SvMission | null,
     rank: 1, // how far the squad has got: what the board's missions are pitched at
   };
@@ -45,7 +45,7 @@ export const SpaceSv = (() => {
   const offers = () => SD.offers(st.board.seed, st.board.level);
   const goneOf = (B: typeof st.board) => B.gone || (B.gone = B.done.slice()); // (a board kept from before there was gone: what's done is gone)
   const boardMsg = () => ({ t: 'board', seed: st.board.seed, level: st.board.level, picked: st.board.picked, done: st.board.done, gone: goneOf(st.board) });
-  const shipMsg = () => ({ docked: st.ship.docked ? 1 : 0, at: st.ship.at, ctl: st.ship.ctl, pose: st.ship.pose });
+  const shipMsg = () => ({ docked: st.ship.docked ? 1 : 0, at: st.ship.at, ctl: st.ship.ctl, pose: st.ship.pose, hatch: st.ship.hatch ? 1 : 0 });
   // what a screen needs to be in the hangar (or the space round it), and to be in a mission's level
   const shopMsg = () => ({ board: boardMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg() });
   // The zone the squad is in (js/spacedata.ts zone): the mission it came for (ms), which of the zone's ships the level is now
@@ -85,7 +85,7 @@ export const SpaceSv = (() => {
     const sv = S();
     st.rank = 1; st.fleet = SD.cleanFleet(fleet || st.fleet); st.seats = {}; st.M = null;
     st.board = { seed: (Math.random() * 2 ** 31) | 0, level: st.rank, picked: [], done: [], gone: [] };
-    st.ship = { docked: true, at: null, ctl: null, pose: null };
+    st.ship = { docked: true, at: null, ctl: null, pose: null, hatch: true };
     sv.level = 1; sv.team = { ver: 0, items: [] }; sv.arms = {};
     net().broadcast({ t: 'newrun' });
     if (dbg) { sv.toShop(); return; }
@@ -498,15 +498,23 @@ export const SpaceSv = (() => {
 
   // ---- The squad's ship against the hull, in the host's world as on everyone's screen: her walls, decks and the tunnel are there to
   // be seen through (they can't), shot through (hardened steel: js/materials.ts SHIP) or walked on, not open space past the hole
-  let hostShip: { w: any; s: any[] } | null = null;
+  let hostShip: { w: any; s: any[]; hatch: any[] } | null = null;
   function shipSolids(on: boolean) {
     const sv = S(), M = st.M, w = sv.map && sv.map.world;
-    if (hostShip) { for (const s of hostShip.s) if (hostShip.w === w) World.remove(hostShip.w, s); hostShip = null; }
+    if (hostShip) { for (const s of [...hostShip.s, ...hostShip.hatch]) if (hostShip.w === w) World.remove(hostShip.w, s); hostShip = null; }
     if (sv.map) Level.setTilt(sv.map, null, null);
     if (!on || !M || !M.site || !w || !sv.map) return;
     const W = sv.map.W, TS = Level.TS, a = M.site, site = { x: (a[0] % W + 0.5) * TS, z: (((a[0] / W) | 0) + 0.5) * TS, nx: a[1], nz: a[2], ang: a[3] || 0, pt: a[4] || 0 }, d = SD.SHIPS[st.fleet.ship]; // (ang: an angled breach's, degrees off square)
     Level.setTilt(sv.map, d, SD.berthAt(d, site)); // (lying tilted: her own gravity aboard her)
-    hostShip = { w, s: SD.worldBoxes(d, SD.berthAt(d, site), (t) => t !== 'nose' && t !== 'steps').map((q) => World.add(w, SD.solidOf(q, { kind: 'prop', mat: Materials.SHIP }))) };
+    const solid = (q: any) => World.add(w, SD.solidOf(q, { kind: 'prop', mat: Materials.SHIP })), b = SD.berthAt(d, site);
+    hostShip = { w, s: SD.worldBoxes(d, b, (t) => t !== 'nose' && t !== 'steps' && t !== 'hatch').map(solid), hatch: st.ship.hatch ? [] : SD.worldBoxes(d, b, (t) => t === 'hatch').map(solid) }; // (her inner door while it's shut)
+  }
+  // her inner door opened from its button (any of the squad's, while she's against a hull): for everyone, and out of the way here
+  function openHatch(from: string) {
+    if (st.ship.hatch || !st.M || !st.M.docked) return;
+    st.ship.hatch = true;
+    if (hostShip) { for (const s of hostShip.hatch) World.remove(hostShip.w, s); hostShip.hatch = []; }
+    net().broadcast({ t: 'shatch', by: from });
   }
   // ---- the ship: she's against the hull (the plate goes in), on the pad, or away again
   function dock(on: boolean, from: string, at?: unknown) {
@@ -527,6 +535,7 @@ export const SpaceSv = (() => {
     }
     if (on && M.meta && !M.breached) { M.breached = true; if (M.ms.obj === 'visit') say(`${M.ms.name} takes the breach for an attack: her crew are coming for you.`); }
     M.docked = on; st.ship.docked = on;
+    if (on) st.ship.hatch = false; // (a breach shuts her inner door: it's opened from its button, js/space.ts)
     shipSolids(on);
     if (sv.map) ShipGen.seal(sv.map, on ? M.site : null); // (the holes she isn't against: shut)
     net().broadcast({ t: 'sdock', on: on ? 1 : 0, by: from, site: on ? M.site : undefined });
@@ -762,6 +771,7 @@ export const SpaceSv = (() => {
         break;
       }
       case 'sdock': if (p) dock(!!m.on, from, m.site); break;
+      case 'shatch': if (p) openHatch(from); break;
       case 'seat': {
         if (!p) break;
         const s = m.s == null || m.s < 0 ? -1 : m.s | 0;
