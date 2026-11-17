@@ -22,7 +22,7 @@ rendered model coincides with it. Gameplay stats never change here, only the loo
   `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=...&prop=imageinfo&iiprop=url|size&iiurlwidth=1920`,
   then load the thumbnail with `crossOrigin='anonymous'` into a canvas. IMFDB, makers and auction houses are good too, but
   usually block CORS (draw them uncrossed; just don't read the pixels back).
-- First find out what the gun actually is. Check the name against the spec in `js/data.js` and `js/parts.js`: the game's
+- First find out what the gun actually is. Check the name against the spec in `js/data.ts` and `js/parts.ts`: the game's
   "Thor" turned out to be the EAA Thor, not the first .50 BMG pistol a search finds, and the user had to correct it. The
   variant must suit what the game does with it: the F1 look on an F2 that takes STANAG magazines was wrong, so it became a
   G2. If the name is ambiguous, ask.
@@ -31,28 +31,71 @@ rendered model coincides with it. Gameplay stats never change here, only the loo
   magazine): cross-check anything that decides a proportion against a second reference.
 - Scale from the real overall length. Note the source file and its licence.
 
-## 3. Trace
+## 3. Build it in Blender
 
-Read `js/guntraces.js` (data, in photo pixels: `ref, mm, x0, y0, dir, by, rot, top, bot, port, parts, mag`) and in
-`js/gunmodels.js`: `tracer`, `tracedSlide`, `tracedParts`, `tracedSer`, `k.prof`, `k.profs`, `k.loft`, and `rifle()`'s `tr`/`VT`
-receivers. Pistols use `look` and a `G.GunTraces` entry; revolvers `tracedRevolver`; long guns `look` with `by: 0` (a rifle's bore
-is at y = 0, a pistol's at 0.009), or a bespoke `rcv` with a `*Trace` helper when they need custom geometry (the AUG, QBZ-95,
-G36, F2).
+A reworked gun is authored in Blender and baked straight from its .glb (docs/models.md "Authored models (Blender)": read it,
+with "Authored parts", "Authored furniture" and "Per-part bake and assembly", before starting). The procedural recipes in
+`tools/models/recipes.ts` are what's being replaced; only touch them to remove a gun's dead branch once nothing uses it.
+
+**Running Blender.** `"C:/Program Files/Blender Foundation/Blender 5.2/blender.exe" -b -P models/<id>/build_<id>.py` builds
+headless (run it in the background: it can take minutes). With Blender open and its MCP add-on connected
+(`mcp__Blender__*`), `exec(open(r'<repo>/models/<id>/build_<id>.py').read(), {'GUN_DIR': r'<repo>/models/<id>'})` in
+`execute_blender_code` rebuilds into the open scene, and `render_viewport_to_path` / `get_screenshot_of_area_as_image` let
+you look at it; never edit the scene by hand: the script is the source, and every run rebuilds the model's collection from
+nothing.
+
+**The files.** `models/<id>/build_<id>.py` (the source; it writes the rest), `<id>.glb`, `<id>.blend`, `model.json`
+(`{ "source": "authored", "sights": { "builtin": [...], "rail": [...] } }`). A family shares one builder,
+`models/<family>_kit.py`, each gun's build script setting `CFG` and exec'ing it (the AR guns `ar_kit.py`, the AK family
+`ak_kit.py`, the MP5s `mp5_kit.py`: copy their shape). Every script starts with `models/blender_kit.py` (`kit_collection`,
+`kit_mat`, the catalogue colours and helpers). Put the reference photo's source and licence at the top of the script, and any
+traced data beside it (the FAL's `trace.json`).
+
+**The frame and the tree.** Blender X = the gun's right, Y = forward, Z = up, metres; the exporter turns it into the game's
+(x right, y up, -z forward). A rifle's origin is the back of the receiver on the bore line. Under the root empty (named after
+the gun, custom props `gun`, `info_json`, `anchors_json`): meshes with a custom prop `slot` (`base` for the receiver, then the
+factory `stock`, `grip`, `handguard`, `barrel`, `muzzle`, `optic` = its own irons) and ONE catalogue material each, by name
+(`kit_mat`: black, polymer, steel, rubber...; `m_rrggbb` for a one-off); moving parts are `part_<key>` empties (prop `part`,
+the pivot at the node's origin): `part_mag` (with its magazine check), `part_handle`, a bolt, a bipod. The anchors go in
+`anchors_json`: `mount_optic`/`_end`, `mount_handguard`/`_end`, `mount_barrel`, `mount_muzzle`, `mount_stock`, `mount_grip`,
+`mount_mag` (+ `mount_tac`, `mount_optic_rail` when it has them); the info (`sy`, `fSight`, `relief`, `muzzles`, `grip`,
+`support`, `magAt`, `handle`, `port`, `chamberAt`...) in `info_json`. The model holds the factory gun only: everything else the
+catalogue offers is seated from those anchors at its own size.
+
+**Fitting it to the photo.** Trace outlines off the photo in pixels (zoom in, read coordinates off a grid over each crop, as
+below), convert with one scale from the real overall length and one origin, and build each part from its own outline at its
+own thickness (receiver, guard with its window, trigger, grip, panels, controls). Separate parts whose catalogue entries
+differ: what another barrel brings (a gas block, a front sight) is the barrel's slot; what stays is `base`. Then check the
+overlay in the game (section 4), not just in Blender.
+
+**Wiring it in.** The platform's spec in `js/parts.ts` says `rcv: 'authored', authored: '<id>'` and agrees with the anchors
+(`L` = `mount_handguard`, `hgMax`, `mag` = `mount_mag`): the baker fails naming any disagreement. Factory furniture whose
+mount other guns share becomes an authored furniture part (`models/parts/<slot>/<id>/`, replace-only, built by a
+`models/<family>_parts.py` like `ak_parts.py`); a STANAG gun takes `ar_kit.py`'s `mag_stanag` (as the F2 does) so the family's
+other magazines seat at `mount_mag`.
+
+**The loop.** Edit the script, rebuild in Blender, then:
+- `npm run check:models -- models/<id>/<id>.glb` (the contract, the spec, and the model checks listed in section 4);
+- `npm run bake:models -- --parts <id>` (the game loads the bake, not the .glb: a stale bake shows the old model);
+- `node tools/check_authored_golden.mjs --update <id>` once it's right (only that gun's fingerprints), then
+  `npm run test:models` and `npm run typecheck`;
+- `git checkout -- tools/contact-synth/dist` if a build left line-ending churn there; never commit it.
+
+Recipe guns (no `models/<id>/`): `tools/models/recipes.ts` `rifle()` with a bespoke `rcv` and a `*Trace` helper (the AUG, G36,
+F2 before it was authored), pistols in `pistol()`; leave them for Blender rather than tracing a new recipe.
 
 - Zoom in. Draw a pixel grid over a crop and read coordinates off it, region by region (three or four crops a gun). A
   transparent-background photo's alpha channel gives the silhouette directly.
 - Screen pixels aren't image pixels: work out the scale of each crop before reading it.
-- Use separate outlines by thickness: receiver, trigger guard (with its window as a hole), trigger, grip, panels, controls.
 - Controls go on the side the photo shows; a right-side photo (muzzle to the right) means +x.
-- Never change a shared branch's behaviour for other guns: give the gun its own `rcv` or `look`, and check everything that
-  switches on `rcv`: `hw`, `handle`, `kinds()` in `js/vmanim.js`, `bull`, `port`, `chamberAt`, `tacAt`, sights.
+- Never change shared behaviour for other guns: check everything that switches on `rcv`, and `kinds()` in `js/vmanim.ts`.
 - Keep the anchors working: `muzzles`, `grip`, `support`, `magAt`, `cheek`, `chamberAt`, `cylAt`, the handle's animation.
 - Match the code around it: naming, terse comments, British spelling. Files are mostly CRLF; keep each file's endings.
 - Edit by Python scripts with exact-match replacement written to the scratchpad (bash heredocs mangle backslashes).
 
 ## 4. Test
 
-At `http://localhost:<port>/?mute`, in a new tab of your own:
+At `http://localhost:<port>/?mute` (or straight into a level with the gun: `?play&mute&gun=<id>&parts=slot:id,...`, js/debugstart.ts), in a new tab of your own:
 
 ```js
 const mem = {}; G.U.store = { get: (k, d) => (k in mem ? mem[k] : d), set: (k, v) => { mem[k] = v; } };
@@ -118,12 +161,12 @@ scratchpad; never trigger a download.
 Parallel agents editing one checkout overwrite each other, so:
 
 1. Wait for anything already editing the same files to commit.
-2. One agent a gun, `model: "sonnet"` unless told otherwise, `isolation: "worktree"`, `run_in_background`, each told to follow
-   this skill. Run two at a time, starting the next as each finishes: five at once hit the usage limit twice. A worktree can start on an old commit: have the agent check `.claude/skills/rework-gun` and `js/guntraces.js` are there. Start a few at a time: a large batch can hit the usage limit mid-run. An agent stopped that way loses
+2. One agent a gun (or a family that shares a kit), `model: "sonnet"` unless told otherwise, `isolation: "worktree"`, `run_in_background`, each told to follow
+   this skill. Run two at a time, starting the next as each finishes: five at once hit the usage limit twice. A worktree can start on an old commit: have the agent check `.claude/skills/rework-gun` and `models/blender_kit.py` are there. Start a few at a time: a large batch can hit the usage limit mid-run. An agent stopped that way loses
    uncommitted work unless it committed as it went, so tell agents to commit early; continue it with `SendMessage`.
 3. Each serves its own worktree on its own port, starting at 8091: `PORT=8091 node serve.js`, run in the background from the
    worktree, stopped when done. It never touches 8080, nor any tab it didn't open: the user may be playing there.
-4. To limit conflicts, each keeps its data in `js/guntraces.js` where it can, and adds to shared lists on a line of its own.
+4. To limit conflicts, each keeps its work in its own `models/<id>/` (a family in one agent: its kit is shared), and adds to shared lists on a line of its own.
    Agents leave `docs/gun-reworks.md` to the orchestrator.
 5. Review each result yourself before relaying it: rerender it, and close-check whatever the agent says it couldn't see.
    Reports overstate: "sits sensibly" has been wrong.
