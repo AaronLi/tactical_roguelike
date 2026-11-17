@@ -1999,6 +1999,7 @@ export const R = {
     this.frameNo++;
     this.camera.updateMatrixWorld();
     this.vmHolder.matrix.copy(this.camera.matrixWorld);
+    this.vmHolder.userData.tanV = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2); // (the view's half height at a metre out: what's below it is out of sight, js/vmanim.ts a magazine let fall)
     this.vmHolder.matrixWorldNeedsUpdate = true;
     // night vision down (or on its way): the frame goes into a texture for its pass (nvMaterial), the goggles' IR illuminator on
     // in it if it's switched on (js/lightgrid.ts: from before the scope's picture is drawn, which is seen through them too)
