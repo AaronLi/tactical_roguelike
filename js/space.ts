@@ -1762,13 +1762,17 @@ export const Space = (() => {
     return false;
   }
   // keycards on the floor (they're picked up by walking over them)
+  let cardGeo: THREE.BoxGeometry | null = null; const cardMat: Record<string, THREE.Material> = {};
   function cards() {
     for (const o of S.cardObjs) o.parent && o.parent.remove(o);
     S.cardObjs = [];
     if (!S.state || !S.on || S.kind !== 'board') return;
     for (const [key, x, z, y] of S.state.cards as [string, number, number, number][]) {
-      const c = new T.Mesh(new T.BoxGeometry(0.3, 0.02, 0.2), ShipModel.lit(key === 'bridge' ? 0x40a0ff : 0xffb020)); c.position.set(x, (y || 0) + 0.25, z);
-      const l = new T.PointLight(key === 'bridge' ? 0x40a0ff : 0xffb020, 1.2, 3.5, 1.5); c.add(l);
+      // (no light of its own: one more point light than the ship's padded count, PAD_POINTS, has every lit shader in view made again
+      // in that frame, a stop of seconds on some machines; the card glows by its own unlit material. One box and one material per
+      // kind, shared: this runs on every mission-state message)
+      const geo = cardGeo || (cardGeo = new T.BoxGeometry(0.3, 0.02, 0.2)), mat = cardMat[key] || (cardMat[key] = ShipModel.lit(key === 'bridge' ? 0x40a0ff : 0xffb020));
+      const c = new T.Mesh(geo, mat); c.position.set(x, (y || 0) + 0.25, z);
       G_R.levelRoot.add(c); S.cardObjs.push(c);
     }
     for (const q of S.things) if (q.k === 'art') { q.obj.visible = S.state.art === 0; if (S.state.artAt) q.obj.position.set(S.state.artAt[0], 0, S.state.artAt[1]); }
