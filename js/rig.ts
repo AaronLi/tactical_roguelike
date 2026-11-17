@@ -57,6 +57,27 @@ export const Rig = (() => {
     for (const n of _frOrder) n.updateWorldMatrix(false, false);
   }
   const atW = (o: THREE.Object3D, x: number, y: number, z: number) => new T.Vector3(x, y, z).applyMatrix4(o.matrixWorld);
+  // A body's skinned pieces (skin, hair, clothes, each piece of armour: some twenty) are culled together, by a sphere round the body:
+  // CULL_R (times the body's scale) about the hips, as they are after the frame's pose, put on every piece each frame in its own
+  // space (its parent's: the body, or the head). three tests it against each camera that draws them, the shadows' too, so a body
+  // out of sight is drawn by none of them, and one whose shadow falls in sight still casts it. Standing, crouched, prone, on a
+  // ladder, limp: nothing of a body is further than about a metre from its hips. (Before, never culled: every body every frame.)
+  const CULL_R = 1.6, _cw = new T.Vector3(), _cl = new T.Vector3(), _ci = new T.Matrix4();
+  function cullSphere(rig: Rig) {
+    const h = rig.hips || rig.root;
+    if (!h) return;
+    _cw.setFromMatrixPosition(h.matrixWorld);
+    for (const par of [rig.body, rig.head]) {
+      if (!par) continue;
+      _cl.copy(_cw).applyMatrix4(_ci.copy(par.matrixWorld).invert());
+      const r = (CULL_R * rig.scale) / (par.matrixWorld.getMaxScaleOnAxis() || 1);
+      for (const m of par.children as THREE.Mesh[]) {
+        if (!(m as THREE.SkinnedMesh).isSkinnedMesh || !m.userData.shared) continue;
+        const sm = m as THREE.SkinnedMesh, sp = sm.boundingSphere || (sm.boundingSphere = new T.Sphere());
+        sp.center.copy(_cl); sp.radius = r;
+      }
+    }
+  }
   // Two-bone IK: place upper/lower so the end reaches `target`, bending toward `pole`.
   // (an arm's wrist goes straight with it: whatever turned the hand to something it held, gripHand, does so again after. An arm's
   // bones are turned so their x is the elbow's hinge the way a body's arm has it at rest, its inside to -z: an elbow bends the other way
@@ -330,7 +351,7 @@ export const Rig = (() => {
       let sk = skels.get(p.inv);
       if (!sk) { sk = new T.Skeleton(p.bones.map((n: string, i: number) => boneOf(n, p.inv[i])), p.inv); skels.set(p.inv, sk); }
       const sm = new T.SkinnedMesh(p.geo, mat);
-      sm.userData.shared = true; sm.frustumCulled = false; // (its geometry is every such body's; where it's drawn is the joints' affair, not its own place's)
+      sm.userData.shared = true; // (its geometry is every such body's: where it's drawn is the joints' affair, not its own place's. Culled by a sphere round the body, cullSphere)
       sm.bind(sk, ID4);
       return sm;
     };
@@ -770,7 +791,7 @@ export const Rig = (() => {
     rig.setGun = (code: any, skin: any) => setGun(rig, code, skin); // (skin: its stickers, js/stickers.ts)
     rig.setShield = (id: string | null) => setShield(rig, id);
     rig.dropShield = () => dropShield(rig);
-    rig.update = (dt: number, p: any) => update(rig, dt, p);
+    rig.update = (dt: number, p: any) => { update(rig, dt, p); cullSphere(rig); };
     rig.hitboxes = () => hitboxes(rig);
     // a shot: the animation's kick, and on a powered body the gun's muzzle rise (deg, from the host's kickOf)
     // and a shove back through the arms and shoulders along the bore
