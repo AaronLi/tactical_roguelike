@@ -925,11 +925,17 @@ export const Space = (() => {
     H.cam.updateMatrixWorld(); r.setRenderTarget(feedRT); r.clear(); r.render(G_R.scene, H.cam); r.setRenderTarget(null);
     r.shadowMap.autoUpdate = au;
   }
+  // her inner door's sound, from the middle of it: the heavy sliding door's (js/audio.ts slideDoor), as long as it takes on its rails (1.3 s)
+  function hatchSound(open: boolean) {
+    const m = S.model; if (!m || !S.hatch) return;
+    const L = SD.layout(S.def), p = m.group.localToWorld(new THREE.Vector3(0, (L.FB + L.CB) / 2, L.zc + SD.HATCH_Z));
+    Audio.slideDoor(p, open, true, 1.3);
+  }
   // the button pressed: open for everyone (the host says so to all: 'shatch'), open here straight away
   function openHatch() {
     if (!hatchShut()) return;
     Net.toHost({ t: 'shatch' });
-    S.hatchOpen = true; syncSolids(); Audio.click();
+    S.hatchOpen = true; syncSolids(); Audio.click(); hatchSound(true);
   }
 
   // ------------------------------------------------------------------ what's outside, moved by the inverse of her pose
@@ -1471,7 +1477,7 @@ export const Space = (() => {
   }
   // she's against it (or off it) on this screen
   function dockLocal(on: boolean) {
-    if (on && S.kind === 'board') S.hatchOpen = false; // (a breach shuts her inner door: js/spaceserver.ts dock does too)
+    if (on && S.kind === 'board') { if (S.hatchOpen) hatchSound(false); S.hatchOpen = false; } // (a breach shuts her inner door: js/spaceserver.ts dock does too)
     S.brLock = null; S.brRound = null;
     S.docked = on;
     if (on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); S.V.set(0, 0, 0); S.net = null; unhide(); }
@@ -1834,7 +1840,7 @@ export const Space = (() => {
       }
       case 'seats': S.seats = m.s || {}; if (m.ctl !== undefined) S.ctl = m.ctl; if (m.no != null && me().seat === m.no) { stand(); HUD.toast('', 'That seat is taken', 1.5); } return true;
       case 'spose': heardPose(m.a); S.ctl = m.by; return true;
-      case 'shatch': if (!S.hatchOpen) { S.hatchOpen = true; syncSolids(); } if (m.by !== Net.myId) HUD.feed(`<b>${U.esc(Game.nameOf(m.by))}</b> opened the breach door`); return true;
+      case 'shatch': if (!S.hatchOpen) { S.hatchOpen = true; syncSolids(); hatchSound(true); } if (m.by !== Net.myId) HUD.feed(`<b>${U.esc(Game.nameOf(m.by))}</b> opened the breach door`); return true;
       case 'sdock':
         if (S.on && m.on && m.site && S.kind === 'board') { if (m.by !== Net.myId) rebase(berthAt(siteAt(m.site))); cutHere(m.site); }
         if (S.on && S.kind === 'board' && S.map && S.map.sp) ShipGen.seal(S.map, m.on ? m.site || null : null); // (the holes she isn't against: shut)

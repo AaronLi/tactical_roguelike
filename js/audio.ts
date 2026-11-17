@@ -440,10 +440,10 @@ export const Audio = {
   // faint ticks of the rollers passing their joints), and stops softly, dead, with no puff or anything after it. A blast
   // door is the same heavier: a third lower, longer, its stop a deeper thump. Placed in the world like the recorded door
   // (route), at the HANDLING trim.
-  slideDoor(pos: { x: number; y: number; z: number }, open: boolean, blast = false) {
+  slideDoor(pos: { x: number; y: number; z: number }, open: boolean, blast = false, runFor?: number) { // (runFor: how long the door takes, s, where it is not the usual)
     const c = this.ctx; if (!c) return;
     const cam = AudioEnv.R && AudioEnv.R.camera, d = cam ? cam.position.distanceTo(pos as THREE.Vector3) : 0;
-    const t = c.currentTime + 0.02, k = blast ? 0.65 : 1, run = (blast ? 0.95 : 0.5) * (open ? 1 : 0.9), j = 0.96 + Math.random() * 0.08;
+    const t = c.currentTime + 0.02, k = blast ? 0.65 : 1, run = runFor != null ? runFor : (blast ? 0.95 : 0.5) * (open ? 1 : 0.9), j = 0.96 + Math.random() * 0.08;
     const out = c.createGain(); out.gain.value = 1;
     const env = (g: GainNode, t0: number, a: number, hold: number, dec: number, peak: number) => { g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(peak, t0 + a); g.gain.setValueAtTime(peak, t0 + a + hold); g.gain.exponentialRampToValueAtTime(0.0008, t0 + a + hold + dec); };
     const burst = (t0: number, dur: number, type: BiquadFilterType, f0: number, f1: number, q: number, peak: number, a = 0.005) => {
