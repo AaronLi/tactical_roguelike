@@ -31,6 +31,8 @@ if (!vm.SourceTextModule) {
   const r = spawnSync(process.execPath, ['--experimental-vm-modules', '--no-warnings', ...process.execArgv, ...process.argv.slice(1)], { stdio: 'inherit', env: { ...process.env, BP_VM_MODULES_REEXEC: '1' } });
   process.exit(r.status ?? 1);
 }
+// The re-started tool has the flag: its marker goes, so a node it starts (tools/bake_models.mjs runs tools/bake_props.mjs) can re-start itself in turn
+delete process.env.BP_VM_MODULES_REEXEC;
 
 const caches = new WeakMap(); // context -> Map(absolute path -> module)
 const isModule = (src) => /^\s*(import\s*[\w{*'"]|export\s)/m.test(src);
