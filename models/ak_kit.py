@@ -552,10 +552,10 @@ def magazine():
                         18, (x * mm, 0, z * mm)), 'mag', 'brass', pm); smooth(c)
         b = K.obj(lathe([((h + cs) * mm, 0.0004), ((h + cs) * mm, bl * mm), ((h + cs + (oal - cs) * 0.3) * mm, bl * mm), ((h + cs + (oal - cs) * 0.75) * mm, bl * 0.62 * mm),
                          ((h + oal) * mm, bl * 0.15 * mm), ((h + oal) * mm, 0.0004)], 14, (x * mm, 0, z * mm)), 'mag', 'brass', pm); smooth(b)
-        if chk: c['chk'] = {'role': 'top', 'i': 0}; b['chk'] = {'role': 'top', 'i': 1}
+        if chk: k = 2 if chk == 'second' else 0; c['chk'] = {'role': 'top', 'i': k}; b['chk'] = {'role': 'top', 'i': k + 1}  # (the second round: i 2, 3, shown from 2 rounds up)
     r = mk['rim']
     rnd(r * 0.55, Y0 + 0.9 - r, True)
-    rnd(-r * 0.55, Y0 + 0.9 - r - 2 * r * 0.83, False)
+    rnd(-r * 0.55, Y0 + 0.9 - r - 2 * r * 0.83, 'second')
     return mk
 
 # ----------------------------------------------------------------------------------------------------- CHARGING HANDLE (part_handle)

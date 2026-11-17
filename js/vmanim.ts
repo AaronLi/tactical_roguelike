@@ -1006,6 +1006,12 @@ export const VMAnim = (() => {
     chk.top[0].visible = n > 0; chk.top[1].visible = n > 0 && !shot;
     chk.top[0].material = shot ? shellMat(top) : M.brass();
     chk.top[1].material = tipMat(top);
+    // the round under it, staggered to the other side (the authored magazines model the top two: i 2 its case, i 3 its tip), from two rounds up
+    if (chk.top[2]) {
+      const sec = tube.length >= 2 ? tube[tube.length - 2] : w.ammo;
+      chk.top[2].visible = n > 1; chk.top[2].material = shot ? shellMat(sec) : M.brass();
+      if (chk.top[3]) { chk.top[3].visible = n > 1 && !shot; chk.top[3].material = tipMat(sec); }
+    }
     // each hole stamped with the count it stands for (brass in it: at least that many rounds)
     if (chk.labCap !== cap) {
       chk.labCap = cap;

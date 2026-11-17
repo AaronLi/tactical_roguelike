@@ -21,7 +21,7 @@ import { GunModels } from './gunmodels.js';
 // the top round, witness holes stamped with a count, or the rounds themselves through a clear body. A model says which
 // of its meshes are those as DATA (docs/models.md "Magazine check"):
 //   part_mag.extras.check = { w }                           w: the magazine's width, m (how wide a count label is)
-//   <mesh>.extras.chk = { role, i, t? }                     role 'top': i 0 the top round's case, i 1 its tip
+//   <mesh>.extras.chk = { role, i, t? }                     role 'top': i 0 the top round's case, i 1 its tip (i 2, 3: the round under it)
 //                                                           role 'hole': a witness hole: i its order from the top, t 0 at the top .. 1 the bottom (how far down the stack it reads),
 //                                                           side 1: on the back face (toward the shooter; the front has none); the mesh node's rotation is the face's tilt there
 //                                                           role 'round': the i-th drawn round, t how far down; role 'tip': the tip of round i

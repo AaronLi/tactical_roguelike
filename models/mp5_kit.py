@@ -444,9 +444,9 @@ def magazine(parent_slot='mag'):
                          (h + 19.15 * mm, 0.5 * mm)], 18, (x, 0, z)), 'mag', 'brass', pm); smooth(c)
         b = K.obj(lathe([(h + 19.15 * mm, 0.5 * mm), (h + 19.15 * mm, 4.5 * mm), (h + 23.5 * mm, 4.5 * mm), (h + 27.5 * mm, 3.0 * mm), (h + 29.7 * mm, 1.0 * mm), (h + 29.7 * mm, 0.4 * mm)],
                         16, (x, 0, z)), 'mag', 'brass', pm); smooth(b)
-        if chk: c['chk'] = {'role': 'top', 'i': 0}; b['chk'] = {'role': 'top', 'i': 1}
+        if chk: k = 2 if chk == 'second' else 0; c['chk'] = {'role': 'top', 'i': k}; b['chk'] = {'role': 'top', 'i': k + 1}  # (the second round: i 2, 3, shown from 2 rounds up)
     rnd(2.6 * mm, MAG_Y - 3.5 * mm, True)
-    rnd(-2.6 * mm, MAG_Y - 11.5 * mm, False)
+    rnd(-2.6 * mm, MAG_Y - 11.5 * mm, 'second')
     return pm
 
 # ===================================================================================== CLAW MOUNT (the gun's optic mount: slot optic, extras.mount)

@@ -572,9 +572,9 @@ def mag_stanag(top):
         b = K.obj(lathe([(h + 44.7 * mm, 0.0005), (h + 44.7 * mm, 2.85 * mm), (h + 49 * mm, 2.85 * mm), (h + 54 * mm, 1.9 * mm), (h + 57.4 * mm, 0.4 * mm),
                          (h + 57.4 * mm, 0.0005)], 14, (x, 0, z)), 'mag', 'brass', pm)
         smooth(b)
-        if chk: c['chk'] = {'role': 'top', 'i': 0}; b['chk'] = {'role': 'top', 'i': 1}
+        if chk: k = 2 if chk == 'second' else 0; c['chk'] = {'role': 'top', 'i': k}; b['chk'] = {'role': 'top', 'i': k + 1}  # (the second round: i 2, 3, shown from 2 rounds up)
     rnd(2.5 * mm, top[1] - 2.6 * mm, True)
-    rnd(-2.5 * mm, top[1] - 6.8 * mm, False)
+    rnd(-2.5 * mm, top[1] - 6.8 * mm, 'second')
     return pm
 
 def mag_holes(body, pm, face, n, hw, mat='brass'):
@@ -608,7 +608,7 @@ def round_lathe(h, x, z, case, oal, rim, body, neck, bul, pm, chk):
                      (h + case * 0.8, body * 0.97), (h + case * 0.87, neck), (h + case, neck), (h + case, 0.0005)], 18, (x, 0, z)), 'mag', 'brass', pm); smooth(c)
     b = K.obj(lathe([(h + case, 0.0005), (h + case, bul), (h + case + (oal - case) * 0.3, bul), (h + case + (oal - case) * 0.75, bul * 0.66),
                      (h + oal, bul * 0.15), (h + oal, 0.0005)], 14, (x, 0, z)), 'mag', 'brass', pm); smooth(b)
-    if chk: c['chk'] = {'role': 'top', 'i': 0}; b['chk'] = {'role': 'top', 'i': 1}
+    if chk: k = 2 if chk == 'second' else 0; c['chk'] = {'role': 'top', 'i': k}; b['chk'] = {'role': 'top', 'i': k + 1}  # (the second round: i 2, 3, shown from 2 rounds up)
 
 def mag_762(top):
     """The SR-25's 20-round 7.62 magazine: straight through the well (1 mm clear of its walls), curving a little forward below it, open at
@@ -646,7 +646,7 @@ def mag_762(top):
         bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'mag', 'park', pm)
     h = top[0] + b0 + 1.2 * mm     # (7.62 x 51: the case 51 mm, the round 71 mm; its head against the back wall)
     round_lathe(h, 2.9 * mm, top[1] - 3.2 * mm, 0.051, 0.0705, 6.0 * mm, 5.9 * mm, 4.4 * mm, 3.9 * mm, pm, True)
-    round_lathe(h, -2.9 * mm, top[1] - 8.4 * mm, 0.051, 0.0705, 6.0 * mm, 5.9 * mm, 4.4 * mm, 3.9 * mm, pm, False)
+    round_lathe(h, -2.9 * mm, top[1] - 8.4 * mm, 0.051, 0.0705, 6.0 * mm, 5.9 * mm, 4.4 * mm, 3.9 * mm, pm, 'second')
     return pm
 
 def mag_glock(top, L=0.244, rake=None):
@@ -677,7 +677,7 @@ def mag_glock(top, L=0.244, rake=None):
         bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'mag', 'steel', pm)
     h = hb + 1.6 * mm              # (9 x 19: the case 19.15 mm, the round 29.7 mm; level, its head against the back wall)
     round_lathe(h, 2.4 * mm, top[1] - 2.8 * mm, 0.01915, 0.0297, 4.95 * mm, 4.9 * mm, 4.8 * mm, 4.5 * mm, pm, True)
-    round_lathe(h, -2.4 * mm, top[1] - 7.4 * mm, 0.01915, 0.0297, 4.95 * mm, 4.9 * mm, 4.8 * mm, 4.5 * mm, pm, False)
+    round_lathe(h, -2.4 * mm, top[1] - 7.4 * mm, 0.01915, 0.0297, 4.95 * mm, 4.9 * mm, 4.8 * mm, 4.5 * mm, pm, 'second')
     return pm
 
 
