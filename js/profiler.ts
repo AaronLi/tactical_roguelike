@@ -130,6 +130,7 @@ export const Prof = (() => {
       map: m ? { theme: m.theme && m.theme.name, W: m.W, H: m.H, floors: m.NF || 1, solids: m.world ? m.world.solids.filter(Boolean).length : 0, lights: (m.lights || []).length, props: m.props ? m.props.size : 0, windows: (m.windows || []).length, doors: (m.doors || []).length } : null,
       enemies: Views && Views.enemies ? Views.enemies.size : 0, scene: G_R && G_R.scene ? countObjects(G_R.scene) : 0,
       renderer: info ? { calls: info.render.calls, triangles: info.render.triangles, geometries: info.memory.geometries, textures: info.memory.textures, programs: info.programs ? info.programs.length : 0 } : null,
+      shadersInPlay: G_R ? G_R.shadersInPlay : 0, // (shaders three built during play: each a stop, js/render.ts _shaderGuard)
       heapMB: performance.memory ? r2(performance.memory.usedJSHeapSize / 1048576) : null,
       settings: g.settings || null,
       serverThread: ServerLink ? { mode: ServerLink.mode, lastSecond: ServerLink.prof } : null, // (where the host's simulation runs, and its ticks' time there)

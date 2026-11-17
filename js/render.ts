@@ -1830,7 +1830,9 @@ export const R = {
     kit.vm.position.set(0, 0, -0.6); this.vmHolder.add(kit.vm);
     // everything shown, and nothing culled (the real frames at the end draw all of it, into the shadow maps too)
     const hidden: THREE.Object3D[] = [], culled: THREE.Object3D[] = [];
-    for (const sc of [this.scene, this.vmScene]) sc.traverse((o: THREE.Object3D) => { if (!o.visible) { o.visible = true; hidden.push(o); } if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); } });
+    // (not a light: the scene's lights are left as they'll be in play, the dark ones lightPad hides among them, or every shader would
+    // be built for more lights than play has, and built again in play: the hangar's warm-up had 12 point lights to play's 9)
+    for (const sc of [this.scene, this.vmScene]) sc.traverse((o: THREE.Object3D) => { if (!o.visible && !(o as THREE.Light).isLight) { o.visible = true; hidden.push(o); } if (o.frustumCulled) { o.frustumCulled = false; culled.push(o); } });
     W.undo.push(() => {
       for (const o of hidden) o.visible = false;
       for (const o of culled) o.frustumCulled = true;
@@ -1939,7 +1941,10 @@ export const R = {
     // the real frames: a weapon light's shadow map drawn (nothing culled: every kind of thing that casts), with the
     // outlines' passes and without (the depth shaders are built for the light counts the scene's last pass left)
     const glow = this.hasGlow, s0 = this.spots[0];
-    try { for (const g of [true, false, false]) { s0.shadow.needsUpdate = true; this.hasGlow = g; this.render(); } } catch (e) { console.warn('warmup', e); }
+    // (and one through the menus' blur: the scene drawn into its target with the lights as they really are, which the compiles above
+    // weren't always: the shaders the first Tab or shop would have built)
+    try { for (const g of [true, false, false, false]) { s0.shadow.needsUpdate = true; this.hasGlow = g; this._forceBlur = g === false && this._forceBlur === null; this.render(); if (this._forceBlur) this._forceBlur = false; } } catch (e) { console.warn('warmup', e); }
+    this._forceBlur = null;
     this.hasGlow = glow; s0.shadow.needsUpdate = false;
     this._warmEnd();
     return true;
@@ -2016,7 +2021,7 @@ export const R = {
     }
     // a full-screen menu up (the Tab screen, the shop): the frame drawn at half the render resolution and blurred here, behind it,
     // rather than by the page (a backdrop-filter is done at the screen's own resolution, every frame)
-    const blur = !nv && !fish && ReplayEnv.Game && (ReplayEnv.Game.invOpen || ReplayEnv.Game.shopOpen) && dbs.x >= 16 && dbs.y >= 16;
+    const blur = !nv && !fish && (!!this._forceBlur || (ReplayEnv.Game && (ReplayEnv.Game.invOpen || ReplayEnv.Game.shopOpen))) && dbs.x >= 16 && dbs.y >= 16;
     if (blur) r.setRenderTarget(this._blurTargets(Math.max(1, dbs.x >> 1), Math.max(1, dbs.y >> 1))[0]);
     if (nv) r.setRenderTarget(this.nvRT!);
     r.clear();
@@ -2053,6 +2058,38 @@ export const R = {
     if (blur) this._blurPasses();
     LightGrid.on(false);
     r.info.autoReset = true;
+    this._shaderGuard();
+  },
+  // A shader built in play. Every one should have been built ahead (warmup and preload; the scene's light counts kept the same,
+  // lightPad), and three builds what's missing in the frame that first draws it, a stop of tens to hundreds of ms a shader on
+  // Windows. So, in a level with nothing being warmed and no veil up: each new one logged with what it was built for (its kind,
+  // the start of three's key for it, the scene's light counts then) and counted (shadersInPlay: js/profiler.ts context).
+  shadersInPlay: 0, shaderLog: [] as string[], _forceBlur: null as boolean | null, // (the warm-up's one frame through the blur: warmStep)
+  _sg: { n: 0, map: null as unknown },
+  _shaderGuard() {
+    const ps = (this.renderer.info.programs || []) as any[], Gm = ReplayEnv.Game, S = this._sg;
+    const veil = typeof document !== 'undefined' && document.getElementById('veil');
+    const quiet = !Gm || Gm.phase !== 'level' || this._warm || (veil && veil.classList.contains('on')) || Gm.map !== S.map;
+    if (Gm && Gm.map !== S.map) S.map = Gm.map;
+    if (!quiet && ps.length > S.n) {
+      const L = { point: 0, spot: 0, dir: 0, shadows: 0 };
+      this.scene.traverseVisible((o: any) => { if (o.isPointLight) L.point++; else if (o.isSpotLight) L.spot++; else if (o.isDirectionalLight) L.dir++; if (o.isLight && o.castShadow) L.shadows++; });
+      for (const p of ps.slice(S.n)) {
+        this.shadersInPlay++;
+        const line = `${p.name || '?'} | ${String(p.cacheKey).slice(0, 160)} | lights ${L.point} point, ${L.spot} spot, ${L.dir} dir, ${L.shadows} shadowed`;
+        console.warn(`[shaders] built in play (${this.shadersInPlay}): ` + line); if (this.shaderLog.length < 200) this.shaderLog.push(line);
+      }
+    }
+    // Whatever was built this frame for the screen, built now for a target too (the menus' blur, a scope's picture, night vision:
+    // one shader for any target): something added after the warm-up (the hangar's displays, a gun picked up) would otherwise be
+    // built again the first time it's drawn into one, a second stop. Only on a frame that built something, and not while warming
+    // (the warm-up builds both itself); compile passes over what's built already for next to nothing.
+    if (ps.length > S.n && !this._warm && this._preRT) {
+      const r = this.renderer;
+      try { r.setRenderTarget(this._preRT); r.compile(this.scene, this.camera); } catch (e) { console.warn('target compile', e); }
+      r.setRenderTarget(null);
+    }
+    S.n = (this.renderer.info.programs || []).length;
   },
   // ---- the menus' blur: the frame (half size) blurred across into a second target, then down onto the screen
   _blur: null as null | { a: THREE.WebGLRenderTarget; b: THREE.WebGLRenderTarget; mat: THREE.ShaderMaterial; scene: THREE.Scene; cam: THREE.OrthographicCamera },
