@@ -50,7 +50,7 @@ export const VMAnim = (() => {
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
   // the arms and props of a viewmodel (its userData.vma)
-  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number; out?: { p: V3; q: THREE.Quaternion; v: V3 } } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion; magOut?: boolean; magDrop?: boolean }
+  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number; wp?: V3; fq?: THREE.Quaternion; lq?: THREE.Quaternion; v0?: V3; out?: { p: V3; q: THREE.Quaternion; v: V3 } } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion; magOut?: boolean; magDrop?: boolean }
   type MagChk = GunRigMagChk;
   const S = (a: number, b: number, t: number) => U.smooth(a, b, t);
   const lerpV = (a: V3, b: V3, k: number) => a.clone().lerp(b, k);
@@ -837,23 +837,30 @@ export const VMAnim = (() => {
           an.mag.position.copy(A.magHome).sub(A.WB).applyQuaternion(rel).add(pose!.L!);
         }
         else if (mg.mode === 'drop') {
-          if (!a.drop || a.drop.idx !== idx || a.drop.at !== mg.at) a.drop = { idx, at: mg.at, from: an.mag.position.clone(), t0: performance.now() };
-          const tt = (performance.now() - a.drop.t0) / 1000;
-          an.mag.position.copy(a.drop.from); an.mag.position.y -= 0.5 * 9.8 * tt * tt; an.mag.position.z += DROP_DRIFT * tt;
-          // the gun's own magazine falls out of the well, then (once it's below the view) it's the one in the world (js/casings.ts dropMag, held back
-          // till now): where it is, turned as the gun is, and how fast it's going, for that one to carry on from. One magazine, not two.
-          // (handed over once it's fallen out of sight below the view, so the change from one to the other isn't seen; no sooner than
-          // DROP_MIN, no later than DROP_MAX)
-          if (idx === 0 && !a.drop.out && tt >= DROP_MIN) {
-            const wp = h.holder.localToWorld(an.mag.position.clone());
+          // Let go: from its place in the gun as the drop starts, it falls in the world, straight down under gravity, with the shooter's
+          // own speed and a little drift out of the well (DROP_DRIFT, along the gun), turned as it was; drawn each frame back in the gun's
+          // frame (the gun goes on moving through the reload; it doesn't take the magazine with it).
+          const par = an.mag.parent!;
+          par.updateWorldMatrix(true, false);
+          const pq = par.getWorldQuaternion(new T.Quaternion());
+          if (!a.drop || a.drop.idx !== idx || a.drop.at !== mg.at) {
+            const pv = (pl as unknown as { vel?: V3 }).vel;
+            a.drop = { idx, at: mg.at, from: an.mag.position.clone(), t0: performance.now(), wp: par.localToWorld(an.mag.position.clone()), fq: pq.clone(), lq: an.mag.quaternion.clone(),
+              v0: new T.Vector3(0, 0, DROP_DRIFT).applyQuaternion(pq).add(pv ? new T.Vector3(pv.x, 0, pv.z) : new T.Vector3()) };
+          }
+          const D = a.drop, tt = (performance.now() - D.t0) / 1000;
+          const wp = D.wp!.clone().addScaledVector(D.v0!, tt); wp.y -= 0.5 * 9.8 * tt * tt;
+          an.mag.position.copy(par.worldToLocal(wp.clone()));
+          an.mag.quaternion.copy(pq.invert().multiply(D.fq!).multiply(D.lq!));
+          // then (once it's fallen out of sight below the view, so the change isn't seen; no sooner than DROP_MIN, no later than DROP_MAX)
+          // it's the one in the world (js/casings.ts dropMag, held back till now), carrying on from where it is, turned as the gun was as
+          // it let go (the frame the world's is drawn in), at its speed. One magazine, not two.
+          if (idx === 0 && !D.out && tt >= DROP_MIN) {
             let cam: THREE.Object3D | null = h.holder; while (cam && cam.userData.tanV == null) cam = cam.parent;
             const c = cam ? cam.worldToLocal(wp.clone()) : null, gone = !!c && c.z < 0 && c.y + DROP_TOP < -cam!.userData.tanV * -c.z;
-            if (gone || tt >= DROP_MAX) {
-              const q = h.holder.getWorldQuaternion(new T.Quaternion());
-              a.drop.out = { p: wp, q, v: new T.Vector3(0, -9.8 * tt, DROP_DRIFT).applyQuaternion(q) };
-            }
+            if (gone || tt >= DROP_MAX) D.out = { p: wp, q: D.fq!.clone(), v: D.v0!.clone().setY(D.v0!.y - 9.8 * tt) };
           }
-          an.mag.visible = idx === 0 ? !a.drop.out : tt < 0.5;
+          an.mag.visible = idx === 0 ? !D.out : tt < 0.5;
         }
         if (mg.mode !== 'drop' && a.drop && a.drop.idx === idx) a.drop = null;
       }

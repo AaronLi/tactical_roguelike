@@ -353,7 +353,7 @@ export const Casings = (() => {
         if (c.rest) continue;
         if (c.wait) { // (the view's falling magazine handing over: js/vmanim.ts, once it's out of sight below the view)
           const vma = R.vm && R.vm.userData.vma, out = vma && vma.drop && vma.drop.out;
-          if (out) { c.p.copy(out.p); c.q.copy(out.q); c.v.copy(out.v); if (Me.vel) { c.v.x += Me.vel.x; c.v.z += Me.vel.z; } c.w.multiplyScalar(0.4); }
+          if (out) { c.p.copy(out.p); c.q.copy(out.q); c.v.copy(out.v); c.w.multiplyScalar(0.4); } // (its speed has the shooter's in it: vmanim)
           else if (performance.now() - c.wait < WAIT_MAX) continue;
           c.wait = 0; c.mesh!.visible = true; draw(c);
         }
