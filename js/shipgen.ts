@@ -9,7 +9,7 @@ interface ShSeg { x: number; w: number; d: number[]; split: boolean[]; stair: bo
 // 1 starboard, 0 right across her, spine and all), and inside it, from its own corner: the flights up to its gallery
 // ([i, j]: three tiles climbing aft from i, along row j), the columns under the gallery's edge and the frames standing on its
 // floor ([i, j] each)
-interface ShHall { kind: ShHallKind; x: number; w: number; side: number; hh: number; stairs: number[][]; pillars: number[][]; frames: number[][] }
+interface ShHall { kind: ShHallKind; x: number; w: number; side: number; hh: number; stairs: number[][]; pillars: number[][]; frames: number[][]; mz?: number } // (mz: a liner's court, where its mezzanine begins: tiles from the hall's forward end)
 interface ShWing { dO: number; dI: number; ew: number; len: number }
 interface ShSk { wing?: ShWing; decks: number; halls: ShHall[]; size: SpSize; len: number; sw: number; dmax: number; W: number; H: number; zc: number; segs: ShSeg[] }
 export const ShipGen = (() => {
@@ -43,19 +43,20 @@ export const ShipGen = (() => {
   //   bay:   a hangar bay right across her amidships, the spine running into it at each end and over it as a bridge of grating
   //   grove: an arboretum down her port side amidships
   //   works: a machinery hall to starboard aft, next the engine room, and a second, smaller, to port forward
-  //   mall:  a cruise liner's promenade court, right across her well forward (she takes the liner's theme with it, js/level.ts:
-  //          walnut slats and stone, charcoal carpet, dark ceilings with slots of light, a low warm light). Pale marble underfoot,
-  //          slim columns of black stone with brass inlays in place of lengths of bulkhead (js/furniture.ts gcolumn), pendants of
-  //          rings of light, glass balustrades round its gallery (not steel rails), the spine over it a deck (not a grating) that
-  //          ends at the head of a grand stair: the spine's own width, up the middle of the court's after end. A fountain in the
-  //          middle, a brass sculpture forward of it; display cases, screens of walnut slats, a cafe's tables, a lounge's sofas,
-  //          palms in planters about it. No frames on its floor.
+  //   mall:  a cruise liner's promenade court, right across her forward of amidships and longer than the others (she takes the liner's
+  //          theme with it, js/level.ts: walnut slats and stone, charcoal carpet, dark ceilings with slots of light, a low warm light).
+  //          No gallery round it: a mezzanine across its after third, the rest open to the roof wall to wall; the spine carried over
+  //          the open part to the mezzanine as a bridge, a pair of grand flights up to the mezzanine's edge either side of it. Pale
+  //          marble underfoot, slim columns of black stone with brass inlays in place of lengths of bulkhead (js/furniture.ts
+  //          gcolumn), pendants of rings of light, glass balustrades. A fountain in the middle of the open part, a brass sculpture
+  //          forward of it; boutique islands, display cases, screens of walnut slats, a cafe's tables, a lounge's sofas, palms in
+  //          planters about it. No frames on its floor.
   // stairs: where her ordinary stairwells are along her (of her spine's length), clear of the halls.
   const HALLS: Record<ShHallKind, { stairs: number[]; at: [number, number, number, number][] }> = { // at: [side, where along her, least and most tiles long]
     bay: { stairs: [0.08, 0.84], at: [[0, 0.48, 11, 16]] },
     grove: { stairs: [0.08, 0.84], at: [[-1, 0.5, 13, 19]] },
     works: { stairs: [0.5], at: [[1, 0.8, 10, 15], [-1, 0.2, 8, 12]] },
-    mall: { stairs: [0.64, 0.86], at: [[0, 0.27, 11, 16]] },
+    mall: { stairs: [0.74, 0.88], at: [[0, 0.32, 17, 22]] },
   };
   function halls(r: LvRng, sk: ShSk, kind: ShHallKind) {
     const U = G_U, segs = sk.segs, n = segs.length, dmax = sk.dmax;
@@ -77,7 +78,10 @@ export const ShipGen = (() => {
       for (let i = a; i <= b; i++) { const sg = segs[i]; sg.hall = sg.hall || [false, false]; for (const k of ks) { sg.hall[k] = true; sg.d[k] = dmax; sg.split[k] = false; } }
       // the flights: along the hull's side, climbing aft, from two tiles in; right across her, a second up her other side from its after end
       // (a liner's court: its second is a grand stair, the spine's own width, up the middle of its after end to the upper deck's spine: [i, j, rows])
-      const jH = side > 0 ? hh - 1 : 0, stairs = [[2, jH]]; if (side === 0) stairs.push(kind === 'mall' ? [w - 5, dmax + 1, sk.sw] : [w - 6, hh - 1]);
+      // A liner's court has no gallery round it: a mezzanine across its after third (from mz), the spine carried over the open part to it as
+      // a bridge, and a pair of grand flights up to the mezzanine's edge, two tiles wide each, one either side of the bridge: [i, j, rows]
+      const mz = kind === 'mall' ? w - Math.max(5, Math.round(w / 3)) : undefined;
+      const jH = side > 0 ? hh - 1 : 0, stairs = mz != null ? [[mz - 3, dmax - 1, 2], [mz - 3, dmax + 1 + sk.sw, 2]] : [[2, jH]]; if (side === 0 && mz == null) stairs.push([w - 6, hh - 1]);
       // columns under the gallery's edge: its corners, and about every four tiles down its long sides
       const pillars: number[][] = [], np = Math.max(1, Math.round((w - 3) / 4));
       for (let q = 0; q <= np; q++) { const i = 1 + Math.round(q * (w - 3) / np); pillars.push([i, 1], [i, hh - 2]); }
@@ -96,7 +100,7 @@ export const ShipGen = (() => {
           frame(i + U.ri(r, 0, 1), U.ri(r, js + sk.sw + 1, hi - (across ? 0 : len - 1)), across ? 1 : 0, across ? 0 : 1, len);
         }
       } else for (let i = 3 + U.ri(r, 0, 1), q = U.ri(r, 0, 1); i <= w - 3; i += 3, q++) frame(i, q % 2 ? lo : hi - 2, 0, 1, 3); // (across it, from one side then the other: each reaches past its middle, the gallery's tile clear at both ends)
-      sk.halls.push({ kind, x, w, side, hh, stairs, pillars, frames });
+      sk.halls.push({ kind, x, w, side, hh, stairs, pillars, frames, mz });
     }
   }
   const MX = 12, MZ0 = 12, MZB = 12, GAP = 36; // (open space all round a hull, and between two: room for the squad's ship to stand nose-on to either, js/shipgen.ts sites)
@@ -172,8 +176,11 @@ export const ShipGen = (() => {
     // into a long one) through the wall between them.
     for (const h of sk.halls) {
       const x = sx0 + h.x, z = h.side > 0 ? zc + sw + 1 : zc - 1 - sk.dmax, w = h.w, hh = h.hh, rm = carve(x, z, w, hh, f === 0 ? h.kind : 'gallery');
-      if (f === 0) rm.tall = true; else rm.type = 'catwalk';
-      if (f > 0) for (let j = 1; j < hh - 1; j++) for (let i = 1; i < w - 1; i++) {
+      if (f === 0) rm.tall = true; else rm.type = h.mz != null ? 'mezz' : 'catwalk';
+      if (h.mz != null) (rm as any).mz = x + h.mz; // (where its mezzanine begins: the lamps go by it, js/level.ts)
+      // (a liner's court, upper deck: all of it open forward of the mezzanine, wall to wall, but the bridge down the spine's line)
+      if (f > 0 && h.mz != null) { for (let j = 0; j < hh; j++) for (let i = 0; i < h.mz; i++) if (z + j < zc || z + j >= zc + sw) t[(z + j) * W + x + i] = 5; }
+      else if (f > 0) for (let j = 1; j < hh - 1; j++) for (let i = 1; i < w - 1; i++) {
         const k = (z + j) * W + x + i, bridge = h.side === 0 && z + j >= zc && z + j < zc + sw;
         if (bridge) { if (h.kind !== 'mall') c.grate![k] = 1; } else t[k] = 5; // (a liner's court: the spine crosses it on a deck of its own)
       }

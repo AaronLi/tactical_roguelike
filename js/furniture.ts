@@ -793,6 +793,17 @@ export const Furniture = (() => {
     for (const sx of [-0.86, 0.86]) for (const sz of [-0.36, 0.36]) k.box(brass, 0.02, 0.58, 0.02, sx, 1.14, sz);
     for (let i = 0; i < 4; i++) k.ico(k.mat(k.pick([0xb8935a, 0xe8e4da, 0x9fd0e0, 0x1d1e21]), 0.2, 0.7), 0.06 + k.rnd() * 0.04, -0.6 + i * 0.4, 0.96, (k.rnd() - 0.5) * 0.3);
   } };
+  // A boutique's island, four metres square: a counter of black stone round three sides (cover), a tall lit display at its back, slim
+  // brass posts at the corners carrying a dark canopy with a line of light under its edge.
+  R.pavilion = { w: 3.9, d: 3.9, cover: 1, boxes: [[0, -1.5, 3.4, 0.6, 1.1], [-1.4, 0.1, 0.6, 2.6, 1.1], [1.4, 0.1, 0.6, 2.6, 1.1], [0, 1.45, 2.2, 0.5, 2.7]], build(k: Kit) {
+    const stone = k.mat(0x1d1e21, 0.25, 0.1), brass = k.mat(0xb8935a, 0.25, 0.9), glow = k.mat(0xffe2b8, 0.4, 0, { emissive: 0xffd9a8, emissiveIntensity: 0.9 }), wood = k.mat(0x6a4a32, 0.6);
+    k.box(stone, 3.4, 1.05, 0.6, 0, 0.525, -1.5); k.box(stone, 0.6, 1.05, 2.6, -1.4, 0.525, 0.1); k.box(stone, 0.6, 1.05, 2.6, 1.4, 0.525, 0.1);
+    k.box(brass, 3.44, 0.03, 0.64, 0, 1.065, -1.5); k.box(brass, 0.64, 0.03, 2.64, -1.4, 1.065, 0.1); k.box(brass, 0.64, 0.03, 2.64, 1.4, 1.065, 0.1);
+    k.box(wood, 2.2, 2.7, 0.5, 0, 1.35, 1.45); for (let i = 0; i < 3; i++) k.box(glow, 1.9, 0.5, 0.04, 0, 0.75 + i * 0.75, 1.19); // the display: three lit shelves
+    for (const sx of [-1.75, 1.75]) for (const sz of [-1.75, 1.75]) k.box(brass, 0.05, 3.1, 0.05, sx, 1.55, sz);
+    k.box(stone, 3.8, 0.14, 3.8, 0, 3.17, 0); k.box(glow, 3.6, 0.03, 3.6, 0, 3.085, 0);
+    for (let i = 0; i < 6; i++) k.ico(k.mat(k.pick([0xb8935a, 0xe8e4da, 0x9fd0e0, 0xc03a4a]), 0.2, 0.7), 0.07 + k.rnd() * 0.05, -1.2 + i * 0.48, 1.16, -1.5);
+  } };
   // A screen: walnut slats in a thin brass frame, standing free, taller than a door: what divides the court's floor.
   R.slatwall = { w: 1.98, d: 0.3, boxes: [[0, 0, 1.98, 0.16, 2.7]], build(k: Kit) {
     const wood = k.mat(0x6a4a32, 0.6), brass = k.mat(0xb8935a, 0.25, 0.9), stone = k.mat(0x1d1e21, 0.3, 0.1);
@@ -1417,7 +1428,7 @@ export const Furniture = (() => {
     brig: { must: 'sbench', wall: ['sbench', 'lockers'], center: [], small: ['bin'], floor: null, noArt: 1 },
     pods: { floor: null, bare: 1, noArt: 1 }, spine: { floor: null, bare: 1, noArt: 1 },
     // (a cruiser's halls, two decks high: furnished by shipHalls, below; their galleries are catwalks)
-    mall: { floor: 'tile', bare: 1, noArt: 1 }, bay: { floor: null, bare: 1, noArt: 1 }, grove: { floor: null, bare: 1, noArt: 1 }, works: { floor: null, bare: 1, noArt: 1 },
+    mall: { floor: 'tile', bare: 1, noArt: 1 }, mezz: { floor: null, bare: 1, noArt: 1 }, bay: { floor: null, bare: 1, noArt: 1 }, grove: { floor: null, bare: 1, noArt: 1 }, works: { floor: null, bare: 1, noArt: 1 },
   };
   // small pieces give only their boxes; they need a footprint too when they're set against a wall
   for (const rec of Object.values(R)) if (rec.w == null || rec.d == null) {
@@ -1760,7 +1771,7 @@ export const Furniture = (() => {
     //   works: reactor cores in pairs with a panel between, presses and mills in a line, screens of panels, coolant tanks, turbines
     function shipHalls() {
       let cur: Room | null = null; // (the hall being furnished: nothing's put on the tile against its walls)
-      const C = (v: number) => (v + 0.5) * TS, free = (x: number, z: number) => !!cur && x > cur.x && z > cur.z && x < cur.x + cur.w - 1 && z < cur.z + cur.h - 1 && t[z * W + x] === 0 && t[z * W + x + 1] !== 6 && t[z * W + x + 2] !== 6; // (nor on the two tiles at the foot of a flight)
+      const C = (v: number) => (v + 0.5) * TS, free = (x: number, z: number) => !!cur && x > cur.x && z > cur.z && x < cur.x + cur.w - 1 && z < cur.z + cur.h - 1 && t[z * W + x] === 0 && t[z * W + x + 1] !== 6 && t[z * W + x + 2] !== 6 && !(cur.type === 'mezz' && x <= (cur as any).mz); // (nor on the two tiles at the foot of a flight; nor, on a liner's upper deck, on the bridge or the mezzanine's forward edge, where the flights come up)
       // a piece over nx by nz tiles from (x, z): all of them clear, and the first of them blocked without shutting anything off
       const set = (name: string, x: number, z: number, nx: number, nz: number, q: number) => {
         for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (!free(x + i, z + j)) return false;
@@ -1773,7 +1784,7 @@ export const Furniture = (() => {
         return true;
       };
       const BOXES = [0x4a5a66, 0x5d6b4a, 0x7a3f28, 0x2f5a7a, 0x8a8f94, 0x6b5a2e]; // (navy grey, olive, oxide, blue, light grey, ochre)
-      const FILL: Record<string, string> = { bay: 'crates', grove: 'juniper', works: 'turbine', mall: 'vitrine' }; // (cover, as every piece of more than a tile here is)
+      const FILL: Record<string, string> = { bay: 'crates', grove: 'juniper', works: 'turbine', mall: 'vitrine', mezz: 'vitrine' }; // (cover, as every piece of more than a tile here is)
       const small = (name: string, x: number, z: number, ox: number, oz: number) => { if (!free(x, z) || map.props.has(z * W + x)) return false; put(name, x, z, C(x) + ox, C(z) + oz, Math.floor(r() * 4), r()); return true; };
       // (each: what it puts down from the tile (x, z), and whether any of it went down)
       type Plot = (x: number, z: number) => boolean;
@@ -1799,7 +1810,16 @@ export const Furniture = (() => {
         // (a liner's promenade court: a statue forward of its fountain, in the spine's line. Display cases in pairs and in rows; screens
         // of walnut slats, along and across; a hedge between palms; a cafe's tables; a lounge's sofa and armchairs with a palm by them; a
         // sofa against a screen; a bench under a palm; a piano)
+        // (her mezzanine: a lounge and a bar's tables over the court)
+        mezz: { plots: [
+          [3, (x, z) => { const got = any(set('sofa', x, z, 1, 1, 0), set('armchairs', x, z + 1, 1, 1, 2)); if (got) small('urnpalm', x, z, 0.85, 0); return got; }],
+          [3, (x, z) => { const got = any(set('dining', x, z, 1, 1, U.ri(r, 0, 3)), set('dining', x + 1, z + 1, 1, 1, U.ri(r, 0, 3))); if (got) small('urnpalm', x + 1, z, 0, 0); return got; }],
+          [2, (x, z) => any(set('vitrine', x, z, 1, 1, 1), set('vitrine', x, z + 1, 1, 1, 1))],
+          [2, (x, z) => { const got = any(set('slatwall', x, z, 1, 1, 1), set('slatwall', x, z + 1, 1, 1, 1)); if (got) small('urnpalm', x, z, 0.6, -0.7); return got; }],
+          [1, (x, z) => set('piano', x, z, 1, 1, U.ri(r, 0, 3))],
+        ] },
         mall: { mid: 'fountain', plots: [
+          [4, (x, z) => set('pavilion', x, z, 2, 2, U.ri(r, 0, 3))],
           [3, (x, z) => { const got = any(set('vitrine', x, z, 1, 1, 0), set('vitrine', x + 1, z, 1, 1, 0)); if (got) { small('urnpalm', x, z, -0.75, 0.75); small('urnpalm', x + 1, z, 0.75, -0.75); } return got; }],
           [2, (x, z) => any(set('vitrine', x, z, 1, 1, 1), set('vitrine', x, z + 1, 1, 1, 1), set('vitrine', x, z + 2, 1, 1, 1))],
           [4, (x, z) => (r() < 0.5 ? row(['slatwall', 'slatwall', 'slatwall'], 0)(x, z) : any(set('slatwall', x, z, 1, 1, 1), set('slatwall', x, z + 1, 1, 1, 1), set('slatwall', x, z + 2, 1, 1, 1)))],
@@ -1824,20 +1844,29 @@ export const Furniture = (() => {
       const hall = (rm: Room) => {
         const K = KINDS[rm.type], total = K.plots.reduce((a, [n]) => a + n, 0), iw = rm.w - 2, ih = rm.h - 2;
         cur = rm;
-        // (a court's shopfronts: shelving down its end walls, under the gallery, clear of the spine's doors and of the corners)
+        // (a court's shopfronts: display cases and sofas down its end walls, clear of the spine's doors and of the corners)
         if (rm.type === 'mall') for (const [x, dx] of [[rm.x, -1], [rm.x + rm.w - 1, 1]]) for (let z = rm.z + 2; z < rm.z + rm.h - 2; z++) {
           if (t[z * W + x] !== 0 || t[z * W + x + dx] !== 1 || [-2, -1, 0, 1, 2].some((q) => t[(z + q) * W + x + dx] === 3) || r() < 0.3) continue;
           const name = U.pick(r, ['vitrine', 'vitrine', 'sofa', 'slatwall']), rec = R[name];
           if (tryBlock(x, z, rec.cover ? 2 : 4)) put(name, x, z, C(x) + dx * (1 - 0.02 - rec.d / 2), C(z), facing(dx, 0), r(), [[dx, 0]]);
         }
-        if (K.mid) set(K.mid, rm.x + (rm.w >> 1) - 1, rm.z + (rm.h >> 1) - 1, 2, 2, 0);
-        if (rm.type === 'mall') set('gstatue', rm.x + 3, rm.z + (rm.h >> 1) - (r() < 0.5 ? 1 : 0), 1, 1, 1); // (in the spine's line, three tiles in from its forward doors)
-        for (let want = Math.round(iw * ih / (ih <= 4 ? 6 : 8)), a = 0; want > 0 && a < iw * ih * 3; a++) {
+        // (the middle: of the hall, or of a court's open part, forward of its mezzanine, rm.mz. A court's fountain has a bench at each
+        // quarter and palms between them; its sculpture stands in the spine's line, three tiles in from its forward doors)
+        const mx = rm.type === 'mall' && (rm as any).mz ? (rm.x + (rm as any).mz) >> 1 : rm.x + (rm.w >> 1), mzz = rm.z + (rm.h >> 1);
+        if (K.mid && set(K.mid, mx - 1, mzz - 1, 2, 2, 0) && rm.type === 'mall') {
+          for (const [dx, dz, q] of [[-2, 0, 1], [2, 0, 3], [0, -2, 0], [0, 2, 2]]) set('bench', mx - (dx < 0 ? 1 : 0) + dx, mzz - (dz < 0 ? 1 : 0) + dz, 1, 1, q);
+          for (const [dx, dz] of [[-2, -2], [1, -2], [-2, 1], [1, 1]]) small('urnpalm', mx + dx, mzz + dz, dx < 0 ? 0.5 : -0.5, dz < 0 ? 0.5 : -0.5);
+        }
+        if (rm.type === 'mall') set('gstatue', rm.x + 3, mzz - (r() < 0.5 ? 1 : 0), 1, 1, 1);
+        // About one thing to every eight tiles of open floor inside the walls' tile (every six in a hall down one side of her: its
+        // frames take up much of it; every five in a liner's court and on her mezzanine), wherever it falls and fits.
+        let open = 0; for (let z = rm.z + 1; z < rm.z + rm.h - 1; z++) for (let x = rm.x + 1; x < rm.x + rm.w - 1; x++) if (free(x, z)) open++;
+        for (let want = Math.round(open / (rm.type === 'mall' || rm.type === 'mezz' ? 5 : ih <= 4 ? 6 : 8)), a = 0; want > 0 && a < iw * ih * 3; a++) {
           let pick = r() * total, k = 0; while (k < K.plots.length - 1 && (pick -= K.plots[k][0]) >= 0) k++;
           if (K.plots[k][1](rm.x + 1 + Math.floor(r() * iw), rm.z + 1 + Math.floor(r() * ih))) want--;
         }
       };
-      return { bay: hall, grove: hall, works: hall, mall: hall };
+      return { bay: hall, grove: hall, works: hall, mall: hall, mezz: hall };
     }
     const shp = map.theme.layout === 'ship' ? shipHalls() : null;
     const fest = map.theme.layout === 'festival' ? festival() : null, fdy = map.theme.layout === 'foundry' ? foundry() : null, cst = map.theme.layout === 'crest' ? crestPlan() : null;
