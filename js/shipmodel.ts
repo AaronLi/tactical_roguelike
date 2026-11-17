@@ -714,5 +714,5 @@ export const ShipModel = (() => {
     const g = new T.Group(); g.add(m); g.userData.tex = cv.tex; g.userData.mat = m.material;
     return g;
   }
-  return { boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
+  return { PAINT, boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
 })();

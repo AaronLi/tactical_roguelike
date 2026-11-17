@@ -86,7 +86,8 @@ export const SpaceData = (() => {
     for (let i = 0; i < d.jump; i++) { const sd = i % 2 ? 1 : -1, z = L.zr + 1.4 + Math.floor(i / 2) * 0.95; s.push({ k: 'jump', x: sd * (L.hw - 0.4), y: L.FM, z, yaw: sd * Math.PI / 2, f: L.FM, sx: sd * (L.hw - 1.1), sz: z }); }
     return s;
   }
-  // What stops you aboard, as boxes in the ship's frame: [x0, y0, z0, x1, y1, z1, tag]. Tags: 'nose' the breaching door (gone
+  // What stops you aboard, as boxes in the ship's frame: [x0, y0, z0, x1, y1, z1, tag]. Tags: 'hatch' the inner door at the tunnel's far end, just
+  // inside the breaching door (shut by every breach, till it's opened from its button at the head of the stairs: hatchButton), 'nose' the breaching door (gone
   // while it's open), 'ramp' the rear door (the same), 'steps' the steps down off the open ramp (there only while it's open).
   type ShipBox = [number, number, number, number, number, number, string?];
   function boxes(d: SpShipDef): ShipBox[] {
@@ -105,6 +106,7 @@ export const SpaceData = (() => {
       [-lw, FB, zw, lw, FB + 1.0, zw + 0.25],
       [-sw, FB, zk - 0.05, -fw, CB, zk], [0.06, FB, zk - 0.05, sw, FB + 1.0, zk], // (the stairwell's rail on the right; the up flight comes in on the left)
       [-tw, FB, zc - W, tw, CB, zc, 'nose'],
+      [-tw, FB, zc + HATCH_Z, tw, CB, zc + HATCH_Z + 0.08, 'hatch'], // (the inner door, across the tunnel's far end just inside the breaching door)
       // the stairs: their sides and roof, the wall between the two flights
       [-fw - W, 0, zk, -fw, CB, zr], [fw, 0, zk, fw + W, CB, zr], [-fw - W, CB, zk, fw + W, top, zr], [-0.06, 0, zk, 0.06, FB + 0.9, zr],
       // the crew deck: the hold under it, its sides, roof, the bulkhead at its front either side of the stairs (and over them), the ramp
@@ -129,6 +131,13 @@ export const SpaceData = (() => {
       { tag: 'steps', x0: -hw + 0.3, x1: hw - 0.3, zf: z1 + W + 1.52, zh: z1 + W + 1.52 - 5 * 0.38, y0: 0, rise: FM, n: 5 }, // (off the open ramp)
     ];
   }
+  /** The button that opens the inner hatch, in her frame: on the left wall of the up flight near its head (on your left as you come up),
+   * facing across the flight (+x): x the wall's face, y, z */
+  function hatchButton(d: SpShipDef) {
+    const L = layout(d);
+    return { x: -L.fw, y: L.FB + 1.1, z: L.zk + 0.35 };
+  }
+  const HATCH_Z = 0.06; // (the inner door's place along the tunnel: right behind the breaching door)
   /** where she stands against a stretch of a ship's hull (js/shipgen.ts site: its middle, the way out of it), nose-on: her collar in the hole, her breach deck level with that deck.
    * s.ang: she came in that many degrees off square (an angled breach, up to BREACH_ANG): she lies at that angle, her collar's middle at the
    * same place, a crumpled tunnel from it into the hull (js/shipgen.ts tunnel) */
@@ -330,5 +339,5 @@ export const SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
+  return { BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, hatchButton, HATCH_Z, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();

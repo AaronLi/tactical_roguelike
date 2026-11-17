@@ -97,6 +97,7 @@ export const R = {
   nvOver: 0, // (a flashbang's glare through the tubes, 1 a whiteout, fading: flashOver)
   hasGlow: undefined as unknown as boolean,
   pipLive: undefined as unknown as number,
+  feeds: [] as ((r: THREE.WebGLRenderer) => void)[], // (cameras about the level whose pictures are shown on screens in it: each draws into its own target when it wants, before the scope's picture: js/space.ts the breach door's)
   // (made when first needed)
   vm: undefined as THREE.Object3D | null | undefined,
   trails: undefined as Trail[] | undefined,
@@ -2012,6 +2013,7 @@ export const R = {
       this._nvTargets(sz.x, sz.y);
       this.nvRT!.texture.generateMipmaps = false; // (made once, after the last of the frame's drawn into it)
     } else { this.nvFrame = 0; this.nvHeatAt = -1; }
+    for (const f of this.feeds) f(r);
     // the scope picture: only rendered while you're bringing the gun up or looking through it
     const pip = this.vm && this.vm.visible && this.vm.userData.pip, live = this.pipLive || 0;
     if (pip) {

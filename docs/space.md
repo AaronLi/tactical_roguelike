@@ -40,8 +40,11 @@ off: the game is then the route map and the helicopter, as it was. A debug start
 5. **Boarding.** She arrives 1.7 km off. Ram her hull nose-on at 5 m/s or more (no speed is too high), **anywhere there's a clear stretch of it**:
    port, starboard or the stern quarters. Nothing marks a place for it, and nothing inside stops it: the furniture within a
    couple of metres of the hole is destroyed (`js/shipgen.ts` cut; wreckage across the deck, `js/space.ts` wreck). The navigation screen
-   becomes the approach to wherever the nose is pointed: offset, range, closing speed. The hull is cut through there, her
-   breaching door opens, and it's the CQB game from there. Hold G at the helm to undock: the compartment she backs out of
+   becomes the approach to wherever the nose is pointed: offset, range, closing speed. The hull is cut through there and her
+   breaching door opens, but her inner door, at the tunnel's far end just inside it, shuts with every breach: it stays shut,
+   for the whole squad, till someone presses its button on the left wall at the top of the stairs (F; its lamp goes from red
+   to green). A camera on its far side shows what's out there on screens on the cover either side of the tunnel's mouth
+   and beside the button. Then it's the CQB game. Hold G at the helm to undock: the compartment she backs out of
    is open to space. She can go in again somewhere else.
 6. **A planet.** She arrives in orbit. Fly into the descent corridor: cloud covers the change, and she comes out above the
    base. Within 160 m of the pad, under 45 m/s, hold L to set down. To leave, lift off and climb past 1500 m.

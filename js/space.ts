@@ -41,6 +41,7 @@ export const Space = (() => {
     on: false, kind: 'hub' as SpKind, stage: 'space' as 'space' | 'orbit' | 'atmo', map: null as LvMap | null,
     def: SD.SHIPS.kestrel, fleet: SD.fleet0(), seatsDef: [] as SpSeat[], berth: { x: 0, y: 0, z: 0, yaw: 0 } as { x: number; y: number; z: number; yaw: number; pt?: number }, Dp: new T.Vector3(), Dq: new T.Quaternion(),
     model: null as SmShip | null, solids: [] as { s: any; tag?: string; ship?: boolean; on: boolean; b: number[]; fl?: any; yb?: any; ob?: number[] }[], flights: [] as any[], noseT: 0, rampT: 0,
+    hatchOpen: true, hatchT: 1, hatch: null as null | { leaves: THREE.Object3D[]; rail: (sg: number, s: number) => number[]; D: number[]; lamp: THREE.MeshStandardMaterial; tw: number; cam: THREE.PerspectiveCamera; screen: THREE.MeshBasicMaterial; n: number }, // (her inner door: open, how far, its leaves and its button's lamp)
     docked: true, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(),
     roundBrake: false, brRound: null as null | { site: ShSite; face: THREE.Vector3; E: THREE.Vector3; hard: number; map: LvMap; way: THREE.Vector3[]; ra?: THREE.Vector3 },
     brLock: null as null | { site: ShSite; map: LvMap; hard: number; fa?: number; q0?: THREE.Quaternion; T0?: number; rp?: number; ra?: THREE.Vector3 }, // (the breach site the approach is steering her onto: squareUp)
@@ -122,6 +123,7 @@ export const Space = (() => {
     const m = S.model = ShipModel.ship(d, S.fleet);
     m.group.position.copy(S.Dp); m.group.quaternion.copy(S.Dq); G_R.scene.add(m.group);
     S.solids = []; deck();
+    hatchMesh();
     // what's out there
     S.root = new T.Group(); G_R.scene.add(S.root);
     S.stars = ShipModel.stars(7); G_R.scene.add(S.stars);
@@ -133,6 +135,7 @@ export const Space = (() => {
     S.wps = []; S.anchors = []; S.boxes = []; S.floorAt = null; S.hull = null; S.planet = null; S.things = []; S.cardObjs = []; S.term = null;
     const docked = !sp || !sp.ship || !!sp.ship.docked;
     S.docked = docked; S.noseT = 0; S.rampT = docked && kind !== 'board' ? 1 : 0;
+    S.hatchOpen = !(sp && sp.ship && sp.ship.hatch === 0); S.hatchT = S.hatchOpen ? 1 : 0; // (as the host has it: shut by a breach till its button's pressed)
     S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.net = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1;
     S.zone = new T.Group(); S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.match = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = performance.now();
     if (kind === 'hub') setupHub(map, sp); else if (kind === 'board') setupBoard(map); else setupAssault(map);
@@ -820,7 +823,7 @@ export const Space = (() => {
     const w = S.map && S.map.world; if (!w) return;
     const noseOpen = S.docked && S.kind === 'board', rampOpen = S.docked && S.kind !== 'board';
     for (const q of S.solids) {
-      const want = q.tag === 'nose' ? !noseOpen : q.tag === 'ramp' ? !rampOpen : q.tag === 'steps' ? rampOpen : true;
+      const want = q.tag === 'nose' ? !noseOpen : q.tag === 'ramp' ? !rampOpen : q.tag === 'steps' ? rampOpen : q.tag === 'hatch' ? hatchShut() : true;
       if (want && !q.on) { const o = q.fl ? { kind: 'step', stair: q.fl, mat: Materials.SHIP } : { kind: 'prop', mat: Materials.SHIP }; q.s = World.add(w, SD.solidOf(q, o)); q.on = true; if (q.fl) q.fl.steps.push(q.s); }
       else if (!want && q.on) { World.remove(w, q.s); q.on = false; if (q.fl) q.fl.steps = q.fl.steps.filter((s: any) => s !== q.s); }
     }
@@ -833,7 +836,100 @@ export const Space = (() => {
     const m = S.model!, noseOpen = S.docked && S.kind === 'board' ? 1 : 0, rampOpen = S.docked && S.kind !== 'board' && !S.auto ? 1 : 0;
     S.noseT += U.clamp(noseOpen - S.noseT, -dt * 1.6, dt * 1.6); S.rampT += U.clamp(rampOpen - S.rampT, -dt * 0.8, dt * 0.8);
     for (const lf of m.nose) lf.position.x = lf.userData.s * 0.86 * S.noseT;
+    S.hatchT += U.clamp((hatchShut() ? 0 : 1) - S.hatchT, -dt * 0.75, dt * 0.75); // (1.3 s along its rails)
+    if (S.hatch) {
+      const H = S.hatch, e = S.hatchT * S.hatchT * (3 - 2 * S.hatchT);
+      for (const o of H.leaves) { // (each panel along its rails: its edges where they've got to, it between them, turned as they lie)
+        const u = o.userData, d = H.D[u.sg > 0 ? 0 : 1] * e, A = H.rail(u.sg, u.s0 + d), B2 = H.rail(u.sg, u.s1 + d);
+        o.position.set(0, (A[0] + B2[0]) / 2, (A[1] + B2[1]) / 2);
+        const dy = B2[0] - A[0], dz = B2[1] - A[1]; o.rotation.x = u.sg > 0 ? Math.atan2(dz, dy) : Math.atan2(-dz, -dy);
+      }
+      H.lamp.emissive.setHex(hatchShut() ? 0xff2a10 : 0x20ff60); H.lamp.color.copy(H.lamp.emissive);
+    }
     m.ramp.rotation.x = S.rampT * (m.ramp.userData.open || Math.PI / 2 + 0.1); // (down to the ground behind her)
+  }
+
+  // Her inner door: an octagon in two halves that run apart on rails into the roof and the floor, across the tunnel's far end, just inside her breaching door. Every breach shuts it (the host:
+  // js/spaceserver.ts dock), and it stays shut, for everyone, till one of the squad opens it from its button on the left wall
+  // at the head of the stairs (F: openHatch); the button's lamp red while it's shut, green once it's open.
+  const hatchShut = () => S.kind === 'board' && S.docked && !S.hatchOpen;
+  function hatchMesh() {
+    const m = S.model!, L = SD.layout(S.def), tw = L.tw, h = L.CB - L.FB, z = L.zc + SD.HATCH_Z + 0.04;
+    const dark = ShipModel.M(0x1a1c20, { metalness: 0.5 });
+    // an octagon across the tunnel (its corners cut off, as her collar's are), in her own colour, split across the middle into two
+    // halves of two panels each, linked as a sectional door's are. Each half runs on rails (rail): straight up from the middle to the
+    // roof (the lower half: down to the floor), round a tight bend, and on back over the tunnel flat inside the roof (or the floor), so
+    // to open, the panels slide apart along them, each turning flat as it goes round the bend and on into the roof or the floor out of
+    // sight. A wide octagon boss on the middle rides on the lower half. The cut-off corners are fixed gussets.
+    const accent = ShipModel.M((ShipModel.PAINT[S.def.id] || ShipModel.PAINT.kestrel)[2], { emissive: 0x1a0c02, metalness: 0.35, roughness: 0.55 });
+    const yc = L.FB + h / 2, q = h / 4, c = 0.3, b = 0.25, T0 = 0.045, R = 0.12;
+    // the rails, in her frame: where along them (s, metres from the middle) is [y, z]. Up (sg 1): straight to 2 cm under the roof, a
+    // bend of radius R, then flat 10 cm into the roof; down (-1): straight to the floor, the bend, flat 12 cm into it (room for the boss)
+    const V = [h / 2 - 0.02, h / 2], AR = Math.PI / 2 * R;
+    const rail = (sg: number, s: number) => {
+      const L1 = V[sg > 0 ? 0 : 1], y1 = yc + sg * L1;
+      if (s <= L1) return [yc + sg * s, z];
+      if (s <= L1 + AR) { const t = (s - L1) / R; return [y1 + sg * R * Math.sin(t), z + R - R * Math.cos(t)]; }
+      return [y1 + sg * R, z + R + (s - L1 - AR)];
+    };
+    const D = [V[0] + AR + 0.03, V[1] + AR + 0.03]; // (how far each half's panels go: the one by the middle all the way round the bend)
+    const ext = (pts: number[][], d: number, mat: THREE.Material) => { const g = new T.ExtrudeGeometry(new T.Shape(pts.map(([x, y]) => new T.Vector2(x, y))), { depth: d, bevelEnabled: false }); g.translate(0, 0, -d / 2); const o = new T.Mesh(g, mat); o.castShadow = o.receiveShadow = true; return o; };
+    const leaves: THREE.Object3D[] = [];
+    for (const sg of [1, -1]) { // (1: the upper half; -1: the lower)
+      const Y = (y: number) => sg * y;
+      // each panel drawn about its own middle, as it stands shut; s0, s1: where its edges are along the rail, shut
+      const panel = (pts: number[][], mid: number, s0: number) => { const o = ext(pts.map(([x, y]) => [x, y - mid]), T0, accent); o.userData = { kind: 'panel', sg, s0, s1: s0 + q }; m.group.add(o); leaves.push(o); return o; };
+      const outer = panel([[-tw, Y(q)], [tw, Y(q)], [tw, Y(2 * q - c)], [tw - c, Y(2 * q)], [-tw + c, Y(2 * q)], [-tw, Y(2 * q - c)]], Y(1.5 * q), q);
+      const lo = new T.Mesh(new T.BoxGeometry(2 * tw, 0.035, T0 + 0.006), dark); lo.position.set(0, Y(-q / 2 + 0.0175), 0); outer.add(lo); // (a dark lip along its edge toward the middle)
+      const inner = panel([[-tw, 0], [tw, 0], [tw, Y(q)], [-tw, Y(q)]], Y(0.5 * q), 0);
+      const li = new T.Mesh(new T.BoxGeometry(2 * tw, 0.035, T0 + 0.006), dark); li.position.set(0, Y(-q / 2 + 0.0175), 0); inner.add(li);
+      if (sg < 0) { // the boss: a wide octagon over the middle, dark, an orange one inset on it, on your side
+        const o8 = (w: number, hh: number, k: number) => [[-w + k, -hh], [w - k, -hh], [w, -hh + k], [w, hh - k], [w - k, hh], [-w + k, hh], [-w, hh - k], [-w, -hh + k]];
+        const bo = ext(o8(0.6, b, 0.14), 0.04, dark); bo.position.set(0, q / 2, T0 / 2 + 0.02); inner.add(bo);
+        const bi = ext(o8(0.5, b - 0.08, 0.1), 0.02, accent); bi.position.set(0, q / 2, T0 / 2 + 0.05); inner.add(bi);
+      }
+    }
+    for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { // the corners' gussets, through the door's whole depth
+      const g = ext([[sx * tw, sy * (2 * q - c)], [sx * tw, sy * 2 * q], [sx * (tw - c), sy * 2 * q]], 0.16, accent); g.position.set(0, yc, z); m.group.add(g);
+    }
+    const B = SD.hatchButton(S.def), lamp = new T.MeshStandardMaterial({ color: 0xff2a10, emissive: 0xff2a10, emissiveIntensity: 1.6 });
+    const box = new T.Mesh(new T.BoxGeometry(0.05, 0.18, 0.14), dark); box.position.set(B.x + 0.025, B.y, B.z); m.group.add(box);
+    const btn = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, 0.03, 12), lamp); btn.rotation.z = Math.PI / 2; btn.position.set(B.x + 0.06, B.y, B.z); m.group.add(btn); // (facing across the flight)
+    // the camera on the far side of it, up under the tunnel's roof between it and her breaching door, looking out through that into
+    // whatever's there; its picture on screens on the cover either side of the tunnel's mouth (facing the staging space) and beside the button
+    const cz = L.zc + 0.015, cam = new T.PerspectiveCamera(82, CAM_W / CAM_H, 0.05, 80); cam.position.set(0, L.CB - 0.16, cz - 0.03); cam.rotation.x = -0.12; m.group.add(cam);
+    const housing = new T.Mesh(new T.BoxGeometry(0.1, 0.08, 0.06), dark); housing.position.set(0, L.CB - 0.1, cz); m.group.add(housing);
+    if (!feedRT) feedRT = G_R.viewRT(CAM_W, CAM_H, { type: T.HalfFloatType });
+    const screen = new T.MeshBasicMaterial({ map: feedRT.texture, color: 0x0b0f12 }); // (dark till it's live: feed)
+    const panel = (x: number, y: number, z: number, w: number, ry: number) => {
+      const h = w * CAM_H / CAM_W, bz = new T.Mesh(new T.BoxGeometry(w + 0.05, h + 0.05, 0.025), dark); bz.position.set(x, y, z); bz.rotation.y = ry; m.group.add(bz);
+      const sc = new T.Mesh(new T.PlaneGeometry(w, h), screen); sc.position.set(x + Math.sin(ry) * 0.014, y, z + Math.cos(ry) * 0.014); sc.rotation.y = ry; m.group.add(sc); // (just off the bezel's face, the way it faces)
+    };
+    const cw = Math.min(0.5, L.sw - L.tw - 0.2), cx = (L.tw + L.sw) / 2;
+    if (cw > 0.2) for (const s of [-1, 1]) panel(s * cx, L.FB + 1.45, L.zt + 0.013, cw, 0); // (on the cover, its face toward the staging space)
+    panel(B.x + 0.013, B.y + 0.3, B.z + 0.45, 0.4, Math.PI / 2); // (on the same wall beside the button, behind it along the flight, facing across it)
+    S.hatch = { leaves, rail, D, lamp, tw, cam, screen, n: 0 };
+    if (!G_R.feeds.includes(feed)) G_R.feeds.push(feed);
+  }
+  // The breach camera's picture: drawn while she's against a hull and you're aboard, a frame in three (20 a second, at CAM_W x CAM_H),
+  // into feedRT, without the shadows being drawn again for it (they're the frame's own); dark otherwise
+  const CAM_W = 320, CAM_H = 200;
+  let feedRT: THREE.WebGLRenderTarget | null = null;
+  function feed(r: THREE.WebGLRenderer) {
+    const H = S.hatch;
+    if (!H || !feedRT) return;
+    const live = S.on && S.kind === 'board' && S.docked && !S.auto && aboard();
+    H.screen.color.setHex(live ? 0xd8e8f0 : 0x0b0f12);
+    if (!live || H.n++ % 3) return;
+    const au = r.shadowMap.autoUpdate; r.shadowMap.autoUpdate = false;
+    H.cam.updateMatrixWorld(); r.setRenderTarget(feedRT); r.clear(); r.render(G_R.scene, H.cam); r.setRenderTarget(null);
+    r.shadowMap.autoUpdate = au;
+  }
+  // the button pressed: open for everyone (the host says so to all: 'shatch'), open here straight away
+  function openHatch() {
+    if (!hatchShut()) return;
+    Net.toHost({ t: 'shatch' });
+    S.hatchOpen = true; syncSolids(); Audio.click();
   }
 
   // ------------------------------------------------------------------ what's outside, moved by the inverse of her pose
@@ -1375,6 +1471,7 @@ export const Space = (() => {
   }
   // she's against it (or off it) on this screen
   function dockLocal(on: boolean) {
+    if (on && S.kind === 'board') S.hatchOpen = false; // (a breach shuts her inner door: js/spaceserver.ts dock does too)
     S.brLock = null; S.brRound = null;
     S.docked = on;
     if (on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); S.V.set(0, 0, 0); S.net = null; unhide(); }
@@ -1665,6 +1762,15 @@ export const Space = (() => {
     }
     if (m.dead || m.down) return null;
     const px = m.pos.x, pz = m.pos.z, near = (x: number, z: number, r: number, y = m.pos.y) => Math.hypot(px - x, pz - z) < r && Math.abs(m.pos.y - y) < 2.2;
+    // her inner door's button, at the head of the stairs, while a breach has it shut
+    if (hatchShut() && S.def) {
+      const B = SD.hatchButton(S.def), L = SD.layout(S.def), w = SD.toWorld(S.berth, B.x + 0.4, L.FB, B.z);
+      if (Math.hypot(px - w.x, pz - w.z) < 1.0 && m.pos.y > w.y - 0.75 && m.pos.y < w.y + 0.4) { // (beside it: on the top steps or at their head)
+        if (F) { m.fLatch = true; openHatch(); }
+        out.prompt = hint('F', 'to open the breach door');
+        return out;
+      }
+    }
     // aboard: the nearest seat
     if (aboard()) {
       const best = seatLooked();
@@ -1728,6 +1834,7 @@ export const Space = (() => {
       }
       case 'seats': S.seats = m.s || {}; if (m.ctl !== undefined) S.ctl = m.ctl; if (m.no != null && me().seat === m.no) { stand(); HUD.toast('', 'That seat is taken', 1.5); } return true;
       case 'spose': heardPose(m.a); S.ctl = m.by; return true;
+      case 'shatch': if (!S.hatchOpen) { S.hatchOpen = true; syncSolids(); } if (m.by !== Net.myId) HUD.feed(`<b>${U.esc(Game.nameOf(m.by))}</b> opened the breach door`); return true;
       case 'sdock':
         if (S.on && m.on && m.site && S.kind === 'board') { if (m.by !== Net.myId) rebase(berthAt(siteAt(m.site))); cutHere(m.site); }
         if (S.on && S.kind === 'board' && S.map && S.map.sp) ShipGen.seal(S.map, m.on ? m.site || null : null); // (the holes she isn't against: shut)
