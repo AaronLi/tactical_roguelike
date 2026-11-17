@@ -1298,7 +1298,7 @@ export const Server = {
     }
   },
   // (a suspect down and bleeding out is dealt with: they never get up again. A civilian down still needs rescuing.)
-  remaining(civ: boolean | null = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ)) n++; return n; },
+  remaining(civ: boolean | null = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ) && !(e.ally && civ === false)) n++; return n; }, // (ally: armed, and on the squad's side: not one of the hostiles left)
   openBodies() { let n = 0; for (const b of this.bodies.values()) if (!b.secured) n++; return n; },
   openEvidence() { let n = 0; for (const v of this.evidence) if (!v.secured && !v.taken) n++; return n; },
   // Objectives. "Bring Order to Chaos" (required): every suspect zip-tied, down or dead. "Rescue All of the
@@ -1318,7 +1318,7 @@ export const Server = {
     const officers = [...this.players.values()].filter((q: Player) => q.st && !q.st.dn && !q.st.dd) as LivePlayer[];
     let complied = 0;
     for (const e of this.enemies.values()) {
-      if (!(e.state === 'normal' || e.state === 'cower' || e.state === 'flee' || e.state === 'hide')) continue;
+      if (!(e.state === 'normal' || e.state === 'cower' || e.state === 'flee' || e.state === 'hide') || e.ally) continue; // (ally: on the squad's side, not theirs to order about)
       const d = Math.hypot(e.x - px, e.z - pz);
       const eh = (e.y || 0) + 1.4 * e.def.scale;
       if (d > 16 || e.complyCd > 0 || !L.los(map, px, ey, pz, e.x, eh, e.z)) continue;
@@ -1837,7 +1837,8 @@ export const Server = {
     this.teamT = (this.teamT || 0) - dt; if (this.teamT <= 0) { this.teamT = this.TEAM.T; this.teamForm(); this.pointSwap(); }
     // (pirates aboard with anyone they'd fight: each of them has the other's people to pick out and shoot as well as the squad, npcFoes)
     const foes = this.npcFoes();
-    for (const e of this.enemies.values()) this.think(e, dt, foes ? this.foesOf(e, onFoot, foes) : onFoot);
+    if (foes) this.civFlee(dt);
+    for (const e of this.enemies.values()) this.think(e, dt, foes ? this.foesOf(e, onFoot, foes) : e.ally ? this.NOBODY : onFoot);
 
     // keep enemies from stacking
     const es = [...this.enemies.values()];
@@ -3194,7 +3195,7 @@ export const Server = {
     if (e.state === 'cuffed' || e.state === 'surrender') return;
     if (!e.down && this.clearLine(e, dt)) return; // (out of a shooter's way, before anything else)
     // sent to shelter (a ship's response): fleeing, hiding or frozen, they make for it once there's no officer on top of them
-    if (e.shelter && (e.state === 'cower' || e.state === 'hide' || e.state === 'flee')) { const near = this.nearestOfficer(e); if (!near || near.d > 6) { e.state = 'normal'; e.hide = null; e.crouch = false; e.leanOut = 0; } }
+    if (e.shelter && !e.fromPir && (e.state === 'cower' || e.state === 'hide' || e.state === 'flee')) { const near = this.nearestOfficer(e); if (!near || near.d > 6) { e.state = 'normal'; e.hide = null; e.crouch = false; e.leanOut = 0; } }
     if (e.state === 'cower') return;
     if (e.state === 'hide') {
       if (!e.hide && !this.seekHide(e)) { e.state = 'cower'; e.crouch = false; e.leanOut = 0; return; }
@@ -3207,7 +3208,7 @@ export const Server = {
     }
     if (e.state === 'flee') {
       e.fleeT -= dt;
-      const step = this.flow ? L.flowAway(this.map!, this.flow, e.x, e.z) : null;
+      const away = e.fromPir && this.pirFlow ? this.pirFlow : this.flow, step = away ? L.flowAway(this.map!, away, e.x, e.z) : null; // (from the pirates, if it's them they're running from: civFlee)
       if (step) {
         const dx = step.x - e.x, dz = step.z - e.z, d = Math.hypot(dx, dz) || 1;
         e.yaw += U.angDiff(e.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
@@ -3615,7 +3616,23 @@ export const Server = {
   // people and a civilian ship's fight pirates and nobody else of a ship's: never each other, never the unarmed. Everyone armed still
   // fights the squad. Who's on no side (a building's suspects) is as ever.
   facOf(e: Enemy): 'civ' | 'pirate' | 'navy' | 'civil' | null { return e.def.civ ? 'civ' : e.wear === 'pirate' ? 'pirate' : e.wear === 'navy' ? 'navy' : e.wear === 'civil' ? 'civil' : null; },
-  proxies: null as Map<string, any> | null,
+  proxies: null as Map<string, any> | null, NOBODY: [] as LivePlayer[],
+  // The unarmed run from pirates (when they're aboard together: called with npcFoes). Three times a second: anyone unarmed, on their
+  // feet and not tied, with a pirate in sight within 12 m on their deck, runs: away from the pirates (pirFlow: the way to the
+  // nearest of them, gone the other way: flee), for a few seconds, then hides or cowers where they've got to as anyone running
+  // does; and again when one comes in sight again. Running, they've left wherever they were sheltering.
+  pirFlow: null as Int16Array | null, civT: 0,
+  civFlee(dt: number) {
+    this.civT -= dt; if (this.civT > 0) return; this.civT = 0.33;
+    const map = this.map!, L = Level, pir = [...this.enemies.values()].filter((e) => this.facOf(e) === 'pirate' && this.able(e));
+    this.pirFlow = pir.length ? L.flow(map, pir.map((e) => L.src(map, e.x, e.y || 0, e.z))) : null;
+    for (const e of this.enemies.values()) {
+      if (!e.def.civ || e.down || e.hp <= 0 || !(e.state === 'normal' || e.state === 'cower' || e.state === 'hide')) continue;
+      const near = pir.find((o) => Math.abs((o.y || 0) - (e.y || 0)) < 3 && Math.hypot(o.x - e.x, o.z - e.z) < 12 && L.see(map, e.x, (e.y || 0) + 1.5, e.z, o.x, (o.y || 0) + 1.4, o.z) > 0);
+      if (!near) { if (e.fromPir && !pir.some((o) => Math.hypot(o.x - e.x, o.z - e.z) < 25)) e.fromPir = false; continue; }
+      e.fromPir = true; e.shelter = null; e.hide = null; e.crouch = false; e.threat = { x: near.x, z: near.z }; e.state = 'flee'; e.fleeT = 4 + Math.random() * 3;
+    }
+  },
   // Everyone aboard who could be a target for another side, each as an officer is to the one looking (where they are, how they
   // stand: what think and fire read of a player's state), under an id of their own; null unless pirates and someone they'd fight
   // are aboard together (so nothing changes anywhere else). Made afresh every tick.
@@ -3633,8 +3650,8 @@ export const Server = {
   },
   // who e has to pick a target from: the squad, and (armed, and of a side) those of the other side's within 45 m on its deck or the next
   foesOf(e: Enemy, onFoot: LivePlayer[], prox: Map<string, any>): LivePlayer[] {
-    const f = this.facOf(e); if (!f || f === 'civ' || !e.armed) return onFoot;
-    const out = onFoot.slice();
+    const f = this.facOf(e); if (!f || f === 'civ' || !e.armed) return e.ally ? this.NOBODY : onFoot;
+    const out = e.ally ? [] : onFoot.slice(); // (ally: armed and on the squad's side, a liner's security when she's being held: the squad's no target of theirs)
     for (const q of prox.values()) { const o = q.npc as Enemy, g = this.facOf(o); if (o === e || !(f === 'pirate' ? g !== 'pirate' : g === 'pirate')) continue; if (Math.hypot(o.x - e.x, o.z - e.z) < 45 && Math.abs((o.y || 0) - (e.y || 0)) < 6) out.push(q); }
     return out;
   },

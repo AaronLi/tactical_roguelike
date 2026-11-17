@@ -479,6 +479,8 @@ export const ShipGen = (() => {
         for (let k = -1; k <= 1 && ok; k++) { const cx = x + ax * k, cz = z + az * k, in1 = at(cx - nx, cz - nz); ok = at(cx, cz) === 1 && in1 !== 5 && in1 !== 7 && in1 !== 6 && in1 !== -1 && (in1 !== 1 || k !== 0 || bulkhead(map, cx - nx, cz - nz, nx, nz)) && at(cx + nx, cz + nz) === 5; }
         // (not through an engine room's wall: her nozzles stand out of it, and her engine block over and under it; nor the bridge's
         // prow, where a ram or a bow juts out under her deck: js/shipmodel.ts hull. The squad's ship would sit in them)
+        // (nor into a liner's court, nor within a cell of it along her side: it's armoured, as her shelter is. js/spaceserver.ts vent keeps their air)
+        if (ok && sp.hall === 'mall') for (let k = -2; k <= 2 && ok; k++) { const qx = x + ax * k - nx, qz = z + az * k - nz; ok = !map.rooms.some((rm, i) => (rm.fl || 0) === 0 && sp.roles[i] === 'mall' && qx >= rm.x - 1 && qx <= rm.x + rm.w && qz >= rm.z - 1 && qz <= rm.z + rm.h); }
         if (ok) { const ix = x - nx, iz = z - nz; ok = !map.rooms.some((rm, i) => (rm.fl || 0) === 0 && ix >= rm.x && ix < rm.x + rm.w && iz >= rm.z && iz < rm.z + rm.h && (sp.roles[i] === 'engine' || (sp.roles[i] === 'bridge' && nx < 0))); }
         // (out there: the collar's width at the hull, her cabin's behind it, her engine pods' from ten metres out)
         for (let d = 1; d <= 33 && ok; d++) for (let w = d <= 5 ? 3 : d <= 14 ? 5 : 7, k = -w; k <= w && ok; k++) { const o = at(x + nx * d + ax * k, z + nz * d + az * k); ok = o === 5 || o === -1; } // (past the map's edge: open space too)

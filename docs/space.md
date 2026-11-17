@@ -224,8 +224,14 @@ door, through the court's after wall at the back of the mezzanine; none onto the
 A liner on the board is always one of two jobs, by her seed (`G.SpaceData.offers`): **retake her** (`hostage`: pirates hold her, her
 people tied in her court) or **hold her** (`defend`, `js/spaceserver.ts` defendTick):
 
-- Nobody of hers fights, and nobody carries a keycard. Her passengers and hands (her class's civilians and four more) are in the
-  shelter from the start and stay there.
+- **She's expecting the squad.** Boarding her is no attack: no alarm, no drill, her hull guns hold their fire, nobody carries a
+  keycard. Her passengers and hands (her class's civilians and four more) are in the shelter from the start.
+- **Her security** (four, one more for each officer past the first; rifles) wait in her court, on the squad's side (`ally`,
+  `js/server.ts` foesOf): the squad is no target of theirs, a shout doesn't order them about, they aren't counted among the
+  hostiles left. They fight the pirates where they stand. Alone they hold the court for about two and a half minutes.
+- **Her court, its mezzanine and her shelter are armoured**: no breach site opens into the court or within a cell of it along her
+  side (`G.ShipGen.sites`: the squad's ship and the pirates' pods both come through her forward and after compartments or her
+  cross passage; 85 to 102 sites a liner), and none of the three ever loses its air (`vent`).
 - From when the squad is aboard, for three minutes (`G.SpaceData.DEFEND`: 180 s, 5 pods, the first after 8 s, then every 37 s
   or so), a pirate pod comes through her hull on her lower deck, clear of the squad's ship and of the pods already in her. Its
   boarders (three, one more for every three levels of the mission's danger and for each officer past the first) come out inside her
@@ -249,7 +255,7 @@ the **unarmed** (passengers, crew who don't fight).
 | --- | --- |
 | pirates | a navy's people, a civilian ship's armed hands, and the unarmed (not those tied: hostages are worth more alive) |
 | a navy's people, a civilian ship's armed hands | pirates. Never each other, never the unarmed |
-| the unarmed | nobody |
+| the unarmed | nobody. They **run** from a pirate in sight within 12 m (`civFlee`: away from the pirates, a few seconds, then hide or cower where they've got to; again when one comes in sight again), leaving wherever they were sheltering |
 
 Everyone armed still fights the squad, and a building's suspects are of no side: nothing there has changed. It only comes into it
 when pirates are aboard with someone they'd fight (so every other level runs exactly as before): then each of them has the other

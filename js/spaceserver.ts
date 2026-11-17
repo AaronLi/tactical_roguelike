@@ -74,7 +74,7 @@ export const SpaceSv = (() => {
   function msMsg() {
     const M = st.M; if (!M) return null;
     return { t: 'ms', i: M.ms.i, docked: M.docked ? 1 : 0, done: M.done ? 1 : 0, keys: Object.keys(M.keys).filter((k) => M.keys[k]), cards: M.cards.filter((c) => c.st === 1).map((c) => [c.key, c.x, c.z, c.y]),
-      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, unlocked: M.unlocked || [], salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj !== 'visit' || M.breached ? 1 : 0, gn: gunnersLeft(), left: M.ms.obj === 'hostage' || M.ms.obj === 'defend' ? S().remaining(false) : 0, def: M.def ? { on: M.def.on ? 1 : 0, t: Math.ceil(M.def.t), pods: M.def.pods, lost: M.def.lost ? 1 : 0, civ: civUp() } : null };
+      art: M.art, artBy: M.artBy, artAt: M.meta && M.meta.artifact ? [M.meta.artifact.x, M.meta.artifact.z] : null, cuts: M.meta ? M.meta.cuts : [], site: M.site, unlocked: M.unlocked || [], salv: M.salv, hvt: M.hvtSt, hvtId: M.hvt, arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom ? 1 : 0, vac: [...M.vac], cleared: M.cleared ? 1 : 0, raid: M.raid, hold: M.hold, zt: Z ? Math.round(Z.zt * 10) / 10 : 0, hostile: M.ms.obj === 'defend' ? 0 : M.ms.obj !== 'visit' || M.breached ? 1 : 0, gn: gunnersLeft(), left: M.ms.obj === 'hostage' || M.ms.obj === 'defend' ? S().remaining(false) : 0, def: M.def ? { on: M.def.on ? 1 : 0, t: Math.ceil(M.def.t), pods: M.def.pods, lost: M.def.lost ? 1 : 0, civ: civUp() } : null };
   }
   const levelMsg = () => (st.M ? { zone: Z ? { ms: { seed: Z.ms.seed, size: Z.ms.size, th: Z.ms.th, wing: !!Z.ms.wing, name: Z.ms.name, obj: Z.ms.obj, other: Z.ms.other || null, diff: Z.ms.diff, night: !!Z.ms.night }, act: Z.active, near: Z.active !== 0 || !!st.M.revisit } : null, ms: st.M.ms, gen: genOf(st.M.ms), state: msMsg(), fleet: st.fleet, seats: st.seats, ship: shipMsg(), board: boardMsg() } : null);
   const genOf = (ms: SpMission): SpGen | null => (ms.kind === 'board' ? { size: ms.size!, obj: ms.obj, ship: st.fleet.ship, other: ms.other || null, wing: !!ms.wing } : null);
@@ -177,6 +177,10 @@ export const SpaceSv = (() => {
         const rm = map.rooms[sh], flow = Level.flow(map, [[rm.cx, rm.cz, rm.fl || 0]]);
         M.hold = sh;
         for (let k = 0; k < cls.crew.civ + 4; k++) { const e = put('civ', [sh], 0); if (e) { e.armed = false; e.shelter = { x: e.x, y: e.y || 0, z: e.z, flow, room: sh }; e.home = { x: e.x, y: e.y || 0, z: e.z }; } }
+        // Her security: four (one more for each officer past the first), waiting for the squad in her court, on its side (ally: the
+        // squad's no target of theirs, js/server.ts foesOf; they fight the pirates as her own, wear civil). They hold where they stand.
+        const court = rooms('mall');
+        for (let k = 0; k < 4 + (np - 1); k++) { const e = put('grunt', court.length ? court : all, 0); if (e) { e.ally = true; e.drawn = true; e.guard = true; e.post = { x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, flow: sv.flowTo(e.x, e.y || 0, e.z) }; e.home = { x: e.x, y: e.y || 0, z: e.z }; } }
         continue;
       }
       // those who don't fight: a liner's civilians; a warship's or a pirate's own hands (ratings: a pistol, no stomach for it)
@@ -513,7 +517,8 @@ export const SpaceSv = (() => {
     const sv = S(), M = st.M!, map = sv.map!, TS = Level.TS, C = SD.DEFEND; let ch = false;
     const D = M.def || (M.def = { on: false, t: C.secs, pods: 0, lost: false, said: -1 });
     if (M.cleared || D.lost) return false;
-    if (!D.on) { if (!M.docked) return false; D.on = true; say('Pirates inbound. Her passengers are in the shelter behind the mezzanine: hold it for three minutes.'); return true; }
+    if (!D.on) { if (!M.docked) return false; D.on = true; for (const e of sv.enemies.values()) if (e.ally) { e.alert = true; e.drawn = true; } // (her security: told, and ready for them)
+      say('Pirates inbound. Her passengers are in the shelter behind the mezzanine, her security is with you in the court: hold for three minutes.'); return true; }
     const rm = map.rooms[M.hold], fl = rm ? rm.fl || 0 : 0, fy = Level.floorMap(map, fl).fy || 0;
     if (D.t > 0) {
       D.t = Math.max(0, D.t - dt);
@@ -521,7 +526,10 @@ export const SpaceSv = (() => {
       if (D.pods < C.pods && gone >= C.first + D.pods * gap) {
         // (where: a site clear of the squad's ship and of every pod; who: out of it onto the nearest clear floor inside)
         const W = map.W, far = (c: number, q: number[], m: number) => Math.hypot(c % W - q[0] % W, ((c / W) | 0) - ((q[0] / W) | 0)) * TS > m;
-        const ss = ShipGen.sites(map).filter((q) => M.raid.every((a) => far(q.c, a, 6.5)) && (!M.site || far(q.c, M.site, 12))), s = ss.length ? ss[Math.floor(Math.random() * ss.length)] : null;
+        // (her court can't be come through, js/shipgen.ts sites: if what's left of her side is full of pods, the next comes in closer to them)
+        const all = ShipGen.sites(map), pick = (pod: number, ship: number) => all.filter((q) => M.raid.every((a) => far(q.c, a, pod)) && (!M.site || far(q.c, M.site, ship)));
+        let ss = pick(6.5, 12); if (!ss.length) ss = pick(4.5, 9); if (!ss.length) ss = pick(0.5, 5); if (!ss.length) ss = all;
+        const s = ss.length ? ss[Math.floor(Math.random() * ss.length)] : null;
         D.pods++; ch = true;
         if (s) {
           M.raid.push([s.c, s.nx, s.nz]);
@@ -684,6 +692,7 @@ export const SpaceSv = (() => {
   }
   function vent(ri: number, why?: string) {
     const M = st.M, sv = S(); if (!M || !M.meta || ri < 0 || M.vac.has(ri) || !sv.map) return;
+    if (['mall', 'gallery', 'shelter'].includes(M.meta.roles[ri] || '')) return; // (a liner's court, its mezzanine and her shelter: armoured, and never without air)
     M.vac.add(ri);
     const role = M.meta.roles[ri];
     net().broadcast({ t: 'vent', r: ri });
