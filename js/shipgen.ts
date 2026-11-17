@@ -34,6 +34,9 @@ export const ShipGen = (() => {
   // (a cruiser with a hall, HALLS: two decks. Her lower deck is her working one, her people live on the upper)
   PROGRAM['large+:0'] = [['gunnery', 0.4], ['security', 0.6], ['armoury', 0.35], ['vault', 0.5], ['barracks', null], ['magazine', 0.85], ['medbay', null], ['brig', null], ['pods', 0.5], ['magazine', 0.2], ['cargo', null], ['barracks', null], ['pods', 0.7]];
   PROGRAM['large+:1'] = [['quarters', 0.05], ['mess', 0.5], ['galley', 0.55], ['quarters', 0.15], ['medbay', null], ['barracks', 0.8], ['pods', 0.4], ['quarters', null], ['mess', null], ['barracks', null]];
+  // (a luxury cruiser: a civilian ship. No gun control, magazines, barracks or brig: her security's office and armoury, a purser's vault, and what her passengers want)
+  PROGRAM['liner:0'] = [['security', 0.6], ['armoury', 0.35], ['vault', 0.5], ['medbay', null], ['galley', null], ['pods', 0.5], ['mess', null], ['cargo', null], ['quarters', null], ['pods', 0.7]];
+  PROGRAM['liner:1'] = [['quarters', 0.05], ['mess', 0.5], ['galley', 0.55], ['quarters', 0.15], ['medbay', null], ['pods', 0.4], ['quarters', null], ['mess', null]];
   const FILL: ShRole[] = ['cargo', 'quarters', 'mess', 'cargo', 'barracks'];
   // ---- A cruiser's halls (sp.hall; which a cruiser has, if any, goes by her seed: js/spacedata.ts hallOf). She has two decks,
   // and one or two compartments the height of both: open from the lower deck's floor to the upper deck's roof, a gallery round
@@ -160,7 +163,7 @@ export const ShipGen = (() => {
     };
     const bx0 = ox + 1, sx0 = bx0 + S.bw + 1, sx1 = sx0 + sk.len - 1, ex0 = sx1 + 2;
     // the bow room (the bridge on her top deck; under it on a ship of two, the forward magazine), the spine, the stern room
-    const bow = carve(bx0, zc - S.bd, S.bw, sw + 2 * S.bd, top ? 'bridge' : 'magazine');
+    const bow = carve(bx0, zc - S.bd, S.bw, sw + 2 * S.bd, top ? 'bridge' : sk.halls.some((h) => h.kind === 'mall') ? 'cargo' : 'magazine'); // (a luxury cruiser has no magazine: baggage)
     // (the spine: one corridor her length, or a length of it either end of a hall that's right across her)
     const across = sk.halls.filter((h) => h.side === 0).sort((a, b) => a.x - b.x), spines: LvRoom[] = [];
     { let x = 0; for (const h of across) { spines.push(carve(sx0 + x, zc, h.x - (h.fx || 0) - 1 - x, sw, 'spine')); x = h.x + h.w + 1; } spines.push(carve(sx0 + x, zc, sk.len - x, sw, 'spine')); }
@@ -231,13 +234,14 @@ export const ShipGen = (() => {
     // A liner's shelter: on her upper deck, the compartment aft of her court to port. Its only door is through the court's after wall,
     // at the back of the mezzanine (the side doors, below): none onto the spine. Where her passengers are got to when she's boarded.
     if (f > 0) for (const h of sk.halls) if (h.kind === 'mall') { const s = free.find((q) => q.side < 0 && q.x > sx0 + h.x + h.w && !q.deep && !slots.some((o) => o.inner === q.rm)); if (s) take(s, 'shelter'); }
-    for (const [role, pref] of PROGRAM[sk.size + (sk.halls.length ? '+' : '') + ':' + f] || PROGRAM[sk.size + ':' + f] || PROGRAM[sk.size + ':0']) {
+    const liner = sk.halls.some((h) => h.kind === 'mall');
+    for (const [role, pref] of (liner && PROGRAM['liner:' + f]) || PROGRAM[sk.size + (sk.halls.length ? '+' : '') + ':' + f] || PROGRAM[sk.size + ':' + f] || PROGRAM[sk.size + ':0']) {
       if (!free.length) break;
       const deepWant = role === 'vault' || role === 'reactor' || role === 'magazine';
       const sc = (s: ShSlot) => (pref == null ? 0 : Math.abs(s.pos - pref) * 2) + (deepWant && !s.deep ? 0.6 : 0) + ((role === 'pods' || role === 'medbay' || role === 'mess') && s.deep ? 1.5 : 0) + r() * 0.5;
       take(free.map((s) => [sc(s), s] as [number, ShSlot]).sort((a, b) => a[0] - b[0])[0][1], role);
     }
-    for (const s of free.slice()) take(s, U.pick(r, FILL));
+    for (const s of free.slice()) take(s, liner ? U.pick(r, ['quarters', 'mess', 'cargo', 'quarters'] as ShRole[]) : U.pick(r, FILL));
     const locked = (rm: LvRoom) => rm.ship === 'armoury' || rm.ship === 'vault';
     for (const s of slots) if (s.rm.ship !== 'shelter') door(s.door[0], s.door[1], 'z', s.rm.ship === 'armoury' ? 'armory' : s.rm.ship === 'vault' ? 'bridge' : null);
     // A liner's court: besides the spine's, a door through its after wall to port and to starboard of it, into whatever compartment is the

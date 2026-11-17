@@ -1692,7 +1692,7 @@ export const Server = {
     const d = m.k ? e.hp + 1 : Math.min(5000, (+m.d || 0) + Math.min(5, Math.max(0, +m.f || 0)) * person);
     if (!(d > 0)) return;
     e.hp -= d;
-    if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
+    if (!m.bo) { e.lastHit = from; e.lastHitN = from ? null : m.byn || null; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
       if (Array.isArray(m.tb) && m.tb.length === 2 && m.tb.every(Number.isFinite)) { const t = e.tb || (e.tb = { burn: 0, blast: 0, n: 0 }); t.burn += G_U.clamp(m.tb[0], 0, 2); t.blast += G_U.clamp(m.tb[1], 0, 2); t.n++; } // (a thermobaric's burns and blast: injuries of their own, injuryTick; and for F9, js/hud.ts)
       e.lastGr = Number.isFinite(m.gr) ? m.gr : 0; e.lastFb = e.flashT! > 0 ? e.flashId || 0 : 0; } // bleeding out is judged by what they were doing when shot (and for the highlights: a frag grenade's, gr its seed; blind from a flashbang, which)
     // Shock: being hit wrecks your aim for a moment (most of it, for a hard hit), throws off the shot you were
@@ -1746,7 +1746,7 @@ export const Server = {
       if (!hl.bo && e.lastGr) hl.gr = e.lastGr; // (a frag grenade did it: which)
       if (!hl.bo && e.lastFb) hl.fb = e.lastFb; // (blind from a flashbang when it was done: which)
       if (m.cz === 'burns' || m.cz === 'blast') { hl.cz = m.cz; if (e.lastGr) hl.gr = e.lastGr; } // (died of a thermobaric's burns or blast lung: injuryTick; the grenade's)
-      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr: this.pay(cr), h: !!m.h, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
+      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, bn: from ? undefined : m.byn || e.lastHitN || undefined, cr: this.pay(cr), h: !!m.h, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
       this.checkClear();
     }
   },
@@ -1767,7 +1767,7 @@ export const Server = {
   incapMsg(e: Enemy) {
     if (e.def.civ || e.incap) return; // (a civilian down still needs rescuing)
     const { cr, why } = this.incapacitate(e, e.lastHit, e.hitState || e.state);
-    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr: this.pay(cr), h: !!e.lastH, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
+    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, bn: e.lastHit ? undefined : e.lastHitN || undefined, cr: this.pay(cr), h: !!e.lastH, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
   },
   // A suspect down for good, for the highlights (js/highlights.ts suspectDown): incapacitated, their clip. The round
   // that put them down, with what a kill of it would carry; or, more than 4 s after a round last hit them, a bleed-out
@@ -2677,6 +2677,7 @@ export const Server = {
   // What they're called (js/spacedata.ts TITLES): aboard a ship, by whose she is and where they stand in her; anywhere else, their type's
   // name. Kept on them (e.title) for the feed once they're gone.
   titleOf(e: Enemy) {
+    if (e.named) return (e.title = e.named); // (someone with a name of their own: a liner's security beside the squad, js/spaceserver.ts)
     const T = e.wear && !e.def.civ ? (SpaceData.TITLES as Record<string, Record<string, string>>)[e.wear] : null;
     if (!T) return e.def.name;
     const M = SpaceSv.st.M, lead = this.leads(e) && [...this.enemies.values()].some((o) => o !== e && o.team === e.id);
@@ -3608,7 +3609,7 @@ export const Server = {
     const npc = (p as any).npc as Enemy | undefined;
     if (npc) {
       const c = G_U.clamp(chance, 0.01, 0.97) * (pellets > 1 ? 0.6 : 1); let n = 0; for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
-      if (n && L.los(map, from[0], from[1], from[2], npc.x, (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), npc.z)) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)) }, null);
+      if (n && L.los(map, from[0], from[1], from[2], npc.x, (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), npc.z)) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)), byn: e.wear ? this.titleOf(e) : e.def.name }, null);
     }
   },
   // ---- Sides (a ship's people: js/spaceserver.ts, who each is dressed as, wear). Pirates fight everyone: a navy's people, a

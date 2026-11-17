@@ -1158,7 +1158,7 @@ export const Game = {
   // the feed and, for whoever did it, the credits and their tally: a kill, or a suspect incapacitated
   credit(m: any, kind: 'kill' | 'incap' = 'kill') {
     const Me = G_Me, def = (ENEMIES as Record<string, any>)[m.ty];
-    const killer = this.nameOf(m.by);
+    const killer = m.by ? this.nameOf(m.by) : m.bn || '???'; // (bn: one of a ship's people shot by another side's, js/server.ts fire: who)
     const kc = m.by === Net.myId ? '#ffd24a' : this.roster[m.by] ? U.hex(this.roster[m.by].color) : '#fff';
     HUD.feed(`<b style="color:${kc}">${U.esc(killer)}</b> ${m.h ? '<span class="hs">⌖</span>' : '✕'} ${m.nm || (def ? def.name : 'hostile')}`);
     if (m.why) {

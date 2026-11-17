@@ -26,6 +26,7 @@ interface SvMission {
   gunners?: number[]; gn?: number; // (her gun crew, the ids of those posted in her gun control; how many of them are still at it, last told)
   arm: number | null; boom: boolean; cleared: boolean; unlocked?: number[];
   alarm?: boolean; camOp?: number | null; camOn?: boolean; belief?: { x: number; y: number; z: number; room: number } | null; beliefAt?: number; searchTo?: Map<number, { ri: number; at: number }>; searching?: boolean; sweepAt?: number; respT?: number; safe?: number; shutDoors?: Set<number>; zt: number; leftSaid?: number; revisit?: boolean; cutsWas?: number[][]; keep?: SvKeep | null; breached?: boolean; // (zt: the zone's clock, seconds since the squad came out of the jump: where everything that's under way out there is)
+  staff?: string[]; // (holding a liner: her security with the squad, by rank and name)
   def?: { on: boolean; t: number; pods: number; lost: boolean; said: number } | null; // (holding a liner, obj defend: begun, seconds left, pods come, all of her passengers dead, what was last told)
   site: number[] | null; raid: number[][]; hold: number; told?: boolean; // (raid: where the pirates' pods are in her hull, as sites; hold: the room their hostages are in)
   // (arm: seconds left on the self-destruct; site: where the squad's ship is against her, or last was)
@@ -181,7 +182,7 @@ export const SpaceSv = (() => {
         for (let k = 0; k < cls.crew.civ + 4; k++) { const e = put('civ', [sh], 0); if (e) { e.armed = false; e.shelter = { x: e.x, y: e.y || 0, z: e.z, flow, room: sh }; e.home = { x: e.x, y: e.y || 0, z: e.z }; } }
         // Her security: four (one more for each officer past the first), waiting for the squad in her court, on its side (ally: the
         // squad's no target of theirs, js/server.ts foesOf; they fight the pirates as her own, wear civil). They hold where they stand.
-        const court = rooms('mall');
+        const court = rooms('mall'), names = SD.STAFF.slice().sort(() => Math.random() - 0.5), staff: string[] = []; // (each of her security with the squad has a rank and a name: what they're called on every screen, and in the feed when they shoot someone or are shot)
         // The fight that's already been: the first pirates aboard, and most of her security, dead where they fell about her (not
         // in the shelter): ten of hers and eight of theirs. Why there's only a handful of her people left to help. Bodies from the
         // start (pre: nobody's kill, js/server.ts bodies), each as they'd be called and dressed alive.
@@ -189,7 +190,8 @@ export const SpaceSv = (() => {
           const dead = (type: EnemyKind, as: string, k: number) => { for (let a = 0; a < where.length; a++) { const p = spot(where[(k * 5 + a * 3) % where.length]); if (!p) continue; const e = sv.addEnemy(type, p.x, p.z, 1, p.y); e.wear = as; e.title = sv.titleOf(e); sv.enemies.delete(e.id); sv.bodies.set(e.id, { id: e.id, type: e.type, def: e.def, x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, civ: false, secured: false, rec: e, pre: true } as any); return; } }; // (as they fell: not tied, as a body the squad has secured is)
           for (let k = 0; k < 10; k++) dead(k % 3 === 2 ? 'suspect' : 'grunt', 'civil', k);
           for (let k = 0; k < 8; k++) dead(k % 3 === 0 ? 'grunt' : k % 3 === 1 ? 'suspect' : 'rusher', 'pirate', k + 3); }
-        for (let k = 0; k < 4 + (np - 1); k++) { const e = put('grunt', court.length ? court : all, 0); if (e) { e.ally = true; e.drawn = true; e.guard = true; e.post = { x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, flow: sv.flowTo(e.x, e.y || 0, e.z) }; e.home = { x: e.x, y: e.y || 0, z: e.z }; } }
+        for (let k = 0; k < 4 + (np - 1); k++) { const e = put('grunt', court.length ? court : all, 0); if (e) { e.ally = true; e.named = `${k === 0 ? 'Security Lead' : k % 3 === 0 ? 'Senior Security Officer' : 'Security Officer'} ${names[k % names.length]}`; e.title = e.named; staff.push(e.named); e.drawn = true; e.guard = true; e.post = { x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, flow: sv.flowTo(e.x, e.y || 0, e.z) }; e.home = { x: e.x, y: e.y || 0, z: e.z }; } }
+        M.staff = staff;
         continue;
       }
       // those who don't fight: a liner's civilians; a warship's or a pirate's own hands (ratings: a pistol, no stomach for it)
@@ -212,7 +214,7 @@ export const SpaceSv = (() => {
       // her security office (frigates and up): one on the cameras, watching the ship
       if (h === 0 && M) { const so = rooms('security'); if (so.length) { const e = put('suspect', so, 0); if (e) { M.camOp = e.id; e.stay = true; } } }
       // her gun crew: two at gun control for each hull that has guns (the boarded ship's are what her guns need: gunnersLeft)
-      const G0 = SpaceData.SIZES[meta.hulls[h].size].guns;
+      const G0 = SpaceData.gunsOf(meta.hulls[h].size, liner);
       if (G0.pd + G0.cannon + G0.missile > 0) for (let k = 0; k < 2; k++) { const e = put('suspect', rooms('gunnery'), k); if (e) e.stay = true; if (e && M && h === 0) (M.gunners = M.gunners || []).push(e.id); }
       const rs = rooms('mess', 'quarters', 'spine', 'cargo');
       for (let q = 0; q < C.resp; q++) (['suspect', 'rusher', 'suspect'] as EnemyKind[]).forEach((kd, i) => { const e = put(kd, [rs[q % Math.max(1, rs.length)]].filter((v) => v != null), 0); if (e && M) M.resp.set(e.id, h); if (e && i === 0) sv.giveShield(e, shieldId()); }); // (the first of each with a shield: their point man)
@@ -527,7 +529,7 @@ export const SpaceSv = (() => {
     const D = M.def || (M.def = { on: false, t: C.secs, pods: 0, lost: false, said: -1 });
     if (M.cleared || D.lost) return false;
     if (!D.on) { if (!M.docked) return false; D.on = true; for (const e of sv.enemies.values()) if (e.ally) { e.alert = true; e.drawn = true; } // (her security: told, and ready for them)
-      say('More pirates inbound. Her passengers are in the shelter behind the mezzanine; what is left of her security is with you in the court: hold for three minutes.'); return true; }
+      say(`More pirates inbound. Her passengers are in the shelter behind the mezzanine. With you in the court: ${(M.staff || []).join(', ') || 'what is left of her security'}. Hold for three minutes.`); return true; }
     const rm = map.rooms[M.hold], fl = rm ? rm.fl || 0 : 0, fy = Level.floorMap(map, fl).fy || 0;
     if (D.t > 0) {
       D.t = Math.max(0, D.t - dt);

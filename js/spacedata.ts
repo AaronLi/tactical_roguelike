@@ -215,7 +215,7 @@ export const SpaceData = (() => {
     { name: 'Navy warship', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.07, foes: 1.35, crowd: 0.4, home: 0, reflect: 0.3, floor: '#3a4149', wall: '#65717b', crate: '#566650', accent: '#d23a30', fog: 0x020306, light: 0xdfe8ff, ceil: '#4a525b', hemi: 0x8fa6c8, hemiI: 0.3, far: 30000 },
     // (a cruise liner: a cruiser with a promenade court, js/shipgen.ts HALLS mall. Never drawn by lot: LOT below. liner: her surfaces are
     // walnut slats and stone, charcoal carpet and dark ceilings with slots of light, js/levelview.ts _shipTex; warm and low lit)
-    { name: 'Cruise liner', layout: 'ship', space: 1, liner: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.25, floor: '#2a2c30', wall: '#9a948a', crate: '#3a3d42', accent: '#b8935a', fog: 0x020306, light: 0xffdfb8, ceil: '#232427', hemi: 0xa8a098, hemiI: 0.16, far: 30000 },
+    { name: 'Luxury cruiser', layout: 'ship', space: 1, liner: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.25, floor: '#2a2c30', wall: '#9a948a', crate: '#3a3d42', accent: '#b8935a', fog: 0x020306, light: 0xffdfb8, ceil: '#232427', hemi: 0xa8a098, hemiI: 0.16, far: 30000 },
   ];
   const TH0 = 1000, LOT = 3, LINER = TH0 + 3; // (LOT: the ships' themes a board's offers are drawn from, the first of them; LINER: a cruise liner's)
   const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G_THEMES[th] || null);
@@ -283,7 +283,7 @@ export const SpaceData = (() => {
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },
     destruct: { name: 'Scuttle her', pay: 700, line: 'Reach the bridge, start the self-destruct, and be off the ship (yours, or one of her escape pods) before it runs out.' },
     hostage: { name: 'Retake the ship', pay: 600, line: 'Pirates have boarded her (their pods are still in her hull) and hold her people tied in one compartment. Clear every pirate off her: dead, down or in restraints. Each hostage alive at the end pays.' },
-    defend: { name: 'Hold the liner', pay: 900, line: 'Pirates are closing on a cruise liner. Her passengers are shut in the shelter at the back of her upper deck, behind the mezzanine. They have been aboard once already: most of her security died throwing them off. She is expecting you: board her anywhere but her court (it is armoured), and nobody will take it for an attack. What is left of her security will be waiting in the court to fight beside you. For three minutes pirate pods will come through her hull, one after another. Every passenger unhurt at the end pays.' },
+    defend: { name: 'Hold the cruiser', pay: 900, line: 'Pirates are closing on a luxury cruiser. Her passengers are shut in the shelter at the back of her upper deck, behind the mezzanine. They have been aboard once already: most of her security died throwing them off. She is expecting you: board her anywhere but her court (it is armoured), and nobody will take it for an attack. What is left of her security will be waiting in the court to fight beside you. For three minutes pirate pods will come through her hull, one after another. Every passenger unhurt at the end pays.' },
     visit: { name: 'Unlisted ship', pay: 0, line: 'Not the mission: a ship that happened to be passing. What is in her hold is worth carrying off. A breach is an attack: she will fight.' },
     assault: { name: 'Planetary assault', pay: 300, line: 'Land at the pad outside the base and bring it under control: every hostile down or in restraints.' },
   };
@@ -314,7 +314,7 @@ export const SpaceData = (() => {
       out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, wing, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name + (wing ? ' (a flying wing)' : ''), brief: OBJ[obj].line, other, night: assault && !T.night && r() < 0.25,
         ly: Math.round((3 + r() * 40) * 10) / 10, anchor: [Math.cos(a) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(a) * Math.cos(el) * d] });
       { const o = out[out.length - 1]; if (o.kind === 'board' && hallOf(o.seed, o.size) === 'mall') { // (and what's wanted of the squad aboard her goes by her seed, a third each: she's to be held; she's been taken; or the job she'd have been anyway, against her own security and her alarms, never a scuttling)
-        o.th = LINER; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Cruise liner'; { const way = (o.seed >>> 4) % 3; o.obj = way === 0 ? 'defend' : way === 1 ? 'hostage' : o.obj === 'destruct' ? 'hvt' : o.obj; } o.brief = OBJ[o.obj].line; o.pay = Math.round((SIZES.large.pay + OBJ[o.obj].pay + 160 * o.diff) / 50) * 50; } }
+        o.th = LINER; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Luxury cruiser'; { const way = (o.seed >>> 4) % 3; o.obj = way === 0 ? 'defend' : way === 1 ? 'hostage' : o.obj === 'destruct' ? 'hvt' : o.obj; } o.brief = OBJ[o.obj].line; o.pay = Math.round((SIZES.large.pay + OBJ[o.obj].pay + 160 * o.diff) / 50) * 50; } }
     }
     return out;
   }
@@ -327,7 +327,7 @@ export const SpaceData = (() => {
   const HALL_LINE: Record<ShHallKind, { brief: string; offer: string }> = {
     bay: { brief: 'a hangar bay', offer: 'Two decks, with a hangar bay right across her, open through both: a gallery round it looks down on its floor.' },
     grove: { brief: 'an arboretum', offer: 'Two decks, with an arboretum down her port side, open through both: a gallery round it looks down on its floor.' },
-    mall: { brief: 'a promenade court', offer: 'A cruise liner. Two decks, with a promenade court right across her forward, open through both: shops, a fountain, a gallery round it looking down on its floor.' },
+    mall: { brief: 'a promenade court', offer: 'A luxury cruiser, unarmed. Two decks, with a promenade court right across her forward, open through both: shops, a fountain, a gallery round it looking down on its floor.' },
     works: { brief: 'machinery halls', offer: 'Two decks, with machinery halls fore and aft, open through both: a gallery round each looks down on its floor.' },
   };
   const hallOf = (seed: number, size: SpSize | null | undefined): ShHallKind | null => { if (size !== 'large') return null; const q = (Math.imul(seed ^ 0x5ca1ab1e, 0x9e3779b1) >>> 0) % 10; return q < 8 ? HALL_KINDS[q >> 1] : null; };
@@ -350,5 +350,10 @@ export const SpaceData = (() => {
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
   // Holding a liner (obj defend, js/spaceserver.ts defendTick): how long, how many pods in that time, the first of them after how long
   const DEFEND = { secs: 180, pods: 5, first: 8 };
-  return { DEFEND, LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
+  // A luxury cruiser (a cruiser with a promenade court): what she's called, and no guns on her hull. guns, className: any ship's, by her
+  // class and whether she's one. STAFF: the family names of her security, for those who fight beside the squad (js/spaceserver.ts).
+  const NOGUNS = { pd: 0, cannon: 0, missile: 0 };
+  const gunsOf = (size: SpSize, liner?: boolean) => (liner ? NOGUNS : SIZES[size].guns), className = (size: SpSize, liner?: boolean) => (liner ? 'luxury cruiser' : SIZES[size].name);
+  const STAFF = ['Okafor', 'Reyes', 'Lindqvist', 'Tanaka', 'Moreau', 'Abara', 'Castellanos', 'Novak', 'Haddad', 'Ferreira', 'Kowalczyk', 'Iyer', 'Marchetti', 'Osei', 'Brandt', 'Yilmaz'];
+  return { gunsOf, className, STAFF, DEFEND, LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();

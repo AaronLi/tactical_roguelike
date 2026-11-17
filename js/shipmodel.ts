@@ -328,7 +328,7 @@ export const ShipModel = (() => {
       guns.push({ k, x, y: y + (k === 'cannon' ? 2.1 : 1.1), z, hp: k === 'pd' ? 100 : k === 'cannon' ? 320 : 180, obj: o, gun: gn, cool: 1 + r() * 3 });
     };
     {
-      const C = SpaceData.SIZES[sp.size].guns, list: ('pd' | 'cannon' | 'missile')[] = [], hm = sp.hull;
+      const C = SpaceData.gunsOf(sp.size, sp.hall === 'mall'), list: ('pd' | 'cannon' | 'missile')[] = [], hm = sp.hull;
       for (let k = 0; k < Math.max(C.pd, C.cannon, C.missile); k++) { if (k < C.cannon) list.push('cannon'); if (k < C.pd) list.push('pd'); if (k < C.missile) list.push('missile'); }
       for (let k = C.pd; k > 0 && list.filter((q) => q === 'pd').length < C.pd; k--) list.push('pd');
       list.forEach((k, n) => { const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * (k === 'cannon' ? 0 : 3.4); K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); });

@@ -221,6 +221,11 @@ band of lit windows round each, a raked blue funnel, a wheelhouse tier over her 
 On a cruise liner's upper deck the compartment aft of her court to port is her **shelter** (`meta.shelter`, role `shelter`): one
 door, through the court's after wall at the back of the mezzanine; none onto the spine. Benches round its walls.
 
+On every screen she is a **luxury cruiser** (the theme's name, the board, the objective's panel; `G.SpaceData.className`), and she
+has **no guns on her hull** (`gunsOf`: none drawn, none manned, "unarmed" in the panel) and no gun control, magazines, barracks
+or brig inside (`js/shipgen.ts` PROGRAM liner: a security office and armoury, a purser's vault, sick bay, galley, mess, cabins,
+baggage under her bridge).
+
 A liner is a **high-security ship**: her own people are a civilian ship's (security guards and officers, not a navy's), with two
 more guards and a security squad more than a cruiser's (34 armed aboard one, in the simulation), and boarding her is an attack
 like any other: her cameras, her alarm, her response teams. Only on the one job below is she expecting the squad.
@@ -234,7 +239,10 @@ or **hold her** (`defend`, `js/spaceserver.ts` defendTick):
 
 - **She's expecting the squad.** Boarding her is no attack: no alarm, no drill, her hull guns hold their fire, nobody carries a
   keycard. Her passengers and hands (her class's civilians and four more) are in the shelter from the start.
-- **Her security** (four, one more for each officer past the first; rifles) wait in her court, on the squad's side (`ally`,
+- **Her security** (four, one more for each officer past the first; rifles), each with a rank and a name of their own (a Security
+  Lead, Security Officers, a Senior Security Officer; family names from `G.SpaceData.STAFF`: what they're called wherever a
+  title shows, named in the radio call when the squad comes aboard, and in the feed when one of them shoots a pirate or is shot:
+  `bn`, who did it when it wasn't an officer), wait in her court, on the squad's side (`ally`,
   `js/server.ts` foesOf): the squad is no target of theirs, a shout doesn't order them about, they aren't counted among the
   hostiles left. They fight the pirates where they stand. Alone they hold the court for about two and a half minutes.
 - **Her court, its mezzanine and her shelter are armoured**: no breach site opens into the court or within a cell of it along her

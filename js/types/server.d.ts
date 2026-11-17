@@ -34,7 +34,7 @@ interface Enemy {
   order?: Order | null; radioT?: number; callAt?: number; callTgt?: { x: number; y: number; z: number } | null; callLog?: string[]; calls?: number; noLead?: number;
   point?: boolean; // (their team's point man, with a shield: giveShield)
   shieldBy?: number; // (another team's shield man they've got in behind, with no cover of their own to go to: shieldNear)
-  grade?: number; rank?: number; team?: number | null; stay?: boolean; ally?: boolean; fromPir?: boolean; wear?: string | null; title?: string; // (wear: whose ship they're aboard, civil, pirate or navy: what they're called, titleOf) // (grade: how strong they are within the level's gear tier, 0-1, their kit by it: equip; rank: grade, a Leader a whole rank up; team: their fireteam's leader's id, their own if they lead it; stay: at a station, in no team: teamForm)
+  grade?: number; rank?: number; team?: number | null; stay?: boolean; ally?: boolean; fromPir?: boolean; named?: string; lastHitN?: string | null; wear?: string | null; title?: string; // (wear: whose ship they're aboard, civil, pirate or navy: what they're called, titleOf) // (grade: how strong they are within the level's gear tier, 0-1, their kit by it: equip; rank: grade, a Leader a whole rank up; team: their fireteam's leader's id, their own if they lead it; stay: at a station, in no team: teamForm)
   coverFlow?: ReturnType<typeof import('../level.js').Level.flow> | null; coverCheckT?: number; emboldened?: boolean; fl?: number;
   lowRun?: boolean;
   artGuard?: boolean; // (posted with the artifact, aboard a ship carrying one: js/spaceserver.ts crew, shelter)
