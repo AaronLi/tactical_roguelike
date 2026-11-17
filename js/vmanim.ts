@@ -50,7 +50,7 @@ export const VMAnim = (() => {
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
   // the arms and props of a viewmodel (its userData.vma)
-  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion; magOut?: boolean }
+  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion; magOut?: boolean; magDrop?: boolean }
   type MagChk = GunRigMagChk;
   const S = (a: number, b: number, t: number) => U.smooth(a, b, t);
   const lerpV = (a: V3, b: V3, k: number) => a.clone().lerp(b, k);
@@ -820,7 +820,8 @@ export const VMAnim = (() => {
         if (mg.mode !== 'chk') an.mag.quaternion.copy(A.magQ);
         // what the magazine in view holds: the gun's, and through a reload, once the old one's gone (dropped or stowed), the fresh
         // one coming up to go in (its rounds, their types, its capacity), not the old one's count carried on into it
-        if (!pl.reloading) a.magOut = false; else if (mg.mode === 'gone' || mg.mode === 'drop') a.magOut = true;
+        // (stowed, 'gone': out of sight at once; let fall, 'drop': it's still in view, falling, so only once the hand has the fresh one)
+        if (!pl.reloading) { a.magOut = false; a.magDrop = false; } else if (mg.mode === 'gone' || (a.magDrop && mg.mode !== 'drop')) a.magOut = true; else if (mg.mode === 'drop') a.magDrop = true;
         const inc = pl.reloading && a.magOut ? (pl as unknown as { reloadIn: GItem | null }).reloadIn : null;
         if (idx === 0) {
           if (inc && inc.r) magFill(a, h.chk, { mag: inc.r.length, tube: inc.r, ammo: inc.am, noMag: false } as unknown as PWeapon, inc.cap || pl.magSize(w));
