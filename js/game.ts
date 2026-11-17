@@ -1018,7 +1018,7 @@ export const Game = {
           const piv = this.map!.doorMeshes && this.map!.doorMeshes[m.i];
           if (piv) piv.userData.rate = d.open ? 2.6 : 5; // pushed open gently, pulled shut a bit quicker
         }
-        if (!m.k) Audio.sampleAt(d.open ? 'door_open' : 'door_close', new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.6, 1); // from the door (at its handle, on its own floor)
+        if (!m.k) { const at = new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z); if (Level.slides(d)) Audio.slideDoor(at, d.open, d.kind === 'blast'); else Audio.sampleAt(d.open ? 'door_open' : 'door_close', at, 0.6, 1); } // from the door (at its handle, on its own floor)
         break;
       }
       case 'order': if (m.id !== Net.myId) Audio.order(this.playerPos(m.id)!); break;

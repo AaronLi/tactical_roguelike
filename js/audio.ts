@@ -434,6 +434,49 @@ export const Audio = {
     this._noise(t, 0.06, 3000, 2, 0.2 * att, 'bandpass');
     this.sample('door_open', 0.7 * att, 1.7);
   },
+  // A ship's door (js/level.ts slides: a bulkhead door that slides into the wall, and a locked blast door), made as it'd be
+  // made: no recording. Opening: the seal letting go (a hiss of air), then the drive (a motor's whine climbing as it takes the
+  // door's weight, under a rumble in the track) and, as the door meets the end of its travel, the latch (a clack and a low
+  // knock). Closing: the whine falls away as the door runs home, the latch and the seal (a short hiss) at the end. A blast door
+  // is the same much heavier: a third lower, longer, its knock deeper. Placed in the world like the recorded door (route), at
+  // the HANDLING trim; ~0.5 at the door (3 m: -25 dBFS peak, the recorded door's level).
+  slideDoor(pos: { x: number; y: number; z: number }, open: boolean, blast = false) {
+    const c = this.ctx; if (!c) return;
+    const cam = AudioEnv.R && AudioEnv.R.camera, d = cam ? cam.position.distanceTo(pos as THREE.Vector3) : 0;
+    const t = c.currentTime, k = blast ? 0.62 : 1, run = (blast ? 1.0 : 0.62) * (open ? 1 : 0.85), j = 0.94 + Math.random() * 0.12;
+    const out = c.createGain(); out.gain.value = 1;
+    const env = (g: GainNode, t0: number, a: number, hold: number, dec: number, peak: number) => { g.gain.setValueAtTime(0, t0); g.gain.linearRampToValueAtTime(peak, t0 + a); g.gain.setValueAtTime(peak, t0 + a + hold); g.gain.exponentialRampToValueAtTime(0.0008, t0 + a + hold + dec); };
+    const noise = (t0: number, dur: number, type: BiquadFilterType, f0: number, f1: number, q: number, peak: number, a = 0.01) => {
+      const src = c.createBufferSource(); src.buffer = this.noise; src.playbackRate.value = 0.9 + Math.random() * 0.2;
+      const f = c.createBiquadFilter(); f.type = type; f.Q.value = q; f.frequency.setValueAtTime(f0, t0); f.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+      const g = c.createGain(); env(g, t0, a, dur * 0.15, dur * 0.85, peak);
+      src.connect(f); f.connect(g); g.connect(out); src.start(t0, Math.random() * 0.5); src.stop(t0 + dur + 0.05);
+    };
+    const tone = (t0: number, dur: number, type: OscillatorType, f0: number, f1: number, peak: number, a: number, hold: number, lp = 0) => {
+      const o = c.createOscillator(); o.type = type; o.frequency.setValueAtTime(f0, t0); o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+      const g = c.createGain(); env(g, t0, a, hold, Math.max(0.02, dur - a - hold), peak);
+      if (lp) { const f = c.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = lp; f.Q.value = 0.7; o.connect(f); f.connect(g); } else o.connect(g);
+      g.connect(out); o.start(t0); o.stop(t0 + dur + 0.05);
+      return o;
+    };
+    const end = t + 0.12 + run; // (the door meets the end of its travel)
+    // the seal: air let out as it lets go (opening), taken in a breath as it seats (closing: at the end)
+    if (open) noise(t, 0.34 / k, 'bandpass', 5200, 2400, 0.9, 0.5 * k, 0.015);
+    else noise(end - 0.05, 0.2 / k, 'bandpass', 4200, 2200, 0.9, 0.32 * k, 0.01);
+    // the drive: a motor's whine (a saw under a lowpass, a square a fifth above it), rising on opening, falling as it closes
+    const w0 = (open ? 150 : 330) * k * j, w1 = (open ? 330 : 140) * k * j;
+    const m = tone(t + 0.1, run, 'sawtooth', w0, w1, 0.16, 0.12, run * 0.5, 1500 * k + 500);
+    tone(t + 0.1, run, 'square', w0 * 1.5, w1 * 1.5, 0.05, 0.12, run * 0.5, 1800 * k + 400);
+    const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 22 * k; lg.gain.value = 6 * k; lfo.connect(lg); lg.connect(m.frequency); lfo.start(t + 0.1); lfo.stop(t + 0.2 + run); // (the motor's ripple)
+    // the track: the door's weight running along its rail
+    noise(t + 0.1, run + 0.1, 'lowpass', 420 * k, 260 * k, 0.8, 0.3 * k, 0.1);
+    // the latch: a clack, and the knock of the door against its stop
+    noise(end, 0.05, 'bandpass', 2600 * k, 1800 * k, 3, 0.45, 0.002);
+    tone(end, 0.22 / k, 'sine', 120 * k, 48 * k, 0.55 * (open ? 0.85 : 1) / Math.sqrt(k), 0.003, 0.02);
+    noise(end, 0.1 / k, 'lowpass', 700 * k, 200, 0.7, 0.35, 0.002);
+    const at = pos, att = this.far(d), hand = this.HANDLING; // (the same trim as the recorded foley: HANDLING)
+    this.route(out, at, 0.5 * hand * att / 0.7, 0.5 * hand * this.NEAR_PLACED / 0.7);
+  },
   // Foley for hands-on actions, keyed by action kind: [progress, sound]. Each plays as the action passes its
   // mark: for my own actions, and for teammates' (from their state, attenuated by distance).
   FOLEY: <Record<FoleyKind, [number, FoleySound][]>>{
