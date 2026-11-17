@@ -38,7 +38,7 @@ type ServerPhase = 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 interface Evidence { i: number; wpn: string; x: number; y: number; z: number; owner: number; secured: boolean; taken: boolean }
 interface Loot { id: number; x: number; y: number; z: number; item: any; yaw: number; fit?: number }
 interface Cab { open: boolean; ver: number; items: any[][] }
-interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; civ: boolean; secured: boolean; rec: Enemy } // (the dead, until secured)
+interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; civ: boolean; secured: boolean; rec: Enemy; pre?: boolean } // (the dead, until secured)
 interface ServerReport { incap: number; bleedouts: number; bleedBy: Record<string, number>; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number; bodies: number; allRescued?: boolean; stronghold?: boolean }
 interface ServerRoute { seed: number; act: number; path: number[]; votes: Record<string, number> }
 interface TeamLocker { ver: number; items: any[][] }

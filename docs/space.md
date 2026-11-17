@@ -221,8 +221,16 @@ band of lit windows round each, a raked blue funnel, a wheelhouse tier over her 
 On a cruise liner's upper deck the compartment aft of her court to port is her **shelter** (`meta.shelter`, role `shelter`): one
 door, through the court's after wall at the back of the mezzanine; none onto the spine. Benches round its walls.
 
-A liner on the board is always one of two jobs, by her seed (`G.SpaceData.offers`): **retake her** (`hostage`: pirates hold her, her
-people tied in her court) or **hold her** (`defend`, `js/spaceserver.ts` defendTick):
+A liner is a **high-security ship**: her own people are a civilian ship's (security guards and officers, not a navy's), with two
+more guards and a security squad more than a cruiser's (34 armed aboard one, in the simulation), and boarding her is an attack
+like any other: her cameras, her alarm, her response teams. Only on the one job below is she expecting the squad.
+
+A liner on the board is one of three jobs, a third each by her seed (`G.SpaceData.offers`): the job she'd have been anyway
+(an artifact or a wanted officer, against all of that); **retake her** (`hostage`: pirates hold her, her people tied in her court);
+or **hold her** (`defend`, `js/spaceserver.ts` defendTick):
+
+- **There's been a fight already.** Ten of her security and eight pirates lie dead about her from the start (not in the shelter;
+  nobody's kill in the debrief): why only a handful of her people are left.
 
 - **She's expecting the squad.** Boarding her is no attack: no alarm, no drill, her hull guns hold their fire, nobody carries a
   keycard. Her passengers and hands (her class's civilians and four more) are in the shelter from the start.

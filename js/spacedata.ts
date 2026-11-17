@@ -283,7 +283,7 @@ export const SpaceData = (() => {
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },
     destruct: { name: 'Scuttle her', pay: 700, line: 'Reach the bridge, start the self-destruct, and be off the ship (yours, or one of her escape pods) before it runs out.' },
     hostage: { name: 'Retake the ship', pay: 600, line: 'Pirates have boarded her (their pods are still in her hull) and hold her people tied in one compartment. Clear every pirate off her: dead, down or in restraints. Each hostage alive at the end pays.' },
-    defend: { name: 'Hold the liner', pay: 900, line: 'Pirates are closing on a cruise liner. Her passengers are shut in the shelter at the back of her upper deck, behind the mezzanine. She is expecting you: board her anywhere but her court (it is armoured), and nobody will take it for an attack. Her security will be waiting in the court to fight beside you. For three minutes pirate pods will come through her hull, one after another. Every passenger unhurt at the end pays.' },
+    defend: { name: 'Hold the liner', pay: 900, line: 'Pirates are closing on a cruise liner. Her passengers are shut in the shelter at the back of her upper deck, behind the mezzanine. They have been aboard once already: most of her security died throwing them off. She is expecting you: board her anywhere but her court (it is armoured), and nobody will take it for an attack. What is left of her security will be waiting in the court to fight beside you. For three minutes pirate pods will come through her hull, one after another. Every passenger unhurt at the end pays.' },
     visit: { name: 'Unlisted ship', pay: 0, line: 'Not the mission: a ship that happened to be passing. What is in her hold is worth carrying off. A breach is an attack: she will fight.' },
     assault: { name: 'Planetary assault', pay: 300, line: 'Land at the pad outside the base and bring it under control: every hostile down or in restraints.' },
   };
@@ -313,8 +313,8 @@ export const SpaceData = (() => {
       // (a cruiser with a promenade court is a cruise liner, a civilian ship in her own livery, LINER: below, once her seed's drawn)
       out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, wing, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name + (wing ? ' (a flying wing)' : ''), brief: OBJ[obj].line, other, night: assault && !T.night && r() < 0.25,
         ly: Math.round((3 + r() * 40) * 10) / 10, anchor: [Math.cos(a) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(a) * Math.cos(el) * d] });
-      { const o = out[out.length - 1]; if (o.kind === 'board' && hallOf(o.seed, o.size) === 'mall') { // (and what's wanted of the squad aboard her is one of two things, by her seed: she's been taken by pirates, or they're on their way)
-        o.th = LINER; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Cruise liner'; o.obj = (o.seed >>> 4) & 1 ? 'hostage' : 'defend'; o.brief = OBJ[o.obj].line; o.pay = Math.round((SIZES.large.pay + OBJ[o.obj].pay + 160 * o.diff) / 50) * 50; } }
+      { const o = out[out.length - 1]; if (o.kind === 'board' && hallOf(o.seed, o.size) === 'mall') { // (and what's wanted of the squad aboard her goes by her seed, a third each: she's to be held; she's been taken; or the job she'd have been anyway, against her own security and her alarms, never a scuttling)
+        o.th = LINER; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Cruise liner'; { const way = (o.seed >>> 4) % 3; o.obj = way === 0 ? 'defend' : way === 1 ? 'hostage' : o.obj === 'destruct' ? 'hvt' : o.obj; } o.brief = OBJ[o.obj].line; o.pay = Math.round((SIZES.large.pay + OBJ[o.obj].pay + 160 * o.diff) / 50) * 50; } }
     }
     return out;
   }
