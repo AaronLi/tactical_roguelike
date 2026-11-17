@@ -540,10 +540,12 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
     for (let i = 0; i < 1024; i++) { const x = (i / 1023) * 2 - 1; drive[i] = Math.tanh(x * 3.5); }
 
     // How big the blast is, apart from how loud: the gas let go at the muzzle (gasLoad: 1 for a 5.56 from a 14.5"
-    // barrel, 0.8 from a 10.3", 2.8 a .308 from 20"). A blast's duration and the depth of its thump go with the
-    // cube root of its energy (blast scaling), so two rounds as loud as each other at the muzzle (a 10.3" 5.56 and a
-    // 20" .308 are, as measured) still differ in weight: the bigger charge lasts longer, sits lower and thumps
-    // harder. (gasLoad puts a 9 mm pistol at 0.76 and an MP5 at 1.3, well over their real share of a rifle's
+    // barrel, 0.8 from a 10.3", 2.8 a .308 from 20"). The depth of a blast's thump goes with the cube root of
+    // its energy (blast scaling), so two rounds as loud as each other at the muzzle (a 10.3" 5.56 and a 20" .308 are,
+    // as measured) still differ in weight: the bigger charge sits lower and thumps harder. Not longer, though: the
+    // decay below (tau) is tens of ms already, ten times a real blast's 3-5 ms, and the mic stage clips it flat, so
+    // any more of it isn't a bigger bang but a longer roar of gas (a .50's held its loudest for 0.4 s when tau went
+    // with the gas too). (gasLoad puts a 9 mm pistol at 0.76 and an MP5 at 1.3, well over their real share of a rifle's
     // charge: the ballistics model is generous to pistols. So this tells rifle rounds apart, and pistols hardly move.)
     const gw = Math.cbrt(clamp(gasLoad(p, b), 0.15, 6));
     // Blast spectral centroid — device tilt baked, listener directivity NOT.
@@ -559,7 +561,7 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
       0.05, 2.0
     );
     // (a can blows down: the more volume, the longer the gas takes to leave it)
-    const tau = (0.010 + 0.02 * (p.caliber / 9)) * gw * (can ? 1 + 0.75 * can.vol : dev.decay) * (1 + 0.35 * (1 - b.burn));
+    const tau = (0.010 + 0.02 * (p.caliber / 9)) * (can ? 1 + 0.75 * can.vol : dev.decay) * (1 + 0.35 * (1 - b.burn));
     const g0 = dbToGain(sup ? sup.db : dev.level);   // device level baked into blast + tang
     // The action and the crack aren't suppressed: they stay at their own level (the bolt a little harder, with the
     // can's back pressure driving it), so next to the quieted blast they come forward.

@@ -2174,11 +2174,11 @@ plateau. Measured against the open gun: an integral can about 19 dB down, a full
 a compact can about 10. (The drive used to drop by all of it and the output by a quarter more, on top of the
 blast's own cut: an integral can ended 35-40 dB down, a whisper even in your own hands.) The crack and the bolt stay at their own level, so
 next to the quieted blast they come forward.
-**Blast weight:** how long the blast lasts and how deep it sits go with the gas let go at the muzzle
-(`gasLoad`, its cube root: blast scaling), not the bore alone. A 10.3" 5.56 and a 20" .308 are about as loud as
-each other at the muzzle (as measured), but the .308 lets go 3.5 times the gas: its blast lasts half as long
-again, its thump is lower and harder, and through a can its low end is cut from lower down. In the final render
-the .308 is about 30% darker than the M4, open or suppressed (it was 20% and 15%).
+**Blast weight:** how deep the blast sits goes with the gas let go at the muzzle (`gasLoad`, its cube root:
+blast scaling), not the bore alone. A 10.3" 5.56 and a 20" .308 are about as loud as each other at the muzzle
+(as measured), but the .308 lets go 3.5 times the gas: its blast is darker, its thump lower and harder, and
+through a can its low end is cut from lower down. Its length doesn't go with the gas: the mic stage clips a
+longer decay into a longer flat roar, not a bigger bang.
 
 **Secondary blast:** a short barrel on a rifle round throws burning powder out of the muzzle, and it
 re-ignites in the air: a second, slower, lower wave 3-4 ms behind the first (measured on 10.3" and 14.5" 5.56
