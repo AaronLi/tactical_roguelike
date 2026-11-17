@@ -567,15 +567,6 @@ const G_GunRecipes = (() => {
         k.prof([[-0.02, 0.02], [-0.215, 0.016], [-0.225, -0.082], [-0.205, -0.088], [-0.196, -0.004], [-0.02, 0.0]], 0.018, m);
         pad(-0.222, -0.034, 0.1);
         break;
-      case 'scar': { // the SCAR's: its hinge on the back of the receiver, a raised comb for the cheek, the butt raked a
-        // little, its lower front edge ribbed (traced with the receiver: scarTrace)
-        const V = scarTrace, pts = (a: number[][]) => a.map(V);
-        k.box(0.036, V([0, 199])[1] - V([0, 324])[1], 0.03, m, V([388, 0])[0] - 0.01, (V([0, 199])[1] + V([0, 324])[1]) / 2);
-        k.prof(pts([[390, 196], [241, 206], [113, 216], [114, 224], [148, 425], [160, 415], [238, 309], [390, 310]]), 0.04, m, 0, null, 0.004);
-        k.prof(pts([[100, 220], [114, 216], [150, 427], [137, 429]]), 0.042, M.rubber(), 0, null, 0.0008);
-        for (let i = 0; i < 6; i++) { const t = (i + 0.5) / 6, [f, y] = V([162 + 74 * t, 412 - 100 * t]); k.box(0.041, 0.004, 0.006, M.rubber(), f - 0.003, y); }
-        break;
-      }
       case 'g36': { // the G36's: a skeleton folding on the hinge at the back of the receiver, a window through it and a
         // small one ahead of that, the strut under them sweeping down to the foot of the butt (traced with the receiver)
         const V = g36Trace, pts = (a: number[][]) => a.map(V);
@@ -1066,9 +1057,6 @@ const G_GunRecipes = (() => {
     for (const [a, b] of [[535, 568], [578, 612]]) k.box(0.0385, 0.003, (b - a) / 122 * len, D, fx(a), V([0, 353.5])[1]);
     k.cyl(0.0195, 0.007, M.gunmetal(), f0 + len, 0); // (its ferrule, where it ends)
   }
-  // the SCAR's trace (rifle(), rcv 'scar', and its stock): a pixel of its reference photo ([x, y]: x forward from the back
-  // of the upper at 400, y down from the bore at 245, the photo drawn 1500 px wide) to gun space ([forward, up], metres)
-  const scarTrace = ([x, y]: number[]) => [(x - 400) * 0.00059, (245 - y) * 0.00059];
   // the G36's trace (rifle(), rcv 'g36', its handguard and its stock): a pixel of its reference photo ([x, y]: x forward
   // from the stock's hinge at 330, y down from the bore at 143.6) to gun space ([forward, up], metres)
   const g36Trace = ([x, y]: number[]) => [(x - 330) * 0.000945, (143.6 - y) * 0.000945];
@@ -1381,31 +1369,6 @@ const G_GunRecipes = (() => {
       const ext = o.railExt || 0;
       if (ext) k.box(0.024, 0.009, ext, rm, L, 0.0215);
       top = S.rail(k, 0.004, L + ext - 0.004, 0.026, rm);
-    } else if (rcv === 'scar') {
-      // The FN SCAR (the L, Mk 16), traced from a side photo of the right side (Wikimedia Commons, "FN SCAR-L noBG.png",
-      // CC BY-SA 4.0) at 0.59 mm a pixel: 787 mm overall with the stock in (FN: 850 extended), its STANAG magazine 66
-      // mm deep. One long aluminium upper from the hinge to the gas block, a rail along its whole top, short rails each
-      // side of its front and one under it (so no handguard: the rails are the upper's); the charging handle rides a slot
-      // along its side. The lower is polymer: the grip, the trigger guard and the magazine well in one moulding. The H
-      // is the same gun scaled up in the magazine well (its 7.62 magazine) with a longer barrel.
-      const V = scarTrace, pts = (a: number[][]) => a.map(V), B = M.black(), D = M.rubber(), up = rm, lo = fm;
-      k.prof(pts([[400, 188], [1042, 188], [1042, 269], [750, 269], [745, 281], [400, 281]]), 0.034, up);
-      // (the magazine well: its front face straight down from a curve in under the upper, its mouth sloping up toward the
-      // front, the magazine going in along it)
-      k.prof(pts([[410, 281], [770, 281], [758, 288], [748, 298], [746, 346], [640, 370], [548, 370], [541, 340], [447, 330], [425, 300], [410, 295]]), 0.03, lo, 0,
-        [pts([[554, 331], [636, 331], [636, 365], [554, 365]])]);
-      k.box(0.005, V([0, 331])[1] - V([0, 352])[1], 0.006, B, V([584, 0])[0], (V([0, 331])[1] + V([0, 352])[1]) / 2); // the trigger
-      // the rails: under the front, and a short one each side of it
-      { const [f0] = V([785, 0]), [f1] = V([1040, 0]), yb = V([0, 271])[1]; k.box(0.021, 0.006, f1 - f0, B, f0, yb - 0.003); for (let i = 0; i < Math.floor((f1 - f0) / 0.0105); i++) k.box(0.023, 0.004, 0.0052, B, f0 + 0.003 + i * 0.0105, yb - 0.008); }
-      for (const x of [-0.0185, 0.0185]) sideRail(k, V([882, 0])[0], V([1044, 0])[0] - V([882, 0])[0], V([0, 254])[1], x, B);
-      // the lightening cuts down the front, the charging handle's slot, the ejection port (right side)
-      for (const sd of [-1, 1]) for (const [a, b] of [[865, 905], [912, 952], [958, 996]]) k.box(0.0005, V([0, 206])[1] - V([0, 215])[1], V([b, 0])[0] - V([a, 0])[0], D, V([a, 0])[0], V([0, 210])[1], sd * 0.0171);
-      k.box(0.0005, V([0, 206])[1] - V([0, 216])[1], V([846, 0])[0] - V([620, 0])[0], D, V([620, 0])[0], V([0, 211])[1], -0.0171);
-      k.box(0.0005, V([0, 242])[1] - V([0, 259])[1], V([739, 0])[0] - V([617, 0])[0], D, V([617, 0])[0], V([0, 250])[1], 0.0171);
-      k.box(0.003, 0.009, V([730, 0])[0] - V([625, 0])[0], M.steel(), V([625, 0])[0], V([0, 251])[1], 0.0172);
-      // the gas block at the front of the upper, round the barrel
-      k.box(0.026, V([0, 225])[1] - V([0, 263])[1], V([1119, 0])[0] - V([1040, 0])[0], B, V([1040, 0])[0], (V([0, 225])[1] + V([0, 263])[1]) / 2);
-      top = S.rail(k, V([405, 0])[0], V([1040, 0])[0] - V([405, 0])[0], V([0, 188])[1], up);
     } else if (rcv === 'g36') {
       // The HK G36, traced from a side photo of the right side (Wikimedia Commons, "Gewehr G36 weiss.jpg", CC BY-SA 3.0)
       // at 0.945 mm a pixel: 999 mm overall with the stock out, HK's figure. Polymer throughout: the receiver, the
@@ -1470,7 +1433,7 @@ const G_GunRecipes = (() => {
       if (tr) { tracedParts(k, tr, VT, 'base', mats); top = VT([0, tr.topY])[1]; }
       else { k.prof([[0, -0.04], [0, 0.012], [L, 0.012], [L, -0.04]], 0.044, o.rm || M.steel()); top = 0.012; }
     }
-    if (!tr && rcv !== 'vector' && rcv !== 'aug' && rcv !== 'qbz95' && rcv !== 'scar' && rcv !== 'f2' && rcv !== 'aksu' && rcv !== 'gm6' && rcv !== 'authored') triggerGuard(k, gf, rm); // (the F2's is a loop of its own) // (the SCAR's is its lower's) // (the QBZ-95's is its shell) // (the Vector's opening is in its lower; the AUG's guard is its shell)
+    if (!tr && rcv !== 'vector' && rcv !== 'aug' && rcv !== 'qbz95' && rcv !== 'f2' && rcv !== 'aksu' && rcv !== 'gm6' && rcv !== 'authored') triggerGuard(k, gf, rm); // (the F2's is a loop of its own) // (the QBZ-95's is its shell) // (the Vector's opening is in its lower; the AUG's guard is its shell)
     if (o.extra === 'ksgTubes') for (const x of [-0.013, 0.013]) k.cyl(0.011, 0.3, M.black(), 0.1, -0.03, x);
     // a carry handle: low enough to keep clear of the line of sight (the irons sit 34 mm over the top), or,
     // like the FAL's, folded down along the left side of the receiver
@@ -1699,7 +1662,6 @@ const G_GunRecipes = (() => {
       if (rn) k.into(rn.node, rn.f, rn.y);
     }
     else if (o.fg && A && A.anchors.mount_fg) { k.tag('fg'); fgF = A.anchors.mount_fg[0]; k.moved(0, A.anchors.mount_fg[1] + 0.022, () => foregrip(k, o.fg!, fgF!, fm, anim)); } // (a rail under the model's own forend: the foregrip hangs from it)
-    else if (o.fg && !hgLen && o.fgAt != null) { k.tag('fg'); fgF = o.fgAt; foregrip(k, o.fg, fgF, fm, anim); } // (a rail under the receiver itself: the SCAR's)
     else if (o.fg && hgLen) {
       k.tag('fg'); fgF = rcv === 'vector' && o.hg && o.hg.t === 'vector' ? L - 0.05 : hgF + Math.min(hgLen * 0.35, 0.09, hgLen - 0.04);
       // (an authored handguard whose bottom rail, part.rails.bottom, does not reach under that seat, a drop-in's under a short gas tube: the foregrip goes on
@@ -1799,7 +1761,6 @@ const G_GunRecipes = (() => {
       k.annulus(0.003, 0.005, 0.002, B, fR - 0.007, sy);
       sight = { sy, fSight: fR - 0.007, relief: 0.17 };
     } else if (rcv === 'g36' && (['irons', 'notch', undefined] as (string | undefined)[]).includes(o.optic)) sight = S.irons(k, g36Trace([362, 0])[0], g36Trace([632, 0])[0], top + 0.016, top, top, 'ar'); // (low ones at the ends of the handle's rail)
-    else if (o.ironsAt && (['irons', 'notch', undefined] as (string | undefined)[]).includes(o.optic)) sight = S.irons(k, o.ironsAt[0], o.ironsAt[1], top + 0.034, top, o.ironsAt[2] != null ? o.ironsAt[2] : top, 'ar'); // (the upper's own flip-ups: the SCAR's, the front on its gas block)
     else sight = rcv === 'vector' && (['irons', 'notch', undefined] as (string | undefined)[]).includes(o.optic) ? S.irons(k, vecTrace([358, 0])[0], vecTrace([700, 0])[0], top + 0.034, top, top, 'ar') // (the flip-ups at the rail's two ends, raised)
       : tr && tr.sightF != null && o.optic === 'notch' && o.sightRise ? raisedSights(k, tr, bEnd, top, o.sightRise, by)
       : tr && tr.sightF != null && o.optic === 'notch' ? (rcv === 'break' ? breakSights(k, tr, bEnd - 0.012, top + (tr.sh || 0.0075), by + 0.004, top) : S.pistolSights(k, tr.sightF, L - 0.012, top + (tr.sh || 0.0075), top, false, top, tr.sw))
@@ -1814,7 +1775,7 @@ const G_GunRecipes = (() => {
     const port = o.bolt ? [o.bolt - 0.02, top - 0.004, 0] : o.lever ? [L * 0.55, 0.0, 0.02] : o.pump || o.tube ? [L * 0.62, -0.042, 0] : rcv === 'break' ? [L, 0.0, 0] : [L * 0.5, top, 0];
     // where a chamber check shows the round: through the ejection port on the right (js/vmanim.ts), or for a
     // break-action, the shell heads in the breech
-    const hw = ({ fal: 0.016, ar: 0.0178, ak: 0.022, aksu: 0.0192, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, gm6: 0.03, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, scar: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 } as Record<string, number>)[rcv] || 0.018;
+    const hw = ({ fal: 0.016, ar: 0.0178, ak: 0.022, aksu: 0.0192, box: (o.W || 0.045) / 2, round: 0.018, bullpup: 0.023, vector: 0.026, aug: 0.029, gm6: 0.03, f2: 0.032, qbz95: 0.027, qbz192: 0.0172, g36: 0.022, mcx: 0.0156, mpx: 0.0156 } as Record<string, number>)[rcv] || 0.018;
     const chamberAt = tr && tr.chamber ? { side: 'breech', heads: [[0, by - hy]], z: L - tr.chamber, r: 0.0097, bore: true } // (the Thor's: in the back face of its sleeve, half proud of it, the bore there when it's empty)
       : rcv === 'break' ? { side: 'breech', heads: (o.barrels || [0]).map((x: number) => [x, by - hy]), z: -0.0005, r: br } // (in the barrels' hinge frame)
       : o.bolt ? { side: 'top', f: o.bolt - 0.05, y: rcv === 'round' ? top - 0.0015 : top, x: rcv === 'round' ? 0.006 : 0.011, w: 0.024 } // (a bolt gun's port is its open top, to the right of a scope's line, above the stock)
