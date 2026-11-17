@@ -1858,10 +1858,11 @@ export const Furniture = (() => {
           for (const [dx, dz] of [[-2, -2], [1, -2], [-2, 1], [1, 1]]) small('urnpalm', mx + dx, mzz + dz, dx < 0 ? 0.5 : -0.5, dz < 0 ? 0.5 : -0.5);
         }
         if (rm.type === 'mall') set('gstatue', rm.x + 3, mzz - (r() < 0.5 ? 1 : 0), 1, 1, 1);
-        // About one thing to every eight tiles of open floor inside the walls' tile (every six in a hall down one side of her: its
-        // frames take up much of it; every five in a liner's court and on her mezzanine), wherever it falls and fits.
+        // About one thing to every eight tiles of the floor inside the walls' tile (every six in a hall down one side of her: its
+        // frames take up much of it), wherever it falls and fits; in a liner's court and on her mezzanine, one to every five
+        // tiles that are clear to stand something on.
         let open = 0; for (let z = rm.z + 1; z < rm.z + rm.h - 1; z++) for (let x = rm.x + 1; x < rm.x + rm.w - 1; x++) if (free(x, z)) open++;
-        for (let want = Math.round(open / (rm.type === 'mall' || rm.type === 'mezz' ? 5 : ih <= 4 ? 6 : 8)), a = 0; want > 0 && a < iw * ih * 3; a++) {
+        for (let want = rm.type === 'mall' || rm.type === 'mezz' ? Math.round(open / 5) : Math.round(iw * ih / (ih <= 4 ? 6 : 8)), a = 0; want > 0 && a < iw * ih * 3; a++) {
           let pick = r() * total, k = 0; while (k < K.plots.length - 1 && (pick -= K.plots[k][0]) >= 0) k++;
           if (K.plots[k][1](rm.x + 1 + Math.floor(r() * iw), rm.z + 1 + Math.floor(r() * ih))) want--;
         }
