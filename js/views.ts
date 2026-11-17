@@ -61,6 +61,7 @@ export const Views = {
   // the rounds in flight, the pings by player, the evidence outline's and the halo's materials (and their shared resolution, and smoothed geometry),
   // the evidence envelope's, the suspects' light housing, the drip timer
   warmed: undefined as boolean | undefined,
+  _invWarm: null as unknown, // (the level the Tab screen was last drawn ahead for: applySnap)
   _sp: undefined as THREE.Vector3 | undefined,
   _occ: undefined as ((s: { kind: string }) => boolean) | undefined,
   selfBody: undefined as { rig: Rig; pos: THREE.Vector3; yaw: number } | null | undefined,
@@ -175,7 +176,8 @@ export const Views = {
   slowFill: false, // (a level come up with from outside, with no veil: its people are made a few a snapshot, not all in one frame. js/game.ts enterLevel)
   applySnap(m: any) {
     const fillT = performance.now();
-    if (!this.warmed) { this.warmed = true; Game.veilSay('Compiling shaders'); setTimeout(() => InvUI.warm(), 30); setTimeout(() => R.warmup(() => { Game.veilN = Game.VEIL_SMOOTH; Game.veilWait = 0; }), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
+    if (this._invWarm !== Game.map) { this._invWarm = Game.map; setTimeout(() => InvUI.warm(), 30); } // (the Tab screen's pictures, once a level however it came up: InvUI.warm)
+    if (!this.warmed) { this.warmed = true; Game.veilSay('Compiling shaders'); setTimeout(() => R.warmup(() => { Game.veilN = Game.VEIL_SMOOTH; Game.veilWait = 0; }), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
     for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd, fc = 0, rd = 0] of m.e) {
       seen.add(id);

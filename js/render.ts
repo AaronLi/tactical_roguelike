@@ -1778,6 +1778,7 @@ export const R = {
       objs.push(o);
     });
     if (!this._preRT) { this._preRT = new THREE.WebGLRenderTarget(4, 4); this._preMat = new THREE.MeshBasicMaterial({ fog: false }); }
+    this._blurWarm();
     const stand: THREE.PointLight[] = []; for (let i = 0; i < points; i++) stand.push(new THREE.PointLight(0xffffff, 0));
     return (ms: number) => {
       const t0 = performance.now(), late = () => performance.now() - t0 > ms, hid: THREE.Object3D[] = [];
@@ -1790,6 +1791,9 @@ export const R = {
           const o = objs.pop(), kids = o.children.splice(0), mat = o.material, fc = o.frustumCulled, vis = o.visible;
           try {
             r.compile(o, this.camera, this.scene);
+            // (and as it's drawn into a target: the menus' blur behind Tab and the shop, a scope's picture, night vision. Another
+            // shader for each, built here and not on the first Tab: any target will do, they're built for one as for another)
+            r.setRenderTarget(this._preRT); r.compile(o, this.camera, this.scene); r.setRenderTarget(null);
             if (o.isMesh && (o.isInstancedMesh || !seenG.has(o.geometry))) {
               seenG.add(o.geometry);
               o.material = this._preMat; o.frustumCulled = false; o.visible = true;
@@ -1899,8 +1903,7 @@ export const R = {
     compile(nvq, this.fishCam!, nvT); compile(nvq, this.fishCam!, null);
     // (the menus' blur, behind the Tab screen and the shop: _blurPasses, its pass into a target and its pass onto the screen. The
     // level under it is drawn into a target as the scope's picture is, built above)
-    // (and its targets at the size the frame will want, half the drawing buffer's, so the first Tab doesn't make them over)
-    { const d = r.getDrawingBufferSize(new THREE.Vector2()); this._blurTargets(Math.max(1, d.x >> 1), Math.max(1, d.y >> 1)); const B = this._blur!; compile(B.scene, B.cam, B.a); compile(B.scene, B.cam, null); }
+    W.tasks.push(() => this._blurWarm());
     if (Highlights.warm) Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, true));
     ReplayEnv.Game!.veilSay('Compiling shaders');
   },
@@ -2069,6 +2072,15 @@ export const R = {
     }
     if (B.a.width !== w || B.a.height !== h) { B.a.setSize(w, h); B.b.setSize(w, h); }
     return [B.a, B.b];
+  },
+  // the blur's targets made at the size the frame will want (half the drawing buffer's) and its passes' shaders built (into a
+  // target, and onto the screen), ahead of the first Tab (warmup, preload)
+  _blurWarm() {
+    const r = this.renderer, d = r.getDrawingBufferSize(new THREE.Vector2());
+    this._blurTargets(Math.max(1, d.x >> 1), Math.max(1, d.y >> 1));
+    const B = this._blur!;
+    try { r.setRenderTarget(B.a); r.compile(B.scene, B.cam); r.setRenderTarget(null); r.compile(B.scene, B.cam); } catch (e) { console.warn('blur warm', e); }
+    r.setRenderTarget(null);
   },
   _blurPasses() {
     const r = this.renderer, B = this._blur!, u = B.mat.uniforms;
