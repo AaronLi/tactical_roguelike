@@ -50,7 +50,7 @@ export const VMAnim = (() => {
   interface ChvHeads { heads: THREE.Group[]; shot: boolean; cyl?: boolean }
   interface ChvPort { g: THREE.Group; round: THREE.Group; face: THREE.Mesh; shot: boolean; real: boolean; bolt: THREE.Mesh | null; win: number; f: number }
   // the arms and props of a viewmodel (its userData.vma)
-  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion }
+  interface Vma { def: Def; k: { reload: VmReload; action: VmAction | null }; hs: Rig[]; R: Arm; L: Arm; props: Record<string, THREE.Group>; drop: { idx: number; at: number | undefined; from: V3; t0: number } | null; chv: ChvHeads | ChvPort | null; fw: number; trig: number; pose?: Pose | null; reloadT?: number; gripQ?: THREE.Quaternion; magOut?: boolean }
   type MagChk = GunRigMagChk;
   const S = (a: number, b: number, t: number) => U.smooth(a, b, t);
   const lerpV = (a: V3, b: V3, k: number) => a.clone().lerp(b, k);
@@ -818,7 +818,14 @@ export const VMAnim = (() => {
         const mg: MagState = pose ? pose.mag : { mode: 'in' };
         an.mag.visible = mg.mode !== 'gone' && !(w.noMag && mg.mode === 'in' && !pl.reloading); // (a gun with its magazine out has none on it)
         if (mg.mode !== 'chk') an.mag.quaternion.copy(A.magQ);
-        if (idx === 0 && !pl.reloading) magFill(a, h.chk, w, pl.magSize(w));
+        // what the magazine in view holds: the gun's, and through a reload, once the old one's gone (dropped or stowed), the fresh
+        // one coming up to go in (its rounds, their types, its capacity), not the old one's count carried on into it
+        if (!pl.reloading) a.magOut = false; else if (mg.mode === 'gone' || mg.mode === 'drop') a.magOut = true;
+        const inc = pl.reloading && a.magOut ? (pl as unknown as { reloadIn: GItem | null }).reloadIn : null;
+        if (idx === 0) {
+          if (inc && inc.r) magFill(a, h.chk, { mag: inc.r.length, tube: inc.r, ammo: inc.am, noMag: false } as unknown as PWeapon, inc.cap || pl.magSize(w));
+          else if (!pl.reloading || !a.magOut) magFill(a, h.chk, w, pl.magSize(w));
+        }
         if (mg.mode === 'in') an.mag.position.copy(A.magHome);
         else if (mg.mode === 'peek') an.mag.position.copy(alongMag(A, A.magHome, mg.d!));
         else if (mg.mode === 'rise') an.mag.position.copy(alongMag(A, A.magHome, 0.15 * (1 - mg.k!)));

@@ -144,6 +144,7 @@ export const Me = {
   reloadSeat: undefined as unknown as number, reloadPackK: undefined as unknown as number, reloadN: undefined as unknown as number, reloadEv: undefined as unknown as number, hCues: null as { at: number; name: string; done: boolean }[] | null, loadN: undefined as unknown as number,
   reloadEmpty: undefined as unknown as boolean, reloadAct: undefined as unknown as PActKind | null, slap: undefined as unknown as boolean,
   byHand: undefined as unknown as boolean, revOpen: undefined as unknown as boolean, revClose: undefined as unknown as boolean,
+  reloadIn: null as GItem | null, // (the magazine a reload's putting in: what it shows once the old one's out, js/vmanim.ts magFill)
   magDropped: undefined as any, dumpDest: undefined as unknown as GGrid | null, dumped: undefined as unknown as GItem | null,
   handCase: undefined as any, handOut: undefined as unknown as boolean, ejected: undefined as unknown as string[] | undefined, ejecting: undefined as unknown as number, ejectT: undefined as unknown as number,
   adsT: undefined as unknown as number, ads: undefined as unknown as boolean,
@@ -1187,6 +1188,7 @@ export const Me = {
     this.reloading = true;
     this.reloadMode = isMag && !w.def.enbloc ? 'retain' : 'plain';
     this.reloadPackK = best && best.pack ? 1.8 : 1;
+    this.reloadIn = best ? best.it : null;
     this.magDropped = false; this.dumpDest = null;
     this.burstQ = 0;
     this.reloadEmpty = chambered(w.def) ? !w.chamber : w.mag === 0; // (dry: it'll need the action worked)
