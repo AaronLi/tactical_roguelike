@@ -243,13 +243,16 @@ export const ShipModel = (() => {
     // Whose lines she has (her design language), by what she is: a freighter's (containers, tanks and gantries on a blunt hull), a
     // corporate cutter's (a needle bow, rounded shoulders, fins and nacelles), a pirate's (a toothed ram, scrap plates, spikes and
     // a boom, strapped-on engines, nothing matching) or a navy's (a long wedge bow, sloped armour over her roof and under her keel,
-    // a citadel with masts, tail fins). Pirates' plating is dark and rusted whatever she was built as.
-    const langOf = (size: SpSize): string => (size === 'transport' ? (th.name === 'Corporate cutter' ? 'cutter' : 'freighter') : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
+    // a citadel with masts, tail fins). Pirates' plating is dark and rusted whatever she was built as. A cruise liner (a theme with
+    // liner set) is white all over, whatever her bulkheads are inside: a raked bow, rounded shoulders, a blue band at her keel with
+    // a line of brass over it, a glazed roof over her court, two set-back tiers of superstructure aft of it with a band of lit
+    // windows round each, a raked funnel.
+    const langOf = (size: SpSize): string => (th.liner && size === 'large' ? 'liner' : size === 'transport' ? (th.name === 'Corporate cutter' ? 'cutter' : 'freighter') : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
     const decor: THREE.Mesh[] = [], washes: THREE.Mesh[] = []; // (what's cut away where she's rammed: cutAt)
-    const base = new T.Color(th.wall as string), r = G_U.rng((map.seed ^ 0x4a11) >>> 0);
+    const liner = langOf(sp.size) === 'liner', base = new T.Color(liner ? 0xeef0ee : th.wall as string), r = G_U.rng((map.seed ^ 0x4a11) >>> 0);
     if (langOf(sp.size) === 'pirate') base.multiplyScalar(0.62).lerp(new T.Color(0x5a3222), 0.3);
-    const shade = (k: number, o?: Record<string, any>) => M(base.clone().multiplyScalar(k).getHex(), Object.assign({ emissive: base.clone().multiplyScalar(k * 0.16).getHex() }, o || {}));
-    const plate = shade(0.62), dark = shade(0.36, { metalness: 0.5 }), light = shade(0.85), trim = M(0xb8862a, { emissive: 0x2a1c06 }), win = lit(0xffe2a8), nav = lit(0xff4030), eng = lit(0x7fd0ff);
+    const shade = (k: number, o?: Record<string, any>) => M(base.clone().multiplyScalar(k).getHex(), Object.assign({ emissive: base.clone().multiplyScalar(k * (liner ? 0.42 : 0.16)).getHex() }, o || {})); // (a liner's white: it has to read as white out in the dark)
+    const plate = shade(liner ? 0.86 : 0.62), dark = liner ? shade(0.74, { metalness: 0.15 }) : shade(0.36, { metalness: 0.5 }), light = shade(liner ? 0.96 : 0.85), trim = M(0xb8862a, { emissive: 0x2a1c06 }), win = lit(0xffe2a8), nav = lit(0xff4030), eng = lit(0x7fd0ff);
     const solid = (x: number, z: number) => x >= 0 && z >= 0 && x < W && z < H && t[z * W + x] !== 5;
     // the belly: under every run of cells that's part of a hull (a row at a time)
     for (let z = 0; z < H; z++) for (let x = 0; x < W;) {
@@ -476,6 +479,31 @@ export const ShipModel = (() => {
             bar(paint, V(stern - 10, y, z), V(stern - 8, y, z), 0.15, 0.85, 10); bar(paint, V(stern - 8, y, z), V(stern + 1, y, z), 0.85, 0.7, 10); bar(glowB, V(stern + 1, y, z), V(stern + 1.05, y, z), 0.55, 0.55, 10);
             for (const dx of [-7, -2]) bar(dLight, V(stern + dx, RY, zf - sg * 0.6), V(stern + dx, y, z), 0.14);
           }
+        } else if (lang === 'liner') {
+          // a cruise liner: a raked bow; her roof's edges rounded off; a blue keel and band at her waterline, a line of brass over it
+          const navy = DM(0x1c2f4a), brass = DM(0xb8935a), glassM = lit(0xd8b888), CT = Level.CTS, paint = M(0xf4f5f3, { side: T.DoubleSide, emissive: 0x6a6c6a }); // (her own white, brighter than a cutter's paint)
+          nose(paint, Math.min(18, pw * 0.6 + 6), 0.5, -0.4, RY * 0.8);
+          along(bow + 0.3, stern - 0.3, 4, (x, ln, zf, sg) => {
+            prism(paint, [V(x, RY + 0.2, zf + sg * 0.3), V(x, RY + 0.9, zf - sg * 0.5), V(x, RY + 1.15, zf - sg * 2.2), V(x, RY + 0.2, zf - sg * 2.2)], V(ln, 0, 0));
+            prism(navy, [V(x, -1.0, zf + sg * 0.34), V(x, -1.75, zf - sg * 0.7), V(x, -2.0, zf - sg * 2.6), V(x, -1.0, zf - sg * 2.6)], V(ln, 0, 0));
+            prism(navy, [V(x, -1.0, zf + sg * 0.34), V(x, -0.22, zf + sg * 0.34), V(x, -0.22, zf + sg * 0.3), V(x, -1.0, zf + sg * 0.3)], V(ln, 0, 0));
+            prism(brass, [V(x, -0.22, zf + sg * 0.35), V(x, -0.1, zf + sg * 0.35), V(x, -0.1, zf + sg * 0.3), V(x, -0.22, zf + sg * 0.3)], V(ln, 0, 0));
+          });
+          // over her court: a glazed roof down the middle of its open part, in a white kerb, blue glazing bars across it; the two
+          // tiers aft of it from where her mezzanine begins, each set in from the one under it, a band of lit windows round each; the
+          // funnel on the upper one, raked, a brass band near its top; a wheelhouse tier over her bridge, forward
+          const ci = map.rooms.findIndex((q, i) => !(q.fl) && sp.roles[i] === 'mall' && sp.hullOf[i] === h), court = map.rooms[ci] as any;
+          const cx0 = court ? court.x * TS : bow + L * 0.25, mzX = court && court.mz ? court.mz * CT : bow + L * 0.55, hw = Math.max(4, pw * 0.34);
+          { const a = cx0 + 3, b = mzX - 2, gw = Math.min(5.5, hw);
+            if (b - a > 6) { K.box(light, a - 0.5, RY, zc - gw - 0.5, b + 0.5, RY + 0.55, zc + gw + 0.5); K.box(glassM, a, RY + 0.5, zc - gw, b, RY + 0.62, zc + gw); for (let x = a + 3; x < b - 1; x += 3) K.box(navy, x - 0.08, RY + 0.55, zc - gw, x + 0.08, RY + 0.7, zc + gw); K.box(navy, a, RY + 0.55, zc - 0.1, b, RY + 0.7, zc + 0.1); } }
+          const tier = (x0: number, x1: number, y0: number, y1: number, w: number) => { K.box(light, x0, y0, zc - w, x1, y1, zc + w); K.box(navy, x0 - 0.25, y1, zc - w - 0.25, x1 + 0.25, y1 + 0.12, zc + w + 0.25);
+            for (const sg of [-1, 1]) K.box(win, x0 + 0.6, y0 + 1.0, zc + sg * w - 0.03, x1 - 0.6, y0 + 1.85, zc + sg * w + 0.03); K.box(win, x0 - 0.03, y0 + 1.0, zc - w + 0.6, x0 + 0.03, y0 + 1.85, zc + w - 0.6); K.box(win, x1 - 0.03, y0 + 1.0, zc - w + 0.6, x1 + 0.03, y0 + 1.85, zc + w - 0.6); };
+          const t1a = mzX + 1, t1b = stern - 7;
+          if (t1b - t1a > 10) { tier(t1a, t1b, RY, RY + 2.8, hw); tier(t1a + 3, t1b - 5, RY + 2.92, RY + 5.5, hw * 0.68);
+            const fx = t1a + (t1b - t1a) * 0.55, fy = RY + 5.62;
+            prism(navy, [V(fx, fy, zc - 1.4), V(fx + 5, fy, zc - 1.4), V(fx + 6.6, fy + 5.2, zc - 1.4), V(fx + 2.6, fy + 5.2, zc - 1.4)], V(0, 0, 2.8));
+            prism(brass, [V(fx + 2.0, fy + 3.8, zc - 1.45), V(fx + 6.2, fy + 3.8, zc - 1.45), V(fx + 6.42, fy + 4.4, zc - 1.45), V(fx + 2.2, fy + 4.4, zc - 1.45)], V(0, 0, 2.9)); }
+          tier(bow + 1.5, Math.min(bow + 9, cx0 - 1), RY, RY + 2.4, Math.max(3, pw * 0.3));
         } else if (lang === 'freighter') {
           // a blunt bow; containers down her back, tanks slung off her roof's edges, gantries over the stacks, a dish aft
           nose(dPlate, 2.8, pw * 0.36, -0.4, top * 0.8);
@@ -529,7 +557,7 @@ export const ShipModel = (() => {
       // Streamlining. Where her side steps in or out (an inside corner of her plan) the corner's filled: a fairing from the step's
       // full depth down to nothing along the longer wall, keel to roof, in slices (it's smashed through like the rest: cutAt).
       {
-        const fairM = langOf(sp.size) === 'cutter' ? paint : dPlate;
+        const fairM = langOf(sp.size) === 'cutter' || langOf(sp.size) === 'liner' ? paint : dPlate;
         for (const f of ShipGen.fairings(W, H, t)) { // (where they are: js/shipgen.ts fairings; no window goes behind one)
           const { cx, cz, short, long } = f, u = V(f.ux, 0, f.uz), v = V(f.vx, 0, f.vz), C0 = V(cx, 0, cz);
           const hm = sp.hulls.find((q) => cx > q.x0 - 2 && cx < q.x1 + 2 && cz > q.z0 - 2 && cz < q.z1 + 2) || sp.hull, y0 = -1.0, y1 = (hm.main ? TOP : WH) + 0.5, n = Math.max(2, Math.ceil(long / (TS * 1.5)));

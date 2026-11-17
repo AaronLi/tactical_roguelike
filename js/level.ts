@@ -785,7 +785,9 @@ export const Level = {
       const horiz = !run.v, nx = horiz ? 0 : 1, nz = horiz ? 1 : 0, cells = []; // (v: a north-south wall)
       if (horiz) { const z = run.z0 * K + 1; for (let x = run.x0 * K; x < (run.x1 + 1) * K; x++) cells.push(z * W + x); }
       else { const x = run.x0 * K + 1; for (let z = run.z0 * K; z < (run.z1 + 1) * K; z++) cells.push(z * W + x); }
-      const ok = (i: number) => t[i] === 1 && !used.has(i) && floor(i - nx - nz * W) && floor(i + nx + nz * W);
+      // (drop: glass with a drop the other side of it, not floor: a liner's promenade looking down into her court from the upper deck)
+      const side = (i: number) => floor(i) || (!!run.drop && t[i] === 5 && !out[i]);
+      const ok = (i: number) => t[i] === 1 && !used.has(i) && side(i - nx - nz * W) && side(i + nx + nz * W);
       for (let k = 0; k + 1 < cells.length; k++) if (ok(cells[k]) && ok(cells[k + 1])) { add([cells[k], cells[k + 1]], nx, nz, false, run); k++; }
     }
     // a wall cell with floor either side along one axis (a thin wall), indoors on one side and outdoors on the other
