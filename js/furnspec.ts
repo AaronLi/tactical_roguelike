@@ -463,6 +463,7 @@ export const FurnSpec = (() => {
         else if (spec.floor === 'flag') tex = tx.flag(pick(['#b0948a', '#a8968a', '#b89c8e']));
         else if (spec.floor === 'pave') tex = tx.tile(pick(['#55524c', '#4a4844', '#5e5a52']), '#34322e');
         else if (rm.lid) tex = tx.concrete('#6e6d69');
+        else if (spec.floor === 'tile' && rm.type === 'mall') tex = tx.tile(pick(['#b9a988', '#b3a280', '#bfae8c']), '#8a6a2c'); // (a liner's court: honey marble, gilt in its joints)
         else if (spec.floor === 'tile') tex = tx.tile(pick(['#d8d4cc', '#b8c0c4', '#e4dccc', '#3a3d40']), '#7a7670');
         else tex = tx.carpet(pick(['#5a5f6a', '#6a5a4a', '#4a5a52', '#7a6e62', '#3d4452']));
         tex.rep = [rm.w, rm.h];

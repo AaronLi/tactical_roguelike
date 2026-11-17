@@ -194,7 +194,7 @@ catwalks; a liner's court has glass balustrades instead), looking down on the fl
 | --- | --- | --- |
 | hangar bay (`bay`) | right across her amidships, about 30 x 32 m. The spine runs into it at each end, and crosses it on the upper deck as a bridge of grating | containers, pallet racking, forklifts, stacked crates and drums |
 | arboretum (`grove`) | down her port side amidships, about 30 x 12 m | a fountain, tanks, sheds, raised beds with fruit trees, hedges, junipers and boulders, benches |
-| promenade court (`mall`) | a **cruise liner's**: right across her well forward, behind the bridge, about 30 x 32 m. The spine crosses it on the upper deck on a deck of its own | a mall's court: a tiled floor, a fountain in the middle, kiosks and stalls under awnings, walls of shop shelving, planters (a hedge with trees along it), a cafe's tables, sofas and armchairs, a piano, shopfronts down its end walls. No frames on its floor but one in the spine's line at each end |
+| promenade court (`mall`) | a **cruise liner's**: right across her well forward, behind the bridge, about 30 x 32 m. The spine crosses it on the upper deck on a deck of its own, as far as the head of a **grand stair** (the spine's width, up the middle of the court's after end) | honey marble underfoot, marble columns with gilt capitals (`gcolumn`: furniture, not bulkhead), chandeliers, glass balustrades. A fountain in the middle and a gilt statue forward of it; display cases, glass cabinets and bookcases, a cafe's tables, sofas and armchairs, a piano, palms in gilt urns. No frames on its floor |
 | machinery halls (`works`) | one to starboard aft, next the engine room, a smaller one to port forward, about 20 x 12 m each | reactor cores, presses and mills, screens of panels, coolant tanks, turbines |
 
 So that nowhere on a hall's floor sees all of it: columns stand under the gallery's edge (up through both decks), **frames** (lengths
@@ -202,12 +202,15 @@ of bulkhead two or three tiles long) stand free on the floor, turn and turn abou
 a hangar bay, and most of what's stowed there is taller than a head (`js/furniture.ts` shipHalls; nothing is put down that would
 shut any of the floor off, and the tile under the gallery is kept clear all round). `node tools/ship_halls.mjs` measures it: from
 every place on each hall's floor, the share of that floor in sight. Over 32 halls it's at most 71%, and about 25 to 35% on average
-(a liner's court is the most open: at most 70% over ten of them, 43% on average).
+(a liner's court is the most open of them: at most 70% over eight).
 Her ordinary stairwells are moved clear of the halls (one or two, toward her ends), her lower deck is her working one (armoury,
 vault, magazines, brig), and her people live on the upper (quarters, mess, galley). High-bay lamps hang under the hall's roof
 and light the gallery too. On the terminal a cruiser with a hall says so, and the objective's panel aboard names it.
-A cruiser with a promenade court is offered as a cruise liner, in the corporate cutter's white livery (`G.SpaceData.offers`).
-`?board=large&seed=11` is a hangar bay, `&seed=6` an arboretum, `&seed=1` machinery halls, `&seed=9&hull=1` a liner's court, `&seed=3` none;
+A cruiser with a promenade court is a **cruise liner** all through: she takes a theme of her own (`G.SpaceData.LINER`, never drawn
+by lot; `js/level.ts` gives it to her whatever she was offered as), her bulkheads wood wainscot under cream damask with gilt rails and
+wall lights, her decks red carpet with a gilt lattice, her ceilings coffered (`js/levelview.ts` _shipTex: lbulkhead, ldeck,
+loverhead), her light warm and low.
+`?board=large&seed=11` is a hangar bay, `&seed=6` an arboretum, `&seed=1` machinery halls, `&seed=9` a liner's court, `&seed=3` none;
 `node tools/ship_dump.mjs large 7 2 artifact --hall=bay` prints one of any seed (`--hall=` for none).
 
 ## A flying wing (`sp.wing`)

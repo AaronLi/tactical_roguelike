@@ -64,12 +64,13 @@ export const Level = {
   genSp: null as SpGen | null,
   generateDay(seed: number, level: number, th?: number) {
     const U = G_U, r = U.rng(seed);
-    const theme = (th != null && SpaceData.themeAt(th)) || THEMES[(level - 1) % THEMES.length]; // (th from 1000: a ship, js/spacedata.ts)
+    let theme = (th != null && SpaceData.themeAt(th)) || THEMES[(level - 1) % THEMES.length]; // (th from 1000: a ship, js/spacedata.ts)
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
     if (theme.layout === 'ship') { // a ship to board (js/shipgen.ts): one deck, open space round it
       // (a cruiser's hall two decks high: asked for, or else whichever her seed gives her, if any: js/spacedata.ts hallOf)
       const gs = this.genSp, hall = gs && gs.hall !== undefined ? gs.hall : SpaceData.hallOf(seed, gs && gs.size);
+      if (hall === 'mall') theme = SpaceData.themeAt(SpaceData.LINER)!; // (a promenade court: she's a cruise liner, whatever she was offered as)
       const sl = ShipGen.lay(r, level, gs ? Object.assign({}, gs, { hall }) : gs) as LvLay & Partial<LvBuilding>;
       // (a capital ship: her decks planned one by one and stacked, as a building's storeys are)
       if (sl.floors) return ShipGen.finish(this.stack(sl.floors.map((fl: LvLay) => this.plan(fl, r, seed, level, theme)), sl), sl);
@@ -586,8 +587,9 @@ export const Level = {
       if (rm.out || rm.type === 'catwalk') continue; // (a catwalk: lit by its hall's lamps, high over it)
       if (rm.tall) { // a hall the building's full height: high-bay lamps under its roof, a grid of them (lighting the catwalks too: stack)
         if (map.theme.layout === 'ship') { // (a cruiser's hall, two decks high, js/shipgen.ts HALLS: hers every eight metres, and bright enough at that height to light its floor as her other compartments' lamps do theirs)
-          const nx = Math.max(1, Math.round(rm.w * TS / 8)), nz = Math.max(1, Math.round(rm.h * TS / 8));
-          for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) map.lights.push({ kind: 'highbay', x: (rm.x + (i + 0.5) * rm.w / nx) * TS, z: (rm.z + (j + 0.5) * rm.h / nz) * TS, y: this.FLOOR_H + this.WALL_H - 0.6, color: map.theme.light, i: rm.type === 'mall' ? 1.15 : 1.5, d: 24, up: 1 }); // (a liner's court: its pale tiles throw more of it back)
+          // (a liner's court: chandeliers, fewer and lower, a warm light and not much of it)
+          const mall = rm.type === 'mall', gap = mall ? 10 : 8, nx = Math.max(1, Math.round(rm.w * TS / gap)), nz = Math.max(1, Math.round(rm.h * TS / gap));
+          for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) map.lights.push(Object.assign({ kind: 'highbay', x: (rm.x + (i + 0.5) * rm.w / nx) * TS, z: (rm.z + (j + 0.5) * rm.h / nz) * TS, y: this.FLOOR_H + this.WALL_H - (mall ? 1.7 : 0.6), color: map.theme.light, i: mall ? 0.95 : 1.5, d: mall ? 20 : 24, up: 1 }, mall ? { chand: 1 } : {}) as LvLight);
           continue;
         }
         for (let z = rm.z + 5; z < rm.z + rm.h - 2; z += 12) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 15) map.lights.push({ kind: 'highbay', x: (x + 0.5) * TS, z: (z + 0.5) * TS, y: this.FLOOR_H + this.WALL_H - 0.6, color: 0xffe2b8, i: 0.5, d: 17, up: 1 });

@@ -761,6 +761,38 @@ export const Furniture = (() => {
     k.cyl(water, 0.62, 0.62, 0.02, 0, 1.66, 0, 18);
     k.cyl(stone, 0.12, 0.16, 0.5, 0, 1.9, 0, 10);
   } };
+  // ---------------------------------------------------------------- a cruise liner's promenade court (js/shipgen.ts HALLS mall)
+  // A column of the court: marble, the height of both decks (floor to the upper deck's roof), on a stepped plinth with a gilt
+  // base, fluted, a gilt capital spreading under a square abacus.
+  R.gcolumn = { w: 0.9, d: 0.9, boxes: [[0, 0, 0.8, 0.8, 8.3]], build(k: Kit) {
+    const marble = k.mat(0xcfc4ae, 0.35), vein = k.mat(0xb3a78e, 0.4), gilt = k.mat(0xc9a24a, 0.3, 0.85), dark = k.mat(0x3b2218, 0.5);
+    k.box(dark, 0.9, 0.18, 0.9, 0, 0.09, 0); k.box(marble, 0.8, 0.5, 0.8, 0, 0.43, 0); k.box(gilt, 0.84, 0.05, 0.84, 0, 0.7, 0);
+    k.cyl(gilt, 0.33, 0.4, 0.16, 0, 0.8, 0, 16); k.cyl(marble, 0.27, 0.3, 6.6, 0, 4.18, 0, 16);
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.box(vein, 0.05, 6.3, 0.05, Math.cos(a) * 0.275, 4.18, Math.sin(a) * 0.275); } // its fluting
+    k.cyl(gilt, 0.3, 0.27, 0.08, 0, 7.52, 0, 16); k.cyl(gilt, 0.5, 0.3, 0.4, 0, 7.76, 0, 12); k.box(marble, 1.0, 0.16, 1.0, 0, 8.04, 0); k.box(dark, 1.1, 0.18, 1.1, 0, 8.21, 0);
+  } };
+  // A statue: a figure in gilt, more than life size, on a marble plinth with a dark step.
+  R.gstatue = { w: 1.5, d: 1.5, cover: 1, boxes: [[0, 0, 1.4, 1.4, 1.3], [0, 0, 0.7, 0.7, 3.4]], build(k: Kit) {
+    const marble = k.mat(0xcfc4ae, 0.35), gilt = k.mat(0xc9a24a, 0.28, 0.9), dark = k.mat(0x3b2218, 0.5);
+    k.box(dark, 1.5, 0.16, 1.5, 0, 0.08, 0); k.box(marble, 1.3, 1.0, 1.3, 0, 0.66, 0); k.box(gilt, 1.36, 0.05, 1.36, 0, 1.18, 0); k.box(marble, 1.1, 0.12, 1.1, 0, 1.26, 0);
+    k.cyl(gilt, 0.2, 0.3, 0.9, 0, 1.77, 0, 10); k.cyl(gilt, 0.27, 0.2, 0.7, 0, 2.55, 0, 10); k.ico(gilt, 0.19, 0, 3.1, 0); // robes, the body, the head
+    k.box(gilt, 0.12, 0.7, 0.12, 0.32, 2.75, 0, 0); k.box(gilt, 0.12, 0.12, 0.6, -0.3, 2.7, 0.2, 0); k.cyl(gilt, 0.02, 0.02, 1.5, 0.34, 3.0, 0, 6); k.ico(gilt, 0.1, 0.34, 3.8, 0); // an arm up with a staff, the other out
+  } };
+  // A palm in a gilt urn.
+  R.urnpalm = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.55, 0.55, 2.6]], build(k: Kit) {
+    const gilt = k.mat(0xc9a24a, 0.3, 0.85), leaf = k.mat(k.pick([0x2a5a2a, 0x24502a, 0x32622c]), 0.9, 0, { flatShading: true });
+    k.cyl(gilt, 0.2, 0.14, 0.12, 0, 0.06, 0, 10); k.cyl(gilt, 0.3, 0.2, 0.5, 0, 0.37, 0, 12); k.cyl(k.mat(0x4a3a2a, 0.95), 0.06, 0.09, 1.5, 0, 1.35, 0, 8);
+    for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + k.rnd(), d = 0.45 + k.rnd() * 0.25; k.box(leaf, 0.95, 0.03, 0.2, Math.cos(a) * d, 2.15 + k.rnd() * 0.3, -Math.sin(a) * d, a); }
+    k.ico(leaf, 0.22, 0, 2.2, 0);
+  } };
+  // A display case: a dark wood base with a gilt band, a glazed case over it with a gilt frame, what's shown inside on a velvet pad.
+  R.vitrine = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.8, 0.8, 1.45]], build(k: Kit) {
+    const dark = k.mat(0x3b2218, 0.5), gilt = k.mat(0xc9a24a, 0.3, 0.85), glass = k.mat(0xbfd6dc, 0.05, 0.1, { transparent: true, opacity: 0.28 }), velvet = k.mat(k.pick([0x5a1420, 0x1e2a52, 0x24432c]), 0.95);
+    k.box(dark, 1.8, 0.8, 0.8, 0, 0.4, 0); k.box(gilt, 1.84, 0.05, 0.84, 0, 0.82, 0); k.box(velvet, 1.6, 0.04, 0.6, 0, 0.87, 0);
+    k.box(glass, 1.7, 0.55, 0.7, 0, 1.13, 0); k.box(gilt, 1.76, 0.04, 0.76, 0, 1.42, 0);
+    for (const sx of [-0.86, 0.86]) for (const sz of [-0.36, 0.36]) k.box(gilt, 0.04, 0.58, 0.04, sx, 1.13, sz);
+    for (let i = 0; i < 5; i++) k.ico(k.mat(k.pick([0xc9a24a, 0xe8e4da, 0x9fd0e0, 0xc03a4a]), 0.2, 0.7), 0.05 + k.rnd() * 0.04, -0.65 + i * 0.32, 0.95, (k.rnd() - 0.5) * 0.3);
+  } };
   // ---------------------------------------------------------------- a foundry (js/level.ts layFoundry)
   // fx: what a piece throws off (js/levelview.ts fx: 'sparks' and 'jet' along dir, 'embers' off a molten surface r across,
   // 'smoke', 'steam'), glow: the light it gives (a lamp of its own); both in its own frame, from the floor up.
@@ -1721,7 +1753,7 @@ export const Furniture = (() => {
     //   works: reactor cores in pairs with a panel between, presses and mills in a line, screens of panels, coolant tanks, turbines
     function shipHalls() {
       let cur: Room | null = null; // (the hall being furnished: nothing's put on the tile against its walls)
-      const C = (v: number) => (v + 0.5) * TS, free = (x: number, z: number) => !!cur && x > cur.x && z > cur.z && x < cur.x + cur.w - 1 && z < cur.z + cur.h - 1 && t[z * W + x] === 0;
+      const C = (v: number) => (v + 0.5) * TS, free = (x: number, z: number) => !!cur && x > cur.x && z > cur.z && x < cur.x + cur.w - 1 && z < cur.z + cur.h - 1 && t[z * W + x] === 0 && t[z * W + x + 1] !== 6 && t[z * W + x + 2] !== 6; // (nor on the two tiles at the foot of a flight)
       // a piece over nx by nz tiles from (x, z): all of them clear, and the first of them blocked without shutting anything off
       const set = (name: string, x: number, z: number, nx: number, nz: number, q: number) => {
         for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (!free(x + i, z + j)) return false;
@@ -1734,7 +1766,7 @@ export const Furniture = (() => {
         return true;
       };
       const BOXES = [0x4a5a66, 0x5d6b4a, 0x7a3f28, 0x2f5a7a, 0x8a8f94, 0x6b5a2e]; // (navy grey, olive, oxide, blue, light grey, ochre)
-      const FILL: Record<string, string> = { bay: 'crates', grove: 'juniper', works: 'turbine', mall: 'gondola' }; // (cover, as every piece of more than a tile here is)
+      const FILL: Record<string, string> = { bay: 'crates', grove: 'juniper', works: 'turbine', mall: 'vitrine' }; // (cover, as every piece of more than a tile here is)
       const small = (name: string, x: number, z: number, ox: number, oz: number) => { if (!free(x, z) || map.props.has(z * W + x)) return false; put(name, x, z, C(x) + ox, C(z) + oz, Math.floor(r() * 4), r()); return true; };
       // (each: what it puts down from the tile (x, z), and whether any of it went down)
       type Plot = (x: number, z: number) => boolean;
@@ -1757,17 +1789,18 @@ export const Furniture = (() => {
           [1, (x, z) => { const got = set('bench', x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('tree', x, z, 0.6, 0.6); return got; }],
           [2, row(['hedge', 'hedge', 'hedge'])],
         ] },
-        // (a liner's promenade court: a mall's. Kiosks and stalls, single and double; walls of shop shelving back to back; planters:
-        // a hedge with trees along it; a cafe's tables; a lounge's sofa and armchairs; display gondolas; a bench under a tree; a piano)
+        // (a liner's promenade court: a statue forward of its fountain, in the spine's line. Display cases in pairs and in rows; glass
+        // cabinets and bookcases back to back; a hedge between palms; a cafe's tables; a lounge's sofa and armchairs with a palm by them; a
+        // glass cabinet between palms; a bench under a palm; a piano)
         mall: { mid: 'fountain', plots: [
-          [3, (x, z) => { const got = set(U.pick(r, ['stallmerch', 'stallfood']), x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('tallplant', x, z, 0.85, 0.8); return got; }],
-          [2, (x, z) => set(U.pick(r, ['bigmerch', 'bigfood']), x, z, 2, 1, turn())],
-          [3, (x, z) => { const got = row(['shopwall', 'shopwall', 'shopwall'])(x, z); if (got) row(['shopwall', 'shopwall', 'shopwall'])(x, z + 1); return got; }],
-          [3, (x, z) => { const n = U.ri(r, 2, 3), got = any(...[0, 1, 2].slice(0, n).map((i) => set('hedge', x + i, z, 1, 1, 0))); if (got) for (let i = 0; i < n; i++) small('tree', x + i, z, 0, 0); return got; }],
-          [2, (x, z) => { const got = any(set('dining', x, z, 1, 1, U.ri(r, 0, 3)), set('dining', x + 1, z + 1, 1, 1, U.ri(r, 0, 3))); if (got) small('tallplant', x + 1, z, 0, 0); return got; }],
-          [2, (x, z) => { const got = any(set('sofa', x, z, 1, 1, 0), set('armchairs', x, z + 1, 1, 1, 2)); if (got) small('potplant', x, z, 0.85, 0); return got; }],
-          [2, row(['gondola', 'gondola'])],
-          [1, (x, z) => { const got = set('bench', x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('tree', x, z, 0.7, 0.7); return got; }],
+          [3, (x, z) => { const got = any(set('vitrine', x, z, 1, 1, 0), set('vitrine', x + 1, z, 1, 1, 0)); if (got) { small('urnpalm', x, z, -0.75, 0.75); small('urnpalm', x + 1, z, 0.75, -0.75); } return got; }],
+          [2, (x, z) => any(set('vitrine', x, z, 1, 1, 1), set('vitrine', x, z + 1, 1, 1, 1), set('vitrine', x, z + 2, 1, 1, 1))],
+          [3, (x, z) => { const got = row(['bookshelf', 'china', 'bookshelf'], 0)(x, z); if (got) row(['china', 'bookshelf', 'china'], 2)(x, z + 1); return got; }],
+          [2, (x, z) => { const n = U.ri(r, 2, 3), got = any(...[0, 1, 2].slice(0, n).map((i) => set('hedge', x + i, z, 1, 1, 0))); if (got) { small('urnpalm', x, z, -0.8, 0); small('urnpalm', x + n - 1, z, 0.8, 0); } return got; }],
+          [2, (x, z) => { const got = any(set('dining', x, z, 1, 1, U.ri(r, 0, 3)), set('dining', x + 1, z + 1, 1, 1, U.ri(r, 0, 3))); if (got) small('urnpalm', x + 1, z, 0, 0); return got; }],
+          [3, (x, z) => { const got = any(set('sofa', x, z, 1, 1, 0), set('armchairs', x, z + 1, 1, 1, 2)); if (got) small('urnpalm', x, z, 0.85, 0); return got; }],
+          [2, (x, z) => { const got = set('china', x, z, 1, 1, turn()); if (got) { small('urnpalm', x, z, -0.75, 0); small('urnpalm', x, z, 0.75, 0); } return got; }],
+          [1, (x, z) => { const got = set('bench', x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('urnpalm', x, z, 0.7, 0.7); return got; }],
           [1, (x, z) => set('piano', x, z, 1, 1, U.ri(r, 0, 3))],
         ] },
         works: { plots: [
@@ -1787,10 +1820,11 @@ export const Furniture = (() => {
         // (a court's shopfronts: shelving down its end walls, under the gallery, clear of the spine's doors and of the corners)
         if (rm.type === 'mall') for (const [x, dx] of [[rm.x, -1], [rm.x + rm.w - 1, 1]]) for (let z = rm.z + 2; z < rm.z + rm.h - 2; z++) {
           if (t[z * W + x] !== 0 || t[z * W + x + dx] !== 1 || [-2, -1, 0, 1, 2].some((q) => t[(z + q) * W + x + dx] === 3) || r() < 0.3) continue;
-          const name = U.pick(r, ['shopwall', 'shopwall', 'rack', 'china', 'dispenser']), rec = R[name];
+          const name = U.pick(r, ['bookshelf', 'china', 'china', 'vitrine', 'sofa']), rec = R[name];
           if (tryBlock(x, z, rec.cover ? 2 : 4)) put(name, x, z, C(x) + dx * (1 - 0.02 - rec.d / 2), C(z), facing(dx, 0), r(), [[dx, 0]]);
         }
         if (K.mid) set(K.mid, rm.x + (rm.w >> 1) - 1, rm.z + (rm.h >> 1) - 1, 2, 2, 0);
+        if (rm.type === 'mall') set('gstatue', rm.x + 3, rm.z + (rm.h >> 1) - (r() < 0.5 ? 1 : 0), 1, 1, 1); // (in the spine's line, three tiles in from its forward doors)
         for (let want = Math.round(iw * ih / (ih <= 4 ? 6 : 8)), a = 0; want > 0 && a < iw * ih * 3; a++) {
           let pick = r() * total, k = 0; while (k < K.plots.length - 1 && (pick -= K.plots[k][0]) >= 0) k++;
           if (K.plots[k][1](rm.x + 1 + Math.floor(r() * iw), rm.z + 1 + Math.floor(r() * ih))) want--;
