@@ -1,10 +1,9 @@
 'use strict';
+import { Furniture } from './furniture.js';
+import { Level } from './level.js';
+import { U as G_U } from './util.js';
 // The kit js/furniture.ts hands to a piece's build() (js/furnspec.ts FdKit: it records what the piece is made of), its
 // materials, a piece's style, and a floor spec.
-type HomeMat = FdMat;
-type HomeKit = FdKit;
-type HomeStyle = Record<string, any>; // (a piece's style: whatever its build reads)
-interface HomeFloor { kind: string; color: string; grout?: string; sound?: string }
 // A resident's data: see the notes below.
 interface HomeSwap { piece: string; style?: HomeStyle; at?: string }
 interface HomeItem extends HomeSwap { id: string; at: string; hang?: number; need?: number; must?: number; pull?: number; swap?: HomeSwap[] }
@@ -48,7 +47,7 @@ interface HomeHung { name: string; x: number; z: number; q: number; v: number; s
 //       isn't there (a bathroom), cut from a corner: see cut(). If no corner will take it it's left out, not the home.
 //     tight: a room too small to keep its door approach clear: only the doorway's kept
 //     items: what goes in, in order: { id, piece, style?, at, hang?, need?, must?, pull?, swap? }
-//       piece: a name in G.Furniture.R; style: handed to its build
+//       piece: a name in Furniture.R; style: handed to its build
 //       at: 'long': the wall with the most free run of it. 'facing:id', 'cross:id': the wall opposite that item's, one
 //         across it. 'beside:id', 'away:id': as near to it, as far from it, as there's room. 'corner': in a corner.
 //         'middle': out on the floor. 'wall': anywhere, spread round the room
@@ -61,8 +60,8 @@ interface HomeHung { name: string; x: number; z: number; q: number; v: number; s
 // A home needs the room types its resident lists (bar spare, up and carved ones): a room type left out is painted by `rest`.
 // A loft is one home on two floors: its resident's chosen on the ground floor and dresses the upper floor too (lofts).
 // More residents: js/residents.ts.
-const G_Homes = (() => {
-  const U = G.U, F = G.Furniture, R = F.R;
+export const Homes = (() => {
+  const U = G_U, F = Furniture, R = F.R;
   const CREAM = '#d9d0b0'; // (smoke-stained, every ceiling of his but the bathroom's)
   const RESIDENTS: HomeResident[] = [
     { id: 'harold', name: 'Harold Pruitt', home: 'flat', rate: 0.08,
@@ -446,14 +445,14 @@ const G_Homes = (() => {
     // done: the furniture its rooms were cleared of out of the level (the grid lost its boxes as each room was cleared)
     map.propList = map.propList.filter((p: LvProp) => !home.cleared.has(p));
     for (const rm of plan.rest!) if (who.rest) { rm.dress = Object.assign({}, who.rest, { who: who.id, type0: rm.type, cells: cellsOf(map, rm, home), hung: [], was: new Map(), own: [] }); }
-    for (const rm of done) G.Level.respot(map, rm);
+    for (const rm of done) Level.respot(map, rm);
     return true;
   }
 
   // Everything in the room out: off the grid now (was: every cell touched, as it stood, for undress to put back), and the
   // pieces held aside in cleared, to come out of map.propList once the whole home's done (dressHome) or stay if it isn't.
   function clear(map: LvMap, rm: LvRoom, cleared: Set<LvProp>) {
-    const { W, t, props } = map, TS = G.Level.TS, was = new Map<number, [number, LvProp | undefined]>(), x0 = rm.x * TS, x1 = (rm.x + rm.w) * TS, z0 = rm.z * TS, z1 = (rm.z + rm.h) * TS;
+    const { W, t, props } = map, TS = Level.TS, was = new Map<number, [number, LvProp | undefined]>(), x0 = rm.x * TS, x1 = (rm.x + rm.w) * TS, z0 = rm.z * TS, z1 = (rm.z + rm.h) * TS;
     const note = (i: number) => { if (!was.has(i)) was.set(i, [t[i], props.get(i)]); };
     for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) note(z * W + x);
     const out = map.propList.filter((p: LvProp) => !p.own && !cleared.has(p) && p.x >= x0 && p.x < x1 && p.z >= z0 && p.z < z1), dead = new Set<LvBox>();
@@ -516,7 +515,7 @@ const G_Homes = (() => {
   // and the like and the way to them, and the extraction point. Cells. tight: only the doorway itself, for the room's main
   // piece when it won't go anywhere else (and the rooms too small to have it any other way).
   function kept(map: LvMap, rm: LvRoom, tight?: boolean) {
-    const { W, t } = map, TS = G.Level.TS, keep = new Set<number>(), inRoom = (x: number, z: number) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
+    const { W, t } = map, TS = Level.TS, keep = new Set<number>(), inRoom = (x: number, z: number) => x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h;
     const mark = (x: number, z: number) => { if (inRoom(x, z)) keep.add(z * W + x); };
     for (let z = rm.z; z < rm.z + rm.h; z++) for (let x = rm.x; x < rm.x + rm.w; x++) {
       for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
@@ -540,7 +539,7 @@ const G_Homes = (() => {
   const sources = (map: LvMap) => [[map.spawnRoom.cx, map.spawnRoom.cz]].concat(map.entries || []);
   // does every cell that could be walked to (reach) still have a way, on this plan (t)?
   const reachable = (map: LvMap, t: Uint8Array, reach: ArrayLike<number>) => {
-    const f = G.Level.flow({ W: map.W, H: map.H, t } as LvMap, sources(map));
+    const f = Level.flow({ W: map.W, H: map.H, t } as LvMap, sources(map));
     for (let i = 0; i < f.length; i++) if (reach[i] >= 0 && f[i] < 0 && (t[i] === 0 || t[i] === 3)) return false;
     return true;
   };
@@ -552,7 +551,7 @@ const G_Homes = (() => {
   // windows, the case and cabinets, and it's only cut if every cell around stays reachable. c: { size: [short, long], in cells,
   // from }. Returns the room, or null if no corner will take it.
   function cut(map: LvMap, rm: LvRoom, c: HomeCarve, r: LvRng, home: HomeState) {
-    const L = G.Level, TS = L.TS, { W, t } = map, keep = kept(map, rm), reach = L.flow(map, sources(map)), tries: number[][] = [];
+    const L = Level, TS = L.TS, { W, t } = map, keep = kept(map, rm), reach = L.flow(map, sources(map)), tries: number[][] = [];
     for (const [ix, iz] of [c.size, [c.size[1], c.size[0]]]) for (const sx of [-1, 1]) for (const sz of [-1, 1]) tries.push([r(), ix, iz, sx, sz]);
     tries.sort((a, b) => a[0] - b[0]);
     for (const [, ix, iz, sx, sz] of tries) {
@@ -585,7 +584,7 @@ const G_Homes = (() => {
 
   // A room done over for a resident. false: it can't be (the home's left as it was: dressHome).
   function dress(map: LvMap, rm: LvRoom, spec: HomeRoomSpec, type: RoomType, home: HomeState, carve?: HomeCarve | null) {
-    const L = G.Level, TS = L.TS, { W, t } = map, r = U.rng((home.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x2545f491)) >>> 0);
+    const L = Level, TS = L.TS, { W, t } = map, r = U.rng((home.seed ^ Math.imul(rm.z * W + rm.x + 1, 0x2545f491)) >>> 0);
     const was = clear(map, rm, home.cleared), own: LvProp[] = [], hung: HomeHung[] = [];
     rm.dress = { who: home.who.id, type0: rm.type, wall: spec.wall, paper: spec.paper, ceil: spec.ceil, trim: spec.trim, floor: spec.floor, cells: null, hung, was, own };
     rm.type = type;
@@ -745,6 +744,4 @@ const G_Homes = (() => {
   }
   return { RESIDENTS, start, fill, ceilings, paint };
 })();
-G.Homes = G_Homes;
 
-interface GameModules { Homes: typeof G_Homes; }

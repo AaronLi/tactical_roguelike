@@ -1,9 +1,11 @@
 'use strict';
+import { Furniture } from './furniture.js';
+import { Homes } from './homes.js';
 // The rest of who lives in the apartments (docs/apartment-personas/): more entries for js/homes.ts RESIDENTS, and what they
 // own. The notes at the top of js/homes.ts say what each field does. Pieces as js/furniture.ts R (back at -z, against
 // the wall), what stops a round in js/materials.ts PROPS.
 (() => {
-  const R = G.Furniture.R, lit = (k: HomeKit, c: number, i = 1) => k.mat(c, 0.5, 0, { emissive: c, emissiveIntensity: i });
+  const R = Furniture.R, lit = (k: HomeKit, c: number, i = 1) => k.mat(c, 0.5, 0, { emissive: c, emissiveIntensity: i });
   // ---------------------------------------------------------------- pieces more than one of them has
   // A small bathroom basin on a pedestal, a mirror's worth of tap
   R.basin = { small: 1, w: 0.56, d: 0.46, boxes: [[0, 0, 0.56, 0.44, 0.9]], build(k: HomeKit) {
@@ -205,7 +207,7 @@
   const lino = (color: string, grout?: string) => ({ kind: 'lino', color, grout: grout || color, sound: 'tile' }), slab = (color: string) => ({ kind: 'concrete', color, sound: 'concrete' }), lam = (color: string) => ({ kind: 'laminate', color, sound: 'wood' }), parquet = (color: string) => ({ kind: 'parquet', color, sound: 'wood' });
   const bath = (wall: string, ceil: string, trim: string, floor: HomeFloor) => ({ carve: { from: ['bedroom', 'dining', 'office', 'kitchen'] as RoomType[], size: [3, 4] }, tight: 1, wall, ceil, trim, floor, items: [{ id: 'basin', piece: 'basin', at: 'wall' }, { id: 'toilet', piece: 'toilet', at: 'corner', swap: [{ piece: 'toilet', at: 'wall' }] }, { id: 'shower', piece: 'shower', at: 'corner', swap: [{ piece: 'basin', at: 'wall' }] }] });
   const FLAT = 0.055, LOFT = 0.15; // (the chance of each: a loft's rarer, and has fewer who'd take it)
-  G.Homes.RESIDENTS.push(
+  Homes.RESIDENTS.push(
     { id: 'stash', name: 'Dario Vance and Kell Adeyemi', home: 'flat', rate: FLAT,
       rest: { wall: '#8f9a88', ceil: '#b9b9ab', trim: '#5c5f55', floor: slab('#7a7873') },
       rooms: {

@@ -9,7 +9,7 @@ import { ROOT, loadGame } from './model_env.mjs';
 import { sweepOf, loadedBuild, defOf, meshesOf, buildKey } from './model_sweep.mjs';
 import { authoredIds } from './bake_authored.mjs';
 
-const args = process.argv.slice(2), update = args.includes('--update'), ids = args.filter((a) => !a.startsWith('--')), G = loadGame(), GS = G.Gunsmith;
+const args = process.argv.slice(2), update = args.includes('--update'), ids = args.filter((a) => !a.startsWith('--')), G = await loadGame(), GS = G.Gunsmith;
 const sha = (s) => crypto.createHash('sha1').update(s).digest('hex').slice(0, 16);
 const leaves = (v, p, out) => { if (v && v.isObject3D) return out; if (Array.isArray(v)) v.forEach((x, i) => leaves(x, p + '[' + i + ']', out)); else if (v && typeof v === 'object') for (const k of Object.keys(v).sort()) leaves(v[k], p + '.' + k, out); else out.push(p + '=' + (typeof v === 'number' ? Math.round(v * 1e5) / 1e5 : v)); return out; };
 

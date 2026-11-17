@@ -1,7 +1,7 @@
 // The Tempest's round types (TASK 20; js/data.ts def.barrels.rounds, CALIBERS loads, js/gear.ts): the length of round loaded in a block decides its capacity, the boxes
 // that fill it, the per-barrel bookkeeping and the rounds' figures. Data-level checks on the compiled game (no browser).   node tools/check_tempest_rounds.test.mjs
 import { loadGame } from './model_env.mjs';
-const G = loadGame(); let bad = 0, n = 0;
+const G = await loadGame(); let bad = 0, n = 0;
 const ok = (label, cond, extra = '') => { n++; if (!cond) { bad++; console.error(`FAIL ${label} ${extra}`); } else console.log('ok   ' + label); };
 const eq = (label, a, b) => ok(label, JSON.stringify(a) === JSON.stringify(b), `got ${JSON.stringify(a)}, expected ${JSON.stringify(b)}`);
 const def = G.Gunsmith.compile('tempest'), Gr = G.Gear, b = def.barrels;

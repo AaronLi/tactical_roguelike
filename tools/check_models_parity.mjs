@@ -17,7 +17,7 @@ const SWEEP = !args.includes('--no-sweep'), CASES = !args.includes('--no-cases')
 const ids = args.filter((a, i) => !a.startsWith('--') && !(i > 0 && ['--old-dist', '--old-root', '--held', '--seed', '--tol', '--learn'].includes(args[i - 1])));
 if (!OLD_DIST || !OLD_ROOT) { console.error('usage: node tools/check_models_parity.mjs --old-dist <dir> --old-root <dir> [ids ...]'); process.exit(2); }
 const t0 = Date.now();
-const N = await loadGameWithModels(), O = await loadGameWithModels({ dist: OLD_DIST.replace(/\/?$/, '/'), root: OLD_ROOT }), Models = loadModels(), GS = N.Gunsmith, cmp = makeComparer(N, Models, TOL); // (a difference is judged against the recipe: which of the two is the gun)
+const N = await loadGameWithModels(), O = await loadGameWithModels({ dist: OLD_DIST.replace(/\/?$/, '/'), root: OLD_ROOT }), Models = await loadModels(), GS = N.Gunsmith, cmp = makeComparer(N, Models, TOL); // (a difference is judged against the recipe: which of the two is the gun)
 const plats = Object.keys(GS.PLATFORMS).filter((id) => N.WEAPONS[id] && (!ids.length || ids.includes(id)));
 /** An order-free numeric hash of a slot's triangles (each corner to 0.1 mm, its corners in order, with the material): the same triangles, the same hash. */
 const fastHash = (ms) => {

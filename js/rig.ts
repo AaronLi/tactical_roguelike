@@ -1,51 +1,23 @@
 'use strict';
-// Character rig: a jointed skeleton animated procedurally, with hitboxes that ride the bones.
-//
-//   root (ground, yaw) → body (tips over when downed) → hips → spine → chest → neck → head
-//                                                                    chest → shoulders → upper arm → forearm
-//                                                             hips → thigh → shin
-// Legs use two-bone IK onto procedurally placed feet (no foot sliding, works for strafing and
-// backpedalling, and crouching just lowers the hips). Arms use two-bone IK onto the grip and
-// support-hand points of the carried gun (G.GunModels), so hands stay on any weapon.
-// Upper body handles aim pitch, low-ready, corner leans, recoil, flinches and grenade throws.
-// Dead characters go to a Verlet ragdoll (see ragdollInit). Living suspects and civilians are the same ragdoll,
-// powered: muscles pull each joint toward the animation, as strong as the person is (see powerStep).
-interface Ragdoll { // the Verlet ragdoll a dead (or powered, living) rig carries: particles 0 pelvis ... 15 right foot
-  P: THREE.Vector3[]; prev: THREE.Vector3[]; r: number[]; still: number; asleep: boolean; roll: RagRoll | null; on: Uint8Array; sp: Float32Array; rigid: number[][]; topple: THREE.Vector3; min: number[][];
-  // (what the solver and the handling add as they go)
-  handled?: { t: number } | null; calm?: number; push?: THREE.Vector3 | null; keepPin?: number; drive?: { T: THREE.Vector3[]; Tv: THREE.Vector3[]; [field: string]: any } | null;
-  Pold?: THREE.Vector3[]; acc?: number; pinT?: number; Tprev?: THREE.Vector3[]; R?: THREE.Vector3[]; armL?: number;
-  near?: any[] | null; // the level's solids around the body (what stops a person), gathered once a step: gather
-}
-interface RagRoll { t: number; driven?: boolean; [field: string]: any } // a body being rolled onto its front (planRoll)
-interface RigArm { sh: THREE.Object3D; up: THREE.Object3D; lo: THREE.Object3D; wr: THREE.Object3D; tie: THREE.Mesh }
-// a rider's swing under the trolley (zipSwing): th, how far the feet are swung forward of hanging straight down (rad), its rate, and
-// the speed along the line (eased) and the acceleration of that it has been working from
-interface ZipSwing { th: number; w: number; v: number; a: number }
-interface RigLeg { th: THREE.Object3D; sh: THREE.Object3D }
-type RigState = 'alive' | 'down' | 'dead';
-interface Rig { // a character's skeleton and its meshes (what create makes, and what update, the hit and the zip tie add as they go)
-  hairMesh: THREE.Mesh | null; look: Record<string, any>; pantsM: THREE.Material; seat: THREE.Mesh[] | null; kitParts: THREE.Object3D[]; kitKey: string | null; hKit?: Record<string, (m: THREE.Material) => THREE.SkinnedMesh>; hPart?: Record<string, HumanPart>; hBone?: (name: string) => { b: THREE.Bone; inv: THREE.Matrix4 } | null; kit: Record<string, any> | null; headWear?: { cap: number | null; bandana: number | null }; headWorn?: THREE.Object3D[];
-  callsign: { id: string; name: string } | null; root: THREE.Object3D; body: THREE.Object3D; hips: THREE.Object3D; spine: THREE.Object3D; chest: THREE.Object3D; neck: THREE.Object3D; head: THREE.Object3D;
-  armL: RigArm; armR: RigArm; legL: RigLeg; legR: RigLeg; gunMount: THREE.Object3D; slingMount: THREE.Object3D; hipMount: THREE.Object3D; slung: boolean; mats: any[]; scale: number; style: string; shoe: FsSole | null;
-  gun: THREE.Object3D | null; gunInfo: Record<string, any> | null; gunKey: string | null; phase: number; vel: THREE.Vector3; lastPos: THREE.Vector3 | null;
-  crouchW: number; aimW: number; lean: number; kick: number; flinch: THREE.Vector3; throwT: number; state: string; deadT: number; fallX: number; fallZ: number; downW: number;
-  hb: any[] | null; dbg: THREE.Mesh[] | null; rd: Ragdoll; hitKit?: THREE.Mesh[] | null; dbgKit?: THREE.Mesh[] | null;
-  curl: number[]; fingers: { hand: number; thumb: boolean; bones: THREE.Bone[]; rest: THREE.Matrix4[]; step: THREE.Matrix4[] }[]; // (how closed each hand is, the right's then the left's: 0 open, 1 round a grip; and the body's fingers that show it: poseFingers)
-  // (set by create)
-  setGun(code: any, skin?: any): void; update(dt: number, p: any): void; hitboxes(): any[]; recoil(deg?: number): void; hit(dir: any, mv?: number): void; dropGun(): void; goLimp(): void;
-  die(dir: any): void; throwNade(str?: number): void; setKit(k: any): void; setCallsign(id: string, name: string): void; holster(on: boolean, anim?: boolean): void; swap?: { on: boolean; t: number; Rs: THREE.Matrix4 } | null; slingWant?: boolean | null; zip(on: boolean, instant?: boolean): void;
-  secure(t: number): void; settle(sec?: number): void; startle(): void; dispose(): void;
-  shield?: THREE.Object3D | null; shieldDropped?: THREE.Object3D | null; shieldMount?: THREE.Object3D; shieldW?: number; setShield(id: string | null): void; dropShield(): THREE.Object3D | null; // (a handheld ballistic shield on the left arm: setShield, its pose in update)
-  // (what the animation keeps from frame to frame)
-  powered?: boolean; limp?: boolean; zipped?: boolean; zipKit?: THREE.Object3D; zipT?: number; zipYaw?: number | null; zipSw?: ZipSwing; proneW?: number; proneS?: number; effPh?: number; effT?: number; braceW?: number; gunAimW?: number; gunKick?: number;
-  gunHold?: GunHolds; gunBase?: { p: THREE.Vector3; q: THREE.Quaternion; s: THREE.Vector3 }; gunBaseOf?: THREE.Object3D; gunSupport?: THREE.Vector3 | null; bipodK?: number; hitDir?: THREE.Vector3; xbLoaded?: any;
-  cold?: boolean; // (no warmth for a thermal channel: a mannequin)
-  nvPivot?: THREE.Object3D | null; nvLit?: THREE.Mesh[]; nvK?: number; nvWant?: number; // (night vision on the helmet: what swings, its lit eyepieces, how far down it is and is going: setKit, update)
-  blindW?: number; radioW?: number; dazeW?: number; blindT?: number; atakW?: number; atak?: THREE.Group; atakAlways?: boolean; handNade?: any; throwHand?: boolean; throwStr?: any; dropped?: { g: THREE.Object3D; vy: number; spin: number; floor?: number; [field: string]: any } | null;
-  [bone: string]: any; // (a bone looked up by name: js/ballistics.ts boneOf, the hitbox readouts of js/hud.ts and js/highlights.ts; and what js/hud.ts keeps on a rig)
-}
-const G_Rig = (() => {
+import { Callsigns } from './callsigns.js';
+import { SHIELDS } from './data.js';
+import { Gear } from './gear.js';
+import { GunModels } from './gunmodels.js';
+import { Headgear } from './headgear.js';
+import { Humans } from './humans.js';
+import { Level } from './level.js';
+import { LevelView } from './levelview.js';
+import { Gunsmith } from './parts.js';
+import { ReplayEnv } from './replayenv.js';
+import { Sim } from './sim.js';
+import { SpaceData } from './spacedata.js';
+import { Stickers } from './stickers.js';
+import { U as G_U } from './util.js';
+import { VMAnim } from './vmanim.js';
+import { World } from './world.js';
+import { GunRig } from './gunrig.js';
+// (ReplayEnv.Footsteps is read, not imported, and its guards mean it: the export worker does not load it, and its figures stride and step without it)
+export const Rig = (() => {
   const T = THREE;
   const UP = new T.Vector3(0, 1, 0);
   const _a = new T.Vector3(), _b = new T.Vector3(), _c = new T.Vector3(), _d = new T.Vector3(), _e = new T.Vector3();
@@ -78,9 +50,9 @@ const G_Rig = (() => {
     if (lower.userData.wr) lower.userData.wr.quaternion.identity();
     const A = upper.getWorldPosition(_a);
     const D = _b.subVectors(target, A);
-    const dist = G.U.clamp(D.length(), 0.01, (l1 + l2) * 0.999);
+    const dist = G_U.clamp(D.length(), 0.01, (l1 + l2) * 0.999);
     const dir = D.normalize();
-    const cosA = G.U.clamp((l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist), -1, 1);
+    const cosA = G_U.clamp((l1 * l1 + dist * dist - l2 * l2) / (2 * l1 * dist), -1, 1);
     const sinA = Math.sqrt(1 - cosA * cosA);
     const toPole = new T.Vector3().subVectors(pole, A);
     const bend = toPole.sub(dir.clone().multiplyScalar(toPole.dot(dir))).normalize();
@@ -111,8 +83,8 @@ const G_Rig = (() => {
   // the chest's and the hips' frames: x right, y up, -z the front.
   // An officer's own look (the main menu), and what they wear if they haven't picked; a look from anywhere (the network),
   // known options and colours only (js/sim.ts: the host's simulation cleans what it's told with the same)
-  const OFFICER_LOOK = G.Sim.OFFICER_LOOK, LOOKS = G.Sim.LOOKS;
-  const cleanLook = (l: Record<string, any>) => G.Sim.cleanLook(l);
+  const OFFICER_LOOK = Sim.OFFICER_LOOK, LOOKS = Sim.LOOKS;
+  const cleanLook = (l: Record<string, any>) => Sim.cleanLook(l);
   const KIT_COL = (d: any) => (!d ? 0x2e3236 : /Sable|Paragon/.test(d.brand || '') ? 0x5a5240 : /Kestrel|Vantage/.test(d.brand || '') ? 0x4d5639 : 0x2e3236);
   const kitMat = new Map();
   // a pouch's MOLLE footprint (columns, rows) and its boxes ([w, h, d, x, y, z, colour] in its frame: x across, y up, z out from the
@@ -157,10 +129,10 @@ const G_Rig = (() => {
   // one, else on the carrier, else on the shirt
   function backPatch(rig: Rig, k: any) {
     const cs = rig.callsign;
-    if (!cs || !G.Callsigns) return;
-    const D = (id: any) => (id && G.Gear && G.Gear.DEFS[id]) || null, cd = D(k && k.carrier), pd = D(k && k.pack);
+    if (!cs || !Callsigns) return;
+    const D = (id: any) => (id && Gear && Gear.DEFS[id]) || null, cd = D(k && k.carrier), pd = D(k && k.pack);
     let y = 0.22, z = 0.128;
-    const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.05), new T.MeshLambertMaterial({ map: G.Callsigns.backTex(cs.id, cs.name) }));
+    const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.05), new T.MeshLambertMaterial({ map: Callsigns.backTex(cs.id, cs.name) }));
     // on a pack: on its back face, near its top (where the body's own pack is: its outermost, model space y up, the back -z)
     const pp = pd && rig.hPart && rig.hPart[packMesh(pd, cd)], hb = pp && rig.hBone && rig.hBone('chest');
     if (pd) {
@@ -191,7 +163,7 @@ const G_Rig = (() => {
   const live = new Set<Rig>();
   function heatMark(o: THREE.Object3D, skip?: THREE.Object3D | null) {
     if (o === skip) return;
-    if ((o as THREE.Mesh).isMesh) o.layers.enable(3); // (js/render.ts HEAT_LAYER: the video's worker has no G.R)
+    if ((o as THREE.Mesh).isMesh) o.layers.enable(3); // (js/render.ts HEAT_LAYER: the video's worker has no R)
     for (const c of o.children) heatMark(c, skip);
   }
   // ---------------------------------------------------------------- the body (js/humans.ts), and the fit of what's worn on it
@@ -322,7 +294,7 @@ const G_Rig = (() => {
     gripHand(rig, arm, cur.lerp(on, w), N, F, pole, HAND_PALM, c0 + (curl - c0) * w, w);
   }
   function attachHuman(rig: Rig) {
-    const parts = rig.human && G.Humans.get(rig.human);
+    const parts = rig.human && Humans.get(rig.human);
     if (!parts || rig.humanOn || !live.has(rig)) return;
     rig.humanOn = true;
     for (const m of rig.prims as THREE.Mesh[]) { if (m.parent) m.parent.remove(m); m.geometry.dispose(); }
@@ -385,7 +357,7 @@ const G_Rig = (() => {
     rig.nvPivot = null; rig.nvLit = [];
     backPatch(rig, k);
     if (!k) return;
-    const D = (id: any) => (id && G.Gear && G.Gear.DEFS[id]) || null;
+    const D = (id: any) => (id && Gear && Gear.DEFS[id]) || null;
     let part: string | null = null; // (which piece of kit the parts being made are: the hangar shows each on its own)
     const add = (parent: THREE.Object3D, m: THREE.Object3D, x: number, y: number, z: number) => { m.position.set(x, y, z); m.userData.part = part; parent.add(m); fitPart(rig, parent, m); rig.kitParts.push(m); return m; };
     const Hd = rig.hat || rig.head; // (the head's things: on the hat, which is the head's fit)
@@ -435,12 +407,12 @@ const G_Rig = (() => {
     const putHd = (m: THREE.Object3D) => add(Hd, m, m.position.x, m.position.y, m.position.z);
     // the body's own helmet (models/characters/kit_head.py: its shell, rails, shroud, loop panels...) with the chinstrap
     const HELM: Record<string, string> = { 'h.bump': 'bump', 'h.fast': 'fast', 'h.ach': 'ach', 'h.rifle': 'rifle' }, hk = hd && HK && HK['kithelm' + HELM[hd.id]] ? HELM[hd.id] : null;
-    if (hd && hk) { own('kithelm' + hk, k.hc || G.Headgear.MODELS[hd.id].col); own('kitstrap', 0x18191a); }
+    if (hd && hk) { own('kithelm' + hk, k.hc || Headgear.MODELS[hd.id].col); own('kitstrap', 0x18191a); }
     // on the helmet's mount: a mandible round the jaw, or a shield over the face
     const fd = D(k.face);
     part = 'face';
     if (fd && hd && hk) {
-      if (fd.id === 'f.mandible') { own('kitmandible', k.hc ? shade(k.hc, 0.9) : 0x50575e); own('kitmandarms' + (G.Headgear.MODELS[hd.id].cut === 'high' ? 'high' : 'mid'), 0x3c4248); }
+      if (fd.id === 'f.mandible') { own('kitmandible', k.hc ? shade(k.hc, 0.9) : 0x50575e); own('kitmandarms' + (Headgear.MODELS[hd.id].cut === 'high' ? 'high' : 'mid'), 0x3c4248); }
       else { const rifle = fd.id === 'f.rifle'; own(rifle ? 'kitshieldrifle' : 'kitshield', rifle ? 0x3e4e56 : 0x8aaaba, { transparent: true, opacity: rifle ? 0.72 : 0.38, depthWrite: false }); own('kitshieldframe', 0x1c1e20); }
     }
     // night vision on its shroud: down in front of the eyes or swung up (nvK: as far as it's got, kept through a rebuild)
@@ -454,7 +426,7 @@ const G_Rig = (() => {
         const pa = ap.geo.getAttribute('position'), v = new T.Vector3(); for (let i = 0; i < pa.count; i++) v.add(new T.Vector3().fromBufferAttribute(pa, i)); v.divideScalar(pa.count);
         rig.root.updateMatrixWorld(true); hinge = Hd.worldToLocal(v.applyMatrix4(hb.inv).applyMatrix4(hb.b.matrixWorld));
       }
-      const nv = G.Headgear.nvg(nd.id, hd.id, KM, putHd, hinge);
+      const nv = Headgear.nvg(nd.id, hd.id, KM, putHd, hinge);
       rig.nvPivot = nv.pivot; rig.nvLit = nv.lit;
       if (rig.nvK == null) rig.nvK = rig.nvWant;
       nvPose(rig);
@@ -516,19 +488,19 @@ const G_Rig = (() => {
   function nvPose(rig: Rig) {
     if (!rig.nvPivot) return;
     const k = rig.nvK || 0, e = k * k * (3 - 2 * k);
-    rig.nvPivot.rotation.x = (1 - e) * G.Headgear.NV_UP;
+    rig.nvPivot.rotation.x = (1 - e) * Headgear.NV_UP;
     for (const m of rig.nvLit || []) m.visible = k > 0.97;
   }
-  // A suspect's armour (G.ARMORS ids) as the gear an officer would wear: the same models for the same kit
+  // A suspect's armour (ARMORS ids) as the gear an officer would wear: the same models for the same kit
   function armourKit(vest: string, helmet: string, armored: boolean, face?: any, ex?: any) {
     const V = ({ soft2: ['c.lite', 0, 0], soft: ['c.ghost', 0, 0], steel: ['c.patrol', 1, 2], ceramic: ['c.assault', 1, 3], assault: ['c.heavy', 1, 2] } as Record<string, (string | number)[]>)[vest] || (armored ? ['c.heavy', 1, 2] : null);
     const H = ({ ach: 'h.ach', riflehelm: 'h.rifle', visor: 'h.rifle' } as Record<string, string>)[helmet] || (armored ? 'h.rifle' : 0);
-    const X = (kind: string) => (ex || []).find((id: string) => G.Gear.DEFS[id] && G.Gear.DEFS[id].kind === kind) || 0;
+    const X = (kind: string) => (ex || []).find((id: string) => Gear.DEFS[id] && Gear.DEFS[id].kind === kind) || 0;
     return { helmet: H, face: helmet === 'visor' ? 'f.shield' : (H && face) || 0, carrier: V ? V[0] : 0, plate: V ? V[1] : 0, sh: X('shoulder'), gr: X('groin'), cp: V ? V[2] : 0, belt: armored ? 'b.battle' : 0, lg: X('legs'), bp: armored ? 2 : 0, pack: 0, ifak: 0 };
   }
   function create(o: any) {
     // whose body (js/humans.ts): its height is a scale of the whole figure, on top of the character's own
-    const hid: string | null = G.Humans ? G.Humans.pick(o) : null, hdef = hid ? G.Humans.def(hid) : null;
+    const hid: string | null = Humans ? Humans.pick(o) : null, hdef = hid ? Humans.def(hid) : null;
     const s = (o.scale || 1) * (hdef ? hdef.scale : 1), style = o.style || 'tactical';
     let seed = (o.seed || Math.floor(Math.random() * 1e6)) >>> 0;
     const rnd = () => { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; };
@@ -538,7 +510,7 @@ const G_Rig = (() => {
     // main menu); everyone else is dressed for who they are.
     let headCover = null, hairM = null;
     const skin0 = o.mannequin || o.skinColor != null ? 0 : pick(PAL.skin);
-    const skin = L(o.mannequin ? 0xa9afb5 : o.skinColor != null ? o.skinColor : hdef ? hdef.skin : skin0); // (a mannequin: plain grey, no face, no hair: see G.Hangar)
+    const skin = L(o.mannequin ? 0xa9afb5 : o.skinColor != null ? o.skinColor : hdef ? hdef.skin : skin0); // (a mannequin: plain grey, no face, no hair: see ReplayEnv.Hangar)
     let look;
     if (style === 'tactical') look = Object.assign({}, OFFICER_LOOK, o.look || {});
     // everyone else, from the same wardrobe, by who they are: enforcers in combat clothes and balaclavas,
@@ -553,13 +525,13 @@ const G_Rig = (() => {
       const tp = rnd();
       look = { top: tp < 0.5 ? 'tshirt' : tp < 0.85 ? 'longsleeve' : 'hoodie', topC: pick(PAL.shirt), pants: pick(['jeans', 'jeans', 'cargo']), pantsC: pick(PAL.pants), eyes: rnd() < 0.15 ? 'glasses' : 'none', gloves: 'none' };
     }
-    // A kind of dress (o.wear; none by default: everyday clothes, the look's own):
+    // Aboard a ship (docs/space.md) the crew wear what their ship's kind does (o.wear, or the ship being boarded: SpaceData.wearNow):
     //   navy    a crewman's dark blue coverall and cap; the guards' working uniform with a white belt; the squads' blue combat dress;
     //           an officer's white shirt, cap, gold shoulder boards and cuff rings
     //   pirate  a sleeveless vest, a T-shirt or an open jacket in faded colours, a bandana, a sash; whoever's with them in everyday clothes
     //   civil   a liner's people in everyday clothes, her guards in a security shirt and cap
     // ex: what goes with it (a cap, a bandana, a belt, a sash, boards, cuffs: made below, with the body)
-    const wear: string | null = o.wear !== undefined ? o.wear : null;
+    const wear: string | null = o.wear !== undefined ? o.wear : style === 'tactical' || o.vex || o.mannequin || !SpaceData || !SpaceData.wearNow ? null : SpaceData.wearNow(ReplayEnv.Game);
     const ex: Record<string, number | null> = {};
     if (wear) {
       const officer = !!(o.leader || o.boss), casual = () => { const tp = rnd(); return { top: tp < 0.35 ? 'tshirt' : tp < 0.6 ? 'longsleeve' : tp < 0.8 ? 'jacket' : 'hoodie', topC: pick(PAL.shirt), frontC: pick(PAL.shirt), pants: pick(['jeans', 'jeans', 'cargo', 'shorts']), pantsC: pick(PAL.pants), eyes: rnd() < 0.15 ? 'glasses' : 'none', gloves: 'none' }; };
@@ -699,8 +671,8 @@ const G_Rig = (() => {
       const up = joint(sh, 0, 0, 0);
       if (longSleeves) B_(cyl(0.056, 0.047, UARM, 10), top, 0, -UARM / 2, 0, up);
       else { B_(cyl(0.06, 0.056, UARM * 0.45, 10), top, 0, -UARM * 0.22, 0, up); B_(cyl(0.05, 0.045, UARM * 0.7, 10), skin, 0, -UARM * 0.62, 0, up); }
-      if (style === 'tactical' && side < 0 && o.animal && G.Callsigns) { // their animal's patch on the shoulder
-        const p = new T.Mesh(new T.PlaneGeometry(0.058, 0.058), new T.MeshLambertMaterial({ map: G.Callsigns.armTex(o.animal) }));
+      if (style === 'tactical' && side < 0 && o.animal && Callsigns) { // their animal's patch on the shoulder
+        const p = new T.Mesh(new T.PlaneGeometry(0.058, 0.058), new T.MeshLambertMaterial({ map: Callsigns.armTex(o.animal) }));
         p.position.set(side * 0.06, -0.085, 0); p.rotation.y = side * Math.PI / 2; up.add(p);
       } else if (style === 'tactical' && side < 0 && o.color != null) M_(cyl(0.059, 0.059, 0.03, 12), L(o.color), 0, -0.08, 0, up); // the squad armband
       const lo = joint(up, 0, -UARM, 0);
@@ -851,7 +823,7 @@ const G_Rig = (() => {
     setSeat(rig);
     heatMark(rig.root, rig.gun); // (warm: js/render.ts _heatPass)
     rig.cold = !!o.mannequin; live.add(rig);
-    if (hid) { if (G.Humans.get(hid)) attachHuman(rig); else G.Humans.ensure(hid).then(() => attachHuman(rig)); }
+    if (hid) { if (Humans.get(hid)) attachHuman(rig); else Humans.ensure(hid).then(() => attachHuman(rig)); }
     // put the weapon away (true) or bring it to the hands (false)
     // anim: the hand carries it there (slingSwap) rather than it jumping; and it isn't taken back up while the ATAK's still out
     // (the phone's folded away first: rig.slingWant waits for it)
@@ -888,7 +860,7 @@ const G_Rig = (() => {
       rd.handled.t = t;
       rd.asleep = false;
       if (rd.roll && rd.roll.driven) {
-        rd.roll.t = G.U.smooth(0.03, 0.4, t);
+        rd.roll.t = G_U.smooth(0.03, 0.4, t);
         if (rd.roll.t >= 1) { rd.roll = null; rd.calm = 0.8; rd.still = 0; } // on its front: physics again, wrists next
       }
     };
@@ -909,14 +881,14 @@ const G_Rig = (() => {
     return rig;
   }
 
-  // A handheld ballistic shield (js/data.ts G.SHIELDS): its face (a slab its own size and thickness, black), a rubber edge, the viewport
+  // A handheld ballistic shield (js/data.ts SHIELDS): its face (a slab its own size and thickness, black), a rubber edge, the viewport
   // if it has one, and behind it the handle the left hand closes round and the strap over the forearm. Its frame: x across, y up, the
   // face toward -z; userData.shield its def (js/player.ts shieldHit tests a round against the slab in this frame).
   const _shF = new T.Vector3(), _shQ = new T.Quaternion();
   const SHM = { face: new T.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.85, metalness: 0.05 }), trim: new T.MeshStandardMaterial({ color: 0x0b0b0c, roughness: 0.95 }), port: new T.MeshStandardMaterial({ color: 0x8aa6b8, roughness: 0.05, metalness: 0.2, transparent: true, opacity: 0.45 }) };
   function setShield(rig: Rig, id: string | null) {
     if (rig.shield) { rig.shield.removeFromParent(); rig.shield = null; }
-    const d = id ? G.SHIELDS[id] : null; if (!d) return;
+    const d = id ? SHIELDS[id] : null; if (!d) return;
     const g = new T.Group(), e = 0.012, box = (w: number, h: number, z: number, m: THREE.Material, x: number, y: number, zz: number) => { const o = new T.Mesh(new T.BoxGeometry(w, h, z), m); o.position.set(x, y, zz); o.castShadow = true; o.receiveShadow = true; g.add(o); return o; };
     box(d.w, d.h, d.th, SHM.face, 0, 0, 0);
     box(d.w + e * 2, e * 2, d.th + 0.008, SHM.trim, 0, d.h / 2, 0); box(d.w + e * 2, e * 2, d.th + 0.008, SHM.trim, 0, -d.h / 2, 0);
@@ -932,25 +904,25 @@ const G_Rig = (() => {
   function dropShield(rig: Rig) {
     const g = rig.shield; if (!g) return null;
     rig.shield = null; rig.shieldDropped = g; g.updateMatrixWorld(true);
-    const d = g.userData.shield as ShieldDef, wp = g.getWorldPosition(new T.Vector3()), f = new T.Vector3(0, 0, -1).transformDirection(g.matrixWorld), map = G.Game && G.Game.map;
-    const fy = map ? G.Level.groundAt(map, wp.x, wp.z, 0.05, wp.y, 1.6) : 0;
+    const d = g.userData.shield as ShieldDef, wp = g.getWorldPosition(new T.Vector3()), f = new T.Vector3(0, 0, -1).transformDirection(g.matrixWorld), map = ReplayEnv.Game && ReplayEnv.Game.map;
+    const fy = map ? Level.groundAt(map, wp.x, wp.z, 0.05, wp.y, 1.6) : 0;
     g.removeFromParent();
     g.position.set(wp.x + f.x * 0.2, fy + d.th / 2 + 0.006, wp.z + f.z * 0.2); g.rotation.set(-Math.PI / 2, Math.atan2(-f.x, -f.z), 0, 'YXZ');
     return g;
   }
   // code: a build code (or a plain weapon id for its factory build)
   function setGun(rig: Rig, code: any, skin: any) {
-    const key = code ? code + (skin && skin.length ? '#' + G.Stickers.key(skin) : '') : null;
+    const key = code ? code + (skin && skin.length ? '#' + Stickers.key(skin) : '') : null;
     if (rig.gunKey === key) return;
     if (rig.gun && rig.gun.parent) rig.gun.parent.remove(rig.gun);
     if (rig.gun) rig.gun.traverse((o: any) => { if (o.userData.sticker) o.geometry.dispose(); }); // (its stickers' own: the model's shared)
     rig.slung = false; rig.swap = null; rig.slingWant = null; // (a new gun starts in the hands: whatever the old one was doing is over)
     rig.gunKey = key;
-    const def = code ? G.Gunsmith.fromCode(code) : null;
+    const def = code ? Gunsmith.fromCode(code) : null;
     if (!def) { rig.gun = null; rig.gunInfo = null; return; }
-    rig.gun = G.GunModels.world(def, skin);
+    rig.gun = GunModels.world(def, skin);
     rig.gunInfo = rig.gun.userData.info;
-    rig.gunHold = G.GunRig.holds(def, rig.gunInfo!); // (how each hand takes it: js/gunrig.ts holds)
+    rig.gunHold = GunRig.holds(def, rig.gunInfo!); // (how each hand takes it: js/gunrig.ts holds)
     rig.gunMount.add(rig.gun);
   }
 
@@ -1022,11 +994,11 @@ const G_Rig = (() => {
     const f = sw.v + (v - sw.v) * Math.min(1, dt * 3); sw.a = (f - sw.v) / dt; sw.v = f; // (their speed as the trolley picks it up: over a third of a second or so, not all at once)
     for (let left = Math.min(dt, 0.25); left > 1e-6; left -= 0.02) {
       const h = Math.min(left, 0.02);
-      sw.w += (-9.5 * (sw.th + 0.011 * sw.v) - 1.5 * sw.w - 0.3 * sw.a) * h; sw.th = G.U.clamp(sw.th + sw.w * h, -0.7, 0.7);
+      sw.w += (-9.5 * (sw.th + 0.011 * sw.v) - 1.5 * sw.w - 0.3 * sw.a) * h; sw.th = G_U.clamp(sw.th + sw.w * h, -0.7, 0.7);
     }
   }
   function update(rig: Rig, dt: number, p: any) {
-    const U = G.U, s = rig.scale;
+    const U = G_U, s = rig.scale;
     const root = rig.root;
     // velocity in the rig's local frame (for stepping)
     if (!rig.lastPos) rig.lastPos = p.pos.clone();
@@ -1036,7 +1008,7 @@ const G_Rig = (() => {
     root.position.copy(p.pos);
     // (on a zipline: facing the way they're carried, as they've been moving; lifted straight up onto it, the way they faced)
     if (p.zip) { if (rig.zipYaw == null) rig.zipYaw = p.yaw; if (Math.hypot(rig.vel.x, rig.vel.z) > 1.5) rig.zipYaw = Math.atan2(-rig.vel.x, -rig.vel.z); } else rig.zipYaw = null;
-    root.rotation.y = p.climb ? p.climb.yaw : p.zip ? rig.zipYaw : p.yaw; // (on a ladder: facing it, wherever they're looking)
+    root.rotation.set(0, p.climb ? p.climb.yaw : p.zip ? rig.zipYaw : p.yaw, 0); // (on a ladder: facing it, wherever they're looking. Level: her tilt, aboard a ship lying tilted, is put on last)
     if (rig.state !== 'dead' && !rig.limp) gunHome(rig); // (before the hands reach for it: the right hand may have turned it, below)
     // night vision flipping down or up (a third of a second, as the wearer's own: js/player.ts nvFlip)
     if (rig.nvPivot && rig.nvK !== rig.nvWant) { const w = rig.nvWant || 0; rig.nvK = (rig.nvK || 0) + Math.sign(w - (rig.nvK || 0)) * Math.min(Math.abs(w - (rig.nvK || 0)), dt / 0.32); nvPose(rig); }
@@ -1045,9 +1017,8 @@ const G_Rig = (() => {
     if (rig.gun && rig.gun.userData.xb) {
       const ld = p.loaded == null ? rig.xbLoaded !== false : !!p.loaded, rl = p.reload == null ? -1 : p.reload;
       rig.xbLoaded = ld;
-      G.GunRig.setLoaded(rig.gun, ld || rl >= 0.72, ld || rl >= 0.3);
+      GunRig.setLoaded(rig.gun, ld || rl >= 0.72, ld || rl >= 0.3);
     }
-
 
     if (rig.state === 'dead' || rig.limp) { animateDeath(rig, dt); drawDebug(rig); return; }
 
@@ -1086,12 +1057,12 @@ const G_Rig = (() => {
     if (rig.throwT >= 0) { rig.throwT += dt; if (rig.throwT > 0.9) rig.throwT = -1; }
 
     // gait: one full cycle = two steps, at a walker's cadence for the speed (js/footsteps.ts: longer and quicker strides as it rises)
-    const stride = G.Footsteps ? G.Footsteps.stride(speed * s, rig.crouchW) / s : U.lerp(1.1, 1.8, U.clamp(speed / 6, 0, 1)) * (1 - rig.crouchW * 0.35);
+    const stride = ReplayEnv.Footsteps ? ReplayEnv.Footsteps.stride(speed * s, rig.crouchW) / s : U.lerp(1.1, 1.8, U.clamp(speed / 6, 0, 1)) * (1 - rig.crouchW * 0.35);
     const ph0 = rig.phase;
     rig.phase += (speed * dt / stride) * Math.PI * 2;
     // a foot comes down where its lift (below) runs out: the left at phase π/2, the right at 3π/2 (js/footsteps.ts)
-    if (p.feet && moving > 0.6 && !p.zip && !p.climb && p.state !== 'down' && rig.proneS < 0.3 && !posed && G.Footsteps
-      && Math.floor((rig.phase - Math.PI / 2) / Math.PI) > Math.floor((ph0 - Math.PI / 2) / Math.PI)) G.Footsteps.rigStep(rig, p, speed * s);
+    if (p.feet && moving > 0.6 && !p.zip && !p.climb && p.state !== 'down' && rig.proneS < 0.3 && !posed && ReplayEnv.Footsteps
+      && Math.floor((rig.phase - Math.PI / 2) / Math.PI) > Math.floor((ph0 - Math.PI / 2) / Math.PI)) ReplayEnv.Footsteps.rigStep(rig, p, speed * s);
     const bob = Math.abs(Math.sin(rig.phase)) * 0.035 * moving;
 
     // body: hips height, lean, downed pose
@@ -1101,7 +1072,7 @@ const G_Rig = (() => {
     // on a zipline: the whole body swings from the left hand on the trolley's handle (a pendulum, zipSwing), a little more as it
     // speeds up and stops, with a slow small sway of its own, and hangs a hand's width off the line so the arm goes straight up
     if (p.zip) {
-      const sw = rig.zipSw || (rig.zipSw = { th: 0, w: 0, v: 0, a: 0 }), L = G.Level, h = L.ZIP_HANG - L.ZIP_BAR;
+      const sw = rig.zipSw || (rig.zipSw = { th: 0, w: 0, v: 0, a: 0 }), L = Level, h = L.ZIP_HANG - L.ZIP_BAR;
       rig.zipT = (rig.zipT || 0) + dt;
       zipSwing(sw, -(rig.vel.x * Math.sin(rig.zipYaw!) + rig.vel.z * Math.cos(rig.zipYaw!)), dt); // (along the way they face)
       const th = sw.th + 0.03 * Math.sin(rig.zipT * 1.9 + rig.phase);
@@ -1208,7 +1179,7 @@ const G_Rig = (() => {
         fx = U.lerp(fx, px, k); fy = U.lerp(fy, py, k); fz = U.lerp(fz, pz, k);
         legPole = rig.body.localToWorld(_d.set(side * 1.2, side > 0 ? 0.9 : 0.6, 0.12)).clone();
       }
-      if (p.act && p.act.kind === 'kick' && side > 0) { const k = G.U.kickFoot(p.act.t); fx = 0.1; fy = k.y; fz = k.z; } // right leg kicks
+      if (p.act && p.act.kind === 'kick' && side > 0) { const k = G_U.kickFoot(p.act.t); fx = 0.1; fy = k.y; fz = k.z; } // right leg kicks
       const target = rig.body.localToWorld(_c.set(fx, fy, fz)).clone();
       const pole = rig.body.localToWorld(_d.set(fx, 0.6, -1.2)).clone();
       if (legPole) pole.lerp(legPole, U.smooth(0.3, 0.9, rig.proneS)); // (the knees turn out once the body's most of the way down, not as it starts)
@@ -1298,7 +1269,7 @@ const G_Rig = (() => {
       const hd = rig.gun.userData.handle as THREE.Object3D | undefined, hi = gi && gi.handle && gi.handle.lock ? gi.handle : null;
       let ru = rl, sh: { on: THREE.Vector3; k: number } | null = null;
       if (hd && hi) {
-        const SL = G.VMAnim.SLAP, st = rl >= 0 ? G.VMAnim.slapState(rl) : { back: 0, lock: 0, hand: 0 }, home = rig.gun.userData.handleHome as THREE.Vector3;
+        const SL = VMAnim.SLAP, st = rl >= 0 ? VMAnim.slapState(rl) : { back: 0, lock: 0, hand: 0 }, home = rig.gun.userData.handleHome as THREE.Vector3;
         hd.position.copy(home); hd.position.z += st.back * hi.travel; hd.rotation.z = -hi.lock! * st.lock;
         if (rl >= 0) {
           ru = U.clamp((rl - SL.mag0) / (SL.mag1 - SL.mag0), 0, 1);
@@ -1314,7 +1285,7 @@ const G_Rig = (() => {
       } else if (p.magChk != null && p.magChk >= 0) sp = well.clone().lerp(rig.chest.localToWorld(new T.Vector3(-0.04, 0.32, -0.4)), U.smooth(0.25, 1, p.magChk));
       const wL = 1 - U.smooth(0.02, 0.08, sp.distanceTo(supp) / s);
       if (wL < 0.01) { ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, sp, poleL); rig.curl[1] = 0.4; }
-      else { // (closed round a foregrip, over the firing hand on a pistol, the palm under a forend: G.GunRig.holds)
+      else { // (closed round a foregrip, over the firing hand on a pistol, the palm under a forend: GunRig.holds)
         const k = HD.support.kind, c = k === 'pistol' ? U.lerp(0.55, 0.9, wL) : k === 'fg' ? U.lerp(0.4, 1, wL) : U.lerp(0.4, 0.75, wL);
         gripHand(rig, rig.armL, sp, D(HD.support.palm), D(HD.support.fingers), poleL, HD.support.hold === 'closed' ? HAND_GRIP : HAND_PALM, c, wL, U.lerp(LOW.wrist, Math.PI, rig.aimW));
       }
@@ -1334,7 +1305,7 @@ const G_Rig = (() => {
       const bcg = rig.gun.userData.catch as THREE.Object3D | undefined;
       if (bcg) bcg.rotation.x = (p.loaded != null && !p.loaded ? 1 : 0) * 0.14;
       // the bipod's legs: down when they've put it down (a quarter of a second either way)
-      if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); G.GunRig.bipodPose(rig.gun.userData.bipod, rig.bipodK); }
+      if (rig.gun.userData.bipod) { rig.bipodK = U.clamp((rig.bipodK || 0) + (p.bipod ? 1 : -1) * dt * 4, 0, 1); GunRig.bipodPose(rig.gun.userData.bipod, rig.bipodK); }
     } else {
       // unarmed: arms swing opposite the legs
       for (const [arm, side] of [[rig.armL, -1], [rig.armR, 1]] as [RigArm, number][]) {
@@ -1361,7 +1332,7 @@ const G_Rig = (() => {
     // the grenade itself, in their right hand until it's thrown
     if (p.hold || rig.handNade) {
       if (!rig.handNade) {
-        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })), tb: G.Views ? G.Views.tbMesh(0.033, 0.115) : new T.Mesh(new T.CylinderGeometry(0.033, 0.033, 0.115, 10), new T.MeshLambertMaterial({ color: 0x4c5634 })), sticky: G.Views ? G.Views.stickyMesh(0.042) : new T.Mesh(new T.SphereGeometry(0.042, 10, 8), new T.MeshLambertMaterial({ color: 0x9a8558 })) }; // (the video's worker has no js/views.ts)
+        rig.handNade = { frag: new T.Mesh(new T.SphereGeometry(0.04, 10, 8), new T.MeshLambertMaterial({ color: 0x3a4a2a })), flash: new T.Mesh(new T.CylinderGeometry(0.027, 0.027, 0.1, 10), new T.MeshLambertMaterial({ color: 0x7d8388 })), tb: ReplayEnv.Views ? ReplayEnv.Views.tbMesh(0.033, 0.115) : new T.Mesh(new T.CylinderGeometry(0.033, 0.033, 0.115, 10), new T.MeshLambertMaterial({ color: 0x4c5634 })), sticky: ReplayEnv.Views ? ReplayEnv.Views.stickyMesh(0.042) : new T.Mesh(new T.SphereGeometry(0.042, 10, 8), new T.MeshLambertMaterial({ color: 0x9a8558 })) }; // (the video's worker has no js/views.ts)
         for (const m of Object.values(rig.handNade)) { m.position.set(-0.05, -0.075, -0.005); rig.armR.wr.add(m); } // (in the palm)
       }
       for (const [k, m] of Object.entries(rig.handNade)) m.visible = !!p.hold && p.hold.kind === k && !handThrow && !posed;
@@ -1426,7 +1397,7 @@ const G_Rig = (() => {
     // door actions: one hand reaches for the handle / door edge (players use the right hand with the
     // weapon put away; an enemy with a gun in hand uses his free left hand)
     if (p.act && (p.act.kind === 'open' || p.act.kind === 'close')) {
-      const h = p.act.kind === 'open' ? G.U.openHand(p.act.t) : G.U.closeHand(p.act.t);
+      const h = p.act.kind === 'open' ? G_U.openHand(p.act.t) : G_U.closeHand(p.act.t);
       const left = p.act.hand === 'L', arm = left ? rig.armL : rig.armR, sx = left ? -1 : 1;
       const tgt = rig.body.localToWorld(new T.Vector3(h.x * sx, h.y, h.z));
       ik(arm.up, arm.lo, UARM * s, FARM * s, tgt, rig.chest.localToWorld(new T.Vector3(sx * 0.7, -0.3, 0.2)));
@@ -1449,23 +1420,23 @@ const G_Rig = (() => {
       ik(rig.armR.up, rig.armR.lo, UARM * s, FARM * s, rig.body.localToWorld(rh), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.2)));
       ik(rig.armL.up, rig.armL.lo, UARM * s, FARM * s, rig.body.localToWorld(lh), rig.chest.localToWorld(new T.Vector3(-0.7, -0.3, 0.2)));
     }
-    // on a ladder (p.climb: the ladder, one of a level's crest.ladders): hands and feet on its rungs, where G.Level.ladderGrip has them
+    // on a ladder (p.climb: the ladder, one of a level's crest.ladders): hands and feet on its rungs, where Level.ladderGrip has them
     // for how high their feet are; the hips held off it a little and sat down into the lower foot (so it reaches its rung),
     // the knees and elbows out from it
     if (p.climb) {
-      const l = p.climb, y = p.pos.y, at = (k: any) => new T.Vector3(...G.Level.ladderGrip(l, y, k));
+      const l = p.climb, y = p.pos.y, at = (k: any) => new T.Vector3(...Level.ladderGrip(l, y, k));
       rig.hips.position.z += 0.06; rig.hips.position.y -= 0.17; rig.spine.rotation.x -= 0.08;
       root.updateMatrixWorld(true);
       for (const [leg, side, k] of [[rig.legL, -1, 'fL'], [rig.legR, 1, 'fR']] as [RigLeg, number, string][]) ik(leg.th, leg.sh, THIGH * s, SHIN * s, at(k), new T.Vector3(l.x - 0.6, y + 0.7, l.z - side * 0.25));
       const fwd = new T.Vector3(0, 0, -1).transformDirection(root.matrixWorld); // (closed round the rung: the palm to the ladder, the fingers up and over)
       for (const [arm, side, k] of [[rig.armL, -1, 'hL'], [rig.armR, 1, 'hR']] as [RigArm, number, string][]) gripHand(rig, arm, at(k), fwd, UP, new T.Vector3(l.x + 0.5, y + 1.0, l.z - side * 0.7), HAND_GRIP, 1);
     }
-    // on a zipline (p.zip): hanging by the left hand from the handle of a trolley on the line (G.LevelView.zipKit, the cable ZIP_HANG over
+    // on a zipline (p.zip): hanging by the left hand from the handle of a trolley on the line (LevelView.zipKit, the cable ZIP_HANG over
     // their feet), the right hand with the gun (above); the body swings under it (above), the legs together, a little bent, the feet
     // kicked up and trailing the swing
     if (p.zip) {
-      const L = G.Level;
-      if (!rig.zipKit) { rig.zipKit = G.LevelView.zipKit(); root.add(rig.zipKit); }
+      const L = Level;
+      if (!rig.zipKit) { rig.zipKit = LevelView.zipKit(); root.add(rig.zipKit); }
       rig.zipKit.visible = true; rig.zipKit.position.set(0, L.ZIP_HANG, 0);
       root.updateMatrixWorld(true);
       gripHand(rig, rig.armL, root.localToWorld(new T.Vector3(0, L.ZIP_HANG - L.ZIP_BAR, 0)), new T.Vector3(0, 0, -1).transformDirection(root.matrixWorld), UP, rig.chest.localToWorld(new T.Vector3(-0.55, 0.15, 0.1)), HAND_GRIP, 1); // (closed round the handle, the palm forward)
@@ -1480,6 +1451,8 @@ const G_Rig = (() => {
     if (rig.powered && p.str != null) powerStep(rig, dt, p.str, p.aimAt);
     else if (rig.powered) rig.rd = null!; // (far off: animated only; the body starts again from the pose when near)
     if (rig.dropped) dropGun(rig, dt);
+    // aboard a ship lying tilted (a breach nose up or down): standing square to her decks, turned with her about their feet (js/level.ts tiltQ)
+    if (rig.state !== 'dead' && !rig.limp && !p.zip && !p.climb && ReplayEnv.Game && ReplayEnv.Game.map) { const tq = Level.tiltQ(ReplayEnv.Game.map, p.pos.x, p.pos.y, p.pos.z); if (tq) root.quaternion.premultiply(tq); }
     poseFingers(rig);
     drawDebug(rig);
   }
@@ -1535,7 +1508,7 @@ const G_Rig = (() => {
     const sw = rig.swap!, g = rig.gun!, gi = rig.gunInfo;
     sw.t += dt;
     // (unslinging, the hand reaches back to it first, REACH of the time, then brings it round; slinging, it's in the hand already)
-    const f = Math.min(1, sw.t / SWAP_T), REACH = 0.3, u = G.U.smooth(0, 1, sw.on ? f : Math.max(0, (f - REACH) / (1 - REACH)));
+    const f = Math.min(1, sw.t / SWAP_T), REACH = 0.3, u = G_U.smooth(0, 1, sw.on ? f : Math.max(0, (f - REACH) / (1 - REACH)));
     rig.chest.updateMatrixWorld(true);
     const B = new T.Matrix4().compose(rig.gunBase!.p, rig.gunBase!.q, rig.gunBase!.s);
     const sl = g.parent!, hand = new T.Matrix4().multiplyMatrices(rig.gunMount.matrixWorld, B), rest = new T.Matrix4().multiplyMatrices(sl.matrixWorld, B);
@@ -1551,9 +1524,9 @@ const G_Rig = (() => {
     // the right hand on its grip all the way (letting go over the last bit when it's slung)
     if (gi && gi.grip) {
       const grip = g.localToWorld(new T.Vector3(gi.grip[2], gi.grip[1], -gi.grip[0])), arm = rig.armR;
-      const w = sw.on ? 1 - G.U.smooth(0.8, 1, f) : G.U.smooth(0, REACH, f), cur = arm.wr.localToWorld(HAND_GRIP.clone());
+      const w = sw.on ? 1 - G_U.smooth(0.8, 1, f) : G_U.smooth(0, REACH, f), cur = arm.wr.localToWorld(HAND_GRIP.clone());
       const gm = g.matrixWorld, H = rig.gunHold!.grip;
-      if (w > 0.01) gripHand(rig, arm, cur.lerp(grip, w), H.palm.clone().transformDirection(gm), H.fingers.clone().transformDirection(gm), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.1)), HAND_GRIP, G.U.lerp(CURL_REST, 1, w), w);
+      if (w > 0.01) gripHand(rig, arm, cur.lerp(grip, w), H.palm.clone().transformDirection(gm), H.fingers.clone().transformDirection(gm), rig.chest.localToWorld(new T.Vector3(0.7, -0.3, 0.1)), HAND_GRIP, G_U.lerp(CURL_REST, 1, w), w);
     }
     if (sw.t >= SWAP_T) endSwap(rig);
   }
@@ -1599,7 +1572,7 @@ const G_Rig = (() => {
     const fwd = new T.Vector3(-Math.sin(rig.root.rotation.y), 0, -Math.cos(rig.root.rotation.y));
     // unsteady: the body the muscles are trying to hold drifts about over the feet (a stagger, a sway), more the
     // weaker they are
-    const sway = G.U.clamp((0.75 - str) / 0.55, 0, 1);
+    const sway = G_U.clamp((0.75 - str) / 0.55, 0, 1);
     if (sway > 0) {
       const t = rig.effT, a = 0.13 * sway * rig.scale, sx = Math.sin(t * 1.3 + rig.effPh) + 0.5 * Math.sin(t * 2.9 + rig.effPh * 2), sz = Math.cos(t * 0.9 + rig.effPh * 3) + 0.5 * Math.sin(t * 2.3);
       for (const [i, k] of [[0, 0.4], [1, 0.4], [2, 0.4], [3, 0.9], [4, 0.9], [5, 0.9], [6, 1], [7, 1.1], [8, 0.9], [9, 0.9], [10, 0.9], [11, 0.9]]) { Tg[i].x += sx * a * k; Tg[i].z += sz * a * k; }
@@ -1642,15 +1615,15 @@ const G_Rig = (() => {
       let aw = 0;
       if (aimAt) {
         const tx = aimAt.x - rig.root.position.x, tz = aimAt.z - rig.root.position.z, tl = Math.hypot(tx, tz) || 1;
-        const facing = G.U.clamp(((tx * -Math.sin(rig.root.rotation.y) + tz * -Math.cos(rig.root.rotation.y)) / tl - 0.5) / 0.3, 0, 1);
+        const facing = G_U.clamp(((tx * -Math.sin(rig.root.rotation.y) + tz * -Math.cos(rig.root.rotation.y)) / tl - 0.5) / 0.3, 0, 1);
         aw = facing;
       }
-      const sag = (1 - G.U.clamp(str / 0.6, 0, 1)) * 45 * D2R; // how far off it's left: as much as the arms can't hold
+      const sag = (1 - G_U.clamp(str / 0.6, 0, 1)) * 45 * D2R; // how far off it's left: as much as the arms can't hold
       rig.gunAimW = (rig.gunAimW || 0) + (aw - (rig.gunAimW || 0)) * Math.min(1, dt * 6);
       if (rig.gunAimW > 0.01 && aimAt) {
         const gi = rig.gunInfo, grip = g.localToWorld(_ga.set(gi!.grip[2], gi!.grip[1], -gi!.grip[0]));
         const f = _gf.set(0, 0, -1).transformDirection(g.matrixWorld), want = _gw.subVectors(aimAt, grip).normalize();
-        const off = Math.acos(G.U.clamp(f.dot(want), -1, 1)), turn = Math.max(0, off - sag) * rig.gunAimW;
+        const off = Math.acos(G_U.clamp(f.dot(want), -1, 1)), turn = Math.max(0, off - sag) * rig.gunAimW;
         _gq.setFromUnitVectors(f, want); if (off > 1e-4) _gq.slerp(_gI, 1 - turn / off);
         // turn the gun about the grip: its world pose = T(grip) R T(-grip) pose
         _gm.makeTranslation(-grip.x, -grip.y, -grip.z).premultiply(_gl.makeRotationFromQuaternion(_gq)).premultiply(_gr.makeTranslation(grip.x, grip.y, grip.z)).multiply(g.matrixWorld);
@@ -1685,7 +1658,7 @@ const G_Rig = (() => {
         _gl.copy(g.parent!.matrixWorld).invert().multiply(_gm).decompose(_gp, _gq, _gs);
         g.position.copy(_gp); g.quaternion.copy(_gq); g.scale.copy(_gs);
         g.updateMatrixWorld(true);
-        rig.gunKick! *= Math.exp(-(str >= TWO_HAND ? 7 : 4) * (0.4 + 0.6 * G.U.clamp(str / 0.6, 0, 1)) * dt); // (as js/server.ts kickBack)
+        rig.gunKick! *= Math.exp(-(str >= TWO_HAND ? 7 : 4) * (0.4 + 0.6 * G_U.clamp(str / 0.6, 0, 1)) * dt); // (as js/server.ts kickBack)
       }
       // and never through the floor (down on the ground, the hand rests on it instead)
       if (str < 0.4) {
@@ -1756,10 +1729,10 @@ const G_Rig = (() => {
     _s1.subVectors(q1, p1); _s2.subVectors(q2, p2); _sr.subVectors(p1, p2);
     const a = _s1.dot(_s1), e = _s2.dot(_s2), f = _s2.dot(_sr), c = _s1.dot(_sr), b = _s1.dot(_s2), den = a * e - b * b;
     if (a < 1e-9 && e < 1e-9) return [0, 0];
-    if (a < 1e-9) return [0, G.U.clamp(f / e, 0, 1)];
-    if (e < 1e-9) return [G.U.clamp(-c / a, 0, 1), 0];
-    let s = den > 1e-9 ? G.U.clamp((b * f - c * e) / den, 0, 1) : 0, t = (b * s + f) / e;
-    if (t < 0) { t = 0; s = G.U.clamp(-c / a, 0, 1); } else if (t > 1) { t = 1; s = G.U.clamp((b - c) / a, 0, 1); }
+    if (a < 1e-9) return [0, G_U.clamp(f / e, 0, 1)];
+    if (e < 1e-9) return [G_U.clamp(-c / a, 0, 1), 0];
+    let s = den > 1e-9 ? G_U.clamp((b * f - c * e) / den, 0, 1) : 0, t = (b * s + f) / e;
+    if (t < 0) { t = 0; s = G_U.clamp(-c / a, 0, 1); } else if (t > 1) { t = 1; s = G_U.clamp((b - c) / a, 0, 1); }
     return [s, t];
   }
   // Push two capsules apart, splitting the correction over each one's ends by where they touch (equal and
@@ -1838,18 +1811,18 @@ const G_Rig = (() => {
   // The level's solids around a body, gathered once a step: a body's sixteen joints are each tested six or ten times a step,
   // and every one of those goes through this short list instead of the world's grid.
   function gather(rd: Ragdoll) {
-    const map: any = G.Game && G.Game.map;
+    const map: any = ReplayEnv.Game && ReplayEnv.Game.map;
     if (!map || !map.world) { rd.near = null; return; }
     let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
     for (const p of rd.P) { if (p.x < x0) x0 = p.x; if (p.x > x1) x1 = p.x; if (p.y < y0) y0 = p.y; if (p.y > y1) y1 = p.y; if (p.z < z0) z0 = p.z; if (p.z > z1) z1 = p.z; }
     const m = 0.5, list: any[] = rd.near || [];
     list.length = 0;
-    G.World.query(map.world, [x0 - m, y0 - m, z0 - m], [x1 + m, y1 + m, z1 + m], (s: any) => { if (s.move) list.push(s); });
+    World.query(map.world, [x0 - m, y0 - m, z0 - m], [x1 + m, y1 + m, z1 + m], (s: any) => { if (s.move) list.push(s); });
     rd.near = list;
   }
   // roll: a body being turned over by hand, out of a wall at once (not PUSH a pass)
   function collide(rd: Ragdoll, i: number, roll = false) {
-    const p = rd.P[i], q = rd.prev[i], r = rd.r[i], L = G.Level, map: any = G.Game && G.Game.map;
+    const p = rd.P[i], q = rd.prev[i], r = rd.r[i], L = Level, map: any = ReplayEnv.Game && ReplayEnv.Game.map;
     if (map && map.world) { // out of whatever solid it's in (the world's: any floor, a step, a sofa), the shallowest way
       if (!rd.near) gather(rd);
       const list = rd.near!, qx = q.x, qz = q.z; // (where it was: which face of a wall it came in by)
@@ -1879,7 +1852,7 @@ const G_Rig = (() => {
       }
       // rolling ground (js/world.ts terrainAt: its blocks are for rays): up out of it to lie on it as it lies
       const tr = map.world.terrain;
-      if (tr) { const g = G.World.terrainUnder(tr, p.x, p.z) + r; if (p.y < g) { p.y = g; if (q.y < g) q.y = g; rd.on[i] = 1; } }
+      if (tr) { const g = World.terrainUnder(tr, p.x, p.z) + r; if (p.y < g) { p.y = g; if (q.y < g) q.y = g; rd.on[i] = 1; } }
       return;
     }
     if (p.y < r) { p.y = r; if (q.y < r) q.y = r; rd.on[i] = 1; }
@@ -1906,7 +1879,7 @@ const G_Rig = (() => {
     if (rd.roll) { // rolling the body face down to secure it
       const ro = rd.roll;
       if (!ro.driven) ro.t = Math.min(1, ro.t + dt / 0.5);
-      const q = new T.Quaternion().setFromAxisAngle(ro.axis, ro.angle * G.U.smooth(0, 1, ro.t));
+      const q = new T.Quaternion().setFromAxisAngle(ro.axis, ro.angle * G_U.smooth(0, 1, ro.t));
       let sink = 0;
       const sh = ro.shift || (ro.shift = new T.Vector3());
       P.forEach((p, i) => { p.copy(ro.base[i]).sub(ro.pivot).applyQuaternion(q).add(ro.pivot).add(sh); sink = Math.max(sink, ro.ground + rd.r[i] - p.y); });
@@ -1922,7 +1895,7 @@ const G_Rig = (() => {
         for (let pass = 0; pass < 3; pass++) for (let i = 0; i < P.length; i++) collide(rd, i, true);
         let dx = 0, dz = 0;
         P.forEach((p, i) => { const ex = p.x - was[i].x, ez = p.z - was[i].z; if (Math.abs(ex) > Math.abs(dx)) dx = ex; if (Math.abs(ez) > Math.abs(dz)) dz = ez; });
-        sh.x += G.U.clamp(dx, -ROLL_SLIDE, ROLL_SLIDE); sh.z += G.U.clamp(dz, -ROLL_SLIDE, ROLL_SLIDE);
+        sh.x += G_U.clamp(dx, -ROLL_SLIDE, ROLL_SLIDE); sh.z += G_U.clamp(dz, -ROLL_SLIDE, ROLL_SLIDE);
       }
       P.forEach((p, i) => { prev[i].copy(p); });
       if (ro.t >= 1 && !ro.driven) { rd.roll = null; rd.asleep = false; rd.still = 0; rd.calm = 0.8; rd.pinT = 0; }
@@ -1992,7 +1965,7 @@ const G_Rig = (() => {
     rd.keepPin = Math.max(0, (rd.keepPin || 0) - h);
     let pin = 0; // wrists drawn together over a moment, not snapped
     if (rig.zipped) pin = 0.5 * Math.min(1, rd.pinT / 0.6);
-    else if (rd.handled && !rd.roll) pin = 0.5 * G.U.smooth(0.42, 0.62, rd.handled.t); // pulled behind the back
+    else if (rd.handled && !rd.roll) pin = 0.5 * G_U.smooth(0.42, 0.62, rd.handled.t); // pulled behind the back
     else if (rd.keepPin > 0) pin = 0.5; // tie done, waiting for the host to confirm it
     if (pin > 0) { const f = torsoFrame(P); wrist = P[0].clone().addScaledVector(f.z, 0.16 * rig.scale).addScaledVector(f.y, 0.12 * rig.scale); }
     const iters = D ? 4 : 8, self = !D || D.self; // (a strong living body: fewer passes, no tangling to check)
@@ -2103,7 +2076,7 @@ const G_Rig = (() => {
       const a = up.getWorldPosition(new T.Vector3());
       const u = new T.Vector3().subVectors(P[j], a), l = new T.Vector3().subVectors(P[e], P[j]);
       const bend = new T.Vector3().crossVectors(u, l), sinB = bend.length() / Math.max(1e-6, u.length() * l.length());
-      const w = G.U.smooth(0.08, 0.3, sinB); // how much there is to go on
+      const w = G_U.smooth(0.08, 0.3, sinB); // how much there is to go on
       aimBone(up, a, P[j], sideFor(u.normalize(), bend, w));
       const lp = lo.getWorldPosition(new T.Vector3()); // where the lower bone actually starts once the upper is placed
       aimBone(lo, lp, P[e], sideFor(l.subVectors(P[e], lp).normalize(), bend, w));
@@ -2144,8 +2117,8 @@ const G_Rig = (() => {
     if (instant) ragdollStep(rig, 0);
   }
   function dropGun(rig: Rig, dt: number) {
-    const d = rig.dropped, g = d!.g, map = G.Game && G.Game.map;
-    if (d!.floor == null) d!.floor = (map ? G.Level.groundAt(map, g.position.x, g.position.z, 0.05, g.position.y, 0.05) : 0) + 0.05; // (the floor it falls to: upstairs or down)
+    const d = rig.dropped, g = d!.g, map = ReplayEnv.Game && ReplayEnv.Game.map;
+    if (d!.floor == null) d!.floor = (map ? Level.groundAt(map, g.position.x, g.position.z, 0.05, g.position.y, 0.05) : 0) + 0.05; // (the floor it falls to: upstairs or down)
     if (g.position.y <= d!.floor) return;
     d!.vy -= 12 * dt;
     g.position.y = Math.max(d!.floor, g.position.y + d!.vy * dt);
@@ -2298,8 +2271,8 @@ const G_Rig = (() => {
   function zipPoint(rig: Rig, t: number, living: boolean) {
     rig.root.updateMatrixWorld(true);
     const wr = rig.armL.tie.getWorldPosition(new THREE.Vector3()).add(rig.armR.tie.getWorldPosition(new THREE.Vector3())).multiplyScalar(0.5);
-    if (!living) return rig.chest.localToWorld(new THREE.Vector3(0, 0.22, 0)).lerp(wr, G.U.smooth(0.38, 0.6, t));
-    return rig.chest.localToWorld(new THREE.Vector3(0, 0.16, 0.14)).lerp(wr, G.U.smooth(0.42, 0.56, t));
+    if (!living) return rig.chest.localToWorld(new THREE.Vector3(0, 0.22, 0)).lerp(wr, G_U.smooth(0.38, 0.6, t));
+    return rig.chest.localToWorld(new THREE.Vector3(0, 0.16, 0.14)).lerp(wr, G_U.smooth(0.42, 0.56, t));
   }
   // where someone lying (dead, or down for good) is: their ragdoll's hips, wherever it came to rest
   function bodyAt(rig: Rig) { return (rig.hips || rig.root).getWorldPosition(new THREE.Vector3()); }
@@ -2307,7 +2280,7 @@ const G_Rig = (() => {
   // its arm's materials as create dresses an officer in that look: the sleeves the top's (bare arms in a T-shirt, bare upper arms in a
   // vest), the hands and fingers gloved if the look has gloves (a fingerless glove's fingers bare).
   function armLook(o: any) {
-    const hid = G.Humans.pick(o), hdef = G.Humans.def(hid), look = Object.assign({}, OFFICER_LOOK, o.look || {});
+    const hid = Humans.pick(o), hdef = Humans.def(hid), look = Object.assign({}, OFFICER_LOOK, o.look || {});
     const skin = hdef ? hdef.skin : 0xc4a490, glove = ({ tactical: 0x1c1d1f, leather: 0x5e3e24, fingerless: 0x1c1d1f } as Record<string, number>)[look.gloves as string];
     const long = look.top !== 'tshirt' && look.top !== 'vest', hand = glove != null ? glove : skin, top = look.topC as number;
     return { human: hid, col: { upsleeve: look.top === 'vest' ? skin : top, sleeve: long ? top : skin, hand, finger: look.gloves === 'fingerless' ? skin : hand } as Record<string, number>, gloved: glove != null };
@@ -2318,5 +2291,3 @@ const G_Rig = (() => {
     toggleDebug() { debug = !debug; return debug; },
   };
 })();
-G.Rig = G_Rig;
-interface GameModules { Rig: typeof G_Rig; }

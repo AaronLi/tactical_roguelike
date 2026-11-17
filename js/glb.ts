@@ -1,3 +1,8 @@
+import { GunMaterials } from './gunmaterials.js';
+import { Gunsmith } from './parts.js';
+import { Stickers } from './stickers.js';
+import { BundlesEnv } from './bundlesenv.js';
+import { Hooks } from './util.js';
 // glTF gun models: the CONTRACT a 3D model must meet to be supported, one validator generated from it, and the loader.
 //
 // Everything a model author (Blender export script, hand edit, a Rust/Bevy loader) needs to know is in THIS file's first
@@ -15,7 +20,10 @@
 // ===================================================================================================================
 
 // (Scripts share one global scope: all of it lives inside one function, so its short names don't collide with the others'.)
-const G_Models = (() => {
+/** The glTF loader (made from three's GLTFLoader below, when the page has it; the tools put their own: tools/model_env.mjs). */
+interface GlbModuleApi { ready: Promise<boolean>; load(url: string): Promise<any> }
+export const GLB: { loader: GlbModuleApi | null } = { loader: null };
+export const Models = (() => {
 /** The `slot` a mesh belongs to (glTF node extras `slot`): which gunsmith part it is, so the gunsmith can highlight and pick it. */
 const SLOTS = {
   base: 'base', grip: 'grip', stock: 'stock', mag: 'mag', barrel: 'barrel', handguard: 'handguard', muzzle: 'muzzle', optic: 'optic',
@@ -49,7 +57,7 @@ const NAMES = {
 interface PartSpec { doc: string; /** this `info.<field>` is non-null exactly when the model has this part */ pairedWith: keyof GunModelInfo | null }
 /** One mesh slot. */
 interface SlotSpec { doc: string; /** a model must have at least one mesh in it */ required?: boolean }
-/** A catalogue material (G.GunMaterials.M.<name>). */
+/** A catalogue material (GunMaterials.M.<name>). */
 interface MaterialSpec { doc: string; /** the relief map (js/gunmodels.ts `relief`) rebuilt at load: stp = stipple pits, chq = chequering diamonds */ bump?: 'stp' | 'chq' }
 
 // ---- the info anchors ------------------------------------------------------------------------------------------------
@@ -169,7 +177,7 @@ const CONTRACT_CORE = {
       dot: { doc: 'Red emissive dot.' }, amber: { doc: 'Amber emissive.' }, glow: { doc: 'Cyan emissive.' }, sightPaint: { doc: 'White sight paint.' }, tritium: { doc: 'Green night-sight glow.' }, fibre: { doc: 'Green fibre-optic sight insert (bright, a faint glow).' },
       redInsert: { doc: 'Red revolver ramp insert.' }, string: { doc: 'String / cord.' }, fabric: { doc: 'Fabric.' }, glove: { doc: 'Glove leather.' },
     } as Record<string, MaterialSpec>,
-    anonymous: 'A one-off colour that isn\'t in the catalogue is named `m_<rrggbb>` (hex colour) and is kept as exported: a standard PBR material, no bump. An AUTHORED model\'s meshes are drawn by name (G.GunMaterials.byName): a catalogue name, else an anonymous colour the game aliases to a catalogue material (G.GunMaterials.ALIAS: m_2fe05a, the 2011\'s green front-sight fibre, is drawn as fibre), else black.',
+    anonymous: 'A one-off colour that isn\'t in the catalogue is named `m_<rrggbb>` (hex colour) and is kept as exported: a standard PBR material, no bump. An AUTHORED model\'s meshes are drawn by name (GunMaterials.byName): a catalogue name, else an anonymous colour the game aliases to a catalogue material (GunMaterials.ALIAS: m_2fe05a, the 2011\'s green front-sight fibre, is drawn as fibre), else black.',
     anonymousPattern: '^m_[0-9a-f]{6}$',
     rule: 'The material NAME is what counts: at load the catalogue\'s material of that name replaces whatever the file carries (its colours, roughness, emissive, transparency and bump map come from the game), so the game keeps its shared materials and its look. Give meshes the catalogue name; colours in the file only matter for anonymous materials and for viewing the file elsewhere.',
   },
@@ -251,7 +259,7 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   example: { name: 'part_mag', extras: { part: 'mag', check: { w: 0.024 } }, child: { name: 'mag_91', extras: { slot: 'mag', chk: { role: 'hole', i: 0, t: 0.1567, side: 1 } } } },
 }, multi: {
   what: 'MULTI-BARREL GUNS AND RELOAD SEQUENCES (any gun; the first is the Tempest). A gun with several barrels says so in info.barrels = { n, rounds: { <type>: { rounds_each, effective_mm: [...] }, ... }, default } (info.muzzles has n entries, barrel i at muzzles[i]); the game keeps rounds_each rounds per barrel (of the round type loaded in the block: a longer round, fewer of them in the same stack) and fires from the barrels the fire mode asks for. info.barrelGroups names sets of barrels by index (top, bottom, all).',
-  speed: 'rounds.<type>.effective_mm[k] is the effective barrel length of the (k+1)-th round of that type fired from a fresh barrel: the more of a barrel\'s stack is gone, the longer the bore the next round runs down. The game sets the shot\'s muzzle velocity from it (js/data.ts G.shotDef: damage, which goes with the energy, and range run from a fraction, def.barrels.full = 0.8, of the full figures at the shortest length to 1.0 at the longest). The report is the synth\'s for that barrel length, with its pressure and charge scaled by it (js/parts.ts soundSpec) and the shot\'s gain by the square of the same factor, so a barrel sounds fuller and louder as it empties. A shot from several barrels plays one report per barrel, stacking.',
+  speed: 'rounds.<type>.effective_mm[k] is the effective barrel length of the (k+1)-th round of that type fired from a fresh barrel: the more of a barrel\'s stack is gone, the longer the bore the next round runs down. The game sets the shot\'s muzzle velocity from it (js/data.ts shotDef: damage, which goes with the energy, and range run from a fraction, def.barrels.full = 0.8, of the full figures at the shortest length to 1.0 at the longest). The report is the synth\'s for that barrel length, with its pressure and charge scaled by it (js/parts.ts soundSpec) and the shot\'s gain by the square of the same factor, so a barrel sounds fuller and louder as it empties. A shot from several barrels plays one report per barrel, stacking.',
   display: 'A display surface named display_ammo (the contract\'s Display surfaces) is painted with the rounds left: one row per barrel in info.muzzles order, one pip per round (lit while the round remains); u runs left to right and v away from the shooter\'s end (js/viewmodel.ts).',
   dial: 'info.modeDial = { at, axis, modes, stepDeg }: the fire-mode dial, turned about its axis by stepDeg for each position of the selected mode in modes (js/player.ts). If the model has a `part_dial` node (PARTS key dial) holding the dial\'s meshes, that node turns about its pivot; without one the game puts a marker on the dial\'s face at `at` and turns that (the model\'s own pointer then stays where it was drawn).',
   hinge: 'info.hinge (root extras.hinge_json) = { sequence: [...] }: the steps of a reload that takes the gun apart, in order, each moving ONE part_ node by rotate_deg about axis x, y or z (three.js rotation about the node\'s own pivot) or by move [forward, up, right] metres in the frame of the part_ node named by frame (default: its parent\'s). Parts may nest (part_brk > part_pump > part_mag > part_carry): a pack stores each node under its parent (extras.parent) and the assembled gun nests them, so a step moves everything inside the node. The viewmodel plays the steps one after another over the first half of the reload (the old block comes out), then back (the new one goes in): js/vmanim.ts hingeClip. How each step feels is the step\'s own optional data: share (its part of the time, relative: the reload\'s length, def.reload, is shared out over the steps, the hand\'s moves between them and a moment with the block clear), ease and back.ease (' + HINGE_EASES.join(', ') + ': ' + HINGE_EASE_DOC + ' The gun\'s own kick, dip and sag go with the ease), over (a spring\'s overshoot), and hand { part, at } (the support hand on that part_ node at that point of it, following it; the right hand stays on the grip). A step without them is smooth, of equal share, the hand where it was. The sequence is data, not a gun: any model with a hinge_json gets the animation. Part keys used: lever, carry, pump, brk and mag keep their ordinary names but are driven only by the sequence on a gun that has one.',
@@ -259,7 +267,7 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
 }, bipod: {
   what: 'A BIPOD is one node, `part_bipod` (PARTS key bipod, listed in info.anim.bipod), whose children are its LEGS: each leg is a `group_<n>` node with extras.leg = { deploy: [rx, ry, rz] } holding that leg\'s meshes. A leg\'s pivot (its node origin) is its hinge. The model is drawn FOLDED: every leg at rotation 0. part_bipod\'s own origin is only a reference point (the first hinge) and nothing turns it. The legs\' meshes are slot fg when the bipod is a foregrip option (the Kodiak) or slot base when it is part of the gun (a machine gun\'s, a sniper rifle\'s); one gun may have both, in the one part_bipod node.',
   pose: 'extras.leg.deploy is the leg\'s rotation when the bipod is DOWN: three numbers, radians, an XYZ Euler rotation about the leg\'s pivot in the gun\'s frame (x right, y up, z back), the legs pointing at the ground and splayed a little. A leg folded back along the gun (its foot behind the hinge) turns by +PI/2 about x, one folded forward by -PI/2. Folded is rotation 0 (how the meshes are drawn): the folded and the deployed pose are both data of the model.',
-  drive: 'The game drives every leg with the same rule: rotation = deploy * smoothstep(k), k from 0 (folded) to 1 (down) over a quarter of a second, set by the player\'s stance and what is in front of the gun (js/player.ts bipodStep for the first person, a remote player\'s state in js/rig.ts for the third) and posed by G.GunRig.bipodPose(part_bipod node, k). The first-person model poses the live part_bipod node; the third-person (merged) model pulls each leg out on its own so it can turn.',
+  drive: 'The game drives every leg with the same rule: rotation = deploy * smoothstep(k), k from 0 (folded) to 1 (down) over a quarter of a second, set by the player\'s stance and what is in front of the gun (js/player.ts bipodStep for the first person, a remote player\'s state in js/rig.ts for the third) and posed by GunRig.bipodPose(part_bipod node, k). The first-person model poses the live part_bipod node; the third-person (merged) model pulls each leg out on its own so it can turn.',
   packs: 'In a pack the part_bipod node holds no mesh itself (the base pack owns it); each leg is a group_<slot>_<n> node with extras.parent = "part_bipod" and extras.leg, directly under the pack root like every node.',
   example: { name: 'part_bipod', child: { name: 'group_7', extras: { leg: { deploy: [1.5708, 0.2, 0] } } } },
 }, anchors: {
@@ -285,7 +293,7 @@ const GUN_MODEL_CONTRACT = { ...CONTRACT_CORE, displays: {
   stretch: 'STRETCH (stretch: true; the piece has rear, len, len0). The piece is scaled along the bore about its rear: every point\'s forward position in the file f becomes rear + (f - rear) * L / len, then the piece is moved as any other; L = len0 plus the sum over the slots but the provider\'s of anchors[...]["len_<tag>"]. Exact for the boxes it is used on (a bead sight\'s rib, as long as the barrel runs: its normals are along the axes). A negative L (a barrel that ends behind where the rib starts) reverses it.',
   show: 'THRESHOLD (show: { a: [slot, key], b: [slot, key], gt }). The tag shows only while value(a) - value(b) > gt, value(s, key) being values["<s>=<part>"][key] else values[""][key] (parsed JSON): the G36\'s barrel sleeve, only where the barrel is longer than its handguard by more than the sleeve. The bake builds every pair of parts whose difference falls between the last absent and the first present one, so gt is exact for every pair the catalogue can make.',
   info: 'INFO. Each leaf of `info` (a/b/0 paths: infoLeaves) is PROVIDED: by the first filled slot of its `from` whose part is not in `skip`, else the platform (""); with `vary`, "#<label>" as a tag\'s. Its value is own[provider] ({ "del": 1 }: the leaf is absent), plus, when off[<provider\'s slot>] is given, the sum over the other slots of off[...].x["<slot>=<part>"] and, for each condition slot c filled, of off[...].y[c][...]: a part\'s value moves with the part (the sight line with the optic\'s riser and a magnifier, the support hand with the handguard a foregrip is on). With `max: { by, v }` the leaf is the larger of that and v[<the part in by>] (a pistol chassis\'s front, ahead of a short slide\'s muzzle). The offsets are solved exactly from the recipe\'s values. Then `info.anim` from the pieces\' nodes and `info.mounts` (mount_<tag>: each piece\'s offset) for reference.',
-  assembly: 'ASSEMBLY (G.Models.assemble(def) in js/glb.ts, synchronous: the piece files must be loaded, G.Models.ensure(def) / preloadPlatform(id) load them; G.Models.planBuild(index, build) is the pure planner, no three.js). For each tag: the provider and its piece (or none), the offsets, the stretch; the owner nodes from the pieces, every piece\'s meshes placed against them. G.Models.infoOf(def) gives the build\'s info from the index alone (no piece files), synchronously. A build the index cannot plan (a part it has no piece or value for) is assembled from what it has and the result says `approx` (the tests count that as a failure).',
+  assembly: 'ASSEMBLY (Models.assemble(def) in js/glb.ts, synchronous: the piece files must be loaded, Models.ensure(def) / preloadPlatform(id) load them; Models.planBuild(index, build) is the pure planner, no three.js). For each tag: the provider and its piece (or none), the offsets, the stretch; the owner nodes from the pieces, every piece\'s meshes placed against them. Models.infoOf(def) gives the build\'s info from the index alone (no piece files), synchronously. A build the index cannot plan (a part it has no piece or value for) is assembled from what it has and the result says `approx` (the tests count that as a failure).',
   shared: 'SHARED PIECES. A piece that is the same shape on several platforms (an optic, a magnifier, a light, a foregrip, a muzzle device) or at several places is stored once: in assets/models/parts/_shared/<tag>/<file>.glb, in its own frame (the origin at the corner of its bounding box: smallest forward, up and right), and each platform\'s piece entry names it with the `at` that places it. Two pieces are one when their triangles agree to 2 micrometres after the move.',
   mounts: 'MOUNT PIECES (optics and front sights). A sight is ONE object, the same file on every gun, built in its own frame: the origin on the TOP of the rail (the surface its foot rests on) at its mount point, centred; metres, [forward, up, right]; everything it tells the game (sy, fSight, relief, reflex, pip, mount_magnifier) is in that frame. What is specific to a gun between the gun and the sight is a MOUNT PIECE, a tag of its own: `optic@mount` (the rail section under the sight, a riser, an adapter, the fixtures of the gun\'s own sights, a pistol optic plate). An iron front sight is its HEAD `optic@barrel` (post, ears, hood: placed by the barrel, at the length its front sight stands) on its BASE `optic@sightbase` (the column from 4 mm over the bore up to the head); a bead `optic@barrelend` (at the barrel\'s end), its rib `optic@rib` (stretched) and the rib\'s posts `optic@ribpost<i>`; a front sight at the barrel\'s end of a gun\'s own irons `optic@barrelend` and its base `optic@endbase`. A recipe draws a piece of another part\'s with k.at(<anchor>).',
   verify: 'VERIFICATION. In the bake, per platform: every rule is solved from the builds and must explain each of them exactly (each piece against every build it is in, each offset across the parts it applies to, each info leaf to 1e-9); then every one of those builds and a random sample of others (MODELS_SAMPLE a platform, 5 by default: a few hundred) is planned from the index by the game\'s own planner and compared with the recipe vertex for vertex (to 0.01 mm) and leaf for leaf; the bake fails otherwise. `npm run test:models` assembles the edge cases and regressions through the real files (glb, decoder, assembler) against the recipe and the golden fingerprints; `npm run test:models:full` adds the whole sweep and 10,000 random held-out builds.',
@@ -1230,7 +1238,7 @@ function contractMarkdown(): string {
   /** ?checkModels: validate each model as it loads. (Every gun the game shows comes from these files: there is no flag and no procedural fallback.) */
   const on = true, checking = qs.has('checkModels');
   const R = { base: '' }; // (R.base: where the page's folder is from here: '' on the page, '../../' in the export worker, js/exportworker.ts)
-  const glbReady = (): Promise<boolean> => (G.GLB ? G.GLB.ready.then((x) => x, () => false) : Promise.resolve(false));
+  const glbReady = (): Promise<boolean> => (GLB.loader ? GLB.loader.ready.then((x) => x, () => false) : Promise.resolve(false));
 
   // ---- per-part packs: loading, and assembling any build from them ----
   const PARTS_BASE = 'assets/models/parts/', SHARED_DIR = '_shared/';
@@ -1238,7 +1246,7 @@ function contractMarkdown(): string {
   const packRoots = new Map<string, any>();
   const platformIndex = (id: string): Promise<PartsIndex | null> => {
     let p = platPending.get(id);
-    if (!p) platPending.set(id, (p = G.Bundles.getJson(PARTS_BASE + id + '/index.json').then((ix: PartsIndex | null) => { // (from the '_boot' bundle: js/modelbundles.ts)
+    if (!p) platPending.set(id, (p = BundlesEnv.Bundles.getJson(PARTS_BASE + id + '/index.json').then((ix: PartsIndex | null) => { // (from the '_boot' bundle: js/modelbundles.ts)
       if (ix && checking) { const r = validatePartsIndex(ix); for (const e of r.errors) console.error(`[checkModels] parts/${id}/index.json: ${e}`); }
       if (ix) platIx.set(id, ix); return ix;
     })));
@@ -1271,12 +1279,12 @@ function contractMarkdown(): string {
   }
   const loadPack = (id: string, file: string, pri = 0): Promise<boolean> => {
     const url = packUrl(id, file); if (packRoots.has(url)) return Promise.resolve(true);
-    return enqueue(url, pri, () => G.GLB!.load(url).then((scene) => {
+    return enqueue(url, pri, () => GLB.loader!.load(url).then((scene) => {
       if (checking) { const r = validatePack(describeScene(scene)); for (const e of r.errors) console.error(`[checkModels] ${url}: ${e}`); for (const w of r.warnings) console.warn(`[checkModels] ${url}: ${w}`); }
       const root = scene.children[0]; if (root) packRoots.set(url, root); return !!root;
     }, (e: any) => { console.warn('[baked guns] ' + url + ': ' + (e && e.message || e)); return false; }));
   };
-  const buildOf = (def: any): Record<string, string> => def.build || G.Gunsmith.defaultBuild(def.id);
+  const buildOf = (def: any): Record<string, string> => def.build || Gunsmith.defaultBuild(def.id);
   const pool = async <X,>(items: X[], n: number, fn: (x: X) => Promise<unknown>) => { let i = 0; await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) await fn(items[i++]); })); };
   /** Loads the platform's index and the packs this build needs; resolves to whether `assemble(def)` can now work. */
   async function ensure(def: any, pri = 0): Promise<boolean> {
@@ -1300,7 +1308,7 @@ function contractMarkdown(): string {
   }
   /** Own geometry for a mesh and the catalogue's material by name: what the whole-gun path does to every mesh (the gunsmith and icons dispose geometry; the game's materials are shared). */
   function finishMeshes(group: THREE.Object3D) {
-    const M = G.GunMaterials.M as Record<string, () => THREE.Material>;
+    const M = GunMaterials.M as Record<string, () => THREE.Material>;
     group.traverse((o: any) => {
       if (!o.isMesh) return;
       if (!o.userData.own) o.geometry = o.geometry.clone();
@@ -1309,7 +1317,7 @@ function contractMarkdown(): string {
     });
   }
   /**
-   * The gun for ANY build from the loaded packs: { group, info } as G.GunModels.display gives (slot-tagged meshes, part_ nodes with their
+   * The gun for ANY build from the loaded packs: { group, info } as GunModels.display gives (slot-tagged meshes, part_ nodes with their
    * pivots, info with the muzzles list, the mounts and info.anim), or null if the platform's index or a pack it needs is not loaded
    * (ensure / preloadPlatform) or the packs do not cover the build (a combination the baker never saw).
    */
@@ -1356,12 +1364,12 @@ function contractMarkdown(): string {
     finishMeshes(group);
     const info = plan.info; info.anim = {}; // (the tables' and the anchors' info: the same as infoOf(def) gives, with the live nodes in anim)
     for (const [name, node] of nodes) if (name.startsWith(NAMES.partPrefix) && node.userData[NAMES.extras.part]) info.anim[node.userData[NAMES.extras.part]] = node;
-    if (skin && skin.length) G.Stickers.decorate(group, skin);
+    if (skin && skin.length) Stickers.decorate(group, skin);
     return plan.approx ? { group, info, approx: plan.approx } : { group, info };
   }
   /**
    * The build's `info` from the platform's index alone: no pack files, no meshes, synchronous (once the platform's index.json is loaded:
-   * G.Models.platformIndex(id) / ensure / preloadPlatform load it). The same numbers assemble(def) gives; `anim` holds the NAMES of the part_
+   * Models.platformIndex(id) / ensure / preloadPlatform load it). The same numbers assemble(def) gives; `anim` holds the NAMES of the part_
    * nodes (key -> "part_<key>") instead of the live nodes. null while the index is not loaded.
    */
   function infoOf(def: any): any | null {
@@ -1420,25 +1428,25 @@ function contractMarkdown(): string {
     return scene;
   }
   const GL = (globalThis as any).ThreeAddons;
-  if (GL && !G.GLB) {
+  if (GL && !GLB.loader) {
     const loader = new GL.GLTFLoader().setMeshoptDecoder(GL.MeshoptDecoder), cache = new Map<string, Promise<any>>();
-    G.GLB = {
+    GLB.loader = {
       ready: Promise.resolve(GL.MeshoptDecoder.ready).then(() => true, () => false),
-      load: (url: string) => { const hit = cache.get(url); if (hit) return hit; const p: Promise<any> = (G.Bundles.bundleOf(url) ? G.Bundles.getFile(url).then((b) => loader.parseAsync(b, '')) : loader.loadAsync(R.base + url)).then((g: any) => dequantize(g.scene), (e: any) => { cache.delete(url); throw e; }); cache.set(url, p); return p; },
+      load: (url: string) => { const hit = cache.get(url); if (hit) return hit; const p: Promise<any> = (BundlesEnv.Bundles.bundleOf(url) ? BundlesEnv.Bundles.getFile(url).then((b) => loader.parseAsync(b, '')) : loader.loadAsync(R.base + url)).then((g: any) => dequantize(g.scene), (e: any) => { cache.delete(url); throw e; }); cache.set(url, p); return p; },
     };
   }
   /** Where the page's folder is from here (the export worker's scripts are two folders down: js/exportworker.ts sets '../../'). */
-  const setRoot = (base: string) => { R.base = base; G.Bundles.setRoot(base); };
+  const setRoot = (base: string) => { R.base = base; BundlesEnv.Bundles.setRoot(base); };
   /** A .glb or JSON of the game's assets (assets/models/...), by the loader above: for the props (js/gunmodels.ts). */
-  const loadFile = (url: string): Promise<any> => glbReady().then((ok) => { if (!ok) throw new Error('no glTF loader'); return G.GLB!.load(url); });
-  const fetchJson = (url: string): Promise<any> => (G.Bundles.bundleOf(url) ? G.Bundles.getJson(url) : fetch(R.base + url, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null));
+  const loadFile = (url: string): Promise<any> => glbReady().then((ok) => { if (!ok) throw new Error('no glTF loader'); return GLB.loader!.load(url); });
+  const fetchJson = (url: string): Promise<any> => (BundlesEnv.Bundles.bundleOf(url) ? BundlesEnv.Bundles.getJson(url) : fetch(R.base + url, { cache: 'no-cache' }).then((r) => (r.ok ? r.json() : null), () => null));
 
   /** Every platform's index (assets/models/parts/<id>/index.json: ~0.24 MB gzipped for all): what boot() waits on. */
   let booting: Promise<number> | null = null;
   function boot(): Promise<number> {
     return booting || (booting = glbReady().then(async (ok) => {
       if (!ok) return 0;
-      const ids = Object.keys(G.Gunsmith.PLATFORMS); let n = 0;
+      const ids = Object.keys(Gunsmith.PLATFORMS); let n = 0;
       await pool(ids, 8, async (id) => { if (await platformIndex(id)) n++; });
       return n;
     }));
@@ -1460,7 +1468,4 @@ function contractMarkdown(): string {
     planBuild, infoLeaves, infoFromLeaves, buildKeyOf, slotKey, PARTS_INDEX_VERSION,
   };
 })();
-G.Models = G_Models;
-/** G.GLB: the glTF loader (made from three's GLTFLoader in js/glb.ts; tools replace it with their own). */
-interface GlbModuleApi { ready: Promise<boolean>; load(url: string): Promise<any> }
-interface GameModules { Models: typeof G_Models; GLB?: GlbModuleApi }
+Hooks.modelInfo = (def) => (Models.infoOf ? Models.infoOf(def) : null); // (a barrel's effective lengths from the model: js/data.ts barrelMm)

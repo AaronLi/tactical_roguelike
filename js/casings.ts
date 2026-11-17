@@ -1,4 +1,20 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
+import { AudioEnv } from './audioenv.js';
+import { Audio } from './audio.js';
+import { beltFed, GUN_SPECS, WEAPONS } from './data.js';
+import { Furniture } from './furniture.js';
+import { Gear } from './gear.js';
+import { Handling } from './handling.js';
+import { Level } from './level.js';
+import { Gunsmith } from './parts.js';
+import { U } from './util.js';
+import { World } from './world.js';
+import { Icons } from './icons.js';
+import { Loot } from './loot.js';
+import { R } from './render.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
 // Spent cases. Every gun that ejects throws its case out of the ejection port: flicked right and up, tumbling,
 // with the shooter's own movement. Cases fly under gravity, bounce off floors, furniture tops, walls and props,
 // and come to rest lying on their side, where they stay (the oldest are recycled). Each real impact makes its
@@ -14,7 +30,7 @@
 // When a gun ejects: semi and full autos as they fire; pump, lever and bolt guns when they're worked (a beat
 // after the shot); revolvers and break-actions when they're reloaded (the empties dumped out); launchers, the
 // crossbow and the railgun not at all.
-const G_Casings = (() => {
+export const Casings = (() => {
   const T = THREE, MAX = 180, GRAV = 9.8;
   const COLORS: Record<CaseMat, number> = { brass: 0xc9a14a, steel: 0x5c5444, aluminum: 0xb9bdc2, plastic: 0x9c2a22 };
   // the case: what it's made of, its length (mm) and radius (m) (h: its length in m, for a case; a dropped magazine's has none)
@@ -37,19 +53,19 @@ const G_Casings = (() => {
     for (let i = 0; i < MAX; i++) { metal.setColorAt(i, col.set(COLORS.brass)); hull.setColorAt(i, col.set(COLORS.plastic)); }
     free = [...Array(MAX).keys()];
   }
-  function attach() { meshes(); if (metal.parent !== G.R.dynRoot) { G.R.dynRoot.add(metal); G.R.dynRoot.add(hull); } }
+  function attach() { meshes(); if (metal.parent !== R.dynRoot) { R.dynRoot.add(metal); R.dynRoot.add(hull); } }
 
   // how a gun gets rid of its cases
   function mode(def: WeaponDef | null | undefined) {
     if (!def || def.explosive || def.cls === 'BOW' || def.cls === 'RAIL') return null;
-    const plat = G.Gunsmith.PLATFORMS[def.id], spec = (plat && plat.spec) || {};
+    const plat = Gunsmith.PLATFORMS[def.id], spec = (plat && plat.spec) || {};
     if ((plat && (plat.arch === 'revolver' || plat.arch === 'derringer' || plat.arch === 'pepperbox')) || spec.rcv === 'break') return 'reload'; // (a falling block's come out as the block drops)
     if (def.manual) return 'cycle';
     return 'shot';
   }
   // the case: what it's made of, its length (mm) and radius (m)
   function kind(def: CaseGun): CaseKind {
-    const gs: Record<string, any> = G.GUN_SPECS[def.id] || {}, mat: CaseMat = gs.caseMaterial || 'brass', len = gs.caseLength || 30;
+    const gs: Record<string, any> = GUN_SPECS[def.id] || {}, mat: CaseMat = gs.caseMaterial || 'brass', len = gs.caseLength || 30;
     const r = mat === 'plastic' ? 0.0105 : len > 80 ? 0.0105 : len > 50 ? 0.0062 : len > 26 ? 0.0055 : 0.0048;
     return { mat, len, r, h: len / 1000 };
   }
@@ -57,7 +73,7 @@ const G_Casings = (() => {
   // A case leaving the gun at pos, thrown along `right` and `up` (world vectors), plus the shooter's velocity.
   // drop: tipped out of a revolver or a break-action instead of flung.
   function spawn(def: CaseGun, pos: THREE.Vector3, right: THREE.Vector3, up: THREE.Vector3, fwd: THREE.Vector3, vel: THREE.Vector3 | null, drop: boolean, am?: string) {
-    if (!G.R || !G.R.camera || pos.distanceTo(G.R.camera.position) > 32) return;
+    if (!R || !R.camera || pos.distanceTo(R.camera.position) > 32) return;
     attach();
     const k = kind(def);
     if (!free.length) recycle();
@@ -81,13 +97,13 @@ const G_Casings = (() => {
   const V = () => new T.Vector3();
   // your own gun: the ejection port of the first-person model, at the moment it ejects
   function fromView(def: WeaponDef, drop: boolean, n = 1, am?: string | string[]) {
-    const vm = G.R.vm, h = vm && vm.userData.holders && vm.userData.holders[0];
+    const vm = R.vm, h = vm && vm.userData.holders && vm.userData.holders[0];
     if (!h) return;
     const info = vm.userData.info, port = info.port || (info.pistol ? [0.075, 0.022, 0] : [0.12, 0.02, 0]);
     h.holder.updateMatrixWorld(true);
     const m = h.holder.matrixWorld;
     const right = V().setFromMatrixColumn(m, 0).normalize(), up = V().setFromMatrixColumn(m, 1).normalize(), fwd = V().setFromMatrixColumn(m, 2).normalize().negate();
-    const vel = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : null;
+    const vel = Me.vel ? V().set(Me.vel.x, 0, Me.vel.z) : null;
     for (let i = 0; i < n; i++) spawn(def, h.holder.localToWorld(V().set(drop ? 0 : 0.022, port[1] + 0.006, -port[0])), right, up, fwd, vel, drop, Array.isArray(am) ? am[i] : am);
   }
   // someone else's gun, from where its round left and where it went
@@ -112,7 +128,7 @@ const G_Casings = (() => {
   function loose(def: CaseGun, pos: THREE.Vector3, holder: THREE.Object3D, am?: string) {
     holder.updateMatrixWorld(true);
     const m = holder.matrixWorld, right = V().setFromMatrixColumn(m, 0).normalize(), up = V().setFromMatrixColumn(m, 1).normalize(), fwd = V().setFromMatrixColumn(m, 2).normalize().negate();
-    spawn(def, pos, right, up, fwd, G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : null, true, am);
+    spawn(def, pos, right, up, fwd, Me.vel ? V().set(Me.vel.x, 0, Me.vel.z) : null, true, am);
   }
 
   // ---------------------------------------------------------------- dropped magazines
@@ -120,9 +136,9 @@ const G_Casings = (() => {
   let mags: Spent[] = [], magMat: THREE.MeshStandardMaterial = null!;
   let boxMat: THREE.MeshStandardMaterial = null!;
   function magMesh(def: WeaponDef, item: any) {
-    const am = G.Gear.ammoFor(def), pistol = def.cls === 'PST' || def.cls === 'MP';
+    const am = Gear.ammoFor(def), pistol = def.cls === 'PST' || def.cls === 'MP';
     // a drum is a drum: a disc that lies on one face (the variant in the item, or the gun's own when it's in it)
-    const vid = item ? item.vid : def.build && def.build.mag, mp = vid && G.Gunsmith.PARTS[vid];
+    const vid = item ? item.vid : def.build && def.build.mag, mp = vid && Gunsmith.PARTS[vid];
     if (mp && mp.model && mp.model.mag && mp.model.mag.t === 'drum' && !(item && item.k === 'ammo')) {
       if (!magMat) magMat = new T.MeshStandardMaterial({ color: 0x232527, roughness: 0.55, metalness: 0.3 });
       const r = mp.model.mag.r || 0.07, w = mp.model.mag.dw || 0.05, geo = new T.CylinderGeometry(r, r, w, 20);
@@ -130,26 +146,26 @@ const G_Casings = (() => {
       return { mesh: new T.Mesh(geo, magMat), r: w / 2 };
     }
     // thickness (it lies on this), height, depth; a box of rounds is a cardboard box
-    const [x, y, z] = item && item.k === 'ammo' ? [0.05, 0.09, 0.12] : G.beltFed(def) ? [0.09, 0.1, 0.13] : pistol ? [0.022, 0.11, 0.032] : am.h === 1 ? [0.026, 0.11, 0.06] : [0.026, 0.18, 0.065];
+    const [x, y, z] = item && item.k === 'ammo' ? [0.05, 0.09, 0.12] : beltFed(def) ? [0.09, 0.1, 0.13] : pistol ? [0.022, 0.11, 0.032] : am.h === 1 ? [0.026, 0.11, 0.06] : [0.026, 0.18, 0.065];
     if (!magMat) magMat = new T.MeshStandardMaterial({ color: 0x232527, roughness: 0.55, metalness: 0.3 });
     if (!boxMat) boxMat = new T.MeshStandardMaterial({ color: 0xb0915e, roughness: 0.9 });
     return { mesh: new T.Mesh(new T.BoxGeometry(x, y, z), item && item.k === 'ammo' ? boxMat : magMat), r: x / 2 };
   }
   // (fill: how full it was, 0..1: its fall's sound, js/handling.ts drop)
   function dropMag(def: WeaponDef, fill = 0) {
-    const vm = G.R.vm, a = vm && vm.userData.vma, h = vm && vm.userData.holders && vm.userData.holders[0];
-    if (!h || !G.R.dynRoot) return undefined;
+    const vm = R.vm, a = vm && vm.userData.vma, h = vm && vm.userData.holders && vm.userData.holders[0];
+    if (!h || !R.dynRoot) return undefined;
     const { mesh, r } = magMesh(def, null);
     h.holder.updateMatrixWorld(true);
     const home = a && a.hs[0] && a.hs[0].A.magHome ? a.hs[0].A.magHome.clone() : V().set(0, -0.06, -0.12);
-    const p = h.holder.localToWorld(home), q = new T.Quaternion(), cam = G.R.camera.position, map = G.Game.map;
+    const p = h.holder.localToWorld(home), q = new T.Quaternion(), cam = R.camera.position, map = Game.map;
     // (up against a wall the gun, and the magazine in it, can be half through it: then it falls from where you stand, not from the far side)
-    if (map && !G.Level.los(map, cam.x, cam.y, cam.z, p.x, p.y, p.z)) { p.x = cam.x; p.z = cam.z; }
+    if (map && !Level.los(map, cam.x, cam.y, cam.z, p.x, p.y, p.z)) { p.x = cam.x; p.z = cam.z; }
     h.holder.getWorldQuaternion(q);
-    const v = G.Me.vel ? V().set(G.Me.vel.x, 0, G.Me.vel.z) : V();
+    const v = Me.vel ? V().set(Me.vel.x, 0, Me.vel.z) : V();
     v.y -= 0.6;
     const c: Spent = { mesh, p, q, v, w: new T.Vector3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 4, (Math.random() - 0.5) * 6), rest: false, age: 0, k: { mat: 'steel', len: 120, r }, drop: { def, fill } };
-    G.R.dynRoot.add(mesh);
+    R.dynRoot.add(mesh);
     mags.push(c);
     // too many lying about: the oldest one that nobody can pick up goes
     while (mags.length > MAX_MAGS) { const i = Math.max(0, mags.findIndex((o) => !o.item)); takeMag(mags[i]); }
@@ -168,7 +184,7 @@ const G_Casings = (() => {
     let best: Spent | null = null, bd = reach;
     for (const c of mags) {
       if (!c.item) continue;
-      const t = G.Loot.rayHit(o, d, c.mesh!, c.box || (c.box = G.Loot.boxOf(c.mesh!)), bd);
+      const t = Loot.rayHit(o, d, c.mesh!, c.box || (c.box = Loot.boxOf(c.mesh!)), bd);
       if (t < bd) { bd = t; best = c; }
     }
     return best;
@@ -176,7 +192,7 @@ const G_Casings = (() => {
 
   // ---------------------------------------------------------------- physics
   function surface(map: any, x: number, z: number, y: number) {
-    const L = G.Level, f = map.floors ? L.floorAt(map, x, y, z)! : 0, fy = map.floors ? map.floors[f].fy : 0; // (which floor it's on)
+    const L = Level, f = map.floors ? L.floorAt(map, x, y, z)! : 0, fy = map.floors ? map.floors[f].fy : 0; // (which floor it's on)
     if (y - fy > 0.05) return 'wood'; // something's top: a table, a crate, a sofa (or a step)
     if (!map.surf) {
       // what each tile's floor is, as it's drawn (each floor its own): the open ground what the level lays outside (a
@@ -184,7 +200,7 @@ const G_Casings = (() => {
       // (out of doors too: a road's paving, a lawn's grass, the Crest's dirt tracks; js/furniture.ts ROOMS, `sound` where
       // a case or a foot hears it differently from what's drawn), a festival's slabs over its lawn (the square's paving, the
       // gate's, the car park's asphalt, the toilet block's tiles: js/leveldesc.ts festival), and a resident's room its own
-      const WH = map.W * map.H, NF = map.NF || 1, TS = L.TS, ROOMS = G.Furniture.ROOMS as Record<string, any>;
+      const WH = map.W * map.H, NF = map.NF || 1, TS = L.TS, ROOMS = Furniture.ROOMS as Record<string, any>;
       const ground = map.fest ? 'grass' : map.theme.rock ? 'gravel' : 'concrete', inside = map.theme.home >= 1 ? 'hard' : 'concrete';
       map.surf = new Array(WH * NF);
       const sky = new Uint8Array(WH * NF);
@@ -219,7 +235,7 @@ const G_Casings = (() => {
   }
   function impact(c: Spent, speed: number, map: any) {
     if (c.quiet || speed < 0.35 || sounds > 5) return;
-    const cam = G.R.camera, d = c.p.distanceTo(cam.position);
+    const cam = R.camera, d = c.p.distanceTo(cam.position);
     if (d > 26) return;
     sounds++;
     // a magazine of yours on a hard floor: its own fall (js/handling.ts: that gun's magazine simulated landing, every
@@ -227,14 +243,14 @@ const G_Casings = (() => {
     if (c.drop) {
       const dr = c.drop, surf = surface(map, c.p.x, c.p.z, c.p.y - c.k.r);
       c.drop = null;
-      if (!G.Audio.SOFT[surf] && G.Handling.drop(dr.def, dr.fill, c.p)) { c.quiet = true; return; }
+      if (!Audio.SOFT[surf] && Handling.drop(dr.def, dr.fill, c.p)) { c.quiet = true; return; }
     }
     // left or right of you
     const rel = V().subVectors(c.p, cam.position).normalize(), right = V().setFromMatrixColumn(cam.matrixWorld, 0);
-    G.Audio.casing(d, c.k.mat, c.k.len, surface(map, c.p.x, c.p.z, c.p.y - c.k.r), speed, G.U.clamp(rel.dot(right), -1, 1), c.p);
+    Audio.casing(d, c.k.mat, c.k.len, surface(map, c.p.x, c.p.z, c.p.y - c.k.r), speed, U.clamp(rel.dot(right), -1, 1), c.p);
   }
   function step(c: Spent, h: number, map: any) {
-    const L = G.Level;
+    const L = Level;
     prevP.copy(c.p); // (where it was: a wall pushes it back to that side, never on through to the far one)
     c.v.y -= GRAV * h;
     c.p.addScaledVector(c.v, h);
@@ -257,7 +273,7 @@ const G_Casings = (() => {
     };
     if (map.world) {
       const r = c.k.r;
-      G.World.query(map.world, [c.p.x - r, c.p.y, c.p.z - r], [c.p.x + r, c.p.y, c.p.z + r], (s: any) => {
+      World.query(map.world, [c.p.x - r, c.p.y, c.p.z - r], [c.p.x + r, c.p.y, c.p.z + r], (s: any) => {
         if (!s.move || c.p.y < s.min[1] || c.p.y > s.max[1] - 0.01) return;
         hit((s.min[0] + s.max[0]) / 2, (s.min[2] + s.max[2]) / 2, (s.max[0] - s.min[0]) / 2, (s.max[2] - s.min[2]) / 2);
       });
@@ -285,7 +301,7 @@ const G_Casings = (() => {
     const X1 = map.W * L.TS - c.k.r, Z1 = map.H * L.TS - c.k.r;
     if (c.p.x < c.k.r || c.p.x > X1) { c.p.x = Math.min(X1, Math.max(c.k.r, c.p.x)); c.v.x *= -0.3; }
     if (c.p.z < c.k.r || c.p.z > Z1) { c.p.z = Math.min(Z1, Math.max(c.k.r, c.p.z)); c.v.z *= -0.3; }
-    const floor = (G.Game.map && G.Game.map.minY) || 0;
+    const floor = (Game.map && Game.map.minY) || 0;
     if (c.p.y < floor - 1) settle(c, floor); // (a basement's floor is below the ground)
   }
   // lying on its side, wherever it stopped
@@ -300,7 +316,7 @@ const G_Casings = (() => {
     const k = c.k;
     if (k.mat === 'plastic') {
       // hull body, and the brass head at one end
-      tmpS.set(k.r, k.h! * 0.78, k.r); tmpM.compose(c.p, c.q, tmpS); hull.setMatrixAt(c.slots![0], tmpM); hull.setColorAt(c.slots![0], col.set(G.Icons.shellCol(c.am as string)));
+      tmpS.set(k.r, k.h! * 0.78, k.r); tmpM.compose(c.p, c.q, tmpS); hull.setMatrixAt(c.slots![0], tmpM); hull.setColorAt(c.slots![0], col.set(Icons.shellCol(c.am as string)));
       if (c.slots![1] != null) {
         const off = V().set(0, -k.h! * 0.39 - k.h! * 0.11, 0).applyQuaternion(c.q).add(c.p);
         tmpS.set(k.r * 1.04, k.h! * 0.22, k.r * 1.04); tmpM.compose(off, c.q, tmpS); metal.setMatrixAt(c.slots![1], tmpM); metal.setColorAt(c.slots![1], col.set(COLORS.brass));
@@ -312,12 +328,12 @@ const G_Casings = (() => {
 
   return {
     mode, fired, emptied, loose, dropMag, magMesh, takeMag, aimedMag, surface,
-    // for G.R.warmup: the cases' meshes in the scene now, and a sample magazine and box (not kept)
-    warm() { attach(); const def = G.WEAPONS.m4; return [magMesh(def, null).mesh, magMesh(def, { k: 'ammo' }).mesh]; },
+    // for R.warmup: the cases' meshes in the scene now, and a sample magazine and box (not kept)
+    warm() { attach(); const def = WEAPONS.m4; return [magMesh(def, null).mesh, magMesh(def, { k: 'ammo' }).mesh]; },
     get mags() { return mags; }, // for debugging
     get live() { return live; }, // for debugging
     update(dt: number) {
-      const map = G.Game.map;
+      const map = Game.map;
       if (!map) return;
       sounds = 0;
       for (const c of mags) {
@@ -325,7 +341,7 @@ const G_Casings = (() => {
         const h = Math.min(dt, 0.05), n = Math.ceil(h / 0.006);
         c.age += h;
         for (let i = 0; i < n && !c.rest; i++) step(c, h / n, map);
-        if (c.age > 6 && !c.rest) settle(c, G.Level.groundAt(map, c.p.x, c.p.z, 0.01, c.p.y + 0.03));
+        if (c.age > 6 && !c.rest) settle(c, Level.groundAt(map, c.p.x, c.p.z, 0.01, c.p.y + 0.03));
         draw(c);
       }
       if (!metal && !queue.length) return;
@@ -344,7 +360,7 @@ const G_Casings = (() => {
         c.age += h;
         const n = Math.ceil(h / 0.006);
         for (let i = 0; i < n && !c.rest; i++) step(c, h / n, map);
-        if (c.age > 6 && !c.rest) settle(c, G.Level.groundAt(map, c.p.x, c.p.z, 0.01, c.p.y + 0.03));
+        if (c.age > 6 && !c.rest) settle(c, Level.groundAt(map, c.p.x, c.p.z, 0.01, c.p.y + 0.03));
         draw(c); moved = true;
       }
       if (moved || queue.length === 0) { metal.instanceMatrix.needsUpdate = true; hull.instanceMatrix.needsUpdate = true; if (metal.instanceColor) metal.instanceColor.needsUpdate = true; if (hull.instanceColor) hull.instanceColor.needsUpdate = true; }
@@ -362,5 +378,5 @@ const G_Casings = (() => {
     },
   };
 })();
-G.Casings = G_Casings;
-interface GameModules { Casings: typeof G_Casings; }
+ReplayEnv.Casings = Casings; // (what the replay asks of it: js/replayenv.ts)
+AudioEnv.Casings = Casings; // (what sound asks of it: js/audioenv.ts)

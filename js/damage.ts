@@ -1,4 +1,8 @@
 'use strict';
+import { Hooks, U } from './util.js';
+import { World } from './world.js';
+import { Level } from './level.js';
+import { Scars } from './scars.js';
 // What a round really does to a wall or a door: it takes the material away. js/scars.ts draws what's left round the damage; this cuts it.
 //   A hit's a record (rec, below) that means the same on every screen, told to the squad as the marks are ('hole'), and it's the
 //   same record in the replays (from a round's path). apply() takes one and:
@@ -16,7 +20,7 @@
 //   the latch lets go and it swings open; shoot out all the hinges and nothing's holding it, and it falls (fallTrack: worked out once, in
 //   full, so everyone and every replay sees the same fall). The host keeps the score (js/server.ts doorHit).
 //   Furniture, floors, ceilings, lintels and the wall round a window aren't cut: they keep their marks.
-const G_Damage = (() => {
+export const Damage = (() => {
   const T = THREE, N = 36, MAX = 900, BORE = 0.85, REACH = 0.17, THIN = 0.012; // (N: the points round a hole. MAX: holes in a level; after that, marks only. BORE: how wide it is past its mouth, as a share of its radius. REACH: how near a wall's end a hit breaks a piece off it. THIN: narrower than this, what's left between two holes has crumbled)
   type V3 = THREE.Vector3;
   type WMat = THREE.MeshLambertMaterial & { defines?: Record<string, any> };
@@ -44,7 +48,7 @@ const G_Damage = (() => {
   interface DoorHole extends Shape { lining: number; m: string; J: number; c0: number; R0: number; dirL: V3 }
   interface Door { id: number; x: number; z: number; w?: number; fy?: number; axis: 'x' | 'z'; mirror?: boolean; open?: boolean; kind?: string; holes: DoorHole[] | null; gone: Record<string, number> | null; fallen?: boolean; rest?: number[] | null }
   interface Solid { kind?: string; edge?: boolean; win?: boolean; glass?: any; door?: Door; move?: boolean; min: number[]; max: number[]; holes?: Hole[] | null }
-  type WorldT = Parameters<typeof G.World.query>[0];
+  type WorldT = Parameters<typeof World.query>[0];
   // a floor of the level (or the level, when it has one floor)
   interface FloorMap { W: number; H: number; t: ArrayLike<number>; fy?: number; fl?: number; skirt?: number; wallMesh?: THREE.InstancedMesh; wallIdx?: Map<number, number>; wallBase?: ArrayLike<number>; winAt?: Set<number> }
   interface DmgMap extends FloorMap { dmg?: DState | null; floors?: FloorMap[]; world?: WorldT; doorMeshes?: Record<string, THREE.Object3D>; doors?: Door[]; doorVer?: number }
@@ -68,7 +72,7 @@ const G_Damage = (() => {
   const rngOf = (s: number) => () => { s = (Math.imul(s, 1597334677) + 12345) | 0; return ((s ^ (s >>> 15)) >>> 0) / 4294967296; };
   const seedOf = (a: number[]) => (Math.round(a[0] * 997) * 31 + Math.round(a[1] * 991) * 17 + Math.round(a[2] * 983)) | 0;
   HOLE.sheet = HOLE.mild;
-  const radius = (m: string, J?: number, cal?: number) => { const h = HOLE[m]; return h ? h.r * G.U.clamp(Math.sqrt((J || 800) / 800), 0.7, 1.35) * G.U.clamp((cal || 8) / 8, 0.8, 1.3) : 0; };
+  const radius = (m: string, J?: number, cal?: number) => { const h = HOLE[m]; return h ? h.r * U.clamp(Math.sqrt((J || 800) / 800), 0.7, 1.35) * U.clamp((cal || 8) / 8, 0.8, 1.3) : 0; };
   // a hole's outline: how far out it is at each of N angles (m), rough all round, with spikes that run out of it (cracks, splinters),
   // long up the grain
   function outline(seed: number, h: Look, r: number, wide = 1) {
@@ -167,7 +171,7 @@ const G_Damage = (() => {
   }
   // the state of a level's damage (a map's: the host's has no meshes, only what rays need)
   const st = (map: DmgMap): DState => map.dmg || (map.dmg = { holes: [], bites: [], seen: new Set(), faces: new Map(), tiles: new Map(), mats: new Map(), falls: [] });
-  const floorOf = (map: DmgMap, y: number): FloorMap => (map.floors ? map.floors.find((f) => y >= (f.fy || 0) - 0.5 && y < (f.fy || 0) + G.Level.WALL_H + 0.3) || map.floors[0] : map);
+  const floorOf = (map: DmgMap, y: number): FloorMap => (map.floors ? map.floors.find((f) => y >= (f.fy || 0) - 0.5 && y < (f.fy || 0) + Level.WALL_H + 0.3) || map.floors[0] : map);
   const liningMat = (map: DmgMap, col: number) => {
     const D = st(map);
     if (!D.mats.has(col)) D.mats.set(col, new T.MeshLambertMaterial({ color: col, vertexColors: true, side: T.DoubleSide }));
@@ -194,7 +198,7 @@ const G_Damage = (() => {
   };
 
   // ---------------------------------------------------------------- walls
-  const faceKey = (fm: FloorMap, ax: number, sg: number, c: number) => `${fm.fl || 0}:${ax}:${sg}:${Math.round(c / G.Level.TS)}`;
+  const faceKey = (fm: FloorMap, ax: number, sg: number, c: number) => `${fm.fl || 0}:${ax}:${sg}:${Math.round(c / Level.TS)}`;
   const axisOf = (n: number[]) => (Math.abs(n[0]) > 0.5 ? 0 : Math.abs(n[2]) > 0.5 ? 2 : -1);
   // a hole's outline in the face with normal n, at a point in it, with its place in the world
   function inFace(fm: FloorMap, m: string, a: number[], n: number[], rad: number[]): Face | null {
@@ -267,7 +271,7 @@ const G_Damage = (() => {
   // the marks round a hole's edge (a face's, on its side of the wall): js/scars.ts's, less anything it'd stand up: rimFlaps has that
   function marksOf(F: Face, H: Hole, k: MarkSide, D: DState) {
     const h = HOLE[F.m] || H.look, dir = new T.Vector3(...H.u), n = new T.Vector3(...F.n), o = { m: F.m, k, n: F.n, dir, J: H.J, stop: k === 'e' && !H.fb, cal: H.c, fit: fitOf(F) }, ua = F.ax === 0 ? 2 : 0, sd = (F.v * 31 + Math.round(F.a[1] * 500)) | 0;
-    F.marks = (G.Scars.plan(o) as Mark[]).filter((c) => c.mat.map); F.clip = null;
+    F.marks = (Scars.plan(o) as Mark[]).filter((c) => c.mat.map); F.clip = null;
     F.flip = [Math.sign(dir.getComponent(ua)) || 1, sd & 1 ? 1 : -1];
     F.flap = !H.bite && h.flap && (k === 'x' || h.flap.in) ? { h: h.flap, geo: rimFlaps(ring3(F, 0.999), new T.Vector3(...F.a), k === 'x' ? n : n.clone().negate(), dir, H.R0 * h.flap.l, H.R0 * h.flap.h, sd, F.rad, F.core, (p: V3) => (D.faces.get(F.key) || []).some((f) => f !== F && inOutline(f, uvOf(f, [p.x, p.y, p.z]), 0.95))) } : null;
   }
@@ -297,7 +301,7 @@ const G_Damage = (() => {
   }
   // how far a face's surface runs along the wall from a point on it: to the wall's ends (a doorway, a corner), a few tiles either way at most
   function spanOf(fm: FloorMap, F: Face) {
-    const TS = G.Level.TS, sg = Math.sign(F.n[F.ax]), back = Math.round(F.plane / TS) + (sg > 0 ? -1 : 0);
+    const TS = Level.TS, sg = Math.sign(F.n[F.ax]), back = Math.round(F.plane / TS) + (sg > 0 ? -1 : 0);
     const ok = (k: number) => { const x = F.ax === 0 ? back : k, z = F.ax === 0 ? k : back; return x >= 0 && z >= 0 && x < fm.W && z < fm.H && fm.t[z * fm.W + x] === 1; };
     let ut = Math.floor(F.c[0] / TS);
     if (!ok(ut)) ut = ok(ut - 1) ? ut - 1 : ok(ut + 1) ? ut + 1 : ut; // (a piece off a wall's end sits on the corner itself: the wall's the tile beside it)
@@ -305,12 +309,12 @@ const G_Damage = (() => {
     while (lo > ut - 4 && ok(lo - 1)) lo--;
     while (hi < ut + 4 && ok(hi + 1)) hi++;
     const Y = fm.fy || 0;
-    return [lo * TS, (hi + 1) * TS, Y, Y + G.Level.WALL_H];
+    return [lo * TS, (hi + 1) * TS, Y, Y + Level.WALL_H];
   }
   // what's torn up, into a mesh a material
   function flapMeshes(faces: { flap?: FlapGeo | null }[], off?: V3) {
     const by = new Map<THREE.Material, FlapBuf>(), out: THREE.Mesh[] = [];
-    for (const F of faces) { if (!F.flap) continue; const mat = G.Scars.flapMat(F.flap.h.c, !!F.flap.h.m), b: FlapBuf = by.get(mat) || { pos: [], col: [] }; by.set(mat, b); for (const x of F.flap.geo.pos) b.pos.push(x); for (const x of F.flap.geo.col) b.col.push(x); }
+    for (const F of faces) { if (!F.flap) continue; const mat = Scars.flapMat(F.flap.h.c, !!F.flap.h.m), b: FlapBuf = by.get(mat) || { pos: [], col: [] }; by.set(mat, b); for (const x of F.flap.geo.pos) b.pos.push(x); for (const x of F.flap.geo.col) b.col.push(x); }
     for (const [mat, b] of by) { const m = lined(b.pos, b.col, mat, off); m.userData.keepMat = true; out.push(m); }
     return out;
   }
@@ -333,7 +337,7 @@ const G_Damage = (() => {
   function tileMesh(map: DmgMap, fm: FloorMap, x: number, z: number) {
     const D = st(map), tile = tileOf(map, fm, x, z);
     if (!tile) return;
-    const TS = G.Level.TS, Y = fm.fy || 0, SK = fm.skirt || 0, WH = G.Level.WALL_H;
+    const TS = Level.TS, Y = fm.fy || 0, SK = fm.skirt || 0, WH = Level.WALL_H;
     for (const c of [...tile.group.children]) if (!c.userData.lining) { c.removeFromParent(); (c as THREE.Mesh).geometry.dispose(); }
     const pos = [], nor = [], uvs = [], x0 = x * TS, x1 = x0 + TS, z0 = z * TS, z1 = z0 + TS, v0 = -SK, v1 = WH;
     // (u along the face, v up it, and the texture across it as a BoxGeometry's runs: seen from outside, left to right)
@@ -381,7 +385,7 @@ const G_Damage = (() => {
   }
   // every tile a hole touches: its outlines, and along its bore
   function touched(fm: FloorMap, H: Hole) {
-    const TS = G.Level.TS, out = new Set<number>(), add = (px: number, pz: number) => { const x = Math.floor(px / TS), z = Math.floor(pz / TS); if (x >= 0 && z >= 0 && x < fm.W && z < fm.H) out.add(z * fm.W + x); };
+    const TS = Level.TS, out = new Set<number>(), add = (px: number, pz: number) => { const x = Math.floor(px / TS), z = Math.floor(pz / TS); if (x >= 0 && z >= 0 && x < fm.W && z < fm.H) out.add(z * fm.W + x); };
     for (const F of [H.fa, H.fb]) if (F) for (const p of F.pts) { const e = 1e-3; if (F.ax === 0) { add(F.a[0] + e, p[0]); add(F.a[0] - e, p[0]); } else { add(p[0], F.a[2] + e); add(p[0], F.a[2] - e); } }
     const r = H.r;
     for (let s = 0; s <= H.len + 0.05; s += 0.1) for (const [ox, oz] of [[0, 0], [r, 0], [-r, 0], [0, r], [0, -r]]) add(H.a[0] + H.u[0] * s + ox, H.a[2] + H.u[2] * s + oz);
@@ -396,7 +400,7 @@ const G_Damage = (() => {
     const near = H.bite ? [] : neighbours(D, H);
     for (const o of near) { o.lined = false; if (o.look.flap) { marksOf(o.fa, o, 'e', D); if (o.fb) marksOf(o.fb, o, 'x', D); } }
     marksOf(H.fa, H, 'e', D); if (H.fb) marksOf(H.fb, H, 'x', D);
-    const TS = G.Level.TS, ts = touched(fm, H), home = Math.floor((H.a[2] + H.u[2] * 0.01) / TS) * fm.W + Math.floor((H.a[0] + H.u[0] * 0.01) / TS);
+    const TS = Level.TS, ts = touched(fm, H), home = Math.floor((H.a[2] + H.u[2] * 0.01) / TS) * fm.W + Math.floor((H.a[0] + H.u[0] * 0.01) / TS);
     for (const o of near) for (const i of touched(fm, o)) ts.add(i); // (it's been chipped, and its lining stops at this one now)
     // (the bore's mesh lives with a tile that's really there: the one it went in by, or the first along it that is)
     let owner = null as Tile | null;
@@ -415,21 +419,21 @@ const G_Damage = (() => {
   // A bite's a wedge out of the corner: B.p the point on the corner, an outline in each face (fuse, as holes), and a rough fan of faces in from
   // them to the back of it, B.d in from each face; rays go into it as they do a bore.
   function edgeOf(fm: FloorMap, a: number[], n: number[]) {
-    const TS = G.Level.TS, ax = axisOf(n), ua = ax === 0 ? 2 : 0, c = a[ua], across = Math.floor((a[ax] - n[ax] * 0.02) / TS);
+    const TS = Level.TS, ax = axisOf(n), ua = ax === 0 ? 2 : 0, c = a[ua], across = Math.floor((a[ax] - n[ax] * 0.02) / TS);
     for (const dir of [1, -1]) {
       const b = (dir > 0 ? Math.ceil(c / TS - 1e-6) : Math.floor(c / TS + 1e-6)) * TS;
       if (Math.abs(b - c) > REACH) continue;
       const along = Math.floor((b + dir * 0.01) / TS), x = ax === 0 ? across : along, z = ax === 0 ? along : across;
       if (x < 0 || z < 0 || x >= fm.W || z >= fm.H) continue;
       const v = fm.t[z * fm.W + x];
-      if (v === 1 || (v === 3 && a[1] - (fm.fy || 0) > G.Level.DOOR_H)) continue;
+      if (v === 1 || (v === 3 && a[1] - (fm.fy || 0) > Level.DOOR_H)) continue;
       return { ua, b, dir };
     }
     return null;
   }
   const inBite = (B: Bite, x: number, y: number, z: number, pad = 0) => {
     const dx = x - B.p[0], dy = y - B.p[1], dz = z - B.p[2], a = dx * B.in1[0] + dz * B.in1[2], b = dx * B.in2[0] + dz * B.in2[2];
-    return a > -0.03 - pad && b > -0.03 - pad && a + b < B.d * 1.1 + pad && Math.abs(dy) < Math.max(B.fa.max, B.fb.max) * (1 - G.U.clamp((a + b) / (B.d * 1.3), 0, 1)) + pad;
+    return a > -0.03 - pad && b > -0.03 - pad && a + b < B.d * 1.1 + pad && Math.abs(dy) < Math.max(B.fa.max, B.fb.max) * (1 - U.clamp((a + b) / (B.d * 1.3), 0, 1)) + pad;
   };
   // What's left of the wall round a bite: one surface from the edge of the break in to the back of it. The break's edge is one loop round the corner, over
   // one face and back over the other: an outline's middle is on the corner, so its half on the wall runs from straight up to straight down of it, and nothing's
@@ -439,7 +443,7 @@ const G_Damage = (() => {
     const half = (F: Face, ownUp: number) => { // (top to bottom)
       const [lo, hi] = spanOf(fm, F), lim = F.c[0], out = [];
       for (let i = N / 4; i <= (3 * N) / 4; i++) {
-        const [u, v] = F.pts[ownUp > 0 ? i : ((3 * N) / 4 + (i - N / 4)) % N], k = G.U.clamp(ownUp > 0 ? Math.min(u, lim) : Math.max(u, lim), lo, hi);
+        const [u, v] = F.pts[ownUp > 0 ? i : ((3 * N) / 4 + (i - N / 4)) % N], k = U.clamp(ownUp > 0 ? Math.min(u, lim) : Math.max(u, lim), lo, hi);
         out.push(F.ax === 0 ? new T.Vector3(F.plane, v, k) : new T.Vector3(k, v, F.plane));
       }
       return ownUp > 0 ? out : out.reverse();
@@ -480,13 +484,13 @@ const G_Damage = (() => {
     }
     B.a = B.p;
     biteSolids(map, B); redraw(map, fm, B);
-    if (fm.wallMesh && (map as unknown) === G.Game.map && G.R.debris) G.R.debris.burst(new T.Vector3(...rec.a), { m: rec.m, k: 'e', n, J: rec.J * 3, dir: new T.Vector3(...rec.u) }); // (a piece of it, not a chip)
+    if (fm.wallMesh) Hooks.biteDebris!(map, rec, n); // (a piece of it, not a chip: as debris, if this is the level on the screen)
   }
   function biteSolids(map: DmgMap, B: Bite) {
     const w = map.world, x = B.p[0] + (B.in1[0] + B.in2[0]) * 0.05, y = B.p[1], z = B.p[2] + (B.in1[2] + B.in2[2]) * 0.05, k = B.d + 0.02;
     for (const s of B.solids || []) s.holes!.splice(s.holes!.indexOf(B), 1);
     B.solids = [];
-    G.World.query(w!, [x - k, y - k, z - k], [x + k, y + k, z + k], (s: Solid) => { if (s.kind === 'wall' && !s.edge && !s.win) { (s.holes = s.holes || []).push(B); B.solids!.push(s); } });
+    World.query(w!, [x - k, y - k, z - k], [x + k, y + k, z + k], (s: Solid) => { if (s.kind === 'wall' && !s.edge && !s.win) { (s.holes = s.holes || []).push(B); B.solids!.push(s); } });
   }
   // the solids along a bore have it, for rays
   function onSolids(map: DmgMap, H: Hole) {
@@ -495,7 +499,7 @@ const G_Damage = (() => {
     H.solids = [];
     for (let t = 0; t <= H.len + 0.01; t += 0.05) {
       const x = H.a[0] + u[0] * t, y = H.a[1] + u[1] * t, z = H.a[2] + u[2] * t, k = 0.002;
-      G.World.query(w!, [x - k, y - k, z - k], [x + k, y + k, z + k], (s: Solid) => { if (s.kind === 'wall' && !H.solids!.includes(s)) { (s.holes = s.holes || []).push(H); H.solids!.push(s); } });
+      World.query(w!, [x - k, y - k, z - k], [x + k, y + k, z + k], (s: Solid) => { if (s.kind === 'wall' && !H.solids!.includes(s)) { (s.holes = s.holes || []).push(H); H.solids!.push(s); } });
     }
   }
   // how far along a ray (from t0, into a solid it leaves at t1) it stays in a bore: t0 if it doesn't go down it
@@ -519,7 +523,7 @@ const G_Damage = (() => {
   // ---------------------------------------------------------------- doors
   // a point on a door in its leaf's own terms ([x from the hinge, y up], js/level.ts: pivot), shut or standing open
   function onLeaf(d: Door, p: number[]) {
-    const half = (d.w || G.Level.TS) / 2, m = d.mirror ? -1 : 1, y = p[1] - (d.fy || 0);
+    const half = (d.w || Level.TS) / 2, m = d.mirror ? -1 : 1, y = p[1] - (d.fy || 0);
     if (d.open) return [d.axis === 'x' ? p[0] - d.x : d.z - p[2], y];
     return [d.axis === 'x' ? (p[2] - (d.z - half * m)) * m : (p[0] - (d.x - half * m)) * m, y];
   }
@@ -529,7 +533,7 @@ const G_Damage = (() => {
   // what of a door's a round struck there: 'h' its handle, 0 1 2 a hinge, or nothing
   function partAt(d: Door, p: number[]) {
     if (d.kind === 'vault') return null;
-    const q = onLeaf(d, p), L = (d.w || G.Level.TS) - 0.05;
+    const q = onLeaf(d, p), L = (d.w || Level.TS) - 0.05;
     if (Math.hypot(q[0] - (L - 0.08), q[1] - 1) < 0.085) return 'h';
     if (q[0] < 0.12) for (let i = 0; i < 3; i++) if (Math.abs(q[1] - HINGES[i]) < 0.09) return i;
     return null;
@@ -559,7 +563,7 @@ const G_Damage = (() => {
       const look = HOLE[q.m], dir = q.dirL, mid = new T.Vector3(q.c[0] - cx, q.c[1] - cy, 0), sg = dir.z > 0 ? -1 : 1, flip = [Math.sign(dir.x) || 1, 1]; // (sg: the side it came in by)
       for (const [side, k] of [[sg, 'e'], [-sg, 'x']] as [number, MarkSide][]) {
         const n = [0, 0, side], put = (u: number, v: number) => [u - cx, v - cy, side * (t + 0.003)];
-        for (const c of (G.Scars.plan({ m: q.m, k, n, dir, J: q.J, cal: q.c0, fit: fitOf(q) }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, q.c[0], q.c[1], rect, polys, flip, put, n, side > 0 ? [0, 2, 4] : [0, 4, 2]);
+        for (const c of (Scars.plan({ m: q.m, k, n, dir, J: q.J, cal: q.c0, fit: fitOf(q) }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, q.c[0], q.c[1], rect, polys, flip, put, n, side > 0 ? [0, 2, 4] : [0, 4, 2]);
         if (look.flap && (k === 'x' || look.flap.in)) { const rim = q.core.map((r, i) => { const a = (i / N) * Math.PI * 2; return new T.Vector3(mid.x + Math.cos(a) * r, mid.y + Math.sin(a) * r, side * t); }); faces.push({ flap: { h: look.flap, geo: rimFlaps(rim, mid.clone().setZ(side * t), new T.Vector3(0, 0, k === 'x' ? side : -side), dir, q.R0 * look.flap.l, q.R0 * look.flap.h, (q.v * 31 + i0(q)) | 0, q.rad, q.core, (p: V3) => d.holes!.some((o) => o !== q && inOutline(o, [p.x + cx, p.y + cy], 0.95))) } }); }
       }
     }
@@ -609,12 +613,12 @@ const G_Damage = (() => {
     D.seen.add(rec.id);
     const a = rec.a, n = rec.n, in0 = [a[0] - n[0] * 0.01, a[1] - n[1] * 0.01, a[2] - n[2] * 0.01];
     let door = null as Door | null, wall = false as false | Solid; // (set in the query's callback)
-    G.World.query(w, in0.map((v) => v - 0.02), in0.map((v) => v + 0.02), (s: Solid) => { if (s.door && (s.kind === 'door' || s.kind === 'leaf') && s.glass == null) door = s.door; else if (s.kind === 'wall' && !s.edge && !s.win) wall = s; });
+    World.query(w, in0.map((v) => v - 0.02), in0.map((v) => v + 0.02), (s: Solid) => { if (s.door && (s.kind === 'door' || s.kind === 'leaf') && s.glass == null) door = s.door; else if (s.kind === 'wall' && !s.edge && !s.win) wall = s; });
     const look = HOLE[rec.m] || HOLE.concrete, R = radius(rec.m, rec.J, rec.c), seed = seedOf(a);
     if (door) {
       if (!rec.b) return false;
       const c = [(a[0] + rec.b[0]) / 2, (a[1] + rec.b[1]) / 2, (a[2] + rec.b[2]) / 2], q = onLeaf(door, c);
-      if (q[1] > G.Level.DOOR_H) return false;
+      if (q[1] > Level.DOOR_H) return false;
       const piv = map.doorMeshes && map.doorMeshes[door.id], leaf = piv && piv.userData.leaf, dirL = new T.Vector3(...rec.u);
       if (leaf) dirL.applyQuaternion(leaf.getWorldQuaternion(new T.Quaternion()).invert());
       const h = { lining: look.lining, m: rec.m, J: rec.J, c0: rec.c, R0: R, dirL } as DoorHole, rnd = rngOf(seed + 9);
@@ -687,7 +691,7 @@ const G_Damage = (() => {
       const ux = dx / d, uy = dy / d, uz = dz / d, tx = p.x - c.x, ty = p.y - c.y, tz = p.z - c.z, along = tx * ux + ty * uy + tz * uz;
       if (along < d) continue;
       const cx = tx - ux * along, cy = ty - uy * along, cz = tz - uz * along;
-      if (cx * cx + cy * cy + cz * cz < 0.8 && G.World.raycast(map.world!, c.x, c.y, c.z, ux, uy, uz, along).t >= along - 0.3) return true;
+      if (cx * cx + cy * cy + cz * cz < 0.8 && World.raycast(map.world!, c.x, c.y, c.z, ux, uy, uz, along).t >= along - 0.3) return true;
     }
     return false;
   }
@@ -695,7 +699,7 @@ const G_Damage = (() => {
   // ---------------------------------------------------------------- a door falling
   // Where a leaf stands: its centre, and how it's turned (ang 0 shut, 1 open)
   function leafPose(d: Door, ang: number) {
-    const half = (d.w || G.Level.TS) / 2, m = d.mirror ? -1 : 1, Y = d.fy || 0, L = (d.w || G.Level.TS) - 0.05, LH = G.Level.DOOR_H - 0.04;
+    const half = (d.w || Level.TS) / 2, m = d.mirror ? -1 : 1, Y = d.fy || 0, L = (d.w || Level.TS) - 0.05, LH = Level.DOOR_H - 0.04;
     const base = d.axis === 'x' ? -Math.PI / 2 * m : d.mirror ? Math.PI : 0, yaw = base + ang * Math.PI / 2 * 0.95 * m;
     const px = d.axis === 'x' ? d.x : d.x - half * m, pz = d.axis === 'x' ? d.z - half * m : d.z;
     const q = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), yaw), c = new T.Vector3(L / 2 + 0.02, LH / 2, 0).applyQuaternion(q).add(new T.Vector3(px, Y, pz));
@@ -707,7 +711,7 @@ const G_Damage = (() => {
     const w = map.world!, P0 = leafPose(d, ang), rnd = rngOf(seed), hw = P0.L / 2, hh = P0.LH / 2, ht = 0.025, M = 22;
     const ib = new T.Vector3(3 * 1 / (M * (hh * hh + ht * ht)), 3 * 1 / (M * (hw * hw + ht * ht)), 3 * 1 / (M * (hw * hw + hh * hh)));
     const solids: Solid[] = [];
-    G.World.query(w, [P0.c.x - 3.5, P0.c.y - 3, P0.c.z - 3.5], [P0.c.x + 3.5, P0.c.y + 3, P0.c.z + 3.5], (s: Solid) => { if (s.move && s.door !== d) solids.push(s); });
+    World.query(w, [P0.c.x - 3.5, P0.c.y - 3, P0.c.z - 3.5], [P0.c.x + 3.5, P0.c.y + 3, P0.c.z + 3.5], (s: Solid) => { if (s.move && s.door !== d) solids.push(s); });
     const c = P0.c.clone(), q = P0.q.clone(), up = new T.Vector3(0, 1, 0), dh = new T.Vector3(dir[0], 0, dir[1]);
     if (dh.lengthSq() < 1e-4) dh.set(1, 0, 0);
     dh.normalize();
@@ -773,14 +777,14 @@ const G_Damage = (() => {
     d.fallen = true; d.open = true;
     const tr = fallTrack(map, d, ang, dir, seed);
     d.rest = restBox(d, tr);
-    G.World.door(map.world!, map, d);
+    World.door(map.world!, map, d);
     map.doorVer = (map.doorVer || 0) + 1;
     const piv = map.doorMeshes && map.doorMeshes[d.id];
     if (!piv) return;
     piv.userData.fallen = true;
     const u = piv.userData; u.centre = tr.centre;
     st(map).falls.push({ piv, tr, t: snap ? 1e3 : 0, Y: d.fy || 0, d, thud: false });
-    if (!snap && G.Audio && G.Audio.sampleAt) G.Audio.sampleAt('door_close', new T.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.5, 0.7); // (on its own floor)
+    if (!snap && Hooks.doorFallSound) Hooks.doorFallSound(d); // (a door_close sample on its own floor)
   }
   function update(map: DmgMap, dt: number) {
     const D = map && map.dmg;
@@ -791,8 +795,8 @@ const G_Damage = (() => {
       setPose(F.piv, F.piv.userData as { centre: V3; p0?: V3 }, fr[i], F.Y);
       if (!F.thud && F.tr.thud >= 0 && F.t >= F.tr.thud) {
         F.thud = true;
-        if (F.t < 8 && G.Audio && G.Audio.kick) G.Audio.kick(G.R.camera.position.distanceTo(F.piv.position));
-        if (G.R.particles && F.t < 8) G.R.particles(new T.Vector3(fr[i][1], (F.Y || 0) + 0.05, fr[i][3]), 16, 0xa8a090, 1.4, 0.8, 1, 0.8);
+        if (F.t < 8 && Hooks.doorKick) Hooks.doorKick(F.piv);
+        Hooks.doorDust!(F.t, fr[i][1], (F.Y || 0) + 0.05, fr[i][3]);
       }
       return i < fr.length - 1;
     });
@@ -818,7 +822,7 @@ const G_Damage = (() => {
   function warm(map: DmgMap) {
     const m = lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], liningMat(map, HOLE.concrete.lining)), n = [0, 0, 1], out: THREE.Mesh[] = [m];
     // (and the marks, the first time anything's cut)
-    for (const [mm, k] of [['concrete', 'e'], ['pine', 'x'], ['mild', 'x']] as [string, MarkSide][]) { const by = new Map<THREE.Material, MarkBuf>(); for (const c of (G.Scars.plan({ m: mm, k, n, dir: new T.Vector3(0, 0, 1), J: 800, cal: 8, fit: 0.03 }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, 0, 0, [-1, 1, -1, 1], [], [1, 1], (u: number, v: number) => [u, v, 0], n, [0, 2, 4]); out.push(...markMeshes(by)); const f = HOLE[mm].flap; if (f) out.push(lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], G.Scars.flapMat(f.c, !!f.m))); }
+    for (const [mm, k] of [['concrete', 'e'], ['pine', 'x'], ['mild', 'x']] as [string, MarkSide][]) { const by = new Map<THREE.Material, MarkBuf>(); for (const c of (Scars.plan({ m: mm, k, n, dir: new T.Vector3(0, 0, 1), J: 800, cal: 8, fit: 0.03 }) as Mark[]).filter((c) => c.mat.map)) clipInto(by, c, 0, 0, [-1, 1, -1, 1], [], [1, 1], (u: number, v: number) => [u, v, 0], n, [0, 2, 4]); out.push(...markMeshes(by)); const f = HOLE[mm].flap; if (f) out.push(lined([0, 0, 0, 1, 0, 0, 0, 1, 0], [1, 1, 1, 1, 1, 1, 1, 1, 1], Scars.flapMat(f.c, !!f.m))); }
     return out;
   }
   // ---------------------------------------------------------------- glass
@@ -831,7 +835,7 @@ const G_Damage = (() => {
     const g = pane.geometry; if (!g.boundingBox) g.computeBoundingBox();
     const b = g.boundingBox!, sx = b.max.x - b.min.x, sz = b.max.z - b.min.z, side = sx < sz && sx < 0.2, A = side ? sz : sx, H = b.max.y - b.min.y, l = pane.worldToLocal(at.clone()), lo = side ? b.min.z : b.min.x;
     const W = 512, Hp = Math.max(64, Math.min(1024, Math.round((W * H) / A))), cv = typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: W, height: Hp }) : new OffscreenCanvas(W, Hp), c = cv.getContext('2d')!;
-    const hx = G.U.clamp(((side ? l.z : l.x) - lo) / A, 0.02, 0.98) * W, hy = (1 - G.U.clamp((l.y - b.min.y) / H, 0.02, 0.98)) * Hp, rnd = rngOf(seedOf([at.x, at.y, at.z])), R = Math.hypot(W, Hp) * 1.1, n = 15 + Math.floor(rnd() * 6), arms = [];
+    const hx = U.clamp(((side ? l.z : l.x) - lo) / A, 0.02, 0.98) * W, hy = (1 - U.clamp((l.y - b.min.y) / H, 0.02, 0.98)) * Hp, rnd = rngOf(seedOf([at.x, at.y, at.z])), R = Math.hypot(W, Hp) * 1.1, n = 15 + Math.floor(rnd() * 6), arms = [];
     c.fillStyle = 'rgba(214,230,238,0.07)'; c.fillRect(0, 0, W, Hp);
     c.lineCap = 'round'; c.lineJoin = 'round';
     const pen = (w: number, col: string) => { c.lineWidth = w; c.strokeStyle = col; c.stroke(); };
@@ -867,6 +871,4 @@ const G_Damage = (() => {
   }
   return { crack, HOLE, PARTS, HINGES, radius, hit, ofEvent, apply, clear, doorHole, onLeaf, partAt, fall, fallTrack, leafPose, setPose, partGone, update, reset, seenThrough, warm };
 })();
-G.Damage = G_Damage;
 
-interface GameModules { Damage: typeof G_Damage; }

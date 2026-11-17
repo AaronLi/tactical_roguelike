@@ -1,12 +1,13 @@
 'use strict';
+import { FurnSpec } from './furnspec.js';
 // The furniture's meshes, on the page: js/furnspec.ts describes a level's furniture and its rooms' dressing as data, and
 // this draws it, as three.js meshes. Everything static is merged into one mesh per finish (roughness, metalness,
 // texture, glow), a piece's colour in its vertices: a houseful of furniture is a few dozen draw calls, not hundreds.
 // The textures the description names are painted here, on canvases (js/furnspec.ts painters, from the state of the
 // stream they were described at); so is the view out of a window (outsideMaterial) and the level's own use of the floor
 // textures (textures: js/level.ts).
-const G_FurnMesh = (() => {
-  const S = G.FurnSpec;
+export const FurnMesh = (() => {
+  const S = FurnSpec;
   // a canvas painted, as a texture: the floors', rugs' and pictures' (repeating), the stock's labels, the window's view
   const canvas = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d')!, w, h); return c; };
   const mkTex: FdMk<THREE.CanvasTexture> = (w, h, draw) => { const tx = new THREE.CanvasTexture(canvas(w, h, draw)); tx.wrapS = tx.wrapT = THREE.RepeatWrapping; tx.anisotropy = 4; return tx; };
@@ -190,6 +191,4 @@ const G_FurnMesh = (() => {
 
   return { build, realise, geometry, textures, outsideMaterial, packaging };
 })();
-G.FurnMesh = G_FurnMesh;
 
-interface GameModules { FurnMesh: typeof G_FurnMesh; }

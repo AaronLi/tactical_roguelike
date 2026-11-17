@@ -24,7 +24,7 @@ export async function makeEnv({ verbose = false } = {}) {
     readAsArrayBuffer(b) { b.arrayBuffer().then((r) => { this.result = r; this.onloadend && this.onloadend(); }); }
     readAsDataURL(b) { b.arrayBuffer().then((r) => { this.result = 'data:' + b.type + ';base64,' + Buffer.from(r).toString('base64'); this.onloadend && this.onloadend(); }); }
   };
-  const G = loadGame(), GM = G.GunRecipes, GS = G.Gunsmith, Models = loadModels();
+  const G = await loadGame(), GM = G.GunRecipes, GS = G.Gunsmith, Models = await loadModels();
   const src = sha(['tools/models/recipes', 'tools/models/guntraces', 'tools/models/authored', 'tools/models/authoredparts', 'js/parts', 'js/materials', 'js/gunmaterials'].map((f) => fs.readFileSync(path.join(ROOT, f + '.ts'), 'utf8')).join('\0') + '\0' + authoredSrc() + '\0' + authoredPartsSrc());
   await MeshoptEncoder.ready; await MeshoptDecoder.ready;
   const logger = new Logger(verbose ? Logger.Verbosity.INFO : Logger.Verbosity.WARN);

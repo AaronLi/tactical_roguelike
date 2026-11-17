@@ -10,7 +10,7 @@
 //   node tools/check_holds.test.mjs [id ...]        (after tsc: npm run test:models runs it)
 import { loadGame } from './model_env.mjs';
 
-const G = loadGame();
+const G = await loadGame();
 const only = process.argv.slice(2).filter((a) => !a.startsWith('-'));
 const fails = [];
 let n = 0;

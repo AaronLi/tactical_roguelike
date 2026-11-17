@@ -9,7 +9,9 @@
 //   node tools/wind.test.mjs        (after tsc -p .)
 import { loadLevel } from './level_env.mjs';
 
-const A = loadLevel().G, B = loadLevel().G; // (two peers)
+// (two peers: the game loads once per process now that its files are modules (three.js is shared), so the second "peer" is the same copy:
+// windAt being a pure function of the seed, the mean and the time is what makes two machines agree)
+const A = (await loadLevel()).G, B = A;
 let bad = 0;
 const fail = (m) => { bad++; console.log('FAIL ' + m); };
 const ok = (m) => console.log('ok   ' + m);

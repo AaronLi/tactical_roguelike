@@ -8,6 +8,7 @@
 //   node tools/check_hangar_golden.mjs            compares with tests/hangar-golden.json
 //   node tools/check_hangar_golden.mjs --update   rewrites it (review the diff: it's the change in the hangar's scene)
 // (Needs the compiled game and the baked scene: npm run test:models compiles; npm run bake:hangar bakes.)
+import { runScripts } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import fs from 'fs'; import vm from 'vm'; import path from 'path'; import crypto from 'crypto';
 import * as THREE_NS from 'three';
 import { getBounds } from '@gltf-transform/core';
@@ -48,8 +49,12 @@ const solids = data.solids.map(solidKey);
 // ---- the collision the code makes now (js/hangar.ts decorate, js/range.ts decorate on node's three)
 {
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, performance, location: { search: '' }, URLSearchParams, THREE: { ...THREE_NS }, addEventListener() {} };
+  // (js/hangar.ts imports the screens (shop, inventory, gunsmith ...), which read the page's document and window as they load: an object that
+  // answers anything, so they load; none of it is used by decorate)
+  const anything = () => new Proxy(function () {}, { get: (_t, k) => (k === Symbol.toPrimitive ? () => 0 : anything()), apply: () => anything(), construct: () => anything(), set: () => true });
+  Object.assign(ctx, { document: anything(), matchMedia: () => ({ matches: false, addEventListener() {} }), navigator: { userAgent: 'node', maxTouchPoints: 0 }, devicePixelRatio: 1, innerWidth: 1280, innerHeight: 720, localStorage: anything(), requestAnimationFrame: () => 0, setTimeout, clearTimeout, setInterval, clearInterval });
   ctx.window = ctx; ctx.self = ctx; ctx.G = {}; vm.createContext(ctx);
-  for (const f of ['util', 'data', 'world', 'course', 'range', 'hangar']) { const file = DIST + f + '.js'; if (!fs.existsSync(file)) fail(`${path.relative(ROOT, file)} missing: run tsc first`); vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: f + '.js' }); }
+  await runScripts(ctx, DIST, ['util', 'data', 'spacedata', 'world', 'course', 'range', 'hangar']);
   const G = ctx.G, world = G.World.create();
   G.Hangar.decorate({ world });
   const now = world.solids.filter(Boolean).map((s) => solidKey(JSON.parse(JSON.stringify(s, (k, v) => (k === 'id' || k === 'target' ? undefined : v)))));

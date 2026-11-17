@@ -1,47 +1,6 @@
 'use strict';
-// What everything is made of, for a round (js/ballistics.ts strike, crossSolid).
-//
-// MAT: every material a round can meet, armour and walls and furniture alike, by the same numbers:
-//   K      the de Marre constant: the speed it takes to get through t mm is v = K·t^0.7·d^0.75/m^0.5 (d in mm, m in g).
-//          It's fitted to what the material is known to do (below), and armour's to the NIJ ratings.
-//   E      how well each core works on it: the speed needed is divided by this (default CORE_E).
-//   rho    density, kg/m³: how hard it is to shove aside at speed, half rho v².
-//   sig    the stress it stands up to, Pa. With rho it sets the pressure on the round's nose, and so whether the round
-//          flattens, breaks up or stays whole (js/ballistics.ts deform).
-//   mu, e  a ricochet: the share of its speed along the surface it loses, and what it keeps of its speed into it.
-//   noRic  it never glances (fabric, foam, anything a round just goes into).
-//   clog   it plugs a hollow point's nose, which then doesn't open.
-//   fx     what a hit looks and sounds like (js/render.ts IMPACT).
-//   blunt, wearJ, soft, hard: armour's (js/ballistics.ts): the share of a stopped round's energy the body behind it
-//          takes, joules per point of durability, and how it behaves.
-//   spall  a hard plate's: the share of the plug a round pushes out of it that flies off its back as chips (stack).
-// Fitted to: 9 mm ball stopped by about 3 mm of mild steel and 85 mm of pine, through a dozen sheets of plasterboard; M193
-// 5.56 through 8 mm of mild steel; a single brick stopping 5.56 and 7.62x39 and passing 7.62x51 slowly; hollow block's
-// shell not stopping a rifle, stopping a pistol; 100 mm of concrete stopping 7.62x51; a car door nothing to anyone.
-//
-// A SOLID is a box in the world (js/world.ts), and the boxes are what the level's made of, not what it's built from: a
-// wall is 67 cm thick. So each solid has a construction: { skin: the layers on each face, outside in, core: what's
-// between the faces (null: a void), fill: the share of the way through the core that's really core, stud: the framing in
-// the void, every so many metres }. of(map, solid, p, q) gives the construction of the solid a round met at p and left
-// at q. A partition is two sheets of plasterboard and a void, with a stud every 40 cm; a bunker's wall is concrete all
-// the way through; a fridge is thin steel with foam in it; a car is thin steel with an engine in it.
-/** Every material a round can meet (js/materials.ts MAT's keys). */
-type MatKey = 'aramid' | 'pe' | 'steel' | 'ceramic' | 'pc' | 'abs' | 'nylon' | 'polyurea' | 'pad' | 'bone' | 'mild' | 'sheet' | 'iron' | 'alu' | 'concrete' | 'cmu' | 'brick' | 'ceram' | 'hardwood' | 'pine' | 'ply' | 'mdf' | 'gypsum' | 'card' | 'paper' | 'fabric' | 'foam' | 'pur' | 'wool' | 'goods' | 'foliage' | 'rubber' | 'hdpe' | 'soil' | 'sand' | 'granite' | 'water' | 'glass' | 'bpglass' | 'paperT';
-/** What a body is made of (TISSUE's keys), for a round going through it. */
-type TissueKey = 'skin' | 'fat' | 'muscle' | 'viscera' | 'liver' | 'heart' | 'brain' | 'lung' | 'airway' | 'vessel' | 'cortical' | 'cancellous' | 'marrow' | 'rib' | 'diploe';
-/** A round's core, which a material's E is keyed by. */
-type MatCore = 'lead' | 'mild' | 'hard' | 'wc';
-/** What a hit on a material looks and sounds like (js/render.ts IMPACT). */
-type MatFx = 'soft' | 'metal' | 'stone' | 'glass' | 'plastic' | 'wood' | 'plaster' | 'soil' | 'water';
-/** One material's numbers (the header comment says what each is). */
-interface MatDef {
-  name: string; K: number; rho: number; sig: number; fx: MatFx; E: Record<MatCore, number>; mu: number; e: number;
-  noRic?: boolean; clog?: boolean; blunt?: number; wearJ?: number; soft?: boolean; hard?: boolean; spall?: number; damp?: number; weave?: number;
-}
-/** What a solid is built of: skin on each face (outside in), the core between (null: a void), the share of it that's core, the framing in a void. */
-interface MatBuild { skin: [MatKey, number][]; core: MatKey | null; fill: number; stud: MatStud | null; one?: boolean }
-interface MatStud { every: number; w: number; mat: MatKey; mm: number }
-const G_Materials = (() => {
+import { Level } from './level.js';
+export const Materials = (() => {
   const CORE_E: Record<MatCore, number> = { lead: 1, mild: 1.1, hard: 1.4, wc: 1.6 };
   const m = (name: string, K: number, rho: number, sig: number, fx: MatFx, o?: Partial<MatDef>): MatDef => Object.assign({ name, K, rho, sig, fx, E: CORE_E, mu: 0.3, e: 0.15 }, o || {});
   const MAT: Record<MatKey, MatDef> = {
@@ -139,10 +98,15 @@ const G_Materials = (() => {
     Festival: [C([['ply', 12]], null, 1, STUD), C([['ply', 12]], null, 1, STUD)],
     'Sandia Crest': [SOLID('granite'), SOLID('granite')], // (the outcrops, and the Crest House is built of the same stone)
     Hangar: [SOLID('concrete'), SOLID('concrete')],
+    // the ships (js/spacedata.ts THEMES): bulkheads of steel sheet over insulation, a hull of steel plate, a warship's thicker and armoured
+    Freighter: [C([['mild', 1.5]], 'wool', 0.3), C([['mild', 10]], 'pur', 0.4)],
+    'Corporate cutter': [C([['mild', 1.5]], 'wool', 0.3), C([['mild', 10]], 'pur', 0.4)],
+    'Navy warship': [C([['mild', 4]], 'wool', 0.3), C([['steel', 15]], 'pur', 0.4)],
   };
   // floors and ceilings by environment: [the ground's, between storeys]
   const SLAB = SOLID('concrete'), JOISTS = C([['ply', 18], ['gypsum', 13]], 'wool', 0.1);
-  const DECK = { Apartment: SLAB, Suburbs: JOISTS, Festival: C([['ply', 18]]), 'Cold Storage': C([['sheet', 0.7]], 'pur'), Warehouse: C([['sheet', 1.5]], 'wool', 0.1) };
+  const DECK = { Apartment: SLAB, Suburbs: JOISTS, Festival: C([['ply', 18]]), 'Cold Storage': C([['sheet', 0.7]], 'pur'), Warehouse: C([['sheet', 1.5]], 'wool', 0.1),
+    Freighter: ONE([['mild', 8]]), 'Corporate cutter': ONE([['mild', 8]]), 'Navy warship': ONE([['mild', 12]]) }; // (a ship's decks: steel plate)
   // furniture, by the piece (js/furniture.ts)
   const CAB = C([['mdf', 18]]), SHEET = (mm: number, core: MatKey | null = null, fill = 1) => C([[mm <= 1.5 ? 'sheet' : 'mild', mm]], core, fill), MACHINE = C([['mild', 12]], 'iron', 0.35);
   const PROPS = {
@@ -174,12 +138,14 @@ const G_Materials = (() => {
     carton: C([['card', 3]], 'goods', 0.6), wrapped: C([['hdpe', 0.3], ['card', 3]], 'goods', 0.7), drum: C([['sheet', 1]], 'water', 0.9), // the load
     stock: C([['card', 0.1]], 'goods', 0.01), // a shelf's run of packets, tins and bottles: mostly air, next to nothing to a round (a look it still stops)
   };
+  // the squad's ship: a breaching pod's armoured hull and decks, hardened steel all through (what stops a rifle's round and more)
+  const SHIP = ONE([['steel', 20]]);
   const CRATE = PROPS.crates, RAIL = ONE([['mild', 3]]), GRATE = ONE([['mild', 4]]); // (a bar of it: what a round has to get through is js/world.ts barHit's)
   // the same construction with only what's needed changed: a void wall's stud, say
   const wallOf = (theme: any, out: any) => { const w = (WALLS as Record<string, any>)[theme.name] || WALLS.Apartment; return w[out ? 1 : 0]; };
   // is this point outdoors (on its floor's plan)?
   function outAt(map: any, p: any) {
-    const fl = map.floors ? map.floors.find((f: any) => p.y >= (f.fy || 0) - 0.02 && p.y < (f.fy || 0) + G.Level.WALL_H + 0.3) || map.floors[0] : map, TS = G.Level.TS, x = Math.floor(p.x / TS), z = Math.floor(p.z / TS);
+    const fl = map.floors ? map.floors.find((f: any) => p.y >= (f.fy || 0) - 0.02 && p.y < (f.fy || 0) + Level.WALL_H + 0.3) || map.floors[0] : map, TS = Level.TS, x = Math.floor(p.x / TS), z = Math.floor(p.z / TS);
     if (x < 0 || z < 0 || x >= fl.W || z >= fl.H) return true;
     return !!(fl.out && fl.out[z * fl.W + x]);
   }
@@ -188,20 +154,25 @@ const G_Materials = (() => {
     if (s.mat) return s.mat;
     const theme = map.theme || {};
     switch (s.kind) {
-      case 'wall': case 'lintel': if (s.edge) return SOLID('concrete'); return wallOf(theme, outAt(map, p) || (q && outAt(map, q)));
+      case 'wall': case 'lintel': // (a ship's edge is her hull)
+        if (s.edge) return theme.layout === 'ship' ? wallOf(theme, true) : SOLID('concrete');
+        return wallOf(theme, outAt(map, p) || (q && outAt(map, q)));
       case 'floor': case 'ceil': case 'step': {
         if (theme.hub) return SOLID('concrete');
+        if (theme.layout === 'ship') return (DECK as Record<string, any>)[theme.name] || ONE([['mild', 8]]); // (her lowest deck too: there's no ground under it)
         if ((s.kind === 'floor' && s.max[1] <= 0.01 && s.min[1] <= -0.4) || outAt(map, p)) return outAt(map, p) ? SOLID('soil') : SOLID('concrete'); // (the ground: earth outdoors, a slab on it in)
         return (DECK as Record<string, any>)[theme.name] || SLAB;
       }
       case 'door': case 'leaf': {
         const d = s.door || {};
         if (d.kind === 'vault') return C([['mild', 25]], 'mild', 0.04);
+        if (d.kind === 'blast') return ONE([['mild', 20]]); // (a ship's: a blast door's a slab of steel; a sliding door steel skins round a filling, a warship's heavier)
+        if (d.kind === 'slide') return theme.name === 'Navy warship' ? C([['mild', 4]], 'wool', 0.4) : C([['mild', 1.5]], 'wool', 0.4);
         if (s.glass != null) return ONE([['glass', 8]]);
         if (d.kind === 'fire') return C([['sheet', 1.5]], 'wool', 0.5); // (a roof's)
         return theme.name === 'Bunker' || theme.name === 'Foundry' || theme.name === 'Warehouse' ? C([['sheet', 1.5]], 'wool', 0.5) : theme.name === 'Cold Storage' || theme.name === 'Research Lab' ? C([['sheet', 1]], 'pur') : C([['hardwood', 4]]); // (hollow-core timber, or a steel fire door)
       }
-      case 'glass': return s.win && s.win.armor ? ONE([['bpglass', 40]]) : ONE([['glass', 5]]);
+      case 'glass': return s.win && (s.win.armor || s.win.ship) ? ONE([['bpglass', 40]]) : ONE([['glass', 5]]); // (a ship's glass stops rounds as armour glass does: js/level.ts paneBreaks)
       case 'rail': return RAIL;
       case 'grate': return GRATE;
       case 'view': return SOLID('soil');
@@ -211,8 +182,6 @@ const G_Materials = (() => {
         return theme.hub ? SOLID('concrete') : CRATE;
     }
   }
-  return { MAT, TISSUE, CORE_E, PROPS, PARTS, WALLS, of, outAt, built };
+  return { MAT, TISSUE, CORE_E, PROPS, PARTS, WALLS, SHIP, of, outAt, built };
 })();
-G.Materials = G_Materials;
 
-interface GameModules { Materials: typeof G_Materials; }

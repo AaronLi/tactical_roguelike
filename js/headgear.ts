@@ -1,9 +1,11 @@
 'use strict';
+import { Gear } from './gear.js';
+import { Humans } from './humans.js';
 // What's put on the head here (in the head's frame of js/rig.ts: y up from the neck joint, the face toward -z, metres): night
 // vision on a helmet's mount (an arm down to the bridge and its tubes in front of the eyes, swung up over the brow when it's off:
 // nvg), its parts the shared gear made in Blender (models/characters/build_gear.py). The helmets, the face pieces, the caps and
 // the bandanas are each body's own, made on its head (models/characters/kit_head.py); MODELS is each helmet's colour and cut.
-const G_Headgear = (() => {
+export const Headgear = (() => {
   const T = THREE, PI = Math.PI;
   type V3 = [number, number, number];
   type Mat = (c: number, o?: Record<string, any>) => THREE.Material; // (rig.ts's kit materials)
@@ -22,7 +24,7 @@ const G_Headgear = (() => {
   };
   const R0 = 0.125; // (the dome a mount's put on, without the body's own: where night vision hinges)
 
-  // Night vision on the helmet's mount ('n.mono', 'n.bino', 'n.pano', 'n.fuse'): the body's own gear (G.Humans.gear: made in Blender,
+  // Night vision on the helmet's mount ('n.mono', 'n.bino', 'n.pano', 'n.fuse'): the body's own gear (Humans.gear: made in Blender,
   // models/characters/build_gear.py). The mount stays put; what hangs from it (the arm, the bridge and the tubes, an eyecup at the back
   // of each and its objective lens in front) is in a pivot at the hinge, drawn down in front of the eyes. Its rotation.x swings it:
   // 0 down, NV_UP up over the brow, tubes pointing up. A panoramic's outer pair are canted out; a fused set has the thermal core on
@@ -31,13 +33,13 @@ const G_Headgear = (() => {
   const NV_UP = 1.95, glowMats: Record<string, THREE.MeshBasicMaterial> = {};
   const NVCOL: Record<string, number> = { nvbody: 0x2c3034, nvrubber: 0x101112, nvdark: 0x1a1c1e, nvlens: 0x05080a, nvthermal: 0x3a3428, nvwindow: 0x2a1a08, nvbatt: 0x24272a };
   function nvg(id: string, _helmetId: string, mat: Mat, put: Put, hingeAt?: THREE.Vector3 | null) {
-    const d = G.Gear && G.Gear.DEFS[id], v = d && d.nv, n = v ? v.tubes.length : 2;
+    const d = Gear && Gear.DEFS[id], v = d && d.nv, n = v ? v.tubes.length : 2;
     const hinge = hingeAt || at(R0 + 0.018, 0, PI * 0.36);
     const key = (v ? (v.phos[0] > 0.6 ? 'w' : 'g') : 'g'), glow = glowMats[key] || (glowMats[key] = new T.MeshBasicMaterial({ color: key === 'w' ? 0x9fb8ff : 0x3aff7a }));
     const lit: THREE.Mesh[] = [];
     // a node of the gear, its own: its materials the game's (by name), its geometry the file's (shared: never disposed with a rig)
     const node = (name: string) => {
-      const s = G.Humans.gear(name); if (!s) return null;
+      const s = Humans.gear(name); if (!s) return null;
       const g = s.clone(true);
       g.traverse((o: any) => { if (!o.isMesh) return; o.userData.shared = true; const nm = String(o.material.name || '').split('.')[0]; if (nm === 'nvlit') { o.material = glow; lit.push(o); } else o.material = mat(NVCOL[nm] ?? 0x2c3034); });
       return g;
@@ -55,5 +57,3 @@ const G_Headgear = (() => {
   }
   return { nvg, NV_UP, MODELS };
 })();
-G.Headgear = G_Headgear;
-interface GameModules { Headgear: typeof G_Headgear; }

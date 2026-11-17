@@ -325,7 +325,7 @@ A `part_<key>` node (or the root of a per-part pack) may carry `extras.anchors` 
 **Multi-barrel guns and reload sequences** (`info.barrels`, `info.hinge`):
 
 - what: MULTI-BARREL GUNS AND RELOAD SEQUENCES (any gun; the first is the Tempest). A gun with several barrels says so in info.barrels = { n, rounds: { <type>: { rounds_each, effective_mm: [...] }, ... }, default } (info.muzzles has n entries, barrel i at muzzles[i]); the game keeps rounds_each rounds per barrel (of the round type loaded in the block: a longer round, fewer of them in the same stack) and fires from the barrels the fire mode asks for. info.barrelGroups names sets of barrels by index (top, bottom, all).
-- speed: rounds.<type>.effective_mm[k] is the effective barrel length of the (k+1)-th round of that type fired from a fresh barrel: the more of a barrel's stack is gone, the longer the bore the next round runs down. The game sets the shot's muzzle velocity from it (js/data.ts G.shotDef: damage, which goes with the energy, and range run from a fraction, def.barrels.full = 0.8, of the full figures at the shortest length to 1.0 at the longest). The report is the synth's for that barrel length, with its pressure and charge scaled by it (js/parts.ts soundSpec) and the shot's gain by the square of the same factor, so a barrel sounds fuller and louder as it empties. A shot from several barrels plays one report per barrel, stacking.
+- speed: rounds.<type>.effective_mm[k] is the effective barrel length of the (k+1)-th round of that type fired from a fresh barrel: the more of a barrel's stack is gone, the longer the bore the next round runs down. The game sets the shot's muzzle velocity from it (js/data.ts shotDef: damage, which goes with the energy, and range run from a fraction, def.barrels.full = 0.8, of the full figures at the shortest length to 1.0 at the longest). The report is the synth's for that barrel length, with its pressure and charge scaled by it (js/parts.ts soundSpec) and the shot's gain by the square of the same factor, so a barrel sounds fuller and louder as it empties. A shot from several barrels plays one report per barrel, stacking.
 - display: A display surface named display_ammo (the contract's Display surfaces) is painted with the rounds left: one row per barrel in info.muzzles order, one pip per round (lit while the round remains); u runs left to right and v away from the shooter's end (js/viewmodel.ts).
 - dial: info.modeDial = { at, axis, modes, stepDeg }: the fire-mode dial, turned about its axis by stepDeg for each position of the selected mode in modes (js/player.ts). If the model has a `part_dial` node (PARTS key dial) holding the dial's meshes, that node turns about its pivot; without one the game puts a marker on the dial's face at `at` and turns that (the model's own pointer then stays where it was drawn).
 - hinge: info.hinge (root extras.hinge_json) = { sequence: [...] }: the steps of a reload that takes the gun apart, in order, each moving ONE part_ node by rotate_deg about axis x, y or z (three.js rotation about the node's own pivot) or by move [forward, up, right] metres in the frame of the part_ node named by frame (default: its parent's). Parts may nest (part_brk > part_pump > part_mag > part_carry): a pack stores each node under its parent (extras.parent) and the assembled gun nests them, so a step moves everything inside the node. The viewmodel plays the steps one after another over the first half of the reload (the old block comes out), then back (the new one goes in): js/vmanim.ts hingeClip. How each step feels is the step's own optional data: share (its part of the time, relative: the reload's length, def.reload, is shared out over the steps, the hand's moves between them and a moment with the block clear), ease and back.ease (smooth, linear, in, out, spring, detent, heavy, magnet: smooth (eased in and out), linear, in (speeding up), out (slowing down), spring (released: a sharp start, past the end by over, settled back; the gun kicks), detent (a firm pull: it creeps, holds at a detent, then gives and drops onto its stop; the hand leads, the gun dips with the effort), heavy (a weight lifted: slow, the gun sagging under it and recovering), magnet (drawn in: speeding up all the way, then a soft, damped stop with no bounce). The gun's own kick, dip and sag go with the ease), over (a spring's overshoot), and hand { part, at } (the support hand on that part_ node at that point of it, following it; the right hand stays on the grip). A step without them is smooth, of equal share, the hand where it was. The sequence is data, not a gun: any model with a hinge_json gets the animation. Part keys used: lever, carry, pump, brk and mag keep their ordinary names but are driven only by the sequence on a gun that has one.
@@ -335,7 +335,7 @@ A `part_<key>` node (or the root of a per-part pack) may carry `extras.anchors` 
 
 - what: A BIPOD is one node, `part_bipod` (PARTS key bipod, listed in info.anim.bipod), whose children are its LEGS: each leg is a `group_<n>` node with extras.leg = { deploy: [rx, ry, rz] } holding that leg's meshes. A leg's pivot (its node origin) is its hinge. The model is drawn FOLDED: every leg at rotation 0. part_bipod's own origin is only a reference point (the first hinge) and nothing turns it. The legs' meshes are slot fg when the bipod is a foregrip option (the Kodiak) or slot base when it is part of the gun (a machine gun's, a sniper rifle's); one gun may have both, in the one part_bipod node.
 - pose: extras.leg.deploy is the leg's rotation when the bipod is DOWN: three numbers, radians, an XYZ Euler rotation about the leg's pivot in the gun's frame (x right, y up, z back), the legs pointing at the ground and splayed a little. A leg folded back along the gun (its foot behind the hinge) turns by +PI/2 about x, one folded forward by -PI/2. Folded is rotation 0 (how the meshes are drawn): the folded and the deployed pose are both data of the model.
-- drive: The game drives every leg with the same rule: rotation = deploy * smoothstep(k), k from 0 (folded) to 1 (down) over a quarter of a second, set by the player's stance and what is in front of the gun (js/player.ts bipodStep for the first person, a remote player's state in js/rig.ts for the third) and posed by G.GunRig.bipodPose(part_bipod node, k). The first-person model poses the live part_bipod node; the third-person (merged) model pulls each leg out on its own so it can turn.
+- drive: The game drives every leg with the same rule: rotation = deploy * smoothstep(k), k from 0 (folded) to 1 (down) over a quarter of a second, set by the player's stance and what is in front of the gun (js/player.ts bipodStep for the first person, a remote player's state in js/rig.ts for the third) and posed by GunRig.bipodPose(part_bipod node, k). The first-person model poses the live part_bipod node; the third-person (merged) model pulls each leg out on its own so it can turn.
 - packs: In a pack the part_bipod node holds no mesh itself (the base pack owns it); each leg is a group_<slot>_<n> node with extras.parent = "part_bipod" and extras.leg, directly under the pack root like every node.
 - example: `{"name":"part_bipod","child":{"name":"group_7","extras":{"leg":{"deploy":[1.5708,0.2,0]}}}}`
 
@@ -352,15 +352,45 @@ A `part_<key>` node (or the root of a per-part pack) may carry `extras.anchors` 
 - stretch: STRETCH (stretch: true; the piece has rear, len, len0). The piece is scaled along the bore about its rear: every point's forward position in the file f becomes rear + (f - rear) * L / len, then the piece is moved as any other; L = len0 plus the sum over the slots but the provider's of anchors[...]["len_<tag>"]. Exact for the boxes it is used on (a bead sight's rib, as long as the barrel runs: its normals are along the axes). A negative L (a barrel that ends behind where the rib starts) reverses it.
 - show: THRESHOLD (show: { a: [slot, key], b: [slot, key], gt }). The tag shows only while value(a) - value(b) > gt, value(s, key) being values["<s>=<part>"][key] else values[""][key] (parsed JSON): the G36's barrel sleeve, only where the barrel is longer than its handguard by more than the sleeve. The bake builds every pair of parts whose difference falls between the last absent and the first present one, so gt is exact for every pair the catalogue can make.
 - info: INFO. Each leaf of `info` (a/b/0 paths: infoLeaves) is PROVIDED: by the first filled slot of its `from` whose part is not in `skip`, else the platform (""); with `vary`, "#<label>" as a tag's. Its value is own[provider] ({ "del": 1 }: the leaf is absent), plus, when off[<provider's slot>] is given, the sum over the other slots of off[...].x["<slot>=<part>"] and, for each condition slot c filled, of off[...].y[c][...]: a part's value moves with the part (the sight line with the optic's riser and a magnifier, the support hand with the handguard a foregrip is on). With `max: { by, v }` the leaf is the larger of that and v[<the part in by>] (a pistol chassis's front, ahead of a short slide's muzzle). The offsets are solved exactly from the recipe's values. Then `info.anim` from the pieces' nodes and `info.mounts` (mount_<tag>: each piece's offset) for reference.
-- assembly: ASSEMBLY (G.Models.assemble(def) in js/glb.ts, synchronous: the piece files must be loaded, G.Models.ensure(def) / preloadPlatform(id) load them; G.Models.planBuild(index, build) is the pure planner, no three.js). For each tag: the provider and its piece (or none), the offsets, the stretch; the owner nodes from the pieces, every piece's meshes placed against them. G.Models.infoOf(def) gives the build's info from the index alone (no piece files), synchronously. A build the index cannot plan (a part it has no piece or value for) is assembled from what it has and the result says `approx` (the tests count that as a failure).
+- assembly: ASSEMBLY (Models.assemble(def) in js/glb.ts, synchronous: the piece files must be loaded, Models.ensure(def) / preloadPlatform(id) load them; Models.planBuild(index, build) is the pure planner, no three.js). For each tag: the provider and its piece (or none), the offsets, the stretch; the owner nodes from the pieces, every piece's meshes placed against them. Models.infoOf(def) gives the build's info from the index alone (no piece files), synchronously. A build the index cannot plan (a part it has no piece or value for) is assembled from what it has and the result says `approx` (the tests count that as a failure).
 - shared: SHARED PIECES. A piece that is the same shape on several platforms (an optic, a magnifier, a light, a foregrip, a muzzle device) or at several places is stored once: in assets/models/parts/_shared/<tag>/<file>.glb, in its own frame (the origin at the corner of its bounding box: smallest forward, up and right), and each platform's piece entry names it with the `at` that places it. Two pieces are one when their triangles agree to 2 micrometres after the move.
 - mounts: MOUNT PIECES (optics and front sights). A sight is ONE object, the same file on every gun, built in its own frame: the origin on the TOP of the rail (the surface its foot rests on) at its mount point, centred; metres, [forward, up, right]; everything it tells the game (sy, fSight, relief, reflex, pip, mount_magnifier) is in that frame. What is specific to a gun between the gun and the sight is a MOUNT PIECE, a tag of its own: `optic@mount` (the rail section under the sight, a riser, an adapter, the fixtures of the gun's own sights, a pistol optic plate). An iron front sight is its HEAD `optic@barrel` (post, ears, hood: placed by the barrel, at the length its front sight stands) on its BASE `optic@sightbase` (the column from 4 mm over the bore up to the head); a bead `optic@barrelend` (at the barrel's end), its rib `optic@rib` (stretched) and the rib's posts `optic@ribpost<i>`; a front sight at the barrel's end of a gun's own irons `optic@barrelend` and its base `optic@endbase`. A recipe draws a piece of another part's with k.at(<anchor>).
 - verify: VERIFICATION. In the bake, per platform: every rule is solved from the builds and must explain each of them exactly (each piece against every build it is in, each offset across the parts it applies to, each info leaf to 1e-9); then every one of those builds and a random sample of others (MODELS_SAMPLE a platform, 5 by default: a few hundred) is planned from the index by the game's own planner and compared with the recipe vertex for vertex (to 0.01 mm) and leaf for leaf; the bake fails otherwise. `npm run test:models` assembles the edge cases and regressions through the real files (glb, decoder, assembler) against the recipe and the golden fingerprints; `npm run test:models:full` adds the whole sweep and 10,000 random held-out builds.
 
-A one-off colour that isn't in the catalogue is named `m_<rrggbb>` (hex colour) and is kept as exported: a standard PBR material, no bump. An AUTHORED model's meshes are drawn by name (G.GunMaterials.byName): a catalogue name, else an anonymous colour the game aliases to a catalogue material (G.GunMaterials.ALIAS: m_2fe05a, the 2011's green front-sight fibre, is drawn as fibre), else black.
+A one-off colour that isn't in the catalogue is named `m_<rrggbb>` (hex colour) and is kept as exported: a standard PBR material, no bump. An AUTHORED model's meshes are drawn by name (GunMaterials.byName): a catalogue name, else an anonymous colour the game aliases to a catalogue material (GunMaterials.ALIAS: m_2fe05a, the 2011's green front-sight fibre, is drawn as fibre), else black.
 
 **Extras keys:** root: `info`, `gun`, `anchors`; mesh: `slot`, `display`, `chk`; part: `part`, `anchors`, `owner`, `parent`, `leg`, `check`; pack: `pack`.
 <!-- contract:end -->
+
+### Hand frames
+
+`info.grip` and `info.support` say where the hands go; `G.GunRig.holds(def, info)` (js/gunrig.ts) says how: for each hand a frame in the gun's
+own space (x right, y up, z back, metres), so a hand is turned to the gun from data and not worked out from how the arm happens to come in.
+Third person (js/rig.ts gripHand) holds every gun by it; the first-person arms are to take the same frames.
+
+| field | meaning |
+| --- | --- |
+| `at` | the point the hand goes to: `info.grip`; `info.support` a centimetre to the left, and on a foregrip that far down it |
+| `palm` | unit vector: the way the palm faces, from its face into what it holds |
+| `fingers` | unit vector, square to `palm`: the way the fingers run from the knuckles before they close round what's held |
+| `hold` | which point of the hand goes on `at`: `closed`, the closed hand's hold (a grip's axis runs through it, under the knuckles), or `palm`, the middle of the palm's face |
+| `kind` | `grip`; the support's `forend`, `fg` (a foregrip) or `pistol` |
+
+For a right-handed shooter:
+
+- **grip** (the right hand): the palm on the grip's right side facing left (`palm` -x), the fingers forward along the bore (`fingers` -z) and
+  closed round the grip's front, the thumb up over the top. A raked grip runs back across the palm, as it does in a hand, so the frame is the
+  bore's, not the grip's rake; a stock's wrist (a gun with no pistol grip) is taken the same way.
+- **support on a forend**: the left hand's palm under it facing up and to the right (`palm` (0.5, 0.87, 0)), the fingers out to the right and
+  forward and round its far side.
+- **support on a foregrip** (a vertical or stubby `fg` part in the build, or `HOLD_FIX`): closed round it 45 mm (28 mm stubby) under
+  `info.support`, the palm on its left side facing right (`palm` +x), the fingers forward.
+- **support on a pistol**: the palm on the grip's left panel facing right, the fingers forward and down over the firing hand's.
+
+`HOLD_FIX` in js/gunrig.ts corrects a gun the rules get wrong (the AUG's front grip is part of its stock: `fgDrop`). `tools/check_holds.test.mjs`
+(in `test:models`) fails a gun whose frames aren't unit and square, whose grip palm doesn't face the gun's left or whose fingers don't run
+forward (a hand on the grip back to front or upside down), whose support palm faces the wrong way for its kind, or whose support isn't ahead
+of the grip.
 
 ## Barrels, grips and box handguards (one object on every gun)
 
@@ -489,6 +519,7 @@ Every pack and prop (`tools/model_emit.mjs` `compression()`, after the weld on f
 | a level's loads (`?play=1&level=3`: ~385 packs and props) | 4.2-4.5 s from the first to the last, spread over the level build | the same |
 | GPU memory | float32 positions | the same (dequantised at load; no textures) |
 
+
 ## Human bodies
 
 The twenty bodies (`js/humans.ts`) are made in Blender by a script (`models/characters/build_variants.py`, from
@@ -517,8 +548,6 @@ What a body must be (a failure names the body and the rule):
 
 The same checks run in three places: when the bodies are made (`build_variants.py` ends with `bake_humans.mjs --source`),
 in the bake, and in `npm run test:models` (`--check`: the sources, and that the baked tree is their copy).
-
-
 
 ## Bundles
 
@@ -689,3 +718,25 @@ Builds two rules give are one case carrying both labels. When the rules give som
 **Adding a case.** A new KIND of case: add a rule in `generate()` in tools/model_cases.mjs. A build that went wrong: add it to tests/model-regressions.json. Either way, `--update-golden` and review.
 
 **Timings** (24-core Windows machine, `-j 3`). The whole bake (`npm run bake:models`): 1 min 36 s, the platforms 1 min 23 s (before the per-part bake: 7 min 14 s and 6 min 36 s). `npm run test:models`: about 2.5 minutes, the suite itself about 2 for 2,463 cases + 9 regressions + golden. `test:models:full` (the sweep and 10,000 held-out builds against the recipe) is the occasional job.
+
+## The squad's ship
+
+The squad's ships are made in Blender by `models/ships/build_ship.py`, from the game's own layout of each
+(`js/spacedata.ts` `layout`, `seats`, `boxes`, written to `models/ships/<id>.layout.json` by `tools/ship_layout.mjs`), so
+her decks, stairs and walls are drawn where the game's solids are. The `.glb` is kept in the repo; `tools/bake_ships.mjs`
+(a phase of `npm run bake:models`; `npm run bake:ships` alone) checks it and puts it in `assets/models/ships/` for the
+bundle. Blender is wanted only to change her:
+
+    node tools/ship_layout.mjs && blender -b -P models/ships/build_ship.py -- kestrel && npm run bake:ships
+
+What the game finds in her file, by name (`js/shipmodel.ts` `fromModel`; a ship with no file is drawn by its recipe,
+`shipRecipe`, from the same layout):
+- `body`: everything that doesn't move. Its materials are named for what they are and swapped for the game's own:
+  `hull`, `armor`, `accent` (her paint), `deck`, `inner`, `dark`, `seat`, `glass`, `glow`, `strip`, `hot` (lit).
+- `nose_L`, `nose_R`: the breaching door's leaves, each with its origin at the door's middle (slid apart in x).
+- `ramp`: the rear door, closed, its origin at its hinge on the crew deck's floor (turned about x to open).
+- `screen_nav`, `screen_sensors`: the screens, UVs a canvas's way up (the game draws on them).
+- `hp_0`, `hp_1` (the hardpoints, port then starboard), `light_0..2` (her lamps), `thrust_L`, `thrust_R` (the exhausts).
+
+The bake fails a ship whose file is missing one of these, whose doors, ramp or hardpoints aren't where her layout now puts
+them (the layout changed: rebuild her), or whose materials the game doesn't dress. `npm run test:models` runs its check.

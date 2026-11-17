@@ -1,18 +1,21 @@
 'use strict';
+import { Audio } from './audio.js';
+import { AMMO, ammoTypes, asCal, ballFor, boreTip, cartOf, chambered, flight, zeroOf } from './data.js';
+import { Me as G_Me } from './player.js';
 // The zeroing table (a shop tab; a table in the hangar's workshop): turn each gun's elevation a click at a time and
 // see the round's path against the line of sight out to 500 m. The sights sit above the bore, so a round leaves
 // below the line, climbs through it (the near zero), peaks, and falls back through it (the far zero). Every gun
 // comes zeroed for its class's distance with ball; each click (0.1 mil: a centimetre at 100 m) tips the bore that
 // much more (up: it strikes higher). Every load fires from the same tip, so a slower one drops more: pick one here
-// to see where it goes. The same sums fly every round (G.flight, G.boreTip, js/player.ts fly).
-const G_ZeroUI = (() => {
+// to see where it goes. The same sums fly every round (flight, boreTip, js/player.ts fly).
+export const ZeroUI = (() => {
   const MAXD = 500, ROWS = [25, 50, 100, 150, 200, 250, 300, 400, 500], MAXC = 150; // (±15 mil)
   const st = { wslot: 'p', am: null as string | null };
   interface Pt { d: number; h: number; v: number; t: number }
-  const weapon = () => G.Me.weapons[st.wslot] || G.Me.weapons.p || G.Me.weapons.s;
-  const loads = (w: GWeapon): string[] => G.ammoTypes(G.cartOf(w)) || [];
+  const weapon = () => G_Me.weapons[st.wslot] || G_Me.weapons.p || G_Me.weapons.s;
+  const loads = (w: GWeapon): string[] => ammoTypes(cartOf(w)) || [];
   // the path of `am` from this gun with its sights as set (or with `clicks` of elevation instead)
-  const path = (w: GWeapon, am: string, clicks = w.clicks || 0): Pt[] => G.flight(G.asCal(w.def, G.cartOf(w)), am, G.boreTip(Object.assign({}, w, { clicks })), MAXD);
+  const path = (w: GWeapon, am: string, clicks = w.clicks || 0): Pt[] => flight(asCal(w.def, cartOf(w)), am, boreTip(Object.assign({}, w, { clicks })), MAXD);
   // where a path crosses the line of sight (metres)
   function crossings(p: Pt[]) {
     const out: number[] = [];
@@ -26,18 +29,18 @@ const G_ZeroUI = (() => {
   function scopeNote(w: GWeapon, viewed: string) {
     const d = w.def as Record<string, any>;
     if (d.reticle !== 'range') return '';
-    const nm = (a: string) => (G.AMMO as Record<string, any>)[a].name, next = (G.chambered(d) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || viewed;
+    const nm = (a: string) => (AMMO as Record<string, any>)[a].name, next = (chambered(d) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || viewed;
     return `<div class="zr-note zr-scope">Scope marks: this scope's holdover marks (1-5, for 100-500 m) are worked out from the zero set here and the round that fires next, <b>${nm(next)}</b>${next === viewed ? '' : `. You are looking at ${nm(viewed)}: load it to get its marks`}. Change the elevation or the load and they follow. Its brackets (1.8 m man, 100-500 m) are true ${d.fp === 'ffp' ? 'at any power' : `at ${d.fpMag}×`}.</div>`;
   }
   function html() {
-    const Me = G.Me, w = weapon();
+    const Me = G_Me, w = weapon();
     if (!w) return '<div class="gs-empty">No weapon to zero.</div>';
-    const def = w.def, clicks = w.clicks || 0, std = G.zeroOf(def), ball = G.ballFor(G.cartOf(w))!;
+    const def = w.def, clicks = w.clicks || 0, std = zeroOf(def), ball = ballFor(cartOf(w))!;
     if (!st.am || !loads(w).includes(st.am)) st.am = w.ammo && loads(w).includes(w.ammo) ? w.ammo : ball!;
     const tabs = ['p', 's'].map((k) => { const ww = Me.weapons[k]; return `<button class="tab${st.wslot === k ? ' on' : ''}" data-zw="${k}" ${ww ? '' : 'disabled'}>${k === 'p' ? 'Primary' : 'Sidearm'}: ${ww ? ww.def.name : '—'}</button>`; }).join('');
     if (def.cls === 'RAIL') return `<div class="gs-wrap zr"><div class="gs-tabs">${tabs}</div><div class="zr-note">A railgun's slug flies flat: there's nothing to zero.</div></div>`;
     const am = st.am!, p = path(w, am);
-    const amBtns = loads(w).map((a) => `<button class="tab${a === am ? ' on' : ''}" data-zam="${a}">${(G.AMMO as Record<string, any>)[a].name}</button>`).join('');
+    const amBtns = loads(w).map((a) => `<button class="tab${a === am ? ' on' : ''}" data-zam="${a}">${(AMMO as Record<string, any>)[a].name}</button>`).join('');
     const step = (n: number, label: string) => `<button class="tab" data-zc="${n}" ${Math.abs(clicks + n) > MAXC ? 'disabled' : ''}>${label}</button>`;
     const rows = ROWS.map((d) => {
       const q = p[d];
@@ -51,7 +54,7 @@ const G_ZeroUI = (() => {
       <div class="zr-row"><span class="zr-l">Load</span><div class="gs-tabs">${amBtns}</div></div>
       <div class="zr-row"><span class="zr-l">Elevation</span><div class="gs-tabs">${step(-10, '−1.0')}${step(-1, '−0.1')}<span class="zr-dial">${mil(clicks)} <small>${clicks > 0 ? '+' : ''}${clicks} click${Math.abs(clicks) === 1 ? '' : 's'} · ${(clicks * 0.3438).toFixed(1)} MOA</small></span>${step(1, '+0.1')}${step(10, '+1.0')}
         ${clicks ? '<button class="tab" data-zc="reset">Reset</button>' : ''}</div></div>
-      <div class="zr-note">${def.name}: the sights ${clicks ? `${mil(clicks)} from the standard zero (${std} m with ${(G.AMMO as Record<string, any>)[ball!].name})` : `at the standard zero, ${std} m with ${(G.AMMO as Record<string, any>)[ball!].name}`}. ${(G.AMMO as Record<string, any>)[am].name} leaves at <b>${Math.round(p[0].v)} m/s</b>;
+      <div class="zr-note">${def.name}: the sights ${clicks ? `${mil(clicks)} from the standard zero (${std} m with ${(AMMO as Record<string, any>)[ball!].name})` : `at the standard zero, ${std} m with ${(AMMO as Record<string, any>)[ball!].name}`}. ${(AMMO as Record<string, any>)[am].name} leaves at <b>${Math.round(p[0].v)} m/s</b>;
         it crosses the line of sight at ${xs.length ? xs.map((x) => `<b>${Math.round(x)} m</b>`).join(' and ') : 'no point'}, peaks <b>${cm(peak.h)} cm</b> at ${peak.d} m${spent != null ? `, spent at <b>${spent} m</b>` : ''}.</div>
       ${scopeNote(w, am)}
       <div class="zr-graph"><canvas id="zrCanvas"></canvas></div>
@@ -91,25 +94,23 @@ const G_ZeroUI = (() => {
     g.fillStyle = '#9aa4ae'; g.textAlign = 'right'; g.fillText('bullet elevation vs line of sight', W - R - 6 * dpr, T + 8 * dpr);
   }
   function show(container: HTMLElement) {
-    container.classList.add('gs-host'); // (the whole panel: G.GunsmithUI.hide takes it off again)
+    container.classList.add('gs-host'); // (the whole panel: GunsmithUI.hide takes it off again)
     container.innerHTML = html();
     requestAnimationFrame(draw);
   }
   function refresh() { const el = document.getElementById('shopItems'); if (el) show(el); }
   function onClick(e: Event) {
     const t = e.target as HTMLElement, w = weapon();
-    const zw = t.closest('[data-zw]') as HTMLButtonElement | null; if (zw && !zw.disabled) { st.wslot = zw.dataset.zw!; st.am = null; G.Audio.click(); return refresh(); }
-    const za = t.closest('[data-zam]') as HTMLElement | null; if (za) { st.am = za.dataset.zam!; G.Audio.click(); return refresh(); }
+    const zw = t.closest('[data-zw]') as HTMLButtonElement | null; if (zw && !zw.disabled) { st.wslot = zw.dataset.zw!; st.am = null; Audio.click(); return refresh(); }
+    const za = t.closest('[data-zam]') as HTMLElement | null; if (za) { st.am = za.dataset.zam!; Audio.click(); return refresh(); }
     const zc = t.closest('[data-zc]') as HTMLButtonElement | null;
     if (zc && !zc.disabled && w) {
       w.clicks = zc.dataset.zc === 'reset' ? 0 : Math.max(-MAXC, Math.min(MAXC, (w.clicks || 0) + +zc.dataset.zc!));
       if (!w.clicks) delete w.clicks;
-      G.Audio.click(); return refresh();
+      Audio.click(); return refresh();
     }
   }
   window.addEventListener('resize', () => { if (document.getElementById('zrCanvas')) draw(); });
   return { show, onClick, refresh, path, state: st };
 })();
-G.ZeroUI = G_ZeroUI;
 
-interface GameModules { ZeroUI: typeof G_ZeroUI; }

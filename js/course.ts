@@ -1,37 +1,27 @@
 'use strict';
-// The IPSC course: the strip on the left of the shooting range (x 2..12, from the yard 28 m north, js/level.ts
-// layHangar), a random stage laid out in it. A stage is three shooting boxes one behind the other, barriers to work
-// round, and eight to eleven targets downrange of them: IPSC cardboard (two hits each, best two count), white
-// no-shoots beside some of them, and steel poppers that fall when hit.
-//   - The stage is laid from a seed every squad member shares. The REGENERATE button by the entrance (in the yard)
-//     lays a new one, but only while nobody is in the course (G.Net: 'course').
-//   - The START button in the first box: "standby", a random pause, the beep, and the clock runs. Every shot you
-//     fire is a split; every hit is scored where it lands. The run ends when every target's done (each paper hit
-//     twice, every popper down), or when you walk out of the course.
-//   - The board in the yard shows the run: each target's hits, every shot's time and split, then the total, the
-//     points (A 5, C 3, D 1, steel 5; a miss or a no-shoot hit -10) and the hit factor (points / seconds). Whoever's
-//     shooting sends it to the others as it happens (G.Net: 'crun').
-//   - Two spectator screens in the yard switch on while anyone's in the course: one behind the shooter, one looking
-//     back at them from the far end.
-// Coordinates are the hall's, as in js/range.ts (z negative past the hall's north wall; the yard's north edge, the
-// range's firing line, is at FL).
-// A target of the course: paper(q) or popper(q) give it its meshes and solid, resetTargets() its hits (and for a popper, whether it's down).
-type CourseKind = 'paper' | 'steel' | 'noshoot';
-interface CourseTarget {
-  kind: CourseKind; x: number; z: number; box: number; n: number; hits: IpscHit[]; yaw: number; w: number; h: number; y0: number;
-  c: HTMLCanvasElement; tex: THREE.CanvasTexture; grp: THREE.Group; solid: RangeSolid | null; hinge: THREE.Group; mat: THREE.MeshStandardMaterial; down: boolean; fall: number; vel: number;
-}
-// A run (sent to the squad as it happens, G.Net 'crun'): hits are [target n, zone, seconds].
+import { Audio } from './audio.js';
+import { HANGAR_ROWS } from './data.js';
+import { HUD } from './hud.js';
+import { LightGrid } from './lightgrid.js';
+import { R } from './render.js';
+import { U } from './util.js';
+import { Views } from './views.js';
+import { World } from './world.js';
+import { Net } from './net.js';
+import { Range } from './range.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
+// A run (sent to the squad as it happens, Net 'crun'): hits are [target n, zone, seconds].
 type CourseRunState = 'standby' | 'running' | 'done';
 interface CourseRun {
   who: string | null; name: string | null; seed: number; state: CourseRunState; t0: number; shots: number[]; hits: [number, string, number][]; end: number; dq?: string | null; el?: number;
 }
 interface CoursePanel { mesh: THREE.Mesh<any, any>; c: HTMLCanvasElement; tx: THREE.CanvasTexture; }
 interface CourseState {
-  root: THREE.Object3D; grp: THREE.Group; H: RangeHelpers; world: Parameters<typeof G_World.add>[0]; RZ: number; seed: number; tg: CourseTarget[]; solids: RangeSolid[]; run: CourseRun | null; last: unknown;
+  root: THREE.Object3D; grp: THREE.Group; H: RangeHelpers; world: Parameters<typeof World.add>[0]; RZ: number; seed: number; tg: CourseTarget[]; solids: RangeSolid[]; run: CourseRun | null; last: unknown;
   board: CoursePanel | null; screens: CoursePanel[]; cams: THREE.PerspectiveCamera[]; rts: THREE.WebGLRenderTarget[]; on: boolean; frame: number; boxes?: { x: number; z: number }[]; live?: THREE.Object3D[];
 }
-const G_Course = (() => {
+export const Course = (() => {
   const T = THREE;
   const A = { x0: 2, x1: 12, z0: -6, z1: -34 }; // the course: x0..x1, from its open end on the yard (z0) to its backstop (z1)
   const BOXES = [-8.5, -14.5, -20.5]; // the shooting boxes (their middles, z)
@@ -41,14 +31,14 @@ const G_Course = (() => {
   const inside = (x: number, z: number) => x > A.x0 && x < A.x1 && z < A.z0 && z > A.z1; // (hall coordinates)
   function anyoneIn() {
     const RZ = S.RZ, ps: THREE.Vector3[] = [];
-    if (G.Me.pos && !G.Me.dead) ps.push(G.Me.pos);
-    for (const pv of G.Views.players.values()) if (pv.st && !pv.st.dd) ps.push(pv.pos);
+    if (Me.pos && !Me.dead) ps.push(Me.pos);
+    for (const pv of Views.players.values()) if (pv.st && !pv.st.dd) ps.push(pv.pos);
     return ps.some((p) => inside(p.x, p.z - RZ));
   }
   function shooterPos() { // the one in the course (you, or a teammate), for the screens to follow
     const RZ = S.RZ;
-    if (G.Me.pos && !G.Me.dead && inside(G.Me.pos.x, G.Me.pos.z - RZ)) return { p: G.Me.pos, yaw: G.Me.yaw, me: true };
-    for (const pv of G.Views.players.values()) if (pv.st && !pv.st.dd && inside(pv.pos.x, pv.pos.z - RZ)) return { p: pv.pos, yaw: pv.yaw };
+    if (Me.pos && !Me.dead && inside(Me.pos.x, Me.pos.z - RZ)) return { p: Me.pos, yaw: Me.yaw, me: true };
+    for (const pv of Views.players.values()) if (pv.st && !pv.st.dd && inside(pv.pos.x, pv.pos.z - RZ)) return { p: pv.pos, yaw: pv.yaw };
     return null;
   }
 
@@ -80,7 +70,7 @@ const G_Course = (() => {
     });
   }
   function build(root: THREE.Object3D, hangar: HangarState, H: RangeHelpers) {
-    S.root = root; S.H = H; S.world = hangar.map.world; S.RZ = G.HANGAR_ROWS * 2; S.live = [];
+    S.root = root; S.H = H; S.world = hangar.map.world; S.RZ = HANGAR_ROWS * 2; S.live = [];
     // the buttons: START in the first box, REGENERATE in the yard beside the entrance
     post(0, () => start(), 'start a run (standby, then the beep)');
     post(1, () => regenerate(), 'lay a new stage (nobody may be in the course)');
@@ -119,15 +109,15 @@ const G_Course = (() => {
 
   // ---------------------------------------------------------------- the stage, from its seed
   function clear() {
-    for (const s of S.solids) G.World.remove(S.world, s);
+    for (const s of S.solids) World.remove(S.world, s);
     S.solids = []; S.tg = [];
-    if (S.grp) { G.R.freeMarks(S.grp); S.root.remove(S.grp); S.grp.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }
+    if (S.grp) { R.freeMarks(S.grp); S.root.remove(S.grp); S.grp.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.geometry) o.geometry.dispose(); if (o.material && o.material.map) o.material.map.dispose(); }); }
     S.grp = new T.Group(); S.root.add(S.grp);
   }
-  const solid = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, unknown>) => { const s = G.World.add(S.world, G.World.box(Math.min(x0, x1), y0, Math.min(z0, z1) + S.RZ, Math.max(x0, x1), y1, Math.max(z0, z1) + S.RZ, Object.assign({ kind: 'prop', move: false }, o || {}))); S.solids.push(s); return s; };
+  const solid = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, unknown>) => { const s = World.add(S.world, World.box(Math.min(x0, x1), y0, Math.min(z0, z1) + S.RZ, Math.max(x0, x1), y1, Math.max(z0, z1) + S.RZ, Object.assign({ kind: 'prop', move: false }, o || {}))); S.solids.push(s); return s; };
   function lay(seed: number) {
     S.seed = seed; clear();
-    const r = G.U.rng(seed >>> 0), g = S.grp, wood = new T.MeshStandardMaterial({ color: 0x8a6a44, roughness: 0.9 }), white = new T.MeshBasicMaterial({ color: 0xe8e4d4 });
+    const r = U.rng(seed >>> 0), g = S.grp, wood = new T.MeshStandardMaterial({ color: 0x8a6a44, roughness: 0.9 }), white = new T.MeshBasicMaterial({ color: 0xe8e4d4 });
     const flat = (x0: number, z0: number, x1: number, z1: number) => { const m = new T.Mesh(new T.PlaneGeometry(x1 - x0, z1 - z0), white); m.rotation.x = -Math.PI / 2; m.position.set((x0 + x1) / 2, 0.016, (z0 + z1) / 2); g.add(m); };
     // the shooting boxes: a square of tape, numbered
     S.boxes = BOXES.map((z, i) => ({ x: 7 + (i === 1 ? (r() - 0.5) * 3 : 0), z }));
@@ -183,14 +173,14 @@ const G_Course = (() => {
   function redraw(q: CourseTarget) {
     if (q.kind === 'steel') return;
     const g = q.c.getContext('2d')!; g.clearRect(0, 0, q.c.width, q.c.height);
-    G.Range.drawIpsc(g, 0, 0, q.c.width, q.c.height, q.hits, true, q.kind === 'noshoot' ? '#ecebe6' : null);
+    Range.drawIpsc(g, 0, 0, q.c.width, q.c.height, q.hits, true, q.kind === 'noshoot' ? '#ecebe6' : null);
     g.fillStyle = q.kind === 'noshoot' ? '#c04030' : '#5a4428'; g.font = 'bold 22px sans-serif'; g.textAlign = 'center'; g.fillText(q.kind === 'noshoot' ? 'NS' : 'T' + q.n, 64, 200);
     q.tex.needsUpdate = true;
   }
   function resetTargets() {
     for (const q of S.tg) {
       q.hits = [];
-      if (q.kind === 'steel') { G.R.freeMarks(q.hinge); q.down = false; q.fall = 0; q.hinge.rotation.x = 0; if (!q.solid) q.solid = solid(q.x - 0.16, 0.06, q.z - 0.06, q.x + 0.16, 1.15, q.z + 0.06, { kind: 'target', target: { kind: 'course', q } }); }
+      if (q.kind === 'steel') { R.freeMarks(q.hinge); q.down = false; q.fall = 0; q.hinge.rotation.x = 0; if (!q.solid) q.solid = solid(q.x - 0.16, 0.06, q.z - 0.06, q.x + 0.16, 1.15, q.z + 0.06, { kind: 'target', target: { kind: 'course', q } }); }
       else redraw(q);
     }
   }
@@ -198,18 +188,18 @@ const G_Course = (() => {
   // ---------------------------------------------------------------- a run
   // run: { who, state: 'standby' | 'running' | 'done', t0 (performance.now at the beep), shots: [s], hits: [[n, zone, s]], end: s }
   function start() {
-    const me = G.Me;
-    if (!inside(me.pos.x, me.pos.z - S.RZ)) return G.HUD.toast('THE COURSE', 'Start from inside the course, in the first box', 1.6);
-    if (S.run && S.run.state !== 'done' && S.run.who !== G.Net.myId) return G.HUD.toast('THE COURSE', 'Someone else is shooting it', 1.4);
+    const me = Me;
+    if (!inside(me.pos.x, me.pos.z - S.RZ)) return HUD.toast('THE COURSE', 'Start from inside the course, in the first box', 1.6);
+    if (S.run && S.run.state !== 'done' && S.run.who !== Net.myId) return HUD.toast('THE COURSE', 'Someone else is shooting it', 1.4);
     resetTargets();
-    S.run = { who: G.Net.myId, name: G.Game.myName, seed: S.seed, state: 'standby', t0: 0, shots: [], hits: [], end: 0 };
-    G.HUD.toast('THE COURSE', 'Shooter ready… standby', 1.4);
-    G.Audio.click();
+    S.run = { who: Net.myId, name: Game.myName, seed: S.seed, state: 'standby', t0: 0, shots: [], hits: [], end: 0 };
+    HUD.toast('THE COURSE', 'Shooter ready… standby', 1.4);
+    Audio.click();
     const run = S.run!, wait = 1.5 + Math.random() * 2.5;
     setTimeout(() => {
       if (S.run !== run || run.state !== 'standby') return;
       run.state = 'running'; run.t0 = performance.now();
-      G.Audio.tone(2500, 0.32, 'square', 0.22); // the beep
+      Audio.tone(2500, 0.32, 'square', 0.22); // the beep
       send();
     }, wait * 1000);
     send(); paintBoard();
@@ -218,8 +208,8 @@ const G_Course = (() => {
   // a shot of yours (js/player.ts shoot): a split, if you're on the clock
   function shot() {
     const run = S.run;
-    if (!run || run.who !== G.Net.myId) return;
-    if (run.state === 'standby') { run.state = 'done'; run.dq = 'Shot before the beep'; send(); paintBoard(); G.HUD.toast('THE COURSE', 'Shot before the beep: the run is stopped', 1.8); return; }
+    if (!run || run.who !== Net.myId) return;
+    if (run.state === 'standby') { run.state = 'done'; run.dq = 'Shot before the beep'; send(); paintBoard(); HUD.toast('THE COURSE', 'Shot before the beep: the run is stopped', 1.8); return; }
     if (run.state !== 'running') return;
     run.shots.push(+now(run).toFixed(2));
     send(); paintBoard();
@@ -229,8 +219,8 @@ const G_Course = (() => {
     const q = t.q;
     if (q.kind === 'steel') {
       if (q.down) return;
-      q.down = true; q.vel = 0; if (q.solid) { G.World.remove(S.world, q.solid); S.solids = S.solids.filter((s) => s !== q.solid); q.solid = null; }
-      setTimeout(() => G.Audio.impact && G.Audio.impact('metal', 3, 0), 30);
+      q.down = true; q.vel = 0; if (q.solid) { World.remove(S.world, q.solid); S.solids = S.solids.filter((s) => s !== q.solid); q.solid = null; }
+      setTimeout(() => Audio.impact && Audio.impact('metal', 3, 0), 30);
       record(q, 'S');
       return;
     }
@@ -239,15 +229,15 @@ const G_Course = (() => {
     let hp = p.clone();
     if (dir) { const den = dir.dot(n); if (Math.abs(den) > 1e-4) hp = p.clone().addScaledVector(dir, c.clone().sub(p).dot(n) / den); }
     const right = new T.Vector3(Math.cos(q.yaw), 0, -Math.sin(q.yaw));
-    const x = hp.clone().sub(c).dot(right) * 100, y = (hp.y - q.y0) * 100, z = G.Range.zoneAt(x, y);
+    const x = hp.clone().sub(c).dot(right) * 100, y = (hp.y - q.y0) * 100, z = Range.zoneAt(x, y);
     if (!z) return;
     q.hits.push({ x, y, z }); redraw(q);
-    G.Audio.hit(false);
+    Audio.hit(false);
     record(q, z);
   }
   function record(q: CourseTarget, zone: string) {
     const run = S.run;
-    if (!run || run.who !== G.Net.myId || run.state !== 'running') return;
+    if (!run || run.who !== Net.myId || run.state !== 'running') return;
     run.hits.push([q.n, zone, +now(run).toFixed(2)]);
     // done when every target is: paper hit twice, every popper down (no-shoots don't count)
     const done = S.tg.every((t) => (t.kind === 'steel' ? t.down : t.kind === 'noshoot' ? true : t.hits.length >= 2));
@@ -259,7 +249,7 @@ const G_Course = (() => {
     if (!run || run.state === 'done') return;
     run.state = 'done'; if (dq) run.dq = dq;
     run.end = run.shots.length ? run.shots[run.shots.length - 1] : +now(run).toFixed(2);
-    G.Audio.tone(1800, 0.12, 'square', 0.18); setTimeout(() => G.Audio.tone(1800, 0.12, 'square', 0.18), 160);
+    Audio.tone(1800, 0.12, 'square', 0.18); setTimeout(() => Audio.tone(1800, 0.12, 'square', 0.18), 160);
     send(); paintBoard();
   }
   // the score: best two hits on each paper, steel down or not, no-shoot hits; points and hit factor
@@ -280,23 +270,23 @@ const G_Course = (() => {
   }
 
   // ---------------------------------------------------------------- the squad: the stage and the runs
-  function send() { if (S.run) G.Net.toHost({ t: 'crun', s: { who: S.run.who, name: S.run.name, seed: S.run.seed, state: S.run.state, shots: S.run.shots, hits: S.run.hits, end: S.run.end, dq: S.run.dq || null, el: S.run.state === 'running' ? now(S.run) : 0 } }); }
+  function send() { if (S.run) Net.toHost({ t: 'crun', s: { who: S.run.who, name: S.run.name, seed: S.run.seed, state: S.run.state, shots: S.run.shots, hits: S.run.hits, end: S.run.end, dq: S.run.dq || null, el: S.run.state === 'running' ? now(S.run) : 0 } }); }
   // someone else's run, as they send it
   function remoteRun(s: CourseRun | null | undefined) {
-    if (!s || s.who === G.Net.myId) return;
+    if (!s || s.who === Net.myId) return;
     if (s.seed !== S.seed) setCourse(s.seed);
     const was = S.run && S.run.who === s.who ? S.run : null;
     if (s.state === 'standby' && !(was && was.state === 'standby')) resetTargets(); // (a fresh run: the targets set up again)
     S.run = Object.assign({}, s, { t0: s.state === 'running' ? performance.now() - (s.el || 0) * 1000 : was ? was.t0 : 0 });
     // their hits, on our copy of the targets
-    for (const q of S.tg) if (q.kind === 'steel') { const d = s.hits.some(([n]) => n === q.n); if (d && !q.down) { q.down = true; if (q.solid) { G.World.remove(S.world, q.solid); S.solids = S.solids.filter((x) => x !== q.solid); q.solid = null; } } }
+    for (const q of S.tg) if (q.kind === 'steel') { const d = s.hits.some(([n]) => n === q.n); if (d && !q.down) { q.down = true; if (q.solid) { World.remove(S.world, q.solid); S.solids = S.solids.filter((x) => x !== q.solid); q.solid = null; } } }
     paintBoard();
   }
   function regenerate() {
-    if (anyoneIn()) return G.HUD.toast('THE COURSE', 'Everyone has to be out of the course first', 1.6);
+    if (anyoneIn()) return HUD.toast('THE COURSE', 'Everyone has to be out of the course first', 1.6);
     const seed = 1 + Math.floor(Math.random() * 1e6);
-    setCourse(seed); G.Net.toHost({ t: 'course', seed });
-    G.HUD.toast('THE COURSE', 'A new stage is laid out', 1.4); G.Audio.click();
+    setCourse(seed); Net.toHost({ t: 'course', seed });
+    HUD.toast('THE COURSE', 'A new stage is laid out', 1.4); Audio.click();
   }
   function setCourse(seed: number) {
     if (!S.root || !(seed > 0) || seed === S.seed) return;
@@ -341,43 +331,41 @@ const G_Course = (() => {
   // ---------------------------------------------------------------- every frame
   function update(dt: number) {
     if (!S.root) return;
-    const me = G.Me, RZ = S.RZ;
+    const me = Me, RZ = S.RZ;
     // poppers fall back on their hinges
     for (const q of S.tg) if (q.kind === 'steel' && q.down && q.hinge.rotation.x > -1.45) { q.vel = (q.vel || 0) - 14 * dt; q.hinge.rotation.x = Math.max(-1.45, q.hinge.rotation.x + q.vel * dt); }
     const run = S.run;
     if (run && run.state === 'running') {
       // walked out of the course: the run ends there (yours); the clock on the board
-      if (run.who === G.Net.myId && me.pos && !inside(me.pos.x, me.pos.z - RZ)) finish();
+      if (run.who === Net.myId && me.pos && !inside(me.pos.x, me.pos.z - RZ)) finish();
       if ((S.frame & 7) === 0) paintBoard();
     }
-    if (run && run.state === 'standby' && run.who === G.Net.myId && me.pos && !inside(me.pos.x, me.pos.z - RZ)) { S.run = null; paintBoard(); }
+    if (run && run.state === 'standby' && run.who === Net.myId && me.pos && !inside(me.pos.x, me.pos.z - RZ)) { S.run = null; paintBoard(); }
     // the spectator screens: on while someone's in the course
     const sh = shooterPos();
     if (!!sh !== S.on) { S.on = !!sh; for (let i = 0; i < 2; i++) { const m = S.screens[i].mesh.material; m.map = S.on ? S.rts[i].texture : null; m.color.setHex(S.on ? 0xffffff : 0x000000); m.needsUpdate = true; } }
     S.frame++;
     if (S.on && (S.frame & 1) === 0) {
-      const p = sh!.p, c0 = S.cams[0], c1 = S.cams[1], r = G.R.renderer;
+      const p = sh!.p, c0 = S.cams[0], c1 = S.cams[1], r = R.renderer;
       // behind and above the shooter, looking where they face; and from the far end, back at them
       c0.position.set(p.x + Math.sin(sh!.yaw) * 2.6, (p.y || 0) + 2.2, p.z + Math.cos(sh!.yaw) * 2.6);
       c0.lookAt(p.x - Math.sin(sh!.yaw) * 6, (p.y || 0) + 1.0, p.z - Math.cos(sh!.yaw) * 6);
       c1.position.set(7, 3.2, A.z1 + 1.6 + RZ); c1.lookAt(p.x, (p.y || 0) + 1.0, p.z);
       const prevT = r.getRenderTarget();
-      G.LightGrid.on(true);
+      LightGrid.on(true);
       // (the screens out of their own pictures: a screen in view while its target's drawn would read the texture being written:
       // WebGL's 'feedback loop formed between Framebuffer and active Texture', and the draw dropped)
       for (const sc of S.screens) sc.mesh.visible = false;
-      for (let i = 0; i < 2; i++) { r.setRenderTarget(S.rts[i]); r.clear(); r.render(G.R.scene, S.cams[i]); }
+      for (let i = 0; i < 2; i++) { r.setRenderTarget(S.rts[i]); r.clear(); r.render(R.scene, S.cams[i]); }
       for (const sc of S.screens) sc.mesh.visible = true;
-      G.LightGrid.on(false);
+      LightGrid.on(false);
       r.setRenderTarget(prevT);
     }
   }
   function leave() {
-    if (S.world) for (const s of S.solids) G.World.remove(S.world, s);
+    if (S.world) for (const s of S.solids) World.remove(S.world, s);
     for (const rt of S.rts) if (rt) rt.dispose();
     Object.assign(S, { root: null, grp: null, seed: 0, tg: [], solids: [], run: null, board: null, screens: [], cams: [], rts: [], on: false });
   }
   return { fixtures, build, update, leave, hit, shot, remoteRun, setCourse, regenerate, start, inside, anyoneIn, score, A, S };
 })();
-G.Course = G_Course;
-interface GameModules { Course: typeof G_Course; }

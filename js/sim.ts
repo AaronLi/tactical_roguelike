@@ -1,9 +1,15 @@
 'use strict';
+import { chambered, loadFor, ROUND_LIFE } from './data.js';
+import { Gunsmith } from './parts.js';
+import { SpaceData } from './spacedata.js';
+import { U } from './util.js';
+import { Level } from './level.js';
+import { World } from './world.js';
 // What the simulation and the game on screen both work out, the same way: pure reckonings (no state, nothing drawn) that
 // used to live in the files that draw (js/player.ts, js/views.ts, js/rig.ts, js/game.ts) or in the host's own file
 // (js/server.ts). The host's simulation runs in a thread of its own (js/serverworker.ts, docs/threads.md) that loads none of
-// those files: it finds these here, and so do they (G.Me.tbModel, G.Views.predictNade, G.Rig.cleanLook... hand on to them).
-const G_Sim = {
+// those files: it finds these here, and so do they (Me.tbModel, Views.predictNade, Rig.cleanLook... hand on to them).
+export const Sim = {
   // ---------------------------------------------------------------- the loading veil (js/game.ts veil)
   // The wipe on (css/style.css veilIn 0.8 s, and a frame): the host waits this long after telling everyone (js/server.ts
   // overBlack) before it builds the next place, so the panel is all the way down when the work starts.
@@ -41,17 +47,17 @@ const G_Sim = {
   // one type); a gun loaded a round at a time keeps the order in its tube (the last one in is the next one fired). (js/player.ts
   // makeWeapon adds what you carry for it.)
   makeWeapon(id: string, build?: PBuild): PWeapon {
-    const def = G.Gunsmith.compile(id, build!);
-    const w: any = { def, sup: def.sup, mag: def.mag, ammo: G.loadFor(def), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
+    const def = Gunsmith.compile(id, build!);
+    const w: any = { def, sup: def.sup, mag: def.mag, ammo: loadFor(def), fm: (def.modes || [def.mode])[0] }; // fm: where its selector is
     if (def.barrels) w.rl = def.barrels.default; // (a gun of several barrels: the round type its block holds, js/data.ts)
     w.tube = Array(w.mag).fill(w.ammo); // every gun: its rounds in order (a magazine's own stack, when it has one in)
-    w.chamber = G.chambered(def) ? w.ammo : null; // and the round in the chamber (G.chambered)
+    w.chamber = chambered(def) ? w.ammo : null; // and the round in the chamber (chambered)
     return w;
   },
 
   // ---------------------------------------------------------------- the wind
   // A level's wind (docs/level-data.md "Wind"): the air out in the open moving sideways, { x, z } m/s (where it blows TO),
-  // from the level's seed and the theme's mean speed (G.THEMES wind; none, no wind) at the level's clock t (s). Three
+  // from the level's seed and the theme's mean speed (THEMES wind; none, no wind) at the level's clock t (s). Three
   // terms of smooth noise (each three sines, their rates and phases from the seed): the direction wanders slowly about
   // one picked from the seed (DIR radians either way, over minutes), the speed swells and eases (SPD of the mean, over a
   // minute or so), and gusts on top (GUST of the mean, over seconds). Smooth in t (no steps), the same for the same seed and t.
@@ -60,7 +66,7 @@ const G_Sim = {
   WIND: { DIR: 1.1, DIR_T: 300, SPD: 0.3, SPD_T: 90, GUST: 0.2, GUST_T: 8, SEND: 0.5 },
   windAt(seed: number, mean: number, t: number) {
     if (!(mean > 0)) return { x: 0, z: 0 };
-    const W = this.WIND, r = G.U.rng(((seed >>> 0) ^ 0x3d1e5a) >>> 0), d0 = r() * Math.PI * 2;
+    const W = this.WIND, r = U.rng(((seed >>> 0) ^ 0x3d1e5a) >>> 0), d0 = r() * Math.PI * 2;
     // smooth noise in about [-1, 1], period about T: three sines, their rates 1, ~1.8 and ~3.2 times the slowest, each 0.4 the last's size
     const n = (T: number) => { let s = 0, a = 1, f = 1; for (let i = 0; i < 3; i++) { const w = (2 * Math.PI / T) * f * (0.8 + 0.4 * r()), ph = r() * Math.PI * 2; s += a * Math.sin(w * t + ph); a *= 0.4; f *= 1.6 + r() * 0.4; } return s / 1.56; };
     const dir = d0 + W.DIR * n(W.DIR_T), gust = n(W.GUST_T), sp = Math.max(0, mean * (1 + W.SPD * n(W.SPD_T) + W.GUST * gust));
@@ -70,7 +76,7 @@ const G_Sim = {
   // under a roof, a glass one too: map.glassRoofs); off the map, the open air
   windy(map: LvMap | null, x: number, y: number, z: number) {
     if (!map) return false;
-    const L = G.Level, TS = L.TS, tx = Math.floor(x / TS), tz = Math.floor(z / TS);
+    const L = Level, TS = L.TS, tx = Math.floor(x / TS), tz = Math.floor(z / TS);
     if (tx < 0 || tz < 0 || tx >= map.W || tz >= map.H) return true;
     const fm = L.floorMap(map, L.floorAt(map, x, y, z)), out = (fm && fm.out) || map.out;
     if (!(out && out[tz * map.W + tx])) return false;
@@ -89,11 +95,11 @@ const G_Sim = {
   // Close in it makes no odds: the drift itself is millimetres.
   JUDGE: { LO: 0.2, HI: 0.35, SHOT: 0.06 },
   windJudge(acc: number | null | undefined, rnd = Math.random) {
-    const J = this.JUDGE, k = G.U.clamp(((acc == null ? 0.4 : acc) - 0.3) / 0.45, 0, 1), m = J.HI + (J.LO - J.HI) * k;
-    return (rnd() < 0.5 ? -1 : 1) * G.U.clamp(m * (0.9 + 0.2 * rnd()), J.LO, J.HI);
+    const J = this.JUDGE, k = U.clamp(((acc == null ? 0.4 : acc) - 0.3) / 0.45, 0, 1), m = J.HI + (J.LO - J.HI) * k;
+    return (rnd() < 0.5 ? -1 : 1) * U.clamp(m * (0.9 + 0.2 * rnd()), J.LO, J.HI);
   },
   windShot(bias: number, rnd = Math.random) { const n = Math.sqrt(-2 * Math.log(1 - rnd())) * Math.cos(2 * Math.PI * rnd()); return Math.max(0, 1 + bias + this.JUDGE.SHOT * n); },
-  // the lag time (s) of a round leaving at v0 m/s, drag metres (G.dragOf), s metres out, gravity left out: its time of flight,
+  // the lag time (s) of a round leaving at v0 m/s, drag metres (dragOf), s metres out, gravity left out: its time of flight,
   // drag / v0 (e^(s / drag) - 1), less s / v0, the time it'd take with no drag. A crosswind of w carries it w times this sideways.
   lagAt(v0: number, drag: number, s: number) { return drag > 1e8 ? 0 : (drag / v0) * Math.expm1(s / drag) - s / v0; },
 
@@ -102,12 +108,12 @@ const G_Sim = {
   // draw it going there); wind: the level's now (windAt), carrying it out in the open (windy)
   predictEnd(p0: THREE.Vector3, v0: THREE.Vector3, drag: number, grav: number, map: LvMap, wind?: { x: number; z: number } | null) {
     const p = p0.clone(), v = v0.clone(), dt = 1 / 60, wo = wind && (wind.x || wind.z) ? wind : null;
-    for (let i = 0, dist = 0; i < 240 && dist < G.ROUND_LIFE.dist; i++) {
+    for (let i = 0, dist = 0; i < 240 && dist < ROUND_LIFE.dist; i++) {
       const p1 = p.clone().addScaledVector(v, dt); p1.y -= 0.5 * grav * dt * dt;
       const seg = p1.clone().sub(p), len = seg.length();
       if (len < 1e-4) break;
       seg.divideScalar(len);
-      const h = G.Level.raycast(map, p.x, p.y, p.z, seg.x, seg.y, seg.z, len);
+      const h = Level.raycast(map, p.x, p.y, p.z, seg.x, seg.y, seg.z, len);
       if (h.t < len) return p.addScaledVector(seg, h.t);
       const k = Math.exp(-len / drag);
       v.multiplyScalar(k); v.y -= grav * dt;
@@ -125,8 +131,12 @@ const G_Sim = {
   NADE_R: 0.05, NADE_G: 14,
   STICKY: { FUSE: 2, MAX_FLY: 6 }, // (a sticky grenade's fuse, from when it holds; and how long it may fly before it goes off anyway: js/player.ts STICKY)
   nadeStep(n: VwNadeMotion, dt: number, map: LvMap | null) {
+    if (map && (map as any).tilt) { Level.inFrame(map, { p: n.pos, v: n.vel }, (m) => this.nadeIn(n, dt, m)); return; } // (aboard a ship lying tilted: it falls her way, js/level.ts)
+    this.nadeIn(n, dt, map);
+  },
+  nadeIn(n: VwNadeMotion, dt: number, map: LvMap | null) {
     const R = this.NADE_R, w = map && map.world, p = n.pos, v = n.vel;
-    const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; G.World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if ((s.move || s.ray) && !(s.nostep && !s.ray) && (!s.hull || G.World.touches(s, [x0, y0, z0], [x1, y1, z1]))) h = true; }); return h; }; // (a rock: its own shape, not the boxes that stop people)
+    const hits = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number) => { if (!w) return y0 < 0; let h = false; World.query(w, [x0, y0, z0], [x1, y1, z1], (s) => { if ((s.move || s.ray) && !(s.nostep && !s.ray) && (!s.hull || World.touches(s, [x0, y0, z0], [x1, y1, z1]))) h = true; }); return h; }; // (a rock: its own shape, not the boxes that stop people)
     const side = (x: number, y: number, z: number) => hits(x - R, y - R + 0.03, z - R, x + R, y + R, z + R); // (clear of the floor it's on)
     const below = (x: number, y: number, z: number) => hits(x - R + 0.01, y - R, z - R + 0.01, x + R - 0.01, y + R - 0.02, z + R - 0.01);
     const N = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / N;
@@ -151,12 +161,22 @@ const G_Sim = {
   // A sticky grenade in the air: no bounces, it holds to the first solid it meets. One step of dt (in 1/120 s pieces); returns where it
   // struck ({ at, n: the face's normal }) or null while it's still flying. (Bodies are the thrower's own test: js/views.ts stickStep)
   stickFly(n: VwNadeMotion, dt: number, map: LvMap | null): { at: THREE.Vector3; n: number[]; t: number } | null {
+    if (map && (map as any).tilt && Level.frameAt(map, n.pos.x, n.pos.y, n.pos.z)) { // (aboard a ship lying tilted: in her frame, where it holds put back in the world's)
+      let r: { at: THREE.Vector3; n: number[]; t: number } | null = null;
+      Level.inFrame(map, { p: n.pos, v: n.vel }, (m) => { r = this.stickIn(n, dt, m); });
+      const R = r as { at: THREE.Vector3; n: number[]; t: number } | null, t = (map as any).tilt.b, SD = SpaceData;
+      if (R) { const w = SD.toWorld(t, R.at.x, R.at.y, R.at.z), nn = SD.toWorld({ x: 0, y: 0, z: 0, yaw: t.yaw, pt: t.pt }, R.n[0], R.n[1], R.n[2]); R.at.set(w.x, w.y, w.z); R.n = [nn.x, nn.y, nn.z]; }
+      return R;
+    }
+    return this.stickIn(n, dt, map);
+  },
+  stickIn(n: VwNadeMotion, dt: number, map: LvMap | null): { at: THREE.Vector3; n: number[]; t: number } | null {
     const p = n.pos, v = n.vel, N = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / N;
     for (let k = 0; k < N; k++) {
       v.y -= this.NADE_G * h;
       const len = v.length() * h; if (len < 1e-6) continue;
       const dx = v.x / v.length(), dy = v.y / v.length(), dz = v.z / v.length();
-      const hit = map ? G.Level.raycast(map, p.x, p.y, p.z, dx, dy, dz, len + this.NADE_R) : null;
+      const hit = map ? Level.raycast(map, p.x, p.y, p.z, dx, dy, dz, len + this.NADE_R) : null;
       if (hit && hit.solid && hit.t < len + this.NADE_R) { const at = p.clone().addScaledVector(new THREE.Vector3(dx, dy, dz), Math.max(0, hit.t)); return { at, n: hit.n || [0, 1, 0], t: k * h }; }
       if (!map && p.y + v.y * h < 0) return { at: new THREE.Vector3(p.x, 0, p.z), n: [0, 1, 0], t: k * h };
       p.x += v.x * h; p.y += v.y * h; p.z += v.z * h;
@@ -186,7 +206,7 @@ const G_Sim = {
   // turns the downward ones itself, js/ballistics.ts glances.)
   blastR(map: LvMap | null, p: THREE.Vector3) {
     if (!map) return this.BLAST.r;
-    const g = G.Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05);
+    const g = Level.groundAt(map, p.x, p.z, 0.01, p.y + 0.05);
     return g != null && p.y - g < 0.15 ? this.BLAST.r * this.BLAST.SURFACE : this.BLAST.r;
   },
   // A thermobaric's burst (js/player.ts thermobaric tells what it does; this is the reckoning): the fill of the space round it
@@ -200,7 +220,7 @@ const G_Sim = {
   // same fireball and the F9 view shows the volume it filled.
   TB: { FUSE: 2.6, CLOUD: 110, SPACE: 900, ROOM_H: 2.7, E: 6.0e6, BURN: 0.45, BLAST: 0.9, QS0: 25, QS_K: 180, WALL_R: 3 },
   tbModel(map: LvMap, p: THREE.Vector3): PTbModel {
-    const T = this.TB, L = G.Level, TS = L.TS, cellA = TS * TS;
+    const T = this.TB, L = Level, TS = L.TS, cellA = TS * TS;
     const fill = L.blastFill(map, p.x, p.y, p.z, T.SPACE);
     // how much of the cloud's reach is open to the sky (counted over the first CLOUD cells): the cloud thins and rises there
     let outC = 0; const fm = L.floorMap(map, fill.f), out = fm.out || map.out, nC = Math.min(fill.n, T.CLOUD);
@@ -209,7 +229,7 @@ const G_Sim = {
     // how well the space holds the burn in: open sky over it, the ways out it met (broken windows, the map's edge), and how much
     // more room past the cloud there is for it to spread into (a big hall holds it in hardly better than the open). Less held
     // in, the cloud's thinner and smaller as it lights, and burns less of its fuel.
-    const held = G.U.clamp(T.CLOUD * 2.5 / Math.max(1, space), 0, 1), conf = G.U.clamp((1 - outFrac) / (1 + 0.12 * fill.vents) * (0.3 + 0.7 * held), 0.08, 1);
+    const held = U.clamp(T.CLOUD * 2.5 / Math.max(1, space), 0, 1), conf = U.clamp((1 - outFrac) / (1 + 0.12 * fill.vents) * (0.3 + 0.7 * held), 0.08, 1);
     const cloud = Math.max(Math.min(fill.n, 12), Math.min(fill.n, Math.round(T.CLOUD * (0.45 + 0.55 * held) * (1 - 0.6 * outFrac))));
     const V = Math.max(1, space) * cellA * T.ROOM_H, qs = closed || skyAll < 0.05 ? 0.4 * T.E / V / 1000 * (1 - skyAll) / (1 + 0.12 * fill.vents) : 0;
     const rc = cloud ? fill.d[cloud - 1] : 0; // (the cloud's edge, along the floor)
@@ -219,16 +239,14 @@ const G_Sim = {
   },
   // what a thermobaric's burst does to someone at (x, y, z): burn and blast (shares of a life), daze (0..1), and where they were
   tbDose(M: PTbModel, x: number, y: number, z: number) {
-    const T = this.TB, L = G.Level, map = M.map, TS = L.TS, f = L.floorAt(map, x, y, z);
-    const i = G.U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + G.U.clamp(Math.floor(x / TS), 0, map.W - 1), k = f === M.fill.f ? M.idx[i] : -1;
+    const T = this.TB, L = Level, map = M.map, TS = L.TS, f = L.floorAt(map, x, y, z);
+    const i = U.clamp(Math.floor(z / TS), 0, map.H - 1) * map.W + U.clamp(Math.floor(x / TS), 0, map.W - 1), k = f === M.fill.f ? M.idx[i] : -1;
     if (k >= 0 && k < M.cloud) return { burn: T.BURN, blast: T.BLAST * M.conf, daze: 1, at: 'cloud', d: M.fill.d[k] };
     if (k >= 0) { // in the space it filled, past the fireball: the long push of the pressure, and the front's last of it close to the edge
       const past = M.fill.d[k] - M.rc, front = M.conf * Math.exp(-past / 1.5);
-      return { burn: 0.15 * Math.exp(-past / 0.7), blast: G.U.clamp((M.qs - T.QS0) / T.QS_K, 0, 0.5) + 0.45 * front, daze: G.U.clamp(M.qs / 50 + front, 0, 1), at: 'space', d: M.fill.d[k] };
+      return { burn: 0.15 * Math.exp(-past / 0.7), blast: U.clamp((M.qs - T.QS0) / T.QS_K, 0, 0.5) + 0.45 * front, daze: U.clamp(M.qs / 50 + front, 0, 1), at: 'space', d: M.fill.d[k] };
     }
     const r = Math.hypot(x - M.p.x, z - M.p.z), reach = M.rc + T.WALL_R; // (through a wall, or a floor)
     return { burn: 0, blast: 0, daze: r < reach ? 0.35 * (1 - r / reach) * (f === M.fill.f ? 1 : 0.5) : 0, at: r < reach ? 'wall' : 'none', d: r };
   },
 };
-G.Sim = G_Sim;
-interface GameModules { Sim: typeof G_Sim; }

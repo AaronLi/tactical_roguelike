@@ -1,4 +1,18 @@
 'use strict';
+import { Audio } from './audio.js';
+import { Ballistics } from './ballistics.js';
+import { aimSway, AMMO, ammoTypes, asCal, CALIBERS, calOf, calsOf, fullReload, MUZZLE_V, roundSpeed } from './data.js';
+import { GunAudio } from './gunaudio.js';
+import { GunModels } from './gunmodels.js';
+import { HUD } from './hud.js';
+import { Gunsmith } from './parts.js';
+import { R as G_R } from './render.js';
+import { Shop } from './shop.js';
+import { ShopUI } from './shopui.js';
+import { Stickers } from './stickers.js';
+import { U } from './util.js';
+import { Pad } from './gamepad.js';
+import { Me as G_Me } from './player.js';
 // The gunsmith (a tab in the between-level shop): rebuild your weapons part by part on a 3D model.
 // Drag to orbit, scroll to zoom, hover to see what a piece is, click it (or a slot in the list) to pick
 // that slot. Hovering a part in the list previews it on the gun with its stat changes; clicking fits
@@ -13,8 +27,8 @@ interface GsState {
   wslot: string; slot: string | null; hoverPart: string | null | undefined; hoverSlot: string | null | undefined; dotHover?: boolean;
   stk: boolean; stkPick: string | null; stkK: number; stkR: number; stkF: number; stkAt: any; stkHover: any; stkDirty: boolean;
 }
-const G_GunsmithUI = (() => {
-  const T = THREE, GS = G.Gunsmith;
+export const GunsmithUI = (() => {
+  const T = THREE, GS = Gunsmith;
   let renderer = null as unknown as THREE.WebGLRenderer, scene: THREE.Scene, camera: THREE.PerspectiveCamera, model = null as unknown as THREE.Object3D, modelKey = '', canvas: HTMLCanvasElement, raf = 0, active = false;
   const view: GsView = { yaw: Math.PI / 2 - 0.3, pitch: 0.15, dist: 1.4, center: new T.Vector3(), auto: true }; // right side, muzzle to the right
   const st: GsState = { wslot: 'p', slot: null, hoverPart: null, hoverSlot: null,
@@ -29,7 +43,7 @@ const G_GunsmithUI = (() => {
     renderer = new T.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, matchMedia('(hover: none) and (pointer: coarse)').matches ? 1.5 : 2));
     scene = new T.Scene();
-    scene.environment = G.R._envMap(renderer);
+    scene.environment = G_R._envMap(renderer);
     scene.add(new T.HemisphereLight(0xe8eef5, 0x2a2622, Math.PI * 1.0));
     const key = new T.DirectionalLight(0xffffff, Math.PI * 1.3); key.position.set(1, 2, 1.5); scene.add(key);
     const fill = new T.DirectionalLight(0xffffff, Math.PI * 0.6); fill.position.set(-1, 0.6, 1.5); scene.add(fill);
@@ -43,36 +57,36 @@ const G_GunsmithUI = (() => {
       if (drag) {
         const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
         drag.moved += Math.abs(dx) + Math.abs(dy); drag.x = e.clientX; drag.y = e.clientY;
-        view.yaw -= dx * 0.008; view.pitch = G.U.clamp(view.pitch + dy * 0.006, -1.2, 1.2);
+        view.yaw -= dx * 0.008; view.pitch = U.clamp(view.pitch + dy * 0.006, -1.2, 1.2);
       } else hover(e);
     });
     canvas.addEventListener('pointerup', (e) => {
       if (!e.isPrimary) return;
       if (drag && drag.moved < 4 && st.stk) stkPlace(e);
-      else if (drag && drag.moved < 4) { const s = pick(e); if (s) { st.slot = s; G.Audio.click(); refresh(); } }
+      else if (drag && drag.moved < 4) { const s = pick(e); if (s) { st.slot = s; Audio.click(); refresh(); } }
       drag = null;
     });
     canvas.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'touch' && st.hoverSlot) { st.hoverSlot = null; paint(); label(null); } });
-    canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (st.stk && st.stkPick && (e.shiftKey || e.ctrlKey || e.altKey)) return stkWheel(e); view.dist = G.U.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.1), 0.3, 4); }, { passive: false });
+    canvas.addEventListener('wheel', (e) => { e.preventDefault(); if (st.stk && st.stkPick && (e.shiftKey || e.ctrlKey || e.altKey)) return stkWheel(e); view.dist = U.clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.1), 0.3, 4); }, { passive: false });
   }
 
   // ------------------------------------------------------------------ model
-  function weapon() { const Me = G.Me; return Me.weapons[st.wslot] || Me.weapons.s || Me.weapons.p; }
+  function weapon() { const Me = G_Me; return Me.weapons[st.wslot] || Me.weapons.s || Me.weapons.p; }
   // (skin: the stickers shown on it, the gun's own by default)
   function setModel(def: WeaponDef, skin = (weapon() || {} as any).stickers) {
-    const key = def.code + '#' + G.Stickers.key(skin);
+    const key = def.code + '#' + Stickers.key(skin);
     if ((model && modelKey === key) || wantKey === key) return;
     wantKey = key;
-    const { group } = G.GunModels.display(def);
+    const { group } = GunModels.display(def);
     // (a build whose packs are not in yet is an empty group that fills in: the old model stays up till it has, and only the last one asked for is shown)
-    G.GunModels.whenReady(group, (ok) => { if (wantKey === key && ok) showModel(def, group, key, skin); else if (wantKey !== key) group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); });
+    GunModels.whenReady(group, (ok) => { if (wantKey === key && ok) showModel(def, group, key, skin); else if (wantKey !== key) group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); });
   }
   let wantKey = '';
   function showModel(def: WeaponDef, group: THREE.Object3D, key: string, skin: any) {
     if (model) { scene.remove(model); model.traverse((o: any) => { if (o.isMesh) { o.geometry.dispose(); if (!o.userData.sticker) o.material.dispose(); } }); } // (a sticker's material is the picture's, shared)
     // own materials, so a part can glow when picked
     group.traverse((o: any) => { if (o.isMesh) o.material = o.material.clone(); });
-    G.Stickers.decorate(group, skin);
+    Stickers.decorate(group, skin);
     model = group; modelKey = key; st.stkDirty = true;
     scene.add(model);
     const box = new T.Box3().setFromObject(model), size = box.getSize(new T.Vector3());
@@ -168,7 +182,7 @@ const G_GunsmithUI = (() => {
     if (!el) return;
     const w = weapon(), pid = s && w.def.build[s], p = pid && GS.PARTS[pid];
     const sl = s && GS.visibleSlots(w.def.id, w.def.build).find((q: Slot) => q.slot === s);
-    el.innerHTML = s ? `<b>${sl ? GS.slotLabel(sl) : (GS.SLOT_LABEL as Record<string, string>)[s!]}</b> ${p ? G.U.esc(p.name) : 'empty'}` : '';
+    el.innerHTML = s ? `<b>${sl ? GS.slotLabel(sl) : (GS.SLOT_LABEL as Record<string, string>)[s!]}</b> ${p ? U.esc(p.name) : 'empty'}` : '';
   }
   function loop() {
     if (!active) return;
@@ -181,7 +195,7 @@ const G_GunsmithUI = (() => {
     const c = view.center, d = view.dist;
     camera.position.set(c.x + Math.sin(view.yaw) * Math.cos(view.pitch) * d, c.y + Math.sin(view.pitch) * d, c.z + Math.cos(view.yaw) * Math.cos(view.pitch) * d);
     camera.lookAt(c);
-    if (st.stkDirty && model) { st.stkDirty = false; G.Stickers.ghost(model, stkTry()); }
+    if (st.stkDirty && model) { st.stkDirty = false; Stickers.ghost(model, stkTry()); }
     renderer.render(scene, camera);
     placeDots();
   }
@@ -194,12 +208,12 @@ const G_GunsmithUI = (() => {
     ['Recoil', (d) => d.recoil, -1, (v) => v.toFixed(2) + '°', [0, 6]],
     ['Accuracy', (d) => d.ads * 120, -1, (v) => (v < 10 ? v.toFixed(1) : Math.round(v)) + ' MOA', [0, 20]], // (aimed: the group the gun itself makes)
     ['Hip spread', (d) => d.spread, -1, (v) => v.toFixed(1) + '°', [0, 8]],
-    ['Aim sway', (d) => G.aimSway(d).score * 100, -1, (v) => Math.round(v) + '%', [0, 400]], // (an M4's 100%: a stock to your shoulder steadies it most)
-    ['Energy', (d) => (d.explosive ? d.explosive.dmg : G.Ballistics.energy(d)), 1, (v) => G.U.fmt(Math.round(v)) + ' J', [0, 4000]], // (its round's at 10 m, with ball: js/ballistics.ts)
+    ['Aim sway', (d) => aimSway(d).score * 100, -1, (v) => Math.round(v) + '%', [0, 400]], // (an M4's 100%: a stock to your shoulder steadies it most)
+    ['Energy', (d) => (d.explosive ? d.explosive.dmg : Ballistics.energy(d)), 1, (v) => U.fmt(Math.round(v)) + ' J', [0, 4000]], // (its round's at 10 m, with ball: js/ballistics.ts)
     ['Range', (d) => d.range, 1, (v) => Math.round(v) + ' m', [0, 150]],
     ['Fire rate', (d) => d.rpm, 1, (v) => Math.round(v) + ' rpm', [0, 2000]],
     ['Capacity', (d) => d.mag, 1, (v) => Math.round(v), [0, 200]],
-    ['Reload', (d) => G.fullReload(d), -1, (v) => v.toFixed(2) + ' s', [0, 6]],
+    ['Reload', (d) => fullReload(d), -1, (v) => v.toFixed(2) + ' s', [0, 6]],
     ['Weight', (d) => d.weight, -1, (v) => v.toFixed(2) + ' kg', [0, 12]],
     ['Mobility', (d) => d.speed * 100, 1, (v) => Math.round(v) + '%', [60, 110]],
     ['Sight', (d) => (d.magLevels ? d.magLevels[d.magLevels.length - 1] : d.magnif || 1), 0, (v) => v + '×', [1, 8]],
@@ -209,22 +223,22 @@ const G_GunsmithUI = (() => {
     for (const [name, f, better, fmt, [lo, hi]] of ROWS) {
       const a = f(cur), b = prev ? f(prev) : a;
       const diff = b - a, good = better === 0 || Math.abs(diff) < 1e-6 || fmt(a) === fmt(b) ? '' : (diff > 0) === (better > 0) ? 'up' : 'down';
-      const w = G.U.clamp((b - lo) / (hi - lo), 0, 1) * 100;
+      const w = U.clamp((b - lo) / (hi - lo), 0, 1) * 100;
       h += `<div class="gs-stat ${good}"><span>${name}</span><div><i style="width:${w}%"></i></div><b>${fmt(b)}${good ? ` <em>${diff > 0 ? '▲' : '▼'} ${fmt(Math.abs(diff))}</em>` : ''}</b></div>`;
     }
-    const c0 = (G.CALIBERS as Record<string, CaliberDef>)[G.calOf(cur)], c1 = (G.CALIBERS as Record<string, CaliberDef>)[G.calOf(prev || cur)];
-    if (c1) h += `<div class="gs-stat${c0 !== c1 ? ' up' : ''}"><span>Caliber</span><div></div><b>${c1.name}${prev && prev.id !== cur.id ? ` <em>${G.U.esc(prev.name)}</em>` : ''}</b></div>`;
+    const c0 = (CALIBERS as Record<string, CaliberDef>)[calOf(cur)], c1 = (CALIBERS as Record<string, CaliberDef>)[calOf(prev || cur)];
+    if (c1) h += `<div class="gs-stat${c0 !== c1 ? ' up' : ''}"><span>Caliber</span><div></div><b>${c1.name}${prev && prev.id !== cur.id ? ` <em>${U.esc(prev.name)}</em>` : ''}</b></div>`;
     h += `<div class="gs-stat"><span>Report</span><div></div><b>${(prev || cur).sup ? 'Suppressed' : (prev || cur).device === 'none' ? 'Bare muzzle' : (prev || cur).device}</b></div>`;
     // each load through this build's barrel: how fast it leaves, and the energy it leaves with (all its pellets)
     const d0 = prev || cur, cur0 = cur;
-    for (const cal of G.calsOf(d0)) { // (a gun of several barrels: each round type it takes, in its own caliber)
-      const d = G.asCal(d0, cal), cur = G.asCal(cur0, cal), grp = (G.CALIBERS as Record<string, CaliberDef>)[cal] && G.ammoTypes(cal);
-      if (grp && (G.MUZZLE_V as Record<string, any>)[cal] && !d.explosive && d.cls !== 'RAIL') {
-        h += `<div class="gs-loads"><span>${d0.barrels ? (G.CALIBERS as Record<string, CaliberDef>)[cal].name : 'Load'}</span><span>Muzzle</span><span>Energy</span>`;
+    for (const cal of calsOf(d0)) { // (a gun of several barrels: each round type it takes, in its own caliber)
+      const d = asCal(d0, cal), cur = asCal(cur0, cal), grp = (CALIBERS as Record<string, CaliberDef>)[cal] && ammoTypes(cal);
+      if (grp && (MUZZLE_V as Record<string, any>)[cal] && !d.explosive && d.cls !== 'RAIL') {
+        h += `<div class="gs-loads"><span>${d0.barrels ? (CALIBERS as Record<string, CaliberDef>)[cal].name : 'Load'}</span><span>Muzzle</span><span>Energy</span>`;
         for (const am of grp) {
-          const v = G.roundSpeed(d, am), v0 = G.roundSpeed(cur, am), e = G.Ballistics.energy(d, am, 0), ch = Math.round(v) - Math.round(v0);
+          const v = roundSpeed(d, am), v0 = roundSpeed(cur, am), e = Ballistics.energy(d, am, 0), ch = Math.round(v) - Math.round(v0);
           const cls = ch ? (ch > 0 ? ' class="up"' : ' class="down"') : '';
-          h += `<span>${(G.AMMO as Record<string, any>)[am].name}</span><b${cls}>${Math.round(v)} m/s${ch ? ` <em>${ch > 0 ? '+' : ''}${ch}</em>` : ''}</b><b${cls}>${G.U.fmt(Math.round(e))} J</b>`;
+          h += `<span>${(AMMO as Record<string, any>)[am].name}</span><b${cls}>${Math.round(v)} m/s${ch ? ` <em>${ch > 0 ? '+' : ''}${ch}</em>` : ''}</b><b${cls}>${U.fmt(Math.round(e))} J</b>`;
         }
         h += '</div>';
       }
@@ -234,7 +248,7 @@ const G_GunsmithUI = (() => {
   // the stat card's: what the part you're hovering would change (with a receiver kit, the gun it makes), then the stats
   function sideStats(cur: any, prev: any, pid?: string | null) {
     const p = pid && GS.PARTS[pid];
-    const head = prev ? `<div class="gs-change"><div class="gs-ch-h">${p ? `Fitting ${G.U.esc(p.name)}` : 'With this part'}</div><div class="gs-pe">${prev.id !== cur.id ? `<span class="g">Makes it a ${G.U.esc(prev.name)}</span>` : ''}${deltaHtml(cur, prev)}</div></div>` : '';
+    const head = prev ? `<div class="gs-change"><div class="gs-ch-h">${p ? `Fitting ${U.esc(p.name)}` : 'With this part'}</div><div class="gs-pe">${prev.id !== cur.id ? `<span class="g">Makes it a ${U.esc(prev.name)}</span>` : ''}${deltaHtml(cur, prev)}</div></div>` : '';
     return head + statsHtml(cur, prev);
   }
   // just what a change would change, old to new (good green, bad red)
@@ -245,31 +259,31 @@ const G_GunsmithUI = (() => {
       if (Math.abs(b - a) < 1e-6 || fmt(a) === fmt(b)) continue;
       out.push(`<span class="${better === 0 ? '' : (b > a) === (better > 0) ? 'g' : 'b'}">${name} ${fmt(a)} → ${fmt(b)}</span>`);
     }
-    const c0 = (G.CALIBERS as Record<string, CaliberDef>)[G.calOf(cur)], c1 = (G.CALIBERS as Record<string, CaliberDef>)[G.calOf(prev)];
+    const c0 = (CALIBERS as Record<string, CaliberDef>)[calOf(cur)], c1 = (CALIBERS as Record<string, CaliberDef>)[calOf(prev)];
     if (c1 && c0 !== c1) out.push(`<span class="g">${c0 ? c0.name + ' → ' : ''}${c1.name}</span>`);
     if (!!cur.sup !== !!prev.sup) out.push(`<span class="${prev.sup ? 'g' : 'b'}">${prev.sup ? 'Suppressed' : 'Unsuppressed'}</span>`);
-    const v0 = G.roundSpeed(cur), v1 = G.roundSpeed(prev);
+    const v0 = roundSpeed(cur), v1 = roundSpeed(prev);
     if (v0 && v1 && Math.round(v0) !== Math.round(v1)) out.push(`<span class="${v1 > v0 ? 'g' : 'b'}">Muzzle ${Math.round(v0)} → ${Math.round(v1)} m/s</span>`);
     return out.length ? out.join('') : '<span>No change to the numbers</span>';
   }
-  // a part's figures as chips (js/parts.ts G.Gunsmith.partEffects: there so the highlights' video worker, which has no gunsmith screen, can word them too)
+  // a part's figures as chips (js/parts.ts Gunsmith.partEffects: there so the highlights' video worker, which has no gunsmith screen, can word them too)
   const partEffects = (p: Part, gid?: string | null) => GS.partEffects(p, gid);
 
   // what a part fits: its interface, how many weapons take it, and which of yours
   function fitsLine(p: Part, exceptId: string) {
-    const ids = GS.fitsPart(p), mine = Object.values(G.Me.weapons).filter((w) => w && w.def.id !== exceptId && ids.includes(w.def.id));
-    return `<em class="gs-fit">${G.U.esc(GS.ifaceName(p.mount))}${ids.length > 1 ? ` · fits ${ids.length} weapons` : ''}${mine.length ? ` · also your ${mine.map((w) => w.def.name).join(', ')}` : ''}</em>`;
+    const ids = GS.fitsPart(p), mine = Object.values(G_Me.weapons).filter((w) => w && w.def.id !== exceptId && ids.includes(w.def.id));
+    return `<em class="gs-fit">${U.esc(GS.ifaceName(p.mount))}${ids.length > 1 ? ` · fits ${ids.length} weapons` : ''}${mine.length ? ` · also your ${mine.map((w) => w.def.name).join(', ')}` : ''}</em>`;
   }
 
   // ------------------------------------------------------------------ build changes
-  const stash = () => G.Me.stash || (G.Me.stash = {});
+  const stash = () => G_Me.stash || (G_Me.stash = {});
   const toStash = (pid: string) => { const s = stash(); s[pid] = (s[pid] || 0) + 1; };
   const fromStash = (pid: string) => { const s = stash(); if (!s[pid]) return false; if (--s[pid] <= 0) delete s[pid]; return true; };
   // for sale: what he has in stock, and always the right core part for a gun that's missing one or has one
   // that doesn't fit (its own barrel, after a receiver swap)
   // (Timberline's too: the precision showcase by the hangar door, js/hangar.ts. Its own section in the list.)
-  const forSale = (p: Part) => (!p.factory && G.Shop.partStock && G.Shop.partStock.has(p.id) && G.Shop.inStock('part:' + p.id)) || atShowcase(p) || needed(p);
-  const atShowcase = (p: Part) => !p.factory && !!G.Shop.precStock && G.Shop.precStock.includes(p.id) && G.Shop.inStock('part:' + p.id);
+  const forSale = (p: Part) => (!p.factory && Shop.partStock && Shop.partStock.has(p.id) && Shop.inStock('part:' + p.id)) || atShowcase(p) || needed(p);
+  const atShowcase = (p: Part) => !p.factory && !!Shop.precStock && Shop.precStock.includes(p.id) && Shop.inStock('part:' + p.id);
   const needed = (p: Part) => { const w = weapon(), d = w && w.def; return !!d && GS.PLATFORMS[d.id].defaults[p.slot] === p.id && d.missing.includes(p.slot); };
   // does the store have a part for this slot of the gun you're working on (one that fits it, and isn't the one on it)?
   // Its dot on the model and its row in the list get a "!".
@@ -278,60 +292,60 @@ const G_GunsmithUI = (() => {
     return !!s && GS.compatible(s.mount).some((p: Part) => p.id !== w.def.build[slot] && !GS.sameFamily(p, GS.PARTS[w.def.build[slot]]) && GS.fitsLen(p, w.def.id, w.def.build) && forSale(p));
   }
   function apply(w: any, build: any) {
-    G.Me.refit(w, build);
-    if (G.GunAudio.available()) G.GunAudio.buildDry(w.def.soundKey);
+    G_Me.refit(w, build);
+    if (GunAudio.available()) GunAudio.buildDry(w.def.soundKey);
   }
   function install(slot: string, pid: string): void {
     const w = weapon(), build = Object.assign({}, w.def.build), p = GS.PARTS[pid];
-    if (!p || build[slot] === pid || G.Shop.ready) return;
+    if (!p || build[slot] === pid || ShopUI.ready) return;
     if (!fromStash(pid)) {
-      if (!forSale(p) || !G.Shop.afford(GS.buyPrice(p))) return;
+      if (!forSale(p) || !ShopUI.afford(GS.buyPrice(p))) return;
       // from his stock (the squad's: the host's count, js/shop.ts take), unless it's the core part the gun needs
-      if (!needed(p)) { G.Shop.take('part:' + pid, () => { if (weapon() !== w || !G.Shop.spend(GS.buyPrice(p))) return false; toStash(pid); install(slot, pid); return undefined; }); return; }
-      if (!G.Shop.spend(GS.buyPrice(p))) return;
-    } else G.Audio.pickup();
+      if (!needed(p)) { ShopUI.take('part:' + pid, () => { if (weapon() !== w || !ShopUI.spend(GS.buyPrice(p))) return false; toStash(pid); install(slot, pid); return undefined; }); return; }
+      if (!ShopUI.spend(GS.buyPrice(p))) return;
+    } else Audio.pickup();
     if (build[slot]) toStash(build[slot]);
     build[slot] = pid;
     for (const r of GS.prune(w.def.id, build)) toStash(r);
     apply(w, build);
     st.hoverPart = null;
-    G.Shop.render();
+    ShopUI.render();
   }
   function remove(slot: string) {
     const w = weapon(), build = Object.assign({}, w.def.build);
     const sl = GS.slotsOf(w.def.id, build).find((s: Slot) => s.slot === slot);
-    if (!sl || sl.req || !build[slot] || G.Shop.ready) return;
+    if (!sl || sl.req || !build[slot] || ShopUI.ready) return;
     toStash(build[slot]); delete build[slot];
     for (const r of GS.prune(w.def.id, build)) toStash(r);
-    apply(w, build); G.Audio.click();
-    G.Shop.render();
+    apply(w, build); Audio.click();
+    ShopUI.render();
   }
   // the part on the picked slot in another finish (the gun's stock grip, or a part with a skin family: GS.skinsOf): it's the same part,
   // so it costs nothing and goes on as it is
   function reskin(pid: string) {
     const w = weapon(), build = Object.assign({}, w.def.build), slot = st.slot;
-    if (!slot || !build[slot] || !GS.skinsOf(w.def.id, GS.PARTS[build[slot]]).some((p: Part) => p.id === pid) || G.Shop.ready) return;
+    if (!slot || !build[slot] || !GS.skinsOf(w.def.id, GS.PARTS[build[slot]]).some((p: Part) => p.id === pid) || ShopUI.ready) return;
     build[slot] = pid;
-    apply(w, build); G.Audio.click();
-    G.Shop.render();
+    apply(w, build); Audio.click();
+    ShopUI.render();
   }
   // one in the stash, in another finish: the item becomes that one (a part's worth is the same in any: nothing's gained)
   function restash(from: string, to: string) {
     const w = weapon(), a = GS.PARTS[from], b = GS.PARTS[to];
-    if (!w || !a || !b || a === b || !GS.sameFamily(a, b) || !GS.skinsOf(w.def.id, a).includes(b) || G.Shop.ready || !fromStash(from)) return;
-    toStash(to); G.Audio.click();
-    G.Shop.render();
+    if (!w || !a || !b || a === b || !GS.sameFamily(a, b) || !GS.skinsOf(w.def.id, a).includes(b) || ShopUI.ready || !fromStash(from)) return;
+    toStash(to); Audio.click();
+    ShopUI.render();
   }
   function sell(pid: string) {
     const p = GS.PARTS[pid];
-    if (!p || G.Shop.ready || !fromStash(pid)) return;
-    G.Me.credits += GS.sellPrice(p);
-    G.Audio.buy();
-    G.Shop.render();
+    if (!p || ShopUI.ready || !fromStash(pid)) return;
+    G_Me.credits += GS.sellPrice(p);
+    Audio.buy();
+    ShopUI.render();
   }
 
   // ------------------------------------------------------------------ stickers (js/stickers.ts)
-  const SK = () => G.Stickers;
+  const SK = () => Stickers;
   const stkName = (n: string) => n.replace(/\.[a-z0-9]+$/i, '').replace(/[-_]+/g, ' ');
   // where on the gun the pointer is: a point on its surface and the way that surface faces, in the gun's frame
   function surfaceAt(e: MouseEvent) {
@@ -362,13 +376,13 @@ const G_GunsmithUI = (() => {
     if (!st.stkPick || !w || (w.stickers || []).length >= SK().MAX) return;
     const at = surfaceAt(e);
     if (!at) return;
-    st.stkAt = at; st.stkDirty = true; G.Audio.click();
+    st.stkAt = at; st.stkDirty = true; Audio.click();
     stkPanel();
   }
   // Shift + scroll: its size; Ctrl (or Alt) + scroll: its turn
   function stkWheel(e: WheelEvent) {
     const d = Math.sign(e.deltaY);
-    if (e.shiftKey) st.stkK = G.U.clamp(st.stkK * (1 - d * 0.08), SK().MIN_K, SK().MAX_K);
+    if (e.shiftKey) st.stkK = U.clamp(st.stkK * (1 - d * 0.08), SK().MIN_K, SK().MAX_K);
     else st.stkR = Math.atan2(Math.sin(st.stkR - d * Math.PI / 12), Math.cos(st.stkR - d * Math.PI / 12));
     st.stkDirty = true; stkControls();
   }
@@ -382,7 +396,7 @@ const G_GunsmithUI = (() => {
   }
   function stkInput(e: Event) {
     const t = e.target as HTMLInputElement;
-    if (t.matches('[data-gstksize]')) st.stkK = G.U.clamp(+t.value, SK().MIN_K, SK().MAX_K);
+    if (t.matches('[data-gstksize]')) st.stkK = U.clamp(+t.value, SK().MIN_K, SK().MAX_K);
     else if (t.matches('[data-gstkrot]')) st.stkR = +t.value * Math.PI / 180;
     else if (t.matches('[data-gstkflip]')) st.stkF = t.checked ? 1 : 0;
     else return;
@@ -391,17 +405,17 @@ const G_GunsmithUI = (() => {
   // on, for good: one of yours used up
   function stickOn() {
     const w = weapon(), s = stkTry();
-    if (!w || !s || !st.stkAt || G.Shop.ready || (w.stickers || []).length >= SK().MAX || !SK().use(s.s)) return;
+    if (!w || !s || !st.stkAt || ShopUI.ready || (w.stickers || []).length >= SK().MAX || !SK().use(s.s)) return;
     w.stickers = SK().clean([...(w.stickers || []), s]);
     st.stkAt = null; st.stkHover = null;
     if (!SK().owned()[st.stkPick!]) st.stkPick = null; // (that was the last of them)
-    G.Audio.pickup();
-    G.HUD.toast('', `Stuck it on your ${w.def.name}`, 1.6);
+    Audio.pickup();
+    HUD.toast('', `Stuck it on your ${w.def.name}`, 1.6);
     refresh();
   }
   function stkPanel() { const el = document.querySelector('.gs-stk'); if (el) el.innerHTML = stkHtml(weapon()); }
   function stkHtml(w: any) {
-    const S = SK(), own = S.owned(), names = Object.keys(own).sort(), on = (w.stickers || []).length, full = on >= S.MAX, esc = G.U.esc;
+    const S = SK(), own = S.owned(), names = Object.keys(own).sort(), on = (w.stickers || []).length, full = on >= S.MAX, esc = U.esc;
     const cards = names.map((n) => `<button class="stk-card${st.stkPick === n ? ' on' : ''}" data-gstkpick="${esc(n)}" title="${esc(stkName(n))}"><img src="${S.url(n)}" alt="" draggable="false"><b>×${own[n]}</b></button>`).join('');
     const deg = Math.round(st.stkR * 180 / Math.PI);
     return `<div class="gs-sub">Stickers <small>${on} of ${S.MAX} on your ${esc(w.def.name)}</small></div>
@@ -411,26 +425,26 @@ const G_GunsmithUI = (() => {
         <label>Turn <input type="range" data-gstkrot min="-180" max="180" step="1" value="${deg}"><span>${deg}°</span></label>
         <label class="stk-flip"><input type="checkbox" data-gstkflip ${st.stkF ? 'checked' : ''}> Mirror</label>
       </div>
-      <div class="stk-act">${st.stkAt ? `<button class="btn small buy" data-gstkapply ${G.Shop.ready ? 'disabled' : ''}>Stick it on <small>(for good)</small></button> <button class="btn small" data-gstkmove>Move it</button>`
-        : `<span>${G.Pad.text(full ? 'This gun has all the stickers it can take.' : st.stkPick ? 'Click the gun where it goes.' : names.length ? 'Pick a sticker, then click the gun where it goes.' : '')}</span>`}</div>
+      <div class="stk-act">${st.stkAt ? `<button class="btn small buy" data-gstkapply ${ShopUI.ready ? 'disabled' : ''}>Stick it on <small>(for good)</small></button> <button class="btn small" data-gstkmove>Move it</button>`
+        : `<span>${Pad.text(full ? 'This gun has all the stickers it can take.' : st.stkPick ? 'Click the gun where it goes.' : names.length ? 'Pick a sticker, then click the gun where it goes.' : '')}</span>`}</div>
       <p class="stk-hint">Shift + scroll: size · Ctrl + scroll: turn · a sticker's on its gun for good, wherever the gun goes</p>`;
   }
 
   // ------------------------------------------------------------------ html
   function html() {
-    const Me = G.Me, w = weapon();
+    const Me = G_Me, w = weapon();
     if (!w) return '<div class="gs-empty">No weapon to work on.</div>';
     const def = w.def, build = def.build, slots = GS.visibleSlots(def.id, build);
     if (!st.slot || !slots.some((s: Slot) => s.slot === st.slot)) st.slot = slots[0] && slots[0].slot;
     const preview = st.hoverPart ? previewDef(def, st.slot, st.hoverPart) : null;
-    const nStk = Object.values(G.Stickers.owned()).reduce((a, n) => a + n, 0);
+    const nStk = Object.values(Stickers.owned()).reduce((a, n) => a + n, 0);
     const tabs = ['p', 's'].map((k) => { const ww = Me.weapons[k]; return `<button class="tab${st.wslot === k ? ' on' : ''}" data-gw="${k}" ${ww ? '' : 'disabled'}>${k === 'p' ? 'Primary' : 'Sidearm'}: ${ww ? ww.def.name : '—'}</button>`; }).join('')
       + `<button class="tab gs-stk-tab${st.stk ? ' on' : ''}" data-gstk>Stickers${nStk ? ` <small>×${nStk}</small>` : ''}</button>`;
     let slotRows = '';
     for (const s of slots) {
       const p = build[s.slot] && GS.PARTS[build[s.slot]];
       const bad = p && !GS.fitsSlot(s, p, def.id, build);
-      slotRows += `<div class="gs-slot${s.slot === st.slot ? ' on' : ''}${s.parent ? ' sub' : ''}${bad || (!p && s.req) ? ' misfit' : ''}" data-gslot="${s.slot}"><span>${GS.slotLabel(s)}${s.req ? '' : ' <small>opt.</small>'}${buyable(s.slot) ? ' <i class="gs-bang" title="Parts for it in the store">!</i>' : ''}</span><b>${p ? G.U.esc(p.name) : s.slot === 'loader' ? '<em>by hand</em>' : '<em>empty</em>'}<i>${bad ? `doesn't fit the ${G.U.esc(GS.ifaceName(s.mount))}: it won't fire` : G.U.esc(GS.ifaceName(s.mount))}</i></b></div>`;
+      slotRows += `<div class="gs-slot${s.slot === st.slot ? ' on' : ''}${s.parent ? ' sub' : ''}${bad || (!p && s.req) ? ' misfit' : ''}" data-gslot="${s.slot}"><span>${GS.slotLabel(s)}${s.req ? '' : ' <small>opt.</small>'}${buyable(s.slot) ? ' <i class="gs-bang" title="Parts for it in the store">!</i>' : ''}</span><b>${p ? U.esc(p.name) : s.slot === 'loader' ? '<em>by hand</em>' : '<em>empty</em>'}<i>${bad ? `doesn't fit the ${U.esc(GS.ifaceName(s.mount))}: it won't fire` : U.esc(GS.ifaceName(s.mount))}</i></b></div>`;
     }
     // parts that fit the picked slot: fitted, in your stash, for sale (his, then Timberline's), then the rest (out of stock / later)
     const cur = slots.find((s: Slot) => s.slot === st.slot);
@@ -444,7 +458,7 @@ const G_GunsmithUI = (() => {
       const plainOut = (p: Part) => (cur.slot === 'grip' ? (skinned ? GS.plainGrip(p) : GS.plainHere(p, def.id)) : !!p.skin && (p.alt || GS.sameFamily(fitted, p) || famStashed(p)));
       const parts = GS.compatible(cur.mount).filter((p: Part) => GS.fitsLen(p, def.id, build) && (!p.factory || p.plat === def.id || (Me.stash || {})[p.id] || build[cur.slot] === p.id) && !(p.not || []).includes(def.id) && (!plainOut(p) || own(p)));
       const rank = (p: Part) => (build[cur.slot] === p.id ? 0 : (Me.stash || {})[p.id] ? 1 : atShowcase(p) && !needed(p) ? 3 : forSale(p) ? 2 : 4);
-      parts.sort((a: Part, b: Part) => rank(a) - rank(b) || +G.Shop.wished(b.id) - +G.Shop.wished(a.id) || (a.len != null && b.len != null ? a.len - b.len : 0) || a.price - b.price); // (barrels: by length)
+      parts.sort((a: Part, b: Part) => rank(a) - rank(b) || +Shop.wished(b.id) - +Shop.wished(a.id) || (a.len != null && b.len != null ? a.len - b.len : 0) || a.price - b.price); // (barrels: by length)
       let head = -1;
       for (const p of parts) {
         const r = rank(p), n = (Me.stash || {})[p.id] || 0, factoryHere = p.factory && p.plat === def.id;
@@ -456,12 +470,12 @@ const G_GunsmithUI = (() => {
         }
         let action;
         if (r === 0 && !(skinned && skins.length > 1)) action = cur.req ? '<span class="tag">Fitted</span>' : `<button class="btn small" data-gremove="${cur.slot}">Remove</button>`;
-        else if (r === 0) action = `<select class="gs-skin" data-gskin ${G.Shop.ready ? 'disabled' : ''}>${skins.map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>`;
-        else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${G.U.fmt(GS.sellPrice(p))}</button>${p.skin && GS.skinsOf(def.id, p).length > 1 ? ` <select class="gs-skin" data-gskinstash="${p.id}" ${G.Shop.ready ? 'disabled' : ''}>${GS.skinsOf(def.id, p).map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${G.U.esc(q.skinName || q.name)}</option>`).join('')}</select>` : ''}`;
-        else if (r === 2 || r === 3) action = `<button class="btn small buy" data-ginstall="${p.id}" ${Me.credits < GS.buyPrice(p) ? 'disabled' : ''}>¢${G.U.fmt(GS.buyPrice(p))}</button>`;
-        else action = `<span class="tag">${factoryHere ? 'Comes with the gun' : p.tier > Math.min(3, 1 + Math.floor((G.Shop.level || 1) / 2)) ? 'Available later' : 'Out of stock'}</span>`;
-        list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 4 ? ' na' : ''}${G.Shop.wished(p.id) ? ' wished' : ''}" data-gpart="${p.id}">
-          <div class="gs-pn">${G.Shop.star(p.id)}<small>${G.U.esc(p.brand)}</small>${G.U.esc(p.name)}${fitsLine(p, def.id)}</div>
+        else if (r === 0) action = `<select class="gs-skin" data-gskin ${ShopUI.ready ? 'disabled' : ''}>${skins.map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${U.esc(q.skinName || q.name)}</option>`).join('')}</select>`;
+        else if (r === 1) action = `<button class="btn small buy" data-ginstall="${p.id}">Fit (stash ×${n})</button> <button class="btn small" data-gsell="${p.id}">Sell ¢${U.fmt(GS.sellPrice(p))}</button>${p.skin && GS.skinsOf(def.id, p).length > 1 ? ` <select class="gs-skin" data-gskinstash="${p.id}" ${ShopUI.ready ? 'disabled' : ''}>${GS.skinsOf(def.id, p).map((q: any) => `<option value="${q.id}"${q === p ? ' selected' : ''}>${U.esc(q.skinName || q.name)}</option>`).join('')}</select>` : ''}`;
+        else if (r === 2 || r === 3) action = `<button class="btn small buy" data-ginstall="${p.id}" ${Me.credits < GS.buyPrice(p) ? 'disabled' : ''}>¢${U.fmt(GS.buyPrice(p))}</button>`;
+        else action = `<span class="tag">${factoryHere ? 'Comes with the gun' : p.tier > Math.min(3, 1 + Math.floor((Shop.level || 1) / 2)) ? 'Available later' : 'Out of stock'}</span>`;
+        list += `<div class="gs-part${r === 0 ? ' fitted' : ''}${r === 4 ? ' na' : ''}${Shop.wished(p.id) ? ' wished' : ''}" data-gpart="${p.id}">
+          <div class="gs-pn">${ShopUI.star(p.id)}<small>${U.esc(p.brand)}</small>${U.esc(p.name)}${fitsLine(p, def.id)}</div>
           <div class="gs-pe">${partEffects(p, def.id) || '<span>—</span>'}</div>
           <div class="gs-pa">${action}</div></div>`;
       }
@@ -469,7 +483,7 @@ const G_GunsmithUI = (() => {
     return `<div class="gs-wrap">
       <div class="gs-tabs">${tabs}</div>
       <div class="gs-main">
-        <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div id="gsDots" class="gs-dots"></div><div class="gs-hint">${G.Pad.text(st.stk ? 'Drag to turn · scroll to zoom · click the gun to put the sticker there' : 'Drag to turn · scroll to zoom · click a part or a dot')}</div></div>
+        <div class="gs-left"><div class="gs-view"><div id="gsHover" class="gs-hover"></div><div id="gsDots" class="gs-dots"></div><div class="gs-hint">${Pad.text(st.stk ? 'Drag to turn · scroll to zoom · click the gun to put the sticker there' : 'Drag to turn · scroll to zoom · click a part or a dot')}</div></div>
         ${st.stk ? `<div class="gs-list gs-stk">${stkHtml(w)}</div>` : `<div class="gs-list"><div class="gs-sub">${cur ? GS.slotLabel(cur) + (cur.req ? '' : ' (optional)') : ''}</div>${list}</div>`}</div>
         <div class="gs-side"><div class="gs-title">${def.name}${def.modified ? ' <small>CUSTOM</small>' : ''}${def.missing.length ? ' <small class="broken">WON\'T FIRE</small>' : ''}</div>
           <div class="gs-slots">${slotRows}</div>
@@ -488,11 +502,16 @@ const G_GunsmithUI = (() => {
   function show(container: HTMLElement) {
     if (!renderer) init();
     container.classList.add('gs-host');
+    // (the list and side column scroll on their own, css .gs-list: kept where they were across a redraw of the same slot's list)
+    const key = `${st.wslot}|${st.slot}|${st.stk ? 1 : 0}`, l0 = container.querySelector('.gs-list'), s0 = container.querySelector('.gs-side');
+    const keep = container.dataset.gsKey === key && l0 ? [l0.scrollTop, s0 ? s0.scrollTop : 0] : null;
     container.innerHTML = html();
+    container.dataset.gsKey = key;
+    if (keep) { const l1 = container.querySelector('.gs-list'), s1 = container.querySelector('.gs-side'); if (l1) l1.scrollTop = keep[0]; if (s1) s1.scrollTop = keep[1]; }
     const w = weapon();
     if (!container.dataset.gsInput) { container.dataset.gsInput = 1 as any; container.addEventListener('input', (e: Event) => { if (container.classList.contains('gs-host')) stkInput(e); }); } // (the sticker tool's sliders)
     if (w) {
-      G.GunModels.preload([w.def]); // (every pack of this gun's platform, so a part swap shows at once)
+      GunModels.preload([w.def]); // (every pack of this gun's platform, so a part swap shows at once)
       container.querySelector('.gs-view')!.prepend(canvas);
       setModel(st.hoverPart ? previewDef(w.def, st.slot!, st.hoverPart) : w.def);
       paint();
@@ -502,15 +521,15 @@ const G_GunsmithUI = (() => {
   function refresh() { const el = document.getElementById('shopItems'); if (el && el.classList.contains('gs-host')) show(el); }
   function onClick(e: Event) {
     const t = e.target as any;
-    const gw = t.closest('[data-gw]'); if (gw && !gw.disabled) { st.wslot = gw.dataset.gw; st.slot = null; st.hoverPart = null; st.hoverSlot = null; st.stkAt = null; st.stkHover = null; view.auto = !st.stk; G.Audio.click(); return refresh(); }
+    const gw = t.closest('[data-gw]'); if (gw && !gw.disabled) { st.wslot = gw.dataset.gw; st.slot = null; st.hoverPart = null; st.hoverSlot = null; st.stkAt = null; st.stkHover = null; view.auto = !st.stk; Audio.click(); return refresh(); }
     // the sticker tool: on and off, a sticker picked, stuck on, or put somewhere else
-    if (t.closest('[data-gstk]')) { st.stk = !st.stk; st.stkAt = null; st.stkHover = null; st.hoverPart = null; st.hoverSlot = null; st.stkDirty = true; if (st.stk) view.auto = false; G.Audio.click(); return refresh(); }
-    const sp = t.closest('[data-gstkpick]'); if (sp) { st.stkPick = st.stkPick === sp.dataset.gstkpick ? null : sp.dataset.gstkpick; st.stkDirty = true; G.Audio.click(); return stkPanel(); }
+    if (t.closest('[data-gstk]')) { st.stk = !st.stk; st.stkAt = null; st.stkHover = null; st.hoverPart = null; st.hoverSlot = null; st.stkDirty = true; if (st.stk) view.auto = false; Audio.click(); return refresh(); }
+    const sp = t.closest('[data-gstkpick]'); if (sp) { st.stkPick = st.stkPick === sp.dataset.gstkpick ? null : sp.dataset.gstkpick; st.stkDirty = true; Audio.click(); return stkPanel(); }
     if (t.closest('[data-gstkapply]')) return stickOn();
-    if (t.closest('[data-gstkmove]')) { st.stkAt = null; st.stkDirty = true; G.Audio.click(); return stkPanel(); }
-    const gs = t.closest('[data-gslot]'); if (gs) { st.slot = gs.dataset.gslot; st.hoverPart = null; G.Audio.click(); return refresh(); }
-    const gd = t.closest('[data-gdot]'); if (gd) { st.slot = gd.dataset.gdot; st.hoverPart = null; G.Audio.click(); return refresh(); }
-    const gwish = t.closest('[data-wish]'); if (gwish) { G.Shop.toggleWish(gwish.dataset.wish); G.Audio.click(); return refresh(); }
+    if (t.closest('[data-gstkmove]')) { st.stkAt = null; st.stkDirty = true; Audio.click(); return stkPanel(); }
+    const gs = t.closest('[data-gslot]'); if (gs) { st.slot = gs.dataset.gslot; st.hoverPart = null; Audio.click(); return refresh(); }
+    const gd = t.closest('[data-gdot]'); if (gd) { st.slot = gd.dataset.gdot; st.hoverPart = null; Audio.click(); return refresh(); }
+    const gwish = t.closest('[data-wish]'); if (gwish) { Shop.toggleWish(gwish.dataset.wish); Audio.click(); return refresh(); }
     const gi = t.closest('[data-ginstall]'); if (gi && !gi.disabled) return install(st.slot!, gi.dataset.ginstall);
     const gr = t.closest('[data-gremove]'); if (gr) return remove(gr.dataset.gremove);
     const gl = t.closest('[data-gsell]'); if (gl) return sell(gl.dataset.gsell);
@@ -542,5 +561,3 @@ const G_GunsmithUI = (() => {
 
   return { show, hide, onClick, onChange, onHover, refresh, state: st, partEffects, statsHtml, deltaHtml, fitsLine, _setModel: (d: WeaponDef) => setModel(d), _view: view, _canvas: () => canvas, _model: () => model };
 })();
-G.GunsmithUI = G_GunsmithUI;
-interface GameModules { GunsmithUI: typeof G_GunsmithUI; }

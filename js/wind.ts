@@ -1,4 +1,7 @@
 'use strict';
+import { Furniture } from './furniture.js';
+import { Sim } from './sim.js';
+import { U } from './util.js';
 // The wind on this screen (docs/level-data.md "Wind"). The host's simulation owns it (js/server.ts windTick: js/sim.ts windAt,
 // from the level's seed and the theme's mean speed, on the level's clock) and every half second tells everyone ('wind': w
 // [x, z, x1, z1], m/s: now, and half a second on). Here that's eased into: from what this screen shows when a message comes
@@ -10,7 +13,7 @@
 //  - the flags (flagpoles: js/furniture.ts R.flagpole, placed with the level): cloth hoisted at the top of each pole,
 //    streaming downwind, standing out further and fluttering faster the stronger it blows, limp in a calm. One material
 //    for all of them, its vertices waved in the shader (no bones, nothing per flag a frame but its turn).
-const G_Wind = (() => {
+export const Wind = (() => {
   const T = THREE;
   let from = { x: 0, z: 0 }, to = { x: 0, z: 0 }, t0 = 0, have = false;
   let flags: THREE.Object3D[] = [], mat: THREE.MeshLambertMaterial | null = null, tex: THREE.Texture | null = null, ph = 0, stand = 0.25;
@@ -20,12 +23,12 @@ const G_Wind = (() => {
     // the wind now, { x, z } m/s (where it's blowing to): eased between what the host said
     vec() {
       if (!have) return { x: 0, z: 0 };
-      const u = G.U.clamp((performance.now() - t0) / (G.Sim.WIND.SEND * 1000), 0, 1);
+      const u = U.clamp((performance.now() - t0) / (Sim.WIND.SEND * 1000), 0, 1);
       return { x: from.x + (to.x - from.x) * u, z: from.z + (to.z - from.z) * u };
     },
     // the wind at a point, or null where it doesn't reach (indoors, under a roof: js/sim.ts windy) or there's none
     at(map: LvMap | null | undefined, p: { x: number; y: number; z: number }) {
-      if (!this.mean || !have || !map || !G.Sim.windy(map, p.x, p.y, p.z)) return null;
+      if (!this.mean || !have || !map || !Sim.windy(map, p.x, p.y, p.z)) return null;
       return this.vec();
     },
     // the host's word ('wind', js/game.ts): the first of a level's taken as it is, the rest eased into
@@ -40,7 +43,7 @@ const G_Wind = (() => {
       this.mean = map.theme && map.theme.wind > 0 ? +map.theme.wind : 0;
       flags = [];
       const g = new T.Group(); g.name = 'flags';
-      const R = G.Furniture.R.flagpole;
+      const R = Furniture.R.flagpole;
       for (const p of map.propList || []) if (p.name === 'flagpole') {
         const F = R.flag, f = new T.Group();
         f.position.set(p.x, (p.gy || 0) + 0.3 + F.pole - F.top, p.z); // (the pole's top: on its footing's 0.3, js/furniture.ts)
@@ -52,7 +55,7 @@ const G_Wind = (() => {
     // a frame on: the flags turned downwind, how far they stand out and how fast they flutter
     update(dt: number) {
       if (!flags.length) return;
-      const v = this.vec(), s = Math.hypot(v.x, v.z), x = G.U.clamp(s / 9, 0, 1), want = 0.22 + 1.36 * x * x * (3 - 2 * x); // (from hanging, 0.22 rad off the pole, to straight out at 9 m/s)
+      const v = this.vec(), s = Math.hypot(v.x, v.z), x = U.clamp(s / 9, 0, 1), want = 0.22 + 1.36 * x * x * (3 - 2 * x); // (from hanging, 0.22 rad off the pole, to straight out at 9 m/s)
       stand += (want - stand) * (1 - Math.exp(-dt / 0.6)); // (cloth has weight: it takes a moment to rise and fall)
       ph += dt * (1.5 + 1.7 * s);
       uni.uStand.value = stand; uni.uPh.value = ph; uni.uAmp.value = 0.02 + 0.09 * Math.min(1, s / 8);
@@ -71,7 +74,7 @@ const G_Wind = (() => {
   function material() {
     if (mat) return mat;
     tex = flagTexture();
-    uni.uW.value = G.Furniture.R.flagpole.flag.w;
+    uni.uW.value = Furniture.R.flagpole.flag.w;
     mat = new T.MeshLambertMaterial({ map: tex, side: T.DoubleSide });
     mat.onBeforeCompile = (sh: any) => {
       Object.assign(sh.uniforms, uni);
@@ -105,5 +108,3 @@ const G_Wind = (() => {
   }
   return W;
 })();
-G.Wind = G_Wind;
-interface GameModules { Wind: typeof G_Wind; }

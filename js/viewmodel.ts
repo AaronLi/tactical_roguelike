@@ -1,37 +1,19 @@
 'use strict';
-// First-person extras and the third-person model, applied to a gun MODEL (a group of slot-tagged meshes, `part_<key>` nodes and
-// `info`: docs/models.md), not to the recipes' internals. The recipes (js/gunmodels.ts) or a .glb (js/glb.ts) make the geometry;
-// js/gunrig.ts binds its animation; this file adds what only the first person (or only the far-off view) needs:
-//
-//   G.Viewmodel.assemble(def, models)   the first-person gun: each model (a { group, info } with its sight windows) in a holder with
-//                                       its muzzle flashes, a reflex sight's reticle, a scope's lens, its display surfaces; the
-//                                       arms and animation bound on top (G.GunRig.bind via js/vmanim.ts prepare)
-//   G.Viewmodel.reflex(group, o)        a reflex sight's collimated reticle behind its window (o: info.reflex)
-//   G.Viewmodel.pipLens(group, o, def)  a scope's picture-in-picture lens (o: info.pip)
-//   G.Viewmodel.flash(color)            a muzzle flash sprite
-//   G.Viewmodel.surfaces(group)         the model's display_<name> meshes, each given a CanvasTexture to paint: { name: { mesh, canvas, ctx, tex, width, height } }
-//   G.Viewmodel.paintAmmo(s, left, per) a multi-barrel gun's display_ammo: the rounds left in each barrel
-//   G.Viewmodel.paintRange(s, text)     a rail ballistic computer's display_range: its seven-segment readout (rangeText(metres) makes the text)
-//   G.Viewmodel.worldProto(group, info) the third-person model of a gun: its meshes merged one per material, the magazine, a
-//                                       crossbow's bolt and strings and a bipod's legs pulled out on their own (cache it)
-//   G.Viewmodel.worldInstance(proto)    a group of it, sharing the proto's geometry
-//
-// The sight windows (info.reflex, info.pip) and the display surfaces are in the model contract (docs/models.md); a recipe's model
-// gives its windows to assemble alongside, as the kit recorded them.
-/** A reflex sight's window, in the gun's frame (metres; f: forward, y: up): the stencil mask's size and the reticle kind drawn in it. */
-interface VmReflex { f: number; y: number; w: number; h: number; round?: boolean; kind: string }
-/** A scope's ocular lens (the picture-in-picture one): r its radius. parent/pos: a lens that swings on a hinge (a magnifier's): the hinge's node (or its name) and the lens's place in it. */
-interface VmPip { f: number; y: number; r: number; parent?: THREE.Object3D | string; pos?: THREE.Vector3 | number[] }
-/** What a gun model gives the first person to put on it: its geometry, its anchors, its sight windows. */
-interface VmModel { group: THREE.Object3D; info: GunRigInfo & { muzzles: number[][]; sy: number; fSight: number; relief: number; cheek?: number | null; pistol?: boolean | null; reflex?: VmReflex | null; pip?: VmPip | null }; reflex?: VmReflex | null; pip?: VmPip | null }
+import { AMMO, ammoTypes, asCal, ballFor, boreTip, calOf, cartOf, chambered, flight } from './data.js';
+import { VMAnim } from './vmanim.js';
+import { R } from './render.js';
+import { TONE } from './tone.js';
+import { Game } from './game.js';
+import { Sim } from './sim.js';
+import { Wind } from './wind.js';
 /** A display surface (display_<name>): the canvas the game draws on and the texture that shows it on the mesh. Draw, then set tex.needsUpdate. */
 interface VmSurface { mesh: THREE.Mesh; canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D; tex: THREE.CanvasTexture; width: number; height: number }
-const G_Viewmodel = (() => {
+export const Viewmodel = (() => {
   const T = THREE;
 
   // ---------------------------------------------------------------- muzzle flash sprite
   function flash(color: number) {
-    const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.2), new T.MeshBasicMaterial({ map: G.R.flashTexture(), transparent: true, blending: T.AdditiveBlending, depthWrite: false, color }));
+    const m = new T.Mesh(new T.PlaneGeometry(0.2, 0.2), new T.MeshBasicMaterial({ map: R.flashTexture(), transparent: true, blending: T.AdditiveBlending, depthWrite: false, color }));
     m.visible = false;
     return m;
   }
@@ -119,14 +101,14 @@ const G_Viewmodel = (() => {
     ret.onBeforeRender = (r: THREE.WebGLRenderer, _s: THREE.Scene, cam: THREE.Camera) => {
       const ppt = (r.getDrawingBufferSize(new T.Vector2()).y / 2) * (cam as THREE.PerspectiveCamera).projectionMatrix.elements[5];
       u.pxPerTan.value = ppt; u.t.value = performance.now() / 1000;
-      u.nvDim.value = G.R.nv && G.R.nv.k > 0.5 ? G.R.NV_DIM : 1; // (night vision down: its NV setting, a dot dim enough not to bloom the tubes)
+      u.nvDim.value = R.nv && R.nv.k > 0.5 ? R.NV_DIM : 1; // (night vision down: its NV setting, a dot dim enough not to bloom the tubes)
       u.spanPx.value = Math.max(k.ring * MOA * ppt * 1.3 + 16, 48);
     };
     g.add(ret);
   }
 
   // ---------------------------------------------------------------- picture-in-picture scopes
-  // The ocular lens shows the world through the scope: G.R renders the scene from the lens along the scope's
+  // The ocular lens shows the world through the scope: R renders the scene from the lens along the scope's
   // axis with a field of view set by the magnification, into a texture this disk shows. The reticle is drawn
   // over it, and a dark crescent creeps in when your eye is off the scope's axis (the eyebox).
   // (dot, dotG, cdot and holo: a reflex sight's own reticle, seen through a magnifier)
@@ -135,12 +117,12 @@ const G_Viewmodel = (() => {
   // The crossbow's reticle (first focal plane: js/render.ts _renderPip says how big a mil is at this power, so it grows with
   // the picture and the marks are true at any power). In mils, on a canvas BDC_R either side of the centre:
   //   - a lit dot and, to pick it up at low power, a lit horseshoe; fine wires with heavy posts outside, a tick every mil near the middle
-  //   - down the post, a rung for each distance, for a broadhead (the shots' own sums, G.flight, zeroed as it comes): hold it on the
+  //   - down the post, a rung for each distance, for a broadhead (the shots' own sums, flight, zeroed as it comes): hold it on the
   //     target at that range. Each rung's a man's shoulders wide (0.5 m) at its range. Ticks on the left: the same for a bodkin
   //   - standing on the left wire, a man 1.75 m tall at each range, nearest furthest out: stand him on the wire and match him
   const BDC_R = 170, BDC_TEX = new Map();
   function bdcTex(def: any) {
-    const ball = G.ballFor(G.calOf(def)), tip = G.boreTip({ def }), hold = (am: string, d: number) => { const q = G.flight(def, am, tip, d)[d]; return q ? (-q.h / d) * 1000 : null; }, key = [10, 30, 100].map((d) => (hold(ball, d) || 0).toFixed(2)).join();
+    const ball = ballFor(calOf(def)), tip = boreTip({ def }), hold = (am: string, d: number) => { const q = flight(def, am, tip, d)[d]; return q ? (-q.h / d) * 1000 : null; }, key = [10, 30, 100].map((d) => (hold(ball, d) || 0).toFixed(2)).join();
     if (BDC_TEX.has(key)) return BDC_TEX.get(key);
     const S0 = 4096, s = S0 / (2 * BDC_R), c = document.createElement('canvas');
     c.width = c.height = S0;
@@ -168,7 +150,7 @@ const G_Viewmodel = (() => {
       label(String(d), hw + 0.9, y, TH);
     }
     // a bodkin's
-    const heavy = G.ammoTypes(G.calOf(def)).find((a) => a !== ball && (G.AMMO as Record<string, any>)[a].velK);
+    const heavy = ammoTypes(calOf(def)).find((a) => a !== ball && (AMMO as Record<string, any>)[a].velK);
     if (heavy) {
       for (const d of [20, 30, 40, 50, 60, 70, 80, 100]) {
         const y = hold(heavy, d);
@@ -176,7 +158,7 @@ const G_Viewmodel = (() => {
         line(0.16, ink, () => { g.moveTo(-1.8, y); g.lineTo(0, y); });
         if (d % 20 === 0 || d < 40 || d === 50 || d === 70) label(String(d), -2.3, y, TH * 0.72, 'right');
       }
-      label((G.AMMO as Record<string, any>)[heavy].tag, -2.3, hold(heavy, 20)! - TH * 0.95, TH * 0.6, 'right');
+      label((AMMO as Record<string, any>)[heavy].tag, -2.3, hold(heavy, 20)! - TH * 0.95, TH * 0.6, 'right');
     }
     // the men on the wire: 150 m nearest the middle, 20 m furthest out
     let x = -7.5;
@@ -201,7 +183,7 @@ const G_Viewmodel = (() => {
   //     1.8 m, a full standing figure: it is the figure a suspect is, and the bar stays long enough to read at 500 m. The torso, shoulder to hip (0.5 m, 0.95-1.45 m
   //     up), is the heavier part of each bar, for a target half behind cover (or a crouched man: his whole body is about this). A target of another size scales it.
   //   - HOLDOVER, under the middle: a tick every 100 m from 200 to 1100 (HOLDS), the odd hundreds numbered and longer (HOLD_LABEL), at the drop of the round that fires next (the chambered one) from this gun's bore as the zeroing
-  //     table has it turned (G.flight and G.boreTip, the sums every round is flown by), numbered 3, 5, 7, 9, 11. It is rebuilt when the load or the zero changes.
+  //     table has it turned (flight and boreTip, the sums every round is flown by), numbered 3, 5, 7, 9, 11. It is rebuilt when the load or the zero changes.
   //   - WINDAGE: ticks under the horizontal wire every half mil (the ballistic computer's cells), longer every 2.5, out to 10; and windage dots a mil apart on
   //     the 300 m and 500 m holdover rows (WIND_ROWS), 4 and 6 either side, those rows' numbers past them. Hold the dot for the wind's drift.
   //   - FOCAL PLANE: first (ffp: the marks grow with the picture, true at any power) or second (sfp: they stay one size on the glass, true at one power only, the
@@ -214,14 +196,14 @@ const G_Viewmodel = (() => {
   const HOLDS = [200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100], HOLD_LABEL = [300, 500, 700, 900, 1100];
   const WIND_ROWS = [300, 500], dotsOf = (i: number) => (WIND_ROWS.includes(HOLDS[i]) ? 1 + HOLDS[i] / 100 : 0);
   function nextRound(def: any, w: any) {
-    const cdef = G.asCal(def, G.cartOf(w.def ? w : { def, rl: w.rl }) || G.calOf(def));
-    const am = (G.chambered(def) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || G.ballFor(G.calOf(def));
+    const cdef = asCal(def, cartOf(w.def ? w : { def, rl: w.rl }) || calOf(def));
+    const am = (chambered(def) && w.chamber) || (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : null) || w.ammo || ballFor(calOf(def));
     return { cdef, am };
   }
   function rangeHolds(def: any, w: any): { am: string; holds: (number | null)[] } {
     const { cdef, am } = nextRound(def, w);
     if (def.cls === 'RAIL') return { am, holds: HOLDS.map(() => null) }; // (a slug that flies flat: nothing to hold over)
-    const p = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), HOLDS[HOLDS.length - 1]);
+    const p = flight(cdef, am, boreTip({ def: cdef, clicks: w.clicks || 0 }), HOLDS[HOLDS.length - 1]);
     return { am, holds: HOLDS.map((d) => (p[d] ? (-p[d].h / d) * 1000 : null)) };
   }
   function rangeTex(holds: (number | null)[]) {
@@ -299,7 +281,7 @@ const G_Viewmodel = (() => {
   // windage marks (every scope over 4×: docs/level-data.md "Wind"): a mark every WIND_STEP mil (a computer's cell), a longer one every WIND_MAJOR of them, out to WIND_MAX mil
   const WIND_STEP = POI_CELL, WIND_MAJOR = 5, WIND_MAX = 10;
   const PIP_VS = 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }';
-  const PIP_FS = G.R.TONE + `
+  const PIP_FS = TONE + `
     uniform sampler2D map; uniform float live; uniform vec2 eye; uniform int ret; uniform vec3 illum;
     uniform int calc; uniform sampler2D dmap; uniform vec3 poi; // (a ballistic computer: its readout's picture; the marker's cell, in cells from the middle, and whether there is one)
     uniform sampler2D rmap; uniform float pmil; // (a first-focal-plane reticle: its picture, and how much of the lens's radius a mil is at this power)
@@ -368,7 +350,7 @@ const G_Viewmodel = (() => {
     const reticle = def.reticle || 'cross';
     if (reticle === 'thermal') return thermalLens(g, o, def);
     const mat = new T.ShaderMaterial({
-      uniforms: { map: { value: G.R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: G.ballFor(G.calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
+      uniforms: { map: { value: R.pipTexture() }, live: { value: 0 }, eye: { value: new T.Vector2() }, ret: { value: PIP_RETICLE[reticle] || 0 }, illum: { value: new T.Color(PIP_ILLUM[reticle] || 0) }, rmap: { value: reticle === 'bdc' ? bdcTex(def) : reticle === 'range' ? rangeTex(rangeHolds(def, { def, clicks: 0, ammo: ballFor(calOf(def)) }).holds) : null }, pmil: { value: 1 }, calc: { value: def.calc || 0 }, dmap: { value: null }, poi: { value: new T.Vector3() } },
       vertexShader: PIP_VS, fragmentShader: PIP_FS, toneMapped: false, // (it rolls off the picture itself: bpTone)
     });
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
@@ -399,17 +381,17 @@ const G_Viewmodel = (() => {
       const poi = mat.uniforms.poi.value;
       if (def.calc < 2 || r == null || r < 1) { poi.z = 0; return; }
       const { cdef, am } = nextRound(def, w), k = `${cdef.id}|${am}|${w.clicks || 0}`;
-      if (k !== pathK) { pathK = k; path = G.flight(cdef, am, G.boreTip({ def: cdef, clicks: w.clicks || 0 }), POI_FAR); }
+      if (k !== pathK) { pathK = k; path = flight(cdef, am, boreTip({ def: cdef, clicks: w.clicks || 0 }), POI_FAR); }
       const q = path[Math.round(r)]; // (past the round's reach there is no impact to show)
       if (!q) { poi.z = 0; return; }
       // and off sideways with the wind (js/wind.ts: the level's, as the host last said): the crosswind across the line of sight
-      // times the round's lag time at that range (G.flight's lag; js/sim.ts windStep), by how much of the way there is out in
+      // times the round's lag time at that range (flight's lag; js/sim.ts windStep), by how much of the way there is out in
       // it (eight points along the line: from a room out through a window, only the part outside; into a room, none of it)
       let side = 0;
-      if (G.Wind && G.Wind.mean && q.lag) {
-        const cam = G.R.scopeCam || G.R.camera, f = cam.getWorldDirection(new T.Vector3()), o = cam.getWorldPosition(new T.Vector3()), wv = G.Wind.vec(), rl = Math.hypot(f.x, f.z), map = G.Game.map;
+      if (Wind && Wind.mean && q.lag) {
+        const cam = R.scopeCam || R.camera, f = cam.getWorldDirection(new T.Vector3()), o = cam.getWorldPosition(new T.Vector3()), wv = Wind.vec(), rl = Math.hypot(f.x, f.z), map = Game.map;
         let out = 0;
-        for (let i = 0; i < 8; i++) { const s = r * (i + 0.5) / 8; if (G.Sim.windy(map, o.x + f.x * s, o.y + f.y * s, o.z + f.z * s)) out++; }
+        for (let i = 0; i < 8; i++) { const s = r * (i + 0.5) / 8; if (Sim.windy(map, o.x + f.x * s, o.y + f.y * s, o.z + f.z * s)) out++; }
         if (out && rl > 1e-3) side = ((wv.x * -f.z + wv.z * f.x) / rl) * q.lag * out / 8; // (metres to the right: the wind's part along the right of the line, -f.z, f.x)
       }
       poi.set(Math.round(((side / r) * 1000) / POI_CELL), Math.round(((q.h / r) * 1000) / POI_CELL), 1);
@@ -419,22 +401,21 @@ const G_Viewmodel = (() => {
       if (!w) return;
       if (def.calc && range) calcStep(w, range);
       if (reticle !== 'range') return;
-      const k = `${(G.chambered(w.def) && w.chamber) || (w.tube && w.tube[w.tube.length - 1]) || w.ammo}|${w.clicks || 0}`;
+      const k = `${(chambered(w.def) && w.chamber) || (w.tube && w.tube[w.tube.length - 1]) || w.ammo}|${w.clicks || 0}`;
       if (k === sig) return;
       sig = k; mat.uniforms.rmap.value = rangeTex(rangeHolds(def, w).holds);
     };
     return { disk, r: o.r, mat, mag: def.magnif || 4, fp: def.fp as string | undefined, fpMag: (def.fpMag || def.magnif || 4) as number, sync };
   }
 
-
   // A digital thermal sight's eyepiece (op.th.0): a screen, not a lens. js/render.ts _renderPip draws its sensor's picture
-  // (heat: _heatPass, from the sight along its axis at its widest), and this shows it (G.R.thermalMaterial): zoomed in digitally
+  // (heat: _heatPass, from the sight along its axis at its widest), and this shows it (R.thermalMaterial): zoomed in digitally
   // to the power it's set to (the sensor's pixels growing as it does), in the palette picked (w.thPal: T or the comms wheel),
   // with its reticle and a readout of the power, the palette and the battery painted on a canvas over it.
   const TH_PAL = ['WH', 'BH', 'IRON'];
   function thermalLens(g: THREE.Object3D, o: VmPip, def: any) {
     const cv = document.createElement('canvas'); cv.width = cv.height = 256;
-    const osd = new T.CanvasTexture(cv), mat = G.R.thermalMaterial(osd), cx = cv.getContext('2d')!;
+    const osd = new T.CanvasTexture(cv), mat = R.thermalMaterial(osd), cx = cv.getContext('2d')!;
     const disk = new T.Mesh(new T.CircleGeometry(o.r, 48), mat);
     disk.position.set(0, o.y, -o.f); g.add(disk);
     const L = def.magLevels || [def.magnif || 2], pip = { disk, r: o.r, mat, mag: L[0], mag0: L[0], fp: undefined as string | undefined, fpMag: L[0], thermal: true, heatRT: null as THREE.WebGLRenderTarget | null, sync: (w: any) => {} };
@@ -541,7 +522,7 @@ const G_Viewmodel = (() => {
     const hip = def.akimbo ? new T.Vector3(0, -0.15, -0.34) : info.pistol ? new T.Vector3(0.1, -0.1 - info.sy, -0.32) : new T.Vector3(0.1, -0.1 - info.sy * 0.6, adsZ - 0.1);
     root.userData = { flash: flashes[0], flashes, dial: dials[0] || null, sightY: info.sy, hip, ads, anim: info.anim, info, holders, pip };
     if (Object.keys(displays).length) root.userData.displays = displays;
-    G.VMAnim.prepare(root, def); // arms, reload and inspect animation (js/vmanim.ts), bound to the parts by js/gunrig.ts
+    VMAnim.prepare(root, def); // arms, reload and inspect animation (js/vmanim.ts), bound to the parts by js/gunrig.ts
     return root;
   }
 
@@ -679,7 +660,7 @@ const G_Viewmodel = (() => {
       }
       g.userData.xb.slack.visible = false;
     }
-    if (proto.legs.length) { // (the bipod: a node whose children are the legs, each at its hinge with its extras.leg; G.GunRig.bipodPose turns them)
+    if (proto.legs.length) { // (the bipod: a node whose children are the legs, each at its hinge with its extras.leg; GunRig.bipodPose turns them)
       const bp = new T.Group();
       for (const l of proto.legs) {
         const sub = new T.Group();
@@ -694,5 +675,3 @@ const G_Viewmodel = (() => {
 
   return { assemble, reflex, pipLens, flash, surfaces, paintAmmo, paintRange, rangeText, worldProto, worldInstance, merge };
 })();
-G.Viewmodel = G_Viewmodel;
-interface GameModules { Viewmodel: typeof G_Viewmodel; }

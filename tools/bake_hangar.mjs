@@ -12,6 +12,7 @@
 //   assets/models/scenes/index.json    { version, scenes: { hangar: { file, data, bytes, tris, meshes, nodes, anchors } } }
 // The files go into the model bundle (tools/bundle_models.mjs; `npm run bake:hangar` runs both). Needs the compiled game (tsc).
 //   node tools/bake_hangar.mjs [--keep-raw]
+import { runScripts } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import fs from 'fs'; import vm from 'vm'; import path from 'path'; import os from 'os';
 import * as THREE_NS from 'three';
 import { GLTFExporter } from 'three/examples/jsm/exporters/GLTFExporter.js';
@@ -24,16 +25,18 @@ const args = process.argv.slice(2);
 const OUT = path.join(ROOT, 'assets/models/scenes/'), DIST = path.join(ROOT, 'dist/js/'), THREE_VER = JSON.parse(fs.readFileSync(path.join(ROOT, 'node_modules/three/package.json'), 'utf8')).version;
 if (!fs.existsSync(DIST + 'hangar.js')) { console.error('dist/js/hangar.js missing: run tsc first (npm run bake:hangar does)'); process.exit(1); }
 
-// ---- the game, as much of it as draws the hangar: its scripts in the page's order (index.html), in a vm whose document makes node's canvases
-const WANT = new Set(['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'levelview', 'scars', 'damage', 'stickers', 'course', 'range', 'highlights', 'hangar']);
+// ---- the game, as much of it as draws the hangar: its files in the page's order (the imports of js/main.ts, the page's entry file), in a vm whose document makes node's canvases
+const WANT = new Set(['util', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'furnmesh', 'levelview', 'scars', 'damage', 'stickers', 'course', 'range', 'highlights', 'hangar']);
 async function loadGame() {
-  const NC = await nodeCanvas(), order = [...fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8').matchAll(/src="dist\/js\/([a-z-]+)\.js"/g)].map((m) => m[1]).filter((f) => WANT.has(f));
+  const NC = await nodeCanvas(), order = [...fs.readFileSync(path.join(ROOT, 'js/main.ts'), 'utf8').matchAll(/^import '\.\/([a-z-]+)\.js';/gm)].map((m) => m[1]).filter((f) => WANT.has(f));
   const ctx = { console, Math, JSON, Set, Map, WeakMap, WeakSet, Object, Array, Number, String, Boolean, Uint8Array, Uint8ClampedArray, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, ArrayBuffer, DataView, Infinity, NaN, isFinite, parseInt, parseFloat, Error, TypeError, RangeError, Symbol, Date, Proxy, Reflect, Promise, performance, THREE: { ...THREE_NS },
     document: { body: { prepend() {}, append() {}, appendChild() {} }, addEventListener() {}, getElementById: () => null, querySelector: () => null }, location: { search: '' }, navigator: { userAgent: 'node' }, URLSearchParams, addEventListener() {}, setTimeout, clearTimeout, setInterval, clearInterval, requestAnimationFrame: () => 0 };
+  // (js/hangar.ts imports the screens, which read these as they load; the hangar's drawing doesn't use them)
+  Object.assign(ctx, { matchMedia: () => ({ matches: false, addEventListener() {} }), devicePixelRatio: 1, innerWidth: 1280, innerHeight: 720 });
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx; ctx.G = {};
   NC.install(ctx); NC.install(globalThis); // (the game's canvases, and the exporter's)
   vm.createContext(ctx);
-  for (const f of order) vm.runInContext(fs.readFileSync(DIST + f + '.js', 'utf8'), ctx, { filename: f + '.js' });
+  await runScripts(ctx, DIST, order);
   return { G: ctx.G, T: ctx.THREE };
 }
 

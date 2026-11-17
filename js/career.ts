@@ -1,63 +1,60 @@
 'use strict';
-// Your career: what you've done over every run, and a log of the runs themselves, kept in this browser (G.U.store 'career' and
-// 'runs') and, with the cloud saves on, in your account (js/cloud.ts, docs/cloud.md). Only your own: each player keeps theirs,
-// host or not. It hears what your screen hears (js/game.ts: the host's word of kills, arrests, the phases; js/player.ts: you
-// going down, dying), never the simulation itself, which is in its own thread (docs/threads.md). Nothing here changes play.
-// A run: from the lobby's Deploy (the host's 'newrun'), or from joining one that's going, to the game over table (wiped), or
-// to leaving it (left). One the page was closed in the middle of is put down as abandoned the next time the page loads.
-interface CareerBest { id: string; start: number; lvl: number; credits: number; squad: number; outcome: string }
-interface CareerStats {
-  v: number; runs: number; runsDone: number; deepest: number; acts: number; levels: number; kills: number; incaps: number; headshots: number;
-  arrests: number; rescued: number; civKilled: number; unauth: number; deaths: number; downs: number; revives: number; evidence: number; credits: number;
-  bestLevel: CareerBest | null; bestCredits: CareerBest | null;
-}
-// a level of a run: where, and what you did in it (report: the squad's, as the hangar's screen shows it: js/shop.ts render)
-interface CareerLevel {
-  n: number; th: number; theme: string; night: boolean; stronghold: boolean; boss: boolean; cleared: boolean;
-  kills: number; incaps: number; headshots: number; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number;
-  downs: number; deaths: number; revives: number; credits: number; report: Record<string, number | boolean> | null;
-}
-interface CareerRun {
-  id: string; v: number; start: number; end: number | null; solo: boolean; host: boolean; squad: number; joined: number | null;
-  outcome: 'playing' | 'wiped' | 'left' | 'abandoned'; deepest: number; credits: number; kills: number; arrests: number; levels: CareerLevel[];
-  t: number; u: number; sy: number; // (last touched; its version, and the version the cloud has: js/cloud.ts)
-}
-const G_Career = (() => {
+import { Hooks, U } from './util.js';
+import { THEMES } from './data.js';
+import { Game } from './game.js';
+import { Net } from './net.js';
+import { Route } from './route.js';
+// (tools/cloud.test.mjs loads util, cloudconfig, career and cloud and answers the imports of the page's other files with stand-ins: tools/vm_game.mjs `stubs`.)
+export const Career = (() => {
   const V = 1, KEEP = 50;
   // the counters, and their columns in the career table (supabase/migrations)
   const COLS: Record<string, string> = { runs: 'runs', runsDone: 'runs_done', acts: 'acts', levels: 'levels', kills: 'kills', incaps: 'incaps', headshots: 'headshots', arrests: 'arrests', rescued: 'rescued', civKilled: 'civ_killed', unauth: 'unauth', deaths: 'deaths', downs: 'downs', revives: 'revives', evidence: 'evidence', credits: 'credits' };
-  const zero = (): CareerStats => ({ v: V, runs: 0, runsDone: 0, deepest: 0, acts: 0, levels: 0, kills: 0, incaps: 0, headshots: 0, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, deaths: 0, downs: 0, revives: 0, evidence: 0, credits: 0, bestLevel: null, bestCredits: null });
+  const zero = (): CareerStats => ({ v: V, runs: 0, runsDone: 0, deepest: 0, acts: 0, levels: 0, kills: 0, incaps: 0, headshots: 0, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, deaths: 0, downs: 0, revives: 0, evidence: 0, credits: 0, bestLevel: null, bestCredits: null, mis: {}, hardest: 0, bestPay: 0, bigClass: 0, bestRank: 0 });
   const num = (x: unknown) => (typeof x === 'number' && isFinite(x) ? x : 0);
+  // the maxima, and their columns (deepest, then the missions' bests: js/space.ts mdone)
+  const MAXES: Record<string, string> = { deepest: 'deepest', hardest: 'hardest', bestPay: 'best_pay', bigClass: 'big_class', bestRank: 'best_rank' };
+  // the missions' counters' names (as the career table's missions object has them: supabase/migrations/20261116000000_space.sql)
+  const MIS_KEY = /^[a-z0-9_]{1,24}$/;
   // what's stored, made whole whatever shape it's in (an older version, a hand-edited one)
   function clean(s: any): CareerStats {
     const z = zero();
     if (!s || typeof s !== 'object') return z;
     for (const k of Object.keys(COLS)) (z as any)[k] = Math.max(0, Math.round(num(s[k])));
-    z.deepest = Math.max(0, Math.round(num(s.deepest)));
+    for (const k of Object.keys(MAXES)) (z as any)[k] = Math.max(0, Math.round(num(s[k])));
+    if (s.mis && typeof s.mis === 'object') for (const [k, v] of Object.entries(s.mis)) if (MIS_KEY.test(k)) z.mis[k] = Math.max(0, Math.round(num(v)));
     z.bestLevel = s.bestLevel && typeof s.bestLevel === 'object' ? s.bestLevel : null;
     z.bestCredits = s.bestCredits && typeof s.bestCredits === 'object' ? s.bestCredits : null;
     return z;
   }
   let stats: CareerStats | null = null, list: CareerRun[] | null = null, run: CareerRun | null = null, lvl: CareerLevel | null = null;
-  const S = () => stats || (stats = clean(G.U.store.get('career', null)));
-  const L = (): CareerRun[] => list || (list = (G.U.store.get('runs', []) || []).filter((r: any) => r && typeof r.id === 'string' && Array.isArray(r.levels)));
-  const keepStats = () => G.U.store.put('career', S());
+  const S = () => stats || (stats = clean(U.store.get('career', null)));
+  const L = (): CareerRun[] => list || (list = (U.store.get('runs', []) || []).filter((r: any) => r && typeof r.id === 'string' && Array.isArray(r.levels)));
+  const keepStats = () => U.store.put('career', S());
   function keepRuns() {
     const l = L();
     l.sort((a, b) => b.start - a.start);
     // the newest KEEP (the cloud keeps the rest); the ones the cloud hasn't got yet go last
     while (l.length > KEEP) { let i = l.length - 1; for (let j = l.length - 1; j >= 0; j--) if (l[j].sy === l[j].u && l[j] !== run) { i = j; break; } l.splice(i, 1); }
-    G.U.store.put('runs', l);
+    U.store.put('runs', l);
   }
   const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => { const r = (Math.random() * 16) | 0; return (c === 'x' ? r : (r & 3) | 8).toString(16); }));
   // one more of something: here, and to the account (js/cloud.ts add: queued till it's sent)
   function bump(k: string, n = 1) {
     if (!n) return;
     (S() as any)[k] += n; keepStats();
-    if (G.Cloud) G.Cloud.add({ [k]: n });
+    if (Hooks.cloud) Hooks.cloud.add({ [k]: n });
   }
-  function deepest(n: number) {
-    if (n > S().deepest) { S().deepest = n; keepStats(); if (G.Cloud) G.Cloud.add({}, { deepest: n }); }
+  // a maximum: kept if it's a new best, here and to the account
+  function best(k: string, n: number) {
+    n = Math.max(0, Math.round(num(n)));
+    if (n > (S() as any)[k]) { (S() as any)[k] = n; keepStats(); if (Hooks.cloud) Hooks.cloud.add({}, { [k]: n }); }
+  }
+  const deepest = (n: number) => best('deepest', n);
+  // one more of a mission's counter (to the account as 'm.<name>': js/cloud.ts sends those as career_add's missions)
+  function misBump(k: string, n = 1) {
+    if (!n || !MIS_KEY.test(k)) return;
+    const m = S().mis; m[k] = (m[k] || 0) + n; keepStats();
+    if (Hooks.cloud) Hooks.cloud.add({ ['m.' + k]: n });
   }
   function touch(push = false) {
     if (!run) return;
@@ -65,15 +62,15 @@ const G_Career = (() => {
     if (push) run.u++;
     if (!L().includes(run)) L().unshift(run);
     keepRuns();
-    if (push && G.Cloud) G.Cloud.runChanged();
+    if (push && Hooks.cloud) Hooks.cloud.runChanged();
   }
   const summary = (r: CareerRun): CareerBest => ({ id: r.id, start: r.start, lvl: r.deepest, credits: r.credits, squad: r.squad, outcome: r.outcome });
 
   // ------------------------------------------------------------- runs
   function runStart(joined: number | null = null) {
     if (run) runEnd('left');
-    const net = G.Net;
-    run = { id: uuid(), v: V, start: Date.now(), end: null, solo: !!net.solo, host: !!net.isHost, squad: Math.max(1, Object.keys((G.Game && G.Game.roster) || {}).length), joined,
+    const net = Net;
+    run = { id: uuid(), v: V, start: Date.now(), end: null, solo: !!net.solo, host: !!net.isHost, squad: Math.max(1, Object.keys((Game && Game.roster) || {}).length), joined,
       outcome: 'playing', deepest: 0, credits: 0, kills: 0, arrests: 0, levels: [], t: Date.now(), u: 1, sy: 0 };
     lvl = null;
     bump('runs');
@@ -90,7 +87,7 @@ const G_Career = (() => {
     if (run.deepest > 0 && (!s.bestLevel || run.deepest > s.bestLevel.lvl)) { s.bestLevel = b; (best = best || ({} as Best)).best_level = b; }
     if (run.credits > 0 && (!s.bestCredits || run.credits > s.bestCredits.credits)) { s.bestCredits = b; (best = best || ({} as Best)).best_credits = b; }
     keepStats();
-    if (best && G.Cloud) G.Cloud.add({}, {}, best);
+    if (best && Hooks.cloud) Hooks.cloud.add({}, {}, best);
     touch(true);
     run = null;
   }
@@ -99,8 +96,8 @@ const G_Career = (() => {
   function levelStart(n: number, th: number | undefined, night: boolean, stronghold: boolean) {
     if (!run) runStart(n); // (joined a run already going)
     if (lvl) run!.levels.push(lvl); // (a level never seen to its end: the next one's begun)
-    const T = th != null && G.THEMES[th] ? G.THEMES[th] : null;
-    lvl = { n, th: th == null ? -1 : th, theme: T ? T.name : '', night: !!night, stronghold: !!stronghold, boss: !!(G.Route && G.Route.isBoss(n)), cleared: false,
+    const T = th != null && THEMES[th] ? THEMES[th] : null;
+    lvl = { n, th: th == null ? -1 : th, theme: T ? T.name : '', night: !!night, stronghold: !!stronghold, boss: !!(Route && Route.isBoss(n)), cleared: false,
       kills: 0, incaps: 0, headshots: 0, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, downs: 0, deaths: 0, revives: 0, credits: 0, report: null };
     run!.deepest = Math.max(run!.deepest, n);
     deepest(n);
@@ -119,6 +116,33 @@ const G_Career = (() => {
     lvl = null;
     touch(true);
   }
+  // A mission done (space: the host's mdone, js/space.ts): counted (done, its objective, its class of ship, the HVT taken alive or dead), its
+  // pay and bonus to the credits, the bests (hardest, best paid, biggest class, rank: tier, rank as the page has them), and into the run.
+  function mission(m: Record<string, any>, tier: number, rank: number) {
+    const ms = (m && m.ms) || {}, obj = typeof ms.obj === 'string' ? ms.obj : '', size = typeof ms.size === 'string' ? ms.size : null;
+    const pay = Math.max(0, Math.round(num(m.pay))), bonus = Math.max(0, Math.round(num(m.bonus))), diff = Math.round(num(m.diff || ms.diff));
+    misBump('done');
+    if (obj) misBump(obj);
+    if (size) misBump('ship_' + size);
+    if (obj === 'hvt' && (m.hvt === 1 || m.hvt === 2)) misBump(m.hvt === 2 ? 'hvt_alive' : 'hvt_dead');
+    if (pay + bonus) bump('credits', pay + bonus);
+    best('hardest', diff); best('bestPay', pay + bonus); best('bigClass', tier); best('bestRank', rank);
+    if (!run) return;
+    run.credits += pay + bonus;
+    (run.missions || (run.missions = [])).push({ name: String(ms.name || m.name || ''), kind: String(ms.kind || ''), obj, size, th: Math.round(num(ms.th)), diff, pay, bonus,
+      hvt: m.hvt === 1 || m.hvt === 2 ? m.hvt : null, freed: Math.max(0, Math.round(num(m.freed))), at: Date.now() });
+    if (run.missions.length > 100) run.missions.splice(0, run.missions.length - 100);
+    touch(true);
+  }
+  // salvage carried off (the host's mdone, ok 2): what it paid, and how many unlisted ships it came off (when the host says)
+  function looted(pay: number, ships: number) {
+    pay = Math.max(0, Math.round(num(pay)));
+    if (ships > 0) misBump('looted', Math.round(ships));
+    if (pay) bump('credits', pay);
+    if (run && pay) { run.credits += pay; touch(); }
+  }
+  // the rank as it is now (js/loadout.ts): a new highest is kept
+  const rank = (r: number) => best('bestRank', r);
   // something you did (the host's word of it: js/game.ts), and what it paid (or cost)
   function ev(kind: 'kill' | 'incap' | 'civ' | 'unauth' | 'arrest' | 'rescue' | 'body' | 'evidence' | 'down' | 'death' | 'revive', cr = 0, hs = false) {
     const K: Record<string, string> = { kill: 'kills', incap: 'incaps', civ: 'civKilled', unauth: 'unauth', arrest: 'arrests', rescue: 'rescued', evidence: 'evidence', down: 'downs', death: 'deaths', revive: 'revives' };
@@ -163,7 +187,7 @@ const G_Career = (() => {
 
   // ------------------------------------------------------------- the career screen (main menu) and the hangar's Career tab
   function html(): string {
-    const s = S(), f = G.U.fmt, esc = G.U.esc;
+    const s = S(), f = U.fmt, esc = U.esc;
     const tile = (label: string, v: string | number, sub = '') => `<div class="cr-tile"><b>${v}</b><span>${label}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
     const day = (t: number) => new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) + ' ' + new Date(t).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     const OUT: Record<string, string> = { playing: 'In progress', wiped: 'Squad wiped', left: 'Left', abandoned: 'Abandoned' };
@@ -179,9 +203,7 @@ const G_Career = (() => {
       <h3 class="cr-h">Last runs <small class="dim">kills / arrests</small></h3>${runs || '<div class="dim">No runs yet.</div>'}`;
   }
 
-  return { COLS, init, runStart, runEnd, squad, levelStart, levelEnd, ev, mergeRuns, unsyncAll, onlyRuns, setStats, markSynced, reset, html, clean,
+  return { COLS, MAXES, MIS_KEY, init, runStart, runEnd, squad, levelStart, levelEnd, ev, mission, looted, rank, mergeRuns, unsyncAll, onlyRuns, setStats, markSynced, reset, html, clean,
     stats: () => S(), runs: () => L(), get run() { return run; }, get level() { return lvl; } };
 })();
-G.Career = G_Career;
 
-interface GameModules { Career: typeof G_Career; }

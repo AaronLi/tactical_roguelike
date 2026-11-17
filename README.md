@@ -3,6 +3,8 @@
 Peer-to-peer co-op roguelike tactical FPS that runs in the browser. Written in TypeScript (`js/*.ts`), Three.js
 for rendering, WebRTC (via PeerJS) for networking.
 
+**This branch takes the game into space** (the hangar is a base in an asteroid; missions are flown to in the squad's own ship, boarding ships or landing at bases): see [docs/space.md](docs/space.md).
+
 ## Running it
 
 ```bash
@@ -13,6 +15,8 @@ npm run dev
 Then open http://localhost:8080. `npm run dev` compiles the TypeScript into `dist/js/` and keeps recompiling as you
 save, and serves the game. To build once and serve the folder some other way: `npm run build`, then `node serve.js`
 (or any static file server, e.g. `python -m http.server 8080`). The page loads `dist/js/`, so it needs a build first.
+That's the development build: about 90 unbundled modules. The published site loads five files instead (`npm run bundle`, `tools/bundle.mjs`; the GitHub
+Pages workflow lays them over five files of `dist/js`), see [docs/typescript.md](docs/typescript.md).
 See [docs/typescript.md](docs/typescript.md) for how the code is organised and the type-checking status.
 
 **Weapon demo reel:** http://localhost:8080/?demo plays itself (`js/demo.ts`). It starts a solo level with
@@ -592,11 +596,11 @@ says the same), but not whose: the shooter's name isn't shown.
     sees you) will often hide and peek exactly like a civilian, with the gun still holstered or slung, and
     draws the moment it sees an officer. Look at hands, clothes and what's on their back, or shout and see
     who complies.
-- **Civilians** pay out when restrained (hold F);
-  killing one costs the shooter. Killing a suspect who has surrendered or been cuffed is unauthorised force
-  and is penalised too.
+- **Civilians** pay out when restrained (hold F). Killing one costs no credits (it will cost reputation, still
+  to come), but it's counted and fails the rescue objective. Killing a suspect who has surrendered or been
+  cuffed is unauthorised force and costs the shooter.
 - The hangar shows an after-action report (arrests, kills, civilians secured, casualties) when you arrive. A
-  clean operation, with no civilian deaths and no unauthorised force, pays a bonus.
+  clean operation, with no unauthorised force, pays a bonus.
 - **First aid cabinets.** About a third of levels have a white cabinet with a red cross on an indoor wall,
   and some have two.
   - **Using one:** look at it (the crosshair on the cabinet itself, within arm's reach, nothing in between: not
@@ -622,7 +626,7 @@ says the same), but not whose: the shooter's name isn't shown.
     and translucent 16- and 24-rounders that show the rounds left), the **P9** (9 mm, 15 rounds, semi) or the **derringer** (two shots of .44 Magnum). It comes loaded with
     tracers, with two spare loads in your small pockets (two magazines, or for the derringer two boxes of 12).
   - **The sidearm web** (`js/arsenal.ts`): what you can start with, a map you drag about and zoom, the P9 in the middle and three paths out of it. Each gun's earned with the one before it, by
-    doing what its path is about, and it's yours for good on this machine. Full auto: TX22 (15 double-tap kills with the P9), 92FS Burst (15 five-hit bursts: five hits on one suspect inside a second, once a suspect, down or not), G18 (15 burst kills: three hits inside 0.35 s), MAC-10 (10 double kills: two inside 3 s). Heavy calibre: derringer (15 kills within 5 m), .357 Revolver (16 one-round kills), Desert Eagle (15 kills on armoured suspects), Thor .50 (15 wall-bang kills), and a branch off the revolver, The Judge (15 kills within 5 m with the revolver; its pro build, Hanging Judge, takes 20 double kills). Modern classics: Walther PPK (15 kills on unaware suspects: down before they react, and not once they've seen you or heard gunfire), M1911 (15 headshot kills), USP (15 headshot kills past 10 m), Five-seveN (15 kills past 20 m). Each gun has a pro build too, a named set of parts earned by mastering that gun (more of what it's best at), and once it's yours you choose whether the gun starts in pro mode. Civilians and those who've given up don't count, and a gun only counts once it's yours.
+    doing what its path is about, and it's yours for good on this machine. Full auto: TX22 (15 double-tap kills with the P9), 92FS Burst (15 five-hit bursts: five hits on one suspect inside a second, once a suspect, down or not), G18 (15 burst kills: three hits inside 0.35 s), MAC-10 (10 double kills: two inside 3 s). Heavy calibre: derringer (15 kills within 5 m), .357 Revolver (16 one-round kills), Desert Eagle (15 kills on armoured suspects), Thor .50 (15 wall-bang kills), and a branch off the revolver, The Judge (15 kills within 5 m with the revolver; its pro build, Hanging Judge, takes 20 double kills). Modern classics: Walther PPK (10 leader kills: a fireteam leader, a Leader or a ship's officer), and off it the Welrod (8 kills on shield carriers with the PPK) and Maxim 9 (8 leader headshot kills with the Welrod), M1911 (15 headshot kills), USP (15 headshot kills past 10 m), Five-seveN (15 kills past 20 m). Each gun has a pro build too, a named set of parts earned by mastering that gun (more of what it's best at), and once it's yours you choose whether the gun starts in pro mode. Civilians and those who've given up don't count, and a gun only counts once it's yours.
   - **What's inside:** a weapon in its standard build, fully loaded. It's a long gun three times in four,
     picked by rarity. Each tier has a share of the odds, split evenly between its weapons, and deeper
     levels shift the odds toward rarer tiers. Legendaries only appear from level 3. Every weapon can turn up,
@@ -770,7 +774,7 @@ says the same), but not whose: the shooter's name isn't shown.
   - **Under it** it's an ordinary level with a flag (`G.Game.hub`; the phase is still `'level'`, which is why
     movement, other players, collision and sound all work). The host's phase stays `'shop'` and only carries
     the squad about (`G.Server.updateHub`) and times the helicopter. What's on the shelves is the same
-    stock `js/shop.ts` always had, drawn from it (`G.Hangar.refresh`), and a purchase is `G.Shop.buy`.
+    stock `js/shop.ts` always had, drawn from it (`G.Hangar.refresh`), and a purchase is `G.ShopUI.buy`.
 - **Shared magazines.** Guns built round the same magazine take each other's (`G.MAG_FAMILY` in `data.js`,
   the magazines in `parts.js` `MAG_FAMS`):
 
@@ -2479,7 +2483,8 @@ solids at any height. Doors and windows are dynamic: their solids change as they
 | `js/gunsmith.ts` | The gunsmith: 3D weapon view, part fitting and the sticker tool |
 | `js/stickers.ts` | Stickers: which there are, your collection, decals on guns, the squad's lists by hash |
 | `js/zip.ts` | Writing and reading .zip files (the highlights' recordings) |
-| `js/hud.ts`, `js/shop.ts` | UI; the shop's stock and its buying |
+| `js/hud.ts`, `js/shopui.ts` | UI; the shop's screen and its buying |
+| `js/shop.ts` | The shop's reckonings (what Vex stocks this visit, the squad's count of it, the wishlist): no screen, the server's thread loads it |
 | `js/hangar.ts` | The hangar between levels: workshop, store, warehouse, lounge, helicopter, and looking-to-buy |
 | `js/profiler.ts` | The profiler: frame timings by piece of work, saved from the pause menu |
 | `js/damage.ts` | What a round takes out of walls and doors: holes cut in their geometry, bores rays go down, doors shot off their hinges and falling |

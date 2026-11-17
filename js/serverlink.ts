@@ -1,13 +1,16 @@
 'use strict';
-// The page's end of the host's simulation (docs/threads.md). The simulation (G.Server, js/server.ts, run by js/serverhost.ts)
+import { Net } from './net.js';
+import { ServerHost } from './serverhost.js';
+import { Game } from './game.js';
+// The page's end of the host's simulation (docs/threads.md). The simulation (Server, js/server.ts, run by js/serverhost.ts)
 // has a thread of its own, a worker (js/serverworker.ts); the page is a player like any other: it draws, and it sends what
 // you do. When the page hosts, its own player's messages go to the simulation on a MessagePort of their own (toServer) and
-// come back on it (to G.Net.onClient); the remote players' come in over PeerJS, which needs the page, so they're relayed
-// (fromPeer, join, leave), and what the simulation says to them is sent on from here (G.Net.relay, relayTo). The wire between
+// come back on it (to Net.onClient); the remote players' come in over PeerJS, which needs the page, so they're relayed
+// (fromPeer, join, leave), and what the simulation says to them is sent on from here (Net.relay, relayTo). The wire between
 // a host and the players who join it is what it was.
 // If a worker can't be had (none here, or it won't load), or with ?serverthread=0 in the URL, the simulation runs on the page
 // instead: the same code, on ports within the page (mode 'main').
-const G_ServerLink = {
+export const ServerLink = {
   mode: null as 'worker' | 'main' | null,
   worker: null as Worker | null,
   ctl: null as MessagePort | null, // (the control port: for as long as the simulation's thread runs)
@@ -50,12 +53,12 @@ const G_ServerLink = {
         this.mode = 'main';
         const ch = new MessageChannel();
         this.listen(ch.port1, done);
-        G.ServerHost.attach(ch.port2);
+        ServerHost.attach(ch.port2);
       };
       if (!this.wanted()) return here(null);
       if (typeof Worker !== 'function') return here('this browser has no workers');
       let w: Worker;
-      try { w = new Worker('dist/js/serverworker.js'); } catch (e) { return here('the worker could not be made (' + e + ')'); }
+      try { w = new Worker('dist/js/serverworker.js', { type: 'module' }); } catch (e) { return here('the worker could not be made (' + e + ')'); }
       const ch = new MessageChannel();
       let settled = false;
       const timer = setTimeout(() => fail('the worker had not started after 30 s'), 30000);
@@ -81,8 +84,8 @@ const G_ServerLink = {
       if (!c || typeof c !== 'object') return;
       switch (c.k) {
         case 'ready': this.up = true; for (const [m, tr] of this.pend.splice(0)) port.postMessage(m, tr); onReady(); break;
-        case 'bc': G.Net.relay(c.m, c.x); break;
-        case 'to': G.Net.relayTo(c.id, c.m); break;
+        case 'bc': Net.relay(c.m, c.x); break;
+        case 'to': Net.relayTo(c.id, c.m); break;
         case 'rec': this.save(c.name, c.data); break;
         case 'prof': this.prof = { n: c.n, ms: c.ms, max: c.max }; break;
         case 'digest': case 'stat': { const f = this.asks.get(c.q); if (f) { this.asks.delete(c.q); f(c); } break; }
@@ -99,7 +102,7 @@ const G_ServerLink = {
     this.close();
     const ch = new MessageChannel(), port = ch.port1;
     this.cli = port;
-    port.onmessage = (e: MessageEvent) => { if (this.cli === port && e.data && typeof e.data === 'object') G.Net.onClient(e.data); };
+    port.onmessage = (e: MessageEvent) => { if (this.cli === port && e.data && typeof e.data === 'object') Net.onClient(e.data); };
     this.post({ k: 'init', id, cli: ch.port2, rec: this.recording() }, [ch.port2]);
     if (this.names) this.post({ k: 'stickers', names: this.names });
   },
@@ -134,12 +137,10 @@ const G_ServerLink = {
   // the simulation's level against the one on this screen: built from the same seed, they must be the same place
   // (same: the two descriptions are equal, the whole of them as JSON; differ: the parts whose fingerprints differ)
   async digest() {
-    const s = await this.ask('digest', { json: true }), m = G.Game.map, parts: Record<string, string> = {};
-    const mine = m && !m.hub ? G.ServerHost.digest(m, parts) : null, differ = Object.keys(parts).filter((k) => !s.parts || s.parts[k] !== parts[k]);
+    const s = await this.ask('digest', { json: true }), m = Game.map, parts: Record<string, string> = {};
+    const mine = m && !m.hub ? ServerHost.digest(m, parts) : null, differ = Object.keys(parts).filter((k) => !s.parts || s.parts[k] !== parts[k]);
     const same = !!s.json && !!m && !!m.desc && s.json === JSON.stringify(m.desc);
     return { server: s.d, client: mine, same, bytes: s.json ? s.json.length : 0, differ, seed: s.seed, level: s.level, th: s.th, night: s.night };
   },
   stat() { return this.ask('stat'); },
 };
-G.ServerLink = G_ServerLink;
-interface GameModules { ServerLink: typeof G_ServerLink; }

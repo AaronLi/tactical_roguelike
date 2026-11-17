@@ -479,6 +479,20 @@ label.check input { width: auto; accent-color: var(--ui-text); }
 
 /* ---------------------------------------------------------------- gunsmith */
 #shopItems.gs-host { display: block; overflow-y: auto; }
+/* the gunsmith fills the column below the tabs and holds still: only its attachments list (and, if it runs long, the
+   build's side column) scrolls. Stacked to one column, narrow or on touch, the whole of it scrolls as before */
+@media (min-width: 901px) {
+  #shopItems.gs-host { flex: 1 1 auto; min-height: 0; }
+  body:not(.touch-on) .gs-wrap { height: 100%; min-height: 0; }
+  body:not(.touch-on) .gs-wrap > .gs-tabs { flex: 0 0 auto; }
+  body:not(.touch-on) .gs-main { flex: 1 1 auto; min-height: 0; grid-template-rows: minmax(0, 1fr); }
+  body:not(.touch-on) .gs-left { min-height: 0; }
+  /* (on a short window the view gives up height, down to 160 px, before the list goes under about 200 px: js/gunsmith.ts
+     fits the picture to whatever box it has) */
+  body:not(.touch-on) .gs-left > .gs-view { flex: 0 1 calc(340px * var(--ik, 1)); height: auto; min-height: calc(160px * var(--ik, 1)); }
+  body:not(.touch-on) .gs-left > .gs-list { flex: 1 1 0; min-height: calc(200px * var(--ik, 1)); overflow-y: auto; padding-right: calc(4px * var(--ik, 1)); }
+  body:not(.touch-on) .gs-side { min-height: 0; overflow-y: auto; }
+}
 .gs-wrap { display: flex; flex-direction: column; gap: calc(10px * var(--ik, 1)); }
 .gs-tabs { display: flex; gap: calc(4px * var(--ik, 1)); flex-wrap: wrap; }
 .gs-main { display: grid; grid-template-columns: minmax(0, 1fr) calc(300px * var(--ik, 1)); gap: calc(10px * var(--ik, 1)); }
@@ -1217,10 +1231,151 @@ body.touch-on #scoreboard { top: 10%; }
 body.touch-on #fieldInv { background: rgba(7, 9, 11, 0.95); }
 @media (orientation: landscape) { body.touch-on .inv > .inv-col.eq { flex: 0 0 210px; } body.touch-on .inv > .inv-col:nth-child(2) { flex: 1 1 300px; max-width: none; } }
 body.touch-on #shop { background: rgba(6, 8, 10, 0.95); }
+/* the loadout screen (js/game.ts loBar, loWeb): a bar over the tree, rank and XP, the four slots, Deploy */
+.web-full:has(.lo-bar) { padding-top: 104px; box-sizing: border-box; }
+.lo-bar { position: absolute; left: 0; top: 0; right: 0; z-index: 2; height: 104px; display: flex; align-items: stretch; gap: 8px; padding: 8px 14px; box-sizing: border-box; background: #0b0e11; border-bottom: 1px solid var(--ui-line); }
+.lo-rank { display: flex; flex-direction: column; justify-content: center; min-width: 150px; gap: 3px; font: 400 12px var(--ui-font); color: var(--ui-dim); text-align: left; background: none; border: 1px solid transparent; border-radius: var(--ui-r); padding: 4px 8px; cursor: pointer; }
+.lo-rank:hover, .lo-rank.on { border-color: var(--ui-line-hi); background: var(--ui-fill); }
+.lo-rank b { font: 500 16px var(--ui-font); color: var(--ui-text); }
+.lo-rank i { display: block; height: 4px; background: var(--ui-line); border-radius: 2px; overflow: hidden; }
+.lo-rank em { display: block; height: 100%; background: #9fd6ff; }
+.lo-tab { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; padding: 4px 12px; background: var(--ui-fill); border: 1px solid var(--ui-line); border-radius: var(--ui-r); color: var(--ui-text); cursor: pointer; font: inherit; }
+.lo-tab small { font: 400 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1px; }
+.lo-tab b { font: 500 14px var(--ui-font); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.lo-tab:hover { border-color: var(--ui-line-hi); }
+.lo-slot.lo-thrs { flex-direction: row; gap: 6px; } /* (the throwables: two boxes side by side, each the bar's full height) */
+.lo-thrs > .lo-tab { flex: 1 1 0; height: 100%; }
+.lo-thrbox:not(.full) b { color: var(--ui-dim); font-weight: 400; }
+.lo-thrcard { max-width: 220px; } .lo-thrcard small { font: 400 11.5px/1.35 var(--ui-font); color: var(--ui-dim); text-align: left; }
+.lo-thrcard img { max-height: 64px; }
+.lo-tab.on { border-color: var(--ui-line-hi); background: var(--ui-fill-hi); box-shadow: inset 0 -2px 0 #9fd6ff; }
+.lo-go { align-self: center; padding: 10px 26px; }
+.lo-clear { margin-top: 6px; width: 100%; }
+.lo-tab small i { font-style: normal; margin-left: 8px; color: #9fd6ff; letter-spacing: 0; text-transform: none; }
+.lo-pts { display: flex; flex-direction: column; justify-content: center; align-items: center; min-width: 74px; font: 400 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1px; }
+.lo-pts b { font: 500 18px var(--ui-font); color: var(--ui-text); letter-spacing: 0; }
+.lo-pts.over b, .lo-pts.over span { color: #ff6a5a; }
+.lo-cost { font: 500 13px var(--ui-font); color: #9fd6ff; }
+.lo-cost small { color: var(--ui-dim); font-weight: 400; }
+.lo-atts { display: flex; flex-direction: column; gap: 7px; }
+.lo-att { display: flex; flex-direction: column; gap: 2px; }
+.lo-att small { font: 400 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1px; }
+.lo-att select { background: var(--ui-fill); color: var(--ui-text); border: 1px solid var(--ui-line); border-radius: 4px; padding: 4px 6px; font: 400 12.5px var(--ui-font); }
+.lo-att select:disabled { opacity: 0.55; }
+.lo-att span { font: 400 11.5px var(--ui-font); color: var(--ui-dim); }
+/* a piece's two attachment boxes, under it on the web, and the list of what can go in one */
+.lo-boxes { position: absolute; transform: translate(-50%, 0); display: flex; gap: 6px; z-index: 3; }
+.lo-box { width: 85px; min-height: 46px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 1px; padding: 4px 6px; background: rgba(20, 24, 28, 0.92); border: 1px dashed var(--ui-line-hi); border-radius: var(--ui-r); color: var(--ui-dim); cursor: pointer; font: inherit; text-align: center; }
+.lo-box b { font: 500 12px var(--ui-font); color: var(--ui-text); line-height: 1.15; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.lo-box small { font: 400 10px var(--ui-font); color: var(--ui-dim); }
+.lo-box.full { border-style: solid; border-color: #9fd6ff; }
+.lo-box:hover, .lo-box.on { background: var(--ui-fill-hi); border-color: #9fd6ff; }
+.lo-menu { position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%); width: 260px; max-height: 300px; overflow-y: auto; padding: 8px; background: #0d1114; border: 1px solid var(--ui-line-hi); border-radius: var(--ui-r); display: flex; flex-direction: column; gap: 3px; text-align: left; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6); }
+.lo-menu h5 { margin: 6px 0 2px; font: 500 10.5px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1px; }
+.lo-part { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 4px 6px; background: none; border: 1px solid transparent; border-radius: 4px; color: var(--ui-text); font: 400 12.5px var(--ui-font); cursor: pointer; text-align: left; }
+.lo-part:hover { background: var(--ui-fill-hi); border-color: var(--ui-line); }
+.lo-part.in { border-color: #9fd6ff; }
+.lo-part i { font-style: normal; color: #9fd6ff; white-space: nowrap; }
+.lo-part.locked { cursor: default; flex-direction: column; gap: 0; opacity: 0.6; }
+.lo-part.locked small { color: var(--ui-dim); font-size: 11px; }
+.lo-part.clear { color: #ff9a8a; }
+.lo-note { margin: 0; font: 400 12px var(--ui-font); color: var(--ui-dim); }
 /* what a piece of armour covers, and how well (js/ballistics.ts coverageHTML) */
+#debrief { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; background: rgba(4, 7, 10, 0.62); }
+#debrief.hidden { display: none; }
+#debrief .db-card { width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 48px); overflow: auto; padding: 22px 26px; background: rgba(14, 18, 22, 0.97); border: 1px solid var(--ui-line); border-radius: var(--ui-r); color: var(--ui-text); font: 400 13px var(--ui-font); }
+#debrief .db-head small { display: block; font: 500 11px var(--ui-font); letter-spacing: 0.14em; text-transform: uppercase; }
+#debrief .db-head.ok small { color: var(--good); }
+#debrief .db-head.fail small { color: #ff6b6b; }
+#debrief .db-head h2 { margin: 4px 0 2px; font: 500 24px var(--ui-font); letter-spacing: 0.04em; }
+#debrief .db-head span { color: var(--ui-dim); }
+#debrief .db-brief { margin: 12px 0 16px; line-height: 1.45; color: var(--ui-dim); }
+#debrief .db-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 18px; }
+#debrief h4 { margin: 0 0 8px; font: 500 11px var(--ui-font); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ui-dim); }
+#debrief .db-row { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--ui-line-lo); }
+#debrief .db-row b { font-weight: 500; }
+#debrief .db-row.bad b { color: #ff6b6b; }
+#debrief .db-row.good b { color: var(--good); }
+#debrief .db-row.total { border-bottom: 0; padding-top: 8px; }
+#debrief .db-row.total b { font-size: 16px; color: #ffd24a; }
+#debrief .db-row.xp b { color: #9fd6ff; }
+#debrief .db-go { margin-top: 20px; float: right; }
+#debrief .db-xp { margin-top: 18px; }
+#debrief .db-xph { display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+#debrief .db-xph b { font: 500 15px var(--ui-font); }
+#debrief .db-xph span { color: var(--ui-dim); }
+#debrief .db-xph span:last-child { margin-left: auto; }
+#debrief .db-xph .up { color: #ffd24a; font-weight: 500; }
+#debrief .db-xph em { font-style: normal; color: #9fd6ff; }
+#debrief .db-bar { position: relative; height: 8px; background: var(--ui-line-lo); border-radius: 4px; overflow: hidden; }
+#debrief .db-bar i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+#debrief .db-bar .now { background: #9fd6ff; transition: width 1.1s ease-out 0.2s; }
+#debrief .db-bar .was { background: rgba(233, 237, 240, 0.55); z-index: 1; }
+.lo-swatches { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 2px; }
+.lo-sw { width: 26px; height: 26px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.18); cursor: pointer; padding: 0; }
+.lo-sw.issue { width: auto; padding: 0 8px; background: transparent; color: var(--ui-dim); font: 500 10.5px var(--ui-font); }
+.lo-sw.on { outline: 2px solid #fff; outline-offset: 1px; }
 .cov { width: 100%; border-collapse: collapse; margin: 10px 0 4px; font: 400 11.5px var(--ui-font); }
 .cov th { font: 500 9.5px var(--ui-font); letter-spacing: 1.2px; text-transform: uppercase; color: var(--ui-dim); text-align: left; padding: 0 6px 4px 0; }
 .cov td { padding: 4px 6px 4px 0; border-top: 1px solid rgba(255,255,255,0.08); vertical-align: top; }
 .cov td:first-child { color: var(--ui-dim); }
 .cov td.ok { color: #9fd18b; } .cov td.mid { color: #e4c56c; } .cov td.no { color: #d98a7a; }
 .cov-note { margin: 2px 0 6px; font: 400 10.5px var(--ui-font); color: var(--ui-dim); line-height: 1.4; }
+
+/* a slot in the bar: its tab, and under it the two attachment boxes of what's taken in it */
+.lo-slot { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.lo-slot > .lo-tab { flex: 1 1 auto; }
+.lo-tboxes { display: flex; gap: 4px; height: 30px; }
+.lo-tbox { flex: 1 1 0; min-width: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 8px; background: rgba(20, 24, 28, 0.9); border: 1px dashed var(--ui-line-hi); border-radius: 4px; color: var(--ui-dim); cursor: pointer; font: inherit; }
+.lo-tbox b { font: 500 11.5px var(--ui-font); color: var(--ui-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.lo-tbox i { font-style: normal; font: 500 11px var(--ui-font); color: #9fd6ff; }
+.lo-tbox small { font: 400 11px var(--ui-font); }
+.lo-tbox.full { border-style: solid; border-color: #9fd6ff; }
+.lo-tbox:hover:not(:disabled), .lo-tbox.on { background: var(--ui-fill-hi); border-color: #9fd6ff; }
+.lo-tbox.on { box-shadow: inset 0 -2px 0 #9fd6ff; }
+.lo-tbox:disabled { opacity: 0.35; cursor: default; }
+/* an attachment box being filled: its own view, a card for each part */
+.lo-attview { cursor: default; }
+.lo-attscroll { position: absolute; inset: 0; overflow-y: auto; padding: 18px 24px 80px; box-sizing: border-box; text-align: left; }
+.lo-atthead h2 { margin: 0; font: 300 24px var(--ui-font); color: var(--ui-text); letter-spacing: 2px; }
+.lo-atthead h2 span { color: var(--ui-dim); font-size: 16px; letter-spacing: 0; }
+.lo-atthead p { margin: 4px 0 10px; font: 400 12.5px var(--ui-font); color: var(--ui-dim); }
+.lo-attview section h4 { margin: 14px 0 6px; font: 500 11px var(--ui-font); color: var(--ui-dim); text-transform: uppercase; letter-spacing: 1.5px; }
+.lo-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.lo-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; background: rgba(20, 24, 28, 0.92); border: 1px solid var(--ui-line); border-radius: var(--ui-r); color: var(--ui-text); cursor: pointer; font: inherit; text-align: center; }
+.lo-card img { height: 46px; max-width: 100%; object-fit: contain; pointer-events: none; }
+.lo-card b { font: 500 12.5px var(--ui-font); line-height: 1.2; }
+.lo-card i { font-style: normal; font: 500 11.5px var(--ui-font); color: #9fd6ff; }
+.lo-card small { font: 400 11px var(--ui-font); color: var(--ui-dim); }
+.lo-card:hover:not(:disabled) { border-color: #9fd6ff; background: var(--ui-fill-hi); }
+.lo-card.in { border-color: #9fd6ff; box-shadow: inset 0 0 0 1px #9fd6ff; cursor: default; }
+.lo-card.other { border-style: dashed; }
+.lo-card.locked { opacity: 0.45; cursor: default; }
+.lo-card[aria-disabled="true"]:hover { border-color: var(--ui-line); background: rgba(20, 24, 28, 0.92); }
+.lo-card.locked:hover { opacity: 0.7; }
+.lo-stats { margin: 8px 0 4px; display: flex; flex-direction: column; gap: 6px; }
+.lo-stats .gs-pe { display: flex; flex-wrap: wrap; gap: 4px 8px; font: 400 11.5px var(--ui-font); }
+.lo-stats .gs-pe .g { color: var(--good); }
+.lo-stats .gs-pe .b { color: #ff6b6b; }
+.cov tr.add td { color: var(--good); }
+.cov tr.gone td { color: #ff6b6b; text-decoration: line-through; opacity: 0.8; }
+.lo-empty { margin: 4px 0 6px; }
+
+/* the ranks' timeline (js/game.ts loRankView): a column a rank, what it opens, a line where you are */
+.lo-tscroll { overflow-x: auto; padding-top: 30px; margin-top: -20px; }
+.lo-timeline { position: relative; height: 470px; margin-top: 10px; }
+.lo-rtrack { position: absolute; left: 0; right: 0; top: 44px; height: 2px; background: var(--ui-line); }
+.lo-rcol { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 8px; box-sizing: border-box; border-left: 1px solid rgba(255, 255, 255, 0.04); }
+.lo-rhead { display: flex; flex-direction: column; align-items: center; height: 56px; justify-content: flex-start; }
+.lo-rhead b { font: 500 15px var(--ui-font); color: var(--ui-dim); }
+.lo-rhead small { font: 400 11px var(--ui-font); color: var(--ui-dim); }
+.lo-rcol.got .lo-rhead b { color: var(--ui-text); }
+.lo-ritem { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 6px; background: rgba(20, 24, 28, 0.92); border: 1px solid var(--ui-line); border-radius: var(--ui-r); text-align: center; }
+.lo-ritem img { height: 46px; max-width: 100%; object-fit: contain; }
+.lo-ritem b { font: 500 12.5px var(--ui-font); color: var(--ui-text); line-height: 1.2; }
+.lo-ritem small { font: 400 11px var(--ui-font); color: var(--ui-dim); }
+.lo-ritem.locked img, .lo-ritem.locked b { opacity: 0.45; }
+.lo-lock { position: absolute; top: 14px; left: 50%; width: 26px; height: 26px; transform: translateX(-50%); color: #e8edf2; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.9)); }
+.lo-rnone { font: 400 12px var(--ui-font); color: var(--ui-dim); margin: 6px 0 0; }
+.lo-rnow { position: absolute; top: 30px; bottom: 0; width: 2px; margin-left: -1px; background: #9fd6ff; box-shadow: 0 0 8px rgba(159, 214, 255, 0.7); z-index: 2; pointer-events: none; }
+.lo-rnow span { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); white-space: nowrap; padding: 2px 8px; border-radius: 3px; background: #9fd6ff; color: #071018; font: 600 11px var(--ui-font); }

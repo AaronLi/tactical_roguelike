@@ -1,9 +1,14 @@
 'use strict';
+import { WEAPONS } from './data.js';
+import { GunModels } from './gunmodels.js';
+import { Gunsmith } from './parts.js';
+import { U } from './util.js';
+import { Highlights } from './highlights.js';
 // The main menu's background: the guns, one after another, each alone against black while the camera runs a couple of
 // the gear room's slow moves round it, slowed down further (about a quarter of the reel's speed; js/highlights.ts tourMoves, tourPath: the same paths the highlight reel's tour
 // uses), with a fade to black between guns. The gun is on the left, the menu on the right. It takes over from
 // the rotating level (js/game.ts menuBackdrop) once its first gun is in (the models arrive with the bundle: js/modelbundles.ts).
-const G_MenuShow = (() => {
+export const MenuShow = (() => {
   const T = THREE;
   // the guns it shows (their factory builds), in a shuffled order, round and round
   const GUNS = ['m4', 'hk416', 'ak', 'scar', 'mk14', 'awm', 'r700', 'mp5', 'vector', 'aug', 'tavor', 'fal', 'tempest', 'm249', 'hailstorm', 'benelli', 'mcx', 'galil', 'svd', 'p90'];
@@ -20,7 +25,7 @@ const G_MenuShow = (() => {
     // the fade: a black card just in front of the lens
     const veil = new T.Mesh(new T.PlaneGeometry(4, 4), new T.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 1, depthTest: false, depthWrite: false }));
     veil.position.z = -0.05; veil.renderOrder = 999; cam.add(veil);
-    const order = G.U.shuffle(Math.random, GUNS.filter((id) => G.WEAPONS[id]));
+    const order = U.shuffle(Math.random, GUNS.filter((id) => WEAPONS[id]));
     S = { scene, pivot, cam, veil, order, n: 0, gun: null, pre: null, poses: null, moves: [], t: 0, dur: 0, side: 1, live: false };
   }
   // The gun after this one, loading while this one plays (its model asked for at once: its packs may take a moment), so the cut to it
@@ -29,10 +34,10 @@ const G_MenuShow = (() => {
     for (let tries = 0; tries < S.order.length; tries++) {
       const id = S.order[S.n++ % S.order.length];
       let g: THREE.Group | null = null;
-      try { g = G.GunModels.display(G.Gunsmith.compile(id, G.Gunsmith.defaultBuild(id))).group; } catch (e) { g = null; }
+      try { g = GunModels.display(Gunsmith.compile(id, Gunsmith.defaultBuild(id))).group; } catch (e) { g = null; }
       if (!g) continue;
       const nx: any = { id, g, ready: !g.userData.pending, failed: false };
-      if (!nx.ready) G.GunModels.whenReady(g, (ok: boolean) => { if (ok) nx.ready = true; else nx.failed = true; });
+      if (!nx.ready) GunModels.whenReady(g, (ok: boolean) => { if (ok) nx.ready = true; else nx.failed = true; });
       S.pre = nx;
       return;
     }
@@ -49,8 +54,8 @@ const G_MenuShow = (() => {
     const b = new T.Box3().setFromObject(g);
     S.pivot.rotation.y = YAW; S.pivot.updateMatrixWorld(true);
     S.gun = g;
-    const slow = (G.Highlights.tourMoves as any[]).filter((m) => m.tempo === 'slow');
-    S.moves = G.U.shuffle(Math.random, slow.slice()).slice(0, MOVES);
+    const slow = (Highlights.tourMoves as any[]).filter((m) => m.tempo === 'slow');
+    S.moves = U.shuffle(Math.random, slow.slice()).slice(0, MOVES);
     S.poses = S.moves.map((m: any) => (m.keys || [m.a]).map((sh: any) => pose(b, sh)));
     S.dur = S.moves.reduce((a: number, m: any) => a + m.dur * SLOW, 0); S.t = 0; S.live = true;
     fetchNext();
@@ -70,12 +75,12 @@ const G_MenuShow = (() => {
     if (S.t >= S.dur) { S.veil.material.opacity = 1; next(); if (S.t >= S.dur) return true; }
     let t = S.t, i = 0;
     while (i < S.moves.length - 1 && t >= S.moves[i].dur * SLOW) { t -= S.moves[i].dur * SLOW; i++; }
-    const p = G.U.clamp(t / (S.moves[i].dur * SLOW), 0, 1), k = 0.5 - 0.5 * Math.cos(Math.PI * p);
-    const c = G.Highlights.tourPath(S.poses[i], k);
+    const p = U.clamp(t / (S.moves[i].dur * SLOW), 0, 1), k = 0.5 - 0.5 * Math.cos(Math.PI * p);
+    const c = Highlights.tourPath(S.poses[i], k);
     S.cam.position.copy(c.pos); S.cam.lookAt(c.tw); S.cam.rotateZ(c.roll || 0);
     // black at the start and the end of each gun, and for a moment between its moves (a cut, softened)
     const edge = Math.min(S.t, S.dur - S.t), cut = i > 0 && t < 0.35 ? 1 - t / 0.35 : 0;
-    S.veil.material.opacity = Math.max(1 - G.U.clamp(edge / FADE, 0, 1), cut * 0.85);
+    S.veil.material.opacity = Math.max(1 - U.clamp(edge / FADE, 0, 1), cut * 0.85);
     return true;
   }
   // drawn instead of the level (js/game.ts loop): the gun on the left, the menu's box on the right (css: #menu)
@@ -86,6 +91,4 @@ const G_MenuShow = (() => {
   }
   return { update, render, get live() { return !!(S && S.live); } };
 })();
-G.MenuShow = G_MenuShow;
 
-interface GameModules { MenuShow: typeof G_MenuShow; }

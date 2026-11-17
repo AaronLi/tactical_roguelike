@@ -1,53 +1,12 @@
 'use strict';
-// Furniture and home interiors as data (docs/furniture-data.md is the contract). Loaded by the page, the server's thread and
-// the tools alike: nothing here draws, and there's no THREE in it.
-//   piece()    - one piece's description: what it's made of (box, cylinder, sphere, icosahedron, a traced side profile), each
-//                with its size, place, turn and material, in the piece's own frame; and its solids (js/furniture.ts solids).
-//   describe() - a level's: every piece where it stands, and the rooms' floors, rugs, skirting, pictures and clocks, as
-//                js/furnmesh.ts turns them into meshes on the page.
-// What goes where, how big, what's on the shelves and what a festival's dressed with stays in code, seeded as ever (the
-// pieces' recipes: js/furniture.ts R, js/homes.ts, js/residents.ts; the plan: js/furniture.ts plan, js/homes.ts fill): only
-// what each piece is made of is data. Looks draw on random streams seeded by what they're the looks of (a piece by its own
-// v, a room by the level's seed and where the room is: describe), so nothing looks as it does for what came before it.
-// A texture, by what paints it (k) and with what (a: its colours), from the random stream's state (s) where its painting
-// starts; rep, rot: its repeat over a face and its turn. 'crate' is the level's crate texture (js/level.ts _tex), 'pack'
-// the stock's label atlas (packPaint).
-interface FdTex { k: string; a?: (string | boolean)[]; s?: number; rep?: number[]; rot?: number }
-// A material, by value: colour (c, sRGB hex), roughness (r), metalness (m) and what else it has (x: emissive,
-// emissiveIntensity, flatShading, transparent, opacity, depthWrite; map: a texture's index in the level's tex).
-interface FdMat { c: number; r: number; m: number; x?: Record<string, any> }
-type FdPrimKind = 'box' | 'cyl' | 'sph' | 'ico' | 'side' | 'plane' | 'grid';
-// A primitive: t its kind, m its material (an index; while it's being described, the material itself), s its size, p
-// where (its centre), r its turn [rx, ry] (three's 'YXZ': turned to face first, then tilted), and by kind: seg (a
-// cylinder's sides; a grid's [cols, rows]), lb (a label of the stock atlas over every face), pts, b (a side profile's
-// outline and its rounded edges), uv (a plane's own uv, corner by corner), z (a grid's heights, corner by corner)
-interface FdPrim { t: FdPrimKind; m: any; s: number[]; p: number[]; r?: number[]; seg?: number | number[]; lb?: number; uv?: number[]; pts?: number[][]; b?: number; z?: number[] }
-// What stops people (boxes), rounds and eyes (ray, hulls), in the piece's frame: js/furniture.ts solids, worldBoxes
-interface FdSolids { boxes: any[]; ray?: any[]; hulls?: number[][] }
-// A group: primitives in one frame (at, turned q quarter-turns about y if q is there: a piece; else only moved), and the
-// piece it is (piece, v, style; solids when asked for)
-interface FdGroup { at: number[]; q?: number; piece?: string; v?: number; style?: any; room?: number; solids?: FdSolids; prims: FdPrim[] }
-interface FdLevel { v: number; mats: FdMat[]; tex: FdTex[]; groups: FdGroup[] }
+import { Level } from './level.js';
+import { U } from './util.js';
+import { World } from './world.js';
+import { Furniture } from './furniture.js';
 type FdRng = (() => number) & { st(): number };
-type FdMk<R> = (w: number, h: number, draw: (g: CanvasRenderingContext2D, w: number, h: number) => void) => R;
-interface FdKit {
-  rnd(): number; pick<T>(a: T[]): T; tint(hex: number, f: number): number;
-  mat(hex: number, rough?: number, metal?: number, extra?: Record<string, any>): FdMat;
-  box(m: FdMat, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
-  cyl(m: FdMat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number, rx?: number): void;
-  cylX(m: FdMat, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
-  sph(m: FdMat, r: number, x: number, y: number, z: number): void;
-  ico(m: FdMat, r: number, x: number, y: number, z: number, ry?: number): void;
-  side(m: FdMat, pts: number[][], w: number, x?: number, b?: number): void;
-  leaf(): FdMat; screen(): FdMat; shade(): FdMat; crate(): FdMat;
-  pack(kind: string, shade?: number): FdMat; label(): number;
-  boxL(m: FdMat, lb: number, w: number, h: number, d: number, x: number, y: number, z: number, ry?: number, rx?: number): void;
-  cylL(m: FdMat, lb: number, rt: number, rb: number, h: number, x: number, y: number, z: number, seg?: number): void;
-  tableLamp(x: number, y: number, z: number): void; plantSmall(x: number, y: number, z: number): void; fruit(x: number, y: number, z: number): void;
-}
-const G_FurnSpec = (() => {
+export const FurnSpec = (() => {
   const VERSION = 1;
-  // G.U.rng's generator (mulberry32), its state readable: a texture's painting starts where the stream is (FdTex.s), and
+  // U.rng's generator (mulberry32), its state readable: a texture's painting starts where the stream is (FdTex.s), and
   // srng(s) carries on from there exactly as the stream would have
   const srng = (seed: number): FdRng => {
     let a = seed >>> 0;
@@ -81,7 +40,7 @@ const G_FurnSpec = (() => {
   function packPaint<R>(mk: FdMk<R>): R {
     const S = 128;
     return mk(S * PACK_N, S * PACK_N, (g) => {
-    const rnd = G.U.rng(0x9ac4a6e);
+    const rnd = U.rng(0x9ac4a6e);
     const INK = ['#b8392e', '#d8a632', '#2c5aa6', '#2f8a48', '#d0702c', '#6c3a9a', '#26262a', '#b8386e', '#3a9a9e', '#9a7238', '#e8e2d2', '#5a2a22', '#c8c03a', '#1e3a5e', '#e6d9b8', '#8a1e24'];
     const pick = <T,>(a: T[]): T => a[Math.floor(rnd() * a.length)];
     for (let ty = 0; ty < PACK_N; ty++) for (let tx = 0; tx < PACK_N; tx++) {
@@ -386,7 +345,7 @@ const G_FurnSpec = (() => {
   // One piece, on its own: as it's drawn wherever it stands (name: js/furniture.ts R; v: its own seed; style: what a
   // resident's or the plan's picked for it), its looks drawn on a stream from seed. With its solids.
   function piece(name: string, v: number, style?: any, seed = 1): FdLevel {
-    const F = G.Furniture, D = recorder(srng(seed));
+    const F = Furniture, D = recorder(srng(seed));
     D.begin([0, 0, 0], 0, { piece: name, v, style, solids: F.solids(F.R[name], v) });
     F.R[name].build(D.k, v, style);
     return D.done();
@@ -395,7 +354,7 @@ const G_FurnSpec = (() => {
   // A level's furniture and the rooms' dressing, as js/furnmesh.ts draws it (solids: each piece's solids too, as the
   // golden test has them; the simulation has its own from the same pieces, js/furniture.ts worldBoxes).
   function describe(map: any, opts: { solids?: boolean } = {}): FdLevel {
-    const L = G.Level, F = G.Furniture, R = F.R, TS = L.TS, { W, t } = map;
+    const L = Level, F = Furniture, R = F.R, TS = L.TS, { W, t } = map;
     const D = recorder(srng((map.seed ^ 0x5eed1e) >>> 0)), k = D.k, mat = D.mat, rnd = D.rnd, pick = k.pick;
     // (every piece's looks draw on a stream of its own, seeded by its v and where it stands (in centimetres: fence panels
     // and the like share a few v's between them, js/level.ts refine), and every room's on one of its own, seeded by the
@@ -405,7 +364,7 @@ const G_FurnSpec = (() => {
     const pieceRng = (p: { v: number; x: number; z: number }) => srng((Math.floor((p.v || 0) * 4294967295) ^ Math.imul(cm(p.x), 0x9e3779b1) ^ Math.imul(cm(p.z), 0x85ebca6b)) >>> 0);
     const roomRng = (rm: any, salt: number) => srng((map.seed ^ salt ^ Math.imul(((rm.fl || 0) * map.H + rm.z) * W + rm.x + 1, 0x9e3779b1) ^ Math.imul(rm.w * 65536 + rm.h, 0x85ebca6b)) >>> 0);
     for (const p of map.propList || new Set(map.props.values())) {
-      // (gy: on rolling ground, a rock or a tree where it lies: G.Level.crestGround)
+      // (gy: on rolling ground, a rock or a tree where it lies: Level.crestGround)
       D.cur = pieceRng(p);
       D.begin([p.x, p.gy || 0, p.z], p.q, { piece: p.name, v: p.v, style: p.style, solids: opts.solids ? F.solids(R[p.name], p.v) : undefined });
       R[p.name].build(k, p.v, p.style);
@@ -447,7 +406,7 @@ const G_FurnSpec = (() => {
         let hilly = false;
         for (let z = rm.z; z <= rm.z + rm.h && !hilly; z++) for (let x = rm.x; x <= rm.x + rm.w; x++) if (Math.abs(tr.v[z * tr.VW + x]) > 1e-3) { hilly = true; break; }
         if (hilly) {
-          const z = gridZ(w, d, rm.w, rm.h, (gx, gy) => G.World.terrainAt(tr, x0 + w / 2 + gx, z0 + d / 2 - gy)); // (the plane's z is up once it's laid flat)
+          const z = gridZ(w, d, rm.w, rm.h, (gx, gy) => World.terrainAt(tr, x0 + w / 2 + gx, z0 + d / 2 - gy)); // (the plane's z is up once it's laid flat)
           D.push({ t: 'grid', m: fm, s: [w, d], seg: [rm.w, rm.h], z, p: [x0 + w / 2, y, z0 + d / 2], r: rot(0, -PI / 2) });
           return;
         }
@@ -590,6 +549,4 @@ const G_FurnSpec = (() => {
 
   return { VERSION, srng, tint, painters, outsidePaint, packPaint, PACK_N, TEX_KINDS, piece, describe, fingerprint, hashOf };
 })();
-G.FurnSpec = G_FurnSpec;
 
-interface GameModules { FurnSpec: typeof G_FurnSpec; }

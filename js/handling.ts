@@ -1,4 +1,9 @@
 'use strict';
+import { Audio } from './audio.js';
+import { beltFed, REV, revolver } from './data.js';
+import { U } from './util.js';
+import { R } from './render.js';
+import { VMAnim } from './vmanim.js';
 // The guns' handling sounds, synthesized: tools/contact-synth simulates each part of the action and the magazine (its
 // materials, its contacts, the air inside it) and scripts/game-bank.mjs bakes them, dry, into assets/audio/handling/
 // (a folder per family of guns, manifest.json: each clip's anchor, the moment into it that the game's cue lines up
@@ -7,7 +12,7 @@
 // suspect's from their hands. A gun with no family of its own (a crossbow) keeps the recorded foley (js/audio.ts
 // sample): every call here returns false when it has nothing, for the caller's fallback.
 interface HandEntry { gain: number; clips: Record<string, { anchor: number; len: number }> }
-const G_Handling = (() => {
+export const Handling = (() => {
   let manifest: { families: Record<string, HandEntry> } | null = null, asked = false;
   const bufs = new Map<string, AudioBuffer>(), loading = new Set<string>();
   // Each gun's family: how its action and its magazine work (the contact synth's specs: an AR-15's charging handle and
@@ -33,23 +38,23 @@ const G_Handling = (() => {
     if (!def) return null;
     if (def.manual) return 'manual';
     if (BY_ID[def.id]) return BY_ID[def.id];
-    if (def.akimbo || def.barrels || def.volley || def.handReload || G.revolver(def) || G.beltFed(def)) return null;
+    if (def.akimbo || def.barrels || def.volley || def.handReload || revolver(def) || beltFed(def)) return null;
     return def.cls === 'PST' || def.cls === 'MP' ? 'g19' : null;
   }
   // the manifest, then a family's clips, fetched as they're first wanted (a family's ~25 clips, ~300 kB)
   function want(f: string) {
-    const ctx = G.Audio.ctx;
+    const ctx = Audio.ctx;
     if (!ctx) return;
     if (!manifest) {
       if (asked) return;
       asked = true;
-      G.Audio.bankJson('handling/manifest.json').then((m) => { manifest = m; want(f); }).catch(() => {}); // (from the audio bundle: G.Audio.bankFile)
+      Audio.bankJson('handling/manifest.json').then((m) => { manifest = m; want(f); }).catch(() => {}); // (from the audio bundle: Audio.bankFile)
       return;
     }
     if (loading.has(f) || !manifest.families[f]) return;
     loading.add(f);
     for (const n of Object.keys(manifest.families[f].clips)) {
-      G.Audio.bankFile('handling/' + f + '/' + n + '.ogg').then((b) => ctx.decodeAudioData(b))
+      Audio.bankFile('handling/' + f + '/' + n + '.ogg').then((b) => ctx.decodeAudioData(b))
         .then((buf) => { bufs.set(f + '/' + n, buf); }).catch(() => {});
     }
   }
@@ -71,12 +76,12 @@ const G_Handling = (() => {
   // land = anchor; one that fires when the recorded foley started: where that foley's own hit was). At your hands (pos
   // null) or from pos. vol: the level the recorded foley played at (the bank is levelled against it).
   function playF(f: string | null, name: string, o: { land?: number; vol?: number; pos?: THREE.Vector3 | { x: number; y: number; z: number } | null } = {}) {
-    const A = G.Audio, ctx = A.ctx, c = clip(f, name);
+    const A = Audio, ctx = A.ctx, c = clip(f, name);
     if (!ctx || !c) return false;
     const now = ctx.currentTime, when = now + (o.land != null ? o.land : c.anchor) - c.anchor;
     const s = ctx.createBufferSource(); s.buffer = c.buf;
     s.playbackRate.value = 0.98 + Math.random() * 0.04; // (no two quite alike)
-    const v = (o.vol != null ? o.vol : 0.7) * c.gain * A.HANDLING, cam = G.R && G.R.camera; // (A.HANDLING: the handling sounds' trim)
+    const v = (o.vol != null ? o.vol : 0.7) * c.gain * A.HANDLING, cam = R && R.camera; // (A.HANDLING: the handling sounds' trim)
     if (o.pos && cam) A.route(s, o.pos, v * A.far(cam.position.distanceTo(o.pos as THREE.Vector3)), v * A.NEAR_PLACED);
     else A.route(s, null, v * A.HANDLING_OWN, v * A.HANDLING_OWN * A.NEAR_HANDS); // (your own: A.HANDLING_OWN up)
     if (when >= now) s.start(when); else s.start(now, Math.min(now - when, c.buf.duration));
@@ -101,19 +106,19 @@ const G_Handling = (() => {
   }
   // A revolver loaded by hand, or a falling block (js/player.ts revOpen, revShut): opened as its first round's reload
   // begins (the crane on its stop REV.open's 0.32 in: vmanim revolverRound), shut over REV.close (the latch at 0.6 of it).
-  const open = (def: WeaponDef) => play(def, 'open-cue', { land: 0.32 * G.REV.open });
-  const shut = (def: WeaponDef) => play(def, 'close', { land: 0.6 * G.REV.close });
+  const open = (def: WeaponDef) => play(def, 'open-cue', { land: 0.32 * REV.open });
+  const shut = (def: WeaponDef) => play(def, 'close', { land: 0.6 * REV.close });
   // When the recorded foley's own hit came after its cue (assets/audio: the insert's catch 0.19 s in, the rack's stop
   // 0.15 s, the slide dropping 0.09 s): cues tuned by ear with it keep their timing.
   const LAND = { magIn: 0.19, magOut: 0, rack: 0.15, home: 0.09, roundIn: 0.19 };
   /** the action worked by hand: which of the family's clips (a manual action's bolt or pump; else by its clock) */
   function rackClip(def: WeaponDef, dur: number) {
-    if (def.manual) return G.VMAnim.kinds(def).action === 'pump' ? 'pump' : 'bolt';
+    if (def.manual) return VMAnim.kinds(def).action === 'pump' ? 'pump' : 'bolt';
     return dur < 0.52 ? 'rack-45' : 'rack-60';
   }
   /** a round loaded by hand (a shell into a tube, a cartridge into a chamber or a magazine) */
   function roundIn(def: WeaponDef, o?: Parameters<typeof playF>[2]) {
-    return playF('manual', def.shell && def.cls === 'SG' && !G.revolver(def) ? 'shell-in' : 'cartridge-in', { land: LAND.roundIn, ...o });
+    return playF('manual', def.shell && def.cls === 'SG' && !revolver(def) ? 'shell-in' : 'cartridge-in', { land: LAND.roundIn, ...o });
   }
   // A dropped magazine's fall, from its first contact (the bank's own drop of that gun's magazine: empty, a third, two
   // thirds or full, landing on its base, its top, its side or its nose), at pos. fill: 0..1.
@@ -121,10 +126,8 @@ const G_Handling = (() => {
   function drop(def: WeaponDef, fill: number, pos: { x: number; y: number; z: number }) {
     const f = fam(def);
     if (!f || f === 'manual' || CUES[f] || f === 'enbloc') return false; // (no magazine of its own to drop)
-    const n = 'drop-' + FILLS[Math.round(G.U.clamp(fill, 0, 1) * 3)] + '-' + WAYS[Math.floor(Math.random() * 4)];
+    const n = 'drop-' + FILLS[Math.round(U.clamp(fill, 0, 1) * 3)] + '-' + WAYS[Math.floor(Math.random() * 4)];
     return playF(f, n, { land: 0, vol: 0.7, pos });
   }
   return { fam, prewarm, lead, play, playF, LAND, rackClip, roundIn, drop, cues, open, shut };
 })();
-G.Handling = G_Handling;
-interface GameModules { Handling: typeof G_Handling; }

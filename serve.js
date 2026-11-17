@@ -1,7 +1,8 @@
 // Zero-dependency static file server: `node serve.js`, then open http://localhost:8080 here, or the network
-// address it prints from another machine on your network. PORT and HOST can be set in the environment.
+// address it prints from another machine on your network. PORT and HOST can be set in the environment; SITE_ROOT serves another folder
+// (a copy of the site with the release bundles in it: tools/bundle.mjs --site, docs/typescript.md).
 const http = require('http'), fs = require('fs'), path = require('path'), os = require('os');
-const root = __dirname, port = +process.env.PORT || 8080, host = process.env.HOST || '::'; // '::': every interface, IPv4 too
+const root = process.env.SITE_ROOT ? path.resolve(process.env.SITE_ROOT) : __dirname, port = +process.env.PORT || 8080, host = process.env.HOST || '::'; // '::': every interface, IPv4 too
 const types = {
   '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.png': 'image/png', '.svg': 'image/svg+xml',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.ico': 'image/x-icon', '.ogg': 'audio/ogg', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.md': 'text/markdown',

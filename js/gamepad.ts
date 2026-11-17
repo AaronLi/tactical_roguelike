@@ -1,13 +1,20 @@
 'use strict';
-// A controller (the Gamepad API's standard mapping: an Xbox pad, a Steam Deck's own controls), polled once a frame by G.Game.loop. It's not a
+import { Audio } from './audio.js';
+import { HUD } from './hud.js';
+import { U } from './util.js';
+import { Touch } from './touch.js';
+import { InvUI } from './invui.js';
+import { Game } from './game.js';
+import { Me } from './player.js';
+// A controller (the Gamepad API's standard mapping: an Xbox pad, a Steam Deck's own controls), polled once a frame by Game.loop. It's not a
 // control scheme of its own: in a level its buttons are the keys and mouse buttons they stand for, sent as those events down the same handlers
 // (js/player.ts bindInput, js/game.ts bindMenu); in a menu it drives a cursor that presses, drags and right-clicks what's on the screen with
 // pointer events, so a shop, the inventory's grids and the gunsmith's canvas all work as they do with a mouse. Only the sticks' fractions go in
-// direct (G.Me.padMove, G.Me.lookBy). A button press isn't a user gesture to a browser, so there's no pointer lock to be had from one: G.Game.softLocked
+// direct (Me.padMove, Me.lookBy). A button press isn't a user gesture to a browser, so there's no pointer lock to be had from one: Game.softLocked
 // stands in for it (js/game.ts lock).
 type PadBtn = 'A' | 'B' | 'X' | 'Y' | 'LB' | 'RB' | 'LT' | 'RT' | 'VIEW' | 'MENU' | 'L3' | 'R3' | 'UP' | 'DOWN' | 'LEFT' | 'RIGHT';
 type PadDir = [number, number];
-const G_Pad = (() => {
+export const Pad = (() => {
   const BTNS: PadBtn[] = ['A', 'B', 'X', 'Y', 'LB', 'RB', 'LT', 'RT', 'VIEW', 'MENU', 'L3', 'R3', 'UP', 'DOWN', 'LEFT', 'RIGHT'];
   const DIRS: Partial<Record<PadBtn, PadDir>> = { UP: [0, -1], DOWN: [0, 1], LEFT: [-1, 0], RIGHT: [1, 0] };
   const DEAD_MOVE = 0.05, DEAD_LOOK = 0.05, LOOK_YAW = 3.4, LOOK_PITCH = 2.3, LOOK_UNITS = 700; // (full stick: rad/s, each way. LOOK_UNITS: "pixels"/s, what the comms wheel's picked by)
@@ -46,7 +53,7 @@ const G_Pad = (() => {
     // (a second one: whichever is being used)
     if (!gp || !anyDown(gp)) { const busy = std.find(anyDown); if (busy) gp = busy; }
     if (!gp && std.length) gp = std[0];
-    if (!gp && !warned && pads.some((p) => p && p.connected)) { warned = true; G.HUD.toast('', 'That controller has no standard mapping in this browser: it can\'t be used', 3); }
+    if (!gp && !warned && pads.some((p) => p && p.connected)) { warned = true; HUD.toast('', 'That controller has no standard mapping in this browser: it can\'t be used', 3); }
     return gp || null;
   }
   const value = (gp: Gamepad, i: number) => { const b = gp.buttons[i]; return b ? (i === 6 || i === 7 ? (b.value > 0.3 ? 1 : 0) : b.pressed || b.value > 0.5 ? 1 : 0) : 0; };
@@ -68,20 +75,20 @@ const G_Pad = (() => {
     const was = on, playing = wasPlay;
     releaseAll(); wasPlay = false; setOn(false); closeOsk(false);
     if (!was) return;
-    G.HUD.toast('', 'Controller disconnected', 3);
-    if (playing && G.Game.softLocked) G.Game.unlock(); // (no way of playing on: the pause menu, and a mouse or the next controller takes it from there)
+    HUD.toast('', 'Controller disconnected', 3);
+    if (playing && Game.softLocked) Game.unlock(); // (no way of playing on: the pause menu, and a mouse or the next controller takes it from there)
   }
 
   function update(dt: number) {
     const gp = read();
     if (!gp) { if (index != null) unplugged(); return; }
-    if (index == null) G.HUD.toast('', 'Controller connected', 2);
+    if (index == null) HUD.toast('', 'Controller connected', 2);
     index = gp.index;
     if (anyDown(gp)) setOn(true);
     prev = cur; cur = {};
     BTNS.forEach((b, i) => { cur[b] = !!value(gp, i); });
     if (!on) return;
-    const g = G.Game, level = g.phase === 'level';
+    const g = Game, level = g.phase === 'level';
     if (level && !g.locked && !g.menuOpen() && g.$('pause').classList.contains('hidden')) g.lock(); // (nothing to click: straight in)
     const play = level && g.locked && !g.menuOpen() && g.$('pause').classList.contains('hidden') && !osk;
     if (wasPlay && !play) releaseAll();
@@ -100,25 +107,25 @@ const G_Pad = (() => {
   function releaseAll() {
     for (const b of BTNS) letGo(b);
     if (steady) { steady = false; key('keyup', 'ShiftLeft'); }
-    if (G.Me) G.Me.padMove = null;
+    if (Me) Me.padMove = null;
     chordUsed = false; rbAt = bAt = 0; bDone = false;
   }
   // Y: the mouse wheel: the other weapon, or aiming through a scope with steps, the next one (round to the lowest again)
   function wheelStep() {
-    const me = G.Me, w = me.cur(), L = w && w.def.magLevels;
+    const me = Me, w = me.cur(), L = w && w.def.magLevels;
     const top = L && me.ads && me.adsT > 0.5 && me.sight(w).i >= L.length - 1;
     for (let i = 0; i < (top ? L.length - 1 : 1); i++) fire(window, new WheelEvent('wheel', { deltaY: top ? 100 : -100 }));
   }
   // RB tapped: a grenade into your hand, the next kind each tap, and past the last one back to the gun (the number keys' own path: the same key again puts it away)
   function nextGrenade() {
-    const me = G.Me, q = me.quick as (string | null | undefined)[], slots = [0, 1, 2].filter((i) => q[i]);
+    const me = Me, q = me.quick as (string | null | undefined)[], slots = [0, 1, 2].filter((i) => q[i]);
     if (!slots.length) return tap('Digit3');
     const at = me.held ? slots.findIndex((i) => q[i] === me.held!.kind) : -1;
     tap('Digit' + (slots[at >= 0 && at + 1 >= slots.length ? at : at + 1] + 3));
   }
   function gameplay(gp: Gamepad, dt: number) {
-    const now = performance.now(), me = G.Me;
-    if (hit('MENU')) { G.Game.unlock(); return; }
+    const now = performance.now(), me = Me;
+    if (hit('MENU')) { Game.unlock(); return; }
     for (const b of BTNS) if (lift(b)) letGo(b);
     if (hit('RB')) { rbAt = now; chordUsed = false; }
     if (lift('RB')) { if (!chordUsed && now - rbAt < HOLD * 1000) nextGrenade(); rbAt = 0; }
@@ -139,7 +146,7 @@ const G_Pad = (() => {
     const [mx, my, mk] = stick(gp, 0, DEAD_MOVE, 1);
     me.padMove = mk ? { st: mx, fw: -my, k: Math.max(0.3, mk) } : null;
     const [lx, ly, lk] = stick(gp, 2, DEAD_LOOK, LOOK_CURVE);
-    if (lk) me.lookBy(lx * LOOK_UNITS * dt, ly * LOOK_UNITS * dt * (LOOK_PITCH / LOOK_YAW), (LOOK_YAW / LOOK_UNITS) * G.Game.settings.padSens);
+    if (lk) me.lookBy(lx * LOOK_UNITS * dt, ly * LOOK_UNITS * dt * (LOOK_PITCH / LOOK_YAW), (LOOK_YAW / LOOK_UNITS) * Game.settings.padSens);
   }
 
   // ------------------------------------------------------------- in a menu
@@ -196,7 +203,7 @@ const G_Pad = (() => {
       const s = along + across * 2.5;
       if (s < bs) { bs = s; best = e; }
     }
-    if (best) { setFocus(best); G.Audio.click(); } else scrollBy(dy * 160);
+    if (best) { setFocus(best); Audio.click(); } else scrollBy(dy * 160);
   }
   function elementAtCursor() { return document.elementFromPoint(cx, cy); }
   function pointer(type: string, t: Element, buttons: number) {
@@ -243,7 +250,7 @@ const G_Pad = (() => {
   function cycle(s: HTMLSelectElement, d: number) {
     const n = s.options.length; if (!n) return;
     s.selectedIndex = (s.selectedIndex + d + n) % n;
-    fire(s, new Event('input', { bubbles: true })); fire(s, new Event('change', { bubbles: true })); G.Audio.click();
+    fire(s, new Event('input', { bubbles: true })); fire(s, new Event('change', { bubbles: true })); Audio.click();
   }
   function nudge(el: HTMLInputElement, d: number) {
     const was = el.value;
@@ -260,13 +267,13 @@ const G_Pad = (() => {
     const f = focus && !free ? focus : null;
     if (dx && f instanceof HTMLInputElement && f.type === 'range') return nudge(f, dx);
     if (dx && f instanceof HTMLSelectElement) return cycle(f, dx);
-    const cell = press ? G.InvUI.dragCell : 0; // (carrying something: a cell at a time, to put it down exactly)
-    if (cell) { cx = G.U.clamp(cx + dx * cell, 0, innerWidth - 1); cy = G.U.clamp(cy + dy * cell, 0, innerHeight - 1); free = true; focus = null; moved = true; return; }
+    const cell = press ? InvUI.dragCell : 0; // (carrying something: a cell at a time, to put it down exactly)
+    if (cell) { cx = U.clamp(cx + dx * cell, 0, innerWidth - 1); cy = U.clamp(cy + dy * cell, 0, innerHeight - 1); free = true; focus = null; moved = true; return; }
     snap([dx, dy]);
   }
   function back() {
     if (osk) { if (osk.input.value) oskKey('back'); else closeOsk(false); return; }
-    const g = G.Game, hid = (id: string) => g.$(id).classList.contains('hidden'), r = root && root.id;
+    const g = Game, hid = (id: string) => g.$(id).classList.contains('hidden'), r = root && root.id;
     if (root && root.classList.contains('inv-menu')) { pointer('pointerdown', document.body, 1); pointer('pointerup', document.body, 0); return; }
     if (focus) { const d = focus.closest('details'); if (d && d.open) { d.open = false; setFocus(d.querySelector('summary')); return; } }
     if (r === 'pause') g.$('btnResume').click();
@@ -276,14 +283,14 @@ const G_Pad = (() => {
   }
   function tabs(d: number) {
     const all = [...document.querySelectorAll<HTMLElement>('#shop:not(.hidden) #shopTabs .tab')], i = all.findIndex((t) => t.classList.contains('on'));
-    if (all.length && i >= 0) { all[(i + d + all.length) % all.length].click(); G.Audio.click(); }
+    if (all.length && i >= 0) { all[(i + d + all.length) % all.length].click(); Audio.click(); }
   }
   function context() {
     const t = aimed(); if (!t) return;
     fire(t, new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: cx, clientY: cy, button: 2 }));
   }
   function menus(gp: Gamepad, dt: number) {
-    const g = G.Game;
+    const g = Game;
     if (g.chatOpen && !osk) openOsk(g.$<HTMLInputElement>('chatInput'));
     if (osk && osk.input.id === 'chatInput' && !g.chatOpen) closeOsk(false);
     const r = findRoot();
@@ -293,7 +300,7 @@ const G_Pad = (() => {
     // the left stick: the cursor, free (for what isn't a button: a place in a grid, a part of a gun)
     const [sx, sy, sk] = stick(gp, 0, DEAD_MOVE, 1.6);
     if (sk) {
-      cx = G.U.clamp(cx + sx * CURSOR * dt, 0, innerWidth - 1); cy = G.U.clamp(cy + sy * CURSOR * dt, 0, innerHeight - 1);
+      cx = U.clamp(cx + sx * CURSOR * dt, 0, innerWidth - 1); cy = U.clamp(cy + sy * CURSOR * dt, 0, innerHeight - 1);
       free = true; moved = true;
       let e = elementAtCursor(); while (e && e !== r && !clickable(e)) e = e.parentElement;
       focus = e && e !== r ? e : null;
@@ -333,7 +340,7 @@ const G_Pad = (() => {
     const g = (b: string) => glyph(b);
     if (osk) return `${g('A')} type · ${g('B')} delete · ${g('X')} shift · ${g('Y')} space · ${g('Menu')} done · ${g('View')} cancel`;
     const carry = root && (root.id === 'fieldInv' || root.id === 'shop') ? ` · hold ${g('A')} carry · ${g('Y')} turn · ${g('X')} more` : '';
-    const sound = G.Audio.ctx && G.Audio.ctx.state === 'suspended' ? ' · <span class="pad-warn">Tap the screen once for sound</span>' : '';
+    const sound = Audio.ctx && Audio.ctx.state === 'suspended' ? ' · <span class="pad-warn">Tap the screen once for sound</span>' : '';
     return `${g('D-pad')} select · ${g('L')} cursor · ${g('R')} scroll · ${g('A')} confirm · ${g('B')} back${root && root.id === 'shop' ? ` · ${g('LB')}${g('RB')} tabs` : ''}${carry}${sound}`;
   }
   function paint() {
@@ -354,8 +361,8 @@ const G_Pad = (() => {
     if (!osk) return;
     const R = ['1234567890', 'QWERTYUIOP', 'ASDFGHJKL-', 'ZXCVBNM_.@'], up = oskShift;
     const v = osk.input.type === 'password' ? '•'.repeat(osk.input.value.length) : osk.input.value;
-    oskEl.innerHTML = `<div class="osk-box ui-panel"><div class="osk-what">${G.U.esc(osk.input.placeholder || 'Enter text')}</div><div class="osk-text">${G.U.esc(v)}<i></i></div>`
-      + R.map((r) => `<div class="osk-row">${[...r].map((c) => { const k = up ? c : c.toLowerCase(); return `<button class="btn" data-k="${G.U.esc(k)}">${G.U.esc(k)}</button>`; }).join('')}</div>`).join('')
+    oskEl.innerHTML = `<div class="osk-box ui-panel"><div class="osk-what">${U.esc(osk.input.placeholder || 'Enter text')}</div><div class="osk-text">${U.esc(v)}<i></i></div>`
+      + R.map((r) => `<div class="osk-row">${[...r].map((c) => { const k = up ? c : c.toLowerCase(); return `<button class="btn" data-k="${U.esc(k)}">${U.esc(k)}</button>`; }).join('')}</div>`).join('')
       + `<div class="osk-row"><button class="btn${up ? ' on' : ''}" data-k="shift">Shift</button><button class="btn osk-wide" data-k=" ">Space</button><button class="btn" data-k="back">Delete</button><button class="btn" data-k="cancel">Cancel</button><button class="btn primary" data-k="done">Done</button></div></div>`;
   }
   function openOsk(input: HTMLInputElement) {
@@ -387,7 +394,7 @@ const G_Pad = (() => {
     const at = focus instanceof HTMLElement ? focus.dataset.k : null;
     oskDraw();
     if (at != null) { const b = [...oskEl.querySelectorAll<HTMLElement>('[data-k]')].find((e) => (e.dataset.k as string).toLowerCase() === at.toLowerCase()); if (b) setFocus(b, false); }
-    G.Audio.click();
+    Audio.click();
   }
 
   function init() {
@@ -396,7 +403,7 @@ const G_Pad = (() => {
     oskEl.addEventListener('click', (e) => { const b = (e.target as HTMLElement).closest<HTMLElement>('[data-k]'); if (b) oskKey(b.dataset.k!); });
     // A mouse or a keyboard picks up where the controller left off (real ones only: what's sent from here isn't trusted). The prompts go back to keys, the
     // cursor's gone; and a real press is the gesture a browser wants before it will play sound.
-    const mine = (e: Event) => { if (!e.isTrusted) return; if (on) setOn(false); if (G.Audio.ctx && G.Audio.ctx.state === 'suspended') G.Audio.init(); };
+    const mine = (e: Event) => { if (!e.isTrusted) return; if (on) setOn(false); if (Audio.ctx && Audio.ctx.state === 'suspended') Audio.init(); };
     for (const ev of ['keydown', 'mousedown', 'pointerdown', 'touchend']) window.addEventListener(ev, mine, true);
     window.addEventListener('mousemove', (e) => { if (e.isTrusted && on && Math.abs(e.movementX) + Math.abs(e.movementY) > 4) setOn(false); }, true);
   }
@@ -407,8 +414,6 @@ const G_Pad = (() => {
     // the events a level's buttons are, and the two that take working out (js/touch.ts sends the same ones)
     synth: { fire, key, tap, wheelStep, nextGrenade },
     // a key prompt, in the controller's buttons while it's the one being used
-    text(html: string) { if (G.Touch.active()) return G.Touch.text(html); if (!on) return html; for (const [re, to] of SUBS) html = html.replace(re, to); return html; },
+    text(html: string) { if (Touch.active()) return Touch.text(html); if (!on) return html; for (const [re, to] of SUBS) html = html.replace(re, to); return html; },
   };
 })();
-G.Pad = G_Pad;
-interface GameModules { Pad: typeof G_Pad; }

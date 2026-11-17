@@ -1,22 +1,6 @@
 'use strict';
-// What a round does to what it hits: the damage it leaves on a surface and what it throws out of it, by what the surface is made
-// of (js/materials.ts). plan() works out a mark; the game puts it in its pool of marks (js/render.ts impact: they stay on doors and
-// targets), the replays in their own scene (js/highlights.ts struck). Walls and doors have the hole really cut in them (js/damage.ts);
-// a mark is what's left round it, or all there is on anything else: a picture of the damage laid on the surface (one sheet of them, drawn
-// here, lit as the level is; a second with the holes left clear, for what's been cut) and, where something really stands proud of
-// it, a piece of geometry too: metal torn open and bent the way the round was going, splinters, torn paper. The way it went
-// matters: a dent's dragged along the round's line, a gouge runs with it, an exit's petals lean with it.
-//   - metal dimples into the hole on the way in and comes out of the far side in petals; a round it stops leaves a dent and lead
-//     smeared in it; cast iron's brittle, and cracks and chips instead
-//   - concrete, block, brick and tile crater and crack, thrown chips and dust, spalling wider out of the back than the front
-//   - wood takes a ragged hole and blows out in splinters along the grain; particle board just crumbles
-//   - plasterboard takes a neat hole in, a torn paper-edged blowout out, and hangs in the air as dust
-//   - cardboard, paper, cloth, foam, wool and stock tear and let go of what's in them, which drifts
-//   - glass and tile star; plastic whitens and stars; earth and sand crater; water splashes; leaves fall
-// what a round does to a surface (js/damage.ts and js/render.ts pass these; dir is a vector or an [x, y, z]). k: e in, x out, r off (a skid)
-type MarkSide = 'e' | 'x' | 'r';
-interface MarkOpts { m?: string; fx?: string; k?: string; n?: number[] | null; dir?: any; J?: number; stop?: boolean; cal?: number; cut?: number; fit?: number; }
-const G_Scars = (() => {
+import { Hooks, U } from './util.js';
+export const Scars = (() => {
   const T = THREE, CELLS = 4, PX = 256;
   type Rnd = () => number;
   type ChipShape = 'chunk' | 'sliver' | 'flake';
@@ -165,7 +149,7 @@ const G_Scars = (() => {
       const y = new T.Vector3().crossVectors(z, x);
       return new T.Quaternion().setFromRotationMatrix(new T.Matrix4().makeBasis(x, y, z));
     };
-    const J = o.J == null ? 800 : o.J, sz = G.U.clamp(Math.sqrt(J / 1000), 0.55, 1.7), cal = (o.cal || 8) / 8, tint = L.tint, out: Piece[] = [];
+    const J = o.J == null ? 800 : o.J, sz = U.clamp(Math.sqrt(J / 1000), 0.55, 1.7), cal = (o.cal || 8) / 8, tint = L.tint, out: Piece[] = [];
     const decal = (cell: number, r0: number, spin = true, sy = 1, t = tint) => { const r = o.fit || r0; out.push({ geo: cellGeo(cell), mat: decalMat(t), s: [r * 2, r * 2 * sy, 1], q: q(spin), off: 0.004 }); }; // (o.fit: this wide: round a hole, js/damage.ts: the hole sets it)
     const look = L.look, x = o.k === 'x', v = Math.floor(Math.random() * 3);
     if (o.k === 'r') { // (a skid: along the way it was going, as long as it was shallow)
@@ -219,7 +203,7 @@ const G_Scars = (() => {
     // o as plan's, at p
     function burst(p: THREE.Vector3, o: MarkOpts) {
       const L = LOOK[o.m || BY_FX[o.fx!] || 'concrete'] || LOOK.concrete, ch = L.chips, n0 = o.n ? new T.Vector3(o.n[0], o.n[1], o.n[2]) : new T.Vector3(0, 1, 0), dir = o.dir ? new T.Vector3(o.dir.x != null ? o.dir.x : o.dir[0], o.dir.y != null ? o.dir.y : o.dir[1], o.dir.z != null ? o.dir.z : o.dir[2]) : null;
-      const k = G.U.clamp(Math.sqrt((o.J == null ? 800 : o.J) / 800), 0.5, 1.6), out = o.k === 'x' && dir ? dir : o.k === 'r' && dir ? dir.clone().addScaledVector(n0, 0.5).normalize() : n0;
+      const k = U.clamp(Math.sqrt((o.J == null ? 800 : o.J) / 800), 0.5, 1.6), out = o.k === 'x' && dir ? dir : o.k === 'r' && dir ? dir.clone().addScaledVector(n0, 0.5).normalize() : n0;
       if (ch) {
         const n = Math.round(ch.n * k * (o.k === 'x' ? 1.5 : 1));
         for (let i = 0; i < n; i++) {
@@ -238,7 +222,7 @@ const G_Scars = (() => {
       if (L.dust != null) {
         const u = puffs[puffI], m = u.obj; puffI = (puffI + 1) % puffs.length;
         u.t = 0; u.life = 1.6 + Math.random() * 1.2; u.k = 0.22 * k * (o.k === 'x' ? 1.5 : 1); u.v.copy(out).multiplyScalar(0.7 * k);
-        m.position.copy(p).addScaledVector(n0, 0.03); m.material.color.setHex(L.dust).multiplyScalar(G.R.partLight ? G.R.partLight(p) : 1); m.material.opacity = 0.7; // (unlit: as lit as where it is, js/render.ts partLight) m.scale.setScalar(u.k); m.visible = true;
+        m.position.copy(p).addScaledVector(n0, 0.03); m.material.color.setHex(L.dust).multiplyScalar(Hooks.partLight!(p)); m.material.opacity = 0.7; // (unlit: as lit as where it is, js/render.ts partLight) m.scale.setScalar(u.k); m.visible = true;
       }
     }
     function update(dt: number) {
@@ -267,5 +251,3 @@ const G_Scars = (() => {
   }
   return { plan, meshes, debris, flapMat };
 })();
-G.Scars = G_Scars;
-interface GameModules { Scars: typeof G_Scars; }

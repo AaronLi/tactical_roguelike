@@ -1,52 +1,36 @@
 'use strict';
-// The hangar: where the squad spends the time between levels. A real place on the same map machinery as a level
-// (G.Level.generateHub: walls, floor, lights, collision, rays), dressed by hand here:
-//   the workshop (west): a bench for each officer, with a computer that opens the gunsmith, and a rack of the
-//     gunsmith's parts for sale;
-//   the store (middle): Vex at his counter (his till opens the whole stock), the kit for sale on pedestals,
-//     a shelf of pouches, and a vending machine (medical gear and grenades; ammunition's at his till);
-//   the stash (east, at the back, by the walkway to the lounge): your crates in a cage, and a console that opens your stash and loadout;
-//   Nightjar Optronics (east, at the back, where the warehouse was): a special-operations outfitter behind a glass front,
-//     night vision in glass cases (G.Shop.offers.nvg), a counter with their rep behind it;
-//   the lounge (east, at the front, by the hangar door): sofas in front of a big screen showing the highlights of the
-//     level just played (js/highlights.ts);
-//   the helipad (out the front): hold F on the helicopter to climb in and ready up; hold F again to get out.
-// Everything for sale can be bought by looking at it (F); the till, the bench computers, the console and the
-// machines' screens open the same shop panels (js/shop.ts) a menu would. Nothing here is on the host: the hangar
-// is the same on every machine, bought stock is a matter for each player, and where everyone stands is what
-// they already tell the host.
-// What never changes is a baked glTF scene (assets/models/scenes/hangar.glb, in the model bundle: tools/bake_hangar.mjs runs
-// fixtures() below, js/range.ts and js/course.ts fixtures and the shell's fixed pieces (js/level.ts buildMesh) in a page and
-// exports them); the game loads it once and adds what changes on its anchors (docs/hangar-data.md, the contract for the Bevy
-// port). The solids (decorate) and what you can look at and press F on (the targets) stay here, as data.
-// one thing for sale or to use (see addTarget); the fields vary with its kind
-interface HangarTarget {
-  id: string; kind: HangarKind; box: number[]; what?: HangarWhat; key?: string | null; sold?: boolean; reach?: number; // (reach: further, a TV on the wall)
-  label?: string; title?: string; tab?: string; who?: string; mine?: boolean; run?: () => void; runText?: string; // (a use target: 'pos')
-  disp?: THREE.Group; sign?: THREE.Mesh<any, any>; spin?: THREE.Object3D | null; signTop?: number; slot?: THREE.Group; idx?: number; // (a thing on show)
-  vendOf?: HangarMachine; name?: string; price?: number; item?: GItem; // (one in a vending machine)
-}
-type HangarKind = 'pos' | 'buy' | 'heli';
-type HangarWhat = 'gear' | 'part' | 'pouch' | 'ammo' | 'svc';
-interface HangarRig { rig: Rig; x: number; z: number; yaw: number; vex?: boolean; y?: number; }
-interface HangarVend { id: string; title: string; x: number; z: number; cols: number; rows: number; tab: string; }
-interface HangarMachine { v: HangarVend; group: THREE.Group; key: string; slots: unknown[]; }
-interface HangarShip { group: THREE.Group; rotors: THREE.Group[]; tail: THREE.Group; glow: THREE.MeshBasicMaterial; thrust: THREE.MeshBasicMaterial; }
-interface HangarHeli extends HangarShip { rotor: THREE.Group; speed: number; spin: number; }
-interface HangarState {
-  root: THREE.Group; map: LvMap; targets: HangarTarget[]; items: HangarTarget[]; stands: HangarTarget[]; rigs: HangarRig[]; heli: HangarHeli | null; vend: HangarMachine[];
-  hover: HangarTarget | null; hold: number; hl: THREE.Object3D | null; t: number; vexQuip: number; key: string;
-  rosterKey: string | undefined; partStands: HangarTarget[] | undefined; precStands: HangarTarget[] | undefined; njStands?: HangarTarget[]; njPart?: HangarTarget | null; pouchSlots: THREE.Group[] | undefined;
-  anchors?: Map<string, THREE.Object3D> | null; live?: THREE.Object3D[]; loadMs?: number; // (the baked scene's anchors, by name; what the live parts added; how long the baked scene took to parse)
-}
+import { ReplayEnv } from './replayenv.js';
+import { Audio } from './audio.js';
+import { Course } from './course.js';
+import { HANGAR_ROWS, VENDOR_QUIPS } from './data.js';
+import { Gear } from './gear.js';
+import { Models } from './glb.js';
+import { GunModels } from './gunmodels.js';
+import { Highlights } from './highlights.js';
+import { HUD } from './hud.js';
+import { Humans } from './humans.js';
+import { Icons } from './icons.js';
+import { LevelView } from './levelview.js';
+import { Gunsmith } from './parts.js';
+import { Range } from './range.js';
+import { R } from './render.js';
+import { Rig } from './rig.js';
+import { Shop } from './shop.js';
+import { ShopUI } from './shopui.js';
+import { SpaceData } from './spacedata.js';
+import { Hooks, U } from './util.js';
+import { World } from './world.js';
+import { Net } from './net.js';
+import { Game } from './game.js';
+import { Me as G_Me } from './player.js';
 
-const G_Hangar = (() => {
+export const Hangar = (() => {
   const T = THREE;
   // ------------------------------------------------------------------------ the plan (metres)
   // Everything below is in the hall's own coordinates (its north wall at z 0..2, the range beyond it at negative z). The
   // map has the range's rows first: RZ is how far the hall sits from the map's origin. The scene hangs from a group set
   // RZ in (so meshes just use the hall's), and what's in the world (solids, targets, where you stand) adds it.
-  const RZ = G.HANGAR_ROWS * 2;
+  const RZ = HANGAR_ROWS * 2;
   const HELI = { x: 26, z: 36.2, floor: 0.55, seats: 6 };
   const BENCH = (i: number) => ({ x: 2.1, x1: 3.25, z: 4 + i * 4 });
   const COUNTER = { x0: 22, x1: 28, z0: 4, z1: 5, h: 1.05 }, VEX = { x: 25, z: 2.9 };
@@ -67,7 +51,7 @@ const G_Hangar = (() => {
   const LOUNGE = { x0: 36, x1: 50, z0: 14.2, z1: 26, wall: 38, sofas: [{ x: 43.4, z0: 17.6, z1: 22.4 }, { x: 40.4, z0: 17.2, z1: 22.8 }], table: [45.0, 19.3, 46.0, 20.7, 0.42], bar: [37.0, 23.4, 38.0, 25.8, 1.0] };
   // the precision showcase: the front of the workshop side, by the hangar door, done up as a hunting superstore (Timberline
   // Outfitters): a plank floor inside log rails (a way in off the hall, and one from the workshop), six tree stumps (two rows of three) with the
-  // scopes, the bipod and the match barrels for sale turning on them (G.Gunsmith.rollPrecision), fibreglass rockwork along the
+  // scopes, the bipod and the match barrels for sale turning on them (Gunsmith.rollPrecision), fibreglass rockwork along the
   // front wall with a waterfall into a pond, a stuffed grizzly reared up on a boulder, pines, a canoe hung from the roof
   const OUT = { x0: 5.4, x1: 16.6, z0: 16.4, z1: 26, rows: [18.6, 21.6], xs: [7.6, 10.9, 14.2], top: 0.9, size: 0.9, rocks: 24.9, pond: [10.0, 23.0, 14.8, 25.4], bear: [7.0, 24.0], pines: [[15.9, 25.0], [6.1, 17.2]], door: [19.0, 21.2], back: 8.4 };
   const REACH = 3.2, HELI_REACH = 4.2, HOLD = 1.1;
@@ -81,7 +65,7 @@ const G_Hangar = (() => {
   const rockG = () => ROCK_G || (ROCK_G = new THREE.IcosahedronGeometry(1, 1));
   function rockwork() {
     if (ROCKS) return ROCKS;
-    const T = THREE, O = OUT, rnd = G.U.rng(0x70c4e5), cols = [0x9a8468, 0x8a7a66, 0xa89276, 0x7a7064, 0xb09a7c], at: number[][] = [], m4 = new T.Matrix4(), e = new T.Euler();
+    const T = THREE, O = OUT, rnd = U.rng(0x70c4e5), cols = [0x9a8468, 0x8a7a66, 0xa89276, 0x7a7064, 0xb09a7c], at: number[][] = [], m4 = new T.Matrix4(), e = new T.Euler();
     for (let x = O.x0 + 0.3; x < O.x1; x += 0.9) for (let k = 0; k < 3; k++) at.push([x + (rnd() - 0.5) * 0.5, 0.35 + k * 0.85 + rnd() * 0.2, O.rocks + 0.55 + (rnd() - 0.5) * 0.3, 0.75 - k * 0.12 + rnd() * 0.25]);
     for (let i = 0; i < 9; i++) { const a = rnd() * 6.28, d = rnd() * 0.7; at.push([O.bear[0] + Math.cos(a) * d, 0.2 + rnd() * 0.15, O.bear[1] + Math.sin(a) * d, 0.55 + rnd() * 0.25]); } // (the bear's boulder)
     for (let x = O.pond[0]; x <= O.pond[2]; x += 0.6) at.push([x, 0.15, O.pond[1] + 0.15, 0.32 + rnd() * 0.12]); // (the pond's rim)
@@ -91,7 +75,7 @@ const G_Hangar = (() => {
 
   // ------------------------------------------------------------------------ the solids (every machine's map has them)
   function decorate(map: LvMap) {
-    const w = map.world, add = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, unknown>) => G.World.add(w, G.World.box(x0, y0, z0 + RZ, x1, y1, z1 + RZ, Object.assign({ kind: 'prop' }, o || {})));
+    const w = map.world, add = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, o?: Record<string, unknown>) => World.add(w, World.box(x0, y0, z0 + RZ, x1, y1, z1 + RZ, Object.assign({ kind: 'prop' }, o || {})));
     for (let i = 0; i < 6; i++) { const b = BENCH(i); add(b.x, 0, b.z - 1.1, b.x1, 0.9, b.z + 1.1); }
     for (let i = 0; i < PARTS.n; i++) { const x = PARTS.x0 + i * PARTS.step; add(x - 0.36, 0, PARTS.z - 0.34, x + 0.36, 1.5, PARTS.z + 0.34); } // (a parts pedestal, and the air its part turns in)
     add(ZERO.x0, 0, ZERO.z0, ZERO.x1, ZERO.h + 0.05, ZERO.z1); // (the zeroing table)
@@ -104,9 +88,9 @@ const G_Hangar = (() => {
     for (const k of rockwork()) {
       m4.fromArray(k.m);
       const t: number[] = []; for (let i = 0; i < tri.length; i += 3) { v.set(tri[i], tri[i + 1], tri[i + 2]).applyMatrix4(m4); t.push(v.x, v.y, v.z + RZ); }
-      const h = G.World.hullOf(t, [[0, -1, 0, 0]], { kind: 'prop', move: false });
-      G.World.add(w, h);
-      for (const b of G.World.fitBoxes(h, 0, 0.2)) G.World.add(w, G.World.box(b[0], b[1], b[2], b[3], b[4], b[5], { kind: 'prop', ray: false, nostep: true }));
+      const h = World.hullOf(t, [[0, -1, 0, 0]], { kind: 'prop', move: false });
+      World.add(w, h);
+      for (const b of World.fitBoxes(h, 0, 0.2)) World.add(w, World.box(b[0], b[1], b[2], b[3], b[4], b[5], { kind: 'prop', ray: false, nostep: true }));
     }
     add(OUT.x0, 0, OUT.rocks + 0.6, OUT.x1, 2.8, OUT.z1, { ray: false }); // (behind the rocks, between them and the wall)
     add(OUT.pond[0], 0, OUT.pond[1], OUT.pond[2], 0.5, OUT.pond[3], { ray: false }); add(OUT.pond[0], 0, OUT.pond[1], OUT.pond[2], 0.32, OUT.pond[3], { move: false });
@@ -117,7 +101,7 @@ const G_Hangar = (() => {
     add(COUNTER.x0, 0, COUNTER.z0, COUNTER.x1, COUNTER.h, COUNTER.z1);
     add(COUNTER.x0 - 0.1, 0, 2, COUNTER.x0 + 0.1, 2.2, COUNTER.z1); add(COUNTER.x1 - 0.1, 0, 2, COUNTER.x1 + 0.1, 2.2, COUNTER.z1);
     add(COUNTER.x0, 0, 2, COUNTER.x1, 2.2, 2.45);
-    if (G.Range) G.Range.decorate(map, add);
+    if (Range) Range.decorate(map, add);
     for (const x of STAND.xs) add(x - 0.5, 0, STAND.z - 0.45, x + 0.5, 2.0, STAND.z + 0.45); // (a pedestal, and the air its piece hangs in)
     add(POUCH.x0, 0, POUCH.z0 - 0.2, POUCH.x1, 1.9, POUCH.z0 + POUCH.n * POUCH.step);
     for (const v of VEND) add(v.x, 0, v.z - 0.55, v.x + 1.1, 1.95, v.z + 0.55);
@@ -136,8 +120,8 @@ const G_Hangar = (() => {
     add(L.table[0], 0, L.table[1], L.table[2], L.table[4], L.table[3]);
     add(L.bar[0], 0, L.bar[1], L.bar[2], L.bar[4], L.bar[3]);
     // the helicopter: the cabin and nose, and the tail boom (above head height at its end, but there's no walking through it)
-    add(HELI.x - 3.4, 0, HELI.z - 1.35, HELI.x + 2.4, 2.8, HELI.z + 1.35);
-    add(HELI.x + 2.4, 1.5, HELI.z - 0.3, HELI.x + 8.3, 2.5, HELI.z + 0.3);
+    // (the game in space: the squad's ship stands on the pad instead, its deck its own: js/space.ts)
+    if (!SpaceData.ON) { add(HELI.x - 3.4, 0, HELI.z - 1.35, HELI.x + 2.4, 2.8, HELI.z + 1.35); add(HELI.x + 2.4, 1.5, HELI.z - 0.3, HELI.x + 8.3, 2.5, HELI.z + 0.3); }
   }
 
   // ------------------------------------------------------------------------ drawing helpers
@@ -194,14 +178,14 @@ const G_Hangar = (() => {
       c.traverse((o: THREE.Object3D & Record<string, any>) => { if (o.geometry) o.geometry.dispose(); const m = o.material; if (m && !m.userData.keep) { if (m.map) m.map.dispose(); m.dispose(); } });
     }
   }
-  const money = (n: number) => '¢' + G.U.fmt(n);
+  const money = (n: number) => '¢' + U.fmt(n);
 
   // a product on display: a card with the item's icon, `s` metres per cell of it, and a tag under it
   function product(parent: THREE.Object3D, item: GItem, x: number, y: number, z: number, yaw: number, tag: THREE.Material | null, s = 0.13, tagMat: THREE.Material | null = null) {
-    const [cw, ch] = G.Gear.size(item), w = Math.max(0.22, cw * s), h = Math.max(0.22, ch * s), g = new T.Group();
+    const [cw, ch] = Gear.size(item), w = Math.max(0.22, cw * s), h = Math.max(0.22, ch * s), g = new T.Group();
     g.position.set(x, y, z); g.rotation.y = yaw;
     const back = new T.Mesh(new T.BoxGeometry(w + 0.04, h + 0.04, 0.03), M(0x1b1e22)); back.position.z = 0; g.add(back);
-    const ic = new T.Mesh(new T.PlaneGeometry(w, h), iconMat(G.Icons.of(item, cw, ch, false))); ic.position.z = 0.0165; g.add(ic);
+    const ic = new T.Mesh(new T.PlaneGeometry(w, h), iconMat(Icons.of(item, cw, ch, false))); ic.position.z = 0.0165; g.add(ic);
     parent.add(g);
     if (tag) { const t = new T.Mesh(new T.PlaneGeometry(0.46, 0.17), tag); t.position.set(0, -h / 2 - 0.14, 0.02); g.add(t); }
     return g;
@@ -210,7 +194,7 @@ const G_Hangar = (() => {
   // ------------------------------------------------------------------------ what's for sale: one row per thing
   // A thing for sale or to use: its box (what you look at), what it says, and what F does.
   function addTarget(t: HangarTarget) { t.box = [t.box[0], t.box[1], t.box[2] + RZ, t.box[3], t.box[4], t.box[5] + RZ]; S.targets.push(t); return t; } // (boxes are said in the hall's coordinates, kept in the world's)
-  const gearOf = (id: string) => G.Gear.DEFS[id];
+  const gearOf = (id: string) => Gear.DEFS[id];
   // what a piece of gear fits on that isn't part of the sale (a plate goes in a carrier, a face guard on a helmet)
   const needs = (d: GearDef) => (d.kind === 'plate' || d.kind === 'shoulder' || d.kind === 'groin' ? 'carrier not included' : d.kind === 'face' || d.kind === 'nvg' ? 'helmet not included' : d.kind === 'legs' ? 'belt not included' : null);
   // The piece on show, on its own. The same models the squad wears (js/rig.ts setKit makes them in the frames of a body):
@@ -220,18 +204,18 @@ const G_Hangar = (() => {
   function plateMesh(id: string, k = 1) {
     // (the shared gear's plate: models/characters/build_gear.py, a SAPI cut, curved, its strike face raised; loaded with the bodies)
     const g = new T.Group(), c = PLATE_COL[id] || 0x4a4f55, put = () => {
-      const s = G.Humans.gear('plate'); if (!s) return;
+      const s = Humans.gear('plate'); if (!s) return;
       const p = s.clone(true); p.scale.setScalar(k);
       p.traverse((o: any) => { if (o.isMesh) o.material = /plateface/.test(o.material.name || '') ? M(c, { roughness: 0.9 }) : M(c, { roughness: 0.5, metalness: 0.4 }); });
       g.add(p);
     };
-    if (G.Humans.gear('plate')) put(); else G.Humans.ensure('m01').then(put);
+    if (Humans.gear('plate')) put(); else Humans.ensure('m01').then(put);
     return g;
   }
   const SHOW: Record<string, string[]> = { carrier: ['carrier'], helmet: ['helmet', 'face'], face: ['face'], shoulder: ['shoulder'], groin: ['groin'], legs: ['legs'], belt: ['belt'], pack: ['pack'] }, SCALE: Record<string, number> = { carrier: 1.45, helmet: 1.9, face: 2.1, shoulder: 1.5, groin: 2, legs: 1.1, belt: 1.7, pack: 1.5 };
   // A mannequin to build a piece on, and f once its body's in (the pieces are its own: js/rig.ts setKit draws nothing before)
-  const MANNEQUIN = (top: number, pants: number) => G.Rig.create({ style: 'tactical', bare: true, mannequin: true, look: { top: 'tshirt', topC: top, pants: 'jeans', pantsC: pants, eyes: 'none', gloves: 'none' }, seed: 5 });
-  const onBody = (rig: any, f: () => void) => { if (rig.hKit) f(); else G.Humans.ensure(rig.human).then(() => { if (rig.hKit) f(); }); };
+  const MANNEQUIN = (top: number, pants: number) => Rig.create({ style: 'tactical', bare: true, mannequin: true, look: { top: 'tshirt', topC: top, pants: 'jeans', pantsC: pants, eyes: 'none', gloves: 'none' }, seed: 5 });
+  const onBody = (rig: any, f: () => void) => { if (rig.hKit) f(); else Humans.ensure(rig.human).then(() => { if (rig.hKit) f(); }); };
   // a piece as it is on the body, standing on its own: a skinned piece's vertices where its bones have them now, a plain mesh
   // (in world space, as m was)
   function frozen(m: THREE.Mesh, mat?: THREE.Material) {
@@ -246,7 +230,7 @@ const G_Hangar = (() => {
     const c = new T.Mesh(geo, mat || m.material); m.matrixWorld.decompose(c.position, c.quaternion, c.scale); return c;
   }
   function showPiece(id: string) {
-    const d = gearOf(id), O = (G.Shop.offers || {}) as ShopOffers, np = (d.pouches || []).length, root = new T.Group();
+    const d = gearOf(id), O = (Shop.offers || {}) as ShopOffers, np = (d.pouches || []).length, root = new T.Group();
     if (d.kind === 'plate') { const p = plateMesh(id, 2.3); p.position.y = STAND.top + 0.14; p.rotation.x = -0.14; root.add(p); return { root, spin: null }; }
     const pivot = new T.Group(); pivot.scale.setScalar(SCALE[d.kind] || 1.5); pivot.position.y = STAND.top + 0.12; pivot.rotation.y = Math.PI; // (worn, its front's -z: turned to face the aisle)
     root.add(pivot);
@@ -275,7 +259,7 @@ const G_Hangar = (() => {
   // out. If it can't be (a receiver kit, a dot that sits on a riser), its card instead.
   // (size: how long it's drawn, its longest side; top: what it stands over. The showcase's are bigger: OUT)
   function partPiece(id: string, size = 0.5, top = PARTS.top) {
-    const GS = G.Gunsmith, p = GS.PARTS[id], root = new T.Group(), pivot = new T.Group();
+    const GS = Gunsmith, p = GS.PARTS[id], root = new T.Group(), pivot = new T.Group();
     root.add(pivot);
     // the guns it fits, and the build with it on each (the first that shows it is used: the models are baked glTF that may still be coming in, so this goes one gun at a time)
     const cands: { gid: string; b: Record<string, string>; slot: string }[] = [];
@@ -286,11 +270,11 @@ const G_Hangar = (() => {
       if (b[sl.slot] !== id) continue;
       cands.push({ gid, b, slot: sl.slot });
     }
-    const card = () => { product(root, G.Gear.partItem(id), 0, top + 0.24, 0, 0, null, 0.1); };
+    const card = () => { product(root, Gear.partItem(id), 0, top + 0.24, 0, 0, null, 0.1); };
     const attempt = (i: number) => {
       if (i >= cands.length) return card();
-      const c = cands[i], { group } = G.GunModels.display(GS.compile(c.gid, c.b)), keep: THREE.Mesh<any, any>[] = [];
-      G.GunModels.whenReady(group, (ok) => {
+      const c = cands[i], { group } = GunModels.display(GS.compile(c.gid, c.b)), keep: THREE.Mesh<any, any>[] = [];
+      GunModels.whenReady(group, (ok) => {
         if (!ok) return attempt(i + 1);
         group.updateMatrixWorld(true);
         group.traverse((o: any) => { if (o.isMesh && o.userData.slot === c.slot) keep.push(o); });
@@ -313,15 +297,15 @@ const G_Hangar = (() => {
   }
   // what's on the sign: the name, the price, and everything that comes with it (or doesn't)
   function signFor(id: string, sold: boolean) {
-    const d = gearOf(id), Sh = G.Shop, O = Sh.offers!, L = [d.name, sold ? 'SOLD' : money(Sh.gearPrice(id))];
+    const d = gearOf(id), Sh = Shop, O = Sh.offers!, L = [d.name, sold ? 'SOLD' : money(Sh.gearPrice(id))];
     if (sold) return L;
     const pl = O.plates && O.plates[id] && gearOf(O.plates[id]), fc = O.faces && O.faces[id] && gearOf(O.faces[id]);
     if (d.kind === 'carrier') {
-      if (d.molle) L.push('comes with: ' + Sh.issued(d));
+      if (d.molle) L.push('comes with: ' + ShopUI.issued(d));
       if (pl) L.push('plate included: ' + pl.name); else if (d.plate) L.push('!plate pocket: plate not included');
     } else if (d.kind === 'helmet') {
       if (fc) L.push('face guard included: ' + fc.name); else if (d.face) L.push('!face guard not included');
-    } else if (d.kind === 'belt') L.push('comes with: ' + Sh.issued(d));
+    } else if (d.kind === 'belt') L.push('comes with: ' + ShopUI.issued(d));
     else if (d.kind === 'pack') { const [w, h] = d.grids![0]; L.push(`holds ${w}×${h}`); }
     else if (needs(d)) L.push('!' + needs(d));
     return L;
@@ -343,10 +327,10 @@ const G_Hangar = (() => {
   function load(): Promise<boolean> {
     if (loadP) return loadP;
     const t0 = performance.now();
-    return (loadP = G.Models.loadFile(FILE).then((scene: THREE.Object3D) => { BAKED = prep(scene); loadMs = performance.now() - t0; S.loadMs = Math.round(loadMs); return true; },
+    return (loadP = Models.loadFile(FILE).then((scene: THREE.Object3D) => { BAKED = prep(scene); loadMs = performance.now() - t0; S.loadMs = Math.round(loadMs); return true; },
       (e: any) => { console.error('[hangar] ' + FILE + ': ' + (e && e.message || e)); loadP = null; return false; }));
   }
-  // a quantised attribute (normals, UVs: tools/model_emit.mjs compression) as float32 (what G.LevelView.batchStatic batches)
+  // a quantised attribute (normals, UVs: tools/model_emit.mjs compression) as float32 (what LevelView.batchStatic batches)
   function floatAttr(a: THREE.BufferAttribute | THREE.InterleavedBufferAttribute) {
     const n = a.count, s = a.itemSize, f = new Float32Array(n * s);
     for (let i = 0; i < n; i++) { f[i * s] = a.getX(i); if (s > 1) f[i * s + 1] = a.getY(i); if (s > 2) f[i * s + 2] = a.getZ(i); if (s > 3) f[i * s + 3] = a.getW(i); }
@@ -401,9 +385,11 @@ const G_Hangar = (() => {
     if (!BAKED) console.error('[hangar] the baked hangar is not loaded (' + FILE + '): only what changes is drawn');
     S.root = (BAKED ? BAKED.clone() : new T.Group()) as THREE.Group; S.root.position.set(0, 0, RZ);
     S.anchors = new Map(); S.root.traverse((o) => { if (o.userData.anchor) S.anchors!.set(o.name, o); });
-    G.R.levelRoot.add(S.root);
-    workshop(); outfitters(); store(); stash(); nightjar(); helicopter(); if (G.Range) G.Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget, at }); outline();
-    if (G.Highlights) G.Highlights.mount(S.root, { addTarget, at }); // (the TVs, showing the level just played, F to record it: js/highlights.ts)
+    R.levelRoot.add(S.root);
+    // (the game in space: no helicopter, nor the sign that hung over its door: the squad's ship stands there, js/space.ts)
+    if (SpaceData.ON) { const hp = S.root.getObjectByName('helipad'); if (hp) for (const c of [...hp.children]) if (Math.abs(c.position.y - 2.98) < 0.05) hp.remove(c); }
+    workshop(); outfitters(); store(); stash(); nightjar(); if (!SpaceData.ON) helicopter(); if (Range) Range.build(S.root, S, { box, M, signMat, canvasTex, addTarget, at }); outline();
+    if (Highlights) Highlights.mount(S.root, { addTarget, at }); // (the TVs, showing the level just played, F to record it: js/highlights.ts)
     refresh(true);
     batch();
   }
@@ -415,8 +401,8 @@ const G_Hangar = (() => {
     const sec = (name: string) => { const g = new T.Group(); g.name = name; root.add(g); return g; };
     S.map = map;
     zonesFixed(sec('zones')); workshopFixed(sec('workshop')); outfittersFixed(sec('outfitters')); storeFixed(sec('store')); stashFixed(sec('stash')); nightjarFixed(sec('nightjar')); loungeFixed(sec('lounge')); helipadFixed(sec('helipad'));
-    if (G.Range) G.Range.fixtures(sec('range'), sec('course'), { box, M, signMat, canvasTex, anchor });
-    if (G.Highlights) G.Highlights.TVS.forEach(([x, y, z, ry, w]: number[], i: number) => anchor(root.getObjectByName('lounge')!, 'tv', i, x, y, z, ry, { w })); // (the TVs: js/highlights.ts mount)
+    if (Range) Range.fixtures(sec('range'), sec('course'), { box, M, signMat, canvasTex, anchor });
+    if (Highlights) Highlights.TVS.forEach(([x, y, z, ry, w]: number[], i: number) => anchor(root.getObjectByName('lounge')!, 'tv', i, x, y, z, ry, { w })); // (the TVs: js/highlights.ts mount)
     return root;
   }
   // The hall's fixtures and what's added to them (the floor's markings, the benches, counters, shelves, the stash's cage,
@@ -424,7 +410,7 @@ const G_Hangar = (() => {
   // (js/levelview.ts batchStatic): about half the hangar's draw calls. Not anything that's kept hold of to be moved or changed
   // later, nor what's under it: what's on show and turning, its sign, the vending machines' slots, the pouch shelf, the
   // helicopter (its rotors), the people, the range's plates, carriers and screens, the course's stage, the TVs.
-  //   (G.LevelView.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
+  //   (LevelView.batchStatic leaves alone anything with a material of its own, as a sign's or a screen's is.)
   function batch() {
     const keep = new Set<THREE.Object3D>(), hold = (o: unknown, d = 0) => {
       if (!o || typeof o !== 'object' || d > 2) return;
@@ -433,19 +419,19 @@ const G_Hangar = (() => {
     };
     for (const t of S.targets) hold(t);
     hold(S.rigs.map((r) => r.rig.root)); hold(S.vend); hold(S.heli); hold(S.pouchSlots); hold(S.hl); hold(S.live);
-    if (G.Range) { hold(G.Range.S.tg); hold(G.Range.S.lanes); hold(G.Range.S.live); }
-    if (G.Course) { const C = G.Course.S; hold([C.grp, C.tg, C.board, C.screens, C.live]); }
-    if (G.Highlights && (G.Highlights as any).P) hold((G.Highlights as any).P.tvs);
+    if (Range) { hold(Range.S.tg); hold(Range.S.lanes); hold(Range.S.live); }
+    if (Course) { const C = Course.S; hold([C.grp, C.tg, C.board, C.screens, C.live]); }
+    if (Highlights && (Highlights as any).P) hold((Highlights as any).P.tvs);
     keep.delete(S.root);
-    G.LevelView.batchStatic(S.root, keep);
+    LevelView.batchStatic(S.root, keep);
   }
   function leave() {
-    if (G.Range) G.Range.leave();
-    if (G.Highlights) G.Highlights.unmount();
+    if (Range) Range.leave();
+    if (Highlights) Highlights.unmount();
     if (S.root && S.root.parent) S.root.parent.remove(S.root);
     S.root = null as unknown as THREE.Group; S.map = null as unknown as LvMap; S.targets = []; S.items = []; S.rigs = []; S.heli = null; S.hover = null; S.njStands = []; S.njPart = null; S.anchors = null; S.live = [];
   }
-  const rosterKey = () => Object.keys(G.Game.roster || {}).sort().join(',');
+  const rosterKey = () => Object.keys(Game.roster || {}).sort().join(',');
   // what the live parts added that nothing else keeps hold of (batch: not to be batched)
   const live = <O extends THREE.Object3D>(o: O) => { (S.live || (S.live = [])).push(o); return o; };
 
@@ -523,9 +509,9 @@ const G_Hangar = (() => {
     }
   }
   function workshop() {
-    const r = S.root, ids = Object.keys(G.Game.roster || {}).sort();
+    const r = S.root, ids = Object.keys(Game.roster || {}).sort();
     for (let i = 0; i < 6; i++) {
-      const a = at('bench', i), x = a.position.x, z = a.position.z, x1 = a.userData.x1 as number, owner = ids[i] ? G.Game.roster[ids[i]] : null, mine = ids[i] === G.Net.myId;
+      const a = at('bench', i), x = a.position.x, z = a.position.z, x1 = a.userData.x1 as number, owner = ids[i] ? Game.roster[ids[i]] : null, mine = ids[i] === Net.myId;
       const scr = new T.Mesh(new T.PlaneGeometry(0.62, 0.3), screenMat('GUNSMITH', [owner ? owner.name.toUpperCase() : 'FREE BENCH', mine ? 'F: work on your guns' : owner ? 'their bench' : ''], 256, 124));
       scr.rotation.y = Math.PI / 2; scr.position.set(x + 0.385, 1.26, z); r.add(live(scr));
       // the nameplate on the front edge
@@ -547,7 +533,7 @@ const G_Hangar = (() => {
 
   // ---- the precision showcase (OUT): a hunting superstore's corner. What's for sale is on the stumps (refresh: S.precStands).
   function outfittersFixed(r: THREE.Object3D) {
-    const O = OUT, rnd = G.U.rng(0x7b3a5e);
+    const O = OUT, rnd = U.rng(0x7b3a5e);
     // a log from (x0, y0, z0) to (x1, y1, z1), bark on it
     const bark = M(0x5a3f28, { roughness: 1 }), barkD = M(0x46301e, { roughness: 1 }), up = new T.Vector3(0, 1, 0);
     const log = (a: [number, number, number], b: [number, number, number], rad: number, mat: THREE.Material = bark) => {
@@ -700,7 +686,7 @@ const G_Hangar = (() => {
     addTarget({ id: 'vex', kind: 'pos', box: [COUNTER.x0, 0.0, 2.2, COUNTER.x1, 2.1, 5.0], label: 'Vex', tab: 'stock', title: 'Vex: the whole stock' });
     // Vex himself
     const va = at('vex'), vx = va.position.x, vz = va.position.z;
-    const vex = G.Rig.create({ style: 'tactical', bare: true, vex: true, skinColor: 0x8a6e55, look: { top: 'hoodie', topC: 0x2b2a24, pants: 'cargo', pantsC: 0x23221c, eyes: 'none', gloves: 'leather' }, seed: 77, scale: 1.04 });
+    const vex = Rig.create({ style: 'tactical', bare: true, vex: true, skinColor: 0x8a6e55, look: { top: 'hoodie', topC: 0x2b2a24, pants: 'cargo', pantsC: 0x23221c, eyes: 'none', gloves: 'leather' }, seed: 77, scale: 1.04 });
     vex.setKit({ carrier: 'c.recon', cp: 3, belt: 'b.battle', bp: 2, ifak: 1 });
     vex.root.position.set(vx, 0, vz); r.add(vex.root); S.rigs.push({ rig: vex, x: vx, z: vz, yaw: (va.userData.ry as number) || 0, vex: true });
     // the pedestals' pieces of gear: the piece turning slowly on top, its sign on the front
@@ -760,7 +746,7 @@ const G_Hangar = (() => {
   // the brand on the back wall over two rows of glass cases (one for each set they make, the set turning inside on a
   // mannequin's head, its card on the case's face to the aisle), a counter at the far end with their rep behind it (a
   // panoramic set flipped up on the helmet), shelves of boxed stock, a keypad at the door and a camera dome over it.
-  // What's in stock this visit is the shop's (G.Shop.offers.nvg); a set not in this visit (or not yet: lv) says so on its card.
+  // What's in stock this visit is the shop's (Shop.offers.nvg); a set not in this visit (or not yet: lv) says so on its card.
   function nightjarFixed(r: THREE.Object3D) {
     const N = NJ, cx = (N.x0 + N.x1) / 2, cz = (N.z0 + N.z1) / 2;
     const black = M(0x121416, { roughness: 0.45, metalness: 0.3 }), panel = M(0x1b1f23, { roughness: 0.6, metalness: 0.2 }), steel = M(0x3a4046, { roughness: 0.35, metalness: 0.7 });
@@ -869,7 +855,7 @@ const G_Hangar = (() => {
     addTarget({ id: 'njtill', kind: 'pos', box: [C.x0 - 0.1, C.h - 0.1, tcz - 0.3, C.x1, C.h + 0.45, tcz + 0.3], label: 'the Nightjar terminal', tab: 'stock', title: 'Nightjar: night vision (and the rest of the stock)' });
     // their rep, behind the counter
     const ra = at('njrep'), rx = ra.position.x, rz = ra.position.z;
-    const rep = G.Rig.create({ style: 'tactical', bare: true, look: { top: 'combat', topC: 0x16181a, pants: 'combat', pantsC: 0x1c1e20, eyes: 'none', gloves: 'tactical' }, seed: 31, scale: 1 });
+    const rep = Rig.create({ style: 'tactical', bare: true, look: { top: 'combat', topC: 0x16181a, pants: 'combat', pantsC: 0x1c1e20, eyes: 'none', gloves: 'tactical' }, seed: 31, scale: 1 });
     rep.setKit({ helmet: 'h.rifle', nv: 'n.pano', nd: 0, carrier: 'c.slick', plate: 1, cp: 1, belt: 'b.duty', bp: 1 });
     rep.root.position.set(rx, 0, rz); r.add(rep.root); S.rigs.push({ rig: rep, x: rx, z: rz, yaw: (ra.userData.ry as number) || 0 });
   }
@@ -897,9 +883,9 @@ const G_Hangar = (() => {
   }
   // its card: the name, the price, what it is, and that the helmet's not in it (or why it's not on sale)
   function njSign(id: string, sold: boolean, out: string | null) {
-    const d = gearOf(id), L = [d.name, out ? out : sold ? 'SOLD' : money(G.Shop.gearPrice(id))];
-    if (!out && !sold) { L.push(G.Shop.nvField(d)); L.push('!helmet not included'); }
-    else if (out) L.push(G.Shop.nvField(d));
+    const d = gearOf(id), L = [d.name, out ? out : sold ? 'SOLD' : money(Shop.gearPrice(id))];
+    if (!out && !sold) { L.push(ShopUI.nvField(d)); L.push('!helmet not included'); }
+    else if (out) L.push(ShopUI.nvField(d));
     return L;
   }
 
@@ -1042,8 +1028,8 @@ const G_Hangar = (() => {
   // ------------------------------------------------------------------------ what's on display, from the shop's stock
   // Called when the stock changes (and once on entering): puts each thing for sale in its place, taking away what's sold.
   function refresh(force?: boolean) {
-    if (!S.root || !G.Shop.offers) return;
-    const Sh = G.Shop, O = Sh.offers!;
+    if (!S.root || !Shop.offers) return;
+    const Sh = Shop, O = Sh.offers!;
     if (S.rosterKey !== rosterKey()) { enter(S.map); return; } // (someone joined or left: the benches are theirs)
     // only when something's changed (each change draws new signs)
     const parts0 = [...(Sh.partStock || [])].sort((a, b) => +Sh.wished(b as string) - +Sh.wished(a as string)), prec0 = [...(Sh.precStock || [])], key = JSON.stringify([O.gear, O.nvg, O.njParts, parts0, prec0, Sh.stock, parts0.concat(prec0).filter((i) => Sh.wished(i as string))]);
@@ -1063,7 +1049,7 @@ const G_Hangar = (() => {
       tg.sign!.position.y = 0.1 + (STAND.top - 0.14) / 2;
     });
     // Nightjar's cases: one for each set they make, in stock this visit or not (and not yet, at this level: lv)
-    const nvAll = G.Gear.LIST.filter((d) => d.kind === 'nvg');
+    const nvAll = Gear.LIST.filter((d) => d.kind === 'nvg');
     (S.njStands || []).forEach((tg: HangarTarget, i: number) => {
       const d = nvAll[i], stocked = !!d && (O.nvg || []).includes(d.id);
       tg.key = stocked ? d.id : null;
@@ -1079,24 +1065,24 @@ const G_Hangar = (() => {
     });
     // and the thermal sight on their counter
     if (S.njPart) {
-      const tg = S.njPart, id = (O.njParts || [])[0], p = id && G.Gunsmith.PARTS[id], left = p ? Sh.count('part:' + id) : 0;
+      const tg = S.njPart, id = (O.njParts || [])[0], p = id && Gunsmith.PARTS[id], left = p ? Sh.count('part:' + id) : 0;
       tg.key = id || null; tg.sold = !p || !left;
       clear(tg.disp!); tg.spin = null;
       if (p && left) { const sh = partPiece(id, 0.36, NJ.counter.h); tg.disp!.add(sh.root); tg.spin = sh.spin; }
-      const all = G.Gunsmith.LIST.find((q) => q.seller === 'nj'), lines = p ? (left ? [p.name, money(p.price), 'digital thermal · 2-4-8×'] : [p.name, 'SOLD']) : all ? [all.name, `from level ${2 * all.tier - 3}`] : ['—'];
+      const all = Gunsmith.LIST.find((q) => q.seller === 'nj'), lines = p ? (left ? [p.name, money(p.price), 'digital thermal · 2-4-8×'] : [p.name, 'SOLD']) : all ? [all.name, `from level ${2 * all.tier - 3}`] : ['—'];
       if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
       tg.sign!.material = signMat(lines, 512, 256, '#0a0d0f', p && left ? '#8dffbe' : p ? '#ff6a5a' : '#7a8a90', '#ffffff');
     }
     // the parts pedestals, and the precision showcase's stumps
     const onShow = (S.partStands || []).map((tg: HangarTarget, i: number) => [tg, parts0[i]]).concat((S.precStands || []).map((tg: HangarTarget, i: number) => [tg, prec0[i]])) as [HangarTarget, string][];
     onShow.forEach(([tg, id]: [HangarTarget, string]) => {
-      const p = id && G.Gunsmith.PARTS[id];
+      const p = id && Gunsmith.PARTS[id];
       const left = p ? Sh.count('part:' + id) : 0, wish = !!p && Sh.wished(id);
       tg.key = id || null; tg.sold = !p || !left;
       clear(tg.disp!); tg.spin = null;
       if (p && left) { const sh = tg.signTop ? partPiece(id, OUT.size, tg.signTop) : partPiece(id); tg.disp!.add(sh.root); tg.spin = sh.spin; }
-      const n = p ? G.Gunsmith.fitsPart(p).length : 0;
-      const lines = !p ? ['—'] : !left ? [p.name, 'SOLD'] : [(wish ? '★ ' : '') + p.name, money(p.price) + (left > 1 ? ' · ' + left + ' left' : ''), `${G.Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`];
+      const n = p ? Gunsmith.fitsPart(p).length : 0;
+      const lines = !p ? ['—'] : !left ? [p.name, 'SOLD'] : [(wish ? '★ ' : '') + p.name, money(p.price) + (left > 1 ? ' · ' + left + ' left' : ''), `${Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`];
       const SH = Math.min(0.62, 0.22 + 0.12 * lines.length);
       if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
       tg.sign!.material = signMat(lines, 384, Math.round(384 * SH / 0.6), '#101418', left ? (wish ? '#ffffff' : '#ffd24a') : '#ff6a5a', '#ffffff');
@@ -1106,10 +1092,10 @@ const G_Hangar = (() => {
     // the pouch shelf
     S.pouchSlots!.forEach((slot: THREE.Group, i: number) => {
       clear(slot);
-      const tg = S.items.find((q: HangarTarget) => q.id === 'pouch' + i), o = O.pouches[i], P = o && G.Gear.POUCHES[o.id];
+      const tg = S.items.find((q: HangarTarget) => q.id === 'pouch' + i), o = O.pouches[i], P = o && Gear.POUCHES[o.id];
       tg!.key = o ? o.id : null; tg!.sold = !o || !Sh.inStock('pouch:' + o.id);
       if (!P) return;
-      const it = G.Gear.pouchItem(o.id), left = Sh.count('pouch:' + o.id);
+      const it = Gear.pouchItem(o.id), left = Sh.count('pouch:' + o.id);
       product(slot, it, at('pouch', i).position.x + 0.16, 1.0, 0, Math.PI / 2, signMat([P.name, left ? money(P.price) + ' · ' + left + ' left' : 'SOLD'], 400, 100, '#101418', left ? '#ffd24a' : '#ff6a5a', '#ffffff'), 0.16);
     });
     vending(force);
@@ -1118,7 +1104,7 @@ const G_Hangar = (() => {
 
   // the vending machine's contents: field supplies (medical items, flashbangs, frags, sticky grenades and thermobarics)
   function vendList(_id: string) {
-    const Sh = G.Shop, Gr = G.Gear, out = [], sv = Sh.services();
+    const Gr = Gear, out = [], sv = ShopUI.services();
     for (const s of sv) {
       if (s.id.startsWith('med.')) out.push({ k: 'svc', key: s.id, item: Gr.medItem(s.id.slice(4)), name: s.name, price: s.price, sold: false });
       else if (s.id === 'flash') out.push({ k: 'svc', key: s.id, item: Gr.flashItem(), name: s.name, price: s.price, sold: false });
@@ -1139,10 +1125,10 @@ const G_Hangar = (() => {
       const { v } = m, cols = v.cols, rows = v.rows, cw = 0.9 / cols, ch = 1.3 / rows;
       list.slice(0, cols * rows).forEach((q, i) => {
         const c = i % cols, rw = Math.floor(i / cols), z = v.z - 0.45 + cw * (c + 0.5), y = 1.5 - ch * (rw + 0.5) + 0.05;
-        const it = q.item, [iw, ih] = G.Gear.size(it), s = Math.min(cw * 0.7 / iw, ch * 0.55 / ih, 0.12);
+        const it = q.item, [iw, ih] = Gear.size(it), s = Math.min(cw * 0.7 / iw, ch * 0.55 / ih, 0.12);
         const g = new T.Group(); g.position.set(v.x - 0.06, y, z); g.rotation.y = -Math.PI / 2;
         if (!q.sold) {
-          const ic = new T.Mesh(new T.PlaneGeometry(iw * s, ih * s), iconMat(G.Icons.of(it, iw, ih, false))); ic.position.z = 0.0; g.add(ic);
+          const ic = new T.Mesh(new T.PlaneGeometry(iw * s, ih * s), iconMat(Icons.of(it, iw, ih, false))); ic.position.z = 0.0; g.add(ic);
         }
         const tag = new T.Mesh(new T.PlaneGeometry(cw * 0.92, 0.1), signMat([q.sold ? 'SOLD' : money(q.price)], 160, 44, '#05121a', q.sold ? '#ff6a5a' : '#7dff9a')); tag.position.set(0, -ch * 0.42, 0.001); g.add(tag);
         m.group.add(g);
@@ -1156,7 +1142,7 @@ const G_Hangar = (() => {
   function update(dt: number) {
     if (!S.root) return;
     S.t += dt;
-    const me = G.Me;
+    const me = G_Me;
     // the kit on show, turning
     for (const tg of S.stands) if (tg.spin) tg.spin.rotation.y += dt * 0.5;
     for (const tg of (S.partStands || []).concat(S.precStands || [])) if (tg.spin) tg.spin.rotation.y += dt * 0.6;
@@ -1170,17 +1156,17 @@ const G_Hangar = (() => {
     // the helicopter's rotor: slow at rest, faster the more of the squad are in their seats
     const H = S.heli;
     if (H) {
-      const ids = Object.keys(G.Game.roster || {}), ready = ids.filter((id) => G.Game.roster[id].ready).length;
+      const ids = Object.keys(Game.roster || {}), ready = ids.filter((id) => Game.roster[id].ready).length;
       const target = ids.length && ready === ids.length ? 38 : 2 + 14 * (ids.length ? ready / ids.length : 0);
       H.spin += (target - H.spin) * Math.min(1, dt * 0.8);
       H.rotors.forEach((o: THREE.Object3D, i: number) => { o.rotation.y += (i ? -1 : 1) * H.spin * dt; }); H.tail.rotation.z += H.spin * 1.6 * dt;
       const k = ids.length ? ready / ids.length : 0; H.glow.color.setRGB(0.9 - 0.8 * k, 0.15 + 0.75 * k, 0.1 + 0.2 * k); H.thrust.opacity = 0.08 + 0.4 * Math.min(1, H.spin / 38); // (status strips: red to green as the squad gets in)
       H.rotor.rotation.x = Math.sin(S.t * 0.7) * 0.004 * (1 + H.spin * 0.05);
     }
-    if (G.Range) G.Range.update(dt);
-    if (G.Highlights) G.Highlights.update(dt);
+    if (Range) Range.update(dt);
+    if (Highlights) Highlights.update(dt);
     // a word from Vex now and then, when you're in the store
-    if (me.pos && me.pos.x > 16 && me.pos.x < 36 && me.pos.z - RZ < 26 && me.pos.z - RZ > 0 && (S.vexQuip -= dt) <= 0) { S.vexQuip = 40 + Math.random() * 30; if (!G.Game.shopOpen && Math.hypot(me.pos.x - VEX.x, me.pos.z - RZ - VEX.z) < 9) G.HUD.toast('VEX', G.VENDOR_QUIPS.hello[Math.floor(Math.random() * G.VENDOR_QUIPS.hello.length)], 2.4); }
+    if (me.pos && me.pos.x > 16 && me.pos.x < 36 && me.pos.z - RZ < 26 && me.pos.z - RZ > 0 && (S.vexQuip -= dt) <= 0) { S.vexQuip = 40 + Math.random() * 30; if (!Game.shopOpen && Math.hypot(me.pos.x - VEX.x, me.pos.z - RZ - VEX.z) < 9) HUD.toast('VEX', VENDOR_QUIPS.hello[Math.floor(Math.random() * VENDOR_QUIPS.hello.length)], 2.4); }
   }
   // ------------------------------------------------------------------------ looking and pressing F
   const _o = new T.Vector3(), _d = new T.Vector3();
@@ -1197,7 +1183,7 @@ const G_Hangar = (() => {
   }
   // what's under the crosshair, in reach
   function aim() {
-    const cam = G.R.camera;
+    const cam = R.camera;
     _o.copy(cam.position); _d.set(0, 0, -1).applyQuaternion(cam.quaternion);
     let best = null, bt = 1e9;
     for (const t of S.targets) {
@@ -1206,42 +1192,42 @@ const G_Hangar = (() => {
     }
     return best;
   }
-  const afford = (price: number) => G.Me.credits >= price;
+  const afford = (price: number) => G_Me.credits >= price;
   // what a thing says when you look at it, and what F does
   function describe(t: HangarTarget) {
-    const Sh = G.Shop;
+    const Sh = Shop;
     if (t.kind === 'heli') return { html: '' };
     if (t.kind === 'pos') {
-      if (t.id.startsWith('bench') && !t.mine) return { html: `${G.U.esc(t.label!)} <small>(you work at your own)</small>` };
-      if (t.run) return { html: `Press <b>F</b> to ${G.U.esc(t.runText || 'use ' + t.label)}`, act: t.run };
-      return { html: `Press <b>F</b> to use ${G.U.esc(t.label!)} <small>· ${G.U.esc(t.title!)}</small>`, act: () => open(t) };
+      if (t.id.startsWith('bench') && !t.mine) return { html: `${U.esc(t.label!)} <small>(you work at your own)</small>` };
+      if (t.run) return { html: `Press <b>F</b> to ${U.esc(t.runText || 'use ' + t.label)}`, act: t.run };
+      return { html: `Press <b>F</b> to use ${U.esc(t.label!)} <small>· ${U.esc(t.title!)}</small>`, act: () => open(t) };
     }
     // something for sale
     let name: string, price, sold = !!t.sold, extra = '', buy = null;
     if (t.what === 'gear') { if (!t.key) return { html: '' }; const d = gearOf(t.key); name = d.name; price = Sh.gearPrice(t.key); sold = !Sh.inStock('gear:' + t.key); extra = d.plate && Sh.offers!.plates![t.key] ? ' (plate fitted)' : needs(d) ? ` <small>(${needs(d)})</small>` : ''; buy = ['gear', t.key]; }
-    else if (t.what === 'part') { if (!t.key) return { html: '' }; const p = G.Gunsmith.PARTS[t.key]; name = p.name; price = p.price; sold = !Sh.inStock('part:' + t.key); extra = ' <small>(to your stash)</small>'; buy = ['part', t.key]; }
-    else if (t.what === 'pouch') { if (!t.key) return { html: '' }; const P = G.Gear.POUCHES[t.key]; name = P.name; price = P.price; sold = !Sh.inStock('pouch:' + t.key); buy = ['pouch', t.key]; }
+    else if (t.what === 'part') { if (!t.key) return { html: '' }; const p = Gunsmith.PARTS[t.key]; name = p.name; price = p.price; sold = !Sh.inStock('part:' + t.key); extra = ' <small>(to your stash)</small>'; buy = ['part', t.key]; }
+    else if (t.what === 'pouch') { if (!t.key) return { html: '' }; const P = Gear.POUCHES[t.key]; name = P.name; price = P.price; sold = !Sh.inStock('pouch:' + t.key); buy = ['pouch', t.key]; }
     else if (t.what === 'ammo') { name = t.name!; price = t.price!; sold = !Sh.inStock('ammo:' + t.key); buy = ['ammo', t.key!]; }
-    else if (t.what === 'svc') { const s = Sh.services().find((q) => q.id === t.key); if (!s) return { html: '' }; name = s.name; price = s.price; sold = !!s.disabled; extra = s.disabled ? ' <small>(no room, or nothing to do)</small>' : ''; buy = ['svc', t.key]; }
+    else if (t.what === 'svc') { const s = ShopUI.services().find((q) => q.id === t.key); if (!s) return { html: '' }; name = s.name; price = s.price; sold = !!s.disabled; extra = s.disabled ? ' <small>(no room, or nothing to do)</small>' : ''; buy = ['svc', t.key]; }
     if (!buy) return { html: '' };
-    if (sold) return { html: `<b>${G.U.esc(name!)}</b> <small>sold out${t.what === 'gear' ? '' : extra}</small>` };
-    return { html: `Press <b>F</b> to buy <b>${G.U.esc(name!)}</b>${extra} — <b${afford(price) ? '' : ' style="color:#ff6a5a"'}>${money(price)}</b>`, act: () => purchase(buy[0]!, buy[1]!, name!) };
+    if (sold) return { html: `<b>${U.esc(name!)}</b> <small>sold out${t.what === 'gear' ? '' : extra}</small>` };
+    return { html: `Press <b>F</b> to buy <b>${U.esc(name!)}</b>${extra} — <b${afford(price) ? '' : ' style="color:#ff6a5a"'}>${money(price)}</b>`, act: () => purchase(buy[0]!, buy[1]!, name!) };
   }
   function purchase(kind: string, key: string, name: string) {
-    const Me = G.Me, before = Me.credits;
-    G.Shop.buy(kind, key);
-    if (Me.credits < before) G.HUD.toast('', `Bought ${G.U.esc(name)} <small>−${money(before - Me.credits)}</small>`, 1.4);
+    const Me = G_Me, before = Me.credits;
+    ShopUI.buy(kind, key);
+    if (Me.credits < before) HUD.toast('', `Bought ${U.esc(name)} <small>−${money(before - Me.credits)}</small>`, 1.4);
     refresh();
   }
   function open(t: HangarTarget) {
-    G.Game.openShop(t.tab, t.title);
+    Game.openShop(t.tab, t.title);
   }
   // seated: which seat is mine (the same on every machine: by position in the sorted roster)
-  function mySeat() { const ids = Object.keys(G.Game.roster || {}).sort(); return Math.max(0, Math.min(HELI.seats - 1, ids.indexOf(G.Net.myId!))); }
+  function mySeat() { const ids = Object.keys(Game.roster || {}).sort(); return Math.max(0, Math.min(HELI.seats - 1, ids.indexOf(Net.myId!))); }
   // F, from the player's interact(): returns { prompt, prog, label }; walking up to a thing and pressing F
-  function interact(me: typeof G.Me, dt: number, held: boolean, edge: boolean) {
+  function interact(me: typeof G_Me, dt: number, held: boolean, edge: boolean) {
     const out = { prompt: '', prog: -1, label: '' };
-    if (G.Game.shopOpen) return out;
+    if (Game.shopOpen) return out;
     // seated in the helicopter: hold F to get out
     if (me.seat != null) {
       out.prompt = 'Hold <b>F</b> to leave your seat <small>(you\'re ready: the helicopter goes when everyone is)</small>';
@@ -1262,23 +1248,23 @@ const G_Hangar = (() => {
     if (edge && d.act) { me.fLatch = true; d.act(); }
     return out;
   }
-  function seat(me: typeof G.Me) {
+  function seat(me: typeof G_Me) {
     const i = mySeat(), p = seatPos(i);
     me.seat = i; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.yaw = p.yaw; me.pitch = 0; me.crouch = true; me.stowed = true; me.mouse.l = me.mouse.r = false;
-    G.Shop.setReady(true);
-    G.Audio.click();
+    ShopUI.setReady(true);
+    Audio.click();
   }
-  function unseat(me: typeof G.Me) {
+  function unseat(me: typeof G_Me) {
     const p = exitPos(me.seat!);
     me.seat = null; me.pos.set(p.x, p.y, p.z); me.vel.set(0, 0, 0); me.crouch = false; me.stowed = false; me.yaw = Math.PI;
-    G.Shop.setReady(false);
-    G.Audio.click();
+    ShopUI.setReady(false);
+    Audio.click();
   }
   // the highlight round what you're looking at (called once a frame from the player's camera update)
   function mark() {
     const hl = S.hl;
     if (!hl) return;
-    const t = G.Game.shopOpen || (G.Me && G.Me.seat != null) ? null : S.hover;
+    const t = Game.shopOpen || (G_Me && G_Me.seat != null) ? null : S.hover;
     if (!t || t.kind === 'heli' || (t.kind === 'buy' && !describe(t).act)) { hl.visible = false; return; }
     const b = t.box;
     hl.visible = true; hl.position.set((b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2 - RZ); hl.scale.set(b[3] - b[0], b[4] - b[1], b[5] - b[2]);
@@ -1288,6 +1274,6 @@ const G_Hangar = (() => {
 
   return { decorate, enter, leave, update, refresh, aim, interact, mark, seatPos, exitPos, spawnAt, ship, padMesh, load, fixtures, at, baked: () => !!BAKED, FILE, S, HELI, HOLD, RZ };
 })();
-G.Hangar = G_Hangar;
-window.addEventListener('gunicons', () => { if (G_Hangar.S.root) G_Hangar.refresh(true); }); // (a gun's picture came in after its sign was drawn: js/icons.ts)
-interface GameModules { Hangar: typeof G_Hangar; }
+ReplayEnv.Hangar = Hangar; // (what the replay asks of it: js/replayenv.ts)
+Hooks.hangarDecorate = (map) => Hangar.decorate(map); // (a hangar's map gets its own fittings: js/level.ts generateHub)
+window.addEventListener('gunicons', () => { if (Hangar.S.root) Hangar.refresh(true); }); // (a gun's picture came in after its sign was drawn: js/icons.ts)

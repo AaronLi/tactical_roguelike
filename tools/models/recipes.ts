@@ -2802,4 +2802,3 @@ const G_GunRecipes = (() => {
   return { M, build, display, feet, roundDims, roundShape, quarrel };
 })();
 G.GunRecipes = G_GunRecipes;
-interface GameModules { GunRecipes: typeof G_GunRecipes; }

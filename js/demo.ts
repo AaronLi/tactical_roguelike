@@ -1,8 +1,16 @@
 'use strict';
+import { Game } from './game.js';
+import { Gear } from './gear.js';
+import { Net } from './net.js';
+import { Me } from './player.js';
+import { R } from './render.js';
+import { Route } from './route.js';
+import { VMAnim } from './vmanim.js';
+import { World } from './world.js';
 // A demo reel: open the game with ?demo and it plays itself. A solo level with nobody else in it, and the main
 // weapon archetypes one after another: drawn, fired (and cycled), a partial reload, run dry, a reload from
 // empty (the action after it), the magazine checked and a chamber check held. Captions say what's showing.
-const G_Demo = (() => {
+export const Demo = (() => {
   // the archetypes: [weapon, what it is, how it fires]
   const REEL = [
     ['m4', 'AR-15 carbine: charging handle, bolt catch', 'auto'],
@@ -17,7 +25,7 @@ const G_Demo = (() => {
     ['rev', 'Revolver: swing-out cylinder', 'semi'],
     ['dbl', 'Double barrel: break-action', 'semi'],
   ];
-  // timed on the game's own clock, and stepped from inside its frames (G.Me.update, hooked in run()): each wait
+  // timed on the game's own clock, and stepped from inside its frames (Me.update, hooked in run()): each wait
   // ends on the frame its time comes, so a slow or throttled tab slows the reel with it rather than skipping
   let clock = 0;
   const waiters: { t: number; r: () => void }[] = [];
@@ -39,7 +47,7 @@ const G_Demo = (() => {
     }
     cap.innerHTML = `${title}<div style="font-size:16px;font-weight:500;opacity:.85;margin-top:4px">${step}</div>`;
   }
-  const me = () => G.Me;
+  const me = () => Me;
   // the trigger: held (or let go)
   function trigger(on: boolean) { const m = me(); m.mouse.l = on; if (on) m.pressBuf = 0.15; }
   async function tap(n: number, gap: number) { for (let i = 0; i < n; i++) { trigger(true); await wait(0.06); trigger(false); await wait(gap); } }
@@ -53,7 +61,7 @@ const G_Demo = (() => {
     const m = me();
     if (!pocket) { pocket = { id: 99999, w: 14, h: 14, accept: null, label: 'Demo', items: [] }; m.pockets.unshift(pocket); }
     pocket.items.length = 0;
-    for (let i = 0; i < 3; i++) G.Gear.stow(m, G.Gear.ammoItem(w.def), [pocket]);
+    for (let i = 0; i < 3; i++) Gear.stow(m, Gear.ammoItem(w.def), [pocket]);
   }
   async function reload() { const m = me(); m.startReload(); await wait(0.1); await until(() => !m.reloading && !m.act); await wait(0.4); }
   async function show([id, title, how]: string[]) {
@@ -66,15 +74,15 @@ const G_Demo = (() => {
     caption(title, how === 'bolt' ? 'Fired (hold the trigger to stay on target, let go to work the bolt)' : 'Fired'); await fire(how);
     caption(title, 'Partial reload: no action needed'); await reload();
     caption(title, 'Run dry'); w.mag = Math.min(w.mag, 1); w.tube = (w.tube || []).slice(-w.mag); await fire(how === 'auto' ? 'semi' : how, 3); await wait(0.3);
-    caption(title, G.VMAnim.kinds(w.def).action ? 'Reload from empty, then the action' : 'Reload from empty'); await reload();
-    if (G.VMAnim.canMagCheck(G.R.vm)) { caption(title, 'Magazine check (hold R)'); m.keys.KeyR = true; m.rHeldAt = performance.now() - 1000; await wait(2.0); m.keys.KeyR = false; m.rHeldAt = 0; await until(() => !m.magChk); await wait(0.3); }
+    caption(title, VMAnim.kinds(w.def).action ? 'Reload from empty, then the action' : 'Reload from empty'); await reload();
+    if (VMAnim.canMagCheck(R.vm)) { caption(title, 'Magazine check (hold R)'); m.keys.KeyR = true; m.rHeldAt = performance.now() - 1000; await wait(2.0); m.keys.KeyR = false; m.rHeldAt = 0; await until(() => !m.magChk); await wait(0.3); }
     caption(title, 'Inspect, chamber check held (hold I)'); m.keys.KeyI = true; m.inspect(); await wait(m.inspectDur * 0.7 + 1.6); m.keys.KeyI = false; await until(() => !(m.inspectT > 0)); await wait(0.5);
   }
   // stand where there's the longest clear line of sight on the ground floor (open floor the level knows of), and
   // face down it, so the rounds fly a way before they hit
   function face() {
-    const m = me(), map = G.Game.map!, wd = map.world;
-    const ray = (x: number, z: number, yaw: number, y: number) => G.World.raycast(wd, x, y, z, -Math.sin(yaw), 0, -Math.cos(yaw), 60).t;
+    const m = me(), map = Game.map!, wd = map.world;
+    const ray = (x: number, z: number, yaw: number, y: number) => World.raycast(wd, x, y, z, -Math.sin(yaw), 0, -Math.cos(yaw), 60).t;
     const spots = [[m.pos.x, m.pos.z], ...(map.enemySpots || []).filter((p: number[]) => !p[2])];
     let best = -1, at: number[] | null = null;
     for (const [x, z] of spots) for (let i = 0; i < 32; i++) {
@@ -86,23 +94,21 @@ const G_Demo = (() => {
     return best;
   }
   async function run() {
-    const up = G.Me.update; G.Me.update = function (dt) { const r = up.call(this, dt); tick(dt); return r; };
-    G.Game.solo(); await sleep(0.8);
-    G.Net.toHost({ t: 'startRun' }); // (the host's simulation, in its own thread: js/serverlink.ts)
-    await untilReal(() => G.Game.phase === 'route' && G.Game.routeMap);
-    const g0 = G.Game; g0.pickRoute(G.Route.options(g0.routeMap!, g0.routeSt!.path[g0.routeSt!.path.length - 1])[0]);
-    await untilReal(() => G.Game.phase === 'level' && G.Me.kit);
+    const up = Me.update; Me.update = function (dt) { const r = up.call(this, dt); tick(dt); return r; };
+    Game.solo(); await sleep(0.8);
+    Net.toHost({ t: 'startRun', dbg: { classic: true } }); // (the host's simulation, in its own thread: js/serverlink.ts)
+    await untilReal(() => Game.phase === 'route' && Game.routeMap);
+    const g0 = Game; g0.pickRoute(Route.options(g0.routeMap!, g0.routeSt!.path[g0.routeSt!.path.length - 1])[0]);
+    await untilReal(() => Game.phase === 'level' && Me.kit);
     await wait(1.0);
     // nobody else in it, and the game playing as if the mouse were captured
-    G.Net.toHost({ t: 'noFoes' });
-    const g = G.Game; let lk = true; Object.defineProperty(g, 'locked', { get: () => lk, set: () => {}, configurable: true });
+    Net.toHost({ t: 'noFoes' });
+    const g = Game; let lk = true; Object.defineProperty(g, 'locked', { get: () => lk, set: () => {}, configurable: true });
     for (const el of ['pause', 'clickToPlay']) { const e = g.$(el); if (e) e.classList.add('hidden'); }
     face();
-    for (;;) for (const r of REEL) { G.Net.toHost({ t: 'noFoes' }); await show(r); }
+    for (;;) for (const r of REEL) { Net.toHost({ t: 'noFoes' }); await show(r); }
   }
   if (new URLSearchParams(location.search).has('demo')) window.addEventListener('load', () => setTimeout(run, 300));
   return { REEL, run };
 })();
-G.Demo = G_Demo;
 
-interface GameModules { Demo: typeof G_Demo; }

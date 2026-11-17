@@ -1,5 +1,42 @@
 'use strict';
-// The host's simulation (G.Server, js/server.ts) on a thread: what feeds it, ticks it and carries its word out. The same code
+// This is the server thread's entry file (js/serverworker.ts imports it and nothing else). The simulation's files, as the worker's list
+// used to load them (SERVER_SCRIPTS: the page's order, index.html): each runs once, before this file does. Most are imported by the
+// files that need them anyway; they are named here so the thread loads all of them, and for the one nothing imports (residents
+// registers itself and has no export). A file runs when it is first imported, so where one imports another that comes later in this
+// list (level imports homes), that one runs first: what must hold is that a file that reads another while it loads comes after it,
+// and tools/deps.mjs checks that (npm run deps:check). The order that results is in docs/modules-plan.md, phase 4 part c.
+import './util.js';
+import './medical.js';
+import './materials.js';
+import './data.js';
+import './spacedata.js';
+import './shipgen.js';
+import './callsigns.js';
+import './arsenal.js';
+import './parts.js';
+import './gear.js';
+import './sim.js';
+import './world.js';
+import './ballistics.js';
+import './leveldesc.js';
+import './level.js';
+import './furnspec.js';
+import './furniture.js';
+import './homes.js';
+import './residents.js';
+import './scars.js';
+import './damage.js';
+import './stickers.js';
+import './route.js';
+import './shop.js';
+import './recorder.js';
+import './server.js';
+import './spaceserver.js';
+import { LevelDesc } from './leveldesc.js';
+import { Recorder } from './recorder.js';
+import { Server } from './server.js';
+import { Stickers } from './stickers.js';
+// The host's simulation (Server, js/server.ts) on a thread: what feeds it, ticks it and carries its word out. The same code
 // in both places it can run (docs/threads.md): the server's own thread (js/serverworker.ts loads it there) or, as a fallback,
 // the page's (js/serverlink.ts starts it there when a worker can't be had, or with ?serverthread=0). Either way it's reached
 // only through two MessagePorts, so it can't tell which:
@@ -13,11 +50,11 @@
 //     network, both ways.
 // It ticks on its own timer, TICK_MS apart (as fast as the frames used to come), dt the time since the last (at most 0.1 s),
 // whether or not the page is drawing.
-const G_ServerHost = {
+export const ServerHost = {
   TICK_MS: 1000 / 60,
   ctl: null as MessagePort | null,
   cli: null as MessagePort | null,
-  id: null as string | null, // (the host's own player: SvNet.myId)
+  id: null as string | null, // (the host's own player: Server.net.myId)
   on: false,
   remotes: new Set<string>(), // (remote players whose connections are open)
   timer: 0 as unknown as ReturnType<typeof setInterval>,
@@ -29,49 +66,49 @@ const G_ServerHost = {
   attach(ctl: MessagePort) {
     this.ctl = ctl;
     ctl.onmessage = (e: MessageEvent) => this.control(e.data);
-    SvNet.broadcast = (m, x) => this.broadcast(m, x);
-    SvNet.sendTo = (id, m) => this.sendTo(id, m);
-    G.Recorder.out = (name, data) => this.ctl!.postMessage({ k: 'rec', name, data }); // (a level's recording: js/recorder.ts)
+    Server.net.broadcast = (m, x) => this.broadcast(m, x);
+    Server.net.sendTo = (id, m) => this.sendTo(id, m);
+    Recorder.out = (name, data) => this.ctl!.postMessage({ k: 'rec', name, data }); // (a level's recording: js/recorder.ts)
     ctl.postMessage({ k: 'ready' });
   },
   control(c: any) {
     if (!c || typeof c !== 'object') return;
     switch (c.k) {
-      case 'init': G.Recorder.on = !!c.rec; this.start(c.id, c.cli); break;
+      case 'init': Recorder.on = !!c.rec; this.start(c.id, c.cli); break;
       case 'stop': this.stop(); break;
-      case 'in': if (this.on && c.m && typeof c.m === 'object') { G.Recorder.msg(G.Server, c.m, String(c.from)); G.Server.handle(c.m, String(c.from)); } break;
+      case 'in': if (this.on && c.m && typeof c.m === 'object') { Recorder.msg(Server, c.m, String(c.from)); Server.handle(c.m, String(c.from)); } break;
       case 'join': this.remotes.add(String(c.id)); break;
-      case 'leave': if (this.remotes.delete(String(c.id)) && this.on) G.Server.onLeave(String(c.id)); break;
-      case 'stickers': if (Array.isArray(c.names)) G.Stickers.names = c.names.filter((n: unknown) => typeof n === 'string'); break;
-      case 'digest': { const parts: Record<string, string> = {}, m = G.Server.map; this.ctl!.postMessage({ k: 'digest', q: c.q, d: m ? this.digest(m, parts) : null, parts, json: c.json && m && m.desc ? JSON.stringify(m.desc) : null, seed: G.Server.seed, level: G.Server.level, th: G.Server.theme, night: G.Server.night }); break; }
-      case 'stat': this.ctl!.postMessage({ k: 'stat', q: c.q, clock: G.Server.clock || 0, ticks: this.ticks, phase: G.Server.phase, level: G.Server.level, enemies: G.Server.enemies.size, players: G.Server.players.size }); break;
+      case 'leave': if (this.remotes.delete(String(c.id)) && this.on) Server.onLeave(String(c.id)); break;
+      case 'stickers': if (Array.isArray(c.names)) Stickers.names = c.names.filter((n: unknown) => typeof n === 'string'); break;
+      case 'digest': { const parts: Record<string, string> = {}, m = Server.map; this.ctl!.postMessage({ k: 'digest', q: c.q, d: m ? this.digest(m, parts) : null, parts, json: c.json && m && m.desc ? JSON.stringify(m.desc) : null, seed: Server.seed, level: Server.level, th: Server.theme, night: Server.night }); break; }
+      case 'stat': this.ctl!.postMessage({ k: 'stat', q: c.q, clock: Server.clock || 0, ticks: this.ticks, phase: Server.phase, level: Server.level, enemies: Server.enemies.size, players: Server.players.size }); break;
     }
   },
-  // a session: the host's player (id) and their port; the simulation as it is when someone starts hosting (G.Server.reset)
+  // a session: the host's player (id) and their port; the simulation as it is when someone starts hosting (Server.reset)
   start(id: string, cli: MessagePort) {
     this.stop();
-    this.id = SvNet.myId = id;
+    this.id = Server.net.myId = id;
     this.cli = cli;
-    cli.onmessage = (e: MessageEvent) => { if (this.on && e.data && typeof e.data === 'object') { G.Recorder.msg(G.Server, e.data, this.id!); G.Server.handle(e.data, this.id!); } };
-    G.Server.reset();
+    cli.onmessage = (e: MessageEvent) => { if (this.on && e.data && typeof e.data === 'object') { Recorder.msg(Server, e.data, this.id!); Server.handle(e.data, this.id!); } };
+    Server.reset();
     this.on = true;
     this.last = performance.now();
     this.timer = setInterval(() => this.tick(), this.TICK_MS);
     this.ctl!.postMessage({ k: 'on', id });
   },
   stop() {
-    G.Recorder.end('stop');
+    Recorder.end('stop');
     clearInterval(this.timer);
     if (this.cli) { this.cli.onmessage = null; this.cli.close(); }
     this.cli = null; this.on = false; this.remotes.clear();
-    G.Server.reset();
+    Server.reset();
   },
   tick() {
     if (!this.on) return;
     const now = performance.now(), dt = Math.min((now - this.last) / 1000, 0.1);
     this.last = now;
-    G.Server.update(dt);
-    G.Recorder.tick(G.Server, dt);
+    Server.update(dt);
+    Recorder.tick(Server, dt);
     const P = this.prof, took = performance.now() - now;
     this.ticks++; P.n++; P.ms += took; if (took > P.max) P.max = took;
     if (now - P.at > 1000) { if (P.at) this.ctl!.postMessage({ k: 'prof', n: P.n, ms: P.ms, max: P.max }); P.n = 0; P.ms = 0; P.max = 0; P.at = now; }
@@ -98,15 +135,13 @@ const G_ServerHost = {
 
   // ---------------------------------------------------------------- is it the same place?
   // The level the simulation built from its seed (its description: js/leveldesc.ts) and every screen built again from it must
-  // be the same object (G.ServerLink.digest compares them): each part's fingerprint, and the whole of it as JSON (json: true).
+  // be the same object (ServerLink.digest compares them): each part's fingerprint, and the whole of it as JSON (json: true).
   // (What a screen adds after, the helicopter on the pad, js/landing.ts, goes in its world, not in the description.)
   born(_map: LvMap) {},
   digest(map: LvMap, parts?: Record<string, string>) {
     if (!map || !map.desc) return null;
-    const fp = G.LevelDesc.fingerprint(map.desc);
+    const fp = LevelDesc.fingerprint(map.desc);
     if (parts) Object.assign(parts, fp.parts);
     return fp.hash;
   },
 };
-G.ServerHost = G_ServerHost;
-interface GameModules { ServerHost: typeof G_ServerHost; }

@@ -3,7 +3,7 @@
 import fs from 'fs'; import path from 'path';
 import { loadModels, loadGame, ROOT } from './model_env.mjs';
 import { authoredPartKeys, checkAuthoredPart, checkGeometry, checkFurniture, checkMagnifier, checkPipClear, boundsOf, readAuthoredPart, entryOf, partsTsWithBlock, PARTS_TS, FINISH } from './authored_parts.mjs';
-const M = loadModels(); let bad = 0, n = 0;
+const M = await loadModels(); let bad = 0, n = 0;
 const run = (label, msgs, re) => {
   n++; const all = msgs.join('\n'), ok = re === null ? msgs.length === 0 : re.test(all);
   if (!ok) { bad++; console.error(`FAIL ${label}: expected ${re}, got:\n  ${all || '(nothing)'}`); } else console.log('ok   ' + label);
@@ -111,7 +111,7 @@ FG('handguard/quad_rail_240', 'the origin at its front', (b) => { b.min[2] += 0.
 FG('handguard/quad_rail_240', 'not the length it says', () => {}, /the handguard ends at forward 239\.5 mm, not at part\.len \(300\.0 mm\)/, (c) => { c.part.len = 0.3; });
 FG('handguard/ironvale_ir12', 'the support off the handguard', () => {}, /anchors\.support \[0\.4,-0\.03,0\] is off the handguard/, (c) => { c.anchors.support = [0.4, -0.03, 0]; });
 // the catalogue: the entries each piece of furniture replaces carry it (js/parts.ts AP_KEY), by name and by match, and nothing else does
-{ const Gm = loadGame(), P = Gm.Gunsmith.PARTS, has = (id, k, v) => (P[id] && P[id].model && P[id].model[k] === v ? [] : [`${id}: model.${k} is ${P[id] && P[id].model ? P[id].model[k] : '(no part)'}, expected ${v}`]);
+{ const Gm = await loadGame(), P = Gm.Gunsmith.PARTS, has = (id, k, v) => (P[id] && P[id].model && P[id].model[k] === v ? [] : [`${id}: model.${k} is ${P[id] && P[id].model ? P[id].model[k] : '(no part)'}, expected ${v}`]);
   const byName = (n) => Object.values(P).find((q) => q.name === n).id;
   run('the Kestrel CS-4 (the Mk18\'s, AR-9\'s, Benelli\'s factory stock) has the model', has(byName('Kestrel CS-4 carbine stock'), 'apStock', 'stock/kestrel_cs4'), null);
   run('the IR-12 (the HK416\'s factory rail) has the model', has(Gm.Gunsmith.PLATFORMS.hk416.defaults.handguard, 'apHg', 'handguard/ironvale_ir12'), null);
@@ -169,7 +169,7 @@ T('a magnifier\'s part_magn is only for a magnifier', tree([mesh('optic_1'), { n
   const pc = (f) => checkPipClear({ optic: { pip: { f, y: 0, r: mp.cfg.magnifier.pip.r } } }, mp.meshes);
   run('magnifier pip clear: the FTS 3 as authored', pc(mp.cfg.magnifier.pip.f), null);
   run('magnifier pip clear: the disc inside the eyepiece', pc(mp.cfg.magnifier.pip.f + 0.004), /is not on the eye side of the glass mesh/); }
-{ const Gm = loadGame(), P = Gm.Gunsmith.PARTS, byName = (n) => Object.values(P).find((q) => q.name === n);
+{ const Gm = await loadGame(), P = Gm.Gunsmith.PARTS, byName = (n) => Object.values(P).find((q) => q.name === n);
   for (const [n, k] of [['Brightline 2× micro magnifier', 'brightline_2x'], ['Strix FTS 3× flip magnifier', 'strix_fts3'], ['Meridian 5× flip magnifier', 'meridian_5x']]) { const p = byName(n); run(`the ${n} has its model`, p && p.model && p.model.apMagn === 'magnifier/' + k ? [] : [`${n}: model ${JSON.stringify(p && p.model)}`], null); }
   const b = { ...Gm.Gunsmith.defaultBuild('m4'), optic: byName('Strix HX-2 holographic').id, magnifier: byName('Meridian 5× flip magnifier').id }, spec = Gm.Gunsmith.modelSpec({ id: 'm4', build: b });
   run('a build\'s spec carries the magnifier\'s key (the Mk18 with the 5x behind an HX-2)', spec.apMagn === 'magnifier/meridian_5x' && spec.magnifier && spec.magnifier.len === 0.09 ? [] : [JSON.stringify({ apMagn: spec.apMagn, magnifier: spec.magnifier })], null);

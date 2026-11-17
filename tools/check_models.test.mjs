@@ -1,7 +1,7 @@
 // Negative tests for the model validator (js/glb.ts): each broken model must produce the expected message.  node tools/check_models.test.mjs
 // (npm run test:models runs the contract self-test first; this one checks the validator really catches what the contract forbids.)
 import { loadModels } from './model_env.mjs';
-const M = loadModels();
+const M = await loadModels();
 const mesh = (name, slot, mat = 'black', extra = {}) => ({ name, extras: { slot, ...extra }, mesh: true, uv: false, materials: [mat], children: [] });
 const info = () => ({ sy: 0.07, fSight: 0.02, relief: 0.1, muzzles: [[0.5, 0, 0]], grip: [0.05, -0.07, 0], support: [0.2, -0.03, 0], anim: {} });
 const gun = (children, over = {}, rootExtras = {}) => ({ roots: [{ name: 'x', extras: { gun: 'x', info: { ...info(), ...over }, ...rootExtras }, mesh: false, uv: false, materials: [], children }] });

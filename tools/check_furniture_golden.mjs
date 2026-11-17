@@ -8,6 +8,7 @@
 //   node tools/check_furniture_golden.mjs --update     rewrites it (review the diff: it's the change in what the levels look like)
 //   node tools/check_furniture_golden.mjs --dump DIR   also writes each level's description (and the pieces') as JSON into DIR
 // (Needs the compiled game: npm run test:models compiles it first.)
+import { runScripts, moduleOf } from './vm_game.mjs'; // (first: it starts node again with what the ES modules need)
 import fs from 'fs'; import vm from 'vm'; import path from 'path';
 import * as THREE_NS from 'three';
 import { ROOT, DIST } from './model_env.mjs';
@@ -15,19 +16,16 @@ import { ROOT, DIST } from './model_env.mjs';
 const args = process.argv.slice(2), update = args.includes('--update'), dumpAt = args.includes('--dump') ? args[args.indexOf('--dump') + 1] : null;
 const GOLDEN = path.join(ROOT, 'tests/furniture-golden.json');
 // The simulation's side of the game (what js/serverworker.ts loads to generate a level, its description: js/leveldesc.ts, and js/furnspec.ts), on node's three
-const FILES = ['util', 'data', 'callsigns', 'arsenal', 'parts', 'gear', 'medical', 'sim', 'materials', 'ballistics', 'level', 'leveldesc', 'world', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers'];
-function loadLevelGame() {
+const FILES = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers'];
+async function loadLevelGame() {
   const ctx = { console, Math, JSON, Set, Map, WeakMap, Object, Array, Number, String, Boolean, Uint8Array, Uint8ClampedArray, Int8Array, Int16Array, Int32Array, Uint16Array, Uint32Array, Float32Array, Float64Array, Infinity, NaN, isFinite, parseInt, parseFloat, Error, Symbol, Date, Proxy, Reflect, TextEncoder, performance, location: { search: '' }, URLSearchParams, THREE: { ...THREE_NS } };
-  ctx.window = ctx; ctx.self = ctx; ctx.G = { Hangar: { decorate() {} } }; // (the hangar's solids: js/hangar.ts, page-side; nothing it does is furniture)
+  ctx.window = ctx; ctx.self = ctx; ctx.G = {};
   vm.createContext(ctx);
-  for (const f of FILES) {
-    const file = DIST + f + '.js';
-    if (!fs.existsSync(file)) { console.error(`${path.relative(ROOT, file)} missing: run tsc first (npm run test:models does)`); process.exit(1); }
-    vm.runInContext(fs.readFileSync(file, 'utf8'), ctx, { filename: f + '.js' });
-  }
+  await runScripts(ctx, DIST, FILES, { what: 'npm run test:models does' });
+  moduleOf(ctx, path.join(DIST, 'util.js')).Hooks.hangarDecorate = () => {}; // (the hangar's solids: js/hangar.ts, page-side, which sets this hook; nothing it does is furniture)
   return ctx.G;
 }
-const G = loadLevelGame(), FS = G.FurnSpec;
+const G = await loadLevelGame(), FS = G.FurnSpec;
 // The levels: every theme by day and by night (the theme's own place in the run: level th + 1), an apartment block where several
 // homes have residents (js/homes.ts), and the hangar
 const CASES = [];

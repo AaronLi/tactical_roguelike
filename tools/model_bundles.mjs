@@ -11,9 +11,9 @@ export const MODELS = path.join(ROOT, 'assets/models');
 export function loadBundles() {
   const f = DIST + 'modelbundles.js';
   if (!fs.existsSync(f)) { console.error('dist/js/modelbundles.js missing: run tsc first (npm run bake:models / test:models do)'); process.exit(1); }
-  const ctx = { console, JSON, Object, Array, Number, String, Map, Set, Error, Promise, Uint8Array, DataView, TextDecoder, setTimeout, G: {}, fetch: () => Promise.reject(new Error('no fetch')) };
+  const ctx = { console, JSON, Object, Array, Number, String, Map, Set, Error, Promise, Uint8Array, DataView, TextDecoder, setTimeout, fetch: () => Promise.reject(new Error('no fetch')) };
   vm.createContext(ctx); vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: 'modelbundles.js' });
-  return ctx.G.Bundles;
+  return ctx.RTBundles.Bundles;
 }
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -21,7 +21,7 @@ const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 export function listLoose(models, B) {
   const out = [];
   const walk = (dir, rel) => { for (const d of fs.readdirSync(dir, { withFileTypes: true })) { const r = rel + d.name; if (d.isDirectory()) walk(path.join(dir, d.name), r + '/'); else if (B.bundleOf(r)) out.push(r); } };
-  for (const top of ['parts', 'props', 'scenes', 'humans']) if (fs.existsSync(path.join(models, top))) walk(path.join(models, top), top + '/');
+  for (const top of ['parts', 'props', 'scenes', 'humans', 'ships']) if (fs.existsSync(path.join(models, top))) walk(path.join(models, top), top + '/');
   return out.sort(cmp);
 }
 
@@ -104,6 +104,9 @@ export function check(models, B) {
   const hf = path.join(models, 'humans/index.json');
   if (fs.existsSync(hf)) { let hx = null; try { hx = JSON.parse(fs.readFileSync(hf, 'utf8')); } catch { errs.push('humans/index.json is not JSON'); } if (hx) for (const [k, e] of Object.entries(hx.humans || {})) if (e.file) resolve('humans/' + e.file, `humans/index.json ${k}`); }
   if (files.has('humans/gear.glb')) resolve('humans/gear.glb', 'the gear every body shares (tools/bake_humans.mjs, js/humans.ts gear)'); // (named by no index: it's always there)
+  // the squad's ships (tools/bake_ships.mjs): ships/index.json names each one's glTF
+  const shf = path.join(models, 'ships/index.json');
+  if (fs.existsSync(shf)) { let sx = null; try { sx = JSON.parse(fs.readFileSync(shf, 'utf8')); } catch { errs.push('ships/index.json is not JSON'); } if (sx) for (const [k, e] of Object.entries(sx.ships || {})) if (e.file) resolve('ships/' + e.file, `ships/index.json ${k}`); }
   for (const p of files.keys()) if (!named.has(p) && !p.endsWith('/index.json')) errs.push(`orphan: ${p} in bundle ${B.NAME} is named by no index`);
   return errs;
 }

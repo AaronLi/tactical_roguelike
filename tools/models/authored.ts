@@ -26,4 +26,3 @@ interface AuthoredGun { src: string; rig: AuthoredRig; sights: { builtin: string
 var G_Authored: Record<string, AuthoredGun> = {};
 G.Authored = G_Authored;
 }
-interface GameModules { Authored: typeof G_Authored; }

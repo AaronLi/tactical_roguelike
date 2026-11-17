@@ -1,9 +1,18 @@
 'use strict';
+import { BundlesEnv } from './bundlesenv.js';
+import { ReplayEnv } from './replayenv.js';
+import { AudioEnv } from './audioenv.js';
+import { baseAm, CALIBERS, calOf, CLASS_SND, roundSpeed, SOUND_SPEED } from './data.js';
+import { Hooks, U } from './util.js';
+import { Acoustics } from './acoustics.js';
+import { Footsteps } from './footsteps.js';
+import { GunAudio } from './gunaudio.js';
+import { Level } from './level.js';
 // Fully synthesized sound effects (no asset files needed).
 type FoleyKind = 'zip' | 'bag'; // a hands-on action (FOLEY)
 type FoleySound = 'grab' | 'thud' | 'zipOut' | 'zipTie' | 'clink' | 'rustle' | 'tape'; // its sounds, by name
 type ImpactMat = 'body' | 'metal' | 'wood' | 'soft' | 'wall'; // what a round heard landing hit (impact)
-const G_Audio = {
+export const Audio = {
   ctx: null as unknown as AudioContext,
   master: null as unknown as GainNode,
   noise: null as unknown as AudioBuffer,
@@ -35,7 +44,7 @@ const G_Audio = {
     const dw = now - this._lw;
     if (dw >= 0.25) {
       const rate = (ct - this._lc) / dw; // (1: in time)
-      this._load = rate < 0.97 ? G.U.clamp((1 - rate) * 4, 0, 1) : this._load * 0.6; // (eases off once it's caught up)
+      this._load = rate < 0.97 ? U.clamp((1 - rate) * 4, 0, 1) : this._load * 0.6; // (eases off once it's caught up)
       if (dw > 2) this._load = 0; // (the page was in the background: not the audio's doing)
       this._lw = now; this._lc = ct;
     }
@@ -43,10 +52,10 @@ const G_Audio = {
   },
 
   // A file of the synthesized audio (path below assets/audio/: 'handling/ar15/rack-45.ogg', 'footsteps/manifest.json'): from the
-  // audio bundle (js/modelbundles.ts G.AudioBundle: one download, kept in the local store), or, if it didn't load, the loose file.
+  // audio bundle (js/modelbundles.ts, js/bundlesenv.ts: one download, kept in the local store), or, if it didn't load, the loose file.
   bankFile(path: string): Promise<ArrayBuffer> {
     const loose = () => fetch('assets/audio/' + path).then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.arrayBuffer(); });
-    const B = G.AudioBundle;
+    const B = BundlesEnv.AudioBundle;
     if (!B || B.state().phase === 'failed') return loose();
     return B.getFile('assets/audio/' + path).catch(loose);
   },
@@ -112,7 +121,7 @@ const G_Audio = {
   //   its clock stopped though it says it's running: said (a reload's the cure);
   //   the audio thread falling behind real time (more live sound than it can render: load()): said, with how far.
   watch() {
-    const now = performance.now() / 1000, live = () => `(gunshot voices ${G.GunAudio ? G.GunAudio.voices : '?'}, cases ${this._caseVoices}, steps ${G.Footsteps ? G.Footsteps.voices : '?'})`;
+    const now = performance.now() / 1000, live = () => `(gunshot voices ${GunAudio ? GunAudio.voices : '?'}, cases ${this._caseVoices}, steps ${Footsteps ? Footsteps.voices : '?'})`;
     for (const o of this._outs) {
       const c = o.ctx, w = o.wd, who = o.name === 'game' ? '' : ` (${o.name})`;
       if (c.state !== 'running') {
@@ -153,7 +162,7 @@ const G_Audio = {
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
     // recorded reload foley; fails quietly (e.g. when opened from file://) and the synthesized clicks are used instead
-    if (G.Footsteps) G.Footsteps.init(); // (the synthesized footsteps: js/footsteps.ts)
+    if (Footsteps) Footsteps.init(); // (the synthesized footsteps: js/footsteps.ts)
     for (const n of this.SAMPLES) {
       fetch('assets/audio/' + n + '.ogg').then((r) => r.arrayBuffer()).then((b) => this.ctx.decodeAudioData(b))
         .then((buf) => { this.samples[n] = buf; }).catch(() => {});
@@ -174,7 +183,7 @@ const G_Audio = {
   // A recorded sound from a place in the world: panned in 3D (HRTF, against the listener that follows the camera),
   // quieter with distance, heard the way it reaches you and in its room (route). pos: a Vector3.
   sampleAt(name: string, pos: THREE.Vector3, vol = 0.7, rate = 1) {
-    const buf = this.ctx && this.samples[name], cam = G.R && G.R.camera;
+    const buf = this.ctx && this.samples[name], cam = AudioEnv.R && AudioEnv.R.camera;
     if (!buf) return false;
     if (!pos || !cam) return this.sample(name, vol, rate, 0);
     vol *= this.HANDLING;
@@ -207,9 +216,9 @@ const G_Audio = {
   // dull as the openings on it let it be, from the one it comes in by), its own room's response heard the same way, and
   // a sound from another room filling yours. Without the acoustics (or out of a level), muffled behind a wall and dry.
   route(src: AudioNode, pos: { x: number; y: number; z: number } | null, gain: number, send: number) {
-    const c = this.ctx, map = G.Game && G.Game.map, cam = G.R && G.R.camera && G.R.camera.position, GA = G.GunAudio;
+    const c = this.ctx, map = AudioEnv.Game && AudioEnv.Game.map, cam = AudioEnv.R && AudioEnv.R.camera && AudioEnv.R.camera.position, GA = GunAudio;
     const g = c.createGain(); g.connect(this.master);
-    const ac = !!(G.Acoustics && GA && map && cam && G.Game.phase === 'level');
+    const ac = !!(Acoustics && GA && map && cam && AudioEnv.Game!.phase === 'level');
     const into = (from: AudioNode, k: number, v: { cv: ConvolverNode } | null) => {
       if (!v || k <= 0) return;
       const sg = c.createGain(); sg.gain.value = k; from.connect(sg); sg.connect(v.cv);
@@ -223,13 +232,13 @@ const G_Audio = {
     lp.type = 'lowpass'; pan.panningModel = 'HRTF'; pan.distanceModel = 'inverse'; pan.rolloffFactor = 0; // (loudness comes from the gain)
     let at = pos;
     if (ac) {
-      const h = G.Acoustics.hear(map, pos, cam);
+      const h = Acoustics.hear(map, pos, cam);
       gain *= h.k; lp.frequency.value = h.same ? 20000 : h.lp; at = h.at;
       const rv = GA.roomVerb(c, map, pos, h, this.far(Math.hypot(pos.x - cam.x, pos.y - cam.y, pos.z - cam.z)));
       into(src, send, rv);
       if (!h.same) { const lv = GA.listenerVerb(c, map); if (lv !== rv) into(g, 1, lv); }
     } else {
-      const blocked = map && !G.Level.los(map, cam.x, cam.y, cam.z, pos.x, pos.y, pos.z);
+      const blocked = map && !Level.los(map, cam.x, cam.y, cam.z, pos.x, pos.y, pos.z);
       if (blocked) gain *= 0.55;
       lp.frequency.value = blocked ? 1100 : 18000;
     }
@@ -333,7 +342,7 @@ const G_Audio = {
     if (!this.ctx) return;
     const att = 1 / (1 + dist * 0.06);
     this.tone(1800, 0.35, 'sawtooth', 0.12 * att, 120);
-    this.shot(G.CLASS_SND.RAIL, dist);
+    this.shot(CLASS_SND.RAIL, dist);
   },
   click() { this.tone(1800, 0.03, 'square', 0.08); },
   dry() { this.tone(900, 0.04, 'square', 0.1); },
@@ -377,7 +386,7 @@ const G_Audio = {
   // "POLICE!" — a barked, band-limited burst (no voice samples available); quieter from teammates
   shout(from: THREE.Vector3) {
     if (!this.ctx) return;
-    const d = from && G.R ? G.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.08), t = this.ctx.currentTime;
+    const d = from && AudioEnv.R ? AudioEnv.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.08), t = this.ctx.currentTime;
     for (const [f, st] of [[620, 0], [480, 0.16], [700, 0.34]]) {
       const o = this.ctx.createOscillator(), g = this.ctx.createGain(), bp = this.ctx.createBiquadFilter();
       o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 0.5, t + st); o.frequency.linearRampToValueAtTime(f * 0.42, t + st + 0.14);
@@ -389,7 +398,7 @@ const G_Audio = {
   // a short barked command ("Turn around!"): two clipped syllables, lower than the full shout
   order(from: THREE.Vector3) {
     if (!this.ctx) return;
-    const d = from && G.R ? G.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.08), t = this.ctx.currentTime;
+    const d = from && AudioEnv.R ? AudioEnv.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.08), t = this.ctx.currentTime;
     for (const [f, st, len] of [[520, 0, 0.13], [430, 0.17, 0.2]]) {
       const o = this.ctx.createOscillator(), g = this.ctx.createGain(), bp = this.ctx.createBiquadFilter();
       o.type = 'sawtooth'; o.frequency.setValueAtTime(f * 0.48, t + st); o.frequency.linearRampToValueAtTime(f * 0.4, t + st + len);
@@ -402,7 +411,7 @@ const G_Audio = {
   // the squelch again as it lets go; heard by everyone near enough (it's loud: he's shouting into it)
   radio(from: THREE.Vector3 | null) {
     if (!this.ctx) return;
-    const d = from && G.R ? G.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.07), t = this.ctx.currentTime;
+    const d = from && AudioEnv.R ? AudioEnv.R.camera.position.distanceTo(from) : 0, att = 1 / (1 + d * 0.07), t = this.ctx.currentTime;
     this._noise(t, 0.07, 2400, 2, 0.16 * att, 'bandpass');
     for (const [f, st, len] of [[440, 0.12, 0.14], [380, 0.3, 0.12], [500, 0.46, 0.22]]) {
       const o = this.ctx.createOscillator(), g = this.ctx.createGain(), bp = this.ctx.createBiquadFilter();
@@ -451,7 +460,7 @@ const G_Audio = {
   },
   _out(pan: number) {
     const c = this.ctx, out: GainNode | StereoPannerNode = c.createStereoPanner ? c.createStereoPanner() : c.createGain();
-    if ((out as StereoPannerNode).pan) (out as StereoPannerNode).pan.value = G.U.clamp(pan, -1, 1) * 0.85;
+    if ((out as StereoPannerNode).pan) (out as StereoPannerNode).pan.value = U.clamp(pan, -1, 1) * 0.85;
     out.connect(this.master);
     return out;
   },
@@ -498,29 +507,29 @@ const G_Audio = {
   },
   // where you're listening from, and how far right of you a point is (-1 .. 1)
   _ear(p: THREE.Vector3) {
-    const cam = G.R && G.R.camera;
+    const cam = AudioEnv.R && AudioEnv.R.camera;
     if (!cam) return null;
     const rel = new THREE.Vector3().subVectors(p, cam.position), d = rel.length(), right = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
     return { d, pan: d > 1e-4 ? rel.normalize().dot(right) : 0, cam: cam.position };
   },
   // A shot's path from `from` to `to`: if it passes close to you (and goes past or near you, not just
   // toward you from far behind), the crack, but only if it's still supersonic where it passes (its speed
-  // from the gun, its load and how far it's come: G.roundSpeed); slower, a zip of air. am: the load.
+  // from the gun, its load and how far it's come: roundSpeed); slower, a zip of air. am: the load.
   flyby(from: THREE.Vector3, to: THREE.Vector3, def: WeaponDef, am: string) {
     if (!this.ctx || !def || def.explosive || def.cls === 'BOW' || def.cls === 'GL') return;
     const e = this._ear(from);
     if (!e) return;
     const seg = new THREE.Vector3().subVectors(to, from), L = seg.length();
     if (L < 1e-3) return;
-    const s = G.U.clamp(new THREE.Vector3().subVectors(e.cam, from).dot(seg) / (L * L), 0, 1);
+    const s = U.clamp(new THREE.Vector3().subVectors(e.cam, from).dot(seg) / (L * L), 0, 1);
     const near = from.clone().addScaledVector(seg, s), miss = near.distanceTo(e.cam);
     if (s <= 0.02 || miss > 5 || near.distanceTo(from) < 2) return; // not past you, too wide, or it's your own muzzle
-    const pe = this._ear(near), cal = G.calOf(def), v = G.roundSpeed(def, am, near.distanceTo(from));
+    const pe = this._ear(near), cal = calOf(def), v = roundSpeed(def, am, near.distanceTo(from));
     if (v < 60) return;
-    if (v <= G.SOUND_SPEED) return this.zip(miss, pe!.pan);
+    if (v <= SOUND_SPEED) return this.zip(miss, pe!.pan);
     // the crack: bigger rounds louder (and the heavy ones thump), barely-supersonic ones softer
-    const size = def.cls === 'RAIL' ? 1.6 : ['12.7/99', '8.6/69'].includes(cal) ? 1.5 : G.baseAm(am) !== 'slug' && def.cls === 'SG' ? 0.5 : ((G.CALIBERS as Record<string, any>)[cal] || {}).group === 'pistol' ? 0.6 : 1;
-    this.crack(miss, pe!.pan, size * G.U.clamp((v / G.SOUND_SPEED - 1) * 3, 0.35, 1));
+    const size = def.cls === 'RAIL' ? 1.6 : ['12.7/99', '8.6/69'].includes(cal) ? 1.5 : baseAm(am) !== 'slug' && def.cls === 'SG' ? 0.5 : ((CALIBERS as Record<string, any>)[cal] || {}).group === 'pistol' ? 0.6 : 1;
+    this.crack(miss, pe!.pan, size * U.clamp((v / SOUND_SPEED - 1) * 3, 0.35, 1));
   },
   // a round's impact point: heard if it's close, as whatever it hit
   impactAt(p: THREE.Vector3, kind: ImpactKind, fx?: ImpactFx) {
@@ -530,9 +539,9 @@ const G_Audio = {
     if (kind === 'blood') mat = 'body';
     else if (kind === 'armor') mat = 'metal';
     else if (fx) mat = fx === 'metal' || fx === 'glass' ? 'metal' : fx === 'wood' ? 'wood' : fx === 'soft' || fx === 'soil' || fx === 'water' ? 'soft' : 'wall'; // (what it really hit: js/materials.ts)
-    else if (G.Game && G.Game.map) {
-      const map = G.Game.map, L = G.Level, tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS), fm = L.floorMap(map, L.floorAt(map, p.x, p.y, p.z)!), tile = L.tile(fm, tx, tz);
-      if (p.y - (fm.fy || 0) < 0.06) { const s = G.Casings.surface(map, p.x, p.z, fm.fy || 0); mat = G.Audio.SOFT[s] ? 'soft' : s === 'wood' ? 'wood' : 'wall'; } // (on the floor of whichever floor it's on)
+    else if (AudioEnv.Game && AudioEnv.Game.map) {
+      const map = AudioEnv.Game.map, L = Level, tx = Math.floor(p.x / L.TS), tz = Math.floor(p.z / L.TS), fm = L.floorMap(map, L.floorAt(map, p.x, p.y, p.z)!), tile = L.tile(fm, tx, tz);
+      if (p.y - (fm.fy || 0) < 0.06) { const s = AudioEnv.Casings!.surface(map, p.x, p.z, fm.fy || 0); mat = Audio.SOFT[s] ? 'soft' : s === 'wood' ? 'wood' : 'wall'; } // (on the floor of whichever floor it's on)
       else if (tile === 3) mat = 'wood'; // a door
       else if (tile === 2 || tile === 4) mat = 'wood'; // furniture, fences
     }
@@ -598,7 +607,7 @@ const G_Audio = {
     if (this.load() > 0.15 && dist > 3) return; // (behind: the far ones go first)
     const src = c.createBufferSource();
     src.buffer = this._caseBuf(mat, len, surf, soft); src.playbackRate.value = 0.97 + Math.random() * 0.06;
-    const cam = pos && G.R && G.R.camera;
+    const cam = pos && AudioEnv.R && AudioEnv.R.camera;
     if (cam) {
       // (its strikes are levelled for the distance already, _att: its room's share is the level at the case, at 1 m)
       const g = c.createGain(); g.gain.value = a; src.connect(g);
@@ -652,5 +661,8 @@ const G_Audio = {
   tape(dist = 0) { const a = this._att(dist), t = this.ctx.currentTime; this._noise(t, 0.22, 1300, 2, 0.2 * a, 'bandpass', 5200); this._noise(t + 0.26, 0.06, 800, 1, 0.18 * a, 'lowpass'); },
   heal() { this.tone(600, 0.25, 'sine', 0.15, 900); },
 };
-G.Audio = G_Audio;
-interface GameModules { Audio: typeof G_Audio; }
+ReplayEnv.Audio = Audio; // (what the replay asks of it: js/replayenv.ts)
+// (what the simulation's files may sound: js/arsenal.ts, js/damage.ts)
+Hooks.click = () => { if (Audio.click) Audio.click(); };
+Hooks.doorFallSound = (d) => { if (Audio.sampleAt) Audio.sampleAt('door_close', new THREE.Vector3(d.x, (d.fy || 0) + 1.1, d.z), 0.5, 0.7); };
+Hooks.doorKick = (piv) => { if (Audio.kick) Audio.kick(AudioEnv.R!.camera.position.distanceTo(piv.position)); };

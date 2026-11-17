@@ -1,20 +1,27 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
+import { AMMO, baseAm, beltFed, CALIBERS, calOf, WEAPONS } from './data.js';
+import { Gear } from './gear.js';
+import { Gunsmith } from './parts.js';
+import { U } from './util.js';
+import { GunModels } from './gunmodels.js';
+import { R as G_R } from './render.js';
 // Item icons for the inventory and the shop: little drawings made on a canvas, cached as images.
-// G.Icons.of(item, w, h, rot) -> data URL for an item shown w x h cells (rot: shown turned, so the drawing is
+// Icons.of(item, w, h, rot) -> data URL for an item shown w x h cells (rot: shown turned, so the drawing is
 // turned with it). Magazines look like the gun's (curved rifle, straight pistol, drum, belt box,
 // en-bloc clip), ammo boxes carry their caliber and a stripe in the ammo type's colour, and gear is drawn by
 // kind (a soft vest, a plate carrier with its pouches, a chest rig, a plate, a helmet, a belt, a backpack).
 // Guns are the weapon's own 3D model (as built, parts and all), rendered side-on once and kept.
-const G_Icons = (() => {
+export const Icons = (() => {
   const CELL = 64, cache = new Map<string, string>();
   // What a round looks like, everywhere it's drawn (these icons, and the rounds in the viewmodel: js/vmanim.ts, the
   // spent hulls: js/casings.ts): a shotgun shell's hull is colour-coded by its load; a bullet's tip shows its type.
-  const shellCol = (am: string) => ({ slug: '#d8c040', flechette: '#3a6ab0', birdshot: '#3a8a3a', he: '#e07a1a' } as Record<string, string>)[G.baseAm(am)] || '#b02a22'; // (buckshot red)
-  const tipCol = (am: string) => ({ ap: '#2a2a2a', tracer: '#c03020', hp: '#d8b070', subsonic: '#5a6a3a' } as Record<string, string>)[G.baseAm(am)] || '#b87333'; // (ball: copper)
+  const shellCol = (am: string) => ({ slug: '#d8c040', flechette: '#3a6ab0', birdshot: '#3a8a3a', he: '#e07a1a' } as Record<string, string>)[baseAm(am)] || '#b02a22'; // (buckshot red)
+  const tipCol = (am: string) => ({ ap: '#2a2a2a', tracer: '#c03020', hp: '#d8b070', subsonic: '#5a6a3a' } as Record<string, string>)[baseAm(am)] || '#b87333'; // (ball: copper)
   const TYPE_COL: Record<string, string> = { // (a +P load's box is its base colour, lifted to a hot gold-orange below)
     ball: '#c9a14a', hp: '#e0604a', ap: '#4a90e0', sabot: '#7ad0ff', tracer: '#ff6a2a', subsonic: '#9aa4ac', buck: '#c03a2a', slug: '#e8c050', birdshot: '#8ab040', flechette: '#4a90e0', he: '#c8b040', broadhead: '#39c060', mechanical: '#e09020', bodkin: '#d040b0', railslug: '#40c8e0' };
   // +P: its base colour pushed hot, half way to a bright amber, so a +P box is told from its base load at a glance
-  for (const id of Object.keys(G.AMMO)) if (G.AMMO[id].plus && TYPE_COL[G.AMMO[id].base!]) { const c = parseInt(TYPE_COL[G.AMMO[id].base!].slice(1), 16), h = [16, 8, 0].map((sh, i) => Math.round((((c >> sh) & 255) + [255, 190, 20][i]) / 2)); TYPE_COL[id] = '#' + h.map((x) => x.toString(16).padStart(2, '0')).join(''); }
+  for (const id of Object.keys(AMMO)) if (AMMO[id].plus && TYPE_COL[AMMO[id].base!]) { const c = parseInt(TYPE_COL[AMMO[id].base!].slice(1), 16), h = [16, 8, 0].map((sh, i) => Math.round((((c >> sh) & 255) + [255, 190, 20][i]) / 2)); TYPE_COL[id] = '#' + h.map((x) => x.toString(16).padStart(2, '0')).join(''); }
 
   function rr(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) { g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r); g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath(); }
   function shade(g: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) { const gr = g.createLinearGradient(x, y, x + w, y); gr.addColorStop(0, 'rgba(255,255,255,0.18)'); gr.addColorStop(0.5, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.25)'); g.fillStyle = gr; g.fill(); }
@@ -26,8 +33,8 @@ const G_Icons = (() => {
 
   // ---------------------------------------------------------------- magazines
   function magStyle(def: WeaponDef) {
-    const cal = G.calOf(def);
-    if (G.beltFed(def)) return 'box';
+    const cal = calOf(def);
+    if (beltFed(def)) return 'box';
     if (def.enbloc) return 'clip';
     if (def.id === 'p90') return 'p90';
     if (def.id === 'thompson' || def.id === 'ppsh') return 'drum';
@@ -37,14 +44,14 @@ const G_Icons = (() => {
     return def.mag > 20 ? 'curved' : 'straight';
   }
   // How full a container is (0..1), and how many of k slots that fills (at least one if there's any in it)
-  const fillOf = (it: GItem) => (it.cap ? G.U.clamp(it.n / it.cap, 0, 1) : it.n > 0 ? 1 : 0);
+  const fillOf = (it: GItem) => (it.cap ? U.clamp(it.n / it.cap, 0, 1) : it.n > 0 ? 1 : 0);
   const slotsOf = (it: GItem, k: number) => (it.n > 0 ? Math.max(1, Math.round(fillOf(it) * k)) : 0);
   // Every container is drawn as full as it is: a box magazine's rounds from the feed lips down, then the
   // follower and the spring; a drum's round its ring; a belt box's belt; a clip's rounds.
   function drawMag(g: CanvasRenderingContext2D, W: number, H: number, it: GItem) {
-    const def = G.WEAPONS[it.wid] || {}, full = it.n > 0, am = TYPE_COL[it.am] || TYPE_COL.ball, frac = fillOf(it);
+    const def = WEAPONS[it.wid] || {}, full = it.n > 0, am = TYPE_COL[it.am] || TYPE_COL.ball, frac = fillOf(it);
     // the variant's own shape: a drum for a drum, a box for a stick magazine on a drum gun
-    const vp = it.vid && G.Gunsmith.PARTS[it.vid], vt = vp && vp.model && vp.model.mag && vp.model.mag.t;
+    const vp = it.vid && Gunsmith.PARTS[it.vid], vt = vp && vp.model && vp.model.mag && vp.model.mag.t;
     let st = magStyle(def);
     if (vt === 'drum' && st !== 'box') st = 'drum'; else if (st === 'drum' && vt && vt !== 'drum') st = 'straight';
     const body = def.id === 'ak' ? '#7a3a22' : def.id === 'g36' || def.id === 'aug' ? 'rgba(170,190,185,0.85)' : '#2a2c2e';
@@ -111,7 +118,7 @@ const G_Icons = (() => {
   // A gun loaded a round at a time (a shotgun's tube, a lever or bolt action's magazine, a break action's
   // barrels, a crossbow, a launcher's cylinder): a row of what it holds, the empty places dim.
   function drawTube(g: CanvasRenderingContext2D, W: number, H: number, it: GItem) {
-    const C = (G.CALIBERS as Record<string, CaliberDef>)[it.key] || { group: 'rifle' }, col = TYPE_COL[it.am] || TYPE_COL.ball, n = Math.max(1, it.cap || 1), k = Math.min(n, it.n);
+    const C = (CALIBERS as Record<string, CaliberDef>)[it.key] || { group: 'rifle' }, col = TYPE_COL[it.am] || TYPE_COL.ball, n = Math.max(1, it.cap || 1), k = Math.min(n, it.n);
     const rows = n > 8 ? 2 : 1, per = Math.ceil(n / rows), cw = W * 0.9 / per, ch = H * 0.86 / rows;
     for (let i = 0; i < n; i++) {
       const x = W * 0.05 + (i % per) * cw, y = H * 0.07 + Math.floor(i / per) * ch, on = i < k;
@@ -134,7 +141,7 @@ const G_Icons = (() => {
     let url = cache.get(key);
     if (url) return url;
     const c = document.createElement('canvas'); c.width = 24; c.height = 64; const g = c.getContext('2d')!;
-    oneRound(g, 2, 4, 20, 56, ((G.CALIBERS as Record<string, any>)[cal] || { group: 'rifle' }).group, am, TYPE_COL[am] || TYPE_COL.ball);
+    oneRound(g, 2, 4, 20, 56, ((CALIBERS as Record<string, any>)[cal] || { group: 'rifle' }).group, am, TYPE_COL[am] || TYPE_COL.ball);
     url = c.toDataURL(); cache.set(key, url);
     return url;
   }
@@ -142,7 +149,7 @@ const G_Icons = (() => {
   // ---------------------------------------------------------------- ammo boxes
   function drawAmmo(g: CanvasRenderingContext2D, W: number, H: number, it: GItem) {
     // (no count: how full it is shows in how many stand on top of it)
-    const C = (G.CALIBERS as Record<string, CaliberDef>)[it.key] || { name: '?', group: 'rifle' }, col = TYPE_COL[it.am] || '#c9a14a', frac = fillOf(it);
+    const C = (CALIBERS as Record<string, CaliberDef>)[it.key] || { name: '?', group: 'rifle' }, col = TYPE_COL[it.am] || '#c9a14a', frac = fillOf(it);
     if (C.group === 'shotgun') { // shells
       const k = Math.ceil(frac * 4);
       for (let i = 0; i < k; i++) { const x = W * 0.08 + i * W * 0.22; g.fillStyle = shellCol(it.am); rr(g, x, H * 0.18, W * 0.18, H * 0.52, 3); g.fill(); g.fillStyle = '#c9a14a'; g.fillRect(x, H * 0.62, W * 0.18, H * 0.16); }
@@ -301,7 +308,7 @@ const G_Icons = (() => {
     g.fillStyle = 'rgba(160,170,130,0.18)';
     for (let r = 0; r < rows * 3; r++) g.fillRect(x, y + (r + 0.5) * h / (rows * 3), w, 1.5);
     for (const [pid, px, py] of d.pouches || []) {
-      const P = G.Gear.POUCHES[pid];
+      const P = Gear.POUCHES[pid];
       const mw = P.mw || P.w, mh = P.mh || P.h;
       rr(g, x + px * cw + 1, y + py * ch + 1, mw * cw - 2, mh * ch - 2, 2);
       g.fillStyle = col || 'rgba(0,0,0,0.35)'; g.fill();
@@ -310,7 +317,7 @@ const G_Icons = (() => {
   }
   // a pouch on its own: the body, a flap, and what it's for
   function drawPouch(g: CanvasRenderingContext2D, W: number, H: number, it: GItem) {
-    const P = G.Gear.POUCHES[it.pid], col = P.dump ? '#5a5240' : P.acc && P.acc[0] === 'med' ? '#4a3a32' : '#4d5639';
+    const P = Gear.POUCHES[it.pid], col = P.dump ? '#5a5240' : P.acc && P.acc[0] === 'med' ? '#4a3a32' : '#4d5639';
     if (P.dump) { // a wide bag with a drawstring top
       g.fillStyle = col; g.beginPath(); g.moveTo(W * 0.12, H * 0.22); g.lineTo(W * 0.88, H * 0.22); g.lineTo(W * 0.82, H * 0.9); g.lineTo(W * 0.18, H * 0.9); g.closePath(); g.fill(); shade(g, W * 0.12, H * 0.22, W * 0.76, H * 0.68);
       g.strokeStyle = '#c9b88a'; g.lineWidth = 2; g.beginPath(); g.moveTo(W * 0.14, H * 0.27); g.lineTo(W * 0.86, H * 0.27); g.stroke();
@@ -415,18 +422,18 @@ const G_Icons = (() => {
   const iconsReady = () => { if (iconsQueued) return; iconsQueued = true; setTimeout(() => { iconsQueued = false; window.dispatchEvent(new Event('gunicons')); }, 30); };
   function gunImage(def: WeaponDef, W: number, H: number, noMag = false): HTMLCanvasElement | null {
     const T = THREE;
-    const m = G.GunModels.display(def);
+    const m = GunModels.display(def);
     if (noMag && m.info.anim && m.info.anim.mag) m.info.anim.mag.visible = false; // (a gun with its magazine out: none on it)
     if (m.group.userData.pending) {
       gunWaits = true;
       const k = def.code || def.id;
-      if (!waiting.has(k)) { waiting.add(k); G.GunModels.whenReady(m.group, () => { waiting.delete(k); m.group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); iconsReady(); }); }
+      if (!waiting.has(k)) { waiting.add(k); GunModels.whenReady(m.group, () => { waiting.delete(k); m.group.traverse((o: any) => { if (o.isMesh) o.geometry.dispose(); }); iconsReady(); }); }
       return null;
     }
     if (!gR) {
       gR = new T.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
       gScene = new T.Scene();
-      gScene.environment = G.R._envMap(gR);
+      gScene.environment = G_R._envMap(gR);
       gScene.add(new T.HemisphereLight(0xe8eef5, 0x2a2622, Math.PI * 0.7));
       const key = new T.DirectionalLight(0xffffff, Math.PI * 0.9); key.position.set(1.5, 2, 0.5); gScene.add(key);
       const fill = new T.DirectionalLight(0xffffff, Math.PI * 0.35); fill.position.set(1, -0.5, -1); gScene.add(fill);
@@ -449,7 +456,7 @@ const G_Icons = (() => {
   function draw(it: GItem, W: number, H: number) {
     const c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d')!;
-    const d = it.gid ? G.Gear.DEFS[it.gid] : null;
+    const d = it.gid ? Gear.DEFS[it.gid] : null;
     if (it.k === 'mag') drawMag(g, W, H, it);
     else if ((it.k as string) === 'tube') drawTube(g, W, H, it);
     else if (it.k === 'ammo') drawAmmo(g, W, H, it);
@@ -460,7 +467,7 @@ const G_Icons = (() => {
     else if (it.k === 'sticky') drawSticky(g, W, H);
     else if (it.k === 'carrier') drawCarrier(g, W, H, d!);
     else if (it.k === 'plate') drawPlate(g, W, H, d!);
-    else if (it.k === 'helmet') { drawHelmet(g, W, H, d!); if (it.face) drawFace(g, W, H, G.Gear.defOf(it.face) as GearDef, true); if (it.nvg) drawNvg(g, W, H, G.Gear.defOf(it.nvg) as GearDef, true); }
+    else if (it.k === 'helmet') { drawHelmet(g, W, H, d!); if (it.face) drawFace(g, W, H, Gear.defOf(it.face) as GearDef, true); if (it.nvg) drawNvg(g, W, H, Gear.defOf(it.nvg) as GearDef, true); }
     else if (it.k === 'nvg') drawNvg(g, W, H, d!);
     else if (it.k === 'face') drawFace(g, W, H, d!);
     else if (it.k === 'shoulder' || it.k === 'groin' || it.k === 'legs') drawAddon(g, W, H, d!);
@@ -472,14 +479,14 @@ const G_Icons = (() => {
       g.fillStyle = 'rgba(0,0,0,0.3)'; g.fillRect(W * 0.12, H * 0.16, W * 0.76, H * 0.05);
       g.fillStyle = '#e8e4da'; g.fillRect(W * 0.43, H * 0.38, W * 0.14, H * 0.3); g.fillRect(W * 0.32, H * 0.46, W * 0.36, H * 0.12);
     }
-    else if (it.k === 'part') drawPart(g, W, H, G.Gunsmith.PARTS[it.pid]);
+    else if (it.k === 'part') drawPart(g, W, H, Gunsmith.PARTS[it.pid]);
     else if (it.k === 'gun') { try { const im = gunImage(it.w.def, W, H, !!it.w.noMag); if (im) g.drawImage(im, 0, 0); } catch (e) { console.warn(e); } }
     return c;
   }
   // an item drawn in its natural orientation (w x h cells), turned if it's shown turned
   function of(it: GItem, w: number, h: number, rot?: boolean) {
     // (a magazine or tube is drawn as full as it is: that's part of the key, to a round on small ones)
-    const fill = it.k === 'mag' || (it.k as string) === 'tube' ? (it.cap ? Math.round(G.U.clamp(it.n / it.cap, 0, 1) * Math.min(it.cap, 40)) : it.n > 0 ? 1 : 0) + '/' + (it.cap || 0) : it.k === 'ammo' ? Math.ceil(fillOf(it) * 20) : it.n > 0 ? 1 : 0;
+    const fill = it.k === 'mag' || (it.k as string) === 'tube' ? (it.cap ? Math.round(U.clamp(it.n / it.cap, 0, 1) * Math.min(it.cap, 40)) : it.n > 0 ? 1 : 0) + '/' + (it.cap || 0) : it.k === 'ammo' ? Math.ceil(fillOf(it) * 20) : it.n > 0 ? 1 : 0;
     const key = [it.k, it.k === 'gun' ? it.w.def.code + (it.w.noMag ? 'n' : '') : it.wid || it.key || it.gid || it.pid || it.mt || '', it.vid || '', it.am || '', fill, w, h, rot ? 1 : 0, it.face ? it.face.gid : '', it.nvg ? it.nvg.gid : ''].join('|');
     let url = cache.get(key);
     if (url) return url;
@@ -496,16 +503,16 @@ const G_Icons = (() => {
   // loaded (a box magazine from the bottom up, a drum round its ring, a tube or a cylinder slot by slot), and the
   // round in the chamber, solid when there's one in it. kind: styleFor(def); n of cap; W x H in CSS pixels.
   function styleFor(def: WeaponDef, vid?: string) {
-    const af = G.Gear.ammoFor(def);
+    const af = Gear.ammoFor(def);
     if (af.kind !== 'mag') return 'tube';
-    const vp = vid && G.Gunsmith.PARTS[vid], vt = vp && vp.model && vp.model.mag && vp.model.mag.t;
+    const vp = vid && Gunsmith.PARTS[vid], vt = vp && vp.model && vp.model.mag && vp.model.mag.t;
     let st = magStyle(def);
     if (vt === 'drum' && st !== 'box') st = 'drum'; else if (st === 'drum' && vt && vt !== 'drum') st = 'straight';
     return st;
   }
   const GW = 'rgba(255,255,255,0.95)', GD = 'rgba(255,255,255,0.14)';
   function gauge(kind: string, n: number, cap: number, W: number, H: number) {
-    const frac = cap ? G.U.clamp(n / cap, 0, 1) : n > 0 ? 1 : 0, q = kind === 'tube' || kind === 'clip' ? n : Math.round(frac * 40);
+    const frac = cap ? U.clamp(n / cap, 0, 1) : n > 0 ? 1 : 0, q = kind === 'tube' || kind === 'clip' ? n : Math.round(frac * 40);
     const key = ['gauge', kind, q, cap, W, H].join('|');
     let url = cache.get(key);
     if (url) return url;
@@ -561,5 +568,4 @@ const G_Icons = (() => {
   const pending = () => gunWaits;
   return { of, pending, chamberPic, styleFor, gauge, chamberGauge, TYPE_COL, shellCol, tipCol };
 })();
-G.Icons = G_Icons;
-interface GameModules { Icons: typeof G_Icons; }
+ReplayEnv.Icons = Icons; // (what the replay asks of it: js/replayenv.ts)

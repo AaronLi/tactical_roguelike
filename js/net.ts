@@ -1,10 +1,13 @@
 'use strict';
+import { ReplayEnv } from './replayenv.js';
+import { Hooks, U } from './util.js';
+import { ServerLink } from './serverlink.js';
 // Peer-to-peer transport (WebRTC via PeerJS). Star topology: the host is the authority,
 // clients talk only to the host and the host relays. The host's authority is its simulation, in a thread of its own
 // (js/serverlink.ts, docs/threads.md), and the host's game is a client of it like any other: toHost() goes to it on a port
 // of its own, and its word comes back to onClient. What it says to the remote players is sent from here (relay, relayTo),
 // and what they send comes in to onServer (js/game.ts hands it on to the simulation).
-const G_Net = {
+export const Net = {
   PREFIX: 'breachproto-v1-',
   peer: null as any,
   isHost: false,
@@ -28,7 +31,7 @@ const G_Net = {
       { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'] },
       { urls: 'stun:stun.cloudflare.com:3478' },
     ];
-    const own = G.U.store.get('turn', null);
+    const own = U.store.get('turn', null);
     if (own && own.url) ice.push({ urls: own.url.split(/[\s,]+/).filter(Boolean), username: own.user || '', credential: own.pass || '' });
     ice.push({ urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' });
     return { debug, config: { iceServers: ice } };
@@ -41,7 +44,7 @@ const G_Net = {
     if (!this.available()) return cb('PeerJS failed to load (are you offline?)');
     let kept = null;
     try { kept = sessionStorage.getItem('bp_hostCode'); } catch (e) { /* storage unavailable */ }
-    const code = kept && attempt < 6 ? kept : G.U.code(5);
+    const code = kept && attempt < 6 ? kept : U.code(5);
     const peer = new Peer(this.PREFIX + code, this.opts());
     this.peer = peer;
     let opened = false;
@@ -101,7 +104,7 @@ const G_Net = {
   // (Still through the PeerJS broker, like every connection: it needs the internet, but no server of our own.)
   noRoute: 'Found the game, but could not open a connection to the host: neither a direct path through your networks nor the relay worked. Two different browsers on one computer cannot always reach each other; a VPN or a strict firewall can block it too.',
   LAN_SLOTS: 6,
-  lanInfo: (() => null) as () => any, // what a host's beacon says about its game (set by G.Game)
+  lanInfo: (() => null) as () => any, // what a host's beacon says about its game (set by Game)
   beacon: null as any,
   _lanKey: undefined as string | null | undefined, // (this network's key, once worked out)
   async lanKey() {
@@ -165,7 +168,7 @@ const G_Net = {
   },
 
   toHost(msg: any) {
-    if (this.isHost) G.ServerLink.toServer(msg); // (the simulation's thread: js/serverlink.ts)
+    if (this.isHost) ServerLink.toServer(msg); // (the simulation's thread: js/serverlink.ts)
     else if (this.hostConn && this.hostConn.open) this.hostConn.send(msg);
   },
   // host only: what the simulation says to every remote player (but exceptId), and to one of them (js/serverlink.ts)
@@ -185,6 +188,7 @@ const G_Net = {
     this.isHost = false; this.solo = false; this.myId = null; this.code = null;
   },
 };
-G.Net = G_Net;
+ReplayEnv.Net = Net; // (what the replay asks of it: js/replayenv.ts)
+Hooks.online = () => !!Net.myId; // (whether there's a host to tell about your sticker skin: js/stickers.ts share)
+Hooks.toHost = (m) => Net.toHost(m);
 
-interface GameModules { Net: typeof G_Net; }

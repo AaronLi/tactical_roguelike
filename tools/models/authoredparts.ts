@@ -80,4 +80,3 @@ var G_AuthoredParts = {
 };
 G.AuthoredParts = G_AuthoredParts;
 }
-interface GameModules { AuthoredParts: typeof G_AuthoredParts; }

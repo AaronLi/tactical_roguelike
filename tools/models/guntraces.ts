@@ -391,4 +391,3 @@ var G_GunTraces: Record<string, GunTrace> = {
 };
 G.GunTraces = G_GunTraces;
 }
-interface GameModules { GunTraces: typeof G_GunTraces; }

@@ -84,7 +84,7 @@ export function judge(results, waivers) {
 // ---- the command line
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const { loadGame } = await import('./model_env.mjs'), { loadedBuild, buildKey, defOf } = await import('./model_sweep.mjs');
-  const t0 = Date.now(), args = process.argv.slice(2), verbose = args.includes('--verbose'), G = loadGame(), GS = G.Gunsmith;
+  const t0 = Date.now(), args = process.argv.slice(2), verbose = args.includes('--verbose'), G = await loadGame(), GS = G.Gunsmith;
   const ids = args.filter((a) => !a.startsWith('--')), plats = ids.length ? ids : Object.keys(GS.PLATFORMS);
   const waivers = JSON.parse(fs.readFileSync(WAIVERS_FILE, 'utf8')), results = [];
   let n = 0;

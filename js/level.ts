@@ -1,23 +1,20 @@
-'use strict'; interface LvMap { W: number; H: number; t: Uint8Array; out: Uint8Array; glassRoofs?: number[][]; rooms: LvRoom[]; doors: LvDoor[]; cover: LvPt[]; wallSpots: LvPt[]; lights: LvLight[]; lamps: LvLight[]; stairs: LvStair[]; windows: LvWin[]; cabinets: LvCab[]; fx: Record<string, any>[]; winMeshes: THREE.Object3D[]; lightPool: THREE.PointLight[]; enemySpots: number[][];
-  seed: number; level: number; theme: ThemeDef; TS?: number; world: ReturnType<typeof G_World.create>; crest?: any; chasm: number; floors: LvMap[]; props: Map<number, LvProp>; propList: LvProp[];
-  case?: any; abox?: any; sbox?: any; winAt?: any; leafAt: Map<number, any>; unitAt?: Int8Array | null; doorAt?: any; doorMeshes?: any; fy: number; fl?: number; spawn: any; spawnRoom: LvRoom; exitRoom: LvRoom; extract?: any;
-  grate?: any; railSteel?: boolean; fest?: any; base?: number; NF: number; minY?: number; rails: any[]; lz?: any; lzSpots?: number[][]; terrain?: any; skirt: number; entries?: number[][]; caseView?: any; cabViews?: any; aboxView?: any; sboxView?: any;
-  above?: LvMap | null; voidAbove?: ArrayLike<number> | null; units?: number; navG?: any; lightT?: number; underground?: boolean; rollers?: number[][]; hub?: boolean; glassRuns?: any; fences: LvFence[]; doorVer?: number; cracked?: any; dmg?: any;
-  wallMesh?: any; wallIdx?: Map<number, number>; wallBase?: Float32Array; homes?: any; civSpots?: { x: number; z: number; yaw: number }[] | null; night?: boolean; lux?: LvLux; desc?: LvDesc } interface LvLight { x: number; z: number; y?: number; gy?: number; kind?: LvLightKind; color?: number; i?: number; d?: number; up?: number; porch?: number; fl?: number; glow?: number; off?: boolean; sign?: { x: number; z: number; ax: LvAxis } } interface LvLux { W: number; H: number; NF: number; v: Float32Array } interface LvWin { solids?: any[]; id: number; cells: number[]; nx: number; nz: number; ext: boolean; broken: boolean; x: number; z: number; len: number; armor?: boolean; cooler?: boolean; sill?: number; top?: number; door?: LvDoor; cracked?: any; fy?: number; rail?: any; fl?: number } interface LvCab { x: number; z: number; yaw: number; fy?: number } interface LvRoom { cars?: any; type: RoomType; x: number; z: number; w: number; h: number; cx: number; cz: number; dress?: LvDress | null; unit?: number; lid?: any; door?: any; out?: boolean; loft?: boolean; lamp?: any; cover?: any[][]; carved?: boolean; front?: any; tall?: any; house?: any; fl?: number; flush?: boolean } interface LvLz { x: number; z: number; f?: number; lamps?: number[][]; y?: number } type LvFence = [number, number, string, string?]; type LvRng = () => number; type LvObj = THREE.Object3D & Record<string, any>; interface LvBox { m?: any; cx: number; cz: number; hx: number; hz: number; y0: number; h: number; ray?: LvBox[]; gy?: number; walk?: boolean; hull?: number[] } interface LvDoor { id: number; i: number; tx: number; tz: number; x: number; z: number; axis: LvAxis; open: boolean; mirror: boolean; kind: any; cells?: number[]; w?: number; leaf?: LvBox; solids?: any[]; holes: any; gone: any; fallen?: boolean; rest?: any; pane?: any; fy?: number; fl?: number } interface LvProp { style?: Record<string, any>; name: string; x: number; z: number; q: number; v: number; boxes: LvBox[]; gy?: number; wd?: any; own?: boolean; block?: number } // a room's purpose (what furniture.ts fits it out as; homes.ts re-types a room to a resident's)
-type RoomType = 'living' | 'kitchen' | 'dining' | 'bedroom' | 'office' | 'storage' | 'breakroom' | 'yard' | 'hall' | 'hangar' | 'lz' | 'street' | 'road' | 'lot' | 'corridor' | 'bathroom' | 'alley' | 'stage' | 'washroom' | 'plaza' | 'cafe' | 'store' | 'mart' | 'bar' | 'melt' | 'control' | 'mcc' | 'locker' | 'kitchenette' | 'lobby' | 'observe' | 'boss' | 'meeting' | 'trail' | 'garden' | 'giftshop' | 'storeroom' | 'stockroom' | 'freezer' | 'cashier' | 'dock' | 'lawn' | 'landing' | 'range' | 'seating' | 'roof' | 'picnic' | 'parking' | 'pad' | 'gate' | 'cubicle' | 'court' | 'aisle' | 'overlook' | 'catwalk' | 'ridge' | 'saddle' | 'greenhouse' | 'antennas' | 'carpark' | 'mill' | 'loading' | 'restroom' | 'terrace' | 'viewing';
-type LvAxis = 'x' | 'z'; // (which way a door, stair or fence runs)
-type LvDoorKind = 'stair' | 'fire' | 'vault'; // (a door that isn't the plain wooden one)
-type LvLightKind = 'string' | 'highbay' | 'panel' | 'exit';
-type LvFxKind = 'sparks' | 'jet' | 'embers' | 'steam' | 'smoke';
-interface LvDress { who: string; type0: RoomType; wall: string; paper?: number; ceil: string; trim: string; floor: HomeFloor; cells: number[] | null; hung: any[]; was: Map<any, any>; own: any[] }
-// what a ray is asked to do (G.World.raycast, G.Level.raycast): through glass, a look not a round, bars, what stops people, solids to skip
-interface LvRayOpts { glass?: boolean; sight?: boolean; bars?: boolean; move?: boolean; skip?: (s: any) => boolean }
+'use strict';
+import { HANGAR_ROWS, HANGAR_THEME, THEMES } from './data.js';
+import { Materials } from './materials.js';
+import { ShipGen } from './shipgen.js';
+import { SpaceData } from './spacedata.js';
+import { Hooks, U as G_U } from './util.js';
+import { World } from './world.js';
+import { LevelDesc } from './leveldesc.js';
+import { Furniture } from './furniture.js';
+import { Homes } from './homes.js';
+type LvDoorKind = 'stair' | 'fire' | 'vault' | 'slide' | 'blast'; // (a door that isn't the plain wooden one. slide, blast: a ship's, which slide into the wall: slides())
 interface LvBuilding { floors: LvLay[]; stairs: any; rail?: string; base?: number; units?: number; lz?: LvLz | null }
-interface LvLay { W: number; H: number; t: Uint8Array; rooms: LvRoom[]; out?: Uint8Array; glassRoofs?: number[][]; doors?: LvDoorSpec[]; fences?: LvFence[]; grate?: any; crest?: any; glass?: any[]; spawn?: any; lz?: LvLz | null; entries?: number[][] | null; units?: number; underground?: boolean; chasm?: number; rollers?: number[][]; ids?: Int16Array; homes?: any; ringDoors?: boolean } interface LvPt { x: number; z: number; y?: number; cx?: number; cz?: number; fl?: number; lean?: any } interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[] } type LvDoorSpec = [number, number, LvAxis, boolean?, boolean?, any?]; type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; unit?: number; head?: number[]; drop?: number[] } interface LvStair { axis: LvAxis; up: number; x0: number; x1: number; z0: number; z1: number; f: number; y0?: number; steps?: any; rise?: number } interface LvNav { stairOf: number[]; foot: Set<string>; WH: number }
+interface LvFl { t: Uint8Array; out: Uint8Array; rooms: LvRoom[]; doors: any[]; fences?: LvFence[]; ids?: Int16Array; glass?: any[] }  type LvTheme = Record<string, any>; interface LvUnit { x: number; w: number; z0: number; h: number; wallZ: number; loft: boolean; unit?: number; head?: number[]; drop?: number[] }  interface LvNav { stairOf: number[]; foot: Set<string>; WH: number }
 // Procedural level generation, collision, raycasting and path flow-fields.
 // The map is a tile grid (TS metres per tile, after refinement: see TS/CTS/K below). 0 = floor, 1 = wall, 2 = furniture you can take cover behind,
 // 3 = door, 4 = other furniture (garden fences are furniture too). map.out marks tiles open to the sky. Furniture collision boxes live in map.props (see js/furniture.ts).
-const G_Level = {
+export const Level = {
   // The grid: levels are laid out on 2 m cells (CTS), then refined 3x (K) to 0.67 m cells (TS) so walls between
   // spaces are a single 0.67 m cell thick instead of a whole 2 m tile. Everything that plays on the map
   // (collision, rays, paths, AI, rendering) works on the fine grid.
@@ -34,9 +31,11 @@ const G_Level = {
   CRATE_HX: 0.8,
   DOOR_H: 2.3,
 
-  // th: the environment (index into G.THEMES) picked on the route map; by default they come round in turn. night: a night
+  // th: the environment (index into THEMES) picked on the route map; by default they come round in turn. night: a night
   // level (the route node's: js/route.ts), the same place with the lights out (nightify)
-  generate(seed: number, level: number, th?: number, night = false) {
+  // sp: what a mission's level is for besides (js/spacedata.ts SpGen: a ship's size and what's wanted aboard her)
+  generate(seed: number, level: number, th?: number, night = false, sp?: SpGen | null) {
+    this.genSp = sp || null;
     this.genNight = night; // (the furniture's plan reads it: fewer cars left in the car parks at night, js/furniture.ts)
     let map: LvMap;
     try { map = this.generateDay(seed, level, th); } finally { this.genNight = false; }
@@ -45,7 +44,7 @@ const G_Level = {
   },
   // The level as data (js/leveldesc.ts, docs/level-data.md): map.desc, everything that's drawn and everything that's solid,
   // the same wherever it's made from the same seed. The light grid's lamps are its (map.lamps); the world everyone collides
-  // with, sees and shoots through is built from its solids alone (G.World.fromDesc: the planner's own, which the landing's
+  // with, sees and shoots through is built from its solids alone (World.fromDesc: the planner's own, which the landing's
   // sight lines were worked out in, is let go).
   described(map: LvMap) {
     const lampsOf = (m: LvMap) => m.lights.map((l) => this.lampOf(l, map.theme)).filter((l): l is LvLight => !!l);
@@ -53,16 +52,29 @@ const G_Level = {
       map.lamps = [];
       for (const m of map.floors) { m.lamps = lampsOf(m); for (const l of m.lamps) map.lamps.push(Object.assign({}, l, { y: l.y! + m.fy, fl: m.fl })); }
     } else map.lamps = lampsOf(map);
-    map.desc = G.LevelDesc.describe(map);
-    G.World.fromDesc(map.desc, map);
+    map.desc = LevelDesc.describe(map);
+    World.fromDesc(map.desc, map);
     return map;
   },
   genNight: false,
+  // A door that slides into the wall beside it instead of swinging (a ship's bulkhead door, and its locked blast doors): open,
+  // there's no leaf standing in the room. sturdy: no hinges or handle to shoot out, and not to be kicked in.
+  slides(d: { kind?: any }) { return d.kind === 'slide' || d.kind === 'blast'; },
+  sturdy(d: { kind?: any }) { return d.kind === 'vault' || d.kind === 'slide' || d.kind === 'blast'; },
+  genSp: null as SpGen | null,
   generateDay(seed: number, level: number, th?: number) {
-    const U = G.U, r = U.rng(seed);
-    const theme = G.THEMES[th != null && G.THEMES[th] ? th : (level - 1) % G.THEMES.length];
+    const U = G_U, r = U.rng(seed);
+    const theme = (th != null && SpaceData.themeAt(th)) || THEMES[(level - 1) % THEMES.length]; // (th from 1000: a ship, js/spacedata.ts)
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
+    if (theme.layout === 'ship') { // a ship to board (js/shipgen.ts): one deck, open space round it
+      const sl = ShipGen.lay(r, level, this.genSp) as LvLay & Partial<LvBuilding>;
+      // (a capital ship: her decks planned one by one and stacked, as a building's storeys are)
+      if (sl.floors) return ShipGen.finish(this.stack(sl.floors.map((fl: LvLay) => this.plan(fl, r, seed, level, theme)), sl), sl);
+      const sm = ShipGen.finish(this.plan(sl, r, seed, level, theme), sl);
+      World.fromTileMap(sm);
+      return sm;
+    }
     const lay = (theme.layout === 'apartments' ? this.layApartments(r, level) : theme.layout === 'warehouse' ? this.layWarehouse(r, level)
       : theme.layout === 'houses' ? this.layHouses(r, level) : theme.layout === 'festival' ? this.layFestival(r, level) : theme.layout === 'mart' ? this.layMart(r, level)
       : theme.layout === 'foundry' ? this.layFoundry(r, level) : theme.layout === 'crest' ? this.layCrest(r, level)
@@ -70,15 +82,15 @@ const G_Level = {
     // a building of several floors: each one planned as a storey, then stacked (stack: the stairs between them)
     if (lay.floors) {
       // (who lives where: nothing to do with the layout, and from the seed alone: js/homes.ts)
-      if (theme.residents) { const homes = G.Homes.start(seed); lay.floors.forEach((fl: LvLay) => { fl.homes = homes; }); }
+      if (theme.residents) { const homes = Homes.start(seed); lay.floors.forEach((fl: LvLay) => { fl.homes = homes; }); }
       return this.landing(this.stack(lay.floors.map((fl: LvLay) => this.plan(fl, r, seed, level, theme)), lay), lay.lz);
     }
     const map = this.plan(lay, r, seed, level, theme);
     if (map.crest) { this.crestLadder(map); this.crestGround(map); } // (a way up onto the Crest House; a mountain top: the ground rolls)
     // glass roofs the layout puts over open-to-the-sky rooms ([x0, z0, x1, z1] coarse tiles, the walls and all, and the roof's top over
-    // the ground there, metres): the sky's light comes through, its wind doesn't (G.Sim.windy). In metres, the top over the ground as it lies.
+    // the ground there, metres): the sky's light comes through, its wind doesn't (Sim.windy). In metres, the top over the ground as it lies.
     if (lay.glassRoofs) map.glassRoofs = lay.glassRoofs.map(([x0, z0, x1, z1, h]) => { const C = this.CTS; return [x0 * C, z0 * C, x1 * C, z1 * C, this.groundHeight(map, (x0 + x1) / 2 * C, (z0 + z1) / 2 * C) + h]; });
-    G.World.fromTileMap(map); // the level as 3D solids (js/world.ts): what every ray, sight line and step is asked of
+    World.fromTileMap(map); // the level as 3D solids (js/world.ts): what every ray, sight line and step is asked of
     if (map.crest) this.crestSolids(map); // (the viewing building's roof and its parapet)
     return this.landing(map, lay.lz);
   },
@@ -116,7 +128,7 @@ const G_Level = {
   // much dimmer and bluer (NIGHT). Drawn from a generator of its own (from the seed), so the place is the day's.
   NIGHT: { fog: 0x04060b, hemi: 0x8a9ad0, hemiI: 0.15, cloud: 0x1c2030 }, // (cloud: the clouds the helicopter flies through, js/landing.ts)
   nightify(map: LvMap, seed: number) {
-    const r = G.U.rng(seed ^ 0x6e1647), TS = this.TS, th = Object.assign({}, map.theme, this.NIGHT) as ThemeDef;
+    const r = G_U.rng(seed ^ 0x6e1647), TS = this.TS, th = Object.assign({}, map.theme, this.NIGHT) as ThemeDef;
     map.night = true; map.theme = th;
     for (const fm of map.floors || [map]) {
       fm.night = true; fm.theme = th;
@@ -216,14 +228,14 @@ const G_Level = {
     return v;
   },
   // The hangar between levels (js/hangar.ts): the whole map is the same as any level's (the same walls, floor,
-  // lights, collision and rays), with nothing in it but what G.Hangar puts there.
+  // lights, collision and rays), with nothing in it but what Hangar puts there.
   generateHub(seed: number, level: number) {
-    const r = G.U.rng(seed), lay = this.layHangar(r, level);
-    const map = this.plan(lay, r, seed, level, G.HANGAR_THEME);
+    const r = G_U.rng(seed), lay = this.layHangar(r, level);
+    const map = this.plan(lay, r, seed, level, HANGAR_THEME);
     map.case = null; map.abox = null; map.sbox = null; map.cabinets = []; map.enemySpots = []; map.hub = true;
-    G.World.fromTileMap(map);
+    World.fromTileMap(map);
     this.described(map); // (the hall as any level's: its own fittings are js/hangar.ts', added to the world after)
-    G.Hangar.decorate(map);
+    Hooks.hangarDecorate!(map);
     return map;
   },
   // One storey, from its layout: doors, furniture, the fine grid and everything placed on it
@@ -282,7 +294,7 @@ const G_Level = {
       if (nr !== reach - 1) { t[i] = 0; return false; }
       reach = nr; return true;
     };
-    G.Furniture.plan(c, r, spawnRoom, exitRoom, tryBlock);
+    Furniture.plan(c, r, spawnRoom, exitRoom, tryBlock);
 
     // then the fine grid, and everything that's placed on it
     const map = this.refine(c);
@@ -308,7 +320,7 @@ const G_Level = {
     if (map.crest) { const cr = map.crest, west = cr.CX0 * this.CTS, east = (cr.CX1 + 1) * this.CTS; map.enemySpots = map.enemySpots.filter(([x]: number[]) => { const m = (x + 0.5) * this.TS; return m >= east || r() < (m < west ? 0.2 : 0.4); }); }
     // the walls, the doors and everything else are done: now who lives here redoes the rooms they have (after all of
     // it, on its own random stream, so nothing else on the map moves for them)
-    if (lay.homes) G.Homes.fill(map, lay.homes);
+    if (lay.homes) Homes.fill(map, lay.homes);
     return map;
   },
 
@@ -364,7 +376,7 @@ const G_Level = {
           continue;
         }
         if (v === 5) { t[fi] = 5; out[fi] = c.out[ci] ? 1 : 0; continue; } // a drop: no floor (the floor below shows through), or upstairs, the open air outside
-        if (v === 6) { t[fi] = 7; continue; } // a flight of stairs (its steps are solids: G.Level.stack)
+        if (v === 6) { t[fi] = 7; continue; } // a flight of stairs (its steps are solids: Level.stack)
         t[fi] = 0; out[fi] = c.out[ci] ? 1 : 0; // floor (furniture is laid on it below)
         if (grate && cg[ci]) grate[fi] = 1;
       }
@@ -411,7 +423,7 @@ const G_Level = {
       return q;
     });
     // furniture: slid out to its wall's new face, then laid on the cells it covers
-    const R = G.Furniture.R, wb = G.Furniture.worldBoxes, props = new Map<number, LvProp>(), propList: LvProp[] = [];
+    const R = Furniture.R, wb = Furniture.worldBoxes, props = new Map<number, LvProp>(), propList: LvProp[] = [];
     for (const [ci, p0] of c.props) {
       if (fenceC.has(ci)) continue;
       const cx = ci % c.W, cz = (ci / c.W) | 0;
@@ -456,7 +468,7 @@ const G_Level = {
   // Everything placed on the fine grid: cover spots, hiding spots, where suspects start, the weapon case, the
   // lights, spawn and extraction.
   finish(map: LvMap, r: LvRng) {
-    const U = G.U, { W, H, t, rooms, spawnRoom, exitRoom } = map, TS = this.TS, K = this.K;
+    const U = G_U, { W, H, t, rooms, spawnRoom, exitRoom } = map, TS = this.TS, K = this.K;
     // Cover spots: floor cells beside furniture you can hide behind, tight against its side
     map.cover = [];
     for (let z = 1; z < H - 1; z++) for (let x = 1; x < W - 1; x++) this.coverAt(map, x, z);
@@ -477,7 +489,7 @@ const G_Level = {
     // floor along a wall in a room away from the spawn: two clear cells side by side against the wall
     map.case = null;
     const hasCase = r() < this.CASE_CHANCE || !!map.theme.starter;
-    const keepIn = (q: LvRoom) => !map.theme.starter || q.type === 'stockroom'; // (a starter level: its stockroom has them all)
+    const lootRooms = rooms.some((q) => q.lootRoom), keepIn = (q: LvRoom) => (!map.theme.starter || q.type === 'stockroom') && (!lootRooms || !!q.lootRoom); // (a ship with an armoury: in it) // (a starter level: its stockroom has them all)
     const clear = (x: number, z: number) => t[z * W + x] === 0 && !map.props.has(z * W + x);
     if (hasCase) for (const rm of U.shuffle(r, rooms.filter((q) => q !== spawnRoom && !q.front && !q.lid && q.type !== 'roof' && keepIn(q)))) {
       const spots = [];
@@ -579,7 +591,7 @@ const G_Level = {
         for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) map.lights.push({ kind: 'panel', x: x0 + (i + 0.5) * rm.w * TS / nx, z: z0 + (j + 0.5) * rm.h * TS / nz });
         continue;
       }
-      if (rm.type === 'corridor') { for (let x = rm.x + 2; x < rm.x + rm.w; x += 7) map.lights.push({ x: (x + 0.5) * TS, z: (rm.cz + 0.5) * TS }); continue; } // down a hallway
+      if (rm.type === 'corridor' || rm.type === 'spine') { for (let x = rm.x + 2; x < rm.x + rm.w; x += 7) map.lights.push({ x: (x + 0.5) * TS, z: (rm.cz + 0.5) * TS }); continue; } // down a hallway
       if (rm.type === 'hangar') { // a lamp every 8 m by 6 m down the hall
         for (let z = rm.z + 3; z < rm.z + rm.h; z += 9) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 12) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
       } else if (rm.type === 'hall' || rm.type === 'dock') {
@@ -597,7 +609,7 @@ const G_Level = {
     // (lighting the floor above too: up), and what it throws off (sparks, embers, smoke, steam: buildFx)
     map.fx = [];
     for (const p of map.propList || []) {
-      const rec = G.Furniture.R[p.name];
+      const rec = Furniture.R[p.name];
       if (!rec.glow && !rec.fx) continue;
       const s = Math.round(Math.sin(p.q * Math.PI / 2)), c = Math.round(Math.cos(p.q * Math.PI / 2)), at = (lx: number, lz: number) => [p.x + lx * c + lz * s, p.z - lx * s + lz * c];
       if (rec.glow) { const g = rec.glow, [x, z] = at(g.x || 0, g.z || 0); map.lights.push({ kind: 'string', x, z, y: g.y, color: g.color, i: g.i, d: g.d, up: 1, glow: 1 }); }
@@ -626,7 +638,7 @@ const G_Level = {
     // An open door's leaf stands out into the room beside its hinge; it hides whoever's behind it and stops
     // rounds (like the closed door), though you can walk past it. Which cells it stands in, per door.
     map.leafAt = new Map();
-    for (const d of map.doors) this.hangLeaf(map, d);
+    for (const d of map.doors) if (!this.slides(d)) this.hangLeaf(map, d);
     map.unitAt = null;
     if (map.units) {
       map.unitAt = new Int8Array(W * H).fill(-1);
@@ -708,16 +720,25 @@ const G_Level = {
   //     outsideMaterial; high up in an apartment block). Rounds through it stop in the wall behind.
   // From the level's own random stream, so every peer has the same windows. map.windows[id], map.winAt: cell -> ray boxes.
   SILL: 0.95, TOP: 2.25,
-  CRACKS: 2, // (rounds that fracture a pane without bringing it down: the next one breaks it, js/player.ts roundPane)
+  CRACKS: 1, // (rounds that fracture a pane without bringing it down: the next one breaks it, js/player.ts roundPane. One: a second round brings it down)
+  // A ship's glass (w.ship: js/shipgen.ts finish) never comes down: rounds don't go through it (its material's armour glass's, js/materials.ts),
+  // each one fractures it more, up to CRACK_MAX cracks drawn, and nothing breaks it (rounds, blasts, someone walking into it fractured).
+  // Anywhere else glass is as it was: CRACKS rounds fracture a pane, the next one, a blast, or walking into it fractured brings it down.
+  CRACK_MAX: 6,
+  paneBreaks(w: { ship?: boolean } | null | undefined) { return !(w && w.ship); },
+  // how many cracks a pane can take
+  crackCap(w: { ship?: boolean } | null | undefined) { return this.paneBreaks(w) ? this.CRACKS : this.CRACK_MAX; },
   placeWindows(map: LvMap) {
-    const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G.U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
+    const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G_U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
     map.windows = []; map.winAt = new Map();
     if (map.theme.entry === 'vault' || map.theme.hub || map.underground || rooms.some((q) => q.lid)) return; // a bunker has none, nor does the hangar, nor a basement, nor a roof's stair heads
     const used = new Set(), floor = (i: number) => t[i] === 0 || t[i] === 2 || t[i] === 4 || (t[i] === 5 && out[i]); // (upstairs, the open air outside a house counts)
     const nearDoor = (x: number, z: number) => { for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) if (t[(z + dz) * W + x + dx] === 3) return true; return false; };
     const tall = (i: number) => { const p = map.props && map.props.get(i); return !!(p && p.boxes[0] && p.boxes[0].h > 1.0); };
     const inside = (x: number, z: number) => x > 0 && z > 0 && x < W - 1 && z < H - 1;
+    const faired = map.theme.layout === 'ship' ? ShipGen.faired(W, H, t) : null; // (a ship: none in her side where a fairing covers it, js/shipgen.ts)
     const add = (cells: number[], nx: number, nz: number, ext: boolean, kind?: Record<string, any>) => {
+      if (faired && cells.some((i) => faired.has(i + nx + nz * W) || faired.has(i - nx - nz * W))) return;
       const [a, b] = cells.map((i) => [i % W, (i / W) | 0]);
       const mx = ((a[0] + b[0]) / 2 + 0.5) * TS, mz = ((a[1] + b[1]) / 2 + 0.5) * TS, near = (o: LvPt | null) => o && Math.hypot(o.x - mx, o.z - mz) < 1.6;
       if (!kind && (near(map.case) || near(map.abox) || near(map.sbox) || (map.cabinets || []).some(near))) return; // (not through the wall a cabinet or the weapon case is against)
@@ -769,7 +790,7 @@ const G_Level = {
       const [nx, nz, roomSide] = c, ax = nz ? 1 : 0, az = nx ? 1 : 0, c2 = thruAt(x + ax, z + az);
       if (!c2 || c2[0] !== nx || c2[1] !== nz || nearDoor(x, z) || nearDoor(x + ax, z + az)) continue;
       if (tall(roomSide) || tall(c2[2]) || used.has((z - az) * W + x - ax) || used.has((z - 2 * az) * W + x - 2 * ax)) continue;
-      if (rw() < 0.45) add([z * W + x, (z + az) * W + x + ax], nx, nz, false);
+      if (rw() < (map.theme.thru != null ? map.theme.thru : 0.45)) add([z * W + x, (z + az) * W + x + ax], nx, nz, false);
     }
     // the building's outer walls: a wall face of a room, with solid wall from there to the edge of the map (and
     // not too thick); a couple to a room
@@ -822,9 +843,9 @@ const G_Level = {
   //    and along the north (cafes, stores, bars, each with a door onto the square), a fountain in the middle.
   //  - The car park along the south, where you come in: rows of parked cars, the festival's gate under its arch
   //    and the street into the square opening off it.
-  // (What goes where: G.Furniture.plan's festival(); the lights, sky and stage rig: buildFestival.)
+  // (What goes where: Furniture.plan's festival(); the lights, sky and stage rig: buildFestival.)
   layFestival(r: LvRng, level: number): LvLay {
-    const U = G.U, W = 58 + Math.min(level, 4) * 2, H = 61, TX = 17, PZ = 42; // the town west of TX; the car park south of PZ, the overflow beyond it where the helicopter lands
+    const U = G_U, W = 58 + Math.min(level, 4) * 2, H = 61, TX = 17, PZ = 42; // the town west of TX; the car park south of PZ, the overflow beyond it where the helicopter lands
     const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H).fill(1), rooms: LvRoom[] = [], doors: LvDoorSpec[] = [], fences: LvFence[] = [];
     const fill = (x0: number, z0: number, w: number, h: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     const solid = (x0: number, z0: number, x1: number, z1: number) => { for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { t[z * W + x] = 1; out[z * W + x] = 0; } }; // a building's footprint
@@ -884,7 +905,7 @@ const G_Level = {
   //    wall (the theme's fence) along every edge of it and round the map.
   // The outcrops (wall tiles, lay.crest.kind 1) are laid in blobs, each kept only if every bit of ground is still reached,
   // and never a tile thick (a wall that thick between two open spaces thins to a slab: refine).
-  // (What goes where: G.Furniture.plan's crest(); the sky, the mountain under it and the city below: buildCrest.)
+  // (What goes where: Furniture.plan's crest(); the sky, the mountain under it and the city below: buildCrest.)
   CHASM: 45,
   // The Sandia Crest's ground, not flat: map.terrain, a height at each corner of the fine grid (v, (W + 1) x (H + 1)), the
   // ground across a cell the two triangles between its corners (js/world.ts terrainAt; drawn the same: build). What it's
@@ -901,7 +922,7 @@ const G_Level = {
   // goes under them.)
   GROUND: { RISE: 0.2, ROLL: 0.45, VIEW: -15, GARDEN: -22, HILLS: 1.8, NATURAL: new Set(['boulder', 'juniper', 'pinon', 'cholla']) },
   crestGround(map: LvMap) {
-    const { W, H, t } = map, TS = this.TS, VW = W + 1, VH = H + 1, cr = map.crest, CS = this.CTS, G2 = this.GROUND, rr = G.U.rng((map.seed ^ 0x51ab0e) >>> 0);
+    const { W, H, t } = map, TS = this.TS, VW = W + 1, VH = H + 1, cr = map.crest, CS = this.CTS, G2 = this.GROUND, rr = G_U.rng((map.seed ^ 0x51ab0e) >>> 0);
     const s1 = rr() * 6.3, s2 = rr() * 6.3, s3 = rr() * 6.3;
     // cells something stands on, or that are kept level: then their corners (and a corner round them, for what overhangs)
     const flat = new Uint8Array(W * H), keepRooms = map.rooms.filter((q) => q.type === 'lz' || q.type === 'overlook' || q.type === 'terrace' || q.type === 'greenhouse' || !q.out);
@@ -914,7 +935,7 @@ const G_Level = {
     for (let i = 0; i < W * H; i++) if (flat[i]) { const x = i % W, z = (i / W) | 0; for (let dz = -1; dz <= 2; dz++) for (let dx = -1; dx <= 2; dx++) { const vx = x + dx, vz = z + dz; if (vx >= 0 && vz >= 0 && vx < VW && vz < VH) fixed[vz * VW + vx] = 1; } }
     // what the ground would do left to itself (m)
     const gauss = (x: number, z: number, cx: number, cz: number, rx: number, rz: number) => Math.exp(-(((x - cx) / rx) ** 2) - (((z - cz) / rz) ** 2));
-    const rim0 = cr.CX0 * CS, rim1 = (cr.CX1 + 1) * CS, sz = cr.SZ * CS, Wm = W * TS, sm = (a: number, b: number, x: number) => G.U.smooth(a, b, x);
+    const rim0 = cr.CX0 * CS, rim1 = (cr.CX1 + 1) * CS, sz = cr.SZ * CS, Wm = W * TS, sm = (a: number, b: number, x: number) => G_U.smooth(a, b, x);
     // what it's built on (m): the falls along the saddle (none till past the overlook; the viewing site level, VIEW, from a
     // few metres either side of it; GARDEN from short of the east rim), and the garden's hills
     const [gx, gz] = cr.gh, g0 = [gx * CS - 3, gz * CS - 3], g1 = [(gx + 7) * CS + 3, (gz + 9) * CS + 3];
@@ -963,7 +984,7 @@ const G_Level = {
     // and everything else that stands on it where it's built: doors and windows (fy, as a storey's floor is), the lamps
     // (gy: the floor they hang over), the spots suspects take cover at or start from, the weapon case and the
     // boxes, the cabinets (fy), the coin-op viewers, each zipline's ends
-    const gh = (x: number, z: number) => G.World.terrainAt(map.terrain, x, z);
+    const gh = (x: number, z: number) => World.terrainAt(map.terrain, x, z);
     for (const d of map.doors) d.fy = gh(d.x, d.z);
     for (const w of map.windows || []) w.fy = gh(w.x, w.z);
     for (const l of map.lights) l.gy = gh(l.x, l.z);
@@ -975,7 +996,7 @@ const G_Level = {
   // how far the Sandia Crest's ground has fallen at x (m, from the west summit's: crestGround), the garden's hills left out
   crestFall(cr: any, x: number) {
     const CS = this.CTS, G2 = this.GROUND, rim0 = cr.CX0 * CS, rim1 = (cr.CX1 + 1) * CS, sx0 = cr.site[0] * CS, sx1 = (cr.site[1] + 1) * CS;
-    return G2.VIEW * G.U.smooth(rim0 + 14, sx0 - 8, x) + (G2.GARDEN - G2.VIEW) * G.U.smooth(sx1 + 8, rim1 - 10, x);
+    return G2.VIEW * G_U.smooth(rim0 + 14, sx0 - 8, x) + (G2.GARDEN - G2.VIEW) * G_U.smooth(sx1 + 8, rim1 - 10, x);
   },
   // the height of the floor a spot is on (f, a storey's: fy), and of the ground there on the ground floor of a level whose
   // ground rolls
@@ -1027,14 +1048,14 @@ const G_Level = {
   // The viewing building's roof as solids (after the rest of the level's: js/world.ts fromTileMap): its slab over the whole
   // of it (the ceilings stop at the walls' middle lines), the parapet round its edge; and the guard rail inside its front
   // glass (crest.guard: it stops you walking out where the glass is shot out; only its handrail stops a round, as a
-  // railing's: G.Level.stack)
+  // railing's: Level.stack)
   // The outcrops' rough tops (an icosahedron over each one's wall, sometimes a smaller one on that) and a lump or two at their
   // feet: each one's matrix (placed, turned, stretched) and its shade (p). From the seed alone, so the meshes (buildCrest) and
   // what rays meet (crestSolids: each its own convex shape, js/world.ts hullOf) are the same rocks.
   crestCaps(map: LvMap): { m: number[]; p: number }[] {
     const cr = map.crest;
     if (cr.caps) return cr.caps;
-    const D = G.LevelDesc, TS = this.TS, CS = this.CTS, W = map.W, rnd = G.U.rng((map.seed ^ 0xca95e7) >>> 0), out: { m: number[]; p: number }[] = [];
+    const D = LevelDesc, TS = this.TS, CS = this.CTS, W = map.W, rnd = G_U.rng((map.seed ^ 0xca95e7) >>> 0), out: { m: number[]; p: number }[] = [];
     const open = (x: number, z: number) => x >= 0 && z >= 0 && x < cr.W && z < cr.H && cr.kind[z * cr.W + x] !== 1 && cr.kind[z * cr.W + x] !== 2;
     for (let i = 0; i < cr.W * cr.H; i++) {
       if (cr.kind[i] !== 1) continue;
@@ -1055,26 +1076,26 @@ const G_Level = {
     const w = map.world, WH = this.WALL_H, P = this.PARAPET, gd = map.crest.guard;
     // the outcrops' tops and the lumps at their feet, as drawn: rays meet them (you never get up there, and the lumps are at the
     // walls' feet: what stops you is the walls)
-    // (the icosahedron's corners as three.js has them, and the matrix applied as it applies one: G.LevelDesc.ICO, apply)
-    const D = G.LevelDesc, tri = D.ICO;
+    // (the icosahedron's corners as three.js has them, and the matrix applied as it applies one: LevelDesc.ICO, apply)
+    const D = LevelDesc, tri = D.ICO;
     for (const c of this.crestCaps(map)) {
       const t: number[] = []; for (let i = 0; i < tri.length; i += 3) t.push(...D.apply(c.m, tri[i], tri[i + 1], tri[i + 2]));
-      G.World.add(w, G.World.hullOf(t, [], { kind: 'prop', move: false, mat: G.Materials.PROPS.boulder }));
+      World.add(w, World.hullOf(t, [], { kind: 'prop', move: false, mat: Materials.PROPS.boulder }));
     }
     if (gd) {
       const [x0, x1, z] = gd, y = this.crestFall(map.crest, (x0 + x1) / 2), H = this.GUARD_H;
-      G.World.add(w, G.World.box(x0, y, z - 0.03, x1, y + H, z + 0.03, { kind: 'rail', ray: false }));
-      G.World.add(w, G.World.box(x0, y + H - 0.05, z - 0.03, x1, y + H, z + 0.03, { kind: 'rail', move: false }));
+      World.add(w, World.box(x0, y, z - 0.03, x1, y + H, z + 0.03, { kind: 'rail', ray: false }));
+      World.add(w, World.box(x0, y + H - 0.05, z - 0.03, x1, y + H, z + 0.03, { kind: 'rail', move: false }));
     }
     for (const R of map.crest.roofs || []) {
       if (!R.parapet) continue;
-      G.World.add(w, G.World.box(R.x0, R.gy + WH, R.z0, R.x1, R.y, R.z1, { kind: 'ceil' }));
+      World.add(w, World.box(R.x0, R.gy + WH, R.z0, R.x1, R.y, R.z1, { kind: 'ceil' }));
       // (a steel railing on a low concrete kerb: you can't walk through it or off the roof, but you see and shoot through it, as at the
       // terraces: only the kerb and the handrail stop a round)
       for (const [x0, z0, x1, z1] of this.parapetRuns(R)) {
-        G.World.add(w, G.World.box(x0, R.y, z0, x1, R.y + P.KERB, z1, { kind: 'wall', edge: true })); // (the kerb: concrete, cast)
-        G.World.add(w, G.World.box(x0, R.y, z0, x1, R.y + P.H, z1, { kind: 'rail', ray: false }));
-        G.World.add(w, G.World.box(x0, R.y + P.H - 0.05, z0, x1, R.y + P.H, z1, { kind: 'rail', move: false }));
+        World.add(w, World.box(x0, R.y, z0, x1, R.y + P.KERB, z1, { kind: 'wall', edge: true })); // (the kerb: concrete, cast)
+        World.add(w, World.box(x0, R.y, z0, x1, R.y + P.H, z1, { kind: 'rail', ray: false }));
+        World.add(w, World.box(x0, R.y + P.H - 0.05, z0, x1, R.y + P.H, z1, { kind: 'rail', move: false }));
       }
     }
   },
@@ -1090,13 +1111,13 @@ const G_Level = {
   RUNG: 0.3,
   ladderGrip(l: { x: number; z: number; top: number }, y: number, limb: string) {
     const R = this.RUNG, hand = limb[0] === 'h', left = limb[1] === 'L', u0 = y / (2 * R) + (hand === left ? 0 : 0.5), u = u0 - Math.floor(u0);
-    let gy = y + (hand ? 1.8 : 0.3) + 2 * R * (G.U.smooth(0.65, 1, u) - u);
+    let gy = y + (hand ? 1.8 : 0.3) + 2 * R * (G_U.smooth(0.65, 1, u) - u);
     const rail = hand && gy > l.top;
     gy = hand ? Math.min(gy, l.top + 0.9) : Math.max(Math.min(gy, l.top), y); // (a foot's never under where they stand: over the top, on the roof's edge)
     return [l.x + (hand ? 0.13 : 0.16), gy + (hand ? 0 : 0.02), l.z + (left ? 1 : -1) * (rail ? 0.24 : hand ? 0.17 : 0.13)]; // (the climber faces the wall, west: their left is +z)
   },
   // the ground's height at (x, z) on a level with it (0 elsewhere, and off it)
-  groundHeight(map: LvMap, x: number, z: number) { return map.terrain ? G.World.terrainAt(map.terrain, x, z) : 0; },
+  groundHeight(map: LvMap, x: number, z: number) { return map.terrain ? World.terrainAt(map.terrain, x, z) : 0; },
   // what's built on fine cell i stands on (on rolling ground: the lowest of its corners, in 5 cm steps, as its solids are:
   // js/world.ts fromTileMap), 0 elsewhere
   builtY(map: LvMap, i: number) {
@@ -1106,7 +1127,7 @@ const G_Level = {
     return Math.round(Math.min(tr.v[k], tr.v[k + 1], tr.v[k + tr.VW], tr.v[k + tr.VW + 1]) / 0.05) * 0.05;
   },
   layCrest(r: LvRng, level: number): LvLay {
-    const U = G.U, CX0 = 24, CX1 = 265, W = CX1 + 25, H = 46, SZ = 6; // the gorge from x CX0 to CX1 (482 m across), south of the saddle's wall (row SZ)
+    const U = G_U, CX0 = 24, CX1 = 265, W = CX1 + 25, H = 46, SZ = 6; // the gorge from x CX0 to CX1 (482 m across), south of the saddle's wall (row SZ)
     const OZ0 = 12, OZ1 = 17, OX1 = CX0 + 3; // the overlook: its rows, its east side
     const HX = 13, HZ = 23, GX = CX1 + 9, GZ = 13; // the Crest House's and the greenhouse's north-west corners (walls and all)
     // the viewing site halfway along the saddle, out over the gorge from its rim: x SX0 to SX1 (the railing down each side),
@@ -1261,10 +1282,10 @@ const G_Level = {
   _pad(rm: LvRoom, W: number, x: number, z: number, kit: Record<string, any>, east?: boolean) {
     const c: any[][] = rm.cover = [], cs = this.CTS, GAP = 1.6, put = (name: string, px: number, pz: number, q: number) => c.push([name, px, pz, q, kit.style]);
     if (east) { const px = (x + this.LZ_W) * cs + 1; put(kit.long, px, (z + 2.5) * cs, 1); put(kit.short, px, (z + 0.6) * cs, 1); return { x, z }; }
-    const x0 = Math.max(3, (x - 1) * cs), x1 = Math.min(W * cs - 3, (x + this.LZ_W + 1) * cs), L = G.Furniture.R[kit.long].w, n = Math.max(1, Math.floor((x1 - x0 + GAP) / (L + GAP))), run = n * L + (n - 1) * GAP, a0 = (x0 + x1 - run) / 2, pz = (z - 0.5) * cs - 0.5;
+    const x0 = Math.max(3, (x - 1) * cs), x1 = Math.min(W * cs - 3, (x + this.LZ_W + 1) * cs), L = Furniture.R[kit.long].w, n = Math.max(1, Math.floor((x1 - x0 + GAP) / (L + GAP))), run = n * L + (n - 1) * GAP, a0 = (x0 + x1 - run) / 2, pz = (z - 0.5) * cs - 0.5;
     for (let i = 0; i < n; i++) put(kit.long, a0 + L / 2 + i * (L + GAP), pz, 0);
     // (a row that doesn't fill its side: the short thing either end of it, a step's gap off; else turned at the ends)
-    const S = G.Furniture.R[kit.short].w, side = a0 - x0;
+    const S = Furniture.R[kit.short].w, side = a0 - x0;
     for (const [px, sn] of [[a0, -1], [a0 + run, 1]]) {
       if (side >= S + 1) put(kit.short, px + sn * (1 + S / 2), pz, 0);
       if (px + sn * 2.4 > 2 && px + sn * 2.4 < W * cs - 2) put(kit.short, px + sn * (side >= S + 1 ? 2 + S : 1.2), z * cs + 1.6, 1);
@@ -1282,9 +1303,9 @@ const G_Level = {
   //   the front wall, glass either side of its double door, and the lot outside it (fenced), delivery trucks parked across
   //     it and the helicopter's pad behind them, where you come in.
   // The shelving is laid on the fine grid (js/furniture.ts plan, mart), not tile by tile: that's what makes the aisles narrow.
-  // Its weapon case, attachments box and first aid cabinet are always in the stockroom (G.THEMES starter).
+  // Its weapon case, attachments box and first aid cabinet are always in the stockroom (THEMES starter).
   layMart(r: LvRng, level: number): LvLay {
-    const W = 10, B = 9, D = 10, H = B + D, U = G.U;
+    const W = 10, B = 9, D = 10, H = B + D, U = G_U;
     const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences: LvFence[] = [], doors: LvDoorSpec[] = [];
     const fill = (x0: number, z0: number, w: number, h: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     fill(1, 1, 3, 2); fill(5, 1, 4, 2); // the freezer, the stockroom
@@ -1388,7 +1409,7 @@ const G_Level = {
 
   // Rooms joined by corridors (apartments, bunkers, labs...).
   layRooms(r: LvRng, level: number): LvLay {
-    const U = G.U;
+    const U = G_U;
     // compact: ~38 m across on level 1, never more than 60 m
     const W = Math.min(18 + level, 30), H = W;
     const t = new Uint8Array(W * H).fill(1);
@@ -1439,7 +1460,7 @@ const G_Level = {
     const lz = this._pad(pad, W, (W - this.LZ_W) >> 1, H + 3, (this.LZ_KIT as Record<string, any>)[theme.name] || this.LZ_KIT.store);
     // the room nearest the front, and a two-wide corridor from it to the front wall
     const rm = lay.rooms.reduce((a, b) => (b.z + b.h > a.z + a.h ? b : a));
-    const x0 = G.U.clamp(rm.cx, 2, W - 4);
+    const x0 = G_U.clamp(rm.cx, 2, W - 4);
     for (let z = rm.z + rm.h; z < H - 1; z++) for (const x of [x0, x0 + 1]) t[z * W + x] = 0;
     doors.push([x0, H - 1, 'z', false, false, theme.entry || null], [x0 + 1, H - 1, 'z', false, true, theme.entry || null]);
     return Object.assign({}, lay, { H: H2, t, out, fences, doors, rooms: lay.rooms.concat([lot, pad]), spawn: pad, lz });
@@ -1450,7 +1471,7 @@ const G_Level = {
   // c.even (an apartment): no corridors for rooms. A split lands near the middle, and a room twice as long as it's wide
   // is split again if it can be, however deep. (Without it a home can leave a room 4 tiles by 2.)
   _house(c: Record<string, any>, x0: number, z0: number, w: number, h: number): LvRoom[] {
-    const U = G.U, { r, t, W, ids, rooms, doors } = c;
+    const U = G_U, { r, t, W, ids, rooms, doors } = c;
     const fill = (x1: number, z1: number, w1: number, h1: number) => { for (let z = z1; z < z1 + h1; z++) for (let x = x1; x < x1 + w1; x++) t[z * W + x] = 0; };
     const leaves: number[][] = [], lo = c.lo || 3; // the smallest room, in tiles
     const split = (x: number, z: number, w: number, h: number, depth: number) => {
@@ -1493,7 +1514,7 @@ const G_Level = {
   // it looks down into the living room). Upstairs are single-floor apartments and the lofts' upper floors. Each
   // apartment has to be cleared. Tile values on the plan: 5 a drop (no floor), 6 a flight of stairs.
   layApartments(r: LvRng, level: number): LvBuilding {
-    const U = G.U, per = 2 + Math.min(level >> 1, 2); // apartments each side of the hallway
+    const U = G_U, per = 2 + Math.min(level >> 1, 2); // apartments each side of the hallway
     const ud = U.ri(r, 5, 6), ud2 = U.ri(r, 5, 6);
     const W = 10 + per * 8, hz = ud + 2, H = hz + 2 + ud2 + 1, xa0 = 5, xa1 = W - 6; // (the homes between the stairwells)
     // the homes along each side, the same on both floors (a loft's upper floor sits over it)
@@ -1586,9 +1607,9 @@ const G_Level = {
   },
   // What each room of a home is, so it's a home and not a deal of the cards: the front door opens into the kitchen, the
   // biggest room through it at the back of the home is the living room (a loft's already is), and the rest are a bedroom,
-  // the biggest, then whatever suits. Set here, the types don't come from G.Furniture.plan's deal.
+  // the biggest, then whatever suits. Set here, the types don't come from Furniture.plan's deal.
   _program(r: LvRng, mine: LvRoom[], doors: LvDoorSpec[], fr: LvRoom, back: (q: LvRoom) => boolean) {
-    const U = G.U, size = (q: LvRoom) => q.w * q.h, big = (a: LvRoom, b: LvRoom) => size(b) - size(a), next = this._through(fr, mine, doors);
+    const U = G_U, size = (q: LvRoom) => q.w * q.h, big = (a: LvRoom, b: LvRoom) => size(b) - size(a), next = this._through(fr, mine, doors);
     const living = mine.find((q) => q.type === 'living') || (back(fr) ? null : next.filter(back).sort(big)[0]) || fr;
     const near = this._through(living, mine, doors);
     const kitchen = living !== fr && near.includes(fr) ? fr : near.concat(mine.filter((q) => q !== living)).sort((a: LvRoom, b: LvRoom) => ((near.includes(b) as unknown as number) - (near.includes(a) as unknown as number)) || big(b, a))[0];
@@ -1661,8 +1682,8 @@ const G_Level = {
       for (const w of m.wallSpots) map.wallSpots.push(Object.assign(w, { y: m.fy, fl: f }));
       for (const sp of m.enemySpots) map.enemySpots.push([sp[0], sp[1], f]);
     });
-    // a glass door's pane, counted with the windows (shot through and shot out the same way: G.Views.breakGlass,
-    // G.Server.breakGlass); its mesh is the door's leaf
+    // a glass door's pane, counted with the windows (shot through and shot out the same way: Views.breakGlass,
+    // Server.breakGlass); its mesh is the door's leaf
     for (const d of map.doors) if (d.kind === 'stair') { d.pane = { id: map.windows.length, door: d, x: d.x, z: d.z, fy: d.fy, fl: d.fl, broken: false, cells: [], len: d.w || TS }; map.windows.push(d.pane); }
     // the stairs, in metres: their footprint, the floor at their foot, which way they climb
     map.stairs = lay.stairs.map((st: LvStair) => ({ f: st.f, y0: fms[st.f].fy, rise: FH, axis: st.axis, up: st.up, x0: st.x0 * CTS, x1: (st.x1 + 1) * CTS, z0: st.z0 * CTS, z1: (st.z1 + 1) * CTS }));
@@ -1695,16 +1716,16 @@ const G_Level = {
       map.windows.push(r.pane);
     }
     // one world for all of it
-    const w = G.World.create();
-    fms.forEach((m, f) => G.World.fromTileMap(m, { world: w, y: m.fy, skirt: m.skirt, voidAbove: m.voidAbove, ground: f === 0 && base === 0 })); // (over a basement, the ground floor has its stair holes)
-    for (const st of map.stairs) G.World.stairs(w, st);
-    fms.forEach((m, f) => { const up = fms[f + 1]; if (up) for (let i = 0; i < m.W * m.H; i++) if (this._capped(m, up, i)) { const x = (i % m.W) * TS, z = Math.floor(i / m.W) * TS; G.World.add(w, G.World.box(x, m.fy + this.WALL_H, z, x + TS, up.fy, z + TS, { kind: 'floor' })); } });
+    const w = World.create();
+    fms.forEach((m, f) => World.fromTileMap(m, { world: w, y: m.fy, skirt: m.skirt, voidAbove: m.voidAbove, ground: f === 0 && base === 0 })); // (over a basement, the ground floor has its stair holes)
+    for (const st of map.stairs) World.stairs(w, st);
+    fms.forEach((m, f) => { const up = fms[f + 1]; if (up) for (let i = 0; i < m.W * m.H; i++) if (this._capped(m, up, i)) { const x = (i % m.W) * TS, z = Math.floor(i / m.W) * TS; World.add(w, World.box(x, m.fy + this.WALL_H, z, x + TS, up.fy, z + TS, { kind: 'floor' })); } });
     // a railing stops you walking off the drop (glass or not); only its steel handrail stops a round: under it, the
-    // glass is a pane (its solids: G.World.windowSolids), shot through and out
+    // glass is a pane (its solids: World.windowSolids), shot through and out
     for (const rl of map.rails) {
-      G.World.add(w, G.World.box(rl.x0, rl.y, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', ray: false }));
-      G.World.add(w, G.World.box(rl.x0, rl.y + this.RAIL_H - 0.05, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', move: false }));
-      if (rl.pane) { rl.pane.solids = []; G.World.windowSolids(w, map, rl.pane); }
+      World.add(w, World.box(rl.x0, rl.y, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', ray: false }));
+      World.add(w, World.box(rl.x0, rl.y + this.RAIL_H - 0.05, rl.z0, rl.x1, rl.y + this.RAIL_H, rl.z1, { kind: 'rail', move: false }));
+      if (rl.pane) { rl.pane.solids = []; World.windowSolids(w, map, rl.pane); }
     }
     map.world = w; fms.forEach((m) => { m.world = w; });
     return map;
@@ -1715,7 +1736,7 @@ const G_Level = {
   floorAt(map: LvMap, x: number, y: number, z: number) {
     if (!map.floors) return 0;
     for (const st of map.stairs) if (x > st.x0 && x < st.x1 && z > st.z0 && z < st.z1 && y < st.y0! + st.rise! + 0.3 && y > st.y0! - 0.5) return st.f; // (on its top tread too: the floor above has a drop there)
-    return G.U.clamp(Math.floor((y + 0.6) / this.FLOOR_H) + (map.base || 0), 0, map.NF - 1);
+    return G_U.clamp(Math.floor((y + 0.6) / this.FLOOR_H) + (map.base || 0), 0, map.NF - 1);
   },
   floorMap(map: LvMap, f: number) { return map.floors ? map.floors[f] : map; },
   // The space a blast fills, on the floor it went off on: cell by cell out from the one it's in, nearest (along the floor)
@@ -1730,7 +1751,7 @@ const G_Level = {
     const doorAt: Map<number, LvDoor> = (fm as any).doorAt || map.doorAt || new Map();
     const order = new Int32Array(cap), d = new Float32Array(cap), seen = new Uint8Array(W * H), broken = new Set<number>();
     for (const w of map.windows || []) if (w.broken && (w.fl || 0) === f) for (const c of w.cells) broken.add(c);
-    let sx = G.U.clamp(Math.floor(x / TS), 0, W - 1), sz = G.U.clamp(Math.floor(z / TS), 0, H - 1);
+    let sx = G_U.clamp(Math.floor(x / TS), 0, W - 1), sz = G_U.clamp(Math.floor(z / TS), 0, H - 1);
     // (gone off against a wall, or over a cell the grid calls solid: the nearest open cell next to it)
     if (t[sz * W + sx] === 1) { // (the one whose middle is nearest the point: the side of the wall it's on)
       let bx = sx, bz = sz, bd = Infinity;
@@ -1774,7 +1795,7 @@ const G_Level = {
   // aisles between and cross-aisles through them), open at the front onto the loading dock, the yard past it, where you
   // come in: the helicopter's pad behind a row of containers.
   layWarehouse(r: LvRng, level: number): LvLay {
-    const U = G.U, W = 26 + Math.min(level, 4), lzH = 7, H = 22 + Math.min(level, 3) + lzH; // (the last rows: the blast walls and the helicopter's pad past the dock)
+    const U = G_U, W = 26 + Math.min(level, 4), lzH = 7, H = 22 + Math.min(level, 3) + lzH; // (the last rows: the blast walls and the helicopter's pad past the dock)
     const t = new Uint8Array(W * H).fill(1), rooms: LvRoom[] = [], doors: LvDoorSpec[] = [];
     const fill = (x0: number, z0: number, w: number, h: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     // offices, 4 tiles deep, side by side with a wall between each
@@ -1808,11 +1829,11 @@ const G_Level = {
 
   // The hangar: one big hall (the workshop, the store and the warehouse side by side in it), a wide opening in its
   // front wall, and the helipad out in front of that, open to the sky and fenced. 52 x 42 m.
-  // Behind its north wall (a garage door in it) is the shooting range, in the first G.HANGAR_ROWS rows: a yard to stand in
+  // Behind its north wall (a garage door in it) is the shooting range, in the first HANGAR_ROWS rows: a yard to stand in
   // at the firing line, an IPSC course on the left, a pistol range (16 m) and a rifle range (300 m), walled between and open
   // to the sky, a backstop at the far end of each.
   layHangar(_r?: LvRng, _level?: number): LvLay {
-    const R = G.HANGAR_ROWS, W = 26, H = 21 + R, hallH = 12, hz = R + 1, fz = hz + hallH, padH = 6, ox = 9, ow = 8;
+    const R = HANGAR_ROWS, W = 26, H = 21 + R, hallH = 12, hz = R + 1, fz = hz + hallH, padH = 6, ox = 9, ow = 8;
     const t = new Uint8Array(W * H).fill(1), out = new Uint8Array(W * H), fences: LvFence[] = [];
     const fill = (x0: number, z0: number, w: number, h: number) => { for (let z = z0; z < z0 + h; z++) for (let x = x0; x < x0 + w; x++) t[z * W + x] = 0; };
     fill(1, hz, W - 2, hallH);
@@ -1850,7 +1871,7 @@ const G_Level = {
   // Floors: 0 the basement, 1 the ground floor (base), 2 upstairs. Upstairs, everything outside the houses is open
   // air (tile 5, open to the sky): nothing to stand on, no ceiling, and a roof over the top.
   layHouses(r: LvRng, level: number): LvBuilding {
-    const U = G.U, S = 4, SP = 21, TC = 8; // the street, S tiles deep; its west end, SP tiles, before the houses; the first TC of them the turning circle
+    const U = G_U, S = 4, SP = 21, TC = 8; // the street, S tiles deep; its west end, SP tiles, before the houses; the first TC of them the turning circle
     const grow = Math.min(level >> 1, 2);
     const hwA = U.ri(r, 9, 10) + (grow >> 1), hwB = U.ri(r, 9, 10) + (grow >> 1), hh = U.ri(r, 6, 7), yd = U.ri(r, 5, 6);
     const zF = S + 3, z0 = zF + 1, zb = z0 + hh, H = zb + yd + 2; // the front wall row, the first row inside, the back wall row
@@ -1968,7 +1989,7 @@ const G_Level = {
   // opts.glass: go through glass (listing the panes crossed, nearest first, in .glass) instead of stopping at it.
   // A hit on the view behind an outside window comes back with .view (no mark to leave there).
   raycast(map: LvMap, ox: number, oy: number, oz: number, dx: number, dy: number, dz: number, maxD: number, opts?: LvRayOpts) {
-    if (map.world) return G.World.raycast(map.world, ox, oy, oz, dx, dy, dz, maxD, opts);
+    if (map.world) return World.raycast(map.world, ox, oy, oz, dx, dy, dz, maxD, opts);
     const pass = !!(opts && opts.glass), crossed: number[][] | null = pass ? [] : null;
     const TS = this.TS;
     let limit = maxD, ln = null;
@@ -2037,9 +2058,46 @@ const G_Level = {
 
   // Circle-vs-tile collision. Boxes the entity is standing on top of (y >= box height) are ignored.
   // step: how high a thing can be and still be stepped up onto, not walked into (a stair's step is 0.2)
-  // smooth: someone walking (stairs are slopes for them: G.World.rampAt)
+  // smooth: someone walking (stairs are slopes for them: World.rampAt)
+  // ---- Aboard a ship lying tilted against this one (a breach nose up or down: js/space.ts and js/spaceserver.ts setTilt), her own
+  // gravity: her decks are level to whoever's aboard her. Anyone (and any grenade) there is moved in her own frame, where she lies level
+  // (tilt.lm: this map with her own boxes and flights as she's built in place of its world: js/spacedata.ts frameWorld), and put back
+  // (inFrame). The view and the bodies drawn turn with her (tiltQ), eased out along the tunnel she drove in.
+  setTilt(map: LvMap, d: SpShipDef | null, b: { x: number; y: number; z: number; yaw: number; pt?: number } | null) {
+    const SD = SpaceData;
+    (map as any).tilt = d && b && b.pt ? { b, d, L: SD.layout(d), lm: Object.assign(Object.create(map), { tilt: null, world: SD.frameWorld(d), cracked: null }) } : null;
+  },
+  // her, if (x, y, z) is aboard her (aft of where her floor meets the hull), else null
+  frameAt(map: LvMap | null, x: number, y: number, z: number): any {
+    const t = map && (map as any).tilt; if (!t) return null;
+    const l = SpaceData.toShip(t.b, x, y, z);
+    return l.z > Math.max(t.L.zc, t.L.zc - 0.22 + 1.16 * Math.tan(t.b.pt)) && SpaceData.aboard(t.d, t.b, x, y, z) ? t : null; // (from where her floor meets the hull's face: js/spacedata.ts worldBoxes)
+  },
+  // how her tilt turns someone standing at (x, y, z): all of it aboard, easing to none along the tunnel to its far end (null: none)
+  tiltQ(map: LvMap | null, x: number, y: number, z: number): THREE.Quaternion | null {
+    const t = map && (map as any).tilt; if (!t) return null;
+    const SD = SpaceData, l = SD.toShip(t.b, x, y, z), z0 = t.L.zc - 0.22 - ShipGen.TUN.IN - 0.6;
+    const k = SD.aboard(t.d, t.b, x, y, z) ? 1 : Math.abs(l.x) < 1.6 && l.z > z0 && l.z < t.L.zc + 0.5 && l.y > t.L.FB - 1.5 && l.y < t.L.CB + 0.5 ? G_U.smooth(z0, t.L.zc, l.z) : 0;
+    if (k <= 0) return null;
+    return new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(Math.cos(t.b.yaw), 0, -Math.sin(t.b.yaw)), t.b.pt * k);
+  },
+  // run fn on a thing at p moving at v (and facing yaw, if it has one) in her frame if it's aboard her (fn given her frame's map), else as
+  // it is (fn given map). Its place, way and heading are hers while fn runs, the world's again after
+  inFrame(map: LvMap, o: { p: LvPt & { y: number }; v?: { x: number; y: number; z: number }; yaw?: { v: number } }, fn: (m: LvMap) => void) {
+    const t = this.frameAt(map, o.p.x, o.p.y, o.p.z);
+    if (!t) { fn(map); return; }
+    const SD = SpaceData, b = t.b, l = SD.toShip(b, o.p.x, o.p.y, o.p.z), v = o.v, b0 = { x: 0, y: 0, z: 0, yaw: b.yaw, pt: b.pt };
+    o.p.x = l.x; o.p.y = l.y; o.p.z = l.z;
+    if (v) { const lv = SD.toShip(b0, v.x, v.y, v.z); v.x = lv.x; v.y = lv.y; v.z = lv.z; }
+    if (o.yaw) o.yaw.v -= b.yaw;
+    try { fn(t.lm); } finally {
+      const w = SD.toWorld(b, o.p.x, o.p.y, o.p.z); o.p.x = w.x; o.p.y = w.y; o.p.z = w.z;
+      if (v) { const wv = SD.toWorld(b0, v.x, v.y, v.z); v.x = wv.x; v.y = wv.y; v.z = wv.z; }
+      if (o.yaw) o.yaw.v += b.yaw;
+    }
+  },
   resolve(map: LvMap, p: LvPt, r: number, y = 0, step = 0.02, smooth = false) {
-    if (map.world) { const q = { x: p.x, y, z: p.z }; G.World.resolve(map.world, q, r, 1.9, step, smooth); p.x = q.x; p.z = q.z; return; }
+    if (map.world) { const q = { x: p.x, y, z: p.z }; World.resolve(map.world, q, r, 1.9, step, smooth); p.x = q.x; p.z = q.z; return; }
     const TS = this.TS;
     for (let iter = 0; iter < 2; iter++) {
       const x0 = Math.floor((p.x - r) / TS), x1 = Math.floor((p.x + r) / TS);
@@ -2047,7 +2105,7 @@ const G_Level = {
       for (let tz = z0; tz <= z1; tz++) for (let tx = x0; tx <= x1; tx++) {
         for (const b of this.boxesAt(map, tx, tz)) {
         if (y >= b.h - 0.02 || b.y0 > 1.9) continue; // stood on top of it, or walking under a door lintel
-        const qx = G.U.clamp(p.x, b.cx - b.hx, b.cx + b.hx), qz = G.U.clamp(p.z, b.cz - b.hz, b.cz + b.hz);
+        const qx = G_U.clamp(p.x, b.cx - b.hx, b.cx + b.hx), qz = G_U.clamp(p.z, b.cz - b.hz, b.cz + b.hz);
         let ddx = p.x - qx, ddz = p.z - qz;
         const d = Math.hypot(ddx, ddz);
         if (d >= r) continue;
@@ -2062,7 +2120,7 @@ const G_Level = {
     }
   },
   groundAt(map: LvMap, x: number, z: number, r: number, y: number, step = 0.05, smooth = false) {
-    if (map.world) { const g = G.World.groundAt(map.world, x, z, r, y, step, smooth); return Number.isFinite(g) ? g : 0; }
+    if (map.world) { const g = World.groundAt(map.world, x, z, r, y, step, smooth); return Number.isFinite(g) ? g : 0; }
     const TS = this.TS;
     let g = 0;
     const x0 = Math.floor((x - r) / TS), x1 = Math.floor((x + r) / TS);
@@ -2127,7 +2185,7 @@ const G_Level = {
       if (!(t[i] === 0 || t[i] === 3) || dist[i] >= 0) continue;
       dist[i] = 0; q[qt++] = i;
     }
-    const ok = (j: number) => (t[j] === 0 || t[j] === 3) && dist[j] < 0;
+    const no = map.aiNo, ok = (j: number) => (t[j] === 0 || t[j] === 3) && dist[j] < 0 && !(no && no(j, 0));
     while (qh < qt) {
       const i = q[qh++], x = i % W, z = (i / W) | 0, d = dist[i] + 1;
       if (x > 0 && ok(i - 1)) { dist[i - 1] = d; q[qt++] = i - 1; }
@@ -2149,7 +2207,7 @@ const G_Level = {
     }
     while (qh < qt) {
       const n = q[qh++], i = n % WH, x = i % W, z = (i / W) | 0, d = dist[n] + 1;
-      const go = (m: number) => { if (dist[m] < 0 && walk(m) && this.navStep(g, n, m, W)) { dist[m] = d; q[qt++] = m; } };
+      const go = (m: number) => { if (dist[m] < 0 && walk(m) && !(map.aiNo && map.aiNo(m % WH, (m / WH) | 0)) && this.navStep(g, n, m, W)) { dist[m] = d; q[qt++] = m; } };
       if (x > 0) go(n - 1);
       if (x < W - 1) go(n + 1);
       if (z > 0) go(n - W);
@@ -2163,8 +2221,9 @@ const G_Level = {
   // or up or down a flight
   flowStep3(map: LvMap, dist: Int16Array, x: number, z: number, y: number, away: boolean) {
     const g = this.nav(map), W = map.W, WH = g.WH, n = this.navNode(map, x, y, z);
-    if (n < 0 || dist[n] < 0) return null;
-    let best = null, bd = dist[n];
+    const inNo = n >= 0 && !!map.aiNo && map.aiNo(n % WH, (n / WH) | 0);
+    if (n < 0 || (dist[n] < 0 && !inNo)) return null;
+    let best = null, bd = dist[n] < 0 ? (away ? -1 : 1e9) : dist[n];
     const i = n % WH, tx = i % W, tz = (i / W) | 0, base = n - i;
     const take = (m: number, score: number) => { if (dist[m] < 0) return; if (away ? score > bd : score < bd) { bd = score; best = m; } };
     for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
@@ -2190,16 +2249,17 @@ const G_Level = {
     if (map.floors) return this.flowStep3(map, dist, x, z, y, false);
     const TS = this.TS, W = map.W;
     const tx = Math.floor(x / TS), tz = Math.floor(z / TS);
+    const no = map.aiNo, inNo = !!no && tx >= 0 && tz >= 0 && tx < W && tz < map.H && no(tz * W + tx, 0);
     const here = dist[tz * W + tx];
-    if (here < 0) return null;
-    let best = null, bd = here;
+    if (here < 0 && !inNo) return null;
+    let best = null, bd = here < 0 ? 1e9 : here; // (standing somewhere their ways don't go, right up against something: out of it, the best way on)
     for (let oz = -1; oz <= 1; oz++) for (let ox = -1; ox <= 1; ox++) {
       if (!ox && !oz) continue;
       const nx = tx + ox, nz = tz + oz;
       if (nx < 0 || nz < 0 || nx >= W || nz >= map.H) continue;
       const nd = dist[nz * W + nx];
       if (nd < 0) continue;
-      if (ox && oz && (map.t[tz * W + nx] !== 0 || map.t[nz * W + tx] !== 0)) continue; // no diagonal corner-cutting (or through door frames)
+      if (ox && oz && (map.t[tz * W + nx] !== 0 || map.t[nz * W + tx] !== 0 || (no && (no(tz * W + nx, 0) || no(nz * W + tx, 0))))) continue; // no diagonal corner-cutting (or through door frames, or round furniture)
       const score = nd + (ox && oz ? 0.4 : 0);
       if (score < bd) { bd = score; best = [nx, nz]; }
     }
@@ -2245,5 +2305,3 @@ const G_Level = {
   // the middle (a parabola's near enough to the catenary)
   zipPoint(l: { a: number[]; b: number[]; sag: number }, s: number) { return [l.a[0] + (l.b[0] - l.a[0]) * s, l.a[1] + (l.b[1] - l.a[1]) * s - l.sag * 4 * s * (1 - s), l.a[2] + (l.b[2] - l.a[2]) * s]; },
 };
-G.Level = G_Level;
- interface GameModules { Level: typeof G_Level; }

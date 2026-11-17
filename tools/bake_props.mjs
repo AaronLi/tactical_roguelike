@@ -18,7 +18,7 @@ globalThis.FileReader = class { // (GLTFExporter wants a browser's FileReader on
   readAsArrayBuffer(b) { b.arrayBuffer().then((r) => { this.result = r; this.onloadend && this.onloadend(); }); }
   readAsDataURL(b) { b.arrayBuffer().then((r) => { this.result = 'data:' + b.type + ';base64,' + Buffer.from(r).toString('base64'); this.onloadend && this.onloadend(); }); }
 };
-const G = loadGame(), R = G.GunRecipes, OUT = path.join(ROOT, 'assets/models/props/'), io = await makeIO();
+const G = await loadGame(), R = G.GunRecipes, OUT = path.join(ROOT, 'assets/models/props/'), io = await makeIO();
 fs.mkdirSync(OUT, { recursive: true });
 
 // a material named for the exporter: the catalogue's by key (the game puts its own back by name), else m_<hex>
