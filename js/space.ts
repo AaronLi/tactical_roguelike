@@ -858,7 +858,7 @@ export const Space = (() => {
     const sc = G_R.scene, keep = new Set<THREE.Object3D>([G_R.camera, G_R.levelRoot, G_R.dynRoot, S.root!, S.model!.group, S.stars!, S.sun!, S.sun!.target]);
     if (!S.hidden) S.hidden = new Map();
     for (const c of sc.children) {
-      if (keep.has(c) || (c as any).isHemisphereLight || (c as any).isAmbientLight) continue;
+      if (keep.has(c) || (c as any).isLight) continue; // (every light stays: the weapon lights' and muzzle flashes' pools are dark till used, and one light more or less when they came back at the breach had every shader made again)
       if (!S.hidden.has(c)) S.hidden.set(c, c.visible);
       c.visible = false;
     }

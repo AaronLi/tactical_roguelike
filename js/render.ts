@@ -159,7 +159,7 @@ export const R = {
     this.muzzleLights = [0, 1, 2].map(() => {
       const l = new THREE.PointLight(0xffb060, 0, 9, 2);
       this.scene.add(l);
-      l.userData.t = 0;
+      l.userData.t = 0; l.userData.pool = true; // (one of the pools always in the scene, lit or not: lightPad leaves it out of its count)
       return l;
     });
     this.muzzleIdx = 0;
@@ -610,7 +610,7 @@ export const R = {
     // explosions: six fireballs, and two lights between them (every lit pixel of the level works through every light in
     // the scene each frame, lit or not; two blasts at once is plenty, and a third takes the dimmer one's light)
     this.blasts = []; this.blastLights = [];
-    for (let i = 0; i < 2; i++) { const l = new THREE.PointLight(0xff8040, 0, 18, 2); l.userData.by = null; this.scene.add(l); this.blastLights.push(l); }
+    for (let i = 0; i < 2; i++) { const l = new THREE.PointLight(0xff8040, 0, 18, 2); l.userData.by = null; l.userData.pool = true; this.scene.add(l); this.blastLights.push(l); }
     for (let i = 0; i < 6; i++) {
       const m = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xff8830, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
       m.visible = false; m.userData.life = 0;
@@ -1763,7 +1763,7 @@ export const R = {
   lightPad() {
     const want = this.padTo;
     if (!want) { for (const l of this._pads) l.visible = false; return; }
-    let n = 0; this.scene.traverseVisible((o: any) => { if (o.isPointLight && !o.userData.pad) n++; });
+    let n = 0; this.scene.traverseVisible((o: any) => { if (o.isPointLight && !o.userData.pad && !o.userData.pool) n++; }); // (the muzzle flashes' and blasts' pools are always there: padTo is on top of them)
     while (this._pads.length < want) { const l = new THREE.PointLight(0x000000, 0, 0.01); l.position.set(0, -1e5, 0); l.userData.pad = true; l.visible = false; this.scene.add(l); this._pads.push(l); }
     this._pads.forEach((l, i) => { l.visible = i < want - n; if (!l.parent) this.scene.add(l); });
   },
