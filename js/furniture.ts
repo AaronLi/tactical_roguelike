@@ -762,36 +762,43 @@ export const Furniture = (() => {
     k.cyl(stone, 0.12, 0.16, 0.5, 0, 1.9, 0, 10);
   } };
   // ---------------------------------------------------------------- a cruise liner's promenade court (js/shipgen.ts HALLS mall)
-  // A column of the court: marble, the height of both decks (floor to the upper deck's roof), on a stepped plinth with a gilt
-  // base, fluted, a gilt capital spreading under a square abacus.
-  R.gcolumn = { w: 0.9, d: 0.9, boxes: [[0, 0, 0.8, 0.8, 8.3]], build(k: Kit) {
-    const marble = k.mat(0xcfc4ae, 0.35), vein = k.mat(0xb3a78e, 0.4), gilt = k.mat(0xc9a24a, 0.3, 0.85), dark = k.mat(0x3b2218, 0.5);
-    k.box(dark, 0.9, 0.18, 0.9, 0, 0.09, 0); k.box(marble, 0.8, 0.5, 0.8, 0, 0.43, 0); k.box(gilt, 0.84, 0.05, 0.84, 0, 0.7, 0);
-    k.cyl(gilt, 0.33, 0.4, 0.16, 0, 0.8, 0, 16); k.cyl(marble, 0.27, 0.3, 6.6, 0, 4.18, 0, 16);
-    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; k.box(vein, 0.05, 6.3, 0.05, Math.cos(a) * 0.275, 4.18, Math.sin(a) * 0.275); } // its fluting
-    k.cyl(gilt, 0.3, 0.27, 0.08, 0, 7.52, 0, 16); k.cyl(gilt, 0.5, 0.3, 0.4, 0, 7.76, 0, 12); k.box(marble, 1.0, 0.16, 1.0, 0, 8.04, 0); k.box(dark, 1.1, 0.18, 1.1, 0, 8.21, 0);
+  // A column of the court: square and slim, clad in black stone the height of both decks (floor to the upper deck's roof), a
+  // brass inlay down each face, a reveal of warm light at its foot and under its head.
+  R.gcolumn = { w: 0.8, d: 0.8, boxes: [[0, 0, 0.62, 0.62, 8.3]], build(k: Kit) {
+    const stone = k.mat(0x1d1e21, 0.25, 0.1), brass = k.mat(0xb8935a, 0.25, 0.9), glow = k.mat(0xffe2b8, 0.4, 0, { emissive: 0xffd9a8, emissiveIntensity: 0.9 });
+    k.box(stone, 0.66, 0.1, 0.66, 0, 0.05, 0); k.box(glow, 0.5, 0.06, 0.5, 0, 0.13, 0); k.box(stone, 0.6, 7.86, 0.6, 0, 4.09, 0);
+    for (const [dx, dz] of [[0.3, 0], [-0.3, 0], [0, 0.3], [0, -0.3]]) k.box(brass, dx ? 0.012 : 0.05, 7.86, dx ? 0.05 : 0.012, dx * 1.01, 4.09, dz * 1.01);
+    k.box(glow, 0.5, 0.06, 0.5, 0, 8.05, 0); k.box(stone, 0.7, 0.22, 0.7, 0, 8.19, 0);
   } };
-  // A statue: a figure in gilt, more than life size, on a marble plinth with a dark step.
-  R.gstatue = { w: 1.5, d: 1.5, cover: 1, boxes: [[0, 0, 1.4, 1.4, 1.3], [0, 0, 0.7, 0.7, 3.4]], build(k: Kit) {
-    const marble = k.mat(0xcfc4ae, 0.35), gilt = k.mat(0xc9a24a, 0.28, 0.9), dark = k.mat(0x3b2218, 0.5);
-    k.box(dark, 1.5, 0.16, 1.5, 0, 0.08, 0); k.box(marble, 1.3, 1.0, 1.3, 0, 0.66, 0); k.box(gilt, 1.36, 0.05, 1.36, 0, 1.18, 0); k.box(marble, 1.1, 0.12, 1.1, 0, 1.26, 0);
-    k.cyl(gilt, 0.2, 0.3, 0.9, 0, 1.77, 0, 10); k.cyl(gilt, 0.27, 0.2, 0.7, 0, 2.55, 0, 10); k.ico(gilt, 0.19, 0, 3.1, 0); // robes, the body, the head
-    k.box(gilt, 0.12, 0.7, 0.12, 0.32, 2.75, 0, 0); k.box(gilt, 0.12, 0.12, 0.6, -0.3, 2.7, 0.2, 0); k.cyl(gilt, 0.02, 0.02, 1.5, 0.34, 3.0, 0, 6); k.ico(gilt, 0.1, 0.34, 3.8, 0); // an arm up with a staff, the other out
+  // A sculpture: polished brass, abstract (a ring on edge, a sphere held in it, a blade leaning through), on a block of black stone
+  // with a line of light round its foot.
+  R.gstatue = { w: 1.5, d: 1.5, cover: 1, boxes: [[0, 0, 1.4, 1.4, 1.0], [0, 0, 1.0, 0.5, 3.3]], build(k: Kit) {
+    const stone = k.mat(0x1d1e21, 0.25, 0.1), brass = k.mat(0xb8935a, 0.18, 0.95), glow = k.mat(0xffe2b8, 0.4, 0, { emissive: 0xffd9a8, emissiveIntensity: 0.9 });
+    k.box(glow, 1.3, 0.05, 1.3, 0, 0.03, 0); k.box(stone, 1.4, 0.9, 1.4, 0, 0.51, 0);
+    for (let i = 0; i < 20; i++) { const a = (i / 20) * Math.PI * 2; k.box(brass, 0.36, 0.1, 0.12, Math.cos(a) * 1.0, 2.1 + Math.sin(a) * 1.0, 0, 0); } // the ring, on edge
+    k.ico(brass, 0.42, 0, 2.1, 0); k.box(brass, 0.08, 2.5, 0.3, 0.25, 2.2, 0.1, 0.5);
   } };
-  // A palm in a gilt urn.
-  R.urnpalm = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.55, 0.55, 2.6]], build(k: Kit) {
-    const gilt = k.mat(0xc9a24a, 0.3, 0.85), leaf = k.mat(k.pick([0x2a5a2a, 0x24502a, 0x32622c]), 0.9, 0, { flatShading: true });
-    k.cyl(gilt, 0.2, 0.14, 0.12, 0, 0.06, 0, 10); k.cyl(gilt, 0.3, 0.2, 0.5, 0, 0.37, 0, 12); k.cyl(k.mat(0x4a3a2a, 0.95), 0.06, 0.09, 1.5, 0, 1.35, 0, 8);
-    for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + k.rnd(), d = 0.45 + k.rnd() * 0.25; k.box(leaf, 0.95, 0.03, 0.2, Math.cos(a) * d, 2.15 + k.rnd() * 0.3, -Math.sin(a) * d, a); }
-    k.ico(leaf, 0.22, 0, 2.2, 0);
+  // A palm in a tall planter: matte black, a brass band.
+  R.urnpalm = { small: 1, w: 0.6, d: 0.6, boxes: [[0, 0, 0.5, 0.5, 2.6]], build(k: Kit) {
+    const pot = k.mat(0x1d1e21, 0.6), brass = k.mat(0xb8935a, 0.25, 0.9), leaf = k.mat(k.pick([0x2a5a2a, 0x24502a, 0x32622c]), 0.9, 0, { flatShading: true });
+    k.cyl(pot, 0.24, 0.2, 0.8, 0, 0.4, 0, 16); k.cyl(brass, 0.245, 0.245, 0.04, 0, 0.7, 0, 16); k.cyl(k.mat(0x4a3a2a, 0.95), 0.05, 0.07, 1.2, 0, 1.4, 0, 8);
+    for (let i = 0; i < 9; i++) { const a = (i / 9) * Math.PI * 2 + k.rnd(), d = 0.45 + k.rnd() * 0.25; k.box(leaf, 0.95, 0.03, 0.2, Math.cos(a) * d, 2.05 + k.rnd() * 0.3, -Math.sin(a) * d, a); }
+    k.ico(leaf, 0.2, 0, 2.1, 0);
   } };
-  // A display case: a dark wood base with a gilt band, a glazed case over it with a gilt frame, what's shown inside on a velvet pad.
+  // A display case: a block of black stone, a glazed case over it framed in thin brass, what's shown inside lit from under.
   R.vitrine = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.8, 0.8, 1.45]], build(k: Kit) {
-    const dark = k.mat(0x3b2218, 0.5), gilt = k.mat(0xc9a24a, 0.3, 0.85), glass = k.mat(0xbfd6dc, 0.05, 0.1, { transparent: true, opacity: 0.28 }), velvet = k.mat(k.pick([0x5a1420, 0x1e2a52, 0x24432c]), 0.95);
-    k.box(dark, 1.8, 0.8, 0.8, 0, 0.4, 0); k.box(gilt, 1.84, 0.05, 0.84, 0, 0.82, 0); k.box(velvet, 1.6, 0.04, 0.6, 0, 0.87, 0);
-    k.box(glass, 1.7, 0.55, 0.7, 0, 1.13, 0); k.box(gilt, 1.76, 0.04, 0.76, 0, 1.42, 0);
-    for (const sx of [-0.86, 0.86]) for (const sz of [-0.36, 0.36]) k.box(gilt, 0.04, 0.58, 0.04, sx, 1.13, sz);
-    for (let i = 0; i < 5; i++) k.ico(k.mat(k.pick([0xc9a24a, 0xe8e4da, 0x9fd0e0, 0xc03a4a]), 0.2, 0.7), 0.05 + k.rnd() * 0.04, -0.65 + i * 0.32, 0.95, (k.rnd() - 0.5) * 0.3);
+    const stone = k.mat(0x1d1e21, 0.25, 0.1), brass = k.mat(0xb8935a, 0.25, 0.9), glass = k.mat(0xcfe0e4, 0.05, 0.1, { transparent: true, opacity: 0.22 }), pad = k.mat(0xfff0d8, 0.6, 0, { emissive: 0xffe2b8, emissiveIntensity: 0.6 });
+    k.box(stone, 1.8, 0.84, 0.8, 0, 0.42, 0); k.box(pad, 1.6, 0.03, 0.6, 0, 0.86, 0);
+    k.box(glass, 1.7, 0.55, 0.7, 0, 1.14, 0); k.box(brass, 1.74, 0.02, 0.74, 0, 1.43, 0);
+    for (const sx of [-0.86, 0.86]) for (const sz of [-0.36, 0.36]) k.box(brass, 0.02, 0.58, 0.02, sx, 1.14, sz);
+    for (let i = 0; i < 4; i++) k.ico(k.mat(k.pick([0xb8935a, 0xe8e4da, 0x9fd0e0, 0x1d1e21]), 0.2, 0.7), 0.06 + k.rnd() * 0.04, -0.6 + i * 0.4, 0.96, (k.rnd() - 0.5) * 0.3);
+  } };
+  // A screen: walnut slats in a thin brass frame, standing free, taller than a door: what divides the court's floor.
+  R.slatwall = { w: 1.98, d: 0.3, boxes: [[0, 0, 1.98, 0.16, 2.7]], build(k: Kit) {
+    const wood = k.mat(0x6a4a32, 0.6), brass = k.mat(0xb8935a, 0.25, 0.9), stone = k.mat(0x1d1e21, 0.3, 0.1);
+    k.box(stone, 1.98, 0.1, 0.28, 0, 0.05, 0); k.box(brass, 1.98, 0.03, 0.14, 0, 2.685, 0);
+    for (let i = 0; i < 12; i++) k.box(wood, 0.09, 2.57, 0.1, -0.9 + i * 0.1636, 1.385, 0);
+    k.box(stone, 1.9, 2.5, 0.02, 0, 1.36, 0);
   } };
   // ---------------------------------------------------------------- a foundry (js/level.ts layFoundry)
   // fx: what a piece throws off (js/levelview.ts fx: 'sparks' and 'jet' along dir, 'embers' off a molten surface r across,
@@ -1789,17 +1796,17 @@ export const Furniture = (() => {
           [1, (x, z) => { const got = set('bench', x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('tree', x, z, 0.6, 0.6); return got; }],
           [2, row(['hedge', 'hedge', 'hedge'])],
         ] },
-        // (a liner's promenade court: a statue forward of its fountain, in the spine's line. Display cases in pairs and in rows; glass
-        // cabinets and bookcases back to back; a hedge between palms; a cafe's tables; a lounge's sofa and armchairs with a palm by them; a
-        // glass cabinet between palms; a bench under a palm; a piano)
+        // (a liner's promenade court: a statue forward of its fountain, in the spine's line. Display cases in pairs and in rows; screens
+        // of walnut slats, along and across; a hedge between palms; a cafe's tables; a lounge's sofa and armchairs with a palm by them; a
+        // sofa against a screen; a bench under a palm; a piano)
         mall: { mid: 'fountain', plots: [
           [3, (x, z) => { const got = any(set('vitrine', x, z, 1, 1, 0), set('vitrine', x + 1, z, 1, 1, 0)); if (got) { small('urnpalm', x, z, -0.75, 0.75); small('urnpalm', x + 1, z, 0.75, -0.75); } return got; }],
           [2, (x, z) => any(set('vitrine', x, z, 1, 1, 1), set('vitrine', x, z + 1, 1, 1, 1), set('vitrine', x, z + 2, 1, 1, 1))],
-          [3, (x, z) => { const got = row(['bookshelf', 'china', 'bookshelf'], 0)(x, z); if (got) row(['china', 'bookshelf', 'china'], 2)(x, z + 1); return got; }],
+          [4, (x, z) => (r() < 0.5 ? row(['slatwall', 'slatwall', 'slatwall'], 0)(x, z) : any(set('slatwall', x, z, 1, 1, 1), set('slatwall', x, z + 1, 1, 1, 1), set('slatwall', x, z + 2, 1, 1, 1)))],
           [2, (x, z) => { const n = U.ri(r, 2, 3), got = any(...[0, 1, 2].slice(0, n).map((i) => set('hedge', x + i, z, 1, 1, 0))); if (got) { small('urnpalm', x, z, -0.8, 0); small('urnpalm', x + n - 1, z, 0.8, 0); } return got; }],
           [2, (x, z) => { const got = any(set('dining', x, z, 1, 1, U.ri(r, 0, 3)), set('dining', x + 1, z + 1, 1, 1, U.ri(r, 0, 3))); if (got) small('urnpalm', x + 1, z, 0, 0); return got; }],
           [3, (x, z) => { const got = any(set('sofa', x, z, 1, 1, 0), set('armchairs', x, z + 1, 1, 1, 2)); if (got) small('urnpalm', x, z, 0.85, 0); return got; }],
-          [2, (x, z) => { const got = set('china', x, z, 1, 1, turn()); if (got) { small('urnpalm', x, z, -0.75, 0); small('urnpalm', x, z, 0.75, 0); } return got; }],
+          [2, (x, z) => { const got = any(set('slatwall', x, z, 1, 1, 0), set('sofa', x, z + 1, 1, 1, 2)); if (got) small('urnpalm', x, z + 1, 0.85, 0); return got; }],
           [1, (x, z) => { const got = set('bench', x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('urnpalm', x, z, 0.7, 0.7); return got; }],
           [1, (x, z) => set('piano', x, z, 1, 1, U.ri(r, 0, 3))],
         ] },
@@ -1820,7 +1827,7 @@ export const Furniture = (() => {
         // (a court's shopfronts: shelving down its end walls, under the gallery, clear of the spine's doors and of the corners)
         if (rm.type === 'mall') for (const [x, dx] of [[rm.x, -1], [rm.x + rm.w - 1, 1]]) for (let z = rm.z + 2; z < rm.z + rm.h - 2; z++) {
           if (t[z * W + x] !== 0 || t[z * W + x + dx] !== 1 || [-2, -1, 0, 1, 2].some((q) => t[(z + q) * W + x + dx] === 3) || r() < 0.3) continue;
-          const name = U.pick(r, ['bookshelf', 'china', 'china', 'vitrine', 'sofa']), rec = R[name];
+          const name = U.pick(r, ['vitrine', 'vitrine', 'sofa', 'slatwall']), rec = R[name];
           if (tryBlock(x, z, rec.cover ? 2 : 4)) put(name, x, z, C(x) + dx * (1 - 0.02 - rec.d / 2), C(z), facing(dx, 0), r(), [[dx, 0]]);
         }
         if (K.mid) set(K.mid, rm.x + (rm.w >> 1) - 1, rm.z + (rm.h >> 1) - 1, 2, 2, 0);

@@ -311,6 +311,7 @@ export const LevelDesc = (() => {
 
     // ceiling lamps' fittings (the light grid lights the level from the lamps: js/lightgrid.ts)
     // (a lamp that's off, a night level's: its fitting unlit, a dull glass; an exit sign: a lit panel over a doorway)
+    let ringM = -1; const ringMat = () => (ringM >= 0 ? ringM : (ringM = B.basic({ color: th.light, side: 2 }))); // (a ring pendant's lit face, seen from inside the ring)
     let gilt = -1, lampMat = -1, bayMat = -1, panelMat = -1, porchMat = -1, porchBox = -1, offMat = -1, barBox = -1;
     const lampGeo = B.geo('sphere', [0.32, 16, 8, 0, PI * 2, 0, PI / 2], [['s', 1, 0.45, 1], ['rx', PI]]), bayGeo = B.geo('cyl', [0.1, 0.42, 0.32, 16, 1, 1]), bayLens = B.geo('circle', [0.38, 16], [['rx', PI / 2]]);
     const panelGeo = B.geo('box', [1.2, 0.04, 0.6]), signGeo = B.geo('box', [0.36, 0.15, 0.05]), signMats = new Map<number, number>();
@@ -330,17 +331,14 @@ export const LevelDesc = (() => {
         continue;
       }
       if (l.kind === 'panel') { root.push(hf(B.mesh(panelGeo, lit ? panelMat : offMat, { p: [l.x, (l.gy || 0) + WALL_H - 0.02, l.z] }))); continue; } // a shop's flat ceiling panel
-      if (l.kind === 'highbay' && (l as any).chand) { // a liner's court: a chandelier. A gilt rod, two rings of candle lamps, a bowl of light under them
+      if (l.kind === 'highbay' && (l as any).chand) { // a liner's court: a pendant of three rings of light, brass outside and lit within, hung on wires at their own heights and tilts
         const roof = L.FLOOR_H + WALL_H, y = l.y!;
-        if (gilt < 0) gilt = B.std({ color: 0xc9a24a, roughness: 0.3, metalness: 0.85, side: 2 });
-        root.push(B.mesh(B.geo('cyl', [0.025, 0.025, roof - y]), gilt, { p: [l.x, (roof + y) / 2, l.z] }));
-        root.push(B.mesh(B.geo('cyl', [0.1, 0.2, 0.3, 10]), gilt, { p: [l.x, y + 0.1, l.z] }));
-        for (const [rr, dy, n] of [[1.15, 0, 10], [0.65, -0.38, 6]]) {
-          root.push(B.mesh(B.geo('cyl', [rr, rr, 0.07, 28, 1, 1]), gilt, { p: [l.x, y + dy, l.z] }));
-          for (let q = 0; q < n; q++) { const a = (q / n) * PI * 2; root.push(B.mesh(B.geo('cyl', [0.035, 0.045, 0.2, 6]), lit ? lampMat : offMat, { p: [l.x + Math.cos(a) * rr, y + dy + 0.14, l.z + Math.sin(a) * rr] })); }
-          for (let q = 0; q < 4; q++) { const a = (q / 4) * PI * 2 + rr; root.push(B.mesh(B.geo('cyl', [0.012, 0.012, 0.45 + rr * 0.3]), gilt, { p: [l.x + Math.cos(a) * rr * 0.5, y + dy + 0.2, l.z + Math.sin(a) * rr * 0.5], r: [Math.sin(a) * 0.9, 0, -Math.cos(a) * 0.9] })); }
-        }
-        root.push(B.mesh(B.geo('sphere', [0.3, 12, 6, 0, PI * 2, PI / 2, PI / 2]), lit ? lampMat : offMat, { p: [l.x, y - 0.42, l.z] }));
+        if (gilt < 0) gilt = B.std({ color: 0xb8935a, roughness: 0.25, metalness: 0.9, side: 2 });
+        [[1.5, 0.35, 0.1, 0.06], [1.05, -0.1, -0.14, 0.1], [0.62, -0.5, 0.08, -0.12]].forEach(([rr, dy, tx, tz], q) => {
+          root.push(B.mesh(B.geo('cyl', [rr, rr, 0.09, 40, 1, 1]), gilt, { p: [l.x, y + dy, l.z], r: [tx, 0, tz] }));
+          root.push(B.mesh(B.geo('cyl', [rr - 0.012, rr - 0.012, 0.06, 40, 1, 1]), lit ? ringMat() : offMat, { p: [l.x, y + dy, l.z], r: [tx, 0, tz] }));
+          for (let w = 0; w < 3; w++) { const a = (w / 3) * PI * 2 + q; root.push(B.mesh(B.geo('cyl', [0.006, 0.006, roof - y - dy]), gilt, { p: [l.x + Math.cos(a) * rr, (roof + y + dy) / 2, l.z + Math.sin(a) * rr] })); }
+        });
         continue;
       }
       if (l.kind === 'highbay') { // a hall's: a dome on a rod down from the roof (the floor above's ceiling)

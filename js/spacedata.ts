@@ -214,8 +214,8 @@ export const SpaceData = (() => {
     { name: 'Corporate cutter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.14, foes: 1.1, crowd: 0.8, home: 0, reflect: 0.4, floor: '#a9afb4', wall: '#dde2e4', crate: '#4f7896', accent: '#2fc6d6', fog: 0x020306, light: 0xeef4ff, ceil: '#cfd5d8', hemi: 0x9fb4d8, hemiI: 0.4, far: 30000 },
     { name: 'Navy warship', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.07, foes: 1.35, crowd: 0.4, home: 0, reflect: 0.3, floor: '#3a4149', wall: '#65717b', crate: '#566650', accent: '#d23a30', fog: 0x020306, light: 0xdfe8ff, ceil: '#4a525b', hemi: 0x8fa6c8, hemiI: 0.3, far: 30000 },
     // (a cruise liner: a cruiser with a promenade court, js/shipgen.ts HALLS mall. Never drawn by lot: LOT below. liner: her surfaces are
-    // panelling, carpet and coffered ceilings, js/levelview.ts _shipTex; warm and low lit)
-    { name: 'Cruise liner', layout: 'ship', space: 1, liner: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.25, floor: '#4c1c22', wall: '#a8926c', crate: '#6b3a2a', accent: '#c9a24a', fog: 0x020306, light: 0xf2c890, ceil: '#8c7a5c', hemi: 0xb89878, hemiI: 0.16, far: 30000 },
+    // walnut slats and stone, charcoal carpet and dark ceilings with slots of light, js/levelview.ts _shipTex; warm and low lit)
+    { name: 'Cruise liner', layout: 'ship', space: 1, liner: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.25, floor: '#2a2c30', wall: '#9a948a', crate: '#3a3d42', accent: '#b8935a', fog: 0x020306, light: 0xffdfb8, ceil: '#232427', hemi: 0xa8a098, hemiI: 0.16, far: 30000 },
   ];
   const TH0 = 1000, LOT = 3, LINER = TH0 + 3; // (LOT: the ships' themes a board's offers are drawn from, the first of them; LINER: a cruise liner's)
   const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G_THEMES[th] || null);

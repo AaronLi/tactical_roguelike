@@ -43,12 +43,13 @@ export const ShipGen = (() => {
   //   bay:   a hangar bay right across her amidships, the spine running into it at each end and over it as a bridge of grating
   //   grove: an arboretum down her port side amidships
   //   works: a machinery hall to starboard aft, next the engine room, and a second, smaller, to port forward
-  //   mall:  a cruise liner's promenade court, right across her well forward (she takes the liner's theme with it, js/level.ts: wood
-  //          panelling, carpet, coffered ceilings, a low warm light). Honey marble underfoot, marble columns with gilt capitals in
-  //          place of lengths of bulkhead (js/furniture.ts gcolumn), chandeliers, glass balustrades round its gallery (not steel
-  //          rails), the spine over it a deck (not a grating) that ends at the head of a grand stair: the spine's own width, up the
-  //          middle of the court's after end. A fountain in the middle, a gilt statue forward of it; display cases, cabinets,
-  //          a cafe's tables, a lounge's sofas, palms in urns about it. No frames on its floor.
+  //   mall:  a cruise liner's promenade court, right across her well forward (she takes the liner's theme with it, js/level.ts:
+  //          walnut slats and stone, charcoal carpet, dark ceilings with slots of light, a low warm light). Pale marble underfoot,
+  //          slim columns of black stone with brass inlays in place of lengths of bulkhead (js/furniture.ts gcolumn), pendants of
+  //          rings of light, glass balustrades round its gallery (not steel rails), the spine over it a deck (not a grating) that
+  //          ends at the head of a grand stair: the spine's own width, up the middle of the court's after end. A fountain in the
+  //          middle, a brass sculpture forward of it; display cases, screens of walnut slats, a cafe's tables, a lounge's sofas,
+  //          palms in planters about it. No frames on its floor.
   // stairs: where her ordinary stairwells are along her (of her spine's length), clear of the halls.
   const HALLS: Record<ShHallKind, { stairs: number[]; at: [number, number, number, number][] }> = { // at: [side, where along her, least and most tiles long]
     bay: { stairs: [0.08, 0.84], at: [[0, 0.48, 11, 16]] },
@@ -176,7 +177,7 @@ export const ShipGen = (() => {
         const k = (z + j) * W + x + i, bridge = h.side === 0 && z + j >= zc && z + j < zc + sw;
         if (bridge) { if (h.kind !== 'mall') c.grate![k] = 1; } else t[k] = 5; // (a liner's court: the spine crosses it on a deck of its own)
       }
-      // (a liner's court: its columns aren't lengths of bulkhead but marble, a piece of furniture each, js/furniture.ts gcolumn, standing
+      // (a liner's court: its columns aren't lengths of bulkhead but stone-clad, a piece of furniture each, js/furniture.ts gcolumn, standing
       // on the lower deck up through the drop; their tiles kept clear for them, 4)
       if (h.kind === 'mall') { if (f === 0) for (const [i, j] of h.pillars) { t[(z + j) * W + x + i] = 4; (rm.cover = rm.cover || []).push(['gcolumn', (x + i + 0.5) * L.CTS, (z + j + 0.5) * L.CTS, 0, null]); } }
       else for (const [i, j] of h.pillars) t[(z + j) * W + x + i] = 1;

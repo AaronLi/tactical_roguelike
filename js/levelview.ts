@@ -317,38 +317,35 @@ export const LevelView = {
     rect(0, 0, W, H, base);
     for (let i = 0; i < W * H / 50; i++) { const v = R() * 2 - 1; g.fillStyle = v > 0 ? lt(v * 0.05) : dk(-v * 0.07); if (kd === 'bulkhead' || kd === 'cargo') g.fillRect(R() * W, R() * H, 1, 6 + R() * 26); else g.fillRect(R() * W, R() * H, 3 + R() * 14, 1); } // (brushed: its grain)
     if (kd === 'lbulkhead' || kd === 'ldeck' || kd === 'loverhead') {
-      // A cruise liner's (a theme with liner set): base is the wall's cream, the carpet's red or the ceiling's stone, acc her gilt.
-      //   lbulkhead  a skirting and a wainscot of dark wood in raised panels, a gilt dado rail, a field of cream damask with a gilt
-      //              frame and a wall light in it, a gilt picture rail, a frieze, a dark cornice with dentils
-      //   ldeck      carpet: a lattice of gilt lines on its red, a flower at each crossing, a border round every two metres
-      //   loverhead  coffers: dark beams crossing, a gilt bead inside them, a recessed panel with a rosette
-      const wood = '#3b2218', woodHi = '#5a3626', gold = (a: number) => { g.globalAlpha = a; return acc; }, done = () => { g.globalAlpha = 1; };
+      // A cruise liner's (a theme with liner set): modern. base is the wall's stone, the carpet's charcoal or the ceiling's dark, acc her brass.
+      //   lbulkhead  a black recessed plinth with a line of warm light over it; walnut slats to above the doors' height; a brass
+      //              inlay; a smooth stone panel, faintly veined; a cove of warm light under a dark shadow gap at the top
+      //   ldeck      carpet: charcoal, a fine pile, broad tone-on-tone bands, a hairline of brass round every two metres
+      //   loverhead  dark matte panels, a slot of warm light across each, hairline joints
+      const warm = (a: number) => `rgba(255,214,160,${a})`, brass = (a: number) => { g.globalAlpha = a; return acc; }, done = () => { g.globalAlpha = 1; };
       if (kd === 'lbulkhead') {
         const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, f: string) => rect(0, Y(m1), W, Y(m0) - Y(m1), f);
-        for (let y = Y(2.9); y < Y(1.13); y += 14) for (let x = (y / 14) & 1 ? 7 : 0; x < W; x += 14) { g.fillStyle = dk(0.05); g.beginPath(); g.moveTo(x, y - 5); g.lineTo(x + 4, y); g.lineTo(x, y + 5); g.lineTo(x - 4, y); g.fill(); } // the damask
-        g.lineWidth = 2; g.strokeStyle = gold(0.9); g.strokeRect(14, Y(2.72), W - 28, Y(1.32) - Y(2.72)); done(); g.lineWidth = 1; g.strokeStyle = dk(0.25); g.strokeRect(17, Y(2.72) + 3, W - 34, Y(1.32) - Y(2.72) - 6);
-        // the wall light: a gilt bracket, a shade lit from inside, its glow on the wall round it
-        { const cx = W / 2, cy = Y(2.15), gr = g.createRadialGradient(cx, cy - 6, 2, cx, cy - 6, 46); gr.addColorStop(0, 'rgba(255,226,170,0.55)'); gr.addColorStop(1, 'rgba(255,226,170,0)'); g.fillStyle = gr; g.fillRect(cx - 46, cy - 52, 92, 92);
-          rect(cx - 2, cy, 4, 20, gold(1)); done(); rect(cx - 9, cy + 18, 18, 4, gold(1)); done(); g.fillStyle = '#fff0cc'; g.beginPath(); g.moveTo(cx - 7, cy - 16); g.lineTo(cx + 7, cy - 16); g.lineTo(cx + 11, cy + 2); g.lineTo(cx - 11, cy + 2); g.fill(); }
-        band(2.9, 2.97, gold(1)); done(); band(2.9, 2.915, dk(0.3));
-        band(2.97, 3.55, dk(0.16)); for (let x = 10; x < W; x += 36) { g.fillStyle = gold(0.8); g.beginPath(); g.arc(x + 8, Y(3.26), 6, 0, 7); g.fill(); done(); g.fillStyle = dk(0.3); g.beginPath(); g.arc(x + 8, Y(3.26), 2.5, 0, 7); g.fill(); } // the frieze, its rosettes
-        band(3.55, 4, wood); band(3.55, 3.6, gold(1)); done(); for (let x = 2; x < W; x += 12) rect(x, Y(3.74), 7, Y(3.64) - Y(3.74), woodHi); band(3.9, 4, dk(0.3)); // the cornice, its dentils
-        band(0.16, 1.05, wood); for (let i = 0; i < 60; i++) { g.fillStyle = i & 1 ? lt(0.03) : dk(0.08); g.fillRect(R() * W, Y(1.05) + R() * (Y(0.16) - Y(1.05)), 1, 10 + R() * 40); } // the wainscot, its grain
-        rect(12, Y(0.95), W - 24, Y(0.28) - Y(0.95), woodHi); g.lineWidth = 3; g.strokeStyle = dk(0.4); g.strokeRect(12, Y(0.95), W - 24, Y(0.28) - Y(0.95)); g.lineWidth = 1; g.strokeStyle = lt(0.1); g.strokeRect(17, Y(0.95) + 5, W - 34, Y(0.28) - Y(0.95) - 10);
-        band(1.05, 1.13, gold(1)); done(); band(1.05, 1.065, dk(0.35)); band(1.115, 1.13, lt(0.25)); // the dado rail
-        band(0, 0.16, '#24140e'); band(0.15, 0.16, lt(0.1)); // the skirting
-        rect(0, Y(3.55), 3, Y(1.13) - Y(3.55), wood); rect(W - 3, Y(3.55), 3, Y(1.13) - Y(3.55), wood); rect(3, Y(3.55), 1, Y(1.13) - Y(3.55), gold(0.7)); done(); // a pilaster's edge at the joint
+        // the stone panel: a few faint veins across it
+        for (let i = 0; i < 5; i++) { g.strokeStyle = i & 1 ? lt(0.07) : dk(0.07); g.lineWidth = 1 + R(); g.beginPath(); let x = R() * W, y = Y(3.6); g.moveTo(x, y); while (y < Y(2.6)) { x += (R() - 0.5) * 26; y += 12 + R() * 18; g.lineTo(x, y); } g.stroke(); }
+        // the cove: a slot of light, its glow down the stone under it, the shadow gap over it
+        { const gr = g.createLinearGradient(0, Y(3.66), 0, Y(2.9)); gr.addColorStop(0, warm(0.5)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, Y(3.66), W, Y(2.9) - Y(3.66)); }
+        band(3.66, 3.72, '#ffe6c0'); band(3.72, 4, '#141416');
+        // the slats: walnut, a dark gap between each, lit a little from the plinth's line below
+        band(0.12, 2.56, '#3a2a1e');
+        for (let x = 0; x < W; x += 16) { rect(x + 2, Y(2.56), 11, Y(0.12) - Y(2.56), '#6a4a32'); rect(x + 2, Y(2.56), 2, Y(0.12) - Y(2.56), lt(0.12)); rect(x + 11, Y(2.56), 2, Y(0.12) - Y(2.56), dk(0.22)); }
+        for (let i = 0; i < 70; i++) { g.fillStyle = i & 1 ? lt(0.04) : dk(0.08); g.fillRect(R() * W, Y(2.56) + R() * (Y(0.12) - Y(2.56)), 1, 14 + R() * 60); } // their grain
+        { const gr = g.createLinearGradient(0, Y(0.12), 0, Y(0.7)); gr.addColorStop(0, warm(0.4)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, Y(0.7), W, Y(0.12) - Y(0.7)); }
+        band(2.56, 2.6, brass(1)); done(); band(2.56, 2.567, dk(0.35)); // the inlay
+        band(0, 0.1, '#101012'); band(0.1, 0.125, '#ffe2b8'); // the plinth, its line of light
       } else if (kd === 'ldeck') {
-        for (let i = 0; i < 2600; i++) { g.fillStyle = R() < 0.5 ? lt(0.035) : dk(0.07); g.fillRect(R() * W, R() * H, 2, 2); } // its pile
-        g.strokeStyle = gold(0.5); g.lineWidth = 1.5; const S = W / 4;
-        for (let k = -4; k <= 8; k++) { g.beginPath(); g.moveTo(k * S, 0); g.lineTo(k * S + H, H); g.stroke(); g.beginPath(); g.moveTo(k * S, 0); g.lineTo(k * S - H, H); g.stroke(); }
-        done();
-        for (let y = 0; y <= H; y += S / 2) for (let x = (Math.round(y / (S / 2)) & 1) ? S / 2 : 0; x <= W; x += S) { g.fillStyle = gold(0.75); g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); done(); g.fillStyle = dk(0.3); g.beginPath(); g.arc(x, y, 1.5, 0, 7); g.fill(); }
-        g.lineWidth = 6; g.strokeStyle = dk(0.3); g.strokeRect(3, 3, W - 6, H - 6); g.lineWidth = 1.5; g.strokeStyle = gold(0.8); g.strokeRect(8, 8, W - 16, H - 16); done();
+        for (let i = 0; i < 3000; i++) { g.fillStyle = R() < 0.5 ? lt(0.03) : dk(0.08); g.fillRect(R() * W, R() * H, 2, 2); } // its pile
+        for (let y = 0; y < H; y += 64) { rect(0, y, W, 30, lt(0.035)); rect(0, y + 30, W, 2, dk(0.12)); } // broad bands, tone on tone
+        g.lineWidth = 1.5; g.strokeStyle = brass(0.55); g.strokeRect(0.75, 0.75, W - 1.5, H - 1.5); done();
       } else {
-        rect(0, 0, W, 26, wood); rect(0, 0, 26, H, wood); rect(0, 26, W, 3, gold(0.9)); rect(26, 0, 3, H, gold(0.9)); done(); rect(0, 29, W, 5, dk(0.3)); rect(29, 0, 5, H, dk(0.3)); // the beams, their gilt bead and shadow
-        rect(48, 48, W - 70, H - 70, dk(0.1)); g.lineWidth = 2; g.strokeStyle = dk(0.3); g.strokeRect(48, 48, W - 70, H - 70); g.lineWidth = 1; g.strokeStyle = gold(0.7); g.strokeRect(54, 54, W - 82, H - 82); done();
-        { const cx = (48 + W - 22) / 2, cy = (48 + H - 22) / 2; for (let q = 0; q < 8; q++) { const a = q * Math.PI / 4; g.fillStyle = gold(0.85); g.beginPath(); g.ellipse(cx + Math.cos(a) * 15, cy + Math.sin(a) * 15, 10, 5, a, 0, 7); g.fill(); } done(); g.fillStyle = wood; g.beginPath(); g.arc(cx, cy, 7, 0, 7); g.fill(); } // the rosette
+        for (let i = 0; i < 900; i++) { g.fillStyle = R() < 0.5 ? lt(0.02) : dk(0.06); g.fillRect(R() * W, R() * H, 3, 3); }
+        g.lineWidth = 1; g.strokeStyle = dk(0.5); g.strokeRect(0.5, 0.5, W - 1, H - 1); g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.stroke(); // the panels' joints
+        { const gr = g.createLinearGradient(0, H / 2 - 30, 0, H / 2 + 30); gr.addColorStop(0, warm(0)); gr.addColorStop(0.5, warm(0.35)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, H / 2 - 30, W, 60); }
+        rect(0, H / 2 - 5, W, 10, '#0c0c0e'); rect(0, H / 2 - 3, W, 6, '#ffe6c0'); rect(0, H / 2 - 5, W, 1, brass(0.8)); rect(0, H / 2 + 4, W, 1, brass(0.8)); done(); // the slot of light, a brass lip either side
       }
     } else if (kd === 'bulkhead') {
       const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, f: string) => rect(0, Y(m1), W, Y(m0) - Y(m1), f);
