@@ -34,7 +34,7 @@ import { Me } from './player.js';
 //   A jump is the change of level: the screens go to the jump's light instead of black (the veil, kind 'ftl'), the place
 //   is built behind it, and she comes out of the tunnel when it's ready.
 interface SpWp { id: string; name: string; sub: string; p: THREE.Vector3; kind: 'anchor' | 'base' | 'breach' | 'lz' | 'entry'; i?: number; hide?: boolean }
-interface SpMs { gn?: number; raid?: number[][]; hold: number; left?: number; zt?: number; hostile?: number; salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
+interface SpMs { def?: { on: number; lead: number; t: number; pods: number; lost: number; civ: number } | null; gn?: number; raid?: number[][]; hold: number; left?: number; zt?: number; hostile?: number; salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
 type SpKind = 'hub' | 'board' | 'assault';
 export const Space = (() => {
   const T = THREE, SD = SpaceData;
@@ -270,7 +270,7 @@ export const Space = (() => {
     const b = brief; brief = null;
     const E = U.esc, ms = b.ms || {}, c = b.cas || {}, ok = !!b.ok, o = (SD.OBJ as any)[ms.obj] || null, f = (v: number) => U.fmt(Math.round(v || 0));
     const row = (k: string, v: string, cls = '') => `<div class="db-row${cls ? ' ' + cls : ''}"><span>${k}</span><b>${v}</b></div>`;
-    const bonusWhy = ms.obj === 'hvt' && b.hvt === 2 ? 'Taken alive' : ms.obj === 'hostage' && b.freed ? `${b.freed} hostage${b.freed === 1 ? '' : 's'} freed` : 'Bonus';
+    const bonusWhy = ms.obj === 'hvt' && b.hvt === 2 ? 'Taken alive' : ms.obj === 'hostage' && b.freed ? `${b.freed} hostage${b.freed === 1 ? '' : 's'} freed` : ms.obj === 'defend' && b.freed ? `${b.freed} passenger${b.freed === 1 ? '' : 's'} unhurt` : 'Bonus';
     const paid = (ok ? (b.pay || 0) + (b.bonus || 0) : 0) + (b.salv || 0);
     const el = document.getElementById('debrief') || Object.assign(document.createElement('div'), { id: 'debrief' });
     el.innerHTML = `<div class="db-card"><div class="db-head ${ok ? 'ok' : 'fail'}"><small>${ok ? 'Mission complete' : 'Mission failed · nothing paid for it'}</small><h2>${E(b.name || ms.name || 'Mission')}</h2><span>${E(ms.where || '')}${o ? ' · ' + E(o.name) : ''}</span></div>

@@ -1,10 +1,10 @@
 // Prints a generated ship's deck plans (js/shipgen.ts) as text:
-//   node tools/ship_dump.mjs [transport|small|medium|large|capital] [seed] [level] [obj] [other class]
+//   node tools/ship_dump.mjs [transport|small|medium|large|capital] [seed] [level] [obj] [other class] [--wing] [--hall=bay|grove|works|mall]
 import { loadLevel } from './level_env.mjs';
 const { G } = await loadLevel();
 const size = process.argv[2] || 'small', seed = +(process.argv[3] || 7), level = +(process.argv[4] || 2), other = process.argv[6] || null;
 const t0 = performance.now();
-const map = G.Level.generate(seed, level, G.SpaceData.TH0, false, { size, obj: process.argv[5] || 'artifact', other, wing: process.argv.includes('--wing') });
+const map = G.Level.generate(seed, level, G.SpaceData.TH0, false, { size, obj: process.argv[5] || 'artifact', other, wing: process.argv.includes('--wing'), ...(process.argv.find((q) => q.startsWith('--hall=')) ? { hall: process.argv.find((q) => q.startsWith('--hall=')).slice(7) || null } : {}) }); // (--hall=bay|grove|works|mall: a cruiser's hall two decks high; --hall= for none; else whichever her seed gives her)
 const ms = performance.now() - t0, sp = map.sp, TS = G.Level.TS, floors = map.floors || [map];
 floors.forEach((fm, f) => {
   const { W, H, t } = fm, ch = new Array(W * H);

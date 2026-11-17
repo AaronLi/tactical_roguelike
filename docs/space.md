@@ -74,7 +74,7 @@ space round her is tile 5, open to the sky, with `chasm` 300 so nothing is drawn
 | civilian transport | about 34 x 18 m | bridge, engine room, a hold, cabins, a mess. 6 crew, 3 light guards | nothing |
 | corvette | about 40 x 20 m | the same, larger. 4 guards, one breach response squad | 1 point-defence gun |
 | frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 2 point defence, 1 cannon |
-| cruiser | about 100 x 36 m | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 cannon, 1 missile launcher |
+| cruiser | about 100 x 36 m; eight in ten **two decks** with a hall the height of both (below) | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 cannon, 1 missile launcher |
 | capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 5 point defence, 3 cannon, 2 missile launchers |
 
 What the board offers goes by how far the squad has got: transports and corvettes first, capital ships from the fifth rank.
@@ -129,6 +129,7 @@ not 45). The host's fleet is kept in its browser (`fleet`).
 ## Checking it
 
 - `node tools/ship_dump.mjs <small|medium|large> <seed> [level] [obj]`: a generated deck plan as text.
+- `node tools/ship_halls.mjs [seeds] [--hall=bay|grove|works|mall]`: how much of each cruiser's hall can be seen from one place in it.
 - `node tools/space_shot.mjs "<query>" <steps.mjs> --gpu`: the game in a headless Chromium against a running
   `node serve.js` (`--port`), with screenshots. Queries: `mute&hangar`, `mute&fly`, `mute&board=medium&obj=destruct&dock&nofoes&fuse=25`,
   `mute&assault=warehouse` (js/debugstart.ts).
@@ -183,6 +184,106 @@ ship (cruisers, capital ships) a long wedge bow, armour sloped over her roof's e
 with masts, tail fins, and on two decks a chine between them. Every inside corner of her plan is faired in. What's over her
 sides is smashed away where she's rammed (`cutAt`, called from `js/space.ts` cutHere and for the pirates' pods).
 `node tools/space_shot.mjs "mute&board=large&hull=2" tools/hull_views.mjs --out <dir> --gpu` looks at one from outside.
+
+## A cruiser's halls (`sp.hall`)
+
+Eight cruisers in ten have **two decks** and a compartment or two the height of both (`js/shipgen.ts` HALLS, halls; which, if any,
+goes by her seed alone, `G.SpaceData.hallOf`, so every machine lays her out the same without being told). The rest are as they
+were, one deck. A hall is open from the lower deck's floor to the upper deck's roof. On the upper deck a **gallery** runs round it
+against the walls, a tile (2 m) wide, a steel rail along its edge (open between its rails: seen and shot through, as a foundry's
+catwalks; a liner's court has glass balustrades instead), looking down on the floor; a flight or two inside the hall climbs to it, and both decks have doors into it.
+
+| Hall | Where | What's in it |
+| --- | --- | --- |
+| hangar bay (`bay`) | right across her amidships, about 30 x 32 m. The spine runs into it at each end, and crosses it on the upper deck as a bridge of grating | containers, pallet racking, forklifts, stacked crates and drums |
+| arboretum (`grove`) | down her port side amidships, about 30 x 12 m | a fountain, tanks, sheds, raised beds with fruit trees, hedges, junipers and boulders, benches |
+| promenade court (`mall`) | a **cruise liner's** (her spine is cut to fit it: a compartment's length forward of it and one aft, a hull of 94 to 98 m): right across her, hull to hull, 41 to 49 m long and 33 m across. A **cross passage** 3 m wide runs right across her against its forward wall (the end away from its mezzanine), on both decks: the spine runs into it, and the compartments forward of it open onto it. **No gallery round it**: a **mezzanine** across its after third (12 to 14 m deep, a lounge and a bar's tables), all of it open to the roof forward of that. The spine crosses the open part on the upper deck as a bridge to the mezzanine (the only way aft from her bridge and forward cabins on that deck), and a pair of **grand flights**, 4 m wide each, climb to the mezzanine's edge either side of it. **Side doors**: on the lower deck a door from the cross passage into the court to port and to starboard, halfway out to her sides, besides the spine's in the middle; and through its after wall a door either side of the spine's into the compartment beyond (locked where that's an armoury or a vault) | pale marble underfoot, a colonnade of slim square columns clad in black stone with a brass inlay down each face (`gcolumn`: furniture, not bulkhead), pendants of three rings of light over the open part, glass balustrades. A fountain in the middle of the open part with benches and palms round it, a brass sculpture forward of it; boutique islands under canopies (`pavilion`), display cases, free-standing screens of walnut slats, a cafe's tables, sofas and armchairs, a piano, palms in black planters: about one thing to every five tiles of floor. No frames on its floor, but standing **floor to roof** in its open part: two piers four metres square, one to port and one to starboard, and a fin of wall six metres long across from each |
+| machinery halls (`works`) | one to starboard aft, next the engine room, a smaller one to port forward, about 20 x 12 m each | reactor cores, presses and mills, screens of panels, coolant tanks, turbines |
+
+So that nowhere on a hall's floor sees all of it: columns stand under the gallery's edge (up through both decks), **frames** (lengths
+of bulkhead two or three tiles long) stand free on the floor, turn and turn about, one half across the spine's line at each end of
+a hangar bay, and most of what's stowed there is taller than a head (`js/furniture.ts` shipHalls; nothing is put down that would
+shut any of the floor off, and the tile under the gallery is kept clear all round). `node tools/ship_halls.mjs` measures it: from
+every place on each hall's floor, the share of that floor in sight. Over 32 halls it's at most 71%, and about 25 to 35% on average
+(a liner's court: at most 47% over eight).
+Her ordinary stairwells are moved clear of the halls (one or two, toward her ends), her lower deck is her working one (armoury,
+vault, magazines, brig), and her people live on the upper (quarters, mess, galley). High-bay lamps hang under the hall's roof
+and light the gallery too. On the terminal a cruiser with a hall says so, and the objective's panel aboard names it.
+A cruiser with a promenade court is a **cruise liner** all through: she takes a theme of her own (`G.SpaceData.LINER`, never drawn
+by lot; `js/level.ts` gives it to her whatever she was offered as), modern: her bulkheads walnut slats over a lit plinth, a brass
+inlay, smooth stone above with a cove of warm light; her decks charcoal carpet; her ceilings dark with a slot of light across
+each panel (`js/levelview.ts` _shipTex: lbulkhead, ldeck, loverhead); her light warm and low.
+Outside (`js/shipmodel.ts`, the 'liner' language) she is white: a raked bow, rounded shoulders, a blue keel and band at her waterline
+with a line of brass over it, a glazed roof over the open part of her court, two set-back tiers of superstructure aft of it with a
+band of lit windows round each, a raked blue funnel, a wheelhouse tier over her bridge. She still carries a cruiser's guns.
+`?board=large&seed=11` is a hangar bay, `&seed=6` an arboretum, `&seed=1` machinery halls, `&seed=9` a liner's court, `&seed=3` none;
+`node tools/ship_dump.mjs large 7 2 artifact --hall=bay` prints one of any seed (`--hall=` for none).
+
+## A liner's shelter, and holding her (`obj: 'defend'`)
+
+On a cruise liner's upper deck the compartment aft of her court to port is her **shelter** (`meta.shelter`, role `shelter`): one
+door, through the court's after wall at the back of the mezzanine; none onto the spine. Benches round its walls.
+
+On every screen she is a **luxury cruiser** (the theme's name, the board, the objective's panel; `G.SpaceData.className`), and she
+has **no guns on her hull** (`gunsOf`: none drawn, none manned, "unarmed" in the panel) and no gun control, magazines, barracks
+or brig inside (`js/shipgen.ts` PROGRAM liner: a security office and armoury, a purser's vault, sick bay, galley, mess, cabins,
+baggage under her bridge).
+
+A liner is a **high-security ship**: her own people are a civilian ship's (security guards and officers, not a navy's), with two
+more guards and a security squad more than a cruiser's (34 armed aboard one, in the simulation), and boarding her is an attack
+like any other: her cameras, her alarm, her response teams. Only on the one job below is she expecting the squad.
+
+A liner on the board is one of three jobs, a third each by her seed (`G.SpaceData.offers`): the job she'd have been anyway
+(an artifact or a wanted officer, against all of that); **retake her** (`hostage`: pirates hold her, her people tied in her court);
+or **hold her** (`defend`, `js/spaceserver.ts` defendTick):
+
+- **There's been a fight already.** Ten of her security and eight pirates lie dead about her from the start (not in the shelter;
+  nobody's kill in the debrief): why only a handful of her people are left.
+
+- **She's expecting the squad.** Boarding her is no attack: no alarm, no drill, her hull guns hold their fire, nobody carries a
+  keycard. Her passengers and hands (her class's civilians and four more) are in the shelter from the start.
+- **Her security** (four, one more for each officer past the first; rifles), each with a rank and a name of their own (a Security
+  Lead, Security Officers, a Senior Security Officer; family names from `G.SpaceData.STAFF`: what they're called wherever a
+  title shows, named in the radio call when the squad comes aboard, and in the feed when one of them shoots a pirate or is shot:
+  `bn`, who did it when it wasn't an officer), wait in her court, on the squad's side (`ally`,
+  `js/server.ts` foesOf): the squad is no target of theirs, a shout doesn't order them about, they aren't counted among the
+  hostiles left. They fight the pirates where they stand. Alone they hold the court for about two and a half minutes.
+- **Her court, its mezzanine and her shelter are armoured**: no breach site opens into the court or within a cell of it along her
+  side (`G.ShipGen.sites`: the squad's ship and the pirates' pods both come through her forward and after compartments or her
+  cross passage; 85 to 102 sites a liner), and none of the three ever loses its air (`vent`).
+- From when the squad is aboard there are **20 seconds** before anything comes (`G.SpaceData.DEFEND.lead`: counted down in the
+  panel, to get to her court in). Then, for three minutes (180 s, 5 pods, the first 2 s in, then every 39 s or so), a pirate pod comes through her hull on her lower deck, clear of the squad's ship and of the pods already in her. Its
+  boarders (three, one more for every three levels of the mission's danger and for each officer past the first) come out inside her
+  and make for the shelter, fighting whoever they meet. From her hull to the shelter's door is about forty seconds unopposed.
+- Pirates shoot her passengers as they'd shoot anyone not their own (Sides, below). One shot down is a casualty, living or not:
+  what counts is how many are still on their feet.
+- When the time is up and the last pirate aboard is dead, down or tied, she's held: the fee, and 120 for each of her people unhurt.
+  If the last of them is shot down first the job has failed.
+- The objective's panel counts the time down and shows the pods come, the pirates aboard and the passengers unhurt.
+
+`?board=large&seed=9&obj=defend&dock` starts one aboard. `node tools/defend_sim.mjs [passive|win] [seed]` runs one in node (the
+simulation alone): passive, the officer stands where he came aboard and the pirates reach the shelter; win, every boarder dies
+twelve seconds after he comes aboard and she's held.
+
+## Sides (`js/server.ts` facOf, npcFoes)
+
+A ship's people are of a side, by how they're dressed (`wear`): **pirates**, a **navy's**, a **civilian ship's** armed hands, and
+the **unarmed** (passengers, crew who don't fight).
+
+| | fights |
+| --- | --- |
+| pirates | a navy's people, a civilian ship's armed hands, and the unarmed (not those tied: hostages are worth more alive) |
+| a navy's people, a civilian ship's armed hands | pirates. Never each other, never the unarmed |
+| the unarmed | nobody. They **run** from a pirate in sight within 12 m (`civFlee`: away from the pirates, a few seconds, then hide or cower where they've got to; again when one comes in sight again), leaving wherever they were sheltering |
+
+Everyone armed still fights the squad, and a building's suspects are of no side: nothing there has changed. It only comes into it
+when pirates are aboard with someone they'd fight (so every other level runs exactly as before): then each of them has the other
+side's people within 45 m to pick a target from as well as the squad, by the same eyes and the same rules (nearest in sight first,
+the unarmed after anyone with a gun as near), takes cover from them and shoots at them as at an officer. A shot at one of another
+side is settled by the host: each round lands with the chance its aim gives it if the way from the muzzle is clear, and takes
+near half of a person's life (a pistol's a third, a pellet a seventh). They fight where they meet: nobody goes hunting another
+side through the ship. Checked in the simulation: eight pirates put in a navy cruiser's busiest compartment left five of hers
+down and one dead for one of theirs in the first quarter of a minute, and nobody picked a target on their own side.
 
 ## A flying wing (`sp.wing`)
 

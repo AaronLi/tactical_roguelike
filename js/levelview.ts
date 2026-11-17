@@ -309,14 +309,45 @@ export const LevelView = {
   //   overhead  frames crossing, a recessed panel between them, a cable run
   //   cargo     a container's side: corrugated, framed, a band of her colour and a label
   _shipTex(kd: string, base: string, acc: string) {
-    const W = kd === 'bulkhead' ? 128 : 256, H = kd === 'bulkhead' ? 768 : 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const wallK = kd === 'bulkhead' || kd === 'lbulkhead', W = wallK ? 128 : 256, H = wallK ? 768 : 256, c = document.createElement('canvas'); c.width = W; c.height = H;
     const g = c.getContext('2d')!, dk = (a: number) => `rgba(0,0,0,${a})`, lt = (a: number) => `rgba(255,255,255,${a})`, R = Math.random;
     const rect = (x: number, y: number, w: number, h: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, h); };
     const inset = (x: number, y: number, w: number, h: number) => { g.lineWidth = 2; g.strokeStyle = dk(0.3); g.strokeRect(x, y, w, h); g.lineWidth = 1; g.strokeStyle = lt(0.1); g.strokeRect(x + 2, y + 2, w - 4, h - 4); };
     const bolt = (x: number, y: number, r = 2.2) => { g.fillStyle = dk(0.4); g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.fillStyle = lt(0.16); g.beginPath(); g.arc(x - 0.6, y - 0.6, r * 0.45, 0, 7); g.fill(); };
     rect(0, 0, W, H, base);
     for (let i = 0; i < W * H / 50; i++) { const v = R() * 2 - 1; g.fillStyle = v > 0 ? lt(v * 0.05) : dk(-v * 0.07); if (kd === 'bulkhead' || kd === 'cargo') g.fillRect(R() * W, R() * H, 1, 6 + R() * 26); else g.fillRect(R() * W, R() * H, 3 + R() * 14, 1); } // (brushed: its grain)
-    if (kd === 'bulkhead') {
+    if (kd === 'lbulkhead' || kd === 'ldeck' || kd === 'loverhead') {
+      // A cruise liner's (a theme with liner set): modern. base is the wall's stone, the carpet's charcoal or the ceiling's dark, acc her brass.
+      //   lbulkhead  a black recessed plinth with a line of warm light over it; walnut slats to above the doors' height; a brass
+      //              inlay; a smooth stone panel, faintly veined; a cove of warm light under a dark shadow gap at the top
+      //   ldeck      carpet: charcoal, a fine pile, broad tone-on-tone bands, a hairline of brass round every two metres
+      //   loverhead  dark matte panels, a slot of warm light across each, hairline joints
+      const warm = (a: number) => `rgba(255,214,160,${a})`, brass = (a: number) => { g.globalAlpha = a; return acc; }, done = () => { g.globalAlpha = 1; };
+      if (kd === 'lbulkhead') {
+        const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, f: string) => rect(0, Y(m1), W, Y(m0) - Y(m1), f);
+        // the stone panel: a few faint veins across it
+        for (let i = 0; i < 5; i++) { g.strokeStyle = i & 1 ? lt(0.07) : dk(0.07); g.lineWidth = 1 + R(); g.beginPath(); let x = R() * W, y = Y(3.6); g.moveTo(x, y); while (y < Y(2.6)) { x += (R() - 0.5) * 26; y += 12 + R() * 18; g.lineTo(x, y); } g.stroke(); }
+        // the cove: a slot of light, its glow down the stone under it, the shadow gap over it
+        { const gr = g.createLinearGradient(0, Y(3.66), 0, Y(2.9)); gr.addColorStop(0, warm(0.5)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, Y(3.66), W, Y(2.9) - Y(3.66)); }
+        band(3.66, 3.72, '#ffe6c0'); band(3.72, 4, '#141416');
+        // the slats: walnut, a dark gap between each, lit a little from the plinth's line below
+        band(0.12, 2.56, '#3a2a1e');
+        for (let x = 0; x < W; x += 16) { rect(x + 2, Y(2.56), 11, Y(0.12) - Y(2.56), '#6a4a32'); rect(x + 2, Y(2.56), 2, Y(0.12) - Y(2.56), lt(0.12)); rect(x + 11, Y(2.56), 2, Y(0.12) - Y(2.56), dk(0.22)); }
+        for (let i = 0; i < 70; i++) { g.fillStyle = i & 1 ? lt(0.04) : dk(0.08); g.fillRect(R() * W, Y(2.56) + R() * (Y(0.12) - Y(2.56)), 1, 14 + R() * 60); } // their grain
+        { const gr = g.createLinearGradient(0, Y(0.12), 0, Y(0.7)); gr.addColorStop(0, warm(0.4)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, Y(0.7), W, Y(0.12) - Y(0.7)); }
+        band(2.56, 2.6, brass(1)); done(); band(2.56, 2.567, dk(0.35)); // the inlay
+        band(0, 0.1, '#101012'); band(0.1, 0.125, '#ffe2b8'); // the plinth, its line of light
+      } else if (kd === 'ldeck') {
+        for (let i = 0; i < 3000; i++) { g.fillStyle = R() < 0.5 ? lt(0.03) : dk(0.08); g.fillRect(R() * W, R() * H, 2, 2); } // its pile
+        for (let y = 0; y < H; y += 64) { rect(0, y, W, 30, lt(0.035)); rect(0, y + 30, W, 2, dk(0.12)); } // broad bands, tone on tone
+        g.lineWidth = 1.5; g.strokeStyle = brass(0.55); g.strokeRect(0.75, 0.75, W - 1.5, H - 1.5); done();
+      } else {
+        for (let i = 0; i < 900; i++) { g.fillStyle = R() < 0.5 ? lt(0.02) : dk(0.06); g.fillRect(R() * W, R() * H, 3, 3); }
+        g.lineWidth = 1; g.strokeStyle = dk(0.5); g.strokeRect(0.5, 0.5, W - 1, H - 1); g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.stroke(); // the panels' joints
+        { const gr = g.createLinearGradient(0, H / 2 - 30, 0, H / 2 + 30); gr.addColorStop(0, warm(0)); gr.addColorStop(0.5, warm(0.35)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, H / 2 - 30, W, 60); }
+        rect(0, H / 2 - 5, W, 10, '#0c0c0e'); rect(0, H / 2 - 3, W, 6, '#ffe6c0'); rect(0, H / 2 - 5, W, 1, brass(0.8)); rect(0, H / 2 + 4, W, 1, brass(0.8)); done(); // the slot of light, a brass lip either side
+      }
+    } else if (kd === 'bulkhead') {
       const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, f: string) => rect(0, Y(m1), W, Y(m0) - Y(m1), f);
       band(2.5, 4, dk(0.34)); // the plating over the light
       for (let m = 2.75; m < 3.7; m += 0.25) { band(m, m + 0.012, dk(0.3)); band(m - 0.012, m, lt(0.05)); }

@@ -38,7 +38,7 @@ type ServerPhase = 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 interface Evidence { i: number; wpn: string; x: number; y: number; z: number; owner: number; secured: boolean; taken: boolean }
 interface Loot { id: number; x: number; y: number; z: number; item: any; yaw: number; fit?: number }
 interface Cab { open: boolean; ver: number; items: any[][] }
-interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; civ: boolean; secured: boolean; rec: Enemy } // (the dead, until secured)
+interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; civ: boolean; secured: boolean; rec: Enemy; pre?: boolean } // (the dead, until secured)
 interface ServerReport { incap: number; bleedouts: number; bleedBy: Record<string, number>; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number; bodies: number; allRescued?: boolean; stronghold?: boolean }
 interface ServerRoute { seed: number; act: number; path: number[]; votes: Record<string, number> }
 interface TeamLocker { ver: number; items: any[][] }
@@ -1298,7 +1298,7 @@ export const Server = {
     }
   },
   // (a suspect down and bleeding out is dealt with: they never get up again. A civilian down still needs rescuing.)
-  remaining(civ: boolean | null = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ)) n++; return n; },
+  remaining(civ: boolean | null = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ) && !(e.ally && civ === false)) n++; return n; }, // (ally: armed, and on the squad's side: not one of the hostiles left)
   openBodies() { let n = 0; for (const b of this.bodies.values()) if (!b.secured) n++; return n; },
   openEvidence() { let n = 0; for (const v of this.evidence) if (!v.secured && !v.taken) n++; return n; },
   // Objectives. "Bring Order to Chaos" (required): every suspect zip-tied, down or dead. "Rescue All of the
@@ -1318,7 +1318,7 @@ export const Server = {
     const officers = [...this.players.values()].filter((q: Player) => q.st && !q.st.dn && !q.st.dd) as LivePlayer[];
     let complied = 0;
     for (const e of this.enemies.values()) {
-      if (!(e.state === 'normal' || e.state === 'cower' || e.state === 'flee' || e.state === 'hide')) continue;
+      if (!(e.state === 'normal' || e.state === 'cower' || e.state === 'flee' || e.state === 'hide') || e.ally) continue; // (ally: on the squad's side, not theirs to order about)
       const d = Math.hypot(e.x - px, e.z - pz);
       const eh = (e.y || 0) + 1.4 * e.def.scale;
       if (d > 16 || e.complyCd > 0 || !L.los(map, px, ey, pz, e.x, eh, e.z)) continue;
@@ -1692,7 +1692,7 @@ export const Server = {
     const d = m.k ? e.hp + 1 : Math.min(5000, (+m.d || 0) + Math.min(5, Math.max(0, +m.f || 0)) * person);
     if (!(d > 0)) return;
     e.hp -= d;
-    if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
+    if (!m.bo) { e.lastHit = from; e.lastHitN = from ? null : m.byn || null; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
       if (Array.isArray(m.tb) && m.tb.length === 2 && m.tb.every(Number.isFinite)) { const t = e.tb || (e.tb = { burn: 0, blast: 0, n: 0 }); t.burn += G_U.clamp(m.tb[0], 0, 2); t.blast += G_U.clamp(m.tb[1], 0, 2); t.n++; } // (a thermobaric's burns and blast: injuries of their own, injuryTick; and for F9, js/hud.ts)
       e.lastGr = Number.isFinite(m.gr) ? m.gr : 0; e.lastFb = e.flashT! > 0 ? e.flashId || 0 : 0; } // bleeding out is judged by what they were doing when shot (and for the highlights: a frag grenade's, gr its seed; blind from a flashbang, which)
     // Shock: being hit wrecks your aim for a moment (most of it, for a hard hit), throws off the shot you were
@@ -1746,7 +1746,7 @@ export const Server = {
       if (!hl.bo && e.lastGr) hl.gr = e.lastGr; // (a frag grenade did it: which)
       if (!hl.bo && e.lastFb) hl.fb = e.lastFb; // (blind from a flashbang when it was done: which)
       if (m.cz === 'burns' || m.cz === 'blast') { hl.cz = m.cz; if (e.lastGr) hl.gr = e.lastGr; } // (died of a thermobaric's burns or blast lung: injuryTick; the grenade's)
-      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr: this.pay(cr), h: !!m.h, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
+      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, bn: from ? undefined : m.byn || e.lastHitN || undefined, cr: this.pay(cr), h: !!m.h, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
       this.checkClear();
     }
   },
@@ -1767,7 +1767,7 @@ export const Server = {
   incapMsg(e: Enemy) {
     if (e.def.civ || e.incap) return; // (a civilian down still needs rescuing)
     const { cr, why } = this.incapacitate(e, e.lastHit, e.hitState || e.state);
-    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr: this.pay(cr), h: !!e.lastH, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
+    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, bn: e.lastHit ? undefined : e.lastHitN || undefined, cr: this.pay(cr), h: !!e.lastH, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
   },
   // A suspect down for good, for the highlights (js/highlights.ts suspectDown): incapacitated, their clip. The round
   // that put them down, with what a kill of it would carry; or, more than 4 s after a round last hit them, a bleed-out
@@ -1835,7 +1835,10 @@ export const Server = {
     const onFoot = alive.filter((p) => !p.st.se); // (se: still in the helicopter that brought them: nobody's to aim at yet, js/landing.ts)
     this.teamCheck();
     this.teamT = (this.teamT || 0) - dt; if (this.teamT <= 0) { this.teamT = this.TEAM.T; this.teamForm(); this.pointSwap(); }
-    for (const e of this.enemies.values()) this.think(e, dt, onFoot);
+    // (pirates aboard with anyone they'd fight: each of them has the other's people to pick out and shoot as well as the squad, npcFoes)
+    const foes = this.npcFoes();
+    if (foes) this.civFlee(dt);
+    for (const e of this.enemies.values()) this.think(e, dt, foes ? this.foesOf(e, onFoot, foes) : e.ally ? this.NOBODY : onFoot);
 
     // keep enemies from stacking
     const es = [...this.enemies.values()];
@@ -1956,7 +1959,7 @@ export const Server = {
         // (through a window: k < 1; through bulletproof glass, seen but not to be shot: no round gets through it)
         let proof = false;
         if (k > 0 && k < 1) { const dx = hx - lx, dy = hy - ey, dz = hz - lz, dd = Math.hypot(dx, dy, dz) || 1; proof = L.raycast(map, lx, ey, lz, dx / dd, dy / dd, dz / dd, dd, { glass: true }).t < dd - 0.1; }
-        const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0);
+        const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0) + ((p as any).npc && (p as any).npc.def.civ ? 6 : 0); // (someone unarmed: after anyone with a gun as near)
         if (score < bs) { bs = score; best = p; bvis = vis; bd = d; bk = lk; e.proof = proof; }
       }
       e.tgt = best ? best.id : null; e.canSee = bvis; e.tgtD = bd; e.visK = best && bvis ? bk : 0;
@@ -1966,7 +1969,7 @@ export const Server = {
       // seen behind bulletproof glass: they know where you are (and that shooting's no use): they come round for you
       if (best && e.proof) { e.alert = true; e.lostT = G_U.clamp(e.lostT || 0, 0.01, 1); e.blind = false; e.lastSeen = { x: best.st.p[0], y: best.st.p[1], z: best.st.p[2] }; }
     }
-    const p = e.tgt ? this.players.get(e.tgt) : null;
+    const p = e.tgt ? this.players.get(e.tgt) || (this.proxies && this.proxies.get(e.tgt)) || null : null; // (an officer, or someone of another side's: npcFoes)
     const st = p && p.st && !p.st.dn && !p.st.dd ? p.st : null;
     if (!st) { e.canSee = false; e.aiming = false; }
 
@@ -2674,6 +2677,7 @@ export const Server = {
   // What they're called (js/spacedata.ts TITLES): aboard a ship, by whose she is and where they stand in her; anywhere else, their type's
   // name. Kept on them (e.title) for the feed once they're gone.
   titleOf(e: Enemy) {
+    if (e.named) return (e.title = e.named); // (someone with a name of their own: a liner's security beside the squad, js/spaceserver.ts)
     const T = e.wear && !e.def.civ ? (SpaceData.TITLES as Record<string, Record<string, string>>)[e.wear] : null;
     if (!T) return e.def.name;
     const M = SpaceSv.st.M, lead = this.leads(e) && [...this.enemies.values()].some((o) => o !== e && o.team === e.id);
@@ -3192,7 +3196,7 @@ export const Server = {
     if (e.state === 'cuffed' || e.state === 'surrender') return;
     if (!e.down && this.clearLine(e, dt)) return; // (out of a shooter's way, before anything else)
     // sent to shelter (a ship's response): fleeing, hiding or frozen, they make for it once there's no officer on top of them
-    if (e.shelter && (e.state === 'cower' || e.state === 'hide' || e.state === 'flee')) { const near = this.nearestOfficer(e); if (!near || near.d > 6) { e.state = 'normal'; e.hide = null; e.crouch = false; e.leanOut = 0; } }
+    if (e.shelter && !e.fromPir && (e.state === 'cower' || e.state === 'hide' || e.state === 'flee')) { const near = this.nearestOfficer(e); if (!near || near.d > 6) { e.state = 'normal'; e.hide = null; e.crouch = false; e.leanOut = 0; } }
     if (e.state === 'cower') return;
     if (e.state === 'hide') {
       if (!e.hide && !this.seekHide(e)) { e.state = 'cower'; e.crouch = false; e.leanOut = 0; return; }
@@ -3205,7 +3209,7 @@ export const Server = {
     }
     if (e.state === 'flee') {
       e.fleeT -= dt;
-      const step = this.flow ? L.flowAway(this.map!, this.flow, e.x, e.z) : null;
+      const away = e.fromPir && this.pirFlow ? this.pirFlow : this.flow, step = away ? L.flowAway(this.map!, away, e.x, e.z) : null; // (from the pirates, if it's them they're running from: civFlee)
       if (step) {
         const dx = step.x - e.x, dz = step.z - e.z, d = Math.hypot(dx, dz) || 1;
         e.yaw += U.angDiff(e.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
@@ -3598,6 +3602,59 @@ export const Server = {
     if (SvNet.myId) SvNet.sendTo(SvNet.myId, { t: 'eround', e: e.id, wp: def.wpn, am, sid, f: from, ds }); // (js/player.ts enemyRounds)
     const to = Sim.predictEnd(fv, aim.clone().multiplyScalar(v0), wdrag, GRAVITY, map, wind).toArray();
     SvNet.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, sid });
+    // At one of another side's (npcFoes), not an officer: nobody's screen flies that round into them (a suspect's round goes by
+    // suspects and civilians there), so it's settled here. Each pellet lands with the chance worked out above, if the way from the
+    // muzzle to their chest is clear; a hit is a share of a person's life: a rifle's or a submachine gun's round near half, a
+    // pistol's a third, a pellet a seventh.
+    const npc = (p as any).npc as Enemy | undefined;
+    if (npc) {
+      const c = G_U.clamp(chance, 0.01, 0.97) * (pellets > 1 ? 0.6 : 1); let n = 0; for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
+      if (n && L.los(map, from[0], from[1], from[2], npc.x, (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), npc.z)) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)), byn: e.wear ? this.titleOf(e) : e.def.name }, null);
+    }
+  },
+  // ---- Sides (a ship's people: js/spaceserver.ts, who each is dressed as, wear). Pirates fight everyone: a navy's people, a
+  // civilian ship's own armed hands, and the unarmed (her passengers and crew, unless tied: hostages are worth more alive). A navy's
+  // people and a civilian ship's fight pirates and nobody else of a ship's: never each other, never the unarmed. Everyone armed still
+  // fights the squad. Who's on no side (a building's suspects) is as ever.
+  facOf(e: Enemy): 'civ' | 'pirate' | 'navy' | 'civil' | null { return e.def.civ ? 'civ' : e.wear === 'pirate' ? 'pirate' : e.wear === 'navy' ? 'navy' : e.wear === 'civil' ? 'civil' : null; },
+  proxies: null as Map<string, any> | null, NOBODY: [] as LivePlayer[],
+  // The unarmed run from pirates (when they're aboard together: called with npcFoes). Three times a second: anyone unarmed, on their
+  // feet and not tied, with a pirate in sight within 12 m on their deck, runs: away from the pirates (pirFlow: the way to the
+  // nearest of them, gone the other way: flee), for a few seconds, then hides or cowers where they've got to as anyone running
+  // does; and again when one comes in sight again. Running, they've left wherever they were sheltering.
+  pirFlow: null as Int16Array | null, civT: 0,
+  civFlee(dt: number) {
+    this.civT -= dt; if (this.civT > 0) return; this.civT = 0.33;
+    const map = this.map!, L = Level, pir = [...this.enemies.values()].filter((e) => this.facOf(e) === 'pirate' && this.able(e));
+    this.pirFlow = pir.length ? L.flow(map, pir.map((e) => L.src(map, e.x, e.y || 0, e.z))) : null;
+    for (const e of this.enemies.values()) {
+      if (!e.def.civ || e.down || e.hp <= 0 || !(e.state === 'normal' || e.state === 'cower' || e.state === 'hide')) continue;
+      const near = pir.find((o) => Math.abs((o.y || 0) - (e.y || 0)) < 3 && Math.hypot(o.x - e.x, o.z - e.z) < 12 && L.see(map, e.x, (e.y || 0) + 1.5, e.z, o.x, (o.y || 0) + 1.4, o.z) > 0);
+      if (!near) { if (e.fromPir && !pir.some((o) => Math.hypot(o.x - e.x, o.z - e.z) < 25)) e.fromPir = false; continue; }
+      e.fromPir = true; e.shelter = null; e.hide = null; e.crouch = false; e.threat = { x: near.x, z: near.z }; e.state = 'flee'; e.fleeT = 4 + Math.random() * 3;
+    }
+  },
+  // Everyone aboard who could be a target for another side, each as an officer is to the one looking (where they are, how they
+  // stand: what think and fire read of a player's state), under an id of their own; null unless pirates and someone they'd fight
+  // are aboard together (so nothing changes anywhere else). Made afresh every tick.
+  npcFoes() {
+    let pir = false, oth = false;
+    for (const e of this.enemies.values()) { const f = this.facOf(e); if (f === 'pirate') pir = true; else if (f) oth = true; }
+    if (!pir || !oth) { this.proxies = null; return null; }
+    const m = new Map<string, any>();
+    for (const e of this.enemies.values()) {
+      if (!this.facOf(e) || e.down || e.hp <= 0 || e.state === 'cuffed' || e.state === 'surrender' || e.state === 'dead') continue;
+      const id = 'npc:' + e.id;
+      m.set(id, { id, name: '', npc: e, st: { p: [e.x, e.y || 0, e.z], yw: e.yaw, pt: 0, cr: e.crouch ? 1 : 0, pr: 0, ln: 0, sd: 0, se: 0, lr: 0, dd: 0, dn: 0, mv: 0, tl: 0, w: e.def.wpn || '', hp: e.hp, mhp: e.maxHp } });
+    }
+    return (this.proxies = m);
+  },
+  // who e has to pick a target from: the squad, and (armed, and of a side) those of the other side's within 45 m on its deck or the next
+  foesOf(e: Enemy, onFoot: LivePlayer[], prox: Map<string, any>): LivePlayer[] {
+    const f = this.facOf(e); if (!f || f === 'civ' || !e.armed) return e.ally ? this.NOBODY : onFoot;
+    const out = e.ally ? [] : onFoot.slice(); // (ally: armed and on the squad's side, a liner's security when she's being held: the squad's no target of theirs)
+    for (const q of prox.values()) { const o = q.npc as Enemy, g = this.facOf(o); if (o === e || !(f === 'pirate' ? g !== 'pirate' : g === 'pirate')) continue; if (Math.hypot(o.x - e.x, o.z - e.z) < 45 && Math.abs((o.y || 0) - (e.y || 0)) < 6) out.push(q); }
+    return out;
   },
   BODY_R: 0.24,
 };

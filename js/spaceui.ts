@@ -240,19 +240,33 @@ export const SpaceUI = (() => {
   // ------------------------------------------------------------------ the mission's objective
   function objDraw() { make(); objTick(true); }
   let armAt = 0, armLeft = 0, objKey = '';
+  let defLeft = -1, defAt = 0, leadLeft = -1, leadAt = 0;
   function objTick(force?: boolean) {
     const s = S(), ms = s.ms, st = s.state;
     if (!ms || !st || !s.on || s.kind === 'hub') { if (obj.style.display !== 'none') obj.style.display = 'none'; objKey = ''; return; }
     if (st.arm != null && st.arm !== armLeft) { armLeft = st.arm; armAt = performance.now(); }
     const left = st.arm != null ? Math.max(0, st.arm - (performance.now() - armAt) / 1000) : null;
     const O = SD.OBJ[ms.obj], lines: string[] = [], meta = s.map && s.map.sp;
-    if (ms.size && ms.kind === 'board') lines.push(`<small>${SD.SIZES[ms.size].name}: ${meta && meta.decks > 1 ? 'two decks, ' : ''}${(() => { const g = SD.SIZES[ms.size!].guns, a = [g.pd ? g.pd + ' point defence' : '', g.cannon ? g.cannon + ' cannon' : '', g.missile ? g.missile + ' missile launcher' + (g.missile > 1 ? 's' : '') : ''].filter(Boolean); return a.length ? a.join(', ') : 'unarmed'; })()}</small>`);
-    const needKey = (k: string) => !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k);
+    if (ms.size && ms.kind === 'board') lines.push(`<small>${SD.className(ms.size, !!meta && meta.hall === 'mall')}: ${meta && meta.decks > 1 ? 'two decks, ' : ''}${meta && meta.hall ? SD.HALL_LINE[meta.hall].brief + ', ' : ''}${(() => { const g = SD.gunsOf(ms.size!, !!meta && meta.hall === 'mall'), a = [g.pd ? g.pd + ' point defence' : '', g.cannon ? g.cannon + ' cannon' : '', g.missile ? g.missile + ' missile launcher' + (g.missile > 1 ? 's' : '') : ''].filter(Boolean); return a.length ? a.join(', ') : 'unarmed'; })()}</small>`);
+    const needKey = (k: string) => ms.obj !== 'defend' && !!meta && Object.values(meta.locks).includes(k) && !st.keys.includes(k); // (holding a liner: nobody aboard carries a card, and nothing behind her locks is wanted)
     if (ms.kind === 'board' && !st.docked && !st.done && !st.boom) lines.push('Ram her hull nose-on to board, anywhere along it: what is inside there is destroyed.');
     if (ms.obj === 'artifact') lines.push(st.art === 1 ? `<span class="ok">${st.artBy === Net.myId ? 'You have' : U.esc(Game.nameOf(st.artBy || '')) + ' has'} the artifact.</span> Get it to the ship and jump home.` : st.art === 2 ? '<span class="bad">The artifact is lost.</span>' : 'Find the artifact' + (meta && meta.roles.includes('vault') ? ' (the vault)' : '') + ' and take it.');
     if (ms.obj === 'hvt') lines.push(st.hvt === 1 ? '<span class="ok">Target dead.</span> Back to the ship and jump home.' : st.hvt === 2 ? '<span class="ok">Target in restraints.</span> Back to the ship and jump home.' : 'Find the target (the bridge): kill or restrain.');
     if (ms.obj === 'destruct') lines.push(st.boom ? '<span class="ok">She\'s gone.</span> Jump home.' : left != null ? `<span class="tm">${Math.floor(left / 60)}:${String(Math.floor(left % 60)).padStart(2, '0')}</span><br>Get off her: your ship, or an escape pod. Then undock.` : 'Reach the bridge and start the self-destruct.');
     if (ms.obj === 'hostage') lines.push(st.cleared ? '<span class="ok">She is clear of pirates.</span> Back to the ship and jump home.' : !s.docked ? 'Pirates hold her. Their pods are in her hull: board anywhere else.' : `Clear the pirates: ${st.left || 0} left.` + (meta && st.hold >= 0 && meta.roles[st.hold] ? ` <small>Her people are tied in the ${ShipGen.NAMES[meta.roles[st.hold]!].toLowerCase()}.</small>` : ''));
+    // (holding a liner: the time left counted down here between the host's tellings, as the self-destruct's is)
+    if (ms.obj === 'defend') {
+      const d = st.def;
+      if (d && d.t !== defLeft) { defLeft = d.t; defAt = performance.now(); }
+      if (d && d.on && d.lead !== leadLeft) { leadLeft = d.lead; leadAt = performance.now(); }
+      const ll = d && d.on && d.lead > 0 ? Math.max(0, d.lead - (performance.now() - leadAt) / 1000) : 0; // (the lead: the time to get to her court in, before the first pod)
+      const tl = d && d.on ? Math.max(0, d.t - (performance.now() - defAt) / 1000) : null, who = d ? `${d.civ} passenger${d.civ === 1 ? '' : 's'} unhurt` : '';
+      lines.push(st.cleared ? `<span class="ok">She is held.</span> ${who}. Back to the ship and jump home.` : d && d.lost ? '<span class="bad">Her passengers are all shot down.</span> Back to the ship.'
+        : !d || !d.on ? 'Board her, anywhere along her hull. Her passengers are in the shelter at the back of her upper deck, behind the mezzanine: the pirates\' pods come once you are aboard.'
+        : ll > 0 ? `<span class="tm">0:${String(Math.ceil(ll)).padStart(2, '0')}</span><br>Pirates inbound. Get to her court: her security is waiting there. <small>${who}.</small>`
+        : tl! > 0 ? `<span class="tm">${Math.floor(tl! / 60)}:${String(Math.floor(tl! % 60)).padStart(2, '0')}</span><br>Hold the shelter (upper deck, behind the mezzanine). Pods through her hull: ${d.pods} of ${SD.DEFEND.pods}. Pirates aboard: ${st.left || 0}. <small>${who}.</small>`
+        : `No more pods. Clear the pirates still aboard: ${st.left || 0} left. <small>${who}.</small>`);
+    }
     if (ms.obj === 'visit') lines.push('Not the mission: board her for what is in her holds, or fly on.' + (st.hostile ? ' <span class="bad">She is fighting you.</span>' : ' <small>A breach is an attack: she will fight.</small>'));
     if (ms.obj === 'assault') lines.push(st.cleared ? '<span class="ok">Base under control.</span> Back to the ship, up through the cloud and jump home.' : s.docked ? `Bring the base under control: ${Game.enemiesLeft || 0} hostile${Game.enemiesLeft === 1 ? '' : 's'} left.` : 'Take her down the descent corridor and set down on the pad.');
     if (needKey('bridge') && (ms.obj !== 'artifact' || (meta && meta.roles.includes('vault')))) lines.push('The bridge' + (meta && meta.roles.includes('vault') ? ' and the vault are' : ' is') + ' locked: an officer carries the card.');
@@ -307,7 +321,7 @@ export const SpaceUI = (() => {
         return `<div class="card${on ? ' on' : ''}${done ? ' done' : ''}"><div class="row"><h3>${esc(m.name)}</h3><span class="pay">¢${U.fmt(m.pay)}</span></div>
           <div><span class="tag${m.kind === 'assault' ? ' r' : ''}">${m.kind === 'assault' ? 'PLANET ASSAULT' : 'BOARDING'}</span><span class="tag">${esc(SD.OBJ[m.obj].name.toUpperCase())}</span><span class="tag">THREAT ${m.diff}</span>${m.night ? '<span class="tag">NIGHT</span>' : ''}</div>
           <small>${esc(m.where)} · anchor ${SD.dist(d)} out · jump ${m.ly.toFixed(1)} ly</small><p>${esc(m.brief)}${SD.drillLine(m) ? ' ' + esc(SD.drillLine(m)) : ''}</p>
-          <div class="row"><small>${m.size === 'capital' ? 'Two decks, security squads, cannon and missiles on her hull: the hardest there is.' : m.size === 'large' ? 'Barracks, sick bay, magazines, a vault, a big bridge: a long fight.' : m.size === 'medium' ? 'An armoury and a locked bridge: find the keycards.' : m.size === 'small' ? 'A few compartments off one corridor, one gun on her hull.' : m.size === 'transport' ? 'Civilian: a few guards, no guns on her hull.' : 'Set down on the pad outside.'}</small>
+          <div class="row"><small>${m.size === 'capital' ? 'Two decks, security squads, cannon and missiles on her hull: the hardest there is.' : m.size === 'large' ? (m.kind === 'board' && SD.hallOf(m.seed, m.size) === 'mall' ? SD.HALL_LINE.mall.offer : 'Barracks, sick bay, magazines, a vault, a big bridge: a long fight.' + (m.kind === 'board' && SD.hallOf(m.seed, m.size) ? ' ' + SD.HALL_LINE[SD.hallOf(m.seed, m.size)!].offer : '')) : m.size === 'medium' ? 'An armoury and a locked bridge: find the keycards.' : m.size === 'small' ? 'A few compartments off one corridor, one gun on her hull.' : m.size === 'transport' ? 'Civilian: a few guards, no guns on her hull.' : 'Set down on the pad outside.'}</small>
           <button class="b" data-pick="${i}"${done || (!on && full) || !s.docked ? ' disabled' : ''}>${done ? 'DONE' : on ? 'DROP' : 'TAKE'}</button></div></div>`;
       }).join('') + `</div><div class="foot"><span>Take up to ${SD.PICKS}. Each has an anchor out past the rock: fly to it, hold J at the helm to jump. Pay comes when the mission is done and you have jumped home.</span><span>${s.board.picked.length} / ${SD.PICKS}</span></div>`;
     } else {

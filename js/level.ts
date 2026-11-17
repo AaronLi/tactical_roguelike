@@ -64,11 +64,14 @@ export const Level = {
   genSp: null as SpGen | null,
   generateDay(seed: number, level: number, th?: number) {
     const U = G_U, r = U.rng(seed);
-    const theme = (th != null && SpaceData.themeAt(th)) || THEMES[(level - 1) % THEMES.length]; // (th from 1000: a ship, js/spacedata.ts)
+    let theme = (th != null && SpaceData.themeAt(th)) || THEMES[(level - 1) % THEMES.length]; // (th from 1000: a ship, js/spacedata.ts)
     // the layout: an apartment block, a warehouse, two houses back to back with their gardens between, or a
     // building of rooms and corridors. Every one starts outside it (or, for the apartments, on the stairs).
     if (theme.layout === 'ship') { // a ship to board (js/shipgen.ts): one deck, open space round it
-      const sl = ShipGen.lay(r, level, this.genSp) as LvLay & Partial<LvBuilding>;
+      // (a cruiser's hall two decks high: asked for, or else whichever her seed gives her, if any: js/spacedata.ts hallOf)
+      const gs = this.genSp, hall = gs && gs.hall !== undefined ? gs.hall : SpaceData.hallOf(seed, gs && gs.size);
+      if (hall === 'mall') theme = SpaceData.themeAt(SpaceData.LINER)!; // (a promenade court: she's a cruise liner, whatever she was offered as)
+      const sl = ShipGen.lay(r, level, gs ? Object.assign({}, gs, { hall }) : gs) as LvLay & Partial<LvBuilding>;
       // (a capital ship: her decks planned one by one and stacked, as a building's storeys are)
       if (sl.floors) return ShipGen.finish(this.stack(sl.floors.map((fl: LvLay) => this.plan(fl, r, seed, level, theme)), sl), sl);
       const sm = ShipGen.finish(this.plan(sl, r, seed, level, theme), sl);
@@ -582,7 +585,20 @@ export const Level = {
     map.lights = [];
     for (const rm of rooms) {
       if (rm.out || rm.type === 'catwalk') continue; // (a catwalk: lit by its hall's lamps, high over it)
+      if (rm.type === 'mezz') { // (a liner's mezzanine: a lamp every six metres over its floor, none over the drop)
+        for (let z = rm.z + 5; z < rm.z + rm.h - 2; z += 9) for (let x = rm.x + 4; x < rm.x + rm.w - 1; x += 9) if (map.t[z * W + x] !== 5) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
+        continue;
+      }
       if (rm.tall) { // a hall the building's full height: high-bay lamps under its roof, a grid of them (lighting the catwalks too: stack)
+        if (map.theme.layout === 'ship') { // (a cruiser's hall, two decks high, js/shipgen.ts HALLS: hers every eight metres, and bright enough at that height to light its floor as her other compartments' lamps do theirs)
+          // (a liner's court: ring pendants, fewer and lower, a warm light and not much of it)
+          // (none where a pier stands)
+          // (her pendants hang over the open part only; under her mezzanine, lamps in its underside as any compartment's)
+          const mall = rm.type === 'mall', gap = mall ? 10 : 8, rw = mall && (rm as any).mz ? (rm as any).mz * this.K - rm.x : rm.w, nx = Math.max(1, Math.round(rw * TS / gap)), nz = Math.max(1, Math.round(rm.h * TS / gap));
+          if (rw < rm.w) for (let z = rm.z + 5; z < rm.z + rm.h - 2; z += 10) for (let x = rm.x + rw + 4; x < rm.x + rm.w - 1; x += 9) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
+          for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (map.t[Math.floor(rm.z + (j + 0.5) * rm.h / nz) * W + Math.floor(rm.x + (i + 0.5) * rw / nx)] !== 1) map.lights.push(Object.assign({ kind: 'highbay', x: (rm.x + (i + 0.5) * rw / nx) * TS, z: (rm.z + (j + 0.5) * rm.h / nz) * TS, y: this.FLOOR_H + this.WALL_H - (mall ? 1.7 : 0.6), color: map.theme.light, i: mall ? 0.95 : 1.5, d: mall ? 20 : 24, up: 1 }, mall ? { chand: 1 } : {}) as LvLight);
+          continue;
+        }
         for (let z = rm.z + 5; z < rm.z + rm.h - 2; z += 12) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 15) map.lights.push({ kind: 'highbay', x: (x + 0.5) * TS, z: (z + 0.5) * TS, y: this.FLOOR_H + this.WALL_H - 0.6, color: 0xffe2b8, i: 0.5, d: 17, up: 1 });
         continue;
       }
@@ -591,6 +607,7 @@ export const Level = {
         for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) map.lights.push({ kind: 'panel', x: x0 + (i + 0.5) * rm.w * TS / nx, z: z0 + (j + 0.5) * rm.h * TS / nz });
         continue;
       }
+      if (rm.ship === 'passage') { for (let z = rm.z + 3; z < rm.z + rm.h; z += 9) map.lights.push({ x: (rm.cx + 0.5) * TS, z: (z + 0.5) * TS }); continue; } // (a liner's cross passage: down its length, which is across her)
       if (rm.type === 'corridor' || rm.type === 'spine') { for (let x = rm.x + 2; x < rm.x + rm.w; x += 7) map.lights.push({ x: (x + 0.5) * TS, z: (rm.cz + 0.5) * TS }); continue; } // down a hallway
       if (rm.type === 'hangar') { // a lamp every 8 m by 6 m down the hall
         for (let z = rm.z + 3; z < rm.z + rm.h; z += 9) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 12) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });

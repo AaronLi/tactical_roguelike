@@ -224,8 +224,11 @@ export const SpaceData = (() => {
     { name: 'Freighter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.3, floor: '#4a4e52', wall: '#868b8c', crate: '#b0702c', accent: '#e8922a', fog: 0x020306, light: 0xffe2c0, ceil: '#5a5f66', hemi: 0x8fa6c8, hemiI: 0.35, far: 30000 },
     { name: 'Corporate cutter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.14, foes: 1.1, crowd: 0.8, home: 0, reflect: 0.4, floor: '#a9afb4', wall: '#dde2e4', crate: '#4f7896', accent: '#2fc6d6', fog: 0x020306, light: 0xeef4ff, ceil: '#cfd5d8', hemi: 0x9fb4d8, hemiI: 0.4, far: 30000 },
     { name: 'Navy warship', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.07, foes: 1.35, crowd: 0.4, home: 0, reflect: 0.3, floor: '#3a4149', wall: '#65717b', crate: '#566650', accent: '#d23a30', fog: 0x020306, light: 0xdfe8ff, ceil: '#4a525b', hemi: 0x8fa6c8, hemiI: 0.3, far: 30000 },
+    // (a cruise liner: a cruiser with a promenade court, js/shipgen.ts HALLS mall. Never drawn by lot: LOT below. liner: her surfaces are
+    // walnut slats and stone, charcoal carpet and dark ceilings with slots of light, js/levelview.ts _shipTex; warm and low lit)
+    { name: 'Luxury cruiser', layout: 'ship', space: 1, liner: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.25, floor: '#2a2c30', wall: '#9a948a', crate: '#3a3d42', accent: '#b8935a', fog: 0x020306, light: 0xffdfb8, ceil: '#232427', hemi: 0xa8a098, hemiI: 0.16, far: 30000 },
   ];
-  const TH0 = 1000;
+  const TH0 = 1000, LOT = 3, LINER = TH0 + 3; // (LOT: the ships' themes a board's offers are drawn from, the first of them; LINER: a cruise liner's)
   const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G_THEMES[th] || null);
   const themeIndex = (T: ThemeDef | null | undefined) => { if (!T) return -1; const i = G_THEMES.findIndex((q) => q.name === T.name); return i >= 0 ? i : THEMES.findIndex((q) => q.name === T.name) >= 0 ? TH0 + THEMES.findIndex((q) => q.name === T.name) : -1; };
 
@@ -266,7 +269,7 @@ export const SpaceData = (() => {
     return { p: [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u], d };
   }
   /** What a ship's people wear, by her class (js/rig.ts create): a liner's are civilians, the big warships a navy's, the rest pirates'. */
-  const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
+  const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : obj === 'defend' ? 'civil' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
   /** What her armed people are called aboard a ship, by whose she is (wearOf) and where they stand in her (js/server.ts titleOf): the
    *  officer the mission's after (hvt), her highest-ranked fighter (top, when that officer isn't aboard), a Leader (leader), anyone else
    *  leading a fireteam (tl), and the rest by what they are, the strongest of them (vet: the prefix) a step up. */
@@ -291,6 +294,7 @@ export const SpaceData = (() => {
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },
     destruct: { name: 'Scuttle her', pay: 700, line: 'Reach the bridge, start the self-destruct, and be off the ship (yours, or one of her escape pods) before it runs out.' },
     hostage: { name: 'Retake the ship', pay: 600, line: 'Pirates have boarded her (their pods are still in her hull) and hold her people tied in one compartment. Clear every pirate off her: dead, down or in restraints. Each hostage alive at the end pays.' },
+    defend: { name: 'Hold the cruiser', pay: 900, line: 'Pirates are closing on a luxury cruiser. Her passengers are shut in the shelter at the back of her upper deck, behind the mezzanine. They have been aboard once already: most of her security died throwing them off. She is expecting you: board her anywhere but her court (it is armoured), and nobody will take it for an attack. What is left of her security will be waiting in the court to fight beside you. For three minutes pirate pods will come through her hull, one after another. Every passenger unhurt at the end pays.' },
     visit: { name: 'Unlisted ship', pay: 0, line: 'Not the mission: a ship that happened to be passing. What is in her hold is worth carrying off. A breach is an attack: she will fight.' },
     assault: { name: 'Planetary assault', pay: 300, line: 'Land at the pad outside the base and bring it under control: every hostile down or in restraints.' },
   };
@@ -309,7 +313,7 @@ export const SpaceData = (() => {
       const assault = i === 2 || (i === 5 && r() < 0.5), taken = i === 4, size = assault ? null : taken ? 'transport' : i === 0 ? sizes[0] : U.pick(r, sizes);
       // (scuttling's a job against a navy or a pirate: never a civilian transport)
       const obj: SpObj = assault ? 'assault' : taken ? 'hostage' : i === 0 ? 'artifact' : U.pick(r, (size === 'transport' ? ['artifact', 'hvt'] : ['artifact', 'hvt', 'destruct']) as SpObj[]);
-      const rth = TH0 + U.ri(r, 0, THEMES.length - 1), th = assault ? U.pick(r, planets) : size === 'transport' ? TH0 + U.ri(r, 0, 1) : size === 'capital' ? TH0 + 2 : rth, T = themeAt(th)!;
+      const rth = TH0 + U.ri(r, 0, LOT - 1), th = assault ? U.pick(r, planets) : size === 'transport' ? TH0 + U.ri(r, 0, 1) : size === 'capital' ? TH0 + 2 : rth, T = themeAt(th)!;
       void (!assault && size !== 'capital' && r() < 0.4 ? level >= 4 && r() < 0.35 : 0); const other: SpSize | null = null; // (no second ship lying off her any more: its draws kept, so every board's the same otherwise)
       const wing = (size === 'small' || size === 'medium') && r() < 0.3; // (some corvettes and frigates are flying wings: two arms swept back from a glazed corner)
       const diff = Math.max(1, level + (size ? SIZES[size].diff : 1) + (r() < 0.3 ? 1 : 0) - (i === 0 ? 1 : 0));
@@ -317,19 +321,33 @@ export const SpaceData = (() => {
       // its anchor: a direction off the golden angle, a little above or below the plane, 7 to 13 km out
       const a = i * 2.39996 + r() * 0.5, el = (r() - 0.5) * 0.7, d = 7000 + r() * 6000;
       const name = assault ? U.pick(r, WORLDS) : (T.name === 'Navy warship' ? 'NSV ' : T.name === 'Freighter' ? 'MV ' : 'CSV ') + U.pick(r, SHIP_NAMES);
+      // (a cruiser with a promenade court is a cruise liner, a civilian ship in her own livery, LINER: below, once her seed's drawn)
       out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, wing, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name + (wing ? ' (a flying wing)' : ''), brief: OBJ[obj].line, other, night: assault && !T.night && r() < 0.25,
         ly: Math.round((3 + r() * 40) * 10) / 10, anchor: [Math.cos(a) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(a) * Math.cos(el) * d] });
+      { const o = out[out.length - 1]; if (o.kind === 'board' && hallOf(o.seed, o.size) === 'mall') { // (and what's wanted of the squad aboard her goes by her seed, a third each: she's to be held; she's been taken; or the job she'd have been anyway, against her own security and her alarms, never a scuttling)
+        o.th = LINER; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Luxury cruiser'; { const way = (o.seed >>> 4) % 3; o.obj = way === 0 ? 'defend' : way === 1 ? 'hostage' : o.obj === 'destruct' ? 'hvt' : o.obj; } o.brief = OBJ[o.obj].line; o.pay = Math.round((SIZES.large.pay + OBJ[o.obj].pay + 160 * o.diff) / 50) * 50; } }
     }
     return out;
   }
   // How a ship answers being boarded, by her size (js/spaceserver.ts doctrine): a transport or a corvette's is informal (her people
   // shelter, under guard), a frigate's and up practiced (her teams sweep for the squad); and as the mission board says it
+  // Which hall two decks high a cruiser has, if any (js/shipgen.ts HALLS): from her seed alone, so every machine lays her out the
+  // same without being told. Eight cruisers in ten have one: a hangar bay, an arboretum, machinery halls or (a cruise liner) a promenade court, as likely as each other.
+  const HALL_KINDS: ShHallKind[] = ['bay', 'grove', 'works', 'mall'];
+  // (what the terminal says of a cruiser that has one, and the objective's panel aboard her)
+  const HALL_LINE: Record<ShHallKind, { brief: string; offer: string }> = {
+    bay: { brief: 'a hangar bay', offer: 'Two decks, with a hangar bay right across her, open through both: a gallery round it looks down on its floor.' },
+    grove: { brief: 'an arboretum', offer: 'Two decks, with an arboretum down her port side, open through both: a gallery round it looks down on its floor.' },
+    mall: { brief: 'a promenade court', offer: 'A luxury cruiser, unarmed. Two decks, with a promenade court right across her forward, open through both: shops, a fountain, a gallery round it looking down on its floor.' },
+    works: { brief: 'machinery halls', offer: 'Two decks, with machinery halls fore and aft, open through both: a gallery round each looks down on its floor.' },
+  };
+  const hallOf = (seed: number, size: SpSize | null | undefined): ShHallKind | null => { if (size !== 'large') return null; const q = (Math.imul(seed ^ 0x5ca1ab1e, 0x9e3779b1) >>> 0) % 10; return q < 8 ? HALL_KINDS[q >> 1] : null; };
   const drill = (size: SpSize | null | undefined, wing = false): 'informal' | 'practiced' => (!wing && (!size || size === 'transport' || size === 'small') ? 'informal' : 'practiced'); // (a flying wing: a warship's crew, even a corvette's, with her own security office: js/shipgen.ts wingDeck)
   const DRILL_LINE = {
     informal: 'Her breach response is informal: her people shelter in her safest compartment, under guard, and nobody comes looking for you.',
     practiced: 'Her breach response is practiced: her teams sweep the ship for you, on her security cameras while someone is at them.',
   };
-  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' ? DRILL_LINE[drill(m.size, !!m.wing)] : ''); // (a pirate-held ship answers nobody)
+  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' && m.obj !== 'defend' ? DRILL_LINE[drill(m.size, !!m.wing)] : ''); // (a pirate-held ship answers nobody)
   // A distance, written: metres under a kilometre, then kilometres, megametres, light-seconds; a jump's in light-years.
   function dist(m: number): string {
     m = Math.abs(m);
@@ -341,5 +359,12 @@ export const SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, hatchButton, HATCH_Z, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
+  // Holding a liner (obj defend, js/spaceserver.ts defendTick): how long the squad has to get to her court, how long she's then to be held, how many pods in that time, the first of them after how long
+  const DEFEND = { lead: 20, secs: 180, pods: 5, first: 2 }; // (lead: from the squad coming aboard to the first pod, to get to her court in; then secs, the first pod first seconds into it)
+  // A luxury cruiser (a cruiser with a promenade court): what she's called, and no guns on her hull. guns, className: any ship's, by her
+  // class and whether she's one. STAFF: the family names of her security, for those who fight beside the squad (js/spaceserver.ts).
+  const NOGUNS = { pd: 0, cannon: 0, missile: 0 };
+  const gunsOf = (size: SpSize, liner?: boolean) => (liner ? NOGUNS : SIZES[size].guns), className = (size: SpSize, liner?: boolean) => (liner ? 'luxury cruiser' : SIZES[size].name);
+  const STAFF = ['Okafor', 'Reyes', 'Lindqvist', 'Tanaka', 'Moreau', 'Abara', 'Castellanos', 'Novak', 'Haddad', 'Ferreira', 'Kowalczyk', 'Iyer', 'Marchetti', 'Osei', 'Brandt', 'Yilmaz'];
+  return { gunsOf, className, STAFF, DEFEND, LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, hatchButton, HATCH_Z, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();
