@@ -1041,6 +1041,10 @@ export const InvUI = (() => {
       if (f) { if (f.slot && WSLOT[f.slot] && Object.keys(me.weapons).length <= 1) return; detach(me, f); }
     },
     cancelDrag,
+    // The Tab screen drawn once, out of sight, as a level starts (behind its veil: js/views.ts applySnap), so its pictures are made
+    // there and not on the first Tab: each item's icon drawn and encoded (Icons.of, cached), and the guns' pictures, whose renderer
+    // (a WebGL context of its own: its environment map and every gun material's shaders built again for it) is made the first time.
+    warm() { if (root) return; try { this.show(document.createElement('div'), { field: true }); } catch (e) { console.warn('inventory warm', e); } this.hide(); },
     hide() { cancelJobs(); if (root) cabSync(); cab = null; patient = null; closeMenu(); cancelDrag(); if (root) root.classList.remove('inv-host'); root = null; field = false; },
     // the health panel only (kept fresh while the field screen is open, without disturbing a drag)
     update,

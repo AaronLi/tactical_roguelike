@@ -26,6 +26,7 @@ import { R } from './render.js';
 import { Net } from './net.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
+import { InvUI } from './invui.js';
 const WP = new THREE.Vector3(), WD = new THREE.Vector3(); // (a wound's place and direction: woundStreams)
 interface VwEvidence { mesh: THREE.Object3D; wpn: string; x: number; y: number; z: number; secured?: boolean; [k: string]: any }
 interface VwNade extends VwNadeMotion { fuse: number; own: boolean; enemy: boolean; mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshLambertMaterial>; kind: VwNadeKind; nid?: number; from?: string; flyT?: number; stuck?: { rig?: Rig; bone?: THREE.Object3D | null; l?: THREE.Vector3; me?: THREE.Vector3 } | null } // (nid, from: a sticky's, so where it held can be told: 'stk')
@@ -171,7 +172,7 @@ export const Views = {
   slowFill: false, // (a level come up with from outside, with no veil: its people are made a few a snapshot, not all in one frame. js/game.ts enterLevel)
   applySnap(m: any) {
     const fillT = performance.now();
-    if (!this.warmed) { this.warmed = true; Game.veilSay('Compiling shaders'); setTimeout(() => R.warmup(() => { Game.veilN = Game.VEIL_SMOOTH; Game.veilWait = 0; }), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
+    if (!this.warmed) { this.warmed = true; Game.veilSay('Compiling shaders'); setTimeout(() => InvUI.warm(), 30); setTimeout(() => R.warmup(() => { Game.veilN = Game.VEIL_SMOOTH; Game.veilWait = 0; }), 60); } // (compile everything once the level's full, then a few frames drawn and the veil lifts: js/game.ts veil. The wait: time to draw that line first)
     const seen = new Set<number>();
     for (const [id, type, x, z, yaw, hp, aim, alert, crouch, lean, armed, scode, surp, door, kit, fl, str, y = 0, wd, fc = 0, rd = 0] of m.e) {
       seen.add(id);

@@ -1897,6 +1897,9 @@ export const R = {
     compile(this.vmScene, this.camera, nvT, 0, H.near, false, heatOnly);
     compile(this.vmScene, this.camera, nvT, 0, H.far, false, heatOnly);
     compile(nvq, this.fishCam!, nvT); compile(nvq, this.fishCam!, null);
+    // (the menus' blur, behind the Tab screen and the shop: _blurPasses, its pass into a target and its pass onto the screen. The
+    // level under it is drawn into a target as the scope's picture is, built above)
+    { if (!this._blur) this._blurTargets(16, 16); const B = this._blur!; compile(B.scene, B.cam, B.a); compile(B.scene, B.cam, null); }
     if (Highlights.warm) Highlights.warm((scene, cam, target, layer, over) => compile(scene, cam, target, layer, over, true));
     ReplayEnv.Game!.veilSay('Compiling shaders');
   },
