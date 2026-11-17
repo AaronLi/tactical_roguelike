@@ -398,11 +398,15 @@ export const GunAudio = {
   // it's the shooter's body and the gun in the way. About +3 dB straight ahead, -4 dB straight behind, and the highs
   // going first round the back (the crack's ahead of the blast). heard: where the sound leaves for you (the shooter, or
   // the opening it reaches you by: what matters is which way that is from the muzzle).
-  directivity(pos: EchoPt, aim: EchoPt, toward: EchoPt) {
+  // Through a suppressor it's less of a beam (the can takes more off to the side than behind the gun: SUP_DIR, as
+  // the synth's own listener, js/gunshot-synth.ts): the same pattern about its level to the side, narrower.
+  SUP_DIR: 0.65,
+  directivity(pos: EchoPt, aim: EchoPt, toward: EchoPt, sup = false) {
     const ax = aim.x - pos.x, ay = aim.y - pos.y, az = aim.z - pos.z, al = Math.hypot(ax, ay, az) || 1;
     const lx = toward.x - pos.x, ly = toward.y - pos.y, lz = toward.z - pos.z, ll = Math.hypot(lx, ly, lz) || 1;
     const c = (ax * lx + ay * ly + az * lz) / (al * ll), f = (1 + c) / 2; // (1 ahead, 0.5 side, 0 behind)
-    return { k: Math.pow(10, (-4 + 7 * f) / 20), lp: 6000 + 14000 * f };
+    const w = (f - 0.5) * (sup ? this.SUP_DIR : 1); // (-0.5 behind .. 0.5 ahead)
+    return { k: Math.pow(10, (-0.5 + 7 * w) / 20), lp: 13000 + 14000 * w };
   },
   // a suppressed gun's first shot after a pause (by shooter: two of them with the same gun are two cans)
   firstRound(id: string, who: string, now: number) {
@@ -450,7 +454,7 @@ export const GunAudio = {
       if (Acoustics) {
         heard = Acoustics.hear(map, pos, cam);
         gain *= heard.k; panPos = heard.at; occluded = !heard.same || heard.k < 1;
-        if (aim) { const dv = this.directivity(pos, aim, heard.at); gain *= dv.k; heard.lp = Math.min(heard.lp, dv.lp); }
+        if (aim) { const dv = this.directivity(pos, aim, heard.at, this.spec(id).muzzleDevice === 'suppressor'); gain *= dv.k; heard.lp = Math.min(heard.lp, dv.lp); }
       } else {
         occluded = !Level.los(map, cam.x, cam.y, cam.z, pos.x, pos.y, pos.z);
         if (occluded) portal = taps.reduce<EchoTap | null>((b, t) => (!b || t.amp > b.amp ? t : b), null);

@@ -2147,9 +2147,17 @@ Acoustics* 2019):
   5.56, and a compact can loses more; a 9 mm through a pistol can gains some. Measured in game against
   the open gun: M4 with a full can −22 dB peak, with a compact −13, .308 −16, 9 mm SMG −19, MP5SD −24
   (against the MP5), pump shotgun with its can −11.
-- **The baffles break up the shock front**, so what's left rises more slowly, is darker (a bigger can is
-  darker still), and lasts longer: the can blows down for tens of ms. A ported integral barrel starts
+- **The baffles break up the shock front**, so what's left rises more slowly, is a little darker (a bigger
+  can is darker still), and lasts longer: the can blows down for tens of ms. A ported integral barrel starts
   bleeding gas sooner.
+- **The low end goes first.** Band by band, a can takes most out of the low and middle of the blast (250 Hz to
+  2 kHz to the side), where an open shot's thump sits (250-315 Hz). So the concussion is cut about 7 dB further
+  than the rest (`SUP_RUMBLE`), the body is high-passed (`SUP_HP`), and the blowdown is a hiss, not a low
+  rush. Measured on the M4's full can with the bolt taken out: the share of the report under 300 Hz went
+  from 16% to 6%, and over 2 kHz from 4% to 15%, at the same loudness (within 1 dB).
+- **It's less of a beam.** More is taken off to the side than behind the gun, so a suppressed report's
+  front-to-back spread is 65% of an open one's (`SUP_DIR`, in the synth's listener and in `GunAudio.directivity`:
+  +1.8 dB ahead and -2.8 dB behind, against +3 and -4). The evidence is thin (one study), hence a modest figure.
 - **The ballistic crack and the action aren't suppressed.** Supersonic rounds still crack downrange, and
   the bolt clatter comes forward (only subsonic ammunition removes the crack).
 - **Back pressure:** the can holds gas in the bore, so it spits out of the action as it opens. That's a
@@ -2166,6 +2174,11 @@ plateau. Measured against the open gun: an integral can about 19 dB down, a full
 a compact can about 10. (The drive used to drop by all of it and the output by a quarter more, on top of the
 blast's own cut: an integral can ended 35-40 dB down, a whisper even in your own hands.) The crack and the bolt stay at their own level, so
 next to the quieted blast they come forward.
+**Secondary blast:** a short barrel on a rifle round throws burning powder out of the muzzle, and it
+re-ignites in the air: a second, slower, lower wave 3-4 ms behind the first (measured on 10.3" and 14.5" 5.56
+barrels; it's most of what makes a short barrel worse than its peak says). It goes with the pressure left at
+the muzzle and with how slow the powder is: strong on a 10.3" 5.56, about half that at 14.5", next to nothing
+at 20", none on pistols and SMGs, and none through a can (no air in it to burn with, but for the first round's pop).
 The railgun and explosions still use the simple procedural sounds.
 
 On top of the baked room reverb, echoes are **ray-traced through the level** for every shot:

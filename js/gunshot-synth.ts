@@ -76,8 +76,17 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
     flash:      { label: 'Flash hider',        level: -1,  lp: 0.95, decay: 1.00, tang: 0.05, whoosh: 0.00 },
     comp:       { label: 'Compensator',        level: 2,   lp: 1.15, decay: 0.90, tang: 0.18, whoosh: 0.00 },
     brake:      { label: 'Muzzle brake',       level: 4,   lp: 1.28, decay: 0.82, tang: 0.38, whoosh: 0.00 },
-    suppressor: { label: 'Suppressor',         level: -20, lp: 0.34, decay: 1.85, tang: 0.00, whoosh: 0.85 },
+    suppressor: { label: 'Suppressor',         level: -20, lp: 0.55, decay: 1.85, tang: 0.00, whoosh: 0.85 },
   };
+  // The shape a can leaves the report, beyond its level (sup.db). Measured band by band, a can takes most out of the
+  // low and middle of the blast (250-2000 Hz to the side, NIOSH/Murphy et al. 2018), where an open shot's thump sits
+  // (250-315 Hz): what's left is less of a boom and more of a hiss, the gas still leaving the can. So the blast's low
+  // end is cut further than the rest (SUP_RUMBLE on the concussion, SUP_HP under the body), the body is only
+  // moderately darker (the device's lp), and the blowdown sits higher (precompute).
+  //  SUP_DIR: a suppressed report is less of a beam than an open one. The same study found more taken off to the side
+  //  than behind the gun, so the front-to-back spread is narrower (thin evidence: one study, and its instructor
+  //  position behind the shooter read the other way; hence a modest figure).
+  const SUP_RUMBLE = 0.45, SUP_HP = 220, SUP_DIR = 0.65;
 
   // Suppressors (the 'suppressor' device, by can). What a can does to the report, from the measurements:
   //  - It cuts the muzzle blast's peak by roughly 17-24 dB at the shooter's ear (3-32 dB across rifles,
@@ -243,7 +252,8 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
   //    giving the classic "crack ... boom" separation that widens with range.
   //  - Distance attenuates level (~1/r) and rolls off highs (air absorption),
   //    turning a near "crack" into a far "boom/pop".
-  function listener(p: ShotParams, b: Ballistics) {
+  function listener(p: ShotParams, b: Ballistics, sup?: Suppression) {
+    const dirK = sup ? SUP_DIR : 1;                   // (a can's report: less of a beam, SUP_DIR)
     const dist = clamp(p.lisDist ?? 3, 0.5, 400);
     const th = (clamp(p.lisBearing ?? 90, 0, 180)) * Math.PI / 180;
     const cosT = Math.cos(th);                       // +1 front .. -1 rear
@@ -256,8 +266,8 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
     // gentler power law (~−4 dB/doubling) so distance dulls the shot without
     // dropping it to the noise floor.
     const distGain = clamp(Math.pow(2 / Math.max(dist, 2), 0.6), 0.08, 1);
-    const dirDb = 8 * cosT;                           // +8 dB front .. -8 dB rear
-    const dirBright = 0.55 + 0.65 * ((cosT + 1) / 2); // 1.2 front .. 0.55 rear
+    const dirDb = 8 * cosT * dirK;                    // +8 dB front .. -8 dB rear
+    const dirBright = 0.875 + 0.325 * cosT * dirK;    // 1.2 front .. 0.55 rear
     const crackDir = smoothstep(-0.30, 0.35, cosT) * (b.mach > 1 ? 1 : 0);
 
     // Crack lead over the muzzle blast: bullet covers Lx at v while the report
@@ -274,7 +284,7 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
 
   function listenerInfo(p: ShotParams) {
     const b = ballistics(p);
-    const L = listener(p, b);
+    const L = listener(p, b, suppression(p, b));
     return {
       blastDb: Math.round(20 * Math.log10(L.distGain) + L.dirDb),
       crackHeard: L.crackDir > 0.02,
@@ -567,7 +577,7 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
     const bSrc = ctx.createBufferSource(); bSrc.buffer = noiseBuffer(ctx, 0.4);
     const bLp = ctx.createBiquadFilter();
     bLp.type = 'lowpass'; bLp.frequency.value = fc; bLp.Q.value = 0.5;
-    const bHp = ctx.createBiquadFilter(); bHp.type = 'highpass'; bHp.frequency.value = 90;
+    const bHp = ctx.createBiquadFilter(); bHp.type = 'highpass'; bHp.frequency.value = can ? SUP_HP : 90; // (a can takes the low end most: SUP_HP)
     const bSat = ctx.createWaveShaper(); bSat.curve = drive; bSat.oversample = '4x';
     const bEnv = percEnv(ctx, t0, blastAmp * g0, can ? 0.0012 : 0.0004, tau);
     bSrc.connect(bHp).connect(bLp).connect(bSat); add(bSat, bEnv, 0);
@@ -578,18 +588,38 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
     const rLp = ctx.createBiquadFilter();
     rLp.type = 'lowpass'; rLp.frequency.value = clamp(240 * Math.pow(9 / p.caliber, 0.4), 90, 360);
     rLp.Q.value = 0.7;
-    const rEnv = percEnv(ctx, t0, 0.8 * blastAmp * g0, 0.0015, tau * 1.9);
+    const rEnv = percEnv(ctx, t0, 0.8 * blastAmp * g0 * (can ? SUP_RUMBLE : 1), 0.0015, tau * 1.9); // (the thump: what a can takes most of)
     rum.connect(rLp); add(rLp, rEnv, 0);
     rum.start(t0); rum.stop(t0 + tau * 12);
+
+    // (d) secondary blast: a short barrel on a rifle round throws powder still burning out of the muzzle, and it
+    // re-ignites in the air ahead of it: a second, slower pressure wave a few ms behind the first, most of a short
+    // 5.56's extra severity over a long barrel's (PEW Science: the 10.3" and 14.5" both show it; the 10.3"'s impulse
+    // is almost 30% over a 20" 7.62's for the same peak). It goes with the pressure left at the muzzle and with how
+    // slow the powder is (a pistol's fast powder is burnt in the bore). Not through a can: there's no air in it to
+    // burn with, but for the first round's (the pop, at playback).
+    const after = can ? 0 : smoothstep(0.2, 0.4, b.muzzleFrac) * smoothstep(0.1, 0.35, 1 - b.burn);
+    if (after > 0.02) {
+      const tA = t0 + 0.0025 + 0.0015 * after;
+      const aSrc = ctx.createBufferSource(); aSrc.buffer = noiseBuffer(ctx, 0.3);
+      const aLp = ctx.createBiquadFilter(); aLp.type = 'lowpass'; aLp.frequency.value = clamp(fc * 0.45, 350, 1800); aLp.Q.value = 0.6;
+      const aHp = ctx.createBiquadFilter(); aHp.type = 'highpass'; aHp.frequency.value = 70;
+      const aSat = ctx.createWaveShaper(); aSat.curve = drive; aSat.oversample = '4x';
+      const aEnv = percEnv(ctx, tA, 0.6 * after * blastAmp * g0, 0.0015, tau * 0.8);
+      aSrc.connect(aHp).connect(aLp).connect(aSat); add(aSat, aEnv, 0);
+      aSrc.start(tA); aSrc.stop(tA + tau * 7);
+    }
 
     // suppressor / brake gas rush -> channel 2 (no device level)
     if (dev.whoosh > 0) {
       const w = ctx.createBufferSource(); w.buffer = noiseBuffer(ctx, 0.4);
-      const wLp = ctx.createBiquadFilter(); wLp.type = 'lowpass'; wLp.frequency.value = can ? 700 + 500 / can.vol : 900;
+      // (a can's blowdown is a hiss, not a thump: above the low end the can has taken out, lower for a bigger can)
+      const wLp = ctx.createBiquadFilter(); wLp.type = 'lowpass'; wLp.frequency.value = can ? 1500 + 900 / can.vol : 900;
+      const wHp = ctx.createBiquadFilter(); wHp.type = 'highpass'; wHp.frequency.value = can ? 350 : 20;
       // (through a can: the blowdown, gas still leaving the can after the shot; a ported barrel starts bleeding early)
-      const wAmt = can ? (0.45 + 0.25 * can.vol) * blastAmp * g0 : dev.whoosh * 0.5; // (as loud as what's left of the blast, longer)
+      const wAmt = can ? (0.3 + 0.17 * can.vol) * blastAmp * g0 : dev.whoosh * 0.5; // (about as loud as what's left of the blast, longer; less of it than when it was a low rush: the wider band carries more)
       const wEnv = percEnv(ctx, t0 + (can && can.ported ? 0.001 : 0.004), wAmt, 0.006, tau * 2.2);
-      w.connect(wLp); add(wLp, wEnv, 2);
+      w.connect(wHp).connect(wLp); add(wLp, wEnv, 2);
       w.start(t0); w.stop(t0 + tau * 12);
     }
     // the can ringing: its column of hot gas (open at the muzzle, closed at the blast baffle: f = c/4L, with c
@@ -688,7 +718,7 @@ type ActionKind = 'gas' | 'longstroke' | 'roller' | 'blowback' | 'recoil';
   function place(source: ShotSource, p: ShotParams) {
     const b = source.ballistics;
     const sched = source.schedule;
-    const L = listener(p, b);
+    const L = listener(p, b, source.suppression);
 
     const envP = ENVIRONMENTS[p.env!] || ENVIRONMENTS.none;
     const envSize = p.envSize ?? 0.5;
