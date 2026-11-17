@@ -607,6 +607,7 @@ export const Level = {
         for (let i = 0; i < nx; i++) for (let j = 0; j < nz; j++) map.lights.push({ kind: 'panel', x: x0 + (i + 0.5) * rm.w * TS / nx, z: z0 + (j + 0.5) * rm.h * TS / nz });
         continue;
       }
+      if (rm.ship === 'passage') { for (let z = rm.z + 3; z < rm.z + rm.h; z += 9) map.lights.push({ x: (rm.cx + 0.5) * TS, z: (z + 0.5) * TS }); continue; } // (a liner's cross passage: down its length, which is across her)
       if (rm.type === 'corridor' || rm.type === 'spine') { for (let x = rm.x + 2; x < rm.x + rm.w; x += 7) map.lights.push({ x: (x + 0.5) * TS, z: (rm.cz + 0.5) * TS }); continue; } // down a hallway
       if (rm.type === 'hangar') { // a lamp every 8 m by 6 m down the hall
         for (let z = rm.z + 3; z < rm.z + rm.h; z += 9) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 12) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
@@ -785,9 +786,7 @@ export const Level = {
       const horiz = !run.v, nx = horiz ? 0 : 1, nz = horiz ? 1 : 0, cells = []; // (v: a north-south wall)
       if (horiz) { const z = run.z0 * K + 1; for (let x = run.x0 * K; x < (run.x1 + 1) * K; x++) cells.push(z * W + x); }
       else { const x = run.x0 * K + 1; for (let z = run.z0 * K; z < (run.z1 + 1) * K; z++) cells.push(z * W + x); }
-      // (drop: glass with a drop the other side of it, not floor: a liner's promenade looking down into her court from the upper deck)
-      const side = (i: number) => floor(i) || (!!run.drop && t[i] === 5 && !out[i]);
-      const ok = (i: number) => t[i] === 1 && !used.has(i) && side(i - nx - nz * W) && side(i + nx + nz * W);
+      const ok = (i: number) => t[i] === 1 && !used.has(i) && floor(i - nx - nz * W) && floor(i + nx + nz * W);
       for (let k = 0; k + 1 < cells.length; k++) if (ok(cells[k]) && ok(cells[k + 1])) { add([cells[k], cells[k + 1]], nx, nz, false, run); k++; }
     }
     // a wall cell with floor either side along one axis (a thin wall), indoors on one side and outdoors on the other
