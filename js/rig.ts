@@ -42,6 +42,21 @@ export const Rig = (() => {
     bone.quaternion.copy(_q2.multiply(_q));
     bone.updateMatrixWorld(true);
   }
+  // Several objects' world matrices brought up to date at once, each of them and each of their ancestors once, top down: what
+  // o.localToWorld does for one (three's updateWorldMatrix(true, false): the same per-object update, up the chain from the scene)
+  // without walking a shared chain again for every bone read off it. After it, v.applyMatrix4(o.matrixWorld) is o.localToWorld(v),
+  // exactly. (a pose read at sixteen or twenty-two points: sample, ragdollInit, hitboxes)
+  const _frOrder: THREE.Object3D[] = [], _frSeen = new Set<THREE.Object3D>(), _frChain: THREE.Object3D[] = [];
+  function fresh(objs: THREE.Object3D[]) {
+    _frOrder.length = 0; _frSeen.clear();
+    for (const o of objs) {
+      _frChain.length = 0;
+      for (let n: THREE.Object3D | null = o; n && !_frSeen.has(n); n = n.parent) _frChain.push(n);
+      for (let i = _frChain.length - 1; i >= 0; i--) { _frSeen.add(_frChain[i]); _frOrder.push(_frChain[i]); }
+    }
+    for (const n of _frOrder) n.updateWorldMatrix(false, false);
+  }
+  const atW = (o: THREE.Object3D, x: number, y: number, z: number) => new T.Vector3(x, y, z).applyMatrix4(o.matrixWorld);
   // Two-bone IK: place upper/lower so the end reaches `target`, bending toward `pole`.
   // (an arm's wrist goes straight with it: whatever turned the hand to something it held, gripHand, does so again after. An arm's
   // bones are turned so their x is the elbow's hinge the way a body's arm has it at rest, its inside to -z: an elbow bends the other way
@@ -1476,7 +1491,8 @@ export const Rig = (() => {
   const _gb = new T.Vector3();
   function sample(rig: Rig) { // the animated pose, at the ragdoll's particles (0 pelvis ... 15 right foot)
     const { hips, chest, neck, head, armL, armR, legL, legR } = rig;
-    const w = (o: THREE.Object3D, x = 0, y = 0, z = 0) => o.localToWorld(new T.Vector3(x, y, z));
+    fresh([hips, legL.th, legR.th, chest, armL.up, armR.up, neck, head, armL.lo, armR.lo, legL.sh, legR.sh]);
+    const w = (o: THREE.Object3D, x = 0, y = 0, z = 0) => atW(o, x, y, z);
     return [w(hips), w(legL.th), w(legR.th), w(chest, 0, 0.14, 0), w(armL.up), w(armR.up), w(neck), w(head, 0, 0.1, 0),
       w(armL.lo), w(armR.lo), w(armL.lo, 0, -FARM, 0), w(armR.lo, 0, -FARM, 0), w(legL.sh), w(legR.sh), w(legL.sh, 0, -SHIN, 0), w(legR.sh, 0, -SHIN, 0)];
   }
@@ -1773,7 +1789,8 @@ export const Rig = (() => {
   function ragdollInit(rig: Rig, dir: THREE.Vector3 | null) {
     const { root, hips, chest, neck, head, armL, armR, legL, legR } = rig;
     root.updateMatrixWorld(true);
-    const w = (o: THREE.Object3D, x = 0, y = 0, z = 0) => o.localToWorld(new T.Vector3(x, y, z));
+    fresh([hips, legL.th, legR.th, chest, armL.up, armR.up, neck, head, armL.lo, armR.lo, legL.sh, legR.sh]); // (and the root's own ancestors, as localToWorld would)
+    const w = (o: THREE.Object3D, x = 0, y = 0, z = 0) => atW(o, x, y, z);
     const P = [w(hips), w(legL.th), w(legR.th), w(chest, 0, 0.14, 0), w(armL.up), w(armR.up), w(neck), w(head, 0, 0.1, 0),
       w(armL.lo), w(armR.lo), w(armL.lo, 0, -FARM, 0), w(armR.lo, 0, -FARM, 0), w(legL.sh), w(legR.sh), w(legL.sh, 0, -SHIN, 0), w(legR.sh, 0, -SHIN, 0)];
     const s = rig.scale, dt = 1 / 60;
@@ -2163,7 +2180,8 @@ export const Rig = (() => {
         mk('thigh', 0.09, 'L'), mk('shin', 0.07, 'L'), mk('thigh', 0.09, 'R'), mk('shin', 0.07, 'R')];
     }
     const s = rig.scale, h = rig.hb;
-    const W = (o: THREE.Object3D, x: number, y: number, z: number, out: THREE.Vector3) => o.localToWorld(out.set(x, y, z));
+    fresh([rig.head, rig.chest, rig.hips, rig.spine, rig.armL.up, rig.armL.lo, rig.armR.up, rig.armR.lo, rig.legL.th, rig.legL.sh, rig.legR.th, rig.legR.sh]);
+    const W = (o: THREE.Object3D, x: number, y: number, z: number, out: THREE.Vector3) => out.set(x, y, z).applyMatrix4(o.matrixWorld);
     const R = rig.fit && rig.fit.hbR; // (a body's own: js/humans.ts)
     if (R) { h[0].r = R[0]; h[1].r = R[1]; h[2].r = R[2]; for (const i of [3, 5]) { h[i].r = R[3]; h[i + 1].r = R[4]; } for (const i of [7, 9]) { h[i].r = R[5]; h[i + 1].r = R[6]; } }
 

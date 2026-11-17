@@ -19,7 +19,7 @@ const exe = browserPath(); if (!exe) { console.error('no Chromium found (set BRO
 fs.mkdirSync(out, { recursive: true });
 const prof = fs.mkdtempSync(path.join(os.tmpdir(), 'space-shot-'));
 const proc = spawn(exe, ['--headless=new', ...(process.platform === 'linux' ? ['--no-sandbox'] : []), '--remote-debugging-port=0', `--user-data-dir=${prof}`, '--no-first-run', '--no-default-browser-check', '--mute-audio',
-  ...(process.argv.includes('--gpu') ? [] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']), '--window-size=1280,720', 'about:blank'], { stdio: 'ignore' });
+  ...(process.argv.includes('--gpu') ? [] : ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']), '--window-size=1280,720', ...(process.argv.includes('--mute-audio') ? ['--mute-audio'] : []), 'about:blank'], { stdio: 'ignore' });
 let wsUrl = null;
 for (let i = 0; i < 100 && !wsUrl; i++) { await sleep(100); try { const [p] = fs.readFileSync(path.join(prof, 'DevToolsActivePort'), 'utf8').split('\n'); const tabs = await (await fetch(`http://127.0.0.1:${p}/json`)).json(); const t = tabs.find((q) => q.type === 'page'); if (t) wsUrl = t.webSocketDebuggerUrl; } catch { /* not up yet */ } }
 if (!wsUrl) { console.error('the browser did not start'); proc.kill(); process.exit(1); }
