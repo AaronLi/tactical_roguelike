@@ -313,6 +313,16 @@ export const SpaceData = (() => {
   }
   // How a ship answers being boarded, by her size (js/spaceserver.ts doctrine): a transport or a corvette's is informal (her people
   // shelter, under guard), a frigate's and up practiced (her teams sweep for the squad); and as the mission board says it
+  // Which hall two decks high a cruiser has, if any (js/shipgen.ts HALLS): from her seed alone, so every machine lays her out the
+  // same without being told. Six cruisers in ten have one: a hangar bay, an arboretum or a machinery hall, as likely as each other.
+  const HALL_KINDS: ShHallKind[] = ['bay', 'grove', 'works'];
+  // (what the terminal says of a cruiser that has one, and the objective's panel aboard her)
+  const HALL_LINE: Record<ShHallKind, { brief: string; offer: string }> = {
+    bay: { brief: 'a hangar bay', offer: 'Two decks, with a hangar bay right across her, open through both: a gallery round it looks down on its floor.' },
+    grove: { brief: 'an arboretum', offer: 'Two decks, with an arboretum down her port side, open through both: a gallery round it looks down on its floor.' },
+    works: { brief: 'machinery halls', offer: 'Two decks, with machinery halls fore and aft, open through both: a gallery round each looks down on its floor.' },
+  };
+  const hallOf = (seed: number, size: SpSize | null | undefined): ShHallKind | null => { if (size !== 'large') return null; const q = (Math.imul(seed ^ 0x5ca1ab1e, 0x9e3779b1) >>> 0) % 10; return q < 6 ? HALL_KINDS[q >> 1] : null; };
   const drill = (size: SpSize | null | undefined, wing = false): 'informal' | 'practiced' => (!wing && (!size || size === 'transport' || size === 'small') ? 'informal' : 'practiced'); // (a flying wing: a warship's crew, even a corvette's, with her own security office: js/shipgen.ts wingDeck)
   const DRILL_LINE = {
     informal: 'Her breach response is informal: her people shelter in her safest compartment, under guard, and nobody comes looking for you.',
@@ -330,5 +340,5 @@ export const SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
+  return { hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
 })();

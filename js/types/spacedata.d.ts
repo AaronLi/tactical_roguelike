@@ -15,7 +15,7 @@ type SpSize = 'transport' | 'small' | 'medium' | 'large' | 'capital';
 
 // what a level is generated for, besides the four figures (js/level.ts generate: its fifth). size: the ship boarded; obj: what's
 // wanted aboard; side: which side the breach is on (1 starboard, -1 port); ship: the squad's own ship (its berth is cut to it)
-interface SpGen { size?: SpSize; obj?: SpObj; ship?: string; planet?: number; other?: SpSize | null; wing?: boolean } // (other: a second ship lying off her, nothing to do with the mission)
+interface SpGen { size?: SpSize; obj?: SpObj; ship?: string; planet?: number; other?: SpSize | null; wing?: boolean; hall?: ShHallKind | null } // (other: a second ship lying off her, nothing to do with the mission; hall: a cruiser's hall two decks high, js/shipgen.ts HALLS)
 
 interface SpMission { i: number; kind: 'board' | 'assault'; obj: SpObj; size: SpSize | null; th: number; seed: number; diff: number; pay: number; name: string; brief: string; where: string; night: boolean; ly: number; anchor: [number, number, number]; other?: SpSize | null; fuse?: number; wing?: boolean } // (wing: a corvette or a frigate built as a flying wing: js/shipgen.ts wingDeck)
 

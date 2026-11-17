@@ -1377,6 +1377,8 @@ export const Furniture = (() => {
     vault: { must: 'srack', wall: ['lockers', 'srack'], center: [], small: ['bin'], floor: null, noArt: 1 },
     brig: { must: 'sbench', wall: ['sbench', 'lockers'], center: [], small: ['bin'], floor: null, noArt: 1 },
     pods: { floor: null, bare: 1, noArt: 1 }, spine: { floor: null, bare: 1, noArt: 1 },
+    // (a cruiser's halls, two decks high: furnished by shipHalls, below; their galleries are catwalks)
+    bay: { floor: null, bare: 1, noArt: 1 }, grove: { floor: null, bare: 1, noArt: 1 }, works: { floor: null, bare: 1, noArt: 1 },
   };
   // small pieces give only their boxes; they need a footprint too when they're set against a wall
   for (const rec of Object.values(R)) if (rec.w == null || rec.d == null) {
@@ -1709,6 +1711,75 @@ export const Furniture = (() => {
         },
       };
     }
+    // A cruiser's halls, two decks high (js/shipgen.ts HALLS): what stands about their floors. The hall's own frame is the
+    // layout's (columns under the gallery's edge, lengths of bulkhead); this is the rest, set down about the floor inside the
+    // gallery's line wherever it falls and fits. The tile against the walls all round (under the gallery) is kept clear, and
+    // nothing is put down that would shut any of the floor off (tryBlock).
+    // Most of it is taller than a head, some only cover: between that and the frames, nowhere on the floor sees the whole hall.
+    //   bay:   containers (lengthwise, across, two side by side), pallet racking, a forklift with its load, stacked crates and drums
+    //   grove: tanks, sheds, a fountain in the middle, raised beds with fruit trees at their ends, junipers and boulders, benches
+    //   works: reactor cores in pairs with a panel between, presses and mills in a line, screens of panels, coolant tanks, turbines
+    function shipHalls() {
+      let cur: Room | null = null; // (the hall being furnished: nothing's put on the tile against its walls)
+      const C = (v: number) => (v + 0.5) * TS, free = (x: number, z: number) => !!cur && x > cur.x && z > cur.z && x < cur.x + cur.w - 1 && z < cur.z + cur.h - 1 && t[z * W + x] === 0;
+      // a piece over nx by nz tiles from (x, z): all of them clear, and the first of them blocked without shutting anything off
+      const set = (name: string, x: number, z: number, nx: number, nz: number, q: number) => {
+        for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (!free(x + i, z + j)) return false;
+        const b = R[name].cover ? 2 : 4, got: number[][] = [];
+        // (tile by tile: if one of them would shut some floor off, the piece isn't put down, and the tiles already taken for it
+        // get something of a tile's size each instead, FILL: a blocked tile is never left with nothing standing on it)
+        for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) { if (tryBlock(x + i, z + j, b)) { got.push([x + i, z + j]); continue; } for (const [a, c] of got) put(FILL[cur!.type], a, c, C(a), C(c), Math.floor(r() * 4), r()); return got.length > 0; }
+        put(name, x, z, (x + nx / 2) * TS, (z + nz / 2) * TS, q, r());
+        if (name === 'container') map.props.get(z * W + x)!.style = { c: U.pick(r, BOXES) }; // (its paint: a container's drawn in its style's colour)
+        return true;
+      };
+      const BOXES = [0x4a5a66, 0x5d6b4a, 0x7a3f28, 0x2f5a7a, 0x8a8f94, 0x6b5a2e]; // (navy grey, olive, oxide, blue, light grey, ochre)
+      const FILL: Record<string, string> = { bay: 'crates', grove: 'juniper', works: 'turbine' }; // (cover, as every piece of more than a tile here is)
+      const small = (name: string, x: number, z: number, ox: number, oz: number) => { if (!free(x, z) || map.props.has(z * W + x)) return false; put(name, x, z, C(x) + ox, C(z) + oz, Math.floor(r() * 4), r()); return true; };
+      // (each: what it puts down from the tile (x, z), and whether any of it went down)
+      type Plot = (x: number, z: number) => boolean;
+      const any = (...got: boolean[]) => got.some(Boolean), turn = () => (r() < 0.5 ? 0 : 2);
+      const row = (names: string[], q?: number): Plot => (x, z) => any(...names.map((name, i) => set(name, x + i, z, 1, 1, q == null ? turn() : q)));
+      const KINDS: Record<string, { mid?: string; plots: [number, Plot][] }> = {
+        bay: { plots: [
+          [3, (x, z) => set('container', x, z, 3, 1, turn())],
+          [2, (x, z) => set('container', x, z, 1, 3, r() < 0.5 ? 1 : 3)],
+          [2, (x, z) => any(set('container', x, z, 3, 1, 0), set('container', x, z + 1, 3, 1, 2))],
+          [2, row(['palletrack', 'palletrack', 'palletrack'])],
+          [2, (x, z) => any(set('forklift', x, z, 1, 2, turn()), set(U.pick(r, ['pallet', 'crates']), x + 1, z + U.ri(r, 0, 1), 1, 1, U.ri(r, 0, 3)))],
+          [2, (x, z) => any(...[[0, 0], [1, 0], [0, 1], [1, 1]].map(([i, j]) => r() < 0.75 && set(U.pick(r, ['crates', 'crates', 'drums', 'pallet']), x + i, z + j, 1, 1, U.ri(r, 0, 3))))],
+        ] },
+        grove: { mid: 'fountain', plots: [
+          [3, (x, z) => set('watertank', x, z, 2, 2, U.ri(r, 0, 3))],
+          [2, (x, z) => any(set('shed', x, z, 1, 1, U.ri(r, 0, 3)), set('hedge', x + 1, z, 1, 1, turn()))],
+          [3, (x, z) => { const n = U.ri(r, 2, 3), got = any(...[0, 1, 2].slice(0, n).map((i) => set('chilebed', x + i, z, 1, 1, 0))); if (got) { small('fruittree', x, z, -0.7, 0.2); small('fruittree', x + n - 1, z, 0.7, -0.2); } return got; }],
+          [2, (x, z) => { const got = any(set('boulder', x, z, 1, 1, U.ri(r, 0, 3)), set('juniper', x + 1, z + 1, 1, 1, U.ri(r, 0, 3))); if (got) { small('pinon', x + 1, z, 0.2, -0.3); small('tree', x, z + 1, -0.2, 0.3); } return got; }],
+          [1, (x, z) => { const got = set('bench', x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('tree', x, z, 0.6, 0.6); return got; }],
+          [2, row(['hedge', 'hedge', 'hedge'])],
+        ] },
+        works: { plots: [
+          [3, row(['core', 'panel', 'core'], 0)],
+          [2, (x, z) => row(['press', 'mill', U.pick(r, ['mill', 'saw'])], 0)(x, z)],
+          [2, row(['panel', 'panel', 'panel'])],
+          [2, (x, z) => set('watertank', x, z, 2, 2, U.ri(r, 0, 3))],
+          [2, (x, z) => { const got = any(set('turbine', x, z, 1, 1, U.ri(r, 0, 3)), set('turbine', x + 1, z, 1, 1, U.ri(r, 0, 3))); if (got) small('canister', x, z, 0.2, 0.8); return got; }],
+          [1, (x, z) => set('hvac', x, z, 1, 1, U.ri(r, 0, 3))],
+        ] },
+      };
+      // About one thing to every eight tiles of the floor inside the gallery's line (every six in a hall down one side of her:
+      // its frames take up much of it), wherever it falls and fits.
+      const hall = (rm: Room) => {
+        const K = KINDS[rm.type], total = K.plots.reduce((a, [n]) => a + n, 0), iw = rm.w - 2, ih = rm.h - 2;
+        cur = rm;
+        if (K.mid) set(K.mid, rm.x + (rm.w >> 1) - 1, rm.z + (rm.h >> 1) - 1, 2, 2, 0);
+        for (let want = Math.round(iw * ih / (ih <= 4 ? 6 : 8)), a = 0; want > 0 && a < iw * ih * 3; a++) {
+          let pick = r() * total, k = 0; while (k < K.plots.length - 1 && (pick -= K.plots[k][0]) >= 0) k++;
+          if (K.plots[k][1](rm.x + 1 + Math.floor(r() * iw), rm.z + 1 + Math.floor(r() * ih))) want--;
+        }
+      };
+      return { bay: hall, grove: hall, works: hall };
+    }
+    const shp = map.theme.layout === 'ship' ? shipHalls() : null;
     const fest = map.theme.layout === 'festival' ? festival() : null, fdy = map.theme.layout === 'foundry' ? foundry() : null, cst = map.theme.layout === 'crest' ? crestPlan() : null;
     let nFine = 0; // (pieces laid on the fine grid: kept past the tiles' own keys)
     for (const rm of rooms) {
@@ -1717,6 +1788,7 @@ export const Furniture = (() => {
       for (const [name, x, z, q, st] of rm.cover || []) { const rec = R[name], v = r(); map.props.set(W * map.H + nFine++, { name, q, x, z, v, style: st || {}, block: rec.small ? 0 : rec.cover ? 2 : 4, boxes: worldBoxes(rec, x, z, q, v) }); }
       if (fest && (fest as Record<string, any>)[rm.type]) { (fest as Record<string, any>)[rm.type](rm); continue; }
       if (fdy && (fdy as Record<string, any>)[rm.type]) { (fdy as Record<string, any>)[rm.type](rm); continue; }
+      if (shp && (shp as Record<string, any>)[rm.type]) { (shp as Record<string, any>)[rm.type](rm); continue; }
       if (cst && (cst as Record<string, any>)[rm.type]) { (cst as Record<string, any>)[rm.type](rm); continue; }
       // patrol cars where the layout puts them: [x, z, along] (coarse tiles; along: lengthwise down the road, else across)
       for (const [x, z, along] of rm.cars || []) {
