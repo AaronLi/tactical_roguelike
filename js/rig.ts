@@ -2082,6 +2082,9 @@ export const Rig = (() => {
     }
     rd.still = moved < 4e-6 && (down || rig.deadT > 3) ? rd.still + 1 : 0;
     if (rd.still > 30 || (rig.deadT > (down ? 4.5 : 8) && !(rd.calm! > 0) && !rd.handled && !rd.keepPin && !rig.zipped)) rd.asleep = true; // a body that's been down a while lies still
+    // secured: once the wrists are drawn in (the pin's whole at 0.6 s) and the roll's settled (calm), it lies as it was tied, not
+    // pulled about by the pin against the joints for good (a tied body seldom comes to the stillness above)
+    else if (rig.zipped && rd.pinT! > 1 && !(rd.calm! > 0) && !rd.handled && !rd.keepPin && !rd.roll) rd.asleep = true;
   }
   function setWorldQ(bone: THREE.Object3D, q: THREE.Quaternion) { bone.parent!.getWorldQuaternion(_q2).invert(); bone.quaternion.copy(_q2.multiply(q)); bone.updateMatrixWorld(true); }
   function frameQ(xv: THREE.Vector3, yv: THREE.Vector3) {
