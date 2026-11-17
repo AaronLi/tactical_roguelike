@@ -24,11 +24,14 @@ export const Audio = {
     'crowd_bed', 'crowd_cheer', 'crowd_cheer_big', 'crowd_roar', 'crowd_laugh', 'crowd_laugh_long', 'crowd_ooh', 'crowd_wow', 'crowd_awww'],
   lastShot: 0,
   // The handling sounds' trim (a magazine, the action, a door: the recorded foley here and the synthesized bank,
-  // js/handling.ts): 3 dB under where they were set, nearer the ambience, further under the shots.
-  HANDLING: 0.7,
-  /** your own gun's handling (in your hands: sample, and js/handling.ts at you): back at the level it was set at
-   *  (1 / HANDLING), where the others' are 3 dB under it */
-  HANDLING_OWN: 1 / 0.7,
+  // js/handling.ts), set so the shots stand clear above them. Measured at the master (before its compressor, which pulls a
+  // shot's peak down toward a click's): a shot's 5-10 dB under full scale peak and -14..-20 dB RMS (suppressed ones 12-25 dB
+  // under that); at 0.7 / 1 the handling clips peaked -3..-10 dB and the slide, bolt and magazine recordings matched a shot's
+  // RMS. 5 dB under that now (0.39 = 0.7 less 5 dB): handling ends 8+ dB under the shots' RMS and 5+ dB under their peaks.
+  HANDLING: 0.39,
+  /** your own gun's handling (in your hands: sample, and js/handling.ts at you): HANDLING times this is 0.56 (the 0.7 the
+   *  others' were 3 dB under, less the same 5 dB), where the others' stay 3 dB under it */
+  HANDLING_OWN: 0.56 / 0.39,
   // ---------------------------------------------------------------- keeping up
   // Is the audio thread keeping up? Its clock (ctx.currentTime) runs at real time while it renders in time; when there's
   // more live sound than it can render (a belt dumped: shots, their echoes, every case's bounce), it falls behind, the
@@ -426,9 +429,9 @@ export const Audio = {
   kick(dist = 0) {
     if (!this.ctx) return;
     const att = 1 / (1 + dist * 0.06), t = this.ctx.currentTime;
-    this.tone(95, 0.25, 'sine', 0.8 * att, 40);
-    this._noise(t, 0.18, 900, 0.8, 0.7 * att, 'lowpass', 200);
-    this._noise(t, 0.06, 3000, 2, 0.35 * att, 'bandpass');
+    this.tone(95, 0.25, 'sine', 0.45 * att, 40); // (a door kicked in: 5 dB under what it was, as loud as a shot was; the shots stand over it)
+    this._noise(t, 0.18, 900, 0.8, 0.4 * att, 'lowpass', 200);
+    this._noise(t, 0.06, 3000, 2, 0.2 * att, 'bandpass');
     this.sample('door_open', 0.7 * att, 1.7);
   },
   // Foley for hands-on actions, keyed by action kind: [progress, sound]. Each plays as the action passes its
