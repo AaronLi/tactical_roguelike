@@ -81,24 +81,15 @@ export const Loot = (() => {
       const { mesh, r } = Casings.magMesh(mdef, it), g = new T.Group();
       mesh.rotation.z = Math.PI / 2; mesh.position.y = r;
       g.add(mesh);
-      try {
-        const b = Gunsmith.defaultBuild(mdef.id); if (it.vid && b.mag !== undefined) b.mag = it.vid;
-        const gun = GunModels.world(Gunsmith.encode(mdef.id, b));
-        const take = () => {
-          let src: THREE.Object3D | null = gun.userData.mag || null; // (the world model's magazine, kept apart for its checks: js/viewmodel.ts)
-          if (!src) gun.traverse((o: any) => { if (!src && (o.name === 'part_mag' || (o.userData && o.userData.part === 'mag'))) src = o; });
-          if (!src) return;
-          gun.updateMatrixWorld(true);
-          const m = (src as THREE.Object3D).clone(true), hold = new T.Group(), lie = new T.Group();
-          m.traverse((o: any) => { if (o.geometry) o.geometry = o.geometry.clone(); }); // (its own: what's dropped is disposed with it, the gun's isn't)
-          (src as THREE.Object3D).matrixWorld.decompose(m.position, m.quaternion, m.scale); // (where it sits in the gun: the gun's frame)
-          hold.add(m); hold.rotation.z = Math.PI / 2; lie.add(hold); lie.updateMatrixWorld(true);
-          const bb = new T.Box3().setFromObject(lie); if (bb.isEmpty()) return;
-          hold.position.set(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
-          g.remove(mesh); mesh.geometry.dispose(); g.add(lie);
-        };
-        if (gun.userData.pending) { g.userData.gun = gun; GunModels.whenReady(gun, (ok) => { if (ok) take(); }); } else take();
-      } catch (e) { /* the plain one, then */ }
+      const b = Gunsmith.defaultBuild(mdef.id); if (it.vid && b.mag !== undefined) b.mag = it.vid;
+      const gun = magOff(Gunsmith.encode(mdef.id, b), (m) => {
+        const hold = new T.Group(), lie = new T.Group();
+        hold.add(m); hold.rotation.z = Math.PI / 2; lie.add(hold); lie.updateMatrixWorld(true);
+        const bb = new T.Box3().setFromObject(lie); if (bb.isEmpty()) return;
+        hold.position.set(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2);
+        g.remove(mesh); mesh.geometry.dispose(); g.add(lie);
+      });
+      if (gun && gun.userData.pending) g.userData.gun = gun;
       return g;
     }
     const [w, h] = Gear.size(it), sx = Math.max(0.06, w * 0.1), sz = Math.max(0.06, h * 0.1), sy = 0.04 + 0.02 * Math.min(w, h);
@@ -108,6 +99,26 @@ export const Loot = (() => {
     m.position.y = sy / 2;
     const g = new T.Group(); g.add(m);
     return g;
+  }
+  // A gun's magazine off its world model (gun: a def or a code; its magazine variant is the build's): a copy, with its own geometry (what's
+  // dropped or picked up is disposed with it, the gun's isn't), placed as it sits in the gun (the gun's frame), handed to take now or once
+  // the model's in. Nothing if there's no model to be had. Returns the gun model (pending, if it's still coming). (the weapon case and the
+  // floor's magazines: meshFor; an emergency reload's: js/casings.ts dropMag)
+  function magOff(gunOf: any, take: (m: THREE.Object3D) => void): THREE.Group | null {
+    let gun: THREE.Group;
+    try { gun = GunModels.world(gunOf); } catch (e) { return null; }
+    const go = () => {
+      let src: THREE.Object3D | null = gun.userData.mag || null; // (the world model's magazine, kept apart for its checks: js/viewmodel.ts)
+      if (!src) gun.traverse((o: any) => { if (!src && (o.name === 'part_mag' || (o.userData && o.userData.part === 'mag'))) src = o; });
+      if (!src) return;
+      gun.updateMatrixWorld(true);
+      const m = (src as THREE.Object3D).clone(true);
+      m.traverse((o: any) => { if (o.geometry) o.geometry = o.geometry.clone(); });
+      (src as THREE.Object3D).matrixWorld.decompose(m.position, m.quaternion, m.scale);
+      take(m);
+    };
+    if (gun.userData.pending) GunModels.whenReady(gun, (ok) => { if (ok) go(); }); else go();
+    return gun;
   }
   function add(id: number, x: number, y: number, z: number, packed: any, yaw: number | null | undefined, fit?: number) {
     if (list.has(id) || !R || !R.dynRoot) return;
@@ -141,7 +152,7 @@ export const Loot = (() => {
     if (packed.k === 'gun' && packed.w) return (WEAPONS[packed.w.id] || { name: 'gun' }).name;
     try { const it = Gear.unpack(packed); return it.k === 'mag' ? Gear.magName(it) : Gear.label(it); } catch (e) { return 'item'; }
   }
-  return { add, remove, clear, aimed, boxOf, rayHit, name, meshFor, get list() { return list; } };
+  return { add, remove, clear, aimed, boxOf, rayHit, name, meshFor, magOff, get list() { return list; } };
 })();
 ReplayEnv.Loot = Loot; // (what the replay asks of it: js/replayenv.ts)
 

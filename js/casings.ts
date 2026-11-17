@@ -37,7 +37,7 @@ export const Casings = (() => {
   type CaseGun = Record<string, any>; // a gun, as far as a case is concerned (its id)
   interface CaseKind { mat: CaseMat; len: number; r: number; h?: number }
   // one thing falling: a spent case (slots in the instanced meshes, am: its load) or a dropped magazine (mesh, item: what it carries, box: its pick-up box)
-  interface Spent { k: CaseKind; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; rest: boolean; age: number; slots?: number[]; am?: string; mesh?: THREE.Mesh; item?: any; box?: any; drop?: { def: WeaponDef; fill: number } | null; quiet?: boolean; wait?: number }
+  interface Spent { k: CaseKind; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; w: THREE.Vector3; rest: boolean; age: number; slots?: number[]; am?: string; mesh?: THREE.Mesh; item?: any; box?: any; drop?: { def: WeaponDef; fill: number } | null; quiet?: boolean; wait?: number; gone?: boolean }
   // a case or some cases due out of a gun, in t seconds
   interface Pending { t: number; def: WeaponDef; local: boolean; from?: THREE.Vector3 | null; to?: THREE.Vector3 | null; am?: string | string[]; drop?: boolean; n?: number }
   let metal: THREE.InstancedMesh = null!, hull: THREE.InstancedMesh = null!, live: Spent[] = [], queue: Pending[] = [], free: number[] = [], sounds = 0;
@@ -133,7 +133,7 @@ export const Casings = (() => {
 
   // ---------------------------------------------------------------- dropped magazines
   const MAX_MAGS = 40, WAIT_MAX = 600; // (ms a dropped magazine waits for the view's to hand it over)
-  let mags: Spent[] = [], magMat: THREE.MeshStandardMaterial = null!;
+  let mags: Spent[] = [], magMat: THREE.MeshStandardMaterial = null!, unseen: THREE.Material | null = null;
   let boxMat: THREE.MeshStandardMaterial = null!;
   function magMesh(def: WeaponDef, item: any) {
     const am = Gear.ammoFor(def), pistol = def.cls === 'PST' || def.cls === 'MP';
@@ -168,6 +168,16 @@ export const Casings = (() => {
     // (held back, unseen, while the gun's own magazine falls out of the well in the view: it carries on from there, update. Without
     // that fall to take over from, as it was here, after WAIT_MAX)
     c.wait = performance.now(); mesh.visible = false;
+    // what's seen of it: the gun's own magazine (its variant), as the weapon case shows one (js/loot.ts magOff), centred on the plain
+    // one and turned as it sits in the gun (the plain one's frame too), which stays as what it lies and rolls and is picked up as
+    Loot.magOff(def, (m) => {
+      if (c.gone) { m.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); return; } // (picked up or cleared before its model came)
+      const bb = new T.Box3().setFromObject(m); if (bb.isEmpty()) return;
+      m.position.sub(bb.getCenter(V()));
+      // (it lies on its side, as thick as the real one: a little thicker than the plain one, it'd sink into the floor by the difference)
+      const rr = bb.getSize(V()).x / 2; if (rr > c.k.r) { if (c.rest) c.p.y += rr - c.k.r; c.k.r = rr; draw(c); }
+      mesh.add(m); (mesh as THREE.Mesh<THREE.BufferGeometry, THREE.Material>).material = unseen || (unseen = new T.MeshBasicMaterial({ visible: false }));
+    });
     R.dynRoot.add(mesh);
     mags.push(c);
     // too many lying about: the oldest one that nobody can pick up goes
@@ -178,9 +188,9 @@ export const Casings = (() => {
   function takeMag(c: Spent) {
     const i = mags.indexOf(c);
     if (i < 0) return;
-    mags.splice(i, 1);
+    mags.splice(i, 1); c.gone = true;
     if (c.mesh!.parent) c.mesh!.parent.remove(c.mesh!);
-    c.mesh!.geometry.dispose();
+    c.mesh!.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); }); // (and the gun's magazine drawn for it: dropMag)
   }
   // the dropped magazine under the crosshair (o, d: your aim) that you can pick up, within reach
   function aimedMag(o: any, d: any, reach = 2.2) {
