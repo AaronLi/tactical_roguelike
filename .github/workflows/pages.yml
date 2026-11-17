@@ -4,21 +4,21 @@
 # bundles (tools/bundle.mjs: esbuild, minified; the page's main.js, the three workers' files and modelbundles.js: five files in place of about ninety, under the same
 # names, so index.html and the workers' URLs are the same as in development, which loads dist/js unbundled; docs/typescript.md). Every push and pull request is
 # built and tested (build: a check that it compiles, bakes and passes).
-# The site (site, deploy): main at d5g.ca, and beside it an experimental branch (SPACE_BRANCH: now the cruiser work, claude/funny-pascal-a130mk) at
-# d5g.ca/space-experimental, built the same way into the site's space-experimental/ folder. A push to main (or Run workflow on main) publishes both, each as its
-# branch stands; a push to the experimental branch only builds and tests it (publishing from it too would need that branch allowed in Settings -> Environments ->
-# github-pages). To point the page at another branch, change SPACE_BRANCH; to switch it off, set PUBLISH_SPACE to 'false' (the steps are kept for experimenting later).
+# The site (site, deploy): main at d5g.ca, and beside it the experimental branch (SPACE_BRANCH: feature/space-direction, now carrying the cruiser work) at
+# d5g.ca/space-experimental, built the same way into the site's space-experimental/ folder. A push to either (or Run workflow on main) publishes both, each as its
+# branch stands. To point the page at another branch, change SPACE_BRANCH (and the branch in the site job's if, which can't read env, and allow it in Settings ->
+# Environments -> github-pages); to switch it off, set PUBLISH_SPACE to 'false' (the steps are kept for experimenting later).
 # The experimental copy has no cloud saves: its js/cloudconfig.ts is emptied before it is built (no Supabase, no request), and the build fails if the project's address
 # is found anywhere in what it publishes. The copy at /space-experimental keeps its own saves, in the browser only
 # (js/util.ts NS; no cloud saves: js/cloud.ts).
-# One-time setup: Settings -> Pages -> Source: GitHub Actions; and Settings -> Environments -> github-pages -> Deployment branches: main.
+# One-time setup: Settings -> Pages -> Source: GitHub Actions; and Settings -> Environments -> github-pages -> Deployment branches: main and the experimental branch.
 name: pages
 on:
   push:
   pull_request:
   workflow_dispatch:
 env:
-  SPACE_BRANCH: claude/funny-pascal-a130mk
+  SPACE_BRANCH: feature/space-direction
   PUBLISH_SPACE: 'true' # ('false': main only, the experimental steps skipped)
 permissions:
   contents: read
@@ -71,7 +71,7 @@ jobs:
       - run: node tools/bundle.mjs
   # The site: main at the root, the space branch under space-experimental/ (each checked out, built and baked on its own), published together
   site:
-    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/space-direction') # (SPACE_BRANCH: a job's if can't read env)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
