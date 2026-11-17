@@ -587,7 +587,7 @@ export const Level = {
       if (rm.tall) { // a hall the building's full height: high-bay lamps under its roof, a grid of them (lighting the catwalks too: stack)
         if (map.theme.layout === 'ship') { // (a cruiser's hall, two decks high, js/shipgen.ts HALLS: hers every eight metres, and bright enough at that height to light its floor as her other compartments' lamps do theirs)
           const nx = Math.max(1, Math.round(rm.w * TS / 8)), nz = Math.max(1, Math.round(rm.h * TS / 8));
-          for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) map.lights.push({ kind: 'highbay', x: (rm.x + (i + 0.5) * rm.w / nx) * TS, z: (rm.z + (j + 0.5) * rm.h / nz) * TS, y: this.FLOOR_H + this.WALL_H - 0.6, color: map.theme.light, i: 1.5, d: 24, up: 1 });
+          for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) map.lights.push({ kind: 'highbay', x: (rm.x + (i + 0.5) * rm.w / nx) * TS, z: (rm.z + (j + 0.5) * rm.h / nz) * TS, y: this.FLOOR_H + this.WALL_H - 0.6, color: map.theme.light, i: rm.type === 'mall' ? 1.15 : 1.5, d: 24, up: 1 }); // (a liner's court: its pale tiles throw more of it back)
           continue;
         }
         for (let z = rm.z + 5; z < rm.z + rm.h - 2; z += 12) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 15) map.lights.push({ kind: 'highbay', x: (x + 0.5) * TS, z: (z + 0.5) * TS, y: this.FLOOR_H + this.WALL_H - 0.6, color: 0xffe2b8, i: 0.5, d: 17, up: 1 });

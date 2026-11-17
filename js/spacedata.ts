@@ -306,23 +306,26 @@ export const SpaceData = (() => {
       // its anchor: a direction off the golden angle, a little above or below the plane, 7 to 13 km out
       const a = i * 2.39996 + r() * 0.5, el = (r() - 0.5) * 0.7, d = 7000 + r() * 6000;
       const name = assault ? U.pick(r, WORLDS) : (T.name === 'Navy warship' ? 'NSV ' : T.name === 'Freighter' ? 'MV ' : 'CSV ') + U.pick(r, SHIP_NAMES);
+      // (a cruiser with a promenade court is a cruise liner, a civilian ship in the cutter's livery: below, once her seed's drawn)
       out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, wing, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name + (wing ? ' (a flying wing)' : ''), brief: OBJ[obj].line, other, night: assault && !T.night && r() < 0.25,
         ly: Math.round((3 + r() * 40) * 10) / 10, anchor: [Math.cos(a) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(a) * Math.cos(el) * d] });
+      { const o = out[out.length - 1]; if (o.kind === 'board' && hallOf(o.seed, o.size) === 'mall') { o.th = TH0 + 1; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Cruise liner'; } }
     }
     return out;
   }
   // How a ship answers being boarded, by her size (js/spaceserver.ts doctrine): a transport or a corvette's is informal (her people
   // shelter, under guard), a frigate's and up practiced (her teams sweep for the squad); and as the mission board says it
   // Which hall two decks high a cruiser has, if any (js/shipgen.ts HALLS): from her seed alone, so every machine lays her out the
-  // same without being told. Six cruisers in ten have one: a hangar bay, an arboretum or a machinery hall, as likely as each other.
-  const HALL_KINDS: ShHallKind[] = ['bay', 'grove', 'works'];
+  // same without being told. Eight cruisers in ten have one: a hangar bay, an arboretum, machinery halls or (a cruise liner) a promenade court, as likely as each other.
+  const HALL_KINDS: ShHallKind[] = ['bay', 'grove', 'works', 'mall'];
   // (what the terminal says of a cruiser that has one, and the objective's panel aboard her)
   const HALL_LINE: Record<ShHallKind, { brief: string; offer: string }> = {
     bay: { brief: 'a hangar bay', offer: 'Two decks, with a hangar bay right across her, open through both: a gallery round it looks down on its floor.' },
     grove: { brief: 'an arboretum', offer: 'Two decks, with an arboretum down her port side, open through both: a gallery round it looks down on its floor.' },
+    mall: { brief: 'a promenade court', offer: 'A cruise liner. Two decks, with a promenade court right across her forward, open through both: shops, a fountain, a gallery round it looking down on its floor.' },
     works: { brief: 'machinery halls', offer: 'Two decks, with machinery halls fore and aft, open through both: a gallery round each looks down on its floor.' },
   };
-  const hallOf = (seed: number, size: SpSize | null | undefined): ShHallKind | null => { if (size !== 'large') return null; const q = (Math.imul(seed ^ 0x5ca1ab1e, 0x9e3779b1) >>> 0) % 10; return q < 6 ? HALL_KINDS[q >> 1] : null; };
+  const hallOf = (seed: number, size: SpSize | null | undefined): ShHallKind | null => { if (size !== 'large') return null; const q = (Math.imul(seed ^ 0x5ca1ab1e, 0x9e3779b1) >>> 0) % 10; return q < 8 ? HALL_KINDS[q >> 1] : null; };
   const drill = (size: SpSize | null | undefined, wing = false): 'informal' | 'practiced' => (!wing && (!size || size === 'transport' || size === 'small') ? 'informal' : 'practiced'); // (a flying wing: a warship's crew, even a corvette's, with her own security office: js/shipgen.ts wingDeck)
   const DRILL_LINE = {
     informal: 'Her breach response is informal: her people shelter in her safest compartment, under guard, and nobody comes looking for you.',

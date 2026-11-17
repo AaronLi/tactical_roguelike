@@ -1,5 +1,5 @@
 // A cruiser's halls two decks high (js/shipgen.ts HALLS): how much of each hall's floor can be seen from one place.
-//   node tools/ship_halls.mjs [seeds, default 12] [--hall=bay|grove|works]
+//   node tools/ship_halls.mjs [seeds, default 12] [--hall=bay|grove|works|mall]
 // For every hall, from each place someone can stand on its floor (every other cell, at a standing eye's height) and on its
 // gallery: the share of the hall's floor in sight (a chest's height over each cell). Prints the most seen from anywhere on
 // the floor, the average, and the same from the gallery. The floor's most should stay well short of all of it.

@@ -22,7 +22,7 @@ interface ShMeta { hall?: ShHallKind | null; size: SpSize; obj: SpObj | null; de
 // target's port side), to be boarded or left alone.
 // finish(map, lay), after the plan: what the mission needs of the finished map (map.sp).
 type ShRole = 'bridge' | 'security' | 'gunnery' | 'engine' | 'reactor' | 'cargo' | 'quarters' | 'barracks' | 'mess' | 'galley' | 'medbay' | 'armoury' | 'magazine' | 'vault' | 'brig' | 'pods' | 'spine' | 'stairs' | ShHallKind | 'gallery';
-type ShHallKind = 'bay' | 'grove' | 'works'; // (a cruiser's hall two decks high: js/shipgen.ts HALLS)
+type ShHallKind = 'bay' | 'grove' | 'works' | 'mall'; // (a cruiser's hall two decks high: js/shipgen.ts HALLS)
 
 interface ShPt { x: number; z: number; y: number }
 

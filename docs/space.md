@@ -71,7 +71,7 @@ space round her is tile 5, open to the sky, with `chasm` 300 so nothing is drawn
 | civilian transport | about 34 x 18 m | bridge, engine room, a hold, cabins, a mess. 6 crew, 3 light guards | nothing |
 | corvette | about 40 x 20 m | the same, larger. 4 guards, one breach response squad | 1 point-defence gun |
 | frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 2 point defence, 1 cannon |
-| cruiser | about 100 x 36 m; six in ten **two decks** with a hall the height of both (below) | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 cannon, 1 missile launcher |
+| cruiser | about 100 x 36 m; eight in ten **two decks** with a hall the height of both (below) | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 cannon, 1 missile launcher |
 | capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 5 point defence, 3 cannon, 2 missile launchers |
 
 What the board offers goes by how far the squad has got: transports and corvettes first, capital ships from the fifth rank.
@@ -126,7 +126,7 @@ not 45). The host's fleet is kept in its browser (`fleet`).
 ## Checking it
 
 - `node tools/ship_dump.mjs <small|medium|large> <seed> [level] [obj]`: a generated deck plan as text.
-- `node tools/ship_halls.mjs [seeds] [--hall=bay|grove|works]`: how much of each cruiser's hall can be seen from one place in it.
+- `node tools/ship_halls.mjs [seeds] [--hall=bay|grove|works|mall]`: how much of each cruiser's hall can be seen from one place in it.
 - `node tools/space_shot.mjs "<query>" <steps.mjs> --gpu`: the game in a headless Chromium against a running
   `node serve.js` (`--port`), with screenshots. Queries: `mute&hangar`, `mute&fly`, `mute&board=medium&obj=destruct&dock&nofoes&fuse=25`,
   `mute&assault=warehouse` (js/debugstart.ts).
@@ -184,27 +184,30 @@ sides is smashed away where she's rammed (`cutAt`, called from `js/space.ts` cut
 
 ## A cruiser's halls (`sp.hall`)
 
-Six cruisers in ten have **two decks** and a compartment or two the height of both (`js/shipgen.ts` HALLS, halls; which, if any,
+Eight cruisers in ten have **two decks** and a compartment or two the height of both (`js/shipgen.ts` HALLS, halls; which, if any,
 goes by her seed alone, `G.SpaceData.hallOf`, so every machine lays her out the same without being told). The rest are as they
 were, one deck. A hall is open from the lower deck's floor to the upper deck's roof. On the upper deck a **gallery** runs round it
 against the walls, a tile (2 m) wide, a steel rail along its edge (open between its rails: seen and shot through, as a foundry's
-catwalks), looking down on the floor; a flight or two inside the hall climbs to it, and both decks have doors into it.
+catwalks; a liner's court has glass balustrades instead), looking down on the floor; a flight or two inside the hall climbs to it, and both decks have doors into it.
 
 | Hall | Where | What's in it |
 | --- | --- | --- |
 | hangar bay (`bay`) | right across her amidships, about 30 x 32 m. The spine runs into it at each end, and crosses it on the upper deck as a bridge of grating | containers, pallet racking, forklifts, stacked crates and drums |
 | arboretum (`grove`) | down her port side amidships, about 30 x 12 m | a fountain, tanks, sheds, raised beds with fruit trees, hedges, junipers and boulders, benches |
+| promenade court (`mall`) | a **cruise liner's**: right across her well forward, behind the bridge, about 30 x 32 m. The spine crosses it on the upper deck on a deck of its own | a mall's court: a tiled floor, a fountain in the middle, kiosks and stalls under awnings, walls of shop shelving, planters (a hedge with trees along it), a cafe's tables, sofas and armchairs, a piano, shopfronts down its end walls. No frames on its floor but one in the spine's line at each end |
 | machinery halls (`works`) | one to starboard aft, next the engine room, a smaller one to port forward, about 20 x 12 m each | reactor cores, presses and mills, screens of panels, coolant tanks, turbines |
 
 So that nowhere on a hall's floor sees all of it: columns stand under the gallery's edge (up through both decks), **frames** (lengths
 of bulkhead two or three tiles long) stand free on the floor, turn and turn about, one half across the spine's line at each end of
 a hangar bay, and most of what's stowed there is taller than a head (`js/furniture.ts` shipHalls; nothing is put down that would
 shut any of the floor off, and the tile under the gallery is kept clear all round). `node tools/ship_halls.mjs` measures it: from
-every place on each hall's floor, the share of that floor in sight. Over 32 halls it's at most 71%, and about 25 to 35% on average.
+every place on each hall's floor, the share of that floor in sight. Over 32 halls it's at most 71%, and about 25 to 35% on average
+(a liner's court is the most open: at most 70% over ten of them, 43% on average).
 Her ordinary stairwells are moved clear of the halls (one or two, toward her ends), her lower deck is her working one (armoury,
 vault, magazines, brig), and her people live on the upper (quarters, mess, galley). High-bay lamps hang under the hall's roof
 and light the gallery too. On the terminal a cruiser with a hall says so, and the objective's panel aboard names it.
-`?board=large&seed=11` is a hangar bay, `&seed=6` an arboretum, `&seed=1` machinery halls, `&seed=3` none;
+A cruiser with a promenade court is offered as a cruise liner, in the corporate cutter's white livery (`G.SpaceData.offers`).
+`?board=large&seed=11` is a hangar bay, `&seed=6` an arboretum, `&seed=1` machinery halls, `&seed=9&hull=1` a liner's court, `&seed=3` none;
 `node tools/ship_dump.mjs large 7 2 artifact --hall=bay` prints one of any seed (`--hall=` for none).
 
 ## A flying wing (`sp.wing`)

@@ -1378,7 +1378,7 @@ export const Furniture = (() => {
     brig: { must: 'sbench', wall: ['sbench', 'lockers'], center: [], small: ['bin'], floor: null, noArt: 1 },
     pods: { floor: null, bare: 1, noArt: 1 }, spine: { floor: null, bare: 1, noArt: 1 },
     // (a cruiser's halls, two decks high: furnished by shipHalls, below; their galleries are catwalks)
-    bay: { floor: null, bare: 1, noArt: 1 }, grove: { floor: null, bare: 1, noArt: 1 }, works: { floor: null, bare: 1, noArt: 1 },
+    mall: { floor: 'tile', bare: 1, noArt: 1 }, bay: { floor: null, bare: 1, noArt: 1 }, grove: { floor: null, bare: 1, noArt: 1 }, works: { floor: null, bare: 1, noArt: 1 },
   };
   // small pieces give only their boxes; they need a footprint too when they're set against a wall
   for (const rec of Object.values(R)) if (rec.w == null || rec.d == null) {
@@ -1734,7 +1734,7 @@ export const Furniture = (() => {
         return true;
       };
       const BOXES = [0x4a5a66, 0x5d6b4a, 0x7a3f28, 0x2f5a7a, 0x8a8f94, 0x6b5a2e]; // (navy grey, olive, oxide, blue, light grey, ochre)
-      const FILL: Record<string, string> = { bay: 'crates', grove: 'juniper', works: 'turbine' }; // (cover, as every piece of more than a tile here is)
+      const FILL: Record<string, string> = { bay: 'crates', grove: 'juniper', works: 'turbine', mall: 'gondola' }; // (cover, as every piece of more than a tile here is)
       const small = (name: string, x: number, z: number, ox: number, oz: number) => { if (!free(x, z) || map.props.has(z * W + x)) return false; put(name, x, z, C(x) + ox, C(z) + oz, Math.floor(r() * 4), r()); return true; };
       // (each: what it puts down from the tile (x, z), and whether any of it went down)
       type Plot = (x: number, z: number) => boolean;
@@ -1757,6 +1757,19 @@ export const Furniture = (() => {
           [1, (x, z) => { const got = set('bench', x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('tree', x, z, 0.6, 0.6); return got; }],
           [2, row(['hedge', 'hedge', 'hedge'])],
         ] },
+        // (a liner's promenade court: a mall's. Kiosks and stalls, single and double; walls of shop shelving back to back; planters:
+        // a hedge with trees along it; a cafe's tables; a lounge's sofa and armchairs; display gondolas; a bench under a tree; a piano)
+        mall: { mid: 'fountain', plots: [
+          [3, (x, z) => { const got = set(U.pick(r, ['stallmerch', 'stallfood']), x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('tallplant', x, z, 0.85, 0.8); return got; }],
+          [2, (x, z) => set(U.pick(r, ['bigmerch', 'bigfood']), x, z, 2, 1, turn())],
+          [3, (x, z) => { const got = row(['shopwall', 'shopwall', 'shopwall'])(x, z); if (got) row(['shopwall', 'shopwall', 'shopwall'])(x, z + 1); return got; }],
+          [3, (x, z) => { const n = U.ri(r, 2, 3), got = any(...[0, 1, 2].slice(0, n).map((i) => set('hedge', x + i, z, 1, 1, 0))); if (got) for (let i = 0; i < n; i++) small('tree', x + i, z, 0, 0); return got; }],
+          [2, (x, z) => { const got = any(set('dining', x, z, 1, 1, U.ri(r, 0, 3)), set('dining', x + 1, z + 1, 1, 1, U.ri(r, 0, 3))); if (got) small('tallplant', x + 1, z, 0, 0); return got; }],
+          [2, (x, z) => { const got = any(set('sofa', x, z, 1, 1, 0), set('armchairs', x, z + 1, 1, 1, 2)); if (got) small('potplant', x, z, 0.85, 0); return got; }],
+          [2, row(['gondola', 'gondola'])],
+          [1, (x, z) => { const got = set('bench', x, z, 1, 1, U.ri(r, 0, 3)); if (got) small('tree', x, z, 0.7, 0.7); return got; }],
+          [1, (x, z) => set('piano', x, z, 1, 1, U.ri(r, 0, 3))],
+        ] },
         works: { plots: [
           [3, row(['core', 'panel', 'core'], 0)],
           [2, (x, z) => row(['press', 'mill', U.pick(r, ['mill', 'saw'])], 0)(x, z)],
@@ -1771,13 +1784,19 @@ export const Furniture = (() => {
       const hall = (rm: Room) => {
         const K = KINDS[rm.type], total = K.plots.reduce((a, [n]) => a + n, 0), iw = rm.w - 2, ih = rm.h - 2;
         cur = rm;
+        // (a court's shopfronts: shelving down its end walls, under the gallery, clear of the spine's doors and of the corners)
+        if (rm.type === 'mall') for (const [x, dx] of [[rm.x, -1], [rm.x + rm.w - 1, 1]]) for (let z = rm.z + 2; z < rm.z + rm.h - 2; z++) {
+          if (t[z * W + x] !== 0 || t[z * W + x + dx] !== 1 || [-2, -1, 0, 1, 2].some((q) => t[(z + q) * W + x + dx] === 3) || r() < 0.3) continue;
+          const name = U.pick(r, ['shopwall', 'shopwall', 'rack', 'china', 'dispenser']), rec = R[name];
+          if (tryBlock(x, z, rec.cover ? 2 : 4)) put(name, x, z, C(x) + dx * (1 - 0.02 - rec.d / 2), C(z), facing(dx, 0), r(), [[dx, 0]]);
+        }
         if (K.mid) set(K.mid, rm.x + (rm.w >> 1) - 1, rm.z + (rm.h >> 1) - 1, 2, 2, 0);
         for (let want = Math.round(iw * ih / (ih <= 4 ? 6 : 8)), a = 0; want > 0 && a < iw * ih * 3; a++) {
           let pick = r() * total, k = 0; while (k < K.plots.length - 1 && (pick -= K.plots[k][0]) >= 0) k++;
           if (K.plots[k][1](rm.x + 1 + Math.floor(r() * iw), rm.z + 1 + Math.floor(r() * ih))) want--;
         }
       };
-      return { bay: hall, grove: hall, works: hall };
+      return { bay: hall, grove: hall, works: hall, mall: hall };
     }
     const shp = map.theme.layout === 'ship' ? shipHalls() : null;
     const fest = map.theme.layout === 'festival' ? festival() : null, fdy = map.theme.layout === 'foundry' ? foundry() : null, cst = map.theme.layout === 'crest' ? crestPlan() : null;

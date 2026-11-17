@@ -43,11 +43,16 @@ export const ShipGen = (() => {
   //   bay:   a hangar bay right across her amidships, the spine running into it at each end and over it as a bridge of grating
   //   grove: an arboretum down her port side amidships
   //   works: a machinery hall to starboard aft, next the engine room, and a second, smaller, to port forward
+  //   mall:  a cruise liner's promenade court, right across her well forward: a mall's court. A tiled floor, a fountain in the
+  //          middle of it, kiosks, planters, a cafe's tables and a lounge's sofas about it, shopfronts down its end walls; glass
+  //          balustrades round its gallery (not steel rails), the spine over it a deck, not a grating. No frames on its floor
+  //          but the one in the spine's line at each end: what stands about it is what breaks it up.
   // stairs: where her ordinary stairwells are along her (of her spine's length), clear of the halls.
   const HALLS: Record<ShHallKind, { stairs: number[]; at: [number, number, number, number][] }> = { // at: [side, where along her, least and most tiles long]
     bay: { stairs: [0.08, 0.84], at: [[0, 0.48, 11, 16]] },
     grove: { stairs: [0.08, 0.84], at: [[-1, 0.5, 13, 19]] },
     works: { stairs: [0.5], at: [[1, 0.8, 10, 15], [-1, 0.2, 8, 12]] },
+    mall: { stairs: [0.64, 0.86], at: [[0, 0.27, 11, 16]] },
   };
   function halls(r: LvRng, sk: ShSk, kind: ShHallKind) {
     const U = G_U, segs = sk.segs, n = segs.length, dmax = sk.dmax;
@@ -81,7 +86,7 @@ export const ShipGen = (() => {
       if (side === 0) {
         const js = dmax + 1; // (the spine's first row, in the hall)
         frame(3, js, 0, 1, 1); frame(w - 4, js + sk.sw - 1, 0, -1, 1);
-        for (let i = 4 + U.ri(r, 0, 1), q = 0; i <= w - 4; i += U.ri(r, 3, 4), q++) {
+        for (let i = 4 + U.ri(r, 0, 1), q = 0; kind !== 'mall' && i <= w - 4; i += U.ri(r, 3, 4), q++) {
           const across = q % 2 === 0, len = U.ri(r, 2, 3);
           frame(i, U.ri(r, lo, js - 2 - (across ? len - 1 : 0)), across ? 0 : 1, across ? 1 : 0, len);
           frame(i + U.ri(r, 0, 1), U.ri(r, js + sk.sw + 1, hi - (across ? 0 : len - 1)), across ? 1 : 0, across ? 0 : 1, len);
@@ -166,7 +171,7 @@ export const ShipGen = (() => {
       if (f === 0) rm.tall = true; else rm.type = 'catwalk';
       if (f > 0) for (let j = 1; j < hh - 1; j++) for (let i = 1; i < w - 1; i++) {
         const k = (z + j) * W + x + i, bridge = h.side === 0 && z + j >= zc && z + j < zc + sw;
-        if (bridge) c.grate![k] = 1; else t[k] = 5;
+        if (bridge) { if (h.kind !== 'mall') c.grate![k] = 1; } else t[k] = 5; // (a liner's court: the spine crosses it on a deck of its own)
       }
       for (const [i, j] of h.pillars) t[(z + j) * W + x + i] = 1;
       if (f === 0) for (const [i, j] of h.frames) t[(z + j) * W + x + i] = 1;
@@ -290,7 +295,7 @@ export const ShipGen = (() => {
     const hull = (sk: ShSk, o: number[], isMain: boolean): any => ({ x0: o[0], z0: o[1], x1: o[0] + sk.W - 1, z1: o[1] + sk.H - 1, zc: o[1] + sk.zc + sk.sw / 2, main: isMain, size: sk.size });
     const src = { wing, hall, size, obj: (sp && sp.obj) || null, decks, other: osz, locks, breach, hulls: [hull(main, mo, true)].concat(other ? [hull(other, oo, false)] : []) };
     if (decks === 1) return Object.assign(floors[0], { sp: src });
-    return { floors, stairs, sp: src, rail: hall ? 'steel' : undefined } as unknown as LvLay; // (a hall's gallery: steel rails, open between, as a foundry's catwalks)
+    return { floors, stairs, sp: src, rail: hall && hall !== 'mall' ? 'steel' : undefined } as unknown as LvLay; // (a hall's gallery: steel rails, open between, as a foundry's catwalks; a liner's court: glass balustrades, as a building's stairwells)
   }
 
   // After the plan (and the stacking of her decks): map.sp
@@ -571,6 +576,6 @@ export const ShipGen = (() => {
       }
     }
   }
-  const NAMES: Record<string, string> = { bridge: 'Bridge', security: 'Security', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell', bay: 'Hangar bay', grove: 'Arboretum', works: 'Machinery hall', gallery: 'Gallery' };
+  const NAMES: Record<string, string> = { bridge: 'Bridge', security: 'Security', gunnery: 'Gun control', engine: 'Engine room', reactor: 'Reactor', cargo: 'Hold', quarters: 'Quarters', barracks: 'Barracks', mess: 'Mess', galley: 'Galley', medbay: 'Sick bay', armoury: 'Armoury', magazine: 'Magazine', vault: 'Vault', brig: 'Brig', pods: 'Escape pods', spine: 'Spine', stairs: 'Stairwell', bay: 'Hangar bay', grove: 'Arboretum', works: 'Machinery hall', mall: 'Promenade court', gallery: 'Gallery' };
   return { lay, finish, fairings, faired, roomAt, sites, siteOf, siteAt, cut, seal, tunnelPath, bent, cutKey, TUN, NAMES, SPEC, HALLS };
 })();
