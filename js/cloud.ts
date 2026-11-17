@@ -31,7 +31,7 @@ interface CloudQueue { add: Record<string, number>; max: Record<string, number>;
 export const Cloud = (() => {
   const V = 1; // (the data's shape: schema_version in every row. The client's version is in load's import, and js/types/supabase-cdn.d.ts)
   // what's synced, by where it goes (never the TURN relay's settings, 'turn': a connection's credentials stay in this browser): the profile row's columns, its settings (jsonb), and the progress row
-  const PROFILE = ['name', 'look'], SETTINGS = ['animals', 'sens', 'padSens', 'touchSens', 'fov', 'vol', 'loadKit', 'muted', 'quick'], PROGRESS = ['arsenal', 'wishlist'];
+  const PROFILE = ['name', 'look'], SETTINGS = ['animals', 'sens', 'padSens', 'touchSens', 'fov', 'scale', 'vol', 'loadKit', 'muted', 'quick'], PROGRESS = ['arsenal', 'wishlist', 'loadout'];
   const PREFS = [...PROFILE, ...SETTINGS], SYNCED = new Set([...PREFS, ...PROGRESS]);
   const DEBOUNCE = 4000, RETRY0 = 5000, RETRY_MAX = 60000;
   const q = new URLSearchParams(location.search);
@@ -135,18 +135,36 @@ export const Cloud = (() => {
     const on = Object.assign({}, newerB ? A.on : B.on, newerB ? B.on : A.on);
     return { got, n, pro, on };
   }
+  // The loadout's trees (js/loadout.ts, U.store 'loadout'): the XP the higher, the pieces earned the union, each challenge's tally the
+  // higher; what's picked, its attachments, colours and throwables the newer side's (newerB: b's changed later than a's).
+  function mergeLoadout(a: any, b: any, newerB: boolean) {
+    const A = a && typeof a === 'object' ? a : {}, B = b && typeof b === 'object' ? b : {}, N = newerB ? B : A, O = newerB ? A : B;
+    const got = [...new Set([...(Array.isArray(A.got) ? A.got : []), ...(Array.isArray(B.got) ? B.got : [])])].filter((x) => typeof x === 'string');
+    const n: Record<string, Record<string, number>> = {};
+    for (const src of [A.n || {}, B.n || {}]) for (const [g, st] of Object.entries(src as Record<string, Record<string, number>>)) {
+      const o = n[g] || (n[g] = {});
+      for (const [k, v] of Object.entries(st || {})) if (typeof v === 'number') o[k] = Math.max(o[k] || 0, v);
+    }
+    const out: any = { xp: Math.max(+A.xp || 0, +B.xp || 0), got, n };
+    for (const k of ['sel', 'box', 'col', 'thr']) { const v = N[k] !== undefined ? N[k] : O[k]; if (v !== undefined) out[k] = v; }
+    return out;
+  }
+  const loadoutEmpty = (l: any) => !l || (!l.xp && !(l.got && l.got.length) && !Object.keys(l.n || {}).length);
   // the career: the account's counters plus what's here that it hasn't had (d.add), the maxima the higher, the best runs the better
   function careerFrom(row: any): CareerStats {
     const s: any = Career.clean(null);
     if (!row) return s;
     for (const [k, col] of Object.entries(Career.COLS)) s[k] = +row[col] || 0;
-    s.deepest = +row.deepest || 0; s.bestLevel = row.best_level || null; s.bestCredits = row.best_credits || null;
+    for (const [k, col] of Object.entries(Career.MAXES)) s[k] = +row[col] || 0;
+    s.bestLevel = row.best_level || null; s.bestCredits = row.best_credits || null;
+    s.mis = {}; if (row.missions && typeof row.missions === 'object') for (const [k, v] of Object.entries(row.missions)) if (Career.MIS_KEY.test(k)) s.mis[k] = +(v as number) || 0;
     return s;
   }
   function careerPlus(c: CareerStats, d: CloudQueue): CareerStats {
     const s: any = Object.assign({}, c);
-    for (const [k, n] of Object.entries(d.add)) if (k in Career.COLS) s[k] = (s[k] || 0) + n;
-    s.deepest = Math.max(s.deepest, d.max.deepest || 0);
+    s.mis = Object.assign({}, c.mis || {});
+    for (const [k, n] of Object.entries(d.add)) { if (k in Career.COLS) s[k] = (s[k] || 0) + n; else if (k.startsWith('m.')) s.mis[k.slice(2)] = (s.mis[k.slice(2)] || 0) + n; }
+    for (const k of Object.keys(Career.MAXES)) s[k] = Math.max(s[k] || 0, d.max[k] || 0);
     if (d.best.best_level && (!s.bestLevel || d.best.best_level.lvl > s.bestLevel.lvl)) s.bestLevel = d.best.best_level;
     if (d.best.best_credits && (!s.bestCredits || d.best.best_credits.credits > s.bestCredits.credits)) s.bestCredits = d.best.best_credits;
     return s;
@@ -155,23 +173,30 @@ export const Cloud = (() => {
   function careerAsDelta(s: CareerStats): CloudQueue {
     const d: CloudQueue = { add: {}, max: {}, best: {}, profile: 0, progress: 0 };
     for (const k of Object.keys(Career.COLS)) if ((s as any)[k]) d.add[k] = (s as any)[k];
-    if (s.deepest) d.max.deepest = s.deepest;
+    for (const [k, n] of Object.entries(s.mis || {})) if (n) d.add['m.' + k] = n; // (the missions' counters: 'm.' and the key)
+    for (const k of Object.keys(Career.MAXES)) if ((s as any)[k]) d.max[k] = (s as any)[k];
     if (s.bestLevel) d.best.best_level = s.bestLevel;
     if (s.bestCredits) d.best.best_credits = s.bestCredits;
     return d;
   }
   const rpcDelta = (d: CloudQueue) => {
     const a: Record<string, number> = {};
-    for (const [k, n] of Object.entries(d.add)) if (Career.COLS[k] && n > 0) a[Career.COLS[k]] = Math.round(n);
-    return { add: a, max: d.max, best_level: d.best.best_level || null, best_credits: d.best.best_credits || null };
+    const ms: Record<string, number> = {}, mx: Record<string, number> = {};
+    for (const [k, n] of Object.entries(d.add)) {
+      if (Career.COLS[k] && n > 0) a[Career.COLS[k]] = Math.round(n);
+      else if (k.startsWith('m.') && Career.MIS_KEY.test(k.slice(2)) && n > 0) ms[k.slice(2)] = Math.round(n);
+    }
+    for (const [k, n] of Object.entries(d.max)) if (Career.MAXES[k] && n > 0) mx[Career.MAXES[k]] = Math.round(n);
+    // (the missions' counters and the bests: supabase/migrations/20261116000000_space.sql)
+    return { add: a, max: mx, missions: ms, best_level: d.best.best_level || null, best_credits: d.best.best_credits || null };
   };
   // a run, as its row (and back)
   const iso = (t: number | null) => (t ? new Date(t).toISOString() : null);
   const runRow = (r: CareerRun, uid: string) => ({ user_id: uid, id: r.id, started_at: iso(r.start), ended_at: r.end && r.end >= r.start ? iso(r.end) : null, solo: !!r.solo, host: !!r.host,
     squad: Math.max(1, Math.min(16, r.squad | 0)), joined_at: r.joined ? Math.max(1, Math.min(10000, r.joined | 0)) : null, outcome: r.outcome, deepest: Math.min(10000, r.deepest | 0),
-    credits: Math.round(r.credits) || 0, kills: Math.min(100000, r.kills | 0), arrests: Math.min(100000, r.arrests | 0), levels: r.levels.slice(-200), schema_version: V });
+    credits: Math.round(r.credits) || 0, kills: Math.min(100000, r.kills | 0), arrests: Math.min(100000, r.arrests | 0), levels: r.levels.slice(-200), missions: (r.missions || []).slice(-100), schema_version: V });
   const runFrom = (w: any): CareerRun => ({ id: w.id, v: w.schema_version || 1, start: Date.parse(w.started_at), end: w.ended_at ? Date.parse(w.ended_at) : null, solo: !!w.solo, host: !!w.host, squad: w.squad || 1,
-    joined: w.joined_at || null, outcome: w.outcome, deepest: w.deepest || 0, credits: w.credits || 0, kills: w.kills || 0, arrests: w.arrests || 0, levels: Array.isArray(w.levels) ? w.levels : [],
+    joined: w.joined_at || null, outcome: w.outcome, deepest: w.deepest || 0, credits: w.credits || 0, kills: w.kills || 0, arrests: w.arrests || 0, levels: Array.isArray(w.levels) ? w.levels : [], missions: Array.isArray(w.missions) ? w.missions : [],
     t: Date.parse(w.updated_at || w.ended_at || w.started_at) || 0, u: 1, sy: 1 });
 
   // ------------------------------------------------------------- the client and the session
@@ -256,9 +281,13 @@ export const Cloud = (() => {
         if (JSON.stringify(arsenal) !== JSON.stringify(la || null) && (la || arsenal.got.length || Object.keys(arsenal.n).length)) { S.put('arsenal', arsenal); changed.push('arsenal'); }
         if (w.toLocal.length && w.vals.wishlist !== undefined) { S.put('wishlist', w.vals.wishlist); m.mt.wishlist = w.mt.wishlist || 0; changed.push('wishlist'); }
       }
-      const mt = { arsenal: Math.max(m.mt.arsenal || 0, cmt.arsenal || 0), wishlist: w.mt.wishlist || 0 };
-      up = !row || JSON.stringify(arsenal) !== JSON.stringify(ca) || w.toCloud;
-      Object.assign(out, { arsenal, wishlist: Array.isArray(w.vals.wishlist) ? w.vals.wishlist.slice(0, 500) : [], mt });
+      // the loadout's trees: merged as the arsenal is (mergeLoadout)
+      const ll = S.get('loadout', null), cl = row && row.loadout && typeof row.loadout === 'object' && Object.keys(row.loadout).length ? row.loadout : null;
+      const loadout = mode === 'replace' ? mergeLoadout(cl, null, false) : mergeLoadout(ll, cl, (cmt.loadout || 0) > (m.mt.loadout || 0));
+      if (mode !== 'adopt' && JSON.stringify(loadout) !== JSON.stringify(ll || null) && !(loadoutEmpty(loadout) && !ll)) { S.put('loadout', loadout); changed.push('loadout'); }
+      const mt = { arsenal: Math.max(m.mt.arsenal || 0, cmt.arsenal || 0), wishlist: w.mt.wishlist || 0, loadout: Math.max(m.mt.loadout || 0, cmt.loadout || 0) };
+      up = !row || JSON.stringify(arsenal) !== JSON.stringify(ca) || w.toCloud || JSON.stringify(loadout) !== JSON.stringify(cl || {});
+      Object.assign(out, { arsenal, wishlist: Array.isArray(w.vals.wishlist) ? w.vals.wishlist.slice(0, 500) : [], loadout, mt });
     }
     keepMeta();
     if (changed.length) applyLive(changed);
@@ -267,6 +296,7 @@ export const Cloud = (() => {
   // what's merged in, into the game as it is now (the menu's controls, the arsenal's copy, the wishlist, the quick slots)
   function applyLive(keys: string[]) {
     if (keys.includes('arsenal') && Arsenal) Arsenal.reload();
+    if (keys.includes('loadout') && Hooks.loadout) Hooks.loadout.reload(); // (js/loadout.ts: its store read afresh)
     if (keys.includes('wishlist') && Shop) Shop.wishSet = null;
     if (keys.includes('quick') && Me) (Me as any)._quick = null;
     if (Game && Game.applyStored) Game.applyStored(keys);
@@ -322,12 +352,13 @@ export const Cloud = (() => {
     for (const [k, n] of Object.entries(now)) if (n - (snapA[k] || 0) > 0) extra[k] = n - (snapA[k] || 0);
     const pr: any = prow || {};
     S.put('arsenal', pr.arsenal && pr.arsenal.got ? pr.arsenal : undefined); S.put('wishlist', Array.isArray(pr.wishlist) ? pr.wishlist : undefined);
-    m.mt.arsenal = (pr.mt && pr.mt.arsenal) || 0; m.mt.wishlist = (pr.mt && pr.mt.wishlist) || 0;
+    S.put('loadout', loadoutEmpty(pr.loadout) ? undefined : mergeLoadout(pr.loadout, null, false));
+    m.mt.arsenal = (pr.mt && pr.mt.arsenal) || 0; m.mt.wishlist = (pr.mt && pr.mt.wishlist) || 0; m.mt.loadout = (pr.mt && pr.mt.loadout) || 0;
     m.owner = uid; m.ownerAnon = false; m.mig = null; m.migSent = {}; keepMeta();
     queueV = { add: {}, max: {}, best: {}, profile: 0, progress: 0 }; keepQ();
     Career.setStats(careerFrom(crow)); Career.onlyRuns((runs as any[]).map(runFrom));
     if (Object.keys(extra).length) add(extra);
-    applyLive(['arsenal', 'wishlist']);
+    applyLive(['arsenal', 'wishlist', 'loadout']);
   }
   // what of the guest's career the account hasn't had yet: its totals, less what's confirmed and what's in flight
   function migDelta(uid: string): CloudQueue | null {
@@ -360,17 +391,18 @@ export const Cloud = (() => {
     const x = Q();
     if (careerPending(x)) { fly().push({ id: uuid(), uid, d: { add: x.add, max: x.max, best: x.best, profile: 0, progress: 0 }, mig: false }); keepFly(); }
     const runs = Career.runs().filter((r) => r.sy !== r.u), st = S.get('cloudstash', {}) || {};
-    if (x.progress || runs.length) { const o = st[uid] || {}; st[uid] = { arsenal: x.progress ? S.get('arsenal', null) : o.arsenal || null, wishlist: x.progress ? S.get('wishlist', null) : o.wishlist || null, runs: [...(o.runs || []), ...runs].slice(-200) }; S.put('cloudstash', st); }
+    if (x.progress || runs.length) { const o = st[uid] || {}; st[uid] = { arsenal: x.progress ? S.get('arsenal', null) : o.arsenal || null, wishlist: x.progress ? S.get('wishlist', null) : o.wishlist || null, loadout: x.progress ? S.get('loadout', null) : o.loadout || null, runs: [...(o.runs || []), ...runs].slice(-200) }; S.put('cloudstash', st); }
     queueV = { add: {}, max: {}, best: {}, profile: 0, progress: 0 }; keepQ();
   }
   // ...and sent once it's back: its progress merged into the account's (unions, maxima), its runs upserted
   async function unstash(uid: string) {
     const st = S.get('cloudstash', {}) || {}, o = st[uid];
     if (!o) return;
-    if (o.arsenal || o.wishlist) {
+    if (o.arsenal || o.wishlist || o.loadout) {
       const row: any = await one('progress', uid); alive(uid);
       const arsenal = mergeArsenal(o.arsenal, row ? row.arsenal : null, true), wl = Array.isArray(o.wishlist) ? o.wishlist : row ? row.wishlist : [];
-      alive(uid); await must(client!.from('progress').upsert({ user_id: uid, schema_version: V, arsenal, wishlist: wl, mt: (row && row.mt) || {} }, { onConflict: 'user_id' }));
+      const loadout = mergeLoadout(row ? row.loadout : null, o.loadout, true);
+      alive(uid); await must(client!.from('progress').upsert({ user_id: uid, schema_version: V, arsenal, wishlist: wl, loadout, mt: (row && row.mt) || {} }, { onConflict: 'user_id' }));
     }
     if (o.runs && o.runs.length) { alive(uid); await must(client!.from('runs').upsert(o.runs.map((r: CareerRun) => runRow(r, uid)), { onConflict: 'user_id,id' })); }
     const now = S.get('cloudstash', {}) || {}; delete now[uid]; S.put('cloudstash', now);
@@ -450,10 +482,10 @@ export const Cloud = (() => {
     // to the same account again)
     if (m.owner !== was) { setState('idle'); tellHost(); return; }
     // this browser's copy of the account's progress goes (the account keeps it): an empty guest save; your preferences stay
-    S.put('arsenal', undefined); S.put('wishlist', undefined); Career.reset();
+    S.put('arsenal', undefined); S.put('wishlist', undefined); S.put('loadout', undefined); Career.reset();
     queueV = { add: {}, max: {}, best: {}, profile: 0, progress: 0 }; keepQ();
-    m.owner = null; m.ownerAnon = false; m.mig = null; m.migSent = {}; delete m.mt.arsenal; delete m.mt.wishlist; keepMeta();
-    applyLive(['arsenal', 'wishlist']);
+    m.owner = null; m.ownerAnon = false; m.mig = null; m.migSent = {}; delete m.mt.arsenal; delete m.mt.wishlist; delete m.mt.loadout; keepMeta();
+    applyLive(['arsenal', 'wishlist', 'loadout']);
     setState('idle'); tellHost();
   }
 
@@ -599,7 +631,7 @@ export const Cloud = (() => {
   }
 
   return { boot, add, runChanged, flush, sync, signInEmail, showOffer, hideOffer, get offerOpen() { return offerOpen; }, verifyCode, signOut, render,
-    mergePrefs, mergeArsenal, careerPlus, careerAsDelta, careerFrom,
+    mergePrefs, mergeArsenal, mergeLoadout, careerPlus, careerAsDelta, careerFrom,
     on, configured, guest, queue: () => Q(), meta: () => meta(), fly: () => fly(), tune(o: { batch?: number }) { if (o.batch) BATCH = o.batch; },
     get state() { return state; }, get user() { return user; }, get client() { return client; } };
 })();

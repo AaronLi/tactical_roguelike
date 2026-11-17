@@ -1737,8 +1737,8 @@ export const Space = (() => {
       case 'unlock': unlocked(m.i); Audio.click(); return true;
       case 'ms': if (m.zt != null && S.kind === 'board') { S.zt0 = m.zt; S.ztAt = performance.now(); } S.state = m; raidPods(m.raid); SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
       case 'mdone': {
-        if (m.ok === 2) { me().credits += m.pay || 0; HUD.chat(null, 0, `Salvage: +¢${U.fmt(m.pay || 0)}`); HUD.feed(`<span class="cr">Salvage +¢${U.fmt(m.pay || 0)}</span>`); }
-        else if (m.ok) { const xp = Loadout ? Loadout.mission(me(), m.diff || 1) : 0; const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; HUD.chat(null, 0, `Mission complete: +¢${U.fmt(n)}`); Audio.extract(); if (Career.run) Career.ev('evidence', n); debrief(Object.assign({ xp }, m)); }
+        if (m.ok === 2) { me().credits += m.pay || 0; Career.looted(m.pay || 0, m.ships || 0); HUD.chat(null, 0, `Salvage: +¢${U.fmt(m.pay || 0)}`); HUD.feed(`<span class="cr">Salvage +¢${U.fmt(m.pay || 0)}</span>`); }
+        else if (m.ok) { const xp = Loadout ? Loadout.mission(me(), m.diff || 1) : 0; const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; HUD.chat(null, 0, `Mission complete: +¢${U.fmt(n)}`); Audio.extract(); Career.mission(m, (m.ms && (SD.SIZES as Record<string, { tier: number }>)[m.ms.size]?.tier) || 0, Loadout ? Loadout.rank() : 0); debrief(Object.assign({ xp }, m)); }
         else debrief(Object.assign({ xp: 0 }, m));
         return true;
       }

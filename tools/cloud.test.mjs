@@ -94,6 +94,18 @@ await test('limits: oversized and out-of-range rows are refused, career_add caps
   await D.as(a, `insert into public.runs (user_id, id, started_at) select $1, gen_random_uuid(), now() - (i || ' minutes')::interval from generate_series(1, 1003) i`, [a]);
   assert.equal(+(await D.admin('select count(*) n from public.runs where user_id = $1', [a]))[0].n, 1000);
 });
+await test('space: career_add adds the counts for the missions key by key and keeps the bests as maxima; bad keys and too many are refused', async () => {
+  const a = await D.user();
+  const r = (await D.as(a, `select * from public.career_add('{"missions":{"done":1,"hvt":1,"ship_large":5000},"max":{"hardest":4,"best_pay":1200,"big_class":4,"best_rank":7}}'::jsonb)`))[0];
+  assert.deepEqual(r.missions, { done: 1, hvt: 1, ship_large: 1000 }, 'each addition capped'); assert.equal(r.hardest, 4); assert.equal(r.best_pay, 1200); assert.equal(r.big_class, 4); assert.equal(r.best_rank, 7);
+  const r2 = (await D.as(a, `select * from public.career_add('{"missions":{"done":2,"looted":3},"max":{"hardest":2,"best_pay":5000,"big_class":99}}'::jsonb)`))[0];
+  assert.deepEqual(r2.missions, { done: 3, hvt: 1, ship_large: 1000, looted: 3 }); assert.equal(r2.hardest, 4, 'a lower max ignored'); assert.equal(r2.best_pay, 5000); assert.equal(r2.big_class, 10, 'capped');
+  await assert.rejects(D.as(a, `select public.career_add('{"missions":{"Bad-Key":1}}'::jsonb)`), /bad career delta/);
+  await assert.rejects(D.as(a, `select public.career_add('{"missions":{"done":"x"}}'::jsonb)`), /bad career delta/);
+  await assert.rejects(D.as(a, `select public.career_add(jsonb_build_object('missions', (select jsonb_object_agg('k' || i, 1) from generate_series(1, 41) i)))`), /bad career delta/);
+  await assert.rejects(D.as(a, `insert into public.progress (user_id, loadout) values ($1, '[]')`, [a]), /check constraint/);
+  await assert.rejects(D.as(a, `insert into public.runs (user_id, id, started_at, missions) values ($1, gen_random_uuid(), now(), '{}')`, [a]), /check constraint/);
+});
 
 await test('guest cleanup: anonymous users idle 90 days go, with their rows; active, recent or emailed ones stay', async () => {
   const old = "now() - interval '100 days'";
@@ -123,6 +135,9 @@ await test('merge rules (pure functions)', async () => {
   assert.equal(t.vals.n, 'Hawk', 'a tie (an untouched default) is the account\'s');
   const a = C.mergeArsenal({ got: ['tx22'], n: { p9: { kills: 20, tap: 3 } }, pro: {}, on: { p9: true } }, { got: ['derringer'], n: { p9: { kills: 12, tap: 9 }, tx22: { burst: 2 } }, pro: { p9: 1 }, on: { p9: false } }, false);
   assert.deepEqual([...a.got].sort(), ['derringer', 'tx22']); assert.deepEqual({ ...a.n.p9 }, { kills: 20, tap: 9 }); assert.equal(a.n.tx22.burst, 2); assert.equal(a.pro.p9, 1); assert.equal(a.on.p9, true);
+  const l = C.mergeLoadout({ xp: 900, got: ['p:mk18'], n: { 'p:mk18': { kills: 40, hs: 2 } }, sel: { p: 'mk18' }, col: { h: 1 } }, { xp: 400, got: ['h:ops'], n: { 'p:mk18': { kills: 10, hs: 6 } }, sel: { p: 'ak' }, thr: ['frag'] }, true);
+  assert.equal(l.xp, 900, 'the XP the higher'); assert.deepEqual([...l.got].sort(), ['h:ops', 'p:mk18']); assert.deepEqual({ ...l.n['p:mk18'] }, { kills: 40, hs: 6 });
+  assert.equal(l.sel.p, 'ak', 'the picks are from the newer side'); assert.equal(l.col.h, 1, 'kept from the older where the newer has none'); assert.deepEqual([...l.thr], ['frag']);
 });
 
 await test('not set up: no client made, nothing queued, the Account box says so', async () => {
@@ -149,8 +164,10 @@ async function signIn(w, email) {
 await test('not signed in: playing and changing settings, with the project set up, make no request and no account; GUEST to the squad', async () => {
   const pre = await browser(server, stA); pre.G.Cloud.boot();
   pre.G.U.store.set('arsenal', { got: ['tx22'], n: { p9: { kills: 31 } }, pro: { p9: 1 }, on: {} });
-  pre.G.U.store.set('name', 'Hawkeye'); pre.G.U.store.set('sens', 1.4);
-  const C = pre.G.Career; C.runStart(); C.levelStart(1, 0, false, false); C.ev('kill', 60, true); C.ev('arrest', 120); C.levelEnd({ arrests: 1, incap: 1, civKilled: 0 }, 400); C.runEnd('left');
+  pre.G.U.store.set('name', 'Hawkeye'); pre.G.U.store.set('sens', 1.4); pre.G.U.store.set('scale', 0.8);
+  pre.G.U.store.set('loadout', { xp: 1500, got: ['p:mk18'], n: { 'p:mk18': { kills: 12 } }, sel: { p: 'mk18' }, box: {}, col: {} });
+  const C = pre.G.Career; C.runStart(); C.levelStart(1, 0, false, false); C.ev('kill', 60, true); C.ev('arrest', 120); C.levelEnd({ arrests: 1, incap: 1, civKilled: 0 }, 400);
+  C.mission({ ms: { obj: 'hvt', size: 'large', diff: 3, name: 'Night Heron' }, pay: 1000, bonus: 200, hvt: 2 }, 4, 7); C.looted(500, 2); C.runEnd('left');
   await sleep(1800);
   assert.equal(server.calls.length, 0); assert.equal(pre.G.Cloud.client, null); assert.equal(pre.G.Cloud.user, null);
   assert.equal(pre.G.Cloud.guest(), true);
@@ -166,9 +183,12 @@ await test('first sign-in with an email: the account is made, and everything her
   assert.equal(prof.name, 'Hawkeye'); assert.equal(prof.settings.sens, 1.4);
   assert.deepEqual(prog.arsenal.got, ['tx22']); assert.equal(prog.arsenal.n.p9.kills, 31);
   const c = await careerRow(D, uidA);
-  assert.equal(c.kills, 1); assert.equal(c.arrests, 1); assert.equal(c.runs, 1); assert.equal(c.levels, 1); assert.equal(c.headshots, 1); assert.equal(c.deepest, 1); assert.equal(+c.credits, 580);
+  assert.equal(c.kills, 1); assert.equal(c.arrests, 1); assert.equal(c.runs, 1); assert.equal(c.levels, 1); assert.equal(c.headshots, 1); assert.equal(c.deepest, 1); assert.equal(+c.credits, 2280);
+  assert.deepEqual(c.missions, { done: 1, hvt: 1, ship_large: 1, hvt_alive: 1, looted: 2 }); assert.equal(c.hardest, 3); assert.equal(c.best_pay, 1200); assert.equal(c.big_class, 4); assert.equal(c.best_rank, 7);
+  assert.equal(prof.settings.scale, 0.8); assert.equal(prog.loadout.xp, 1500); assert.deepEqual(prog.loadout.got, ['p:mk18']);
   const runs = await D.admin('select * from public.runs where user_id = $1', [uidA]);
   assert.equal(runs.length, 1); assert.equal(runs[0].outcome, 'left'); assert.equal(runs[0].levels[0].report.arrests, 1);
+  assert.equal(runs[0].missions.length, 1); assert.equal(runs[0].missions[0].name, 'Night Heron'); assert.equal(runs[0].missions[0].hvt, 2);
 });await test('reload: the session is restored, nothing counted twice; a change while playing goes up after the debounce', async () => {
   A = await browser(server, stA); A.G.Cloud.boot();
   await until(() => A.G.Cloud.state === 'ok' && A.G.Cloud.user);

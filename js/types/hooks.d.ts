@@ -34,6 +34,8 @@ interface SimHooks {
   roundSoundKey?: (def: Record<string, any>, am: string) => string;
   /** the account's side of the career counters (js/cloud.ts): what Career adds up is queued for it; unset where js/cloud.ts isn't loaded */
   cloud?: { add(d: Record<string, number>, mx?: Record<string, number>, best?: Record<string, CareerBest>): void; runChanged(): void };
+  /** the loadout's trees (js/loadout.ts): its store read afresh, once js/cloud.ts has merged the account's copy into it */
+  loadout?: { reload(): void };
   // --- js/gear.ts
   /** your own gun as built, when there's a you (js/player.ts); without it the gun's made as the simulation makes it */
   makeWeapon?: (id: string, build: any) => GWeapon;

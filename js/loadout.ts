@@ -250,4 +250,5 @@ export const Loadout = (() => {
   function reload() { save = null; }
   return { THROWS, THROW_SLOTS, THROW_PTS, THROW_NAME, THROW_SHORT, THROW_DESC, throwItem, thr, setThr, nextThr, thrCost, TREES, RINGS, BOXES, by, xpOf, rankAt, xp, rank, open, count, left, name, need, at, along, tally, gunStat, stopped, mission, worn, sel, pick, apply, reload, COLOURS, col, setCol, atts, boxes, boxesWith, fit, build, BUDGET, pts, cost, total };
 })();
+Hooks.loadout = { reload: Loadout.reload }; // (js/cloud.ts: a merged copy came down)
 Hooks.gunStat = (id, stat) => Loadout.gunStat(id, stat); // (the sidearm tree's kills count here too: js/arsenal.ts tally)

@@ -30,8 +30,11 @@ was: no request to Supabase, and the Account box in the main menu says cloud sav
 5. **Enable pg_cron** (for the guest cleanup): **Database > Extensions**, search *pg_cron*, enable it. (Optional: without it the
    cleanup isn't scheduled, and the migration says so with a notice; enable it later and run the second migration again.)
 6. **Run the migrations**, in order: either paste each file of `supabase/migrations/` (`20261107000000_progress.sql`, then
-   `20261108000000_guest_cleanup.sql`, then `20261109000000_career_idempotent.sql`) into **SQL Editor** and run it, or with the Supabase CLI: `supabase link --project-ref <ref>`
+   `20261108000000_guest_cleanup.sql`, then `20261109000000_career_idempotent.sql`, then `20261116000000_space.sql`) into **SQL Editor** and run it, or with the Supabase CLI: `supabase link --project-ref <ref>`
    then `supabase db push`.
+   **The order matters on a live project:** apply a new migration *before* deploying the client that needs it. A client from
+   before a migration works against the newer schema (every column it adds is defaulted), but a newer client against the older
+   schema has its `progress` and `runs` writes refused (unknown columns) until the migration is in.
 7. **Paste the URL and the anon key** into `js/cloudconfig.ts` (from **Project Settings > API**: "Project URL" and the `anon` `public`
    key; newer projects call it the "publishable" key, which works the same). **Never** the `service_role` / secret key: it bypasses
    Row Level Security. Rebuild (`npm run build`) and deploy as usual.
@@ -80,18 +83,20 @@ role (no session) has no grants at all.
 
 | Table | Columns | Limits |
 | --- | --- | --- |
-| `profiles` | `name`, `animal` (the 1st of the ranking, kept for anything reading it), `look` (jsonb), `settings` (jsonb: `animals` (every animal, ranked) `sens fov vol loadKit muted quick`; never the TURN relay's), `mt` (jsonb: when each was last changed), `updated_at` | name/animal ≤ 32 chars, look ≤ 4 KB, settings ≤ 8 KB |
-| `progress` | `arsenal` (jsonb: `{ got, n, pro, on }`, js/arsenal.ts), `wishlist` (jsonb array), `mt`, `updated_at` | arsenal ≤ 32 KB, wishlist ≤ 500 items / 32 KB |
-| `career` | `runs runs_done deepest acts levels kills incaps headshots arrests rescued civ_killed unauth deaths downs revives evidence credits`, `best_level`, `best_credits` (jsonb run summaries) | non-negative, capped; written only through `career_add` |
-| `runs` | PK `(user_id, id)`; `id` (client uuid), `started_at`, `ended_at`, `solo`, `host`, `squad`, `joined_at`, `outcome` (`playing wiped left abandoned`), `deepest`, `credits`, `kills`, `arrests`, `levels` (jsonb), `updated_at` | ≤ 200 levels / 64 KB; squad 1-16; the newest 1000 runs a player are kept |
+| `profiles` | `name`, `animal` (the 1st of the ranking, kept for anything reading it), `look` (jsonb), `settings` (jsonb: `animals` (every animal, ranked) `sens padSens touchSens fov scale vol loadKit muted quick`; never the TURN relay's), `mt` (jsonb: when each was last changed), `updated_at` | name/animal ≤ 32 chars, look ≤ 4 KB, settings ≤ 8 KB |
+| `progress` | `arsenal` (jsonb: `{ got, n, pro, on }`, js/arsenal.ts), `wishlist` (jsonb array), `loadout` (jsonb: `{ xp, got, n, sel, box, col, thr }`, js/loadout.ts's trees), `mt`, `updated_at` | arsenal ≤ 32 KB, wishlist ≤ 500 items / 32 KB, loadout ≤ 64 KB |
+| `career` | `runs runs_done deepest acts levels kills incaps headshots arrests rescued civ_killed unauth deaths downs revives evidence credits`, `best_level`, `best_credits` (jsonb run summaries), `missions` (jsonb counters), `hardest best_pay big_class best_rank` (maxima) | non-negative, capped; written only through `career_add` |
+| `runs` | PK `(user_id, id)`; `id` (client uuid), `started_at`, `ended_at`, `solo`, `host`, `squad`, `joined_at`, `outcome` (`playing wiped left abandoned`), `deepest`, `credits`, `kills`, `arrests`, `levels` (jsonb), `missions` (jsonb), `updated_at` | ≤ 200 levels / 64 KB; ≤ 100 missions / 32 KB; squad 1-16; the newest 1000 runs a player are kept |
 
 `career_add(d jsonb)` (security invoker: it runs as the player, under RLS) adds `d.add`'s counters (each addition capped: 1000 runs,
-100 000 kills... at a time), raises `deepest` to `d.max.deepest`, and replaces a best run only with a better one; it returns the row.
+100 000 kills... at a time), raises `deepest`, `hardest`, `best_pay`, `big_class` and `best_rank` to `d.max`'s, adds `d.missions`'s counters into `missions` key by key
+(at most 40 keys, each `[a-z0-9_]{1,24}`, 1000 at a time; new keys need no migration), and replaces a best run only with a better one; it returns the row.
 Two browsers on one account both count, because nothing overwrites the counters.
 
 A run's `levels` entry: `{ n, th, theme, night, stronghold, boss, cleared, kills, incaps, headshots, arrests, rescued, civKilled, unauth,
 evidence, downs, deaths, revives, credits, report }`, `report` being the squad's level report as the hangar's screen shows it (arrests,
 incap, bleedouts, rescued, evidence, bodies, civKilled, unauth, allRescued, stronghold).
+A run's `missions` entry (space): `{ name, kind, obj, size, th, diff, pay, bonus, hvt, freed, at }`.
 
 ### What counts (js/career.ts)
 
@@ -107,6 +112,11 @@ Only your own, host or client, from your screen's messages (never the simulation
   teammates you revived.
 - **credits** credits earned (kills, arrests, evidence, bodies, mission bonuses; penalties don't subtract here). A run's own
   `credits` is net of penalties; **best_credits** is the run with the most.
+- **Space** (the host's `mdone`, js/space.ts): `missions` counts `done`, each objective (`artifact hvt destruct hostage assault`), each
+  class of ship (`ship_transport` .. `ship_capital`), `hvt_alive` / `hvt_dead`, and `looted` (unlisted ships salvage came off). A
+  mission's pay and bonus, and salvage, go to **credits**. **hardest** the highest difficulty done, **best_pay** the most a mission
+  paid (with its bonus), **big_class** the biggest class boarded (1 a transport .. 5 a capital ship), **best_rank** the highest
+  loadout rank. The fleet isn't synced yet (there's one ship).
 
 ## Merge rules (signing in)
 
@@ -152,6 +162,8 @@ Per item:
 
 - **Sidearm unlocks** (`got`): the union. **Tallies** (`n`): per gun and stat, the higher. **Pro builds earned**: earned on either
   side is earned. **Start in pro mode** (`on`): the side whose arsenal changed last.
+- **Loadout trees** (space): **XP** the higher of the two; pieces earned (`got`) the union; challenge tallies (`n`) per piece and
+  stat the higher; what's picked, its attachments, colours and throwables (`sel box col thr`) the side whose loadout changed last.
 - **Preferences** (name, the callsign ranking (as a whole), look, each setting, and the wishlist): per key, the one changed later (`mt`, the
   changing device's clock). A tie, or a value nobody chose (the made-up `OperatorNN` name, written with `mt` 0), goes to the account;
   a key only one side has comes from that side. (The wishlist is a preference rather than a union, so un-starring sticks.)

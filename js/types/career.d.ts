@@ -13,11 +13,16 @@ interface CareerStats {
   v: number; runs: number; runsDone: number; deepest: number; acts: number; levels: number; kills: number; incaps: number; headshots: number;
   arrests: number; rescued: number; civKilled: number; unauth: number; deaths: number; downs: number; revives: number; evidence: number; credits: number;
   bestLevel: CareerBest | null; bestCredits: CareerBest | null;
+  // the missions (space: js/space.ts mdone): their counters by name (done, each objective, each class of ship boarded, hvt_alive and
+  // hvt_dead, looted: the unlisted ships salvaged), and the bests: the hardest done, the most one paid, the biggest class boarded
+  // (1 a civilian transport .. 5 a capital ship), the highest rank (js/loadout.ts)
+  mis: Record<string, number>; hardest: number; bestPay: number; bigClass: number; bestRank: number;
 }
 
 interface CareerRun {
   id: string; v: number; start: number; end: number | null; solo: boolean; host: boolean; squad: number; joined: number | null;
   outcome: 'playing' | 'wiped' | 'left' | 'abandoned'; deepest: number; credits: number; kills: number; arrests: number; levels: CareerLevel[];
+  missions?: CareerMission[]; // (the missions done in it: space)
   t: number; u: number; sy: number; // (last touched; its version, and the version the cloud has: js/cloud.ts)
 }
 
@@ -26,4 +31,10 @@ interface CareerLevel {
   n: number; th: number; theme: string; night: boolean; stronghold: boolean; boss: boolean; cleared: boolean;
   kills: number; incaps: number; headshots: number; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number;
   downs: number; deaths: number; revives: number; credits: number; report: Record<string, number | boolean> | null;
+}
+
+// a mission done in a run (space: the host's mdone): what it was and what it paid. kind: board or assault; obj: artifact, hvt, destruct,
+// hostage, assault; size: the class of ship (none for an assault); th: the theme; hvt: 1 dead, 2 in restraints; freed: hostages freed
+interface CareerMission {
+  name: string; kind: string; obj: string; size: string | null; th: number; diff: number; pay: number; bonus: number; hvt: number | null; freed: number; at: number;
 }

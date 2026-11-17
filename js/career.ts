@@ -9,14 +9,19 @@ export const Career = (() => {
   const V = 1, KEEP = 50;
   // the counters, and their columns in the career table (supabase/migrations)
   const COLS: Record<string, string> = { runs: 'runs', runsDone: 'runs_done', acts: 'acts', levels: 'levels', kills: 'kills', incaps: 'incaps', headshots: 'headshots', arrests: 'arrests', rescued: 'rescued', civKilled: 'civ_killed', unauth: 'unauth', deaths: 'deaths', downs: 'downs', revives: 'revives', evidence: 'evidence', credits: 'credits' };
-  const zero = (): CareerStats => ({ v: V, runs: 0, runsDone: 0, deepest: 0, acts: 0, levels: 0, kills: 0, incaps: 0, headshots: 0, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, deaths: 0, downs: 0, revives: 0, evidence: 0, credits: 0, bestLevel: null, bestCredits: null });
+  const zero = (): CareerStats => ({ v: V, runs: 0, runsDone: 0, deepest: 0, acts: 0, levels: 0, kills: 0, incaps: 0, headshots: 0, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, deaths: 0, downs: 0, revives: 0, evidence: 0, credits: 0, bestLevel: null, bestCredits: null, mis: {}, hardest: 0, bestPay: 0, bigClass: 0, bestRank: 0 });
   const num = (x: unknown) => (typeof x === 'number' && isFinite(x) ? x : 0);
+  // the maxima, and their columns (deepest, then the missions' bests: js/space.ts mdone)
+  const MAXES: Record<string, string> = { deepest: 'deepest', hardest: 'hardest', bestPay: 'best_pay', bigClass: 'big_class', bestRank: 'best_rank' };
+  // the missions' counters' names (as the career table's missions object has them: supabase/migrations/20261116000000_space.sql)
+  const MIS_KEY = /^[a-z0-9_]{1,24}$/;
   // what's stored, made whole whatever shape it's in (an older version, a hand-edited one)
   function clean(s: any): CareerStats {
     const z = zero();
     if (!s || typeof s !== 'object') return z;
     for (const k of Object.keys(COLS)) (z as any)[k] = Math.max(0, Math.round(num(s[k])));
-    z.deepest = Math.max(0, Math.round(num(s.deepest)));
+    for (const k of Object.keys(MAXES)) (z as any)[k] = Math.max(0, Math.round(num(s[k])));
+    if (s.mis && typeof s.mis === 'object') for (const [k, v] of Object.entries(s.mis)) if (MIS_KEY.test(k)) z.mis[k] = Math.max(0, Math.round(num(v)));
     z.bestLevel = s.bestLevel && typeof s.bestLevel === 'object' ? s.bestLevel : null;
     z.bestCredits = s.bestCredits && typeof s.bestCredits === 'object' ? s.bestCredits : null;
     return z;
@@ -39,8 +44,17 @@ export const Career = (() => {
     (S() as any)[k] += n; keepStats();
     if (Hooks.cloud) Hooks.cloud.add({ [k]: n });
   }
-  function deepest(n: number) {
-    if (n > S().deepest) { S().deepest = n; keepStats(); if (Hooks.cloud) Hooks.cloud.add({}, { deepest: n }); }
+  // a maximum: kept if it's a new best, here and to the account
+  function best(k: string, n: number) {
+    n = Math.max(0, Math.round(num(n)));
+    if (n > (S() as any)[k]) { (S() as any)[k] = n; keepStats(); if (Hooks.cloud) Hooks.cloud.add({}, { [k]: n }); }
+  }
+  const deepest = (n: number) => best('deepest', n);
+  // one more of a mission's counter (to the account as 'm.<name>': js/cloud.ts sends those as career_add's missions)
+  function misBump(k: string, n = 1) {
+    if (!n || !MIS_KEY.test(k)) return;
+    const m = S().mis; m[k] = (m[k] || 0) + n; keepStats();
+    if (Hooks.cloud) Hooks.cloud.add({ ['m.' + k]: n });
   }
   function touch(push = false) {
     if (!run) return;
@@ -102,6 +116,33 @@ export const Career = (() => {
     lvl = null;
     touch(true);
   }
+  // A mission done (space: the host's mdone, js/space.ts): counted (done, its objective, its class of ship, the HVT taken alive or dead), its
+  // pay and bonus to the credits, the bests (hardest, best paid, biggest class, rank: tier, rank as the page has them), and into the run.
+  function mission(m: Record<string, any>, tier: number, rank: number) {
+    const ms = (m && m.ms) || {}, obj = typeof ms.obj === 'string' ? ms.obj : '', size = typeof ms.size === 'string' ? ms.size : null;
+    const pay = Math.max(0, Math.round(num(m.pay))), bonus = Math.max(0, Math.round(num(m.bonus))), diff = Math.round(num(m.diff || ms.diff));
+    misBump('done');
+    if (obj) misBump(obj);
+    if (size) misBump('ship_' + size);
+    if (obj === 'hvt' && (m.hvt === 1 || m.hvt === 2)) misBump(m.hvt === 2 ? 'hvt_alive' : 'hvt_dead');
+    if (pay + bonus) bump('credits', pay + bonus);
+    best('hardest', diff); best('bestPay', pay + bonus); best('bigClass', tier); best('bestRank', rank);
+    if (!run) return;
+    run.credits += pay + bonus;
+    (run.missions || (run.missions = [])).push({ name: String(ms.name || m.name || ''), kind: String(ms.kind || ''), obj, size, th: Math.round(num(ms.th)), diff, pay, bonus,
+      hvt: m.hvt === 1 || m.hvt === 2 ? m.hvt : null, freed: Math.max(0, Math.round(num(m.freed))), at: Date.now() });
+    if (run.missions.length > 100) run.missions.splice(0, run.missions.length - 100);
+    touch(true);
+  }
+  // salvage carried off (the host's mdone, ok 2): what it paid, and how many unlisted ships it came off (when the host says)
+  function looted(pay: number, ships: number) {
+    pay = Math.max(0, Math.round(num(pay)));
+    if (ships > 0) misBump('looted', Math.round(ships));
+    if (pay) bump('credits', pay);
+    if (run && pay) { run.credits += pay; touch(); }
+  }
+  // the rank as it is now (js/loadout.ts): a new highest is kept
+  const rank = (r: number) => best('bestRank', r);
   // something you did (the host's word of it: js/game.ts), and what it paid (or cost)
   function ev(kind: 'kill' | 'incap' | 'civ' | 'unauth' | 'arrest' | 'rescue' | 'body' | 'evidence' | 'down' | 'death' | 'revive', cr = 0, hs = false) {
     const K: Record<string, string> = { kill: 'kills', incap: 'incaps', civ: 'civKilled', unauth: 'unauth', arrest: 'arrests', rescue: 'rescued', evidence: 'evidence', down: 'downs', death: 'deaths', revive: 'revives' };
@@ -162,7 +203,7 @@ export const Career = (() => {
       <h3 class="cr-h">Last runs <small class="dim">kills / arrests</small></h3>${runs || '<div class="dim">No runs yet.</div>'}`;
   }
 
-  return { COLS, init, runStart, runEnd, squad, levelStart, levelEnd, ev, mergeRuns, unsyncAll, onlyRuns, setStats, markSynced, reset, html, clean,
+  return { COLS, MAXES, MIS_KEY, init, runStart, runEnd, squad, levelStart, levelEnd, ev, mission, looted, rank, mergeRuns, unsyncAll, onlyRuns, setStats, markSynced, reset, html, clean,
     stats: () => S(), runs: () => L(), get run() { return run; }, get level() { return lvl; } };
 })();
 

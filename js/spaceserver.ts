@@ -474,7 +474,7 @@ export const SpaceSv = (() => {
       const vis = Z ? [...(Z.kept || new Map()).values()].filter((q) => q.ms.obj === 'visit' && q !== V).concat(V ? [V] : []) : [];
       if (Z) (Z.casBy = Z.casBy || {})[Z.active] = casNow();
       const ok = finished(M), nSalv = M.salv.length + vis.reduce((a, q) => a + q.salv.length, 0), cas = Object.values((Z && Z.casBy) || { 0: casNow() }).reduce((a: SvCas | undefined, b) => casAdd(a, b), undefined as SvCas | undefined)!;
-      if (nSalv) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 2, pay: nSalv * (350 + 60 * M.ms.diff), name: 'Salvage' });
+      if (nSalv) net().broadcast({ t: 'mdone', i: M.ms.i, ok: 2, pay: nSalv * (350 + 60 * M.ms.diff), name: 'Salvage', ships: vis.filter((q) => q.salv.length).length });
       if (ok && !st.board.done.includes(M.ms.i)) {
         st.board.done.push(M.ms.i);
         const freed = M.ms.obj === 'hostage' ? [...sv.enemies.values()].filter((e) => e.def.civ && e.state !== 'dead' && e.hp > 0).length : 0;
