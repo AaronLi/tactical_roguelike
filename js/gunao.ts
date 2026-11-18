@@ -12,10 +12,10 @@
 export const GunAo = (() => {
   const T = THREE;
   /** What a thing's occlusion is made of: how far a ray reaches (m), how many rays, the finest cell (m) and the most cells along its longest side, the longest an edge may be before it is split (m), how much the shut-in share is scaled and its cap. */
-  interface Opts { reach: number; rays: number; cell: number; cells: number; edge: number; strength: number; max: number; direct: boolean; async: boolean }
-  const GUN: Opts = { reach: 0.045, rays: 14, cell: 0.003, cells: 300, edge: 0.012, strength: 3.2, max: 0.9, direct: false, async: false };
+  interface Opts { reach: number; rays: number; cell: number; cells: number; edge: number; strength: number; max: number; direct: boolean; async: boolean; adaptive: boolean; fine: number; tol: number }
+  const GUN: Opts = { reach: 0.045, rays: 14, cell: 0.003, cells: 300, edge: 0.04, strength: 3.2, max: 0.9, direct: false, async: false, adaptive: true, fine: 0.003, tol: 0.2 };
   /** The squad's ship (inside and out): rooms and hull plates metres across, so a ray reaches a metre and a half, cells of 8 cm. */
-  const SHIP: Opts = { reach: 1.5, rays: 16, cell: 0.08, cells: 400, edge: 0.7, strength: 1.4, max: 0.75, direct: true, async: true };
+  const SHIP: Opts = { reach: 1.5, rays: 16, cell: 0.08, cells: 400, edge: 0.7, strength: 1.4, max: 0.75, direct: true, async: true, adaptive: false, fine: 0, tol: 0 };
   const cache = new Map<string, Float32Array[]>();
   let last = 0; // (the last apply, ms)
   // the hemisphere's rays about +z, cosine-weighted
@@ -112,9 +112,28 @@ export const GunAo = (() => {
       }
     }
   }
+  /** How shut in a point is (0 open .. o.max): rays over the hemisphere its normal faces, against the grid. */
+  function shut(g: Grid, o: Opts, px: number, py: number, pz: number, nxv: number, nyv: number, nzv: number): number {
+    const REACH = o.reach, RAYS = o.rays, dirs = dirsOf(o.rays), { occ, x0, y0, z0, nx, ny, nz, c, ic } = g, steps = Math.ceil(REACH / c), start = 3;
+    // a frame about the normal
+    let tx: number, ty: number, tz: number;
+    if (Math.abs(nxv) < 0.8) { tx = 0; ty = -nzv; tz = nyv; } else { tx = nzv; ty = 0; tz = -nxv; }
+    const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+    const bx = nyv * tz - nzv * ty, by = nzv * tx - nxv * tz, bz = nxv * ty - nyv * tx;
+    let sum = 0;
+    for (const dv of dirs) {
+      const dx = tx * dv[0] + bx * dv[1] + nxv * dv[2], dy = ty * dv[0] + by * dv[1] + nyv * dv[2], dz = tz * dv[0] + bz * dv[1] + nzv * dv[2];
+      for (let s = start; s <= steps; s++) {
+        const q = s * c, cx = Math.floor((px + dx * q - x0) * ic), cy = Math.floor((py + dy * q - y0) * ic), cz = Math.floor((pz + dz * q - z0) * ic);
+        if (cx < 0 || cy < 0 || cz < 0 || cx >= nx || cy >= ny || cz >= nz) break;
+        if (occ[(cz * ny + cy) * nx + cx]) { sum += 1 - q / REACH; break; }
+      }
+    }
+    return Math.min(o.max, (sum / RAYS) * o.strength);
+  }
   /** How shut in each vertex is (0 open .. o.max): rays over its hemisphere against the grid. `want`: only these meshes' vertices (the rest 0); `box`: and only those inside this box (x0, y0, z0, x1, y1, z1). */
   function* traceG(g: Grid, ms: M[], o: Opts, want?: (mi: number) => boolean, box?: number[]): Generator<void, Float32Array[], void> {
-    const REACH = o.reach, RAYS = o.rays, dirs = dirsOf(o.rays), { occ, x0, y0, z0, nx, ny, nz, c, ic } = g, res: Float32Array[] = [], steps = Math.ceil(REACH / c), start = 3;
+    const res: Float32Array[] = [];
     for (let mi = 0; mi < ms.length; mi++) {
       const m = ms[mi], out = new Float32Array(m.n);
       if (want && !want(mi)) { res.push(out); continue; }
@@ -122,21 +141,7 @@ export const GunAo = (() => {
         const px = m.pos[i * 3], py = m.pos[i * 3 + 1], pz = m.pos[i * 3 + 2], nxv = m.nor[i * 3], nyv = m.nor[i * 3 + 1], nzv = m.nor[i * 3 + 2];
         if ((i & 255) === 255) yield; // (a place to stop at, for the time-sliced)
         if (box && (px < box[0] || py < box[1] || pz < box[2] || px > box[3] || py > box[4] || pz > box[5])) continue;
-        // a frame about the normal
-        let tx: number, ty: number, tz: number;
-        if (Math.abs(nxv) < 0.8) { tx = 0; ty = -nzv; tz = nyv; } else { tx = nzv; ty = 0; tz = -nxv; }
-        const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
-        const bx = nyv * tz - nzv * ty, by = nzv * tx - nxv * tz, bz = nxv * ty - nyv * tx;
-        let sum = 0;
-        for (const dv of dirs) {
-          const dx = tx * dv[0] + bx * dv[1] + nxv * dv[2], dy = ty * dv[0] + by * dv[1] + nyv * dv[2], dz = tz * dv[0] + bz * dv[1] + nzv * dv[2];
-          for (let s = start; s <= steps; s++) {
-            const q = s * c, cx = Math.floor((px + dx * q - x0) * ic), cy = Math.floor((py + dy * q - y0) * ic), cz = Math.floor((pz + dz * q - z0) * ic);
-            if (cx < 0 || cy < 0 || cz < 0 || cx >= nx || cy >= ny || cz >= nz) break;
-            if (occ[(cz * ny + cy) * nx + cx]) { sum += 1 - q / REACH; break; }
-          }
-        }
-        out[i] = Math.min(o.max, (sum / RAYS) * o.strength);
+        out[i] = shut(g, o, px, py, pz, nxv, nyv, nzv);
       }
       res.push(out);
     }
@@ -150,6 +155,60 @@ export const GunAo = (() => {
     for (const m of ms) mark(g, m);
     return trace(g, ms, o);
   }
+
+
+  // Where the occlusion is worked out first and the mesh made to fit it: a triangle is split (its longest edge halved) only where the occlusion
+  // at its edges' middles isn't what the corners' average says (or its middle isn't), so a flat plate in the open, a long cylinder facet that
+  // is lit the same along its length, keeps its three vertices, and the places the occlusion changes quickly get the vertices. Nothing is
+  // bigger than o.edge (4 cm for a gun) either way, so a small thing in the middle of a face isn't missed, and nothing is smaller than o.fine.
+  function refine(m: M, g: Grid, o: Opts): { geo: THREE.BufferGeometry; ao: Float32Array } | null {
+    const geo = m.mesh.geometry, src = geo.index ? geo.toNonIndexed() : geo, names = Object.keys(src.attributes), offs: number[] = [], sizes: number[] = [];
+    if (geo.groups && geo.groups.length > 1) return null;
+    let stride = 0;
+    for (const n of names) { offs.push(stride); sizes.push(src.attributes[n].itemSize); stride += src.attributes[n].itemSize; }
+    const pi = names.indexOf('position'), ni = names.indexOf('normal');
+    if (pi < 0 || ni < 0) return null;
+    const po = offs[pi], no = offs[ni], cnt = src.attributes.position.count, W = stride + 1, mw = m.mesh.matrixWorld.elements, nm = new T.Matrix3().getNormalMatrix(m.mesh.matrixWorld).elements;
+    const cur = new Float32Array(cnt * W);
+    names.forEach((nme, k) => { const a = src.attributes[nme] as THREE.BufferAttribute; for (let i = 0; i < cnt; i++) for (let c = 0; c < sizes[k]; c++) cur[i * W + offs[k] + c] = a.getComponent(i, c); });
+    const aoOf = (v: Float32Array) => {
+      const x = v[po], y = v[po + 1], z = v[po + 2], a = v[no], b = v[no + 1], c = v[no + 2];
+      let nx = nm[0] * a + nm[3] * b + nm[6] * c, ny = nm[1] * a + nm[4] * b + nm[7] * c, nz = nm[2] * a + nm[5] * b + nm[8] * c; const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+      return shut(g, o, mw[0] * x + mw[4] * y + mw[8] * z + mw[12], mw[1] * x + mw[5] * y + mw[9] * z + mw[13], mw[2] * x + mw[6] * y + mw[10] * z + mw[14], nx, ny, nz);
+    };
+    const d2 = (a: Float32Array, b: Float32Array) => { const x = a[po] - b[po], y = a[po + 1] - b[po + 1], z = a[po + 2] - b[po + 2]; return x * x + y * y + z * z; };
+    const mid = (a: Float32Array, b: Float32Array) => { const r = new Float32Array(W); for (let k = 0; k < stride; k++) r[k] = (a[k] + b[k]) / 2; const l = Math.hypot(r[no], r[no + 1], r[no + 2]) || 1; r[no] /= l; r[no + 1] /= l; r[no + 2] /= l; r[stride] = aoOf(r); return r; };
+    const big = o.edge * o.edge, small = o.fine * o.fine, tol = o.tol;
+    let out = new Float32Array(cnt * W * 2), n = 0;
+    const emit = (a: Float32Array, b: Float32Array, c: Float32Array) => { if (n + W * 3 > out.length) { const r = new Float32Array(out.length * 2); r.set(out); out = r; } out.set(a, n); out.set(b, n + W); out.set(c, n + W * 2); n += W * 3; };
+    const sub = (t: number, k: number) => cur.subarray((t * 3 + k) * W, (t * 3 + k + 1) * W);
+    let changed = false;
+    for (let t = 0; t < cnt / 3; t++) {
+      const v = [sub(t, 0), sub(t, 1), sub(t, 2)]; for (const x of v) x[stride] = aoOf(x);
+      const stack: Float32Array[][] = [v]; let guard = 0;
+      while (stack.length) {
+        const [a, b, c] = stack.pop()!, ab = d2(a, b), bc = d2(b, c), ca = d2(c, a), mx = Math.max(ab, bc, ca);
+        if (mx <= small || ++guard > 512) { emit(a, b, c); continue; }
+        let split = mx > big;
+        if (!split) { // (does the occlusion in the middle of an edge, and at the face's middle, follow the corners'?)
+          const mab = mid(a, b), mbc = mid(b, c), mca = mid(c, a);
+          let err = Math.max(Math.abs(mab[stride] - (a[stride] + b[stride]) / 2), Math.abs(mbc[stride] - (b[stride] + c[stride]) / 2), Math.abs(mca[stride] - (c[stride] + a[stride]) / 2));
+          if (err <= tol) { const cen = new Float32Array(W); for (let k = 0; k < stride; k++) cen[k] = (a[k] + b[k] + c[k]) / 3; const l = Math.hypot(cen[no], cen[no + 1], cen[no + 2]) || 1; cen[no] /= l; cen[no + 1] /= l; cen[no + 2] /= l; err = Math.abs(aoOf(cen) - (a[stride] + b[stride] + c[stride]) / 3); }
+          split = err > tol;
+        }
+        if (!split) { emit(a, b, c); continue; }
+        changed = true;
+        if (mx === ab) { const mm = mid(a, b); stack.push([mm, b, c], [a, mm, c]); } else if (mx === bc) { const mm = mid(b, c); stack.push([a, mm, c], [a, b, mm]); } else { const mm = mid(c, a); stack.push([b, c, mm], [a, b, mm]); }
+      }
+    }
+    const nv = n / W, bg = new THREE.BufferGeometry(), ao = new Float32Array(nv);
+    names.forEach((nme, k) => { const arr = new Float32Array(nv * sizes[k]); for (let i = 0; i < nv; i++) for (let c = 0; c < sizes[k]; c++) arr[i * sizes[k] + c] = out[i * W + offs[k] + c]; bg.setAttribute(nme, new THREE.BufferAttribute(arr, sizes[k])); });
+    for (let i = 0; i < nv; i++) ao[i] = out[i * W + stride];
+    if (!changed && !geo.index) { bg.dispose(); return { geo, ao }; }
+    bg.userData = geo.userData; bg.computeBoundingBox(); bg.computeBoundingSphere();
+    return { geo: bg, ao };
+  }
+  const refCache = new Map<string, { n: number; geo: THREE.BufferGeometry }[]>();
 
   /** The numbers of a thing with moving parts: `base` with every one of them away (and each one's own surfaces against what stays), and for each layer (a door, a ramp: its meshes) what it adds to a vertex of what stays when it's in place: `d`, and `l` the layer's number (1 up; the vertex's strongest). */
   interface Layered { base: Float32Array[]; d: Float32Array[]; l: Float32Array[] }
@@ -183,7 +242,7 @@ export const GunAo = (() => {
    * worked out a few ms a frame (a ship: a couple of seconds all told), and takes hold when it's done.
    */
   function apply(group: THREE.Object3D, key?: string, o: Opts = GUN, layers?: THREE.Object3D[][]) {
-    const t0 = performance.now(), ms = collect(group, o);
+    const t0 = performance.now(), ms = collect(group, o.adaptive ? null : o);
     if (!ms.length) return;
     const same = (a: Float32Array[] | undefined) => !!a && a.length === ms.length && a.every((x, i) => x.length === ms[i].n);
     // (a magazine takes none itself, though it still shuts in what it sits against)
@@ -197,6 +256,29 @@ export const GunAo = (() => {
       });
       last = Math.round(performance.now() - t0);
     };
+    if (o.adaptive && !(layers && layers.length)) {
+      const isMag2 = (x: THREE.Object3D | null) => { for (; x; x = x.parent) if (x.userData && (x.userData.slot === 'mag' || x.userData.part === 'mag')) return true; return false; };
+      const hit = key ? refCache.get(key) : undefined;
+      if (hit && hit.length === ms.length && hit.every((h, i) => h.n === ms[i].n)) {
+        ms.forEach((m, i) => { m.mesh.geometry.dispose(); const gm = hit[i].geo.clone(); m.mesh.geometry = gm; if (isMag2(m.mesh)) gm.setAttribute('aOcc', new T.BufferAttribute(new Float32Array(gm.attributes.position.count), 1)); });
+      } else {
+        const g = makeGrid(ms, o); if (!g) return;
+        for (const m of ms) mark(g, m);
+        const made: { n: number; geo: THREE.BufferGeometry }[] = [];
+        ms.forEach((m) => {
+          const r = refine(m, g, o);
+          if (!r) { made.push({ n: m.n, geo: m.mesh.geometry.clone() }); return; }
+          const gm = r.geo; gm.setAttribute('aOcc', new T.BufferAttribute(r.ao, 1));
+          made.push({ n: m.n, geo: gm });
+          const own = gm.clone(); if (isMag2(m.mesh)) own.setAttribute('aOcc', new T.BufferAttribute(new Float32Array(own.attributes.position.count), 1));
+          if (m.mesh.geometry !== gm) m.mesh.geometry.dispose();
+          m.mesh.geometry = own;
+        });
+        if (key) refCache.set(key, made);
+      }
+      last = Math.round(performance.now() - t0);
+      return;
+    }
     if (layers && layers.length) {
       const hit = key ? layerCache.get(key) : undefined;
       if (hit && same(hit.base)) { put(hit); return; }
