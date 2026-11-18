@@ -4,6 +4,7 @@ import { Gunsmith } from './parts.js';
 import { Stickers } from './stickers.js';
 import { Models } from './glb.js';
 import { Viewmodel } from './viewmodel.js';
+import { GunAo } from './gunao.js';
 // The game's gun models: every gun it shows (the gunsmith, the hangar, icons, the loot on the floor, everyone's gun in third person, the one in your
 // hands) is a baked glTF (docs/models.md): per-part packs the baker made from the recipes (tools/models/), assembled for any build by js/glb.ts.
 // There are no recipes here and no fallback to them. This file is the facade the rest of the game calls:
@@ -121,12 +122,12 @@ export const GunModels = (() => {
   // ---------------------------------------------------------------- display: every part separate (the gunsmith, the hangar, icons)
   function display(def: any, skin?: any): { group: THREE.Group; info: any } {
     const a = Models.assemble(def, skin);
-    if (a) return a;
+    if (a) { GunAo.apply(a.group, def.code); return a; }
     const group = new T.Group(), info = infoBefore(def);
     group.userData.pending = true;
     request(def).then((ok) => {
       const b = ok ? Models.assemble(def, skin) : null;
-      if (b) { adopt(group, b.group); Object.assign(info, b.info); }
+      if (b) { GunAo.apply(b.group, def.code); adopt(group, b.group); Object.assign(info, b.info); }
       filled(group, !!b);
     });
     return { group, info };
@@ -139,6 +140,7 @@ export const GunModels = (() => {
     if (!proto) {
       const a = Models.assemble(def);
       if (!a) return null;
+      GunAo.apply(a.group, def.code);
       proto = Viewmodel.worldProto(a.group, a.info); // (takes the assembled model apart: nothing else holds it)
       worldCache.set(def.code, proto);
     }
@@ -176,6 +178,7 @@ export const GunModels = (() => {
     for (let i = 0; i < (def.akimbo ? 2 : 1); i++) {
       const a = Models.assemble(def, skin);
       if (!a) { request(def); return null; }
+      GunAo.apply(a.group, def.code);
       models.push(vmModel(a));
     }
     return Viewmodel.assemble(def, models) as THREE.Group;

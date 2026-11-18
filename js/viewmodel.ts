@@ -542,7 +542,7 @@ export const Viewmodel = (() => {
         geo.setAttribute(name, new T.BufferAttribute(f, 3));
       }
       geo.applyMatrix4(o.matrixWorld);
-      for (const name of Object.keys(geo.attributes)) if (name !== 'position' && name !== 'normal') geo.deleteAttribute(name);
+      for (const name of Object.keys(geo.attributes)) if (name !== 'position' && name !== 'normal' && name !== 'aOcc') geo.deleteAttribute(name); // (aOcc: js/gunao.ts)
       if (!byMat.has(o.material)) byMat.set(o.material, []);
       byMat.get(o.material)!.push(geo);
     });
@@ -550,12 +550,13 @@ export const Viewmodel = (() => {
     for (const [material, geos] of byMat) {
       let n = 0;
       geos.forEach((gg) => (n += gg.attributes.position.count));
-      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), occ = geos.some((gg) => gg.attributes.aOcc) ? new Float32Array(n) : null;
       let off = 0;
-      for (const gg of geos) { pos.set((gg.attributes.position as THREE.BufferAttribute).array, off * 3); nor.set((gg.attributes.normal as THREE.BufferAttribute).array, off * 3); off += gg.attributes.position.count; gg.dispose(); }
+      for (const gg of geos) { pos.set((gg.attributes.position as THREE.BufferAttribute).array, off * 3); nor.set((gg.attributes.normal as THREE.BufferAttribute).array, off * 3); if (occ && gg.attributes.aOcc) occ.set((gg.attributes.aOcc as THREE.BufferAttribute).array, off); off += gg.attributes.position.count; gg.dispose(); }
       const bg = new T.BufferGeometry();
       bg.setAttribute('position', new T.BufferAttribute(pos, 3));
       bg.setAttribute('normal', new T.BufferAttribute(nor, 3));
+      if (occ) bg.setAttribute('aOcc', new T.BufferAttribute(occ, 1));
       bg.computeBoundingSphere();
       out.push({ geometry: bg, material });
     }

@@ -55,7 +55,8 @@ export const LightGrid = (() => {
   const opts = { bounce: 1.75, bounces: 6, settle: 0.06, sky: 1, fill: 0.25, reach: 5, spill: 4, spillK: 0.55 };
 
   // every lit material reads the grid (added to its shader as three.js compiles it)
-  const VS_HEAD = 'varying vec3 vLgP;\nvarying vec3 vLgN;\n';
+  // (aOcc: a gun's occlusion at the vertex, js/gunao.ts: 0 none, and 0 too for a mesh that has none: a missing attribute reads as 0)
+  const VS_HEAD = 'varying vec3 vLgP;\nvarying vec3 vLgN;\nattribute float aOcc;\nvarying float vOcc;\n';
   const VS_BODY = `
     { vec4 lgp = vec4(transformed, 1.0); vec3 lgn = objectNormal;
       #ifdef USE_BATCHING
@@ -64,8 +65,8 @@ export const LightGrid = (() => {
       #ifdef USE_INSTANCING
       lgp = instanceMatrix * lgp; lgn = mat3(instanceMatrix) * lgn;
       #endif
-      lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); }`;
-  const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
+      lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc; }`;
+  const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nvarying float vOcc;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
 uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
   // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
@@ -130,6 +131,11 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
         irradiance *= lgao; // (the fill: the hemisphere's light, taken into reflectedLight just after this, in lights_fragment_end)
         #endif
       }
+      float lgg = 1.0 - clamp(vOcc, 0.0, 1.0) * clamp(lgAo.x, 0.0, 1.0); // (a gun's own occlusion, js/gunao.ts: the fill and the grid's light)
+      lgao *= lgg;
+      #if defined( RE_IndirectDiffuse )
+      irradiance *= lgg;
+      #endif
       if (lgL.a > 0.02) {
         vec3 lgdir = lgD.rgb / lgL.a;
         float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir), 0.0, 1.0);
@@ -143,7 +149,10 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
       float nvc = smoothstep(lgNvD.w, mix(lgNvD.w, 1.0, 0.5), dot(-nvd / nvr, lgNvD.xyz));
       reflectedLight.directDiffuse += diffuseColor.rgb * lgNv.w * nvc * nvf * nvf * clamp(dot(normalize(vLgN), nvd / nvr), 0.0, 1.0) / (1.0 + nvr * nvr) * (0.15 + 0.85 * smoothstep(0.5, 1.8, nvr)); // (the gun in your hands below the head-mounted lamp, mostly out of its beam)
     }
-    #include <lights_fragment_end>`;
+    #include <lights_fragment_end>
+    { float lgg2 = 1.0 - clamp(vOcc, 0.0, 1.0) * clamp(lgAo.x, 0.0, 1.0); // (and what it reflects of the room, and the fill where there's no grid: a gun in the gunsmith)
+      reflectedLight.indirectSpecular *= lgg2;
+      if (lgGrid.w < 0.5) reflectedLight.indirectDiffuse *= lgg2; }`;
   function patch(shader: THREE.WebGLProgramParametersWithUniforms) {
     if (!shader.fragmentShader.includes('#include <lights_fragment_end>') || !shader.vertexShader.includes('#include <worldpos_vertex>')) return;
     Object.assign(shader.uniforms, U);
