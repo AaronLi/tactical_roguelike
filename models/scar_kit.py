@@ -162,13 +162,20 @@ def lower():
     bevel(lo, 1.0 * mm, 2, 30); smooth(lo); K.adopt(lo, 'base', FURN)
     # the trigger in its guard
     o = K.tmp(prism([(0.0735, -0.0545), (0.0775, -0.0545), (0.0785, -0.066), (0.0835, -0.0765), (0.0925, -0.0835), (0.0915, -0.0845), (0.0825, -0.0795), (0.0745, -0.0715), (0.0725, -0.058)], 'x', -1.0 * mm, 1.0 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
-    # the selector (both sides): its boss on the pin, the lever lying forward and down; the magazine catch's button through the well's front
+    # the selector (both sides, as FN's 16S left and right shots show): its boss (a black disc, 6.5 mm) on the pin, the lever lying back from it to a small flat tab
     for s in (-1, 1):
-        o = K.obj(cyl(5.4 * mm, *xs(s * (HWL - 0.3) * mm, s * (HWL + 2.4) * mm), 'x', (Fp(762), Up(410)), 18), 'base', 'black'); smooth(o)
-        lv = K.tmp(prism([(0.0385, -0.0282), (0.0515, -0.0282), (0.0515, -0.0312), (0.0385, -0.0312)], 'x', *xs(s * (HWL + 1.8) * mm, s * (HWL + 4.2) * mm))); bevel(lv, 0.7 * mm, 1); smooth(lv); K.adopt(lv, 'base', 'black')
-    # the bolt catch's paddle on the left, ahead of the grip
-    pc = K.part('catch', (0, Fp(745), Up(452)))     # (part_catch: it turns about its pin with the bolt held open, as the AR's does)
-    o = K.tmp(prism(PL([(728, 440), (748, 440), (752, 458), (730, 458)]), 'x', *xs(-(HWL - 0.2) * mm, -(HWL + 1.8) * mm))); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black', pc)
+        o = K.obj(cyl(6.5 * mm, *xs(s * (HWL - 0.3 * mm), s * (HWL + 2.4 * mm)), 'x', (0.047, -0.031), 20), 'base', 'black'); smooth(o)
+        lv = K.tmp(prism([(0.029, -0.0295), (0.047, -0.0295), (0.047, -0.0325), (0.029, -0.0325)], 'x', *xs(s * (HWL + 1.8 * mm), s * (HWL + 4.0 * mm)))); bevel(lv, 0.7 * mm, 1); smooth(lv); K.adopt(lv, 'base', 'black')
+        tb = K.tmp(prism(rounded(0.0285, -0.031, 2.2 * mm, 3.6 * mm, 1.2 * mm, 3), 'x', *xs(s * (HWL + 1.8 * mm), s * (HWL + 5.0 * mm)))); bevel(tb, 0.5 * mm, 1); smooth(tb); K.adopt(tb, 'base', 'black')
+    # the left side's moulded pad above the bolt release's lever (FN's left shot: a raised tan oblong)
+    o = K.tmp(prism(rounded(0.1247, -0.0215, 13 * mm, 4.8 * mm, 2 * mm, 4), 'x', -(HWL + 1.4 * mm), -(HWL - 0.3 * mm))); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', FURN)
+    # the bolt release on the left (part_catch: it turns about its pin with the bolt held open, as the AR's does): FN's left shot shows a vertical ridged paddle rising from the
+    # lower to the upper's flank (F 0.102, U -0.040 to +0.001) and a dark lever running forward from its foot (to F 0.1375)
+    pc = K.part('catch', (0, 0.102, -0.040))
+    o = K.tmp(box(-(HWL + 3.5 * mm), -(HWL - 0.2 * mm), 0.098, 0.106, -0.0415, -0.0215)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black', pc)
+    o = K.tmp(box(-(HWU + 2.5) * mm, -(HWU - 0.5) * mm, 0.099, 0.105, -0.0215, 0.001)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black', pc)
+    o = K.tmp(multibox([(-(HWU + 3.0) * mm, -(HWU + 2.2) * mm, 0.0985, 0.1055, u - 0.0007, u + 0.0007) for u in (-0.0100, -0.0066, -0.0032, 0.0002)])); smooth(o); K.adopt(o, 'base', 'black', pc)   # (the ridges on its top)
+    o = K.tmp(prism([(0.102, -0.0425), (0.1375, -0.0425), (0.1375, -0.0355), (0.102, -0.0355)], 'x', -(HWL + 3.6 * mm), -(HWL + 0.4 * mm))); bevel(o, 0.8 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black', pc)
 
 # ----------------------------------------------------------------------------------------------------- GAS BLOCK (base) and the barrel
 def gas_block():
@@ -351,7 +358,7 @@ def details():
             q = K.tmp(cyl(5.8 * mm, *xs(s * (HWU - 0.4) * mm, s * (HWU + 3.0) * mm), 'x', (f, u), 20)); cut(q, cyl(2.6 * mm, *xs(s * (HWU - 1.0) * mm, s * (HWU + 3.5) * mm), 'x', (f, u), 14))
             bevel(q, 0.4 * mm, 1); smooth(q); K.adopt(q, 'base', 'steel')
         g = K.tmp(box(*xs(s * (HWU - 0.2) * mm, s * (HWU + 0.7) * mm), 0.0, F_FRONT - 0.002, UP_BOT * mm - 0.0006, UP_BOT * mm + 0.0006)); smooth(g); K.adopt(g, 'base', 'black')
-        for ch, f, u in (('5', 0.0653, -0.0297), ('1', 0.0628, -0.0197)):
+        for ch, f, u in (('5', 0.0585, -0.0330), ('1', 0.0535, -0.0210)):
             o = K.tmp(digit(ch, f, u, s, s * HWL, h=4.2 * mm, w=2.6 * mm, t=0.6 * mm, rise=0.35 * mm)); smooth(o); K.adopt(o, 'base', 'black')
     lg = K.tmp(box(-HWL, HWL, W_OUT_F - 0.004, 0.2085, -0.0335, -0.0177)); bevel(lg, 1.0 * mm, 2, 30); smooth(lg); K.adopt(lg, 'base', FURN)   # (the lug the hinge pin goes through, at the lower's front top)
     d = K.tmp(prism([(0.086, -0.0035), (0.099, -0.0035), (0.100, 0.0105), (0.093, 0.0119), (0.086, 0.0090)], 'x', (HWU - 0.4) * mm, (HWU + 5.0) * mm)); bevel(d, 0.9 * mm, 2, 30); smooth(d); K.adopt(d, 'base', 'gunmetal')
