@@ -48,6 +48,7 @@ export const GpuAo = (() => {
     uniform int uPass;      // 0: the floor, the ceiling, the top of a piece; 1: the vertical surfaces
     varying vec2 vUv;
     float stp(int k) { return k == 0 ? 0.08 : k == 1 ? 0.2 : k == 2 ? 0.38 : k == 3 ? 0.6 : k == 4 ? 0.85 : 1.15; }
+    float gMin = 0.0; // (a piece counts only if it is at least this tall: set while looking for the surface up above the head)
     bool solidAt(vec3 p) {
       vec2 uv = p.xz / uMap;
       if (uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return false;
@@ -56,6 +57,7 @@ export const GpuAo = (() => {
       if (hi < 0.5 && lo < 0.5) return false;
       float h = hi < 0.5 ? lo - 1.0 + 0.05 : hi - 1.0, l = lo < 0.5 ? 0.0 : lo - 1.0;
       if (l > h) l = 0.0; // (an underside seen above its own top: a piece that stands on the floor)
+      if (h < gMin) return false;
       return p.y >= l && p.y <= h;
     }
     float openAt(vec3 p, vec3 n) {
@@ -70,12 +72,19 @@ export const GpuAo = (() => {
     }
     float wallAx(float h, bool ax, vec2 c) {
       float best = 9.0, v = 1.0;
+      gMin = h > 1.0 ? h + 0.35 : 0.0;
+      bool within = solidAt(vec3(c.x, h, c.y)); // (a cell that is itself inside a piece at this height: nothing looks at a surface from here)
+      gMin = 0.0;
+      if (within) return 1.0;
       for (int sg = 0; sg < 2; sg++) {
         float sgn = sg == 0 ? 1.0 : -1.0;
         vec2 dd = ax ? vec2(sgn, 0.0) : vec2(0.0, sgn);
         for (int k = 1; k <= 10; k++) {
           float d = 0.07 * float(k); if (d >= best) break;
-          if (solidAt(vec3(c.x - dd.x * d, h, c.y - dd.y * d))) { best = d; v = openAt(vec3(c.x - dd.x * (d - 0.02), h, c.y - dd.y * (d - 0.02)), vec3(dd.x, 0.0, dd.y)); break; }
+          gMin = h > 1.0 ? h + 0.35 : 0.0; // (up above the head: a piece shorter than that is not what this surface faces: the wall behind it is)
+          bool hit = solidAt(vec3(c.x - dd.x * d, h, c.y - dd.y * d));
+          if (hit) { best = d; v = openAt(vec3(c.x - dd.x * (d - 0.02), h, c.y - dd.y * (d - 0.02)), vec3(dd.x, 0.0, dd.y)); gMin = 0.0; break; }
+          gMin = 0.0;
         }
       }
       return v;
@@ -117,7 +126,8 @@ export const GpuAo = (() => {
     dispose();
     mark(root);
     const rtOpt = { type: T.HalfFloatType, format: T.RGBAFormat, minFilter: T.NearestFilter, magFilter: T.NearestFilter, depthBuffer: true, generateMipmaps: false };
-    const rtTop = new T.WebGLRenderTarget(AW, AH, rtOpt), rtBot = new T.WebGLRenderTarget(AW, AH, rtOpt);
+    // (the heights at a finer grain than the occlusion (SH a tile: 8 cm): a door frame or a post a few centimetres across is a few of the rays' steps, not a whole cell)
+    const SH = Math.max(S, Math.min(8, Math.floor(Math.sqrt(2.5e6 / (W * H))))), rtTop = new T.WebGLRenderTarget(W * SH, H * SH, rtOpt), rtBot = new T.WebGLRenderTarget(W * SH, H * SH, rtOpt);
     const outOpt = { type: T.UnsignedByteType, format: T.RGBAFormat, minFilter: T.LinearFilter, magFilter: T.LinearFilter, depthBuffer: false, generateMipmaps: false };
     rtA = new T.WebGLRenderTarget(AW, AH * NF, outOpt); rtB = new T.WebGLRenderTarget(AW, AH * NF, outOpt);
     heightMat = new T.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { uRange: { value: new T.Vector2() } }, side: T.FrontSide });
@@ -170,5 +180,5 @@ export const GpuAo = (() => {
     if (aoMat) { aoMat.dispose(); aoMat = null; }
     if (quad) { quad.geometry.dispose(); quad = null; }
   }
-  return { bake, dispose, on, S };
+  return { bake, dispose, on, S, targets: () => ({ a: rtA, b: rtB }) };
 })();
