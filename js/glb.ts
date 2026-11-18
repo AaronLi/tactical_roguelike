@@ -705,8 +705,8 @@ function validateAuthoredConfig(cfg: any): string[] {
   else {
     for (const k of ['builtin', 'rail']) if (!Array.isArray(sg[k]) || !sg[k].every((x: any) => typeof x === 'string')) out.push(`model.json: sights.${k} must be a list of optic kind names`);
     if (Array.isArray(sg.builtin) && Array.isArray(sg.rail)) for (const x of sg.rail) if (!sg.builtin.includes(x)) out.push(`model.json: sights.rail has "${x}", which is not in sights.builtin`);
-    for (const k of ['meshless', 'railed']) if (sg[k] !== undefined && typeof sg[k] !== 'boolean') out.push(`model.json: sights.${k} must be true or false`);
-    for (const k of Object.keys(sg)) if (!['builtin', 'rail', 'meshless', 'railed'].includes(k)) out.push(`model.json: unknown field "sights.${k}"`);
+    for (const k of ['meshless', 'railed', 'scoped']) if (sg[k] !== undefined && typeof sg[k] !== 'boolean') out.push(`model.json: sights.${k} must be true or false`);
+    for (const k of Object.keys(sg)) if (!['builtin', 'rail', 'meshless', 'railed', 'scoped'].includes(k)) out.push(`model.json: unknown field "sights.${k}"`);
   }
   for (const k of Object.keys(cfg)) if (k !== 'source' && k !== 'sights') out.push(`model.json: unknown field "${k}"`);
   return out;

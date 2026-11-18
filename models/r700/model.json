@@ -1,0 +1,11 @@
+{
+  "source": "authored",
+  "sights": {
+    "builtin": [
+      "irons"
+    ],
+    "rail": [],
+    "railed": false,
+    "scoped": true
+  }
+}

@@ -140,7 +140,7 @@ export function toAuthoredGun(src) {
   const variants = {};
   for (const [name, v] of Object.entries(src.variants || {})) variants[name] = { slot: v.meta.slot, of: v.meta.of, info: v.meta.info || null, anchors: v.meta.anchors || null, thread: v.meta.thread || null, cap: v.meta.cap || null, note: v.meta.note || '', meshes: v.meshes, check: (Object.values(v.parts || {}).find((q) => q.check) || {}).check || null };
   return {
-    src: `models/${src.id}/${src.id}.glb`, info, meshes: src.meshes, parts: src.parts || {}, hinge: src.hinge || null, sights: { builtin: src.cfg.sights.builtin.slice(), rail: src.cfg.sights.rail.slice(), meshless: !!src.cfg.sights.meshless, railed: !!src.cfg.sights.railed }, pistol, anchors: a, variants,
+    src: `models/${src.id}/${src.id}.glb`, info, meshes: src.meshes, parts: src.parts || {}, hinge: src.hinge || null, sights: { builtin: src.cfg.sights.builtin.slice(), rail: src.cfg.sights.rail.slice(), meshless: !!src.cfg.sights.meshless, railed: !!src.cfg.sights.railed, scoped: !!src.cfg.sights.scoped }, pistol, anchors: a, variants,
     rig: pistol ? { top: y('mount_optic'), rail: [f('mount_optic'), f('mount_optic_end')], hgF: 0, hgEnd: 0, end: info.muzzles[0][0], barrel: f('mount_barrel'), stockY: y('mount_stock'), gripY: y('mount_grip'), mag: [a.mount_mag[0], a.mount_mag[1]] }
       : { top: a.mount_optic[1], rail: [f('mount_optic'), f('mount_optic_end')], mount: a.mount_optic_rail ? { top: a.mount_optic_rail[1], rail: [f('mount_optic_rail'), f('mount_optic_rail_end')] } : null, hgF: f('mount_handguard'), hgEnd: f('mount_handguard_end'), end: f('mount_muzzle'), barrel: f('mount_barrel'), stockY: a.mount_stock[1], gripY: a.mount_grip[1], mag: [a.mount_mag[0], a.mount_mag[1]] },
   };

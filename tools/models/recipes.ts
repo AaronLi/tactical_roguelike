@@ -1077,7 +1077,7 @@ const G_GunRecipes = (() => {
     // (the model's built-in sights: its factory optic, none, or any optic kind its model.json lists as the gun's own (A.sights.builtin): the
     // aperture on the receiver, the post on the barrel. Another gun's irons would put a front sight on the barrel, and every optic would
     // follow the barrel's length)
-    const ownIrons = !!A && (own('optic') || !o.optic || A.sights.builtin.includes(o.optic));
+    const ownIrons = !!A && ((own('optic') && !A.sights.scoped) || !o.optic || A.sights.builtin.includes(o.optic)); // (sights.scoped: the gun's factory sight is a scope on its rail, not the model's irons: the sniper rifles)
     // (the model's own FRONT sight stands on its own handguard's top rail (an AR's flip-up post: everything of slot optic ahead of where a handguard starts): with
     // another handguard fitted it goes to that one's front, by the difference in their front ends, as a piece placed by the handguard (optic@handguard: the
     // bake learns its offset per handguard). Without this it stood where the factory rail ended, in the air over a shorter one)
@@ -1136,6 +1136,7 @@ const G_GunRecipes = (() => {
       if (A!.info.anim && A!.info.anim.dust && !A!.hinge) anim.dust = authoredPart(k, A!, 'dust'); // (the port's dust cover, hinged: js/vmanim.ts)
       if (A!.info.anim && A!.info.anim.carrier && !A!.hinge) anim.carrier = authoredPart(k, A!, 'carrier'); // (a bolt carrier in the port: part_carrier, js/vmanim.ts)
       if (A!.info.anim && A!.info.anim.catch && !A!.hinge) anim.catch = authoredPart(k, A!, 'catch'); // (the bolt catch, part_catch: the receiver's own, a node that turns with the bolt held open)
+      if (A!.info.anim && A!.info.anim.bolt && !A!.hinge) anim.bolt = authoredPart(k, A!, 'bolt'); // (a bolt-action's bolt, handle and knob, part_bolt: turned up and drawn back by the hand, js/vmanim.ts)
       if (A!.info.anim && A!.info.anim.bipod && A!.parts.bipod && !A!.hinge) { // (the model's own bipod, its legs swung down by the game: the RPK's)
         // (its legs hinge on the collar, which is the barrel's: with another barrel (a variant, drawn whole) the legs go forward or back with that barrel's end. They are
         // the barrel's slot too, so each barrel's piece carries them where its collar is; the node stays on the root, as a variant can't hold a part_ node)
@@ -1805,6 +1806,7 @@ const G_GunRecipes = (() => {
       recoilBarrel: rcTravel, // (a long-recoil barrel: how far it runs back each shot, js/vmanim.ts)
       ...(A ? { grip: A.info.grip, port: A.info.port, chamberAt: A.info.chamberAt, ...(A.info.carrier ? { carrier: A.info.carrier } : {}) } : {}), // (the model's own)
       ...(A && A.info.magRake ? { magRake: A.info.magRake } : {}), // (its well's rake: js/vmanim.ts draws the magazine out along it)
+      ...(A && A.info.anim && A.info.anim.bolt ? { bolt: A.info.bolt, ...(A.info.boltTravel != null ? { boltTravel: A.info.boltTravel } : {}) } : {}), // (a bolt-action's knob, where the hand takes it, and how far the bolt comes back)
       ...(A && A.anchors.mount_fg ? { support: [fgF != null ? fgF : A.info.support[0], A.info.support[1], A.info.support[2]] } : {}), // (held on the I-beam's rail, or at the foregrip)
       ...(A && A.info.barrels ? { barrels: A.info.barrels, barrelGroups: A.info.barrelGroups, modeDial: A.info.modeDial } : {}), // (a gun of several barrels)
       ...(A && A.hinge ? { hinge: A.hinge } : {}), // (and its reload sequence)

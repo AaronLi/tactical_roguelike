@@ -21,7 +21,7 @@ interface AuthoredVariant { slot: 'barrel' | 'mag' | 'muzzle'; of: string; info:
  * One authored gun: the frame the other parts are seated on (rig), which optic kinds are its own sights (sights), the factory build's info and the meshes.
  * pistol: a pistol (info.pistol): the rig is made from the pistol anchor set, and the raw anchors (mount_slide, mount_optic, mount_tac...) are in `anchors`; variants: its per-gun parts by file name.
  */
-interface AuthoredGun { src: string; rig: AuthoredRig; sights: { builtin: string[]; rail: string[]; meshless?: boolean; railed?: boolean }; info: Record<string, any>; meshes: AuthoredMesh[]; pistol: boolean; anchors: Record<string, number[]>; variants: Record<string, AuthoredVariant>; parts: Record<string, { at: number[]; parent: string | null; check?: Record<string, any>; legs?: { at: number[]; deploy: number[] }[] /* part_bipod: its legs (group_ nodes with extras.leg): pivot, gun frame (three's axes), and deploy rotation */ }>; hinge: Record<string, any> | null }
+interface AuthoredGun { src: string; rig: AuthoredRig; sights: { builtin: string[]; rail: string[]; meshless?: boolean; railed?: boolean; scoped?: boolean }; info: Record<string, any>; meshes: AuthoredMesh[]; pistol: boolean; anchors: Record<string, number[]>; variants: Record<string, AuthoredVariant>; parts: Record<string, { at: number[]; parent: string | null; check?: Record<string, any>; legs?: { at: number[]; deploy: number[] }[] /* part_bipod: its legs (group_ nodes with extras.leg): pivot, gun frame (three's axes), and deploy rotation */ }>; hinge: Record<string, any> | null }
 {
 var G_Authored: Record<string, AuthoredGun> = {};
 G.Authored = G_Authored;
