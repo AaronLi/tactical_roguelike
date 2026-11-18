@@ -422,7 +422,7 @@ info = {
     'magAt': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4)],
     'handle': {'f': round(HANDLE[0], 4), 'y': round(HANDLE[1], 4), 'x': round(-(HWU + 18.0) * mm, 4), 'travel': 0.120, 'recip': False, 'style': 'knob', 'grab': [round(HANDLE[0], 4), round(HANDLE[1], 4), round(-(HWU + 20.0) * mm, 4)]},
     'port': [round(Fp(956), 4), round(Up(349), 4), round(HWU * mm, 4)],
-    'chamberAt': {'side': 'port', 'f': 0.1425, 'y': 0.0048, 'x': 0.0},   # (a real port: the game draws no plate or bolt face over it; the round shows in it, its case head at F 0.1425, when the carrier is back)
+    'chamberAt': {'side': 'port', 'f': round(PORT[1] - 0.7 * mm - 0.72 * (0.0476 if VAR == 'h' else 0.042), 4), 'y': 0.0059 if VAR == 'h' else 0.0048, 'x': 0.0},   # (a real port: the game draws no plate or bolt face over it; the round shows in it, its case head at F 0.1425, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(MZ0, 4), 0, 0]},
 }
