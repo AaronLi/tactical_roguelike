@@ -171,13 +171,12 @@ def upper(fa=True, deflector=True, port=(755, 925)):
     sec = [(-HW_UP + 2.6 * mm, RAIL_U0 + 0.001), (HW_UP - 2.6 * mm, RAIL_U0 + 0.001), (HW_UP, RAIL_U0 - 5 * mm), (HW_UP, U(155)), (-HW_UP, U(155)), (-HW_UP, RAIL_U0 - 5 * mm)]
     boolean(up, prism(sec, 'y', -0.05, UP_F1 + 0.01), 'INTERSECT')
     boolean(up, cyl(HW_UP + 0.8 * mm, F(522), F(752), 'y', (0, U(122)), 28), 'UNION')                 # the bolt carrier's housing
-    cut(up, box(HW_UP - 1.4 * mm, HW_UP + 2 * mm, F(port[0]), F(port[1]), U(140), U(92)))              # the ejection port's recess
+    cut(up, port_pocket(F(port[0]), F(port[1]), U(140), U(92), HW_UP + 2 * mm))                           # the ejection port: open (the dust cover is down), a pocket past the bore
     cut(up, box(-6.5 * mm, 6.5 * mm, F(490), F(586), RAIL_U0 - 3.5 * mm, RAIL_U0 + 0.01))               # the charging handle's channel
     bevel(up, 0.7 * mm, 1, 30); smooth(up); K.adopt(up, 'base', RCV)
     picatinny(K, F(586), UP_F1, RAIL_U0, 'base', RCV)
-    # the dust cover (closed), its stiffening rib and the hinge rod along its foot
-    o = K.tmp(box(HW_UP - 1.2 * mm, HW_UP - 0.2 * mm, F(port[0] + 2), F(port[1] - 2), U(141), U(91))); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)
-    o = K.tmp(box(HW_UP - 0.4 * mm, HW_UP + 0.6 * mm, F(port[0] + 45), F(port[1] - 45), U(122), U(112))); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)
+    # the port's inside (what the carrier uncovers) and the dust cover's hinge rod along its foot (the cover itself is open, down out of the way)
+    port_inside(K, F(port[0]), F(port[1]), U(140), U(92), HW_UP, mouth_r=C.get('mouth_r', 5.6 * mm))
     o = K.obj(cyl(1.3 * mm, F(port[0] - 3), F(port[1] + 3), 'y', (HW_UP - 0.3 * mm, U(143)), 8), 'base', 'steel'); smooth(o)
     if deflector:
         o = K.tmp(prism(PL([(722, 126), (722, 74), (736, 70), (752, 90), (752, 126)]), 'x', HW_UP - 0.5 * mm, HW_UP + 4.5 * mm)); bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'base', RCV)
@@ -514,6 +513,29 @@ def front_flip(f, base):
     bevel(ea, 0.5 * mm, 1); smooth(ea); K.adopt(ea, 'optic', RCV)
     o = K.obj(box(-0.75 * mm, 0.75 * mm, f - 1.6 * mm, f + 0.2 * mm, SY - 12.5 * mm, SY), 'optic', 'steel')
 
+def fold_irons(rs, fs_):
+    """The flip-up irons FOLDED: the optic's mount piece (slot optic, extras.mount: drawn only under a real optic, never with the upright irons). The rear sight's clamp base
+    stays and its leaf lies flat forward along the rail on top of it (the disc and its aperture at the front); the front sight's block stays and its post and ears lie flat
+    back over it. Nothing stands higher than 11 mm over the rail."""
+    def mount(o): o['mount'] = True; return o
+    f = rs
+    o = K.tmp(prism([(f - 11 * mm, RAIL_TOP), (f + 10 * mm, RAIL_TOP), (f + 9 * mm, RAIL_TOP + 8 * mm), (f - 10 * mm, RAIL_TOP + 8 * mm)], 'x', -9.5 * mm, 9.5 * mm))
+    bevel(o, 0.8 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', RCV))
+    o = mount(K.obj(cyl(4.2 * mm, 9.5 * mm, 12.0 * mm, 'x', (f + 2 * mm, RAIL_TOP + 4.5 * mm), 16), 'optic', RCV)); smooth(o)
+    ln = SY + 6.2 * mm - (RAIL_TOP + 7 * mm)            # (the leaf's length, hinge to the top of its disc)
+    lf = K.tmp(prism([(-4.5 * mm, f + 1 * mm), (4.5 * mm, f + 1 * mm), (4.5 * mm, f + ln - 6.2 * mm), (-4.5 * mm, f + ln - 6.2 * mm)], 'z', RAIL_TOP + 8.0 * mm, RAIL_TOP + 10.6 * mm))
+    boolean(lf, cyl(6.2 * mm, RAIL_TOP + 8.0 * mm, RAIL_TOP + 10.6 * mm, 'z', (0, f + ln - 6.2 * mm), 28), 'UNION')
+    cut(lf, cyl(3.2 * mm, RAIL_TOP + 7 * mm, RAIL_TOP + 12 * mm, 'z', (0, f + ln - 6.2 * mm), 24))
+    bevel(lf, 0.4 * mm, 1); smooth(lf); mount(K.adopt(lf, 'optic', RCV))
+    f = fs_; base = RAIL_TOP
+    o = K.tmp(prism([(f - 24 * mm, base), (f + 8 * mm, base), (f + 7 * mm, base + 7 * mm), (f - 22 * mm, base + 8 * mm)], 'x', -9.5 * mm, 9.5 * mm))
+    bevel(o, 0.8 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', RCV))
+    o = mount(K.obj(cyl(3.0 * mm, 9.5 * mm, 11.5 * mm, 'x', (f - 16 * mm, base + 4 * mm), 14), 'optic', 'steel')); smooth(o)
+    ea = K.tmp(prism([(-9.0 * mm, f - 22 * mm), (9.0 * mm, f - 22 * mm), (9.0 * mm, f + 1 * mm), (-9.0 * mm, f + 1 * mm)], 'z', base + 8.0 * mm, base + 10.2 * mm))
+    cut(ea, box(-7.2 * mm, 7.2 * mm, f - 18 * mm, f - 2 * mm, base + 6 * mm, base + 12 * mm))
+    bevel(ea, 0.4 * mm, 1); smooth(ea); mount(K.adopt(ea, 'optic', RCV))
+    o = mount(K.obj(box(-0.75 * mm, 0.75 * mm, f - 14 * mm, f - 0.0, base + 10.2 * mm, base + 11.7 * mm), 'optic', 'steel'))
+
 # ===================================================================================== MAGAZINES (part_mag)
 def mag_stanag(top):
     """A curved 30-round STANAG magazine, its top (the photo point 866, 232) at `top`: open at the top between its feed lips, the top
@@ -686,6 +708,8 @@ la = lower(C.get('lower', 'ar15'))
 PORT = C.get('port', (755, 925))
 upper(fa=C.get('forward_assist', True), deflector=C.get('deflector', True), port=PORT)
 ch_at = charging_handle()
+CARRIER = port_carrier(K, F(PORT[0]), F(PORT[1]), U(140), U(92), HW_UP, x0=C.get('mouth_r', 5.6 * mm) + 0.4 * mm)   # (the bolt carrier in the port: part_carrier)
+RND = C.get('round', (0.0048, 0.042))      # (the game's round in the port: its radius and length, js/vmanim.ts chamberView)
 {'m4': stock_m4, 'hk': stock_hk}[C.get('stock', 'm4')]()   # (the SOPMOD / Crane stays in stock_sopmod, unused for now)
 {'a2': grip_a2, 'mod': grip_mod, 'hk': grip_hk}[C.get('grip', 'mod')](la['grip'])
 HG0 = UP_F1 + 0.6 * mm                                    # (the rail's rear butts against the upper: it hides the barrel nut)
@@ -711,6 +735,7 @@ MUZ = muzzle_a2(MZ0, C.get('muzzle_sc', 1.0))
 RS = F(609)                                # (the rear sight's leaf: its base on the rail at photo x 586-632)
 rear_flip(RS)
 if FRONT == 'flip': front_flip(FS, HB_T + 5.6 * mm)   # (after the rear sight: the M4's parts keep their order)
+if FRONT == 'flip': fold_irons(RS, FS)                # (the irons folded flat: the optic's mount piece, drawn under a real optic instead of dropping the irons)
 MK = C.get('mag', 'stanag')
 if MK == 'glock':
     MTOP = la['mag']
@@ -724,17 +749,19 @@ info = {
     'sy': round(SY, 4), 'fSight': round(RS, 4), 'relief': 0.075,
     'muzzles': [[round(MUZ, 4), 0, 0]],
     'grip': [round(la['grip'][0] - 0.040, 4), round(la['grip'][1] - 0.040, 4), 0], 'support': [round((HG0 + HG1) / 2 + 0.03, 4), round(HGB - 6 * mm, 4), 0],
-    'anim': {'ch': 'part_ch', 'mag': 'part_mag', 'catch': 'part_catch'},
+    'anim': {'ch': 'part_ch', 'mag': 'part_mag', 'catch': 'part_catch', 'carrier': 'part_carrier'},
+    'carrier': {'travel': C.get('carrier', 0.090)},
     'magAt': [round(MTOP[0], 4), round(MTOP[1], 4)],
     **({'magRake': round(GRK, 4)} if C.get('lower', 'ar15') == 'glock' else {}),   # (the well's rake: a reload draws the magazine out along it)
     'port': [round(F((PORT[0] + PORT[1]) / 2), 4), round(U(116), 4), round(HW_UP, 4)],
-    'chamberAt': {'side': 'right', 'f': round(F(PORT[1] + 5), 4), 'y': 0.0, 'x': round(HW_UP - 0.6 * mm, 4)},
+    'chamberAt': {'side': 'port', 'f': round(F(PORT[1]) - 0.7 * mm - RND[1], 4), 'y': RND[0], 'x': 0.0},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
     'ch': [round(ch_at[0], 4), round(ch_at[1], 4), 0],
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(MZ0, 4), 0, 0]},
 }
 anchors = {
-    'mount_optic': [round(F(586), 4), round(RAIL_TOP, 4), 0], 'mount_optic_end': [round(UP_F1, 4), round(RAIL_TOP, 4), 0],
+    'mount_optic': [round(F(586), 4), round(RAIL_U0, 4), 0], 'mount_optic_end': [round(UP_F1, 4), round(RAIL_U0, 4), 0],
+    **({'mount_optic_rail': [round(F(586), 4), round(RAIL_TOP, 4), 0], 'mount_optic_rail_end': [round(UP_F1, 4), round(RAIL_TOP, 4), 0]} if FRONT == 'flip' else {}),
     'mount_handguard': [round(HG0, 4), 0, 0], 'mount_handguard_end': [round(HG_END, 4), 0, 0],
     'mount_barrel': [round(FB, 4), 0, 0], 'mount_muzzle': [round(MZ0, 4), 0, 0],
     'mount_stock': [0, 0, 0], 'mount_grip': [round(la['grip'][0], 4), round(la['grip'][1], 4), 0],
