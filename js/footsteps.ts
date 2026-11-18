@@ -21,11 +21,12 @@ export const Footsteps = {
   man: null as null | { variants: number; soles: Record<string, Record<string, { anchor: number }>>; kit: Record<string, { anchor: number }> },
   bufs: {} as Record<string, AudioBuffer>,
   started: false,
+  retryAt: 0, // (when a manifest that failed to load may be asked for again: a step asks every time, and a missing one is a 404 each)
   // the game's floors (js/casings.ts surface(): a room's floor, a home's, out of doors) as the synth's
   FLOOR: { concrete: 'concrete', hard: 'wood', tile: 'tile', pave: 'pave', flag: 'pave', carpet: 'carpet', wood: 'wood', parquet: 'wood', lino: 'lino', dirt: 'dirt', soil: 'dirt', grass: 'grass', gravel: 'gravel', leaves: 'leaves', metal: 'metal' } as Record<string, string>,
 
   init() {
-    if (this.started || !Audio.ctx) return;
+    if (this.started || !Audio.ctx || performance.now() < this.retryAt) return;
     this.started = true;
     const ctx = Audio.ctx;
     Audio.bankJson('footsteps/manifest.json').then((m) => { // (from the audio bundle: Audio.bankFile)
@@ -39,7 +40,7 @@ export const Footsteps = {
         Audio.bankFile('footsteps/' + n + '.ogg').then((b) => ctx.decodeAudioData(b)).then((buf) => { this.bufs[n] = buf; }).catch(() => {}).then(next);
       };
       for (let k = 0; k < 6; k++) next();
-    }).catch(() => { this.started = false; });
+    }).catch(() => { this.started = false; this.retryAt = performance.now() + 15000; });
   },
   clip(dir: string, name: string): FsClip | null {
     const m = this.man, e = m && (dir === 'kit' ? m.kit[name] : m.soles[dir] && m.soles[dir][name]), buf = this.bufs[dir + '/' + name];
