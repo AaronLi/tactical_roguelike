@@ -36,15 +36,16 @@ TI = TITANIUM
 # ---- the triangle budget: curves sized for a viewmodel (the front of the gun is a metre from the eye) ----
 _cyl, _hull, _bevel = cyl, circles_hull, bevel
 def cyl(r, a0, a1, axis, c, seg=20):          # small round things at most 12 sides, larger ones 16
-    return _cyl(r, a0, a1, axis, c, min(seg, 8 if r < 3.5 * mm else (10 if r < 6 * mm else 16)))
+    return _cyl(r, a0, a1, axis, c, min(seg, 8 if r < 3.5 * mm else (10 if r < 6 * mm else 12)))   # (12 to match the barrels' 12 sides)
 def circles_hull(cs, r, seg=24):              # outlines round the barrels: at most 10 segments a barrel
     return _hull(cs, r, min(seg, 8))
 _pic = picatinny
 def picatinny(*a, **k):                         # rails in their six-point silhouette
     k.setdefault('lean', True); return _pic(*a, **k)
 def bevel(o, w, seg=2, angle=40):             # forward of the back panel: one segment
+    tidy(o, 0.1 * mm, False)                  # (an edge under 0.1 mm would clamp the whole bevel to nothing: modeling-practices rule 5)
     vs = o.data.vertices
-    if len(vs) and sum(v.co.y for v in vs) / len(vs) > 0.15: seg = 1     # (only the panel, grip and rail, near the eye, keep two)
+    seg = 1                                    # a chamfer, not a round (rule 1): only the back panel, nearest the eye, keeps two (_bevel direct)
     return _bevel(o, w, seg, angle)
 # COLOURWAYS: 'raw' (default): bare titanium everywhere, rails included, the barrels bead-blasted raw steel, only the grip and stock dark;
 # 'dark': titanium frame, blued barrels, black rails.
@@ -52,6 +53,13 @@ COLOURWAY = os.environ.get('COLOURWAY', 'raw')
 RAIL_M = TI if COLOURWAY == 'raw' else 'black'
 BARREL_M = 'm_80838a' if COLOURWAY == 'raw' else 'blued'
 
+_lathe = lathe
+def lathe(prof, seg=24, at=(0, 0, 0)):        # round things of revolution: 12 sides (barrels 8.5 mm: 0.3 mm off round), tidy-ed caps
+    return _lathe(prof, min(seg, 12), at)
+_adopt = Kit.adopt
+def _adopt_tidy(self, o, *a, **k):            # every model mesh leaves tidy: n-gons beauty-triangulated, not fanned (rule 5)
+    tidy(o); return _adopt(self, o, *a, **k)
+Kit.adopt = _adopt_tidy
 coll, root = kit_collection(ID)
 K = Kit(coll, root)
 
@@ -90,9 +98,9 @@ RAIL_B, RAIL_U, RAIL_F1 = 0.029, 0.037, BP1 + 0.075   # the beam's underside (3 
 # ================================================== BACK PANEL (base, titanium) ==================================================
 SCREWS = ((0.020, 0.006), (BP1 - 0.020, 0.006), (0.020, -0.030), (BP1 - 0.020, -0.030))
 bp = K.tmp(prism([(0.0, -0.054), (BP1 - 0.014, -0.054), (BP1, -0.042), (BP1, 0.026), (BP1 - 0.006, 0.030), (0.012, 0.030), (0.0, 0.020)], 'x', -25 * mm, 25 * mm))
-bevel(bp, 2.5 * mm, 3, 30)
+tidy(bp, 0.1 * mm, False); _bevel(bp, 2.5 * mm, 2, 30)
 for s in (-1, 1):   # a pocketed side panel each side (the electronics bay's lid), four counterbored screws in its corners
-    cut(bp, prism(rounded(BP1 / 2, -0.012, BP1 / 2 - 0.012, 0.026, 5 * mm, 3), 'x', s * 23.6 * mm, s * 26 * mm))
+    cut(bp, prism(rounded(BP1 / 2, -0.012, BP1 / 2 - 0.012, 0.026, 5 * mm, 2), 'x', s * 23.6 * mm, s * 26 * mm))
     for f, z in SCREWS:
         cut(bp, cyl(1.9 * mm, s * 22.6 * mm, s * 24 * mm, 'x', (f, z), 12))
 cut(bp, prism(circles_hull(BORES, RB + 4 * mm, 24), 'y', BP1 - 0.004, BP1 + 0.001))       # the dock in the front face (the contacts)
@@ -119,7 +127,7 @@ o = K.obj(cyl(3 * mm, -KN_OUT + 0.5 * mm, KN_OUT - 0.5 * mm, 'x', HINGE, 16), 'b
 # the FIXED CHASSIS (base, titanium): from the panel's front to the hinge, under and beside the barrels' rear (the block's breech end
 # lies in it); its floor carries the hinge's outer knuckles
 ch = K.tmp(prism([(BP1 - 0.004, -0.054), (CH1 - 0.006, -0.054), (CH1, -0.048), (CH1, 0.002), (CH1 - 0.008, 0.006), (BP1 - 0.004, 0.006)], 'x', -27 * mm, 27 * mm))
-bevel(ch, 2 * mm, 2, 30)
+bevel(ch, 2 * mm, 1, 30)
 cut(ch, prism(circles_hull(BORES, RB + 5.6 * mm, 24) + [(-RB - 5.6 * mm - D, 0.03), (RB + 5.6 * mm + D, 0.03)], 'y', BP1 - 0.01, CH1 + 0.01))   # its channel
 # the same extrusion as the forend's rear: the cheeks down to a fluted side member, the floor up to a web (the hinge's leaves stay)
 for s in (-1, 1):
@@ -210,7 +218,7 @@ SY = RAIL_TOP - GROOVE_D
 # telescoping rods, a cheek piece riding them, a polymer buttplate with a QD socket and a ribbed rubber pad
 RH = 5.6 * mm                                                       # (the rail stands this far behind the face)
 ad = K.tmp(prism([(-RH, -0.038), (-0.032, -0.038), (-0.036, -0.030), (-0.036, 0.010), (-0.032, 0.016), (-RH, 0.016)], 'x', -13 * mm, 13 * mm))
-bevel(ad, 2 * mm, 2, 30)
+bevel(ad, 2 * mm, 1, 30)
 cut(ad, box(-11 * mm, 11 * mm, -RH - 0.001, -RH + 0.002, SR0 - 0.001, SR1 + 0.001))               # (it sits over the rail)
 smooth(ad); K.adopt(ad, 'stock', 'black')
 o = K.obj(cyl(6 * mm, -0.038, 0.016, 'z', (-13 * mm, -0.020), 20), 'stock', 'black'); smooth(o)        # the fold hinge (left)
@@ -218,23 +226,23 @@ o = K.obj(cyl(3.5 * mm, 13 * mm, 15.5 * mm, 'x', (-0.020, -0.012), 14), 'stock',
 for x in (-8 * mm, 8 * mm):                                                                          # the rods
     o = K.obj(cyl(5 * mm, -0.250, -0.034, 'y', (x, -0.008), 16), 'stock', 'black'); smooth(o)
 ck = K.tmp(prism([(-0.150, 0.010), (-0.160, 0.024), (-0.236, 0.030), (-0.240, 0.012), (-0.240, -0.018), (-0.150, -0.018)], 'x', -16 * mm, 16 * mm))
-bevel(ck, 2.5 * mm, 3, 30)
+bevel(ck, 2.5 * mm, 1, 30)
 for x in (-8 * mm, 8 * mm): cut(ck, cyl(5.2 * mm, -0.30, -0.10, 'y', (x, -0.008), 16))
 smooth(ck); K.adopt(ck, 'stock', 'polymer')                                                          # the cheek piece
 bt = K.tmp(prism([(-0.238, 0.034), (-0.262, 0.036), (-0.266, -0.092), (-0.244, -0.094), (-0.238, -0.040)], 'x', -17 * mm, 17 * mm))
-bevel(bt, 3 * mm, 3, 30)
+bevel(bt, 3 * mm, 1, 30)
 cut(bt, prism(rounded(-0.252, -0.060, 0.006, 0.018, 3 * mm, 2), 'x', -0.03, 0.03))                 # a lightening window
 for x in (-8 * mm, 8 * mm): cut(bt, cyl(5.2 * mm, -0.30, -0.10, 'y', (x, -0.008), 16))
 smooth(bt); K.adopt(bt, 'stock', 'polymer')                                                          # the buttplate
 o = K.obj(cyl(5 * mm, -17.6 * mm, -15 * mm, 'x', (-0.252, -0.025), 16), 'stock', 'steel'); smooth(o)   # its QD sling socket
 pad = K.tmp(prism([(-0.264, 0.036), (-0.278, 0.036), (-0.280, 0.030), (-0.280, -0.090), (-0.278, -0.096), (-0.264, -0.096)], 'x', -17.5 * mm, 17.5 * mm))
-bevel(pad, 3 * mm, 3, 30)
+bevel(pad, 3 * mm, 1, 30)
 for i in range(5): cut(pad, box(-0.03, 0.03, -0.283, -0.277, -0.080 + i * 0.024, -0.075 + i * 0.024))   # its ribs
 smooth(pad); K.adopt(pad, 'stock', 'rubber')
 GRIP_SEAT = (0.036, -0.054)
 gp = K.tmp(prism([(0.036, -0.052), (0.070, -0.052), (0.060, -0.075), (0.052, -0.085), (0.048, -0.100), (0.032, -0.153), (0.000, -0.153),
                   (-0.006, -0.145), (0.002, -0.100), (0.010, -0.060)], 'x', -15.5 * mm, 15.5 * mm))
-bevel(gp, 3 * mm, 3, 30); smooth(gp); K.adopt(gp, 'grip', 'stipple')
+bevel(gp, 3 * mm, 1, 30); smooth(gp); K.adopt(gp, 'grip', 'stipple')
 
 # ================================================== FRONT (part_brk): lower support body + muzzle device ==================================================
 pbrk = K.part('brk', (0, HINGE[0], HINGE[1]))

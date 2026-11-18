@@ -34,6 +34,7 @@ SW = 12.75 * mm                                     # half its width
 s_top, s_bot = U(108), U(185)
 front = [(-SW, s_bot), (SW, s_bot), (SW, s_top - 4 * mm), (SW - 3.2 * mm, s_top), (-SW + 3.2 * mm, s_top), (-SW, s_top - 4 * mm)]
 slide = K.tmp(prism(front, 'y', 0.0, F(450)))
+bevel(slide, 0.6 * mm, 1, 30)                       # chamfer once, before the cuts (modeling-practices rule 1)
 cut(slide, prism([(-0.001, s_top + 0.001), (-0.001, s_top - 5 * mm), (7 * mm, s_top + 0.001)], 'x', -0.03, 0.03))          # the rear's top bevelled off
 cut(slide, prism([(-0.001, s_bot - 0.001), (-0.001, s_bot + 2.5 * mm), (2.5 * mm, s_bot - 0.001)], 'x', -0.03, 0.03))      # (and its foot)
 cut(slide, box(-0.03, 0.03, F(470), F(440), s_top - 1.5 * mm, s_top + 0.01))                                                     # the nose's step down
@@ -45,7 +46,7 @@ for i in range(5):                                                              
         cut(slide, prism(sl, 'x', s * (SW - 1.1 * mm), s * (SW + 0.01)))
 OPT_F, OPT_D = 0.32 * F(450), 3 * mm                 # the optic cut: its centre 0.32 x the slide's length forward of its rear, 3 mm deep
 cut(slide, box(-12.5 * mm, 12.5 * mm, OPT_F - 17 * mm, OPT_F + 17 * mm, s_top - OPT_D, s_top + 0.01))
-bevel(slide, 0.6 * mm, 2); smooth(slide)
+tidy(slide, 0.1 * mm, False); slice_at_vertices(slide, 'y'); tidy(slide); smooth(slide, 1)
 pslide = K.part('slide', (0, 0, 0))
 K.adopt(slide, 'slide', 'black', pslide)
 # the rear sight (on the slide: it moves with it): a dovetailed block with a square notch
@@ -72,7 +73,7 @@ def suppressor(Kx, fx):
     sec = [(-HW, bot - 0.01), (HW, bot - 0.01), (HW, U(186)), (UW, U(186) + 5 * mm), (UW, top - 5.5 * mm), (UW - 5.5 * mm, top + 0.0005),
            (-UW + 5.5 * mm, top + 0.0005), (-UW, top - 5.5 * mm), (-UW, U(186) + 5 * mm), (-HW, U(186))]
     boolean(hs, prism(sec, 'y', F(460), F(fx) + 0.01), 'INTERSECT')
-    bevel(hs, 2.2 * mm, 3, 30)                                              # (rounded first: the panels, seams and holes are cut crisp into it)
+    bevel(hs, 2.2 * mm, 1, 30)                                            # (rounded first: the panels, seams and holes are cut crisp into it)
     # the recessed side panels: the small one on the front block, the long one behind it (on the short, what is left of it)
     pans = [PL([(fx + 12, 198), (fx + 98, 198), (fx + 108, 268), (fx + 20, 276)])] if fx < 100 else []
     pans.append(PL([(max(122, fx + 12), 198), (330, 198), (392, 228), (395, 258), (345, 288), (max(130, fx + 20), 282)]))
@@ -80,33 +81,33 @@ def suppressor(Kx, fx):
         for pts in pans:
             cut(hs, prism(pts, 'x', s_ * (HW - 0.8 * mm), s_ * (HW + 0.01)))
     # the seams: the main one (x 275: the front block comes off here) deep, the baffle segments' (x 55, 97, 143) fine; round the sides and top
-    for sx, dp, wd in ((55, 0.3, 0.25), (97, 0.3, 0.25), (143, 0.3, 0.25), (MAIN_SEAM, 0.7, 0.45)):
+    for sx, dp, wd in ((MAIN_SEAM, 0.7, 0.45),):
         if sx < fx + 20: continue
         g0, g1 = F(sx) - wd * mm, F(sx) + wd * mm
         for s_ in (-1, 1): cut(hs, box(s_ * (HW - dp * mm), s_ * (HW + 0.01), g0, g1, bot - 0.01, top + 0.01))
         cut(hs, box(-0.03, 0.03, g0, g1, top - dp * mm, top + 0.01))
-    cut(hs, cyl(5.2 * mm, F(fx + 20), F(fx) + 0.002, 'y', (0, 0), 24))       # the bore's exit
+    cut(hs, cyl(5.2 * mm, F(fx + 20), F(fx) + 0.002, 'y', (0, 0), segs(5.2 * mm)))       # the bore's exit
     for x in (-5.5 * mm, 5.5 * mm):                                          # two small holes in the face under it (the take-down pins' ends)
-        cut(hs, cyl(1.5 * mm, F(fx + 8), F(fx) + 0.002, 'y', (x, U(185)), 12))
-    smooth(hs)
+        cut(hs, cyl(1.5 * mm, F(fx + 8), F(fx) + 0.002, 'y', (x, U(185)), segs(1.5 * mm)))
+    tidy(hs); smooth(hs, 1)
     Kx.adopt(hs, 'barrel', 'black')
     # the front sight on the housing's top, near its front
     o = Kx.obj(prism(PL([(fx + 40, 103), (fx + 15, 103), (fx + 17, 92), (fx + 37, 92)]), 'x', -1.6 * mm, 1.6 * mm), 'barrel', 'black'); bevel(o, 0.3 * mm, 1); smooth(o)
     o = Kx.obj(cyl(0.9 * mm, F(fx + 20), F(fx + 18), 'y', (0, U(95)), 10), 'barrel', 'sightPaint')
     # the hood and chamber block seen through the port, and the barrel ahead of it inside the slide
     o = Kx.obj(box(-5.5 * mm, 5.5 * mm, F(700), F(560), -3 * mm, s_top - OPT_D - 0.6 * mm), 'barrel', 'gunmetal'); bevel(o, 0.4 * mm, 1); smooth(o)
-    o = Kx.obj(lathe([(F(560), 6.4 * mm), (F(452), 6.4 * mm)], 18), 'barrel', 'gunmetal'); smooth(o)
+    o = Kx.obj(lathe([(F(560), 6.4 * mm), (F(452), 6.4 * mm)], 12), 'barrel', 'gunmetal'); smooth(o)
     return F(fx)
 MUZ = suppressor(K, 10)
 
 # ---- FRAME (base): the dust cover under the slide behind the housing, the rails, the trigger guard, the trigger, slide stop and magazine catch ----
 FW = 14 * mm
 fr = K.tmp(prism(PL([(365, 186), (776, 186), (792, 204), (786, 222), (745, 232), (588, 262), (440, 262), (365, 262)]), 'x', -FW, FW))
-bevel(fr, 1.5 * mm, 2, 30); smooth(fr)
+bevel(fr, 1.5 * mm, 1, 30); tidy(fr, 0.1 * mm, False); slice_at_vertices(fr, 'y'); tidy(fr); smooth(fr, 1)
 K.adopt(fr, 'base', 'polymer')
 tg = K.tmp(prism(PL([(430, 255), (452, 325), (552, 325), (590, 280), (592, 258)]), 'x', -5.5 * mm, 5.5 * mm))
 cut(tg, prism(PL([(452, 262), (468, 312), (540, 312), (568, 280), (575, 258)]), 'x', -0.02, 0.02))
-bevel(tg, 1.2 * mm, 2, 30); smooth(tg)
+bevel(tg, 1.2 * mm, 1, 30); tidy(tg, 0.1 * mm, False); slice_at_vertices(tg, 'y'); tidy(tg); smooth(tg, 1)
 K.adopt(tg, 'base', 'polymer')
 o = K.obj(prism(PL([(546, 240), (556, 240), (562, 300), (553, 303), (541, 272)]), 'x', -3 * mm, 3 * mm), 'base', 'black'); bevel(o, 0.6 * mm, 2); smooth(o)
 o = K.obj(prism(PL([(578, 196), (642, 194), (642, 204), (580, 206)]), 'x', -FW - 1.2 * mm, -FW + 0.3 * mm), 'base', 'black'); bevel(o, 0.3 * mm, 1); smooth(o)   # slide stop (left)
@@ -116,8 +117,9 @@ o = K.obj(prism(rounded(F(615), U(282), 4.5 * mm, 4 * mm, 1.5 * mm, 3), 'x', -FW
 GW = 15.5 * mm
 gp = PL([(588, 258), (745, 228), (790, 214), (796, 226), (778, 260), (792, 470), (782, 488), (652, 488), (640, 470), (618, 330), (596, 300)])
 g = K.tmp(prism(gp, 'x', -GW, GW))
+bevel(g, 3.5 * mm, 1, 30)
 cut(g, prism(PL([(612, 255), (725, 255), (782, 486), (660, 486)]), 'x', -10.5 * mm, 10.5 * mm))      # the magazine well (open at the bottom)
-bevel(g, 3.5 * mm, 3, 30); smooth(g)
+tidy(g, 0.1 * mm, False); slice_at_vertices(g, 'y'); tidy(g); smooth(g, 1)
 K.adopt(g, 'grip', 'stipple')
 
 # ---- MAGAZINE (part_mag): the body up the well to just under the slide, the base plate; the pivot at its top front (magAt) ----
@@ -144,7 +146,7 @@ def magazine(Kx, ext=0):
             g = box(x - 2.4 * mm, x + 2.4 * mm, -1.4 * mm, 1.4 * mm, -2.6 * mm, 2.6 * mm)
             g.transform(Matrix.Translation((0, q[0], q[1])) @ Matrix.Rotation(ang, 4, 'X')); cut(body, g)
             wins.append((i - 1, t, side, q, ang, nF, nU))
-    smooth(body); Kx.adopt(body, 'mag', 'black', pm)
+    tidy(body); smooth(body, 1); Kx.adopt(body, 'mag', 'black', pm)
     for i, t, side, q, ang, nF, nU in wins:
         x = -side * 2.6 * mm
         o = Kx.obj(box(x - 2.2 * mm, x + 2.2 * mm, -0.3 * mm, 0.3 * mm, -2.4 * mm, 2.4 * mm), 'mag', 'brass', pm)
@@ -157,11 +159,11 @@ def magazine(Kx, ext=0):
     # the top round (9x19: the case 19.15 mm, a round nose to 29.7 mm), its case head at the body's back wall; the check's case and tip
     h, zc = P(706, 0)[0], MAG_TOP[1] - 2.5 * mm
     o = Kx.obj(lathe([(h, 0.0005), (h, 4.9 * mm), (h + 0.9 * mm, 4.9 * mm), (h + 1.2 * mm, 4.3 * mm), (h + 2.0 * mm, 4.3 * mm), (h + 2.3 * mm, 4.95 * mm),
-                      (h + 19.15 * mm, 4.8 * mm), (h + 19.15 * mm, 0.0005)], 18, (0, 0, zc)), 'mag', 'brass', pm); smooth(o); o['chk'] = {'role': 'top', 'i': 0}
+                      (h + 19.15 * mm, 4.8 * mm), (h + 19.15 * mm, 0.0005)], 12, (0, 0, zc)), 'mag', 'brass', pm); smooth(o); o['chk'] = {'role': 'top', 'i': 0}
     o = Kx.obj(lathe([(h + 19.15 * mm, 0.0005), (h + 19.15 * mm, 4.5 * mm), (h + 23.5 * mm, 4.5 * mm), (h + 27.0 * mm, 3.9 * mm), (h + 29.2 * mm, 2.2 * mm), (h + 29.7 * mm, 0.0005)],
-                   16, (0, 0, zc)), 'mag', 'brass', pm); smooth(o); o['chk'] = {'role': 'top', 'i': 1}
+                   12, (0, 0, zc)), 'mag', 'brass', pm); smooth(o); o['chk'] = {'role': 'top', 'i': 1}
     pad = [(660, 484), (792, 484), (796, 498), (788, 506), (664, 506)] if not ext else [(660, 484), (792, 484), (798, 500), (794, 512), (780, 518), (668, 518)]
-    o = Kx.obj(prism(PL([(x + dx, y + ext) for x, y in pad]), 'x', -15.5 * mm, 15.5 * mm), 'mag', 'polymer', pm); bevel(o, 1.5 * mm, 2); smooth(o)
+    o = Kx.obj(prism(PL([(x + dx, y + ext) for x, y in pad]), 'x', -15.5 * mm, 15.5 * mm), 'mag', 'polymer', pm); bevel(o, 1.5 * mm, 1); smooth(o, 1)
     if ext:
         o = Kx.tmp(prism(PL([(664, 482), (782, 482), (780 + dx, 486 + ext), (664 + dx, 486 + ext)]), 'x', -11.5 * mm, 11.5 * mm))
         for s_ in (-1, 1):   # a witness window each side
