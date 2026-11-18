@@ -1848,6 +1848,12 @@ says the same), but not whose: the shooter's name isn't shown.
   family's magazine (`models/ar_kit.py`'s, as the F2's); the A2 grip and A2 birdcage are the shared authored parts; the folding stock (`models/parts/stock/factory_scar_stock`) and
   the 7.62 birdcage (`models/parts/muzzle/ironvale_a2_762`) are authored parts of their own (`models/scar_parts.py`). The rails are the upper's, so the SCARs have no handguard
   slot: a foregrip goes on the underside (`mount_fg`), lights and lasers on the flanks (`mount_tac`).
+  **The AN-94 Abakan** (`rcv: 'authored'`, `models/an94`, built by `models/an94/build_an94.py`) is modelled in Blender and laid over Wikimedia Commons' "AN-94 Abakan (3).jpg" (right side) and "(4).jpg" (left side),
+  both by Vitaly V. Kuzmin, CC BY-SA 4.0, 1920 px thumbnails at 0.496 mm a pixel along the gun (1901 px butt to muzzle = the published 943 mm; heights at 0.54 mm a pixel, the photo is taken from above). The black polymer housing
+  with its stepped hump and the rotary drum rear sight, the hollow magazine well (the AK-74 magazine, the family's, swung back 3 degrees and canted 4 to the right), the tall polymer forend (finger grooves down the flanks, a row of
+  slots in each upper flank, ribs across the top) over the barrel's steel sleeve and the gas tube with its steel hanger, the hooded front sight, the two-lobe muzzle device, the long narrow ejection slot on the right and the
+  left-hand charging bar in its channel (`part_handle`, 60 mm of travel, not reciprocating), the side-folding stock with its steel hinge plates and the pistol grip with its stippled panels. The left photo is taken at an angle, so it is
+  used for detail, not for the outline. The optic rail on the housing's top takes any sight; the rotary drum and the hooded front sight are the factory irons (the `optic` slot) and give way to a fitted sight.
   **The G36** (`rcv: 'g36'`, `g36Trace`) is traced from a right-side photo (Wikimedia Commons, "Gewehr G36 weiss.jpg")
   at 0.945 mm a pixel: the polymer receiver, the trigger group pinned under it with the magazine well raked back at
   its foot, the carrying handle's loop from the back of the receiver out over the handguard with the charging handle
@@ -1897,7 +1903,7 @@ says the same), but not whose: the shooter's name isn't shown.
   | Tavor | 739 | 720 | Thompson | 882 | 860 |
   | AUG | 804 | 790 | PPSh-41 | 857 | 843 |
   | Galil ACE | 955 | 927 | Remington 870 | 976 | 978 |
-  | AN-94 | 975 | 943 | Saiga-12 | 1120 | 1145 |
+  | AN-94 | 941 | 943 | Saiga-12 | 1120 | 1145 |
   | FAL | 1117 | 1090 | AA-12 | 987 | 966 |
   | Mk 14 | 932 | 889 | KSG | 684 | 680 |
   | M1 Garand | 1112 | 1100 | M249 | 1077 | 1035 |

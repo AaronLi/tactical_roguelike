@@ -1686,10 +1686,6 @@
    "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "hg.ak.2", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "an94.optic", "stock": "oem.stk.ak.5" }
   },
   { "platform": "an94",
-   "why": "authored handguard (oem.hg.ak.7)",
-   "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.7", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "an94.optic", "stock": "oem.stk.ak.5" }
-  },
-  { "platform": "an94",
    "why": "authored handguard (oem.hg.ak.9)",
    "build": { "barrel": "br.5.6x39.15.9", "grip": "oem.gr.ak.3", "handguard": "oem.hg.ak.9", "mag": "ak74.mag.30", "muzzle": "mz.rak.brake", "optic": "an94.optic", "stock": "oem.stk.ak.5" }
   },
