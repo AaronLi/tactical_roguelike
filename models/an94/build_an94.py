@@ -107,13 +107,14 @@ def housing():
     sec = hullc([(s_ * (HW - 7.0) * mm, (TOP - 7.0) * mm, 7.0 * mm) for s_ in (-1, 1)] + [(s_ * (HW - 4.0) * mm, (WELL_B + 4.0) * mm, 4.0 * mm) for s_ in (-1, 1)], 14)
     boolean(h, prism(sec, 'y', -0.01, HG0 * mm + 0.01), 'INTERSECT')       # (the housing's section: a flat top between round shoulders, the flanks upright, where the controls stand)
     cut(h, box(-14.0 * mm, 15.9 * mm, (MAG_F - 34) * mm, (MAG_F + 36) * mm, (WELL_B - 2) * mm, 8 * mm))        # (the well: hollow round the canted magazine)
+    tidy(h, 1e-6, False); bevel(h, 0.8 * mm, 1, 30)                                                       # (the body's chamfer once, then the port, slot, recess and plug: no chamfer of their own)
     pa, pb, pu0, pu1 = PORT
     cut(h, prism(rounded((pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm, (pb - pa) / 2 * mm, (pu1 - pu0) / 2 * mm, 2.2 * mm, 4), 'x', -2.0 * mm, (HW + 1) * mm))       # (the port, right)
     cut(h, box((HW - 3.5) * mm, (HW + 1) * mm, SLOT[0] * mm, SLOT[1] * mm, SLOT[2] * mm, SLOT[3] * mm))          # (the lever's slot, right)
     cut(h, box(-(HW + 1) * mm, -(HW - 3.0) * mm, 36 * mm, 166 * mm, -7.5 * mm, 1.5 * mm))                        # (the left recess)
     cut(h, cyl(7.0 * mm, (HW - 0.6) * mm, (HW + 1) * mm, 'x', (FX(932) * mm, UY(540) * mm), 24))               # (the round plug's recess, right)
     cut(h, cyl(1.6 * mm, (HW - 1.4) * mm, (HW + 1) * mm, 'x', (FX(1018) * mm, UY(538) * mm), 12))              # (the small hole)
-    bevel(h, 0.8 * mm, 1, 30); smooth(h); K.adopt(h, 'base', HP)
+    slice_at_vertices(h, 'y'); tidy(h); smooth(h); K.adopt(h, 'base', HP)
     # the openings read dark: the slot's floor, the plug's disc, the left recess's floor, the small hole's
     for o in (K.tmp(box((HW - 3.7) * mm, (HW - 3.3) * mm, (SLOT[0] + 1) * mm, (SLOT[1] - 1) * mm, (SLOT[2] + 0.3) * mm, (SLOT[3] - 0.3) * mm)),
               K.tmp(cyl(6.6 * mm, (HW - 0.9) * mm, (HW - 0.5) * mm, 'x', (FX(932) * mm, UY(540) * mm), 24)),
@@ -159,18 +160,19 @@ def barrel_base():
     """What stays when another barrel or handguard is fitted: the barrel's shank under the forend, the gas tube ahead of it and the bracket that hangs from its end to the
     front sight base. Under the forend, hidden in it, a second tube and a gas block ahead of the forend: an AK's upper handguard (the standard furniture fits this gun)
     is a cover round a gas tube, and with none under it the cover floated."""
-    o = K.obj(lathe([((HG0 - 50) * mm, 8.4 * mm), ((HG1 + 4) * mm, 8.4 * mm)], 24), 'base', 'black'); smooth(o)
+    o = K.obj(lathe([((HG0 - 50) * mm, 8.4 * mm), ((HG1 + 4) * mm, 8.4 * mm)], 16), 'base', 'black'); smooth(o)
     TU = UY(606)                                                    # the gas tube's axis (below the barrel)
     o = K.obj(lathe([((HG1 - 4) * mm, 8.4 * mm), (FX(1560) * mm, 8.4 * mm)], 24, (0, 0, TU * mm)), 'base', 'steel'); smooth(o)
     o = K.obj(lathe([(FX(1556) * mm, 9.0 * mm), (FX(1568) * mm, 9.0 * mm)], 24, (0, 0, TU * mm)), 'base', 'steel'); smooth(o)     # (the collar the bracket clamps)
     # the AK furniture's bearer: a tube over the barrel as an AK's gas tube is, inside the AN-94 forend (its top 0.6 mm under the forend's ribs), and a block closing its front
     TA = 18.0
-    o = K.obj(lathe([((HG0 - 40) * mm, 5.8 * mm), ((HG1 + 3) * mm, 5.8 * mm)], 20, (0, 0, TA * mm)), 'base', 'steel'); smooth(o)
+    o = K.obj(lathe([((HG0 - 40) * mm, 5.8 * mm), ((HG1 + 3) * mm, 5.8 * mm)], 16, (0, 0, TA * mm)), 'base', 'steel'); smooth(o)
     gb = K.tmp(prism(hullc([(0, 0, 9.6 * mm), (0, TA * mm, 5.8 * mm)], 20), 'y', (HG1 + 2.5) * mm, (HG1 + 11.5) * mm)); bevel(gb, 0.5 * mm, 1, 30); smooth(gb); K.adopt(gb, 'base', 'black')
     # the bracket: a thin plate hung from the tube's end up to the sight base's foot (the photos: a thick lug, its lower edge sloping down to a rounded point and up to the front)
     br = K.tmp(prism(PP([(1558, 592), (1640, 592), (1648, 584), (1692, 584), (1692, 600), (1676, 610), (1652, 622), (1618, 640), (1600, 648), (1584, 646), (1566, 636), (1558, 630)]), 'x', -3.0 * mm, 3.0 * mm))
+    tidy(br, 1e-6, False); bevel(br, 1.0 * mm, 1, 30)
     cut(br, cyl(2.4 * mm, -0.02, 0.02, 'x', (FX(1640) * mm, UY(606) * mm), 12))                   # (its hole)
-    bevel(br, 1.0 * mm, 2, 30); smooth(br); K.adopt(br, 'base', 'black')
+    tidy(br); smooth(br); K.adopt(br, 'base', 'black')
     o = K.tmp(box(-3.4 * mm, 3.4 * mm, FX(1612) * mm, FX(1648) * mm, UY(590) * mm, (UY(590) + 3.0) * mm)); K.adopt(o, 'base', 'steel')    # (the rail on the hanger's top)
     for s_ in (-1, 1): rivet(s_ * 3.0, FX(1572), UY(618), 1.2, 0.7)
 
@@ -199,6 +201,7 @@ def forend():
     bpy.data.objects.remove(lo, do_unlink=True)
     fo = up
     cut(fo, cyl(9.8 * mm, HG0 * mm - 0.01, HG1 * mm + 0.01, 'y', (0, 0), 24))                       # (the barrel passes through)
+    tidy(fo, 1e-6, False); bevel(fo, 0.7 * mm, 1, 30)                                        # (the body's chamfer once, before the grooves, slots and ribs: they get none of their own; after the bore, which a boolean can't cut cleanly through the chamfer)
     def bot_at(f): return UY(652) if f < FX(1170) else (UY(626) if f > FX(1230) else UY(652) + (f - FX(1170)) / (FX(1230) - FX(1170)) * (UY(626) - UY(652)))
     gs, f = [], HG0 + 30
     while f + 2.2 < HG1 - 8:                                                                     # (finer grooves, 11.5 mm apart)
@@ -217,7 +220,10 @@ def forend():
     rc = K.tmp(multi(rb))
     boolean(rc, prism(hullc([(s_ * (UW - RT) * mm, (top - RT) * mm, (RT - 1.4) * mm) for s_ in (-1, 1)] + [(s_ * (UW - 1.4) * mm, (zl - 3) * mm, 0.4 * mm) for s_ in (-1, 1)], 16), 'y', HG0 * mm - 0.05, HG1 * mm + 0.05), 'DIFFERENCE')
     cut(fo, rc.data.copy()); bpy.data.objects.remove(rc, do_unlink=True)
-    bevel(fo, 0.7 * mm, 2, 30); smooth(fo); K.adopt(fo, 'handguard', HP)
+    for s_ in (-1, 1):                                                                           # (a line along each flat flank under the slots: they sit in a band of their own and the faces between the ribs stay short cells)
+        slice_faces(fo, [((s_ * UW * mm, 0, 0), (s_, 0, 0), (0, 0, (top - 11.3) * mm), (0, 0, 1))])
+    strip_ngons(fo, 'y', passes=1)
+    tidy(fo); smooth(fo); K.adopt(fo, 'handguard', HP)
     fl = []   # the slots' dark floors (a strip over each floor) and the grooves': one mesh
     for s_ in (-1, 1): fl.append(box(*xs(s_ * (UW - 2.8) * mm, s_ * (UW - 2.4) * mm), FX(1211) * mm, FX(1385) * mm, (top - 9.8) * mm, (top - 5.8) * mm))
     f = HG0 + 30
@@ -234,20 +240,21 @@ def grip():
     pts = PP([(520, 584), (590, 584), (592, 640), (590, 690), (582, 740), (574, 788), (578, 820), (568, 838), (484, 836), (478, 820), (486, 796), (494, 720), (504, 630), (512, 605)])
     gp = K.tmp(prism(pts, 'x', -GW * mm, GW * mm))
     boolean(gp, prism([(-GW * mm, 14 * mm), (GW * mm, 14 * mm), ((GW - 1.8) * mm, -150 * mm), (-(GW - 1.8) * mm, -150 * mm)], 'y', FX(470) * mm, FX(620) * mm), 'INTERSECT')   # (narrower toward the heel)
+    tidy(gp, 0.1 * mm, False); bevel(gp, 4.2 * mm, 2, 30)                                          # (the round once, then the grooves and the panels' recesses: no round of their own)
     for u in (668, 706, 744):                                                                      # (finger grooves in the front edge)
         cut(gp, cyl(3.6 * mm, -0.03, 0.03, 'x', (FX(594 - (u - 640) * 0.04 + 3.4) * mm, UY(u) * mm), 14))
     for s in (-1, 1):
         cut(gp, prism(PP([(545, 650), (578, 650), (566, 800), (505, 800), (515, 700)]), 'x', *xs(s * (GW - 1.5) * mm, s * (GW + 1.5) * mm)))
-    bevel(gp, 4.2 * mm, 3, 30); smooth(gp); K.adopt(gp, 'grip', HP)
+    tidy(gp); smooth(gp); K.adopt(gp, 'grip', HP)
     for s in (-1, 1):
         pn = K.tmp(prism(PP([(545, 650), (578, 650), (566, 800), (505, 800), (515, 700)]), 'x', *xs(s * (GW - 1.8) * mm, s * (GW - 0.5) * mm)))
-        dm = []                                                                                    # (the stipple: a grid of dimples 2.8 mm apart, a third deep)
-        for i in range(8):
-            for j in range(14):
-                f = FX(505) + 2.5 + i * 3.6 + (j % 2) * 1.8; u = UY(790) + 2.5 + j * 4.6
-                dm.append(cyl(0.55 * mm, *xs(s * (GW - 1.1) * mm, s * (GW + 0.3) * mm), 'x', (f * mm, u * mm), 6))
-        cut(pn, multi(dm))
-        smooth(pn); K.adopt(pn, 'grip', 'stipple')
+        dm = []                                                                                    # (the stipple: a grid of dimples about 4 mm apart, a third deep)
+        for i in range(7):
+            for j in range(11):
+                f = FX(505) + 2.5 + i * 4.3 + (j % 2) * 2.15; u = UY(790) + 2.5 + j * 5.9
+                dm.append(cyl(0.75 * mm, *xs(s * (GW - 1.1) * mm, s * (GW + 0.3) * mm), 'x', (f * mm, u * mm), 4))
+        cut(pn, multi(dm)); tidy(pn)
+        smooth(pn, 1); K.adopt(pn, 'grip', 'stipple')
     o = K.obj(cyl(4.6 * mm, FX(521) * mm, FX(525) * mm, 'y', (0, UY(837) * mm), 14), 'grip', 'steel'); smooth(o)           # (the grip screw's head at the heel)
 
 def trigger_group():
@@ -266,8 +273,9 @@ def stock():
     out = PP([(58, 593), (100, 591), (486, 578), (486, 636), (450, 660), (400, 674), (300, 699), (200, 732), (100, 766), (70, 779), (48, 786), (30, 788), (16, 780), (22, 752), (28, 700), (40, 645)])
     st = K.tmp(prism(out, 'x', -(STW1 + 1) * mm, (STW1 + 1) * mm))
     boolean(st, prism([(-STW0 * mm, FX(486) * mm), (STW0 * mm, FX(486) * mm), (STW1 * mm, FX(8) * mm), (-STW1 * mm, FX(8) * mm)], 'z', -0.2, 0.05), 'INTERSECT')       # (narrow at the hinge, wider at the butt)
+    tidy(st, 0.1 * mm, False); bevel(st, 4.5 * mm, 2, 30)                                                                                                 # (the round once, then the slot: no round of its own)
     for s in (-1, 1): cut(st, prism(PP([(335, 688), (445, 668), (445, 676), (335, 697)]), 'x', *xs(s * (STW0 - 1.5) * mm, s * 20 * mm)))                   # (the slot under it, both sides)
-    bevel(st, 4.5 * mm, 3, 30); smooth(st); K.adopt(st, 'stock', HP)
+    tidy(st); smooth(st); K.adopt(st, 'stock', HP)
     for s in (-1, 1):
         o = K.tmp(prism(PP([(337, 689), (443, 669.5), (443, 674.5), (337, 694.5)]), 'x', *xs(s * (STW0 - 1.8) * mm, s * (STW0 - 1.2) * mm))); K.adopt(o, 'stock', 'rubber')
     pad = K.tmp(prism(PP([(40, 645), (28, 700), (22, 752), (16, 780), (32, 790), (39, 784), (37, 752), (43, 700), (53, 645)]), 'x', -(STW1 + 0.3) * mm, (STW1 + 0.3) * mm))
@@ -276,8 +284,9 @@ def stock():
     for k_ in range(8):
         yp = 668 + k_ * 12.5; xf = 40 + (yp - 645) * (16 - 40) / (780 - 645)
         gv.append(box(-(STW1 + 1) * mm, (STW1 + 1) * mm, FX(xf) * mm - 1.4 * mm, FX(xf) * mm + 0.7 * mm, UY(yp) * mm, (UY(yp) + 1.2) * mm))
+    tidy(pad, 0.1 * mm, False); bevel(pad, 2.6 * mm, 2, 30)
     cut(pad, multi(gv))
-    bevel(pad, 2.6 * mm, 3, 30); smooth(pad); K.adopt(pad, 'stock', 'rubber')
+    tidy(pad); smooth(pad); K.adopt(pad, 'stock', 'rubber')
     ring = K.tmp(cyl(5.2 * mm, -0.9 * mm, 0.9 * mm, 'x', (FX(437) * mm, UY(686) * mm), 18))
     cut(ring, cyl(3.5 * mm, -0.02, 0.02, 'x', (FX(437) * mm, UY(686) * mm), 18)); smooth(ring); K.adopt(ring, 'stock', 'steel')
     o = K.tmp(box(-7 * mm, 7 * mm, FX(437) * mm - 4 * mm, FX(437) * mm + 4 * mm, UY(666) * mm, UY(652) * mm)); K.adopt(o, 'stock', 'steel')
@@ -295,7 +304,7 @@ def muzzle():
     for fc in (FX(1809), FX(1854)):                                                                  # (a vent across each lobe)
         cut(mz, cyl(2.0 * mm, -0.02, 0.02, 'x', (fc * mm, (ZC + 14.0) * mm), 12))
         cut(mz, cyl(2.0 * mm, -0.02, 0.02, 'x', (fc * mm, (ZC - 14.0) * mm), 12))
-    smooth(mz); K.adopt(mz, 'muzzle', 'black')
+    tidy(mz); smooth(mz); K.adopt(mz, 'muzzle', 'black')
     o = K.obj(lathe([(f0 * mm, 9.4 * mm), ((f0 + 4.5) * mm, 9.4 * mm)], 24, (0, 0, ZC * mm)), 'muzzle', 'steel'); smooth(o)   # (the thread nut)
     return MUZ_END
 
@@ -305,11 +314,12 @@ def irons():
     """The rotary drum rear sight on the housing's hump (a knurled drum with its rear blade and its U notch) and the front sight: a block on the barrel with the post
     standing in a protecting ring."""
     dr = K.tmp(cyl(13.0 * mm, (TOP - 2) * mm, (SY - 2.2) * mm, 'z', (0, DRUM_F * mm), 32))
+    bevel(dr, 0.6 * mm, 1, 30)                                                                                              # (the chamfer once, then the notches)
     for k in range(24):      # (the drum's rim: crenellations)
         a = k * math.pi / 12
         g = box(-0.9 * mm, 0.9 * mm, -2.2 * mm, 2.2 * mm, (SY - 7.0) * mm, (SY - 1.9) * mm); g.transform(Matrix.Translation((0, DRUM_F * mm + 0.0, 0)) @ Matrix.Rotation(a, 4, 'Z') @ Matrix.Translation((0, 13.0 * mm, 0)))
         cut(dr, g)
-    bevel(dr, 0.6 * mm, 1, 30); smooth(dr); K.adopt(dr, 'optic', 'black')
+    tidy(dr); smooth(dr); K.adopt(dr, 'optic', 'black')
     o = K.obj(cyl(4.0 * mm, (SY - 2.4) * mm, (SY - 1.4) * mm, 'z', (0, DRUM_F * mm), 14), 'optic', 'steel'); smooth(o)        # (the drum's cap screw)
     bl = K.tmp(box(-8.5 * mm, 8.5 * mm, NOTCH_F * mm, (NOTCH_F + 2.8) * mm, (SY - 2.5) * mm, (SY + 1.8) * mm))
     cut(bl, box(-1.3 * mm, 1.3 * mm, (NOTCH_F - 1) * mm, (NOTCH_F + 4) * mm, (SY - 1.5) * mm, (SY + 3) * mm))
@@ -322,10 +332,10 @@ def irons():
     bk = K.tmp(prism(hullc([(0, 0, 10.2 * mm), (-3.4 * mm, -12.8 * mm, 3.2 * mm), (3.4 * mm, -12.8 * mm, 3.2 * mm)], 20), 'y', (pf - 14) * mm, (pf + 25) * mm))
     bevel(bk, 0.6 * mm, 1, 30); smooth(bk); K.adopt(bk, 'optic', 'black')     # (solid: with a shorter barrel it still sits on the bracket)
     HC = SY - 3.5
-    rg = K.tmp(cyl(8.3 * mm, (pf - 3.5) * mm, (pf + 3.5) * mm, 'y', (0, HC * mm), 28))
-    cut(rg, cyl(6.2 * mm, (pf - 4) * mm, (pf + 4) * mm, 'y', (0, HC * mm), 28))
+    rg = K.tmp(cyl(8.3 * mm, (pf - 3.5) * mm, (pf + 3.5) * mm, 'y', (0, HC * mm), segs(8.3 * mm)))
+    cut(rg, cyl(6.2 * mm, (pf - 4) * mm, (pf + 4) * mm, 'y', (0, HC * mm), segs(6.2 * mm)))
     cut(rg, box(-4.2 * mm, 4.2 * mm, (pf - 4) * mm, (pf + 4) * mm, (HC + 5) * mm, (HC + 12) * mm))      # (open at the top)
-    bevel(rg, 0.4 * mm, 1, 30); smooth(rg); K.adopt(rg, 'optic', 'black')
+    tidy(rg, 1e-6, False); bevel(rg, 0.4 * mm, 1, 30); tidy(rg); smooth(rg); K.adopt(rg, 'optic', 'black')
     o = K.obj(cyl(2.4 * mm, 6 * mm, (HC - 6.5) * mm, 'z', (0, pf * mm), 12), 'optic', 'black'); smooth(o)           # (the tower)
     o = K.obj(cyl(0.9 * mm, (HC - 6.5) * mm, SY * mm, 'z', (0, pf * mm), 10), 'optic', 'steel'); smooth(o)          # (the post)
     for s in (-1, 1):   # the ring's two feet
@@ -402,6 +412,7 @@ def magazine():
             o.data.transform(Rc @ Sc @ Td @ W)
             for v in o.data.vertices: straighten(v.co)
             o.matrix_world = Matrix.Identity(4)
+            tidy(o)                                       # (the kit's n-gons, round the rib slots, triangulated by Blender's beauty rule, not fanned from one corner)
         for i_, m_ in enumerate(list(o.data.materials)):
             if m_ and m_.name == 'plum': o.data.materials[i_] = kit_mat('polymer')
         K.n += 1; o.name = '%s_%d' % (o.get('slot', 'mag'), K.n)
