@@ -52,7 +52,7 @@ for o in stk:   # (the body takes the gun's furniture finish: material polymer; 
     for i, m in enumerate(o.data.materials):
         if m and m.name == 'tan': o.data.materials[i] = k['kit_mat']('polymer')
 write_part(k, 'stock', 'factory_scar_stock', stk, (0.0, SU),
-           {'butt': r4([Fp(160), Up(460) - SU, 0]), 'cheek': r4([Fp(300), Up(290) - SU, 0])},
+           {'butt': r4([k['STOCK_ANCH']['butt'][0], k['STOCK_ANCH']['butt'][1] - SU, 0]), 'cheek': r4([k['STOCK_ANCH']['cheek'][0], k['STOCK_ANCH']['cheek'][1] - SU, 0])},
            {'part': {'mount': 'hinge', 'position': 'extended (the SCAR\'s folding stock, drawn at its longest: the hinge block against the upper\'s back)'},
             'replaces': ['SCAR folding stock']})
 k = build('scar')

@@ -4,7 +4,14 @@
 # stock on its hinge are the same on both; the H's well takes the 20-round 7.62 magazine (its own, below), the L's the STANAG family's (ar_kit.py's
 # mag_stanag, borrowed as the F2 does), and the barrel and flash hider are each calibre's.
 #
-# References (viewed on Wikimedia Commons, not downloaded):
+# This is the NRCH generation (the SCAR 17S NRCH for the H, the 16S NRCH for the L): M-LOK on the forend, a non-reciprocating charging handle on the left (part_ch),
+# the telescoping stock with its adjustable cheek, the large trigger guard. References (viewed in the browser, not downloaded):
+#  - FN America's product pages, the level side-on studio shots on a transparent background (1200 x 598, the right side, FDE): "SCAR-17S-NRCH_Rotators_7_0000_SCAR17S_FDE_right_side_"
+#    (fnamerica.com/products/rifles/fn-scar-17s-nrch/: barrel 16.25", overall 36"-38.5"; the H's well, magazine and trigger guard are fitted to it; 0.834 mm a pixel from its
+#    rail's slot pitch, 12.0 px) and "NRCH_Rotators__0000_SCAR16S_FDE_right_side_" (fnamerica.com/products/rifles/fn-scar-16s-nrch/: overall 34.5"-37"; the L's lower and
+#    magazine, the NRCH stock, the guard's window and the trigger; 0.804 mm a pixel, slot pitch 12.45 px, 1168 px of gun = 939 mm).
+#  - The upper, rails, irons and gas block were laid over the older photo below; they agree with FN's shots to a few percent.
+# Older references (Wikimedia Commons):
 #  - "FN SCAR-L noBG.png" (CC BY-SA 4.0; 2148 x 815, the right side, muzzle right, the stock extended, an FDE Mk 16 with the factory flash hider): the
 #    outlines below are its pixels, in the full-size image's frame (x forward, y down): the upper's rear face at x 640, the bore at y 351
 #    (the barrel is 30 px across at its centre line). Its scale is 0.455 mm a pixel: the top rail's slot pitch is 22.2 px (the Picatinny pitch,
@@ -51,8 +58,8 @@ ag['FURN'] = 'tan'
 
 # ----------------------------------------------------------------------------------------------------- the variant's figures
 V = {
-    'l': dict(mag='stanag', barrel_r=7.0, thr_r=7.6, muzzle_sc=1.0, muzzle_len=0.0505, mount_muzzle=0.575, hwl=15.0, ihalf=12.4, mag_depth=(-32.3, 31.0)),
-    'h': dict(mag='h', barrel_r=7.5, thr_r=8.0, muzzle_sc=1.12, muzzle_len=0.0566, mount_muzzle=0.610, hwl=16.8, ihalf=14.2, mag_depth=(-36.5, 36.5)),
+    'l': dict(mag='stanag', barrel_r=7.0, thr_r=7.6, muzzle_sc=1.0, muzzle_len=0.0505, mount_muzzle=0.602, hwl=15.0, ihalf=12.4, mag_depth=(-32.3, 31.0), magx=0.152),
+    'h': dict(mag='h', barrel_r=7.5, thr_r=8.0, muzzle_sc=1.12, muzzle_len=0.0566, mount_muzzle=0.630, hwl=16.8, ihalf=14.2, mag_depth=(-38.0, 38.0), magx=0.160),
 }[VAR]
 RCV, FURN = 'tan', 'tan'
 
@@ -64,12 +71,12 @@ F_GAS = Fp(1600)              # the gas block's front: mount_barrel
 BORE_R = V['barrel_r'] * mm
 SY = 75.0                     # the sight line over the bore (mm): the front post's tip, the rear aperture's centre
 RS_F = -0.0010                # the rear aperture blade's back face (info.fSight)
-MAG_TOP = (Fp(991), -0.030)   # the magazine's top, centred on its axis (magAt)
+MAG_TOP = (V['magx'], -0.030)  # the magazine's top, centred on its axis (magAt)
 MB, MF = V['mag_depth']       # the magazine's back and front from MAG_TOP[0] (mm)
 W_IN_B, W_IN_F = MAG_TOP[0] + (MB - 2.8) * mm, MAG_TOP[0] + (MF + 1.6) * mm      # the well's inside, back and front
 W_OUT_B, W_OUT_F = W_IN_B - 3.0 * mm, W_IN_F + 3.0 * mm
 HWL = V['hwl'] * mm           # the lower's half width
-W_BOT = Up(538)               # the well's bottom (the guard's too)
+W_BOT = -0.0895             # the well's bottom (the guard's too)
 MZ0 = V['mount_muzzle']       # the factory barrel's end: mount_muzzle
 
 # ----------------------------------------------------------------------------------------------------- UPPER and RAILS (base)
@@ -88,7 +95,12 @@ def upper():
     for xa, xb in ((1250, 1285), (1300, 1340), (1370, 1410)):
         for s in (-1, 1):
             cut(up, prism(rounded(Fp((xa + xb) / 2), Up(307), (Fp(xb) - Fp(xa)) / 2, 2.4 * mm, 2.2 * mm, 4), 'x', *xs(s * (HWU - 2.2) * mm, s * (HWU + 1) * mm)))
-    cut(up, prism(rounded(Fp((905 + 1200) / 2), Up(303.5), (Fp(1200) - Fp(905)) / 2, 1.6 * mm, 1.5 * mm, 4), 'x', (HWU - 1.4) * mm, (HWU + 1) * mm))
+    cut(up, prism(rounded(Fp((905 + 1200) / 2), Up(303.5), (Fp(1200) - Fp(905)) / 2, 1.6 * mm, 1.5 * mm, 4), 'x', -(HWU + 1) * mm, -(HWU - 1.4) * mm))   # (the NRCH's handle is on the left)
+    # M-LOK at 3, 6 and 9 o'clock: three slots 32 x 7 mm at 29 mm centres, 3 mm deep, on each flank and the underside of the forend
+    for f in (0.300, 0.329, 0.358):
+        for s in (-1, 1):
+            cut(up, prism(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU + 1) * mm)))
+        cut(up, prism(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT - 1) * mm, (UP_BOT + 3.0) * mm))
     bevel(up, 0.9 * mm, 1, 30); smooth(up); K.adopt(up, 'base', RCV)
     # the bolt carrier's flank in the port
     o = K.tmp(box((HWU - 4.6) * mm, (HWU - 3.8) * mm, Fp(868), Fp(1044), Up(352), Up(344))); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel')
@@ -100,9 +112,7 @@ def upper():
 def rails():
     """The top rail along the whole upper, a short rail each side of its front and one under it (all Picatinny: 21.2 mm across, 5.6 tall)."""
     picatinny(K, 0.0, F_FRONT - 0.002, UP_TOP * mm, 'base', RCV)
-    for s_, ax in ((1, 'right'), (-1, 'left')):
-        picatinny(K, Fp(1270), Fp(1494), Up(371), 'base', 'black', axis=ax, x0=s_ * HWU * mm)
-    picatinny(K, Fp(1090), Fp(1494), UP_BOT * mm, 'base', 'black', axis='bottom')
+    # (the NRCH generation: M-LOK slots at 3, 6 and 9 o'clock on the forend instead, mlok_slots() in the upper: three 32 x 7 mm slots at a 29 mm pitch)
 
 # ----------------------------------------------------------------------------------------------------- LOWER (base)
 def lower():
@@ -110,16 +120,17 @@ def lower():
     well, a hollow shell round the magazine (walls 3 mm, the magazine 1.6 to 2.8 mm clear of them) open at the bottom; the selector each side, the
     magazine catch's button."""
     ul = Up(390)
-    pts = [(0.0, ul), (W_OUT_F + 0.010, ul), (W_OUT_F + 0.003, Up(402)), (W_OUT_F, Up(425)), (W_OUT_F, W_BOT), (Fp(790), W_BOT), (Fp(776), Up(525)), (Fp(776), Up(500)),
-           (Fp(790), Up(470)), (Fp(700), Up(470)), (Fp(664), Up(456)), (0.0, Up(445))]
+    pts = [(0.0, ul), (W_OUT_F + 0.010, ul), (W_OUT_F + 0.003, Up(402)), (W_OUT_F, Up(425)), (W_OUT_F, W_BOT), (GRIP_TOP[0] + 0.004, W_BOT), (GRIP_TOP[0], Up(525)), (GRIP_TOP[0], Up(500)),
+           (GRIP_TOP[0] + 0.004, Up(470)), (Fp(700), Up(470)), (Fp(664), Up(456)), (0.0, Up(445))]
     lo = K.tmp(prism(pts, 'x', -HWL, HWL))
     # the guard: the strap's sides cut away to 10 mm each side of the middle, its window through
-    for s in (-1, 1): cut(lo, box(*xs(s * 10.0 * mm, s * 24 * mm), Fp(778), W_OUT_B, W_BOT - 0.01, Up(472)))
-    cut(lo, prism(rounded(Fp(850), Up(512), 50 * PXMM * mm, 15.5 * PXMM * mm, 5 * mm, 4), 'x', -0.02, 0.02))
+    for s in (-1, 1): cut(lo, box(*xs(s * 10.0 * mm, s * 24 * mm), GRIP_TOP[0] - 0.002, W_OUT_B, W_BOT - 0.01, Up(472)))
+    wa, wb = GRIP_TOP[0] + 0.008, min(0.1158, W_OUT_B - 0.002)   # (the guard's window, traced off FN's 16S/17S NRCH studio shots: 56 mm long, 30 deep, from the grip's front to the well's back wall)
+    cut(lo, prism(rounded((wa + wb) / 2, -0.0693, (wb - wa) / 2, 0.01525, 5 * mm, 4), 'x', -0.02, 0.02))
     cut(lo, box(-V['ihalf'] * mm, V['ihalf'] * mm, W_IN_B, W_IN_F, W_BOT - 0.01, MAG_TOP[1] + 7 * mm))                                # (the well)
     bevel(lo, 1.0 * mm, 2, 30); smooth(lo); K.adopt(lo, 'base', FURN)
     # the trigger in its guard
-    o = K.tmp(prism(PL([(833, 489), (843, 489), (847, 506), (841, 518), (835, 518), (837, 506)]), 'x', -2.2 * mm, 2.2 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
+    o = K.tmp(prism([(0.0715, -0.0545), (0.0805, -0.0545), (0.0815, -0.067), (0.0865, -0.077), (0.095, -0.0835), (0.0935, -0.0845), (0.0835, -0.0825), (0.0745, -0.072), (0.0715, -0.058)], 'x', -2.2 * mm, 2.2 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
     # the selector (both sides): its boss on the pin, the lever lying forward and down; the magazine catch's button through the well's front
     for s in (-1, 1):
         o = K.obj(cyl(5.4 * mm, *xs(s * (HWL - 0.3) * mm, s * (HWL + 2.4) * mm), 'x', (Fp(762), Up(410)), 18), 'base', 'black'); smooth(o)
@@ -177,45 +188,45 @@ def front_sight():
 # ----------------------------------------------------------------------------------------------------- CHARGING HANDLE (part_handle)
 HANDLE = (Fp(1120), Up(362))
 def handle():
-    """The reciprocating charging handle (part_handle: it runs back with the bolt on every shot): the oval pad folded flat against the right of the
-    upper ahead of the ejection port, its three studs, the stem into the track."""
-    ph = K.part('handle', (0, HANDLE[0], HANDLE[1]))
-    pad = K.tmp(prism(rounded(HANDLE[0], HANDLE[1], 28 * mm, 8.4 * mm, 6.5 * mm, 5), 'x', (HWU + 0.1) * mm, (HWU + 5.2) * mm)); bevel(pad, 1.2 * mm, 2, 30); smooth(pad); K.adopt(pad, 'base', 'black', ph)
+    """The non-reciprocating charging handle of the NRCH generation (part_ch: it stays put when the gun fires and is pulled back only when it is charged, as
+    the AR's is): the oval pad folded flat against the LEFT of the upper ahead of the ejection port, its three studs, the stem into the track."""
+    ph = K.part('ch', (0, HANDLE[0], HANDLE[1]))
+    pad = K.tmp(prism(rounded(HANDLE[0], HANDLE[1], 28 * mm, 8.4 * mm, 6.5 * mm, 5), 'x', -(HWU + 5.2) * mm, -(HWU + 0.1) * mm)); bevel(pad, 1.2 * mm, 2, 30); smooth(pad); K.adopt(pad, 'base', 'black', ph)
     for dx in (-17, 0, 17):
-        o = K.obj(cyl(2.7 * mm, (HWU + 5.0) * mm, (HWU + 7.0) * mm, 'x', (HANDLE[0] + dx * mm, HANDLE[1]), 14), 'base', 'steel', ph); smooth(o)
-    st = K.tmp(box((HWU - 1.2) * mm, (HWU + 0.5) * mm, HANDLE[0] - 20 * mm, HANDLE[0] + 20 * mm, HANDLE[1] - 2 * mm, HANDLE[1] + 2 * mm)); smooth(st); K.adopt(st, 'base', 'steel', ph)
+        o = K.obj(cyl(2.7 * mm, -(HWU + 7.0) * mm, -(HWU + 5.0) * mm, 'x', (HANDLE[0] + dx * mm, HANDLE[1]), 14), 'base', 'steel', ph); smooth(o)
+    st = K.tmp(box(-(HWU + 0.5) * mm, -(HWU - 1.2) * mm, HANDLE[0] - 20 * mm, HANDLE[0] + 20 * mm, HANDLE[1] - 2 * mm, HANDLE[1] + 2 * mm)); smooth(st); K.adopt(st, 'base', 'steel', ph)
     return ph
 
 # ----------------------------------------------------------------------------------------------------- STOCK (factory: stock)
 STOCK_UP = -0.010            # mount_stock's height: the stock's wrist at the upper's back
+# (the NRCH stock is traced off FN's 16S NRCH studio shot, a second frame: 0.804 mm a pixel (the rail's slot pitch 12.45 px), the upper's back at x 363, the bore at y 233)
+def P16(x, y): return ((x - 363) * 0.804 * mm, (233 - y) * 0.804 * mm)
+STOCK_ANCH = {'butt': P16(22, 300), 'cheek': P16(250, 181)}
 def stock():
-    """The SCAR's folding, telescoping stock: its hinge block against the upper's back, the comb rising to the hinge, the long body with its slot and
-    its sling loop, the butt raked back down to the heel with its rubber pad, the lower strut's ribbed front edge."""
-    body = PL([(136, 303), (232, 303), (333, 285), (600, 268), (640, 268), (640, 446), (626, 445), (599, 464), (571, 465), (564, 463), (556, 446), (340, 447), (322, 489), (299, 543),
-               (290, 571), (270, 592), (248, 597), (236, 611), (211, 614), (209, 575), (186, 560), (172, 449), (150, 322), (136, 309)])
+    """The SCAR NRCH's folding, telescoping stock with its raised adjustable cheek: its hinge block against the upper's back, the comb rising to the hinge, the
+    long body with its slot, the butt raked back down to the heel with its rubber pad, the lower strut's ribbed front edge."""
+    body = [P16(x, y) for x, y in [(48, 206), (141, 205), (182, 188), (283, 185), (318, 179), (363, 177), (363, 285), (305, 285), (299, 282), (173, 282), (170, 278), (124, 278), (116, 284),
+                                   (115, 292), (104, 312), (92, 328), (82, 352), (73, 363), (63, 376), (48, 380), (43, 388), (34, 391), (30, 372), (31, 326), (31, 267), (30, 222), (36, 198)]]
     st = K.tmp(prism(body, 'x', -17.0 * mm, 17.0 * mm))
-    # the section: the sides leaning in over the comb, a flat across the top
-    boolean(st, prism([(-17 * mm, Up(640)), (17 * mm, Up(640)), (17 * mm, Up(290)), (13 * mm, Up(262)), (-13 * mm, Up(262)), (-17 * mm, Up(290))], 'y', -0.5, 0.1), 'INTERSECT')
-    for s in (-1, 1):   # the lightening slot and the sling loop's window, each side
-        cut(st, prism(rounded(Fp(195), Up(347), 55 * PXMM * mm, 8 * PXMM * mm, 3 * mm, 4), 'x', *xs(s * 15.0 * mm, s * 19 * mm)))
+    boolean(st, prism([(-17 * mm, -0.16), (17 * mm, -0.16), (17 * mm, 0.036), (13 * mm, 0.0485), (-13 * mm, 0.0485), (-17 * mm, 0.036)], 'y', -0.5, 0.1), 'INTERSECT')
+    for s in (-1, 1):   # the lightening slot, each side
+        f0, f1 = P16(66, 0)[0], P16(155, 0)[0]
+        cut(st, prism(rounded((f0 + f1) / 2, P16(0, 215)[1], (f1 - f0) / 2, 4.5 * mm, 3 * mm, 4), 'x', *xs(s * 15.0 * mm, s * 19 * mm)))
     for k_ in range(7):   # the ribs down the lower strut's front edge
-        t = (k_ + 0.5) / 7; x_ = 340 - 50 * t; y_ = 450 + 122 * t
-        for s in (-1, 1): cut(st, prism(PL([(x_ - 12, y_ + 3), (x_ + 4, y_ - 9), (x_ + 4, y_ - 5), (x_ - 10, y_ + 6)]), 'x', *xs(s * 15.5 * mm, s * 18 * mm)))
+        t = (k_ + 0.5) / 7; x_ = 119 - 52 * t; y_ = 282 + 95 * t
+        for s in (-1, 1): cut(st, prism([P16(x_ - 12, y_ + 3), P16(x_ + 4, y_ - 9), P16(x_ + 4, y_ - 5), P16(x_ - 10, y_ + 6)], 'x', *xs(s * 15.5 * mm, s * 18 * mm)))
     bevel(st, 2.2 * mm, 2, 30); smooth(st); K.adopt(st, 'stock', FURN)
     # the hinge block against the upper's back: a plate and the three knuckles on the hinge's vertical axis
-    hb = K.tmp(prism(PL([(556, 283), (640, 283), (640, 446), (556, 446)]), 'x', -HWU * mm, HWU * mm)); bevel(hb, 1.4 * mm, 2, 30); smooth(hb); K.adopt(hb, 'stock', FURN)
-    for y0, y1 in ((283, 345), (352, 412), (418, 446)):
-        o = K.obj(cyl(6.2 * mm, Up(y1), Up(y0), 'z', (HWU * mm + 1.4 * mm, Fp(598)), 20), 'stock', FURN); smooth(o)
-    o = K.obj(cyl(2.6 * mm, Up(450), Up(280), 'z', (HWU * mm + 1.4 * mm, Fp(598)), 12), 'stock', 'steel'); smooth(o)
+    hb = K.tmp(prism([P16(300, 178), P16(363, 178), P16(363, 285), P16(300, 285)], 'x', -HWU * mm, HWU * mm)); bevel(hb, 1.4 * mm, 2, 30); smooth(hb); K.adopt(hb, 'stock', FURN)
+    for y0, y1 in ((176, 225), (232, 262), (268, 285)):
+        o = K.obj(cyl(6.2 * mm, P16(0, y1)[1], P16(0, y0)[1], 'z', (HWU * mm + 1.4 * mm, P16(330, 0)[0]), 20), 'stock', FURN); smooth(o)
+    o = K.obj(cyl(2.6 * mm, P16(0, 290)[1], P16(0, 172)[1], 'z', (HWU * mm + 1.4 * mm, P16(330, 0)[0]), 12), 'stock', 'steel'); smooth(o)
     # the rubber butt pad along the raked rear edge, a little proud of the body all round
-    pad = K.tmp(prism(PL([(150, 322), (172, 449), (186, 560), (209, 575), (211, 614), (199, 614), (192, 606), (186, 575), (173, 571), (167, 560), (153, 449), (124, 322), (128, 309), (136, 303), (140, 309)]),
-                      'x', -17.8 * mm, 17.8 * mm))
-    for k_ in range(0): pass
+    pad = K.tmp(prism([P16(x, y) for x, y in [(34, 198), (50, 206), (46, 222), (44, 267), (45, 326), (48, 372), (56, 390), (34, 394), (18, 387), (21, 222), (21, 196)]], 'x', -17.8 * mm, 17.8 * mm))
     bevel(pad, 1.4 * mm, 2, 30); smooth(pad); K.adopt(pad, 'stock', 'rubber')
-    o = K.tmp(prism(PL([(299, 340), (322, 340), (325, 366), (301, 366)]), 'x', *xs(-17.2 * mm, -18.4 * mm))); smooth(o); K.adopt(o, 'stock', 'steel')   # (the rear sling swivel's plate)
 
 # ----------------------------------------------------------------------------------------------------- GRIP (factory: grip): the standard A2
-GRIP_TOP = (Fp(790), Up(470))        # its front top, under the lower: mount_grip
+GRIP_TOP = (0.050, Up(470))       # its front top, under the lower: mount_grip
 
 # ----------------------------------------------------------------------------------------------------- MAGAZINE (part_mag)
 def mag_h(top):
@@ -225,7 +236,7 @@ def mag_h(top):
     pm = K.part('mag', (0, top[0], top[1])); HWm = 13.0 * mm; pm['check'] = {'w': round(2 * HWm, 4)}
     b0, f0_ = MB * mm, MF * mm                                                  # (its back and front, from its top's middle)
     dB = (W_BOT - top[1]) + 0.002                                               # (the well's mouth below its top: straight to here)
-    L, cv = 0.150, 0.012
+    L, cv = 0.134, 0.003
     def cx(z): return 0.0 if z > dB else cv * ((dB - z) / (dB + L)) ** 1.6
     zs = [0.0, dB] + [dB + (-L - dB) * k / 6 for k in range(1, 7)]
     back = [(top[0] + b0 + cx(z), top[1] + z) for z in zs]
@@ -283,9 +294,9 @@ info = {
     'sy': round(SY * mm, 4), 'fSight': round(RS_F, 4), 'relief': 0.075,
     'muzzles': [[round(MUZ, 4), 0, 0]],
     'grip': [round(GRIP_TOP[0] - 0.040, 4), round(GRIP_TOP[1] - 0.040, 4), 0], 'support': [0.300, -0.030, 0],
-    'anim': {'handle': 'part_handle', 'mag': 'part_mag'},
+    'anim': {'ch': 'part_ch', 'mag': 'part_mag'},
     'magAt': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4)],
-    'handle': {'f': round(HANDLE[0], 4), 'y': round(HANDLE[1], 4), 'x': round((HWU + 5.0) * mm, 4), 'travel': 0.085, 'recip': True, 'style': 'fold'},
+    'ch': [round(HANDLE[0], 4), round(HANDLE[1], 4), round(-(HWU + 3.0) * mm, 4)],
     'port': [round(Fp(956), 4), round(Up(349), 4), round(HWU * mm, 4)],
     'chamberAt': {'side': 'right', 'f': round(Fp(1030), 4), 'y': 0.0, 'x': round((HWU - 2.5) * mm, 4)},
     'recoilBarrel': 0,
@@ -297,7 +308,7 @@ anchors = {
     'mount_barrel': [round(F_GAS, 4), 0, 0], 'mount_muzzle': [round(MZ0, 4), 0, 0],
     'mount_stock': [0, STOCK_UP, 0], 'mount_grip': [round(GRIP_TOP[0], 4), round(GRIP_TOP[1], 4), 0],
     'mount_mag': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4), 0],
-    'mount_tac': [round(Fp(1400), 4), round(Up(371), 4), round((HWU + 3.0) * mm, 4)],
+    'mount_tac': [round(Fp(1400), 4), round(Up(371), 4), round((HWU + 0.5) * mm, 4)],
     'mount_fg': [0.270, round(UP_BOT * mm - 0.0056, 4), 0],
 }
 root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)

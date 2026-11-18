@@ -1836,19 +1836,17 @@ says the same), but not whose: the shooter's name isn't shown.
   The MCX's variants are parts: a 5.5" barrel, short handguard and strut stock make a Rattler; 11.5" (factory) a
   Virtus SBR; the 16" barrel, the lightened FDE handguard and the padded stock a Spear LT; the KeyMod handguard a
   Gen 1. The QBZ-192 takes the same folding stocks (`stk:fold`, a hinge), and a 14.5" barrel makes it a QBZ-191.
-  **The FN SCAR-H and SCAR-L** (`rcv: 'authored'`, `models/scar`, `models/scarl`) are modelled in Blender by one shared builder
-  (`models/scar_kit.py`) from a right-side photo of a SCAR-L (Wikimedia Commons, "FN SCAR-L noBG.png", CC BY-SA 4.0; 2148 px wide, the
-  top rail's slot pitch measured at 22.2 px for the Picatinny 10.01 mm: 0.455 mm a pixel), laid over the photo until they coincide:
-  the long aluminium upper from the hinge to the front of the handguard section with its top rail, the three lightening slots down
-  each side, the track and the oval pad of the reciprocating charging handle (it runs back with every shot), a short rail each side of
-  the front and one under it, the polymer lower with its trigger guard and magazine well (a hollow shell round the magazine), the gas
-  piston's housing and barrel collar, the raised folding rear sight and the front sight on the housing (the gun's own irons), the
-  folding, telescoping stock on its hinge with its ribbed lower strut and rubber pad. The magazine well is the photo's, the SCAR-H's
-  fuller for its 20-round 7.62 magazine ("FN SCAR-L and SCAR-H.png", public domain: the H under the L; "SCAR-H EP.jpg", CC BY-SA 4.0);
-  the SCAR-L's takes the STANAG family's magazine (`models/ar_kit.py`'s, as the F2's). The A2 grip and the A2 birdcage are the shared
-  authored parts, the folding stock (`models/parts/stock/factory_scar_stock`) and the 7.62 birdcage (`models/parts/muzzle/ironvale_a2_762`)
-  are authored parts of their own (`models/scar_parts.py`). The rails are the upper's, so the SCARs have no handguard slot: a foregrip
-  goes on the rail under the front (`mount_fg`), lights and lasers on the side rails (`mount_tac`).
+  **The FN SCAR 17S NRCH and SCAR 16S NRCH** (the game's SCAR-H and SCAR-L; `rcv: 'authored'`, `models/scar`, `models/scarl`) are modelled in Blender by one shared
+  builder (`models/scar_kit.py`) from FN America's own level side-on studio shots (fnamerica.com, the "FN SCAR 17S NRCH" and "FN SCAR 16S NRCH" product pages, the FDE
+  right-side images, 1200 px wide: 0.834 and 0.804 mm a pixel from their rails' slot pitch, the 16S's 1168 px of gun = 939 mm of its 34.5-37 in) and laid over them (the guard,
+  well, magazine, rails and stock coincide to a few pixels); the upper, irons and gas block were first laid over Wikimedia Commons' "FN SCAR-L noBG.png" (CC BY-SA 4.0), and the
+  H's 20-round well checked against "FN SCAR-L and SCAR-H.png" (public domain). The NRCH generation: the long aluminium upper with its top rail and M-LOK slots at 3, 6 and 9
+  o'clock of the forend (lights, lasers and foregrips clamp on the flat faces), a non-reciprocating charging handle (`part_ch`: the oval pad folded flat on the left; it moves only
+  when the gun is charged, as the AR's does), the polymer lower with its large, deep trigger guard (a 56 x 30 mm window, the trigger's face concave to the rear) and the magazine
+  well (a hollow shell round the magazine), the raised folding irons, the telescoping stock on its hinge with its raised cheek and rubber pad. The SCAR-L's well takes the STANAG
+  family's magazine (`models/ar_kit.py`'s, as the F2's); the A2 grip and A2 birdcage are the shared authored parts; the folding stock (`models/parts/stock/factory_scar_stock`) and
+  the 7.62 birdcage (`models/parts/muzzle/ironvale_a2_762`) are authored parts of their own (`models/scar_parts.py`). The rails are the upper's, so the SCARs have no handguard
+  slot: a foregrip goes on the underside (`mount_fg`), lights and lasers on the flanks (`mount_tac`).
   **The G36** (`rcv: 'g36'`, `g36Trace`) is traced from a right-side photo (Wikimedia Commons, "Gewehr G36 weiss.jpg")
   at 0.945 mm a pixel: the polymer receiver, the trigger group pinned under it with the magazine well raked back at
   its foot, the carrying handle's loop from the back of the receiver out over the handguard with the charging handle
@@ -1894,7 +1892,7 @@ says the same), but not whose: the shooter's name isn't shown.
   | AK-47 | 906 | 880 | Micro Uzi | 460 | 460 |
   | FAMAS | 760 | 757 | Vector | 732 | 706 |
   | G36 | 1009 | 999 | MP7 | 637 | 638 |
-  | SCAR-H | 901 | 965 | P90 | 477 | 505 |
+  | SCAR-H | 964 | 965 | P90 | 477 | 505 |
   | Tavor | 739 | 720 | Thompson | 882 | 860 |
   | AUG | 804 | 790 | PPSh-41 | 857 | 843 |
   | Galil ACE | 955 | 927 | Remington 870 | 976 | 978 |
@@ -2010,7 +2008,7 @@ says the same), but not whose: the shooter's name isn't shown.
   (Wikimedia Commons, CC BY 2.0): the long box body with the butt and cheek, the tall 5-round magazine behind the grip
   with its witness holes, the open grip frame, the tube with its sling plates and short rail, the bipod clamped on its
   end with the legs folded back, and the GM6's own brake (a slim neck, a blocky head with one big port).
-  - **Right side, forward:** the SCARs (a flat pad, ahead of the ejection port).
+  - **Left side, forward:** the SCARs (a flat pad ahead of the ejection port, not moving with the shots),
   - **Left side, forward:** the AUG and Tavor; folding levers on the FAL, Vector and AA-12.
   - **Others:**
     - the HK tube over the handguard, front left (MP5, MP5SD), whose tab slides along a tube that stays put;
