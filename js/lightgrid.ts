@@ -39,6 +39,7 @@ export const LightGrid = (() => {
     // is (the eye: x, y, z) and how bright (w, 0 off), lgNvD which way it points (x, y, z) and the cosine of its cone's half-angle (w)
     lgNv: { value: new T.Vector4(0, 0, 0, 0) }, lgNvD: { value: new T.Vector4(0, 0, -1, 0.9) },
     // ambient occlusion (below): x how much (0 off, 1 as made), y the walls' height (m); js/render.ts setAO
+    lgAoK: { value: new Float32Array(8).fill(1) }, // (the moving parts' layers of the occlusion: 1 in place, 0 away; js/gunao.ts)
     lgAo: { value: new T.Vector4(1, 4, 0, 0.28) }, lgAoA: { value: blank }, lgAoB: { value: blank },
     lgBand: { value: new T.Vector4(1, 0.5, 1, 0) }, // the slabs of a floor: how many, the first one's middle, each one's height (m) // (z: the baked one's in; else the open share, below)
   };
@@ -56,7 +57,7 @@ export const LightGrid = (() => {
 
   // every lit material reads the grid (added to its shader as three.js compiles it)
   // (aOcc: a gun's occlusion at the vertex, js/gunao.ts: 0 none, and 0 too for a mesh that has none: a missing attribute reads as 0)
-  const VS_HEAD = 'varying vec3 vLgP;\nvarying vec3 vLgN;\nattribute float aOcc;\nvarying float vOcc;\n';
+  const VS_HEAD = 'varying vec3 vLgP;\nvarying vec3 vLgN;\nattribute float aOcc;\nattribute float aOccD;\nattribute float aOccI;\nuniform float lgAoK[8];\nvarying float vOcc;\n';
   const VS_BODY = `
     { vec4 lgp = vec4(transformed, 1.0); vec3 lgn = objectNormal;
       #ifdef USE_BATCHING
@@ -65,7 +66,7 @@ export const LightGrid = (() => {
       #ifdef USE_INSTANCING
       lgp = instanceMatrix * lgp; lgn = mat3(instanceMatrix) * lgn;
       #endif
-      lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc; }`;
+      lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc + aOccD * lgAoK[int(aOccI + 0.5)]; }`; // (a moving part's occlusion on what's round it, as the part is in place: js/gunao.ts layers)
   const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nvarying float vOcc;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
 uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one

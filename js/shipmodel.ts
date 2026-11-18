@@ -56,7 +56,7 @@ export const ShipModel = (() => {
   }
   function ship(d: SpShipDef, fleet: SpFleet): SmShip {
     const src = MODELS.get(d.id), r = src ? fromModel(src, d, fleet) : shipRecipe(d, fleet);
-    GunAo.apply(r.group, 'ship:' + d.id + ':' + (src ? 'm' : 'r'), GunAo.SHIP); // (her own occlusion, inside and out: js/gunao.ts)
+    GunAo.apply(r.group, 'ship:' + d.id + ':' + (src ? 'm' : 'r'), GunAo.SHIP, [r.nose, [r.ramp]]); // (layers 1 and 2: the breach door's leaves and the ramp, js/space.ts doors sets how far each is shut) // (her own occlusion, inside and out: js/gunao.ts)
     return r;
   }
   function fromModel(src: THREE.Object3D, d: SpShipDef, fleet: SpFleet): SmShip {

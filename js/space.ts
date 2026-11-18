@@ -4,6 +4,7 @@ import { Audio } from './audio.js';
 import { Hangar } from './hangar.js';
 import { HUD } from './hud.js';
 import { Level } from './level.js';
+import { LightGrid } from './lightgrid.js';
 import { LevelView } from './levelview.js';
 import { Loadout } from './loadout.js';
 import { Materials } from './materials.js';
@@ -837,6 +838,7 @@ export const Space = (() => {
     const m = S.model!, noseOpen = S.docked && S.kind === 'board' ? 1 : 0, rampOpen = S.docked && S.kind !== 'board' && !S.auto ? 1 : 0;
     S.noseT += U.clamp(noseOpen - S.noseT, -dt * 1.6, dt * 1.6); S.rampT += U.clamp(rampOpen - S.rampT, -dt * 0.8, dt * 0.8);
     for (const lf of m.nose) lf.position.x = lf.userData.s * 0.86 * S.noseT;
+    { const k = LightGrid.U.lgAoK.value as Float32Array; k[1] = 1 - S.noseT; k[2] = 1 - S.rampT; } // (the occlusion the breach door and the ramp make on what's round them: js/gunao.ts)
     S.hatchT += U.clamp((hatchShut() ? 0 : 1) - S.hatchT, -dt * 0.75, dt * 0.75); // (1.3 s along its rails)
     if (S.hatch) {
       const H = S.hatch, e = S.hatchT * S.hatchT * (3 - 2 * S.hatchT);
