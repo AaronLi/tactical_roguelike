@@ -11,7 +11,7 @@
 // magazine) takes its darkening along as it was in the gun at rest; the muzzle flash's, the lenses' and anything see-through has none.
 export const GunAo = (() => {
   const T = THREE;
-  const REACH = 0.045, RAYS = 14, STRENGTH = 1.6, MAX = 0.8;
+  const REACH = 0.045, RAYS = 14, STRENGTH = 3.2, MAX = 0.9;
   const cache = new Map<string, Float32Array[]>();
   // the hemisphere's rays about +z, cosine-weighted
   const dirs: number[][] = [];
