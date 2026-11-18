@@ -71,7 +71,7 @@ body(K, SIDE, PLAN, 'stock', 'polymer', bev=0.0045, cuts=cuts)
 # the recoil pad, the pistol grip's cap, a sling stud
 put(K, prism([(-0.2975, 0.0455), (-0.3255, 0.0425), (-0.3310, -0.0985), (-0.2975, -0.0925)], 'x', -0.0197, 0.0197), 'stock', 'rubber', bev=0.0012)
 put(K, prism([(-0.034, -0.1225), (-0.012, -0.1252), (0.008, -0.1190), (0.006, -0.1150), (-0.012, -0.1210), (-0.033, -0.1180)], 'x', -0.0195, 0.0195), 'stock', 'rubber', bev=0.0005)
-put(K, cyl(3.0 * mm, -0.0925 - 0.0055, -0.0925 + 0.0005, 'z', (0, -0.080), 12), 'stock', 'steel')
+put(K, cyl(3.0 * mm, -0.0712 - 0.0055, -0.0712 + 0.0008, 'z', (0, -0.100), 12), 'stock', 'steel')
 # moulded finger-grooves (the dark panels each side of the grip and forend)
 for sd in (-1, 1):
     put(K, prism([(-0.040, -0.058), (0.030, -0.066), (0.036, -0.088), (-0.032, -0.090)], 'x', sd * 0.0214, sd * 0.0222), 'stock', 'rubber')
