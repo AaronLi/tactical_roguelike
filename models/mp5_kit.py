@@ -92,7 +92,7 @@ def receiver():
     bevel(rc, 0.8 * mm, 1, 35); smooth(rc); K.adopt(rc, 'base', RCV)
     # the port's inside (what the bolt carrier uncovers: a black lining, the chamber's mouth, the feed ramp), at the round's height (the pocket's middle); the carrier is part_carrier
     port_inside(K, F(707), F(775), U(129) - 15 * S, U(129) + 15 * S, HW, mouth_r=5.0 * mm, ramp=18 * mm, x_in=HW - 14.0 * mm, ax=HW - 10.0 * mm, az=U(129))
-    CARRIER = port_carrier(K, F(707), F(775), U(129) - 15 * S, U(129) + 15 * S, HW, x0=HW - 5.4 * mm, ribs=3, x1=HW - 3.2 * mm)     # (the bolt carrier in the port: a thin plate over the pocket, its face under the receiver's side)
+    CARRIER = port_carrier(K, F(707), F(775), U(129) - 15 * S, U(129) + 15 * S, HW, x1=HW - 3.2 * mm, ax=HW - 10.0 * mm, az=U(129), head=0.026, rollers=True)     # (the bolt carrier in the port: a thin plate over the pocket, its face under the receiver's side)
     # the end cap: a little proud of the tube all round, its top-back corner sloping down to the stock (photo 418-440)
     ec = K.tmp(prism(ccw([(x * 1.03, z + (0.6 * mm if z > 0 else -0.6 * mm)) for x, z in full]), 'y', 0.0, F(441)))
     boolean(ec, rprism(PL([(425, 112), (430, 101), (441, 93), (442, 93), (442, 205), (425, 205)]), -0.03, 0.03), 'INTERSECT')

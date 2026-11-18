@@ -574,10 +574,7 @@ CARRIER_TRAVEL = 0.085       # the carrier's stroke: the handle's (the handle is
 def carrier():
     """The bolt carrier seen through the open ejection port (part_carrier): a steel block (its flank milled with shallow ribs) in the right half of the receiver's box, its
     face just inside the port; it runs back with the handle on every shot and a charge, and held back on an empty magazine it uncovers the receiver's inside and the chamber's mouth."""
-    pk = K.part('carrier', (0, 197.0 * mm, 4.0 * mm))
-    o = K.tmp(box(3.0 * mm, 13.8 * mm, 150 * mm, 238 * mm, -1.5 * mm, 8.5 * mm)); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel', pk)
-    for f in (170, 186, 202, 218):
-        g = K.tmp(box(13.6 * mm, 14.2 * mm, (f - 1.2) * mm, (f + 1.2) * mm, -0.5 * mm, 7.5 * mm)); smooth(g); K.adopt(g, 'base', 'gunmetal', pk)
+    pk = port_carrier(K, 166 * mm, 229 * mm, -2 * mm, (RTOP + 1) * mm, HW * mm, x0=3.0 * mm, x1=13.8 * mm, body='box', ax=0.0, az=0.0, head=0.030, rh=7.2 * mm)   # (the carrier's milled block over the bolt, its head at the port's front)
     return pk
 
 # ----------------------------------------------------------------------------------------------------- RAILED DUST COVER (slot optic, extras.mount)

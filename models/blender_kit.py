@@ -278,15 +278,37 @@ def port_inside(Kx, pa, pb, pu0, pu1, hw, mouth_r=5.6 * MM_, ramp=24 * MM_, pare
     o = Kx.obj(lathe([(pb - 4.6 * MM_, mouth_r), (pb - 0.7 * MM_, mouth_r)], 24, (ax, 0, az)), 'base', 'gunmetal', parent); smooth(o)
     o = Kx.tmp(prism([(pb - ramp, pu0 + 0.6 * MM_), (pb - 1.0 * MM_, az - mouth_r * 0.2), (pb - 1.0 * MM_, pu0 + 0.6 * MM_)], 'x', ax - mouth_r * 1.6, ax + mouth_r * 1.6)); smooth(o); Kx.adopt(o, 'base', 'gunmetal', parent)
 
-def port_carrier(Kx, pa, pb, pu0, pu1, hw, x0=5.6 * MM_, ribs=4, mat='black', x1=None):
-    """part_carrier: a black block filling the port (1 mm in from its edges), its outer face 0.8 mm inside the receiver's surface so it never stands out, shallow gunmetal ribs
-    across its flank; the part's pivot at the port's middle, sliding back (+z) in the game."""
+def port_carrier(Kx, pa, pb, pu0, pu1, hw, x0=5.6 * MM_, ribs=4, mat='black', x1=None, ax=0.0, az=None, head=0.034, body='cyl', rb=None, rh=None, rollers=False):
+    """part_carrier: the bolt group seen through the open port (not a plate: the carrier's own body and the bolt in front of it), sliding back (+z in the game). Its outer face stays 0.8 mm inside
+    the receiver's surface (x1) wherever it runs back to. The round bolt carrier (body 'cyl': a cylinder on the bore axis (ax, az), phosphated black, two grooves, a flat gas-key land)
+    runs forward into the bolt (a steel cylinder, a ring of locking lugs behind its face, the extractor claw and its spring pin on the right); the carrier of a box receiver (body 'box': a milled
+    block, round on top, between x0 and x1) carries the same bolt. rollers: a roller-delayed bolt's two locking rollers stand out of the head's sides. The bolt head (length 'head', 34 mm) reaches
+    the port's front: it covers the chambered round's case until the carrier is drawn back."""
     pc, pu = (pa + pb) / 2, (pu0 + pu1) / 2
-    x1 = hw - 0.8 * MM_ if x1 is None else x1       # (its outer face: inside the receiver's surface wherever the block runs back to, so it never stands out)
+    az = pu if az is None else az
+    x1 = hw - 0.8 * MM_ if x1 is None else x1
     pk = Kx.part('carrier', (0, pc, pu))
-    o = Kx.tmp(prism(rounded(pc, pu, (pb - pa) / 2 - 1.0 * MM_, (pu1 - pu0) / 2 - 1.0 * MM_, 1.6 * MM_, 4), 'x', x0, x1)); bevel(o, 0.5 * MM_, 2, 30); smooth(o); Kx.adopt(o, 'base', mat, pk)
-    L = pb - pa
-    for i in range(ribs):
-        f = pc + (i - (ribs - 1) / 2) * L * 0.2
-        g = Kx.tmp(box(x1 - 0.5 * MM_, x1 + 0.1 * MM_, f - 0.7 * MM_, f + 0.7 * MM_, pu - (pu1 - pu0) * 0.34, pu + (pu1 - pu0) * 0.34)); smooth(g); Kx.adopt(g, 'base', 'gunmetal', pk)
+    f0, f1 = pa + 1.0 * MM_, pb - 1.0 * MM_
+    fh = f1 - head                                  # (where the bolt head begins)
+    rb = min((pu1 - pu0) / 2 - 0.5 * MM_, x1 - ax) if rb is None else rb
+    rh = rb * 0.86 if rh is None else rh
+    if body == 'cyl':
+        o = Kx.tmp(lathe([(f0, rb * 0.9), (f0 + 2.5 * MM_, rb), (fh + 1.0 * MM_, rb), (fh + 1.0 * MM_, rh)], 28, (ax, 0, az))); smooth(o); Kx.adopt(o, 'base', mat, pk)
+        for g in (0.3, 0.55):                       # (the grooves round the carrier)
+            fg = f0 + (fh - f0) * g
+            o = Kx.tmp(lathe([(fg - 0.9 * MM_, rb * 0.97), (fg, rb * 0.97 - 0.9 * MM_), (fg + 0.9 * MM_, rb * 0.97)], 28, (ax, 0, az))); smooth(o); Kx.adopt(o, 'base', 'gunmetal', pk)
+        o = Kx.tmp(box(ax - rb * 0.5, ax + rb * 0.5, f0 + (fh - f0) * 0.62, fh - 3.0 * MM_, az + rb * 0.5, az + rb * 0.98)); smooth(o); Kx.adopt(o, 'base', 'gunmetal', pk)   # (the gas key's land, on top)
+    else:
+        o = Kx.tmp(prism(rounded((f0 + fh) / 2, pu, (fh - f0) / 2, (pu1 - pu0) / 2 - 0.5 * MM_, 2.5 * MM_, 4), 'x', x0, x1)); bevel(o, 0.5 * MM_, 2, 30); smooth(o); Kx.adopt(o, 'base', mat, pk)
+        for g in (0.3, 0.6):                        # (a milled step or two along it)
+            fg = f0 + (fh - f0) * g
+            o = Kx.tmp(box(x1 - 0.6 * MM_, x1 + 0.1 * MM_, fg - 1.0 * MM_, fg + 1.0 * MM_, pu0 + 1.5 * MM_, pu1 - 1.5 * MM_)); smooth(o); Kx.adopt(o, 'base', 'gunmetal', pk)
+    o = Kx.tmp(lathe([(fh, rh), (f1 - 3.0 * MM_, rh), (f1 - 1.2 * MM_, rh * 0.93), (f1, rh * 0.9)], 28, (ax, 0, az))); smooth(o); Kx.adopt(o, 'base', 'steel', pk)       # (the bolt: its face chamfered)
+    o = Kx.tmp(lathe([(f1 - 10.0 * MM_, rh * 1.04), (f1 - 5.5 * MM_, rh * 1.04)], 28, (ax, 0, az))); smooth(o); Kx.adopt(o, 'base', 'gunmetal', pk)                         # (the locking lugs' ring)
+    xe = min(ax + rh + 1.0 * MM_, x1)
+    o = Kx.tmp(box(xe - 2.6 * MM_, xe, f1 - 14.0 * MM_, f1 - 1.5 * MM_, az - rh * 0.1, az + rh * 0.55)); bevel(o, 0.4 * MM_, 1); smooth(o); Kx.adopt(o, 'base', 'gunmetal', pk)    # (the extractor's claw)
+    o = Kx.obj(cyl(0.9 * MM_, xe - 1.0 * MM_, xe + 0.05 * MM_, 'x', (f1 - 9.0 * MM_, az + rh * 0.3), 10), 'base', 'steel', pk); smooth(o)                                  # (its spring's pin)
+    if rollers:
+        for sgn in (1,):
+            o = Kx.obj(cyl(2.4 * MM_, az - 3.0 * MM_, az + 3.0 * MM_, 'z', (min(ax + rh - 0.4 * MM_, x1 - 2.4 * MM_), fh + head * 0.45), 14), 'base', 'steel', pk); smooth(o)
     return pk

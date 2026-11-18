@@ -332,10 +332,13 @@ CH_AX, CH_Z = 0.002, (PU0 + PU1) / 2
 obj(tube([(PB - 0.0046, 0.0066), (PB - 0.0007, 0.0066)], 24, 'y', (CH_AX, 0, CH_Z)), 'base', 'gunmetal')
 CARRIER_TRAVEL = 0.100                       # the stroke (the handle's: the block's rear stays 76 mm inside the receiver's back at the full stroke)
 pc_ = part('carrier', (0, (PA + PB) / 2, CH_Z))
-cb = obj(box(0.0075, PHW - 0.0008, PA + 0.001, PB - 0.001, PU0 + 0.001, PU1 - 0.001), 'base', 'black', pc_); bevel(cb, 0.0005, 2); finish(cb.data)
-for k in range(5):
-    fr = PA + (PB - PA) * (0.12 + 0.19 * k)
-    rb = obj(box(PHW - 0.0013, PHW - 0.0007, fr - 0.0007, fr + 0.0007, PU0 + 0.0035, PU1 - 0.0035), 'base', 'gunmetal', pc_); finish(rb.data)
+F1, FH = PB - 0.001, PB - 0.001 - 0.030                     # (the carrier's front, and where its bolt head begins)
+cb = obj(box(0.0075, PHW - 0.0008, PA + 0.001, FH + 0.001, PU0 + 0.001, PU1 - 0.001), 'base', 'black', pc_); bevel(cb, 0.0007, 2); finish(cb.data)           # (the carrier: a milled block, round-cornered)
+for k in range(2):
+    fr = PA + (FH - PA) * (0.35 + 0.25 * k)
+    rb = obj(box(PHW - 0.0012, PHW - 0.0007, fr - 0.0008, fr + 0.0008, PU0 + 0.002, PU1 - 0.002), 'base', 'gunmetal', pc_); finish(rb.data)       # (a milled step across it)
+obj(tube([(FH, 0.0050), (F1 - 0.003, 0.0050), (F1, 0.0046)], 24, 'y', (CH_AX, 0, CH_Z)), 'base', 'steel', pc_)                                        # (the bolt, in front of it: a round head)
+obj(box(CH_AX + 0.0042, CH_AX + 0.0058, F1 - 0.014, F1 - 0.002, CH_Z - 0.001, CH_Z + 0.0035), 'base', 'gunmetal', pc_)                                  # (its extractor's claw)
 # pins, the takedown lever and the selector
 for px, py, r in ((748, 279, 0.0022), (796, 282, 0.0022), (831, 273, 0.0028)):
     o = obj(tube([(-0.019, r * 0.8), (-0.018, r), (0.018, r), (0.019, r * 0.8)], 16, 'x', (0, F(px), U(py))), 'base', 'steel'); finish(o.data)

@@ -77,7 +77,7 @@ PORT = (F(657), F(946), U(979), U(933))
 cut(sh, port_pocket(*PORT, 21 * mm))
 bevel(sh, 3.0 * mm, 2, 30); wnorm(sh); K.adopt(sh, 'base', SH)
 port_inside(K, *PORT, 20 * mm, mouth_r=5.6 * mm, ramp=26 * mm, az=(PORT[2] + PORT[3]) / 2)
-CARRIER = port_carrier(K, *PORT, 20 * mm, x0=6.0 * mm, ribs=5)                          # (the bolt carrier in the port: part_carrier)
+CARRIER = port_carrier(K, *PORT, 20 * mm, ax=0.0, az=(PORT[2] + PORT[3]) / 2)                          # (the bolt carrier in the port: part_carrier)
 # the butt pad, a little proud of the shell all round its back
 BUTT = [[239, 815], [225, 827], [205, 949], [203, 1035], [204, 1068], [213, 1083], [206, 1088], [207, 1107], [215, 1119], [226, 1140], [237, 1148], [285, 1148],
         [290, 820], [265, 816]]

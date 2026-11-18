@@ -175,7 +175,7 @@ def upper(fa=True, deflector=True, port=(755, 925)):
     cut(up, box(-6.5 * mm, 6.5 * mm, F(490), F(586), RAIL_U0 - 3.5 * mm, RAIL_U0 + 0.01))               # the charging handle's channel
     bevel(up, 0.7 * mm, 1, 30); smooth(up); K.adopt(up, 'base', RCV)
     picatinny(K, F(586), UP_F1, RAIL_U0, 'base', RCV)
-    # the port's inside (what the carrier uncovers) and the dust cover's hinge rod along its foot (the cover itself is open, down out of the way)
+    # the port's inside (what the carrier uncovers) and the dust cover's hinge rod along its foot (the cover itself is part_dust: dust_cover())
     port_inside(K, F(port[0]), F(port[1]), U(140), U(92), HW_UP, mouth_r=C.get('mouth_r', 5.6 * mm))
     o = K.obj(cyl(1.3 * mm, F(port[0] - 3), F(port[1] + 3), 'y', (HW_UP - 0.3 * mm, U(143)), 8), 'base', 'steel'); smooth(o)
     if deflector:
@@ -187,6 +187,13 @@ def upper(fa=True, deflector=True, port=(755, 925)):
         smooth(bt); K.adopt(bt, 'base', 'steel')
     # the barrel nut (the upper's front)
     o = K.obj(lathe([(UP_F1 - 0.5 * mm, NUT_R), (UP_F1 + 0.016, NUT_R)], 24), 'base', 'park'); smooth(o)
+
+def dust_cover(port):
+    """The ejection port's dust cover (part_dust): the hinged door shut over the port, a stiffening rib on it; its pivot is the hinge rod along the port's foot, and it swings open about it (down and out)."""
+    pd = K.part('dust', (HW_UP - 0.3 * mm, F((port[0] + port[1]) / 2), U(143)))
+    o = K.tmp(box(HW_UP - 1.2 * mm, HW_UP - 0.2 * mm, F(port[0] + 2), F(port[1] - 2), U(141), U(91))); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', RCV, pd)
+    o = K.tmp(box(HW_UP - 0.4 * mm, HW_UP + 0.6 * mm, F(port[0] + 45), F(port[1] - 45), U(122), U(112))); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', RCV, pd)
+    return pd
 
 # ===================================================================================== CHARGING HANDLE (part_ch)
 def charging_handle():
@@ -708,7 +715,8 @@ la = lower(C.get('lower', 'ar15'))
 PORT = C.get('port', (755, 925))
 upper(fa=C.get('forward_assist', True), deflector=C.get('deflector', True), port=PORT)
 ch_at = charging_handle()
-CARRIER = port_carrier(K, F(PORT[0]), F(PORT[1]), U(140), U(92), HW_UP, x0=C.get('mouth_r', 5.6 * mm) + 0.4 * mm)   # (the bolt carrier in the port: part_carrier)
+CARRIER = port_carrier(K, F(PORT[0]), F(PORT[1]), U(140), U(92), HW_UP, ax=0.0, az=0.0)   # (the bolt carrier and bolt in the port: part_carrier)
+DUST = dust_cover(PORT)                                                                    # (the port's dust cover: part_dust, closed at rest, swung open by the game)
 RND = C.get('round', (0.0048, 0.042))      # (the game's round in the port: its radius and length, js/vmanim.ts chamberView)
 {'m4': stock_m4, 'hk': stock_hk}[C.get('stock', 'm4')]()   # (the SOPMOD / Crane stays in stock_sopmod, unused for now)
 {'a2': grip_a2, 'mod': grip_mod, 'hk': grip_hk}[C.get('grip', 'mod')](la['grip'])
@@ -749,7 +757,7 @@ info = {
     'sy': round(SY, 4), 'fSight': round(RS, 4), 'relief': 0.075,
     'muzzles': [[round(MUZ, 4), 0, 0]],
     'grip': [round(la['grip'][0] - 0.040, 4), round(la['grip'][1] - 0.040, 4), 0], 'support': [round((HG0 + HG1) / 2 + 0.03, 4), round(HGB - 6 * mm, 4), 0],
-    'anim': {'ch': 'part_ch', 'mag': 'part_mag', 'catch': 'part_catch', 'carrier': 'part_carrier'},
+    'anim': {'ch': 'part_ch', 'mag': 'part_mag', 'catch': 'part_catch', 'carrier': 'part_carrier', 'dust': 'part_dust'},
     'carrier': {'travel': C.get('carrier', 0.090)},
     'magAt': [round(MTOP[0], 4), round(MTOP[1], 4)],
     **({'magRake': round(GRK, 4)} if C.get('lower', 'ar15') == 'glock' else {}),   # (the well's rake: a reload draws the magazine out along it)
