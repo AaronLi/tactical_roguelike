@@ -89,7 +89,7 @@ export const Gunsmith = (() => {
   const kindOf = (sl: string) => sl.replace(/\d+$/, '');
   const slotRank = (sl: string) => ORDER.indexOf(kindOf(sl)) + (parseInt((sl.match(/\d+$/) || [])[0]!, 10) || 0) * 0.01; // (the display order, each level of a nest after the last)
   // whether part p goes in slot s (its interface, and its kind or the kind the slot takes)
-  const fitsSlot = (s: Slot, p: Part, id: string, build?: Record<string, string> | false) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[kindOf(s.slot)] === p.slot) && !(id && p.not && p.not.includes(id)) && fitsLen(p, id, build); // (p.not: guns on that mount it still doesn't go on)
+  const fitsSlot = (s: Slot, p: Part, id: string, build?: Record<string, string> | false) => !!(s && p) && (s.mount === p.mount || (p.alsoMounts || []).includes(s.mount)) && (s.slot === p.slot || ALIAS[kindOf(s.slot)] === p.slot) && !(id && p.not && p.not.includes(id)) && !(id && p.only && p.only !== id) && fitsLen(p, id, build); // (p.not: guns on that mount it still doesn't go on; p.only: the one gun it goes on: the AN-94's own furniture)
   // A shared long-gun barrel (a cartridge's: br:<cartridge>) fits a gun whose factory barrel it's within 0.6x-1.6x the length of
   // (the MCX down to 0.45x: its Rattler barrel)
   const LEN_MIN_IN: Record<string, number> = { fal: 17 }; // (the FAL's gas block and tube stand on the barrel to 15 mm behind this: a barrel ending before them is not offered.
@@ -1555,7 +1555,7 @@ export const Gunsmith = (() => {
   // the AN-94's own furniture (parts of its own, appended after the authored parts so no id shifts; each is the model of models/parts/<slot>/an94_*: the AK family's standard stocks, grips,
   // handguards and muzzles stay as they were and fit its anchors): the solid side-folding stock, the raked grip, the forend and the two-lobe muzzle device
   { const plat = PLATFORMS.an94;
-    const a = (o: any) => add(Object.assign({ brand: 'Factory', oem: true, tier: 1 }, o));
+    const a = (o: any) => add(Object.assign({ brand: 'Factory', oem: true, tier: 1, plat: 'an94', only: 'an94' }, o)); // (its own: no other AK takes them)
     plat.defaults.stock = a({ id: 'stk.ak.an94', slot: 'stock', mount: 'stk:ak', name: 'AN-94 side-folding stock', price: 220, stype: 'skeleton', st: { ergo: 1, recoil: -4, weight: 0.45 }, desc: 'Solid polymer; folds to the side.', model: { stock: 'skeleton', sm: null } }).id;
     plat.defaults.grip = a({ id: 'gr.ak.an94', slot: 'grip', mount: 'gr:ak', name: 'AN-94 pistol grip', price: 70, desc: 'Standard-issue part.', model: { gripT: 'wood', gm: null } }).id;
     plat.defaults.handguard = a({ id: 'hg.ak.an94', slot: 'handguard', mount: 'hg:ak', name: 'AN-94 forend', price: 180, st: HG_ST.wood, desc: 'No rails.', hgScale: false, model: { hg: { t: 'wood', len: 0.198, m: 'polymer' } } }).id;
@@ -1681,7 +1681,7 @@ export const Gunsmith = (() => {
   // every weapon a part fits, through any interface it takes (a 9 mm can on a ½-28 .22)
   // (a handguard fits a gun that has a barrel for it)
   const hgFitsAny = (p: Part, id: string) => { const b = PLATFORMS[id].slots.find((sl: Slot) => sl.slot === 'barrel'); return hgFits(p, id, PLATFORMS[id].defaults.barrel) || (!!b && (BY_MOUNT.get(b.mount) || []).some((q: Part) => !q.retired && q.slot === 'barrel' && !(q.not || []).includes(id) && fitsLen(q, id, false) && hgFits(p, id, q.id))); };
-  const fitsPart = (p: Part) => [...new Set([p.mount, ...(p.alsoMounts || [])].flatMap((m) => fits(m)))].filter((id) => !(p.not || []).includes(id) && fitsLen(p, id, false) && (hgLenOf(p) == null || hgFitsAny(p, id)));
+  const fitsPart = (p: Part) => [...new Set([p.mount, ...(p.alsoMounts || [])].flatMap((m) => fits(m)))].filter((id) => !(p.not || []).includes(id) && (!p.only || p.only === id) && fitsLen(p, id, false) && (hgLenOf(p) == null || hgFitsAny(p, id)));
 
   // ------------------------------------------------------------------ the gunsmith's stock this visit
   // Six parts at a time (on pedestals in the hangar), the same for the whole squad. Parts that fit more weapons turn up more often;

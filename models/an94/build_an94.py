@@ -172,9 +172,9 @@ def forend():
     zl = UY(583)                                                                                 # (where the lower guard's top is: the ledge)
     up = K.tmp(prism(P([(HG0, top), (HG1, top), (HG1, zl + 2.0), (HG0, zl + 2.0)]), 'x', -(FW - 1.2) * mm, (FW - 1.2) * mm))
     boolean(up, prism(rounded(0, (top + zl) / 2 * mm, (FW - 1.2) * mm, (top - zl) / 2 * mm + 0.5 * mm, 5 * mm, 4), 'y', HG0 * mm - 0.01, HG1 * mm + 0.01), 'INTERSECT')
-    side = [(HG0, zl + 0.5), (HG1, zl + 0.5), (HG1, UY(622)), (FX(1230), UY(626)), (FX(1170), UY(652)), (HG0, UY(652))]
+    side = [(HG0, zl + 4.0), (HG1, zl + 4.0), (HG1, UY(622)), (FX(1230), UY(626)), (FX(1170), UY(652)), (HG0, UY(652))]
     lo = K.tmp(prism(P(side), 'x', -FW * mm, FW * mm))
-    boolean(lo, prism(rounded(0, (zl + bot) / 2 * mm, FW * mm, (zl - bot) / 2 * mm + 0.5 * mm, 9 * mm, 5), 'y', HG0 * mm - 0.01, HG1 * mm + 0.01), 'INTERSECT')
+    boolean(lo, prism(rounded(0, (zl + 4.0 + bot) / 2 * mm, FW * mm, (zl + 4.0 - bot) / 2 * mm, 9 * mm, 5), 'y', HG0 * mm - 0.01, HG1 * mm + 0.01), 'INTERSECT')
     boolean(up, lo.data.copy(), 'UNION')
     bpy.data.objects.remove(lo, do_unlink=True)
     fo = up

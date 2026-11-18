@@ -4,7 +4,7 @@
 interface Part { // a part as the catalog holds it
   id: string; idx: number; slot: SlotKind; mount: string; st: Record<string, number>; set: PartSet; tier: number;
   brand: string; name: string; desc: string; price: number; model?: PartModel; provides?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }> | null;
-  chassis?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }>; not?: string[]; alsoMounts?: string[]; factory?: boolean; oem?: boolean; fam?: string; plat?: string;
+  chassis?: Record<string, string | { mount: string; bare?: boolean; brace?: Record<string, number> }>; not?: string[]; only?: string; alsoMounts?: string[]; factory?: boolean; oem?: boolean; fam?: string; plat?: string;
   stype?: string; variant?: boolean; retired?: boolean; becomes: string /* (a receiver kit: the gun it makes) */;
   skin?: string; alt?: boolean; skinName?: string; /* (a skin family: the parts of one mount that are one part in different finishes; skin is the family's root part, alt a member that isn't it, skinName the finish) */
   into?: string; /* (a part merged into another, the same part in the same finish: it's retired, and a saved gun with it gets that one) */
