@@ -166,8 +166,6 @@ def lower():
     for s in (-1, 1):
         o = K.obj(cyl(5.4 * mm, *xs(s * (HWL - 0.3) * mm, s * (HWL + 2.4) * mm), 'x', (Fp(762), Up(410)), 18), 'base', 'black'); smooth(o)
         lv = K.tmp(prism([(0.0385, -0.0282), (0.0515, -0.0282), (0.0515, -0.0312), (0.0385, -0.0312)], 'x', *xs(s * (HWL + 1.8) * mm, s * (HWL + 4.2) * mm))); bevel(lv, 0.7 * mm, 1); smooth(lv); K.adopt(lv, 'base', 'black')
-    for s in (-1, 1):
-        o = K.obj(cyl(4.2 * mm, *xs(s * (HWL - 0.3 * mm), s * (HWL + 2.2 * mm)), 'x', (W_OUT_F - 4.5 * mm, Up(398)), 16), 'base', 'steel'); smooth(o)
     # the bolt catch's paddle on the left, ahead of the grip
     o = K.tmp(prism(PL([(728, 440), (748, 440), (752, 458), (730, 458)]), 'x', *xs(-(HWL - 0.2) * mm, -(HWL + 1.8) * mm))); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
 
@@ -334,8 +332,9 @@ def details():
         o = K.tmp(prism(rounded(0.1108, -0.037, 19.5 * mm, 14.5 * mm, 4 * mm, 4), 'x', *xs(s * (HWL - 0.3 * mm), s * (HWL + 2.0 * mm)))); bevel(o, 0.7 * mm, 2, 30); smooth(o); K.adopt(o, 'base', FURN)
         o = K.obj(cyl(5.8 * mm, *xs(s * (HWL + 1.8 * mm), s * (HWL + 4.6 * mm)), 'x', (0.1134, -0.0362), 20), 'base', 'black'); smooth(o)
         o = K.obj(cyl(2.4 * mm, *xs(s * (HWL + 1.8 * mm), s * (HWL + 3.0 * mm)), 'x', (0.099, -0.032), 12), 'base', 'steel'); smooth(o)
-        for f, u, r in ((0.018, -0.0145, 3.4), (0.171, -0.0145, 3.0), (0.0715, -0.045, 2.0), (0.038, -0.017, 2.4), (0.112, -0.021, 1.6)):
+        for f, u, r in ((0.018, -0.0145, 3.4), (0.0715, -0.045, 2.0), (0.038, -0.017, 2.4), (0.112, -0.021, 1.6)):
             o = K.obj(cyl(r * mm, *xs(s * (HWL - 0.2 * mm), s * (HWL + 2.0 * mm)), 'x', (f, u), 16), 'base', 'steel'); smooth(o)
+        o = K.obj(cyl(4.4 * mm, *xs(s * (HWU - 0.5) * mm, s * (HWU + 0.9) * mm), 'x', (0.199, -0.0199), 20), 'base', 'black'); smooth(o)   # (the lower's hinge pin head, measured off FN's 16S shot: x 610, y 258, 4.4 mm radius)
         for f, u in ((0.010, 0.0075), (F_FRONT + 0.006, -0.012)):
             q = K.tmp(cyl(5.8 * mm, *xs(s * (HWU - 0.4) * mm, s * (HWU + 3.0) * mm), 'x', (f, u), 20)); cut(q, cyl(2.6 * mm, *xs(s * (HWU - 1.0) * mm, s * (HWU + 3.5) * mm), 'x', (f, u), 14))
             bevel(q, 0.4 * mm, 1); smooth(q); K.adopt(q, 'base', 'steel')
