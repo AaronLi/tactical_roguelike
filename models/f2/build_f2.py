@@ -72,11 +72,12 @@ sh = K.tmp(prism(PL(SHELL), 'x', -20 * mm, 20 * mm))           # (40 mm across, 
 boolean(sh, prism([(-20 * mm, U(1300)), (20 * mm, U(1300)), (20 * mm, U(880)), (13 * mm, U(812)), (-13 * mm, U(812)), (-20 * mm, U(880))], 'y', -0.01, F(910)), 'INTERSECT')
 # the magazine well: a pocket up into the shell round the magazine (its walls the shell's own sides, front and back)
 cut(sh, box(-12.4 * mm, 12.4 * mm, MAG_TOP[0] + MB - 1.0 * mm, MAG_TOP[0] + MF + 1.0 * mm, U(1250), MAG_TOP[1] + 2 * mm))
-# the ejection port (right): a recess its cover sits in, the bolt showing
-cut(sh, box(17.5 * mm, 21 * mm, F(657), F(946), U(979), U(933)))
+# the ejection port (right): open, a pocket down past the bore (what the bolt carrier uncovers: the lining, the chamber's mouth; the carrier is part_carrier)
+PORT = (F(657), F(946), U(979), U(933))
+cut(sh, port_pocket(*PORT, 21 * mm))
 bevel(sh, 3.0 * mm, 2, 30); wnorm(sh); K.adopt(sh, 'base', SH)
-o = K.tmp(box(17.0 * mm, 19.5 * mm, F(665), F(938), U(972), U(940))); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel')     # (the bolt)
-o = K.tmp(box(16.5 * mm, 18.0 * mm, F(940), F(946), U(979), U(933))); smooth(o); K.adopt(o, 'base', 'black')                             # (the port's front lip)
+port_inside(K, *PORT, 20 * mm, mouth_r=5.6 * mm, ramp=26 * mm, az=(PORT[2] + PORT[3]) / 2)
+CARRIER = port_carrier(K, *PORT, 20 * mm, x0=6.0 * mm, ribs=5)                          # (the bolt carrier in the port: part_carrier)
 # the butt pad, a little proud of the shell all round its back
 BUTT = [[239, 815], [225, 827], [205, 949], [203, 1035], [204, 1068], [213, 1083], [206, 1088], [207, 1107], [215, 1119], [226, 1140], [237, 1148], [285, 1148],
         [290, 820], [265, 816]]
@@ -208,11 +209,12 @@ info = {
     'sy': r4(SY), 'fSight': r4(RS), 'relief': 0.08,
     'muzzles': [[r4(MUZ), 0, 0]],
     'grip': [r4(F(1180)), r4(U(1100)), 0], 'support': [0.53, r4(U(1000) - 6 * mm), 0],
-    'anim': {'mag': 'part_mag', 'handle': 'part_handle'},
+    'anim': {'mag': 'part_mag', 'handle': 'part_handle', 'carrier': 'part_carrier'},
+    'carrier': {'travel': 0.090},
     'magAt': [r4(MAG_TOP[0]), r4(MAG_TOP[1])],
     'handle': {'f': r4(H0[0]), 'y': r4(U(800)), 'x': 0, 'travel': 0.055, 'style': 'top', 'stem': 0.008, 'recip': False},
     'port': [r4(F(800)), r4(U(956)), 0.02],
-    'chamberAt': {'side': 'right', 'f': r4(F(930)), 'y': 0.0, 'x': 0.018},
+    'chamberAt': {'side': 'port', 'f': r4(PORT[1] - 0.7 * mm - 0.042), 'y': r4((PORT[2] + PORT[3]) / 2 + 0.0048), 'x': 0.0},   # (a real port: the round shows in it, at the port's middle height, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [r4(MZ0), 0, 0]},
 }
