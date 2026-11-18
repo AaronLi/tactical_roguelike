@@ -111,6 +111,10 @@ memory, and then ask which configuration the game wants: the game's shooter is r
 - **Folding irons fold.** Under an optic, flip-up sights fold flat rather than vanish: the folded state as slot `optic` meshes with
   `extras.mount = true` (drawn only under a real sight), the rail anchors `mount_optic_rail`.. on the gun's own rail so optics sit
   where they did.
+- **The right kind of handle, and its full stroke.** An AR's rear T-handle is `part_ch`/`info.ch` with the AR's short pull; a side
+  charging handle (the SCAR's, an AK's, an HK's) is `part_handle` with `info.handle` (`x` its side, `travel` its whole run, `recip`
+  whether it moves with each shot, `grab`). Measure the travel off the photo's channel: a SCAR's knob runs the channel's length,
+  and with the AR's mechanism the charge looked like the wrist just turning.
 - **Moving parts survive the bake.** A `part_ch` or `part_catch` in the .glb is no proof the game animates it: in the game,
   `G.R.vm` must have the node and `G.R.vm.userData.info.anim` its key (the Mk18 has catch, ch, mag), and it must move during a rack
   (`G.Me.startReload()` with a full magazine and an empty chamber). The SCAR's handle was in the model and not in the game.
