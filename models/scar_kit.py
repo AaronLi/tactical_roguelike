@@ -219,8 +219,9 @@ def handle():
     """The NRCH's non-reciprocating charging handle (part_ch: it stays put when the gun fires and is pulled back only when it is charged, as the AR's is): a
     knob (a ring round a dark socket) at the front of its channel along the upper's upper half on the RIGHT, ahead of the ejection port."""
     ph = K.part('ch', (0, HANDLE[0], HANDLE[1]))
-    o = K.tmp(cyl(6.4 * mm, (HWU - 1.4) * mm, (HWU + 4.2) * mm, 'x', HANDLE, 24)); cut(o, cyl(3.2 * mm, (HWU + 2.6) * mm, (HWU + 5) * mm, 'x', HANDLE, 16)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black', ph)
-    o = K.obj(cyl(2.6 * mm, (HWU + 2.0) * mm, (HWU + 2.8) * mm, 'x', HANDLE, 14), 'base', 'steel', ph); smooth(o)
+    o = K.obj(cyl(3.0 * mm, (HWU - 1.4) * mm, (HWU + 17.0) * mm, 'x', HANDLE, 16), 'base', 'black', ph); smooth(o)            # (the stem, standing out of the channel)
+    o = K.tmp(cyl(6.8 * mm, (HWU + 16.5) * mm, (HWU + 24.0) * mm, 'x', HANDLE, 24)); bevel(o, 2.0 * mm, 3, 30); smooth(o); K.adopt(o, 'base', 'black', ph)   # (the knob: a rounded black head)
+    o = K.obj(cyl(2.4 * mm, (HWU + 23.6) * mm, (HWU + 24.6) * mm, 'x', HANDLE, 14), 'base', 'steel', ph); smooth(o)           # (its steel cap)
     st = K.tmp(box((HWU - 1.4) * mm, (HWU + 0.2) * mm, HANDLE[0] - 22 * mm, HANDLE[0] + 2 * mm, HANDLE[1] - 2.5 * mm, HANDLE[1] + 2.5 * mm)); smooth(st); K.adopt(st, 'base', 'steel', ph)
     return ph
 
