@@ -249,7 +249,12 @@ export const VMAnim = (() => {
     if (kind === 'bolt') pose.Rk = on; else if (kind === 'pistol' || kind === 'ar' || kind === 'handle') { pose.Lk = on; pose.Lkind = kind; } // (the hand on its control: holdSupport)
     if (kind === 'pistol' && A.slide) { pose.slide = pull; pose.L = lerpV(R0, off(grab || off(A.slide, -0.02, 0.012), -SLIDE * pull), on); }
     else if (kind === 'ar' && A.ch) { pose.ch = pull; pose.L = lerpV(R0, off(grab || off(A.ch, 0.005, 0.001, -0.0175), -CH * pull), on); } // (the T handle's left latch wing, pinched)
-    else if (kind === 'handle' && A.H) { pose.handle = pull; pose.L = lerpV(R0, off(grab || A.H, -h.travel * pull), on); }
+    else if (kind === 'handle' && A.H) {
+      pose.handle = pull; const to = off(grab || A.H, -h.travel * pull);
+      // (a handle on the right (the AK's): the left hand goes under the gun and up its right side to it, not straight through the receiver)
+      if (A.H.x > 0.005) { const under = off(to, 0, -0.075, -(A.H.x + 0.01)); pose.L = path(on, [[0, R0], [0.5, under], [1, to]]); }
+      else pose.L = lerpV(R0, to, on);
+    }
     else if (kind === 'bolt' && A.bolt) { const lift = U.clamp(pull * 2, 0, 1), back = U.clamp(pull * 2 - 1, 0, 1); pose.bolt = [lift, back]; pose.R = lerpV(A.G, knobAt(A, lift, back, boltBack(h)), on); }
     else if (kind === 'pump') { pose.pump = pull; pose.L = off(A.S, -PUMP * pull); } // (the left hand rides it)
     else if (kind === 'lever') pose.lever = pull;
@@ -730,7 +735,8 @@ export const VMAnim = (() => {
     if (rot) { pose.gun[5] -= rot[0]; pose.gun[3] -= rot[1]; } // (side to side rolls it over, up and down tips the muzzle)
     const a = quick != null ? 0 : S(0.0, 0.18, t) * (1 - S(0.36, 0.5, t)), b = quick != null ? S(0, 0.6, quick) : S(0.4, 0.55, t) * (1 - S(0.8, 0.95, t));
     const rev = kind === 'revolver', tb = rev ? 0 : b; // (a revolver has no port on its right to turn to: held straight, its cylinder swings out to the left)
-    pose.gun[4] += 0.95 * a - 0.5 * tb; pose.gun[5] += -0.3 * a + 0.35 * tb; pose.gun[3] += 0.12 * a + 0.32 * tb;
+    const tk = pl.cur().def.id === 'f2' ? 0.35 : 1; // (the F2's: a small natural turn, not the swing the others take)
+    pose.gun[4] += (0.95 * a - 0.5 * tb) * tk; pose.gun[5] += (-0.3 * a + 0.35 * tb) * tk; pose.gun[3] += (0.12 * a + 0.32 * tb) * tk;
     pose.gun[0] -= 0.02 * a; pose.gun[2] += 0.04 * (a + b); pose.gun[1] += 0.02 * a;
     const c = quick != null ? 0.5 * S(0.2, 1, quick) : U.clamp((t - 0.58) / 0.22, 0, 1);
     // for the chamber check: muzzle level, nearer, canted so the port faces you
@@ -738,7 +744,10 @@ export const VMAnim = (() => {
     pose.chk = kind === 'break' || kind === 'revolver' ? 0 : cv; // (the port open: js/vmanim.ts chamberView)
     // (a pistol: its port's on top of the slide, so tip the muzzle down and look in from above instead)
     const CV = kind === 'pistol' ? PISTOL_CV : kind === 'break' ? (A.breech ? (BREECH_CHK_LONG[A.breech.long] || BREECH_CHK) : BREAK_CV) : kind === 'revolver' ? REV_CV : kind === 'bolt' ? BOLT_CV : RIFLE_CV;
-    for (let i = 0; i < 6; i++) pose.gun[i] += CV[i] * cv;
+    // (the F2's: the port is by your face already, so the turn to it is a small one; a gun with its handle on the right (the AK's): tipped muzzle-down, so the left hand can reach it from under)
+    const f2 = pl.cur().def.id === 'f2', cvk = f2 ? 0.4 : 1, rh = kind === 'handle' && !!A.H && A.H.x > 0.005;
+    for (let i = 0; i < 6; i++) pose.gun[i] += CV[i] * cv * (i >= 3 ? cvk : 1);
+    if (rh) pose.gun[3] += 0.14 * cv;
     if (c > 0 && c < 1) {
       // the action worked part way (CHECK: how far: a press check), held there while you look in, then let home
       if (kind === 'handle' ? !!A.H : actTravel(h, kind) > 0) {
@@ -1302,6 +1311,7 @@ export const VMAnim = (() => {
     top: fp([0.45, 0.7, 0.45], [0.5, 0.75, 0.45], [0.9, 1.1, 0.7], [1.0, 1.2, 0.7], [0.75, 0.2, 0.35, 0.3]), // (a round or a clip pinched, pressed in from above)
     rack: fp([0.55, 1.0, 0.65], [0.6, 1.05, 0.65], [0.65, 1.1, 0.7], [0.7, 1.1, 0.7], [0.65, 0.2, 0.3, 0.2]), // (over a slide, or round a handle)
     hook: fp([0.3, 1.35, 0.9], [0.3, 1.4, 0.9], [0.6, 1.5, 1.0], [0.7, 1.5, 1.0], [0.5, 0.1, 0.2, 0.2]), // (an AR's charging handle, hooked from in front)
+    hook2: fp([0.1, 0.75, 0.55], [0.1, 0.8, 0.55], [1.0, 1.35, 0.95], [1.1, 1.45, 1.0], [0.85, 0.3, 0.45, 0.35]), // (the F2's cocking lever: the index and middle fingers out and hooked over it, the ring and little fingers and the thumb curled in)
     bolt: fp([0.65, 0.85, 0.55], [1.2, 1.45, 0.9], [1.3, 1.5, 0.9], [1.35, 1.5, 0.9], [1.0, 0.25, 0.4, 0.3]), // (a bolt's knob between the thumb and the crooked index finger)
     fist: fp([1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [0.85, 0.3, 0.7, 0.5]), // (the Wolverine grip: a loose fist)
     grip: fp([1.0, 1.2, 0.7], [1.2, 1.4, 0.8], [1.25, 1.4, 0.8], [1.3, 1.4, 0.8], [0.9, 0.15, 0.3, 0.2]), // (round a grip, when there's none to measure: holdObj)
@@ -1417,7 +1427,7 @@ export const VMAnim = (() => {
       arm.cache.sup = c;
     }
     let F = fmix(fmix(FP.open, FP.top, up), c.F, on);
-    if (k) F = fmix(F, lk === 'ar' ? FP.bolt : lk === 'palm' ? FP.flat : FP.rack, k);
+    if (k) F = fmix(F, lk === 'ar' ? FP.bolt : lk === 'palm' ? FP.flat : lk === 'handle' && h.info.handle && (h.info.handle as { style?: string }).style === 'top' ? FP.hook2 : FP.rack, k);
     return { q, r: U.lerp(0.012, c.r, on) * (1 - k) + 0.01 * k, fz: k * (lk === 'ar' ? 0.06 : lk === 'pistol' ? 0.01 : lk === 'palm' ? 0 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
   }
   // the hand set at a hold: its frame (Arm.glove: where vmanim's clips and turns can move it on), the palm's reach, the fingers
