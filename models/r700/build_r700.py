@@ -33,7 +33,7 @@ LUG_TOP = RB
 rc = K.tmp(lathe([(0, RB * 0.985), (0.0008, RB), (F_MOUTH, RB)], segs(RB)))
 cut(rc, cyl(BORE, -0.002, F_MOUTH - 3.0 * mm, 'y', (0, 0), 20))                                  # the bolt way, open at the back
 cut(rc, port_pocket(0.108, 0.186, -0.0075, RB + 0.003, 0.03, 3.0 * mm, -2.0 * mm))               # the ejection port: the upper right quarter of the tube
-cut(rc, box(0.0085, 0.03, 0.058, 0.102, -0.0075, 0.0045))                                         # the handle's notch behind it, on the right
+cut(rc, box(0.0085, 0.03, 0.046, 0.090, -0.0075, 0.0045))                                         # the handle's notch behind it, on the right
 wnorm(rc, 30); K.adopt(rc, 'base', 'blued')
 # a black lining in the port (the dark inside), the chamber's mouth and the feed ramp
 port_inside(K, 0.108, 0.186, -0.0075, 0.012, RB, mouth_r=6.4 * mm, ramp=24 * mm, x_in=-2.0 * mm)
@@ -45,14 +45,14 @@ put(K, lathe([(F_MOUTH + 4.0 * mm, 0.0150), (0.262, 0.0148)], segs(0.0148)), 'ba
 for f in (0.030, 0.058, 0.196):
     K.obj(cyl(2.2 * mm, RB - 0.5 * mm, RB + 0.3 * mm, 'z', (0, f), segs(2.2 * mm)), 'base', 'black')
 # the trigger group, the guard bow and the floorplate (the box magazine's bottom, hinged at the back, its catch in the guard's front)
-put(K, box(-0.0105, 0.0105, 0.040, 0.108, -0.0300, -0.0140), 'base', 'blued', bev=0.001)
-g = K.tmp(prism([(0.052, -0.0140), (0.052, -0.0615), (0.066, -0.0675), (0.098, -0.0675), (0.112, -0.0615), (0.112, -0.0140)], 'x', -0.0045, 0.0045))
-cut(g, prism([(0.0585, -0.0295), (0.0585, -0.0575), (0.0685, -0.0615), (0.0955, -0.0615), (0.1055, -0.0575), (0.1055, -0.0295)], 'x', -0.006, 0.006))
+put(K, box(-0.0105, 0.0105, -0.005, 0.063, -0.0300, -0.0140), 'base', 'blued', bev=0.001)
+g = K.tmp(prism([(0.007, -0.0140), (0.007, -0.0615), (0.021, -0.0675), (0.053, -0.0675), (0.067, -0.0615), (0.067, -0.0140)], 'x', -0.0045, 0.0045))
+cut(g, prism([(0.0135, -0.0295), (0.0135, -0.0575), (0.0235, -0.0615), (0.0505, -0.0615), (0.0605, -0.0575), (0.0605, -0.0295)], 'x', -0.006, 0.006))
 bevel(g, 0.0008, 1, 40); wnorm(g); K.adopt(g, 'base', 'blued')
-put(K, box(-0.0125, 0.0125, 0.1115, 0.190, -0.0457, -0.0417), 'mag', 'blued', bev=0.0008)               # the floorplate: the internal magazine's, slot mag (the detachable box replaces it)
-put(K, box(-0.0035, 0.0035, 0.1015, 0.1115, -0.0575, -0.0425), 'mag', 'gunmetal', bev=0.0006)          # its catch, in the guard
-put(K, prism([(0.0775, -0.0290), (0.0830, -0.0290), (0.0875, -0.0520), (0.0815, -0.0520)], 'x', -0.0032, 0.0032), 'base', 'gunmetal', bev=0.0006)   # the trigger
-put(K, box(-0.0100, 0.0100, 0.0400, 0.0460, -0.0140, -0.0095), 'base', 'gunmetal')                      # the trigger's adjusting block
+put(K, box(-0.0125, 0.0125, 0.0665, 0.145, -0.0457, -0.0417), 'mag', 'blued', bev=0.0008)               # the floorplate: the internal magazine's, slot mag (the detachable box replaces it)
+put(K, box(-0.0035, 0.0035, 0.0565, 0.0665, -0.0575, -0.0425), 'mag', 'gunmetal', bev=0.0006)          # its catch, in the guard
+put(K, prism([(0.0325, -0.0290), (0.0380, -0.0290), (0.0425, -0.0520), (0.0365, -0.0520)], 'x', -0.0032, 0.0032), 'base', 'gunmetal', bev=0.0006)   # the trigger
+put(K, box(-0.0100, 0.0100, -0.005, 0.001, -0.0140, -0.0095), 'base', 'gunmetal')                      # the trigger's adjusting block
 # the safety: a boss and a thumb lever on the right of the tang
 put(K, cyl(5.0 * mm, 0.0160, 0.0195, 'x', (0.013, 0.0), segs(5.0 * mm)), 'base', 'gunmetal', bev=0.0005)
 put(K, box(0.0185, 0.0225, 0.004, 0.020, 0.0005, 0.0065), 'base', 'gunmetal', bev=0.0006)
@@ -62,21 +62,24 @@ put(K, box(0.0185, 0.0235, 0.004, 0.007, 0.0005, 0.0085), 'base', 'gunmetal', be
 # traced off the M24 photo (Wikimedia Commons "M24 Rifle (7414626896).jpg", public domain, 2100 x 445, left side on white): 0.546 mm a pixel from its 1092 mm overall length (butt pad
 # to muzzle); origin the tang (the stock's scoop behind the receiver, photo x 541), the bore line y 147. The comb is a flat 16.5 mm UNDER the bore (not over it), a scoop behind the
 # tang, a pistol grip that swells 18 mm under the belly, the belly a straight slope up to it; the butt an adjustable one (pad, two rods and a knob) 0.268 m behind the tang.
-SIDE = [(-0.197, -0.0165), (-0.043, -0.0165), (-0.033, -0.0164), (-0.022, -0.0191), (-0.0115, -0.0273), (-0.0006, -0.0295), (0.0104, -0.0268), (0.0213, -0.0235), (0.0322, -0.0197),
-        (0.0431, -0.0158), (0.054, -0.0126), (0.065, -0.0085), (F_MOUTH + 0.0135, -0.0085), (F_MOUTH + 0.0135, -0.0445), (0.165, -0.0510), (0.120, -0.0520), (0.0868, -0.0524),
-        (0.065, -0.0562), (0.054, -0.0562), (0.043, -0.0557), (0.0322, -0.0612), (0.0213, -0.0710), (0.0104, -0.0950), (-0.0006, -0.1087), (-0.0115, -0.1065), (-0.0224, -0.1032),
-        (-0.033, -0.0988), (-0.044, -0.0885), (-0.055, -0.0906), (-0.100, -0.1024), (-0.150, -0.1156), (-0.186, -0.1250), (-0.194, -0.1260), (-0.197, -0.1180)]
-PLAN = [(-0.20, 0.0195), (-0.12, 0.0195), (-0.07, 0.0205), (-0.04, 0.0215), (F_MOUTH + 0.0135, 0.0215)]
-cuts = [cyl(RB + 0.6 * mm, -0.06, F_MOUTH + 0.02, 'y', (0, 0), 20),                                  # the action bed: the receiver lies in it
-        box(-0.0115, 0.0115, 0.045, 0.108, -0.075, -0.0140),                                        # the trigger guard's opening
-        box(-0.0135, 0.0135, 0.108, 0.1925, -0.075, -0.0140)]                                       # the floorplate's
+# The action sits IN the stock: its sides come up round the receiver to just under the bore (u -2 mm, the fore-end's top level with it), the tang in the scoop, the bolt's shroud alone over
+# the wrist; the photo's tang, 50 mm behind the receiver's back, is at f -0.050 here (the M24 is a long action, this the short one).
+SIDE = [(-0.247, -0.0165), (-0.093, -0.0165), (-0.083, -0.0164), (-0.072, -0.0191), (-0.0615, -0.0273), (-0.0506, -0.0295), (-0.0396, -0.0268), (-0.0287, -0.0235), (-0.0178, -0.0197),
+        (-0.0069, -0.0158), (0.004, -0.0126), (0.020, -0.0060), (0.045, -0.0020), (F_MOUTH + 0.0135, 0.0020), (F_MOUTH + 0.0135, -0.0445), (0.115, -0.0510), (0.070, -0.0520), (0.0368, -0.0524),
+        (0.015, -0.0562), (0.004, -0.0562), (-0.007, -0.0557), (-0.0178, -0.0612), (-0.0287, -0.0710), (-0.0396, -0.0950), (-0.0506, -0.1087), (-0.0615, -0.1065), (-0.0724, -0.1032),
+        (-0.083, -0.0988), (-0.094, -0.0885), (-0.105, -0.0906), (-0.150, -0.1024), (-0.200, -0.1156), (-0.236, -0.1250), (-0.244, -0.1260), (-0.247, -0.1180)]
+PLAN = [(-0.25, 0.0195), (-0.17, 0.0195), (-0.12, 0.0205), (-0.09, 0.0215), (F_MOUTH + 0.0135, 0.0215)]
+cuts = [cyl(RB + 0.6 * mm, -0.10, F_MOUTH + 0.02, 'y', (0, 0), 20),                                  # the action bed: the receiver lies in it
+        box(-0.0115, 0.0115, 0.0, 0.063, -0.075, -0.0140),                                          # the trigger guard's opening
+        box(-0.0135, 0.0135, 0.063, 0.1475, -0.075, -0.0140),                                       # the floorplate's
+        box(0.0, 0.03, 0.104, 0.190, -0.0125, 0.03)]                                                # the ejection port's relief in the stock's right side
 body(K, SIDE, PLAN, 'stock', 'polymer', bev=0.0045, cuts=cuts)
-# the adjustable butt: a rubber pad (photo x 50-100), two rods into the stock and the length-of-pull knob between them; a sling stud under the belly
-put(K, prism([(-0.241, -0.0200), (-0.268, -0.0220), (-0.268, -0.1360), (-0.241, -0.1340)], 'x', -0.0195, 0.0195), 'stock', 'rubber', bev=0.0018)
-put(K, box(-0.012, 0.012, -0.2415, -0.1965, -0.099, -0.034), 'stock', 'black', bev=0.0008)   # the spacer block between the rods
-for u in (-0.034, -0.099): put(K, rod((0, -0.2412, u), (0, -0.1965, u), 0.0040, 0.0040, 12), 'stock', 'gunmetal')
-put(K, rod((0, -0.234, -0.056), (0, -0.213, -0.056), 0.0170, 0.0170, 20), 'stock', 'black', bev=0.0006)
-put(K, cyl(3.0 * mm, -0.1156 - 0.0055, -0.1156 + 0.0008, 'z', (0, -0.150), segs(3.0 * mm)), 'stock', 'steel')
+# the adjustable butt: the stock ends in a flat face; then air, with two guide rods and the knurled length-of-pull wheel on its threaded rod; then the rubber pad (photo x 50-100)
+put(K, prism([(-0.291, -0.0200), (-0.318, -0.0220), (-0.318, -0.1360), (-0.291, -0.1340)], 'x', -0.0195, 0.0195), 'stock', 'rubber', bev=0.0018)
+for u in (-0.034, -0.099): put(K, rod((0, -0.2912, u), (0, -0.2465, u), 0.0040, 0.0040, 8), 'stock', 'gunmetal')
+put(K, rod((0, -0.2912, -0.056), (0, -0.2465, -0.056), 0.0042, 0.0042, 8), 'stock', 'steel')
+put(K, rod((0, -0.284, -0.056), (0, -0.263, -0.056), 0.0170, 0.0170, segs(0.017)), 'stock', 'black', bev=0.0006)
+put(K, cyl(3.0 * mm, -0.1156 - 0.0055, -0.1156 + 0.0008, 'z', (0, -0.200), segs(3.0 * mm)), 'stock', 'steel')
 
 # ================================================================================================ the fore-end (handguard slot): a trough under the barrel, its top level with the bore
 HG0, HG1 = F_MOUTH + 0.0135, 0.582
@@ -107,10 +110,10 @@ bevel(ring, 0.0005, 1, 40); wnorm(ring); K.adopt(ring, 'optic', 'black')
 put(K, cyl(3.0 * mm, 0.0066, 0.0112, 'x', (RS, SY - 0.0035), segs(3.0 * mm)), 'optic', 'gunmetal', bev=0.0004)           # the windage screw's knob
 
 # ================================================================================================ the bolt (part_bolt): body, lugs, extractor, sleeve, cocking piece, swept stem and oval knob
-PIV = 0.082                                                                  # the handle's root
+PIV = 0.070                                                                  # the handle's root
 HANDLE = [(0.0100, PIV, -0.001, 0.0045), (0.0300, PIV - 0.0070, -0.004, 0.0040), (0.0560, PIV - 0.0230, -0.010, 0.0036)]   # (right, forward, up, radius)
 KNOB = (0.0705, PIV - 0.0300, -0.0125, 0.0105, (0.95, 1.18, 0.95))
-bolt_group(K, K, PIV, rear=-0.028, face=FACE, rb=0.0095, handle=HANDLE, knob=KNOB, sleeve=(-0.014, 0.038, 0.0122), cock=(0.0058, 0.014), lug_r=0.0103,
+bolt_group(K, K, PIV, rear=-0.028, face=FACE, rb=0.0095, handle=HANDLE, knob=KNOB, sleeve=(-0.006, 0.038, 0.0122), cock=(0.0058, 0.010), lug_r=0.0103,
            knob_mat='blued', handle_mat='blued')
 
 # ================================================================================================ info and anchors
@@ -129,7 +132,7 @@ anchors = {
     'mount_handguard': [round(HG0, 4), 0, 0], 'mount_handguard_end': [0.760, 0, 0],
     'mount_barrel': [0.761, 0, 0], 'mount_muzzle': [MUZ, 0, 0],
     'mount_stock': [0, -0.002, 0], 'mount_grip': [0.05, -0.0172, 0],
-    'mount_mag': [0.150, -0.0417, 0],
+    'mount_mag': [0.105, -0.0417, 0],
 }
 root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
 bad = sweep_check(coll)
