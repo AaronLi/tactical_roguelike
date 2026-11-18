@@ -9,6 +9,7 @@ import { LevelView } from './levelview.js';
 import { GunModels } from './gunmodels.js';
 import { Highlights } from './highlights.js';
 import { LightGrid } from './lightgrid.js';
+import { GpuAo } from './gpuao.js';
 import { ReplayEnv } from './replayenv.js';
 import { Rig } from './rig.js';
 import { TONE } from './tone.js';
@@ -255,6 +256,9 @@ export const R = {
   // How finely the 3D is drawn: a percentage (33 to 100) of the screen's own resolution, each way. The picture is stretched
   // to the window; the ReplayEnv.HUD and the menus are the page's own and stay sharp. (The settings' "Render resolution": js/game.ts)
   basePR: 1, scalePct: 100,
+  // ambient occlusion (js/lightgrid.ts: the floor plan's open share round a spot darkens the foot of the walls and the corners): 0 off, 1 as made
+  aoK: 1,
+  setAO(k: number) { this.aoK = Math.max(0, Math.min(1.5, k || 0)); LightGrid.U.lgAo.value.x = this.aoK; },
   setScale(pct: number) {
     this.scalePct = Math.max(33, Math.min(100, Math.round(pct) || 100));
     if (!this.renderer) return;
@@ -273,6 +277,7 @@ export const R = {
     // what stops a weapon light: the level, bar what you can see through (glass, a grating)
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
+    { const gpu = GpuAo.bake(this.renderer, this.scene, this.levelRoot, map); if (gpu) { LightGrid.useGpuAo(gpu.a, gpu.b); (map as any).gpuAoMs = gpu.ms; } } // (the occlusion from the meshes on the GPU: ?gpuao=1, js/gpuao.ts)
     const th = map.theme;
     (this.scene.fog as THREE.Fog).color.setHex(th.fog);
     const fog = this.scene.fog as THREE.Fog; fog.near = th.noFog ? 1e4 : th.fogNear || 8; fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
@@ -388,6 +393,7 @@ export const R = {
         if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
     };
+    GpuAo.dispose();
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
     this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false)); this.craters.forEach((m) => (m.visible = false));

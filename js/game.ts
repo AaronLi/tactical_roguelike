@@ -499,6 +499,10 @@ export const Game = {
     bindRange(['fov', 'fov2'], 'fov', (v) => v + '°');
     bindRange(['scale', 'scale2'], 'scale', (v) => v + '%', (v) => G_R.setScale(v)); G_R.setScale(this.settings.scale); // (this screen's own: not kept with the account, js/cloud.ts)
     bindRange(['vol', 'vol2'], 'vol', (v) => Math.round(v * 100) + '%', (v) => Audio.setVolume(v));
+    // ambient occlusion: on unless the box is cleared (this screen's own, like the resolution: not kept with the account); ?ao=0 (or ?ao=0.5) in the URL is for that visit
+    { const boxes = ['aoOn', 'aoOn2'].map((i) => this.$<HTMLInputElement>(i)).filter(Boolean), on = !!U.store.get('ao', true), q = new URLSearchParams(location.search).get('ao');
+      for (const b of boxes) { b.checked = on; b.addEventListener('change', () => { for (const o of boxes) o.checked = b.checked; U.store.set('ao', b.checked); G_R.setAO(b.checked ? 1 : 0); }); }
+      G_R.setAO(q != null && q !== '' && isFinite(+q) ? +q : on ? 1 : 0); }
 
     const loadKit = this.$<HTMLSelectElement>('loadKit');
     loadKit.value = String(this.settings.loadKit);
