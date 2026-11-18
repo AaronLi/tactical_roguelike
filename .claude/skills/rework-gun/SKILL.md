@@ -82,7 +82,40 @@ pixels can still be missing most of its detail. Go region by region (stock, rece
 side and list what is there: the ejection port (open, the bolt in it), the deflector, latches, pins and screws, the selector with
 its markings, the magazine and bolt releases (raised housings, not flat squares), sling points and slots, seams between parts,
 moulded panels, markings, a butt pad's ribs, a grip's texture. Read which side each control is on from the photos, never from
-memory (the SCAR NRCH's charging handle was put on the left from an instruction; FN's photos show it on the right).
+memory, and then ask which configuration the game wants: the game's shooter is right-handed.
+
+**What the SCAR rework kept getting wrong** (each one a round trip with the user; check them before showing anything):
+- **The variant.** Settle which generation and model it is before modelling (the SCAR became the 16S/17S NRCH: an M-LOK forend, a
+  non-reciprocating charging handle), and what the user wants kept even where the photo differs (M-LOK stayed though FN's shots
+  show bolted Picatinny segments).
+- **Ambidextrous and swappable controls.** A maker's side shot may show the left-handed setup (FN's NRCH photos have the handle on
+  the right). Put a swappable control where a right-handed shooter has it (the charging handle on the support side), and model what
+  both sides share (the SCAR's upper has a handle channel on each side; the unused one stays empty).
+- **Openings are dark.** Through-slots, vents, M-LOK slots, a sling slot, an ejection port show the dark inside: give them dark
+  walls and floor (catalogue `black`) or cut them through. A recess in the body's own material reads as a faint outline.
+- **Repeated features are in line and evenly spaced.** Vents carry on along the channel's line; screws on a plate sit at an even
+  pitch. Measure the pitch off the photo and use it; check the line in the render.
+- **The cross-section, not just the side.** A receiver that steps in or is chamfered (the SCAR's upper narrows along the handle
+  channel's band) can't be seen in a level side shot: read it off angled shots (a maker's "angle high" image), model the profile,
+  and show a front end-on render.
+- **Features against each other, not only against the frame.** Where things meet decides the look: the bolt plate's top runs along
+  the ledge where the upper steps in; the lower's hinge pin sits on the upper/lower seam inside the lower's front lug. Check these
+  relations in the overlay, and when two disagree, find which one is wrong by the photo (move the step to the plate, not the plate to
+  the step) rather than inventing geometry to reconcile them (a lug added under a pin to keep it off a misjudged seam).
+- **Small controls must read.** A charging handle 1 cm across flat on the side is invisible: model it the size and colour the photos
+  show (FN's: a black knob on a stem, ~24 mm out) and check it in three-quarter views, not only side-on.
+- **Measure in the image's own pixels.** Coordinates read off a scaled screenshot are wrong (screw centres quoted 22 px apart were
+  16): measure on the full-size image or a crop of it at a known scale.
+- **Materials as the gun is made.** A polymer lower and an anodised upper are different shades of the same colour (FN's FDE);
+  dark inserts, steel pins and screw heads are their own materials, not dots of the body's.
+- **Folding irons fold.** Under an optic, flip-up sights fold flat rather than vanish: the folded state as slot `optic` meshes with
+  `extras.mount = true` (drawn only under a real sight), the rail anchors `mount_optic_rail`.. on the gun's own rail so optics sit
+  where they did.
+- **Moving parts survive the bake.** A `part_ch` or `part_catch` in the .glb is no proof the game animates it: in the game,
+  `G.R.vm` must have the node and `G.R.vm.userData.info.anim` its key (the Mk18 has catch, ch, mag), and it must move during a rack
+  (`G.Me.startReload()` with a full magazine and an empty chamber). The SCAR's handle was in the model and not in the game.
+- **Shared parts reach other guns.** A rebuilt shared part (the SCAR folding stock) changes every gun that can take it: the FAL's
+  golden and tests/model-golden.json go stale. Say so when reporting, and leave those updates for the user to approve.
 
 **Wiring it in.** The platform's spec in `js/parts.ts` says `rcv: 'authored', authored: '<id>'` and agrees with the anchors
 (`L` = `mount_handguard`, `hgMax`, `mag` = `mount_mag`): the baker fails naming any disagreement. Factory furniture whose
@@ -159,6 +192,12 @@ const mem = {}; G.U.store = { get: (k, d) => (k in mem ? mem[k] : d), set: (k, v
   confirm the magazine actually refills. Compare with a similar gun before calling something a fault: every bullpup throws its
   stock across the view.
 - **Other guns** sharing what you touched still build.
+- **Its sound.** The shot is synthesised from the gun's `GUN_SPECS` row in `js/data.ts` (barrel, calibre, muzzle device, pressure,
+  bullet, bolt, action); its handling sounds are a family by id in `js/handling.ts`. Check both suit the gun (a SCAR on its AR
+  family's `gas` action and handling, for want of a short-stroke piston, is a known compromise), and compare its shot with its kin:
+  render each through the game's synth (`G.GunAudio.getSource(id)` then `GunshotSynth.place(src, G.GunAudio.placeParams(id, room))`,
+  to WAV) and compare length, spectrum and level.
+- **Renders on a transparent background** look black when viewed: composite them on mid-grey before judging them.
 - **A Blender-authored gun** (`models/<id>/`) must pass `npm run check:models -- models/<id>/<id>.glb`, whose model checks
   (`tools/authored_checks.mjs`, docs/models.md "Model checks") need from the model:
   - a. irons: the front post's tip at `sy` on the bore plane, no wider than 1.2 degrees from the eye (`fSight - relief`); a rear
@@ -189,6 +228,12 @@ scratchpad; never trigger a download.
 - Delete temporary files; `.claude/dev` must not be committed. Add only your own paths, never `git add -A`.
 - Commit titled `<Gun>: ...`. Don't push.
 - Report plainly what you verified, what you only eyeballed, and what doesn't match the reference.
+- **A showcase video** for the user, last: `node tools/showcase.mjs <id> --url http://localhost:<port>/` (on the
+  `feature/showcase` branch until it's merged; docs/showcase.md) records profiles, a turntable, hip, the sights, every fire mode,
+  charging, both reloads, a few optics and the attachments, with the game's sound, from a server of your worktree; `--seg` picks
+  segments. The server's build needs its handling sounds (`assets/audio/handling`, baked by `npm run build`; link the main
+  checkout's into a worktree that has none) or the reloads are nearly silent. Look at it before sending it: it caught a handle
+  that never moved.
 
 ## 6. Several guns at once
 
