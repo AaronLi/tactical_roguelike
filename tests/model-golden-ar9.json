@@ -4,997 +4,997 @@
  "builds": {
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "default",
-   "geometry": "bce666855b90f31a",
+   "geometry": "de999877127497e0",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "loaded A",
-   "geometry": "ef5218d7668619b0",
+   "geometry": "11fd5ae949659285",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33": {
    "label": "bare (required slots only)",
-   "geometry": "b573a3ef21af90a9",
+   "geometry": "1e69ab30919269f7",
    "info": "a3b181b93177e306"
   },
   "barrel=br.9x19.8,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "shortest barrel br.9x19.8",
-   "geometry": "dd9b946580bac75a",
+   "geometry": "db38499004c7d991",
    "info": "93ea9f0132a7d044"
   },
   "barrel=br.9x19.16,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "longest barrel br.9x19.16",
-   "geometry": "d93161ea73885b5f",
+   "geometry": "0ab05cf064975ed6",
    "info": "6dde686fc698515f"
   },
   "barrel=br.9x19.8.9,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "barrel=br.9x19.8.9",
-   "geometry": "3e15d0fdb297768f",
+   "geometry": "a5d52e5c45a45c41",
    "info": "b2b312c901ab9e64"
   },
   "barrel=br.9x19.12.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "barrel=br.9x19.12.5",
-   "geometry": "618e1f9697cd5864",
+   "geometry": "c0bfbb83c5caa4c1",
    "info": "bad26f949a0eae6c"
   },
   "barrel=br.9x19.8.light,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "barrel=br.9x19.8.light",
-   "geometry": "3071b0061210ea8f",
+   "geometry": "5a656708c9335e4c",
    "info": "93ea9f0132a7d044"
   },
   "barrel=br.9x19.8.9.light,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "barrel=br.9x19.8.9.light",
-   "geometry": "95f7835ce7e6a362",
+   "geometry": "ccbab0a29b0e2db1",
    "info": "b2b312c901ab9e64"
   },
   "barrel=br.9x19.10.5.light,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "barrel=br.9x19.10.5.light",
-   "geometry": "605d56100bb76e32",
+   "geometry": "ceed3f778c730513",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.12.5.light,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "barrel=br.9x19.12.5.light",
-   "geometry": "a0f2622aee87bfbe",
+   "geometry": "5074a05e75d2c04d",
    "info": "bad26f949a0eae6c"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.comp,optic=op.pic.0,stock=stk.tube.0": {
    "label": "muzzle=mz.r9.comp",
-   "geometry": "6a050dacc8b21f80",
+   "geometry": "c2fb37d8d922d82c",
    "info": "24dc073c4bb00392"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.can,optic=op.pic.0,stock=stk.tube.0": {
    "label": "muzzle=mz.r9.can",
-   "geometry": "607eff5e5f66d8b5",
+   "geometry": "6d2bdecbdf4e2e76",
    "info": "ae3ce3279ad1ba42"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.short,optic=op.pic.0,stock=stk.tube.0": {
    "label": "muzzle=mz.r9.short",
-   "geometry": "8943b6d20572cda6",
+   "geometry": "46d09a5936aa843f",
    "info": "d83cba8c3633cd97"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.prong,optic=op.pic.0,stock=stk.tube.0": {
    "label": "muzzle=mz.r9.prong",
-   "geometry": "3483157c4fc7e3fb",
+   "geometry": "368378bcdecfbb74",
    "info": "c2a72534c11e3820"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.tri,optic=op.pic.0,stock=stk.tube.0": {
    "label": "muzzle=mz.r9.tri",
-   "geometry": "88e2c04d48ac0153",
+   "geometry": "a2c44901a8890cdf",
    "info": "6be6bb17bfde62ad"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.cap,optic=op.pic.0,stock=stk.tube.0": {
    "label": "muzzle=mz.r9.cap",
-   "geometry": "a383fa40a997527b",
+   "geometry": "a71d3809a5f8f6fa",
    "info": "036a0f52f95af37d"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,optic=op.pic.0,stock=stk.tube.0": {
    "label": "muzzle=(none)",
-   "geometry": "a383fa40a997527b",
+   "geometry": "a71d3809a5f8f6fa",
    "info": "036a0f52f95af37d"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.3,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=hg.ar.3",
-   "geometry": "8dd478514c4cd8de",
+   "geometry": "8d34829e16a78dd1",
    "info": "9d34ca3629dd215b"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.short.carbine,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=hg.ar.short.carbine",
-   "geometry": "09293abdc6fcac21",
+   "geometry": "743a7097dc457792",
    "info": "1a77b8e921deb1d3"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=hg.ar.short.mlok",
-   "geometry": "8112dae8c5c0de4a",
+   "geometry": "9ff102f3f405a997",
    "info": "7ce6a66c0887dc51"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "fg=fg.0",
-   "geometry": "bf0ccd22e063d0a6",
+   "geometry": "cf6840f3201da444",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.1,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "fg=fg.1",
-   "geometry": "a5d607347e080de8",
+   "geometry": "a2ebf573fb3d8e87",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.2,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "fg=fg.2",
-   "geometry": "63e5c3a429191512",
+   "geometry": "a7dbeab9dc69cce9",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "fg=fg.3",
-   "geometry": "23a437a9fb80a99c",
+   "geometry": "f21ceccf7458052e",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.4,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "fg=fg.4",
-   "geometry": "caed9b82382c15b8",
+   "geometry": "d565045d63fe0fa5",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0": {
    "label": "tac=tac.0",
-   "geometry": "8af03aa6c7c8fa84",
+   "geometry": "d173519ffa73fc3a",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.1": {
    "label": "tac=tac.1",
-   "geometry": "3b08bfd96adfb3eb",
+   "geometry": "0258b3f981caa0f9",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.2": {
    "label": "tac=tac.2",
-   "geometry": "0ff325047b858730",
+   "geometry": "2857717a4fbf11f4",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.3": {
    "label": "tac=tac.3",
-   "geometry": "3146185a87ddb8ca",
+   "geometry": "4cc287ca0cf0922b",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.4": {
    "label": "tac=tac.4",
-   "geometry": "22d55aa0817cb10e",
+   "geometry": "f87dbcffe2c277f6",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.bc.0": {
    "label": "tac=tac.bc.0",
-   "geometry": "a0183eddd2f38011",
+   "geometry": "8926464406a2c5e0",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.0": {
    "label": "tacL=tac.0",
-   "geometry": "b9ff3101ad037104",
+   "geometry": "2a772b31de6eb9e4",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.1": {
    "label": "tacL=tac.1",
-   "geometry": "f5a8dc75952af07e",
+   "geometry": "f9d99dc3cfbf5ccb",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.2": {
    "label": "tacL=tac.2",
-   "geometry": "5f8eb121ac2e39f5",
+   "geometry": "76fa1ce50d0aa18e",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.3": {
    "label": "tacL=tac.3",
-   "geometry": "eb1e7354225d4a24",
+   "geometry": "e771fe764a175c01",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.4": {
    "label": "tacL=tac.4",
-   "geometry": "9e86c1e78cc46da5",
+   "geometry": "96cf0b4580f3d2b7",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.bc.0": {
    "label": "tacL=tac.bc.0",
-   "geometry": "59aeb234f3bb267b",
+   "geometry": "20dc863eb683dfa6",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.1,stock=stk.tube.0": {
    "label": "optic=op.pic.1",
-   "geometry": "33365cdeaaca3b21",
+   "geometry": "25da680326e0519b",
    "info": "57804b5ec95aa139"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.2,stock=stk.tube.0": {
    "label": "optic=op.pic.2",
-   "geometry": "4ee37aa39594fc96",
+   "geometry": "0323234a448f4efc",
    "info": "1be20fbc0a43ea40"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.3,stock=stk.tube.0": {
    "label": "optic=op.pic.3",
-   "geometry": "79355c9d9e444eba",
+   "geometry": "3b71877783b869f7",
    "info": "f578b1572eb8d2bb"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.4,stock=stk.tube.0": {
    "label": "optic=op.pic.4",
-   "geometry": "c5cf91d26ce72dc3",
+   "geometry": "92974d5ab5b54ea7",
    "info": "f578b1572eb8d2bb"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.5,stock=stk.tube.0": {
    "label": "optic=op.pic.5",
-   "geometry": "446686d47217d8b1",
+   "geometry": "189c735b8b9704cc",
    "info": "c1ba9209b60e6a8c"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.6,stock=stk.tube.0": {
    "label": "optic=op.pic.6",
-   "geometry": "e8730f4bcc9a7e17",
+   "geometry": "7183fadd73f80f37",
    "info": "8d982210d6f3e944"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.7,stock=stk.tube.0": {
    "label": "optic=op.pic.7",
-   "geometry": "6a8f4fe775ab25a0",
+   "geometry": "fba28c9223afe440",
    "info": "b9f4e7917796eaed"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.8,stock=stk.tube.0": {
    "label": "optic=op.pic.8",
-   "geometry": "823e5556d2da9c2f",
+   "geometry": "99c2eb58409739ee",
    "info": "8d377d70306686c6"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.9,stock=stk.tube.0": {
    "label": "optic=op.pic.9",
-   "geometry": "0e8470b6aa23d7ea",
+   "geometry": "638a8271df2e1445",
    "info": "7f9e5e61d2b3ccd2"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.10,stock=stk.tube.0": {
    "label": "optic=op.pic.10",
-   "geometry": "1cb2dbaefb5416cc",
+   "geometry": "c7ecdd97cc7abb3f",
    "info": "2dcc82ad6f791d6a"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.11,stock=stk.tube.0": {
    "label": "optic=op.pic.11",
-   "geometry": "0b179e9cbeae728a",
+   "geometry": "acbf3bd26bc8cd1d",
    "info": "efd7dae8be6468dd"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.12,stock=stk.tube.0": {
    "label": "optic=op.pic.12",
-   "geometry": "3d4c23fb53177495",
+   "geometry": "b9515a3806b490b1",
    "info": "9a3f9b4d3fcd1afc"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.13,stock=stk.tube.0": {
    "label": "optic=op.pic.13",
-   "geometry": "94a6d4ac0b344cc2",
+   "geometry": "c9fe76fd01e8d2ea",
    "info": "f4b750d8c40e4a51"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.14,stock=stk.tube.0": {
    "label": "optic=op.pic.14",
-   "geometry": "4f2ee51d70fa9445",
+   "geometry": "9280a34d4db5050c",
    "info": "4acfa5e637373bb5"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.15,stock=stk.tube.0": {
    "label": "optic=op.pic.15",
-   "geometry": "6c9c6ab2b3965d17",
+   "geometry": "58d228d45347b7f7",
    "info": "98ac2f2c8c01d110"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.16,stock=stk.tube.0": {
    "label": "optic=op.pic.16",
-   "geometry": "d368b6540d1d7f22",
+   "geometry": "ceddc4d7c713595a",
    "info": "96489f2cb7b45295"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=ak.optic,stock=stk.tube.0": {
    "label": "optic=ak.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=aug.optic,stock=stk.tube.0": {
    "label": "optic=aug.optic",
-   "geometry": "77367b00bec55b79",
+   "geometry": "cdeebe2354779767",
    "info": "9a3f9b4d3fcd1afc"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=an94.optic,stock=stk.tube.0": {
    "label": "optic=an94.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.20,stock=stk.tube.0": {
    "label": "optic=oem.op.pic.20",
-   "geometry": "1bbc20f808441257",
+   "geometry": "827191e4aff34c42",
    "info": "68f25e86503229ff"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.21,stock=stk.tube.0": {
    "label": "optic=oem.op.pic.21",
-   "geometry": "72268cd8f10b51a7",
+   "geometry": "7efe3c43e890ebd5",
    "info": "165680a709ce58de"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.22,stock=stk.tube.0": {
    "label": "optic=oem.op.pic.22",
-   "geometry": "7a7c7ace316ddb0c",
+   "geometry": "e8d40440699824a7",
    "info": "bafa4a0b92eff086"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.23,stock=stk.tube.0": {
    "label": "optic=oem.op.pic.23",
-   "geometry": "7e810b4f8c001049",
+   "geometry": "d36ba6863d955e13",
    "info": "bafa4a0b92eff086"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=uzi.optic,stock=stk.tube.0": {
    "label": "optic=uzi.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=ppsh.optic,stock=stk.tube.0": {
    "label": "optic=ppsh.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=pump.optic,stock=stk.tube.0": {
    "label": "optic=pump.optic",
-   "geometry": "f75b078c18e620ec",
+   "geometry": "bc4ac3d9244bdec9",
    "info": "48073ea49cbd2379"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=dbl.optic,stock=stk.tube.0": {
    "label": "optic=dbl.optic",
-   "geometry": "f75b078c18e620ec",
+   "geometry": "bc4ac3d9244bdec9",
    "info": "48073ea49cbd2379"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=saiga.optic,stock=stk.tube.0": {
    "label": "optic=saiga.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=pkm.optic,stock=stk.tube.0": {
    "label": "optic=pkm.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=skorp.optic,stock=stk.tube.0": {
    "label": "optic=skorp.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=mac10.optic,stock=stk.tube.0": {
    "label": "optic=mac10.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=ak74.optic,stock=stk.tube.0": {
    "label": "optic=ak74.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=aks74u.optic,stock=stk.tube.0": {
    "label": "optic=aks74u.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=rpk.optic,stock=stk.tube.0": {
    "label": "optic=rpk.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=aug9.optic,stock=stk.tube.0": {
    "label": "optic=aug9.optic",
-   "geometry": "77367b00bec55b79",
+   "geometry": "cdeebe2354779767",
    "info": "9a3f9b4d3fcd1afc"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=sawn.optic,stock=stk.tube.0": {
    "label": "optic=sawn.optic",
-   "geometry": "f75b078c18e620ec",
+   "geometry": "bc4ac3d9244bdec9",
    "info": "48073ea49cbd2379"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=thor.optic,stock=stk.tube.0": {
    "label": "optic=thor.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=pocketgl.optic,stock=stk.tube.0": {
    "label": "optic=pocketgl.optic",
-   "geometry": "53df1ab1f5440212",
+   "geometry": "1ac95c08fae23fd8",
    "info": "d59007f0119d0300"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.39,stock=stk.tube.0": {
    "label": "optic=oem.op.pic.39",
-   "geometry": "e8ddc4f9c15a42f7",
+   "geometry": "5f2e187adc1ac480",
    "info": "6669623549a40609"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=qbz95.optic,stock=stk.tube.0": {
    "label": "optic=qbz95.optic",
-   "geometry": "77367b00bec55b79",
+   "geometry": "cdeebe2354779767",
    "info": "9a3f9b4d3fcd1afc"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=crossbow.optic,stock=stk.tube.0": {
    "label": "optic=crossbow.optic",
-   "geometry": "ce573188b276ac77",
+   "geometry": "91f2678d8c68797e",
    "info": "7eb6193ef53dced5"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.auth.falcon,stock=stk.tube.0": {
    "label": "optic=op.auth.falcon",
-   "geometry": "ebc16666f6aa7a9b",
+   "geometry": "9077cc00d6ed51f1",
    "info": "8de333a0a46bc7f0"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.bc.0,stock=stk.tube.0": {
    "label": "optic=op.bc.0",
-   "geometry": "78ba7347439f2dd4",
+   "geometry": "67d3e37126a4980b",
    "info": "7f9e5e61d2b3ccd2"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=hailstorm.optic,stock=stk.tube.0": {
    "label": "optic=hailstorm.optic",
-   "geometry": "f75b078c18e620ec",
+   "geometry": "bc4ac3d9244bdec9",
    "info": "48073ea49cbd2379"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.th.0,stock=stk.tube.0": {
    "label": "optic=op.th.0",
-   "geometry": "92a8db1069b30e9f",
+   "geometry": "d263a449d2ef5f0f",
    "info": "0a6286cfe0861885"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,stock=stk.tube.0": {
    "label": "optic=(none)",
-   "geometry": "bce666855b90f31a",
+   "geometry": "de999877127497e0",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=ch.ar.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "charging=ch.ar.0",
-   "geometry": "91ed1cd0cc36d9ed",
+   "geometry": "359110fdcbbb4000",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=ch.ar.1,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "charging=ch.ar.1",
-   "geometry": "85b2c5010f804a8c",
+   "geometry": "7dccdbf1441e902c",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=ch.ar.2,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "charging=ch.ar.2",
-   "geometry": "85b2c5010f804a8c",
+   "geometry": "7dccdbf1441e902c",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "charging=(none)",
-   "geometry": "cf40620ad97129f7",
+   "geometry": "58d5a838cfcdfff1",
    "info": "9632aa336e1b11f8"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=gr.ar.0,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "grip=gr.ar.0",
-   "geometry": "790fb6a8dde6f7d8",
+   "geometry": "1e1fa683ef162006",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=gr.ar.1,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "grip=gr.ar.1",
-   "geometry": "07594450c1001e03",
+   "geometry": "1e8393c6d3500a93",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=gr.ar.2,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "grip=gr.ar.2",
-   "geometry": "d332849b9e593b5b",
+   "geometry": "a8bff39a8335373f",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=gr.ar.3,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "grip=gr.ar.3",
-   "geometry": "4bb1a3a1e35be2cf",
+   "geometry": "dab4a0b2e723ae35",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.1": {
    "label": "stock=stk.tube.1",
-   "geometry": "5efaa5c35b9adc96",
+   "geometry": "e14f492d053cd5a0",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.2": {
    "label": "stock=stk.tube.2",
-   "geometry": "9db21bb80167ccf4",
+   "geometry": "528461d9f295a53c",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.3": {
    "label": "stock=stk.tube.3",
-   "geometry": "66125f56d4a7ff63",
+   "geometry": "d07fd912c58f3c9a",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.4": {
    "label": "stock=stk.tube.4",
-   "geometry": "a88b76ab24747234",
+   "geometry": "0d69d9ecad672aff",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=oem.stk.tube.5": {
    "label": "stock=oem.stk.tube.5",
-   "geometry": "491c576982853ce5",
+   "geometry": "7971c99e805f431a",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0": {
    "label": "stock=(none)",
-   "geometry": "206de8d3864012c9",
+   "geometry": "ddc5f3690fe2f75c",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.15,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "mag=glock.mag.15",
-   "geometry": "16078b934fec735e",
+   "geometry": "cb4ec6e3c50ab18e",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.17,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "mag=glock.mag.17",
-   "geometry": "3d60745fdfe75102",
+   "geometry": "a1a2269ebb5336f6",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.50,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "mag=glock.mag.50",
-   "geometry": "ba0b773b93e118a2",
+   "geometry": "d3f5146170629533",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.17c,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "mag=glock.mag.17c",
-   "geometry": "3189f030b8fe6391",
+   "geometry": "6bbe6c631f324b34",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.8,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "barrel=br.9x19.8 from loaded A",
-   "geometry": "66cdd14247366a32",
+   "geometry": "3ecbca3b81996d6f",
    "info": "40ce90a51ba6eb38"
   },
   "barrel=br.9x19.8.9,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "barrel=br.9x19.8.9 from loaded A",
-   "geometry": "afe0e42ebf9edf36",
+   "geometry": "d34c3efea0bbeb2d",
    "info": "a109835b2445f6e9"
   },
   "barrel=br.9x19.12.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "barrel=br.9x19.12.5 from loaded A",
-   "geometry": "f2b12479a5f0a949",
+   "geometry": "6cd3b47c80b5c813",
    "info": "c2c320cff10bc7af"
   },
   "barrel=br.9x19.16,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "barrel=br.9x19.16 from loaded A",
-   "geometry": "77ddff349bc25661",
+   "geometry": "d8dc81ce0e1a9811",
    "info": "45676f9b1ba5cc0d"
   },
   "barrel=br.9x19.8.light,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "barrel=br.9x19.8.light from loaded A",
-   "geometry": "0cab7edd5386ddff",
+   "geometry": "adca654b84c0d088",
    "info": "40ce90a51ba6eb38"
   },
   "barrel=br.9x19.8.9.light,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "barrel=br.9x19.8.9.light from loaded A",
-   "geometry": "58f376e1c6772e78",
+   "geometry": "697c1288ab5083d9",
    "info": "a109835b2445f6e9"
   },
   "barrel=br.9x19.10.5.light,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "barrel=br.9x19.10.5.light from loaded A",
-   "geometry": "a365806274160740",
+   "geometry": "bba73b0eacd47669",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.12.5.light,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "barrel=br.9x19.12.5.light from loaded A",
-   "geometry": "8535c0fa68906977",
+   "geometry": "88802386e780ba74",
    "info": "c2c320cff10bc7af"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.comp,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "muzzle=mz.r9.comp from loaded A",
-   "geometry": "15154c350aa30b2f",
+   "geometry": "a08c33be3709699d",
    "info": "2ce280dc8bbf23cc"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.can,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "muzzle=mz.r9.can from loaded A",
-   "geometry": "b9330707d842ae96",
+   "geometry": "f5b821c5a9039751",
    "info": "031ace6e0b9d27f6"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.short,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "muzzle=mz.r9.short from loaded A",
-   "geometry": "9acb5c1fb41b492e",
+   "geometry": "4008430590d9d5b3",
    "info": "269a81caee944175"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.prong,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "muzzle=mz.r9.prong from loaded A",
-   "geometry": "15f56bf739b6b626",
+   "geometry": "41c3bb9dcf4529af",
    "info": "d16299705b388b84"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.tri,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "muzzle=mz.r9.tri from loaded A",
-   "geometry": "36e342a1bff29ae1",
+   "geometry": "870484581942430a",
    "info": "4b978aae7a742c97"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.cap,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "muzzle=mz.r9.cap from loaded A",
-   "geometry": "2cfa6d16f7ba188e",
+   "geometry": "4134b2512d4d1cf7",
    "info": "8e0b8e0fa53d83d2"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "muzzle=(none) from loaded A",
-   "geometry": "2cfa6d16f7ba188e",
+   "geometry": "4134b2512d4d1cf7",
    "info": "8e0b8e0fa53d83d2"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=hg.ar.short.mlok,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "handguard=hg.ar.short.mlok from loaded A",
-   "geometry": "2fcbed4d0ae4a1c5",
+   "geometry": "3f4db346c303f2e4",
    "info": "38512fd68472e004"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.1,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "fg=fg.1 from loaded A",
-   "geometry": "8bba0268f84ebf79",
+   "geometry": "4bcff1584719a927",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.2,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "fg=fg.2 from loaded A",
-   "geometry": "8f9ca81156872044",
+   "geometry": "3401e5e8cd241da4",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "fg=fg.3 from loaded A",
-   "geometry": "66961dda709c8bcd",
+   "geometry": "1b47f2a828296012",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.4,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "fg=fg.4 from loaded A",
-   "geometry": "76345cc001ade9d0",
+   "geometry": "49e07960f16f6e76",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "fg=(none) from loaded A",
-   "geometry": "30935f460b0b2dbf",
+   "geometry": "7c572afe3cfad457",
    "info": "3d16ce1b4dbb45db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.1,tacL=tac.0": {
    "label": "tac=tac.1 from loaded A",
-   "geometry": "3d72ff6dabafe7b6",
+   "geometry": "90f5ca558c5929e9",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.2,tacL=tac.0": {
    "label": "tac=tac.2 from loaded A",
-   "geometry": "754071cdc2b32f1c",
+   "geometry": "2a207af8a2b99aba",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.3,tacL=tac.0": {
    "label": "tac=tac.3 from loaded A",
-   "geometry": "841fe90cf1e339d8",
+   "geometry": "8deb7a6cd855a977",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.4,tacL=tac.0": {
    "label": "tac=tac.4 from loaded A",
-   "geometry": "c4a014112cd57474",
+   "geometry": "b7ee4c20800104af",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.bc.0,tacL=tac.0": {
    "label": "tac=tac.bc.0 from loaded A",
-   "geometry": "90d2e4c684590a23",
+   "geometry": "56e9b4df8027859c",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tacL=tac.0": {
    "label": "tac=(none) from loaded A",
-   "geometry": "468b837fa1039ec9",
+   "geometry": "cee66b119750e4ce",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.1": {
    "label": "tacL=tac.1 from loaded A",
-   "geometry": "179ca61c288fe9c6",
+   "geometry": "f3d0f8e2d27084bf",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.2": {
    "label": "tacL=tac.2 from loaded A",
-   "geometry": "6434de38090f972a",
+   "geometry": "9cfe2606749701a4",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.3": {
    "label": "tacL=tac.3 from loaded A",
-   "geometry": "1590ec47e714a218",
+   "geometry": "2a2fb82fe66626cf",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.4": {
    "label": "tacL=tac.4 from loaded A",
-   "geometry": "2e19b136c26b5025",
+   "geometry": "d9b97fa94eda7c1c",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.bc.0": {
    "label": "tacL=tac.bc.0 from loaded A",
-   "geometry": "41b8e561bced78ee",
+   "geometry": "b943c52f736ba28b",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0": {
    "label": "tacL=(none) from loaded A",
-   "geometry": "63ccdbff9f6f40af",
+   "geometry": "5c534cbb3b96336d",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.1,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.1 from loaded A",
-   "geometry": "decf40d197269496",
+   "geometry": "3aba61c9b9364ab9",
    "info": "a401225922b23c70"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.2,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.2 from loaded A",
-   "geometry": "277c3d797168f0a4",
+   "geometry": "cdb3cf32df4f472f",
    "info": "5d66a1d60647aa58"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.3,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.3 from loaded A",
-   "geometry": "bcb53f3c808ab505",
+   "geometry": "e4997df7da42d786",
    "info": "2796abc3fc5e8d84"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.4,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.4 from loaded A",
-   "geometry": "511a973bee8501ca",
+   "geometry": "ad85e63fd2147e95",
    "info": "2796abc3fc5e8d84"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.5,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.5 from loaded A",
-   "geometry": "3aff6256df3f0c51",
+   "geometry": "2e3e65fac442de19",
    "info": "963881e31c7724c3"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.6,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.6 from loaded A",
-   "geometry": "773b9d143ee921a7",
+   "geometry": "ef060a69b0b3698e",
    "info": "d607367c089eb43d"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.7,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.7 from loaded A",
-   "geometry": "33c4d2fc7ed010a6",
+   "geometry": "617d64e4de5431db",
    "info": "0132bf84be568cb8"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.8,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.8 from loaded A",
-   "geometry": "7a6a318401f50df8",
+   "geometry": "f73e9d13a893d894",
    "info": "27ccc2029a564b68"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.9,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.9 from loaded A",
-   "geometry": "b91cc6c3972c14d6",
+   "geometry": "20aed1b1769a461f",
    "info": "b18cd6ef84836660"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.10,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.10 from loaded A",
-   "geometry": "c84ca45282bccdc9",
+   "geometry": "3356f3c6d678a2b9",
    "info": "14683567cf340944"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.11,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.11 from loaded A",
-   "geometry": "ab10000cd63e710d",
+   "geometry": "822a0730a910fd4c",
    "info": "0290dca31c66d649"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.12,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.12 from loaded A",
-   "geometry": "4b193f52b4abe048",
+   "geometry": "69a5cb3e3afe6b84",
    "info": "448c285ceb9dc17a"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.13,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.13 from loaded A",
-   "geometry": "76ae011adeefbf40",
+   "geometry": "82abcf8439ebd724",
    "info": "7a325f6329cc6d14"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.14,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.14 from loaded A",
-   "geometry": "95eb1e0f43f256cd",
+   "geometry": "49956d5086ea9af4",
    "info": "adf547c49f07e646"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.15,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.15 from loaded A",
-   "geometry": "303107871eabdc42",
+   "geometry": "3c0bdade09ce9fb1",
    "info": "3ab97615258be065"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.16,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.pic.16 from loaded A",
-   "geometry": "ab20484172c74ad6",
+   "geometry": "9c379104850971a2",
    "info": "d16e057a84dcaa42"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=ak.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=ak.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=aug.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=aug.optic from loaded A",
-   "geometry": "f201fc0f2dcb4c5a",
+   "geometry": "cddafed9ace8baf8",
    "info": "448c285ceb9dc17a"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=an94.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=an94.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.20,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=oem.op.pic.20 from loaded A",
-   "geometry": "ea282d3ee6f5ec08",
+   "geometry": "92854a5aef259622",
    "info": "edb4a0d59cd91968"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.21,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=oem.op.pic.21 from loaded A",
-   "geometry": "ebad448173aca9ad",
+   "geometry": "58eb72b0d4512038",
    "info": "555cad312761e2bb"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.22,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=oem.op.pic.22 from loaded A",
-   "geometry": "3b6aad209f7bebf1",
+   "geometry": "7b3b7fd437d4611f",
    "info": "2520e7507bee41f0"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.23,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=oem.op.pic.23 from loaded A",
-   "geometry": "7061a69b825e56aa",
+   "geometry": "a30de0f3accf591e",
    "info": "2520e7507bee41f0"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=uzi.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=uzi.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=ppsh.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=ppsh.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=pump.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=pump.optic from loaded A",
-   "geometry": "f42ffbb35a66a984",
+   "geometry": "67c5e387094c6b50",
    "info": "7e0d481d433ae404"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=dbl.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=dbl.optic from loaded A",
-   "geometry": "f42ffbb35a66a984",
+   "geometry": "67c5e387094c6b50",
    "info": "7e0d481d433ae404"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=saiga.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=saiga.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=pkm.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=pkm.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=skorp.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=skorp.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=mac10.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=mac10.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=ak74.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=ak74.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=aks74u.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=aks74u.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=rpk.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=rpk.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=aug9.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=aug9.optic from loaded A",
-   "geometry": "f201fc0f2dcb4c5a",
+   "geometry": "cddafed9ace8baf8",
    "info": "448c285ceb9dc17a"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=sawn.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=sawn.optic from loaded A",
-   "geometry": "f42ffbb35a66a984",
+   "geometry": "67c5e387094c6b50",
    "info": "7e0d481d433ae404"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=thor.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=thor.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=pocketgl.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=pocketgl.optic from loaded A",
-   "geometry": "cfa62f7e411afa13",
+   "geometry": "6996c0272571dc9a",
    "info": "65b5b129ec17a585"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=oem.op.pic.39,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=oem.op.pic.39 from loaded A",
-   "geometry": "a920804b81e09669",
+   "geometry": "3af1594a758dfbf7",
    "info": "e47a9db5c7f73a9e"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=qbz95.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=qbz95.optic from loaded A",
-   "geometry": "f201fc0f2dcb4c5a",
+   "geometry": "cddafed9ace8baf8",
    "info": "448c285ceb9dc17a"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=crossbow.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=crossbow.optic from loaded A",
-   "geometry": "ab6cf48b7f632a5b",
+   "geometry": "ee7790ca25c5a16f",
    "info": "01fd3c9b7a456f61"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.auth.falcon,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.auth.falcon from loaded A",
-   "geometry": "f85a574ac7170e3b",
+   "geometry": "7786ec10cab44ead",
    "info": "3c6483a0e093f1e3"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.bc.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.bc.0 from loaded A",
-   "geometry": "fd8febb45d5e3d53",
+   "geometry": "81e67754a4a8b16b",
    "info": "b18cd6ef84836660"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=hailstorm.optic,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=hailstorm.optic from loaded A",
-   "geometry": "f42ffbb35a66a984",
+   "geometry": "67c5e387094c6b50",
    "info": "7e0d481d433ae404"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.th.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=op.th.0 from loaded A",
-   "geometry": "3870fbc991bb850a",
+   "geometry": "d3323451444be876",
    "info": "12a42f8b4056b096"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "optic=(none) from loaded A",
-   "geometry": "ef5218d7668619b0",
+   "geometry": "11fd5ae949659285",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=ch.ar.0,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "charging=ch.ar.0 from loaded A",
-   "geometry": "fd8c6369724b63c5",
+   "geometry": "135fcf5f714a2feb",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=ch.ar.1,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "charging=ch.ar.1 from loaded A",
-   "geometry": "a3de1d26fb2712a4",
+   "geometry": "6837a9eee487d67d",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=ch.ar.2,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "charging=ch.ar.2 from loaded A",
-   "geometry": "a3de1d26fb2712a4",
+   "geometry": "6837a9eee487d67d",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "charging=(none) from loaded A",
-   "geometry": "b78464d81294f59b",
+   "geometry": "5b56e4764dbaa5f1",
    "info": "4efb5d643258c7db"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.0,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "grip=gr.ar.0 from loaded A",
-   "geometry": "4b0ae1f5d5d94233",
+   "geometry": "285fe921ba02b4d2",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.1,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "grip=gr.ar.1 from loaded A",
-   "geometry": "3988692b52ac35b1",
+   "geometry": "65dadafb40e12ca0",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.2,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "grip=gr.ar.2 from loaded A",
-   "geometry": "1cc3432c43da42e0",
+   "geometry": "6e371fa2531a5150",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.3,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "grip=gr.ar.3 from loaded A",
-   "geometry": "5438d3960bd0a4c5",
+   "geometry": "bf163f7be63772b8",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.1,tac=tac.0,tacL=tac.0": {
    "label": "stock=stk.tube.1 from loaded A",
-   "geometry": "022cf99f64c6ac4f",
+   "geometry": "1315030b04d1db18",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.2,tac=tac.0,tacL=tac.0": {
    "label": "stock=stk.tube.2 from loaded A",
-   "geometry": "a1c883152ab8bcf7",
+   "geometry": "ed9a1afdcb39bfeb",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.3,tac=tac.0,tacL=tac.0": {
    "label": "stock=stk.tube.3 from loaded A",
-   "geometry": "af23ebc9556f63f7",
+   "geometry": "941816b1f151346e",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.4,tac=tac.0,tacL=tac.0": {
    "label": "stock=stk.tube.4 from loaded A",
-   "geometry": "c9cd0c593bf77841",
+   "geometry": "07c9551453e9b9b9",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,stock=oem.stk.tube.5,tac=tac.0,tacL=tac.0": {
    "label": "stock=oem.stk.tube.5 from loaded A",
-   "geometry": "2498d023054d3af0",
+   "geometry": "9544e49206075aa9",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.33,muzzle=mz.r9.a2,optic=op.pic.0,tac=tac.0,tacL=tac.0": {
    "label": "stock=(none) from loaded A",
-   "geometry": "a03c0f95158b614d",
+   "geometry": "1b5a817ce2ec0da1",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.15,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "mag=glock.mag.15 from loaded A",
-   "geometry": "23dd80feaad5c65f",
+   "geometry": "b3d7a6ee7d93d119",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.17,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "mag=glock.mag.17 from loaded A",
-   "geometry": "766bf66e3e28c11d",
+   "geometry": "bd599d70d44b172b",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.50,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "mag=glock.mag.50 from loaded A",
-   "geometry": "ae76896073139ae7",
+   "geometry": "19757b6cf21c8620",
    "info": "2eb5f2ac66e84487"
   },
   "barrel=br.9x19.10.5,charging=oem.ch.ar.3,fg=fg.0,grip=oem.gr.ar.4,handguard=oem.hg.ar.11,mag=glock.mag.17c,muzzle=mz.r9.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "mag=glock.mag.17c from loaded A",
-   "geometry": "6b2b53a075fb2df6",
+   "geometry": "73e54770887161f0",
    "info": "2eb5f2ac66e84487"
   }
  }

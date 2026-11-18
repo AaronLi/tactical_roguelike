@@ -1078,6 +1078,19 @@ const G_GunRecipes = (() => {
     // aperture on the receiver, the post on the barrel. Another gun's irons would put a front sight on the barrel, and every optic would
     // follow the barrel's length)
     const ownIrons = !!A && (own('optic') || !o.optic || A.sights.builtin.includes(o.optic));
+    // (the model's own FRONT sight stands on its own handguard's top rail (an AR's flip-up post: everything of slot optic ahead of where a handguard starts): with
+    // another handguard fitted it goes to that one's front, by the difference in their front ends, as a piece placed by the handguard (optic@handguard: the
+    // bake learns its offset per handguard). Without this it stood where the factory rail ended, in the air over a shorter one)
+    const zMin = (e: AuthoredMesh) => { let m = Infinity; for (let i = 2; i < e.pos.length; i += 3) m = Math.min(m, e.pos[i]); return m; }, zMax = (e: AuthoredMesh) => { let m = -Infinity; for (let i = 2; i < e.pos.length; i += 3) m = Math.max(m, e.pos[i]); return m; };
+    const hgF0 = L + (o.hgGap || 0), ownHg = A ? A.meshes.filter((e) => e.slot === 'handguard' && !e.part) : [];
+    const ownHgFront = ownHg.length ? Math.max(...ownHg.map((e) => -zMin(e))) : 0;
+    const isFrontSight = (e: AuthoredMesh) => e.slot === 'optic' && !e.part && ownHg.length > 0 && -zMax(e) > hgF0 + 0.002 && -zMax(e) < ownHgFront - 0.002;   // (on the handguard: an MP5's hood on the barrel ahead of it isn't)
+    // (by where the two TOP RAILS end, the rail the sight clamps to: an authored part's own figure (model.json part.rails.top), else 1.5 mm short of a
+    // handguard's front, as the authored ones run; no anchor of its own needed)
+    const topEnd = (): number => { if (o.apHg) { const pt = G.AuthoredParts.get(o.apHg).part; if (pt) return pt.rails && pt.rails.top ? pt.rails.top[1] : pt.len - 0.0015; } return o.hg!.len - 0.0015; };
+    const fsShift = A && ownHg.length && o.hg && !own('handguard') ? topEnd() - (ownHgFront - hgF0 - 0.0015) : 0;
+    const shifted = (_e: AuthoredMesh, g: THREE.BufferGeometry) => { if (!fsShift) return g; const c = g.clone(); c.translate(0, 0, -fsShift); return c; };
+    const drawOwnSights = (which: (e: AuthoredMesh) => boolean) => { authored(k, A!, (e) => which(e) && !isFrontSight(e)); k.at('handguard', () => authored(k, A!, (e) => which(e) && isFrontSight(e), shifted)); };
     k.tag('base');
     if (rcv === 'ar') {
       if (tr) tracedParts(k, tr, VT, 'base', mats); // (a traced upper and lower: the AR-9's, tools/models/guntraces.ts)
@@ -1133,7 +1146,7 @@ const G_GunRecipes = (() => {
       if (o.optic && (!ownIrons || A!.sights.rail.includes(o.optic))) {
         rcvTop = top;
         const mt = A!.rig.mount;
-        if (mt) { top = k.under('optic', () => k.at('mount', () => { authored(k, A!, (e) => !!e.mount); return mt.top; })); foot('rail', mt.rail[0], mt.rail[1], mt.top, 'mount'); } // (a mount piece, optic@mount, like the rail it replaces)
+        if (mt) { top = k.under('optic', () => { k.at('mount', () => authored(k, A!, (e) => !!e.mount && !isFrontSight(e))); k.at('handguard', () => authored(k, A!, (e) => !!e.mount && isFrontSight(e), shifted)); return mt.top; }); foot('rail', mt.rail[0], mt.rail[1], mt.top, 'mount'); } // (a mount piece, optic@mount, like the rail it replaces)
         else if (A!.sights.railed) foot('rail', A!.rig.rail[0], A!.rig.rail[1], top, 'receiver');
         else if (!A!.sights.railed) top = k.under('optic', () => S.rail(k, A!.rig.rail[0], A!.rig.rail[1] - A!.rig.rail[0], top, rm)); // (railed: the model's receiver top is the rail)
       }
@@ -1705,7 +1718,7 @@ const G_GunRecipes = (() => {
     if (onBarrels) k.into(brk, L, hy);
     let sight: Sight;
     if (ownIrons) { // (its own aperture, the front post's on the barrel; a riser on the rail over the aperture, the irons still used)
-      authored(k, A!, (e) => e.slot === 'optic' && !e.mount); sight = { sy: A!.info.sy, fSight: A!.info.fSight, relief: A!.info.relief };
+      drawOwnSights((e) => e.slot === 'optic' && !e.mount); sight = { sy: A!.info.sy, fSight: A!.info.fSight, relief: A!.info.relief };
       if (o.optic && A!.sights.rail.includes(o.optic)) k.at('mount', () => k.box(0.024, o.riser || 0.022, 0.034, M.black(), ofs - 0.017, top + (o.riser || 0.022) / 2));
     }
     else if (rcv === 'aug') {
