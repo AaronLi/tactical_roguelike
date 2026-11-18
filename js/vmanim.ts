@@ -250,7 +250,8 @@ export const VMAnim = (() => {
     if (kind === 'pistol' && A.slide) { pose.slide = pull; pose.L = lerpV(R0, off(grab || off(A.slide, -0.02, 0.012), -SLIDE * pull), on); }
     else if (kind === 'ar' && A.ch) { pose.ch = pull; pose.L = lerpV(R0, off(grab || off(A.ch, 0.002, 0.0, -0.0175 - 0.026), -CH * pull), on); } // (the T handle's left latch wing: the fist beside it on the left, the index hooked round its front)
     else if (kind === 'handle' && A.H) {
-      pose.handle = pull; const to = off(grab || A.H, -h.travel * pull, A.H.x > 0.005 && !grab ? -0.04 : 0); // (a right-side handle: the hand held 4 cm below it, so the thumb standing up from it is what reaches the knob)
+      pose.handle = pull; const topH = !!h.info.handle && (h.info.handle as { style?: string }).style === 'top'; const to = topH && !grab ? off(A.H, -h.travel * pull + 0.002, -0.035, 0) : off(grab || A.H, -h.travel * pull - 0.005, A.H.x > 0.005 && !grab ? 0.012 : 0, A.H.x > 0.005 && !grab ? 0.057 : 0); // (the F2's lever: the hand seated so the index's pad lies on its front face, measured in the game: the hand 2 cm below the handle's point, which brings the index's middle joint to its front-top edge)
+      // (a right-side handle: the hand held 4 cm below it, so the thumb standing up from it is what reaches the knob)
       if (A.H.x > 0.005) pose.Lelbow = -on; // (and the elbow brought down: the forearm comes up round the underside of the gun clear of the magazine and the receiver's bottom)
       // (a handle on the right (the AK's): the left hand goes under the gun and up its right side to it, not straight through the receiver)
       if (A.H.x > 0.005) { const under = off(to, 0, -0.075, -(A.H.x + 0.01)); pose.L = path(on, [[0, R0], [0.5, under], [1, to]]); }
@@ -286,7 +287,7 @@ export const VMAnim = (() => {
     else if (kind === 'ar') { pose.gun[3] += 0.35 * r; pose.gun[2] -= 0.1 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r; }
     else if (kind === 'handle' && A.H) {
       const side = Math.abs(A.H.x) > 0.005 ? Math.sign(A.H.x) : 0; // (turn the handle side toward you; one on top: tip it up)
-      pose.gun[5] += (side > 0 ? 0.45 : side < 0 ? -0.3 : 0) * r; pose.gun[3] += (side ? 0.2 : 0.3) * r; pose.gun[0] -= (side > 0 ? 0.1 : 0.05) * r; pose.gun[1] += 0.03 * r; if (side > 0) pose.gun[2] += 0.05 * r; // (a right-side handle: the gun brought in toward the left hand and back, so the arm has a bend to lower the elbow with)
+      pose.gun[5] += (side > 0 ? 0.45 : side < 0 ? -0.3 : 0) * r; pose.gun[3] += (side ? 0.2 : 0.3) * r; pose.gun[0] -= (side > 0 ? 0.1 : 0.05) * r; pose.gun[1] += 0.03 * r; if (side > 0) { pose.gun[2] += 0.05 * r; pose.gun[4] += 0.35 * r; } // (a right-side handle: the gun brought in toward the left hand and back, so the arm has a bend to lower the elbow with)
     } else if (kind === 'bolt') { pose.gun[5] += 0.2 * r; pose.gun[3] += 0.05 * r; } // (canted a little, the bolt toward you)
   }
   // Sending the action home from where it locked open: the left thumb on the slide stop (a pistol) or the palm
@@ -757,7 +758,7 @@ export const VMAnim = (() => {
     // (the F2's: the port is by your face already, so the turn to it is a small one; a gun with its handle on the right (the AK's): tipped muzzle-down, so the left hand can reach it from under)
     const cvk = 1, rh = kind === 'handle' && !!A.H && A.H.x > 0.005;
     for (let i = 0; i < 6; i++) pose.gun[i] += CV[i] * cv * (i >= 3 ? cvk : 1);
-    if (rh) { pose.gun[3] += 0.14 * cv; pose.gun[0] -= 0.05 * cv; pose.gun[2] += 0.05 * cv; }
+    if (rh) { pose.gun[3] += 0.14 * cv; pose.gun[0] -= 0.05 * cv; pose.gun[2] += 0.05 * cv; pose.gun[4] += 0.35 * cv; }
     if (c > 0 && c < 1) {
       // the action worked part way (CHECK: how far: a press check), held there while you look in, then let home
       if (kind === 'handle' ? !!A.H : actTravel(h, kind) > 0) {
@@ -1189,7 +1190,7 @@ export const VMAnim = (() => {
   // have bones of their own (three a finger, and the thumb's): each hold poses them (the fingers section below), closed round what it holds. (The model's L is your right: it faces +z, so its -x side turns to your right.)
   const HUM_SH = [new T.Vector3(0.17, -0.2, 0.12), new T.Vector3(-0.16, -0.22, 0.06)]; // (the shoulders, camera space: right, left)
   const HUM_POLE = [new T.Vector3(0.75, -1, 0.3).normalize(), new T.Vector3(-0.45, -1, 0.2).normalize()]; // (where the elbows go, camera space)
-  const HUM_POLE_LOW = [new T.Vector3(0.6, -1.6, 0.3).normalize(), new T.Vector3(-0.15, -1.6, 0.25).normalize()]; // (the elbows brought further down: pose.Lelbow below 0, a hand reaching round the underside of the gun)
+  const HUM_POLE_LOW = [new T.Vector3(0.6, -1.6, 0.3).normalize(), new T.Vector3(-0.3, -1.1, 0.5).normalize()]; // (the elbows brought further down and back toward the body: pose.Lelbow below 0, a hand reaching round the underside of the gun)
   const HUM_POLE_OUT = [new T.Vector3(1, -0.05, 0.15).normalize(), new T.Vector3(-1, -0.05, 0.15).normalize()]; // (raised and out to the side: pose.Lelbow, a hand working across the gun with its wrist straight)
   const _elbow = [0, 0]; // (how far each elbow is brought out: HUM_POLE to HUM_POLE_OUT, set from the pose each frame)
   const HUM_MAGCHK = 0.003; // (the left hand's hold on a magazine it's looking over: a little up its body from the floorplate)
@@ -1414,7 +1415,7 @@ export const VMAnim = (() => {
   const Q_PSUP = qBasis(new T.Vector3(1, 0.35, 0), new T.Vector3(0, 0.3, 1)); // (on a pistol, the left hand round the right, its palm on the grip's left side)
   const Q_RACK = qBasis(new T.Vector3(0, -1, 0), new T.Vector3(-1, 0, 0.3)); // (over the top on a slide or a handle on the right, the fingers down its right side)
   const Q_CH = qBasis(new T.Vector3(0, -1, 0), new T.Vector3(0, 0, 1)); // (an AR's charging handle: a fist, palm down, the knuckles pointing the way of the barrel; the index finger hooks the front of the T handle's left latch wing and pulls, the thumb presses it from behind)
-  const Q_UNDER = qBasis(new T.Vector3(-1, 0, 0), new T.Vector3(0, 0, 1)); // (a handle on the right (the AK's): the hand come up the gun's right side from under, rolled counter-clockwise (as you see it) so the palm faces the receiver's side, the fingers forward along it and the knuckles up, the thumb up on the handle)
+  const Q_UNDER = qBasis(new T.Vector3(0, 0, 1), new T.Vector3(0, -1, 0)); // (a handle on the right (the AK's): the hand in front of the knob, the palm facing the back of the gun (the way the knob is pulled), the knuckles pointing up, the fingers relaxed and extended upward; the thumb hooked on the knob's front face)
   const Q_HL = qBasis(new T.Vector3(1, 0.2, 0), new T.Vector3(0, -0.4, 1)); // (a handle on the left: from that side, the palm toward the gun, the fingers round it)
   const Q_F2 = qBasis(new T.Vector3(Math.cos(0.33), 0, Math.sin(0.33)), new T.Vector3(-Math.sin(0.33), 0, Math.cos(0.33))); // (the F2's charging handle: a fist, the knuckles forward and turned 19 degrees to the right, the palm facing the gun's right side (the hand rolled 90 degrees left from palm down))
   const Q_SLAP = qBasis(new T.Vector3(1, 0, 0), new T.Vector3(0, 0.2, 1)); // (the MP5's release slap: the flat hand from the left, the palm facing the gun's side, the fingers forward and a little down, the heel leading)
