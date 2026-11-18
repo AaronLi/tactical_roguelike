@@ -15,16 +15,68 @@ export const GunAo = (() => {
   const cache = new Map<string, Float32Array[]>();
   // the hemisphere's rays about +z, cosine-weighted
   const dirs: number[][] = [];
-  for (let i = 0; i < RAYS; i++) { const u = (i + 0.5) / RAYS, r = Math.sqrt(u), ph = i * 2.399963; dirs.push([r * Math.cos(ph), r * Math.sin(ph), Math.sqrt(1 - u)]); }
+  for (let i = 0; i < RAYS; i++) { const u = (i + 0.5) / RAYS, r = Math.sqrt(u), ph = i * 2.399963; const d = [r * Math.cos(ph), r * Math.sin(ph), Math.sqrt(1 - u) + 0.45], l = Math.hypot(d[0], d[1], d[2]); dirs.push([d[0] / l, d[1] / l, d[2] / l]); } // (leaned toward the normal: a ray along the surface meets the next facet of the same curve)
+
+  // A big flat face is two triangles with a value at each corner, and a value that differs from one corner to the next is a smear across
+  // the diagonal. So a triangle with an edge past MAXEDGE is split (midpoints, as often as it takes) before the occlusion is worked out:
+  // the values are then ones a few centimetres apart, and the face takes the shading of what is close to each part of it.
+  const MAXEDGE = 0.012;
+  function subdivide(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+    if (geo.groups && geo.groups.length > 1) return geo;
+    const g = geo.index ? geo.toNonIndexed() : geo, names = Object.keys(g.attributes), offs: number[] = [], sizes: number[] = [];
+    let stride = 0;
+    for (const n of names) { offs.push(stride); sizes.push(g.attributes[n].itemSize); stride += g.attributes[n].itemSize; }
+    const pi = names.indexOf('position'), ni = names.indexOf('normal');
+    if (pi < 0) return geo;
+    const cnt = g.attributes.position.count;
+    let cur = new Float32Array(cnt * stride);
+    names.forEach((n, k) => { const a = g.attributes[n] as THREE.BufferAttribute; for (let i = 0; i < cnt; i++) for (let c = 0; c < sizes[k]; c++) cur[i * stride + offs[k] + c] = a.getComponent(i, c); });
+    const po = offs[pi], e2 = MAXEDGE * MAXEDGE;
+    const d2 = (v: Float32Array, a: number, b: number) => { const x = v[a + po] - v[b + po], y = v[a + po + 1] - v[b + po + 1], z = v[a + po + 2] - v[b + po + 2]; return x * x + y * y + z * z; };
+    let changed = false;
+    for (let pass = 0; pass < 6; pass++) {
+      const nt = cur.length / stride / 3; let big = 0;
+      for (let t = 0; t < nt; t++) { const a = t * 3 * stride, b = a + stride, c = b + stride; if (d2(cur, a, b) > e2 || d2(cur, b, c) > e2 || d2(cur, c, a) > e2) big++; }
+      if (!big) break;
+      changed = true;
+      const out = new Float32Array((nt + big * 3) * 3 * stride); let o = 0;
+      const mid = (a: number, b: number, at: number) => { for (let k = 0; k < stride; k++) out[at + k] = (cur[a + k] + cur[b + k]) / 2; if (ni >= 0) { const q = at + offs[ni], l = Math.hypot(out[q], out[q + 1], out[q + 2]) || 1; out[q] /= l; out[q + 1] /= l; out[q + 2] /= l; } };
+      for (let t = 0; t < nt; t++) {
+        const a = t * 3 * stride, b = a + stride, c = b + stride;
+        if (d2(cur, a, b) > e2 || d2(cur, b, c) > e2 || d2(cur, c, a) > e2) {
+          const ab = o + 3 * stride, bc = ab + stride, ca = bc + stride; // (a, b, c's corners and their midpoints, laid out as four triangles)
+          // a ab ca / ab b bc / ca bc c / ab bc ca
+          const tri = (i: number, p: number[]) => { for (let k = 0; k < 3; k++) out.set(p[k] >= 0 ? cur.subarray(p[k], p[k] + stride) : out.subarray(-p[k] - 1, -p[k] - 1 + stride), o + (i * 3 + k) * stride); };
+          // the midpoints first, in the three slots after the first triangle's (a scratch the later triangles read), then every triangle
+          const sc = new Float32Array(stride * 3), m = (x: number, y: number, at: number) => { for (let k = 0; k < stride; k++) sc[at + k] = (cur[x + k] + cur[y + k]) / 2; if (ni >= 0) { const q = at + offs[ni], l = Math.hypot(sc[q], sc[q + 1], sc[q + 2]) || 1; sc[q] /= l; sc[q + 1] /= l; sc[q + 2] /= l; } };
+          m(a, b, 0); m(b, c, stride); m(c, a, stride * 2);
+          const put = (v: Float32Array | null, src: number) => { if (v) out.set(v.subarray(src, src + stride), o); else out.set(cur.subarray(src, src + stride), o); o += stride; };
+          put(null, a); put(sc, 0); put(sc, stride * 2);
+          put(sc, 0); put(null, b); put(sc, stride);
+          put(sc, stride * 2); put(sc, stride); put(null, c);
+          put(sc, 0); put(sc, stride); put(sc, stride * 2);
+          void ab; void bc; void ca; void tri; void mid;
+        } else { out.set(cur.subarray(a, a + stride * 3), o); o += stride * 3; }
+      }
+      cur = out.subarray(0, o);
+    }
+    if (!changed) return geo;
+    const n = cur.length / stride, bg = new THREE.BufferGeometry();
+    names.forEach((nm, k) => { const arr = new Float32Array(n * sizes[k]); for (let i = 0; i < n; i++) for (let c = 0; c < sizes[k]; c++) arr[i * sizes[k] + c] = cur[i * stride + offs[k] + c]; bg.setAttribute(nm, new THREE.BufferAttribute(arr, sizes[k])); });
+    bg.userData = geo.userData; geo.dispose();
+    bg.computeBoundingBox(); bg.computeBoundingSphere();
+    return bg;
+  }
 
   interface M { mesh: THREE.Mesh; pos: Float32Array; nor: Float32Array; idx: ArrayLike<number> | null; n: number }
-  function collect(group: THREE.Object3D): M[] {
+  function collect(group: THREE.Object3D, split = false): M[] {
     group.updateMatrixWorld(true);
     const out: M[] = [], v = new T.Vector3(), nm = new T.Matrix3();
     group.traverse((o: any) => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.position || !o.geometry.attributes.normal) return;
       const ms = Array.isArray(o.material) ? o.material : [o.material];
       if (ms.some((m: any) => !m || m.transparent || m.visible === false || m.alphaTest > 0)) return;
+      if (split && !o.geometry.attributes.aOcc) o.geometry = subdivide(o.geometry);
       const g = o.geometry, p = g.attributes.position, nn = g.attributes.normal, n = p.count, pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
       nm.getNormalMatrix(o.matrixWorld);
       for (let i = 0; i < n; i++) {
@@ -59,7 +111,7 @@ export const GunAo = (() => {
         }
       }
     }
-    const res: Float32Array[] = [], steps = Math.ceil(REACH / c), start = 2;
+    const res: Float32Array[] = [], steps = Math.ceil(REACH / c), start = 3;
     for (const m of ms) {
       const out = new Float32Array(m.n);
       for (let i = 0; i < m.n; i++) {
@@ -87,7 +139,7 @@ export const GunAo = (() => {
 
   /** Gives every opaque mesh of an assembled gun its aOcc attribute (a build's `key` keeps the numbers for the next ask). */
   function apply(group: THREE.Object3D, key?: string) {
-    const ms = collect(group);
+    const ms = collect(group, true);
     if (!ms.length) return;
     let occ = key ? cache.get(key) : undefined;
     if (!occ || occ.length !== ms.length || occ.some((a, i) => a.length !== ms[i].n)) { occ = compute(ms); if (key) cache.set(key, occ); }
