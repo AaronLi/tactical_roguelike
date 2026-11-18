@@ -244,10 +244,7 @@ def carrier():
     """The bolt carrier seen through the ejection port (part_carrier: it runs back and home with every shot, back with the hand's pull on a charge, held back on an empty
     magazine): a black block filling the port, its outer face 0.8 mm inside the receiver's surface so it never stands out; behind it the pocket shows the chamber."""
     pa, pb, pu0, pu1 = PORT
-    pk = K.part('carrier', (0, (pa + pb) / 2, (pu0 + pu1) / 2))
-    o = K.tmp(prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2 - 1.0 * mm, (pu1 - pu0) / 2 - 1.0 * mm, 1.6 * mm, 4), 'x', 11.0 * mm, (HWU - 0.8) * mm)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black', pk)
-    for f in (-0.034, -0.012, 0.010, 0.032):    # (the carrier's flank: shallow ribs across its face)
-        g = K.tmp(box((HWU - 1.3) * mm, (HWU - 0.7) * mm, (pa + pb) / 2 + f - 0.0007, (pa + pb) / 2 + f + 0.0007, (pu0 + pu1) / 2 - 0.0045, (pu0 + pu1) / 2 + 0.0045)); smooth(g); K.adopt(g, 'base', 'gunmetal', pk)
+    pk = port_carrier(K, pa, pb, pu0, pu1, HWU * mm, ax=0.0, az=0.0)
     return pk
 
 # ----------------------------------------------------------------------------------------------------- CHARGING HANDLE (part_handle)
@@ -425,7 +422,7 @@ info = {
     'magAt': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4)],
     'handle': {'f': round(HANDLE[0], 4), 'y': round(HANDLE[1], 4), 'x': round(-(HWU + 18.0) * mm, 4), 'travel': 0.120, 'recip': False, 'style': 'knob', 'grab': [round(HANDLE[0], 4), round(HANDLE[1], 4), round(-(HWU + 20.0) * mm, 4)]},
     'port': [round(Fp(956), 4), round(Up(349), 4), round(HWU * mm, 4)],
-    'chamberAt': {'side': 'port', 'f': 0.1425, 'y': 0.0048, 'x': 0.0},   # (a real port: the game draws no plate or bolt face over it; the round shows in it, its case head at F 0.1425, when the carrier is back)
+    'chamberAt': {'side': 'port', 'f': round(PORT[1] - 0.7 * mm - 0.72 * (0.0476 if VAR == 'h' else 0.042), 4), 'y': 0.0059 if VAR == 'h' else 0.0048, 'x': 0.0},   # (a real port: the game draws no plate or bolt face over it; the round shows in it, its case head at F 0.1425, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(MZ0, 4), 0, 0]},
 }

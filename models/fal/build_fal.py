@@ -41,7 +41,7 @@ coll = reset()
 # the catalogue's materials by NAME (the game swaps its own in at load); the colours here are for viewing in Blender
 MATS = {
     'park': ((0.055, 0.056, 0.054), 0.85, 0.55), 'black': ((0.02, 0.02, 0.022), 0.7, 0.45), 'polymer': ((0.025, 0.025, 0.025), 0.0, 0.6),
-    'rubber': ((0.015, 0.015, 0.015), 0.0, 0.9), 'brass': ((0.75, 0.55, 0.22), 1.0, 0.3), 'steel': ((0.45, 0.45, 0.46), 1.0, 0.3),
+    'rubber': ((0.015, 0.015, 0.015), 0.0, 0.9), 'gunmetal': ((0.14, 0.14, 0.15), 0.9, 0.4), 'brass': ((0.75, 0.55, 0.22), 1.0, 0.3), 'steel': ((0.45, 0.45, 0.46), 1.0, 0.3),
 }
 def mat(name):
     m = bpy.data.materials.get(name)
@@ -310,7 +310,7 @@ widths(rc, w_rcv)
 COV = (603, 905, 195)                                              # the cover: photo x0, x1, its lower edge (px)
 cutters = [
     box(-0.03, 0.03, F(COV[0]), F(COV[1]), U(COV[2]), 0.05),        # (the cover replaces the receiver's top here)
-    box(0.0128, 0.04, F(690), F(856), U(250), U(232)),             # ejection port (right)
+    box(-0.004, 0.04, F(894), F(1060), U(250), U(232)),             # ejection port (right): a pocket down past the bore, the carrier's and the chamber's space
     box(-0.04, -0.0165, F(600), F(1092), U(282.5), U(281.5)),       # upper/lower receiver seam
     box(0.0165, 0.04, F(600), F(1092), U(282.5), U(281.5)),
     box(-0.04, -0.0135, F(930), F(1060), U(204), U(201)),          # the charging handle's slot (left)
@@ -323,8 +323,22 @@ for f, t in rdp(top, 0.0004):                                      # (sections o
     ring = [(hw, b)] + [(hw * math.cos(a), b + (t - b) * math.sin(a)) for a in [math.pi * k / 8 for k in range(9)]] + [(-hw, b)]
     rings.append([(x, f, z) for x, z in ring])
 dc = obj(loft(rings), 'base', 'park'); finish(dc.data, 40, caps=False)
-# the bolt carrier showing in the port
-obj(box(0.006, 0.0118, F(695), F(851), U(248), U(234)), 'base', 'black')
+# the port's inside (what the bolt carrier uncovers): a 0.45 mm black lining shell, the chamber's mouth at the front wall (the barrel's breech face, gunmetal), and the carrier
+# itself (part_carrier: a black block filling the port, its face inside the receiver's side, ribbed; it runs back with the handle on a shot and a charge)
+PA, PB, PU0, PU1, PHW = F(894), F(1060), U(250), U(232), 0.015    # (the port over the magazine well (its rear at the well's, F 903) and its front just ahead of the magazine's front (F 1053), where the chamber is)
+tub = obj(box(-0.004, PHW - 0.0003, PA + 0.00015, PB - 0.00015, PU0 + 0.00015, PU1 - 0.00015), 'base', 'black')
+cut(tub, [box(-0.0035, PHW + 0.001, PA + 0.0006, PB - 0.0006, PU0 + 0.0006, PU1 - 0.0006)]); finish(tub.data)
+CH_AX, CH_Z = 0.002, (PU0 + PU1) / 2
+obj(tube([(PB - 0.0046, 0.0066), (PB - 0.0007, 0.0066)], 24, 'y', (CH_AX, 0, CH_Z)), 'base', 'gunmetal')
+CARRIER_TRAVEL = 0.100                       # the stroke (the handle's: the block's rear stays 76 mm inside the receiver's back at the full stroke)
+pc_ = part('carrier', (0, (PA + PB) / 2, CH_Z))
+F1, FH = PB - 0.001, PB - 0.001 - 0.030                     # (the carrier's front, and where its bolt head begins)
+cb = obj(box(0.0075, PHW - 0.0008, PA + 0.001, FH + 0.001, PU0 + 0.001, PU1 - 0.001), 'base', 'black', pc_); bevel(cb, 0.0007, 2); finish(cb.data)           # (the carrier: a milled block, round-cornered)
+for k in range(2):
+    fr = PA + (FH - PA) * (0.35 + 0.25 * k)
+    rb = obj(box(PHW - 0.0012, PHW - 0.0007, fr - 0.0008, fr + 0.0008, PU0 + 0.002, PU1 - 0.002), 'base', 'gunmetal', pc_); finish(rb.data)       # (a milled step across it)
+obj(tube([(FH, 0.0050), (F1 - 0.003, 0.0050), (F1, 0.0046)], 24, 'y', (CH_AX, 0, CH_Z)), 'base', 'steel', pc_)                                        # (the bolt, in front of it: a round head)
+obj(box(CH_AX + 0.0042, CH_AX + 0.0058, F1 - 0.014, F1 - 0.002, CH_Z - 0.001, CH_Z + 0.0035), 'base', 'gunmetal', pc_)                                  # (its extractor's claw)
 # pins, the takedown lever and the selector
 for px, py, r in ((748, 279, 0.0022), (796, 282, 0.0022), (831, 273, 0.0028)):
     o = obj(tube([(-0.019, r * 0.8), (-0.018, r), (0.018, r), (0.019, r * 0.8)], 16, 'x', (0, F(px), U(py))), 'base', 'steel'); finish(o.data)
@@ -476,11 +490,12 @@ info = {
     'sy': SY, 'fSight': F(587), 'relief': 0.075,
     'muzzles': [[round(MZ, 4), 0, 0]],
     'grip': [0.05, -0.078, 0], 'support': [0.37, -0.024, 0],
-    'anim': {'handle': 'part_handle', 'mag': 'part_mag'},
+    'anim': {'handle': 'part_handle', 'carrier': 'part_carrier', 'mag': 'part_mag'},
+    'carrier': {'travel': CARRIER_TRAVEL},
     'magAt': [round(MAG_F, 4), round(MAG_U, 4)],
-    'handle': {'f': HF, 'y': HY, 'x': HX, 'travel': 0.1, 'style': 'fold', 'grab': [HF, HY + 0.006, HX - 0.028]},
-    'port': [round(F(780), 4), round(U(241), 4), 0.016],
-    'chamberAt': {'side': 'right', 'f': round(F(760), 4), 'y': round(U(241), 4), 'x': 0.012},
+    'handle': {'f': HF, 'y': HY, 'x': HX, 'travel': 0.1, 'recip': True, 'style': 'fold', 'grab': [HF, HY + 0.006, HX - 0.028]},
+    'port': [round(F(977), 4), round(U(241), 4), 0.016],
+    'chamberAt': {'side': 'port', 'f': round(PB - 0.0007 - 0.72 * 0.0476, 4), 'y': round(CH_Z + 0.0059, 4), 'x': CH_AX},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(F(1880), 4), 0, 0]},
 }

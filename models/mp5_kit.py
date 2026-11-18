@@ -88,11 +88,11 @@ def receiver():
     for s in (-1, 1):
         cut(rc, prism(rounded((F(503) + F(773)) / 2, U(157.5), (F(773) - F(503)) / 2, 5.5 * S, 5.0 * S, 3), 'x', *xs(s * (HW - 1.3 * mm), s * (HW + 1 * mm))))   # the long groove
         cut(rc, prism(rounded((F(560) + F(704)) / 2, U(135), (F(704) - F(560)) / 2, 9.0 * S, 2.5 * mm, 3), 'x', *xs(s * (HW - 0.7 * mm), s * (HW + 1 * mm))))  # the panel behind the port
-    cut(rc, prism(rounded((F(707) + F(775)) / 2, U(129), (F(775) - F(707)) / 2, 15 * S, 4.5 * mm, 4), 'x', HW - 5.5 * mm, HW + 1 * mm))                   # the ejection port (right)
+    cut(rc, port_pocket(F(707), F(775), U(129) - 15 * S, U(129) + 15 * S, HW + 1 * mm, 4.5 * mm, HW - 14.0 * mm))                                       # the ejection port (right): a pocket 14 mm deep
     bevel(rc, 0.8 * mm, 1, 35); smooth(rc); K.adopt(rc, 'base', RCV)
-    # the bolt in the port, its extractor's slot
-    o = K.obj(box(HW - 5.6 * mm, HW - 4.8 * mm, F(709), F(773), U(141), U(117)), 'base', 'gunmetal')
-    o = K.obj(box(HW - 5.0 * mm, HW - 4.4 * mm, F(752), F(770), U(132), U(127)), 'base', 'black')
+    # the port's inside (what the bolt carrier uncovers: a black lining, the chamber's mouth, the feed ramp), at the round's height (the pocket's middle); the carrier is part_carrier
+    port_inside(K, F(707), F(775), U(129) - 15 * S, U(129) + 15 * S, HW, mouth_r=5.0 * mm, ramp=18 * mm, x_in=HW - 14.0 * mm, ax=HW - 10.0 * mm, az=U(129))
+    CARRIER = port_carrier(K, F(707), F(775), U(129) - 15 * S, U(129) + 15 * S, HW, x1=HW - 3.2 * mm, ax=HW - 10.0 * mm, az=U(129), head=0.026, rollers=True)     # (the bolt carrier in the port: a thin plate over the pocket, its face under the receiver's side)
     # the end cap: a little proud of the tube all round, its top-back corner sloping down to the stock (photo 418-440)
     ec = K.tmp(prism(ccw([(x * 1.03, z + (0.6 * mm if z > 0 else -0.6 * mm)) for x, z in full]), 'y', 0.0, F(441)))
     boolean(ec, rprism(PL([(425, 112), (430, 101), (441, 93), (442, 93), (442, 205), (425, 205)]), -0.03, 0.03), 'INTERSECT')
@@ -537,11 +537,12 @@ info = {
     'sy': round(SY, 4), 'fSight': round(DRUM_F, 4), 'relief': 0.075,
     'muzzles': [[round(END, 4), 0, 0]],
     'grip': [0.058, -0.082, 0], 'support': [0.36 if SD else 0.31, -0.028, 0],
-    'anim': {'handle': 'part_handle', 'mag': 'part_mag'},
+    'anim': {'handle': 'part_handle', 'carrier': 'part_carrier', 'mag': 'part_mag'},
+    'carrier': {'travel': 0.080},
     'magAt': [round(MAG_F, 4), round(MAG_Y, 4)],
     'handle': {'f': round(HANDLE_F, 4), 'y': round(CT_Z, 4), 'x': round(-CT_R, 4), 'travel': HANDLE_TRAVEL, 'style': 'tube', 'recip': False, 'grab': grab, 'lock': round(HANDLE_LOCK, 4)},
     'port': [round((F(707) + F(775)) / 2, 4), round(U(129), 4), round(HW, 4)],
-    'chamberAt': {'side': 'right', 'f': round(F(760), 4), 'y': round(U(129), 4), 'x': round(HW - 4.8 * mm, 4)},
+    'chamberAt': {'side': 'port', 'f': round(F(775) - 0.7 * mm - 0.72 * 0.026, 4), 'y': round(U(129) + 0.0045, 4), 'x': round(HW - 10.0 * mm, 4)},   # (a real port: the round shows in it, at the pocket's middle, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(MOUNT_MUZZLE, 4), 0, 0]},
 }

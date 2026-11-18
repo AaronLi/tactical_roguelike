@@ -4,448 +4,448 @@
  "builds": {
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "default",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,receiver=rcv.ak74": {
    "label": "bare (required slots only)",
-   "geometry": "a20621751d607532",
-   "info": "74c1924f945d4f62"
+   "geometry": "aa29b952396d5eb2",
+   "info": "fa0732443953232c"
   },
   "barrel=ak74.br.10_5,grip=oem.gr.ak.3,handguard=oem.hg.ak.8,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "shortest barrel ak74.br.10_5",
-   "geometry": "60ed7d376f3bacd8",
-   "info": "d3dd855fd7f49141"
+   "geometry": "152676235a49eb8e",
+   "info": "466df77c4298af1e"
   },
   "barrel=ak74.br.20,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "longest barrel ak74.br.20",
-   "geometry": "8a7f585e4fe7da56",
-   "info": "d8d951f0d32f3cf1"
+   "geometry": "6fde26191da006cf",
+   "info": "4e55dfb4ec37824a"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak,stock=stk.ak.1": {
    "label": "receiver=rcv.ak",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.rpk,stock=stk.ak.1": {
    "label": "receiver=rcv.rpk",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.br.12_5,grip=oem.gr.ak.3,handguard=hg.ak.1,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "barrel=ak74.br.12_5",
-   "geometry": "0e93c3f959c794c4",
-   "info": "d602bec78a761663"
+   "geometry": "33928949e72c8592",
+   "info": "dfa05ea7fbfe7263"
   },
   "barrel=ak74.br.15_9,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "barrel=ak74.br.15_9",
-   "geometry": "ee2d69726a6e463a",
-   "info": "033bab7db0575f42"
+   "geometry": "f81882aeca371812",
+   "info": "c3610ac788c0125e"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.prong,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.prong",
-   "geometry": "e7fdf423fb8d200e",
-   "info": "a3299824980bbbb8"
+   "geometry": "b3752e566c653078",
+   "info": "fb325c9751659d03"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.comp,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.comp",
-   "geometry": "7f1aa2e5a2b6a342",
-   "info": "cf44b0cbe7df4431"
+   "geometry": "f55eb9bec7dd4531",
+   "info": "65a0fb6105eead40"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.can,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.can",
-   "geometry": "ea2b0bbd7e426716",
-   "info": "a2cdd74d266f4b67"
+   "geometry": "f4b81c9c6e8b9019",
+   "info": "1ac69348513317da"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.short,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.short",
-   "geometry": "b3b57c8ad4412bb9",
-   "info": "e9007a86f577da4d"
+   "geometry": "d34ee3b458212f7e",
+   "info": "9a72a78ab47a95b2"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.cap,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.cap",
-   "geometry": "05be769c1cdd9c97",
-   "info": "74c1924f945d4f62"
+   "geometry": "2dccd50aba0039a0",
+   "info": "fa0732443953232c"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.a2,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.a2",
-   "geometry": "d34d3e2ef0686105",
-   "info": "2d96856c89c50f16"
+   "geometry": "09cdcd6355910091",
+   "info": "d06dfaff1ea022ee"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.slant,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.slant",
-   "geometry": "586a3427e99e0a9e",
-   "info": "ff77ac07a613e0ee"
+   "geometry": "b780fe590509a897",
+   "info": "e35259ca2397daab"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.74,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.74",
-   "geometry": "f5bf1c656e43502c",
-   "info": "d8db74edd8d39e1f"
+   "geometry": "7b48be0422fcadbc",
+   "info": "8b3a02ae70036028"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.boost,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=mz.rak.boost",
-   "geometry": "58aba26fe225d9bf",
-   "info": "91b04004846808f4"
+   "geometry": "95bf35d8b2a1ebdb",
+   "info": "ab4ad15be1b7b8e2"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "muzzle=(none)",
-   "geometry": "05be769c1cdd9c97",
-   "info": "74c1924f945d4f62"
+   "geometry": "2dccd50aba0039a0",
+   "info": "fa0732443953232c"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.1,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=hg.ak.1",
-   "geometry": "65b948659bf7e8c7",
-   "info": "6629eca5deba3457"
+   "geometry": "8c66e50baf8451eb",
+   "info": "5882436042923a72"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.2,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=hg.ak.2",
-   "geometry": "d057338a0e5252e6",
-   "info": "6629eca5deba3457"
+   "geometry": "305bf9c93e952dae",
+   "info": "5882436042923a72"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.3,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=hg.ak.3",
-   "geometry": "78026d23b52be799",
-   "info": "ad80f07e087a95e0"
+   "geometry": "7400cc6efb8be0fb",
+   "info": "a5d9242e69b309b3"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.5,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=oem.hg.ak.5",
-   "geometry": "f2c4ac0a5e86289d",
-   "info": "ad80f07e087a95e0"
+   "geometry": "7cffab7d2bc1ef63",
+   "info": "a5d9242e69b309b3"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.6,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=oem.hg.ak.6",
-   "geometry": "2e226daf48a67c37",
-   "info": "acf78c43c5a452e5"
+   "geometry": "49127ff913fdcd87",
+   "info": "7f32541a87762e9d"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.7,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=oem.hg.ak.7",
-   "geometry": "cf8ee1ef647b59ef",
-   "info": "8a159c90c9a0d935"
+   "geometry": "45862e66a36f18ac",
+   "info": "b30364ea5d7e11b5"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.8,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=oem.hg.ak.8",
-   "geometry": "6c8880fe1e6c0daf",
-   "info": "6c79fa0b874698cb"
+   "geometry": "8b0043e5f2e29239",
+   "info": "2c55e087c6a53d61"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=oem.hg.ak.9,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=oem.hg.ak.9",
-   "geometry": "b1d755c0c14f07d7",
-   "info": "acf78c43c5a452e5"
+   "geometry": "e0035c87e5b8b82c",
+   "info": "7f32541a87762e9d"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.short.rail,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=hg.ak.short.rail",
-   "geometry": "1d4909e56b99ea5e",
-   "info": "6c79fa0b874698cb"
+   "geometry": "2c0500bf24eaa865",
+   "info": "2c55e087c6a53d61"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.short.mlok,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "handguard=hg.ak.short.mlok",
-   "geometry": "238e9b159eeca16d",
-   "info": "6c79fa0b874698cb"
+   "geometry": "a1304e220e7a0030",
+   "info": "2c55e087c6a53d61"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.0,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.0",
-   "geometry": "1268e1ab2bc59d0f",
-   "info": "59c06f452a1ea54f"
+   "geometry": "afa3872bccdecf7c",
+   "info": "0b22aaf294a6e3c9"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.1,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.1",
-   "geometry": "38bac175701a5be5",
-   "info": "6f4b06efcc670397"
+   "geometry": "cf0ed1b5e273f184",
+   "info": "40b8bb1effc9a24c"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.2,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.2",
-   "geometry": "bd607a702fa9096b",
-   "info": "0af3a725abd9a962"
+   "geometry": "679efb6fad610194",
+   "info": "1b5d4289b5cf5031"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.3,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.3",
-   "geometry": "149853e1b352480a",
-   "info": "ca848f48c4700d8d"
+   "geometry": "40e5c9b1cdd5f5ef",
+   "info": "ac763f090e019449"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.4,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.4",
-   "geometry": "533e064bdf89eb0a",
-   "info": "ca848f48c4700d8d"
+   "geometry": "a06690b5b60798c7",
+   "info": "ac763f090e019449"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.5,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.5",
-   "geometry": "7beb363c293c34b5",
-   "info": "9a4eef21f33c10fd"
+   "geometry": "28a9cc01e0bb5ca2",
+   "info": "fafde46330b992a4"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.6,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.6",
-   "geometry": "4cd5ef1975f6d872",
-   "info": "34ae7c97e9894e2c"
+   "geometry": "86f257191e4271b3",
+   "info": "0ed775427d54d68f"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.7,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.7",
-   "geometry": "84194563cc24597c",
-   "info": "a54409a4a8aa8818"
+   "geometry": "024fccdd190cc0ed",
+   "info": "fd78fda6277a61b0"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.8,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.8",
-   "geometry": "2686bb1a836e1f1e",
-   "info": "51a030e3d891f6df"
+   "geometry": "2be90aca197a3d5e",
+   "info": "5194e2855478669b"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.9,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.9",
-   "geometry": "2a31c32efde86f10",
-   "info": "8a78853d1b0056db"
+   "geometry": "ca548f86ff8f0b9d",
+   "info": "5934b289458ed327"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.10,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.10",
-   "geometry": "5e2f22e12dd957e2",
-   "info": "e0eb3258c3c0106a"
+   "geometry": "8b1647ca7c0d0261",
+   "info": "041a8860585ee5a1"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.11,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.11",
-   "geometry": "57f8c3d462ec3a85",
-   "info": "bc554ccbd55e259b"
+   "geometry": "359df16b19b50659",
+   "info": "e3dbff215febd4f4"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.12,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.12",
-   "geometry": "c1cf47e1afbebe38",
-   "info": "59c06f452a1ea54f"
+   "geometry": "96f8a2ba9b8eb05d",
+   "info": "0b22aaf294a6e3c9"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.13,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.13",
-   "geometry": "b5fa39f84f370db5",
-   "info": "7ef1479c45b85478"
+   "geometry": "0588d6a40029a718",
+   "info": "5a1e5741432bad14"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.14,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.14",
-   "geometry": "b3cc9ea8172a70a9",
-   "info": "8e7259c4347ded1a"
+   "geometry": "9996366fc9d5f476",
+   "info": "5fd411948d2cf9ce"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.15,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.15",
-   "geometry": "c9b8a104be336d36",
-   "info": "a519dccbcab80077"
+   "geometry": "472fcd175dea24c3",
+   "info": "9c813242022caa99"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.pic.16,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.pic.16",
-   "geometry": "0c588b54696cac80",
-   "info": "66b2ba8312a2cd28"
+   "geometry": "8e49613946f2a0ac",
+   "info": "c6da93e32eea9e27"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=ak.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=aug.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=aug.optic",
-   "geometry": "1268e1ab2bc59d0f",
-   "info": "59c06f452a1ea54f"
+   "geometry": "afa3872bccdecf7c",
+   "info": "0b22aaf294a6e3c9"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=an94.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=an94.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=oem.op.pic.20,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=oem.op.pic.20",
-   "geometry": "68702e96f2cd9c5f",
-   "info": "c2a54a1c78821534"
+   "geometry": "1ae04c7ba0c9b1ef",
+   "info": "156f216c25db5056"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=oem.op.pic.21,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=oem.op.pic.21",
-   "geometry": "d3f0b5d3dc6c0726",
-   "info": "046e017c9206b53c"
+   "geometry": "83b6e261fc9737c3",
+   "info": "7c4e88efa2ef1e96"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=oem.op.pic.22,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=oem.op.pic.22",
-   "geometry": "529bc72ddb6eac99",
-   "info": "2eaaed1d028384c2"
+   "geometry": "99584e64e14a6c6c",
+   "info": "59edd4d8d631ca0e"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=oem.op.pic.23,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=oem.op.pic.23",
-   "geometry": "4d860a09b0aa3d25",
-   "info": "2eaaed1d028384c2"
+   "geometry": "b3047f42b5cf11dc",
+   "info": "59edd4d8d631ca0e"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=uzi.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=uzi.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ppsh.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=ppsh.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=pump.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=pump.optic",
-   "geometry": "26d76ad272ba0a0e",
-   "info": "060d41d10cad2079"
+   "geometry": "8d79148d15a671ea",
+   "info": "e072035bf1817fa2"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=dbl.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=dbl.optic",
-   "geometry": "26d76ad272ba0a0e",
-   "info": "060d41d10cad2079"
+   "geometry": "8d79148d15a671ea",
+   "info": "e072035bf1817fa2"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=saiga.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=saiga.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=pkm.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=pkm.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=skorp.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=skorp.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=mac10.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=mac10.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=aks74u.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=aks74u.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=rpk.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=rpk.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=aug9.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=aug9.optic",
-   "geometry": "1268e1ab2bc59d0f",
-   "info": "59c06f452a1ea54f"
+   "geometry": "afa3872bccdecf7c",
+   "info": "0b22aaf294a6e3c9"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=sawn.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=sawn.optic",
-   "geometry": "26d76ad272ba0a0e",
-   "info": "060d41d10cad2079"
+   "geometry": "8d79148d15a671ea",
+   "info": "e072035bf1817fa2"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=thor.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=thor.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=pocketgl.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=pocketgl.optic",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=oem.op.pic.39,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=oem.op.pic.39",
-   "geometry": "25ca3ae152f66d0f",
-   "info": "201d9638f994bd12"
+   "geometry": "8f4642b49065084a",
+   "info": "b51cdaf03ea5789c"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=qbz95.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=qbz95.optic",
-   "geometry": "1268e1ab2bc59d0f",
-   "info": "59c06f452a1ea54f"
+   "geometry": "afa3872bccdecf7c",
+   "info": "0b22aaf294a6e3c9"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=crossbow.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=crossbow.optic",
-   "geometry": "1eed05946c8bbb73",
-   "info": "d40db324274d4ad8"
+   "geometry": "878b79039f263752",
+   "info": "e09c419b673f09c8"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.auth.falcon,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.auth.falcon",
-   "geometry": "6400337869280cbc",
-   "info": "e047c4015913e7eb"
+   "geometry": "114416d7b63b0e96",
+   "info": "243ae83fe233eae3"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.bc.0,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.bc.0",
-   "geometry": "34a37b4a4a836326",
-   "info": "8a78853d1b0056db"
+   "geometry": "4cbd498020eac936",
+   "info": "5934b289458ed327"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=hailstorm.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=hailstorm.optic",
-   "geometry": "26d76ad272ba0a0e",
-   "info": "060d41d10cad2079"
+   "geometry": "8d79148d15a671ea",
+   "info": "e072035bf1817fa2"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=op.th.0,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=op.th.0",
-   "geometry": "5f2fe2841dfc17e7",
-   "info": "c738d878bfb24470"
+   "geometry": "89aa37e553df00a7",
+   "info": "b65a3611c46e4542"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "optic=(none)",
-   "geometry": "c34f1e575ac4b4b7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2370ed07061c5720",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=gr.ak.0,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "grip=gr.ak.0",
-   "geometry": "2962695fc6cc9a20",
-   "info": "e106bd51975bd5bc"
+   "geometry": "a4d65474fb23bb02",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=gr.ak.1,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "grip=gr.ak.1",
-   "geometry": "f73d724b36414928",
-   "info": "e106bd51975bd5bc"
+   "geometry": "c022943899f518d0",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=gr.ak.2,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "grip=gr.ak.2",
-   "geometry": "3b086cd685f5f7fb",
-   "info": "e106bd51975bd5bc"
+   "geometry": "188eff470890974d",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.4,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "grip=oem.gr.ak.4",
-   "geometry": "872b959aa774a67b",
-   "info": "e106bd51975bd5bc"
+   "geometry": "b4215c7ce6a75cec",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.5,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "grip=oem.gr.ak.5",
-   "geometry": "0861f5ce5e8c1a72",
-   "info": "e106bd51975bd5bc"
+   "geometry": "19337417bd2f5540",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.0": {
    "label": "stock=stk.ak.0",
-   "geometry": "60fb2b614f35bb6d",
-   "info": "e106bd51975bd5bc"
+   "geometry": "3bbf6dede80e1aeb",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.2": {
    "label": "stock=stk.ak.2",
-   "geometry": "17aa167a366b90d7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "89e79ccd5daa9acf",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.3": {
    "label": "stock=stk.ak.3",
-   "geometry": "be00dca45b348c8e",
-   "info": "e106bd51975bd5bc"
+   "geometry": "1a36aac35e5e9a97",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=oem.stk.ak.4": {
    "label": "stock=oem.stk.ak.4",
-   "geometry": "60fb2b614f35bb6d",
-   "info": "e106bd51975bd5bc"
+   "geometry": "3bbf6dede80e1aeb",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=oem.stk.ak.5": {
    "label": "stock=oem.stk.ak.5",
-   "geometry": "e97091fb01765e08",
-   "info": "e106bd51975bd5bc"
+   "geometry": "75462d3e7e6749ef",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74": {
    "label": "stock=(none)",
-   "geometry": "94dac6b7adec72be",
-   "info": "e106bd51975bd5bc"
+   "geometry": "2ac4ccd7971e4a97",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.20,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "mag=ak74.mag.20",
-   "geometry": "46a8d71e2b4381a7",
-   "info": "e106bd51975bd5bc"
+   "geometry": "436f564fecc11f0d",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.45,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "mag=ak74.mag.45",
-   "geometry": "4cb049fb550c2d0f",
-   "info": "e106bd51975bd5bc"
+   "geometry": "c1c54de752e4da24",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.60,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "mag=ak74.mag.60",
-   "geometry": "efe3737ede730677",
-   "info": "e106bd51975bd5bc"
+   "geometry": "c8fb4593cc05e932",
+   "info": "22525b510735cfe7"
   },
   "barrel=ak74.barrel,grip=oem.gr.ak.3,handguard=hg.ak.0,mag=ak74.mag.30c,muzzle=mz.rak.brake,optic=ak74.optic,receiver=rcv.ak74,stock=stk.ak.1": {
    "label": "mag=ak74.mag.30c",
-   "geometry": "a2125a2b41b47b86",
-   "info": "e106bd51975bd5bc"
+   "geometry": "bde69dd435b1fdfc",
+   "info": "22525b510735cfe7"
   }
  }
 }
