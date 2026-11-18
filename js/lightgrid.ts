@@ -152,6 +152,9 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
     #include <lights_fragment_end>
     { float lgg2 = 1.0 - clamp(vOcc, 0.0, 1.0) * clamp(lgAo.x, 0.0, 1.0); // (and what it reflects of the room, and the fill where there's no grid: a gun in the gunsmith)
       reflectedLight.indirectSpecular *= lgg2;
+      #ifdef AO_DIRECT
+      reflectedLight.directDiffuse *= lgg2;
+      #endif
       if (lgGrid.w < 0.5) reflectedLight.indirectDiffuse *= lgg2; }`;
   function patch(shader: THREE.WebGLProgramParametersWithUniforms) {
     if (!shader.fragmentShader.includes('#include <lights_fragment_end>') || !shader.vertexShader.includes('#include <worldpos_vertex>')) return;

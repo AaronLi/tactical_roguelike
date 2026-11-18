@@ -4,6 +4,7 @@ import { Level } from './level.js';
 import { ShipGen } from './shipgen.js';
 import { SpaceData } from './spacedata.js';
 import { U as G_U } from './util.js';
+import { GunAo } from './gunao.js';
 interface SmGun { k: 'pd' | 'cannon' | 'missile'; x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
 export const ShipModel = (() => {
   const T = THREE;
@@ -54,8 +55,9 @@ export const ShipModel = (() => {
     for (const id of Object.keys(SpaceData.SHIPS)) Models.loadFile('assets/models/ships/' + id + '.glb').then((sc: any) => { if (sc) MODELS.set(id, sc); }, () => { /* (none made for her yet: the recipe) */ });
   }
   function ship(d: SpShipDef, fleet: SpFleet): SmShip {
-    const src = MODELS.get(d.id);
-    return src ? fromModel(src, d, fleet) : shipRecipe(d, fleet);
+    const src = MODELS.get(d.id), r = src ? fromModel(src, d, fleet) : shipRecipe(d, fleet);
+    GunAo.apply(r.group, 'ship:' + d.id + ':' + (src ? 'm' : 'r'), GunAo.SHIP); // (her own occlusion, inside and out: js/gunao.ts)
+    return r;
   }
   function fromModel(src: THREE.Object3D, d: SpShipDef, fleet: SpFleet): SmShip {
     const SD = SpaceData, L = SD.layout(d), g = new T.Group();

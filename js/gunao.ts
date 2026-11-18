@@ -11,17 +11,26 @@
 // magazine) takes its darkening along as it was in the gun at rest; the muzzle flash's, the lenses' and anything see-through has none.
 export const GunAo = (() => {
   const T = THREE;
-  const REACH = 0.045, RAYS = 14, STRENGTH = 3.2, MAX = 0.9;
+  /** What a thing's occlusion is made of: how far a ray reaches (m), how many rays, the finest cell (m) and the most cells along its longest side, the longest an edge may be before it is split (m), how much the shut-in share is scaled and its cap. */
+  interface Opts { reach: number; rays: number; cell: number; cells: number; edge: number; strength: number; max: number; direct: boolean }
+  const GUN: Opts = { reach: 0.045, rays: 14, cell: 0.003, cells: 300, edge: 0.012, strength: 3.2, max: 0.9, direct: false };
+  /** The squad's ship (inside and out): rooms and hull plates metres across, so a ray reaches a metre and a half, cells of 8 cm. */
+  const SHIP: Opts = { reach: 1.5, rays: 24, cell: 0.08, cells: 400, edge: 0.4, strength: 1.8, max: 0.75, direct: true };
   const cache = new Map<string, Float32Array[]>();
+  let last = 0; // (the last apply, ms)
   // the hemisphere's rays about +z, cosine-weighted
-  const dirs: number[][] = [];
-  for (let i = 0; i < RAYS; i++) { const u = (i + 0.5) / RAYS, r = Math.sqrt(u), ph = i * 2.399963; const d = [r * Math.cos(ph), r * Math.sin(ph), Math.sqrt(1 - u) + 0.45], l = Math.hypot(d[0], d[1], d[2]); dirs.push([d[0] / l, d[1] / l, d[2] / l]); } // (leaned toward the normal: a ray along the surface meets the next facet of the same curve)
+  const dirCache = new Map<number, number[][]>();
+  function dirsOf(n: number): number[][] {
+    let dirs = dirCache.get(n); if (dirs) return dirs;
+    dirs = [];
+    for (let i = 0; i < n; i++) { const u = (i + 0.5) / n, r = Math.sqrt(u), ph = i * 2.399963; const d = [r * Math.cos(ph), r * Math.sin(ph), Math.sqrt(1 - u) + 0.45], l = Math.hypot(d[0], d[1], d[2]); dirs.push([d[0] / l, d[1] / l, d[2] / l]); } // (leaned toward the normal: a ray along the surface meets the next facet of the same curve)
+    dirCache.set(n, dirs); return dirs;
+  }
 
   // A big flat face is two triangles with a value at each corner, and a value that differs from one corner to the next is a smear across
   // the diagonal. So a triangle with an edge past MAXEDGE is split (midpoints, as often as it takes) before the occlusion is worked out:
   // the values are then ones a few centimetres apart, and the face takes the shading of what is close to each part of it.
-  const MAXEDGE = 0.012;
-  function subdivide(geo: THREE.BufferGeometry): THREE.BufferGeometry {
+  function subdivide(geo: THREE.BufferGeometry, maxEdge: number): THREE.BufferGeometry {
     if (geo.groups && geo.groups.length > 1) return geo;
     const g = geo.index ? geo.toNonIndexed() : geo, names = Object.keys(g.attributes), offs: number[] = [], sizes: number[] = [];
     let stride = 0;
@@ -31,7 +40,7 @@ export const GunAo = (() => {
     const cnt = g.attributes.position.count;
     let cur = new Float32Array(cnt * stride);
     names.forEach((n, k) => { const a = g.attributes[n] as THREE.BufferAttribute; for (let i = 0; i < cnt; i++) for (let c = 0; c < sizes[k]; c++) cur[i * stride + offs[k] + c] = a.getComponent(i, c); });
-    const po = offs[pi], e2 = MAXEDGE * MAXEDGE;
+    const po = offs[pi], e2 = maxEdge * maxEdge;
     const d2 = (v: Float32Array, a: number, b: number) => { const x = v[a + po] - v[b + po], y = v[a + po + 1] - v[b + po + 1], z = v[a + po + 2] - v[b + po + 2]; return x * x + y * y + z * z; };
     let changed = false;
     for (let pass = 0; pass < 6; pass++) {
@@ -69,14 +78,14 @@ export const GunAo = (() => {
   }
 
   interface M { mesh: THREE.Mesh; pos: Float32Array; nor: Float32Array; idx: ArrayLike<number> | null; n: number }
-  function collect(group: THREE.Object3D, split = false): M[] {
+  function collect(group: THREE.Object3D, split: Opts | null = null): M[] {
     group.updateMatrixWorld(true);
     const out: M[] = [], v = new T.Vector3(), nm = new T.Matrix3();
     group.traverse((o: any) => {
       if (!o.isMesh || !o.geometry || !o.geometry.attributes.position || !o.geometry.attributes.normal) return;
       const ms = Array.isArray(o.material) ? o.material : [o.material];
       if (ms.some((m: any) => !m || m.transparent || m.visible === false || m.alphaTest > 0)) return;
-      if (split && !o.geometry.attributes.aOcc) o.geometry = subdivide(o.geometry);
+      if (split && !o.geometry.attributes.aOcc) o.geometry = subdivide(o.geometry, split.edge);
       const g = o.geometry, p = g.attributes.position, nn = g.attributes.normal, n = p.count, pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
       nm.getNormalMatrix(o.matrixWorld);
       for (let i = 0; i < n; i++) {
@@ -88,14 +97,15 @@ export const GunAo = (() => {
     return out;
   }
 
-  function compute(ms: M[]): Float32Array[] {
+  function compute(ms: M[], o: Opts): Float32Array[] {
+    const REACH = o.reach, RAYS = o.rays, dirs = dirsOf(o.rays);
     let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
     for (const m of ms) for (let i = 0; i < m.n; i++) {
       const x = m.pos[i * 3], y = m.pos[i * 3 + 1], z = m.pos[i * 3 + 2];
       if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; if (z < z0) z0 = z; if (z > z1) z1 = z;
     }
     if (x1 < x0) return ms.map((m) => new Float32Array(m.n));
-    const pad = REACH + 0.02, c = Math.max(0.003, Math.max(x1 - x0, y1 - y0, z1 - z0) / 300), ic = 1 / c;
+    const pad = REACH + 0.02, c = Math.max(o.cell, Math.max(x1 - x0, y1 - y0, z1 - z0) / o.cells), ic = 1 / c;
     x0 -= pad; y0 -= pad; z0 -= pad;
     const nx = Math.ceil((x1 + pad - x0) * ic) + 1, ny = Math.ceil((y1 + pad - y0) * ic) + 1, nz = Math.ceil((z1 + pad - z0) * ic) + 1, occ = new Uint8Array(nx * ny * nz);
     // the surfaces: each triangle sampled finely enough to leave no cell unmarked
@@ -130,7 +140,7 @@ export const GunAo = (() => {
             if (occ[(cz * ny + cy) * nx + cx]) { sum += 1 - q / REACH; break; }
           }
         }
-        out[i] = Math.min(MAX, (sum / RAYS) * STRENGTH);
+        out[i] = Math.min(o.max, (sum / RAYS) * o.strength);
       }
       res.push(out);
     }
@@ -138,14 +148,16 @@ export const GunAo = (() => {
   }
 
   /** Gives every opaque mesh of an assembled gun its aOcc attribute (a build's `key` keeps the numbers for the next ask). */
-  function apply(group: THREE.Object3D, key?: string) {
-    const ms = collect(group, true);
+  function apply(group: THREE.Object3D, key?: string, o: Opts = GUN) {
+    const t0 = performance.now(), ms = collect(group, o);
     if (!ms.length) return;
     let occ = key ? cache.get(key) : undefined;
-    if (!occ || occ.length !== ms.length || occ.some((a, i) => a.length !== ms[i].n)) { occ = compute(ms); if (key) cache.set(key, occ); }
+    if (!occ || occ.length !== ms.length || occ.some((a, i) => a.length !== ms[i].n)) { occ = compute(ms, o); if (key) cache.set(key, occ); }
     // (a magazine takes none itself, though it still shuts in what it sits against)
     const isMag = (o: THREE.Object3D | null) => { for (; o; o = o.parent) if (o.userData && (o.userData.slot === 'mag' || o.userData.part === 'mag')) return true; return false; };
+    if (o.direct) for (const m of ms) for (const mt of (Array.isArray(m.mesh.material) ? m.mesh.material : [m.mesh.material]) as any[]) if (mt && mt.isMeshStandardMaterial && !(mt.defines && mt.defines.AO_DIRECT !== undefined)) { mt.defines = Object.assign({}, mt.defines, { AO_DIRECT: '' }); mt.needsUpdate = true; } // (rooms lit by lamps with no shadows: the occlusion takes their light too)
     ms.forEach((m, i) => m.mesh.geometry.setAttribute('aOcc', new T.BufferAttribute(isMag(m.mesh) ? new Float32Array(m.n) : occ![i], 1)));
+    last = Math.round(performance.now() - t0);
   }
-  return { apply, compute: (g: THREE.Object3D) => compute(collect(g)) };
+  return { apply, GUN, SHIP, get lastMs() { return last; }, compute: (g: THREE.Object3D, o: Opts = GUN) => compute(collect(g), o) };
 })();
