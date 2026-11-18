@@ -107,9 +107,9 @@ def upper():
     pa, pb, pu0, pu1 = Fp(850), Fp(1062), -0.0032, 0.0113
     cut(up, prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2, 2.2 * mm, 4), 'x', (HWU - 4.0) * mm, (HWU + 1) * mm))
     # the lightening slots down the front, each side; the charging handle's track on the right
-    for xa, xb in ((1250, 1285), (1300, 1340), (1370, 1410)):
+    for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
         for s in (-1, 1):
-            cut(up, prism(rounded(Fp((xa + xb) / 2), Up(307), (Fp(xb) - Fp(xa)) / 2, 2.4 * mm, 2.2 * mm, 4), 'x', *xs(s * (HWU - 2.2) * mm, s * (HWU + 1) * mm)))
+            cut(up, prism(rounded(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 4), 'x', *xs(s * (HWU - 2.2) * mm, s * (HWU + 1) * mm)))
     cut(up, prism(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWU - 2.0) * mm, (HWU + 1) * mm))   # (the charging handle's channel, right, along the upper's upper half)
     # M-LOK at 3, 6 and 9 o'clock: three slots 32 x 7 mm at 29 mm centres, 3 mm deep, on each flank and the underside of the forend
     for f in (0.300, 0.329, 0.358):
@@ -120,9 +120,9 @@ def upper():
     # the openings read black: each recess gets a thin black liner on its floor (FN's channel, vents and M-LOK slots are through-cuts)
     def liner(poly, axis, a0, a1, slot='base'):
         o = K.tmp(prism(poly, axis, a0, a1)); smooth(o); K.adopt(o, slot, 'black')
-    for xa, xb in ((1250, 1285), (1300, 1340), (1370, 1410)):
+    for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
         for s in (-1, 1):
-            liner(rounded(Fp((xa + xb) / 2), Up(307), (Fp(xb) - Fp(xa)) / 2, 2.4 * mm, 2.2 * mm, 4), 'x', *xs(s * (HWU - 2.2) * mm, s * (HWU - 1.7) * mm))
+            liner(rounded(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 4), 'x', *xs(s * (HWU - 2.2) * mm, s * (HWU - 1.7) * mm))
     liner(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWU - 2.0) * mm, (HWU - 1.5) * mm)
     for f in (0.300, 0.329, 0.358):
         for s in (-1, 1): liner(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU - 2.5) * mm))
