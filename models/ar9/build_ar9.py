@@ -7,7 +7,8 @@ import os
 HERE = globals().get('GUN_DIR') or os.path.dirname(os.path.abspath(__file__))
 mm = 0.001
 CFG = {'lower': 'glock', 'forward_assist': False, 'deflector': False, 'port': (815, 935), 'stock': 'm4', 'grip': 'a2',
-       'hg': 'mlok', 'hg_len': 0.170, 'barrel': 0.200, 'gas': 0.140, 'thr_r': 6.3 * mm, 'muzzle_sc': 0.92, 'mag': 'glock'}
+       'hg': 'mlok', 'hg_len': 0.170, 'barrel': 0.200, 'gas': 0.140, 'thr_r': 6.3 * mm, 'muzzle_sc': 0.92, 'mag': 'glock',
+       'carrier': 0.075, 'mouth_r': 5.2 * mm, 'round': (0.0045, 0.026)}
 g = {'GUN_DIR': HERE, 'CFG': CFG}
 exec(open(os.path.join(os.path.dirname(HERE), 'ar_kit.py'), encoding='utf-8').read(), g)
 result = g['result']
