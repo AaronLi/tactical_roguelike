@@ -14,6 +14,9 @@ from mathutils import Vector, Matrix, geometry
 
 HERE = globals().get('FAL_DIR') or os.environ.get('FAL_DIR') or os.path.dirname(os.path.abspath(__file__))
 T = json.load(open(os.path.join(HERE, 'trace.json')))
+import sys
+sys.path.insert(0, os.path.join(HERE, '..'))
+from blender_kit import strip_ngons, slice_at_vertices, tidy as kit_tidy   # (the kit's cleaners: .claude/skills/modeling-practices)
 
 # photo pixels -> metres: the gun is 1090 mm long overall (FN's figure for the 50.00), 1929 px in the photo
 S = 1.090 / 1929
@@ -289,18 +292,18 @@ def no_swivel(name):
         out.append({'area': l['area'], 'pts': [p for p in l['pts'] if not (SW[0] < p[0] < SW[1] and p[1] > SW[2])]})
     T['parts'][name + '_main'] = out
     return loops_of(name + '_main')
-st = obj(slab(no_swivel('stock'), 0.046, 0.0135, 4), 'stock', 'polymer')
-widths(st, lambda f, u: ramp(f, F(140), F(560), 0.046, 0.032)); finish(st.data)
+st = obj(slab(no_swivel('stock'), 0.046, 0.0135, 2), 'stock', 'polymer')
+widths(st, lambda f, u: ramp(f, F(140), F(560), 0.046, 0.032)); slice_at_vertices(st, 'y', 4e-3); kit_tidy(st); finish(st.data)
 sv = obj(slab(loops_of('stock'), 0.007, 0.0008, 1), 'stock', 'black')
 clip(sv, [((0, F(SW[0]), 0), (0, -1, 0)), ((0, F(SW[1]), 0), (0, 1, 0)), ((0, 0, U(SW[2]) + 0.002), (0, 0, 1))]); finish(sv.data)
 
 # GRIP: polymer, an oval in section, a little fuller at the palm swell
-gr = obj(slab(loops_of('grip'), 0.031, 0.0115, 4), 'grip', 'polymer')
-widths(gr, lambda f, u: ramp(u, U(300), U(380), 0.027, 0.031)); finish(gr.data)
+gr = obj(slab(loops_of('grip'), 0.031, 0.0115, 2), 'grip', 'polymer')
+widths(gr, lambda f, u: ramp(u, U(300), U(380), 0.027, 0.031)); slice_at_vertices(gr, 'z', 4e-3); kit_tidy(gr); finish(gr.data)
 
 # RECEIVER (base): parkerised steel, machined flat sides with small radii; upper 30 mm, lower 34; the trigger guard
 # and trigger thin. The top from the rear sight to the receiver's front is the dust cover: a pressed steel arch.
-rc = obj(slab(loops_of('base'), 0.034, 0.0018, 2), 'base', 'park')
+rc = obj(slab(loops_of('base', 2.5), 0.034, 0.0018, 1), 'base', 'park')
 def w_rcv(f, u):
     if F(752) < f < F(862) and u < U(300): return 0.006 if F(770) < f < F(800) and u > U(345) else 0.009
     if F(866) < f < F(906) and u < U(297): return 0.014
@@ -315,7 +318,7 @@ cutters = [
     box(0.0165, 0.04, F(600), F(1092), U(282.5), U(281.5)),
     box(-0.04, -0.0135, F(930), F(1060), U(204), U(201)),          # the charging handle's slot (left)
 ]
-cut(rc, cutters); finish(rc.data)
+cut(rc, cutters); slice_at_vertices(rc, 'y'); kit_tidy(rc); finish(rc.data)
 rings = []
 top = [(F(px), U(col_run(px, 190)[0])) for px in range(COV[0], COV[1] + 1)]
 for f, t in rdp(top, 0.0004):                                      # (sections only where its top line bends)
@@ -341,9 +344,9 @@ obj(tube([(FH, 0.0050), (F1 - 0.003, 0.0050), (F1, 0.0046)], 24, 'y', (CH_AX, 0,
 obj(box(CH_AX + 0.0042, CH_AX + 0.0058, F1 - 0.014, F1 - 0.002, CH_Z - 0.001, CH_Z + 0.0035), 'base', 'gunmetal', pc_)                                  # (its extractor's claw)
 # pins, the takedown lever and the selector
 for px, py, r in ((748, 279, 0.0022), (796, 282, 0.0022), (831, 273, 0.0028)):
-    o = obj(tube([(-0.019, r * 0.8), (-0.018, r), (0.018, r), (0.019, r * 0.8)], 16, 'x', (0, F(px), U(py))), 'base', 'steel'); finish(o.data)
+    o = obj(tube([(-0.019, r * 0.8), (-0.018, r), (0.018, r), (0.019, r * 0.8)], 12, 'x', (0, F(px), U(py))), 'base', 'steel'); finish(o.data)
 for side in (-1, 1):
-    o = obj(tube([(0, 0.0045), (0.001, 0.0065), (0.0025, 0.0065), (0.0035, 0.0045)], 20, 'x', (side * 0.0168 - (0.0035 if side < 0 else 0), F(863), U(271))), 'base', 'black')
+    o = obj(tube([(0, 0.0045), (0.001, 0.0065), (0.0025, 0.0065), (0.0035, 0.0045)], 18, 'x', (side * 0.0168 - (0.0035 if side < 0 else 0), F(863), U(271))), 'base', 'black')
     finish(o.data)
 sel = obj(box(-0.0195, -0.0168, F(840), F(890), U(268), U(258)), 'base', 'black'); bevel(sel, 0.001, 1); finish(sel.data)
 
@@ -378,7 +381,7 @@ tb = obj(box(HX - 0.022, HX - 0.002, HF - 0.008, HF, HY - 0.005, HY + 0.005), 'b
 # MAGAZINE (part_mag): steel, 20 rounds, ribbed sides, a round on top
 MAG_F, MAG_U = (F(903) + F(1053)) / 2, U(298)
 pm = part('mag', (0, MAG_F, MAG_U)); pm['check'] = {'w': 0.028}
-mg = obj(slab(loops_of('mag'), 0.028, 0.0017, 2), 'mag', 'park', pm)
+mg = obj(slab(loops_of('mag'), 0.028, 0.0017, 1), 'mag', 'park', pm)
 rib = []
 for px in (936, 972, 1021):
     for s in (-1, 1): rib.append(box(s * 0.0128, s * 0.03, F(px) - 0.0016, F(px) + 0.0016, U(492), U(318)))
@@ -401,7 +404,7 @@ for side in (1,):
         x = -side * 0.004
         g = box(x - 0.0026, x + 0.0026, -0.0016, 0.0016, -0.0028, 0.0028); g.transform(Matrix.Translation((0, y, z)) @ Matrix.Rotation(ang, 4, 'X'))
         rib.append(g); wins.append((i - 1, t, side, (y, z), ang, nF, nU))
-cut(mg, rib); finish(mg.data)
+cut(mg, rib); kit_tidy(mg); finish(mg.data)
 for i, t, side, (y, z), ang, nF, nU in wins:
     x = -side * 0.004
     o = obj(box(x - 0.0024, x + 0.0024, -0.0003, 0.0003, -0.0026, 0.0026), 'mag', 'brass', pm)
@@ -423,14 +426,14 @@ for k, (x, z) in enumerate(((0.0, LIPS - 0.0035), (0.0052, LIPS - 0.0035 - 0.008
     if k == 0: cs['chk'] = {'role': 'top', 'i': 0}; tp['chk'] = {'role': 'top', 'i': 1}
 
 # HANDGUARD: polymer, rounded, three vent slots a side, a long groove and vent holes along the bottom
-hg = obj(slab(loops_of('handguard'), 0.050, 0.019, 5), 'handguard', 'polymer')   # an oval in section (its front end's view)
+hg = obj(slab(loops_of('handguard'), 0.050, 0.019, 3), 'handguard', 'polymer')   # an oval in section (its front end's view)
 hc = []
 for a, b in ((1327, 1372), (1394, 1439), (1459, 1504)):
     for s in (-1, 1): hc.append(box(s * 0.006, s * 0.04, F(a), F(b), U(192), U(182)))      # (through, into the barrel channel)
 for s in (-1, 1): hc.append(box(s * 0.0236, s * 0.04, F(1135), F(1520), U(236), U(229)))
 for px in (1180, 1370, 1430, 1495):
     hc.append(tube([(-0.04, 0.0022), (0.04, 0.0022)], 12, 'x', (0, F(px), U(257))))
-cut(hg, hc); finish(hg.data)
+cut(hg, hc); kit_tidy(hg, 0.1e-3); finish(hg.data)
 # the front sling swivel
 o = obj(box(-0.0015, 0.0015, F(1505), F(1520), U(268), U(258)), 'handguard', 'black'); finish(o.data)
 # (the traced handguard runs 234.5 mm to the gas block; the longest the platform takes is 231.5 (hgMax): scaled to 230.5 mm from its rear)
@@ -477,12 +480,12 @@ for px in range(1880, 2022, 2):
     r = col_run(px, PY0); mp.append((F(px), (r[1] - r[0] + 1) / 2 * S if r else 0.0095))
 MZ = F(2021)
 mp = [(mp[0][0], 0.0085)] + mp + [(MZ, mp[-1][1] * 0.94), (MZ, 0.0042), (MZ - 0.03, 0.0042)]
-mz = obj(lathe(mp, 18), 'muzzle', 'black')
+mz = obj(lathe(mp, 18, eps=0.0003), 'muzzle', 'black')
 sl = []
 for i in range(6):
     a = 2 * math.pi * i / 6 + math.pi / 6
     c = box(-0.0013, 0.0013, F(1950), F(2012), 0.004, 0.02); c.transform(Matrix.Rotation(a, 4, 'Y')); sl.append(c)
-cut(mz, sl); finish(mz.data)
+cut(mz, sl); kit_tidy(mz); finish(mz.data)
 
 # =====================================================================================================================
 # the anchors the game needs (docs/models.md), in its [forward, up, right] metres
