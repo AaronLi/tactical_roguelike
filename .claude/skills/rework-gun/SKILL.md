@@ -17,7 +17,8 @@ rendered model coincides with it. Gameplay stats never change here, only the loo
 
 ## 2. References
 
-- Look, don't remember. View photos in the built-in browser only (`mcp__Claude_Browser__*`); never download them. Commons
+- Look, don't remember. Photos may be viewed in any browser (the pane, or headless Chromium when the pane is full) and
+  downloaded to the scratchpad; never commit them. A full pane is no reason to skip the photos. Commons
   thumbnails are CORS-enabled: from a localhost page, fetch
   `https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrsearch=...&prop=imageinfo&iiprop=url|size&iiurlwidth=1920`,
   then load the thumbnail with `crossOrigin='anonymous'` into a canvas. IMFDB, makers and auction houses are good too, but
@@ -263,7 +264,7 @@ Browser traps: pass your tabId on every call and check `location.href` first, be
 
 Browser quirks: screenshots go stale, so wait about 2 s and hover somewhere new first. `javascript_tool` times out at 45 s, so
 run long loops in the background and poll a `window` variable. To get images out, POST them to a throwaway Node server in the
-scratchpad; never trigger a download.
+scratchpad, or save them there directly.
 
 ## 5. Finish a gun
 
