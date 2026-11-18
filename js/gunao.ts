@@ -14,6 +14,9 @@ export const GunAo = (() => {
   /** What a thing's occlusion is made of: how far a ray reaches (m), how many rays, the finest cell (m) and the most cells along its longest side, the longest an edge may be before it is split (m), how much the shut-in share is scaled and its cap. */
   interface Opts { reach: number; rays: number; cell: number; cells: number; edge: number; strength: number; max: number; direct: boolean; async: boolean; adaptive: boolean; fine: number; tol: number }
   const GUN: Opts = { reach: 0.045, rays: 14, cell: 0.003, cells: 300, edge: 0.04, strength: 3.2, max: 0.9, direct: false, async: false, adaptive: true, fine: 0.003, tol: 0.2 };
+  /** A gun's far levels of detail (models/lod_kit.py: level 2 on): the same rays, but no triangle is split: each vertex the level has takes its own occlusion and that is all (a split
+   *  would put back the triangles the level took out: an M4's 20 m level 1,033 -> 3,966). edge 0: nothing is split. */
+  const GUN_FAR: Opts = { ...GUN, adaptive: false, edge: 0, fine: 0, tol: 0 };
   /** The squad's ship (inside and out): rooms and hull plates metres across, so a ray reaches a metre and a half, cells of 8 cm. */
   const SHIP: Opts = { reach: 1.5, rays: 16, cell: 0.08, cells: 400, edge: 0.7, strength: 1.4, max: 0.75, direct: true, async: true, adaptive: false, fine: 0, tol: 0 };
   const cache = new Map<string, Float32Array[]>();
@@ -280,7 +283,7 @@ export const GunAo = (() => {
    * worked out a few ms a frame (a ship: a couple of seconds all told), and takes hold when it's done.
    */
   function apply(group: THREE.Object3D, key?: string, o: Opts = GUN, layers?: THREE.Object3D[][]) {
-    const t0 = performance.now(), ms = collect(group, o.adaptive ? null : o);
+    const t0 = performance.now(), ms = collect(group, o.adaptive || !(o.edge > 0) ? null : o);
     if (!ms.length) return;
     const same = (a: Float32Array[] | undefined) => !!a && a.length === ms.length && a.every((x, i) => x.length === ms[i].n);
     // (a magazine takes none itself, though it still shuts in what it sits against)
@@ -339,5 +342,5 @@ export const GunAo = (() => {
     if (!same(occ)) { occ = compute(ms, o); if (key) cache.set(key, occ); }
     put({ base: occ! });
   }
-  return { apply, GUN, SHIP, get lastMs() { return last; }, compute: (g: THREE.Object3D, o: Opts = GUN) => compute(collect(g), o) };
+  return { apply, GUN, GUN_FAR, SHIP, get lastMs() { return last; }, compute: (g: THREE.Object3D, o: Opts = GUN) => compute(collect(g), o) };
 })();

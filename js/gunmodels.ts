@@ -138,10 +138,17 @@ export const GunModels = (() => {
   function worldProtoOf(def: any) {
     let proto = worldCache.get(def.code);
     if (!proto) {
-      const a = Models.assemble(def);
+      // from the pieces' levels of detail (tools/model_lod.mjs): level 1 is the third-person gun, levels 2 and 3 take its place by distance
+      // (Viewmodel.worldLods). A build with no levels baked is the pieces themselves, at every distance.
+      const a = Models.assemble(def, undefined, 1);
       if (!a) return null;
-      GunAo.apply(a.group, def.code);
+      GunAo.apply(a.group, a.lod ? undefined : def.code);
       proto = Viewmodel.worldProto(a.group, a.info); // (takes the assembled model apart: nothing else holds it)
+      if (a.lod) {
+        const far: ReturnType<typeof Viewmodel.worldProto>[] = [];
+        for (let n = 2; n <= 3; n++) { const b = Models.assemble(def, undefined, n); if (!b || !b.lod) break; GunAo.apply(b.group, undefined, GunAo.GUN_FAR); far.push(Viewmodel.worldProto(b.group, b.info)); } // (GUN_FAR: no triangle is split for the occlusion, which would put back what the level took out)
+        Viewmodel.worldLods(proto, far);
+      }
       worldCache.set(def.code, proto);
     }
     return proto;

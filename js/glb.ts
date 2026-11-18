@@ -1255,6 +1255,9 @@ function contractMarkdown(): string {
     })));
     return p;
   };
+  /** A piece's levels of detail (tools/model_lod.mjs: <file>.lod<n>.glb beside it, n 1..LOD_LEVELS; the third-person gun is built from them). */
+  const LOD_LEVELS = 3, lodFile = (file: string, lod: number) => file.replace(/\.glb$/, '.lod' + lod + '.glb');
+  const inBundle = (url: string) => { const B: any = BundlesEnv.Bundles; return !!B && typeof B.has === 'function' && B.has(url); };
   const packUrl = (id: string, file: string) => PARTS_BASE + (file.startsWith(SHARED_DIR) ? '' : id + '/') + file; // (a shared pack is one file for every platform)
   // ---- the parse queue: what is needed now jumps what is only wanted soon ----
   // Every file is already in memory (the one model bundle, js/modelbundles.ts), so nothing here waits on the network: the queue only schedules glTF PARSING,
@@ -1295,7 +1298,12 @@ function contractMarkdown(): string {
     const ok = await glbReady(); if (!ok) return false;
     const ix = await platformIndex(def.id); if (!ix) return false;
     const plan = planBuild(ix, buildOf(def));
-    const r = await Promise.all(plan.tags.filter((t) => t.entry).map((t) => loadPack(def.id, t.entry!.file!, pri)));
+    const files = plan.tags.filter((t) => t.entry).map((t) => t.entry!.file!);
+    // (and the pieces' levels of detail, where the bundle has them: a level that is missing or fails is not an error, the piece itself stands in)
+    const lods: Promise<boolean>[] = [];
+    for (const f of files) for (let n = 1; n <= LOD_LEVELS; n++) { const lf = lodFile(f, n); if (inBundle(packUrl(def.id, lf))) lods.push(loadPack(def.id, lf, pri)); }
+    const r = await Promise.all(files.map((f) => loadPack(def.id, f, pri)));
+    await Promise.all(lods);
     return r.every((x) => x);
   }
   /** Loads the platform's index and EVERY pack of it (or only those of the given builds' tags if `builds` is given); resolves to the number of packs loaded. */
@@ -1324,13 +1332,14 @@ function contractMarkdown(): string {
    * pivots, info with the muzzles list, the mounts and info.anim), or null if the platform's index or a pack it needs is not loaded
    * (ensure / preloadPlatform) or the packs do not cover the build (a combination the baker never saw).
    */
-  function assemble(def: any, skin?: any): { group: THREE.Group; info: any; approx?: string } | null {
+  function assemble(def: any, skin?: any, lod = 0): { group: THREE.Group; info: any; approx?: string; lod?: boolean } | null {
     const ix = def && platIx.get(def.id); if (!ix) return null;
     const plan = planBuild(ix, buildOf(def));
     const T = THREE, group = new T.Group();
     interface Src { root: THREE.Object3D; rigid: Vec3; scale?: number; rear?: number }
     const srcs: Src[] = [];
-    for (const t of plan.tags) { const root = packRoots.get(packUrl(def.id, t.entry.file)); if (!root) return null; srcs.push({ root, rigid: [t.rigid[0] + t.at[0], t.rigid[1] + t.at[1], t.rigid[2] + t.at[2]], scale: t.scale, rear: t.rear }); }
+    let lodUsed = false; // (lod 1..LOD_LEVELS: each piece's file of that level where it is loaded, the piece itself where not)
+    for (const t of plan.tags) { let root = packRoots.get(packUrl(def.id, t.entry.file)); if (!root) return null; if (lod) { const lr = packRoots.get(packUrl(def.id, lodFile(t.entry.file, lod))); if (lr) { root = lr; lodUsed = true; } } srcs.push({ root, rigid: [t.rigid[0] + t.at[0], t.rigid[1] + t.at[1], t.rigid[2] + t.at[2]], scale: t.scale, rear: t.rear }); }
     /** A point of the pack's frame (glTF axes) moved to where it sits in this build. */
     const op = (s: Src, x: number, y: number, z: number, out: THREE.Vector3) => out.set(x + s.rigid[2], y + s.rigid[1], z - s.rigid[0]);
     const fin = new Map<string, THREE.Vector3>(), nodes = new Map<string, THREE.Group>(), parentOf = new Map<string, string>(), tmp = new T.Vector3();
@@ -1368,7 +1377,7 @@ function contractMarkdown(): string {
     const info = plan.info; info.anim = {}; // (the tables' and the anchors' info: the same as infoOf(def) gives, with the live nodes in anim)
     for (const [name, node] of nodes) if (name.startsWith(NAMES.partPrefix) && node.userData[NAMES.extras.part]) info.anim[node.userData[NAMES.extras.part]] = node;
     if (skin && skin.length) Stickers.decorate(group, skin);
-    return plan.approx ? { group, info, approx: plan.approx } : { group, info };
+    return plan.approx ? { group, info, approx: plan.approx, lod: lodUsed } : { group, info, lod: lodUsed };
   }
   /**
    * The build's `info` from the platform's index alone: no pack files, no meshes, synchronous (once the platform's index.json is loaded:

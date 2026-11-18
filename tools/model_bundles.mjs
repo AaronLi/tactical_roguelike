@@ -107,6 +107,7 @@ export function check(models, B) {
   // the squad's ships (tools/bake_ships.mjs): ships/index.json names each one's glTF
   const shf = path.join(models, 'ships/index.json');
   if (fs.existsSync(shf)) { let sx = null; try { sx = JSON.parse(fs.readFileSync(shf, 'utf8')); } catch { errs.push('ships/index.json is not JSON'); } if (sx) for (const [k, e] of Object.entries(sx.ships || {})) if (e.file) resolve('ships/' + e.file, `ships/index.json ${k}`); }
+  for (const p of [...named]) for (let n = 1; n <= 9; n++) { const l = p.replace(/\.glb$/, '.lod' + n + '.glb'); if (l !== p && files.has(l)) named.add(l); } // (a piece's levels of detail: tools/model_lod.mjs)
   for (const p of files.keys()) if (!named.has(p) && !p.endsWith('/index.json')) errs.push(`orphan: ${p} in bundle ${B.NAME} is named by no index`);
   return errs;
 }
