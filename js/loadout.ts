@@ -139,6 +139,9 @@ export const Loadout = (() => {
     return g;
   }
   // ---- attachments. A gun's: each kind of part by its own challenge with the gun, a part of tier t when the count reaches the t-th of n
+  // ATT_PACE: how much slower than the counts in the two tables below attachments are earned (every count of theirs times this, a gun's and a piece of gear's:
+  // it was 1, and the first parts came inside a mission or two: a headshot or three, a few kills). Rounded, never under one.
+  const ATT_PACE = 2, pace = (n: number) => Math.max(1, Math.round(n * ATT_PACE));
   const ATT: Record<string, { stat: string; what: string; n: number[] }> = {
     optic: { stat: 'hs', what: 'headshot kills', n: [3, 10, 20, 35] }, muzzle: { stat: 'kills', what: 'kills', n: [8, 20, 35, 50] },
     barrel: { stat: 'far', what: 'kills past 20 m', n: [3, 8, 15, 25] }, handguard: { stat: 'kills', what: 'kills', n: [5, 15, 30, 45] },
@@ -168,7 +171,7 @@ export const Loadout = (() => {
         const k = GS.kindOf(s.slot), A = ATT[k]; if (!A || (only && only !== s.slot)) continue;
         for (const p of GS.LIST) {
           if (p.id === b[s.slot] || p.factory || p.retired || p.variant || p.becomes || GS.plainHere(p, id) || !GS.fitsSlot(s, p, id, b)) continue;
-          const stat = A.stat, n = A.n[Math.min(3, Math.max(0, (p.tier || 1) - 1))], have = count(slot, id, stat);
+          const stat = A.stat, n = pace(A.n[Math.min(3, Math.max(0, (p.tier || 1) - 1))]), have = count(slot, id, stat);
           out.push({ k: s.slot, id: p.id, name: p.name, pts: Math.max(1, pts(GS.buyPrice(p))) + (slot === 's' ? PISTOL_ATT_UP[p.id === 'gr.derringer.stock' ? 'stock' : k] || 0 : 0), open: open(slot, id) && have >= n, stat, what: A.what, n, have: Math.min(n, have) });
         }
       }
@@ -177,7 +180,7 @@ export const Loadout = (() => {
       for (const k of mounts) {
         if (only && only !== k) continue;
         for (const g of Gear.LIST.filter((x) => x.kind === k && !LO_OFF.includes(x.id))) {
-          const q = GEAR_ATT[k][Math.min(GEAR_ATT[k].length - 1, Math.max(0, (g.tier || 1) - 1))], have = count(slot, id, q.stat);
+          const q0 = GEAR_ATT[k][Math.min(GEAR_ATT[k].length - 1, Math.max(0, (g.tier || 1) - 1))], q = { ...q0, n: pace(q0.n) }, have = count(slot, id, q.stat);
           out.push({ k, id: g.id, name: g.name, pts: Math.max(1, pts(g.price, k === 'plate' ? PLATE_PER : 400)), open: open(slot, id) && have >= q.n, stat: q.stat, what: q.what, n: q.n, have: Math.min(q.n, have) });
         }
       }
