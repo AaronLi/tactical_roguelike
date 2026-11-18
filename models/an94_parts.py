@@ -44,7 +44,7 @@ def write_part(slot, pid, objs, origin, anchors, cfg):
 # the stock: origin the gun's mount_stock [0, UY(578) - 3 mm]
 so = (0.0, UY(578) * mm - 0.003)
 write_part('stock', 'an94_folding', slot_meshes('stock'), so,
-           {'butt': r4([FX(20) * mm - so[0], UY(700) * mm - so[1], 0]), 'cheek': r4([FX(300) * mm - so[0], UY(578) * mm - so[1], 0])},
+           {'butt': r4([FX(20) * mm - so[0], UY(720) * mm - so[1], 0]), 'cheek': r4([FX(300) * mm - so[0], UY(578) * mm - so[1], 0])},
            {'part': {'mount': 'ak', 'position': 'unfolded (the AN-94 side-folder, 258 mm, solid polymer)'}, 'replaces': ['AN-94 side-folding stock']})
 # the grip: origin the gun's mount_grip
 go = (FX(590) * mm, k['SHELF'] * mm)
