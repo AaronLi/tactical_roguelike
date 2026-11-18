@@ -178,7 +178,7 @@ export const GunAo = (() => {
     };
     const d2 = (a: Float32Array, b: Float32Array) => { const x = a[po] - b[po], y = a[po + 1] - b[po + 1], z = a[po + 2] - b[po + 2]; return x * x + y * y + z * z; };
     const mid = (a: Float32Array, b: Float32Array) => { const r = new Float32Array(W); for (let k = 0; k < stride; k++) r[k] = (a[k] + b[k]) / 2; const l = Math.hypot(r[no], r[no + 1], r[no + 2]) || 1; r[no] /= l; r[no + 1] /= l; r[no + 2] /= l; r[stride] = aoOf(r); return r; };
-    const big = o.edge * o.edge, small = o.fine * o.fine, tol = o.tol, dark = o.max - 0.05;   // (dark: as shut in as a vertex gets)
+    const big = o.edge * o.edge, small = o.fine * o.fine, tol = o.tol, dark = o.max - 0.05, SAMPLE = o.edge / 2;   // (dark: as shut in as a vertex gets; SAMPLE: how far apart a long edge's occlusion is read)
     let out = new Float32Array(cnt * W * 2), n = 0;
     const emit = (a: Float32Array, b: Float32Array, c: Float32Array) => { if (n + W * 3 > out.length) { const r = new Float32Array(out.length * 2); r.set(out); out = r; } out.set(a, n); out.set(b, n + W); out.set(c, n + W * 2); n += W * 3; };
     const sub = (t: number, k: number) => cur.subarray((t * 3 + k) * W, (t * 3 + k + 1) * W);
@@ -195,6 +195,26 @@ export const GunAo = (() => {
           // dark too; uniformly dark faces were 41% of an M4's triangles after the split and added nothing)
           const mab = mid(a, b), mbc = mid(b, c), mca = mid(c, a);
           if (Math.min(mab[stride], mbc[stride], mca[stride]) >= dark) split = false;
+        }
+        if (split && mx > big) {
+          // (a long triangle, a barrel's or tube's facet, a rail's flank: it used to be cut to 4 cm whatever its occlusion did, so
+          // long parts grew x5-19. Now its occlusion is read every 2 cm along each long edge and at points inside it, and it's cut only
+          // if that doesn't follow its corners: a shadow line across it is still found, an evenly lit stretch stays whole)
+          const at = (p: Float32Array, q: Float32Array, t: number) => { const r = new Float32Array(W); for (let k = 0; k < stride; k++) r[k] = p[k] + (q[k] - p[k]) * t; const l = Math.hypot(r[no], r[no + 1], r[no + 2]) || 1; r[no] /= l; r[no + 1] /= l; r[no + 2] /= l; return aoOf(r); };
+          let err = 0;
+          for (const [p, q] of [[a, b], [b, c], [c, a]] as Float32Array[][]) {
+            const L = Math.sqrt(d2(p, q)), n = Math.ceil(L / SAMPLE);
+            for (let i = 1; i < n && err <= tol; i++) { const t = i / n; err = Math.max(err, Math.abs(at(p, q, t) - (p[stride] + (q[stride] - p[stride]) * t))); }
+            if (err > tol) break;
+          }
+          if (err <= tol) {   // (and inside: its middle and halfway from it to each corner)
+            const cen = new Float32Array(W); for (let k = 0; k < stride; k++) cen[k] = (a[k] + b[k] + c[k]) / 3;
+            cen[stride] = (a[stride] + b[stride] + c[stride]) / 3;
+            for (const p of [a, b, c]) { const e = Math.abs(at(cen, p, 0.5) - (cen[stride] + p[stride]) / 2); if (e > err) err = e; }
+            const l = Math.hypot(cen[no], cen[no + 1], cen[no + 2]) || 1; cen[no] /= l; cen[no + 1] /= l; cen[no + 2] /= l;
+            err = Math.max(err, Math.abs(aoOf(cen) - cen[stride]));
+          }
+          split = err > tol;
         }
         if (!split && mx <= big) { // (does the occlusion in the middle of an edge, and at the face's middle, follow the corners'?)
           const mab = mid(a, b), mbc = mid(b, c), mca = mid(c, a);
