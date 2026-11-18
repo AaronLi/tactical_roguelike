@@ -13,7 +13,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { pack, gzip, hashOf } from './model_bundles.mjs';
+import { pack, rawSize, hashOf } from './model_bundles.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url)), synth = join(root, 'tools/contact-synth');
 const argv = process.argv.slice(2), force = argv.includes('--force');
@@ -45,12 +45,12 @@ for (const b of BANKS) {
 }
 
 // the bundle: every file of both banks (their manifests and clips), as paths below assets/audio/, in byte order
-const audio = join(root, 'assets/audio'), bdir = join(audio, 'bundles'), FORMAT = 1;
+const audio = join(root, 'assets/audio'), bdir = join(audio, 'bundles'), FORMAT = 2;
 if (baked || !existsSync(join(bdir, 'audio.rtb')) || !existsSync(join(bdir, 'manifest.json'))) {
   const list = BANKS.flatMap((b) => files(join(root, b.out))).map((f) => relative(audio, f).split(String.fromCharCode(92)).join('/')).filter((p) => !p.endsWith('/.inputs')).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  const raw = pack(list.map((p) => [p, readFileSync(join(audio, p))])), z = gzip(raw), h = hashOf(z);
+  const packed = list.map((p) => [p, readFileSync(join(audio, p))]), raw = { length: rawSize(packed) }, z = pack(packed), h = hashOf(z);
   mkdirSync(bdir, { recursive: true });
   writeFileSync(join(bdir, 'audio.rtb'), z);
   writeFileSync(join(bdir, 'manifest.json'), JSON.stringify({ v: FORMAT, hash: h, size: z.length }) + '\n');
-  console.log(`audio bundle: ${list.length} files, ${(raw.length / 1048576).toFixed(2)} MB, ${(z.length / 1048576).toFixed(2)} MB gzipped, hash ${h}`);
+  console.log(`audio bundle: ${list.length} files, ${(raw.length / 1048576).toFixed(2)} MB, ${(z.length / 1048576).toFixed(2)} MB in gzipped chunks, hash ${h}`);
 } else console.log('audio bundle: up to date');

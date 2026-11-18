@@ -1,6 +1,7 @@
 // Negative tests for the model bundle (tools/model_bundles.mjs): a tiny fake models folder is bundled, must check clean and bundle byte-identically
 // twice, and each way of breaking it must be reported.  node tools/bundle_models.test.mjs
 import fs from 'fs'; import os from 'os'; import path from 'path';
+import zlib from 'zlib';
 import { loadBundles, writeBundles, check, readBundle, pack, gzip, hashOf } from './model_bundles.mjs';
 
 const B = loadBundles(); let failed = 0, ran = 0;
@@ -39,7 +40,8 @@ ok('same input, byte-identical bundle and manifest', fs.readFileSync(bf(r1)).equ
 const all = readBundle(bf(r1), B);
 ok('guns/ and the bake reports are not in the bundle', ![...all.keys()].some((p) => p.startsWith('guns/') || p === 'parts/index.json'));
 ok('the reader slices a file out', all.get('parts/aa/barrel/a.glb').toString() === 'glb-a' && all.get('parts/_shared/optic/s.glb').toString() === 'shared' && all.get('props/quarrel.glb').toString() === 'q');
-ok('the container is read raw too', (() => { const raw = pack([['x', Buffer.from('hello')], ['y', Buffer.from('w')]]); const f = path.join(r1, 'raw.rtb'); fs.writeFileSync(f, raw); const m = readBundle(f, B); return m.get('x').toString() === 'hello' && m.get('y').toString() === 'w' && gzip(raw)[9] === 255; })());
+ok('files are chunked by what is read together, a chunk unpacked on its own', (() => { const big = Buffer.alloc(700, 7), fl = [['parts/aa/index.json', Buffer.from('{}')], ['parts/aa/barrel/a.glb', big], ['parts/aa/barrel/a.lod1.glb', Buffer.from('lod')], ['parts/aa/barrel/b.glb', big], ['parts/bb/index.json', Buffer.from('[]')], ['props/q.glb', Buffer.from('q')]]; const z = pack(fl, { max: 1000 }), f = path.join(r1, 'chunks.rtb'); fs.writeFileSync(f, z); const m = readBundle(f, B), h = B.head(new Uint8Array(z.buffer, z.byteOffset, 8)), toc = B.toc(JSON.parse(zlib.gunzipSync(z.subarray(h.from, h.to)).toString('utf8')), h.base, z.length); fs.unlinkSync(f); const ch = (p) => toc.files.get(p)[0]; return fl.every(([p, b]) => m.get(p).equals(b)) && z.subarray(0, 4).toString('latin1') === 'RTB2' && ch('parts/aa/index.json') === ch('parts/bb/index.json') && ch('parts/aa/barrel/a.glb') !== ch('parts/aa/barrel/b.glb') && ch('parts/aa/barrel/a.lod1.glb') !== ch('parts/aa/barrel/a.glb') && ch('props/q.glb') !== ch('parts/aa/index.json') && toc.chunks.every((c) => c[0] === 'gzip') && gzip(big)[9] === 255; })());
+{ const z = pack([['x', Buffer.from('hello')]]); const cutf = path.join(r1, 'cut.rtb'); fs.writeFileSync(cutf, z.subarray(0, z.length - 3)); let msg = ''; try { readBundle(cutf, B); } catch (e) { msg = e.message; } fs.unlinkSync(cutf); ok('a container cut short does not read', /past the end/.test(msg), msg); }
 { const old = tree(); put(old, 'bundles/aa.rtb', 'old per-platform bundle'); writeBundles(old, B); ok('old per-platform bundles are removed when rebundling', !fs.existsSync(path.join(old, 'bundles', 'aa.rtb')) && errsOf(old).length === 0); }
 
 // negative: each break is reported
@@ -57,7 +59,7 @@ ok('the container is read raw too', (() => { const raw = pack([['x', Buffer.from
 
 // the hash manifest the game fetches: { v: FORMAT (3), hash, size }
 { const r = tree(); writeBundles(r, B); const m = JSON.parse(fs.readFileSync(mf(r), 'utf8'));
-  ok('manifest: v ' + B.FORMAT + ', a 16-hex hash, the gzipped size', m.v === B.FORMAT && B.FORMAT === 3 && /^[0-9a-f]{16}$/.test(m.hash) && m.size === fs.statSync(bf(r)).size && Object.keys(m).sort().join() === 'hash,size,v', JSON.stringify(m));
+  ok('manifest: v ' + B.FORMAT + ', a 16-hex hash, the size of the file', m.v === B.FORMAT && B.FORMAT === 4 && /^[0-9a-f]{16}$/.test(m.hash) && m.size === fs.statSync(bf(r)).size && Object.keys(m).sort().join() === 'hash,size,v', JSON.stringify(m));
   ok('manifest: hash is of the .rtb bytes', m.hash === hashOf(fs.readFileSync(bf(r))));
   const r3 = tree(); put(r3, 'parts/aa/barrel/a.glb', Buffer.from('other')); writeBundles(r3, B); const m3 = JSON.parse(fs.readFileSync(mf(r3), 'utf8'));
   ok('manifest: any changed file gives a new hash', m3.hash !== m.hash); }
