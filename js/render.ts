@@ -255,6 +255,9 @@ export const R = {
   // How finely the 3D is drawn: a percentage (33 to 100) of the screen's own resolution, each way. The picture is stretched
   // to the window; the ReplayEnv.HUD and the menus are the page's own and stay sharp. (The settings' "Render resolution": js/game.ts)
   basePR: 1, scalePct: 100,
+  // ambient occlusion (js/lightgrid.ts: the floor plan's open share round a spot darkens the foot of the walls and the corners): 0 off, 1 as made
+  aoK: 1,
+  setAO(k: number) { this.aoK = Math.max(0, Math.min(1.5, k || 0)); LightGrid.U.lgAo.value.x = this.aoK; },
   setScale(pct: number) {
     this.scalePct = Math.max(33, Math.min(100, Math.round(pct) || 100));
     if (!this.renderer) return;
