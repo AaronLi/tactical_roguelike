@@ -119,6 +119,46 @@ memory, and then ask which configuration the game wants: the game's shooter is r
   `G.R.vm` must have the node and `G.R.vm.userData.info.anim` its key (the Mk18 has catch, ch, mag), and it must move during a rack
   (`G.Me.startReload()` with a full magazine and an empty chamber). The SCAR's handle was in the model and not in the game.
   A rifle's bolt carrier seen through its port is `part_carrier` with `info.carrier.travel` (and `chamberAt` side `port`, so the game draws no plate or bolt of its own): it must run back and home on a shot, back with the handle on a rack, and stay back on an empty magazine until the release (the SCARs).
+- **Folding irons fold toward the shooter.** Both the rear leaf and the front post fold back (toward the stock), flat over their
+  bases; check the folded state in a close-up, not just that it's lower.
+- **The port where the gun has it.** Place the ejection port from the photo against the magazine well and the chamber (the FAL's
+  sits over the magazine, not behind it), and give the carrier the travel the handle really has.
+
+**What the bolt-carrier and handling round kept getting wrong** (each one a round trip with the user; check every one before
+showing anything):
+- **A carrier looks like a carrier.** What shows in the open port is the round carrier body (grooves, gas-key land) running into
+  a steel bolt head (locking-lug ring, chamfered face, extractor claw), an AK's milled carrier block, an HK's bolt head with a
+  locking roller. A dark ribbed plate reads as a dust cover. An AR's dust cover is its own part (`part_dust`, hinged, shut at rest,
+  open on any charge, rack, release, press check or hold-open, shut on plain shots).
+- **The chambered round by calibre, case forward.** Size the round from the gun's cartridge (7.62x51: 71 mm overall, 51 mm case;
+  5.56: 57/45; 7.62x39: 56/39; 9 mm: 29/19), never one rifle size for all. The case mouth sits at the chamber mouth, so the bullet
+  is inside the barrel: a press check showing a bullet tip in the port means the round is too far back, reversed or the wrong
+  length (the SCAR-H and SCAR-L did).
+- **A press check is a partial pull.** It draws the carrier only far enough to show the case's bottom half in the port (about
+  0.45 of the case length), never far enough that the round could eject (the MP5's first pull could). A rack keeps the full
+  stroke. Check it from the player's eye: the FAMAS's first press check showed nothing.
+- **The hand follows the handle the whole stroke.** The support hand's grip point is the handle in the gun's own frame, minus
+  the current pull, so at the press check's furthest point the fingers are still on the handle (the SCAR's index stayed at the
+  front of the slot while the knob went back).
+- **Hand poses by handle**, each from the user's own description; a new pose gets its own `FP` entry rather than bending a shared
+  one, and never changes another gun's:
+  - AR rear T-handle: a fist, palm down, knuckles toward the muzzle; the index hooks the left latch wing and pulls, the thumb
+    pinches it from behind. Never the palm on the T (it clipped through the gun).
+  - SCAR's left side knob: the same fist at the knob, the index curled round the knob's front, the thumb behind.
+  - AK's right side handle: the hand reaches under the gun to the right side, knuckles up, palm to the receiver, the four
+    fingers relaxed and extended along it, the thumb on the handle doing the pull; the elbow low so the forearm clears the
+    magazine and the receiver's bottom; the muzzle tipped slightly down.
+  - FAMAS's top handle under the carry handle: a fist, palm facing the gun's right, pointing forward and a little right, only
+    the index hooked on the handle; the other fingers curled tight. Its inspect swing stays small.
+  - MP5's bolt drop after a reload: the open, flat hand slaps the cocking lever out of its notch with the heel of the palm and
+    carries through past it (down and forward), on a gun brought back nearly level after the magazine goes in. Never a grab.
+  Don't guess a rotation the user words loosely ("left 90"): if it reads two ways, say which you took and why.
+- **See the hand on the part.** A render that doesn't show the fingers on the handle proves nothing, and the reports that
+  "couldn't confirm" were most of the rework. For every handling pose capture, in the game (not Blender, not the third-person
+  world model): the player's camera at mid-pull at a normal viewport size, and close-ups from the left (or right), above and
+  behind, 0.2 m from the handle, with the handle and the working finger both in frame, at mid-rack and at the press check's
+  furthest point. If the pose's framing hides it (a rack pitches the receiver out of view), move the camera, not the claim. Say
+  which way the palm faces and which digit is on the handle in each frame.
 - **Shared parts reach other guns.** A rebuilt shared part (the SCAR folding stock) changes every gun that can take it: the FAL's
   golden and tests/model-golden.json go stale. Say so when reporting, and leave those updates for the user to approve.
 
