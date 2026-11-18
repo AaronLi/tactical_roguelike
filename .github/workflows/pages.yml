@@ -93,6 +93,9 @@ jobs:
       # ---- main (main/)
       - run: npm ci
         working-directory: main
+      # (Rust for its WebAssembly module, when it has one: its npm run build makes it, and fails without Rust on CI)
+      - name: Rust, main (its WebAssembly module)
+        run: if [ -f main/wasm/acoustics/rust-toolchain.toml ]; then cd main/wasm/acoustics && rustup toolchain install; fi
       - name: Baked audio, main (cache)
         uses: actions/cache@v4
         with:
@@ -117,6 +120,10 @@ jobs:
       - run: npm ci
         if: env.PUBLISH_SPACE == 'true'
         working-directory: space
+      # (Rust for its WebAssembly module, when it has one: its npm run build makes it; a branch without wasm/acoustics needs none)
+      - name: Rust, the space branch (its WebAssembly module)
+        if: env.PUBLISH_SPACE == 'true'
+        run: if [ -f space/wasm/acoustics/rust-toolchain.toml ]; then cd space/wasm/acoustics && rustup toolchain install; fi
       - name: No cloud saves in the experimental copy
         if: env.PUBLISH_SPACE == 'true'
         working-directory: space
