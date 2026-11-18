@@ -288,7 +288,7 @@ def irons():
     bevel(bl, 0.3 * mm, 1); smooth(bl); K.adopt(bl, 'optic', 'steel')
     for s in (-1, 1):        # (the little ears either side of the drum)
         o = K.tmp(box(*xs(s * 9.0 * mm, s * 11.5 * mm), (DRUM_F - 3) * mm, (DRUM_F + 3) * mm, (TOP - 1) * mm, (TOP + 5.5) * mm)); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'optic', 'black')
-    # the front sight: the block clamped on the barrel, the tower and post, the ring
+    # the front sight: the block clamped on the barrel, the tower and the ring are the irons' (slot optic; a shorter barrel leaves them where the factory one ended)
     pf = POST_F
     bk = K.tmp(prism(P([(pf - 9, -7), (pf + 9, -7), (pf + 9, 8), (pf - 9, 8)]), 'x', -8.0 * mm, 8.0 * mm))
     boolean(bk, prism(circles_hull([(0, 0.5 * mm)], 8.0 * mm, 24), 'y', (pf - 10) * mm, (pf + 10) * mm), 'INTERSECT')
