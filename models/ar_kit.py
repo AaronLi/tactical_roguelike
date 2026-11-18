@@ -377,7 +377,7 @@ def handguard_quad(f0, f1, hk=False):
         o = K.obj(cyl(3.6 * mm, *xs(s * (HB_X + 5.6 * mm), s * (HB_X + 6.4 * mm)), 'x', (f1 - 6 * mm, HC - 2 * mm), segs(3.6 * mm)), 'handguard', 'steel'); tidy(o); smooth(o)
     return HB_B
 
-def handguard_mlok(f0, f1, mat=None, sc=1.0):
+def handguard_mlok(f0, f1, mat=None, sc=1.0, rail=None, top45='mlok'):
     """A free-floated M-LOK handguard (after the Midwest Industries / Aero Precision pattern in the Crane comparison sheet,
     KeyMod_and_M-LOK_handguards.png on Commons): an aluminium tube flush with the receiver's rail (a neck straight down from the rail, 45-degree bevels), a Picatinny rail its full
     length on top, a row of small round lightening holes along each upper bevel, M-LOK slots (32 x 7 mm on a 40 mm pitch) down each side,
@@ -419,15 +419,18 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
     faces = {'ubR': (P[2], P[3]), 'sR': (P[3], P[4]), 'lbR': (P[4], P[5]), 'bot': (P[5], P[6]), 'lbL': (P[6], P[7]), 'sL': (P[7], P[8]), 'ubL': (P[8], P[9])}
     CL = 0.030                                                                # (the clamp: the rear 30 mm, no slots)
     n = int((f1 - f0 - CL - 0.010 + 0.008) / 0.040)
+    if top45 == 'mlok':   # (on the lower bevels' pitch, half a pitch from the sides')
+        UB, UBS = [f0 + CL + 0.016 + k * 0.040 + 0.020 for k in range(n) if f0 + CL + 0.016 + k * 0.040 + 0.036 < f1 - 0.010], (32 * mm, 7 * mm)
+    else:
+        UB, UBS, f = [], (4.4 * mm, 4.4 * mm), f0 + CL + 0.004
+        while f < f1 - 0.010: UB.append(f); f += 0.020
     for k in range(n):
         f = f0 + CL + 0.016 + k * 0.040
         for nm in ('sR', 'sL', 'bot'): cut(hg, face_cut(*faces[nm], f, 32 * mm, 7 * mm))
         if f + 0.020 + 0.016 < f1 - 0.010:
             for nm in ('lbR', 'lbL'): cut(hg, face_cut(*faces[nm], f + 0.020, 32 * mm, 7 * mm))
-    k, f = 0, f0 + CL + 0.004                                                 # the round holes along the upper bevels, every 20 mm
-    while f < f1 - 0.010:
-        for nm in ('ubR', 'ubL'): cut(hg, face_cut(*faces[nm], f, 4.4 * mm, 4.4 * mm, True))
-        f += 0.020
+    for f in UB:                                                              # the upper bevels: round holes every 20 mm, or (top45 'mlok') slots like the lower bevels'
+        for nm in ('ubR', 'ubL'): cut(hg, face_cut(*faces[nm], f, *UBS, hole=top45 != 'mlok'))
     # the clamp: the rear 18 mm (over the barrel nut, r 16.5 at the bore) a solid ring bored to the nut, split along the bottom, the
     # split's two jaws a lug under the tube; two socket-head screws across the lug, below the nut, pull the split shut on it
     CJ, NR = 0.018, NUT_R + 0.2 * mm                                                 # (the clamp's length; its bore, the nut's radius and a hair)
@@ -448,10 +451,8 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
         for nm in ('sR', 'sL', 'bot'): feats[nm].append((f, 32 * mm + 2 * TP, 7 * mm + 2 * TP))
         if f + 0.020 + 0.016 < f1 - 0.010:
             for nm in ('lbR', 'lbL'): feats[nm].append((f + 0.020, 32 * mm + 2 * TP, 7 * mm + 2 * TP))
-    f = f0 + CL + 0.004
-    while f < f1 - 0.010:
-        for nm in ('ubR', 'ubL'): feats[nm].append((f, 4.4 * mm + 2 * TP, 4.4 * mm + 2 * TP))
-        f += 0.020
+    for f in UB:
+        for nm in ('ubR', 'ubL'): feats[nm].append((f, UBS[0] + 2 * TP, UBS[1] + 2 * TP))
     fc, Y = [], (0, 1, 0)
     for nm, fl in feats.items():
         if not fl: continue
@@ -485,7 +486,15 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
         o = K.tmp(cyl(6.5 * mm, *xs(s * (W - 0.5 * mm), s * (W + 1.6 * mm)), 'x', (f0 + 0.016, (P[3][1] + P[4][1]) / 2), segs(6.5 * mm)))
         cut(o, cyl(3.6 * mm, *xs(s * (W - 1.0 * mm), s * (W + 2.0 * mm)), 'x', (f0 + 0.016, (P[3][1] + P[4][1]) / 2), segs(3.6 * mm)))
         bevel(o, 0.4 * mm, 1); tidy(o); smooth(o); K.adopt(o, 'handguard', mat)
-    picatinny(K, f0, f1 - 1.5 * mm, T, 'handguard', mat, lean=True)
+    # the top rail: its full length, or (rail) only the sections [(from, to) forward of f0, ...]: a split top rail (the SR-25's: a rear
+    # length continuing the upper's and a front one for the front sight, the tube's plain top between: a long rail's flanks cost most under the AO)
+    # where a section stops short of the handguard's ends its end slopes down to the tube's top (RAMP long, a 0.5 mm lip left)
+    RAMP, FULL = 12 * mm, f1 - f0 - 1.5 * mm
+    for a, b in (rail or [(0.0, FULL)]):
+        ra, rb = f0 + a, f0 + min(b, FULL); r = picatinny(K, ra, rb, T, 'handguard', mat, lean=True); top = T + 6 * mm
+        if a > 1e-6: cut(r, prism([(ra - 0.001, top), (ra + RAMP, top), (ra - 0.001, T + 0.5 * mm)], 'x', -0.02, 0.02))
+        if b < FULL - 1e-6: cut(r, prism([(rb - RAMP, top), (rb + 0.001, top), (rb + 0.001, T + 0.5 * mm)], 'x', -0.02, 0.02))
+        if a > 1e-6 or b < FULL - 1e-6: tidy(r)
     return B
 
 def handguard_carbine(f0, f1):
@@ -804,7 +813,7 @@ HG0 = UP_F1 + 0.6 * mm                                    # (the rail's rear but
 HG1 = HG0 + C.get('hg_len', 0.2395)   # (the 9.5" RIS II: it ends 0.240 m ahead of the upper's front, inside the game's 15 mm of room before the muzzle)
 HGK = C.get('hg', 'quad')
 HGB = {'quad': lambda: handguard_quad(HG0, HG1), 'hk': lambda: handguard_quad(HG0, HG1, hk=True),
-       'mlok': lambda: handguard_mlok(HG0, HG1, sc=RY), 'carbine': lambda: handguard_carbine(HG0, HG1)}[HGK]()   # (its bottom)
+       'mlok': lambda: handguard_mlok(HG0, HG1, sc=RY, rail=C.get('hg_rail'), top45=C.get('hg_top45', 'mlok')), 'carbine': lambda: handguard_carbine(HG0, HG1)}[HGK]()   # (its bottom)
 MZ0 = UP_F1 + C.get('barrel', 0.2557)                      # the factory barrel's end (a muzzle device screws on here)
 BR = C.get('bore_r', 9.5 * mm)
 FRONT = C.get('front', 'flip')
