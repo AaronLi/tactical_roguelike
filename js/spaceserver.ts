@@ -508,12 +508,14 @@ export const SpaceSv = (() => {
     Level.setTilt(sv.map, d, SD.berthAt(d, site)); // (lying tilted: her own gravity aboard her)
     const solid = (q: any) => World.add(w, SD.solidOf(q, { kind: 'prop', mat: Materials.SHIP })), b = SD.berthAt(d, site);
     hostShip = { w, s: SD.worldBoxes(d, b, (t) => t !== 'nose' && t !== 'steps' && t !== 'hatch').map(solid), hatch: st.ship.hatch ? [] : SD.worldBoxes(d, b, (t) => t === 'hatch').map(solid) }; // (her inner door while it's shut)
+    Level.tiltHatch(sv.map, !st.ship.hatch); // (and in her own frame, where anyone and any grenade aboard her is moved while she lies tilted)
   }
   // her inner door opened from its button (any of the squad's, while she's against a hull): for everyone, and out of the way here
   function openHatch(from: string) {
     if (st.ship.hatch || !st.M || !st.M.docked) return;
     st.ship.hatch = true;
     if (hostShip) { for (const s of hostShip.hatch) World.remove(hostShip.w, s); hostShip.hatch = []; }
+    Level.tiltHatch(S().map, false);
     net().broadcast({ t: 'shatch', by: from });
   }
   // ---- the ship: she's against the hull (the plate goes in), on the pad, or away again

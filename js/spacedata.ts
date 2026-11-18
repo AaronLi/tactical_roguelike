@@ -180,12 +180,14 @@ export const SpaceData = (() => {
   function frameWorld(d: SpShipDef) {
     const W = World, w = W.create(), mat = Materials.SHIP;
     const fls = flights(d).map((fl) => ({ tag: fl.tag, axis: 'z', up: fl.zh > fl.zf ? 1 : -1, x0: Math.min(fl.x0, fl.x1), x1: Math.max(fl.x0, fl.x1), z0: Math.min(fl.zf, fl.zh), z1: Math.max(fl.zf, fl.zh), y0: fl.y0, rise: fl.rise, n: fl.n, f: 0, steps: [] as any[], on: true }));
+    const hatch: { s: any; on: boolean }[] = [];
     for (const q of boxes(d)) {
       if (q[6] === 'nose' || q[6] === 'steps') continue;
       const fl = fls.find((f) => f.tag === q[6]), s = W.add(w, W.box(q[0], q[1], q[2], q[3], q[4], q[5], fl ? { kind: 'step', stair: fl, mat } : { kind: 'prop', mat }));
       if (fl) fl.steps.push(s);
+      if (q[6] === 'hatch') hatch.push({ s, on: true }); // (her inner door: shut here till js/level.ts tiltHatch opens it)
     }
-    (w as any).ramps = fls.filter((f) => f.steps.length);
+    (w as any).ramps = fls.filter((f) => f.steps.length); (w as any).hatch = hatch;
     return w;
   }
   // the most a breach may be off square (js/space.ts events), degrees; and nose up or down

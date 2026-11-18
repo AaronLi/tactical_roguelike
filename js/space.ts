@@ -827,6 +827,7 @@ export const Space = (() => {
       if (want && !q.on) { const o = q.fl ? { kind: 'step', stair: q.fl, mat: Materials.SHIP } : { kind: 'prop', mat: Materials.SHIP }; q.s = World.add(w, SD.solidOf(q, o)); q.on = true; if (q.fl) q.fl.steps.push(q.s); }
       else if (!want && q.on) { World.remove(w, q.s); q.on = false; if (q.fl) q.fl.steps = q.fl.steps.filter((s: any) => s !== q.s); }
     }
+    Level.tiltHatch(S.map, hatchShut()); // (her inner door in her own frame too, where you're moved while she lies tilted)
     for (const fl of S.flights) { // (a flight's slope there while its steps are)
       const want = fl.steps.length > 0;
       if (want !== fl.on) { fl.on = want; if (want) (w.ramps = w.ramps || []).push(fl); else w.ramps = (w.ramps || []).filter((st: any) => st !== fl); }

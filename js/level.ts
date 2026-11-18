@@ -2067,6 +2067,12 @@ export const Level = {
     const SD = SpaceData;
     (map as any).tilt = d && b && b.pt ? { b, d, L: SD.layout(d), lm: Object.assign(Object.create(map), { tilt: null, world: SD.frameWorld(d), cracked: null }) } : null;
   },
+  // her inner door in her own frame's world (js/spacedata.ts frameWorld) shut or open, as it is in the world's: whoever and whatever's
+  // moved in her frame (inFrame) is stopped by it there, not by the world's (js/space.ts syncSolids, js/spaceserver.ts shipSolids)
+  tiltHatch(map: LvMap | null, shut: boolean) {
+    const t = map && (map as any).tilt, w = t && t.lm.world; if (!w || !w.hatch) return;
+    for (const h of w.hatch) { if (shut && !h.on) { World.add(w, h.s); h.on = true; } else if (!shut && h.on) { World.remove(w, h.s); h.on = false; } }
+  },
   // her, if (x, y, z) is aboard her (aft of where her floor meets the hull), else null
   frameAt(map: LvMap | null, x: number, y: number, z: number): any {
     const t = map && (map as any).tilt; if (!t) return null;
