@@ -248,7 +248,7 @@ export const VMAnim = (() => {
     pose.open = (kind === 'bolt' ? U.clamp(pull * 2 - 1, 0, 1) : pull) * actTravel(h, kind);
     if (kind === 'bolt') pose.Rk = on; else if (kind === 'pistol' || kind === 'ar' || kind === 'handle') { pose.Lk = on; pose.Lkind = kind; } // (the hand on its control: holdSupport)
     if (kind === 'pistol' && A.slide) { pose.slide = pull; pose.L = lerpV(R0, off(grab || off(A.slide, -0.02, 0.012), -SLIDE * pull), on); }
-    else if (kind === 'ar' && A.ch) { pose.ch = pull; pose.L = lerpV(R0, off(grab || off(A.ch, 0.005, 0.001, -0.0175), -CH * pull), on); } // (the T handle's left latch wing, pinched)
+    else if (kind === 'ar' && A.ch) { pose.ch = pull; pose.L = lerpV(R0, off(grab || off(A.ch, 0.002, 0.0, -0.0175 - 0.026), -CH * pull), on); } // (the T handle's left latch wing: the fist beside it on the left, the index hooked round its front)
     else if (kind === 'handle' && A.H) {
       pose.handle = pull; const to = off(grab || A.H, -h.travel * pull);
       // (a handle on the right (the AK's): the left hand goes under the gun and up its right side to it, not straight through the receiver)
@@ -1312,6 +1312,7 @@ export const VMAnim = (() => {
     rack: fp([0.55, 1.0, 0.65], [0.6, 1.05, 0.65], [0.65, 1.1, 0.7], [0.7, 1.1, 0.7], [0.65, 0.2, 0.3, 0.2]), // (over a slide, or round a handle)
     hook: fp([0.3, 1.35, 0.9], [0.3, 1.4, 0.9], [0.6, 1.5, 1.0], [0.7, 1.5, 1.0], [0.5, 0.1, 0.2, 0.2]), // (an AR's charging handle, hooked from in front)
     hook2: fp([0.1, 0.75, 0.55], [0.1, 0.8, 0.55], [1.0, 1.35, 0.95], [1.1, 1.45, 1.0], [0.85, 0.3, 0.45, 0.35]), // (the F2's cocking lever: the index and middle fingers out and hooked over it, the ring and little fingers and the thumb curled in)
+    chpull: fp([0.25, 1.0, 0.8], [1.2, 1.5, 1.0], [1.3, 1.55, 1.0], [1.35, 1.55, 1.0], [0.55, 0.15, 0.3, 0.25]), // (a fist, palm down, the index finger hooked round the front of a handle and pulling, the thumb across to pinch it from behind: an AR's T handle)
     bolt: fp([0.65, 0.85, 0.55], [1.2, 1.45, 0.9], [1.3, 1.5, 0.9], [1.35, 1.5, 0.9], [1.0, 0.25, 0.4, 0.3]), // (a bolt's knob between the thumb and the crooked index finger)
     fist: fp([1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [0.85, 0.3, 0.7, 0.5]), // (the Wolverine grip: a loose fist)
     grip: fp([1.0, 1.2, 0.7], [1.2, 1.4, 0.8], [1.25, 1.4, 0.8], [1.3, 1.4, 0.8], [0.9, 0.15, 0.3, 0.2]), // (round a grip, when there's none to measure: holdObj)
@@ -1395,7 +1396,7 @@ export const VMAnim = (() => {
   const Q_SUP = qBasis(new T.Vector3(0.35, 1, 0), new T.Vector3(-0.75, 0, 0.65)); // (the support hand under a handguard, the thumb along its left side)
   const Q_PSUP = qBasis(new T.Vector3(1, 0.35, 0), new T.Vector3(0, 0.3, 1)); // (on a pistol, the left hand round the right, its palm on the grip's left side)
   const Q_RACK = qBasis(new T.Vector3(0, -1, 0), new T.Vector3(-1, 0, 0.3)); // (over the top on a slide or a handle on the right, the fingers down its right side)
-  const Q_CH = new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), -Math.PI / 2).multiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), -Math.PI / 2)).multiply(qBasis(new T.Vector3(0, -0.2, -1), new T.Vector3(-1, 0, 0.15))); // (an AR's charging handle, pinched between thumb and index at its left latch wing: the first hold (fingers across to the right, palm forward) turned 90 degrees about the vertical, then tipped 90 degrees forward about the cross axis: the hand left of the wing, its palm facing the wing's side and clear of the receiver, the pinching fingers up under the wing. (The turn is the one that brings the palm to the wing: the other way round leaves the back of the hand to the gun.))
+  const Q_CH = qBasis(new T.Vector3(0, -1, 0), new T.Vector3(0, 0, 1)); // (an AR's charging handle: a fist, palm down, the knuckles pointing the way of the barrel; the index finger hooks the front of the T handle's left latch wing and pulls, the thumb presses it from behind)
   const Q_UNDER = qBasis(new T.Vector3(0, 1, 0), new T.Vector3(-1, 0, -0.3)); // (a handle on the right: from under the gun, the palm up, the fingers round it from below)
   const Q_HL = qBasis(new T.Vector3(1, 0.2, 0), new T.Vector3(0, -0.4, 1)); // (a handle on the left: from that side, the palm toward the gun, the fingers round it)
   const Q_FREE = new T.Quaternion(); // (palm up, the fingers forward: carrying something, a magazine by its floorplate)
@@ -1427,8 +1428,8 @@ export const VMAnim = (() => {
       arm.cache.sup = c;
     }
     let F = fmix(fmix(FP.open, FP.top, up), c.F, on);
-    if (k) F = fmix(F, lk === 'ar' ? FP.bolt : lk === 'palm' ? FP.flat : lk === 'handle' && h.info.handle && (h.info.handle as { style?: string }).style === 'top' ? FP.hook2 : FP.rack, k);
-    return { q, r: U.lerp(0.012, c.r, on) * (1 - k) + 0.01 * k, fz: k * (lk === 'ar' ? 0.06 : lk === 'pistol' ? 0.01 : lk === 'palm' ? 0 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
+    if (k) F = fmix(F, lk === 'ar' ? FP.chpull : lk === 'palm' ? FP.flat : lk === 'handle' && h.info.handle && (h.info.handle as { style?: string }).style === 'top' ? FP.hook2 : FP.rack, k);
+    return { q, r: U.lerp(0.012, c.r, on) * (1 - k) + 0.01 * k, fz: k * (lk === 'ar' ? 0.045 : lk === 'pistol' ? 0.01 : lk === 'palm' ? 0 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
   }
   // the hand set at a hold: its frame (Arm.glove: where vmanim's clips and turns can move it on), the palm's reach, the fingers
   function humHold(arm: Arm, h: Rig, at: V3, o: HumHoldT) {
