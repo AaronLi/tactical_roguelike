@@ -118,6 +118,7 @@ memory, and then ask which configuration the game wants: the game's shooter is r
 - **Moving parts survive the bake.** A `part_ch` or `part_catch` in the .glb is no proof the game animates it: in the game,
   `G.R.vm` must have the node and `G.R.vm.userData.info.anim` its key (the Mk18 has catch, ch, mag), and it must move during a rack
   (`G.Me.startReload()` with a full magazine and an empty chamber). The SCAR's handle was in the model and not in the game.
+  A rifle's bolt carrier seen through its port is `part_carrier` with `info.carrier.travel` (and `chamberAt` side `port`, so the game draws no plate or bolt of its own): it must run back and home on a shot, back with the handle on a rack, and stay back on an empty magazine until the release (the SCARs).
 - **Shared parts reach other guns.** A rebuilt shared part (the SCAR folding stock) changes every gun that can take it: the FAL's
   golden and tests/model-golden.json go stale. Say so when reporting, and leave those updates for the user to approve.
 

@@ -131,13 +131,14 @@ export const GunRig = (() => {
     if (an.handle) A.handleHome = an.handle.position.clone();
     if (an.ch) A.chHome = an.ch.position.clone();
     if (an.catch) A.catchHome = an.catch.position.clone(); // (the bolt catch's pivot: the hand goes to it, and it turns about x with the bolt held open)
+    if (an.carrier) A.carrierHome = an.carrier.position.clone(); // (a rifle's bolt carrier in its port: slides along z, js/vmanim.ts)
     if (an.cyl) A.cylHome = an.cyl.position.clone();
     if (an.bolt) A.boltHome = an.bolt.position.clone();
     if (an.barrel) A.barrelHome = an.barrel.position.clone(); // (a long-recoil barrel's)
     if (an.brk) A.brkHome = an.brk.position.clone(); // (a falling block's: where it sits shut, info.block)
     // recip: the handle rides the bolt (it jumps back each shot); open: an open-bolt gun, whose bolt (and a
     // riding handle with it) sits back, cocked, while there's a round to fire
-    return { holder: group, info, side: o.side || 1, an, A, chk: magCheck(an.mag), travel: info.handle ? info.handle.travel : 0.07, lock: info.handle && info.handle.lock || 0, recip: !!(info.handle && info.handle.recip), open: OPEN_BOLT.includes(def.id) };
+    return { holder: group, info, side: o.side || 1, an, A, chk: magCheck(an.mag), travel: info.handle ? info.handle.travel : 0.07, lock: info.handle && info.handle.lock || 0, recip: !!(info.handle && info.handle.recip), carrier: info.carrier ? info.carrier.travel : 0, open: OPEN_BOLT.includes(def.id) };
   }
 
   /**

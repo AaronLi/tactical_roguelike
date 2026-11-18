@@ -1120,6 +1120,7 @@ const G_GunRecipes = (() => {
       // the model's own adapter (A.rig.mount: the MP5's claw mount, its meshes extras.mount), the sight on its rail
       authored(k, A!, (e) => e.slot === 'base' && !e.part);
       if (A!.hinge) authored(k, A!, (e) => e.slot === 'base' && !!e.part); // (a gun with a reload sequence has its moving parts as nodes: the latch is the receiver's)
+      if (A!.info.anim && A!.info.anim.carrier && !A!.hinge) anim.carrier = authoredPart(k, A!, 'carrier'); // (a bolt carrier in the port: part_carrier, js/vmanim.ts)
       if (A!.info.anim && A!.info.anim.catch && !A!.hinge) anim.catch = authoredPart(k, A!, 'catch'); // (the bolt catch, part_catch: the receiver's own, a node that turns with the bolt held open)
       if (A!.info.anim && A!.info.anim.bipod && A!.parts.bipod && !A!.hinge) { // (the model's own bipod, its legs swung down by the game: the RPK's)
         // (its legs hinge on the collar, which is the barrel's: with another barrel (a variant, drawn whole) the legs go forward or back with that barrel's end. They are
@@ -1788,7 +1789,7 @@ const G_GunRecipes = (() => {
       anim, magAt, handle, port, chamberAt, breech: tr && tr.chamber ? Object.assign(breechAt(L, hy, L - tr.chamber, by - hy, BRK_OPEN), { long: o.hgGap ? (o.optic === 'notch' ? 'irons' : 'rail') : null }) : null, ch: (rcv === 'ar' && !o.cock) || o.ch ? [-0.006, 0.026, 0] : null, bolt: o.bolt ? [o.bolt, 0.01, 0.068] : null,
       cheek: o.cheek != null ? o.cheek : null, // (a bullpup: where your eye is, whatever's on the rail: tools/models/recipes.ts viewmodel)
       recoilBarrel: rcTravel, // (a long-recoil barrel: how far it runs back each shot, js/vmanim.ts)
-      ...(A ? { grip: A.info.grip, port: A.info.port, chamberAt: A.info.chamberAt } : {}), // (the model's own)
+      ...(A ? { grip: A.info.grip, port: A.info.port, chamberAt: A.info.chamberAt, ...(A.info.carrier ? { carrier: A.info.carrier } : {}) } : {}), // (the model's own)
       ...(A && A.info.magRake ? { magRake: A.info.magRake } : {}), // (its well's rake: js/vmanim.ts draws the magazine out along it)
       ...(A && A.anchors.mount_fg ? { support: [fgF != null ? fgF : A.info.support[0], A.info.support[1], A.info.support[2]] } : {}), // (held on the I-beam's rail, or at the foregrip)
       ...(A && A.info.barrels ? { barrels: A.info.barrels, barrelGroups: A.info.barrelGroups, modeDial: A.info.modeDial } : {}), // (a gun of several barrels)
