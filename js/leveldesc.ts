@@ -473,7 +473,8 @@ export const LevelDesc = (() => {
     const frameMat = shipAcc >= 0 ? B.std({ color: 0x24282d, roughness: 0.5, metalness: 0.5 }) : -1, accMat = shipAcc >= 0 ? B.std({ color: shipAcc, roughness: 0.6 }) : -1, accLit = shipAcc >= 0 ? (map.night ? accMat : B.basic({ color: shipAcc })) : -1;
     for (const d of map.doors) {
       const dw = d.w || TS, half = dw / 2, leafL = dw - 0.05, gy = map.terrain ? d.fy || 0 : 0; // (on rolling ground, the ground it's in: a storey's floor is its whole group's)
-      out.push(B.mesh(d.axis === 'x' ? B.geo('box', [TS, L.WALL_H - L.DOOR_H, dw]) : B.geo('box', [dw, L.WALL_H - L.DOOR_H, TS]), lintelMat, { p: [d.x, gy + (L.WALL_H + L.DOOR_H) / 2, d.z], l1: 1 }));
+      const lb = shipAcc >= 0 && d.kind !== 'stair' ? L.DOOR_H + 0.18 : L.DOOR_H; // (the wall over the opening: on a ship it starts at the top of the frame's head, which would otherwise run into it)
+      out.push(B.mesh(d.axis === 'x' ? B.geo('box', [TS, L.WALL_H - lb, dw]) : B.geo('box', [dw, L.WALL_H - lb, TS]), lintelMat, { p: [d.x, gy + (L.WALL_H + lb) / 2, d.z], l1: 1 }));
       if (shipAcc >= 0 && d.kind !== 'stair') { // (a ship's: a frame proud of the bulkhead either side, a lit bar of her colour over the opening)
         const ax = d.axis === 'x', fr = (along: number, y: number, h: number, w: number, deep: number, m: number) => out.push(B.mesh(ax ? B.geo('box', [deep, h, w]) : B.geo('box', [w, h, deep]), m, { p: [d.x + (ax ? 0 : along), gy + y, d.z + (ax ? along : 0)] }));
         for (const sd of [-1, 1]) fr(sd * (half - 0.04), L.DOOR_H / 2, L.DOOR_H, 0.09, TS + 0.14, frameMat);
