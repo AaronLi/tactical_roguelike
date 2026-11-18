@@ -1213,9 +1213,9 @@ export const Gunsmith = (() => {
     { barrel: { len: 0.24 }, thread: 'r58', muzzle: 'flash', handguard: ['qbz', { t: 'qbz', len: 0.22 }], stock: ['fold', 'qbz'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.152, d: 0.072, c: 0.068, w: 0.026 }, optic: ['pic', { optic: 'irons' }] });
   P('mcx', 'rifle', { rcv: 'mcx', L: 0.22, fm: 'black', railExt: 0.11 }, { barrel: { len: 0.262 }, thread: 'r556', muzzle: 'flash', handguard: ['mcx', { t: 'sig', len: 0.24 }], stock: ['fold', 'mcx'], grip: ['ar', 'ar'],
     mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, optic: ['pic', { optic: 'irons' }], charging: 'ar' });
-  // the B&T APC9 (PRO) modelled in Blender (models/apc9, build_apc9.py), on a lower made for the MP5's curved magazine (not B&T's own: the user's MP5-magazine APC9). Rails and the PRO's forend are the
+  // the B&T APC9 K modelled in Blender (models/apc9, build_apc9.py), on a lower made for the MP5's curved magazine (not B&T's own: the user's MP5-magazine APC9). Its rails and forend are the
   // upper's (no handguard slot: hgMax 0), the irons fold on its rail (mount_optic_rail), a short rail each side of the forend (mount_tac), the non-reciprocating handle on the left, the strut stock on a hinge (stk:fold).
-  P('apc9', 'rifle', { optFMag: 0.18, rcv: 'authored', authored: 'apc9', siderails: true, L: 0.2811, hgMax: 0, optF: 0.12, grip: 0.0, support: 0.31, mag: { f: 0.1647, y: -0.012 } }, { barrel: { len: 0.047 }, thread: 'r9', muzzle: 'flash', stock: ['fold', 'rattler'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.18, d: 0.032, c: 0.058, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
+  P('apc9', 'rifle', { optFMag: 0.18, rcv: 'authored', authored: 'apc9', siderails: true, L: 0.2811, hgMax: 0, optF: 0.12, grip: 0.0, support: 0.31, mag: { f: 0.1647, y: -0.012 } }, { barrel: { len: 0.01 }, thread: 'r9', muzzle: 'flash', stock: ['fold', 'rattler'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.18, d: 0.032, c: 0.058, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
   // the MCX as its variants: a Rattler's barrel and handguard, the Virtus's longer ones, a Gen 1's KeyMod, a Spear LT's
   // lightened FDE handguard and padded stock (the QBZ-192 takes the same folding stocks: the same hinge)
   // ------------------------------------------------------------------ shared barrels (once every gun is made)
