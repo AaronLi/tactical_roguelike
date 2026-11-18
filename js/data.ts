@@ -401,7 +401,7 @@ export const GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the sa
   m27:      GS(16.5, 5.56, 'flash', 55000, 0.70, 62, 0.45, 0.55, 'gas', 'brass', 45),
   m14:      GS(22.0, 7.62, 'flash', 60000, 0.90, 147, 0.60, 0.60, 'gas', 'brass', 51),
   sr25:     GS(20.0, 7.62, 'flash', 60000, 0.90, 168, 0.45, 0.50, 'gas', 'brass', 51),
-  apc9:     GS(6.9, 9.00, 'none', 35000, 0.40, 124, 0.40, 0.55, 'blowback', 'brass', 19),
+  apc9:     GS(8.0, 9.00, 'none', 35000, 0.40, 124, 0.40, 0.55, 'blowback', 'brass', 19),
   mpx:      GS(8.0, 9.00, 'none', 35000, 0.40, 124, 0.35, 0.55, 'gas', 'brass', 19),
   g19:      GS(4.0, 9.00, 'none', 35000, 0.35, 115, 0.40, 0.60, 'recoil', 'brass', 19),
   benelli:  GS(18.5, 18.5, 'none', 11000, 0.55, 432, 0.60, 0.60, 'gas', 'plastic', 70, 9),

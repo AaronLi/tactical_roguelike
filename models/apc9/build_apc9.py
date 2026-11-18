@@ -200,8 +200,8 @@ def handle():
     ar = K.tmp(prism([(-(HWT + 1.0 * mm), H_Y - 7.5 * mm), (-(HWT + 22.0 * mm), H_Y - 5.5 * mm), (-(HWT + 24.0 * mm), H_Y + 6.5 * mm), (-(HWT + 1.0 * mm), H_Y + 7.5 * mm)], 'z', H_F - 3.0 * mm, H_F + 4.0 * mm)) if False else None
     arm = K.tmp(rprism([(H_F - 4.0 * mm, H_Y - 8.0 * mm), (H_F + 5.0 * mm, H_Y - 8.0 * mm), (H_F + 5.0 * mm, H_Y + 8.0 * mm), (H_F - 4.0 * mm, H_Y + 8.0 * mm)], -(HWT + 1.0 * mm), -(HWT + 24.0 * mm)))
     bevel(arm, 1.0 * mm, 2, 35); smooth(arm); K.adopt(arm, 'base', 'black', ph)
-    lip = K.tmp(rprism([(H_F - 10.0 * mm, H_Y - 8.0 * mm), (H_F + 5.0 * mm, H_Y - 8.0 * mm), (H_F + 5.0 * mm, H_Y + 8.0 * mm), (H_F - 10.0 * mm, H_Y + 8.0 * mm)], -(HWT + 20.0 * mm), -(HWT + 24.0 * mm)))
-    bevel(lip, 1.0 * mm, 2, 35); smooth(lip); K.adopt(lip, 'base', 'black', ph)     # (the lip at the outer end, forward of the arm: the pull's hook)
+    lip = K.tmp(rprism([(H_F + 0.0 * mm, H_Y - 8.0 * mm), (H_F + 14.0 * mm, H_Y - 8.0 * mm), (H_F + 14.0 * mm, H_Y + 8.0 * mm), (H_F + 0.0 * mm, H_Y + 8.0 * mm)], -(HWT + 20.0 * mm), -(HWT + 24.0 * mm)))
+    bevel(lip, 1.0 * mm, 2, 35); smooth(lip); K.adopt(lip, 'base', 'black', ph)     # (the flange at the outer end, forward of the arm: the finger pulls on the arm's front face, the flange keeps it from sliding off)
     for k in range(3):   # grooves on the arm's face
         g = H_F - 1.5 * mm + k * 1.5 * mm
         o = K.obj(box(-(HWT + 1.2 * mm), -(HWT + 17.0 * mm), g, g + 0.5 * mm, H_Y - 6.9 * mm, H_Y + 6.9 * mm), 'base', 'gunmetal', ph)
@@ -292,7 +292,7 @@ info = {
     'carrier': {'travel': 0.075},
     'magAt': [round(MAG_F, 4), round(MAG_Y, 4)],
     'handle': {'f': round(H_F, 4), 'y': round(H_Y, 4), 'x': round(-(HWT + 16.0 * mm), 4), 'travel': H_TRAVEL, 'style': 'tab', 'recip': False,
-               'grab': [round(H_F - 6.0 * mm, 4), round(H_Y, 4), round(-(HWT + 17.0 * mm), 4)]},
+               'grab': [round(H_F + 14.0 * mm, 4), round(H_Y + 19.7 * mm, 4), round(-(HWT + 33.5 * mm), 4)]},   # (seated by measurement in the game: with the 'tab' pose the index fingertip lands on the arm's front face, inside the flange, 0 mm from the handle's box over the whole stroke and at the press check's furthest point)
     'port': [round((PORT[0] + PORT[1]) / 2, 4), round((PORT_U[0] + PORT_U[1]) / 2, 4), round(HW, 4)],
     'chamberAt': {'side': 'port', 'f': round(PORT[1] - 0.7 * mm - 0.72 * 0.026, 4), 'y': 0.0045, 'x': 0.0},
     'recoilBarrel': 0,
