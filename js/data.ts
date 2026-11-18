@@ -108,6 +108,7 @@ export const WEAPON_LIST: WeaponDef[] = [
   W({ id: 'm27', slot: 'p', cls: 'AR', tier: 3, price: 2400, name: 'M27 IAR', rpm: 750, mag: 30, reserve: 270, reload: 2.4, spread: 2.6, ads: 0.01667, range: 45, zoom: 0.7, speed: 0.92, desc: 'An automatic rifle built to keep firing: heavy barrel, bipod, STANAG magazines.' }),
   W({ id: 'm14', slot: 'p', cls: 'BR', tier: 2, price: 1900, name: 'M14', rpm: 700, mag: 20, reserve: 140, reload: 2.6, spread: 2.8, ads: 0.02083, range: 55, zoom: 0.8, speed: 0.92, pen: 1, desc: 'Walnut and 7.62 NATO. Fit the EBR chassis kit and it becomes a Mk14.' }),
   W({ id: 'sr25', slot: 'p', cls: 'DMR', tier: 3, price: 2600, name: 'SR-25', rpm: 360, mode: 'semi', mag: 20, reserve: 120, reload: 2.5, spread: 2.4, ads: 0.00833, range: 65, zoom: 0.45, speed: 0.93, pen: 1, desc: 'An AR-10 marksman rifle: AR controls, AR parts, 7.62 NATO.' }),
+  W({ id: 'apc9', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'B&T APC9', rpm: 850, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.025, range: 22, falloff: 0.5, speed: 1.03, desc: 'Swiss closed-bolt 9mm carbine: a side charging handle, folding irons, a strut stock. Takes MP5 magazines.' }),
   W({ id: 'mpx', slot: 'p', cls: 'SMG', tier: 2, price: 1500, name: 'MPX', rpm: 850, mag: 30, reserve: 210, reload: 2.0, spread: 2.4, ads: 0.025, range: 22, falloff: 0.5, speed: 1.04, desc: 'A 9mm SMG that handles like an AR: buffer tube, AR grip, AR rail.' }),
   W({ id: 'benelli', slot: 'p', cls: 'SG', tier: 2, price: 1800, name: 'Benelli M4', pellets: 8, rpm: 240, mode: 'semi', mag: 7, reserve: 42, reload: 0.5, shell: true, choke: 0.8, spread: 4.5, ads: 0.04167, range: 16, falloff: 0.25, speed: 0.98, desc: 'Semi-auto, tube-fed, AR stock and grip. Fast follow-ups, slow to top up (fit a speed loader).' }),
   W({ id: 'vepr', slot: 'p', cls: 'SG', tier: 2, price: 1700, name: 'Vepr-12', pellets: 8, rpm: 280, mode: 'semi', mag: 8, reserve: 48, reload: 2.5, choke: 0.8, spread: 4.5, ads: 0.05, range: 16, falloff: 0.25, speed: 0.98, desc: 'The better-mannered Saiga: same magazines, softer recoil.' }),
@@ -283,7 +284,7 @@ export const fullReload = (d: Record<string, any>) => ((revolver(d) || fblock(d)
 // Bolt hold-open: the action locks back on the last round, so a reload from empty is a magazine change and a
 // thumb on the bolt catch (or the slide stop), not a full rack. Every pistol with a slide, the AR-15 family and the
 // rifles and SMGs built the same way; not the AK family, the MP5's roller bolt, the open-bolt guns or a bolt-action.
-export const BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192', 'm4', 'mcx']); // (m4: the Mk18, authored in Blender, so no longer rcv 'ar' below; mcx: SIG's own lower, which locks back too)
+export const BOLT_HOLD = new Set(['scar', 'scarl', 'g36', 'aug', 'aug9', 'tavor', 'fal', 'm14', 'mk14', 'sr25', 'barrett', 'gm6', 'mpx', 'mp7', 'vector', 'skorp', 'svd', 'ar9', 'm27', 'hk416', 'br3', 'qbz192', 'm4', 'mcx', 'apc9']); // (m4: the Mk18, authored in Blender, so no longer rcv 'ar' below; mcx: SIG's own lower, which locks back too)
 export const boltHold = (def: Record<string, any>) => {
   const P = def && Hooks.platformOf && Hooks.platformOf(def.id);
   return !!P && ((P.arch === 'pistol' && !def.manual) || BOLT_HOLD.has(def.id) || (P.arch === 'rifle' && (P.spec.rcv || 'ar') === 'ar')); // (the AR-15 pattern: a bolt catch over the well)
@@ -292,7 +293,7 @@ export const boltHold = (def: Record<string, any>) => {
 export const loaded = (w: { mag: number; chamber?: unknown } | null | undefined) => (w ? w.mag + (w.chamber ? 1 : 0) : 0);
 // Magazine families: guns that take the same magazines (one set of magazine parts, js/parts.ts MAG_FAMS).
 //   stanag: NATO 5.56 (AR-15 pattern): the M4, HK416, F2000, Tavor, SCAR-L and M27
-//   mp5: the MP5 and the MP5SD
+//   mp5: the MP5, the MP5SD and the APC9 (its well is made for the MP5's curved magazine)
 //   akm: 7.62x39 AK pattern: the AK, the Galil ACE (built to take AK magazines) and the RPK
 //   ak74: 5.45x39: the AK-74M, AKS-74U and AN-94
 //   glock: 9mm Glock pattern: the P9, G18, G19, the AR-9 (its own Glock-pattern well) and the AUG 9mm conversion
@@ -301,7 +302,7 @@ export const loaded = (w: { mag: number; chamber?: unknown } | null | undefined)
 //   qbz: 5.8x42: the QBZ-95 and QBZ-192
 // (The G36 and AUG are their NATO versions, on STANAG magazines; the other 7.62x51 rifles, and the .45s, each have their own.)
 export const MAG_FAMILY: Record<string, string> = {
-  m4: 'stanag', hk416: 'stanag', f2: 'stanag', tavor: 'stanag', scarl: 'stanag', m27: 'stanag', mcx: 'stanag', g36: 'stanag', aug: 'stanag', qbz95: 'qbz', qbz192: 'qbz', mp5: 'mp5', mp5sd: 'mp5', ak: 'akm', galil: 'akm', rpk: 'akm',
+  m4: 'stanag', hk416: 'stanag', f2: 'stanag', tavor: 'stanag', scarl: 'stanag', m27: 'stanag', mcx: 'stanag', g36: 'stanag', aug: 'stanag', qbz95: 'qbz', qbz192: 'qbz', mp5: 'mp5', mp5sd: 'mp5', apc9: 'mp5', ak: 'akm', galil: 'akm', rpk: 'akm',
   ak74: 'ak74', aks74u: 'ak74', an94: 'ak74', p9: 'glock', g18: 'glock', g19: 'glock', ar9: 'glock', aug9: 'glock', m14: 'm14', mk14: 'm14', saiga: 'saiga12', vepr: 'saiga12',
 };
 // Belt boxes shared the same way: the linked 5.56 of the M249 and the Shredder. (Not in MAG_FAMILY: they're still
@@ -400,6 +401,7 @@ export const GUN_SPECS: Record<string, any> = { // (any, not GunSpec, for the sa
   m27:      GS(16.5, 5.56, 'flash', 55000, 0.70, 62, 0.45, 0.55, 'gas', 'brass', 45),
   m14:      GS(22.0, 7.62, 'flash', 60000, 0.90, 147, 0.60, 0.60, 'gas', 'brass', 51),
   sr25:     GS(20.0, 7.62, 'flash', 60000, 0.90, 168, 0.45, 0.50, 'gas', 'brass', 51),
+  apc9:     GS(6.9, 9.00, 'none', 35000, 0.40, 124, 0.40, 0.55, 'blowback', 'brass', 19),
   mpx:      GS(8.0, 9.00, 'none', 35000, 0.40, 124, 0.35, 0.55, 'gas', 'brass', 19),
   g19:      GS(4.0, 9.00, 'none', 35000, 0.35, 115, 0.40, 0.60, 'recoil', 'brass', 19),
   benelli:  GS(18.5, 18.5, 'none', 11000, 0.55, 432, 0.60, 0.60, 'gas', 'plastic', 70, 9),
@@ -672,7 +674,7 @@ export const CHARGE_GR: Record<string, number> = { // powder charge (grains)
 export const GUN_KG: Record<string, number> = { // each gun as it comes (kg)
   m4: 2.9, ak: 3.5, f2: 3.6, g36: 3.6, br3: 3.4, scar: 3.6, tavor: 3.3, hk416: 3.5, aug: 3.6, galil: 3.4, an94: 3.85,
   ak74: 3.4, aks74u: 2.7, scarl: 3.3, m27: 3.6, fal: 4.3, m14: 4.5, mk14: 5.1, garand: 4.3, svd: 4.3, vss: 2.6, lever: 3.3,
-  sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, ar9: 2.9, aug9: 3.3, qbz95: 3.3, qbz192: 3.0, mcx: 2.7,
+  sr25: 4.9, uzi: 1.5, mp5: 2.5, p90: 2.6, vector: 2.7, thompson: 4.9, ppsh: 3.6, mp5sd: 2.9, mpx: 2.7, apc9: 2.5, ar9: 2.9, aug9: 3.3, qbz95: 3.3, qbz192: 3.0, mcx: 2.7,
   pump: 3.6, dbl: 3.2, saiga: 3.6, aa12: 4.8, ksg: 3.6, slug: 3.6, benelli: 3.8, vepr: 4.0, m249: 7.5, pkm: 7.5, m60: 10.5,
   rpk: 4.8, shredder: 16, r700: 4.1, barrett: 14, gm6: 11.5, mosin: 4.0, awm: 6.5, m32: 5.3, rail: 7.5, crossbow: 3.5,
   tempest: 4.6, p9: 0.75, g19: 0.7, m1911: 1.1, usp: 0.75, fiveseven: 0.75, thor: 5.4, b92: 0.97, ppk: 0.59, auto9: 1.1, deagle: 2.0, rev: 1.1, hc500: 2.0, akimbo: 0.95, derringer: 0.4,
@@ -807,12 +809,12 @@ export const ENEMY_GEAR = {
   weapons: {
     suspect: [['p9', 'rev', 'derringer', 'tx22'], ['p9', 'm1911', 'usp', 'rev', 'g19'], ['usp', 'm1911', 'g18', 'deagle', 'g19'], ['g18', 'deagle', 'usp']],
     rating: [['p9', 'rev', 'tx22'], ['p9', 'g19', 'usp', 'm1911'], ['g19', 'usp', 'm1911'], ['usp', 'g19', 'm1911']], // (a sidearm for their own defence: no machine pistols, no hand cannons)
-    grunt: [['uzi', 'skorp', 'aks74u', 'ar9'], ['ak', 'mp5', 'uzi', 'thompson', 'aks74u', 'ak74', 'mpx'], ['ak', 'm4', 'galil', 'mp5', 'vector', 'ak74', 'scarl', 'aug9', 'qbz95'], ['hk416', 'scar', 'an94', 'tavor', 'aug', 'scarl', 'm27', 'qbz192', 'mcx']],
+    grunt: [['uzi', 'skorp', 'aks74u', 'ar9'], ['ak', 'mp5', 'uzi', 'thompson', 'aks74u', 'ak74', 'mpx', 'apc9'], ['ak', 'm4', 'galil', 'mp5', 'vector', 'ak74', 'scarl', 'aug9', 'qbz95'], ['hk416', 'scar', 'an94', 'tavor', 'aug', 'scarl', 'm27', 'qbz192', 'mcx']],
     rusher: [['sawn', 'dbl'], ['pump', 'dbl', 'sawn'], ['pump', 'saiga', 'ksg', 'vepr', 'benelli'], ['saiga', 'aa12', 'ksg', 'benelli', 'vepr']],
     marksman: [['lever', 'mosin'], ['mosin', 'r700', 'm14'], ['r700', 'svd', 'mk14', 'm14', 'sr25'], ['svd', 'awm', 'mk14', 'sr25']],
     heavy: [['thompson', 'uzi', 'mp5'], ['ak', 'rpk', 'thompson'], ['m249', 'pkm', 'm60', 'rpk'], ['m60', 'm249', 'pkm']], // (an early Enforcer is armour and an SMG, a drum-fed Thompson as often as not; a rifle or an RPK at the second tier; the belt-fed guns from the third)
     warden: [['scar'], ['scar', 'fal'], ['scar', 'fal'], ['scar', 'hk416']],
-    leader: [['mp5', 'uzi', 'aks74u'], ['ak', 'mp5', 'mpx', 'ak74'], ['ak', 'm4', 'scarl', 'mp5', 'aug9'], ['hk416', 'scar', 'tavor', 'mcx', 'scarl']],
+    leader: [['mp5', 'uzi', 'aks74u'], ['ak', 'mp5', 'mpx', 'ak74'], ['ak', 'm4', 'scarl', 'mp5', 'aug9', 'apc9'], ['hk416', 'scar', 'tavor', 'mcx', 'scarl']],
   },
   // What they wear by the level: the chance of each, in the order of ids, at the levels in at, in a line between them, and
   // no further than the last. Armour's weighted by the level and not the tier, so it goes on getting heavier after the

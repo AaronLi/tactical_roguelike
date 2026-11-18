@@ -1331,6 +1331,7 @@ export const VMAnim = (() => {
     chpull: fp([0.25, 1.0, 0.8], [1.2, 1.5, 1.0], [1.3, 1.55, 1.0], [1.35, 1.55, 1.0], [0.55, 0.15, 0.3, 0.25]), // (a fist, palm down, the index finger hooked round the front of a handle and pulling, the thumb across to pinch it from behind: an AR's T handle)
     thumbpull: fp([0.08, 0.12, 0.08], [0.1, 0.15, 0.1], [0.14, 0.2, 0.12], [0.2, 0.25, 0.15], [0.1, 0.05, 0.1, 0.1]), // (the AK's right-side handle: the four fingers relaxed and extended along the receiver's side, the thumb out straight, up on the handle's knob and pulling it back)
     knobhook: fp([0.15, 1.35, 1.2], [1.3, 1.55, 1.0], [1.35, 1.55, 1.0], [1.4, 1.55, 1.0], [0.5, 0.15, 0.3, 0.25]), // (the SCAR's side knob: the index curled hard round the knob's front, its pad and middle segment on it, the other fingers in a fist, the thumb across behind it)
+    tabhook: fp([0.15, 1.2, 1.1], [1.25, 1.5, 1.0], [1.3, 1.55, 1.0], [1.35, 1.55, 1.0], [0.5, 0.15, 0.3, 0.25]), // (the APC9's side lever: the index hooked round the front of the lip at the lever's outer end, its pad on the lip, the other fingers in a fist, the thumb across behind the lever)
     bolt: fp([0.65, 0.85, 0.55], [1.2, 1.45, 0.9], [1.3, 1.5, 0.9], [1.35, 1.5, 0.9], [1.0, 0.25, 0.4, 0.3]), // (a bolt's knob between the thumb and the crooked index finger)
     fist: fp([1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [1.45, 1.75, 1.1], [0.85, 0.3, 0.7, 0.5]), // (the Wolverine grip: a loose fist)
     grip: fp([1.0, 1.2, 0.7], [1.2, 1.4, 0.8], [1.25, 1.4, 0.8], [1.3, 1.4, 0.8], [0.9, 0.15, 0.3, 0.2]), // (round a grip, when there's none to measure: holdObj)
@@ -1439,7 +1440,7 @@ export const VMAnim = (() => {
   function holdSupport(arm: HumArm, h: Rig, pose: Pose | null | undefined, Lt: V3, pistol: boolean): HumHoldT {
     const on = 1 - S(0.02, 0.09, Lt.distanceTo(h.A.S)), k = (pose && pose.Lk) || 0;
     const up = S(0.0, 0.035, Lt.y) * (1 - on), q = Q_FREE.clone().slerp(pose && pose.prop && pose.prop.kind !== 'clip' ? Q_HL : Q_TOP, up).slerp(pistol ? Q_PSUP : Q_SUP, on), lk = pose && pose.Lkind, left = lk === 'handle' && h.A.H && h.A.H.x < -0.005; // (up: over the gun, putting something in from above: a clip pressed down, a round or a bolt from the left, clear of a sight over it)
-    const knobL = lk === 'handle' && !!h.A.H && h.A.H.x < -0.005 && !!h.info.handle && (h.info.handle as { style?: string }).style === 'knob'; // (the SCAR's side charging handle, a knob on the left: held like an AR's, the fist palm down toward the muzzle, the index hooked round the knob's front, the thumb behind it)
+    const knobL = lk === 'handle' && !!h.A.H && h.A.H.x < -0.005 && !!h.info.handle && ['knob', 'tab'].includes((h.info.handle as { style?: string }).style || ''); // (the APC9's lever is a 'tab', held the same way: the SCAR's side charging handle, a knob on the left: held like an AR's, the fist palm down toward the muzzle, the index hooked round the knob's front, the thumb behind it)
     const topH = lk === 'handle' && !!h.info.handle && (h.info.handle as { style?: string }).style === 'top';
     if (k) q.slerp(lk === 'lslap' ? Q_SLAP : lk === 'ar' || knobL ? Q_CH : topH ? Q_F2 : left || lk === 'palm' ? Q_HL : lk === 'handle' && h.A.H && h.A.H.x > 0.005 ? Q_UNDER : Q_RACK, k);
     let c = arm.cache.sup;
@@ -1450,7 +1451,7 @@ export const VMAnim = (() => {
       arm.cache.sup = c;
     }
     let F = fmix(fmix(FP.open, FP.top, up), c.F, on);
-    if (k) F = fmix(F, knobL ? FP.knobhook : lk === 'ar' ? FP.chpull : lk === 'palm' || lk === 'lslap' ? FP.flat : lk === 'handle' && h.info.handle && (h.info.handle as { style?: string }).style === 'top' ? FP.f2hook : lk === 'handle' && h.A.H && h.A.H.x > 0.005 ? FP.thumbpull : FP.rack, k);
+    if (k) F = fmix(F, knobL ? ((h.info.handle as { style?: string }).style === 'tab' ? FP.tabhook : FP.knobhook) : lk === 'ar' ? FP.chpull : lk === 'palm' || lk === 'lslap' ? FP.flat : lk === 'handle' && h.info.handle && (h.info.handle as { style?: string }).style === 'top' ? FP.f2hook : lk === 'handle' && h.A.H && h.A.H.x > 0.005 ? FP.thumbpull : FP.rack, k);
     const rhand = lk === 'handle' && !!h.A.H && h.A.H.x > 0.005, hook = lk === 'handle' && !!h.info.handle && (h.info.handle as { style?: string }).style === 'top'; // (the F2's lever: the hooked fingertips are what touch it, so the hand is drawn back along the fingers by their length and the palm held off)
     return { q, r: U.lerp(0.012, c.r, on) * (1 - k) + (hook ? 0.025 : rhand ? 0.028 : knobL ? 0.016 : 0.01) * k, fz: k * (lk === 'ar' ? 0.045 : knobL ? 0.06 : lk === 'pistol' ? 0.01 : lk === 'palm' || lk === 'lslap' ? 0 : hook ? 0.05 : rhand ? 0.045 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
   }
