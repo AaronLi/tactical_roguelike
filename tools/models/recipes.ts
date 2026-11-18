@@ -1120,6 +1120,7 @@ const G_GunRecipes = (() => {
       // the model's own adapter (A.rig.mount: the MP5's claw mount, its meshes extras.mount), the sight on its rail
       authored(k, A!, (e) => e.slot === 'base' && !e.part);
       if (A!.hinge) authored(k, A!, (e) => e.slot === 'base' && !!e.part); // (a gun with a reload sequence has its moving parts as nodes: the latch is the receiver's)
+      if (A!.info.anim && A!.info.anim.dust && !A!.hinge) anim.dust = authoredPart(k, A!, 'dust'); // (the port's dust cover, hinged: js/vmanim.ts)
       if (A!.info.anim && A!.info.anim.carrier && !A!.hinge) anim.carrier = authoredPart(k, A!, 'carrier'); // (a bolt carrier in the port: part_carrier, js/vmanim.ts)
       if (A!.info.anim && A!.info.anim.catch && !A!.hinge) anim.catch = authoredPart(k, A!, 'catch'); // (the bolt catch, part_catch: the receiver's own, a node that turns with the bolt held open)
       if (A!.info.anim && A!.info.anim.bipod && A!.parts.bipod && !A!.hinge) { // (the model's own bipod, its legs swung down by the game: the RPK's)

@@ -131,6 +131,7 @@ export const GunRig = (() => {
     if (an.handle) A.handleHome = an.handle.position.clone();
     if (an.ch) A.chHome = an.ch.position.clone();
     if (an.catch) A.catchHome = an.catch.position.clone(); // (the bolt catch's pivot: the hand goes to it, and it turns about x with the bolt held open)
+    if (an.dust) A.dustHome = an.dust.position.clone();
     if (an.carrier) A.carrierHome = an.carrier.position.clone(); // (a rifle's bolt carrier in its port: slides along z, js/vmanim.ts)
     if (an.cyl) A.cylHome = an.cyl.position.clone();
     if (an.bolt) A.boltHome = an.bolt.position.clone();

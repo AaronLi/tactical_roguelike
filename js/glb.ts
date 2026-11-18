@@ -35,7 +35,7 @@ type SlotName = (typeof SLOTS)[keyof typeof SLOTS];
 /** The key of an animated sub-assembly: its node is named `part_<key>` and is listed under `info.anim.<key>`. */
 const PARTS = {
   mag: 'mag', slide: 'slide', bolt: 'bolt', ch: 'ch', handle: 'handle', pump: 'pump', lever: 'lever', cyl: 'cyl', brk: 'brk', barrel: 'barrel', cover: 'cover', magn: 'magn',
-  spin: 'spin', carry: 'carry', dial: 'dial', catch: 'catch', carrier: 'carrier', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
+  spin: 'spin', carry: 'carry', dial: 'dial', catch: 'catch', carrier: 'carrier', dust: 'dust', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
 } as const;
 type PartKey = (typeof PARTS)[keyof typeof PARTS];
 
@@ -159,6 +159,7 @@ const CONTRACT_CORE = {
     mag: { doc: 'The magazine: drops out and swaps on a reload.', pairedWith: 'magAt' }, slide: { doc: 'A pistol slide: cycles with each shot.', pairedWith: 'slide' },
     bolt: { doc: 'An exposed bolt / carrier.', pairedWith: null }, ch: { doc: 'A charging handle.', pairedWith: null },
     catch: { doc: 'The bolt catch (an AR\'s paddle on the left of the lower, behind the magazine well): its origin is its pivot pin, and it turns about x (up to 0.14 rad, the upper arm tipping back) when the bolt is held open on an empty magazine; the hand presses it to send the bolt home (js/vmanim.ts).', pairedWith: null },
+    dust: { doc: 'The ejection port\'s dust cover (an AR\'s hinged door on the right of the upper), a gun with a part_carrier only: its origin is its hinge (the rod along the port\'s foot, running forward), closed over the port at rest and swung open about z (down and out, -1.9 rad) when the action is worked by hand (a charge, a rack, a release, a chamber check) or locked open (js/vmanim.ts).', pairedWith: null },
     carrier: { doc: 'The bolt carrier seen through the ejection port, on a rifle or SMG with a real ejection port (every authored one but the pistols\', the Welrod\'s and the Tempest\'s: a block filling the port, drawn in the port\'s pocket, its outer face inside the receiver\'s surface so it never stands out): its origin is the carrier\'s own pivot (it only slides, along z), and it runs back info.carrier.travel metres and home on every shot (a closed bolt, about 0.08 s), back with the hand\'s pull through a charge, a rack or a release (a riding handle, info.handle.recip, is on the carrier and runs with it), and held back on an empty magazine where the gun locks open, uncovering the chamber the model draws behind it (js/vmanim.ts). A model that gives it sets info.chamberAt side "port" (the game then draws no plate or bolt face of its own over the port).', pairedWith: 'carrier' },
     handle: { doc: 'A cocking handle that reciprocates or is worked by the hand.', pairedWith: 'handle' }, pump: { doc: 'A pump-action forend.', pairedWith: null },
     lever: { doc: 'A lever-action lever.', pairedWith: null }, cyl: { doc: 'A revolver cylinder: it rotates (z) by 1/n per shot.', pairedWith: null },
