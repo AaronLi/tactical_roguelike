@@ -154,12 +154,12 @@ def rear_sight():
     between two protective ears."""
     rt = RAIL_T * mm
     o = K.tmp(box(-11.0 * mm, 11.0 * mm, -0.012, 0.0265, rt - 12 * mm, rt + 6.2 * mm)); bevel(o, 0.9 * mm, 1); smooth(o); K.adopt(o, 'optic', 'black')
-    bl = K.tmp(box(-8.4 * mm, 8.4 * mm, RS_F, RS_F + 4.0 * mm, rt + 5 * mm, (SY + 6.0) * mm))
+    bl = K.tmp(box(-5.8 * mm, 5.8 * mm, RS_F, RS_F + 4.0 * mm, rt + 5 * mm, (SY + 6.0) * mm))
     cut(bl, cyl(3.3 * mm, RS_F - 0.001, RS_F + 5 * mm, 'y', (0, SY * mm), 28))
     cut(bl, lathe([(RS_F - 0.001, 4.8 * mm), (RS_F + 1.2 * mm, 3.3 * mm)], 24, (0, 0, SY * mm)))                       # (countersunk toward the eye)
     bevel(bl, 0.5 * mm, 1); smooth(bl); K.adopt(bl, 'optic', 'black')
     for s in (-1, 1):
-        o = K.tmp(prism([(RS_F - 3 * mm, rt + 4 * mm), (RS_F + 9 * mm, rt + 4 * mm), (RS_F + 8 * mm, (SY + 7) * mm), (RS_F - 1 * mm, (SY + 7) * mm)], 'x', *xs(s * 9.0 * mm, s * 11.2 * mm)))
+        o = K.tmp(prism([(RS_F - 3 * mm, rt + 4 * mm), (RS_F + 9 * mm, rt + 4 * mm), (RS_F + 8 * mm, (SY + 7) * mm), (RS_F - 1 * mm, (SY + 7) * mm)], 'x', *xs(s * 6.8 * mm, s * 8.8 * mm)))
         bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'optic', 'black')
     o = K.obj(cyl(3.6 * mm, 11.0 * mm, 14.0 * mm, 'x', (RS_F + 8 * mm, rt + 3.2 * mm), 16), 'optic', 'steel'); smooth(o)          # (the windage knob)
 

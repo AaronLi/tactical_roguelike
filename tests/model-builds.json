@@ -594,6 +594,10 @@
    "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "magnifier": "mgn.2", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "stock": "stk.heavy.g36" }
   },
   { "platform": "g36",
+   "why": "authored stock (stk.heavy.scar)",
+   "build": { "barrel": "br.5.56x45.18.9.light", "grip": "oem.gr.ar.4", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "g36",
    "why": "authored grip (gr.ar.0)",
    "build": { "barrel": "br.5.56x45.18.9.light", "grip": "gr.ar.0", "handguard": "oem.hg.g36.0", "mag": "stanag.mag.30", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.g36" }
   },
@@ -736,6 +740,10 @@
   { "platform": "br3",
    "why": "authored grip (gr.ar.0)",
    "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "gr.ar.0", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.comp", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
+  },
+  { "platform": "br3",
+   "why": "authored muzzle (mz.r762.a2)",
+   "build": { "barrel": "br.7x43.16", "charging": "oem.ch.ar.3", "grip": "oem.gr.ar.4", "handguard": "oem.hg.ar.6", "mag": "br3.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.tube.5" }
   },
   { "platform": "br3",
    "why": "authored handguard (hg.ar.0)",
@@ -1794,6 +1802,10 @@
    "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "magnifier": "mgn.2", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "stock": "stk.heavy.0" }
   },
   { "platform": "fal",
+   "why": "authored stock (stk.heavy.scar)",
+   "build": { "barrel": "fal.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "fal",
    "why": "authored grip (gr.ar.0)",
    "build": { "barrel": "fal.barrel", "grip": "gr.ar.0", "handguard": "oem.hg.box.4", "mag": "fal.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "stk.heavy.0" }
   },
@@ -2076,6 +2088,10 @@
   { "platform": "garand",
    "why": "authored magnifier (mgn.2) behind op.pic.1",
    "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "magnifier": "mgn.2", "muzzle": "mz.r762.cap", "optic": "op.pic.1", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "garand",
+   "why": "authored muzzle (mz.r762.a2)",
+   "build": { "barrel": "br.7.62x63.24", "handguard": "oem.hg.classic.3", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.classic.4" }
   },
   { "platform": "garand",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -2486,6 +2502,10 @@
    "build": { "barrel": "br.11.6x53.18.5.tapered", "handguard": "oem.hg.classic.4", "magnifier": "mgn.2", "muzzle": "mz.r762.cap", "optic": "op.pic.1", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
   },
   { "platform": "lever",
+   "why": "authored muzzle (mz.r762.a2)",
+   "build": { "barrel": "br.11.6x53.18.5.tapered", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
+  },
+  { "platform": "lever",
    "why": "suppressor on the muzzle (mz.r762.can)",
    "build": { "barrel": "br.11.6x53.18.5.tapered", "handguard": "oem.hg.classic.4", "muzzle": "mz.r762.can", "optic": "op.pic.0", "stock": "oem.stk.classic.5", "tube": "lever.tube" }
   },
@@ -2630,6 +2650,10 @@
    "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "magnifier": "mgn.2", "muzzle": "mz.r762.cap", "optic": "op.pic.1", "stock": "oem.stk.precision.5" }
   },
   { "platform": "r700",
+   "why": "authored muzzle (mz.r762.a2)",
+   "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.20", "stock": "oem.stk.precision.5" }
+  },
+  { "platform": "r700",
    "why": "biggest magazine (r700.mag.box)",
    "build": { "barrel": "br.7.62x51.24.tapered", "handguard": "oem.hg.classic.5", "mag": "r700.mag.box", "muzzle": "mz.r762.cap", "optic": "oem.op.pic.20", "stock": "oem.stk.precision.5" }
   },
@@ -2752,6 +2776,10 @@
   { "platform": "mosin",
    "why": "authored magnifier (mgn.2) behind op.pic.1",
    "build": { "barrel": "br.7.62x54.28.7.tapered", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "magnifier": "mgn.2", "muzzle": "mz.r762.cap", "optic": "op.pic.1", "stock": "oem.stk.classic.4" }
+  },
+  { "platform": "mosin",
+   "why": "authored muzzle (mz.r762.a2)",
+   "build": { "barrel": "br.7.62x54.28.7.tapered", "handguard": "oem.hg.classic.6", "mag": "mosin.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.21", "stock": "oem.stk.classic.4" }
   },
   { "platform": "mosin",
    "why": "biggest magazine (mosin.mag.box)",
@@ -2892,6 +2920,10 @@
   { "platform": "awm",
    "why": "authored grip (gr.ar.0)",
    "build": { "barrel": "br.8.6x69.27", "grip": "gr.ar.0", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.brake", "optic": "oem.op.pic.22", "stock": "oem.stk.precision.6" }
+  },
+  { "platform": "awm",
+   "why": "authored muzzle (mz.r762.a2)",
+   "build": { "barrel": "br.8.6x69.27", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.5", "mag": "awm.mag", "muzzle": "mz.r762.a2", "optic": "oem.op.pic.22", "stock": "oem.stk.precision.6" }
   },
   { "platform": "awm",
    "why": "suppressor on the muzzle (mz.r762.can)",
@@ -4574,6 +4606,10 @@
    "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "magnifier": "mgn.2", "muzzle": "mz.sg.flash", "optic": "op.pic.1", "stock": "stk.heavy.0" }
   },
   { "platform": "aa12",
+   "why": "authored stock (stk.heavy.scar)",
+   "build": { "barrel": "aa12.barrel", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.pic.0", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "aa12",
    "why": "authored grip (gr.ar.0)",
    "build": { "barrel": "aa12.barrel", "grip": "gr.ar.0", "handguard": "oem.hg.box.7", "mag": "aa12.mag", "muzzle": "mz.sg.flash", "optic": "op.pic.0", "stock": "stk.heavy.0" }
   },
@@ -4990,6 +5026,10 @@
    "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "magnifier": "mgn.2", "muzzle": "mz.r556.a2", "optic": "op.pic.1", "stock": "stk.heavy.0" }
   },
   { "platform": "m249",
+   "why": "authored stock (stk.heavy.scar)",
+   "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "m249",
    "why": "authored grip (gr.ar.0)",
    "build": { "barrel": "br.5.56x45.20.5", "fg": "fg.0", "grip": "gr.ar.0", "handguard": "oem.hg.box.8", "mag": "m249.mag", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "stock": "stk.heavy.0" }
   },
@@ -5134,6 +5174,10 @@
    "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "magnifier": "mgn.2", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "stock": "oem.stk.heavy.4" }
   },
   { "platform": "pkm",
+   "why": "authored stock (stk.heavy.scar)",
+   "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.a2", "optic": "pkm.optic", "stock": "stk.heavy.scar" }
+  },
+  { "platform": "pkm",
    "why": "suppressor on the muzzle (mz.r762.can)",
    "build": { "barrel": "br.7.62x54.25.4.tapered", "grip": "oem.gr.ak.3", "mag": "pkm.mag", "muzzle": "mz.r762.can", "optic": "pkm.optic", "railmount": "rm.0", "stock": "oem.stk.heavy.4", "tac": "tac.0" }
   },
@@ -5264,6 +5308,10 @@
   { "platform": "m60",
    "why": "authored magnifier (mgn.2) behind op.pic.1",
    "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "magnifier": "mgn.2", "muzzle": "mz.r762.a2", "optic": "op.pic.1", "stock": "stk.heavy.0" }
+  },
+  { "platform": "m60",
+   "why": "authored stock (stk.heavy.scar)",
+   "build": { "barrel": "br.7.62x51.22", "grip": "oem.gr.ar.4", "handguard": "oem.hg.box.3", "mag": "m60.mag", "muzzle": "mz.r762.a2", "optic": "op.pic.0", "stock": "stk.heavy.scar" }
   },
   { "platform": "m60",
    "why": "authored grip (gr.ar.0)",
