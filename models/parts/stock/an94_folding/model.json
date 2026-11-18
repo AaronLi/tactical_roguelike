@@ -1,0 +1,25 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "stock",
+  "frame": "stock-mount",
+  "anchors": {
+    "butt": [
+      -0.2311,
+      -0.0629,
+      0
+    ],
+    "cheek": [
+      -0.0923,
+      0.003,
+      0
+    ]
+  },
+  "part": {
+    "mount": "ak",
+    "position": "unfolded (the AN-94 side-folder, 258 mm, solid polymer)"
+  },
+  "replaces": [
+    "AN-94 side-folding stock"
+  ]
+}

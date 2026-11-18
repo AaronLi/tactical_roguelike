@@ -1,0 +1,22 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "muzzle",
+  "frame": "muzzle-mount",
+  "anchors": {
+    "muzzles": [
+      [
+        0.0908,
+        0,
+        0
+      ]
+    ]
+  },
+  "part": {
+    "thread": "rak",
+    "kind": "brake"
+  },
+  "replaces": [
+    "AN-94 muzzle device"
+  ]
+}

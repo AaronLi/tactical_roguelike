@@ -1,0 +1,20 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.1192,
+      -0.012,
+      0
+    ]
+  },
+  "part": {
+    "t": "wood",
+    "len": 0.1984
+  },
+  "replaces": [
+    "AN-94 forend"
+  ]
+}

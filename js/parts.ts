@@ -1502,10 +1502,12 @@ export const Gunsmith = (() => {
     {"id":"op.auth.falcon","slot":"optic","mount":"op:pic","brand":"strix","name":"Strix Falcon open reflex","price":340,"tier":1,"st":{"ergo":-1,"acc":-2,"hip":2},"set":{"zoom":0.8,"scoped":false},"desc":"Unmagnified. Takes a magnifier behind it.","model":{"optic":"authored","apart":"optic/falcon","ret":"dot"},"magnifier":true,"height":"low","src":"models/parts/optic/falcon"},
   ];
   const AUTHORED_REPLACES: any[] = [
+    {"apart":"grip/an94_grip","names":["AN-94 pistol grip"]},
     {"apart":"grip/brightline_a2","names":["Brightline A2 pistol grip (matches the furniture)"]},
     {"apart":"grip/paragon_pg23","names":["Paragon PG-23 ergonomic grip"]},
     {"apart":"handguard/ak_dropin_mlok","names":["Vantage AKX M-LOK"],"len":0.158},
     {"apart":"handguard/ak_dropin_quad","names":["Ironvale AK quad rail"],"len":0.158},
+    {"apart":"handguard/an94_forend","names":["AN-94 forend"],"len":0.1984},
     {"apart":"handguard/halcyon_67","names":["Halcyon 6.7\" M-LOK handguard"],"len":0.17},
     {"apart":"handguard/ironvale_134","names":["Ironvale 13.4\" M-LOK handguard"],"len":0.34},
     {"apart":"handguard/ironvale_ir12","names":["Ironvale IR-12 quad rail"],"len":0.3},
@@ -1523,6 +1525,7 @@ export const Gunsmith = (() => {
     {"apart":"magnifier/brightline_2x","names":["Brightline 2× micro magnifier"],"len":0.06,"px":2},
     {"apart":"magnifier/meridian_5x","names":["Meridian 5× flip magnifier"],"len":0.09,"px":5},
     {"apart":"magnifier/strix_fts3","names":["Strix FTS 3× flip magnifier"],"len":0.075,"px":3},
+    {"apart":"muzzle/an94_device","names":["AN-94 muzzle device"]},
     {"apart":"muzzle/ironvale_a2_556","names":["Ironvale A2 5.56 birdcage"]},
     {"apart":"muzzle/ironvale_a2_762","names":["Ironvale A2 7.62 birdcage"]},
     {"apart":"optic/brightline_pip","names":["Brightline Pip red dot"]},
@@ -1541,6 +1544,7 @@ export const Gunsmith = (() => {
     {"apart":"optic/strix_owlet","names":["Strix Owlet micro dot"]},
     {"apart":"optic/vantage_halo","names":["Vantage Halo circle-dot sight"]},
     {"apart":"optic/vantage_halo_p","names":["Vantage Halo circle-dot pistol sight"]},
+    {"apart":"stock/an94_folding","names":["AN-94 side-folding stock"]},
     {"apart":"stock/factory_scar_stock","names":["SCAR folding stock"]},
     {"apart":"stock/kestrel_cs4","names":["Kestrel CS-4 carbine stock"]},
     {"apart":"stock/kodiak_ak74m","names":["Kodiak AK-74M side-folding stock (Polymer)"]},
@@ -1548,6 +1552,15 @@ export const Gunsmith = (() => {
   ];
   // authored-parts:end
   for (const a of AUTHORED_PARTS) add({ id: a.id, slot: a.slot, mount: a.mount, brand: BR[a.brand], name: a.name, price: a.price, tier: a.tier, st: a.st, set: a.set, desc: a.desc, model: a.model, authored: { height: a.height }, provides: a.magnifier ? { magnifier: 'magn' } : null });
+  // the AN-94's own furniture (parts of its own, appended after the authored parts so no id shifts; each is the model of models/parts/<slot>/an94_*: the AK family's standard stocks, grips,
+  // handguards and muzzles stay as they were and fit its anchors): the solid side-folding stock, the raked grip, the forend and the two-lobe muzzle device
+  { const plat = PLATFORMS.an94;
+    const a = (o: any) => add(Object.assign({ brand: 'Factory', oem: true, tier: 1 }, o));
+    plat.defaults.stock = a({ id: 'stk.ak.an94', slot: 'stock', mount: 'stk:ak', name: 'AN-94 side-folding stock', price: 220, stype: 'skeleton', st: { ergo: 1, recoil: -4, weight: 0.45 }, desc: 'Solid polymer; folds to the side.', model: { stock: 'skeleton', sm: null } }).id;
+    plat.defaults.grip = a({ id: 'gr.ak.an94', slot: 'grip', mount: 'gr:ak', name: 'AN-94 pistol grip', price: 70, desc: 'Standard-issue part.', model: { gripT: 'wood', gm: null } }).id;
+    plat.defaults.handguard = a({ id: 'hg.ak.an94', slot: 'handguard', mount: 'hg:ak', name: 'AN-94 forend', price: 180, st: HG_ST.wood, desc: 'No rails.', hgScale: false, model: { hg: { t: 'wood', len: 0.198, m: 'polymer' } } }).id;
+    plat.defaults.muzzle = a({ id: 'mz.rak.an94', slot: 'muzzle', mount: 'mz:rak', name: 'AN-94 muzzle device', price: 140, desc: 'Standard-issue part.', set: { device: DEV.brake }, model: { muzzle: 'brake' } }).id;
+    plat.hgLen = 0.198; }
   // A REPLACE-ONLY authored part (model.json "replaces") gives existing entries its model: the id, stats, price, tier, mount, what it opens and its build code stay; `was` keeps the
   // old model's optic kind for what ranks or groups sights by kind (tools/model_cases.mjs), and a riser the entry stands on stays the gun's mount piece (model.riser).
   // (FURNITURE, a stock, grip, muzzle device or handguard, gives its model at the end, once every gun's parts are made: furnitureReplaces below)

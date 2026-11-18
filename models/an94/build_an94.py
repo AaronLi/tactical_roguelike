@@ -1,5 +1,5 @@
 # The AN-94 "Abakan" (game id an94): the Nikonov 5.45 x 39 assault rifle as fielded, with its black polymer housing, the side-folding polymer stock, the
-# ribbed forend, the rotary drum rear sight, the offset two-lobe muzzle device and the left-hand charging bar, in Blender.
+# ribbed and grooved forend, the rotary drum rear sight, the two-lobe muzzle device and the right-hand charging lever, in Blender.
 #   Blender: exec(open(r'<repo>/models/an94/build_an94.py').read(), {'GUN_DIR': r'<repo>/models/an94'})
 #   or:      blender -b -P models/an94/build_an94.py
 # References (all viewed on Wikimedia Commons, not downloaded):
@@ -7,15 +7,18 @@
 #    above: a slight tilt, so heights read about 9 % high against lengths): the outline and the right side's detail. Read off its 1920-px thumbnail:
 #    1901 px butt to muzzle = the published 943 mm (stock extended), 0.496 mm a pixel along the gun; heights are scaled 0.54 mm a pixel (the tilt:
 #    checked against "Rifle AN-94.jpg", public domain, 500 x 197, a level right-side shot, and the magazine's length, which is the AK-74's).
-#  - "AN-94 Abakan (4).jpg" and "(1).jpg" (same author and licence; the LEFT side, muzzle left): the charging bar in its channel on the left, the
-#    left hinge plate, the stippled panel, the same housing without a port.
-#  - "АН-94 - Интерполитех-2009 01.jpg" (same author, CC BY-SA 4.0): the right side on the wall, the stock hinge and the latch.
+#  - "AN-94 Abakan (4).jpg" and "(1).jpg" (same author and licence; the LEFT side, muzzle left): the recess and rod on the left, the left hinge plate, the
+#    stippled panel, the same housing without a port.
+#  - "АН-94 - Интерполитех-2009 01.jpg", "АН-94 - МВСВ-2008 01.jpg" and "02.jpg" (same author, CC BY-SA 4.0): the right side on the wall and in the hand,
+#    from the muzzle end (the forend's width against the magazine's), the stock hinge and the latch.
+#  - the prototype shots "Опытный образец автомата АН-94 ... Танковому Биатлону-2014" (same author): the grooved forend's flank and the trigger group.
 # Real figures: 943 mm overall stock extended (728 folded), 405 mm barrel, 3.85 kg, 5.45 x 39 from AK-74 magazines (the AN-94's well cants it a few
 # degrees to the right).
 # What the photos show: the housing is polymer, a stepped hump over the trigger group carrying the rotary drum rear sight, the magazine well deep in
-# the housing, the forend ribbed (vent slots along its top, finger grooves down its sides). Ahead of it the barrel with its steel sleeve and the
-# front sight (a hooded post) on the barrel's front, the muzzle device (two round lobes, set above the bore), and a gas tube under the barrel ending
-# in a steel bracket. The charging bar is a long steel rod in a channel on the LEFT, a thumb hook at its rear.
+# the housing, the forend a ribbed upper over a deeper, grooved lower guard (a ledge where they meet). Ahead of it the barrel with its steel sleeve and the
+# front sight (a hooded post) on the barrel's front, the muzzle device (two round lobes), and a gas tube under the barrel ending in a steel hanger. The
+# charging lever is on the RIGHT: a long narrow slot along the top of the right flank with a bent steel lever standing out of its front end. A round
+# plug, a steel magazine catch block and its round button show on the right flank; the left has a recess with a rod.
 #
 # Frame (docs/models.md "Authored models"): Blender X = right, Y = forward, Z = up, metres; the ORIGIN is the back of the housing on the bore line.
 # Photo pixels (the thumbnail): f = (x - 486) * 0.496 mm, u = (561 - y) * 0.54 mm.
@@ -32,6 +35,12 @@ def UY(y): return (561 - y) * SU
 def PP(pts): return [(FX(x) * mm, UY(y) * mm) for x, y in pts]          # photo pixels -> (forward, up) metres
 def P(pts): return [(f * mm, u * mm) for f, u in pts]                   # (forward, up) in mm -> metres
 def xs(a, b): return tuple(sorted((a, b)))
+
+def multi(boxes):
+    """Several closed meshes as one cutter mesh (one boolean for a row of slots)."""
+    bm = bmesh.new()
+    for bx in boxes: bm.from_mesh(bx); bpy.data.meshes.remove(bx)
+    me = bpy.data.meshes.new('tmp'); bm.to_mesh(me); bm.free(); return me
 
 # ---- the magazine: the AK-74's (models/ak_kit.py, the family's: its other magazines seat at mount_mag), borrowed by running the AK builder into a scratch collection
 os.environ['GUN_EXPORT'] = '0'
@@ -54,63 +63,100 @@ K = Kit(coll, root)
 root['gun'] = ID
 HP = 'polymer'                   # the housing, stock, grip and forend: black polymer
 
-HW = 20.0                        # the housing's half width
-TOP = UY(505)                    # the housing's top (31.0)
+HW = 18.5                        # the housing's half width (37 mm: an AK's stamped receiver is 31, the AN-94's polymer housing a little over it)
+FW = 21.0                        # the forend's lower guard's half width (42 mm); its ribbed upper 1.2 mm less each side
+TOP = UY(505)                    # the housing's top (30.2)
 SHELF = UY(598)                  # the underside behind the magazine well (-20)
-WELL_B = UY(608)                 # the well's floor: the housing's underside ahead of the shelf (the photo shows the table under it)
+WELL_B = UY(636)                 # the well's floor: the housing's lower band ahead of the shelf (-40.5)
 SY = 40.0                        # the sight line: the front post's tip, the rear notch
 DRUM_F = FX(668)                 # the drum's centre
 MAG_F, MAG_Y = 159.0, 6.0        # the magazine's top (mount_mag)
 MAG_LEN = 1.0                    # the photo's magazine is the kit's AK-74 magazine at full length (platform magFit.len)
-CANT = 4.0                       # the magazine canted this many degrees to the right
+CANT = 2.5                       # the magazine canted this many degrees to the right
 PITCH = 3.0                      # and its foot swung this many degrees back (the photo's magazine stands straighter than the kit's)
+FOOT_BACK = 12.0                 # and bent straighter: its foot this many mm further back than a rigid swing leaves it
 HG0, HG1 = FX(1000), FX(1395)    # the forend
 BORE_END = FX(1730)              # the barrel's front (the muzzle device screws on)
 MUZ_END = FX(1913)               # the device's tip (the bullet leaves it)
 POST_F = FX(1672)
+PORT = (FX(848), FX(965), UY(578), UY(530))   # the ejection port's rear, front, bottom and top (mm): a pocket on the right flank down past the bore
+SLOT = (FX(807), FX(1027), UY(521), UY(509))  # the charging lever's slot along the top of the right flank: rear, front, bottom, top
 print('anchors f: well', MAG_F, 'hg', HG0, HG1, 'barrel end', BORE_END, 'muzzle', MUZ_END, 'post', POST_F)
+
+def rivet(x, f, u, r=1.5, h=0.9, slot='base'):
+    """A domed steel head on a flank: x the flank's surface (signed), forward f, up u (mm)."""
+    s = 1 if x >= 0 else -1
+    o = K.tmp(cyl(r * mm, *xs(x * mm - s * 0.2 * mm, x * mm + s * h * mm), 'x', (f * mm, u * mm), 10)); bevel(o, 0.35 * mm, 1); smooth(o); K.adopt(o, slot, 'steel')
 
 # ----------------------------------------------------------------------------------------------------- HOUSING (base)
 def housing():
     """The housing: the stepped hump over the trigger group, the magazine well, the flat top to the forend; its section a rounded box. The well is
-    hollow (walls 5 mm) and tall enough for the canted magazine; the ejection port on the right and the charging bar's channel on the left have dark
-    floors; the selector, the magazine catch and the steel block on the right."""
-    prof = PP([(486, 556), (530, 544), (572, 540), (590, 522), (600, 505), (1000, 505), (1000, 608), (760, 608), (760, 598), (500, 598), (486, 590)])
+    hollow and tall enough for the canted magazine. On the right: the ejection port (a pocket lined black, the carrier in it), the charging lever's slot along
+    the top, the round plug, the magazine catch block and its button, the selector, rivets, the seam; on the left a recess with a rod; the steel hinge plates at the
+    back on both sides."""
+    prof = PP([(486, 556), (530, 544), (572, 540), (590, 522), (600, 505), (1000, 505), (1000, 636), (760, 636), (760, 598), (500, 598), (486, 590)])
     h = K.tmp(prism(prof, 'x', -HW * mm, HW * mm))
     boolean(h, prism(rounded(0, (TOP + WELL_B) / 2 * mm, HW * mm, (TOP - WELL_B) / 2 * mm + 0.001, 6 * mm, 5), 'y', -0.01, HG0 * mm + 0.01), 'INTERSECT')
-    # the well: hollow round the canted magazine
-    cut(h, box(-15.5 * mm, 18.5 * mm, (MAG_F - 34) * mm, (MAG_F + 36) * mm, (WELL_B - 2) * mm, 8 * mm))
-    # the ejection port (right): a pocket with a dark floor; the left channel for the charging bar (dark floor)
-    cut(h, box((HW - 4.5) * mm, (HW + 1) * mm, FX(812) * mm, FX(1003) * mm, UY(524) * mm, UY(513) * mm))
-    cut(h, box(-(HW + 1) * mm, -(HW - 4.0) * mm, 36 * mm, 166 * mm, -7.5 * mm, 1.5 * mm))
+    cut(h, box(-14.0 * mm, 15.9 * mm, (MAG_F - 34) * mm, (MAG_F + 36) * mm, (WELL_B - 2) * mm, 8 * mm))        # (the well: hollow round the canted magazine)
+    pa, pb, pu0, pu1 = PORT
+    cut(h, prism(rounded((pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm, (pb - pa) / 2 * mm, (pu1 - pu0) / 2 * mm, 2.2 * mm, 4), 'x', -2.0 * mm, (HW + 1) * mm))       # (the port, right)
+    cut(h, box((HW - 3.5) * mm, (HW + 1) * mm, SLOT[0] * mm, SLOT[1] * mm, SLOT[2] * mm, SLOT[3] * mm))          # (the lever's slot, right)
+    cut(h, box(-(HW + 1) * mm, -(HW - 3.0) * mm, 36 * mm, 166 * mm, -7.5 * mm, 1.5 * mm))                        # (the left recess)
+    cut(h, cyl(7.0 * mm, (HW - 0.6) * mm, (HW + 1) * mm, 'x', (FX(932) * mm, UY(540) * mm), 24))               # (the round plug's recess, right)
+    cut(h, cyl(1.6 * mm, (HW - 1.4) * mm, (HW + 1) * mm, 'x', (FX(1018) * mm, UY(538) * mm), 12))              # (the small hole)
     bevel(h, 0.8 * mm, 1, 30); smooth(h); K.adopt(h, 'base', HP)
-    o = K.tmp(box((HW - 4.7) * mm, (HW - 4.3) * mm, FX(813) * mm, FX(1002) * mm, (UY(524) + 0.3) * mm, (UY(513) - 0.3) * mm)); K.adopt(o, 'base', 'rubber')       # (the port's floor)
-    # the bolt carrier's flank seen through the port
-    o = K.tmp(box(-(HW - 4.3) * mm, -(HW - 3.9) * mm, 37 * mm, 165 * mm, -7 * mm, 1.0 * mm)); K.adopt(o, 'base', 'rubber')         # (the channel's floor)
-    # the steel block and the magazine catch's round tab on the right (front of the well)
-    o = K.tmp(box(HW * mm, (HW + 3.0) * mm, FX(907) * mm, FX(923) * mm, UY(596) * mm, UY(576) * mm)); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel')
-    o = K.obj(cyl(3.6 * mm, HW * mm, (HW + 2.4) * mm, 'x', (FX(934) * mm, UY(620) * mm), 16), 'base', 'steel'); smooth(o)
-    # the selector, right: its boss on the axis by the trigger guard's front and the lever running down along the housing
+    # the openings read dark: the slot's floor, the plug's disc, the left recess's floor, the small hole's
+    for o in (K.tmp(box((HW - 3.7) * mm, (HW - 3.3) * mm, (SLOT[0] + 1) * mm, (SLOT[1] - 1) * mm, (SLOT[2] + 0.3) * mm, (SLOT[3] - 0.3) * mm)),
+              K.tmp(cyl(6.6 * mm, (HW - 0.9) * mm, (HW - 0.5) * mm, 'x', (FX(932) * mm, UY(540) * mm), 24)),
+              K.tmp(box(-(HW - 3.3) * mm, -(HW - 2.9) * mm, 37 * mm, 165 * mm, -7 * mm, 1.0 * mm)),
+              K.tmp(cyl(1.2 * mm, (HW - 1.7) * mm, (HW - 1.2) * mm, 'x', (FX(1018) * mm, UY(538) * mm), 10))):
+        smooth(o); K.adopt(o, 'base', 'rubber')
+    # the port's lining (the carrier uncovers it): a thin black shell, the chamber's mouth at its front wall and the feed ramp
+    pc, pu, ph, pv = (pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2
+    tub = K.tmp(prism(rounded(pc * mm, pu * mm, (ph - 0.15) * mm, (pv - 0.15) * mm, 2.0 * mm, 4), 'x', -2.0 * mm, (HW - 0.3) * mm))
+    cut(tub, prism(rounded(pc * mm, pu * mm, (ph - 0.6) * mm, (pv - 0.6) * mm, 1.8 * mm, 4), 'x', -1.55 * mm, (HW + 1) * mm)); smooth(tub); K.adopt(tub, 'base', 'black')
+    o = K.obj(lathe([((pb - 4.6) * mm, 5.6 * mm), ((pb - 0.7) * mm, 5.6 * mm)], 24, (0, 0, 0)), 'base', 'gunmetal'); smooth(o)
+    o = K.tmp(prism([((pb - 24) * mm, -2.6 * mm), ((pb - 1.0) * mm, 1.0 * mm), ((pb - 1.0) * mm, -2.6 * mm)], 'x', -7.0 * mm, 7.0 * mm)); smooth(o); K.adopt(o, 'base', 'gunmetal')
+    # panel seams (thin dark inlays): the long seam along the right flank, the hump's edge on both sides
+    for s_ in (-1, 1):
+        o = K.tmp(box(*xs(s_ * (HW - 0.05) * mm, s_ * (HW + 0.22) * mm), FX(520) * mm, FX(790) * mm, UY(571) * mm, (UY(571) + 0.7) * mm)); K.adopt(o, 'base', 'rubber')
+        o = K.tmp(box(*xs(s_ * (HW - 0.05) * mm, s_ * (HW + 0.22) * mm), FX(742) * mm, (FX(742) + 0.7) * mm, UY(598) * mm, UY(556) * mm)); K.adopt(o, 'base', 'rubber')
+    # rivets and screw heads (right: the photo's; left: mirrored places)
+    for px, py in ((838, 583), (672, 560), (716, 558), (790, 590), (562, 586), (610, 590)):
+        rivet(HW, FX(px), UY(py), 1.5)
+        rivet(-HW, FX(px + 14), UY(py + 6), 1.5)
+    # the magazine catch: the steel L-block on the right at the well's front and the square recess with its round button below it
+    o = K.tmp(prism(P([(FX(910), UY(593)), (FX(928), UY(593)), (FX(928), UY(580)), (FX(921), UY(580)), (FX(921), UY(572)), (FX(910), UY(572))]), 'x', HW * mm, (HW + 2.6) * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel')
+    o = K.tmp(box(HW * mm, (HW + 0.4) * mm, (FX(933) - 6.5) * mm, (FX(933) + 6.5) * mm, (UY(620) - 6.0) * mm, (UY(620) + 6.0) * mm)); K.adopt(o, 'base', 'rubber')
+    o = K.obj(cyl(3.6 * mm, (HW + 0.3) * mm, (HW + 1.9) * mm, 'x', (FX(933) * mm, UY(620) * mm), 16), 'base', 'steel'); smooth(o)
+    # the selector, right: its boss on the axis by the trigger guard's front and the lever running down along the housing, its edge ridged
     o = K.obj(cyl(5.0 * mm, HW * mm, (HW + 2.0) * mm, 'x', (FX(728) * mm, UY(612) * mm), 18), 'base', 'black'); smooth(o)
     o = K.tmp(prism(PP([(716, 606), (740, 606), (748, 668), (738, 690), (726, 690)]), 'x', (HW + 1.5) * mm, (HW + 3.5) * mm)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
-    # the housing's rear: the steel hinge plates (both sides) the stock's pins go through, with the latch button on the right
+    for k_ in range(6):
+        o = K.tmp(box((HW + 3.4) * mm, (HW + 3.9) * mm, FX(728) * mm - 4.2 * mm, FX(728) * mm + 5.0 * mm, UY(640 + k_ * 7) * mm, (UY(640 + k_ * 7) + 1.2) * mm)); K.adopt(o, 'base', 'rubber')
+    # the housing's rear: the steel hinge plates (both sides) the stock's pins go through, a pin through them, the latch button on the right
     for s in (-1, 1):
-        o = K.tmp(prism(PP([(474, 580), (500, 576), (502, 638), (480, 640)]), 'x', *xs(s * 14.4 * mm, s * 17.4 * mm))); bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel')
-    o = K.obj(cyl(3.2 * mm, 17.0 * mm, 20.0 * mm, 'x', (FX(488) * mm, UY(594) * mm), 14), 'base', 'steel'); smooth(o)
-    # the wire catch standing on the housing's top at its front, and the wire along its right side
-    wire = K.obj(cyl(0.9 * mm, TOP * mm - 1 * mm, (TOP + 9.5) * mm, 'z', (4 * mm, FX(1032) * mm), 8), 'base', 'steel'); smooth(wire)
-    o = K.obj(cyl(0.9 * mm, FX(1032) * mm, FX(1044) * mm, 'y', (4 * mm, (TOP + 9.0) * mm), 8), 'base', 'steel'); smooth(o)
-    o = K.obj(cyl(0.9 * mm, FX(1040) * mm, FX(1200) * mm, 'y', ((HW + 3.0) * mm, (TOP - 3.5) * mm), 8), 'base', 'steel'); smooth(o)
+        o = K.tmp(prism(PP([(474, 580), (500, 576), (502, 638), (480, 640)]), 'x', *xs(s * (HW - 3.6) * mm, s * (HW - 0.6) * mm))); bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel')
+        o = K.obj(cyl(2.6 * mm, *xs(s * (HW - 0.8) * mm, s * (HW + 0.9) * mm), 'x', (FX(488) * mm, UY(594) * mm), 14), 'base', 'steel'); smooth(o)
+    o = K.obj(cyl(3.2 * mm, (HW - 0.6) * mm, (HW + 2.2) * mm, 'x', (FX(510) * mm, UY(594) * mm), 14), 'base', 'steel'); smooth(o)      # (the latch button, right: the photo's second boss)
+    o = K.obj(cyl(1.7 * mm, (HW + 2.0) * mm, (HW + 3.0) * mm, 'x', (FX(510) * mm, UY(594) * mm), 10), 'base', 'rubber'); smooth(o)
+    # the retaining wire along the right of the forend's upper flank
+    o = K.obj(cyl(0.9 * mm, FX(1040) * mm, FX(1210) * mm, 'y', ((FW - 0.6 + 0.7) * mm, 11.0 * mm), 8), 'base', 'steel'); smooth(o)
+    # the steel collar where the forend meets the housing
+    o = K.obj(lathe([(HG0 * mm - 1.5 * mm, 10.8 * mm), (HG0 * mm + 1.5 * mm, 10.8 * mm)], 24), 'base', 'steel'); smooth(o)
 
 # ----------------------------------------------------------------------------------------------------- THE BARREL GROUP AND THE LOWER TUBE
 def barrel_base():
-    """What stays when another barrel is fitted: the barrel's shank under the forend, the gas tube under it and its steel bracket forward."""
+    """What stays when another barrel or handguard is fitted: the barrel's shank under the forend, the gas tube ahead of it and its steel hanger."""
     o = K.obj(lathe([((HG0 - 50) * mm, 8.4 * mm), ((HG1 + 4) * mm, 8.4 * mm)], 24), 'base', 'black'); smooth(o)
     TU = UY(606)                                                    # the gas tube's axis
-    o = K.obj(lathe([((HG0 - 40) * mm, 8.4 * mm), (FX(1500) * mm, 8.4 * mm)], 24, (0, 0, TU * mm)), 'base', 'steel'); smooth(o)
+    o = K.obj(lathe([((HG1 - 4) * mm, 8.4 * mm), (FX(1500) * mm, 8.4 * mm)], 24, (0, 0, TU * mm)), 'base', 'steel'); smooth(o)
+    o = K.obj(lathe([(FX(1500) * mm, 9.0 * mm), ((FX(1500) + 3) * mm, 9.0 * mm)], 24, (0, 0, TU * mm)), 'base', 'steel'); smooth(o)     # (the collar the hanger clamps)
     br = K.tmp(prism(PP([(1500, 590), (1690, 590), (1690, 610), (1650, 622), (1590, 643), (1560, 632), (1500, 622)]), 'x', -4.2 * mm, 4.2 * mm))
     cut(br, cyl(2.4 * mm, -0.02, 0.02, 'x', (FX(1640) * mm, UY(603) * mm), 12))                   # (its hole)
     bevel(br, 0.6 * mm, 1, 30); smooth(br); K.adopt(br, 'base', 'black')
+    o = K.tmp(box(-3.4 * mm, 3.4 * mm, FX(1612) * mm, FX(1648) * mm, UY(590) * mm, (UY(590) + 3.0) * mm)); K.adopt(o, 'base', 'steel')    # (the rail on the hanger's top)
+    for s_ in (-1, 1): rivet(s_ * 4.2, FX(1560), UY(607), 1.2, 0.7)
 
 def barrel():
     """The barrel (slot barrel): its steel sleeve from the forend's front, then the black barrel to the front sight and the thread."""
@@ -118,68 +164,71 @@ def barrel():
     o = K.obj(lathe([((HG1 - 2) * mm, 8.4 * mm), (FX(1495) * mm, 8.4 * mm), (FX(1500) * mm, 8.2 * mm), (BORE_END * mm, 8.2 * mm)], 24), 'barrel', 'black'); smooth(o)
 
 # ----------------------------------------------------------------------------------------------------- FOREND (handguard)
-def multi(boxes):
-    """Several boxes as one cutter mesh (one boolean for a row of slots)."""
-    bm = bmesh.new()
-    for bx in boxes: bm.from_mesh(bx); bpy.data.meshes.remove(bx)
-    me = bpy.data.meshes.new('tmp'); bm.to_mesh(me); bm.free(); return me
-
 def forend():
-    """The forend (slot handguard), a rounded body from the housing's front to the barrel's sleeve: the polymer guard's lower half bulges under the barrel (its
-    bottom at the photo's y 652 behind, 625 ahead of the step), the finger grooves down its sides, the transverse ribs along the top, a row of small slots in each
-    upper flank (dark floors), the steel collar at the front."""
+    """The forend (slot handguard): a ribbed upper over a deeper grooved lower guard (a ledge where they meet), the lower's bottom at the photo's y 652 behind and
+    625 ahead of the step: the finger grooves down the lower flanks, a row of small slots in each upper flank, ribs across the top (dark floors), the steel collar."""
     top = TOP
     bot = UY(652)
-    side = [(HG0, top), (HG1, top), (HG1, UY(622)), (FX(1230), UY(626)), (FX(1170), UY(652)), (HG0, UY(652))]
-    fo = K.tmp(prism(P(side), 'x', -24.0 * mm, 24.0 * mm))
-    boolean(fo, prism(rounded(0, (top + bot) / 2 * mm, 24 * mm, (top - bot) / 2 * mm, 9 * mm, 5), 'y', HG0 * mm - 0.01, HG1 * mm + 0.01), 'INTERSECT')
+    zl = UY(583)                                                                                 # (where the lower guard's top is: the ledge)
+    up = K.tmp(prism(P([(HG0, top), (HG1, top), (HG1, zl + 2.0), (HG0, zl + 2.0)]), 'x', -(FW - 1.2) * mm, (FW - 1.2) * mm))
+    boolean(up, prism(rounded(0, (top + zl) / 2 * mm, (FW - 1.2) * mm, (top - zl) / 2 * mm + 0.5 * mm, 5 * mm, 4), 'y', HG0 * mm - 0.01, HG1 * mm + 0.01), 'INTERSECT')
+    side = [(HG0, zl + 0.5), (HG1, zl + 0.5), (HG1, UY(622)), (FX(1230), UY(626)), (FX(1170), UY(652)), (HG0, UY(652))]
+    lo = K.tmp(prism(P(side), 'x', -FW * mm, FW * mm))
+    boolean(lo, prism(rounded(0, (zl + bot) / 2 * mm, FW * mm, (zl - bot) / 2 * mm + 0.5 * mm, 9 * mm, 5), 'y', HG0 * mm - 0.01, HG1 * mm + 0.01), 'INTERSECT')
+    boolean(up, lo.data.copy(), 'UNION')
+    bpy.data.objects.remove(lo, do_unlink=True)
+    fo = up
     cut(fo, cyl(9.8 * mm, HG0 * mm - 0.01, HG1 * mm + 0.01, 'y', (0, 0), 24))                       # (the barrel passes through)
-    # finger grooves: down each flank's lower half, 8.6 mm apart
-    gs = []
-    f = HG0 + 40
-    while f + 3.2 < HG1 - 8:
-        for s_ in (-1, 1): gs.append(box(*xs(s_ * 22.6 * mm, s_ * 25 * mm), f * mm, (f + 3.2) * mm, (bot - 1) * mm, (top - 29) * mm))
-        f += 17.0
-    cut(fo, multi(gs))
     def bot_at(f): return UY(652) if f < FX(1170) else (UY(626) if f > FX(1230) else UY(652) + (f - FX(1170)) / (FX(1230) - FX(1170)) * (UY(626) - UY(652)))
-    # the upper flank's slots: 16 small squares at 10.8 px
+    gs, f = [], HG0 + 30
+    while f + 2.2 < HG1 - 8:                                                                     # (finer grooves, 11.5 mm apart)
+        for s_ in (-1, 1): gs.append(box(*xs(s_ * (FW - 1.1) * mm, s_ * (FW + 1) * mm), f * mm, (f + 2.2) * mm, (bot_at(f) + 3) * mm, (zl - 3) * mm))
+        f += 11.5
+    cut(fo, multi(gs))
     sl = []
-    for k in range(16):
+    for k in range(16):                                                                          # (the upper flank's slots: 16 small squares at 10.8 px)
         f = 1212 + k * 10.8
-        for s_ in (-1, 1): sl.append(box(*xs(s_ * 21.6 * mm, s_ * 25 * mm), FX(f) * mm, FX(f + 5.4) * mm, (top - 12.5) * mm, (top - 7.5) * mm))
+        for s_ in (-1, 1): sl.append(box(*xs(s_ * (FW - 2.8) * mm, s_ * (FW + 1) * mm), FX(f) * mm, FX(f + 5.4) * mm, (top - 12.5) * mm, (top - 7.5) * mm))
     cut(fo, multi(sl))
-    # the ribs across the top
-    rb = []
-    f = HG0 + 12
-    while f + 3.0 < HG1 - 6:
-        rb.append(box(-26 * mm, 26 * mm, f * mm, (f + 3.0) * mm, (top - 1.4) * mm, (top + 1) * mm)); f += 6.0
+    rb, f = [], HG0 + 12
+    while f + 2.4 < HG1 - 6:                                                                     # (the ribs across the top: 2.4 mm cuts at 4.8 mm)
+        rb.append(box(-26 * mm, 26 * mm, f * mm, (f + 2.4) * mm, (top - 1.4) * mm, (top + 1) * mm)); f += 4.8
     cut(fo, multi(rb))
-    bevel(fo, 1.0 * mm, 2, 30); smooth(fo); K.adopt(fo, 'handguard', HP)
-    for s_ in (-1, 1):   # the slots' dark floors (a strip over each floor)
-        o = K.tmp(box(*xs(s_ * 21.5 * mm, s_ * 21.9 * mm), FX(1211) * mm, FX(1385) * mm, (top - 12.5) * mm, (top - 7.5) * mm)); K.adopt(o, 'handguard', 'rubber')
-    f = HG0 + 40
-    while f + 3.2 < HG1 - 8:   # (and the grooves')
-        for s_ in (-1, 1):
-            o = K.tmp(box(*xs(s_ * 22.5 * mm, s_ * 22.9 * mm), (f + 0.2) * mm, (f + 3.0) * mm, (bot_at(f) + 8) * mm, (top - 29) * mm)); K.adopt(o, 'handguard', 'rubber')
-        f += 17.0
-    # the front: a steel collar round the sleeve
-    o = K.obj(lathe([((HG1 - 0.5) * mm, 10.2 * mm), ((HG1 + 2.5) * mm, 10.2 * mm)], 24), 'handguard', 'steel'); smooth(o)
+    bevel(fo, 0.9 * mm, 2, 30); smooth(fo); K.adopt(fo, 'handguard', HP)
+    fl = []   # the slots' dark floors (a strip over each floor) and the grooves': one mesh
+    for s_ in (-1, 1): fl.append(box(*xs(s_ * (FW - 2.8) * mm, s_ * (FW - 2.4) * mm), FX(1211) * mm, FX(1385) * mm, (top - 12.5) * mm, (top - 7.5) * mm))
+    f = HG0 + 30
+    while f + 2.2 < HG1 - 8:
+        for s_ in (-1, 1): fl.append(box(*xs(s_ * (FW - 1.15) * mm, s_ * (FW - 0.75) * mm), (f + 0.2) * mm, (f + 2.0) * mm, (bot_at(f) + 4) * mm, (zl - 3) * mm))
+        f += 11.5
+    o = K.tmp(multi(fl)); K.adopt(o, 'handguard', 'rubber')
+    o = K.obj(lathe([((HG1 - 0.5) * mm, 10.2 * mm), ((HG1 + 2.5) * mm, 10.2 * mm)], 24), 'handguard', 'steel'); smooth(o)      # (the front: a steel collar round the sleeve)
 
 # ----------------------------------------------------------------------------------------------------- GRIP (factory: grip) AND TRIGGER GROUP
 def grip():
-    """The pistol grip: raked back, its panels stippled; the trigger guard (a rectangular steel loop) and the trigger with it."""
-    pts = PP([(520, 598), (590, 598), (592, 640), (580, 720), (568, 800), (566, 822), (487, 822), (490, 790), (496, 720), (505, 630), (512, 605)])
-    gp = K.tmp(prism(pts, 'x', -16.0 * mm, 16.0 * mm))
+    """The pistol grip (slot grip): raked back, a palm swell and a flared heel, three finger grooves down the front, the stippled panels each side (dimpled); the
+    trigger guard (a rectangular steel loop) and the trigger are the housing's."""
+    pts = PP([(520, 584), (590, 584), (592, 640), (590, 690), (582, 740), (574, 788), (576, 812), (566, 828), (488, 826), (482, 812), (490, 790), (496, 720), (505, 630), (512, 605)])
+    gp = K.tmp(prism(pts, 'x', -14.5 * mm, 14.5 * mm))
+    for u in (668, 706, 744):                                                                      # (finger grooves in the front edge)
+        cut(gp, cyl(3.6 * mm, -0.03, 0.03, 'x', (FX(594 - (u - 640) * 0.04 + 3.4) * mm, UY(u) * mm), 14))
     for s in (-1, 1):
-        cut(gp, prism(PP([(545, 650), (578, 650), (566, 800), (505, 800), (515, 700)]), 'x', *xs(s * 14.4 * mm, s * 17 * mm)))
-    bevel(gp, 2.6 * mm, 2, 30); smooth(gp); K.adopt(gp, 'grip', HP)
+        cut(gp, prism(PP([(545, 650), (578, 650), (566, 800), (505, 800), (515, 700)]), 'x', *xs(s * 13.0 * mm, s * 15 * mm)))
+    bevel(gp, 2.4 * mm, 2, 30); smooth(gp); K.adopt(gp, 'grip', HP)
     for s in (-1, 1):
-        pn = K.tmp(prism(PP([(545, 650), (578, 650), (566, 800), (505, 800), (515, 700)]), 'x', *xs(s * 14.0 * mm, s * 15.2 * mm)))
-        bevel(pn, 0.5 * mm, 1); smooth(pn); K.adopt(pn, 'grip', 'stipple')
-    o = K.obj(cyl(4.6 * mm, FX(521) * mm, FX(525) * mm, 'y', (0, UY(823) * mm), 14), 'grip', 'steel'); smooth(o)           # (the grip screw's head at the heel)
-    # the trigger group's block under the housing, ahead of the grip's tang (black in both photos behind the trigger)
+        pn = K.tmp(prism(PP([(545, 650), (578, 650), (566, 800), (505, 800), (515, 700)]), 'x', *xs(s * 12.7 * mm, s * 14.0 * mm)))
+        dm = []                                                                                    # (the stipple: a grid of dimples 2.8 mm apart, a third deep)
+        for i in range(8):
+            for j in range(14):
+                f = FX(505) + 2.5 + i * 3.6 + (j % 2) * 1.8; u = UY(790) + 2.5 + j * 4.6
+                dm.append(cyl(0.55 * mm, *xs(s * 13.4 * mm, s * 14.5 * mm), 'x', (f * mm, u * mm), 6))
+        cut(pn, multi(dm))
+        smooth(pn); K.adopt(pn, 'grip', 'stipple')
+    o = K.obj(cyl(4.6 * mm, FX(521) * mm, FX(525) * mm, 'y', (0, UY(827) * mm), 14), 'grip', 'steel'); smooth(o)           # (the grip screw's head at the heel)
+
+def trigger_group():
+    """The trigger group's block under the housing, the trigger guard (a rectangular loop hung from the housing) and the trigger."""
     tb = K.tmp(prism(PP([(598, 597), (736, 597), (736, 644), (702, 650), (604, 650)]), 'x', -12.5 * mm, 12.5 * mm)); bevel(tb, 1.2 * mm, 2, 30); smooth(tb); K.adopt(tb, 'base', HP)
-    # the trigger guard: a rectangular loop hung from the housing
     tg = K.tmp(prism(PP([(622, 596), (724, 596), (724, 692), (622, 692)]), 'x', -2.4 * mm, 2.4 * mm))
     cut(tg, prism(PP([(628, 590), (718, 590), (718, 685), (628, 685)]), 'x', -0.01, 0.01))
     bevel(tg, 0.6 * mm, 1, 30); smooth(tg); K.adopt(tg, 'base', 'black')
@@ -188,42 +237,51 @@ def grip():
 # ----------------------------------------------------------------------------------------------------- STOCK (factory: stock)
 STOCK_ANCH = {'butt': (FX(20) * mm, UY(700) * mm, 0), 'cheek': (FX(300) * mm, UY(578) * mm, 0)}
 def stock():
-    """The side-folding polymer stock: a plain tapering wedge from the housing's back to the butt, its underside sweeping down to the toe, the sling loop
-    under it; the hinge block at its front (the steel plates are the housing's)."""
+    """The side-folding polymer stock (slot stock): a plain tapering wedge from the housing's back to the butt, its underside sweeping down to the toe, the rubber butt
+    pad on its back, a slot under it by the hinge, the sling loop; the steel hinge plates are the housing's."""
     out = PP([(58, 584), (100, 580), (486, 578), (486, 626), (450, 646), (350, 668), (250, 692), (150, 727), (100, 745), (70, 758), (50, 770), (30, 772), (14, 765), (22, 740), (28, 690), (40, 640)])
     st = K.tmp(prism(out, 'x', -20.0 * mm, 20.0 * mm))
-    boolean(st, prism([(-14 * mm, FX(486) * mm), (14 * mm, FX(486) * mm), (19 * mm, FX(8) * mm), (-19 * mm, FX(8) * mm)], 'z', -0.2, 0.05), 'INTERSECT')
+    boolean(st, prism([(-15.0 * mm, FX(486) * mm), (15.0 * mm, FX(486) * mm), (17.5 * mm, FX(8) * mm), (-17.5 * mm, FX(8) * mm)], 'z', -0.2, 0.05), 'INTERSECT')
+    for s in (-1, 1): cut(st, prism(PP([(335, 668), (445, 653), (445, 661), (335, 677)]), 'x', *xs(s * 12.0 * mm, s * 20 * mm)))                   # (the slot under it, both sides)
     bevel(st, 3.0 * mm, 2, 30); smooth(st); K.adopt(st, 'stock', HP)
+    for s in (-1, 1):
+        o = K.tmp(prism(PP([(337, 669), (443, 654.5), (443, 659.5), (337, 674.5)]), 'x', *xs(s * 11.6 * mm, s * 12.1 * mm))); K.adopt(o, 'stock', 'rubber')
+    pad = K.tmp(prism(PP([(40, 640), (28, 690), (22, 740), (14, 765), (30, 772), (30 + 7, 766), (37, 742), (43, 690), (53, 640)]), 'x', -17.9 * mm, 17.9 * mm))
+    boolean(pad, prism([(-17.9 * mm, FX(486) * mm), (17.9 * mm, FX(486) * mm), (17.9 * mm, FX(0) * mm), (-17.9 * mm, FX(0) * mm)], 'z', -0.2, 0.05), 'INTERSECT')
+    bevel(pad, 1.4 * mm, 2, 30); smooth(pad); K.adopt(pad, 'stock', 'rubber')
     ring = K.tmp(cyl(5.2 * mm, -0.9 * mm, 0.9 * mm, 'x', (FX(437) * mm, UY(668) * mm), 18))
     cut(ring, cyl(3.5 * mm, -0.02, 0.02, 'x', (FX(437) * mm, UY(668) * mm), 18)); smooth(ring); K.adopt(ring, 'stock', 'steel')
     o = K.tmp(box(-9 * mm, 9 * mm, FX(437) * mm - 4 * mm, FX(437) * mm + 4 * mm, UY(646) * mm, UY(632) * mm)); K.adopt(o, 'stock', 'steel')
 
 # ----------------------------------------------------------------------------------------------------- MUZZLE DEVICE (factory: muzzle)
 def muzzle():
-    """The AN-94's muzzle device: a neck over the thread and two round lobes, set above the bore (the lobes are centred 8.5 mm over it), the bore's
-    exit a hole low in the face."""
+    """The AN-94's muzzle device (slot muzzle): a neck over the thread and two round lobes (their axis 1.5 mm over the bore), a vent across each lobe, the bore's
+    exit a hole low in the face, the thread nut."""
     f0 = BORE_END
-    ZC = 4.0                                                                                          # (the lobes' axis: 4 mm over the bore)
+    ZC = 1.5
     mz = K.tmp(lathe([(f0 * mm, 8.2 * mm), ((f0 + 8) * mm, 8.6 * mm), ((f0 + 24) * mm, 9.0 * mm), (FX(1782) * mm, 9.5 * mm), (FX(1786) * mm, 12.5 * mm), (FX(1800) * mm, 13.6 * mm),
                       (FX(1818) * mm, 13.6 * mm), (FX(1826) * mm, 11.2 * mm), (FX(1838) * mm, 11.0 * mm), (FX(1846) * mm, 14.0 * mm), (FX(1862) * mm, 14.6 * mm), (FX(1876) * mm, 13.8 * mm),
                       (FX(1884) * mm, 9.0 * mm), (MUZ_END * mm, 7.2 * mm), (MUZ_END * mm, 0.0004)], 28, (0, 0, ZC * mm)))
     cut(mz, cyl(2.8 * mm, f0 * mm - 0.01, MUZ_END * mm + 0.01, 'y', (0, 0), 14))                    # (the bore)
     for fc in (FX(1809), FX(1854)):                                                                  # (a vent across each lobe)
         cut(mz, cyl(2.0 * mm, -0.02, 0.02, 'x', (fc * mm, (ZC + 14.0) * mm), 12))
+        cut(mz, cyl(2.0 * mm, -0.02, 0.02, 'x', (fc * mm, (ZC - 14.0) * mm), 12))
     smooth(mz); K.adopt(mz, 'muzzle', 'black')
+    o = K.obj(lathe([(f0 * mm, 9.4 * mm), ((f0 + 4.5) * mm, 9.4 * mm)], 24, (0, 0, ZC * mm)), 'muzzle', 'steel'); smooth(o)   # (the thread nut)
     return MUZ_END
 
 # ----------------------------------------------------------------------------------------------------- IRONS (factory: optic)
 NOTCH_F = DRUM_F - 9.0
 def irons():
-    """The rotary drum rear sight on the housing's hump (a drum with its rear blade and its U notch) and the front sight: a block on the barrel with the post
+    """The rotary drum rear sight on the housing's hump (a knurled drum with its rear blade and its U notch) and the front sight: a block on the barrel with the post
     standing in a protecting ring."""
-    dr = K.tmp(cyl(13.0 * mm, (TOP - 2) * mm, (SY - 2.2) * mm, 'z', (0, DRUM_F * mm), 28))
-    for k in range(12):      # (the drum's rim: crenellations)
-        a = k * math.pi / 6
-        g = box(-1.1 * mm, 1.1 * mm, -2.6 * mm, 2.6 * mm, (SY - 6.0) * mm, (SY - 1.9) * mm); g.transform(Matrix.Translation((0, DRUM_F * mm + 0.0, 0)) @ Matrix.Rotation(a, 4, 'Z') @ Matrix.Translation((0, 13.0 * mm, 0)))
+    dr = K.tmp(cyl(13.0 * mm, (TOP - 2) * mm, (SY - 2.2) * mm, 'z', (0, DRUM_F * mm), 32))
+    for k in range(24):      # (the drum's rim: crenellations)
+        a = k * math.pi / 12
+        g = box(-0.9 * mm, 0.9 * mm, -2.2 * mm, 2.2 * mm, (SY - 7.0) * mm, (SY - 1.9) * mm); g.transform(Matrix.Translation((0, DRUM_F * mm + 0.0, 0)) @ Matrix.Rotation(a, 4, 'Z') @ Matrix.Translation((0, 13.0 * mm, 0)))
         cut(dr, g)
     bevel(dr, 0.6 * mm, 1, 30); smooth(dr); K.adopt(dr, 'optic', 'black')
+    o = K.obj(cyl(4.0 * mm, (SY - 2.4) * mm, (SY - 1.4) * mm, 'z', (0, DRUM_F * mm), 14), 'optic', 'steel'); smooth(o)        # (the drum's cap screw)
     bl = K.tmp(box(-8.5 * mm, 8.5 * mm, NOTCH_F * mm, (NOTCH_F + 2.8) * mm, (SY - 2.5) * mm, (SY + 1.8) * mm))
     cut(bl, box(-1.3 * mm, 1.3 * mm, (NOTCH_F - 1) * mm, (NOTCH_F + 4) * mm, (SY - 1.5) * mm, (SY + 3) * mm))
     cut(bl, cyl(1.3 * mm, (NOTCH_F - 1) * mm, (NOTCH_F + 4) * mm, 'y', (0, (SY - 1.5) * mm), 12))
@@ -234,7 +292,7 @@ def irons():
     pf = POST_F
     bk = K.tmp(prism(P([(pf - 9, -7), (pf + 9, -7), (pf + 9, 8), (pf - 9, 8)]), 'x', -8.0 * mm, 8.0 * mm))
     boolean(bk, prism(circles_hull([(0, 0.5 * mm)], 8.0 * mm, 24), 'y', (pf - 10) * mm, (pf + 10) * mm), 'INTERSECT')
-    cut(bk, cyl(5.8 * mm, (pf - 11) * mm, (pf + 11) * mm, 'y', (0, 0), 20))
+    cut(bk, cyl(8.3 * mm, (pf - 11) * mm, (pf + 11) * mm, 'y', (0, 0), 20))
     bevel(bk, 0.5 * mm, 1, 30); smooth(bk); K.adopt(bk, 'optic', 'black')
     HC = SY - 3.5
     rg = K.tmp(cyl(8.3 * mm, (pf - 3.5) * mm, (pf + 3.5) * mm, 'y', (0, HC * mm), 28))
@@ -258,22 +316,37 @@ def railed_mount():
         for s_ in (-1, 1):
             o = K.obj(cyl(1.6 * mm, (RC_T - 0.5) * mm, (RC_T + 0.6) * mm, 'z', (s_ * 11.4 * mm, f * mm), 10), 'optic', 'steel'); smooth(o); mount(o)
 
-# ----------------------------------------------------------------------------------------------------- CHARGING BAR (part_handle, on the LEFT)
-HOOK_U = -3.0
-BAR0, BAR1 = 40.0, 158.0                         # the bar's rear (the hook) and its pointed tip
-BAR_X = -(HW - 2.0)
+# ----------------------------------------------------------------------------------------------------- CHARGING LEVER (part_handle, on the RIGHT)
+LEV_F = FX(1035)                  # the lever's place at the slot's front end (the bent steel hook in the photo)
+LEV_U = (SLOT[2] + SLOT[3]) / 2   # the slot's height
+LEV_TRAVEL = 0.075                # the slot's run
 def handle():
-    """The left-hand charging bar (part_handle): a long steel rod in its channel with a thumb hook at the rear and a pointed tip, the clip on it. It is not
-    reciprocating: it stays forward when the gun fires and is pulled back to charge."""
-    ph = K.part('handle', (0, BAR0 * mm, HOOK_U * mm))
-    o = K.obj(lathe([(BAR0 * mm, 1.7 * mm), ((BAR1 - 8) * mm, 1.7 * mm), (BAR1 * mm, 0.4 * mm)], 12, (BAR_X * mm, 0, HOOK_U * mm)), 'base', 'steel', ph); smooth(o)
-    hk = K.tmp(box(*xs((BAR_X + 1.5) * mm, -(HW + 5.5) * mm), (BAR0 - 0.5) * mm, (BAR0 + 3.5) * mm, (HOOK_U - 2.0) * mm, (HOOK_U + 9.0) * mm)); bevel(hk, 0.6 * mm, 1); smooth(hk); K.adopt(hk, 'base', 'steel', ph)
-    cp = K.tmp(box(*xs((BAR_X - 1.6) * mm, -(HW + 1.2) * mm), 92 * mm, 112 * mm, (HOOK_U - 5.0) * mm, (HOOK_U + 2.0) * mm)); bevel(cp, 0.5 * mm, 1); smooth(cp); K.adopt(cp, 'base', 'steel', ph)
+    """The right-hand charging lever (part_handle): a bent steel lever standing out of the front end of its slot along the top of the right flank, its slide in the
+    slot; it is not reciprocating: it stays forward when the gun fires and is pulled back to charge."""
+    ph = K.part('handle', (0, LEV_F * mm, LEV_U * mm))
+    sl = K.tmp(box((HW - 3.4) * mm, (HW - 0.3) * mm, (LEV_F - 16) * mm, (LEV_F + 0.5) * mm, (LEV_U - 2.0) * mm, (LEV_U + 2.0) * mm)); bevel(sl, 0.4 * mm, 1); smooth(sl); K.adopt(sl, 'base', 'steel', ph)     # (the slide in its slot)
+    st = K.tmp(prism([(-3.0 * mm, -2.0 * mm), (3.6 * mm, -2.0 * mm), (3.6 * mm, 8.5 * mm), (1.6 * mm, 13.5 * mm), (-2.6 * mm, 15.5 * mm), (-4.2 * mm, 12.5 * mm), (-0.9 * mm, 9.5 * mm), (-0.9 * mm, 4.0 * mm), (-3.0 * mm, 4.0 * mm)],
+                     'x', (HW + 1.0) * mm, (HW + 3.4) * mm))                                           # (the lever: up out of the slot, the hook bent back at its top; frame: forward, up from the slide's centre)
+    st.data.transform(Matrix.Translation((0, LEV_F * mm, LEV_U * mm))); bevel(st, 0.4 * mm, 1); smooth(st); K.adopt(st, 'base', 'steel', ph)
+    o = K.tmp(box((HW - 0.3) * mm, (HW + 1.2) * mm, (LEV_F - 3.0) * mm, (LEV_F + 3.6) * mm, (LEV_U - 2.0) * mm, (LEV_U + 2.0) * mm)); smooth(o); K.adopt(o, 'base', 'steel', ph)
     return ph
+
+# ----------------------------------------------------------------------------------------------------- BOLT CARRIER (part_carrier, in the port)
+CARRIER_TRAVEL = 0.050
+def carrier():
+    """The bolt carrier seen through the ejection port (part_carrier: it runs back and home with every shot, back with the hand's pull on a charge, held back on an empty
+    magazine): a black block filling the port, its outer face 0.8 mm inside the housing's surface so it never stands out; behind it the pocket shows the chamber."""
+    pa, pb, pu0, pu1 = PORT
+    pk = K.part('carrier', (0, (pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm))
+    o = K.tmp(prism(rounded((pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm, ((pb - pa) / 2 - 1.0) * mm, ((pu1 - pu0) / 2 - 1.0) * mm, 1.6 * mm, 4), 'x', 11.0 * mm, (HW - 0.8) * mm)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black', pk)
+    for f in (-0.022, -0.008, 0.006, 0.020):    # (the carrier's flank: shallow ribs across its face)
+        g = K.tmp(box((HW - 1.3) * mm, (HW - 0.7) * mm, (pa + pb) / 2 * mm + f - 0.0007, (pa + pb) / 2 * mm + f + 0.0007, (pu0 + pu1) / 2 * mm - 0.0045, (pu0 + pu1) / 2 * mm + 0.0045)); smooth(g); K.adopt(g, 'base', 'gunmetal', pk)
+    return pk
 
 # ----------------------------------------------------------------------------------------------------- THE MAGAZINE (part_mag, borrowed)
 def magazine():
-    """The AK-74's 30-round magazine (the family's: the kit's top at 184 / -8 moved to this well's), canted CANT degrees to the right about its top."""
+    """The AK-74's 30-round magazine (the family's: the kit's top at 184 / -8 moved to this well's), canted CANT degrees to the right about its top, its foot swung back
+    PITCH degrees and bent FOOT_BACK mm straighter than the kit's curve."""
     pm = [o for o in borrow if o.name == 'part_mag'][0]
     for o in borrow: coll.objects.link(o)
     pm.parent = root; pm.matrix_parent_inverse = Matrix.Identity(4); pm.matrix_world = Matrix.Translation((0, MAG_F * mm, MAG_Y * mm))
@@ -281,18 +354,27 @@ def magazine():
     Td = Matrix.Translation((0, (MAG_F - 184.0) * mm, (MAG_Y + 8.0) * mm))
     Rc = Matrix.Translation((0, MAG_F * mm, MAG_Y * mm)) @ Matrix.Rotation(-math.radians(CANT), 4, 'Y') @ Matrix.Rotation(-math.radians(PITCH), 4, 'X') @ Matrix.Translation((0, -MAG_F * mm, -MAG_Y * mm))
     Sc = Matrix.Translation((0, MAG_F * mm, MAG_Y * mm)) @ Matrix.Diagonal((1.0, 1.0, MAG_LEN, 1.0)) @ Matrix.Translation((0, -MAG_F * mm, -MAG_Y * mm))
+    L = 235.0
+    def straighten(v):    # (a vertex moves back as the cube of its depth below the top: the foot most)
+        d = max(0.0, (MAG_Y * mm - v.z) / (L * mm)); v.y -= FOOT_BACK * mm * d ** 3
     for o in borrow:
         if o is pm: continue
-        W = Wold[o]; ident = (W.to_3x3() - Matrix.Identity(3)).median_type if False else max(abs(W[i][j] - (1.0 if i == j else 0.0)) for i in range(3) for j in range(3)) < 1e-6
+        W = Wold[o]; ident = max(abs(W[i][j] - (1.0 if i == j else 0.0)) for i in range(3) for j in range(3)) < 1e-6
         o.parent = pm; o.matrix_parent_inverse = Matrix.Identity(4)
         if o.get('chk') is not None and not ident:       # (a witness hole: tilted to the face, moved with the scaled magazine, not stretched)
             full = Rc @ Sc @ Td @ W
             R3 = Rc.to_3x3() @ W.to_3x3()
-            o.matrix_world = Matrix.Translation(full.translation) @ R3.to_4x4()
+            from mathutils import Vector
+            t = Vector(full.translation); d = max(0.0, (MAG_Y * mm - t.z) / (L * mm)); t.y -= FOOT_BACK * mm * d ** 3
+            o.matrix_world = Matrix.Translation(t) @ R3.to_4x4()
         elif o.get('chk') is not None:                    # (a round: moved, not scaled)
-            o.data.transform(Rc @ Td @ W); o.matrix_world = Matrix.Identity(4)
+            o.data.transform(Rc @ Td @ W)
+            for v in o.data.vertices: straighten(v.co)
+            o.matrix_world = Matrix.Identity(4)
         else:                                             # (the body: its vertices carry the scale)
-            o.data.transform(Rc @ Sc @ Td @ W); o.matrix_world = Matrix.Identity(4)
+            o.data.transform(Rc @ Sc @ Td @ W)
+            for v in o.data.vertices: straighten(v.co)
+            o.matrix_world = Matrix.Identity(4)
         K.n += 1; o.name = '%s_%d' % (o.get('slot', 'mag'), K.n)
     bpy.context.view_layer.update()
     return pm
@@ -303,11 +385,13 @@ forend()
 barrel_base()
 barrel()
 grip()
+trigger_group()
 stock()
 MUZ = muzzle()
 irons()
 railed_mount()
 ph = handle()
+pk = carrier()
 pm = magazine()
 pm['check'] = pm.get('check') or {'w': 0.026}
 bpy.context.view_layer.update()
@@ -329,11 +413,12 @@ info = {
     'sy': r4(SY * mm), 'fSight': r4(NOTCH_F * mm), 'relief': 0.15,
     'muzzles': [[r4(MUZ * mm), 0, 0]],
     'grip': [0.026, -0.08, 0], 'support': [r4((HG0 + HG1) / 2 * mm + 0.02), -0.012, 0],
-    'anim': {'handle': 'part_handle', 'mag': 'part_mag'},
+    'anim': {'handle': 'part_handle', 'carrier': 'part_carrier', 'mag': 'part_mag'},
+    'carrier': {'travel': CARRIER_TRAVEL},
     'magAt': [r4(MAG_F * mm), r4(MAG_Y * mm)],
-    'handle': {'f': r4(BAR0 * mm), 'y': r4(HOOK_U * mm), 'x': r4(-(HW + 3.0) * mm), 'travel': 0.060, 'recip': False, 'style': 'bar', 'grab': [r4(BAR0 * mm + 0.002), r4(HOOK_U * mm + 0.004), r4(-(HW + 4.0) * mm)]},
-    'port': [r4(FX(907) * mm), r4(UY(518) * mm), r4(HW * mm)],
-    'chamberAt': {'side': 'right', 'f': r4(197 * mm), 'y': 0.0, 'x': r4((HW - 2.5) * mm)},
+    'handle': {'f': r4(LEV_F * mm), 'y': r4(LEV_U * mm), 'x': r4((HW + 2.2) * mm), 'travel': LEV_TRAVEL, 'recip': False, 'style': 'ak', 'grab': [r4(LEV_F * mm + 0.002), r4(LEV_U * mm + 0.011), r4((HW + 2.8) * mm)]},
+    'port': [r4(FX(907) * mm), r4((PORT[2] + PORT[3]) / 2 * mm), r4(HW * mm)],
+    'chamberAt': {'side': 'port', 'f': r4((PORT[1] - 6.0) * mm), 'y': 0.0, 'x': 0.0},     # (a real port: the game draws no plate or bolt face over it; the round shows in it when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [r4(BORE_END * mm), 0, 0]},
 }
@@ -362,3 +447,4 @@ def open_edges(objs):
 result = {'id': ID, 'meshes': len(meshes), 'tris': tris_of(meshes), 'open_meshes': open_edges(meshes), 'bounds_mm': [[round(x * 1000, 1) for x in v] for v in bb],
           'glb': save_and_export(coll, root, HERE, ID, EXPORT), 'info': info, 'anchors': anchors}
 print('RESULT', json.dumps(result))
+g = globals()            # (models/an94_parts.py cuts the furniture parts out of this build)
