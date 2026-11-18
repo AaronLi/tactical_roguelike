@@ -253,7 +253,10 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   // the lower bands and open above it, a fridge in the lower three), the lamps at their own heights (the light a point in the slab
   // would take: nearer a lamp's height, brighter), the light stopped by what stands in the slab and bounced round it. A surface takes
   // the two slabs its height is between, by how far between. Each is a layer of the textures, floor by floor and band by band.
-  const BANDS = 4, BAND0 = 0.5, BANDH = 1.0;
+  // BANDS 1 is the grid as it was: one layer a floor, a point a metre up, only the walls (and windows) in its way, furniture not in the light at all.
+  // 4 is the layers described above: 3.5 to 6 times the bake (an apartment 7.5 s, a festival 3.6 s), 4 times the light textures, furniture throwing
+  // shadow and not lit as bare floor. Off for now; the ambient occlusion (below) has the furniture in it either way.
+  const BANDS = 1, BAND0 = BANDS === 1 ? 1.0 : 0.5, BANDH = 1.0;
 
   // What stands on each tile, by height: from its lowest to its highest (a wall: all of it, a window's glass too (the light goes
   // through it, below)), as a lamp's line of sight meets it. A line from a lamp high up to a tile on the floor passes over a
@@ -263,7 +266,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
     for (let i = 0; i < N; i++) if (t[i] === 1) { top[i] = 1e9; bot[i] = -1; }
     const props: Iterable<LvProp> = (fm as any).propList || (fm.props ? new Set(fm.props.values()) : []);
     for (const p of props) for (const bx of p.boxes) {
-      if (bx.walk) continue;
+      if (bx.walk || BANDS === 1) continue;
       for (let z = Math.max(0, Math.floor((bx.cz - bx.hz) / TS)); z <= Math.min(H - 1, Math.floor((bx.cz + bx.hz) / TS)); z++) for (let x = Math.max(0, Math.floor((bx.cx - bx.hx) / TS)); x <= Math.min(W - 1, Math.floor((bx.cx + bx.hx) / TS)); x++) {
         const i = z * W + x, ox = Math.min((x + 1) * TS, bx.cx + bx.hx) - Math.max(x * TS, bx.cx - bx.hx), oz = Math.min((z + 1) * TS, bx.cz + bx.hz) - Math.max(z * TS, bx.cz - bx.hz);
         if (ox <= 0 || oz <= 0 || t[i] === 1) continue;
@@ -275,6 +278,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
     return { top, bot };
   }
   function bandSolid(fm: LvMap, b: number, W: number, H: number): Uint8Array {
+    if (BANDS === 1) return Uint8Array.from(fm.t as ArrayLike<number>);
     const TS = Level.TS, t = Uint8Array.from(fm.t as ArrayLike<number>), cover = new Float32Array(W * H), lo = b * BANDH, hi = lo + BANDH, props: Iterable<LvProp> = (fm as any).propList || (fm.props ? new Set(fm.props.values()) : []);
     for (const p of props) for (const bx of p.boxes) {
       if (bx.walk || Math.min(bx.h, hi) - Math.max(bx.y0, lo) < 0.4) continue; // (fills 40 cm of the slab at least)
