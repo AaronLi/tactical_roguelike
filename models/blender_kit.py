@@ -266,26 +266,27 @@ def save_and_export(coll, root, here, name, export=True, also=()):
 # it, dark metal) and the carrier itself (port_carrier: a black block filling the port, its outer face inside the receiver's surface, ribbed; it slides along z, backward).
 # pa, pb: the port's rear and front (forward, metres); pu0, pu1: its bottom and top (up); hw: the receiver's surface half width there; the bore is the Y axis.
 MM_ = 0.001
-def port_pocket(pa, pb, pu0, pu1, x_out, r=2.0 * MM_):
-    """The cutter for the opening: from just past the bore (x -2 mm) out through the receiver's surface."""
-    return prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2, r, 4), 'x', -2.0 * MM_, x_out)
+def port_pocket(pa, pb, pu0, pu1, x_out, r=2.0 * MM_, x_in=-2.0 * MM_):
+    """The cutter for the opening: from just past the bore (x_in, -2 mm) out through the receiver's surface."""
+    return prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2, r, 4), 'x', x_in, x_out)
 
-def port_inside(Kx, pa, pb, pu0, pu1, hw, mouth_r=5.6 * MM_, ramp=24 * MM_, parent=None):
+def port_inside(Kx, pa, pb, pu0, pu1, hw, mouth_r=5.6 * MM_, ramp=24 * MM_, parent=None, x_in=-2.0 * MM_, ax=0.0, az=0.0):
     """The port's inside: a 0.45 mm black lining shell, the chamber's mouth (the barrel extension's face, gunmetal) at the front wall and the feed ramp under the round's path."""
     pc, pu, ph, pv = (pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2
-    tub = Kx.tmp(prism(rounded(pc, pu, ph - 0.15 * MM_, pv - 0.15 * MM_, 2.0 * MM_, 4), 'x', -2.0 * MM_, hw - 0.3 * MM_))
-    cut(tub, prism(rounded(pc, pu, ph - 0.6 * MM_, pv - 0.6 * MM_, 1.8 * MM_, 4), 'x', -1.55 * MM_, hw + 1 * MM_)); smooth(tub); Kx.adopt(tub, 'base', 'black', parent)
-    o = Kx.obj(lathe([(pb - 4.6 * MM_, mouth_r), (pb - 0.7 * MM_, mouth_r)], 24, (0, 0, 0)), 'base', 'gunmetal', parent); smooth(o)
-    o = Kx.tmp(prism([(pb - ramp, pu0 + 0.6 * MM_), (pb - 1.0 * MM_, -mouth_r * 0.2), (pb - 1.0 * MM_, pu0 + 0.6 * MM_)], 'x', -mouth_r * 1.6, mouth_r * 1.6)); smooth(o); Kx.adopt(o, 'base', 'gunmetal', parent)
+    tub = Kx.tmp(prism(rounded(pc, pu, ph - 0.15 * MM_, pv - 0.15 * MM_, 2.0 * MM_, 4), 'x', x_in, hw - 0.3 * MM_))
+    cut(tub, prism(rounded(pc, pu, ph - 0.6 * MM_, pv - 0.6 * MM_, 1.8 * MM_, 4), 'x', x_in + 0.45 * MM_, hw + 1 * MM_)); smooth(tub); Kx.adopt(tub, 'base', 'black', parent)
+    o = Kx.obj(lathe([(pb - 4.6 * MM_, mouth_r), (pb - 0.7 * MM_, mouth_r)], 24, (ax, 0, az)), 'base', 'gunmetal', parent); smooth(o)
+    o = Kx.tmp(prism([(pb - ramp, pu0 + 0.6 * MM_), (pb - 1.0 * MM_, az - mouth_r * 0.2), (pb - 1.0 * MM_, pu0 + 0.6 * MM_)], 'x', ax - mouth_r * 1.6, ax + mouth_r * 1.6)); smooth(o); Kx.adopt(o, 'base', 'gunmetal', parent)
 
-def port_carrier(Kx, pa, pb, pu0, pu1, hw, x0=5.6 * MM_, ribs=4, mat='black'):
+def port_carrier(Kx, pa, pb, pu0, pu1, hw, x0=5.6 * MM_, ribs=4, mat='black', x1=None):
     """part_carrier: a black block filling the port (1 mm in from its edges), its outer face 0.8 mm inside the receiver's surface so it never stands out, shallow gunmetal ribs
     across its flank; the part's pivot at the port's middle, sliding back (+z) in the game."""
     pc, pu = (pa + pb) / 2, (pu0 + pu1) / 2
+    x1 = hw - 0.8 * MM_ if x1 is None else x1       # (its outer face: inside the receiver's surface wherever the block runs back to, so it never stands out)
     pk = Kx.part('carrier', (0, pc, pu))
-    o = Kx.tmp(prism(rounded(pc, pu, (pb - pa) / 2 - 1.0 * MM_, (pu1 - pu0) / 2 - 1.0 * MM_, 1.6 * MM_, 4), 'x', x0, hw - 0.8 * MM_)); bevel(o, 0.5 * MM_, 2, 30); smooth(o); Kx.adopt(o, 'base', mat, pk)
+    o = Kx.tmp(prism(rounded(pc, pu, (pb - pa) / 2 - 1.0 * MM_, (pu1 - pu0) / 2 - 1.0 * MM_, 1.6 * MM_, 4), 'x', x0, x1)); bevel(o, 0.5 * MM_, 2, 30); smooth(o); Kx.adopt(o, 'base', mat, pk)
     L = pb - pa
     for i in range(ribs):
         f = pc + (i - (ribs - 1) / 2) * L * 0.2
-        g = Kx.tmp(box(hw - 1.3 * MM_, hw - 0.7 * MM_, f - 0.7 * MM_, f + 0.7 * MM_, pu - (pu1 - pu0) * 0.34, pu + (pu1 - pu0) * 0.34)); smooth(g); Kx.adopt(g, 'base', 'gunmetal', pk)
+        g = Kx.tmp(box(x1 - 0.5 * MM_, x1 + 0.1 * MM_, f - 0.7 * MM_, f + 0.7 * MM_, pu - (pu1 - pu0) * 0.34, pu + (pu1 - pu0) * 0.34)); smooth(g); Kx.adopt(g, 'base', 'gunmetal', pk)
     return pk
