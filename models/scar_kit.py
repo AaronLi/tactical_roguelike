@@ -127,6 +127,9 @@ def lower():
     for s in (-1, 1): cut(lo, box(*xs(s * 10.0 * mm, s * 24 * mm), GRIP_TOP[0] - 0.002, W_OUT_B, W_BOT - 0.01, Up(472)))
     wa, wb = GRIP_TOP[0] + 0.008, min(0.1158, W_OUT_B - 0.002)   # (the guard's window, traced off FN's 16S/17S NRCH studio shots: 56 mm long, 30 deep, from the grip's front to the well's back wall)
     cut(lo, prism(rounded((wa + wb) / 2, -0.0693, (wb - wa) / 2, 0.01525, 5 * mm, 4), 'x', -0.02, 0.02))
+    for s in (-1, 1):   # (moulded panels let into the flanks, 0.6 mm: behind the selector, ahead of the guard)
+        cut(lo, prism(rounded(0.020, -0.040, 0.015, 0.008, 3 * mm, 4), 'x', *xs(s * (HWL - 0.6 * mm), s * (HWL + 1.0 * mm))))
+        cut(lo, prism(rounded(0.098, -0.068, 0.012, 0.007, 3 * mm, 4), 'x', *xs(s * (HWL - 0.6 * mm), s * (HWL + 1.0 * mm))))
     cut(lo, box(-V['ihalf'] * mm, V['ihalf'] * mm, W_IN_B, W_IN_F, W_BOT - 0.01, MAG_TOP[1] + 7 * mm))                                # (the well)
     bevel(lo, 1.0 * mm, 2, 30); smooth(lo); K.adopt(lo, 'base', FURN)
     # the trigger in its guard
@@ -267,6 +270,24 @@ def mag_h(top):
     ag['round_lathe'](h, -2.9 * mm, top[1] - 8.4 * mm, 0.051, 0.0705, 6.0 * mm, 5.9 * mm, 4.4 * mm, 3.9 * mm, pm, 'second')
     return pm
 
+# ----------------------------------------------------------------------------------------------------- DETAILS (base): what FN's NRCH studio shots show
+def details():
+    """The right side's features, and the left's: the brass deflector's wedge behind the ejection port, the magazine release (a square housing and its round
+    button on each flank of the well's top), the takedown pins, the quick-detach sling sockets on the upper's back and under the gas housing, the seam
+    groove between the upper and the lower, the handle's lock stud on the left."""
+    for s in (-1, 1):
+        o = K.tmp(prism(rounded(0.114, -0.041, 8 * mm, 11 * mm, 2.5 * mm, 4), 'x', *xs(s * (HWL - 0.3 * mm), s * (HWL + 1.4 * mm)))); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', FURN)
+        o = K.obj(cyl(4.6 * mm, *xs(s * (HWL + 1.0 * mm), s * (HWL + 3.2 * mm)), 'x', (0.114, -0.041), 18), 'base', 'black'); smooth(o)
+        for f, u, r in ((0.018, -0.0145, 3.4), (0.171, -0.0145, 3.0)):     # (the takedown pins, rear and front)
+            o = K.obj(cyl(r * mm, *xs(s * (HWL - 0.2 * mm), s * (HWL + 2.0 * mm)), 'x', (f, u), 16), 'base', 'steel'); smooth(o)
+        for f, u in ((0.010, 0.0075), (F_FRONT + 0.006, -0.012)):             # (the quick-detach sockets: a boss with its hole)
+            q = K.tmp(cyl(5.8 * mm, *xs(s * (HWU - 0.4) * mm, s * (HWU + 3.0) * mm), 'x', (f, u), 20)); cut(q, cyl(2.6 * mm, *xs(s * (HWU - 1.0) * mm, s * (HWU + 3.5) * mm), 'x', (f, u), 14))
+            bevel(q, 0.4 * mm, 1); smooth(q); K.adopt(q, 'base', 'steel')
+        g = K.tmp(box(*xs(s * (HWU - 0.2) * mm, s * (HWU + 0.7) * mm), 0.0, F_FRONT - 0.002, UP_BOT * mm - 0.0006, UP_BOT * mm + 0.0006)); smooth(g); K.adopt(g, 'base', 'black')   # (the seam)
+    # the brass deflector: a wedge at the port's rear on the right, its slope toward the port
+    d = K.tmp(prism([(0.086, -0.003), (0.100, -0.003), (0.100, 0.016), (0.092, 0.017), (0.086, 0.009)], 'x', (HWU - 0.4) * mm, (HWU + 4.4) * mm)); bevel(d, 0.8 * mm, 2, 30); smooth(d); K.adopt(d, 'base', 'black')
+    o = K.obj(cyl(3.2 * mm, -(HWU + 2.2) * mm, -(HWU - 0.4) * mm, 'x', (HANDLE[0] - 0.026, HANDLE[1] + 0.012), 16), 'base', 'steel'); smooth(o)         # (the left handle's lock stud)
+
 # ===================================================================================================== ASSEMBLY
 upper()
 rails()
@@ -275,12 +296,18 @@ gas_block()
 rear_sight()
 front_sight()
 ph = handle()
+details()
 barrel()
 MUZ = muzzle()
 ag['grip_a2'](GRIP_TOP)
 stock()
 if V['mag'] == 'stanag': ag['mag_stanag'](MAG_TOP)
 else: mag_h(MAG_TOP)
+# flat faces shade flat, edges hard at 30 degrees: normals weighted by face area (no streaks across long thin triangles of big faces)
+for o in [o for o in coll.all_objects if o.type == 'MESH' and not o.name.startswith('tmp')]:
+    smooth(o, 30)
+    md = o.modifiers.new('wn', 'WEIGHTED_NORMAL'); md.mode = 'FACE_AREA'; md.keep_sharp = True; md.weight = 100
+    _apply(o, md)
 for o in list(coll.all_objects):
     if o.name.startswith('tmp') or o.name.startswith('cutter'): bpy.data.objects.remove(o, do_unlink=True)
 # viewing colours for the materials blender_kit does not know (the game replaces every material by its name)
