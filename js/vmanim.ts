@@ -333,8 +333,8 @@ export const VMAnim = (() => {
   // of the hand slaps the handle down out of the notch (lock back to 0) and the bolt runs home (back to 0), chambering a round.
   const SLAP = { grab: 0.053, pull: 0.143, lock: 0.196, mag0: 0.208, mag1: 0.774, slap: 0.836, home: 0.87, rest: 0.966 }; // (an MP5 keeping its magazine, 2.65 s: the draw back 0.24 s, the turn into the notch 0.14 s, the change 1.5 s)
   const slapState = (t: number) => ({
-    back: S(SLAP.grab, SLAP.pull, t) * (1 - S(SLAP.slap - 0.005, SLAP.home, t)),
-    lock: S(SLAP.pull, SLAP.lock, t) * (1 - S(SLAP.slap - 0.02, SLAP.slap + 0.005, t)),
+    back: S(SLAP.grab, SLAP.pull, t) * (1 - S(SLAP.slap + 0.005, SLAP.home, t)),
+    lock: S(SLAP.pull, SLAP.lock, t) * (1 - S(SLAP.slap, SLAP.slap + 0.02, t)), // (the lever is struck out of its notch at the slap, then the bolt runs home)
     hand: S(0, SLAP.grab, t) * (1 - S(SLAP.lock, SLAP.mag0 + 0.06, t)) + S(SLAP.mag1 - 0.055, SLAP.mag1 + 0.02, t) * (1 - S(SLAP.home, SLAP.rest, t)), // (how much of the hand is on the handle: straight there from the seated magazine, slapM)
   });
   const isSlap = (def: Def) => { const i = Models.infoOf(def); return !!(i && i.handle && i.handle.lock > 0 && !def.akimbo && kinds(def).reload === 'mag'); };
@@ -358,6 +358,14 @@ export const VMAnim = (() => {
     // the left hand: on the handle, wherever it is, while it works it; on the magazine in between
     const onH = slapGrab(h, st.back, st.lock);
     pose.L = lerpV(pose.L || A.S, onH, st.hand); pose.Lk = st.hand; pose.Lkind = 'handle';
+    // the release: the magazine in and the bolt locked back, the support hand comes in from the left open and flat, fingers out, palm to the gun's side, and slaps the lever out of its
+    // notch with the heel of the palm (a short approach, the strike on SLAP.slap, the hand coming off): it does not take the lever
+    const t1 = SLAP.mag1 - 0.055;
+    if (t >= t1) {
+      const from = pose.L || A.S, appr = off(onH, 0.012, 0.025, -0.07), hit = off(onH, 0.0, 0.0, -0.004), away = off(onH, 0.02, 0.04, -0.1);
+      pose.L = path(t, [[t1, from], [SLAP.slap - 0.06, appr], [SLAP.slap, hit], [SLAP.slap + 0.05, away], [SLAP.rest, A.S]]);
+      pose.Lk = S(t1, t1 + 0.06, t) * (1 - S(SLAP.slap + 0.04, SLAP.rest, t)); pose.Lkind = 'palm';
+    }
     // the gun turned to show its left side to the hand on the handle, as for any left-hand handle
     const r = S(0.02, 0.09, t) * (1 - S(0.0, 0.14, m)) * (t < SLAP.mag1 - 0.05 ? 1 : 0) + S(SLAP.mag1 - 0.04, SLAP.mag1, t) * (1 - S(SLAP.home, SLAP.rest, t)); // (the turn to the handle hands over to the magazine's own tilt as it comes in, magTilt, not before it: no sag between)
     pose.gun[5] -= 0.3 * r; pose.gun[3] += 0.2 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r;
