@@ -1,0 +1,39 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.18,
+      -0.025,
+      0
+    ]
+  },
+  "part": {
+    "t": "mlok",
+    "len": 0.3,
+    "rails": {
+      "top": [
+        0,
+        0.2985
+      ],
+      "left": [
+        0.03,
+        0.29
+      ],
+      "right": [
+        0.03,
+        0.29
+      ],
+      "bottom": [
+        0.03,
+        0.29
+      ],
+      "kind": "mlok"
+    }
+  },
+  "replaces": [
+    "Talon 11.8\" FDE M-LOK handguard"
+  ]
+}

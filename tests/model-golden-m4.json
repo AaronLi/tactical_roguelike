@@ -109,8 +109,8 @@
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,grip=gr.ar.0,handguard=oem.hg.ar.11,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=oem.hg.ar.11",
-   "geometry": "234ce7bbb864db85",
-   "info": "e02f257ec0717023"
+   "geometry": "fa7c1a2b84e96c2f",
+   "info": "f97d21fed928af5c"
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,grip=gr.ar.0,handguard=hg.ar.short.carbine,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0": {
    "label": "handguard=hg.ar.short.carbine",
@@ -614,7 +614,7 @@
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.0,handguard=oem.hg.ar.11,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {
    "label": "handguard=oem.hg.ar.11 from loaded A",
-   "geometry": "258efa74e38c2542",
+   "geometry": "58b44fe2630dd936",
    "info": "945cec50d0891aff"
   },
   "barrel=br.5.56x45.10.3,charging=oem.ch.ar.3,fg=fg.0,grip=gr.ar.0,handguard=hg.ar.short.mlok,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,stock=stk.tube.0,tac=tac.0,tacL=tac.0": {

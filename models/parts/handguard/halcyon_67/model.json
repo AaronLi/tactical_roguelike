@@ -1,0 +1,39 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.115,
+      -0.025,
+      0
+    ]
+  },
+  "part": {
+    "t": "mlok",
+    "len": 0.17,
+    "rails": {
+      "top": [
+        0,
+        0.1685
+      ],
+      "left": [
+        0.03,
+        0.16
+      ],
+      "right": [
+        0.03,
+        0.16
+      ],
+      "bottom": [
+        0.03,
+        0.16
+      ],
+      "kind": "mlok"
+    }
+  },
+  "replaces": [
+    "Halcyon 6.7\" M-LOK handguard"
+  ]
+}

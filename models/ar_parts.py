@@ -90,4 +90,13 @@ for pid, L, mat, name in (('vantage_vx15', 0.360, None, 'Vantage VX-15 M-LOK 15"
     g['handguard_mlok'](HG0, HG0 + L, mat)
     write_part('handguard', pid, slot_meshes('handguard') - before, (HG0, 0.0), {'support': r4([L / 2 + 0.03, -0.019 - 6 * mm, 0])},
                {'part': {'t': 'mlok', 'len': L, 'rails': mlok_rails(L)}, 'replaces': [name]})
+# ---- the factory M-LOK handguards of other AR-family guns, as parts so they look the same on every gun that takes them (each gun's own
+# model draws its own: these are for fitting them elsewhere): the Talon 11.8" (FDE), the SR-25's Ironvale 13.4" and the AR-9's
+# Halcyon 6.7" (full-length top rails: a part's rails are one range each)
+for pid, L, mat, name in (('talon_118_fde', 0.300, 'tan', 'Talon 11.8" FDE M-LOK handguard'), ('ironvale_134', 0.340, None, 'Ironvale 13.4" M-LOK handguard'),
+                          ('halcyon_67', 0.170, None, 'Halcyon 6.7" M-LOK handguard')):
+    before = slot_meshes('handguard')
+    g['handguard_mlok'](HG0, HG0 + L, mat)
+    write_part('handguard', pid, slot_meshes('handguard') - before, (HG0, 0.0), {'support': r4([L / 2 + 0.03, -0.019 - 6 * mm, 0])},
+               {'part': {'t': 'mlok', 'len': L, 'rails': mlok_rails(L)}, 'replaces': [name]})
 print('PARTS DONE')

@@ -1,0 +1,39 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "handguard",
+  "frame": "handguard-mount",
+  "anchors": {
+    "support": [
+      0.2,
+      -0.025,
+      0
+    ]
+  },
+  "part": {
+    "t": "mlok",
+    "len": 0.34,
+    "rails": {
+      "top": [
+        0,
+        0.3385
+      ],
+      "left": [
+        0.03,
+        0.33
+      ],
+      "right": [
+        0.03,
+        0.33
+      ],
+      "bottom": [
+        0.03,
+        0.33
+      ],
+      "kind": "mlok"
+    }
+  },
+  "replaces": [
+    "Ironvale 13.4\" M-LOK handguard"
+  ]
+}
