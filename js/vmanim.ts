@@ -926,7 +926,9 @@ export const VMAnim = (() => {
         // bolt's back and home, an open bolt's slams home to fire and comes back to be caught
         const loaded = G_loaded(w) > 0, ts = pl.sinceShot == null ? 9 : pl.sinceShot, CYC = 0.08;
         let k = h.open && h.recip && loaded ? 1 : 0;
+        if (an.carrier && h.recip && !loaded && boltHold(a.def)) k = 1; // (the handle is on the carrier: back with it where the gun locks open)
         if (pose && pose.handle != null) k = pose.handle;
+        else if (an.carrier && h.recip && pose && pose.open != null) k = U.clamp(pose.open / Math.max(1e-6, actTravel(h, actKind(a, h))), 0, 1); // (a release sends the carrier home: the handle goes with it)
         else if (h.recip && ts < CYC) k = h.open ? (loaded ? Math.min(1, ts / (CYC * 0.5)) : 0) : Math.sin(Math.PI * ts / CYC);
         an.handle.position.copy(A.handleHome).z += k * h.travel;
         if (h.recip) hdlK = k;
@@ -939,7 +941,7 @@ export const VMAnim = (() => {
         let k = (!G_loaded(w) && boltHold(a.def)) || (h.open && w.mag > 0) ? 1 : 0;
         if (pose && pose.open != null) k = U.clamp(pose.open / Math.max(1e-6, actTravel(h, hk)), 0, 1);
         else if (!h.open && ts < CYC) k = Math.max(k, Math.sin(Math.PI * ts / CYC));
-        if (hdlK != null) k = hdlK; // (the handle is on the carrier: one stroke, whatever the gun's doing)
+        if (hdlK != null && !(pose && pose.open != null)) k = Math.max(hdlK, !G_loaded(w) && boltHold(a.def) ? 1 : 0); // (the handle is on the carrier: one stroke, and back where the gun locks open)
         an.carrier.position.copy(A.carrierHome).z += k * h.carrier;
       }
       // a long-recoil barrel (the GM6's): slammed back the whole stroke with the shot, the bolt locked to it; a moment there while
