@@ -85,6 +85,7 @@ def receiver():
         for s in (-1, 1):
             o = K.obj(cyl(r * mm, *xs(s * (HW - 0.3) * mm, s * (HW + 0.7) * mm), 'x', (f * mm, u * mm), 10), 'base', RCV); smooth(o)
     o = K.obj(cyl(4.0 * mm, -(HW + 1.2) * mm, -(HW - 0.3) * mm, 'x', (50 * mm, -13 * mm), 16), 'base', RCV); smooth(o)
+    o = K.obj(lathe([(221.0 * mm, V.get('mouth', 6.0 * mm)), (225.5 * mm, V.get('mouth', 6.0 * mm))], 24, (0, 0, 0)), 'base', 'gunmetal'); smooth(o)   # (the chamber's mouth, the barrel's breech face standing in the box's front: seen through the port when the carrier is back)
     # the selector (right): its boss on the axis, the long lever running forward and up along the side to its finger tab under the cover
     o = K.obj(cyl(6.0 * mm, (HW - 0.3) * mm, (HW + 1.6) * mm, 'x', (50 * mm, -13 * mm), 20), 'base', RCV); smooth(o)
     o = K.tmp(prism(P([(46, -18.5), (54, -18.5), (150, 1.5), (156, 2.5), (158, 8.5), (146, 8.5), (140, 6.0), (46, -8.0)]), 'x', (HW + 0.6) * mm, (HW + 2.0) * mm))
@@ -562,13 +563,22 @@ def magazine():
 HANDLE = (232.0, 11.0)       # the knob's centre (forward, up), on the right
 def handle():
     """The bolt carrier's handle (part_handle: it runs back with the carrier on every shot): the knob on its stem out of the right side at
-    the front of the ejection port, and the carrier's flank seen through the port."""
+    the front of the ejection port (the carrier it is fixed to is part_carrier: it moves with this)."""
     ph = K.part('handle', (0, HANDLE[0] * mm, HANDLE[1] * mm))
     m = 'park' if RCV == 'blued' else RCV
-    o = K.tmp(box(10.5 * mm, 13.8 * mm, 150 * mm, 238 * mm, -1.5 * mm, 8.5 * mm)); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel', ph)   # the carrier's flank
     o = K.tmp(prism(P([(224, 5), (236, 5), (236, 15), (226, 15)]), 'x', 13.5 * mm, 23 * mm)); bevel(o, 0.8 * mm, 1); smooth(o); K.adopt(o, 'base', m, ph)
     o = K.obj(cyl(5.2 * mm, 21 * mm, 27.5 * mm, 'x', (HANDLE[0] * mm, HANDLE[1] * mm), 20), 'base', m, ph); bevel(o, 1.4 * mm, 2, 30); smooth(o)
     return ph
+
+CARRIER_TRAVEL = 0.085       # the carrier's stroke: the handle's (the handle is on the carrier: they move as one)
+def carrier():
+    """The bolt carrier seen through the open ejection port (part_carrier): a steel block (its flank milled with shallow ribs) in the right half of the receiver's box, its
+    face just inside the port; it runs back with the handle on every shot and a charge, and held back on an empty magazine it uncovers the receiver's inside and the chamber's mouth."""
+    pk = K.part('carrier', (0, 197.0 * mm, 4.0 * mm))
+    o = K.tmp(box(3.0 * mm, 13.8 * mm, 150 * mm, 238 * mm, -1.5 * mm, 8.5 * mm)); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel', pk)
+    for f in (170, 186, 202, 218):
+        g = K.tmp(box(13.6 * mm, 14.2 * mm, (f - 1.2) * mm, (f + 1.2) * mm, -0.5 * mm, 7.5 * mm)); smooth(g); K.adopt(g, 'base', 'gunmetal', pk)
+    return pk
 
 # ----------------------------------------------------------------------------------------------------- RAILED DUST COVER (slot optic, extras.mount)
 # The gun's optic mount (docs/models.md "Authored models"; the MP5's claw mount is the other): a railed dust cover, the Picatinny top
@@ -627,6 +637,7 @@ grip()
 stock()
 MK = magazine()
 ph = handle()
+CARRIER = carrier()
 if V.get('bipod'): bipod(FB['bipod_f'])
 railed_cover()               # (last: the meshes before it keep their names)
 for o in list(coll.all_objects):
@@ -642,11 +653,12 @@ info = {
     'sy': round(SY * mm, 4), 'fSight': round(NOTCH_F * mm, 4), 'relief': 0.17,
     'muzzles': [[round(MUZ * mm, 4), 0, 0]],
     'grip': [0.042, -0.08, 0], 'support': [round((HG_LO[0] + HG_LO[1]) / 2 * mm + 0.02, 4), -0.026, 0],
-    'anim': dict({'handle': 'part_handle', 'mag': 'part_mag'}, **({'bipod': 'part_bipod'} if V.get('bipod') else {})),
+    'anim': dict({'handle': 'part_handle', 'carrier': 'part_carrier', 'mag': 'part_mag'}, **({'bipod': 'part_bipod'} if V.get('bipod') else {})),
+    'carrier': {'travel': CARRIER_TRAVEL},
     'magAt': [round(MK['F'] * mm, 4), round(MK['Y'] * mm, 4)],
     'handle': {'f': round(HANDLE[0] * mm, 4), 'y': round(HANDLE[1] * mm, 4), 'x': 0.0255, 'travel': 0.085, 'recip': True, 'style': 'ak'},
     'port': [round((166 + 229) / 2 * mm, 4), round(4 * mm, 4), round(HW * mm, 4)],
-    'chamberAt': {'side': 'right', 'f': round(222 * mm, 4), 'y': 0.0, 'x': round((HW - 2.5) * mm, 4)},
+    'chamberAt': {'side': 'port', 'f': round(225.5 * mm - 0.7 * mm - 0.042, 4), 'y': 0.0048, 'x': 0.0},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(BE * mm, 4), 0, 0]},
 }

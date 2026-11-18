@@ -920,6 +920,7 @@ export const VMAnim = (() => {
         const held = pose && pose.catch != null ? pose.catch : (pl as unknown as { reloading: boolean; reloadAct: string | null }).reloading && (pl as unknown as { reloadAct: string | null }).reloadAct === 'release' ? 1 : !G_loaded(w) && boltHold(a.def) ? 1 : 0;
         an.catch.position.copy(A.catchHome); an.catch.rotation.x = held * CATCH_LOCK;
       }
+      let hdlK: number | null = null; // (a riding handle's stroke this frame: the carrier it is fixed to moves with it)
       if (an.handle && A.handleHome) {
         // at rest: home, or (an open bolt with a round to fire) back; a riding handle jumps with each shot: a closed
         // bolt's back and home, an open bolt's slams home to fire and comes back to be caught
@@ -928,6 +929,7 @@ export const VMAnim = (() => {
         if (pose && pose.handle != null) k = pose.handle;
         else if (h.recip && ts < CYC) k = h.open ? (loaded ? Math.min(1, ts / (CYC * 0.5)) : 0) : Math.sin(Math.PI * ts / CYC);
         an.handle.position.copy(A.handleHome).z += k * h.travel;
+        if (h.recip) hdlK = k;
         if (h.lock) an.handle.rotation.z = -h.lock * (pose ? pose.lock : 0); // (a handle that turns up into a notch: about the tube's axis, the part's origin)
       }
       if (an.carrier && A.carrierHome) {
@@ -937,6 +939,7 @@ export const VMAnim = (() => {
         let k = (!G_loaded(w) && boltHold(a.def)) || (h.open && w.mag > 0) ? 1 : 0;
         if (pose && pose.open != null) k = U.clamp(pose.open / Math.max(1e-6, actTravel(h, hk)), 0, 1);
         else if (!h.open && ts < CYC) k = Math.max(k, Math.sin(Math.PI * ts / CYC));
+        if (hdlK != null) k = hdlK; // (the handle is on the carrier: one stroke, whatever the gun's doing)
         an.carrier.position.copy(A.carrierHome).z += k * h.carrier;
       }
       // a long-recoil barrel (the GM6's): slammed back the whole stroke with the shot, the bolt locked to it; a moment there while
