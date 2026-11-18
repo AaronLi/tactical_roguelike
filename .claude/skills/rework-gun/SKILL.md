@@ -30,6 +30,10 @@ rendered model coincides with it. Gameplay stats never change here, only the loo
   against the real figures, and look at several photos before settling. A photo can show a non-standard part (a short
   magazine): cross-check anything that decides a proportion against a second reference.
 - Scale from the real overall length. Note the source file and its licence.
+- Makers' product pages often have the best references: level studio side shots on white or transparent, both sides (FN's
+  SCAR 16S/17S NRCH pages). Check a photo's angle before trusting it: a visible butt face or rail top means it's taken from
+  behind or above; compare the scale from two measures (the rail's slot pitch, the overall length): 2% apart is a slight angle.
+  A gun with no good side-on photo of its own (the SCAR-H, at first) is fitted by eye: say so.
 
 ## 3. Build it in Blender
 
@@ -68,6 +72,18 @@ own thickness (receiver, guard with its window, trigger, grip, panels, controls)
 differ: what another barrel brings (a gas block, a front sight) is the barrel's slot; what stays is `base`. Then check the
 overlay in the game (section 4), not just in Blender.
 
+**Shading and edges.** Long flat faces made of n-gons or thin triangles with smoothed normals show diagonal streaks. End the
+build with a pass over every mesh: hard edges at about 30 degrees and Blender's Weighted Normal modifier (area-weighted, keep
+sharp), applied before export. Give every body a small bevel (0.5-1 mm, 1-2 segments): machined and moulded edges catch a line
+of light, and without it the gun reads as boxes. Keep the triangle count under about twice what it was.
+
+**Model what the photo shows, on both sides.** The outline is the easy part: a gun that matches the photo's outline within a few
+pixels can still be missing most of its detail. Go region by region (stock, receiver, lower, forend, front) on the photo of each
+side and list what is there: the ejection port (open, the bolt in it), the deflector, latches, pins and screws, the selector with
+its markings, the magazine and bolt releases (raised housings, not flat squares), sling points and slots, seams between parts,
+moulded panels, markings, a butt pad's ribs, a grip's texture. Read which side each control is on from the photos, never from
+memory (the SCAR NRCH's charging handle was put on the left from an instruction; FN's photos show it on the right).
+
 **Wiring it in.** The platform's spec in `js/parts.ts` says `rcv: 'authored', authored: '<id>'` and agrees with the anchors
 (`L` = `mount_handguard`, `hgMax`, `mag` = `mount_mag`): the baker fails naming any disagreement. Factory furniture whose
 mount other guns share becomes an authored furniture part (`models/parts/<slot>/<id>/`, replace-only, built by a
@@ -91,7 +107,9 @@ F2 before it was authored), pistols in `pistol()`; leave them for Blender rather
 - Never change shared behaviour for other guns: check everything that switches on `rcv`, and `kinds()` in `js/vmanim.ts`.
 - Keep the anchors working: `muzzles`, `grip`, `support`, `magAt`, `cheek`, `chamberAt`, `cylAt`, the handle's animation.
 - Match the code around it: naming, terse comments, British spelling. Files are mostly CRLF; keep each file's endings.
-- Edit by Python scripts with exact-match replacement written to the scratchpad (bash heredocs mangle backslashes).
+- Edit by Python scripts with exact-match replacement written to the scratchpad (bash heredocs mangle backslashes). Escapes in
+  Python strings bite too: `\b` in a non-raw string is a backspace byte (a regex's word boundary that silently never matches),
+  `\n` a newline in the middle of a JavaScript string. Use raw strings, and grep or hexdump what you wrote.
 
 ## 4. Test
 
@@ -105,6 +123,22 @@ const mem = {}; G.U.store = { get: (k, d) => (k in mem ? mem[k] : d), set: (k, v
   WebGLRenderer and an OrthographicCamera at the trace's scale, semi-transparent over the photo, and correct the trace until they
   coincide. From the gun's left, forward is screen left. Remember a trace's `by` when centring the camera. Read the overlay
   zoomed in: a stray 9 mm offset once came from the harness, not the model.
+- **Compare with the photo, by numbers and by detail.** Render the model side-on (orthographic, the photo's scale and origin) into
+  an image the photo's size, on white, so the two are in one frame, then compare them in a page on the local server (a render on
+  localhost can't be read from another site's page; Commons' and FN's images can be read cross-origin from it, with
+  `crossOrigin = 'anonymous'`). Three views, each showing different faults:
+  - **Silhouettes:** a mask from each (the photo's alpha or not-white; the render's not-white). Colour photo-only red, model-only
+    blue, both grey. Report the overlap (intersection over union) and the worst 40 px bands along the gun by mismatch, split into
+    photo-only (missing from the model) and model-only (extra). A band of red on one edge and blue on the other is a part shifted;
+    red all round is a part too small. Seen this way: a magazine foot 12 mm short, a front sight behind the photo's, a grip 6 mm
+    back, a stock drawn more extended.
+  - **Edges:** Sobel edges of each image's brightness (thresholds around 60 for the photo, 40 for the flat-shaded render). Photo-only
+    edges red, model-only cyan, coinciding white: features inside the outline that are missing (red with no cyan), misplaced (red
+    and cyan side by side) or invented (cyan alone).
+  - **Side by side:** the same crops of the photo above the render, region by region, at 2x. The plainest way to list what the model
+    lacks; send these to the user when they review.
+  Do it for each side and each gun of a family that has its own photo. Show the crops through a canvas scaled to the pane (the
+  browser pane is narrow: a full-size image is cut off, and its screenshot is scaled).
 - **Alone,** from left, right, top, rear and three-quarter.
 - **Every attachment.** Loop `G.Gunsmith.attachOptions(id, base)`, plus each option that only appears with a threaded barrel:
   apply with `G.Gunsmith.prune`, then `display`, `world` and `viewmodel` must not throw, `sy`/`fSight`/`relief` must be finite,
