@@ -201,6 +201,8 @@ function makeBundle(cfg: BundleCfg) {
     NAME, EXT, DIR, MAGIC, FORMAT, bundleOf, parse, start, getFile, getJson,
     state: (): State => ({ ...st }), onChange: (fn: (s: State) => void) => { listeners.push(fn); },
     loaded: () => !!done,
+    /** whether the path is a file of the bundle (false until the bundle is in) */
+    has: (path: string) => !!done && done.files.has(rel(path)),
     setRoot: (base: string) => { R.base = base; }, // (shared: every bundle's)
     stats: () => (done ? [{ name: NAME, files: done.files.size, bytes: done.bytes, wire: done.wire, from: done.from }] : []),
   };

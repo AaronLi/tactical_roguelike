@@ -638,7 +638,67 @@ export const Viewmodel = (() => {
     });
     return { meshes: merge(group), info, mag, handle, catch: catchP, xb: xb.bolt ? xb : null, legs };
   }
-  function worldInstance(proto: WorldProto) {
+  // ---- the world gun's levels of detail: a mesh of an instance draws the level its distance asks for.
+  // The bake makes each level for a distance (tools/model_lod.mjs LODS: half a pixel of error there, on the game's 75 degree view 1080
+  // pixels tall). The distance is taken through the camera that draws it: a narrower view (a
+  // scope) or a taller screen brings it nearer. A mesh asks as it is drawn (onBeforeRender) and changes on the next frame, to the nearest
+  // level any camera of the frame asked for; going back to a finer level waits until it is 8 % inside the distance, so a gun at a boundary
+  // doesn't flicker.
+  // WORLD_LOD_STEPS: which level is drawn from which distance (m), nearest first; nearer than the first it is level 1. The default is level 2
+  // from 4 m (nearer than the 10 m the bake made it for: it holds up, and level 1 is for a gun you are standing over) and level 3 from the
+  // 40 m it was made for (nearer, its missing small parts show). ?lod=<m>:<level>,<m>:<level> in the page's address tries another
+  // plan without a bake: ?lod=8:3 goes straight from level 1 to level 3 at 8 m; ?lod=0:1 is level 1 everywhere.
+  const WORLD_LOD_STEPS: [number, number][] = (() => {
+    const def: [number, number][] = [[4, 2], [40, 3]];
+    try {
+      const q = new URLSearchParams(location.search).get('lod'); if (!q) return def;
+      const st = q.split(',').map((x) => x.split(':').map(Number) as [number, number]).filter((x) => x.length === 2 && x[0] >= 0 && x[1] >= 1 && x[1] <= 3).sort((a, b) => a[0] - b[0]);
+      return st.length ? st : def;
+    } catch (e) { return def; }
+  })();
+  const WORLD_LOD_FROM = WORLD_LOD_STEPS.map((x) => x[0]), LOD_REF = 1080 / Math.tan((75 * Math.PI) / 360), _lodP = new T.Vector3(), _lodC = new T.Vector3(), _lodV = new T.Vector4();
+  /** level: the one drawn (1..3); step: how many of WORLD_LOD_STEPS have been passed. */
+  interface LodState { geos: THREE.BufferGeometry[]; cur: number; level: number; frame: number; min: number }
+  function lodBefore(this: THREE.Mesh, renderer: THREE.WebGLRenderer, _scene: THREE.Scene, camera: THREE.Camera) {
+    const u = this.userData.lod as LodState, f = renderer.info.render.frame;
+    if (u.frame !== f) {
+      if (u.frame >= 0 && u.min < Infinity) {
+        let want = 0; while (want < WORLD_LOD_FROM.length && u.min >= WORLD_LOD_FROM[want] * (want < u.cur ? 0.92 : 1)) want++;
+        if (want !== u.cur) { u.cur = want; u.level = Math.min(want ? WORLD_LOD_STEPS[want - 1][1] : 1, u.geos.length); this.geometry = u.geos[u.level - 1]; }
+      }
+      u.frame = f; u.min = Infinity;
+    }
+    let d = 0;
+    if ((camera as THREE.PerspectiveCamera).isPerspectiveCamera) {
+      // (how far it would be on the reference view for the same size on screen: the projection's scale times the view's height in pixels)
+      const h = renderer.getCurrentViewport(_lodV).w || 1080;
+      d = _lodP.setFromMatrixPosition(this.matrixWorld).distanceTo(_lodC.setFromMatrixPosition(camera.matrixWorld)) * LOD_REF / (camera.projectionMatrix.elements[5] * h);
+    }
+    if (d < u.min) u.min = d;
+  }
+  /** The lists of a proto's merged meshes by role, as worldInstance makes them. */
+  const protoLists = (p: WorldProto): [string, Merged | null | undefined][] => [['', p.meshes], ['mag', p.mag && p.mag.meshes], ['handle', p.handle && p.handle.meshes], ['catch', p.catch && p.catch.meshes],
+    ...Object.entries(p.xb || {}).map(([k, l]) => ['xb.' + k, l] as [string, Merged]), ...p.legs.map((l, i) => ['leg.' + i, l.meshes] as [string, Merged])];
+  const lodOf = new WeakMap<THREE.BufferGeometry, THREE.BufferGeometry[]>();
+  /** Gives a proto (level 1) its further levels (`far`: the protos of levels 2, 3...): every instance's meshes then change geometry by distance. A mesh a level has nothing for (its parts too small to draw there) keeps the level before's. */
+  function worldLods(proto: WorldProto, far: WorldProto[]) {
+    if (!far.length) return;
+    const keyed = (p: WorldProto) => {
+      const m = new Map<string, THREE.BufferGeometry>();
+      for (const [role, list] of protoLists(p)) { const seen: Record<string, number> = {}; for (const e of list || []) { const k = role + '|' + (e.material.name || e.material.uuid); seen[k] = (seen[k] || 0) + 1; m.set(k + '|' + seen[k], e.geometry); } }
+      return m;
+    };
+    const base = keyed(proto), fars = far.map(keyed);
+    // (a magazine is centred on itself, and a level's box is not quite level 1's: its geometry moved to sit where level 1's does)
+    far.forEach((fp) => { if (fp.mag && proto.mag) { const d = fp.mag.home.clone().sub(proto.mag.home); for (const e of fp.mag.meshes) e.geometry.translate(d.x, d.y, d.z); } });
+    for (const [k, g] of base) { const geos = [g]; for (const fm of fars) geos.push(fm.get(k) || geos[geos.length - 1]); if (geos.some((x) => x !== g)) lodOf.set(g, geos); }
+  }
+  function lodInstance<X extends THREE.Object3D>(g: X): X {
+    g.traverse((o: any) => { const geos = o.isMesh && lodOf.get(o.geometry); if (geos) { o.userData.lod = { geos, cur: 0, level: 1, frame: -1, min: Infinity } as LodState; o.onBeforeRender = lodBefore; } });
+    return g;
+  }
+  function worldInstance(proto: WorldProto) { return lodInstance(worldInstance0(proto)); }
+  function worldInstance0(proto: WorldProto) {
     const g = new T.Group();
     for (const m of proto.meshes) g.add(new T.Mesh(m.geometry, m.material));
     if (proto.mag) {
@@ -684,5 +744,5 @@ export const Viewmodel = (() => {
     return g;
   }
 
-  return { assemble, reflex, pipLens, flash, surfaces, paintAmmo, paintRange, rangeText, worldProto, worldInstance, merge };
+  return { assemble, reflex, pipLens, flash, surfaces, paintAmmo, paintRange, rangeText, worldProto, worldInstance, worldLods, WORLD_LOD_STEPS, merge };
 })();

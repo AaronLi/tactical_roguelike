@@ -11,6 +11,7 @@ import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
 import { dedup, weld, quantize, meshopt, prune } from '@gltf-transform/functions';
 import { MeshoptEncoder, MeshoptDecoder } from 'meshoptimizer';
 import { makeEmitter } from './model_emit.mjs';
+import { LODS, lodRoot, lodFile, lodReady } from './model_lod.mjs';
 import { platformJob } from './bake_parts.mjs';
 import { authoredSrc } from './bake_authored.mjs';
 import { authoredPartsSrc } from './authored_parts.mjs';
@@ -117,7 +118,13 @@ export function createHandlers(env) {
       const em = await getEmitter();
       const wr = await em.write(root, j.shared ? '_shared' : j.id, j.tag);
       fs.mkdirSync(path.dirname(j.path), { recursive: true }); fs.writeFileSync(j.path, wr.buf);
-      return { bytes: wr.buf.length, gz: wr.gz };
+      // its levels of detail (tools/model_lod.mjs): the same nodes with fewer triangles, <file>.lod<n>.glb beside it, for the third-person gun
+      await lodReady(); const lod = [];
+      for (const L of LODS) {
+        const lr = lodRoot(root, L), lw = await em.write(lr.root, j.shared ? '_shared' : j.id, j.tag);
+        fs.writeFileSync(lodFile(j.path, L.lod), lw.buf); lod.push({ bytes: lw.buf.length, gz: lw.gz, tris: lr.tris });
+      }
+      return { bytes: wr.buf.length, gz: wr.gz, lod };
     },
   };
 }
