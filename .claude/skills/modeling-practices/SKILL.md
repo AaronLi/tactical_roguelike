@@ -5,140 +5,137 @@ description: Mesh topology and triangle-budget rules for the game's Blender-buil
 
 # Modeling practices
 
-The GPU draws only triangles: every quad and n-gon is triangulated at export. What matters is the **shape and number of the
-triangles**, not whether the source is quads or tris. Quads are still the nicer source (they edit and slice cleanly), but nothing
-downstream needs them.
+The GPU draws only triangles: every quad and n-gon is triangulated at export. What matters is the **number and shape of the
+triangles**, not whether the source is quads or tris.
 
-Why shape matters here: the weapon AO (`js/gunao.ts`) and the light grid store values **per vertex** and interpolate them across each
-triangle. A long thin triangle stretches one vertex's value 30 cm down a handguard (the smears we chased), and the AO's adaptive split
-(longest edge halved while the occlusion along it isn't what its corners say, or while it's over 4 cm) has to cut it into many pieces.
-Thin triangles also shade slower: the GPU shades 2x2 pixel blocks, and every block an edge crosses is shaded once per triangle (Humus,
-"Triangulation": a fan gets slower with more sides, a max-area triangulation doesn't).
+Why shape matters here: the weapon AO (`js/gunao.ts`) stores occlusion **per vertex** and interpolates it across each triangle, so a long
+thin triangle smears it. To avoid that it splits triangles: it halves any edge **longer than 4 cm** unless the triangle is uniformly
+shut in, and any edge along which the occlusion isn't what its corners say (down to 3 mm). So under the AO a part's cost depends on how
+many **long strips** it has (each is cut every 4 cm along its length) and how many fans and slivers (cut where they cross a shadow).
+Thin triangles also shade slower: the GPU shades 2x2 pixel blocks, and every block an edge crosses is shaded once per triangle.
 
-What the AO costs now (2026-11-18): its output is indexed again (it used to give every triangle three vertices of its own, which was
-most of the "vertex explosion": an M4 went 25k -> 134k vertices) and it doesn't cut faces that are uniformly shut in (the inside of a
-handguard, a tube in its stock: 41% of an M4's split triangles). So **measure triangles, not vertices**: a clean part grows x1.1-1.2
-under the AO, a fanned one x1.5-2.6, a long cylinder crossing a shadow line (a buffer tube entering its stock) up to x10.
+**Measure triangles, baked and with the AO, never the flagged %** (`tools/ao_split.mjs --meshes`). A change can raise one and lower the
+other (strips raised an MP5 receiver 888 -> 1,702 baked and lowered it 4,485 -> 2,977 with the AO): the with-AO figure is what the game
+draws. A clean part grows x1.1-1.4 under the AO, a fanned one x1.5-2.6, a long cylinder crossing a shadow line up to x10.
 
-## The rules
+What the rework of every Blender gun found (2026-11-18, eleven agents and parts): **rule 1 was the biggest win almost everywhere**; rules
+2 and 6 were the next; rules 3 and 4 helped on some parts and made others worse, so they're tried, measured and dropped if they lose.
 
-1. **Spend triangles on what's seen.** At arm's length a gun is a few hundred pixels long: a 1.4 mm two-segment round on every edge,
-   or 24 sides on a tube hidden in a stock, is invisible and costs thousands of triangles (the Kestrel stock was 6,502, now 2,154).
-   - **Chamfer once, before the small features.** `bevel(o, w, 1, 30)` on the body, *then* cut its slots, pockets and holes, so they
-     don't get a bevel round their rim and floor (that was 3/4 of the old stock). One segment, not two: a chamfer, not a round.
-   - **Keep the look with a tapered cutter.** A square-walled pocket seen square-on disappears (walls edge-on, floor like the surface
-     round it). Cut it with `loft(floor_outline, rim_outline, ...)` (models/blender_kit.py), the walls sloping out ~0.5-0.6 mm at the
-     surface: they catch the light as a chamfer did, with no more faces than square walls. See `stock_m4` and `handguard_quad` in
-     models/ar_kit.py. **Both outlines must be valid:** scale a `rounded()` outline's corner radius with it (at most ~0.96 of its half
-     height); a fixed radius on the smaller outline self-intersects, and the boolean then silently cuts *nothing*, no error.
-   - **But keep the body's chamfer.** Dropping it altogether made the AO cost *worse* (a quad rail 6,721 triangles with the AO vs 5,815
-     chamfered): the chamfer strips give the AO an edge to stop at. One segment, on the body's own edges.
-   - **Hidden things get few sides.** A bore or tube that's inside another part: 16 sides, not 24-28.
-2. **Size circles to what they are.** `segs(r)` gives the sides a circle needs to stay within 0.1 mm of round (1.6 mm screw 8, 2.6 mm
-   head 12, 6.5 mm boss 18, 16.5 mm bore 28; at least 6, even); `corner_segs(r)` for a `rounded()` corner. Don't write 12, 18, 24, 40 by
-   hand. A small screw at arm's length is a few pixels. (Hidden ones fewer still: rule 1.)
-3. **No face round a hole: frame it.** A boolean that cuts slots or holes into a flat face leaves one n-gon wrapped round all of them
-   (sometimes a "keyhole": its outline passes the same point twice), which exports as a fan of slivers the length of the part. Give each
-   hole a small rectangle of its own in its face, a margin (~1.5 mm) out from it:
-   - `slice_faces(o, cuts)` cuts only the faces lying in one plane. How many lines depends on the face:
-     - **A face about as wide as its holes** (a quad rail's corner faces, a row of vents): **one line across per pitch, midway between
-       neighbouring holes, on that face only.** Each hole gets a cell of its own; that's enough. A full frame here (three lines per
-       hole) spread vertices into the next faces and made a quad rail's body worse (3,300 triangles vs 1,952). See `handguard_quad`.
-     - **A wide face with room round its holes** (an M-LOK tube's sides): lines along the face just outside the holes' sides (over the
-       span from the first hole to the last), and lines across that face only, just past each hole's ends and through its middle.
-       See `handguard_mlok`.
-   - Then `strip_ngons(o, axis, passes=1)`: the plain faces beside a framed one pick up the frame's vertices on their shared edge and
-     become long n-gons that fan; this cuts them across at their own vertices. One pass here: repeating it for the faces that cutting
-     made n-gons of added 14% to a handguard for nothing.
-   - **Strips aren't always cheaper than a fan.** A face whose edge is a comb (a vertex at every slot: a Picatinny rail's flank) costs
-     more cut into strips than left to fan (a quad rail 4,060 -> 4,772 baked, 5,815 -> 6,449 with the AO, though its flagged % halved).
-     Judge every change by **triangles baked and with the AO**, never by the flagged % alone.
-   - **Budget:** a framed hole costs about 36 triangles, about 60 with its cell. Much more than that per hole is a sign of fans.
-   - Cut positions exact, not rounded: a cut 0.07 mm off a slot's arc leaves a micro-edge (rule 5).
-   - See `handguard_mlok` in models/ar_kit.py.
-   **Limits** (tried on the handguard): cuts can bound a hole's fan, not remove it; "pucker" vertices (many triangles at a frame
-   corner or a hole's tip) remain. Lines from each arc vertex out to the frame moved the fans into the next band; lines along the face
-   at every arc vertex's height made a dense grid (+50% after the AO, open edges). Pucker-free means **building** the panel as cells
-   (a rectangle with the hole and a ring of quads to the cell's own vertices, matched to its neighbours'), not a boolean then cuts.
-4. **An extruded outline's sides: strips at their own vertices.** A part made by extruding a traced outline (a receiver, a magazine
-   well) has big flat sides, one n-gon each, that fan. `slice_at_vertices(o, axis)` cuts each such face across at *its own* vertices
-   (merged within 1.5 mm), into trapezoid strips. Run it after the bevel (the bevel's chamfer corners make n-gons of the faces next to
-   them); before it as well only if the picture still shows fans (a receiver needed both; the Paragon grip, with no holes, only after). Don't cut the whole part round at every vertex it has anywhere (`slice_across` with all positions): that
-   drew lines across faces that line up with nothing (a cramped column on the M4 upper beside its port). Not for faces with many holes
-   (a slotted stock: every slot end becomes a line down the whole side): frame those (rule 3) or leave them to `tidy`.
-5. **Tidy after booleans and bevels.** `tidy(o)` welds vertices closer than 1 µm, dissolves zero-area faces and triangulates any n-gon
-   over 4 sides with Blender's BEAUTY (largest smallest angle) rather than the exporter's fan, which matters most for cylinder caps.
-   Before a `bevel` with `use_clamp_overlap`, `tidy(o, 0.1 * mm, False)`: one edge under 0.1 mm clamps the **whole** bevel to zero width
-   (the VX15 had 2,843 zero-area faces and no chamfers for that reason). **Don't bevel a plate thinner than about twice the bevel
-   width** (a 0.65 mm stipple panel with a 0.4 mm bevel): it clamps to nothing and leaves zero-area faces; `tidy` it and leave it square.
-6. **Picatinny rails** (`picatinny()` in models/blender_kit.py) are half of a quad rail's triangles. Use `lean=True` (the six-point
-   dovetail) unless the rail is seen up close; its flanks fan from the slot vertices and that's acceptable (rule 3: strips cost more).
-   Fewer or shallower slots are the next saving if one is needed.
-7. **Long quads are fine where nothing varies along them.** A barrel's, tube's or rail's facets, a 0.5 mm chamfer strip: long and thin
-   by nature, a quad split once. A fan across a flat face from one corner is the thing to fix.
-8. **Flat-shade flat parts.** `smooth(o, 1)` (every edge sharp) for machined parts, so normals never smear across a slot's chamfer.
-9. **Shape first, never by eye.** After a topology change the part's `model.json` (anchors, rails) must come out unchanged and the
-   silhouette the same; a look change (a chamfer dropped, a slot's walls sloped) is deliberate and shown.
+## The rules, in the order to try them
+
+1. **Chamfer once, before the small features.** `bevel(o, w, 1, 30)` on the body first, *then* cut its slots, pockets, holes, windows,
+   ports and grooves, so they don't get a bevel round their rim and floor. One segment: a chamfer, not a round. This alone took a P2011
+   slide 4,934 -> 1,348, a Kestrel stock 6,502 -> 2,154, an MP5 stock 3,296 -> 1,136. Two segments are justified only on a big curved
+   part seen up close (a grip's back, a stock's comb), and three almost never.
+   - **Keep the look with a tapered cutter.** A square-walled pocket seen square-on disappears. Cut it with `loft(floor_outline,
+     rim_outline, ...)` (models/blender_kit.py), the walls sloping out ~0.5-0.6 mm at the surface: they catch the light as a chamfer
+     did, at no cost. See `stock_m4`, `handguard_quad`, `handguard_mlok` in models/ar_kit.py, the SCAR's upper in models/scar_kit.py.
+   - **Both cutter outlines must be valid:** a `rounded()` outline whose corner radius is more than its half width (the taper shrank it)
+     self-intersects, and the exact boolean then returns **an empty mesh, no error**: the whole part vanishes. Scale the radius with the
+     outline (at most ~0.96 of its half height). If a part disappears after a cut, look here first.
+   - **Keep the body's own chamfer** rather than dropping it: without it a quad rail cost *more* with the AO (6,721 vs 5,815).
+   - **Don't bevel a plate thinner than about twice the bevel width** (a 0.65 mm stipple panel, a 0.4 mm bevel): it clamps to nothing.
+   - **Merge features that already overlap** into one outline before cutting (the SCAR's three overlapping M-LOK slots became one).
+   - **Drop sub-0.5 mm seams and grooves that go all the way round a long part:** each one is a full ring of faces (a Maxim 9's baffle
+     seams: ~250 triangles for nothing visible).
+   - If the build script wraps `bevel`, `cyl`, `lathe` (the Tempest's does), change the wrapper: one edit applies everywhere.
+2. **Size circles to what they are; hide what's hidden.**
+   - `segs(r)` gives the sides a circle needs to stay within 0.1 mm of round (1.6 mm screw 8, 6.5 mm boss 18, 16.5 mm bore 28; at
+     least 6, even); `corner_segs(r)` for a `rounded()` corner. Don't write 12, 18, 24, 40 by hand.
+   - **Hidden things get few sides:** a bore, a tube inside a stock, a barrel under a handguard: 8-16 sides.
+   - **Split a long cylinder into its hidden and visible stretches** (the AR's `barrel(..., hide=)` with CFG `barrel_hide`, the AK's
+     `barrel_tube()`): few sides where it's inside a handguard, gas block or receiver, `segs(r)` where it shows. The SR-25's barrel went
+     2,718 -> 669 with the AO.
+   - **Leave out what can't be seen:** a cap whose disc is inside another part (the F2's barrel rings are uncapped bands whose open
+     edges lie on the barrel's surface), a length of barrel inside a suppressor can (the MP5SD's).
+3. **Long parts: give the AO edges to stop at.** A tube, barrel or suppressor whose side facets are 20-30 cm long is cut by the AO every
+   4 cm, one triangle at a time, into a mess of slivers (a Welrod's suppressor 592 -> 2,339). Build it with a ring of edges every
+   3.8 cm or less (the Welrod's `along()` profile in models/welrod/build_welrod.py): the AO then leaves it alone (2,339 -> ~770). For
+   any long part, the number of long strips (chamfer strips, facets, flanks) is what the AO multiplies: fewer sides and fewer chamfer
+   strips cut more than framing does.
+4. **Strips at a face's own vertices** (`slice_at_vertices(o, axis)` then `tidy(o)`): for an extruded outline whose big flat sides fan
+   (a receiver, a slide with serrations, a grip). It cuts each such face across at *its own* vertices (merged within 1.5 mm). Run it
+   after the bevel (the chamfer's corners make n-gons of the faces beside them); before the bevel too only if fans remain. Always
+   follow it with `tidy` (it leaves n-gons). **Measure it: it made many parts worse** — a housing ringed with grooves, a face with a
+   column of pockets or windows, a rounded slab, a slotted stock, the F2's shell, handle and grip, the Tempest's chassis. Keep it where it
+   wins (receivers, the P2011 and Maxim 9 slides, the MP5's receiver), drop it elsewhere. Never cut the whole part round at every vertex
+   it has (`slice_across` with all positions): lines across faces that line up with nothing.
+5. **Frame holes only where it pays.** A boolean through a flat face leaves one n-gon wrapped round all its holes (sometimes a "keyhole")
+   that exports as a long fan. Framing (`slice_faces(o, cuts)`: lines on that face only) gives each hole a cell:
+   - **A face about as wide as its holes** (a quad rail's corner faces, a row of vents): one line across per pitch, midway between
+     holes, on that face only. See `handguard_quad`.
+   - **A wide face with room round its holes** (an M-LOK tube): lines along each side of the row and across past each end; see
+     `handguard_mlok`. Then `strip_ngons(o, axis, passes=1)` for the plain faces beside it (`passes=2` where a framed face meets a plain
+     one with no chamfer strip between, as on the AR-9's M-LOK neck).
+   - **Often a fan is cheaper:** framing lost on the AK quad rail, both AK drop-ins, a P2011's slots, a magazine's windows, and a comb-
+     edged face (a Picatinny flank) costs more as strips than as a fan. A framed hole should cost about 36 triangles, 60 with its cell.
+   - `slice_faces` and `strip_ngons` pick faces by their **centre**: a long face whose centre is far from the cuts' range is silently
+     skipped (the P2011 agent had to select by bounding box). Check the picture after.
+   - Cuts can bound a hole's fan, not remove it; pucker-free topology round a hole means building the panel as cells (rectangles with a
+     ring of quads to their own vertices), not a boolean then cuts.
+6. **Tidy, and keep geometry from touching.** `tidy(o)` welds vertices closer than 1 µm, dissolves zero-area faces and triangulates
+   n-gons with BEAUTY instead of the exporter's fan: run it after the booleans of every part (on adoption, if the script has a wrapper).
+   - Before a `bevel` with `use_clamp_overlap`, `tidy(o, 0.1 * mm, False)`: one edge under 0.1 mm clamps the **whole** bevel to zero.
+   - After cutting grooves into a chamfered body, `tidy(o, 0.15 * mm)` repairs edges shared by four faces.
+   - **No tangent cuts:** a bore whose radius equals a face's distance from its axis leaves a zero-width pinch, open and non-manifold
+     edges (the AK drop-in M-LOK's 16 open edges). Move one of them or cut the material away.
+   - **Simplify traced outlines:** a higher RDP epsilon on a traced profile removes the near-flat wedges and zero-area slivers at
+     their root (the FAL's receiver).
+7. **Picatinny rails** (`picatinny()`): `lean=True` (the six-point dovetail) saves baked triangles, but judge it with the AO on a long rail
+   (on the SCAR's 390 mm rail it cost more with the AO: 1,636 -> 2,085). The flanks fan from the slot vertices; leave them.
+8. **Flat-shade flat parts.** `smooth(o, 1)` for machined parts, so normals never smear across a slot's chamfer.
+9. **Shape first, never by eye.** Every `model.json` (anchors, rails, info) must come out unchanged and the silhouette the same; a look
+   change (a round become a chamfer, a slot's walls sloped, fewer sides) is deliberate, listed, and looked at **lit** (below).
 
 ## Checking
 
 ```bash
+node tools/ao_split.mjs models/p2011/p2011.glb old.glb --meshes 12     # triangles before/after the AO, whole file and the 12 meshes that grow most
 node tools/mesh_check.mjs models/parts/stock/kestrel_cs4/kestrel_cs4.blend --zoom 1
-node tools/mesh_check.mjs models/m4/m4.blend --only base          # one slot (or object names): the receiver alone
+node tools/mesh_check.mjs models/m4/m4.blend --only base               # one slot (or object names)
+node tools/check_models.mjs models/p2011/p2011.glb                     # the contract; needs npx tsc -p tsconfig.tools.json
 ```
 
-Writes `reports/mesh/<name>.png` (left, right, top: red < 2 deg and > 1 cm, orange < 5 deg, purple zero-area, light blue keyhole) and
-`report.json`; `--all` checks every tracked .blend (about 20 s). The files must be under `models/` (the output is named from that path).
-Its pictures are named from the path under models/ (`models/parts/grip/paragon_pg23/...blend` -> `reports/mesh/parts_grip_paragon_pg23.png`,
-and `..._zoom.png` with `--zoom f`, `_<slot>` added with `--only`), and each run overwrites them: copy them aside before your first
-rebuild if you want a before/after pair. Read the picture, not just
-the numbers: chamfer strips and long cylinder facets show orange/red legitimately (a gun's "bad %" is mostly
-its barrel and buffer tube); fans from one corner across a face are the thing to fix. The side views draw faces at an angle
-foreshortened: for a slanted face, look at it square-on. The pictures can't show depth: pocket floors and the surface round them draw
-over each other.
-
-```bash
-node tools/ao_split.mjs models/parts/stock/kestrel_cs4/kestrel_cs4.glb old.glb
-```
-
-Runs the weapon AO on the part alone and prints vertices and **triangles** before and after (needs `dist/js`: `npx tsc -p .`; Node's
-`MODULE_TYPELESS_PACKAGE_JSON` warning is harmless); each file
-is reported on its own, so pass the committed version too to compare (`git show HEAD:<path>.glb > old.glb`). It doesn't break the
-growth down by mesh: to find *what* splits, count each mesh's triangles before and after `GunAo.apply` (or by face normal) in a small
-script. For a whole gun in the game, per part: `G.Models.assemble(def)` then
-`G.GunAo.apply(group)` in a page, counting each slot's triangles before and after.
-
-**Look at it lit.** Render the gun with a raking light (from above and ahead, not from beside the camera) and from three-quarters as
-well as the side: front-on light flattens shallow detail, and a square pocket seen square-on vanishes. Render to a target whose
-texture is `SRGBColorSpace`, or everything comes out dark.
+- **`ao_split`** needs `dist/js` (`npx tsc -p .`); Node's `MODULE_TYPELESS_PACKAGE_JSON` warning is harmless. Each file is reported on its
+  own: for a before/after, `git show HEAD:<path>.glb > old.glb` and pass both.
+- **`mesh_check`** draws the exported triangulation (red < 2 deg and > 1 cm, orange < 5 deg, purple zero-area, light blue keyhole) to
+  `reports/mesh/<path under models/ with _>.png` (`_zoom.png` with `--zoom f`, `_<slot>` with `--only`), overwriting it each run: copy it
+  aside first for a before/after pair. It counts **everything in the .blend, variant barrels and magazines included** (the Welrod's
+  .blend is 7,662 triangles, its shipped gun 3,210): use `ao_split` on the glb for the real figures. Chamfer strips and cylinder facets
+  show red/orange legitimately; side views foreshorten slanted faces; pocket floors draw over the surface round them.
+- **`check_models`** on a gun's main glb and on parts. Variant files (`barrel_*.glb`, `mag_*.glb`, a Tempest `muzzle_*.glb`) always fail
+  it on their own (no root extras, no base): they're checked through the bake. Mesh names `<slot>_<n>` renumber when meshes are added or
+  split; that's fine (the goldens fingerprint by slot).
+- **Look at it lit.** Render with a raking light (from above and ahead, not beside the camera) from the side and three-quarters, to a
+  target whose texture is `SRGBColorSpace` (or everything comes out dark): front-on light flattens shallow detail and a square pocket
+  seen square-on vanishes. A Blender Workbench render of the glb is a quick alternative.
 
 ## Rebuilding
 
-Parts come from their builder, never from editing the .blend by hand: the AR furniture `blender -b -P models/ar_parts.py` (it rewrites
-every AR part, about a dozen: restore the ones you didn't mean to change with `git checkout --`, or, where the working tree has
-uncommitted changes to them you must keep, copy their folders aside before the run and back after; it builds the Vantage handguards and the Kestrel stock from
-the same functions the guns use), the AK furniture `models/ak_parts.py`, a gun its `models/<id>/build_<id>.py`. Then `npm run
-bake:models` and `node tools/check_authored_golden.mjs`: a shared part changes **other guns'** goldens too (the Vantage handguards are in
-the AR-9's and SR-25's builds); update the guns whose change you meant (`--update m4 ar9 sr25`) and check every other gun still matches.
+Parts come from their builder, never from editing the .blend by hand: a gun its `models/<id>/build_<id>.py`; the AR furniture
+`blender -b -P models/ar_parts.py`, the AK furniture `models/ak_parts.py`, the SCAR's `scar_parts.py`, the MP5's `mp5_parts.py`. A
+parts builder rewrites every part it makes (about a dozen): `git checkout --` the ones you didn't mean to change, or copy aside and back
+any with uncommitted changes you must keep. A kit function is shared: `handguard_mlok` builds the SR-25's and AR-9's handguards *and* the
+four Vantage parts. Then `npm run bake:models`, and the goldens: `node tools/check_authored_golden.mjs` (authored guns; a shared part
+changes **other guns'** goldens) and `node tools/check_model_cases.mjs` (recipe guns fitted with authored parts, `--update-golden`).
+Check every difference is in the slots you meant before updating (`... changed` lines, `GOLDEN DIFFERS` slot lines).
+
+**Agents in a worktree:** link the main checkout's node_modules with PowerShell `New-Item -ItemType Junction -Path node_modules -Target
+<main>\node_modules` (Bash's `mklink` and chained or computed commands are refused there; one plain command per call, or a script file);
+run `npx tsc -p .` and `npx tsc -p tsconfig.tools.json`; give scratch files a unique prefix (agents share the scratchpad).
 
 ## Reference
 
 - Humus, "Triangulation": http://www.humus.name/index.php?page=News&ID=228 (fan vs max-area, cost of thin triangles)
 - Polycount, "long thin triangles": https://polycount.com/discussion/232923/long-thin-triangles
-- Polycount threads on hole topology: match segment counts of intersecting shapes; keep the edges round a hole local to it.
 
 ## Status (2026-11-18)
 
-Done, triangles as baked -> with the AO:
-- the Vantage M-LOK handguards (`handguard_mlok`): VX15 15,602 -> 23,190 (its chamfers back), x1.10 under the AO (was x2.27); 59% -> 14% flagged;
-- the M4 receiver (`lower`, `lower_ar15_well`, `upper`: rule 4) and its buffer tube (16 sides: 92 -> 60, 888 -> 583 with the AO);
-- the Kestrel CS-4 stock (`stock_m4`: rule 1): 6,502 -> 2,154, with the AO 9,589 -> 4,209;
-- the Paragon PG-23 grip (`grip_mod`, by a Sonnet agent from this skill): 2,316 -> 958, with the AO 3,265 -> 1,182; its 2.8 mm
-  three-segment round is now a 2.2 mm chamfer and its stipple plates square-edged. Not yet in m4.blend or baked;
-- the quad rails (`handguard_quad`, done by a Sonnet agent from this skill): quad_rail_240 5,580 -> 4,060, with the AO 9,609 -> 5,815
-  (x1.72 -> x1.43), no keyholes or zero-area faces; the rails' flanks still fan (rule 6). In the M4 and baked.
-The whole default M4: about 24.7k baked, 35k with the AO (was 134k vertices). The AR-9 and SR-25 build their own receiver, stock and
-handguard from these functions and haven't been rebuilt. Left from the first audit, by what they cost under the AO: the AK's quad rail
-(northmark_ak_quad, its own builder), the SCAR's
-barrel (156 -> 1,277) and receiver, the AK's stock and barrel (x2.1-2.5), the AK drop-in M-LOK handguard (16 open edges), the P2011
-slide.
+Every Blender gun reworked (the M4 and its parts by hand, the rest by Sonnet agents from this skill), triangles baked -> with the AO:
+M4 24.2k -> 17.4k, 46.2k -> 24.0k; AK 17.1k -> 15.0k, 30.9k -> ~24.3k; AK-74 20.0k -> 16.0k, 35.0k -> ~25.1k; RPK 18.0k -> 15.9k,
+34.8k -> 27.7k; AR-9 24.6k -> 18.2k, 37.5k -> 25.7k; SR-25 34.1k -> 26.5k, 55.7k -> 38.2k; SCAR 23.6k -> 19.7k, 39.2k -> 28.6k;
+MP5 22.5k -> 16.0k, 36.9k -> 23.5k; MP5SD 28.1k -> 19.2k, 43.9k -> 27.7k; F2 13.7k -> 9.3k, 24.6k -> 16.1k; FAL 9.2k -> 8.1k,
+17.4k -> 14.5k; Maxim 9 5.4k -> 3.0k, 8.0k -> 4.1k; P2011 13.4k -> 5.5k, 17.6k -> 7.9k; Tempest 17.5k -> 15.2k, 36.2k -> 29.9k;
+Welrod 3.2k -> 2.9k, 6.7k -> 3.8k. Left: long cylinders still grow x5-10 with the AO wherever rule 3 isn't applied (the Tempest's
+barrels, the buffer tubes, the SR-25's rail); a fix in js/gunao.ts (cutting a long strip into even rings rather than triangle by
+triangle) would cover them all at once. The FAL's receiver and handguard, the AK dust covers, the F2's receiver and handle still fan.
