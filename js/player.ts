@@ -1228,7 +1228,11 @@ export const Me = {
   // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment (a falling block likewise: the block stays down till it's shut, js/data.ts fblock)
   revHand(def: WeaponDef) { return (revolver(def) || fblock(def)) && this.loose(def); },
   revShut(def: WeaponDef) { this.revClose = true; this.reloadT = this.reloadTotal = REV.close; Handling.shut(def); },
-  ACT_T: { release: 0.4, rack: 0.6 },
+  // The action worked by hand, s: after a magazine change run dry (the catch hit: release, or the handle or slide racked: rack), or on its own (charge). They were 0.4 / 0.6 / 0.45 and
+  // far too quick to read; the magazine change before them gives the difference back (reloadTimes), so a reload from empty is as long as it was.
+  ACT_T: { release: 0.75, rack: 0.85, charge: 0.7, was: { release: 0.4, rack: 0.6 } },
+  /** how long the action takes: a manual gun's (a bolt, a pump, a lever) always its own cycle; else by what it is */
+  actDur(def: WeaponDef, kind: PActKind, seat: boolean) { return kind === 'release' ? this.ACT_T.release : def.manual ? this.MANUAL_T : seat ? this.ACT_T.rack : this.ACT_T.charge; },
   // how far through its motions a magazine change goes before the action, from empty: it stops as the magazine
   // seats and the hand goes straight on to the catch or the handle (no trip back to the handguard first)
   SEAT: { retain: 0.78, pouch: 0.78, floor: 0.7, plain: 0.7 },
@@ -1240,6 +1244,8 @@ export const Me = {
     this.reloadTotal = this.reloadTime(def) * (this.slap ? this.SLAP_K : this.RELOAD_K)[this.reloadMode] * this.reloadPackK * seat;
     const plat = Gunsmith.PLATFORMS[def.id];
     if (plat && plat.arch === 'derringer' && this.reloadN) this.reloadTotal *= 0.6 + 0.4 * this.reloadN / this.magSize(def); // (turning it over, opening and shutting it take most of it: one round in is a little quicker)
+    // the action after a run-dry change takes longer than it did: the change gives that back, so the whole reload is as long as it was
+    if (this.reloadAct) this.reloadTotal = Math.max(this.reloadTotal * 0.6, this.reloadTotal - (this.actDur(def, this.reloadAct, true) - this.ACT_T.was[this.reloadAct]));
     this.reloadT = Math.max(0.05, this.reloadTotal - done);
   },
   // a retention reload turned into a dump reload: where the old magazine goes decides how long it takes
@@ -1477,7 +1483,7 @@ export const Me = {
   // how far through its motions that went); a partial reload has none. The rounds move as the action does (above).
   workAction(w: GWeapon, kind: PActKind, seat: number | null = null) {
     const ev = VMAnim.actEvents(kind, VMAnim.kinds(w.def).action, !!w.def.manual);
-    const dur = kind === 'release' ? this.ACT_T.release : w.def.manual ? this.MANUAL_T : seat ? this.ACT_T.rack : 0.45;
+    const dur = this.actDur(w.def, kind, !!seat);
     this.act = { kind, seat, t: 0, dur, back: ev.back, home: ev.home };
     this.fireCd = Math.max(this.fireCd, dur);
   },

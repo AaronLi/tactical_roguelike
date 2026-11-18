@@ -25,6 +25,8 @@ const out = args[0];
 const opt = (k, d) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : d; };
 const URL = opt('url', 'http://127.0.0.1:8080/');
 const GUN = opt('gun', 'm4');
+// other guns of the same kind borrow one of the four's sounds and captions (the game's gun is GUN; the scenes and what's said are CFG's)
+const SAME = { hk416: 'm4', scar: 'm4', scarl: 'm4', ak74: 'ak', usp: 'g19', deagle: 'g19', p9: 'g19' }, CFG = SAME[GUN] || GUN;
 // --redub <silent.mp4> --events <recording.log | .events.json>: don't record; dub a recording made earlier
 const REDUB = opt('redub', null), EVENTS = opt('events', null);
 // --wet: the synth's own room on every sound (default: dry, the room left to the game); --no-space: plain mono
@@ -55,7 +57,7 @@ const GUNS = {
 // back from 30% to 52% of it and lets go at once, home at 60%), keeping each gun's real stroke.
 const CHARGE_BUILD = { m4: (t) => arChargeScene('loaded', t), ak: (t) => chargeScene('ak', 'loaded', t), mp5: (t) => chargeScene('mp5', 'loaded', t), g19: (t) => chargeScene('g19', 'loaded', t) };
 const HANDLE_PARTS = { m4: /charging handle|handle (bottoms|rattles)|latch/, mp5: /cocking handle|handle (stops|hits|spring)/ };
-const C = GUNS[GUN];
+const C = GUNS[CFG];
 if (!C) { console.error('--gun: one of ' + Object.keys(GUNS).join(', ')); process.exit(1); }
 // 30 fps at 960x540: headless WebGL (SwiftShader) takes seconds a frame, so this keeps a run to ~45 min.
 const FPS = +opt('fps', '30'), W = 960, H = 540;
@@ -78,7 +80,7 @@ await page.addInitScript(() => {
   Date.now = () => (fake ? dateBase + off : realDate());
   window.requestAnimationFrame = (cb) => { if (fake) { q.push(cb); return 1; } return realRaf(cb); };
 });
-await page.addInitScript(([f, g]) => { window.__fps = f; window.__gun = g; }, [FPS, GUN]);
+await page.addInitScript(([f, g, c]) => { window.__fps = f; window.__gun = g; window.__cfg = c; }, [FPS, GUN, CFG]);
 await page.goto(URL);
 await page.waitForFunction(() => window.G && G.Game && G.Me, null, { timeout: 60000 });
 
@@ -155,7 +157,7 @@ await page.evaluate(async () => {
   const sample = G.Audio.sample.bind(G.Audio);
   G.Audio.sample = (name, ...r) => { window.__log.push({ ev: name, t: window.__clock.t() }); return sample(name, ...r); };
   // the game's own recorded handling (js/handling.ts) plays these in place of the recordings above: logged as the moments they stand for
-  const hmap = (n) => /^(pull|rack)/.test(n) ? (window.__gun === 'g19' ? 'drop_slide' : 'rack_slide') : n === 'release' || n === 'home' ? 'drop_slide' : n === 'mag-in' ? 'insert_magazine' : null;
+  const hmap = (n) => /^(pull|rack)/.test(n) ? (window.__cfg === 'g19' ? 'drop_slide' : 'rack_slide') : n === 'release' || n === 'home' ? 'drop_slide' : n === 'mag-in' ? 'insert_magazine' : null;
   const hplay = G.Handling.play; G.Handling.play = (def, name, o) => { const r = hplay(def, name, o); const ev = r && hmap(name); if (ev) window.__log.push({ ev, t: window.__clock.t() + (o && o.land != null ? o.land : 0) }); return r; }; // (its cue lands `land` s on)
   window.__prevM = -1;
   const FPS = window.__fps;
@@ -239,7 +241,7 @@ if (REDUB) {
     await hold(0.5);
   }
   await cap(T, 'Magazine change with rounds left');
-  await page.evaluate(() => { const w = G.Me.cur(); w.mag = 12; w.tube = w.tube.slice(-12); G.Me.startReload(); }); await busy(); await hold(1.0);
+  await page.evaluate(() => { const w = G.Me.cur(), n = Math.max(1, Math.min(12, G.Me.magSize(w.def) - 3)); w.mag = n; w.tube = w.tube.slice(-n); G.Me.startReload(); /* (a few short of full: a small magazine as well) */ }); await busy(); await hold(1.0);
   await cap(T, C.after === 'release' ? 'Run dry: it locks open' : 'Run dry: nothing to hold it open');
   await page.evaluate(() => { const w = G.Me.cur(); w.mag = 0; w.tube = []; w.chamber = null; }); await hold(0.8);
   await cap(T, 'Emergency reload: the empty magazine dropped, a fresh one in, ' + C.afterCap.replace(/^Magazine (change|rocked in), then /, ''));
@@ -300,9 +302,9 @@ const homeAfter = (t) => log.find((e) => e.ev === 'bolt home' && e.t >= t - 1e-6
 function worked([id, rear, slam], back) {
   // the action logged just before the handle reached the rear: its length sets the pull
   const act = log.filter((e) => e.ev === 'action' && e.t <= back + 1e-6).pop();
-  const sc = act && act.dur ? CHARGE_BUILD[GUN]({ pull: 0.22 * act.dur, hold: 0 }) : scene(id);
+  const sc = act && act.dur ? CHARGE_BUILD[CFG]({ pull: 0.22 * act.dur, hold: 0 }) : scene(id);
   if (act && act.dur) console.log(`  ${sc.id}: pull ${(0.22 * act.dur * 1000).toFixed(0)} ms (the animation's), no hold`);
-  const hp = HANDLE_PARTS[GUN], isHandle = (e) => !!hp && hp.test(e.what);
+  const hp = HANDLE_PARTS[CFG], isHandle = (e) => !!hp && hp.test(e.what);
   const pullTracks = sc.tracks.filter((t) => t.name !== 'release-forward').map((t) => t.name), home = homeAfter(back);
   place(sc, rear, back, pullTracks, 0, 'port', (e) => !isHandle(e));
   place(sc, slam, home, ['release-forward'], 0, 'port', (e) => !isHandle(e));

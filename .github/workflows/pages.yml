@@ -4,11 +4,14 @@
 # bundles (tools/bundle.mjs: esbuild, minified; the page's main.js, the three workers' files and modelbundles.js: five files in place of about ninety, under the same
 # names, so index.html and the workers' URLs are the same as in development, which loads dist/js unbundled; docs/typescript.md). Every push and pull request is
 # built and tested (build: a check that it compiles, bakes and passes).
-# The site (site, deploy): main at d5g.ca, and beside it the space branch (SPACE_BRANCH) at d5g.ca/space-experimental, built the same way into the
-# site's space-experimental/ folder. A push to either publishes both, each as its branch stands. The copy at /space-experimental keeps its own saves, in the browser only
+# The site (site, deploy): main at d5g.ca, and beside it the experimental branch (SPACE_BRANCH: feature/space-direction, now carrying the cruiser work) at
+# d5g.ca/space-experimental, built the same way into the site's space-experimental/ folder. A push to either (or Run workflow on main) publishes both, each as its
+# branch stands. To point the page at another branch, change SPACE_BRANCH (and the branch in the site job's if, which can't read env, and allow it in Settings ->
+# Environments -> github-pages); to switch it off, set PUBLISH_SPACE to 'false' (the steps are kept for experimenting later).
+# The experimental copy has no cloud saves: its js/cloudconfig.ts is emptied before it is built (no Supabase, no request), and the build fails if the project's address
+# is found anywhere in what it publishes. The copy at /space-experimental keeps its own saves, in the browser only
 # (js/util.ts NS; no cloud saves: js/cloud.ts).
-# One-time setup: Settings -> Pages -> Source: GitHub Actions; and Settings -> Environments -> github-pages -> Deployment branches: main and
-# the space branch (a push to the space branch publishes too).
+# One-time setup: Settings -> Pages -> Source: GitHub Actions; and Settings -> Environments -> github-pages -> Deployment branches: main and the experimental branch.
 name: pages
 on:
   push:
@@ -16,6 +19,7 @@ on:
   workflow_dispatch:
 env:
   SPACE_BRANCH: feature/space-direction
+  PUBLISH_SPACE: 'true' # ('false': main only, the experimental steps skipped)
 permissions:
   contents: read
   pages: write
@@ -67,7 +71,7 @@ jobs:
       - run: node tools/bundle.mjs
   # The site: main at the root, the space branch under space-experimental/ (each checked out, built and baked on its own), published together
   site:
-    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/space-direction') # (SPACE_BRANCH: a job's if can't read env)
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feature/space-direction') # (SPACE_BRANCH: a job's if can't read env)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -75,6 +79,7 @@ jobs:
           ref: main
           path: main
       - uses: actions/checkout@v4
+        if: env.PUBLISH_SPACE == 'true'
         with:
           ref: ${{ env.SPACE_BRANCH }}
           path: space
@@ -88,6 +93,9 @@ jobs:
       # ---- main (main/)
       - run: npm ci
         working-directory: main
+      # (Rust for its WebAssembly module, when it has one: its npm run build makes it, and fails without Rust on CI)
+      - name: Rust, main (its WebAssembly module)
+        run: if [ -f main/wasm/acoustics/rust-toolchain.toml ]; then cd main/wasm/acoustics && rustup toolchain install; fi
       - name: Baked audio, main (cache)
         uses: actions/cache@v4
         with:
@@ -108,10 +116,24 @@ jobs:
         if: steps.models_main.outputs.cache-hit != 'true'
         run: npm run bake:models -- -j 4
         working-directory: main
-      # ---- the space branch (space/)
+      # ---- the experimental branch (space/), while PUBLISH_SPACE is 'true'
       - run: npm ci
+        if: env.PUBLISH_SPACE == 'true'
         working-directory: space
+      # (Rust for its WebAssembly module, when it has one: its npm run build makes it; a branch without wasm/acoustics needs none)
+      - name: Rust, the space branch (its WebAssembly module)
+        if: env.PUBLISH_SPACE == 'true'
+        run: if [ -f space/wasm/acoustics/rust-toolchain.toml ]; then cd space/wasm/acoustics && rustup toolchain install; fi
+      - name: No cloud saves in the experimental copy
+        if: env.PUBLISH_SPACE == 'true'
+        working-directory: space
+        run: |
+          # (js/cloudconfig.ts empty: the game makes no request to Supabase and keeps its saves in the browser only)
+          sed -i "s#SUPABASE_URL: '[^']*'#SUPABASE_URL: ''#; s#SUPABASE_ANON_KEY: '[^']*'#SUPABASE_ANON_KEY: ''#" js/cloudconfig.ts
+          if grep -q "supabase.co" js/cloudconfig.ts; then echo 'js/cloudconfig.ts still names a project'; exit 1; fi
+          grep -n SUPABASE js/cloudconfig.ts
       - name: Baked audio, the space branch (cache)
+        if: env.PUBLISH_SPACE == 'true'
         uses: actions/cache@v4
         with:
           path: |
@@ -120,29 +142,33 @@ jobs:
             space/assets/audio/bundles
           key: audio-${{ hashFiles('space/tools/contact-synth/src/**', 'space/tools/contact-synth/scripts/**', 'space/tools/contact-synth/package.json', 'space/tools/bake_audio.mjs', 'space/package-lock.json') }}
       - run: npm run build -- -j 4 --no-models
+        if: env.PUBLISH_SPACE == 'true'
         working-directory: space
       - name: Baked models, the space branch (cache)
         id: models_space
+        if: env.PUBLISH_SPACE == 'true'
         uses: actions/cache@v4
         with:
           path: space/assets/models
           key: models-${{ hashFiles('space/tools/**', 'space/js/parts.ts', 'space/js/data.ts', 'space/js/glb.ts', 'space/js/modelbundles.ts', 'space/js/gunmaterials.ts', 'space/js/hangar.ts', 'space/js/range.ts', 'space/js/course.ts', 'space/js/level.ts', 'space/js/leveldesc.ts', 'space/js/levelview.ts', 'space/js/highlights.ts', 'space/js/furnspec.ts', 'space/js/furnmesh.ts', 'space/models/**', 'space/package-lock.json') }}
       - name: Bake the models, the space branch
-        if: steps.models_space.outputs.cache-hit != 'true'
+        if: env.PUBLISH_SPACE == 'true' && steps.models_space.outputs.cache-hit != 'true'
         run: npm run bake:models -- -j 4
         working-directory: space
       - name: The site
         run: |
-          mkdir -p _site/space-experimental
+          mkdir -p _site
           # the game loads the models only from assets/models/bundles (js/modelbundles.ts): the loose packs, props, scenes and whole-gun files are for the tools and tests, not shipped
           X="--exclude node_modules --exclude _site --exclude .git --exclude .github --exclude /assets/models/guns --exclude /assets/models/parts --exclude /assets/models/props --exclude /assets/models/scenes --exclude /dist/bundle"
           rsync -a $X main/ _site/
-          rsync -a $X --exclude /CNAME space/ _site/space-experimental/
+          if [ -d space ]; then mkdir -p _site/space-experimental && rsync -a $X --exclude /CNAME space/ _site/space-experimental/; fi # (the experimental copy, if it was checked out)
           # the release: five files of a copy's dist/js (the compiled game, ~90 files) replaced by its bundles, which have the same names (tools/bundle.mjs);
           # the game loads those five and nothing else (the other compiled files stay for ambience.html, which imports audio.js and ambience.js).
           # (each branch's copy is bundled by its own tools/bundle.mjs, if it has one: a branch whose files aren't modules yet has none and is published as it is)
           if [ -f main/tools/bundle.mjs ]; then node main/tools/bundle.mjs --site _site; fi
           if [ -f space/tools/bundle.mjs ]; then node space/tools/bundle.mjs --site _site/space-experimental; fi
+          # the experimental copy must not carry the cloud project: its address nowhere in it (main's own copy does, by design)
+          if [ -d _site/space-experimental ] && grep -rIl 'gooxmxjvwfdocicxrsro' _site/space-experimental; then echo 'the experimental copy names the Supabase project'; exit 1; fi
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
