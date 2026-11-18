@@ -38,8 +38,8 @@ root['gun'] = ID
 RCV, LOW = 'black', 'polymer'
 
 # ---- stations (metres) ----
-HW = 24.0 * mm                       # the upper's half width below its shoulder
-HWT = 21.0 * mm                      # ... and above the step (a ledge runs along each side at photo y 425)
+HW = 22.0 * mm                       # the upper's half width below its ledge (44 mm across: B&T give the APC9 60 mm overall, with the handle out on one side and the rails on the other)
+HWT = 17.5 * mm                      # ... and above the step (a ledge runs along each side at photo y 425): 35 mm across, a Picatinny rail's 21.2 mm with 6.9 mm shoulders
 UB = U(512)                          # the upper's underside (the lower's seam)
 RAIL_U0 = U(354)                     # the rail's base: the top of the upper's body
 RAIL_TOP = RAIL_U0 + 5.6 * mm        # ... and the rail's top
@@ -52,7 +52,7 @@ FS = F(1603)                         # the front sight's pivot
 PORT = (F(1242), F(1363))            # the ejection port, forward
 PORT_U = (U(479), U(422))            # ... its foot and top (the photo's window, "Cal. 9x19mm": the bolt and the chambered round show at its middle height, 8 mm over the bore as the MP5's do)
 PORT_CZ = (PORT_U[0] + PORT_U[1]) / 2
-RAIL_OUT = 6.5 * mm                  # how far the side rails' bars stand out of the flank
+RAIL_OUT = 5.0 * mm                  # how far the side rails' bars stand out of the flank
 BR = 6.6 * mm
 
 # ===================================================================================== UPPER (base)
@@ -82,7 +82,7 @@ def upper():
             cut(up, prism(rounded((F(a) + F(b)) / 2, U(388), (F(b) - F(a)) / 2, 12 * S, 2.0 * mm, corner_segs(2.0 * mm)), 'x', *xs(s * (HWT - 1.0 * mm), s * (HWT + 1 * mm))))
     if 'u' in SLICE: slice_at_vertices(up, 'y')
     smooth(up, 35); K.adopt(up, 'base', RCV)
-    fb = K.tmp(prism(rounded(0, (UB + U(533)) / 2, 20.0 * mm, (UB - U(533)) / 2 + 1.0 * mm, 2.0 * mm, corner_segs(2.0 * mm)), 'y', F(1430), UP_F1)); bevel(fb, 0.8 * mm, 1, 35); smooth(fb, 35); K.adopt(fb, 'base', RCV)   # (the forend's lower plate, photo y 533)
+    fb = K.tmp(prism(rounded(0, (UB + U(533)) / 2, 19.0 * mm, (UB - U(533)) / 2 + 1.0 * mm, 2.0 * mm, corner_segs(2.0 * mm)), 'y', F(1430), UP_F1)); bevel(fb, 0.8 * mm, 1, 35); smooth(fb, 35); K.adopt(fb, 'base', RCV)   # (the forend's lower plate, photo y 533)
     picatinny(K, 1.0 * mm, F(1648) - 1.0 * mm, RAIL_U0, 'base', RCV, lean=True)                                            # (the six-point dovetail: rule 6)
     for s in (-1, 1):    # the dark floor of each channel and window, so they read as openings
         o = K.obj(box(*xs(s * (HWT - 3.0 * mm + 0.05 * mm), s * (HWT - 3.2 * mm)), F(1150) + 2 * mm, F(1535) - 2 * mm, U(388) - 4.0 * mm, U(388) + 4.0 * mm), 'base', 'black'); smooth(o)
@@ -111,7 +111,7 @@ MAG_F, MAG_Y = F(1318), -12.0 * mm   # the magazine well's centre and the magazi
 MAG_LEN, MAG_C, MAG_D, MAG_W = 0.180, 0.058, 0.032, 0.022
 W_BK, W_FR = MAG_F - 17.5 * mm, MAG_F + 25.0 * mm   # the well's inside, back and front (the curved magazine drifts forward as it goes down)
 W_HW = 12.5 * mm                                     # its inside half width (the magazine is 22 mm)
-LW = 19.0 * mm                                       # the lower's half width
+LW = 17.0 * mm                                       # the lower's half width
 LIP = U(700)                                         # the well's mouth (the lower's underside)
 def lower():
     """The polymer lower: the body with its trigger guard and the magazine well (hollow, for the MP5's curved magazine), the machined lines on its flank (two long slots along
@@ -158,7 +158,7 @@ def lower():
 def grip():
     """B&T's grip (an AR-pattern pistol grip: a flat back strap with deep slats pressed across it, finger slats down the front, a hooked toe); its front top is mount_grip."""
     pts = PL([(1021, 612), (1021, 724), (990, 740), (973, 780), (955, 820), (937, 860), (919, 900), (913, 922), (924, 936), (934, 946), (928, 953), (884, 946), (837, 925), (794, 905), (755, 882), (759, 860), (781, 820), (804, 780), (830, 740), (859, 700), (878, 660), (870, 620), (849, 600), (900, 588), (960, 602)])   # (the photo's grip outline, read off its silhouette every 20 px; the toe hooks forward at its front)
-    gp = K.tmp(rprism(pts, -15.0 * mm, 15.0 * mm))
+    gp = K.tmp(rprism(pts, -14.0 * mm, 14.0 * mm))
     bevel(gp, 2.2 * mm, 1, 30)                                                                                           # (one chamfer, before the slats)
     d = (0.914, 0.405)                                                                                                    # (the slats run square to the grip's axis: down to the right in the photo)
     def rear_edge(y):
@@ -175,7 +175,7 @@ def grip():
         n = (-d[1], d[0])
         a = (c[0] - d[0] * half, c[1] - d[1] * half); b = (c[0] + d[0] * half, c[1] + d[1] * half)
         poly = PL([(a[0] - n[0] * thick, a[1] - n[1] * thick), (b[0] - n[0] * thick, b[1] - n[1] * thick), (b[0] + n[0] * thick, b[1] + n[1] * thick), (a[0] + n[0] * thick, a[1] + n[1] * thick)])
-        return rprism(poly, s * (15.0 * mm - depth), s * (15.0 * mm + 1.0 * mm))
+        return rprism(poly, s * (14.0 * mm - depth), s * (14.0 * mm + 1.0 * mm))
     def joined(mes):
         bm = bmesh.new()
         for me in mes: bm.from_mesh(me); bpy.data.meshes.remove(me)
@@ -188,16 +188,16 @@ def grip():
             e = front_edge(y); cs.append(slat((e[0] - d[0] * 24, e[1] - d[1] * 24), 30, 2.2, 1.8 * mm, s))
         for k in range(0, len(cs), 4): cut(gp, joined(cs[k:k + 4]))
     tidy(gp); smooth(gp, 30); K.adopt(gp, 'grip', LOW)
-    for s in (-1, 1): screw_head(s, 885, 700, 2.4, 1.0, 14.0, slot='grip')                                                # (the medallion's screw each side)
+    for s in (-1, 1): screw_head(s, 885, 700, 2.4, 1.0, 13.0, slot='grip')                                                # (the medallion's screw each side)
 
 # ===================================================================================== STOCK (factory: stock): the hinge block, the strut, the butt plate
 def stock():
     """The strut stock: the hinge block (a vertical slot through it, the round boss, the fold latch's tab below), the wide flat strut with its detent notches along the top, the oval butt plate with its two windows and a hub with two screws."""
-    hb = K.tmp(rprism(PL([(800, 338), (729, 440), (740, 458), (738, 530), (750, 560), (785, 580), (849, 600), (849, 512), (800, 512)]), -20.0 * mm, 20.0 * mm)); bevel(hb, 1.5 * mm, 1, 35)
+    hb = K.tmp(rprism(PL([(800, 338), (729, 440), (740, 458), (738, 530), (750, 560), (785, 580), (849, 600), (849, 512), (800, 512)]), -18.0 * mm, 18.0 * mm)); bevel(hb, 1.5 * mm, 1, 35)
     cut(hb, prism(rounded(F(777), U(474), 2.5 * mm, 7.9 * mm, 2.4 * mm, corner_segs(2.4 * mm)), 'x', -25 * mm, 25 * mm))                      # the vertical slot through the block (photo x 770-785, y 450-500)
     smooth(hb, 35); K.adopt(hb, 'stock', LOW)
     for s in (-1, 1):
-        o = K.tmp(cyl(3.8 * mm, *xs(s * 19.6 * mm, s * 20.6 * mm), 'x', (F(820), U(525)), segs(3.8 * mm))); smooth(o); K.adopt(o, 'stock', 'gunmetal')               # (the round boss, photo (820, 525))
+        o = K.tmp(cyl(3.8 * mm, *xs(s * 17.6 * mm, s * 18.6 * mm), 'x', (F(820), U(525)), segs(3.8 * mm))); smooth(o); K.adopt(o, 'stock', 'gunmetal')               # (the round boss, photo (820, 525))
     tb = K.tmp(rprism(PL([(718, 538), (745, 538), (745, 558), (718, 558)]), -6.0 * mm, 6.0 * mm)); bevel(tb, 1.0 * mm, 1, 35); smooth(tb, 35); K.adopt(tb, 'stock', 'black')     # (the fold latch's tab, photo (718-745, 538-558))
     st = K.tmp(rprism(PL([(790, 450), (125, 450), (125, 498), (790, 498)]), -13.0 * mm, 13.0 * mm)); bevel(st, 1.0 * mm, 1, 35)
     for a, b in ((520, 538), (620, 642)): cut(st, box(-14 * mm, 14 * mm, F(a), F(b), U(456), U(449)))                      # the detent notches along the strut's top (photo x 520-538 and 620-642, 2 mm deep)
@@ -256,16 +256,16 @@ def handle():
     """B&T's non-reciprocating handle: a stem through the channel and a lever standing out of the flank, a flat blade 22 mm out and 14 mm tall with a hooked lip at its
     front where the finger takes it. It stays put when the gun fires and is pulled back only by the hand."""
     ph = K.part('handle', (0, H_F, H_Y))
-    o = K.obj(cyl(3.2 * mm, -(HWT + 6.0 * mm), -(HWT - 3.0 * mm), 'x', (H_F, H_Y), segs(3.2 * mm)), 'base', 'steel', ph); smooth(o)
+    o = K.obj(cyl(3.2 * mm, -(HWT + 4.0 * mm), -(HWT - 3.0 * mm), 'x', (H_F, H_Y), segs(3.2 * mm)), 'base', 'steel', ph); smooth(o)
     st = K.tmp(box(-(HWT - 2.6 * mm), -(HWT - 3.0 * mm), H_F - 13 * mm, H_F + 4 * mm, H_Y - 3.0 * mm, H_Y + 3.0 * mm)); smooth(st); K.adopt(st, 'base', 'steel', ph)
     ar = K.tmp(prism([(-(HWT + 1.0 * mm), H_Y - 7.5 * mm), (-(HWT + 22.0 * mm), H_Y - 5.5 * mm), (-(HWT + 24.0 * mm), H_Y + 6.5 * mm), (-(HWT + 1.0 * mm), H_Y + 7.5 * mm)], 'z', H_F - 3.0 * mm, H_F + 4.0 * mm)) if False else None
-    arm = K.tmp(rprism([(H_F - 4.0 * mm, H_Y - 8.0 * mm), (H_F + 5.0 * mm, H_Y - 8.0 * mm), (H_F + 5.0 * mm, H_Y + 8.0 * mm), (H_F - 4.0 * mm, H_Y + 8.0 * mm)], -(HWT + 1.0 * mm), -(HWT + 24.0 * mm)))
+    arm = K.tmp(rprism([(H_F - 4.0 * mm, H_Y - 8.0 * mm), (H_F + 5.0 * mm, H_Y - 8.0 * mm), (H_F + 5.0 * mm, H_Y + 8.0 * mm), (H_F - 4.0 * mm, H_Y + 8.0 * mm)], -(HWT + 1.0 * mm), -(HWT + 13.0 * mm)))
     bevel(arm, 1.0 * mm, 2, 35); smooth(arm); K.adopt(arm, 'base', 'black', ph)
-    lip = K.tmp(rprism([(H_F + 0.0 * mm, H_Y - 8.0 * mm), (H_F + 14.0 * mm, H_Y - 8.0 * mm), (H_F + 14.0 * mm, H_Y + 8.0 * mm), (H_F + 0.0 * mm, H_Y + 8.0 * mm)], -(HWT + 20.0 * mm), -(HWT + 24.0 * mm)))
+    lip = K.tmp(rprism([(H_F + 0.0 * mm, H_Y - 8.0 * mm), (H_F + 14.0 * mm, H_Y - 8.0 * mm), (H_F + 14.0 * mm, H_Y + 8.0 * mm), (H_F + 0.0 * mm, H_Y + 8.0 * mm)], -(HWT + 9.0 * mm), -(HWT + 13.0 * mm)))
     bevel(lip, 1.0 * mm, 2, 35); smooth(lip); K.adopt(lip, 'base', 'black', ph)     # (the flange at the outer end, forward of the arm: the finger pulls on the arm's front face, the flange keeps it from sliding off)
     for k in range(3):   # grooves on the arm's face
         g = H_F - 1.5 * mm + k * 1.5 * mm
-        o = K.obj(box(-(HWT + 1.2 * mm), -(HWT + 17.0 * mm), g, g + 0.5 * mm, H_Y - 6.9 * mm, H_Y + 6.9 * mm), 'base', 'gunmetal', ph)
+        o = K.obj(box(-(HWT + 1.2 * mm), -(HWT + 10.0 * mm), g, g + 0.5 * mm, H_Y - 6.9 * mm, H_Y + 6.9 * mm), 'base', 'gunmetal', ph)
     return ph
 
 # ===================================================================================== MAGAZINE (part_mag): the MP5 family's, as models/mp5_kit.py draws it
@@ -354,8 +354,8 @@ info = {
     'anim': {'handle': 'part_handle', 'carrier': 'part_carrier', 'mag': 'part_mag'},
     'carrier': {'travel': 0.075},
     'magAt': [round(MAG_F, 4), round(MAG_Y, 4)],
-    'handle': {'f': round(H_F, 4), 'y': round(H_Y, 4), 'x': round(-(HWT + 16.0 * mm), 4), 'travel': H_TRAVEL, 'style': 'tab', 'recip': False,
-               'grab': [round(H_F + 111.5 * mm, 4), round(H_Y - 42.3 * mm, 4), round(-(HWT + 24.1 * mm), 4)]},   # (seated by measurement in the game: the hand's origin is the palm, 112 mm ahead of the lever and 42 mm below it, so that with the 'tab' pose (fingers pointing back and up along the left flank) the index fingertip lands on the arm's front face)
+    'handle': {'f': round(H_F, 4), 'y': round(H_Y, 4), 'x': round(-(HWT + 9.0 * mm), 4), 'travel': H_TRAVEL, 'style': 'tab', 'recip': False,
+               'grab': [round(H_F + 111.5 * mm, 4), round(H_Y - 42.3 * mm, 4), round(-(HWT + 19.1 * mm), 4)]},   # (seated by measurement in the game: the hand's origin is the palm, 112 mm ahead of the lever and 42 mm below it, so that with the 'tab' pose (fingers pointing back and up along the left flank) the index fingertip lands on the arm's front face)
     'port': [round((PORT[0] + PORT[1]) / 2, 4), round((PORT_U[0] + PORT_U[1]) / 2, 4), round(HW, 4)],
     'chamberAt': {'side': 'port', 'f': round(PORT[1] - 0.7 * mm - 0.72 * 0.026, 4), 'y': round(PORT_CZ + 0.0045, 4), 'x': 0.0},
     'recoilBarrel': 0,
