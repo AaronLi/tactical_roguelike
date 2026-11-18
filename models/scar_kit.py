@@ -110,7 +110,8 @@ def upper():
     for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
         for s in (-1, 1):
             cut(up, prism(rounded(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 4), 'x', *xs(s * (HWU - 2.2) * mm, s * (HWU + 1) * mm)))
-    cut(up, prism(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWU - 2.0) * mm, (HWU + 1) * mm))   # (the charging handle's channel, right, along the upper's upper half)
+    cut(up, prism(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWU - 2.0) * mm, (HWU + 1) * mm))   # (the charging handle's channel, along the upper's upper half: both sides, the handle is ambidextrous)
+    cut(up, prism(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', -(HWU + 1) * mm, -(HWU - 2.0) * mm))
     # M-LOK at 3, 6 and 9 o'clock: three slots 32 x 7 mm at 29 mm centres, 3 mm deep, on each flank and the underside of the forend
     for f in (0.300, 0.329, 0.358):
         for s in (-1, 1):
@@ -124,6 +125,7 @@ def upper():
         for s in (-1, 1):
             liner(rounded(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 4), 'x', *xs(s * (HWU - 2.2) * mm, s * (HWU - 1.7) * mm))
     liner(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWU - 2.0) * mm, (HWU - 1.5) * mm)
+    liner(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', -(HWU - 1.5) * mm, -(HWU - 2.0) * mm)
     for f in (0.300, 0.329, 0.358):
         for s in (-1, 1): liner(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU - 2.5) * mm))
         liner(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT + 2.5) * mm, (UP_BOT + 3.0) * mm)
@@ -217,12 +219,12 @@ def front_sight():
 HANDLE = (0.2525, 0.0322)       # the knob (the NRCH's handle rides at the front of its channel, photo x 677, y 193)
 def handle():
     """The NRCH's non-reciprocating charging handle (part_ch: it stays put when the gun fires and is pulled back only when it is charged, as the AR's is): a
-    knob (a ring round a dark socket) at the front of its channel along the upper's upper half on the RIGHT, ahead of the ejection port."""
+    knob (a ring round a dark socket) at the front of its channel along the upper's upper half on the LEFT (ambidextrous; the shooter is right-handed), ahead of the ejection port."""
     ph = K.part('ch', (0, HANDLE[0], HANDLE[1]))
-    o = K.obj(cyl(3.0 * mm, (HWU - 1.4) * mm, (HWU + 17.0) * mm, 'x', HANDLE, 16), 'base', 'black', ph); smooth(o)            # (the stem, standing out of the channel)
-    o = K.tmp(cyl(6.8 * mm, (HWU + 16.5) * mm, (HWU + 24.0) * mm, 'x', HANDLE, 24)); bevel(o, 2.0 * mm, 3, 30); smooth(o); K.adopt(o, 'base', 'black', ph)   # (the knob: a rounded black head)
-    o = K.obj(cyl(2.4 * mm, (HWU + 23.6) * mm, (HWU + 24.6) * mm, 'x', HANDLE, 14), 'base', 'steel', ph); smooth(o)           # (its steel cap)
-    st = K.tmp(box((HWU - 1.4) * mm, (HWU + 0.2) * mm, HANDLE[0] - 22 * mm, HANDLE[0] + 2 * mm, HANDLE[1] - 2.5 * mm, HANDLE[1] + 2.5 * mm)); smooth(st); K.adopt(st, 'base', 'steel', ph)
+    o = K.obj(cyl(3.0 * mm, -(HWU + 17.0) * mm, -(HWU - 1.4) * mm, 'x', HANDLE, 16), 'base', 'black', ph); smooth(o)            # (the stem, standing out of the channel)
+    o = K.tmp(cyl(6.8 * mm, -(HWU + 24.0) * mm, -(HWU + 16.5) * mm, 'x', HANDLE, 24)); bevel(o, 2.0 * mm, 3, 30); smooth(o); K.adopt(o, 'base', 'black', ph)   # (the knob: a rounded black head)
+    o = K.obj(cyl(2.4 * mm, -(HWU + 24.6) * mm, -(HWU + 23.6) * mm, 'x', HANDLE, 14), 'base', 'steel', ph); smooth(o)           # (its steel cap)
+    st = K.tmp(box(-(HWU + 0.2) * mm, -(HWU - 1.4) * mm, HANDLE[0] - 22 * mm, HANDLE[0] + 2 * mm, HANDLE[1] - 2.5 * mm, HANDLE[1] + 2.5 * mm)); smooth(st); K.adopt(st, 'base', 'steel', ph)
     return ph
 
 # ----------------------------------------------------------------------------------------------------- STOCK (factory: stock)
@@ -376,7 +378,7 @@ info = {
     'grip': [round(GRIP_TOP[0] - 0.040, 4), round(GRIP_TOP[1] - 0.040, 4), 0], 'support': [0.300, -0.030, 0],
     'anim': {'ch': 'part_ch', 'mag': 'part_mag'},
     'magAt': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4)],
-    'ch': [round(HANDLE[0], 4), round(HANDLE[1], 4), round((HWU + 3.0) * mm, 4)],
+    'ch': [round(HANDLE[0], 4), round(HANDLE[1], 4), round(-(HWU + 3.0) * mm, 4)],
     'port': [round(Fp(956), 4), round(Up(349), 4), round(HWU * mm, 4)],
     'chamberAt': {'side': 'right', 'f': round(Fp(1030), 4), 'y': 0.0, 'x': round((HWU - 2.5) * mm, 4)},
     'recoilBarrel': 0,
