@@ -876,6 +876,9 @@ export const Space = (() => {
     const D = [V[0] + AR + 0.03, V[1] + AR + 0.03]; // (how far each half's panels go: the one by the middle all the way round the bend)
     const ext = (pts: number[][], d: number, mat: THREE.Material) => { const g = new T.ExtrudeGeometry(new T.Shape(pts.map(([x, y]) => new T.Vector2(x, y))), { depth: d, bevelEnabled: false }); g.translate(0, 0, -d / 2); const o = new T.Mesh(g, mat); o.castShadow = o.receiveShadow = true; return o; };
     const leaves: THREE.Object3D[] = [];
+    if (!feedRT) feedRT = G_R.viewRT(CAM_W, CAM_H, { type: T.HalfFloatType });
+    const screen = new T.MeshBasicMaterial({ map: feedRT.texture, color: 0x0b0f12 }); // (dark till it's live: feed)
+    const cam = new T.PerspectiveCamera(88, CAM_W / CAM_H, 0.05, 80);
     for (const sg of [1, -1]) { // (1: the upper half; -1: the lower)
       const Y = (y: number) => sg * y;
       // each panel drawn about its own middle, as it stands shut; s0, s1: where its edges are along the rail, shut
@@ -888,6 +891,11 @@ export const Space = (() => {
         const o8 = (w: number, hh: number, k: number) => [[-w + k, -hh], [w - k, -hh], [w, -hh + k], [w, hh - k], [w - k, hh], [-w + k, hh], [-w, hh - k], [-w, -hh + k]];
         const bo = ext(o8(0.6, b, 0.14), 0.04, dark); bo.position.set(0, q / 2, T0 / 2 + 0.02); inner.add(bo);
         const bi = ext(o8(0.5, b - 0.08, 0.1), 0.02, accent); bi.position.set(0, q / 2, T0 / 2 + 0.05); inner.add(bi);
+        const sw = 0.48, sc = new T.Mesh(new T.PlaneGeometry(sw, sw * CAM_H / CAM_W), screen); sc.position.set(0, q / 2, T0 / 2 + 0.062); inner.add(sc); // (the camera's picture on the boss, on your side)
+        // the camera: in the middle of the door's outer face, just under the seam, looking straight out through her breaching door
+        // into whatever's there; it rides with the panel, and it's off once the door's open (feed)
+        const housing = new T.Mesh(new T.BoxGeometry(0.12, 0.08, 0.05), dark); housing.position.set(0, q / 2 - 0.06, -T0 / 2 - 0.025); inner.add(housing);
+        cam.position.set(0, q / 2 - 0.06, -T0 / 2 - 0.055); inner.add(cam);
       }
     }
     for (const [sx, sy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { // the corners' gussets, through the door's whole depth
@@ -896,12 +904,7 @@ export const Space = (() => {
     const B = SD.hatchButton(S.def), lamp = new T.MeshStandardMaterial({ color: 0xff2a10, emissive: 0xff2a10, emissiveIntensity: 1.6 });
     const box = new T.Mesh(new T.BoxGeometry(0.05, 0.18, 0.14), dark); box.position.set(B.x + 0.025, B.y, B.z); m.group.add(box);
     const btn = new T.Mesh(new T.CylinderGeometry(0.035, 0.035, 0.03, 12), lamp); btn.rotation.z = Math.PI / 2; btn.position.set(B.x + 0.06, B.y, B.z); m.group.add(btn); // (facing across the flight)
-    // the camera on the far side of it, up under the tunnel's roof between it and her breaching door, looking out through that into
-    // whatever's there; its picture on screens on the cover either side of the tunnel's mouth (facing the staging space) and beside the button
-    const cz = L.zc + 0.015, cam = new T.PerspectiveCamera(82, CAM_W / CAM_H, 0.05, 80); cam.position.set(0, L.CB - 0.16, cz - 0.03); cam.rotation.x = -0.12; m.group.add(cam);
-    const housing = new T.Mesh(new T.BoxGeometry(0.1, 0.08, 0.06), dark); housing.position.set(0, L.CB - 0.1, cz); m.group.add(housing);
-    if (!feedRT) feedRT = G_R.viewRT(CAM_W, CAM_H, { type: T.HalfFloatType });
-    const screen = new T.MeshBasicMaterial({ map: feedRT.texture, color: 0x0b0f12 }); // (dark till it's live: feed)
+    // the door camera's picture also on screens on the cover either side of the tunnel's mouth (facing the staging space) and beside the button
     const panel = (x: number, y: number, z: number, w: number, ry: number) => {
       const h = w * CAM_H / CAM_W, bz = new T.Mesh(new T.BoxGeometry(w + 0.05, h + 0.05, 0.025), dark); bz.position.set(x, y, z); bz.rotation.y = ry; m.group.add(bz);
       const sc = new T.Mesh(new T.PlaneGeometry(w, h), screen); sc.position.set(x + Math.sin(ry) * 0.014, y, z + Math.cos(ry) * 0.014); sc.rotation.y = ry; m.group.add(sc); // (just off the bezel's face, the way it faces)
@@ -912,14 +915,14 @@ export const Space = (() => {
     S.hatch = { leaves, rail, D, lamp, tw, cam, screen, n: 0 };
     if (!G_R.feeds.includes(feed)) G_R.feeds.push(feed);
   }
-  // The breach camera's picture: drawn while she's against a hull and you're aboard, a frame in three (20 a second, at CAM_W x CAM_H),
+  // The door camera's picture: drawn while she's against a hull with her inner door shut and you're aboard, a frame in three (20 a second, at CAM_W x CAM_H),
   // into feedRT, without the shadows being drawn again for it (they're the frame's own); dark otherwise
   const CAM_W = 320, CAM_H = 200;
   let feedRT: THREE.WebGLRenderTarget | null = null;
   function feed(r: THREE.WebGLRenderer) {
     const H = S.hatch;
     if (!H || !feedRT) return;
-    const live = S.on && S.kind === 'board' && S.docked && !S.auto && aboard();
+    const live = S.on && S.kind === 'board' && S.docked && !S.auto && hatchShut() && aboard(); // (the door open: you can see for yourself)
     H.screen.color.setHex(live ? 0xd8e8f0 : 0x0b0f12);
     if (!live || H.n++ % 3) return;
     const au = r.shadowMap.autoUpdate; r.shadowMap.autoUpdate = false;
