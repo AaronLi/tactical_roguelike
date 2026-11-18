@@ -354,7 +354,7 @@ def mag_h(top):
 def details():
     """What FN's NRCH shots show on the flanks: the black side plate with its three screws ahead of the ejection port (both sides), the brass deflector's
     raised wedge behind the port, the bolt catch / magazine release's moulded housing with its button, the safety's markings, the pins and screws, the
-    takedown pins, the quick-detach sockets, the seam groove between the upper and the lower."""
+    takedown pins, the quick-detach sockets. (No seam strip: the upper overhangs the narrower lower, and its edge makes the line.)"""
     for s in (-1, 1):
         # the barrel's bolt plate (measured off FN's 16S shot: x 602-670, y 218-239; a lozenge, blunt behind and tapering to a rounded nose; two hex-socket screws at x 611 and 643 and a pin hole between at 628)
         c = 0.0036                 # (as the photo has it; the ledge where the upper steps in is at its top edge, U 11.9)
@@ -374,7 +374,6 @@ def details():
         for f, u in ((0.010, 0.0075), (F_FRONT + 0.006, -0.012)):
             q = K.tmp(cyl(5.8 * mm, *xs(s * (HWU - 0.4) * mm, s * (HWU + 3.0) * mm), 'x', (f, u), 20)); cut(q, cyl(2.6 * mm, *xs(s * (HWU - 1.0) * mm, s * (HWU + 3.5) * mm), 'x', (f, u), 14))
             bevel(q, 0.4 * mm, 1); smooth(q); K.adopt(q, 'base', 'steel')
-        g = K.tmp(box(*xs(s * (HWU - 0.2) * mm, s * (HWU + 0.7) * mm), 0.0, F_FRONT - 0.002, UP_BOT * mm - 0.0006, UP_BOT * mm + 0.0006)); smooth(g); K.adopt(g, 'base', 'black')
         for ch, f, u in (('5', 0.0585, -0.0330), ('1', 0.0535, -0.0210)):
             o = K.tmp(digit(ch, f, u, s, s * HWL, h=4.2 * mm, w=2.6 * mm, t=0.6 * mm, rise=0.35 * mm)); smooth(o); K.adopt(o, 'base', 'black')
     lg = K.tmp(box(-HWL, HWL, W_OUT_F - 0.004, 0.2085, -0.0335, -0.0177)); bevel(lg, 1.0 * mm, 2, 30); smooth(lg); K.adopt(lg, 'base', FURN)   # (the lug the hinge pin goes through, at the lower's front top)
