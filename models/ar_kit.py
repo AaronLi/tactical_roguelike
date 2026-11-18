@@ -394,16 +394,24 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
         tr, n, lb = c; zu = t - n - (w - tr)                             # (the upper bevel at 45 degrees from the neck's foot to the side flat)
         return [(-tr, t), (tr, t), (tr, t - n), (w, zu), (w, b + lb), (w - lb, b), (-w + lb, b), (-w, b + lb), (-w, zu), (-tr, t - n)]
     hg = K.tmp(prism(octo(T, B, W, C), 'y', f0, f1))
+    bevel(hg, 0.5 * mm, 1, 30)                                                # (chamfered once, on the solid, before the hollow and the slots: they get no bevel round their rims)
     cut(hg, prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, CI), 'y', f0 - 0.01, f1 + 0.01))   # (hollow: 2.6 mm walls)
-    def face_cut(a, b, f, ln, wd, r=None, depth=6 * mm):
-        """A slot ln long, wd across, through the face from section point a to b, centred along it, its centre at forward f."""
+    TP = 0.5 * mm                                                             # (the slots' and holes' walls slope out this much at the surface, like the chamfer that used to ring them)
+    def face_cut(a, b, f, ln, wd, hole=False):
+        """A slot ln long, wd across (or a round hole of diameter wd), through the face from section point a to b, centred along it, its
+        centre at forward f: a tapered cutter (the wall's inner face at the nominal size, TP wider at the surface)."""
         ax, az = a; bx, bz = b
         tx, tz = bx - ax, bz - az; n_ = math.hypot(tx, tz); tx, tz = tx / n_, tz / n_
         nx, nz = tz, -tx                                                      # (the face's outward normal, the octagon wound anticlockwise)
         if nx * (ax + bx) + nz * (az + bz - (T + B)) < 0: nx, nz = -nx, -nz
         if nx * tz - nz * tx < 0: tx, tz = -tx, -tz                           # (keep the frame right-handed)
         cx, cz = (ax + bx) / 2, (az + bz) / 2
-        g = prism(rounded(f, 0.0, ln / 2, wd / 2, (r or wd / 2) * 0.98, corner_segs((r or wd / 2) * 0.98)), 'x', -depth, depth)
+        def outline(d):
+            hw, hh = ln / 2 + d, wd / 2 + d
+            if hole: return [(f + hh * math.cos(2 * math.pi * i / 8), hh * math.sin(2 * math.pi * i / 8)) for i in range(8)]
+            return rounded(f, 0.0, hw, hh, hh * 0.98, 2)
+        k_ = TP / (2.6 * mm)                                                  # (the offset grows from 0 at the wall's inner face to TP at the surface)
+        g = loft(outline(-1.0 * mm * k_), outline(3.2 * mm * k_), 'x', -3.6 * mm, 0.6 * mm)
         g.transform(Matrix(((nx, 0, tx, cx), (0, 1, 0, 0), (nz, 0, tz, cz), (0, 0, 0, 1))))
         return g
     P = octo(T, B, W, C)
@@ -417,7 +425,7 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
             for nm in ('lbR', 'lbL'): cut(hg, face_cut(*faces[nm], f + 0.020, 32 * mm, 7 * mm))
     k, f = 0, f0 + CL + 0.004                                                 # the round holes along the upper bevels, every 20 mm
     while f < f1 - 0.010:
-        for nm in ('ubR', 'ubL'): cut(hg, face_cut(*faces[nm], f, 4.4 * mm, 4.4 * mm))
+        for nm in ('ubR', 'ubL'): cut(hg, face_cut(*faces[nm], f, 4.4 * mm, 4.4 * mm, True))
         f += 0.020
     # the clamp: the rear 18 mm (over the barrel nut, r 16.5 at the bore) a solid ring bored to the nut, split along the bottom, the
     # split's two jaws a lug under the tube; two socket-head screws across the lug, below the nut, pull the split shut on it
@@ -436,12 +444,12 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
     feats = {nm: [] for nm in faces}                                          # (each face's features: (centre forward, length, width))
     for k in range(n):
         f = f0 + CL + 0.016 + k * 0.040
-        for nm in ('sR', 'sL', 'bot'): feats[nm].append((f, 32 * mm, 7 * mm))
+        for nm in ('sR', 'sL', 'bot'): feats[nm].append((f, 32 * mm + 2 * TP, 7 * mm + 2 * TP))
         if f + 0.020 + 0.016 < f1 - 0.010:
-            for nm in ('lbR', 'lbL'): feats[nm].append((f + 0.020, 32 * mm, 7 * mm))
+            for nm in ('lbR', 'lbL'): feats[nm].append((f + 0.020, 32 * mm + 2 * TP, 7 * mm + 2 * TP))
     f = f0 + CL + 0.004
     while f < f1 - 0.010:
-        for nm in ('ubR', 'ubL'): feats[nm].append((f, 4.4 * mm, 4.4 * mm))
+        for nm in ('ubR', 'ubL'): feats[nm].append((f, 4.4 * mm + 2 * TP, 4.4 * mm + 2 * TP))
         f += 0.020
     fc, Y = [], (0, 1, 0)
     for nm, fl in feats.items():
@@ -455,17 +463,18 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
         for sd in (-1, 1):                                                     # (along it, each side, over the features' span)
             e = sd * (wd / 2 + m); fc.append((FP, FN, (cx + tx * e, 0, cz + tz * e), ACR, (Y, y0, y1)))
     slice_across(hg, 'y', at)
-    slice_faces(hg, fc); strip_ngons(hg, 'y', passes=1); tidy(hg, 0.1 * mm, False)   # (and no edge under 0.1 mm: one would clamp the bevel below to nothing)
-    bevel(hg, 0.5 * mm, 1, 30); tidy(hg); smooth(hg, 1); K.adopt(hg, 'handguard', mat)   # (flat-shaded: every edge sharp)
+    slice_faces(hg, fc); strip_ngons(hg, 'y', passes=2)
+    tidy(hg); smooth(hg, 1); K.adopt(hg, 'handguard', mat)   # (flat-shaded: every edge sharp)
     ring = K.tmp(prism(octo(T - 2.6 * mm, B + 2.6 * mm, W - 2.6 * mm, CI), 'y', f0, f0 + CJ))
     cut(ring, cyl(NR, f0 - 0.01, f0 + CJ + 0.01, 'y', (0, 0), segs(NR)), SPL.copy(), box(-W, W, f0 - 0.01, f0 + CJ + 0.01, 0.0, T))   # (a collar under the nut only: over it the top keeps the tube's own wall, as thin as the bottom)
     tidy(ring); smooth(ring); K.adopt(ring, 'handguard', mat)
     LZ0, LZ1, LX = B - 6.0 * mm, B + 0.5 * mm, 7.5 * mm                       # (the lug: its bottom, top (inside the tube's wall), half width)
     SZ, SFQ = B - 2.8 * mm, (0.0045, 0.0130)                                 # (the screws: height, positions back to front over the nut)
     lug = K.tmp(prism([(-LX, LZ1), (LX, LZ1), (LX, LZ0 + 1.5 * mm), (LX - 1.5 * mm, LZ0), (-LX + 1.5 * mm, LZ0), (-LX, LZ0 + 1.5 * mm)], 'y', f0, f0 + CJ))
+    bevel(lug, 0.5 * mm, 1, 30)                                                # (chamfered once, before its bores: they get no bevel round their rims)
     cut(lug, *[SPL] + [cyl(1.6 * mm, -LX - 0.01, LX + 0.01, 'x', (f0 + q, SZ), segs(1.6 * mm)) for q in SFQ]
              + [cyl(2.9 * mm, LX - 2.6 * mm, LX + 0.01, 'x', (f0 + q, SZ), segs(2.9 * mm)) for q in SFQ])      # (bores; the heads' counterbores, right)
-    bevel(lug, 0.5 * mm, 1, 30); tidy(lug); smooth(lug); K.adopt(lug, 'handguard', mat)
+    tidy(lug); smooth(lug); K.adopt(lug, 'handguard', mat)
     for q in SFQ:                                                              # the screws: socket heads sunk in the right jaw, the threaded
         o = K.tmp(cyl(2.6 * mm, LX - 2.6 * mm, LX - 0.3 * mm, 'x', (f0 + q, SZ), segs(2.6 * mm)))   # ends flush in the left
         hx = prism([(f0 + q + 1.25 * mm * math.cos(math.pi / 3 * j), SZ + 1.25 * mm * math.sin(math.pi / 3 * j)) for j in range(6)], 'x', LX - 1.5 * mm, LX)
@@ -475,7 +484,7 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
         o = K.tmp(cyl(6.5 * mm, *xs(s * (W - 0.5 * mm), s * (W + 1.6 * mm)), 'x', (f0 + 0.016, (P[3][1] + P[4][1]) / 2), segs(6.5 * mm)))
         cut(o, cyl(3.6 * mm, *xs(s * (W - 1.0 * mm), s * (W + 2.0 * mm)), 'x', (f0 + 0.016, (P[3][1] + P[4][1]) / 2), segs(3.6 * mm)))
         bevel(o, 0.4 * mm, 1); tidy(o); smooth(o); K.adopt(o, 'handguard', mat)
-    picatinny(K, f0, f1 - 1.5 * mm, T, 'handguard', mat)
+    picatinny(K, f0, f1 - 1.5 * mm, T, 'handguard', mat, lean=True)
     return B
 
 def handguard_carbine(f0, f1):
@@ -525,12 +534,15 @@ def front_sight_base(f, br):
     cut(sw, cyl(3.8 * mm, -0.01, 0.01, 'x', (f + 4 * mm, -br - 15 * mm), 18)); smooth(sw); K.adopt(sw, 'base', 'steel')
 
 # ===================================================================================== BARREL, GAS, MUZZLE DEVICES
-def barrel(f0, mz0, r=9.5 * mm, gas_f=None, fb=None, thr=7.6 * mm):
+def barrel(f0, mz0, r=9.5 * mm, gas_f=None, fb=None, thr=7.6 * mm, hide=None):
     """The factory barrel (a plain contour, its muzzle thread's shoulder) from `fb` (mount_barrel: what shows ahead of the longest
     handguard; the length under the handguard is base, it stays when another barrel is fitted) and (base) a low-profile gas block with its
     tube under a free-float handguard."""
     fb = fb or f0
-    if fb > f0: o = K.obj(lathe([(f0, r), (fb, r)], 20), 'base', 'park'); smooth(o)
+    if hide and f0 < hide < fb:    # (hide: where the handguard ends: inside it the barrel is unseen, 8 sides; ahead of it what shows gets segs(r))
+        o = K.obj(lathe([(f0, r), (hide, r)], 8), 'base', 'park'); smooth(o)
+        o = K.obj(lathe([(hide, r), (fb, r)], segs(r, 0.15 * mm)), 'base', 'park'); smooth(o)
+    elif fb > f0: o = K.obj(lathe([(f0, r), (fb, r)], 20), 'base', 'park'); smooth(o)
     o = K.obj(lathe([(fb, r), (mz0 - 6 * mm, r), (mz0 - 6 * mm, thr), (mz0, thr)], 20), 'barrel', 'park'); smooth(o)
     if gas_f:
         o = K.obj(lathe([(gas_f, r + 3.5 * mm), (gas_f + 0.018, r + 3.5 * mm)], 20), 'base', 'park'); smooth(o)
@@ -745,14 +757,24 @@ def mag_glock(top, L=0.244, rake=None):
     ext = D / 2 * math.tan(r) + 1 * mm                                    # (built a little long at the top: cut level after the turn)
     fb, ff = top[0] - D / 2, top[0] + D / 2
     mg = K.tmp(prism([(fb, top[1] + ext), (ff, top[1] + ext), (ff, top[1] - L), (fb, top[1] - L)], 'x', -HWm, HWm))
-    boolean(mg, prism(rounded(0.0, top[0] - 4 * mm, HWm, D / 2 + 4 * mm, 7.5 * mm, 4), 'z', top[1] - L - 0.01, top[1] + ext + 0.01), 'INTERSECT')   # (its section: the front rounded)
+    boolean(mg, prism(rounded(0.0, top[0] - 4 * mm, HWm, D / 2 + 4 * mm, 7.5 * mm, 3), 'z', top[1] - L - 0.01, top[1] + ext + 0.01), 'INTERSECT')   # (its section: the front rounded)
     cut(mg, box(-3.5 * mm, 3.5 * mm, ff - 2.0 * mm, ff + 0.01, top[1] - 0.034, top[1] - 0.028))       # (the catch's notch in its front)
     wins = mag_holes(mg, pm, lambda t: ((fb, top[1] - 0.012 + t * (-L + 0.040)), (0.0, -1.0)), 5, HWm)
+    # each window and the catch's notch framed in its own small rectangle of its face (rule 3), while the body is still upright: one line
+    # across above and below each, and one along beside each (a face this long without frames fans, and the AO then cuts those fans to pieces)
+    fm, X_, Z_ = 1.5 * mm, (1, 0, 0), (0, 0, 1)
+    wx, wz = -HWm * 0.25, [w_[2][1] for w_ in wins]
+    fc = [((0, fb, top[1] - L / 2), (0, -1, 0), (0, fb, zc + sg * (2.8 * mm + fm)), Z_) for zc in wz for sg in (-1, 1)]
+    fc += [((0, fb, top[1] - L / 2), (0, -1, 0), (wx + sg * (2.6 * mm + fm), fb, 0), X_, (Z_, min(wz) - 4.4 * mm, max(wz) + 4.4 * mm)) for sg in (-1, 1)]
+    zn = top[1] - 0.031
+    fc += [((0, ff, top[1] - L / 2), (0, 1, 0), (0, ff, zn + sg * (3.0 * mm + fm)), Z_) for sg in (-1, 1)]
+    fc += [((0, ff, top[1] - L / 2), (0, 1, 0), (sg * (3.5 * mm + fm), ff, 0), X_, (Z_, zn - 3 * mm - fm, zn + 3 * mm + fm)) for sg in (-1, 1)]
+    slice_faces(mg, fc); strip_ngons(mg, 'z', passes=2)
     mg.data.transform(M)
     hb, hf = top[0] - D / 2 / math.cos(r), top[0] + D / 2 / math.cos(r)  # (its back and front at the level top)
     cut(mg, box(-0.05, 0.05, top[0] - 0.05, top[0] + 0.05, top[1], top[1] + 0.05),
         box(-HWm + 1.1 * mm, HWm - 1.1 * mm, hb + 1.4 * mm, hf - 1.6 * mm, top[1] - 4 * mm, top[1] + 0.01))   # (the top level, open between the lips)
-    bevel(mg, 0.8 * mm, 1, 30); smooth(mg); K.adopt(mg, 'mag', 'polymer', pm)
+    smooth(mg); K.adopt(mg, 'mag', 'polymer', pm)
     for o in mag_hole_glass(wins, pm): o.matrix_world = M @ o.matrix_world
     o = K.tmp(prism([(fb - 1.0 * mm, top[1] - L + 6 * mm), (ff + 2.5 * mm, top[1] - L + 6 * mm), (ff + 2.5 * mm, top[1] - L - 1.5 * mm), (fb - 1.0 * mm, top[1] - L - 1.5 * mm)],
                     'x', -HWm - 0.9 * mm, HWm + 0.9 * mm))
@@ -795,7 +817,7 @@ else:
     HG_END = MZ0 - 0.012                # the furthest a handguard reaches (hgMax = this - mount_handguard - 3 mm: the 0.240 m rail; the game keeps 15 mm of barrel bare)
     FB = HG_END + 1 * mm
     FS = HG1 - 0.016
-barrel(UP_F1, MZ0, r=BR, gas_f=None if C.get('gas', 0.186) is None else UP_F1 + C.get('gas', 0.186), fb=FB, thr=C.get('thr_r', 7.6 * mm))
+barrel(UP_F1, MZ0, r=BR, gas_f=None if C.get('gas', 0.186) is None else UP_F1 + C.get('gas', 0.186), fb=FB, thr=C.get('thr_r', 7.6 * mm), hide=HG1 if C.get('barrel_hide') else None)
 MUZ = muzzle_a2(MZ0, C.get('muzzle_sc', 1.0))
 RS = F(609)                                # (the rear sight's leaf: its base on the rail at photo x 586-632)
 rear_flip(RS)
