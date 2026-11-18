@@ -138,7 +138,7 @@ info = {
     'chamberAt': {'side': 'port', 'f': round(FACE, 4), 'y': RND[0], 'x': 0.0},
 }
 anchors = {
-    'mount_optic': [0.012, round(RB + 0.005, 4), 0], 'mount_optic_end': [0.134, round(RB + 0.005, 4), 0],
+    'mount_optic': [0.0, round(RB + 0.005, 4), 0], 'mount_optic_end': [0.170, round(RB + 0.005, 4), 0],
     'mount_handguard': [round(HG0, 4), 0, 0], 'mount_handguard_end': [0.855, 0, 0],
     'mount_barrel': [0.856, 0, 0], 'mount_muzzle': [MUZ, 0, 0],
     'mount_stock': [0, -0.002, 0], 'mount_grip': [0.05, -0.0165, 0],
