@@ -515,7 +515,7 @@ def front_flip(f, base):
 
 def fold_irons(rs, fs_):
     """The flip-up irons FOLDED: the optic's mount piece (slot optic, extras.mount: drawn only under a real optic, never with the upright irons). The rear sight's clamp base
-    stays and its leaf lies flat forward along the rail on top of it (the disc and its aperture at the front); the front sight's block stays and its post and ears lie flat
+    stays and its leaf lies flat BACK (toward the shooter) along the rail on top of it (the disc and its aperture at the rear end); the front sight's block stays and its post and ears lie flat
     back over it. Nothing stands higher than 11 mm over the rail."""
     def mount(o): o['mount'] = True; return o
     f = rs
@@ -523,9 +523,9 @@ def fold_irons(rs, fs_):
     bevel(o, 0.8 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', RCV))
     o = mount(K.obj(cyl(4.2 * mm, 9.5 * mm, 12.0 * mm, 'x', (f + 2 * mm, RAIL_TOP + 4.5 * mm), 16), 'optic', RCV)); smooth(o)
     ln = SY + 6.2 * mm - (RAIL_TOP + 7 * mm)            # (the leaf's length, hinge to the top of its disc)
-    lf = K.tmp(prism([(-4.5 * mm, f + 1 * mm), (4.5 * mm, f + 1 * mm), (4.5 * mm, f + ln - 6.2 * mm), (-4.5 * mm, f + ln - 6.2 * mm)], 'z', RAIL_TOP + 8.0 * mm, RAIL_TOP + 10.6 * mm))
-    boolean(lf, cyl(6.2 * mm, RAIL_TOP + 8.0 * mm, RAIL_TOP + 10.6 * mm, 'z', (0, f + ln - 6.2 * mm), 28), 'UNION')
-    cut(lf, cyl(3.2 * mm, RAIL_TOP + 7 * mm, RAIL_TOP + 12 * mm, 'z', (0, f + ln - 6.2 * mm), 24))
+    lf = K.tmp(prism([(-4.5 * mm, f - 1 * mm), (4.5 * mm, f - 1 * mm), (4.5 * mm, f - ln + 6.2 * mm), (-4.5 * mm, f - ln + 6.2 * mm)], 'z', RAIL_TOP + 8.0 * mm, RAIL_TOP + 10.6 * mm))
+    boolean(lf, cyl(6.2 * mm, RAIL_TOP + 8.0 * mm, RAIL_TOP + 10.6 * mm, 'z', (0, f - ln + 6.2 * mm), 28), 'UNION')
+    cut(lf, cyl(3.2 * mm, RAIL_TOP + 7 * mm, RAIL_TOP + 12 * mm, 'z', (0, f - ln + 6.2 * mm), 24))
     bevel(lf, 0.4 * mm, 1); smooth(lf); mount(K.adopt(lf, 'optic', RCV))
     f = fs_; base = RAIL_TOP
     o = K.tmp(prism([(f - 24 * mm, base), (f + 8 * mm, base), (f + 7 * mm, base + 7 * mm), (f - 22 * mm, base + 8 * mm)], 'x', -9.5 * mm, 9.5 * mm))
