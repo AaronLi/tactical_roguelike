@@ -409,7 +409,8 @@ def handguard_mlok(f0, f1, mat=None, sc=1.0):
         def outline(d):
             hw, hh = ln / 2 + d, wd / 2 + d
             if hole: return [(f + hh * math.cos(2 * math.pi * i / 8), hh * math.sin(2 * math.pi * i / 8)) for i in range(8)]
-            return rounded(f, 0.0, hw, hh, hh * 0.98, 2)
+            pts = rounded(f, 0.0, hw, hh, hh, 2)                                 # (ends true half circles, each to ONE point: at 0.98 of the half height a 0.14 mm flat at the tip
+            return [p for i, p in enumerate(pts) if math.dist(p, pts[i - 1]) > 1e-7]   #  joined the next slot's by a hairline strip; the corners' shared points kept once)
         k_ = TP / (2.6 * mm)                                                  # (the offset grows from 0 at the wall's inner face to TP at the surface)
         g = loft(outline(-1.0 * mm * k_), outline(3.2 * mm * k_), 'x', -3.6 * mm, 0.6 * mm)
         g.transform(Matrix(((nx, 0, tx, cx), (0, 1, 0, 0), (nz, 0, tz, cz), (0, 0, 0, 1))))
