@@ -754,7 +754,7 @@ info = {
     'magAt': [round(MTOP[0], 4), round(MTOP[1], 4)],
     **({'magRake': round(GRK, 4)} if C.get('lower', 'ar15') == 'glock' else {}),   # (the well's rake: a reload draws the magazine out along it)
     'port': [round(F((PORT[0] + PORT[1]) / 2), 4), round(U(116), 4), round(HW_UP, 4)],
-    'chamberAt': {'side': 'port', 'f': round(F(PORT[1]) - 0.7 * mm - RND[1], 4), 'y': RND[0], 'x': 0.0},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
+    'chamberAt': {'side': 'port', 'f': round(F(PORT[1]) - 0.7 * mm - 0.72 * RND[1], 4), 'y': RND[0], 'x': 0.0},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
     'ch': [round(ch_at[0], 4), round(ch_at[1], 4), 0],
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(MZ0, 4), 0, 0]},

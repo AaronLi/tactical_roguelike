@@ -542,7 +542,7 @@ info = {
     'magAt': [round(MAG_F, 4), round(MAG_Y, 4)],
     'handle': {'f': round(HANDLE_F, 4), 'y': round(CT_Z, 4), 'x': round(-CT_R, 4), 'travel': HANDLE_TRAVEL, 'style': 'tube', 'recip': False, 'grab': grab, 'lock': round(HANDLE_LOCK, 4)},
     'port': [round((F(707) + F(775)) / 2, 4), round(U(129), 4), round(HW, 4)],
-    'chamberAt': {'side': 'port', 'f': round(F(775) - 0.7 * mm - 0.026, 4), 'y': round(U(129) + 0.0045, 4), 'x': round(HW - 10.0 * mm, 4)},   # (a real port: the round shows in it, at the pocket's middle, its nose at the chamber's mouth, when the carrier is back)
+    'chamberAt': {'side': 'port', 'f': round(F(775) - 0.7 * mm - 0.72 * 0.026, 4), 'y': round(U(129) + 0.0045, 4), 'x': round(HW - 10.0 * mm, 4)},   # (a real port: the round shows in it, at the pocket's middle, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(MOUNT_MUZZLE, 4), 0, 0]},
 }

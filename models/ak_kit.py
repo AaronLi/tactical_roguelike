@@ -658,7 +658,7 @@ info = {
     'magAt': [round(MK['F'] * mm, 4), round(MK['Y'] * mm, 4)],
     'handle': {'f': round(HANDLE[0] * mm, 4), 'y': round(HANDLE[1] * mm, 4), 'x': 0.0255, 'travel': 0.085, 'recip': True, 'style': 'ak'},
     'port': [round((166 + 229) / 2 * mm, 4), round(4 * mm, 4), round(HW * mm, 4)],
-    'chamberAt': {'side': 'port', 'f': round(225.5 * mm - 0.7 * mm - 0.042, 4), 'y': 0.0048, 'x': 0.0},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
+    'chamberAt': {'side': 'port', 'f': round(225.5 * mm - 0.7 * mm - 0.72 * 0.0364, 4), 'y': 0.0047 if VAR == 'ak74' else 0.0057, 'x': 0.0},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(BE * mm, 4), 0, 0]},
 }

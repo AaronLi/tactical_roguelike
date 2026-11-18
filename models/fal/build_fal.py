@@ -329,7 +329,7 @@ PA, PB, PU0, PU1, PHW = F(690), F(856), U(250), U(232), 0.015
 tub = obj(box(-0.004, PHW - 0.0003, PA + 0.00015, PB - 0.00015, PU0 + 0.00015, PU1 - 0.00015), 'base', 'black')
 cut(tub, [box(-0.0035, PHW + 0.001, PA + 0.0006, PB - 0.0006, PU0 + 0.0006, PU1 - 0.0006)]); finish(tub.data)
 CH_AX, CH_Z = 0.002, (PU0 + PU1) / 2
-obj(tube([(PB - 0.0046, 0.0058), (PB - 0.0007, 0.0058)], 24, 'y', (CH_AX, 0, CH_Z)), 'base', 'gunmetal')
+obj(tube([(PB - 0.0046, 0.0066), (PB - 0.0007, 0.0066)], 24, 'y', (CH_AX, 0, CH_Z)), 'base', 'gunmetal')
 CARRIER_TRAVEL = 0.058                       # the stroke (the block's rear goes back to 5 mm short of the receiver's back, 63.6 mm behind the port's... never out of it)
 pc_ = part('carrier', (0, (PA + PB) / 2, CH_Z))
 cb = obj(box(0.0075, PHW - 0.0008, PA + 0.001, PB - 0.001, PU0 + 0.001, PU1 - 0.001), 'base', 'black', pc_); bevel(cb, 0.0005, 2); finish(cb.data)
@@ -492,7 +492,7 @@ info = {
     'magAt': [round(MAG_F, 4), round(MAG_U, 4)],
     'handle': {'f': HF, 'y': HY, 'x': HX, 'travel': 0.1, 'recip': True, 'style': 'fold', 'grab': [HF, HY + 0.006, HX - 0.028]},
     'port': [round(F(780), 4), round(U(241), 4), 0.016],
-    'chamberAt': {'side': 'port', 'f': round(PB - 0.0007 - 0.042, 4), 'y': round(CH_Z + 0.0048, 4), 'x': CH_AX},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
+    'chamberAt': {'side': 'port', 'f': round(PB - 0.0007 - 0.72 * 0.0476, 4), 'y': round(CH_Z + 0.0059, 4), 'x': CH_AX},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(F(1880), 4), 0, 0]},
 }

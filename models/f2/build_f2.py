@@ -214,7 +214,7 @@ info = {
     'magAt': [r4(MAG_TOP[0]), r4(MAG_TOP[1])],
     'handle': {'f': r4(H0[0]), 'y': r4(U(800)), 'x': 0, 'travel': 0.055, 'style': 'top', 'stem': 0.008, 'recip': False},
     'port': [r4(F(800)), r4(U(956)), 0.02],
-    'chamberAt': {'side': 'port', 'f': r4(PORT[1] - 0.7 * mm - 0.042), 'y': r4((PORT[2] + PORT[3]) / 2 + 0.0048), 'x': 0.0},   # (a real port: the round shows in it, at the port's middle height, its nose at the chamber's mouth, when the carrier is back)
+    'chamberAt': {'side': 'port', 'f': r4(PORT[1] - 0.7 * mm - 0.72 * 0.042), 'y': r4((PORT[2] + PORT[3]) / 2 + 0.0048), 'x': 0.0},   # (a real port: the round shows in it, at the port's middle height, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [r4(MZ0), 0, 0]},
 }
