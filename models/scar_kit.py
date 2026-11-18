@@ -104,9 +104,9 @@ def upper():
     up = K.tmp(prism([(f0, ub), (f1, ub), (f1, UP_TOP * mm), (f0, UP_TOP * mm)], 'x', -HWU * mm, HWU * mm))
     sec = [(-HWU + 3, UP_BOT), (HWU - 3, UP_BOT), (HWU, UP_BOT + 3), (HWU, 11.9), (HWB, 14.4), (HWB, 36.5), (13.0, UP_TOP), (-13.0, UP_TOP), (-HWB, 36.5), (-HWB, 14.4), (-HWU, 11.9), (-HWU, UP_BOT + 3)]
     boolean(up, prism([(x * mm, u * mm) for x, u in sec], 'y', f0 - 0.01, f1 + 0.01), 'INTERSECT')
-    # the ejection port, right: a pocket 4 mm deep (the bolt carrier's flank shows in it)
+    # the ejection port, right: a pocket down past the bore (the chamber's side: the carrier covers it, back it shows the chamber, lined black)
     pa, pb, pu0, pu1 = Fp(850), Fp(1062), -0.0032, 0.0119
-    cut(up, prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2, 2.2 * mm, 4), 'x', (HWU - 4.0) * mm, (HWU + 1) * mm))
+    cut(up, prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2, 2.2 * mm, 4), 'x', -2.0 * mm, (HWU + 1) * mm))
     # the lightening slots down the front, each side; the charging handle's track on the right
     for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
         for s in (-1, 1):
@@ -130,8 +130,13 @@ def upper():
     for f in (0.300, 0.329, 0.358):
         for s in (-1, 1): liner(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU - 2.5) * mm))
         liner(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT + 2.5) * mm, (UP_BOT + 3.0) * mm)
-    # the bolt carrier's flank in the port
-    o = K.tmp(box((HWU - 4.6) * mm, (HWU - 3.8) * mm, Fp(868), Fp(1044), -0.0012, 0.0092)); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', 'park')
+    # the port's inside, what the carrier uncovers: a 0.45 mm black lining shell in the pocket (its floor past the bore), the chamber's mouth (the barrel extension's face, dark metal)
+    # at the pocket's front wall, the feed ramp under the round's path
+    pc_, pu_, ph_, pv_ = (pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2
+    tub = K.tmp(prism(rounded(pc_, pu_, ph_ - 0.15 * mm, pv_ - 0.15 * mm, 2.0 * mm, 4), 'x', -2.0 * mm, (HWU - 0.3) * mm))
+    cut(tub, prism(rounded(pc_, pu_, ph_ - 0.6 * mm, pv_ - 0.6 * mm, 1.8 * mm, 4), 'x', -1.55 * mm, (HWU + 1) * mm)); smooth(tub); K.adopt(tub, 'base', 'black')
+    o = K.obj(lathe([(pb - 4.6 * mm, 5.6 * mm), (pb - 0.7 * mm, 5.6 * mm)], 24, (0, 0, 0)), 'base', 'gunmetal'); smooth(o)
+    o = K.tmp(prism([(pb - 24 * mm, -2.6 * mm), (pb - 1.0 * mm, 1.0 * mm), (pb - 1.0 * mm, -2.6 * mm)], 'x', -9.0 * mm, 9.0 * mm)); smooth(o); K.adopt(o, 'base', 'gunmetal')
     # the barrel nut's pins and the lower's pins (both sides)
     for px, py, r in ((682, 367, 2.6), (716, 367, 2.6), (826, 360, 2.8)):
         for s in (-1, 1):
@@ -232,6 +237,18 @@ def fold_irons():
     pu = Up(314)
     o = K.tmp(box(-7.5 * mm, 7.5 * mm, Fp(1503), Fp(1566), pu + 5.5 * mm, rt + 1.5 * mm)); bevel(o, 1.0 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', 'black'))
     o = K.tmp(box(-6.4 * mm, 6.4 * mm, POST_F - 52 * mm, POST_F + 4 * mm, rt + 1.5 * mm, rt + 4.5 * mm)); bevel(o, 0.6 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', 'black'))
+
+PORT = (Fp(850), Fp(1062), -0.0032, 0.0119)    # the ejection port's rear, front, bottom and top (the pocket's outline)
+CARRIER_TRAVEL = 0.085                         # how far the carrier runs back (most of the port's 96 mm: it goes into the receiver's wall, never past its surface)
+def carrier():
+    """The bolt carrier seen through the ejection port (part_carrier: it runs back and home with every shot, back with the hand's pull on a charge, held back on an empty
+    magazine): a black block filling the port, its outer face 0.8 mm inside the receiver's surface so it never stands out; behind it the pocket shows the chamber."""
+    pa, pb, pu0, pu1 = PORT
+    pk = K.part('carrier', (0, (pa + pb) / 2, (pu0 + pu1) / 2))
+    o = K.tmp(prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2 - 1.0 * mm, (pu1 - pu0) / 2 - 1.0 * mm, 1.6 * mm, 4), 'x', 11.0 * mm, (HWU - 0.8) * mm)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black', pk)
+    for f in (-0.034, -0.012, 0.010, 0.032):    # (the carrier's flank: shallow ribs across its face)
+        g = K.tmp(box((HWU - 1.3) * mm, (HWU - 0.7) * mm, (pa + pb) / 2 + f - 0.0007, (pa + pb) / 2 + f + 0.0007, (pu0 + pu1) / 2 - 0.0045, (pu0 + pu1) / 2 + 0.0045)); smooth(g); K.adopt(g, 'base', 'gunmetal', pk)
+    return pk
 
 # ----------------------------------------------------------------------------------------------------- CHARGING HANDLE (part_handle)
 HANDLE = (0.2525, 0.0322)       # the knob (the NRCH's handle rides at the front of its channel, photo x 677, y 193)
@@ -375,6 +392,7 @@ front_sight()
 fold_irons()
 ph = handle()
 details()
+CARRIER = carrier()
 barrel()
 MUZ = muzzle()
 ag['grip_a2'](GRIP_TOP)
@@ -403,11 +421,12 @@ info = {
     'sy': round(SY * mm, 4), 'fSight': round(RS_F, 4), 'relief': 0.075,
     'muzzles': [[round(MUZ, 4), 0, 0]],
     'grip': [round(GRIP_TOP[0] - 0.040, 4), round(GRIP_TOP[1] - 0.040, 4), 0], 'support': [0.300, -0.030, 0],
-    'anim': {'handle': 'part_handle', 'catch': 'part_catch', 'mag': 'part_mag'},
+    'anim': {'handle': 'part_handle', 'catch': 'part_catch', 'carrier': 'part_carrier', 'mag': 'part_mag'},
+    'carrier': {'travel': CARRIER_TRAVEL},
     'magAt': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4)],
     'handle': {'f': round(HANDLE[0], 4), 'y': round(HANDLE[1], 4), 'x': round(-(HWU + 18.0) * mm, 4), 'travel': 0.120, 'recip': False, 'style': 'knob', 'grab': [round(HANDLE[0], 4), round(HANDLE[1], 4), round(-(HWU + 20.0) * mm, 4)]},
     'port': [round(Fp(956), 4), round(Up(349), 4), round(HWU * mm, 4)],
-    'chamberAt': {'side': 'right', 'f': round(Fp(1030), 4), 'y': 0.0, 'x': round((HWU - 2.5) * mm, 4)},
+    'chamberAt': {'side': 'port', 'f': 0.1425, 'y': 0.0048, 'x': 0.0},   # (a real port: the game draws no plate or bolt face over it; the round shows in it, its case head at F 0.1425, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(MZ0, 4), 0, 0]},
 }
