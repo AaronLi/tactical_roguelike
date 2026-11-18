@@ -59,32 +59,32 @@ put(K, box(0.0185, 0.0225, 0.004, 0.020, 0.0005, 0.0065), 'base', 'gunmetal', be
 put(K, box(0.0185, 0.0235, 0.004, 0.007, 0.0005, 0.0085), 'base', 'gunmetal', bev=0.0005)
 
 # ================================================================================================ the stock (polymer): butt, comb, wrist, pistol grip, the action bed
-SIDE = [(-0.298, 0.0455), (-0.250, 0.0510), (-0.200, 0.0545), (-0.150, 0.0560), (-0.100, 0.0545), (-0.072, 0.0470), (-0.052, 0.0310), (-0.036, 0.0120), (-0.024, 0.0030),
-        (-0.010, -0.0085), (0.0, -0.0085), (F_MOUTH + 0.0135, -0.0085), (F_MOUTH + 0.0135, -0.0460), (0.062, -0.0490), (0.050, -0.0570), (0.040, -0.0800), (0.026, -0.1040), (0.008, -0.1185),
-        (-0.012, -0.1250), (-0.034, -0.1220), (-0.050, -0.1040), (-0.058, -0.0820), (-0.075, -0.0710), (-0.150, -0.0725), (-0.230, -0.0825), (-0.298, -0.0925)]
-PLAN = [(-0.30, 0.0185), (-0.25, 0.0195), (-0.12, 0.0190), (-0.07, 0.0200), (-0.04, 0.0215), (F_MOUTH + 0.0135, 0.0215)]
+# traced off the M24 photo (Wikimedia Commons "M24 Rifle (7414626896).jpg", public domain, 2100 x 445, left side on white): 0.546 mm a pixel from its 1092 mm overall length (butt pad
+# to muzzle); origin the tang (the stock's scoop behind the receiver, photo x 541), the bore line y 147. The comb is a flat 16.5 mm UNDER the bore (not over it), a scoop behind the
+# tang, a pistol grip that swells 18 mm under the belly, the belly a straight slope up to it; the butt an adjustable one (pad, two rods and a knob) 0.268 m behind the tang.
+SIDE = [(-0.197, -0.0165), (-0.043, -0.0165), (-0.033, -0.0164), (-0.022, -0.0191), (-0.0115, -0.0273), (-0.0006, -0.0295), (0.0104, -0.0268), (0.0213, -0.0235), (0.0322, -0.0197),
+        (0.0431, -0.0158), (0.054, -0.0126), (0.065, -0.0085), (F_MOUTH + 0.0135, -0.0085), (F_MOUTH + 0.0135, -0.0445), (0.165, -0.0510), (0.120, -0.0520), (0.0868, -0.0524),
+        (0.065, -0.0562), (0.054, -0.0562), (0.043, -0.0557), (0.0322, -0.0612), (0.0213, -0.0710), (0.0104, -0.0950), (-0.0006, -0.1087), (-0.0115, -0.1065), (-0.0224, -0.1032),
+        (-0.033, -0.0988), (-0.044, -0.0885), (-0.055, -0.0906), (-0.100, -0.1024), (-0.150, -0.1156), (-0.186, -0.1250), (-0.194, -0.1260), (-0.197, -0.1180)]
+PLAN = [(-0.20, 0.0195), (-0.12, 0.0195), (-0.07, 0.0205), (-0.04, 0.0215), (F_MOUTH + 0.0135, 0.0215)]
 cuts = [cyl(RB + 0.6 * mm, -0.06, F_MOUTH + 0.02, 'y', (0, 0), 36),                                  # the action bed: the receiver lies in it
-        cyl(0.0135, -0.06, 0.0, 'y', (0, 0), 24),                                                   # the recess round the bolt's sleeve behind the tang
         box(-0.0115, 0.0115, 0.045, 0.108, -0.075, -0.0140),                                        # the trigger guard's opening
         box(-0.0135, 0.0135, 0.108, 0.1925, -0.075, -0.0140)]                                       # the floorplate's
 body(K, SIDE, PLAN, 'stock', 'polymer', bev=0.0045, cuts=cuts)
-# the recoil pad, the pistol grip's cap, a sling stud
-put(K, prism([(-0.2975, 0.0455), (-0.3255, 0.0425), (-0.3310, -0.0985), (-0.2975, -0.0925)], 'x', -0.0197, 0.0197), 'stock', 'rubber', bev=0.0012)
-put(K, prism([(-0.034, -0.1225), (-0.012, -0.1252), (0.008, -0.1190), (0.006, -0.1150), (-0.012, -0.1210), (-0.033, -0.1180)], 'x', -0.0195, 0.0195), 'stock', 'rubber', bev=0.0005)
-put(K, cyl(3.0 * mm, -0.0712 - 0.0055, -0.0712 + 0.0008, 'z', (0, -0.100), 12), 'stock', 'steel')
-# moulded finger-grooves (the dark panels each side of the grip and forend)
-for sd in (-1, 1):
-    put(K, prism([(-0.040, -0.058), (0.030, -0.066), (0.036, -0.088), (-0.032, -0.090)], 'x', sd * 0.0214, sd * 0.0222), 'stock', 'rubber')
+# the adjustable butt: a rubber pad (photo x 50-100), two rods into the stock and the length-of-pull knob between them; a sling stud under the belly
+put(K, prism([(-0.241, -0.0200), (-0.268, -0.0220), (-0.268, -0.1360), (-0.241, -0.1340)], 'x', -0.0195, 0.0195), 'stock', 'rubber', bev=0.0018)
+put(K, box(-0.012, 0.012, -0.2415, -0.1965, -0.099, -0.034), 'stock', 'black', bev=0.0008)   # the spacer block between the rods
+for u in (-0.034, -0.099): put(K, rod((0, -0.2412, u), (0, -0.1965, u), 0.0040, 0.0040, 12), 'stock', 'gunmetal')
+put(K, rod((0, -0.234, -0.056), (0, -0.213, -0.056), 0.0170, 0.0170, 20), 'stock', 'black', bev=0.0006)
+put(K, cyl(3.0 * mm, -0.1156 - 0.0055, -0.1156 + 0.0008, 'z', (0, -0.150), 12), 'stock', 'steel')
 
-# ================================================================================================ the fore-end (handguard slot)
+# ================================================================================================ the fore-end (handguard slot): a trough under the barrel, its top level with the bore
 HG0, HG1 = F_MOUTH + 0.0135, 0.582
-HSIDE = [(HG0, 0.0060), (0.55, 0.0045), (HG1 - 0.004, 0.0030), (HG1, 0.0010), (HG1, -0.0345), (0.50, -0.0375), (HG0, -0.0460)]
+HSIDE = [(HG0, 0.0020), (HG1 - 0.004, 0.0020), (HG1, 0.0), (HG1, -0.0365), (0.50, -0.0380), (HG0, -0.0445)]
 HPLAN = [(HG0 - 0.01, 0.0215), (0.30, 0.0225), (0.45, 0.0215), (HG1 - 0.004, 0.0190), (HG1 + 0.01, 0.0190)]
 hg = body(K, HSIDE, HPLAN, 'handguard', 'polymer', bev=0.0040,
           cuts=[rod((0, HG0 - 0.02, 0), (0, HG1 + 0.02, 0), 0.0166, 0.0128, 28)])                     # the barrel's channel: the barrel floats in it
-put(K, cyl(3.0 * mm, -0.0375 - 0.0055, -0.0375 + 0.0005, 'z', (0, 0.43), 12), 'handguard', 'steel')     # the forward sling stud
-put(K, prism([(HG0 + 0.01, -0.0100), (HG1 - 0.012, -0.0105), (HG1 - 0.012, -0.0290), (HG0 + 0.01, -0.0295)], 'x', 0.0213, 0.0221), 'handguard', 'rubber')
-put(K, prism([(HG0 + 0.01, -0.0100), (HG1 - 0.012, -0.0105), (HG1 - 0.012, -0.0290), (HG0 + 0.01, -0.0295)], 'x', -0.0221, -0.0213), 'handguard', 'rubber')
+put(K, cyl(3.0 * mm, -0.0380 - 0.0055, -0.0380 + 0.0005, 'z', (0, 0.43), 12), 'handguard', 'steel')     # the forward sling stud
 
 # ================================================================================================ the barrel: a 24" varmint contour, the front sight, the crown cap
 bar = K.tmp(lathe([(0.262, 0.0148), (0.300, 0.0143), (0.520, 0.0127), (0.700, 0.0118), (MUZ - 0.012, 0.0114), (MUZ, 0.0112)], 32)); wnorm(bar, 30); K.adopt(bar, 'barrel', 'blued')

@@ -32,12 +32,11 @@ CASE = 0.72 * RND[1]
 FACE = F_MOUTH - 0.7 * mm - CASE   # the bolt face closed
 MUZ = 0.870                        # the barrel's end
 SY = 0.0295                        # the sight line over the bore
-BUTT = -0.345
 
 # ================================================================================================ the receiver (base): tube, open top, clip guide, ring
 rc = K.tmp(lathe([(0, RB * 0.985), (0.0008, RB), (F_REAR, RB), (F_REAR + 0.002, RB * 1.04), (F_RING, RB * 1.04)], 40))
 cut(rc, cyl(BORE, -0.002, F_MOUTH - 2.0 * mm, 'y', (0, 0), 32))                                        # the bolt way
-cut(rc, port_pocket(0.054, 0.1335, -0.0060, RB + 0.004, 0.03, 2.5 * mm, -0.0102))                      # the open top and right of the loading window
+cut(rc, port_pocket(0.054, 0.1335, -0.0040, RB + 0.004, 0.03, 2.5 * mm, -0.0102))                      # the open top and right of the loading window
 cut(rc, box(0.0075, 0.03, 0.040, 0.084, -0.0075, 0.0030))                                              # the handle's notch, on the right behind the window
 wnorm(rc, 30); K.adopt(rc, 'base', 'blued')
 port_inside(K, 0.054, 0.1335, -0.0060, 0.012, RB, mouth_r=7.6 * mm, ramp=24 * mm, x_in=-0.0102)
@@ -50,61 +49,63 @@ put(K, box(-0.0105, 0.0105, 0.0125, 0.0165, RB + 0.0049, RB + 0.0057), 'base', '
 put(K, lathe([(F_RING, 0.0160), (0.2380, 0.0150)], 28), 'base', 'blued')
 put(K, box(-0.0100, 0.0100, 0.1800, 0.2360, 0.0118, 0.0212), 'base', 'blued', bev=0.0008)
 put(K, box(-0.0106, 0.0106, 0.1800, 0.1830, 0.0100, 0.0200), 'base', 'gunmetal', bev=0.0005)
-# the trigger group, the guard bow with its trigger, the box magazine's walls
-put(K, box(-0.0105, 0.0105, 0.020, 0.074, -0.0300, -0.0130), 'base', 'blued', bev=0.001)
-g = K.tmp(prism([(0.026, -0.0130), (0.026, -0.0600), (0.040, -0.0665), (0.062, -0.0665), (0.078, -0.0600), (0.078, -0.0130)], 'x', -0.0042, 0.0042))
-cut(g, prism([(0.0325, -0.0285), (0.0325, -0.0570), (0.0425, -0.0610), (0.0585, -0.0610), (0.0715, -0.0570), (0.0715, -0.0285)], 'x', -0.006, 0.006))
+# the trigger group, the guard bow with its trigger (photo: the hook at x 1125, 8 mm ahead of the receiver's back; the bow from -3 to 53 mm, 91 mm under the bore), the box magazine
+put(K, box(-0.0105, 0.0105, -0.012, 0.040, -0.0300, -0.0130), 'base', 'blued', bev=0.001)
+g = K.tmp(prism([(-0.003, -0.0130), (-0.003, -0.0800), (0.010, -0.0905), (0.040, -0.0905), (0.053, -0.0820), (0.053, -0.0130)], 'x', -0.0042, 0.0042))
+cut(g, prism([(0.0035, -0.0285), (0.0035, -0.0760), (0.0125, -0.0840), (0.0375, -0.0840), (0.0465, -0.0760), (0.0465, -0.0285)], 'x', -0.006, 0.006))
 bevel(g, 0.0008, 1, 40); wnorm(g); K.adopt(g, 'base', 'blued')
-put(K, prism([(0.0480, -0.0290), (0.0530, -0.0290), (0.0570, -0.0500), (0.0515, -0.0500)], 'x', -0.0030, 0.0030), 'base', 'gunmetal', bev=0.0006)   # the trigger
-put(K, box(-0.0125, 0.0125, 0.0780, 0.1520, -0.0425, -0.0140), 'base', 'blued', bev=0.001)               # the box magazine under the receiver
+put(K, prism([(0.0000, -0.0290), (0.0060, -0.0290), (0.0110, -0.0750), (0.0050, -0.0750)], 'x', -0.0030, 0.0030), 'base', 'gunmetal', bev=0.0006)   # the trigger
+put(K, prism([(0.053, -0.0300), (0.177, -0.0300), (0.177, -0.0520), (0.053, -0.0780)], 'x', -0.0125, 0.0125), 'base', 'blued', bev=0.001)   # the box magazine under the receiver: its floor slopes up to the fore-end
 # the safety: the cocking piece's tab turned (the Mosin has none on the receiver: its safety is the bolt's cocking piece, below). A sling-slot ring and the bolt-stop on the left rear
 put(K, box(-0.0225, -0.0150, 0.0560, 0.0640, -0.0040, 0.0040), 'base', 'gunmetal', bev=0.0006)         # the bolt stop (the magazine cut-off's neighbour) on the left
 
 # ================================================================================================ the stock (wood): butt, wrist, the receiver's bed, the lower fore-end's start
-SIDE = [(BUTT + 0.006, 0.0345), (-0.250, 0.0300), (-0.150, 0.0225), (-0.090, 0.0150), (-0.055, 0.0105), (-0.030, 0.0085), (-0.010, 0.0020), (0.0, -0.0065), (F_RING, -0.0065),
-        (F_RING, -0.0440), (0.150, -0.0485), (0.078, -0.0520), (0.040, -0.0620), (0.010, -0.0775), (-0.015, -0.0840), (-0.050, -0.0780), (-0.100, -0.0780), (-0.200, -0.0840),
-        (-0.290, -0.0930), (BUTT + 0.006, -0.0980)]
-PLAN = [(-0.35, 0.0190), (-0.25, 0.0195), (-0.12, 0.0180), (-0.05, 0.0190), (0.0, 0.0205), (F_RING + 0.01, 0.0210)]
+# traced off the 91/30 sniper photo (Wikimedia Commons "Mosin-Nagant m91-30 sniper noBG.png", CC BY-SA 3.0, 3840 x 877 with alpha, left side): 0.3343 mm a pixel from the gun's 1232 mm overall
+# length; origin the receiver's back (photo x 1100), the bore line y 299.5 (the muzzle's). The stock's top is 31 mm UNDER the bore along the comb, a scoop behind the receiver, the heel 50 mm
+# under it; the belly a long slope up from a toe 160 mm under the bore; the butt plate leans back at the top (the stock is 361 mm from the trigger to the heel).
+BUTT = -0.351
+SIDE = [(-0.351, -0.0520), (-0.343, -0.0506), (-0.334, -0.0490), (-0.326, -0.0460), (-0.318, -0.0443), (-0.309, -0.0430), (-0.301, -0.0416), (-0.292, -0.0403), (-0.284, -0.0393),
+        (-0.276, -0.0383), (-0.268, -0.0373), (-0.251, -0.0359), (-0.234, -0.0346), (-0.217, -0.0333), (-0.201, -0.0319), (-0.184, -0.0313), (-0.167, -0.0309), (-0.134, -0.0309),
+        (-0.117, -0.0363), (-0.100, -0.0379), (-0.084, -0.0343), (-0.067, -0.0293), (-0.050, -0.0236), (-0.033, -0.0172), (-0.017, -0.0102), (0.0, -0.0030), (F_RING, -0.0030),
+        (F_RING, -0.0485), (0.134, -0.0470), (0.066, -0.0540), (0.0, -0.0620), (-0.017, -0.0690), (-0.033, -0.0727), (-0.050, -0.0774), (-0.067, -0.0821), (-0.084, -0.0871),
+        (-0.100, -0.0921), (-0.117, -0.0974), (-0.134, -0.1030), (-0.150, -0.1080), (-0.167, -0.1135), (-0.184, -0.1190), (-0.201, -0.1245), (-0.217, -0.1300), (-0.234, -0.1350),
+        (-0.251, -0.1400), (-0.276, -0.1480), (-0.301, -0.1530), (-0.326, -0.1570), (-0.343, -0.1600), (-0.347, -0.1585)]
+PLAN = [(-0.36, 0.0190), (-0.25, 0.0195), (-0.12, 0.0180), (-0.05, 0.0190), (0.0, 0.0205), (F_RING + 0.01, 0.0210)]
 cuts = [cyl(RB + 0.5 * mm, -0.06, F_RING + 0.02, 'y', (0, 0), 36),
-        cyl(0.0125, -0.06, 0.0, 'y', (0, 0), 24),
-        box(-0.0115, 0.0115, 0.026, 0.081, -0.075, -0.0130),
-        box(-0.0135, 0.0135, 0.078, 0.1545, -0.075, -0.0130)]
+        box(-0.0115, 0.0115, -0.012, 0.055, -0.095, -0.0130)]
 body(K, SIDE, PLAN, 'stock', 'wood', bev=0.0035, cuts=cuts)
-# the steel butt plate (a curved plate with its two screws) and the sling swivel loop
-put(K, prism([(BUTT + 0.0055, 0.0350), (BUTT - 0.0045, 0.0325), (BUTT - 0.0090, -0.0990), (BUTT + 0.0055, -0.0985)], 'x', -0.0198, 0.0198), 'stock', 'steel', bev=0.0010)
-for z in (0.014, -0.075):
-    put(K, cyl(2.2 * mm, BUTT - 0.0072, BUTT - 0.0040, 'y', (0, z), 12), 'stock', 'gunmetal')
-put(K, box(-0.0060, 0.0060, -0.2900, -0.2800, -0.1040, -0.0920), 'stock', 'steel', bev=0.0006)         # the butt's sling swivel plate
-# the stock's grip lines: the thin dark seams along the wrist
+# the steel butt plate (leaning back at the top) with its two screws, and the sling slot through the butt (dark)
+put(K, prism([(-0.3465, -0.0525), (-0.3560, -0.0545), (-0.3500, -0.1600), (-0.3400, -0.1600)], 'x', -0.0198, 0.0198), 'stock', 'steel', bev=0.0010)
+for z in (-0.060, -0.140):
+    put(K, cyl(2.2 * mm, BUTT - 0.0050, BUTT - 0.0030, 'y', (0, z), 12), 'stock', 'gunmetal')
 for sd in (-1, 1):
-    put(K, prism([(-0.140, 0.010), (-0.030, 0.0050), (-0.030, 0.0030), (-0.140, 0.0070)], 'x', sd * 0.0180, sd * 0.0186), 'stock', 'woodDark')
+    put(K, prism([(-0.1750, -0.0590), (-0.1500, -0.0590), (-0.1500, -0.0640), (-0.1750, -0.0640)], 'x', sd * 0.0185, sd * 0.0190), 'stock', 'black')
 
 # ================================================================================================ the fore-end and upper handguard (handguard slot), the bands, the nose cap
 HG0, HG1 = F_RING, 0.796
-HSIDE = [(HG0, 0.0050), (0.60, 0.0040), (HG1, 0.0025), (HG1, -0.0300), (0.60, -0.0310), (HG0, -0.0440)]
+HSIDE = [(HG0, -0.0030), (0.300, -0.0030), (0.330, 0.0060), (0.370, 0.0095), (0.745, 0.0102), (0.780, 0.0065), (HG1, 0.0065), (HG1, -0.0235), (0.745, -0.0246), (0.679, -0.0252),
+         (0.612, -0.0259), (0.545, -0.0266), (0.478, -0.0272), (0.411, -0.0279), (0.378, -0.0282), (0.344, -0.0353), (0.311, -0.0399), (0.277, -0.0440), (0.2435, -0.0476), (HG0, -0.0485)]
 HPLAN = [(HG0 - 0.01, 0.0210), (0.30, 0.0185), (0.60, 0.0165), (HG1, 0.0155), (HG1 + 0.01, 0.0155)]
-body(K, HSIDE, HPLAN, 'handguard', 'wood', bev=0.0030, cuts=[rod((0, HG0 - 0.02, 0), (0, HG1 + 0.02, 0), 0.0152, 0.0112, 28)])
-UH = K.tmp(lathe([(0.2380, 0.0208), (0.5250, 0.0205)], 28)); cut(UH, rod((0, 0.2, 0), (0, 0.55, 0), 0.0152, 0.0145, 28))
-cut(UH, box(-0.03, 0.03, 0.2, 0.55, -0.05, -0.0015)); bevel(UH, 0.0012, 1, 40); wnorm(UH); K.adopt(UH, 'handguard', 'wood')   # the upper handguard: a wood hood over the barrel
-for fb, w in ((0.5160, 0.013), (0.7000, 0.012)):                                                          # the two barrel bands
-    if True:
-        o = K.tmp(prism(rounded(0, -0.0100 if fb > 0.6 else -0.0075, 0.0184 if fb > 0.6 else 0.0214, 0.0270 if fb > 0.6 else 0.0300, 0.006, 4), 'y', fb, fb + w))
-        cut(o, prism(rounded(0, -0.0100 if fb > 0.6 else -0.0075, 0.0164 if fb > 0.6 else 0.0194, 0.0250 if fb > 0.6 else 0.0280, 0.005, 4), 'y', fb - 0.001, fb + w + 0.001))
-        bevel(o, 0.0006, 1, 40); wnorm(o); K.adopt(o, 'handguard', 'gunmetal')
-put(K, box(-0.0035, 0.0035, 0.7040, 0.7080, -0.0390, -0.0300), 'handguard', 'steel', bev=0.0004)         # the front band's sling swivel
-nc = K.tmp(prism(rounded(0, -0.0125, 0.0165, 0.0225, 0.006, 4), 'y', HG1 - 0.012, HG1 + 0.012)); cut(nc, rod((0, HG1 - 0.03, 0), (0, HG1 + 0.03, 0), 0.0108, 0.0108, 24))
+body(K, HSIDE, HPLAN, 'handguard', 'wood', bev=0.0025, cuts=[rod((0, HG0 - 0.02, 0), (0, 0.400, 0), 0.0155, 0.0086, 28), rod((0, 0.400, 0), (0, HG1 + 0.02, 0), 0.0086, 0.0082, 28)])   # (the upper handguard is the fore-end's own top, 10 mm over the bore)
+for fb, w, cz, hh in ((0.3720, 0.013, -0.0085, 0.0196), (0.6970, 0.012, -0.0075, 0.0178)):               # the two barrel bands
+    o = K.tmp(prism(rounded(0, cz, 0.0185, hh + 0.0014, 0.005, 4), 'y', fb, fb + w))
+    cut(o, prism(rounded(0, cz, 0.0166, hh - 0.0006, 0.004, 4), 'y', fb - 0.001, fb + w + 0.001))
+    bevel(o, 0.0006, 1, 40); wnorm(o); K.adopt(o, 'handguard', 'gunmetal')
+put(K, box(-0.0035, 0.0035, 0.7040, 0.7080, -0.0345, -0.0235), 'handguard', 'steel', bev=0.0004)         # the front band's sling swivel
+nc = K.tmp(prism(rounded(0, -0.0082, 0.0166, 0.0156, 0.006, 4), 'y', HG1 - 0.012, HG1 + 0.012)); cut(nc, rod((0, HG1 - 0.03, 0), (0, HG1 + 0.03, 0), 0.0078, 0.0078, 24))
 bevel(nc, 0.0008, 1, 40); wnorm(nc); K.adopt(nc, 'handguard', 'steel')                                    # the nose cap
 
 # ================================================================================================ the barrel (slot barrel): the 91/30's 730 mm, the front sight base and hood, then the crown cap (slot muzzle)
-bar = K.tmp(lathe([(0.2380, 0.0150), (0.30, 0.0146), (0.60, 0.0124), (0.80, 0.0112), (0.846, 0.0108)], 32)); wnorm(bar, 30); K.adopt(bar, 'barrel', 'blued')
+bar = K.tmp(lathe([(0.2380, 0.0125), (0.30, 0.0100), (0.370, 0.0083), (0.80, 0.0076), (0.846, 0.0076)], 32)); wnorm(bar, 30); K.adopt(bar, 'barrel', 'blued')
 FB = 0.846
-put(K, lathe([(FB, 0.0131), (FB + 0.001, 0.0138), (MUZ - 0.0035, 0.0138), (MUZ - 0.0025, 0.0120), (MUZ, 0.0108)], 28), 'barrel', 'blued')       # the front sight's base
-put(K, box(-0.0032, 0.0032, FB + 0.006, MUZ - 0.006, 0.0105, 0.0200), 'barrel', 'blued', bev=0.0005)                                          # its block
+put(K, lathe([(FB, 0.0086), (FB + 0.001, 0.0096), (MUZ - 0.0035, 0.0096), (MUZ - 0.0025, 0.0084), (MUZ, 0.0076)], 28), 'barrel', 'blued')
+put(K, rod((0, 0.790, -0.0195), (0, 0.853, -0.0195), 0.0033, 0.0033, 12), 'barrel', 'steel')   # the cleaning rod's end, out of the nose cap       # the front sight's base
+put(K, box(-0.0032, 0.0032, FB + 0.006, MUZ - 0.006, 0.0085, 0.0200), 'barrel', 'blued', bev=0.0005)                                          # its block
 hood = K.tmp(prism([(math.cos(a / 14 * 2 * math.pi) * 0.0098, SY + math.sin(a / 14 * 2 * math.pi) * 0.0098) for a in range(14)], 'y', FB + 0.0060, FB + 0.0210))
 cut(hood, cyl(0.0082, FB, FB + 0.04, 'y', (0, SY), 24)); wnorm(hood); K.adopt(hood, 'barrel', 'blued')                                         # the hood round the post
 put(K, box(-0.0030, 0.0030, FB + 0.0105, FB + 0.0150, 0.0185, SY - 0.0095), 'barrel', 'blued', bev=0.0004)                                    # the web joining the hood to the block
 put(K, prism([(FB + 0.0125, 0.0200), (FB + 0.0150, 0.0200), (FB + 0.0150, SY), (FB + 0.0125, SY)], 'x', -0.0008, 0.0008), 'barrel', 'black', bev=0.0002)   # the post (a thin blade)
-cap = K.tmp(lathe([(MUZ, 0.0109), (MUZ + 0.0008, 0.0112), (MUZ + 0.0098, 0.0112), (MUZ + 0.0110, 0.0098), (MUZ + 0.0110, 0.0042), (MUZ + 0.0088, 0.0042)], 28)); wnorm(cap, 30); K.adopt(cap, 'muzzle', 'black')
+cap = K.tmp(lathe([(MUZ, 0.0076), (MUZ + 0.0008, 0.0079), (MUZ + 0.0098, 0.0079), (MUZ + 0.0110, 0.0068), (MUZ + 0.0110, 0.0035), (MUZ + 0.0088, 0.0035)], 28)); wnorm(cap, 30); K.adopt(cap, 'muzzle', 'black')
 MUZ_TIP = MUZ + 0.0110
 
 # ================================================================================================ the tangent rear sight, folded down: the notch block at its rear is the battle sight (optic: the model's own irons)
@@ -116,8 +117,8 @@ put(K, box(-0.0082, 0.0082, 0.1990, 0.2085, 0.0236, 0.0275), 'optic', 'gunmetal'
 for i in range(5): put(K, box(-0.0075, 0.0075, 0.2100 + i * 0.0045, 0.2108 + i * 0.0045, 0.0236, 0.0242), 'optic', 'blued')   # the range graduations
 
 # ================================================================================================ the floorplate (slot mag): the hinged plate and its catch
-put(K, box(-0.0125, 0.0125, 0.0765, 0.1530, -0.0480, -0.0425), 'mag', 'blued', bev=0.0008)
-put(K, box(-0.0035, 0.0035, 0.0710, 0.0780, -0.0570, -0.0440), 'mag', 'gunmetal', bev=0.0006)
+put(K, prism([(0.055, -0.0775), (0.177, -0.0515), (0.177, -0.0560), (0.055, -0.0820)], 'x', -0.0125, 0.0125), 'mag', 'blued', bev=0.0008)
+put(K, box(-0.0035, 0.0035, 0.0480, 0.0580, -0.0900, -0.0780), 'mag', 'gunmetal', bev=0.0006)
 
 # ================================================================================================ the bolt (part_bolt): body, bolt head, sleeve, cocking piece with its tab, bent handle, round knob
 PIV = 0.0820
@@ -138,11 +139,11 @@ info = {
     'chamberAt': {'side': 'port', 'f': round(FACE, 4), 'y': RND[0], 'x': 0.0},
 }
 anchors = {
-    'mount_optic': [0.0, round(RB + 0.005, 4), 0], 'mount_optic_end': [0.170, round(RB + 0.005, 4), 0],
+    'mount_optic': [0.0, round(RB, 4), 0], 'mount_optic_end': [0.170, round(RB, 4), 0],
     'mount_handguard': [round(HG0, 4), 0, 0], 'mount_handguard_end': [0.855, 0, 0],
     'mount_barrel': [0.856, 0, 0], 'mount_muzzle': [MUZ, 0, 0],
     'mount_stock': [0, -0.002, 0], 'mount_grip': [0.05, -0.0165, 0],
-    'mount_mag': [0.1148, -0.0480, 0],
+    'mount_mag': [0.1160, -0.0670, 0],
 }
 root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
 bad = sweep_check(coll)
