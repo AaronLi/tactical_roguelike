@@ -310,7 +310,7 @@ widths(rc, w_rcv)
 COV = (603, 905, 195)                                              # the cover: photo x0, x1, its lower edge (px)
 cutters = [
     box(-0.03, 0.03, F(COV[0]), F(COV[1]), U(COV[2]), 0.05),        # (the cover replaces the receiver's top here)
-    box(-0.004, 0.04, F(690), F(856), U(250), U(232)),             # ejection port (right): a pocket down past the bore, the carrier's and the chamber's space
+    box(-0.004, 0.04, F(894), F(1060), U(250), U(232)),             # ejection port (right): a pocket down past the bore, the carrier's and the chamber's space
     box(-0.04, -0.0165, F(600), F(1092), U(282.5), U(281.5)),       # upper/lower receiver seam
     box(0.0165, 0.04, F(600), F(1092), U(282.5), U(281.5)),
     box(-0.04, -0.0135, F(930), F(1060), U(204), U(201)),          # the charging handle's slot (left)
@@ -325,12 +325,12 @@ for f, t in rdp(top, 0.0004):                                      # (sections o
 dc = obj(loft(rings), 'base', 'park'); finish(dc.data, 40, caps=False)
 # the port's inside (what the bolt carrier uncovers): a 0.45 mm black lining shell, the chamber's mouth at the front wall (the barrel's breech face, gunmetal), and the carrier
 # itself (part_carrier: a black block filling the port, its face inside the receiver's side, ribbed; it runs back with the handle on a shot and a charge)
-PA, PB, PU0, PU1, PHW = F(690), F(856), U(250), U(232), 0.015
+PA, PB, PU0, PU1, PHW = F(894), F(1060), U(250), U(232), 0.015    # (the port over the magazine well (its rear at the well's, F 903) and its front just ahead of the magazine's front (F 1053), where the chamber is)
 tub = obj(box(-0.004, PHW - 0.0003, PA + 0.00015, PB - 0.00015, PU0 + 0.00015, PU1 - 0.00015), 'base', 'black')
 cut(tub, [box(-0.0035, PHW + 0.001, PA + 0.0006, PB - 0.0006, PU0 + 0.0006, PU1 - 0.0006)]); finish(tub.data)
 CH_AX, CH_Z = 0.002, (PU0 + PU1) / 2
 obj(tube([(PB - 0.0046, 0.0066), (PB - 0.0007, 0.0066)], 24, 'y', (CH_AX, 0, CH_Z)), 'base', 'gunmetal')
-CARRIER_TRAVEL = 0.058                       # the stroke (the block's rear goes back to 5 mm short of the receiver's back, 63.6 mm behind the port's... never out of it)
+CARRIER_TRAVEL = 0.100                       # the stroke (the handle's: the block's rear stays 76 mm inside the receiver's back at the full stroke)
 pc_ = part('carrier', (0, (PA + PB) / 2, CH_Z))
 cb = obj(box(0.0075, PHW - 0.0008, PA + 0.001, PB - 0.001, PU0 + 0.001, PU1 - 0.001), 'base', 'black', pc_); bevel(cb, 0.0005, 2); finish(cb.data)
 for k in range(5):
@@ -491,7 +491,7 @@ info = {
     'carrier': {'travel': CARRIER_TRAVEL},
     'magAt': [round(MAG_F, 4), round(MAG_U, 4)],
     'handle': {'f': HF, 'y': HY, 'x': HX, 'travel': 0.1, 'recip': True, 'style': 'fold', 'grab': [HF, HY + 0.006, HX - 0.028]},
-    'port': [round(F(780), 4), round(U(241), 4), 0.016],
+    'port': [round(F(977), 4), round(U(241), 4), 0.016],
     'chamberAt': {'side': 'port', 'f': round(PB - 0.0007 - 0.72 * 0.0476, 4), 'y': round(CH_Z + 0.0059, 4), 'x': CH_AX},   # (a real port: the round shows in it, its nose at the chamber's mouth, when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(F(1880), 4), 0, 0]},
