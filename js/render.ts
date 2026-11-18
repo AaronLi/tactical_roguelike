@@ -9,6 +9,7 @@ import { LevelView } from './levelview.js';
 import { GunModels } from './gunmodels.js';
 import { Highlights } from './highlights.js';
 import { LightGrid } from './lightgrid.js';
+import { GpuAo } from './gpuao.js';
 import { ReplayEnv } from './replayenv.js';
 import { Rig } from './rig.js';
 import { TONE } from './tone.js';
@@ -276,6 +277,7 @@ export const R = {
     // what stops a weapon light: the level, bar what you can see through (glass, a grating)
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
+    { const gpu = GpuAo.bake(this.renderer, this.scene, this.levelRoot, map); if (gpu) { LightGrid.useGpuAo(gpu.a, gpu.b); (map as any).gpuAoMs = gpu.ms; } } // (the occlusion from the meshes on the GPU: ?gpuao=1, js/gpuao.ts)
     const th = map.theme;
     (this.scene.fog as THREE.Fog).color.setHex(th.fog);
     const fog = this.scene.fog as THREE.Fog; fog.near = th.noFog ? 1e4 : th.fogNear || 8; fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
@@ -391,6 +393,7 @@ export const R = {
         if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
     };
+    GpuAo.dispose();
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
     this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false)); this.craters.forEach((m) => (m.visible = false));

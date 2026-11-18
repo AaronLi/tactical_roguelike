@@ -538,6 +538,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
     G0.tl.needsUpdate = G0.td.needsUpdate = true;
   }
   function dispose() {
+    if (held) { for (const t of [...held.cpu, ...held.gpu]) if (t && t !== blank) t.dispose(); held = null; }
     for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoA', 'lgAoB'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
     U.lgAo.value.z = 0;
     G0 = null; built = false;
@@ -570,5 +571,13 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   }
   // on while the level's drawn (R.render), off for anything else drawn with the same materials
   const on = (v: boolean) => { U.lgGrid.value.w = v && built ? 1 : 0; };
-  return { build, compute, dispose, on, at, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
+  // the occlusion baked on the GPU in place of the box bake's (js/gpuao.ts): its textures, which the grid then holds and lets go of
+  // (the box bake's are kept beside them, for swapAo: to see the two on the same level)
+  let held: { cpu: any[]; gpu: any[] } | null = null;
+  function useGpuAo(a: THREE.Texture, b: THREE.Texture) {
+    held = { cpu: [U.lgAoA.value, U.lgAoB.value], gpu: [a, b] };
+    U.lgAoA.value = a as any; U.lgAoB.value = b as any; U.lgAo.value.z = 1; U.lgAo.value.w = Level.FLOOR_H - Level.WALL_H - 0.02; U.lgAo.value.y = Level.WALL_H;
+  }
+  function swapAo(gpu: boolean) { if (!held) return false; const [a, b] = gpu ? held.gpu : held.cpu; U.lgAoA.value = a; U.lgAoB.value = b; return true; }
+  return { build, compute, dispose, on, at, useGpuAo, swapAo, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();
