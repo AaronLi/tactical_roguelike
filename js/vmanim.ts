@@ -1326,7 +1326,7 @@ export const VMAnim = (() => {
     top: fp([0.45, 0.7, 0.45], [0.5, 0.75, 0.45], [0.9, 1.1, 0.7], [1.0, 1.2, 0.7], [0.75, 0.2, 0.35, 0.3]), // (a round or a clip pinched, pressed in from above)
     rack: fp([0.55, 1.0, 0.65], [0.6, 1.05, 0.65], [0.65, 1.1, 0.7], [0.7, 1.1, 0.7], [0.65, 0.2, 0.3, 0.2]), // (over a slide, or round a handle)
     hook: fp([0.3, 1.35, 0.9], [0.3, 1.4, 0.9], [0.6, 1.5, 1.0], [0.7, 1.5, 1.0], [0.5, 0.1, 0.2, 0.2]), // (an AR's charging handle, hooked from in front)
-    f2hook: fp([0.35, 1.0, 0.8], [0.4, 1.05, 0.8], [1.5, 1.65, 1.15], [1.55, 1.65, 1.15], [1.15, 0.5, 0.6, 0.5]), // (the F2's charging handle: the index and middle fingers hooked over the handle and pulling it, the ring and little fingers curled tight into a closed fist and the thumb folded in)
+    f2hook: fp([0.35, 1.0, 0.8], [1.5, 1.65, 1.15], [1.5, 1.65, 1.15], [1.55, 1.65, 1.15], [1.15, 0.5, 0.6, 0.5]), // (the F2's charging handle: the index finger alone hooked over the handle and pulling it, the middle, ring and little fingers curled tight into a closed fist and the thumb folded in)
     chpull: fp([0.25, 1.0, 0.8], [1.2, 1.5, 1.0], [1.3, 1.55, 1.0], [1.35, 1.55, 1.0], [0.55, 0.15, 0.3, 0.25]), // (a fist, palm down, the index finger hooked round the front of a handle and pulling, the thumb across to pinch it from behind: an AR's T handle)
     thumbpull: fp([0.08, 0.12, 0.08], [0.1, 0.15, 0.1], [0.14, 0.2, 0.12], [0.2, 0.25, 0.15], [0.1, 0.05, 0.1, 0.1]), // (the AK's right-side handle: the four fingers relaxed and extended along the receiver's side, the thumb out straight, up on the handle's knob and pulling it back)
     knobhook: fp([0.15, 1.35, 1.2], [1.3, 1.55, 1.0], [1.35, 1.55, 1.0], [1.4, 1.55, 1.0], [0.5, 0.15, 0.3, 0.25]), // (the SCAR's side knob: the index curled hard round the knob's front, its pad and middle segment on it, the other fingers in a fist, the thumb across behind it)
@@ -1451,7 +1451,7 @@ export const VMAnim = (() => {
     let F = fmix(fmix(FP.open, FP.top, up), c.F, on);
     if (k) F = fmix(F, knobL ? FP.knobhook : lk === 'ar' ? FP.chpull : lk === 'palm' || lk === 'lslap' ? FP.flat : lk === 'handle' && h.info.handle && (h.info.handle as { style?: string }).style === 'top' ? FP.f2hook : lk === 'handle' && h.A.H && h.A.H.x > 0.005 ? FP.thumbpull : FP.rack, k);
     const rhand = lk === 'handle' && !!h.A.H && h.A.H.x > 0.005, hook = lk === 'handle' && !!h.info.handle && (h.info.handle as { style?: string }).style === 'top'; // (the F2's lever: the hooked fingertips are what touch it, so the hand is drawn back along the fingers by their length and the palm held off)
-    return { q, r: U.lerp(0.012, c.r, on) * (1 - k) + (hook ? 0.025 : rhand ? 0.028 : knobL ? 0.016 : 0.01) * k, fz: k * (lk === 'ar' ? 0.045 : knobL ? 0.025 : lk === 'pistol' ? 0.01 : lk === 'palm' || lk === 'lslap' ? 0 : hook ? 0.05 : rhand ? 0.045 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
+    return { q, r: U.lerp(0.012, c.r, on) * (1 - k) + (hook ? 0.025 : rhand ? 0.028 : knobL ? 0.016 : 0.01) * k, fz: k * (lk === 'ar' ? 0.045 : knobL ? 0.06 : lk === 'pistol' ? 0.01 : lk === 'palm' || lk === 'lslap' ? 0 : hook ? 0.05 : rhand ? 0.045 : 0.03), F, off: c.off.clone().multiplyScalar(on * (1 - k)) };
   }
   // the hand set at a hold: its frame (Arm.glove: where vmanim's clips and turns can move it on), the palm's reach, the fingers
   function humHold(arm: Arm, h: Rig, at: V3, o: HumHoldT) {
