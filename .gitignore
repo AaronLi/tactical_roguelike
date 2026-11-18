@@ -25,3 +25,6 @@ recordings/
 
 # the Supabase CLI's local state (supabase link)
 supabase/.temp/
+
+# tools/mesh_check.mjs pictures
+reports/mesh/

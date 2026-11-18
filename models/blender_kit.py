@@ -167,6 +167,18 @@ def prism(pts, axis, a0, a1):
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     me = bpy.data.meshes.new('tmp'); bm.to_mesh(me); bm.free(); return me
 
+def loft(pts0, pts1, axis, a0, a1):
+    """Like prism, but the outline pts0 at a0 and pts1 (as many points) at a1: a tapered cutter, so a pocket's walls slope and catch
+    the light like a chamfer round its rim, with no more faces than square walls."""
+    bm = bmesh.new()
+    P = lambda u, v, a: {'x': (a, u, v), 'y': (u, a, v), 'z': (u, v, a)}[axis]
+    lo = [bm.verts.new(P(u, v, a0)) for u, v in pts0]; hi = [bm.verts.new(P(u, v, a1)) for u, v in pts1]
+    n = len(pts0)
+    bm.faces.new(lo); bm.faces.new(list(reversed(hi)))
+    for i in range(n): bm.faces.new((lo[i], lo[(i + 1) % n], hi[(i + 1) % n], hi[i]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    me = bpy.data.meshes.new('tmp'); bm.to_mesh(me); bm.free(); return me
+
 def box(x0, x1, y0, y1, z0, z1):
     return prism([(y0, z0), (y1, z0), (y1, z1), (y0, z1)], 'x', min(x0, x1), max(x0, x1))
 
@@ -219,6 +231,105 @@ def bevel(o, w, seg=2, angle=40):
     md = o.modifiers.new('bv', 'BEVEL'); md.width = w; md.segments = seg; md.limit_method = 'ANGLE'; md.angle_limit = math.radians(angle)
     md.use_clamp_overlap = True
     _apply(o, md); return o
+
+def slice_across(o, axis, at, gap=None, merge=2 * mm):
+    """Cut o's mesh through with planes square to `axis` ('x', 'y', 'z') at each of `at` (and between them, so no two are more than
+    `gap` apart): a long flat face a boolean has pierced (slots, holes) is one n-gon wrapped round them all, which exports as a fan of
+    slivers the whole length of the part; cut across at each hole it's short pieces that triangulate cleanly (and a vertex attribute,
+    the weapon AO, has vertices along it to vary on)."""
+    k = 'xyz'.index(axis); at0 = sorted(set(round(a, 6) for a in at)); at = []
+    for a in at0:                                                         # (two cuts closer than merge are one: a hairline strip between them
+        if not at or a - at[-1] >= merge: at.append(a)                    #  is all slivers)
+    if gap:
+        full = []
+        for a, b in zip(at, at[1:]):
+            n = max(1, math.ceil((b - a) / gap - 1e-9)); full += [a + (b - a) * j / n for j in range(n)]
+        at = full + at[-1:]
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    lo, hi = min(v.co[k] for v in bm.verts), max(v.co[k] for v in bm.verts)
+    no = [0.0, 0.0, 0.0]; no[k] = 1.0
+    for a in at:
+        if a <= lo + 1e-5 or a >= hi - 1e-5: continue
+        co = [0.0, 0.0, 0.0]; co[k] = a
+        bmesh.ops.bisect_plane(bm, geom=bm.verts[:] + bm.edges[:] + bm.faces[:], plane_co=co, plane_no=no, dist=1e-6)
+    bm.to_mesh(o.data); bm.free(); o.data.update(); return o
+
+def segs(r, tol=0.1 * mm, lo=6):
+    """How many sides a circle of radius r needs: as few as keep each side within tol of the true circle (0.1 mm: a 1.6 mm screw 8,
+    a 6.5 mm boss 18, a 16.5 mm bore 28), at least lo, even. .claude/skills/modeling-practices."""
+    n = math.pi / math.acos(max(-1.0, 1 - tol / r)) if r > tol else lo
+    n = max(lo, math.ceil(n)); return n + (n % 2)
+
+def corner_segs(r, tol=0.1 * mm):
+    """A rounded() corner's segments for radius r: a quarter of segs(r), at least 1."""
+    return max(1, math.ceil(segs(r, tol, 4) / 4))
+
+def slice_faces(o, cuts, tol=0.05e-3):
+    """Cut only some faces of o: each cut (face_point, face_normal, plane_point, plane_normal[, (dir, lo, hi)]) splits the faces lying in
+    the plane through face_point square to face_normal (within tol), and whose middle's dot with dir is within lo..hi if given, along
+    the plane (plane_point, plane_normal). For framing a hole in a flat face: lines
+    just outside it along the face, so it sits in a little rectangle of its own and its triangles stay inside that (the rest of the face
+    keeps clean quads)."""
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    for cut in cuts:
+        fp, fn, co, no = Vector(cut[0]), Vector(cut[1]).normalized(), cut[2], cut[3]
+        rng = (Vector(cut[4][0]), cut[4][1], cut[4][2]) if len(cut) > 4 else None
+        fs = [f for f in bm.faces if f.normal.dot(fn) > 0.9999 and abs((f.calc_center_median() - fp).dot(fn)) < tol
+              and (not rng or rng[1] <= f.calc_center_median().dot(rng[0]) <= rng[2])]
+        if not fs: continue
+        es = list({e for f in fs for e in f.edges}); vs = list({v for f in fs for v in f.verts})
+        bmesh.ops.bisect_plane(bm, geom=vs + es + fs, plane_co=co, plane_no=no, dist=1e-6)
+    bm.to_mesh(o.data); bm.free(); o.data.update(); return o
+
+def strip_ngons(o, axis, aspect=6.0, merge=0.0, passes=3):
+    """An n-gon (more than 4 sides) longer along `axis` than `aspect` times its width cut across at each of ITS OWN vertices into
+    strips (its cuts closer than merge are one), the plane limited to that face: left alone it exports as a fan the length of the face.
+    Cutting a face puts vertices on its neighbours' edges, so it goes round again (passes) for the faces that made n-gons of."""
+    k = 'xyz'.index(axis); no = [0.0, 0.0, 0.0]; no[k] = 1.0
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    for _ in range(passes):
+        done = 0
+        for f in [f for f in bm.faces if len(f.verts) > 4]:
+            if not f.is_valid or len(f.verts) <= 4: continue
+            cs = [v.co[k] for v in f.verts]; lo, hi = min(cs), max(cs); ln_ = hi - lo
+            if aspect:
+                pts = [Vector(v.co) for v in f.verts]; c0 = sum(pts, Vector()) / len(pts)
+                wd = max(((v - c0) - (v - c0).dot(Vector(no)) * Vector(no)).length for v in pts) * 2
+                if ln_ < aspect * max(wd, 1e-6): continue
+            fn, fp = f.normal.copy(), f.calc_center_median()
+            at = []
+            for a in sorted(set(round(c, 7) for c in cs)):
+                if a <= lo + max(merge, 1e-6) or a >= hi - max(merge, 1e-6): continue
+                if at and a - at[-1] < merge: continue
+                at.append(a)
+            for a in at:
+                fs = [g for g in bm.faces if g.normal.dot(fn) > 0.9999 and abs((g.calc_center_median() - fp).dot(fn)) < 0.05e-3
+                      and min(v.co[k] for v in g.verts) < a - 1e-6 and max(v.co[k] for v in g.verts) > a + 1e-6 and lo - 1e-6 <= g.calc_center_median()[k] <= hi + 1e-6]
+                if not fs: continue
+                co = [0.0, 0.0, 0.0]; co[k] = a; done += 1
+                bmesh.ops.bisect_plane(bm, geom=list({v for g in fs for v in g.verts}) + list({e for g in fs for e in g.edges}) + fs, plane_co=co, plane_no=no, dist=1e-6)
+        if not done: break
+    bm.to_mesh(o.data); bm.free(); o.data.update(); return o
+
+def slice_at_vertices(o, axis, merge=1.5e-3):
+    """A solid made by extruding an outline (a receiver's traced side, a section) and cutting it with booleans has big flat sides that
+    are one n-gon each, exported as a fan of slivers. Each such face cut across `axis` at its own vertices (cuts closer than merge are
+    one), not the whole part round at every vertex it has anywhere (that put lines on faces that lined up with nothing): each side
+    becomes a row of trapezoid strips. For holes in a face use slice_faces instead (.claude/skills/modeling-practices)."""
+    strip_ngons(o, axis, aspect=0, merge=merge)
+    return tidy(o, 0.1e-3, False)
+
+def tidy(o, dist=1e-6, tri=True):
+    """Weld vertices closer than dist and drop the faces that have no area left (a boolean's or a clamped bevel's leftovers); with tri,
+    every n-gon (more than 4 sides: a cylinder's cap, a face round a hole) triangulated by Blender's 'beauty' (the triangles' smallest
+    angles as large as they can be) instead of left to the exporter's fan."""
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=dist)
+    bmesh.ops.dissolve_degenerate(bm, edges=bm.edges, dist=dist)
+    if tri:
+        ng = [f for f in bm.faces if len(f.verts) > 4]
+        if ng: bmesh.ops.triangulate(bm, faces=ng, quad_method='BEAUTY', ngon_method='BEAUTY')
+    bm.to_mesh(o.data); bm.free(); o.data.update(); return o
 
 def smooth(o, deg=35):
     """Flat faces stay flat, rounded ones shade smooth (split normals by angle; the glTF export writes them)."""

@@ -76,4 +76,18 @@ L = 0.300
 g['handguard_quad'](HG0, HG0 + L)
 write_part('handguard', 'ironvale_ir12', slot_meshes('handguard') - before, (HG0, 0.0), {'support': r4([L / 2 + 0.03, HB_B - 6 * mm, 0])},
            {'part': {'t': 'rail', 'len': L, 'rails': rails(L)}, 'replaces': ['Ironvale IR-12 quad rail']})
+# ---- the M-LOK handguards: the Vantage VX-10 (10", 0.26 m)
+def mlok_rails(L): return {'top': r4([0, L - 1.5 * mm]), 'left': r4([0.030, L - 0.010]), 'right': r4([0.030, L - 0.010]), 'bottom': r4([0.030, L - 0.010]), 'kind': 'mlok'}
+before = slot_meshes('handguard')
+L = 0.260
+g['handguard_mlok'](HG0, HG0 + L)
+write_part('handguard', 'vantage_vx10', slot_meshes('handguard') - before, (HG0, 0.0), {'support': r4([L / 2 + 0.03, -0.019 - 6 * mm, 0])},
+           {'part': {'t': 'mlok', 'len': L, 'rails': mlok_rails(L)}, 'replaces': ['Vantage VX-10 M-LOK 10"']})
+# ---- the rest of the Vantage family, the same handguard at its other lengths (the VX-13 in flat dark earth)
+for pid, L, mat, name in (('vantage_vx15', 0.360, None, 'Vantage VX-15 M-LOK 15"'), ('vantage_vx13_fde', 0.320, 'tan', 'Vantage VX-13 M-LOK (FDE)'),
+                          ('vantage_vx5', 0.120, None, 'Vantage VX-5 M-LOK 5"')):
+    before = slot_meshes('handguard')
+    g['handguard_mlok'](HG0, HG0 + L, mat)
+    write_part('handguard', pid, slot_meshes('handguard') - before, (HG0, 0.0), {'support': r4([L / 2 + 0.03, -0.019 - 6 * mm, 0])},
+               {'part': {'t': 'mlok', 'len': L, 'rails': mlok_rails(L)}, 'replaces': [name]})
 print('PARTS DONE')

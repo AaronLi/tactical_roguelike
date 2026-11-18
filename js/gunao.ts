@@ -178,7 +178,7 @@ export const GunAo = (() => {
     };
     const d2 = (a: Float32Array, b: Float32Array) => { const x = a[po] - b[po], y = a[po + 1] - b[po + 1], z = a[po + 2] - b[po + 2]; return x * x + y * y + z * z; };
     const mid = (a: Float32Array, b: Float32Array) => { const r = new Float32Array(W); for (let k = 0; k < stride; k++) r[k] = (a[k] + b[k]) / 2; const l = Math.hypot(r[no], r[no + 1], r[no + 2]) || 1; r[no] /= l; r[no + 1] /= l; r[no + 2] /= l; r[stride] = aoOf(r); return r; };
-    const big = o.edge * o.edge, small = o.fine * o.fine, tol = o.tol;
+    const big = o.edge * o.edge, small = o.fine * o.fine, tol = o.tol, dark = o.max - 0.05;   // (dark: as shut in as a vertex gets)
     let out = new Float32Array(cnt * W * 2), n = 0;
     const emit = (a: Float32Array, b: Float32Array, c: Float32Array) => { if (n + W * 3 > out.length) { const r = new Float32Array(out.length * 2); r.set(out); out = r; } out.set(a, n); out.set(b, n + W); out.set(c, n + W * 2); n += W * 3; };
     const sub = (t: number, k: number) => cur.subarray((t * 3 + k) * W, (t * 3 + k + 1) * W);
@@ -190,7 +190,13 @@ export const GunAo = (() => {
         const [a, b, c] = stack.pop()!, ab = d2(a, b), bc = d2(b, c), ca = d2(c, a), mx = Math.max(ab, bc, ca);
         if (mx <= small || ++guard > 512) { emit(a, b, c); continue; }
         let split = mx > big;
-        if (!split) { // (does the occlusion in the middle of an edge, and at the face's middle, follow the corners'?)
+        if (split && Math.min(a[stride], b[stride], c[stride]) >= dark) {
+          // (all its corners shut in, the inside of a handguard, a buffer tube in its stock: long, but split only if its middle isn't
+          // dark too; uniformly dark faces were 41% of an M4's triangles after the split and added nothing)
+          const mab = mid(a, b), mbc = mid(b, c), mca = mid(c, a);
+          if (Math.min(mab[stride], mbc[stride], mca[stride]) >= dark) split = false;
+        }
+        if (!split && mx <= big) { // (does the occlusion in the middle of an edge, and at the face's middle, follow the corners'?)
           const mab = mid(a, b), mbc = mid(b, c), mca = mid(c, a);
           let err = Math.max(Math.abs(mab[stride] - (a[stride] + b[stride]) / 2), Math.abs(mbc[stride] - (b[stride] + c[stride]) / 2), Math.abs(mca[stride] - (c[stride] + a[stride]) / 2));
           if (err <= tol) { const cen = new Float32Array(W); for (let k = 0; k < stride; k++) cen[k] = (a[k] + b[k] + c[k]) / 3; const l = Math.hypot(cen[no], cen[no + 1], cen[no + 2]) || 1; cen[no] /= l; cen[no + 1] /= l; cen[no + 2] /= l; err = Math.abs(aoOf(cen) - (a[stride] + b[stride] + c[stride]) / 3); }
@@ -201,10 +207,22 @@ export const GunAo = (() => {
         if (mx === ab) { const mm = mid(a, b); stack.push([mm, b, c], [a, mm, c]); } else if (mx === bc) { const mm = mid(b, c); stack.push([a, mm, c], [a, b, mm]); } else { const mm = mid(c, a); stack.push([b, c, mm], [a, b, mm]); }
       }
     }
-    const nv = n / W, bg = new THREE.BufferGeometry(), ao = new Float32Array(nv);
-    names.forEach((nme, k) => { const arr = new Float32Array(nv * sizes[k]); for (let i = 0; i < nv; i++) for (let c = 0; c < sizes[k]; c++) arr[i * sizes[k] + c] = out[i * W + offs[k] + c]; bg.setAttribute(nme, new THREE.BufferAttribute(arr, sizes[k])); });
-    for (let i = 0; i < nv; i++) ao[i] = out[i * W + stride];
-    if (!changed && !geo.index) { bg.dispose(); return { geo, ao }; }
+    const nt = n / W;
+    if (!changed && !geo.index) { const ao = new Float32Array(nt); for (let i = 0; i < nt; i++) ao[i] = out[i * W + stride]; return { geo, ao }; }
+    // indexed again: a corner the triangles share (same position, normal, everything, so the same occlusion) is one vertex, as in the
+    // model it came from; left as three per triangle the mesh had ~3x its vertices (82k on a 28k-triangle handguard, not 34k)
+    const idx = new Uint32Array(nt), weld = new Map<string, number>(), keep: number[] = [];
+    for (let i = 0; i < nt; i++) {
+      let key = '';
+      for (let k = 0; k < W; k++) key += Math.round(out[i * W + k] * 1e6) + ',';
+      let j = weld.get(key);
+      if (j === undefined) { j = keep.length; weld.set(key, j); keep.push(i); }
+      idx[i] = j;
+    }
+    const nv = keep.length, bg = new THREE.BufferGeometry(), ao = new Float32Array(nv);
+    names.forEach((nme, k) => { const arr = new Float32Array(nv * sizes[k]); for (let i = 0; i < nv; i++) for (let c = 0; c < sizes[k]; c++) arr[i * sizes[k] + c] = out[keep[i] * W + offs[k] + c]; bg.setAttribute(nme, new THREE.BufferAttribute(arr, sizes[k])); });
+    for (let i = 0; i < nv; i++) ao[i] = out[keep[i] * W + stride];
+    bg.setIndex(new THREE.BufferAttribute(nv > 65535 ? idx : new Uint16Array(idx), 1));
     bg.userData = geo.userData; bg.computeBoundingBox(); bg.computeBoundingSphere();
     return { geo: bg, ao };
   }

@@ -404,7 +404,7 @@
   },
   "barrel=br.5.56x45.19.2.light,grip=gr.ar.0,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0": {
    "label": "grip=gr.ar.0",
-   "geometry": "16990fb8fe9dfbde",
+   "geometry": "2d28cb8736563edd",
    "info": "636f6bf4af9d1e3b"
   },
   "barrel=br.5.56x45.19.2.light,grip=gr.ar.1,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0": {
@@ -819,7 +819,7 @@
   },
   "barrel=br.5.56x45.19.2.light,grip=gr.ar.0,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,tac=tac.0,tacL=tac.0": {
    "label": "grip=gr.ar.0 from loaded A",
-   "geometry": "aadf1bee9578e819",
+   "geometry": "744da3ea363bd1e3",
    "info": "636f6bf4af9d1e3b"
   },
   "barrel=br.5.56x45.19.2.light,grip=gr.ar.1,mag=stanag.mag.30,muzzle=mz.r556.a2,optic=op.pic.0,tac=tac.0,tacL=tac.0": {

@@ -532,7 +532,7 @@ export const Viewmodel = (() => {
     const byMat = new Map<THREE.Material, THREE.BufferGeometry[]>();
     group.traverse((o: any) => {
       if (!o.isMesh) return;
-      const geo = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
+      const geo = o.geometry.clone();   // (indexed kept indexed: un-indexing gave every triangle three vertices of its own)
       // (a model read from a file may have its positions and normals quantised: 16-bit and 8-bit integers, normalised; the merge is in floats)
       for (const name of ['position', 'normal']) {
         const a = geo.attributes[name] as THREE.BufferAttribute;
@@ -552,11 +552,21 @@ export const Viewmodel = (() => {
       geos.forEach((gg) => (n += gg.attributes.position.count));
       const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3), occ = geos.some((gg) => gg.attributes.aOcc) ? new Float32Array(n) : null;
       let off = 0;
-      for (const gg of geos) { pos.set((gg.attributes.position as THREE.BufferAttribute).array, off * 3); nor.set((gg.attributes.normal as THREE.BufferAttribute).array, off * 3); if (occ && gg.attributes.aOcc) occ.set((gg.attributes.aOcc as THREE.BufferAttribute).array, off); off += gg.attributes.position.count; gg.dispose(); }
+      let ni = 0;
+      geos.forEach((gg) => (ni += gg.index ? gg.index.count : gg.attributes.position.count));
+      const idx = n > 65535 ? new Uint32Array(ni) : new Uint16Array(ni);
+      let io = 0;
+      for (const gg of geos) {
+        pos.set((gg.attributes.position as THREE.BufferAttribute).array, off * 3); nor.set((gg.attributes.normal as THREE.BufferAttribute).array, off * 3); if (occ && gg.attributes.aOcc) occ.set((gg.attributes.aOcc as THREE.BufferAttribute).array, off);
+        const c = gg.attributes.position.count;
+        if (gg.index) { const a = gg.index.array; for (let i = 0; i < a.length; i++) idx[io++] = a[i] + off; } else for (let i = 0; i < c; i++) idx[io++] = i + off;
+        off += c; gg.dispose();
+      }
       const bg = new T.BufferGeometry();
       bg.setAttribute('position', new T.BufferAttribute(pos, 3));
       bg.setAttribute('normal', new T.BufferAttribute(nor, 3));
       if (occ) bg.setAttribute('aOcc', new T.BufferAttribute(occ, 1));
+      bg.setIndex(new T.BufferAttribute(idx, 1));
       bg.computeBoundingSphere();
       out.push({ geometry: bg, material });
     }
