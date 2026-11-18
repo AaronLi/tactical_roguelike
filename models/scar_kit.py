@@ -102,10 +102,10 @@ def upper():
     f0, f1 = 0.0, F_FRONT
     ub = UP_BOT * mm
     up = K.tmp(prism([(f0, ub), (f1, ub), (f1, UP_TOP * mm), (f0, UP_TOP * mm)], 'x', -HWU * mm, HWU * mm))
-    sec = [(-HWU + 3, UP_BOT), (HWU - 3, UP_BOT), (HWU, UP_BOT + 3), (HWU, 7.5), (HWB, 10.0), (HWB, 33.0), (13.0, UP_TOP), (-13.0, UP_TOP), (-HWB, 33.0), (-HWB, 10.0), (-HWU, 7.5), (-HWU, UP_BOT + 3)]
+    sec = [(-HWU + 3, UP_BOT), (HWU - 3, UP_BOT), (HWU, UP_BOT + 3), (HWU, 11.9), (HWB, 14.4), (HWB, 36.5), (13.0, UP_TOP), (-13.0, UP_TOP), (-HWB, 36.5), (-HWB, 14.4), (-HWU, 11.9), (-HWU, UP_BOT + 3)]
     boolean(up, prism([(x * mm, u * mm) for x, u in sec], 'y', f0 - 0.01, f1 + 0.01), 'INTERSECT')
     # the ejection port, right: a pocket 4 mm deep (the bolt carrier's flank shows in it)
-    pa, pb, pu0, pu1 = Fp(850), Fp(1062), -0.0032, 0.0075
+    pa, pb, pu0, pu1 = Fp(850), Fp(1062), -0.0032, 0.0119
     cut(up, prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2, 2.2 * mm, 4), 'x', (HWU - 4.0) * mm, (HWU + 1) * mm))
     # the lightening slots down the front, each side; the charging handle's track on the right
     for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
@@ -131,7 +131,7 @@ def upper():
         for s in (-1, 1): liner(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU - 2.5) * mm))
         liner(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT + 2.5) * mm, (UP_BOT + 3.0) * mm)
     # the bolt carrier's flank in the port
-    o = K.tmp(box((HWU - 4.6) * mm, (HWU - 3.8) * mm, Fp(868), Fp(1044), -0.0012, 0.0058)); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', 'park')
+    o = K.tmp(box((HWU - 4.6) * mm, (HWU - 3.8) * mm, Fp(868), Fp(1044), -0.0012, 0.0092)); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', 'park')
     # the barrel nut's pins and the lower's pins (both sides)
     for px, py, r in ((682, 367, 2.6), (716, 367, 2.6), (826, 360, 2.8)):
         for s in (-1, 1):
@@ -321,7 +321,7 @@ def details():
     takedown pins, the quick-detach sockets, the seam groove between the upper and the lower."""
     for s in (-1, 1):
         # the barrel's bolt plate (measured off FN's 16S shot: x 602-670, y 218-239; a lozenge, blunt behind and tapering to a rounded nose; two hex-socket screws at x 611 and 643 and a pin hole between at 628)
-        c = 0.0075 - 8.3 * mm      # (its top edge on the ledge where the upper steps in, U 7.5)
+        c = 0.0036                 # (as the photo has it; the ledge where the upper steps in is at its top edge, U 11.9)
         pl = [(0.1922, c - 6 * mm), (0.1935, c - 8.3 * mm), (0.236, c - 8.3 * mm), (0.2425, c - 6.2 * mm), (0.2462, c - 3.0 * mm), (0.2470, c), (0.2462, c + 3.0 * mm), (0.2425, c + 6.2 * mm), (0.236, c + 8.3 * mm), (0.1935, c + 8.3 * mm), (0.1922, c + 6 * mm)]
         o = K.tmp(prism(pl, 'x', *xs(s * (HWU - 0.2) * mm, s * (HWU + 3.0) * mm))); bevel(o, 1.0 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black')
         for f in (0.1997, 0.2253):
@@ -334,14 +334,15 @@ def details():
         o = K.obj(cyl(2.4 * mm, *xs(s * (HWL + 1.8 * mm), s * (HWL + 3.0 * mm)), 'x', (0.099, -0.032), 12), 'base', 'steel'); smooth(o)
         for f, u, r in ((0.018, -0.0145, 3.4), (0.0715, -0.045, 2.0), (0.038, -0.017, 2.4), (0.112, -0.021, 1.6)):
             o = K.obj(cyl(r * mm, *xs(s * (HWL - 0.2 * mm), s * (HWL + 2.0 * mm)), 'x', (f, u), 16), 'base', 'steel'); smooth(o)
-        o = K.obj(cyl(4.4 * mm, *xs(s * (HWU - 0.5) * mm, s * (HWU + 0.9) * mm), 'x', (0.199, -0.0199), 20), 'base', 'black'); smooth(o)   # (the lower's hinge pin head, measured off FN's 16S shot: x 610, y 258, 4.4 mm radius)
+        o = K.obj(cyl(4.0 * mm, *xs(s * (HWL - 0.5 * mm), s * (HWL + 1.0 * mm)), 'x', (0.199, -0.0275), 20), 'base', 'black'); smooth(o)   # (the lower's hinge pin head, on its front lug: FN's 16S shot, x 610, y 258, 4.4 mm radius, below the seam)
         for f, u in ((0.010, 0.0075), (F_FRONT + 0.006, -0.012)):
             q = K.tmp(cyl(5.8 * mm, *xs(s * (HWU - 0.4) * mm, s * (HWU + 3.0) * mm), 'x', (f, u), 20)); cut(q, cyl(2.6 * mm, *xs(s * (HWU - 1.0) * mm, s * (HWU + 3.5) * mm), 'x', (f, u), 14))
             bevel(q, 0.4 * mm, 1); smooth(q); K.adopt(q, 'base', 'steel')
         g = K.tmp(box(*xs(s * (HWU - 0.2) * mm, s * (HWU + 0.7) * mm), 0.0, F_FRONT - 0.002, UP_BOT * mm - 0.0006, UP_BOT * mm + 0.0006)); smooth(g); K.adopt(g, 'base', 'black')
         for ch, f, u in (('5', 0.0653, -0.0297), ('1', 0.0628, -0.0197)):
             o = K.tmp(digit(ch, f, u, s, s * HWL, h=4.2 * mm, w=2.6 * mm, t=0.6 * mm, rise=0.35 * mm)); smooth(o); K.adopt(o, 'base', 'black')
-    d = K.tmp(prism([(0.086, -0.0035), (0.099, -0.0035), (0.100, 0.0070), (0.093, 0.0075), (0.086, 0.0055)], 'x', (HWU - 0.4) * mm, (HWU + 5.0) * mm)); bevel(d, 0.9 * mm, 2, 30); smooth(d); K.adopt(d, 'base', 'gunmetal')
+    lg = K.tmp(box(-HWL, HWL, W_OUT_F - 0.004, 0.2085, -0.0335, -0.0215)); bevel(lg, 1.0 * mm, 2, 30); smooth(lg); K.adopt(lg, 'base', FURN)   # (the lug the hinge pin goes through, at the lower's front top)
+    d = K.tmp(prism([(0.086, -0.0035), (0.099, -0.0035), (0.100, 0.0105), (0.093, 0.0119), (0.086, 0.0090)], 'x', (HWU - 0.4) * mm, (HWU + 5.0) * mm)); bevel(d, 0.9 * mm, 2, 30); smooth(d); K.adopt(d, 'base', 'gunmetal')
     for f in (0.0715, 0.0875):
         o = K.obj(cyl(2.6 * mm, (HWU - 0.2) * mm, (HWU + 0.8) * mm, 'x', (f, 0.0035), 14), 'base', 'black'); smooth(o)
 
