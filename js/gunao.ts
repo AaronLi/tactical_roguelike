@@ -143,7 +143,9 @@ export const GunAo = (() => {
     if (!ms.length) return;
     let occ = key ? cache.get(key) : undefined;
     if (!occ || occ.length !== ms.length || occ.some((a, i) => a.length !== ms[i].n)) { occ = compute(ms); if (key) cache.set(key, occ); }
-    ms.forEach((m, i) => m.mesh.geometry.setAttribute('aOcc', new T.BufferAttribute(occ![i], 1)));
+    // (a magazine takes none itself, though it still shuts in what it sits against)
+    const isMag = (o: THREE.Object3D | null) => { for (; o; o = o.parent) if (o.userData && (o.userData.slot === 'mag' || o.userData.part === 'mag')) return true; return false; };
+    ms.forEach((m, i) => m.mesh.geometry.setAttribute('aOcc', new T.BufferAttribute(isMag(m.mesh) ? new Float32Array(m.n) : occ![i], 1)));
   }
   return { apply, compute: (g: THREE.Object3D) => compute(collect(g)) };
 })();
