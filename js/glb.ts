@@ -35,7 +35,7 @@ type SlotName = (typeof SLOTS)[keyof typeof SLOTS];
 /** The key of an animated sub-assembly: its node is named `part_<key>` and is listed under `info.anim.<key>`. */
 const PARTS = {
   mag: 'mag', slide: 'slide', bolt: 'bolt', ch: 'ch', handle: 'handle', pump: 'pump', lever: 'lever', cyl: 'cyl', brk: 'brk', barrel: 'barrel', cover: 'cover', magn: 'magn',
-  spin: 'spin', carry: 'carry', dial: 'dial', catch: 'catch', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
+  spin: 'spin', carry: 'carry', dial: 'dial', catch: 'catch', carrier: 'carrier', bipod: 'bipod', quarrel: 'quarrel', quarrelHead: 'quarrelHead', quarrelNock: 'quarrelNock', stringCocked: 'stringCocked', stringSlack: 'stringSlack',
 } as const;
 type PartKey = (typeof PARTS)[keyof typeof PARTS];
 
@@ -82,7 +82,7 @@ interface HandleInfo { f: number; y: number; x: number; travel: number; grab?: V
 /** What `extras.info` on the root node says about the gun. Fields marked required must be present (and non-null); the others may be absent or null. */
 interface GunModelInfo {
   sy: number; fSight: number; relief: number; muzzles: Vec3[]; grip: Vec3; support: Vec3; anim: Record<string, string>;
-  magAt?: Vec2 | null; handle?: HandleInfo | null; port?: Vec3 | null; chamberAt?: ChamberAt | null;
+  magAt?: Vec2 | null; handle?: HandleInfo | null; carrier?: { travel: number } | null; port?: Vec3 | null; chamberAt?: ChamberAt | null;
   breech?: { at: Vec2; pitch: number; long: string | null } | null; ch?: Vec3 | null; bolt?: Vec3 | null; boltTravel?: number | null; cheek?: number | null; recoilBarrel?: number | null;
   pistol?: boolean | null; slide?: Vec3 | null; cylAt?: Vec3 | null; load?: { at: Vec2[]; pitch: number } | null; cup?: Vec3 | null; block?: { drop: number; lever: number } | null; magTop?: boolean | null; magRake?: number | null;
   quarrelMats?: Record<string, unknown> | null; mounts?: Record<string, Vec3> | null;
@@ -159,6 +159,7 @@ const CONTRACT_CORE = {
     mag: { doc: 'The magazine: drops out and swaps on a reload.', pairedWith: 'magAt' }, slide: { doc: 'A pistol slide: cycles with each shot.', pairedWith: 'slide' },
     bolt: { doc: 'An exposed bolt / carrier.', pairedWith: null }, ch: { doc: 'A charging handle.', pairedWith: null },
     catch: { doc: 'The bolt catch (an AR\'s paddle on the left of the lower, behind the magazine well): its origin is its pivot pin, and it turns about x (up to 0.14 rad, the upper arm tipping back) when the bolt is held open on an empty magazine; the hand presses it to send the bolt home (js/vmanim.ts).', pairedWith: null },
+    carrier: { doc: 'The bolt carrier seen through the ejection port, on a semi- or full-automatic rifle (the SCARs\': a black block filling the port, drawn in the port\'s pocket, its outer face inside the receiver\'s surface so it never stands out): its origin is the carrier\'s own pivot (it only slides, along z), and it runs back info.carrier.travel metres and home on every shot (a closed bolt, about 0.08 s), back with the hand\'s pull through a charge, a rack or a release, and held back on an empty magazine where the gun locks open, uncovering the chamber the model draws behind it (js/vmanim.ts). A model that gives it sets info.chamberAt side "port" (the game then draws no plate or bolt face of its own over the port).', pairedWith: 'carrier' },
     handle: { doc: 'A cocking handle that reciprocates or is worked by the hand.', pairedWith: 'handle' }, pump: { doc: 'A pump-action forend.', pairedWith: null },
     lever: { doc: 'A lever-action lever.', pairedWith: null }, cyl: { doc: 'A revolver cylinder: it rotates (z) by 1/n per shot.', pairedWith: null },
     brk: { doc: 'A break-action barrel group that tips open on its hinge.', pairedWith: null }, barrel: { doc: 'A long-recoil barrel (runs back by info.recoilBarrel).', pairedWith: null },
@@ -201,6 +202,7 @@ const INFO_FIELDS: { [K in keyof GunModelInfo]-?: Field } = {
   anim: F('Animated parts: key (a PARTS value) -> the NAME of its `part_<key>` node. Rebuilt into live node references at load.', { t: 'map', of: { t: 'str' } }),
   magAt: vec2('Where the magazine seats: [forward, up] metres of its top/centre in the well. Present exactly when the model has a part_mag.', true),
   handle: F('The cocking handle, when there is one (part_handle).', { t: 'obj', props: HANDLE_PROPS }, true),
+  carrier: F('The bolt carrier a model draws in its ejection port (part_carrier): how far it runs back, metres. Present exactly when the model has a part_carrier.', { t: 'obj', props: { travel: num('Metres it runs back from where it sits (home): up to the port\'s length, and it must not leave the receiver.', false, { min: 0.01, max: 0.2 }) } }, true),
   port: vec3('The ejection port, [forward, up, right] metres: where spent cases leave.', true),
   chamberAt: F('Where a round shows in the chamber, as `side` says (a tagged union).', {
     t: 'tagged', tag: 'side', variants: {

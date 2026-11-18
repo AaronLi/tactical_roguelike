@@ -190,6 +190,30 @@
       ],
       "description": "The cocking handle, when there is one (part_handle)."
     },
+    "carrier": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "travel": {
+              "type": "number",
+              "minimum": 0.01,
+              "maximum": 0.2,
+              "description": "Metres it runs back from where it sits (home): up to the port's length, and it must not leave the receiver."
+            }
+          },
+          "required": [
+            "travel"
+          ],
+          "additionalProperties": false,
+          "description": "The bolt carrier a model draws in its ejection port (part_carrier): how far it runs back, metres. Present exactly when the model has a part_carrier."
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The bolt carrier a model draws in its ejection port (part_carrier): how far it runs back, metres. Present exactly when the model has a part_carrier."
+    },
     "port": {
       "oneOf": [
         {

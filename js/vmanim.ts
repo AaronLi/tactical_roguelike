@@ -930,6 +930,15 @@ export const VMAnim = (() => {
         an.handle.position.copy(A.handleHome).z += k * h.travel;
         if (h.lock) an.handle.rotation.z = -h.lock * (pose ? pose.lock : 0); // (a handle that turns up into a notch: about the tube's axis, the part's origin)
       }
+      if (an.carrier && A.carrierHome) {
+        // the bolt carrier a model draws in its port (part_carrier, info.carrier): back and home on every shot (a closed bolt cycles in 0.08 s, as a riding handle does), back with
+        // pose.open through a charge, a rack or a release (the hand's pull, and held until the release sends it home), held back where the gun locks open on an empty magazine
+        const ts = pl.sinceShot == null ? 9 : pl.sinceShot, CYC = 0.08, hk = actKind(a, h);
+        let k = (!G_loaded(w) && boltHold(a.def)) || (h.open && w.mag > 0) ? 1 : 0;
+        if (pose && pose.open != null) k = U.clamp(pose.open / Math.max(1e-6, actTravel(h, hk)), 0, 1);
+        else if (!h.open && ts < CYC) k = Math.max(k, Math.sin(Math.PI * ts / CYC));
+        an.carrier.position.copy(A.carrierHome).z += k * h.carrier;
+      }
       // a long-recoil barrel (the GM6's): slammed back the whole stroke with the shot, the bolt locked to it; a moment there while
       // the bolt unlocks and is held, then it runs home ahead of the bolt (eased in at the end, as the spring's spent)
       if (an.barrel && A.barrelHome) {
