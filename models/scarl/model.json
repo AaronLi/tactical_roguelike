@@ -4,7 +4,6 @@
     "builtin": [
       "irons"
     ],
-    "rail": [],
-    "railed": true
+    "rail": []
   }
 }

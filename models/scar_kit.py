@@ -4,7 +4,7 @@
 # stock on its hinge are the same on both; the H's well takes the 20-round 7.62 magazine (its own, below), the L's the STANAG family's (ar_kit.py's
 # mag_stanag, borrowed as the F2 does), and the barrel and flash hider are each calibre's.
 #
-# This is the NRCH generation (the SCAR 17S NRCH for the H, the 16S NRCH for the L): M-LOK on the forend, a non-reciprocating charging handle on the left (part_ch),
+# This is the NRCH generation (the SCAR 17S NRCH for the H, the 16S NRCH for the L): M-LOK on the forend, a non-reciprocating charging handle on the left (part_handle),
 # the telescoping stock with its adjustable cheek, the large trigger guard. References (viewed in the browser, not downloaded):
 #  - FN America's product pages, the level side-on studio shots on a transparent background (1200 x 598, the right side, FDE): "SCAR-17S-NRCH_Rotators_7_0000_SCAR17S_FDE_right_side_"
 #    (fnamerica.com/products/rifles/fn-scar-17s-nrch/: barrel 16.25", overall 36"-38.5"; the H's well, magazine and trigger guard are fitted to it; 0.834 mm a pixel from its
@@ -111,8 +111,8 @@ def upper():
     for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
         for s in (-1, 1):
             cut(up, prism(rounded(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 4), 'x', *xs(s * (HWB - 2.2) * mm, s * (HWB + 1) * mm)))
-    cut(up, prism(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWB - 2.0) * mm, (HWB + 1) * mm))   # (the charging handle's channel, along the upper's upper half: both sides, the handle is ambidextrous)
-    cut(up, prism(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', -(HWB + 1) * mm, -(HWB - 2.0) * mm))
+    cut(up, prism(rounded((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWB - 2.0) * mm, (HWB + 1) * mm))   # (the charging handle's channel, along the upper's upper half: both sides, the handle is ambidextrous)
+    cut(up, prism(rounded((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', -(HWB + 1) * mm, -(HWB - 2.0) * mm))
     # M-LOK at 3, 6 and 9 o'clock: three slots 32 x 7 mm at 29 mm centres, 3 mm deep, on each flank and the underside of the forend
     for f in (0.300, 0.329, 0.358):
         for s in (-1, 1):
@@ -125,8 +125,8 @@ def upper():
     for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
         for s in (-1, 1):
             liner(rounded(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 4), 'x', *xs(s * (HWB - 2.2) * mm, s * (HWB - 1.7) * mm))
-    liner(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWB - 2.0) * mm, (HWB - 1.5) * mm)
-    liner(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', -(HWB - 1.5) * mm, -(HWB - 2.0) * mm)
+    liner(rounded((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWB - 2.0) * mm, (HWB - 1.5) * mm)
+    liner(rounded((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', -(HWB - 1.5) * mm, -(HWB - 2.0) * mm)
     for f in (0.300, 0.329, 0.358):
         for s in (-1, 1): liner(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU - 2.5) * mm))
         liner(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT + 2.5) * mm, (UP_BOT + 3.0) * mm)
@@ -167,7 +167,8 @@ def lower():
         o = K.obj(cyl(5.4 * mm, *xs(s * (HWL - 0.3) * mm, s * (HWL + 2.4) * mm), 'x', (Fp(762), Up(410)), 18), 'base', 'black'); smooth(o)
         lv = K.tmp(prism([(0.0385, -0.0282), (0.0515, -0.0282), (0.0515, -0.0312), (0.0385, -0.0312)], 'x', *xs(s * (HWL + 1.8) * mm, s * (HWL + 4.2) * mm))); bevel(lv, 0.7 * mm, 1); smooth(lv); K.adopt(lv, 'base', 'black')
     # the bolt catch's paddle on the left, ahead of the grip
-    o = K.tmp(prism(PL([(728, 440), (748, 440), (752, 458), (730, 458)]), 'x', *xs(-(HWL - 0.2) * mm, -(HWL + 1.8) * mm))); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
+    pc = K.part('catch', (0, Fp(745), Up(452)))     # (part_catch: it turns about its pin with the bolt held open, as the AR's does)
+    o = K.tmp(prism(PL([(728, 440), (748, 440), (752, 458), (730, 458)]), 'x', *xs(-(HWL - 0.2) * mm, -(HWL + 1.8) * mm))); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black', pc)
 
 # ----------------------------------------------------------------------------------------------------- GAS BLOCK (base) and the barrel
 def gas_block():
@@ -214,12 +215,23 @@ def front_sight():
         bevel(ea, 0.5 * mm, 1); smooth(ea); K.adopt(ea, 'optic', 'black')
     o = K.tmp(box(-0.8 * mm, 0.8 * mm, POST_F - 0.8 * mm, POST_F + 0.8 * mm, RAIL_T * mm, SY * mm)); smooth(o); K.adopt(o, 'optic', 'steel')
 
+def fold_irons():
+    """The irons FOLDED, the optic's mount piece (slot optic, extras.mount: drawn only under a real optic, never with the upright irons): the rear aperture folded
+    forward flat on its clamp base, the front post and its ears folded back flat on the housing's seat. Nothing stands higher than 10 mm over the rail."""
+    def mount(o): o['mount'] = True; return o
+    rt = RAIL_T * mm
+    o = K.tmp(box(-11.0 * mm, 11.0 * mm, -0.012, 0.0265, rt - 12 * mm, rt + 6.2 * mm)); bevel(o, 0.9 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', 'black'))
+    o = K.tmp(box(-5.8 * mm, 5.8 * mm, RS_F, RS_F + 43.5 * mm, rt + 6.2 * mm, rt + 10.0 * mm)); cut(o, cyl(3.3 * mm, rt + 5 * mm, rt + 12 * mm, 'z', (0, RS_F + 38.0 * mm), 24)); bevel(o, 0.5 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', 'black'))
+    pu = Up(314)
+    o = K.tmp(box(-7.5 * mm, 7.5 * mm, Fp(1503), Fp(1566), pu + 5.5 * mm, rt + 1.5 * mm)); bevel(o, 1.0 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', 'black'))
+    o = K.tmp(box(-6.4 * mm, 6.4 * mm, POST_F - 52 * mm, POST_F + 4 * mm, rt + 1.5 * mm, rt + 4.5 * mm)); bevel(o, 0.6 * mm, 1); smooth(o); mount(K.adopt(o, 'optic', 'black'))
+
 # ----------------------------------------------------------------------------------------------------- CHARGING HANDLE (part_handle)
 HANDLE = (0.2525, 0.0322)       # the knob (the NRCH's handle rides at the front of its channel, photo x 677, y 193)
 def handle():
-    """The NRCH's non-reciprocating charging handle (part_ch: it stays put when the gun fires and is pulled back only when it is charged, as the AR's is): a
+    """The NRCH's non-reciprocating charging handle (part_handle: it stays put when the gun fires and is pulled back only when it is charged, as the AR's is): a
     knob (a ring round a dark socket) at the front of its channel along the upper's upper half on the LEFT (ambidextrous; the shooter is right-handed), ahead of the ejection port."""
-    ph = K.part('ch', (0, HANDLE[0], HANDLE[1]))
+    ph = K.part('handle', (0, HANDLE[0], HANDLE[1]))
     o = K.obj(cyl(3.0 * mm, -(HWU + 17.0) * mm, -(HWB - 1.4) * mm, 'x', HANDLE, 16), 'base', 'black', ph); smooth(o)            # (the stem, standing out of the channel)
     o = K.tmp(cyl(6.8 * mm, -(HWU + 24.0) * mm, -(HWU + 16.5) * mm, 'x', HANDLE, 24)); bevel(o, 2.0 * mm, 3, 30); smooth(o); K.adopt(o, 'base', 'black', ph)   # (the knob: a rounded black head)
     o = K.obj(cyl(2.4 * mm, -(HWU + 24.6) * mm, -(HWU + 23.6) * mm, 'x', HANDLE, 14), 'base', 'steel', ph); smooth(o)           # (its steel cap)
@@ -334,14 +346,14 @@ def details():
         o = K.obj(cyl(2.4 * mm, *xs(s * (HWL + 1.8 * mm), s * (HWL + 3.0 * mm)), 'x', (0.099, -0.032), 12), 'base', 'steel'); smooth(o)
         for f, u, r in ((0.018, -0.0145, 3.4), (0.0715, -0.045, 2.0), (0.038, -0.017, 2.4), (0.112, -0.021, 1.6)):
             o = K.obj(cyl(r * mm, *xs(s * (HWL - 0.2 * mm), s * (HWL + 2.0 * mm)), 'x', (f, u), 16), 'base', 'steel'); smooth(o)
-        o = K.obj(cyl(4.0 * mm, *xs(s * (HWL - 0.5 * mm), s * (HWL + 1.0 * mm)), 'x', (0.199, -0.0275), 20), 'base', 'black'); smooth(o)   # (the lower's hinge pin head, on its front lug: FN's 16S shot, x 610, y 258, 4.4 mm radius, below the seam)
+        o = K.obj(cyl(4.2 * mm, *xs(s * (HWL - 0.5 * mm), s * (HWL + 1.0 * mm)), 'x', (0.199, UP_BOT * mm), 20), 'base', 'black'); smooth(o)   # (the lower's hinge pin head, on its front lug: FN's 16S shot, x 610, y 258, 4.4 mm radius, below the seam)
         for f, u in ((0.010, 0.0075), (F_FRONT + 0.006, -0.012)):
             q = K.tmp(cyl(5.8 * mm, *xs(s * (HWU - 0.4) * mm, s * (HWU + 3.0) * mm), 'x', (f, u), 20)); cut(q, cyl(2.6 * mm, *xs(s * (HWU - 1.0) * mm, s * (HWU + 3.5) * mm), 'x', (f, u), 14))
             bevel(q, 0.4 * mm, 1); smooth(q); K.adopt(q, 'base', 'steel')
         g = K.tmp(box(*xs(s * (HWU - 0.2) * mm, s * (HWU + 0.7) * mm), 0.0, F_FRONT - 0.002, UP_BOT * mm - 0.0006, UP_BOT * mm + 0.0006)); smooth(g); K.adopt(g, 'base', 'black')
         for ch, f, u in (('5', 0.0653, -0.0297), ('1', 0.0628, -0.0197)):
             o = K.tmp(digit(ch, f, u, s, s * HWL, h=4.2 * mm, w=2.6 * mm, t=0.6 * mm, rise=0.35 * mm)); smooth(o); K.adopt(o, 'base', 'black')
-    lg = K.tmp(box(-HWL, HWL, W_OUT_F - 0.004, 0.2085, -0.0335, -0.0215)); bevel(lg, 1.0 * mm, 2, 30); smooth(lg); K.adopt(lg, 'base', FURN)   # (the lug the hinge pin goes through, at the lower's front top)
+    lg = K.tmp(box(-HWL, HWL, W_OUT_F - 0.004, 0.2085, -0.0335, -0.0177)); bevel(lg, 1.0 * mm, 2, 30); smooth(lg); K.adopt(lg, 'base', FURN)   # (the lug the hinge pin goes through, at the lower's front top)
     d = K.tmp(prism([(0.086, -0.0035), (0.099, -0.0035), (0.100, 0.0105), (0.093, 0.0119), (0.086, 0.0090)], 'x', (HWU - 0.4) * mm, (HWU + 5.0) * mm)); bevel(d, 0.9 * mm, 2, 30); smooth(d); K.adopt(d, 'base', 'gunmetal')
     for f in (0.0715, 0.0875):
         o = K.obj(cyl(2.6 * mm, (HWU - 0.2) * mm, (HWU + 0.8) * mm, 'x', (f, 0.0035), 14), 'base', 'black'); smooth(o)
@@ -353,6 +365,7 @@ lower()
 gas_block()
 rear_sight()
 front_sight()
+fold_irons()
 ph = handle()
 details()
 barrel()
@@ -383,16 +396,17 @@ info = {
     'sy': round(SY * mm, 4), 'fSight': round(RS_F, 4), 'relief': 0.075,
     'muzzles': [[round(MUZ, 4), 0, 0]],
     'grip': [round(GRIP_TOP[0] - 0.040, 4), round(GRIP_TOP[1] - 0.040, 4), 0], 'support': [0.300, -0.030, 0],
-    'anim': {'ch': 'part_ch', 'mag': 'part_mag'},
+    'anim': {'handle': 'part_handle', 'catch': 'part_catch', 'mag': 'part_mag'},
     'magAt': [round(MAG_TOP[0], 4), round(MAG_TOP[1], 4)],
-    'ch': [round(HANDLE[0], 4), round(HANDLE[1], 4), round(-(HWU + 3.0) * mm, 4)],
+    'handle': {'f': round(HANDLE[0], 4), 'y': round(HANDLE[1], 4), 'x': round(-(HWU + 18.0) * mm, 4), 'travel': 0.120, 'recip': False, 'style': 'knob', 'grab': [round(HANDLE[0], 4), round(HANDLE[1], 4), round(-(HWU + 20.0) * mm, 4)]},
     'port': [round(Fp(956), 4), round(Up(349), 4), round(HWU * mm, 4)],
     'chamberAt': {'side': 'right', 'f': round(Fp(1030), 4), 'y': 0.0, 'x': round((HWU - 2.5) * mm, 4)},
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [round(MZ0, 4), 0, 0]},
 }
 anchors = {
-    'mount_optic': [0.035, round(RAIL_T * mm, 4), 0], 'mount_optic_end': [round(F_FRONT - 0.002, 4), round(RAIL_T * mm, 4), 0],
+    'mount_optic': [0.035, round(UP_TOP * mm, 4), 0], 'mount_optic_end': [round(F_FRONT - 0.002, 4), round(UP_TOP * mm, 4), 0],
+    'mount_optic_rail': [0.035, round(RAIL_T * mm, 4), 0], 'mount_optic_rail_end': [round(F_FRONT - 0.002, 4), round(RAIL_T * mm, 4), 0],
     'mount_handguard': [round(F_FRONT, 4), 0, 0], 'mount_handguard_end': [round(HG_END, 4), 0, 0],
     'mount_barrel': [round(F_GAS, 4), 0, 0], 'mount_muzzle': [round(MZ0, 4), 0, 0],
     'mount_stock': [0, STOCK_UP, 0], 'mount_grip': [round(GRIP_TOP[0], 4), round(GRIP_TOP[1], 4), 0],
@@ -406,7 +420,7 @@ bb = [[min((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) 
       [max((o.matrix_world @ v.co)[a] for o in meshes for v in o.data.vertices) for a in range(3)]]
 if EXPORT:
     with open(os.path.join(HERE, 'model.json'), 'w', encoding='utf-8') as fh:
-        fh.write(json.dumps({'source': 'authored', 'sights': {'builtin': ['irons'], 'rail': [], 'railed': True}}, indent=2) + '\n')
+        fh.write(json.dumps({'source': 'authored', 'sights': {'builtin': ['irons'], 'rail': []}}, indent=2) + '\n')
 def open_edges(objs):
     """The meshes with non-manifold edges (open, or more than two faces on an edge): name -> count."""
     import bmesh as _bm
