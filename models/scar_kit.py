@@ -107,29 +107,58 @@ def upper():
     # the ejection port, right: a pocket down past the bore (the chamber's side: the carrier covers it, back it shows the chamber, lined black)
     pa, pb, pu0, pu1 = Fp(850), Fp(1062), -0.0032, 0.0119
     cut(up, prism(rounded((pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2, 2.2 * mm, 4), 'x', -2.0 * mm, (HWU + 1) * mm))
-    # the lightening slots down the front, each side; the charging handle's track on the right
-    for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
-        for s in (-1, 1):
-            cut(up, prism(rounded(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 4), 'x', *xs(s * (HWB - 2.2) * mm, s * (HWB + 1) * mm)))
-    cut(up, prism(rounded((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWB - 2.0) * mm, (HWB + 1) * mm))   # (the charging handle's channel, along the upper's upper half: both sides, the handle is ambidextrous)
-    cut(up, prism(rounded((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', -(HWB + 1) * mm, -(HWB - 2.0) * mm))
-    # M-LOK at 3, 6 and 9 o'clock: three slots 32 x 7 mm at 29 mm centres, 3 mm deep, on each flank and the underside of the forend
-    for f in (0.300, 0.329, 0.358):
-        for s in (-1, 1):
-            cut(up, prism(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU + 1) * mm)))
-        cut(up, prism(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT - 1) * mm, (UP_BOT + 3.0) * mm))
-    bevel(up, 0.9 * mm, 1, 30); smooth(up); K.adopt(up, 'base', RCV)
+    # the chamfer once, on the body, before the small features (modeling-practices rule 1): the slots below are cut after it, tapered (walls sloping out 0.5 mm at the
+    # surface, as the chamfer round their rim did), each framed in its own face (rule 3)
+    slice_at_vertices(up, 'y'); bevel(up, 0.9 * mm, 1, 30); slice_at_vertices(up, 'y')
+    def slot(plane, s, f, u, hw, hh, r, d, floor_only=False, axis='x'):
+        """A tapered slot cutter through the flank at |x| = plane (s the side) or, axis 'z', the underside: floor d deep, wider by 0.5 mm at the surface."""
+        sg = corner_segs(r) if not floor_only else 2
+        e = 0.5 * mm * (d + 1.0 * mm) / d
+        fl, ot = rounded(f, u, hw, hh, r, sg), rounded(f, u, hw + e, hh + e, r + e, sg)
+        if axis == 'x':
+            return loft(fl, ot, 'x', s * (plane - d), s * (plane + 1.0 * mm)) if s > 0 else loft(ot, fl, 'x', -(plane + 1.0 * mm), -(plane - d))
+        return loft(ot, fl, 'z', plane - 1.0 * mm, plane + d)
+    # the row on the upper band of each flank: the charging handle's track, three lightening slots
+    CH = ((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 2.0 * mm)
+    VENTS = [(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 2.2 * mm) for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430))]
+    for s in (-1, 1):
+        for f, u, hw, hh, r, d in [CH] + VENTS: cut(up, slot(HWB * mm, s, f, u, hw, hh, r, d))
+    # M-LOK at 3, 6 and 9 o'clock: three slots 32 x 7 mm at 29 mm centres (overlapping: one long slot), 3 mm deep, each flank and the underside of the forend
+    ML = (0.329, -8.6 * mm, 45 * mm, 3.5 * mm, 3.4 * mm, 3.0 * mm)
+    for s in (-1, 1): cut(up, slot(HWU * mm, s, *ML))
+    cut(up, slot(UP_BOT * mm, 1, 0, 0.329, 3.5 * mm, 45 * mm, 3.4 * mm, 3.0 * mm, axis="z"))
+    # frame each slot (or row) in its own face: lines along it just outside its sides, across it past its ends and through its middle
+    M = 1.5 * mm
+    def frame(FP, FN, feats, along, across, lo, hi, ulo, uhi):
+        """feats (centre along, centre across, half along, half across); across-lines on the face (all of it), along-lines over the features' span."""
+        fc, ys = [], []
+        a0, a1 = min(c - l for c, _, l, _ in feats) - M, max(c + l for c, _, l, _ in feats) + M
+        for c, _, l, _ in feats:
+            for y in (c - l - M, c, c + l + M): ys.append(round(y, 7))
+        for y in sorted(set(ys)):
+            fc.append((FP, FN, tuple(y * v for v in along), along))
+        zs = set()
+        for _, cu, _, hh in feats:
+            for sd in (-1, 1):
+                z = cu + sd * (hh + M)
+                if ulo + 0.8 * mm < z < uhi - 0.8 * mm: zs.add(round(z, 7))
+        for z in sorted(zs):
+            fc.append((FP, FN, tuple(z * v for v in across), across, (along, a0, a1)))
+        return fc
+    cuts = []
+    for s in (-1, 1):
+        cuts += frame((s * HWB * mm, 0, 0), (s, 0, 0), [(f, u, hw, hh) for f, u, hw, hh, r, d in [CH] + VENTS], (0, 1, 0), (0, 0, 1), 0, 0, 15.2 * mm, 35.8 * mm)
+        cuts += frame((s * HWU * mm, 0, 0), (s, 0, 0), [ML[:4]], (0, 1, 0), (0, 0, 1), 0, 0, -17.8 * mm, 11.0 * mm)
+    cuts += frame((0, 0, UP_BOT * mm), (0, 0, -1), [(0.329, 0, 45 * mm, 3.5 * mm)], (0, 1, 0), (1, 0, 0), 0, 0, -15.5 * mm, 15.5 * mm)
+    slice_faces(up, cuts); strip_ngons(up, 'y', passes=1); tidy(up, 0.1 * mm, False)
+    smooth(up); K.adopt(up, 'base', RCV)
     # the openings read black: each recess gets a thin black liner on its floor (FN's channel, vents and M-LOK slots are through-cuts)
     def liner(poly, axis, a0, a1, slot='base'):
         o = K.tmp(prism(poly, axis, a0, a1)); smooth(o); K.adopt(o, slot, 'black')
-    for xa, xb in ((1242, 1290), (1312, 1360), (1382, 1430)):
-        for s in (-1, 1):
-            liner(rounded(Fp((xa + xb) / 2), Up(280.2), (Fp(xb) - Fp(xa)) / 2, 3.0 * mm, 2.9 * mm, 4), 'x', *xs(s * (HWB - 2.2) * mm, s * (HWB - 1.7) * mm))
-    liner(rounded((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWB - 2.0) * mm, (HWB - 1.5) * mm)
-    liner(rounded((0.1257 + 0.2593) / 2, 0.0322, (0.2593 - 0.1257) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', -(HWB - 1.5) * mm, -(HWB - 2.0) * mm)
-    for f in (0.300, 0.329, 0.358):
-        for s in (-1, 1): liner(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU - 2.5) * mm))
-        liner(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT + 2.5) * mm, (UP_BOT + 3.0) * mm)
+    for f, u, hw, hh, r, d in [CH] + VENTS:
+        for s in (-1, 1): liner(rounded(f, u, hw, hh, r, 2), 'x', *xs(s * (HWB * mm - d), s * (HWB * mm - d + 0.5 * mm)))
+    for s in (-1, 1): liner(rounded(ML[0], ML[1], ML[2], ML[3], ML[4], 2), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU - 2.5) * mm))
+    liner(rounded(0, 0.329, 3.5 * mm, 45 * mm, 3.4 * mm, 2), 'z', (UP_BOT + 2.5) * mm, (UP_BOT + 3.0) * mm)
     # the port's inside, what the carrier uncovers: a 0.45 mm black lining shell in the pocket (its floor past the bore), the chamber's mouth (the barrel extension's face, dark metal)
     # at the pocket's front wall, the feed ramp under the round's path
     pc_, pu_, ph_, pv_ = (pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2
@@ -160,11 +189,13 @@ def lower():
     for s in (-1, 1): cut(lo, box(*xs(s * 10.0 * mm, s * 24 * mm), GRIP_TOP[0] - 0.002, W_OUT_B, W_BOT - 0.01, Up(472)))
     wa, wb = GRIP_TOP[0] + 0.008, min(0.1158, W_OUT_B - 0.002)   # (the guard's window, traced off FN's 16S/17S NRCH studio shots: 56 mm long, 30 deep, from the grip's front to the well's back wall)
     cut(lo, prism(rounded((wa + wb) / 2, -0.0693, (wb - wa) / 2, 0.01525, 5 * mm, 4), 'x', -0.02, 0.02))
-    for s in (-1, 1):   # (moulded panels let into the flanks, 0.6 mm: behind the selector, ahead of the guard)
-        cut(lo, prism(rounded(0.020, -0.040, 0.015, 0.008, 3 * mm, 4), 'x', *xs(s * (HWL - 0.6 * mm), s * (HWL + 1.0 * mm))))
-        cut(lo, prism(rounded(0.098, -0.068, 0.012, 0.007, 3 * mm, 4), 'x', *xs(s * (HWL - 0.6 * mm), s * (HWL + 1.0 * mm))))
     cut(lo, box(-V['ihalf'] * mm, V['ihalf'] * mm, W_IN_B, W_IN_F, W_BOT - 0.01, MAG_TOP[1] + 7 * mm))                                # (the well)
-    bevel(lo, 1.0 * mm, 2, 30); smooth(lo); K.adopt(lo, 'base', FURN)
+    slice_at_vertices(lo, 'y'); bevel(lo, 1.0 * mm, 1, 30); slice_at_vertices(lo, 'y')   # (the chamfer once, on the body, before the panels; strips, not one fan per side: modeling-practices)
+    for s in (-1, 1):   # (moulded panels let into the flanks, 0.6 mm: behind the selector, ahead of the guard; tapered walls, cut after the chamfer)
+        for pf, pu, ph, pv in ((0.020, -0.040, 0.015, 0.008), (0.098, -0.068, 0.012, 0.007)):
+            fl, ot = rounded(pf, pu, ph, pv, 3 * mm, 3), rounded(pf, pu, ph + 0.5 * mm * 1.6 / 0.6, pv + 0.5 * mm * 1.6 / 0.6, 3 * mm + 0.5 * mm * 1.6 / 0.6, 3)
+            cut(lo, loft(fl, ot, 'x', HWL - 0.6 * mm, HWL + 1.0 * mm) if s > 0 else loft(ot, fl, 'x', -HWL - 1.0 * mm, -HWL + 0.6 * mm))
+    tidy(lo); smooth(lo); K.adopt(lo, 'base', FURN)
     # the trigger in its guard
     o = K.tmp(prism([(0.0735, -0.0545), (0.0775, -0.0545), (0.0785, -0.066), (0.0835, -0.0765), (0.0925, -0.0835), (0.0915, -0.0845), (0.0825, -0.0795), (0.0745, -0.0715), (0.0725, -0.058)], 'x', -1.0 * mm, 1.0 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
     # the selector (both sides, as FN's 16S left and right shots show): its boss (a black disc, 6.5 mm) on the pin, the lever lying back from it to a small flat tab
@@ -195,7 +226,7 @@ def gas_block():
 def barrel():
     """The factory barrel (the light pencil one): from the gas block's front to the muzzle thread's shoulder, the thread; slot barrel."""
     r = BORE_R
-    o = K.obj(lathe([(F_GAS - 0.002, r), (MZ0 - 6 * mm, r), (MZ0 - 6 * mm, V['thr_r'] * mm), (MZ0, V['thr_r'] * mm)], 20), 'barrel', 'park'); smooth(o)
+    o = K.obj(lathe([(F_GAS - 0.002, r), (MZ0 - 6 * mm, r), (MZ0 - 6 * mm, V['thr_r'] * mm), (MZ0, V['thr_r'] * mm)], 16), 'barrel', 'park'); smooth(o)
 
 def muzzle():
     """The factory flash hider: the A2 birdcage (ar_kit.py's), the 7.62's a little larger. Returns where the bullet leaves it."""
@@ -271,22 +302,23 @@ def stock():
                                    (115, 292), (104, 312), (92, 328), (82, 352), (73, 363), (63, 376), (48, 380), (43, 388), (34, 391), (30, 372), (31, 326), (31, 267), (30, 222), (36, 198)]]
     st = K.tmp(prism(body, 'x', -17.0 * mm, 17.0 * mm))
     boolean(st, prism([(-17 * mm, -0.16), (17 * mm, -0.16), (17 * mm, 0.036), (13 * mm, 0.0485), (-13 * mm, 0.0485), (-17 * mm, 0.036)], 'y', -0.5, 0.1), 'INTERSECT')
-    for s in (-1, 1):   # the lightening slot, each side
-        f0, f1 = P16(46, 0)[0], P16(91, 0)[0]
-        cut(st, prism(rounded((f0 + f1) / 2, P16(0, 215)[1], (f1 - f0) / 2, 4.5 * mm, 3 * mm, 4), 'x', *xs(s * 14.0 * mm, s * 19 * mm)))
-        o = K.tmp(prism(rounded((f0 + f1) / 2, P16(0, 215)[1], (f1 - f0) / 2, 4.5 * mm, 3 * mm, 4), 'x', *xs(s * 14.0 * mm, s * 14.5 * mm))); smooth(o); K.adopt(o, 'stock', 'black')
+    slice_at_vertices(st, 'y'); bevel(st, 2.2 * mm, 1, 30); slice_at_vertices(st, 'y')   # (the chamfer once, on the body, before the slot, ribs and stripes cut into it: modeling-practices rule 1)
+    for s in (-1, 1):   # the lightening slot, each side (tapered walls: the sloped sides catch the light as the chamfer round its rim did)
+        f0, f1 = P16(46, 0)[0], P16(91, 0)[0]; c_, w_ = P16(0, 215)[1], 3.0 * mm
+        fl, ot = rounded((f0 + f1) / 2, c_, (f1 - f0) / 2, 4.5 * mm, w_, corner_segs(w_)), rounded((f0 + f1) / 2, c_, (f1 - f0) / 2 + 0.8 * mm, 4.5 * mm + 0.8 * mm, w_ + 0.8 * mm, corner_segs(w_))
+        cut(st, loft(fl, ot, 'x', 14.0 * mm, 19 * mm) if s > 0 else loft(ot, fl, 'x', -19 * mm, -14.0 * mm))
+        o = K.tmp(prism(rounded((f0 + f1) / 2, c_, (f1 - f0) / 2, 4.5 * mm, w_, 2), 'x', *xs(s * 14.0 * mm, s * 14.5 * mm))); smooth(o); K.adopt(o, 'stock', 'black')
     for k_ in range(7):   # the ribs down the lower strut's front edge
         t = (k_ + 0.5) / 7; x_ = 119 - 52 * t; y_ = 282 + 95 * t
-        for s in (-1, 1): cut(st, prism([P16(x_ - 12, y_ + 3), P16(x_ + 4, y_ - 9), P16(x_ + 4, y_ - 5), P16(x_ - 10, y_ + 6)], 'x', *xs(s * 15.5 * mm, s * 18 * mm)))
-    bevel(st, 2.2 * mm, 2, 30); smooth(st); K.adopt(st, 'stock', FURN)
+        for s in (-1, 1): cut(st, prism([P16(x_ - 12, y_ + 3), P16(x_ + 4, y_ - 9), P16(x_ + 4, y_ - 5), P16(x_ - 10, y_ + 6)], 'x', *xs(s * 15.4 * mm, s * 18 * mm)))
     # the hinge block against the upper's back: a plate and the three knuckles on the hinge's vertical axis
-    hb = K.tmp(prism([P16(300, 178), P16(363, 178), P16(363, 285), P16(300, 285)], 'x', -HWU * mm, HWU * mm)); bevel(hb, 1.4 * mm, 2, 30); smooth(hb); K.adopt(hb, 'stock', FURN)
+    hb = K.tmp(prism([P16(300, 178), P16(363, 178), P16(363, 285), P16(300, 285)], 'x', -HWU * mm, HWU * mm)); bevel(hb, 1.4 * mm, 1, 30); smooth(hb); K.adopt(hb, 'stock', FURN)
     for y0, y1 in ((176, 225), (232, 262), (268, 285)):
-        o = K.obj(cyl(6.2 * mm, P16(0, y1)[1], P16(0, y0)[1], 'z', (HWU * mm + 1.4 * mm, P16(330, 0)[0]), 20), 'stock', FURN); smooth(o)
-    o = K.obj(cyl(2.6 * mm, P16(0, 290)[1], P16(0, 172)[1], 'z', (HWU * mm + 1.4 * mm, P16(330, 0)[0]), 12), 'stock', 'steel'); smooth(o)
+        o = K.obj(cyl(6.2 * mm, P16(0, y1)[1], P16(0, y0)[1], 'z', (HWU * mm + 1.4 * mm, P16(330, 0)[0]), segs(6.2 * mm)), 'stock', FURN); smooth(o)
+    o = K.obj(cyl(2.6 * mm, P16(0, 290)[1], P16(0, 172)[1], 'z', (HWU * mm + 1.4 * mm, P16(330, 0)[0]), segs(2.6 * mm)), 'stock', 'steel'); smooth(o)
     # the rubber butt pad along the raked rear edge, a little proud of the body all round
     pad = K.tmp(prism([P16(x, y) for x, y in [(34, 198), (50, 206), (46, 222), (44, 267), (45, 326), (48, 372), (56, 390), (34, 394), (18, 387), (21, 222), (21, 196)]], 'x', -17.8 * mm, 17.8 * mm))
-    bevel(pad, 1.4 * mm, 2, 30); smooth(pad); K.adopt(pad, 'stock', 'rubber')
+    bevel(pad, 1.4 * mm, 1, 30); smooth(pad); K.adopt(pad, 'stock', 'rubber')
     rs = [(-16.5 * mm, 16.5 * mm, P16(17.5, 0)[0] - 0.9 * mm, P16(21, 0)[0] + 0.3 * mm, P16(0, y)[1] - 0.6 * mm, P16(0, y)[1] + 0.6 * mm) for y in range(222, 384, 5)]
     o = K.tmp(multibox(rs)); smooth(o); K.adopt(o, 'stock', 'rubber')
     def stripe(pts, w):
@@ -299,9 +331,10 @@ def stock():
         sm = [P16(*q) for q in ((100, 209), (104, 235), (111, 255), (118, 263), (165, 266))]
         cut(st, prism(stripe(sm, 0.9 * mm), 'x', *xs(s * 16.2 * mm, s * 18 * mm)))
         cut(st, prism(stripe([P16(145, 200), P16(147, 235)], 0.9 * mm), 'x', *xs(s * 16.2 * mm, s * 18 * mm)))
+    tidy(st, 0.15 * mm); smooth(st); K.adopt(st, 'stock', FURN)
     o = K.tmp(prism(rounded(P16(158, 0)[0], P16(0, 207)[1], 9 * 0.804 * mm, 8 * 0.804 * mm, 2 * mm, 4), 'x', 16.4 * mm, 18.0 * mm)); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'stock', 'black')
     for s in (-1, 1):
-        q = K.tmp(cyl(4.6 * mm, *xs(s * 16.4 * mm, s * 18.2 * mm), 'x', (P16(165, 0)[0], P16(0, 230)[1]), 18)); cut(q, cyl(2.0 * mm, *xs(s * 17.0 * mm, s * 19 * mm), 'x', (P16(165, 0)[0], P16(0, 230)[1]), 12)); smooth(q); K.adopt(q, 'stock', 'steel')
+        q = K.tmp(cyl(4.6 * mm, *xs(s * 16.4 * mm, s * 18.2 * mm), 'x', (P16(165, 0)[0], P16(0, 230)[1]), segs(4.6 * mm))); cut(q, cyl(2.0 * mm, *xs(s * 17.0 * mm, s * 19 * mm), 'x', (P16(165, 0)[0], P16(0, 230)[1]), segs(2.0 * mm))); smooth(q); K.adopt(q, 'stock', 'steel')
     for ch, x in (('6', 105), ('5', 124), ('4', 140), ('3', 157)):
         o = K.tmp(digit(ch, P16(x, 0)[0], P16(0, 244)[1], 1, 17.0 * mm)); smooth(o); K.adopt(o, 'stock', 'black')
 
