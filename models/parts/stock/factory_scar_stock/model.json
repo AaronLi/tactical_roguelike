@@ -1,0 +1,25 @@
+{
+  "source": "authored",
+  "kind": "part",
+  "slot": "stock",
+  "frame": "stock-mount",
+  "anchors": {
+    "butt": [
+      -0.2742,
+      -0.0439,
+      0
+    ],
+    "cheek": [
+      -0.0909,
+      0.0518,
+      0
+    ]
+  },
+  "part": {
+    "mount": "hinge",
+    "position": "extended (the SCAR's folding stock, drawn at its longest: the hinge block against the upper's back)"
+  },
+  "replaces": [
+    "SCAR folding stock"
+  ]
+}
