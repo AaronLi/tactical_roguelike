@@ -37,41 +37,29 @@ export const GunAo = (() => {
     for (const n of names) { offs.push(stride); sizes.push(g.attributes[n].itemSize); stride += g.attributes[n].itemSize; }
     const pi = names.indexOf('position'), ni = names.indexOf('normal');
     if (pi < 0) return geo;
-    const cnt = g.attributes.position.count;
-    let cur = new Float32Array(cnt * stride);
+    const cnt = g.attributes.position.count, po = offs[pi], e2 = maxEdge * maxEdge;
+    const cur = new Float32Array(cnt * stride);
     names.forEach((n, k) => { const a = g.attributes[n] as THREE.BufferAttribute; for (let i = 0; i < cnt; i++) for (let c = 0; c < sizes[k]; c++) cur[i * stride + offs[k] + c] = a.getComponent(i, c); });
-    const po = offs[pi], e2 = maxEdge * maxEdge;
-    const d2 = (v: Float32Array, a: number, b: number) => { const x = v[a + po] - v[b + po], y = v[a + po + 1] - v[b + po + 1], z = v[a + po + 2] - v[b + po + 2]; return x * x + y * y + z * z; };
-    let changed = false;
-    for (let pass = 0; pass < 6; pass++) {
-      const nt = cur.length / stride / 3; let big = 0;
-      for (let t = 0; t < nt; t++) { const a = t * 3 * stride, b = a + stride, c = b + stride; if (d2(cur, a, b) > e2 || d2(cur, b, c) > e2 || d2(cur, c, a) > e2) big++; }
-      if (!big) break;
-      changed = true;
-      const out = new Float32Array((nt + big * 3) * 3 * stride); let o = 0;
-      const mid = (a: number, b: number, at: number) => { for (let k = 0; k < stride; k++) out[at + k] = (cur[a + k] + cur[b + k]) / 2; if (ni >= 0) { const q = at + offs[ni], l = Math.hypot(out[q], out[q + 1], out[q + 2]) || 1; out[q] /= l; out[q + 1] /= l; out[q + 2] /= l; } };
-      for (let t = 0; t < nt; t++) {
-        const a = t * 3 * stride, b = a + stride, c = b + stride;
-        if (d2(cur, a, b) > e2 || d2(cur, b, c) > e2 || d2(cur, c, a) > e2) {
-          const ab = o + 3 * stride, bc = ab + stride, ca = bc + stride; // (a, b, c's corners and their midpoints, laid out as four triangles)
-          // a ab ca / ab b bc / ca bc c / ab bc ca
-          const tri = (i: number, p: number[]) => { for (let k = 0; k < 3; k++) out.set(p[k] >= 0 ? cur.subarray(p[k], p[k] + stride) : out.subarray(-p[k] - 1, -p[k] - 1 + stride), o + (i * 3 + k) * stride); };
-          // the midpoints first, in the three slots after the first triangle's (a scratch the later triangles read), then every triangle
-          const sc = new Float32Array(stride * 3), m = (x: number, y: number, at: number) => { for (let k = 0; k < stride; k++) sc[at + k] = (cur[x + k] + cur[y + k]) / 2; if (ni >= 0) { const q = at + offs[ni], l = Math.hypot(sc[q], sc[q + 1], sc[q + 2]) || 1; sc[q] /= l; sc[q + 1] /= l; sc[q + 2] /= l; } };
-          m(a, b, 0); m(b, c, stride); m(c, a, stride * 2);
-          const put = (v: Float32Array | null, src: number) => { if (v) out.set(v.subarray(src, src + stride), o); else out.set(cur.subarray(src, src + stride), o); o += stride; };
-          put(null, a); put(sc, 0); put(sc, stride * 2);
-          put(sc, 0); put(null, b); put(sc, stride);
-          put(sc, stride * 2); put(sc, stride); put(null, c);
-          put(sc, 0); put(sc, stride); put(sc, stride * 2);
-          void ab; void bc; void ca; void tri; void mid;
-        } else { out.set(cur.subarray(a, a + stride * 3), o); o += stride * 3; }
+    const d2 = (a: Float32Array, b: Float32Array) => { const x = a[po] - b[po], y = a[po + 1] - b[po + 1], z = a[po + 2] - b[po + 2]; return x * x + y * y + z * z; };
+    const mid = (a: Float32Array, b: Float32Array) => { const m = new Float32Array(stride); for (let k = 0; k < stride; k++) m[k] = (a[k] + b[k]) / 2; if (ni >= 0) { const q = offs[ni], l = Math.hypot(m[q], m[q + 1], m[q + 2]) || 1; m[q] /= l; m[q + 1] /= l; m[q + 2] /= l; } return m; };
+    // each triangle: its longest edge is halved while it is too long (so a sliver is cut across its length, not into slivers of slivers)
+    let out = new Float32Array(cnt * stride * 2), o = 0, changed = false;
+    const emit = (a: Float32Array, b: Float32Array, c: Float32Array) => { if (o + stride * 3 > out.length) { const n = new Float32Array(out.length * 2); n.set(out); out = n; } out.set(a, o); out.set(b, o + stride); out.set(c, o + stride * 2); o += stride * 3; };
+    const stack: Float32Array[][] = [];
+    for (let t = 0; t < cnt / 3; t++) {
+      const v0 = cur.subarray(t * 3 * stride, t * 3 * stride + stride), v1 = cur.subarray((t * 3 + 1) * stride, (t * 3 + 1) * stride + stride), v2 = cur.subarray((t * 3 + 2) * stride, (t * 3 + 2) * stride + stride);
+      stack.push([v0, v1, v2]);
+      let guard = 0;
+      while (stack.length) {
+        const [a, b, c] = stack.pop()!, ab = d2(a, b), bc = d2(b, c), ca = d2(c, a), mx = Math.max(ab, bc, ca);
+        if (mx <= e2 || ++guard > 4096) { emit(a, b, c); continue; }
+        changed = true;
+        if (mx === ab) { const m = mid(a, b); stack.push([m, b, c], [a, m, c]); } else if (mx === bc) { const m = mid(b, c); stack.push([a, m, c], [a, b, m]); } else { const m = mid(c, a); stack.push([b, c, m], [a, b, m]); }
       }
-      cur = out.subarray(0, o);
     }
     if (!changed) return geo;
-    const n = cur.length / stride, bg = new THREE.BufferGeometry();
-    names.forEach((nm, k) => { const arr = new Float32Array(n * sizes[k]); for (let i = 0; i < n; i++) for (let c = 0; c < sizes[k]; c++) arr[i * sizes[k] + c] = cur[i * stride + offs[k] + c]; bg.setAttribute(nm, new THREE.BufferAttribute(arr, sizes[k])); });
+    const n = o / stride, bg = new THREE.BufferGeometry();
+    names.forEach((nm, k) => { const arr = new Float32Array(n * sizes[k]); for (let i = 0; i < n; i++) for (let c = 0; c < sizes[k]; c++) arr[i * sizes[k] + c] = out[i * stride + offs[k] + c]; bg.setAttribute(nm, new THREE.BufferAttribute(arr, sizes[k])); });
     bg.userData = geo.userData; geo.dispose();
     bg.computeBoundingBox(); bg.computeBoundingSphere();
     return bg;
