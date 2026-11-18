@@ -124,7 +124,7 @@ FG('handguard/ironvale_ir12', 'the support off the handguard', () => {}, /anchor
     run('a Mk18 code with the A2 grip (the old default) still decodes to it', Object.keys(old).filter((k) => back[k] !== old[k]).map((k) => `${k}: ${back[k]} for ${old[k]}`), null); }
   run('the A2 birdcage (the r556 factory muzzle) has the model', has(Gm.Gunsmith.PLATFORMS.hk416.defaults.muzzle, 'apMuzzle', 'muzzle/ironvale_a2_556'), null);
   const spec = Gm.Gunsmith.modelSpec({ id: 'ar9', build: Gm.Gunsmith.defaultBuild('ar9') });
-  run('a build\'s spec carries the furniture keys (the AR-9: the Kestrel and the A2 grip)', spec.apStock === 'stock/kestrel_cs4' && spec.apGrip === 'grip/brightline_a2' && spec.apHg == null ? [] : [JSON.stringify({ apStock: spec.apStock, apGrip: spec.apGrip, apHg: spec.apHg })], null); }
+  run('a build\'s spec carries the furniture keys (the AR-9: the Kestrel and the A2 grip)', spec.apStock === 'stock/kestrel_cs4' && spec.apGrip === 'grip/brightline_a2' && spec.apHg === 'handguard/halcyon_67' ? [] : [JSON.stringify({ apStock: spec.apStock, apGrip: spec.apGrip, apHg: spec.apHg })], null); }
 // FLIP MAGNIFIERS (models/parts/magnifier: GUN_MODEL_CONTRACT.authoredParts.magnifier): the config, the node tree (one part_magn), the geometry (checkMagnifier), the catalogue
 fconf('magnifier/strix_fts3', 'the FTS 3 is valid', () => {}, null);
 fconf('magnifier/strix_fts3', 'the optic frame on a magnifier', (c) => { c.frame = 'rail-top'; }, /"frame" is "rail-top", expected "magnifier-mount"/);
