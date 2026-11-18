@@ -117,6 +117,16 @@ def upper():
             cut(up, prism(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU + 1) * mm)))
         cut(up, prism(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT - 1) * mm, (UP_BOT + 3.0) * mm))
     bevel(up, 0.9 * mm, 1, 30); smooth(up); K.adopt(up, 'base', RCV)
+    # the openings read black: each recess gets a thin black liner on its floor (FN's channel, vents and M-LOK slots are through-cuts)
+    def liner(poly, axis, a0, a1, slot='base'):
+        o = K.tmp(prism(poly, axis, a0, a1)); smooth(o); K.adopt(o, slot, 'black')
+    for xa, xb in ((1250, 1285), (1300, 1340), (1370, 1410)):
+        for s in (-1, 1):
+            liner(rounded(Fp((xa + xb) / 2), Up(307), (Fp(xb) - Fp(xa)) / 2, 2.4 * mm, 2.2 * mm, 4), 'x', *xs(s * (HWU - 2.2) * mm, s * (HWU - 1.7) * mm))
+    liner(rounded((0.113 + 0.2525) / 2, 0.0322, (0.2525 - 0.113) / 2, 3.2 * mm, 1.5 * mm, 4), 'x', (HWU - 2.0) * mm, (HWU - 1.5) * mm)
+    for f in (0.300, 0.329, 0.358):
+        for s in (-1, 1): liner(rounded(f, -8.6 * mm, 16 * mm, 3.5 * mm, 3.4 * mm, 4), 'x', *xs(s * (HWU - 3.0) * mm, s * (HWU - 2.5) * mm))
+        liner(rounded(0, f, 3.5 * mm, 16 * mm, 3.4 * mm, 4), 'z', (UP_BOT + 2.5) * mm, (UP_BOT + 3.0) * mm)
     # the bolt carrier's flank in the port
     o = K.tmp(box((HWU - 4.6) * mm, (HWU - 3.8) * mm, Fp(868), Fp(1044), -0.0012, 0.0092)); bevel(o, 0.3 * mm, 1); smooth(o); K.adopt(o, 'base', 'park')
     # the barrel nut's pins and the lower's pins (both sides)
@@ -228,7 +238,8 @@ def stock():
     boolean(st, prism([(-17 * mm, -0.16), (17 * mm, -0.16), (17 * mm, 0.036), (13 * mm, 0.0485), (-13 * mm, 0.0485), (-17 * mm, 0.036)], 'y', -0.5, 0.1), 'INTERSECT')
     for s in (-1, 1):   # the lightening slot, each side
         f0, f1 = P16(46, 0)[0], P16(91, 0)[0]
-        cut(st, prism(rounded((f0 + f1) / 2, P16(0, 215)[1], (f1 - f0) / 2, 4.5 * mm, 3 * mm, 4), 'x', *xs(s * 15.0 * mm, s * 19 * mm)))
+        cut(st, prism(rounded((f0 + f1) / 2, P16(0, 215)[1], (f1 - f0) / 2, 4.5 * mm, 3 * mm, 4), 'x', *xs(s * 14.0 * mm, s * 19 * mm)))
+        o = K.tmp(prism(rounded((f0 + f1) / 2, P16(0, 215)[1], (f1 - f0) / 2, 4.5 * mm, 3 * mm, 4), 'x', *xs(s * 14.0 * mm, s * 14.5 * mm))); smooth(o); K.adopt(o, 'stock', 'black')
     for k_ in range(7):   # the ribs down the lower strut's front edge
         t = (k_ + 0.5) / 7; x_ = 119 - 52 * t; y_ = 282 + 95 * t
         for s in (-1, 1): cut(st, prism([P16(x_ - 12, y_ + 3), P16(x_ + 4, y_ - 9), P16(x_ + 4, y_ - 5), P16(x_ - 10, y_ + 6)], 'x', *xs(s * 15.5 * mm, s * 18 * mm)))
