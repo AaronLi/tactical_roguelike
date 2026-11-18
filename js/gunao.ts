@@ -208,7 +208,7 @@ export const GunAo = (() => {
     bg.userData = geo.userData; bg.computeBoundingBox(); bg.computeBoundingSphere();
     return { geo: bg, ao };
   }
-  const refCache = new Map<string, { n: number; geo: THREE.BufferGeometry }[]>();
+  const refCache = new Map<string, { n: number; geo: THREE.BufferGeometry }[]>(), REF_KEEP = 6;
 
   /** The numbers of a thing with moving parts: `base` with every one of them away (and each one's own surfaces against what stays), and for each layer (a door, a ramp: its meshes) what it adds to a vertex of what stays when it's in place: `d`, and `l` the layer's number (1 up; the vertex's strongest). */
   interface Layered { base: Float32Array[]; d: Float32Array[]; l: Float32Array[] }
@@ -259,7 +259,8 @@ export const GunAo = (() => {
     if (o.adaptive && !(layers && layers.length)) {
       const isMag2 = (x: THREE.Object3D | null) => { for (; x; x = x.parent) if (x.userData && (x.userData.slot === 'mag' || x.userData.part === 'mag')) return true; return false; };
       const hit = key ? refCache.get(key) : undefined;
-      if (hit && hit.length === ms.length && hit.every((h, i) => h.n === ms[i].n)) {
+      if (hit && key && hit.length === ms.length && hit.every((h, i) => h.n === ms[i].n)) {
+        refCache.delete(key); refCache.set(key, hit); // (the most recently used goes to the end)
         ms.forEach((m, i) => { m.mesh.geometry.dispose(); const gm = hit[i].geo.clone(); m.mesh.geometry = gm; if (isMag2(m.mesh)) gm.setAttribute('aOcc', new T.BufferAttribute(new Float32Array(gm.attributes.position.count), 1)); });
       } else {
         const g = makeGrid(ms, o); if (!g) return;
@@ -274,7 +275,11 @@ export const GunAo = (() => {
           if (m.mesh.geometry !== gm) m.mesh.geometry.dispose();
           m.mesh.geometry = own;
         });
-        if (key) refCache.set(key, made);
+        if (key) {
+          refCache.set(key, made);
+          // (a refined gun is megabytes of geometry: only the last few builds are kept, the oldest let go)
+          while (refCache.size > REF_KEEP) { const k = refCache.keys().next().value as string; for (const h of refCache.get(k)!) h.geo.dispose(); refCache.delete(k); }
+        }
       }
       last = Math.round(performance.now() - t0);
       return;
