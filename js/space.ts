@@ -1765,7 +1765,7 @@ export const Space = (() => {
       } else if (seat.k === 'turret') {
         const e = SD.EQUIP[(S.fleet.fit[S.def.id] || [])[seat.n || 0] || ''];
         lines.push(e ? `${U.esc(e.name)} <small>· the mouse lays it, the trigger fires</small>` : 'Nothing is fitted to this hardpoint');
-      } else if (seat.k === 'sensors') lines.push(SD.fitted(S.fleet, 'sensors') ? 'Sensor station' : 'No scanner fitted <small>(the shipyard)</small>');
+      } else if (seat.k === 'sensors') lines.push(SD.fitted(S.fleet, 'sensors') ? 'Sensor station' : (SpaceUI.SHIPYARD ? 'No scanner fitted <small>(the shipyard)</small>' : 'No scanner fitted'));
       // out of the seat
       if (held && !m.fLatch) { const p = holdFor('F', true, dt, 0.5, () => { m.fLatch = true; stand(); }); if (p >= 0 && out.prog < 0) { out.prog = p; out.label = 'Getting up'; } }
       lines.push('<small>' + hint('Hold F', 'to get up') + '</small>');
@@ -1801,7 +1801,7 @@ export const Space = (() => {
     // the missions terminal by the pad
     if (S.kind === 'hub' && S.term && near(S.term.x, S.term.z, 1.6)) {
       if (F) { m.fLatch = true; SpaceUI.openOps(); }
-      out.prompt = hint('F', 'missions board and shipyard');
+      out.prompt = hint('F', SpaceUI.SHIPYARD ? 'missions board and shipyard' : 'missions board');
       return out;
     }
     // a mission's things

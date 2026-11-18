@@ -18,6 +18,9 @@ import { Me } from './player.js';
 export const SpaceUI = (() => {
   const SD = SpaceData, T = THREE;
   let made = false, nav: HTMLCanvasElement, navT = 0, hud: HTMLElement, brMsg: HTMLElement, top: HTMLElement, helm: HTMLElement, marks: HTMLElement, obj: HTMLElement, ops: HTMLElement, fl: HTMLElement, plan: HTMLCanvasElement, tab = 'missions', planT = 0;
+  // the terminal's shipyard tab (buying ships, fitting hardpoints and bays): switched off for now; the terminal is the missions board
+  // alone. (Its page below is kept: true brings the tab back.)
+  const SHIPYARD = false;
   let board: ReturnType<typeof ShipModel.canvasTex> | null = null;
   const CSS = `
 #spHud { position: fixed; inset: 0; z-index: 40; pointer-events: none; font: 500 12px var(--ui-font, system-ui, sans-serif); color: #d7e6f2; letter-spacing: 0.5px; }
@@ -294,6 +297,7 @@ export const SpaceUI = (() => {
   function opsRender() {
     if (!made || !S().uiOpen) return;
     const s = S(), esc = U.esc, cr = Me.credits || 0;
+    if (!SHIPYARD) tab = 'missions';
     let body = '';
     if (tab === 'missions') {
       const offers = SD.offers(s.board.seed, s.board.level), full = s.board.picked.length >= SD.PICKS;
@@ -324,13 +328,13 @@ export const SpaceUI = (() => {
       }
       body += '</div><div class="foot"><span>What\'s fitted is paid for as it goes on. A hardpoint\'s gun is fired from the turret seat under it; the scanner is read at the sensor station.</span><span></span></div>';
     }
-    ops.innerHTML = `<div class="box"><div class="hd"><h2>OPERATIONS</h2><div class="tabs"><button data-tab="missions" class="${tab === 'missions' ? 'on' : ''}">MISSIONS</button> <button data-tab="yard" class="${tab === 'yard' ? 'on' : ''}">SHIPYARD</button></div><span style="flex:1"></span><span class="pay">¢${U.fmt(cr)}</span><button class="b" data-close="1">CLOSE</button></div>${body}</div>`;
+    ops.innerHTML = `<div class="box"><div class="hd"><h2>OPERATIONS</h2><div class="tabs"><button data-tab="missions" class="${tab === 'missions' ? 'on' : ''}">MISSIONS</button>${SHIPYARD ? ` <button data-tab="yard" class="${tab === 'yard' ? 'on' : ''}">SHIPYARD</button>` : ''}</div><span style="flex:1"></span><span class="pay">¢${U.fmt(cr)}</span><button class="b" data-close="1">CLOSE</button></div>${body}</div>`;
   }
   function click(t: HTMLElement) {
     const b = t.closest<HTMLElement>('button'); if (!b || (b as HTMLButtonElement).disabled) { if (t === ops) closeOps(); return; }
     const d = b.dataset;
     if (d.close) closeOps();
-    else if (d.tab) { tab = d.tab; opsRender(); }
+    else if (d.tab && (SHIPYARD || d.tab === 'missions')) { tab = d.tab; opsRender(); }
     else if (d.pick != null) { Net.toHost({ t: 'mpick', i: +d.pick }); Audio.click(); }
     else if (d.buy) { const sh = SD.SHIPS[d.buy]; if (sh && Me.credits >= sh.price) { Me.credits -= sh.price; Net.toHost({ t: 'fbuy', id: sh.id }); Audio.buy(); } }
     else if (d.use) { Net.toHost({ t: 'fuse', id: d.use }); Audio.click(); }
@@ -340,5 +344,5 @@ export const SpaceUI = (() => {
     if (e && e.price) { if (Me.credits < e.price) { opsRender(); return; } Me.credits -= e.price; Audio.buy(); }
     Net.toHost({ t: 'ffit', s: slot, id });
   }
-  return { show, update, flash, openOps, closeOps, opsRender, boardTex, boardDraw, objDraw };
+  return { SHIPYARD, show, update, flash, openOps, closeOps, opsRender, boardTex, boardDraw, objDraw };
 })();

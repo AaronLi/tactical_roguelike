@@ -15,8 +15,8 @@ off: the game is then the route map and the helicopter, as it was. A debug start
 
 ## How a sortie goes
 
-1. **The base.** The ship stands on the pad. The terminal by it (F) lists six missions: take up to three. Its second tab is
-   the shipyard.
+1. **The base.** The ship stands on the pad. The terminal by it (F) lists six missions: take up to three. Its shipyard tab
+   (buying ships, fitting hardpoints and bays) is switched off for now (`SHIPYARD` in js/spaceui.ts; its page is kept).
 2. **Aboard.** Walk up the ramp. Seats: the helm (port, forward), the sensor station beside it, a seat under each hardpoint,
    jump seats. Hold F at one to sit, hold F to get up.
 3. **Lift off.** At the helm, hold G. Nobody on their feet may be left outside. Flight is first person, from the seat,
