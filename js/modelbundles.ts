@@ -1,28 +1,60 @@
 // The baked models, bundled (docs/models.md "Bundles"). The baker (tools/bundle_models.mjs, the last step of `npm run bake:models`) packs the
-// ~2,500 small files of assets/models (the guns' packs, the props, the hangar's scene) into ONE container file, assets/models/bundles/models.rtb (~3.3 MB gzipped); the game fetches it once at boot
-// (the very first thing the page does: this is the first script in index.html), keeps it in memory and slices the files out of it, so there are no
-// model requests after that and nothing waits on a fetch later. Nothing is parsed at boot: a glTF is parsed when a model is first shown (js/glb.ts).
+// ~6,600 small files of assets/models (the guns' pieces and their levels of detail, the props, the hangar's scene, the bodies) into ONE container file,
+// assets/models/bundles/models.rtb; the game fetches it once at boot (the very first thing the page does: this is the first script in index.html) and keeps
+// it AS DOWNLOADED (a Blob: on disk once the local store has it), so there are no model requests after that. Nothing is unpacked or parsed at boot: a file
+// is read out of the bundle when it is first asked for, by unpacking only the chunk it is in (js/glb.ts parses a glTF when a model is first shown).
 // There is no fallback to the loose files: a path that belongs to the bundle comes from it or fails.
 //
-//   RTBundles.Bundles.start()               Promise<boolean>: begin (or retry) the download; true once the bundle is in memory (it retries by itself first, then gives false)
+//   RTBundles.Bundles.start()               Promise<boolean>: begin (or retry) the download; true once the bundle is here (it retries by itself first, then gives false)
 //   RTBundles.Bundles.state()               { phase: 'idle'|'loading'|'ready'|'failed', loaded, total, from: 'store'|'net'|null }   (bytes, for a progress line)
 //   RTBundles.Bundles.onChange(fn)          fn(state) on every progress step and phase change
 //   RTBundles.Bundles.getFile(path)         Promise<ArrayBuffer>: the file's bytes (waits for the bundle; starts it if nothing has)
 //   RTBundles.Bundles.getJson(path)         Promise<any | null>: the file parsed (null if the bundle or the file is missing)
 //   RTBundles.Bundles.bundleOf(path)        'models' if the path is in the bundle, null if not (guns/*.glb, the scenes' data, the bake reports)
+//   RTBundles.Bundles.has(path)             whether the path is a file of the bundle (false until the bundle is here)
 //
-// Returning visitors: bundles/manifest.json ({ v: 3, hash, size }, fetched with no-cache at boot, ~100 bytes) says which bundle is current; the one hash is
-// compared with the stored copy (IndexedDB), which is used with no request if it matches and is of this format (FORMAT: 3 since the packs' positions are int16); otherwise models.rtb?h=<hash> is fetched and replaces it.
+// Returning visitors: bundles/manifest.json ({ v: 4, hash, size }, fetched with no-cache at boot, ~100 bytes) says which bundle is current; the one hash is
+// compared with the stored copy (IndexedDB), which is used with no request if it matches and is of this format (FORMAT 4: the chunked container); otherwise
+// models.rtb?h=<hash> is fetched and replaces it.
 //
-// The container ("RTB1"): the bytes `RTB1`, u32le tocLength, the table of contents as UTF-8 JSON `{ "files": [[path, offset, length], ...] }`, zero padding to a
-// multiple of 4, then the files back to back (offsets count from the start of that data, paths are relative to assets/models/, sorted). The file on disk is that
-// container gzipped (the web server cannot be trusted to compress an unknown type): it is unpacked with DecompressionStream (off the main thread); a raw one is read as it is.
+// The container ("RTB2", tools/model_bundles.mjs pack): the bytes `RTB2`, u32le headLength, the head (the table of contents, UTF-8 JSON, gzipped:
+// { "chunks": [[codec, offset, length, rawLength], ...], "files": [[path, chunk, offsetInChunk, length], ...] }), zero padding to a multiple of 4, then the
+// chunks back to back (offsets count from the start of that data; paths are relative to assets/models/). A CHUNK is some files end to end, compressed on its
+// own (codec "gzip", or "raw" for none; another codec, zstd say, is one more entry in CODECS and a decoder), so a file is read by unpacking its chunk and
+// nothing else: files that are wanted together share a chunk (a platform's pieces; its pieces' levels of detail; every platform's index), about a megabyte
+// unpacked each. The file is NOT compressed as a whole (the old RTB1 was one gzip stream: all of it had to be unpacked, 86 MB, and was held for the session);
+// gzip looks back 32 KB, so chunks of this size cost it nothing. An unpacked chunk is let go a few seconds after it was last read.
 
 // The same machinery serves more than one bundle (makeBundle): the models (RTBundles.Bundles, as above) and the synthesized audio
 // (RTBundles.AudioBundle: assets/audio/bundles/audio.rtb, the handling and footstep banks, packed by tools/bake_audio.mjs). Each has its own
 // manifest, its own copy in the local store and its own download; the audio's waits for the models' to finish (it isn't needed
 // till a level, and mustn't hold up the boot).
-const EXT = '.rtb', MAGIC = 'RTB1';
+const EXT = '.rtb', MAGIC = 'RTB2';
+type Chunk = [codec: string, offset: number, length: number, rawLength: number];
+interface Toc { chunks: Chunk[]; files: Map<string, [chunk: number, offset: number, length: number]>; base: number }
+/** Where the head is: the container's first 8 bytes -> the head's bytes [from, to) and where the chunks begin. Throws on anything else. */
+function bundleHead(first: Uint8Array): { from: number; to: number; base: number } {
+  if (first.length < 8 || String.fromCharCode(first[0], first[1], first[2], first[3]) !== MAGIC) throw new Error('not an ' + MAGIC + ' bundle');
+  const n = (first[4] | (first[5] << 8) | (first[6] << 16) | (first[7] << 24)) >>> 0;
+  return { from: 8, to: 8 + n, base: 8 + n + ((4 - ((8 + n) % 4)) % 4) };
+}
+/** The head's JSON (unpacked) -> the table of contents, checked against the container's size. Throws on a malformed one. */
+function bundleToc(head: any, base: number, size: number): Toc {
+  if (!head || !Array.isArray(head.chunks) || !Array.isArray(head.files)) throw new Error('bundle head: no chunks or files');
+  const chunks = head.chunks as Chunk[], files = new Map<string, [number, number, number]>();
+  for (const [codec, off, len, raw] of chunks) if (typeof codec !== 'string' || !(off >= 0) || !(len >= 0) || !(raw >= 0) || base + off + len > size) throw new Error('bundle chunk past the end');
+  for (const [p, c, off, len] of head.files as [string, number, number, number][]) {
+    if (!chunks[c] || !(off >= 0) || !(len >= 0) || off + len > chunks[c][3]) throw new Error('bundle entry past its chunk: ' + p);
+    files.set(p, [c, off, len]);
+  }
+  return { chunks, files, base };
+}
+/** How a chunk's bytes are unpacked, by its codec's name (each: the stored bytes -> the chunk). A codec the browser has no decoder for is added here with one. */
+const CODECS: Record<string, (b: Blob) => Promise<ArrayBuffer>> = {
+  raw: (b) => b.arrayBuffer(),
+  gzip: (b) => new (globalThis as any).Response(b.stream().pipeThrough(new (globalThis as any).DecompressionStream('gzip'))).arrayBuffer(),
+};
+const CHUNK_KEEP_MS = 8000; // (an unpacked chunk is kept this long after it was last read: a gun's files are asked for in a burst)
 const R_BUNDLES = { base: '' }; // (where the page's folder is from here: '' on the page, '../../' in the export worker: Models.setRoot)
 const KNOWN_BUNDLES = new Set<string>(); // (the store's records of any other name are stale: sweep)
 interface BundleCfg { name: string; dir: string; root: string; format: number; flag: string; bundleOf: (rel: string) => boolean }
@@ -30,7 +62,7 @@ function makeBundle(cfg: BundleCfg) {
   const DIR = cfg.dir, ROOT = cfg.root, NAME = cfg.name, FORMAT = cfg.format, R = R_BUNDLES;
   KNOWN_BUNDLES.add(NAME);
 
-  interface Bundle { bytes: number; wire: number; files: Map<string, [number, number]>; buf: ArrayBuffer; from: 'net' | 'store' }
+  interface Bundle { bytes: number; wire: number; toc: Toc; blob: Blob; from: 'net' | 'store' }
   interface State { phase: 'idle' | 'loading' | 'ready' | 'failed'; loaded: number; total: number; from: 'net' | 'store' | null; error?: string }
   const st: State = { phase: 'idle', loaded: 0, total: 0, from: null };
   const listeners: ((s: State) => void)[] = [];
@@ -43,29 +75,37 @@ function makeBundle(cfg: BundleCfg) {
   function bundleOf(path: string): string | null { return cfg.bundleOf(rel(path)) ? NAME : null; }
   const fileOf = () => R.base + DIR + NAME + EXT;
 
-  /** Container bytes (already gunzipped) -> its table of contents. Throws on a malformed one. */
-  function parse(buf: ArrayBuffer): { files: Map<string, [number, number]> } {
-    const u8 = new Uint8Array(buf);
-    if (u8.length < 8 || String.fromCharCode(u8[0], u8[1], u8[2], u8[3]) !== MAGIC) throw new Error('not a ' + NAME + ' bundle');
-    const tocLen = new DataView(buf).getUint32(4, true), toc = JSON.parse(new TextDecoder().decode(u8.subarray(8, 8 + tocLen)));
-    const base = 8 + tocLen + ((4 - ((8 + tocLen) % 4)) % 4), files = new Map<string, [number, number]>();
-    for (const [p, off, len] of toc.files as [string, number, number][]) {
-      if (base + off + len > u8.length) throw new Error('bundle entry past the end: ' + p);
-      files.set(p, [base + off, base + off + len]);
-    }
-    return { files };
+  /** The container's table of contents, read off the stored bytes (the first 8, then the head: nothing else is touched). Throws on a malformed one. */
+  async function readToc(blob: Blob): Promise<Toc> {
+    const h = bundleHead(new Uint8Array(await blob.slice(0, 8).arrayBuffer()));
+    if (h.to > blob.size) throw new Error('bundle head past the end');
+    const head = JSON.parse(new TextDecoder().decode(await CODECS.gzip(blob.slice(h.from, h.to))));
+    return bundleToc(head, h.base, blob.size);
   }
-  async function gunzip(buf: ArrayBuffer): Promise<ArrayBuffer> {
-    const u8 = new Uint8Array(buf);
-    if (!(u8.length > 2 && u8[0] === 0x1f && u8[1] === 0x8b)) return buf; // (the server already undid it, or it was stored raw)
-    const ds = new (globalThis as any).DecompressionStream('gzip');
-    return new (globalThis as any).Response(new (globalThis as any).Blob([buf]).stream().pipeThrough(ds)).arrayBuffer();
+  // the chunks unpacked just now: each is let go CHUNK_KEEP_MS after it was last read
+  const open = new Map<number, { p: Promise<ArrayBuffer>; t: any }>(), read = { chunks: 0, bytes: 0, ms: 0, files: 0, busy: 0, since: 0 }; // (read: what has been unpacked so far, for stats(); ms: the time during which any chunk was being unpacked)
+  function chunkOf(b: Bundle, i: number): Promise<ArrayBuffer> {
+    let o = open.get(i);
+    if (!o) {
+      const [codec, off, len, raw] = b.toc.chunks[i], un = CODECS[codec];
+      if (!read.busy++) read.since = Date.now();
+      const end = () => { if (!--read.busy) read.ms += Date.now() - read.since; };
+      const p = un ? un(b.blob.slice(b.toc.base + off, b.toc.base + off + len)).then((ab) => { if (ab.byteLength !== raw) throw new Error(`bundle chunk ${i} unpacked to ${ab.byteLength} B, not ${raw}`); read.chunks++; read.bytes += raw; return ab; })
+        : Promise.reject(new Error('no decoder for a "' + codec + '" chunk'));
+      o = { p, t: null }; open.set(i, o);
+      p.then(end, () => { end(); if (open.get(i) === o) open.delete(i); }); // (a failed read is tried again at the next ask)
+    }
+    if (typeof setTimeout !== 'function') return o.p; // (the tools' context has no timers: what it unpacks it keeps)
+    if (o.t) clearTimeout(o.t);
+    const mine = o; o.t = setTimeout(() => { if (open.get(i) === mine) open.delete(i); }, CHUNK_KEEP_MS);
+    if (o.t && o.t.unref) o.t.unref(); // (node: the tools' process doesn't wait on it)
+    return o.p;
   }
 
-  // The local store (docs/models.md "Bundles"): the bundle is kept in IndexedDB as downloaded (gzipped) with the content hash from bundles/manifest.json,
+  // The local store (docs/models.md "Bundles"): the bundle is kept in IndexedDB as downloaded (a Blob: the browser keeps it on disk, and a read takes only the bytes asked for) with the content hash from bundles/manifest.json,
   // so a returning visitor fetches nothing while it is current. Every failure (no IndexedDB, private mode, quota, eviction, a corrupt record) falls back to
   // the network without a word; a stored copy that fails to parse is dropped and fetched again.
-  interface Rec { hash: string; v?: number; buf: ArrayBuffer }
+  interface Rec { hash: string; v?: number; blob: Blob }
   const NS = (typeof location !== 'undefined' && /^\/space-experimental(\/|$)/.test(location.pathname) ? 'space_' : ''); // (the copy at d5g.ca/space-experimental: its own cache, js/util.ts NS)
   const DB = 'rt-model-bundles' + (NS ? '-' + NS.slice(0, -1) : ''), TABLE = 'bundles', checking = typeof location !== 'undefined' && /[?&]checkModels/.test(location.search || '');
   const log = (...a: any[]) => { if (checking) console.log('[bundles]', ...a); };
@@ -146,8 +186,8 @@ function makeBundle(cfg: BundleCfg) {
     if (m) st.total = m.size;
     if (hash) {
       const rec = await storeGet();
-      if (rec && rec.hash === hash && rec.v === FORMAT && rec.buf instanceof ArrayBuffer) {
-        try { const buf = await gunzip(rec.buf); log('from the local store'); st.loaded = st.total = rec.buf.byteLength; st.from = 'store'; return { bytes: buf.byteLength, wire: 0, files: parse(buf).files, buf, from: 'store' }; }
+      if (rec && rec.hash === hash && rec.v === FORMAT && rec.blob && typeof rec.blob.slice === 'function') {
+        try { const toc = await readToc(rec.blob); log('from the local store'); st.loaded = st.total = rec.blob.size; st.from = 'store'; return { bytes: toc.chunks.reduce((n, c) => n + c[3], 0), wire: 0, toc, blob: rec.blob, from: 'store' }; }
         catch (e) { log('stored copy is corrupt, dropping it', e); storeDrop(); flagSet(null); }
       } else if (rec) log(rec.v === FORMAT ? 'stored copy is for another hash' : 'stored copy is of another format');
     }
@@ -160,9 +200,10 @@ function makeBundle(cfg: BundleCfg) {
       try { const b = await download(e, m ? m.size : 0); if (!hash || await hashOf(b) === hash) raw = b; else log('the early fetch is not the current bundle'); } catch (err) { log('early fetch failed', err); }
     }
     if (!raw) { st.loaded = 0; raw = await download(fetch(fileOf() + (hash ? '?h=' + hash : ''), hash ? undefined : { cache: 'no-cache' }), m ? m.size : 0); }
-    const buf = await gunzip(raw);
-    const b: Bundle = { bytes: buf.byteLength, wire: raw.byteLength, files: parse(buf).files, buf, from: 'net' };
-    if (hash) storePut({ hash, v: FORMAT, buf: raw }).then((k) => flagSet(k ? hash : null)); // (as downloaded; replaces the old hash; failures are silent)
+    const blob = new (globalThis as any).Blob([raw]) as Blob, toc = await readToc(blob);
+    const b: Bundle = { bytes: toc.chunks.reduce((n, c) => n + c[3], 0), wire: raw.byteLength, toc, blob, from: 'net' };
+    // (as downloaded; replaces the old hash; failures are silent. Once it is stored the bundle is read from the store's copy, which is on disk: the downloaded bytes are let go)
+    if (hash) storePut({ hash, v: FORMAT, blob }).then((k) => { flagSet(k ? hash : null); if (k) storeGet().then((rec) => { if (rec && rec.hash === hash && rec.blob && rec.blob.size === blob.size && done === b) b.blob = rec.blob; }); });
     st.from = 'net'; log('fetched', raw.byteLength, 'B');
     return b;
   }
@@ -191,20 +232,21 @@ function makeBundle(cfg: BundleCfg) {
     if (st.phase === 'failed' && !running) return Promise.reject(new Error('the ' + NAME + ' bundle did not load')); // (not retried per file: start() retries it)
     return start().then((ok) => {
       if (!ok || !done) throw new Error('the ' + NAME + ' bundle did not load');
-      const e = done.files.get(p); if (!e) throw new Error(`${p} is not in the ${NAME} bundle`);
-      return done.buf.slice(e[0], e[1]);
+      const b = done, e = b.toc.files.get(p); if (!e) throw new Error(`${p} is not in the ${NAME} bundle`);
+      read.files++;
+      return chunkOf(b, e[0]).then((ab) => ab.slice(e[1], e[1] + e[2]));
     });
   }
   const getJson = (path: string): Promise<any> => getFile(path).then((b) => JSON.parse(new TextDecoder().decode(b)), () => null);
 
   const api = {
-    NAME, EXT, DIR, MAGIC, FORMAT, bundleOf, parse, start, getFile, getJson,
+    NAME, EXT, DIR, MAGIC, FORMAT, bundleOf, head: bundleHead, toc: bundleToc, codecs: CODECS, start, getFile, getJson,
     state: (): State => ({ ...st }), onChange: (fn: (s: State) => void) => { listeners.push(fn); },
     loaded: () => !!done,
     /** whether the path is a file of the bundle (false until the bundle is in) */
-    has: (path: string) => !!done && done.files.has(rel(path)),
+    has: (path: string) => !!done && done.toc.files.has(rel(path)),
     setRoot: (base: string) => { R.base = base; }, // (shared: every bundle's)
-    stats: () => (done ? [{ name: NAME, files: done.files.size, bytes: done.bytes, wire: done.wire, from: done.from }] : []),
+    stats: () => (done ? [{ name: NAME, files: done.toc.files.size, chunks: done.toc.chunks.length, open: open.size, read: { files: read.files, chunks: read.chunks, bytes: read.bytes, ms: Math.round(read.ms) }, bytes: done.bytes, wire: done.wire, from: done.from }] : []),
   };
   return Object.assign(api, {
     /** begin at once, a first visit's download before the manifest's even asked (the models: the first thing the page does) */
@@ -217,16 +259,16 @@ function makeBundle(cfg: BundleCfg) {
 }
 // The models: props/**, scenes/*.glb (the hangar: tools/bake_hangar.mjs), humans/*.glb (the bodies: tools/bake_humans.mjs), ships/*.glb (the squad's ships: tools/bake_ships.mjs) and parts/<id>/** (not the whole-gun files, the scenes'
 // data (for the tools and the Bevy port) nor the bake's reports: parts/index.json, rules.json...).
-// FORMAT 3: the files' format, in the manifest (v) and on the stored copy: 2 = meshopt with float32 positions, 3 = int16 positions the loader
-// undoes (js/glb.ts dequantize). A copy of another format is never used.
+// FORMAT 4: the bundle's format, in the manifest (v) and on the stored copy: 2 = meshopt with float32 positions, 3 = int16 positions the loader
+// undoes (js/glb.ts dequantize), 4 = the chunked container (RTB2). A copy of another format is never used.
 const G_Bundles = makeBundle({
-  name: 'models', dir: 'assets/models/bundles/', root: 'assets/models/', format: 3, flag: 'rt-models-stored',
+  name: 'models', dir: 'assets/models/bundles/', root: 'assets/models/', format: 4, flag: 'rt-models-stored',
   bundleOf: (p) => p.startsWith('props/') || (p.startsWith('scenes/') && p.endsWith('.glb')) || (p.startsWith('humans/') && p.endsWith('.glb')) || (p.startsWith('ships/') && p.endsWith('.glb')) || (p.startsWith('parts/') && p.indexOf('/', 6) > 6),
 });
 // The synthesized audio: the guns' handling bank and the footsteps (each folder's manifest.json and its clips), Ogg Vorbis, the
-// container gzipped (it halves it: every clip carries the same Vorbis setup header). FORMAT 1.
+// chunks gzipped (it halves them: every clip carries the same Vorbis setup header). FORMAT 2 (the chunked container; 1 was one gzip stream).
 const G_AudioBundle = makeBundle({
-  name: 'audio', dir: 'assets/audio/bundles/', root: 'assets/audio/', format: 1, flag: 'rt-audio-stored',
+  name: 'audio', dir: 'assets/audio/bundles/', root: 'assets/audio/', format: 2, flag: 'rt-audio-stored',
   bundleOf: (p) => p.startsWith('handling/') || p.startsWith('footsteps/'),
 });
 // On the page the models' download is the first thing that happens (this script is the first one in index.html, before three.js and the

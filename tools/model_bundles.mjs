@@ -11,7 +11,7 @@ export const MODELS = path.join(ROOT, 'assets/models');
 export function loadBundles() {
   const f = DIST + 'modelbundles.js';
   if (!fs.existsSync(f)) { console.error('dist/js/modelbundles.js missing: run tsc first (npm run bake:models / test:models do)'); process.exit(1); }
-  const ctx = { console, JSON, Object, Array, Number, String, Map, Set, Error, Promise, Uint8Array, DataView, TextDecoder, setTimeout, fetch: () => Promise.reject(new Error('no fetch')) };
+  const ctx = { console, JSON, Object, Array, Number, String, Map, Set, Error, Promise, Uint8Array, DataView, TextDecoder, setTimeout, clearTimeout, fetch: () => Promise.reject(new Error('no fetch')) };
   vm.createContext(ctx); vm.runInContext(fs.readFileSync(f, 'utf8'), ctx, { filename: 'modelbundles.js' });
   return ctx.RTBundles.Bundles;
 }
@@ -25,26 +25,58 @@ export function listLoose(models, B) {
   return out.sort(cmp);
 }
 
-/** The container: RTB1, u32 tocLength, the table of contents (JSON), padding to 4, the files back to back. `files` = [[path, Buffer]] in the order to store. */
-export function pack(files) {
-  let off = 0; const toc = files.map(([p, b]) => { const e = [p, off, b.length]; off += b.length; return e; });
-  const tocBuf = Buffer.from(JSON.stringify({ files: toc }), 'utf8'), head = Buffer.alloc(8);
-  head.write('RTB1', 0, 'latin1'); head.writeUInt32LE(tocBuf.length, 4);
-  const pad = Buffer.alloc((4 - ((8 + tocBuf.length) % 4)) % 4);
-  return Buffer.concat([head, tocBuf, pad, ...files.map(([, b]) => b)]);
+/** Which chunk a path goes in (js/modelbundles.ts: a file is read by unpacking its chunk, so what is wanted together goes together): every platform's index
+ *  (the game parses them all at boot); a platform's pieces; apart from them its pieces' levels of detail (the third-person gun needs only those: an enemy's
+ *  gun is never seen in first person); the shared pieces by tag; else the path's first folder (props, scenes, humans, ships; the audio's banks). */
+export function chunkKey(p) {
+  const s = p.split('/');
+  if (s[0] === 'parts') {
+    if (s.length === 3 && s[2] === 'index.json') return 'parts#index';
+    return 'parts/' + s[1] + (s[1] === '_shared' && s.length > 3 ? '/' + s[2] : '') + (/\.lod\d\.glb$/.test(p) ? '#lod' : '');
+  }
+  return s[0];
 }
+/** The most a chunk holds unpacked (a bigger file is a chunk to itself). Gzip looks back 32 KB, so a megabyte costs the size nothing; smaller, and a gun's files are in more chunks. */
+export const CHUNK_MAX = 1 << 20;
+/**
+ * The container (js/modelbundles.ts "RTB2"): RTB2, u32 headLength, the head (the table of contents as JSON, gzipped), padding to 4, the chunks back to back.
+ * `files` = [[path, Buffer]] in the order to store (sorted paths): they are put in chunks by chunkKey, in that order, a new chunk when one is full, and each
+ * chunk is gzipped on its own. Returns the file's bytes (not to be compressed again).
+ */
+export function pack(files, { max = CHUNK_MAX, key = chunkKey } = {}) {
+  const groups = new Map();
+  for (const f of files) { const k = key(f[0]); if (!groups.has(k)) groups.set(k, []); groups.get(k).push(f); }
+  const chunks = [], toc = [], data = []; let off = 0;
+  const close = (list) => {
+    if (!list.length) return;
+    let o = 0; for (const [p, b] of list) { toc.push([p, chunks.length, o, b.length]); o += b.length; }
+    const z = gzip(Buffer.concat(list.map(([, b]) => b)));
+    chunks.push(['gzip', off, z.length, o]); data.push(z); off += z.length;
+  };
+  for (const list of groups.values()) {
+    let cur = [], n = 0;
+    for (const f of list) { if (cur.length && n + f[1].length > max) { close(cur); cur = []; n = 0; } cur.push(f); n += f[1].length; }
+    close(cur);
+  }
+  const headBuf = gzip(Buffer.from(JSON.stringify({ chunks, files: toc }), 'utf8')), head = Buffer.alloc(8);
+  head.write('RTB2', 0, 'latin1'); head.writeUInt32LE(headBuf.length, 4);
+  const pad = Buffer.alloc((4 - ((8 + headBuf.length) % 4)) % 4);
+  return Buffer.concat([head, headBuf, pad, ...data]);
+}
+/** The unpacked size of a container's chunks (what the old one-stream bundle held in memory). */
+export const rawSize = (files) => files.reduce((n, [, b]) => n + b.length, 0);
 /** Gzipped the same on every machine: level 9, and the header's OS byte fixed (zlib puts the platform's there). */
 export function gzip(buf) { const z = zlib.gzipSync(buf, { level: 9 }); z[9] = 255; return z; }
 
-/** The content hash the game keys its local store by: sha256 of the .rtb bytes (the gzipped file as served), first 16 hex digits. */
+/** The content hash the game keys its local store by: sha256 of the .rtb bytes (the file as served), first 16 hex digits. */
 export const hashOf = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex').slice(0, 16);
 
 /** Writes assets/models/bundles/models.rtb (every loose file), bundles/index.json (for the tools) and bundles/manifest.json (what the game fetches); removes any other bundle file. Returns the index. */
 export function writeBundles(models, B, log = () => {}) {
   const dir = path.join(models, 'bundles'); fs.mkdirSync(dir, { recursive: true });
-  const paths = listLoose(models, B), raw = pack(paths.map((p) => [p, fs.readFileSync(path.join(models, p))])), z = gzip(raw);
+  const paths = listLoose(models, B), files = paths.map((p) => [p, fs.readFileSync(path.join(models, p))]), raw = { length: rawSize(files) }, z = pack(files);
   fs.writeFileSync(path.join(dir, B.NAME + B.EXT), z);
-  log(`  ${B.NAME}${B.EXT}: ${paths.length} files, ${raw.length} B, ${z.length} B gzipped`);
+  log(`  ${B.NAME}${B.EXT}: ${paths.length} files, ${raw.length} B, ${z.length} B in gzipped chunks`);
   for (const f of fs.readdirSync(dir)) if (f.endsWith(B.EXT) && f !== B.NAME + B.EXT) fs.unlinkSync(path.join(dir, f)); // (the old per-platform bundles)
   const hash = hashOf(z), index = { version: B.FORMAT, name: B.NAME + B.EXT, files: paths.length, bytes: raw.length, gz: z.length, sha1: crypto.createHash('sha1').update(z).digest('hex'), hash };
   fs.writeFileSync(path.join(dir, 'index.json'), JSON.stringify(index, null, 1) + '\n');
@@ -52,11 +84,17 @@ export function writeBundles(models, B, log = () => {}) {
   return index;
 }
 
-/** Reads a bundle file back: Map(path -> Buffer) through the game's own reader. */
+/** Reads a bundle file back: Map(path -> Buffer), the table of contents through the game's own reader (its head and toc), the chunks unpacked here. */
 export function readBundle(file, B) {
-  let buf = fs.readFileSync(file); if (buf[0] === 0x1f && buf[1] === 0x8b) buf = zlib.gunzipSync(buf);
-  const ab = buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length), { files } = B.parse(ab), out = new Map();
-  for (const [p, [a, b]] of files) out.set(p, buf.subarray(a, b));
+  const buf = fs.readFileSync(file), h = B.head(new Uint8Array(buf.buffer, buf.byteOffset, Math.min(8, buf.length)));
+  if (h.to > buf.length) throw new Error('bundle head past the end');
+  const toc = B.toc(JSON.parse(zlib.gunzipSync(buf.subarray(h.from, h.to)).toString('utf8')), h.base, buf.length), out = new Map(), open = new Map();
+  const chunk = (i) => {
+    if (!open.has(i)) { const [codec, off, len, raw] = toc.chunks[i], b = buf.subarray(toc.base + off, toc.base + off + len), u = codec === 'gzip' ? zlib.gunzipSync(b) : codec === 'raw' ? b : null;
+      if (!u) throw new Error('no decoder for a "' + codec + '" chunk'); if (u.length !== raw) throw new Error(`chunk ${i} unpacks to ${u.length} B, not ${raw}`); open.set(i, u); }
+    return open.get(i);
+  };
+  for (const [p, [c, off, len]] of toc.files) out.set(p, chunk(c).subarray(off, off + len));
   return out;
 }
 
