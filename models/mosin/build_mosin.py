@@ -61,7 +61,7 @@ put(K, box(-0.0125, 0.0125, 0.0780, 0.1520, -0.0425, -0.0140), 'base', 'blued', 
 put(K, box(-0.0225, -0.0150, 0.0560, 0.0640, -0.0040, 0.0040), 'base', 'gunmetal', bev=0.0006)         # the bolt stop (the magazine cut-off's neighbour) on the left
 
 # ================================================================================================ the stock (wood): butt, wrist, the receiver's bed, the lower fore-end's start
-SIDE = [(BUTT + 0.006, 0.0345), (-0.250, 0.0300), (-0.150, 0.0225), (-0.090, 0.0150), (-0.055, 0.0105), (-0.030, 0.0085), (-0.010, 0.0060), (0.0, 0.0050), (F_RING, 0.0050),
+SIDE = [(BUTT + 0.006, 0.0345), (-0.250, 0.0300), (-0.150, 0.0225), (-0.090, 0.0150), (-0.055, 0.0105), (-0.030, 0.0085), (-0.010, 0.0020), (0.0, -0.0065), (F_RING, -0.0065),
         (F_RING, -0.0440), (0.150, -0.0485), (0.078, -0.0520), (0.040, -0.0620), (0.010, -0.0775), (-0.015, -0.0840), (-0.050, -0.0780), (-0.100, -0.0780), (-0.200, -0.0840),
         (-0.290, -0.0930), (BUTT + 0.006, -0.0980)]
 PLAN = [(-0.35, 0.0190), (-0.25, 0.0195), (-0.12, 0.0180), (-0.05, 0.0190), (0.0, 0.0205), (F_RING + 0.01, 0.0210)]
@@ -72,8 +72,6 @@ cuts = [cyl(RB + 0.5 * mm, -0.06, F_RING + 0.02, 'y', (0, 0), 36),
 body(K, SIDE, PLAN, 'stock', 'wood', bev=0.0035, cuts=cuts)
 # the steel butt plate (a curved plate with its two screws) and the sling swivel loop
 put(K, prism([(BUTT + 0.0055, 0.0350), (BUTT - 0.0045, 0.0325), (BUTT - 0.0090, -0.0990), (BUTT + 0.0055, -0.0985)], 'x', -0.0198, 0.0198), 'stock', 'steel', bev=0.0010)
-for sd in (0.0, 1):
-    pass
 for z in (0.014, -0.075):
     put(K, cyl(2.2 * mm, BUTT - 0.0072, BUTT - 0.0040, 'y', (0, z), 12), 'stock', 'gunmetal')
 put(K, box(-0.0060, 0.0060, -0.2900, -0.2800, -0.1040, -0.0920), 'stock', 'steel', bev=0.0006)         # the butt's sling swivel plate
@@ -89,14 +87,13 @@ body(K, HSIDE, HPLAN, 'handguard', 'wood', bev=0.0030, cuts=[rod((0, HG0 - 0.02,
 UH = K.tmp(lathe([(0.2380, 0.0208), (0.5250, 0.0205)], 28)); cut(UH, rod((0, 0.2, 0), (0, 0.55, 0), 0.0152, 0.0145, 28))
 cut(UH, box(-0.03, 0.03, 0.2, 0.55, -0.05, -0.0015)); bevel(UH, 0.0012, 1, 40); wnorm(UH); K.adopt(UH, 'handguard', 'wood')   # the upper handguard: a wood hood over the barrel
 for fb, w in ((0.5160, 0.013), (0.7000, 0.012)):                                                          # the two barrel bands
-    for pa in (1,):
+    if True:
         o = K.tmp(prism(rounded(0, -0.0100 if fb > 0.6 else -0.0075, 0.0184 if fb > 0.6 else 0.0214, 0.0270 if fb > 0.6 else 0.0300, 0.006, 4), 'y', fb, fb + w))
         cut(o, prism(rounded(0, -0.0100 if fb > 0.6 else -0.0075, 0.0164 if fb > 0.6 else 0.0194, 0.0250 if fb > 0.6 else 0.0280, 0.005, 4), 'y', fb - 0.001, fb + w + 0.001))
         bevel(o, 0.0006, 1, 40); wnorm(o); K.adopt(o, 'handguard', 'gunmetal')
 put(K, box(-0.0035, 0.0035, 0.7040, 0.7080, -0.0390, -0.0300), 'handguard', 'steel', bev=0.0004)         # the front band's sling swivel
 nc = K.tmp(prism(rounded(0, -0.0125, 0.0165, 0.0225, 0.006, 4), 'y', HG1 - 0.012, HG1 + 0.012)); cut(nc, rod((0, HG1 - 0.03, 0), (0, HG1 + 0.03, 0), 0.0108, 0.0108, 24))
 bevel(nc, 0.0008, 1, 40); wnorm(nc); K.adopt(nc, 'handguard', 'steel')                                    # the nose cap
-put(K, cyl(2.8 * mm, -0.0405, -0.0300, 'z', (0, HG1 + 0.0085), 14), 'handguard', 'steel') if False else None
 
 # ================================================================================================ the barrel (slot barrel): the 91/30's 730 mm, the front sight base and hood, then the crown cap (slot muzzle)
 bar = K.tmp(lathe([(0.2380, 0.0150), (0.30, 0.0146), (0.60, 0.0124), (0.80, 0.0112), (0.846, 0.0108)], 32)); wnorm(bar, 30); K.adopt(bar, 'barrel', 'blued')

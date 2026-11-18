@@ -28,7 +28,7 @@ type VmHold = VmAction | 'revolver' | 'break' | 'palm' | 'lslap'; // (palm: the 
 /** What the magazine is doing in a pose. */
 type VmMagMode = 'in' | 'hand' | 'drop' | 'gone' | 'peek' | 'rise' | 'chk';
 /** Something the left hand carries. */
-type VmPropKind = 'shell' | 'case' | 'loader' | 'clip' | 'bolt' | 'claw';
+type VmPropKind = 'shell' | 'case' | 'loader' | 'clip' | 'bolt' | 'claw' | 'stripper';
 export const VMAnim = (() => {
   const T = THREE;
   type V3 = THREE.Vector3;
@@ -87,6 +87,10 @@ export const VMAnim = (() => {
     if ((kind === 'shell' || kind === 'case') && def) g = GunModels.roundProp(def as { id: string }, kind);
     else if (kind === 'loader') { const plat = Gunsmith.PLATFORMS[def!.id], n = (plat && plat.spec.chambers) || 6, r = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.012, 14), M.black()); r.rotation.x = Math.PI / 2; g.add(r); for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; const c = new T.Mesh(new T.CylinderGeometry(0.0045, 0.0045, 0.035, 8), M.brass()); c.rotation.x = Math.PI / 2; c.position.set(Math.cos(a) * 0.012, Math.sin(a) * 0.012, -0.02); g.add(c); } }
     else if (kind === 'clip') { const c = new T.Mesh(new T.BoxGeometry(0.014, 0.03, 0.06), M.brass()); g.add(c); }
+    else if (kind === 'stripper' && def) { // a stripper clip (a Mosin's): a spring-steel strip across the rims and five rounds in it, staggered, noses forward (-z)
+      const d = GunModels.roundDims(def as { id: string }), len = d ? d.cs + d.bl : 0.077, strip = new T.Mesh(new T.BoxGeometry(0.0016, 0.082, 0.021), M.steel()); strip.position.set(0, 0, len / 2 - 0.014); g.add(strip);
+      for (let i = 0; i < 5; i++) { const r = GunModels.roundProp(def as { id: string }, 'shell'); r.position.set(i % 2 ? 0.0032 : -0.0032, (i - 2) * 0.0148, 0); g.add(r); }
+    }
     else if (kind === 'bolt') g = GunModels.quarrel(true).group; // (the crossbow's own bolt: nock, shaft, vanes and head)
     else if (kind === 'claw' && def) for (let i = 0; i < CLAW_N; i++) g.add(GunModels.roundProp(def as { id: string }, 'shell')); // (the Wolverine grip: a round in each gap between the fingers, placed one by one in apply)
     g.visible = false;
@@ -105,7 +109,7 @@ export const VMAnim = (() => {
     else if (def.shell) reload = 'shell';
     else if (o.feed) reload = 'belt';
     if (arch === 'pistol') action = 'pistol';
-    else if (o.bolt) action = 'bolt';
+    else if (o.bolt || (def.manual && o.rcv === 'authored' && arch === 'rifle')) action = 'bolt'; // (an authored bolt-action has the bolt as its model's part_bolt: no spec number)
     else if (o.pump) action = 'pump';
     else if (o.lever) action = 'lever';
     else if (arch === 'p90') action = 'handle';
@@ -122,7 +126,7 @@ export const VMAnim = (() => {
     if (hs[0].info.hinge) { k.reload = 'hinge'; if (!def.manual) k.action = null; } // (a model with a reload sequence (info.hinge): its moving parts are driven by that and by nothing else, see hingeClip)
     const R = makeArm(M), L = makeArm(M);
     root.add(R.g, L.g);
-    const props: Record<string, THREE.Group> = { shell: prop('shell', M, def), case: prop('case', M, def), loader: prop('loader', M, def), clip: prop('clip', M), bolt: prop('bolt', M) };
+    const props: Record<string, THREE.Group> = { shell: prop('shell', M, def), case: prop('case', M, def), loader: prop('loader', M, def), clip: prop('clip', M), stripper: prop('stripper', M, def), bolt: prop('bolt', M) };
     if (k.reload === 'block') { props.claw = prop('claw', M, def); L.fist = makeFist(M); L.glove.add(L.fist); } // (a falling block: a Wolverine grip may load it, def.perLoad)
     for (const p of Object.values(props)) hs[0].holder.add(p);
     u.vma = { def, k, hs, R, L, props, drop: null, chv: chamberView(hs[0], def, M), fw: 0, trig: 1 };
@@ -150,7 +154,7 @@ export const VMAnim = (() => {
     }
     return g;
   }
-  const ROUND_RIFLE: Record<string, [number, number]> = { '5.56/45': [0.0048, 0.042], '5.6/39': [0.0047, 0.0364], '7.62/39': [0.0057, 0.0364], '7.62/51': [0.0059, 0.0476] }; // (case head radius, length)
+  const ROUND_RIFLE: Record<string, [number, number]> = { '5.56/45': [0.0048, 0.042], '5.6/39': [0.0047, 0.0364], '7.62/39': [0.0057, 0.0364], '7.62/51': [0.0059, 0.0476], '7.62/54': [0.0073, 0.0516] }; // (case head radius, length)
   function chamberView(h: Rig, def: Def, M: Mats): ChvHeads | ChvPort | null {
     const c = h.info.chamberAt;
     if (!c) return null;
@@ -227,11 +231,14 @@ export const VMAnim = (() => {
 
   // a bolt-action's bolt: turned up (radians) and drawn back (m) at full lift and pull; how far a pistol's slide,
   // an AR's charging handle, a pump come back
+  interface BoltHold { d: V3; q: THREE.Quaternion; r: number; fz: number; F: FPose }
+  let _bh: BoltHold | null = null; const _v0 = new T.Vector3(); // (the bolt hold of the gun being posed: BOLT_HOLD)
   const BOLT_LIFT = 1.3, BOLT_BACK = 0.12, SLIDE = 0.04, CH = 0.065, PUMP = 0.085;
   // where the bolt handle's knob is with the bolt turned up by lift (0..1) and drawn back by back (0..1)
   // (how far this gun's bolt comes back: info.boltTravel, the Welrod's short stroke; else BOLT_BACK)
   const boltBack = (h: Rig) => h.info.boltTravel || BOLT_BACK;
-  const knobAt = (A: Anchors, lift: number, back: number, travel = BOLT_BACK) => new T.Vector3(A.bolt!.x * Math.cos(lift * BOLT_LIFT), A.bolt!.y + A.bolt!.x * Math.sin(lift * BOLT_LIFT), A.bolt!.z + back * travel);
+  // (turned about the bolt's own axis, the part's origin: a knob below it (a Mosin's bent handle) swings up and round as the bolt turns, not just across)
+  const knobAt = (A: Anchors, lift: number, back: number, travel = BOLT_BACK) => { const th = lift * BOLT_LIFT, c = Math.cos(th), sn = Math.sin(th), py = A.boltHome ? A.boltHome.y : A.bolt!.y, dy = A.bolt!.y - py; return new T.Vector3(A.bolt!.x * c - dy * sn, py + A.bolt!.x * sn + dy * c, A.bolt!.z + back * travel); };
   // how far the bolt face comes back off the chamber at full pull (m)
   const actTravel = (h: Rig, kind: VmHold) => kind === 'pistol' ? SLIDE : kind === 'ar' ? CH : kind === 'handle' ? h.travel : kind === 'bolt' ? boltBack(h) : kind === 'pump' ? PUMP : kind === 'lever' ? 0.05 : 0;
   // which action a gun's hands work: 'pistol' (the slide), 'ar' (the charging handle), 'handle' (a cocking handle),
@@ -257,7 +264,7 @@ export const VMAnim = (() => {
       if (A.H.x > 0.005) { const under = off(to, 0, -0.075, -(A.H.x + 0.01)); pose.L = path(on, [[0, R0], [0.5, under], [1, to]]); }
       else pose.L = lerpV(R0, to, on);
     }
-    else if (kind === 'bolt' && A.bolt) { const lift = U.clamp(pull * 2, 0, 1), back = U.clamp(pull * 2 - 1, 0, 1); pose.bolt = [lift, back]; pose.R = lerpV(A.G, knobAt(A, lift, back, boltBack(h)), on); }
+    else if (kind === 'bolt' && A.bolt) { const lift = U.clamp(pull * 2, 0, 1), back = U.clamp(pull * 2 - 1, 0, 1); pose.bolt = [lift, back]; pose.R = lerpV(A.G, knobAt(A, lift, back, boltBack(h)).add(_bh ? _bh.d : _v0), on); }
     else if (kind === 'pump') { pose.pump = pull; pose.L = off(A.S, -PUMP * pull); } // (the left hand rides it)
     else if (kind === 'lever') pose.lever = pull;
   }
@@ -580,7 +587,7 @@ export const VMAnim = (() => {
     return pose;
   }
   // One round at a time into a tube / internal magazine / drum.
-  function shellClip(t: number, h: Rig) {
+  function shellClip(t: number, h: Rig, pl?: Pl) {
     const A = h.A, pose = base(), port = A.port || A.S;
     const under = port.y < -0.02, side = port.x > 0.01;
     const tilt = S(0.0, 0.2, t) * (1 - S(0.8, 1, t));
@@ -588,7 +595,20 @@ export const VMAnim = (() => {
     const into = under ? off(port, 0.01, 0.0) : side ? off(port, 0, 0, 0.02) : off(port, 0, 0.03);
     pose.L = path(t, [[0, A.S], [0.3, A.P], [0.38, A.P], [0.62, into], [0.72, port], [0.8, port], [1, A.S]]);
     if (t > 0.34 && t < 0.72) pose.prop = { kind: 'shell' };
+    if (pl && h.an.bolt && h.A.bolt) boltLoad(t, h, pl, pose);
     return pose;
+  }
+  // A hand-worked bolt-action loaded through its open action (a Mosin's, from a stripper clip pressed down in the guide on the receiver's rear bridge): the right hand on the knob holds the bolt up and back
+  // for the whole load (it opens it on the first round and shuts it after the last), the left brings the clip to the guide and presses the rounds down with its thumb, a round a step, the gun turned a little to it.
+  function boltLoad(t: number, h: Rig, pl: Pl, pose: Pose) {
+    const A = h.A, w = pl.cur(), left = pl.magSize(w) - w.mag, first = left === pl.reloadN, last = left <= (pl.loadN || 1), travel = boltBack(h);
+    const open = (first ? S(0.0, 0.3, t) : 1) * (1 - (last ? S(0.58, 0.95, t) : 0)), lift = U.clamp(open * 2, 0, 1), back = U.clamp(open * 2 - 1, 0, 1), on = (first ? S(0.0, 0.2, t) : 1) * (1 - (last ? S(0.94, 1, t) : 0));
+    pose.bolt = [lift, back]; pose.open = back * travel; pose.Rk = on;
+    pose.R = lerpV(A.G, knobAt(A, lift, back, travel).add(_bh ? _bh.d : _v0), on);
+    const port = A.port || A.S, guide = new T.Vector3(0, port.y + 0.035, port.z + 0.064); // (above the clip guide: 64 mm behind the port's middle, the receiver's top)
+    pose.L = path(t, [[0, A.S], [0.3, A.P], [0.38, A.P], [0.6, off(guide, 0, 0.05)], [0.7, guide], [0.8, guide], [1, A.S]]);
+    pose.prop = t > 0.3 && t < 0.78 ? { kind: 'stripper' } : null;
+    pose.gun[5] = -0.18 * S(0.0, 0.2, t) * (1 - S(0.8, 1, t)); pose.gun[3] = 0.1 * S(0.0, 0.2, t) * (1 - S(0.8, 1, t)); // (the gun canted a little to the left hand's work, its muzzle up)
   }
   function revolverClip(t: number, h: Rig) {
     const A = h.A, pose = base(), cyl = A.cyl || A.S;
@@ -807,6 +827,7 @@ export const VMAnim = (() => {
   function sample(pl: Pl, vm: THREE.Object3D) {
     const u = vm.userData, a: Vma = u.vma;
     if (!a) return [0, 0, 0, 0, 0, 0];
+    _bh = BOLT_HOLD[a.def.id] || null;
     const h = a.hs[0];
     // the pouch, in this gun's space (from last frame's pose: close enough)
     vm.updateMatrix(); h.holder.updateMatrix();
@@ -816,7 +837,7 @@ export const VMAnim = (() => {
     const { reload, action } = a.k;
     if (pl.reloading && pl.reloadTotal) {
       const t = U.clamp(1 - pl.reloadT / pl.reloadTotal, 0, 1);
-      if (reload === 'shell') pose = shellClip(t, h);
+      if (reload === 'shell') pose = shellClip(t, h, pl);
       else if (reload === 'revolver') pose = pl.revHand(a.def) ? revolverRound(t, h, pl) : revolverClip(t, h);
       else if (reload === 'break') pose = breakClip(t, h, pl.reloadN, pl);
       else if (reload === 'block') pose = blockRound(t, h, pl);
@@ -849,6 +870,7 @@ export const VMAnim = (() => {
     const a: Vma = vm.userData.vma;
     if (!a) return;
     const pose = a.pose, w = pl.cur();
+    _bh = BOLT_HOLD[a.def.id] || null;
     vm.updateMatrix();
     _inv.copy(vm.matrix).invert();
     a.trig += ((pose ? 0 : 1) - a.trig) * 0.25; // (the trigger finger: on the trigger, or off it along the frame while the gun's being worked)
@@ -1054,6 +1076,15 @@ export const VMAnim = (() => {
           const rd = chambered(a.def) ? w.chamber : !OPEN_BOLT.includes(a.def.id) && w.mag > 0 ? (w.tube && w.tube.length ? w.tube[w.tube.length - 1] : w.ammo) : null;
           chv.round.visible = !!rd;
           if (rd) chv.face.material = chv.shot ? shellMat(rd) : tipMat(rd);
+          // (an authored bolt-action's real port, the bolt worked by hand: the fired case rides the bolt face back, extracted; the next round, up out of the magazine, rides it forward and is chambered
+          // as the bolt closes, its case mouth at the chamber's mouth: the round is held at the bolt face the whole way, so the head is on the face and never inside it)
+          if (chv.real && hk === 'bolt') {
+            const ru = chv.round.userData as { z0?: number; y0?: number }, ac = pl.act as { b?: boolean; h?: boolean } | null;
+            if (ru.z0 == null) { ru.z0 = chv.round.position.z; ru.y0 = chv.round.position.y; }
+            const out = !!ac && !ac.b && !!w.spentCh, inn = !!ac && !!ac.b && !ac.h && (!!w.chamber || w.mag > 0), k = U.clamp(open / boltBack(h), 0, 1);
+            if (out || inn) { chv.round.visible = true; chv.face.visible = inn; chv.round.position.z = ru.z0 + open; chv.round.position.y = ru.y0! - (inn ? 0.007 * S(0.05, 0.9, k) : 0); if (inn) chv.face.material = tipMat(w.chamber || w.ammo); }
+            else { chv.round.position.z = ru.z0; chv.round.position.y = ru.y0!; chv.face.visible = true; }
+          }
         }
         // something in the left hand
         if (pose && pose.dropCase && pl.handCase && !pl.handOut) { pl.handOut = true; ReplayEnv.Casings!.loose(a.def, h.holder.localToWorld(a.props.case.position.clone()), h.holder, pl.handCase); } // (a real case now, falling from where the hand had it)
@@ -1412,6 +1443,13 @@ export const VMAnim = (() => {
   const RAKE = 0.3; // (a pistol grip's slope, its bottom back: the fingers square to it)
   const Q_GRIP = [qBasis(new T.Vector3(1, 0, 0), new T.Vector3(0, Math.sin(RAKE), Math.cos(RAKE))), qBasis(new T.Vector3(-1, 0, 0), new T.Vector3(0, Math.sin(RAKE), Math.cos(RAKE)))]; // (the left hand's, the right's: the palm on the grip's side, the fingers round its front)
   const Q_BOLT = qBasis(new T.Vector3(-0.6, 0, -1), new T.Vector3(0.2, -1, 0.2)); // (the right hand on a bolt's knob: pinched from behind, the fingers up round it, the hand below it)
+  // The right hand on a hand-worked bolt's knob, per gun, for the guns whose knob the hand was fitted to by measurement (the finger bones against the knob's ellipsoid: the gaps in docs/gun-reworks.md): d: the hand's seat from the knob (the gun's frame), q, r, fz: as
+  // holdGrip's, F: the fingers (index, middle, ring, little, thumb).
+  const BOLT_HOLD: Record<string, BoltHold> = {
+    // (fitted in the game: thumb and index within 1.5 mm of the knob's surface at the lift, the rearmost point and the close, the middle finger touching it at most; the other fingers curled under the stem)
+    r700: { d: new T.Vector3(0.0109, 0.003, -0.00955), q: Q_BOLT.clone(), r: 0.004375, fz: 0.035, F: [[0, 1.06625, 0.85, 0.55], [0, 0.751875, 1.45, 0.9], [0, 1.3, 1.5, 0.9], [0, 1.35, 1.5, 0.9], [1.41, 0.1975, 0.15625, 0.3]] },
+    mosin: { d: new T.Vector3(0.01225, 0.003, -0.00775), q: Q_BOLT.clone(), r: 0.004375, fz: 0.035, F: [[0, 1.15625, 0.85, 0.55], [0, 0.759375, 1.45, 0.9], [0, 1.3, 1.5, 0.9], [0, 1.35, 1.5, 0.9], [1.5375, 0.175, 0.15625, 0.3]] },
+  };
   const Q_SUP = qBasis(new T.Vector3(0.35, 1, 0), new T.Vector3(-0.75, 0, 0.65)); // (the support hand under a handguard, the thumb along its left side)
   const Q_PSUP = qBasis(new T.Vector3(1, 0.35, 0), new T.Vector3(0, 0.3, 1)); // (on a pistol, the left hand round the right, its palm on the grip's left side)
   const Q_RACK = qBasis(new T.Vector3(0, -1, 0), new T.Vector3(-1, 0, 0.3)); // (over the top on a slide or a handle on the right, the fingers down its right side)
@@ -1426,15 +1464,16 @@ export const VMAnim = (() => {
   // The firing hand on the grip (side: its hand, -1 the left, an akimbo pair's), or on the bolt's knob (bolt 0..1); trig 0..1: the index finger on the trigger, or off
   // it along the frame. On a grip it can measure (holdObj), the hand's middle on the grip's, the palm against its side and the fingers closed round it.
   function holdGrip(arm: HumArm, h: Rig, side: number, bolt: number, trig: number): HumHoldT {
+    const bh = _bh;
     const q = Q_GRIP[side > 0 ? 1 : 0].clone(), key = 'grip' + side;
     let c = arm.cache[key];
     if (!c) {
       const o = holdObj(h, 'grip'), r = o ? o.a + 0.004 : 0.017;
       c = arm.cache[key] = { r, off: o ? o.c.clone().sub(h.A.G) : new T.Vector3(), F: o && arm.fingers.length ? fingerWrap(arm, FP.grip, o, q, o.c, r, [1, 2, 3]) : FP.grip };
     }
-    if (bolt) q.slerp(Q_BOLT, bolt);
-    const F = fmix(fpick(c.F, fmix(FP.indexed, FP.trigger, trig), [0]), FP.bolt, bolt);
-    return { q, r: U.lerp(c.r, 0.006, bolt), fz: 0.035 * bolt, F, off: c.off.clone().multiplyScalar(1 - bolt) };
+    if (bolt) q.slerp(bh ? bh.q : Q_BOLT, bolt);
+    const F = fmix(fpick(c.F, fmix(FP.indexed, FP.trigger, trig), [0]), bh ? bh.F : FP.bolt, bolt);
+    return { q, r: U.lerp(c.r, bh ? bh.r : 0.006, bolt), fz: (bh ? bh.fz : 0.035) * bolt, F, off: c.off.clone().multiplyScalar(1 - bolt) };
   }
   // The support hand: on the handguard (its fingers closed round what's there to measure, or a pistol's grip round the firing hand's fingers), carrying, over the
   // gun, or on a control (pose.Lk, pose.Lkind)

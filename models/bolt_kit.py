@@ -42,11 +42,6 @@ def put(Kx, me, slot, mat, parent=None, bev=0, deg=30):
     if bev: bevel(o, bev, 1, 40)
     wnorm(o, deg); Kx.adopt(o, slot, mat, parent); return o
 
-def loop(outer, inner, x0, x1):
-    """A flat ring (e.g. a trigger guard) from two outlines (forward, up) extruded across x0..x1."""
-    o = bpy.data.objects.new('tmp', prism(outer, 'x', x0, x1)); bpy.context.scene.collection.objects.link(o)
-    boolean(o, prism(inner, 'x', x0 - 0.001, x1 + 0.001), 'DIFFERENCE'); return o
-
 def bolt_group(Kx, K, pivot_f, rear, face, rb, handle, knob, sleeve=None, cock=None, lug_r=None, ext=True, knob_mat='blued', handle_mat='blued', body_mat='steel', ribs=0):
     """part_bolt: pivot at (0, pivot_f, 0), the handle's root. The bolt body (steel) from the sleeve's front to `face` (the bolt face, closed), a ring of locking lugs and an
     extractor on its head, the sleeve (black) with its cocking piece behind it, and the handle (a stem through the points in `handle`, a ball at `knob` = (right, forward, up, radii))."""
@@ -65,8 +60,6 @@ def bolt_group(Kx, K, pivot_f, rear, face, rb, handle, knob, sleeve=None, cock=N
     if cock:   # the cocking piece: a knob behind the sleeve (cr, length) and the cocking indicator's tab on top
         cr, cl = cock
         put(Kx, lathe([(s0 - cl, cr * 0.7), (s0 - cl + 0.002, cr), (s0 - 0.0005, cr), (s0 + 0.0005, sr * 0.72)], 20), 'base', 'steel', pb)
-        for i in range(5):
-            put(Kx, box(-cr * 1.05, cr * 1.05, s0 - cl + 0.003 + i * 0.0023, s0 - cl + 0.0042 + i * 0.0023, -cr * 1.05, cr * 1.05), 'base', 'gunmetal', pb) if False else None
         put(Kx, box(-0.0022, 0.0022, s0 - cl * 0.9, s0 - 0.001, cr * 0.7, cr * 1.5), 'base', 'steel', pb, bev=0.0004)
     # the handle's root collar, the stem, the knob
     put(Kx, lathe([(pivot_f - 0.011, rb * 1.12), (pivot_f - 0.010, rb * 1.3), (pivot_f + 0.011, rb * 1.3), (pivot_f + 0.012, rb * 1.12)], 24), 'base', handle_mat, pb)
