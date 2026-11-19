@@ -29,7 +29,7 @@ F_RING = 0.176
 F_MOUTH = 0.1405                   # the chamber's mouth
 RND = (0.0073, 0.0516)             # the game's 7.62x54R round (case head radius: the rim, length); its case is drawn 0.72 of it
 CASE = 0.72 * RND[1]
-FACE = F_MOUTH - 0.7 * mm - CASE   # the bolt face closed
+FACE = 0.1343                      # the bolt face closed: against the chamber, at the loading window's front edge (0.1335): the case head in the bolt face, the whole case in the ring
 MUZ = 0.870                        # the barrel's end
 SY = 0.0295                        # the sight line over the bore
 

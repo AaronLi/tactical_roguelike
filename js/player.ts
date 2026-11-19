@@ -1223,15 +1223,15 @@ export const Me = {
     const have = fs.filter((f) => f.it.am === first).reduce((a, f) => a + f.it.n, 0);
     return Math.max(1, Math.min(per, mag - w.mag, have));
   },
-  // The Mosin's load on the animation's own moments (js/vmanim.ts boltLoad, as a fraction of each round's step: the bolt thrown open to its stop by 30% of the
-  // first step, the stripper clip dropped in its guide by 62%, each round thumbed down past the lips by 78%, the bolt shut by 93% of the last, the empty clip off at 80%).
+  // The Mosin's load on the animation's own moments (js/vmanim.ts boltLoad and its loadMoments: the bolt open, the clip seated, each round thumbed down, the empty clip off and the bolt shut).
   mosinLoad(def: WeaponDef, w: PWeapon, mag: number) {
     const total = this.reloadTotal, k = 1 - this.reloadT / total, p = this.mlk == null || k < this.mlk ? -1 : this.mlk; this.mlk = k;
     const first = mag - w.mag === this.reloadN, last = mag - w.mag <= (this.loadN || 1);
     const cue = (at: number, name: string) => { const ld = Handling.lead(def, name); if (ld == null) return false; const tr = Math.max(0, at - ld / total); if (p < tr && k >= tr) return Handling.play(def, name, { land: Math.max(0, (at - k) * total), vol: 0.8 }); return false; };
-    if (first) { cue(0.3, 'open'); cue(0.62, 'clip-in'); }
-    if (cue(0.78, 'cartridge-in')) this.mlCi = true;
-    if (last) { cue(0.8, 'clip-out'); cue(0.93, 'shut'); }
+    const m = VMAnim.loadMoments(first, last);
+    if (first) { cue(m.o1, 'open'); cue(m.s0, 'clip-in'); }
+    if (cue(m.press + 0.02, 'cartridge-in')) this.mlCi = true;
+    if (last) { cue(m.fl0 + 0.05, 'clip-out'); cue(m.shut, 'shut'); }
   },
   // loaded a round (or a push of shells) at a time, this reload: a shell-fed gun, or a revolver topped up by hand
   loose(def: WeaponDef) { return def.shell || (!!this.byHand && revolver(def)); },

@@ -41,7 +41,7 @@ export const VMAnim = (() => {
   type Rig = GunRig; // (one gun in the hands: its holder, its parts, its anchors, its magazine's check data: js/gunrig.ts)
   interface MagState { mode: VmMagMode; at?: number; d?: number; k?: number; q?: THREE.Quaternion }
   // one frame of a clip: the gun's offset and what each part and hand is doing (null: left alone)
-  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; hsteps?: number[] | null; Lon?: HingeHold | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean; Lk?: number; Rk?: number; Lkind?: VmHold; Lelbow?: number } // (Lk, Rk: how far a hand is on an action's control, Lkind which one, for how it holds it: holdSupport)
+  interface Pose { gun: number[]; L: V3 | null; R: V3 | null; mag: MagState; ch: number; catch?: number | null; handle: number | null; open: number | null; slide: number | null; cyl: number; brk: number; cover: number; pump: number | null; lever: number | null; hinge: number | null; hsteps?: number[] | null; Lon?: HingeHold | null; lock: number; bolt: number[] | null; prop: { kind: VmPropKind; pos?: V3; p?: number; pn?: number; dip?: number; rx?: number; dx?: number; by?: V3; n?: number; seat?: number; up?: number; at?: V3[]; home?: V3 } | null; chk?: number; dropCase?: boolean; fed?: number; pulled?: boolean; Lk?: number; Rk?: number; Rc?: number; Lkind?: VmHold; Lelbow?: number } // (Lk, Rk: how far a hand is on an action's control, Lkind which one, for how it holds it: holdSupport)
   // the support hand during a reload sequence (hingeClip): between a and b (k: 0..1), each a point in the gun's space or ON a part_ node (it moves with it: resolved in apply, once the
   // sequence has posed the parts); lead: how far it presses ahead of that point, down (m); carry: the block (part_mag) goes where the hand takes it
   type HingeRef = V3 | { part: string; at: number[] };
@@ -87,9 +87,9 @@ export const VMAnim = (() => {
     if ((kind === 'shell' || kind === 'case') && def) g = GunModels.roundProp(def as { id: string }, kind);
     else if (kind === 'loader') { const plat = Gunsmith.PLATFORMS[def!.id], n = (plat && plat.spec.chambers) || 6, r = new T.Mesh(new T.CylinderGeometry(0.02, 0.02, 0.012, 14), M.black()); r.rotation.x = Math.PI / 2; g.add(r); for (let i = 0; i < n; i++) { const a = (i / n) * Math.PI * 2; const c = new T.Mesh(new T.CylinderGeometry(0.0045, 0.0045, 0.035, 8), M.brass()); c.rotation.x = Math.PI / 2; c.position.set(Math.cos(a) * 0.012, Math.sin(a) * 0.012, -0.02); g.add(c); } }
     else if (kind === 'clip') { const c = new T.Mesh(new T.BoxGeometry(0.014, 0.03, 0.06), M.brass()); g.add(c); }
-    else if (kind === 'stripper' && def) { // a stripper clip (a Mosin's): a spring-steel strip across the rims and five rounds in it, staggered, noses forward (-z)
-      const d = GunModels.roundDims(def as { id: string }), len = d ? d.cs + d.bl : 0.077, strip = new T.Mesh(new T.BoxGeometry(0.0016, 0.082, 0.021), M.steel()); strip.position.set(0, 0, len / 2 - 0.014); g.add(strip);
-      for (let i = 0; i < 5; i++) { const r = GunModels.roundProp(def as { id: string }, 'shell'); r.position.set(i % 2 ? 0.0032 : -0.0032, (i - 2) * 0.0148, 0); g.add(r); }
+    else if (kind === 'stripper' && def) { // a stripper clip (a Mosin's) as it sits in the guide: a spring-steel strip across the case heads and five rounds standing in a row along the bore, noses down, their rims staggered; the origin is the row's middle at the case heads' plane, round 0 the rearmost (+z)
+      const d = GunModels.roundDims(def as { id: string }), len = d ? d.cs + d.bl : 0.077, strip = new T.Mesh(new T.BoxGeometry(0.0135, 0.0016, 0.0127 * 5 + 0.004), M.steel()); strip.position.set(0, -0.0036, 0); g.add(strip);
+      for (let i = 0; i < 5; i++) { const r = GunModels.roundProp(def as { id: string }, 'shell'); r.rotation.x = -Math.PI / 2; r.position.set(i % 2 ? 0.0032 : -0.0032, -len / 2, (2 - i) * 0.0127); g.add(r); }
     }
     else if (kind === 'bolt') g = GunModels.quarrel(true).group; // (the crossbow's own bolt: nock, shaft, vanes and head)
     else if (kind === 'claw' && def) for (let i = 0; i < CLAW_N; i++) g.add(GunModels.roundProp(def as { id: string }, 'shell')); // (the Wolverine grip: a round in each gap between the fingers, placed one by one in apply)
@@ -596,20 +596,38 @@ export const VMAnim = (() => {
     const into = under ? off(port, 0.01, 0.0) : side ? off(port, 0, 0, 0.02) : off(port, 0, 0.03);
     pose.L = path(t, [[0, A.S], [0.3, A.P], [0.38, A.P], [0.62, into], [0.72, port], [0.8, port], [1, A.S]]);
     if (t > 0.34 && t < 0.72) pose.prop = { kind: 'shell' };
-    if (pl && h.an.bolt && h.A.bolt) boltLoad(t, h, pl, pose);
+    if (pl && h.an.bolt && h.A.bolt) { pose.L = null; boltLoad(t, h, pl, pose); }
     return pose;
   }
-  // A hand-worked bolt-action loaded through its open action (a Mosin's, from a stripper clip pressed down in the guide on the receiver's rear bridge): the right hand on the knob holds the bolt up and back
-  // for the whole load (it opens it on the first round and shuts it after the last), the left brings the clip to the guide and presses the rounds down with its thumb, a round a step, the gun turned a little to it.
+  // A hand-worked bolt-action loaded through its open action (a Mosin's, from a stripper clip pressed down in the guide on the receiver's rear bridge), as a 91/30 is loaded: the right hand works the
+  // bolt open (the handle up, drawn back) on the first round's step and lets go of it, fetches the clip and sets it in the guide, and its thumb presses the rounds down into the box, a round a step, on the
+  // case head of the next one along the clip; after the last the right hand flicks the empty clip off and takes the knob again to close the bolt. The left stays at the fore-end throughout, the gun canted
+  // a little to the work, its muzzle up. The time each part takes is a share of the step (first / middle / last of the reload; the whole reload's time is the game's, js/player.ts).
+  const CLIP_PITCH = 0.0127, CLIP_PUSH = 0.016;
+  // the moments of a round's step of the load (fractions of it): the bolt open (o1: the first step's), the clip grabbed (g) and seated (s0), the thumb's push begins (pa) and bottoms out (press), the empty clip off (fl0..fl1: the last's), the bolt closing (cs: the last's) and home (shut); js/player.ts times the sounds from these
+  function loadMoments(first: boolean, last: boolean) {
+    const o1 = last ? 0.25 : 0.28, g = last ? 0.36 : 0.44, s0 = last ? 0.46 : 0.62, pa = first ? (last ? 0.5 : 0.7) : last ? 0.12 : 0.2, fl0 = pa + 0.3, fl1 = fl0 + 0.1, cs = last ? Math.max(fl1 + 0.06, first ? 0.74 : 0.62) : 2;
+    return { o1, g, s0, pa, press: pa + 0.12, fl0, fl1, cs, shut: last ? 0.95 : 2 };
+  }
   function boltLoad(t: number, h: Rig, pl: Pl, pose: Pose) {
-    const A = h.A, w = pl.cur(), left = pl.magSize(w) - w.mag, first = left === pl.reloadN, last = left <= (pl.loadN || 1), travel = boltBack(h);
-    const open = (first ? S(0.0, 0.3, t) : 1) * (1 - (last ? S(0.58, 0.95, t) : 0)), lift = U.clamp(open * 2, 0, 1), back = U.clamp(open * 2 - 1, 0, 1), on = (first ? S(0.0, 0.2, t) : 1) * (1 - (last ? S(0.94, 1, t) : 0));
-    pose.bolt = [lift, back]; pose.open = back * travel; pose.Rk = on;
-    pose.R = lerpV(A.G, knobAt(A, lift, back, travel).add(_bh ? _bh.d : _v0), on);
-    const port = A.port || A.S, guide = new T.Vector3(0, port.y + 0.035, port.z + 0.064); // (above the clip guide: 64 mm behind the port's middle, the receiver's top)
-    pose.L = path(t, [[0, A.S], [0.3, A.P], [0.38, A.P], [0.6, off(guide, 0, 0.05)], [0.7, guide], [0.8, guide], [1, A.S]]);
-    pose.prop = t > 0.3 && t < 0.78 ? { kind: 'stripper' } : null;
-    pose.gun[5] = -0.18 * S(0.0, 0.2, t) * (1 - S(0.8, 1, t)); pose.gun[3] = 0.1 * S(0.0, 0.2, t) * (1 - S(0.8, 1, t)); // (the gun canted a little to the left hand's work, its muzzle up)
+    const A = h.A, w = pl.cur(), left = pl.magSize(w) - w.mag, first = left === pl.reloadN, last = left <= (pl.loadN || 1), travel = boltBack(h), j = Math.max(0, pl.reloadN - left);
+    // the step's moments (fractions of it): the bolt open by o1; the clip grabbed g and seated s0; the thumb's push begins pa; the clip off fl0..fl1; the hand back on the knob kb, the bolt closing cs..0.97
+    const { o1, g, s0, pa, fl0, fl1, cs } = loadMoments(first, last), kb = cs - 0.1;
+    const openK = (first ? S(0.0, o1, t) : 1) * (1 - (last ? S(cs, 0.97, t) : 0)), lift = U.clamp(openK * 2, 0, 1), back = U.clamp(openK * 2 - 1, 0, 1);
+    pose.bolt = [lift, back]; pose.open = back * travel;
+    const knob = knobAt(A, lift, back, travel).add(_bh ? _bh.d : _v0);
+    const kn = Math.max(first ? S(0.0, 0.06, t) * (1 - S(o1, o1 + 0.1, t)) : 0, last ? S(kb, kb + 0.08, t) : 0); // (the right hand on the knob)
+    pose.Rk = kn; pose.Rc = 1 - kn;
+    const port = A.port || A.S, guide = new T.Vector3(0, port.y + 0.030, port.z + 0.063), gone = guide.clone().add(new T.Vector3(0.07, 0.07, 0.05)), src = guide.clone().add(new T.Vector3(0.1, -0.07, 0.08));
+    const seat = first ? S(g, s0, t) : 1, away = last ? S(fl0, fl1, t) : 0;
+    const clipPos = (first ? lerpV(src, guide, seat) : guide.clone()).lerp(gone, away);
+    const pu = S(pa, pa + 0.12, t), dip = CLIP_PUSH * pu, hd = dip * (1 - S(pa + 0.14, pa + 0.26, t)), stag = (j % 2 ? 0.0032 : -0.0032);
+    // the hand rides the clip: its target a fixed seat from the case head the thumb is on (that round, along the row as they go down)
+    const head = clipPos.clone().add(new T.Vector3(stag, -hd, (2 - j) * CLIP_PITCH * (1 - away)));
+    pose.R = lerpV(head.add(CLIP_HOLD.d), knob, kn);
+    const here = t >= (first ? g : 0) && t < (last ? fl1 : 2);
+    pose.prop = here ? { kind: 'stripper', pos: clipPos, p: j, pn: Math.min(5, pl.reloadN), dip: t < pa + 0.26 ? dip : 99 } : null;
+    pose.gun[5] = -0.18 * S(0.0, 0.2, t) * (1 - S(0.8, 1, t)); pose.gun[3] = 0.1 * S(0.0, 0.2, t) * (1 - S(0.8, 1, t)); // (the gun canted a little to the left, its muzzle up)
   }
   function revolverClip(t: number, h: Rig) {
     const A = h.A, pose = base(), cyl = A.cyl || A.S;
@@ -1028,7 +1046,7 @@ export const VMAnim = (() => {
         return;
       }
       if (idx === 0) {
-        if (a.R.hum) humHold(a.R, h, Rt.applyMatrix4(h.holder.matrix), holdGrip(a.R.hum, h, 1, pose && pose.Rk || 0, a.trig)); else place(a.R, SHOULDER_R.clone().applyMatrix4(_inv), Rt.applyMatrix4(h.holder.matrix));
+        if (a.R.hum) humHold(a.R, h, Rt.applyMatrix4(h.holder.matrix), holdGrip(a.R.hum, h, 1, pose && pose.Rk || 0, a.trig, pose && pose.Rc || 0)); else place(a.R, SHOULDER_R.clone().applyMatrix4(_inv), Rt.applyMatrix4(h.holder.matrix));
         if (a.L.hum) humHold(a.L, h, Lt.clone().applyMatrix4(h.holder.matrix), holdSupport(a.L.hum, h, pose, Lt, !!(h.info as { pistol?: boolean }).pistol || a.k.action === 'pistol' || (!!h.A.S && !!h.A.G && h.A.S.distanceTo(h.A.G) < 0.07))); else place(a.L, SHOULDER_L.clone().applyMatrix4(_inv), Lt.clone().applyMatrix4(h.holder.matrix));
         a.L.sleeve.visible = a.L.glove.visible = !pl.zipRide && !a.L.hum; // (on a zipline the left hand's up on the trolley, out of view)
         if (a.L.hum) for (const m of a.L.hum.meshes) m.visible = !pl.zipRide;
@@ -1096,6 +1114,7 @@ export const VMAnim = (() => {
           if (kind === 'claw') { if (obj.visible) clawPose(obj, pose!.prop!, a.L.glove, h.holder, Lt, !!a.L.hum); continue; }
           const rx = (obj.visible && pose!.prop!.rx) || 0; // (tipped up with a derringer's barrels, held by its base)
           obj.rotation.x = rx;
+          if (obj.visible && pose!.prop!.pos) { obj.position.copy(pose!.prop!.pos); if (kind === 'stripper') { const pp = pose!.prop!; const rd0 = GunModels.roundDims(a.def as { id: string }), ln = rd0 ? rd0.cs + rd0.bl : 0.077; obj.children.forEach((c, i) => { if (i) { c.visible = i - 1 >= (pp.p || 0) && i - 1 < (pp.pn || 5); c.position.y = -ln / 2 - (i - 1 === pp.p ? pp.dip || 0 : 0); } }); } continue; } // (a prop set in the gun's space, not the left hand's: a stripper clip in the right)
           if (obj.visible) obj.position.copy(Lt).add(new T.Vector3(0.0, -0.012, -0.03).applyAxisAngle(_X, rx)).add(_v2.set(pose!.prop!.dx || 0, 0, 0)); // (dx: held to the side of the hand)
           if (obj.visible && pose!.prop!.by) obj.position.add(pose!.prop!.by); // (by: held by its rim, not its middle)
           if (obj.visible && kind === 'shell' && !obj.userData.cart) {
@@ -1453,6 +1472,9 @@ export const VMAnim = (() => {
     // (the Mosin's hand rolled 60 degrees left seen from behind (about the gun's +z axis), the knob between the index, the middle finger and the thumb, all within 2 mm of it)
     mosin: { d: new T.Vector3(0.007375, 0.009, -0.00775), q: Q_BOLT.clone().premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), Math.PI / 3)), r: 0.005875, fz: 0.035, F: [[0, 1.025, 0.85, 0.55], [0, 0.534375, 1.45, 0.9], [0, 1.3, 1.5, 0.9], [0, 1.35, 1.5, 0.9], [1.6875, 0.0625, 0.15625, 0.3]] },
   };
+  // The right hand's hold on a stripper clip in the Mosin's guide, the thumb on the top round's case head pressing it down (Mosin reload, boltLoad): the palm toward the gun's left, the fingers round the clip's right
+  // side, the thumb along the top; d: where the hand's target sits from the case head the thumb is on (the gun's frame), fitted so the thumb's tip rests on the head.
+  const CLIP_HOLD = { q: qBasis(new T.Vector3(-1, 0, -0.3), new T.Vector3(0, 1, 0.2)), r: 0.012, fz: 0.02, d: new T.Vector3(-0.014, -0.0023, 0.0548), F: [[0, 0.7, 1.1, 0.8], [0, 0.8, 1.2, 0.8], [0, 0.9, 1.3, 0.8], [0, 1.0, 1.3, 0.8], [0.3, 0.0, 0.1, 0.1]] as FPose };
   const Q_SUP = qBasis(new T.Vector3(0.35, 1, 0), new T.Vector3(-0.75, 0, 0.65)); // (the support hand under a handguard, the thumb along its left side)
   const Q_PSUP = qBasis(new T.Vector3(1, 0.35, 0), new T.Vector3(0, 0.3, 1)); // (on a pistol, the left hand round the right, its palm on the grip's left side)
   const Q_RACK = qBasis(new T.Vector3(0, -1, 0), new T.Vector3(-1, 0, 0.3)); // (over the top on a slide or a handle on the right, the fingers down its right side)
@@ -1466,7 +1488,7 @@ export const VMAnim = (() => {
   const Q_TOP = qBasis(new T.Vector3(0.25, -1, 0), new T.Vector3(-1, 0.2, 0.45)); // (over the gun, the palm down and the fingers across it to the right, the arm from the left: a round, a clip or a bolt pressed in from above)
   // The firing hand on the grip (side: its hand, -1 the left, an akimbo pair's), or on the bolt's knob (bolt 0..1); trig 0..1: the index finger on the trigger, or off
   // it along the frame. On a grip it can measure (holdObj), the hand's middle on the grip's, the palm against its side and the fingers closed round it.
-  function holdGrip(arm: HumArm, h: Rig, side: number, bolt: number, trig: number): HumHoldT {
+  function holdGrip(arm: HumArm, h: Rig, side: number, bolt: number, trig: number, clip = 0): HumHoldT {
     const bh = _bh;
     const q = Q_GRIP[side > 0 ? 1 : 0].clone(), key = 'grip' + side;
     let c = arm.cache[key];
@@ -1475,8 +1497,10 @@ export const VMAnim = (() => {
       c = arm.cache[key] = { r, off: o ? o.c.clone().sub(h.A.G) : new T.Vector3(), F: o && arm.fingers.length ? fingerWrap(arm, FP.grip, o, q, o.c, r, [1, 2, 3]) : FP.grip };
     }
     if (bolt) q.slerp(bh ? bh.q : Q_BOLT, bolt);
-    const F = fmix(fpick(c.F, fmix(FP.indexed, FP.trigger, trig), [0]), bh ? bh.F : FP.bolt, bolt);
-    return { q, r: U.lerp(c.r, bh ? bh.r : 0.006, bolt), fz: (bh ? bh.fz : 0.035) * bolt, F, off: c.off.clone().multiplyScalar(1 - bolt) };
+    let F = fmix(fpick(c.F, fmix(FP.indexed, FP.trigger, trig), [0]), bh ? bh.F : FP.bolt, bolt);
+    let r = U.lerp(c.r, bh ? bh.r : 0.006, bolt), fz = (bh ? bh.fz : 0.035) * bolt;
+    if (clip > 0) { q.slerp(CLIP_HOLD.q, clip); F = fmix(F, CLIP_HOLD.F, clip); r = U.lerp(r, CLIP_HOLD.r, clip); fz = U.lerp(fz, CLIP_HOLD.fz, clip); } // (a stripper clip held, its rounds thumbed down: CLIP_HOLD)
+    return { q, r, fz, F, off: c.off.clone().multiplyScalar((1 - bolt) * (1 - clip)) };
   }
   // The support hand: on the handguard (its fingers closed round what's there to measure, or a pistol's grip round the firing hand's fingers), carrying, over the
   // gun, or on a control (pose.Lk, pose.Lkind)
@@ -1572,6 +1596,6 @@ export const VMAnim = (() => {
     arm.glove.quaternion.copy(_q).multiply(RX);
   }
 
-  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap, hingeTimeline, hingeSteps, HINGE_EASE };
+  return { loadMoments, prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap, hingeTimeline, hingeSteps, HINGE_EASE };
 })();
 
