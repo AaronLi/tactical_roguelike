@@ -62,7 +62,26 @@ def hw(f):
     for (a, wa), (b, wb) in zip(pts, pts[1:]):
         if a <= f <= b: return (wa + (wb - wa) * (f - a) / (b - a)) * mm
     return 27.0 * mm
-PLAN = [(-30 * mm, -0.01), (-31 * mm, 0.12), (-31 * mm, 0.36), (-HWG, 0.40), (-HWG, 0.62), (HWG, 0.62), (HWG, 0.40), (31 * mm, 0.36), (31 * mm, 0.12), (30 * mm, -0.01)]
+def plan_pts(d=0.0):
+    """The body seen from above (x, forward): the butt's back edge straight across its middle, its corners rounded by 20 mm arcs, 62 mm across behind the grip, 54 round the handguard."""
+    R = 26 * mm; W = 31 * mm + d; cx = W - R; right = []
+    for i in range(9):                                            # (the rear right corner: from the back edge round to the side)
+        a = math.pi / 2 * i / 8; right.append((cx + R * math.sin(a), 0.0 - d + R - R * math.cos(a)))
+    right += [(31 * mm + d, 0.36), (HWG + d, 0.40), (HWG + d, 0.62 + d)]
+    return [(-x, f) for x, f in right[::-1]] + right
+PLAN = plan_pts()
+def section_pts(d=0.0, zb=-0.080, zt=0.0482):
+    """The body's cross-section (x, up): broad shoulders (15 mm radius on the top corners), a flat top, the underside's corners rounded by 10 mm."""
+    W = 31 * mm + d; Rt = 20 * mm; Rb = 14 * mm; pts = []
+    for i in range(9):                                            # (top right shoulder, from the side up to the top)
+        a = math.pi / 2 * i / 8; pts.append((W - Rt + Rt * math.cos(a), zt + d - Rt + Rt * math.sin(a)))
+    for i in range(9):                                            # (top left)
+        a = math.pi / 2 + math.pi / 2 * i / 8; pts.append((-W + Rt + Rt * math.cos(a), zt + d - Rt + Rt * math.sin(a)))
+    for i in range(9):                                            # (bottom left)
+        a = math.pi + math.pi / 2 * i / 8; pts.append((-W + Rb + Rb * math.cos(a), zb - d + Rb + Rb * math.sin(a)))
+    for i in range(9):                                            # (bottom right)
+        a = 1.5 * math.pi + math.pi / 2 * i / 8; pts.append((W - Rb + Rb * math.cos(a), zb - d + Rb + Rb * math.sin(a)))
+    return pts
 def dark(poly_px, x_lo, x_hi):
     o = K.tmp(prism(PL(poly_px), 'x', x_lo, x_hi)); smooth(o); K.adopt(o, 'base', 'black'); return o
 def pocket(sh, poly_px, f, sx, depth, floor=True, mat='black'):
@@ -71,7 +90,7 @@ def pocket(sh, poly_px, f, sx, depth, floor=True, mat='black'):
     cut(sh, prism(PL(poly_px), 'x', *xs(a, b)))
     if floor: dark(poly_px, *xs(sx * (w - depth), sx * (w - depth + 0.7 * mm)))
 def raised(poly_px, f, sx, h, mat='black', bev=0.4):
-    w = hw(f); o = K.tmp(prism(PL(poly_px), 'x', *xs(sx * (w - 0.3 * mm), sx * (w + h)))); bevel(o, min(0.4 * mm, h * 0.45), 1); smooth(o); K.adopt(o, 'base', mat); return o
+    w = hw(f); o = K.tmp(prism(PL(poly_px), 'x', *xs(sx * (w - 0.3 * mm), sx * (w + h)))); boolean(o, prism(plan_pts(h), 'z', U(1300), U(-300)), 'INTERSECT'); boolean(o, prism(section_pts(h), 'y', -0.10, 0.80), 'INTERSECT'); bevel(o, min(0.4 * mm, h * 0.45), 1); smooth(o); K.adopt(o, 'base', mat); return o
 def disc(cx, cy, r, f, sx, h, mat, n=14, depth=0.0):
     w = hw(f); o = K.obj(cyl(r * S, *xs(sx * (w - depth), sx * (w + h)), 'x', (F(cx), U(cy)), n), 'base', mat); smooth(o); return o
 
@@ -83,8 +102,8 @@ MAG_TOP = (F(452), -0.0458)                  # the well's mouth is photo x 421-4
 MB, MF = -32.6 * mm, 31.6 * mm
 sh = K.tmp(prism(PL(SHELL), 'x', -40 * mm, 40 * mm))
 boolean(sh, prism(PLAN, 'z', U(1300), U(-300)), 'INTERSECT')
-# the sides lean in over the top 20 mm (the cross-section's soft shoulders), then the whole body's edges are rounded (4 mm, three segments) before any detail is cut
-boolean(sh, prism([(-31 * mm, -0.30), (31 * mm, -0.30), (31 * mm, 0.030), (25 * mm, 0.0505), (-25 * mm, 0.0505), (-31 * mm, 0.030)], 'y', -0.10, 0.80), 'INTERSECT')
+# the section: broad shoulders on the top (15 mm), the underside rounded (10 mm); then the remaining edges are rounded (4 mm, three segments) before any detail is cut
+boolean(sh, prism(section_pts(), 'y', -0.10, 0.80), 'INTERSECT')
 tidy(sh, 0.1 * mm, False); bevel(sh, 4.0 * mm, 3, 30)               # (chamfer the body once, THEN the cuts)
 cut(sh, box(-12.4 * mm, 12.4 * mm, MAG_TOP[0] + MB - 1.0 * mm, MAG_TOP[0] + MF + 1.0 * mm, U(1250), MAG_TOP[1] + 2 * mm))
 PORT = (F(499), F(419), U(172), U(153))                             # (the right side's ejection port; the left shows its cover panel at the same place)
@@ -119,7 +138,7 @@ for i in range(11):
     cut(sh, box(-HWG - 1 * mm, HWG + 1 * mm, F(xg + 1.8), F(xg), U(196) - 0.001, U(196) + 1.6 * mm))
 # ---- the left side: the long channel for the charging knob, the cover panel where the port would be, its hole plate, the plugs, the mag release's recess
 CH = slot_pts(291.5, 148, 86, 7, 90, 8)
-pocket(sh, CH, 0.45, -1, 12.0 * mm)
+cut(sh, prism(PL(CH), 'x', -40 * mm, -HWG + 12.0 * mm)); dark(CH, -HWG + 11.4 * mm, -HWG + 12.2 * mm)       # (the channel: open from the shell's side, wherever that is along its length (31 mm out behind f 0.40, 27 ahead of it), down to a floor 15 mm from the axis)
 BLANK = rect(419, 154, 499, 170, 2.0)
 pocket(sh, BLANK, 0.18, -1, 7.0 * mm)
 HOLEPLATE = rect(500, 153, 529, 170, 1.5)
@@ -137,7 +156,7 @@ for sx in (-1, 1):
     pocket(sh, circ(323, 183, 12.5), 0.31, sx, 3.0 * mm, floor=False)               # (the selector's recess)
 cut(sh, box(-4.5 * mm, 4.5 * mm, F(297.6), F(283.4), U(199), U(188)))                 # (the slot in the floor the trigger comes through)
 tidy(sh, 1e-6, True)
-wnorm(sh); K.adopt(sh, 'base', SH)
+wnorm(sh, 50); K.adopt(sh, 'base', SH)
 port_inside(K, *PORT, 31 * mm, mouth_r=5.6 * mm, ramp=26 * mm, az=(PORT[2] + PORT[3]) / 2)
 CARRIER = port_carrier(K, *PORT, 31 * mm, ax=0.0, az=(PORT[2] + PORT[3]) / 2)
 
@@ -154,7 +173,7 @@ for gy in (153, 157, 161, 165):
     cut(pn, prism(PL(rect(177, gy, 194, gy + 0.9, 0.2)), 'x', -w_ - 1 * mm, -w_ + 0.0 * mm) if False else prism(PL(rect(177, gy, 194, gy + 0.9, 0.2)), 'x', -w_ - 1 * mm, -w_ + 0.7 * mm))
 bevel(pn, 0.3 * mm, 1); smooth(pn); K.adopt(pn, 'base', SH)
 raised(rect(547, 172, 577, 178, 1.5), 0.1, -1, 0.8 * mm, 'steel')                  # (the serial plate)
-raised(rect(581, 136, 631, 170, 4.0), 0.03, -1, 0.9 * mm, SH); raised(rect(581, 136, 631, 170, 4.0), 0.03, 1, 0.9 * mm, SH)   # (the butt's raised rear panel, each side)
+raised(rect(581, 136, 612, 170, 4.0), 0.03, -1, 0.9 * mm, SH); raised(rect(581, 136, 612, 170, 4.0), 0.03, 1, 0.9 * mm, SH)   # (the butt's raised rear panel, each side)
 for sx in (-1, 1):
     disc(595, 146, 5.0, 0.04, sx, 1.4 * mm, 'black'); disc(595, 146, 2.0, 0.04, sx, 1.9 * mm, 'steel')       # (its pin)
     disc(535, 208, 6.0, 0.1, sx, 1.0 * mm, 'steel', depth=3.0 * mm)                      # (the ring plug's stud)
@@ -179,7 +198,8 @@ o = K.tmp(prism(PL(rect(120, 153, 148, 172, 2.0)), 'x', 30.7 * mm, 33.2 * mm)); 
 o = K.obj(cyl(2.0 * mm, 33.0 * mm, 33.8 * mm, 'x', (F(135), U(162)), 8), 'base', 'steel'); smooth(o)
 # the butt pad (a line of rubber across the butt's rear)
 BUTT = [[612, 125], [622, 125], [630, 127], [634, 133], [633, 164], [631, 192], [631, 231], [627, 235], [621, 236], [612, 236]]
-o = K.tmp(prism(PL(BUTT), 'x', -30.8 * mm, 30.8 * mm)); tidy(o, 0.1 * mm, False); bevel(o, 3.0 * mm, 2, 30); wnorm(o); K.adopt(o, 'base', 'rubber')
+pad = K.tmp(prism(PL(SHELL), 'x', -40 * mm, 40 * mm)); boolean(pad, prism(plan_pts(0.8 * mm), 'z', U(1300), U(-300)), 'INTERSECT'); boolean(pad, prism(section_pts(0.8 * mm), 'y', -0.10, 0.80), 'INTERSECT')
+tidy(pad, 0.1 * mm, False); bevel(pad, 4.0 * mm, 3, 30); boolean(pad, prism(PL(BUTT), 'x', -40 * mm, 40 * mm), 'INTERSECT'); wnorm(pad, 50); K.adopt(pad, 'base', 'rubber')      # (the butt pad: the shell's own shape, 0.8 mm proud, cut off at its front)
 # the trigger
 # the trigger: a thin curved steel blade coming down out of a slot in the receiver's floor (its top inside the housing), its tip forward and low (photo x 284-296, y 189-220)
 TRIG = [[285.5, 188.5], [296, 188.5], [296, 199], [295.6, 206], [293.4, 213.5], [288.5, 218.5], [285, 219.7], [284.4, 218], [287, 212.5], [288.8, 204], [287.5, 198], [285.5, 196]]
@@ -248,8 +268,8 @@ for sx in (-1, 1):
 H0 = (F(238), U(148))
 ph = K.part('handle', (0, H0[0], H0[1]))
 XH = -HWG
-o = K.obj(cyl(3.6 * mm, XH - 40.0 * mm, XH + 0.5 * mm, 'x', H0, 12), 'base', 'black', ph); smooth(o)                                   # (the stem)
-hd = K.tmp(cyl(9.0 * mm, XH - 57.0 * mm, XH - 38.0 * mm, 'x', H0, 24)); bevel(hd, 3.2 * mm, 2, 30); smooth(hd); K.adopt(hd, 'base', 'black', ph)   # (the round knob)
+o = K.obj(cyl(3.4 * mm, XH - 9.0 * mm, XH + 0.5 * mm, 'x', H0, 12), 'base', 'black', ph); smooth(o)                                   # (the stem)
+hd = K.tmp(cyl(8.0 * mm, XH - 17.0 * mm, XH - 8.5 * mm, 'x', H0, 20)); bevel(hd, 2.4 * mm, 2, 30); smooth(hd); K.adopt(hd, 'base', 'black', ph)   # (the round knob)
 o = K.obj(cyl(1.8 * mm, H0[0] - 0.100, H0[0] - 0.004, 'y', (XH + 1.6 * mm, H0[1]), 8), 'base', 'steel', ph); smooth(o)                  # (the guide rod in the channel)
 
 # ===================================================================================== the sights (optic: the gun's own flip-up irons on the rail)
@@ -287,7 +307,7 @@ info = {
     'anim': {'mag': 'part_mag', 'handle': 'part_handle', 'carrier': 'part_carrier'},
     'carrier': {'travel': 0.090},
     'magAt': [r4(MAG_TOP[0]), r4(MAG_TOP[1])],
-    'handle': {'f': r4(H0[0]), 'y': r4(H0[1]), 'x': r4(XH - 0.048), 'travel': 0.100, 'recip': False, 'style': 'knob', 'grab': [r4(H0[0] + 0.008), r4(H0[1]), r4(XH - 0.048)]},
+    'handle': {'f': r4(H0[0]), 'y': r4(H0[1]), 'x': r4(XH - 0.014), 'travel': 0.100, 'recip': False, 'style': 'knob', 'grab': [r4(H0[0] + 0.008), r4(H0[1]), r4(XH - 0.014)]},
     'port': [r4((PORT[0] + PORT[1]) / 2), r4((PORT[2] + PORT[3]) / 2), 0.031],
     'chamberAt': {'side': 'port', 'f': r4(PORT[1] - 0.7 * mm - 0.72 * 0.042), 'y': r4((PORT[2] + PORT[3]) / 2 + 0.0048), 'x': 0.0},
     'recoilBarrel': 0,

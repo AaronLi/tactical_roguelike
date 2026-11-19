@@ -294,7 +294,7 @@ export const VMAnim = (() => {
     else if (kind === 'ar') { pose.gun[3] += 0.35 * r; pose.gun[2] -= 0.1 * r; pose.gun[0] -= 0.04 * r; pose.gun[1] += 0.02 * r; }
     else if (kind === 'handle' && A.H) {
       const side = Math.abs(A.H.x) > 0.005 ? Math.sign(A.H.x) : 0; // (turn the handle side toward you; one on top: tip it up)
-      pose.gun[5] += (side > 0 ? 0.45 : side < 0 ? -0.3 : 0) * r; pose.gun[3] += (side ? 0.2 : 0.3) * r; pose.gun[0] -= (side > 0 ? 0.1 : 0.05) * r; pose.gun[1] += 0.03 * r; if (side > 0) { pose.gun[2] += 0.05 * r; pose.gun[4] += 0.35 * r; } // (a right-side handle: the gun brought in toward the left hand and back, so the arm has a bend to lower the elbow with)
+      pose.gun[5] += (side > 0 ? 0.45 : side < 0 ? (pause ? -0.7 : -0.3) : 0) * r; // (the X95's left handle: the gun turned further so the channel and the knob's pull are broadside to you) pose.gun[3] += (side ? 0.2 : 0.3) * r; pose.gun[0] -= (side > 0 ? 0.1 : 0.05) * r; pose.gun[1] += 0.03 * r; if (side > 0) { pose.gun[2] += 0.05 * r; pose.gun[4] += 0.35 * r; } // (a right-side handle: the gun brought in toward the left hand and back, so the arm has a bend to lower the elbow with)
     } else if (kind === 'bolt') { pose.gun[5] += 0.2 * r; pose.gun[3] += 0.05 * r; } // (canted a little, the bolt toward you)
   }
   // Sending the action home from where it locked open: the left thumb on the slide stop (a pistol) or the palm
