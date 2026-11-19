@@ -96,15 +96,15 @@ for pc_ in port_cutter(*PORT, -2.0 * mm, 33 * mm): cut(sh, pc_)
 
 # ---- the handguard (both sides): the slanted slots, the row of short slots along its lower edge, the top dashes, the grid panel, the nose cap's vents
 for sx in (-1, 1):
-    for hx in (112, 128, 144, 160, 176, 192, 208):
-        pocket(sh, slot_pts(hx, 160, 30, 3.6, -11), 0.5, sx, 9.0 * mm)
-    for i in range(10):
-        pocket(sh, slot_pts(98 + 10.8 * i, 178, 9, 4.2, 0), 0.5, sx, 9.0 * mm)
-    for hx in (100, 114, 128, 226, 242):
-        pocket(sh, slot_pts(hx, 128, 12, 4, 90), 0.5, sx, 7.0 * mm)
-cut(sh, prism(PL(circ(160, 128, 2.8, 8)), 'x', -40 * mm, 40 * mm))       # (the four round holes in the top housing: the photo shows daylight through them)
-for hx in (172, 184, 196): cut(sh, prism(PL(circ(hx, 128, 2.8, 8)), 'x', -40 * mm, 40 * mm))
-pocket(sh, rect(166, 147, 198, 169, 1.5), 0.5, -1, 1.2 * mm, floor=False)          # (the grid panel, left: recessed, with its ribs raised again below)
+    for hx in (130, 141, 154, 166, 202, 216, 228, 238):                        # (the slanted slots, the top leaning toward the muzzle: pitch 12 px, 21 long)
+        pocket(sh, slot_pts(hx, 154, 21, 3.6, -11), 0.5, sx, 9.0 * mm)
+    for hx in (95, 107, 118, 130, 141, 154, 166, 202):                         # (the short round-ended slots along its lower edge)
+        pocket(sh, slot_pts(hx, 170.5, 9, 4.2, 0), 0.5, sx, 9.0 * mm)
+    for hx in (121, 135, 185, 202):                                            # (the dashes along the top housing's side)
+        pocket(sh, slot_pts(hx, 132, 9, 3.6, 90), 0.5, sx, 7.0 * mm)
+for hx in (153, 168):                                                          # (two of them go through: the photo shows daylight through the middle ones)
+    cut(sh, prism(PL(slot_pts(hx, 132, 9, 3.6, 90)), 'x', -40 * mm, 40 * mm))
+pocket(sh, rect(174, 145, 197, 170, 1.5), 0.5, -1, 1.2 * mm, floor=False)          # (the grid panel, left: recessed, with its ribs raised again below)
 # the nose cap's vents (on its front face, cut along the bore): four slots over the barrel, two round holes under it
 def nose_cut(poly_xz, depth=10.0):
     cut(sh, prism(poly_xz, 'y', F(91) - 0.001, F(91) + depth * mm))
@@ -112,10 +112,10 @@ for xo in (-15, -8, 8, 15):
     nose_cut([(xo * mm - 1.6 * mm, 4 * mm), (xo * mm + 1.6 * mm, 4 * mm), (xo * mm + 1.6 * mm, 16 * mm), (xo * mm - 1.6 * mm, 16 * mm)])
 for xo in (-10, 10): nose_cut([(xo * mm + 3.0 * mm * math.cos(2 * math.pi * i / 10), -17 * mm + 3.0 * mm * math.sin(2 * math.pi * i / 10)) for i in range(10)])
 # the sling hole through the nose cap's flanks
-cut(sh, prism([(F(101) + 4.5 * mm * math.cos(2 * math.pi * i / 10), U(152) + 4.5 * mm * math.sin(2 * math.pi * i / 10)) for i in range(10)], 'x', -40 * mm, 40 * mm))
+cut(sh, prism([(F(101) + 4.5 * mm * math.cos(2 * math.pi * i / 10), U(148) + 4.5 * mm * math.sin(2 * math.pi * i / 10)) for i in range(10)], 'x', -40 * mm, 40 * mm))
 # the ridged lower lip: grooves across the handguard's underside
-for i in range(15):
-    xg = 118 + 8.4 * i
+for i in range(11):
+    xg = 100 + 12.5 * i
     cut(sh, box(-HWG - 1 * mm, HWG + 1 * mm, F(xg + 1.8), F(xg), U(196) - 0.001, U(196) + 1.6 * mm))
 # ---- the left side: the long channel for the charging knob, the cover panel where the port would be, its hole plate, the plugs, the mag release's recess
 CH = slot_pts(291.5, 148, 86, 7, 90, 8)
@@ -141,8 +141,8 @@ port_inside(K, *PORT, 31 * mm, mouth_r=5.6 * mm, ramp=26 * mm, az=(PORT[2] + POR
 CARRIER = port_carrier(K, *PORT, 31 * mm, ax=0.0, az=(PORT[2] + PORT[3]) / 2)
 
 # ---- the grid panel's ribs, the raised and fitted parts, the pins and plugs (both sides where the photos show them on both)
-for gx in (170, 178, 186, 194): raised(rect(gx, 149, gx + 1.6, 167, 0.3), 0.5, -1, 0.8 * mm, SH)
-for gy in (153, 159, 165): raised(rect(168, gy, 197, gy + 1.6, 0.3), 0.5, -1, 0.8 * mm, SH)
+for gx in (178, 184, 190): raised(rect(gx, 147, gx + 1.6, 168, 0.3), 0.5, -1, 0.8 * mm, SH)
+for gy in (151, 157, 163): raised(rect(175, gy, 196, gy + 1.6, 0.3), 0.5, -1, 0.8 * mm, SH)
 raised(rect(547, 172, 577, 178, 1.5), 0.1, -1, 0.8 * mm, 'steel')                  # (the serial plate)
 raised(rect(581, 136, 631, 170, 4.0), 0.03, -1, 0.9 * mm, SH); raised(rect(581, 136, 631, 170, 4.0), 0.03, 1, 0.9 * mm, SH)   # (the butt's raised rear panel, each side)
 for sx in (-1, 1):
@@ -184,7 +184,7 @@ SY = 0.088                                                        # the sight li
 L = F(91)                                                         # the handguard's nose face: where the barrel comes out
 # the lower rail is the handguard's own ridged lip; the side rail sections for the game's lights sit on its flanks
 for s_, ax in ((1, 'right'), (-1, 'left')):
-    picatinny(K, L - 0.090, L - 0.045, -6 * mm, 'base', 'black', axis=ax, x0=s_ * HWG, lean=True)
+    picatinny(K, F(227), F(203), -6 * mm, 'base', 'black', axis=ax, x0=s_ * HWG, lean=True)
 
 # ===================================================================================== the barrel (barrel) and the flash hider (muzzle)
 MZ0 = F(55)
@@ -208,15 +208,29 @@ def flash_hider(mz0, ln=0.0450, R=10.2 * mm):
 MUZ = flash_hider(MZ0)
 
 # ===================================================================================== the grip (grip): the pistol grip and the trigger-guard loop in one, as the photos show
-GRIP = [[248, 193], [248, 196], [252, 200], [252, 202], [255, 204], [255, 207], [258, 210], [260, 220], [262, 222], [263, 228], [269, 240], [269, 243], [271, 245], [272, 251], [276, 258],
-        [281, 274], [283, 276], [284, 282], [287, 288], [292, 293], [299, 296], [350, 296], [354, 295], [360, 292], [365, 287], [366, 274], [365, 264], [363, 252], [361, 246],
-        [356, 224], [348, 208], [348, 201], [350, 196], [357, 190], [360, 185]]
-WIN = [[284, 190], [278, 196], [274, 197], [273, 200], [271, 201], [269, 211], [271, 213], [271, 217], [272, 217], [275, 229], [278, 233], [279, 239], [282, 243], [282, 246], [284, 248],
-       [288, 262], [293, 270], [296, 280], [302, 285], [327, 285], [329, 284], [331, 281], [331, 265], [330, 265], [330, 260], [329, 260], [327, 251], [325, 250], [325, 248],
-       [320, 246], [320, 240], [321, 240], [320, 233], [315, 228], [305, 226], [305, 223], [311, 221], [312, 218], [314, 217], [314, 214], [315, 214], [314, 201], [312, 200], [310, 196], [310, 190]]
+def chaikin(pts, n=2):
+    """Corner cutting: each pass replaces every corner by two points a quarter of the way along its edges (a clean curve through straight runs, no pixel steps)."""
+    for _ in range(n):
+        out = []
+        for i in range(len(pts)):
+            a, b = pts[i], pts[(i + 1) % len(pts)]
+            out.append((0.75 * a[0] + 0.25 * b[0], 0.75 * a[1] + 0.25 * b[1])); out.append((0.25 * a[0] + 0.75 * b[0], 0.25 * a[1] + 0.75 * b[1]))
+        pts = out
+    return pts
+# the loop's outline: its front strap runs straight down to a rounded foot, the foot along the bottom, up the grip's back (the photos' silhouette, smoothed)
+GRIP = chaikin([(246, 186), (248, 196), (255, 207), (263, 224), (271, 243), (281, 266), (289, 282), (294, 291), (300, 296), (346, 296), (355, 295), (362, 290), (366, 280),
+                (366, 268), (362, 248), (357, 230), (352, 215), (349, 205), (352, 196), (358, 188), (360, 184)], 2)
+# the window: a straight slanted front edge, a rounded bottom, the grip's front strap up its back (the finger grooves are cut into it below)
+WIN = chaikin([(267, 176), (267, 198), (274, 224), (281, 246), (288, 264), (294, 278), (299, 285), (307, 288), (322, 288), (329, 285), (331, 279), (331, 266), (327, 252), (325, 248),
+               (320, 245), (320, 235), (314, 229), (306, 226), (306, 222), (312, 218), (314, 214), (314, 200), (314, 176)], 1)
 gp = K.tmp(prism(PL(GRIP), 'x', -16 * mm, 16 * mm)); tidy(gp, 0.1 * mm, False); bevel(gp, 2.0 * mm, 1, 30)
 cut(gp, prism(PL(WIN), 'x', -20 * mm, 20 * mm))
 tidy(gp); wnorm(gp, 35); K.adopt(gp, 'grip', SH)
+# the grip's side panel: a raised, textured insert outlined on each side, with its screw
+PANEL = chaikin([(325, 212), (344, 208), (352, 220), (358, 240), (363, 262), (364, 280), (360, 287), (348, 288), (338, 284), (334, 270), (331, 252), (328, 236), (326, 224)], 1)
+for sx in (-1, 1):
+    o = K.tmp(prism(PL(PANEL), 'x', *xs(sx * 15.5 * mm, sx * 16.9 * mm))); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'grip', 'stipple')
+    o = K.obj(cyl(2.0 * S, *xs(sx * 16.8 * mm, sx * 17.8 * mm), 'x', (F(353), U(240)), 10), 'grip', 'steel'); smooth(o)
 
 # ===================================================================================== the charging handle (part_handle): a mushroom knob on the LEFT, at the front of its channel
 H0 = (F(238), U(148))
@@ -275,11 +289,11 @@ anchors = {
     'mount_stock': [0, r4(U(150)), 0],
     'mount_grip': [r4(F(330)), r4(U(192)), 0],
     'mount_mag': [r4(MAG_TOP[0]), r4(MAG_TOP[1]), 0],
-    'mount_tac': [r4(L - 0.0675), -0.006, 0.026],
+    'mount_tac': [r4(F(215)), -0.006, 0.026],
     'mount_fg': [r4(L - 0.10), r4(U(197)) - 0.0056, 0],
 }
 root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
-for _n, _c in (('polymer', (0.16, 0.16, 0.175, 1)), ('rubber', (0.07, 0.07, 0.075, 1))):    # (viewing colours only: the game replaces every material by its name)
+for _n, _c in (('polymer', (0.16, 0.16, 0.175, 1)), ('stipple', (0.2, 0.2, 0.215, 1)), ('rubber', (0.07, 0.07, 0.075, 1))):    # (viewing colours only: the game replaces every material by its name)
     _m = bpy.data.materials.get(_n)
     if _m: _m.diffuse_color = _c
 json.dump({'source': 'authored', 'sights': {'builtin': ['irons'], 'rail': [], 'railed': True}}, open(os.path.join(HERE, 'model.json'), 'w', encoding='utf-8'), indent=2)
