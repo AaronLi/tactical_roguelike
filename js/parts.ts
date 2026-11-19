@@ -1216,6 +1216,7 @@ export const Gunsmith = (() => {
   // the B&T APC9 K modelled in Blender (models/apc9, build_apc9.py), on a lower made for the MP5's curved magazine (not B&T's own: the user's MP5-magazine APC9). Its rails and forend are the
   // upper's (no handguard slot: hgMax 0), the irons fold on its rail (mount_optic_rail), a short rail each side of the forend (mount_tac), the non-reciprocating handle on the left, the strut stock on a hinge (stk:fold).
   P('apc9', 'rifle', { optFMag: 0.18, rcv: 'authored', authored: 'apc9', siderails: true, L: 0.2811, hgMax: 0, optF: 0.12, grip: 0.0, support: 0.31, mag: { f: 0.1647, y: -0.012 } }, { barrel: { len: 0.01 }, thread: 'r9', muzzle: 'flash', stock: ['fold', 'rattler'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.18, d: 0.032, c: 0.058, w: 0.022 }, optic: ['pic', { optic: 'irons' }] });
+  { const plat = PLATFORMS.apc9; plat.slots.push({ slot: 'fg', mount: 'fg', req: false, bare: true }); plat.slots.sort((a: Slot, b: Slot) => ORDER.indexOf(a.slot) - ORDER.indexOf(b.slot)); } // (the rail under the K's forend, mount_fg: nothing fitted from the factory; any foregrip, the hand stop or the bipod takes it)
   // the MCX as its variants: a Rattler's barrel and handguard, the Virtus's longer ones, a Gen 1's KeyMod, a Spear LT's
   // lightened FDE handguard and padded stock (the QBZ-192 takes the same folding stocks: the same hinge)
   // ------------------------------------------------------------------ shared barrels (once every gun is made)

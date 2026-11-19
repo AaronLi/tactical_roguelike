@@ -102,9 +102,8 @@ def upper():
         for px in (1495, 1630): screw_head(s, px, 471, 2.9, 1.2, (HW + RAIL_OUT) / mm - 0.2)                              # (the two socket screws on the rail's bars, photo (1495, 471) and (1630, 472))
         # the pins' heads (photo (1401, 451) (1455, 451) (1427, 494)); the takedown pin's boss is the lower's
         for px, py, r in ((1401, 451, 3.6), (1455, 451, 3.6), (1427, 494, 3.6)): screw_head(s, px, py, r, 1.2, HW / mm - 0.2)
-    # the hand stop under the forend: a hooked lug (photo x 1598-1662, y 526-606) with its socket screw
-    hs = K.tmp(rprism(PL([(1598, 526), (1662, 526), (1660, 556), (1642, 570), (1636, 596), (1630, 606), (1612, 606), (1608, 590), (1598, 570)]), -6.0 * mm, 6.0 * mm)); bevel(hs, 0.8 * mm, 1, 35); smooth(hs, 35); K.adopt(hs, 'base', RCV)
-    for s in (-1, 1): screw_head(s, 1627, 545, 2.9, 1.2, 6.0)
+    # the Picatinny rail under the forend (photo x 1500-1665, the slots the photo shows under the plate): where a foregrip or the hand stop (the catalogue's, the K's factory one) clamps: mount_fg
+    picatinny(K, F(1500), F(1665), U(533), 'base', RCV, axis='bottom', lean=True)
 
 # ===================================================================================== LOWER (base): body, guard, trigger, well, releases, selector
 MAG_F, MAG_Y = F(1318), -12.0 * mm   # the magazine well's centre and the magazine's top (mount_mag): the MP5's 30-round, drawn as models/mp5_kit.py draws it
@@ -368,6 +367,7 @@ anchors = {
     'mount_barrel': [round(UP_F1 + 0.004, 4), 0, 0], 'mount_muzzle': [round(MZ0, 4), 0, 0],
     'mount_stock': [0, 0, 0], 'mount_grip': [round(GRIP_TOP[0], 4), round(GRIP_TOP[1], 4), 0],
     'mount_mag': [round(MAG_F, 4), round(MAG_Y, 4), 0],
+    'mount_fg': [round(F(1632), 4), round(U(533) - 0.0056, 4), 0],
     'mount_tac': [round(F(1590), 4), round(U(472.5), 4), round(HW + RAIL_OUT, 4)],
 }
 root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)

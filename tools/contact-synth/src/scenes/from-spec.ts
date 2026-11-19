@@ -496,6 +496,22 @@ GUN_SPECS.smg = {
   cartridge: { oalMm: 29, caseMm: 19, massG: 8 },
   magazine: { capacity: 32, lengthCm: 23, widthCm: 3, thicknessCm: 2.4, material: 'steel', wallMm: 0.8, massEmptyKg: 0.2, springN: 9, springRate: 110, insert: 'straight', catch: 'button', freeDrop: false, well: 'stamped' },
 };
+/**
+ * The B&T APC9 K (models/apc9): a closed-bolt 9 mm blowback carbine with a hammer, an aluminium upper on a polymer lower,
+ * a non-reciprocating side handle (a light lever on its own spring: pulled back along its channel, it returns by itself and
+ * stays out of the bolt's way), a bolt that locks open on an empty magazine, and the MP5's curved steel magazine in a
+ * polymer well with a paddle release along the trigger guard. Lighter and snappier than the AR's carrier and nothing like the
+ * MP5's rollers and slap. Figures from the datasheet (receiver 28 cm, 2.5 kg gun) and typical blowback numbers.
+ */
+GUN_SPECS.apc9 = {
+  id: 'apc9', name: 'B&T APC9 K',
+  action: { mass: 0.34, stroke: 0.075, springHome: 34, springRear: 56, carrierCm: 12, boltCm: 8, lockup: 'blowback', lube: 'oiled', holdOpen: true, trigger: 'hammer', hammerSpringMm: 1.1 },
+  handle: { kind: 'separate', material: 'polymer', lengthCm: 3.5, returns: 'own-spring' },
+  receiver: { build: 'billet', wallMm: 2.5, lengthCm: 28, widthCm: 3.6, heightCm: 4.4, ports: 'closed' },
+  gun: { barrelCm: 11, barrelMm: 14, lengthCm: 56, frame: 'aluminum', splitFrame: true },
+  cartridge: { oalMm: 29, caseMm: 19, massG: 8 },
+  magazine: { capacity: 30, lengthCm: 20, widthCm: 5.5, thicknessCm: 2.5, material: 'steel', wallMm: 0.8, ribPitchCm: 4, massEmptyKg: 0.13, springN: 9, springRate: 110, insert: 'straight', catch: 'paddle', freeDrop: false, well: 'polymer' },
+};
 GUN_SPECS.bullpup = {
   id: 'bullpup', name: '5.56 bullpup',
   action: { mass: 0.4, stroke: 0.09, springHome: 60, springRear: 120, carrierCm: 15, boltCm: 6, lockup: 'rotating', lube: 'oiled', holdOpen: true, trigger: 'hammer', hammerSpringMm: 1.2 },

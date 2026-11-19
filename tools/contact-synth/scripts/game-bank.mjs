@@ -41,7 +41,7 @@ const HAND = {
   g19: { mag: 'g19', charge: (t) => chargeScene('g19', 'loaded', t), rear: 'slide stops at the rear', slam: 'slide slams home', release: 'g19-slide-release',
     magIn: 'g19-mag-in', magInEmpty: 'g19-mag-in-empty', magOut: 'g19-mag-out', magOutEmpty: 'g19-mag-out-empty', click: 'catch clicks into the magazine' },
 };
-for (const id of ['sr25', 'smg', 'bullpup']) {
+for (const id of ['sr25', 'smg', 'bullpup', 'apc9']) {
   const g = GUN_SPECS[id], tilt = g.action.lockup === 'tilting';
   HAND[id] = {
     mag: id, charge: (t) => chargeFromSpec(g, 'loaded', t), rear: tilt ? 'slide stops at the rear' : 'carrier hits the rear stop',

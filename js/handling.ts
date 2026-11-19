@@ -21,10 +21,10 @@ export const Handling = (() => {
   const BY_ID: Record<string, string> = {
     m4: 'ar15', hk416: 'ar15', scarl: 'ar15', m27: 'ar15', mcx: 'ar15', g36: 'ar15', br3: 'ar15', tempest: 'ar15',
     ak: 'kv47', ak74: 'kv47', aks74u: 'kv47', galil: 'kv47', an94: 'kv47', rpk: 'kv47', svd: 'kv47', saiga: 'kv47', vepr: 'kv47',
-    mp5: 'mp5', mp5sd: 'mp5',
+    mp5: 'mp5', mp5sd: 'mp5', apc9: 'apc9',
     f2: 'bullpup', tavor: 'bullpup', aug: 'bullpup', qbz95: 'bullpup', qbz192: 'bullpup',
     sr25: 'sr25', mk14: 'sr25', m14: 'sr25', scar: 'sr25', fal: 'sr25',
-    uzi: 'smg', p90: 'smg', vector: 'smg', thompson: 'smg', ppsh: 'smg', mpx: 'smg', apc9: 'smg', ar9: 'smg', aug9: 'smg', mac10: 'smg', mp7: 'smg', skorp: 'smg',
+    uzi: 'smg', p90: 'smg', vector: 'smg', thompson: 'smg', ppsh: 'smg', mpx: 'smg', ar9: 'smg', aug9: 'smg', mac10: 'smg', mp7: 'smg', skorp: 'smg',
     // the nearest kin's action and magazine: a .50's big carrier, an AK-pattern box, a semi-auto shotgun's bolt worked
     // by its handle (its shells: roundIn), a railgun's cell into a well
     barrett: 'sr25', gm6: 'sr25', benelli: 'sr25', slug: 'sr25', aa12: 'kv47', vss: 'kv47', rail: 'ar15', akimbo: 'g19',
