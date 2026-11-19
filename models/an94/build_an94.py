@@ -87,7 +87,7 @@ HG0, HG1 = FX(1000), FX(1395)    # the forend
 BORE_END = FX(1730)              # the barrel's front (the muzzle device screws on)
 MUZ_END = FX(1913)               # the device's tip (the bullet leaves it)
 POST_F = FX(1672)
-PORT = (FX(903), FX(965), UY(578), UY(530))   # the ejection port's rear, front, bottom and top (mm): a plain cut in the right flank down past the bore, its rear where the magazine's front edge meets the housing (AK pattern: no cover, no hinge)
+PORT = (FX(756), FX(965), UY(578), UY(530))   # the ejection port's rear, front, bottom and top (mm): a plain cut in the right flank down past the bore, from the magazine's rear edge where it meets the housing (photo px 756) to the front at 965 (AK pattern: no cover, no hinge)
 SLOT = (FX(807), FX(1027), UY(522), UY(513))  # the charging lever's slot along the top of the right flank: rear, front, bottom, top
 print('anchors f: well', MAG_F, 'hg', HG0, HG1, 'barrel end', BORE_END, 'muzzle', MUZ_END, 'post', POST_F)
 
@@ -112,12 +112,12 @@ def housing():
     cut(h, prism(rounded((pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm, (pb - pa) / 2 * mm, (pu1 - pu0) / 2 * mm, 2.2 * mm, 4), 'x', -2.0 * mm, (HW + 1) * mm))       # (the port, right)
     cut(h, box((HW - 3.5) * mm, (HW + 1) * mm, SLOT[0] * mm, SLOT[1] * mm, SLOT[2] * mm, SLOT[3] * mm))          # (the lever's slot, right)
     cut(h, box(-(HW + 1) * mm, -(HW - 3.0) * mm, 36 * mm, 166 * mm, -7.5 * mm, 1.5 * mm))                        # (the left recess)
-    cut(h, cyl(7.0 * mm, (HW - 0.6) * mm, (HW + 1) * mm, 'x', (FX(884) * mm, UY(540) * mm), 24))               # (the round plug's recess, right)
+    cut(h, cyl(7.0 * mm, (HW - 0.6) * mm, (HW + 1) * mm, 'x', (FX(724) * mm, UY(536) * mm), 24))               # (the round plug's recess, right)
     cut(h, cyl(1.6 * mm, (HW - 1.4) * mm, (HW + 1) * mm, 'x', (FX(1018) * mm, UY(538) * mm), 12))              # (the small hole)
     slice_at_vertices(h, 'y'); tidy(h); smooth(h); K.adopt(h, 'base', HP)
     # the openings read dark: the slot's floor, the plug's disc, the left recess's floor, the small hole's
     for o in (K.tmp(box((HW - 3.7) * mm, (HW - 3.3) * mm, (SLOT[0] + 1) * mm, (SLOT[1] - 1) * mm, (SLOT[2] + 0.3) * mm, (SLOT[3] - 0.3) * mm)),
-              K.tmp(cyl(6.6 * mm, (HW - 0.9) * mm, (HW - 0.5) * mm, 'x', (FX(884) * mm, UY(540) * mm), 24)),
+              K.tmp(cyl(6.6 * mm, (HW - 0.9) * mm, (HW - 0.5) * mm, 'x', (FX(724) * mm, UY(536) * mm), 24)),
               K.tmp(box(-(HW - 3.3) * mm, -(HW - 2.9) * mm, 37 * mm, 165 * mm, -7 * mm, 1.0 * mm)),
               K.tmp(cyl(1.2 * mm, (HW - 1.7) * mm, (HW - 1.2) * mm, 'x', (FX(1018) * mm, UY(538) * mm), 10))):
         smooth(o); K.adopt(o, 'base', 'rubber')
@@ -129,7 +129,7 @@ def housing():
     o = K.tmp(prism([((pb - 24) * mm, -2.6 * mm), ((pb - 1.0) * mm, 1.0 * mm), ((pb - 1.0) * mm, -2.6 * mm)], 'x', -7.0 * mm, 7.0 * mm)); smooth(o); K.adopt(o, 'base', 'gunmetal')
     # panel seams (thin dark inlays): the long seam along the right flank, the hump's edge on both sides
     for s_ in (-1, 1):
-        o = K.tmp(box(*xs(s_ * (HW - 0.05) * mm, s_ * (HW + 0.22) * mm), FX(520) * mm, FX(790) * mm, UY(571) * mm, (UY(571) + 0.7) * mm)); K.adopt(o, 'base', 'rubber')
+        o = K.tmp(box(*xs(s_ * (HW - 0.05) * mm, s_ * (HW + 0.22) * mm), FX(520) * mm, FX(750) * mm, UY(571) * mm, (UY(571) + 0.7) * mm)); K.adopt(o, 'base', 'rubber')
         o = K.tmp(box(*xs(s_ * (HW - 0.05) * mm, s_ * (HW + 0.22) * mm), FX(742) * mm, (FX(742) + 0.7) * mm, UY(598) * mm, UY(556) * mm)); K.adopt(o, 'base', 'rubber')
     # rivets and screw heads (right: the photo's; left: mirrored places)
     for px, py in ((838, 583), (672, 560), (716, 558), (790, 590), (562, 586), (610, 590)):
@@ -369,13 +369,13 @@ def handle():
     return ph
 
 # ----------------------------------------------------------------------------------------------------- BOLT CARRIER (part_carrier, in the port)
-CARRIER_TRAVEL = 0.050
+CARRIER_TRAVEL = 0.075                # (the lever's run: the handle rides on the carrier)
 def carrier():
     """The bolt carrier seen through the ejection port (part_carrier: it runs back and home with every shot, back with the hand's pull on a charge, held back on an empty
     magazine): the kit's AK pattern (port_carrier, body 'box'): a milled carrier block running forward into the steel bolt head, which has its locking-lug ring, chamfered face and the
-    extractor claw and covers the chambered round's case until the carrier is drawn back. No ribs, no plate; the head is 22 mm of the port's 31."""
+    extractor claw and covers the chambered round's case until the carrier is drawn back. No ribs, no plate; the head is 30 mm of the port's 103."""
     pa, pb, pu0, pu1 = PORT
-    return port_carrier(K, pa * mm, pb * mm, pu0 * mm, pu1 * mm, HW * mm, x0=3.0 * mm, body='box', ax=0.0, az=0.0, head=0.022, rh=5.2 * mm)
+    return port_carrier(K, pa * mm, pb * mm, pu0 * mm, pu1 * mm, HW * mm, x0=3.0 * mm, body='box', ax=0.0, az=0.0, head=0.030, rh=5.2 * mm)
 
 # ----------------------------------------------------------------------------------------------------- THE MAGAZINE (part_mag, borrowed)
 def magazine():
@@ -454,7 +454,7 @@ info = {
     'carrier': {'travel': CARRIER_TRAVEL},
     'magAt': [r4(MAG_F * mm), r4(MAG_Y * mm)],
     'handle': {'f': r4(LEV_F * mm), 'y': r4(LEV_U * mm), 'x': r4((HW + 2.2) * mm), 'travel': LEV_TRAVEL, 'recip': False, 'style': 'ak', 'grab': [r4(LEV_F * mm + 0.002), r4(LEV_U * mm + 0.011), r4((HW + 2.8) * mm)]},
-    'port': [r4(FX(907) * mm), r4((PORT[2] + PORT[3]) / 2 * mm), r4(HW * mm)],
+    'port': [r4((PORT[0] + PORT[1]) / 2 * mm), r4((PORT[2] + PORT[3]) / 2 * mm), r4(HW * mm)],
     'chamberAt': {'side': 'port', 'f': r4((PORT[1] - 6.0) * mm), 'y': 0.0, 'x': 0.0},     # (a real port: the game draws no plate or bolt face over it; the round shows in it when the carrier is back)
     'recoilBarrel': 0,
     'mounts': {'mount_muzzle': [r4(BORE_END * mm), 0, 0]},
