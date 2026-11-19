@@ -111,7 +111,7 @@ put(K, cyl(3.0 * mm, 0.0066, 0.0112, 'x', (RS, SY - 0.0035), segs(3.0 * mm)), 'o
 
 # ================================================================================================ the bolt (part_bolt): body, lugs, extractor, sleeve, cocking piece, swept stem and oval knob
 PIV = 0.070                                                                  # the handle's root
-HANDLE = [(0.0100, PIV, -0.001, 0.0045), (0.0300, PIV - 0.0070, -0.004, 0.0040), (0.0560, PIV - 0.0230, -0.010, 0.0036)]   # (right, forward, up, radius)
+HANDLE = [(0.0100, PIV, -0.001, 0.0045), (0.0300, PIV - 0.0070, -0.004, 0.0040), (0.0705, PIV - 0.0300, -0.0125, 0.0036)]   # (the stem runs into the knob's centre)   # (right, forward, up, radius)
 KNOB = (0.0705, PIV - 0.0300, -0.0125, 0.0105, (0.95, 1.18, 0.95))
 bolt_group(K, K, PIV, rear=-0.028, face=FACE, rb=0.0095, handle=HANDLE, knob=KNOB, sleeve=(-0.006, 0.038, 0.0122), cock=(0.0058, 0.010), lug_r=0.0103,
            knob_mat='blued', handle_mat='blued')

@@ -280,7 +280,8 @@ export const VMAnim = (() => {
   function rack(c: number, h: Rig, kind: VmAction, pose: Pose, from: V3 | null, down = false) { // (down: a pistol's arm lowered to get at the slide, not the wrist turned (a release's rack))
     const A = h.A, stay = kind === 'handle' && h.open && h.recip;
     let pull: number, on: number;
-    if (kind === 'bolt') { pull = S(0.25, 0.6, c) * (1 - S(0.6, 0.85, c)); on = S(0.08, 0.25, c) * (1 - S(0.85, 1, c)); } // (the right hand: up, back, the case flies, forward, down)
+    if (kind === 'bolt' && _bh) { pull = 0.5 * (S(0.06, 0.20, c) + S(0.27, 0.45, c) - S(0.60, 0.74, c) - S(0.74, 0.84, c)); on = S(0.0, 0.1, c) * (1 - S(0.88, 1, c)); } // (the R700's and the Mosin's, a deliberate cycle in the same time: the handle up, a pause, drawn back, a pause at the rear where the case is thrown (0.55), forward, down)
+    else if (kind === 'bolt') { pull = S(0.25, 0.6, c) * (1 - S(0.6, 0.85, c)); on = S(0.08, 0.25, c) * (1 - S(0.85, 1, c)); } // (the right hand: up, back, the case flies, forward, down)
     else if (kind === 'pump' || kind === 'lever') { pull = S(0.1, 0.45, c) * (1 - S(0.5, 0.9, c)); on = 1; }
     else { pull = S(0.3, 0.52, c) * (stay ? 1 : 1 - S(0.52, 0.6, c)); on = S(0.05, 0.3, c) * (1 - S(stay ? 0.55 : 0.62, 0.95, c)); }
     actionPose(kind, h, pose, pull, on, c < 0.5 ? from : null);
@@ -786,6 +787,7 @@ export const VMAnim = (() => {
         // (a gun that draws its own bolt carrier in its port: a press check draws it back only as far as shows the front of the chambered case, 0.45 of the case's length in the
         // chamber (its calibre's: 5.56 13.6 mm, 7.62x51 15.4, 7.62x39 and 5.45 11.8, 9 mm 8.4), well short of where the case's rim would clear the chamber and meet the ejector; racks and charges keep the whole stroke)
         let full = CHECK[kind];
+        if (kind === 'bolt' && _bh) full = 0.5 + 0.5 * Math.min(1, 0.02 / boltBack(h)); // (the R700's and the Mosin's press check draws the bolt back only 20 mm: the case head clear of the face in the window, not a long stroke)
         if (h.carrier > 0) { const cd = pl.cur().def, grp = ((CALIBERS as Record<string, any>)[calOf(cd)] || { group: 'rifle' }).group, rl = grp === 'pistol' ? 0.026 : (ROUND_RIFLE[calOf(cd)] || [0, 0.042])[1]; full = Math.min(full, (cd.id === 'f2' ? 0.8 : 0.45) * 0.72 * rl / h.carrier); } // (the F2's check shows the round's lower half from your eye: 0.8 of the case, 24 mm; the others 0.45)
         const pull = cocked ? 1 : full * S(0.18, 0.35, c) * (1 - S(0.65, 0.82, c)), on = S(0, 0.2, c) * (1 - S(0.8, 1, c));
         actionPose(kind, h, pose, pull, on, null, kind === 'pistol' && A.slide ? off(A.slide, -0.035, 0.002, -0.024) : null); // (a pistol's pinched at the back of the slide from the left, clear of the port)
@@ -1447,8 +1449,9 @@ export const VMAnim = (() => {
   // holdGrip's, F: the fingers (index, middle, ring, little, thumb).
   const BOLT_HOLD: Record<string, BoltHold> = {
     // (fitted in the game: thumb and index within 1.5 mm of the knob's surface at the lift, the rearmost point and the close, the middle finger touching it at most; the other fingers curled under the stem)
-    r700: { d: new T.Vector3(0.0109, 0.003, -0.00955), q: Q_BOLT.clone(), r: 0.004375, fz: 0.035, F: [[0, 1.06625, 0.85, 0.55], [0, 0.751875, 1.45, 0.9], [0, 1.3, 1.5, 0.9], [0, 1.35, 1.5, 0.9], [1.41, 0.1975, 0.15625, 0.3]] },
-    mosin: { d: new T.Vector3(0.01225, 0.003, -0.00775), q: Q_BOLT.clone(), r: 0.004375, fz: 0.035, F: [[0, 1.15625, 0.85, 0.55], [0, 0.759375, 1.45, 0.9], [0, 1.3, 1.5, 0.9], [0, 1.35, 1.5, 0.9], [1.5375, 0.175, 0.15625, 0.3]] },
+    r700: { d: new T.Vector3(0.0109, 0.003, -0.00955), q: Q_BOLT.clone(), r: 0.004375, fz: 0.035, F: [[0, 1.06625, 0.85, 0.55], [0, 0.414375, 1.45, 0.9], [0, 1.3, 1.5, 0.9], [0, 1.35, 1.5, 0.9], [1.41, 0.1975, 0.15625, 0.3]] },
+    // (the Mosin's hand rolled 60 degrees left seen from behind (about the gun's +z axis), the knob between the index, the middle finger and the thumb, all within 2 mm of it)
+    mosin: { d: new T.Vector3(0.007375, 0.009, -0.00775), q: Q_BOLT.clone().premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 0, 1), Math.PI / 3)), r: 0.005875, fz: 0.035, F: [[0, 1.025, 0.85, 0.55], [0, 0.534375, 1.45, 0.9], [0, 1.3, 1.5, 0.9], [0, 1.35, 1.5, 0.9], [1.6875, 0.0625, 0.15625, 0.3]] },
   };
   const Q_SUP = qBasis(new T.Vector3(0.35, 1, 0), new T.Vector3(-0.75, 0, 0.65)); // (the support hand under a handguard, the thumb along its left side)
   const Q_PSUP = qBasis(new T.Vector3(1, 0.35, 0), new T.Vector3(0, 0.3, 1)); // (on a pistol, the left hand round the right, its palm on the grip's left side)

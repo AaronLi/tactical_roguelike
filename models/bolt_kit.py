@@ -28,12 +28,14 @@ def simplify(pts, tol=0.4e-3):
     h = len(pts) // 2
     return rdp(pts[:h + 1])[:-1] + rdp(pts[h:] + [pts[0]])[:-1]
 
-def body(Kx, side, hws, slot, mat, parent=None, bev=0.004, seg=1, cuts=(), adds=(), angle=40):
-    """A solid whose side outline is `side` ([(forward, up)]) and plan outline `hws` ([(forward, half width)]), intersected; then cuts, bevelled, shaded."""
+def body(Kx, side, hws, slot, mat, parent=None, bev=0.004, seg=1, cuts=(), adds=(), angle=40, round_first=False):
+    """A solid whose side outline is `side` ([(forward, up)]) and plan outline `hws` ([(forward, half width)]), intersected; then cuts, bevelled, shaded.
+    round_first: the (wide, rounded: seg segments) bevel BEFORE the cuts, so a wide round section isn't also taken round the cuts' rims (modeling-practices rule 1)."""
     o = Kx.tmp(prism(simplify(side), 'x', -0.08, 0.08)); boolean(o, prism(plan_poly(hws), 'z', -0.5, 0.5), 'INTERSECT')
+    if round_first and bev: bevel(o, bev, seg, angle)
     for c in cuts: boolean(o, c, 'DIFFERENCE')
     for a in adds: boolean(o, a, 'UNION')
-    if bev: bevel(o, bev, seg, angle)
+    if bev and not round_first: bevel(o, bev, seg, angle)
     slice_at_vertices(o, 'y')
     wnorm(o); Kx.adopt(o, slot, mat, parent); return o
 

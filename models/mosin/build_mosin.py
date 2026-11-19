@@ -73,9 +73,9 @@ SIDE = [(-0.351, -0.0520), (-0.343, -0.0506), (-0.334, -0.0490), (-0.326, -0.046
 PLAN = [(-0.36, 0.0190), (-0.25, 0.0195), (-0.12, 0.0180), (-0.05, 0.0190), (0.0, 0.0205), (F_RING + 0.01, 0.0210)]
 cuts = [cyl(RB + 0.5 * mm, -0.06, F_RING + 0.02, 'y', (0, 0), 20),
         box(-0.0115, 0.0115, -0.012, 0.055, -0.095, -0.0130)]
-body(K, SIDE, PLAN, 'stock', 'wood', bev=0.0035, cuts=cuts)
+body(K, SIDE, PLAN, 'stock', 'wood', bev=0.010, seg=3, cuts=cuts, round_first=True)   # (a rounded section: the wood furniture's edges are 10 mm rounds, not squares)
 # the steel butt plate (leaning back at the top) with its two screws, and the sling slot through the butt (dark)
-put(K, prism([(-0.3465, -0.0525), (-0.3560, -0.0545), (-0.3500, -0.1600), (-0.3400, -0.1600)], 'x', -0.0198, 0.0198), 'stock', 'steel', bev=0.0010)
+put(K, prism([(-0.3465, -0.0525), (-0.3560, -0.0545), (-0.3500, -0.1600), (-0.3400, -0.1600)], 'x', -0.0198, 0.0198), 'stock', 'steel', bev=0.0050)
 for z in (-0.060, -0.140):
     put(K, cyl(2.2 * mm, BUTT - 0.0050, BUTT - 0.0030, 'y', (0, z), segs(2.2 * mm)), 'stock', 'gunmetal')
 for sd in (-1, 1):
@@ -86,13 +86,13 @@ HG0, HG1 = F_RING, 0.796
 HSIDE = [(HG0, -0.0030), (0.300, -0.0030), (0.330, 0.0060), (0.370, 0.0095), (0.745, 0.0102), (0.780, 0.0065), (HG1, 0.0065), (HG1, -0.0235), (0.745, -0.0246), (0.679, -0.0252),
          (0.612, -0.0259), (0.545, -0.0266), (0.478, -0.0272), (0.411, -0.0279), (0.378, -0.0282), (0.344, -0.0353), (0.311, -0.0399), (0.277, -0.0440), (0.2435, -0.0476), (HG0, -0.0485)]
 HPLAN = [(HG0 - 0.01, 0.0210), (0.30, 0.0185), (0.60, 0.0165), (HG1, 0.0155), (HG1 + 0.01, 0.0155)]
-body(K, HSIDE, HPLAN, 'handguard', 'wood', bev=0.0025, cuts=[rod((0, HG0 - 0.02, 0), (0, 0.400, 0), 0.0155, 0.0086, 20), rod((0, 0.400, 0), (0, HG1 + 0.02, 0), 0.0086, 0.0082, 20)])   # (the upper handguard is the fore-end's own top, 10 mm over the bore)
+body(K, HSIDE, HPLAN, 'handguard', 'wood', bev=0.012, seg=3, round_first=True, cuts=[rod((0, HG0 - 0.02, 0), (0, 0.400, 0), 0.0155, 0.0086, 20), rod((0, 0.400, 0), (0, HG1 + 0.02, 0), 0.0086, 0.0082, 20)])   # (the upper handguard is the fore-end's own top, 10 mm over the bore)
 for fb, w, cz, hh in ((0.3720, 0.013, -0.0085, 0.0196), (0.6970, 0.012, -0.0075, 0.0178)):               # the two barrel bands
-    o = K.tmp(prism(rounded(0, cz, 0.0185, hh + 0.0014, 0.005, 2), 'y', fb, fb + w))
-    cut(o, prism(rounded(0, cz, 0.0166, hh - 0.0006, 0.004, 2), 'y', fb - 0.001, fb + w + 0.001))
+    o = K.tmp(prism(rounded(0, cz, 0.0185, hh + 0.0014, 0.010, 3), 'y', fb, fb + w))
+    cut(o, prism(rounded(0, cz, 0.0166, hh - 0.0006, 0.008, 3), 'y', fb - 0.001, fb + w + 0.001))
     bevel(o, 0.0006, 1, 40); wnorm(o); K.adopt(o, 'handguard', 'gunmetal')
 put(K, box(-0.0035, 0.0035, 0.7040, 0.7080, -0.0345, -0.0235), 'handguard', 'steel', bev=0.0004)         # the front band's sling swivel
-nc = K.tmp(prism(rounded(0, -0.0082, 0.0166, 0.0156, 0.006, 4), 'y', HG1 - 0.012, HG1 + 0.012)); cut(nc, rod((0, HG1 - 0.03, 0), (0, HG1 + 0.03, 0), 0.0078, 0.0078, 24))
+nc = K.tmp(prism(rounded(0, -0.0082, 0.0166, 0.0156, 0.010, 3), 'y', HG1 - 0.012, HG1 + 0.012)); cut(nc, rod((0, HG1 - 0.03, 0), (0, HG1 + 0.03, 0), 0.0078, 0.0078, 24))
 bevel(nc, 0.0008, 1, 40); wnorm(nc); K.adopt(nc, 'handguard', 'steel')                                    # the nose cap
 
 # ================================================================================================ the barrel (slot barrel): the 91/30's 730 mm, the front sight base and hood, then the crown cap (slot muzzle)
@@ -124,7 +124,7 @@ put(K, box(-0.0035, 0.0035, 0.0480, 0.0580, -0.0900, -0.0780), 'mag', 'gunmetal'
 PIV = 0.0820
 HANDLE = [(0.0110, PIV, -0.0020, 0.0052), (0.0440, PIV - 0.0040, -0.0040, 0.0048), (0.0650, PIV - 0.0120, -0.0260, 0.0044)]
 KNOB = (0.0690, PIV - 0.0130, -0.0345, 0.0102, (0.82, 0.95, 1.0))
-bolt_group(K, K, PIV, rear=-0.046, face=FACE, rb=0.0098, handle=HANDLE, knob=KNOB, sleeve=(-0.020, 0.046, 0.0108), cock=(0.0062, 0.026), lug_r=0.0106,
+bolt_group(K, K, PIV, rear=-0.046, face=FACE, rb=0.0098, handle=HANDLE, knob=KNOB, sleeve=(-0.004, 0.046, 0.0108), cock=(0.0062, 0.016), lug_r=0.0106,
            knob_mat='blued', handle_mat='blued')
 
 # ================================================================================================ info and anchors
