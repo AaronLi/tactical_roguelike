@@ -30,8 +30,8 @@ it), its magazine checked and a chamber check held. A caption says what's showin
 
 **Reload mocap:** http://localhost:8080/mocap.html is a tool, not the game: mime a reload at a webcam and it draws the
 chosen gun in your grip hand, with zones on its magazine, its charging handle and your chest rig, times your support hand
-between them, and lays the take beside the game's own reload clip (and writes the hand's path as clip keys for
-`js/vmanim.ts`). `?demo` plays a made-up reload with no camera. See [docs/mocap.md](docs/mocap.md).
+between them (and when it closes and opens), and lays the take beside the game's own reload clip (and writes the hand's path as clip keys for
+`js/vmanim.ts`). The game's character is laid on your body, and a second view looks out of its eyes with a bore laser. `?demo` plays a made-up reload with no camera. See [docs/mocap.md](docs/mocap.md).
 
 ## Playing on your local network
 

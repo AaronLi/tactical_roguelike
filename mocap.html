@@ -6,13 +6,14 @@
 <title>Reload Mocap</title>
 <!-- Mime a reload at a webcam and read its timing off against the game's own clip (js/mocap.ts, js/mocapmath.ts): the chosen gun's model is drawn in your
      grip hand over the camera's picture, with zones on its magazine, its charging handle and your chest rig; the support hand's trips between them are
-     timed, and written out as keys in the form js/vmanim.ts writes a clip's. One camera, no markers: MediaPipe's pose and hand models, from the CDN.
+     timed, and written out as keys in the form js/vmanim.ts writes a clip's. The game's character is laid on your body, and a second view looks out of its
+     eyes, with a point at its middle and a laser down the bore. One camera, no markers: MediaPipe's pose and hand models, from the CDN.
      Served by the dev server: npm run dev, then /mocap.html (a camera needs localhost or https). /mocap.html?demo plays a made-up reload, no camera. -->
 <style>
   :root { --bg: #111417; --panel: #1b2025; --line: #2c333a; --text: #d8dde2; --dim: #8a949e; --hot: #f0a63a; }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
-  main { max-width: 1500px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  main { max-width: 1900px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
   header { grid-column: 1 / -1; }
   h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: 0.04em; }
   p.sub { color: var(--dim); margin: 0; max-width: 100ch; }
@@ -31,6 +32,13 @@
   input[type=checkbox] { accent-color: var(--hot); }
   #file { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
+  #views { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+  @media (max-width: 1300px) { #views { grid-template-columns: minmax(0, 1fr); } }
+  #fpwrap { position: relative; background: #2b333b; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  #fpwrap canvas { display: block; width: 100%; height: 100%; }
+  #fpwrap.idle::after { content: 'The view from the head, once a body is seen'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--dim); }
+  .tag { position: absolute; left: 14px; top: 10px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); text-shadow: 0 1px 3px #000; }
+  #fpinfo { position: absolute; right: 14px; top: 10px; font-size: 13px; font-variant-numeric: tabular-nums; color: #ff8a8a; text-shadow: 0 1px 3px #000; }
   #stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #07090b; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
   #stage video, #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
   #stage video { object-fit: fill; }
@@ -49,6 +57,8 @@
   #ticks b { position: absolute; top: 0; font-weight: 400; font-size: 11px; color: var(--dim); transform: translateX(-50%); }
   .lane i { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; overflow: hidden; min-width: 3px; }
   .lane i em { font-style: normal; font-size: 11px; font-weight: 600; color: #111; padding: 0 5px; line-height: 20px; white-space: nowrap; }
+  .lane s { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; }
+  .lane s.opened { background: none; border-left: 2px dotted #fff; }
   .lane u { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); opacity: 0.6; }
   .lane > span { position: absolute; left: 8px; top: 4px; font-size: 12px; }
   #lanes { position: relative; }
@@ -81,12 +91,15 @@
   </header>
 
   <div>
+    <div id="views">
     <div id="stage" class="idle">
       <video id="video" playsinline muted></video>
       <canvas id="gl"></canvas>
       <canvas id="hud"></canvas>
       <div id="idle"><div>Start the camera, open a video of a reload, or play the demo.<br><br>Stand so the camera sees you from the waist up, turned a little so your support hand's side is toward it. Hold your grip hand as if on a pistol grip, rest the other on the handguard, then reload.</div></div>
       <div id="now"></div><div id="rec"></div><div id="src"></div><div id="msg" hidden></div>
+    </div>
+    <div id="fpwrap" class="idle"><canvas id="fp"></canvas><span class="tag">First person</span><div id="fpinfo"></div></div>
     </div>
     <div class="row">
       <button id="cam" class="go">Start camera</button>
@@ -105,7 +118,7 @@
         <span class="name" id="tl-game">Game</span>
       </div>
       <table>
-        <thead><tr><th>Beat</th><th colspan="2">You: in–out</th><th colspan="2">Game: in–out <span id="ref-label"></span></th><th>You start</th></tr></thead>
+        <thead><tr><th>Beat</th><th colspan="2">You: in–out</th><th>Hand</th><th colspan="2">Game: in–out <span id="ref-label"></span></th><th>You start</th></tr></thead>
         <tbody id="beats"></tbody>
       </table>
     </section>
@@ -121,14 +134,24 @@
     <section>
       <h2>Gun</h2>
       <select id="gun"></select>
-      <div class="row"><label><input type="checkbox" id="lock"> Lock to chest <kbd>L</kbd></label><button id="relock">Ready stance</button></div>
+      <div class="row"><label><input type="checkbox" id="lock"> Lock to chest <kbd>L</kbd></label><button id="relock">Shouldered</button></div>
       <div class="row"><label><input type="checkbox" id="lefty"> Left-handed</label></div>
     </section>
     <section>
       <h2>Zones</h2>
       <div id="zones"></div>
+      <div class="zone"><span></span><span class="zn">Grip hand's curl</span><span class="bar"><i id="curl-grip" style="background:#cfd6dc"></i></span></div>
+      <div class="zone"><span></span><span class="zn">Support hand's curl <b id="grab" style="color:#fff"></b></span><span class="bar"><i id="curl-off" style="background:#6dff8a"></i></span></div>
+      <div class="row"><label title="The magazine leaves the gun only with a hand that closed on it, is stowed where the hand opens at the rig, and a fresh one is taken where it closes; the handle is drawn only by a closed hand. Off: by the zones alone."><input type="checkbox" id="grabs"> Grabs need a closed hand</label></div>
       <label class="sl">Size <input type="range" id="zoneScale" min="0.6" max="1.8" step="0.05"><output id="zoneScale-v"></output></label>
       <label class="sl">Depth counts <input type="range" id="depthK" min="0.1" max="1" step="0.05"><output id="depthK-v"></output></label>
+    </section>
+    <section>
+      <h2>Views</h2>
+      <div class="row"><label><input type="checkbox" id="character"> Character</label><label><input type="checkbox" id="laser"> Bore laser</label></div>
+      <label class="sl">Overlay opacity <input type="range" id="opacity" min="0.2" max="1" step="0.05"><output id="opacity-v"></output></label>
+      <label class="sl">First-person FOV <input type="range" id="fpFov" min="60" max="130" step="1"><output id="fpFov-v"></output></label>
+      <label class="sl">Look down <input type="range" id="fpPitch" min="-30" max="80" step="1"><output id="fpPitch-v"></output></label>
     </section>
     <section>
       <h2>Game's reload</h2>

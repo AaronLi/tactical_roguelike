@@ -10,14 +10,15 @@
 //   oneEuro / pointFilter               the 1-euro filter (Casiez et al. 2012): steady when the hand is still, quick when it moves
 //   zoneRatio(p, zone, depthK)          how far a hand is into a zone (a capsule): < 1 inside. Along the camera's ray the distance counts for
 //                                       depthK of itself: depth is the one thing a single camera guesses, so a zone is deeper than it is wide
+//   curl(hand) / grabber()              how closed a hand is from its 21 points (0 flat .. 1 a fist), and whether that is a grab (closed past `on`, until open past `off`)
 //   tracker()                           which zone the hand is in from frame to frame: held against flicker (in at 1, out at `exit`, a change kept
 //                                       only once it has lasted `hold` seconds)
 //   takes()                             a reload cut out of the stream by itself: from the hand leaving its home zone (the forend) to its return
 //   visitsOf / compare                  a take's beats (which zone, in and out, as times and as fractions of the whole), and two takes' side by side
 //   simplify / keysOf                   the hand's path boiled down to keys in the form js/vmanim.ts writes its clips: [fraction, anchor + offset]
 export interface McZone { id: string; a: number[]; b: number[]; r: number }
-export interface McVisit { zone: string; t0: number; t1: number; f0: number; f1: number }
-export interface McSample { t: number; zone: string | null; p?: number[] | null }
+export interface McVisit { zone: string; t0: number; t1: number; f0: number; f1: number; g0: number | null; g1: number | null } // (g0, g1: when the hand first closed there and when it last opened there, from the take's start; null: it did not)
+export interface McSample { t: number; zone: string | null; p?: number[] | null; g?: boolean } // (g: the hand is closed)
 export interface McTake { t0: number; t1: number; dur: number; visits: McVisit[]; samples: McSample[] }
 export interface McKey { f: number; t: number; p: number[]; near: string | null; off: number[] | null }
 
@@ -86,6 +87,26 @@ export const MocapMath = (() => {
         return pts.map((p, i) => [fs[i * 3].filter(p[0], t), fs[i * 3 + 1].filter(p[1], t), fs[i * 3 + 2].filter(p[2], t)]);
       },
     };
+  }
+
+  // ---------------------------------------------------------------- the hand: open or closed
+  /**
+   * How closed a hand is, from its 21 points (any space: only their shape is read): each finger's tip-to-knuckle distance over the finger's length along
+   * its bones (1 straight, about 0.3 in a fist), averaged over the four fingers and stretched to 0 (flat) .. 1 (a fist). The thumb is left out: it closes
+   * across the palm, and round a magazine it may not close at all.
+   */
+  function curl(h: number[][]): number {
+    let sum = 0;
+    for (const m of [5, 9, 13, 17]) {
+      const along = len(sub(h[m + 1], h[m])) + len(sub(h[m + 2], h[m + 1])) + len(sub(h[m + 3], h[m + 2]));
+      sum += along > 1e-9 ? len(sub(h[m + 3], h[m])) / along : 1;
+    }
+    return Math.min(1, Math.max(0, (1 - sum / 4) / 0.62));
+  }
+  /** A grab from a curl, frame to frame: closed past `on`, held until open past `off`. step(curl | null) -> closed; a hand not seen keeps what it had. */
+  function grabber(on = 0.55, off = 0.38) {
+    let held = false;
+    return { get held() { return held; }, reset() { held = false; }, step(c: number | null) { if (c !== null) held = held ? c > off : c >= on; return held; } };
   }
 
   // ---------------------------------------------------------------- zones
@@ -183,11 +204,15 @@ export const MocapMath = (() => {
     let cur: McVisit | null = null;
     // (a zone crossed in under minDwell s is on the way, not a stop: the magazine's, between the charging handle and the handguard)
     const shut = (t: number) => { if (cur) { cur.t1 = t - t0; cur.f1 = cur.t1 / dur; if (cur.t1 - cur.t0 >= minDwell) out.push(cur); cur = null; } };
+    let held: boolean | undefined; // (the hand closed, as of the sample before)
     for (const s of samples) {
-      if (s.t < t0 || s.t > t1) continue;
+      if (s.t < t0 || s.t > t1) { held = s.g; continue; }
       const z = s.zone && s.zone !== home ? s.zone : null;
       if (cur && cur.zone !== z) shut(s.t);
-      if (!cur && z) cur = { zone: z, t0: s.t - t0, t1: 0, f0: (s.t - t0) / dur, f1: 0 };
+      if (!cur && z) cur = { zone: z, t0: s.t - t0, t1: 0, f0: (s.t - t0) / dur, f1: 0, g0: null, g1: null };
+      // the hand closing in the zone (the first time) and opening in it (the last): either may come first (a magazine stowed, then a fresh one taken)
+      if (cur && s.g !== undefined) { if (s.g && held === false && cur.g0 === null) cur.g0 = s.t - t0; if (!s.g && held === true) cur.g1 = s.t - t0; }
+      held = s.g;
     }
     shut(t1);
     return out;
@@ -256,5 +281,5 @@ export const MocapMath = (() => {
     }).join(', ');
   }
 
-  return { sub, add, mul, dot, cross, len, norm, lerp, solveT, project, oneEuro, pointFilter, nearestOn, zoneDist, zoneRatio, tracker, takes, visitsOf, cut, compare, simplify, keysOf, keysText };
+  return { sub, add, mul, dot, cross, len, norm, lerp, solveT, project, oneEuro, pointFilter, nearestOn, zoneDist, zoneRatio, curl, grabber, tracker, takes, visitsOf, cut, compare, simplify, keysOf, keysText };
 })();

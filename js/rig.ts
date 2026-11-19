@@ -2344,8 +2344,30 @@ export const Rig = (() => {
     const long = look.top !== 'tshirt' && look.top !== 'vest', hand = glove != null ? glove : skin, top = look.topC as number;
     return { human: hid, col: { upsleeve: look.top === 'vest' ? skin : top, sleeve: long ? top : skin, hand, finger: look.gloves === 'fingerless' ? skin : hand } as Record<string, number>, gloved: glove != null };
   }
+  // For tools (js/mocap.ts puts the character on a body a camera saw): the skeleton laid on sixteen points in the world, in sample()'s order (0 pelvis, 1 2 the
+  // thighs' tops, 3 chest, 4 5 the shoulders, 6 neck, 7 head, 8 9 elbows, 10 11 wrists, 12 13 knees, 14 15 feet; left before right), as a ragdoll's is
+  // (ragdollPose), then moved bodily so the middle of its shoulders is at `mid` (the figure's own proportions are kept: the points give its directions).
+  // hands: [right, left], each { at: the palm's centre, n: the way the palm faces, f: the way the fingers run, curl: 0 open .. 1 a fist } (gripHand), or
+  // null: that arm then reaches for its wrist's point. Nothing else of the rig is run: no update(), no animation.
+  function poseAt(rig: Rig, P: THREE.Vector3[], mid: THREE.Vector3, hands: ({ at: THREE.Vector3; n: THREE.Vector3; f: THREE.Vector3; curl: number } | null)[]) {
+    const rd = rig.rd, s = rig.scale;
+    rig.root.position.set(0, 0, 0);
+    rig.rd = { P, acc: 0 } as unknown as Ragdoll; ragdollPose(rig); rig.rd = rd;
+    fresh([rig.armL.up, rig.armR.up]);
+    rig.root.position.copy(mid).sub(atW(rig.armL.up, 0, 0, 0).add(atW(rig.armR.up, 0, 0, 0)).multiplyScalar(0.5));
+    rig.root.updateMatrixWorld(true);
+    [rig.armR, rig.armL].forEach((arm, i) => {
+      const h = hands[i], elbow = P[i ? 8 : 9];
+      if (h) gripHand(rig, arm, h.at, h.n, h.f, elbow, HAND_PALM, h.curl);
+      else { ik(arm.up, arm.lo, UARM * s, FARM * s, P[i ? 10 : 11], elbow); rig.curl[i] = 0.35; }
+    });
+    poseFingers(rig);
+    rig.root.updateMatrixWorld(true);
+    cullSphere(rig);
+  }
+
   return {
-    create, live, armLook, zipSwing, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt,
+    create, live, armLook, zipSwing, raycast, rayCapsule, OFFICER_LOOK, LOOKS, cleanLook, armourKit, zipPoint, bodyAt, poseAt,
     get debug() { return debug; },
     toggleDebug() { debug = !debug; return debug; },
   };

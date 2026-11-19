@@ -2,6 +2,7 @@
 //  - a hand or a body put somewhere in front of a camera and projected comes back where it was (solveT), at several fields of view, with a few
 //    points missing, and with the picture's points jittered by a pixel;
 //  - the 1-euro filter settles on a still value and follows a moving one;
+//  - a hand's curl runs from flat to a fist, a grab holds between its two thresholds, and a beat has when the hand closed and opened in it;
 //  - a zone reaches further along the camera's ray than across it (zoneRatio, depthK);
 //  - the tracker holds a zone against flicker at its edge, lets go of it between zones, and goes from one straight into a nearer one;
 //  - a stream is cut into a take from the hand leaving the handguard to its return, with its beats; a hand that goes nowhere makes none;
@@ -47,6 +48,19 @@ let seed = 7; const rnd = () => { seed = (Math.imul(seed, 1103515245) + 12345) >
   check(lag < 0.06, `the filter follows a hand at 2 m/s (${(lag * 100).toFixed(1)} cm behind)`);
   const pf = M.pointFilter();
   check(pf.filter([[1, 2, 3]], 0)[0].join() === '1,2,3' && pf.filter([[9, 9, 9]], 5)[0].join() === '9,9,9', 'a set of points starts afresh after a gap');
+}
+
+// ---- the hand: open or closed
+{
+  // a hand of four fingers, each three bones bent by `c` of a fist's angles, as js/mocap.ts makes the demo's
+  const hand = (c) => { const p = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0]]; for (const x of [0.025, 0.003, -0.017, -0.035]) { let at = [x, 0.09, 0], a = 0; p.push(at); for (const [l, b] of [[0.042, 80], [0.026, 100], [0.021, 70]]) { a += b * c * Math.PI / 180; at = [at[0], at[1] + l * Math.cos(a), at[2] + l * Math.sin(a)]; p.push(at); } } return p; };
+  const cs = [0, 0.25, 0.5, 0.75, 1].map((c) => M.curl(hand(c)));
+  check(cs[0] < 0.02 && cs[4] > 0.95 && cs.every((c, i) => !i || c > cs[i - 1]), `curl runs from a flat hand to a fist (${cs.map((c) => c.toFixed(2)).join(' ')})`);
+  const g = M.grabber();
+  check([0.2, 0.5, 0.6, 0.45, 0.4, 0.3, null].map((c) => g.step(c)).join() === 'false,false,true,true,true,false,false', 'a grab holds from closed until properly open');
+  const s = [['support', 0], ['support', 0], [null, 0], ['mag', 0], ['mag', 1], ['mag', 1], [null, 1], ['rig', 1], ['rig', 0], ['rig', 0], ['rig', 1], [null, 1], ['support', 1]].flatMap(([zone, g], i) => [0, 1, 2].map((k) => ({ t: (i * 3 + k) / 10, zone, g: !!g })));
+  const v = M.visitsOf(s, 0.6, 3.6, 'support');
+  check(v.length === 2 && Math.abs(v[0].g0 - 0.6) < 1e-9 && v[0].g1 === null && Math.abs(v[1].g1 - 1.8) < 1e-9 && Math.abs(v[1].g0 - 2.4) < 1e-9, 'a beat has when the hand closed in it and when it opened: taken at the magazine, stowed then a fresh one taken at the rig');
 }
 
 // ---- zones

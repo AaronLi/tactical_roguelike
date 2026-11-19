@@ -4,6 +4,11 @@
 from the handguard to the magazine, the chest rig, the charging handle and back, beside the game's own reload clip for the
 same gun. It is for animating: what a real reload's beats are, against what `js/vmanim.ts` plays.
 
+It has two views. **Camera**: the camera's picture with the game's character (an officer in a chest rig) laid on your body,
+the gun in its grip hand and the zones. **First person**: the same scene out of the character's eyes, placed and turned by
+your head, with a white point at the middle of the view and a red laser down the gun's bore; the red ring is where the
+bore points, and the corner says how far that is from the middle of the view.
+
 ```bash
 npm run build        # once: the page loads the compiled game and the baked gun models
 npm run dev          # then http://localhost:8080/mocap.html
@@ -24,12 +29,19 @@ cdn.jsdelivr.net and storage.googleapis.com the first time a camera or a video i
 4. Read the timeline: your beats over the game's, on one scale of seconds, and in the table as times and as fractions of
    the whole. **Play** runs a take again; **Save** writes it as JSON; a saved take opens with **Open video or take…**.
 
-While you move, the magazine leaves the gun with your hand, is gone at the rig or the belt, comes back fresh and seats as
-the hand returns; the charging handle (or bolt handle) comes back as far as your hand draws it.
+**Grabs.** Each hand's curl is read from its fingers (0 flat, 1 a fist: the bars under the zones); the support hand closed
+past 0.55 is a grab, until it opens past 0.38. The magazine leaves the gun only with a hand that closed on it at the
+magazine and left closed; it is stowed where the hand opens at the rig or the belt, a fresh one is taken where it closes
+there, and it seats as a hand holding one comes back to the well. The charging handle (or bolt handle) is drawn back as
+far as a closed hand draws it. Each beat records when the hand closed and opened in it (the white marks on the timeline,
+the Hand column, `grab` and `release` in a take file). **Grabs need a closed hand** off: all of that by the zones alone.
 
 | Control | |
 | --- | --- |
-| Lock to chest (`L`) | The gun stays where it is against your chest instead of following the grip hand: for when the grip hand has to leave it (an AK's handle worked with the right hand), or its tracking wanders. **Ready stance** puts it back at the game's. It is held this way by itself whenever the grip hand is lost. |
+| Lock to chest (`L`) | The gun stays where it is against your chest instead of following the grip hand: for when the grip hand has to leave it (an AK's handle worked with the right hand), or its tracking wanders. **Shouldered** puts it at the shoulder as the game's first person holds it. It is held this way by itself whenever the grip hand is lost. |
+| Character, Overlay opacity | The character on or off; how solid everything drawn over the camera's picture is (lower, to see yourself through it). |
+| Bore laser | The laser and its ring. |
+| First-person FOV, Look down | That view's horizontal field of view, and its gaze tipped down from where your head faces. A level gaze sees a shouldered gun, as the game's does; hands at the chest or the belt are far below it (55-65 shows them). |
 | Left-handed | The grip hand is the left; the zones on the body swap sides. |
 | Zones: Size, Depth counts | How big the zones are, and how much a distance toward or away from the camera counts (0.5: a zone reaches twice as far along the camera's ray as across the picture; depth is what one camera guesses). |
 | Game's reload | Which of the game's magazine changes is laid beside yours: dropped, retained, to the dump pouch; run dry adds the action after it. Its hand path is the amber line on the gun. |
@@ -59,6 +71,11 @@ the hand returns; the charging handle (or bolt handle) comes back as far as your
   default each hand is slid along the camera's ray to the depth of the body's wrist, followed with a quarter-second lag.
 - **The gun** is the game's own model (`GunModels.display`), with its anchors (`GunRig.bind`: the same the first-person
   hands go to). It sits in the grip hand by the palm's frame: its right is the back of the hand, its up the knuckles' line.
+- **The character** is the game's own (`Rig.create`), posed by `Rig.poseAt` (added for this): its skeleton laid on the
+  body's points as a ragdoll's is, moved so its shoulders are on yours, each arm then solved to put its palm on yours,
+  turned as yours and closed as far. It keeps its own proportions, so it is your pose, not your outline.
+- **The first-person view** is at the midpoint of the eyes; the ears give the head's left and right and the eyes its
+  front. It is drawn with the character's head left out. Its floor assumes the real camera is held level.
 - **The zones** are capsules: on the gun from its anchors (the handguard, the lower half of the magazine and below it, the
   charging handle or bolt handle or slide), on the body from the shoulders and hips (the chest rig across the lower chest,
   a belt pouch on the support side). The support hand's palm is in a zone inside its radius, stays until 1.3 radii out,
@@ -79,3 +96,6 @@ the hand returns; the charging handle (or bolt handle) comes back as far as your
 - An empty hand is not a rifle: there is nothing to stop your hand at the magazine well, so beats are a few centimetres
   and a few hundredths of a second loose. Holding something gun-shaped helps your hands; it can hide them from the camera.
 - Only the support hand is timed. The grip hand places the gun.
+- The head's turn comes from five points on the face: steady to a few degrees, no better. Read the bore's offset as a
+  guide, not a zero.
+- A hand seen edge-on or half hidden reads more closed or more open than it is; a grab can be missed or made up there.
