@@ -64,7 +64,7 @@ def slot_pts(cx, cy, ln, wd, ang, n=8):
     return pts
 
 # ===================================================================================== the shell (base)
-SHELL = [[675, 445], [684, 425], [702, 402], [725, 380], [736, 364], [2205, 364], [2210, 292], [2805, 282], [2930, 284], [2954, 294], [3040, 413], [3046, 417], [3048, 455],
+SHELL = [[675, 445], [684, 425], [702, 402], [725, 380], [736, 370], [1060, 370], [1060, 364], [2205, 364], [2210, 292], [2805, 282], [2930, 284], [2954, 294], [3040, 413], [3046, 417], [3048, 455],
          [3032, 531], [3032, 545], [3028, 555], [2976, 866], [2891, 883], [2840, 881], [2835, 886], [2818, 886], [2746, 859], [2620, 719], [2612, 728], [2580, 745],
          [2556, 764], [2540, 769], [2517, 756], [2511, 748], [2499, 741], [2457, 746], [2442, 753], [2424, 769], [2418, 769], [2391, 760], [2380, 773], [2124, 781],
          [2110, 777], [2090, 761], [2032, 642], [2017, 626], [1996, 614], [1986, 612], [1979, 620], [1950, 621], [1943, 608], [1932, 602], [1752, 603], [1722, 614],
@@ -91,15 +91,21 @@ for pc_ in port_cutter(*PORT, -2.0 * mm, 33 * mm): cut(sh, pc_)
 # over the selector, the recessed pad with the bolt catch's button, the blank where the port would be; each pocket 3 to 10 mm deep with sloped walls
 CH_SLOT = slot_pts(981, 458, 580, 38, 90, 8)                  # (a long stadium lying along the photo's x: ang 90 -> the axis horizontal)
 hwc = 26.0 * mm
-cut(sh, prism(PL(CH_SLOT), 'x', -hwc - 1 * mm, -hwc + 6.0 * mm))
+cut(sh, prism(PL(CH_SLOT), 'x', -hwc - 1 * mm, -hwc + 12.0 * mm))
 for cx_ in (1448, 1542, 1642, 1742):
-    cut(sh, prism(PL(slot_pts(cx_, 468, 92, 40, 17, 8)), 'x', -31 * mm - 1 * mm, -31 * mm + 9.0 * mm))
+    cut(sh, prism(PL(slot_pts(cx_, 468, 92, 40, 17, 8)), 'x', -40 * mm, 40 * mm))      # (through both walls: the photo shows the daylight through them)
 # the bolt catch's pad (recessed 0.8 mm), both sides
 BC_PAD = [[1890, 424], [2036, 424], [2044, 436], [2044, 462], [2036, 472], [1890, 472], [1882, 462], [1882, 436]]
 for sx in (-1, 1): cut(sh, prism(PL(BC_PAD), 'x', *xs(sx * (31 * mm - 0.8 * mm), sx * (31 * mm + 1 * mm))))
 # the blank where the left port would be: a dark panel set 1.5 mm in
 BLANK = [[2148, 484], [2488, 484], [2492, 490], [2492, 540], [2488, 546], [2148, 546], [2144, 540], [2144, 490]]
-cut(sh, prism(PL(BLANK), 'x', -31 * mm - 1 * mm, -31 * mm + 1.5 * mm))
+cut(sh, prism(PL(BLANK), 'x', -31 * mm - 1 * mm, -31 * mm + 9.0 * mm))
+# the hole plate behind it (three round holes in a small recessed rectangle), the forend's stud ring, the slot along the forend's top ahead of the rail
+HOLEPLATE = [[2506, 488], [2596, 488], [2600, 494], [2600, 538], [2596, 544], [2506, 544], [2502, 538], [2502, 494]]
+cut(sh, prism(PL(HOLEPLATE), 'x', -31 * mm - 1 * mm, -31 * mm + 1.5 * mm))
+for hx in (2528, 2551, 2574): cut(sh, cyl(1.8 * mm, -31 * mm - 1 * mm, -31 * mm + 6.0 * mm, 'x', (F(hx), U(516)), 10))
+for sx in (-1, 1): cut(sh, lathe([(F(790) - 0.0, 10.5 * mm)], 6, (0, 0, 0)) if False else cyl(10.5 * mm, *xs(sx * (26 * mm - 8.0 * mm), sx * (26 * mm + 1 * mm)), 'x', (F(790), U(610)), 20))
+cut(sh, box(-5.5 * mm, 5.5 * mm, F(1040), F(752), U(370) - 9.0 * mm, U(370) + 1 * mm))
 # the handguard's lower pad (the raised, rounded panel the support hand takes): a shallow step on each side, 0.8 mm
 PAD = [[740, 545], [1290, 545], [1296, 560], [1290, 690], [1260, 698], [770, 698], [748, 690], [726, 640], [722, 580], [726, 556]]
 tidy(sh, 1e-6, True)
@@ -110,12 +116,22 @@ CARRIER = port_carrier(K, *PORT, 31 * mm, ax=0.0, az=(PORT[2] + PORT[3]) / 2)
 # the dark floors of the openings
 def dark(poly_px, x_lo, x_hi):
     o = K.tmp(prism(PL(poly_px), 'x', x_lo, x_hi)); smooth(o); K.adopt(o, 'base', 'black'); return o
-dark(CH_SLOT, -hwc + 5.4 * mm, -hwc + 6.2 * mm)
-for cx_ in (1448, 1542, 1642, 1742): dark(slot_pts(cx_, 468, 92, 40, 17, 8), -31 * mm + 8.4 * mm, -31 * mm + 9.2 * mm)
-dark(BLANK, -31 * mm + 1.2 * mm, -31 * mm + 1.8 * mm)
+dark(CH_SLOT, -hwc + 11.4 * mm, -hwc + 12.2 * mm)
+dark(BLANK, -31 * mm + 8.4 * mm, -31 * mm + 9.0 * mm)
+dark(HOLEPLATE, -31 * mm + 1.0 * mm, -31 * mm + 1.5 * mm)
+for hx in (2528, 2551, 2574): o = K.obj(cyl(1.8 * mm, -31 * mm + 5.2 * mm, -31 * mm + 6.0 * mm, 'x', (F(hx), U(516)), 10), 'base', 'black'); smooth(o)
+for sx in (-1, 1):     # (the stud ring on the forend: a dark well with a steel button in it)
+    o = K.obj(cyl(10.5 * mm, *xs(sx * (26 * mm - 7.4 * mm), sx * (26 * mm - 6.6 * mm)), 'x', (F(790), U(610)), 20), 'base', 'black'); smooth(o)
+    o = K.obj(cyl(6.0 * mm, *xs(sx * (26 * mm - 6.6 * mm), sx * (26 * mm - 1.0 * mm)), 'x', (F(790), U(610)), 14), 'base', 'steel'); smooth(o)
+dark([[1040, 365], [752, 365], [752, 376], [1040, 376]], -5.5 * mm, 5.5 * mm) if False else None
+o = K.tmp(box(-5.2 * mm, 5.2 * mm, F(1040), F(752), U(370) - 8.4 * mm, U(370) - 7.6 * mm)); smooth(o); K.adopt(o, 'base', 'black')      # (the top slot's floor)
+o = K.tmp(box(-1.6 * mm, 1.6 * mm, F(1030), F(760), U(370) - 8.0 * mm, U(370) - 3.0 * mm)); smooth(o); K.adopt(o, 'base', 'steel')       # (the guide in it)
+# what shows through the vents: the barrel's sleeve and the gas piston rod above it
+o = K.obj(lathe([(0.300, 11.2 * mm), (0.430, 11.2 * mm)], 20), 'barrel', 'gunmetal'); smooth(o)
+o = K.obj(cyl(3.0 * mm, 0.300, 0.52, 'y', (0, 15 * mm), 10), 'barrel', 'steel'); smooth(o)
 # the raised pad's outline as a thin black-edged step is skipped: a plate 0.6 mm proud, the same olive
 for sx in (-1, 1):
-    pp = K.tmp(prism(PL(PAD), 'x', *xs(sx * (26 * mm - 0.2 * mm), sx * (26 * mm + 0.7 * mm)))); bevel(pp, 0.3 * mm, 1); smooth(pp); K.adopt(pp, 'base', SH)
+    pp = K.tmp(prism(PL(PAD), 'x', *xs(sx * (26 * mm - 0.2 * mm), sx * (26 * mm + 0.7 * mm)))); bevel(pp, 0.3 * mm, 1); cut(pp, cyl(10.5 * mm, -0.04, 0.04, 'x', (F(790), U(610)), 20)) if False else cut(pp, prism([(F(790) + 10.5 * mm * math.cos(2 * math.pi * i / 20), U(610) + 10.5 * mm * math.sin(2 * math.pi * i / 20)) for i in range(20)], 'x', *xs(sx * 20 * mm, sx * 30 * mm))); smooth(pp); K.adopt(pp, 'base', SH)
 # the butt pad: a little proud of the shell all round its back
 BUTT = [[2930, 284], [2954, 294], [3040, 413], [3046, 417], [3048, 455], [3032, 531], [3032, 545], [3028, 555], [2976, 866], [2891, 883], [2900, 830], [2915, 650],
         [2930, 500], [2925, 380], [2905, 318]]
@@ -142,11 +158,11 @@ TRIG = [[1409, 650], [1438, 681], [1438, 701], [1433, 714], [1421, 729], [1419, 
 o = K.tmp(prism(PL(TRIG), 'x', -3.5 * mm, 3.5 * mm)); bevel(o, 0.6 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
 
 # ===================================================================================== the top rail and the barrel's nose
-RA, RB = F(2190), F(750)
+RA, RB = F(2190), F(1060)
 RAIL_U = U(364)
 picatinny(K, RA, RB, RAIL_U, 'base', 'black', lean=True)
 RAIL_TOP = RAIL_U + 5.6 * mm
-SY = RAIL_TOP + 19 * mm
+SY = 0.070                                                  # (the sight line, read off the TAR-21 photos: the front post stands about 34 mm over the forend's top, 14 mm over the cheek)
 # the side rails (the game's light mounts): short Picatinny stubs on the handguard's flanks, low, ahead of the pad's rear (not on the real TAR-21; the X95 has them)
 L = F(676)                                                   # (the nose's front face: where the barrel comes out)
 for s_, ax in ((1, 'right'), (-1, 'left')):
@@ -200,10 +216,17 @@ o = K.obj(cyl(2.0 * mm, H0[0] - 0.115, H0[0] - 0.004, 'y', (XH + 2.0 * mm, H0[1]
 
 # ===================================================================================== the sights (optic: the gun's own flip-up irons, on the rail)
 ag['K'] = K; ag['RAIL_TOP'] = RAIL_TOP; ag['SY'] = SY; ag['RCV'] = 'black'
-RS, FS = F(2125), F(790)
+RS, FS = F(2125), F(0.0 + 3048 - 0.5545 / S)            # (the rear on the rail's back end, the front on the forend's top 40 mm behind its nose)
+FB = U(370)
 ag['rear_flip'](RS)
-ag['front_flip'](FS, RAIL_TOP)
-ag['fold_irons'](RS, FS)
+ag['front_flip'](FS, FB)
+def folded(keep_rear, rail_top):
+    n0 = K.n; ag['RAIL_TOP'] = rail_top; ag['fold_irons'](RS, FS)
+    for o in list(coll.all_objects):
+        if o.type == 'MESH' and o.get('slot') == 'optic' and int(o.name.split('_')[-1]) > n0:
+            f = sum(v.co.y for v in o.data.vertices) / len(o.data.vertices)
+            if (f < 0.4) != keep_rear: bpy.data.objects.remove(o, do_unlink=True)
+folded(True, RAIL_TOP); folded(False, FB); ag['RAIL_TOP'] = RAIL_TOP
 
 # ===================================================================================== the magazine (part_mag): the Mk18's STANAG
 ag['mag_stanag'](MAG_TOP)
