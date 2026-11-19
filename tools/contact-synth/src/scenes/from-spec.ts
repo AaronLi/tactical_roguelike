@@ -588,8 +588,7 @@ export const R700_MAG: GunSpec = {
  * extractor over the rim, the handle turned down into its notch); pull: the press check's handle up and 20 mm back; bolt: the
  * whole cycle. The R700 is smoother and tighter (oiled, a lighter bolt, short crisp hits); the Mosin rougher and heavier (dry
  * and gritty, a longer bolt, loose fits, a heavy dull thud on its stop). The Mosin's open and shut (the bolt thrown open for a
- * reload and closed on the last round) and its stripper clip: dropped in its guide, a round thumbed down past the lips, the
- * empty clip flicked off. `cue`: each phase's anchor element, and `at` the fraction of the 0.6 s rack cycle it lands on.
+ * reload and closed on the last round) and a round pressed down into its magazine, one at a time by hand. `cue`: each phase's anchor element, and `at` the fraction of the 0.6 s rack cycle it lands on.
  */
 export type BoltRifle = 'r700' | 'mosin';
 export const BOLT_CUES: Record<string, { anchor: string; at: number }> = {
@@ -658,13 +657,9 @@ export function boltRifleScenes(v: BoltRifle): Record<string, Scene> {
     // the bolt thrown open for a reload (the handle up and the bolt drawn to the stop; anchor: its stop) and closed on the last round (anchor: the handle down)
     const open = [...lift(0), ...draw(0.075).map((e) => e), ...rear(0.19)], shut = [...fwd(0), ...lock(0.075)];
     out.open = mk('open', 'The bolt thrown open for the load', open); out.shut = mk('shut', 'The bolt closed on the last round', shut);
-    const clip = steel(8, 1.2, 0.4), lips = steel(6, 2);
-    out['clip-in'] = mk('clip-in', 'The stripper clip seated in the guide', [hit('clip dropped into the guide', 0, -8, 0.9, clip, rcv, { radius: 2, click: 0.7, sharp: 0.6 }),
-      rub('rounds seat against the guide', 0.03, -12, { force: 5, duration: 0.05, speed: 0.5, profile: 'swell', roughness: 6, grain: 0.3, contactWidth: 0.05 }, round, lips)]);
-    out['cartridge-in'] = mk('cartridge-in', 'A round thumbed down past the lips', [rub('round pushed down the clip', 0, -10, { force: 8, duration: 0.05, speed: 0.6, profile: 'accelerate', roughness: 6, grain: 0.3, contactWidth: 0.05 }, round, lips),
+    const lips = steel(6, 2);
+    out['cartridge-in'] = mk('cartridge-in', 'A round pressed down into the magazine under the receiver lips', [rub('round pushed down past the lips', 0, -10, { force: 8, duration: 0.05, speed: 0.6, profile: 'accelerate', roughness: 6, grain: 0.3, contactWidth: 0.05 }, round, lips),
       snp('round snaps under the lips', 0.05, -6, 0.6, lips, round)]);
-    out['clip-out'] = mk('clip-out', 'The empty clip flicked off the guide', [snp('clip released from the guide', 0, -8, 0.8, clip, rcv),
-      hit('clip knocked off', 0.03, -10, 0.5, clip, steel(10, 4), { radius: 1.2, click: 0.8, sharp: 0.7 })]);
   }
   return out;
 }

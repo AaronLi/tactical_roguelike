@@ -163,9 +163,9 @@ if (doing('manual')) {
   family('manual', manual);
 }
 // The R700 and the Mosin (the game's rack with its pauses, js/vmanim.ts): a clip a phase of the bolt's cycle, each anchored on the
-// moment the game's cue lands it (BOLT_CUES); the R700's detachable box magazine; the Mosin's open and shut and its stripper clip.
-// Levelled against their own: the R700's magazine going in, the Mosin's stripper clip dropped in.
-const ANCHORS = { pull: 'bolt eased back', open: 'bolt hits its stop', shut: 'handle drops into its notch', 'clip-in': 'clip dropped into the guide', 'cartridge-in': 'round snaps under the lips', 'clip-out': 'clip released from the guide', bolt: 'bolt hits its stop' };
+// moment the game's cue lands it (BOLT_CUES); the R700's detachable box magazine; the Mosin's open and shut and the rounds pressed in by hand.
+// Levelled against their own: the R700's magazine going in, the Mosin's round pressed in.
+const ANCHORS = { pull: 'bolt eased back', open: 'bolt hits its stop', shut: 'handle drops into its notch', 'cartridge-in': 'round snaps under the lips', bolt: 'bolt hits its stop' };
 for (const v of ['r700', 'mosin']) {
   if (!doing(v)) continue;
   const clips = {};
@@ -175,7 +175,7 @@ for (const v of ['r700', 'mosin']) {
     clips['mag-in-empty'] = render(magFromSpec(R700_MAG, 'in', 'empty'), 'catch clicks into the magazine');
     clips['mag-out'] = render(magFromSpec(R700_MAG, 'out', 'loaded'));
     clips['mag-out-empty'] = render(magFromSpec(R700_MAG, 'out', 'empty'));
-  } else clips['mag-in'] = clips['clip-in'];
+  } else clips['mag-in'] = clips['cartridge-in'];
   family(v, clips);
 }
 // The guns with no magazine of the from-spec kinds (scenes/no-family.ts). Open: its start's the cue; shut: the latch.

@@ -133,7 +133,7 @@ export const Handling = (() => {
   }
   /** a round loaded by hand (a shell into a tube, a cartridge into a chamber or a magazine) */
   function roundIn(def: WeaponDef, o?: Parameters<typeof playF>[2]) {
-    if (def.id === 'mosin' && playF('mosin', 'cartridge-in', { land: 0.05, ...o })) return true; // (its own: a round thumbed down past the clip's lips)
+    if (def.id === 'mosin' && playF('mosin', 'cartridge-in', { land: 0.05, ...o })) return true; // (its own: a round pressed down into the magazine)
     return playF('manual', def.shell && def.cls === 'SG' && !revolver(def) ? 'shell-in' : 'cartridge-in', { land: LAND.roundIn, ...o });
   }
   // A dropped magazine's fall, from its first contact (the bank's own drop of that gun's magazine: empty, a third, two
