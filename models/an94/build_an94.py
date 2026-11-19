@@ -124,7 +124,8 @@ def housing():
     # the port's lining (the carrier uncovers it): a thin black shell, the chamber's mouth at its front wall and the feed ramp
     pc, pu, ph, pv = (pa + pb) / 2, (pu0 + pu1) / 2, (pb - pa) / 2, (pu1 - pu0) / 2
     tub = K.tmp(prism(rounded(pc * mm, pu * mm, (ph - 0.15) * mm, (pv - 0.15) * mm, 2.0 * mm, 4), 'x', -2.0 * mm, (HW - 0.3) * mm))
-    cut(tub, prism(rounded(pc * mm, pu * mm, (ph - 0.6) * mm, (pv - 0.6) * mm, 1.8 * mm, 4), 'x', -1.55 * mm, (HW + 1) * mm)); smooth(tub); K.adopt(tub, 'base', 'black')
+    cut(tub, prism(rounded(pc * mm, pu * mm, (ph - 0.6) * mm, (pv - 0.6) * mm, 1.8 * mm, 4), 'x', -1.55 * mm, (HW + 1) * mm)); smooth(tub); K.adopt(tub, 'base', 'rubber')
+    bf = K.tmp(box(14.6 * mm, 15.2 * mm, (pa + 0.8) * mm, (pa + 66.0) * mm, (pu0 + 1.0) * mm, (pu1 - 1.0) * mm)); smooth(bf, 1); K.adopt(bf, 'base', 'rubber')      # (a dark baffle in the port's rear, over the magazine's top: it shows when the carrier is back, and the carrier's face stands in front of it)
     o = K.obj(lathe([((pb - 4.6) * mm, 5.6 * mm), ((pb - 0.7) * mm, 5.6 * mm)], 24, (0, 0, 0)), 'base', 'gunmetal'); smooth(o)
     o = K.tmp(prism([((pb - 24) * mm, -2.6 * mm), ((pb - 1.0) * mm, 1.0 * mm), ((pb - 1.0) * mm, -2.6 * mm)], 'x', -7.0 * mm, 7.0 * mm)); smooth(o); K.adopt(o, 'base', 'gunmetal')
     # panel seams (thin dark inlays): the long seam along the right flank, the hump's edge on both sides
@@ -372,14 +373,23 @@ def handle():
 CARRIER_TRAVEL = 0.075                # (the lever's run: the handle rides on the carrier)
 def carrier():
     """The bolt carrier seen through the ejection port (part_carrier: it runs back and home with every shot, back with the hand's pull on a charge, held back on an empty
-    magazine): the kit's AK pattern (port_carrier, body 'box'): a milled carrier block running forward into the steel bolt head, which has its locking-lug ring, chamfered face and the
-    extractor claw and covers the chambered round's case until the carrier is drawn back. No ribs, no plate; the head is 30 mm of the port's 103."""
+    magazine). The kit's bolt (steel head with its lug ring, chamfered face, extractor claw and pin) ahead; behind it an AK-pattern milled carrier of its own, seen from the side:
+    a raised upper body over a lower rail land (the land is cut back from the face), a cut-out over the bolt with a lower tongue ahead of it, a slanted cam slot in the body and a
+    cam lug on the tongue, all edges chamfered. It sits inside the opening (face 1.2 mm under the surface), with dark inside above and below; behind its rear the port has a dark baffle."""
     pa, pb, pu0, pu1 = PORT
-    # the block is a part inside a hole, not a panel: 15 mm tall in a 26 mm opening (5 mm of dark inside above and below), gunmetal, set 3 mm back from the surface,
-    # and without the kit's two thin cross steps (they read as a cover's seams)
-    pk = port_carrier(K, pa * mm, pb * mm, (pu0 + 5.0) * mm, (pu1 - 5.0) * mm, HW * mm, x0=3.0 * mm, x1=(HW - 3.0) * mm, mat='gunmetal', body='box', ax=0.0, az=0.0, head=0.030, rh=5.2 * mm)
-    for o in [o for o in bpy.data.objects if o.parent == pk and o.type == 'MESH' and len(o.data.polygons) == 6 and o.dimensions.x < 1.0 * mm]:
-        bpy.data.objects.remove(o, do_unlink=True)
+    pk = port_carrier(K, pa * mm, pb * mm, (pu0 + 5.0) * mm, (pu1 - 5.0) * mm, HW * mm, x0=3.0 * mm, x1=(HW - 1.2) * mm, mat='gunmetal', body='box', ax=0.0, az=0.0, head=0.030, rh=5.2 * mm)
+    for o in [o for o in bpy.data.objects if o.parent == pk and o.type == 'MESH' and (len(o.data.polygons) == 6 or o.dimensions.y > 40.0 * mm) and o.dimensions.x < 14.0 * mm and o.data.materials[0].name in ('gunmetal', 'black')]:
+        bpy.data.objects.remove(o, do_unlink=True)                    # (the kit's flat block and its two cross steps: the carrier below replaces them)
+    f0, fh = pa + 1.0, pb - 1.0 - 30.0                                 # (the carrier's rear and where the bolt head begins, mm)
+    L = fh - f0
+    x1 = HW - 1.2
+    prof = [(0, -6.5), (L, -6.5), (L, 4.5), (L - 22, 4.5), (L - 22, 1.0), (L - 34, 1.0), (L - 34, 9.0), (7, 9.0), (0, 6.0)]
+    cb = K.tmp(prism([((f0 + u) * mm, z * mm) for u, z in prof], 'x', 3.0 * mm, x1 * mm))
+    tidy(cb, 1e-6, False); bevel(cb, 0.7 * mm, 1, 40)
+    cut(cb, box((x1 - 1.5) * mm, (x1 + 1) * mm, (f0 - 1) * mm, (f0 + L - 34) * mm, -7 * mm, -3.0 * mm))                       # (the lower rail land stands back from the face)
+    cut(cb, prism([((f0 + 14) * mm, 8.0 * mm), ((f0 + 17) * mm, 8.0 * mm), ((f0 + 31) * mm, 0.5 * mm), ((f0 + 28) * mm, 0.5 * mm)], 'x', (x1 - 1.4) * mm, (x1 + 1) * mm))   # (the cam slot, slanted down toward the bolt)
+    tidy(cb); smooth(cb, 30); K.adopt(cb, 'base', 'gunmetal', pk)
+    lg = K.tmp(box((x1 - 0.6) * mm, (x1 + 0.4) * mm, (f0 + L - 15) * mm, (f0 + L - 8) * mm, 0.0, 3.8 * mm)); bevel(lg, 0.3 * mm, 1); smooth(lg, 30); K.adopt(lg, 'base', 'steel', pk)   # (the cam lug on the tongue)
     return pk
 
 # ----------------------------------------------------------------------------------------------------- THE MAGAZINE (part_mag, borrowed)
