@@ -9,7 +9,7 @@
   },
   "barrel=br.7.62x54.28.7.tapered,handguard=oem.hg.classic.6,mag=mosin.mag": {
    "label": "bare (required slots only)",
-   "geometry": "da8ac63e955b86c9",
+   "geometry": "767effa746f18d48",
    "info": "1c242520db3295a7"
   },
   "barrel=br.7.62x54.15,handguard=oem.hg.classic.6,mag=mosin.mag,muzzle=mz.r762.cap,optic=oem.op.pic.21,stock=oem.stk.classic.4": {
@@ -159,7 +159,7 @@
   },
   "barrel=br.7.62x54.28.7.tapered,handguard=oem.hg.classic.6,mag=mosin.mag,muzzle=mz.r762.cap,optic=op.pic.0,stock=oem.stk.classic.4": {
    "label": "optic=op.pic.0",
-   "geometry": "2328f74d35e21ab4",
+   "geometry": "6f161b95dd961d63",
    "info": "82749e678d8f54fb"
   },
   "barrel=br.7.62x54.28.7.tapered,handguard=oem.hg.classic.6,mag=mosin.mag,muzzle=mz.r762.cap,optic=op.pic.1,stock=oem.stk.classic.4": {
@@ -384,7 +384,7 @@
   },
   "barrel=br.7.62x54.28.7.tapered,handguard=oem.hg.classic.6,mag=mosin.mag,muzzle=mz.r762.cap,stock=oem.stk.classic.4": {
    "label": "optic=(none)",
-   "geometry": "2328f74d35e21ab4",
+   "geometry": "6f161b95dd961d63",
    "info": "82749e678d8f54fb"
   },
   "barrel=br.7.62x54.28.7.tapered,handguard=oem.hg.classic.6,mag=mosin.mag,muzzle=mz.r762.cap,optic=oem.op.pic.21,stock=stk.classic.0": {
