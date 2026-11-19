@@ -24,7 +24,8 @@ BORE = 12.3 * mm                   # the bolt way
 F_MOUTH = 0.2085                   # the receiver's front face: the chamber's mouth
 RND = (0.0059, 0.0476)             # the game's .308 round (case head radius, length); its case is drawn 0.72 of it
 CASE = 0.72 * RND[1]
-FACE = F_MOUTH - 0.7 * mm - CASE   # the bolt face closed (a chambered round's case head)
+FACE = F_MOUTH - 0.7 * mm - CASE
+MAGF, MAGU = 0.105, -0.0105          # the detachable magazine: its top's centre (forward, up): the feed lips just inside the bolt way's floor   # the bolt face closed (a chambered round's case head)
 MUZ = 0.790                        # the factory barrel's end
 SY = 0.0300                        # the sight line over the bore
 LUG_TOP = RB
@@ -33,7 +34,8 @@ LUG_TOP = RB
 rc = K.tmp(lathe([(0, RB * 0.985), (0.0008, RB), (F_MOUTH, RB)], segs(RB)))
 cut(rc, cyl(BORE, -0.002, F_MOUTH - 3.0 * mm, 'y', (0, 0), 20))                                  # the bolt way, open at the back
 cut(rc, port_pocket(0.108, 0.186, -0.0075, RB + 0.003, 0.03, 3.0 * mm, -2.0 * mm))               # the ejection port: the upper right quarter of the tube
-cut(rc, box(0.0085, 0.03, 0.046, 0.090, -0.0075, 0.0045))                                         # the handle's notch behind it, on the right
+cut(rc, box(0.0085, 0.03, 0.046, 0.090, -0.0075, 0.0045))
+cut(rc, box(-0.0128, 0.0128, MAGF - 0.0415, MAGF + 0.0415, -0.0200, -0.0060))                  # the magazine's slot through the tube's floor                                         # the handle's notch behind it, on the right
 wnorm(rc, 30); K.adopt(rc, 'base', 'blued')
 # a black lining in the port (the dark inside), the chamber's mouth and the feed ramp
 port_inside(K, 0.108, 0.186, -0.0075, 0.012, RB, mouth_r=6.4 * mm, ramp=24 * mm, x_in=-2.0 * mm)
@@ -49,8 +51,9 @@ put(K, box(-0.0105, 0.0105, -0.005, 0.063, -0.0300, -0.0140), 'base', 'blued', b
 g = K.tmp(prism([(0.007, -0.0140), (0.007, -0.0615), (0.021, -0.0675), (0.053, -0.0675), (0.067, -0.0615), (0.067, -0.0140)], 'x', -0.0045, 0.0045))
 cut(g, prism([(0.0135, -0.0295), (0.0135, -0.0575), (0.0235, -0.0615), (0.0505, -0.0615), (0.0605, -0.0575), (0.0605, -0.0295)], 'x', -0.006, 0.006))
 bevel(g, 0.0008, 1, 40); wnorm(g); K.adopt(g, 'base', 'blued')
-put(K, box(-0.0125, 0.0125, 0.0665, 0.145, -0.0457, -0.0417), 'mag', 'blued', bev=0.0008)               # the floorplate: the internal magazine's, slot mag (the detachable box replaces it)
-put(K, box(-0.0035, 0.0035, 0.0565, 0.0665, -0.0575, -0.0425), 'mag', 'gunmetal', bev=0.0006)          # its catch, in the guard
+# the bottom metal's magazine well: a hollow rectangular shell from the receiver's floor down to the guard's level (the detachable box seats in it)
+wl = K.tmp(box(-0.0160, 0.0160, MAGF - 0.0450, MAGF + 0.0450, -0.0535, -0.0150)); cut(wl, box(-0.0130, 0.0130, MAGF - 0.0420, MAGF + 0.0420, -0.0600, -0.0100))
+bevel(wl, 0.0008, 1, 40); wnorm(wl); K.adopt(wl, 'base', 'blued')
 put(K, prism([(0.0325, -0.0290), (0.0380, -0.0290), (0.0425, -0.0520), (0.0365, -0.0520)], 'x', -0.0032, 0.0032), 'base', 'gunmetal', bev=0.0006)   # the trigger
 put(K, box(-0.0100, 0.0100, -0.005, 0.001, -0.0140, -0.0095), 'base', 'gunmetal')                      # the trigger's adjusting block
 # the safety: a boss and a thumb lever on the right of the tang
@@ -71,7 +74,7 @@ SIDE = [(-0.247, -0.0165), (-0.093, -0.0165), (-0.083, -0.0164), (-0.072, -0.019
 PLAN = [(-0.25, 0.0195), (-0.17, 0.0195), (-0.12, 0.0205), (-0.09, 0.0215), (F_MOUTH + 0.0135, 0.0215)]
 cuts = [cyl(RB + 0.6 * mm, -0.10, F_MOUTH + 0.02, 'y', (0, 0), 20),                                  # the action bed: the receiver lies in it
         box(-0.0115, 0.0115, 0.0, 0.063, -0.075, -0.0140),                                          # the trigger guard's opening
-        box(-0.0135, 0.0135, 0.063, 0.1475, -0.075, -0.0140),                                       # the floorplate's
+        box(-0.0168, 0.0168, MAGF - 0.0452, MAGF + 0.0452, -0.075, -0.0140),                       # the magazine well's
         box(0.0, 0.03, 0.104, 0.190, -0.0125, 0.03)]                                                # the ejection port's relief in the stock's right side
 body(K, SIDE, PLAN, 'stock', 'polymer', bev=0.0045, cuts=cuts)
 # the adjustable butt: the stock ends in a flat face; then air, with two guide rods and the knurled length-of-pull wheel on its threaded rod; then the rubber pad (photo x 50-100)
@@ -109,6 +112,32 @@ ring = K.tmp(cyl(6.6 * mm, RS - 0.0033, RS + 0.0033, 'y', (0, SY), segs(6.6 * mm
 bevel(ring, 0.0005, 1, 40); wnorm(ring); K.adopt(ring, 'optic', 'black')
 put(K, cyl(3.0 * mm, 0.0066, 0.0112, 'x', (RS, SY - 0.0035), segs(3.0 * mm)), 'optic', 'gunmetal', bev=0.0004)           # the windage screw's knob
 
+# ================================================================================================ the magazine (part_mag): a 5-round .308 detachable box (AICS pattern), seated in the well
+# Its check (docs/models.md): part_mag.check.w, the top round (chk role top i 0 case, i 1 tip; the second round i 2 and 3) and a witness window each round down the back face (role hole, side 1).
+HM, HB, WM = 0.0800, 0.0790, 0.0236          # its height under the lips, its length (forward), its width
+pm = K.part('mag', (0, MAGF, MAGU)); pm['check'] = {'w': WM}
+mg = K.tmp(box(-WM / 2, WM / 2, MAGF - HB / 2, MAGF + HB / 2, MAGU - HM, MAGU - 0.001))
+cut(mg, box(-WM / 2 + 0.0016, WM / 2 - 0.0016, MAGF - HB / 2 + 0.0016, MAGF + HB / 2 - 0.0016, MAGU - HM + 0.003, MAGU + 0.001))          # hollow: the follower's well, open at the top
+wins = []
+for i in range(5):
+    uh = MAGU - 0.0140 - i * 0.0125; t = (MAGU - uh) / HM
+    cut(mg, box(-0.0026 - 0.0026, -0.0026 + 0.0026, MAGF - HB / 2 - 0.001, MAGF - HB / 2 + 0.0030, uh - 0.0028, uh + 0.0028)); wins.append((i, t, uh))
+bevel(mg, 0.0008, 1, 40); wnorm(mg); K.adopt(mg, 'mag', 'polymer', pm)
+put(K, box(-WM / 2 - 0.0006, WM / 2 + 0.0006, MAGF - HB / 2 - 0.0006, MAGF + HB / 2 + 0.0006, MAGU - HM - 0.003, MAGU - HM + 0.003), 'mag', 'black', pm, bev=0.0008)          # the floorplate
+for sd in (-1, 1):                                                                                                                                                 # the feed lips: two thin steel strips turned in over the rounds
+    put(K, box(sd * (WM / 2 - 0.0016), sd * (WM / 2 - 0.0046), MAGF - 0.030, MAGF + 0.030, MAGU - 0.0030, MAGU + 0.0004), 'mag', 'steel', pm)
+for i, t, uh in wins:
+    o = K.obj(box(-0.0026 - 0.0024, -0.0026 + 0.0024, MAGF - HB / 2 + 0.0004, MAGF - HB / 2 + 0.0012, uh - 0.0025, uh + 0.0025), 'mag', 'brass', pm)
+    o['chk'] = {'role': 'hole', 'i': i, 't': round(t, 4), 'side': 1}
+def rnd(x, z, chk):                                     # a .308 round lying forward, its case head at the back wall (case 51.2 mm, bullet to 71.1 mm)
+    h = MAGF - HB / 2 + 0.0030
+    c = K.obj(lathe([(h, 0.0005), (h, 5.9 * mm), (h + 1.3 * mm, 5.9 * mm), (h + 1.6 * mm, 5.0 * mm), (h + 2.8 * mm, 5.0 * mm), (h + 3.2 * mm, 5.9 * mm), (h + 40 * mm, 5.5 * mm),
+                     (h + 46 * mm, 4.4 * mm), (h + 51.2 * mm, 4.1 * mm), (h + 51.2 * mm, 0.0005)], segs(5.9 * mm), (x, 0, z)), 'mag', 'brass', pm); smooth(c)
+    b = K.obj(lathe([(h + 51.2 * mm, 0.0005), (h + 51.2 * mm, 3.9 * mm), (h + 60 * mm, 3.9 * mm), (h + 67 * mm, 2.4 * mm), (h + 71.1 * mm, 0.4 * mm), (h + 71.1 * mm, 0.0005)], segs(3.9 * mm), (x, 0, z)), 'mag', 'brass', pm); smooth(b)
+    if chk: k = 2 if chk == 'second' else 0; c['chk'] = {'role': 'top', 'i': k}; b['chk'] = {'role': 'top', 'i': k + 1}
+rnd(0.0028, MAGU - 0.0042, True)
+rnd(-0.0028, MAGU - 0.0042 - 0.0105, 'second')
+
 # ================================================================================================ the bolt (part_bolt): body, lugs, extractor, sleeve, cocking piece, swept stem and oval knob
 PIV = 0.070                                                                  # the handle's root
 HANDLE = [(0.0100, PIV, -0.001, 0.0045), (0.0300, PIV - 0.0070, -0.004, 0.0040), (0.0705, PIV - 0.0300, -0.0125, 0.0036)]   # (the stem runs into the knob's centre)   # (right, forward, up, radius)
@@ -121,7 +150,8 @@ info = {
     'sy': SY, 'fSight': RS, 'relief': 0.075,
     'muzzles': [[round(MUZ_TIP, 4), 0, 0]],
     'grip': [0.0, -0.088, 0], 'support': [0.33, -0.030, 0],
-    'anim': {'bolt': 'part_bolt'},
+    'anim': {'bolt': 'part_bolt', 'mag': 'part_mag'},
+    'magAt': [MAGF, MAGU],
     'port': [0.147, 0.0, round(RB, 4)],
     'bolt': [round(KNOB[1], 4), round(KNOB[2], 4), round(KNOB[0], 4)],
     'boltTravel': 0.090,
@@ -132,7 +162,7 @@ anchors = {
     'mount_handguard': [round(HG0, 4), 0, 0], 'mount_handguard_end': [0.760, 0, 0],
     'mount_barrel': [0.761, 0, 0], 'mount_muzzle': [MUZ, 0, 0],
     'mount_stock': [0, -0.002, 0], 'mount_grip': [0.05, -0.0172, 0],
-    'mount_mag': [0.105, -0.0417, 0],
+    'mount_mag': [MAGF, MAGU, 0],
 }
 root['gun'] = ID; root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
 bad = sweep_check(coll)
