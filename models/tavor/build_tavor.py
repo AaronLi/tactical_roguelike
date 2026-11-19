@@ -96,15 +96,13 @@ for pc_ in port_cutter(*PORT, -2.0 * mm, 33 * mm): cut(sh, pc_)
 
 # ---- the handguard (both sides): the slanted slots, the row of short slots along its lower edge, the top dashes, the grid panel, the nose cap's vents
 for sx in (-1, 1):
-    for hx in (130, 141, 154, 166, 202, 216, 228, 238):                        # (the slanted slots, the top leaning toward the muzzle: pitch 12 px, 21 long)
-        pocket(sh, slot_pts(hx, 154, 21, 3.6, -11), 0.5, sx, 9.0 * mm)
-    for hx in (95, 107, 118, 130, 141, 154, 166, 202):                         # (the short round-ended slots along its lower edge)
-        pocket(sh, slot_pts(hx, 170.5, 9, 4.2, 0), 0.5, sx, 9.0 * mm)
-    for hx in (121, 135, 185, 202):                                            # (the dashes along the top housing's side)
-        pocket(sh, slot_pts(hx, 132, 9, 3.6, 90), 0.5, sx, 7.0 * mm)
-for hx in (153, 168):                                                          # (two of them go through: the photo shows daylight through the middle ones)
-    cut(sh, prism(PL(slot_pts(hx, 132, 9, 3.6, 90)), 'x', -40 * mm, 40 * mm))
-pocket(sh, rect(174, 145, 197, 170, 1.5), 0.5, -1, 1.2 * mm, floor=False)          # (the grid panel, left: recessed, with its ribs raised again below)
+    pocket(sh, rect(100, 141, 248, 168, 3.0), 0.5, sx, 1.0 * mm, floor=False)     # (the band the slanted ribs stand in: recessed 1 mm, the ribs rise back to the surface below)
+    for hx in (95, 107, 118.6, 130, 142, 153.6, 165, 202):                          # (the lower row: bold, dark, 5 x 13 px round-ended slots, deep)
+        pocket(sh, slot_pts(hx, 169.5, 13, 5, 0), 0.5, sx, 14.0 * mm)
+    for hx in (104, 120, 136, 217, 227):                                             # (the top row's dashes: nine in the photo, 12 px long, pitch about 16)
+        pocket(sh, slot_pts(hx, 135, 12, 4.6, 90), 0.5, sx, 8.0 * mm)
+for hx in (152, 168, 184, 200):                                                      # (four of them go through: the left photo shows daylight in them)
+    cut(sh, prism(PL(slot_pts(hx, 135, 12, 4.6, 90)), 'x', -40 * mm, 40 * mm))
 # the nose cap's vents (on its front face, cut along the bore): four slots over the barrel, two round holes under it
 def nose_cut(poly_xz, depth=10.0):
     cut(sh, prism(poly_xz, 'y', F(91) - 0.001, F(91) + depth * mm))
@@ -142,8 +140,17 @@ port_inside(K, *PORT, 31 * mm, mouth_r=5.6 * mm, ramp=26 * mm, az=(PORT[2] + POR
 CARRIER = port_carrier(K, *PORT, 31 * mm, ax=0.0, az=(PORT[2] + PORT[3]) / 2)
 
 # ---- the grid panel's ribs, the raised and fitted parts, the pins and plugs (both sides where the photos show them on both)
-for gx in (178, 184, 190): raised(rect(gx, 147, gx + 1.6, 168, 0.3), 0.5, -1, 0.8 * mm, SH)
-for gy in (151, 157, 163): raised(rect(175, gy, 196, gy + 1.6, 0.3), 0.5, -1, 0.8 * mm, SH)
+def flush(poly_px, f, sx, depth=1.0 * mm, mat=SH):
+    """A piece standing in a 1 mm recess, its face flush with the surface (a rib, a panel)."""
+    w = hw(f); o = K.tmp(prism(PL(poly_px), 'x', *xs(sx * (w - depth - 0.3 * mm), sx * w))); return o
+for sx in (-1, 1):
+    for hx in (130, 141, 154, 166, 202, 216, 228, 238):                              # (the slanted slots of the photo are thin raised ribs: 2 mm wide, the top toward the muzzle)
+        o = flush(slot_pts(hx, 152, 20, 1.9, -11), 0.5, sx); smooth(o); K.adopt(o, 'base', SH)
+pn = flush(rect(174, 145, 197, 170, 1.0), 0.5, -1)                                    # (the raised rectangle with its horizontal lines)
+w_ = hw(0.5)
+for gy in (153, 157, 161, 165):
+    cut(pn, prism(PL(rect(177, gy, 194, gy + 0.9, 0.2)), 'x', -w_ - 1 * mm, -w_ + 0.0 * mm) if False else prism(PL(rect(177, gy, 194, gy + 0.9, 0.2)), 'x', -w_ - 1 * mm, -w_ + 0.7 * mm))
+bevel(pn, 0.3 * mm, 1); smooth(pn); K.adopt(pn, 'base', SH)
 raised(rect(547, 172, 577, 178, 1.5), 0.1, -1, 0.8 * mm, 'steel')                  # (the serial plate)
 raised(rect(581, 136, 631, 170, 4.0), 0.03, -1, 0.9 * mm, SH); raised(rect(581, 136, 631, 170, 4.0), 0.03, 1, 0.9 * mm, SH)   # (the butt's raised rear panel, each side)
 for sx in (-1, 1):
@@ -187,7 +194,7 @@ SY = 0.088                                                        # the sight li
 L = F(91)                                                         # the handguard's nose face: where the barrel comes out
 # the lower rail is the handguard's own ridged lip; the side rail sections for the game's lights sit on its flanks
 for s_, ax in ((1, 'right'), (-1, 'left')):
-    picatinny(K, F(227), F(203), -6 * mm, 'base', 'black', axis=ax, x0=s_ * HWG, lean=True)
+    picatinny(K, F(248), F(232), -6 * mm, 'base', 'black', axis=ax, x0=s_ * HWG, lean=True)
 
 # ===================================================================================== the barrel (barrel) and the flash hider (muzzle)
 MZ0 = F(55)
@@ -292,11 +299,11 @@ anchors = {
     'mount_stock': [0, r4(U(150)), 0],
     'mount_grip': [r4(F(330)), r4(U(192)), 0],
     'mount_mag': [r4(MAG_TOP[0]), r4(MAG_TOP[1]), 0],
-    'mount_tac': [r4(F(215)), -0.006, 0.026],
+    'mount_tac': [r4(F(240)), -0.006, 0.026],
     'mount_fg': [r4(L - 0.10), r4(U(197)) - 0.0056, 0],
 }
 root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
-for _n, _c in (('polymer', (0.16, 0.16, 0.175, 1)), ('stipple', (0.2, 0.2, 0.215, 1)), ('rubber', (0.07, 0.07, 0.075, 1))):    # (viewing colours only: the game replaces every material by its name)
+for _n, _c in (('black', (0.01, 0.01, 0.012, 1)), ('polymer', (0.16, 0.16, 0.175, 1)), ('stipple', (0.2, 0.2, 0.215, 1)), ('rubber', (0.07, 0.07, 0.075, 1))):    # (viewing colours only: the game replaces every material by its name)
     _m = bpy.data.materials.get(_n)
     if _m: _m.diffuse_color = _c
 json.dump({'source': 'authored', 'sights': {'builtin': ['irons'], 'rail': [], 'railed': True}}, open(os.path.join(HERE, 'model.json'), 'w', encoding='utf-8'), indent=2)
