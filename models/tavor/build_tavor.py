@@ -146,7 +146,7 @@ RA, RB = F(2190), F(750)
 RAIL_U = U(364)
 picatinny(K, RA, RB, RAIL_U, 'base', 'black', lean=True)
 RAIL_TOP = RAIL_U + 5.6 * mm
-SY = RAIL_TOP + 16 * mm
+SY = RAIL_TOP + 19 * mm
 # the side rails (the game's light mounts): short Picatinny stubs on the handguard's flanks, low, ahead of the pad's rear (not on the real TAR-21; the X95 has them)
 L = F(676)                                                   # (the nose's front face: where the barrel comes out)
 for s_, ax in ((1, 'right'), (-1, 'left')):
@@ -218,7 +218,7 @@ info = {
     'anim': {'mag': 'part_mag', 'handle': 'part_handle', 'carrier': 'part_carrier'},
     'carrier': {'travel': 0.090},
     'magAt': [r4(MAG_TOP[0]), r4(MAG_TOP[1])],
-    'handle': {'f': r4(H0[0]), 'y': r4(H0[1]), 'x': r4(XH - 0.012), 'travel': 0.100, 'recip': False, 'style': 'knob', 'grab': [r4(H0[0]), r4(H0[1]), r4(XH - 0.014)]},
+    'handle': {'f': r4(H0[0]), 'y': r4(H0[1]), 'x': r4(XH - 0.012), 'travel': 0.100, 'recip': False, 'style': 'knob', 'grab': [r4(H0[0] + 0.0055), r4(H0[1]), r4(XH - 0.014)]},
     'port': [r4((PORT[0] + PORT[1]) / 2), r4((PORT[2] + PORT[3]) / 2), 0.031],
     'chamberAt': {'side': 'port', 'f': r4(PORT[1] - 0.7 * mm - 0.72 * 0.042), 'y': r4((PORT[2] + PORT[3]) / 2 + 0.0048), 'x': 0.0},
     'recoilBarrel': 0,
