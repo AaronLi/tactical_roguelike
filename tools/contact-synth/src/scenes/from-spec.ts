@@ -504,7 +504,7 @@ GUN_SPECS.smg = {
  * MP5's rollers and slap. Figures from the datasheet (receiver 28 cm, 2.5 kg gun) and typical blowback numbers.
  */
 GUN_SPECS.apc9 = {
-  id: 'apc9', name: 'B&T APC9 K',
+  id: 'apc9', name: 'APC9 K',
   action: { mass: 0.34, stroke: 0.075, springHome: 34, springRear: 56, carrierCm: 12, boltCm: 8, lockup: 'blowback', lube: 'oiled', holdOpen: true, trigger: 'hammer', hammerSpringMm: 1.1 },
   handle: { kind: 'separate', material: 'polymer', lengthCm: 3.5, returns: 'own-spring' },
   receiver: { build: 'billet', wallMm: 2.5, lengthCm: 28, widthCm: 3.6, heightCm: 4.4, ports: 'closed' },
