@@ -97,12 +97,12 @@ for pc_ in port_cutter(*PORT, -2.0 * mm, 33 * mm): cut(sh, pc_)
 # ---- the handguard (both sides): the slanted slots, the row of short slots along its lower edge, the top dashes, the grid panel, the nose cap's vents
 for sx in (-1, 1):
     pocket(sh, rect(100, 141, 248, 168, 3.0), 0.5, sx, 1.0 * mm, floor=False)     # (the band the slanted ribs stand in: recessed 1 mm, the ribs rise back to the surface below)
-    for hx in (95, 107, 118.6, 130, 142, 153.6, 165, 202):                          # (the lower row: bold, dark, 5 x 13 px round-ended slots, deep)
+    for hx in (97, 107.5, 118.6, 130, 142, 153.6, 165, 202):                          # (the lower row: bold, dark, 5 x 13 px round-ended slots, deep)
         pocket(sh, slot_pts(hx, 169.5, 13, 5, 0), 0.5, sx, 14.0 * mm)
-    for hx in (104, 120, 136, 217, 227):                                             # (the top row's dashes: nine in the photo, 12 px long, pitch about 16)
-        pocket(sh, slot_pts(hx, 135, 12, 4.6, 90), 0.5, sx, 8.0 * mm)
-for hx in (152, 168, 184, 200):                                                      # (four of them go through: the left photo shows daylight in them)
-    cut(sh, prism(PL(slot_pts(hx, 135, 12, 4.6, 90)), 'x', -40 * mm, 40 * mm))
+    for hx in (116, 130, 144, 214, 228):                                             # (the top row's dashes: nine, 10 px long at a 14 px pitch, the first well behind the body's sloped front corner: its edge is at x 102 at this height)
+        pocket(sh, slot_pts(hx, 135, 10, 4.6, 90), 0.5, sx, 8.0 * mm)
+for hx in (158, 172, 186, 200):                                                      # (four of them go through: the left photo shows daylight in them)
+    cut(sh, prism(PL(slot_pts(hx, 135, 10, 4.6, 90)), 'x', -40 * mm, 40 * mm))
 # the nose cap's vents (on its front face, cut along the bore): four slots over the barrel, two round holes under it
 def nose_cut(poly_xz, depth=10.0):
     cut(sh, prism(poly_xz, 'y', F(91) - 0.001, F(91) + depth * mm))
