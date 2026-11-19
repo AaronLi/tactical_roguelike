@@ -1526,40 +1526,8 @@
    "build": { "barrel": "br.5.6x39.15.9", "grip": "gr.ak.an94", "handguard": "hg.ak.an94", "mag": "ak74.mag.30" }
   },
   { "platform": "an94",
-   "why": "shortest barrel (br.5.6x39.10.5) x longest handguard that fits (hg.ak.2)",
-   "build": { "barrel": "br.5.6x39.10.5", "grip": "gr.ak.an94", "handguard": "hg.ak.2", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94" }
-  },
-  { "platform": "an94",
-   "why": "longest barrel (br.5.6x39.20.heavy) x shortest handguard (oem.hg.ak.8)",
-   "build": { "barrel": "br.5.6x39.20.heavy", "grip": "gr.ak.an94", "handguard": "oem.hg.ak.8", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94" }
-  },
-  { "platform": "an94",
-   "why": "opens slots: br.5.6x39.10.5 in barrel (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.10.5", "fg": "fg.0", "grip": "gr.ak.an94", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94", "tac": "tac.0", "tacL": "tac.0" }
-  },
-  { "platform": "an94",
-   "why": "opens slots: br.5.6x39.10.5.light in barrel (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.10.5.light", "fg": "fg.0", "grip": "gr.ak.an94", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94", "tac": "tac.0", "tacL": "tac.0" }
-  },
-  { "platform": "an94",
-   "why": "opens slots: hg.ak.1 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.15.9", "fg": "fg.0", "grip": "gr.ak.an94", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94", "tac": "tac.0", "tacL": "tac.0" }
-  },
-  { "platform": "an94",
-   "why": "opens slots: hg.ak.2 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.15.9", "fg": "fg.0", "grip": "gr.ak.an94", "handguard": "hg.ak.2", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94", "tac": "tac.0", "tacL": "tac.0" }
-  },
-  { "platform": "an94",
-   "why": "opens slots: oem.hg.ak.9 in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.15.9", "fg": "fg.0", "grip": "gr.ak.an94", "handguard": "oem.hg.ak.9", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94", "tac": "tac.0", "tacL": "tac.0" }
-  },
-  { "platform": "an94",
-   "why": "opens slots: hg.ak.short.rail in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.15.9", "fg": "fg.0", "grip": "gr.ak.an94", "handguard": "hg.ak.short.rail", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94", "tac": "tac.0", "tacL": "tac.0" }
-  },
-  { "platform": "an94",
-   "why": "opens slots: hg.ak.short.mlok in handguard (fg, tac, tacL)",
-   "build": { "barrel": "br.5.6x39.15.9", "fg": "fg.0", "grip": "gr.ak.an94", "handguard": "hg.ak.short.mlok", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94", "tac": "tac.0", "tacL": "tac.0" }
+   "why": "longest barrel (br.5.6x39.20.heavy) x shortest handguard (hg.ak.an94)",
+   "build": { "barrel": "br.5.6x39.20.heavy", "grip": "gr.ak.an94", "handguard": "hg.ak.an94", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94" }
   },
   { "platform": "an94",
    "why": "opens slots: op.pic.12 in optic (riserdot) + replaced optic (op.pso.1) on the riser",
@@ -1676,22 +1644,6 @@
   { "platform": "an94",
    "why": "authored stock (oem.stk.ak.4)",
    "build": { "barrel": "br.5.6x39.15.9", "grip": "gr.ak.an94", "handguard": "hg.ak.an94", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "oem.stk.ak.4" }
-  },
-  { "platform": "an94",
-   "why": "authored handguard (hg.ak.1)",
-   "build": { "barrel": "br.5.6x39.15.9", "grip": "gr.ak.an94", "handguard": "hg.ak.1", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94" }
-  },
-  { "platform": "an94",
-   "why": "authored handguard (hg.ak.2)",
-   "build": { "barrel": "br.5.6x39.15.9", "grip": "gr.ak.an94", "handguard": "hg.ak.2", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94" }
-  },
-  { "platform": "an94",
-   "why": "authored handguard (oem.hg.ak.6)",
-   "build": { "barrel": "br.5.6x39.15.9", "grip": "gr.ak.an94", "handguard": "oem.hg.ak.6", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94" }
-  },
-  { "platform": "an94",
-   "why": "authored handguard (oem.hg.ak.9)",
-   "build": { "barrel": "br.5.6x39.15.9", "grip": "gr.ak.an94", "handguard": "oem.hg.ak.9", "mag": "ak74.mag.30", "muzzle": "mz.rak.an94", "optic": "an94.optic", "stock": "stk.ak.an94" }
   },
   { "platform": "an94",
    "why": "suppressor on the muzzle (mz.rak.can)",

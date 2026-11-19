@@ -896,7 +896,7 @@ export const Gunsmith = (() => {
       for (const [sl, pid] of Object.entries(build)) {
         const s = avail.find((a: Slot) => a.slot === sl);
         if (!s || !PARTS[pid] || (!fitsSlot(s, PARTS[pid], id, build) && !s.req)) { removed.push(pid); delete build[sl]; changed = true; }
-        else if (s.req && sl === 'handguard' && fitsSlot(s, PARTS[pid], id, false) && !fitsSlot(s, PARTS[pid], id, build)) { // (too long for its barrel: the gun's own, or what's longest that fits, in its place)
+        else if (s.req && sl === 'handguard' && ((fitsSlot(s, PARTS[pid], id, false) && !fitsSlot(s, PARTS[pid], id, build)) || (PARTS[pid].not || []).includes(id))) { // (too long for its barrel, or one the gun refuses (the AN-94's): the gun's own, or what's longest that fits, in its place)
           const q = hgFallback(id, build, s);
           if (q) { removed.push(pid); build[sl] = q.id; changed = true; }
         }
@@ -1669,6 +1669,8 @@ export const Gunsmith = (() => {
         }
       }
     } }
+  // the AN-94's forend is its own (hg.ak.an94): none of the AK family's other handguards go on it, so the gunsmith offers it that one, fitted and not changeable (prune puts it back on a build that has another)
+  for (const p of LIST) if (p.slot === 'handguard' && p.only !== 'an94' && [p.mount, ...(p.alsoMounts || [])].includes('hg:ak')) p.not = [...(p.not || []), 'an94'];
   const compatible =(mount: string) => BY_MOUNT.get(mount) || [];
   const FITS = new Map(); // interface -> weapon ids that have (or can get) a slot for it
   const addFits = (plat: Platform) => {
