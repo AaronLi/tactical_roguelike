@@ -77,13 +77,15 @@ def disc(cx, cy, r, f, sx, h, mat, n=14, depth=0.0):
 
 # ===================================================================================== the shell (base): the photo's outline above the grip
 SHELL = [[91, 177], [91, 151], [91, 145], [93, 141], [97, 137], [102, 135], [110, 121], [440, 121], [440, 124], [612, 124], [622, 125], [630, 127], [634, 133], [633, 164],
-         [631, 192], [631, 231], [627, 235], [621, 236], [540, 236], [540, 239], [528, 238], [527, 236], [490, 236], [487, 239], [483, 240], [483, 232], [421, 232], [421, 217],
+         [631, 192], [631, 231], [627, 235], [621, 236], [483, 236], [483, 232], [421, 232], [421, 217],
          [415, 211], [414, 199], [408, 191], [406, 188], [360, 187], [248, 196], [107, 197], [107, 204], [105, 208], [97, 208], [95, 205], [93, 192], [91, 186]]
 MAG_TOP = (F(452), -0.0458)                  # the well's mouth is photo x 421-483 (its middle 452) at y 232; the magazine's foot reaches y 342
 MB, MF = -32.6 * mm, 31.6 * mm
 sh = K.tmp(prism(PL(SHELL), 'x', -40 * mm, 40 * mm))
 boolean(sh, prism(PLAN, 'z', U(1300), U(-300)), 'INTERSECT')
-tidy(sh, 0.1 * mm, False); bevel(sh, 2.5 * mm, 1, 30)               # (chamfer the body once, THEN the cuts)
+# the sides lean in over the top 20 mm (the cross-section's soft shoulders), then the whole body's edges are rounded (4 mm, three segments) before any detail is cut
+boolean(sh, prism([(-31 * mm, -0.30), (31 * mm, -0.30), (31 * mm, 0.030), (25 * mm, 0.0505), (-25 * mm, 0.0505), (-31 * mm, 0.030)], 'y', -0.10, 0.80), 'INTERSECT')
+tidy(sh, 0.1 * mm, False); bevel(sh, 4.0 * mm, 3, 30)               # (chamfer the body once, THEN the cuts)
 cut(sh, box(-12.4 * mm, 12.4 * mm, MAG_TOP[0] + MB - 1.0 * mm, MAG_TOP[0] + MF + 1.0 * mm, U(1250), MAG_TOP[1] + 2 * mm))
 PORT = (F(499), F(419), U(172), U(153))                             # (the right side's ejection port; the left shows its cover panel at the same place)
 def port_cutter(pa, pb, pu0, pu1, x_in, x_out, flare=0.7 * mm):
@@ -177,7 +179,7 @@ o = K.tmp(prism(PL(rect(120, 153, 148, 172, 2.0)), 'x', 30.7 * mm, 33.2 * mm)); 
 o = K.obj(cyl(2.0 * mm, 33.0 * mm, 33.8 * mm, 'x', (F(135), U(162)), 8), 'base', 'steel'); smooth(o)
 # the butt pad (a line of rubber across the butt's rear)
 BUTT = [[612, 125], [622, 125], [630, 127], [634, 133], [633, 164], [631, 192], [631, 231], [627, 235], [621, 236], [612, 236]]
-o = K.tmp(prism(PL(BUTT), 'x', -30.8 * mm, 30.8 * mm)); tidy(o, 0.1 * mm, False); bevel(o, 1.5 * mm, 1, 30); wnorm(o); K.adopt(o, 'base', 'rubber')
+o = K.tmp(prism(PL(BUTT), 'x', -30.8 * mm, 30.8 * mm)); tidy(o, 0.1 * mm, False); bevel(o, 3.0 * mm, 2, 30); wnorm(o); K.adopt(o, 'base', 'rubber')
 # the trigger
 # the trigger: a thin curved steel blade coming down out of a slot in the receiver's floor (its top inside the housing), its tip forward and low (photo x 284-296, y 189-220)
 TRIG = [[285.5, 188.5], [296, 188.5], [296, 199], [295.6, 206], [293.4, 213.5], [288.5, 218.5], [285, 219.7], [284.4, 218], [287, 212.5], [288.8, 204], [287.5, 198], [285.5, 196]]
@@ -233,7 +235,7 @@ GRIP = chaikin([(246, 186), (248, 196), (255, 207), (263, 224), (271, 243), (281
 # the window: a straight slanted front edge, a rounded bottom, the grip's front strap up its back (the finger grooves are cut into it below)
 WIN = chaikin([(267, 176), (267, 198), (274, 224), (281, 246), (288, 264), (294, 278), (299, 285), (307, 288), (322, 288), (329, 285), (331, 279), (331, 266), (327, 252), (325, 248),
                (320, 245), (320, 235), (314, 229), (306, 226), (306, 222), (312, 218), (314, 214), (314, 200), (314, 176)], 1)
-gp = K.tmp(prism(PL(GRIP), 'x', -16 * mm, 16 * mm)); tidy(gp, 0.1 * mm, False); bevel(gp, 2.0 * mm, 1, 30)
+gp = K.tmp(prism(PL(GRIP), 'x', -16 * mm, 16 * mm)); tidy(gp, 0.1 * mm, False); bevel(gp, 3.0 * mm, 2, 30)
 cut(gp, prism(PL(WIN), 'x', -20 * mm, 20 * mm))
 tidy(gp); wnorm(gp, 35); K.adopt(gp, 'grip', SH)
 # the grip's side panel: a raised, textured insert outlined on each side, with its screw
@@ -246,8 +248,8 @@ for sx in (-1, 1):
 H0 = (F(238), U(148))
 ph = K.part('handle', (0, H0[0], H0[1]))
 XH = -HWG
-o = K.obj(cyl(3.4 * mm, XH - 9.0 * mm, XH + 0.5 * mm, 'x', H0, 12), 'base', 'black', ph); smooth(o)                                   # (the stem)
-hd = K.tmp(cyl(8.0 * mm, XH - 17.0 * mm, XH - 8.5 * mm, 'x', H0, 20)); bevel(hd, 2.4 * mm, 2, 30); smooth(hd); K.adopt(hd, 'base', 'black', ph)   # (the round knob)
+o = K.obj(cyl(3.6 * mm, XH - 40.0 * mm, XH + 0.5 * mm, 'x', H0, 12), 'base', 'black', ph); smooth(o)                                   # (the stem)
+hd = K.tmp(cyl(9.0 * mm, XH - 57.0 * mm, XH - 38.0 * mm, 'x', H0, 24)); bevel(hd, 3.2 * mm, 2, 30); smooth(hd); K.adopt(hd, 'base', 'black', ph)   # (the round knob)
 o = K.obj(cyl(1.8 * mm, H0[0] - 0.100, H0[0] - 0.004, 'y', (XH + 1.6 * mm, H0[1]), 8), 'base', 'steel', ph); smooth(o)                  # (the guide rod in the channel)
 
 # ===================================================================================== the sights (optic: the gun's own flip-up irons on the rail)
@@ -285,7 +287,7 @@ info = {
     'anim': {'mag': 'part_mag', 'handle': 'part_handle', 'carrier': 'part_carrier'},
     'carrier': {'travel': 0.090},
     'magAt': [r4(MAG_TOP[0]), r4(MAG_TOP[1])],
-    'handle': {'f': r4(H0[0]), 'y': r4(H0[1]), 'x': r4(XH - 0.014), 'travel': 0.100, 'recip': False, 'style': 'knob', 'grab': [r4(H0[0] + 0.008), r4(H0[1]), r4(XH - 0.014)]},
+    'handle': {'f': r4(H0[0]), 'y': r4(H0[1]), 'x': r4(XH - 0.048), 'travel': 0.100, 'recip': False, 'style': 'knob', 'grab': [r4(H0[0] + 0.008), r4(H0[1]), r4(XH - 0.048)]},
     'port': [r4((PORT[0] + PORT[1]) / 2), r4((PORT[2] + PORT[3]) / 2), 0.031],
     'chamberAt': {'side': 'port', 'f': r4(PORT[1] - 0.7 * mm - 0.72 * 0.042), 'y': r4((PORT[2] + PORT[3]) / 2 + 0.0048), 'x': 0.0},
     'recoilBarrel': 0,

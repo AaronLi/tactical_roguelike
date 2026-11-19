@@ -266,19 +266,22 @@ export const VMAnim = (() => {
   }
   // when, through a rack (or a release), the action's fully back (the case it held thrown) and home again (a round
   // fed): js/player.ts times the rounds to it
-  function actEvents(kind: string, action: VmAction | null, manual = false) {
+  const PAUSE_RACK = new Set(['tavor']); // (guns whose charge holds the handle at the back of its pull: the X95's, a beat before it is let home; the rack's time is the same)
+  function actEvents(kind: string, action: VmAction | null, manual = false, id?: string) {
     if (kind === 'release') return { back: 0, home: 0.38 };
+    if (id && PAUSE_RACK.has(id) && !manual) return { back: 0.5, home: 0.7 }; // (back as the hold begins, the round fed as the handle is let home)
     if (manual) return { back: 0.55, home: 0.88 }; // (one cycle for every manual action: bolt, pump, lever)
     return { back: 0.52, home: 0.6 };
   }
   // Racking: the action pulled through and let go (a riding open bolt's left back: cocked). c: 0..1 over it; from:
   // where the left hand starts, if not on the handguard (the magazine it's just seated)
-  function rack(c: number, h: Rig, kind: VmAction, pose: Pose, from: V3 | null, down = false) { // (down: a pistol's arm lowered to get at the slide, not the wrist turned (a release's rack))
+  function rack(c: number, h: Rig, kind: VmAction, pose: Pose, from: V3 | null, down = false, pause = false) { // (down: a pistol's arm lowered to get at the slide, not the wrist turned (a release's rack); pause: held at the back (PAUSE_RACK))
     const A = h.A, stay = kind === 'handle' && h.open && h.recip;
     let pull: number, on: number;
     if (kind === 'bolt' && _bh) { pull = 0.5 * (S(0.06, 0.20, c) + S(0.27, 0.45, c) - S(0.60, 0.74, c) - S(0.74, 0.84, c)); on = S(0.0, 0.1, c) * (1 - S(0.88, 1, c)); } // (the R700's and the Mosin's, a deliberate cycle in the same time: the handle up, a pause, drawn back, a pause at the rear where the case is thrown (0.55), forward, down)
     else if (kind === 'bolt') { pull = S(0.25, 0.6, c) * (1 - S(0.6, 0.85, c)); on = S(0.08, 0.25, c) * (1 - S(0.85, 1, c)); } // (the right hand: up, back, the case flies, forward, down)
     else if (kind === 'pump' || kind === 'lever') { pull = S(0.1, 0.45, c) * (1 - S(0.5, 0.9, c)); on = 1; }
+    else if (pause && kind === 'handle' && !stay) { pull = S(0.3, 0.46, c) * (1 - S(0.64, 0.74, c)); on = S(0.05, 0.3, c) * (1 - S(0.78, 0.95, c)); } // (up to the rear by 0.46, held to 0.64, let home by 0.74: the same time as the plain charge)
     else { pull = S(0.3, 0.52, c) * (stay ? 1 : 1 - S(0.52, 0.6, c)); on = S(0.05, 0.3, c) * (1 - S(stay ? 0.55 : 0.62, 0.95, c)); }
     actionPose(kind, h, pose, pull, on, c < 0.5 ? from : null);
     if (from && kind === 'bolt') pose.L = path(c, [[0, from], [0.3, A.S], [1, A.S]]); // (the left hand back to the handguard)
@@ -865,7 +868,7 @@ export const VMAnim = (() => {
     } else if (pl.act) { // the action, worked by hand (js/player.ts workAction): on its own, or straight on from a magazine just seated
       const ac = pl.act, c = U.clamp(ac.t, 0, 1), kind = actKind(a, h), from = ac.seat && h.A.WB ? off(h.A.WB, 0, 0.012) : null;
       pose = base();
-      if (ac.kind === 'release') release(c, h, kind, pose, from); else rack(c, h, kind, pose, from);
+      if (ac.kind === 'release') release(c, h, kind, pose, from); else rack(c, h, kind, pose, from, false, PAUSE_RACK.has(a.def.id));
       if (ac.seat) tiltPose(pose, magTilt(ac.seat) * (1 - S(0, ac.kind === 'release' ? 0.27 : 0.45, c))); // (the gun comes back from the magazine change's turn: a release has it level before the hand presses the catch, so the hit lands on a gun that is still)
     } else if (pl.magChk && canMagCheck(vm)) {
       const Qh = new T.Quaternion(); _m.copy(vm.matrix).multiply(h.holder.matrix).decompose(new T.Vector3(), Qh, new T.Vector3());

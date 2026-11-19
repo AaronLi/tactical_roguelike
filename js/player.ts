@@ -1508,7 +1508,7 @@ export const Me = {
   // 'release' (locked open: the catch hit). After a magazine change run dry it follows on from the seating (seat:
   // how far through its motions that went); a partial reload has none. The rounds move as the action does (above).
   workAction(w: GWeapon, kind: PActKind, seat: number | null = null) {
-    const ev = VMAnim.actEvents(kind, VMAnim.kinds(w.def).action, !!w.def.manual);
+    const ev = VMAnim.actEvents(kind, VMAnim.kinds(w.def).action, !!w.def.manual, w.def.id);
     const dur = this.actDur(w.def, kind, !!seat);
     this.act = { kind, seat, t: 0, dur, back: ev.back, home: ev.home };
     this.fireCd = Math.max(this.fireCd, dur);
