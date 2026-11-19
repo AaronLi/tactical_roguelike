@@ -135,6 +135,7 @@ for sx in (-1, 1):
     pocket(sh, circ(570, 198, 6), 0.06, sx, 6.0 * mm)
     pocket(sh, circ(382, 152, 10.5), 0.25, sx, 4.0 * mm)                           # (the round recess behind the selector's front: the barrel nut's cap)
     pocket(sh, circ(323, 183, 12.5), 0.31, sx, 3.0 * mm, floor=False)               # (the selector's recess)
+cut(sh, box(-4.5 * mm, 4.5 * mm, F(297.6), F(283.4), U(199), U(188)))                 # (the slot in the floor the trigger comes through)
 tidy(sh, 1e-6, True)
 wnorm(sh); K.adopt(sh, 'base', SH)
 port_inside(K, *PORT, 31 * mm, mouth_r=5.6 * mm, ramp=26 * mm, az=(PORT[2] + PORT[3]) / 2)
@@ -171,8 +172,10 @@ o = K.obj(cyl(2.0 * mm, 33.0 * mm, 33.8 * mm, 'x', (F(135), U(162)), 8), 'base',
 BUTT = [[612, 125], [622, 125], [630, 127], [634, 133], [633, 164], [631, 192], [631, 231], [627, 235], [621, 236], [612, 236]]
 o = K.tmp(prism(PL(BUTT), 'x', -30.8 * mm, 30.8 * mm)); tidy(o, 0.1 * mm, False); bevel(o, 1.5 * mm, 1, 30); wnorm(o); K.adopt(o, 'base', 'rubber')
 # the trigger
-TRIG = [[297, 196], [295, 200], [296, 208], [295, 208], [293, 215], [287, 220], [284, 220], [284, 217], [287, 213], [287, 201], [284, 196]]
-o = K.tmp(prism(PL(TRIG), 'x', -3.2 * mm, 3.2 * mm)); bevel(o, 0.5 * mm, 1); smooth(o); K.adopt(o, 'base', 'black')
+# the trigger: a thin curved steel blade coming down out of a slot in the receiver's floor (its top inside the housing), its tip forward and low (photo x 284-296, y 189-220)
+TRIG = [[285.5, 188.5], [296, 188.5], [296, 199], [295.6, 206], [293.4, 213.5], [288.5, 218.5], [285, 219.7], [284.4, 218], [287, 212.5], [288.8, 204], [287.5, 198], [285.5, 196]]
+o = K.tmp(prism(PL(TRIG), 'x', -2.4 * mm, 2.4 * mm)); bevel(o, 0.4 * mm, 1); smooth(o); K.adopt(o, 'base', 'steel')
+dark([[283, 187.6], [297.4, 187.6], [297.4, 188.4], [283, 188.4]], -4.4 * mm, 4.4 * mm)
 
 # ===================================================================================== the top rail (two stretches, the gap at photo x 357-366)
 RA, RB = F(440), F(117)
