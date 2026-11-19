@@ -13,7 +13,7 @@ import { join } from 'node:path';
 import { renderPool, encodeAll, jobsArg } from './render-pool.mjs';
 import {
   SCENES, arChargeScene, chargeScene, magDropScene, chargeFromSpec, releaseFromSpec, magFromSpec,
-  GUN_SPECS, MAG_TYPES, boltActionScene, roundInScene,
+  GUN_SPECS, MAG_TYPES, boltActionScene, boltRifleScenes, BOLT_CUES, R700_MAG, roundInScene,
   revolverOpen, revolverClose, revolverLoader, breakOpen, breakClose, breakLoad, beltOut, beltIn, enblocIn,
 } from '../dist/index.js';
 import { readFileSync, existsSync } from 'node:fs';
@@ -161,6 +161,22 @@ if (doing('manual')) {
     'cartridge-in': render(roundInScene('cartridge'), 'rim seats on the chamber face'),
   };
   family('manual', manual);
+}
+// The R700 and the Mosin (the game's rack with its pauses, js/vmanim.ts): a clip a phase of the bolt's cycle, each anchored on the
+// moment the game's cue lands it (BOLT_CUES); the R700's detachable box magazine; the Mosin's open and shut and its stripper clip.
+// Levelled against their own: the R700's magazine going in, the Mosin's stripper clip dropped in.
+const ANCHORS = { pull: 'bolt eased back', open: 'bolt hits its stop', shut: 'handle drops into its notch', 'clip-in': 'clip dropped into the guide', 'cartridge-in': 'round snaps under the lips', 'clip-out': 'clip released from the guide', bolt: 'bolt hits its stop' };
+for (const v of ['r700', 'mosin']) {
+  if (!doing(v)) continue;
+  const clips = {};
+  for (const [n, sc] of Object.entries(boltRifleScenes(v))) clips[n] = render(sc, BOLT_CUES[n] ? BOLT_CUES[n].anchor : ANCHORS[n]);
+  if (v === 'r700') {
+    clips['mag-in'] = render(magFromSpec(R700_MAG, 'in', 'loaded'), 'catch clicks into the magazine');
+    clips['mag-in-empty'] = render(magFromSpec(R700_MAG, 'in', 'empty'), 'catch clicks into the magazine');
+    clips['mag-out'] = render(magFromSpec(R700_MAG, 'out', 'loaded'));
+    clips['mag-out-empty'] = render(magFromSpec(R700_MAG, 'out', 'empty'));
+  } else clips['mag-in'] = clips['clip-in'];
+  family(v, clips);
 }
 // The guns with no magazine of the from-spec kinds (scenes/no-family.ts). Open: its start's the cue; shut: the latch.
 // mag-out / mag-in are what the game's magazine cues play for them (the cylinder out and the empties punched out, a

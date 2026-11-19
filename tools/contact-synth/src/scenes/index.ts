@@ -9,7 +9,7 @@ import { SHIP_DOOR_SCENES } from './ship-doors.js';
 
 export const SCENES: Scene[] = [...RECON_SCENES, ...FIREARM_SCENES, ...MORE_GUN_SCENES, ...SPEC_SCENES, ...NO_FAMILY_SCENES, ...FOOTSTEP_SCENES, ...SHIP_DOOR_SCENES];
 export { SOLES, FLOORS, GAITS, STRIKE, deriveStep, stepScene, walkScene, kitElements, FOOTSTEP_SCENES, type SoleSpec, type FloorSpec, type GaitSpec, type StepSpec, type KitId } from './footsteps.js';
-export { GUN_SPECS, gunScenes, derive, magTypeOf, chargeFromSpec, releaseFromSpec, magFromSpec, boltActionScene, roundInScene, SPEC_SCENES, type GunSpec } from './from-spec.js';
+export { GUN_SPECS, gunScenes, derive, magTypeOf, chargeFromSpec, releaseFromSpec, magFromSpec, boltActionScene, boltRifleScenes, BOLT_CUES, R700_MAG, roundInScene, SPEC_SCENES, type GunSpec } from './from-spec.js';
 export { MORE_GUN_SCENES, chargeScene, type ChargeTiming } from './more-guns.js';
 export { RECON_CS6, RECON_CS6_DRY } from './recon-cs6.js';
 export {

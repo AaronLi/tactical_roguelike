@@ -84,9 +84,9 @@ interface PAction {
   target?: number; living?: boolean; civBody?: boolean; approach?: PXZ | null; spot?: PXZ | null; face?: PXZ; stuck?: number; start?: THREE.Vector3; pull?: PPull | null; qFloor?: THREE.Quaternion;
 }
 // the action worked by hand (rack / release), the magazine pulled to look at, the chamber check, the comms wheel, a viewer, a zipline, a ladder
-interface PAct { kind: PActKind; seat: number | null; t: number; dur: number; back: number; home: number; b?: boolean; h?: boolean; s?: boolean } // (s: its sound's started: js/handling.ts, ahead of the stop it lines up with)
+interface PAct { kind: PActKind; seat: number | null; t: number; dur: number; back: number; home: number; b?: boolean; h?: boolean; s?: boolean; q?: { at: number; name: string; done: boolean }[] | null } // (s: its sound's started: js/handling.ts, ahead of the stop it lines up with)
 interface PMagChk { k: number; back: number; yaw: number; pitch: number; rel?: boolean; seated?: boolean }
-interface PRChk { k: number; rel: boolean }
+interface PRChk { k: number; rel: boolean; s?: boolean }
 interface PWheelItem { id: string; label: string; sub: string; off?: boolean; act: () => void }
 interface PWheel { x: number; y: number; sel: number; items: PWheelItem[] }
 interface PViewer { v: any; was: boolean; yaw: number; pitch: number }
@@ -156,7 +156,7 @@ export const Me = {
   lastTrigger: undefined as unknown as boolean, pressBuf: undefined as unknown as number, rHeldAt: undefined as unknown as number, fLatch: undefined as unknown as boolean, fEdge: undefined as unknown as boolean,
   pairHeld: undefined as unknown as WeaponDef | null, pairAim: undefined as unknown as [number, number] | null,
   stowed: undefined as unknown as boolean, stowW: undefined as unknown as number,
-  act: undefined as unknown as PAct | null, magChk: undefined as unknown as PMagChk | null, rChk: undefined as unknown as PRChk | null,
+  mlk: null as number | null, mlCi: false, inspS: 0, act: undefined as unknown as PAct | null, magChk: undefined as unknown as PMagChk | null, rChk: undefined as unknown as PRChk | null,
   action: undefined as unknown as PAction | null, held: undefined as unknown as PHeld | null, throwStr: undefined as unknown as number | undefined,
   inspectT: undefined as unknown as number, inspectDur: undefined as unknown as number, inspHold: undefined as unknown as boolean, inspYaw: undefined as unknown as number, inspPitch: undefined as unknown as number,
   // recoil, sway and the camera
@@ -1223,6 +1223,16 @@ export const Me = {
     const have = fs.filter((f) => f.it.am === first).reduce((a, f) => a + f.it.n, 0);
     return Math.max(1, Math.min(per, mag - w.mag, have));
   },
+  // The Mosin's load on the animation's own moments (js/vmanim.ts boltLoad, as a fraction of each round's step: the bolt thrown open to its stop by 30% of the
+  // first step, the stripper clip dropped in its guide by 62%, each round thumbed down past the lips by 78%, the bolt shut by 93% of the last, the empty clip off at 80%).
+  mosinLoad(def: WeaponDef, w: PWeapon, mag: number) {
+    const total = this.reloadTotal, k = 1 - this.reloadT / total, p = this.mlk == null || k < this.mlk ? -1 : this.mlk; this.mlk = k;
+    const first = mag - w.mag === this.reloadN, last = mag - w.mag <= (this.loadN || 1);
+    const cue = (at: number, name: string) => { const ld = Handling.lead(def, name); if (ld == null) return false; const tr = Math.max(0, at - ld / total); if (p < tr && k >= tr) return Handling.play(def, name, { land: Math.max(0, (at - k) * total), vol: 0.8 }); return false; };
+    if (first) { cue(0.3, 'open'); cue(0.62, 'clip-in'); }
+    if (cue(0.78, 'cartridge-in')) this.mlCi = true;
+    if (last) { cue(0.8, 'clip-out'); cue(0.93, 'shut'); }
+  },
   // loaded a round (or a push of shells) at a time, this reload: a shell-fed gun, or a revolver topped up by hand
   loose(def: WeaponDef) { return def.shell || (!!this.byHand && revolver(def)); },
   // a revolver loaded a round at a time: it stays open till it's shut, which takes a moment (a falling block likewise: the block stays down till it's shut, js/data.ts fblock)
@@ -1269,7 +1279,7 @@ export const Me = {
   fireMode(w: PWeapon): FireMode { const modes = w.def.modes || [w.def.mode]; return modes.includes(w.fm) ? w.fm : modes[0]; },
   inspect() {
     if (this.reloading || this.act || this.magChk || this.rChk || this.stowed || this.swapT > 0 || this.adsT > 0.2 || this.down || this.inspectT > 0 || this.zipRide) return;
-    this.inspYaw = this.inspPitch = 0;
+    this.inspYaw = this.inspPitch = 0; this.inspS = 0;
     this.inspectDur = this.cur().def.slot === 's' ? 2.0 : 2.6;
     this.inspectT = this.inspectDur;
   },
@@ -1297,6 +1307,13 @@ export const Me = {
     const IH = VMAnim.INSPECT_HOLD;
     this.inspHold = this.inspectT > 0 && !!this.keys.KeyI && 1 - this.inspectT / this.inspectDur >= IH;
     if (this.inspHold) this.inspectT = this.inspectDur * (1 - IH);
+    if (this.inspectT > 0 && this.inspectDur) { // a bolt rifle's press check in the inspect (js/vmanim.ts inspectClip: the handle up and the bolt eased 20 mm back at 62-66% of it, let home at 72-76%)
+      const fr = 1 - this.inspectT / this.inspectDur;
+      for (const [bit, at, nm] of [[1, 0.64, 'pull'], [2, 0.76, 'lock']] as [number, number, string][]) {
+        const ld = Handling.lead(def, nm);
+        if (ld != null && !(this.inspS & bit) && (at - fr) * this.inspectDur <= ld) { this.inspS |= bit; Handling.play(def, nm, { land: Math.max(0, (at - fr) * this.inspectDur), vol: 0.4 }); }
+      }
+    }
     else if ((this.inspYaw || this.inspPitch) && !(this.rChk && !this.rChk.rel)) { const k = Math.min(1, dt * 6); this.inspYaw -= this.inspYaw * k; this.inspPitch -= this.inspPitch * k; if (Math.abs(this.inspYaw) + Math.abs(this.inspPitch) < 1e-3) this.inspYaw = this.inspPitch = 0; }
     // holding R: the magazine check (js/vmanim.ts magCheckClip). Out, look, and back in when you let go (or do anything else).
     if (this.rHeldAt && performance.now() - this.rHeldAt > 260) {
@@ -1309,6 +1326,7 @@ export const Me = {
     const rc = this.rChk;
     if (rc) {
       if (!rc.rel && (this.mouse.l || this.mouse.r || this.stowed || this.lowReady || this.down || this.swapT > 0 || this.reloading || !this.keys.KeyR)) rc.rel = true;
+      if (rc.rel && !rc.s) { rc.s = true; Handling.rackCues(def) && Handling.play(def, 'lock', { land: 0.1, vol: 0.4 }); } // (a bolt rifle's: the handle let down again)
       rc.k = rc.rel ? rc.k - dt / 0.35 : Math.min(1, rc.k + dt / 0.45);
       if (rc.rel && rc.k <= 0) this.rChk = null;
       this.fireCd = Math.max(this.fireCd, 0.12);
@@ -1334,7 +1352,10 @@ export const Me = {
       const pistol = def.cls === 'PST' || def.cls === 'MP';
       // its sound (js/handling.ts: the gun's own), started ahead of the stop it lines up with by as much as leads up to
       // it in the clip: a rack's rear stop, a release's slam home. Else the recording, at the stop.
-      if (!ac.s) {
+      // A bolt rifle's rack (the R700, the Mosin: js/handling.ts rackCues): a clip a phase, each started ahead of its moment of the cycle by its lead.
+      if (ac.q === undefined) ac.q = ac.kind === 'rack' && def.manual ? Handling.rackCues(def) : null;
+      if (ac.q) for (const c of ac.q) { const ld = c.done ? null : Handling.lead(def, c.name); if (ld != null && ac.t >= c.at - ld / ac.dur) { c.done = true; if (c.name === 'rear') ac.s = true; Handling.play(def, c.name, { land: Math.max(0, (c.at - ac.t) * ac.dur), vol: 0.8 }); } }
+      else if (!ac.s) {
         const rack = ac.kind === 'rack', nm = rack ? Handling.rackClip(def, ac.dur) : Handling.lead(def, 'release') != null ? 'release' : 'home';
         const stop = rack ? ac.back : ac.home, ld = Handling.lead(def, nm);
         if (ld != null && ac.t >= stop - ld / ac.dur) { ac.s = true; Handling.play(def, nm, { land: Math.max(0, (stop - ac.t) * ac.dur), vol: rack ? 0.8 : 0.9 }); }
@@ -1346,6 +1367,7 @@ export const Me = {
     if (this.ejecting && (this.ejectT -= dt) <= 0) this.ejecting = 0;
     if (this.reloading) {
       this.reloadT -= dt;
+      if (def.id === 'mosin' && this.loose(def) && this.reloadTotal) this.mosinLoad(def, w, mag);
       if (!this.loose(def) && this.reloadTotal) {
         const k = 1 - this.reloadT / this.reloadTotal, pistol = def.cls === 'PST' || def.cls === 'MP';
         // the old magazine leaves your hand onto the floor (as the viewmodel lets go of it)
@@ -1365,7 +1387,8 @@ export const Me = {
           // one shell, or with a speed loader several at a push
           this.revOpen = false;
           const got = w.mag < mag ? Gear.takeRounds(this, def, Math.min(def.perLoad || 1, mag - w.mag), w.ammo) : [];
-          if (got.length) { Gear.chamberIn(w, got); Handling.roundIn(def, { vol: 0.5 }) || Audio.sample('insert_magazine', 0.5, 1.6) || Audio.shell(); }
+          if (got.length) { Gear.chamberIn(w, got); (def.id === 'mosin' && this.mlCi) || Handling.roundIn(def, { vol: 0.5 }) || Audio.sample('insert_magazine', 0.5, 1.6) || Audio.shell(); }
+          this.mlCi = false;
           if (w.mag < mag && w.reserve > 0) { this.reloadT = this.reloadTime(def); this.reloadTotal = this.reloadT; this.loadN = this.loadCount(w, mag); }
           else if (this.revHand(def)) this.revShut(def);
           else { this.reloading = false; if (this.reloadEmpty) this.rack(w); else this.feed(w); }

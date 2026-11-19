@@ -574,4 +574,99 @@ export function roundInScene(kind: 'shell' | 'cartridge'): Scene {
   return { id: `${kind}-in`, title: kind === 'shell' ? 'Shotshell loaded into the tube' : 'Cartridge pushed into the chamber', room: 0.04, roomSize: 0.35, tracks: [{ name: 'in', description: 'In by hand.', elements: els }] };
 }
 
+/** The R700's magazine: a 5-round .308 detachable polymer box (AICS pattern), its catch a paddle ahead of the well. */
+export const R700_MAG: GunSpec = {
+  ...GUN_SPECS.sr25, id: 'r700', name: 'R700 box magazine',
+  magazine: { capacity: 5, lengthCm: 8, widthCm: 7.9, thicknessCm: 2.4, material: 'polymer', wallMm: 2, massEmptyKg: 0.06, springN: 8, springRate: 150, insert: 'straight', catch: 'paddle', freeDrop: true, well: 'polymer' },
+};
+
+/**
+ * The turn-bolt worked by hand as the R700 and the Mosin work it, on the game's rack with its pauses (js/vmanim.ts rack: the
+ * handle up, a pause, drawn back, a pause at the rear, forward, down), a clip for each phase so the game can line each up with
+ * its own moment: lift (the cocking cam and the lugs turning free), draw (the bolt sliding back, the extractor's let go), rear
+ * (the bolt on its stop), eject (the case flicked out in the pause), forward (the top round stripped and chambered), lock (the
+ * extractor over the rim, the handle turned down into its notch); pull: the press check's handle up and 20 mm back; bolt: the
+ * whole cycle. The R700 is smoother and tighter (oiled, a lighter bolt, short crisp hits); the Mosin rougher and heavier (dry
+ * and gritty, a longer bolt, loose fits, a heavy dull thud on its stop). The Mosin's open and shut (the bolt thrown open for a
+ * reload and closed on the last round) and its stripper clip: dropped in its guide, a round thumbed down past the lips, the
+ * empty clip flicked off. `cue`: each phase's anchor element, and `at` the fraction of the 0.6 s rack cycle it lands on.
+ */
+export type BoltRifle = 'r700' | 'mosin';
+export const BOLT_CUES: Record<string, { anchor: string; at: number }> = {
+  lift: { anchor: 'cocking piece cams back up the bolt', at: 0.12 }, draw: { anchor: 'bolt drawn back in the receiver', at: 0.28 }, rear: { anchor: 'bolt hits its stop', at: 0.45 },
+  eject: { anchor: 'case flicked out by the ejector', at: 0.55 }, forward: { anchor: 'bolt face strips the top round', at: 0.65 }, lock: { anchor: 'handle drops into its notch', at: 0.83 },
+};
+export function boltRifleScenes(v: BoltRifle): Record<string, Scene> {
+  const m = v === 'mosin', k = m ? 1.35 : 0.9, click = m ? 0.55 : 0.9, sharp = m ? 0.55 : 0.9;   // (the Mosin's hits heavy and dull, the R700's lighter and crisp)
+  const steel = (cm: number, mm: number, damping = 0.6): Body => ({ ...mat('steel'), shape: 'bar', size: cm, thickness: mm, modes: 1, irregularity: m ? 0.9 : 0.5, damping: m ? damping - 0.1 : damping + 0.05, level: 0 });
+  const bolt = m ? steel(25, 22, 0.6) : steel(19, 16, 0.75), boltSliding: Body = { ...bolt, modes: 0, damping: 0.8 };
+  const rcv: Body = { ...mat('steel'), shape: 'shell', size: m ? 26 : 21, thickness: m ? 5 : 4, modes: 0, irregularity: m ? 0.9 : 0.6, damping: m ? 0.5 : 0.65, level: 0 };
+  const handle = m ? steel(8, 10, 0.4) : steel(6, 8, 0.55), cock = m ? steel(4, 12, 0.4) : steel(3, 10), round: Body = { ...arCase, size: m ? 9.5 : 8.4, thickness: m ? 12 : 10 };
+  const tex: Partial<FrictionParams> = m ? { ...TEXTURE.dry, roughness: 8, grain: 0.5 } : TEXTURE.oiled;
+  const coil = { level: m ? 0.6 : 0.4, length: 4, dispersion: m ? 0.7 : 0.5, decay: m ? 0.18 : 0.1, brightness: m ? 3200 : 4600 };
+  const grit = m ? GRIT : { ...GRIT, roughness: 3, grain: 0.15, stickSlip: 0.1 };
+  const chamber = steel(10, 12), snp = (what: string, at: number, g: number, s: number, A: Body, B: Body) => snap(what, at, g, { strength: s, preload: 0, seat: 0.3, seatDelay: 1 }, A, B);
+  const slide = (what: string, at: number, dur: number, f: number) => rub(what, at, -10, { force: f * (m ? 1.5 : 1), duration: dur, speed: 0.9, profile: 'swell', ...tex }, boltSliding, rcv);
+  const lift = (b: number): SceneElement[] => [
+    hit('hand takes the bolt handle', b, -18, 0.4 * k, handle, steel(2, 2), { radius: 1, click: 0.3, sharp: 0.3 }),
+    rub('cocking piece cams back up the bolt', b + 0.03, -9, { force: m ? 18 : 10, duration: m ? 0.04 : 0.025, speed: 0.4, profile: 'steady', ...grit }, cock, bolt),
+    rub('firing pin spring compresses', b + 0.032, -14, { force: 6, duration: 0.028, speed: 0.3, profile: 'accelerate', roughness: 4, grain: 0.3, contactWidth: 0.04 }, springWire(6, 1.1), bolt, { coil }),
+    snp('lugs turn free', b + 0.06, -6, 0.7 * k, bolt, rcv),
+  ];
+  const draw = (b: number): SceneElement[] => [
+    slide('bolt drawn back in the receiver', b, 0.1, 5),
+    rub('case pulled out of the chamber', b, -12, { force: 6, duration: 0.03, speed: 0.6, profile: 'accelerate', roughness: m ? 6 : 3, grain: 0.2, contactWidth: 0.05 }, round, chamber),
+    snp('extractor lets go of the rim', b + 0.025, -12, 0.6 * k, steel(2, 3), round),
+  ];
+  const rear = (b: number): SceneElement[] => [hit('bolt hits its stop', b, -2, 1.3 * k, bolt, rcv, { radius: m ? 5 : 3.5, click, sharp })];
+  const eject = (b: number): SceneElement[] => [
+    hit('case flicked out by the ejector', b, -8, 1.2 * k, round, steel(2, 3), { radius: 1.5, click: 0.8, sharp: 0.8 }),
+    hit('case rings off the bolt', b + 0.012, -16, 0.5, round, bolt, { radius: 1.5, click: 0.7, sharp: 0.8 }),
+  ];
+  const fwd = (b: number): SceneElement[] => [
+    slide('bolt pushed forward in the receiver', b, 0.075, 5),
+    hit('bolt face strips the top round', b + 0.03, -7, 0.7 * k, bolt, round, { radius: 1.5, click: 0.6, sharp: 0.7 }),
+    rub('round slides into the chamber', b + 0.035, -12, { force: 4, duration: 0.04, speed: 0.6, profile: 'steady', roughness: m ? 6 : 3, grain: 0.2, contactWidth: 0.05 }, round, chamber),
+    hit('next round snaps up into the lips', b + 0.04, -14, 0.8, round, steel(5, 1), { radius: 1.5, click: 0.6, sharp: 0.7 }),
+    hit('bolt closes on the chamber', b + 0.078, -4, 0.9 * k, bolt, chamber, { radius: 3, click, sharp }),
+  ];
+  const lock = (b: number): SceneElement[] => [
+    snp('extractor snaps over the rim', b, -10, 0.7 * k, steel(2, 3), round),
+    rub('lugs cam home as the handle turns down', b + 0.012, -9, { force: m ? 22 : 12, duration: 0.03, speed: 0.4, profile: 'steady', ...grit }, bolt, rcv),
+    hit('handle drops into its notch', b + 0.045, -3, 1.0 * k, handle, rcv, { radius: 2, click: 0.85, sharp: 0.85 }),
+  ];
+  const pull = (b: number): SceneElement[] => [...lift(b), slide('bolt eased back', b + 0.07, 0.06, 3), snp('extractor over the rim', b + 0.11, -14, 0.4 * k, steel(2, 3), round)];
+  const mk = (id: string, title: string, els: SceneElement[]): Scene => ({
+    id: `${v}-${id}`, title, room: 0.04, roomSize: 0.35, housing: { amount: 0.5, cavity: 0.3, ...rcv, cavities: [{ length: 18, width: 2, depth: 2, q: 8, level: 1 }] },
+    tracks: [{ name: id, description: title, elements: els }],
+  });
+  const phases: Record<string, (b: number) => SceneElement[]> = { lift, draw, rear, eject, forward: fwd, lock };
+  const anchorAt = (name: string, els: SceneElement[]) => els.find((e) => e.what === BOLT_CUES[name].anchor)!.at;
+  // each phase started where its anchor lands on the cycle (the 0.6 s rack), the whole cycle from them
+  const whole: SceneElement[] = [], out: Record<string, Scene> = {};
+  const titles: Record<string, string> = { lift: 'The handle lifted: the cocking cam and the lugs turning free', draw: 'The bolt drawn back, the extractor letting go', rear: 'The bolt on its rear stop',
+    eject: 'The case flicked out', forward: 'The bolt pushed forward, stripping and chambering a round', lock: 'The handle turned down to lock' };
+  for (const [n, f] of Object.entries(phases)) {
+    out[n] = mk(n, titles[n], f(0));
+    const els = f(0), shift = BOLT_CUES[n].at * 0.6 - anchorAt(n, els);
+    whole.push(...els.map((e) => ({ ...e, at: e.at + shift })));
+  }
+  const ease = pull(0);
+  out.pull = mk('pull', 'The press check: the handle up and the bolt eased back 20 mm', ease);
+  out.bolt = mk('bolt', 'The whole cycle', whole);
+  if (m) {
+    // the bolt thrown open for a reload (the handle up and the bolt drawn to the stop; anchor: its stop) and closed on the last round (anchor: the handle down)
+    const open = [...lift(0), ...draw(0.075).map((e) => e), ...rear(0.19)], shut = [...fwd(0), ...lock(0.075)];
+    out.open = mk('open', 'The bolt thrown open for the load', open); out.shut = mk('shut', 'The bolt closed on the last round', shut);
+    const clip = steel(8, 1.2, 0.4), lips = steel(6, 2);
+    out['clip-in'] = mk('clip-in', 'The stripper clip seated in the guide', [hit('clip dropped into the guide', 0, -8, 0.9, clip, rcv, { radius: 2, click: 0.7, sharp: 0.6 }),
+      rub('rounds seat against the guide', 0.03, -12, { force: 5, duration: 0.05, speed: 0.5, profile: 'swell', roughness: 6, grain: 0.3, contactWidth: 0.05 }, round, lips)]);
+    out['cartridge-in'] = mk('cartridge-in', 'A round thumbed down past the lips', [rub('round pushed down the clip', 0, -10, { force: 8, duration: 0.05, speed: 0.6, profile: 'accelerate', roughness: 6, grain: 0.3, contactWidth: 0.05 }, round, lips),
+      snp('round snaps under the lips', 0.05, -6, 0.6, lips, round)]);
+    out['clip-out'] = mk('clip-out', 'The empty clip flicked off the guide', [snp('clip released from the guide', 0, -8, 0.8, clip, rcv),
+      hit('clip knocked off', 0.03, -10, 0.5, clip, steel(10, 4), { radius: 1.2, click: 0.8, sharp: 0.7 })]);
+  }
+  return out;
+}
+
 export const SPEC_SCENES: Scene[] = [...Object.values(GUN_SPECS).flatMap(gunScenes), boltActionScene(), roundInScene('shell'), roundInScene('cartridge')];

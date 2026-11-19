@@ -34,8 +34,16 @@ export const Handling = (() => {
     dbl: 'break', sawn: 'break', pocketgl: 'break', hailstorm: 'break', derringer: 'break', thor: 'break',
     m249: 'belt', pkm: 'belt', m60: 'belt', shredder: 'belt', garand: 'enbloc',
   };
+  // The hand-worked bolt rifles with their own families (tools/contact-synth boltRifleScenes): a clip a phase of the paused rack
+  // (js/vmanim.ts rack: the handle up 6-20% of the cycle, drawn back 27-45%, the pause at the rear, forward 60-74%, down 74-84%),
+  // each lined up on its own moment (the fraction of the cycle its anchor lands on: the contact synth's BOLT_CUES).
+  const BOLT_RIFLE: Record<string, [number, string][]> = {
+    r700: [[0.12, 'lift'], [0.28, 'draw'], [0.45, 'rear'], [0.55, 'eject'], [0.65, 'forward'], [0.83, 'lock']],
+    mosin: [[0.12, 'lift'], [0.28, 'draw'], [0.45, 'rear'], [0.55, 'eject'], [0.65, 'forward'], [0.83, 'lock']],
+  };
   function fam(def: WeaponDef | null | undefined): string | null {
     if (!def) return null;
+    if (BOLT_RIFLE[def.id]) return def.id; // (the R700 and the Mosin: their own bolts, js/vmanim.ts's paused rack)
     if (def.manual) return 'manual';
     if (BY_ID[def.id]) return BY_ID[def.id];
     if (def.akimbo || def.barrels || def.volley || def.handReload || revolver(def) || beltFed(def)) return null;
@@ -116,8 +124,16 @@ export const Handling = (() => {
     if (def.manual) return VMAnim.kinds(def).action === 'pump' ? 'pump' : 'bolt';
     return dur < 0.52 ? 'rack-45' : 'rack-60';
   }
+  /** the cues of a bolt rifle's rack (a fresh copy, each to fire once), or null for any other gun's: each phase on its own moment of the cycle */
+  function rackCues(def: WeaponDef) {
+    const f = fam(def), c = f && BOLT_RIFLE[f];
+    if (!c) return null;
+    want(f!);
+    return c.map(([at, name]) => ({ at, name, done: false }));
+  }
   /** a round loaded by hand (a shell into a tube, a cartridge into a chamber or a magazine) */
   function roundIn(def: WeaponDef, o?: Parameters<typeof playF>[2]) {
+    if (def.id === 'mosin' && playF('mosin', 'cartridge-in', { land: 0.05, ...o })) return true; // (its own: a round thumbed down past the clip's lips)
     return playF('manual', def.shell && def.cls === 'SG' && !revolver(def) ? 'shell-in' : 'cartridge-in', { land: LAND.roundIn, ...o });
   }
   // A dropped magazine's fall, from its first contact (the bank's own drop of that gun's magazine: empty, a third, two
@@ -129,5 +145,5 @@ export const Handling = (() => {
     const n = 'drop-' + FILLS[Math.round(U.clamp(fill, 0, 1) * 3)] + '-' + WAYS[Math.floor(Math.random() * 4)];
     return playF(f, n, { land: 0, vol: 0.7, pos });
   }
-  return { fam, prewarm, lead, play, playF, LAND, rackClip, roundIn, drop, cues, open, shut };
+  return { fam, prewarm, lead, play, playF, LAND, rackClip, rackCues, roundIn, drop, cues, open, shut };
 })();
