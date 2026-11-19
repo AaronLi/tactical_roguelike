@@ -115,19 +115,23 @@ put(K, cyl(3.0 * mm, 0.0066, 0.0112, 'x', (RS, SY - 0.0035), segs(3.0 * mm)), 'o
 # ================================================================================================ the magazine (part_mag): a 5-round .308 detachable box (AICS pattern), seated in the well
 # Its check (docs/models.md): part_mag.check.w, the top round (chk role top i 0 case, i 1 tip; the second round i 2 and 3) and a witness window each round down the back face (role hole, side 1).
 HM, HB, WM = 0.0800, 0.0790, 0.0236          # its height under the lips, its length (forward), its width
-pm = K.part('mag', (0, MAGF, MAGU)); pm['check'] = {'w': WM}
+pm = K.part('mag', (0, MAGF, MAGU)); pm['check'] = {'w': 0.017}   # (what the game sizes and places each window's count by: 0.43 of it beside the window, 0.56 wide: kept inside the face)
 mg = K.tmp(box(-WM / 2, WM / 2, MAGF - HB / 2, MAGF + HB / 2, MAGU - HM, MAGU - 0.001))
 cut(mg, box(-WM / 2 + 0.0016, WM / 2 - 0.0016, MAGF - HB / 2 + 0.0016, MAGF + HB / 2 - 0.0016, MAGU - HM + 0.003, MAGU + 0.001))          # hollow: the follower's well, open at the top
+# five witness windows down the back face, one a round: 7 mm high and 5.5 mm wide, a 14.5 mm pitch over the body's height (the game stamps each one's count beside it, a 9.5 mm label: they must not touch);
+# each its own mesh with its origin at its window's middle, so the game's labels land beside their own window and not all on the magazine's origin
 wins = []
+HX, HHZ, HPITCH, H0 = -0.0055, 0.0035, 0.0145, 0.0105
 for i in range(5):
-    uh = MAGU - 0.0140 - i * 0.0125; t = (MAGU - uh) / HM
-    cut(mg, box(-0.0026 - 0.0026, -0.0026 + 0.0026, MAGF - HB / 2 - 0.001, MAGF - HB / 2 + 0.0030, uh - 0.0028, uh + 0.0028)); wins.append((i, t, uh))
+    uh = MAGU - H0 - i * HPITCH; t = (MAGU - uh) / HM
+    cut(mg, box(HX - 0.00275, HX + 0.00275, MAGF - HB / 2 - 0.001, MAGF - HB / 2 + 0.0030, uh - HHZ, uh + HHZ)); wins.append((i, t, uh))
 bevel(mg, 0.0008, 1, 40); wnorm(mg); K.adopt(mg, 'mag', 'polymer', pm)
 put(K, box(-WM / 2 - 0.0006, WM / 2 + 0.0006, MAGF - HB / 2 - 0.0006, MAGF + HB / 2 + 0.0006, MAGU - HM - 0.003, MAGU - HM + 0.003), 'mag', 'black', pm, bev=0.0008)          # the floorplate
 for sd in (-1, 1):                                                                                                                                                 # the feed lips: two thin steel strips turned in over the rounds
     put(K, box(sd * (WM / 2 - 0.0016), sd * (WM / 2 - 0.0046), MAGF - 0.030, MAGF + 0.030, MAGU - 0.0030, MAGU + 0.0004), 'mag', 'steel', pm)
 for i, t, uh in wins:
-    o = K.obj(box(-0.0026 - 0.0024, -0.0026 + 0.0024, MAGF - HB / 2 + 0.0004, MAGF - HB / 2 + 0.0012, uh - 0.0025, uh + 0.0025), 'mag', 'brass', pm)
+    o = K.obj(box(HX - 0.0025, HX + 0.0025, -0.0004, 0.0004, -HHZ + 0.0004, HHZ - 0.0004), 'mag', 'brass', pm)
+    o.matrix_world = Matrix.Translation((0, MAGF - HB / 2 + 0.0008, uh))
     o['chk'] = {'role': 'hole', 'i': i, 't': round(t, 4), 'side': 1}
 def rnd(x, z, chk):                                     # a .308 round lying forward, its case head at the back wall (case 51.2 mm, bullet to 71.1 mm)
     h = MAGF - HB / 2 + 0.0030
