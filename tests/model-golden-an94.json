@@ -389,12 +389,12 @@
   },
   "barrel=br.5.6x39.15.9,grip=gr.ak.an94,handguard=hg.ak.an94,mag=ak74.mag.30,muzzle=mz.rak.an94,optic=an94.optic,stock=stk.ak.0": {
    "label": "stock=stk.ak.0",
-   "geometry": "3a3f706c8d083103",
+   "geometry": "7e27e67acc3dbb63",
    "info": "58d990d0f5b7d5a2"
   },
   "barrel=br.5.6x39.15.9,grip=gr.ak.an94,handguard=hg.ak.an94,mag=ak74.mag.30,muzzle=mz.rak.an94,optic=an94.optic,stock=stk.ak.1": {
    "label": "stock=stk.ak.1",
-   "geometry": "b297aa1b83451a94",
+   "geometry": "eb335a09da3a8bbb",
    "info": "58d990d0f5b7d5a2"
   },
   "barrel=br.5.6x39.15.9,grip=gr.ak.an94,handguard=hg.ak.an94,mag=ak74.mag.30,muzzle=mz.rak.an94,optic=an94.optic,stock=stk.ak.2": {
@@ -409,7 +409,7 @@
   },
   "barrel=br.5.6x39.15.9,grip=gr.ak.an94,handguard=hg.ak.an94,mag=ak74.mag.30,muzzle=mz.rak.an94,optic=an94.optic,stock=oem.stk.ak.4": {
    "label": "stock=oem.stk.ak.4",
-   "geometry": "3a3f706c8d083103",
+   "geometry": "7e27e67acc3dbb63",
    "info": "58d990d0f5b7d5a2"
   },
   "barrel=br.5.6x39.15.9,grip=gr.ak.an94,handguard=hg.ak.an94,mag=ak74.mag.30,muzzle=mz.rak.an94,optic=an94.optic,stock=oem.stk.ak.5": {
