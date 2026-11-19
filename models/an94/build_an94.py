@@ -112,12 +112,12 @@ def housing():
     cut(h, prism(rounded((pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm, (pb - pa) / 2 * mm, (pu1 - pu0) / 2 * mm, 2.2 * mm, 4), 'x', -2.0 * mm, (HW + 1) * mm))       # (the port, right)
     cut(h, box((HW - 3.5) * mm, (HW + 1) * mm, SLOT[0] * mm, SLOT[1] * mm, SLOT[2] * mm, SLOT[3] * mm))          # (the lever's slot, right)
     cut(h, box(-(HW + 1) * mm, -(HW - 3.0) * mm, 36 * mm, 166 * mm, -7.5 * mm, 1.5 * mm))                        # (the left recess)
-    cut(h, cyl(7.0 * mm, (HW - 0.6) * mm, (HW + 1) * mm, 'x', (FX(932) * mm, UY(540) * mm), 24))               # (the round plug's recess, right)
+    cut(h, cyl(7.0 * mm, (HW - 0.6) * mm, (HW + 1) * mm, 'x', (FX(884) * mm, UY(540) * mm), 24))               # (the round plug's recess, right)
     cut(h, cyl(1.6 * mm, (HW - 1.4) * mm, (HW + 1) * mm, 'x', (FX(1018) * mm, UY(538) * mm), 12))              # (the small hole)
     slice_at_vertices(h, 'y'); tidy(h); smooth(h); K.adopt(h, 'base', HP)
     # the openings read dark: the slot's floor, the plug's disc, the left recess's floor, the small hole's
     for o in (K.tmp(box((HW - 3.7) * mm, (HW - 3.3) * mm, (SLOT[0] + 1) * mm, (SLOT[1] - 1) * mm, (SLOT[2] + 0.3) * mm, (SLOT[3] - 0.3) * mm)),
-              K.tmp(cyl(6.6 * mm, (HW - 0.9) * mm, (HW - 0.5) * mm, 'x', (FX(932) * mm, UY(540) * mm), 24)),
+              K.tmp(cyl(6.6 * mm, (HW - 0.9) * mm, (HW - 0.5) * mm, 'x', (FX(884) * mm, UY(540) * mm), 24)),
               K.tmp(box(-(HW - 3.3) * mm, -(HW - 2.9) * mm, 37 * mm, 165 * mm, -7 * mm, 1.0 * mm)),
               K.tmp(cyl(1.2 * mm, (HW - 1.7) * mm, (HW - 1.2) * mm, 'x', (FX(1018) * mm, UY(538) * mm), 10))):
         smooth(o); K.adopt(o, 'base', 'rubber')
@@ -160,13 +160,13 @@ def barrel_base():
     """What stays when another barrel or handguard is fitted: the barrel's shank under the forend, the gas tube ahead of it and the bracket that hangs from its end to the
     front sight base. Under the forend, hidden in it, a second tube and a gas block ahead of the forend: an AK's upper handguard (the standard furniture fits this gun)
     is a cover round a gas tube, and with none under it the cover floated."""
-    o = K.obj(lathe([((HG0 - 50) * mm, 8.4 * mm), ((HG1 + 4) * mm, 8.4 * mm)], 16), 'base', 'black'); smooth(o)
+    o = K.obj(lathe([((PORT[1] - 0.5) * mm, 8.4 * mm), ((HG1 + 4) * mm, 8.4 * mm)], 16), 'base', 'black'); smooth(o)
     TU = UY(606)                                                    # the gas tube's axis (below the barrel)
     o = K.obj(lathe([((HG1 - 4) * mm, 8.4 * mm), (FX(1560) * mm, 8.4 * mm)], 24, (0, 0, TU * mm)), 'base', 'steel'); smooth(o)
     o = K.obj(lathe([(FX(1556) * mm, 9.0 * mm), (FX(1568) * mm, 9.0 * mm)], 24, (0, 0, TU * mm)), 'base', 'steel'); smooth(o)     # (the collar the bracket clamps)
     # the AK furniture's bearer: a tube over the barrel as an AK's gas tube is, inside the AN-94 forend (its top 0.6 mm under the forend's ribs), and a block closing its front
     TA = 18.0
-    o = K.obj(lathe([((HG0 - 40) * mm, 5.8 * mm), ((HG1 + 3) * mm, 5.8 * mm)], 16, (0, 0, TA * mm)), 'base', 'steel'); smooth(o)
+    o = K.obj(lathe([((PORT[1] + 1.0) * mm, 5.8 * mm), ((HG1 + 3) * mm, 5.8 * mm)], 16, (0, 0, TA * mm)), 'base', 'steel'); smooth(o)
     gb = K.tmp(prism(hullc([(0, 0, 9.6 * mm), (0, TA * mm, 5.8 * mm)], 20), 'y', (HG1 + 2.5) * mm, (HG1 + 11.5) * mm)); bevel(gb, 0.5 * mm, 1, 30); smooth(gb); K.adopt(gb, 'base', 'black')
     # the bracket: a thin plate hung from the tube's end up to the sight base's foot (the photos: a thick lug, its lower edge sloping down to a rounded point and up to the front)
     br = K.tmp(prism(PP([(1558, 592), (1640, 592), (1648, 584), (1692, 584), (1692, 600), (1676, 610), (1652, 622), (1618, 640), (1600, 648), (1584, 646), (1566, 636), (1558, 630)]), 'x', -3.0 * mm, 3.0 * mm))
@@ -372,13 +372,10 @@ def handle():
 CARRIER_TRAVEL = 0.050
 def carrier():
     """The bolt carrier seen through the ejection port (part_carrier: it runs back and home with every shot, back with the hand's pull on a charge, held back on an empty
-    magazine): a black block filling the port, its outer face 0.8 mm inside the housing's surface so it never stands out; behind it the pocket shows the chamber."""
+    magazine): the kit's AK pattern (port_carrier, body 'box'): a milled carrier block running forward into the steel bolt head, which has its locking-lug ring, chamfered face and the
+    extractor claw and covers the chambered round's case until the carrier is drawn back. No ribs, no plate; the head is 22 mm of the port's 31."""
     pa, pb, pu0, pu1 = PORT
-    pk = K.part('carrier', (0, (pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm))
-    o = K.tmp(prism(rounded((pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm, ((pb - pa) / 2 - 1.0) * mm, ((pu1 - pu0) / 2 - 1.0) * mm, 1.6 * mm, 4), 'x', 11.0 * mm, (HW - 0.8) * mm)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black', pk)
-    for f in (-0.005, 0.007):    # (the carrier's flank: two shallow ribs across its face)
-        g = K.tmp(box((HW - 1.3) * mm, (HW - 0.7) * mm, (pa + pb) / 2 * mm + f - 0.0007, (pa + pb) / 2 * mm + f + 0.0007, (pu0 + pu1) / 2 * mm - 0.0045, (pu0 + pu1) / 2 * mm + 0.0045)); smooth(g); K.adopt(g, 'base', 'gunmetal', pk)
-    return pk
+    return port_carrier(K, pa * mm, pb * mm, pu0 * mm, pu1 * mm, HW * mm, x0=3.0 * mm, body='box', ax=0.0, az=0.0, head=0.022, rh=5.2 * mm)
 
 # ----------------------------------------------------------------------------------------------------- THE MAGAZINE (part_mag, borrowed)
 def magazine():
