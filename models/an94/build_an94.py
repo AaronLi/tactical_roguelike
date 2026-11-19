@@ -87,7 +87,7 @@ HG0, HG1 = FX(1000), FX(1395)    # the forend
 BORE_END = FX(1730)              # the barrel's front (the muzzle device screws on)
 MUZ_END = FX(1913)               # the device's tip (the bullet leaves it)
 POST_F = FX(1672)
-PORT = (FX(848), FX(965), UY(578), UY(530))   # the ejection port's rear, front, bottom and top (mm): a pocket on the right flank down past the bore
+PORT = (FX(903), FX(965), UY(578), UY(530))   # the ejection port's rear, front, bottom and top (mm): a plain cut in the right flank down past the bore, its rear where the magazine's front edge meets the housing (AK pattern: no cover, no hinge)
 SLOT = (FX(807), FX(1027), UY(522), UY(513))  # the charging lever's slot along the top of the right flank: rear, front, bottom, top
 print('anchors f: well', MAG_F, 'hg', HG0, HG1, 'barrel end', BORE_END, 'muzzle', MUZ_END, 'post', POST_F)
 
@@ -376,7 +376,7 @@ def carrier():
     pa, pb, pu0, pu1 = PORT
     pk = K.part('carrier', (0, (pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm))
     o = K.tmp(prism(rounded((pa + pb) / 2 * mm, (pu0 + pu1) / 2 * mm, ((pb - pa) / 2 - 1.0) * mm, ((pu1 - pu0) / 2 - 1.0) * mm, 1.6 * mm, 4), 'x', 11.0 * mm, (HW - 0.8) * mm)); bevel(o, 0.6 * mm, 2, 30); smooth(o); K.adopt(o, 'base', 'black', pk)
-    for f in (-0.022, -0.008, 0.006, 0.020):    # (the carrier's flank: shallow ribs across its face)
+    for f in (-0.005, 0.007):    # (the carrier's flank: two shallow ribs across its face)
         g = K.tmp(box((HW - 1.3) * mm, (HW - 0.7) * mm, (pa + pb) / 2 * mm + f - 0.0007, (pa + pb) / 2 * mm + f + 0.0007, (pu0 + pu1) / 2 * mm - 0.0045, (pu0 + pu1) / 2 * mm + 0.0045)); smooth(g); K.adopt(g, 'base', 'gunmetal', pk)
     return pk
 
