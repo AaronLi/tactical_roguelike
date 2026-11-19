@@ -375,7 +375,12 @@ def carrier():
     magazine): the kit's AK pattern (port_carrier, body 'box'): a milled carrier block running forward into the steel bolt head, which has its locking-lug ring, chamfered face and the
     extractor claw and covers the chambered round's case until the carrier is drawn back. No ribs, no plate; the head is 30 mm of the port's 103."""
     pa, pb, pu0, pu1 = PORT
-    return port_carrier(K, pa * mm, pb * mm, pu0 * mm, pu1 * mm, HW * mm, x0=3.0 * mm, body='box', ax=0.0, az=0.0, head=0.030, rh=5.2 * mm)
+    # the block is a part inside a hole, not a panel: 15 mm tall in a 26 mm opening (5 mm of dark inside above and below), gunmetal, set 3 mm back from the surface,
+    # and without the kit's two thin cross steps (they read as a cover's seams)
+    pk = port_carrier(K, pa * mm, pb * mm, (pu0 + 5.0) * mm, (pu1 - 5.0) * mm, HW * mm, x0=3.0 * mm, x1=(HW - 3.0) * mm, mat='gunmetal', body='box', ax=0.0, az=0.0, head=0.030, rh=5.2 * mm)
+    for o in [o for o in bpy.data.objects if o.parent == pk and o.type == 'MESH' and len(o.data.polygons) == 6 and o.dimensions.x < 1.0 * mm]:
+        bpy.data.objects.remove(o, do_unlink=True)
+    return pk
 
 # ----------------------------------------------------------------------------------------------------- THE MAGAZINE (part_mag, borrowed)
 def magazine():
