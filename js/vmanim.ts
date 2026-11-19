@@ -1097,7 +1097,7 @@ export const VMAnim = (() => {
             if (ru.z0 == null) { ru.z0 = chv.round.position.z; ru.y0 = chv.round.position.y; }
             const out = !!ac && !ac.b && !!w.spentCh, inn = !!ac && !!ac.b && !ac.h && (!!w.chamber || w.mag > 0), k = U.clamp(open / boltBack(h), 0, 1);
             if (out || inn) { chv.round.visible = true; chv.face.visible = inn; chv.round.position.z = ru.z0 + open; chv.round.position.y = ru.y0! - (inn ? 0.007 * S(0.05, 0.9, k) : 0); if (inn) chv.face.material = tipMat(w.chamber || w.ammo); }
-            else { chv.round.position.z = ru.z0 + (pl.rChk && rd ? open : 0); chv.round.position.y = ru.y0!; chv.face.visible = true; } // (a press check: the extractor has the case by its rim, and draws it back with the bolt)
+            else { chv.round.position.z = ru.z0 + ((pl.rChk || pl.inspectT > 0) && rd ? open : 0); chv.round.position.y = ru.y0!; chv.face.visible = true; } // (a press check: the extractor has the case by its rim, and draws it back with the bolt)
           }
         }
         // something in the left hand
