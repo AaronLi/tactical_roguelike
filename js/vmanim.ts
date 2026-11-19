@@ -1527,6 +1527,24 @@ export const VMAnim = (() => {
     arm.glove.quaternion.copy(_q).multiply(RX);
   }
 
-  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap, hingeTimeline, hingeSteps, HINGE_EASE };
+  // For the tools that read a clip without playing it (js/mocap.ts lays the game's own reload beside one mimed at a camera): the pose the game would show, on a gun
+  // bound by GunRig.bind whose pouch (h.A.P, in the gun's space) the caller has set. Its L is the support hand in the gun's space, null while it is on the handguard.
+  /** A magazine change at t (0..1), `how` as js/player.ts reloadMode has it ('floor', 'retain', 'pouch'), up to `seat` of its motions (run dry). Null: this gun is not reloaded by magazine. */
+  function reloadPose(t: number, h: Rig, def: Def, how: string, seat?: number): Pose | null {
+    const k = kinds(def);
+    if (k.reload !== 'mag') return null;
+    return isSlap(def) ? slapClip(t, h, how) : magClip(t, h, !!(h.info as { pistol?: boolean }).pistol || k.action === 'pistol', how, seat);
+  }
+  /** The action worked by hand at c (0..1): a rack, or a release from where it locked open; seated: straight on from a magazine just seated. Null: nothing to work. */
+  function actPose(c: number, h: Rig, def: Def, kind: 'rack' | 'release', seated: boolean): Pose | null {
+    const ac = kinds(def).action;
+    if (!ac) return null;
+    const ak: VmAction = ac === 'pistol' || ac === 'bolt' || ac === 'pump' || ac === 'lever' ? ac : h.A.ch ? 'ar' : 'handle'; // (as actKind)
+    const pose = base(), from = seated && h.A.WB ? off(h.A.WB, 0, 0.012) : null;
+    if (kind === 'release') release(c, h, ak, pose, from); else rack(c, h, ak, pose, from);
+    return pose;
+  }
+
+  return { prepare, sample, apply, kinds, canMagCheck, actEvents, INSPECT_HOLD, SLAP, slapState, slapM, isSlap, hingeTimeline, hingeSteps, HINGE_EASE, reloadPose, actPose };
 })();
 

@@ -26,7 +26,8 @@
     "deps": "node tools/deps.mjs",
     "deps:check": "node tools/deps.mjs --check",
     "smoke": "node tools/smoke.mjs",
-    "test": "npm run test:models && npm run test:level && npm run test:sim",
+    "test": "npm run test:models && npm run test:level && npm run test:sim && npm run test:mocap",
+    "test:mocap": "tsc -p . && node tools/mocap.test.mjs",
     "test:cloud": "tsc -p . && node tools/cloud.test.mjs",
     "cases:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/model_cases.mjs"
   },

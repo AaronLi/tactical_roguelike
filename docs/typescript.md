@@ -26,7 +26,7 @@ fails a push only if `npm run typecheck` fails, then publishes the site with `di
 - **The release** (the published site) loads five files in place of those: `tools/bundle.mjs` runs esbuild over the compiled `dist/js` and writes `main.js`
   (the page), `serverworker.js`, `prepworker.js`, `exportworker.js` (one self-contained bundle each) and `modelbundles.js` (the classic script, on its own),
   minified, with source maps that point back to `js/*.ts`. They have the names of the unbundled files, so the workflow just lays them over those five files of `dist/js` in the
-  published copy (the rest of the compiled files stay there, for `ambience.html`, a page of its own that imports `audio.js` and `ambience.js`; the game loads none of them) (`node tools/bundle.mjs --site _site`) and `index.html` and the workers' URLs are the same in both. three.js stays on the CDN (the bundles import it from
+  published copy (the rest of the compiled files stay there, for `ambience.html` and `mocap.html`, pages of their own that import the files they use; the game loads none of them) (`node tools/bundle.mjs --site _site`) and `index.html` and the workers' URLs are the same in both. three.js stays on the CDN (the bundles import it from
   jsDelivr as `js/threeboot.ts` does), nothing is tree-shaken (the entry files are lists of side-effect imports) and there is no code splitting: each bundle runs the modules in the order the
   unbundled build does (the page's `Object.keys(window.G)` is identical), and each worker's file sets `window` and `document` before its game code runs.
 - **To try the release locally:** `npm run bundle`, then make a copy of the site's folder with the five files replaced (`node tools/bundle.mjs --site <dir>` does it in a copy

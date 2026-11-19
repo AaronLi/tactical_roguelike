@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reload Mocap</title>
+<!-- Mime a reload at a webcam and read its timing off against the game's own clip (js/mocap.ts, js/mocapmath.ts): the chosen gun's model is drawn in your
+     grip hand over the camera's picture, with zones on its magazine, its charging handle and your chest rig; the support hand's trips between them are
+     timed, and written out as keys in the form js/vmanim.ts writes a clip's. One camera, no markers: MediaPipe's pose and hand models, from the CDN.
+     Served by the dev server: npm run dev, then /mocap.html (a camera needs localhost or https). /mocap.html?demo plays a made-up reload, no camera. -->
+<style>
+  :root { --bg: #111417; --panel: #1b2025; --line: #2c333a; --text: #d8dde2; --dim: #8a949e; --hot: #f0a63a; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 system-ui, sans-serif; }
+  main { max-width: 1500px; margin: 0 auto; padding: 16px; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  header { grid-column: 1 / -1; }
+  h1 { font-size: 20px; margin: 0 0 4px; letter-spacing: 0.04em; }
+  p.sub { color: var(--dim); margin: 0; max-width: 100ch; }
+  .dim { color: var(--dim); }
+  button, select, .filebtn { background: var(--panel); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; }
+  button:hover, .filebtn:hover { border-color: var(--dim); }
+  button.go { background: var(--hot); color: #111; border: 0; font-weight: 600; }
+  select { width: 100%; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; margin: 0 0 12px; }
+  section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--dim); margin: 0 0 8px; }
+  label { display: flex; gap: 8px; align-items: center; color: var(--text); }
+  label.sl { display: grid; grid-template-columns: 1fr 130px 40px; margin: 6px 0; color: var(--dim); }
+  label.sl output { text-align: right; font-variant-numeric: tabular-nums; color: var(--text); }
+  input[type=range] { width: 100%; accent-color: var(--hot); }
+  input[type=checkbox] { accent-color: var(--hot); }
+  #file { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+  #stage { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #07090b; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  #stage video, #stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #stage video { object-fit: fill; }
+  #now { position: absolute; left: 14px; top: 10px; font-size: 22px; font-weight: 700; letter-spacing: 0.03em; text-shadow: 0 1px 4px #000; }
+  #rec { position: absolute; right: 14px; top: 12px; font-weight: 700; color: #ff5a5a; font-variant-numeric: tabular-nums; text-shadow: 0 1px 4px #000; }
+  #src { position: absolute; left: 14px; bottom: 10px; color: var(--dim); font-size: 12px; text-shadow: 0 1px 3px #000; }
+  #msg { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); background: rgba(0, 0, 0, 0.8); border: 1px solid var(--line); border-radius: 6px; padding: 8px 14px; max-width: 80%; }
+  #idle { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; color: var(--dim); padding: 24px; }
+  #stage.idle #idle { display: flex; }
+  #idle div { max-width: 52ch; }
+
+  .tl { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 6px 10px; align-items: center; }
+  .tl .name { color: var(--dim); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lane, #ticks { position: relative; height: 26px; background: #0d1013; border-radius: 4px; }
+  #ticks { height: 16px; background: none; }
+  #ticks b { position: absolute; top: 0; font-weight: 400; font-size: 11px; color: var(--dim); transform: translateX(-50%); }
+  .lane i { position: absolute; top: 3px; bottom: 3px; border-radius: 3px; overflow: hidden; min-width: 3px; }
+  .lane i em { font-style: normal; font-size: 11px; font-weight: 600; color: #111; padding: 0 5px; line-height: 20px; white-space: nowrap; }
+  .lane u { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--text); opacity: 0.6; }
+  .lane > span { position: absolute; left: 8px; top: 4px; font-size: 12px; }
+  #lanes { position: relative; }
+  #head { position: absolute; top: 0; bottom: 0; width: 2px; background: #ff5a5a; pointer-events: none; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; margin-top: 10px; }
+  th { text-align: left; font-weight: 500; color: var(--dim); font-size: 12px; padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line); }
+  td { padding: 4px 8px 4px 0; border-bottom: 1px solid #22282e; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 7px; }
+  #keys { width: 100%; min-height: 64px; background: #0d1013; color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font: 12px/1.5 ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
+
+  .zone { display: grid; grid-template-columns: 16px 1fr 90px; align-items: center; padding: 3px 0; color: var(--dim); }
+  .zone.on { color: var(--text); font-weight: 600; }
+  .zone .dot { margin: 0; }
+  .bar { height: 6px; background: #0d1013; border-radius: 3px; overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; }
+  .tk { display: grid; grid-template-columns: 1fr auto auto auto; gap: 2px 6px; align-items: center; padding: 7px 8px; border: 1px solid var(--line); border-radius: 6px; margin: 6px 0; cursor: pointer; }
+  .tk.sel { border-color: var(--hot); }
+  .tk span { grid-column: 1; grid-row: 2; color: var(--dim); font-size: 12px; }
+  .tk b { grid-column: 1; }
+  .tk button { grid-row: 1 / 3; padding: 4px 8px; font-size: 12px; }
+  kbd { background: #0d1013; border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; font: 12px ui-monospace, Menlo, Consolas, monospace; }
+  @media (max-width: 1000px) { main { grid-template-columns: minmax(0, 1fr); } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Reload mocap</h1>
+    <p class="sub">Mime a reload at your camera. The game's gun is drawn in your grip hand; your support hand is timed from the handguard to the magazine, the chest rig, the charging handle and back, and laid beside the game's own reload clip.</p>
+  </header>
+
+  <div>
+    <div id="stage" class="idle">
+      <video id="video" playsinline muted></video>
+      <canvas id="gl"></canvas>
+      <canvas id="hud"></canvas>
+      <div id="idle"><div>Start the camera, open a video of a reload, or play the demo.<br><br>Stand so the camera sees you from the waist up, turned a little so your support hand's side is toward it. Hold your grip hand as if on a pistol grip, rest the other on the handguard, then reload.</div></div>
+      <div id="now"></div><div id="rec"></div><div id="src"></div><div id="msg" hidden></div>
+    </div>
+    <div class="row">
+      <button id="cam" class="go">Start camera</button>
+      <label class="filebtn" for="file">Open video or take…</label><input type="file" id="file" accept="video/*,.json,application/json">
+      <button id="demo">Play demo</button>
+      <button id="stop">Stop</button>
+      <span style="flex:1"></span>
+      <button id="take">Start take (Space)</button>
+    </div>
+
+    <section>
+      <h2>Timeline</h2>
+      <div class="tl">
+        <span></span><div id="ticks"></div>
+        <span class="name" id="tl-me">You</span><div id="lanes" style="grid-row: span 2; display: grid; gap: 6px;"><div class="lane" id="lane-me"></div><div class="lane" id="lane-game"></div><div id="head"></div></div>
+        <span class="name" id="tl-game">Game</span>
+      </div>
+      <table>
+        <thead><tr><th>Beat</th><th colspan="2">You: in–out</th><th colspan="2">Game: in–out <span id="ref-label"></span></th><th>You start</th></tr></thead>
+        <tbody id="beats"></tbody>
+      </table>
+    </section>
+    <section>
+      <h2>Your support hand's path, as clip keys</h2>
+      <p class="dim" style="margin:0 0 8px">The selected take's path in the gun's space, reduced to its corners: <code>[fraction of the take, anchor]</code>, as the keys of <code>path()</code> in <code>js/vmanim.ts</code> (<code>off(p, forward, up, right)</code> in metres; <code>A.P</code> is the pouch, here the chest rig).</p>
+      <textarea id="keys" readonly spellcheck="false"></textarea>
+      <div class="row"><button id="copy">Copy</button></div>
+    </section>
+  </div>
+
+  <aside>
+    <section>
+      <h2>Gun</h2>
+      <select id="gun"></select>
+      <div class="row"><label><input type="checkbox" id="lock"> Lock to chest <kbd>L</kbd></label><button id="relock">Ready stance</button></div>
+      <div class="row"><label><input type="checkbox" id="lefty"> Left-handed</label></div>
+    </section>
+    <section>
+      <h2>Zones</h2>
+      <div id="zones"></div>
+      <label class="sl">Size <input type="range" id="zoneScale" min="0.6" max="1.8" step="0.05"><output id="zoneScale-v"></output></label>
+      <label class="sl">Depth counts <input type="range" id="depthK" min="0.1" max="1" step="0.05"><output id="depthK-v"></output></label>
+    </section>
+    <section>
+      <h2>Game's reload</h2>
+      <select id="how"><option value="floor">Magazine dropped</option><option value="retain">Magazine retained</option><option value="pouch">Magazine to the dump pouch</option></select>
+      <div class="row"><label><input type="checkbox" id="empty"> Run dry (works the action after)</label></div>
+      <div class="row"><label><input type="checkbox" id="showGhost"> Show its hand path</label></div>
+    </section>
+    <section>
+      <h2>Takes</h2>
+      <label><input type="checkbox" id="auto"> Cut takes automatically</label>
+      <div id="takes"></div>
+    </section>
+    <section>
+      <h2>Camera and fit</h2>
+      <label class="sl">Field of view <input type="range" id="fov" min="40" max="100" step="1"><output id="fov-v"></output></label>
+      <div class="row"><label title="Each hand's distance is taken from the body's wrist. Off: from the hand's own apparent size (set Hand size to yours)."><input type="checkbox" id="bodyDepth"> Hands' depth from the body</label></div>
+      <label class="sl">Hand size <input type="range" id="handScale" min="0.8" max="1.25" step="0.01"><output id="handScale-v"></output></label>
+      <label class="sl">Grip pitch <input type="range" id="gripPitch" min="-30" max="60" step="1"><output id="gripPitch-v"></output></label>
+      <label class="sl">Grip yaw <input type="range" id="gripYaw" min="-45" max="45" step="1"><output id="gripYaw-v"></output></label>
+      <div class="row"><label><input type="checkbox" id="mirror"> Mirror <kbd>M</kbd></label><label><input type="checkbox" id="showBody"> Skeleton</label><label><input type="checkbox" id="showZones"> Zones</label></div>
+    </section>
+  </aside>
+</main>
+<!-- The models' bundle first (a classic script: the download starts at once), three.js (the game's files read the global THREE while they load), then the page. -->
+<!-- (the game's files start the game itself when the window has loaded (js/game.ts): that is index.html's, and this page has none of its elements) -->
+<script>window.addEventListener('load', (e) => e.stopImmediatePropagation(), true);</script>
+<script src="dist/js/modelbundles.js"></script>
+<script type="module" src="dist/js/threeboot.js"></script>
+<script type="module">
+import { Mocap } from './dist/js/mocap.js';
+Mocap.boot().catch((e) => { console.error(e); const m = document.getElementById('msg'); m.hidden = false; m.textContent = 'Could not start: ' + (e && e.message || e) + ' (the game needs a build first: npm run build)'; });
+</script>
+</body>
+</html>

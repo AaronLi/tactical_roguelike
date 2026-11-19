@@ -28,6 +28,11 @@ weapon archetypes:
 Each one is drawn, fired (and cycled), reloaded with rounds left, run dry, reloaded from empty (the action after
 it), its magazine checked and a chamber check held. A caption says what's showing.
 
+**Reload mocap:** http://localhost:8080/mocap.html is a tool, not the game: mime a reload at a webcam and it draws the
+chosen gun in your grip hand, with zones on its magazine, its charging handle and your chest rig, times your support hand
+between them, and lays the take beside the game's own reload clip (and writes the hand's path as clip keys for
+`js/vmanim.ts`). `?demo` plays a made-up reload with no camera. See [docs/mocap.md](docs/mocap.md).
+
 ## Playing on your local network
 
 `node serve.js` listens on every network interface and prints the address others can use, for example
