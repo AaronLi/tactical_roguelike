@@ -204,7 +204,10 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
   orange, watch yellow, neutral grey, civilian grey-blue, friendly green), a contact only one scanner holds drawn as the arc it
   could be on (its fan at its range, where her hull doesn't hide it), its middle the point to aim at; her scanners' fans sweeping out from the middle (cyan bearing, magenta roll) and each tracker's beam a line from it
   along its axis as it is that instant (the conical scan's circling shows), out to its range gate (a ring), amber
-  acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed amber, its beam going along it. Holding **G** focuses on it (`holoFocus`): the room's frame is blurred and the hologram drawn sharp over it (layer 6,
+  acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed amber, its beam going along it. Sitting at the station goes straight into it (`holoFocus`): the world blurs out by degrees and the hologram rises out of
+  the console and opens (0.6 s), to just under the middle of the view, the view eased onto it. Its cursor is its own: a small
+  ring where the mouse is, which slides onto a track under it and opens into a halo round it in the track's colour. Getting up
+  (hold F) comes back out; holding **G** steps out to look round the room and back in. Focused (the same as G), the room's frame is blurred and the hologram drawn sharp over it (layer 6,
   js/render.ts focusBlur), the rest of the screen's UI is put away, and the mouse is let go (still counted as captured:
   js/game.ts holoCursor, softLocked) so its own cursor points at the tracks (a left click tracks one; dragging with the right
   button turns it; a tap of the right drops the trackers); holding G again (or Esc) comes back out, the mouse captured again. Holding the right button turns it (the operator's view held still); the middle of their

@@ -2085,7 +2085,7 @@ export const R = {
   // lightPad), and three builds what's missing in the frame that first draws it, a stop of tens to hundreds of ms a shader on
   // Windows. So, in a level with nothing being warmed and no veil up: each new one logged with what it was built for (its kind,
   // the start of three's key for it, the scene's light counts then) and counted (shadersInPlay: js/profiler.ts context).
-  shadersInPlay: 0, shaderLog: [] as string[], focusBlur: false, _forceBlur: null as boolean | null, // (the warm-up's one frame through the blur: warmStep)
+  shadersInPlay: 0, shaderLog: [] as string[], focusBlur: false, focusAmt: 1, _forceBlur: null as boolean | null, // (the warm-up's one frame through the blur: warmStep)
   _sg: { n: 0, map: null as unknown },
   _shaderGuard() {
     const ps = (this.renderer.info.programs || []) as any[], Gm = ReplayEnv.Game, S = this._sg;
@@ -2142,8 +2142,9 @@ export const R = {
   },
   _blurPasses() {
     const r = this.renderer, B = this._blur!, u = B.mat.uniforms;
-    u.map.value = B.a.texture; u.dir.value.set(1 / B.a.width, 0); u.fin.value = 0; r.setRenderTarget(B.b); r.render(B.scene, B.cam);
-    u.map.value = B.b.texture; u.dir.value.set(0, 1 / B.b.height); u.fin.value = 1; r.setRenderTarget(null); r.render(B.scene, B.cam);
+    const k = this.focusBlur ? Math.max(0.05, this.focusAmt) : 1; // (focusing: the blur coming in by degrees, focusAmt 0 to 1)
+    u.map.value = B.a.texture; u.dir.value.set(k / B.a.width, 0); u.fin.value = 0; r.setRenderTarget(B.b); r.render(B.scene, B.cam);
+    u.map.value = B.b.texture; u.dir.value.set(0, k / B.b.height); u.fin.value = 1; r.setRenderTarget(null); r.render(B.scene, B.cam);
   },
 };
 AudioEnv.R = R; // (what sound asks of it: js/audioenv.ts)

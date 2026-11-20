@@ -106,10 +106,10 @@ export const DebugStart = (() => {
   function captured() {
     const g = Game, cv = R.renderer.domElement;
     let real = false;
-    Object.defineProperty(g, 'locked', { get: () => (real ? document.pointerLockElement === cv : true), set: () => {}, configurable: true });
+    Object.defineProperty(g, 'locked', { get: () => (real ? document.pointerLockElement === cv || !!g.softLocked : true), set: () => {}, configurable: true }); // (soft-locked counts: the sensor station's hologram lets the mouse go, js/space.ts holoFocus)
     document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement === cv) real = true; });
     window.addEventListener('mousedown', (e) => {
-      if (g.phase !== 'level' || document.pointerLockElement === cv || (e.target !== cv && e.target !== document.body)) return;
+      if (g.phase !== 'level' || document.pointerLockElement === cv || (g as any).holoCursor || (e.target !== cv && e.target !== document.body)) return;
       if (real) return; // (once captured for real, the game's own click-to-play does it)
       e.stopImmediatePropagation(); e.preventDefault(); g.lock();
     }, true);

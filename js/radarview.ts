@@ -444,13 +444,13 @@ export const RadarView = (() => {
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
-  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false) {
+  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1) {
     if (!parent || !su) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.style.display = 'none'; } return; }
     if (!holoG || holoG.R !== R) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.remove(); } holoMake(parent, R); }
     const H = holoG!; if (H.g.parent !== parent) parent.add(H.g);
-    H.g.position.copy(c); H.inner.quaternion.copy(rot); H.hint.style.display = seated ? '' : 'none';
+    H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
-    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'hold G: back to the room · point at a track, left click: track it · drag with the right button: turn it · tap right: drop the trackers' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
+    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag with the right button: turn it · tap right: drop the trackers · hold G: look round the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / RMAX)) * R / L : 0); };
     // the fans: as wide as the shell, sweeping (none of a fan where her hull hides it)
@@ -490,7 +490,7 @@ export const RadarView = (() => {
     H.items = items;
     // the one pointed at: ringed (facing the viewer), and named
     const p = pick && items.find((q) => q.plot === pick.plot && q.label.split(' ')[0] === pick.label.split(' ')[0]);
-    H.sel.visible = H.label.visible = !!p;
+    H.sel.visible = !!p && !focus; H.label.visible = !!p;
     if (p) {
       H.sel.position.copy(p.pos); const camQ = new T.Quaternion(); (parent as any).updateWorldMatrix?.(true, false); H.inner.getWorldQuaternion(camQ); H.sel.quaternion.copy(camQ.invert().multiply(G_cam.quaternion)); H.sel.scale.setScalar(1 + 0.15 * Math.sin(now * 8));
       H.label.position.copy(p.pos).add(new T.Vector3(0, R * 0.12, 0).applyQuaternion(rot.clone().invert()));
@@ -506,5 +506,7 @@ export const RadarView = (() => {
     for (const it of holoG.items) { w.copy(it.pos).applyMatrix4(holoG.inner.matrixWorld).sub(ray.origin); const a = w.angleTo(ray.direction); if (a < bd) { bd = a; best = it; } }
     return best;
   }
-  return { update, scope, pick, holo, holoPick };
+  // where an item of the hologram is in the world (for the operator's cursor's halo round it)
+  function holoWorld(it: HoloItem) { if (!holoG) return null; holoG.inner.updateWorldMatrix(true, false); return it.pos.clone().applyMatrix4(holoG.inner.matrixWorld); }
+  return { update, scope, pick, holo, holoPick, holoWorld };
 })();

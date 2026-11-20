@@ -81,7 +81,7 @@ export const Space = (() => {
   // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
-  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false } };
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7 } };
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -292,7 +292,7 @@ export const Space = (() => {
   // screen's UI put away, and the mouse let go (still counted as captured: js/game.ts holoCursor, softLocked) to point at it
   // with its own cursor; out, all of it back and the mouse captured again
   function holoFocus(on: boolean) {
-    const H = EW.holo; if (H.focus === on) return; H.focus = on; G_R.focusBlur = on;
+    const H = EW.holo; if (H.focus === on) return; H.focus = on; G_R.focusBlur = on; H.fT = on ? S.t : -1; G_R.focusAmt = 0;
     if (!H.inputOn) { H.inputOn = true;
       window.addEventListener('mousemove', (e) => { if (!H.focus) return; H.mx = e.clientX; H.my = e.clientY; if (H.mr) { H.dx += e.movementX; H.dy += e.movementY; } });
       window.addEventListener('mousedown', (e) => { if (!H.focus) return; if (e.button === 0) H.ml = true; if (e.button === 2) H.mr = true; });
@@ -302,12 +302,14 @@ export const Space = (() => {
     if (on) {
       H.mx = innerWidth / 2; H.my = innerHeight / 2; H.ml = H.mr = false; me().mouse.l = me().mouse.r = false;
       H.hid = []; // (everything beside the canvas, at every level from it up to the page's body: the HUD's in with it)
-      for (let n: Element = cv; n.parentElement; n = n.parentElement) for (const el of n.parentElement.children) if (el !== n && el !== hint && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') H.hid.push(el as HTMLElement);
+      for (let n: Element = cv; n.parentElement; n = n.parentElement) for (const el of n.parentElement.children) if (el !== n && el !== hint && el.id !== 'holo-cursor' && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') H.hid.push(el as HTMLElement);
       if (!document.getElementById('holo-hide-css')) { const st = document.createElement('style'); st.id = 'holo-hide-css'; st.textContent = '.holo-hide { visibility: hidden !important; }'; document.head.appendChild(st); } // (over whatever its own code sets each frame)
       for (const el of H.hid) el.classList.add('holo-hide');
-      Game.holoCursor = true; Game.softLocked = true; if (document.pointerLockElement) document.exitPointerLock(); cv.style.cursor = 'crosshair';
+      Game.holoCursor = true; Game.softLocked = true; if (document.pointerLockElement) document.exitPointerLock(); cv.style.cursor = 'none';
+      if (!H.cur) { const c = document.createElement('div'); c.id = 'holo-cursor'; Object.assign(c.style, { position: 'fixed', left: '0', top: '0', width: '14px', height: '14px', border: '2px solid rgba(140,230,255,0.95)', borderRadius: '50%', boxShadow: '0 0 6px rgba(80,200,255,0.8)', pointerEvents: 'none', zIndex: '60', display: 'none' }); document.body.appendChild(c); H.cur = c; }
+      H.cx = H.mx; H.cy = H.my; H.cr = 7; H.cur.style.display = '';
     } else {
-      for (const el of H.hid) el.classList.remove('holo-hide'); H.hid = []; cv.style.cursor = '';
+      for (const el of H.hid) el.classList.remove('holo-hide'); H.hid = []; cv.style.cursor = ''; if (H.cur) H.cur.style.display = 'none';
       Game.holoCursor = false; if (Game.softLocked) { Game.softLocked = false; Game.lock(); }
     }
   }
@@ -318,11 +320,24 @@ export const Space = (() => {
     if (K('KeyG')) { if (!H.gT) H.gT = S.t; if (S.t - H.gT > 0.35 && !H.gDone) { H.gDone = true; holoFocus(!H.focus); Audio.click(); } } else { H.gT = 0; H.gDone = false; }
     if (H.focus) { // (focused: the mouse's own cursor points at it, the right button held and dragged turns it)
       if (!Game.locked) { holoFocus(false); return; } // (Esc: the pause menu)
+      { // (the view eased onto it: the mouse is the cursor's now, not the head's)
+        const g = S.model!.group, w = H.c.clone().add(new T.Vector3(0, 0.2, 0)).applyMatrix4(g.matrixWorld), cam = G_R.camera, d = w.sub(cam.getWorldPosition(new T.Vector3())).applyQuaternion(g.getWorldQuaternion(new T.Quaternion()).invert()).normalize();
+        const want = Math.asin(U.clamp(d.y, -1, 1)) + 0.08, f = new T.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new T.Quaternion())).applyQuaternion(g.getWorldQuaternion(new T.Quaternion()).invert()), dyaw = Math.atan2(-d.x, -d.z) - Math.atan2(-f.x, -f.z);
+        m.pitch += (want - Math.asin(U.clamp(f.y, -1, 1))) * 0.15; m.yaw += Math.atan2(Math.sin(dyaw), Math.cos(dyaw)) * 0.15;
+      }
       if (H.mr) { H.rot.premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), H.dx * 0.008)).premultiply(new T.Quaternion().setFromAxisAngle(new T.Vector3(1, 0, 0), H.dy * 0.008)).normalize(); if (Math.abs(H.dx) + Math.abs(H.dy) > 2) H.moved = true; }
       H.dx = H.dy = 0;
       if (!H.mr && EW.r && !H.moved && S.t - H.rAt < 0.3) { ewCue([-1]); Net.toHost({ t: 'srcue', a: [-1] }); Audio.click(); }
       if (H.mr && !EW.r) { H.rAt = S.t; H.moved = false; }
       _ray.setFromCamera(new T.Vector2(H.mx / innerWidth * 2 - 1, 1 - H.my / innerHeight * 2), G_R.camera); H.pick = RadarView.holoPick(_ray.ray, G_R.camera);
+      // (the cursor: a small ring where the mouse is; over a track, it slides onto it and opens into a halo round it)
+      if (H.cur) {
+        let tx = H.mx, ty = H.my, tr = 7; const w = H.pick && RadarView.holoWorld(H.pick);
+        if (w) { const p = w.project(G_R.camera); tx = (p.x + 1) / 2 * innerWidth; ty = (1 - p.y) / 2 * innerHeight; tr = 17; }
+        const k = 0.35; H.cx += (tx - H.cx) * k; H.cy += (ty - H.cy) * k; H.cr += (tr - H.cr) * k;
+        const st = H.cur.style; st.width = st.height = (2 * H.cr) + 'px'; st.transform = `translate(${H.cx - H.cr - 2}px, ${H.cy - H.cr - 2}px)`;
+        st.borderColor = w ? (H.pick.col || '#ffffff') : 'rgba(140,230,255,0.95)'; st.borderWidth = w ? '2.5px' : '2px';
+      }
       if (H.ml && !EW.l && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); Net.toHost({ t: 'srcue', a }); Audio.click(); }
       EW.l = H.ml; EW.r = H.mr; return;
     }
@@ -332,6 +347,7 @@ export const Space = (() => {
       f.applyAxisAngle(new T.Vector3(0, 1, 0), H.sy - m.yaw); // (the way the seat faces, however they've looked round since)
       H.c.copy(eye).addScaledVector(f, H.R + 0.42).add(new T.Vector3(0, -0.3, 0)); H.placed = true;
     }
+    if (H.auto && H.placed && S.t - H.sat > 0.3) { H.auto = false; holoFocus(true); } // (sat down: into it)
     if (m.mouse.r) {
       if (!EW.r) { H.rAt = S.t; H.moved = false; H.y0 = m.yaw; H.p0 = m.pitch; }
       const dy = m.yaw - H.y0, dp = m.pitch - H.p0; if (Math.abs(dy) + Math.abs(dp) > 0.003) H.moved = true;
@@ -1300,7 +1316,7 @@ export const Space = (() => {
   }
   function sit(i: number, quiet?: boolean) {
     const m = me(), p = seatPos(i);
-    if (S.seatsDef[i] && S.seatsDef[i].k === 'sensors') { EW.holo.sy = p.yaw; EW.holo.sat = S.t; } // (where the seat faces, for its hologram: sensorStep)
+    if (S.seatsDef[i] && S.seatsDef[i].k === 'sensors') { EW.holo.sy = p.yaw; EW.holo.sat = S.t; EW.holo.auto = true; } // (and on sitting, into the hologram: sensorStep) // (where the seat faces, for its hologram: sensorStep)
     m.seat = i; m.pos.set(p.x, p.y, p.z); m.vel.set(0, 0, 0); m.yaw = p.yaw; m.pitch = 0; m.crouch = true; m.stowed = true; m.mouse.l = m.mouse.r = false;
     if (!quiet) { Net.toHost({ t: 'seat', s: i }); Audio.click(); }
     if (S.seatsDef[i].k === 'helm') { S.ctl = Net.myId; S.net = null; S.helpAt = S.t; }
@@ -1889,7 +1905,9 @@ export const Space = (() => {
     outside();
     sensorStep(); // (after the view's placed: where the operator's looking is where the camera is now)
     ewCam();
-    { const seat = mySeat(); RadarView.holo(S.model ? S.model.group : null, EW.own, EW.holo.c, EW.holo.R, EW.holo.rot, S.t, !!seat && seat.k === 'sensors', EW.holo.pick, EW.holo.focus); }
+    { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); G_R.focusAmt = e; // (going in: the world blurring out and the hologram opening, over 0.6 s)
+      const lift = H.focus ? 0.2 * e : 0; // (focused: up from below the eyes to just under the middle of the view)
+      RadarView.holo(S.model ? S.model.group : null, EW.own, H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, S.t, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1); }
     RadarView.update(S.root, Radar.show, ewList(), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', S.t, G_R.camera, Radar.sel);
     // her engines, the status strip, the mission's things
     const th = S.docked ? 0 : U.clamp(S.V.length() / S.def.speed, 0.12, 1) * (S.cruise ? 1.3 : 0.75);
