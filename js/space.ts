@@ -83,9 +83,9 @@ export const Space = (() => {
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
   const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, zi: 4 } };
   const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000];
-  // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the sector each would search next (pend:
-  // its middle and half-width), and the number keys' presses (when each went down, whether a hold's acted)
-  const SEC = { sel: -1, pend: [{ c: 0, h: Math.PI / 4 }, { c: 0, h: Math.PI / 4 }], dn: [-1, -1], held: [false, false], lt: 0, sp: false }; // (the range at the hologram's edge, scrolled through)
+  // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the number keys' presses (when each went
+  // down, whether a hold's acted), and a sector changed by the keys not yet told to the crew (dirty)
+  const SEC = { sel: -1, dn: [-1, -1], held: [false, false], lt: 0, dirty: -1, sent: 0 }; // (the range at the hologram's edge, scrolled through)
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -307,7 +307,7 @@ export const Space = (() => {
     if (on) {
       H.mx = innerWidth / 2; H.my = innerHeight / 2; H.ml = H.mr = false; me().mouse.l = me().mouse.r = false;
       H.hid = []; // (everything beside the canvas, at every level from it up to the page's body: the HUD's in with it)
-      for (let n: Element = cv; n.parentElement; n = n.parentElement) for (const el of n.parentElement.children) if (el !== n && el !== hint && el.id !== 'holo-cursor' && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') H.hid.push(el as HTMLElement);
+      for (let n: Element = cv; n.parentElement; n = n.parentElement) for (const el of n.parentElement.children) if (el !== n && el !== hint && el.id !== 'holo-cursor' && el.id !== 'holo-scan' && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') H.hid.push(el as HTMLElement);
       if (!document.getElementById('holo-hide-css')) { const st = document.createElement('style'); st.id = 'holo-hide-css'; st.textContent = '.holo-hide { visibility: hidden !important; }'; document.head.appendChild(st); } // (over whatever its own code sets each frame)
       for (const el of H.hid) el.classList.add('holo-hide');
       Game.holoCursor = true; Game.softLocked = true; if (document.pointerLockElement) document.exitPointerLock(); cv.style.cursor = 'none';
@@ -326,23 +326,25 @@ export const Space = (() => {
       HUD.toast('SCAN ' + sc.tag, on ? `sector ${Math.round(2 * h * 180 / Math.PI)}° at ${String(Math.round(((c * 180 / Math.PI) % 360 + 360) % 360)).padStart(3, '0')}°` : 'all round', 1.4); }
   }
   // The scan keys at the sensor station: 1 and 2 the bearing and roll scanners. Held, a scanner goes between round and its
-  // sector; tapped, its sector's the one the keys set (tapped again, none). W and S widen and narrow the sector to come, A and D
-  // turn it (to port and starboard; for the roll scanner, round her the one way and the other); space starts the search there.
+  // sector; tapped, its sector's the one the keys set (tapped again, none). W and S widen and narrow its sector, A and D turn it
+  // (to port and starboard; for the roll scanner, round her the one way and the other): as it searches, if it is.
   function scanKeys() {
     const dt = Math.min(0.1, Math.max(0, S.t - SEC.lt)); SEC.lt = S.t; if (!EW.own) return;
     ['Digit1', 'Digit2'].forEach((code, k) => {
       if (K(code)) { if (SEC.dn[k] < 0) { SEC.dn[k] = S.t; SEC.held[k] = false; }
         if (!SEC.held[k] && S.t - SEC.dn[k] > 0.4) { SEC.held[k] = true; const sc = EW.own!.scans[k]; secSet(k, !sc.sec.on, sc.sec.c, sc.sec.h); } }
-      else if (SEC.dn[k] >= 0) { if (!SEC.held[k]) { SEC.sel = SEC.sel === k ? -1 : k; if (SEC.sel >= 0) { const sc = EW.own!.scans[k]; SEC.pend[k] = sc.sec.on ? { c: sc.sec.c, h: sc.sec.h } : { c: sc.th, h: SEC.pend[k].h }; } Audio.click(); } SEC.dn[k] = -1; }
+      else if (SEC.dn[k] >= 0) { if (!SEC.held[k]) { SEC.sel = SEC.sel === k ? -1 : k; Audio.click(); } SEC.dn[k] = -1; }
     });
     if (SEC.sel >= 0) {
-      const P = SEC.pend[SEC.sel];
+      const P = EW.own.scans[SEC.sel].sec, h0 = P.h, c0 = P.c;
       if (K('KeyW')) P.h = Math.min(Math.PI, P.h + 0.9 * dt); if (K('KeyS')) P.h = Math.max(4 * Math.PI / 180, P.h - 0.9 * dt);
-      if (K('KeyD')) P.c += 1.2 * dt; if (K('KeyA')) P.c -= 1.2 * dt;
-      if (K('Space') && !SEC.sp) secSet(SEC.sel, P.h < Math.PI - 1e-3, P.c, P.h);
+      if (K('KeyD')) P.c = wrapA(P.c + 1.2 * dt); if (K('KeyA')) P.c = wrapA(P.c - 1.2 * dt);
+      if (P.h !== h0 || P.c !== c0) SEC.dirty = SEC.sel;
     }
-    SEC.sp = K('Space');
+    // (the crew told of a sector the keys have changed: five times a second at most)
+    if (SEC.dirty >= 0 && S.t - SEC.sent > 0.2) { const sc = EW.own.scans[SEC.dirty]; Net.toHost({ t: 'ssec', a: [SEC.dirty, sc.sec.on ? 1 : 0, Math.round(sc.sec.c * 1000) / 1000, Math.round(sc.sec.h * 1000) / 1000] }); SEC.sent = S.t; SEC.dirty = -1; }
   }
+  const wrapA = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   function sensorStep() {
     const seat = mySeat(), m = me(), H = EW.holo; EW.cu = null;
     if (seat && seat.k === 'sensors' && EW.own && !Game.menuOpen()) scanKeys(); else SEC.sel = -1;
@@ -400,9 +402,8 @@ export const Space = (() => {
   }
   // the sectors for the hologram: each scanner's searching one, and the one the keys are setting (selected)
   function secView() {
-    if (!EW.own) return []; const out: { k: number; c: number; h: number; kind: 'on' | 'pend'; sel: boolean }[] = [];
-    EW.own.scans.forEach((sc, k) => { if (sc.sec.on) out.push({ k, c: sc.sec.c, h: sc.sec.h, kind: 'on', sel: SEC.sel === k }); });
-    if (SEC.sel >= 0) out.push({ k: SEC.sel, c: SEC.pend[SEC.sel].c, h: SEC.pend[SEC.sel].h, kind: 'pend', sel: true });
+    if (!EW.own) return []; const out: { k: number; c: number; h: number; on: boolean; sel: boolean }[] = [];
+    EW.own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k) out.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k }); }); // (searching a sector, or picked: its sector shown, to set before it's switched to)
     return out;
   }
   // her warning receiver's picture: each radar on her and the way to it (in her frame), and what it's doing: a tracker locked on

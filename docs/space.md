@@ -212,12 +212,15 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     fading over a second (js/radar.ts litTrk, paintsOn).
   - **Sector search** (js/space.ts scanKeys, secSet; js/radar.ts scanStep `sec`): **1** and **2** are the bearing and roll
     scanners. Held, a scanner goes between turning round and searching its sector (back and forth across it, turning at its
-    edges); tapped, it's the one the keys set (tapped again, none). **W**/**S** widen and narrow the sector to come, **A**/**D**
-    turn it (port and starboard; for the roll scanner, round her one way and the other); **space** starts the search there.
-    The sector to come is drawn white and dashed, each searching one in its scanner's colour; everyone aboard gets it
-    (`ssec`). A sector's revisit is there and back across it (`perOf`), so what's in it is seen often (the frigate at 2 km in
-    a 37 degree sector: two looks a second against one in 3 s); a peak at its edge is compared only with the fresh columns
-    beside it, and one seen again at once (its edge crossed there and back) is taken for the same contact.
+    edges); tapped, it's the one the keys work (tapped again, none). **W**/**S** widen and narrow its sector, **A**/**D** turn it
+    (port and starboard; for the roll scanner, round her one way and the other), as it searches if it is. In the corner, each
+    search radar's mode (ROUND, or SECTOR with its width and direction) and which the keys work. In the hologram, its search
+    cone: the space its fan sweeps across its sector (a patch at the edge and the fans at its sides), brighter for the one the
+    keys work, fainter while it's still going round (a preview to set before switching). Everyone aboard gets it (`ssec`,
+    five times a second at most while it's set). A sector's revisit is there and back across it (`perOf`), so what's in it is
+    seen often (the frigate at 2 km in a 37 degree sector: two looks a second against one in 3 s); a peak at its edge is
+    compared only with the fresh columns beside it, and one seen again at once (its edge crossed there and back) is taken
+    for the same contact.
   - **Range:** rings in her plane at a quarter, half and all of the range shown, each named; the wheel zooms the range at the
     edge through 0.5, 1, 2.5, 5 and 10 km (anything further sits at the edge).
   - **Sitting down goes straight into it** (`holoFocus`): the world blurs out by degrees (js/render.ts focusBlur, focusAmt)
