@@ -44,6 +44,7 @@ import { Landing } from './landing.js';
 import { Loot } from './loot.js';
 import { Range } from './range.js';
 import { Space } from './space.js';
+import { Radar } from './radar.js';
 import { Views } from './views.js';
 import { Wind } from './wind.js';
 const _shC = new THREE.Vector3(), _shS = new THREE.Vector3(), _shA = new THREE.Vector3(); // (shieldHit's)
@@ -558,7 +559,7 @@ export const Me = {
         case 'KeyM': Game.setMuted(!Audio.muted); HUD.toast('', Audio.muted ? 'Sound muted' : 'Sound on', 1); break;
         case 'KeyF': this.fEdge = true; break;
         case 'Space': this.lowToggle = !this.lowToggle; break;
-        case 'F8': GunAudio.debugEchoes = !GunAudio.debugEchoes; HUD.toast('', GunAudio.debugEchoes ? 'Echo paths shown' : 'Echo paths hidden', 1); break;
+        case 'F8': Radar.show = (Radar.show + 1) % 4; HUD.toast('', ['Electronic warfare view off', 'Electronic warfare view: from your seat', 'Electronic warfare view: chase camera', 'Electronic warfare view: both ships'][Radar.show], 1.4); break; // (js/radarview.ts: the radars at work; the echo paths are ?echoes)
         case 'F9': HUD.toast('', G_Rig.toggleDebug() ? 'Hitboxes shown' : 'Hitboxes hidden', 1); break;
       }
     });
@@ -753,7 +754,9 @@ export const Me = {
       this.pos.set(sp.x, sp.y, sp.z); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0;
       this.crouch = true; this.stowed = true; this.lowToggle = false;
       this.yaw = sp.yaw + U.clamp(U.angDiff(sp.yaw, this.yaw), -1.9, 1.9);
-      this.pitch = U.clamp(this.pitch, -0.7, 0.6);
+      // (at the sensor station you can look down at its screen on the console by your knees: js/space.ts sensorStep)
+      const sens = Space.on() && (Space.mySeat() as any)?.k === 'sensors';
+      this.pitch = U.clamp(this.pitch, sens ? -1.25 : -0.7, 0.6);
       this.eyeH += (1.12 - this.eyeH) * Math.min(1, dt * 12);
       return;
     }

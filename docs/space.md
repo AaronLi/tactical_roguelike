@@ -126,6 +126,46 @@ the PD-20 autocannon or the Lancet railgun; bays take the deck scanner (the sens
 3 km, and who's aboard inside 900 m), ablative plating, a tuned warp drive, a comms jammer (the breach is heard 14 m off,
 not 45). The host's fleet is kept in its browser (`fleet`).
 
+## Radar (`js/radar.ts`, `js/radarview.ts`)
+
+A ship knows where another ship is only from what her radars tell her. Every ship carries the same set:
+
+- **Two scanning radars.** These are mechanically steered pulse radars with a fan beam 2° wide and ±45° along the fan,
+  each making one turn every 3 s. Scanner A turns about her up axis and gives bearing. Scanner B turns about her
+  athwartships axis and gives elevation. A plot is (scanner, angle of the turn, range). Where along the fan the echo came
+  from is unknown.
+- **Two tracking radars,** port and starboard, each covering its own half of the sky. Each is a turret with a 3° pencil
+  beam. A cue on a plot works in three steps:
+  - The turret slews to the plot.
+  - It sweeps along the fan's long axis inside a range gate and takes the peak (`acq`).
+  - It tracks by conical scan. The beam is squinted 1° and nutates at 6 Hz. The echo's modulation over each turn gives
+    the pointing error, which is corrected once per turn and rate-aided.
+
+  The track's alpha-beta filter gives the firing solution (`est.p`, `est.v`, `q`).
+
+Detection follows the radar equation: SNR ∝ σ/R⁴, so range ∝ σ^¼. A ship's radar cross-section σ comes from her hull's own
+triangles. Each facet gives a specular flash toward its normal and a little diffuse return. The result is tabulated by
+aspect, every 5°, and cached per hull. Turning her nose toward a scanner shrinks her return, and so the range at which
+she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km) and about 400 m² broadside (15 km).
+
+- **The mission ship's fire control** cues a tracker on the newest plot of the squad's ship. Her cannon and missiles fire
+  only while a tracker holds a lock (`q ≥ 0.15`). They aim at the predicted point, and a hit is judged against where the
+  squad's ship really is, so a poor track misses.
+- **The sensor station's screen** shows two scopes, one per scanner, with plots, the trackers' boxes and their state. The
+  operator looks at the screen and a cursor follows their gaze. A left click on a plot cues a tracker on it and a right
+  click drops both (`srcue`, relayed to the crew). The deck plan the deck scanner gives is now behind **M**.
+- **F8** cycles through the electronic-warfare debug view (it replaced the echo view, still at `?echoes`):
+  1. From the seat.
+  2. Chase camera.
+  3. Both ships.
+
+  It shows the scanners' fans with trails, each tracker's cone, boresight and nutation ring, the plots, the squad ship's
+  detection envelope against the mission ship's scanner, and a panel with her RCS toward it, the range she'd be painted at
+  and whether she's painted or locked.
+
+Not yet: stealth fittings, infrared and optical sensors, jamming, and the radar in co-op. Each client runs its own radars
+with its own noise, so plots can differ between screens.
+
 ## Checking it
 
 - `node tools/ship_dump.mjs <small|medium|large> <seed> [level] [obj]`: a generated deck plan as text.

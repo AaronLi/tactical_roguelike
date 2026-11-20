@@ -69,7 +69,7 @@ export const ShipModel = (() => {
       glass: new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0.6, depthWrite: false, side: T.DoubleSide, emissive: 0x06202c }),
       glow, strip: lit(0xdff2ff), hot,
     };
-    const scr = canvasTex(256, 160, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
+    const scr = canvasTex(512, 320, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
     const root = src.clone(true), seats: THREE.MeshStandardMaterial[][] = []; g.add(root);
     root.traverse((o: any) => {
       if (!o.isMesh) return;
@@ -145,7 +145,7 @@ export const ShipModel = (() => {
     }
     // ---- the cockpit's fittings: the helm's console under the glass (the navigation screen on it), the sensor station's screen
     // on the wall at its right hand (js/space.ts draws the deck plan on it), the seats
-    const scr = canvasTex(256, 160, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
+    const scr = canvasTex(512, 320, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
     K.box(dark, -0.82, FC, zc + 1.2, -0.74, FC + 0.75, zc + 1.28); // (the navigation screen on an arm at the pilot's left knee, clear of the glass)
     const nf = part(g, new T.Mesh(new T.PlaneGeometry(0.5, 0.32), new T.MeshBasicMaterial({ map: nav.tex })), -0.7, FC + 0.85, zc + 1.2); nf.rotation.set(-0.7, 0.55, 0, 'YXZ');
     const sf = part(g, new T.Mesh(new T.PlaneGeometry(0.62, 0.4), new T.MeshBasicMaterial({ map: scr.tex })), 0.68, FC + 1.25, zc + 2.4); sf.rotation.set(-0.35, -0.75, 0, 'YXZ'); // (the sensor station's, on an arm at its right)

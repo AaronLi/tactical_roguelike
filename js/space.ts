@@ -21,6 +21,8 @@ import { Career } from './career.js';
 import { Net } from './net.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
+import { Radar, RSuite, RTarget } from './radar.js';
+import { RadarView } from './radarview.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -75,8 +77,75 @@ export const Space = (() => {
   const sealed = () => S.on && !S.docked && aboard();
   const store = () => U.store;
 
+  // ------------------------------------------------------------------ radar (js/radar.ts): her set and the mission ship's, and who's seen whom
+  // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
+  // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
+  // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false };
+  const _ray = new T.Raycaster();
+  function ewStep(dt: number) {
+    if (!S.model) return;
+    if (EW.modelFor !== S.model) { // (her own set and her return, made once her drawing's there)
+      const g = S.model.group; g.updateMatrixWorld(true);
+      const inv = g.matrixWorld.clone().invert(), box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
+      const sz = box.getSize(new T.Vector3()), size = Math.max(4, sz.z / 2);
+      EW.own = Radar.suite('own', size, sz.y * 0.45, sz.x * 0.45);
+      EW.ownT = { id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('ship:' + S.def.id, g, inv) };
+      EW.scr = null; g.traverse((o: any) => { if (!EW.scr && o.isMesh && o.material && o.material.map === S.model!.screen.tex) EW.scr = o; }); { const sm = EW.scr as THREE.Mesh | null; if (sm) (sm.material as THREE.Material).side = T.DoubleSide; } // (its face is the one toward the operator, whichever way the model wound it)
+      EW.modelFor = S.model;
+    }
+    if (S.hull !== EW.hullFor) { // (the mission ship's, made once her hull's there)
+      EW.foe = null; EW.foeT = null; EW.hullFor = S.hull;
+      if (S.hull && S.map && S.map.sp) {
+        const g = S.hull.group; g.updateMatrixWorld(true);
+        const inv = g.matrixWorld.clone().invert(), hb = S.map.sp.hull, box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
+        const c = new T.Vector3((hb.x0 + hb.x1) / 2, box.isEmpty() ? 0 : (box.min.y + box.max.y) / 2, (hb.z0 + hb.z1) / 2), h = box.isEmpty() ? 20 : box.max.y - c.y;
+        EW.foe = Radar.suite('hull', Math.max(hb.x1 - hb.x0, hb.z1 - hb.z0) / 2, h, (hb.x1 - hb.x0) * 0.45); EW.foe.P.copy(c);
+        EW.foeT = { id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
+      }
+    }
+    const own = EW.own!, me = EW.ownT!; own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
+    if (S.docked || S.ftl || S.warp) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (against a hull, or between: nothing to look at)
+    const tg = [me, ...(EW.foeT ? [EW.foeT] : [])];
+    Radar.step(own, dt, tg, S.t);
+    if (EW.foe) {
+      Radar.step(EW.foe, dt, tg, S.t);
+      // her fire control: a tracker cued on the newest plot of the squad's ship, while she's hostile and has her people at her guns
+      const hostile = !!(S.state && S.state.hostile !== 0 && S.state.gn && S.state.arm == null && !S.state.boom);
+      if (!hostile) { for (const t of EW.foe.trks) if (t.st !== 'idle') Radar.drop(t); }
+      else if (!EW.foe.trks.some((t) => t.st === 'slew' || t.st === 'acq' || (t.st === 'track' && t.tgt === 'own'))) {
+        let p = null as null | (typeof EW.foe.scans)[0]['plots'][0]; for (const sc of EW.foe.scans) for (const q of sc.plots) if (q.id === 'own' && S.t - q.t < 0.3 && (!p || q.db > p.db)) p = q;
+        if (p) Radar.cue(EW.foe, p);
+      }
+    }
+  }
+  // the sensor station: where its operator's looking on its screen (the middle of their view on the screen's face), and a click: a
+  // tracker cued on the plot under it (told to everyone aboard: srcue); the other button drops both trackers
+  function sensorStep() {
+    const seat = mySeat(), m = me(); EW.cu = null;
+    if (!seat || seat.k !== 'sensors' || !EW.scr || !EW.own || Game.menuOpen()) { EW.l = EW.r = false; return; }
+    _ray.setFromCamera(new T.Vector2(0, 0), G_R.camera); const hit = _ray.intersectObject(EW.scr, false)[0];
+    const cv = S.model!.screen.cv; if (hit && hit.uv) EW.cu = [hit.uv.x * cv.width, (1 - hit.uv.y) * cv.height];
+    if (m.mouse.l && !EW.l && EW.cu) { const p = RadarView.pick(EW.own, EW.cu, cv.width, cv.height, S.t); if (p) { const a = [p.k, p.phi, p.r]; ewCue(a); Net.toHost({ t: 'srcue', a }); Audio.click(); } }
+    if (m.mouse.r && !EW.r) { ewCue([-1]); Net.toHost({ t: 'srcue', a: [-1] }); Audio.click(); }
+    EW.l = m.mouse.l; EW.r = m.mouse.r;
+  }
+  // the debug view's cameras (F8 the second and third time): behind and above her, and off to the side of both ships, looking at their middle
+  function ewCam() {
+    if (Radar.show < 2 || !S.root || !S.model) return;
+    const cam = G_R.camera, sp = S.model.group.getWorldPosition(new T.Vector3()), sq = S.model.group.getWorldQuaternion(new T.Quaternion());
+    if (Radar.show === 2 || !EW.foeT) { cam.position.copy(new T.Vector3(0, 70, 220).applyQuaternion(sq).add(sp)); cam.lookAt(sp); }
+    else {
+      const hp = EW.foeT.p.clone().applyMatrix4(S.root.matrixWorld), mid = sp.clone().add(hp).multiplyScalar(0.5), span = sp.distanceTo(hp), side = new T.Vector3().subVectors(hp, sp).cross(new T.Vector3(0, 1, 0)).normalize();
+      cam.position.copy(mid).addScaledVector(side, span * 0.9).add(new T.Vector3(0, span * 0.35, 0)); cam.lookAt(mid);
+    }
+    (cam as THREE.PerspectiveCamera).far = Math.max((cam as THREE.PerspectiveCamera).far, 40000); (cam as THREE.PerspectiveCamera).updateProjectionMatrix(); cam.updateMatrixWorld();
+  }
+  function ewCue(a: number[]) { if (!EW.own) return; if (a[0] < 0) { for (const t of EW.own.trks) Radar.drop(t); return; } Radar.cue(EW.own, { k: a[0] | 0, phi: a[1], r: a[2], t: S.t, db: 0, id: '', e: 0 }); }
+
   // ------------------------------------------------------------------ coming and going
   function leave() {
+    RadarView.update(null, false, [], [], '', 0);
     if (!S.on && !S.model) return;
     if (S.on && S.kind === 'board' && S.tclose && S.zone) {
       const q = S.traffic.find((o) => o.c.k === S.tclose!.k && o.wp);
@@ -1593,6 +1662,7 @@ export const Space = (() => {
     ftlStep(dt);
     doors(dt);
     turrets(dt);
+    ewStep(dt);
     if (!S.docked || S.auto) hideStrays();
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
     const seat = mySeat(), cam = G_R.camera;
@@ -1600,6 +1670,9 @@ export const Space = (() => {
     if (S.shake > 0.01) { cam.position.x += (Math.random() - 0.5) * S.shake * 0.25; cam.position.y += (Math.random() - 0.5) * S.shake * 0.25; S.shake *= Math.exp(-dt * 4); }
     cam.updateMatrixWorld();
     outside();
+    sensorStep(); // (after the view's placed: where the operator's looking is where the camera is now)
+    ewCam();
+    RadarView.update(S.root, Radar.show, [EW.own, EW.foe].filter((q): q is RSuite => !!q), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', S.t);
     // her engines, the status strip, the mission's things
     const th = S.docked ? 0 : U.clamp(S.V.length() / S.def.speed, 0.12, 1) * (S.cruise ? 1.3 : 0.75);
     S.model.thrust.opacity += (th - S.model.thrust.opacity) * Math.min(1, dt * 4);
@@ -1667,20 +1740,27 @@ export const Space = (() => {
     if (!S.hull || S.docked || S.ftl || (S.state && S.state.boom)) return;
     if (S.state && S.state.hostile === 0) return; // (a ship that isn't the mission's holds her fire till she's breached)
     if (!S.state || !S.state.gn || S.state.arm != null) return; // (nobody left at her gun control, or she's counting down to blowing herself apart: her guns are silent)
+    // (and only on a track: her tracking radar's, js/radar.ts. Without one she doesn't know where to shoot)
+    const lk = Radar.lockOn(EW.foe, 'own'); if (!lk || !lk.est.p || lk.est.q < 0.15) return;
+    const up = new T.Vector3(0, 1.5, 0);
     for (const gn of S.hull.guns) {
       if (gn.hp <= 0) continue;
-      const H = SD.HULLGUN[gn.k], from = new T.Vector3(gn.x, gn.y, gn.z), to = S.P.clone().add(new T.Vector3(0, 1.5, 0)).sub(from), dist = to.length();
+      const H = SD.HULLGUN[gn.k], from = new T.Vector3(gn.x, gn.y, gn.z), to = S.P.clone().add(up).sub(from), dist = to.length();
       if (dist > H.range) continue;
       if (gn.k !== 'missile' && to.y < -1.5 && Math.hypot(to.x, to.z) < (gn.k === 'pd' ? 90 : 260)) continue; // (under their own deck's edge, close in: they can't bear)
-      if (gn.k !== 'missile') { gn.obj.rotation.y = Math.atan2(-to.x, -to.z); gn.gun.rotation.x = Math.asin(U.clamp(to.y / dist, -0.2, 1)); }
+      // where the track says she'll be when the round gets there (its flight time), and where she really will be if she holds her course
+      const tof = dist / (gn.k === 'pd' ? 1100 : 650), aim = lk.est.p.clone().addScaledVector(lk.est.v, tof).add(up).sub(from), real = S.P.clone().addScaledVector(S.V, tof).add(up).sub(from);
+      if (gn.k !== 'missile') { const ad = aim.length(); gn.obj.rotation.y = Math.atan2(-aim.x, -aim.z); gn.gun.rotation.x = Math.asin(U.clamp(aim.y / ad, -0.2, 1)); }
       gn.cool -= dt;
       if (gn.cool > 0) continue;
       gn.cool = H.cool[0] + Math.random() * (H.cool[1] - H.cool[0]);
       if (gn.k === 'missile') { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); Net.toHost({ t: 'smis', a }); } continue; }
-      const sp = S.V.length(), miss = Math.random() < (gn.k === 'pd' ? U.clamp(0.25 + sp / 260 + dist / 3000, 0.25, 0.92) : U.clamp(0.3 + sp / 110 + dist / 12000, 0.3, 0.96)), d = to.clone().normalize();
-      if (miss) d.add(new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(0.05)).normalize();
-      tracer(from, d, miss ? dist + 300 : dist, gn.k === 'cannon');
-      if (!miss && isCtl()) { damage(H.dmg, gn.k === 'cannon' ? 'A cannon shell' : undefined); S.shake = Math.max(S.shake, gn.k === 'cannon' ? 0.8 : 0.3); }
+      // the round goes along the aim, spread by the gun and by the track's own error; it hits if it passes within her size of where she is
+      const d = aim.normalize(), spread = (gn.k === 'pd' ? 0.004 : 0.002) + lk.err * 0.5;
+      d.add(new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(spread * 2)).normalize();
+      const along = real.dot(d), miss = real.clone().addScaledVector(d, -along).length(), hit = along > 0 && miss < Math.max(4, EW.own ? EW.own.size * 0.6 : 5);
+      tracer(from, d, hit ? dist : dist + 300, gn.k === 'cannon');
+      if (hit && isCtl()) { damage(H.dmg, gn.k === 'cannon' ? 'A cannon shell' : undefined); S.shake = Math.max(S.shake, gn.k === 'cannon' ? 0.8 : 0.3); }
     }
   }
   // a missile: a[0] its number, where it left her; a[4] 1: it's been shot down
@@ -1819,6 +1899,7 @@ export const Space = (() => {
   // a key pressed while you're in one of her seats: hers, not your own (js/player.ts keydown asks)
   function key(code: string) {
     const seat = mySeat(); if (!seat) return false;
+    if (seat.k === 'sensors' && code === 'KeyM') { EW.plan = !EW.plan; Audio.click(); return true; }
     if (seat.k === 'helm') {
       if (code === 'KeyH') { const w = S.wps[S.tgt]; if (isCtl() && !S.docked && !S.ftl && !S.warp && w && !w.hide && w.kind !== 'anchor') { S.match = S.match === w.id ? null : w.id; Audio.click(); } return true; } // (her speed matched with her target's, or no longer)
       if (code === 'KeyT') { if (S.warp) return true; if (isCtl() && warpGo()) return true; S.spin = 0; for (let k = 1; k <= S.wps.length; k++) { const j = (S.tgt + k) % S.wps.length; if (!S.wps[j].hide) { S.tgt = j; break; } } return true; }
@@ -1875,6 +1956,7 @@ export const Space = (() => {
         return true;
       }
       case 'smis': if (S.on && m.by !== Net.myId) missile(m.a); return true;
+      case 'srcue': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) ewCue(m.a); return true;
       case 'sfire': if (S.on && m.by !== Net.myId && S.root) tracer(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true;
       case 'shit': if (m.i >= 0) gunHit(m.i, m.hp); else if (!isCtl()) S.hp = m.hp; return true;
     }
@@ -1940,6 +2022,6 @@ export const Space = (() => {
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
   /** in a jump, aboard: what the screen shows is the pod and the tunnel, not a veil (js/game.ts) */
   const jumping = () => S.on && !!S.ftl && aboard();
-  return { debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { ew: () => EW, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)

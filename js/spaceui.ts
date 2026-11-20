@@ -9,6 +9,7 @@ import { SpaceData } from './spacedata.js';
 import { U } from './util.js';
 import { Views } from './views.js';
 import { Net } from './net.js';
+import { RadarView } from './radarview.js';
 import { Space } from './space.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
@@ -140,10 +141,11 @@ export const SpaceUI = (() => {
     navT -= dt;
     if (navT <= 0 && s.model && (atHelm || aboard)) { navT = atHelm ? 0.05 : 0.5; if (atHelm && !s.docked) drawNav(nav, true); drawNav(s.model.nav.cv); s.model.nav.tex.needsUpdate = true; } // (the HUD's, and the screen's own)
     // the sensor station's deck plan: on its screen aboard, and large for whoever sits at it
-    const atSens = !!seat && seat.k === 'sensors' && SD.fitted(s.fleet, 'sensors') && s.kind === 'board';
+    // (its screen is the radar's (js/radarview.ts scope: the operator's cursor on it where they look); the deck plan over the view on M, boarding)
+    const atSeat = !!seat && seat.k === 'sensors', ew = Space.ew(), atSens = atSeat && ew.plan && SD.fitted(s.fleet, 'sensors') && s.kind === 'board';
     plan.style.display = atSens ? '' : 'none';
     planT -= dt;
-    if (planT <= 0) { planT = atSens ? 0.2 : 1; if (s.model) { drawPlan(s.model.screen.cv, false); s.model.screen.tex.needsUpdate = true; } if (atSens) drawPlan(plan, true); }
+    if (planT <= 0) { planT = atSeat ? 0.05 : 0.25; if (s.model) { if (ew.own) RadarView.scope(s.model.screen.cv, ew.own, ew.cu, s.t, atSeat); else drawPlan(s.model.screen.cv, false); s.model.screen.tex.needsUpdate = true; } if (atSens) drawPlan(plan, true); }
     objTick();
   }
   // The navigation screen. Left: a scope, her own nose up, everything with a waypoint on it by bearing and (log) range, the
