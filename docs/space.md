@@ -197,8 +197,9 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
 - **The mission ship's fire control** cues a tracker on the newest plot of the squad's ship. Her guns and missiles fire
   only while a tracker holds a lock (`q ≥ 0.15`). They aim at the predicted point, and a hit is judged against where the
   squad's ship really is, so a poor track misses.
-- **The sensor station's hologram** (js/radarview.ts holo) is a sphere of light over the console in place of its screen: her
-  ship at its middle (a cone, her nose its point); every track her radars hold where it is round her (its true way from her,
+- **The sensor station's hologram** (js/radarview.ts holo) is a sphere's worth of space in place of its screen (its shell not
+  drawn), centred in front of the seat just below the operator's eyes (placed when someone first sits there): her ship at its
+  middle (a cone, her nose its point, a fin on her back: how it's turned reads off her); every track her radars hold where it is round her (its true way from her,
   its distance as the square root, 10 km at the shell): a 3D track solid and coloured by her assessment (hostile red, suspect
   orange, watch yellow, neutral grey, civilian grey-blue, friendly green), a contact one scanner holds faint at its fan's
   middle; her scanners' fans sweeping out from the middle (cyan bearing, magenta roll) and each tracker's beam a line from it

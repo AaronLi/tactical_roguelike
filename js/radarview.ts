@@ -414,7 +414,8 @@ export const RadarView = (() => {
     c.fillStyle = '#5f8fa4'; c.fillText(`${su.fus.length} correlated · cyan: A arcs · magenta: B arcs · dashed: the next 10 s`, x0 + 4, y0 + h - 14);
   }
   // ---------------------------------------------------------------- the sensor station's hologram
-  // A sphere of light over the console in place of its screen: her own ship at its middle (a cone, her nose its point), what her
+  // A hologram over the console in place of its screen (a sphere's worth of space, the shell itself not drawn): her own ship at
+  // its middle (a cone, her nose its point, a fin on her back), what her
   // radars hold round her where it is (its way from her, true; its distance as its square root, 10 km at the shell): a 3D track
   // solid and coloured as her assessment has it (hostile red, suspect orange, watch yellow, neutral grey, civilian grey-blue,
   // friendly green), a contact only one scanner holds faint (it's somewhere on its fan: drawn at the fan's middle); her
@@ -427,10 +428,10 @@ export const RadarView = (() => {
   function holoMake(parent: THREE.Object3D, R: number) {
     const g = new T.Group(), inner = new T.Group(); g.add(inner); parent.add(g);
     const glow = (c: number, o: number) => new T.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide });
-    const shell = new T.LineSegments(new T.WireframeGeometry(new T.SphereGeometry(R, 18, 12)), new T.LineBasicMaterial({ color: 0x40c8ff, transparent: true, opacity: 0.16, depthWrite: false, blending: T.AdditiveBlending })); inner.add(shell);
-    const fog = new T.Mesh(new T.SphereGeometry(R, 32, 20), glow(0x1080b0, 0.05)); inner.add(fog);
     for (const f of [0.25, 0.5]) { const ring = new T.Mesh(new T.RingGeometry(R * f - 0.002, R * f + 0.002, 48), glow(0x40c8ff, 0.25)); ring.rotation.x = -Math.PI / 2; inner.add(ring); } // (her plane: 625 m and 2.5 km)
-    const ship = new T.Mesh(new T.ConeGeometry(R * 0.035, R * 0.12, 10), glow(0x60e0ff, 0.9)); ship.rotation.x = -Math.PI / 2; inner.add(ship);
+    // (her: a cone, her nose its point, and a fin on her back: which way's up on her, so how the sphere's turned reads off her)
+    const ship = new T.Mesh(new T.ConeGeometry(R * 0.045, R * 0.16, 12), glow(0x60e0ff, 0.9)); ship.rotation.x = -Math.PI / 2; inner.add(ship);
+    const fin = new T.Mesh(new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, R * 0.07), new T.Vector3(0, R * 0.07, R * 0.07), new T.Vector3(0, 0, -R * 0.02)]), glow(0x60e0ff, 0.8)); inner.add(fin);
     const fans = [0, 1].map((i) => { const m = new T.Mesh(fanGeo(), glow(i ? 0xe070ff : 0x50d8ff, 0.16)); inner.add(m); return m; });
     const beams = [0, 1].map(() => { const l = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -R)]), new T.LineBasicMaterial({ color: 0xff4030, transparent: true, opacity: 0.9, depthWrite: false })); inner.add(l); return l; });
     const sel = new T.Mesh(new T.RingGeometry(R * 0.045, R * 0.055, 24), glow(0xffffff, 0.9)); inner.add(sel);
