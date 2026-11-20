@@ -78,17 +78,21 @@ export const RadarView = (() => {
     return marks[i];
   }
   // the debug view, in the level's frame (parent: js/space.ts S.root), for the suites and targets as they are now
-  function update(parent: THREE.Object3D | null, on: number | boolean, suites: RSuite[], targets: RTarget[], ownId: string, now: number, cam?: THREE.Camera) {
+  function update(parent: THREE.Object3D | null, on: number | boolean, suites: RSuite[], targets: RTarget[], ownId: string, now: number, cam?: THREE.Camera, sel = ownId) {
     for (const m of marks) m.style.display = 'none';
     if (!on || !parent) { if (root) root.visible = false; if (panel) panel.style.display = 'none'; return; }
     nmk = 0;
     if (!root || root.parent !== parent) { if (root && root.parent) root.parent.remove(root); root = new T.Group(); parent.add(root); }
     root.visible = true;
-    const lines: string[] = [];
+    const lines: string[] = [], selSu = suites.find((q) => q.id === sel) || suites[0];
+    for (const g0 of [...root.children]) if (g0.userData.su && !suites.some((q) => q.dbg && q.dbg.g === g0)) root.remove(g0); // (a ship's gone out of reach)
     for (const su of suites) {
-      const own = su.id === ownId;
-      if (!su.dbg || su.dbg.g.parent !== root) { su.dbg = make(su, own); root.add(su.dbg.g); }
+      const own = su.id === ownId, mine = su === selSu;
+      if (!su.dbg || su.dbg.g.parent !== root) { su.dbg = make(su, own); su.dbg.g.userData.su = 1; root.add(su.dbg.g); }
       const D = su.dbg; D.g.position.copy(su.P); D.g.quaternion.copy(su.Q);
+      // (her fans and beams drawn for the ship whose radars are shown, and the squad's own; the rest only their trackers' markers)
+      D.g.visible = mine || own;
+      if (!D.g.visible) { for (const [k, tr] of su.trks.entries()) { void k; if (cam && tr.st !== 'idle') trackMark(tr, D, cam, ownId, now); } continue; }
       su.scans.forEach((sc, k) => { D.fans[k].piv.position.copy(sc.at); D.fans[k].ms.forEach((m: THREE.Mesh, i: number) => fanFill(m, sc, sc.th - i * 4 * D2R)); });
       su.trks.forEach((tr, k) => {
         const o = D.trks[k], len = tr.st === 'idle' ? 0 : tr.hand ? tr.hand.p.distanceTo(su.P) : tr.rng; // (acquiring: its range gate where it's looking)
@@ -100,19 +104,11 @@ export const RadarView = (() => {
         o.bl.position.copy(tr.at); o.bl.quaternion.setFromUnitVectors(Z, tr.b); o.bl.scale.setScalar(Math.max(60, len));
         if (tr.st === 'track') { o.rg.position.copy(tr.b).multiplyScalar(len).add(tr.at); o.rg.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), tr.b); o.rg.scale.setScalar(len * Math.tan(Radar.TRK.sq)); }
         const nm = `${su.id} ${tr.side > 0 ? 'stbd' : 'port'}`;
-        // another ship's tracker on her: a marker on the screen where its turret is (a beam pointed at you is a point, seen from you)
-        if (!own && cam && tr.st !== 'idle') {
-          const w = tr.at.clone().applyMatrix4(D.g.matrixWorld).project(cam);
-          if (w.z < 1 && Math.abs(w.x) < 1.2 && Math.abs(w.y) < 1.2) {
-            const el = mark(nmk++), lk = tr.st === 'track' && tr.tgt === ownId;
-            el.style.display = ''; el.style.left = ((w.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - w.y) / 2 * innerHeight) + 'px';
-            el.style.color = lk ? '#ff3030' : '#ffa030'; el.style.borderColor = el.style.color; el.style.opacity = lk ? String(0.65 + 0.35 * Math.sin(now * 12)) : '0.9';
-            el.firstChild!.textContent = lk ? 'TRK LOCK' : tr.st === 'track' ? 'TRK' : 'ACQ';
-          }
-        }
-        lines.push(`${nm}: <b>${tr.st}</b>${tr.st === 'track' ? ` ${(tr.rng / 1000).toFixed(2)} km · ${tr.db.toFixed(0)} dB · err ${(tr.err / D2R).toFixed(2)}° · q ${tr.est.q.toFixed(2)} · ${tr.lockT.toFixed(1)} s` : tr.st === 'acq' ? ` sweeping the fan, best ${tr.best.db.toFixed(0)} dB` : ''}`);
+        if (!own && cam && tr.st !== 'idle') trackMark(tr, D, cam, ownId, now);
+        if (mine) lines.push(`${nm}: <b>${tr.st}</b>${tr.st === 'track' ? ` ${(tr.rng / 1000).toFixed(2)} km · ${tr.db.toFixed(0)} dB · err ${(tr.err / D2R).toFixed(2)}° · q ${tr.est.q.toFixed(2)} · ${tr.lockT.toFixed(1)} s` : tr.st === 'acq' ? ` sweeping the fan, best ${tr.best.db.toFixed(0)} dB` : ''}`);
       });
       // the plots: an arc each along its fan at its range, fading as the sweep comes round
+      if (!mine) { D.arcs.geometry.setDrawRange(0, 0); continue; }
       const pa = D.arcs.geometry.attributes.position as THREE.BufferAttribute, ca = D.arcs.geometry.attributes.color as THREE.BufferAttribute, c = new T.Color(own ? COL.own : COL.foe), v = new T.Vector3(); let n = 0;
       for (const sc of su.scans) for (const p of sc.plots) {
         if (n >= MAXP * SEG * 2) break;
@@ -123,10 +119,10 @@ export const RadarView = (() => {
       D.arcs.geometry.setDrawRange(0, n); pa.needsUpdate = ca.needsUpdate = true;
     }
     // her envelope, toward the nearest hostile scanner
-    const me = targets.find((t) => t.id === ownId), foe = suites.find((s) => s.id !== ownId);
+    const me = targets.find((t) => t.id === ownId), foe = suites.find((s) => s.id === 'hull');
     if (me) {
       if (!env || env.t !== me || env.key !== me.rcs) { if (env) { root.remove(env.m); root.remove(env.line); } const R0 = Radar.SCAN.R0; env = { m: new T.LineSegments(new T.WireframeGeometry(envelope(me, R0)), new T.LineBasicMaterial({ color: 0x80ff90, transparent: true, opacity: 0.35 })), line: new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -1)]), new T.LineBasicMaterial({ color: 0xffff60 })), t: me, key: me.rcs }; env.m.frustumCulled = env.line.frustumCulled = false; root.add(env.m, env.line); }
-      env.m.position.copy(me.p); env.m.quaternion.copy(me.q); env.m.visible = on !== 1; // (from your own seat it would be all round you)
+      env.m.position.copy(me.p); env.m.quaternion.copy(me.q); env.m.visible = sel !== ownId; // (from your own seat it would be all round you)
       lines.unshift(`<b>${ownId}</b> RCS: ${me.rcs.mean.toFixed(1)} m² on average, ${me.rcs.max.toFixed(0)} m² at most · envelope drawn at 1:${Math.round(1 / ENV_K)}`);
       if (foe) {
         const from = foe.scans[0].at.clone().applyQuaternion(foe.Q).add(foe.P), sig = Radar.rcsToward(me, from), R = me.p.distanceTo(from), det = Radar.detRange(Radar.SCAN.R0, sig);
@@ -135,9 +131,10 @@ export const RadarView = (() => {
         lines.unshift(`toward <b>${foe.id}</b>'s scanner: ${sig.toFixed(1)} m² → detected inside ${(det / 1000).toFixed(2)} km · you're at ${(R / 1000).toFixed(2)} km · ${locked ? '<b style="color:#ff6050">LOCKED</b>' : seen ? '<b style="color:#ffc040">PAINTED</b>' : 'unseen'}`);
       } else env.line.visible = false;
     }
-    if (!panel) { panel = document.createElement('div'); panel.id = 'ew-dbg'; Object.assign(panel.style, { position: 'fixed', left: '12px', top: '64px', zIndex: '40', font: '12px ui-monospace, Consolas, monospace', color: '#cfe8f5', background: 'rgba(4,10,16,0.72)', padding: '8px 10px', borderRadius: '4px', pointerEvents: 'none', maxWidth: '46vw', lineHeight: '1.45' }); document.body.appendChild(panel); }
-    panel.style.display = ''; panel.innerHTML = '<b style="color:#40e0ff">ELECTRONIC WARFARE (F8)</b> · <span style="color:#40e0ff">■ yours</span> (trackers <span style="color:#60ffd0">acquiring</span> / <span style="color:#3090ff">tracking</span>) · <span style="color:#ff5040">■ theirs</span> (<span style="color:#ffa030">acquiring</span> / <span style="color:#ff2020">tracking</span>)<br>' + lines.join('<br>');
-    panel.appendChild(maps(suites, now)); // (each ship's maps, as they are)
+    if (!panel) { panel = document.createElement('div'); panel.id = 'ew-dbg'; Object.assign(panel.style, { position: 'fixed', left: '2vw', top: '56px', zIndex: '40', font: '12px ui-monospace, Consolas, monospace', color: '#cfe8f5', background: 'rgba(4,10,16,0.8)', padding: '6px 10px', borderRadius: '4px', pointerEvents: 'none', width: '96vw', boxSizing: 'border-box', lineHeight: '1.4' }); document.body.appendChild(panel); }
+    const head = selSu ? `<b style="color:#40e0ff">ELECTRONIC WARFARE (F8: next ship)</b> · <b>${selSu.id === ownId ? 'your ship' : selSu.name || selSu.id}</b>${selSu.id === 'hull' ? ' · fire control: tracks the nearest contact that doesn\'t answer as a civilian' : selSu.id === ownId ? '' : ' · civilian: no fire control'} · <span style="color:#40e0ff">■ yours</span> <span style="color:#ff5040">■ theirs</span>` : '';
+    panel.style.display = ''; panel.innerHTML = head + '<br>' + lines.join('<br>');
+    if (selSu) panel.appendChild(pipeline(selSu, now, panel.clientWidth - 20)); // (her radars' picture, stage by stage)
   }
   // ---------------------------------------------------------------- the sensor station's screen
   const RMAX = 10000;
@@ -162,8 +159,11 @@ export const RadarView = (() => {
   }
   const conOf = (su: RSuite, p: RPlot) => su.scans[p.k].cons.find((c) => c.p === p);
   // a contact as its IFF answer has it: the mission's ship red, a civilian grey-blue, the squad's own ship green, no answer amber
-  const iffCol = (c: RContact) => (!c.iff ? '255,200,90' : c.iff.c === 'tgt' ? '255,90,70' : c.iff.c === 'civ' ? '140,170,190' : '110,240,140');
-  const iffTxt = (c: RContact) => (!c.iff ? c.n + ' ?' : c.n + ' ' + (c.iff.c === 'tgt' ? 'TGT ' : c.iff.c === 'civ' ? 'CIV ' : '') + c.iff.n);
+  // (as the ship looking has it (who: her id): to the squad's ship the mission's ship is its target; to the mission's ship the
+  // squad's is the hostile; to a civilian anything that isn't a civilian is just a name)
+  const kind = (c: RContact, who: string) => (!c.iff ? '?' : c.iff.c === 'civ' ? 'civ' : who === 'own' ? (c.iff.c === 'tgt' ? 'tgt' : 'own') : who === 'hull' ? (c.iff.c === 'squad' ? 'tgt' : 'own') : 'named');
+  const iffCol = (c: RContact, who = 'own') => ({ '?': '255,200,90', civ: '140,170,190', tgt: '255,90,70', own: '110,240,140', named: '225,228,236' } as Record<string, string>)[kind(c, who)];
+  const iffTxt = (c: RContact, who = 'own') => { const k0 = kind(c, who); return k0 === '?' ? c.n + ' ?' : c.n + ' ' + (k0 === 'tgt' ? (who === 'hull' ? 'HOSTILE ' : 'TGT ') : k0 === 'civ' ? 'CIV ' : '') + c.iff!.n; };
   // The map drawn: each pixel of a scope is an angle and a range (worked out once a layout: lut), looked up on the map where that
   // angle is now (the map's held still about its axis: off), its brightness the power there in dB over the noise, dimmer the longer
   // since the sweep wrote it (a PPI's afterglow)
@@ -227,39 +227,84 @@ export const RadarView = (() => {
       c.strokeStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.moveTo(cu[0] - 9 * k, cu[1]); c.lineTo(cu[0] - 3 * k, cu[1]); c.moveTo(cu[0] + 3 * k, cu[1]); c.lineTo(cu[0] + 9 * k, cu[1]); c.moveTo(cu[0], cu[1] - 9 * k); c.lineTo(cu[0], cu[1] - 3 * k); c.moveTo(cu[0], cu[1] + 3 * k); c.lineTo(cu[0], cu[1] + 9 * k); c.stroke();
     }
   }
-  // The debug view's maps (F8): each ship's two maps as they are, angle across (her nose, or her up, in the middle) and range down
-  // (its square root), every peak a contact holds ringed with its number
-  let mapCv: HTMLCanvasElement | null = null, mapImg: ImageData | null = null;
-  function maps(suites: RSuite[], now: number) {
-    const MW = 240, MH = 120, M = Radar.MAP, rows = suites.length;
-    if (!mapCv) { mapCv = document.createElement('canvas'); mapCv.style.display = 'block'; mapCv.style.marginTop = '6px'; }
-    if (mapCv.width !== MW * 2 + 10 || mapCv.height !== rows * (MH + 16)) { mapCv.width = MW * 2 + 10; mapCv.height = rows * (MH + 16); mapImg = null; }
-    const c = mapCv.getContext('2d')!; if (!mapImg) mapImg = c.createImageData(mapCv.width, mapCv.height);
-    const d = mapImg.data; d.fill(0); for (let q = 3; q < d.length; q += 4) d[q] = 0;
-    suites.forEach((su, row) => su.scans.forEach((sc, k) => {
-      const x0 = k * (MW + 10), y0 = row * (MH + 16) + 14;
-      for (let x = 0; x < MW; x++) {
-        let A = ((x + 0.5) / MW - 0.5) * TAU - sc.off; A = ((A % TAU) + TAU) % TAU; const col = Math.floor(A / (TAU / M.na)) % M.na;
-        const age = (now - sc.age[col]) * sc.rate / TAU, f = age > 1 ? 0.15 : 0.35 + 0.65 * (1 - age);
-        for (let y = 0; y < MH; y++) {
-          const rb = Math.min(M.nr - 1, Math.floor(((y + 0.5) / MH) ** 2 * RMAX / M.dr)), v = sc.map[col * M.nr + rb], b = Math.max(0, Math.min(1, (10 * Math.log10(Math.max(1e-3, v)) - 2) / 22)) * f, o = ((y0 + y) * mapCv!.width + x0 + x) * 4;
-          d[o] = 10 + 140 * b * b; d[o + 1] = 14 + 240 * b; d[o + 2] = 20 + 120 * b * b; d[o + 3] = 235;
+  // another ship's tracker on her: a marker on the screen where its turret is (a beam pointed at you is a point, seen from you)
+  function trackMark(tr: RSuite['trks'][0], D: any, cam: THREE.Camera, ownId: string, now: number) {
+    const w = tr.at.clone().applyMatrix4(D.g.matrixWorld).project(cam);
+    if (w.z >= 1 || Math.abs(w.x) > 1.2 || Math.abs(w.y) > 1.2) return;
+    const el = mark(nmk++), lk = tr.st === 'track' && tr.tgt === ownId;
+    el.style.display = ''; el.style.left = ((w.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - w.y) / 2 * innerHeight) + 'px';
+    el.style.color = lk ? '#ff3030' : '#ffa030'; el.style.borderColor = el.style.color; el.style.opacity = lk ? String(0.65 + 0.35 * Math.sin(now * 12)) : '0.9';
+    el.firstChild!.textContent = lk ? 'TRK LOCK' : tr.st === 'track' ? 'TRK' : 'ACQ';
+  }
+  // The debug view's pipeline (F8): a ship's radars' picture, stage by stage across the screen, a row a scanner. Every cell's angle
+  // across (her nose, or her up, in the middle: as she's turned now) and range down (its square root, 10 km at the bottom):
+  //   1 RAW: the map as the sweep left it, its power in dB over the noise
+  //   2 FILTER: each cell over the mean of the noise round it in range (CA-CFAR's ratio); orange where that's over the threshold,
+  //     and the peaks found (the plots) ringed
+  //   3 TRACK: the plots of the last sweeps, each contact's joined up (a point seen sweep after sweep is a contact; one seen once is
+  //     a tentative one, hollow)
+  //   4 IDENTIFY: each contact with its IFF answer, range and range rate; the ones her trackers are on marked
+  // Redrawn ten times a second.
+  let pipeCv: HTMLCanvasElement | null = null, pipeImg: ImageData | null = null, pipeAt = -1, pipeFor = '';
+  function pipeline(su: RSuite, now: number, width: number) {
+    const M = Radar.MAP, K = 4, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / K), ch = 128, top = 16, rh = ch + 16, CH = top + su.scans.length * rh;
+    if (!pipeCv) { pipeCv = document.createElement('canvas'); pipeCv.style.display = 'block'; pipeCv.style.marginTop = '4px'; }
+    if (pipeCv.width !== CW || pipeCv.height !== CH) { pipeCv.width = CW; pipeCv.height = CH; pipeImg = null; pipeAt = -1; }
+    if (now - pipeAt < 0.1 && pipeFor === su.id) return pipeCv;
+    pipeAt = now; pipeFor = su.id;
+    const c = pipeCv.getContext('2d')!; if (!pipeImg) pipeImg = c.createImageData(CW, CH);
+    const d = pipeImg.data; for (let q = 0; q < d.length; q += 4) { d[q] = 4; d[q + 1] = 9; d[q + 2] = 13; d[q + 3] = 230; }
+    const DA = TAU / M.na, rbOf = new Int32Array(ch); for (let y = 0; y < ch; y++) rbOf[y] = Math.min(M.nr - 1, Math.floor(((y + 0.5) / ch) ** 2 * RMAX / M.dr));
+    const px = (x0: number, y0: number, x: number, y: number, r: number, g: number, b: number) => { const o = ((y0 + y) * CW + x0 + x) * 4; d[o] = r; d[o + 1] = g; d[o + 2] = b; };
+    su.scans.forEach((sc, row) => {
+      const y0 = top + row * rh + 14, per = TAU / sc.rate;
+      for (let x = 0; x < cw; x++) {
+        let A = ((x + 0.5) / cw - 0.5) * TAU - sc.off; A = ((A % TAU) + TAU) % TAU; const col = Math.floor(A / DA) % M.na, base = col * M.nr;
+        const age = (now - sc.age[col]) / per, f = age > 1 ? 0.25 : 0.45 + 0.55 * (1 - age);
+        for (let y = 0; y < ch; y++) {
+          const rb = rbOf[y], v = sc.map[base + rb], db = 10 * Math.log10(Math.max(1e-3, v));
+          const b1 = Math.max(0, Math.min(1, (db - 1) / 24)) * f; px(0, y0, x, y, 10 + 150 * b1 * b1, 16 + 239 * b1, 22 + 120 * b1 * b1);
+          let z = 0, nz = 0; for (let g = 3; g <= 10; g++) { if (rb - g >= 0) { z += sc.map[base + rb - g]; nz++; } if (rb + g < M.nr) { z += sc.map[base + rb + g]; nz++; } }
+          const ratio = v / Math.max(0.5, z / Math.max(1, nz)), rdb = 10 * Math.log10(Math.max(1e-3, ratio)), over = ratio >= M.K && v >= M.floor;
+          const b2 = Math.max(0, Math.min(1, rdb / 16)) * f;
+          if (over) px(cw + gap, y0, x, y, 255, 150 + 60 * b2, 40); else px(cw + gap, y0, x, y, 8 + 50 * b2, 14 + 90 * b2, 24 + 120 * b2);
         }
       }
-    }));
-    c.putImageData(mapImg, 0, 0);
-    c.font = '10px ui-monospace, Consolas, monospace'; c.textBaseline = 'top';
-    suites.forEach((su, row) => su.scans.forEach((sc, k) => {
-      const x0 = k * (MW + 10), y0 = row * (MH + 16) + 14;
-      c.fillStyle = '#9fd0e4'; c.fillText(`${su.id} · ${sc.tag} ${sc.ax === 'y' ? 'bearing (nose mid)' : 'roll (up mid)'} × range`, x0, y0 - 12);
-      const sx = (((wrapPi(sc.th) / TAU) + 0.5) * MW); c.strokeStyle = 'rgba(120,230,255,0.7)'; c.beginPath(); c.moveTo(x0 + sx, y0); c.lineTo(x0 + sx, y0 + MH); c.stroke();
-      for (const ct of shown(sc, now)) {
-        const ph = phiNow(su, ct.p), x = x0 + ((wrapPi(ph) / TAU) + 0.5) * MW, y = y0 + Math.sqrt(Math.min(1, ct.p.r / RMAX)) * MH;
-        c.strokeStyle = `rgb(${iffCol(ct)})`; c.beginPath(); c.arc(x, y, 5, 0, TAU); c.stroke(); c.fillStyle = `rgb(${iffCol(ct)})`; c.fillText(iffTxt(ct) + (ct.p.id ? ' [' + ct.p.id + ']' : ''), x + 6, y - 4);
+    });
+    c.putImageData(pipeImg, 0, 0);
+    const X = (k: number) => k * (cw + gap), xOf = (ph: number) => (Radar.wrapPi(ph) / TAU + 0.5) * cw, yOf = (r: number) => Math.sqrt(Math.min(1, Math.max(0, r) / RMAX)) * ch;
+    c.font = '11px ui-monospace, Consolas, monospace'; c.textBaseline = 'top';
+    ['1 RAW RETURN · dB over noise', '2 FILTER · CFAR ratio, peaks', '3 TRACK · peaks across sweeps', '4 IDENTIFY · IFF · range · rate'].forEach((t, k) => { c.fillStyle = '#7fd4ee'; c.fillText(t, X(k), 2); if (k < K - 1) { c.fillStyle = '#3a6f84'; c.fillText('→', X(k + 1) - gap + 1, top + 4); } });
+    su.scans.forEach((sc, row) => {
+      const y0 = top + row * rh + 14, per = TAU / sc.rate, lbl = sc.tag + (sc.ax === 'y' ? ' bearing (nose mid)' : ' roll (up mid)');
+      c.fillStyle = '#9fd0e4'; c.fillText(lbl, X(0) + 2, y0 - 13);
+      for (let k = 0; k < K; k++) { c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, cw - 1, ch - 1); for (const r of [625, 2500, 5625]) { c.beginPath(); c.moveTo(X(k), y0 + yOf(r)); c.lineTo(X(k) + cw, y0 + yOf(r)); c.stroke(); } }
+      // the sweep's place on 1 and 2
+      for (const k of [0, 1]) { const sx = X(k) + xOf(sc.th); c.strokeStyle = 'rgba(120,230,255,0.75)'; c.beginPath(); c.moveTo(sx, y0); c.lineTo(sx, y0 + ch); c.stroke(); }
+      // 2: this sweep's peaks
+      for (const p of sc.plots) { if (now - p.t > per) continue; const x = X(1) + xOf(phiNow(su, p)), y = y0 + yOf(p.r); c.strokeStyle = '#ffffff'; c.beginPath(); c.arc(x, y, 4, 0, TAU); c.stroke(); }
+      // 3: each contact's plots sweep after sweep, joined
+      for (const ct of sc.cons) {
+        const col = ct.hits >= 2 ? iffCol(ct, su.id) : '150,160,170', pts = ct.trail.map((q) => [X(2) + xOf(q.A + sc.off), y0 + yOf(q.r), q.t] as const);
+        c.strokeStyle = `rgba(${col},0.7)`; c.beginPath(); pts.forEach(([x, y], i) => { if (i && Math.abs(x - pts[i - 1][0]) < cw / 2) c.lineTo(x, y); else c.moveTo(x, y); }); c.stroke();
+        pts.forEach(([x, y, t], i) => { const a = Math.max(0.25, 1 - (now - t) / (per * 8)); c.fillStyle = `rgba(${col},${a})`; c.beginPath(); c.arc(x, y, i === pts.length - 1 ? 3 : 2, 0, TAU); if (ct.hits >= 2) c.fill(); else { c.strokeStyle = `rgba(${col},${a})`; c.stroke(); } });
+        if (ct.hits >= 2) { const [x, y] = pts[pts.length - 1]; c.fillStyle = `rgb(${col})`; c.fillText(ct.n + ' ×' + ct.hits, x + 5, y - 5); }
       }
-    }));
-    return mapCv;
+      // 4: the contacts held, named, and what's tracked
+      const trk = su.trks.filter((t) => t.st === 'track').map((t) => ({ ph: Radar.angOf(sc.ax, t.b)[0], r: t.rng })), used: number[][] = [];
+      for (const ct of shown(sc, now)) {
+        const ph = phiNow(su, ct.p), x = X(3) + xOf(ph), y = y0 + yOf(ct.p.r), col = iffCol(ct, su.id), on = trk.some((t) => Math.abs(Radar.wrapPi(t.ph - ph)) < 4 * D2R && Math.abs(t.r - ct.p.r) < 200);
+        c.fillStyle = `rgb(${col})`; c.beginPath(); c.arc(x, y, 3.5, 0, TAU); c.fill(); if (on) { c.strokeStyle = '#ff4030'; c.strokeRect(x - 6, y - 6, 12, 12); }
+        const ign = su.id === 'hull' && ct.iff && ct.iff.c === 'civ';
+        const l1 = iffTxt(ct, su.id) + (on ? '  TRK' : ign ? '  (let be)' : ''), l2 = `${(ct.p.r / 1000).toFixed(2)} km ${ct.vr >= 0 ? '+' : ''}${Math.round(ct.vr)} m/s` + (ct.p.id ? ` [${ct.p.id}]` : '');
+        const lw = Math.max(c.measureText(l1).width, c.measureText(l2).width), tx = Math.min(x + 6, X(3) + cw - 6 - lw); let ty = y - 11;
+        const hit = (t0: number) => used.some(([ux, uy, uw]) => tx < ux + uw && ux < tx + lw && Math.abs(uy - t0) < 24);
+        for (let k2 = 1; hit(ty) && k2 < 12; k2++) { const dn = y - 11 + 24 * Math.ceil(k2 / 2) * (k2 % 2 ? 1 : -1); if (dn >= y0 && dn <= y0 + ch - 24) ty = dn; } // (not over another's label: the nearest free place above or below, inside its cell)
+        used.push([tx, ty, lw]); if (ty !== y - 11) { c.strokeStyle = `rgba(${col},0.5)`; c.beginPath(); c.moveTo(x, y); c.lineTo(tx, ty + 6); c.stroke(); }
+        c.fillStyle = `rgb(${col})`; c.fillText(l1, tx, ty); c.fillStyle = '#8fb3c4'; c.fillText(l2, tx, ty + 12);
+      }
+    });
+    return pipeCv;
   }
-  const wrapPi = (a: number) => Radar.wrapPi(a);
   return { update, scope, pick };
 })();

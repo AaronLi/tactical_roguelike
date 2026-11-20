@@ -23,7 +23,7 @@ export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: TH
 export interface RIff { c: 'civ' | 'squad' | 'tgt'; n: string } // (a civilian's, the squad's ship's, the mission's ship's; and the name it gives)
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3; iff?: RIff | null } // (q, o: how she was turned and where she was when it was made)
 export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her frame: 'y' her up (yaw), 'x' her beam (pitch), 'z' her length (roll))
-export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null } // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
+export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null; trail: { A: number; r: number; t: number }[] } // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
 export interface RScan {
   ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number;
   map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
@@ -35,7 +35,7 @@ export interface RTrack {
   hand: { p: THREE.Vector3; v: THREE.Vector3; t: number } | null; // (handed a track by the other tracker: where its solution has the target, slewed to straight)
   dE: THREE.Vector3; dA: number; dP: number; w: THREE.Vector3; // (the conical scan's demodulator over the revolution under way, and the boresight's rate)
 }
-export interface RSuite { id: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
+export interface RSuite { id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
 
 export const Radar = (() => {
   const T = THREE, D2R = Math.PI / 180, TAU = Math.PI * 2;
@@ -217,10 +217,10 @@ export const Radar = (() => {
       const dA = Math.abs(wrapPi(A - (c.A + c.vA * dt))), dr = Math.abs(p.r - (c.r + c.vr * dt)), gA = Math.max(4 * D2R, Math.atan2((c.hits > 2 ? 80 : 250) * dt, Math.max(50, p.r))), gr = Math.max(120, 0.04 * p.r) + (c.hits > 2 ? 80 : 250) * dt; // (as far as a ship could have gone across or along since, at 250 m/s: less once its rates are known)
       if (dA > gA || dr > gr) continue; const d = dA / gA + dr / gr; if (d < bd) { bd = d; best = c; }
     }
-    if (!best) { sc.cons.push({ n: sc.tag + (++sc.nid), A, r: p.r, vA: 0, vr: 0, t: now, hits: 1, p, iff: p.iff }); return; }
+    if (!best) { sc.cons.push({ n: sc.tag + (++sc.nid), A, r: p.r, vA: 0, vr: 0, t: now, hits: 1, p, iff: p.iff, trail: [{ A, r: p.r, t: now }] }); return; }
     const dt = now - best.t, eA = wrapPi(A - (best.A + best.vA * dt)), er = p.r - (best.r + best.vr * dt);
     best.A = wrap(best.A + best.vA * dt + 0.6 * eA); best.r = best.r + best.vr * dt + 0.6 * er;
-    best.vA += 0.3 * eA / dt; best.vr += 0.3 * er / dt; best.t = now; best.hits++; best.p = p; best.iff = p.iff || null; // (each sweep's answer: a transponder switched off is unknown from then on)
+    best.vA += 0.3 * eA / dt; best.vr += 0.3 * er / dt; best.t = now; best.hits++; best.p = p; best.iff = p.iff || null; best.trail.push({ A, r: p.r, t: now }); if (best.trail.length > 8) best.trail.shift(); // (each sweep's answer: a transponder switched off is unknown from then on)
   }
   // A tracker knows how its own ship moves (her gyros and her navigation): before it looks, its boresight is turned to undo her
   // rotation since the last step (held still in space, not in her frame), and to stay on the point it was on (at the range in its
@@ -348,5 +348,5 @@ export const Radar = (() => {
   function best(su: RSuite | null) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && (!b || t.est.q > b.est.q)) b = t; return b; }
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
-  return { show: 0, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { show: 0, sel: 'own', spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

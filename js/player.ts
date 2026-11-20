@@ -559,7 +559,11 @@ export const Me = {
         case 'KeyM': Game.setMuted(!Audio.muted); HUD.toast('', Audio.muted ? 'Sound muted' : 'Sound on', 1); break;
         case 'KeyF': this.fEdge = true; break;
         case 'Space': this.lowToggle = !this.lowToggle; break;
-        case 'F8': Radar.show = (Radar.show + 1) % 4; HUD.toast('', ['Electronic warfare view off', 'Electronic warfare view: from your seat', 'Electronic warfare view: chase camera', 'Electronic warfare view: both ships'][Radar.show], 1.4); break; // (js/radarview.ts: the radars at work; the echo paths are ?echoes)
+        case 'F8': { // (js/radarview.ts: a ship's radars at work, each tap the next ship's: hers, the mission ship's, the zone's near ones; then off. The echo paths are ?echoes)
+          const L = Space.on() ? Space.ewList() : [], i = L.findIndex((q) => q.id === Radar.sel);
+          if (!Radar.show) { Radar.show = L.length ? 1 : 0; Radar.sel = L.length ? L[0].id : 'own'; } else if (i >= 0 && i + 1 < L.length) Radar.sel = L[i + 1].id; else { Radar.show = 0; Radar.sel = 'own'; }
+          const su = L.find((q) => q.id === Radar.sel); HUD.toast('', Radar.show && su ? 'Electronic warfare: ' + (su.id === 'own' ? 'your ship' : su.name || su.id) : 'Electronic warfare view off', 1.4); break;
+        }
         case 'F9': HUD.toast('', G_Rig.toggleDebug() ? 'Hitboxes shown' : 'Hitboxes hidden', 1); break;
       }
     });

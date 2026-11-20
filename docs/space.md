@@ -197,10 +197,17 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
 - **The sensor station's screen** shows two scopes, one per scanner, with plots, the trackers' boxes and their state. The
   operator looks at the screen and a cursor follows their gaze. A left click on a plot cues a tracker on it and a right
   click drops both (`srcue`, relayed to the crew). The deck plan the deck scanner gives is now behind **M**.
-- **F8** cycles through the electronic-warfare debug view (it replaced the echo view, still at `?echoes`):
-  1. From the seat.
-  2. Chase camera.
-  3. Both ships.
+- **F8** shows a ship's radars, each tap the next ship's: the squad's (from where you are), the mission ship's, then the
+  zone's ships within 12 km, nearest first (each has its own radars there: scanners, trackers and a transponder, but a
+  civilian has no fire control), then off. It replaced the echo view, still at `?echoes`. On another ship's radars, the camera
+  is off her quarter looking at her. Across the top of the screen is her radars' pipeline, a row per scanner, four stages:
+  1. **Raw return:** her map as the sweep left it, in dB over the noise.
+  2. **Filter:** each cell over the noise round it in range (CA-CFAR's ratio), orange over the threshold, this sweep's peaks
+     ringed.
+  3. **Track:** the plots of the last eight sweeps, each contact's joined; hollow while it's been seen once.
+  4. **Identify:** each contact with its IFF answer as she has it (to the squad, the mission ship is TGT; to the mission ship,
+     the squad's ship is HOSTILE; to a civilian, only names), its range and range rate, and the true object in brackets.
+     The contacts her trackers are on are boxed.
 
   The squad's ship is drawn in blues (cyan fans, teal acquiring, blue tracking) and every other ship in reds (red fans, amber
   acquiring, red tracking). Another ship's tracker gets a marker on the screen at its turret (ACQ, TRK, or a pulsing TRK
