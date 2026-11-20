@@ -343,9 +343,9 @@ export const RadarView = (() => {
     const rcx = X(0) + h / 2 + 4, rcy = y0 + h / 2, r0 = h * 0.22, mx = Math.max(1e-6, ...Array.from(dg.ring)), mn = Math.min(...Array.from(dg.ring));
     c.strokeStyle = '#1f4a5c'; c.beginPath(); c.arc(rcx, rcy, r0, 0, TAU); c.stroke();
     c.strokeStyle = '#ff8070'; c.beginPath(); for (let i = 0; i <= 32; i++) { const a = (i % 32 + 0.5) / 32 * TAU, k = (dg.ring[i % 32] - mn) / Math.max(1e-6, mx - mn), r = r0 + k * h * 0.22; const x = rcx + Math.cos(a) * r, y = rcy - Math.sin(a) * r; if (i) c.lineTo(x, y); else c.moveTo(x, y); } c.stroke();
-    const gx = X(0) + h + 10, gw = cw - h - 14, G = dg.gate, gmx = Math.max(...Array.from(G));
-    for (let j = 0; j < G.length; j++) { const v = 10 * Math.log10(Math.max(1, G[j])) / Math.max(1, 10 * Math.log10(gmx)), bh = v * (h - 14), x = gx + j / G.length * gw; c.fillStyle = Math.abs(j - 20) <= 2 ? '#ff8070' : '#3d7f96'; c.fillRect(x, y0 + h - 4 - bh, gw / G.length - 1, bh); }
-    c.strokeStyle = '#ffffff'; c.beginPath(); c.moveTo(gx + 20.5 / G.length * gw, y0 + 2); c.lineTo(gx + 20.5 / G.length * gw, y0 + h - 2); c.stroke();
+    const gx = X(0) + h + 10, gw = cw - h - 14, GT = dg.gate, gmx = Math.max(...Array.from(GT));
+    for (let j = 0; j < GT.length; j++) { const v = 10 * Math.log10(Math.max(1, GT[j])) / Math.max(1, 10 * Math.log10(gmx)), bh = v * (h - 14), x = gx + j / GT.length * gw; c.fillStyle = Math.abs(j - 20) <= 2 ? '#ff8070' : '#3d7f96'; c.fillRect(x, y0 + h - 4 - bh, gw / GT.length - 1, bh); }
+    c.strokeStyle = '#ffffff'; c.beginPath(); c.moveTo(gx + 20.5 / GT.length * gw, y0 + 2); c.lineTo(gx + 20.5 / GT.length * gw, y0 + h - 2); c.stroke();
     c.fillStyle = '#8fb3c4'; c.fillText('conical scan', rcx - r0 - 2, y0 + 2); c.fillText('range gate ±200 m', gx, y0 + 2);
     // 2: the angle errors and the range error
     const ex = X(1) + h / 2 + 4, ey = y0 + h / 2, es = h * 0.4;
