@@ -2265,7 +2265,7 @@ export const Space = (() => {
   // TORP.vc of closing speed (it keeps some for turning). It's a radar target like anything out here (torpTargets: no
   // transponder), so a ship's own threat assessment and fire control deal with it as they would anything coming at her: a
   // round that meets it (rounds) kills it. The pilot's screen flies it and tells everyone aboard (storp, ten times a second).
-  const TORP = { loads: 4, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, burn: 85, vc: 300, N: 4, seek: 1000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
+  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, burn: 85, vc: 300, N: 4, seek: 1000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
   type Torp = { id: number; o: THREE.Group; fl: THREE.Mesh; puffs: THREE.Mesh[]; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; sent: number; lock: string; rt: RTarget };
   const TP = { list: [] as Torp[], n: 1, base: 1 + Math.floor(Math.random() * 1e6), left: TORP.loads, look: '', pick: '', l: false, cool: 0, tube: null as null | { at: THREE.Vector3; m: THREE.Object3D } };
   function tubeKit(g: THREE.Object3D, box: THREE.Box3, size: number) {
@@ -2310,10 +2310,10 @@ export const Space = (() => {
     if (!f) { HUD.toast('TORPEDO', 'No target: look at a 3D fix (hold right mouse), click to pick it', 2); Audio.deny(); return; }
     if (TP.left <= 0) { HUD.toast('TORPEDO', 'Tube empty', 1.4); Audio.deny(); return; }
     if (TP.cool > 0) return;
-    TP.left--; TP.cool = 2.5;
+    if (TP.left !== Infinity) TP.left--; TP.cool = 2.5;
     const p = TP.tube.at.clone().applyQuaternion(S.Q).add(S.P), v = S.V.clone().addScaledVector(new T.Vector3(0, -1, 0).applyQuaternion(S.Q), TORP.eject);
     const tp = torpNew(TP.base * 1000 + TP.n++, p, v, S.Q, true, f.n, f.pl, f.v);
-    torpSend(tp, 0); HUD.toast('TORPEDO', `Away on ${f.n} · ${TP.left} left`, 1.6); Audio.click();
+    torpSend(tp, 0); HUD.toast('TORPEDO', `Away on ${f.n}${TP.left === Infinity ? '' : ' · ' + TP.left + ' left'}`, 1.6); Audio.click();
   }
   function torpSend(tp: Torp, gone: number) {
     tp.sent = S.t; const r = (x: number) => Math.round(x * 100) / 100;
@@ -2459,7 +2459,7 @@ export const Space = (() => {
           }
           const g = warpGate();
           if (g) lines.push(S.spin >= 1 ? hint('T', 'to warp to ' + U.esc(g.w.name)) : S.spin > 0 ? `Warp drive spinning up · ${Math.round(S.spin * 100)}% <small>(keep her on ${U.esc(g.w.name)})</small>` : `<small>Turn her nose onto ${U.esc(g.w.name)} to spin up the warp drive</small>`);
-          if (EW.own && EW.own.fus.length) lines.push(`<small><b>B</b> torpedo <small>(${TP.left} left)</small>${TP.pick ? ' at ' + U.esc(TP.pick) : ' · hold right mouse to look at a fix, click to pick it'}</small>`);
+          if (EW.own && EW.own.fus.length) lines.push(`<small><b>B</b> torpedo${TP.left === Infinity ? '' : ` <small>(${TP.left} left)</small>`}${TP.pick ? ' at ' + U.esc(TP.pick) : ' · hold right mouse to look at a fix, click to pick it'}</small>`);
           if (S.tclose) lines.push(`Matching course with ${U.esc(S.tclose.name)}…`);
           else if (S.match && S.wps[S.tgt]) lines.push(`Speed matched with ${U.esc(S.wps[S.tgt].name)} <small>(H to let go)</small>`);
           if (S.kind === 'board' && !(S.state && S.state.boom)) { const a = aim(300); if (a) lines.push(a.close < 4 ? 'Ram the hull: nose on, 5 m/s or more' : `Ram her: within ${SD.BREACH_ANG}° of square`); }

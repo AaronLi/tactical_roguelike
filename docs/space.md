@@ -309,7 +309,7 @@ with its own noise, so plots can differ between screens.
 
 ## The torpedo (js/space.ts torps, TORP)
 
-- **The tube:** one, under her keel (`tubeKit`), 4 torpedoes a sortie.
+- **The tube:** one, under her keel (`tubeKit`), as many torpedoes as you like for now (TORP.loads: Infinity, for testing), one every 2.5 s.
 - **Aiming:** the pilot's HUD shows her sensors' 3D fixes in space (rings). Holding right mouse turns the head; the fix
   nearest the middle of the view (within 7°) is the one looked at (`torpSee`: a dashed ring, "click: pick"). A left click picks
   it ("TORPEDO TARGET"), again lets it go. **B** fires at the one picked, or the one looked at. A fix ahead in the bow
