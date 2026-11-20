@@ -32,9 +32,9 @@ export interface RScan {
 } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track'; off?: boolean; // (off: switched off by its operator: silent, takes no cue)
-  cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion; o: THREE.Vector3; con?: RContact | null } | null; spiral?: { t: number; best: number; b: THREE.Vector3; r: number; p: THREE.Vector3; v: THREE.Vector3; t0: number } | null; sw: number; best: { db: number; b: THREE.Vector3; r: number }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
+  cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion; o: THREE.Vector3; con?: RContact | null } | null; spiral?: { t: number; best: number; b: THREE.Vector3; r: number; p: THREE.Vector3; v: THREE.Vector3; t0: number; ray?: boolean } | null; sw: number; best: { db: number; b: THREE.Vector3; r: number }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
   tgt: string | null; lockT: number; lost: number; err: number; db: number; rng: number; est: { p: THREE.Vector3 | null; v: THREE.Vector3; q: number; kf?: KF3 | null };
-  hand: { p: THREE.Vector3; v: THREE.Vector3; t: number } | null; // (handed a track by the other tracker: where its solution has the target, slewed to straight)
+  hand: { p: THREE.Vector3; v: THREE.Vector3; t: number; ray?: boolean } | null; // (ray: a way to look, not a place (a radar warning's bearing): its range not known) // (handed a track by the other tracker: where its solution has the target, slewed to straight)
   hist?: { t: number; p: THREE.Vector3 }[]; // (where its solution has had her, the last 8 s)
   rev?: number; meas?: { p: THREE.Vector3; R: number[] } | null; // (its revolutions done, and the last one's measurement: where it put her, and how unsure)
   // (what the debug view's pipeline shows of it: ring, the return round the last nutation circle; gate, the power across its range
@@ -506,11 +506,11 @@ export const Radar = (() => {
     for (const tr of use) { if (!tr) continue; tr.hand = null; dgOf(tr).sweep = []; tr.st = 'slew'; tr.cue = cueOf; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3(), r: p.r }; tr.tgt = null; tr.lockT = 0; tr.lost = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; }
     return use[0] || null;
   }
-  // one tracker sent by its operator (js/space.ts trackKeys): to a point (a spiral search round it, then tracking what's there) or
-  // on a plot (as cue, but only it)
+  // one tracker sent by its operator (js/space.ts trkSend): on a plot (as cue, but only it), or along a bearing (cueRay)
   // whether a tracker can see a point (the level's frame): in its half of the sky from its mount
   const canSee = (su: RSuite, tr: RTrack, p: THREE.Vector3) => inSide(tr, p.clone().sub(tr.at.clone().applyQuaternion(su.Q).add(su.P)).normalize().applyQuaternion(su.Q.clone().invert()));
-  function cueAt(su: RSuite, tr: RTrack, p: THREE.Vector3, now: number) { if (tr.off) return; drop(tr); tr.st = 'slew'; tr.hand = { p: p.clone(), v: new T.Vector3(), t: now }; }
+  // one tracker sent along a bearing (a radar warning's: from her, the way d, level frame): a spiral round it, its gate open
+  function cueRay(su: RSuite, tr: RTrack, d: THREE.Vector3, now: number) { if (tr.off) return; drop(tr); tr.st = 'slew'; tr.hand = { p: su.P.clone().addScaledVector(d.clone().normalize(), 5000), v: new T.Vector3(), t: now, ray: true }; }
   function cueOne(su: RSuite, tr: RTrack, p: RPlot) {
     if (tr.off) return; const f = su.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p));
     if (f && f.kf.n >= 3) { drop(tr); tr.st = 'slew'; tr.hand = { p: f.pl.clone(), v: f.v.clone(), t: f.kf.t }; return; }
@@ -542,7 +542,7 @@ export const Radar = (() => {
     if (tr.st === 'slew' && tr.hand) { // (a handover: straight onto where the other tracker's solution has her, and tracking)
       const h = tr.hand, mt = tr.at.clone().applyQuaternion(su.Q).add(su.P), pt = h.p.clone().addScaledVector(h.v, now - h.t), to = pt.clone().sub(mt).normalize().applyQuaternion(_qi.copy(su.Q).invert());
       if (now - h.t > 3) { drop(tr); return; } // (not there in 3 s: her solution's gone stale)
-      if (slewTo(tr, to, TRK.stab * dt) < 1 * D2R) { tr.st = 'acq'; tr.spiral = { t: 0, best: -99, b: new T.Vector3(), r: pt.distanceTo(mt), p: h.p.clone(), v: h.v.clone(), t0: h.t }; tr.hand = null; }
+      if (slewTo(tr, to, TRK.stab * dt) < 1 * D2R) { tr.st = 'acq'; tr.spiral = { t: 0, best: -99, b: new T.Vector3(), r: pt.distanceTo(mt), p: h.p.clone(), v: h.v.clone(), t0: h.t, ray: h.ray }; tr.hand = null; }
       tr.a.copy(tr.b); return;
     }
     if (tr.st === 'acq' && tr.spiral) {
@@ -553,7 +553,7 @@ export const Radar = (() => {
       sp.t += dt; const turns = 3, T0 = 1.6, f = Math.min(1, sp.t / T0), ang = f * turns * TAU, rad = f * turns * TRK.bw;
       const e1 = new T.Vector3(), e2 = new T.Vector3(); (Math.abs(c0.y) < 0.9 ? e1.set(0, 1, 0) : e1.set(1, 0, 0)).cross(c0).normalize(); e2.crossVectors(c0, e1);
       tr.b.copy(c0).addScaledVector(e1, Math.cos(ang) * Math.tan(rad)).addScaledVector(e2, Math.sin(ang) * Math.tan(rad)).normalize(); tr.a.copy(tr.b); tr.rng = rng;
-      if (inSide(tr, tr.b)) { const r = beam(su, tr, tr.b, targets, rng); dgOf(tr).sweep.push({ e: rad, db: r.db }); if (r.db > THR) illum(r.id, su, tr, now); if (r.db + gauss() * 1.2 > sp.best) { sp.best = r.db; sp.b.copy(tr.b).applyQuaternion(su.Q); sp.r = r.R || rng; } }
+      if (inSide(tr, tr.b)) { const r = beam(su, tr, tr.b, targets, sp.ray ? null : rng); dgOf(tr).sweep.push({ e: rad, db: r.db }); if (r.db > THR) illum(r.id, su, tr, now); if (r.db + gauss() * 1.2 > sp.best) { sp.best = r.db; sp.b.copy(tr.b).applyQuaternion(su.Q); sp.r = r.R || rng; } } // (along a bearing: its gate open, any range)
       if (f >= 1 || (sp.best > THR + 10 && rad < TRK.bw)) { // (done; or strong already, near the middle: no need to go on round)
         if (sp.best > THR) { tr.b.copy(sp.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = sp.r; tr.lockT = 0; tr.lost = 0; tr.err = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.spiral = null; }
         else drop(tr);
@@ -635,5 +635,5 @@ export const Radar = (() => {
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
   const warnClear = () => { lit.clear(); painted.clear(); }; // (a new sortie: nobody's radar on anyone yet)
-  return { canSee, cueAt, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

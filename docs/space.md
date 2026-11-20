@@ -227,9 +227,10 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     once (its edge crossed there and back) is taken for the same contact.
   - **Tracking radars** (js/space.ts trkOff, trkSend; js/radar.ts cueOne, cueAt): **3** the port tracker, **4** the starboard,
     each a box in the corner (OFF, IDLE, SLEW, SEARCH, LOCK and the track it's on). Tapped, it's picked to be sent (tapped
-    again, not): its beam bright in the hologram, and a left click sends it on the track under the cursor (tracking it), or,
-    on nothing, to search where the cursor points in the hologram (its way from her, and by how far out from the middle, its
-    range: a spiral search there). Somewhere it can't see (the other side of her hull) it says so. Held, it's switched off
+    again, not): its beam bright in the hologram, and a left click sends it on the track under the cursor (tracking it). A left
+    click on a radar warning's chevron sends it (or, none picked, the one that can see that way) along that bearing: a spiral
+    round it with its range gate open, locking the strongest return at whatever range (`cueRay`). Not at an empty place:
+    a tracker goes after something it's been told of. Somewhere it can't see (the other side of her hull) it says so. Held, it's switched off
     (silent: it lets go and takes no cue) or on again. Everyone aboard gets it (`strk`). With none picked, a left click on a
     track sends whichever tracker can see it.
   - **Range:** rings in her plane at a quarter, half and all of the range shown, each named; the wheel zooms the range at the

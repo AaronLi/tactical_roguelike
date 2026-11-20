@@ -422,8 +422,8 @@ export const RadarView = (() => {
   // scanners' fans sweeping out from the middle (cyan the bearing scanner's, magenta the roll scanner's), and each tracker's
   // beam a line from the middle along its boresight (amber slewing or sweeping, red tracking). The operator turns it (rot) and
   // points at a track with the middle of their view (holoPick).
-  type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string };
-  let holoG: { scanUi: HTMLElement; secs: { patch: THREE.Mesh; edges: THREE.Mesh }[]; rwr: { cone: THREE.Mesh; line: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[]; zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
+  type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string; rwr?: THREE.Vector3 }; // (rwr: a radar warning's bearing (her frame), to send a tracker along)
+  let holoG: { rwrItems: HoloItem[]; scanUi: HTMLElement; secs: { patch: THREE.Mesh; edges: THREE.Mesh }[]; rwr: { cone: THREE.Mesh; line: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[]; zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
   const HCOL: Record<string, number> = { HOSTILE: 0xff4a3a, SUSPECT: 0xffa040, WATCH: 0xffe070, NEUTRAL: 0xa8b8c4, CIV: 0x7f9fb0, FRIENDLY: 0x70f090 };
   function holoMake(parent: THREE.Object3D, R: number) {
     const g = new T.Group(), inner = new T.Group(); g.add(inner); parent.add(g);
@@ -448,7 +448,7 @@ export const RadarView = (() => {
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
     const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', font: '12px ui-monospace, Consolas, monospace', color: '#9fe4ff', textShadow: '0 0 4px #000', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · aim at a track, left click: track it · tap right: drop the trackers'; document.body.appendChild(hint);
     const scanUi = document.createElement('div'); scanUi.id = 'holo-scan'; Object.assign(scanUi.style, { position: 'fixed', left: '24px', top: '24px', font: '13px ui-monospace, Consolas, monospace', color: '#cfe8f5', textShadow: '0 0 4px #000', pointerEvents: 'none', display: 'none', zIndex: '35', lineHeight: '1.6' }); document.body.appendChild(scanUi);
-    holoG = { scanUi, secs: [], rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
+    holoG = { rwrItems: [], scanUi, secs: [], rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
@@ -519,7 +519,7 @@ export const RadarView = (() => {
         const st = tr.off ? 'OFF' : tr.st === 'track' ? 'LOCK' + (f ? ' on ' + f.n : '') : tr.st === 'acq' ? 'SEARCH' : tr.st === 'slew' ? 'SLEW' : 'IDLE';
         const col = tr.off ? '#5f6f78' : tr.st === 'track' ? '#ff6050' : tr.st === 'idle' ? '#9fc2d4' : '#ffb040';
         return `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:4px 8px;border:1px solid ${sel ? '#ffb040' : 'rgba(120,180,210,0.35)'};background:rgba(4,12,18,0.55);border-radius:3px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <b style="float:right;color:${col}">${st}</b>`
-          + (sel ? `<div style="color:#fff;font-size:11px">left click: a track to track it, or a place to search · hold ${j + 3}: ${tr.off ? 'on' : 'off'}</div>` : '') + '</div>';
+          + (sel ? `<div style="color:#fff;font-size:11px">left click: a track, or a radar warning's bearing · hold ${j + 3}: ${tr.off ? 'on' : 'off'}</div>` : '') + '</div>';
       }).join('<br>');
       if (H.scanUi.innerHTML !== html) H.scanUi.innerHTML = html;
     }
@@ -529,7 +529,9 @@ export const RadarView = (() => {
     // radar warning: each radar on her, at the edge the way it is (her warning receiver hears its direction, not its range):
     // a tracker locked on her a pulsing red chevron with a line in to her and LOCK; one sweeping for her amber, TRK; a scanner's
     // beam going over her a brief amber ping, fading
+    H.rwrItems = [];
     rwr.forEach((w, i) => {
+      H.rwrItems.push({ pos: w.d.clone().normalize().multiplyScalar(R * 1.15), plot: null, label: `RADAR ${w.kind === 'lock' ? 'LOCKED ON US' : w.kind === 'trk' ? 'TRACKING' : 'SEARCHING'} · its bearing: click to send a tracker`, col: w.kind === 'lock' ? '#ff5040' : '#ffb050', rwr: w.d.clone() });
       let m = H.rwr[i];
       if (!m) {
         const cone = new T.Mesh(new T.ConeGeometry(R * 0.06, R * 0.18, 4), new T.MeshBasicMaterial({ color: 0xff3020, transparent: true, depthWrite: false, depthTest: false, blending: T.AdditiveBlending })); cone.renderOrder = 18; H.inner.add(cone);
@@ -569,7 +571,7 @@ export const RadarView = (() => {
     for (let i = items.length; i < H.dots.length; i++) H.dots[i].visible = false;
     H.items = items;
     // the one pointed at: ringed (facing the viewer), and named
-    const p = pick && items.find((q) => q.plot === pick.plot && q.label.split(' ')[0] === pick.label.split(' ')[0]);
+    const p = pick && (pick.rwr ? H.rwrItems.find((q) => q.rwr && q.rwr.angleTo(pick.rwr!) < 0.05) : items.find((q) => q.plot === pick.plot && q.label.split(' ')[0] === pick.label.split(' ')[0]));
     H.sel.visible = !!p && !focus; H.label.visible = !!p;
     if (p) {
       H.sel.position.copy(p.pos); const camQ = new T.Quaternion(); (parent as any).updateWorldMatrix?.(true, false); H.inner.getWorldQuaternion(camQ); H.sel.quaternion.copy(camQ.invert().multiply(G_cam.quaternion)); H.sel.scale.setScalar(1 + 0.15 * Math.sin(now * 8));
@@ -583,18 +585,10 @@ export const RadarView = (() => {
     if (!holoG || !holoG.g.parent) return null; G_cam.quaternion.copy(cam.quaternion);
     let best: HoloItem | null = null, bd = 4 * D2R; const w = new T.Vector3();
     holoG.inner.updateWorldMatrix(true, false);
-    for (const it of holoG.items) { w.copy(it.pos).applyMatrix4(holoG.inner.matrixWorld).sub(ray.origin); const a = w.angleTo(ray.direction); if (a < bd) { bd = a; best = it; } }
+    for (const it of [...holoG.items, ...holoG.rwrItems]) { w.copy(it.pos).applyMatrix4(holoG.inner.matrixWorld).sub(ray.origin); const a = w.angleTo(ray.direction); if (a < bd) { bd = a; best = it; } }
     return best;
-  }
-  // where in her space the cursor's ray points, through the hologram (the point on it nearest the middle; no further out than its
-  // edge): its way from her and its range (its distance out from the middle, squared, times the range shown), in her frame
-  function holoPoint(ray: THREE.Ray, zoom: number) {
-    if (!holoG) return null; holoG.inner.updateWorldMatrix(true, false);
-    const c = new T.Vector3().setFromMatrixPosition(holoG.inner.matrixWorld), t = c.clone().sub(ray.origin).dot(ray.direction), p = ray.origin.clone().addScaledVector(ray.direction, t);
-    const local = holoG.inner.worldToLocal(p), L = local.length(); if (L < 1e-6) return null;
-    const f = Math.min(1, L / holoG.R); return local.normalize().multiplyScalar(f * f * zoom);
   }
   // where an item of the hologram is in the world (for the operator's cursor's halo round it)
   function holoWorld(it: HoloItem) { if (!holoG) return null; holoG.inner.updateWorldMatrix(true, false); return it.pos.clone().applyMatrix4(holoG.inner.matrixWorld); }
-  return { update, scope, pick, holo, holoPick, holoWorld, holoPoint };
+  return { update, scope, pick, holo, holoPick, holoWorld };
 })();

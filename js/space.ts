@@ -369,17 +369,24 @@ export const Space = (() => {
     if (off) Radar.drop(tr); tr.off = off;
     if (!quiet) { Net.toHost({ t: 'strk', a: [ti, 0, off ? 1 : 0] }); Audio.click(); HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), off ? 'off' : 'on', 1.2); }
   }
-  // the picked tracker sent by a left click: on the track under the cursor, or (on nothing) to search where the cursor points in
-  // the hologram (its way from her and, by how far out from the middle, its range)
-  function trkSend(ray: THREE.Ray) {
-    const ti = TRKK.sel, tr = EW.own && EW.own.trks[ti], H = EW.holo; if (!tr || !EW.own) return false;
+  // A left click on a radar warning's chevron in the hologram: a tracker sent along its bearing (the one picked, or the one that
+  // can see that way). A left click on a track with a tracker picked: that one sent on it. Nowhere else: a tracker's sent on
+  // something, a track or a radar it can hear, not at an empty place.
+  function trkSend(): boolean {
+    const H = EW.holo, it = H.pick; if (!EW.own || !it) return false;
+    const pick = TRKK.sel >= 0 ? EW.own.trks[TRKK.sel] : null;
+    if (it.rwr) {
+      const d = (it.rwr as THREE.Vector3).clone().applyQuaternion(S.Q), far = S.P.clone().addScaledVector(d.clone().normalize(), 3000), tr = pick || EW.own.trks.find((t) => !t.off && Radar.canSee(EW.own!, t, far)) || null;
+      if (!tr) return false; const ti = EW.own.trks.indexOf(tr);
+      if (tr.off) trkOff(ti, false);
+      if (!Radar.canSee(EW.own, tr, far)) { HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), "can't see that way: her hull's in the way", 1.4); Audio.deny(); return true; }
+      Radar.cueRay(EW.own, tr, d, S.t); Net.toHost({ t: 'strk', a: [ti, 1, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4)] }); Audio.click(); return true;
+    }
+    if (!pick || !it.plot) return false; const ti = TRKK.sel, tr = pick, p = it.plot;
     if (tr.off) trkOff(ti, false);
-    const cant = () => { HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), "can't see there: her hull's in the way", 1.4); Audio.deny(); return true; };
-    if (H.pick && H.pick.plot) { const p = H.pick.plot, w0 = RadarView.holoWorld(H.pick), f = EW.own.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p));
-      const at = f ? f.pl : (() => { const sc = EW.own!.scans[p.k]; return Radar.dirOf(sc.ax, p.phi, 0).applyQuaternion(p.q || S.Q).multiplyScalar(p.r).add(p.o || S.P); })(); void w0;
-      if (!Radar.canSee(EW.own, tr, at)) return cant(); Radar.cueOne(EW.own, tr, p); Net.toHost({ t: 'strk', a: [ti, 2, p.k, p.phi, p.r] }); Audio.click(); return true; }
-    const v = RadarView.holoPoint(ray, HOLO_ZOOM[H.zi]); if (!v) return false;
-    const w = v.applyQuaternion(S.Q).add(S.P); if (!Radar.canSee(EW.own, tr, w)) return cant(); Radar.cueAt(EW.own, tr, w, S.t); Net.toHost({ t: 'strk', a: [ti, 1, Math.round(w.x), Math.round(w.y), Math.round(w.z)] }); Audio.click(); return true;
+    const f = EW.own.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p)), at = f ? f.pl : (() => { const sc = EW.own!.scans[p.k]; return Radar.dirOf(sc.ax, p.phi, 0).applyQuaternion(p.q || S.Q).multiplyScalar(p.r).add(p.o || S.P); })();
+    if (!Radar.canSee(EW.own, tr, at)) { HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), "can't see there: her hull's in the way", 1.4); Audio.deny(); return true; }
+    Radar.cueOne(EW.own, tr, p); Net.toHost({ t: 'strk', a: [ti, 2, p.k, p.phi, p.r] }); Audio.click(); return true;
   }
   const wrapA = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   function sensorStep() {
@@ -409,7 +416,7 @@ export const Space = (() => {
         const st = H.cur.style; st.width = st.height = (2 * H.cr) + 'px'; st.transform = `translate(${H.cx - H.cr - 2}px, ${H.cy - H.cr - 2}px)`;
         st.borderColor = w ? (H.pick.col || '#ffffff') : 'rgba(140,230,255,0.95)'; st.borderWidth = w ? '2.5px' : '2px';
       }
-      if (H.ml && !EW.l && !(TRKK.sel >= 0 && trkSend(_ray.ray)) && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); Net.toHost({ t: 'srcue', a }); Audio.click(); }
+      if (H.ml && !EW.l && !trkSend() && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); Net.toHost({ t: 'srcue', a }); Audio.click(); }
       EW.l = H.ml; EW.r = H.mr; return;
     }
     if (!H.placed && S.model && H.sat >= 0 && S.t - H.sat > 0.25) { // (put where its operator has it: centred in front of the seat, just below their eyes; once, the view settled at the seat)
@@ -426,7 +433,7 @@ export const Space = (() => {
       m.yaw = H.y0; m.pitch = H.p0; // (the view held still)
     } else if (EW.r && !H.moved && S.t - H.rAt < 0.3) { ewCue([-1]); Net.toHost({ t: 'srcue', a: [-1] }); Audio.click(); }
     _ray.setFromCamera(new T.Vector2(0, 0), G_R.camera); H.pick = RadarView.holoPick(_ray.ray, G_R.camera);
-    if (m.mouse.l && !EW.l && !(TRKK.sel >= 0 && trkSend(_ray.ray)) && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); /* (the contact itself: a 3D track it's part of is used) */ Net.toHost({ t: 'srcue', a }); Audio.click(); }
+    if (m.mouse.l && !EW.l && !trkSend() && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); /* (the contact itself: a 3D track it's part of is used) */ Net.toHost({ t: 'srcue', a }); Audio.click(); }
     EW.l = m.mouse.l; EW.r = m.mouse.r;
   }
   // the debug view's cameras (F8 the second and third time): behind and above her, and off to the side of both ships, looking at their middle
@@ -2351,7 +2358,7 @@ export const Space = (() => {
       case 'srcue': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) ewCue(m.a); return true;
       case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && m.a.length === 4) modeSet(m.a[0] | 0, MODES[m.a[1] | 0] || 'round', +m.a[2], +m.a[3], true); return true;
       case 'strk': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && EW.own) { const ti = m.a[0] | 0, tr = EW.own.trks[ti]; if (tr) { // (the sensor operator's tracker commands: js/space.ts trkOff, trkSend)
-        if (m.a[1] === 0) trkOff(ti, !!m.a[2], true); else if (m.a[1] === 1) Radar.cueAt(EW.own, tr, new T.Vector3(+m.a[2], +m.a[3], +m.a[4]), S.t); else Radar.cueOne(EW.own, tr, { k: m.a[2] | 0, phi: +m.a[3], r: +m.a[4], t: S.t, db: 0, id: '', e: 0 }); } } return true;
+        if (m.a[1] === 0) trkOff(ti, !!m.a[2], true); else if (m.a[1] === 1) Radar.cueRay(EW.own, tr, new T.Vector3(+m.a[2], +m.a[3], +m.a[4]), S.t); else Radar.cueOne(EW.own, tr, { k: m.a[2] | 0, phi: +m.a[3], r: +m.a[4], t: S.t, db: 0, id: '', e: 0 }); } } return true;
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
       case 'sfire': if (S.on && m.by !== Net.myId && S.root) tracer(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true;
