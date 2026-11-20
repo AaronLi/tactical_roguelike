@@ -19,7 +19,7 @@
 // Everything here is in the level's frame (the ship the mission's on is the level: js/space.ts), a ship's own frame being her
 // group's (forward -z, up +y, starboard +x).
 export interface RcsTable { s: Float32Array; max: number; mean: number }
-export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number; iff?: RIff | null; aff?: RAff; xon?: boolean } // (iso: a return the same every way, m2: a chaff cloud's, a missile's; iff: what its transponder answers an interrogation with, or nothing)
+export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number; iff?: RIff | null; aff?: RAff; xon?: boolean; only?: RAff } // (only: its transponder answers only an interrogator of that side's (a torpedo's to its own ship's)) // (iso: a return the same every way, m2: a chaff cloud's, a missile's; iff: what its transponder answers an interrogation with, or nothing)
 export type RAff = 'civ' | 'navy' | 'pirate' | 'squad'; // (whose a ship is: a civilian's, a navy's, pirates', the squad's)
 export interface RIff { c: 'civ' | 'squad' | 'navy'; n: string } // (the answer: what it says it is, and its name) // (a civilian's, the squad's ship's, the mission's ship's; and the name it gives)
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3; iff?: RIff | null } // (q, o: how she was turned and where she was when it was made)
@@ -233,7 +233,7 @@ export const Radar = (() => {
   // 'z' map); a contact not seen for two sweeps is dropped.
   // whether a ship's transponder answers this ship's interrogator: a civilian's always; a navy's only a navy's interrogation (its
   // own mode); a pirate's never; the squad's whenever it's switched on
-  const answers = (t: RTarget, su: RSuite) => !!t.iff && t.xon !== false && (t.aff === 'civ' || t.aff === 'squad' || (t.aff === 'navy' && su.aff === 'navy'));
+  const answers = (t: RTarget, su: RSuite) => !!t.iff && t.xon !== false && (t.only ? su.aff === t.only : (t.aff === 'civ' || t.aff === 'squad' || (t.aff === 'navy' && su.aff === 'navy')));
   const IFF_R = 12000, DA = TAU / MAP.na, AGS = 4 * Math.LN2 / (SCAN.bw * SCAN.bw), _cd = new T.Vector3(), _ref = new T.Vector3();
   // how long a scanner takes to come back to the same place: a turn; or, searching a sector, there and back across it
   const perOf = (sc: RScan) => (sc.sec.on ? Math.max(0.3, 4 * sc.sec.h / sc.rate) : TAU / sc.rate);

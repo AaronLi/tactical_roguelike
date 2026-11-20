@@ -321,7 +321,7 @@ with its own noise, so plots can differ between screens.
   radar: the strongest return in a 20° cone and a 300 m range gate round where it expects the target (chaff can draw it).
   A proximity fuse: a hull by her box, a ship within 30 m, anything small within 7 m. On the mission's ship it knocks out
   her guns within 45 m. It self-destructs after 90 s.
-- **Its return:** 1.5 m², no transponder. Nothing special-cases it: the enemy's scanners, threat assessment and fire control
+- **Its return:** 1.5 m². To her own interrogator it answers (`only: 'squad'`), so her radars show it as FRIENDLY, "TORP n"; to anyone else's, nothing. Nothing special-cases it: the enemy's scanners, threat assessment and fire control
   see it as they see anything, and a minigun round passing within 3 m kills it. The pilot's screen flies it and tells everyone
   aboard (`storp`, ten times a second).
 - **Tested:** from 5 km side-on to the frigate. Her scanners have it at 3.2 km, HOSTILE at 2 km, a tracker locked at 1.5 km,
