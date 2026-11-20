@@ -186,6 +186,12 @@ A ship knows where another ship is only from what her radars tell her. Every shi
   over or under her, a 'y' plot ahead or astern) can't tell which side the target is on, so both free trackers sweep their own halves of the fan and the first to find the target keeps it. The mission
   ship's mounts are set on her plating by raycasting her hull (`fitMounts`). Her hardware is drawn and moves with the radars
   (`radarKit`): lattice masts, antennas turning with their sweeps, and each tracker's dish pointing along its boresight.
+- **What the pilot's shown** (js/space.ts ewMarks; js/spaceui.ts): her sensors' picture, not knowing. A ship of the zone's is a
+  waypoint (marked, on the nav screen, to be picked with T and warped to) only once a contact of her radars answers to its
+  name; the mission's ship's place is known from the mission. Everything else her radars hold is a track point, a ring in
+  its colour (hostile red to friendly green) with its number, class and IFF: a 3D track where it is; a contact only the
+  bearing scanner holds at its bearing and range, level with her (height ?). With her search radars off, she's shown only
+  the mission's ship and the anchors.
 - **Targets** are the mission ship and every ship of the zone that's shown, each with a return from her own drawing (the
   stand-in far off, her own hull near).
 

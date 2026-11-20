@@ -34,7 +34,7 @@ export const SpaceUI = (() => {
 .sp-mark { position: absolute; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; text-shadow: 0 0 4px #000; }
 .sp-mark i { display: block; width: 14px; height: 14px; margin: 0 auto 3px; border: 2px solid #8fd6ff; transform: rotate(45deg); box-sizing: border-box; }
 .sp-mark.sel i { border-color: #ffd24a; box-shadow: 0 0 8px #ffd24a; } .sp-mark.sel { color: #ffe9a8; }
-.sp-mark.off i { border-radius: 50%; transform: none; opacity: 0.8; } .sp-mark small { display: block; color: #9fb4c4; font-size: 10px; }
+.sp-mark.off i { border-radius: 50%; transform: none; opacity: 0.8; } .sp-mark.trk i { border-radius: 50%; transform: none; width: 12px; height: 12px; } .sp-mark.trk { font-size: 12px; } .sp-mark small { display: block; color: #9fb4c4; font-size: 10px; }
 #spObj { position: absolute; right: 18px; top: 150px; width: 250px; padding: 9px 12px; background: rgba(6, 12, 18, 0.55); border-left: 2px solid #8fd6ff; }
 #spObj h4 { margin: 0 0 4px; font: 600 12px var(--ui-font, system-ui, sans-serif); letter-spacing: 2px; color: #8fd6ff; } #spObj p { margin: 3px 0; line-height: 1.35; }
 #spObj .ok { color: #7dff9a; } #spObj .bad { color: #ff6a50; } #spObj .tm { font: 600 20px var(--ui-font, system-ui, sans-serif); color: #ffd24a; }
@@ -96,7 +96,7 @@ export const SpaceUI = (() => {
   function update(dt: number) {
     const s = S(); if (!s.on || !made) return;
     hud.style.visibility = Game.invOpen || Game.shopOpen ? 'hidden' : ''; // (under the Tab screen and the shop, as the rest of the HUD is: #hud holds them, and this isn't in it)
-    const seat = Space.mySeat(), flying = !s.docked || !!s.auto, aboard = Space.aboard(), wp = s.wps[s.tgt] && !s.wps[s.tgt].hide ? s.wps[s.tgt] : null;
+    const seat = Space.mySeat(), flying = !s.docked || !!s.auto, aboard = Space.aboard(), wp = s.wps[s.tgt] && !s.wps[s.tgt].hide && !s.wps[s.tgt].unseen ? s.wps[s.tgt] : null;
     const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(_v.copy(s.P).sub(wp.p).normalize()) : 0;
     // the line at the top: for everyone aboard while she's under way
     const showTop = aboard && (flying || !!s.ftl);
@@ -117,7 +117,7 @@ export const SpaceUI = (() => {
       const cam = G_R.camera, W = window.innerWidth, H = window.innerHeight; let html = '';
       _q.copy(s.Q).invert().premultiply(s.Dq);
       s.wps.forEach((w, i) => {
-        if (w.hide) return;
+        if (w.hide || w.unseen) return;
         _v.copy(w.p).sub(s.P).applyQuaternion(_q).add(s.Dp);
         const d = s.P.distanceTo(w.p), behind = _v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0; _v.project(cam);
         let x = (_v.x * 0.5 + 0.5) * W, y = (-_v.y * 0.5 + 0.5) * H, off = behind;
@@ -125,6 +125,15 @@ export const SpaceUI = (() => {
         if (off || x < 40 || x > W - 40 || y < 40 || y > H - 60) { const a = Math.atan2(y - H / 2, x - W / 2); x = W / 2 + Math.cos(a) * (W / 2 - 60); y = H / 2 + Math.sin(a) * (H / 2 - 70); off = true; }
         html += `<div class="sp-mark${i === s.tgt ? ' sel' : ''}${off ? ' off' : ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px"><i></i>${U.esc(w.name)} · ${SD.dist(d)}${i === s.tgt ? `<small>${U.esc(w.sub)}</small>` : ''}</div>`;
       });
+      // the track points: what her radars hold that isn't a waypoint shown (js/space.ts ewMarks), a ring in its colour
+      for (const t of s.trkMarks) {
+        _v.copy(t.p).sub(s.P).applyQuaternion(_q).add(s.Dp);
+        const d = s.P.distanceTo(t.p), behind = _v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0; _v.project(cam);
+        let x = (_v.x * 0.5 + 0.5) * W, y = (-_v.y * 0.5 + 0.5) * H, off = behind;
+        if (behind) { x = W - x; y = H - y; if (Math.hypot(x - W / 2, y - H / 2) < 60) y = H; }
+        if (off || x < 40 || x > W - 40 || y < 40 || y > H - 60) { const a = Math.atan2(y - H / 2, x - W / 2); x = W / 2 + Math.cos(a) * (W / 2 - 60); y = H / 2 + Math.sin(a) * (H / 2 - 70); off = true; }
+        html += `<div class="sp-mark trk${off ? ' off' : ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;color:${t.col}"><i style="border-color:${t.col}"></i>${U.esc(t.label)} · ${SD.dist(d)}</div>`;
+      }
       // at the helm: where her nose points, and where she's actually going
       if (atHelm) {
         const pr = (v: THREE.Vector3) => { const b = v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0; v.project(cam); return b ? null : [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H]; };
@@ -189,9 +198,12 @@ export const SpaceUI = (() => {
     for (const r of [R, R * 0.66, R * 0.33]) { c.beginPath(); c.arc(cx, cy, r, 0, 7); c.stroke(); }
     c.beginPath(); c.moveTo(cx, cy - R); c.lineTo(cx, cy + R); c.moveTo(cx - R, cy); c.lineTo(cx + R, cy); c.stroke();
     c.fillStyle = P.accent; c.beginPath(); c.moveTo(cx, cy - 6); c.lineTo(cx + 4, cy + 5); c.lineTo(cx - 4, cy + 5); c.fill();
-    const wp = s.wps[s.tgt] && !s.wps[s.tgt].hide ? s.wps[s.tgt] : null;
+    const wp = s.wps[s.tgt] && !s.wps[s.tgt].hide && !s.wps[s.tgt].unseen ? s.wps[s.tgt] : null;
+    // (the track points, rings in their colours, under the waypoints)
+    for (const t of s.trkMarks) { const v = t.p.clone().sub(s.P).applyQuaternion(inv), d = v.length(), rr = U.clamp(Math.log10(Math.max(10, d)) - 1, 0, 3.4) / 3.4 * R, a = Math.atan2(v.x, -v.z); c.strokeStyle = t.col; c.beginPath(); c.arc(cx + Math.sin(a) * rr, cy - Math.cos(a) * rr, 3.5, 0, 7); c.stroke(); }
+    c.strokeStyle = P.grid;
     s.wps.forEach((w, i) => {
-      if (w.hide) return;
+      if (w.hide || w.unseen) return;
       const v = w.p.clone().sub(s.P).applyQuaternion(inv), d = v.length(), rr = U.clamp(Math.log10(Math.max(10, d)) - 1, 0, 3.4) / 3.4 * R, a = Math.atan2(v.x, -v.z);
       const x = cx + Math.sin(a) * rr, y = cy - Math.cos(a) * rr;
       c.fillStyle = c.strokeStyle = i === s.tgt ? P.tgt : P.accent; if (hud) c.strokeRect(x - 3, y - 3, 6, 6); else c.fillRect(x - 3, y - 3, 6, 6);

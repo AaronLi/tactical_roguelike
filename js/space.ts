@@ -35,7 +35,7 @@ import { RadarView } from './radarview.js';
 //   to it. Docking, launching and jumping go through the host (sdock, jump).
 //   A jump is the change of level: the screens go to the jump's light instead of black (the veil, kind 'ftl'), the place
 //   is built behind it, and she comes out of the tunnel when it's ready.
-interface SpWp { id: string; name: string; sub: string; p: THREE.Vector3; kind: 'anchor' | 'base' | 'breach' | 'lz' | 'entry'; i?: number; hide?: boolean }
+interface SpWp { id: string; name: string; sub: string; p: THREE.Vector3; kind: 'anchor' | 'base' | 'breach' | 'lz' | 'entry'; i?: number; hide?: boolean; unseen?: boolean } // (unseen: a ship her sensors haven't named: not shown, not to be picked (ewMarks))
 interface SpMs { def?: { on: number; lead: number; t: number; pods: number; lost: number; civ: number } | null; gn?: number; raid?: number[][]; hold: number; left?: number; zt?: number; hostile?: number; salv?: number[]; cuts?: number[][]; site?: number[] | null; i: number; docked: number; done: number; keys: string[]; cards: number[][]; art: number; artBy: string | null; artAt: number[] | null; hvt: number; hvtId: number | null; arm: number | null; boom: number; vac: number[]; cleared: number; at?: number }
 type SpKind = 'hub' | 'board' | 'assault';
 export const Space = (() => {
@@ -62,7 +62,7 @@ export const Space = (() => {
     // the warp drive (warpStep): spin, how far it's spun up (0..1) on the target she's facing; warp, the run itself; tv, the
     // target's own velocity (tgtTrack), which she's left matching at the end of it
     spin: 0, warp: null as null | { j: number; u: number; t: number; top: number }, tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1, match: null as null | string,
-    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], rounds: [] as { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
+    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], trkMarks: [] as { p: THREE.Vector3; label: string; col: string }[], rounds: [] as { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
   };
   const me = () => Me, on = () => S.on;
   const isCtl = () => S.ctl === Net.myId;
@@ -473,6 +473,26 @@ export const Space = (() => {
       for (const sc of su.scans) { sc.age.fill(-1e9); sc.plots = []; sc.cons = []; sc.pend = []; sc.col = -1; }
       for (const t of su.trks) Radar.drop(t);
       su.fus = []; su.fusHist.clear(); su.fusKF.clear(); su.fusSeen.clear(); su.fusIds.clear(); su.ass = []; su.assHold.clear(); su.fusT = -1; su.init = false;
+    }
+  }
+  // What the pilot's shown comes from her sensors, not from knowing: a ship of the zone's is a waypoint only once her radars hold a
+  // contact that answers to its name (the mission's ship's place is known from the mission itself); everything else her radars
+  // hold in 3D is a track point (trkMarks: where, what it is to her, its colour), one on a waypoint already shown left out
+  const TCOL: Record<string, string> = { HOSTILE: '#ff4a3a', SUSPECT: '#ffa040', WATCH: '#ffe070', NEUTRAL: '#a8b8c4', CIV: '#7f9fb0', FRIENDLY: '#70f090' };
+  function ewMarks() {
+    const su = EW.own, names = new Set<string>(); S.trkMarks = [];
+    if (su) for (const sc of su.scans) for (const c of sc.cons) if (c.hits >= 2 && c.iff) names.add(c.iff.n);
+    for (const w of S.wps) if (/^t\d+$/.test(w.id) && w.id !== 't0') w.unseen = !names.has(w.name);
+    if (S.wps[S.tgt] && S.wps[S.tgt].unseen) { const j = S.wps.findIndex((w) => !w.hide && !w.unseen && w.kind === 'anchor'); if (j >= 0) S.tgt = j; }
+    if (!su) return;
+    for (const a of su.ass) {
+      // (a 3D track where it is; a contact only the bearing scanner holds, at its bearing and range, level with her: its height not known)
+      let p: THREE.Vector3 | null = null, flat = false;
+      if (a.f) p = a.f.pl; else if (a.c && a.plot && su.scans[a.plot.k].ax === 'y') { const sc = su.scans[a.plot.k], dt = S.t - a.c.t; p = Radar.dirOf('y', wrapA(a.c.A + a.c.vA * dt + sc.off), 0).multiplyScalar(a.c.r + a.c.vr * dt).applyQuaternion(S.Q).add(S.P); flat = true; }
+      if (!p) continue;
+      if (S.wps.some((w) => !w.hide && !w.unseen && w.p.distanceTo(p) < Math.max(300, 0.06 * a.r))) continue;
+      const nm = a.iff ? (a.iff.c === 'civ' ? 'CIV ' : a.iff.c === 'navy' ? 'NAVY ' : '') + a.iff.n : '?';
+      S.trkMarks.push({ p: p.clone(), label: `${a.n} ${a.cls} · ${nm}${flat ? ' · height ?' : ''}`, col: TCOL[a.cls] || '#ffffff' });
     }
   }
   // every ship's radar the debug view can show (F8 goes through them): hers, the mission ship's, the zone's ships near enough
@@ -2003,7 +2023,7 @@ export const Space = (() => {
     ftlStep(dt);
     doors(dt);
     turrets(dt);
-    ewStep(dt);
+    ewStep(dt); ewMarks();
     if (!S.docked || S.auto) hideStrays();
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
     const seat = mySeat(), cam = G_R.camera;
@@ -2301,7 +2321,7 @@ export const Space = (() => {
     if (seat.k === 'sensors' && code === 'KeyI') { xpdr(!EW.xpdr); Net.toHost({ t: 'sxpdr', on: EW.xpdr ? 1 : 0 }); return true; } // (her transponder on or off)
     if (seat.k === 'helm') {
       if (code === 'KeyH') { const w = S.wps[S.tgt]; if (isCtl() && !S.docked && !S.ftl && !S.warp && w && !w.hide && w.kind !== 'anchor') { S.match = S.match === w.id ? null : w.id; Audio.click(); } return true; } // (her speed matched with her target's, or no longer)
-      if (code === 'KeyT') { if (S.warp) return true; if (isCtl() && warpGo()) return true; S.spin = 0; for (let k = 1; k <= S.wps.length; k++) { const j = (S.tgt + k) % S.wps.length; if (!S.wps[j].hide) { S.tgt = j; break; } } return true; }
+      if (code === 'KeyT') { if (S.warp) return true; if (isCtl() && warpGo()) return true; S.spin = 0; for (let k = 1; k <= S.wps.length; k++) { const j = (S.tgt + k) % S.wps.length; if (!S.wps[j].hide && !S.wps[j].unseen) { S.tgt = j; break; } } return true; }
     }
     return ['KeyC', 'KeyV', 'KeyX', 'KeyT', 'KeyG', 'KeyQ', 'KeyE', 'KeyR', 'KeyB', 'KeyZ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyH', 'KeyN', 'KeyY'].includes(code);
   }
