@@ -104,6 +104,7 @@ export const Game = {
   locked: false,
   escHeld: false, escAt: -1e9, lockAt: -1e9, lockOnEscUp: false, pauseAt: -1e9, // (Esc down now, when it last went down, when the mouse was last captured, a capture waiting for Esc to come up: lock; when the pause menu last came up)
   softLocked: false, // (playing on a controller or a touch screen, with no pointer lock to be had: counts as locked; js/gamepad.ts, js/touch.ts)
+  holoCursor: false, // (focused on the sensor station's hologram: the mouse let go to point at it, still counted as locked: js/space.ts holoFocus)
   runStarted: false,
   // the rest of what it keeps, made as it goes (init and the methods below): all here, so its whole shape is in one place. Those marked (init)
   // are always set before anything reads them.
@@ -539,7 +540,7 @@ export const Game = {
     this.$('btnNewRun').onclick = () => { if (Net.isHost) Net.toHost({ t: 'toLobby' }); };
     this.$('btnMenu').onclick = () => this.toMenu();
     this.$('clickToPlay').onclick = () => this.lock();
-    G_R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked)) this.lock(); });
+    G_R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked) && !this.holoCursor) this.lock(); });
 
     document.addEventListener('pointerlockchange', () => this.lockChanged());
     // Esc, held and let go: a menu shut with it takes the mouse back once it's up (lock), not while the browser's still treating the
