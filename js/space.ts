@@ -81,7 +81,7 @@ export const Space = (() => {
   // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
-  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, zi: 4 } };
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, fO: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, zi: 4 } };
   const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000];
   // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the number keys' presses (when each went
   // down, whether a hold's acted), and a sector changed by the keys not yet told to the crew (dirty)
@@ -301,7 +301,7 @@ export const Space = (() => {
   // screen's UI put away, and the mouse let go (still counted as captured: js/game.ts holoCursor, softLocked) to point at it
   // with its own cursor; out, all of it back and the mouse captured again
   function holoFocus(on: boolean) {
-    const H = EW.holo; if (H.focus === on) return; H.focus = on; G_R.focusBlur = on; H.fT = on ? S.t : -1; G_R.focusAmt = 0;
+    const H = EW.holo; if (H.focus === on) return; H.focus = on; H.fT = on ? S.t : -1; H.fO = on ? -1 : S.t; if (on) { G_R.focusBlur = true; G_R.focusAmt = 0; } // (out: the blur fades away (fO), not gone at once)
     if (!H.inputOn) { H.inputOn = true;
       window.addEventListener('mousemove', (e) => { if (!H.focus) return; H.mx = e.clientX; H.my = e.clientY; if (H.mr) { H.dx += e.movementX; H.dy += e.movementY; } });
       window.addEventListener('mousedown', (e) => { if (!H.focus) return; if (e.button === 0) H.ml = true; if (e.button === 2) H.mr = true; });
@@ -504,7 +504,7 @@ export const Space = (() => {
 
   // ------------------------------------------------------------------ coming and going
   function leave() {
-    holoFocus(false);
+    holoFocus(false); G_R.focusBlur = false; EW.holo.fO = -1;
     RadarView.update(null, false, [], [], '', 0); RadarView.holo(null, null, new T.Vector3(), 0, new T.Quaternion(), 0, false, null); for (const c of EW.chaff) c.pts.removeFromParent(); EW.chaff = [];
     if (!S.on && !S.model) return;
     if (S.on && S.kind === 'board' && S.tclose && S.zone) {
@@ -2033,7 +2033,8 @@ export const Space = (() => {
     outside();
     sensorStep(); // (after the view's placed: where the operator's looking is where the camera is now)
     ewCam();
-    { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); G_R.focusAmt = e; // (going in: the world blurring out and the hologram opening, over 0.6 s)
+    { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); if (H.focus) G_R.focusAmt = e;
+      if (!H.focus && H.fO >= 0) { const o = (S.t - H.fO) / 0.3; if (o >= 1 || !seat) { G_R.focusBlur = false; H.fO = -1; } else G_R.focusAmt = 1 - o; } // (out: the blur fading away) // (going in: the world blurring out and the hologram opening, over 0.6 s)
       const lift = H.focus ? 0.2 * e : 0; // (focused: up from below the eyes to just under the middle of the view)
       RadarView.holo(S.model ? S.model.group : null, EW.own, H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, S.t, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1, HOLO_ZOOM[H.zi], rwrNow(), secView()); }
     RadarView.update(S.root, Radar.show, ewList(), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', S.t, G_R.camera, Radar.sel);
