@@ -82,7 +82,7 @@ What the board offers goes by how far the squad has got: transports and corvette
 - **Her complement** (`G.SpaceSv.crew`, by `G.SpaceData.SIZES`): those who don't fight; light guards posted singly; security
   squads of four, armed and armoured, their chief with the first; breach response squads of three, lighter, who come to
   where the hull is breached (the comms jammer stops them being called).
-- **Her weapons** (`HULLGUN`, js/space.ts guns): her point defence is miniguns (six-barrelled rotary guns: bursts of 1 to 1.8 s at 30 rounds a second inside 1 km, the barrels
+- **Her weapons** (`HULLGUN`, js/space.ts guns): her point defence is miniguns (six-barrelled rotary guns: bursts of 2.5 to 4 s at 3,000 rounds a minute inside 1 km, 1.5 mrad of their own inaccuracy, the barrels
   spinning while they fire); missiles (6.5 km: they home, a hard turn across the nose shakes one, a turret can shoot one
   down, 24 a hit). Guns fire only on a radar lock, leading where the track has her going. Every round is a real one
   (`rounds`): fired at 1,000 to 1,100 m/s, it flies, and hits only if it really passes within her size. A round that has

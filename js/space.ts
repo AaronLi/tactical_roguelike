@@ -1801,10 +1801,12 @@ export const Space = (() => {
   // a round off one of her guns (in the level's frame): along the aim, spread by the gun and by the track's own error
   const RGEO = (() => { const g = new T.CylinderGeometry(0.18, 0.18, 1, 4, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 0.5); return g; })();
   const RMAT = new T.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.95, depthWrite: false, blending: T.AdditiveBlending });
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
   function fireRound(from: THREE.Vector3, aim: THREE.Vector3, H: { speed: number; spread: number; dmg: number; life: number }, err: number) {
     if (!S.root) return;
-    const spread = H.spread + err * 0.5, d = aim.clone().normalize();
-    d.add(new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(spread * 2)).normalize();
+    const spread = H.spread + err * 0.5, d = aim.clone().normalize(), e1 = new T.Vector3(0, 1, 0).cross(d), e2 = new T.Vector3();
+    if (e1.lengthSq() < 1e-6) e1.set(1, 0, 0); e1.normalize(); e2.crossVectors(d, e1);
+    d.addScaledVector(e1, gauss() * spread).addScaledVector(e2, gauss() * spread).normalize(); // (normal each way square to the aim)
     const m = new T.Mesh(RGEO, RMAT); m.frustumCulled = false; m.position.copy(from); m.lookAt(from.clone().sub(d)); m.scale.set(1, 1, 22); S.root.add(m); // (the streak trails behind it: its tail toward the gun)
     S.rounds.push({ m, p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life });
   }
