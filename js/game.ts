@@ -853,6 +853,7 @@ export const Game = {
 
   // ------------------------------------------------------------- messages
   onMsg(m: any) { // (m: straight off the wire, so as dynamic as the host's word: its kind is checked, below)
+    if (m && m.L != null && m.L !== Space.levelK()) return; // (another level's: someone else's, aboard another of the zone's ships, docs/zone-levels.md)
     switch (m.t as GmMsgKind) {
       case 'welcome':
         Stickers.joined(m.skins); // (the stickers on the squad's guns: js/stickers.ts)

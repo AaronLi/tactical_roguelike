@@ -115,11 +115,15 @@ export const ServerHost = {
   },
 
   // ---------------------------------------------------------------- the simulation's word, out (SvNet)
+  // (each message from a level says which (L: js/server.ts curK), but for the space side's and the run's, everyone's)
+  tag(m: any) { if (m && typeof m === 'object' && m.L === undefined && !Server.GLOBAL_T.has(m.t)) m.L = Server.curK(); return m; },
   broadcast(m: any, exceptId?: string | null) {
+    this.tag(m);
     if (exceptId !== this.id && this.cli) this.post(this.cli, m);
     for (const id of this.remotes) if (id !== exceptId) { this.post(this.ctl!, { k: 'bc', m, x: exceptId == null ? null : exceptId }); break; }
   },
   sendTo(id: string, m: any) {
+    this.tag(m);
     if (id === this.id) { if (this.cli) this.post(this.cli, m); }
     else if (this.remotes.has(id)) this.post(this.ctl!, { k: 'to', id, m });
   },

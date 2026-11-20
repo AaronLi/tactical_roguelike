@@ -122,10 +122,33 @@ export const Server = {
     'nadeT', 'noiseT', 'teamT', 'live', 'windT', 'windSend', 'clock', 'report', 'evidence', 'loot', 'bodies', 'glassBroken',
     'glassCracked', 'holes', 'fallen', 'wcase', 'caseOpen', 'cabs', 'abox', 'sbox', 'unitsSeen', 'kickAt', 'aiProp', 'bores', 'team', 'topId',
     'proxies', 'pirFlow', 'civT', 'liftT'] as const,
+  // The other levels live beside the one loaded (ctxs: by the zone ship each is; the loaded one's own is SpaceSv's active), each
+  // stepped in its turn (update), and the messages of whoever's aboard one handled with it loaded (handle). While one's loaded,
+  // the players are only those aboard it (lvOf: a player's level, the loaded one's if not set), so its crew sees no one from
+  // another, in another's frame. What's sent while it's loaded says which it is (L: js/serverhost.ts broadcast), but for what's
+  // everyone's (GLOBAL_T: the space side, the run's).
+  ctxs: new Map<number, LvCtx>(),
+  allPlayers: null as Map<string, Player> | null,
+  GLOBAL_T: new Set(['seats', 'mdone', 'fleet', 'sdock', 'sxpdr', 'strk', 'ssec', 'srcue', 'spose', 'smis', 'shit', 'shatch', 'sfire', 'schaff', 'sboom', 'newrun', 'chat', 'phase', 'board', 'ship', 'lobby', 'hello', 'welcome', 'join', 'left', 'ready', 'route', 'shop', 'prof', 'skins', 'stickers']),
+  curK() { return SpaceSv.ctxSave().active; },
+  lvOf(p: Player) { return (p as any).lv == null ? this.curK() : (p as any).lv; },
+  // (the players aboard the loaded level only, while fn runs)
+  scoped(fn: () => void) {
+    if (this.allPlayers) { fn(); return; }
+    const all = this.players, k = this.curK(), mine = new Map<string, Player>(); for (const [id, p] of all) if (this.lvOf(p) === k) mine.set(id, p);
+    this.allPlayers = all; this.players = mine; try { fn(); } finally { this.players = all; this.allPlayers = null; }
+  },
+  // fn with level k loaded (and its players), then the one that was loaded back
+  inCtx(k: number, fn: () => void) {
+    if (k === this.curK()) { this.scoped(fn); return; }
+    const c = this.ctxs.get(k); if (!c) return;
+    const home = this.ctxSave(); this.ctxLoad(c);
+    try { this.scoped(fn); } finally { this.ctxs.set(k, this.ctxSave()); this.ctxLoad(home); }
+  },
   ctxSave(): LvCtx { const sv: Record<string, unknown> = {}, me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) sv[k] = me[k]; return { sv, sp: SpaceSv.ctxSave() }; },
   ctxLoad(c: LvCtx) { const me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) me[k] = c.sv[k]; SpaceSv.ctxLoad(c.sp); },
   reset() {
-    this.players.clear(); this.enemies.clear();
+    this.players.clear(); this.enemies.clear(); this.ctxs.clear(); this.allPlayers = null;
     this.phase = 'lobby'; this.level = 0; this.map = null; this.leaving = null;
   },
   roster() {
@@ -136,7 +159,8 @@ export const Server = {
   sendRoster() { SvNet.broadcast({ t: 'roster', roster: this.roster() }); },
 
   handle(m: NetMsg, from: string) {
-    const p = this.players.get(from);
+    { const q = (this.allPlayers || this.players).get(from); if (!this.allPlayers && q && this.lvOf(q) !== this.curK() && this.ctxs.has(this.lvOf(q))) { this.inCtx(this.lvOf(q), () => this.handle(m, from)); return; } } // (someone aboard another level: theirs loaded)
+    const p = this.players.get(from) || (this.allPlayers ? this.allPlayers.get(from) : undefined); // (whoever sent it, even while their level isn't the one loaded)
     switch (m.t) {
       case 'hello': {
         const name = String(m.name || 'Operator').slice(0, 16);
@@ -149,7 +173,7 @@ export const Server = {
         if (!animal) animal = (CS.LIST.find((a) => !taken.has(a.id)) || CS.of(prefs[0] || CS.LIST[0].id)).id;
         const color = CS.of(animal).color;
         // anon: signed in to the cloud saves as a guest (js/cloud.ts; optional: an older client sends nothing, and shows nothing)
-        this.players.set(from, { id: from, name, color, animal, look: Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });
+        (this.allPlayers || this.players).set(from, { id: from, name, color, animal, look: Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });
         SvNet.sendTo(from, {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
           sp: !SpaceData.ON ? undefined : this.phase === 'shop' ? SpaceSv.shopMsg() : this.phase === 'level' ? SpaceSv.levelMsg() : undefined, // (the game in space: js/spaceserver.ts)
@@ -417,7 +441,7 @@ export const Server = {
   onLeave(id: string) {
     const p = this.players.get(id);
     if (!p) return;
-    this.players.delete(id);
+    this.players.delete(id); if (this.allPlayers) this.allPlayers.delete(id); // (and from the whole squad, a level being stepped or not)
     SvNet.broadcast({ t: 'left', id });
     SvNet.broadcast({ t: 'chat', id: null, m: p.name + ' left the squad.' });
     this.sendRoster();
@@ -1825,6 +1849,11 @@ export const Server = {
   },
   update(dt: number) {
     if (this.phase === 'shop') return this.updateHub(dt);
+    if (!this.allPlayers) { // (each level stepped, the loaded one first, with only its own players)
+      this.scoped(() => this.update(dt));
+      for (const k of [...this.ctxs.keys()]) this.inCtx(k, () => { const c = this.ctxs; this.ctxs = new Map(); try { this.update(dt); } finally { this.ctxs = c; } });
+      return;
+    }
     if (this.phase !== 'level' || !this.map) return;
     this.clock = (this.clock || 0) + dt;
     SpaceSv.tick(dt);
