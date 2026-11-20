@@ -625,6 +625,11 @@ export const SpaceSv = (() => {
     const sv = S();
     if (sv.phase === 'shop') { st.ship.docked = on; if (on) { st.ship.at = null; landed(); } net().broadcast({ t: 'sdock', on: on ? 1 : 0, by: from }); return; }
     const M = st.M; if (!M || sv.phase !== 'level' || M.docked === on || M.boom) return;
+    if (!on && M.docked && M.site && sv.map) { // (nobody living left behind in the hull she's against: everyone's aboard her first, or dead. Those down still count)
+      const W = sv.map.W, TS = Level.TS, a = M.site, d = SD.SHIPS[st.fleet.ship], b = SD.berthAt(d, { x: (a[0] % W + 0.5) * TS, z: (((a[0] / W) | 0) + 0.5) * TS, nx: a[1], nz: a[2], ang: a[3] || 0, pt: a[4] || 0 } as any), k = sv.curK();
+      const left = [...(sv.allPlayers || sv.players).values()].filter((q: any) => q.st && q.st.p && !q.st.dd && (sv.lvOf(q) !== k || !SD.aboard(d, b, q.st.p[0], q.st.p[1] || 0, q.st.p[2]))).map((q: any) => q.name || q.id);
+      if (left.length) { net().sendTo(from, { t: 'sdock', on: 1, by: '', no: left }); return; }
+    }
     // against her hull: at the site the pilot's game says she hit (any clear stretch of it), cut through there if it isn't already
     let site: ShSite | null = null;
     if (on && M.meta && sv.map) {

@@ -378,7 +378,7 @@ export const Space = (() => {
     const H = EW.holo, it = H.pick; if (!EW.own || !it) return false;
     const pick = TRKK.sel >= 0 ? EW.own.trks[TRKK.sel] : null;
     if (it.rwr) {
-      const d = (it.rwr as THREE.Vector3).clone().applyQuaternion(S.Q), far = S.P.clone().addScaledVector(d.clone().normalize(), 3000), tr = pick || EW.own.trks.find((t) => !t.off && Radar.canSee(EW.own!, t, far)) || null;
+      const d = (it.rwr as THREE.Vector3).clone().applyQuaternion(S.Q), far = S.P.clone().addScaledVector(d.clone().normalize(), 3000), tr = pick;
       if (!tr) return false; const ti = EW.own.trks.indexOf(tr);
       if (tr.off) trkOff(ti, false);
       if (!Radar.canSee(EW.own, tr, far)) { HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), "can't see that way: her hull's in the way", 1.4); Audio.deny(); return true; }
@@ -418,7 +418,7 @@ export const Space = (() => {
         const st = H.cur.style; st.width = st.height = (2 * H.cr) + 'px'; st.transform = `translate(${H.cx - H.cr - 2}px, ${H.cy - H.cr - 2}px)`;
         st.borderColor = w ? (H.pick.col || '#ffffff') : 'rgba(140,230,255,0.95)'; st.borderWidth = w ? '2.5px' : '2px';
       }
-      if (H.ml && !EW.l && !trkSend() && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); Net.toHost({ t: 'srcue', a }); Audio.click(); }
+      if (H.ml && !EW.l) trkSend(); // (only with a tracker picked, 3 or 4: no picking one for you)
       EW.l = H.ml; EW.r = H.mr; return;
     }
     if (!H.placed && S.model && H.sat >= 0 && S.t - H.sat > 0.25) { // (put where its operator has it: centred in front of the seat, just below their eyes; once, the view settled at the seat)
@@ -435,7 +435,7 @@ export const Space = (() => {
       m.yaw = H.y0; m.pitch = H.p0; // (the view held still)
     } else if (EW.r && !H.moved && S.t - H.rAt < 0.3) { ewCue([-1]); Net.toHost({ t: 'srcue', a: [-1] }); Audio.click(); }
     _ray.setFromCamera(new T.Vector2(0, 0), G_R.camera); H.pick = RadarView.holoPick(_ray.ray, G_R.camera);
-    if (m.mouse.l && !EW.l && !trkSend() && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); /* (the contact itself: a 3D track it's part of is used) */ Net.toHost({ t: 'srcue', a }); Audio.click(); }
+    if (m.mouse.l && !EW.l) trkSend();
     EW.l = m.mouse.l; EW.r = m.mouse.r;
   }
   // the debug view's cameras (F8 the second and third time): behind and above her, and off to the side of both ships, looking at their middle
@@ -1483,7 +1483,7 @@ export const Space = (() => {
   // everyone who's on their feet is aboard (nobody's left behind when she goes)
   function crewAboard() {
     const out: string[] = [];
-    for (const pv of Views.players.values()) { const st = pv.st; if (pv.id === Net.myId || !st || st.dd || st.dn) continue; if (!aboardAt(st.p[0], st.p[1], st.p[2])) out.push(pv.name); }
+    for (const pv of Views.players.values()) { const st = pv.st; if (pv.id === Net.myId || !st || st.dd) continue; /* (down still counts: only the dead are left) */ if (!aboardAt(st.p[0], st.p[1], st.p[2])) out.push(pv.name); }
     if (!aboard() && !me().dead) out.push('you');
     return out;
   }
@@ -2373,6 +2373,7 @@ export const Space = (() => {
       case 'spose': heardPose(m.a); S.ctl = m.by; return true;
       case 'shatch': if (!S.hatchOpen) { S.hatchOpen = true; syncSolids(); hatchSound(true); } if (m.by !== Net.myId) HUD.feed(`<b>${U.esc(Game.nameOf(m.by))}</b> opened the breach door`); return true;
       case 'sdock':
+        if (m.no) { if (S.on && !S.docked) { S.auto = null; dockLocal(true); S.P.copy(S.Dp); S.Q.copy(S.Dq); } HUD.toast('NOT YET', 'Not aboard: ' + (m.no as string[]).map((n) => U.esc(String(n))).join(', '), 2); Audio.deny(); return true; } // (the host's word: someone living's still in the hull)
         if (S.on && m.on && m.site && S.kind === 'board') { if (m.by !== Net.myId) rebase(berthAt(siteAt(m.site))); cutHere(m.site); }
         if (S.on && S.kind === 'board' && S.map && S.map.sp) ShipGen.seal(S.map, m.on ? m.site || null : null); // (the holes she isn't against: shut)
         if (S.on && m.by !== Net.myId) { S.auto = null; dockLocal(!!m.on); if (!m.on) { S.P.copy(S.Dp); S.Q.copy(S.Dq); } }

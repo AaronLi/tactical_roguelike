@@ -44,7 +44,7 @@ off: the game is then the route map and the helicopter, as it was. A debug start
    breaching door opens, but her inner door, at the tunnel's far end just inside it, shuts with every breach: it stays shut,
    for the whole squad, till someone presses its button on the left wall at the top of the stairs (F; its lamp goes from red
    to green). A camera on its far side shows what's out there on screens on the cover either side of the tunnel's mouth
-   and beside the button. Then it's the CQB game. Hold G at the helm to undock: the compartment she backs out of
+   and beside the button. Then it's the CQB game. Hold G at the helm to undock, once everyone living is back aboard (down counts; the host refuses otherwise, js/spaceserver.ts dock): the compartment she backs out of
    is open to space. She can go in again somewhere else.
 6. **A planet.** She arrives in orbit. Fly into the descent corridor: cloud covers the change, and she comes out above the
    base. Within 160 m of the pad, under 45 m/s, hold L to set down. To leave, lift off and climb past 1500 m.
@@ -237,16 +237,16 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     click on a radar warning's chevron sends it (or, none picked, the one that can see that way) along that bearing: a spiral
     round it with its range gate open, locking the strongest return at whatever range (`cueRay`). Not at an empty place:
     a tracker goes after something it's been told of. Somewhere it can't see (the other side of her hull) it says so. Held, it's switched off
-    (silent: it lets go and takes no cue) or on again. Everyone aboard gets it (`strk`). With none picked, a left click on a
-    track sends whichever tracker can see it.
+    (silent: it lets go and takes no cue) or on again. Everyone aboard gets it (`strk`). With none picked, a left click does
+    nothing: a tracker's only sent once it's picked.
   - **Range:** rings in her plane at a quarter, half and all of the range shown, each named; the wheel zooms the range at the
     edge through 0.5, 1, 2.5, 5 and 10 km (anything further sits at the edge).
   - **Sitting down goes straight into it** (`holoFocus`): the world blurs out by degrees (js/render.ts focusBlur, focusAmt)
     and the hologram rises out of the console and opens (0.6 s) to just under the middle of the view, the view eased onto
     it. The rest of the screen's UI is put away, and the mouse is let go (still counted as captured: js/game.ts holoCursor,
     softLocked) to work its own cursor: a small ring where the mouse is, which slides onto a track under it and opens into a
-    halo round it in the track's colour, the track named over it. A left click cues a tracker on it (`srcue` to everyone
-    aboard); dragging with the right button turns the hologram; a tap of the right button drops the trackers.
+    halo round it in the track's colour, the track named over it. A left click sends the picked tracker on it (3 or 4
+    first); dragging with the right button turns the hologram; a tap of the right button drops the trackers.
   - **Out:** getting up (hold F), or Esc (the pause menu); holding **G** looks round the room (the hologram stays, below
     the eyes; the middle of the view points at a track, the right button held turns it); let go, back in. The deck
     plan the deck scanner gives is behind **M**.
