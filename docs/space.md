@@ -225,6 +225,13 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     whose box is open, fainter while it's not searching it yet; that radar's fan bright and pulsing, the other's dim. Everyone aboard gets it (`ssec`). A sector's revisit is there
     and back across it (`perOf`); a peak at its edge is compared only with the fresh columns beside it, and one seen again at
     once (its edge crossed there and back) is taken for the same contact.
+  - **Tracking radars** (js/space.ts trkOff, trkSend; js/radar.ts cueOne, cueAt): **3** the port tracker, **4** the starboard,
+    each a box in the corner (OFF, IDLE, SLEW, SEARCH, LOCK and the track it's on). Tapped, it's picked to be sent (tapped
+    again, not): its beam bright in the hologram, and a left click sends it on the track under the cursor (tracking it), or,
+    on nothing, to search where the cursor points in the hologram (its way from her, and by how far out from the middle, its
+    range: a spiral search there). Somewhere it can't see (the other side of her hull) it says so. Held, it's switched off
+    (silent: it lets go and takes no cue) or on again. Everyone aboard gets it (`strk`). With none picked, a left click on a
+    track sends whichever tracker can see it.
   - **Range:** rings in her plane at a quarter, half and all of the range shown, each named; the wheel zooms the range at the
     edge through 0.5, 1, 2.5, 5 and 10 km (anything further sits at the edge).
   - **Sitting down goes straight into it** (`holoFocus`): the world blurs out by degrees (js/render.ts focusBlur, focusAmt)
@@ -233,8 +240,8 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     softLocked) to work its own cursor: a small ring where the mouse is, which slides onto a track under it and opens into a
     halo round it in the track's colour, the track named over it. A left click cues a tracker on it (`srcue` to everyone
     aboard); dragging with the right button turns the hologram; a tap of the right button drops the trackers.
-  - **Out:** getting up (hold F), or Esc (the pause menu); holding **G** steps out to look round the room (the hologram
-    stays, below the eyes; the middle of the view points at a track, the right button held turns it) and back in. The deck
+  - **Out:** getting up (hold F), or Esc (the pause menu); holding **G** looks round the room (the hologram stays, below
+    the eyes; the middle of the view points at a track, the right button held turns it); let go, back in. The deck
     plan the deck scanner gives is behind **M**.
 - **F8** shows a ship's radars, each tap the next ship's: the squad's (from where you are), the mission ship's, then the
   zone's ships within 12 km, nearest first (each has its own radars there: scanners, trackers and a transponder, but a

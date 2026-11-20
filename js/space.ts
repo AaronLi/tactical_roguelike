@@ -85,6 +85,8 @@ export const Space = (() => {
   const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000];
   // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the number keys' presses (when each went
   // down, whether a hold's acted), and a sector changed by the keys not yet told to the crew (dirty)
+  // the tracking radars' keys: 3 the port tracker, 4 the starboard (their index in her set: TKEY), which is picked to be sent (sel)
+  const TRKK = { sel: -1, dn: [-1, -1], held: [false, false] }, TKEY = [1, 0];
   const SEC = { sel: -1, open: -1, cur: 0, dn: [-1, -1], held: [false, false], lt: 0, dirty: -1, sent: 0 }; // (the range at the hologram's edge, scrolled through)
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
@@ -95,7 +97,10 @@ export const Space = (() => {
       const g = S.model.group; g.updateMatrixWorld(true);
       const inv = g.matrixWorld.clone().invert(), box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
       const sz = box.getSize(new T.Vector3()), size = Math.max(4, sz.z / 2);
-      EW.own = Radar.suite('own', size, box.max.y, Math.max(box.max.x, -box.min.x), box.min.y); for (const sc of EW.own.scans) sc.mode = 'off'; // (her search radars off till the sensor operator switches them on: she's silent)
+      const was = EW.own; EW.own = Radar.suite('own', size, box.max.y, Math.max(box.max.x, -box.min.x), box.min.y);
+      // (her search radars as the operator left them, her drawing made again or not (a new level): off at first, she's silent till switched on)
+      EW.own.scans.forEach((sc, k) => { const o = was && was.scans[k]; sc.mode = o ? o.mode : 'off'; if (o) { sc.sec.on = o.sec.on; sc.sec.c = o.sec.c; sc.sec.h = o.sec.h; } });
+      EW.own.trks.forEach((t, k) => { const o = was && was.trks[k]; t.off = !!(o && o.off); });
       EW.ownT = { id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('ship:' + S.def.id, g, inv) };
       EW.scr = null; g.traverse((o: any) => { if (!EW.scr && o.isMesh && o.material && o.material.map === S.model!.screen.tex) EW.scr = o; }); { const sm = EW.scr as THREE.Mesh | null; if (sm) (sm.material as THREE.Material).side = T.DoubleSide; } // (its face is the one toward the operator, whichever way the model wound it)
       // (the sensor station's hologram where its screen was, the screen put away: its middle over the screen's, as big as it)
@@ -334,6 +339,13 @@ export const Space = (() => {
   //   turn it (to port and starboard; for the roll scanner, round her the one way and the other), as it searches if it is
   function scanKeys() {
     const dt = Math.min(0.1, Math.max(0, S.t - SEC.lt)); SEC.lt = S.t; if (!EW.own) return;
+    // (3 and 4, the trackers: tapped, picked to be sent where a left click says (tapped again, not); held, switched off, or on again)
+    ['Digit3', 'Digit4'].forEach((code, j) => {
+      const ti = TKEY[j], tr = EW.own!.trks[ti]; if (!tr) return;
+      if (K(code)) { if (TRKK.dn[j] < 0) { TRKK.dn[j] = S.t; TRKK.held[j] = false; }
+        if (!TRKK.held[j] && S.t - TRKK.dn[j] > 0.4) { TRKK.held[j] = true; trkOff(ti, !tr.off); } }
+      else if (TRKK.dn[j] >= 0) { if (!TRKK.held[j]) { TRKK.sel = TRKK.sel === ti ? -1 : ti; Audio.click(); } TRKK.dn[j] = -1; }
+    });
     ['Digit1', 'Digit2'].forEach((code, k) => {
       const sc = EW.own!.scans[k]; if (!sc) return;
       if (K(code)) { if (SEC.dn[k] < 0) { SEC.dn[k] = S.t; SEC.held[k] = false; }
@@ -351,13 +363,32 @@ export const Space = (() => {
     // (the crew told of a sector the keys have changed: five times a second at most)
     if (SEC.dirty >= 0 && S.t - SEC.sent > 0.2) { const sc = EW.own.scans[SEC.dirty]; Net.toHost({ t: 'ssec', a: [SEC.dirty, MODES.indexOf(sc.mode), Math.round(sc.sec.c * 1000) / 1000, Math.round(sc.sec.h * 1000) / 1000] }); SEC.sent = S.t; SEC.dirty = -1; }
   }
+  // a tracker switched off (silent: it lets go of what it had and takes no cue) or on (told to everyone aboard: strk)
+  function trkOff(ti: number, off: boolean, quiet = false) {
+    const tr = EW.own && EW.own.trks[ti]; if (!tr) return;
+    if (off) Radar.drop(tr); tr.off = off;
+    if (!quiet) { Net.toHost({ t: 'strk', a: [ti, 0, off ? 1 : 0] }); Audio.click(); HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), off ? 'off' : 'on', 1.2); }
+  }
+  // the picked tracker sent by a left click: on the track under the cursor, or (on nothing) to search where the cursor points in
+  // the hologram (its way from her and, by how far out from the middle, its range)
+  function trkSend(ray: THREE.Ray) {
+    const ti = TRKK.sel, tr = EW.own && EW.own.trks[ti], H = EW.holo; if (!tr || !EW.own) return false;
+    if (tr.off) trkOff(ti, false);
+    const cant = () => { HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), "can't see there: her hull's in the way", 1.4); Audio.deny(); return true; };
+    if (H.pick && H.pick.plot) { const p = H.pick.plot, w0 = RadarView.holoWorld(H.pick), f = EW.own.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p));
+      const at = f ? f.pl : (() => { const sc = EW.own!.scans[p.k]; return Radar.dirOf(sc.ax, p.phi, 0).applyQuaternion(p.q || S.Q).multiplyScalar(p.r).add(p.o || S.P); })(); void w0;
+      if (!Radar.canSee(EW.own, tr, at)) return cant(); Radar.cueOne(EW.own, tr, p); Net.toHost({ t: 'strk', a: [ti, 2, p.k, p.phi, p.r] }); Audio.click(); return true; }
+    const v = RadarView.holoPoint(ray, HOLO_ZOOM[H.zi]); if (!v) return false;
+    const w = v.applyQuaternion(S.Q).add(S.P); if (!Radar.canSee(EW.own, tr, w)) return cant(); Radar.cueAt(EW.own, tr, w, S.t); Net.toHost({ t: 'strk', a: [ti, 1, Math.round(w.x), Math.round(w.y), Math.round(w.z)] }); Audio.click(); return true;
+  }
   const wrapA = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   function sensorStep() {
     const seat = mySeat(), m = me(), H = EW.holo; EW.cu = null;
-    if (seat && seat.k === 'sensors' && EW.own && !Game.menuOpen()) scanKeys(); else { SEC.sel = -1; SEC.open = -1; }
+    if (seat && seat.k === 'sensors' && EW.own && !Game.menuOpen()) scanKeys(); else { SEC.sel = -1; SEC.open = -1; TRKK.sel = -1; }
     if (!seat || seat.k !== 'sensors' || !EW.own || Game.menuOpen()) { EW.l = EW.r = false; H.pick = null; if (H.focus && (!seat || seat.k !== 'sensors')) holoFocus(false); return; }
     // (held G: into the hologram (the room blurred behind it) or back out)
-    if (K('KeyG')) { if (!H.gT) H.gT = S.t; if (S.t - H.gT > 0.35 && !H.gDone) { H.gDone = true; holoFocus(!H.focus); Audio.click(); } } else { H.gT = 0; H.gDone = false; }
+    // (G held: out of the hologram to look round the room; let go, back in)
+    if (K('KeyG')) { if (H.focus) holoFocus(false); H.gDone = true; } else if (H.gDone) { H.gDone = false; holoFocus(true); }
     if (H.focus) { // (focused: the mouse's own cursor points at it, the right button held and dragged turns it)
       if (!Game.locked) { holoFocus(false); return; } // (Esc: the pause menu)
       { // (the view eased onto it: the mouse is the cursor's now, not the head's)
@@ -378,7 +409,7 @@ export const Space = (() => {
         const st = H.cur.style; st.width = st.height = (2 * H.cr) + 'px'; st.transform = `translate(${H.cx - H.cr - 2}px, ${H.cy - H.cr - 2}px)`;
         st.borderColor = w ? (H.pick.col || '#ffffff') : 'rgba(140,230,255,0.95)'; st.borderWidth = w ? '2.5px' : '2px';
       }
-      if (H.ml && !EW.l && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); Net.toHost({ t: 'srcue', a }); Audio.click(); }
+      if (H.ml && !EW.l && !(TRKK.sel >= 0 && trkSend(_ray.ray)) && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); Net.toHost({ t: 'srcue', a }); Audio.click(); }
       EW.l = H.ml; EW.r = H.mr; return;
     }
     if (!H.placed && S.model && H.sat >= 0 && S.t - H.sat > 0.25) { // (put where its operator has it: centred in front of the seat, just below their eyes; once, the view settled at the seat)
@@ -395,7 +426,7 @@ export const Space = (() => {
       m.yaw = H.y0; m.pitch = H.p0; // (the view held still)
     } else if (EW.r && !H.moved && S.t - H.rAt < 0.3) { ewCue([-1]); Net.toHost({ t: 'srcue', a: [-1] }); Audio.click(); }
     _ray.setFromCamera(new T.Vector2(0, 0), G_R.camera); H.pick = RadarView.holoPick(_ray.ray, G_R.camera);
-    if (m.mouse.l && !EW.l && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); /* (the contact itself: a 3D track it's part of is used) */ Net.toHost({ t: 'srcue', a }); Audio.click(); }
+    if (m.mouse.l && !EW.l && !(TRKK.sel >= 0 && trkSend(_ray.ray)) && H.pick && H.pick.plot) { const p = H.pick.plot, a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); /* (the contact itself: a 3D track it's part of is used) */ Net.toHost({ t: 'srcue', a }); Audio.click(); }
     EW.l = m.mouse.l; EW.r = m.mouse.r;
   }
   // the debug view's cameras (F8 the second and third time): behind and above her, and off to the side of both ships, looking at their middle
@@ -409,11 +440,11 @@ export const Space = (() => {
   }
   // the sectors for the hologram: each scanner's searching one, and the one the keys are setting (selected)
   function secView() {
-    if (!EW.own) return { secs: [] as { k: number; c: number; h: number; on: boolean; sel: boolean }[], boxes: [] as { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[] };
+    if (!EW.own) return { secs: [] as { k: number; c: number; h: number; on: boolean; sel: boolean }[], boxes: [] as { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[], trkSel: -1 };
     const secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[] = [];
     EW.own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k || (SEC.open === k && MODES[SEC.cur] === 'sector')) secs.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k || SEC.open === k }); }); // (searching a sector, or picked, or about to: its sector shown)
     const boxes = EW.own.scans.map((sc, k) => ({ mode: sc.mode, open: SEC.open === k, cur: SEC.open === k ? SEC.cur : MODES.indexOf(sc.mode), opts: MODES.map((m) => MODE_NAME[m]), sel: SEC.sel === k }));
-    return { secs, boxes };
+    return { secs, boxes, trkSel: TRKK.sel };
   }
   // her warning receiver's picture: each radar on her and the way to it (in her frame), and what it's doing: a tracker locked on
   // her, one sweeping for her, a scanner's beam going over her (a moment ago)
@@ -2319,6 +2350,8 @@ export const Space = (() => {
       case 'smis': if (S.on && m.by !== Net.myId) missile(m.a); return true;
       case 'srcue': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) ewCue(m.a); return true;
       case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && m.a.length === 4) modeSet(m.a[0] | 0, MODES[m.a[1] | 0] || 'round', +m.a[2], +m.a[3], true); return true;
+      case 'strk': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && EW.own) { const ti = m.a[0] | 0, tr = EW.own.trks[ti]; if (tr) { // (the sensor operator's tracker commands: js/space.ts trkOff, trkSend)
+        if (m.a[1] === 0) trkOff(ti, !!m.a[2], true); else if (m.a[1] === 1) Radar.cueAt(EW.own, tr, new T.Vector3(+m.a[2], +m.a[3], +m.a[4]), S.t); else Radar.cueOne(EW.own, tr, { k: m.a[2] | 0, phi: +m.a[3], r: +m.a[4], t: S.t, db: 0, id: '', e: 0 }); } } return true;
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
       case 'sfire': if (S.on && m.by !== Net.myId && S.root) tracer(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true;

@@ -452,14 +452,14 @@ export const RadarView = (() => {
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
-  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [], sv: { secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[]; boxes: { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[] } = { secs: [], boxes: [] }) {
+  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [], sv: { secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[]; boxes: { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[]; trkSel: number } = { secs: [], boxes: [], trkSel: -1 }) {
     const secs = sv.secs;
     if (!parent || !su) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.style.display = 'none'; holoG.scanUi.style.display = 'none'; } return; }
     if (!holoG || holoG.R !== R) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.remove(); } holoMake(parent, R); }
     const H = holoG!; if (H.g.parent !== parent) parent.add(H.g);
     H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
-    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag right: turn · scroll: zoom · tap right: drop the trackers · 1 / 2: a scanner for W A S D (held: its modes) · hold G: the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
+    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag right: turn · scroll: zoom · tap right: drop the trackers · 1 / 2: a scanner for W A S D (held: its modes) · 3 / 4: a tracker to send (held: off / on) · hold G: look round the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / zoom)) * R / L : 0); }; // (beyond the range shown: at its edge)
     if (H.zoom !== zoom) { H.zoom = zoom; [0.25, 0.5, 1].forEach((f, i) => { const g0 = H.rings[i], rr = Math.sqrt(f) * R, km = zoom * f / 1000; g0.l.scale.setScalar(rr); g0.s.position.set(rr + R * 0.1, R * [-0.07, 0.07, 0][i], 0); /* (at her starboard side of each, the inner two staggered up and down: not over each other) */
@@ -471,7 +471,8 @@ export const RadarView = (() => {
       const l = H.beams[i], st = H.strips[i], en = H.ends[i]; if (!l) return;
       const on = tr.st !== 'idle', len = on && tr.rng > 0 ? Math.sqrt(Math.min(1, tr.rng / zoom)) * R : R;
       // (its beam: along its axis as it is this instant, the conical scan's circling and all, out to its range gate)
-      l.visible = on; l.quaternion.setFromUnitVectors(Z, tr.st === 'track' ? tr.a : tr.b); l.scale.setScalar(len); (l.material as THREE.LineBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040);
+      const picked = sv.trkSel === i; // (the one picked to be sent: shown, idle or not, bright and pulsing)
+      l.visible = (on || picked) && !tr.off; l.quaternion.setFromUnitVectors(Z, tr.st === 'track' ? tr.a : tr.b); l.scale.setScalar(on ? len : R * 0.6); (l.material as THREE.LineBasicMaterial).color.setHex(picked ? 0xffffff : tr.st === 'track' ? 0xff4030 : 0xffb040); (l.material as THREE.LineBasicMaterial).opacity = picked ? 0.7 + 0.3 * Math.sin(now * 6) : 0.9;
       en.visible = on && tr.rng > 0; en.position.copy(tr.st === 'track' ? tr.a : tr.b).multiplyScalar(len); en.quaternion.copy(faceCam); (en.material as THREE.MeshBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040);
       // (sweeping: the strip it's searching along, the arc its cue's on)
       st.visible = (tr.st === 'slew' || tr.st === 'acq') && !!tr.cue;
@@ -513,6 +514,12 @@ export const RadarView = (() => {
         if (b.open) h += b.opts.map((o, i) => `<div style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:11px">tap ${k + 1}: next · hold ${k + 1}: set</div>`;
         if (b.sel) h += `<div style="color:#fff;font-size:11px">W S: width · A D: direction</div>`;
         return h + '</div>';
+      }).join('<br>') + '<br>' + [1, 0].map((ti, j) => { // (and the tracking radars': 3 port, 4 starboard)
+        const tr = su.trks[ti]; if (!tr) return ''; const sel = sv.trkSel === ti, f = su.fus.find((q) => q.trk === tr);
+        const st = tr.off ? 'OFF' : tr.st === 'track' ? 'LOCK' + (f ? ' on ' + f.n : '') : tr.st === 'acq' ? 'SEARCH' : tr.st === 'slew' ? 'SLEW' : 'IDLE';
+        const col = tr.off ? '#5f6f78' : tr.st === 'track' ? '#ff6050' : tr.st === 'idle' ? '#9fc2d4' : '#ffb040';
+        return `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:4px 8px;border:1px solid ${sel ? '#ffb040' : 'rgba(120,180,210,0.35)'};background:rgba(4,12,18,0.55);border-radius:3px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <b style="float:right;color:${col}">${st}</b>`
+          + (sel ? `<div style="color:#fff;font-size:11px">left click: a track to track it, or a place to search · hold ${j + 3}: ${tr.off ? 'on' : 'off'}</div>` : '') + '</div>';
       }).join('<br>');
       if (H.scanUi.innerHTML !== html) H.scanUi.innerHTML = html;
     }
@@ -579,7 +586,15 @@ export const RadarView = (() => {
     for (const it of holoG.items) { w.copy(it.pos).applyMatrix4(holoG.inner.matrixWorld).sub(ray.origin); const a = w.angleTo(ray.direction); if (a < bd) { bd = a; best = it; } }
     return best;
   }
+  // where in her space the cursor's ray points, through the hologram (the point on it nearest the middle; no further out than its
+  // edge): its way from her and its range (its distance out from the middle, squared, times the range shown), in her frame
+  function holoPoint(ray: THREE.Ray, zoom: number) {
+    if (!holoG) return null; holoG.inner.updateWorldMatrix(true, false);
+    const c = new T.Vector3().setFromMatrixPosition(holoG.inner.matrixWorld), t = c.clone().sub(ray.origin).dot(ray.direction), p = ray.origin.clone().addScaledVector(ray.direction, t);
+    const local = holoG.inner.worldToLocal(p), L = local.length(); if (L < 1e-6) return null;
+    const f = Math.min(1, L / holoG.R); return local.normalize().multiplyScalar(f * f * zoom);
+  }
   // where an item of the hologram is in the world (for the operator's cursor's halo round it)
   function holoWorld(it: HoloItem) { if (!holoG) return null; holoG.inner.updateWorldMatrix(true, false); return it.pos.clone().applyMatrix4(holoG.inner.matrixWorld); }
-  return { update, scope, pick, holo, holoPick, holoWorld };
+  return { update, scope, pick, holo, holoPick, holoWorld, holoPoint };
 })();
