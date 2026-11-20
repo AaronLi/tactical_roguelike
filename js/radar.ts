@@ -19,10 +19,11 @@
 // Everything here is in the level's frame (the ship the mission's on is the level: js/space.ts), a ship's own frame being her
 // group's (forward -z, up +y, starboard +x).
 export interface RcsTable { s: Float32Array; max: number; mean: number }
-export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number } // (iso: a return the same every way, m2: a chaff cloud's)
-export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3 } // (q, o: how she was turned and where she was when it was made)
+export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number; iff?: RIff | null } // (iso: a return the same every way, m2: a chaff cloud's, a missile's; iff: what its transponder answers an interrogation with, or nothing)
+export interface RIff { c: 'civ' | 'squad' | 'tgt'; n: string } // (a civilian's, the squad's ship's, the mission's ship's; and the name it gives)
+export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3; iff?: RIff | null } // (q, o: how she was turned and where she was when it was made)
 export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her frame: 'y' her up (yaw), 'x' her beam (pitch), 'z' her length (roll))
-export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot } // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
+export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null } // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
 export interface RScan {
   ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number;
   map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
@@ -157,18 +158,18 @@ export const Radar = (() => {
   // Each peak's a PLOT, and plots are followed from sweep to sweep as CONTACTS (associate): a plot near where a contact is expected
   // (its last place plus its rates) is that contact's; one that isn't starts a new one ('A' and a number on the 'y' map, 'B' on the
   // 'z' map); a contact not seen for two sweeps is dropped.
-  const DA = TAU / MAP.na, AGS = 4 * Math.LN2 / (SCAN.bw * SCAN.bw), _cd = new T.Vector3(), _ref = new T.Vector3();
+  const IFF_R = 12000, DA = TAU / MAP.na, AGS = 4 * Math.LN2 / (SCAN.bw * SCAN.bw), _cd = new T.Vector3(), _ref = new T.Vector3();
   const wrapPi = (a: number) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
   function scanStep(su: RSuite, sc: RScan, k: number, dt: number, targets: RTarget[], now: number) {
     // (her turning about its axis since the last step: where its nose (turn 0) was, as she is now)
     angOf(sc.ax, _ref.copy(dirOf(sc.ax, 0, 0, _cd)).applyQuaternion(su.Qp).applyQuaternion(_qi.copy(su.Q).invert())); sc.off = wrap(sc.off + angOf(sc.ax, _ref)[0]);
     // what's out there for it this frame: each target's turn angle, how far along the fan, range and signal (or hidden)
-    const seen: { phi: number; e: number; R: number; s: number; id: string }[] = [];
+    const seen: { phi: number; e: number; R: number; s: number; id: string; iff: RIff | null }[] = [];
     for (const t of targets) {
       if (t.id === su.id) continue;
       const { R, sig } = look(su, sc.at, t, _cd), [phi, e] = angOf(sc.ax, _cd);
       if (Math.abs(e) > sc.fan || _cd.dot(sc.n) < -sc.mask || R > MAP.nr * MAP.dr) continue;
-      seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2) / 10), id: t.id });
+      seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2) / 10), id: t.id, iff: t.iff || null });
     }
     const th0 = sc.th; sc.th = wrap(sc.th + sc.rate * dt);
     // the columns its middle crossed this frame (in her angle), each written where it goes on the map
@@ -188,7 +189,7 @@ export const Radar = (() => {
     const keep = TAU / sc.rate * 1.05; sc.plots = sc.plots.filter((p) => now - p.t < keep);
     sc.cons = sc.cons.filter((c) => now - c.t < keep * 2.1);
   }
-  function cfar(su: RSuite, sc: RScan, k: number, c: number, seen: { phi: number; R: number; id: string }[], now: number) {
+  function cfar(su: RSuite, sc: RScan, k: number, c: number, seen: { phi: number; R: number; id: string; iff: RIff | null }[], now: number) {
     const m = sc.map, NR = MAP.nr, per = TAU / sc.rate, cs = [-2, -1, 1, 2].map((o) => (c + o + MAP.na) % MAP.na), cl = cs[1], cr = cs[2];
     for (const q of cs) if (now - sc.age[q] > per * 0.6) return; // (a neighbour from the sweep before: not comparable)
     const b = c * NR, bl = cl * NR, br = cr * NR;
@@ -202,8 +203,10 @@ export const Radar = (() => {
       const w0 = m[b + i - 1], w2 = m[b + i + 1], R = ((i - 1 + 0.5) * w0 + (i + 0.5) * v + (i + 1.5) * w2) / (w0 + v + w2) * MAP.dr;
       const A = (c + 0.5 + dc) * DA, phi = wrap(A + sc.off), db = 10 * Math.log10(v / z);
       // (which target it really was, if any: for the debug view only, nothing uses it to decide anything)
-      let id = '', bd = 1e9; for (const q of seen) { const dd = Math.abs(wrapPi(q.phi - phi)) / sc.bw + Math.abs(q.R - R) / (MAP.dr * 3); if (dd < 2 && dd < bd) { bd = dd; id = q.id; } }
-      const p: RPlot = { k, phi, r: R, t: now, db, id, e: 0, q: su.Q.clone(), o: su.P.clone() };
+      let id = '', iff: RIff | null = null, bd = 1e9; for (const q of seen) { const dd = Math.abs(wrapPi(q.phi - phi)) / sc.bw + Math.abs(q.R - R) / (MAP.dr * 3); if (dd < 2 && dd < bd) { bd = dd; id = q.id; iff = q.iff; } }
+      // (IFF: the interrogator, on the scanner's beam, asks whatever's at that peak; a transponder there answers with its class and
+      // name, out to IFF_R. Chaff, a missile, a ship running silent: no answer)
+      const p: RPlot = { k, phi, r: R, t: now, db, id, e: 0, q: su.Q.clone(), o: su.P.clone(), iff: R < IFF_R ? iff : null };
       sc.plots.push(p); associate(sc, p, A, now);
     }
   }
@@ -214,10 +217,10 @@ export const Radar = (() => {
       const dA = Math.abs(wrapPi(A - (c.A + c.vA * dt))), dr = Math.abs(p.r - (c.r + c.vr * dt)), gA = Math.max(4 * D2R, Math.atan2((c.hits > 2 ? 80 : 250) * dt, Math.max(50, p.r))), gr = Math.max(120, 0.04 * p.r) + (c.hits > 2 ? 80 : 250) * dt; // (as far as a ship could have gone across or along since, at 250 m/s: less once its rates are known)
       if (dA > gA || dr > gr) continue; const d = dA / gA + dr / gr; if (d < bd) { bd = d; best = c; }
     }
-    if (!best) { sc.cons.push({ n: sc.tag + (++sc.nid), A, r: p.r, vA: 0, vr: 0, t: now, hits: 1, p }); return; }
+    if (!best) { sc.cons.push({ n: sc.tag + (++sc.nid), A, r: p.r, vA: 0, vr: 0, t: now, hits: 1, p, iff: p.iff }); return; }
     const dt = now - best.t, eA = wrapPi(A - (best.A + best.vA * dt)), er = p.r - (best.r + best.vr * dt);
     best.A = wrap(best.A + best.vA * dt + 0.6 * eA); best.r = best.r + best.vr * dt + 0.6 * er;
-    best.vA += 0.3 * eA / dt; best.vr += 0.3 * er / dt; best.t = now; best.hits++; best.p = p;
+    best.vA += 0.3 * eA / dt; best.vr += 0.3 * er / dt; best.t = now; best.hits++; best.p = p; best.iff = p.iff || null; // (each sweep's answer: a transponder switched off is unknown from then on)
   }
   // A tracker knows how its own ship moves (her gyros and her navigation): before it looks, its boresight is turned to undo her
   // rotation since the last step (held still in space, not in her frame), and to stay on the point it was on (at the range in its

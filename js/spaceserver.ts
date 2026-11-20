@@ -864,6 +864,7 @@ export const SpaceSv = (() => {
       case 'spose': if (p && (st.ship.ctl === from || !st.ship.ctl || !sv.players.has(st.ship.ctl)) && Array.isArray(m.a) && m.a.length <= 16 && m.a.every(Number.isFinite)) { st.ship.ctl = from; st.ship.pose = m.a; net().broadcast({ t: 'spose', a: m.a, by: from }, from); } break;
       case 'smis': if (p && Array.isArray(m.a) && m.a.length <= 8 && m.a.every(Number.isFinite)) net().broadcast({ t: 'smis', a: m.a, by: from }, from); break; // (a missile off her hull, or one shot down: told to all)
       case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) net().broadcast({ t: 'sfire', a: m.a, by: from }, from); break;
+      case 'sxpdr': if (p) net().broadcast({ t: 'sxpdr', on: m.on ? 1 : 0, by: from }, from); break; // (her transponder switched: js/space.ts xpdr)
       case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) net().broadcast({ t: 'schaff', a: m.a, by: from }, from); break; // (chaff thrown out of her: js/space.ts chaffGo)
       case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) net().broadcast({ t: 'srcue', a: m.a, by: from }, from); break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
       case 'shit': if (p && Number.isFinite(m.i)) net().broadcast({ t: 'shit', i: m.i | 0, hp: +m.hp || 0, by: from }, from); break; // (a hull gun hit by a turret, or the ship by one: told to all)

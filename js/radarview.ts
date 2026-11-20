@@ -9,7 +9,7 @@
 //   - the sensor station's screen (scope): the 'y' scanner's picture from above (her nose up), the 'z' scanner's from astern
 //     (round her length, her up at the top), the plots fading as the sweep comes round again; the trackers' state under them; a cursor where
 //     the operator is looking (js/space.ts sensorLook), and the plot it's on ringed: clicking cues a tracker on it.
-import { Radar, RSuite, RTarget, RPlot, RScan } from './radar.js';
+import { Radar, RSuite, RTarget, RPlot, RScan, RContact } from './radar.js';
 
 export const RadarView = (() => {
   const T = THREE, D2R = Math.PI / 180, TAU = Math.PI * 2;
@@ -161,6 +161,9 @@ export const RadarView = (() => {
     return best;
   }
   const conOf = (su: RSuite, p: RPlot) => su.scans[p.k].cons.find((c) => c.p === p);
+  // a contact as its IFF answer has it: the mission's ship red, a civilian grey-blue, the squad's own ship green, no answer amber
+  const iffCol = (c: RContact) => (!c.iff ? '255,200,90' : c.iff.c === 'tgt' ? '255,90,70' : c.iff.c === 'civ' ? '140,170,190' : '110,240,140');
+  const iffTxt = (c: RContact) => (!c.iff ? c.n + ' ?' : c.n + ' ' + (c.iff.c === 'tgt' ? 'TGT ' : c.iff.c === 'civ' ? 'CIV ' : '') + c.iff.n);
   // The map drawn: each pixel of a scope is an angle and a range (worked out once a layout: lut), looked up on the map where that
   // angle is now (the map's held still about its axis: off), its brightness the power there in dB over the noise, dimmer the longer
   // since the sweep wrote it (a PPI's afterglow)
@@ -197,8 +200,8 @@ export const RadarView = (() => {
       const [x, y] = polar(cx, cy, sc.ax, sc.th, L.R); c.strokeStyle = 'rgba(120,230,255,0.8)'; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
       // its contacts: a box and its number on each peak it's following
       for (const ct of shown(sc, now)) {
-        const [px, py] = plotXY(su, ct.p, W, H), fresh = Math.max(0.35, 1 - (now - ct.t) * sc.rate / TAU);
-        c.strokeStyle = `rgba(255,236,150,${fresh})`; c.strokeRect(px - 4 * k, py - 4 * k, 8 * k, 8 * k); c.fillStyle = `rgba(255,236,150,${fresh})`; c.fillText(ct.n, px + 6 * k, py - 6 * k);
+        const [px, py] = plotXY(su, ct.p, W, H), fresh = Math.max(0.35, 1 - (now - ct.t) * sc.rate / TAU), col = iffCol(ct);
+        c.strokeStyle = `rgba(${col},${fresh})`; c.strokeRect(px - 4 * k, py - 4 * k, 8 * k, 8 * k); c.fillStyle = `rgba(${col},${fresh})`; c.fillText(ct.iff && ct.iff.c === 'civ' ? ct.n : iffTxt(ct), px + 6 * k, py - 6 * k);
       }
       // the trackers' boresights on it: a tick at the scope's edge, and a box where a track has her
       su.trks.forEach((tr) => {
@@ -220,7 +223,7 @@ export const RadarView = (() => {
     // the cursor, and the contact under it
     if (cu) {
       const p = pick(su, cu, W, H, now);
-      if (p) { const [x, y] = plotXY(su, p, W, H), ct = conOf(su, p); c.strokeStyle = '#ffffff'; c.beginPath(); c.arc(x, y, 9 * k, 0, TAU); c.stroke(); c.fillStyle = '#ffffff'; c.fillText(`${ct ? ct.n + '  ' : ''}${(p.r / 1000).toFixed(2)} km  ${Math.round(p.db)} dB  click: track`, Math.min(x + 12 * k, W - 190 * k), y + 12 * k); }
+      if (p) { const [x, y] = plotXY(su, p, W, H), ct = conOf(su, p); c.strokeStyle = '#ffffff'; c.beginPath(); c.arc(x, y, 9 * k, 0, TAU); c.stroke(); c.fillStyle = '#ffffff'; c.fillText(`${ct ? iffTxt(ct) + '  ' : ''}${(p.r / 1000).toFixed(2)} km  ${Math.round(p.db)} dB  click: track`, Math.min(x + 12 * k, W - 230 * k), y + 12 * k); }
       c.strokeStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.moveTo(cu[0] - 9 * k, cu[1]); c.lineTo(cu[0] - 3 * k, cu[1]); c.moveTo(cu[0] + 3 * k, cu[1]); c.lineTo(cu[0] + 9 * k, cu[1]); c.moveTo(cu[0], cu[1] - 9 * k); c.lineTo(cu[0], cu[1] - 3 * k); c.moveTo(cu[0], cu[1] + 3 * k); c.lineTo(cu[0], cu[1] + 9 * k); c.stroke();
     }
   }
@@ -252,7 +255,7 @@ export const RadarView = (() => {
       const sx = (((wrapPi(sc.th) / TAU) + 0.5) * MW); c.strokeStyle = 'rgba(120,230,255,0.7)'; c.beginPath(); c.moveTo(x0 + sx, y0); c.lineTo(x0 + sx, y0 + MH); c.stroke();
       for (const ct of shown(sc, now)) {
         const ph = phiNow(su, ct.p), x = x0 + ((wrapPi(ph) / TAU) + 0.5) * MW, y = y0 + Math.sqrt(Math.min(1, ct.p.r / RMAX)) * MH;
-        c.strokeStyle = '#ffec96'; c.beginPath(); c.arc(x, y, 5, 0, TAU); c.stroke(); c.fillStyle = '#ffec96'; c.fillText(ct.n + (ct.p.id ? ' ' + ct.p.id : ''), x + 6, y - 4);
+        c.strokeStyle = `rgb(${iffCol(ct)})`; c.beginPath(); c.arc(x, y, 5, 0, TAU); c.stroke(); c.fillStyle = `rgb(${iffCol(ct)})`; c.fillText(iffTxt(ct) + (ct.p.id ? ' [' + ct.p.id + ']' : ''), x + 6, y - 4);
       }
     }));
     return mapCv;

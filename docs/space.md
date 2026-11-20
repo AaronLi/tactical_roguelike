@@ -161,6 +161,13 @@ A ship knows where another ship is only from what her radars tell her. Every shi
   Plots are followed from sweep to sweep as numbered contacts (`associate`; A on the bearing map, B on the roll map), and a
   tracker is cued on a contact's latest plot. The sensor screen draws the maps as PPIs, range as its square root, with the
   contacts boxed; the F8 panel shows each ship's maps as angle by range.
+- **IFF.** Each peak's interrogated (out to 12 km) and a transponder there answers with its class and name: the zone's
+  traffic as civilians, the mission ship as herself, the squad's ship as the squad's own while its transponder's on (I at
+  the sensor station; off, she runs silent and is an unknown). Chaff and missiles don't answer. On the sensor screen the
+  mission ship's contact is red (TGT and her name), civilians grey-blue, unknowns amber. A hostile's fire control cues on the
+  nearest contact that doesn't answer as a civilian, and moves to a much nearer one when it appears.
+- **What has a return:** the squad's ship, the mission ship, the zone's ships in view (each from its own drawing), chaff,
+  and missiles in flight (0.5 m²). Not yet: stations, anchors, the planet, rounds.
 - **A tracker gets everything in its beam and range gate** (`beam`): the conical scan steers to their power-weighted middle,
   and the gate follows their power-weighted range.
 - **Chaff** (V at the helm or the sensor station, 12 loads; `chaffGo`). A cloud keeps the ship's velocity plus 22 m/s. Its

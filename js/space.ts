@@ -21,7 +21,7 @@ import { Career } from './career.js';
 import { Net } from './net.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
-import { Radar, RSuite, RTarget, RPlot } from './radar.js';
+import { Radar, RSuite, RTarget, RPlot, RIff } from './radar.js';
 import { RadarView } from './radarview.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
@@ -81,7 +81,7 @@ export const Space = (() => {
   // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
-  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0 };
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: true, misT: new Map<number, RTarget>() };
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -108,9 +108,9 @@ export const Space = (() => {
         EW.foeT = { id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
       }
     }
-    const own = EW.own!, me = EW.ownT!; own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
+    const own = EW.own!, me = EW.ownT!; me.iff = EW.xpdr ? { c: 'squad', n: S.def.name || 'squad' } : null; if (EW.foeT) EW.foeT.iff = hullIff(); own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
     if (S.docked || S.ftl || S.warp) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (against a hull, or between: nothing to look at)
-    chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...trafficTargets(dt), ...EW.chaff.map((c) => c.t)];
+    chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt)];
     Radar.step(own, dt, tg, S.t);
     if (EW.foe) {
       Radar.step(EW.foe, dt, tg, S.t);
@@ -120,9 +120,9 @@ export const Space = (() => {
       const manned = !!(S.state && S.state.gn && S.state.arm == null && !S.state.boom);
       if (!manned) { for (const t of EW.foe.trks) if (t.st !== 'idle') Radar.drop(t); }
       else {
-        // (she doesn't know which contact is what: the nearest one her scanners hold (seen twice or more), just painted, is the
-        // threat. Cued when her trackers are free, or when one comes in much nearer than what she's tracking)
-        let p = null as null | RPlot; for (const sc of EW.foe.scans) for (const c of sc.cons) if (c.hits >= 2 && S.t - c.p.t < 0.3 && (!p || c.p.r < p.r)) p = c.p;
+        // (she doesn't know which contact is what but for its transponder's answer: the nearest one her scanners hold (seen twice or
+        // more), just painted, that doesn't answer as a civilian, is the threat. Cued when her trackers are free, or when one comes in much nearer than what she's tracking)
+        let p = null as null | RPlot; for (const sc of EW.foe.scans) for (const c of sc.cons) if (c.hits >= 2 && S.t - c.p.t < 0.3 && (!c.iff || c.iff.c !== 'civ') && (!p || c.p.r < p.r)) p = c.p; // (not a civilian: one that answers as one is let be)
         const busy = EW.foe.trks.filter((t) => t.st !== 'idle'), held = Math.min(...busy.map((t) => (t.st === 'track' ? t.rng : 1e9)));
         if (p && (!busy.length || (busy.every((t) => t.st === 'track') && p.r < held * 0.6 - 200))) { for (const t of EW.foe.trks) Radar.drop(t); Radar.cue(EW.foe, p); }
       }
@@ -204,6 +204,9 @@ export const Space = (() => {
       pa.needsUpdate = true; (c.pts.material as THREE.PointsMaterial).opacity = 0.25 + 0.7 * k * (0.6 + 0.4 * Math.random());
     }
   }
+  // her transponder: on, it answers every interrogation with the squad's ship's name (she's known for what she is); off, she's a
+  // contact nobody can name (an unknown: a hostile treats it as a threat as it would her)
+  function xpdr(on: boolean) { EW.xpdr = on; HUD.toast('TRANSPONDER', on ? 'On: she answers interrogation' : 'Off: she runs silent', 1.4); Audio.click(); }
   function chaffGo() {
     if (!S.model || S.docked || S.ftl || S.warp) return;
     if (EW.chaffLeft <= 0) { HUD.toast('CHAFF', 'None left', 1.2); Audio.deny(); return; }
@@ -212,6 +215,19 @@ export const Space = (() => {
     const p = S.P.clone().addScaledVector(up, 2).addScaledVector(back, 3), v = S.V.clone().addScaledVector(up.multiplyScalar(0.6).add(back.multiplyScalar(0.8)).add(side).normalize(), CHAFF.v);
     const a = [p.x, p.y, p.z, v.x, v.y, v.z].map((x) => Math.round(x * 100) / 100); chaffOut(a); Net.toHost({ t: 'schaff', a });
     HUD.toast('CHAFF', EW.chaffLeft + ' left', 1); Audio.click();
+  }
+  // the mission ship's transponder: her name, as the mission's ship (the squad's screen marks her; her own fire control knows itself)
+  function hullIff(): RIff { const q = S.traffic.find((x) => x.c.k === S.zact), ms = S.ms as any; return { c: 'tgt', n: (q && q.c.name) || (ms && ms.name) || 'target' }; }
+  // her missiles in flight, as radar targets: small (half a square metre every way), no transponder
+  function missileTargets(dt: number) {
+    const out: RTarget[] = [], live = new Set<number>();
+    for (const m of S.mis) {
+      live.add(m.id); let t = EW.misT.get(m.id);
+      if (!t) { t = { id: 'missile' + m.id, p: m.o.position.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0.5, iff: null }; EW.misT.set(m.id, t); }
+      if (dt > 0) t.v.copy(m.o.position).sub(t.p).divideScalar(dt); t.p.copy(m.o.position); out.push(t);
+    }
+    for (const k of [...EW.misT.keys()]) if (!live.has(k)) EW.misT.delete(k);
+    return out;
   }
   // the zone's other ships, as radar targets: each where she is in the level's frame, how fast she's going, and her return (from
   // her own drawing: the stand-in far off, her real hull once she's drawn as herself)
@@ -233,7 +249,7 @@ export const Space = (() => {
       }
       _m.decompose(_ps, t.q, _sc);
       if (!(t as any).fresh && dt > 0) t.v.copy(_ps).sub(t.p).divideScalar(dt); (t as any).fresh = false;
-      t.p.copy(_ps); out.push(t);
+      t.p.copy(_ps); t.iff = { c: q.c.k === 0 ? 'tgt' : 'civ', n: q.c.name || 'unnamed' }; out.push(t);
     }
     for (const o of [...EW.trf.keys()]) if (!live.has(o)) EW.trf.delete(o);
     return out;
@@ -2073,6 +2089,7 @@ export const Space = (() => {
     const seat = mySeat(); if (!seat) return false;
     if (seat.k === 'sensors' && code === 'KeyM') { EW.plan = !EW.plan; Audio.click(); return true; }
     if ((seat.k === 'sensors' || seat.k === 'helm') && code === 'KeyV') { chaffGo(); return true; } // (chaff: js/space.ts chaffGo)
+    if (seat.k === 'sensors' && code === 'KeyI') { xpdr(!EW.xpdr); Net.toHost({ t: 'sxpdr', on: EW.xpdr ? 1 : 0 }); return true; } // (her transponder on or off)
     if (seat.k === 'helm') {
       if (code === 'KeyH') { const w = S.wps[S.tgt]; if (isCtl() && !S.docked && !S.ftl && !S.warp && w && !w.hide && w.kind !== 'anchor') { S.match = S.match === w.id ? null : w.id; Audio.click(); } return true; } // (her speed matched with her target's, or no longer)
       if (code === 'KeyT') { if (S.warp) return true; if (isCtl() && warpGo()) return true; S.spin = 0; for (let k = 1; k <= S.wps.length; k++) { const j = (S.tgt + k) % S.wps.length; if (!S.wps[j].hide) { S.tgt = j; break; } } return true; }
@@ -2130,6 +2147,7 @@ export const Space = (() => {
       }
       case 'smis': if (S.on && m.by !== Net.myId) missile(m.a); return true;
       case 'srcue': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) ewCue(m.a); return true;
+      case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
       case 'sfire': if (S.on && m.by !== Net.myId && S.root) tracer(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true;
       case 'shit': if (m.i >= 0) gunHit(m.i, m.hp); else if (!isCtl()) S.hp = m.hp; return true;
