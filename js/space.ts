@@ -1807,7 +1807,7 @@ export const Space = (() => {
     const spread = H.spread + err * 0.5, d = aim.clone().normalize(), e1 = new T.Vector3(0, 1, 0).cross(d), e2 = new T.Vector3();
     if (e1.lengthSq() < 1e-6) e1.set(1, 0, 0); e1.normalize(); e2.crossVectors(d, e1);
     d.addScaledVector(e1, gauss() * spread).addScaledVector(e2, gauss() * spread).normalize(); // (normal each way square to the aim)
-    const m = new T.Mesh(RGEO, RMAT); m.frustumCulled = false; m.position.copy(from); m.lookAt(from.clone().sub(d)); m.scale.set(1, 1, 22); S.root.add(m); // (the streak trails behind it: its tail toward the gun)
+    const m = new T.Mesh(RGEO, RMAT); m.frustumCulled = false; m.position.copy(from); m.lookAt(from.clone().sub(d)); m.scale.set(1, 1, 6); S.root.add(m); // (the streak trails behind it: its tail toward the gun)
     S.rounds.push({ m, p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life });
   }
   // the rounds in flight: each moves, and hits her if it passes within her size of her middle this step (both moving); one that's
