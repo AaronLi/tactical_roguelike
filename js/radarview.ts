@@ -91,7 +91,7 @@ export const RadarView = (() => {
       const D = su.dbg; D.g.position.copy(su.P); D.g.quaternion.copy(su.Q);
       su.scans.forEach((sc, k) => { D.fans[k].piv.position.copy(sc.at); D.fans[k].ms.forEach((m: THREE.Mesh, i: number) => fanFill(m, sc, sc.th - i * 4 * D2R)); });
       su.trks.forEach((tr, k) => {
-        const o = D.trks[k], len = tr.st === 'track' ? tr.rng : tr.st === 'idle' ? 0 : tr.cue ? tr.cue.r : tr.hand ? tr.hand.p.distanceTo(su.P) : 0;
+        const o = D.trks[k], len = tr.st === 'idle' ? 0 : tr.hand ? tr.hand.p.distanceTo(su.P) : tr.rng; // (acquiring: its range gate where it's looking)
         o.cn.visible = len > 0; o.rg.visible = tr.st === 'track';
         const hue = tr.st === 'track' ? D.P.track : tr.st === 'idle' ? D.P.idle : D.P.acq;
         (o.cn.material as THREE.MeshBasicMaterial).color.setHex(hue); (o.cn.material as THREE.MeshBasicMaterial).opacity = tr.st === 'track' ? 0.16 : 0.1;

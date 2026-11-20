@@ -25,7 +25,7 @@ export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her fr
 export interface RScan { ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
-  cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion } | null; sw: number; best: { db: number; b: THREE.Vector3 }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
+  cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion; o: THREE.Vector3 } | null; sw: number; best: { db: number; b: THREE.Vector3; r: number }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
   tgt: string | null; lockT: number; lost: number; err: number; db: number; rng: number; est: { p: THREE.Vector3 | null; v: THREE.Vector3; q: number };
   hand: { p: THREE.Vector3; v: THREE.Vector3; t: number } | null; // (handed a track by the other tracker: where its solution has the target, slewed to straight)
   dE: THREE.Vector3; dA: number; dP: number; w: THREE.Vector3; // (the conical scan's demodulator over the revolution under way, and the boresight's rate)
@@ -104,7 +104,7 @@ export const Radar = (() => {
       { ax: 'y', th: 0, rate: SCAN.rate, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top + mast, -0.1 * size), n: new T.Vector3(0, 1, 0), mast, mask: over(mast, beam) },
       { ax: 'z', th: Math.PI, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)) },
     ];
-    const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3() }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
+    const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3(), r: 0 }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
     return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false };
   }
   // a way out of the radar along a fan: ax its turning axis, phi how far round it's turned, e how far along the fan (her own frame)
@@ -162,7 +162,16 @@ export const Radar = (() => {
     tr.w.applyQuaternion(_dq); tr.dE.applyQuaternion(_dq); // (the rate and the half-summed error, kept in her frame as it is now)
   }
   // a cued direction (her frame when the plot was made, q) in her frame now
-  const cueDir = (su: RSuite, c: NonNullable<RTrack['cue']>, e: number, out: THREE.Vector3) => dirOf(c.ax, c.phi, e, out).applyQuaternion(c.q).applyQuaternion(_qi.copy(su.Q).invert());
+  // A plot says she's somewhere on an arc: along its scanner's fan (e) at its range, from where that scanner was (c.o, c.q: the
+  // level's frame). A tracker sweeping it looks at those points from its own mount (on her flank, not on the scanner's mast: close
+  // in, the way to each is quite different): the way to the point at e, in her frame now (out), and how far it is (returned: its
+  // range gate there)
+  const _cp = new T.Vector3();
+  function cueDir(su: RSuite, tr: RTrack, c: NonNullable<RTrack['cue']>, e: number, out: THREE.Vector3) {
+    dirOf(c.ax, c.phi, e, _cp).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o);
+    out.copy(_cp).sub(_w.copy(tr.at).applyQuaternion(su.Q).add(su.P)); const R = out.length();
+    out.divideScalar(R || 1).applyQuaternion(_qi.copy(su.Q).invert()); return R;
+  }
   // cue a tracker on a plot: the one whose side it's on, an idle one first
   function cue(su: RSuite, p: RPlot) {
     const sc = su.scans[p.k], d0 = dirOf(sc.ax, p.phi, 0), want = Math.abs(d0.x) > 0.2 ? (d0.x > 0 ? 1 : -1) : 0; // (a fan's middle well off to one side: that side's tracker; near her middle line, both)
@@ -170,8 +179,8 @@ export const Radar = (() => {
     // (a 'y' plot's side is known: its tracker's cued. An 'x' plot's fan runs across her, either side: every tracker not already
     // tracking is cued, each sweeps its own half, and the first to find her keeps it (trackStep drops the others))
     const free = ok.filter((t) => t.st !== 'track'), use = want ? [free.find((t) => t.st === 'idle') || free[0] || ok[0]] : free.length ? free : [ok[0]];
-    const cueOf = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: (p.q || su.Q).clone() };
-    for (const tr of use) { if (!tr) continue; tr.hand = null; tr.st = 'slew'; tr.cue = cueOf; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3() }; tr.tgt = null; tr.lockT = 0; tr.lost = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; }
+    const pq = (p.q || su.Q).clone(), cueOf = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: pq, o: (p.o || su.P).clone().add(sc.at.clone().applyQuaternion(pq)) };
+    for (const tr of use) { if (!tr) continue; tr.hand = null; tr.st = 'slew'; tr.cue = cueOf; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3(), r: p.r }; tr.tgt = null; tr.lockT = 0; tr.lost = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; }
     return use[0] || null;
   }
   const drop = (tr: RTrack) => { tr.hand = null; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.st = 'idle'; tr.cue = null; tr.tgt = null; tr.lockT = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; tr.db = -99; };
@@ -201,12 +210,12 @@ export const Radar = (() => {
     }
     if (tr.st === 'slew' || tr.st === 'acq') {
       const c = tr.cue!, sc = su.scans[c.k];
-      if (tr.st === 'slew') { if (slewTo(tr, cueDir(su, c, -sc.fan, new T.Vector3()), TRK.slew * dt) < 1 * D2R) tr.st = 'acq'; tr.a.copy(tr.b); return; }
+      if (tr.st === 'slew') { const to = new T.Vector3(); tr.rng = cueDir(su, tr, c, -sc.fan, to); if (slewTo(tr, to, TRK.slew * dt) < 1 * D2R) tr.st = 'acq'; tr.a.copy(tr.b); return; }
       // along the fan, its range gate at the plot's range: the strongest return on the way is where she is
-      tr.sw += TRK.acq * dt; cueDir(su, c, Math.min(tr.sw, sc.fan), tr.b); tr.a.copy(tr.b);
-      if (inSide(tr, tr.b)) { const r = beamDb(su, tr, tr.b, targets, c.r); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
+      tr.sw += TRK.acq * dt; const gate = cueDir(su, tr, c, Math.min(tr.sw, sc.fan), tr.b); tr.rng = gate; tr.a.copy(tr.b);
+      if (inSide(tr, tr.b)) { const r = beamDb(su, tr, tr.b, targets, gate); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.r = gate; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
       if (tr.sw >= sc.fan) {
-        if (tr.best.db > THR) { for (const o of su.trks) if (o !== tr && o.cue === c && o.st !== 'track') drop(o); tr.b.copy(tr.best.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = c.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }
+        if (tr.best.db > THR) { for (const o of su.trks) if (o !== tr && o.cue === c && o.st !== 'track') drop(o); tr.b.copy(tr.best.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = tr.best.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }
         else drop(tr);
       }
       return;
@@ -231,7 +240,8 @@ export const Radar = (() => {
     // her going round toward the other side (the overlap where both turrets can see): the other tracker, if it's free, is handed
     // the track, so it's held as she crosses from one half of the sky to the other
     const oth = su.trks.find((o) => o !== tr);
-    if (oth && oth.st === 'idle' && tr.est.p && tr.est.q > 0.3 && tr.b.x * tr.side < 0.05) { drop(oth); oth.st = 'slew'; oth.hand = { p: tr.est.p.clone(), v: tr.est.v.clone(), t: now }; }
+    if (oth && oth.st === 'idle' && tr.est.p && tr.est.q > 0.3 && tr.b.x * tr.side < 0.05 && inSide(oth, _w.copy(tr.est.p).sub(_v.copy(oth.at).applyQuaternion(su.Q).add(su.P)).normalize().applyQuaternion(_qi.copy(su.Q).invert()))) { drop(oth); // (only if she's in its half of the sky, from its own mount)
+      oth.st = 'slew'; oth.hand = { p: tr.est.p.clone(), v: tr.est.v.clone(), t: now }; }
     if (!bd.dir || bd.db < THR - 4 || !inSide(tr, tr.b)) { tr.lost += dt; if (tr.lost > 0.5) drop(tr); return; }
     tr.lost = 0; tr.tgt = bd.id; tr.lockT += dt;
     if (tr.dP >= TAU && tr.dA > 0) {
