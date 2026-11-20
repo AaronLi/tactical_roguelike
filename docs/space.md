@@ -158,12 +158,15 @@ A ship knows where another ship is only from what her radars tell her. Every shi
   held still in space about the scanner's axis while the ship turns. Peaks are found by cell-averaging CFAR (`cfar`): a cell
   biggest within two columns and three bins, standing 24 times over the noise either side of it in range. Each is refined to
   a centroid and becomes a plot. Two ships closer than a beam width and a few bins make one peak; noise rarely makes one.
-  Plots are followed from sweep to sweep as numbered contacts (`associate`; A on the bearing map, B on the roll map), and a
+  Plots are followed from sweep to sweep as numbered contacts (`associate`: the peaks waiting are matched together once the
+  oldest is 60° behind the beam, every peak-contact pair inside the contact's Kalman gate best first, each once; A on the bearing map, B on the roll map), and a
   tracker is cued on a contact's latest plot. The sensor screen draws the maps as PPIs, range as its square root, with the
   contacts boxed; the F8 panel shows each ship's maps as angle by range.
-- **IFF.** Each peak's interrogated (out to 12 km) and a transponder there answers with its class and name: the zone's
-  traffic as civilians, the mission ship as herself, the squad's ship as the squad's own while its transponder's on (I at
-  the sensor station; off, she runs silent and is an unknown). Chaff and missiles don't answer. On the sensor screen the
+- **IFF.** Each peak's interrogated (out to 12 km) and a transponder there answers with its class and name, by whose it is
+  (`answers`; js/space.ts missionAff, kindAff): a civilian's (freighters, cutters, liners) always; a navy's (warships, flying
+  wings) only a navy's interrogation; pirates' (and a ship they've taken) never; the squad's only while its transponder's on
+  (I at the sensor station; off by default: she runs silent). So to the squad, a navy or pirate mission ship is an unknown;
+  it's known for the target only if it answers to the mission's name. Chaff and missiles don't answer. On the sensor screen the
   mission ship's contact is red (TGT and her name), civilians grey-blue, unknowns amber. A hostile's fire control cues on the
   nearest contact that doesn't answer as a civilian, and moves to a much nearer one when it appears.
 - **What has a return:** the squad's ship, the mission ship, the zone's ships in view (each from its own drawing), chaff,

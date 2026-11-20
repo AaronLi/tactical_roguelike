@@ -167,12 +167,12 @@ export const RadarView = (() => {
     return best;
   }
   const conOf = (su: RSuite, p: RPlot) => su.scans[p.k].cons.find((c) => c.p === p);
-  // a contact as its IFF answer has it: the mission's ship red, a civilian grey-blue, the squad's own ship green, no answer amber
-  // (as the ship looking has it (who: her id): to the squad's ship the mission's ship is its target; to the mission's ship the
-  // squad's is the hostile; to a civilian anything that isn't a civilian is just a name)
-  const kind = (c: RContact, who: string) => (!c.iff ? '?' : c.iff.c === 'civ' ? 'civ' : who === 'own' ? (c.iff.c === 'tgt' ? 'tgt' : 'own') : who === 'hull' ? (c.iff.c === 'squad' ? 'tgt' : 'own') : 'named');
-  const iffCol = (c: RContact, who = 'own') => ({ '?': '255,200,90', civ: '140,170,190', tgt: '255,90,70', own: '110,240,140', named: '225,228,236' } as Record<string, string>)[kind(c, who)];
-  const iffTxt = (c: RContact, who = 'own') => { const k0 = kind(c, who); return k0 === '?' ? c.n + ' ?' : c.n + ' ' + (k0 === 'tgt' ? (who === 'hull' ? 'HOSTILE ' : 'TGT ') : k0 === 'civ' ? 'CIV ' : '') + c.iff!.n; };
+  // a contact as its IFF answer has it: hostile red, a civilian grey-blue, its own side green, another name white, no answer amber
+  // (as the ship looking (su) has it: a name she knows as hostile, or the squad's transponder to the mission's ship, is hostile;
+  // her own side's (the squad's own, or a navy's to a navy) friendly; a civilian's; another name; no answer)
+  const kind = (c: RContact, su?: RSuite) => { const f = c.iff; if (!f) return '?'; if (su && su.hostNames && su.hostNames.has(f.n)) return 'tgt'; if (f.c === 'squad') return !su || su.aff === 'squad' ? 'own' : su.id === 'hull' ? 'tgt' : 'named'; if (f.c === 'navy') return su && su.aff === 'navy' ? 'own' : 'named'; return f.c === 'civ' ? 'civ' : 'named'; };
+  const iffCol = (c: RContact, su?: RSuite) => ({ '?': '255,200,90', civ: '140,170,190', tgt: '255,90,70', own: '110,240,140', named: '225,228,236' } as Record<string, string>)[kind(c, su)];
+  const iffTxt = (c: RContact, su?: RSuite) => { const k0 = kind(c, su); return k0 === '?' ? c.n + ' ?' : c.n + ' ' + (k0 === 'tgt' ? (su && su.id === 'hull' ? 'HOSTILE ' : 'TGT ') : k0 === 'civ' ? 'CIV ' : c.iff!.c === 'navy' ? 'NAVY ' : '') + c.iff!.n; };
   // The map drawn: each pixel of a scope is an angle and a range (worked out once a layout: lut), looked up on the map where that
   // angle is now (the map's held still about its axis: off), its brightness the power there in dB over the noise, dimmer the longer
   // since the sweep wrote it (a PPI's afterglow)
@@ -209,8 +209,8 @@ export const RadarView = (() => {
       const [x, y] = polar(cx, cy, sc.ax, sc.th, L.R); c.strokeStyle = 'rgba(120,230,255,0.8)'; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
       // its contacts: a box and its number on each peak it's following
       for (const ct of shown(sc, now)) {
-        const [px, py] = plotXY(su, ct.p, W, H), fresh = Math.max(0.35, 1 - (now - ct.t) * sc.rate / TAU), col = iffCol(ct);
-        c.strokeStyle = `rgba(${col},${fresh})`; c.strokeRect(px - 4 * k, py - 4 * k, 8 * k, 8 * k); c.fillStyle = `rgba(${col},${fresh})`; c.fillText(ct.iff && ct.iff.c === 'civ' ? ct.n : iffTxt(ct), px + 6 * k, py - 6 * k);
+        const [px, py] = plotXY(su, ct.p, W, H), fresh = Math.max(0.35, 1 - (now - ct.t) * sc.rate / TAU), col = iffCol(ct, su);
+        c.strokeStyle = `rgba(${col},${fresh})`; c.strokeRect(px - 4 * k, py - 4 * k, 8 * k, 8 * k); c.fillStyle = `rgba(${col},${fresh})`; c.fillText(ct.iff && ct.iff.c === 'civ' ? ct.n : iffTxt(ct, su), px + 6 * k, py - 6 * k);
       }
       // the trackers' boresights on it: a tick at the scope's edge, and a box where a track has her
       su.trks.forEach((tr) => {
@@ -232,7 +232,7 @@ export const RadarView = (() => {
     // the cursor, and the contact under it
     if (cu) {
       const p = pick(su, cu, W, H, now);
-      if (p) { const [x, y] = plotXY(su, p, W, H), ct = conOf(su, p); c.strokeStyle = '#ffffff'; c.beginPath(); c.arc(x, y, 9 * k, 0, TAU); c.stroke(); c.fillStyle = '#ffffff'; c.fillText(`${ct ? iffTxt(ct) + '  ' : ''}${(p.r / 1000).toFixed(2)} km  ${Math.round(p.db)} dB  click: track`, Math.min(x + 12 * k, W - 230 * k), y + 12 * k); }
+      if (p) { const [x, y] = plotXY(su, p, W, H), ct = conOf(su, p); c.strokeStyle = '#ffffff'; c.beginPath(); c.arc(x, y, 9 * k, 0, TAU); c.stroke(); c.fillStyle = '#ffffff'; c.fillText(`${ct ? iffTxt(ct, su) + '  ' : ''}${(p.r / 1000).toFixed(2)} km  ${Math.round(p.db)} dB  click: track`, Math.min(x + 12 * k, W - 230 * k), y + 12 * k); }
       c.strokeStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.moveTo(cu[0] - 9 * k, cu[1]); c.lineTo(cu[0] - 3 * k, cu[1]); c.moveTo(cu[0] + 3 * k, cu[1]); c.lineTo(cu[0] + 9 * k, cu[1]); c.moveTo(cu[0], cu[1] - 9 * k); c.lineTo(cu[0], cu[1] - 3 * k); c.moveTo(cu[0], cu[1] + 3 * k); c.lineTo(cu[0], cu[1] + 9 * k); c.stroke();
     }
   }
@@ -294,7 +294,7 @@ export const RadarView = (() => {
       for (const p of sc.plots) { if (now - p.t > per) continue; const x = X(1) + xOf(phiNow(su, p)), y = y0 + yOf(p.r); c.strokeStyle = '#ffffff'; c.beginPath(); c.arc(x, y, 4, 0, TAU); c.stroke(); }
       // 3: each contact's plots sweep after sweep, joined
       for (const ct of sc.cons) {
-        const col = ct.hits >= 2 ? iffCol(ct, su.id) : '150,160,170', pts = ct.trail.map((q) => [X(2) + xOf(q.A + sc.off), y0 + yOf(q.r), q.t] as const);
+        const col = ct.hits >= 2 ? iffCol(ct, su) : '150,160,170', pts = ct.trail.map((q) => [X(2) + xOf(q.A + sc.off), y0 + yOf(q.r), q.t] as const);
         c.strokeStyle = `rgba(${col},0.7)`; c.beginPath(); pts.forEach(([x, y], i) => { if (i && Math.abs(x - pts[i - 1][0]) < cw / 2) c.lineTo(x, y); else c.moveTo(x, y); }); c.stroke();
         pts.forEach(([x, y, t], i) => { const a = Math.max(0.25, 1 - (now - t) / (per * 8)); c.fillStyle = `rgba(${col},${a})`; c.beginPath(); c.arc(x, y, i === pts.length - 1 ? 3 : 2, 0, TAU); if (ct.hits >= 2) c.fill(); else { c.strokeStyle = `rgba(${col},${a})`; c.stroke(); } });
         if (ct.hits >= 2) { const [x, y] = pts[pts.length - 1]; c.fillStyle = `rgb(${col})`; c.fillText(ct.n + ' ×' + ct.hits, x + 5, y - 5); }
@@ -352,7 +352,7 @@ export const RadarView = (() => {
     const f = su.fus.find((q) => q.trk === tr), los = tr.est.p ? tr.est.p.clone().sub(su.P).normalize() : null, close = los ? -tr.est.v.dot(los) : 0;
     const iff = f && (f.iff || (f.a && f.a.iff) || (f.b && f.b.iff)), lab = f ? `on ${f.n}${f.a || f.b ? ' (' + [f.a && f.a.n, f.b && f.b.n].filter(Boolean).join('+') + ')' : ' (its own)'}` : 'on a track of its own';
     c.fillStyle = '#ff8070'; c.fillText(lab, X(4) + 4, y0 + 6);
-    c.fillStyle = iff ? `rgb(${iffCol({ iff } as RContact, su.id)})` : '#ffc860'; c.fillText(iff ? (iff.c === 'civ' ? 'CIV ' : '') + iff.n : 'no IFF answer', X(4) + 4, y0 + 20);
+    c.fillStyle = iff ? `rgb(${iffCol({ iff } as RContact, su)})` : '#ffc860'; c.fillText(iff ? (iff.c === 'civ' ? 'CIV ' : '') + iff.n : 'no IFF answer', X(4) + 4, y0 + 20);
     c.fillStyle = '#cfe8f5'; c.fillText(`${(tr.rng / 1000).toFixed(2)} km · closing ${close >= 0 ? '+' : ''}${Math.round(close)} m/s`, X(4) + 4, y0 + 36); c.fillText(`solution ${Math.round(tr.est.q * 100)}%${tr.tgt ? ' [' + tr.tgt + ']' : ''}`, X(4) + 4, y0 + 52);
   }
   // Stage 5: hostile or not (js/radar.ts assess): every track she holds, worst first: what it is to her, its range, how fast it's
@@ -397,7 +397,7 @@ export const RadarView = (() => {
     }
     const qn = su.Q.clone().invert(), toHer = (pl: THREE.Vector3) => pl.clone().sub(su.P).applyQuaternion(qn); // (the level's frame to hers as she is now)
     for (const f of su.fus) {
-      const col = f.iff ? iffCol({ iff: f.iff } as RContact, su.id) : '255,200,90', [x, y] = pr(f.p), [bx, by] = pr(new T.Vector3(f.p.x, 0, f.p.z));
+      const col = f.iff ? iffCol({ iff: f.iff } as RContact, su) : '255,200,90', [x, y] = pr(f.p), [bx, by] = pr(new T.Vector3(f.p.x, 0, f.p.z));
       // its trajectory: where it's been (solid, fading) and where its velocity takes it in the next 10 s (dashed)
       c.strokeStyle = `rgba(${col},0.75)`; line(f.hist.map((q) => toHer(q.p)));
       if (f.v.lengthSq() > 1) { const fut: THREE.Vector3[] = []; for (let i = 0; i <= 10; i++) fut.push(toHer(f.pl.clone().addScaledVector(f.v, i))); c.setLineDash([4, 3]); line(fut); c.setLineDash([]); }

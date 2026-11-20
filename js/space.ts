@@ -21,7 +21,7 @@ import { Career } from './career.js';
 import { Net } from './net.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
-import { Radar, RSuite, RTarget, RPlot, RIff } from './radar.js';
+import { Radar, RSuite, RTarget, RPlot, RAff } from './radar.js';
 import { RadarView } from './radarview.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
@@ -81,7 +81,7 @@ export const Space = (() => {
   // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
-  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: true, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>() };
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>() };
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -108,7 +108,9 @@ export const Space = (() => {
         EW.foeT = { id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
       }
     }
-    const own = EW.own!, me = EW.ownT!; me.iff = EW.xpdr ? { c: 'squad', n: S.def.name || 'squad' } : null; if (EW.foeT) EW.foeT.iff = hullIff(); own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
+    const own = EW.own!, me = EW.ownT!; me.iff = { c: 'squad', n: S.def.name || 'squad' }; me.aff = 'squad'; me.xon = EW.xpdr; own.aff = 'squad'; own.hostNames = new Set([hullName()]);
+    if (EW.foeT && EW.foe) { const af = missionAff(); EW.foeT.aff = af; EW.foeT.iff = { c: af === 'navy' ? 'navy' : 'civ', n: hullName() }; EW.foeT.xon = af !== 'pirate'; EW.foe.aff = af; }
+    own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
     if (S.docked || S.ftl) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (against a hull, or jumping between levels: nothing to look at. A warp within the level is real time: everything runs, at her speed)
     chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt)];
     Radar.step(own, dt, tg, S.t);
@@ -226,7 +228,12 @@ export const Space = (() => {
     HUD.toast('CHAFF', EW.chaffLeft + ' left', 1); Audio.click();
   }
   // the mission ship's transponder: her name, as the mission's ship (the squad's screen marks her; her own fire control knows itself)
-  function hullIff(): RIff { const q = S.traffic.find((x) => x.c.k === S.zact), ms = S.ms as any; return { c: 'tgt', n: (q && q.c.name) || (ms && ms.name) || 'target' }; }
+  function hullName(): string { const q = S.traffic.find((x) => x.c.k === S.zact), ms = S.ms as any; return (q && q.c.name) || (ms && ms.name) || 'target'; }
+  // whose the mission's ship is (by her class and the job: js/spacedata.ts wearOf): a navy's, pirates' (a ship they've taken is
+  // theirs now: no answer), or a civilian's
+  function missionAff(): RAff { const ms = S.ms as any, w = ms ? SD.wearOf(ms.size, ms.obj) : null; return w === 'navy' ? 'navy' : w === 'pirate' ? 'pirate' : 'civ'; }
+  // a zone ship's, by her kind (the mission's ship's as hers)
+  const kindAff = (kind: string | undefined, k: number | undefined): RAff => (k === 0 ? missionAff() : kind === 'navy' || kind === 'wing' ? 'navy' : kind === 'pirate' ? 'pirate' : 'civ');
   // her missiles in flight, as radar targets: small (half a square metre every way), no transponder
   function missileTargets(dt: number) {
     const out: RTarget[] = [], live = new Set<number>();
@@ -258,14 +265,14 @@ export const Space = (() => {
       }
       _m.decompose(_ps, t.q, _sc);
       if (!(t as any).fresh && dt > 0) t.v.copy(_ps).sub(t.p).divideScalar(dt); (t as any).fresh = false;
-      t.p.copy(_ps); t.iff = { c: q.c.k === 0 ? 'tgt' : 'civ', n: q.c.name || 'unnamed' }; out.push(t);
+      const af = kindAff((q.c as any).kind, q.c.k); t.p.copy(_ps); t.aff = af; t.iff = { c: af === 'navy' ? 'navy' : 'civ', n: q.c.name || 'unnamed' }; t.xon = af !== 'pirate'; out.push(t);
       // (and her own radars, while she's inside 12 km: scanners and trackers like any ship's; a civilian has no fire control)
       const near = S.P.distanceTo(t.p) < 12000; let ts = EW.tsu.get(o);
       if (near && (!ts || ts.t !== t)) {
         const inv = o.matrixWorld.clone().invert(), box = new T.Box3(); o.traverse((m: any) => { if (m.isMesh && m.geometry && !glowy(m)) { m.geometry.computeBoundingBox(); box.union(m.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, m.matrixWorld))); } });
         const sz = box.isEmpty() ? new T.Vector3(20, 10, 40) : box.getSize(new T.Vector3()), ctr = box.isEmpty() ? new T.Vector3() : box.getCenter(new T.Vector3());
         const long = q.real ? sz.x : sz.z, wide = q.real ? sz.z : sz.x; // (her real hull lies along x, her stand-in along z)
-        const su = Radar.suite(t.id, long / 2, sz.y / 2, wide / 2, -sz.y / 2, Math.max(2, long * 0.06)); su.name = q.c.name || t.id;
+        const su = Radar.suite(t.id, long / 2, sz.y / 2, wide / 2, -sz.y / 2, Math.max(2, long * 0.06)); su.name = q.c.name || t.id; su.aff = t.aff;
         ts = { su, t, turn: q.real ? new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2) : new T.Quaternion() }; (ts as any).ctr = ctr; EW.tsu.set(o, ts);
       } else if (!near && ts) EW.tsu.delete(o);
       if (ts) { ts.su.P.copy(t.p).add(((ts as any).ctr as THREE.Vector3).clone().applyQuaternion(t.q)); ts.su.Q.copy(t.q).multiply(ts.turn); ts.su.V.copy(t.v); }
@@ -296,7 +303,7 @@ export const Space = (() => {
   }
   // every ship's radar the debug view can show (F8 goes through them): hers, the mission ship's, the zone's ships near enough
   function ewList(): RSuite[] {
-    if (EW.own) EW.own.name = S.def.name; if (EW.foe) EW.foe.name = hullIff().n;
+    if (EW.own) EW.own.name = S.def.name; if (EW.foe) EW.foe.name = hullName();
     return [EW.own, EW.foe, ...[...EW.tsu.values()].map((q) => q.su).sort((a, b) => a.P.distanceTo(S.P) - b.P.distanceTo(S.P))].filter((q): q is RSuite => !!q);
   }
   function ewCue(a: number[], q?: THREE.Quaternion) { if (!EW.own) return; if (a[0] < 0) { for (const t of EW.own.trks) Radar.drop(t); return; } Radar.cue(EW.own, { k: a[0] | 0, phi: a[1], r: a[2], t: S.t, db: 0, id: '', e: 0, q }); }

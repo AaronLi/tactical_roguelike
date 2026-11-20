@@ -19,14 +19,15 @@
 // Everything here is in the level's frame (the ship the mission's on is the level: js/space.ts), a ship's own frame being her
 // group's (forward -z, up +y, starboard +x).
 export interface RcsTable { s: Float32Array; max: number; mean: number }
-export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number; iff?: RIff | null } // (iso: a return the same every way, m2: a chaff cloud's, a missile's; iff: what its transponder answers an interrogation with, or nothing)
-export interface RIff { c: 'civ' | 'squad' | 'tgt'; n: string } // (a civilian's, the squad's ship's, the mission's ship's; and the name it gives)
+export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number; iff?: RIff | null; aff?: RAff; xon?: boolean } // (iso: a return the same every way, m2: a chaff cloud's, a missile's; iff: what its transponder answers an interrogation with, or nothing)
+export type RAff = 'civ' | 'navy' | 'pirate' | 'squad'; // (whose a ship is: a civilian's, a navy's, pirates', the squad's)
+export interface RIff { c: 'civ' | 'squad' | 'navy'; n: string } // (the answer: what it says it is, and its name) // (a civilian's, the squad's ship's, the mission's ship's; and the name it gives)
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3; iff?: RIff | null } // (q, o: how she was turned and where she was when it was made)
 export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her frame: 'y' her up (yaw), 'x' her beam (pitch), 'z' her length (roll))
 export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null; trail: { A: number; r: number; t: number }[]; kA: KF1; kr: KF1 } // (kA, kr: its Kalman filters, on its angle and its range) // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
 export interface RScan {
   ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number;
-  map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
+  map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; pend: { p: RPlot; A: number }[]; // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
 } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
@@ -44,7 +45,7 @@ export interface RTrack {
 export interface KF1 { x: number; v: number; p11: number; p12: number; p22: number } // (a scalar's Kalman filter at constant velocity: its value, rate, and their covariance)
 export interface RFused { kf: KF3; trk?: RTrack | null; n: string; a: RContact | null; b: RContact | null; p: THREE.Vector3; pl: THREE.Vector3; res: number; r: number; iff: RIff | null; ea: number; eb: number; v: THREE.Vector3; hist: { t: number; p: THREE.Vector3 }[] } // (v its velocity (level frame), from hist: where it's been, the last 8 s) // (a contact of each scanner's that are one thing: where, in her frame (p) and the level's (pl); how far apart the two fans' points are there (res); ea, eb how far along each fan)
 export interface RAssess { key: string; n: string; f: RFused | null; c: RContact | null; iff: RIff | null; r: number; vc: number; tcpa: number; dcpa: number; score: number; hold: number; cls: 'HOSTILE' | 'SUSPECT' | 'WATCH' | 'NEUTRAL' | 'CIV' | 'FRIENDLY'; plot: RPlot | null; why: string }
-export interface RSuite { fusSeen: Map<string, string>; ass: RAssess[]; assHold: Map<string, number>; fusKF: Map<string, KF3>; fusHist: Map<string, { t: number; p: THREE.Vector3 }[]>; fus: RFused[]; fusIds: Map<string, string>; fusN: number; fusT: number; id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
+export interface RSuite { aff?: RAff; hostNames?: Set<string>; fusSeen: Map<string, string>; ass: RAssess[]; assHold: Map<string, number>; fusKF: Map<string, KF3>; fusHist: Map<string, { t: number; p: THREE.Vector3 }[]>; fus: RFused[]; fusIds: Map<string, string>; fusN: number; fusT: number; id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
 
 // (the Kalman filters' 3D one: js/radar.ts Radar, "Kalman filters")
 export class KF3 {
@@ -164,7 +165,7 @@ export const Radar = (() => {
   const TRK = { bw: 3 * D2R, sq: 1 * D2R, hz: 6, slew: 75 * D2R, stab: 200 * D2R, acq: 60 * D2R, R0: 9000, gate: 0.06 }; // (conical scan at 6 Hz: slow enough to see in the debug view; stab: how fast the turret can turn to hold its beam still while she turns under it)
   // a scanner's response map: MAP.na columns of angle round its axis (a degree each) by MAP.nr bins of range (25 m each, to 10 km)
   const MAP = { na: 360, nr: 400, dr: 25, K: 24, floor: 12 }; // (K: how far over the noise round it a cell must stand to be a peak (CFAR); floor: below that, not even looked at)
-  const mapOf = (tag: string) => ({ map: new Float32Array(MAP.na * MAP.nr), age: new Float32Array(MAP.na).fill(-1e9), off: 0, col: -1, cons: [] as RContact[], nid: 0, tag });
+  const mapOf = (tag: string) => ({ map: new Float32Array(MAP.na * MAP.nr), age: new Float32Array(MAP.na).fill(-1e9), off: 0, col: -1, cons: [] as RContact[], nid: 0, tag, pend: [] as { p: RPlot; A: number }[] });
   const MASK = Math.sin(10 * D2R); // (how far past its own side of her hull a mount can see: over the hull's edge, a little)
   const AG = 4 * Math.LN2 / (TRK.bw * TRK.bw); // (the beam's shape: exp(-AG theta^2), half power at bw/2)
   // a ship's set: scanners on her top amidships, trackers each side; size her half length (where they're mounted, and how far the
@@ -227,6 +228,9 @@ export const Radar = (() => {
   // Each peak's a PLOT, and plots are followed from sweep to sweep as CONTACTS (associate): a plot near where a contact is expected
   // (its last place plus its rates) is that contact's; one that isn't starts a new one ('A' and a number on the 'y' map, 'B' on the
   // 'z' map); a contact not seen for two sweeps is dropped.
+  // whether a ship's transponder answers this ship's interrogator: a civilian's always; a navy's only a navy's interrogation (its
+  // own mode); a pirate's never; the squad's whenever it's switched on
+  const answers = (t: RTarget, su: RSuite) => !!t.iff && t.xon !== false && (t.aff === 'civ' || t.aff === 'squad' || (t.aff === 'navy' && su.aff === 'navy'));
   const IFF_R = 12000, DA = TAU / MAP.na, AGS = 4 * Math.LN2 / (SCAN.bw * SCAN.bw), _cd = new T.Vector3(), _ref = new T.Vector3();
   const wrapPi = (a: number) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
   function scanStep(su: RSuite, sc: RScan, k: number, dt: number, targets: RTarget[], now: number) {
@@ -238,7 +242,7 @@ export const Radar = (() => {
       if (t.id === su.id) continue;
       const { R, sig } = look(su, sc.at, t, _cd), [phi, e] = angOf(sc.ax, _cd);
       if (Math.abs(e) > sc.fan || _cd.dot(sc.n) < -sc.mask || R > MAP.nr * MAP.dr) continue;
-      seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2) / 10), id: t.id, iff: t.iff || null });
+      seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2) / 10), id: t.id, iff: answers(t, su) ? t.iff! : null });
     }
     const th0 = sc.th; sc.th = wrap(sc.th + sc.rate * dt);
     // the columns its middle crossed this frame (in her angle), each written where it goes on the map
@@ -255,6 +259,10 @@ export const Radar = (() => {
       if (sc.col >= 0) cfar(su, sc, k, (mc - 2 + MAP.na) % MAP.na, seen, now); // (two columns back: both pairs of its neighbours are in now)
       sc.col = mc;
     }
+    // (once the oldest peak waiting is 60 degrees behind the beam: all the waiting peaks matched together, so a peak isn't taken by
+    // another's contact before that one's own peak is in)
+    const beamA = wrap(sc.th - sc.off);
+    if (sc.pend.some((q) => { const b = wrap(beamA - q.A); return b > 60 * D2R && b < Math.PI; })) { const ready = sc.pend; sc.pend = []; associate(sc, ready, now); } // (all of them together, those since too)
     const keep = TAU / sc.rate * 1.05; sc.plots = sc.plots.filter((p) => now - p.t < keep);
     sc.cons = sc.cons.filter((c) => now - c.t < keep * 2.1);
   }
@@ -276,23 +284,34 @@ export const Radar = (() => {
       // (IFF: the interrogator, on the scanner's beam, asks whatever's at that peak; a transponder there answers with its class and
       // name, out to IFF_R. Chaff, a missile, a ship running silent: no answer)
       const p: RPlot = { k, phi, r: R, t: now, db, id, e: 0, q: su.Q.clone(), o: su.P.clone(), iff: R < IFF_R ? iff : null };
-      sc.plots.push(p); associate(sc, p, A, now);
+      sc.plots.push(p); sc.pend.push({ p, A }); // (matched to its contact once the beam's well past it: associate)
     }
   }
   // (a contact's two Kalman filters: its angle, unsure by a third of the beam width a look, its rate as much as 250 m/s across at
   // that range; its range, unsure by 15 m a look, its rate by 250 m/s; either accelerating up to some 30 m/s/s)
   const SA = SCAN.bw / 3, SR = 15, ACC = 30, ACC3 = 5; // (ACC3: what a 3D track or a firing solution expects of a ship's acceleration, steady; a manoeuvre raises it (KF3 qb))
-  function associate(sc: RScan, p: RPlot, A: number, now: number) {
-    const per = TAU / sc.rate, qA = (ACC / Math.max(50, p.r)) ** 2, rA = SA * SA, rr = SR * SR; let best: RContact | null = null, bd = 16; // (16: the gate, chi-squared on two dimensions, all but 3 in 10,000 of its own plots inside)
-    for (const c of sc.cons) {
-      const dt = now - c.t; if (dt < per * 0.5) continue; // (one plot a contact a sweep)
-      const pa = kf1Peek(c.kA, dt, qA), pr = kf1Peek(c.kr, dt, ACC * ACC), yA = wrapPi(A - pa.x), yr = p.r - pr.x, m = yA * yA / (pa.p + rA) + yr * yr / (pr.p + rr);
-      if (m < bd) { bd = m; best = c; }
+  function associate(sc: RScan, batch: { p: RPlot; A: number }[], now: number) {
+    // every pairing of a peak with a contact that could be it (inside the contact's gate: its filters' predicted spread and the
+    // peak's own, chi-squared on two dimensions, 11.8: 997 in 1000 of its own peaks inside), best first, each peak and each contact once; a peak left over is a new contact
+    const per = TAU / sc.rate, rA = SA * SA, rr = SR * SR, pairs: { q: typeof batch[0]; c: RContact; m: number }[] = [];
+    for (const q of batch) {
+      const qA = (ACC / Math.max(50, q.p.r)) ** 2;
+      for (const c of sc.cons) {
+        const dt = q.p.t - c.t; if (dt < per * 0.5) continue; // (one peak a contact a sweep)
+        const pa = kf1Peek(c.kA, dt, qA), pr = kf1Peek(c.kr, dt, ACC * ACC), yA = wrapPi(q.A - pa.x), yr = q.p.r - pr.x, m = yA * yA / (pa.p + rA) + yr * yr / (pr.p + rr);
+        if (m < 11.8) pairs.push({ q, c, m });
+      }
     }
-    if (!best) { sc.cons.push({ n: sc.tag + (++sc.nid), A, r: p.r, vA: 0, vr: 0, t: now, hits: 1, p, iff: p.iff, trail: [{ A, r: p.r, t: now }], kA: kf1(A, SA, 250 / Math.max(50, p.r)), kr: kf1(p.r, SR, 250) }); return; }
-    const dt = now - best.t; kf1Pred(best.kA, dt, qA); kf1Pred(best.kr, dt, ACC * ACC);
-    kf1Upd(best.kA, wrapPi(A - best.kA.x), rA); kf1Upd(best.kr, p.r - best.kr.x, rr); best.kA.x = wrap(best.kA.x);
-    best.A = best.kA.x; best.r = best.kr.x; best.vA = best.kA.v; best.vr = best.kr.v; best.t = now; best.hits++; best.p = p; best.iff = p.iff || null; best.trail.push({ A, r: p.r, t: now }); if (best.trail.length > 8) best.trail.shift(); // (each sweep's answer: a transponder switched off is unknown from then on)
+    pairs.sort((a, b) => a.m - b.m);
+    const usedQ = new Set<typeof batch[0]>(), usedC = new Set<RContact>();
+    for (const { q, c } of pairs) {
+      if (usedQ.has(q) || usedC.has(c)) continue; usedQ.add(q); usedC.add(c);
+      const p = q.p, A = q.A, dt = p.t - c.t, qA = (ACC / Math.max(50, p.r)) ** 2;
+      kf1Pred(c.kA, dt, qA); kf1Pred(c.kr, dt, ACC * ACC); kf1Upd(c.kA, wrapPi(A - c.kA.x), rA); kf1Upd(c.kr, p.r - c.kr.x, rr); c.kA.x = wrap(c.kA.x);
+      c.A = c.kA.x; c.r = c.kr.x; c.vA = c.kA.v; c.vr = c.kr.v; c.t = p.t; c.hits++; c.p = p; c.iff = p.iff || null; c.trail.push({ A, r: p.r, t: p.t }); if (c.trail.length > 8) c.trail.shift(); // (each sweep's answer: a transponder switched off is unknown from then on)
+    }
+    for (const q of batch) if (!usedQ.has(q)) { const p = q.p; sc.cons.push({ n: sc.tag + (++sc.nid), A: q.A, r: p.r, vA: 0, vr: 0, t: p.t, hits: 1, p, iff: p.iff, trail: [{ A: q.A, r: p.r, t: p.t }], kA: kf1(q.A, SA, 60 / Math.max(50, p.r)), kr: kf1(p.r, SR, 100) }); /* (a new one's rates unknown: up to some 60 m/s across, 100 along, likely) */ }
+    void now;
   }
   // ---------------------------------------------------------------- correlation in 3D
   // Each scanner puts a contact on an arc: along its fan, at its range, from its mast ('y': her bearing known, how high not; 'z':
@@ -381,10 +400,11 @@ export const Radar = (() => {
   }
   const litOn = (id: string, now: number) => { const m = lit.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t < 1).map(([k, q]) => ({ k, from: q.from })) : []; };
   function prior(su: RSuite, iff: RIff | null) {
-    if (!iff) return { p: 0.3, w: 'no IFF' };
+    if (!iff) return { p: 0.3, w: 'no IFF' }; // (a navy's to anyone else, a pirate, the squad running silent, chaff, a missile)
+    if (su.hostNames && su.hostNames.has(iff.n)) return { p: 0.7, w: 'known hostile' }; // (the squad's: the mission's ship, if she answers to her name)
+    if (iff.c === 'squad') return su.aff === 'squad' ? { p: 0, w: 'own side' } : su.id === 'hull' ? { p: 0.7, w: 'known hostile' } : { p: 0.2, w: 'mercenary' }; // (to the mission's ship, the squad's transponder is her attacker's)
+    if (iff.c === 'navy') return su.aff === 'navy' ? { p: 0, w: 'navy: friendly' } : { p: 0.2, w: 'navy' };
     if (iff.c === 'civ') return { p: 0.05, w: 'civilian' };
-    if ((su.id === 'own' && iff.c === 'tgt') || (su.id === 'hull' && iff.c === 'squad')) return { p: 0.7, w: 'known hostile' };
-    if (su.id === 'own' && iff.c === 'squad') return { p: 0, w: 'own side' };
     return { p: 0.2, w: 'named' };
   }
   function assess(su: RSuite, dt: number) {
