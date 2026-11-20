@@ -446,8 +446,8 @@ export const RadarView = (() => {
     const sel = new T.Mesh(new T.RingGeometry(R * 0.045, R * 0.055, 24), glow(0xffffff, 0.9)); inner.add(sel);
     const lcv = document.createElement('canvas'); lcv.width = 512; lcv.height = 96; const ltex = new T.CanvasTexture(lcv);
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
-    const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', font: '12px ui-monospace, Consolas, monospace', color: '#9fe4ff', textShadow: '0 0 4px #000', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; document.body.appendChild(hint);
-    const scanUi = document.createElement('div'); scanUi.id = 'holo-scan'; Object.assign(scanUi.style, { position: 'fixed', left: '24px', top: '24px', font: '13px ui-monospace, Consolas, monospace', color: '#cfe8f5', textShadow: '0 0 4px #000', pointerEvents: 'none', display: 'none', zIndex: '35', lineHeight: '1.6' }); document.body.appendChild(scanUi);
+    const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', font: '300 13px var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', color: 'rgba(170,225,250,0.75)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; document.body.appendChild(hint);
+    const scanUi = document.createElement('div'); scanUi.id = 'holo-scan'; Object.assign(scanUi.style, { position: 'fixed', left: '24px', top: '24px', font: '300 13px var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', fontVariantNumeric: 'tabular-nums', color: 'rgba(215,235,245,0.85)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35', lineHeight: '1.6' }); document.body.appendChild(scanUi);
     holoG = { rwrItems: [], scanUi, secs: [], rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
@@ -459,11 +459,11 @@ export const RadarView = (() => {
     const H = holoG!; if (H.g.parent !== parent) parent.add(H.g);
     H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
-    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag right: turn · scroll: zoom · tap right: drop the trackers · 1 / 2: a scanner for W A S D (held: its modes) · 3 / 4: a tracker to send (held: off / on) · hold G: look round the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; }
+    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? '1 / 2  scanner (hold: modes) · 3 / 4  tracker, then click a track (hold: off) · drag right  turn · scroll  zoom · hold G  look up · hold F  get up' : 'hold G: focus on it · hold right mouse: turn it · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / zoom)) * R / L : 0); }; // (beyond the range shown: at its edge)
     if (H.zoom !== zoom) { H.zoom = zoom; [0.25, 0.5, 1].forEach((f, i) => { const g0 = H.rings[i], rr = Math.sqrt(f) * R, km = zoom * f / 1000; g0.l.scale.setScalar(rr); g0.s.position.set(rr + R * 0.1, R * [-0.07, 0.07, 0][i], 0); /* (at her starboard side of each, the inner two staggered up and down: not over each other) */
-      const x = g0.cv.getContext('2d')!; x.clearRect(0, 0, 256, 64); x.font = '600 34px ui-monospace, Consolas, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 6; x.strokeStyle = 'rgba(0,0,0,0.7)'; const t = km >= 1 ? +km.toFixed(2) + ' km' : Math.round(km * 1000) + ' m'; x.strokeText(t, 128, 32); x.fillStyle = '#8fdcff'; x.fillText(t, 128, 32); g0.tex.needsUpdate = true; }); }
+      const x = g0.cv.getContext('2d')!; x.clearRect(0, 0, 256, 64); x.font = '400 34px Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.45)'; const t = km >= 1 ? +km.toFixed(2) + ' km' : Math.round(km * 1000) + ' m'; x.strokeText(t, 128, 32); x.fillStyle = 'rgba(143,220,255,0.8)'; x.fillText(t, 128, 32); g0.tex.needsUpdate = true; }); }
     // the fans: as wide as the shell, sweeping (none of a fan where her hull hides it)
     su.scans.forEach((sc, i) => { if (!H.fans[i]) return; fanFill(H.fans[i], { ...sc, R0: R, at: new T.Vector3() } as RScan, sc.th); });
     const camQ = new T.Quaternion(); H.inner.updateWorldMatrix(true, false); H.inner.getWorldQuaternion(camQ); const faceCam = camQ.invert().multiply(G_cam.quaternion);
@@ -509,17 +509,17 @@ export const RadarView = (() => {
       const html = su.scans.map((sc, k) => {
         const b = sv.boxes[k]; if (!b) return ''; const col = sc.ax === 'y' ? '#50d8ff' : '#e070ff', name = b.opts[['round', 'sector', 'off'].indexOf(b.mode)] || b.mode;
         const what = b.mode === 'sector' ? `${name} ${Math.round(sc.sec.h * 360 / Math.PI)}° at ${deg(sc.sec.c)}°` : name;
-        let h = `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:4px 8px;border:1px solid ${b.open || b.sel ? col : 'rgba(120,180,210,0.35)'};background:rgba(4,12,18,0.55);border-radius:3px">`
-          + `<span style="color:${col}">${k + 1} SCAN ${sc.tag}</span> <span style="color:#7f9fb0">${sc.ax === 'y' ? 'bearing' : 'roll'}</span> <b style="float:right">${what} ${b.open ? '▴' : '▾'}</b>`;
-        if (b.open) h += b.opts.map((o, i) => `<div style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:11px">tap ${k + 1}: next · hold ${k + 1}: set</div>`;
-        if (b.sel) h += `<div style="color:#fff;font-size:11px">W S: width · A D: direction</div>`;
+        let h = `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid ${b.open || b.sel ? col : 'rgba(120,180,210,0.18)'};background:rgba(4,12,18,0.32);border-radius:2px">`
+          + `<span style="color:${col}">${k + 1} SCAN ${sc.tag}</span> <span style="color:#7f9fb0">${sc.ax === 'y' ? 'bearing' : 'roll'}</span> <span style="float:right;font-weight:400">${what} ${b.open ? '▴' : '▾'}</span>`;
+        if (b.open) h += b.opts.map((o, i) => `<div style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:12px">tap ${k + 1}: next · hold ${k + 1}: set</div>`;
+        if (b.sel) h += `<div style="color:rgba(255,255,255,0.7);font-size:12px">W S: width · A D: direction</div>`;
         return h + '</div>';
       }).join('<br>') + '<br>' + [1, 0].map((ti, j) => { // (and the tracking radars': 3 port, 4 starboard)
         const tr = su.trks[ti]; if (!tr) return ''; const sel = sv.trkSel === ti, f = su.fus.find((q) => q.trk === tr);
         const st = tr.off ? 'OFF' : tr.st === 'track' ? 'LOCK' + (f ? ' on ' + f.n : '') : tr.st === 'acq' ? 'SEARCH' : tr.st === 'slew' ? 'SLEW' : 'IDLE';
         const col = tr.off ? '#5f6f78' : tr.st === 'track' ? '#ff6050' : tr.st === 'idle' ? '#9fc2d4' : '#ffb040';
-        return `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:4px 8px;border:1px solid ${sel ? '#ffb040' : 'rgba(120,180,210,0.35)'};background:rgba(4,12,18,0.55);border-radius:3px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <b style="float:right;color:${col}">${st}</b>`
-          + (sel ? `<div style="color:#fff;font-size:11px">left click: a track, or a radar warning's bearing · hold ${j + 3}: ${tr.off ? 'on' : 'off'}</div>` : '') + '</div>';
+        return `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid ${sel ? '#ffb040' : 'rgba(120,180,210,0.18)'};background:rgba(4,12,18,0.32);border-radius:2px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span style="float:right;font-weight:400;color:${col}">${st}</span>`
+          + (sel ? `<div style="color:rgba(255,255,255,0.7);font-size:12px">left click: a track, or a radar warning's bearing · hold ${j + 3}: ${tr.off ? 'on' : 'off'}</div>` : '') + '</div>';
       }).join('<br>');
       if (H.scanUi.innerHTML !== html) H.scanUi.innerHTML = html;
     }
@@ -547,7 +547,7 @@ export const RadarView = (() => {
       m.line.visible = w.kind !== 'scan'; m.line.scale.setScalar(R * 1.06); m.line.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d); (m.line.material as THREE.LineDashedMaterial).color.setHex(col); (m.line.material as THREE.LineDashedMaterial).opacity = a * 0.8; m.line.computeLineDistances();
       m.s.position.copy(d).multiplyScalar(R * 1.15).add(new T.Vector3(0, R * 0.16, 0)); /* (over its chevron) */ (m.s.material as THREE.SpriteMaterial).opacity = a;
       const txt = w.kind === 'lock' ? 'LOCK' : w.kind === 'trk' ? 'TRK' : 'SRCH';
-      if (m.txt !== txt) { m.txt = txt; const x = m.cv.getContext('2d')!; x.clearRect(0, 0, 128, 48); x.font = '700 30px ui-monospace, Consolas, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 5; x.strokeStyle = 'rgba(0,0,0,0.75)'; x.strokeText(txt, 64, 24); x.fillStyle = w.kind === 'lock' ? '#ff5040' : '#ffb050'; x.fillText(txt, 64, 24); m.tex.needsUpdate = true; }
+      if (m.txt !== txt) { m.txt = txt; const x = m.cv.getContext('2d')!; x.clearRect(0, 0, 128, 48); x.font = '500 30px Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.5)'; x.strokeText(txt, 64, 24); x.fillStyle = w.kind === 'lock' ? '#ff5040' : '#ffb050'; x.fillText(txt, 64, 24); m.tex.needsUpdate = true; }
     });
     for (let i = rwr.length; i < H.rwr.length; i++) { const m = H.rwr[i]; m.cone.visible = m.line.visible = m.s.visible = false; }
     // the tracks: each 3D track at its place; each contact no 3D track has, faint at its fan's middle
@@ -576,7 +576,7 @@ export const RadarView = (() => {
     if (p) {
       H.sel.position.copy(p.pos); const camQ = new T.Quaternion(); (parent as any).updateWorldMatrix?.(true, false); H.inner.getWorldQuaternion(camQ); H.sel.quaternion.copy(camQ.invert().multiply(G_cam.quaternion)); H.sel.scale.setScalar(1 + 0.15 * Math.sin(now * 8));
       H.label.position.copy(p.pos).add(new T.Vector3(0, R * 0.12, 0).applyQuaternion(rot.clone().invert()));
-      if (H.ltext !== p.label + p.col) { H.ltext = p.label + p.col; const x = H.lcv.getContext('2d')!; x.clearRect(0, 0, 512, 96); x.font = '600 30px ui-monospace, Consolas, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 6; x.strokeStyle = 'rgba(0,0,0,0.8)'; x.strokeText(p.label, 256, 48, 500); x.fillStyle = p.col; x.fillText(p.label, 256, 48, 500); H.ltex.needsUpdate = true; }
+      if (H.ltext !== p.label + p.col) { H.ltext = p.label + p.col; const x = H.lcv.getContext('2d')!; x.clearRect(0, 0, 512, 96); x.font = '400 32px Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.5)'; x.strokeText(p.label, 256, 48, 500); x.fillStyle = p.col; x.fillText(p.label, 256, 48, 500); H.ltex.needsUpdate = true; }
     }
   }
   const G_cam = { quaternion: new T.Quaternion() };
