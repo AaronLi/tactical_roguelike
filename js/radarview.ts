@@ -2,7 +2,7 @@
 // What the radars (js/radar.ts) are doing, drawn:
 //   - the Electronic Warfare debug view (F8, js/space.ts): every ship's two scanning fans sweeping round her (a fading trail behind
 //     each), the plots each has made (an arc at the plot's range along the fan: the angle it can't give), each tracking radar's beam
-//     (a cone, the nutation of its conical scan shown; grey idle, amber slewing and sweeping the fan, red tracking) with the circle its
+//     (a cone, the nutation of its conical scan shown, and a glow at its mount; the squad's ship in blues, every other in reds: js/radarview.ts PAL) with the circle its
 //     beam axis runs round; and round the squad's own ship the range a hostile scanner would detect her at, every way she could be
 //     seen from (her radar cross-section, js/radar.ts rcsOf: a well-turned ship's envelope is small toward the radar), with the way
 //     to that radar marked. A panel of figures beside it.
@@ -13,7 +13,17 @@ import { Radar, RSuite, RTarget, RPlot } from './radar.js';
 
 export const RadarView = (() => {
   const T = THREE, D2R = Math.PI / 180, TAU = Math.PI * 2;
-  const COL = { own: 0x40e0ff, foe: 0xff5040, idle: 0x8090a0, acq: 0xffc040, track: 0xff3030 };
+  // each ship's colours: the squad's ship in blues (her fans cyan, her trackers teal while they acquire and blue once they track),
+  // every other ship in reds (fans red, trackers amber acquiring and red tracking)
+  const PAL = { own: { fan: 0x40e0ff, idle: 0x5a7890, acq: 0x60ffd0, track: 0x3090ff, ring: 0x90d8ff }, foe: { fan: 0xff5040, idle: 0x907070, acq: 0xffa030, track: 0xff2020, ring: 0xff8070 } };
+  const COL = { own: PAL.own.fan, foe: PAL.foe.fan };
+  // a glow at a tracker's mount (the same size on screen however far: a beam pointed at you is otherwise a point)
+  let glowTex: THREE.Texture | null = null;
+  function glow(c: number) {
+    if (!glowTex) { const cv = document.createElement('canvas'); cv.width = cv.height = 64; const x = cv.getContext('2d')!, g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.25, 'rgba(255,255,255,0.6)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); glowTex = new T.CanvasTexture(cv); }
+    const sp = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: c, transparent: true, depthWrite: false, depthTest: false, blending: T.AdditiveBlending, sizeAttenuation: false }));
+    sp.scale.setScalar(0.035); sp.frustumCulled = false; sp.renderOrder = 10; return sp;
+  }
   const add = (m: THREE.Material) => Object.assign(m, { transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide });
   // a scanner's fan at its turn 0, from the radar out to L: upright (ax 'y': in her y-z plane, toward -z) or lying (ax 'x': x-z)
   function fanGeo(ax: 'y' | 'x', fan: number, L: number) {
@@ -28,21 +38,22 @@ export const RadarView = (() => {
   function ring() { const pts: number[] = []; for (let i = 0; i <= 32; i++) { const a = i / 32 * TAU; pts.push(Math.cos(a), Math.sin(a), 0); } const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pts, 3)); return g; }
   const MAXP = 96, SEG = 12;
   function make(su: RSuite, own: boolean) {
-    const g = new T.Group(), c = own ? COL.own : COL.foe;
+    const g = new T.Group(), P = own ? PAL.own : PAL.foe, c = P.fan;
     const fans = su.scans.map((sc) => {
       const piv = new T.Group(); piv.position.copy(sc.at); g.add(piv);
       const ms = [0, 1, 2, 3, 4].map((i) => { const m = new T.Mesh(fanGeo(sc.ax, sc.fan, sc.R0), add(new T.MeshBasicMaterial({ color: c, opacity: i ? 0.07 / i : 0.22 }))); m.frustumCulled = false; piv.add(m); return m; });
       return { piv, ms };
     });
     const trks = su.trks.map(() => {
-      const cn = new T.Mesh(cone(), add(new T.MeshBasicMaterial({ color: COL.idle, opacity: 0.28 }))); cn.frustumCulled = false; g.add(cn);
-      const bl = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -1)]), new T.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })); bl.frustumCulled = false; g.add(bl);
-      const rg = new T.Line(ring(), new T.LineBasicMaterial({ color: COL.track, transparent: true, opacity: 0.8 })); rg.frustumCulled = false; g.add(rg);
-      return { cn, bl, rg };
+      const cn = new T.Mesh(cone(), add(new T.MeshBasicMaterial({ color: P.idle, opacity: 0.28 }))); cn.frustumCulled = false; g.add(cn);
+      const bl = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -1)]), new T.LineBasicMaterial({ color: P.ring, transparent: true, opacity: 0.7 })); bl.frustumCulled = false; g.add(bl);
+      const rg = new T.Line(ring(), new T.LineBasicMaterial({ color: P.ring, transparent: true, opacity: 0.8 })); rg.frustumCulled = false; g.add(rg);
+      const gl = glow(P.track); g.add(gl);
+      return { cn, bl, rg, gl };
     });
     const ag = new T.BufferGeometry(); ag.setAttribute('position', new T.BufferAttribute(new Float32Array(MAXP * SEG * 6), 3)); ag.setAttribute('color', new T.BufferAttribute(new Float32Array(MAXP * SEG * 6), 3));
     const arcs = new T.LineSegments(ag, new T.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); arcs.frustumCulled = false; g.add(arcs);
-    return { g, fans, trks, arcs };
+    return { g, fans, trks, arcs, P };
   }
   // the detection envelope round her (her frame): every way she could be seen from, as far as a scanner of R0 detects her that way
   // (Radar.detRange), drawn at K of the real distance
@@ -54,9 +65,16 @@ export const RadarView = (() => {
   }
   let root: THREE.Group | null = null, panel: HTMLElement | null = null, env: { m: THREE.LineSegments; line: THREE.Line; t: RTarget | null; key: object | null } | null = null;
   const Z = new T.Vector3(0, 0, -1);
+  const marks: HTMLElement[] = []; let nmk = 0;
+  function mark(i: number) {
+    while (marks.length <= i) { const el = document.createElement('div'); Object.assign(el.style, { position: 'fixed', zIndex: '39', width: '30px', height: '30px', marginLeft: '-17px', marginTop: '-17px', border: '2px solid', borderRadius: '50%', pointerEvents: 'none', display: 'none' }); const lb = document.createElement('span'); Object.assign(lb.style, { position: 'absolute', left: '36px', top: '6px', font: '700 12px ui-monospace, Consolas, monospace', whiteSpace: 'nowrap', textShadow: '0 0 3px #000' }); el.appendChild(lb); document.body.appendChild(el); marks.push(el); }
+    return marks[i];
+  }
   // the debug view, in the level's frame (parent: js/space.ts S.root), for the suites and targets as they are now
-  function update(parent: THREE.Object3D | null, on: number | boolean, suites: RSuite[], targets: RTarget[], ownId: string, now: number) {
+  function update(parent: THREE.Object3D | null, on: number | boolean, suites: RSuite[], targets: RTarget[], ownId: string, now: number, cam?: THREE.Camera) {
+    for (const m of marks) m.style.display = 'none';
     if (!on || !parent) { if (root) root.visible = false; if (panel) panel.style.display = 'none'; return; }
+    nmk = 0;
     if (!root || root.parent !== parent) { if (root && root.parent) root.parent.remove(root); root = new T.Group(); parent.add(root); }
     root.visible = true;
     const lines: string[] = [];
@@ -66,13 +84,25 @@ export const RadarView = (() => {
       const D = su.dbg; D.g.position.copy(su.P); D.g.quaternion.copy(su.Q);
       su.scans.forEach((sc, k) => D.fans[k].ms.forEach((m: THREE.Mesh, i: number) => { const th = sc.th - i * 4 * D2R; if (sc.ax === 'y') m.rotation.set(0, -th, 0); else m.rotation.set(th, 0, 0); }));
       su.trks.forEach((tr, k) => {
-        const o = D.trks[k], len = tr.st === 'track' ? tr.rng : tr.st === 'idle' ? 0 : tr.cue ? tr.cue.r : 0;
+        const o = D.trks[k], len = tr.st === 'track' ? tr.rng : tr.st === 'idle' ? 0 : tr.cue ? tr.cue.r : tr.hand ? tr.hand.p.distanceTo(su.P) : 0;
         o.cn.visible = len > 0; o.rg.visible = tr.st === 'track';
-        (o.cn.material as THREE.MeshBasicMaterial).color.setHex(tr.st === 'track' ? COL.track : tr.st === 'idle' ? COL.idle : COL.acq);
+        const hue = tr.st === 'track' ? D.P.track : tr.st === 'idle' ? D.P.idle : D.P.acq;
+        (o.cn.material as THREE.MeshBasicMaterial).color.setHex(hue); (o.cn.material as THREE.MeshBasicMaterial).opacity = tr.st === 'track' ? 0.4 : 0.28;
+        o.gl.visible = tr.st !== 'idle'; o.gl.position.copy(tr.at); (o.gl.material as THREE.SpriteMaterial).color.setHex(hue); o.gl.scale.setScalar(tr.st === 'track' ? 0.03 + 0.012 * Math.sin(now * 12) : 0.025);
         o.cn.position.copy(tr.at); o.cn.quaternion.setFromUnitVectors(Z, tr.a); o.cn.scale.setScalar(Math.max(1, len));
         o.bl.position.copy(tr.at); o.bl.quaternion.setFromUnitVectors(Z, tr.b); o.bl.scale.setScalar(Math.max(60, len));
         if (tr.st === 'track') { o.rg.position.copy(tr.b).multiplyScalar(len).add(tr.at); o.rg.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), tr.b); o.rg.scale.setScalar(len * Math.tan(Radar.TRK.sq)); }
         const nm = `${su.id} ${tr.side > 0 ? 'stbd' : 'port'}`;
+        // another ship's tracker on her: a marker on the screen where its turret is (a beam pointed at you is a point, seen from you)
+        if (!own && cam && tr.st !== 'idle') {
+          const w = tr.at.clone().applyMatrix4(D.g.matrixWorld).project(cam);
+          if (w.z < 1 && Math.abs(w.x) < 1.2 && Math.abs(w.y) < 1.2) {
+            const el = mark(nmk++), lk = tr.st === 'track' && tr.tgt === ownId;
+            el.style.display = ''; el.style.left = ((w.x + 1) / 2 * innerWidth) + 'px'; el.style.top = ((1 - w.y) / 2 * innerHeight) + 'px';
+            el.style.color = lk ? '#ff3030' : '#ffa030'; el.style.borderColor = el.style.color; el.style.opacity = lk ? String(0.65 + 0.35 * Math.sin(now * 12)) : '0.9';
+            el.firstChild!.textContent = lk ? 'TRK LOCK' : tr.st === 'track' ? 'TRK' : 'ACQ';
+          }
+        }
         lines.push(`${nm}: <b>${tr.st}</b>${tr.st === 'track' ? ` ${(tr.rng / 1000).toFixed(2)} km · ${tr.db.toFixed(0)} dB · err ${(tr.err / D2R).toFixed(2)}° · q ${tr.est.q.toFixed(2)} · ${tr.lockT.toFixed(1)} s` : tr.st === 'acq' ? ` sweeping the fan, best ${tr.best.db.toFixed(0)} dB` : ''}`);
       });
       // the plots: an arc each along its fan at its range, fading as the sweep comes round
@@ -98,7 +128,7 @@ export const RadarView = (() => {
       } else env.line.visible = false;
     }
     if (!panel) { panel = document.createElement('div'); panel.id = 'ew-dbg'; Object.assign(panel.style, { position: 'fixed', left: '12px', top: '64px', zIndex: '40', font: '12px ui-monospace, Consolas, monospace', color: '#cfe8f5', background: 'rgba(4,10,16,0.72)', padding: '8px 10px', borderRadius: '4px', pointerEvents: 'none', maxWidth: '46vw', lineHeight: '1.45' }); document.body.appendChild(panel); }
-    panel.style.display = ''; panel.innerHTML = '<b style="color:#40e0ff">ELECTRONIC WARFARE (F8)</b><br>' + lines.join('<br>');
+    panel.style.display = ''; panel.innerHTML = '<b style="color:#40e0ff">ELECTRONIC WARFARE (F8)</b> · <span style="color:#40e0ff">■ yours</span> (trackers <span style="color:#60ffd0">acquiring</span> / <span style="color:#3090ff">tracking</span>) · <span style="color:#ff5040">■ theirs</span> (<span style="color:#ffa030">acquiring</span> / <span style="color:#ff2020">tracking</span>)<br>' + lines.join('<br>');
   }
   // ---------------------------------------------------------------- the sensor station's screen
   const RMAX = 10000;

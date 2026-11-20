@@ -81,7 +81,7 @@ export const Space = (() => {
   // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
-  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false };
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>() };
   const _ray = new T.Raycaster();
   function ewStep(dt: number) {
     if (!S.model) return;
@@ -106,18 +106,44 @@ export const Space = (() => {
     }
     const own = EW.own!, me = EW.ownT!; own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
     if (S.docked || S.ftl || S.warp) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (against a hull, or between: nothing to look at)
-    const tg = [me, ...(EW.foeT ? [EW.foeT] : [])];
+    const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...trafficTargets(dt)];
     Radar.step(own, dt, tg, S.t);
     if (EW.foe) {
       Radar.step(EW.foe, dt, tg, S.t);
-      // her fire control: a tracker cued on the newest plot of the squad's ship, while she's hostile and has her people at her guns
-      const hostile = !!(S.state && S.state.hostile !== 0 && S.state.gn && S.state.arm == null && !S.state.boom);
-      if (!hostile) { for (const t of EW.foe.trks) if (t.st !== 'idle') Radar.drop(t); }
+      // her fire control: a tracker cued on the newest plot of the squad's ship whenever her scanners paint it and she's crewed (a
+      // ship tracks what comes near her whether or not she means to shoot: guns, below, fire only when she's hostile)
+      const manned = !!(S.state && S.state.gn && S.state.arm == null && !S.state.boom);
+      if (!manned) { for (const t of EW.foe.trks) if (t.st !== 'idle') Radar.drop(t); }
       else if (!EW.foe.trks.some((t) => t.st === 'slew' || t.st === 'acq' || (t.st === 'track' && t.tgt === 'own'))) {
         let p = null as null | (typeof EW.foe.scans)[0]['plots'][0]; for (const sc of EW.foe.scans) for (const q of sc.plots) if (q.id === 'own' && S.t - q.t < 0.3 && (!p || q.db > p.db)) p = q;
         if (p) Radar.cue(EW.foe, p);
       }
     }
+  }
+  // the zone's other ships, as radar targets: each where she is in the level's frame, how fast she's going, and her return (from
+  // her own drawing: the stand-in far off, her real hull once she's drawn as herself)
+  const _m = new T.Matrix4(), _ri = new T.Matrix4(), _ps = new T.Vector3(), _sc = new T.Vector3();
+  function trafficTargets(dt: number) {
+    const out: RTarget[] = []; if (!S.root) return out;
+    _ri.copy(S.root.matrixWorld).invert();
+    const live = new Set<THREE.Object3D>();
+    for (const q of S.traffic) {
+      const o = q.obj; let up: THREE.Object3D | null = o, shown = true; while (up && up !== S.root) { if (!up.visible) { shown = false; break; } up = up.parent; }
+      if (!shown || up !== S.root || (q.c.k != null && q.c.k === S.zact && S.hull)) continue; // (hidden, or the one that's the level now: she's the mission ship's target already)
+      live.add(o);
+      _m.multiplyMatrices(_ri, o.matrixWorld);
+      let t = EW.trf.get(o);
+      const key = 'trf:' + (q.c.k ?? -1) + ':' + o.uuid + ':' + (q.real ? 1 : 0);
+      if (!t || (t as any).key !== key) {
+        const inv = o.matrixWorld.clone().invert(), rcs = Radar.rcsOf(key, o, inv);
+        t = { id: 't' + (q.c.k ?? o.id), p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs }; (t as any).key = key; (t as any).fresh = true; EW.trf.set(o, t);
+      }
+      _m.decompose(_ps, t.q, _sc);
+      if (!(t as any).fresh && dt > 0) t.v.copy(_ps).sub(t.p).divideScalar(dt); (t as any).fresh = false;
+      t.p.copy(_ps); out.push(t);
+    }
+    for (const o of [...EW.trf.keys()]) if (!live.has(o)) EW.trf.delete(o);
+    return out;
   }
   // the sensor station: where its operator's looking on its screen (the middle of their view on the screen's face), and a click: a
   // tracker cued on the plot under it (told to everyone aboard: srcue); the other button drops both trackers
@@ -126,7 +152,7 @@ export const Space = (() => {
     if (!seat || seat.k !== 'sensors' || !EW.scr || !EW.own || Game.menuOpen()) { EW.l = EW.r = false; return; }
     _ray.setFromCamera(new T.Vector2(0, 0), G_R.camera); const hit = _ray.intersectObject(EW.scr, false)[0];
     const cv = S.model!.screen.cv; if (hit && hit.uv) EW.cu = [hit.uv.x * cv.width, (1 - hit.uv.y) * cv.height];
-    if (m.mouse.l && !EW.l && EW.cu) { const p = RadarView.pick(EW.own, EW.cu, cv.width, cv.height, S.t); if (p) { const a = [p.k, p.phi, p.r]; ewCue(a); Net.toHost({ t: 'srcue', a }); Audio.click(); } }
+    if (m.mouse.l && !EW.l && EW.cu) { const p = RadarView.pick(EW.own, EW.cu, cv.width, cv.height, S.t); if (p) { const a = [p.k, p.phi, p.r]; ewCue(a, p.q); Net.toHost({ t: 'srcue', a }); Audio.click(); } }
     if (m.mouse.r && !EW.r) { ewCue([-1]); Net.toHost({ t: 'srcue', a: [-1] }); Audio.click(); }
     EW.l = m.mouse.l; EW.r = m.mouse.r;
   }
@@ -141,7 +167,7 @@ export const Space = (() => {
     }
     (cam as THREE.PerspectiveCamera).far = Math.max((cam as THREE.PerspectiveCamera).far, 40000); (cam as THREE.PerspectiveCamera).updateProjectionMatrix(); cam.updateMatrixWorld();
   }
-  function ewCue(a: number[]) { if (!EW.own) return; if (a[0] < 0) { for (const t of EW.own.trks) Radar.drop(t); return; } Radar.cue(EW.own, { k: a[0] | 0, phi: a[1], r: a[2], t: S.t, db: 0, id: '', e: 0 }); }
+  function ewCue(a: number[], q?: THREE.Quaternion) { if (!EW.own) return; if (a[0] < 0) { for (const t of EW.own.trks) Radar.drop(t); return; } Radar.cue(EW.own, { k: a[0] | 0, phi: a[1], r: a[2], t: S.t, db: 0, id: '', e: 0, q }); }
 
   // ------------------------------------------------------------------ coming and going
   function leave() {
@@ -1672,7 +1698,7 @@ export const Space = (() => {
     outside();
     sensorStep(); // (after the view's placed: where the operator's looking is where the camera is now)
     ewCam();
-    RadarView.update(S.root, Radar.show, [EW.own, EW.foe].filter((q): q is RSuite => !!q), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', S.t);
+    RadarView.update(S.root, Radar.show, [EW.own, EW.foe].filter((q): q is RSuite => !!q), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', S.t, G_R.camera);
     // her engines, the status strip, the mission's things
     const th = S.docked ? 0 : U.clamp(S.V.length() / S.def.speed, 0.12, 1) * (S.cruise ? 1.3 : 0.75);
     S.model.thrust.opacity += (th - S.model.thrust.opacity) * Math.min(1, dt * 4);

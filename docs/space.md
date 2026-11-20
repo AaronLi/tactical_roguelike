@@ -143,6 +143,16 @@ A ship knows where another ship is only from what her radars tell her. Every shi
 
   The track's alpha-beta filter gives the firing solution (`est.p`, `est.v`, `q`).
 
+  A tracker knows its own ship's motion. Each step, before it looks, the turret undoes her rotation since the last step and
+  keeps the beam on the point at the gated range as she moves (`stabilise`, up to `TRK.stab`, 200°/s). The conical scan only
+  has to follow the target's own motion. When the target crosses toward the other half of the sky, a free tracker on that
+  side is handed the track: it slews straight to where the solution has her and tracks. Tested by spinning her under a lock:
+  - at 30°/s the lock holds;
+  - at 60°/s the lock holds and is handed across;
+  - at 90°/s and faster it's lost.
+- **Targets** are the mission ship and every ship of the zone that's shown, each with a return from her own drawing (the
+  stand-in far off, her own hull near).
+
 Detection follows the radar equation: SNR ∝ σ/R⁴, so range ∝ σ^¼. A ship's radar cross-section σ comes from her hull's own
 triangles. Each facet gives a specular flash toward its normal and a little diffuse return. The result is tabulated by
 aspect, every 5°, and cached per hull. Turning her nose toward a scanner shrinks her return, and so the range at which
@@ -159,6 +169,9 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
   2. Chase camera.
   3. Both ships.
 
+  The squad's ship is drawn in blues (cyan fans, teal acquiring, blue tracking) and every other ship in reds (red fans, amber
+  acquiring, red tracking). Another ship's tracker gets a marker on the screen at its turret (ACQ, TRK, or a pulsing TRK
+  LOCK when it's on you): a beam pointed at you is only a point from where you sit.
   It shows the scanners' fans with trails, each tracker's cone, boresight and nutation ring, the plots, the squad ship's
   detection envelope against the mission ship's scanner, and a panel with her RCS toward it, the range she'd be painted at
   and whether she's painted or locked.

@@ -145,7 +145,7 @@ export const SpaceUI = (() => {
     const atSeat = !!seat && seat.k === 'sensors', ew = Space.ew(), atSens = atSeat && ew.plan && SD.fitted(s.fleet, 'sensors') && s.kind === 'board';
     plan.style.display = atSens ? '' : 'none';
     planT -= dt;
-    if (planT <= 0) { planT = atSeat ? 0.05 : 0.25; if (s.model) { if (ew.own) RadarView.scope(s.model.screen.cv, ew.own, ew.cu, s.t, atSeat); else drawPlan(s.model.screen.cv, false); s.model.screen.tex.needsUpdate = true; } if (atSens) drawPlan(plan, true); }
+    if (planT <= 0) { planT = atSeat ? 0 : 0.1; /* (every frame for its operator: a sweep that steps is no sweep) */ if (s.model) { if (ew.own) RadarView.scope(s.model.screen.cv, ew.own, ew.cu, s.t, atSeat); else drawPlan(s.model.screen.cv, false); s.model.screen.tex.needsUpdate = true; } if (atSens) drawPlan(plan, true); }
     objTick();
   }
   // The navigation screen. Left: a scope, her own nose up, everything with a waypoint on it by bearing and (log) range, the
