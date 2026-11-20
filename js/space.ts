@@ -21,7 +21,7 @@ import { Career } from './career.js';
 import { Net } from './net.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
-import { Radar, RSuite, RTarget, RPlot, RAff } from './radar.js';
+import { Radar, RSuite, RTarget, RPlot, RAff, RMode } from './radar.js';
 import { RadarView } from './radarview.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
@@ -85,7 +85,7 @@ export const Space = (() => {
   const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000];
   // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the number keys' presses (when each went
   // down, whether a hold's acted), and a sector changed by the keys not yet told to the crew (dirty)
-  const SEC = { sel: -1, dn: [-1, -1], held: [false, false], lt: 0, dirty: -1, sent: 0 }; // (the range at the hologram's edge, scrolled through)
+  const SEC = { sel: -1, open: -1, cur: 0, dn: [-1, -1], held: [false, false], lt: 0, dirty: -1, sent: 0 }; // (the range at the hologram's edge, scrolled through)
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -319,21 +319,29 @@ export const Space = (() => {
     }
   }
   // a scanner's search set (k its number): a sector (c +- h, her angle) or round (told to everyone aboard: ssec)
-  function secSet(k: number, on: boolean, c: number, h: number, quiet = false) {
+  // a search radar's mode (k its number): round, a sector, a sector slowly (a third of its turning rate: three times the dwell, its
+  // range a third again further, seen a third as often), or off (silent); its sector c +- h (told to everyone aboard: ssec)
+  const MODES: RMode[] = ['round', 'sector', 'dwell', 'off'];
+  const MODE_NAME: Record<RMode, string> = { round: 'ROUND', sector: 'SECTOR', dwell: 'SECTOR SLOW', off: 'OFF' };
+  function modeSet(k: number, mode: RMode, c: number, h: number, quiet = false) {
     const sc = EW.own && EW.own.scans[k]; if (!sc) return;
-    sc.sec.on = on; sc.sec.c = c; sc.sec.h = h;
-    if (!quiet) { Net.toHost({ t: 'ssec', a: [k, on ? 1 : 0, Math.round(c * 1000) / 1000, Math.round(h * 1000) / 1000] }); Audio.click();
-      HUD.toast('SCAN ' + sc.tag, on ? `sector ${Math.round(2 * h * 180 / Math.PI)}° at ${String(Math.round(((c * 180 / Math.PI) % 360 + 360) % 360)).padStart(3, '0')}°` : 'all round', 1.4); }
+    sc.mode = mode; sc.sec.on = mode === 'sector' || mode === 'dwell'; sc.rate = sc.rate0 * (mode === 'dwell' ? 1 / 3 : 1); sc.sec.c = c; sc.sec.h = h;
+    if (!quiet) { Net.toHost({ t: 'ssec', a: [k, MODES.indexOf(mode), Math.round(c * 1000) / 1000, Math.round(h * 1000) / 1000] }); Audio.click(); }
   }
-  // The scan keys at the sensor station: 1 and 2 the bearing and roll scanners. Held, a scanner goes between round and its
-  // sector; tapped, its sector's the one the keys set (tapped again, none). W and S widen and narrow its sector, A and D turn it
-  // (to port and starboard; for the roll scanner, round her the one way and the other): as it searches, if it is.
+  // The scan keys at the sensor station, 1 and 2 the bearing and roll scanners, each a box in the corner showing its mode:
+  //   held, its box opens, a list of its modes; tapped while it's open, the next one's picked; held again, it closes and the
+  //   radar's set to the one picked
+  //   tapped while it's closed, it's the radar the keys work (tapped again, none): W and S widen and narrow its sector, A and D
+  //   turn it (to port and starboard; for the roll scanner, round her the one way and the other), as it searches if it is
   function scanKeys() {
     const dt = Math.min(0.1, Math.max(0, S.t - SEC.lt)); SEC.lt = S.t; if (!EW.own) return;
     ['Digit1', 'Digit2'].forEach((code, k) => {
+      const sc = EW.own!.scans[k]; if (!sc) return;
       if (K(code)) { if (SEC.dn[k] < 0) { SEC.dn[k] = S.t; SEC.held[k] = false; }
-        if (!SEC.held[k] && S.t - SEC.dn[k] > 0.4) { SEC.held[k] = true; const sc = EW.own!.scans[k]; secSet(k, !sc.sec.on, sc.sec.c, sc.sec.h); } }
-      else if (SEC.dn[k] >= 0) { if (!SEC.held[k]) { SEC.sel = SEC.sel === k ? -1 : k; Audio.click(); } SEC.dn[k] = -1; }
+        if (!SEC.held[k] && S.t - SEC.dn[k] > 0.4) { SEC.held[k] = true;
+          if (SEC.open === k) { const md = MODES[SEC.cur]; modeSet(k, md, sc.sec.c, sc.sec.h); SEC.open = -1; } // (closed: set to what's picked)
+          else { SEC.open = k; SEC.cur = MODES.indexOf(sc.mode); Audio.click(); } } } // (opened, on what it's doing)
+      else if (SEC.dn[k] >= 0) { if (!SEC.held[k]) { if (SEC.open === k) SEC.cur = (SEC.cur + 1) % MODES.length; else SEC.sel = SEC.sel === k ? -1 : k; Audio.click(); } SEC.dn[k] = -1; }
     });
     if (SEC.sel >= 0) {
       const P = EW.own.scans[SEC.sel].sec, h0 = P.h, c0 = P.c;
@@ -342,12 +350,12 @@ export const Space = (() => {
       if (P.h !== h0 || P.c !== c0) SEC.dirty = SEC.sel;
     }
     // (the crew told of a sector the keys have changed: five times a second at most)
-    if (SEC.dirty >= 0 && S.t - SEC.sent > 0.2) { const sc = EW.own.scans[SEC.dirty]; Net.toHost({ t: 'ssec', a: [SEC.dirty, sc.sec.on ? 1 : 0, Math.round(sc.sec.c * 1000) / 1000, Math.round(sc.sec.h * 1000) / 1000] }); SEC.sent = S.t; SEC.dirty = -1; }
+    if (SEC.dirty >= 0 && S.t - SEC.sent > 0.2) { const sc = EW.own.scans[SEC.dirty]; Net.toHost({ t: 'ssec', a: [SEC.dirty, MODES.indexOf(sc.mode), Math.round(sc.sec.c * 1000) / 1000, Math.round(sc.sec.h * 1000) / 1000] }); SEC.sent = S.t; SEC.dirty = -1; }
   }
   const wrapA = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   function sensorStep() {
     const seat = mySeat(), m = me(), H = EW.holo; EW.cu = null;
-    if (seat && seat.k === 'sensors' && EW.own && !Game.menuOpen()) scanKeys(); else SEC.sel = -1;
+    if (seat && seat.k === 'sensors' && EW.own && !Game.menuOpen()) scanKeys(); else { SEC.sel = -1; SEC.open = -1; }
     if (!seat || seat.k !== 'sensors' || !EW.own || Game.menuOpen()) { EW.l = EW.r = false; H.pick = null; if (H.focus && (!seat || seat.k !== 'sensors')) holoFocus(false); return; }
     // (held G: into the hologram (the room blurred behind it) or back out)
     if (K('KeyG')) { if (!H.gT) H.gT = S.t; if (S.t - H.gT > 0.35 && !H.gDone) { H.gDone = true; holoFocus(!H.focus); Audio.click(); } } else { H.gT = 0; H.gDone = false; }
@@ -402,9 +410,11 @@ export const Space = (() => {
   }
   // the sectors for the hologram: each scanner's searching one, and the one the keys are setting (selected)
   function secView() {
-    if (!EW.own) return []; const out: { k: number; c: number; h: number; on: boolean; sel: boolean }[] = [];
-    EW.own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k) out.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k }); }); // (searching a sector, or picked: its sector shown, to set before it's switched to)
-    return out;
+    if (!EW.own) return { secs: [] as { k: number; c: number; h: number; on: boolean; sel: boolean }[], boxes: [] as { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[] };
+    const secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[] = [];
+    EW.own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k || (SEC.open === k && (MODES[SEC.cur] === 'sector' || MODES[SEC.cur] === 'dwell'))) secs.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k || SEC.open === k }); }); // (searching a sector, or picked, or about to: its sector shown)
+    const boxes = EW.own.scans.map((sc, k) => ({ mode: sc.mode, open: SEC.open === k, cur: SEC.open === k ? SEC.cur : MODES.indexOf(sc.mode), opts: MODES.map((m) => MODE_NAME[m]), sel: SEC.sel === k }));
+    return { secs, boxes };
   }
   // her warning receiver's picture: each radar on her and the way to it (in her frame), and what it's doing: a tracker locked on
   // her, one sweeping for her, a scanner's beam going over her (a moment ago)
@@ -2298,7 +2308,7 @@ export const Space = (() => {
       }
       case 'smis': if (S.on && m.by !== Net.myId) missile(m.a); return true;
       case 'srcue': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) ewCue(m.a); return true;
-      case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && m.a.length === 4) secSet(m.a[0] | 0, !!m.a[1], +m.a[2], +m.a[3], true); return true;
+      case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && m.a.length === 4) modeSet(m.a[0] | 0, MODES[m.a[1] | 0] || 'round', +m.a[2], +m.a[3], true); return true;
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
       case 'sfire': if (S.on && m.by !== Net.myId && S.root) tracer(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true;

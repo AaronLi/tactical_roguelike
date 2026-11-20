@@ -95,7 +95,7 @@ export const RadarView = (() => {
       // (her fans and beams drawn for the ship whose radars are shown, and the squad's own; the rest only their trackers' markers)
       D.g.visible = mine || own;
       if (!D.g.visible) { for (const tj of D.traj) tj.past.visible = tj.fut.visible = false; for (const [k, tr] of su.trks.entries()) { void k; if (cam && tr.st !== 'idle') trackMark(tr, D, cam, ownId, now); } continue; }
-      su.scans.forEach((sc, k) => { D.fans[k].piv.position.copy(sc.at); D.fans[k].ms.forEach((m: THREE.Mesh, i: number) => fanFill(m, sc, sc.th - i * 4 * D2R)); });
+      su.scans.forEach((sc, k) => { D.fans[k].piv.position.copy(sc.at); D.fans[k].piv.visible = sc.mode !== 'off'; D.fans[k].ms.forEach((m: THREE.Mesh, i: number) => fanFill(m, sc, sc.th - i * 4 * D2R)); });
       su.trks.forEach((tr, k) => {
         const o = D.trks[k], len = tr.st === 'idle' ? 0 : tr.hand ? tr.hand.p.distanceTo(su.P) : tr.rng; // (acquiring: its range gate where it's looking)
         o.cn.visible = len > 0; o.rg.visible = tr.st === 'track';
@@ -452,13 +452,14 @@ export const RadarView = (() => {
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
-  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [], secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[] = []) {
+  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [], sv: { secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[]; boxes: { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[] } = { secs: [], boxes: [] }) {
+    const secs = sv.secs;
     if (!parent || !su) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.style.display = 'none'; holoG.scanUi.style.display = 'none'; } return; }
     if (!holoG || holoG.R !== R) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.remove(); } holoMake(parent, R); }
     const H = holoG!; if (H.g.parent !== parent) parent.add(H.g);
     H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
-    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag right: turn · scroll: zoom · tap right: drop the trackers · 1 / 2: pick a scanner (held: round / sector), W S: width, A D: direction · hold G: the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
+    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag right: turn · scroll: zoom · tap right: drop the trackers · 1 / 2: a scanner for W A S D (held: its modes) · hold G: the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / zoom)) * R / L : 0); }; // (beyond the range shown: at its edge)
     if (H.zoom !== zoom) { H.zoom = zoom; [0.25, 0.5, 1].forEach((f, i) => { const g0 = H.rings[i], rr = Math.sqrt(f) * R, km = zoom * f / 1000; g0.l.scale.setScalar(rr); g0.s.position.set(rr + R * 0.1, R * [-0.07, 0.07, 0][i], 0); /* (at her starboard side of each, the inner two staggered up and down: not over each other) */
@@ -499,14 +500,24 @@ export const RadarView = (() => {
       for (const [m, a0] of [[o.patch, 0.16], [o.edges, 0.1]] as [THREE.Mesh, number][]) { m.visible = true; (m.material as THREE.MeshBasicMaterial).color.setHex(col); (m.material as THREE.MeshBasicMaterial).opacity = a0 * k0; }
     });
     for (let i = secs.length; i < H.secs.length; i++) { H.secs[i].patch.visible = H.secs[i].edges.visible = false; }
-    // what each search radar's doing, in the corner (and which the keys are working)
+    // each search radar's box, in the corner: its number, name and mode; open (its number held), the list of its modes with the
+    // one picked marked (tap its number for the next, hold it to set it and close); the radar the keys work marked
     H.scanUi.style.display = seated ? '' : 'none';
     if (seated) {
-      const html = su.scans.map((sc, k) => { const q = secs.find((x) => x.k === k), sel = !!q && q.sel, deg = (a: number) => String(Math.round(((a * 180 / Math.PI) % 360 + 360) % 360)).padStart(3, '0');
-        const mode = sc.sec.on ? `SECTOR ${Math.round(sc.sec.h * 360 / Math.PI)}° at ${deg(sc.sec.c)}°` : 'ROUND';
-        return `<span style="color:${sc.ax === 'y' ? '#50d8ff' : '#e070ff'}">${k + 1} SCAN ${sc.tag}</span> ${sc.ax === 'y' ? 'bearing' : 'roll'} · <b>${mode}</b>${sel ? ` <span style="color:#fff">◀ W S width · A D direction${sc.sec.on ? '' : ` (set: ${Math.round(sc.sec.h * 360 / Math.PI)}° at ${deg(sc.sec.c)}°)`}</span>` : ''}`; }).join('<br>');
+      const deg = (a: number) => String(Math.round(((a * 180 / Math.PI) % 360 + 360) % 360)).padStart(3, '0');
+      const html = su.scans.map((sc, k) => {
+        const b = sv.boxes[k]; if (!b) return ''; const col = sc.ax === 'y' ? '#50d8ff' : '#e070ff', name = b.opts[['round', 'sector', 'dwell', 'off'].indexOf(b.mode)] || b.mode;
+        const what = b.mode === 'sector' || b.mode === 'dwell' ? `${name} ${Math.round(sc.sec.h * 360 / Math.PI)}° at ${deg(sc.sec.c)}°` : name;
+        let h = `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:4px 8px;border:1px solid ${b.open || b.sel ? col : 'rgba(120,180,210,0.35)'};background:rgba(4,12,18,0.55);border-radius:3px">`
+          + `<span style="color:${col}">${k + 1} SCAN ${sc.tag}</span> <span style="color:#7f9fb0">${sc.ax === 'y' ? 'bearing' : 'roll'}</span> <b style="float:right">${what} ${b.open ? '▴' : '▾'}</b>`;
+        if (b.open) h += b.opts.map((o, i) => `<div style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:11px">tap ${k + 1}: next · hold ${k + 1}: set</div>`;
+        if (b.sel) h += `<div style="color:#fff;font-size:11px">W S: width · A D: direction</div>`;
+        return h + '</div>';
+      }).join('<br>');
       if (H.scanUi.innerHTML !== html) H.scanUi.innerHTML = html;
     }
+    // (a radar that's off: its fan not drawn)
+    su.scans.forEach((sc, i) => { if (H.fans[i]) H.fans[i].visible = sc.mode !== 'off'; });
     // radar warning: each radar on her, at the edge the way it is (her warning receiver hears its direction, not its range):
     // a tracker locked on her a pulsing red chevron with a line in to her and LOCK; one sweeping for her amber, TRK; a scanner's
     // beam going over her a brief amber ping, fading
