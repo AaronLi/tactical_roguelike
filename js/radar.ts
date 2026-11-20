@@ -19,10 +19,14 @@
 // Everything here is in the level's frame (the ship the mission's on is the level: js/space.ts), a ship's own frame being her
 // group's (forward -z, up +y, starboard +x).
 export interface RcsTable { s: Float32Array; max: number; mean: number }
-export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable }
+export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number } // (iso: a return the same every way, m2: a chaff cloud's)
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3 } // (q, o: how she was turned and where she was when it was made)
 export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her frame: 'y' her up (yaw), 'x' her beam (pitch), 'z' her length (roll))
-export interface RScan { ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
+export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot } // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
+export interface RScan {
+  ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number;
+  map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
+} // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
   cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion; o: THREE.Vector3 } | null; sw: number; best: { db: number; b: THREE.Vector3; r: number }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
@@ -84,12 +88,14 @@ export const Radar = (() => {
   // ---------------------------------------------------------------- the radar equation
   const THR = 13, SIG0 = 10;                // the detection threshold (dB over the noise), and the 10 m2 a radar's R0 is quoted for
   const snrDb = (R0: number, sig: number, R: number) => THR + 10 * Math.log10(Math.max(1e-6, sig) / SIG0) + 40 * Math.log10(R0 / Math.max(1, R));
-  const pd = (db: number) => 1 / (1 + Math.exp(-(db - THR) / 1.6)); // (the chance a look at that signal is a detection)
   const detRange = (R0: number, sig: number) => R0 * Math.pow(Math.max(1e-6, sig) / SIG0, 0.25); // (where it's even odds)
   const gauss = () => { let u = 0, v = 0; while (u === 0) u = Math.random(); while (v === 0) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
   // ---------------------------------------------------------------- the radars
-  const SCAN = { rate: TAU / 3, bw: 2 * D2R, fan: 45 * D2R, R0: 6000 }; // (a turn every 3 s; 2 degrees by 90)
+  const SCAN = { rate: TAU / 3, bw: 2 * D2R, fan: 45 * D2R, R0: 7500 }; // (a turn every 3 s; 2 degrees by 90)
   const TRK = { bw: 3 * D2R, sq: 1 * D2R, hz: 6, slew: 75 * D2R, stab: 200 * D2R, acq: 60 * D2R, R0: 9000, gate: 0.06 }; // (conical scan at 6 Hz: slow enough to see in the debug view; stab: how fast the turret can turn to hold its beam still while she turns under it)
+  // a scanner's response map: MAP.na columns of angle round its axis (a degree each) by MAP.nr bins of range (25 m each, to 10 km)
+  const MAP = { na: 360, nr: 400, dr: 25, K: 24, floor: 12 }; // (K: how far over the noise round it a cell must stand to be a peak (CFAR); floor: below that, not even looked at)
+  const mapOf = (tag: string) => ({ map: new Float32Array(MAP.na * MAP.nr), age: new Float32Array(MAP.na).fill(-1e9), off: 0, col: -1, cons: [] as RContact[], nid: 0, tag });
   const MASK = Math.sin(10 * D2R); // (how far past its own side of her hull a mount can see: over the hull's edge, a little)
   const AG = 4 * Math.LN2 / (TRK.bw * TRK.bw); // (the beam's shape: exp(-AG theta^2), half power at bw/2)
   // a ship's set: scanners on her top amidships, trackers each side; size her half length (where they're mounted, and how far the
@@ -101,8 +107,8 @@ export const Radar = (() => {
   function suite(id: string, size: number, top = size * 0.25, beam = size * 0.3, bot = -top, mast = Math.max(1.5, size * 0.25)): RSuite {
     const over = (m: number, edge: number) => Math.max(MASK, Math.sin(Math.atan2(m, Math.max(0.5, edge)))); // (how far past its plane a mast that high sees over an edge that far off)
     const scans: RScan[] = [
-      { ax: 'y', th: 0, rate: SCAN.rate, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top + mast, -0.1 * size), n: new T.Vector3(0, 1, 0), mast, mask: over(mast, beam) },
-      { ax: 'z', th: Math.PI, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)) },
+      { ax: 'y', th: 0, rate: SCAN.rate, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top + mast, -0.1 * size), n: new T.Vector3(0, 1, 0), mast, mask: over(mast, beam), ...mapOf('A') },
+      { ax: 'z', th: Math.PI, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)), ...mapOf('B') },
     ];
     const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3(), r: 0 }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
     return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false };
@@ -121,29 +127,97 @@ export const Radar = (() => {
     const from = _w.copy(at).applyQuaternion(su.Q).add(su.P);
     dir.copy(t.p).sub(from); const R = dir.length(); dir.divideScalar(R || 1);
     const u = _v.copy(dir).negate().applyQuaternion(_q.copy(t.q).invert()); // (from her toward the radar, in her frame)
-    const sig = rcsAt(t.rcs, u);
+    const sig = t.iso != null ? t.iso : rcsAt(t.rcs, u);
     dir.applyQuaternion(_q.copy(su.Q).invert());
     return { R, sig };
   }
   const wrap = (a: number) => ((a % TAU) + TAU) % TAU;
   function step(su: RSuite, dt: number, targets: RTarget[], now: number) {
-    const d = new T.Vector3();
     if (!su.init) { su.Pp.copy(su.P); su.Qp.copy(su.Q); su.init = true; }
     for (const tr of su.trks) if (tr.st === 'track') stabilise(su, tr, dt);
-    // the scanners: each target the fan swept over this frame is looked at once
-    su.scans.forEach((sc, k) => {
-      const th0 = sc.th, sweep = sc.rate * dt; sc.th = wrap(sc.th + sweep);
-      for (const t of targets) {
-        if (t.id === su.id) continue;
-        const { R, sig } = look(su, sc.at, t, d), [phi, e] = angOf(sc.ax, d);
-        if (Math.abs(e) > sc.fan || wrap(phi - th0 + sc.bw / 2) > sweep + sc.bw || d.dot(sc.n) < -sc.mask) continue; // (or her own hull's in the way)
-        const db = snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2 + gauss() * 1.5; // (the fan's gain falls off toward its ends)
-        if (Math.random() < pd(db)) sc.plots.push({ k, phi: wrap(phi + gauss() * sc.bw / 4), r: R * (1 + gauss() * 0.004), t: now, db, id: t.id, e, q: su.Q.clone(), o: su.P.clone() });
-      }
-      const keep = TAU / sc.rate * 1.05; sc.plots = sc.plots.filter((p) => now - p.t < keep);
-    });
+    // the scanners: each sweeps its fan round, a column of its map at a time (scanStep)
+    su.scans.forEach((sc, k) => scanStep(su, sc, k, dt, targets, now));
     for (const tr of su.trks) trackStep(su, tr, dt, targets, now);
     su.Pp.copy(su.P); su.Qp.copy(su.Q);
+  }
+  // ---------------------------------------------------------------- the scanners' maps
+  // Each scanner's beam is a fan, narrow the way it turns (SCAN.bw) and wide along it (SCAN.fan each way). As it turns it fills its
+  // map a column at a time: a column is what comes back while the beam's on that degree, every range bin of it: the receiver's
+  // noise (an exponential power, mean 1: the noise is the map's unit) and every return in the fan there (the radar equation's
+  // signal over the noise, times the beam's gain that far off its middle, the fan's gain that far along it, and the target's
+  // fluctuation, a fresh exponential each look: Swerling 2), spread over the range bins it falls between. A return her own hull
+  // hides (past the mast's plane by more than mask) isn't there.
+  // The map is held still in space about the scanner's axis: her turning about it since (off) is taken out of where each column
+  // goes, so what's on it stays where it is while she turns (her pitch and roll for the 'y' map, her yaw and pitch for the 'z' one
+  // move things along its fan, which the map doesn't show).
+  // Peaks (cfar): a cell that's the biggest within two columns and three bins of it and stands K times over the mean of the cells either side of it
+  // in range (cell-averaging CFAR: the noise round it, two guard cells, eight training cells a side): its angle and range from the
+  // cells round it (a parabola across the three columns, a power-weighted mean across three bins). Two ships closer together than
+  // a beam width and a few range bins make one peak; noise now and then makes one (a false alarm: one in some sweeps).
+  // Each peak's a PLOT, and plots are followed from sweep to sweep as CONTACTS (associate): a plot near where a contact is expected
+  // (its last place plus its rates) is that contact's; one that isn't starts a new one ('A' and a number on the 'y' map, 'B' on the
+  // 'z' map); a contact not seen for two sweeps is dropped.
+  const DA = TAU / MAP.na, AGS = 4 * Math.LN2 / (SCAN.bw * SCAN.bw), _cd = new T.Vector3(), _ref = new T.Vector3();
+  const wrapPi = (a: number) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
+  function scanStep(su: RSuite, sc: RScan, k: number, dt: number, targets: RTarget[], now: number) {
+    // (her turning about its axis since the last step: where its nose (turn 0) was, as she is now)
+    angOf(sc.ax, _ref.copy(dirOf(sc.ax, 0, 0, _cd)).applyQuaternion(su.Qp).applyQuaternion(_qi.copy(su.Q).invert())); sc.off = wrap(sc.off + angOf(sc.ax, _ref)[0]);
+    // what's out there for it this frame: each target's turn angle, how far along the fan, range and signal (or hidden)
+    const seen: { phi: number; e: number; R: number; s: number; id: string }[] = [];
+    for (const t of targets) {
+      if (t.id === su.id) continue;
+      const { R, sig } = look(su, sc.at, t, _cd), [phi, e] = angOf(sc.ax, _cd);
+      if (Math.abs(e) > sc.fan || _cd.dot(sc.n) < -sc.mask || R > MAP.nr * MAP.dr) continue;
+      seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2) / 10), id: t.id });
+    }
+    const th0 = sc.th; sc.th = wrap(sc.th + sc.rate * dt);
+    // the columns its middle crossed this frame (in her angle), each written where it goes on the map
+    const j0 = Math.floor(th0 / DA), j1 = Math.floor(sc.th / DA), n = ((j1 - j0) % MAP.na + MAP.na) % MAP.na;
+    for (let s1 = 1; s1 <= n; s1++) {
+      const j = (j0 + s1) % MAP.na, a = (j + 0.5) * DA, mc = Math.floor(wrap(a - sc.off) / DA) % MAP.na, base = mc * MAP.nr, m = sc.map;
+      for (let i = 0; i < MAP.nr; i++) m[base + i] = -Math.log(1 - Math.random());
+      for (const q of seen) {
+        const d = wrapPi(q.phi - a); if (Math.abs(d) > 3 * sc.bw) continue;
+        const pw = q.s * Math.exp(-AGS * d * d) * -Math.log(1 - Math.random()), rb = q.R / MAP.dr - 0.5, i0 = Math.floor(rb), f = rb - i0;
+        if (i0 >= 0 && i0 < MAP.nr) m[base + i0] += pw * (1 - f); if (i0 + 1 >= 0 && i0 + 1 < MAP.nr) m[base + i0 + 1] += pw * f;
+      }
+      sc.age[mc] = now;
+      if (sc.col >= 0) cfar(su, sc, k, (mc - 2 + MAP.na) % MAP.na, seen, now); // (two columns back: both pairs of its neighbours are in now)
+      sc.col = mc;
+    }
+    const keep = TAU / sc.rate * 1.05; sc.plots = sc.plots.filter((p) => now - p.t < keep);
+    sc.cons = sc.cons.filter((c) => now - c.t < keep * 2.1);
+  }
+  function cfar(su: RSuite, sc: RScan, k: number, c: number, seen: { phi: number; R: number; id: string }[], now: number) {
+    const m = sc.map, NR = MAP.nr, per = TAU / sc.rate, cs = [-2, -1, 1, 2].map((o) => (c + o + MAP.na) % MAP.na), cl = cs[1], cr = cs[2];
+    for (const q of cs) if (now - sc.age[q] > per * 0.6) return; // (a neighbour from the sweep before: not comparable)
+    const b = c * NR, bl = cl * NR, br = cr * NR;
+    outer: for (let i = 1; i < NR - 1; i++) {
+      const v = m[b + i]; if (v < MAP.floor) continue;
+      // (the biggest within two columns and three bins: one ship's return spreads over a few, and makes one peak)
+      for (const q of [c, ...cs]) for (let g = -3; g <= 3; g++) { const ii = i + g; if ((q !== c || g !== 0) && ii >= 0 && ii < NR && m[q * NR + ii] > v) continue outer; }
+      let z = 0, nz = 0; for (let g = 3; g <= 10; g++) { if (i - g >= 0) { z += m[b + i - g]; nz++; } if (i + g < NR) { z += m[b + i + g]; nz++; } }
+      z = Math.max(0.5, z / Math.max(1, nz)); if (v < MAP.K * z) continue;
+      const pl = m[bl + i], pr = m[br + i], den = pl - 2 * v + pr, dc = den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (pl - pr) / den)) : 0;
+      const w0 = m[b + i - 1], w2 = m[b + i + 1], R = ((i - 1 + 0.5) * w0 + (i + 0.5) * v + (i + 1.5) * w2) / (w0 + v + w2) * MAP.dr;
+      const A = (c + 0.5 + dc) * DA, phi = wrap(A + sc.off), db = 10 * Math.log10(v / z);
+      // (which target it really was, if any: for the debug view only, nothing uses it to decide anything)
+      let id = '', bd = 1e9; for (const q of seen) { const dd = Math.abs(wrapPi(q.phi - phi)) / sc.bw + Math.abs(q.R - R) / (MAP.dr * 3); if (dd < 2 && dd < bd) { bd = dd; id = q.id; } }
+      const p: RPlot = { k, phi, r: R, t: now, db, id, e: 0, q: su.Q.clone(), o: su.P.clone() };
+      sc.plots.push(p); associate(sc, p, A, now);
+    }
+  }
+  function associate(sc: RScan, p: RPlot, A: number, now: number) {
+    const per = TAU / sc.rate; let best: RContact | null = null, bd = 1e9;
+    for (const c of sc.cons) {
+      const dt = now - c.t; if (dt < per * 0.5) continue; // (one plot a contact a sweep)
+      const dA = Math.abs(wrapPi(A - (c.A + c.vA * dt))), dr = Math.abs(p.r - (c.r + c.vr * dt)), gA = Math.max(4 * D2R, Math.atan2((c.hits > 2 ? 80 : 250) * dt, Math.max(50, p.r))), gr = Math.max(120, 0.04 * p.r) + (c.hits > 2 ? 80 : 250) * dt; // (as far as a ship could have gone across or along since, at 250 m/s: less once its rates are known)
+      if (dA > gA || dr > gr) continue; const d = dA / gA + dr / gr; if (d < bd) { bd = d; best = c; }
+    }
+    if (!best) { sc.cons.push({ n: sc.tag + (++sc.nid), A, r: p.r, vA: 0, vr: 0, t: now, hits: 1, p }); return; }
+    const dt = now - best.t, eA = wrapPi(A - (best.A + best.vA * dt)), er = p.r - (best.r + best.vr * dt);
+    best.A = wrap(best.A + best.vA * dt + 0.6 * eA); best.r = best.r + best.vr * dt + 0.6 * er;
+    best.vA += 0.3 * eA / dt; best.vr += 0.3 * er / dt; best.t = now; best.hits++; best.p = p;
   }
   // A tracker knows how its own ship moves (her gyros and her navigation): before it looks, its boresight is turned to undo her
   // rotation since the last step (held still in space, not in her frame), and to stay on the point it was on (at the range in its
@@ -187,18 +261,21 @@ export const Radar = (() => {
   // the boresight turned toward `to` no faster than the turret can
   function slewTo(tr: RTrack, to: THREE.Vector3, max: number) { const ang = tr.b.angleTo(to); if (ang <= max) tr.b.copy(to); else { const ax = _w.crossVectors(tr.b, to); if (ax.lengthSq() < 1e-12) ax.set(0, 1, 0); tr.b.applyAxisAngle(ax.normalize(), max); } tr.b.normalize(); return ang; }
   const inSide = (tr: RTrack, b: THREE.Vector3) => b.x * tr.side > -MASK; // (a tracker sees its own flank's half of the sky)
-  // what the tracker's beam (axis a) gets back from the targets in its range gate: the strongest, its signal and which it is
-  function beamDb(su: RSuite, tr: RTrack, a: THREE.Vector3, targets: RTarget[], gate: number | null) {
-    let best = -99, id: string | null = null, R0 = 0, dir: THREE.Vector3 | null = null; const d = new T.Vector3();
+  // What the tracker's beam (axis a) gets back from everything in its range gate: the returns (each one's way from the mount, its
+  // signal over the noise at the beam's middle, its range) and their sum through the beam that way (the beam's gain off its axis,
+  // exp(-AG theta^2)). It can't tell them apart: the conical scan steers on their sum (to their power-weighted middle), and the
+  // range gate follows their power-weighted range. id is the strongest of them (for the debug view only).
+  function beam(su: RSuite, tr: RTrack, a: THREE.Vector3, targets: RTarget[], gate: number | null) {
+    const rs: { d: THREE.Vector3; s: number; R: number; id: string }[] = []; let sum = 0, rw = 0, best = 0, id: string | null = null; const d = new T.Vector3();
     for (const t of targets) {
       if (t.id === su.id) continue;
       const { R, sig } = look(su, tr.at, t, d);
       if (gate != null && Math.abs(R - gate) > Math.max(150, gate * TRK.gate)) continue;
       const th = a.angleTo(d); if (th > TRK.bw * 2.5) continue;
-      const db = snrDb(TRK.R0, sig, R) - 10 * Math.log10(Math.E) * AG * th * th;
-      if (db > best) { best = db; id = t.id; R0 = R; dir = d.clone(); }
+      const s0 = Math.pow(10, snrDb(TRK.R0, sig, R) / 10), g = s0 * Math.exp(-AG * th * th); rs.push({ d: d.clone(), s: s0, R, id: t.id });
+      sum += g; rw += g * R; if (g > best) { best = g; id = t.id; }
     }
-    return { db: best, id, R: R0, dir };
+    return { db: sum > 0 ? 10 * Math.log10(sum) : -99, id, R: sum > 0 ? rw / sum : 0, rs };
   }
   function trackStep(su: RSuite, tr: RTrack, dt: number, targets: RTarget[], now: number) {
     if (tr.st === 'idle') { tr.a.copy(tr.b); return; }
@@ -213,7 +290,7 @@ export const Radar = (() => {
       if (tr.st === 'slew') { const to = new T.Vector3(); tr.rng = cueDir(su, tr, c, -sc.fan, to); if (slewTo(tr, to, TRK.slew * dt) < 1 * D2R) tr.st = 'acq'; tr.a.copy(tr.b); return; }
       // along the fan, its range gate at the plot's range: the strongest return on the way is where she is
       tr.sw += TRK.acq * dt; const gate = cueDir(su, tr, c, Math.min(tr.sw, sc.fan), tr.b); tr.rng = gate; tr.a.copy(tr.b);
-      if (inSide(tr, tr.b)) { const r = beamDb(su, tr, tr.b, targets, gate); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.r = gate; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
+      if (inSide(tr, tr.b)) { const r = beam(su, tr, tr.b, targets, gate); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.r = gate; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
       if (tr.sw >= sc.fan) {
         if (tr.best.db > THR) { for (const o of su.trks) if (o !== tr && o.cue === c && o.st !== 'track') drop(o); tr.b.copy(tr.best.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = tr.best.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }
         else drop(tr);
@@ -228,13 +305,13 @@ export const Radar = (() => {
     const e1 = new T.Vector3(), e2 = new T.Vector3(), uv = new T.Vector3(), N = 8;
     tr.b.addScaledVector(tr.w, dt).normalize();
     (Math.abs(tr.b.y) < 0.9 ? e1.set(0, 1, 0) : e1.set(1, 0, 0)).cross(tr.b).normalize(); e2.crossVectors(tr.b, e1);
-    const bd = beamDb(su, tr, tr.b, targets, tr.rng), dph = TAU * TRK.hz * dt / N;
+    const bd = beam(su, tr, tr.b, targets, tr.rng), dph = TAU * TRK.hz * dt / N;
     for (let i = 0; i < N; i++) {
       tr.ph = (tr.ph + dph) % TAU; tr.dP += dph;
       uv.copy(e1).multiplyScalar(Math.cos(tr.ph)).addScaledVector(e2, Math.sin(tr.ph));
       tr.a.copy(tr.b).addScaledVector(uv, Math.tan(TRK.sq)).normalize();
-      if (!bd.dir) continue;
-      const th = tr.a.angleTo(bd.dir), g = Math.exp(-AG * th * th); tr.dE.addScaledVector(uv, g); tr.dA += g;
+      let g = 0; for (const q of bd.rs) { const th = tr.a.angleTo(q.d); g += q.s * Math.exp(-AG * th * th); } // (what comes back with the beam's axis there: all of it)
+      tr.dE.addScaledVector(uv, g); tr.dA += g;
     }
     tr.db = bd.db;
     // her going round toward the other side (the overlap where both turrets can see): the other tracker, if it's free, is handed
@@ -242,7 +319,7 @@ export const Radar = (() => {
     const oth = su.trks.find((o) => o !== tr);
     if (oth && oth.st === 'idle' && tr.est.p && tr.est.q > 0.3 && tr.b.x * tr.side < 0.05 && inSide(oth, _w.copy(tr.est.p).sub(_v.copy(oth.at).applyQuaternion(su.Q).add(su.P)).normalize().applyQuaternion(_qi.copy(su.Q).invert()))) { drop(oth); // (only if she's in its half of the sky, from its own mount)
       oth.st = 'slew'; oth.hand = { p: tr.est.p.clone(), v: tr.est.v.clone(), t: now }; }
-    if (!bd.dir || bd.db < THR - 4 || !inSide(tr, tr.b)) { tr.lost += dt; if (tr.lost > 0.5) drop(tr); return; }
+    if (!bd.rs.length || bd.db < THR - 4 || !inSide(tr, tr.b)) { tr.lost += dt; if (tr.lost > 0.5) drop(tr); return; }
     tr.lost = 0; tr.tgt = bd.id; tr.lockT += dt;
     if (tr.dP >= TAU && tr.dA > 0) {
       // the error: <G u> / (<G> AG sq) is the target's offset from the boresight (exact while she's well inside the beam; it can't
@@ -252,7 +329,7 @@ export const Radar = (() => {
       eps.addScaledVector(tr.b, -eps.dot(tr.b)); // (in the plane square to the boresight)
       tr.err = tr.err * 0.6 + eps.length() * 0.4;
       slewTo(tr, tr.b.clone().add(eps).normalize(), TRK.slew * Tc);
-      tr.w.multiplyScalar(0.98).addScaledVector(eps, 0.5 / Tc); // (an integrator, a little leaky: a steady crossing rate is learnt, and no lag is left behind it) tr.w.addScaledVector(tr.b, -tr.w.dot(tr.b));
+      tr.w.multiplyScalar(0.98).addScaledVector(eps, 0.5 / Tc); tr.w.addScaledVector(tr.b, -tr.w.dot(tr.b)); // (an integrator, a little leaky: a steady crossing rate is learnt, and no lag is left behind it)
       if (tr.w.length() > TRK.slew) tr.w.setLength(TRK.slew);
       tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0;
     }
@@ -263,8 +340,10 @@ export const Radar = (() => {
     es.q = Math.min(1, tr.lockT / 1.5) * Math.max(0, 1 - tr.err / (TRK.bw * 0.5));
   }
   // the best track she has on a target: a tracker holding it, and how good its solution is
-  function lockOn(su: RSuite | null, id: string) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && t.tgt === id && (!b || t.est.q > b.est.q)) b = t; return b; }
+  function lockOn(su: RSuite | null, id: string) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && t.tgt === id && (!b || t.est.q > b.est.q)) b = t; return b; } // (the truth: for the debug view)
+  // her best track on whatever it's on (what her fire control has: it doesn't know what it is)
+  function best(su: RSuite | null) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && (!b || t.est.q > b.est.q)) b = t; return b; }
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
-  return { show: 0, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { show: 0, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

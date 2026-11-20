@@ -152,6 +152,21 @@ A ship knows where another ship is only from what her radars tell her. Every shi
   - at 30°/s the lock holds;
   - at 60°/s the lock holds and is handed across;
   - at 90°/s and faster it's lost.
+- **What a scanner sees is a map** (`scanStep`). As its beam turns it fills a map of response, a column per degree of its turn
+  by 25 m range bins out to 10 km. Each column holds the receiver's noise plus every return in the fan there: the radar
+  equation's signal, the beam's gain off its middle, the fan's gain along it, and a fresh fluctuation each look. The map is
+  held still in space about the scanner's axis while the ship turns. Peaks are found by cell-averaging CFAR (`cfar`): a cell
+  biggest within two columns and three bins, standing 24 times over the noise either side of it in range. Each is refined to
+  a centroid and becomes a plot. Two ships closer than a beam width and a few bins make one peak; noise rarely makes one.
+  Plots are followed from sweep to sweep as numbered contacts (`associate`; A on the bearing map, B on the roll map), and a
+  tracker is cued on a contact's latest plot. The sensor screen draws the maps as PPIs, range as its square root, with the
+  contacts boxed; the F8 panel shows each ship's maps as angle by range.
+- **A tracker gets everything in its beam and range gate** (`beam`): the conical scan steers to their power-weighted middle,
+  and the gate follows their power-weighted range.
+- **Chaff** (V at the helm or the sensor station, 12 loads; `chaffGo`). A cloud keeps the ship's velocity plus 22 m/s. Its
+  return blooms to 250 m² in about half a second, holds for 5 s and fades. It's a peak on the scanners' maps and more return
+  in a tracker's beam. Tested on the frigate's lock at 670 m, launching while pulling away at 60 m/s: her tracker went to
+  the cloud and her estimate drifted off at the ship's speed, and her guns stopped hitting.
 - **Where they're mounted.** Each ship has two scanners, each on a mast. The 'y' scanner stands over her roof: it sees round her
   horizon, and below her deck only as far as its mast lets it see over her sides, so it's blind under her keel. The 'z' scanner
   stands off her bow and turns about her length (roll), its fan lying along her length: a plot is the angle round her and the

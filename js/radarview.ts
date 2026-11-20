@@ -137,48 +137,78 @@ export const RadarView = (() => {
     }
     if (!panel) { panel = document.createElement('div'); panel.id = 'ew-dbg'; Object.assign(panel.style, { position: 'fixed', left: '12px', top: '64px', zIndex: '40', font: '12px ui-monospace, Consolas, monospace', color: '#cfe8f5', background: 'rgba(4,10,16,0.72)', padding: '8px 10px', borderRadius: '4px', pointerEvents: 'none', maxWidth: '46vw', lineHeight: '1.45' }); document.body.appendChild(panel); }
     panel.style.display = ''; panel.innerHTML = '<b style="color:#40e0ff">ELECTRONIC WARFARE (F8)</b> · <span style="color:#40e0ff">■ yours</span> (trackers <span style="color:#60ffd0">acquiring</span> / <span style="color:#3090ff">tracking</span>) · <span style="color:#ff5040">■ theirs</span> (<span style="color:#ffa030">acquiring</span> / <span style="color:#ff2020">tracking</span>)<br>' + lines.join('<br>');
+    panel.appendChild(maps(suites, now)); // (each ship's maps, as they are)
   }
   // ---------------------------------------------------------------- the sensor station's screen
   const RMAX = 10000;
-  // where things are on it (W x H): the two scopes' middles and radius
+  // where things are on it (W x H): the two scopes' middles and radius. Range goes out as its square root (10 km at the edge, 2.5 km
+  // half way, 625 m a quarter): close in is where things happen
   const lay = (W: number, H: number) => { const R = Math.min(W * 0.24, H * 0.36); return { R, c: [[W * 0.26, H * 0.42], [W * 0.74, H * 0.42]] }; };
-  // a plot's place on its scope: its turn angle as she's turned now (the middle of its fan, made when she was turned p.q, in her
-  // frame now), so what she's painted stays where it is in space while she turns
+  const rOut = (r: number, R: number) => Math.sqrt(Math.min(1, Math.max(0, r) / RMAX)) * R;
+  // a plot's turn angle as she's turned now (the middle of its fan, made when she was turned p.q, in her frame now), so what she's
+  // painted stays where it is in space while she turns
   const qi = new T.Quaternion(), _d = new T.Vector3();
   function phiNow(su: RSuite, p: RPlot) { if (!p.q) return p.phi; const ax = su.scans[p.k].ax; Radar.dirOf(ax, p.phi, 0, _d).applyQuaternion(p.q).applyQuaternion(qi.copy(su.Q).invert()); return Radar.angOf(ax, _d)[0]; }
-  function plotXY(su: RSuite, p: RPlot, W: number, H: number) {
-    const L = lay(W, H), sc = su.scans[p.k], [cx, cy] = L.c[sc.ax === 'y' ? 0 : 1], r = Math.min(1, p.r / RMAX) * L.R, ph = phiNow(su, p);
-    return sc.ax !== 'x' ? [cx + Math.sin(ph) * r, cy - Math.cos(ph) * r] : [cx + Math.cos(ph) * r, cy - Math.sin(ph) * r];
-  }
-  // the plot under the cursor (cu: x, y on the screen), if one's within 14 px
+  const sOf = (ax: string) => (ax === 'y' ? 0 : 1);
+  function polar(cx: number, cy: number, ax: string, a: number, r: number) { return ax !== 'x' ? [cx + Math.sin(a) * r, cy - Math.cos(a) * r] : [cx + Math.cos(a) * r, cy - Math.sin(a) * r]; }
+  function plotXY(su: RSuite, p: RPlot, W: number, H: number) { const L = lay(W, H), sc = su.scans[p.k], [cx, cy] = L.c[sOf(sc.ax)]; return polar(cx, cy, sc.ax, phiNow(su, p), rOut(p.r, L.R)); }
+  // the contacts on a scanner's map that are worth showing: seen at least twice, or just now
+  const shown = (sc: RScan, now: number) => sc.cons.filter((c) => c.hits >= 2 || now - c.t < 0.5);
+  // the contact under the cursor (cu: x, y on the screen), if one's within 14 px: its latest plot (what a tracker's cued on)
   function pick(su: RSuite, cu: number[] | null, W: number, H: number, now: number): RPlot | null {
     if (!cu) return null; let best: RPlot | null = null, bd = 14 * W / 512;
-    for (const sc of su.scans) for (const p of sc.plots) { if ((now - p.t) * sc.rate > TAU) continue; const [x, y] = plotXY(su, p, W, H), d = Math.hypot(x - cu[0], y - cu[1]); if (d < bd) { bd = d; best = p; } }
+    for (const sc of su.scans) for (const c of shown(sc, now)) { const [x, y] = plotXY(su, c.p, W, H), d = Math.hypot(x - cu[0], y - cu[1]); if (d < bd) { bd = d; best = c.p; } }
     return best;
   }
+  const conOf = (su: RSuite, p: RPlot) => su.scans[p.k].cons.find((c) => c.p === p);
+  // The map drawn: each pixel of a scope is an angle and a range (worked out once a layout: lut), looked up on the map where that
+  // angle is now (the map's held still about its axis: off), its brightness the power there in dB over the noise, dimmer the longer
+  // since the sweep wrote it (a PPI's afterglow)
+  let lutFor = '', lut: { i: Int32Array; a: Float32Array; rb: Int32Array; s: Uint8Array } | null = null, img: ImageData | null = null;
+  function makeLut(W: number, H: number) {
+    const L = lay(W, H), idx: number[] = [], an: number[] = [], rb: number[] = [], sc: number[] = [];
+    for (let s = 0; s < 2; s++) {
+      const [cx, cy] = L.c[s];
+      for (let y = Math.floor(cy - L.R); y <= Math.ceil(cy + L.R); y++) for (let x = Math.floor(cx - L.R); x <= Math.ceil(cx + L.R); x++) {
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.hypot(dx, dy); if (d > L.R) continue;
+        const r = (d / L.R) ** 2 * RMAX; idx.push(y * W + x); an.push(Math.atan2(dx, -dy)); rb.push(Math.min(Radar.MAP.nr - 1, Math.floor(r / Radar.MAP.dr))); sc.push(s);
+      }
+    }
+    lut = { i: Int32Array.from(idx), a: Float32Array.from(an), rb: Int32Array.from(rb), s: Uint8Array.from(sc) }; lutFor = W + 'x' + H;
+  }
   function scope(cv: HTMLCanvasElement, su: RSuite, cu: number[] | null, now: number, live: boolean) {
-    const c = cv.getContext('2d')!, W = cv.width, H = cv.height, L = lay(W, H), k = W / 512;
-    c.fillStyle = '#03080b'; c.fillRect(0, 0, W, H); c.lineWidth = 1 * k; c.font = `${11 * k}px ui-monospace, Consolas, monospace`; c.textBaseline = 'middle';
-    su.scans.forEach((sc) => { // (one scope an axis: her roof's scanner and her keel's both on it, a sweep each)
-      const [cx, cy] = L.c[sc.ax === 'y' ? 0 : 1];
-      c.strokeStyle = '#163846'; for (const f of [1, 0.75, 0.5, 0.25]) { c.beginPath(); c.arc(cx, cy, L.R * f, 0, TAU); c.stroke(); }
+    const c = cv.getContext('2d')!, W = cv.width, H = cv.height, L = lay(W, H), k = W / 512, M = Radar.MAP;
+    if (lutFor !== W + 'x' + H || !lut) makeLut(W, H);
+    if (!img || img.width !== W || img.height !== H) { img = c.createImageData(W, H); const d0 = img.data; for (let q = 0; q < d0.length; q += 4) { d0[q] = 3; d0[q + 1] = 8; d0[q + 2] = 11; d0[q + 3] = 255; } }
+    const d = img.data, U = lut!, byS = [0, 1].map((s0) => su.scans.find((q) => sOf(q.ax) === s0) || null), TAUa = TAU / M.na;
+    for (let n = 0; n < U.i.length; n++) {
+      const sc = byS[U.s[n]], o = U.i[n] * 4; if (!sc) { d[o] = 3; d[o + 1] = 8; d[o + 2] = 11; continue; }
+      let A = (U.a[n] - sc.off) % TAU; if (A < 0) A += TAU; const col = Math.floor(A / TAUa) % M.na, v = sc.map[col * M.nr + U.rb[n]];
+      const age = (now - sc.age[col]) * sc.rate / TAU, f = age > 1 ? 0 : 0.3 + 0.7 * (1 - age), db = 10 * Math.log10(Math.max(1e-3, v)), b = Math.max(0, Math.min(1, (db - 2) / 22)) * f;
+      d[o] = 4 + 120 * b * b; d[o + 1] = 10 + 245 * b; d[o + 2] = 14 + 140 * b * b;
+    }
+    c.putImageData(img, 0, 0);
+    c.lineWidth = 1 * k; c.font = `${11 * k}px ui-monospace, Consolas, monospace`; c.textBaseline = 'middle';
+    su.scans.forEach((sc) => {
+      const [cx, cy] = L.c[sOf(sc.ax)];
+      c.strokeStyle = 'rgba(40,110,140,0.55)'; for (const r of [625, 2500, 5625, 10000]) { c.beginPath(); c.arc(cx, cy, rOut(r, L.R), 0, TAU); c.stroke(); }
       c.beginPath(); c.moveTo(cx - L.R, cy); c.lineTo(cx + L.R, cy); c.moveTo(cx, cy - L.R); c.lineTo(cx, cy + L.R); c.stroke();
-      // the sweep and its afterglow
-      const sw = (a: number) => sc.ax !== 'x' ? [cx + Math.sin(a) * L.R, cy - Math.cos(a) * L.R] : [cx + Math.cos(a) * L.R, cy - Math.sin(a) * L.R];
-      for (let j = 12; j >= 0; j--) { const [x, y] = sw(sc.th - j * 3 * D2R); c.strokeStyle = `rgba(80,220,255,${j ? 0.05 + 0.02 * (12 - j) / 12 : 0.85})`; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke(); }
-      for (const p of sc.plots) {
-        const f = Math.max(0, 1 - (now - p.t) * sc.rate / TAU); if (f <= 0) continue;
-        const [x, y] = plotXY(su, p, W, H); c.fillStyle = `rgba(140,255,170,${f})`; c.beginPath(); c.arc(x, y, (2 + Math.max(0, Math.min(3, (p.db - Radar.THR) / 6))) * k, 0, TAU); c.fill();
+      const [x, y] = polar(cx, cy, sc.ax, sc.th, L.R); c.strokeStyle = 'rgba(120,230,255,0.8)'; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
+      // its contacts: a box and its number on each peak it's following
+      for (const ct of shown(sc, now)) {
+        const [px, py] = plotXY(su, ct.p, W, H), fresh = Math.max(0.35, 1 - (now - ct.t) * sc.rate / TAU);
+        c.strokeStyle = `rgba(255,236,150,${fresh})`; c.strokeRect(px - 4 * k, py - 4 * k, 8 * k, 8 * k); c.fillStyle = `rgba(255,236,150,${fresh})`; c.fillText(ct.n, px + 6 * k, py - 6 * k);
       }
       // the trackers' boresights on it: a tick at the scope's edge, and a box where a track has her
       su.trks.forEach((tr) => {
         if (tr.st === 'idle') return;
-        const [a] = Radar.angOf(sc.ax, tr.b), [x, y] = sw(a), col = tr.st === 'track' ? '#ff4030' : '#ffc040';
-        c.strokeStyle = col; c.beginPath(); c.moveTo(cx + (x - cx) * 0.9, cy + (y - cy) * 0.9); c.lineTo(x, y); c.stroke();
-        if (tr.st === 'track') { const r = Math.min(1, tr.rng / RMAX) * L.R, px = cx + (x - cx) / L.R * r, py = cy + (y - cy) / L.R * r; c.strokeRect(px - 5 * k, py - 5 * k, 10 * k, 10 * k); }
+        const [a] = Radar.angOf(sc.ax, tr.b), [tx, ty] = polar(cx, cy, sc.ax, a, L.R), col = tr.st === 'track' ? '#ff4030' : '#ffc040';
+        c.strokeStyle = col; c.beginPath(); c.moveTo(cx + (tx - cx) * 0.9, cy + (ty - cy) * 0.9); c.lineTo(tx, ty); c.stroke();
+        if (tr.st === 'track') { const [px, py] = polar(cx, cy, sc.ax, a, rOut(tr.rng, L.R)); c.strokeRect(px - 6 * k, py - 6 * k, 12 * k, 12 * k); }
       });
       c.fillStyle = '#5fa8c4'; c.fillText(sc.ax === 'y' ? 'SCAN A  bearing · nose up' : sc.ax === 'z' ? 'SCAN B  roll · from astern, up ↑' : 'SCAN B  elevation · ahead →', cx - L.R, cy - L.R - 9 * k);
-      c.fillText('10 km', cx + 3 * k, cy - L.R + 7 * k);
+      c.fillStyle = '#3d7a90'; c.fillText('10', cx + 2 * k, cy - L.R + 6 * k); c.fillText('2.5', cx + 2 * k, cy - rOut(2500, L.R) + 6 * k);
     });
     // the trackers
     su.trks.forEach((tr, i) => {
@@ -187,12 +217,46 @@ export const RadarView = (() => {
       c.fillStyle = '#9fc2d4'; if (tr.st === 'track') c.fillText(`${(tr.rng / 1000).toFixed(2)} km  err ${(tr.err / D2R).toFixed(1)}°  sol ${Math.round(tr.est.q * 100)}%`, x, y + 15 * k);
     });
     if (!live) { c.fillStyle = '#3d6a80'; c.fillText('look at the screen: click a contact to track it', 10 * k, 12 * k); }
-    // the cursor, and the plot under it
+    // the cursor, and the contact under it
     if (cu) {
       const p = pick(su, cu, W, H, now);
-      if (p) { const [x, y] = plotXY(su, p, W, H); c.strokeStyle = '#ffffff'; c.beginPath(); c.arc(x, y, 8 * k, 0, TAU); c.stroke(); c.fillStyle = '#ffffff'; c.fillText(`${(p.r / 1000).toFixed(2)} km  ${Math.round(p.db)} dB  click: track`, Math.min(x + 12 * k, W - 170 * k), y); }
+      if (p) { const [x, y] = plotXY(su, p, W, H), ct = conOf(su, p); c.strokeStyle = '#ffffff'; c.beginPath(); c.arc(x, y, 9 * k, 0, TAU); c.stroke(); c.fillStyle = '#ffffff'; c.fillText(`${ct ? ct.n + '  ' : ''}${(p.r / 1000).toFixed(2)} km  ${Math.round(p.db)} dB  click: track`, Math.min(x + 12 * k, W - 190 * k), y + 12 * k); }
       c.strokeStyle = 'rgba(255,255,255,0.85)'; c.beginPath(); c.moveTo(cu[0] - 9 * k, cu[1]); c.lineTo(cu[0] - 3 * k, cu[1]); c.moveTo(cu[0] + 3 * k, cu[1]); c.lineTo(cu[0] + 9 * k, cu[1]); c.moveTo(cu[0], cu[1] - 9 * k); c.lineTo(cu[0], cu[1] - 3 * k); c.moveTo(cu[0], cu[1] + 3 * k); c.lineTo(cu[0], cu[1] + 9 * k); c.stroke();
     }
   }
+  // The debug view's maps (F8): each ship's two maps as they are, angle across (her nose, or her up, in the middle) and range down
+  // (its square root), every peak a contact holds ringed with its number
+  let mapCv: HTMLCanvasElement | null = null, mapImg: ImageData | null = null;
+  function maps(suites: RSuite[], now: number) {
+    const MW = 240, MH = 120, M = Radar.MAP, rows = suites.length;
+    if (!mapCv) { mapCv = document.createElement('canvas'); mapCv.style.display = 'block'; mapCv.style.marginTop = '6px'; }
+    if (mapCv.width !== MW * 2 + 10 || mapCv.height !== rows * (MH + 16)) { mapCv.width = MW * 2 + 10; mapCv.height = rows * (MH + 16); mapImg = null; }
+    const c = mapCv.getContext('2d')!; if (!mapImg) mapImg = c.createImageData(mapCv.width, mapCv.height);
+    const d = mapImg.data; d.fill(0); for (let q = 3; q < d.length; q += 4) d[q] = 0;
+    suites.forEach((su, row) => su.scans.forEach((sc, k) => {
+      const x0 = k * (MW + 10), y0 = row * (MH + 16) + 14;
+      for (let x = 0; x < MW; x++) {
+        let A = ((x + 0.5) / MW - 0.5) * TAU - sc.off; A = ((A % TAU) + TAU) % TAU; const col = Math.floor(A / (TAU / M.na)) % M.na;
+        const age = (now - sc.age[col]) * sc.rate / TAU, f = age > 1 ? 0.15 : 0.35 + 0.65 * (1 - age);
+        for (let y = 0; y < MH; y++) {
+          const rb = Math.min(M.nr - 1, Math.floor(((y + 0.5) / MH) ** 2 * RMAX / M.dr)), v = sc.map[col * M.nr + rb], b = Math.max(0, Math.min(1, (10 * Math.log10(Math.max(1e-3, v)) - 2) / 22)) * f, o = ((y0 + y) * mapCv!.width + x0 + x) * 4;
+          d[o] = 10 + 140 * b * b; d[o + 1] = 14 + 240 * b; d[o + 2] = 20 + 120 * b * b; d[o + 3] = 235;
+        }
+      }
+    }));
+    c.putImageData(mapImg, 0, 0);
+    c.font = '10px ui-monospace, Consolas, monospace'; c.textBaseline = 'top';
+    suites.forEach((su, row) => su.scans.forEach((sc, k) => {
+      const x0 = k * (MW + 10), y0 = row * (MH + 16) + 14;
+      c.fillStyle = '#9fd0e4'; c.fillText(`${su.id} · ${sc.tag} ${sc.ax === 'y' ? 'bearing (nose mid)' : 'roll (up mid)'} × range`, x0, y0 - 12);
+      const sx = (((wrapPi(sc.th) / TAU) + 0.5) * MW); c.strokeStyle = 'rgba(120,230,255,0.7)'; c.beginPath(); c.moveTo(x0 + sx, y0); c.lineTo(x0 + sx, y0 + MH); c.stroke();
+      for (const ct of shown(sc, now)) {
+        const ph = phiNow(su, ct.p), x = x0 + ((wrapPi(ph) / TAU) + 0.5) * MW, y = y0 + Math.sqrt(Math.min(1, ct.p.r / RMAX)) * MH;
+        c.strokeStyle = '#ffec96'; c.beginPath(); c.arc(x, y, 5, 0, TAU); c.stroke(); c.fillStyle = '#ffec96'; c.fillText(ct.n + (ct.p.id ? ' ' + ct.p.id : ''), x + 6, y - 4);
+      }
+    }));
+    return mapCv;
+  }
+  const wrapPi = (a: number) => Radar.wrapPi(a);
   return { update, scope, pick };
 })();
