@@ -85,8 +85,15 @@ ship goes dormant again (its interior saved) once nobody is aboard and the squad
     from it to those coming in (`phaseMsg`, `toLevel`).
   - A live level nobody's in any more is put away.
   - Checked headlessly with a stand-in left aboard the mission ship.
+- **Step 3** (activation ahead): done.
+  - Whoever flies the squad's ship tells the host which zone ships it's within 5 km of, the one it's at too (`'tnear'`),
+    and which it's gone over 8 km from (`'tfar'`): js/space.ts `ewNear`.
+  - Coming within 5 km, the ship's level is made ahead, live (`warm`). It's made quietly: nobody told, no player's state
+    touched (`Server.quiet`), the same way the switch makes one (`bringUp`). At most two are made ahead.
+  - Coming up with it, the switch just loads it.
+  - The ship being left stays live while the squad's ship is near it. Over 8 km off, with nobody aboard, it's put away.
+  - Checked: going to MV Halcyon and back, no level was made at either switch.
 - **Still to do:**
-  - Step 3: activation ahead of arrival, so the ship's live before the squad's ship gets there, plus the cap.
   - Showing the squad's ship to those left in another level (its pose is in the frame of the level it's at, `spose`, so
     they don't get it now).
   - The `L` tag on the run's messages that someone in another level ought to have.

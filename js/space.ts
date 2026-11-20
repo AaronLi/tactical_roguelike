@@ -484,6 +484,20 @@ export const Space = (() => {
       su.fus = []; su.fusHist.clear(); su.fusKF.clear(); su.fusSeen.clear(); su.fusIds.clear(); su.ass = []; su.assHold.clear(); su.fusT = -1; su.init = false;
     }
   }
+  // The zone's ships the squad's ship is coming up with (within 5 km) or going away from (over 8 km), told to the host (by whoever
+  // flies it): their levels made ahead, live, so coming up with one changes nothing that's seen (docs/zone-levels.md)
+  const nearSent = new Set<number>(); let nearOf = -2;
+  function ewNear() {
+    if (S.kind !== 'board' || !S.zinfo || !isCtl()) return;
+    if (nearOf !== S.zinfo.ms.seed) { nearSent.clear(); nearOf = S.zinfo.ms.seed; }
+    if (!nearSent.has(S.zact)) { nearSent.add(S.zact); Net.toHost({ t: 'tnear', k: S.zact }); } // (the one she's at: near it, as she's at it)
+    for (const q of S.traffic) {
+      const k = q.c.k; if (k == null || !q.wp) continue; // (the one she's at too: the host keeps it live as she goes on to another, while she's near it)
+      const d = S.P.distanceTo(q.wp.p);
+      if (d < 5000 && !nearSent.has(k)) { nearSent.add(k); Net.toHost({ t: 'tnear', k }); }
+      else if (d > 8000 && nearSent.has(k)) { nearSent.delete(k); Net.toHost({ t: 'tfar', k }); }
+    }
+  }
   // What the pilot's shown comes from her sensors, not from knowing: a ship of the zone's is a waypoint only once her radars hold a
   // contact that answers to its name (the mission's ship's place is known from the mission itself); everything else her radars
   // hold in 3D is a track point (trkMarks: where, what it is to her, its colour), one on a waypoint already shown left out
@@ -2033,7 +2047,7 @@ export const Space = (() => {
     ftlStep(dt);
     doors(dt);
     turrets(dt);
-    ewStep(dt); ewMarks();
+    ewStep(dt); ewMarks(); ewNear();
     if (!S.docked || S.auto) hideStrays();
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
     const seat = mySeat(), cam = G_R.camera;

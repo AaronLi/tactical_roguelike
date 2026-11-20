@@ -126,11 +126,37 @@ export const SpaceSv = (() => {
     Z = { ms, active: 0, main: null, zt: 0, loot: 0 }; // (a new zone: the mission's)
     beginIn(ms);
   }
+  // Zone ship k's level made the loaded one: as it was left (kept, restored) if it's been aboard, else fresh (a ship of the zone's
+  // that isn't the mission's: a visit). The squad's ship's own state isn't touched (a level made ahead, warm, is made this way too)
+  function bringUp(k: number) {
+    const zz = Z!, sv = S(), c = SD.zone(zz.ms)[k]; zz.active = k;
+    const B = k === 0 ? zz.main : (zz.kept && zz.kept.get(k)) || null;
+    if (B) { if (k === 0) zz.main = null; else zz.kept!.delete(k); B.revisit = true; B.meta = null; B.docked = false; B.site = null; B.cards = []; B.resp = new Map(); B.hvt = null; st.M = B; sv.startLevel(B.ms); return; }
+    const ms: SpMission = { i: zz.ms.i, kind: 'board', obj: 'visit', size: c.size, th: c.th, seed: c.seed, diff: Math.max(1, zz.ms.diff - 1), pay: 0, name: c.name, brief: SD.OBJ.visit.line, where: SD.SIZES[c.size].name, night: false, ly: 0, anchor: [0, 0, 0], wing: c.wing } as SpMission;
+    st.M = missionOf(ms); sv.startLevel(ms);
+  }
+  // Coming up with a zone ship (the squad's ship within 5 km of it: js/space.ts ewNear): its level made ahead, live beside the loaded
+  // one, so it's there when the squad's ship gets to it ('tboard'); going away from it (over 8 km), it's let go (put away once
+  // nobody's in it: js/server.ts update). Two made ahead at most.
+  const nearK = new Set<number>(); // (the zone ships the squad's ship is near, the one it's at too: 'tboard' keeps that one live)
+  function warm(k: number, on: boolean) {
+    const sv = S(); if (on) nearK.add(k); else nearK.delete(k);
+    if (!Z || sv.phase !== 'level' || !st.M) return;
+    const c0 = sv.ctxs.get(k);
+    if (!on) { if (c0) c0.warm = false; return; }
+    if (c0) { c0.warm = true; return; }
+    if (k === Z.active || !SD.zone(Z.ms)[k] || [...sv.ctxs.values()].filter((c) => c.warm).length >= 2) return;
+    const home = sv.ctxSave(); sv.quiet = true;
+    try { bringUp(k); const c = sv.ctxSave(); c.warm = true; sv.ctxs.set(k, c); } finally { sv.quiet = false; sv.ctxLoad(home); }
+  }
   function beginIn(ms: SpMission) {
     const sv = S();
     st.ship.docked = false; st.ship.at = ms.i; st.ship.pose = null;
-    st.M = { ms, meta: null, docked: false, done: false, keys: {}, cards: [], art: 0, artBy: null, hvt: null, hvtSt: 0, arm: null, boom: false, cleared: false, zt: 0, site: null, raid: [], hold: -1, resp: new Map(), salv: [], vac: new Set(), sealT: new Map(), doorRooms: null, vacT: 0, armSay: 0 };
+    st.M = missionOf(ms);
     sv.startLevel(ms);
+  }
+  function missionOf(ms: SpMission): SvMission {
+    return { ms, meta: null, docked: false, done: false, keys: {}, cards: [], art: 0, artBy: null, hvt: null, hvtSt: 0, arm: null, boom: false, cleared: false, zt: 0, site: null, raid: [], hold: -1, resp: new Map(), salv: [], vac: new Set(), sealT: new Map(), doorRooms: null, vacT: 0, armSay: 0 };
   }
   // A ship's complement, by her class (js/spacedata.ts SIZES crew), in place of the usual scatter (js/server.ts spawnEnemies):
   //   those who don't fight (civilians: the mess, the galley, the sick bay, the engine room, cabins, the bridge);
@@ -840,10 +866,11 @@ export const SpaceSv = (() => {
         // Whoever's inside the ship being left stays there: the level stays live beside the one the squad's ship goes to (js/server.ts
         // ctxs, docs/zone-levels.md), till nobody's in it. Nobody inside: it's kept as it is (putAway), all that's happened aboard it,
         // as it was left if the squad comes back to it. Everyone aboard the squad's ship goes with it.
-        const inside = [...sv.players.values()].filter((q: any) => q.st && q.st.p && !q.st.dd && (() => { const r = sv.roomOf(q.st.p[0], q.st.p[1] || 0, q.st.p[2]); return r >= 0 && M.meta!.hullOf[r] != null; })());
-        for (const q of sv.players.values() as Iterable<any>) q.lv = inside.includes(q) ? was : undefined;
+        const here = [...sv.players.values()].filter((q) => sv.lvOf(q) === was); // (those in the level being left: others are aboard yet another, and stay)
+        const inside = here.filter((q: any) => q.st && q.st.p && !q.st.dd && (() => { const r = sv.roomOf(q.st.p[0], q.st.p[1] || 0, q.st.p[2]); return r >= 0 && M.meta!.hullOf[r] != null; })());
+        for (const q of here as any[]) q.lv = inside.includes(q) ? was : undefined;
         (zz.casBy = zz.casBy || {})[was] = casNow(); // (what it cost aboard the ship being left, as it's left)
-        if (inside.length) sv.ctxs.set(was, sv.ctxSave()); else putAway();
+        if (inside.length || nearK.has(was)) { const c = sv.ctxSave(); c.warm = nearK.has(was); sv.ctxs.set(was, c); } else putAway(); // (still near it: kept live too, warm)
         { // (at once: nothing's drawn over it. Each screen carries the squad's ship across as she is: js/space.ts carry)
           zz.active = k;
           const live = sv.ctxs.get(k);
@@ -852,12 +879,11 @@ export const SpaceSv = (() => {
             for (const q of sv.players.values() as Iterable<any>) if (q.lv === k) q.lv = undefined;
             sv.toLevel(sv.phaseMsg(true, true)); break;
           }
-          const B = k === 0 ? zz.main : (zz.kept && zz.kept.get(k)) || null;
-          if (B) { if (k === 0) zz.main = null; else zz.kept!.delete(k); B.revisit = true; B.meta = null; B.docked = false; B.site = null; B.cards = []; B.resp = new Map(); B.hvt = null; st.M = B; st.ship.docked = false; sv.startLevel(B.ms); }
-          else beginIn({ i: zz.ms.i, kind: 'board', obj: 'visit', size: c.size, th: c.th, seed: c.seed, diff: Math.max(1, zz.ms.diff - 1), pay: 0, name: c.name, brief: SD.OBJ.visit.line, where: SD.SIZES[c.size].name, night: false, ly: 0, anchor: [0, 0, 0], wing: c.wing });
+          st.ship.docked = false; bringUp(k);
         }
         break;
       }
+      case 'tnear': case 'tfar': if (p && Number.isFinite(m.k)) warm(m.k | 0, m.t === 'tnear'); break; // (the squad's ship coming up with a zone ship, or going from it: its level made ahead, or let go)
       case 'sdock': if (p) dock(!!m.on, from, m.site); break;
       case 'shatch': if (p) openHatch(from); break;
       case 'seat': {

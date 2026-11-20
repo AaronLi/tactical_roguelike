@@ -57,7 +57,7 @@ const SvNet = {
 };
 
 // (a level context: the server's per-level fields and the space mission's (js/spaceserver.ts ctxSave))
-export interface LvCtx { sv: Record<string, unknown>; sp: unknown }
+export interface LvCtx { sv: Record<string, unknown>; sp: unknown; warm?: boolean } // (warm: made ahead, the squad's ship coming up: kept live with nobody aboard)
 export const Server = {
   net: SvNet,
   players: new Map<string, Player>(),
@@ -128,6 +128,7 @@ export const Server = {
   // another, in another's frame. What's sent while it's loaded says which it is (L: js/serverhost.ts broadcast), but for what's
   // everyone's (GLOBAL_T: the space side, the run's; but the squad's ship's pose (spose), which is in its level's frame).
   ctxs: new Map<number, LvCtx>(),
+  quiet: false, // (a level being made ahead (js/spaceserver.ts warm): nobody told, nobody's state touched)
   allPlayers: null as Map<string, Player> | null,
   GLOBAL_T: new Set(['seats', 'mdone', 'fleet', 'sdock', 'sxpdr', 'strk', 'ssec', 'srcue', 'smis', 'shit', 'shatch', 'sfire', 'schaff', 'sboom', 'newrun', 'chat', 'phase', 'board', 'ship', 'lobby', 'hello', 'welcome', 'join', 'left', 'ready', 'route', 'shop', 'prof', 'skins', 'stickers']),
   curK() { return SpaceSv.ctxSave().active; },
@@ -143,7 +144,7 @@ export const Server = {
     if (k === this.curK()) { this.scoped(fn); return; }
     const c = this.ctxs.get(k); if (!c) return;
     const home = this.ctxSave(); this.ctxLoad(c);
-    try { this.scoped(fn); } finally { if (this.ctxs.has(k)) this.ctxs.set(k, this.ctxSave()); this.ctxLoad(home); } // (unless it was put away meanwhile)
+    try { this.scoped(fn); } finally { const was = this.ctxs.get(k); if (was) { const n = this.ctxSave(); n.warm = was.warm; this.ctxs.set(k, n); } this.ctxLoad(home); } // (unless it was put away meanwhile)
   },
   ctxSave(): LvCtx { const sv: Record<string, unknown> = {}, me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) sv[k] = me[k]; return { sv, sp: SpaceSv.ctxSave() }; },
   ctxLoad(c: LvCtx) { const me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) me[k] = c.sv[k]; SpaceSv.ctxLoad(c.sp); },
@@ -535,7 +536,7 @@ export const Server = {
     if (ms) { this.level = ms.diff; this.theme = ms.th; }
     this.night = ms ? ms.night : this.isNight();
     this.map = Level.generate(this.seed, this.level, this.theme as number, this.night, ms ? SpaceSv.genOf(ms) : null);
-    ServerHost.born(this.map); // (what it was built with: ServerLink.digest)
+    if (!this.quiet) ServerHost.born(this.map); // (what it was built with: ServerLink.digest)
     this.aiMask(this.map);
     this.enemies = new Map(); this.cleared = new Map(); // (new, not cleared: a level context kept holds the one it had, js/server.ts ctxSave)
     this.extract = { active: false, votes: new Set() };
@@ -547,7 +548,7 @@ export const Server = {
     this.glassBroken = new Set(); this.glassCracked = []; // windows broken (map.windows ids), and fractured ([id, where])
     this.holes = []; this.fallen = []; // (what's been shot out of the place: js/damage.ts)
     this.bodies = new Map(); // the dead, until secured: id -> { id, type, x, z, yaw, civ, secured }
-    for (const p of this.players.values()) { p.ready = false; p.st = null; }
+    if (!this.quiet) for (const p of this.players.values()) { p.ready = false; p.st = null; } // (made ahead, quietly: nobody's in it yet)
     // (a ship has her own complement, by her class: js/spaceserver.ts crew)
     if (ms && this.map.sp) SpaceSv.crew(); else this.spawnEnemies();
     if (ms) SpaceSv.populate();
@@ -570,7 +571,7 @@ export const Server = {
       bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : undefined }; // (the dead she's come back to with: js/spaceserver.ts populate)
   },
   // a message to everyone in the loaded level (all of them, but those aboard another of the zone's levels)
-  toLevel(m: any) { const k = this.curK(); for (const [id, p] of this.allPlayers || this.players) if (this.lvOf(p) === k) this.net.sendTo(id, m); },
+  toLevel(m: any) { if (this.quiet) return; const k = this.curK(); for (const [id, p] of this.allPlayers || this.players) if (this.lvOf(p) === k) this.net.sendTo(id, m); },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
   // likely; deeper levels shift the odds toward rarer tiers, and legendaries only turn up from level 3.
@@ -1859,7 +1860,7 @@ export const Server = {
       this.scoped(() => this.update(dt));
       for (const k of [...this.ctxs.keys()]) this.inCtx(k, () => { const c = this.ctxs; this.ctxs = new Map(); try { this.update(dt); } finally { this.ctxs = c; } });
       // (a level kept live that nobody's in any more: put away as it is (dormant, js/spaceserver.ts keepOf), to come back to)
-      for (const k of [...this.ctxs.keys()]) { let n = 0; for (const p of this.players.values()) if (this.lvOf(p) === k) n++; if (!n) this.inCtx(k, () => SpaceSv.putAway()); }
+      for (const k of [...this.ctxs.keys()]) { let n = 0; for (const p of this.players.values()) if (this.lvOf(p) === k) n++; if (!n && !this.ctxs.get(k)!.warm) this.inCtx(k, () => SpaceSv.putAway()); } // (but one made ahead, the squad's ship near)
       return;
     }
     if (this.phase !== 'level' || !this.map) return;
