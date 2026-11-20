@@ -56,6 +56,8 @@ const SvNet = {
   sendTo: ((_id: string, _msg: any) => {}) as (id: string, msg: any) => void,
 };
 
+// (a level context: the server's per-level fields and the space mission's (js/spaceserver.ts ctxSave))
+export interface LvCtx { sv: Record<string, unknown>; sp: unknown }
 export const Server = {
   net: SvNet,
   players: new Map<string, Player>(),
@@ -112,6 +114,16 @@ export const Server = {
   eSid: undefined as number | undefined, // the suspects' shots' ids
   _sound: undefined as SoundCache | undefined,
 
+  // A LEVEL CONTEXT (docs/zone-levels.md): everything the server holds that's one ship's interior and what's going on in it, kept
+  // as a record so several can be held and each swapped in to be stepped (ctxSave, ctxLoad). The run's (players, the route, the
+  // shop, the squad's guns' stickers) stays the server's own.
+  // (the ids it gives (nextEid, lootId, eSid) aren't in it: the server's own, so no two contexts' ids are the same)
+  LVL_KEYS: ['map', 'seed', 'level', 'theme', 'night', 'enemies', 'cleared', 'extract', 'flow', 'flowT', 'snapT', 'wipeT', 'summons',
+    'nadeT', 'noiseT', 'teamT', 'live', 'windT', 'windSend', 'clock', 'report', 'evidence', 'loot', 'bodies', 'glassBroken',
+    'glassCracked', 'holes', 'fallen', 'wcase', 'caseOpen', 'cabs', 'abox', 'sbox', 'unitsSeen', 'kickAt', 'aiProp', 'bores', 'team', 'topId',
+    'proxies', 'pirFlow', 'civT', 'liftT'] as const,
+  ctxSave(): LvCtx { const sv: Record<string, unknown> = {}, me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) sv[k] = me[k]; return { sv, sp: SpaceSv.ctxSave() }; },
+  ctxLoad(c: LvCtx) { const me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) me[k] = c.sv[k]; SpaceSv.ctxLoad(c.sp); },
   reset() {
     this.players.clear(); this.enemies.clear();
     this.phase = 'lobby'; this.level = 0; this.map = null; this.leaving = null;
@@ -501,7 +513,7 @@ export const Server = {
     this.map = Level.generate(this.seed, this.level, this.theme as number, this.night, ms ? SpaceSv.genOf(ms) : null);
     ServerHost.born(this.map); // (what it was built with: ServerLink.digest)
     this.aiMask(this.map);
-    this.enemies.clear(); this.cleared = new Map();
+    this.enemies = new Map(); this.cleared = new Map(); // (new, not cleared: a level context kept holds the one it had, js/server.ts ctxSave)
     this.extract = { active: false, votes: new Set() };
     this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8; this.live = [];
     this.windT = 0; this.windSend = 0; // (the wind's own clock, from the level's start: windTick)

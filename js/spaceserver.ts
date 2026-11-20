@@ -900,5 +900,9 @@ export const SpaceSv = (() => {
     if (st.seats[id] != null) { delete st.seats[id]; net().broadcast({ t: 'seats', s: st.seats, ctl: st.ship.ctl }); }
     if (st.M && st.M.artBy === id) { st.M.art = 0; st.M.artBy = null; sync(); }
   }
-  return { st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
+  // the mission's share of a level context (js/server.ts ctxSave): the mission aboard this ship, which of the zone's ships it is,
+  // the squad's ship's solids as they're laid into its world, and the breach-room cache
+  function ctxSave() { return { M: st.M, active: Z ? Z.active : 0, hostShip, breachedOf }; }
+  function ctxLoad(c: any) { if (!c) return; st.M = c.M; if (Z) Z.active = c.active; hostShip = c.hostShip; breachedOf = c.breachedOf; }
+  return { ctxSave, ctxLoad, st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
 })();
