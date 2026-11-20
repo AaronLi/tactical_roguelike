@@ -103,7 +103,7 @@ export const Space = (() => {
         const inv = g.matrixWorld.clone().invert(), hb = S.map.sp.hull, box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
         const c = new T.Vector3((hb.x0 + hb.x1) / 2, box.isEmpty() ? 0 : (box.min.y + box.max.y) / 2, (hb.z0 + hb.z1) / 2), h = box.isEmpty() ? 20 : box.max.y - c.y;
         // (her radars' frame: her length runs along x, so her bow's -x and her starboard -z: a quarter turn about her up)
-        EW.foe = Radar.suite('hull', (hb.x1 - hb.x0) / 2, h + 0.6, (hb.z1 - hb.z0) / 2 + 0.8, (box.isEmpty() ? -20 : box.min.y - c.y) - 0.6); EW.foe.P.copy(c); EW.foe.Q.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2);
+        EW.foe = Radar.suite('hull', (hb.x1 - hb.x0) / 2, h + 0.6, (hb.z1 - hb.z0) / 2 + 0.8, (box.isEmpty() ? -20 : box.min.y - c.y) - 0.6, 8); EW.foe.P.copy(c); EW.foe.Q.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2);
         fitMounts(EW.foe, S.hull, g); EW.hw = radarKit(EW.foe, g);
         EW.foeT = { id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
       }
@@ -141,9 +141,10 @@ export const Space = (() => {
       if (gn.inv) { if (p.y < gn.obj.position.y + 0.3) { gn.obj.position.y = p.y - 0.1; gn.y = gn.obj.position.y - 1.5; } }
       else if (p.y > gn.obj.position.y - 0.3) { gn.obj.position.y = p.y + 0.1; gn.y = gn.obj.position.y + 1.5; }
     }
-    for (const sc of su.scans) {
-      const w = sc.at.clone().applyQuaternion(su.Q).add(su.P), p = hitAt(new T.Vector3(w.x, sc.n.y > 0 ? 200 : -200, w.z), new T.Vector3(0, -sc.n.y, 0));
-      if (p) sc.at.y = p.y - su.P.y + sc.n.y * 0.1;
+    for (const sc of su.scans) { // (a scanner's mast stands out of her plating along n: a ray in along it, from out beyond her, finds where)
+      const n = sc.n.clone().applyQuaternion(su.Q), foot = sc.at.clone().addScaledVector(sc.n, -sc.mast).applyQuaternion(su.Q).add(su.P);
+      const p = hitAt(foot.clone().addScaledVector(n, 200), n.clone().negate()); if (!p) continue;
+      sc.at.copy(p.addScaledVector(n, sc.mast).sub(su.P).applyQuaternion(su.Q.clone().invert()));
     }
     for (const tr of su.trks) {
       // (in from just outside her side, not from far off: a boom or a lamp standing off her isn't her flank)
@@ -155,12 +156,15 @@ export const Space = (() => {
     const M = ShipModel.M(0x6a7078, { metalness: 0.5 }), D = ShipModel.M(0x2a2e33, { metalness: 0.6 }), rotors: THREE.Object3D[] = [], dishes: THREE.Object3D[] = [];
     const mount = (at: THREE.Vector3) => { const o = new T.Group(); o.position.copy(at).applyQuaternion(su.Q).add(su.P); o.quaternion.copy(su.Q); g.add(o); return o; };
     for (const sc of su.scans) {
-      const o = mount(sc.at), dn = sc.n.y < 0 ? -1 : 1, post = sc.ax === 'y' ? 1.6 : 4.8;
-      const p = new T.Mesh(new T.CylinderGeometry(0.6, 0.9, post, 10), D); p.position.y = dn * post / 2; o.add(p); const plate = new T.Mesh(new T.CylinderGeometry(1.6, 1.8, 0.4, 12), D); plate.position.y = dn * 0.1; o.add(plate); // (a post on a plate on her plating)
-      const r = new T.Group(); r.position.y = dn * post; o.add(r); rotors.push(r);
+      // (its mast: from her plating out along n to the antenna, a lattice of four legs braced, on a plate)
+      const o = mount(sc.at), up = new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 1, 0), sc.n), L = sc.mast, ms = new T.Group(); ms.quaternion.copy(up); ms.position.copy(sc.n).multiplyScalar(-L); o.add(ms);
+      for (const [lx, lz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const leg = new T.Mesh(new T.CylinderGeometry(0.12, 0.16, L, 6), D); leg.position.set(lx * 0.55 * (1 - 0.0), L / 2, lz * 0.55); ms.add(leg); }
+      for (let k = 1; k < 4; k++) { const ring = new T.Mesh(new T.BoxGeometry(1.3, 0.12, 1.3), D); ring.position.y = L * k / 4; ms.add(ring); }
+      const plate = new T.Mesh(new T.CylinderGeometry(1.4, 1.6, 0.4, 12), D); plate.position.y = 0.1; ms.add(plate);
+      const r = new T.Group(); o.add(r); rotors.push(r);
       // (the aperture's long the way its beam's narrow: across the beam for 'y' (narrow in azimuth), up and down for 'x')
-      const bar = new T.Mesh(sc.ax === 'y' ? new T.BoxGeometry(7, 1.0, 0.35) : new T.BoxGeometry(1.0, 7, 0.35), M); bar.position.set(0, sc.ax === 'y' ? dn * 0.6 : 0, -0.4); r.add(bar);
-      const hub = new T.Mesh(new T.BoxGeometry(0.8, 0.8, 0.8), D); r.add(hub);
+      const bar = new T.Mesh(sc.ax === 'y' ? new T.BoxGeometry(7, 1.0, 0.35) : new T.BoxGeometry(1.0, 7, 0.35), M); bar.position.set(0, 0, -0.4); r.add(bar);
+      const hub = new T.Mesh(new T.BoxGeometry(0.9, 0.9, 0.9), D); r.add(hub);
     }
     for (const tr of su.trks) {
       const o = mount(tr.at), arm = new T.Mesh(new T.BoxGeometry(1.4, 0.7, 0.7), D); arm.position.x = tr.side * 0.5; o.add(arm); const plate = new T.Mesh(new T.BoxGeometry(0.4, 2.2, 2.2), D); plate.position.x = -tr.side * 0.1; o.add(plate);

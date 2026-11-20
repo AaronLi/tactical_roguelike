@@ -21,7 +21,7 @@
 export interface RcsTable { s: Float32Array; max: number; mean: number }
 export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable }
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3 } // (q, o: how she was turned and where she was when it was made)
-export interface RScan { ax: 'y' | 'x'; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3 } // (n: the way out of her hull at its mount: it sees nothing more than MASK behind that)
+export interface RScan { ax: 'y' | 'x'; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
   cue: { k: number; ax: 'y' | 'x'; phi: number; r: number; q: THREE.Quaternion } | null; sw: number; best: { db: number; b: THREE.Vector3 }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
@@ -93,11 +93,16 @@ export const Radar = (() => {
   const AG = 4 * Math.LN2 / (TRK.bw * TRK.bw); // (the beam's shape: exp(-AG theta^2), half power at bw/2)
   // a ship's set: scanners on her top amidships, trackers each side; size her half length (where they're mounted, and how far the
   // debug view draws things for her)
-  // (size her half length; top, bot how far her roof and keel are over and under her middle; beam her half width. A scanner of
-  // each kind stands on her roof and another hangs under her keel (the 'y' ones see round her horizon, the 'x' ones over her and
-  // under her), and a tracker on each flank. Each sees only its own side of her: her hull's in the way of the rest)
-  function suite(id: string, size: number, top = size * 0.25, beam = size * 0.3, bot = -top): RSuite {
-    const scans: RScan[] = ([['y', 1], ['x', 1], ['y', -1], ['x', -1]] as const).map(([ax, up], i) => ({ ax, th: i * Math.PI / 2, rate: SCAN.rate * (ax === 'x' ? 1.07 : 1) * (up < 0 ? 0.97 : 1), bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, up > 0 ? top : bot, (ax === 'y' ? -0.15 : 0.15) * size), n: new T.Vector3(0, up, 0) }));
+  // (size her half length; top, bot how far her roof and keel are over and under her middle; beam her half width; mast how high
+  // her scanners' masts stand. Two scanners, each on a mast: the 'y' one over her roof (round her horizon, and down past her
+  // sides as far as the mast lets it see over them: under her keel it's blind), the 'x' one off her bow high up (up over her and down
+  // under her, ahead: astern of her it's blind, her hull's in the way). A tracker on each flank, each seeing its own side)
+  function suite(id: string, size: number, top = size * 0.25, beam = size * 0.3, bot = -top, mast = Math.max(1.5, size * 0.25)): RSuite {
+    const over = (m: number, edge: number) => Math.max(MASK, Math.sin(Math.atan2(m, Math.max(0.5, edge)))); // (how far past its plane a mast that high sees over an edge that far off)
+    const scans: RScan[] = [
+      { ax: 'y', th: 0, rate: SCAN.rate, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top + mast, -0.1 * size), n: new T.Vector3(0, 1, 0), mast, mask: over(mast, beam) },
+      { ax: 'x', th: Math.PI, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)) },
+    ];
     const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3() }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
     return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false };
   }
@@ -125,7 +130,7 @@ export const Radar = (() => {
       for (const t of targets) {
         if (t.id === su.id) continue;
         const { R, sig } = look(su, sc.at, t, d), [phi, e] = angOf(sc.ax, d);
-        if (Math.abs(e) > sc.fan || wrap(phi - th0 + sc.bw / 2) > sweep + sc.bw || d.dot(sc.n) < -MASK) continue; // (or her own hull's in the way)
+        if (Math.abs(e) > sc.fan || wrap(phi - th0 + sc.bw / 2) > sweep + sc.bw || d.dot(sc.n) < -sc.mask) continue; // (or her own hull's in the way)
         const db = snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2 + gauss() * 1.5; // (the fan's gain falls off toward its ends)
         if (Math.random() < pd(db)) sc.plots.push({ k, phi: wrap(phi + gauss() * sc.bw / 4), r: R * (1 + gauss() * 0.004), t: now, db, id: t.id, e, q: su.Q.clone(), o: su.P.clone() });
       }

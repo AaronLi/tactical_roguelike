@@ -152,13 +152,14 @@ A ship knows where another ship is only from what her radars tell her. Every shi
   - at 30°/s the lock holds;
   - at 60°/s the lock holds and is handed across;
   - at 90°/s and faster it's lost.
-- **Where they're mounted.** Each ship has four scanners. One of each kind stands on her roof and another hangs under her
-  keel: the 'y' scanners see round her horizon and the 'x' scanners see over and under her. Her two trackers are on her flanks.
-  Each mount sees only its own side of her hull, and at most 10° past it (`MASK`), because the hull is in the way. A cue on an
-  'x' plot can't tell which side the target is on, so both free trackers sweep their own halves of the fan and the first to
-  find the target keeps it. The mission ship's mounts are set on her plating by raycasting her hull (`fitMounts`). Her
-  hardware is drawn and moves with the radars (`radarKit`): the scanners' antennas turn with their sweeps, and each tracker's
-  dish points along its boresight.
+- **Where they're mounted.** Each ship has two scanners, each on a mast. The 'y' scanner stands over her roof: it sees round her
+  horizon, and below her deck only as far as its mast lets it see over her sides, so it's blind under her keel. The 'x' scanner
+  stands off her bow: it sees up over her and down under her, ahead, and is blind astern of her where her hull is in the way.
+  How far past its mast's plane each can see is the angle over the hull's edge from the mast's top (`mask`). Her two trackers
+  are on her flanks, each seeing its own half of the sky and 10° past it. A cue on an 'x' plot can't tell which side the
+  target is on, so both free trackers sweep their own halves of the fan and the first to find the target keeps it. The mission
+  ship's mounts are set on her plating by raycasting her hull (`fitMounts`). Her hardware is drawn and moves with the radars
+  (`radarKit`): lattice masts, antennas turning with their sweeps, and each tracker's dish pointing along its boresight.
 - **Targets** are the mission ship and every ship of the zone that's shown, each with a return from her own drawing (the
   stand-in far off, her own hull near).
 
