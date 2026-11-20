@@ -81,6 +81,8 @@ export class KF3 {
     for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { let a = 0; for (let k = 0; k < 3; k++) a += K[i * 3 + k] * HP[k * 6 + j]; P[i * 6 + j] -= a; }
     this.n++;
   }
+  // its frame moved (a new level's: x' = R x + t): its position moved with it, its velocity turned
+  move(R: THREE.Quaternion, t: THREE.Vector3) { const p = new THREE.Vector3(this.x[0], this.x[1], this.x[2]).applyQuaternion(R).add(t), v = new THREE.Vector3(this.x[3], this.x[4], this.x[5]).applyQuaternion(R); this.x.set([p.x, p.y, p.z, v.x, v.y, v.z]); }
   pos(out = new THREE.Vector3()) { return out.set(this.x[0], this.x[1], this.x[2]); }
   vel(out = new THREE.Vector3()) { return out.set(this.x[3], this.x[4], this.x[5]); }
   sig() { return Math.sqrt((this.P[0] + this.P[7] + this.P[14]) / 3); } // (its position's spread, one number)
@@ -635,5 +637,20 @@ export const Radar = (() => {
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
   const warnClear = () => { lit.clear(); painted.clear(); }; // (a new sortie: nobody's radar on anyone yet)
-  return { canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  // A suite's frame moved under it (the level's changed to another ship out here, the same space: x' = R x + t): everything it holds
+  // in the level's frame moved with it, velocities turned (what it holds in her own frame, as it was)
+  function rebase(su: RSuite, R: THREE.Quaternion, t: THREE.Vector3) {
+    const mv = (v: THREE.Vector3 | null | undefined) => { if (v) v.applyQuaternion(R).add(t); }, tv = (v: THREE.Vector3 | null | undefined) => { if (v) v.applyQuaternion(R); }, tq = (q: THREE.Quaternion | null | undefined) => { if (q) q.premultiply(R); };
+    mv(su.P); tq(su.Q); mv(su.Pp); tq(su.Qp); tv(su.V);
+    const plots = new Set<RPlot>(); for (const sc of su.scans) { for (const p of sc.plots) plots.add(p); for (const q of sc.pend) plots.add(q.p); for (const c of sc.cons) plots.add(c.p); }
+    for (const p of plots) { mv(p.o); tq(p.q); }
+    for (const f of su.fus) { mv(f.pl); tv(f.v); } for (const kf of su.fusKF.values()) kf.move(R, t); for (const h of su.fusHist.values()) for (const q of h) mv(q.p);
+    for (const tr of su.trks) {
+      mv(tr.est.p); tv(tr.est.v); if (tr.est.kf) tr.est.kf.move(R, t); if (tr.hist) for (const q of tr.hist) mv(q.p);
+      if (tr.hand) { mv(tr.hand.p); tv(tr.hand.v); } if (tr.spiral) { mv(tr.spiral.p); tv(tr.spiral.v); tq(tr.spiral.b ? null : null); if (tr.spiral.b) tr.spiral.b.applyQuaternion(R); }
+      if (tr.cue) { mv(tr.cue.o); tq(tr.cue.q); } if (tr.best) tr.best.b.applyQuaternion(R); tr.meas = null;
+    }
+    lit.clear(); painted.clear(); // (who's on whom: heard again within a moment)
+  }
+  return { rebase, canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();
