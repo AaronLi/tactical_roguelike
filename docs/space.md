@@ -197,22 +197,24 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
 - **The mission ship's fire control** cues a tracker on the newest plot of the squad's ship. Her guns and missiles fire
   only while a tracker holds a lock (`q ≥ 0.15`). They aim at the predicted point, and a hit is judged against where the
   squad's ship really is, so a poor track misses.
-- **The sensor station's hologram** (js/radarview.ts holo) is a sphere's worth of space in place of its screen (its shell not
-  drawn), centred in front of the seat just below the operator's eyes (placed when someone first sits there): her ship at its
-  middle (a cone, her nose its point, a fin on her back: how it's turned reads off her); every track her radars hold where it is round her (its true way from her,
-  its distance as the square root, 10 km at the shell): a 3D track solid and coloured by her assessment (hostile red, suspect
-  orange, watch yellow, neutral grey, civilian grey-blue, friendly green), a contact only one scanner holds drawn as the arc it
-  could be on (its fan at its range, where her hull doesn't hide it), its middle the point to aim at; her scanners' fans sweeping out from the middle (cyan bearing, magenta roll) and each tracker's beam a line from it
-  along its axis as it is that instant (the conical scan's circling shows), out to its range gate (a ring), amber
-  acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed amber, its beam going along it. Sitting at the station goes straight into it (`holoFocus`): the world blurs out by degrees and the hologram rises out of
-  the console and opens (0.6 s), to just under the middle of the view, the view eased onto it. Its cursor is its own: a small
-  ring where the mouse is, which slides onto a track under it and opens into a halo round it in the track's colour. Getting up
-  (hold F) comes back out; holding **G** steps out to look round the room and back in. Focused (the same as G), the room's frame is blurred and the hologram drawn sharp over it (layer 6,
-  js/render.ts focusBlur), the rest of the screen's UI is put away, and the mouse is let go (still counted as captured:
-  js/game.ts holoCursor, softLocked) so its own cursor points at the tracks (a left click tracks one; dragging with the right
-  button turns it; a tap of the right drops the trackers); holding G again (or Esc) comes back out, the mouse captured again. Holding the right button turns it (the operator's view held still); the middle of their
-  view points at a track (ringed and named), a left click cues a tracker on it (`srcue` to everyone aboard), a tap of the
-  right button drops the trackers. The deck plan the deck scanner gives is behind **M**.
+- **The sensor station's hologram** (js/radarview.ts holo) takes the place of its screen: a sphere's worth of space (its shell
+  not drawn) centred in front of the seat just below the operator's eyes (placed when someone first sits there).
+  - **What's in it.** Her ship at the middle (a cone, her nose its point, a fin on her back: how it's turned reads off her).
+    Every track her radars hold round her where it is (its true way from her, its distance as the square root, 10 km at
+    the edge): a 3D track solid and coloured by her assessment (hostile red, suspect orange, watch yellow, neutral grey,
+    civilian grey-blue, friendly green); a contact only one scanner holds drawn as the arc it could be on (its fan at its
+    range, where her hull doesn't hide it). Her scanners' fans sweeping out from the middle (cyan bearing, magenta roll).
+    Each tracker's beam a line from the middle along its axis as it is that instant (the conical scan's circling shows), out
+    to its range gate (a ring), amber acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed.
+  - **Sitting down goes straight into it** (`holoFocus`): the world blurs out by degrees (js/render.ts focusBlur, focusAmt)
+    and the hologram rises out of the console and opens (0.6 s) to just under the middle of the view, the view eased onto
+    it. The rest of the screen's UI is put away, and the mouse is let go (still counted as captured: js/game.ts holoCursor,
+    softLocked) to work its own cursor: a small ring where the mouse is, which slides onto a track under it and opens into a
+    halo round it in the track's colour, the track named over it. A left click cues a tracker on it (`srcue` to everyone
+    aboard); dragging with the right button turns the hologram; a tap of the right button drops the trackers.
+  - **Out:** getting up (hold F), or Esc (the pause menu); holding **G** steps out to look round the room (the hologram
+    stays, below the eyes; the middle of the view points at a track, the right button held turns it) and back in. The deck
+    plan the deck scanner gives is behind **M**.
 - **F8** shows a ship's radars, each tap the next ship's: the squad's (from where you are), the mission ship's, then the
   zone's ships within 12 km, nearest first (each has its own radars there: scanners, trackers and a transponder, but a
   civilian has no fire control), then off. It replaced the echo view, still at `?echoes`. On another ship's radars, the camera
