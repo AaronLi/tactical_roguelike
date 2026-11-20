@@ -422,9 +422,9 @@ export const Radar = (() => {
     let m = painted.get(tgt); if (!m) { m = new Map(); painted.set(tgt, m); }
     m.set(su.id + ':s' + k, { t: now, from: sc.at.clone().applyQuaternion(su.Q).add(su.P) });
   }
-  const paintsOn = (id: string, now: number, keep = 1.2) => { const m = painted.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t < keep).map(([k, q]) => ({ k, from: q.from, age: now - q.t })) : []; };
-  const litTrk = (id: string, now: number) => { const m = lit.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t < 0.5).map(([k, q]) => ({ k, from: q.from, lk: q.lk })) : []; };
-  const litOn = (id: string, now: number) => { const m = lit.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t < 1).map(([k, q]) => ({ k, from: q.from })) : []; };
+  const paintsOn = (id: string, now: number, keep = 1.2) => { const m = painted.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t >= 0 && now - q.t < keep).map(([k, q]) => ({ k, from: q.from, age: now - q.t })) : []; }; // (a stamp from before the clock last started again (a new level) isn't now)
+  const litTrk = (id: string, now: number) => { const m = lit.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t >= 0 && now - q.t < 0.5).map(([k, q]) => ({ k, from: q.from, lk: q.lk })) : []; };
+  const litOn = (id: string, now: number) => { const m = lit.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t >= 0 && now - q.t < 1).map(([k, q]) => ({ k, from: q.from })) : []; };
   function prior(su: RSuite, iff: RIff | null) {
     if (!iff) return { p: 0.3, w: 'no IFF' }; // (a navy's to anyone else, a pirate, the squad running silent, chaff, a missile)
     if (su.hostNames && su.hostNames.has(iff.n)) return { p: 0.7, w: 'known hostile' }; // (the squad's: the mission's ship, if she answers to her name)
@@ -624,5 +624,6 @@ export const Radar = (() => {
   function best(su: RSuite | null) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && (!b || t.est.q > b.est.q)) b = t; return b; }
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
-  return { perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  const warnClear = () => { lit.clear(); painted.clear(); }; // (a new sortie: nobody's radar on anyone yet)
+  return { warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

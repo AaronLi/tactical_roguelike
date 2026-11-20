@@ -534,7 +534,7 @@ export const RadarView = (() => {
       const d = w.d.clone().normalize(), edge = d.clone().multiplyScalar(R * 1.15), col = w.kind === 'lock' ? 0xff3020 : 0xffa030;
       const a = w.kind === 'lock' ? 0.65 + 0.35 * Math.sin(now * 14) : w.kind === 'trk' ? 0.85 : Math.max(0, 1 - w.age / 1.2);
       m.cone.visible = m.s.visible = true; m.cone.position.copy(edge); m.cone.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.clone().negate()); // (its point in toward her)
-      (m.cone.material as THREE.MeshBasicMaterial).color.setHex(col); (m.cone.material as THREE.MeshBasicMaterial).opacity = a; m.cone.scale.setScalar(w.kind === 'scan' ? 0.7 + 0.5 * (w.age / 1.2) : 1);
+      (m.cone.material as THREE.MeshBasicMaterial).color.setHex(col); (m.cone.material as THREE.MeshBasicMaterial).opacity = a; m.cone.scale.setScalar(w.kind === 'scan' ? 0.7 + 0.5 * Math.min(1, Math.max(0, w.age / 1.2)) : 1);
       m.line.visible = w.kind !== 'scan'; m.line.scale.setScalar(R * 1.06); m.line.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d); (m.line.material as THREE.LineDashedMaterial).color.setHex(col); (m.line.material as THREE.LineDashedMaterial).opacity = a * 0.8; m.line.computeLineDistances();
       m.s.position.copy(d).multiplyScalar(R * 1.15).add(new T.Vector3(0, R * 0.16, 0)); /* (over its chevron) */ (m.s.material as THREE.SpriteMaterial).opacity = a;
       const txt = w.kind === 'lock' ? 'LOCK' : w.kind === 'trk' ? 'TRK' : 'SRCH';

@@ -426,6 +426,17 @@ export const Space = (() => {
     for (const e of Radar.paintsOn('own', S.t)) put(e.k, { d: e.from.clone().sub(S.P).applyQuaternion(qi), kind: 'scan', age: e.age });
     out.push(...by.values()); return out.slice(0, 8);
   }
+  // the clock started again (a new level): every time the radars stamped is from the old one; what they hold is let go (her
+  // search radars keep their modes and sectors), and nobody's radar is on anyone yet
+  function ewTimeReset() {
+    Radar.warnClear();
+    for (const su of [EW.own, EW.foe, ...[...EW.tsu.values()].map((q) => q.su)]) {
+      if (!su) continue;
+      for (const sc of su.scans) { sc.age.fill(-1e9); sc.plots = []; sc.cons = []; sc.pend = []; sc.col = -1; }
+      for (const t of su.trks) Radar.drop(t);
+      su.fus = []; su.fusHist.clear(); su.fusKF.clear(); su.fusSeen.clear(); su.fusIds.clear(); su.ass = []; su.assHold.clear(); su.fusT = -1; su.init = false;
+    }
+  }
   // every ship's radar the debug view can show (F8 goes through them): hers, the mission ship's, the zone's ships near enough
   function ewList(): RSuite[] {
     if (EW.own) EW.own.name = S.def.name; if (EW.foe) EW.foe.name = hullName();
@@ -469,7 +480,7 @@ export const Space = (() => {
 
   function setup(map: LvMap, kind: SpKind, sp: any) {
     const keep = S.keep; leave(); S.keep = keep;
-    S.on = true; S.kind = kind; S.map = map; S.t = 0; S.stage = 'space';
+    S.on = true; S.kind = kind; S.map = map; S.t = 0; S.stage = 'space'; ewTimeReset(); // (the clock started again: what the radars hold was timed by the old one)
     S.fleet = SD.cleanFleet(sp && sp.fleet); S.def = SD.SHIPS[S.fleet.ship]; S.seatsDef = SD.seats(S.def);
     S.hpMax = S.def.hull * (SD.fitted(S.fleet, 'plating') ? 1.5 : 1); if (kind === 'hub' && (!sp || !sp.ship || sp.ship.docked)) S.hp = S.hpMax; S.hp = Math.min(S.hp, S.hpMax);
     S.seats = (sp && sp.seats) || {}; S.ctl = sp && sp.ship ? sp.ship.ctl : null;
