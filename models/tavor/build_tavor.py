@@ -82,7 +82,14 @@ def section_pts(d=0.0, zb=-0.080, zt=0.0482):
     for i in range(9):                                            # (bottom right)
         a = 1.5 * math.pi + math.pi / 2 * i / 8; pts.append((W - Rb + Rb * math.cos(a), zb - d + Rb + Rb * math.sin(a)))
     return pts
+def clean(o, d=0.02 * mm):
+    """A boolean-and-slice leftovers pass: vertices within 0.02 mm welded, zero-area faces dissolved, (the faces with no area a slice through existing vertices leaves)."""
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=d)
+    bmesh.ops.dissolve_degenerate(bm, edges=bm.edges, dist=d)
+    bm.to_mesh(o.data); bm.free(); o.data.update(); return o
 def dark(poly_px, x_lo, x_hi):
+    sg = 1 if x_lo + x_hi > 0 else -1; x_lo += sg * 0.04 * mm; x_hi += sg * 0.04 * mm        # (0.04 mm clear of the floor it lies on: faces on the same plane overlap)
     o = K.tmp(prism(PL(poly_px), 'x', x_lo, x_hi)); smooth(o); K.adopt(o, 'base', 'black'); return o
 def pocket(sh, poly_px, f, sx, depth, floor=True, mat='black'):
     """An opening on side sx (-1 left, 1 right): a pocket `depth` deep with walls, and (floor) a dark floor plate at its bottom. Returns the cut applied to sh."""
@@ -155,7 +162,13 @@ for sx in (-1, 1):
     pocket(sh, circ(382, 152, 10.5), 0.25, sx, 4.0 * mm)                           # (the round recess behind the selector's front: the barrel nut's cap)
     pocket(sh, circ(323, 183, 12.5), 0.31, sx, 3.0 * mm, floor=False)               # (the selector's recess)
 cut(sh, box(-4.5 * mm, 4.5 * mm, F(297.6), F(283.4), U(199), U(188)))                 # (the slot in the floor the trigger comes through)
-tidy(sh, 1e-6, True)
+side_cuts = []
+for sx_ in (-1, 1):
+    for xw_, fp_ in ((31 * mm, 0.2), (HWG, 0.5)):
+        for k_ in range(1, 20): side_cuts.append(((sx_ * xw_, fp_, 0.0), (sx_, 0, 0), (0, 0.030 * k_, 0), (0, 1, 0)))
+        for z_ in range(36, -70, -8): side_cuts.append(((sx_ * xw_, fp_, 0.0), (sx_, 0, 0), (0, 0, z_ * mm), (0, 0, 1)))
+slice_faces(sh, side_cuts)
+tidy(sh, 1e-6, True); clean(sh)
 wnorm(sh, 50); K.adopt(sh, 'base', SH)
 port_inside(K, *PORT, 31 * mm, mouth_r=5.6 * mm, ramp=26 * mm, az=(PORT[2] + PORT[3]) / 2)
 CARRIER = port_carrier(K, *PORT, 31 * mm, ax=0.0, az=(PORT[2] + PORT[3]) / 2)
@@ -199,7 +212,7 @@ o = K.obj(cyl(2.0 * mm, 33.0 * mm, 33.8 * mm, 'x', (F(135), U(162)), 8), 'base',
 # the butt pad (a line of rubber across the butt's rear)
 BUTT = [[612, 125], [622, 125], [630, 127], [634, 133], [633, 164], [631, 192], [631, 231], [627, 235], [621, 236], [612, 236]]
 pad = K.tmp(prism(PL(SHELL), 'x', -40 * mm, 40 * mm)); boolean(pad, prism(plan_pts(0.8 * mm), 'z', U(1300), U(-300)), 'INTERSECT'); boolean(pad, prism(section_pts(0.8 * mm), 'y', -0.10, 0.80), 'INTERSECT')
-tidy(pad, 0.1 * mm, False); bevel(pad, 4.0 * mm, 3, 30); boolean(pad, prism(PL(BUTT), 'x', -40 * mm, 40 * mm), 'INTERSECT'); wnorm(pad, 50); K.adopt(pad, 'base', 'rubber')      # (the butt pad: the shell's own shape, 0.8 mm proud, cut off at its front)
+tidy(pad, 0.1 * mm, False); bevel(pad, 4.0 * mm, 3, 30); boolean(pad, prism(PL(BUTT), 'x', -40 * mm, 40 * mm), 'INTERSECT'); tidy(pad, 1e-6, True); wnorm(pad, 50); K.adopt(pad, 'base', 'rubber')      # (the butt pad: the shell's own shape, 0.8 mm proud, cut off at its front)
 # the trigger
 # the trigger: a thin curved steel blade coming down out of a slot in the receiver's floor (its top inside the housing), its tip forward and low (photo x 284-296, y 189-220)
 TRIG = [[285.5, 188.5], [296, 188.5], [296, 199], [295.6, 206], [293.4, 213.5], [288.5, 218.5], [285, 219.7], [284.4, 218], [287, 212.5], [288.8, 204], [287.5, 198], [285.5, 196]]
