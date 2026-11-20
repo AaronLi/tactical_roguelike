@@ -423,7 +423,7 @@ export const RadarView = (() => {
   // beam a line from the middle along its boresight (amber slewing or sweeping, red tracking). The operator turns it (rot) and
   // points at a track with the middle of their view (holoPick).
   type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string };
-  let holoG: { rwr: { cone: THREE.Mesh; line: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[]; zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
+  let holoG: { secs: THREE.Line[]; rwr: { cone: THREE.Mesh; line: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[]; zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
   const HCOL: Record<string, number> = { HOSTILE: 0xff4a3a, SUSPECT: 0xffa040, WATCH: 0xffe070, NEUTRAL: 0xa8b8c4, CIV: 0x7f9fb0, FRIENDLY: 0x70f090 };
   function holoMake(parent: THREE.Object3D, R: number) {
     const g = new T.Group(), inner = new T.Group(); g.add(inner); parent.add(g);
@@ -447,17 +447,17 @@ export const RadarView = (() => {
     const lcv = document.createElement('canvas'); lcv.width = 512; lcv.height = 96; const ltex = new T.CanvasTexture(lcv);
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
     const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', font: '12px ui-monospace, Consolas, monospace', color: '#9fe4ff', textShadow: '0 0 4px #000', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · aim at a track, left click: track it · tap right: drop the trackers'; document.body.appendChild(hint);
-    holoG = { rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
+    holoG = { secs: [], rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
-  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = []) {
+  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [], secs: { k: number; c: number; h: number; kind: 'on' | 'pend'; sel: boolean }[] = []) {
     if (!parent || !su) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.style.display = 'none'; } return; }
     if (!holoG || holoG.R !== R) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.remove(); } holoMake(parent, R); }
     const H = holoG!; if (H.g.parent !== parent) parent.add(H.g);
     H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
-    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag with the right button: turn it · scroll: zoom · tap right: drop the trackers · hold G: look round the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
+    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag right: turn · scroll: zoom · tap right: drop the trackers · 1 / 2: pick a scanner (held: sector on / off), W S: width, A D: direction, space: search there · hold G: the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / zoom)) * R / L : 0); }; // (beyond the range shown: at its edge)
     if (H.zoom !== zoom) { H.zoom = zoom; [0.25, 0.5, 1].forEach((f, i) => { const g0 = H.rings[i], rr = Math.sqrt(f) * R, km = zoom * f / 1000; g0.l.scale.setScalar(rr); g0.s.position.set(rr + R * 0.1, R * [-0.07, 0.07, 0][i], 0); /* (at her starboard side of each, the inner two staggered up and down: not over each other) */
@@ -477,6 +477,16 @@ export const RadarView = (() => {
         for (let j = 0; j <= 24; j++) { Radar.dirOf(c.ax, c.phi, -sc.fan + 2 * sc.fan * j / 24, v).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o).sub(su.P).applyQuaternion(qn); at(v, v); pa.setXYZ(j, v.x, v.y, v.z); }
         pa.needsUpdate = true; st.computeLineDistances(); }
     });
+    // the sectors: a scanner searching one, its edges and arc (its colour); the one the keys are setting, white and dashed
+    secs.forEach((q, i) => {
+      const sc = su.scans[q.k]; if (!sc) return;
+      let l = H.secs[i]; if (!l) { l = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(40 * 3), 3)), new T.LineDashedMaterial({ dashSize: R * 0.03, gapSize: R * 0.02, transparent: true, depthWrite: false })); H.inner.add(l); H.secs[i] = l; }
+      const pa = l.geometry.attributes.position as THREE.BufferAttribute, v = new T.Vector3(); let n = 0; pa.setXYZ(n++, 0, 0, 0);
+      for (let j = 0; j <= 36; j++) { Radar.dirOf(sc.ax, q.c - q.h + 2 * q.h * j / 36, 0, v).multiplyScalar(R); pa.setXYZ(n++, v.x, v.y, v.z); }
+      pa.setXYZ(n++, 0, 0, 0); pa.needsUpdate = true; l.geometry.setDrawRange(0, n); l.computeLineDistances(); l.visible = true;
+      const mt = l.material as THREE.LineDashedMaterial; mt.color.setHex(q.kind === 'pend' ? 0xffffff : sc.ax === 'y' ? 0x50d8ff : 0xe070ff); mt.opacity = q.kind === 'pend' ? 0.9 : q.sel ? 0.8 : 0.5; mt.dashSize = q.kind === 'pend' ? R * 0.03 : R * 10; mt.gapSize = q.kind === 'pend' ? R * 0.02 : 0;
+    });
+    for (let i = secs.length; i < H.secs.length; i++) H.secs[i].visible = false;
     // radar warning: each radar on her, at the edge the way it is (her warning receiver hears its direction, not its range):
     // a tracker locked on her a pulsing red chevron with a line in to her and LOCK; one sweeping for her amber, TRK; a scanner's
     // beam going over her a brief amber ping, fading

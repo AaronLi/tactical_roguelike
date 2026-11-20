@@ -27,7 +27,7 @@ export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her fr
 export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null; trail: { A: number; r: number; t: number }[]; kA: KF1; kr: KF1 } // (kA, kr: its Kalman filters, on its angle and its range) // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
 export interface RScan {
   ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number;
-  map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; pend: { p: RPlot; A: number }[]; // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
+  map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; pend: { p: RPlot; A: number }[]; sec: { on: boolean; c: number; h: number; dir: number }; // (sec: a sector search: back and forth across c +- h (her angle), not round) // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
 } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
@@ -165,7 +165,7 @@ export const Radar = (() => {
   const TRK = { bw: 3 * D2R, sq: 1 * D2R, hz: 6, slew: 75 * D2R, stab: 200 * D2R, acq: 60 * D2R, R0: 9000, gate: 0.06 }; // (conical scan at 6 Hz: slow enough to see in the debug view; stab: how fast the turret can turn to hold its beam still while she turns under it)
   // a scanner's response map: MAP.na columns of angle round its axis (a degree each) by MAP.nr bins of range (25 m each, to 10 km)
   const MAP = { na: 360, nr: 400, dr: 25, K: 24, floor: 12 }; // (K: how far over the noise round it a cell must stand to be a peak (CFAR); floor: below that, not even looked at)
-  const mapOf = (tag: string) => ({ map: new Float32Array(MAP.na * MAP.nr), age: new Float32Array(MAP.na).fill(-1e9), off: 0, col: -1, cons: [] as RContact[], nid: 0, tag, pend: [] as { p: RPlot; A: number }[] });
+  const mapOf = (tag: string) => ({ map: new Float32Array(MAP.na * MAP.nr), age: new Float32Array(MAP.na).fill(-1e9), off: 0, col: -1, cons: [] as RContact[], nid: 0, tag, pend: [] as { p: RPlot; A: number }[], sec: { on: false, c: 0, h: Math.PI / 4, dir: 1 } });
   const MASK = Math.sin(10 * D2R); // (how far past its own side of her hull a mount can see: over the hull's edge, a little)
   const AG = 4 * Math.LN2 / (TRK.bw * TRK.bw); // (the beam's shape: exp(-AG theta^2), half power at bw/2)
   // a ship's set: scanners on her top amidships, trackers each side; size her half length (where they're mounted, and how far the
@@ -232,6 +232,8 @@ export const Radar = (() => {
   // own mode); a pirate's never; the squad's whenever it's switched on
   const answers = (t: RTarget, su: RSuite) => !!t.iff && t.xon !== false && (t.aff === 'civ' || t.aff === 'squad' || (t.aff === 'navy' && su.aff === 'navy'));
   const IFF_R = 12000, DA = TAU / MAP.na, AGS = 4 * Math.LN2 / (SCAN.bw * SCAN.bw), _cd = new T.Vector3(), _ref = new T.Vector3();
+  // how long a scanner takes to come back to the same place: a turn; or, searching a sector, there and back across it
+  const perOf = (sc: RScan) => (sc.sec.on ? Math.max(0.3, 4 * sc.sec.h / sc.rate) : TAU / sc.rate);
   const wrapPi = (a: number) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
   function scanStep(su: RSuite, sc: RScan, k: number, dt: number, targets: RTarget[], now: number) {
     // (her turning about its axis since the last step: where its nose (turn 0) was, as she is now)
@@ -244,12 +246,19 @@ export const Radar = (() => {
       if (Math.abs(e) > sc.fan || _cd.dot(sc.n) < -sc.mask || R > MAP.nr * MAP.dr) continue;
       seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2) / 10), id: t.id, iff: answers(t, su) ? t.iff! : null });
     }
-    const th0 = sc.th; sc.th = wrap(sc.th + sc.rate * dt);
-    for (const q of seen) if (wrap(q.phi - th0 + sc.bw) <= sc.rate * dt + 2 * sc.bw) paint(q.id, su, sc, k, now); // (her beam over it this frame: its warning receiver hears it)
-    // the columns its middle crossed this frame (in her angle), each written where it goes on the map
-    const j0 = Math.floor(th0 / DA), j1 = Math.floor(sc.th / DA), n = ((j1 - j0) % MAP.na + MAP.na) % MAP.na;
+    const th0 = sc.th, Sx = sc.sec;
+    if (!Sx.on) sc.th = wrap(sc.th + sc.rate * dt);
+    else { // (a sector: back and forth across it, turning back at each edge; from outside it, in toward it the short way)
+      const d = wrapPi(sc.th - Sx.c), st = sc.rate * dt;
+      if (Math.abs(d) > Sx.h + st) { Sx.dir = d > 0 ? -1 : 1; sc.th = wrap(sc.th + Sx.dir * st); }
+      else { let nd = d + Sx.dir * st; if (nd > Sx.h) { nd = 2 * Sx.h - nd; Sx.dir = -1; } else if (nd < -Sx.h) { nd = -2 * Sx.h - nd; Sx.dir = 1; } sc.th = wrap(Sx.c + nd); }
+    }
+    const sw = wrapPi(sc.th - th0), sg = sw >= 0 ? 1 : -1, mid = wrap(th0 + sw / 2);
+    for (const q of seen) if (Math.abs(wrapPi(q.phi - mid)) <= Math.abs(sw) / 2 + sc.bw) paint(q.id, su, sc, k, now); // (her beam over it this frame: its warning receiver hears it)
+    // the columns its middle crossed this frame (in her angle, either way), each written where it goes on the map
+    const j0 = Math.floor(th0 / DA), j1 = Math.floor(sc.th / DA), n = ((sg * (j1 - j0)) % MAP.na + MAP.na) % MAP.na;
     for (let s1 = 1; s1 <= n; s1++) {
-      const j = (j0 + s1) % MAP.na, a = (j + 0.5) * DA, mc = Math.floor(wrap(a - sc.off) / DA) % MAP.na, base = mc * MAP.nr, m = sc.map;
+      const j = ((j0 + sg * s1) % MAP.na + MAP.na) % MAP.na, a = (j + 0.5) * DA, mc = Math.floor(wrap(a - sc.off) / DA) % MAP.na, base = mc * MAP.nr, m = sc.map;
       for (let i = 0; i < MAP.nr; i++) m[base + i] = -Math.log(1 - Math.random());
       for (const q of seen) {
         const d = wrapPi(q.phi - a); if (Math.abs(d) > 3 * sc.bw) continue;
@@ -257,27 +266,28 @@ export const Radar = (() => {
         if (i0 >= 0 && i0 < MAP.nr) m[base + i0] += pw * (1 - f); if (i0 + 1 >= 0 && i0 + 1 < MAP.nr) m[base + i0 + 1] += pw * f;
       }
       sc.age[mc] = now;
-      if (sc.col >= 0) cfar(su, sc, k, (mc - 2 + MAP.na) % MAP.na, seen, now); // (two columns back: both pairs of its neighbours are in now)
+      if (sc.col >= 0) cfar(su, sc, k, (mc - 2 * sg + 2 * MAP.na) % MAP.na, seen, now); // (two columns back the way it's going: both pairs of its neighbours are in now)
       sc.col = mc;
     }
     // (once the oldest peak waiting is 60 degrees behind the beam: all the waiting peaks matched together, so a peak isn't taken by
     // another's contact before that one's own peak is in)
     const beamA = wrap(sc.th - sc.off);
-    if (sc.pend.some((q) => { const b = wrap(beamA - q.A); return b > 60 * D2R && b < Math.PI; })) { const ready = sc.pend; sc.pend = []; associate(sc, ready, now); } // (all of them together, those since too)
-    const keep = TAU / sc.rate * 1.05; sc.plots = sc.plots.filter((p) => now - p.t < keep);
-    sc.cons = sc.cons.filter((c) => now - c.t < keep * 2.1);
+    if (sc.pend.some((q) => { const b = wrap(sg * (beamA - q.A)); return (b > 60 * D2R && b < Math.PI) || (Sx.on && now - q.p.t > 0.3); })) { const ready = sc.pend; sc.pend = []; associate(sc, ready, now); } // (all of them together, those since too)
+    const keep = perOf(sc) * 1.05; sc.plots = sc.plots.filter((p) => now - p.t < keep);
+    sc.cons = sc.cons.filter((c) => now - c.t < Math.max(keep * 2.1, 3.5)); // (a contact missed twice running is let go; searching a sector, not before 3.5 s)
   }
   function cfar(su: RSuite, sc: RScan, k: number, c: number, seen: { phi: number; R: number; id: string; iff: RIff | null }[], now: number) {
-    const m = sc.map, NR = MAP.nr, per = TAU / sc.rate, cs = [-2, -1, 1, 2].map((o) => (c + o + MAP.na) % MAP.na), cl = cs[1], cr = cs[2];
-    for (const q of cs) if (now - sc.age[q] > per * 0.6) return; // (a neighbour from the sweep before: not comparable)
+    const m = sc.map, NR = MAP.nr, per = perOf(sc), cs = [-2, -1, 1, 2].map((o) => (c + o + MAP.na) % MAP.na), cl = cs[1], cr = cs[2];
+    // (a neighbour not written this sweep (from the one before, or outside a sector's edge) isn't compared: only the fresh ones are)
+    const fr = (q: number) => now - sc.age[q] <= per * 0.6, fresh = cs.filter(fr); if (!fr(cl) && !fr(cr)) return;
     const b = c * NR, bl = cl * NR, br = cr * NR;
     outer: for (let i = 1; i < NR - 1; i++) {
       const v = m[b + i]; if (v < MAP.floor) continue;
       // (the biggest within two columns and three bins: one ship's return spreads over a few, and makes one peak)
-      for (const q of [c, ...cs]) for (let g = -3; g <= 3; g++) { const ii = i + g; if ((q !== c || g !== 0) && ii >= 0 && ii < NR && m[q * NR + ii] > v) continue outer; }
+      for (const q of [c, ...fresh]) for (let g = -3; g <= 3; g++) { const ii = i + g; if ((q !== c || g !== 0) && ii >= 0 && ii < NR && m[q * NR + ii] > v) continue outer; }
       let z = 0, nz = 0; for (let g = 3; g <= 10; g++) { if (i - g >= 0) { z += m[b + i - g]; nz++; } if (i + g < NR) { z += m[b + i + g]; nz++; } }
       z = Math.max(0.5, z / Math.max(1, nz)); if (v < MAP.K * z) continue;
-      const pl = m[bl + i], pr = m[br + i], den = pl - 2 * v + pr, dc = den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (pl - pr) / den)) : 0;
+      const pl = fr(cl) ? m[bl + i] : m[br + i], pr = fr(cr) ? m[br + i] : m[bl + i], den = pl - 2 * v + pr, dc = den < 0 ? Math.max(-0.5, Math.min(0.5, 0.5 * (pl - pr) / den)) : 0;
       const w0 = m[b + i - 1], w2 = m[b + i + 1], R = ((i - 1 + 0.5) * w0 + (i + 0.5) * v + (i + 1.5) * w2) / (w0 + v + w2) * MAP.dr;
       const A = (c + 0.5 + dc) * DA, phi = wrap(A + sc.off), db = 10 * Math.log10(v / z);
       // (which target it really was, if any: for the debug view only, nothing uses it to decide anything)
@@ -294,11 +304,11 @@ export const Radar = (() => {
   function associate(sc: RScan, batch: { p: RPlot; A: number }[], now: number) {
     // every pairing of a peak with a contact that could be it (inside the contact's gate: its filters' predicted spread and the
     // peak's own, chi-squared on two dimensions, 11.8: 997 in 1000 of its own peaks inside), best first, each peak and each contact once; a peak left over is a new contact
-    const per = TAU / sc.rate, rA = SA * SA, rr = SR * SR, pairs: { q: typeof batch[0]; c: RContact; m: number }[] = [];
+    const per = perOf(sc), minDt = sc.sec.on ? 0.1 : per * 0.5, rA = SA * SA, rr = SR * SR, pairs: { q: typeof batch[0]; c: RContact; m: number }[] = [];
     for (const q of batch) {
       const qA = (ACC / Math.max(50, q.p.r)) ** 2;
       for (const c of sc.cons) {
-        const dt = q.p.t - c.t; if (dt < per * 0.5) continue; // (one peak a contact a sweep)
+        const dt = q.p.t - c.t; if (dt < minDt) continue; // (one peak a contact a sweep (a pass, searching a sector))
         const pa = kf1Peek(c.kA, dt, qA), pr = kf1Peek(c.kr, dt, ACC * ACC), yA = wrapPi(q.A - pa.x), yr = q.p.r - pr.x, m = yA * yA / (pa.p + rA) + yr * yr / (pr.p + rr);
         if (m < 11.8) pairs.push({ q, c, m });
       }
@@ -311,7 +321,10 @@ export const Radar = (() => {
       kf1Pred(c.kA, dt, qA); kf1Pred(c.kr, dt, ACC * ACC); kf1Upd(c.kA, wrapPi(A - c.kA.x), rA); kf1Upd(c.kr, p.r - c.kr.x, rr); c.kA.x = wrap(c.kA.x);
       c.A = c.kA.x; c.r = c.kr.x; c.vA = c.kA.v; c.vr = c.kr.v; c.t = p.t; c.hits++; c.p = p; c.iff = p.iff || null; c.trail.push({ A, r: p.r, t: p.t }); if (c.trail.length > 8) c.trail.shift(); // (each sweep's answer: a transponder switched off is unknown from then on)
     }
-    for (const q of batch) if (!usedQ.has(q)) { const p = q.p; sc.cons.push({ n: sc.tag + (++sc.nid), A: q.A, r: p.r, vA: 0, vr: 0, t: p.t, hits: 1, p, iff: p.iff, trail: [{ A: q.A, r: p.r, t: p.t }], kA: kf1(q.A, SA, 60 / Math.max(50, p.r)), kr: kf1(p.r, SR, 100) }); /* (a new one's rates unknown: up to some 60 m/s across, 100 along, likely) */ }
+    // (a peak no contact took that's inside one's gate anyway is that one seen again too soon (a sector's edge, crossed there and
+    // back): not a new one)
+    const near = (q: typeof batch[0]) => sc.cons.some((c) => { const dt = Math.max(0, q.p.t - c.t), qA = (ACC / Math.max(50, q.p.r)) ** 2, pa = kf1Peek(c.kA, dt, qA), pr = kf1Peek(c.kr, dt, ACC * ACC), yA = wrapPi(q.A - pa.x), yr = q.p.r - pr.x; return yA * yA / (pa.p + rA) + yr * yr / (pr.p + rr) < 11.8; });
+    for (const q of batch) if (!usedQ.has(q) && !near(q)) { const p = q.p; sc.cons.push({ n: sc.tag + (++sc.nid), A: q.A, r: p.r, vA: 0, vr: 0, t: p.t, hits: 1, p, iff: p.iff, trail: [{ A: q.A, r: p.r, t: p.t }], kA: kf1(q.A, SA, 60 / Math.max(50, p.r)), kr: kf1(p.r, SR, 100) }); /* (a new one's rates unknown: up to some 60 m/s across, 100 along, likely) */ }
     void now;
   }
   // ---------------------------------------------------------------- correlation in 3D
@@ -335,7 +348,7 @@ export const Radar = (() => {
   }
   function fuse(su: RSuite, now: number) {
     const sa = su.scans.find((q) => q.ax === 'y'), sb = su.scans.find((q) => q.ax === 'z'); if (!sa || !sb) { su.fus = []; return; }
-    const live = (sc: RScan) => sc.cons.filter((c) => c.hits >= 2 && now - c.t < TAU / sc.rate * 1.5).map((c) => { const dt = now - c.t; return { c, phi: wrap(c.A + c.vA * dt + sc.off), r: c.r + c.vr * dt }; });
+    const live = (sc: RScan) => sc.cons.filter((c) => c.hits >= 2 && now - c.t < perOf(sc) * 1.5).map((c) => { const dt = now - c.t; return { c, phi: wrap(c.A + c.vA * dt + sc.off), r: c.r + c.vr * dt }; });
     const A = live(sa), B = live(sb), sep = sa.at.distanceTo(sb.at), pairs: { a: typeof A[0]; b: typeof B[0]; s: ReturnType<typeof solve> }[] = [];
     for (const a of A) for (const b of B) {
       if (Math.abs(a.r - b.r) > sep + 150 + 0.05 * a.r) continue;
@@ -607,5 +620,5 @@ export const Radar = (() => {
   function best(su: RSuite | null) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && (!b || t.est.q > b.est.q)) b = t; return b; }
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
-  return { show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

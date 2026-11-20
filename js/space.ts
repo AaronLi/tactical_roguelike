@@ -82,7 +82,10 @@ export const Space = (() => {
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
   const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, zi: 4 } };
-  const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000]; // (the range at the hologram's edge, scrolled through)
+  const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000];
+  // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the sector each would search next (pend:
+  // its middle and half-width), and the number keys' presses (when each went down, whether a hold's acted)
+  const SEC = { sel: -1, pend: [{ c: 0, h: Math.PI / 4 }, { c: 0, h: Math.PI / 4 }], dn: [-1, -1], held: [false, false], lt: 0, sp: false }; // (the range at the hologram's edge, scrolled through)
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -315,8 +318,34 @@ export const Space = (() => {
       Game.holoCursor = false; if (Game.softLocked) { Game.softLocked = false; Game.lock(); }
     }
   }
+  // a scanner's search set (k its number): a sector (c +- h, her angle) or round (told to everyone aboard: ssec)
+  function secSet(k: number, on: boolean, c: number, h: number, quiet = false) {
+    const sc = EW.own && EW.own.scans[k]; if (!sc) return;
+    sc.sec.on = on; sc.sec.c = c; sc.sec.h = h;
+    if (!quiet) { Net.toHost({ t: 'ssec', a: [k, on ? 1 : 0, Math.round(c * 1000) / 1000, Math.round(h * 1000) / 1000] }); Audio.click();
+      HUD.toast('SCAN ' + sc.tag, on ? `sector ${Math.round(2 * h * 180 / Math.PI)}° at ${String(Math.round(((c * 180 / Math.PI) % 360 + 360) % 360)).padStart(3, '0')}°` : 'all round', 1.4); }
+  }
+  // The scan keys at the sensor station: 1 and 2 the bearing and roll scanners. Held, a scanner goes between round and its
+  // sector; tapped, its sector's the one the keys set (tapped again, none). W and S widen and narrow the sector to come, A and D
+  // turn it (to port and starboard; for the roll scanner, round her the one way and the other); space starts the search there.
+  function scanKeys() {
+    const dt = Math.min(0.1, Math.max(0, S.t - SEC.lt)); SEC.lt = S.t; if (!EW.own) return;
+    ['Digit1', 'Digit2'].forEach((code, k) => {
+      if (K(code)) { if (SEC.dn[k] < 0) { SEC.dn[k] = S.t; SEC.held[k] = false; }
+        if (!SEC.held[k] && S.t - SEC.dn[k] > 0.4) { SEC.held[k] = true; const sc = EW.own!.scans[k]; secSet(k, !sc.sec.on, sc.sec.c, sc.sec.h); } }
+      else if (SEC.dn[k] >= 0) { if (!SEC.held[k]) { SEC.sel = SEC.sel === k ? -1 : k; if (SEC.sel >= 0) { const sc = EW.own!.scans[k]; SEC.pend[k] = sc.sec.on ? { c: sc.sec.c, h: sc.sec.h } : { c: sc.th, h: SEC.pend[k].h }; } Audio.click(); } SEC.dn[k] = -1; }
+    });
+    if (SEC.sel >= 0) {
+      const P = SEC.pend[SEC.sel];
+      if (K('KeyW')) P.h = Math.min(Math.PI, P.h + 0.9 * dt); if (K('KeyS')) P.h = Math.max(4 * Math.PI / 180, P.h - 0.9 * dt);
+      if (K('KeyD')) P.c += 1.2 * dt; if (K('KeyA')) P.c -= 1.2 * dt;
+      if (K('Space') && !SEC.sp) secSet(SEC.sel, P.h < Math.PI - 1e-3, P.c, P.h);
+    }
+    SEC.sp = K('Space');
+  }
   function sensorStep() {
     const seat = mySeat(), m = me(), H = EW.holo; EW.cu = null;
+    if (seat && seat.k === 'sensors' && EW.own && !Game.menuOpen()) scanKeys(); else SEC.sel = -1;
     if (!seat || seat.k !== 'sensors' || !EW.own || Game.menuOpen()) { EW.l = EW.r = false; H.pick = null; if (H.focus && (!seat || seat.k !== 'sensors')) holoFocus(false); return; }
     // (held G: into the hologram (the room blurred behind it) or back out)
     if (K('KeyG')) { if (!H.gT) H.gT = S.t; if (S.t - H.gT > 0.35 && !H.gDone) { H.gDone = true; holoFocus(!H.focus); Audio.click(); } } else { H.gT = 0; H.gDone = false; }
@@ -368,6 +397,13 @@ export const Space = (() => {
     const cam = G_R.camera, P = su.P.clone().applyMatrix4(S.root.matrixWorld), d = Math.max(60, su.size * 5), off = new T.Vector3(1, 0.55, 0.9).normalize().multiplyScalar(d * 1.6).applyQuaternion(su.Q.clone().premultiply(S.root.getWorldQuaternion(new T.Quaternion())));
     cam.position.copy(P).add(off); cam.lookAt(P);
     (cam as THREE.PerspectiveCamera).far = Math.max((cam as THREE.PerspectiveCamera).far, 40000); (cam as THREE.PerspectiveCamera).updateProjectionMatrix(); cam.updateMatrixWorld();
+  }
+  // the sectors for the hologram: each scanner's searching one, and the one the keys are setting (selected)
+  function secView() {
+    if (!EW.own) return []; const out: { k: number; c: number; h: number; kind: 'on' | 'pend'; sel: boolean }[] = [];
+    EW.own.scans.forEach((sc, k) => { if (sc.sec.on) out.push({ k, c: sc.sec.c, h: sc.sec.h, kind: 'on', sel: SEC.sel === k }); });
+    if (SEC.sel >= 0) out.push({ k: SEC.sel, c: SEC.pend[SEC.sel].c, h: SEC.pend[SEC.sel].h, kind: 'pend', sel: true });
+    return out;
   }
   // her warning receiver's picture: each radar on her and the way to it (in her frame), and what it's doing: a tracker locked on
   // her, one sweeping for her, a scanner's beam going over her (a moment ago)
@@ -1920,7 +1956,7 @@ export const Space = (() => {
     ewCam();
     { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); G_R.focusAmt = e; // (going in: the world blurring out and the hologram opening, over 0.6 s)
       const lift = H.focus ? 0.2 * e : 0; // (focused: up from below the eyes to just under the middle of the view)
-      RadarView.holo(S.model ? S.model.group : null, EW.own, H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, S.t, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1, HOLO_ZOOM[H.zi], rwrNow()); }
+      RadarView.holo(S.model ? S.model.group : null, EW.own, H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, S.t, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1, HOLO_ZOOM[H.zi], rwrNow(), secView()); }
     RadarView.update(S.root, Radar.show, ewList(), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', S.t, G_R.camera, Radar.sel);
     // her engines, the status strip, the mission's things
     const th = S.docked ? 0 : U.clamp(S.V.length() / S.def.speed, 0.12, 1) * (S.cruise ? 1.3 : 0.75);
@@ -2261,6 +2297,7 @@ export const Space = (() => {
       }
       case 'smis': if (S.on && m.by !== Net.myId) missile(m.a); return true;
       case 'srcue': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) ewCue(m.a); return true;
+      case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && m.a.length === 4) secSet(m.a[0] | 0, !!m.a[1], +m.a[2], +m.a[3], true); return true;
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
       case 'sfire': if (S.on && m.by !== Net.myId && S.root) tracer(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true;
