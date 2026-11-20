@@ -256,7 +256,7 @@ export const RadarView = (() => {
   // Redrawn ten times a second.
   let pipeCv: HTMLCanvasElement | null = null, pipeImg: ImageData | null = null, pipeAt = -1, pipeFor = '';
   function pipeline(su: RSuite, now: number, width: number) {
-    const M = Radar.MAP, K = 5, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / 5.8), cw3 = Math.floor(cw * 1.8), ch = 108, top = 16, rh = ch + 16, tch = 78, trh = tch + 16, CH = top + su.scans.length * rh + su.trks.length * trh;
+    const M = Radar.MAP, K = 5, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / 7.2), cw3 = Math.floor(cw * 1.8), cw5 = Math.floor(cw * 1.4), ch = 108, top = 16, rh = ch + 16, tch = 78, trh = tch + 16, CH = top + su.scans.length * rh + su.trks.length * trh;
     if (!pipeCv) { pipeCv = document.createElement('canvas'); pipeCv.style.display = 'block'; pipeCv.style.marginTop = '4px'; }
     if (pipeCv.width !== CW || pipeCv.height !== CH) { pipeCv.width = CW; pipeCv.height = CH; pipeImg = null; pipeAt = -1; }
     if (now - pipeAt < 0.1 && pipeFor === su.id) return pipeCv;
@@ -283,11 +283,11 @@ export const RadarView = (() => {
     c.putImageData(pipeImg, 0, 0);
     const X = (k: number) => k <= 3 ? k * (cw + gap) : 3 * (cw + gap) + cw3 + gap, xOf = (ph: number) => (Radar.wrapPi(ph) / TAU + 0.5) * cw, yOf = (r: number) => Math.sqrt(Math.min(1, Math.max(0, r) / RMAX)) * ch;
     c.font = '11px ui-monospace, Consolas, monospace'; c.textBaseline = 'top';
-    ['1 RAW RETURN · dB over noise', '2 FILTER · CFAR ratio, peaks', '3 TRACK · peaks across sweeps', '4 CORRELATE 3D · both scanners', '5 IDENTIFY · IFF · range · rate'].forEach((t, k) => { c.fillStyle = '#7fd4ee'; c.fillText(t, X(k), 2); if (k < K - 1) { c.fillStyle = '#3a6f84'; c.fillText('→', X(k + 1) - gap + 1, top + 4); } });
+    ['1 RAW RETURN · dB over noise', '2 FILTER · CFAR ratio, peaks', '3 TRACK · peaks across sweeps', '4 CORRELATE 3D · both scanners', '5 ASSESS · hostile or not'].forEach((t, k) => { c.fillStyle = '#7fd4ee'; c.fillText(t, X(k), 2); if (k < K - 1) { c.fillStyle = '#3a6f84'; c.fillText('→', X(k + 1) - gap + 1, top + 4); } });
     su.scans.forEach((sc, row) => {
       const y0 = top + row * rh + 14, per = TAU / sc.rate, lbl = sc.tag + (sc.ax === 'y' ? ' bearing (nose mid)' : ' roll (up mid)');
       c.fillStyle = '#9fd0e4'; c.fillText(lbl, X(0) + 2, y0 - 13);
-      for (let k = 0; k < K; k++) { if (k === 3) continue; c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, cw - 1, ch - 1); for (const r of [625, 2500, 5625]) { c.beginPath(); c.moveTo(X(k), y0 + yOf(r)); c.lineTo(X(k) + cw, y0 + yOf(r)); c.stroke(); } }
+      for (let k = 0; k < K; k++) { if (k >= 3) continue; c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, cw - 1, ch - 1); for (const r of [625, 2500, 5625]) { c.beginPath(); c.moveTo(X(k), y0 + yOf(r)); c.lineTo(X(k) + cw, y0 + yOf(r)); c.stroke(); } }
       // the sweep's place on 1 and 2
       for (const k of [0, 1]) { const sx = X(k) + xOf(sc.th); c.strokeStyle = 'rgba(120,230,255,0.75)'; c.beginPath(); c.moveTo(sx, y0); c.lineTo(sx, y0 + ch); c.stroke(); }
       // 2: this sweep's peaks
@@ -299,22 +299,10 @@ export const RadarView = (() => {
         pts.forEach(([x, y, t], i) => { const a = Math.max(0.25, 1 - (now - t) / (per * 8)); c.fillStyle = `rgba(${col},${a})`; c.beginPath(); c.arc(x, y, i === pts.length - 1 ? 3 : 2, 0, TAU); if (ct.hits >= 2) c.fill(); else { c.strokeStyle = `rgba(${col},${a})`; c.stroke(); } });
         if (ct.hits >= 2) { const [x, y] = pts[pts.length - 1]; c.fillStyle = `rgb(${col})`; c.fillText(ct.n + ' ×' + ct.hits, x + 5, y - 5); }
       }
-      // 4: the contacts held, named, and what's tracked
-      const trk = su.trks.filter((t) => t.st === 'track').map((t) => ({ ph: Radar.angOf(sc.ax, t.b)[0], r: t.rng })), used: number[][] = [];
-      for (const ct of shown(sc, now)) {
-        const ph = phiNow(su, ct.p), x = X(4) + xOf(ph), y = y0 + yOf(ct.p.r), col = iffCol(ct, su.id), on = trk.some((t) => Math.abs(Radar.wrapPi(t.ph - ph)) < 4 * D2R && Math.abs(t.r - ct.p.r) < 200);
-        c.fillStyle = `rgb(${col})`; c.beginPath(); c.arc(x, y, 3.5, 0, TAU); c.fill(); if (on) { c.strokeStyle = '#ff4030'; c.strokeRect(x - 6, y - 6, 12, 12); }
-        const ign = su.id === 'hull' && ct.iff && ct.iff.c === 'civ';
-        const fz = su.fus.find((q) => q.a === ct || q.b === ct), l1 = iffTxt(ct, su.id) + (fz ? ' → ' + fz.n : '') + (on ? '  TRK' : ign ? '  (let be)' : ''), l2 = `${(ct.p.r / 1000).toFixed(2)} km ${ct.vr >= 0 ? '+' : ''}${Math.round(ct.vr)} m/s` + (ct.p.id ? ` [${ct.p.id}]` : '');
-        const lw = Math.max(c.measureText(l1).width, c.measureText(l2).width), tx = Math.min(x + 6, X(4) + cw - 6 - lw); let ty = y - 11;
-        const hit = (t0: number) => used.some(([ux, uy, uw]) => tx < ux + uw && ux < tx + lw && Math.abs(uy - t0) < 24);
-        for (let k2 = 1; hit(ty) && k2 < 12; k2++) { const dn = y - 11 + 24 * Math.ceil(k2 / 2) * (k2 % 2 ? 1 : -1); if (dn >= y0 && dn <= y0 + ch - 24) ty = dn; } // (not over another's label: the nearest free place above or below, inside its cell)
-        used.push([tx, ty, lw]); if (ty !== y - 11) { c.strokeStyle = `rgba(${col},0.5)`; c.beginPath(); c.moveTo(x, y); c.lineTo(tx, ty + 6); c.stroke(); }
-        c.fillStyle = `rgb(${col})`; c.fillText(l1, tx, ty); c.fillStyle = '#8fb3c4'; c.fillText(l2, tx, ty + 12);
-      }
     });
     // the trackers' rows: each its own pipeline
-    su.trks.forEach((tr, i) => trackRow(c, su, tr, now, top + su.scans.length * rh + i * trh + 14, tch, X, cw));
+    su.trks.forEach((tr, i) => trackRow(c, su, tr, now, top + su.scans.length * rh + i * trh + 14, tch, X, cw, cw5));
+    assessTable(c, su, X(4), top + 14, cw5, su.scans.length * rh - 16);
     corr3d(c, su, now, X(3), top + 14, cw3, CH - top - 16);
     return pipeCv;
   }
@@ -327,10 +315,10 @@ export const RadarView = (() => {
   //   3 TRACK: its error and its solution's quality over the last 8 s
   //   (4 is the 3D stage, where its solution joins the track it's on)
   //   5 IDENTIFY: the track it's on, what that track answers, its range, closing speed and quality
-  function trackRow(c: CanvasRenderingContext2D, su: RSuite, tr: RSuite['trks'][0], now: number, y0: number, h: number, X: (k: number) => number, cw: number) {
+  function trackRow(c: CanvasRenderingContext2D, su: RSuite, tr: RSuite['trks'][0], now: number, y0: number, h: number, X: (k: number) => number, cw: number, cw5: number) {
     const dg = tr.dg, nm = `TRK ${tr.side > 0 ? 'STBD' : 'PORT'} · ${tr.st === 'track' ? 'LOCK' : tr.st === 'acq' ? 'SWEEP' : tr.st === 'slew' ? 'SLEW' : 'IDLE'}`;
     c.fillStyle = tr.st === 'track' ? '#ff8070' : tr.st === 'idle' ? '#6f8f9f' : '#ffc060'; c.fillText(nm, X(0) + 2, y0 - 13);
-    for (const k of [0, 1, 2, 4]) { c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, cw - 1, h - 1); }
+    for (const k of [0, 1, 2, 4]) { c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, (k === 4 ? cw5 : cw) - 1, h - 1); }
     if (!dg || tr.st === 'idle') return;
     if (tr.st === 'acq' || tr.st === 'slew') { // (the sweep along the strip)
       const sw = dg.sweep, fan = Radar.SCAN.fan; c.strokeStyle = '#ffc060'; c.beginPath();
@@ -366,6 +354,24 @@ export const RadarView = (() => {
     c.fillStyle = '#ff8070'; c.fillText(lab, X(4) + 4, y0 + 6);
     c.fillStyle = iff ? `rgb(${iffCol({ iff } as RContact, su.id)})` : '#ffc860'; c.fillText(iff ? (iff.c === 'civ' ? 'CIV ' : '') + iff.n : 'no IFF answer', X(4) + 4, y0 + 20);
     c.fillStyle = '#cfe8f5'; c.fillText(`${(tr.rng / 1000).toFixed(2)} km · closing ${close >= 0 ? '+' : ''}${Math.round(close)} m/s`, X(4) + 4, y0 + 36); c.fillText(`solution ${Math.round(tr.est.q * 100)}%${tr.tgt ? ' [' + tr.tgt + ']' : ''}`, X(4) + 4, y0 + 52);
+  }
+  // Stage 5: hostile or not (js/radar.ts assess): every track she holds, worst first: what it is to her, its range, how fast it's
+  // closing, where its course passes her, the score (a bar, the line at 0.6) and the confirmation's progress (the bar under it,
+  // full at 3 s), and why
+  const CLS: Record<string, string> = { HOSTILE: '#ff4a3a', SUSPECT: '#ffa040', WATCH: '#ffe070', NEUTRAL: '#a8b8c4', CIV: '#7f9fb0', FRIENDLY: '#70f090' };
+  function assessTable(c: CanvasRenderingContext2D, su: RSuite, x0: number, y0: number, w: number, h: number) {
+    c.strokeStyle = '#1b3a48'; c.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+    const rowH = 28, n = Math.min(su.ass.length, Math.floor((h - 4) / rowH)), tracked = new Set(su.trks.filter((t) => t.st === 'track').map((t) => su.fus.find((f) => f.trk === t)).filter(Boolean));
+    for (let i = 0; i < n; i++) {
+      const a = su.ass[i], y = y0 + 3 + i * rowH, col = CLS[a.cls];
+      const nm = a.iff ? (a.iff.c === 'civ' ? 'CIV ' : '') + a.iff.n : 'no IFF';
+      c.fillStyle = col; c.fillText(`${a.n} ${a.cls}`, x0 + 4, y); c.fillStyle = '#cfe8f5'; c.fillText(nm, x0 + 4 + c.measureText(`${a.n} ${a.cls}  `).width, y);
+      if (a.f && tracked.has(a.f)) { c.fillStyle = '#ff6050'; c.fillText('TRK', x0 + w - 28, y); }
+      const bw = 70, bx = x0 + w - bw - 34; c.fillStyle = '#16303c'; c.fillRect(bx, y + 1, bw, 6); c.fillStyle = col; c.fillRect(bx, y + 1, bw * a.score, 6); c.fillStyle = '#ffffff'; c.fillRect(bx + bw * 0.6, y, 1, 8);
+      c.fillStyle = '#16303c'; c.fillRect(bx, y + 9, bw, 3); c.fillStyle = '#ff8070'; c.fillRect(bx, y + 9, bw * Math.min(1, a.hold / 3), 3);
+      c.fillStyle = '#8fb3c4'; c.fillText(`${(a.r / 1000).toFixed(2)} km ${a.vc >= 0 ? '+' : ''}${Math.round(a.vc)} m/s · ${a.why}`.slice(0, Math.floor(w / 6.4)), x0 + 4, y + 13);
+    }
+    if (!su.ass.length) { c.fillStyle = '#5f8fa4'; c.fillText('nothing held', x0 + 4, y0 + 4); }
   }
   // Stage 4: the two scanners' contacts in 3D, round her (her frame, turning slowly so it reads as 3D; range out as its square
   // root): each 'y' contact's arc (cyan: up and down its fan at its range and bearing), each 'z' contact's (magenta: fore and aft

@@ -42,7 +42,8 @@ export interface RTrack {
 }
 export interface KF1 { x: number; v: number; p11: number; p12: number; p22: number } // (a scalar's Kalman filter at constant velocity: its value, rate, and their covariance)
 export interface RFused { kf: KF3; trk?: RTrack | null; n: string; a: RContact | null; b: RContact | null; p: THREE.Vector3; pl: THREE.Vector3; res: number; r: number; iff: RIff | null; ea: number; eb: number; v: THREE.Vector3; hist: { t: number; p: THREE.Vector3 }[] } // (v its velocity (level frame), from hist: where it's been, the last 8 s) // (a contact of each scanner's that are one thing: where, in her frame (p) and the level's (pl); how far apart the two fans' points are there (res); ea, eb how far along each fan)
-export interface RSuite { fusKF: Map<string, KF3>; fusHist: Map<string, { t: number; p: THREE.Vector3 }[]>; fus: RFused[]; fusIds: Map<string, string>; fusN: number; fusT: number; id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
+export interface RAssess { key: string; n: string; f: RFused | null; c: RContact | null; iff: RIff | null; r: number; vc: number; tcpa: number; dcpa: number; score: number; hold: number; cls: 'HOSTILE' | 'SUSPECT' | 'WATCH' | 'NEUTRAL' | 'CIV' | 'FRIENDLY'; plot: RPlot | null; why: string }
+export interface RSuite { ass: RAssess[]; assHold: Map<string, number>; fusKF: Map<string, KF3>; fusHist: Map<string, { t: number; p: THREE.Vector3 }[]>; fus: RFused[]; fusIds: Map<string, string>; fusN: number; fusT: number; id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
 
 // (the Kalman filters' 3D one: js/radar.ts Radar, "Kalman filters")
 export class KF3 {
@@ -173,7 +174,7 @@ export const Radar = (() => {
       { ax: 'z', th: Math.PI, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)), ...mapOf('B') },
     ];
     const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3(), r: 0 }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
-    return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false, fus: [], fusIds: new Map(), fusN: 0, fusT: -1, fusHist: new Map(), fusKF: new Map() };
+    return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false, fus: [], fusIds: new Map(), fusN: 0, fusT: -1, fusHist: new Map(), fusKF: new Map(), ass: [], assHold: new Map() };
   }
   // a way out of the radar along a fan: ax its turning axis, phi how far round it's turned, e how far along the fan (her own frame)
   // ('y': phi round from her nose to starboard, e up; 'x': phi up from ahead, e to starboard; 'z': phi round her length from her
@@ -199,7 +200,7 @@ export const Radar = (() => {
     for (const tr of su.trks) if (tr.st === 'track') stabilise(su, tr, dt);
     // the scanners: each sweeps its fan round, a column of its map at a time (scanStep)
     su.scans.forEach((sc, k) => scanStep(su, sc, k, dt, targets, now));
-    if (now - su.fusT > 0.1) { su.fusT = now; fuse(su, now); } // (ten times a second)
+    if (now - su.fusT > 0.1) { const dt0 = su.fusT < 0 ? 0.1 : now - su.fusT; su.fusT = now; fuse(su, now); assess(su, dt0); } // (ten times a second)
     for (const tr of su.trks) trackStep(su, tr, dt, targets, now);
     su.Pp.copy(su.P); su.Qp.copy(su.Q);
   }
@@ -351,6 +352,58 @@ export const Radar = (() => {
     for (const [k, h] of su.fusHist) if (!h.length || now - h[h.length - 1].t > 3) { su.fusHist.delete(k); su.fusKF.delete(k); }
     if (su.fusIds.size > 200) su.fusIds.clear();
   }
+  // ---------------------------------------------------------------- hostile or not
+  // Each 3D track (and each contact no 3D track has, from its range and range rate alone) is weighed, as the ship looking sees it:
+  //   - what its transponder says (to the squad's ship the mission's ship is a known hostile, to the mission's ship the squad's
+  //     is; a civilian's answer is nearly enough to be let be; no answer is unknown: some suspicion; another name, a little);
+  //   - how fast it's closing (from 10 m/s up, the more the faster),
+  //   - how near it is (inside 4 km, the more the nearer),
+  //   - whether its course brings it close (its closest approach inside 800 m within 90 s, the more the closer).
+  // A score of 0.6 or more is SUSPECT; held for 3 s (the confirmation: a moment's closing or a pass isn't enough) it's HOSTILE,
+  // and stays so until it's been under for as long (the hold runs down twice as fast as it runs up). Under: WATCH from 0.35,
+  // else NEUTRAL; a civilian's answer under the line, CIV. A ship's fire control cues only on what's HOSTILE.
+  const HOLD = 3;
+  // Radar warning: every ship hears a tracking radar that's on her (locked on her, or sweeping across her): from which ship and
+  // where (lit: her id to the emitters on her, when last and from where). Being tracked is a sign of hostility (assess).
+  const lit = new Map<string, Map<string, { t: number; from: THREE.Vector3 }>>();
+  function illum(tgt: string | null, su: RSuite, tr: RTrack, now: number) {
+    if (!tgt) return; let m = lit.get(tgt); if (!m) { m = new Map(); lit.set(tgt, m); }
+    m.set(su.id + ':' + tr.side, { t: now, from: tr.at.clone().applyQuaternion(su.Q).add(su.P) });
+  }
+  const litOn = (id: string, now: number) => { const m = lit.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t < 1).map(([k, q]) => ({ k, from: q.from })) : []; };
+  function prior(su: RSuite, iff: RIff | null) {
+    if (!iff) return { p: 0.3, w: 'no IFF' };
+    if (iff.c === 'civ') return { p: 0.05, w: 'civilian' };
+    if ((su.id === 'own' && iff.c === 'tgt') || (su.id === 'hull' && iff.c === 'squad')) return { p: 0.7, w: 'known hostile' };
+    if (su.id === 'own' && iff.c === 'squad') return { p: 0, w: 'own side' };
+    return { p: 0.2, w: 'named' };
+  }
+  function assess(su: RSuite, dt: number) {
+    const out: RAssess[] = [], seen = new Set<string>(), inF = new Set<RContact>();
+    const now = su.fusT, em = litOn(su.id, now), qi = su.Q.clone().invert(); // (the tracking radars on her now: her warning receiver's)
+    const add = (key: string, n: string, f: RFused | null, c: RContact | null, iff: RIff | null, r: number, vc: number, tcpa: number, dcpa: number, plot: RPlot | null, on: boolean) => {
+      const pr = prior(su, iff), kin = vc > 10 ? Math.min(1, (vc - 10) / 60) : 0, near = r < 4000 ? 1 - r / 4000 : 0, cpa = tcpa > 0 && tcpa < 90 && dcpa < 800 ? 1 - dcpa / 800 : 0;
+      const score = pr.p === 0 ? 0 : Math.min(1, pr.p + 0.35 * kin + 0.25 * near + 0.3 * cpa + (on ? 0.45 : 0));
+      let hold = su.assHold.get(key) || 0; hold = score >= 0.6 ? Math.min(HOLD * 2, hold + dt) : Math.max(0, hold - 2 * dt); su.assHold.set(key, hold); seen.add(key);
+      const cls = pr.p === 0 ? 'FRIENDLY' : hold >= HOLD ? 'HOSTILE' : score >= 0.6 ? 'SUSPECT' : score >= 0.35 ? 'WATCH' : iff && iff.c === 'civ' ? 'CIV' : 'NEUTRAL';
+      const why = [pr.w, on ? 'TRACKING US' : '', kin > 0 ? `closing ${Math.round(vc)} m/s` : '', near > 0 ? 'near' : '', cpa > 0 ? `passes ${Math.round(dcpa)} m in ${Math.round(tcpa)} s` : ''].filter(Boolean).join(', ');
+      out.push({ key, n, f, c, iff, r, vc, tcpa, dcpa, score, hold, cls, plot, why });
+    };
+    for (const f of su.fus) {
+      if (f.a) inF.add(f.a); if (f.b) inF.add(f.b);
+      // (relative to her: where it is and how it's moving, its closest approach if it holds its course)
+      const rp = f.pl.clone().sub(su.P), rv = f.v.clone().sub(su.V), r = rp.length(), vc = -rv.dot(rp) / Math.max(1, r), v2 = rv.lengthSq(), tc = v2 > 1 ? -rp.dot(rv) / v2 : -1, dc = tc > 0 ? rp.clone().addScaledVector(rv, tc).length() : r;
+      const on = em.some((e) => e.from.clone().sub(su.P).angleTo(rp) < 4 * D2R && Math.abs(e.from.distanceTo(su.P) - r) < Math.max(150, 0.08 * r)); // (an emitter on her where this track is)
+      add('F:' + f.n, f.n, f, null, f.iff || (f.a && f.a.iff) || (f.b && f.b.iff) || null, r, vc, tc, dc, (f.a && f.a.p) || (f.b && f.b.p) || null, on);
+    }
+    for (const sc of su.scans) for (const c of sc.cons) {
+      if (c.hits < 2 || inF.has(c) || TAU / sc.rate * 1.5 < 0) continue;
+      const on = em.some((e) => { const d = e.from.clone().sub(su.P), R = d.length(); d.applyQuaternion(qi); return Math.abs(wrapPi(angOf(sc.ax, d)[0] - wrap(c.A + sc.off))) < 4 * D2R && Math.abs(R - c.r) < Math.max(150, 0.08 * c.r); });
+      add('C:' + c.n, c.n, null, c, c.iff || null, c.r, -c.vr, -1, c.r, c.p, on); // (one scanner's: no 3D course, its range rate is its closing speed)
+    }
+    for (const k of [...su.assHold.keys()]) if (!seen.has(k)) su.assHold.delete(k);
+    su.ass = out.sort((a, b) => b.score - a.score || a.r - b.r);
+  }
   // A tracker knows how its own ship moves (her gyros and her navigation): before it looks, its boresight is turned to undo her
   // rotation since the last step (held still in space, not in her frame), and to stay on the point it was on (at the range in its
   // gate) as she moves. The target's own motion is the conical scan's to find (and its rate aiding's): what's left is only that. The turret turns no faster than TRK.stab to do it: a turn faster than that still
@@ -430,7 +483,7 @@ export const Radar = (() => {
       if (tr.st === 'slew') { const to = new T.Vector3(); tr.rng = cueDir(su, tr, c, -sc.fan, to); if (slewTo(tr, to, TRK.slew * dt) < 1 * D2R) tr.st = 'acq'; tr.a.copy(tr.b); return; }
       // along the fan, its range gate at the plot's range: the strongest return on the way is where she is
       tr.sw += TRK.acq * dt; const gate = cueDir(su, tr, c, Math.min(tr.sw, sc.fan), tr.b); tr.rng = gate; tr.a.copy(tr.b);
-      if (inSide(tr, tr.b)) { const r = beam(su, tr, tr.b, targets, gate); dgOf(tr).sweep.push({ e: tr.sw, db: r.db }); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.r = gate; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
+      if (inSide(tr, tr.b)) { const r = beam(su, tr, tr.b, targets, gate); dgOf(tr).sweep.push({ e: tr.sw, db: r.db }); if (r.db > THR) illum(r.id, su, tr, now); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.r = gate; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
       if (tr.sw >= sc.fan) {
         if (tr.best.db > THR) { for (const o of su.trks) if (o !== tr && o.cue === c && o.st !== 'track') drop(o); tr.b.copy(tr.best.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = tr.best.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }
         else drop(tr);
@@ -460,7 +513,7 @@ export const Radar = (() => {
     if (oth && oth.st === 'idle' && tr.est.p && tr.est.q > 0.3 && tr.b.x * tr.side < 0.05 && inSide(oth, _w.copy(tr.est.p).sub(_v.copy(oth.at).applyQuaternion(su.Q).add(su.P)).normalize().applyQuaternion(_qi.copy(su.Q).invert()))) { drop(oth); // (only if she's in its half of the sky, from its own mount)
       oth.st = 'slew'; oth.hand = { p: tr.est.p.clone(), v: tr.est.v.clone(), t: now }; }
     if (!bd.rs.length || bd.db < THR - 4 || !inSide(tr, tr.b)) { tr.lost += dt; if (tr.lost > 0.5) drop(tr); return; }
-    tr.lost = 0; tr.tgt = bd.id; tr.lockT += dt;
+    tr.lost = 0; tr.tgt = bd.id; tr.lockT += dt; illum(bd.id, su, tr, now);
     if (tr.dP >= TAU && tr.dA > 0) {
       // the error: <G u> / (<G> AG sq) is the target's offset from the boresight (exact while she's well inside the beam; it can't
       // say more than about the squint's worth beyond that), noisier the weaker she is
@@ -496,5 +549,5 @@ export const Radar = (() => {
   function best(su: RSuite | null) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && (!b || t.est.q > b.est.q)) b = t; return b; }
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
-  return { show: 0, sel: 'own', arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { show: 0, sel: 'own', litOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

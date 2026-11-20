@@ -121,11 +121,19 @@ export const Space = (() => {
       const manned = !!(S.state && S.state.gn && S.state.arm == null && !S.state.boom);
       if (!manned) { for (const t of EW.foe.trks) if (t.st !== 'idle') Radar.drop(t); }
       else {
-        // (she doesn't know which contact is what but for its transponder's answer: the nearest one her scanners hold (seen twice or
-        // more), just painted, that doesn't answer as a civilian, is the threat. Cued when her trackers are free, or when one comes in much nearer than what she's tracking)
-        let p = null as null | RPlot; for (const sc of EW.foe.scans) for (const c of sc.cons) if (c.hits >= 2 && S.t - c.p.t < 0.3 && (!c.iff || c.iff.c !== 'civ') && (!p || c.p.r < p.r)) p = c.p; // (not a civilian: one that answers as one is let be)
+        // (she doesn't know which contact is what: her radars' threat assessment decides what's hostile. Cued when her trackers are free, or when one comes in much nearer than what she's tracking)
+        // (what her threat assessment holds HOSTILE (js/radar.ts assess), the nearest, if it's been painted lately)
+        let p = null as null | RPlot; for (const q of EW.foe.ass) if (q.cls === 'HOSTILE' && q.plot && S.t - q.plot.t < 3.5 && (!p || q.r < p.r)) p = q.plot;
         const busy = EW.foe.trks.filter((t) => t.st !== 'idle'), held = Math.min(...busy.map((t) => (t.st === 'track' ? t.rng : 1e9)));
         if (p && (!busy.length || (busy.every((t) => t.st === 'track') && p.r < held * 0.6 - 200))) { for (const t of EW.foe.trks) Radar.drop(t); Radar.cue(EW.foe, p); }
+        // (and her trackers stay off what isn't hostile: a ship's tracking radar on another is taken as hostility. One locked on
+        // what her assessment no longer has as HOSTILE or SUSPECT (it turned away; it's chaff it was drawn onto) is let go)
+        for (const t of EW.foe.trks) {
+          if (t.st !== 'track' || t.lockT < 2) continue;
+          const f = EW.foe.fus.find((q) => q.trk === t), a = f && EW.foe.ass.find((q) => q.f === f);
+          if (!a || (!f!.a && !f!.b && t.lockT < 8)) continue; // (a track the tracker alone holds: the scanners' pair a sweep or two behind)
+          if (a.cls !== 'HOSTILE' && a.cls !== 'SUSPECT') Radar.drop(t);
+        }
       }
     }
   }

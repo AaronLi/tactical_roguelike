@@ -226,9 +226,15 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
   target, and the power across its range gate; acquiring: its sweep along the strip), its discriminator (the angle errors a
   revolution each, in beam widths; the range gate's error; S/N), its error and solution quality over 8 s, and what it's on
   (the 3D track, its IFF answer, range, closing speed, solution).
-  5. **Identify:** each contact with its IFF answer as she has it (to the squad, the mission ship is TGT; to the mission ship,
-     the squad's ship is HOSTILE; to a civilian, only names), its range and range rate, and the true object in brackets.
-     The contacts her trackers are on are boxed.
+  5. **Assess** (`assess`): hostile or not, every track she holds, as she sees it. Its score is its transponder's answer
+     (to the squad's ship the mission ship is a known hostile, 0.7, and to the mission ship the squad's is; no answer 0.3;
+     another name 0.2; a civilian 0.05), plus how fast it's closing (from 10 m/s), how near it is (inside 4 km), whether its
+     course passes inside 800 m within 90 s, and whether it's tracking her (her radar warning receiver hears a tracking radar
+     on her, and from where: +0.45). From 0.6 it's SUSPECT; held for 3 s, HOSTILE; under, WATCH (from 0.35), NEUTRAL or CIV.
+     Her fire control cues only on what's HOSTILE, and lets a lock go (after 2 s) when what it's on is no longer HOSTILE or
+     SUSPECT: a tracking radar on a ship is taken as hostility, so she keeps hers off what isn't. Tested: the squad's ship
+     silent and still at 2.5 km is WATCH and left alone; running in at 90 m/s it's SUSPECT at once and HOSTILE 3 s later; its
+     own tracker locked on her makes it SUSPECT, then HOSTILE, and she locks it back.
 
   The squad's ship is drawn in blues (cyan fans, teal acquiring, blue tracking) and every other ship in reds (red fans, amber
   acquiring, red tracking). Another ship's tracker gets a marker on the screen at its turret (ACQ, TRK, or a pulsing TRK
