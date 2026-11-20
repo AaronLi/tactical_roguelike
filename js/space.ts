@@ -369,6 +369,17 @@ export const Space = (() => {
     cam.position.copy(P).add(off); cam.lookAt(P);
     (cam as THREE.PerspectiveCamera).far = Math.max((cam as THREE.PerspectiveCamera).far, 40000); (cam as THREE.PerspectiveCamera).updateProjectionMatrix(); cam.updateMatrixWorld();
   }
+  // her warning receiver's picture: each radar on her and the way to it (in her frame), and what it's doing: a tracker locked on
+  // her, one sweeping for her, a scanner's beam going over her (a moment ago)
+  function rwrNow(): { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] {
+    if (!EW.own) return []; const qi = S.Q.clone().invert(), out: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [];
+    // (one a ship, the most she's doing: a lock over a tracker sweeping, over a scanner's paint)
+    const by = new Map<string, typeof out[0]>(), rank = { lock: 3, trk: 2, scan: 1 } as const;
+    const put = (k: string, w: typeof out[0]) => { const ship = k.split(':')[0], h = by.get(ship); if (!h || rank[w.kind] > rank[h.kind] || (w.kind === h.kind && w.age < h.age)) by.set(ship, w); };
+    for (const e of Radar.litTrk('own', S.t)) put(e.k, { d: e.from.clone().sub(S.P).applyQuaternion(qi), kind: e.lk ? 'lock' : 'trk', age: 0 });
+    for (const e of Radar.paintsOn('own', S.t)) put(e.k, { d: e.from.clone().sub(S.P).applyQuaternion(qi), kind: 'scan', age: e.age });
+    out.push(...by.values()); return out.slice(0, 8);
+  }
   // every ship's radar the debug view can show (F8 goes through them): hers, the mission ship's, the zone's ships near enough
   function ewList(): RSuite[] {
     if (EW.own) EW.own.name = S.def.name; if (EW.foe) EW.foe.name = hullName();
@@ -1909,7 +1920,7 @@ export const Space = (() => {
     ewCam();
     { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); G_R.focusAmt = e; // (going in: the world blurring out and the hologram opening, over 0.6 s)
       const lift = H.focus ? 0.2 * e : 0; // (focused: up from below the eyes to just under the middle of the view)
-      RadarView.holo(S.model ? S.model.group : null, EW.own, H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, S.t, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1, HOLO_ZOOM[H.zi]); }
+      RadarView.holo(S.model ? S.model.group : null, EW.own, H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, S.t, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1, HOLO_ZOOM[H.zi], rwrNow()); }
     RadarView.update(S.root, Radar.show, ewList(), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', S.t, G_R.camera, Radar.sel);
     // her engines, the status strip, the mission's things
     const th = S.docked ? 0 : U.clamp(S.V.length() / S.def.speed, 0.12, 1) * (S.cruise ? 1.3 : 0.75);

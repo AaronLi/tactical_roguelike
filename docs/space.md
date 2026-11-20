@@ -206,6 +206,10 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     range, where her hull doesn't hide it). Her scanners' fans sweeping out from the middle (cyan bearing, magenta roll).
     Each tracker's beam a line from the middle along its axis as it is that instant (the conical scan's circling shows), out
     to its range gate (a ring), amber acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed.
+  - **Radar warning:** each ship's radar on her, at the edge the way it is (her warning receiver hears its direction, not
+    its range), one marker a ship for the most it's doing: a tracker locked on her a pulsing red chevron with a dashed line
+    in to her and LOCK; a tracker sweeping for her amber, TRK; a scanner's beam going over her a brief amber ping, SRCH,
+    fading over a second (js/radar.ts litTrk, paintsOn).
   - **Range:** rings in her plane at a quarter, half and all of the range shown, each named; the wheel zooms the range at the
     edge through 0.5, 1, 2.5, 5 and 10 km (anything further sits at the edge).
   - **Sitting down goes straight into it** (`holoFocus`): the world blurs out by degrees (js/render.ts focusBlur, focusAmt)

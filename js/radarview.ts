@@ -423,7 +423,7 @@ export const RadarView = (() => {
   // beam a line from the middle along its boresight (amber slewing or sweeping, red tracking). The operator turns it (rot) and
   // points at a track with the middle of their view (holoPick).
   type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string };
-  let holoG: { zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
+  let holoG: { rwr: { cone: THREE.Mesh; line: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[]; zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
   const HCOL: Record<string, number> = { HOSTILE: 0xff4a3a, SUSPECT: 0xffa040, WATCH: 0xffe070, NEUTRAL: 0xa8b8c4, CIV: 0x7f9fb0, FRIENDLY: 0x70f090 };
   function holoMake(parent: THREE.Object3D, R: number) {
     const g = new T.Group(), inner = new T.Group(); g.add(inner); parent.add(g);
@@ -447,11 +447,11 @@ export const RadarView = (() => {
     const lcv = document.createElement('canvas'); lcv.width = 512; lcv.height = 96; const ltex = new T.CanvasTexture(lcv);
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
     const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', font: '12px ui-monospace, Consolas, monospace', color: '#9fe4ff', textShadow: '0 0 4px #000', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · aim at a track, left click: track it · tap right: drop the trackers'; document.body.appendChild(hint);
-    holoG = { zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
+    holoG = { rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
-  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX) {
+  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = []) {
     if (!parent || !su) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.style.display = 'none'; } return; }
     if (!holoG || holoG.R !== R) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.remove(); } holoMake(parent, R); }
     const H = holoG!; if (H.g.parent !== parent) parent.add(H.g);
@@ -477,6 +477,28 @@ export const RadarView = (() => {
         for (let j = 0; j <= 24; j++) { Radar.dirOf(c.ax, c.phi, -sc.fan + 2 * sc.fan * j / 24, v).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o).sub(su.P).applyQuaternion(qn); at(v, v); pa.setXYZ(j, v.x, v.y, v.z); }
         pa.needsUpdate = true; st.computeLineDistances(); }
     });
+    // radar warning: each radar on her, at the edge the way it is (her warning receiver hears its direction, not its range):
+    // a tracker locked on her a pulsing red chevron with a line in to her and LOCK; one sweeping for her amber, TRK; a scanner's
+    // beam going over her a brief amber ping, fading
+    rwr.forEach((w, i) => {
+      let m = H.rwr[i];
+      if (!m) {
+        const cone = new T.Mesh(new T.ConeGeometry(R * 0.06, R * 0.18, 4), new T.MeshBasicMaterial({ color: 0xff3020, transparent: true, depthWrite: false, depthTest: false, blending: T.AdditiveBlending })); cone.renderOrder = 18; H.inner.add(cone);
+        const line = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 1, 0)]), new T.LineDashedMaterial({ color: 0xff3020, dashSize: R * 0.04, gapSize: R * 0.03, transparent: true, depthWrite: false })); H.inner.add(line);
+        const cv = document.createElement('canvas'); cv.width = 128; cv.height = 48; const tex = new T.CanvasTexture(cv);
+        const sp = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false })); sp.scale.set(R * 0.38, R * 0.14, 1); sp.renderOrder = 19; H.inner.add(sp);
+        m = H.rwr[i] = { cone, line, s: sp, cv, tex, txt: '' };
+      }
+      const d = w.d.clone().normalize(), edge = d.clone().multiplyScalar(R * 1.15), col = w.kind === 'lock' ? 0xff3020 : 0xffa030;
+      const a = w.kind === 'lock' ? 0.65 + 0.35 * Math.sin(now * 14) : w.kind === 'trk' ? 0.85 : Math.max(0, 1 - w.age / 1.2);
+      m.cone.visible = m.s.visible = true; m.cone.position.copy(edge); m.cone.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d.clone().negate()); // (its point in toward her)
+      (m.cone.material as THREE.MeshBasicMaterial).color.setHex(col); (m.cone.material as THREE.MeshBasicMaterial).opacity = a; m.cone.scale.setScalar(w.kind === 'scan' ? 0.7 + 0.5 * (w.age / 1.2) : 1);
+      m.line.visible = w.kind !== 'scan'; m.line.scale.setScalar(R * 1.06); m.line.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d); (m.line.material as THREE.LineDashedMaterial).color.setHex(col); (m.line.material as THREE.LineDashedMaterial).opacity = a * 0.8; m.line.computeLineDistances();
+      m.s.position.copy(d).multiplyScalar(R * 1.15).add(new T.Vector3(0, R * 0.16, 0)); /* (over its chevron) */ (m.s.material as THREE.SpriteMaterial).opacity = a;
+      const txt = w.kind === 'lock' ? 'LOCK' : w.kind === 'trk' ? 'TRK' : 'SRCH';
+      if (m.txt !== txt) { m.txt = txt; const x = m.cv.getContext('2d')!; x.clearRect(0, 0, 128, 48); x.font = '700 30px ui-monospace, Consolas, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 5; x.strokeStyle = 'rgba(0,0,0,0.75)'; x.strokeText(txt, 64, 24); x.fillStyle = w.kind === 'lock' ? '#ff5040' : '#ffb050'; x.fillText(txt, 64, 24); m.tex.needsUpdate = true; }
+    });
+    for (let i = rwr.length; i < H.rwr.length; i++) { const m = H.rwr[i]; m.cone.visible = m.line.visible = m.s.visible = false; }
     // the tracks: each 3D track at its place; each contact no 3D track has, faint at its fan's middle
     const items: HoloItem[] = []; for (const l of H.arcs) l.visible = false;
     for (const a of su.ass) {

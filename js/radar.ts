@@ -245,6 +245,7 @@ export const Radar = (() => {
       seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2) / 10), id: t.id, iff: answers(t, su) ? t.iff! : null });
     }
     const th0 = sc.th; sc.th = wrap(sc.th + sc.rate * dt);
+    for (const q of seen) if (wrap(q.phi - th0 + sc.bw) <= sc.rate * dt + 2 * sc.bw) paint(q.id, su, sc, k, now); // (her beam over it this frame: its warning receiver hears it)
     // the columns its middle crossed this frame (in her angle), each written where it goes on the map
     const j0 = Math.floor(th0 / DA), j1 = Math.floor(sc.th / DA), n = ((j1 - j0) % MAP.na + MAP.na) % MAP.na;
     for (let s1 = 1; s1 <= n; s1++) {
@@ -393,11 +394,19 @@ export const Radar = (() => {
   const HOLD = 3;
   // Radar warning: every ship hears a tracking radar that's on her (locked on her, or sweeping across her): from which ship and
   // where (lit: her id to the emitters on her, when last and from where). Being tracked is a sign of hostility (assess).
-  const lit = new Map<string, Map<string, { t: number; from: THREE.Vector3 }>>();
-  function illum(tgt: string | null, su: RSuite, tr: RTrack, now: number) {
+  const lit = new Map<string, Map<string, { t: number; from: THREE.Vector3; lk: boolean }>>();
+  function illum(tgt: string | null, su: RSuite, tr: RTrack, now: number, lk = false) {
     if (!tgt) return; let m = lit.get(tgt); if (!m) { m = new Map(); lit.set(tgt, m); }
-    m.set(su.id + ':' + tr.side, { t: now, from: tr.at.clone().applyQuaternion(su.Q).add(su.P) });
+    m.set(su.id + ':' + tr.side, { t: now, from: tr.at.clone().applyQuaternion(su.Q).add(su.P), lk }); // (lk: locked on her, not just sweeping over)
   }
+  // (and a scanner's beam going over her: a paint, a pulse train a sweep; heard as it passes, from where)
+  const painted = new Map<string, Map<string, { t: number; from: THREE.Vector3 }>>();
+  function paint(tgt: string, su: RSuite, sc: RScan, k: number, now: number) {
+    let m = painted.get(tgt); if (!m) { m = new Map(); painted.set(tgt, m); }
+    m.set(su.id + ':s' + k, { t: now, from: sc.at.clone().applyQuaternion(su.Q).add(su.P) });
+  }
+  const paintsOn = (id: string, now: number, keep = 1.2) => { const m = painted.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t < keep).map(([k, q]) => ({ k, from: q.from, age: now - q.t })) : []; };
+  const litTrk = (id: string, now: number) => { const m = lit.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t < 0.5).map(([k, q]) => ({ k, from: q.from, lk: q.lk })) : []; };
   const litOn = (id: string, now: number) => { const m = lit.get(id); return m ? [...m.entries()].filter(([, q]) => now - q.t < 1).map(([k, q]) => ({ k, from: q.from })) : []; };
   function prior(su: RSuite, iff: RIff | null) {
     if (!iff) return { p: 0.3, w: 'no IFF' }; // (a navy's to anyone else, a pirate, the squad running silent, chaff, a missile)
@@ -559,7 +568,7 @@ export const Radar = (() => {
     if (oth && oth.st === 'idle' && tr.est.p && tr.est.q > 0.3 && tr.b.x * tr.side < 0.05 && inSide(oth, _w.copy(tr.est.p).sub(_v.copy(oth.at).applyQuaternion(su.Q).add(su.P)).normalize().applyQuaternion(_qi.copy(su.Q).invert()))) { drop(oth); // (only if she's in its half of the sky, from its own mount)
       oth.st = 'slew'; oth.hand = { p: tr.est.p.clone(), v: tr.est.v.clone(), t: now }; }
     if (!bd.rs.length || bd.db < THR - 4 || !inSide(tr, tr.b)) { tr.lost += dt; if (tr.lost > 0.5) drop(tr); return; }
-    tr.lost = 0; tr.tgt = bd.id; tr.lockT += dt; illum(bd.id, su, tr, now);
+    tr.lost = 0; tr.tgt = bd.id; tr.lockT += dt; illum(bd.id, su, tr, now, true);
     let rev = false, sa = 0;
     if (tr.dP >= TAU && tr.dA > 0) {
       // the error: <G u> / (<G> AG sq) is the target's offset from the boresight (exact while she's well inside the beam; it can't
@@ -598,5 +607,5 @@ export const Radar = (() => {
   function best(su: RSuite | null) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && (!b || t.est.q > b.est.q)) b = t; return b; }
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
-  return { show: 0, sel: 'own', litOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();
