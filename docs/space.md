@@ -204,7 +204,8 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
   orange, watch yellow, neutral grey, civilian grey-blue, friendly green), a contact only one scanner holds drawn as the arc it
   could be on (its fan at its range, where her hull doesn't hide it), its middle the point to aim at; her scanners' fans sweeping out from the middle (cyan bearing, magenta roll) and each tracker's beam a line from it
   along its axis as it is that instant (the conical scan's circling shows), out to its range gate (a ring), amber
-  acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed amber, its beam going along it. Holding the right button turns it (the operator's view held still); the middle of their
+  acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed amber, its beam going along it. Holding **G** focuses on it: the room's frame is blurred and the hologram drawn sharp over it (layer 6, js/render.ts
+  focusBlur); holding G again comes back out. Holding the right button turns it (the operator's view held still); the middle of their
   view points at a track (ringed and named), a left click cues a tracker on it (`srcue` to everyone aboard), a tap of the
   right button drops the trackers. The deck plan the deck scanner gives is behind **M**.
 - **F8** shows a ship's radars, each tap the next ship's: the squad's (from where you are), the mission ship's, then the

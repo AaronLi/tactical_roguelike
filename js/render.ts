@@ -2039,7 +2039,7 @@ export const R = {
     }
     // a full-screen menu up (the Tab screen, the shop): the frame drawn at half the render resolution and blurred here, behind it,
     // rather than by the page (a backdrop-filter is done at the screen's own resolution, every frame)
-    const blur = !nv && !fish && (!!this._forceBlur || (ReplayEnv.Game && (ReplayEnv.Game.invOpen || ReplayEnv.Game.shopOpen))) && dbs.x >= 16 && dbs.y >= 16;
+    const blur = !nv && !fish && (!!this._forceBlur || this.focusBlur || (ReplayEnv.Game && (ReplayEnv.Game.invOpen || ReplayEnv.Game.shopOpen))) && dbs.x >= 16 && dbs.y >= 16;
     if (blur) r.setRenderTarget(this._blurTargets(Math.max(1, dbs.x >> 1), Math.max(1, dbs.y >> 1))[0]);
     if (nv) r.setRenderTarget(this.nvRT!);
     r.clear();
@@ -2074,6 +2074,9 @@ export const R = {
     r.render(this.vmScene, this.camera);
     if (nv) { LU.lgNv.value.w = 0; this._nvComposite(); }
     if (blur) this._blurPasses();
+    // (focused on something (focusBlur: the sensor station's hologram, js/space.ts sensorStep): what's on layer 6 drawn sharp over the
+    // blurred frame, against nothing but itself)
+    if (blur && this.focusBlur) { const sc = this.scene, bg = sc.background, cam = this.camera; sc.background = null; r.setRenderTarget(null); r.clearDepth(); cam.layers.set(6); r.render(sc, cam); cam.layers.set(0); sc.background = bg; }
     LightGrid.on(false);
     r.info.autoReset = true;
     this._shaderGuard();
@@ -2082,7 +2085,7 @@ export const R = {
   // lightPad), and three builds what's missing in the frame that first draws it, a stop of tens to hundreds of ms a shader on
   // Windows. So, in a level with nothing being warmed and no veil up: each new one logged with what it was built for (its kind,
   // the start of three's key for it, the scene's light counts then) and counted (shadersInPlay: js/profiler.ts context).
-  shadersInPlay: 0, shaderLog: [] as string[], _forceBlur: null as boolean | null, // (the warm-up's one frame through the blur: warmStep)
+  shadersInPlay: 0, shaderLog: [] as string[], focusBlur: false, _forceBlur: null as boolean | null, // (the warm-up's one frame through the blur: warmStep)
   _sg: { n: 0, map: null as unknown },
   _shaderGuard() {
     const ps = (this.renderer.info.programs || []) as any[], Gm = ReplayEnv.Game, S = this._sg;

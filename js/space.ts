@@ -81,7 +81,7 @@ export const Space = (() => {
   // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
-  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1 } };
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false } };
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -290,7 +290,9 @@ export const Space = (() => {
   // it (told to everyone aboard: srcue)
   function sensorStep() {
     const seat = mySeat(), m = me(), H = EW.holo; EW.cu = null;
-    if (!seat || seat.k !== 'sensors' || !EW.own || Game.menuOpen()) { EW.l = EW.r = false; H.pick = null; return; }
+    if (!seat || seat.k !== 'sensors' || !EW.own || Game.menuOpen()) { EW.l = EW.r = false; H.pick = null; if (H.focus && (!seat || seat.k !== 'sensors')) { H.focus = false; G_R.focusBlur = false; } return; }
+    // (held G: into the hologram (the room blurred behind it) or back out)
+    if (K('KeyG')) { if (!H.gT) H.gT = S.t; if (S.t - H.gT > 0.35 && !H.gDone) { H.gDone = true; H.focus = !H.focus; G_R.focusBlur = H.focus; Audio.click(); } } else { H.gT = 0; H.gDone = false; }
     if (!H.placed && S.model && H.sat >= 0 && S.t - H.sat > 0.25) { // (put where its operator has it: centred in front of the seat, just below their eyes; once, the view settled at the seat)
       const g = S.model.group, inv = g.matrixWorld.clone().invert(), gq = g.getWorldQuaternion(new T.Quaternion()).invert(), cam = G_R.camera;
       const eye = cam.getWorldPosition(new T.Vector3()).applyMatrix4(inv), f = new T.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new T.Quaternion())).applyQuaternion(gq); f.y = 0; f.normalize();
@@ -325,6 +327,7 @@ export const Space = (() => {
 
   // ------------------------------------------------------------------ coming and going
   function leave() {
+    EW.holo.focus = false; G_R.focusBlur = false;
     RadarView.update(null, false, [], [], '', 0); RadarView.holo(null, null, new T.Vector3(), 0, new T.Quaternion(), 0, false, null); for (const c of EW.chaff) c.pts.removeFromParent(); EW.chaff = [];
     if (!S.on && !S.model) return;
     if (S.on && S.kind === 'board' && S.tclose && S.zone) {
@@ -1853,7 +1856,7 @@ export const Space = (() => {
     outside();
     sensorStep(); // (after the view's placed: where the operator's looking is where the camera is now)
     ewCam();
-    { const seat = mySeat(); RadarView.holo(S.model ? S.model.group : null, EW.own, EW.holo.c, EW.holo.R, EW.holo.rot, S.t, !!seat && seat.k === 'sensors', EW.holo.pick); }
+    { const seat = mySeat(); RadarView.holo(S.model ? S.model.group : null, EW.own, EW.holo.c, EW.holo.R, EW.holo.rot, S.t, !!seat && seat.k === 'sensors', EW.holo.pick, EW.holo.focus); }
     RadarView.update(S.root, Radar.show, ewList(), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', S.t, G_R.camera, Radar.sel);
     // her engines, the status strip, the mission's things
     const th = S.docked ? 0 : U.clamp(S.V.length() / S.def.speed, 0.12, 1) * (S.cruise ? 1.3 : 0.75);
