@@ -165,8 +165,8 @@ cut(sh, box(-4.5 * mm, 4.5 * mm, F(297.6), F(283.4), U(199), U(188)))           
 side_cuts = []
 for sx_ in (-1, 1):
     for xw_, fp_ in ((31 * mm, 0.2), (HWG, 0.5)):
-        for k_ in range(1, 20): side_cuts.append(((sx_ * xw_, fp_, 0.0), (sx_, 0, 0), (0, 0.030 * k_, 0), (0, 1, 0)))
-        for z_ in range(36, -70, -8): side_cuts.append(((sx_ * xw_, fp_, 0.0), (sx_, 0, 0), (0, 0, z_ * mm), (0, 0, 1)))
+        for k_ in range(1, 15): side_cuts.append(((sx_ * xw_, fp_, 0.0), (sx_, 0, 0), (0, 0.040 * k_, 0), (0, 1, 0)))
+        for z_ in range(36, -72, -12): side_cuts.append(((sx_ * xw_, fp_, 0.0), (sx_, 0, 0), (0, 0, z_ * mm), (0, 0, 1)))
 slice_faces(sh, side_cuts)
 tidy(sh, 1e-6, True); clean(sh)
 wnorm(sh, 50); K.adopt(sh, 'base', SH)
