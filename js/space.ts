@@ -114,7 +114,7 @@ export const Space = (() => {
     Radar.step(own, dt, tg, S.t);
     if (EW.foe) {
       Radar.step(EW.foe, dt, tg, S.t);
-      if (EW.hw && EW.hw.su === EW.foe) { const hw = EW.hw; EW.foe.scans.forEach((sc, k) => { const r = hw.rotors[k]; if (sc.ax === 'y') r.rotation.set(0, -sc.th, 0); else r.rotation.set(sc.th, 0, 0); }); EW.foe.trks.forEach((tr, k) => hw.dishes[k].quaternion.setFromUnitVectors(_mz, tr.b)); }
+      if (EW.hw && EW.hw.su === EW.foe) { const hw = EW.hw; EW.foe.scans.forEach((sc, k) => Radar.spin(sc.ax, sc.th, hw.rotors[k])); EW.foe.trks.forEach((tr, k) => hw.dishes[k].quaternion.setFromUnitVectors(_mz, tr.b)); }
       // her fire control: a tracker cued on the newest plot of the squad's ship whenever her scanners paint it and she's crewed (a
       // ship tracks what comes near her whether or not she means to shoot: guns, below, fire only when she's hostile)
       const manned = !!(S.state && S.state.gn && S.state.arm == null && !S.state.boom);
@@ -162,8 +162,8 @@ export const Space = (() => {
       for (let k = 1; k < 4; k++) { const ring = new T.Mesh(new T.BoxGeometry(1.3, 0.12, 1.3), D); ring.position.y = L * k / 4; ms.add(ring); }
       const plate = new T.Mesh(new T.CylinderGeometry(1.4, 1.6, 0.4, 12), D); plate.position.y = 0.1; ms.add(plate);
       const r = new T.Group(); o.add(r); rotors.push(r);
-      // (the aperture's long the way its beam's narrow: across the beam for 'y' (narrow in azimuth), up and down for 'x')
-      const bar = new T.Mesh(sc.ax === 'y' ? new T.BoxGeometry(7, 1.0, 0.35) : new T.BoxGeometry(1.0, 7, 0.35), M); bar.position.set(0, 0, -0.4); r.add(bar);
+      // (the aperture's long the way its beam's narrow, the way it sweeps: across for 'y', up and down for 'x', round her for 'z')
+      const bar = new T.Mesh(sc.ax === 'y' ? new T.BoxGeometry(7, 1.0, 0.35) : sc.ax === 'x' ? new T.BoxGeometry(1.0, 7, 0.35) : new T.BoxGeometry(7, 0.35, 1.0), M); bar.position.copy(Radar.dirOf(sc.ax, 0, 0)).multiplyScalar(0.4); r.add(bar); // ('z': long across her, facing out from her length)
       const hub = new T.Mesh(new T.BoxGeometry(0.9, 0.9, 0.9), D); r.add(hub);
     }
     for (const tr of su.trks) {

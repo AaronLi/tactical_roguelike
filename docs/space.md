@@ -153,11 +153,12 @@ A ship knows where another ship is only from what her radars tell her. Every shi
   - at 60°/s the lock holds and is handed across;
   - at 90°/s and faster it's lost.
 - **Where they're mounted.** Each ship has two scanners, each on a mast. The 'y' scanner stands over her roof: it sees round her
-  horizon, and below her deck only as far as its mast lets it see over her sides, so it's blind under her keel. The 'x' scanner
-  stands off her bow: it sees up over her and down under her, ahead, and is blind astern of her where her hull is in the way.
+  horizon, and below her deck only as far as its mast lets it see over her sides, so it's blind under her keel. The 'z' scanner
+  stands off her bow and turns about her length (roll), its fan lying along her length: a plot is the angle round her and the
+  range. It sees all round her ahead of her bow, and is blind astern of her where her hull is in the way.
   How far past its mast's plane each can see is the angle over the hull's edge from the mast's top (`mask`). Her two trackers
-  are on her flanks, each seeing its own half of the sky and 10° past it. A cue on an 'x' plot can't tell which side the
-  target is on, so both free trackers sweep their own halves of the fan and the first to find the target keeps it. The mission
+  are on her flanks, each seeing its own half of the sky and 10° past it. A cue on a plot near her middle line (a 'z' plot
+  over or under her, a 'y' plot ahead or astern) can't tell which side the target is on, so both free trackers sweep their own halves of the fan and the first to find the target keeps it. The mission
   ship's mounts are set on her plating by raycasting her hull (`fitMounts`). Her hardware is drawn and moves with the radars
   (`radarKit`): lattice masts, antennas turning with their sweeps, and each tracker's dish pointing along its boresight.
 - **Targets** are the mission ship and every ship of the zone that's shown, each with a return from her own drawing (the
@@ -182,7 +183,7 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
   The squad's ship is drawn in blues (cyan fans, teal acquiring, blue tracking) and every other ship in reds (red fans, amber
   acquiring, red tracking). Another ship's tracker gets a marker on the screen at its turret (ACQ, TRK, or a pulsing TRK
   LOCK when it's on you): a beam pointed at you is only a point from where you sit.
-  It shows the scanners' fans with trails, each tracker's cone, boresight and nutation ring, the plots, the squad ship's
+  It shows the scanners' fans with trails (none of a fan drawn where her own hull hides it), each tracker's cone, boresight and nutation ring, the plots, the squad ship's
   detection envelope against the mission ship's scanner, and a panel with her RCS toward it, the range she'd be painted at
   and whether she's painted or locked.
 

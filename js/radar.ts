@@ -21,10 +21,11 @@
 export interface RcsTable { s: Float32Array; max: number; mean: number }
 export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable }
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3 } // (q, o: how she was turned and where she was when it was made)
-export interface RScan { ax: 'y' | 'x'; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
+export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her frame: 'y' her up (yaw), 'x' her beam (pitch), 'z' her length (roll))
+export interface RScan { ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
-  cue: { k: number; ax: 'y' | 'x'; phi: number; r: number; q: THREE.Quaternion } | null; sw: number; best: { db: number; b: THREE.Vector3 }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
+  cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion } | null; sw: number; best: { db: number; b: THREE.Vector3 }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
   tgt: string | null; lockT: number; lost: number; err: number; db: number; rng: number; est: { p: THREE.Vector3 | null; v: THREE.Vector3; q: number };
   hand: { p: THREE.Vector3; v: THREE.Vector3; t: number } | null; // (handed a track by the other tracker: where its solution has the target, slewed to straight)
   dE: THREE.Vector3; dA: number; dP: number; w: THREE.Vector3; // (the conical scan's demodulator over the revolution under way, and the boresight's rate)
@@ -95,20 +96,25 @@ export const Radar = (() => {
   // debug view draws things for her)
   // (size her half length; top, bot how far her roof and keel are over and under her middle; beam her half width; mast how high
   // her scanners' masts stand. Two scanners, each on a mast: the 'y' one over her roof (round her horizon, and down past her
-  // sides as far as the mast lets it see over them: under her keel it's blind), the 'x' one off her bow high up (up over her and down
-  // under her, ahead: astern of her it's blind, her hull's in the way). A tracker on each flank, each seeing its own side)
+  // sides as far as the mast lets it see over them: under her keel it's blind), the 'z' one off her bow high up, turning about her length (its
+  // fan along her length: round her, ahead of her bow; astern of her it's blind, her hull's in the way). A tracker on each flank, each seeing its own side)
   function suite(id: string, size: number, top = size * 0.25, beam = size * 0.3, bot = -top, mast = Math.max(1.5, size * 0.25)): RSuite {
     const over = (m: number, edge: number) => Math.max(MASK, Math.sin(Math.atan2(m, Math.max(0.5, edge)))); // (how far past its plane a mast that high sees over an edge that far off)
     const scans: RScan[] = [
       { ax: 'y', th: 0, rate: SCAN.rate, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top + mast, -0.1 * size), n: new T.Vector3(0, 1, 0), mast, mask: over(mast, beam) },
-      { ax: 'x', th: Math.PI, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)) },
+      { ax: 'z', th: Math.PI, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)) },
     ];
     const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3() }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
     return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false };
   }
   // a way out of the radar along a fan: ax its turning axis, phi how far round it's turned, e how far along the fan (her own frame)
-  const dirOf = (ax: 'y' | 'x', phi: number, e: number, out = new T.Vector3()) => ax === 'y' ? out.set(Math.sin(phi) * Math.cos(e), Math.sin(e), -Math.cos(phi) * Math.cos(e)) : out.set(Math.sin(e), Math.sin(phi) * Math.cos(e), -Math.cos(phi) * Math.cos(e));
-  const angOf = (ax: 'y' | 'x', d: THREE.Vector3) => ax === 'y' ? [azOf(d.x, d.z), Math.asin(Math.max(-1, Math.min(1, d.y)))] : [Math.atan2(d.y, -d.z), Math.asin(Math.max(-1, Math.min(1, d.x)))];
+  // ('y': phi round from her nose to starboard, e up; 'x': phi up from ahead, e to starboard; 'z': phi round her length from her
+  // up to starboard (seen from astern), e forward along her length)
+  const dirOf = (ax: RAx, phi: number, e: number, out = new T.Vector3()) => ax === 'y' ? out.set(Math.sin(phi) * Math.cos(e), Math.sin(e), -Math.cos(phi) * Math.cos(e)) : ax === 'x' ? out.set(Math.sin(e), Math.sin(phi) * Math.cos(e), -Math.cos(phi) * Math.cos(e)) : out.set(Math.sin(phi) * Math.cos(e), Math.cos(phi) * Math.cos(e), -Math.sin(e));
+  const cl1 = (v: number) => Math.max(-1, Math.min(1, v));
+  const angOf = (ax: RAx, d: THREE.Vector3) => ax === 'y' ? [azOf(d.x, d.z), Math.asin(cl1(d.y))] : ax === 'x' ? [Math.atan2(d.y, -d.z), Math.asin(cl1(d.x))] : [Math.atan2(d.x, d.y), Math.asin(cl1(-d.z))];
+  // a scanner's antenna (or its fan, drawn) turned to phi: its rotation about its axis
+  const spin = (ax: RAx, th: number, o: THREE.Object3D) => { if (ax === 'y') o.rotation.set(0, -th, 0); else if (ax === 'x') o.rotation.set(th, 0, 0); else o.rotation.set(0, 0, -th); };
   const _v = new T.Vector3(), _w = new T.Vector3(), _q = new T.Quaternion();
   // where a target is from a mount of hers: the way (her frame), the range, and the target's return toward it
   function look(su: RSuite, at: THREE.Vector3, t: RTarget, dir: THREE.Vector3) {
@@ -159,7 +165,7 @@ export const Radar = (() => {
   const cueDir = (su: RSuite, c: NonNullable<RTrack['cue']>, e: number, out: THREE.Vector3) => dirOf(c.ax, c.phi, e, out).applyQuaternion(c.q).applyQuaternion(_qi.copy(su.Q).invert());
   // cue a tracker on a plot: the one whose side it's on, an idle one first
   function cue(su: RSuite, p: RPlot) {
-    const sc = su.scans[p.k], d0 = dirOf(sc.ax, p.phi, 0), want = sc.ax === 'y' ? (d0.x >= 0 ? 1 : -1) : 0;
+    const sc = su.scans[p.k], d0 = dirOf(sc.ax, p.phi, 0), want = Math.abs(d0.x) > 0.2 ? (d0.x > 0 ? 1 : -1) : 0; // (a fan's middle well off to one side: that side's tracker; near her middle line, both)
     const ok = su.trks.filter((t) => !want || t.side === want);
     // (a 'y' plot's side is known: its tracker's cued. An 'x' plot's fan runs across her, either side: every tracker not already
     // tracking is cued, each sweeps its own half, and the first to find her keeps it (trackStep drops the others))
@@ -250,5 +256,5 @@ export const Radar = (() => {
   function lockOn(su: RSuite | null, id: string) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && t.tgt === id && (!b || t.est.q > b.est.q)) b = t; return b; }
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
-  return { show: 0, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { show: 0, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

@@ -6,10 +6,10 @@
 //     beam axis runs round; and round the squad's own ship the range a hostile scanner would detect her at, every way she could be
 //     seen from (her radar cross-section, js/radar.ts rcsOf: a well-turned ship's envelope is small toward the radar), with the way
 //     to that radar marked. A panel of figures beside it.
-//   - the sensor station's screen (scope): the 'y' scanner's picture from above (her nose up), the 'x' scanner's from the side
-//     (ahead to the right, up up), the plots fading as the sweep comes round again; the trackers' state under them; a cursor where
+//   - the sensor station's screen (scope): the 'y' scanner's picture from above (her nose up), the 'z' scanner's from astern
+//     (round her length, her up at the top), the plots fading as the sweep comes round again; the trackers' state under them; a cursor where
 //     the operator is looking (js/space.ts sensorLook), and the plot it's on ringed: clicking cues a tracker on it.
-import { Radar, RSuite, RTarget, RPlot } from './radar.js';
+import { Radar, RSuite, RTarget, RPlot, RScan } from './radar.js';
 
 export const RadarView = (() => {
   const T = THREE, D2R = Math.PI / 180, TAU = Math.PI * 2;
@@ -25,14 +25,21 @@ export const RadarView = (() => {
     sp.scale.setScalar(0.035); sp.frustumCulled = false; sp.renderOrder = 10; return sp;
   }
   const add = (m: THREE.Material) => Object.assign(m, { transparent: true, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide });
-  // a scanner's fan at its turn 0, from the radar out to L: upright (ax 'y': in her y-z plane, toward -z) or lying (ax 'x': x-z)
-  function fanGeo(ax: 'y' | 'x', fan: number, L: number) {
-    const N = 24, pos: number[] = [];
-    for (let i = 0; i < N; i++) {
-      const e0 = -fan + 2 * fan * i / N, e1 = -fan + 2 * fan * (i + 1) / N, p0 = Radar.dirOf(ax, 0, e0).multiplyScalar(L), p1 = Radar.dirOf(ax, 0, e1).multiplyScalar(L);
-      pos.push(0, 0, 0, p0.x, p0.y, p0.z, p1.x, p1.y, p1.z);
+  // a scanner's fan, from the radar out to its R0, drawn turned to th: a triangle a step along it, and none where her own hull's
+  // in the way (past its mast's plane by more than it sees over her edge: RScan mask), so the fan never cuts through her
+  const NF = 24;
+  function fanGeo() { const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(NF * 9), 3)); return g; }
+  const _f0 = new T.Vector3(), _f1 = new T.Vector3(), _fm = new T.Vector3();
+  function fanFill(m: THREE.Mesh, sc: RScan, th: number) {
+    const pa = m.geometry.attributes.position as THREE.BufferAttribute, L = sc.R0;
+    for (let i = 0; i < NF; i++) {
+      const e0 = -sc.fan + 2 * sc.fan * i / NF, e1 = -sc.fan + 2 * sc.fan * (i + 1) / NF;
+      Radar.dirOf(sc.ax, th, e0, _f0); Radar.dirOf(sc.ax, th, e1, _f1); _fm.addVectors(_f0, _f1).normalize();
+      const k = i * 3;
+      if (_fm.dot(sc.n) < -sc.mask) { pa.setXYZ(k, 0, 0, 0); pa.setXYZ(k + 1, 0, 0, 0); pa.setXYZ(k + 2, 0, 0, 0); continue; }
+      pa.setXYZ(k, 0, 0, 0); pa.setXYZ(k + 1, _f0.x * L, _f0.y * L, _f0.z * L); pa.setXYZ(k + 2, _f1.x * L, _f1.y * L, _f1.z * L);
     }
-    const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); return g;
+    pa.needsUpdate = true;
   }
   function cone() { const g = new T.ConeGeometry(Math.tan(Radar.TRK.bw / 2), 1, 20, 1, true); g.translate(0, -0.5, 0); g.rotateX(Math.PI / 2); return g; }
   function ring() { const pts: number[] = []; for (let i = 0; i <= 32; i++) { const a = i / 32 * TAU; pts.push(Math.cos(a), Math.sin(a), 0); } const g = new T.BufferGeometry(); g.setAttribute('position', new T.Float32BufferAttribute(pts, 3)); return g; }
@@ -41,7 +48,7 @@ export const RadarView = (() => {
     const g = new T.Group(), P = own ? PAL.own : PAL.foe, c = P.fan;
     const fans = su.scans.map((sc) => {
       const piv = new T.Group(); piv.position.copy(sc.at); g.add(piv);
-      const ms = [0, 1, 2, 3, 4].map((i) => { const m = new T.Mesh(fanGeo(sc.ax, sc.fan, sc.R0), add(new T.MeshBasicMaterial({ color: c, opacity: i ? 0.025 / i : 0.08 }))); m.frustumCulled = false; piv.add(m); return m; });
+      const ms = [0, 1, 2, 3, 4].map((i) => { const m = new T.Mesh(fanGeo(), add(new T.MeshBasicMaterial({ color: c, opacity: i ? 0.025 / i : 0.08 }))); m.frustumCulled = false; piv.add(m); return m; });
       return { piv, ms };
     });
     const trks = su.trks.map(() => {
@@ -82,7 +89,7 @@ export const RadarView = (() => {
       const own = su.id === ownId;
       if (!su.dbg || su.dbg.g.parent !== root) { su.dbg = make(su, own); root.add(su.dbg.g); }
       const D = su.dbg; D.g.position.copy(su.P); D.g.quaternion.copy(su.Q);
-      su.scans.forEach((sc, k) => D.fans[k].ms.forEach((m: THREE.Mesh, i: number) => { const th = sc.th - i * 4 * D2R; if (sc.ax === 'y') m.rotation.set(0, -th, 0); else m.rotation.set(th, 0, 0); }));
+      su.scans.forEach((sc, k) => { D.fans[k].piv.position.copy(sc.at); D.fans[k].ms.forEach((m: THREE.Mesh, i: number) => fanFill(m, sc, sc.th - i * 4 * D2R)); });
       su.trks.forEach((tr, k) => {
         const o = D.trks[k], len = tr.st === 'track' ? tr.rng : tr.st === 'idle' ? 0 : tr.cue ? tr.cue.r : tr.hand ? tr.hand.p.distanceTo(su.P) : 0;
         o.cn.visible = len > 0; o.rg.visible = tr.st === 'track';
@@ -111,7 +118,7 @@ export const RadarView = (() => {
         if (n >= MAXP * SEG * 2) break;
         const f = Math.max(0, 1 - (now - p.t) * sc.rate / TAU);
         const pq = p.q || su.Q, po = p.o || su.P; qi.copy(su.Q).invert(); // (where it was, in space: drawn in her frame as she is now)
-        for (let i = 0; i < SEG; i++) for (const j of [i, i + 1]) { Radar.dirOf(sc.ax, p.phi, -sc.fan + 2 * sc.fan * j / SEG, v).multiplyScalar(p.r).add(sc.at).applyQuaternion(pq).add(po).sub(su.P).applyQuaternion(qi); pa.setXYZ(n, v.x, v.y, v.z); ca.setXYZ(n, c.r * f, c.g * f, c.b * f); n++; }
+        for (let i = 0; i < SEG; i++) if (Radar.dirOf(sc.ax, p.phi, -sc.fan + 2 * sc.fan * (i + 0.5) / SEG, _fm).dot(sc.n) >= -sc.mask) for (const j of [i, i + 1]) { /* (not where her hull hides it) */ Radar.dirOf(sc.ax, p.phi, -sc.fan + 2 * sc.fan * j / SEG, v).multiplyScalar(p.r).add(sc.at).applyQuaternion(pq).add(po).sub(su.P).applyQuaternion(qi); pa.setXYZ(n, v.x, v.y, v.z); ca.setXYZ(n, c.r * f, c.g * f, c.b * f); n++; }
       }
       D.arcs.geometry.setDrawRange(0, n); pa.needsUpdate = ca.needsUpdate = true;
     }
@@ -141,7 +148,7 @@ export const RadarView = (() => {
   function phiNow(su: RSuite, p: RPlot) { if (!p.q) return p.phi; const ax = su.scans[p.k].ax; Radar.dirOf(ax, p.phi, 0, _d).applyQuaternion(p.q).applyQuaternion(qi.copy(su.Q).invert()); return Radar.angOf(ax, _d)[0]; }
   function plotXY(su: RSuite, p: RPlot, W: number, H: number) {
     const L = lay(W, H), sc = su.scans[p.k], [cx, cy] = L.c[sc.ax === 'y' ? 0 : 1], r = Math.min(1, p.r / RMAX) * L.R, ph = phiNow(su, p);
-    return sc.ax === 'y' ? [cx + Math.sin(ph) * r, cy - Math.cos(ph) * r] : [cx + Math.cos(ph) * r, cy - Math.sin(ph) * r];
+    return sc.ax !== 'x' ? [cx + Math.sin(ph) * r, cy - Math.cos(ph) * r] : [cx + Math.cos(ph) * r, cy - Math.sin(ph) * r];
   }
   // the plot under the cursor (cu: x, y on the screen), if one's within 14 px
   function pick(su: RSuite, cu: number[] | null, W: number, H: number, now: number): RPlot | null {
@@ -157,7 +164,7 @@ export const RadarView = (() => {
       c.strokeStyle = '#163846'; for (const f of [1, 0.75, 0.5, 0.25]) { c.beginPath(); c.arc(cx, cy, L.R * f, 0, TAU); c.stroke(); }
       c.beginPath(); c.moveTo(cx - L.R, cy); c.lineTo(cx + L.R, cy); c.moveTo(cx, cy - L.R); c.lineTo(cx, cy + L.R); c.stroke();
       // the sweep and its afterglow
-      const sw = (a: number) => sc.ax === 'y' ? [cx + Math.sin(a) * L.R, cy - Math.cos(a) * L.R] : [cx + Math.cos(a) * L.R, cy - Math.sin(a) * L.R];
+      const sw = (a: number) => sc.ax !== 'x' ? [cx + Math.sin(a) * L.R, cy - Math.cos(a) * L.R] : [cx + Math.cos(a) * L.R, cy - Math.sin(a) * L.R];
       for (let j = 12; j >= 0; j--) { const [x, y] = sw(sc.th - j * 3 * D2R); c.strokeStyle = `rgba(80,220,255,${j ? 0.05 + 0.02 * (12 - j) / 12 : 0.85})`; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke(); }
       for (const p of sc.plots) {
         const f = Math.max(0, 1 - (now - p.t) * sc.rate / TAU); if (f <= 0) continue;
@@ -170,7 +177,7 @@ export const RadarView = (() => {
         c.strokeStyle = col; c.beginPath(); c.moveTo(cx + (x - cx) * 0.9, cy + (y - cy) * 0.9); c.lineTo(x, y); c.stroke();
         if (tr.st === 'track') { const r = Math.min(1, tr.rng / RMAX) * L.R, px = cx + (x - cx) / L.R * r, py = cy + (y - cy) / L.R * r; c.strokeRect(px - 5 * k, py - 5 * k, 10 * k, 10 * k); }
       });
-      c.fillStyle = '#5fa8c4'; c.fillText(sc.ax === 'y' ? 'SCAN A  bearing · nose up' : 'SCAN B  elevation · ahead →', cx - L.R, cy - L.R - 9 * k);
+      c.fillStyle = '#5fa8c4'; c.fillText(sc.ax === 'y' ? 'SCAN A  bearing · nose up' : sc.ax === 'z' ? 'SCAN B  roll · from astern, up ↑' : 'SCAN B  elevation · ahead →', cx - L.R, cy - L.R - 9 * k);
       c.fillText('10 km', cx + 3 * k, cy - L.R + 7 * k);
     });
     // the trackers
