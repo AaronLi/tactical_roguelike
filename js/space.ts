@@ -109,7 +109,7 @@ export const Space = (() => {
       }
     }
     const own = EW.own!, me = EW.ownT!; me.iff = EW.xpdr ? { c: 'squad', n: S.def.name || 'squad' } : null; if (EW.foeT) EW.foeT.iff = hullIff(); own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
-    if (S.docked || S.ftl || S.warp) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (against a hull, or between: nothing to look at)
+    if (S.docked || S.ftl) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (against a hull, or jumping between levels: nothing to look at. A warp within the level is real time: everything runs, at her speed)
     chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt)];
     Radar.step(own, dt, tg, S.t);
     if (EW.foe) {
@@ -217,7 +217,7 @@ export const Space = (() => {
   // contact nobody can name (an unknown: a hostile treats it as a threat as it would her)
   function xpdr(on: boolean) { EW.xpdr = on; HUD.toast('TRANSPONDER', on ? 'On: she answers interrogation' : 'Off: she runs silent', 1.4); Audio.click(); }
   function chaffGo() {
-    if (!S.model || S.docked || S.ftl || S.warp) return;
+    if (!S.model || S.docked || S.ftl) return;
     if (EW.chaffLeft <= 0) { HUD.toast('CHAFF', 'None left', 1.2); Audio.deny(); return; }
     EW.chaffLeft--;
     const up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), back = new T.Vector3(0, 0, 1).applyQuaternion(S.Q), side = new T.Vector3(Math.random() - 0.5, 0, 0).applyQuaternion(S.Q);
