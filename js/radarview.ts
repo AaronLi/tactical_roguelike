@@ -423,12 +423,19 @@ export const RadarView = (() => {
   // beam a line from the middle along its boresight (amber slewing or sweeping, red tracking). The operator turns it (rot) and
   // points at a track with the middle of their view (holoPick).
   type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string };
-  let holoG: { focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
+  let holoG: { zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
   const HCOL: Record<string, number> = { HOSTILE: 0xff4a3a, SUSPECT: 0xffa040, WATCH: 0xffe070, NEUTRAL: 0xa8b8c4, CIV: 0x7f9fb0, FRIENDLY: 0x70f090 };
   function holoMake(parent: THREE.Object3D, R: number) {
     const g = new T.Group(), inner = new T.Group(); g.add(inner); parent.add(g);
     const glow = (c: number, o: number) => new T.MeshBasicMaterial({ color: c, transparent: true, opacity: o, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide });
-    for (const f of [0.25, 0.5]) { const ring = new T.Mesh(new T.RingGeometry(R * f - 0.002, R * f + 0.002, 48), glow(0x40c8ff, 0.25)); ring.rotation.x = -Math.PI / 2; inner.add(ring); } // (her plane: 625 m and 2.5 km)
+    // (range rings in her plane, a quarter, half and all of the range shown (zoom), each named: holo)
+    const rings = [0, 1, 2].map(() => {
+      const pts: THREE.Vector3[] = []; for (let i = 0; i <= 64; i++) { const a = i / 64 * TAU; pts.push(new T.Vector3(Math.sin(a), 0, -Math.cos(a))); }
+      const l = new T.Line(new T.BufferGeometry().setFromPoints(pts), new T.LineBasicMaterial({ color: 0x40c8ff, transparent: true, opacity: 0.35, depthWrite: false, blending: T.AdditiveBlending })); inner.add(l);
+      const cv = document.createElement('canvas'); cv.width = 256; cv.height = 64; const tex = new T.CanvasTexture(cv);
+      const sp = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false })); sp.scale.set(R * 0.5, R * 0.125, 1); sp.renderOrder = 15; inner.add(sp);
+      return { l, s: sp, cv, tex };
+    });
     // (her: a cone, her nose its point, and a fin on her back: which way's up on her, so how the sphere's turned reads off her)
     const ship = new T.Mesh(new T.ConeGeometry(R * 0.045, R * 0.16, 12), glow(0x60e0ff, 0.9)); ship.rotation.x = -Math.PI / 2; inner.add(ship);
     const fin = new T.Mesh(new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, R * 0.07), new T.Vector3(0, R * 0.07, R * 0.07), new T.Vector3(0, 0, -R * 0.02)]), glow(0x60e0ff, 0.8)); inner.add(fin);
@@ -440,25 +447,27 @@ export const RadarView = (() => {
     const lcv = document.createElement('canvas'); lcv.width = 512; lcv.height = 96; const ltex = new T.CanvasTexture(lcv);
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
     const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', font: '12px ui-monospace, Consolas, monospace', color: '#9fe4ff', textShadow: '0 0 4px #000', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · aim at a track, left click: track it · tap right: drop the trackers'; document.body.appendChild(hint);
-    holoG = { focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
+    holoG = { zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
-  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1) {
+  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX) {
     if (!parent || !su) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.style.display = 'none'; } return; }
     if (!holoG || holoG.R !== R) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.remove(); } holoMake(parent, R); }
     const H = holoG!; if (H.g.parent !== parent) parent.add(H.g);
     H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
-    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag with the right button: turn it · tap right: drop the trackers · hold G: look round the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
+    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? 'point at a track, left click: track it · drag with the right button: turn it · scroll: zoom · tap right: drop the trackers · hold G: look round the room · hold F: get up' : 'hold G: focus on it · hold right mouse: turn it · aim at a track, left click: track it · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
-    const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / RMAX)) * R / L : 0); };
+    const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / zoom)) * R / L : 0); }; // (beyond the range shown: at its edge)
+    if (H.zoom !== zoom) { H.zoom = zoom; [0.25, 0.5, 1].forEach((f, i) => { const g0 = H.rings[i], rr = Math.sqrt(f) * R, km = zoom * f / 1000; g0.l.scale.setScalar(rr); g0.s.position.set(rr + R * 0.1, R * [-0.07, 0.07, 0][i], 0); /* (at her starboard side of each, the inner two staggered up and down: not over each other) */
+      const x = g0.cv.getContext('2d')!; x.clearRect(0, 0, 256, 64); x.font = '600 34px ui-monospace, Consolas, monospace'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 6; x.strokeStyle = 'rgba(0,0,0,0.7)'; const t = km >= 1 ? +km.toFixed(2) + ' km' : Math.round(km * 1000) + ' m'; x.strokeText(t, 128, 32); x.fillStyle = '#8fdcff'; x.fillText(t, 128, 32); g0.tex.needsUpdate = true; }); }
     // the fans: as wide as the shell, sweeping (none of a fan where her hull hides it)
     su.scans.forEach((sc, i) => { if (!H.fans[i]) return; fanFill(H.fans[i], { ...sc, R0: R, at: new T.Vector3() } as RScan, sc.th); });
     const camQ = new T.Quaternion(); H.inner.updateWorldMatrix(true, false); H.inner.getWorldQuaternion(camQ); const faceCam = camQ.invert().multiply(G_cam.quaternion);
     su.trks.forEach((tr, i) => {
       const l = H.beams[i], st = H.strips[i], en = H.ends[i]; if (!l) return;
-      const on = tr.st !== 'idle', len = on && tr.rng > 0 ? Math.sqrt(Math.min(1, tr.rng / RMAX)) * R : R;
+      const on = tr.st !== 'idle', len = on && tr.rng > 0 ? Math.sqrt(Math.min(1, tr.rng / zoom)) * R : R;
       // (its beam: along its axis as it is this instant, the conical scan's circling and all, out to its range gate)
       l.visible = on; l.quaternion.setFromUnitVectors(Z, tr.st === 'track' ? tr.a : tr.b); l.scale.setScalar(len); (l.material as THREE.LineBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040);
       en.visible = on && tr.rng > 0; en.position.copy(tr.st === 'track' ? tr.a : tr.b).multiplyScalar(len); en.quaternion.copy(faceCam); (en.material as THREE.MeshBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040);

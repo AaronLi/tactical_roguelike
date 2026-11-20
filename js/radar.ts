@@ -31,7 +31,7 @@ export interface RScan {
 } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
-  cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion; o: THREE.Vector3 } | null; sw: number; best: { db: number; b: THREE.Vector3; r: number }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
+  cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion; o: THREE.Vector3; con?: RContact | null } | null; spiral?: { t: number; best: number; b: THREE.Vector3; r: number; p: THREE.Vector3; v: THREE.Vector3; t0: number } | null; sw: number; best: { db: number; b: THREE.Vector3; r: number }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
   tgt: string | null; lockT: number; lost: number; err: number; db: number; rng: number; est: { p: THREE.Vector3 | null; v: THREE.Vector3; q: number; kf?: KF3 | null };
   hand: { p: THREE.Vector3; v: THREE.Vector3; t: number } | null; // (handed a track by the other tracker: where its solution has the target, slewed to straight)
   hist?: { t: number; p: THREE.Vector3 }[]; // (where its solution has had her, the last 8 s)
@@ -455,8 +455,10 @@ export const Radar = (() => {
   // in, the way to each is quite different): the way to the point at e, in her frame now (out), and how far it is (returned: its
   // range gate there)
   const _cp = new T.Vector3();
-  function cueDir(su: RSuite, tr: RTrack, c: NonNullable<RTrack['cue']>, e: number, out: THREE.Vector3) {
-    dirOf(c.ax, c.phi, e, _cp).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o);
+  function cueDir(su: RSuite, tr: RTrack, c: NonNullable<RTrack['cue']>, e: number, out: THREE.Vector3, now = -1) {
+    const k = c.con; // (the contact it was cued on, if any: its filters say where it is now, not where the peak was)
+    if (k && now >= 0) { const sc = su.scans[c.k], dt = now - k.t; dirOf(c.ax, wrap(k.A + k.vA * dt + sc.off), e, _cp).applyQuaternion(su.Q).multiplyScalar(k.r + k.vr * dt).add(sc.at.clone().applyQuaternion(su.Q).add(su.P)); }
+    else dirOf(c.ax, c.phi, e, _cp).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o);
     out.copy(_cp).sub(_w.copy(tr.at).applyQuaternion(su.Q).add(su.P)); const R = out.length();
     out.divideScalar(R || 1).applyQuaternion(_qi.copy(su.Q).invert()); return R;
   }
@@ -474,11 +476,11 @@ export const Radar = (() => {
     // (a 'y' plot's side is known: its tracker's cued. An 'x' plot's fan runs across her, either side: every tracker not already
     // tracking is cued, each sweeps its own half, and the first to find her keeps it (trackStep drops the others))
     const free = ok.filter((t) => t.st !== 'track'), use = want ? [free.find((t) => t.st === 'idle') || free[0] || ok[0]] : free.length ? free : [ok[0]];
-    const pq = (p.q || su.Q).clone(), cueOf = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: pq, o: (p.o || su.P).clone().add(sc.at.clone().applyQuaternion(pq)) };
+    const pq = (p.q || su.Q).clone(), cueOf = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: pq, o: (p.o || su.P).clone().add(sc.at.clone().applyQuaternion(pq)), con: sc.cons.find((c) => c.p === p) || null };
     for (const tr of use) { if (!tr) continue; tr.hand = null; dgOf(tr).sweep = []; tr.st = 'slew'; tr.cue = cueOf; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3(), r: p.r }; tr.tgt = null; tr.lockT = 0; tr.lost = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; }
     return use[0] || null;
   }
-  const drop = (tr: RTrack) => { tr.meas = null; tr.hist = []; if (tr.dg) { tr.dg.series = []; tr.dg.errs = []; } tr.hand = null; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.st = 'idle'; tr.cue = null; tr.tgt = null; tr.lockT = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; tr.db = -99; };
+  const drop = (tr: RTrack) => { tr.spiral = null; tr.meas = null; tr.hist = []; if (tr.dg) { tr.dg.series = []; tr.dg.errs = []; } tr.hand = null; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.st = 'idle'; tr.cue = null; tr.tgt = null; tr.lockT = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; tr.db = -99; };
   // the boresight turned toward `to` no faster than the turret can
   function slewTo(tr: RTrack, to: THREE.Vector3, max: number) { const ang = tr.b.angleTo(to); if (ang <= max) tr.b.copy(to); else { const ax = _w.crossVectors(tr.b, to); if (ax.lengthSq() < 1e-12) ax.set(0, 1, 0); tr.b.applyAxisAngle(ax.normalize(), max); } tr.b.normalize(); return ang; }
   const inSide = (tr: RTrack, b: THREE.Vector3) => b.x * tr.side > -MASK; // (a tracker sees its own flank's half of the sky)
@@ -504,14 +506,29 @@ export const Radar = (() => {
     if (tr.st === 'slew' && tr.hand) { // (a handover: straight onto where the other tracker's solution has her, and tracking)
       const h = tr.hand, mt = tr.at.clone().applyQuaternion(su.Q).add(su.P), pt = h.p.clone().addScaledVector(h.v, now - h.t), to = pt.clone().sub(mt).normalize().applyQuaternion(_qi.copy(su.Q).invert());
       if (now - h.t > 3) { drop(tr); return; } // (not there in 3 s: her solution's gone stale)
-      if (slewTo(tr, to, TRK.stab * dt) < 1 * D2R) { tr.st = 'track'; tr.rng = pt.distanceTo(mt); tr.lockT = 0; tr.lost = 0; tr.err = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.hand = null; }
+      if (slewTo(tr, to, TRK.stab * dt) < 1 * D2R) { tr.st = 'acq'; tr.spiral = { t: 0, best: -99, b: new T.Vector3(), r: pt.distanceTo(mt), p: h.p.clone(), v: h.v.clone(), t0: h.t }; tr.hand = null; }
       tr.a.copy(tr.b); return;
+    }
+    if (tr.st === 'acq' && tr.spiral) {
+      // (on where a 3D track has her: a spiral round that point out to three beam widths (an Archimedean one, a beam width a turn),
+      // its range gate at the point's range; the strongest return on the way is where she is. A track's place far off can be some
+      // way out: further than half a beam, and the beam alone, pointed there, would hear nothing)
+      const sp = tr.spiral, mt = tr.at.clone().applyQuaternion(su.Q).add(su.P), pt = sp.p.clone().addScaledVector(sp.v, now - sp.t0), c0 = pt.clone().sub(mt), rng = c0.length(); c0.normalize().applyQuaternion(_qi.copy(su.Q).invert());
+      sp.t += dt; const turns = 3, T0 = 1.6, f = Math.min(1, sp.t / T0), ang = f * turns * TAU, rad = f * turns * TRK.bw;
+      const e1 = new T.Vector3(), e2 = new T.Vector3(); (Math.abs(c0.y) < 0.9 ? e1.set(0, 1, 0) : e1.set(1, 0, 0)).cross(c0).normalize(); e2.crossVectors(c0, e1);
+      tr.b.copy(c0).addScaledVector(e1, Math.cos(ang) * Math.tan(rad)).addScaledVector(e2, Math.sin(ang) * Math.tan(rad)).normalize(); tr.a.copy(tr.b); tr.rng = rng;
+      if (inSide(tr, tr.b)) { const r = beam(su, tr, tr.b, targets, rng); dgOf(tr).sweep.push({ e: rad, db: r.db }); if (r.db > THR) illum(r.id, su, tr, now); if (r.db + gauss() * 1.2 > sp.best) { sp.best = r.db; sp.b.copy(tr.b).applyQuaternion(su.Q); sp.r = r.R || rng; } }
+      if (f >= 1 || (sp.best > THR + 10 && rad < TRK.bw)) { // (done; or strong already, near the middle: no need to go on round)
+        if (sp.best > THR) { tr.b.copy(sp.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = sp.r; tr.lockT = 0; tr.lost = 0; tr.err = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.spiral = null; }
+        else drop(tr);
+      }
+      return;
     }
     if (tr.st === 'slew' || tr.st === 'acq') {
       const c = tr.cue!, sc = su.scans[c.k];
-      if (tr.st === 'slew') { const to = new T.Vector3(); tr.rng = cueDir(su, tr, c, -sc.fan, to); if (slewTo(tr, to, TRK.slew * dt) < 1 * D2R) tr.st = 'acq'; tr.a.copy(tr.b); return; }
+      if (tr.st === 'slew') { const to = new T.Vector3(); tr.rng = cueDir(su, tr, c, -sc.fan, to, now); if (slewTo(tr, to, TRK.slew * dt) < 1 * D2R) tr.st = 'acq'; tr.a.copy(tr.b); return; }
       // along the fan, its range gate at the plot's range: the strongest return on the way is where she is
-      tr.sw += TRK.acq * dt; const gate = cueDir(su, tr, c, Math.min(tr.sw, sc.fan), tr.b); tr.rng = gate; tr.a.copy(tr.b);
+      tr.sw += TRK.acq * dt; const gate = cueDir(su, tr, c, Math.min(tr.sw, sc.fan), tr.b, now); tr.rng = gate; tr.a.copy(tr.b);
       if (inSide(tr, tr.b)) { const r = beam(su, tr, tr.b, targets, gate); dgOf(tr).sweep.push({ e: tr.sw, db: r.db }); if (r.db > THR) illum(r.id, su, tr, now); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.r = gate; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
       if (tr.sw >= sc.fan) {
         if (tr.best.db > THR) { for (const o of su.trks) if (o !== tr && o.cue === c && o.st !== 'track') drop(o); tr.b.copy(tr.best.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = tr.best.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }

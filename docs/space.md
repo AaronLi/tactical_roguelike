@@ -206,6 +206,8 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     range, where her hull doesn't hide it). Her scanners' fans sweeping out from the middle (cyan bearing, magenta roll).
     Each tracker's beam a line from the middle along its axis as it is that instant (the conical scan's circling shows), out
     to its range gate (a ring), amber acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed.
+  - **Range:** rings in her plane at a quarter, half and all of the range shown, each named; the wheel zooms the range at the
+    edge through 0.5, 1, 2.5, 5 and 10 km (anything further sits at the edge).
   - **Sitting down goes straight into it** (`holoFocus`): the world blurs out by degrees (js/render.ts focusBlur, focusAmt)
     and the hologram rises out of the console and opens (0.6 s) to just under the middle of the view, the view eased onto
     it. The rest of the screen's UI is put away, and the mouse is let go (still counted as captured: js/game.ts holoCursor,
