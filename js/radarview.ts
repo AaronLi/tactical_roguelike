@@ -140,7 +140,7 @@ export const RadarView = (() => {
   const qi = new T.Quaternion(), _d = new T.Vector3();
   function phiNow(su: RSuite, p: RPlot) { if (!p.q) return p.phi; const ax = su.scans[p.k].ax; Radar.dirOf(ax, p.phi, 0, _d).applyQuaternion(p.q).applyQuaternion(qi.copy(su.Q).invert()); return Radar.angOf(ax, _d)[0]; }
   function plotXY(su: RSuite, p: RPlot, W: number, H: number) {
-    const L = lay(W, H), sc = su.scans[p.k], [cx, cy] = L.c[p.k], r = Math.min(1, p.r / RMAX) * L.R, ph = phiNow(su, p);
+    const L = lay(W, H), sc = su.scans[p.k], [cx, cy] = L.c[sc.ax === 'y' ? 0 : 1], r = Math.min(1, p.r / RMAX) * L.R, ph = phiNow(su, p);
     return sc.ax === 'y' ? [cx + Math.sin(ph) * r, cy - Math.cos(ph) * r] : [cx + Math.cos(ph) * r, cy - Math.sin(ph) * r];
   }
   // the plot under the cursor (cu: x, y on the screen), if one's within 14 px
@@ -152,8 +152,8 @@ export const RadarView = (() => {
   function scope(cv: HTMLCanvasElement, su: RSuite, cu: number[] | null, now: number, live: boolean) {
     const c = cv.getContext('2d')!, W = cv.width, H = cv.height, L = lay(W, H), k = W / 512;
     c.fillStyle = '#03080b'; c.fillRect(0, 0, W, H); c.lineWidth = 1 * k; c.font = `${11 * k}px ui-monospace, Consolas, monospace`; c.textBaseline = 'middle';
-    su.scans.forEach((sc, i) => {
-      const [cx, cy] = L.c[i];
+    su.scans.forEach((sc) => { // (one scope an axis: her roof's scanner and her keel's both on it, a sweep each)
+      const [cx, cy] = L.c[sc.ax === 'y' ? 0 : 1];
       c.strokeStyle = '#163846'; for (const f of [1, 0.75, 0.5, 0.25]) { c.beginPath(); c.arc(cx, cy, L.R * f, 0, TAU); c.stroke(); }
       c.beginPath(); c.moveTo(cx - L.R, cy); c.lineTo(cx + L.R, cy); c.moveTo(cx, cy - L.R); c.lineTo(cx, cy + L.R); c.stroke();
       // the sweep and its afterglow

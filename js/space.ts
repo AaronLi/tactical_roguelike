@@ -81,7 +81,7 @@ export const Space = (() => {
   // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
-  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>() };
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] } };
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -91,7 +91,7 @@ export const Space = (() => {
       const g = S.model.group; g.updateMatrixWorld(true);
       const inv = g.matrixWorld.clone().invert(), box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
       const sz = box.getSize(new T.Vector3()), size = Math.max(4, sz.z / 2);
-      EW.own = Radar.suite('own', size, sz.y * 0.45, sz.x * 0.45);
+      EW.own = Radar.suite('own', size, box.max.y, Math.max(box.max.x, -box.min.x), box.min.y);
       EW.ownT = { id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('ship:' + S.def.id, g, inv) };
       EW.scr = null; g.traverse((o: any) => { if (!EW.scr && o.isMesh && o.material && o.material.map === S.model!.screen.tex) EW.scr = o; }); { const sm = EW.scr as THREE.Mesh | null; if (sm) (sm.material as THREE.Material).side = T.DoubleSide; } // (its face is the one toward the operator, whichever way the model wound it)
       EW.modelFor = S.model;
@@ -102,7 +102,9 @@ export const Space = (() => {
         const g = S.hull.group; g.updateMatrixWorld(true);
         const inv = g.matrixWorld.clone().invert(), hb = S.map.sp.hull, box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
         const c = new T.Vector3((hb.x0 + hb.x1) / 2, box.isEmpty() ? 0 : (box.min.y + box.max.y) / 2, (hb.z0 + hb.z1) / 2), h = box.isEmpty() ? 20 : box.max.y - c.y;
-        EW.foe = Radar.suite('hull', Math.max(hb.x1 - hb.x0, hb.z1 - hb.z0) / 2, h, (hb.x1 - hb.x0) * 0.45); EW.foe.P.copy(c);
+        // (her radars' frame: her length runs along x, so her bow's -x and her starboard -z: a quarter turn about her up)
+        EW.foe = Radar.suite('hull', (hb.x1 - hb.x0) / 2, h + 0.6, (hb.z1 - hb.z0) / 2 + 0.8, (box.isEmpty() ? -20 : box.min.y - c.y) - 0.6); EW.foe.P.copy(c); EW.foe.Q.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2);
+        fitMounts(EW.foe, S.hull, g); EW.hw = radarKit(EW.foe, g);
         EW.foeT = { id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
       }
     }
@@ -112,6 +114,7 @@ export const Space = (() => {
     Radar.step(own, dt, tg, S.t);
     if (EW.foe) {
       Radar.step(EW.foe, dt, tg, S.t);
+      if (EW.hw && EW.hw.su === EW.foe) { const hw = EW.hw; EW.foe.scans.forEach((sc, k) => { const r = hw.rotors[k]; if (sc.ax === 'y') r.rotation.set(0, -sc.th, 0); else r.rotation.set(sc.th, 0, 0); }); EW.foe.trks.forEach((tr, k) => hw.dishes[k].quaternion.setFromUnitVectors(_mz, tr.b)); }
       // her fire control: a tracker cued on the newest plot of the squad's ship whenever her scanners paint it and she's crewed (a
       // ship tracks what comes near her whether or not she means to shoot: guns, below, fire only when she's hostile)
       const manned = !!(S.state && S.state.gn && S.state.arm == null && !S.state.boom);
@@ -121,6 +124,52 @@ export const Space = (() => {
         if (p) Radar.cue(EW.foe, p);
       }
     }
+  }
+  // Her radars' hardware on her hull (in her group, whose frame is the level's): each scanner an antenna on a post, turning with its
+  // sweep (the 'y' one a long bar on her roof turning about her up; the 'x' one a long bar on a pylon under her keel turning about
+  // her beam), each tracker a dish on her flank, pointed along its boresight
+  const _mz = new T.Vector3(0, 0, -1);
+  // Her mounts set on her plating where it really is (her lines differ ship to ship: a V under a navy keel, a citadel on her roof):
+  // a ray down onto her roof or up into her keel at each gun under her and each scanner, and in at her flank at each tracker
+  function fitMounts(su: RSuite, h: NonNullable<typeof S.hull>, g: THREE.Object3D) {
+    const skip = new Set<THREE.Object3D>(); for (const gn of h.guns) gn.obj.traverse((o) => skip.add(o));
+    const solid: THREE.Object3D[] = []; g.traverse((o: any) => { if (o.isMesh && !glowy(o) && !skip.has(o)) solid.push(o); });
+    const rc = new T.Raycaster(), hitAt = (from: THREE.Vector3, dir: THREE.Vector3) => { rc.set(from, dir); rc.far = 400; const hs = rc.intersectObjects(solid, false); return hs.length ? hs[0].point : null; };
+    for (const gn of h.guns) { // (her guns: the one under her keel hung from the plating there, those on her roof stood on whatever's highest under them)
+      if (gn.k === 'missile') continue;
+      const p = hitAt(new T.Vector3(gn.x, gn.inv ? -200 : 200, gn.z), new T.Vector3(0, gn.inv ? 1 : -1, 0)); if (!p) continue;
+      if (gn.inv) { if (p.y < gn.obj.position.y + 0.3) { gn.obj.position.y = p.y - 0.1; gn.y = gn.obj.position.y - 1.5; } }
+      else if (p.y > gn.obj.position.y - 0.3) { gn.obj.position.y = p.y + 0.1; gn.y = gn.obj.position.y + 1.5; }
+    }
+    for (const sc of su.scans) {
+      const w = sc.at.clone().applyQuaternion(su.Q).add(su.P), p = hitAt(new T.Vector3(w.x, sc.n.y > 0 ? 200 : -200, w.z), new T.Vector3(0, -sc.n.y, 0));
+      if (p) sc.at.y = p.y - su.P.y + sc.n.y * 0.1;
+    }
+    for (const tr of su.trks) {
+      // (in from just outside her side, not from far off: a boom or a lamp standing off her isn't her flank)
+      const out = new T.Vector3(tr.side, 0, 0).applyQuaternion(su.Q), w = tr.at.clone().applyQuaternion(su.Q).add(su.P), p = hitAt(w.clone().addScaledVector(out, 3), out.clone().negate());
+      if (p) tr.at.copy(p.addScaledVector(out, 0.2).sub(su.P).applyQuaternion(su.Q.clone().invert()));
+    }
+  }
+  function radarKit(su: RSuite, g: THREE.Object3D) {
+    const M = ShipModel.M(0x6a7078, { metalness: 0.5 }), D = ShipModel.M(0x2a2e33, { metalness: 0.6 }), rotors: THREE.Object3D[] = [], dishes: THREE.Object3D[] = [];
+    const mount = (at: THREE.Vector3) => { const o = new T.Group(); o.position.copy(at).applyQuaternion(su.Q).add(su.P); o.quaternion.copy(su.Q); g.add(o); return o; };
+    for (const sc of su.scans) {
+      const o = mount(sc.at), dn = sc.n.y < 0 ? -1 : 1, post = sc.ax === 'y' ? 1.6 : 4.8;
+      const p = new T.Mesh(new T.CylinderGeometry(0.6, 0.9, post, 10), D); p.position.y = dn * post / 2; o.add(p); const plate = new T.Mesh(new T.CylinderGeometry(1.6, 1.8, 0.4, 12), D); plate.position.y = dn * 0.1; o.add(plate); // (a post on a plate on her plating)
+      const r = new T.Group(); r.position.y = dn * post; o.add(r); rotors.push(r);
+      // (the aperture's long the way its beam's narrow: across the beam for 'y' (narrow in azimuth), up and down for 'x')
+      const bar = new T.Mesh(sc.ax === 'y' ? new T.BoxGeometry(7, 1.0, 0.35) : new T.BoxGeometry(1.0, 7, 0.35), M); bar.position.set(0, sc.ax === 'y' ? dn * 0.6 : 0, -0.4); r.add(bar);
+      const hub = new T.Mesh(new T.BoxGeometry(0.8, 0.8, 0.8), D); r.add(hub);
+    }
+    for (const tr of su.trks) {
+      const o = mount(tr.at), arm = new T.Mesh(new T.BoxGeometry(1.4, 0.7, 0.7), D); arm.position.x = tr.side * 0.5; o.add(arm); const plate = new T.Mesh(new T.BoxGeometry(0.4, 2.2, 2.2), D); plate.position.x = -tr.side * 0.1; o.add(plate);
+      const d = new T.Group(); d.position.x = tr.side * 1.3; o.add(d); dishes.push(d);
+      const dish = new T.Mesh(new T.CylinderGeometry(1.3, 0.35, 0.6, 16, 1, true), new T.MeshStandardMaterial({ color: 0x8a9098, metalness: 0.4, roughness: 0.5, side: T.DoubleSide })); dish.rotation.x = -Math.PI / 2; dish.position.z = -0.3; d.add(dish);
+      const feed = new T.Mesh(new T.CylinderGeometry(0.06, 0.06, 1.4, 5), D); feed.rotation.x = Math.PI / 2; feed.position.z = -0.9; d.add(feed);
+      d.quaternion.setFromUnitVectors(_mz, tr.b);
+    }
+    return { su, rotors, dishes };
   }
   // the zone's other ships, as radar targets: each where she is in the level's frame, how fast she's going, and her return (from
   // her own drawing: the stand-in far off, her real hull once she's drawn as herself)
@@ -1776,10 +1825,11 @@ export const Space = (() => {
       const g = gn as any, H = SD.HULLGUN[gn.k] as any, sp = gn.gun.userData.spin as THREE.Object3D | undefined, from = new T.Vector3(gn.x, gn.y, gn.z), to = S.P.clone().add(up).sub(from), dist = to.length();
       if (sp) { g.rev = Math.max(0, (g.rev || 0) - dt); sp.rotation.z += dt * 30 * Math.min(1, g.rev); }
       if (dist > H.range) { g.bt = 0; continue; }
-      if (gn.k !== 'missile' && to.y < -1.5 && Math.hypot(to.x, to.z) < (gn.k === 'pd' ? 90 : 120)) { g.bt = 0; continue; } // (under their own deck's edge, close in: they can't bear)
+      const up1 = gn.inv ? -1 : 1; // (a gun under her keel hangs upside down: its up is her down)
+      if (gn.k !== 'missile' && up1 * to.y / dist < -0.17) { g.bt = 0; continue; } // (more than 10 degrees past its own side of her hull: the hull's in the way)
       // where the track says she'll be when the round gets there (its flight time)
       const tof = gn.k === 'missile' ? 0 : dist / H.speed, aim = lk.est.p.clone().addScaledVector(lk.est.v, tof).add(up).sub(from);
-      if (gn.k !== 'missile') { const ad = aim.length(); gn.obj.rotation.y = Math.atan2(-aim.x, -aim.z); gn.gun.rotation.x = Math.asin(U.clamp(aim.y / ad, -0.2, 1)); }
+      if (gn.k !== 'missile') { const ad = aim.length(); gn.obj.rotation.y = Math.atan2(-aim.x, -aim.z); gn.gun.rotation.x = Math.asin(U.clamp(up1 * aim.y / ad, -0.2, 1)); }
       if (gn.k === 'mg') {
         // bursts: the barrels spin up, it fires H.rps for a second or two, then a pause
         if (g.bt > 0) {

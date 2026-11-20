@@ -21,7 +21,7 @@
 export interface RcsTable { s: Float32Array; max: number; mean: number }
 export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable }
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3 } // (q, o: how she was turned and where she was when it was made)
-export interface RScan { ax: 'y' | 'x'; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3 }
+export interface RScan { ax: 'y' | 'x'; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3 } // (n: the way out of her hull at its mount: it sees nothing more than MASK behind that)
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
   cue: { k: number; ax: 'y' | 'x'; phi: number; r: number; q: THREE.Quaternion } | null; sw: number; best: { db: number; b: THREE.Vector3 }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
@@ -89,12 +89,16 @@ export const Radar = (() => {
   // ---------------------------------------------------------------- the radars
   const SCAN = { rate: TAU / 3, bw: 2 * D2R, fan: 45 * D2R, R0: 6000 }; // (a turn every 3 s; 2 degrees by 90)
   const TRK = { bw: 3 * D2R, sq: 1 * D2R, hz: 6, slew: 75 * D2R, stab: 200 * D2R, acq: 60 * D2R, R0: 9000, gate: 0.06 }; // (conical scan at 6 Hz: slow enough to see in the debug view; stab: how fast the turret can turn to hold its beam still while she turns under it)
+  const MASK = Math.sin(10 * D2R); // (how far past its own side of her hull a mount can see: over the hull's edge, a little)
   const AG = 4 * Math.LN2 / (TRK.bw * TRK.bw); // (the beam's shape: exp(-AG theta^2), half power at bw/2)
   // a ship's set: scanners on her top amidships, trackers each side; size her half length (where they're mounted, and how far the
   // debug view draws things for her)
-  function suite(id: string, size: number, top = size * 0.25, beam = size * 0.3): RSuite {
-    const scans: RScan[] = (['y', 'x'] as const).map((ax, i) => ({ ax, th: i * Math.PI, rate: SCAN.rate * (ax === 'x' ? 1.07 : 1), bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top, ax === 'y' ? -size * 0.1 : size * 0.1) }));
-    const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, top * 0.8, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3() }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
+  // (size her half length; top, bot how far her roof and keel are over and under her middle; beam her half width. A scanner of
+  // each kind stands on her roof and another hangs under her keel (the 'y' ones see round her horizon, the 'x' ones over her and
+  // under her), and a tracker on each flank. Each sees only its own side of her: her hull's in the way of the rest)
+  function suite(id: string, size: number, top = size * 0.25, beam = size * 0.3, bot = -top): RSuite {
+    const scans: RScan[] = ([['y', 1], ['x', 1], ['y', -1], ['x', -1]] as const).map(([ax, up], i) => ({ ax, th: i * Math.PI / 2, rate: SCAN.rate * (ax === 'x' ? 1.07 : 1) * (up < 0 ? 0.97 : 1), bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, up > 0 ? top : bot, (ax === 'y' ? -0.15 : 0.15) * size), n: new T.Vector3(0, up, 0) }));
+    const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3() }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
     return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false };
   }
   // a way out of the radar along a fan: ax its turning axis, phi how far round it's turned, e how far along the fan (her own frame)
@@ -121,7 +125,7 @@ export const Radar = (() => {
       for (const t of targets) {
         if (t.id === su.id) continue;
         const { R, sig } = look(su, sc.at, t, d), [phi, e] = angOf(sc.ax, d);
-        if (Math.abs(e) > sc.fan || wrap(phi - th0 + sc.bw / 2) > sweep + sc.bw) continue;
+        if (Math.abs(e) > sc.fan || wrap(phi - th0 + sc.bw / 2) > sweep + sc.bw || d.dot(sc.n) < -MASK) continue; // (or her own hull's in the way)
         const db = snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2 + gauss() * 1.5; // (the fan's gain falls off toward its ends)
         if (Math.random() < pd(db)) sc.plots.push({ k, phi: wrap(phi + gauss() * sc.bw / 4), r: R * (1 + gauss() * 0.004), t: now, db, id: t.id, e, q: su.Q.clone(), o: su.P.clone() });
       }
@@ -152,14 +156,17 @@ export const Radar = (() => {
   function cue(su: RSuite, p: RPlot) {
     const sc = su.scans[p.k], d0 = dirOf(sc.ax, p.phi, 0), want = sc.ax === 'y' ? (d0.x >= 0 ? 1 : -1) : 0;
     const ok = su.trks.filter((t) => !want || t.side === want);
-    const tr = ok.find((t) => t.st === 'idle') || ok.find((t) => t.st !== 'track') || ok[0]; if (!tr) return null;
-    tr.hand = null; tr.st = 'slew'; tr.cue = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: (p.q || su.Q).clone() }; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3() }; tr.tgt = null; tr.lockT = 0; tr.lost = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 };
-    return tr;
+    // (a 'y' plot's side is known: its tracker's cued. An 'x' plot's fan runs across her, either side: every tracker not already
+    // tracking is cued, each sweeps its own half, and the first to find her keeps it (trackStep drops the others))
+    const free = ok.filter((t) => t.st !== 'track'), use = want ? [free.find((t) => t.st === 'idle') || free[0] || ok[0]] : free.length ? free : [ok[0]];
+    const cueOf = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: (p.q || su.Q).clone() };
+    for (const tr of use) { if (!tr) continue; tr.hand = null; tr.st = 'slew'; tr.cue = cueOf; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3() }; tr.tgt = null; tr.lockT = 0; tr.lost = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; }
+    return use[0] || null;
   }
   const drop = (tr: RTrack) => { tr.hand = null; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.st = 'idle'; tr.cue = null; tr.tgt = null; tr.lockT = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; tr.db = -99; };
   // the boresight turned toward `to` no faster than the turret can
   function slewTo(tr: RTrack, to: THREE.Vector3, max: number) { const ang = tr.b.angleTo(to); if (ang <= max) tr.b.copy(to); else { const ax = _w.crossVectors(tr.b, to); if (ax.lengthSq() < 1e-12) ax.set(0, 1, 0); tr.b.applyAxisAngle(ax.normalize(), max); } tr.b.normalize(); return ang; }
-  const inSide = (tr: RTrack, b: THREE.Vector3) => b.x * tr.side > -0.15;
+  const inSide = (tr: RTrack, b: THREE.Vector3) => b.x * tr.side > -MASK; // (a tracker sees its own flank's half of the sky)
   // what the tracker's beam (axis a) gets back from the targets in its range gate: the strongest, its signal and which it is
   function beamDb(su: RSuite, tr: RTrack, a: THREE.Vector3, targets: RTarget[], gate: number | null) {
     let best = -99, id: string | null = null, R0 = 0, dir: THREE.Vector3 | null = null; const d = new T.Vector3();
@@ -188,7 +195,7 @@ export const Radar = (() => {
       tr.sw += TRK.acq * dt; cueDir(su, c, Math.min(tr.sw, sc.fan), tr.b); tr.a.copy(tr.b);
       if (inSide(tr, tr.b)) { const r = beamDb(su, tr, tr.b, targets, c.r); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
       if (tr.sw >= sc.fan) {
-        if (tr.best.db > THR) { tr.b.copy(tr.best.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = c.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }
+        if (tr.best.db > THR) { for (const o of su.trks) if (o !== tr && o.cue === c && o.st !== 'track') drop(o); tr.b.copy(tr.best.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = c.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }
         else drop(tr);
       }
       return;

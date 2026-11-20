@@ -5,7 +5,7 @@ import { ShipGen } from './shipgen.js';
 import { SpaceData } from './spacedata.js';
 import { U as G_U } from './util.js';
 import { GunAo } from './gunao.js';
-interface SmGun { k: 'pd' | 'mg' | 'missile'; x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
+interface SmGun { k: 'pd' | 'mg' | 'missile'; inv?: boolean; x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
 export const ShipModel = (() => {
   const T = THREE;
   // boxes gathered by material, then merged
@@ -310,9 +310,9 @@ export const ShipModel = (() => {
     }
     // what she carries on her hull, by her class (js/spacedata.ts SIZES guns): point-defence guns, miniguns, missile
     // launchers, down her back; a ship that isn't the mission's carries none
-    const guns: SmGun[] = [], Y = TOP + 0.3, bellM = shade(0.3, { metalness: 0.5, side: T.DoubleSide });
-    const gunAt = (k: 'pd' | 'mg' | 'missile', x: number, z: number, y: number) => {
-      const o = new T.Group(), gn = new T.Group(); o.position.set(x, y, z);
+    const guns: SmGun[] = [], Y = TOP + 0.3, KEEL = -2.4, bellM = shade(0.3, { metalness: 0.5, side: T.DoubleSide });
+    const gunAt = (k: 'pd' | 'mg' | 'missile', x: number, z: number, y: number, inv = false) => {
+      const o = new T.Group(), gn = new T.Group(); o.position.set(x, y, z); if (inv) o.rotation.z = Math.PI; // (under her keel: hung upside down)
       if (k === 'pd') {
         part(o, new T.Mesh(new T.CylinderGeometry(0.9, 1.1, 0.7, 12), dark), 0, 0.35, 0);
         part(gn, new T.Mesh(new T.BoxGeometry(1.1, 0.7, 1.4), plate), 0, 0.35, 0);
@@ -330,13 +330,19 @@ export const ShipModel = (() => {
         for (const sx of [-0.8, 0, 0.8]) for (const sy of [0.5, 1.2]) part(gn, new T.Mesh(new T.CircleGeometry(0.3, 10), nav), sx, sy + 0.95, -1.42).rotation.x = 0.5;
       }
       gn.position.y = k === 'mg' ? 0.9 : 0.7; o.add(gn); g.add(o);
-      guns.push({ k, x, y: y + (k === 'mg' ? 1.5 : 1.1), z, hp: k === 'pd' ? 100 : k === 'mg' ? 220 : 180, obj: o, gun: gn, cool: 1 + r() * 3 });
+      guns.push({ k, inv, x, y: y + (inv ? -1 : 1) * (k === 'mg' ? 1.5 : 1.1), z, hp: k === 'pd' ? 100 : k === 'mg' ? 220 : 180, obj: o, gun: gn, cool: 1 + r() * 3 });
     };
     {
       const C = SpaceData.gunsOf(sp.size, sp.hall === 'mall'), list: ('pd' | 'mg' | 'missile')[] = [], hm = sp.hull;
       for (let k = 0; k < Math.max(C.pd, C.mg, C.missile); k++) { if (k < C.mg) list.push('mg'); if (k < C.pd) list.push('pd'); if (k < C.missile) list.push('missile'); }
       for (let k = C.pd; k > 0 && list.filter((q) => q === 'pd').length < C.pd; k--) list.push('pd');
-      list.forEach((k, n) => { const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * 3.4; K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); });
+      // (her guns every other one on her roof and under her keel, so she can shoot both ways; her launchers on her roof)
+      let ng = 0;
+      list.forEach((k, n) => {
+        const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * 3.4, inv = k !== 'missile' && ng++ % 2 === 1;
+        if (!inv) { K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); }
+        else { K.box(dark, x - 1.2, KEEL + 0.6, z - 1.2, x + 1.2, -0.8, z + 1.2); K.box(dark, x - 2.6, KEEL - 0.8, z - 2.6, x + 2.6, KEEL + 0.6, z + 2.6); gunAt(k, x, z, KEEL - 0.8, true); }
+      });
     }
     // each compartment on the roof (her top deck's) and under the keel (her lowest's) as what it is
     map.rooms.forEach((rm, i) => {

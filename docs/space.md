@@ -86,7 +86,7 @@ What the board offers goes by how far the squad has got: transports and corvette
   spinning while they fire); missiles (6.5 km: they home, a hard turn across the nose shakes one, a turret can shoot one
   down, 24 a hit). Guns fire only on a radar lock, leading where the track has her going. Every round is a real one
   (`rounds`): fired at 1,000 to 1,100 m/s, it flies, and hits only if it really passes within her size. A round that has
-  flown 2 km blows itself apart. All of her weapons can be destroyed from a turret seat.
+  flown 2 km blows itself apart. Her miniguns alternate between her roof and under her keel (the keel ones hang upside down). Each fires only into its own side of her hull, at most 10° past it. All of her weapons can be destroyed from a turret seat.
 - **A second ship** (`sp.other`, four offers in ten except with a capital ship): a transport or corvette lying 44 m off the
   target's port side, nothing to do with the mission. She has her own crew and a cargo manifest in her hold: take it
   (hold F) for salvage money, paid at the jump home whether or not the mission is done.
@@ -152,6 +152,13 @@ A ship knows where another ship is only from what her radars tell her. Every shi
   - at 30°/s the lock holds;
   - at 60°/s the lock holds and is handed across;
   - at 90°/s and faster it's lost.
+- **Where they're mounted.** Each ship has four scanners. One of each kind stands on her roof and another hangs under her
+  keel: the 'y' scanners see round her horizon and the 'x' scanners see over and under her. Her two trackers are on her flanks.
+  Each mount sees only its own side of her hull, and at most 10° past it (`MASK`), because the hull is in the way. A cue on an
+  'x' plot can't tell which side the target is on, so both free trackers sweep their own halves of the fan and the first to
+  find the target keeps it. The mission ship's mounts are set on her plating by raycasting her hull (`fitMounts`). Her
+  hardware is drawn and moves with the radars (`radarKit`): the scanners' antennas turn with their sweeps, and each tracker's
+  dish points along its boresight.
 - **Targets** are the mission ship and every ship of the zone that's shown, each with a return from her own drawing (the
   stand-in far off, her own hull near).
 
