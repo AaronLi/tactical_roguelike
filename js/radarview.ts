@@ -110,7 +110,8 @@ export const RadarView = (() => {
       for (const sc of su.scans) for (const p of sc.plots) {
         if (n >= MAXP * SEG * 2) break;
         const f = Math.max(0, 1 - (now - p.t) * sc.rate / TAU);
-        for (let i = 0; i < SEG; i++) for (const j of [i, i + 1]) { Radar.dirOf(sc.ax, p.phi, -sc.fan + 2 * sc.fan * j / SEG, v).multiplyScalar(p.r).add(sc.at); pa.setXYZ(n, v.x, v.y, v.z); ca.setXYZ(n, c.r * f, c.g * f, c.b * f); n++; }
+        const pq = p.q || su.Q, po = p.o || su.P; qi.copy(su.Q).invert(); // (where it was, in space: drawn in her frame as she is now)
+        for (let i = 0; i < SEG; i++) for (const j of [i, i + 1]) { Radar.dirOf(sc.ax, p.phi, -sc.fan + 2 * sc.fan * j / SEG, v).multiplyScalar(p.r).add(sc.at).applyQuaternion(pq).add(po).sub(su.P).applyQuaternion(qi); pa.setXYZ(n, v.x, v.y, v.z); ca.setXYZ(n, c.r * f, c.g * f, c.b * f); n++; }
       }
       D.arcs.geometry.setDrawRange(0, n); pa.needsUpdate = ca.needsUpdate = true;
     }
@@ -134,10 +135,13 @@ export const RadarView = (() => {
   const RMAX = 10000;
   // where things are on it (W x H): the two scopes' middles and radius
   const lay = (W: number, H: number) => { const R = Math.min(W * 0.24, H * 0.36); return { R, c: [[W * 0.26, H * 0.42], [W * 0.74, H * 0.42]] }; };
-  // a plot's place on its scope
+  // a plot's place on its scope: its turn angle as she's turned now (the middle of its fan, made when she was turned p.q, in her
+  // frame now), so what she's painted stays where it is in space while she turns
+  const qi = new T.Quaternion(), _d = new T.Vector3();
+  function phiNow(su: RSuite, p: RPlot) { if (!p.q) return p.phi; const ax = su.scans[p.k].ax; Radar.dirOf(ax, p.phi, 0, _d).applyQuaternion(p.q).applyQuaternion(qi.copy(su.Q).invert()); return Radar.angOf(ax, _d)[0]; }
   function plotXY(su: RSuite, p: RPlot, W: number, H: number) {
-    const L = lay(W, H), sc = su.scans[p.k], [cx, cy] = L.c[p.k], r = Math.min(1, p.r / RMAX) * L.R;
-    return sc.ax === 'y' ? [cx + Math.sin(p.phi) * r, cy - Math.cos(p.phi) * r] : [cx + Math.cos(p.phi) * r, cy - Math.sin(p.phi) * r];
+    const L = lay(W, H), sc = su.scans[p.k], [cx, cy] = L.c[p.k], r = Math.min(1, p.r / RMAX) * L.R, ph = phiNow(su, p);
+    return sc.ax === 'y' ? [cx + Math.sin(ph) * r, cy - Math.cos(ph) * r] : [cx + Math.cos(ph) * r, cy - Math.sin(ph) * r];
   }
   // the plot under the cursor (cu: x, y on the screen), if one's within 14 px
   function pick(su: RSuite, cu: number[] | null, W: number, H: number, now: number): RPlot | null {

@@ -20,11 +20,11 @@
 // group's (forward -z, up +y, starboard +x).
 export interface RcsTable { s: Float32Array; max: number; mean: number }
 export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable }
-export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion } // (q: how she was turned when it was made)
+export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3 } // (q, o: how she was turned and where she was when it was made)
 export interface RScan { ax: 'y' | 'x'; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3 }
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
-  cue: { k: number; ax: 'y' | 'x'; phi: number; r: number; q: THREE.Quaternion } | null; sw: number; best: { db: number; b: THREE.Vector3 }; ph: number;
+  cue: { k: number; ax: 'y' | 'x'; phi: number; r: number; q: THREE.Quaternion } | null; sw: number; best: { db: number; b: THREE.Vector3 }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
   tgt: string | null; lockT: number; lost: number; err: number; db: number; rng: number; est: { p: THREE.Vector3 | null; v: THREE.Vector3; q: number };
   hand: { p: THREE.Vector3; v: THREE.Vector3; t: number } | null; // (handed a track by the other tracker: where its solution has the target, slewed to straight)
   dE: THREE.Vector3; dA: number; dP: number; w: THREE.Vector3; // (the conical scan's demodulator over the revolution under way, and the boresight's rate)
@@ -123,7 +123,7 @@ export const Radar = (() => {
         const { R, sig } = look(su, sc.at, t, d), [phi, e] = angOf(sc.ax, d);
         if (Math.abs(e) > sc.fan || wrap(phi - th0 + sc.bw / 2) > sweep + sc.bw) continue;
         const db = snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2 + gauss() * 1.5; // (the fan's gain falls off toward its ends)
-        if (Math.random() < pd(db)) sc.plots.push({ k, phi: wrap(phi + gauss() * sc.bw / 4), r: R * (1 + gauss() * 0.004), t: now, db, id: t.id, e, q: su.Q.clone() });
+        if (Math.random() < pd(db)) sc.plots.push({ k, phi: wrap(phi + gauss() * sc.bw / 4), r: R * (1 + gauss() * 0.004), t: now, db, id: t.id, e, q: su.Q.clone(), o: su.P.clone() });
       }
       const keep = TAU / sc.rate * 1.05; sc.plots = sc.plots.filter((p) => now - p.t < keep);
     });
@@ -186,9 +186,9 @@ export const Radar = (() => {
       if (tr.st === 'slew') { if (slewTo(tr, cueDir(su, c, -sc.fan, new T.Vector3()), TRK.slew * dt) < 1 * D2R) tr.st = 'acq'; tr.a.copy(tr.b); return; }
       // along the fan, its range gate at the plot's range: the strongest return on the way is where she is
       tr.sw += TRK.acq * dt; cueDir(su, c, Math.min(tr.sw, sc.fan), tr.b); tr.a.copy(tr.b);
-      if (inSide(tr, tr.b)) { const r = beamDb(su, tr, tr.b, targets, c.r); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.b.copy(tr.b); } }
+      if (inSide(tr, tr.b)) { const r = beamDb(su, tr, tr.b, targets, c.r); if (r.db + gauss() * 1.2 > tr.best.db) { tr.best.db = r.db; tr.best.b.copy(tr.b).applyQuaternion(su.Q); } }
       if (tr.sw >= sc.fan) {
-        if (tr.best.db > THR) { tr.b.copy(tr.best.b); tr.st = 'track'; tr.rng = c.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }
+        if (tr.best.db > THR) { tr.b.copy(tr.best.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = c.r; tr.lockT = 0; tr.lost = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; }
         else drop(tr);
       }
       return;
