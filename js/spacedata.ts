@@ -6,7 +6,7 @@ import { Level } from './level.js';
 import { World } from './world.js';
 // what a class carries on her hull, and who's aboard her: light guards posted singly, security squads (four, armed and armoured), breach
 // response squads (three, lighter: they come to where the hull is breached), and those who don't fight
-interface SpClass { name: string; tier: number; pay: number; diff: number; guns: { pd: number; cannon: number; missile: number }; crew: { guard: number; squads: number; resp: number; civ: number } }
+interface SpClass { name: string; tier: number; pay: number; diff: number; guns: { pd: number; mg: number; missile: number }; crew: { guard: number; squads: number; resp: number; civ: number } }
 /** The squad's ship as she's laid out (js/spacedata.ts layout): three levels. Her frame: x to starboard, y up from her keel, z aft (her nose to -z). */
 interface SpLayout {
   fw: number; tw: number; sw: number; hw: number; // half-widths: the cockpit, the breach tunnel, the staging space behind it, the crew deck
@@ -281,14 +281,16 @@ export const SpaceData = (() => {
   /** ...aboard the ship being boarded now (null anywhere else). */
   const wearNow = (g: { map?: { sp?: { size: string; obj?: string | null } | null } | null } | null | undefined): string | null => { const sp = g && g.map && g.map.sp; return sp ? wearOf(sp.size, sp.obj) : null; }; // (g: the game; the page's files ask with ReplayEnv.Game, the export worker's has no map)
   const SIZES: Record<SpSize, SpClass> = {
-    transport: { name: 'civilian transport', tier: 1, pay: 600, diff: -1, guns: { pd: 0, cannon: 0, missile: 0 }, crew: { guard: 3, squads: 0, resp: 0, civ: 6 } },
-    small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 1, cannon: 0, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
-    medium: { name: 'frigate', tier: 3, pay: 1700, diff: 1, guns: { pd: 2, cannon: 1, missile: 0 }, crew: { guard: 4, squads: 1, resp: 1, civ: 5 } },
-    large: { name: 'cruiser', tier: 4, pay: 2800, diff: 2, guns: { pd: 3, cannon: 2, missile: 1 }, crew: { guard: 5, squads: 2, resp: 2, civ: 7 } },
-    capital: { name: 'capital ship', tier: 5, pay: 4600, diff: 3, guns: { pd: 5, cannon: 3, missile: 2 }, crew: { guard: 6, squads: 4, resp: 3, civ: 10 } },
+    transport: { name: 'civilian transport', tier: 1, pay: 600, diff: -1, guns: { pd: 0, mg: 0, missile: 0 }, crew: { guard: 3, squads: 0, resp: 0, civ: 6 } },
+    small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 1, mg: 0, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
+    medium: { name: 'frigate', tier: 3, pay: 1700, diff: 1, guns: { pd: 2, mg: 1, missile: 0 }, crew: { guard: 4, squads: 1, resp: 1, civ: 5 } },
+    large: { name: 'cruiser', tier: 4, pay: 2800, diff: 2, guns: { pd: 3, mg: 2, missile: 1 }, crew: { guard: 5, squads: 2, resp: 2, civ: 7 } },
+    capital: { name: 'capital ship', tier: 5, pay: 4600, diff: 3, guns: { pd: 5, mg: 3, missile: 2 }, crew: { guard: 6, squads: 4, resp: 3, civ: 10 } },
   };
   // the hull's weapons: what each does to the squad's ship (js/space.ts guns)
-  const HULLGUN = { pd: { range: 1300, cool: [0.8, 1.7], dmg: 2.2 }, cannon: { range: 4500, cool: [3.5, 5.5], dmg: 10 }, missile: { range: 6500, cool: [9, 14], dmg: 24, speed: 230, turn: 0.85, life: 34 } };
+  // (rounds: speed m/s, spread radians, a round's life in metres flown before it blows itself apart; the minigun's rps in bursts of
+  // burst seconds, pause seconds between)
+  const HULLGUN = { pd: { range: 1300, cool: [0.8, 1.7], dmg: 2.2, speed: 1100, spread: 0.004, life: 2000 }, mg: { range: 1000, rps: 30, burst: [1.0, 1.8], pause: [1.2, 2.6], cool: [1.2, 2.6], dmg: 0.2, speed: 1000, spread: 0.008, life: 2000 }, missile: { range: 6500, cool: [9, 14], dmg: 24, speed: 230, turn: 0.85, life: 34 } };
   const OBJ: Record<SpObj, { name: string; pay: number; line: string }> = {
     artifact: { name: 'Recover the artifact', pay: 500, line: 'Something old and valuable is locked aboard. Find it, carry it back to your ship and get clear.' },
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },
@@ -363,7 +365,7 @@ export const SpaceData = (() => {
   const DEFEND = { lead: 20, secs: 180, pods: 5, first: 2 }; // (lead: from the squad coming aboard to the first pod, to get to her court in; then secs, the first pod first seconds into it)
   // A luxury cruiser (a cruiser with a promenade court): what she's called, and no guns on her hull. guns, className: any ship's, by her
   // class and whether she's one. STAFF: the family names of her security, for those who fight beside the squad (js/spaceserver.ts).
-  const NOGUNS = { pd: 0, cannon: 0, missile: 0 };
+  const NOGUNS = { pd: 0, mg: 0, missile: 0 };
   const gunsOf = (size: SpSize, liner?: boolean) => (liner ? NOGUNS : SIZES[size].guns), className = (size: SpSize, liner?: boolean) => (liner ? 'luxury cruiser' : SIZES[size].name);
   const STAFF = ['Okafor', 'Reyes', 'Lindqvist', 'Tanaka', 'Moreau', 'Abara', 'Castellanos', 'Novak', 'Haddad', 'Ferreira', 'Kowalczyk', 'Iyer', 'Marchetti', 'Osei', 'Brandt', 'Yilmaz'];
   return { gunsOf, className, STAFF, DEFEND, LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, hatchButton, HATCH_Z, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };

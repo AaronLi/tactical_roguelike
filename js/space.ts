@@ -62,7 +62,7 @@ export const Space = (() => {
     // the warp drive (warpStep): spin, how far it's spun up (0..1) on the target she's facing; warp, the run itself; tv, the
     // target's own velocity (tgtTrack), which she's left matching at the end of it
     spin: 0, warp: null as null | { j: number; u: number; t: number; top: number }, tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1, match: null as null | string,
-    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], fireT: 0,
+    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], rounds: [] as { m: THREE.Mesh; p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
   };
   const me = () => Me, on = () => S.on;
   const isCtl = () => S.ctl === Net.myId;
@@ -83,11 +83,13 @@ export const Space = (() => {
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
   const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, trf: new Map<THREE.Object3D, RTarget>() };
   const _ray = new T.Raycaster();
+  // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
+  const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
   function ewStep(dt: number) {
     if (!S.model) return;
     if (EW.modelFor !== S.model) { // (her own set and her return, made once her drawing's there)
       const g = S.model.group; g.updateMatrixWorld(true);
-      const inv = g.matrixWorld.clone().invert(), box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
+      const inv = g.matrixWorld.clone().invert(), box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
       const sz = box.getSize(new T.Vector3()), size = Math.max(4, sz.z / 2);
       EW.own = Radar.suite('own', size, sz.y * 0.45, sz.x * 0.45);
       EW.ownT = { id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('ship:' + S.def.id, g, inv) };
@@ -98,7 +100,7 @@ export const Space = (() => {
       EW.foe = null; EW.foeT = null; EW.hullFor = S.hull;
       if (S.hull && S.map && S.map.sp) {
         const g = S.hull.group; g.updateMatrixWorld(true);
-        const inv = g.matrixWorld.clone().invert(), hb = S.map.sp.hull, box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
+        const inv = g.matrixWorld.clone().invert(), hb = S.map.sp.hull, box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
         const c = new T.Vector3((hb.x0 + hb.x1) / 2, box.isEmpty() ? 0 : (box.min.y + box.max.y) / 2, (hb.z0 + hb.z1) / 2), h = box.isEmpty() ? 20 : box.max.y - c.y;
         EW.foe = Radar.suite('hull', Math.max(hb.x1 - hb.x0, hb.z1 - hb.z0) / 2, h, (hb.x1 - hb.x0) * 0.45); EW.foe.P.copy(c);
         EW.foeT = { id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
@@ -195,7 +197,7 @@ export const Space = (() => {
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
     if (hid) { for (const o of hid) o.visible = true; hid = null; } tunUp = null;
     G_R.padTo = G_R.PAD_BASE;
-    S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.mis = [];
+    S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.rounds = []; S.mis = [];
     if (me().seat != null) me().seat = null;
     SpaceUI.show(false);
   }
@@ -1704,7 +1706,7 @@ export const Space = (() => {
     S.model.thrust.opacity += (th - S.model.thrust.opacity) * Math.min(1, dt * 4);
     S.model.glow.color.setHex(S.docked ? 0x2a8a5a : S.ftl ? 0x4060ff : 0xa07020);
     for (const a of S.anchors) { a.obj.rotation.z += dt * 0.15; (a.obj.userData.film.material as THREE.MeshBasicMaterial).opacity = 0.1 + 0.05 * Math.sin(S.t * 2); }
-    if (S.hull) { guns(dt); missiles(dt); }
+    if (S.hull) { guns(dt); missiles(dt); } rounds(dt);
     for (const q of S.things) {
       if (q.k === 'art') { const a = q.obj.userData.art as THREE.Mesh; a.rotation.y += dt * 1.5; a.position.y = 1.15 + Math.sin(S.t * 2) * 0.05; }
       if (q.k === 'lock') (q.obj as THREE.Mesh).material = lockMat(q.obj.userData.lock === '' || !!(S.state && S.state.keys.includes(q.obj.userData.lock)));
@@ -1755,39 +1757,78 @@ export const Space = (() => {
   function gunHit(i: number, hp: number) {
     const gn = S.hull && S.hull.guns[i]; if (!gn) return;
     const was = gn.hp; gn.hp = Math.max(0, hp);
-    if (was > 0 && gn.hp <= 0) { gn.gun.rotation.x = -0.5; gn.gun.visible = false; HUD.feed(`<b>${gn.k === 'pd' ? 'Point defence gun' : gn.k === 'cannon' ? 'Cannon' : 'Missile launcher'} destroyed</b>`); }
+    if (was > 0 && gn.hp <= 0) { gn.gun.rotation.x = -0.5; gn.gun.visible = false; HUD.feed(`<b>${gn.k === 'pd' ? 'Point defence gun' : gn.k === 'mg' ? 'Minigun' : 'Missile launcher'} destroyed</b>`); }
   }
-  // her guns: they track the squad's ship inside 1300 m and fire, while there's anyone at her gun control (js/spaceserver.ts gunnersLeft) and
-  // she isn't counting down to her self-destruct; the pilot's screen says what lands
-  // Her weapons, by kind (js/spacedata.ts HULLGUN). Point defence: fast, short, blind close in under its own deck. Cannon: a
-  // heavy shot every few seconds out to 4.5 km, poor against anything quick or close. Missiles: launched at 6.5 km, they
-  // home (missiles()); a turret can shoot one down. The pilot's screen says what lands.
+  // Her weapons, by kind (js/spacedata.ts HULLGUN). Point defence: single shots out to 1.3 km, blind close in under its own deck.
+  // Miniguns: six-barrelled rotary guns firing bursts inside 1 km. Missiles: launched at 6.5 km, they home (missiles()); a turret
+  // can shoot one down. They fire only on a track (her tracking radar's, js/radar.ts: without one she doesn't know where to shoot),
+  // while there's anyone at her gun control (js/spaceserver.ts gunnersLeft) and she isn't counting down to her self-destruct.
+  // Every round is a real one (rounds()): fired along the aim, it flies, and hits only if it really meets her.
   function guns(dt: number) {
+    const spinDown = () => { for (const gn of S.hull!.guns) { const sp = gn.gun.userData.spin as THREE.Object3D | undefined; if (sp) sp.rotation.z += dt * 30 * Math.max(0, (gn as any).rev = Math.max(0, ((gn as any).rev || 0) - dt)); } };
     if (!S.hull || S.docked || S.ftl || (S.state && S.state.boom)) return;
-    if (S.state && S.state.hostile === 0) return; // (a ship that isn't the mission's holds her fire till she's breached)
-    if (!S.state || !S.state.gn || S.state.arm != null) return; // (nobody left at her gun control, or she's counting down to blowing herself apart: her guns are silent)
-    // (and only on a track: her tracking radar's, js/radar.ts. Without one she doesn't know where to shoot)
-    const lk = Radar.lockOn(EW.foe, 'own'); if (!lk || !lk.est.p || lk.est.q < 0.15) return;
+    if (S.state && S.state.hostile === 0) { spinDown(); return; } // (a ship that isn't the mission's holds her fire till she's breached)
+    if (!S.state || !S.state.gn || S.state.arm != null) { spinDown(); return; } // (nobody left at her gun control, or she's counting down to blowing herself apart: her guns are silent)
+    const lk = Radar.lockOn(EW.foe, 'own'); if (!lk || !lk.est.p || lk.est.q < 0.15) { spinDown(); return; }
     const up = new T.Vector3(0, 1.5, 0);
     for (const gn of S.hull.guns) {
       if (gn.hp <= 0) continue;
-      const H = SD.HULLGUN[gn.k], from = new T.Vector3(gn.x, gn.y, gn.z), to = S.P.clone().add(up).sub(from), dist = to.length();
-      if (dist > H.range) continue;
-      if (gn.k !== 'missile' && to.y < -1.5 && Math.hypot(to.x, to.z) < (gn.k === 'pd' ? 90 : 260)) continue; // (under their own deck's edge, close in: they can't bear)
-      // where the track says she'll be when the round gets there (its flight time), and where she really will be if she holds her course
-      const tof = dist / (gn.k === 'pd' ? 1100 : 650), aim = lk.est.p.clone().addScaledVector(lk.est.v, tof).add(up).sub(from), real = S.P.clone().addScaledVector(S.V, tof).add(up).sub(from);
+      const g = gn as any, H = SD.HULLGUN[gn.k] as any, sp = gn.gun.userData.spin as THREE.Object3D | undefined, from = new T.Vector3(gn.x, gn.y, gn.z), to = S.P.clone().add(up).sub(from), dist = to.length();
+      if (sp) { g.rev = Math.max(0, (g.rev || 0) - dt); sp.rotation.z += dt * 30 * Math.min(1, g.rev); }
+      if (dist > H.range) { g.bt = 0; continue; }
+      if (gn.k !== 'missile' && to.y < -1.5 && Math.hypot(to.x, to.z) < (gn.k === 'pd' ? 90 : 120)) { g.bt = 0; continue; } // (under their own deck's edge, close in: they can't bear)
+      // where the track says she'll be when the round gets there (its flight time)
+      const tof = gn.k === 'missile' ? 0 : dist / H.speed, aim = lk.est.p.clone().addScaledVector(lk.est.v, tof).add(up).sub(from);
       if (gn.k !== 'missile') { const ad = aim.length(); gn.obj.rotation.y = Math.atan2(-aim.x, -aim.z); gn.gun.rotation.x = Math.asin(U.clamp(aim.y / ad, -0.2, 1)); }
+      if (gn.k === 'mg') {
+        // bursts: the barrels spin up, it fires H.rps for a second or two, then a pause
+        if (g.bt > 0) {
+          g.bt -= dt; g.rev = 1.5; g.acc = (g.acc || 0) + H.rps * dt;
+          while (g.acc >= 1) { g.acc -= 1; fireRound(from, aim, H, lk.err); }
+          if (g.bt <= 0) gn.cool = H.pause[0] + Math.random() * (H.pause[1] - H.pause[0]);
+          continue;
+        }
+        gn.cool -= dt; if (gn.cool <= 0) { g.bt = H.burst[0] + Math.random() * (H.burst[1] - H.burst[0]); g.acc = 0; }
+        continue;
+      }
       gn.cool -= dt;
       if (gn.cool > 0) continue;
       gn.cool = H.cool[0] + Math.random() * (H.cool[1] - H.cool[0]);
       if (gn.k === 'missile') { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); Net.toHost({ t: 'smis', a }); } continue; }
-      // the round goes along the aim, spread by the gun and by the track's own error; it hits if it passes within her size of where she is
-      const d = aim.normalize(), spread = (gn.k === 'pd' ? 0.004 : 0.002) + lk.err * 0.5;
-      d.add(new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(spread * 2)).normalize();
-      const along = real.dot(d), miss = real.clone().addScaledVector(d, -along).length(), hit = along > 0 && miss < Math.max(4, EW.own ? EW.own.size * 0.6 : 5);
-      tracer(from, d, hit ? dist : dist + 300, gn.k === 'cannon');
-      if (hit && isCtl()) { damage(H.dmg, gn.k === 'cannon' ? 'A cannon shell' : undefined); S.shake = Math.max(S.shake, gn.k === 'cannon' ? 0.8 : 0.3); }
+      fireRound(from, aim, H, lk.err);
     }
+  }
+  // a round off one of her guns (in the level's frame): along the aim, spread by the gun and by the track's own error
+  const RGEO = (() => { const g = new T.CylinderGeometry(0.18, 0.18, 1, 4, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 0.5); return g; })();
+  const RMAT = new T.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.95, depthWrite: false, blending: T.AdditiveBlending });
+  function fireRound(from: THREE.Vector3, aim: THREE.Vector3, H: { speed: number; spread: number; dmg: number; life: number }, err: number) {
+    if (!S.root) return;
+    const spread = H.spread + err * 0.5, d = aim.clone().normalize();
+    d.add(new T.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(spread * 2)).normalize();
+    const m = new T.Mesh(RGEO, RMAT); m.frustumCulled = false; m.position.copy(from); m.lookAt(from.clone().sub(d)); m.scale.set(1, 1, 22); S.root.add(m); // (the streak trails behind it: its tail toward the gun)
+    S.rounds.push({ m, p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life });
+  }
+  // the rounds in flight: each moves, and hits her if it passes within her size of her middle this step (both moving); one that's
+  // flown its life (2 km) blows itself apart, so nothing she fires is left flying through the zone
+  const FLASH = new T.SphereGeometry(1, 8, 6);
+  function rounds(dt: number) {
+    if (!S.rounds.length) return;
+    const c1 = S.P.clone().add(new T.Vector3(0, 1.5, 0)), c0 = c1.clone().addScaledVector(S.V, -dt), R = Math.max(4, EW.own ? EW.own.size * 0.6 : 5);
+    const r0 = new T.Vector3(), r1 = new T.Vector3(), seg = new T.Vector3(); let hits = 0, dmg = 0;
+    for (let i = S.rounds.length - 1; i >= 0; i--) {
+      const q = S.rounds[i], step = q.v.length() * dt;
+      r0.copy(q.p).sub(c0); q.p.addScaledVector(q.v, dt); q.d += step; r1.copy(q.p).sub(c1);
+      seg.subVectors(r1, r0); const L2 = seg.lengthSq(), t = L2 > 0 ? U.clamp(-r0.dot(seg) / L2, 0, 1) : 0, miss = r0.addScaledVector(seg, t).length();
+      const hit = !S.docked && miss < R, gone = hit || q.d >= q.life;
+      if (hit) { hits++; dmg += q.dmg; }
+      if (gone) {
+        q.m.parent && q.m.parent.remove(q.m); S.rounds.splice(i, 1);
+        if (!hit && S.root) { const f = new T.Mesh(FLASH, new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending })); f.position.copy(q.p); f.scale.setScalar(2.5); f.frustumCulled = false; S.root.add(f); S.tracers.push({ m: f, t: 0.12 }); }
+        continue;
+      }
+      q.m.position.copy(q.p);
+    }
+    if (hits && isCtl()) { damage(dmg, dmg > 4 ? 'Minigun fire' : undefined); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + hits * 0.1)); }
   }
   // a missile: a[0] its number, where it left her; a[4] 1: it's been shot down
   function missile(a: number[]) {

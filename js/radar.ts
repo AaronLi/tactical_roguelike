@@ -224,7 +224,7 @@ export const Radar = (() => {
       eps.addScaledVector(tr.b, -eps.dot(tr.b)); // (in the plane square to the boresight)
       tr.err = tr.err * 0.6 + eps.length() * 0.4;
       slewTo(tr, tr.b.clone().add(eps).normalize(), TRK.slew * Tc);
-      tr.w.multiplyScalar(0.6).addScaledVector(eps, 0.4 / Tc); tr.w.addScaledVector(tr.b, -tr.w.dot(tr.b));
+      tr.w.multiplyScalar(0.98).addScaledVector(eps, 0.5 / Tc); // (an integrator, a little leaky: a steady crossing rate is learnt, and no lag is left behind it) tr.w.addScaledVector(tr.b, -tr.w.dot(tr.b));
       if (tr.w.length() > TRK.slew) tr.w.setLength(TRK.slew);
       tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0;
     }

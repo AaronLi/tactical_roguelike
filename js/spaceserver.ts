@@ -215,7 +215,7 @@ export const SpaceSv = (() => {
       if (h === 0 && M) { const so = rooms('security'); if (so.length) { const e = put('suspect', so, 0); if (e) { M.camOp = e.id; e.stay = true; } } }
       // her gun crew: two at gun control for each hull that has guns (the boarded ship's are what her guns need: gunnersLeft)
       const G0 = SpaceData.gunsOf(meta.hulls[h].size, liner);
-      if (G0.pd + G0.cannon + G0.missile > 0) for (let k = 0; k < 2; k++) { const e = put('suspect', rooms('gunnery'), k); if (e) e.stay = true; if (e && M && h === 0) (M.gunners = M.gunners || []).push(e.id); }
+      if (G0.pd + G0.mg + G0.missile > 0) for (let k = 0; k < 2; k++) { const e = put('suspect', rooms('gunnery'), k); if (e) e.stay = true; if (e && M && h === 0) (M.gunners = M.gunners || []).push(e.id); }
       const rs = rooms('mess', 'quarters', 'spine', 'cargo');
       for (let q = 0; q < C.resp; q++) (['suspect', 'rusher', 'suspect'] as EnemyKind[]).forEach((kd, i) => { const e = put(kd, [rs[q % Math.max(1, rs.length)]].filter((v) => v != null), 0); if (e && M) M.resp.set(e.id, h); if (e && i === 0) sv.giveShield(e, shieldId()); }); // (the first of each with a shield: their point man)
     }

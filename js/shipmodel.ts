@@ -5,7 +5,7 @@ import { ShipGen } from './shipgen.js';
 import { SpaceData } from './spacedata.js';
 import { U as G_U } from './util.js';
 import { GunAo } from './gunao.js';
-interface SmGun { k: 'pd' | 'cannon' | 'missile'; x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
+interface SmGun { k: 'pd' | 'mg' | 'missile'; x: number; y: number; z: number; hp: number; obj: THREE.Group; gun: THREE.Group; cool: number }
 export const ShipModel = (() => {
   const T = THREE;
   // boxes gathered by material, then merged
@@ -308,32 +308,35 @@ export const ShipModel = (() => {
       const xf = dx < 0 ? x * TS : (x + 1) * TS; belt(xf + (dx < 0 ? -0.3 : 0), z * TS, xf + (dx < 0 ? 0 : 0.3), (z1 + 1) * TS); sideLights(false, z * TS, (z1 + 1) * TS, xf, dx);
       z = z1 + 1;
     }
-    // what she carries on her hull, by her class (js/spacedata.ts SIZES guns): point-defence guns, heavy cannon, missile
+    // what she carries on her hull, by her class (js/spacedata.ts SIZES guns): point-defence guns, miniguns, missile
     // launchers, down her back; a ship that isn't the mission's carries none
     const guns: SmGun[] = [], Y = TOP + 0.3, bellM = shade(0.3, { metalness: 0.5, side: T.DoubleSide });
-    const gunAt = (k: 'pd' | 'cannon' | 'missile', x: number, z: number, y: number) => {
+    const gunAt = (k: 'pd' | 'mg' | 'missile', x: number, z: number, y: number) => {
       const o = new T.Group(), gn = new T.Group(); o.position.set(x, y, z);
       if (k === 'pd') {
         part(o, new T.Mesh(new T.CylinderGeometry(0.9, 1.1, 0.7, 12), dark), 0, 0.35, 0);
         part(gn, new T.Mesh(new T.BoxGeometry(1.1, 0.7, 1.4), plate), 0, 0.35, 0);
         for (const sx of [-0.25, 0.25]) part(gn, new T.Mesh(new T.CylinderGeometry(0.08, 0.08, 2.6, 8), dark), sx, 0.4, -1.7).rotation.x = Math.PI / 2;
-      } else if (k === 'cannon') {
-        part(o, new T.Mesh(new T.CylinderGeometry(2.2, 2.6, 1.2, 14), dark), 0, 0.6, 0);
-        part(gn, new T.Mesh(new T.BoxGeometry(3.4, 1.6, 4.2), plate), 0, 0.8, 0.3);
-        for (const sx of [-0.8, 0.8]) part(gn, new T.Mesh(new T.CylinderGeometry(0.22, 0.26, 7.5, 10), dark), sx, 0.9, -5.2).rotation.x = Math.PI / 2;
+      } else if (k === 'mg') { // (a six-barrelled rotary gun on a ring mount: the barrel cluster turns while it fires, userData.spin)
+        part(o, new T.Mesh(new T.CylinderGeometry(1.5, 1.8, 0.9, 14), dark), 0, 0.45, 0);
+        part(gn, new T.Mesh(new T.BoxGeometry(1.8, 1.3, 2.6), plate), 0, 0.6, 0.5);
+        part(gn, new T.Mesh(new T.CylinderGeometry(0.75, 0.75, 1.4, 8, 1, true), plate), 1.25, 0.55, 0.6).rotation.x = Math.PI / 2; // (the ammunition drum)
+        const spin = new T.Group(); spin.position.set(0, 0.6, -0.9); gn.add(spin); gn.userData.spin = spin;
+        for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; part(spin, new T.Mesh(new T.CylinderGeometry(0.09, 0.09, 4.2, 6), dark), Math.cos(a) * 0.3, Math.sin(a) * 0.3, -2.1).rotation.x = Math.PI / 2; }
+        for (const z of [-0.6, -3.6]) part(spin, new T.Mesh(new T.CylinderGeometry(0.46, 0.46, 0.2, 10), dark), 0, 0, z).rotation.x = Math.PI / 2; // (the clamps)
       } else {
         part(o, new T.Mesh(new T.BoxGeometry(3.2, 0.6, 3.2), dark), 0, 0.3, 0);
         const bx = part(gn, new T.Mesh(new T.BoxGeometry(2.6, 1.5, 3.4), plate), 0, 0.9, 0); bx.rotation.x = 0.5;
         for (const sx of [-0.8, 0, 0.8]) for (const sy of [0.5, 1.2]) part(gn, new T.Mesh(new T.CircleGeometry(0.3, 10), nav), sx, sy + 0.95, -1.42).rotation.x = 0.5;
       }
-      gn.position.y = k === 'cannon' ? 1.2 : 0.7; o.add(gn); g.add(o);
-      guns.push({ k, x, y: y + (k === 'cannon' ? 2.1 : 1.1), z, hp: k === 'pd' ? 100 : k === 'cannon' ? 320 : 180, obj: o, gun: gn, cool: 1 + r() * 3 });
+      gn.position.y = k === 'mg' ? 0.9 : 0.7; o.add(gn); g.add(o);
+      guns.push({ k, x, y: y + (k === 'mg' ? 1.5 : 1.1), z, hp: k === 'pd' ? 100 : k === 'mg' ? 220 : 180, obj: o, gun: gn, cool: 1 + r() * 3 });
     };
     {
-      const C = SpaceData.gunsOf(sp.size, sp.hall === 'mall'), list: ('pd' | 'cannon' | 'missile')[] = [], hm = sp.hull;
-      for (let k = 0; k < Math.max(C.pd, C.cannon, C.missile); k++) { if (k < C.cannon) list.push('cannon'); if (k < C.pd) list.push('pd'); if (k < C.missile) list.push('missile'); }
+      const C = SpaceData.gunsOf(sp.size, sp.hall === 'mall'), list: ('pd' | 'mg' | 'missile')[] = [], hm = sp.hull;
+      for (let k = 0; k < Math.max(C.pd, C.mg, C.missile); k++) { if (k < C.mg) list.push('mg'); if (k < C.pd) list.push('pd'); if (k < C.missile) list.push('missile'); }
       for (let k = C.pd; k > 0 && list.filter((q) => q === 'pd').length < C.pd; k--) list.push('pd');
-      list.forEach((k, n) => { const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * (k === 'cannon' ? 0 : 3.4); K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); });
+      list.forEach((k, n) => { const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * (k === 'mg' ? 0 : 3.4); K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); });
     }
     // each compartment on the roof (her top deck's) and under the keel (her lowest's) as what it is
     map.rooms.forEach((rm, i) => {

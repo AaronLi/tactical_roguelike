@@ -73,18 +73,21 @@ space round her is tile 5, open to the sky, with `chasm` 300 so nothing is drawn
 | --- | --- | --- | --- |
 | civilian transport | about 34 x 18 m | bridge, engine room, a hold, cabins, a mess. 6 crew, 3 light guards | nothing |
 | corvette | about 40 x 20 m | the same, larger. 4 guards, one breach response squad | 1 point-defence gun |
-| frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 2 point defence, 1 cannon |
-| cruiser | about 100 x 36 m; eight in ten **two decks** with a hall the height of both (below) | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 cannon, 1 missile launcher |
-| capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 5 point defence, 3 cannon, 2 missile launchers |
+| frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 2 point defence, 1 minigun |
+| cruiser | about 100 x 36 m; eight in ten **two decks** with a hall the height of both (below) | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 miniguns, 1 missile launcher |
+| capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 5 point defence, 3 miniguns, 2 missile launchers |
 
 What the board offers goes by how far the squad has got: transports and corvettes first, capital ships from the fifth rank.
 
 - **Her complement** (`G.SpaceSv.crew`, by `G.SpaceData.SIZES`): those who don't fight; light guards posted singly; security
   squads of four, armed and armoured, their chief with the first; breach response squads of three, lighter, who come to
   where the hull is breached (the comms jammer stops them being called).
-- **Her weapons** (`HULLGUN`, js/space.ts guns): point defence (1.3 km, blind under its own deck within 90 m); cannon (4.5 km,
-  10 a hit, poor against anything quick or close in); missiles (6.5 km: they home, a hard turn across the nose shakes
-  one, a turret can shoot one down, 24 a hit). All can be destroyed from a turret seat.
+- **Her weapons** (`HULLGUN`, js/space.ts guns): point defence (single shots out to 1.3 km, blind under its own deck
+  within 90 m); miniguns (six-barrelled rotary guns: bursts of 1 to 1.8 s at 30 rounds a second inside 1 km, the barrels
+  spinning while they fire); missiles (6.5 km: they home, a hard turn across the nose shakes one, a turret can shoot one
+  down, 24 a hit). Guns fire only on a radar lock, leading where the track has her going. Every round is a real one
+  (`rounds`): fired at 1,000 to 1,100 m/s, it flies, and hits only if it really passes within her size. A round that has
+  flown 2 km blows itself apart. All of her weapons can be destroyed from a turret seat.
 - **A second ship** (`sp.other`, four offers in ten except with a capital ship): a transport or corvette lying 44 m off the
   target's port side, nothing to do with the mission. She has her own crew and a cargo manifest in her hold: take it
   (hold F) for salvage money, paid at the jump home whether or not the mission is done.
@@ -158,7 +161,7 @@ triangles. Each facet gives a specular flash toward its normal and a little diff
 aspect, every 5°, and cached per hull. Turning her nose toward a scanner shrinks her return, and so the range at which
 she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km) and about 400 m² broadside (15 km).
 
-- **The mission ship's fire control** cues a tracker on the newest plot of the squad's ship. Her cannon and missiles fire
+- **The mission ship's fire control** cues a tracker on the newest plot of the squad's ship. Her guns and missiles fire
   only while a tracker holds a lock (`q ≥ 0.15`). They aim at the predicted point, and a hit is judged against where the
   squad's ship really is, so a poor track misses.
 - **The sensor station's screen** shows two scopes, one per scanner, with plots, the trackers' boxes and their state. The
