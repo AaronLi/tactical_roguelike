@@ -70,6 +70,27 @@ ship goes dormant again (its interior saved) once nobody is aboard and the squad
    - The pilot returns, and the boarder and the crew are where they were.
    - A ship left far behind goes dormant, and on return it's restored (bodies, doors, holes).
 
+## Where it's got to
+
+- **Step 1** (level contexts): done. A second level made and stepped beside the first, and the first unchanged.
+- **Step 2** (stepping every context; tags, audiences): done.
+  - Each level's own players only while it's stepped. A player's messages are handled with their level loaded.
+  - `L` tags, and a screen leaves another level's.
+  - Nothing is sent from a level nobody's aboard.
+- **Step 4** (moving between levels), the first part: done.
+  - Coming up with another ship (`'tboard'`) keeps the ship being left live if anyone's inside its hull: their `lv` stays
+    it, and it's stepped beside the new one.
+  - Otherwise it's put away (`putAway`, as before).
+  - Coming back to a live ship loads it as it is now: no regeneration, its clock and crew carried on, and a `phase` built
+    from it to those coming in (`phaseMsg`, `toLevel`).
+  - A live level nobody's in any more is put away.
+  - Checked headlessly with a stand-in left aboard the mission ship.
+- **Still to do:**
+  - Step 3: activation ahead of arrival, so the ship's live before the squad's ship gets there, plus the cap.
+  - Showing the squad's ship to those left in another level (its pose is in the frame of the level it's at, `spose`, so
+    they don't get it now).
+  - The `L` tag on the run's messages that someone in another level ought to have.
+
 ## Order and size
 
 Step 1 is mechanical and safe. Steps 2 and 4 are the core: messaging and audiences, and moving the squad's ship between

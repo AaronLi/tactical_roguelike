@@ -836,14 +836,22 @@ export const SpaceSv = (() => {
         const M = st.M, k = m.k | 0;
         if (!p || sv.phase !== 'level' || sv.leaving || !M || !M.meta || M.docked || M.boom || !Z || k === Z.active) break;
         const c = SD.zone(Z.ms)[k]; if (!c) break;
-        const zz = Z;
-        // (the ship being left is kept as she is, the mission's or another, all that's happened aboard her: she's as she was left if
-        // the squad comes back to her)
-        M.cutsWas = M.meta.cuts.map((q) => q.slice()); M.keep = keepOf();
-        if (M.ms.obj === 'visit') (zz.kept = zz.kept || new Map()).set(zz.active, M); else zz.main = M;
+        const zz = Z, was = zz.active;
+        // Whoever's inside the ship being left stays there: the level stays live beside the one the squad's ship goes to (js/server.ts
+        // ctxs, docs/zone-levels.md), till nobody's in it. Nobody inside: it's kept as it is (putAway), all that's happened aboard it,
+        // as it was left if the squad comes back to it. Everyone aboard the squad's ship goes with it.
+        const inside = [...sv.players.values()].filter((q: any) => q.st && q.st.p && !q.st.dd && (() => { const r = sv.roomOf(q.st.p[0], q.st.p[1] || 0, q.st.p[2]); return r >= 0 && M.meta!.hullOf[r] != null; })());
+        for (const q of sv.players.values() as Iterable<any>) q.lv = inside.includes(q) ? was : undefined;
+        (zz.casBy = zz.casBy || {})[was] = casNow(); // (what it cost aboard the ship being left, as it's left)
+        if (inside.length) sv.ctxs.set(was, sv.ctxSave()); else putAway();
         { // (at once: nothing's drawn over it. Each screen carries the squad's ship across as she is: js/space.ts carry)
-          (zz.casBy = zz.casBy || {})[zz.active] = casNow(); // (what it cost aboard the ship being left, as she's left)
           zz.active = k;
+          const live = sv.ctxs.get(k);
+          if (live) { // (the ship gone to is live already (someone's been left aboard it): it's the loaded level again, and they're with it)
+            sv.ctxs.delete(k); sv.ctxLoad(live); zz.active = k; st.ship.docked = false;
+            for (const q of sv.players.values() as Iterable<any>) if (q.lv === k) q.lv = undefined;
+            sv.toLevel(sv.phaseMsg(true, true)); break;
+          }
           const B = k === 0 ? zz.main : (zz.kept && zz.kept.get(k)) || null;
           if (B) { if (k === 0) zz.main = null; else zz.kept!.delete(k); B.revisit = true; B.meta = null; B.docked = false; B.site = null; B.cards = []; B.resp = new Map(); B.hvt = null; st.M = B; st.ship.docked = false; sv.startLevel(B.ms); }
           else beginIn({ i: zz.ms.i, kind: 'board', obj: 'visit', size: c.size, th: c.th, seed: c.seed, diff: Math.max(1, zz.ms.diff - 1), pay: 0, name: c.name, brief: SD.OBJ.visit.line, where: SD.SIZES[c.size].name, night: false, ly: 0, anchor: [0, 0, 0], wing: c.wing });
@@ -902,7 +910,17 @@ export const SpaceSv = (() => {
   }
   // the mission's share of a level context (js/server.ts ctxSave): the mission aboard this ship, which of the zone's ships it is,
   // the squad's ship's solids as they're laid into its world, and the breach-room cache
+  // the loaded level put away (dormant): all that's happened aboard it kept with its mission (keepOf), the mission's ship's as
+  // the zone's main, another's among those kept, to be come back to (restore); the context dropped (js/server.ts update)
+  function putAway() {
+    const M = st.M, sv = S(); if (!M || !Z) return;
+    const k = Z.active;
+    if (M.meta) M.cutsWas = M.meta.cuts.map((q) => q.slice());
+    M.keep = keepOf();
+    if (M.ms.obj === 'visit') (Z.kept = Z.kept || new Map()).set(k, M); else Z.main = M;
+    sv.ctxs.delete(k);
+  }
   function ctxSave() { return { M: st.M, active: Z ? Z.active : 0, hostShip, breachedOf }; }
   function ctxLoad(c: any) { if (!c) return; st.M = c.M; if (Z) Z.active = c.active; hostShip = c.hostShip; breachedOf = c.breachedOf; }
-  return { ctxSave, ctxLoad, st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
+  return { putAway, ctxSave, ctxLoad, st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
 })();

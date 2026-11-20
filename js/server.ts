@@ -126,10 +126,10 @@ export const Server = {
   // stepped in its turn (update), and the messages of whoever's aboard one handled with it loaded (handle). While one's loaded,
   // the players are only those aboard it (lvOf: a player's level, the loaded one's if not set), so its crew sees no one from
   // another, in another's frame. What's sent while it's loaded says which it is (L: js/serverhost.ts broadcast), but for what's
-  // everyone's (GLOBAL_T: the space side, the run's).
+  // everyone's (GLOBAL_T: the space side, the run's; but the squad's ship's pose (spose), which is in its level's frame).
   ctxs: new Map<number, LvCtx>(),
   allPlayers: null as Map<string, Player> | null,
-  GLOBAL_T: new Set(['seats', 'mdone', 'fleet', 'sdock', 'sxpdr', 'strk', 'ssec', 'srcue', 'spose', 'smis', 'shit', 'shatch', 'sfire', 'schaff', 'sboom', 'newrun', 'chat', 'phase', 'board', 'ship', 'lobby', 'hello', 'welcome', 'join', 'left', 'ready', 'route', 'shop', 'prof', 'skins', 'stickers']),
+  GLOBAL_T: new Set(['seats', 'mdone', 'fleet', 'sdock', 'sxpdr', 'strk', 'ssec', 'srcue', 'smis', 'shit', 'shatch', 'sfire', 'schaff', 'sboom', 'newrun', 'chat', 'phase', 'board', 'ship', 'lobby', 'hello', 'welcome', 'join', 'left', 'ready', 'route', 'shop', 'prof', 'skins', 'stickers']),
   curK() { return SpaceSv.ctxSave().active; },
   lvOf(p: Player) { return (p as any).lv == null ? this.curK() : (p as any).lv; },
   // (the players aboard the loaded level only, while fn runs)
@@ -143,7 +143,7 @@ export const Server = {
     if (k === this.curK()) { this.scoped(fn); return; }
     const c = this.ctxs.get(k); if (!c) return;
     const home = this.ctxSave(); this.ctxLoad(c);
-    try { this.scoped(fn); } finally { this.ctxs.set(k, this.ctxSave()); this.ctxLoad(home); }
+    try { this.scoped(fn); } finally { if (this.ctxs.has(k)) this.ctxs.set(k, this.ctxSave()); this.ctxLoad(home); } // (unless it was put away meanwhile)
   },
   ctxSave(): LvCtx { const sv: Record<string, unknown> = {}, me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) sv[k] = me[k]; return { sv, sp: SpaceSv.ctxSave() }; },
   ctxLoad(c: LvCtx) { const me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) me[k] = c.sv[k]; SpaceSv.ctxLoad(c.sp); },
@@ -560,11 +560,17 @@ export const Server = {
     this.sbox = this.map.sbox && sn.length ? { s: sn[Math.floor(Math.random() * sn.length)], by: null } : null;
     // (a ship of the zone's come back to: as she was left, js/spaceserver.ts restore; and everyone's told all of it, as whoever joins is)
     const kept = !!ms && SpaceSv.restore();
-    const was = kept ? { doors: this.map.doors.map((d: Door) => (d.open ? 1 : 0)), holes: this.holes, fallen: this.fallen, evidence: this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]),
-      loot: [...this.loot.values()].map((l) => this.lootMsg(l)), glass: [...this.glassBroken], cracked: this.glassCracked } : {};
-    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? SpaceSv.levelMsg() : undefined, ...was,
-      bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : undefined }); // (the dead she's come back to with: js/spaceserver.ts populate)
+    this.toLevel(this.phaseMsg(!!ms, kept)); // (to those in the loaded level: whoever's aboard another of the zone's ships stays there)
   },
+  // the level as it is, for a screen coming into it: everything if it's been played (kept: come back to, or live), else its start
+  phaseMsg(space: boolean, kept: boolean) {
+    const was = kept ? { doors: this.map!.doors.map((d: Door) => (d.open ? 1 : 0)), holes: this.holes, fallen: this.fallen, evidence: this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]),
+      loot: [...this.loot.values()].map((l) => this.lootMsg(l)), glass: [...this.glassBroken], cracked: this.glassCracked } : {};
+    return { t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: space ? SpaceSv.levelMsg() : undefined, ...was,
+      bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : undefined }; // (the dead she's come back to with: js/spaceserver.ts populate)
+  },
+  // a message to everyone in the loaded level (all of them, but those aboard another of the zone's levels)
+  toLevel(m: any) { const k = this.curK(); for (const [id, p] of this.allPlayers || this.players) if (this.lvOf(p) === k) this.net.sendTo(id, m); },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
   // likely; deeper levels shift the odds toward rarer tiers, and legendaries only turn up from level 3.
@@ -1852,6 +1858,8 @@ export const Server = {
     if (!this.allPlayers) { // (each level stepped, the loaded one first, with only its own players)
       this.scoped(() => this.update(dt));
       for (const k of [...this.ctxs.keys()]) this.inCtx(k, () => { const c = this.ctxs; this.ctxs = new Map(); try { this.update(dt); } finally { this.ctxs = c; } });
+      // (a level kept live that nobody's in any more: put away as it is (dormant, js/spaceserver.ts keepOf), to come back to)
+      for (const k of [...this.ctxs.keys()]) { let n = 0; for (const p of this.players.values()) if (this.lvOf(p) === k) n++; if (!n) this.inCtx(k, () => SpaceSv.putAway()); }
       return;
     }
     if (this.phase !== 'level' || !this.map) return;
