@@ -446,24 +446,29 @@ export const RadarView = (() => {
     const sel = new T.Mesh(new T.RingGeometry(R * 0.045, R * 0.055, 24), glow(0xffffff, 0.9)); inner.add(sel);
     const lcv = document.createElement('canvas'); lcv.width = 512; lcv.height = 96; const ltex = new T.CanvasTexture(lcv);
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
-    const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', font: '300 13px var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', color: 'rgba(170,225,250,0.75)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; document.body.appendChild(hint);
-    const scanUi = document.createElement('div'); scanUi.id = 'holo-scan'; Object.assign(scanUi.style, { position: 'fixed', left: '24px', top: '24px', font: '300 13px var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', fontVariantNumeric: 'tabular-nums', color: 'rgba(215,235,245,0.85)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35', lineHeight: '1.6' }); document.body.appendChild(scanUi);
+    const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', font: '300 13px "Oxanium", var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', color: 'rgba(170,225,250,0.75)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; document.body.appendChild(hint);
+    const scanUi = document.createElement('div'); scanUi.id = 'holo-scan'; Object.assign(scanUi.style, { position: 'fixed', left: '24px', top: '24px', font: '300 13px "Oxanium", var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', fontVariantNumeric: 'tabular-nums', color: 'rgba(215,235,245,0.85)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35', lineHeight: '1.6' }); document.body.appendChild(scanUi);
     holoG = { rwrItems: [], scanUi, secs: [], rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
+  // the hologram's type: Oxanium (assets/fonts, SIL OFL). Its canvas labels are drawn again once it's loaded (a canvas drawn before
+  // it is has the fallback in it, kept till its text changes)
+  let refont = false;
+  try { for (const w of [300, 400, 500]) document.fonts.load(`${w} 32px Oxanium`).then(() => { refont = true; }); } catch { /* (no FontFaceSet: the fallback) */ }
   function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [], sv: { secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[]; boxes: { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[]; trkSel: number } = { secs: [], boxes: [], trkSel: -1 }) {
     const secs = sv.secs;
     if (!parent || !su) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.style.display = 'none'; holoG.scanUi.style.display = 'none'; } return; }
     if (!holoG || holoG.R !== R) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.remove(); } holoMake(parent, R); }
     const H = holoG!; if (H.g.parent !== parent) parent.add(H.g);
+    if (refont) { refont = false; H.zoom = -1; H.ltext = ''; for (const m of H.rwr) if (m) m.txt = ''; }
     H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
     if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? '1 / 2  scanner (hold: modes) · 3 / 4  tracker, then click a track (hold: off) · drag right  turn · scroll  zoom · hold G  look up · hold F  get up' : 'hold G: focus on it · hold right mouse: turn it · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / zoom)) * R / L : 0); }; // (beyond the range shown: at its edge)
     if (H.zoom !== zoom) { H.zoom = zoom; [0.25, 0.5, 1].forEach((f, i) => { const g0 = H.rings[i], rr = Math.sqrt(f) * R, km = zoom * f / 1000; g0.l.scale.setScalar(rr); g0.s.position.set(rr + R * 0.1, R * [-0.07, 0.07, 0][i], 0); /* (at her starboard side of each, the inner two staggered up and down: not over each other) */
-      const x = g0.cv.getContext('2d')!; x.clearRect(0, 0, 256, 64); x.font = '400 34px Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.45)'; const t = km >= 1 ? +km.toFixed(2) + ' km' : Math.round(km * 1000) + ' m'; x.strokeText(t, 128, 32); x.fillStyle = 'rgba(143,220,255,0.8)'; x.fillText(t, 128, 32); g0.tex.needsUpdate = true; }); }
+      const x = g0.cv.getContext('2d')!; x.clearRect(0, 0, 256, 64); x.font = '400 34px Oxanium, Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.45)'; const t = km >= 1 ? +km.toFixed(2) + ' km' : Math.round(km * 1000) + ' m'; x.strokeText(t, 128, 32); x.fillStyle = 'rgba(143,220,255,0.8)'; x.fillText(t, 128, 32); g0.tex.needsUpdate = true; }); }
     // the fans: as wide as the shell, sweeping (none of a fan where her hull hides it)
     su.scans.forEach((sc, i) => { if (!H.fans[i]) return; fanFill(H.fans[i], { ...sc, R0: R, at: new T.Vector3() } as RScan, sc.th); });
     const camQ = new T.Quaternion(); H.inner.updateWorldMatrix(true, false); H.inner.getWorldQuaternion(camQ); const faceCam = camQ.invert().multiply(G_cam.quaternion);
@@ -547,7 +552,7 @@ export const RadarView = (() => {
       m.line.visible = w.kind !== 'scan'; m.line.scale.setScalar(R * 1.06); m.line.quaternion.setFromUnitVectors(new T.Vector3(0, 1, 0), d); (m.line.material as THREE.LineDashedMaterial).color.setHex(col); (m.line.material as THREE.LineDashedMaterial).opacity = a * 0.8; m.line.computeLineDistances();
       m.s.position.copy(d).multiplyScalar(R * 1.15).add(new T.Vector3(0, R * 0.16, 0)); /* (over its chevron) */ (m.s.material as THREE.SpriteMaterial).opacity = a;
       const txt = w.kind === 'lock' ? 'LOCK' : w.kind === 'trk' ? 'TRK' : 'SRCH';
-      if (m.txt !== txt) { m.txt = txt; const x = m.cv.getContext('2d')!; x.clearRect(0, 0, 128, 48); x.font = '500 30px Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.5)'; x.strokeText(txt, 64, 24); x.fillStyle = w.kind === 'lock' ? '#ff5040' : '#ffb050'; x.fillText(txt, 64, 24); m.tex.needsUpdate = true; }
+      if (m.txt !== txt) { m.txt = txt; const x = m.cv.getContext('2d')!; x.clearRect(0, 0, 128, 48); x.font = '500 30px Oxanium, Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.5)'; x.strokeText(txt, 64, 24); x.fillStyle = w.kind === 'lock' ? '#ff5040' : '#ffb050'; x.fillText(txt, 64, 24); m.tex.needsUpdate = true; }
     });
     for (let i = rwr.length; i < H.rwr.length; i++) { const m = H.rwr[i]; m.cone.visible = m.line.visible = m.s.visible = false; }
     // the tracks: each 3D track at its place; each contact no 3D track has, faint at its fan's middle
@@ -576,7 +581,7 @@ export const RadarView = (() => {
     if (p) {
       H.sel.position.copy(p.pos); const camQ = new T.Quaternion(); (parent as any).updateWorldMatrix?.(true, false); H.inner.getWorldQuaternion(camQ); H.sel.quaternion.copy(camQ.invert().multiply(G_cam.quaternion)); H.sel.scale.setScalar(1 + 0.15 * Math.sin(now * 8));
       H.label.position.copy(p.pos).add(new T.Vector3(0, R * 0.12, 0).applyQuaternion(rot.clone().invert()));
-      if (H.ltext !== p.label + p.col) { H.ltext = p.label + p.col; const x = H.lcv.getContext('2d')!; x.clearRect(0, 0, 512, 96); x.font = '400 32px Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.5)'; x.strokeText(p.label, 256, 48, 500); x.fillStyle = p.col; x.fillText(p.label, 256, 48, 500); H.ltex.needsUpdate = true; }
+      if (H.ltext !== p.label + p.col) { H.ltext = p.label + p.col; const x = H.lcv.getContext('2d')!; x.clearRect(0, 0, 512, 96); x.font = '400 32px Oxanium, Barlow, system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.5)'; x.strokeText(p.label, 256, 48, 500); x.fillStyle = p.col; x.fillText(p.label, 256, 48, 500); H.ltex.needsUpdate = true; }
     }
   }
   const G_cam = { quaternion: new T.Quaternion() };
