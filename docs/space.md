@@ -201,9 +201,10 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
   drawn), centred in front of the seat just below the operator's eyes (placed when someone first sits there): her ship at its
   middle (a cone, her nose its point, a fin on her back: how it's turned reads off her); every track her radars hold where it is round her (its true way from her,
   its distance as the square root, 10 km at the shell): a 3D track solid and coloured by her assessment (hostile red, suspect
-  orange, watch yellow, neutral grey, civilian grey-blue, friendly green), a contact one scanner holds faint at its fan's
-  middle; her scanners' fans sweeping out from the middle (cyan bearing, magenta roll) and each tracker's beam a line from it
-  (amber acquiring, red tracking). Holding the right button turns it (the operator's view held still); the middle of their
+  orange, watch yellow, neutral grey, civilian grey-blue, friendly green), a contact only one scanner holds drawn as the arc it
+  could be on (its fan at its range, where her hull doesn't hide it), its middle the point to aim at; her scanners' fans sweeping out from the middle (cyan bearing, magenta roll) and each tracker's beam a line from it
+  along its axis as it is that instant (the conical scan's circling shows), out to its range gate (a ring), amber
+  acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed amber, its beam going along it. Holding the right button turns it (the operator's view held still); the middle of their
   view points at a track (ringed and named), a left click cues a tracker on it (`srcue` to everyone aboard), a tap of the
   right button drops the trackers. The deck plan the deck scanner gives is behind **M**.
 - **F8** shows a ship's radars, each tap the next ship's: the squad's (from where you are), the mission ship's, then the

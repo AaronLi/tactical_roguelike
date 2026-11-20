@@ -423,7 +423,7 @@ export const RadarView = (() => {
   // beam a line from the middle along its boresight (amber slewing or sweeping, red tracking). The operator turns it (rot) and
   // points at a track with the middle of their view (holoPick).
   type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string };
-  let holoG: { g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
+  let holoG: { arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
   const HCOL: Record<string, number> = { HOSTILE: 0xff4a3a, SUSPECT: 0xffa040, WATCH: 0xffe070, NEUTRAL: 0xa8b8c4, CIV: 0x7f9fb0, FRIENDLY: 0x70f090 };
   function holoMake(parent: THREE.Object3D, R: number) {
     const g = new T.Group(), inner = new T.Group(); g.add(inner); parent.add(g);
@@ -433,12 +433,14 @@ export const RadarView = (() => {
     const ship = new T.Mesh(new T.ConeGeometry(R * 0.045, R * 0.16, 12), glow(0x60e0ff, 0.9)); ship.rotation.x = -Math.PI / 2; inner.add(ship);
     const fin = new T.Mesh(new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, R * 0.07), new T.Vector3(0, R * 0.07, R * 0.07), new T.Vector3(0, 0, -R * 0.02)]), glow(0x60e0ff, 0.8)); inner.add(fin);
     const fans = [0, 1].map((i) => { const m = new T.Mesh(fanGeo(), glow(i ? 0xe070ff : 0x50d8ff, 0.16)); inner.add(m); return m; });
-    const beams = [0, 1].map(() => { const l = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -R)]), new T.LineBasicMaterial({ color: 0xff4030, transparent: true, opacity: 0.9, depthWrite: false })); inner.add(l); return l; });
+    const beams = [0, 1].map(() => { const l = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -1)]), new T.LineBasicMaterial({ color: 0xff4030, transparent: true, opacity: 0.9, depthWrite: false })); inner.add(l); return l; });
+    const strips = [0, 1].map(() => { const l = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(25 * 3), 3)), new T.LineDashedMaterial({ color: 0xffb040, dashSize: R * 0.03, gapSize: R * 0.02, transparent: true, opacity: 0.8, depthWrite: false })); inner.add(l); return l; });
+    const ends = [0, 1].map(() => { const m = new T.Mesh(new T.RingGeometry(R * 0.02, R * 0.03, 16), glow(0xff4030, 0.9)); inner.add(m); return m; }); // (where a tracker's range gate is along its beam)
     const sel = new T.Mesh(new T.RingGeometry(R * 0.045, R * 0.055, 24), glow(0xffffff, 0.9)); inner.add(sel);
     const lcv = document.createElement('canvas'); lcv.width = 512; lcv.height = 96; const ltex = new T.CanvasTexture(lcv);
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
     const hint = document.createElement('div'); Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', font: '12px ui-monospace, Consolas, monospace', color: '#9fe4ff', textShadow: '0 0 4px #000', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · aim at a track, left click: track it · tap right: drop the trackers'; document.body.appendChild(hint);
-    holoG = { g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
+    holoG = { arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
@@ -450,13 +452,32 @@ export const RadarView = (() => {
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / RMAX)) * R / L : 0); };
     // the fans: as wide as the shell, sweeping (none of a fan where her hull hides it)
     su.scans.forEach((sc, i) => { if (!H.fans[i]) return; fanFill(H.fans[i], { ...sc, R0: R, at: new T.Vector3() } as RScan, sc.th); });
-    su.trks.forEach((tr, i) => { const l = H.beams[i]; if (!l) return; l.visible = tr.st !== 'idle'; l.quaternion.setFromUnitVectors(Z, tr.b); (l.material as THREE.LineBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040); });
+    const camQ = new T.Quaternion(); H.inner.updateWorldMatrix(true, false); H.inner.getWorldQuaternion(camQ); const faceCam = camQ.invert().multiply(G_cam.quaternion);
+    su.trks.forEach((tr, i) => {
+      const l = H.beams[i], st = H.strips[i], en = H.ends[i]; if (!l) return;
+      const on = tr.st !== 'idle', len = on && tr.rng > 0 ? Math.sqrt(Math.min(1, tr.rng / RMAX)) * R : R;
+      // (its beam: along its axis as it is this instant, the conical scan's circling and all, out to its range gate)
+      l.visible = on; l.quaternion.setFromUnitVectors(Z, tr.st === 'track' ? tr.a : tr.b); l.scale.setScalar(len); (l.material as THREE.LineBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040);
+      en.visible = on && tr.rng > 0; en.position.copy(tr.st === 'track' ? tr.a : tr.b).multiplyScalar(len); en.quaternion.copy(faceCam); (en.material as THREE.MeshBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040);
+      // (sweeping: the strip it's searching along, the arc its cue's on)
+      st.visible = (tr.st === 'slew' || tr.st === 'acq') && !!tr.cue;
+      if (st.visible) { const c = tr.cue!, sc = su.scans[c.k], pa = st.geometry.attributes.position as THREE.BufferAttribute, qn = su.Q.clone().invert(), v = new T.Vector3();
+        for (let j = 0; j <= 24; j++) { Radar.dirOf(c.ax, c.phi, -sc.fan + 2 * sc.fan * j / 24, v).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o).sub(su.P).applyQuaternion(qn); at(v, v); pa.setXYZ(j, v.x, v.y, v.z); }
+        pa.needsUpdate = true; st.computeLineDistances(); }
+    });
     // the tracks: each 3D track at its place; each contact no 3D track has, faint at its fan's middle
-    const items: HoloItem[] = [];
+    const items: HoloItem[] = []; for (const l of H.arcs) l.visible = false;
     for (const a of su.ass) {
       let pos: THREE.Vector3 | null = null;
-      if (a.f) pos = a.f.p.clone(); else if (a.c && a.plot) { const sc = su.scans[a.plot.k]; pos = Radar.dirOf(sc.ax, phiNow(su, a.plot), 0).multiplyScalar(a.plot.r).add(sc.at); }
+      let arc: THREE.Vector3[] | null = null;
+      if (a.f) pos = a.f.p.clone(); else if (a.c && a.plot) {
+        // (one scanner's: it's somewhere on its arc, the fan at its range (where her hull doesn't hide it): the arc drawn, its middle the point to aim at)
+        const sc = su.scans[a.plot.k], ph = phiNow(su, a.plot); pos = Radar.dirOf(sc.ax, ph, 0).multiplyScalar(a.plot.r).add(sc.at); arc = [];
+        for (let j = 0; j <= 16; j++) { const e = -sc.fan + 2 * sc.fan * j / 16, d = Radar.dirOf(sc.ax, ph, e); if (d.dot(sc.n) < -sc.mask) continue; arc.push(at(d.multiplyScalar(a.plot.r).add(sc.at))); }
+      }
       if (!pos) continue;
+      if (arc && arc.length > 1) { const k = H.arcs.findIndex((q) => !q.visible); const l = k >= 0 ? H.arcs[k] : (() => { const n = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(17 * 3), 3)), new T.LineBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false, blending: T.AdditiveBlending })); H.inner.add(n); H.arcs.push(n); return n; })();
+        const pa = l.geometry.attributes.position as THREE.BufferAttribute; arc.forEach((q, j) => pa.setXYZ(j, q.x, q.y, q.z)); pa.needsUpdate = true; l.geometry.setDrawRange(0, arc.length); l.visible = true; (l.material as THREE.LineBasicMaterial).color.setHex(HCOL[a.cls] || 0xffffff); }
       const nm = a.iff ? (a.iff.c === 'civ' ? 'CIV ' : a.iff.c === 'navy' ? 'NAVY ' : '') + a.iff.n : 'no IFF';
       items.push({ pos: at(pos), plot: a.plot, label: `${a.n} ${a.cls} · ${nm} · ${(a.r / 1000).toFixed(2)} km ${a.vc >= 0 ? '+' : ''}${Math.round(a.vc)} m/s`, col: '#' + (HCOL[a.cls] || 0xffffff).toString(16).padStart(6, '0') });
       const m = H.dots[items.length - 1] || (() => { const d = new T.Mesh(new T.SphereGeometry(R * 0.032, 10, 8), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); H.inner.add(d); H.dots.push(d); return d; })();
