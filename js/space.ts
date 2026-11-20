@@ -62,7 +62,7 @@ export const Space = (() => {
     // the warp drive (warpStep): spin, how far it's spun up (0..1) on the target she's facing; warp, the run itself; tv, the
     // target's own velocity (tgtTrack), which she's left matching at the end of it
     spin: 0, warp: null as null | { j: number; u: number; t: number; top: number }, tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1, match: null as null | string,
-    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], rounds: [] as { m: THREE.Mesh; p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
+    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], rounds: [] as { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
   };
   const me = () => Me, on = () => S.on;
   const isCtl = () => S.ctl === Net.myId;
@@ -1799,22 +1799,33 @@ export const Space = (() => {
     }
   }
   // a round off one of her guns (in the level's frame): along the aim, spread by the gun and by the track's own error
-  const RGEO = (() => { const g = new T.CylinderGeometry(0.18, 0.18, 1, 4, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, 0.5); return g; })();
-  const RMAT = new T.MeshBasicMaterial({ color: 0xffc070, transparent: true, opacity: 0.95, depthWrite: false, blending: T.AdditiveBlending });
+  // the rounds in flight are drawn as glowing points, all of them one Points (rPts: under S.root, made again with it)
+  const RMAX = 4096; let rPts: THREE.Points | null = null;
+  function roundPts() {
+    if (rPts && rPts.parent === S.root) return rPts;
+    if (!rPts) {
+      const cv = document.createElement('canvas'); cv.width = cv.height = 32; const x = cv.getContext('2d')!, gr = x.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gr.addColorStop(0, 'rgba(255,255,240,1)'); gr.addColorStop(0.2, 'rgba(255,220,150,0.9)'); gr.addColorStop(0.5, 'rgba(255,160,60,0.3)'); gr.addColorStop(1, 'rgba(255,120,40,0)'); x.fillStyle = gr; x.fillRect(0, 0, 32, 32);
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(RMAX * 3), 3)); g.setDrawRange(0, 0);
+      rPts = new T.Points(g, new T.PointsMaterial({ map: new T.CanvasTexture(cv), size: 6, sizeAttenuation: false, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); // (6 px however near: a point of light, not a ball)
+      rPts.frustumCulled = false;
+    }
+    rPts.removeFromParent(); if (S.root) S.root.add(rPts); return rPts;
+  }
   const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
   function fireRound(from: THREE.Vector3, aim: THREE.Vector3, H: { speed: number; spread: number; dmg: number; life: number }, err: number) {
     if (!S.root) return;
     const spread = H.spread + err * 0.5, d = aim.clone().normalize(), e1 = new T.Vector3(0, 1, 0).cross(d), e2 = new T.Vector3();
     if (e1.lengthSq() < 1e-6) e1.set(1, 0, 0); e1.normalize(); e2.crossVectors(d, e1);
     d.addScaledVector(e1, gauss() * spread).addScaledVector(e2, gauss() * spread).normalize(); // (normal each way square to the aim)
-    const m = new T.Mesh(RGEO, RMAT); m.frustumCulled = false; m.position.copy(from); m.lookAt(from.clone().sub(d)); m.scale.set(1, 1, 6); S.root.add(m); // (the streak trails behind it: its tail toward the gun)
-    S.rounds.push({ m, p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life });
+    if (S.rounds.length >= RMAX) return;
+    S.rounds.push({ p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life });
   }
   // the rounds in flight: each moves, and hits her if it passes within her size of her middle this step (both moving); one that's
   // flown its life (2 km) blows itself apart, so nothing she fires is left flying through the zone
   const FLASH = new T.SphereGeometry(1, 8, 6);
   function rounds(dt: number) {
-    if (!S.rounds.length) return;
+    if (!S.rounds.length) { if (rPts) rPts.geometry.setDrawRange(0, 0); return; }
     const c1 = S.P.clone().add(new T.Vector3(0, 1.5, 0)), c0 = c1.clone().addScaledVector(S.V, -dt), R = Math.max(4, EW.own ? EW.own.size * 0.6 : 5);
     const r0 = new T.Vector3(), r1 = new T.Vector3(), seg = new T.Vector3(); let hits = 0, dmg = 0;
     for (let i = S.rounds.length - 1; i >= 0; i--) {
@@ -1824,12 +1835,12 @@ export const Space = (() => {
       const hit = !S.docked && miss < R, gone = hit || q.d >= q.life;
       if (hit) { hits++; dmg += q.dmg; }
       if (gone) {
-        q.m.parent && q.m.parent.remove(q.m); S.rounds.splice(i, 1);
+        S.rounds.splice(i, 1);
         if (!hit && S.root) { const f = new T.Mesh(FLASH, new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending })); f.position.copy(q.p); f.scale.setScalar(2.5); f.frustumCulled = false; S.root.add(f); S.tracers.push({ m: f, t: 0.12 }); }
         continue;
       }
-      q.m.position.copy(q.p);
     }
+    if (S.root) { const pts = roundPts(), pa = pts.geometry.attributes.position as THREE.BufferAttribute; S.rounds.forEach((q, i) => pa.setXYZ(i, q.p.x, q.p.y, q.p.z)); pa.needsUpdate = true; pts.geometry.setDrawRange(0, S.rounds.length); }
     if (hits && isCtl()) { damage(dmg, dmg > 4 ? 'Minigun fire' : undefined); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + hits * 0.1)); }
   }
   // a missile: a[0] its number, where it left her; a[4] 1: it's been shot down
