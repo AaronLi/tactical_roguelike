@@ -82,6 +82,17 @@ def section_pts(d=0.0, zb=-0.080, zt=0.0482):
     for i in range(9):                                            # (bottom right)
         a = 1.5 * math.pi + math.pi / 2 * i / 8; pts.append((W - Rb + Rb * math.cos(a), zb - d + Rb + Rb * math.sin(a)))
     return pts
+def slice_sel(o, co, no, pred):
+    """Bisect only the faces whose middle satisfies pred (the corner strips of the butt, cut at the same heights as the side cells so they share vertices with them)."""
+    bm = bmesh.new(); bm.from_mesh(o.data)
+    fs = [f for f in bm.faces if pred(f.calc_center_median())]
+    if fs:
+        es = list({e for f in fs for e in f.edges}); vs = list({v for f in fs for v in f.verts})
+        bmesh.ops.bisect_plane(bm, geom=vs + es + fs, plane_co=co, plane_no=no, dist=1e-6)
+    bm.to_mesh(o.data); bm.free(); o.data.update(); return o
+def along(a, b, r, step=0.040):
+    """A lathe profile from a to b at radius r with a ring every `step`: a long tube is a row of short strips, not one 300 mm facet."""
+    n = max(1, math.ceil((b - a) / step)); return [(a + (b - a) * i / n, r) for i in range(n + 1)]
 def clean(o, d=0.02 * mm):
     """A boolean-and-slice leftovers pass: vertices within 0.02 mm welded, zero-area faces dissolved, (the faces with no area a slice through existing vertices leaves)."""
     bm = bmesh.new(); bm.from_mesh(o.data)
@@ -111,7 +122,7 @@ sh = K.tmp(prism(PL(SHELL), 'x', -40 * mm, 40 * mm))
 boolean(sh, prism(PLAN, 'z', U(1300), U(-300)), 'INTERSECT')
 # the section: broad shoulders on the top (15 mm), the underside rounded (10 mm); then the remaining edges are rounded (4 mm, three segments) before any detail is cut
 boolean(sh, prism(section_pts(), 'y', -0.10, 0.80), 'INTERSECT')
-tidy(sh, 0.1 * mm, False); bevel(sh, 4.0 * mm, 3, 30)               # (chamfer the body once, THEN the cuts)
+tidy(sh, 0.1 * mm, False); bevel(sh, 4.0 * mm, 2, 30)               # (chamfer the body once, THEN the cuts)
 cut(sh, box(-12.4 * mm, 12.4 * mm, MAG_TOP[0] + MB - 1.0 * mm, MAG_TOP[0] + MF + 1.0 * mm, U(1250), MAG_TOP[1] + 2 * mm))
 PORT = (F(499), F(419), U(172), U(153))                             # (the right side's ejection port; the left shows its cover panel at the same place)
 def port_cutter(pa, pb, pu0, pu1, x_in, x_out, flare=0.7 * mm):
@@ -165,9 +176,10 @@ cut(sh, box(-4.5 * mm, 4.5 * mm, F(297.6), F(283.4), U(199), U(188)))           
 side_cuts = []
 for sx_ in (-1, 1):
     for xw_, fp_ in ((31 * mm, 0.2), (HWG, 0.5)):
-        for k_ in range(1, 15): side_cuts.append(((sx_ * xw_, fp_, 0.0), (sx_, 0, 0), (0, 0.040 * k_, 0), (0, 1, 0)))
         for z_ in range(36, -72, -12): side_cuts.append(((sx_ * xw_, fp_, 0.0), (sx_, 0, 0), (0, 0, z_ * mm), (0, 0, 1)))
+slice_across(sh, 'y', [0.040 * k_ for k_ in range(1, 15)])                           # (all of it: the long top and bottom bands and their bevels cut every 40 mm, the same planes as the side cells)
 slice_faces(sh, side_cuts)
+for z_ in range(36, -72, -12): slice_sel(sh, (0, 0, z_ * mm), (0, 0, 1), lambda c: c.y < 0.030)     # (the butt's swept back corners and back face, at the side cells' heights)
 tidy(sh, 1e-6, True); clean(sh)
 wnorm(sh, 50); K.adopt(sh, 'base', SH)
 port_inside(K, *PORT, 31 * mm, mouth_r=5.6 * mm, ramp=26 * mm, az=(PORT[2] + PORT[3]) / 2)
@@ -212,7 +224,7 @@ o = K.obj(cyl(2.0 * mm, 33.0 * mm, 33.8 * mm, 'x', (F(135), U(162)), 8), 'base',
 # the butt pad (a line of rubber across the butt's rear)
 BUTT = [[612, 125], [622, 125], [630, 127], [634, 133], [633, 164], [631, 192], [631, 231], [627, 235], [621, 236], [612, 236]]
 pad = K.tmp(prism(PL(SHELL), 'x', -40 * mm, 40 * mm)); boolean(pad, prism(plan_pts(0.8 * mm), 'z', U(1300), U(-300)), 'INTERSECT'); boolean(pad, prism(section_pts(0.8 * mm), 'y', -0.10, 0.80), 'INTERSECT')
-tidy(pad, 0.1 * mm, False); bevel(pad, 4.0 * mm, 3, 30); boolean(pad, prism(PL(BUTT), 'x', -40 * mm, 40 * mm), 'INTERSECT'); tidy(pad, 1e-6, True); wnorm(pad, 50); K.adopt(pad, 'base', 'rubber')      # (the butt pad: the shell's own shape, 0.8 mm proud, cut off at its front)
+tidy(pad, 0.1 * mm, False); bevel(pad, 4.0 * mm, 2, 30); boolean(pad, prism(PL(BUTT), 'x', -40 * mm, 40 * mm), 'INTERSECT'); tidy(pad, 1e-6, True); wnorm(pad, 50); K.adopt(pad, 'base', 'rubber')      # (the butt pad: the shell's own shape, 0.8 mm proud, cut off at its front)
 # the trigger
 # the trigger: a thin curved steel blade coming down out of a slot in the receiver's floor (its top inside the housing), its tip forward and low (photo x 284-296, y 189-220)
 TRIG = [[285.5, 188.5], [296, 188.5], [296, 199], [295.6, 206], [293.4, 213.5], [288.5, 218.5], [285, 219.7], [284.4, 218], [287, 212.5], [288.8, 204], [287.5, 198], [285.5, 196]]
@@ -238,8 +250,8 @@ cl = K.tmp(lathe([(L - 0.032, COLLAR_R), (L + 0.006, COLLAR_R), (L + 0.008, COLL
 cut(cl, cyl(COLLAR_BORE, L - 0.04, L + 0.03, 'y', (0, 0), segs(COLLAR_BORE, 0.3 * mm)))
 tidy(cl); smooth(cl); K.adopt(cl, 'base', 'black')
 BR = 6.4 * mm
-o = K.obj(lathe([(0.222, BR), (L - 0.030, BR)], 12), 'barrel', 'park'); smooth(o)
-o = K.obj(lathe([(L - 0.030, BR), (MZ0, BR)], segs(BR)), 'barrel', 'park'); smooth(o)
+o = K.obj(lathe(along(0.222, L - 0.030, BR), 12), 'barrel', 'park'); smooth(o)
+o = K.obj(lathe(along(L - 0.030, MZ0, BR, 0.016), segs(BR)), 'barrel', 'park'); smooth(o)
 o = K.obj(lathe([(L + 0.002, 8.2 * mm), (L + 0.008, 8.2 * mm), (L + 0.011, BR)], segs(8.2 * mm)), 'barrel', 'black'); smooth(o)
 def flash_hider(mz0, ln=0.0450, R=10.2 * mm):
     o = K.obj(lathe([(mz0 - 2 * mm, 8.6 * mm), (mz0, 8.6 * mm)], segs(8.6 * mm)), 'muzzle', 'steel'); smooth(o)
@@ -270,7 +282,7 @@ WIN = chaikin([(267, 176), (267, 198), (274, 224), (281, 246), (288, 264), (294,
                (320, 245), (320, 235), (314, 229), (306, 226), (306, 222), (312, 218), (314, 214), (314, 200), (314, 176)], 1)
 gp = K.tmp(prism(PL(GRIP), 'x', -16 * mm, 16 * mm)); tidy(gp, 0.1 * mm, False); bevel(gp, 3.0 * mm, 2, 30)
 cut(gp, prism(PL(WIN), 'x', -20 * mm, 20 * mm))
-tidy(gp); wnorm(gp, 35); K.adopt(gp, 'grip', SH)
+slice_across(gp, 'z', [-0.030 - 0.030 * k_ for k_ in range(1, 4)]); tidy(gp); wnorm(gp, 35); K.adopt(gp, 'grip', SH)
 # the grip's side panel: a raised, textured insert outlined on each side, with its screw
 PANEL = chaikin([(325, 212), (344, 208), (352, 220), (358, 240), (363, 262), (364, 280), (360, 287), (348, 288), (338, 284), (334, 270), (331, 252), (328, 236), (326, 224)], 1)
 for sx in (-1, 1):
@@ -283,7 +295,7 @@ ph = K.part('handle', (0, H0[0], H0[1]))
 XH = -HWG
 o = K.obj(cyl(3.4 * mm, XH - 9.0 * mm, XH + 0.5 * mm, 'x', H0, 12), 'base', 'black', ph); smooth(o)                                   # (the stem)
 hd = K.tmp(cyl(8.0 * mm, XH - 17.0 * mm, XH - 8.5 * mm, 'x', H0, 20)); bevel(hd, 2.4 * mm, 2, 30); smooth(hd); K.adopt(hd, 'base', 'black', ph)   # (the round knob)
-o = K.obj(cyl(1.8 * mm, H0[0] - 0.100, H0[0] - 0.004, 'y', (XH + 1.6 * mm, H0[1]), 8), 'base', 'steel', ph); smooth(o)                  # (the guide rod in the channel)
+o = K.obj(lathe(along(H0[0] - 0.100, H0[0] - 0.004, 1.8 * mm, 0.012), 8, (XH + 1.6 * mm, 0, H0[1])), 'base', 'steel', ph); smooth(o)                  # (the guide rod in the channel)
 
 # ===================================================================================== the sights (optic: the gun's own flip-up irons on the rail)
 ag['K'] = K; ag['RAIL_TOP'] = RAIL_TOP; ag['SY'] = SY; ag['RCV'] = 'black'
@@ -308,6 +320,9 @@ ag['fold_irons'](RS, FS)
 
 # ===================================================================================== the magazine (part_mag): the Mk18's STANAG
 ag['mag_stanag'](MAG_TOP)
+for o_ in [o_ for o_ in coll.all_objects if o_.type == 'MESH' and o_.get('slot') == 'mag']:
+    zs_ = [v.co.z for v in o_.data.vertices]
+    if zs_ and max(zs_) - min(zs_) > 0.09: slice_across(o_, 'z', [min(zs_) + 0.035 * k_ for k_ in range(1, int((max(zs_) - min(zs_)) / 0.035) + 1)])
 _pm = [o for o in coll.all_objects if o.get('part') == 'mag'][0]; _pm.rotation_euler = (math.radians(4.5), 0, 0)      # (the photo's magazine leans forward more than the kit's curve)
 
 # ===================================================================================== info and anchors
