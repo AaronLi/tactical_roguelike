@@ -225,6 +225,9 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     - **OFF:** silent: nothing sent (no warning receiver hears it), nothing seen; what it held fades out. The squad's ship's
       search radars start off: she's silent till her sensor operator switches them on.
 
+    The boxes can be clicked too (js/space.ts boxClick): a scanner's box opens its list (and it's the radar the keys work) or
+    closes it, a mode in the list sets it, a tracker's box picks it, and a tracker's state (IDLE, LOCK ...) switches it off or on.
+
     Tapped while closed, it's the radar **W**/**S** (its sector's width) and **A**/**D** (its direction: port and starboard; for
     the roll scanner, round her one way and the other) work, as it searches if it is. In the hologram, a sector's search cone:
     the space its fan sweeps across it (a patch at the edge and the fans at its sides), brighter for the radar the keys work or
@@ -288,6 +291,11 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
      SUSPECT: a tracking radar on a ship is taken as hostility, so she keeps hers off what isn't. Tested: the squad's ship
      silent and still at 2.5 km is WATCH and left alone; running in at 90 m/s it's SUSPECT at once and HOSTILE 3 s later; its
      own tracker locked on her makes it SUSPECT, then HOSTILE, and she locks it back.
+     A scanner contact taken into a 3D track hands the track how long it's been held SUSPECT (its 3 s isn't started again), and
+     a new 3D track starts moving as its contacts' ranges are (closing or opening along the line of sight), not still. A new
+     contact allows for 400 m/s along the line of sight, so something fast (a torpedo) is the same contact on its second
+     sweep. A tracker that's found its target puts its range gate where the target is now, not where its best return was a
+     second before.
 
   The squad's ship is drawn in blues (cyan fans, teal acquiring, blue tracking) and every other ship in reds (red fans, amber
   acquiring, red tracking). Another ship's tracker gets a marker on the screen at its turret (ACQ, TRK, or a pulsing TRK
@@ -298,6 +306,26 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
 
 Not yet: stealth fittings, infrared and optical sensors, jamming, and the radar in co-op. Each client runs its own radars
 with its own noise, so plots can differ between screens.
+
+## The torpedo (js/space.ts torps, TORP)
+
+- **The tube:** one, under her keel (`tubeKit`), 4 torpedoes a sortie.
+- **Aiming:** the pilot's HUD shows her sensors' 3D fixes in space (rings). Holding right mouse turns the head; the fix
+  nearest the middle of the view (within 7°) is the one looked at (`torpSee`: a dashed ring, "click: pick"). A left click picks
+  it ("TORPEDO TARGET"), again lets it go. **B** fires at the one picked, or the one looked at. A fix ahead in the bow
+  scanner's blind cone isn't a 3D fix, so it can't be fired at.
+- **Flight:** a cold launch (pushed out downward at 7 m/s, coasting 1.1 s), then its RCS thrusters push it off to the side
+  away from her path while turning its nose onto the target, then its motor (85 m/s², closing speed held to 300 m/s, the rest
+  for steering by proportional navigation, N = 4).
+- **Guidance:** her sensors' fix as they hold it now (a datalink), dead reckoning when they lose it; inside 1 km, its own
+  radar: the strongest return in a 20° cone and a 300 m range gate round where it expects the target (chaff can draw it).
+  A proximity fuse: a hull by her box, a ship within 30 m, anything small within 7 m. On the mission's ship it knocks out
+  her guns within 45 m. It self-destructs after 90 s.
+- **Its return:** 1.5 m², no transponder. Nothing special-cases it: the enemy's scanners, threat assessment and fire control
+  see it as they see anything, and a minigun round passing within 3 m kills it. The pilot's screen flies it and tells everyone
+  aboard (`storp`, ten times a second).
+- **Tested:** from 5 km side-on to the frigate. Her scanners have it at 3.2 km, HOSTILE at 2 km, a tracker locked at 1.5 km,
+  her miniguns firing from 600 m. Of three runs, it hit twice and was shot down once (closest rounds about 1 m).
 
 ## Checking it
 

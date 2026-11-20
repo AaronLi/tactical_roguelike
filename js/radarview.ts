@@ -514,17 +514,17 @@ export const RadarView = (() => {
       const html = su.scans.map((sc, k) => {
         const b = sv.boxes[k]; if (!b) return ''; const col = sc.ax === 'y' ? '#50d8ff' : '#e070ff', name = b.opts[['round', 'sector', 'off'].indexOf(b.mode)] || b.mode;
         const what = b.mode === 'sector' ? `${name} ${Math.round(sc.sec.h * 360 / Math.PI)}° at ${deg(sc.sec.c)}°` : name;
-        let h = `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid ${b.open || b.sel ? col : 'rgba(120,180,210,0.18)'};background:rgba(4,12,18,0.32);border-radius:2px">`
+        let h = `<div data-hb="s${k}" style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid ${b.open || b.sel ? col : 'rgba(120,180,210,0.18)'};background:rgba(4,12,18,0.32);border-radius:2px">`
           + `<span style="color:${col}">${k + 1} SCAN ${sc.tag}</span> <span style="color:#7f9fb0">${sc.ax === 'y' ? 'bearing' : 'roll'}</span> <span style="float:right;font-weight:400">${what} ${b.open ? '▴' : '▾'}</span>`;
-        if (b.open) h += b.opts.map((o, i) => `<div style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:12px">tap ${k + 1}: next · hold ${k + 1}: set</div>`;
+        if (b.open) h += b.opts.map((o, i) => `<div data-hb="o${k}:${i}" style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:12px">click one, or tap ${k + 1}: next · hold ${k + 1}: set</div>`;
         if (b.sel) h += `<div style="color:rgba(255,255,255,0.7);font-size:12px">W S: width · A D: direction</div>`;
         return h + '</div>';
       }).join('<br>') + '<br>' + [1, 0].map((ti, j) => { // (and the tracking radars': 3 port, 4 starboard)
         const tr = su.trks[ti]; if (!tr) return ''; const sel = sv.trkSel === ti, f = su.fus.find((q) => q.trk === tr);
         const st = tr.off ? 'OFF' : tr.st === 'track' ? 'LOCK' + (f ? ' on ' + f.n : '') : tr.st === 'acq' ? 'SEARCH' : tr.st === 'slew' ? 'SLEW' : 'IDLE';
         const col = tr.off ? '#5f6f78' : tr.st === 'track' ? '#ff6050' : tr.st === 'idle' ? '#9fc2d4' : '#ffb040';
-        return `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid ${sel ? '#ffb040' : 'rgba(120,180,210,0.18)'};background:rgba(4,12,18,0.32);border-radius:2px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span style="float:right;font-weight:400;color:${col}">${st}</span>`
-          + (sel ? `<div style="color:rgba(255,255,255,0.7);font-size:12px">left click: a track, or a radar warning's bearing · hold ${j + 3}: ${tr.off ? 'on' : 'off'}</div>` : '') + '</div>';
+        return `<div data-hb="t${ti}" style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid ${sel ? '#ffb040' : 'rgba(120,180,210,0.18)'};background:rgba(4,12,18,0.32);border-radius:2px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span data-hb="p${ti}" style="float:right;font-weight:400;color:${col}">${st}</span>`
+          + (sel ? `<div style="color:rgba(255,255,255,0.7);font-size:12px">left click: a track, or a radar warning's bearing · hold ${j + 3} or click its state: ${tr.off ? 'on' : 'off'}</div>` : '') + '</div>';
       }).join('<br>');
       if (H.scanUi.innerHTML !== html) H.scanUi.innerHTML = html;
     }

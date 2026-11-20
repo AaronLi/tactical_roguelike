@@ -906,6 +906,7 @@ export const SpaceSv = (() => {
       case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 5 && m.a.every(Number.isFinite)) net().broadcast({ t: 'strk', a: m.a, by: from }, from); break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
       case 'ssec': if (p && Array.isArray(m.a) && m.a.length === 4 && m.a.every(Number.isFinite)) net().broadcast({ t: 'ssec', a: m.a, by: from }, from); break; // (a scanner's search set: js/space.ts secSet)
       case 'sxpdr': if (p) net().broadcast({ t: 'sxpdr', on: m.on ? 1 : 0, by: from }, from); break; // (her transponder switched: js/space.ts xpdr)
+      case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) net().broadcast({ t: 'storp', a: m.a, by: from }, from); break; // (a torpedo in flight: js/space.ts torps)
       case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) net().broadcast({ t: 'schaff', a: m.a, by: from }, from); break; // (chaff thrown out of her: js/space.ts chaffGo)
       case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) net().broadcast({ t: 'srcue', a: m.a, by: from }, from); break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
       case 'shit': if (p && Number.isFinite(m.i)) net().broadcast({ t: 'shit', i: m.i | 0, hp: +m.hp || 0, by: from }, from); break; // (a hull gun hit by a turret, or the ship by one: told to all)
