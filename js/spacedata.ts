@@ -282,10 +282,10 @@ export const SpaceData = (() => {
   const wearNow = (g: { map?: { sp?: { size: string; obj?: string | null } | null } | null } | null | undefined): string | null => { const sp = g && g.map && g.map.sp; return sp ? wearOf(sp.size, sp.obj) : null; }; // (g: the game; the page's files ask with ReplayEnv.Game, the export worker's has no map)
   const SIZES: Record<SpSize, SpClass> = {
     transport: { name: 'civilian transport', tier: 1, pay: 600, diff: -1, guns: { pd: 0, mg: 0, missile: 0 }, crew: { guard: 3, squads: 0, resp: 0, civ: 6 } },
-    small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 1, mg: 0, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
-    medium: { name: 'frigate', tier: 3, pay: 1700, diff: 1, guns: { pd: 2, mg: 1, missile: 0 }, crew: { guard: 4, squads: 1, resp: 1, civ: 5 } },
-    large: { name: 'cruiser', tier: 4, pay: 2800, diff: 2, guns: { pd: 3, mg: 2, missile: 1 }, crew: { guard: 5, squads: 2, resp: 2, civ: 7 } },
-    capital: { name: 'capital ship', tier: 5, pay: 4600, diff: 3, guns: { pd: 5, mg: 3, missile: 2 }, crew: { guard: 6, squads: 4, resp: 3, civ: 10 } },
+    small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 0, mg: 1, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
+    medium: { name: 'frigate', tier: 3, pay: 1700, diff: 1, guns: { pd: 0, mg: 3, missile: 0 }, crew: { guard: 4, squads: 1, resp: 1, civ: 5 } },
+    large: { name: 'cruiser', tier: 4, pay: 2800, diff: 2, guns: { pd: 0, mg: 5, missile: 1 }, crew: { guard: 5, squads: 2, resp: 2, civ: 7 } },
+    capital: { name: 'capital ship', tier: 5, pay: 4600, diff: 3, guns: { pd: 0, mg: 8, missile: 2 }, crew: { guard: 6, squads: 4, resp: 3, civ: 10 } },
   };
   // the hull's weapons: what each does to the squad's ship (js/space.ts guns)
   // (rounds: speed m/s, spread radians, a round's life in metres flown before it blows itself apart; the minigun's rps in bursts of

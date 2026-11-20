@@ -72,18 +72,17 @@ space round her is tile 5, open to the sky, with `chasm` 300 so nothing is drawn
 | Class | Hull | Aboard | On her hull |
 | --- | --- | --- | --- |
 | civilian transport | about 34 x 18 m | bridge, engine room, a hold, cabins, a mess. 6 crew, 3 light guards | nothing |
-| corvette | about 40 x 20 m | the same, larger. 4 guards, one breach response squad | 1 point-defence gun |
-| frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 2 point defence, 1 minigun |
-| cruiser | about 100 x 36 m; eight in ten **two decks** with a hall the height of both (below) | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 miniguns, 1 missile launcher |
-| capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 5 point defence, 3 miniguns, 2 missile launchers |
+| corvette | about 40 x 20 m | the same, larger. 4 guards, one breach response squad | 1 minigun |
+| frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 3 miniguns |
+| cruiser | about 100 x 36 m; eight in ten **two decks** with a hall the height of both (below) | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 5 miniguns, 1 missile launcher |
+| capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 8 miniguns, 2 missile launchers |
 
 What the board offers goes by how far the squad has got: transports and corvettes first, capital ships from the fifth rank.
 
 - **Her complement** (`G.SpaceSv.crew`, by `G.SpaceData.SIZES`): those who don't fight; light guards posted singly; security
   squads of four, armed and armoured, their chief with the first; breach response squads of three, lighter, who come to
   where the hull is breached (the comms jammer stops them being called).
-- **Her weapons** (`HULLGUN`, js/space.ts guns): point defence (single shots out to 1.3 km, blind under its own deck
-  within 90 m); miniguns (six-barrelled rotary guns: bursts of 1 to 1.8 s at 30 rounds a second inside 1 km, the barrels
+- **Her weapons** (`HULLGUN`, js/space.ts guns): her point defence is miniguns (six-barrelled rotary guns: bursts of 1 to 1.8 s at 30 rounds a second inside 1 km, the barrels
   spinning while they fire); missiles (6.5 km: they home, a hard turn across the nose shakes one, a turret can shoot one
   down, 24 a hit). Guns fire only on a radar lock, leading where the track has her going. Every round is a real one
   (`rounds`): fired at 1,000 to 1,100 m/s, it flies, and hits only if it really passes within her size. A round that has

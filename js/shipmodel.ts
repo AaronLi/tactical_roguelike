@@ -336,7 +336,7 @@ export const ShipModel = (() => {
       const C = SpaceData.gunsOf(sp.size, sp.hall === 'mall'), list: ('pd' | 'mg' | 'missile')[] = [], hm = sp.hull;
       for (let k = 0; k < Math.max(C.pd, C.mg, C.missile); k++) { if (k < C.mg) list.push('mg'); if (k < C.pd) list.push('pd'); if (k < C.missile) list.push('missile'); }
       for (let k = C.pd; k > 0 && list.filter((q) => q === 'pd').length < C.pd; k--) list.push('pd');
-      list.forEach((k, n) => { const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * (k === 'mg' ? 0 : 3.4); K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); });
+      list.forEach((k, n) => { const u = (n + 0.5) / list.length, x = hm.x0 + (hm.x1 - hm.x0) * (0.14 + 0.72 * u), z = hm.zc + (n % 2 ? 1 : -1) * 3.4; K.box(dark, x - 2.6, Y, z - 2.6, x + 2.6, Y + 0.8, z + 2.6); gunAt(k, x, z, Y + 0.8); });
     }
     // each compartment on the roof (her top deck's) and under the keel (her lowest's) as what it is
     map.rooms.forEach((rm, i) => {
