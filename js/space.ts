@@ -95,7 +95,7 @@ export const Space = (() => {
       const g = S.model.group; g.updateMatrixWorld(true);
       const inv = g.matrixWorld.clone().invert(), box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
       const sz = box.getSize(new T.Vector3()), size = Math.max(4, sz.z / 2);
-      EW.own = Radar.suite('own', size, box.max.y, Math.max(box.max.x, -box.min.x), box.min.y);
+      EW.own = Radar.suite('own', size, box.max.y, Math.max(box.max.x, -box.min.x), box.min.y); for (const sc of EW.own.scans) sc.mode = 'off'; // (her search radars off till the sensor operator switches them on: she's silent)
       EW.ownT = { id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('ship:' + S.def.id, g, inv) };
       EW.scr = null; g.traverse((o: any) => { if (!EW.scr && o.isMesh && o.material && o.material.map === S.model!.screen.tex) EW.scr = o; }); { const sm = EW.scr as THREE.Mesh | null; if (sm) (sm.material as THREE.Material).side = T.DoubleSide; } // (its face is the one toward the operator, whichever way the model wound it)
       // (the sensor station's hologram where its screen was, the screen put away: its middle over the screen's, as big as it)
@@ -319,13 +319,12 @@ export const Space = (() => {
     }
   }
   // a scanner's search set (k its number): a sector (c +- h, her angle) or round (told to everyone aboard: ssec)
-  // a search radar's mode (k its number): round, a sector, a sector slowly (a third of its turning rate: three times the dwell, its
-  // range a third again further, seen a third as often), or off (silent); its sector c +- h (told to everyone aboard: ssec)
-  const MODES: RMode[] = ['round', 'sector', 'dwell', 'off'];
-  const MODE_NAME: Record<RMode, string> = { round: 'ROUND', sector: 'SECTOR', dwell: 'SECTOR SLOW', off: 'OFF' };
+  // a search radar's mode (k its number): round, a sector, or off (silent); its sector c +- h (told to everyone aboard: ssec)
+  const MODES: RMode[] = ['round', 'sector', 'off'];
+  const MODE_NAME: Record<RMode, string> = { round: 'ROUND', sector: 'SECTOR', off: 'OFF' };
   function modeSet(k: number, mode: RMode, c: number, h: number, quiet = false) {
     const sc = EW.own && EW.own.scans[k]; if (!sc) return;
-    sc.mode = mode; sc.sec.on = mode === 'sector' || mode === 'dwell'; sc.rate = sc.rate0 * (mode === 'dwell' ? 1 / 3 : 1); sc.sec.c = c; sc.sec.h = h;
+    sc.mode = mode; sc.sec.on = mode === 'sector'; sc.sec.c = c; sc.sec.h = h;
     if (!quiet) { Net.toHost({ t: 'ssec', a: [k, MODES.indexOf(mode), Math.round(c * 1000) / 1000, Math.round(h * 1000) / 1000] }); Audio.click(); }
   }
   // The scan keys at the sensor station, 1 and 2 the bearing and roll scanners, each a box in the corner showing its mode:
@@ -412,7 +411,7 @@ export const Space = (() => {
   function secView() {
     if (!EW.own) return { secs: [] as { k: number; c: number; h: number; on: boolean; sel: boolean }[], boxes: [] as { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[] };
     const secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[] = [];
-    EW.own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k || (SEC.open === k && (MODES[SEC.cur] === 'sector' || MODES[SEC.cur] === 'dwell'))) secs.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k || SEC.open === k }); }); // (searching a sector, or picked, or about to: its sector shown)
+    EW.own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k || (SEC.open === k && MODES[SEC.cur] === 'sector')) secs.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k || SEC.open === k }); }); // (searching a sector, or picked, or about to: its sector shown)
     const boxes = EW.own.scans.map((sc, k) => ({ mode: sc.mode, open: SEC.open === k, cur: SEC.open === k ? SEC.cur : MODES.indexOf(sc.mode), opts: MODES.map((m) => MODE_NAME[m]), sel: SEC.sel === k }));
     return { secs, boxes };
   }

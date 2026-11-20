@@ -506,8 +506,8 @@ export const RadarView = (() => {
     if (seated) {
       const deg = (a: number) => String(Math.round(((a * 180 / Math.PI) % 360 + 360) % 360)).padStart(3, '0');
       const html = su.scans.map((sc, k) => {
-        const b = sv.boxes[k]; if (!b) return ''; const col = sc.ax === 'y' ? '#50d8ff' : '#e070ff', name = b.opts[['round', 'sector', 'dwell', 'off'].indexOf(b.mode)] || b.mode;
-        const what = b.mode === 'sector' || b.mode === 'dwell' ? `${name} ${Math.round(sc.sec.h * 360 / Math.PI)}° at ${deg(sc.sec.c)}°` : name;
+        const b = sv.boxes[k]; if (!b) return ''; const col = sc.ax === 'y' ? '#50d8ff' : '#e070ff', name = b.opts[['round', 'sector', 'off'].indexOf(b.mode)] || b.mode;
+        const what = b.mode === 'sector' ? `${name} ${Math.round(sc.sec.h * 360 / Math.PI)}° at ${deg(sc.sec.c)}°` : name;
         let h = `<div style="display:inline-block;min-width:330px;margin-bottom:6px;padding:4px 8px;border:1px solid ${b.open || b.sel ? col : 'rgba(120,180,210,0.35)'};background:rgba(4,12,18,0.55);border-radius:3px">`
           + `<span style="color:${col}">${k + 1} SCAN ${sc.tag}</span> <span style="color:#7f9fb0">${sc.ax === 'y' ? 'bearing' : 'roll'}</span> <b style="float:right">${what} ${b.open ? '▴' : '▾'}</b>`;
         if (b.open) h += b.opts.map((o, i) => `<div style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:11px">tap ${k + 1}: next · hold ${k + 1}: set</div>`;
@@ -516,8 +516,9 @@ export const RadarView = (() => {
       }).join('<br>');
       if (H.scanUi.innerHTML !== html) H.scanUi.innerHTML = html;
     }
-    // (a radar that's off: its fan not drawn)
-    su.scans.forEach((sc, i) => { if (H.fans[i]) H.fans[i].visible = sc.mode !== 'off'; });
+    // (a radar that's off: its fan not drawn; the one the keys work (or whose box is open) bright and pulsing, the other dim)
+    const pickedK = sv.boxes.findIndex((b) => b.sel || b.open);
+    su.scans.forEach((sc, i) => { const f = H.fans[i]; if (!f) return; f.visible = sc.mode !== 'off'; (f.material as THREE.MeshBasicMaterial).opacity = pickedK < 0 ? 0.16 : pickedK === i ? 0.3 + 0.1 * Math.sin(now * 5) : 0.06; });
     // radar warning: each radar on her, at the edge the way it is (her warning receiver hears its direction, not its range):
     // a tracker locked on her a pulsing red chevron with a line in to her and LOCK; one sweeping for her amber, TRK; a scanner's
     // beam going over her a brief amber ping, fading

@@ -23,12 +23,12 @@ export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: TH
 export type RAff = 'civ' | 'navy' | 'pirate' | 'squad'; // (whose a ship is: a civilian's, a navy's, pirates', the squad's)
 export interface RIff { c: 'civ' | 'squad' | 'navy'; n: string } // (the answer: what it says it is, and its name) // (a civilian's, the squad's ship's, the mission's ship's; and the name it gives)
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3; iff?: RIff | null } // (q, o: how she was turned and where she was when it was made)
-export type RMode = 'round' | 'sector' | 'dwell' | 'off'; // (a search radar's modes: js/space.ts modeSet)
+export type RMode = 'round' | 'sector' | 'off'; // (a search radar's modes: js/space.ts modeSet)
 export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her frame: 'y' her up (yaw), 'x' her beam (pitch), 'z' her length (roll))
 export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null; trail: { A: number; r: number; t: number }[]; kA: KF1; kr: KF1 } // (kA, kr: its Kalman filters, on its angle and its range) // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
 export interface RScan {
   ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number;
-  map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; pend: { p: RPlot; A: number }[]; mode: RMode; rate0: number; sec: { on: boolean; c: number; h: number; dir: number }; // (mode: what it's doing (round, a sector, a sector slowly, off: silent); rate0 its own turning rate; sec: a sector search: back and forth across c +- h (her angle), not round) // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
+  map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; pend: { p: RPlot; A: number }[]; mode: RMode; rate0: number; sec: { on: boolean; c: number; h: number; dir: number }; // (mode: what it's doing (round, a sector, off: silent); rate0 its own turning rate; sec: a sector search: back and forth across c +- h (her angle), not round) // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
 } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track';
@@ -245,8 +245,7 @@ export const Radar = (() => {
       if (t.id === su.id) continue;
       const { R, sig } = look(su, sc.at, t, _cd), [phi, e] = angOf(sc.ax, _cd);
       if (Math.abs(e) > sc.fan || _cd.dot(sc.n) < -sc.mask || R > MAP.nr * MAP.dr) continue;
-      seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2 + 10 * Math.log10(sc.rate0 / sc.rate)) / 10), // (turning slower, it dwells longer on each way: more of its pulses on a target, more signal)
-        id: t.id, iff: answers(t, su) ? t.iff! : null });
+      seen.push({ phi, e, R, s: Math.pow(10, (snrDb(sc.R0, sig, R) - 12 * (e / sc.fan) ** 2) / 10), id: t.id, iff: answers(t, su) ? t.iff! : null });
     }
     if (sc.mode === 'off') { // (off: silent; nothing sent, nothing heard, what it held fading out)
       const keep0 = perOf(sc); sc.plots = sc.plots.filter((p) => now - p.t < keep0); sc.cons = sc.cons.filter((c) => now - c.t < Math.max(keep0 * 2.1, 3.5)); sc.pend = []; return;

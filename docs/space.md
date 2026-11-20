@@ -216,14 +216,13 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
     - **ROUND:** turning all round, a look every 3 s.
     - **SECTOR:** back and forth across its sector, turning at its edges: what's in it seen often (the frigate at 2 km in a 37
       degree sector: two looks a second), nothing outside it.
-    - **SECTOR SLOW:** the same at a third of the turning rate: three times the dwell on each way, 4.8 dB more signal, its range
-      about a third further, seen a third as often.
-    - **OFF:** silent: nothing sent (no warning receiver hears it), nothing seen; what it held fades out.
+    - **OFF:** silent: nothing sent (no warning receiver hears it), nothing seen; what it held fades out. The squad's ship's
+      search radars start off: she's silent till her sensor operator switches them on.
 
     Tapped while closed, it's the radar **W**/**S** (its sector's width) and **A**/**D** (its direction: port and starboard; for
     the roll scanner, round her one way and the other) work, as it searches if it is. In the hologram, a sector's search cone:
     the space its fan sweeps across it (a patch at the edge and the fans at its sides), brighter for the radar the keys work or
-    whose box is open, fainter while it's not searching it yet. Everyone aboard gets it (`ssec`). A sector's revisit is there
+    whose box is open, fainter while it's not searching it yet; that radar's fan bright and pulsing, the other's dim. Everyone aboard gets it (`ssec`). A sector's revisit is there
     and back across it (`perOf`); a peak at its edge is compared only with the fresh columns beside it, and one seen again at
     once (its edge crossed there and back) is taken for the same contact.
   - **Range:** rings in her plane at a quarter, half and all of the range shown, each named; the wheel zooms the range at the
