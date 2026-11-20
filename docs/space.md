@@ -205,14 +205,27 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
   2. **Filter:** each cell over the noise round it in range (CA-CFAR's ratio), orange over the threshold, this sweep's peaks
      ringed.
   3. **Track:** the plots of the last eight sweeps, each contact's joined; hollow while it's been seen once.
+  **Kalman filters** (`KF1`, `KF3`, constant velocity, up to some 30 m/s² of acceleration): a contact's angle and range each
+  have one (its sweep-to-sweep gate is the filter's: chi-squared, 16), each 3D track has one in full 3D, and each tracker's
+  firing solution has one. A measurement's uncertainty is along the line of sight (range bins: small) and across it (angle
+  times range: larger). A locked tracker's measurement is one more update of the 3D track it falls in (its gate: 25), so the
+  scanners' pair and the tracker are fused into one track; one in no track makes a track of its own. A cue on a contact in a
+  3D track whose filter has settled points a tracker straight at where the track has it going, without the sweep along the
+  strip: so a crossing target is locked (the sweep took long enough for it to leave the strip).
+  Against the truth: the mission ship's track on the squad's ship at 650 m with her tracker fused in, within 4 m (it was
+  about 120 m from the scanners alone); far ships settle to tens of metres, their velocities to 10 to 20 m/s.
   4. **Correlate 3D** (`fuse`, ten times a second): a 'y' contact is on an arc (its bearing and range known, how high not) and
      a 'z' contact on another (its angle round her and range known, how far fore or aft not). Each pair whose ranges could
      agree is solved for where their arcs come nearest; a pair within 4% of the range (40 m at least) is one thing, a
-     numbered 3D track (F), best pairs first. Its velocity is a line fitted through the last 6 s of where it's been. Drawn in
+     numbered 3D track (F), best pairs first. Drawn in
      3D round her, turning slowly: the arcs (cyan A, magenta B), the tracks with their paths and 10 s ahead dashed, and each
      tracker's solution with its path (red). Against the truth in a pass at 70 m/s: velocities within 10 to 30 m/s, positions
      within 2 to 4% of the range at 7 km but 15 to 20% at 700 m (the contacts are up to a sweep old). Each tracker's solution's
      path and 10 s ahead are also drawn in the world.
+  Each tracker has a row of its own: its raw return (tracking: the return round its nutation circle, bulging toward the
+  target, and the power across its range gate; acquiring: its sweep along the strip), its discriminator (the angle errors a
+  revolution each, in beam widths; the range gate's error; S/N), its error and solution quality over 8 s, and what it's on
+  (the 3D track, its IFF answer, range, closing speed, solution).
   5. **Identify:** each contact with its IFF answer as she has it (to the squad, the mission ship is TGT; to the mission ship,
      the squad's ship is HOSTILE; to a civilian, only names), its range and range rate, and the true object in brackets.
      The contacts her trackers are on are boxed.

@@ -273,7 +273,7 @@ export const Space = (() => {
     if (!seat || seat.k !== 'sensors' || !EW.scr || !EW.own || Game.menuOpen()) { EW.l = EW.r = false; return; }
     _ray.setFromCamera(new T.Vector2(0, 0), G_R.camera); const hit = _ray.intersectObject(EW.scr, false)[0];
     const cv = S.model!.screen.cv; if (hit && hit.uv) EW.cu = [hit.uv.x * cv.width, (1 - hit.uv.y) * cv.height];
-    if (m.mouse.l && !EW.l && EW.cu) { const p = RadarView.pick(EW.own, EW.cu, cv.width, cv.height, S.t); if (p) { const a = [p.k, p.phi, p.r]; ewCue(a, p.q); Net.toHost({ t: 'srcue', a }); Audio.click(); } }
+    if (m.mouse.l && !EW.l && EW.cu) { const p = RadarView.pick(EW.own, EW.cu, cv.width, cv.height, S.t); if (p) { const a = [p.k, p.phi, p.r]; Radar.cue(EW.own, p); /* (here: the contact itself, so a 3D track it's part of is used) */ Net.toHost({ t: 'srcue', a }); Audio.click(); } }
     if (m.mouse.r && !EW.r) { ewCue([-1]); Net.toHost({ t: 'srcue', a: [-1] }); Audio.click(); }
     EW.l = m.mouse.l; EW.r = m.mouse.r;
   }

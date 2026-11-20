@@ -256,7 +256,7 @@ export const RadarView = (() => {
   // Redrawn ten times a second.
   let pipeCv: HTMLCanvasElement | null = null, pipeImg: ImageData | null = null, pipeAt = -1, pipeFor = '';
   function pipeline(su: RSuite, now: number, width: number) {
-    const M = Radar.MAP, K = 5, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / 5.8), cw3 = Math.floor(cw * 1.8), ch = 128, top = 16, rh = ch + 16, CH = top + su.scans.length * rh;
+    const M = Radar.MAP, K = 5, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / 5.8), cw3 = Math.floor(cw * 1.8), ch = 108, top = 16, rh = ch + 16, tch = 78, trh = tch + 16, CH = top + su.scans.length * rh + su.trks.length * trh;
     if (!pipeCv) { pipeCv = document.createElement('canvas'); pipeCv.style.display = 'block'; pipeCv.style.marginTop = '4px'; }
     if (pipeCv.width !== CW || pipeCv.height !== CH) { pipeCv.width = CW; pipeCv.height = CH; pipeImg = null; pipeAt = -1; }
     if (now - pipeAt < 0.1 && pipeFor === su.id) return pipeCv;
@@ -313,8 +313,59 @@ export const RadarView = (() => {
         c.fillStyle = `rgb(${col})`; c.fillText(l1, tx, ty); c.fillStyle = '#8fb3c4'; c.fillText(l2, tx, ty + 12);
       }
     });
-    corr3d(c, su, now, X(3), top + 14, cw3, su.scans.length * rh - 16);
+    // the trackers' rows: each its own pipeline
+    su.trks.forEach((tr, i) => trackRow(c, su, tr, now, top + su.scans.length * rh + i * trh + 14, tch, X, cw));
+    corr3d(c, su, now, X(3), top + 14, cw3, CH - top - 16);
     return pipeCv;
+  }
+  // A tracker's row of the pipeline:
+  //   1 RAW: tracking, the return round its last nutation circle (a ring: further out where it came back stronger, so the side the
+  //     target's on bulges) and the power across its range gate (10 m bins; the gate's middle the line, its early and late
+  //     halves either side); acquiring, the sweep's returns along the strip, the strongest marked
+  //   2 DISCRIMINATE: the angle errors the demodulator found, a revolution each (in beam widths; the last one biggest), the range
+  //     gate's error, and its signal over the noise
+  //   3 TRACK: its error and its solution's quality over the last 8 s
+  //   (4 is the 3D stage, where its solution joins the track it's on)
+  //   5 IDENTIFY: the track it's on, what that track answers, its range, closing speed and quality
+  function trackRow(c: CanvasRenderingContext2D, su: RSuite, tr: RSuite['trks'][0], now: number, y0: number, h: number, X: (k: number) => number, cw: number) {
+    const dg = tr.dg, nm = `TRK ${tr.side > 0 ? 'STBD' : 'PORT'} · ${tr.st === 'track' ? 'LOCK' : tr.st === 'acq' ? 'SWEEP' : tr.st === 'slew' ? 'SLEW' : 'IDLE'}`;
+    c.fillStyle = tr.st === 'track' ? '#ff8070' : tr.st === 'idle' ? '#6f8f9f' : '#ffc060'; c.fillText(nm, X(0) + 2, y0 - 13);
+    for (const k of [0, 1, 2, 4]) { c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, cw - 1, h - 1); }
+    if (!dg || tr.st === 'idle') return;
+    if (tr.st === 'acq' || tr.st === 'slew') { // (the sweep along the strip)
+      const sw = dg.sweep, fan = Radar.SCAN.fan; c.strokeStyle = '#ffc060'; c.beginPath();
+      sw.forEach((q, i) => { const x = X(0) + (q.e / fan * 0.5 + 0.5) * cw, y = y0 + h - 4 - Math.max(0, Math.min(1, q.db / 60)) * (h - 10); if (i) c.lineTo(x, y); else c.moveTo(x, y); }); c.stroke();
+      if (tr.best.db > -99) { const b = sw.reduce((a, q) => (q.db > a.db ? q : a), sw[0] || { e: 0, db: 0 }); const x = X(0) + (b.e / fan * 0.5 + 0.5) * cw; c.strokeStyle = '#ffffff'; c.beginPath(); c.moveTo(x, y0); c.lineTo(x, y0 + h); c.stroke(); }
+      c.fillStyle = '#ffc060'; c.fillText('sweeping the strip: return along it', X(0) + 4, y0 + 3);
+      return;
+    }
+    // 1: the nutation ring and the range gate
+    const rcx = X(0) + h / 2 + 4, rcy = y0 + h / 2, r0 = h * 0.22, mx = Math.max(1e-6, ...Array.from(dg.ring)), mn = Math.min(...Array.from(dg.ring));
+    c.strokeStyle = '#1f4a5c'; c.beginPath(); c.arc(rcx, rcy, r0, 0, TAU); c.stroke();
+    c.strokeStyle = '#ff8070'; c.beginPath(); for (let i = 0; i <= 32; i++) { const a = (i % 32 + 0.5) / 32 * TAU, k = (dg.ring[i % 32] - mn) / Math.max(1e-6, mx - mn), r = r0 + k * h * 0.22; const x = rcx + Math.cos(a) * r, y = rcy - Math.sin(a) * r; if (i) c.lineTo(x, y); else c.moveTo(x, y); } c.stroke();
+    const gx = X(0) + h + 10, gw = cw - h - 14, G = dg.gate, gmx = Math.max(...Array.from(G));
+    for (let j = 0; j < G.length; j++) { const v = 10 * Math.log10(Math.max(1, G[j])) / Math.max(1, 10 * Math.log10(gmx)), bh = v * (h - 14), x = gx + j / G.length * gw; c.fillStyle = Math.abs(j - 20) <= 2 ? '#ff8070' : '#3d7f96'; c.fillRect(x, y0 + h - 4 - bh, gw / G.length - 1, bh); }
+    c.strokeStyle = '#ffffff'; c.beginPath(); c.moveTo(gx + 20.5 / G.length * gw, y0 + 2); c.lineTo(gx + 20.5 / G.length * gw, y0 + h - 2); c.stroke();
+    c.fillStyle = '#8fb3c4'; c.fillText('conical scan', rcx - r0 - 2, y0 + 2); c.fillText('range gate ±200 m', gx, y0 + 2);
+    // 2: the angle errors and the range error
+    const ex = X(1) + h / 2 + 4, ey = y0 + h / 2, es = h * 0.4;
+    c.strokeStyle = '#1f4a5c'; c.strokeRect(ex - es, ey - es, 2 * es, 2 * es); c.beginPath(); c.moveTo(ex - es, ey); c.lineTo(ex + es, ey); c.moveTo(ex, ey - es); c.lineTo(ex, ey + es); c.stroke();
+    dg.errs.forEach((e, i) => { const a = (i + 1) / dg.errs.length; c.fillStyle = `rgba(255,128,112,${a})`; c.beginPath(); c.arc(ex + Math.max(-1, Math.min(1, e[0] * 2)) * es, ey - Math.max(-1, Math.min(1, e[1] * 2)) * es, i === dg.errs.length - 1 ? 3 : 1.6, 0, TAU); c.fill(); });
+    c.fillStyle = '#cfe8f5'; const tx = X(1) + h + 10;
+    c.fillText(`angle err ${(tr.err / D2R).toFixed(2)}°`, tx, y0 + 6); c.fillText(`(±½ beam: box)`, tx, y0 + 20); c.fillText(`range err ${dg.rerr >= 0 ? '+' : ''}${dg.rerr.toFixed(1)} m`, tx, y0 + 36); c.fillText(`S/N ${tr.db.toFixed(0)} dB`, tx, y0 + 52);
+    // 3: error and quality over time
+    const se = dg.series; if (se.length > 1) {
+      const t0 = now - 8, xs = (t: number) => X(2) + (t - t0) / 8 * cw;
+      c.strokeStyle = '#ffb060'; c.beginPath(); se.forEach((q, i) => { const y = y0 + h - 4 - Math.min(1, q.err / D2R / 1.5) * (h - 10); if (i) c.lineTo(xs(q.t), y); else c.moveTo(xs(q.t), y); }); c.stroke();
+      c.strokeStyle = '#70f090'; c.beginPath(); se.forEach((q, i) => { const y = y0 + h - 4 - q.q * (h - 10); if (i) c.lineTo(xs(q.t), y); else c.moveTo(xs(q.t), y); }); c.stroke();
+      c.fillStyle = '#ffb060'; c.fillText('error (to 1.5°)', X(2) + 4, y0 + 3); c.fillStyle = '#70f090'; c.fillText('solution quality', X(2) + 4, y0 + 16);
+    }
+    // 5: what it's on
+    const f = su.fus.find((q) => q.trk === tr), los = tr.est.p ? tr.est.p.clone().sub(su.P).normalize() : null, close = los ? -tr.est.v.dot(los) : 0;
+    const iff = f && (f.iff || (f.a && f.a.iff) || (f.b && f.b.iff)), lab = f ? `on ${f.n}${f.a || f.b ? ' (' + [f.a && f.a.n, f.b && f.b.n].filter(Boolean).join('+') + ')' : ' (its own)'}` : 'on a track of its own';
+    c.fillStyle = '#ff8070'; c.fillText(lab, X(4) + 4, y0 + 6);
+    c.fillStyle = iff ? `rgb(${iffCol({ iff } as RContact, su.id)})` : '#ffc860'; c.fillText(iff ? (iff.c === 'civ' ? 'CIV ' : '') + iff.n : 'no IFF answer', X(4) + 4, y0 + 20);
+    c.fillStyle = '#cfe8f5'; c.fillText(`${(tr.rng / 1000).toFixed(2)} km · closing ${close >= 0 ? '+' : ''}${Math.round(close)} m/s`, X(4) + 4, y0 + 36); c.fillText(`solution ${Math.round(tr.est.q * 100)}%${tr.tgt ? ' [' + tr.tgt + ']' : ''}`, X(4) + 4, y0 + 52);
   }
   // Stage 4: the two scanners' contacts in 3D, round her (her frame, turning slowly so it reads as 3D; range out as its square
   // root): each 'y' contact's arc (cyan: up and down its fan at its range and bearing), each 'z' contact's (magenta: fore and aft
@@ -346,7 +397,7 @@ export const RadarView = (() => {
       if (f.v.lengthSq() > 1) { const fut: THREE.Vector3[] = []; for (let i = 0; i <= 10; i++) fut.push(toHer(f.pl.clone().addScaledVector(f.v, i))); c.setLineDash([4, 3]); line(fut); c.setLineDash([]); }
       c.strokeStyle = `rgba(${col},0.5)`; c.setLineDash([2, 3]); c.beginPath(); c.moveTo(x, y); c.lineTo(bx, by); c.stroke(); c.setLineDash([]);
       c.fillStyle = `rgb(${col})`; c.beginPath(); c.arc(x, y, 4, 0, TAU); c.fill();
-      c.fillText(`${f.n} ${f.a.n}+${f.b.n} ±${Math.round(f.res)} m${f.v.lengthSq() > 1 ? ' · ' + Math.round(f.v.length()) + ' m/s' : ''}`, x + 6, y - 6);
+      c.fillText(`${f.n} ${[f.a && f.a.n, f.b && f.b.n, f.trk && 'TRK ' + (f.trk.side > 0 ? 'S' : 'P')].filter(Boolean).join('+')} ±${Math.round(f.res)} m${f.v.lengthSq() > 1 ? ' · ' + Math.round(f.v.length()) + ' m/s' : ''}`, x + 6, y - 6);
     }
     // the trackers' solutions: where each has had its target, and where it has it going (red)
     for (const tr of su.trks) {
