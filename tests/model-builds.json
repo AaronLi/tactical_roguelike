@@ -931,11 +931,11 @@
   },
   { "platform": "tavor",
    "why": "loaded + lowest optic (op.pic.0)",
-   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.16.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "tavor",
    "why": "loaded-last",
-   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "tac": "tac.bc.0", "tacL": "tac.bc.0" }
+   "build": { "barrel": "br.5.56x45.16.5", "fg": "fg.4", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "tac": "tac.bc.0", "tacL": "tac.bc.0" }
   },
   { "platform": "tavor",
    "why": "opens slots: op.pic.12 in optic (riserdot) + replaced optic (op.pso.1) on the riser",
@@ -943,15 +943,15 @@
   },
   { "platform": "tavor",
    "why": "tallest optic (oem.op.pic.23)",
-   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.16.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "oem.op.pic.23", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "tavor",
    "why": "magnifier on the lowest optic that takes one (op.auth.falcon)",
-   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.16.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.auth.falcon", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "tavor",
    "why": "magnifier on the tallest optic that takes one (op.pic.4)",
-   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.16.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "magnifier": "mgn.0", "muzzle": "mz.r556.a2", "optic": "op.pic.4", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "tavor",
    "why": "authored optic (op.pic.1)",
@@ -1046,8 +1046,12 @@
    "build": { "barrel": "br.5.56x45.16.5", "grip": "gr.ar.0", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.0" }
   },
   { "platform": "tavor",
+   "why": "bipod (fg.4)",
+   "build": { "barrel": "br.5.56x45.16.5", "fg": "fg.4", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.a2", "optic": "op.pic.0", "tac": "tac.0", "tacL": "tac.0" }
+  },
+  { "platform": "tavor",
    "why": "suppressor on the muzzle (mz.r556.can)",
-   "build": { "barrel": "br.5.56x45.16.5", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.can", "optic": "op.pic.0", "tac": "tac.0", "tacL": "tac.0" }
+   "build": { "barrel": "br.5.56x45.16.5", "fg": "fg.0", "grip": "oem.gr.ar.4", "mag": "stanag.mag.40", "muzzle": "mz.r556.can", "optic": "op.pic.0", "tac": "tac.0", "tacL": "tac.0" }
   },
   { "platform": "hk416",
    "why": "default",

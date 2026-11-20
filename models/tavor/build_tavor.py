@@ -239,6 +239,7 @@ picatinny(K, F(357), F(117), RAIL_U, 'base', 'black', lean=True)
 RAIL_TOP = RAIL_U + 5.6 * mm
 SY = 0.088                                                        # the sight line: the flip-ups' tips stand 37-44 mm over the rail (the X95 photos)
 L = F(91)                                                         # the handguard's nose face: where the barrel comes out
+picatinny(K, F(225), F(125), U(196.5), 'base', 'black', axis='bottom', lean=True)         # (the short bottom rail under the forend: foregrips, the hand stop and the bipod stand on it; mount_fg is its middle)
 # the lower rail is the handguard's own ridged lip; the side rail sections for the game's lights sit on its flanks
 for s_, ax in ((1, 'right'), (-1, 'left')):
     picatinny(K, F(248), F(232), -6 * mm, 'base', 'black', axis=ax, x0=s_ * HWG, lean=True)
@@ -350,7 +351,7 @@ anchors = {
     'mount_grip': [r4(F(330)), r4(U(192)), 0],
     'mount_mag': [r4(MAG_TOP[0]), r4(MAG_TOP[1]), 0],
     'mount_tac': [r4(F(240)), -0.006, 0.026],
-    'mount_fg': [r4(L - 0.10), r4(U(197)) - 0.0056, 0],
+    'mount_fg': [r4(F(175)), r4(U(196.5)) - 0.0056, 0],
 }
 root['info_json'] = json.dumps(info); root['anchors_json'] = json.dumps(anchors)
 for _n, _c in (('black', (0.01, 0.01, 0.012, 1)), ('polymer', (0.16, 0.16, 0.175, 1)), ('stipple', (0.2, 0.2, 0.215, 1)), ('rubber', (0.07, 0.07, 0.075, 1))):    # (viewing colours only: the game replaces every material by its name)
