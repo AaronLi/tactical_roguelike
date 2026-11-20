@@ -41,11 +41,11 @@ export const RadarView = (() => {
     const g = new T.Group(), P = own ? PAL.own : PAL.foe, c = P.fan;
     const fans = su.scans.map((sc) => {
       const piv = new T.Group(); piv.position.copy(sc.at); g.add(piv);
-      const ms = [0, 1, 2, 3, 4].map((i) => { const m = new T.Mesh(fanGeo(sc.ax, sc.fan, sc.R0), add(new T.MeshBasicMaterial({ color: c, opacity: i ? 0.07 / i : 0.22 }))); m.frustumCulled = false; piv.add(m); return m; });
+      const ms = [0, 1, 2, 3, 4].map((i) => { const m = new T.Mesh(fanGeo(sc.ax, sc.fan, sc.R0), add(new T.MeshBasicMaterial({ color: c, opacity: i ? 0.025 / i : 0.08 }))); m.frustumCulled = false; piv.add(m); return m; });
       return { piv, ms };
     });
     const trks = su.trks.map(() => {
-      const cn = new T.Mesh(cone(), add(new T.MeshBasicMaterial({ color: P.idle, opacity: 0.28 }))); cn.frustumCulled = false; g.add(cn);
+      const cn = new T.Mesh(cone(), add(new T.MeshBasicMaterial({ color: P.idle, opacity: 0.1 }))); cn.frustumCulled = false; g.add(cn);
       const bl = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -1)]), new T.LineBasicMaterial({ color: P.ring, transparent: true, opacity: 0.7 })); bl.frustumCulled = false; g.add(bl);
       const rg = new T.Line(ring(), new T.LineBasicMaterial({ color: P.ring, transparent: true, opacity: 0.8 })); rg.frustumCulled = false; g.add(rg);
       const gl = glow(P.track); g.add(gl);
@@ -87,7 +87,7 @@ export const RadarView = (() => {
         const o = D.trks[k], len = tr.st === 'track' ? tr.rng : tr.st === 'idle' ? 0 : tr.cue ? tr.cue.r : tr.hand ? tr.hand.p.distanceTo(su.P) : 0;
         o.cn.visible = len > 0; o.rg.visible = tr.st === 'track';
         const hue = tr.st === 'track' ? D.P.track : tr.st === 'idle' ? D.P.idle : D.P.acq;
-        (o.cn.material as THREE.MeshBasicMaterial).color.setHex(hue); (o.cn.material as THREE.MeshBasicMaterial).opacity = tr.st === 'track' ? 0.4 : 0.28;
+        (o.cn.material as THREE.MeshBasicMaterial).color.setHex(hue); (o.cn.material as THREE.MeshBasicMaterial).opacity = tr.st === 'track' ? 0.16 : 0.1;
         o.gl.visible = tr.st !== 'idle'; o.gl.position.copy(tr.at); (o.gl.material as THREE.SpriteMaterial).color.setHex(hue); o.gl.scale.setScalar(tr.st === 'track' ? 0.03 + 0.012 * Math.sin(now * 12) : 0.025);
         o.cn.position.copy(tr.at); o.cn.quaternion.setFromUnitVectors(Z, tr.a); o.cn.scale.setScalar(Math.max(1, len));
         o.bl.position.copy(tr.at); o.bl.quaternion.setFromUnitVectors(Z, tr.b); o.bl.scale.setScalar(Math.max(60, len));
