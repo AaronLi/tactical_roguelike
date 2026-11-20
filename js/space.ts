@@ -122,7 +122,7 @@ export const Space = (() => {
     const own = EW.own!, me = EW.ownT!; me.iff = { c: 'squad', n: S.def.name || 'squad' }; me.aff = 'squad'; me.xon = EW.xpdr; own.aff = 'squad'; own.hostNames = new Set([hullName()]);
     if (EW.foeT && EW.foe) { const af = missionAff(); EW.foeT.aff = af; EW.foeT.iff = { c: af === 'navy' ? 'navy' : 'civ', n: hullName() }; EW.foeT.xon = af !== 'pirate'; EW.foe.aff = af; }
     own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
-    if (S.docked || S.ftl) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (against a hull, or jumping between levels: nothing to look at. A warp within the level is real time: everything runs, at her speed)
+    if (S.ftl) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (jumping between levels: nothing to look at. Docked in a breach, or at warp within the level: everything runs, in real time)
     chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt)];
     Radar.step(own, dt, tg, S.t);
     if (EW.foe) {
