@@ -197,9 +197,14 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
 - **The mission ship's fire control** cues a tracker on the newest plot of the squad's ship. Her guns and missiles fire
   only while a tracker holds a lock (`q ≥ 0.15`). They aim at the predicted point, and a hit is judged against where the
   squad's ship really is, so a poor track misses.
-- **The sensor station's screen** shows two scopes, one per scanner, with plots, the trackers' boxes and their state. The
-  operator looks at the screen and a cursor follows their gaze. A left click on a plot cues a tracker on it and a right
-  click drops both (`srcue`, relayed to the crew). The deck plan the deck scanner gives is now behind **M**.
+- **The sensor station's hologram** (js/radarview.ts holo) is a sphere of light over the console in place of its screen: her
+  ship at its middle (a cone, her nose its point); every track her radars hold where it is round her (its true way from her,
+  its distance as the square root, 10 km at the shell): a 3D track solid and coloured by her assessment (hostile red, suspect
+  orange, watch yellow, neutral grey, civilian grey-blue, friendly green), a contact one scanner holds faint at its fan's
+  middle; her scanners' fans sweeping out from the middle (cyan bearing, magenta roll) and each tracker's beam a line from it
+  (amber acquiring, red tracking). Holding the right button turns it (the operator's view held still); the middle of their
+  view points at a track (ringed and named), a left click cues a tracker on it (`srcue` to everyone aboard), a tap of the
+  right button drops the trackers. The deck plan the deck scanner gives is behind **M**.
 - **F8** shows a ship's radars, each tap the next ship's: the squad's (from where you are), the mission ship's, then the
   zone's ships within 12 km, nearest first (each has its own radars there: scanners, trackers and a transponder, but a
   civilian has no fire control), then off. It replaced the echo view, still at `?echoes`. On another ship's radars, the camera
