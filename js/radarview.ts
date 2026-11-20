@@ -60,7 +60,9 @@ export const RadarView = (() => {
     });
     const ag = new T.BufferGeometry(); ag.setAttribute('position', new T.BufferAttribute(new Float32Array(MAXP * SEG * 6), 3)); ag.setAttribute('color', new T.BufferAttribute(new Float32Array(MAXP * SEG * 6), 3));
     const arcs = new T.LineSegments(ag, new T.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); arcs.frustumCulled = false; g.add(arcs);
-    return { g, fans, trks, arcs, P };
+    // (each tracker's solution's trajectory, in the level's frame: put in the view's root, not her group)
+    const traj = su.trks.map(() => { const past = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(90 * 3), 3)), new T.LineBasicMaterial({ color: P.track, transparent: true, opacity: 0.85 })), fut = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(11 * 3), 3)), new T.LineDashedMaterial({ color: P.track, dashSize: 12, gapSize: 8, transparent: true, opacity: 0.85 })); past.frustumCulled = fut.frustumCulled = false; return { past, fut }; });
+    return { g, fans, trks, arcs, P, traj };
   }
   // the detection envelope round her (her frame): every way she could be seen from, as far as a scanner of R0 detects her that way
   // (Radar.detRange), drawn at K of the real distance
@@ -85,14 +87,14 @@ export const RadarView = (() => {
     if (!root || root.parent !== parent) { if (root && root.parent) root.parent.remove(root); root = new T.Group(); parent.add(root); }
     root.visible = true;
     const lines: string[] = [], selSu = suites.find((q) => q.id === sel) || suites[0];
-    for (const g0 of [...root.children]) if (g0.userData.su && !suites.some((q) => q.dbg && q.dbg.g === g0)) root.remove(g0); // (a ship's gone out of reach)
+    for (const g0 of [...root.children]) if (g0.userData.su && !suites.includes(g0.userData.su)) root.remove(g0); // (a ship's gone out of reach)
     for (const su of suites) {
       const own = su.id === ownId, mine = su === selSu;
-      if (!su.dbg || su.dbg.g.parent !== root) { su.dbg = make(su, own); su.dbg.g.userData.su = 1; root.add(su.dbg.g); }
+      if (!su.dbg || su.dbg.g.parent !== root) { su.dbg = make(su, own); su.dbg.g.userData.su = su; for (const tj of su.dbg.traj) tj.past.userData.su = tj.fut.userData.su = su; root.add(su.dbg.g); }
       const D = su.dbg; D.g.position.copy(su.P); D.g.quaternion.copy(su.Q);
       // (her fans and beams drawn for the ship whose radars are shown, and the squad's own; the rest only their trackers' markers)
       D.g.visible = mine || own;
-      if (!D.g.visible) { for (const [k, tr] of su.trks.entries()) { void k; if (cam && tr.st !== 'idle') trackMark(tr, D, cam, ownId, now); } continue; }
+      if (!D.g.visible) { for (const tj of D.traj) tj.past.visible = tj.fut.visible = false; for (const [k, tr] of su.trks.entries()) { void k; if (cam && tr.st !== 'idle') trackMark(tr, D, cam, ownId, now); } continue; }
       su.scans.forEach((sc, k) => { D.fans[k].piv.position.copy(sc.at); D.fans[k].ms.forEach((m: THREE.Mesh, i: number) => fanFill(m, sc, sc.th - i * 4 * D2R)); });
       su.trks.forEach((tr, k) => {
         const o = D.trks[k], len = tr.st === 'idle' ? 0 : tr.hand ? tr.hand.p.distanceTo(su.P) : tr.rng; // (acquiring: its range gate where it's looking)
@@ -105,6 +107,13 @@ export const RadarView = (() => {
         if (tr.st === 'track') { o.rg.position.copy(tr.b).multiplyScalar(len).add(tr.at); o.rg.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), tr.b); o.rg.scale.setScalar(len * Math.tan(Radar.TRK.sq)); }
         const nm = `${su.id} ${tr.side > 0 ? 'stbd' : 'port'}`;
         if (!own && cam && tr.st !== 'idle') trackMark(tr, D, cam, ownId, now);
+        // its solution's trajectory in space: where it's had its target (solid) and where it has it going, 10 s (dashed)
+        const tj = D.traj[k]; if (tj.past.parent !== root) root!.add(tj.past, tj.fut);
+        const showT = tr.st === 'track' && !!tr.est.p && !!tr.hist && tr.hist.length > 1; tj.past.visible = tj.fut.visible = showT;
+        if (showT) {
+          const pa = tj.past.geometry.attributes.position as THREE.BufferAttribute, h = tr.hist!.slice(-90); h.forEach((q, i) => pa.setXYZ(i, q.p.x, q.p.y, q.p.z)); pa.needsUpdate = true; tj.past.geometry.setDrawRange(0, h.length);
+          const fa = tj.fut.geometry.attributes.position as THREE.BufferAttribute; for (let i = 0; i <= 10; i++) { const p = tr.est.p!.clone().addScaledVector(tr.est.v, i); fa.setXYZ(i, p.x, p.y, p.z); } fa.needsUpdate = true; tj.fut.computeLineDistances();
+        }
         if (mine) lines.push(`${nm}: <b>${tr.st}</b>${tr.st === 'track' ? ` ${(tr.rng / 1000).toFixed(2)} km · ${tr.db.toFixed(0)} dB · err ${(tr.err / D2R).toFixed(2)}° · q ${tr.est.q.toFixed(2)} · ${tr.lockT.toFixed(1)} s` : tr.st === 'acq' ? ` sweeping the fan, best ${tr.best.db.toFixed(0)} dB` : ''}`);
       });
       // the plots: an arc each along its fan at its range, fading as the sweep comes round
@@ -247,7 +256,7 @@ export const RadarView = (() => {
   // Redrawn ten times a second.
   let pipeCv: HTMLCanvasElement | null = null, pipeImg: ImageData | null = null, pipeAt = -1, pipeFor = '';
   function pipeline(su: RSuite, now: number, width: number) {
-    const M = Radar.MAP, K = 4, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / K), ch = 128, top = 16, rh = ch + 16, CH = top + su.scans.length * rh;
+    const M = Radar.MAP, K = 5, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / 5.8), cw3 = Math.floor(cw * 1.8), ch = 128, top = 16, rh = ch + 16, CH = top + su.scans.length * rh;
     if (!pipeCv) { pipeCv = document.createElement('canvas'); pipeCv.style.display = 'block'; pipeCv.style.marginTop = '4px'; }
     if (pipeCv.width !== CW || pipeCv.height !== CH) { pipeCv.width = CW; pipeCv.height = CH; pipeImg = null; pipeAt = -1; }
     if (now - pipeAt < 0.1 && pipeFor === su.id) return pipeCv;
@@ -272,13 +281,13 @@ export const RadarView = (() => {
       }
     });
     c.putImageData(pipeImg, 0, 0);
-    const X = (k: number) => k * (cw + gap), xOf = (ph: number) => (Radar.wrapPi(ph) / TAU + 0.5) * cw, yOf = (r: number) => Math.sqrt(Math.min(1, Math.max(0, r) / RMAX)) * ch;
+    const X = (k: number) => k <= 3 ? k * (cw + gap) : 3 * (cw + gap) + cw3 + gap, xOf = (ph: number) => (Radar.wrapPi(ph) / TAU + 0.5) * cw, yOf = (r: number) => Math.sqrt(Math.min(1, Math.max(0, r) / RMAX)) * ch;
     c.font = '11px ui-monospace, Consolas, monospace'; c.textBaseline = 'top';
-    ['1 RAW RETURN · dB over noise', '2 FILTER · CFAR ratio, peaks', '3 TRACK · peaks across sweeps', '4 IDENTIFY · IFF · range · rate'].forEach((t, k) => { c.fillStyle = '#7fd4ee'; c.fillText(t, X(k), 2); if (k < K - 1) { c.fillStyle = '#3a6f84'; c.fillText('→', X(k + 1) - gap + 1, top + 4); } });
+    ['1 RAW RETURN · dB over noise', '2 FILTER · CFAR ratio, peaks', '3 TRACK · peaks across sweeps', '4 CORRELATE 3D · both scanners', '5 IDENTIFY · IFF · range · rate'].forEach((t, k) => { c.fillStyle = '#7fd4ee'; c.fillText(t, X(k), 2); if (k < K - 1) { c.fillStyle = '#3a6f84'; c.fillText('→', X(k + 1) - gap + 1, top + 4); } });
     su.scans.forEach((sc, row) => {
       const y0 = top + row * rh + 14, per = TAU / sc.rate, lbl = sc.tag + (sc.ax === 'y' ? ' bearing (nose mid)' : ' roll (up mid)');
       c.fillStyle = '#9fd0e4'; c.fillText(lbl, X(0) + 2, y0 - 13);
-      for (let k = 0; k < K; k++) { c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, cw - 1, ch - 1); for (const r of [625, 2500, 5625]) { c.beginPath(); c.moveTo(X(k), y0 + yOf(r)); c.lineTo(X(k) + cw, y0 + yOf(r)); c.stroke(); } }
+      for (let k = 0; k < K; k++) { if (k === 3) continue; c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, cw - 1, ch - 1); for (const r of [625, 2500, 5625]) { c.beginPath(); c.moveTo(X(k), y0 + yOf(r)); c.lineTo(X(k) + cw, y0 + yOf(r)); c.stroke(); } }
       // the sweep's place on 1 and 2
       for (const k of [0, 1]) { const sx = X(k) + xOf(sc.th); c.strokeStyle = 'rgba(120,230,255,0.75)'; c.beginPath(); c.moveTo(sx, y0); c.lineTo(sx, y0 + ch); c.stroke(); }
       // 2: this sweep's peaks
@@ -293,18 +302,59 @@ export const RadarView = (() => {
       // 4: the contacts held, named, and what's tracked
       const trk = su.trks.filter((t) => t.st === 'track').map((t) => ({ ph: Radar.angOf(sc.ax, t.b)[0], r: t.rng })), used: number[][] = [];
       for (const ct of shown(sc, now)) {
-        const ph = phiNow(su, ct.p), x = X(3) + xOf(ph), y = y0 + yOf(ct.p.r), col = iffCol(ct, su.id), on = trk.some((t) => Math.abs(Radar.wrapPi(t.ph - ph)) < 4 * D2R && Math.abs(t.r - ct.p.r) < 200);
+        const ph = phiNow(su, ct.p), x = X(4) + xOf(ph), y = y0 + yOf(ct.p.r), col = iffCol(ct, su.id), on = trk.some((t) => Math.abs(Radar.wrapPi(t.ph - ph)) < 4 * D2R && Math.abs(t.r - ct.p.r) < 200);
         c.fillStyle = `rgb(${col})`; c.beginPath(); c.arc(x, y, 3.5, 0, TAU); c.fill(); if (on) { c.strokeStyle = '#ff4030'; c.strokeRect(x - 6, y - 6, 12, 12); }
         const ign = su.id === 'hull' && ct.iff && ct.iff.c === 'civ';
-        const l1 = iffTxt(ct, su.id) + (on ? '  TRK' : ign ? '  (let be)' : ''), l2 = `${(ct.p.r / 1000).toFixed(2)} km ${ct.vr >= 0 ? '+' : ''}${Math.round(ct.vr)} m/s` + (ct.p.id ? ` [${ct.p.id}]` : '');
-        const lw = Math.max(c.measureText(l1).width, c.measureText(l2).width), tx = Math.min(x + 6, X(3) + cw - 6 - lw); let ty = y - 11;
+        const fz = su.fus.find((q) => q.a === ct || q.b === ct), l1 = iffTxt(ct, su.id) + (fz ? ' → ' + fz.n : '') + (on ? '  TRK' : ign ? '  (let be)' : ''), l2 = `${(ct.p.r / 1000).toFixed(2)} km ${ct.vr >= 0 ? '+' : ''}${Math.round(ct.vr)} m/s` + (ct.p.id ? ` [${ct.p.id}]` : '');
+        const lw = Math.max(c.measureText(l1).width, c.measureText(l2).width), tx = Math.min(x + 6, X(4) + cw - 6 - lw); let ty = y - 11;
         const hit = (t0: number) => used.some(([ux, uy, uw]) => tx < ux + uw && ux < tx + lw && Math.abs(uy - t0) < 24);
         for (let k2 = 1; hit(ty) && k2 < 12; k2++) { const dn = y - 11 + 24 * Math.ceil(k2 / 2) * (k2 % 2 ? 1 : -1); if (dn >= y0 && dn <= y0 + ch - 24) ty = dn; } // (not over another's label: the nearest free place above or below, inside its cell)
         used.push([tx, ty, lw]); if (ty !== y - 11) { c.strokeStyle = `rgba(${col},0.5)`; c.beginPath(); c.moveTo(x, y); c.lineTo(tx, ty + 6); c.stroke(); }
         c.fillStyle = `rgb(${col})`; c.fillText(l1, tx, ty); c.fillStyle = '#8fb3c4'; c.fillText(l2, tx, ty + 12);
       }
     });
+    corr3d(c, su, now, X(3), top + 14, cw3, su.scans.length * rh - 16);
     return pipeCv;
+  }
+  // Stage 4: the two scanners' contacts in 3D, round her (her frame, turning slowly so it reads as 3D; range out as its square
+  // root): each 'y' contact's arc (cyan: up and down its fan at its range and bearing), each 'z' contact's (magenta: fore and aft
+  // along its fan, at its range and angle round her), and where a pair of them meet, the correlated point (F), its height off her
+  // plane drawn down to it, and how far the arcs missed each other there
+  function corr3d(c: CanvasRenderingContext2D, su: RSuite, now: number, x0: number, y0: number, w: number, h: number) {
+    c.strokeStyle = '#1b3a48'; c.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
+    const cx = x0 + w / 2, cy = y0 + h * 0.55, R = Math.min(w, h) * 0.46, yaw = now * 0.25, tilt = 0.45, cyw = Math.cos(yaw), syw = Math.sin(yaw), ct = Math.cos(tilt), st = Math.sin(tilt);
+    const pr = (p: THREE.Vector3) => { const L = p.length(), k = L > 0 ? Math.sqrt(Math.min(1, L / RMAX)) * R / L : 0, x = p.x * k, y = p.y * k, z = p.z * k, x1 = x * cyw - z * syw, z1 = x * syw + z * cyw; return [cx + x1, cy - (y * ct - z1 * st)]; };
+    const line = (pts: THREE.Vector3[]) => { c.beginPath(); pts.forEach((p, i) => { const [x, y] = pr(p); if (i) c.lineTo(x, y); else c.moveTo(x, y); }); c.stroke(); };
+    // her plane's range rings, and her (her nose a line)
+    c.strokeStyle = 'rgba(40,100,125,0.6)'; for (const r of [625, 2500, 10000]) { const ring: THREE.Vector3[] = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * TAU; ring.push(new T.Vector3(Math.sin(a) * r, 0, -Math.cos(a) * r)); } line(ring); }
+    c.strokeStyle = '#40e0ff'; line([new T.Vector3(0, 0, 400), new T.Vector3(0, 0, -900)]); c.fillStyle = '#40e0ff'; const [nx, ny] = pr(new T.Vector3(0, 0, -900)); c.fillText('nose', nx + 3, ny - 5);
+    const v = new T.Vector3();
+    for (const sc of su.scans) {
+      const col = sc.ax === 'y' ? 'rgba(90,220,255,0.55)' : 'rgba(230,110,255,0.55)';
+      for (const ctc of sc.cons) {
+        if (ctc.hits < 2 || now - ctc.t > TAU / sc.rate * 1.5) continue;
+        const dt = now - ctc.t, phi = ctc.A + ctc.vA * dt + sc.off, r = ctc.r + ctc.vr * dt, pts: THREE.Vector3[] = [];
+        for (let i = 0; i <= 16; i++) pts.push(Radar.arcAt(sc, phi, r, -sc.fan + 2 * sc.fan * i / 16, v).clone());
+        c.strokeStyle = col; line(pts); const [ex, ey] = pr(pts[16]); c.fillStyle = col; c.fillText(ctc.n, ex + 2, ey - 5);
+      }
+    }
+    const qn = su.Q.clone().invert(), toHer = (pl: THREE.Vector3) => pl.clone().sub(su.P).applyQuaternion(qn); // (the level's frame to hers as she is now)
+    for (const f of su.fus) {
+      const col = f.iff ? iffCol({ iff: f.iff } as RContact, su.id) : '255,200,90', [x, y] = pr(f.p), [bx, by] = pr(new T.Vector3(f.p.x, 0, f.p.z));
+      // its trajectory: where it's been (solid, fading) and where its velocity takes it in the next 10 s (dashed)
+      c.strokeStyle = `rgba(${col},0.75)`; line(f.hist.map((q) => toHer(q.p)));
+      if (f.v.lengthSq() > 1) { const fut: THREE.Vector3[] = []; for (let i = 0; i <= 10; i++) fut.push(toHer(f.pl.clone().addScaledVector(f.v, i))); c.setLineDash([4, 3]); line(fut); c.setLineDash([]); }
+      c.strokeStyle = `rgba(${col},0.5)`; c.setLineDash([2, 3]); c.beginPath(); c.moveTo(x, y); c.lineTo(bx, by); c.stroke(); c.setLineDash([]);
+      c.fillStyle = `rgb(${col})`; c.beginPath(); c.arc(x, y, 4, 0, TAU); c.fill();
+      c.fillText(`${f.n} ${f.a.n}+${f.b.n} ±${Math.round(f.res)} m${f.v.lengthSq() > 1 ? ' · ' + Math.round(f.v.length()) + ' m/s' : ''}`, x + 6, y - 6);
+    }
+    // the trackers' solutions: where each has had its target, and where it has it going (red)
+    for (const tr of su.trks) {
+      if (tr.st !== 'track' || !tr.est.p || !tr.hist) continue;
+      c.strokeStyle = 'rgba(255,80,60,0.85)'; line(tr.hist.map((q) => toHer(q.p))); const fut: THREE.Vector3[] = []; for (let i = 0; i <= 10; i++) fut.push(toHer(tr.est.p.clone().addScaledVector(tr.est.v, i)));
+      c.setLineDash([4, 3]); line(fut); c.setLineDash([]); const [tx, ty] = pr(toHer(tr.est.p)); c.strokeRect(tx - 5, ty - 5, 10, 10);
+    }
+    c.fillStyle = '#5f8fa4'; c.fillText(`${su.fus.length} correlated · cyan: A arcs · magenta: B arcs · dashed: the next 10 s`, x0 + 4, y0 + h - 14);
   }
   return { update, scope, pick };
 })();

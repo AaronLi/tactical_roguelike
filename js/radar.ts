@@ -33,9 +33,11 @@ export interface RTrack {
   cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion; o: THREE.Vector3 } | null; sw: number; best: { db: number; b: THREE.Vector3; r: number }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
   tgt: string | null; lockT: number; lost: number; err: number; db: number; rng: number; est: { p: THREE.Vector3 | null; v: THREE.Vector3; q: number };
   hand: { p: THREE.Vector3; v: THREE.Vector3; t: number } | null; // (handed a track by the other tracker: where its solution has the target, slewed to straight)
+  hist?: { t: number; p: THREE.Vector3 }[]; // (where its solution has had her, the last 8 s)
   dE: THREE.Vector3; dA: number; dP: number; w: THREE.Vector3; // (the conical scan's demodulator over the revolution under way, and the boresight's rate)
 }
-export interface RSuite { id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
+export interface RFused { n: string; a: RContact; b: RContact; p: THREE.Vector3; pl: THREE.Vector3; res: number; r: number; iff: RIff | null; ea: number; eb: number; v: THREE.Vector3; hist: { t: number; p: THREE.Vector3 }[] } // (v its velocity (level frame), from hist: where it's been, the last 8 s) // (a contact of each scanner's that are one thing: where, in her frame (p) and the level's (pl); how far apart the two fans' points are there (res); ea, eb how far along each fan)
+export interface RSuite { fusHist: Map<string, { t: number; p: THREE.Vector3 }[]>; fus: RFused[]; fusIds: Map<string, string>; fusN: number; fusT: number; id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
 
 export const Radar = (() => {
   const T = THREE, D2R = Math.PI / 180, TAU = Math.PI * 2;
@@ -112,7 +114,7 @@ export const Radar = (() => {
       { ax: 'z', th: Math.PI, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)), ...mapOf('B') },
     ];
     const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3(), r: 0 }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
-    return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false };
+    return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false, fus: [], fusIds: new Map(), fusN: 0, fusT: -1, fusHist: new Map() };
   }
   // a way out of the radar along a fan: ax its turning axis, phi how far round it's turned, e how far along the fan (her own frame)
   // ('y': phi round from her nose to starboard, e up; 'x': phi up from ahead, e to starboard; 'z': phi round her length from her
@@ -138,6 +140,7 @@ export const Radar = (() => {
     for (const tr of su.trks) if (tr.st === 'track') stabilise(su, tr, dt);
     // the scanners: each sweeps its fan round, a column of its map at a time (scanStep)
     su.scans.forEach((sc, k) => scanStep(su, sc, k, dt, targets, now));
+    if (now - su.fusT > 0.1) { su.fusT = now; fuse(su, now); } // (ten times a second)
     for (const tr of su.trks) trackStep(su, tr, dt, targets, now);
     su.Pp.copy(su.P); su.Qp.copy(su.Q);
   }
@@ -222,6 +225,49 @@ export const Radar = (() => {
     best.A = wrap(best.A + best.vA * dt + 0.6 * eA); best.r = best.r + best.vr * dt + 0.6 * er;
     best.vA += 0.3 * eA / dt; best.vr += 0.3 * er / dt; best.t = now; best.hits++; best.p = p; best.iff = p.iff || null; best.trail.push({ A, r: p.r, t: now }); if (best.trail.length > 8) best.trail.shift(); // (each sweep's answer: a transponder switched off is unknown from then on)
   }
+  // ---------------------------------------------------------------- correlation in 3D
+  // Each scanner puts a contact on an arc: along its fan, at its range, from its mast ('y': her bearing known, how high not; 'z':
+  // the angle round her length known, how far fore or aft not). A contact of each that are the same thing are where their two
+  // arcs meet. Every pair (each contact where its rates put it now, in her frame as she is now) whose ranges could agree (the
+  // masts are apart) is solved for the nearest points of the two arcs (a grid along both fans, then a finer one round the best),
+  // and kept if they come within a gate (4% of the range, 40 m at least): the pairs taken best first, each contact in one. A
+  // pair keeps its number (F and a number) while it's the same two contacts.
+  const _pa = new T.Vector3(), _pb = new T.Vector3();
+  function arcAt(sc: RScan, phi: number, r: number, e: number, out: THREE.Vector3) { return dirOf(sc.ax, phi, e, out).multiplyScalar(r).add(sc.at); }
+  function solve(sa: RScan, pa: number, ra: number, sb: RScan, pb: number, rb: number) {
+    let best = { d: 1e9, ea: 0, eb: 0 }; const N = 13;
+    const scanGrid = (ea0: number, eb0: number, span: number) => { for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const ea = Math.max(-sa.fan, Math.min(sa.fan, ea0 + span * (i / (N - 1) - 0.5))), eb = Math.max(-sb.fan, Math.min(sb.fan, eb0 + span * (j / (N - 1) - 0.5)));
+      const d = arcAt(sa, pa, ra, ea, _pa).distanceTo(arcAt(sb, pb, rb, eb, _pb)); if (d < best.d) best = { d, ea, eb }; } };
+    scanGrid(0, 0, 2 * Math.max(sa.fan, sb.fan)); let span = 4 * Math.max(sa.fan, sb.fan) / (N - 1);
+    for (let k = 0; k < 3; k++) { scanGrid(best.ea, best.eb, span); span /= 5; }
+    arcAt(sa, pa, ra, best.ea, _pa); arcAt(sb, pb, rb, best.eb, _pb);
+    return { res: best.d, ea: best.ea, eb: best.eb, p: _pa.clone().add(_pb).multiplyScalar(0.5) };
+  }
+  function fuse(su: RSuite, now: number) {
+    const sa = su.scans.find((q) => q.ax === 'y'), sb = su.scans.find((q) => q.ax === 'z'); if (!sa || !sb) { su.fus = []; return; }
+    const live = (sc: RScan) => sc.cons.filter((c) => c.hits >= 2 && now - c.t < TAU / sc.rate * 1.5).map((c) => { const dt = now - c.t; return { c, phi: wrap(c.A + c.vA * dt + sc.off), r: c.r + c.vr * dt }; });
+    const A = live(sa), B = live(sb), sep = sa.at.distanceTo(sb.at), pairs: { a: typeof A[0]; b: typeof B[0]; s: ReturnType<typeof solve> }[] = [];
+    for (const a of A) for (const b of B) {
+      if (Math.abs(a.r - b.r) > sep + 150 + 0.05 * a.r) continue;
+      const s0 = solve(sa, a.phi, a.r, sb, b.phi, b.r); if (s0.res < Math.max(40, 0.04 * a.r)) pairs.push({ a, b, s: s0 });
+    }
+    pairs.sort((p, q) => p.s.res - q.s.res);
+    const usedA = new Set<RContact>(), usedB = new Set<RContact>(), out: RFused[] = [];
+    for (const pr of pairs) {
+      if (usedA.has(pr.a.c) || usedB.has(pr.b.c)) continue; usedA.add(pr.a.c); usedB.add(pr.b.c);
+      const key = pr.a.c.n + '|' + pr.b.c.n; let n = su.fusIds.get(key); if (!n) { n = 'F' + (++su.fusN); su.fusIds.set(key, n); }
+      const pl = pr.s.p.clone().applyQuaternion(su.Q).add(su.P); let hist = su.fusHist.get(n); if (!hist) { hist = []; su.fusHist.set(n, hist); }
+      hist.push({ t: now, p: pl.clone() }); while (hist.length && now - hist[0].t > 8) hist.shift();
+      // (its velocity: a straight line fitted through where it's been, the last 6 s of it (a second's worth first))
+      const v = new T.Vector3(), rec = hist.filter((q) => now - q.t < 6);
+      if (rec.length >= 10) { const tm = rec.reduce((a, q) => a + q.t, 0) / rec.length, pm = rec.reduce((a, q) => a.add(q.p), new T.Vector3()).divideScalar(rec.length); let tt = 0; for (const q of rec) { const d = q.t - tm; tt += d * d; v.addScaledVector(q.p.clone().sub(pm), d); } if (tt > 0) v.divideScalar(tt); }
+      out.push({ n, a: pr.a.c, b: pr.b.c, p: pr.s.p, pl, res: pr.s.res, r: pr.s.p.length(), iff: pr.a.c.iff || pr.b.c.iff || null, ea: pr.s.ea, eb: pr.s.eb, v, hist });
+    }
+    su.fus = out;
+    for (const [k, h] of su.fusHist) if (!h.length || now - h[h.length - 1].t > 3) su.fusHist.delete(k);
+    if (su.fusIds.size > 200) su.fusIds.clear();
+  }
   // A tracker knows how its own ship moves (her gyros and her navigation): before it looks, its boresight is turned to undo her
   // rotation since the last step (held still in space, not in her frame), and to stay on the point it was on (at the range in its
   // gate) as she moves. The target's own motion is the conical scan's to find (and its rate aiding's): what's left is only that. The turret turns no faster than TRK.stab to do it: a turn faster than that still
@@ -260,7 +306,7 @@ export const Radar = (() => {
     for (const tr of use) { if (!tr) continue; tr.hand = null; tr.st = 'slew'; tr.cue = cueOf; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3(), r: p.r }; tr.tgt = null; tr.lockT = 0; tr.lost = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; }
     return use[0] || null;
   }
-  const drop = (tr: RTrack) => { tr.hand = null; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.st = 'idle'; tr.cue = null; tr.tgt = null; tr.lockT = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; tr.db = -99; };
+  const drop = (tr: RTrack) => { tr.hist = []; tr.hand = null; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.st = 'idle'; tr.cue = null; tr.tgt = null; tr.lockT = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; tr.db = -99; };
   // the boresight turned toward `to` no faster than the turret can
   function slewTo(tr: RTrack, to: THREE.Vector3, max: number) { const ang = tr.b.angleTo(to); if (ang <= max) tr.b.copy(to); else { const ax = _w.crossVectors(tr.b, to); if (ax.lengthSq() < 1e-12) ax.set(0, 1, 0); tr.b.applyAxisAngle(ax.normalize(), max); } tr.b.normalize(); return ang; }
   const inSide = (tr: RTrack, b: THREE.Vector3) => b.x * tr.side > -MASK; // (a tracker sees its own flank's half of the sky)
@@ -341,6 +387,7 @@ export const Radar = (() => {
     const p = tr.b.clone().applyQuaternion(su.Q).multiplyScalar(tr.rng).add(tr.at.clone().applyQuaternion(su.Q).add(su.P)), es = tr.est;
     if (!es.p) es.p = p; else { const pr = es.p.clone().addScaledVector(es.v, dt), r = p.sub(pr); es.p = pr.addScaledVector(r, 0.35); es.v.addScaledVector(r, 0.08 / Math.max(dt, 1e-3)); }
     es.q = Math.min(1, tr.lockT / 1.5) * Math.max(0, 1 - tr.err / (TRK.bw * 0.5));
+    const h = tr.hist || (tr.hist = []); if (!h.length || now - h[h.length - 1].t > 0.1) { h.push({ t: now, p: es.p.clone() }); while (now - h[0].t > 8) h.shift(); }
   }
   // the best track she has on a target: a tracker holding it, and how good its solution is
   function lockOn(su: RSuite | null, id: string) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && t.tgt === id && (!b || t.est.q > b.est.q)) b = t; return b; } // (the truth: for the debug view)
@@ -348,5 +395,5 @@ export const Radar = (() => {
   function best(su: RSuite | null) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && (!b || t.est.q > b.est.q)) b = t; return b; }
   // a target's return from where a radar at `from` (level frame) sees her, and the range it would detect her at
   function rcsToward(t: RTarget, from: THREE.Vector3) { const u = from.clone().sub(t.p).normalize().applyQuaternion(t.q.clone().invert()); return rcsAt(t.rcs, u); }
-  return { show: 0, sel: 'own', spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { show: 0, sel: 'own', arcAt, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

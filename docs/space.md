@@ -205,7 +205,15 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
   2. **Filter:** each cell over the noise round it in range (CA-CFAR's ratio), orange over the threshold, this sweep's peaks
      ringed.
   3. **Track:** the plots of the last eight sweeps, each contact's joined; hollow while it's been seen once.
-  4. **Identify:** each contact with its IFF answer as she has it (to the squad, the mission ship is TGT; to the mission ship,
+  4. **Correlate 3D** (`fuse`, ten times a second): a 'y' contact is on an arc (its bearing and range known, how high not) and
+     a 'z' contact on another (its angle round her and range known, how far fore or aft not). Each pair whose ranges could
+     agree is solved for where their arcs come nearest; a pair within 4% of the range (40 m at least) is one thing, a
+     numbered 3D track (F), best pairs first. Its velocity is a line fitted through the last 6 s of where it's been. Drawn in
+     3D round her, turning slowly: the arcs (cyan A, magenta B), the tracks with their paths and 10 s ahead dashed, and each
+     tracker's solution with its path (red). Against the truth in a pass at 70 m/s: velocities within 10 to 30 m/s, positions
+     within 2 to 4% of the range at 7 km but 15 to 20% at 700 m (the contacts are up to a sweep old). Each tracker's solution's
+     path and 10 s ahead are also drawn in the world.
+  5. **Identify:** each contact with its IFF answer as she has it (to the squad, the mission ship is TGT; to the mission ship,
      the squad's ship is HOSTILE; to a civilian, only names), its range and range rate, and the true object in brackets.
      The contacts her trackers are on are boxed.
 
