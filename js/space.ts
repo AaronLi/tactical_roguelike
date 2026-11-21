@@ -2222,7 +2222,7 @@ export const Space = (() => {
     if (e1.lengthSq() < 1e-6) e1.set(1, 0, 0); e1.normalize(); e2.crossVectors(d, e1);
     d.addScaledVector(e1, gauss() * spread).addScaledVector(e2, gauss() * spread).normalize(); // (normal each way square to the aim)
     if (S.rounds.length >= RMAX) return;
-    S.rounds.push({ p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life });
+    S.rounds.push({ p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life * U.clamp(1 + gauss() * 0.04, 0.88, 1.12) }); // (its self-destruct's timing a little different round to round: some 80 m either way at 2 km, not a wall)
   }
   // the rounds in flight: each moves, and hits her if it passes within her size of her middle this step (both moving); one that's
   // flown its life (2 km) blows itself apart, so nothing she fires is left flying through the zone
