@@ -146,7 +146,7 @@ export const RadarView = (() => {
     if (selSu) panel.appendChild(pipeline(selSu, now, panel.clientWidth - 20)); // (her radars' picture, stage by stage)
   }
   // ---------------------------------------------------------------- the sensor station's screen
-  const RMAX = 10000;
+  const RMAX = 50000; // (as far as a scanner's map reaches: js/radar.ts MAP.Rmax)
   // where things are on it (W x H): the two scopes' middles and radius. Range goes out as its square root (10 km at the edge, 2.5 km
   // half way, 625 m a quarter): close in is where things happen
   const lay = (W: number, H: number) => { const R = Math.min(W * 0.24, H * 0.36); return { R, c: [[W * 0.26, H * 0.42], [W * 0.74, H * 0.42]] }; };
@@ -184,7 +184,7 @@ export const RadarView = (() => {
       for (let y = Math.floor(cy - L.R); y <= Math.ceil(cy + L.R); y++) for (let x = Math.floor(cx - L.R); x <= Math.ceil(cx + L.R); x++) {
         if (x < 0 || y < 0 || x >= W || y >= H) continue;
         const dx = x + 0.5 - cx, dy = y + 0.5 - cy, d = Math.hypot(dx, dy); if (d > L.R) continue;
-        const r = (d / L.R) ** 2 * RMAX; idx.push(y * W + x); an.push(Math.atan2(dx, -dy)); rb.push(Math.min(Radar.MAP.nr - 1, Math.floor(r / Radar.MAP.dr))); sc.push(s);
+        const r = (d / L.R) ** 2 * RMAX; idx.push(y * W + x); an.push(Math.atan2(dx, -dy)); rb.push(Math.min(Radar.MAP.nr - 1, Math.floor(Radar.binOf(r)))); sc.push(s);
       }
     }
     lut = { i: Int32Array.from(idx), a: Float32Array.from(an), rb: Int32Array.from(rb), s: Uint8Array.from(sc) }; lutFor = W + 'x' + H;
@@ -204,7 +204,7 @@ export const RadarView = (() => {
     c.lineWidth = 1 * k; c.font = `${11 * k}px ui-monospace, Consolas, monospace`; c.textBaseline = 'middle';
     su.scans.forEach((sc) => {
       const [cx, cy] = L.c[sOf(sc.ax)];
-      c.strokeStyle = 'rgba(40,110,140,0.55)'; for (const r of [625, 2500, 5625, 10000]) { c.beginPath(); c.arc(cx, cy, rOut(r, L.R), 0, TAU); c.stroke(); }
+      c.strokeStyle = 'rgba(40,110,140,0.55)'; for (const r of [2500, 10000, 25000, 50000]) { c.beginPath(); c.arc(cx, cy, rOut(r, L.R), 0, TAU); c.stroke(); }
       c.beginPath(); c.moveTo(cx - L.R, cy); c.lineTo(cx + L.R, cy); c.moveTo(cx, cy - L.R); c.lineTo(cx, cy + L.R); c.stroke();
       const [x, y] = polar(cx, cy, sc.ax, sc.th, L.R); c.strokeStyle = 'rgba(120,230,255,0.8)'; c.beginPath(); c.moveTo(cx, cy); c.lineTo(x, y); c.stroke();
       // its contacts: a box and its number on each peak it's following
@@ -220,7 +220,7 @@ export const RadarView = (() => {
         if (tr.st === 'track') { const [px, py] = polar(cx, cy, sc.ax, a, rOut(tr.rng, L.R)); c.strokeRect(px - 6 * k, py - 6 * k, 12 * k, 12 * k); }
       });
       c.fillStyle = '#5fa8c4'; c.fillText(sc.ax === 'y' ? 'SCAN A  bearing · nose up' : sc.ax === 'z' ? 'SCAN B  roll · from astern, up ↑' : 'SCAN B  elevation · ahead →', cx - L.R, cy - L.R - 9 * k);
-      c.fillStyle = '#3d7a90'; c.fillText('10', cx + 2 * k, cy - L.R + 6 * k); c.fillText('2.5', cx + 2 * k, cy - rOut(2500, L.R) + 6 * k);
+      c.fillStyle = '#3d7a90'; c.fillText('50', cx + 2 * k, cy - L.R + 6 * k); c.fillText('10', cx + 2 * k, cy - rOut(10000, L.R) + 6 * k); c.fillText('2.5', cx + 2 * k, cy - rOut(2500, L.R) + 6 * k);
     });
     // the trackers
     su.trks.forEach((tr, i) => {
@@ -383,7 +383,7 @@ export const RadarView = (() => {
     const pr = (p: THREE.Vector3) => { const L = p.length(), k = L > 0 ? Math.sqrt(Math.min(1, L / RMAX)) * R / L : 0, x = p.x * k, y = p.y * k, z = p.z * k, x1 = x * cyw - z * syw, z1 = x * syw + z * cyw; return [cx + x1, cy - (y * ct - z1 * st)]; };
     const line = (pts: THREE.Vector3[]) => { c.beginPath(); pts.forEach((p, i) => { const [x, y] = pr(p); if (i) c.lineTo(x, y); else c.moveTo(x, y); }); c.stroke(); };
     // her plane's range rings, and her (her nose a line)
-    c.strokeStyle = 'rgba(40,100,125,0.6)'; for (const r of [625, 2500, 10000]) { const ring: THREE.Vector3[] = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * TAU; ring.push(new T.Vector3(Math.sin(a) * r, 0, -Math.cos(a) * r)); } line(ring); }
+    c.strokeStyle = 'rgba(40,100,125,0.6)'; for (const r of [2500, 10000, 50000]) { const ring: THREE.Vector3[] = []; for (let i = 0; i <= 48; i++) { const a = i / 48 * TAU; ring.push(new T.Vector3(Math.sin(a) * r, 0, -Math.cos(a) * r)); } line(ring); }
     c.strokeStyle = '#40e0ff'; line([new T.Vector3(0, 0, 400), new T.Vector3(0, 0, -900)]); c.fillStyle = '#40e0ff'; const [nx, ny] = pr(new T.Vector3(0, 0, -900)); c.fillText('nose', nx + 3, ny - 5);
     const v = new T.Vector3();
     for (const sc of su.scans) {

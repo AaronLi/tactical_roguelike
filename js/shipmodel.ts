@@ -833,6 +833,18 @@ export const ShipModel = (() => {
   // a rock is about 1650*at pixels across on a 1080p screen: 500, 100, 20, 8, 4 and 2; smaller than the last: not drawn)
   const ROCK_LOD = [{ detail: 32, at: 0.3 }, { detail: 12, at: 0.06 }, { detail: 5, at: 0.012 }, { detail: 2, at: 0.005 }, { detail: 1, at: 0.0024 }, { detail: 0, at: 0.0012 }];
   const rockGeos = new Map<string, THREE.BufferGeometry>(); // (made once, kept: the same shapes every field)
+  // Every shape at every level made ahead, a piece at a time (js/space.ts prep: once a frame, after it's drawn, while there's a
+  // millisecond or two to spare): so the first rock come close to doesn't stop the frame making its finest level. ms: how long it may
+  // take this time (it stops after the piece that runs past it). true once they're all made.
+  function rockPrep(ms: number) {
+    const t0 = performance.now();
+    for (let k = 0; k < ROCK_SHAPES; k++) for (const lv of ROCK_LOD) {
+      const gk = k + ':' + lv.detail; if (rockGeos.has(gk)) continue;
+      if (performance.now() - t0 > ms) return false;
+      rockGeos.set(gk, rockGeo(k, lv.detail));
+    }
+    return true;
+  }
   function rockMat() {
     const mat = new T.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
     // (hard-lit: out here there's no sky to fill the night side, so the scene's fill (the hemisphere's) is all but taken out of
@@ -983,5 +995,5 @@ export const ShipModel = (() => {
     const g = new T.Group(); g.add(m); g.userData.tex = cv.tex; g.userData.mat = m.material;
     return g;
   }
-  return { PAINT, boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, rockField, starModel, compact, compactOn, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
+  return { PAINT, boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, rockField, rockPrep, starModel, compact, compactOn, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
 })();

@@ -245,6 +245,7 @@ export const SpaceData = (() => {
       out.push({ k: out.length, kind, size, th, seed, wing, name, pts, lens, total: lens.reduce((a, b) => a + b, 0), speed, off });
     };
     const wing = !!ms.wing, size = ms.size || 'small', d = wing ? [-0.7071, 0, -0.7071] : [-1, 0, 0], T0 = themeAt(ms.th);
+    const field = hasField(ms); // (whether her zone has a rock field: rocks)
     // (she's under way at her own pace, 30 to 70 m/s by her seed (a stream of its own: the rest of the zone as it always was), fast
     // enough to show against an asteroid field's drift through a Doppler notch from most ways; her course long enough for an hour)
     mk(wing ? 'wing' : size === 'transport' ? (T0 && T0.name === 'Corporate cutter' ? 'cutter' : 'freighter') : size === 'large' || size === 'capital' ? 'navy' : 'pirate', size, ms.th, ms.seed, wing, ms.name,
@@ -254,14 +255,18 @@ export const SpaceData = (() => {
       const kind = U.pick(r, ['freighter', 'freighter', 'cutter', 'pirate', 'navy', 'wing']), sz: SpSize = kind === 'freighter' || kind === 'cutter' ? 'transport' : kind === 'navy' ? 'large' : r() < 0.5 ? 'small' : 'medium';
       const th = kind === 'freighter' ? TH0 : kind === 'cutter' ? TH0 + 1 : kind === 'navy' ? TH0 + 2 : TH0 + U.ri(r, 0, 2);
       const m = 3 + Math.floor(r() * 3), rad = i === 1 ? 2200 + r() * 1200 : 5000 + r() * 20000, a0 = r() * 6.283, tilt = (r() - 0.5) * 0.3, pts: number[][] = [];
-      for (let k = 0; k < m; k++) { const an = a0 + k * 6.283 / m + (r() - 0.5) * 0.4, rr = rad * (0.85 + r() * 0.3); pts.push([Math.cos(an) * rr, Math.sin(an) * rr * tilt + (r() - 0.5) * 300, Math.sin(an) * rr]); }
+      // (where there's a field, her loop's level and clear of it, above or below: she goes along with the mission's ship, through
+      // where the field is, so it's kept out of her way by height (the rocks reach FIELD_Y and no further), not by where she flies)
+      const lane = field ? (r() < 0.5 ? -1 : 1) * (FIELD_Y + 300 + r() * 1500) : 0;
+      for (let k = 0; k < m; k++) { const an = a0 + k * 6.283 / m + (r() - 0.5) * 0.4, rr = rad * (0.85 + r() * 0.3); pts.push([Math.cos(an) * rr, field ? lane + (r() - 0.5) * 300 : Math.sin(an) * rr * tilt + (r() - 0.5) * 300, Math.sin(an) * rr]); }
       mk(kind, sz, th, (ms.seed ^ Math.imul(i, 0x9e3779b1)) >>> 0 & 0x7fffffff, kind === 'wing', (kind === 'navy' ? 'NSV ' : kind === 'freighter' ? 'MV ' : 'CSV ') + SHIP_NAMES[(n0 + i * 5) % SHIP_NAMES.length],
         pts, kind === 'freighter' ? 35 + r() * 25 : kind === 'navy' ? 50 + r() * 30 : 60 + r() * 50, r() * 1e5);
+      out[out.length - 1].follow = out[0]; // (her loop goes along with the mission's ship: the zone's ships keep her company, however far she's gone)
     }
     return out;
   }
   /** Where a contact is at the zone's time t, and the way she's heading (her head comes round over the last and first of each leg). */
-  function zonePos(c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number }, t: number): { p: number[]; d: number[] } {
+  function zonePos(c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number; follow?: SpContact }, t: number): { p: number[]; d: number[] } {
     let s = (t * c.speed + c.off) % c.total, k = 0;
     while (s > c.lens[k]) { s -= c.lens[k]; k = (k + 1) % c.lens.length; }
     const n = c.pts.length, a = c.pts[k], b = c.pts[(k + 1) % n], u = s / c.lens[k], turn = Math.min(0.5, 1500 / c.lens[k]);
@@ -269,7 +274,12 @@ export const SpaceData = (() => {
     let d = dir(a, b), w = 0, o = d;
     if (u > 1 - turn) { o = dir(b, c.pts[(k + 2) % n]); w = (u - (1 - turn)) / turn * 0.5; } else if (u < turn) { o = dir(c.pts[(k + n - 1) % n], a); w = (1 - u / turn) * 0.5; }
     if (w > 0) { d = [d[0] + (o[0] - d[0]) * w, d[1] + (o[1] - d[1]) * w, d[2] + (o[2] - d[2]) * w]; const l = Math.hypot(d[0], d[1], d[2]) || 1; d = [d[0] / l, d[1] / l, d[2] / l]; }
-    return { p: [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u], d };
+    const p = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+    if (c.follow) { // (her loop carried along with whose she follows: where she is, and the way she's going is both together)
+      const f = zonePos(c.follow, t), sp = c.speed, fs = c.follow.speed; p[0] += f.p[0]; p[1] += f.p[1]; p[2] += f.p[2];
+      const vx = d[0] * sp + f.d[0] * fs, vy = d[1] * sp + f.d[1] * fs, vz = d[2] * sp + f.d[2] * fs, l = Math.hypot(vx, vy, vz) || 1; d = [vx / l, vy / l, vz / l];
+    }
+    return { p, d };
   }
   /** What a ship's people wear, by her class (js/rig.ts create): a liner's are civilians, the big warships a navy's, the rest pirates'. */
   const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : obj === 'defend' ? 'civil' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
@@ -395,6 +405,10 @@ export const SpaceData = (() => {
   // past a rock's own size) nor round where the squad comes out of the jump (the zone's middle). Each: p its place in the zone's
   // frame, r its size (m, its mean radius), s its own seed (its shape and turn). Near half are some tens of metres, most of the rest a hundred or two, one in seven some hundreds.
   const ROCK_CLEAR = 450;
+  // how high or low a rock of a field can be, its own size and its clearance in: (rocks: up to 3 km off her course's plane, 800 m
+  // through); and whether a zone has a field at all (rocks' own first roll: some zones are open space)
+  const FIELD_Y = 3000 + 800 + ROCK_CLEAR;
+  const hasField = (ms: { seed: number }) => !(G_U.rng((ms.seed ^ 0x7a57e) >>> 0)() < 0.15);
   interface Rock { p: number[]; r: number; s: number }
   function rocks(ms: { seed: number; size: SpSize | null; th: number; wing?: boolean; name: string }): Rock[] {
     const r = G_U.rng((ms.seed ^ 0x7a57e) >>> 0), cs = zone(ms), out: Rock[] = [];

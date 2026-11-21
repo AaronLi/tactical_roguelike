@@ -220,9 +220,9 @@ export const SpaceUI = (() => {
       if (i === s.tgt) { c.strokeStyle = P.tgt; c.beginPath(); c.arc(x, y, 8, 0, 7); c.stroke(); } c.strokeStyle = P.grid;
     });
     c.fillStyle = P.dim; c.fillText('100 m', cx + 3, cy - R * 0.33 + 7); c.fillText('1 km', cx + 3, cy - R * 0.62 + 7); c.fillText('10 km', cx + 3, cy - R * 0.91 + 7);
-    const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(s.P.clone().sub(wp.p).normalize()) : 0;
+    const speed = s.V.clone().sub(Space.beltV()).length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(s.P.clone().sub(wp.p).normalize()) : 0; // (her speed against the field: what X brakes to, and the 300 m/s she's held to)
     c.fillStyle = P.accent; c.fillText('NAV', 196, 16); c.fillStyle = P.tgt; c.fillText(wp ? wp.name.slice(0, 20) : 'no target', 196, 38);
-    c.fillStyle = P.text; c.fillText('range  ' + (wp ? SD.dist(dist) : '—'), 196, 60); c.fillText('speed  ' + SD.speed(speed), 196, 78); c.fillText('closing  ' + SD.speed(Math.max(0, close)), 196, 96); c.fillText('ETA  ' + (wp && close > 2 ? SD.eta(dist / close) : '--:--'), 196, 114);
+    c.fillStyle = P.text; c.fillText('range  ' + (wp ? SD.dist(dist) : '—'), 196, 60); c.fillText('speed  ' + SD.speed(speed) + ' (field)', 196, 78); c.fillText('closing  ' + SD.speed(Math.max(0, close)), 196, 96); c.fillText('ETA  ' + (wp && close > 2 ? SD.eta(dist / close) : '--:--'), 196, 114);
     c.fillStyle = s.warp || s.spin >= 1 ? P.accent : P.dim; c.fillText(s.warp ? 'AT WARP' : s.spin >= 1 ? 'WARP READY: T' : s.spin > 0 ? 'WARP SPIN-UP ' + Math.round(s.spin * 100) + '%' : Space.warpGate() ? 'face the target to warp' : 'no warp target', 196, 138);
     const na = Space.nearAnchor(); if (na) { c.fillStyle = P.ok; c.fillText('IN THE ANCHOR: jump ready', 196, 160); }
     c.fillStyle = s.hp < s.hpMax * 0.35 ? P.bad : P.dim; c.fillText('hull  ' + Math.round(s.hp / s.hpMax * 100) + '%', 196, 182);

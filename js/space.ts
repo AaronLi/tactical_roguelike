@@ -84,7 +84,7 @@ export const Space = (() => {
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
   const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, rt: 0, ownDef: '', pre: null as null | { P: THREE.Vector3; Q: THREE.Quaternion }, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tg: [] as RTarget[], tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, fO: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, zi: 4 } };
-  const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000];
+  const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000, 25000, 50000]; // (out to the scanners' reach: js/radar.ts MAP.Rmax)
   // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the number keys' presses (when each went
   // down, whether a hold's acted), and a sector changed by the keys not yet told to the crew (dirty)
   // the tracking radars' keys: 3 the port tracker, 4 the starboard (their index in her set: TKEY), which is picked to be sent (sel)
@@ -127,7 +127,8 @@ export const Space = (() => {
     if (EW.foeT && EW.foe) { const af = missionAff(); EW.foeT.aff = af; EW.foeT.iff = { c: af === 'navy' ? 'navy' : 'civ', n: hullName() }; EW.foeT.xon = af !== 'pirate'; EW.foe.aff = af; }
     own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
     if (S.ftl) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (jumping between levels: nothing to look at. Docked in a breach, or at warp within the level: everything runs, in real time)
-    const rk = rocksStep(dt); own.Vc = ROCKS.v; // (her scanners' clutter: the field, moving as the zone does; with no field, the level's frame)
+    const rk = rocksStep(dt); own.Vc = ROCKS.v;
+    { const keep = own.keep || (own.keep = new Set<string>()); keep.clear(); for (const tr of own.trks) if (tr.st === 'track' && tr.tgt) keep.add(tr.tgt); if (S.match && S.match !== 'radar') keep.add(S.match === 'ship' ? 'hull' : S.match); } // (her notch doesn't take what she's holding or matched with: js/radar.ts) // (her scanners' clutter: the field, moving as the zone does; with no field, the level's frame)
     aiNotch(dt);
     chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...rk, ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt), ...torpTargets()]; EW.tg = tg;
     Radar.step(own, dt, tg, EW.rt);
@@ -611,7 +612,7 @@ export const Space = (() => {
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
     if (hid) { for (const o of hid) o.visible = true; hid = null; } tunUp = null;
     G_R.padTo = G_R.PAD_BASE;
-    S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.rounds = []; S.mis = [];
+    S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.rounds = []; S.mis = []; myShots.length = 0;
     if (me().seat != null) me().seat = null;
     SpaceUI.show(false);
   }
@@ -653,7 +654,7 @@ export const Space = (() => {
     S.docked = docked; S.noseT = 0; S.rampT = docked && kind !== 'board' ? 1 : 0;
     S.hatchOpen = !(sp && sp.ship && sp.ship.hatch === 0); S.hatchT = S.hatchOpen ? 1 : 0; // (as the host has it: shut by a breach till its button's pressed)
     S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.net = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1;
-    S.zone = new T.Group(); S.zone.userData.prof = 'zone: other'; S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.match = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = performance.now();
+    zFrame.ok = false; zPrev.t = -1; S.zone = new T.Group(); S.zone.userData.prof = 'zone: other'; S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.match = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = performance.now();
     if (kind === 'hub') setupHub(map, sp); else if (kind === 'board') setupBoard(map); else setupAssault(map);
     if (docked) { S.P.copy(S.Dp); S.Q.copy(S.Dq); }
     syncSolids();
@@ -1117,7 +1118,16 @@ export const Space = (() => {
   // Where everything in the zone is now. On a mission the level is one of the zone's ships (zact), under way on her own course:
   // the zone is drawn from her (it goes by, and turns when she does), so the others, the anchor and the stars are where they'd be
   // seen from her deck or from the squad's ship keeping her company.
-  const _zd = new T.Vector3(), _zq = new T.Quaternion();
+  const _zd = new T.Vector3(), _zq = new T.Quaternion(), zPrev = { p: new T.Vector3(), t: -1, m: new T.Matrix4() };
+  // The field's velocity at a place in the level's frame: the point of the zone that's there now, where it was a step ago. The zone
+  // turns when the ship that's the level does (it's drawn from her), so away from its middle the field doesn't go by at one speed:
+  // what she brakes to and her speed's held against (fly) is the field's where she is. (No zone: the level's own frame, still.)
+  const zFrame = { prev: new T.Matrix4(), inv: new T.Matrix4(), dt: 0, ok: false }, _fa = new T.Vector3();
+  function fieldAt(p: THREE.Vector3, out = new T.Vector3()) {
+    if (!S.zone || !zFrame.ok) return out.copy(S.zoneV);
+    _fa.copy(p).applyMatrix4(zFrame.inv).applyMatrix4(zFrame.prev); // (where that point of the zone was a step ago)
+    out.copy(p).sub(_fa).divideScalar(zFrame.dt); if (out.length() > 600) out.copy(S.zoneV); return out;
+  }
   function zoneStep() {
     if (!S.zone) return;
     const t = S.zt0 + (performance.now() - S.ztAt) / 1000;
@@ -1126,6 +1136,10 @@ export const Space = (() => {
       S.zone.quaternion.copy(yawQ(-(Math.atan2(a.d[0], a.d[2]) - bow)));
       S.zone.position.set(-a.p[0], -a.p[1], -a.p[2]).applyQuaternion(S.zone.quaternion).add(S.zC);
     }
+    // (the zone's velocity in the level's frame: the field's and the stars', what she brakes to and her speed's held against: fly)
+    if (zPrev.t >= 0 && t > zPrev.t) { const v = _zd.copy(S.zone.position).sub(zPrev.p).divideScalar(t - zPrev.t); if (v.length() < 400) S.zoneV.copy(v); } zPrev.p.copy(S.zone.position); // (by the zone's own clock, as it's placed by)
+    // (and the zone's placing then and now: where a point of the field was a step ago, for the field's velocity at a place, fieldAt)
+    S.zone.updateMatrix(); if (zPrev.t >= 0 && t > zPrev.t) { zFrame.prev.copy(zPrev.m); zFrame.inv.copy(S.zone.matrix).invert(); zFrame.dt = t - zPrev.t; zFrame.ok = true; } zPrev.m.copy(S.zone.matrix); zPrev.t = t;
     for (const q of S.anchors) if (q.p0) q.p.copy(q.p0).applyQuaternion(S.zone.quaternion).add(S.zone.position);
     for (const q of S.traffic) {
       const z = SD.zonePos(q.c, t);
@@ -1255,8 +1269,10 @@ export const Space = (() => {
       if (hid) p.root.traverse((o: any) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; hid!.push(o); } });
     }
   }
+  let rocksMade = false;
   function zonePrep() { // (from the game's loop, once the frame's drawn: the scene lit as it's drawn, which is what the shaders are found for)
     zoneShow();
+    if (!rocksMade && S.on) rocksMade = ShipModel.rockPrep(S.ftl || S.warp ? 8 : 2); // (the rocks' shapes at every level, ahead: js/shipmodel.ts rockPrep. More of it in a jump, where a frame's less missed)
     if (!S.on || S.kind !== 'board' || !S.zone || !S.zinfo || S.docked || S.ftl || S.warp || zoneHullsOf !== S.zinfo.ms.seed) return;
     let best: typeof S.traffic[0] | null = null, bd = ZONE_REAL + 1;
     for (const q of S.traffic) {
@@ -1559,6 +1575,10 @@ export const Space = (() => {
 
   // ------------------------------------------------------------------ flying her
   const K = (c: string) => !!me().keys[c] && !Game.chatOpen && !Game.menuOpen();
+  // (her thrust, m/s²: the main engine's, the others', the brake's (all of them, to the field's way); her top speed off the field's way, m/s)
+  const FLY = { main: 30, side: 12, brake: 60, max: 300 };
+  // the first of her trackers holding a track with a solution (where it is and how fast it goes, as her radar has it: js/radar.ts)
+  function radarLock() { const o = EW.own; return o ? o.trks.find((tr) => tr.st === 'track' && tr.est && tr.est.v && tr.est.q > 0.1) || null : null; }
   function fly(dt: number) {
     const d = S.def, seat = mySeat(), helm = !!seat && seat.k === 'helm' && isCtl() && !me().dead && !me().down;
     // the mouse: what it's turned your view by since the last frame is the stick's push (it springs back)
@@ -1600,13 +1620,27 @@ export const Space = (() => {
     want.applyQuaternion(S.Q);
     // (her speed matched with the ship she's locked on (H): her throttle's reckoned from that ship's way, not the level's, so a ship
     // drawing off at near her own top speed can be gained on; and let go, she keeps station on her. Off again with H, or another target)
-    const tw = S.wps[S.tgt]; if (S.match && (!tw || tw.hide || tw.id !== S.match)) S.match = null;
-    const base = helm && S.match ? S.tv : null;
+    const tw = S.wps[S.tgt]; if (S.match && S.match !== 'radar' && (!tw || tw.hide || tw.id !== S.match)) S.match = null;
+    const lk = S.match === 'radar' ? radarLock() : null; if (S.match === 'radar' && !lk) S.match = null; // (the lock lost: matched to nothing)
+    const base = helm && S.match ? (lk ? lk.est.v : S.tv) : null;
     if (base) want.add(base);
-    const dv = want.sub(S.V);
-    if (helm && (S.brLock || S.brRound) && !K('KeyA') && !K('KeyD') && !K('Space') && !K('KeyC') && !K('KeyS') && !K('KeyX')) { const f = fwd(S.Q), k = S.brRound && S.roundBrake ? 0 : Math.max(0, dv.dot(f)); dv.copy(f).multiplyScalar(k); } // (and the throttle's yours on top of what the approach's engine gives: open it, and she goes in at her top speed) // (lined up on a site: her assist only ever speeds her along her nose, never brakes her, and stands down while the approach has her engine)
-    const l = dv.length(), step = acc * dt * ((base ? S.V.clone().sub(base) : S.V).length() > d.speed * 1.2 ? 6 : 1) * (helm && S.brLock && S.brLock.rp != null ? S.brLock.rp : 1); // (handed on from being brought round: her throttle comes in over a second)
-    if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, step / l));
+    // How she flies, tied to no one's frame: her thrusters push her (main engine along her nose, the others square to it), and let go she
+    // keeps going as she was. X held: she brakes to the field's way (the zone's: the rocks and the stars, stood still among them). H on a
+    // target (or Shift H on the radar's lock), with nothing pushed: she's kept matched to it. Never more than FLY.max off the field's way.
+    // (The breach assist, while it has her (W held, lined up on a site), flies as it did: its plan's in velocities.)
+    const fieldV = fieldAt(S.P), assist = helm && (S.brLock || S.brRound) && K('KeyW') && !K('KeyA') && !K('KeyD') && !K('Space') && !K('KeyC') && !K('KeyS') && !K('KeyX');
+    if (assist) {
+      const dv = want.sub(S.V);
+      if (helm && (S.brLock || S.brRound) && !K('KeyA') && !K('KeyD') && !K('Space') && !K('KeyC') && !K('KeyS') && !K('KeyX')) { const f = fwd(S.Q), k = S.brRound && S.roundBrake ? 0 : Math.max(0, dv.dot(f)); dv.copy(f).multiplyScalar(k); } // (and the throttle's yours on top of what the approach's engine gives: open it, and she goes in at her top speed) // (lined up on a site: her assist only ever speeds her along her nose, never brakes her, and stands down while the approach has her engine)
+      const l = dv.length(), step = acc * dt * ((base ? S.V.clone().sub(base) : S.V).length() > d.speed * 1.2 ? 6 : 1) * (helm && S.brLock && S.brLock.rp != null ? S.brLock.rp : 1); // (handed on from being brought round: her throttle comes in over a second)
+      if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, step / l));
+    } else if (helm) {
+      const ax = (K('KeyD') ? 1 : 0) - (K('KeyA') ? 1 : 0), ay = (K('Space') ? 1 : 0) - (K('KeyC') ? 1 : 0), az = (K('KeyS') ? 1 : 0) - (K('KeyW') ? 1 : 0), thr = ax !== 0 || ay !== 0 || az !== 0;
+      if (thr) S.V.addScaledVector(new T.Vector3(ax * FLY.side, ay * FLY.side, az < 0 ? -FLY.main : az * FLY.side).applyQuaternion(S.Q), dt);
+      const to = K('KeyX') ? fieldV : !thr && base ? base : null;
+      if (to) { const dv = to.clone().sub(S.V), l = dv.length(), st = (K('KeyX') ? FLY.brake : FLY.main) * dt; if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, st / l)); }
+    }
+    { const rel = S.V.clone().sub(fieldV); if (rel.length() > FLY.max) S.V.copy(fieldV).add(rel.setLength(FLY.max)); } // (her top speed, against the field)
     S.P.addScaledVector(S.V, dt);
     collide(dt);
     events();
@@ -2128,7 +2162,7 @@ export const Space = (() => {
     pt = Prof.lap('space: flight', pt);
     ftlStep(dt);
     doors(dt);
-    turrets(dt); pt = Prof.lap('space: doors, turrets, jump', pt);
+    turrets(dt); shots(dt); pt = Prof.lap('space: doors, turrets, jump', pt);
     ewStep(dt); pt = Prof.lap('space: radar & fire control', pt); ewMarks(); ewNear(); pt = Prof.lap('space: radar marks', pt);
     if (!S.docked || S.auto) hideStrays();
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
@@ -2188,20 +2222,42 @@ export const Space = (() => {
     // from the muzzle along the gun, in the level's own coordinates (where a hull's guns are)
     const mw = tu.muzzle.getWorldPosition(new T.Vector3()), dw = new T.Vector3(0, 0, -1).applyQuaternion(tu.gun.getWorldQuaternion(new T.Quaternion()));
     const inv = _r.clone().invert(), o = mw.clone().sub(_p).applyQuaternion(inv), d = dw.clone().applyQuaternion(inv);
-    let best = -1, bt = Math.min(e.range || 1500, rockOn(o, o.clone().addScaledVector(d, e.range || 1500)) * (e.range || 1500)); // (no further than the first rock in the way)
-    if (S.hull) S.hull.guns.forEach((gn, i) => { if (gn.hp <= 0) return; const to = new T.Vector3(gn.x, gn.y, gn.z).sub(o), tt = to.dot(d); if (tt < 0 || tt > bt) return; if (to.addScaledVector(d, -tt).length() < 2.2 + tt * 0.004) { bt = tt; best = i; } });
-    // (a missile in the way of it is shot down)
-    for (const ms of S.mis.slice()) { const to = ms.o.position.clone().sub(o), tt = to.dot(d); if (tt > 0 && tt < bt && to.addScaledVector(d, -tt).length() < 5 + tt * 0.006) { const a = [ms.id, 0, 0, 0, 1]; missile(a); Net.toHost({ t: 'smis', a }); } }
-    tracer(o, d, bt, e.id === 'rail');
-    Net.toHost({ t: 'sfire', a: [o.x, o.y, o.z, d.x, d.y, d.z, bt, e.id === 'rail' ? 1 : 0] });
-    if (best >= 0) { const gn = S.hull!.guns[best]; gunHit(best, gn.hp - (e.dmg || 5)); Net.toHost({ t: 'shit', i: best, hp: gn.hp }); }
+    // a round from the muzzle at the gun's own speed and her own way (a railgun's slug at 5 km/s, an autocannon's at 1.1), flown
+    // step by step (shots(): a rock stops it, a gun on her hull or a missile it passes close to is hit), gone at the gun's range
+    const heavy = e.id === 'rail', v = d.clone().multiplyScalar(heavy ? SHOT.rail : SHOT.pd).add(S.V), range = e.range || 1500;
+    shot(o, v, range, e.dmg || 5, heavy, true);
+    Net.toHost({ t: 'sfire', a: [o.x, o.y, o.z, v.x, v.y, v.z, range, heavy ? 1 : 0] }); // (the others fly it too, to see: only the one who fired it hits with it)
     Audio.click();
   }
-  function tracer(o: THREE.Vector3, d: THREE.Vector3, len: number, heavy: boolean) {
+  // The squad's own rounds in flight (her turrets': turrets above). Each moves; the gun on her hull it passes within GUN_R of, or the
+  // missile within MIS_R, this step (each where it is now, the round along its step), is hit, by the one who fired it; a rock stops it;
+  // at its range it's spent. Drawn as a streak a fiftieth of a second long behind it.
+  const SHOT = { pd: 1100, rail: 5000, GUN_R: 2.5, MIS_R: 5, MAX: 160 };
+  const myShots: { p: THREE.Vector3; v: THREE.Vector3; d: number; life: number; dmg: number; heavy: boolean; mine: boolean }[] = [];
+  let shotLines: THREE.LineSegments | null = null;
+  function shot(p: THREE.Vector3, v: THREE.Vector3, life: number, dmg: number, heavy: boolean, mine: boolean) { if (myShots.length < SHOT.MAX) myShots.push({ p: p.clone(), v: v.clone(), d: 0, life, dmg, heavy, mine }); }
+  const _q1 = new T.Vector3(), _q2s = new T.Vector3(), _q3 = new T.Vector3(), _gp = new T.Vector3(); // (_gp: a gun's place, not segNear's own)
+  // (how near a point comes to the step from a to b: the step's own closest point)
+  const segNear = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => { _q1.subVectors(b, a); const L2 = _q1.lengthSq(), t = L2 > 0 ? U.clamp(_q2s.subVectors(c, a).dot(_q1) / L2, 0, 1) : 0; return _q3.copy(a).addScaledVector(_q1, t).distanceTo(c); };
+  function shots(dt: number) {
+    for (let i = myShots.length - 1; i >= 0; i--) {
+      const q = myShots[i], a = q.p.clone(); q.p.addScaledVector(q.v, dt); q.d += q.v.length() * dt;
+      let gone = q.d >= q.life;
+      if (!gone && ROCKS.near.length && rockOn(a, q.p) < 1) { gone = true; rockFlash(q.p); } // (into a rock)
+      if (!gone && q.mine && S.hull) S.hull.guns.forEach((gn, gi) => { if (gone || gn.hp <= 0) return; if (segNear(a, q.p, _gp.set(gn.x, gn.y, gn.z)) < SHOT.GUN_R) { gunHit(gi, gn.hp - q.dmg); Net.toHost({ t: 'shit', i: gi, hp: gn.hp }); gone = true; } });
+      if (!gone && q.mine) for (const ms of S.mis.slice()) if (segNear(a, q.p, ms.o.position) < SHOT.MIS_R) { const m = [ms.id, 0, 0, 0, 1]; missile(m); Net.toHost({ t: 'smis', a: m }); gone = true; break; } // (a missile shot down)
+      if (gone) myShots.splice(i, 1);
+    }
+    // the streaks: one line each, from where it was a fiftieth of a second ago to where it is
     if (!S.root) return;
-    const g = new T.CylinderGeometry(heavy ? 0.14 : 0.06, heavy ? 0.14 : 0.06, len, 5, 1, true); g.rotateX(Math.PI / 2); g.translate(0, 0, len / 2);
-    const m = new T.Mesh(g, new T.MeshBasicMaterial({ color: heavy ? 0x9fd8ff : 0xffd070, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending }));
-    m.position.copy(o); m.lookAt(o.clone().add(d)); m.frustumCulled = false; S.root.add(m); S.tracers.push({ m, t: heavy ? 0.3 : 0.12 });
+    if (!shotLines) {
+      const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(SHOT.MAX * 6), 3)); g.setAttribute('color', new T.BufferAttribute(new Float32Array(SHOT.MAX * 6), 3));
+      shotLines = new T.LineSegments(g, new T.LineBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); shotLines.frustumCulled = false;
+    }
+    if (shotLines.parent !== S.root) S.root.add(shotLines);
+    const P = shotLines.geometry.attributes.position as THREE.BufferAttribute, C = shotLines.geometry.attributes.color as THREE.BufferAttribute;
+    myShots.forEach((q, i) => { const t = q.p.clone().addScaledVector(q.v, -0.02); P.setXYZ(i * 2, t.x, t.y, t.z); P.setXYZ(i * 2 + 1, q.p.x, q.p.y, q.p.z); const c = q.heavy ? [0.62, 0.85, 1] : [1, 0.82, 0.44]; C.setXYZ(i * 2, c[0] * 0.2, c[1] * 0.2, c[2] * 0.2); C.setXYZ(i * 2 + 1, c[0], c[1], c[2]); });
+    P.needsUpdate = true; C.needsUpdate = true; shotLines.geometry.setDrawRange(0, myShots.length * 2);
   }
   function gunHit(i: number, hp: number) {
     const gn = S.hull && S.hull.guns[i]; if (!gn) return;
@@ -2682,7 +2738,10 @@ export const Space = (() => {
     if (seat.k === 'sensors' && code === 'KeyI') { xpdr(!EW.xpdr); Net.toHost({ t: 'sxpdr', on: EW.xpdr ? 1 : 0 }); return true; } // (her transponder on or off)
     if (seat.k === 'helm') {
       if (code === 'KeyB') { torpFire(); return true; } // (a torpedo at the fix picked, or looked at: js/space.ts torpFire)
-      if (code === 'KeyH') { const w = S.wps[S.tgt]; if (isCtl() && !S.docked && !S.ftl && !S.warp && w && !w.hide && w.kind !== 'anchor') { S.match = S.match === w.id ? null : w.id; Audio.click(); } return true; } // (her speed matched with her target's, or no longer)
+      if (code === 'KeyH') { // (H: matched with her target, or not; Shift H: with what the radar's locked on)
+        const w = S.wps[S.tgt], sh = K('ShiftLeft') || K('ShiftRight');
+        if (isCtl() && !S.docked && !S.ftl && !S.warp) { if (sh) { if (S.match === 'radar' || radarLock()) { S.match = S.match === 'radar' ? null : 'radar'; Audio.click(); } } else if (w && !w.hide && w.kind !== 'anchor') { S.match = S.match === w.id ? null : w.id; Audio.click(); } }
+        return true; } // (her speed matched with her target's, or no longer)
       if (code === 'KeyT') { if (S.warp) return true; if (isCtl() && warpGo()) return true; S.spin = 0; for (let k = 1; k <= S.wps.length; k++) { const j = (S.tgt + k) % S.wps.length; if (!S.wps[j].hide && !S.wps[j].unseen) { S.tgt = j; break; } } return true; }
     }
     return ['KeyC', 'KeyV', 'KeyX', 'KeyT', 'KeyG', 'KeyQ', 'KeyE', 'KeyR', 'KeyB', 'KeyZ', 'Digit1', 'Digit2', 'Digit3', 'Digit4', 'KeyH', 'KeyN', 'KeyY'].includes(code);
@@ -2745,7 +2804,7 @@ export const Space = (() => {
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
       case 'storp': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) torpMsg(m.a); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
-      case 'sfire': if (S.on && m.by !== Net.myId && S.root) tracer(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true;
+      case 'sfire': if (S.on && m.by !== Net.myId && S.root) shot(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], 0, !!m.a[7], false); return true; // (another's round: flown to be seen)
       case 'shit': if (m.i >= 0) gunHit(m.i, m.hp); else if (!isCtl()) S.hp = m.hp; return true;
     }
     return false;
@@ -2819,6 +2878,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)

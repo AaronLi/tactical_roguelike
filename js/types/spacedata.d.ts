@@ -8,7 +8,7 @@
 type SpObj = 'artifact' | 'hvt' | 'destruct' | 'assault' | 'hostage' | 'visit' | 'defend'; // (defend: a liner's passengers in her shelter, held against pirates' pods: js/spaceserver.ts defendTick)
 
 // a ship under way in a mission's zone (zone): what she is (kind: her lines; size, th, seed, wing: the level she is when she's boarded), her course (a loop of points, metres in the zone's frame), her pace and where on it she started
-interface SpContact { k: number; kind: string; size: SpSize; th: number; seed: number; wing: boolean; name: string; pts: number[][]; lens: number[]; total: number; speed: number; off: number }
+interface SpContact { k: number; kind: string; size: SpSize; th: number; seed: number; wing: boolean; name: string; pts: number[][]; lens: number[]; total: number; speed: number; off: number; follow?: SpContact } // (follow: whose way her loop is carried along: js/spacedata.ts zone)
 
 // a ship's class, least to most: a civilian transport, a corvette, a frigate, a cruiser, a capital ship (SIZES, js/shipgen.ts SPEC)
 type SpSize = 'transport' | 'small' | 'medium' | 'large' | 'capital';
