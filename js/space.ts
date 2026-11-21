@@ -2161,7 +2161,7 @@ export const Space = (() => {
     if (was > 0 && gn.hp <= 0) { gn.gun.rotation.x = -0.5; gn.gun.visible = false; HUD.feed(`<b>${gn.k === 'pd' ? 'Point defence gun' : gn.k === 'mg' ? 'Minigun' : 'Missile launcher'} destroyed</b>`); }
   }
   // Her weapons, by kind (js/spacedata.ts HULLGUN). Point defence: single shots out to 1.3 km, blind close in under its own deck.
-  // Miniguns: six-barrelled rotary guns firing bursts inside 1 km. Missiles: launched at 6.5 km, they home (missiles()); a turret
+  // Miniguns: six-barrelled rotary guns firing bursts inside 1.5 km. Missiles: launched at 6.5 km, they home (missiles()); a turret
   // can shoot one down. They fire only on a track (her tracking radar's, js/radar.ts: without one she doesn't know where to shoot),
   // while there's anyone at her gun control (js/spaceserver.ts gunnersLeft) and she isn't counting down to her self-destruct.
   // Every round is a real one (rounds()): fired along the aim, it flies, and hits only if it really meets her.
