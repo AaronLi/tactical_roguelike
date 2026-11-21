@@ -498,10 +498,10 @@ export const Server = {
   },
   // Building the next place stalls the host, and it's built before anyone's told: so everyone's screen goes black first
   // (js/game.ts veil), and go runs once it has, if the phase is still the one it was asked from. Only one at a time.
-  overBlack(go: () => void, kind?: string) { // (kind 'ftl': a jump, not a black panel: js/space.ts)
+  overBlack(go: () => void, kind?: string, to?: number) { // (kind 'ftl': a jump, not a black panel, to where (to): js/space.ts joinJump)
     if (this.leaving) return;
     const run = this.leaving = {}, from = this.phase;
-    SvNet.broadcast({ t: 'veil', k: kind });
+    SvNet.broadcast(to == null ? { t: 'veil', k: kind } : { t: 'veil', k: kind, to });
     setTimeout(() => {
       if (this.leaving !== run) return; // (gone back to the menu)
       this.leaving = null;

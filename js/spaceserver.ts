@@ -117,9 +117,9 @@ export const SpaceSv = (() => {
     if (sv.phase === 'shop' && to >= 0) {
       const ms = offers()[to];
       if (!ms || !st.board.picked.includes(to) || goneOf(st.board).includes(to) || st.ship.docked) return;
-      sv.overBlack(() => begin(ms), 'ftl');
+      sv.overBlack(() => begin(ms), 'ftl', to);
     } else if (sv.phase === 'level' && to === -1 && st.M && !st.M.docked) {
-      sv.overBlack(() => home(), 'ftl');
+      sv.overBlack(() => home(), 'ftl', -1);
     }
   }
   function begin(ms: SpMission) {
@@ -930,7 +930,7 @@ export const SpaceSv = (() => {
         const ms: SpMission = Object.assign({}, o, { i: 0, kind: board ? 'board' : 'assault', obj: board ? (['artifact', 'hvt', 'destruct', 'hostage', 'defend'].includes(q.obj) && !(q.obj === 'destruct' && (!SD.SIZES[q.size as SpSize] || q.size === 'transport')) ? q.obj : 'artifact') : 'assault', /* (no scuttling a civilian transport: offers) */ size: board ? (SD.SIZES[q.size as SpSize] ? q.size : 'small') : null, other: board && SD.SIZES[q.other as SpSize] ? q.other : null, wing: !!q.wing,
           th: Number.isInteger(q.th) && SD.themeAt(q.th) ? q.th : board ? SD.TH0 : o.th, seed: Number.isInteger(q.seed) ? q.seed : o.seed, diff: Math.max(1, q.diff | 0), night: !!q.night, name: board ? 'MV Debug' : 'Debug', where: 'debug start', fuse: q.fuse > 0 ? +q.fuse : undefined });
         st.board.picked = [0]; st.ship.docked = false;
-        sv.overBlack(() => begin(ms), 'ftl');
+        sv.overBlack(() => begin(ms), 'ftl', 0);
         break;
       }
       case 'finit': if (from === net().myId && sv.phase === 'lobby') st.fleet = SD.cleanFleet(m.f); break; // (the host's own fleet, as its page kept it)

@@ -895,7 +895,7 @@ export const Game = {
         this.tGrid = null; this.arms = {}; this.armSel = null;
         G_Me.newRun();
             break;
-      case 'veil': if (m.k === 'ftl' && Space.jumping()) break; Space.veilKind(m.k); this.veil(true); break; // (a jump with you aboard: the pod and the tunnel, no veil: js/space.ts) // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
+      case 'veil': if (m.k === 'ftl') Space.joinJump(typeof m.to === 'number' ? m.to : -1); if (m.k === 'ftl' && Space.jumping()) break; Space.veilKind(m.k); this.veil(true); break; // (a jump with you aboard: the pod and the tunnel, no veil: js/space.ts) // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
       case 'phase':
         if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined; // (none: the game in space's sidearm picker)
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
