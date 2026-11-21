@@ -28,5 +28,8 @@ supabase/.temp/
 
 # tools/mesh_check.mjs pictures
 reports/mesh/
-# the acoustic tracer's WebAssembly module: built by npm run build from wasm/acoustics (tools/build_wasm.mjs, docs/wasm.md), and by CI
+# the WebAssembly modules (the acoustic tracer's, a gun's occlusion's): built by npm run build from wasm/acoustics and wasm/gunao (tools/build_wasm.mjs, docs/wasm.md), and by CI
 assets/wasm/
+
+# tools/rig_parity_steps.mjs recordings: made locally before a change to js/rig.ts, compared after
+reports/rig-parity/
