@@ -62,7 +62,7 @@ export const Space = (() => {
     // the warp drive (warpStep): spin, how far it's spun up (0..1) on the target she's facing; warp, the run itself; tv, the
     // target's own velocity (tgtTrack), which she's left matching at the end of it
     spin: 0, warp: null as null | { j: number; u: number; t: number; top: number }, tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1, match: null as null | string,
-    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], trkMarks: [] as { p: THREE.Vector3; label: string; col: string; look?: boolean; pick?: boolean }[], rounds: [] as { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
+    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], trkMarks: [] as { p: THREE.Vector3; label: string; col: string; look?: boolean; pick?: boolean; arc?: THREE.Vector3[] }[], rounds: [] as { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
   };
   const me = () => Me, on = () => S.on;
   const isCtl = () => S.ctl === Net.myId;
@@ -539,14 +539,17 @@ export const Space = (() => {
     if (!su) return;
     for (const a of su.ass) {
       // (a 3D track where it is; a contact only the bearing scanner holds, at its bearing and range, level with her: its height not known)
-      let p: THREE.Vector3 | null = null, flat = false;
-      if (a.f) p = a.f.pl; else if (a.c && a.plot && su.scans[a.plot.k].ax === 'y') { const sc = su.scans[a.plot.k], dt = EW.rt - a.c.t; p = Radar.dirOf('y', wrapA(a.c.A + a.c.vA * dt + sc.off), 0).multiplyScalar(a.c.r + a.c.vr * dt).applyQuaternion(S.Q).add(S.P); flat = true; }
+      // (a contact only one scanner holds: where it could be, all along its fan at its angle and range (a 'y' contact's height not
+      // known, a 'z' one's place fore and aft), a faint line, its middle where the label goes)
+      let p: THREE.Vector3 | null = null, arc: THREE.Vector3[] | undefined;
+      if (a.f) p = a.f.pl; else if (a.c && a.plot) { const sc = su.scans[a.plot.k], dt = EW.rt - a.c.t, phi = wrapA(a.c.A + a.c.vA * dt + sc.off), r = a.c.r + a.c.vr * dt; arc = []; for (let i = 0; i <= 16; i++) arc.push(Radar.arcAt(sc, phi, r, -sc.fan + 2 * sc.fan * i / 16, new T.Vector3()).applyQuaternion(S.Q).add(S.P)); p = arc[8]; }
       if (!p) continue;
+      const flat = !!arc;
       const tsel = !!a.f && (a.f.n === TP.pick || a.f.n === TP.look); // (the fix the pilot's looking at or has picked for a torpedo: shown, on a waypoint or not)
-      if (!tsel && S.wps.some((w) => !w.hide && !w.unseen && w.p.distanceTo(p) < Math.max(300, 0.06 * a.r))) continue;
+      if (!tsel && !arc && S.wps.some((w) => !w.hide && !w.unseen && w.p.distanceTo(p) < Math.max(300, 0.06 * a.r))) continue;
       const nm = a.iff ? (a.iff.c === 'civ' ? 'CIV ' : a.iff.c === 'navy' ? 'NAVY ' : '') + a.iff.n : '?';
       const fn = a.f ? a.f.n : '', pick = !!fn && fn === TP.pick, look = !!fn && fn === TP.look && !pick;
-      S.trkMarks.push({ p: p.clone(), label: `${a.n} ${a.cls} · ${nm}${flat ? ' · height ?' : ''}${pick ? ' · TORPEDO TARGET' : look ? ' · click: pick' : ''}`, col: TCOL[a.cls] || '#ffffff', look, pick });
+      S.trkMarks.push({ p: p.clone(), label: `${a.n} ${a.cls} · ${nm}${flat ? (su.scans[a.plot!.k].ax === 'y' ? ' · height ?' : ' · fore-aft ?') : ''}${pick ? ' · TORPEDO TARGET' : look ? ' · click: pick' : ''}`, col: TCOL[a.cls] || '#ffffff', look, pick, arc });
     }
   }
   // every ship's radar the debug view can show (F8 goes through them): hers, the mission ship's, the zone's ships near enough

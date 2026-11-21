@@ -34,7 +34,7 @@ export const SpaceUI = (() => {
 .sp-mark { position: absolute; transform: translate(-50%, -50%); text-align: center; white-space: nowrap; text-shadow: 0 0 4px #000; }
 .sp-mark i { display: block; width: 14px; height: 14px; margin: 0 auto 3px; border: 2px solid #8fd6ff; transform: rotate(45deg); box-sizing: border-box; }
 .sp-mark.sel i { border-color: #ffd24a; box-shadow: 0 0 8px #ffd24a; } .sp-mark.sel { color: #ffe9a8; }
-.sp-mark.off i { border-radius: 50%; transform: none; opacity: 0.8; } .sp-mark.trk i { border-radius: 50%; transform: none; width: 12px; height: 12px; } .sp-mark.trk { font-size: 12px; } .sp-mark.tl i { width: 20px; height: 20px; border-style: dashed; } .sp-mark.tp i { width: 22px; height: 22px; border-width: 3px; box-shadow: 0 0 8px currentColor; } .sp-mark.tp { font-weight: 600; } .sp-mark small { display: block; color: #9fb4c4; font-size: 10px; }
+.sp-mark.off i { border-radius: 50%; transform: none; opacity: 0.8; } .sp-mark.trk i { border-radius: 50%; transform: none; width: 12px; height: 12px; } .sp-mark.trk { font-size: 12px; } .sp-mark.arcl { font-size: 11px; opacity: 0.55; } .sp-mark.tl i { width: 20px; height: 20px; border-style: dashed; } .sp-mark.tp i { width: 22px; height: 22px; border-width: 3px; box-shadow: 0 0 8px currentColor; } .sp-mark.tp { font-weight: 600; } .sp-mark small { display: block; color: #9fb4c4; font-size: 10px; }
 #spObj { position: absolute; right: 18px; top: 150px; width: 250px; padding: 9px 12px; background: rgba(6, 12, 18, 0.55); border-left: 2px solid #8fd6ff; }
 #spObj h4 { margin: 0 0 4px; font: 600 12px var(--ui-font, system-ui, sans-serif); letter-spacing: 2px; color: #8fd6ff; } #spObj p { margin: 3px 0; line-height: 1.35; }
 #spObj .ok { color: #7dff9a; } #spObj .bad { color: #ff6a50; } #spObj .tm { font: 600 20px var(--ui-font, system-ui, sans-serif); color: #ffd24a; }
@@ -126,7 +126,15 @@ export const SpaceUI = (() => {
         html += `<div class="sp-mark${i === s.tgt ? ' sel' : ''}${off ? ' off' : ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px"><i></i>${U.esc(w.name)} · ${SD.dist(d)}${i === s.tgt ? `<small>${U.esc(w.sub)}</small>` : ''}</div>`;
       });
       // the track points: what her radars hold that isn't a waypoint shown (js/space.ts ewMarks), a ring in its colour
+      let svg = '';
       for (const t of s.trkMarks) {
+        if (t.arc) { // (one scanner's contact: a faint line along where it could be, its label at the middle if that's in view)
+          const P = t.arc.map((q) => { const v = q.clone().sub(s.P).applyQuaternion(_q).add(s.Dp); if (v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0) return null; v.project(cam); return [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H]; });
+          let run: string[] = []; const flush = () => { if (run.length > 1) svg += `<polyline points="${run.join(' ')}" fill="none" stroke="${t.col}" stroke-opacity="0.35" stroke-width="1.5" stroke-linecap="round"/>`; run = []; };
+          for (const q of P) { if (q) run.push(q[0].toFixed(0) + ',' + q[1].toFixed(0)); else flush(); } flush();
+          const m = P[8]; if (m && m[0] > 0 && m[0] < W && m[1] > 0 && m[1] < H) html += `<div class="sp-mark arcl" style="left:${m[0].toFixed(0)}px;top:${m[1].toFixed(0)}px;color:${t.col}">${U.esc(t.label)} · ${SD.dist(s.P.distanceTo(t.p))}</div>`;
+          continue;
+        }
         _v.copy(t.p).sub(s.P).applyQuaternion(_q).add(s.Dp);
         const d = s.P.distanceTo(t.p), behind = _v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0; _v.project(cam);
         let x = (_v.x * 0.5 + 0.5) * W, y = (-_v.y * 0.5 + 0.5) * H, off = behind;
@@ -134,6 +142,7 @@ export const SpaceUI = (() => {
         if (off || x < 40 || x > W - 40 || y < 40 || y > H - 60) { const a = Math.atan2(y - H / 2, x - W / 2); x = W / 2 + Math.cos(a) * (W / 2 - 60); y = H / 2 + Math.sin(a) * (H / 2 - 70); off = true; }
         html += `<div class="sp-mark trk${off ? ' off' : ''}${t.pick ? ' tp' : t.look ? ' tl' : ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;color:${t.col}"><i style="border-color:${t.col}"></i>${U.esc(t.label)} · ${SD.dist(d)}</div>`;
       }
+      if (svg) html = `<svg style="position:absolute;left:0;top:0;width:${W}px;height:${H}px;overflow:visible;pointer-events:none">${svg}</svg>` + html;
       // at the helm: where her nose points, and where she's actually going
       if (atHelm) {
         const pr = (v: THREE.Vector3) => { const b = v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0; v.project(cam); return b ? null : [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H]; };

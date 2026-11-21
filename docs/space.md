@@ -189,8 +189,10 @@ A ship knows where another ship is only from what her radars tell her. Every shi
 - **What the pilot's shown** (js/space.ts ewMarks; js/spaceui.ts): her sensors' picture, not knowing. A ship of the zone's is a
   waypoint (marked, on the nav screen, to be picked with T and warped to) only once a contact of her radars answers to its
   name; the mission's ship's place is known from the mission. Everything else her radars hold is a track point, a ring in
-  its colour (hostile red to friendly green) with its number, class and IFF: a 3D track where it is; a contact only the
-  bearing scanner holds at its bearing and range, level with her (height ?). With her search radars off, she's shown only
+  its colour (hostile red to friendly green) with its number, class and IFF: a 3D track where it is. A contact only one
+  scanner holds is a faint line in its colour along everywhere it could be (its fan at its angle and range: for the bearing
+  scanner, every height; for the roll scanner, fore to aft), its label at the line's middle (height ? or fore-aft ?), shown
+  even over a waypoint. With her search radars off, she's shown only
   the mission's ship and the anchors.
 - **Targets** are the mission ship and every ship of the zone that's shown, each with a return from her own drawing (the
   stand-in far off, her own hull near).
