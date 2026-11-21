@@ -467,7 +467,7 @@ export const RadarView = (() => {
     if (refont) { refont = false; H.zoom = -1; H.ltext = ''; for (const m of H.rwr) if (m) m.txt = ''; }
     H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
-    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? '1 / 2  scanner (hold: modes) · 3 / 4  tracker, then click a track (hold: off) · drag right  turn · scroll  zoom · hold G  look up · hold F  get up' : 'hold G: focus on it · hold right mouse: turn it · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; }
+    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? '1 / 2  scanner (hold: modes) · click a track: keep it tracked (again: let go) · click a warning: search that way · hold 3 / 4: a tracker off · drag right  turn · scroll  zoom · hold G  look up · hold F  get up' : 'hold G: focus on it · hold right mouse: turn it · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / zoom)) * R / L : 0); }; // (beyond the range shown: at its edge)
     if (H.zoom !== zoom) { H.zoom = zoom; [0.25, 0.5, 1].forEach((f, i) => { const g0 = H.rings[i], rr = Math.sqrt(f) * R, km = zoom * f / 1000; g0.l.scale.setScalar(rr); g0.s.position.set(rr + R * 0.1, R * [-0.07, 0.07, 0][i], 0); /* (at her starboard side of each, the inner two staggered up and down: not over each other) */
@@ -523,12 +523,22 @@ export const RadarView = (() => {
         if (b.sel) h += `<div style="color:rgba(255,255,255,0.7);font-size:12px">W S: width · A D: direction</div>`;
         return h + '</div>';
       }).join('<br>') + '<br>' + [1, 0].map((ti, j) => { // (and the tracking radars': 3 port, 4 starboard)
-        const tr = su.trks[ti]; if (!tr) return ''; const sel = sv.trkSel === ti, f = su.fus.find((q) => q.trk === tr);
-        const st = tr.off ? 'OFF' : tr.st === 'track' ? 'LOCK' + (f ? ' on ' + f.n : '') : tr.st === 'acq' ? 'SEARCH' : tr.st === 'slew' ? 'SLEW' : 'IDLE';
-        const col = tr.off ? '#5f6f78' : tr.st === 'track' ? '#ff6050' : tr.st === 'idle' ? '#9fc2d4' : '#ffb040';
-        return `<div data-hb="t${ti}" style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid ${sel ? '#ffb040' : 'rgba(120,180,210,0.18)'};background:rgba(4,12,18,0.32);border-radius:2px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span data-hb="p${ti}" style="float:right;font-weight:400;color:${col}">${st}</span>`
-          + (sel ? `<div style="color:rgba(255,255,255,0.7);font-size:12px">left click: a track, or a radar warning's bearing · hold ${j + 3} or click its state: ${tr.off ? 'on' : 'off'}</div>` : '') + '</div>';
-      }).join('<br>');
+        const tr = su.trks[ti]; if (!tr) return ''; const j0 = tr.job;
+        // (what the scheduler has it doing, how far through it (a bar: its slew, then its dwell), and the head of its queue (what's planned
+        // next, as the scheduler has it now: replanned every epoch, or at once when a threat comes in))
+        const PC = ['#9fc2d4', '#ffffff', '#ff6050'], pc = (p: number) => PC[Math.max(0, Math.min(2, p))];
+        const st = tr.off ? 'OFF' : j0 ? Radar.jobName(j0) + (tr.st === 'slew' ? ' · slew' : tr.st === 'track' ? ' · lock' : tr.st === 'acq' ? ' · search' : '') : 'IDLE';
+        const col = tr.off ? '#5f6f78' : j0 ? pc(Radar.jobPri(j0)) : '#9fc2d4';
+        const prog = j0 ? Radar.jobProg(su, tr, now) : 0;
+        const bar = j0 ? `<div style="height:4px;margin:3px 0 2px;background:rgba(120,180,210,0.15)"><div style="height:4px;width:${(prog * 100).toFixed(1)}%;background:${col}"></div></div>` : '';
+        const q = (su.sched && su.sched.plan.get(tr)) || [];
+        const queue = !tr.off && q.length ? `<div style="font-size:12px;font-weight:400;color:#7f9fb0">next ${q.slice(0, 4).map((j) => `<span style="color:${pc(Radar.jobPri(j))}">${Radar.jobName(j)}</span>`).join(' › ')}${q.length > 4 ? ' › +' + (q.length - 4) : ''}</div>` : '';
+        return `<div data-hb="t${ti}" style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid rgba(120,180,210,0.18);background:rgba(4,12,18,0.32);border-radius:2px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span data-hb="p${ti}" style="float:right;font-weight:400;color:${col}">${st}</span>${bar}${queue}</div>`;
+      }).join('<br>') + (() => { // (her tracks: what the scheduler's keeping, each how often it's really been looked at lately; her operator's starred)
+        const S0 = su.sched; if (!S0 || !S0.tts.length) return '';
+        const row = S0.tts.slice().sort((a, b) => b.pri - a.pri || (b.op ? 1 : 0) - (a.op ? 1 : 0)).slice(0, 6).map((q) => `<span style="color:${q.pri >= 2 ? '#ff6050' : q.op ? '#ffffff' : '#9fc2d4'}">${q.op ? '★' : ''}${q.n} ${Radar.rateOf(q, now).toFixed(1)}/s</span>`).join(' · ');
+        return `<br><div style="display:inline-block;min-width:330px;padding:3px 9px;border:1px solid rgba(120,180,210,0.18);background:rgba(4,12,18,0.32);border-radius:2px;font-weight:400">TRACKS ${row}${S0.reqs.length ? ' · <span style="color:#ffb040">' + S0.reqs.length + ' waiting</span>' : ''}</div>`;
+      })();
       if (H.scanUi.innerHTML !== html) H.scanUi.innerHTML = html;
     }
     // (a radar that's off: its fan not drawn; the one the keys work (or whose box is open) bright and pulsing, the other dim)

@@ -23,7 +23,7 @@ import { Game } from './game.js';
 import { Prof } from './profiler.js';
 import { InteriorCull } from './interiorcull.js';
 import { Me } from './player.js';
-import { Radar, RSuite, RTarget, RAssess, RTrack, RAff, RMode } from './radar.js';
+import { Radar, RSuite, RTarget, RAssess, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
@@ -101,7 +101,7 @@ export const Space = (() => {
       const g = S.model.group; g.updateMatrixWorld(true);
       const inv = g.matrixWorld.clone().invert(), box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
       const sz = box.getSize(new T.Vector3()), size = Math.max(4, sz.z / 2);
-      const was = EW.own; EW.own = was && EW.ownDef === S.def.id ? was : Radar.suite('own', size, box.max.y, Math.max(box.max.x, -box.min.x), box.min.y); EW.ownDef = S.def.id; // (her set kept, all it holds, while she's the same ship: a new level's drawing of her isn't a new her)
+      const was = EW.own; EW.own = was && EW.ownDef === S.def.id ? was : Radar.suite('own', size, box.max.y, Math.max(box.max.x, -box.min.x), box.min.y); Radar.sched(EW.own); // (her trackers run by the scheduler: js/radar.ts schedule) EW.ownDef = S.def.id; // (her set kept, all it holds, while she's the same ship: a new level's drawing of her isn't a new her)
       // (her search radars as the operator left them, her drawing made again or not (a new level): off at first, she's silent till switched on)
       if (EW.own !== was) EW.own.scans.forEach((sc, k) => { const o = was && was.scans[k]; sc.mode = o ? o.mode : 'off'; if (o) { sc.notch = o.notch; sc.sec.on = o.sec.on; sc.sec.c = o.sec.c; sc.sec.h = o.sec.h; } });
       EW.own.trks.forEach((t, k) => { const o = was && was.trks[k]; t.off = !!(o && o.off); });
@@ -118,7 +118,7 @@ export const Space = (() => {
         const inv = g.matrixWorld.clone().invert(), hb = S.map.sp.hull, box = new T.Box3(); g.traverse((o: any) => { if (o.isMesh && o.geometry && !glowy(o)) { o.geometry.computeBoundingBox(); box.union(o.geometry.boundingBox.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, o.matrixWorld))); } });
         const c = new T.Vector3((hb.x0 + hb.x1) / 2, box.isEmpty() ? 0 : (box.min.y + box.max.y) / 2, (hb.z0 + hb.z1) / 2), h = box.isEmpty() ? 20 : box.max.y - c.y;
         // (her radars' frame: her length runs along x, so her bow's -x and her starboard -z: a quarter turn about her up)
-        EW.foe = Radar.suite('hull', (hb.x1 - hb.x0) / 2, h + 0.6, (hb.z1 - hb.z0) / 2 + 0.8, (box.isEmpty() ? -20 : box.min.y - c.y) - 0.6, 8); EW.foe.P.copy(c); EW.foe.Q.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2);
+        EW.foe = Radar.suite('hull', (hb.x1 - hb.x0) / 2, h + 0.6, (hb.z1 - hb.z0) / 2 + 0.8, (box.isEmpty() ? -20 : box.min.y - c.y) - 0.6, 8); Radar.sched(EW.foe); EW.foe.P.copy(c); EW.foe.Q.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2);
         fitMounts(EW.foe, S.hull, g); EW.hw = radarKit(EW.foe, g);
         EW.foeT = { id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
       }
@@ -126,9 +126,9 @@ export const Space = (() => {
     const own = EW.own!, me = EW.ownT!; me.iff = { c: 'squad', n: S.def.name || 'squad' }; me.aff = 'squad'; me.xon = EW.xpdr; own.aff = 'squad'; own.hostNames = new Set([hullName()]);
     if (EW.foeT && EW.foe) { const af = missionAff(); EW.foeT.aff = af; EW.foeT.iff = { c: af === 'navy' ? 'navy' : 'civ', n: hullName() }; EW.foeT.xon = af !== 'pirate'; EW.foe.aff = af; }
     own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
-    if (S.ftl) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (jumping between levels: nothing to look at. Docked in a breach, or at warp within the level: everything runs, in real time)
+    if (S.ftl) { for (const su of [own, EW.foe]) if (su) { for (const t of su.trks) { Radar.drop(t); t.job = null; } if (su.sched) { su.sched.tts.length = 0; su.sched.reqs.length = 0; su.sched.plan.clear(); } } return; } // (jumping between levels: nothing to look at. Docked in a breach, or at warp within the level: everything runs, in real time)
     const rk = rocksStep(dt); own.Vc = ROCKS.v;
-    { const keep = own.keep || (own.keep = new Set<string>()); keep.clear(); for (const tr of own.trks) if (tr.st === 'track' && tr.tgt) keep.add(tr.tgt); if (S.match && S.match !== 'radar') keep.add(S.match === 'ship' ? 'hull' : S.match); } // (her notch doesn't take what she's holding or matched with: js/radar.ts) // (her scanners' clutter: the field, moving as the zone does; with no field, the level's frame)
+    { const keep = own.keep || (own.keep = new Set<string>()); keep.clear(); for (const tr of own.trks) if (tr.st === 'track' && tr.tgt) keep.add(tr.tgt); for (const q of Radar.sched(own).tts) if (q.tgt) keep.add(q.tgt); if (S.match && S.match !== 'radar') keep.add(S.match === 'ship' ? 'hull' : S.match); } // (her notch doesn't take what she's holding or matched with: js/radar.ts) // (her scanners' clutter: the field, moving as the zone does; with no field, the level's frame)
     aiNotch(dt);
     chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...rk, ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt), ...torpTargets()]; EW.tg = tg;
     Radar.step(own, dt, tg, EW.rt);
@@ -139,7 +139,7 @@ export const Space = (() => {
       // her fire control: a tracker cued on the newest plot of the squad's ship whenever her scanners paint it and she's crewed (a
       // ship tracks what comes near her whether or not she means to shoot: guns, below, fire only when she's hostile)
       const manned = !!(S.state && S.state.gn && S.state.arm == null && !S.state.boom);
-      if (!manned) { for (const t of EW.foe.trks) if (t.st !== 'idle') Radar.drop(t); }
+      if (!manned) { for (const t of EW.foe.trks) { if (t.st !== 'idle') Radar.drop(t); t.job = null; } const S0 = Radar.sched(EW.foe); S0.tts.length = 0; S0.reqs.length = 0; S0.plan.clear(); }
       else {
         // (she doesn't know which contact is what: her radars' threat assessment decides what's hostile. Cued when her trackers are free, or when one comes in much nearer than what she's tracking)
         // (what her threat assessment holds HOSTILE (js/radar.ts assess), the nearest, if it's been painted lately)
@@ -148,41 +148,27 @@ export const Space = (() => {
         // what a tracker's on already)
         const su = EW.foe; let bq = null as null | RAssess, bu = Infinity;
         for (const q of su.ass) if (q.cls === 'HOSTILE' && q.plot && EW.rt - q.plot.t < 3.5) { const u = tti(q.r, q.vc); if (u < bu) { bu = u; bq = q; } }
-        const on = bq && su.trks.some((t) => t.st === 'track' && ((bq!.f && bq!.f.trk === t) || (bq!.f && t.est.p && t.est.p.distanceTo(bq!.f.pl) < Math.max(150, 0.05 * bq!.r))));
+        const S0 = Radar.sched(su), on = !!bq && S0.tts.some((q) => q.est.p.distanceTo(bq!.f ? bq!.f.pl : q.est.p) < Math.max(150, 0.05 * bq!.r) && q.looks > 0);
         (EW as any).fc = bq ? { n: bq.n, r: Math.round(bq.r), vc: Math.round(bq.vc), u: Math.round(bu), id: bq.plot!.id, on } : null; // (what her fire control's after: the debug's)
-        // (a tracker already after it: cued on one of its contacts (slewing, sweeping or locked), or handed its 3D track)
-        const after = (t: RTrack) => !!bq && t.st !== 'idle' && ((!!t.cue && !!t.cue.con && (t.cue.con === bq.c || (!!bq.f && (t.cue.con === bq.f.a || t.cue.con === bq.f.b)))) || (!!bq.f && (() => { const h = t.hand ? { p: t.hand.p, v: t.hand.v, t: t.hand.t } : t.spiral && !t.spiral.ray ? { p: t.spiral.p, v: t.spiral.v, t: t.spiral.t0 } : t.st === 'track' && t.est.p ? { p: t.est.p, v: t.est.v, t: EW.rt } : null; return !!h && h.p.clone().addScaledVector(h.v, EW.rt - h.t).distanceTo(bq.f!.pl) < Math.max(150, 0.05 * bq.r); })()));
-        if (bq && !on && bu < FC_URG) {
-          // (something reaching her inside FC_URG seconds (a torpedo, a missile): at once, one tracker. An idle one if she has one; else
-          // the one on what's least urgent is taken off it. The other keeps what it holds)
-          // (nor while a tracker's still on its way to something as urgent it was sent after under 3 s ago: one thing's two scanners'
-          // contacts, before they're one 3D track, are two hostiles, each the more urgent by turns; sent back and forth, it'd lock neither)
-          const going = su.trks.some((t) => { const c = FC_CUED.get(t); return (t.st === 'slew' || t.st === 'acq') && !!c && EW.rt - c.at < 3 && bu > 0.5 * (c.u - (EW.rt - c.at)); });
-          // (nor off a lock that's on something as urgent at about its range: the same thing, under a new contact's name (a contact
-          // lost and found again between sweeps))
-          const same = su.trks.some((t) => t.st === 'track' && t.est.p && trkUrg(su, t) < FC_URG && Math.abs(t.est.p.distanceTo(su.P) - bq.r) < Math.max(300, 0.1 * bq.r));
-          if (!going && !same && !su.trks.some(after)) { const live = su.trks.filter((t) => !t.off); if (live.length && !live.some((t) => t.st === 'idle')) Radar.drop(live.reduce((x, y) => (trkUrg(su, y) > trkUrg(su, x) ? y : x))); const tr = Radar.cue(su, bq.plot!); if (tr) FC_CUED.set(tr, { u: bu, at: EW.rt }); }
-        } else if (bq && !on && !su.trks.some((t) => after(t) && t.st !== 'track')) {
-          const busy = su.trks.filter((t) => t.st !== 'idle'), held = Math.min(...busy.map((t) => trkUrg(su, t)));
-          const more = bu < TTI_FAR ? bu < held * 0.5 : held >= TTI_FAR && bu - TTI_FAR < (held - TTI_FAR) * 0.6 - 200;
-          if (!busy.length || (busy.every((t) => t.st === 'track' && t.lockT > 1) && more)) { /* (a lock not a second old is let settle: its solution isn't there yet) */ for (const t of su.trks) Radar.drop(t); Radar.cue(su, bq.plot!); }
-        }
-        // (and her trackers stay off what isn't hostile: a ship's tracking radar on another is taken as hostility. One locked on
-        // what her assessment no longer has as HOSTILE or SUSPECT (it turned away; it's chaff it was drawn onto) is let go)
-        for (const t of EW.foe.trks) {
-          if (t.st !== 'track' || t.lockT < 2) continue;
-          const f = EW.foe.fus.find((q) => q.trk === t), a = f && EW.foe.ass.find((q) => q.f === f);
-          if (!a || (!f!.a && !f!.b && t.lockT < 8)) continue; // (a track the tracker alone holds: the scanners' pair a sweep or two behind)
-          if (a.cls !== 'HOSTILE' && a.cls !== 'SUSPECT') Radar.drop(t);
+        // (what's hostile is asked for: a track of it kept, by its scheduler (js/radar.ts schedule), looked at as often as it's urgent: what
+        // reaches her inside FC_URG seconds, a threat (pri 2: never left waiting, a dish taken off anything else for it); the rest, a
+        // hostile she watches (pri 1). From its 3D track if her scanners have one, else found from its plot first)
+        if (bq) Radar.want(su, { f: bq.f || null, plot: bq.plot || null, pri: bu < FC_URG ? 2 : 1, rate: bu < FC_URG ? 4 : 1.5, fc: bu }, EW.rt);
+        // (and a threat that's no longer one goes back to being watched: its urgency over)
+        for (const q of S0.tts) if (q.fc != null && q.pri === 2 && trkUrg(su, q) > FC_URG * 1.5) { q.pri = 1; q.rate = 1.5; }
+        // (and she doesn't keep tracking what isn't hostile: a ship's tracking radar on another is taken as hostility. A track of what her
+        // assessment no longer holds HOSTILE or SUSPECT (it turned away; it's chaff it was drawn onto) is let go)
+        for (const q of Radar.sched(EW.foe).tts.slice()) {
+          if (q.looks < 2) continue; const f = EW.foe.fus.find((x) => x.pl.distanceTo(q.est.p) < Math.max(150, 4 * q.kf.sig())), a = f && EW.foe.ass.find((x) => x.f === f);
+          if (a && a.cls !== 'HOSTILE' && a.cls !== 'SUSPECT') Radar.lose(EW.foe, q);
         }
       }
     }
   }
   // how soon something reaches her: its range over its closing speed; not closing, TTI_FAR plus its range (after anything that is, nearest first)
-  const FC_CUED = new WeakMap<RTrack, { u: number; at: number }>(); // (what her fire control sent a tracker after at once: how urgent, when)
   const FC_URG = 12; // (her fire control: what reaches her sooner than this many seconds is taken at once, a tracker pulled off whatever's least urgent)
   const TTI_FAR = 1e6, tti = (r: number, vc: number) => (vc > 10 ? r / vc : TTI_FAR + r);
-  const trkUrg = (su: RSuite, t: RTrack) => { if (t.st !== 'track') return Infinity; if (!t.est.p) return tti(t.rng, 0); const rel = t.est.p.clone().sub(su.P), r = rel.length(); return tti(r, -t.est.v.clone().sub(su.V).dot(rel) / Math.max(1, r)); };
+  const trkUrg = (su: RSuite, t: { st?: string; est: { p: THREE.Vector3 | null; v: THREE.Vector3 }; rng?: number }) => { if (t.st !== 'track') return Infinity; if (!t.est.p) return tti(t.rng || 0, 0); const rel = t.est.p.clone().sub(su.P), r = rel.length(); return tti(r, -t.est.v.clone().sub(su.V).dot(rel) / Math.max(1, r)); };
   // Her radars' hardware on her hull (in her group, whose frame is the level's): each scanner an antenna on a post, turning with its
   // sweep (the 'y' one a long bar on her roof turning about her up; the 'x' one a long bar on a pylon under her keel turning about
   // her beam), each tracker a dish on her flank, pointed along its boresight
@@ -252,7 +238,7 @@ export const Space = (() => {
     for (let i = EW.chaff.length - 1; i >= 0; i--) {
       const c = EW.chaff[i], age = EW.rt - c.born;
       if (age > CHAFF.life || !S.root || c.pts.parent !== S.root) { c.pts.removeFromParent(); c.pts.geometry.dispose(); EW.chaff.splice(i, 1); continue; }
-      c.t.p.addScaledVector(c.t.v, dt);
+      zstep(c.t.p, c.t.v, dt, (c as any).zm || ((c as any).zm = zmem()));
       const k = (1 - Math.exp(-age / CHAFF.bloom)) * (age > CHAFF.hold ? Math.exp(-(age - CHAFF.hold) / CHAFF.fade) : 1); c.t.iso = CHAFF.sig * k;
       const pa = c.pts.geometry.attributes.position as THREE.BufferAttribute, sp = 1.5 + Math.min(age, 4) * 5;
       for (let j = 0; j < pa.count; j++) pa.setXYZ(j, c.t.p.x + c.seeds[j * 3] * sp + (Math.random() - 0.5) * 0.3, c.t.p.y + c.seeds[j * 3 + 1] * sp, c.t.p.z + c.seeds[j * 3 + 2] * sp);
@@ -381,7 +367,7 @@ export const Space = (() => {
       const ti = TKEY[j], tr = EW.own!.trks[ti]; if (!tr) return;
       if (K(code)) { if (TRKK.dn[j] < 0) { TRKK.dn[j] = S.t; TRKK.held[j] = false; }
         if (!TRKK.held[j] && S.t - TRKK.dn[j] > 0.4) { TRKK.held[j] = true; trkOff(ti, !tr.off); } }
-      else if (TRKK.dn[j] >= 0) { if (!TRKK.held[j]) { TRKK.sel = TRKK.sel === ti ? -1 : ti; Audio.click(); } TRKK.dn[j] = -1; }
+      else if (TRKK.dn[j] >= 0) TRKK.dn[j] = -1; // (tapped: nothing, now the scheduler sends them)
     });
     ['Digit1', 'Digit2'].forEach((code, k) => {
       const sc = EW.own!.scans[k]; if (!sc) return;
@@ -421,25 +407,29 @@ export const Space = (() => {
     if (kind === 's') { const sc = own.scans[n]; if (!sc) return true; if (SEC.open === n) SEC.open = -1; else { SEC.open = n; SEC.cur = MODES.indexOf(sc.mode); SEC.sel = n; } Audio.click(); }
     else if (kind === 'o' && parseInt(a.split(':')[1], 10) === NOTCH_OPT) { notchSet(n); SEC.open = -1; }
     else if (kind === 'o') { const i = parseInt(a.split(':')[1], 10), sc = own.scans[n]; if (sc && MODES[i]) { modeSet(n, MODES[i], sc.sec.c, sc.sec.h); SEC.open = -1; SEC.sel = MODES[i] === 'sector' ? n : SEC.sel; } }
-    else if (kind === 't') { TRKK.sel = TRKK.sel === n ? -1 : n; Audio.click(); }
+    else if (kind === 't') { /* (a tracker's box: nothing to pick, the scheduler sends them) */ }
     else if (kind === 'p') { const tr = own.trks[n]; if (tr) trkOff(n, !tr.off); }
     return true;
   }
+  // A left click in the hologram, now her trackers are scheduled (js/radar.ts schedule): on a track, it's kept tracked (her operator's
+  // pick: looked at a couple of times a second, before anything of her own picture's), or, kept already, let go; on a radar warning's
+  // chevron, a search along its bearing. Which dish does it is the scheduler's business. Told to everyone aboard (strk).
+  const fusAt = (at: THREE.Vector3) => (EW.own ? EW.own.fus.find((q) => q.pl.distanceTo(at) < Math.max(200, 0.04 * q.pl.distanceTo(S.P))) || null : null);
+  function trkWant(p: RPlot, f: RFused | null, quiet = false) {
+    const own = EW.own!, S0 = Radar.sched(own), at = f ? f.pl : Radar.plotAt(own, p);
+    const kept = S0.tts.find((q) => q.op && q.est.p.distanceTo(at) < Math.max(200, 4 * q.kf.sig()));
+    if (kept) { Radar.unwant(own, kept); if (!quiet) { HUD.toast('TRACKERS', kept.n + ' let go', 1.2); Audio.click(); } return 5; }
+    const tt = Radar.want(own, { f, plot: p, pri: 1, op: true }, EW.rt); if (!quiet) { HUD.toast('TRACKERS', tt ? tt.n + ': kept tracked' : 'finding it', 1.2); Audio.click(); } return 3;
+  }
   function trkSend(): boolean {
     const H = EW.holo, it = H.pick; if (!EW.own || !it) return false;
-    const pick = TRKK.sel >= 0 ? EW.own.trks[TRKK.sel] : null;
     if (it.rwr) {
-      const d = (it.rwr as THREE.Vector3).clone().applyQuaternion(S.Q), far = S.P.clone().addScaledVector(d.clone().normalize(), 3000), tr = pick;
-      if (!tr) return false; const ti = EW.own.trks.indexOf(tr);
-      if (tr.off) trkOff(ti, false);
-      if (!Radar.canSee(EW.own, tr, far)) { HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), "can't see that way: her hull's in the way", 1.4); Audio.deny(); return true; }
-      Radar.cueRay(EW.own, tr, d, EW.rt); Net.toHost({ t: 'strk', a: [ti, 1, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4)] }); Audio.click(); return true;
+      const d = (it.rwr as THREE.Vector3).clone().applyQuaternion(S.Q).normalize();
+      Radar.wantRay(EW.own, d, EW.rt); Net.toHost({ t: 'strk', a: [-1, 4, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4)] }); HUD.toast('TRACKERS', 'searching that bearing', 1.2); Audio.click(); return true;
     }
-    if (!pick || !it.plot) return false; const ti = TRKK.sel, tr = pick, p = it.plot;
-    if (tr.off) trkOff(ti, false);
-    const f = EW.own.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p)), at = f ? f.pl : (() => { const sc = EW.own!.scans[p.k]; return Radar.dirOf(sc.ax, p.phi, 0).applyQuaternion(p.q || S.Q).multiplyScalar(p.r).add(p.o || S.P); })();
-    if (!Radar.canSee(EW.own, tr, at)) { HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), "can't see there: her hull's in the way", 1.4); Audio.deny(); return true; }
-    Radar.cueOne(EW.own, tr, p); Net.toHost({ t: 'strk', a: [ti, 2, p.k, p.phi, p.r] }); Audio.click(); return true;
+    if (!it.plot) return false; const p = it.plot as RPlot;
+    const f = EW.own.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p)) || null;
+    const code = trkWant(p, f); Net.toHost({ t: 'strk', a: [-1, code, p.k, p.phi, p.r] }); return true;
   }
   const wrapA = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   function sensorStep() {
@@ -1122,11 +1112,33 @@ export const Space = (() => {
   // The field's velocity at a place in the level's frame: the point of the zone that's there now, where it was a step ago. The zone
   // turns when the ship that's the level does (it's drawn from her), so away from its middle the field doesn't go by at one speed:
   // what she brakes to and her speed's held against (fly) is the field's where she is. (No zone: the level's own frame, still.)
-  const zFrame = { prev: new T.Matrix4(), inv: new T.Matrix4(), dt: 0, ok: false }, _fa = new T.Vector3();
+  const zFrame = { prev: new T.Matrix4(), cur: new T.Matrix4(), inv: new T.Matrix4(), pinv: new T.Matrix4(), turn: new T.Quaternion(), dt: 0, ok: false }, _fa = new T.Vector3(), _zv = new T.Vector3(), _zr = new T.Quaternion();
+  // A thing flying free in space (her, a round, a torpedo, chaff), moved a step dt as what it is: going straight through the zone, whatever
+  // the ship that's the level is doing. Its place and velocity are the level's, as everything's here: taken into the zone as it was
+  // placed last frame, moved on there, and brought back as it's placed now (velocity: the zone's own turn, and the field's going-by
+  // where it is, put back on). The level ship going straight at her steady speed, that's p += v dt exactly; her turning, it isn't
+  // turned with her. (zturn: an attitude, kept as it is in the zone while the level turns under it)
+  // (m: the thing's own record of its velocity in the zone, and the level-frame velocity it was last given from it: it goes on with
+  // that, and what's changed its level velocity since as a push, not a velocity worked back out of the level's each step (which, with
+  // the field's going-by reckoned over a step, would drift a little each step the level ship's turn changes))
+  type ZMem = { vz: THREE.Vector3; v: THREE.Vector3 };
+  function zstep(p: THREE.Vector3, v: THREE.Vector3, dt: number, m?: ZMem) {
+    if (!zFrame.ok) { p.addScaledVector(v, dt); if (m) m.v.set(NaN, 0, 0); return; }
+    _zr.setFromRotationMatrix(zFrame.prev).invert();
+    // (its velocity in the zone: what it had, and whatever's been done to it since in the level's frame (a thruster's push, a hit) put
+    // on as a push; a new one's from the level's)
+    const vz = m && !isNaN(m.v.x) ? _zv.copy(m.vz).add(_fa.copy(v).sub(m.v).applyQuaternion(_zr)) : _zv.copy(v).sub(fieldAt(p)).applyQuaternion(_zr);
+    p.applyMatrix4(zFrame.pinv).addScaledVector(vz, dt).applyMatrix4(zFrame.cur);
+    if (m) m.vz.copy(vz);
+    v.copy(vz.applyQuaternion(_zr.setFromRotationMatrix(zFrame.cur))).add(fieldAt(p, _fa.clone()));
+    if (m) m.v.copy(v);
+  }
+  const zmem = (): ZMem => ({ vz: new T.Vector3(), v: new T.Vector3(NaN, 0, 0) });
+  const zturn = (q: THREE.Quaternion) => { if (zFrame.ok) q.premultiply(zFrame.turn); };
   function fieldAt(p: THREE.Vector3, out = new T.Vector3()) {
     if (!S.zone || !zFrame.ok) return out.copy(S.zoneV);
     _fa.copy(p).applyMatrix4(zFrame.inv).applyMatrix4(zFrame.prev); // (where that point of the zone was a step ago)
-    out.copy(p).sub(_fa).divideScalar(zFrame.dt); if (out.length() > 600) out.copy(S.zoneV); return out;
+    return out.copy(p).sub(_fa).divideScalar(zFrame.dt); // (far from the level ship as she turns, that's fast: the level's frame turns about her)
   }
   function zoneStep() {
     if (!S.zone) return;
@@ -1139,7 +1151,7 @@ export const Space = (() => {
     // (the zone's velocity in the level's frame: the field's and the stars', what she brakes to and her speed's held against: fly)
     if (zPrev.t >= 0 && t > zPrev.t) { const v = _zd.copy(S.zone.position).sub(zPrev.p).divideScalar(t - zPrev.t); if (v.length() < 400) S.zoneV.copy(v); } zPrev.p.copy(S.zone.position); // (by the zone's own clock, as it's placed by)
     // (and the zone's placing then and now: where a point of the field was a step ago, for the field's velocity at a place, fieldAt)
-    S.zone.updateMatrix(); if (zPrev.t >= 0 && t > zPrev.t) { zFrame.prev.copy(zPrev.m); zFrame.inv.copy(S.zone.matrix).invert(); zFrame.dt = t - zPrev.t; zFrame.ok = true; } zPrev.m.copy(S.zone.matrix); zPrev.t = t;
+    S.zone.updateMatrix(); zFrame.ok = false; if (zPrev.t >= 0 && t > zPrev.t && t - zPrev.t < 0.25) { zFrame.prev.copy(zPrev.m); zFrame.cur.copy(S.zone.matrix); zFrame.inv.copy(S.zone.matrix).invert(); zFrame.pinv.copy(zPrev.m).invert(); zFrame.turn.setFromRotationMatrix(zFrame.cur).multiply(_zq.setFromRotationMatrix(zFrame.prev).invert()); zFrame.dt = t - zPrev.t; zFrame.ok = true; } zPrev.m.copy(S.zone.matrix); zPrev.t = t; // (a jump in the zone's clock (put right from the host, a new level) isn't the zone moving: nothing's carried with it)
     for (const q of S.anchors) if (q.p0) q.p.copy(q.p0).applyQuaternion(S.zone.quaternion).add(S.zone.position);
     for (const q of S.traffic) {
       const z = SD.zonePos(q.c, t);
@@ -1576,9 +1588,9 @@ export const Space = (() => {
   // ------------------------------------------------------------------ flying her
   const K = (c: string) => !!me().keys[c] && !Game.chatOpen && !Game.menuOpen();
   // (her thrust, m/s²: the main engine's, the others', the brake's (all of them, to the field's way); her top speed off the field's way, m/s)
-  const FLY = { main: 30, side: 12, brake: 60, max: 300 };
+  const FLY = { main: 30, side: 12, brake: 60, max: 300 }, shipZ = zmem();
   // the first of her trackers holding a track with a solution (where it is and how fast it goes, as her radar has it: js/radar.ts)
-  function radarLock() { const o = EW.own; return o ? o.trks.find((tr) => tr.st === 'track' && tr.est && tr.est.v && tr.est.q > 0.1) || null : null; }
+  function radarLock() { const o = EW.own; if (!o) return null; let b: RSTrack | null = null; for (const t of Radar.sched(o).tts) if (t.est.q > 0.1 && (!b || (t.op ? 1 : 0) > (b.op ? 1 : 0) || ((t.op ? 1 : 0) === (b.op ? 1 : 0) && t.est.q > b.est.q))) b = t; return b; } // (her best track: her operator's picks first)
   function fly(dt: number) {
     const d = S.def, seat = mySeat(), helm = !!seat && seat.k === 'helm' && isCtl() && !me().dead && !me().down;
     // the mouse: what it's turned your view by since the last frame is the stick's push (it springs back)
@@ -1641,7 +1653,7 @@ export const Space = (() => {
       if (to) { const dv = to.clone().sub(S.V), l = dv.length(), st = (K('KeyX') ? FLY.brake : FLY.main) * dt; if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, st / l)); }
     }
     { const rel = S.V.clone().sub(fieldV); if (rel.length() > FLY.max) S.V.copy(fieldV).add(rel.setLength(FLY.max)); } // (her top speed, against the field)
-    S.P.addScaledVector(S.V, dt);
+    if (assist) S.P.addScaledVector(S.V, dt); else { zstep(S.P, S.V, dt, shipZ); zturn(S.Q); } // (on the breach assist: in her frame, where the site is)
     collide(dt);
     events();
   }
@@ -2241,7 +2253,7 @@ export const Space = (() => {
   const segNear = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3) => { _q1.subVectors(b, a); const L2 = _q1.lengthSq(), t = L2 > 0 ? U.clamp(_q2s.subVectors(c, a).dot(_q1) / L2, 0, 1) : 0; return _q3.copy(a).addScaledVector(_q1, t).distanceTo(c); };
   function shots(dt: number) {
     for (let i = myShots.length - 1; i >= 0; i--) {
-      const q = myShots[i], a = q.p.clone(); q.p.addScaledVector(q.v, dt); q.d += q.v.length() * dt;
+      const q = myShots[i], a = q.p.clone(); zstep(q.p, q.v, dt, (q as any).zm || ((q as any).zm = zmem())); q.d += a.distanceTo(q.p);
       let gone = q.d >= q.life;
       if (!gone && ROCKS.near.length && rockOn(a, q.p) < 1) { gone = true; rockFlash(q.p); } // (into a rock)
       if (!gone && q.mine && S.hull) S.hull.guns.forEach((gn, gi) => { if (gone || gn.hp <= 0) return; if (segNear(a, q.p, _gp.set(gn.x, gn.y, gn.z)) < SHOT.GUN_R) { gunHit(gi, gn.hp - q.dmg); Net.toHost({ t: 'shit', i: gi, hp: gn.hp }); gone = true; } });
@@ -2274,7 +2286,7 @@ export const Space = (() => {
     if (!S.hull || S.docked || S.ftl || (S.state && S.state.boom)) return;
     if (S.state && S.state.hostile === 0) { spinDown(); return; } // (a ship that isn't the mission's holds her fire till she's breached)
     if (!S.state || !S.state.gn || S.state.arm != null) { spinDown(); return; } // (nobody left at her gun control, or she's counting down to blowing herself apart: her guns are silent)
-    let lk: RTrack | null = null; for (const t of EW.foe!.trks) if (t.st === 'track' && t.est.p && t.est.q >= 0.15 && (!lk || trkUrg(EW.foe!, t) < trkUrg(EW.foe!, lk))) lk = t; // (the most urgent of her locks: what reaches her soonest)
+    let lk: RSTrack | null = null; for (const t of Radar.sched(EW.foe!).tts) if (t.est.q >= 0.15 && (!lk || trkUrg(EW.foe!, t) < trkUrg(EW.foe!, lk))) lk = t; // (the most urgent of her tracks: what reaches her soonest)
     if (!lk || !lk.est.p) { spinDown(); return; } // (on whatever her best track's on: chaff, if it's been drawn off)
     const urgent = trkUrg(EW.foe!, lk) < 4; // (something reaching her inside 4 s: no pause between bursts)
     // (a weapon coming at her (closing faster than any ship flies) on a collision course (hardly moving across her line of sight):
@@ -2298,7 +2310,7 @@ export const Space = (() => {
         // bursts: the barrels spin up, it fires H.rps for a second or two, then a pause
         if (g.bt > 0) {
           g.bt -= dt; g.rev = 1.5; g.acc = (g.acc || 0) + H.rps * dt;
-          while (g.acc >= 1) { g.acc -= 1; fireRound(from, aim, H, lk.err); }
+          while (g.acc >= 1) { g.acc -= 1; fireRound(from, aim, H, lk.err || 0); }
           if (g.bt <= 0) gn.cool = H.pause[0] + Math.random() * (H.pause[1] - H.pause[0]);
           continue;
         }
@@ -2309,7 +2321,7 @@ export const Space = (() => {
       if (gn.cool > 0) continue;
       gn.cool = H.cool[0] + Math.random() * (H.cool[1] - H.cool[0]);
       if (gn.k === 'missile') { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); Net.toHost({ t: 'smis', a }); } continue; }
-      fireRound(from, aim, H, lk.err);
+      fireRound(from, aim, H, lk.err || 0);
     }
   }
   // a round off one of her guns (in the level's frame): along the aim, spread by the gun and by the track's own error
@@ -2345,7 +2357,7 @@ export const Space = (() => {
     for (let i = S.rounds.length - 1; i >= 0; i--) {
       const q = S.rounds[i], step = q.v.length() * dt;
       const qa = TP.list.length ? q.p.clone() : null;
-      r0.copy(q.p).sub(c0); q.p.addScaledVector(q.v, dt); q.d += step; r1.copy(q.p).sub(c1);
+      r0.copy(q.p).sub(c0); zstep(q.p, q.v, dt, (q as any).zm || ((q as any).zm = zmem())); q.d += step; r1.copy(q.p).sub(c1);
       if (qa && isCtl() && roundTorp(qa, q.p, dt)) { S.rounds.splice(i, 1); continue; }
       if (ROCKS.near.length && rockOn(q.p.clone().addScaledVector(q.v, -dt), q.p) < 1) { S.rounds.splice(i, 1); rockFlash(q.p); continue; } // (into a rock)
       seg.subVectors(r1, r0); const L2 = seg.lengthSq(), t = L2 > 0 ? U.clamp(-r0.dot(seg) / L2, 0, 1) : 0, miss = r0.addScaledVector(seg, t).length();
@@ -2558,7 +2570,7 @@ export const Space = (() => {
     for (const tp of TP.list.slice()) {
       if (S.root && tp.o.parent !== S.root) S.root.add(tp.o);
       tp.t += dt; const p0 = tp.p.clone();
-      if (!tp.mine) { tp.p.addScaledVector(tp.v, dt); }
+      if (!tp.mine) { zstep(tp.p, tp.v, dt, (tp as any).zm || ((tp as any).zm = zmem())); }
       else {
         // (where the target is: her sensors' fix, or dead reckoning; within TORP.seek, its own radar)
         const f = EW.own && EW.own.fus.find((q) => q.n === tp.fus);
@@ -2597,7 +2609,7 @@ export const Space = (() => {
           tp.thr = push / TORP.burn; tp.rcs = ang > 0.03 || rest.length() > 1.5;
           (tp as any).dbg = { R, vc, om: om.length(), raw: om.clone().cross(u).multiplyScalar(TORP.N * Math.max(vc, 50)).length(), lat: lat.length(), got: acc.clone().addScaledVector(u, -acc.dot(u)).length(), nose: n2.angleTo(u), ph: tp.ph }; // (the debug's: the turn asked for (raw, and smoothed: lat) against what it got across its line of sight)
         }
-        tp.v.addScaledVector(acc, dt); tp.p.addScaledVector(tp.v, dt);
+        tp.v.addScaledVector(acc, dt); zstep(tp.p, tp.v, dt, (tp as any).zm || ((tp as any).zm = zmem()));
         if (tp.ph >= 2) { const hit = fuse(tp, p0); if (hit) { torpHit(tp, hit); continue; } }
         if (tp.t > TORP.life || S.ftl) { torpGone(tp, 3, true); continue; }
         if (S.t - tp.sent > TORP.send) torpSend(tp, 0);
@@ -2799,8 +2811,10 @@ export const Space = (() => {
       case 'smis': if (S.on && m.by !== Net.myId) missile(m.a); return true;
       case 'srcue': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) ewCue(m.a); return true;
       case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5)) modeSet(m.a[0] | 0, MODES[m.a[1] | 0] || 'round', +m.a[2], +m.a[3], true, m.a.length === 5 ? !!m.a[4] : undefined); return true;
-      case 'strk': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && EW.own) { const ti = m.a[0] | 0, tr = EW.own.trks[ti]; if (tr) { // (the sensor operator's tracker commands: js/space.ts trkOff, trkSend)
-        if (m.a[1] === 0) trkOff(ti, !!m.a[2], true); else if (m.a[1] === 1) Radar.cueRay(EW.own, tr, new T.Vector3(+m.a[2], +m.a[3], +m.a[4]), EW.rt); else Radar.cueOne(EW.own, tr, { k: m.a[2] | 0, phi: +m.a[3], r: +m.a[4], t: EW.rt, db: 0, id: '', e: 0 }); } } return true;
+      case 'strk': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && EW.own) { const ti = m.a[0] | 0, tr = EW.own.trks[ti]; // (the sensor operator's: a tracker off or on (trkOff), a track kept or let go, a bearing searched (trkSend))
+        if (m.a[1] === 0 && tr) trkOff(ti, !!m.a[2], true);
+        else if (m.a[1] === 4) Radar.wantRay(EW.own, new T.Vector3(+m.a[2], +m.a[3], +m.a[4]), EW.rt);
+        else if (m.a[1] === 3 || m.a[1] === 5) { const p: RPlot = { k: m.a[2] | 0, phi: +m.a[3], r: +m.a[4], t: EW.rt, db: 0, id: '', e: 0 }; trkWant(p, fusAt(Radar.plotAt(EW.own, p)), true); } } return true;
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
       case 'storp': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) torpMsg(m.a); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
@@ -2878,6 +2892,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => zFrame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)
