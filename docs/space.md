@@ -319,11 +319,14 @@ with its own noise, so plots can differ between screens.
   it ("TORPEDO TARGET"), again lets it go. **B** fires at the one picked, or the one looked at. A fix ahead in the bow
   scanner's blind cone isn't a 3D fix, so it can't be fired at.
 - **Zoom** (js/space.ts helmZoom): at the helm, holding right mouse (looking about), the wheel zooms the view up to 100×, a
-  quarter a notch; the head turns that much slower. Let go of the right button and it's back to 1×. The wheel doesn't swap
+  quarter a notch, eased (about 0.25 s); the head turns that much slower. Let go of the right button and it eases back to 1×. The wheel doesn't swap
   weapons in any of her seats.
 - **Flight:** a cold launch (pushed out downward at 7 m/s, coasting 1.1 s), then its RCS thrusters push it off to the side
-  away from her path while turning its nose onto the target, then its motor (85 m/s², closing speed held to 300 m/s, the rest
-  for steering by proportional navigation, N = 4).
+  away from her path while turning its nose onto the target, then its motor (85 m/s², closing speed held to 300 m/s; steering
+  by proportional navigation, N = 4, its command smoothed). The motor pushes only along the nose: the RCS turns the nose (1.6
+  rad/s) onto what's wanted while the motor's needed, never more than 35° off the target; at speed the motor's off, the nose
+  on the target, and the RCS pushes it across (up to 7 m/s²). The flame shows the motor's push, the puffs the RCS firing. Its
+  nose is within 20° of where it's going but for its last second or so (its own radar's sharp turn onto the hull).
 - **Guidance:** her sensors' fix as they hold it now (a datalink), dead reckoning when they lose it; inside 1 km, its own
   radar: the strongest return in a 20° cone and a 300 m range gate round where it expects the target (chaff can draw it).
   A proximity fuse: a hull by her box, a ship within 30 m, anything small within 7 m. On the mission's ship it knocks out

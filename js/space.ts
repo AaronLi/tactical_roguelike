@@ -1520,7 +1520,7 @@ export const Space = (() => {
     } else if (helm) {
       // (looking about, zoomed: the head turns that much slower, so what's looked at stays under the mouse)
       const m = me(); if (!ZM.on) { ZM.on = true; ZM.y = m.yaw; ZM.p = m.pitch; }
-      if (ZM.k > 1) { m.yaw = ZM.y + U.angDiff(ZM.y, m.yaw) / ZM.k; m.pitch = ZM.p + (m.pitch - ZM.p) / ZM.k; }
+      if (ZM.z > 1) { m.yaw = ZM.y + U.angDiff(ZM.y, m.yaw) / ZM.z; m.pitch = ZM.p + (m.pitch - ZM.p) / ZM.z; }
       ZM.y = m.yaw; ZM.p = m.pitch; S.lookP = m.pitch;
     }
     S.stick.multiplyScalar(Math.exp(-dt * 2.2));
@@ -2076,7 +2076,7 @@ export const Space = (() => {
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
     const seat = mySeat(), cam = G_R.camera;
     if (seat && seat.k === 'turret') turretView(seat);
-    helmZoom();
+    helmZoom(dt);
     if (S.shake > 0.01) { cam.position.x += (Math.random() - 0.5) * S.shake * 0.25; cam.position.y += (Math.random() - 0.5) * S.shake * 0.25; S.shake *= Math.exp(-dt * 4); }
     cam.updateMatrixWorld();
     outside();
@@ -2271,8 +2271,8 @@ export const Space = (() => {
   // TORP.vc of closing speed (it keeps some for turning). It's a radar target like anything out here (torpTargets: no
   // transponder), so a ship's own threat assessment and fire control deal with it as they would anything coming at her: a
   // round that meets it (rounds) kills it. The pilot's screen flies it and tells everyone aboard (storp, ten times a second).
-  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, burn: 85, vc: 300, N: 4, seek: 1000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
-  type Torp = { id: number; o: THREE.Group; fl: THREE.Mesh; puffs: THREE.Mesh[]; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; sent: number; lock: string; rt: RTarget };
+  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, turn2: 1.6, off: 0.6, burn: 85, vc: 300, N: 4, seek: 1000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
+  type Torp = { id: number; o: THREE.Group; fl: THREE.Mesh; puffs: THREE.Mesh[]; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; sent: number; lock: string; rt: RTarget; thr: number; rcs: boolean; lf: THREE.Vector3 }; // (thr: its motor's push (0..1); rcs: its thrusters firing)
   const TP = { list: [] as Torp[], n: 1, base: 1 + Math.floor(Math.random() * 1e6), left: TORP.loads, look: '', pick: '', l: false, cool: 0, tube: null as null | { at: THREE.Vector3; m: THREE.Object3D } };
   function tubeKit(g: THREE.Object3D, box: THREE.Box3, size: number) {
     if (TP.tube && TP.tube.m.parent === g) return;
@@ -2294,14 +2294,14 @@ export const Space = (() => {
   }
   function torpNew(id: number, p: THREE.Vector3, v: THREE.Vector3, q: THREE.Quaternion, mine: boolean, fus: string, est: THREE.Vector3, ev: THREE.Vector3): Torp {
     const k = torpMesh(); if (S.root) S.root.add(k.o); k.o.position.copy(p); k.o.quaternion.copy(q);
-    const tp: Torp = { id, ...k, p: p.clone(), v: v.clone(), q: q.clone(), ph: 0, t: 0, fus, est: est.clone(), ev: ev.clone(), side: new T.Vector3(), mine, sent: -1, lock: '', rt: { id: 'torp' + id, p: p.clone(), v: v.clone(), q: q.clone(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 1.5, iff: { c: 'squad', n: 'TORP ' + (id % 1000) }, aff: 'squad', only: 'squad' } }; // (its own ship's interrogator gets an answer, its datalink's; anyone else's, nothing)
+    const tp: Torp = { id, ...k, p: p.clone(), v: v.clone(), q: q.clone(), ph: 0, t: 0, fus, est: est.clone(), ev: ev.clone(), side: new T.Vector3(), mine, sent: -1, lock: '', thr: 0, rcs: false, lf: new T.Vector3(), rt: { id: 'torp' + id, p: p.clone(), v: v.clone(), q: q.clone(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 1.5, iff: { c: 'squad', n: 'TORP ' + (id % 1000) }, aff: 'squad', only: 'squad' } }; // (its own ship's interrogator gets an answer, its datalink's; anyone else's, nothing)
     TP.list.push(tp); return tp;
   }
   // the 3D fixes the pilot can see (her sensors' fused tracks), and the one looked at: nearest the middle of the view, within 7 degrees
   // The pilot's zoom: right mouse held (looking about), the wheel zooms the view in, up to 100 times (each notch a quarter more or
   // less); let go of the right button, it's back to 1
-  const ZM = { k: 1, on: false, y: 0, p: 0, wheel: false };
-  function helmZoom() {
+  const ZM = { k: 1, z: 1, on: false, y: 0, p: 0, wheel: false }; // (k: the zoom scrolled to; z: the zoom shown, easing onto it)
+  function helmZoom(dt: number) {
     const seat = mySeat(), m = me(), on = !!seat && seat.k === 'helm' && !!m.mouse.r && !Game.menuOpen();
     if (!ZM.wheel) { ZM.wheel = true; window.addEventListener('wheel', (e) => {
       const st = mySeat(); if (!st || st.k !== 'helm' || !me().mouse.r || Game.menuOpen() || Math.abs(e.deltaY) < 5) return;
@@ -2309,8 +2309,9 @@ export const Space = (() => {
       const k = U.clamp(ZM.k * (e.deltaY < 0 ? 1.25 : 0.8), 1, 100); if (k === ZM.k) return; ZM.k = k < 1.05 ? 1 : k;
       HUD.toast('ZOOM', ZM.k >= 10 ? Math.round(ZM.k) + '×' : ZM.k.toFixed(1) + '×', 0.6);
     }, { capture: true }); }
-    if (!on) { ZM.k = 1; ZM.on = false; return; }
-    if (ZM.k > 1) { Me.updateCamera(1 / 60); /* (the view again from the head as slowed this frame: not a frame late, which at 100x is a shake) */ const cam = G_R.camera as THREE.PerspectiveCamera, f0 = Game.settings.fov * Math.PI / 180; cam.fov = 2 * Math.atan(Math.tan(f0 / 2) / ZM.k) * 180 / Math.PI; cam.updateProjectionMatrix(); }
+    if (!on) { ZM.k = 1; ZM.on = false; }
+    ZM.z = Math.exp(Math.log(ZM.z) + (Math.log(ZM.k) - Math.log(ZM.z)) * (1 - Math.exp(-dt * 12))); if (Math.abs(ZM.z / ZM.k - 1) < 0.002) ZM.z = ZM.k; // (eased, by ratios: 1x to 2x as quick as 50x to 100x; about 0.25 s)
+    if (ZM.z > 1.001) { if (on) Me.updateCamera(1 / 60); /* (the view again from the head as slowed this frame: not a frame late, which at 100x is a shake) */ const cam = G_R.camera as THREE.PerspectiveCamera, f0 = Game.settings.fov * Math.PI / 180; cam.fov = 2 * Math.atan(Math.tan(f0 / 2) / ZM.z) * 180 / Math.PI; cam.updateProjectionMatrix(); }
   }
   function torpSee() {
     TP.look = ''; const seat = mySeat(); if (!seat || seat.k !== 'helm' || !EW.own || !S.model) return;
@@ -2337,7 +2338,7 @@ export const Space = (() => {
   }
   function torpSend(tp: Torp, gone: number) {
     tp.sent = S.t; const r = (x: number) => Math.round(x * 100) / 100;
-    Net.toHost({ t: 'storp', a: [tp.id, ...tp.p.toArray().map(r), ...tp.v.toArray().map(r), ...tp.q.toArray().map((x) => Math.round(x * 1e4) / 1e4), tp.ph, gone] });
+    Net.toHost({ t: 'storp', a: [tp.id, ...tp.p.toArray().map(r), ...tp.v.toArray().map(r), ...tp.q.toArray().map((x) => Math.round(x * 1e4) / 1e4), tp.ph | (tp.thr > 0.05 ? 4 : 0) | (tp.rcs ? 8 : 0), gone] }); // (its phase, and whether its motor and its thrusters are firing)
   }
   function torpMsg(a: number[]) {
     if (!S.root || a.length !== 13 || !a.every(Number.isFinite)) return;
@@ -2345,7 +2346,7 @@ export const Space = (() => {
     const p = new T.Vector3(a[1], a[2], a[3]), v = new T.Vector3(a[4], a[5], a[6]), q = new T.Quaternion(a[7], a[8], a[9], a[10]).normalize();
     if (!tp) { if (a[12]) return; tp = torpNew(a[0], p, v, q, false, '', p, v); }
     if (tp.mine) return;
-    tp.p.copy(p); tp.v.copy(v); tp.q.copy(q); tp.ph = a[11];
+    tp.p.copy(p); tp.v.copy(v); tp.q.copy(q); tp.ph = a[11] & 3; tp.thr = a[11] & 4 ? 1 : 0; tp.rcs = !!(a[11] & 8);
     if (a[12]) torpGone(tp, a[12], false);
   }
   // gone: 1 shot down, 2 hit something (blown), 3 run out
@@ -2395,16 +2396,26 @@ export const Space = (() => {
         }
         let acc = new T.Vector3();
         if (tp.ph === 1) {
-          acc.copy(tp.side).multiplyScalar(TORP.rcsA);
+          acc.copy(tp.side).multiplyScalar(TORP.rcsA); tp.rcs = true; tp.thr = 0;
           const aim = u, ang = nose.angleTo(aim); if (ang > 1e-3) { const k = Math.min(1, TORP.turn * dt / ang); tp.q.slerp(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, -1), nose.clone().lerp(aim, k).normalize()), 1); }
           if ((ang < 0.1 && tp.t > TORP.cold + 1.2 && tp.p.distanceTo(S.P) > 35) || tp.t > TORP.cold + 6) tp.ph = 2;
         } else if (tp.ph >= 2) {
           // proportional navigation: across the line of sight, N times the closing speed times its turning rate; along it, the rest of the motor while closing under TORP.vc
           const om = rel.clone().cross(vrel).divideScalar(Math.max(1, R * R)), lat = om.clone().cross(u).multiplyScalar(TORP.N * Math.max(vc, 50));
           if (lat.length() > TORP.burn) lat.setLength(TORP.burn);
-          const along = vc < TORP.vc ? Math.sqrt(Math.max(0, TORP.burn * TORP.burn - lat.lengthSq())) : 0;
-          acc = lat.addScaledVector(u, along);
-          const want = acc.lengthSq() > 1 ? acc.clone().normalize() : u; tp.q.setFromUnitVectors(new T.Vector3(0, 0, -1), nose.lerp(want, Math.min(1, dt * 6)).normalize());
+          tp.lf.lerp(lat, 1 - Math.exp(-dt * 3)); lat.copy(tp.lf); // (smoothed: the fix it's flying on jitters, and its turning rate times N times 300 m/s is a lot of jitter)
+          const along = vc < TORP.vc ? Math.sqrt(Math.max(0, TORP.burn * TORP.burn - lat.lengthSq())) : 0, want = lat.clone().addScaledVector(u, along);
+          // (the motor pushes only along its nose, so the nose is turned (its RCS, no faster than TORP.turn2) onto what's wanted when
+          // the motor's needed: closing too slowly, or more across than the RCS can push. Otherwise the motor's off, the nose held on
+          // the target, and the RCS thrusters push it across, up to TORP.rcsA)
+          const main = along > 0 || lat.length() > TORP.rcsA * 2, aim = main ? want.clone().normalize() : u.clone();
+          { const off = aim.angleTo(u); if (off > TORP.off) { const ax = u.clone().cross(aim); if (ax.lengthSq() > 1e-8) aim.copy(u).applyAxisAngle(ax.normalize(), TORP.off); } } // (never more than TORP.off off the target: it flies at it, not across it)
+          const ang = nose.angleTo(aim);
+          if (ang > 1e-4) { const ax = nose.clone().cross(aim); if (ax.lengthSq() < 1e-8) ax.set(1, 0, 0).applyQuaternion(tp.q); tp.q.premultiply(new T.Quaternion().setFromAxisAngle(ax.normalize(), Math.min(ang, TORP.turn2 * dt))).normalize(); }
+          const n2 = new T.Vector3(0, 0, -1).applyQuaternion(tp.q), push = main && n2.angleTo(aim) < 0.35 ? U.clamp(want.dot(n2), 0, TORP.burn) : 0;
+          acc.copy(n2).multiplyScalar(push);
+          const rest = want.clone().addScaledVector(n2, -push); rest.addScaledVector(n2, -rest.dot(n2)); if (rest.length() > TORP.rcsA) rest.setLength(TORP.rcsA); acc.add(rest); // (the RCS: across the nose only)
+          tp.thr = push / TORP.burn; tp.rcs = ang > 0.03 || rest.length() > 1.5;
         }
         tp.v.addScaledVector(acc, dt); tp.p.addScaledVector(tp.v, dt);
         if (tp.ph >= 2) { const hit = fuse(tp, p0); if (hit) { torpHit(tp, hit); continue; } }
@@ -2412,8 +2423,8 @@ export const Space = (() => {
         if (S.t - tp.sent > TORP.send) torpSend(tp, 0);
       }
       tp.o.position.copy(tp.p); tp.o.quaternion.copy(tp.q);
-      tp.fl.visible = tp.ph >= 2; if (tp.fl.visible) tp.fl.scale.set(1, 0.8 + Math.random() * 0.4, 1);
-      tp.puffs.forEach((pf) => { pf.visible = tp.ph === 1 && Math.random() < 0.5; });
+      tp.fl.visible = tp.thr > 0.05; if (tp.fl.visible) tp.fl.scale.set(1, (0.4 + 0.6 * tp.thr) * (0.8 + Math.random() * 0.4), 1);
+      tp.puffs.forEach((pf) => { pf.visible = tp.rcs && Math.random() < 0.5; });
     }
   }
   function torpHit(tp: Torp, t: RTarget) {
