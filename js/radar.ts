@@ -500,10 +500,12 @@ export const Radar = (() => {
   }
   // cue a tracker on a plot: the one whose side it's on, an idle one first
   function cue(su: RSuite, p: RPlot) {
-    // (a contact that's part of a 3D track whose filter has settled: the tracker that can see it is pointed straight at where the
-    // track's filter has it going, and tracks; no sweep along the strip)
-    const f = su.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p) || (q.a && q.a.n === (su.scans[p.k].cons.find((c) => c.p === p) || { n: '' }).n));
-    if (f && f.kf.n >= 3) {
+    // (a contact that's part of a 3D track: the tracker that can see it is pointed straight at where the track has it going, and
+    // locks there if the return's there (a spiral round it only if it isn't); no sweep along the strip. Only a contact without
+    // a 3D fix (one scanner's: a fan, its place along it not known) is swept for)
+    const con = su.scans[p.k].cons.find((c) => c.p === p);
+    const f = su.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p) || (!!con && ((q.a && q.a.n === con.n) || (q.b && q.b.n === con.n))));
+    if (f) {
       const tr = su.trks.filter((t) => t.st !== 'track' && !t.off).find((t) => inSide(t, f.pl.clone().sub(t.at.clone().applyQuaternion(su.Q).add(su.P)).normalize().applyQuaternion(su.Q.clone().invert())));
       if (tr) { drop(tr); tr.st = 'slew'; tr.hand = { p: f.pl.clone(), v: f.v.clone(), t: f.kf.t }; dgOf(tr).sweep = []; return tr; }
     }
@@ -564,7 +566,7 @@ export const Radar = (() => {
       const e1 = new T.Vector3(), e2 = new T.Vector3(); (Math.abs(c0.y) < 0.9 ? e1.set(0, 1, 0) : e1.set(1, 0, 0)).cross(c0).normalize(); e2.crossVectors(c0, e1);
       tr.b.copy(c0).addScaledVector(e1, Math.cos(ang) * Math.tan(rad)).addScaledVector(e2, Math.sin(ang) * Math.tan(rad)).normalize(); tr.a.copy(tr.b); tr.rng = rng;
       if (inSide(tr, tr.b)) { const r = beam(su, tr, tr.b, targets, sp.ray ? null : rng); dgOf(tr).sweep.push({ e: rad, db: r.db }); if (r.db > THR) illum(r.id, su, tr, now); if (r.db + gauss() * 1.2 > sp.best) { sp.best = r.db; sp.b.copy(tr.b).applyQuaternion(su.Q); sp.r = r.R || rng; sp.dr = sp.r - rng; } } // (along a bearing: its gate open, any range)
-      if (f >= 1 || (sp.best > THR + 10 && rad < TRK.bw)) { // (done; or strong already, near the middle: no need to go on round)
+      if (f >= 1 || (sp.best > THR + 6 && rad < TRK.bw)) { // (done; or strong already, near the middle: no need to go on round)
         if (sp.best > THR) { tr.b.copy(sp.b).applyQuaternion(_qi.copy(su.Q).invert()); tr.st = 'track'; tr.rng = rng + (sp.dr || 0); tr.lockT = 0; /* (its gate where the best return was against the track's point, carried on to now: something closing fast isn't where it was a second ago) */ tr.lost = 0; tr.err = 0; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.spiral = null; }
         else drop(tr);
       }

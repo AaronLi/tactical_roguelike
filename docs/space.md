@@ -287,6 +287,13 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
      another name 0.2; a civilian 0.05), plus how fast it's closing (from 10 m/s), how near it is (inside 4 km), whether its
      course passes inside 800 m within 90 s, and whether it's tracking her (her radar warning receiver hears a tracking radar
      on her, and from where: +0.45). From 0.6 it's SUSPECT; held for 3 s, HOSTILE; under, WATCH (from 0.35), NEUTRAL or CIV.
+     Her fire control goes for the most urgent HOSTILE track: what reaches her soonest (its range over its closing speed), then
+     what isn't closing, nearest first. A tracker is taken off what it holds for something at least twice as urgent (neither
+     closing: much nearer); a lock under a second old is left to settle. Her guns fire on the most urgent of her locks. A
+     tracker cued on a contact that's part of a 3D track points straight at the track and locks there (a spiral round it only
+     if the return isn't there); only a one-scanner contact is swept for along its fan. Tested: the frigate locked on the
+     squad's ship at 3.6 km in 0.07 s; a torpedo from her went HOSTILE at 1.9 km (its returns in her contact till it's clear),
+     the frigate switched to it and locked at 1.1 km, and shot it down.
      Her fire control cues only on what's HOSTILE, and lets a lock go (after 2 s) when what it's on is no longer HOSTILE or
      SUSPECT: a tracking radar on a ship is taken as hostility, so she keeps hers off what isn't. Tested: the squad's ship
      silent and still at 2.5 km is WATCH and left alone; running in at 90 m/s it's SUSPECT at once and HOSTILE 3 s later; its
@@ -330,7 +337,7 @@ with its own noise, so plots can differ between screens.
 - **Guidance:** her sensors' fix as they hold it now (a datalink), dead reckoning when they lose it; inside 1 km, its own
   radar: the strongest return in a 20° cone and a 300 m range gate round where it expects the target (chaff can draw it).
   A proximity fuse: a hull by her box, a ship within 30 m, anything small within 7 m. On the mission's ship it knocks out
-  her guns within 45 m. It self-destructs after 90 s.
+  her guns within 15 m (TORP.blast; at 45 m one hit took all three of a frigate's). It self-destructs after 90 s.
 - **Its return:** 1.5 m². To her own interrogator it answers (`only: 'squad'`), so her radars show it as FRIENDLY, "TORP n"; to anyone else's, nothing. Nothing special-cases it: the enemy's scanners, threat assessment and fire control
   see it as they see anything, and a minigun round passing within 3 m kills it. The pilot's screen flies it and tells everyone
   aboard (`storp`, ten times a second).

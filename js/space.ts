@@ -21,7 +21,7 @@ import { Career } from './career.js';
 import { Net } from './net.js';
 import { Game } from './game.js';
 import { Me } from './player.js';
-import { Radar, RSuite, RTarget, RPlot, RAff, RMode } from './radar.js';
+import { Radar, RSuite, RTarget, RAssess, RTrack, RAff, RMode } from './radar.js';
 import { RadarView } from './radarview.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
@@ -138,9 +138,18 @@ export const Space = (() => {
       else {
         // (she doesn't know which contact is what: her radars' threat assessment decides what's hostile. Cued when her trackers are free, or when one comes in much nearer than what she's tracking)
         // (what her threat assessment holds HOSTILE (js/radar.ts assess), the nearest, if it's been painted lately)
-        let p = null as null | RPlot; for (const q of EW.foe.ass) if (q.cls === 'HOSTILE' && q.plot && EW.rt - q.plot.t < 3.5 && (!p || q.r < p.r)) p = q.plot;
-        const busy = EW.foe.trks.filter((t) => t.st !== 'idle'), held = Math.min(...busy.map((t) => (t.st === 'track' ? t.rng : 1e9)));
-        if (p && (!busy.length || (busy.every((t) => t.st === 'track') && p.r < held * 0.6 - 200))) { for (const t of EW.foe.trks) Radar.drop(t); Radar.cue(EW.foe, p); }
+        // (the most urgent: what reaches her soonest (its range over its closing speed); what isn't closing, after, nearest first.
+        // A tracker's taken off what it holds for something at least twice as urgent (or, neither closing, much nearer); not for
+        // what a tracker's on already)
+        const su = EW.foe; let bq = null as null | RAssess, bu = Infinity;
+        for (const q of su.ass) if (q.cls === 'HOSTILE' && q.plot && EW.rt - q.plot.t < 3.5) { const u = tti(q.r, q.vc); if (u < bu) { bu = u; bq = q; } }
+        const on = bq && su.trks.some((t) => t.st === 'track' && ((bq!.f && bq!.f.trk === t) || (bq!.f && t.est.p && t.est.p.distanceTo(bq!.f.pl) < Math.max(150, 0.05 * bq!.r))));
+        (EW as any).fc = bq ? { n: bq.n, r: Math.round(bq.r), vc: Math.round(bq.vc), u: Math.round(bu), id: bq.plot!.id, on } : null; // (what her fire control's after: the debug's)
+        if (bq && !on) {
+          const busy = su.trks.filter((t) => t.st !== 'idle'), held = Math.min(...busy.map((t) => trkUrg(su, t)));
+          const more = bu < TTI_FAR ? bu < held * 0.5 : held >= TTI_FAR && bu - TTI_FAR < (held - TTI_FAR) * 0.6 - 200;
+          if (!busy.length || (busy.every((t) => t.st === 'track' && t.lockT > 1) && more)) { /* (a lock not a second old is let settle: its solution isn't there yet) */ for (const t of su.trks) Radar.drop(t); Radar.cue(su, bq.plot!); }
+        }
         // (and her trackers stay off what isn't hostile: a ship's tracking radar on another is taken as hostility. One locked on
         // what her assessment no longer has as HOSTILE or SUSPECT (it turned away; it's chaff it was drawn onto) is let go)
         for (const t of EW.foe.trks) {
@@ -152,6 +161,9 @@ export const Space = (() => {
       }
     }
   }
+  // how soon something reaches her: its range over its closing speed; not closing, TTI_FAR plus its range (after anything that is, nearest first)
+  const TTI_FAR = 1e6, tti = (r: number, vc: number) => (vc > 10 ? r / vc : TTI_FAR + r);
+  const trkUrg = (su: RSuite, t: RTrack) => { if (t.st !== 'track') return Infinity; if (!t.est.p) return tti(t.rng, 0); const rel = t.est.p.clone().sub(su.P), r = rel.length(); return tti(r, -t.est.v.clone().sub(su.V).dot(rel) / Math.max(1, r)); };
   // Her radars' hardware on her hull (in her group, whose frame is the level's): each scanner an antenna on a post, turning with its
   // sweep (the 'y' one a long bar on her roof turning about her up; the 'x' one a long bar on a pylon under her keel turning about
   // her beam), each tracker a dish on her flank, pointed along its boresight
@@ -2155,7 +2167,8 @@ export const Space = (() => {
     if (!S.hull || S.docked || S.ftl || (S.state && S.state.boom)) return;
     if (S.state && S.state.hostile === 0) { spinDown(); return; } // (a ship that isn't the mission's holds her fire till she's breached)
     if (!S.state || !S.state.gn || S.state.arm != null) { spinDown(); return; } // (nobody left at her gun control, or she's counting down to blowing herself apart: her guns are silent)
-    const lk = Radar.best(EW.foe); if (!lk || !lk.est.p || lk.est.q < 0.15) { spinDown(); return; } // (on whatever her best track's on: chaff, if it's been drawn off)
+    let lk: RTrack | null = null; for (const t of EW.foe!.trks) if (t.st === 'track' && t.est.p && t.est.q >= 0.15 && (!lk || trkUrg(EW.foe!, t) < trkUrg(EW.foe!, lk))) lk = t; // (the most urgent of her locks: what reaches her soonest)
+    if (!lk || !lk.est.p) { spinDown(); return; } // (on whatever her best track's on: chaff, if it's been drawn off)
     const up = new T.Vector3(0, 1.5, 0);
     for (const gn of S.hull.guns) {
       if (gn.hp <= 0) continue;
@@ -2271,7 +2284,7 @@ export const Space = (() => {
   // TORP.vc of closing speed (it keeps some for turning). It's a radar target like anything out here (torpTargets: no
   // transponder), so a ship's own threat assessment and fire control deal with it as they would anything coming at her: a
   // round that meets it (rounds) kills it. The pilot's screen flies it and tells everyone aboard (storp, ten times a second).
-  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, turn2: 1.6, off: 0.6, burn: 85, vc: 300, N: 4, seek: 1000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
+  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, turn2: 1.6, off: 0.6, blast: 15, burn: 85, vc: 300, N: 4, seek: 1000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
   type Torp = { id: number; o: THREE.Group; fl: THREE.Mesh; puffs: THREE.Mesh[]; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; sent: number; lock: string; rt: RTarget; thr: number; rcs: boolean; lf: THREE.Vector3 }; // (thr: its motor's push (0..1); rcs: its thrusters firing)
   const TP = { list: [] as Torp[], n: 1, base: 1 + Math.floor(Math.random() * 1e6), left: TORP.loads, look: '', pick: '', l: false, cool: 0, tube: null as null | { at: THREE.Vector3; m: THREE.Object3D } };
   function tubeKit(g: THREE.Object3D, box: THREE.Box3, size: number) {
@@ -2431,7 +2444,7 @@ export const Space = (() => {
     torpGone(tp, 2, true);
     const nm = t.id === 'hull' ? hullName() : t.id.startsWith('trf') ? 'a ship' : t.id.startsWith('chaff') ? 'chaff' : t.id.startsWith('missile') ? 'a missile' : 'something';
     HUD.feed(`<b>Torpedo hit ${U.esc(nm)}</b>`);
-    if (t.id === 'hull' && S.hull) S.hull.guns.forEach((gn, i) => { if (gn.hp > 0 && new T.Vector3(gn.x, gn.y, gn.z).distanceTo(tp.p) < 45) { gunHit(i, 0); Net.toHost({ t: 'shit', i, hp: 0 }); } }); // (her guns near the blast)
+    if (t.id === 'hull' && S.hull) S.hull.guns.forEach((gn, i) => { if (gn.hp > 0 && new T.Vector3(gn.x, gn.y, gn.z).distanceTo(tp.p) < TORP.blast) { gunHit(i, 0); Net.toHost({ t: 'shit', i, hp: 0 }); } }); // (her guns right by the blast)
   }
   // the torpedoes in flight as radar targets: about a square metre and a half; to her own radars it answers (the squad's, by name: FRIENDLY), to anyone else's, nothing
   function torpTargets() { return TP.list.map((tp) => { tp.rt.v.copy(tp.v); tp.rt.p.copy(tp.p); tp.rt.q.copy(tp.q); return tp.rt; }); }
