@@ -904,7 +904,7 @@ export const SpaceSv = (() => {
       case 'smis': if (p && Array.isArray(m.a) && m.a.length <= 8 && m.a.every(Number.isFinite)) net().broadcast({ t: 'smis', a: m.a, by: from }, from); break; // (a missile off her hull, or one shot down: told to all)
       case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) net().broadcast({ t: 'sfire', a: m.a, by: from }, from); break;
       case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 5 && m.a.every(Number.isFinite)) net().broadcast({ t: 'strk', a: m.a, by: from }, from); break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
-      case 'ssec': if (p && Array.isArray(m.a) && m.a.length === 4 && m.a.every(Number.isFinite)) net().broadcast({ t: 'ssec', a: m.a, by: from }, from); break; // (a scanner's search set: js/space.ts secSet)
+      case 'ssec': if (p && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5) && m.a.every(Number.isFinite)) net().broadcast({ t: 'ssec', a: m.a, by: from }, from); break; // (a scanner's search set: js/space.ts secSet)
       case 'sxpdr': if (p) net().broadcast({ t: 'sxpdr', on: m.on ? 1 : 0, by: from }, from); break; // (her transponder switched: js/space.ts xpdr)
       case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) net().broadcast({ t: 'storp', a: m.a, by: from }, from); break; // (a torpedo in flight: js/space.ts torps)
       case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) net().broadcast({ t: 'schaff', a: m.a, by: from }, from); break; // (chaff thrown out of her: js/space.ts chaffGo)

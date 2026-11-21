@@ -423,7 +423,10 @@ export const RadarView = (() => {
   // beam a line from the middle along its boresight (amber slewing or sweeping, red tracking). The operator turns it (rot) and
   // points at a track with the middle of their view (holoPick).
   type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string; rwr?: THREE.Vector3 }; // (rwr: a radar warning's bearing (her frame), to send a tracker along)
-  let holoG: { rwrItems: HoloItem[]; scanUi: HTMLElement; secs: { patch: THREE.Mesh; edges: THREE.Mesh }[]; rwr: { cone: THREE.Mesh; line: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[]; zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
+  let holoG: { vels: THREE.Line[]; rwrItems: HoloItem[]; scanUi: HTMLElement; secs: { patch: THREE.Mesh; edges: THREE.Mesh }[]; rwr: { cone: THREE.Mesh; line: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[]; zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
+  // (a track's velocity line: from its dot to where it'll be in VT seconds at its velocity against hers, so what's coming at
+  // her points at the middle)
+  const VT = 10;
   const HCOL: Record<string, number> = { HOSTILE: 0xff4a3a, SUSPECT: 0xffa040, WATCH: 0xffe070, NEUTRAL: 0xa8b8c4, CIV: 0x7f9fb0, FRIENDLY: 0x70f090 };
   function holoMake(parent: THREE.Object3D, R: number) {
     const g = new T.Group(), inner = new T.Group(); g.add(inner); parent.add(g);
@@ -448,7 +451,7 @@ export const RadarView = (() => {
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
     const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', font: '300 13px "Oxanium", var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', color: 'rgba(170,225,250,0.75)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; document.body.appendChild(hint);
     const scanUi = document.createElement('div'); scanUi.id = 'holo-scan'; Object.assign(scanUi.style, { position: 'fixed', left: '24px', top: '24px', font: '300 13px "Oxanium", var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', fontVariantNumeric: 'tabular-nums', color: 'rgba(215,235,245,0.85)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35', lineHeight: '1.6' }); document.body.appendChild(scanUi);
-    holoG = { rwrItems: [], scanUi, secs: [], rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
+    holoG = { vels: [], rwrItems: [], scanUi, secs: [], rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
   // the hologram as her radars have it now: parent her drawing's group, c its middle there, rot how the operator's turned it,
   // seated whether its operator's at it (the hint), pick the item they're pointing at
@@ -456,7 +459,7 @@ export const RadarView = (() => {
   // it is has the fallback in it, kept till its text changes)
   let refont = false;
   try { for (const w of [300, 400, 500]) document.fonts.load(`${w} 32px Oxanium`).then(() => { refont = true; }); } catch { /* (no FontFaceSet: the fallback) */ }
-  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [], sv: { secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[]; boxes: { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[]; trkSel: number } = { secs: [], boxes: [], trkSel: -1 }) {
+  function holo(parent: THREE.Object3D | null, su: RSuite | null, c: THREE.Vector3, R: number, rot: THREE.Quaternion, now: number, seated: boolean, pick: HoloItem | null, focus = false, grow = 1, zoom = RMAX, rwr: { d: THREE.Vector3; kind: 'lock' | 'trk' | 'scan'; age: number }[] = [], sv: { secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[]; boxes: { mode: string; notch?: boolean; open: boolean; cur: number; opts: string[]; sel: boolean }[]; trkSel: number } = { secs: [], boxes: [], trkSel: -1 }) {
     const secs = sv.secs;
     if (!parent || !su) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.style.display = 'none'; holoG.scanUi.style.display = 'none'; } return; }
     if (!holoG || holoG.R !== R) { if (holoG) { holoG.g.removeFromParent(); holoG.hint.remove(); } holoMake(parent, R); }
@@ -515,7 +518,7 @@ export const RadarView = (() => {
         const b = sv.boxes[k]; if (!b) return ''; const col = sc.ax === 'y' ? '#50d8ff' : '#e070ff', name = b.opts[['round', 'sector', 'off'].indexOf(b.mode)] || b.mode;
         const what = b.mode === 'sector' ? `${name} ${Math.round(sc.sec.h * 360 / Math.PI)}° at ${deg(sc.sec.c)}°` : name;
         let h = `<div data-hb="s${k}" style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid ${b.open || b.sel ? col : 'rgba(120,180,210,0.18)'};background:rgba(4,12,18,0.32);border-radius:2px">`
-          + `<span style="color:${col}">${k + 1} SCAN ${sc.tag}</span> <span style="color:#7f9fb0">${sc.ax === 'y' ? 'bearing' : 'roll'}</span> <span style="float:right;font-weight:400">${what} ${b.open ? '▴' : '▾'}</span>`;
+          + `<span style="color:${col}">${k + 1} SCAN ${sc.tag}</span> <span style="color:#7f9fb0">${sc.ax === 'y' ? 'bearing' : 'roll'}</span> <span style="float:right;font-weight:400">${what}${b.notch ? ' <span style="color:#8dffbe">· NOTCH</span>' : ''} ${b.open ? '▴' : '▾'}</span>`;
         if (b.open) h += b.opts.map((o, i) => `<div data-hb="o${k}:${i}" style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:12px">click one, or tap ${k + 1}: next · hold ${k + 1}: set</div>`;
         if (b.sel) h += `<div style="color:rgba(255,255,255,0.7);font-size:12px">W S: width · A D: direction</div>`;
         return h + '</div>';
@@ -556,7 +559,7 @@ export const RadarView = (() => {
     });
     for (let i = rwr.length; i < H.rwr.length; i++) { const m = H.rwr[i]; m.cone.visible = m.line.visible = m.s.visible = false; }
     // the tracks: each 3D track at its place; each contact no 3D track has, faint at its fan's middle
-    const items: HoloItem[] = []; for (const l of H.arcs) l.visible = false;
+    const items: HoloItem[] = []; for (const l of H.arcs) l.visible = false; let nv = 0; const qn = su.Q.clone().invert();
     for (const a of su.ass) {
       let pos: THREE.Vector3 | null = null;
       let arc: THREE.Vector3[] | null = null;
@@ -572,7 +575,16 @@ export const RadarView = (() => {
       items.push({ pos: at(pos), plot: a.plot, label: `${a.n} ${a.cls} · ${nm} · ${(a.r / 1000).toFixed(2)} km ${a.vc >= 0 ? '+' : ''}${Math.round(a.vc)} m/s`, col: '#' + (HCOL[a.cls] || 0xffffff).toString(16).padStart(6, '0') });
       const m = H.dots[items.length - 1] || (() => { const d = new T.Mesh(new T.SphereGeometry(R * 0.032, 10, 8), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); H.inner.add(d); H.dots.push(d); return d; })();
       m.visible = true; m.position.copy(items[items.length - 1].pos); (m.material as THREE.MeshBasicMaterial).color.setHex(HCOL[a.cls] || 0xffffff); (m.material as THREE.MeshBasicMaterial).opacity = a.f ? 0.95 : 0.4; m.scale.setScalar(a.f ? 1 : 0.7);
+      // (its velocity against hers, in her frame: a 3D track's whole; one scanner's, only its Doppler's along the line of sight)
+      const vr = a.f ? a.f.v.clone().sub(su.V).applyQuaternion(qn) : a.c && a.plot ? pos.clone().sub(su.scans[a.plot.k].at).normalize().multiplyScalar(a.c.vr) : null;
+      if (vr && vr.lengthSq() > 1) {
+        const l = H.vels[nv] || (() => { const n = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3)), new T.LineBasicMaterial({ transparent: true, depthWrite: false, blending: T.AdditiveBlending })); H.inner.add(n); H.vels.push(n); return n; })(); nv++;
+        const e = at(pos.clone().addScaledVector(vr, VT)), pa = l.geometry.attributes.position as THREE.BufferAttribute, s0 = items[items.length - 1].pos;
+        pa.setXYZ(0, s0.x, s0.y, s0.z); pa.setXYZ(1, e.x, e.y, e.z); pa.needsUpdate = true; l.geometry.computeBoundingSphere(); l.visible = true; l.layers.set(focus ? 6 : 0);
+        (l.material as THREE.LineBasicMaterial).color.setHex(HCOL[a.cls] || 0xffffff); (l.material as THREE.LineBasicMaterial).opacity = a.f ? 0.85 : 0.35;
+      }
     }
+    for (let i = nv; i < H.vels.length; i++) H.vels[i].visible = false;
     for (let i = items.length; i < H.dots.length; i++) H.dots[i].visible = false;
     H.items = items;
     // the one pointed at: ringed (facing the viewer), and named

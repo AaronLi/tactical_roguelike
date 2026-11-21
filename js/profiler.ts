@@ -31,7 +31,7 @@ import { Me } from './player.js';
 // to the next (what you feel: it includes the GPU and the browser), "cpu" is the time spent in the game's loop.
 export const Prof = (() => {
   interface Spike { t: number; frame: number; cpu: number; calls: number; tris: number; progs: number; heap: number; parts: Record<string, { ms: number; n: number }> }
-  const CAP = 3600, MAX_SEC = 48, SPIKES = 40, MSG_TYPES = 64, SPIKE_MS = 33;
+  const CAP = 3600, MAX_SEC = 96, SPIKES = 40, MSG_TYPES = 64, SPIKE_MS = 33;
   const FIX = ['t', 'frame', 'cpu', 'calls', 'tris', 'geoms', 'texs', 'progs', 'heap', 'rounds', 'enemies'];
   const NF = FIX.length;
   const ring = new Float32Array(CAP * (NF + MAX_SEC * 2)), stride = NF + MAX_SEC * 2;
@@ -76,7 +76,40 @@ export const Prof = (() => {
     };
   }
 
-  function frameBegin() { loopStart = performance.now(); }
+  function frameBegin() { loopStart = performance.now(); if (!drawHooked && G_R && G_R.renderer) hookDraws(G_R.renderer); }
+  // ---- timing from inside the game's own code, for what's not a method that can be wrapped (js/space.ts's steps):
+  //   let t = Prof.t(); step(); t = Prof.lap('space: step', t); next(); t = Prof.lap('space: next', t);
+  // (off: t() is 0 and lap does nothing but hand back 0). add(label, ms, n): ms and a count straight in.
+  const t = () => (on ? performance.now() : 0);
+  function lap(label: string, t0: number) { if (!on || !t0) return 0; const now = performance.now(), i = sec(label); if (i >= 0) { acc[i] += now - t0; cnt[i]++; } return now; }
+  function add(label: string, ms: number, n = 1) { if (!on) return; const i = sec(label); if (i >= 0) { acc[i] += ms; cnt[i] += n; } }
+  // ---- the draws, counted by whose they are: each draw to the nearest thing above it tagged userData.prof (the level's interior,
+  // its hull, the squad's ship, a zone ship, her interior, the rocks: js/render.ts, js/space.ts), else what it hangs off at the
+  // scene's top. Counts, not times: a draw's few microseconds can't be timed one by one here; ~5 us each (three's own work).
+  let drawHooked = false;
+  const drawSec = new Map<string, number>();
+  function tagOf(o: THREE.Object3D) {
+    let p: THREE.Object3D | null = o, top: THREE.Object3D = o;
+    for (; p; p = p.parent) { const k = p.userData && p.userData.prof; if (k) return k as string; if (p.parent) top = p; }
+    return 'other: ' + (top.name || top.type);
+  }
+  function hookDraws(r: THREE.WebGLRenderer) {
+    drawHooked = true;
+    const rbd = r.renderBufferDirect;
+    r.renderBufferDirect = function (this: any, cam: any, sc: any, geo: any, mat: any, obj: THREE.Object3D) {
+      if (on) { const k = tagOf(obj); let i = drawSec.get(k); if (i == null) { i = sec('draws: ' + k); drawSec.set(k, i); } if (i >= 0) cnt[i]++; }
+      return rbd.apply(this, arguments as any);
+    } as any;
+    // three's own render by what it draws (the scene, the gun in your hands, the rest), and the scene's matrices inside it
+    const rr = r.render;
+    r.render = function (this: any, sc: THREE.Object3D) {
+      if (!on) return rr.apply(this, arguments as any);
+      const a = performance.now();
+      try { return rr.apply(this, arguments as any); } finally { add(sc === G_R.scene ? 'render: three, the scene' : sc === G_R.vmScene ? 'render: three, gun in hand' : 'render: three, other', performance.now() - a); }
+    } as any;
+    const sc = G_R.scene, um = sc.updateMatrixWorld;
+    sc.updateMatrixWorld = function (this: any) { if (!on) return um.apply(this, arguments as any); const a = performance.now(); try { return um.apply(this, arguments as any); } finally { add('render: scene matrices', performance.now() - a); } } as any;
+  }
   function frameEnd() {
     const now = performance.now(), frame = lastFrame ? loopStart - lastFrame : 0, cpu = now - loopStart;
     lastFrame = loopStart;
@@ -285,5 +318,5 @@ export const Prof = (() => {
     if (Course) gpuWrap(Course, 'update', 'course cameras');
   }
 
-  return { install, save, report, summary, line, reset, wrap, sec, gpuSummary, get on() { return on; }, set on(v) { on = !!v; } };
+  return { install, save, report, summary, line, reset, wrap, sec, t, lap, add, gpuSummary, get on() { return on; }, set on(v) { on = !!v; } };
 })();

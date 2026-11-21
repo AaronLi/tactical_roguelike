@@ -1,5 +1,6 @@
 'use strict';
 import { ReplayEnv } from './replayenv.js';
+import { Prof } from './profiler.js';
 import { Audio } from './audio.js';
 import { Ballistics } from './ballistics.js';
 import { Bolts } from './bolts.js';
@@ -47,6 +48,13 @@ interface VwAct { kind: VwActKind; t: number; hand: 'L' | 'R'; pt?: THREE.Vector
 type VwNadeKind = 'frag' | 'flash' | 'tb' | 'sticky'; // (sticky: holds to what it hits first: stickStep)
 interface VwAboxView extends VwLid { key: string | null; lights: THREE.Group }
 interface VwSboxView extends VwLid { name: string | null; card: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> }
+// (whether a body at p is in the camera's view: the view's frustum worked out once a frame)
+const _pf = { f: new THREE.Frustum(), m: new THREE.Matrix4(), at: -1, s: new THREE.Sphere(new THREE.Vector3(), 1.4) };
+function inView(p: { x: number; y: number; z: number }) {
+  const cam = R.camera, fr = R.renderer ? R.renderer.info.render.frame : 0;
+  if (_pf.at !== fr) { _pf.at = fr; cam.updateMatrixWorld(); _pf.f.setFromProjectionMatrix(_pf.m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse)); }
+  _pf.s.center.set(p.x, p.y + 0.9, p.z); return _pf.f.intersectsSphere(_pf.s);
+}
 export const Views = {
   players: new Map<string, VwPlayer>(),
   enemies: new Map<number, VwEnemy>(),
@@ -913,9 +921,8 @@ export const Views = {
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
       ev.aimP = aimed ? aimAt : null; // (who they're on: where their light and laser go)
-      ev.rig.update(dt, { feet: ev.alive && !ev.down ? (ev.feet ||= Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, shieldUp: !!ev.alert && ev.alive && !ev.down && !ev.surp, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
-        reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
-      // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
+      // (whether they can be seen this frame, before they're posed: past the fog or behind a wall they aren't drawn, below)
+      // Past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
       // pieces a draw call. The body, not the root: the root's what a shot checks for (js/player.ts), and it still hits.
       // Nor behind a wall, floor or ceiling (furniture, doors, glass, rails and stairs don't count: you might see them
       // round, over or through it).
@@ -926,6 +933,15 @@ export const Views = {
         const pip = R.vm && R.vm.visible && R.vm.userData.pip, sk = pip && (R.pipLive || 0) > 0.35 ? R.scopeReach(pip.mag).k : 1;
         ev.rig.body.visible = depth < (fog as THREE.Fog).far * sk + 2.5 && this.inSight(ev.rig, at);
       }
+      // Someone who can't be seen (not drawn, or out of the view) is posed every fourth frame, with the time since: their body caught up
+      // the moment it's seen again, or anything asks where it is (a shot, a hit test: js/rig.ts catchUp). Not one shot at lately (their
+      // fall's being watched: near, above).
+      const rt0 = Prof.t();
+      const rp = { feet: ev.alive && !ev.down ? (ev.feet ||= Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, shieldUp: !!ev.alert && ev.alive && !ev.down && !ev.surp, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
+        reload: rlP >= 0 && rlP < 1 ? rlP : -1 };
+      const unseen = (fog ? !ev.rig.body.visible : false) || !inView(at), watched = !!(ev.engagedT && performance.now() - ev.engagedT < 8000);
+      if (unseen && !watched && ((ev.rigSkip = (ev.rigSkip || 0) + 1) & 3)) ev.rig.defer(dt, rp); else { ev.rigSkip = 0; ev.rig.update(dt, rp); }
+      if (rt0) { const ms = performance.now() - rt0; Prof.add('rigs: people', ms); if (!inView(ev.pos)) Prof.add('rigs: people off screen', ms); } // (js/profiler.ts)
       // bleeding: drips falling from them as they go; down for good, from the body where it lies (its ragdoll's hips,
       // not where they last stood)
       if (ev.alive && ev.bleed && !(ev.wnd && ev.wnd.length) && (ev.dripT = (ev.dripT || 0) - dt) <= 0) {
@@ -965,8 +981,10 @@ export const Views = {
       pv.lastRa = st.ra == null ? -1 : st.ra;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : st.hk === 3 ? 'tb' : st.hk === 4 ? 'sticky' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
+      const rt1 = Prof.t();
       pv.rig.update(dt, { feet: st.dn || st.dd ? undefined : { sole: 'boot', kit: 'heavy', careful: !!st.sd, low: !!st.lr }, pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, bipod: !!st.bp, climb: st.cl ? Level.ladderAt(Game.map, pv.pos.x, pv.pos.z) : null, zip: !!st.zp, aim: !!st.ad, alert: !st.lr && !st.sw, atak: !!st.mn, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
         hold, rack: st.ra == null ? -1 : st.ra, reload: st.rl == null ? -1 : st.rl, loaded: st.ld == null ? null : !!st.ld, nomag: !!st.nm, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
+      if (rt1) { const ms = performance.now() - rt1; Prof.add('rigs: players', ms); if (!inView(pv.pos)) Prof.add('rigs: players off screen', ms); }
       if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
     }
 

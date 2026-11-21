@@ -521,9 +521,9 @@ export const LevelView = {
     wheel.position.z = 0.09; const w2 = wheel.clone(); w2.position.z = -0.09; g.add(w2);
     return g;
   },
-  mergeStatic(root: THREE.Object3D, map: LvMap, CH = 24) { const it = this.mergeSteps(root, map, CH); let r = it.next(); while (!r.done) r = it.next(); return r.value; },
-  *mergeSteps(root: THREE.Object3D, map: LvMap, CH = 24): Generator<void, number, void> {
-    const T = THREE, keep = new Set();
+  // what of a level moves or changes while it's played (its doors, windows, the case, the boxes, the cabinets): never merged or batched
+  keepOf(map: LvMap) {
+    const keep = new Set<THREE.Object3D>();
     for (const m of [map, ...(map.floors || [])]) {
       for (const o of m.doorMeshes || []) keep.add(o);
       for (const o of m.winMeshes || []) if (o) keep.add(o);
@@ -532,6 +532,11 @@ export const LevelView = {
       if (m.sboxView) keep.add(m.sboxView.g);
       for (const c of m.cabViews || []) keep.add(c.g);
     }
+    return keep;
+  },
+  mergeStatic(root: THREE.Object3D, map: LvMap, CH = 24) { const it = this.mergeSteps(root, map, CH); let r = it.next(); while (!r.done) r = it.next(); return r.value; },
+  *mergeSteps(root: THREE.Object3D, map: LvMap, CH = 24): Generator<void, number, void> {
+    const T = THREE, keep = this.keepOf(map);
     const plain = (mt: Record<string, any>) => (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && !mt.transparent
       && (!mt.hasOwnProperty('onBeforeCompile'));
     root.updateMatrixWorld(true);

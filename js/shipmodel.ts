@@ -31,6 +31,105 @@ export const ShipModel = (() => {
   const part = (g: THREE.Object3D, mesh: THREE.Object3D, x: number, y: number, z: number) => { mesh.position.set(x, y, z); g.add(mesh); return mesh; };
   const canvasTex = (w: number, h: number, draw?: (g: CanvasRenderingContext2D, w: number, h: number) => void) => { const c = document.createElement('canvas'); c.width = w; c.height = h; if (draw) draw(c.getContext('2d')!, w, h); const t = new T.CanvasTexture(c); return { cv: c, tex: t }; };
 
+  // ---- A model drawn in a few calls: every plain, opaque, untextured part under g that doesn't move or change on its own (not
+  // under anything in keep) merged into one mesh a kind (lit: standard; flat colour: basic), each part's colour, roughness,
+  // metalness and glow (emissive) written into its vertices, so parts that only differ in those share the one draw. Its
+  // standard mesh's shader reads them there (vPbr, vEmi) where three's reads its material's (after the light grid's patch:
+  // js/lightgrid.ts). What can't go in (transparent, textured, a shader of its own, other attributes than position, normal,
+  // uv and colour, in keep) is left as it was. The merged meshes are in g's own frame.
+  const PBR_ATT = new Set(['position', 'normal', 'uv', 'color']);
+  const pbrMats = new Map<string, THREE.Material>(), compactOn = { on: typeof location === 'undefined' || !new URLSearchParams(location.search).has('nocompact') }; // (?nocompact: as built)
+  function pbrMat(kind: 'std' | 'basic', side: number, flat: boolean, env: number, fog: boolean) {
+    const key = kind + side + +flat + env + +fog; let m = pbrMats.get(key);
+    if (m) return m;
+    if (kind === 'basic') m = new T.MeshBasicMaterial({ vertexColors: true, side: side as THREE.Side, fog });
+    else {
+      const sm = new T.MeshStandardMaterial({ vertexColors: true, side: side as THREE.Side, flatShading: flat, fog, roughness: 1, metalness: 1 }); sm.envMapIntensity = env;
+      const NL = String.fromCharCode(10);
+      sm.onBeforeCompile = (sh, rd) => {
+        (T.MeshStandardMaterial.prototype.onBeforeCompile as any).call(sm, sh, rd);
+        sh.vertexShader = sh.vertexShader.replace('#include <common>', ['#include <common>', 'attribute vec2 aPbr;', 'attribute vec3 aEmi;', 'varying vec2 vPbr;', 'varying vec3 vEmi;'].join(NL)).replace('#include <begin_vertex>', ['#include <begin_vertex>', 'vPbr = aPbr; vEmi = aEmi;'].join(NL));
+        sh.fragmentShader = sh.fragmentShader.replace('#include <common>', ['#include <common>', 'varying vec2 vPbr;', 'varying vec3 vEmi;'].join(NL)).replace('#include <roughnessmap_fragment>', 'float roughnessFactor = vPbr.x;').replace('#include <metalnessmap_fragment>', 'float metalnessFactor = vPbr.y;').replace('vec3 totalEmissiveRadiance = emissive;', 'vec3 totalEmissiveRadiance = vEmi;');
+      };
+      sm.customProgramCacheKey = () => 'pbr-vertex';
+      m = sm;
+    }
+    m.userData.keepMat = true; // (shared by every model's merged meshes, all session: js/render.ts clearLevel)
+    pbrMats.set(key, m); return m;
+  }
+  function compact(g: THREE.Object3D, keep: Iterable<THREE.Object3D> = []) {
+    if (!compactOn.on) return { merged: 0, meshes: 0 }; // (off: as built, for comparing)
+    const skip = new Set<THREE.Object3D>(); for (const k of keep) k.traverse((o) => skip.add(o));
+    g.updateMatrixWorld(true);
+    const inv = new T.Matrix4().copy(g.matrixWorld).invert(), N = new T.Matrix3();
+    const noTex = (m: any) => !m.map && !m.alphaMap && !m.lightMap && !m.aoMap && !m.emissiveMap && !m.bumpMap && !m.normalMap && !m.displacementMap && !m.roughnessMap && !m.metalnessMap && !m.envMap && !m.specularMap;
+    const bins = new Map<string, { mat: THREE.Material; cast: boolean; recv: boolean; list: { o: THREE.Mesh; M: THREE.Matrix4 }[] }>();
+    g.traverse((o: any) => {
+      if (!o.isMesh || skip.has(o) || o.isInstancedMesh || o.isBatchedMesh || o.isSkinnedMesh || o.morphTargetInfluences || o.renderOrder || !o.visible || Array.isArray(o.material) || o.hasOwnProperty('onBeforeRender')) return;
+      for (let p = o.parent; p && p !== g; p = p.parent) if (!p.visible) return;
+      const m = o.material, geo = o.geometry as THREE.BufferGeometry;
+      if (m.transparent || m.alphaTest || m.hasOwnProperty('onBeforeCompile') || m.blending !== T.NormalBlending || !m.depthWrite || !m.depthTest || m.wireframe || m.polygonOffset || !noTex(m) || !m.visible || m.userData.own) return;
+      if (!(m.isMeshStandardMaterial && !m.isMeshPhysicalMaterial) && !m.isMeshBasicMaterial) return;
+      if (!geo.attributes.position || geo.drawRange.count !== Infinity || Object.keys(geo.attributes).some((k) => !PBR_ATT.has(k) || (geo.attributes[k] as any).isInterleavedBufferAttribute)) return;
+      const std = !!m.isMeshStandardMaterial, mat = pbrMat(std ? 'std' : 'basic', m.side, std && !!m.flatShading, std ? m.envMapIntensity : 1, m.fog);
+      const key = mat.uuid + +o.castShadow + +o.receiveShadow;
+      let b = bins.get(key); if (!b) bins.set(key, (b = { mat, cast: o.castShadow, recv: o.receiveShadow, list: [] }));
+      b.list.push({ o, M: new T.Matrix4().multiplyMatrices(inv, o.matrixWorld) });
+    });
+    const gone = new Set<THREE.Mesh>(); let made = 0;
+    for (const b of bins.values()) {
+      if (b.list.length < 2) continue;
+      const std = !!(b.mat as any).isMeshStandardMaterial;
+      let n = 0; const flat = b.list.map(({ o, M }) => { const ng = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); if (!ng.attributes.normal && std) ng.computeVertexNormals(); n += ng.attributes.position.count; return { o, M, ng }; });
+      const pos = new Float32Array(n * 3), nrm = std ? new Float32Array(n * 3) : null, col = new Float32Array(n * 3), pbr = std ? new Float32Array(n * 2) : null, emi = std ? new Float32Array(n * 3) : null;
+      const v = new T.Vector3(), c = new T.Color(), e = new T.Color(); let off = 0;
+      for (const { o, M, ng } of flat) {
+        const m = o.material as any, P = ng.attributes.position, Nn = ng.attributes.normal, C = ng.attributes.color, cnt = P.count, mir = M.determinant() < 0;
+        N.getNormalMatrix(M); c.copy(m.color);
+        if (std) e.copy(m.emissive).multiplyScalar(m.emissiveIntensity ?? 1);
+        for (let i = 0; i < cnt; i++) {
+          const j = mir ? (i % 3 === 1 ? i + 1 : i % 3 === 2 ? i - 1 : i) : i, w = off + i; // (mirrored: each triangle wound back the right way round)
+          v.fromBufferAttribute(P, j).applyMatrix4(M); pos[w * 3] = v.x; pos[w * 3 + 1] = v.y; pos[w * 3 + 2] = v.z;
+          if (nrm && Nn) { v.fromBufferAttribute(Nn, j).applyMatrix3(N).normalize(); nrm[w * 3] = v.x; nrm[w * 3 + 1] = v.y; nrm[w * 3 + 2] = v.z; }
+          let r = c.r, gg = c.g, bb = c.b; if (C && m.vertexColors) { r *= C.getX(j); gg *= C.getY(j); bb *= C.getZ(j); }
+          col[w * 3] = r; col[w * 3 + 1] = gg; col[w * 3 + 2] = bb;
+          if (pbr && emi) { pbr[w * 2] = m.roughness; pbr[w * 2 + 1] = m.metalness; emi[w * 3] = e.r; emi[w * 3 + 1] = e.g; emi[w * 3 + 2] = e.b; }
+        }
+        off += cnt; ng.dispose(); gone.add(o);
+      }
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(pos, 3)); out.setAttribute('color', new T.BufferAttribute(col, 3));
+      if (nrm) out.setAttribute('normal', new T.BufferAttribute(nrm, 3)); if (pbr) out.setAttribute('aPbr', new T.BufferAttribute(pbr, 2)); if (emi) out.setAttribute('aEmi', new T.BufferAttribute(emi, 3));
+      out.computeBoundingSphere(); out.computeBoundingBox();
+      const mesh = new T.Mesh(out, b.mat); mesh.castShadow = b.cast; mesh.receiveShadow = b.recv; mesh.matrixAutoUpdate = false; mesh.name = 'compact'; g.add(mesh); made++;
+    }
+    // and the added light (engines' plumes, glows: additive, not writing depth, so in any order it's the same), alike ones in one mesh
+    // with the first one's material: by what they look like and their draw order
+    const adds = new Map<string, { o: THREE.Mesh; M: THREE.Matrix4 }[]>();
+    g.traverse((o: any) => {
+      if (!o.isMesh || skip.has(o) || gone.has(o) || o.isInstancedMesh || o.isBatchedMesh || o.isSkinnedMesh || o.morphTargetInfluences || !o.visible || Array.isArray(o.material) || o.hasOwnProperty('onBeforeRender')) return;
+      for (let p = o.parent; p && p !== g; p = p.parent) if (!p.visible) return;
+      const m = o.material, geo = o.geometry as THREE.BufferGeometry;
+      if (!m.isMeshBasicMaterial || m.blending !== T.AdditiveBlending || m.depthWrite || m.map || m.alphaMap || m.hasOwnProperty('onBeforeCompile') || m.vertexColors || !m.visible) return;
+      if (!geo.attributes.position || geo.drawRange.count !== Infinity || Object.keys(geo.attributes).some((k) => !PBR_ATT.has(k) || k === 'color')) return;
+      const key = m.color.getHexString() + '|' + m.opacity + '|' + m.side + '|' + m.transparent + '|' + m.depthTest + '|' + m.fog + '|' + o.renderOrder;
+      let l = adds.get(key); if (!l) adds.set(key, (l = [])); l.push({ o, M: new T.Matrix4().multiplyMatrices(inv, o.matrixWorld) });
+    });
+    for (const l of adds.values()) {
+      if (l.length < 2) continue;
+      const parts = l.map(({ o, M }) => { const ng = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone(); ng.applyMatrix4(M); return ng; });
+      let n = 0; for (const q of parts) n += q.attributes.position.count;
+      const pos = new Float32Array(n * 3); let off = 0; for (const q of parts) { pos.set(q.attributes.position.array as Float32Array, off * 3); off += q.attributes.position.count; q.dispose(); }
+      const out = new T.BufferGeometry(); out.setAttribute('position', new T.BufferAttribute(pos, 3)); out.computeBoundingSphere();
+      const mesh = new T.Mesh(out, l[0].o.material); mesh.renderOrder = l[0].o.renderOrder; mesh.matrixAutoUpdate = false; mesh.name = 'compact+'; g.add(mesh); made++;
+      for (const { o } of l) gone.add(o);
+    }
+    // what went in: out of the model (its geometry thrown away unless something left still has it)
+    for (const o of gone) o.removeFromParent();
+    const used = new Set<THREE.BufferGeometry>(); g.traverse((o: any) => { if (o.geometry) used.add(o.geometry); });
+    for (const o of gone) if (!used.has(o.geometry)) o.geometry.dispose();
+    return { merged: gone.size, meshes: made };
+  }
+
   // a faceted solid lofted through stations down her length: each a ring of [x, y] at a z (the same count in each), the ends capped
   function loft(st: { z: number; pts: number[][] }[], m: THREE.Material, mirror = false) {
     const pos: number[] = [], sx = mirror ? -1 : 1, v = (k: number, i: number) => [st[k].pts[i][0] * sx, st[k].pts[i][1], st[k].z];
@@ -66,7 +165,7 @@ export const ShipModel = (() => {
     const mats: Record<string, THREE.Material> = {
       hull: M(c0, Object.assign({ emissive: 0x101316, metalness: 0.45, roughness: 0.55 }, DS)), armor: M(c1, Object.assign({ emissive: 0x08090b, metalness: 0.55, roughness: 0.5 }, DS)), accent: M(c2, { emissive: new T.Color(c2).multiplyScalar(0.35).getHex(), flatShading: true }),
       deck: M(0x2b2f34, { roughness: 0.85, emissive: 0x08090a, flatShading: true }), inner: M(0x5d656e, { emissive: 0x15181b, flatShading: true }), dark: M(0x15171a, { metalness: 0.5, flatShading: true }), seat: M(0x3d444d, { emissive: 0x101216, flatShading: true }),
-      glass: new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0.6, depthWrite: false, side: T.DoubleSide, emissive: 0x06202c }),
+      glass: new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.07, roughness: 0.05, metalness: 0.1, depthWrite: false, side: T.DoubleSide, emissive: 0x01070a, envMapIntensity: 0.25 }),
       glow, strip: lit(0xdff2ff), hot,
     };
     const scr = canvasTex(512, 320, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); }), nav = canvasTex(320, 200, (c, cw2, ch) => { c.fillStyle = '#04080c'; c.fillRect(0, 0, cw2, ch); });
@@ -111,7 +210,7 @@ export const ShipModel = (() => {
     const [c0, c1, c2] = PAINT[d.id] || PAINT.kestrel, DS = { side: T.DoubleSide, flatShading: true };
     const hull = M(c0, Object.assign({ emissive: 0x101316, metalness: 0.45, roughness: 0.55 }, DS)), armor = M(c1, Object.assign({ emissive: 0x08090b, metalness: 0.55, roughness: 0.5 }, DS)), accent = M(c2, { emissive: new T.Color(c2).multiplyScalar(0.35).getHex() });
     const deck = M(0x2b2f34, { roughness: 0.85, emissive: 0x08090a }), inner = M(0x5d656e, { emissive: 0x15181b }), dark = M(0x15171a, { metalness: 0.5 }), seatM = M(0x3d444d, { emissive: 0x101216 });
-    const glass = new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.18, roughness: 0.05, metalness: 0.6, depthWrite: false, side: T.DoubleSide, emissive: 0x06202c });
+    const glass = new T.MeshStandardMaterial({ color: 0x7fd0ff, transparent: true, opacity: 0.07, roughness: 0.05, metalness: 0.1, depthWrite: false, side: T.DoubleSide, emissive: 0x01070a, envMapIntensity: 0.25 });
     const glow = lit(0x2a8a5a), strip = lit(0xdff2ff), hot = lit(c2), thrust = new T.MeshBasicMaterial({ color: 0x66c8ff, transparent: true, opacity: 0.0, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending });
     // the cockpit's glass: across its front over a low sill, and down each side for its first three metres
     // (glazed floor to ceiling: across the front, its corners cut back so the view wraps round, down both sides past the sensor station, and the deck
@@ -240,7 +339,7 @@ export const ShipModel = (() => {
 
   // ---- the outside of a ship that's boarded, from her deck plan (the level's own walls are her sides: this is what's
   // over and under them, and what each compartment shows of itself)
-  function hull(map: LvMap): { group: THREE.Group; guns: SmGun[]; marker: THREE.Object3D; cutAt: (x: number, z: number, nx: number, nz: number) => void } {
+  function hull(map: LvMap): { group: THREE.Group; guns: SmGun[]; marker: THREE.Object3D; cutAt: (x: number, z: number, nx: number, nz: number) => void; holes: number[][] } {
     const g = new T.Group(), K = new Kit(), TS = Level.TS, { W, H, t } = map, sp = map.sp!, th = map.theme, WH = Level.WALL_H, FH = Level.FLOOR_H, NF = map.floors ? map.floors.length : 1, TOP = (NF - 1) * FH + WH;
     // Whose lines she has (her design language), by what she is: a freighter's (containers, tanks and gantries on a blunt hull), a
     // corporate cutter's (a needle bow, rounded shoulders, fins and nacelles), a pirate's (a toothed ram, scrap plates, spikes and
@@ -584,7 +683,9 @@ export const ShipModel = (() => {
     const mk = new T.Group(); g.add(mk); // (nothing's marked on her: she's breached wherever she's rammed. An empty group, for what's kept of the old mark's handle)
     // she's been rammed there (a site: the middle of its stretch of wall, the way out of her): what stood over that stretch of
     // her side is gone with it (each piece whose middle is in the hole), and the lamp's light that fell there
+    const holes: number[][] = []; // (where she's been cut open: what's inside her is seen through them, js/interiorcull.ts)
     const cutAt = (x: number, z: number, nx: number, nz: number) => {
+      holes.push([x, z, nx, nz]);
       const inHole = (px: number, py: number, pz: number) => { const out = (px - x) * nx + (pz - z) * nz, al = nx ? pz - z : px - x; return Math.abs(al) < 2.3 && out > -0.5 && out < 2.4 && py > -0.9 && py < 3.5; };
       for (const m of decor) {
         const a = m.geometry.attributes.position as THREE.BufferAttribute, q = a.array as Float32Array; let ch = false;
@@ -594,9 +695,20 @@ export const ShipModel = (() => {
         }
         if (ch) a.needsUpdate = true;
       }
-      for (const w of washes) { const al = nx ? w.position.z - z : w.position.x - x, out = (w.position.x - x) * nx + (w.position.z - z) * nz; if (Math.abs(al) < 1 + 1.7 && out > -0.5 && out < 2.4 && w.position.y < 3.5) w.removeFromParent(); } // (taken away, not hidden: what hides the level for a jump shows again all it hid) // (any whose light falls on the hole: 3.4 wide)
+      for (const w of washes) { const al = nx ? w.position.z - z : w.position.x - x, out = (w.position.x - x) * nx + (w.position.z - z) * nz; if (Math.abs(al) < 1 + 1.7 && out > -0.5 && out < 2.4 && w.position.y < 3.5) { w.removeFromParent(); const k = washAt.get(w); if (k != null && washAll) { const a = washAll.geometry.attributes.position as THREE.BufferAttribute; for (let i = k; i < k + 6; i++) a.setXYZ(i, 0, -1e4, 0); a.needsUpdate = true; } } } // (taken away, not hidden: what hides the level for a jump shows again all it hid) // (any whose light falls on the hole: 3.4 wide)
     };
-    return { group: g, guns, marker: mk, cutAt };
+    // the lamps' washes in one mesh (added light: in any order it's the same), each one's six corners where cutAt can take it away
+    const washAt = new Map<THREE.Mesh, number>(); let washAll: THREE.Mesh | null = null;
+    if (compactOn.on && washes.length > 1) {
+      g.updateMatrixWorld(true); const inv = new T.Matrix4().copy(g.matrixWorld).invert(), M = new T.Matrix4(), v = new T.Vector3(), ng = washG.toNonIndexed(), P = ng.attributes.position, UV = ng.attributes.uv, n = P.count;
+      const pos = new Float32Array(washes.length * n * 3), uv = new Float32Array(washes.length * n * 2);
+      washes.forEach((w, k) => { M.multiplyMatrices(inv, w.matrixWorld); for (let i = 0; i < n; i++) { v.fromBufferAttribute(P, i).applyMatrix4(M); pos.set([v.x, v.y, v.z], (k * n + i) * 3); uv.set([UV.getX(i), UV.getY(i)], (k * n + i) * 2); } washAt.set(w, k * n); w.removeFromParent(); });
+      const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('uv', new T.BufferAttribute(uv, 2)); geo.computeBoundingSphere();
+      washAll = new T.Mesh(geo, washM); washAll.renderOrder = 3; washAll.matrixAutoUpdate = false; g.add(washAll); ng.dispose();
+    }
+    g.userData.prof = 'zone ship hull'; // (the level's own: js/space.ts setupBoard)
+    compact(g, [mk, ...guns.map((q) => q.obj), ...decor, ...washes, ...(washAll ? [washAll] : [])]); // (in a few draws: what's turned, cut or taken away left as it is)
+    return { group: g, guns, marker: mk, cutAt, holes };
   }
 
   // ---- A ship under way out in the zone (js/space.ts traffic): seen passing, not boarded. Built bow to -z, her middle at the
@@ -638,6 +750,7 @@ export const ShipModel = (() => {
     // her lights: red to port, green to starboard, a white strobe over her back (js/space.ts blinks it)
     for (const [c, x] of [[0xff3528, -w / 2 - 0.4], [0x30ff60, w / 2 + 0.4]] as number[][]) part(g, new T.Mesh(new T.SphereGeometry(Math.max(0.7, L * 0.008), 6, 5), lit(c)), kind === 'wing' ? x * 2.2 : x, 0, kind === 'wing' ? L * 0.1 : 0);
     const st = part(g, new T.Mesh(new T.SphereGeometry(Math.max(1.2, L * 0.014), 6, 5), lit(0xffffff)), 0, h * 1.6, aft * 0.5); g.userData.strobe = st;
+    compact(g, [st]);
     return { group: g, len: L };
   }
 
@@ -675,6 +788,122 @@ export const ShipModel = (() => {
     for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, x = cx + Math.cos(a) * (Wm / 2 + 250), z = cz + Math.sin(a) * (Hm / 2 + 250); part(g, new T.Mesh(new T.BoxGeometry(3, 3, 3), red), x, height(x, z) + 6, z); }
     return { group: g, height, R, C: new T.Vector3(cx, -R, cz) };
   }
+  // ---- a field of asteroids (js/spacedata.ts rocks): lumpy rocks, a few shapes each drawn as many as there are of it at once
+  // (InstancedMesh), each rock its own size and turn. Dark: lit by the system's star alone, their night sides near black.
+  const ROCK_SHAPES = 6;
+  // (a rock's surface, as a function of the way out from its middle: so every level of detail of it is the same rock, the finer
+  // ones only showing more of it. Its big lumps and craters, then ridges and bumps, then small craters (each with its rim) and
+  // grit; how far out (h, about 1) and how light the rock is there (c))
+  function rockShape(k: number) {
+    const r = G_U.rng(0x51ce + k * 977), V = () => new T.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize();
+    const waves = Array.from({ length: 7 }, () => ({ d: V(), f: 1.2 + r() * 4.5, a: 0.04 + r() * 0.12, ph: r() * 6 }));
+    const pits = Array.from({ length: 5 }, () => ({ d: V(), w: 0.15 + r() * 0.3, a: 0.06 + r() * 0.12 }));
+    const fine = Array.from({ length: 30 }, (_, i) => { const f = 7 + Math.pow(r(), 1.5) * 55; return { d: V(), f, a: 0.11 / f * (i % 3 === 0 ? 1.6 : 1), ph: r() * 6, ridge: i % 4 === 0 }; });
+    const craters = Array.from({ length: 46 }, () => { const w = 0.012 + Math.pow(r(), 2) * 0.09; return { d: V(), w, a: w * (0.35 + r() * 0.3) }; });
+    const flat = new T.Vector3(1 + (r() - 0.5) * 0.5, 0.7 + r() * 0.35, 1 + (r() - 0.5) * 0.4); // (none of them round)
+    const tone = 0.24 + r() * 0.1, warm = r() * 0.06;
+    const at = (n: THREE.Vector3) => {
+      let h = 1, g = 0;
+      for (const w of waves) h += Math.sin(n.dot(w.d) * w.f + w.ph) * w.a;
+      for (const q of pits) { const c = 1 - n.dot(q.d); if (c < q.w) h -= q.a * (1 - c / q.w) ** 2; } // (big craters: dished in)
+      for (const w of fine) { const s = Math.sin(n.dot(w.d) * w.f + w.ph); const v = w.ridge ? (1 - Math.abs(s)) * 2 - 1 : s; h += v * w.a; g += v * w.a; }
+      for (const q of craters) { const c = Math.sqrt(Math.max(0, 2 * (1 - n.dot(q.d)))) / q.w; if (c < 1.35) { h += c < 1 ? -q.a * (1 - c * c) + q.a * 0.25 * c ** 6 : q.a * 0.25 * Math.max(0, 1 - (c - 1) / 0.35) ** 2; if (c < 1) g -= q.a * 0.8; } } // (small ones: a bowl, a raised rim)
+      return { h, c: tone * (0.9 + 0.12 * Math.sin(n.x * 9 + n.y * 7 + k) + (h - 1) * 0.5 + g * 3) };
+    };
+    return { at, flat, warm };
+  }
+  // one level of detail of it: an icosphere (its vertices shared, so it shades smooth) put out to the surface
+  function rockGeo(k: number, detail: number) {
+    const sh = rockShape(k), src = new T.IcosahedronGeometry(1, detail), sp = src.attributes.position as THREE.BufferAttribute;
+    const key = new Map<string, number>(), idx: number[] = [], pos: number[] = [], col: number[] = [], v = new T.Vector3();
+    for (let i = 0; i < sp.count; i++) {
+      v.fromBufferAttribute(sp, i).normalize(); const kk = Math.round(v.x * 1e5) + ',' + Math.round(v.y * 1e5) + ',' + Math.round(v.z * 1e5);
+      let j = key.get(kk);
+      if (j === undefined) { j = pos.length / 3; key.set(kk, j); const s = sh.at(v); const p = v.clone().multiplyScalar(s.h).multiply(sh.flat); pos.push(p.x, p.y, p.z); const c = Math.max(0.05, s.c); col.push(c * (1 + sh.warm), c, c * (1 - sh.warm)); }
+      idx.push(j);
+    }
+    src.dispose();
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setAttribute('color', new T.Float32BufferAttribute(col, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+    return geo;
+  }
+  // The levels of detail: the finest for a rock filling much of the view, the coarsest for one a speck. Which one a rock is drawn
+  // at goes by how big it looks (its size over its distance from the camera: update, a frame); each shape a mesh a level, each of
+  // those drawing however many of its rocks are at that level.
+  // (three's detail: each face cut in (detail+1)^2: some 22k, 3.4k, 720, 180, 80 and 20 triangles. At 'at' (radius over distance)
+  // a rock is about 1650*at pixels across on a 1080p screen: 500, 100, 20, 8, 4 and 2; smaller than the last: not drawn)
+  const ROCK_LOD = [{ detail: 32, at: 0.3 }, { detail: 12, at: 0.06 }, { detail: 5, at: 0.012 }, { detail: 2, at: 0.005 }, { detail: 1, at: 0.0024 }, { detail: 0, at: 0.0012 }];
+  const rockGeos = new Map<string, THREE.BufferGeometry>(); // (made once, kept: the same shapes every field)
+  function rockMat() {
+    const mat = new T.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 });
+    // (hard-lit: out here there's no sky to fill the night side, so the scene's fill (the hemisphere's) is all but taken out of
+    // them, after the light grid's own patch (js/lightgrid.ts): the side away from the star near black, the side toward it bright)
+    mat.onBeforeCompile = (sh, rd) => { (T.MeshStandardMaterial.prototype.onBeforeCompile as any).call(mat, sh, rd); sh.fragmentShader = sh.fragmentShader.replace('#include <lights_fragment_end>', ['#if defined( RE_IndirectDiffuse )', ' irradiance *= 0.06;', '#endif', '#include <lights_fragment_end>'].join(String.fromCharCode(10))).replace('if (lgL.a > 0.02) {', 'if (false) {'); }; // (nor the level's light grid: out here its edge would light them)
+    mat.customProgramCacheKey = () => 'rock-hardlit';
+    mat.envMapIntensity = 0.04; // (nor the scene's environment's light: it would fill them as the sky does)
+    return mat;
+  }
+  function rockField(list: { p: number[]; r: number; s: number }[]) {
+    const g = new T.Group(), mat = rockMat();
+    const by: { p: number[]; r: number; s: number }[][] = Array.from({ length: ROCK_SHAPES }, () => []); for (const q of list) by[q.s % ROCK_SHAPES].push(q);
+    const q4 = new T.Quaternion(), e = new T.Euler(), sc = new T.Vector3(), ps = new T.Vector3();
+    const sets = by.map((qs, k) => {
+      const ms = qs.map((q) => { const r = G_U.rng(q.s); e.set(r() * 6.28, r() * 6.28, r() * 6.28); q4.setFromEuler(e); sc.setScalar(q.r); return new T.Matrix4().compose(ps.set(q.p[0], q.p[1], q.p[2]), q4, sc); });
+      const ims: (THREE.InstancedMesh | null)[] = ROCK_LOD.map(() => null); // (a level's mesh made the first time one of its rocks is wanted at it: the finest only once something's come close)
+      const im = (L: number) => { let m = ims[L]; if (!m) { const gk = k + ':' + ROCK_LOD[L].detail; let geo = rockGeos.get(gk); if (!geo) { geo = rockGeo(k, ROCK_LOD[L].detail); rockGeos.set(gk, geo); } m = ims[L] = new T.InstancedMesh(geo, mat, qs.length); m.frustumCulled = false; m.count = 0; g.add(m); } return m; };
+      return { qs, ms, ims, im, lv: new Int8Array(qs.length).fill(-2) };
+    });
+    const cnt = ROCK_LOD.map(() => 0);
+    // (cam: the camera's place, in the field's own frame; view: the camera itself, when there is one: a rock out of its view isn't
+    // drawn either: its sphere (with room for its bumps, and a few degrees more for the camera turning before the frame's drawn)
+    // tested against the view's planes, brought into the field's frame)
+    const fr = new T.Frustum(), vm = new T.Matrix4(), sph = new T.Sphere();
+    function update(cam: THREE.Vector3, view?: THREE.Camera) {
+      if (view) { view.updateMatrixWorld(); g.updateWorldMatrix(true, false); fr.setFromProjectionMatrix(vm.multiplyMatrices(view.projectionMatrix, view.matrixWorldInverse).multiply(g.matrixWorld)); }
+      for (const st of sets) {
+        if (!st.qs.length) continue; let changed = false;
+        for (let i = 0; i < st.qs.length; i++) { const q = st.qs[i], dc = Math.hypot(cam.x - q.p[0], cam.y - q.p[1], cam.z - q.p[2]), d = Math.max(1, dc - q.r * 0.5), look = q.r / d; let L = 0; while (L < ROCK_LOD.length && look < ROCK_LOD[L].at) L++; if (L === ROCK_LOD.length) L = -1; /* (-1: too small to draw) */
+          if (L >= 0 && view) { sph.center.set(q.p[0], q.p[1], q.p[2]); sph.radius = q.r * 1.6 + dc * 0.06; if (!fr.intersectsSphere(sph)) L = -1; } /* (-1 too: out of view) */
+          if (st.lv[i] !== L) { st.lv[i] = L; changed = true; } }
+        if (!changed) continue;
+        cnt.fill(0);
+        for (let i = 0; i < st.qs.length; i++) { const L = st.lv[i]; if (L >= 0) st.im(L).setMatrixAt(cnt[L]++, st.ms[i]); }
+        st.ims.forEach((m, L) => { if (m) { m.count = cnt[L]; m.instanceMatrix.needsUpdate = true; } });
+      }
+    }
+    update(new T.Vector3(1e9, 0, 0));
+    g.userData.lod = update; g.userData.prof = 'rocks';
+    return g;
+  }
+  // ---- the system's star (js/spacedata.ts star), seen from here: a disc as wide as it looks (size, its angular radius) and its
+  // glow round it, both always as far off (D, round the camera, as the stars are) and drawn over them but under everything else;
+  // a protostar in its dust, a white dwarf in the shell it threw off (a ring), a giant's face mottled with its convection.
+  function starModel(sd: { stage: string; col: number; size: number; glow: number; neb: number | null; ring: boolean }) {
+    const D = 850, g = new T.Group(), c = new T.Color(sd.col), hex = (k: number, a: number) => `rgba(${Math.round(Math.min(1, c.r * k) * 255)},${Math.round(Math.min(1, c.g * k) * 255)},${Math.round(Math.min(1, c.b * k) * 255)},${a})`;
+    const sprite = (tex: THREE.Texture, rad: number, order: number, tint: number | THREE.Color = 0xffffff) => { const m = new T.SpriteMaterial({ map: tex, color: tint, transparent: false, blending: T.AdditiveBlending, depthTest: false, depthWrite: false, fog: false }); const s = new T.Sprite(m); const w = 2 * D * Math.tan(rad); s.scale.set(w, w, 1); s.position.set(0, 0, -D); s.renderOrder = order; s.frustumCulled = false; g.add(s); return s; };
+    const R = sd.size, r = G_U.rng(Math.round(sd.size * 1e5) ^ sd.col);
+    // its glow: bright near its edge, fading out to glow radii
+    const glow = canvasTex(256, 256, (x, w, h) => { const gr = x.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); const k = 1 / sd.glow; gr.addColorStop(0, hex(1, 0.85)); gr.addColorStop(Math.min(0.9, k), hex(1, 0.4)); gr.addColorStop(Math.min(0.95, k * 1.8), hex(0.9, 0.07)); gr.addColorStop(1, hex(0.8, 0)); x.fillStyle = gr; x.fillRect(0, 0, w, h); });
+    sprite(glow.tex, Math.min(1.2, R * sd.glow), -8);
+    // its face: limb-darkened, a giant's mottled
+    const disc = canvasTex(256, 256, (x, w, h) => {
+      const gr = x.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2 - 2); gr.addColorStop(0, 'rgba(255,255,250,1)'); gr.addColorStop(0.55, hex(1.15, 1)); gr.addColorStop(0.92, hex(0.85, 1)); gr.addColorStop(1, hex(0.6, 0)); x.fillStyle = gr; x.beginPath(); x.arc(w / 2, h / 2, w / 2 - 2, 0, 7); x.fill();
+      if (sd.stage === 'redgiant') { x.globalCompositeOperation = 'source-atop'; for (let i = 0; i < 160; i++) { const a = r() * 6.28, d = Math.sqrt(r()) * (w / 2 - 10); x.fillStyle = r() < 0.5 ? 'rgba(120,30,10,0.1)' : 'rgba(255,200,140,0.08)'; x.beginPath(); x.arc(w / 2 + Math.cos(a) * d, h / 2 + Math.sin(a) * d, 5 + r() * 14, 0, 7); x.fill(); } }
+    });
+    sprite(disc.tex, Math.max(R, 0.0012), -7, new T.Color(2.6, 2.6, 2.6)); // (over-bright: its face burns out to white, as a star's does)
+    if (sd.stage === 'whitedwarf' || sd.stage === 'bluegiant') { // (a point too bright to look at: diffraction spikes)
+      const sp = canvasTex(256, 256, (x, w, h) => { for (const [ax, ay] of [[1, 0], [0, 1], [0.7071, 0.7071], [0.7071, -0.7071]]) { const gr = x.createLinearGradient(w / 2 - ax * w / 2, h / 2 - ay * h / 2, w / 2 + ax * w / 2, h / 2 + ay * h / 2); gr.addColorStop(0, hex(1, 0)); gr.addColorStop(0.5, hex(1, ax && ay ? 0.25 : 0.55)); gr.addColorStop(1, hex(1, 0)); x.strokeStyle = gr; x.lineWidth = 2; x.beginPath(); x.moveTo(w / 2 - ax * w / 2, h / 2 - ay * h / 2); x.lineTo(w / 2 + ax * w / 2, h / 2 + ay * h / 2); x.stroke(); } });
+      sprite(sp.tex, sd.stage === 'whitedwarf' ? 0.09 : 0.14, -7);
+    }
+    if (sd.neb != null) { // (a cloud round it: a protostar's dust, irregular; a white dwarf's shell, a ring)
+      const nc = new T.Color(sd.neb), rgba = (a: number, k = 1) => `rgba(${Math.round(Math.min(1, nc.r * k) * 255)},${Math.round(Math.min(1, nc.g * k) * 255)},${Math.round(Math.min(1, nc.b * k) * 255)},${a})`;
+      const neb = canvasTex(512, 512, (x, w, h) => {
+        if (sd.ring) { for (let i = 0; i < 900; i++) { const a = r() * 6.28, d = w * (0.3 + (r() + r() + r()) / 3 * 0.12); x.fillStyle = r() < 0.3 ? `rgba(220,90,150,${0.05 + r() * 0.05})` : rgba(0.04 + r() * 0.06, 1.3); x.beginPath(); x.arc(w / 2 + Math.cos(a) * d, h / 2 + Math.sin(a) * d * 0.82, 6 + r() * 16, 0, 7); x.fill(); } }
+        else { for (let i = 0; i < 600; i++) { const a = r() * 6.28, d = Math.pow(r(), 0.7) * w * 0.45; x.fillStyle = rgba(0.03 + r() * 0.05, 0.6 + r() * 0.8); x.beginPath(); x.arc(w / 2 + Math.cos(a) * d, h / 2 + Math.sin(a) * d * 0.7, 10 + r() * 40, 0, 7); x.fill(); } }
+      });
+      sprite(neb.tex, sd.ring ? 0.16 : 0.42, -9);
+    }
+    return { group: g, D };
+  }
   // ---- an interspatial anchor: a ring to fly to (60 m across), four pylons, a film of light across it
   function anchor(color = 0x66c8ff) {
     const g = new T.Group(), steel = M(0x59626c, { emissive: 0x101316, metalness: 0.5 }), glow = lit(color);
@@ -682,7 +911,8 @@ export const ShipModel = (() => {
     const inner = new T.Mesh(new T.TorusGeometry(27.5, 0.35, 6, 40), glow); g.add(inner);
     for (let k = 0; k < 4; k++) { const a = k * Math.PI / 2 + Math.PI / 4, b = new T.Mesh(new T.BoxGeometry(5, 12, 7), steel); b.position.set(Math.cos(a) * 31, Math.sin(a) * 31, 0); b.rotation.z = a - Math.PI / 2; g.add(b); const l = new T.Mesh(new T.BoxGeometry(1, 1, 7.4), glow); l.position.set(Math.cos(a) * 36, Math.sin(a) * 36, 0); g.add(l); }
     const film = new T.Mesh(new T.CircleGeometry(27.5, 40), new T.MeshBasicMaterial({ color, transparent: true, opacity: 0.1, side: T.DoubleSide, depthWrite: false, blending: T.AdditiveBlending })); g.add(film);
-    g.userData.film = film;
+    g.userData.film = film; g.userData.prof = 'anchor';
+    compact(g, [film]);
     return g;
   }
   // ---- a planet, seen from orbit: a sphere of its ground's colour under cloud, a rim of air
@@ -753,5 +983,5 @@ export const ShipModel = (() => {
     const g = new T.Group(); g.add(m); g.userData.tex = cv.tex; g.userData.mat = m.material;
     return g;
   }
-  return { PAINT, boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
+  return { PAINT, boot, traffic, ship, hull, asteroid, anchor, planet, stars, tunnel, rockField, starModel, compact, compactOn, M, lit, canvasTex, has: (id: string) => MODELS.has(id) };
 })();

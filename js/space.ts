@@ -20,6 +20,8 @@ import { World } from './world.js';
 import { Career } from './career.js';
 import { Net } from './net.js';
 import { Game } from './game.js';
+import { Prof } from './profiler.js';
+import { InteriorCull } from './interiorcull.js';
 import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RAssess, RTrack, RAff, RMode } from './radar.js';
 import { RadarView } from './radarview.js';
@@ -52,7 +54,7 @@ export const Space = (() => {
     zone: null as THREE.Group | null, zoneV: new T.Vector3(), zt0: 0, ztAt: 0, traffic: [] as { obj: THREE.Object3D; c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number; k?: number; name?: string }; wp: SpWp | null; ph: number; real?: boolean; bow?: number; pend?: LvMap | null }[],
     look: null as null | { yaw: number; pitch: number; eyeH: number; stowW: number; crouch: boolean; stowed: boolean }, carry: null as null | { k: number; v: THREE.Vector3; yaw: number; Q: THREE.Quaternion; V: THREE.Vector3 },
     zdef: [] as SpContact[], zact: 0, zC: new T.Vector3(), zinfo: null as null | { ms: any; act: number; near: boolean }, tclose: null as null | { k: number; t: number; sent?: boolean; name: string },
-    root: null as THREE.Group | null, plan: null as null | { line: THREE.Line; gates: THREE.LineSegments; end: THREE.LineSegments }, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null,
+    root: null as THREE.Group | null, plan: null as null | { line: THREE.Line; gates: THREE.LineSegments; end: THREE.LineSegments }, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null, star: null as null | ReturnType<typeof SpaceData.star>, starObj: null as THREE.Object3D | null, rockList: [] as { p: number[]; r: number; s: number }[],
     hull: null as ReturnType<typeof ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3; p0?: THREE.Vector3 }[],
     ftl: null as null | { st: 'spool' | 'wait' | 'tunnel'; t: number; to: number; T: number; held?: number }, seats: {} as Record<string, number>, ctl: null as string | null,
     hp: 100, hpMax: 100, ms: null as SpMission | null, state: null as SpMs | null, board: { seed: 1, level: 1, picked: [] as number[], done: [] as number[], gone: [] as number[] },
@@ -101,7 +103,7 @@ export const Space = (() => {
       const sz = box.getSize(new T.Vector3()), size = Math.max(4, sz.z / 2);
       const was = EW.own; EW.own = was && EW.ownDef === S.def.id ? was : Radar.suite('own', size, box.max.y, Math.max(box.max.x, -box.min.x), box.min.y); EW.ownDef = S.def.id; // (her set kept, all it holds, while she's the same ship: a new level's drawing of her isn't a new her)
       // (her search radars as the operator left them, her drawing made again or not (a new level): off at first, she's silent till switched on)
-      if (EW.own !== was) EW.own.scans.forEach((sc, k) => { const o = was && was.scans[k]; sc.mode = o ? o.mode : 'off'; if (o) { sc.sec.on = o.sec.on; sc.sec.c = o.sec.c; sc.sec.h = o.sec.h; } });
+      if (EW.own !== was) EW.own.scans.forEach((sc, k) => { const o = was && was.scans[k]; sc.mode = o ? o.mode : 'off'; if (o) { sc.notch = o.notch; sc.sec.on = o.sec.on; sc.sec.c = o.sec.c; sc.sec.h = o.sec.h; } });
       EW.own.trks.forEach((t, k) => { const o = was && was.trks[k]; t.off = !!(o && o.off); });
       EW.ownT = { id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('ship:' + S.def.id, g, inv) };
       EW.scr = null; g.traverse((o: any) => { if (!EW.scr && o.isMesh && o.material && o.material.map === S.model!.screen.tex) EW.scr = o; }); { const sm = EW.scr as THREE.Mesh | null; if (sm) (sm.material as THREE.Material).side = T.DoubleSide; } // (its face is the one toward the operator, whichever way the model wound it)
@@ -125,7 +127,9 @@ export const Space = (() => {
     if (EW.foeT && EW.foe) { const af = missionAff(); EW.foeT.aff = af; EW.foeT.iff = { c: af === 'navy' ? 'navy' : 'civ', n: hullName() }; EW.foeT.xon = af !== 'pirate'; EW.foe.aff = af; }
     own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
     if (S.ftl) { for (const su of [own, EW.foe]) if (su) for (const t of su.trks) Radar.drop(t); return; } // (jumping between levels: nothing to look at. Docked in a breach, or at warp within the level: everything runs, in real time)
-    chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt), ...torpTargets()]; EW.tg = tg;
+    const rk = rocksStep(dt); own.Vc = ROCKS.v; // (her scanners' clutter: the field, moving as the zone does; with no field, the level's frame)
+    aiNotch(dt);
+    chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...rk, ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt), ...torpTargets()]; EW.tg = tg;
     Radar.step(own, dt, tg, EW.rt);
     if (EW.foe) {
       Radar.step(EW.foe, dt, tg, EW.rt);
@@ -145,7 +149,19 @@ export const Space = (() => {
         for (const q of su.ass) if (q.cls === 'HOSTILE' && q.plot && EW.rt - q.plot.t < 3.5) { const u = tti(q.r, q.vc); if (u < bu) { bu = u; bq = q; } }
         const on = bq && su.trks.some((t) => t.st === 'track' && ((bq!.f && bq!.f.trk === t) || (bq!.f && t.est.p && t.est.p.distanceTo(bq!.f.pl) < Math.max(150, 0.05 * bq!.r))));
         (EW as any).fc = bq ? { n: bq.n, r: Math.round(bq.r), vc: Math.round(bq.vc), u: Math.round(bu), id: bq.plot!.id, on } : null; // (what her fire control's after: the debug's)
-        if (bq && !on) {
+        // (a tracker already after it: cued on one of its contacts (slewing, sweeping or locked), or handed its 3D track)
+        const after = (t: RTrack) => !!bq && t.st !== 'idle' && ((!!t.cue && !!t.cue.con && (t.cue.con === bq.c || (!!bq.f && (t.cue.con === bq.f.a || t.cue.con === bq.f.b)))) || (!!bq.f && (() => { const h = t.hand ? { p: t.hand.p, v: t.hand.v, t: t.hand.t } : t.spiral && !t.spiral.ray ? { p: t.spiral.p, v: t.spiral.v, t: t.spiral.t0 } : t.st === 'track' && t.est.p ? { p: t.est.p, v: t.est.v, t: EW.rt } : null; return !!h && h.p.clone().addScaledVector(h.v, EW.rt - h.t).distanceTo(bq.f!.pl) < Math.max(150, 0.05 * bq.r); })()));
+        if (bq && !on && bu < FC_URG) {
+          // (something reaching her inside FC_URG seconds (a torpedo, a missile): at once, one tracker. An idle one if she has one; else
+          // the one on what's least urgent is taken off it. The other keeps what it holds)
+          // (nor while a tracker's still on its way to something as urgent it was sent after under 3 s ago: one thing's two scanners'
+          // contacts, before they're one 3D track, are two hostiles, each the more urgent by turns; sent back and forth, it'd lock neither)
+          const going = su.trks.some((t) => { const c = FC_CUED.get(t); return (t.st === 'slew' || t.st === 'acq') && !!c && EW.rt - c.at < 3 && bu > 0.5 * (c.u - (EW.rt - c.at)); });
+          // (nor off a lock that's on something as urgent at about its range: the same thing, under a new contact's name (a contact
+          // lost and found again between sweeps))
+          const same = su.trks.some((t) => t.st === 'track' && t.est.p && trkUrg(su, t) < FC_URG && Math.abs(t.est.p.distanceTo(su.P) - bq.r) < Math.max(300, 0.1 * bq.r));
+          if (!going && !same && !su.trks.some(after)) { const live = su.trks.filter((t) => !t.off); if (live.length && !live.some((t) => t.st === 'idle')) Radar.drop(live.reduce((x, y) => (trkUrg(su, y) > trkUrg(su, x) ? y : x))); const tr = Radar.cue(su, bq.plot!); if (tr) FC_CUED.set(tr, { u: bu, at: EW.rt }); }
+        } else if (bq && !on && !su.trks.some((t) => after(t) && t.st !== 'track')) {
           const busy = su.trks.filter((t) => t.st !== 'idle'), held = Math.min(...busy.map((t) => trkUrg(su, t)));
           const more = bu < TTI_FAR ? bu < held * 0.5 : held >= TTI_FAR && bu - TTI_FAR < (held - TTI_FAR) * 0.6 - 200;
           if (!busy.length || (busy.every((t) => t.st === 'track' && t.lockT > 1) && more)) { /* (a lock not a second old is let settle: its solution isn't there yet) */ for (const t of su.trks) Radar.drop(t); Radar.cue(su, bq.plot!); }
@@ -162,6 +178,8 @@ export const Space = (() => {
     }
   }
   // how soon something reaches her: its range over its closing speed; not closing, TTI_FAR plus its range (after anything that is, nearest first)
+  const FC_CUED = new WeakMap<RTrack, { u: number; at: number }>(); // (what her fire control sent a tracker after at once: how urgent, when)
+  const FC_URG = 12; // (her fire control: what reaches her sooner than this many seconds is taken at once, a tracker pulled off whatever's least urgent)
   const TTI_FAR = 1e6, tti = (r: number, vc: number) => (vc > 10 ? r / vc : TTI_FAR + r);
   const trkUrg = (su: RSuite, t: RTrack) => { if (t.st !== 'track') return Infinity; if (!t.est.p) return tti(t.rng, 0); const rel = t.est.p.clone().sub(su.P), r = rel.length(); return tti(r, -t.est.v.clone().sub(su.V).dot(rel) / Math.max(1, r)); };
   // Her radars' hardware on her hull (in her group, whose frame is the level's): each scanner an antenna on a post, turning with its
@@ -341,11 +359,15 @@ export const Space = (() => {
   // a search radar's mode (k its number): round, a sector, or off (silent); its sector c +- h (told to everyone aboard: ssec)
   const MODES: RMode[] = ['round', 'sector', 'off'];
   const MODE_NAME: Record<RMode, string> = { round: 'ROUND', sector: 'SECTOR', off: 'OFF' };
-  function modeSet(k: number, mode: RMode, c: number, h: number, quiet = false) {
+  // (and its Doppler notch, on or off, whatever its mode: NOTCH_OPT, the fourth line of its list)
+  const NOTCH_OPT = MODES.length, optsOf = (sc: { notch?: boolean }) => [...MODES.map((m) => MODE_NAME[m]), sc.notch ? 'NOTCH: ON' : 'NOTCH: OFF'];
+  const ssecOf = (k: number, sc: { mode: RMode; sec: { c: number; h: number }; notch?: boolean }) => [k, MODES.indexOf(sc.mode), Math.round(sc.sec.c * 1000) / 1000, Math.round(sc.sec.h * 1000) / 1000, sc.notch ? 1 : 0];
+  function modeSet(k: number, mode: RMode, c: number, h: number, quiet = false, notch?: boolean) {
     const sc = EW.own && EW.own.scans[k]; if (!sc) return;
-    sc.mode = mode; sc.sec.on = mode === 'sector'; sc.sec.c = c; sc.sec.h = h;
-    if (!quiet) { Net.toHost({ t: 'ssec', a: [k, MODES.indexOf(mode), Math.round(c * 1000) / 1000, Math.round(h * 1000) / 1000] }); Audio.click(); }
+    sc.mode = mode; sc.sec.on = mode === 'sector'; sc.sec.c = c; sc.sec.h = h; if (notch != null) sc.notch = notch;
+    if (!quiet) { Net.toHost({ t: 'ssec', a: ssecOf(k, sc) }); Audio.click(); }
   }
+  function notchSet(k: number) { const sc = EW.own && EW.own.scans[k]; if (!sc) return; modeSet(k, sc.mode, sc.sec.c, sc.sec.h, false, !sc.notch); HUD.toast('SCAN ' + sc.tag, 'Doppler notch ' + (sc.notch ? 'on: what closes as the asteroids do is filtered out' : 'off'), 1.6); }
   // The scan keys at the sensor station, 1 and 2 the bearing and roll scanners, each a box in the corner showing its mode:
   //   held, its box opens, a list of its modes; tapped while it's open, the next one's picked; held again, it closes and the
   //   radar's set to the one picked
@@ -364,9 +386,9 @@ export const Space = (() => {
       const sc = EW.own!.scans[k]; if (!sc) return;
       if (K(code)) { if (SEC.dn[k] < 0) { SEC.dn[k] = S.t; SEC.held[k] = false; }
         if (!SEC.held[k] && S.t - SEC.dn[k] > 0.4) { SEC.held[k] = true;
-          if (SEC.open === k) { const md = MODES[SEC.cur]; modeSet(k, md, sc.sec.c, sc.sec.h); SEC.open = -1; } // (closed: set to what's picked)
+          if (SEC.open === k) { if (SEC.cur === NOTCH_OPT) notchSet(k); else modeSet(k, MODES[SEC.cur], sc.sec.c, sc.sec.h); SEC.open = -1; } // (closed: set to what's picked)
           else { SEC.open = k; SEC.cur = MODES.indexOf(sc.mode); Audio.click(); } } } // (opened, on what it's doing)
-      else if (SEC.dn[k] >= 0) { if (!SEC.held[k]) { if (SEC.open === k) SEC.cur = (SEC.cur + 1) % MODES.length; else SEC.sel = SEC.sel === k ? -1 : k; Audio.click(); } SEC.dn[k] = -1; }
+      else if (SEC.dn[k] >= 0) { if (!SEC.held[k]) { if (SEC.open === k) SEC.cur = (SEC.cur + 1) % (MODES.length + 1); else SEC.sel = SEC.sel === k ? -1 : k; Audio.click(); } SEC.dn[k] = -1; }
     });
     if (SEC.sel >= 0) {
       const P = EW.own.scans[SEC.sel].sec, h0 = P.h, c0 = P.c;
@@ -375,7 +397,7 @@ export const Space = (() => {
       if (P.h !== h0 || P.c !== c0) SEC.dirty = SEC.sel;
     }
     // (the crew told of a sector the keys have changed: five times a second at most)
-    if (SEC.dirty >= 0 && S.t - SEC.sent > 0.2) { const sc = EW.own.scans[SEC.dirty]; Net.toHost({ t: 'ssec', a: [SEC.dirty, MODES.indexOf(sc.mode), Math.round(sc.sec.c * 1000) / 1000, Math.round(sc.sec.h * 1000) / 1000] }); SEC.sent = S.t; SEC.dirty = -1; }
+    if (SEC.dirty >= 0 && S.t - SEC.sent > 0.2) { const sc = EW.own.scans[SEC.dirty]; Net.toHost({ t: 'ssec', a: ssecOf(SEC.dirty, sc) }); SEC.sent = S.t; SEC.dirty = -1; }
   }
   // a tracker switched off (silent: it lets go of what it had and takes no cue) or on (told to everyone aboard: strk)
   function trkOff(ti: number, off: boolean, quiet = false) {
@@ -396,6 +418,7 @@ export const Space = (() => {
     if (!hit) return false;
     const a = hit.dataset.hb!, kind = a[0], n = parseInt(a.slice(1), 10);
     if (kind === 's') { const sc = own.scans[n]; if (!sc) return true; if (SEC.open === n) SEC.open = -1; else { SEC.open = n; SEC.cur = MODES.indexOf(sc.mode); SEC.sel = n; } Audio.click(); }
+    else if (kind === 'o' && parseInt(a.split(':')[1], 10) === NOTCH_OPT) { notchSet(n); SEC.open = -1; }
     else if (kind === 'o') { const i = parseInt(a.split(':')[1], 10), sc = own.scans[n]; if (sc && MODES[i]) { modeSet(n, MODES[i], sc.sec.c, sc.sec.h); SEC.open = -1; SEC.sel = MODES[i] === 'sector' ? n : SEC.sel; } }
     else if (kind === 't') { TRKK.sel = TRKK.sel === n ? -1 : n; Audio.click(); }
     else if (kind === 'p') { const tr = own.trks[n]; if (tr) trkOff(n, !tr.off); }
@@ -479,7 +502,7 @@ export const Space = (() => {
     if (!EW.own) return { secs: [] as { k: number; c: number; h: number; on: boolean; sel: boolean }[], boxes: [] as { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[], trkSel: -1 };
     const secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[] = [];
     EW.own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k || (SEC.open === k && MODES[SEC.cur] === 'sector')) secs.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k || SEC.open === k }); }); // (searching a sector, or picked, or about to: its sector shown)
-    const boxes = EW.own.scans.map((sc, k) => ({ mode: sc.mode, open: SEC.open === k, cur: SEC.open === k ? SEC.cur : MODES.indexOf(sc.mode), opts: MODES.map((m) => MODE_NAME[m]), sel: SEC.sel === k }));
+    const boxes = EW.own.scans.map((sc, k) => ({ mode: sc.mode, notch: !!sc.notch, open: SEC.open === k, cur: SEC.open === k ? SEC.cur : MODES.indexOf(sc.mode), opts: optsOf(sc), sel: SEC.sel === k }));
     return { secs, boxes, trkSel: TRKK.sel };
   }
   // her warning receiver's picture: each radar on her and the way to it (in her frame), and what it's doing: a tracker locked on
@@ -561,6 +584,7 @@ export const Space = (() => {
 
   // ------------------------------------------------------------------ coming and going
   function leave() {
+    InteriorCull.clear();
     holoFocus(false); G_R.focusBlur = false; EW.holo.fO = -1;
     RadarView.update(null, false, [], [], '', 0); RadarView.holo(null, null, new T.Vector3(), 0, new T.Quaternion(), 0, false, null); for (const c of EW.chaff) c.pts.removeFromParent(); EW.chaff = [];
     if (!S.on && !S.model) return;
@@ -570,7 +594,7 @@ export const Space = (() => {
     }
     if (S.on && S.kind === 'board' && S.tclose && S.zone && S.zinfo && S.hull && S.map && S.map.sp && S.hull.group.parent) { // (and her hull's kept as it is, holes and all: she's one of the others now, zoneReal)
       const hb = S.map.sp.hull, holder = new T.Group(), h = S.hull; h.marker.visible = false;
-      h.group.removeFromParent(); h.group.position.set(-(hb.x0 + hb.x1) / 2, 0, -(hb.z0 + hb.z1) / 2); holder.add(h.group);
+      h.group.removeFromParent(); h.group.position.set(-(hb.x0 + hb.x1) / 2, 0, -(hb.z0 + hb.z1) / 2); holder.add(h.group); h.group.userData.prof = 'zone ship hull';
       if (zoneHullsOf !== S.zinfo.ms.seed) { zoneClear(); zoneHullsOf = S.zinfo.ms.seed; }
       zoneHulls.set(S.zinfo.ms.seed + ':' + S.zact, { holder, h, bow: S.map.sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0), map: null, key: '' });
     }
@@ -579,7 +603,8 @@ export const Space = (() => {
     // changes when she becomes the level, enterLevel)
     { const m = me(); S.look = S.on && S.kind === 'board' && S.tclose && m.pos ? { yaw: m.yaw - S.berth.yaw, pitch: m.pitch, eyeH: m.eyeH, stowW: m.stowW || 0, crouch: m.crouch, stowed: !!m.stowed } : null; }
     unhide();
-    for (const o of [S.model && S.model.group, S.root, S.stars, S.tunnel, S.sun]) if (o && o.parent) o.parent.remove(o);
+    for (const o of [S.model && S.model.group, S.root, S.stars, S.tunnel, S.sun, S.starObj]) if (o && o.parent) o.parent.remove(o);
+    S.starObj = null; S.star = null; S.rockList = []; ROCKS.near = []; ROCKS.tg.clear(); ROCKS.r.clear(); ROCKS.zt = -1; ROCKS.obj = null; ROCKS.v.set(0, 0, 0); Radar.occ.length = 0;
     litSeat = -1;
     if (S.sun && S.sun.target.parent) S.sun.target.parent.remove(S.sun.target);
     G_R.levelRoot.position.set(0, 0, 0); G_R.levelRoot.quaternion.identity(); G_R.levelRoot.visible = true;
@@ -608,15 +633,18 @@ export const Space = (() => {
     else { const lz = map.lz || { x: map.spawn.x, y: 0, z: map.spawn.z }; S.berth = { x: lz.x + 3.2 + Math.max(0, d.z1 - 5) * 0.5, y: lz.y || 0, z: lz.z, yaw: Math.PI / 2 }; }
     S.Dp.set(S.berth.x, S.berth.y, S.berth.z); S.Dq.copy(berthQ(S.berth));
     // the ship herself, and her deck in the world
-    const m = S.model = ShipModel.ship(d, S.fleet);
+    const m = S.model = ShipModel.ship(d, S.fleet); m.group.userData.prof = 'own ship';
     m.group.position.copy(S.Dp); m.group.quaternion.copy(S.Dq); G_R.scene.add(m.group);
     S.solids = []; deck();
     hatchMesh();
     // what's out there
-    S.root = new T.Group(); G_R.scene.add(S.root);
-    S.stars = ShipModel.stars(7); G_R.scene.add(S.stars);
+    S.root = new T.Group(); S.root.userData.prof = 'space: other'; G_R.scene.add(S.root);
+    S.stars = ShipModel.stars(7); S.stars.userData.prof = 'sky'; G_R.scene.add(S.stars);
     S.tunnel = ShipModel.tunnel(); S.tunnel.visible = false; m.group.add(S.tunnel);
     S.sun = new T.DirectionalLight(0xfff4e0, 0); G_R.scene.add(S.sun, S.sun.target);
+    // (the system's star: the base's an ordinary one; a mission's by its seed, the same for the whole of it (js/spacedata.ts star))
+    S.star = SD.star(kind === 'hub' ? null : S.zinfo && S.zinfo.ms ? S.zinfo.ms.seed : map.seed); S.sun.color.setHex(S.star.light);
+    S.starObj = ShipModel.starModel(S.star).group; G_R.scene.add(S.starObj);
     G_R.padTo = PAD_POINTS; // (as many point lights at the base, on the jump and aboard: nothing's shaders made again on the way, js/render.ts lightPad)
     // (what she was steering for, as a zone's ship (its number) or her anchor: kept across a change of which ship's the level, js/space.ts setupBoard)
     { const w = S.wps[S.tgt]; tgtWas = !w ? null : w.id === 'ship' ? S.zact : w.id === 'out' ? 'out' : /^t\d+$/.test(w.id) ? +w.id.slice(1) : null; }
@@ -625,7 +653,7 @@ export const Space = (() => {
     S.docked = docked; S.noseT = 0; S.rampT = docked && kind !== 'board' ? 1 : 0;
     S.hatchOpen = !(sp && sp.ship && sp.ship.hatch === 0); S.hatchT = S.hatchOpen ? 1 : 0; // (as the host has it: shut by a breach till its button's pressed)
     S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.net = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1;
-    S.zone = new T.Group(); S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.match = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = performance.now();
+    S.zone = new T.Group(); S.zone.userData.prof = 'zone: other'; S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.match = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = performance.now();
     if (kind === 'hub') setupHub(map, sp); else if (kind === 'board') setupBoard(map); else setupAssault(map);
     if (docked) { S.P.copy(S.Dp); S.Q.copy(S.Dq); }
     syncSolids();
@@ -642,6 +670,8 @@ export const Space = (() => {
     // back in the seat you had (the host still has you in it)
     const mine = S.seats[Net.myId!];
     if (mine != null && S.seatsDef[mine] && (!docked || kind !== 'hub')) sit(mine, true);
+    if (kind !== 'hub') G_R.batchLevel(map); // (her static pieces in a call a material, now nothing more's cut from them: js/render.ts)
+    if (kind === 'board' && G_R.levelView) { const hl = S.hull as ReturnType<typeof ShipModel.hull> | null; InteriorCull.track(G_R.levelView, map, () => (S.hull ? S.hull.holes : []), hl ? hl.group : null); } // (her inside drawn only where it can be seen, from out here: js/interiorcull.ts)
     SpaceUI.show(true);
     outside();
   }
@@ -1009,7 +1039,7 @@ export const Space = (() => {
     if (!zk) zoneClear(); // (jumped in: nothing's kept from before)
     // (her hull: the one she's been seen in from outside, if she has been)
     if (kept) { zoneHulls.delete(zk!); kept.holder.remove(kept.h.group); kept.h.group.position.set(0, 0, 0); kept.h.marker.visible = true; if (kept.map && kept.map !== map) viewDrop(kept.map); }
-    const h = S.hull = kept ? kept.h : ShipModel.hull(map);
+    const h = S.hull = kept ? kept.h : ShipModel.hull(map); h.group.userData.prof = 'level hull';
     G_R.levelRoot.add(h.group);
     const TS = Level.TS;
     map.rooms.forEach((rm) => { const y = (rm.fl || 0) * Level.FLOOR_H; S.boxes.push([rm.x * TS - 1.2, y - 2.4, rm.z * TS - 1.2, (rm.x + rm.w) * TS + 1.2, y + Level.WALL_H + 1.2, (rm.z + rm.h) * TS + 1.2]); });
@@ -1025,6 +1055,9 @@ export const Space = (() => {
     const zi = S.zinfo;
     S.zdef = SD.zone(zi ? zi.ms : { seed: map.seed, size: sp.size, th: SD.themeIndex(map.theme), wing: !!sp.wing, name: (S.ms && S.ms.name) || '' }); S.zact = zi ? zi.act : 0;
     S.zC.set((sp.hull.x0 + sp.hull.x1) / 2, 0, (sp.hull.z0 + sp.hull.z1) / 2);
+    // the zone's asteroids (js/spacedata.ts rocks): in the zone's frame, so they go by as it does; radar targets and cover (rocksStep)
+    S.rockList = SD.rocks(zi ? zi.ms : { seed: map.seed, size: sp.size, th: SD.themeIndex(map.theme), wing: !!sp.wing, name: (S.ms && S.ms.name) || '' });
+    ROCKS.obj = S.rockList.length ? ShipModel.rockField(S.rockList) : null; if (ROCKS.obj) S.zone!.add(ROCKS.obj);
     for (const c of S.zdef) {
       if (c.k === S.zact) continue;
       const t = ShipModel.traffic(c.kind, c.seed); S.zone!.add(t.group);
@@ -1128,7 +1161,7 @@ export const Space = (() => {
   type ZHull = { holder: THREE.Group; h: ReturnType<typeof ShipModel.hull>; bow: number; map: LvMap | null; key: string; up?: ((ms: number) => boolean) | null };
   const viewDrop = (map: LvMap | null) => { // (what was made of her ahead, not wanted after all)
     const p = map && (map as any).viewPre as LvViewPre | null; if (!p) return;
-    p.root.removeFromParent(); // (shown on her hull out in the zone, zoneShow)
+    InteriorCull.untrack(p.root); p.root.removeFromParent(); // (shown on her hull out in the zone, zoneShow)
     p.root.traverse((o: any) => { if (o.geometry) o.geometry.dispose(); if (o.material) for (const m of Array.isArray(o.material) ? o.material : [o.material]) { if (m.map) m.map.dispose(); m.dispose(); } });
     (map as any).viewPre = null;
   };
@@ -1218,7 +1251,7 @@ export const Space = (() => {
     for (const [id, h] of zoneHulls) {
       const p = h.map && (h.map as any).viewPre as LvViewPre | null;
       if (!p || p.root.parent || !zoneReady(h) || !id.startsWith(S.zinfo.ms.seed + ':')) continue;
-      h.h.group.add(p.root); // (her drawing's in the level's own frame, as her hull is)
+      h.h.group.add(p.root); p.root.userData.prof = 'zone ship interior'; { const hh = h.h; InteriorCull.track(p.root, h.map!, () => hh.holes, hh.group); } // (her drawing's in the level's own frame, as her hull is)
       if (hid) p.root.traverse((o: any) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; hid!.push(o); } });
     }
   }
@@ -1442,15 +1475,17 @@ export const Space = (() => {
     const cam = G_R.camera;
     if (S.stars) { S.stars.position.copy(cam.position); S.stars.quaternion.copy(_r); if (S.zone) S.stars.quaternion.multiply(S.zone.quaternion); } // (the stars are the zone's: they turn when the ship the level is turns)
     if (S.sun) {
-      const d = new T.Vector3(0.5, 0.62, 0.6).normalize(); if (S.zone) d.applyQuaternion(S.zone.quaternion); d.applyQuaternion(_r); // (the zone's sun, as the stars are the zone's: it stays where it is when the level changes to another of her ships)
+      const sd = S.star ? S.star.dir : [0.5, 0.62, 0.6], d = new T.Vector3(sd[0], sd[1], sd[2]).normalize(); if (S.zone) d.applyQuaternion(S.zone.quaternion); d.applyQuaternion(_r); // (the zone's sun, as the stars are the zone's: it stays where it is when the level changes to another of her ships)
       S.sun.position.copy(cam.position).addScaledVector(d, 200); S.sun.target.position.copy(cam.position);
-      const want = S.docked && !S.auto ? 0 : S.ftl ? 0.4 : 2.4; S.sun.intensity += (want - S.sun.intensity) * 0.08;
+      const want = S.docked && !S.auto ? 0 : S.ftl ? 0.4 : S.star ? S.star.I : 2.4; S.sun.intensity += (want - S.sun.intensity) * 0.08;
+      if (ROCKS.obj && S.zone) { S.zone.updateWorldMatrix(true, false); ROCKS.obj.userData.lod(S.zone.worldToLocal(cam.position.clone()), cam); } // (each rock as finely as it looks big)
+      if (S.starObj) { S.starObj.position.copy(cam.position); S.starObj.quaternion.setFromUnitVectors(_mz, d); S.starObj.visible = !!S.stars && S.stars.visible && !S.ftl; } // (its disc where its light comes from)
     }
   }
   // Flying, nothing of the level's that isn't in its drawing may show (it would hang beside her where the level was):
   // everything loose in the scene is put out of sight, and the people who aren't aboard; put back when she's against it again.
   function hideStrays() {
-    const sc = G_R.scene, keep = new Set<THREE.Object3D>([G_R.camera, G_R.levelRoot, G_R.dynRoot, S.root!, S.model!.group, S.stars!, S.sun!, S.sun!.target]);
+    const sc = G_R.scene, keep = new Set<THREE.Object3D>([G_R.camera, G_R.levelRoot, G_R.dynRoot, S.root!, S.model!.group, S.stars!, S.sun!, S.sun!.target, ...(S.starObj ? [S.starObj] : [])]);
     if (!S.hidden) S.hidden = new Map();
     for (const c of sc.children) {
       if (keep.has(c) || (c as any).isLight) continue; // (every light stays: the weapon lights' and muzzle flashes' pools are dark till used, and one light more or less when they came back at the breach had every shader made again)
@@ -1921,8 +1956,14 @@ export const Space = (() => {
       P.addScaledVector(n, R - dd);
       if (vn < 0) { hit = Math.max(hit, -vn); S.V.addScaledVector(n, -vn * 1.3); }
     }
+    // (a rock: thrown off it, and it hurts as the ground does)
+    for (const k of ROCKS.near) {
+      const c = ROCKS.p[k], rr = S.rockList[k].r * 0.92 + R, dd = P.distanceTo(c); if (dd >= rr) continue;
+      const n = dd > 1e-3 ? P.clone().sub(c).divideScalar(dd) : new T.Vector3(0, 1, 0), vn = S.V.clone().sub(ROCKS.v).dot(n);
+      P.addScaledVector(n, rr - dd); if (vn < 0) { hit = Math.max(hit, -vn); ground = Math.max(ground, -vn); S.V.addScaledVector(n, -vn * 1.3); }
+    }
     // (a ship's hull does her no harm, however she meets it: she's built to ram. She's thrown off it and shaken, no more)
-    if (ground > 12) damage((ground - 12) * 1.2, 'She hit the ground hard');
+    if (ground > 12) damage((ground - 12) * 1.2, S.floorAt ? 'She hit the ground hard' : 'She hit an asteroid');
     if (hit > 12) S.shake = Math.min(1, hit / 40);
   }
   function damage(n: number, why?: string) {
@@ -2079,14 +2120,16 @@ export const Space = (() => {
     if (!S.on || !S.model || Game.map !== S.map) return;
     S.t += dt;
     if (S.plan) S.plan.line.visible = S.plan.gates.visible = S.plan.end.visible = false; // (her plan's drawn again below while she's lined up: planDraw)
-    zoneStep();
-    tgtTrack(dt);
+    let pt = Prof.t();
+    zoneStep(); pt = Prof.lap('space: zone', pt);
+    tgtTrack(dt); pt = Prof.lap('space: target', pt);
     const m = me();
     if (isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2)) { fly(dt); if (!S.docked) sendPose(); zoneClose(dt); } else { if (S.auto) S.auto = null; follow(dt); S.stick.multiplyScalar(Math.exp(-dt * 2.2)); }
+    pt = Prof.lap('space: flight', pt);
     ftlStep(dt);
     doors(dt);
-    turrets(dt);
-    ewStep(dt); ewMarks(); ewNear();
+    turrets(dt); pt = Prof.lap('space: doors, turrets, jump', pt);
+    ewStep(dt); pt = Prof.lap('space: radar & fire control', pt); ewMarks(); ewNear(); pt = Prof.lap('space: radar marks', pt);
     if (!S.docked || S.auto) hideStrays();
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
     const seat = mySeat(), cam = G_R.camera;
@@ -2094,27 +2137,32 @@ export const Space = (() => {
     helmZoom(dt);
     if (S.shake > 0.01) { cam.position.x += (Math.random() - 0.5) * S.shake * 0.25; cam.position.y += (Math.random() - 0.5) * S.shake * 0.25; S.shake *= Math.exp(-dt * 4); }
     cam.updateMatrixWorld();
-    outside();
+    pt = Prof.lap('space: view', pt);
+    outside(); pt = Prof.lap('space: outside (sky, star, rocks)', pt);
+    { const pc = cam as THREE.PerspectiveCamera, hgt = G_R.renderer.domElement.height || 720; InteriorCull.update(cam, hgt / 2 / Math.tan((pc.fov || 70) * Math.PI / 360)); pt = Prof.lap('space: interiors seen', pt); }
     sensorStep(); // (after the view's placed: where the operator's looking is where the camera is now)
     ewCam();
     { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); if (H.focus) G_R.focusAmt = e;
       if (!H.focus && H.fO >= 0) { const o = (S.t - H.fO) / 0.3; if (o >= 1 || !seat) { G_R.focusBlur = false; H.fO = -1; } else G_R.focusAmt = 1 - o; } // (out: the blur fading away) // (going in: the world blurring out and the hologram opening, over 0.6 s)
       const lift = H.focus ? 0.2 * e : 0; // (focused: up from below the eyes to just under the middle of the view)
       RadarView.holo(S.model ? S.model.group : null, EW.own, H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, EW.rt, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1, HOLO_ZOOM[H.zi], rwrNow(), secView()); }
+    pt = Prof.lap('space: sensors, hologram', pt);
     RadarView.update(S.root, Radar.show, ewList(), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', EW.rt, G_R.camera, Radar.sel);
     // her engines, the status strip, the mission's things
     const th = S.docked ? 0 : U.clamp(S.V.length() / S.def.speed, 0.12, 1) * (S.cruise ? 1.3 : 0.75);
     S.model.thrust.opacity += (th - S.model.thrust.opacity) * Math.min(1, dt * 4);
     S.model.glow.color.setHex(S.docked ? 0x2a8a5a : S.ftl ? 0x4060ff : 0xa07020);
     for (const a of S.anchors) { a.obj.rotation.z += dt * 0.15; (a.obj.userData.film.material as THREE.MeshBasicMaterial).opacity = 0.1 + 0.05 * Math.sin(S.t * 2); }
-    if (S.hull) { guns(dt); missiles(dt); } torps(dt); rounds(dt);
+    pt = Prof.lap('space: radar view', pt);
+    if (S.hull) { guns(dt); missiles(dt); } torps(dt); rounds(dt); pt = Prof.lap('space: guns, missiles, torpedoes, rounds', pt);
     for (const q of S.things) {
       if (q.k === 'art') { const a = q.obj.userData.art as THREE.Mesh; a.rotation.y += dt * 1.5; a.position.y = 1.15 + Math.sin(S.t * 2) * 0.05; }
       if (q.k === 'lock') (q.obj as THREE.Mesh).material = lockMat(q.obj.userData.lock === '' || !!(S.state && S.state.keys.includes(q.obj.userData.lock)));
     }
     if (S.boomT >= 0) boomStep(dt);
     if (m.seat != null && (m.dead || m.down)) stand();
-    SpaceUI.update(dt);
+    pt = Prof.lap('space: the rest', pt);
+    SpaceUI.update(dt); Prof.lap('space: UI', pt);
   }
   const _lm: Record<string, THREE.Material> = {};
   const lockMat = (open: boolean) => _lm[open ? 'o' : 'c'] || (_lm[open ? 'o' : 'c'] = ShipModel.lit(open ? 0x30ff60 : 0xff3020));
@@ -2140,7 +2188,7 @@ export const Space = (() => {
     // from the muzzle along the gun, in the level's own coordinates (where a hull's guns are)
     const mw = tu.muzzle.getWorldPosition(new T.Vector3()), dw = new T.Vector3(0, 0, -1).applyQuaternion(tu.gun.getWorldQuaternion(new T.Quaternion()));
     const inv = _r.clone().invert(), o = mw.clone().sub(_p).applyQuaternion(inv), d = dw.clone().applyQuaternion(inv);
-    let best = -1, bt = e.range || 1500;
+    let best = -1, bt = Math.min(e.range || 1500, rockOn(o, o.clone().addScaledVector(d, e.range || 1500)) * (e.range || 1500)); // (no further than the first rock in the way)
     if (S.hull) S.hull.guns.forEach((gn, i) => { if (gn.hp <= 0) return; const to = new T.Vector3(gn.x, gn.y, gn.z).sub(o), tt = to.dot(d); if (tt < 0 || tt > bt) return; if (to.addScaledVector(d, -tt).length() < 2.2 + tt * 0.004) { bt = tt; best = i; } });
     // (a missile in the way of it is shot down)
     for (const ms of S.mis.slice()) { const to = ms.o.position.clone().sub(o), tt = to.dot(d); if (tt > 0 && tt < bt && to.addScaledVector(d, -tt).length() < 5 + tt * 0.006) { const a = [ms.id, 0, 0, 0, 1]; missile(a); Net.toHost({ t: 'smis', a }); } }
@@ -2172,7 +2220,14 @@ export const Space = (() => {
     if (!S.state || !S.state.gn || S.state.arm != null) { spinDown(); return; } // (nobody left at her gun control, or she's counting down to blowing herself apart: her guns are silent)
     let lk: RTrack | null = null; for (const t of EW.foe!.trks) if (t.st === 'track' && t.est.p && t.est.q >= 0.15 && (!lk || trkUrg(EW.foe!, t) < trkUrg(EW.foe!, lk))) lk = t; // (the most urgent of her locks: what reaches her soonest)
     if (!lk || !lk.est.p) { spinDown(); return; } // (on whatever her best track's on: chaff, if it's been drawn off)
-    const up = new T.Vector3(0, 1.5, 0);
+    const urgent = trkUrg(EW.foe!, lk) < 4; // (something reaching her inside 4 s: no pause between bursts)
+    // (a weapon coming at her (closing faster than any ship flies) on a collision course (hardly moving across her line of sight):
+    // its course is the line of sight, so the lead's only along it. Across it, what the solution has is mostly its own noise, and
+    // tens of m/s of that over a second's flight is tens of metres off something three across. And no lift: it's a point, not a hull)
+    const los = lk.est.p.clone().sub(EW.foe!.P), lr = los.length(); los.divideScalar(lr || 1);
+    const rv = lk.est.v.clone().sub(EW.foe!.V), vcl = -rv.dot(los), vlat = rv.clone().addScaledVector(los, vcl).length();
+    const head = vcl > 250 && vlat < 0.15 * vcl, vAim = head ? EW.foe!.V.clone().addScaledVector(los, -vcl) : lk.est.v;
+    const up = new T.Vector3(0, head ? 0 : 1.5, 0);
     for (const gn of S.hull.guns) {
       if (gn.hp <= 0) continue;
       const g = gn as any, H = SD.HULLGUN[gn.k] as any, sp = gn.gun.userData.spin as THREE.Object3D | undefined, from = new T.Vector3(gn.x, gn.y, gn.z), to = lk.est.p.clone().add(up).sub(from), dist = to.length(); // (what it's shooting at: whatever her track's on)
@@ -2181,7 +2236,7 @@ export const Space = (() => {
       const up1 = gn.inv ? -1 : 1; // (a gun under her keel hangs upside down: its up is her down)
       if (gn.k !== 'missile' && up1 * to.y / dist < -0.17) { g.bt = 0; continue; } // (more than 10 degrees past its own side of her hull: the hull's in the way)
       // where the track says she'll be when the round gets there (its flight time)
-      const tof = gn.k === 'missile' ? 0 : dist / H.speed, aim = lk.est.p.clone().addScaledVector(lk.est.v, tof).add(up).sub(from);
+      const tof = gn.k === 'missile' ? 0 : dist / H.speed, aim = lk.est.p.clone().addScaledVector(vAim, tof).add(up).sub(from);
       if (gn.k !== 'missile') { const ad = aim.length(); gn.obj.rotation.y = Math.atan2(-aim.x, -aim.z); gn.gun.rotation.x = Math.asin(U.clamp(up1 * aim.y / ad, -0.2, 1)); }
       if (gn.k === 'mg') {
         // bursts: the barrels spin up, it fires H.rps for a second or two, then a pause
@@ -2191,7 +2246,7 @@ export const Space = (() => {
           if (g.bt <= 0) gn.cool = H.pause[0] + Math.random() * (H.pause[1] - H.pause[0]);
           continue;
         }
-        gn.cool -= dt; if (gn.cool <= 0) { g.bt = H.burst[0] + Math.random() * (H.burst[1] - H.burst[0]); g.acc = 0; }
+        gn.cool -= dt; if (urgent) gn.cool = Math.min(gn.cool, 0); if (gn.cool <= 0) { g.bt = H.burst[0] + Math.random() * (H.burst[1] - H.burst[0]); g.acc = 0; }
         continue;
       }
       gn.cool -= dt;
@@ -2236,6 +2291,7 @@ export const Space = (() => {
       const qa = TP.list.length ? q.p.clone() : null;
       r0.copy(q.p).sub(c0); q.p.addScaledVector(q.v, dt); q.d += step; r1.copy(q.p).sub(c1);
       if (qa && isCtl() && roundTorp(qa, q.p, dt)) { S.rounds.splice(i, 1); continue; }
+      if (ROCKS.near.length && rockOn(q.p.clone().addScaledVector(q.v, -dt), q.p) < 1) { S.rounds.splice(i, 1); rockFlash(q.p); continue; } // (into a rock)
       seg.subVectors(r1, r0); const L2 = seg.lengthSq(), t = L2 > 0 ? U.clamp(-r0.dot(seg) / L2, 0, 1) : 0, miss = r0.addScaledVector(seg, t).length();
       const hit = !S.docked && miss < R, gone = hit || q.d >= q.life;
       if (hit) { hits++; dmg += q.dmg; }
@@ -2269,7 +2325,7 @@ export const Space = (() => {
       const want = to.normalize(), ang = m.v.angleTo(want), k = ang > 1e-4 ? Math.min(1, H.turn * dt / ang) : 1;
       m.v.lerp(want, m.t < 1.2 ? k * 0.4 : k).normalize();
       m.o.position.addScaledVector(m.v, H.speed * (m.t < 1.2 ? 0.45 : 1) * dt); m.o.lookAt(m.o.position.clone().add(m.v));
-      const gone = m.t > H.life || S.docked || !!S.ftl;
+      const gone = m.t > H.life || S.docked || !!S.ftl || (ROCKS.near.length > 0 && rockOn(m.o.position.clone().addScaledVector(m.v, -H.speed * dt), m.o.position) < 1); // (into a rock)
       if (d < 9 || gone) {
         if (d < 9) { if (isCtl()) damage(H.dmg, 'A missile'); S.shake = 1; SpaceUI.flash(0.35); Audio.boom(20); }
         m.o.parent && m.o.parent.remove(m.o); S.mis.splice(i, 1);
@@ -2287,7 +2343,7 @@ export const Space = (() => {
   // TORP.vc of closing speed (it keeps some for turning). It's a radar target like anything out here (torpTargets: no
   // transponder), so a ship's own threat assessment and fire control deal with it as they would anything coming at her: a
   // round that meets it (rounds) kills it. The pilot's screen flies it and tells everyone aboard (storp, ten times a second).
-  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, turn2: 1.6, off: 0.6, turnT: 3, offT: 1.3, blast: 15, burn: 150, vc: 700, N: 4, seek: 2000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
+  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, turn2: 1.6, off: 0.6, turnT: 3, offT: 1.3, blast: 15, burn: 150, vc: 700, N: 4, seek: 2000, cone: 0.35, dop: 80, gate: 300, life: 90, r: 3, send: 0.1 };
   type Torp = { id: number; o: THREE.Group; fl: THREE.Mesh; puffs: THREE.Mesh[]; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; sent: number; lock: string; rt: RTarget; thr: number; rcs: boolean; lf: THREE.Vector3 }; // (thr: its motor's push (0..1); rcs: its thrusters firing)
   const TP = { list: [] as Torp[], n: 1, base: 1 + Math.floor(Math.random() * 1e6), left: TORP.loads, look: '', pick: '', l: false, cool: 0, tube: null as null | { at: THREE.Vector3; m: THREE.Object3D } };
   function tubeKit(g: THREE.Object3D, box: THREE.Box3, size: number) {
@@ -2374,12 +2430,59 @@ export const Space = (() => {
     Audio.boom(Math.max(0, S.P.distanceTo(tp.p) / 60));
   }
   // its own radar: the strongest return near where it expects the target (by its range gate and its cone), chaff and all
+  // ------------------------------------------------------------------ the zone's asteroids, near her
+  // Each frame: every rock's place in the level's frame (the zone's, moved and turned as it is), and those within ROCK_NEAR of her
+  // made radar targets (a return as big as its face: ROCK_SIG of its cross-section, the same every way) and the radars' cover
+  // (Radar.occ: a sphere a little inside its lumps); their velocity the zone's going by. Rounds, shots, torpedoes, missiles and
+  // she herself are stopped by the near ones (rockOn, collide).
+  const ROCK_NEAR = 14000, ROCK_SIG = 0.25, ROCKS = { near: [] as number[], p: [] as THREE.Vector3[], tg: new Map<number, RTarget>(), r: new Map<string, number>(), v: new T.Vector3(), zp: new T.Vector3(), zt: -1, obj: null as THREE.Object3D | null };
+  const NO_RCS = { s: new Float32Array(1), max: 0, mean: 0 };
+  function rocksStep(dt: number): RTarget[] {
+    const out: RTarget[] = []; ROCKS.near = []; Radar.occ.length = 0;
+    if (!S.zone || !S.rockList.length) return out;
+    // (the zone's velocity in the level's frame: how its middle's moved since the last step)
+    if (ROCKS.zt >= 0 && dt > 0) { ROCKS.v.copy(S.zone.position).sub(ROCKS.zp).divideScalar(dt); if (ROCKS.v.length() > 400) ROCKS.v.set(0, 0, 0); } ROCKS.zp.copy(S.zone.position); ROCKS.zt = S.t;
+    const zq = S.zone.quaternion, zp = S.zone.position;
+    S.rockList.forEach((q, k) => {
+      const p = ROCKS.p[k] || (ROCKS.p[k] = new T.Vector3()); p.set(q.p[0], q.p[1], q.p[2]).applyQuaternion(zq).add(zp);
+      if (p.distanceTo(S.P) - q.r > ROCK_NEAR) return;
+      ROCKS.near.push(k);
+      let t = ROCKS.tg.get(k); if (!t) { t = { id: 'rock' + k, p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: NO_RCS, iso: ROCK_SIG * Math.PI * q.r * q.r }; ROCKS.tg.set(k, t); ROCKS.r.set(t.id, q.r); }
+      t.p.copy(p); t.v.copy(ROCKS.v); out.push(t); Radar.occ.push({ p: t.p, r: q.r * 0.85, id: t.id });
+    });
+    return out;
+  }
+  // The other ships' scanners: in a crowded field (AI_NOTCH.on or more rocks inside AI_NOTCH.r of her) both put their Doppler notch
+  // on, and take it off once it's thinned out (AI_NOTCH.off or fewer): so in among the rocks a ship that drifts with them is lost to
+  // their search, as it is to yours. Looked at once a second. Their trackers have their own velocity gate and keep what they hold.
+  const AI_NOTCH = { r: 9000, on: 14, off: 7, t: 0 };
+  function aiNotch(dt: number) {
+    AI_NOTCH.t -= dt; if (AI_NOTCH.t > 0) return; AI_NOTCH.t = 1;
+    const sus = [...(EW.foe ? [EW.foe] : []), ...[...EW.tsu.values()].map((x) => x.su)];
+    for (const su of sus) {
+      su.Vc = ROCKS.v; let n = 0;
+      if (S.zone && S.rockList.length) { const zq = S.zone.quaternion, zp = S.zone.position, p = new T.Vector3(); for (const q of S.rockList) { if (p.set(q.p[0], q.p[1], q.p[2]).applyQuaternion(zq).add(zp).distanceTo(su.P) < AI_NOTCH.r) n++; } }
+      for (const sc of su.scans) { if (!sc.notch && n >= AI_NOTCH.on) sc.notch = true; else if (sc.notch && n <= AI_NOTCH.off) sc.notch = false; }
+    }
+  }
+  // how far along from a to b (0..1) the first near rock is met; 1 if none
+  function rockOn(a: THREE.Vector3, b: THREE.Vector3) {
+    let best = 1; const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, L2 = dx * dx + dy * dy + dz * dz; if (L2 <= 0) return 1;
+    for (const k of ROCKS.near) {
+      const c = ROCKS.p[k], r = S.rockList[k].r * 0.9, wx = c.x - a.x, wy = c.y - a.y, wz = c.z - a.z, m = (wx * dx + wy * dy + wz * dz) / L2, e2 = wx * wx + wy * wy + wz * wz - m * m * L2;
+      if (e2 >= r * r) continue; const h = Math.sqrt((r * r - e2) / L2), f = m - h; if (f >= 0 && f < best) best = f; else if (f < 0 && m + h > 0) best = 0;
+    }
+    return best;
+  }
+  function rockFlash(p: THREE.Vector3) { if (!S.root) return; const f = new T.Mesh(FLASH, new T.MeshBasicMaterial({ color: 0xc8b090, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending })); f.position.copy(p); f.scale.setScalar(2); f.frustumCulled = false; S.root.add(f); S.tracers.push({ m: f, t: 0.1 }); }
   function seekStep(tp: Torp): RTarget | null {
     const to = tp.est.clone().sub(tp.p), R = to.length(); if (R < 1) return null; to.divideScalar(R);
     let best: RTarget | null = null, bs = 0;
     for (const t of EW.tg) {
       if (t.id === 'own' || t.id.startsWith('torp')) continue;
       const d = t.p.clone().sub(tp.p), r = d.length(); if (r < 1 || Math.abs(r - R) > TORP.gate || d.divideScalar(r).dot(to) < Math.cos(TORP.cone)) continue;
+      if (Math.abs(t.v.clone().sub(tp.v).dot(d) - tp.ev.clone().sub(tp.v).dot(to)) > TORP.dop) continue;
+      if (Radar.blocked(tp.p, t.p, t.id)) continue; // (behind a rock from it) // (its Doppler: closing at about the rate the target's expected to; chaff, falling behind, isn't)
       const s = (t.iso != null ? t.iso : Radar.rcsToward(t, tp.p)) / (r * r * r * r); if (s > bs) { bs = s; best = t; }
     }
     return best;
@@ -2389,7 +2492,7 @@ export const Space = (() => {
     for (const t of EW.tg) {
       if (t.id === 'own' || t.id.startsWith('torp')) continue;
       if (t.id === 'hull' && S.map && S.map.sp) { const hb = S.map.sp.hull, y = t.p.y, x = tp.p.x, z = tp.p.z; if (x > hb.x0 - 4 && x < hb.x1 + 4 && z > hb.z0 - 4 && z < hb.z1 + 4 && Math.abs(tp.p.y - y) < 25) return t; continue; }
-      const R = t.id.startsWith('trf') ? 30 : 7, seg = tp.p.clone().sub(p0), w = t.p.clone().sub(p0), L2 = seg.lengthSq(), k = L2 > 0 ? U.clamp(w.dot(seg) / L2, 0, 1) : 0;
+      const R = t.id.startsWith('trf') ? 30 : t.id.startsWith('rock') ? (ROCKS.r.get(t.id) || 30) : 7, seg = tp.p.clone().sub(p0), w = t.p.clone().sub(p0), L2 = seg.lengthSq(), k = L2 > 0 ? U.clamp(w.dot(seg) / L2, 0, 1) : 0;
       if (w.addScaledVector(seg, -k).length() < R) return t;
     }
     return null;
@@ -2450,7 +2553,7 @@ export const Space = (() => {
   }
   function torpHit(tp: Torp, t: RTarget) {
     torpGone(tp, 2, true);
-    const nm = t.id === 'hull' ? hullName() : t.id.startsWith('trf') ? 'a ship' : t.id.startsWith('chaff') ? 'chaff' : t.id.startsWith('missile') ? 'a missile' : 'something';
+    const nm = t.id === 'hull' ? hullName() : t.id.startsWith('trf') ? 'a ship' : t.id.startsWith('chaff') ? 'chaff' : t.id.startsWith('missile') ? 'a missile' : t.id.startsWith('rock') ? 'an asteroid' : 'something';
     HUD.feed(`<b>Torpedo hit ${U.esc(nm)}</b>`);
     if (t.id === 'hull' && S.hull) S.hull.guns.forEach((gn, i) => { if (gn.hp > 0 && new T.Vector3(gn.x, gn.y, gn.z).distanceTo(tp.p) < TORP.blast) { gunHit(i, 0); Net.toHost({ t: 'shit', i, hp: 0 }); } }); // (her guns right by the blast)
   }
@@ -2636,7 +2739,7 @@ export const Space = (() => {
       }
       case 'smis': if (S.on && m.by !== Net.myId) missile(m.a); return true;
       case 'srcue': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) ewCue(m.a); return true;
-      case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && m.a.length === 4) modeSet(m.a[0] | 0, MODES[m.a[1] | 0] || 'round', +m.a[2], +m.a[3], true); return true;
+      case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5)) modeSet(m.a[0] | 0, MODES[m.a[1] | 0] || 'round', +m.a[2], +m.a[3], true, m.a.length === 5 ? !!m.a[4] : undefined); return true;
       case 'strk': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && EW.own) { const ti = m.a[0] | 0, tr = EW.own.trks[ti]; if (tr) { // (the sensor operator's tracker commands: js/space.ts trkOff, trkSend)
         if (m.a[1] === 0) trkOff(ti, !!m.a[2], true); else if (m.a[1] === 1) Radar.cueRay(EW.own, tr, new T.Vector3(+m.a[2], +m.a[3], +m.a[4]), EW.rt); else Radar.cueOne(EW.own, tr, { k: m.a[2] | 0, phi: +m.a[3], r: +m.a[4], t: EW.rt, db: 0, id: '', e: 0 }); } } return true;
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;

@@ -237,6 +237,7 @@ export const SpaceData = (() => {
   // its own; the first of them comes within a few kilometres). Any of them can be closed with and boarded (js/spaceserver.ts
   // 'tboard'): each is a ship of her own class, theme and seed, so she's the same ship whenever she's looked at.
   // The zone's frame: the mission ship's own at the moment the squad came out of the jump, its middle the origin.
+  const MS_RUN = 200000, msSpeed = (seed: number) => 30 + G_U.rng((seed ^ 0x5eed) >>> 0)() * 40;
   function zone(ms: { seed: number; size: SpSize | null; th: number; wing?: boolean; name: string }): SpContact[] {
     const r = G_U.rng((ms.seed ^ 0x20e5) >>> 0), U = G_U, out: SpContact[] = [];
     const mk = (kind: string, size: SpSize, th: number, seed: number, wing: boolean, name: string, pts: number[][], speed: number, off: number) => {
@@ -244,8 +245,10 @@ export const SpaceData = (() => {
       out.push({ k: out.length, kind, size, th, seed, wing, name, pts, lens, total: lens.reduce((a, b) => a + b, 0), speed, off });
     };
     const wing = !!ms.wing, size = ms.size || 'small', d = wing ? [-0.7071, 0, -0.7071] : [-1, 0, 0], T0 = themeAt(ms.th);
+    // (she's under way at her own pace, 30 to 70 m/s by her seed (a stream of its own: the rest of the zone as it always was), fast
+    // enough to show against an asteroid field's drift through a Doppler notch from most ways; her course long enough for an hour)
     mk(wing ? 'wing' : size === 'transport' ? (T0 && T0.name === 'Corporate cutter' ? 'cutter' : 'freighter') : size === 'large' || size === 'capital' ? 'navy' : 'pirate', size, ms.th, ms.seed, wing, ms.name,
-      [[-d[0] * 60000, 0, -d[2] * 60000], [d[0] * 60000, 0, d[2] * 60000]], 12, 60000);
+      [[-d[0] * MS_RUN, 0, -d[2] * MS_RUN], [d[0] * MS_RUN, 0, d[2] * MS_RUN]], msSpeed(ms.seed), MS_RUN);
     const n = 4 + (r() < 0.5 ? 1 : 0), n0 = U.ri(r, 0, SHIP_NAMES.length - 1); // (no two of them of a name)
     for (let i = 1; i <= n; i++) {
       const kind = U.pick(r, ['freighter', 'freighter', 'cutter', 'pirate', 'navy', 'wing']), sz: SpSize = kind === 'freighter' || kind === 'cutter' ? 'transport' : kind === 'navy' ? 'large' : r() < 0.5 ? 'small' : 'medium';
@@ -365,8 +368,54 @@ export const SpaceData = (() => {
   const DEFEND = { lead: 20, secs: 180, pods: 5, first: 2 }; // (lead: from the squad coming aboard to the first pod, to get to her court in; then secs, the first pod first seconds into it)
   // A luxury cruiser (a cruiser with a promenade court): what she's called, and no guns on her hull. guns, className: any ship's, by her
   // class and whether she's one. STAFF: the family names of her security, for those who fight beside the squad (js/spaceserver.ts).
+  // ---- The system's star: what the level's out here is lit by. Each mission's system has its own, at some stage of its life
+  // (by the mission's seed: the same on every screen and every time it's come to); the base's is an ordinary one. Its look:
+  // col the disc's colour, size its angular radius (radians), glow how far its corona reaches (in its radii), neb a cloud round
+  // it (a protostar's dust; a planetary nebula round a white dwarf: ring); its light: light the sunlight's colour, I its
+  // strength (the directional light's), dir the way to it in the zone's frame.
+  type StarStage = 'protostar' | 'main' | 'redgiant' | 'bluegiant' | 'whitedwarf' | 'reddwarf';
+  interface StarDef { stage: StarStage; name: string; col: number; light: number; I: number; size: number; glow: number; neb: number | null; ring: boolean; dir: number[] }
+  const STARS: Record<StarStage, Omit<StarDef, 'stage' | 'dir'> & { w: number }> = {
+    protostar: { w: 1, name: 'Protostar', col: 0xffa860, light: 0xffb47c, I: 2.8, size: 1.3 * Math.PI / 180, glow: 5, neb: 0x8a4a2c, ring: false },
+    main: { w: 4, name: 'Main-sequence star', col: 0xfff2dc, light: 0xfff1dc, I: 4.4, size: 0.9 * Math.PI / 180, glow: 4, neb: null, ring: false },
+    redgiant: { w: 2, name: 'Red giant', col: 0xff7a3c, light: 0xffa070, I: 3.8, size: 9 * Math.PI / 180, glow: 1.6, neb: null, ring: false },
+    bluegiant: { w: 1, name: 'Blue supergiant', col: 0xcfe0ff, light: 0xc6d6ff, I: 5.8, size: 2.4 * Math.PI / 180, glow: 4.5, neb: null, ring: false },
+    whitedwarf: { w: 1, name: 'White dwarf', col: 0xeef4ff, light: 0xdde9ff, I: 2.6, size: 0.14 * Math.PI / 180, glow: 26, neb: 0x40c0b0, ring: true },
+    reddwarf: { w: 2, name: 'Red dwarf', col: 0xff6634, light: 0xff9468, I: 2.3, size: 0.7 * Math.PI / 180, glow: 4, neb: null, ring: false },
+  };
+  function star(seed: number | null): StarDef {
+    if (seed == null) return { stage: 'main', ...STARS.main, dir: [0.5 / 1.0, 0.62, 0.6].map((x) => x / Math.hypot(0.5, 0.62, 0.6)) }; // (the base's: as it always was)
+    const r = G_U.rng((seed ^ 0x57a2) >>> 0), keys = Object.keys(STARS) as StarStage[], tot = keys.reduce((a, k) => a + STARS[k].w, 0);
+    let x = r() * tot, stage: StarStage = 'main'; for (const k of keys) { x -= STARS[k].w; if (x < 0) { stage = k; break; } }
+    const az = r() * Math.PI * 2, el = (12 + r() * 48) * Math.PI / 180; // (somewhere between low on her horizon and high over her)
+    return { stage, ...STARS[stage], dir: [Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)] };
+  }
+  // ---- A mission's asteroids: a field the zone lies in (by the mission's seed), the rocks scattered along the mission ship's
+  // course and either side of it, thicker near it, none in her way or any of the others' (their courses kept clear by ROCK_CLEAR
+  // past a rock's own size) nor round where the squad comes out of the jump (the zone's middle). Each: p its place in the zone's
+  // frame, r its size (m, its mean radius), s its own seed (its shape and turn). Near half are some tens of metres, most of the rest a hundred or two, one in seven some hundreds.
+  const ROCK_CLEAR = 450;
+  interface Rock { p: number[]; r: number; s: number }
+  function rocks(ms: { seed: number; size: SpSize | null; th: number; wing?: boolean; name: string }): Rock[] {
+    const r = G_U.rng((ms.seed ^ 0x7a57e) >>> 0), cs = zone(ms), out: Rock[] = [];
+    if (r() < 0.15) return out; // (some zones are open space)
+    const d0 = cs[0].pts, dx = d0[1][0] - d0[0][0], dz = d0[1][2] - d0[0][2], dl = Math.hypot(dx, dz), ux = dx / dl, uz = dz / dl; // (her course's way)
+    const segs: number[][][] = []; for (const c of cs) for (let i = 0; i < c.pts.length; i++) segs.push([c.pts[i], c.pts[(i + 1) % c.pts.length]]);
+    const segD = (p: number[], a: number[], b: number[]) => { const vx = b[0] - a[0], vy = b[1] - a[1], vz = b[2] - a[2], L2 = vx * vx + vy * vy + vz * vz, k = L2 > 0 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy + (p[2] - a[2]) * vz) / L2)) : 0; return Math.hypot(p[0] - a[0] - vx * k, p[1] - a[1] - vy * k, p[2] - a[2] - vz * k); };
+    // (as far along her course as she goes in some forty minutes, as thick all the way as it was over sixty kilometres)
+    const L = 15000 + cs[0].speed * 2400, dense = 0.6 + r() * 0.8, n = Math.round(140 * dense * (L + 15000) / 60000); // (fewer than once, but bigger: as much cover all told, a third more)
+    for (let i = 0, tries = 0; i < n && tries < n * 6; tries++) {
+      const along = -15000 + r() * (L + 15000), side = (r() < 0.5 ? -1 : 1) * (Math.pow(r(), 1.6) * 9000), up = (r() - 0.5) * 2 * (400 + Math.pow(r(), 2) * 2600);
+      const p = [ux * along - uz * side, up, uz * along + ux * side], q = r(), rad = q < 0.45 ? 30 + r() * 70 : q < 0.85 ? 100 + r() * 200 : 300 + r() * 500;
+      if (Math.hypot(p[0], p[1], p[2]) < 3200 + rad) continue;
+      if (segs.some(([a, b]) => segD(p, a, b) < ROCK_CLEAR + rad)) continue;
+      if (out.some((o) => Math.hypot(o.p[0] - p[0], o.p[1] - p[1], o.p[2] - p[2]) < (o.r + rad) * 1.15)) continue;
+      out.push({ p, r: rad, s: (r() * 0x7fffffff) | 0 }); i++;
+    }
+    return out;
+  }
   const NOGUNS = { pd: 0, mg: 0, missile: 0 };
   const gunsOf = (size: SpSize, liner?: boolean) => (liner ? NOGUNS : SIZES[size].guns), className = (size: SpSize, liner?: boolean) => (liner ? 'luxury cruiser' : SIZES[size].name);
   const STAFF = ['Okafor', 'Reyes', 'Lindqvist', 'Tanaka', 'Moreau', 'Abara', 'Castellanos', 'Novak', 'Haddad', 'Ferreira', 'Kowalczyk', 'Iyer', 'Marchetti', 'Osei', 'Brandt', 'Yilmaz'];
-  return { gunsOf, className, STAFF, DEFEND, LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, hatchButton, HATCH_Z, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
+  return { gunsOf, className, STAFF, DEFEND, LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, hatchButton, HATCH_Z, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos, star, rocks, ROCK_CLEAR };
 })();

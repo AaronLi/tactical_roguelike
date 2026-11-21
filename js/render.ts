@@ -51,6 +51,7 @@ export const R = {
   vmPts: [] as THREE.PointLight[], vmSpots: [] as THREE.SpotLight[], // (the dynamic lights' stand-ins for it: eyeLight)
   vmDark: false, // (no light of its own: the level's light at the eye is all it gets, eyeLight)
   levelRoot: undefined as unknown as THREE.Group,
+  levelView: null as THREE.Object3D | null, // (what LevelView.build made of the level: its static pieces batched, batchLevel)
   dynRoot: undefined as unknown as THREE.Group,
   flashTex: undefined as unknown as THREE.CanvasTexture,
   tracers: undefined as unknown as THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>[],
@@ -168,7 +169,7 @@ export const R = {
 
     // the viewmodel is drawn in its own pass after clearing depth, so guns never clip into walls
     r.autoClear = false;
-    this.vmScene = new THREE.Scene();
+    this.vmScene = new THREE.Scene(); this.vmScene.userData.prof = 'gun in hand';
     this.vmHolder = new THREE.Group();
     this.vmHolder.matrixAutoUpdate = false;
     this.vmScene.add(this.vmHolder);
@@ -186,9 +187,9 @@ export const R = {
     this.vmPts = [0, 1, 2].map(() => { const l = new THREE.PointLight(0xffffff, 0, 1, 2); this.vmScene.add(l); return l; });
     this.vmSpots = [0, 1].map(() => { const s = new THREE.SpotLight(0xffffff, 0, 1, 0.3, 0.6, 1.6); s.target = new THREE.Object3D(); this.vmScene.add(s, s.target); return s; });
 
-    this.levelRoot = new THREE.Group();
+    this.levelRoot = new THREE.Group(); this.levelRoot.userData.prof = 'level: other'; // (the profiler's draw counts: js/profiler.ts)
     this.scene.add(this.levelRoot);
-    this.dynRoot = new THREE.Group();
+    this.dynRoot = new THREE.Group(); this.dynRoot.userData.prof = 'people & effects';
     this.scene.add(this.dynRoot);
 
     this._initFx();
@@ -272,12 +273,13 @@ export const R = {
   },
   setLevel(map: LvMap) {
     this.clearLevel();
-    this.levelRoot.add(LevelView.build(map));
+    this.levelView = LevelView.build(map); this.levelView.userData.prof = 'level interior'; this.levelRoot.add(this.levelView);
     this.levelRoot.add(Wind.level(map)); // (calm till the host says, and the flags: js/wind.ts)
     // what stops a weapon light: the level, bar what you can see through (glass, a grating)
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
     { const gpu = GpuAo.bake(this.renderer, this.scene, this.levelRoot, map); if (gpu) { LightGrid.useGpuAo(gpu.a, gpu.b); (map as any).gpuAoMs = gpu.ms; } } // (the occlusion from the meshes on the GPU: ?gpuao=1, js/gpuao.ts)
+    if (!map.sp && !map.theme.hub) this.batchLevel(map); // (a ship's: once she's all put together, js/space.ts enter)
     const th = map.theme;
     (this.scene.fog as THREE.Fog).color.setHex(th.fog);
     const fog = this.scene.fog as THREE.Fog; fog.near = th.noFog ? 1e4 : th.fogNear || 8; fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
@@ -374,6 +376,10 @@ export const R = {
     for (const c of out) this.levelRoot.remove(c);
     return out;
   },
+  // What's left of the level's static pieces after LevelView's merge (alone in their block with their material, and the merged
+  // blocks themselves) drawn as BatchedMeshes, a call a material (js/levelview.ts batchStatic): not what moves or changes (keepOf).
+  // Once nothing else is going to cut or reshape its meshes (js/space.ts does, putting a ship together): they're out of the scene after.
+  batchLevel(map: LvMap) { if (new URLSearchParams(location.search).has('nolvbatch')) return; /* (?nolvbatch: as merged, for comparing) */ if (this.levelView && this.levelView.parent === this.levelRoot) LevelView.batchStatic(this.levelView, LevelView.keepOf(map)); },
   clearLevel() {
     for (const tr of this.trails || []) this.trailDrop(tr);
     this.trails = []; this.lastShot = null;

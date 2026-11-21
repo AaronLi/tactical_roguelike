@@ -74,6 +74,7 @@ import { ServerHost } from './serverhost.js';
 import { ServerLink } from './serverlink.js';
 import { ShipGen } from './shipgen.js';
 import { ShipModel } from './shipmodel.js';
+import { InteriorCull } from './interiorcull.js';
 import { Shop } from './shop.js';
 import { ShopUI } from './shopui.js';
 import { ShotLog } from './shotlog.js';
@@ -106,5 +107,5 @@ import { Zip } from './zip.js';
   Callsigns, Arsenal, Acoustics, Ambience, GunAudio, Footsteps, Audio, GunMaterials, Models, GunRig, HumanData, Humans, Headgear, FurnSpec, FurnMesh,
   LightGrid, GpuAo, GunAo, LevelView, Wind, Rig, VMAnim, Highlights, R, Viewmodel, GunModels, Icons, Bolts, Route, Shop, Recorder, SpaceSv, Server, ServerHost,
   ServerLink, Net, Career, CloudConfig, Handling, Loot, Casings, Range, Course, GunsmithUI, Hangar, ZeroUI, ShopUI, InvUI, Touch, Pad, Landing, Prep,
-  ShipModel, SpaceUI, Radar, RadarView, Space, Me, Cloud, MenuShow, Prof, Game, Glare, Views, ShotLog, HUD, Loadout, Demo, DebugStart,
+  ShipModel, InteriorCull, SpaceUI, Radar, RadarView, Space, Me, Cloud, MenuShow, Prof, Game, Glare, Views, ShotLog, HUD, Loadout, Demo, DebugStart,
 };
