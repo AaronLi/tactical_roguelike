@@ -25,7 +25,7 @@ export interface RIff { c: 'civ' | 'squad' | 'navy'; n: string } // (the answer:
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; q?: THREE.Quaternion; o?: THREE.Vector3; iff?: RIff | null } // (q, o: how she was turned and where she was when it was made)
 export type RMode = 'round' | 'sector' | 'off'; // (a search radar's modes: js/space.ts modeSet)
 export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her frame: 'y' her up (yaw), 'x' her beam (pitch), 'z' her length (roll))
-export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null; trail: { A: number; r: number; t: number }[]; kA: KF1; kr: KF1 } // (kA, kr: its Kalman filters, on its angle and its range) // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
+export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null; trail: { A: number; r: number; t: number }[]; kA: KF1; kr: KF1; sg?: number } // (sg: the largest its returns have said it is, m2 (sigOf): a fade makes a look smaller, never bigger) // (kA, kr: its Kalman filters, on its angle and its range) // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
 export interface RScan {
   ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number;
   map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; pend: { p: RPlot; A: number }[]; mode: RMode; rate0: number; sec: { on: boolean; c: number; h: number; dir: number }; // (mode: what it's doing (round, a sector, off: silent); rate0 its own turning rate; sec: a sector search: back and forth across c +- h (her angle), not round) // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
@@ -307,6 +307,9 @@ export const Radar = (() => {
   // (a contact's two Kalman filters: its angle, unsure by a third of the beam width a look, its rate as much as 250 m/s across at
   // that range; its range, unsure by 15 m a look, its rate by 250 m/s; either accelerating up to some 30 m/s/s)
   const SA = SCAN.bw / 3, SR = 15, ACC = 30, ACC3 = 5; // (ACC3: what a 3D track or a firing solution expects of a ship's acceleration, steady; a manoeuvre raises it (KF3 qb))
+  // how big a return says its target is (m2, by the radar equation from its strength and range): a lower bound, since where it was
+  // in the fan (off its middle, weaker) and its fading aren't known
+  const sigOf = (sc: RScan, p: RPlot) => SIG0 * Math.pow(10, (p.db - THR - 40 * Math.log10(sc.R0 / Math.max(1, p.r))) / 10);
   function associate(sc: RScan, batch: { p: RPlot; A: number }[], now: number) {
     // every pairing of a peak with a contact that could be it (inside the contact's gate: its filters' predicted spread and the
     // peak's own, chi-squared on two dimensions, 11.8: 997 in 1000 of its own peaks inside), best first, each peak and each contact once; a peak left over is a new contact
@@ -325,12 +328,12 @@ export const Radar = (() => {
       if (usedQ.has(q) || usedC.has(c)) continue; usedQ.add(q); usedC.add(c);
       const p = q.p, A = q.A, dt = p.t - c.t, qA = (ACC / Math.max(50, p.r)) ** 2;
       kf1Pred(c.kA, dt, qA); kf1Pred(c.kr, dt, ACC * ACC); kf1Upd(c.kA, wrapPi(A - c.kA.x), rA); kf1Upd(c.kr, p.r - c.kr.x, rr); c.kA.x = wrap(c.kA.x);
-      c.A = c.kA.x; c.r = c.kr.x; c.vA = c.kA.v; c.vr = c.kr.v; c.t = p.t; c.hits++; c.p = p; c.iff = p.iff || null; c.trail.push({ A, r: p.r, t: p.t }); if (c.trail.length > 8) c.trail.shift(); // (each sweep's answer: a transponder switched off is unknown from then on)
+      c.A = c.kA.x; c.r = c.kr.x; c.vA = c.kA.v; c.vr = c.kr.v; c.t = p.t; c.hits++; c.p = p; c.sg = Math.max(c.sg || 0, sigOf(sc, p)); c.iff = p.iff || null; c.trail.push({ A, r: p.r, t: p.t }); if (c.trail.length > 8) c.trail.shift(); // (each sweep's answer: a transponder switched off is unknown from then on)
     }
     // (a peak no contact took that's inside one's gate anyway is that one seen again too soon (a sector's edge, crossed there and
     // back): not a new one)
     const near = (q: typeof batch[0]) => sc.cons.some((c) => { const dt = Math.max(0, q.p.t - c.t), qA = (ACC / Math.max(50, q.p.r)) ** 2, pa = kf1Peek(c.kA, dt, qA), pr = kf1Peek(c.kr, dt, ACC * ACC), yA = wrapPi(q.A - pa.x), yr = q.p.r - pr.x; return yA * yA / (pa.p + rA) + yr * yr / (pr.p + rr) < 11.8; });
-    for (const q of batch) if (!usedQ.has(q) && !near(q)) { const p = q.p; sc.cons.push({ n: sc.tag + (++sc.nid), A: q.A, r: p.r, vA: 0, vr: 0, t: p.t, hits: 1, p, iff: p.iff, trail: [{ A: q.A, r: p.r, t: p.t }], kA: kf1(q.A, SA, 120 / Math.max(50, p.r)), kr: kf1(p.r, SR, 400) }); /* (a new one's rates unknown: up to some 120 m/s across, 400 along (a torpedo or a missile closing: its second sweep's a kilometre or more nearer), likely) */ }
+    for (const q of batch) if (!usedQ.has(q) && !near(q)) { const p = q.p; sc.cons.push({ n: sc.tag + (++sc.nid), A: q.A, r: p.r, vA: 0, vr: 0, t: p.t, hits: 1, p, iff: p.iff, trail: [{ A: q.A, r: p.r, t: p.t }], sg: sigOf(sc, p), kA: kf1(q.A, SA, 120 / Math.max(50, p.r)), kr: kf1(p.r, SR, 400) }); /* (a new one's rates unknown: up to some 120 m/s across, 400 along (a torpedo or a missile closing: its second sweep's a kilometre or more nearer), likely) */ }
     void now;
   }
   // ---------------------------------------------------------------- correlation in 3D
@@ -411,6 +414,7 @@ export const Radar = (() => {
   // and stays so until it's been under for as long (the hold runs down twice as fast as it runs up). Under: WATCH from 0.35,
   // else NEUTRAL; a civilian's answer under the line, CIV. A ship's fire control cues only on what's HOSTILE.
   const HOLD = 3;
+  const WPN = { sig: 30, vc: 150 }; // (what's taken for a weapon: smaller than 30 m2 and closing faster than 150 m/s)
   // Radar warning: every ship hears a tracking radar that's on her (locked on her, or sweeping across her): from which ship and
   // where (lit: her id to the emitters on her, when last and from where). Being tracked is a sign of hostility (assess).
   const lit = new Map<string, Map<string, { t: number; from: THREE.Vector3; lk: boolean }>>();
@@ -439,12 +443,15 @@ export const Radar = (() => {
     const out: RAssess[] = [], seen = new Set<string>(), inF = new Set<RContact>();
     const now = su.fusT, em = litOn(su.id, now), qi = su.Q.clone().invert(); // (the tracking radars on her now: her warning receiver's)
     const add = (key: string, n: string, f: RFused | null, c: RContact | null, iff: RIff | null, r: number, vc: number, tcpa: number, dcpa: number, plot: RPlot | null, on: boolean) => {
+      // (a weapon: a small return (under WPN.sig, by the largest any look's said it is) closing fast (over WPN.vc): nothing a ship
+      // does, so HOSTILE at once, no waiting to be sure)
+      const sg = Math.max(0, ...[c, f && f.a, f && f.b].map((q) => (q && q.sg) || 0)), wpn = sg > 0 && sg < WPN.sig && vc > WPN.vc;
       const pr = prior(su, iff), kin = vc > 10 ? Math.min(1, (vc - 10) / 60) : 0, near = r < 4000 ? 1 - r / 4000 : 0, cpa = tcpa > 0 && tcpa < 90 && dcpa < 800 ? 1 - dcpa / 800 : 0;
       const score = pr.p === 0 ? 0 : Math.min(1, pr.p + 0.35 * kin + 0.25 * near + 0.3 * cpa + (on ? 0.45 : 0));
-      let hold = su.assHold.get(key) ?? Math.max(0, ...[f && f.a, f && f.b].map((q) => (q ? su.assHold.get('C:' + q.n) || 0 : 0))); // (a new 3D track: as long held as its contacts were, alone)
-      hold = score >= 0.6 ? Math.min(HOLD * 2, hold + dt) : Math.max(0, hold - 2 * dt); su.assHold.set(key, hold); seen.add(key);
+      let hold = wpn ? HOLD : su.assHold.get(key) ?? Math.max(0, ...[f && f.a, f && f.b].map((q) => (q ? su.assHold.get('C:' + q.n) || 0 : 0))); // (a new 3D track: as long held as its contacts were, alone)
+      hold = wpn ? Math.max(hold, HOLD) : score >= 0.6 ? Math.min(HOLD * 2, hold + dt) : Math.max(0, hold - 2 * dt); su.assHold.set(key, hold); seen.add(key);
       const cls = pr.p === 0 ? 'FRIENDLY' : hold >= HOLD ? 'HOSTILE' : score >= 0.6 ? 'SUSPECT' : score >= 0.35 ? 'WATCH' : iff && iff.c === 'civ' ? 'CIV' : 'NEUTRAL';
-      const why = [pr.w, on ? 'TRACKING US' : '', kin > 0 ? `closing ${Math.round(vc)} m/s` : '', near > 0 ? 'near' : '', cpa > 0 ? `passes ${Math.round(dcpa)} m in ${Math.round(tcpa)} s` : ''].filter(Boolean).join(', ');
+      const why = [pr.w, wpn ? `WEAPON: ${sg.toFixed(1)} m2 closing fast` : '', on ? 'TRACKING US' : '', kin > 0 ? `closing ${Math.round(vc)} m/s` : '', near > 0 ? 'near' : '', cpa > 0 ? `passes ${Math.round(dcpa)} m in ${Math.round(tcpa)} s` : ''].filter(Boolean).join(', ');
       out.push({ key, n, f, c, iff, r, vc, tcpa, dcpa, score, hold, cls, plot, why });
     };
     for (const f of su.fus) {

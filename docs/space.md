@@ -291,6 +291,10 @@ she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km
      SUSPECT: a tracking radar on a ship is taken as hostility, so she keeps hers off what isn't. Tested: the squad's ship
      silent and still at 2.5 km is WATCH and left alone; running in at 90 m/s it's SUSPECT at once and HOSTILE 3 s later; its
      own tracker locked on her makes it SUSPECT, then HOSTILE, and she locks it back.
+     **A weapon** (js/radar.ts WPN): a return under 30 m² closing faster than 150 m/s is HOSTILE at once, no 3 s wait. Its
+     size is the radar equation run backwards on its strength and range (`sigOf`), the largest any look has given (a fade or the
+     edge of the fan makes a look smaller, never bigger): ships come out at 60-5000 m², a torpedo at 1-2.5 m². Not for what
+     answers as a friend.
      A scanner contact taken into a 3D track hands the track how long it's been held SUSPECT (its 3 s isn't started again), and
      a new 3D track starts moving as its contacts' ranges are (closing or opening along the line of sight), not still. A new
      contact allows for 400 m/s along the line of sight, so something fast (a torpedo) is the same contact on its second
@@ -324,8 +328,9 @@ with its own noise, so plots can differ between screens.
 - **Its return:** 1.5 m². To her own interrogator it answers (`only: 'squad'`), so her radars show it as FRIENDLY, "TORP n"; to anyone else's, nothing. Nothing special-cases it: the enemy's scanners, threat assessment and fire control
   see it as they see anything, and a minigun round passing within 3 m kills it. The pilot's screen flies it and tells everyone
   aboard (`storp`, ten times a second).
-- **Tested:** from 5 km side-on to the frigate. Her scanners have it at 3.2 km, HOSTILE at 2 km, a tracker locked at 1.5 km,
-  her miniguns firing from 600 m. Of three runs, it hit twice and was shot down once (closest rounds about 1 m).
+- **Tested:** from 5 km side-on to the frigate. Before the weapon rule: HOSTILE at 2 km, a tracker locked at 1.5 km, her
+  miniguns firing from 600 m; of three runs it hit twice. With it: HOSTILE at 3.1, 2.1 and 3.1 km (its second look), locked
+  at 2.4, 1.5 and 2.4 km, firing from 600 m; shot down all three times.
 
 ## Checking it
 
