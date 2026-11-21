@@ -190,6 +190,23 @@ export const R = {
     this.levelRoot = new THREE.Group(); this.levelRoot.userData.prof = 'level: other'; // (the profiler's draw counts: js/profiler.ts)
     this.scene.add(this.levelRoot);
     this.dynRoot = new THREE.Group(); this.dynRoot.userData.prof = 'people & effects';
+    // Not showing, not brought up to date: three works out every object's world matrix every frame, shown or not, and some 3,000 of
+    // the scene's aren't (the pools of marks, tracers and flares waiting to be used; whoever's hidden under dynRoot). One that works out
+    // its own matrix (matrixAutoUpdate) is skipped while it's hidden: the frame it's shown it's worked out again from where it is and
+    // where its parent is then, before it's drawn. (Only the pools, marked userData.pool, and what's under dynRoot: nothing that's read
+    // while hidden.) three's own updateMatrixWorld (r186) otherwise, as it is.
+    const skipHidden = (g: THREE.Object3D, which: (c: THREE.Object3D) => boolean) => {
+      g.updateMatrixWorld = function (this: THREE.Object3D, force?: boolean) {
+        if (this.matrixAutoUpdate) this.updateMatrix();
+        if (this.matrixWorldNeedsUpdate || force) {
+          if (this.matrixWorldAutoUpdate === true) { if (this.parent === null) this.matrixWorld.copy(this.matrix); else this.matrixWorld.multiplyMatrices(this.parent.matrixWorld, this.matrix); }
+          this.matrixWorldNeedsUpdate = false; force = true;
+        }
+        const ch = this.children;
+        for (let i = 0, l = ch.length; i < l; i++) { const c = ch[i]; if (!c.visible && c.matrixAutoUpdate && which(c)) continue; c.updateMatrixWorld(force); }
+      };
+    };
+    skipHidden(this.scene, (c) => !!c.userData.pool); skipHidden(this.dynRoot, () => true);
     this.scene.add(this.dynRoot);
 
     this._initFx();
@@ -632,6 +649,8 @@ export const R = {
       m.visible = false; m.userData.life = 0;
       this.scene.add(m); this.blasts.push(m);
     }
+    // (the pools: marked, so the scene's matrices aren't brought up to date for the ones not showing: skipHidden, below)
+    for (const a of [this.tracers, this.streaks, this.flares, this.decals, this.scorches || [], this.craters || [], this.bloodMarks, this.pools, this.blasts]) for (const o of a as THREE.Object3D[]) o.userData.pool = true;
     // a thermobaric's fireball and smoke (fireball), one of each drawn always, too small to see: their shaders are built with the
     // level's, not on the frame the first one goes off (a hitch, on some machines a long one, just when it's least wanted)
     for (const add of [true, false]) {

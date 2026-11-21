@@ -610,6 +610,7 @@ export const GunAudio = {
   },
 
   // Keep the Web Audio listener glued to the camera so HRTF panning tracks where you look.
+  _lis: null as WeakMap<AudioContext, Float64Array> | null, // (the listener's place and facing as last set, a context each: placeListener)
   updateListener(cam: THREE.Camera) {
     const p = cam.position;
     const f = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
@@ -619,10 +620,12 @@ export const GunAudio = {
   placeListener(ctx: AudioContext, p: THREE.Vector3, f: THREE.Vector3, u: THREE.Vector3) {
     const l = ctx.listener;
     if (l.positionX) {
-      const t = ctx.currentTime;
-      l.positionX.setValueAtTime(p.x, t); l.positionY.setValueAtTime(p.y, t); l.positionZ.setValueAtTime(p.z, t);
-      l.forwardX.setValueAtTime(f.x, t); l.forwardY.setValueAtTime(f.y, t); l.forwardZ.setValueAtTime(f.z, t);
-      l.upX.setValueAtTime(u.x, t); l.upY.setValueAtTime(u.y, t); l.upZ.setValueAtTime(u.z, t);
+      // (only what's changed since it was last set, by more than a millimetre or a ten-thousandth of a turn's direction: each set is an
+      // event on the parameter's timeline, nine a context a frame otherwise, about a quarter of a millisecond)
+      const t = ctx.currentTime, v = [p.x, p.y, p.z, f.x, f.y, f.z, u.x, u.y, u.z], lis = (this._lis ||= new WeakMap<AudioContext, Float64Array>()), was = lis.get(ctx);
+      const ps = [l.positionX, l.positionY, l.positionZ, l.forwardX, l.forwardY, l.forwardZ, l.upX, l.upY, l.upZ];
+      const w = was || new Float64Array(9).fill(NaN); if (!was) lis.set(ctx, w);
+      for (let i = 0; i < 9; i++) if (!(Math.abs(v[i] - w[i]) < (i < 3 ? 1e-3 : 1e-4))) { ps[i].setValueAtTime(v[i], t); w[i] = v[i]; }
     } else {
       l.setPosition(p.x, p.y, p.z);
       l.setOrientation(f.x, f.y, f.z, u.x, u.y, u.z);
