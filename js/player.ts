@@ -596,6 +596,7 @@ export const Me = {
     // swaps weapons
     window.addEventListener('wheel', (e) => {
       if (!Game.locked || Game.phase !== 'level' || Math.abs(e.deltaY) <= 5 || (e.isTrusted && Game.softLocked)) return;
+      if (Space.mySeat()) return; // (in a seat of the squad's ship: the wheel's the seat's (the helm's zoom: js/space.ts helmZoom), the weapons are stowed)
       const w = this.cur(), L = w && w.def.magLevels;
       if (L && this.ads && this.adsT > 0.5) {
         const i = this.sight(w).i, n = U.clamp(i + (e.deltaY < 0 ? 1 : -1), 0, L.length - 1);

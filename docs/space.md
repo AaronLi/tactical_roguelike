@@ -318,6 +318,9 @@ with its own noise, so plots can differ between screens.
   nearest the middle of the view (within 7°) is the one looked at (`torpSee`: a dashed ring, "click: pick"). A left click picks
   it ("TORPEDO TARGET"), again lets it go. **B** fires at the one picked, or the one looked at. A fix ahead in the bow
   scanner's blind cone isn't a 3D fix, so it can't be fired at.
+- **Zoom** (js/space.ts helmZoom): at the helm, holding right mouse (looking about), the wheel zooms the view up to 100×, a
+  quarter a notch; the head turns that much slower. Let go of the right button and it's back to 1×. The wheel doesn't swap
+  weapons in any of her seats.
 - **Flight:** a cold launch (pushed out downward at 7 m/s, coasting 1.1 s), then its RCS thrusters push it off to the side
   away from her path while turning its nose onto the target, then its motor (85 m/s², closing speed held to 300 m/s, the rest
   for steering by proportional navigation, N = 4).

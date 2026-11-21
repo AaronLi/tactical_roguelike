@@ -1517,7 +1517,12 @@ export const Space = (() => {
       const sy = seatPos(me().seat as number).yaw, dy = U.angDiff(sy, me().yaw), dp = me().pitch - S.lookP;
       me().yaw = sy; me().pitch = S.lookP = 0;
       S.stick.x = U.clamp(S.stick.x + dy * 2.2, -1, 1); S.stick.y = U.clamp(S.stick.y + dp * 2.2, -1, 1);
-    } else if (helm) S.lookP = me().pitch;
+    } else if (helm) {
+      // (looking about, zoomed: the head turns that much slower, so what's looked at stays under the mouse)
+      const m = me(); if (!ZM.on) { ZM.on = true; ZM.y = m.yaw; ZM.p = m.pitch; }
+      if (ZM.k > 1) { m.yaw = ZM.y + U.angDiff(ZM.y, m.yaw) / ZM.k; m.pitch = ZM.p + (m.pitch - ZM.p) / ZM.k; }
+      ZM.y = m.yaw; ZM.p = m.pitch; S.lookP = m.pitch;
+    }
     S.stick.multiplyScalar(Math.exp(-dt * 2.2));
     if (S.auto) { autoStep(dt); return; }
     if (S.docked || S.ftl) { S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.spin = 0; S.warp = null; return; }
@@ -2071,6 +2076,7 @@ export const Space = (() => {
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
     const seat = mySeat(), cam = G_R.camera;
     if (seat && seat.k === 'turret') turretView(seat);
+    helmZoom();
     if (S.shake > 0.01) { cam.position.x += (Math.random() - 0.5) * S.shake * 0.25; cam.position.y += (Math.random() - 0.5) * S.shake * 0.25; S.shake *= Math.exp(-dt * 4); }
     cam.updateMatrixWorld();
     outside();
@@ -2292,6 +2298,20 @@ export const Space = (() => {
     TP.list.push(tp); return tp;
   }
   // the 3D fixes the pilot can see (her sensors' fused tracks), and the one looked at: nearest the middle of the view, within 7 degrees
+  // The pilot's zoom: right mouse held (looking about), the wheel zooms the view in, up to 100 times (each notch a quarter more or
+  // less); let go of the right button, it's back to 1
+  const ZM = { k: 1, on: false, y: 0, p: 0, wheel: false };
+  function helmZoom() {
+    const seat = mySeat(), m = me(), on = !!seat && seat.k === 'helm' && !!m.mouse.r && !Game.menuOpen();
+    if (!ZM.wheel) { ZM.wheel = true; window.addEventListener('wheel', (e) => {
+      const st = mySeat(); if (!st || st.k !== 'helm' || !me().mouse.r || Game.menuOpen() || Math.abs(e.deltaY) < 5) return;
+      e.stopImmediatePropagation(); // (not the weapons' wheel: js/player.ts)
+      const k = U.clamp(ZM.k * (e.deltaY < 0 ? 1.25 : 0.8), 1, 100); if (k === ZM.k) return; ZM.k = k < 1.05 ? 1 : k;
+      HUD.toast('ZOOM', ZM.k >= 10 ? Math.round(ZM.k) + '×' : ZM.k.toFixed(1) + '×', 0.6);
+    }, { capture: true }); }
+    if (!on) { ZM.k = 1; ZM.on = false; return; }
+    if (ZM.k > 1) { Me.updateCamera(1 / 60); /* (the view again from the head as slowed this frame: not a frame late, which at 100x is a shake) */ const cam = G_R.camera as THREE.PerspectiveCamera, f0 = Game.settings.fov * Math.PI / 180; cam.fov = 2 * Math.atan(Math.tan(f0 / 2) / ZM.k) * 180 / Math.PI; cam.updateProjectionMatrix(); }
+  }
   function torpSee() {
     TP.look = ''; const seat = mySeat(); if (!seat || seat.k !== 'helm' || !EW.own || !S.model) return;
     const cam = G_R.camera, cp = cam.getWorldPosition(new T.Vector3()), cf = new T.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new T.Quaternion()));
