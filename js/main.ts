@@ -93,7 +93,10 @@ import './demo.js';
 import './debugstart.js';
 import './debugglobals.js';
 import { AcWasm } from './acousticswasm.js';
+import { AoWasm } from './gunaowasm.js';
 // the profiler wraps the game's main pieces of work once they all exist (it did it as it loaded, as the last file but two)
 Prof.install();
 // the acoustic ray tracer's WebAssembly module (js/acousticswasm.ts, docs/wasm.md): fetched without anything waiting for it; the JavaScript tracer works till it's there
 AcWasm.start();
+// a gun's ambient occlusion's (js/gunaowasm.ts, docs/wasm.md): the same, the JavaScript in js/gunao.ts till it's there
+AoWasm.start();

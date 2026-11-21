@@ -185,7 +185,7 @@ export const GunModels = (() => {
     for (let i = 0; i < (def.akimbo ? 2 : 1); i++) {
       const a = Models.assemble(def, skin);
       if (!a) { request(def); return null; }
-      GunAo.apply(a.group, def.code);
+      GunAo.apply(a.group, def.code, GunAo.GUN_ASYNC); // (a build not refined yet is worked out over the next frames, the gun drawn without its occlusion till then: js/gunao.ts refineNow)
       models.push(vmModel(a));
     }
     return Viewmodel.assemble(def, models) as THREE.Group;

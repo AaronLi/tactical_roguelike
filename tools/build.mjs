@@ -1,6 +1,6 @@
 // Everything the game needs that isn't kept in the repo, from a fresh clone or after any change: `npm run build`.
-//   1. the TypeScript compiled (js/*.ts -> dist/js, tools/models/*.ts -> dist/tools), and the acoustic tracer's WebAssembly module (tools/build_wasm.mjs:
-//      wasm/acoustics -> assets/wasm; needs Rust, and without it the game uses the JavaScript tracer: docs/wasm.md)
+//   1. the TypeScript compiled (js/*.ts -> dist/js, tools/models/*.ts -> dist/tools), and the WebAssembly modules (tools/build_wasm.mjs:
+//      wasm/acoustics, wasm/gunao -> assets/wasm; needs Rust, and without it the game uses the JavaScript tracer and occlusion: docs/wasm.md)
 //   2. the stickers (tools/bake_stickers.mjs) and the synthesized audio (tools/bake_audio.mjs: only what's changed)
 //   3. the models (tools/bake_models.mjs: the guns' pieces, the props, the hangar's scene, the human bodies) and their bundle
 // Needs node and what npm install brings, and Rust for the one WebAssembly module (optional locally): no Blender, no browser.
@@ -24,7 +24,7 @@ function step(name, cmd, args, shell = false) {
 const node = (name, file, args = []) => step(name, process.execPath, [path.join(ROOT, 'tools', file), ...args]);
 step('compile the game', 'npx tsc -p .', [], true);
 step('compile the tools', 'npx tsc -p tsconfig.tools.json', [], true);
-node('wasm', 'build_wasm.mjs'); // (the acoustic tracer's module, assets/wasm: needs Rust, skipped with a warning without it but on CI: docs/wasm.md)
+node('wasm', 'build_wasm.mjs'); // (the acoustic tracer's and the occlusion's modules, assets/wasm: needs Rust, skipped with a warning without it but on CI: docs/wasm.md)
 if (bundle) node('bundle', 'bundle.mjs');
 node('stickers', 'bake_stickers.mjs');
 node('audio', 'bake_audio.mjs', jobs);

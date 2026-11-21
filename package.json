@@ -25,6 +25,7 @@
     "test:sim": "tsc -p . && node tools/check_sim_golden.mjs",
     "build:wasm": "node tools/build_wasm.mjs",
     "test:acoustics": "tsc -p . && node tools/build_wasm.mjs && node tools/acoustics_wasm.test.mjs",
+    "check:gunao": "tsc -p . && node tools/build_wasm.mjs && node tools/space_shot.mjs \"mute&hangar\" tools/gunao_wasm_check.mjs",
     "test:gunsounds": "tsc -p . && node tools/gunsounds.test.mjs",
     "deps": "node tools/deps.mjs",
     "deps:check": "node tools/deps.mjs --check",
