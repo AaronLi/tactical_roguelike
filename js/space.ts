@@ -2287,7 +2287,7 @@ export const Space = (() => {
   // TORP.vc of closing speed (it keeps some for turning). It's a radar target like anything out here (torpTargets: no
   // transponder), so a ship's own threat assessment and fire control deal with it as they would anything coming at her: a
   // round that meets it (rounds) kills it. The pilot's screen flies it and tells everyone aboard (storp, ten times a second).
-  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, turn2: 1.6, off: 0.6, blast: 15, burn: 85, vc: 300, N: 4, seek: 1000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
+  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, turn2: 1.6, off: 0.6, turnT: 3, offT: 1.3, blast: 15, burn: 150, vc: 700, N: 4, seek: 2000, cone: 0.35, gate: 300, life: 90, r: 3, send: 0.1 };
   type Torp = { id: number; o: THREE.Group; fl: THREE.Mesh; puffs: THREE.Mesh[]; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; sent: number; lock: string; rt: RTarget; thr: number; rcs: boolean; lf: THREE.Vector3 }; // (thr: its motor's push (0..1); rcs: its thrusters firing)
   const TP = { list: [] as Torp[], n: 1, base: 1 + Math.floor(Math.random() * 1e6), left: TORP.loads, look: '', pick: '', l: false, cool: 0, tube: null as null | { at: THREE.Vector3; m: THREE.Object3D } };
   function tubeKit(g: THREE.Object3D, box: THREE.Box3, size: number) {
@@ -2419,19 +2419,24 @@ export const Space = (() => {
           // proportional navigation: across the line of sight, N times the closing speed times its turning rate; along it, the rest of the motor while closing under TORP.vc
           const om = rel.clone().cross(vrel).divideScalar(Math.max(1, R * R)), lat = om.clone().cross(u).multiplyScalar(TORP.N * Math.max(vc, 50));
           if (lat.length() > TORP.burn) lat.setLength(TORP.burn);
-          tp.lf.lerp(lat, 1 - Math.exp(-dt * 3)); lat.copy(tp.lf); // (smoothed: the fix it's flying on jitters, and its turning rate times N times 300 m/s is a lot of jitter)
-          const along = vc < TORP.vc ? Math.sqrt(Math.max(0, TORP.burn * TORP.burn - lat.lengthSq())) : 0, want = lat.clone().addScaledVector(u, along);
+          tp.lf.lerp(lat, 1 - Math.exp(-dt * (tp.ph === 3 ? 8 : 3))); lat.copy(tp.lf); // (on its own radar, less: its fix steadier, and less time left to lag) // (smoothed: the fix it's flying on jitters, and its turning rate times N times 300 m/s is a lot of jitter)
+          // (the motor's needed when it's closing too slowly or the turn's more than the RCS can push: then it's fired at full, its nose
+          // at the angle off the line of sight that gives the turn asked for across it, the rest along it (faster, past TORP.vc if it
+          // must be: the turn comes first). Otherwise the motor's off and the RCS pushes it across)
+          const latN = lat.length(), needLat = latN > TORP.rcsA * (tp.ph === 3 ? 1 : 2), main0 = needLat || vc < TORP.vc;
+          const want = main0 ? lat.clone().addScaledVector(u, Math.sqrt(Math.max(0, TORP.burn * TORP.burn - latN * latN))) : lat.clone();
           // (the motor pushes only along its nose, so the nose is turned (its RCS, no faster than TORP.turn2) onto what's wanted when
           // the motor's needed: closing too slowly, or more across than the RCS can push. Otherwise the motor's off, the nose held on
           // the target, and the RCS thrusters push it across, up to TORP.rcsA)
-          const main = along > 0 || lat.length() > TORP.rcsA * 2, aim = main ? want.clone().normalize() : u.clone();
-          { const off = aim.angleTo(u); if (off > TORP.off) { const ax = u.clone().cross(aim); if (ax.lengthSq() > 1e-8) aim.copy(u).applyAxisAngle(ax.normalize(), TORP.off); } } // (never more than TORP.off off the target: it flies at it, not across it)
+          const main = main0, aim = main ? want.clone().normalize() : u.clone();
+          { const lim = tp.ph === 3 ? TORP.offT : TORP.off, off = aim.angleTo(u); if (off > lim) { const ax = u.clone().cross(aim); if (ax.lengthSq() > 1e-8) aim.copy(u).applyAxisAngle(ax.normalize(), lim); } } // (on its own radar, closing: as far across as it takes) // (never more than TORP.off off the target: it flies at it, not across it)
           const ang = nose.angleTo(aim);
-          if (ang > 1e-4) { const ax = nose.clone().cross(aim); if (ax.lengthSq() < 1e-8) ax.set(1, 0, 0).applyQuaternion(tp.q); tp.q.premultiply(new T.Quaternion().setFromAxisAngle(ax.normalize(), Math.min(ang, TORP.turn2 * dt))).normalize(); }
+          if (ang > 1e-4) { const ax = nose.clone().cross(aim); if (ax.lengthSq() < 1e-8) ax.set(1, 0, 0).applyQuaternion(tp.q); tp.q.premultiply(new T.Quaternion().setFromAxisAngle(ax.normalize(), Math.min(ang, (tp.ph === 3 ? TORP.turnT : TORP.turn2) * dt))).normalize(); }
           const n2 = new T.Vector3(0, 0, -1).applyQuaternion(tp.q), push = main && n2.angleTo(aim) < 0.35 ? U.clamp(want.dot(n2), 0, TORP.burn) : 0;
           acc.copy(n2).multiplyScalar(push);
           const rest = want.clone().addScaledVector(n2, -push); rest.addScaledVector(n2, -rest.dot(n2)); if (rest.length() > TORP.rcsA) rest.setLength(TORP.rcsA); acc.add(rest); // (the RCS: across the nose only)
           tp.thr = push / TORP.burn; tp.rcs = ang > 0.03 || rest.length() > 1.5;
+          (tp as any).dbg = { R, vc, om: om.length(), raw: om.clone().cross(u).multiplyScalar(TORP.N * Math.max(vc, 50)).length(), lat: lat.length(), got: acc.clone().addScaledVector(u, -acc.dot(u)).length(), nose: n2.angleTo(u), ph: tp.ph }; // (the debug's: the turn asked for (raw, and smoothed: lat) against what it got across its line of sight)
         }
         tp.v.addScaledVector(acc, dt); tp.p.addScaledVector(tp.v, dt);
         if (tp.ph >= 2) { const hit = fuse(tp, p0); if (hit) { torpHit(tp, hit); continue; } }
@@ -2704,6 +2709,6 @@ export const Space = (() => {
   const jumping = () => S.on && !!S.ftl && aboard();
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { dbgTorp: () => ({ TP, fire: torpFire, box: boxClick }), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)

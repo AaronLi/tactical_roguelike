@@ -331,13 +331,18 @@ with its own noise, so plots can differ between screens.
   quarter a notch, eased (about 0.25 s); the head turns that much slower. Let go of the right button and it eases back to 1×. The wheel doesn't swap
   weapons in any of her seats.
 - **Flight:** a cold launch (pushed out downward at 7 m/s, coasting 1.1 s), then its RCS thrusters push it off to the side
-  away from her path while turning its nose onto the target, then its motor (85 m/s², closing speed held to 300 m/s; steering
-  by proportional navigation, N = 4, its command smoothed). The motor pushes only along the nose: the RCS turns the nose (1.6
-  rad/s) onto what's wanted while the motor's needed, never more than 35° off the target; at speed the motor's off, the nose
-  on the target, and the RCS pushes it across (up to 7 m/s²). The flame shows the motor's push, the puffs the RCS firing. Its
-  nose is within 20° of where it's going but for its last second or so (its own radar's sharp turn onto the hull).
-- **Guidance:** her sensors' fix as they hold it now (a datalink), dead reckoning when they lose it; inside 1 km, its own
+  away from her path while turning its nose onto the target, then its motor (150 m/s², closing speed held to 700 m/s;
+  steering by proportional navigation, N = 4, its command smoothed: less once it's on its own radar). The motor pushes only
+  along the nose. When it's needed (closing too slowly, or a turn more than the RCS can give) it fires at full, the nose at
+  the angle off the line of sight that gives the turn asked for, the rest along it (past 700 m/s if the turn needs it): the
+  turn comes first, and the nose never has to swing across before it can push. Otherwise the motor's off, the nose on the
+  target, and the RCS pushes it across (up to 7 m/s²). The RCS turns the nose at 1.6 rad/s (3 on its own radar), never more
+  than 35° off the target (75° on its own radar). The flame shows the motor's push, the puffs the RCS firing.
+- **Guidance:** her sensors' fix as they hold it now (a datalink), dead reckoning when they lose it; inside 2 km, its own
   radar: the strongest return in a 20° cone and a 300 m range gate round where it expects the target (chaff can draw it).
+  At 1 km the handover came 1.4 s out at 700 m/s, and her fix of a frigate can be 100 m off: the line of sight's rate jumped
+  from 17 to 85 mrad/s and it couldn't turn in time (more than its 150 m/s²). At 2 km it peaks at 10-22 mrad/s and it hits
+  (three of three, 31-55 m from her middle, inside her hull).
   A proximity fuse: a hull by her box, a ship within 30 m, anything small within 7 m. On the mission's ship it knocks out
   her guns within 15 m (TORP.blast; at 45 m one hit took all three of a frigate's). It self-destructs after 90 s.
 - **Its return:** 1.5 m². To her own interrogator it answers (`only: 'squad'`), so her radars show it as FRIENDLY, "TORP n"; to anyone else's, nothing. Nothing special-cases it: the enemy's scanners, threat assessment and fire control
