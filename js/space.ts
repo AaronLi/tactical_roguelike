@@ -55,6 +55,7 @@ export const Space = (() => {
     traffic: [] as { obj: THREE.Object3D; c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number; k?: number; name?: string }; wp: SpWp | null; ph: number; real?: boolean; bow?: number; pend?: LvMap | null }[],
     look: null as null | { yaw: number; pitch: number; eyeH: number; stowW: number; crouch: boolean; stowed: boolean }, carry: null as null | { k: number; v: THREE.Vector3; yaw: number; Q: THREE.Quaternion; V: THREE.Vector3 },
     zdef: [] as SpContact[], zact: 0, zC: new T.Vector3(), zinfo: null as null | { ms: any; act: number; near: boolean }, tclose: null as null | { k: number; t: number; sent?: boolean; name: string },
+    thru: null as null | { to: "orbit" | "atmo"; map: unknown; left: number }, veil: null as null | { t: number }, // (thru: the cloud crossing under way (thruStep); veil: the tunnel's look held over a place not ready to draw yet (ftlStep))
     root: null as THREE.Group | null, plan: null as null | { line: THREE.Line; gates: THREE.LineSegments; end: THREE.LineSegments }, stars: null as THREE.Points | null, tunnel: null as THREE.Group | null, sun: null as THREE.DirectionalLight | null, planet: null as THREE.Object3D | null, star: null as null | ReturnType<typeof SpaceData.star>, starObj: null as THREE.Object3D | null, rockList: [] as { p: number[]; r: number; s: number }[],
     hull: null as ReturnType<typeof ShipModel.hull> | null, wps: [] as SpWp[], tgt: 0, anchors: [] as { i: number; obj: THREE.Object3D; p: THREE.Vector3; p0?: THREE.Vector3 }[],
     ftl: null as null | { st: 'spool' | 'wait' | 'tunnel'; t: number; to: number; T: number; held?: number }, seats: {} as Record<string, number>, ctl: null as string | null,
@@ -65,7 +66,8 @@ export const Space = (() => {
     // the warp drive (warpStep): spin, how far it's spun up (0..1) on the target she's facing; warp, the run itself; tv, the
     // target's own velocity (tgtTrack), which she's left matching at the end of it
     spin: 0, warp: null as null | { j: number; u: number; t: number; top: number }, tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1, match: null as null | string,
-    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group; v: THREE.Vector3; t: number }[], misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], trkMarks: [] as { p: THREE.Vector3; label: string; col: string; look?: boolean; pick?: boolean; arc?: THREE.Vector3[] }[], rounds: [] as { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
+    boxes: [] as number[][], floorAt: null as null | ((x: number, z: number) => number), boomT: -1, uiOpen: false, mis: [] as { id: number; o: THREE.Group | null; p: THREE.Vector3; v: THREE.Vector3; t: number }[], // (p, v: where it is and its heading: the simulation's; o: its drawing, put where p is)
+    misN: 1, lostAt: 0, helpAt: 0, lookP: 0, tracers: [] as { m: THREE.Mesh; t: number }[], trkMarks: [] as { p: THREE.Vector3; label: string; col: string; look?: boolean; pick?: boolean; arc?: THREE.Vector3[] }[], rounds: [] as { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number }[], fireT: 0,
   };
   const me = () => Me, on = () => S.on;
   const isCtl = () => S.ctl === Net.myId;
@@ -244,7 +246,7 @@ export const Space = (() => {
   function chaffStep(dt: number) {
     for (let i = EW.chaff.length - 1; i >= 0; i--) {
       const c = EW.chaff[i], age = EW.rt - c.born;
-      if (age > CHAFF.life || !S.root || c.pts.parent !== S.root) { c.pts.removeFromParent(); c.pts.geometry.dispose(); EW.chaff.splice(i, 1); continue; }
+      if (age > CHAFF.life) { c.pts.removeFromParent(); c.pts.geometry.dispose(); EW.chaff.splice(i, 1); continue; } // (by its age alone: drawn or not, it's the simulation's)
       zstep(c.t.p, c.t.v, dt, (c as any).zm || ((c as any).zm = zmem()));
       const k = (1 - Math.exp(-age / CHAFF.bloom)) * (age > CHAFF.hold ? Math.exp(-(age - CHAFF.hold) / CHAFF.fade) : 1); c.t.iso = CHAFF.sig * k;
       const pa = c.pts.geometry.attributes.position as THREE.BufferAttribute, sp = 1.5 + Math.min(age, 4) * 5;
@@ -285,24 +287,32 @@ export const Space = (() => {
     const out: RTarget[] = [], live = new Set<number>();
     for (const m of S.mis) {
       live.add(m.id); let t = EW.misT.get(m.id);
-      if (!t) { t = { sz: 1.5, kind: 'missile', id: 'missile' + m.id, p: m.o.position.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0.5, iff: null }; EW.misT.set(m.id, t); }
-      if (dt > 0) t.v.copy(m.o.position).sub(t.p).divideScalar(dt); t.p.copy(m.o.position); out.push(t);
+      if (!t) { t = { sz: 1.5, kind: 'missile', id: 'missile' + m.id, p: m.p.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0.5, iff: null }; EW.misT.set(m.id, t); }
+      if (dt > 0) t.v.copy(m.p).sub(t.p).divideScalar(dt); t.p.copy(m.p); out.push(t);
     }
     for (const k of [...EW.misT.keys()]) if (!live.has(k)) EW.misT.delete(k);
     return out;
   }
   // the zone's other ships, as radar targets: each where she is in the level's frame, how fast she's going, and her return (from
   // her own drawing: the stand-in far off, her real hull once she's drawn as herself)
-  const _m = new T.Matrix4(), _ri = new T.Matrix4(), _ps = new T.Vector3(), _sc = new T.Vector3();
+  const _ps = new T.Vector3();
+  // a zone ship's place at the zone's time t: in the zone's frame (trafficLocal: where her drawing goes, as a child of the zone), and
+  // in the level's (trafficPose: the zone's own place applied): maths, not read back from the scene
+  type TrfQ = (typeof S.traffic)[0];
+  function trafficLocal(q: TrfQ, t: number, p: THREE.Vector3, qt: THREE.Quaternion) {
+    const z = SD.zonePos(q.c, t); p.set(z.p[0], z.p[1], z.p[2]);
+    if (q.real) qt.copy(yawQ(Math.atan2(z.d[0], z.d[2]) - q.bow!)); else qt.copy(lookQ(_zd.set(z.d[0], z.d[1], z.d[2])));
+  }
+  function trafficPose(q: TrfQ, p: THREE.Vector3, qt: THREE.Quaternion) {
+    trafficLocal(q, S.zt0 + (S.t - S.ztAt), p, qt); p.applyQuaternion(S.zone!.quaternion).add(S.zone!.position); qt.premultiply(S.zone!.quaternion);
+  }
   function trafficTargets(dt: number) {
     const out: RTarget[] = []; if (!S.root) return out;
-    _ri.copy(S.root.matrixWorld).invert();
     const live = new Set<THREE.Object3D>();
     for (const q of S.traffic) {
       const o = q.obj; let up: THREE.Object3D | null = o, shown = true; while (up && up !== S.root) { if (!up.visible) { shown = false; break; } up = up.parent; }
       if (!shown || up !== S.root || (q.c.k != null && q.c.k === S.zact && S.hull)) continue; // (hidden, or the one that's the level now: she's the mission ship's target already)
       live.add(o);
-      _m.multiplyMatrices(_ri, o.matrixWorld);
       let t = EW.trf.get(o);
       const key = 'trf:' + (q.c.k ?? -1) + ':' + o.uuid + ':' + (q.real ? 1 : 0);
       if (!t || (t as any).key !== key) {
@@ -310,7 +320,7 @@ export const Space = (() => {
         const bb = new T.Box3().setFromObject(o), bs = bb.getSize(new T.Vector3()); // (how big she is: what a camera makes of her)
         t = { sz: Math.max(4, Math.max(bs.x, bs.y, bs.z) / 2), kind: 'ship', id: 't' + (q.c.k ?? o.id), p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs }; (t as any).key = key; (t as any).fresh = true; EW.trf.set(o, t);
       }
-      _m.decompose(_ps, t.q, _sc);
+      trafficPose(q, _ps, t.q); // (where she is: the zone's maths, not her drawing's matrix)
       if (!(t as any).fresh && dt > 0) t.v.copy(_ps).sub(t.p).divideScalar(dt); (t as any).fresh = false;
       const af = kindAff((q.c as any).kind, q.c.k); t.p.copy(_ps); t.aff = af; t.iff = { c: af === 'navy' ? 'navy' : 'civ', n: q.c.name || 'unnamed' }; t.xon = af !== 'pirate'; out.push(t);
       // (and her own radars, while she's inside 12 km: scanners and trackers like any ship's; a civilian has no fire control)
@@ -667,7 +677,7 @@ export const Space = (() => {
     S.model = null; S.root = null; S.stars = null; S.tunnel = null; S.sun = null; S.hull = null; S.planet = null; S.solids = []; S.wps = []; S.anchors = []; S.things = []; S.cardObjs = [];
     if (hid) { for (const o of hid) o.visible = true; hid = null; } tunUp = null;
     G_R.padTo = G_R.PAD_BASE;
-    S.on = false; S.map = null; S.ftl = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.rounds = []; S.mis = []; myShots.length = 0;
+    S.on = false; S.map = null; S.ftl = null; S.thru = null; S.veil = null; S.warp = null; S.spin = 0; S.auto = null; S.net = null; S.boomT = -1; S.tracers = []; S.rounds = []; S.mis = []; myShots.length = 0;
     if (me().seat != null) me().seat = null;
     SpaceUI.show(false);
   }
@@ -1221,9 +1231,7 @@ export const Space = (() => {
     S.zone.updateMatrix(); zFrame.ok = false; if (zPrev.t >= 0 && t > zPrev.t && t - zPrev.t < 0.25) { zFrame.prev.copy(zPrev.m); zFrame.cur.copy(S.zone.matrix); zFrame.inv.copy(S.zone.matrix).invert(); zFrame.pinv.copy(zPrev.m).invert(); zFrame.turn.setFromRotationMatrix(zFrame.cur).multiply(_zq.setFromRotationMatrix(zFrame.prev).invert()); zFrame.dt = t - zPrev.t; zFrame.ok = true; } zPrev.m.copy(S.zone.matrix); zPrev.t = t; // (a jump in the zone's clock (put right from the host, a new level) isn't the zone moving: nothing's carried with it)
     for (const q of S.anchors) if (q.p0) q.p.copy(q.p0).applyQuaternion(S.zone.quaternion).add(S.zone.position);
     for (const q of S.traffic) {
-      const z = SD.zonePos(q.c, t);
-      q.obj.position.set(z.p[0], z.p[1], z.p[2]);
-      if (q.real) q.obj.quaternion.copy(yawQ(Math.atan2(z.d[0], z.d[2]) - q.bow!)); else q.obj.quaternion.copy(lookQ(_zd.set(z.d[0], z.d[1], z.d[2])));
+      trafficLocal(q, t, q.obj.position, q.obj.quaternion);
       if (q.wp) q.wp.p.copy(q.obj.position).applyQuaternion(S.zone.quaternion).add(S.zone.position);
       const st = q.obj.userData.strobe as THREE.Object3D | undefined; if (st) st.visible = (t + q.ph) % 1.6 < 0.18;
     }
@@ -1415,9 +1423,14 @@ export const Space = (() => {
   function through(to: 'orbit' | 'atmo') {
     if (S.stage === to) return;
     veilKind('cloud'); Game.veil(true);
-    const map = S.map;
-    setTimeout(() => {
-      if (S.map !== map || !S.on) return;
+    S.thru = { to, map: S.map, left: (Game.VEIL_MS + 250) / 1000 }; // (the other place put there once the veil's up: a countdown of the simulation's steps, thruStep)
+  }
+  function thruStep(dt: number) {
+    const th = S.thru; if (!th) return;
+    if (th.map !== S.map || !S.on) { S.thru = null; return; }
+    if ((th.left -= dt) > 0) return;
+    S.thru = null; const to = th.to;
+    {
       stage(to);
       if (isCtl() || !S.ctl) {
         if (to === 'atmo') { S.P.set(S.berth.x + 500, 900, S.berth.z + 900); const d = new T.Vector3(-0.42, -0.5, -0.75).normalize(); S.Q.copy(lookQ(d)); S.V.copy(d).multiplyScalar(90); }
@@ -1425,7 +1438,7 @@ export const Space = (() => {
       }
       S.net = null;
       Game.veilN = Game.VEIL_SMOOTH;
-    }, Game.VEIL_MS + 250);
+    }
   }
   function lookQ(dir: THREE.Vector3) { const m = new T.Matrix4().lookAt(new T.Vector3(), dir, new T.Vector3(0, 1, 0)); return new T.Quaternion().setFromRotationMatrix(m); }
   // out of a jump here: in the tunnel a few seconds more (the place is built already: this is the last of the trip)
@@ -2177,6 +2190,11 @@ export const Space = (() => {
   }
   function ftlStep(dt: number) {
     const f = S.ftl;
+    if (!f && S.veil) { // (out of the tunnel, the view still veiled while what she sees is made ready: then the flash, and it's there)
+      S.veil.t += dt; if (tunUp) while (tunUp.steps.length && tunUp.steps[0](3)) tunUp.steps.shift();
+      const ready = (!tunUp || !tunUp.steps.length) && G_R.progsReady();
+      if (ready || S.veil.t > 4) { S.veil = null; unseen(false); SpaceUI.flash(); } else { unseen(true); return; }
+    }
     if (!f) {
       if (S.tunnel) S.tunnel.visible = false;
       smear(dt, S.warp ? Math.sqrt(U.clamp(S.warp.u / S.warp.top, 0, 1)) * 0.55 : S.spin * 0.015);
@@ -2199,8 +2217,9 @@ export const Space = (() => {
       if (!tunUp || tunUp.map !== S.map) tunUp = { map: S.map, steps: [G_R.preload(G_R.levelRoot), ...(S.root ? [G_R.preload(S.root)] : [])] };
       while (tunUp.steps.length && tunUp.steps[0](3)) tunUp.steps.shift();
       // (and she doesn't drop out till it is, its shaders made too, on the driver's threads: the clock's held short of the end, four seconds at most)
-      if (left < 0.6 && left > 0.3 && (tunUp.steps.length || !G_R.progsReady()) && (f.held = (f.held || 0) + dt) < 4) f.t -= dt;
-      if (left <= 0) { S.ftl = null; tn.visible = false; SpaceUI.flash(); S.V.copy(fwd(S.Q)).multiplyScalar(45); if (isCtl() || !S.ctl) sendPose(true); }
+      // (she drops out on the trip's own clock; if what she'll see isn't ready to draw yet (its shaders still being made), the view keeps the
+      // tunnel's look over it a little longer (S.veil, four seconds at most): the simulation goes on meanwhile)
+      if (left <= 0) { S.ftl = null; tn.visible = false; S.V.copy(fwd(S.Q)).multiplyScalar(45); if (isCtl() || !S.ctl) sendPose(true); if (tunUp.steps.length || !G_R.progsReady()) S.veil = { t: 0 }; else SpaceUI.flash(); }
     }
     // in the tunnel the place is out of sight (its meshes: its lights stay, or every shader would be made again for the change
     // in them when she drops out), the stars aren't: they're what's smeared
@@ -2241,7 +2260,7 @@ export const Space = (() => {
   // A jump of 300 m or more (a rebase onto another ship, docking) isn't blended: it's a cut
   type IpT = [THREE.Vector3, THREE.Quaternion];
   const IP = { prev: new Map<THREE.Object3D, IpT>(), cur: new Map<THREE.Object3D, IpT>(), drawn: new Map<THREE.Object3D, IpT>(), P0: new T.Vector3(), Q0: new T.Quaternion(), P1: new T.Vector3(), Q1: new T.Quaternion(), dP: new T.Vector3(), dQ: new T.Quaternion(), on: false, off: false }; // (off: no blending, for comparing)
-  const ipObjs = () => { const a: THREE.Object3D[] = []; if (S.zone) a.push(S.zone); for (const q of S.traffic) if (q.obj) a.push(q.obj); for (const tp of TP.list) a.push(tp.o); for (const m of S.mis) a.push(m.o); return a; };
+  const ipObjs = () => { const a: THREE.Object3D[] = []; if (S.zone) a.push(S.zone); for (const q of S.traffic) if (q.obj) a.push(q.obj); for (const tp of TP.list) a.push(tp.o); for (const m of S.mis) if (m.o) a.push(m.o); return a; };
   function ipSnap(into: Map<THREE.Object3D, IpT>) { into.clear(); for (const o of ipObjs()) into.set(o, [o.position.clone(), o.quaternion.clone()]); }
   function ipRestore() {
     if (!IP.on) return; IP.on = false;
@@ -2274,7 +2293,7 @@ export const Space = (() => {
       tgtTrack(h); pt = Prof.lap('space: target', pt);
       if (isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2)) { fly(h); zoneClose(h); } else { if (S.auto) S.auto = null; follow(h); S.stick.multiplyScalar(Math.exp(-h * 2.2)); }
       pt = Prof.lap('space: flight', pt);
-      ftlStep(h);
+      ftlStep(h); thruStep(h);
       doors(h);
       turrets(h); shots(h); pt = Prof.lap('space: doors, turrets, jump', pt);
       ewStep(h); pt = Prof.lap('space: radar & fire control', pt);
@@ -2366,7 +2385,7 @@ export const Space = (() => {
       let gone = q.d >= q.life;
       if (!gone && ROCKS.near.length && rockOn(a, q.p) < 1) { gone = true; rockFlash(q.p); } // (into a rock)
       if (!gone && q.mine && S.hull) S.hull.guns.forEach((gn, gi) => { if (gone || gn.hp <= 0) return; if (segNear(a, q.p, _gp.set(gn.x, gn.y, gn.z)) < SHOT.GUN_R) { gunHit(gi, gn.hp - q.dmg); Net.toHost({ t: 'shit', i: gi, hp: gn.hp }); gone = true; } });
-      if (!gone && q.mine) for (const ms of S.mis.slice()) if (segNear(a, q.p, ms.o.position) < SHOT.MIS_R) { const m = [ms.id, 0, 0, 0, 1]; missile(m); Net.toHost({ t: 'smis', a: m }); gone = true; break; } // (a missile shot down)
+      if (!gone && q.mine) for (const ms of S.mis.slice()) if (segNear(a, q.p, ms.p) < SHOT.MIS_R) { const m = [ms.id, 0, 0, 0, 1]; missile(m); Net.toHost({ t: 'smis', a: m }); gone = true; break; } // (a missile shot down)
       if (gone) myShots.splice(i, 1);
     }
     // the streaks: one line each, from where it was a fiftieth of a second ago to where it is
@@ -2483,29 +2502,29 @@ export const Space = (() => {
   }
   // a missile: a[0] its number, where it left her; a[4] 1: it's been shot down
   function missile(a: number[]) {
-    if (!S.root) return;
     const was = S.mis.find((q) => q.id === a[0]);
-    if (a[4]) { if (was) { was.o.parent && was.o.parent.remove(was.o); S.mis.splice(S.mis.indexOf(was), 1); HUD.feed('<b>Missile shot down</b>'); } return; }
+    if (a[4]) { if (was) { if (was.o) was.o.removeFromParent(); S.mis.splice(S.mis.indexOf(was), 1); HUD.feed('<b>Missile shot down</b>'); } return; }
     if (was) return;
+    const m = { id: a[0], o: null as THREE.Group | null, p: new T.Vector3(a[1], a[2], a[3]), v: new T.Vector3(0, 1, 0), t: 0 }; S.mis.push(m);
+    HUD.toast('MISSILE', 'Turn across it, or have a turret shoot it down', 2.2); Audio.deny();
+    if (!S.root) return; // (its drawing, where there's a scene to put it in)
     const o = new T.Group(), body = new T.Mesh(new T.ConeGeometry(0.5, 3.4, 8), ShipModel.M(0xd8dde2, { emissive: 0x30343a })); body.rotation.x = -Math.PI / 2; o.add(body);
     const fl = new T.Mesh(new T.ConeGeometry(0.7, 9, 8, 1, true), new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.7, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide })); fl.rotation.x = Math.PI / 2; fl.position.z = 6; o.add(fl);
-    o.position.set(a[1], a[2], a[3]); o.frustumCulled = false; S.root.add(o);
-    S.mis.push({ id: a[0], o, v: new T.Vector3(0, 1, 0), t: 0 });
-    HUD.toast('MISSILE', 'Turn across it, or have a turret shoot it down', 2.2); Audio.deny();
+    o.position.copy(m.p); o.frustumCulled = false; S.root.add(o); m.o = o;
   }
   function missiles(dt: number) {
     const H = SD.HULLGUN.missile;
     for (let i = S.mis.length - 1; i >= 0; i--) {
-      const m = S.mis[i], to = S.P.clone().add(new T.Vector3(0, 1.4, 0)).sub(m.o.position), d = to.length();
+      const m = S.mis[i], to = S.P.clone().add(new T.Vector3(0, 1.4, 0)).sub(m.p), d = to.length();
       m.t += dt;
       // it turns toward her no faster than it can; a hard turn across its nose leaves it behind
       const want = to.normalize(), ang = m.v.angleTo(want), k = ang > 1e-4 ? Math.min(1, H.turn * dt / ang) : 1;
       m.v.lerp(want, m.t < 1.2 ? k * 0.4 : k).normalize();
-      m.o.position.addScaledVector(m.v, H.speed * (m.t < 1.2 ? 0.45 : 1) * dt); m.o.lookAt(m.o.position.clone().add(m.v));
-      const gone = m.t > H.life || S.docked || !!S.ftl || (ROCKS.near.length > 0 && rockOn(m.o.position.clone().addScaledVector(m.v, -H.speed * dt), m.o.position) < 1); // (into a rock)
+      m.p.addScaledVector(m.v, H.speed * (m.t < 1.2 ? 0.45 : 1) * dt); if (m.o) { m.o.position.copy(m.p); m.o.lookAt(m.p.clone().add(m.v)); } // (its drawing put where it is)
+      const gone = m.t > H.life || S.docked || !!S.ftl || (ROCKS.near.length > 0 && rockOn(m.p.clone().addScaledVector(m.v, -H.speed * dt), m.p) < 1); // (into a rock)
       if (d < 9 || gone) {
         if (d < 9) { if (isCtl()) damage(H.dmg, 'A missile'); S.shake = 1; SpaceUI.flash(0.35); Audio.boom(20); }
-        m.o.parent && m.o.parent.remove(m.o); S.mis.splice(i, 1);
+        if (m.o) m.o.removeFromParent(); S.mis.splice(i, 1);
       }
     }
   }
@@ -3003,6 +3022,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { IP, SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => zFrame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => zFrame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)
