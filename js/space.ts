@@ -1170,9 +1170,7 @@ export const Space = (() => {
     if (!S.zone) return;
     const t = S.zt0 + (S.t - S.ztAt);
     if (S.kind === 'board' && S.zdef[S.zact]) {
-      const a = SD.zonePos(S.zdef[S.zact], t), bow = S.map && S.map.sp && S.map.sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0);
-      S.zone.quaternion.copy(yawQ(-(Math.atan2(a.d[0], a.d[2]) - bow)));
-      S.zone.position.set(-a.p[0], -a.p[1], -a.p[2]).applyQuaternion(S.zone.quaternion).add(S.zC);
+      SpaceSim.zonePlace(S.zdef, S.zact, !!(S.map && S.map.sp && S.map.sp.wing), S.zC, t, S.zone.position, S.zone.quaternion); // (the simulation's: js/spacesim.ts)
     }
     // (the zone's velocity in the level's frame, and its placing then and now: js/spacesim.ts zoneAt)
     S.zone.updateMatrix(); SpaceSim.zoneAt(ZS, t, S.zone.position, S.zone.matrix); S.zoneV.copy(ZS.v);

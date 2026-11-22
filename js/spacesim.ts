@@ -41,6 +41,7 @@ export interface SimChaff { t: RTarget; born: number; zm?: ZMem }
 export interface SimShip { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; size: number; docked: boolean; ftl: boolean }
 
 import { Radar, RSuite, RTarget, RAssess } from './radar.js';
+import { SpaceData as SD } from './spacedata.js';
 
 export const SpaceSim = (() => {
   const T = THREE;
@@ -340,5 +341,17 @@ export const SpaceSim = (() => {
     return gone;
   }
   const chaffK = (age: number) => (1 - Math.exp(-age / CHAFF.bloom)) * (age > CHAFF.hold ? Math.exp(-(age - CHAFF.hold) / CHAFF.fade) : 1); // (how bloomed it is, 0..1)
-  return { CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
+  // ---------------------------------------------------------------- the zone's placing
+  // On a mission the level is one of the zone's ships (zact), under way on her own course: the zone is drawn from her, so it goes by
+  // her (and by everyone with her) bow first (a flying wing's is her corner), and turns when she does. Its placing at the zone's time t
+  // (zdef: the zone's ships, js/spacedata.ts zone; zC: the middle of her hull in the level's frame): its position p, its turn q
+  const yawQ = (yaw: number, out = new T.Quaternion()) => out.setFromAxisAngle(new T.Vector3(0, 1, 0), yaw);
+  function zonePlace(zdef: any[], zact: number, wing: boolean, zC: THREE.Vector3, t: number, p: THREE.Vector3, q: THREE.Quaternion) {
+    const c = zdef[zact]; if (!c) return false;
+    const a = SD.zonePos(c, t), bow = wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0);
+    yawQ(-(Math.atan2(a.d[0], a.d[2]) - bow), q);
+    p.set(-a.p[0], -a.p[1], -a.p[2]).applyQuaternion(q).add(zC);
+    return true;
+  }
+  return { zonePlace, yawQ, CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
 })();
