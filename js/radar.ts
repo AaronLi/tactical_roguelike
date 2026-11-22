@@ -1095,9 +1095,12 @@ export const Radar = (() => {
   // made since it started), then what it's there for: a look's revolutions (the one under way counted by how far round it is), a
   // sweep along a fan by how far along, a spiral by how far out
   const SLEW_W = 0.3;
+  const _jp = new T.Vector3();
   function jobProg(su: RSuite, tr: RTrack, now: number) {
     const j = tr.job; if (!j) return 0;
-    if (tr.st === 'slew') { const to = jobAt(su, j, now), d = dirFrom(su, tr, to), a0 = tr.jobA ?? (tr.jobA = Math.max(1e-3, tr.b.angleTo(d))); return SLEW_W * Math.max(0, Math.min(1, 1 - tr.b.angleTo(d) / a0)); }
+    // (slewing: how far it's come of the turn it had to make, toward where it's actually turning (trackStep): a handover's place, or the
+    // start of its cue's fan (cueDir), not the job's middle, which it never turns to)
+    if (tr.st === 'slew') { const d = tr.hand ? dirFrom(su, tr, tr.hand.p.clone().addScaledVector(tr.hand.v, now - tr.hand.t)) : tr.cue && su.scans[tr.cue.k] ? (cueDir(su, tr, tr.cue, -su.scans[tr.cue.k].fan, _jp, now), _jp) : dirFrom(su, tr, jobAt(su, j, now)), a0 = tr.jobA ?? (tr.jobA = Math.max(1e-3, tr.b.angleTo(d))); return SLEW_W * Math.max(0, Math.min(1, 1 - tr.b.angleTo(d) / a0)); }
     if (tr.st === 'track') { const want = j.kind === 'look' ? revsOf(su, j.tt!) : SCH.revs + 1, done = tr.jobRev! < 0 ? 0 : (tr.rev || 0) - tr.jobRev! + Math.min(1, tr.kind === 'conical' ? (tr.dP || 0) / TAU : (tr.dP || 0) * tk(tr).hz); return SLEW_W + (1 - SLEW_W) * Math.min(1, done / want); }
     if (tr.st === 'acq') { if (tr.spiral) return SLEW_W + (1 - SLEW_W) * Math.min(1, tr.spiral.t / (0.55 * Math.max(1, (tr.spiral.span || 3 * TRK.bw) / TRK.bw))); const fan = su.scans[j.plot ? j.plot.k : 0].fan; return SLEW_W + (1 - SLEW_W) * Math.min(1, (tr.sw + fan) / (2 * fan)); }
     return 0;
