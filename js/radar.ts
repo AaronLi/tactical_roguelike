@@ -72,7 +72,7 @@ export interface RSuite {
   sched?: { tts: RSTrack[]; reqs: RJob[]; n: number; ep: number; plan: Map<RTrack, RJob[]>; log?: { t: number; k: number; j: string }[] }; // (sched: her trackers run by the scheduler, not one target each)
   bel?: RFused[]; belUsed?: WeakSet<RPlot>; // (bel: every belief, slabs too (fus: the placed ones); belUsed: the peaks gone into them)
   Vc?: THREE.Vector3; keep?: Set<string>; // (keep: targets her notch lets through: one she's tracking, or matched with)
-  wpn?: Map<string, number>; aff?: RAff; hostNames?: Set<string>; fusSeen: Map<string, string>; ass: RAssess[]; assHold: Map<string, number>; fusKF: Map<string, KF3>; fusHist: Map<string, { t: number; p: THREE.Vector3 }[]>; fus: RFused[]; fusIds: Map<string, string>; fusN: number; fusT: number; id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
+  wpn?: Map<string, number>; aff?: RAff; hostNames?: Set<string>; fusSeen: Map<string, string>; ass: RAssess[]; assHold: Map<string, number>; fusKF: Map<string, KF3>; fusHist: Map<string, { t: number; p: THREE.Vector3 }[]>; fus: RFused[]; fusIds: Map<string, string>; fusN: number; fusT: number; id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any; rng?: { s: number } } // (rng: its random stream: js/radar.ts RNG) // (Pp, Qp: where she was and how she was turned at the last step)
 
 // (the Kalman filters' 3D one: js/radar.ts Radar, "Kalman filters")
 export class KF3 {
@@ -204,7 +204,18 @@ export const Radar = (() => {
   const THR = 13, SIG0 = 10;                // the detection threshold (dB over the noise), and the 10 m2 a radar's R0 is quoted for
   const snrDb = (R0: number, sig: number, R: number) => THR + 10 * Math.log10(Math.max(1e-6, sig) / SIG0) + 40 * Math.log10(R0 / Math.max(1, R));
   const detRange = (R0: number, sig: number) => R0 * Math.pow(Math.max(1e-6, sig) / SIG0, 0.25); // (where it's even odds)
-  const gauss = () => { let u = 0, v = 0; while (u === 0) u = Math.random(); while (v === 0) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
+  // The battle's random numbers: each suite its own stream (mulberry32, as U.rng), from the battle's seed (seed) and its id, current
+  // while it steps (RNG.cur); a stream for anything else by name (rngOf). Outside a step, or unseeded, Math.random. The debug view's
+  // display noise (a tracker's range gate, its conical ring) stays on Math.random: it changes nothing
+  const RNG = { base: 1, cur: null as { s: number } | null };
+  const hashS = (n: number, id: string) => { let h = (n ^ 0x811c9dc5) >>> 0; for (let i = 0; i < id.length; i++) { h ^= id.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; } return h | 0; };
+  const mul32 = (g: { s: number }) => { let t = (g.s = (g.s + 0x6d2b79f5) | 0); t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  const rnd = () => (RNG.cur ? mul32(RNG.cur) : Math.random());
+  const seed = (n: number) => { RNG.base = n | 0; };
+  const rngOf = (name: string) => { const g = { s: hashS(RNG.base, name) }; return () => mul32(g); };
+  const reseed = (su: RSuite) => { su.rng = { s: hashS(RNG.base, su.id) }; }; // (a suite's stream from the battle's seed again: a new battle)
+  const gaussV = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(TAU * Math.random()); // (the debug view's)
+  const gauss = () => { let u = 0, v = 0; while (u === 0) u = rnd(); while (v === 0) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
   // ---------------------------------------------------------------- the radars
   // The radar equation from the hardware: what range a 10 m2 target gives the detection threshold at (R0), from the transmitter's peak
   // power (Pt, W), the antenna's gain (from its beam's widths: 0.6 of an ideal aperture's), and how many pulses are taken together
@@ -251,7 +262,7 @@ export const Radar = (() => {
     ];
     const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3(), r: 0 }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
     const opt: ROpt = { mts: [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => new T.Vector3(x * beam, top * 0.6, z * size * 0.6)), quad: 0, b: new T.Vector3(0, 0, -1), fov: OPT.fovMax, rng: 0, st: 'idle', job: null, jobT: 0, slew: 0, next: 0, free: 0, seen: 0, px: 0, tgt: null, n: 0 };
-    return { opt, id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false, fus: [], fusIds: new Map(), fusN: 0, fusT: -1, fusHist: new Map(), fusKF: new Map(), ass: [], assHold: new Map(), fusSeen: new Map() };
+    return { rng: { s: hashS(RNG.base, id) }, opt, id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false, fus: [], fusIds: new Map(), fusN: 0, fusT: -1, fusHist: new Map(), fusKF: new Map(), ass: [], assHold: new Map(), fusSeen: new Map() };
   }
   // a way out of the radar along a fan: ax its turning axis, phi how far round it's turned, e how far along the fan (her own frame)
   // ('y': phi round from her nose to starboard, e up; 'x': phi up from ahead, e to starboard; 'z': phi round her length from her
@@ -290,6 +301,10 @@ export const Radar = (() => {
   const _bf = new T.Vector3();
   const wrap = (a: number) => ((a % TAU) + TAU) % TAU;
   function step(su: RSuite, dt: number, targets: RTarget[], now: number) {
+    const was = RNG.cur; RNG.cur = su.rng || (su.rng = { s: hashS(RNG.base, su.id) }); // (its own stream while it steps)
+    try { stepIn(su, dt, targets, now); } finally { RNG.cur = was; }
+  }
+  function stepIn(su: RSuite, dt: number, targets: RTarget[], now: number) {
     if (!su.init) { su.Pp.copy(su.P); su.Qp.copy(su.Q); su.init = true; }
     for (const tr of su.trks) if (tr.st === 'track') stabilise(su, tr, dt);
     // the scanners: each sweeps its fan round, a column of its map at a time (scanStep)
@@ -354,10 +369,10 @@ export const Radar = (() => {
     const j0 = Math.floor(th0 / DA), j1 = Math.floor(sc.th / DA), n = ((sg * (j1 - j0)) % MAP.na + MAP.na) % MAP.na;
     for (let s1 = 1; s1 <= n; s1++) {
       const j = ((j0 + sg * s1) % MAP.na + MAP.na) % MAP.na, a = (j + 0.5) * DA, mc = Math.floor(wrap(a - sc.off) / DA) % MAP.na, base = mc * MAP.nr, m = sc.map;
-      for (let i = 0; i < MAP.nr; i++) m[base + i] = -Math.log(1 - Math.random());
+      for (let i = 0; i < MAP.nr; i++) m[base + i] = -Math.log(1 - rnd());
       for (const q of seen) {
         const d = wrapPi(q.phi - a); if (Math.abs(d) > 3 * sc.bw) continue;
-        const pw = q.s * Math.exp(-AGS * d * d) * -Math.log(1 - Math.random()), rb = binOf(q.R) - 0.5, i0 = Math.floor(rb), f = rb - i0;
+        const pw = q.s * Math.exp(-AGS * d * d) * -Math.log(1 - rnd()), rb = binOf(q.R) - 0.5, i0 = Math.floor(rb), f = rb - i0;
         if (i0 >= 0 && i0 < MAP.nr) m[base + i0] += pw * (1 - f); if (i0 + 1 >= 0 && i0 + 1 < MAP.nr) m[base + i0 + 1] += pw * f;
       }
       sc.age[mc] = now;
@@ -875,7 +890,7 @@ export const Radar = (() => {
         uv.copy(e1).multiplyScalar(Math.cos(tr.ph)).addScaledVector(e2, Math.sin(tr.ph));
         tr.a.copy(tr.b).addScaledVector(uv, Math.tan(TRK.sq)).normalize();
         let g = 0; for (const q of bd.rs) { const th = tr.a.angleTo(q.d); g += q.s * Math.exp(-AG * th * th); }
-        tr.dE.addScaledVector(uv, g); tr.dA += g; dgOf(tr).ring[Math.floor(tr.ph / TAU * 32) % 32] = g * (1 + gauss() * 0.15 / Math.sqrt(1 + g));
+        tr.dE.addScaledVector(uv, g); tr.dA += g; dgOf(tr).ring[Math.floor(tr.ph / TAU * 32) % 32] = g * (1 + gaussV() * 0.15 / Math.sqrt(1 + g));
       }
     } else { // (monopulse: this step's pulses: the sum, and the two differences over it, each return's offset across the beam, flattened past half a beam)
       tr.a.copy(tr.b); const K = 0.6 * TRK.bw, clampK = (x: number) => Math.max(-K, Math.min(K, x)); let S = 0, Dx = 0, Dy = 0;
@@ -1253,5 +1268,5 @@ export const Radar = (() => {
     }
     lit.clear(); painted.clear(); // (who's on whom: heard again within a moment)
   }
-  return { TK, r0Of, RF, crossSig, OPT, QUAD, optProg, urgency, ttAt, eig3, FIX, want, wantRay, unwant, lose, sched, SCH, rateOf, plotAt, jobProg, jobName, jobPri, binOf, rangeOf, occ, blocked, rebase, canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { seed, rngOf, reseed, TK, r0Of, RF, crossSig, OPT, QUAD, optProg, urgency, ttAt, eig3, FIX, want, wantRay, unwant, lose, sched, SCH, rateOf, plotAt, jobProg, jobName, jobPri, binOf, rangeOf, occ, blocked, rebase, canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

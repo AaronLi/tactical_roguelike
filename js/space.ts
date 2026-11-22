@@ -259,7 +259,7 @@ export const Space = (() => {
     if (!S.model || S.docked || S.ftl) return;
     if (EW.chaffLeft <= 0) { HUD.toast('CHAFF', 'None left', 1.2); Audio.deny(); return; }
     EW.chaffLeft--;
-    const up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), back = new T.Vector3(0, 0, 1).applyQuaternion(S.Q), side = new T.Vector3(Math.random() - 0.5, 0, 0).applyQuaternion(S.Q);
+    const up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), back = new T.Vector3(0, 0, 1).applyQuaternion(S.Q), side = new T.Vector3(SR() - 0.5, 0, 0).applyQuaternion(S.Q);
     const p = S.P.clone().addScaledVector(up, 2).addScaledVector(back, 3), v = S.V.clone().addScaledVector(up.multiplyScalar(0.6).add(back.multiplyScalar(0.8)).add(side).normalize(), CHAFF.v);
     const a = [p.x, p.y, p.z, v.x, v.y, v.z].map((x) => Math.round(x * 100) / 100); chaffOut(a); Net.toHost({ t: 'schaff', a });
     HUD.toast('CHAFF', EW.chaffLeft + ' left', 1); Audio.click();
@@ -678,6 +678,8 @@ export const Space = (() => {
     EW.pre = S.on ? { P: S.P.clone(), Q: S.Q.clone() } : null; // (where she was, in the old level's frame: what her radars hold is moved to the new one's (ewMove))
     const keep = S.keep; leave(); S.keep = keep;
     S.on = true; S.kind = kind; S.map = map; S.t = 0; S.stage = 'space';
+    // (the battle's random numbers from the level's seed: the same level, the same battle (js/radar.ts RNG); her own suite's stream begun again)
+    Radar.seed(((map && map.seed) || 1) * 31 + ((map && map.level) || 0)); SR = Radar.rngOf('space'); if (EW.own) Radar.reseed(EW.own);
     S.fleet = SD.cleanFleet(sp && sp.fleet); S.def = SD.SHIPS[S.fleet.ship]; S.seatsDef = SD.seats(S.def);
     S.hpMax = S.def.hull * (SD.fitted(S.fleet, 'plating') ? 1.5 : 1); if (kind === 'hub' && (!sp || !sp.ship || sp.ship.docked)) S.hp = S.hpMax; S.hp = Math.min(S.hp, S.hpMax);
     S.seats = (sp && sp.seats) || {}; S.ctl = sp && sp.ship ? sp.ship.ctl : null;
@@ -2231,6 +2233,7 @@ export const Space = (() => {
   // up to 0.25 s: a long stall isn't caught up all at once) to what's owed (acc), and as many whole steps as that covers are run;
   // then the view, once. The same battle at any frame rate. (The rest of the game clamps a slow frame to 50 ms: js/game.ts loop)
   const STEP = 1 / 60;
+  let SR: () => number = Math.random; // (the battle's random stream (js/radar.ts rngOf), from the level's seed: set in setup)
   // What's drawn between steps: the steps come at 60 Hz, the frames as fast as the screen; each frame draws her pose, the zone's,
   // its ships', the torpedoes' and the missiles' blended between the last two steps by how far into the next the frame is (one step
   // behind the simulation, smooth at any refresh rate). The true state's put back before the next step (the simulation reads some of
@@ -2255,7 +2258,7 @@ export const Space = (() => {
     if (IP.P0.distanceTo(IP.P1) < 300) { S.P.lerpVectors(IP.P0, IP.P1, a); S.Q.copy(IP.Q0).slerp(IP.Q1, a); }
     IP.dP.copy(S.P); IP.dQ.copy(S.Q);
   }
-  const SIM = { acc: 0, steps: 0 }; // (acc: the real time owed, not yet stepped)
+  const SIM = { acc: 0, steps: 0, hook: null as null | { n: number; f: () => void } }; // (acc: the real time owed, not yet stepped; hook: a test's, called after step n)
   function update(dt: number, raw = dt) {
     ipRestore(); // (the true state back, before anything steps or reads it)
     if (!S.on || !S.model || Game.map !== S.map) return;
@@ -2277,6 +2280,7 @@ export const Space = (() => {
       ewStep(h); pt = Prof.lap('space: radar & fire control', pt);
       if (S.hull) { guns(h); missiles(h); } torps(h); rounds(h); pt = Prof.lap('space: guns, missiles, torpedoes, rounds', pt);
       if (S.boomT >= 0) boomStep(h);
+      if (SIM.hook && SIM.steps === SIM.hook.n) { const f = SIM.hook.f; SIM.hook = null; f(); } // (a test's snapshot at that step)
       if (!S.on || !S.model || Game.map !== S.map) return; // (gone from space within the step: a jump, the level left)
     }
     dt = n * h; // (the view's easing by the simulation's time this frame: none, a frame faster than the steps)
@@ -2416,15 +2420,15 @@ export const Space = (() => {
         if (g.bt > 0) {
           g.bt -= dt; g.rev = 1.5; g.acc = (g.acc || 0) + H.rps * dt;
           while (g.acc >= 1) { g.acc -= 1; fireRound(from, aim, H, lk.err || 0); }
-          if (g.bt <= 0) gn.cool = H.pause[0] + Math.random() * (H.pause[1] - H.pause[0]);
+          if (g.bt <= 0) gn.cool = H.pause[0] + SR() * (H.pause[1] - H.pause[0]);
           continue;
         }
-        gn.cool -= dt; if (urgent) gn.cool = Math.min(gn.cool, 0); if (gn.cool <= 0) { g.bt = H.burst[0] + Math.random() * (H.burst[1] - H.burst[0]); g.acc = 0; }
+        gn.cool -= dt; if (urgent) gn.cool = Math.min(gn.cool, 0); if (gn.cool <= 0) { g.bt = H.burst[0] + SR() * (H.burst[1] - H.burst[0]); g.acc = 0; }
         continue;
       }
       gn.cool -= dt;
       if (gn.cool > 0) continue;
-      gn.cool = H.cool[0] + Math.random() * (H.cool[1] - H.cool[0]);
+      gn.cool = H.cool[0] + SR() * (H.cool[1] - H.cool[0]);
       if (gn.k === 'missile') { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); Net.toHost({ t: 'smis', a }); } continue; }
       fireRound(from, aim, H, lk.err || 0);
     }
@@ -2443,7 +2447,7 @@ export const Space = (() => {
     }
     rPts.removeFromParent(); if (S.root) S.root.add(rPts); return rPts;
   }
-  const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+  const gauss = () => Math.sqrt(-2 * Math.log(1 - SR())) * Math.cos(2 * Math.PI * SR()); // (the battle's stream: a round's spread and self-destruct)
   function fireRound(from: THREE.Vector3, aim: THREE.Vector3, H: { speed: number; spread: number; dmg: number; life: number }, err: number) {
     if (!S.root) return;
     const spread = H.spread + err * 0.5, d = aim.clone().normalize(), e1 = new T.Vector3(0, 1, 0).cross(d), e2 = new T.Vector3();
