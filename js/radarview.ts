@@ -9,7 +9,7 @@
 //   - the sensor station's screen (scope): the 'y' scanner's picture from above (her nose up), the 'z' scanner's from astern
 //     (round her length, her up at the top), the plots fading as the sweep comes round again; the trackers' state under them; a cursor where
 //     the operator is looking (js/space.ts sensorLook), and the plot it's on ringed: clicking cues a tracker on it.
-import { Radar, RSuite, RTarget, RPlot, RScan, RContact } from './radar.js';
+import { Radar, RSuite, RTarget, RPlot, RScan, RContact, RFused, RAssess } from './radar.js';
 
 export const RadarView = (() => {
   const T = THREE, D2R = Math.PI / 180, TAU = Math.PI * 2;
@@ -263,7 +263,7 @@ export const RadarView = (() => {
     pipeAt = now; pipeFor = su.id;
     const c = pipeCv.getContext('2d')!; if (!pipeImg) pipeImg = c.createImageData(CW, CH);
     const d = pipeImg.data; for (let q = 0; q < d.length; q += 4) { d[q] = 4; d[q + 1] = 9; d[q + 2] = 13; d[q + 3] = 230; }
-    const DA = TAU / M.na, rbOf = new Int32Array(ch); for (let y = 0; y < ch; y++) rbOf[y] = Math.min(M.nr - 1, Math.floor(((y + 0.5) / ch) ** 2 * RMAX / M.dr));
+    const DA = TAU / M.na, rbOf = new Int32Array(ch); for (let y = 0; y < ch; y++) rbOf[y] = Math.min(M.nr - 1, Math.floor(Radar.binOf(((y + 0.5) / ch) ** 2 * RMAX))); // (the map's own bins: 25 m to 10 km, 100 m past)
     const px = (x0: number, y0: number, x: number, y: number, r: number, g: number, b: number) => { const o = ((y0 + y) * CW + x0 + x) * 4; d[o] = r; d[o + 1] = g; d[o + 2] = b; };
     su.scans.forEach((sc, row) => {
       const y0 = top + row * rh + 14, per = TAU / sc.rate;
@@ -358,6 +358,17 @@ export const RadarView = (() => {
   // Stage 5: hostile or not (js/radar.ts assess): every track she holds, worst first: what it is to her, its range, how fast it's
   // closing, where its course passes her, the score (a bar, the line at 0.6) and the confirmation's progress (the bar under it,
   // full at 3 s), and why
+  // (the debug view's truth: what a target id is, in words (js/space.ts sets it: the zone's ships by name, a torpedo whose))
+  const dbg = { nameOf: (id: string) => id };
+  // what a row really is (debug only: the ids the radar's peaks carry for this view, nothing decides by them): the things its
+  // contacts' latest peaks and its tracker were on. Two different things: a ghost (two contacts' crossing, nothing there); none: noise
+  function truthOf(a: RAssess) {
+    const ids = [a.c && a.c.p.id, a.f && a.f.a && a.f.a.p.id, a.f && a.f.b && a.f.b.p.id, a.f && a.f.trk && a.f.trk.tgt].filter((x) => x != null) as string[];
+    const real = [...new Set(ids.filter(Boolean))];
+    if (!real.length) return ids.length ? { t: 'noise', col: '#9a9a9a' } : { t: '?', col: '#9a9a9a' };
+    if (real.length > 1) return { t: 'GHOST: ' + real.map(dbg.nameOf).join(' / '), col: '#ff70d0' };
+    return { t: dbg.nameOf(real[0]), col: '#8dffbe' };
+  }
   const CLS: Record<string, string> = { HOSTILE: '#ff4a3a', SUSPECT: '#ffa040', WATCH: '#ffe070', NEUTRAL: '#a8b8c4', CIV: '#7f9fb0', FRIENDLY: '#70f090' };
   function assessTable(c: CanvasRenderingContext2D, su: RSuite, x0: number, y0: number, w: number, h: number) {
     c.strokeStyle = '#1b3a48'; c.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, h - 1);
@@ -369,7 +380,9 @@ export const RadarView = (() => {
       if (a.f && tracked.has(a.f)) { c.fillStyle = '#ff6050'; c.fillText('TRK', x0 + w - 28, y); }
       const bw = 70, bx = x0 + w - bw - 34; c.fillStyle = '#16303c'; c.fillRect(bx, y + 1, bw, 6); c.fillStyle = col; c.fillRect(bx, y + 1, bw * a.score, 6); c.fillStyle = '#ffffff'; c.fillRect(bx + bw * 0.6, y, 1, 8);
       c.fillStyle = '#16303c'; c.fillRect(bx, y + 9, bw, 3); c.fillStyle = '#ff8070'; c.fillRect(bx, y + 9, bw * Math.min(1, a.hold / 3), 3);
-      c.fillStyle = '#8fb3c4'; c.fillText(`${(a.r / 1000).toFixed(2)} km ${a.vc >= 0 ? '+' : ''}${Math.round(a.vc)} m/s · ${a.why}`.slice(0, Math.floor(w / 6.4)), x0 + 4, y + 13);
+      // (what it really is first, the debug view's alone; then its range, closing speed and why)
+      const tr0 = truthOf(a), t0 = '= ' + tr0.t + '  ', tw = c.measureText(t0).width; c.fillStyle = tr0.col; c.fillText(t0, x0 + 4, y + 13);
+      c.fillStyle = '#8fb3c4'; c.fillText(`${(a.r / 1000).toFixed(2)} km ${a.vc >= 0 ? '+' : ''}${Math.round(a.vc)} m/s · ${a.why}`.slice(0, Math.max(0, Math.floor((w - tw) / 6.4))), x0 + 4 + tw, y + 13);
     }
     if (!su.ass.length) { c.fillStyle = '#5f8fa4'; c.fillText('nothing held', x0 + 4, y0 + 4); }
   }
@@ -396,14 +409,42 @@ export const RadarView = (() => {
       }
     }
     const qn = su.Q.clone().invert(), toHer = (pl: THREE.Vector3) => pl.clone().sub(su.P).applyQuaternion(qn); // (the level's frame to hers as she is now)
+    // every belief's shape (js/radar.ts fuse): its covariance's ellipsoid at 2 sigma, its three principal sections; drawn true size
+    // where that's big enough to see, else grown (its proportions kept) to 14 px across: grey a slab (one scanner's: thin in range
+    // and across its fan, long along it), amber placed by both, green a 3D fix
+    const ax2 = [new T.Vector3(), new T.Vector3(), new T.Vector3()];
+    for (const b of su.bel || []) {
+      if (!b.sx || !b.axes) continue;
+      const [x0c, y0c] = pr(b.p), sv: number[][] = [];
+      for (let i = 0; i < 3; i++) { ax2[i].copy(b.axes[i]).applyQuaternion(qn).multiplyScalar(2 * b.sx[i]); const L = ax2[i].length(), eps = Math.min(1, 50 / Math.max(1e-6, L)), [x1, y1] = pr(b.p.clone().addScaledVector(ax2[i], eps)); sv.push([(x1 - x0c) / eps, (y1 - y0c) / eps]); }
+      let big = Math.max(...sv.map(([x, y]) => Math.hypot(x, y))), k = 1; if (big < 4) k = 4 / Math.max(1e-6, big); else if (big > R * 0.5) k = R * 0.5 / big;
+      const col = b.kind === 3 ? '90,255,140' : b.kind === 2 ? '255,200,90' : '170,170,190', al = b.kind === 1 ? 0.35 : 0.8;
+      c.strokeStyle = `rgba(${col},${al})`; c.lineWidth = b.kind === 3 ? 1.5 : 1;
+      for (const [i, j] of [[0, 1], [0, 2], [1, 2]]) { c.beginPath(); for (let s1 = 0; s1 <= 32; s1++) { const t1 = s1 / 32 * TAU, cs = Math.cos(t1) * k, sn = Math.sin(t1) * k, X = x0c + cs * sv[i][0] + sn * sv[j][0], Y = y0c + cs * sv[i][1] + sn * sv[j][1]; if (s1) c.lineTo(X, Y); else c.moveTo(X, Y); } c.stroke(); }
+      c.lineWidth = 1;
+    }
+    // (and the nearest of them each in a cell of its own along the bottom, at its own scale (its widest axis across the cell), turned
+    // as the view is: its shape, whatever its size: a slab a line, placed a flat disc or a bead, a 3D fix a small round ball)
+    { const cs = 62, n = Math.max(0, Math.floor((w - 8) / (cs + 4))), byK = [3, 2, 1].map((k) => (su.bel || []).filter((b) => b.kind === k && b.sx && b.axes).sort((a, b) => a.r - b.r)), sel: RFused[] = []; // (the nearest of each kind in turn: fixes, placed, slabs)
+      for (let i = 0; sel.length < n && i < 50; i++) for (const L of byK) if (L[i] && sel.length < n) sel.push(L[i]);
+      const rot = (v: THREE.Vector3) => { const x1 = v.x * cyw - v.z * syw, z1 = v.x * syw + v.z * cyw; return [x1, -(v.y * ct - z1 * st)]; };
+      sel.forEach((b, i) => {
+        const bx = x0 + 4 + i * (cs + 4), by = y0 + h - cs - 42, mx = bx + cs / 2, my = by + cs / 2 + 4, col = b.kind === 3 ? '90,255,140' : b.kind === 2 ? '255,200,90' : '170,170,190';
+        c.fillStyle = 'rgba(4,14,20,0.85)'; c.fillRect(bx, by, cs, cs + 12); c.strokeStyle = `rgba(${col},0.5)`; c.strokeRect(bx + 0.5, by + 0.5, cs - 1, cs + 11);
+        const k = (cs * 0.4) / (2 * b.sx![0]), sv = [0, 1, 2].map((q) => rot(b.axes![q].clone().applyQuaternion(qn).multiplyScalar(2 * b.sx![q] * k)));
+        c.strokeStyle = `rgba(${col},0.95)`;
+        for (const [ii, jj] of [[0, 1], [0, 2], [1, 2]]) { c.beginPath(); for (let s1 = 0; s1 <= 32; s1++) { const t1 = s1 / 32 * TAU, co = Math.cos(t1), sn = Math.sin(t1), X = mx + co * sv[ii][0] + sn * sv[jj][0], Y = my + co * sv[ii][1] + sn * sv[jj][1]; if (s1) c.lineTo(X, Y); else c.moveTo(X, Y); } c.stroke(); }
+        const f = (q: number) => (q < 10 ? q.toFixed(1) : String(Math.round(q)));
+        c.fillStyle = `rgb(${col})`; c.fillText(`${b.n} ${b.kind === 3 ? 'FIX' : b.kind === 2 ? 'placed' : 'slab'}`, bx + 3, by + 9); c.fillText(`σ ${f(b.sx![0])}×${f(b.sx![2])} m`, bx + 3, by + cs + 9); // (its widest and its thinnest)
+      }); }
     for (const f of su.fus) {
       const col = f.iff ? iffCol({ iff: f.iff } as RContact, su) : '255,200,90', [x, y] = pr(f.p), [bx, by] = pr(new T.Vector3(f.p.x, 0, f.p.z));
       // its trajectory: where it's been (solid, fading) and where its velocity takes it in the next 10 s (dashed)
       c.strokeStyle = `rgba(${col},0.75)`; line(f.hist.map((q) => toHer(q.p)));
       if (f.v.lengthSq() > 1) { const fut: THREE.Vector3[] = []; for (let i = 0; i <= 10; i++) fut.push(toHer(f.pl.clone().addScaledVector(f.v, i))); c.setLineDash([4, 3]); line(fut); c.setLineDash([]); }
       c.strokeStyle = `rgba(${col},0.5)`; c.setLineDash([2, 3]); c.beginPath(); c.moveTo(x, y); c.lineTo(bx, by); c.stroke(); c.setLineDash([]);
-      c.fillStyle = `rgb(${col})`; c.beginPath(); c.arc(x, y, 4, 0, TAU); c.fill();
-      c.fillText(`${f.n} ${[f.a && f.a.n, f.b && f.b.n, f.trk && 'TRK ' + (f.trk.side > 0 ? 'S' : 'P')].filter(Boolean).join('+')} ±${Math.round(f.res)} m${f.v.lengthSq() > 1 ? ' · ' + Math.round(f.v.length()) + ' m/s' : ''}`, x + 6, y - 6);
+      c.fillStyle = `rgb(${col})`; c.beginPath(); c.arc(x, y, f.fix ? 4 : 2.5, 0, TAU); c.fill();
+      if (f.fix || f.trk) c.fillText(`${f.n} ${[f.a && f.a.n, f.b && f.b.n, f.trk && 'TRK ' + (f.trk.side > 0 ? 'S' : 'P')].filter(Boolean).join('+')} ±${Math.round(f.res)} m${f.v.lengthSq() > 1 ? ' · ' + Math.round(f.v.length()) + ' m/s' : ''}`, x + 6, y - 6); // (labelled: its 3D fixes, and what a tracker's on; the rest in the cells below)
     }
     // the trackers' solutions: where each has had its target, and where it has it going (red)
     for (const tr of su.trks) {
@@ -411,7 +452,7 @@ export const RadarView = (() => {
       c.strokeStyle = 'rgba(255,80,60,0.85)'; line(tr.hist.map((q) => toHer(q.p))); const fut: THREE.Vector3[] = []; for (let i = 0; i <= 10; i++) fut.push(toHer(tr.est.p.clone().addScaledVector(tr.est.v, i)));
       c.setLineDash([4, 3]); line(fut); c.setLineDash([]); const [tx, ty] = pr(toHer(tr.est.p)); c.strokeRect(tx - 5, ty - 5, 10, 10);
     }
-    c.fillStyle = '#5f8fa4'; c.fillText(`${su.fus.length} correlated · cyan: A arcs · magenta: B arcs · dashed: the next 10 s`, x0 + 4, y0 + h - 14);
+    c.fillStyle = '#5f8fa4'; c.fillText(`${su.fus.length} placed (${su.fus.filter((f) => f.fix).length} 3D fixes) of ${(su.bel || []).length} beliefs · cyan: A arcs · magenta: B arcs · grey: slabs · amber: placed · green: 3D fix · dashed: the next 10 s`, x0 + 4, y0 + h - 14);
   }
   // ---------------------------------------------------------------- the sensor station's hologram
   // A hologram over the console in place of its screen (a sphere's worth of space, the shell itself not drawn): her own ship at
@@ -449,7 +490,7 @@ export const RadarView = (() => {
     const sel = new T.Mesh(new T.RingGeometry(R * 0.045, R * 0.055, 24), glow(0xffffff, 0.9)); inner.add(sel);
     const lcv = document.createElement('canvas'); lcv.width = 512; lcv.height = 96; const ltex = new T.CanvasTexture(lcv);
     const label = new T.Sprite(new T.SpriteMaterial({ map: ltex, transparent: true, depthWrite: false, depthTest: false })); label.scale.set(R * 1.7, R * 0.32, 1); label.renderOrder = 20; inner.add(label);
-    const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', font: '300 13px "Oxanium", var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', color: 'rgba(170,225,250,0.75)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; document.body.appendChild(hint);
+    const hint = document.createElement('div'); hint.id = 'holo-hint'; Object.assign(hint.style, { position: 'fixed', left: '50%', bottom: '8%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', font: '300 13px "Oxanium", var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', color: 'rgba(170,225,250,0.75)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35' }); hint.textContent = 'hold right mouse: turn the sphere · 3: the camera view · tap right: drop the trackers'; document.body.appendChild(hint);
     const scanUi = document.createElement('div'); scanUi.id = 'holo-scan'; Object.assign(scanUi.style, { position: 'fixed', left: '24px', top: '24px', font: '300 13px "Oxanium", var(--ui-font, system-ui, sans-serif)', letterSpacing: '0.6px', fontVariantNumeric: 'tabular-nums', color: 'rgba(215,235,245,0.85)', textShadow: '0 0 3px rgba(0,0,0,0.6)', pointerEvents: 'none', display: 'none', zIndex: '35', lineHeight: '1.6' }); document.body.appendChild(scanUi);
     holoG = { vels: [], rwrItems: [], scanUi, secs: [], rwr: [], zoom: 0, rings, focus: null, arcs: [], strips, ends, g, inner, fans, beams, dots: [], sel, label, lcv, ltex, ltext: '', items: [], R, hint };
   }
@@ -467,7 +508,7 @@ export const RadarView = (() => {
     if (refont) { refont = false; H.zoom = -1; H.ltext = ''; for (const m of H.rwr) if (m) m.txt = ''; }
     H.g.position.copy(c).add(new T.Vector3(0, -0.3 * (1 - grow), 0)); H.g.scale.setScalar(0.12 + 0.88 * grow); H.inner.quaternion.copy(rot); /* (grow: rising up out of the console and opening, as the operator sits) */ H.hint.style.display = seated ? '' : 'none';
     // (focused: all of it on layer 6 alone, drawn sharp over the blurred frame (js/render.ts focusBlur); else on the scene's own)
-    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? '1 / 2  scanner (hold: modes) · click a track: keep it tracked (again: let go) · click a warning: search that way · hold 3 / 4: a tracker off · drag right  turn · scroll  zoom · hold G  look up · hold F  get up' : 'hold G: focus on it · hold right mouse: turn it · 3 or 4: pick a tracker, then left click a track or a warning to send it · tap right: drop the trackers'; }
+    if (H.focus !== focus) { H.focus = focus; H.hint.textContent = focus ? '1 / 2  scanner (hold: modes) · click a track: keep it tracked (again: let go) · click a warning: search that way · 3: the camera view · drag right  turn · scroll  zoom · hold G  look up · hold F  get up' : 'hold G: focus on it · hold right mouse: turn it · 3: the camera view · tap right: drop the trackers'; }
     H.g.traverse((o) => o.layers.set(focus ? 6 : 0));
     const at = (p: THREE.Vector3, out = new T.Vector3()) => { const L = p.length(); return out.copy(p).multiplyScalar(L > 0 ? Math.sqrt(Math.min(1, L / zoom)) * R / L : 0); }; // (beyond the range shown: at its edge)
     if (H.zoom !== zoom) { H.zoom = zoom; [0.25, 0.5, 1].forEach((f, i) => { const g0 = H.rings[i], rr = Math.sqrt(f) * R, km = zoom * f / 1000; g0.l.scale.setScalar(rr); g0.s.position.set(rr + R * 0.1, R * [-0.07, 0.07, 0][i], 0); /* (at her starboard side of each, the inner two staggered up and down: not over each other) */
@@ -522,22 +563,52 @@ export const RadarView = (() => {
         if (b.open) h += b.opts.map((o, i) => `<div data-hb="o${k}:${i}" style="padding-left:14px;color:${i === b.cur ? '#ffffff' : '#7f9fb0'}">${i === b.cur ? '▶ ' : '&nbsp;&nbsp;'}${o}</div>`).join('') + `<div style="padding-left:14px;color:#5f8fa4;font-size:12px">click one, or tap ${k + 1}: next · hold ${k + 1}: set</div>`;
         if (b.sel) h += `<div style="color:rgba(255,255,255,0.7);font-size:12px">W S: width · A D: direction</div>`;
         return h + '</div>';
-      }).join('<br>') + '<br>' + [1, 0].map((ti, j) => { // (and the tracking radars': 3 port, 4 starboard)
-        const tr = su.trks[ti]; if (!tr) return ''; const j0 = tr.job;
-        // (what the scheduler has it doing, how far through it (a bar: its slew, then its dwell), and the head of its queue (what's planned
-        // next, as the scheduler has it now: replanned every epoch, or at once when a threat comes in))
+      }).join('<br>') + '<br>' + (() => { // (the tracking radars: one scheduler, a slot a dish, and the one queue it hands them work from)
+        // (each dish's slot: its number, what it's on (a bar: its slew, then its dwell) or IDLE / OFF (click the state: off or on). Below,
+        // every job planned, in the order they start: each with the dish it's going to (the first that'll be free and can see it, as
+        // the plan has it now: replanned every epoch, or at once when a threat comes in), when it starts and how long it takes)
         const PC = ['#9fc2d4', '#ffffff', '#ff6050'], pc = (p: number) => PC[Math.max(0, Math.min(2, p))];
-        const st = tr.off ? 'OFF' : j0 ? Radar.jobName(j0) + (tr.st === 'slew' ? ' · slew' : tr.st === 'track' ? ' · lock' : tr.st === 'acq' ? ' · search' : '') : 'IDLE';
-        const col = tr.off ? '#5f6f78' : j0 ? pc(Radar.jobPri(j0)) : '#9fc2d4';
-        const prog = j0 ? Radar.jobProg(su, tr, now) : 0;
-        const bar = j0 ? `<div style="height:4px;margin:3px 0 2px;background:rgba(120,180,210,0.15)"><div style="height:4px;width:${(prog * 100).toFixed(1)}%;background:${col}"></div></div>` : '';
-        const q = (su.sched && su.sched.plan.get(tr)) || [];
-        const queue = !tr.off && q.length ? `<div style="font-size:12px;font-weight:400;color:#7f9fb0">next ${q.slice(0, 4).map((j) => `<span style="color:${pc(Radar.jobPri(j))}">${Radar.jobName(j)}</span>`).join(' › ')}${q.length > 4 ? ' › +' + (q.length - 4) : ''}</div>` : '';
-        return `<div data-hb="t${ti}" style="display:inline-block;min-width:330px;margin-bottom:6px;padding:3px 9px;border:1px solid rgba(120,180,210,0.18);background:rgba(4,12,18,0.32);border-radius:2px"><span style="color:#ffb040">${j + 3} TRK ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span data-hb="p${ti}" style="float:right;font-weight:400;color:${col}">${st}</span>${bar}${queue}</div>`;
-      }).join('<br>') + (() => { // (her tracks: what the scheduler's keeping, each how often it's really been looked at lately; her operator's starred)
+        const slots = [1, 0].map((ti, j) => {
+          const tr = su.trks[ti]; if (!tr) return ''; const j0 = tr.job, col = tr.off ? '#5f6f78' : j0 ? pc(Radar.jobPri(j0)) : '#9fc2d4', prog = j0 ? Radar.jobProg(su, tr, now) : 0;
+          const what = tr.off ? 'OFF' : j0 ? Radar.jobName(j0) : 'IDLE', how = tr.off ? 'switched off' : j0 ? (tr.st === 'slew' ? 'slewing' : tr.st === 'track' ? 'locked' : tr.st === 'acq' ? 'searching' : '') : 'free';
+          return `<div data-hb="t${ti}" style="flex:1 1 0;min-width:150px;padding:3px 7px;border:1px solid ${col}66;border-left:3px solid ${col};background:rgba(4,12,18,0.4)"><div><span style="color:#ffb040">${j + 3} ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span data-hb="p${ti}" style="float:right;color:${col}">${what}</span></div>`
+            + `<div style="height:5px;margin:3px 0;background:rgba(120,180,210,0.15)"><div style="height:5px;width:${(prog * 100).toFixed(1)}%;background:${col}"></div></div><div style="font-size:11px;color:#7f9fb0">${how}</div></div>`;
+        }).join('') + (() => { // (and the camera: what it's looking at, through which quarter's camera, how big the target is in its picture)
+          const o = su.opt; if (!o) return ''; const j0 = o.job, col = o.off ? '#5f6f78' : j0 ? '#8dffbe' : '#9fc2d4', prog = Radar.optProg(su, now);
+          const what = o.off ? 'OFF' : j0 ? (j0.kind === 'acq' ? 'SWEEP ' + ((o as any).con ? (o as any).con.c.n : '') : 'LOOK ' + j0.tt!.n) : 'IDLE', how = o.off ? 'switched off' : !j0 ? 'free' : o.st === 'slew' ? 'turning to it · ' + Radar.QUAD[o.quad] : j0.kind === 'acq' ? 'along its arc · ' + Radar.QUAD[o.quad] : o.px < Radar.OPT.det ? 'nothing in sight · ' + Radar.QUAD[o.quad] : `${Math.round(o.px)} px · ${Radar.QUAD[o.quad]}`;
+          return `<div data-hb="c0" style="flex:1 1 0;min-width:150px;padding:3px 7px;border:1px solid ${col}66;border-left:3px solid ${col};background:rgba(4,12,18,0.4)"><div><span style="color:#8dffbe">OPTICAL</span> <span style="float:right;color:${col}">${what}</span></div>`
+            + `<div style="height:5px;margin:3px 0;background:rgba(120,180,210,0.15)"><div style="height:5px;width:${(prog * 100).toFixed(1)}%;background:${col}"></div></div><div style="font-size:11px;color:#7f9fb0;white-space:nowrap">${how}</div></div>`;
+        })();
+        // (the queue: a token for each track she keeps and each search asked for, most wanted first (Radar.urgency: its priority by how
+        // overdue its next look is, or how long the search has waited); each says how due it is and the dish on it now or planned next)
+        type Tok = { name: string; c0: string; v: number; sub: string; on: string };
+        const S0 = su.sched, toks: Tok[] = [], dishOf = (f: (j: import('./radar.js').RJob) => boolean) => { for (const tr of su.trks) if (!tr.off && tr.job && f(tr.job)) return { now: true, d: tr.side > 0 ? 'S' : 'P', at: now }; if (su.opt && su.opt.job && f(su.opt.job)) return { now: true, d: 'O', at: now }; let best: { at: number; d: string } | null = null; if (S0) for (const [tr, pl] of S0.plan) if (!tr.off) for (const j of pl) if (f(j) && (!best || (j.at ?? 0) < best.at)) best = { at: j.at ?? 0, d: tr.side > 0 ? 'S' : 'P' }; return best ? { now: false, d: best.d, at: best.at } : null; };
+        if (S0) {
+          for (const tt of S0.tts) { const u = Radar.urgency(su, { kind: 'look', tt, t: tt.t, pri: tt.pri }, now), w = dishOf((j) => j.kind === 'look' && j.tt === tt);
+            toks.push({ name: `${tt.op ? '★' : tt.pri >= 2 ? '⚠' : ''}${tt.n}${tt.quiet ? ' ◌' : ''}`, c0: pc(tt.pri), v: u.v, sub: `due ${u.due.toFixed(1)}×`, on: !w ? '' : w.now ? `on ${w.d}` : `→${w.d} +${Math.max(0, w.at - now).toFixed(1)}` }); }
+          for (const rq of S0.reqs) { const u = Radar.urgency(su, rq, now), w = dishOf((j) => j === rq);
+            toks.push({ name: rq.kind === 'acq' ? 'FIND' : 'SEARCH', c0: pc(rq.pri), v: u.v, sub: `${u.due.toFixed(1)} s`, on: !w ? 'waiting' : w.now ? `on ${w.d}` : `→${w.d} +${Math.max(0, w.at - now).toFixed(1)}` }); }
+        }
+        toks.sort((x, y) => y.v - x.v);
+        const chips = toks.map((t) => `<div style="flex:0 0 auto;width:84px;padding:2px 5px;border:1px solid ${t.c0}55;border-left:3px solid ${t.c0};background:${t.on.startsWith('on') ? 'rgba(255,176,64,0.12)' : 'rgba(4,12,18,0.4)'}"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:${t.c0}">${t.name}</span> <span style="float:right;font-size:11px;color:${t.on.startsWith('on') ? '#ffb040' : '#7f9fb0'}">${t.on}</span></div><div style="font-size:11px;color:#7f9fb0;white-space:nowrap">${t.sub}</div></div>`).join('');
+        const waiting = toks.filter((t) => t.on === 'waiting').length;
+        return `<div style="display:inline-block;margin-bottom:6px;padding:3px 9px;border:1px solid rgba(120,180,210,0.18);background:rgba(4,12,18,0.32);border-radius:2px;font-weight:400;min-width:420px;max-width:860px">`
+          + `<div><span style="color:#ffb040">TRACKER SCHEDULER</span> <span style="font-size:11px;color:#7f9fb0">· click a dish's state: off or on · 3: the camera's picture</span></div>`
+          + `<div style="display:flex;gap:6px;margin:3px 0">${slots}</div>`
+          + `<div style="font-size:11px;color:#7f9fb0">QUEUE · a token a track and a search, most wanted first · due: how overdue its next look is (1×: as often as it's wanted) · its dish now (on) or planned next (→)${waiting ? ` · <span style="color:#ffb040">${waiting} waiting</span>` : ''}</div>`
+          + `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:2px;font-size:12px;line-height:1.35">${chips || '<span style="color:#5f8fa4">nothing held</span>'}</div></div>`;
+      })() + (() => { // (her tracks, one a row: what the scheduler's keeping; each its shape (its solution's spread, widest and thinnest: a 3D fix
+        // or not), how fast it's going against her and closing, when it was last seen, how often it's looked at lately; ✕ drops it)
         const S0 = su.sched; if (!S0 || !S0.tts.length) return '';
-        const row = S0.tts.slice().sort((a, b) => b.pri - a.pri || (b.op ? 1 : 0) - (a.op ? 1 : 0)).slice(0, 6).map((q) => `<span style="color:${q.pri >= 2 ? '#ff6050' : q.op ? '#ffffff' : '#9fc2d4'}">${q.op ? '★' : ''}${q.n} ${Radar.rateOf(q, now).toFixed(1)}/s</span>`).join(' · ');
-        return `<br><div style="display:inline-block;min-width:330px;padding:3px 9px;border:1px solid rgba(120,180,210,0.18);background:rgba(4,12,18,0.32);border-radius:2px;font-weight:400">TRACKS ${row}${S0.reqs.length ? ' · <span style="color:#ffb040">' + S0.reqs.length + ' waiting</span>' : ''}</div>`;
+        const qn = su.Q.clone().invert(), FX = Radar.FIX;
+        const rows = S0.tts.slice().sort((a, b) => b.pri - a.pri || (b.op ? 1 : 0) - (a.op ? 1 : 0) || a.t0 - b.t0).slice(0, 8).map((q) => {
+          const P = q.kf.P, e = Radar.eig3([P[0], P[1], P[2], P[6], P[7], P[8], P[12], P[13], P[14]]), sx = e.map((v) => Math.sqrt(v.l)), p = q.kf.pos(new T.Vector3()), r = p.distanceTo(su.P), fix = sx[0] < FX.s + FX.k * r;
+          const rv = q.kf.vel(new T.Vector3()).sub(su.V), los = p.clone().sub(su.P).normalize(), vc = -rv.dot(los), f = (x: number) => (x < 10 ? x.toFixed(1) : String(Math.round(x)));
+          const ago = q.looks ? now - q.t : -1, c0 = q.pri >= 2 ? '#ff6050' : q.op ? '#ffffff' : '#9fc2d4', side = p.clone().sub(su.P).applyQuaternion(qn).x > 0 ? 'S' : 'P';
+          const td = (x: string, w: number, st = '') => `<td style="padding:0 6px 0 0;min-width:${w}px;white-space:nowrap;${st}">${x}</td>`;
+          return `<tr>${td(`<span style="color:${c0}">${q.op ? '★' : q.pri >= 2 ? '⚠' : '&nbsp;'} ${q.n}</span>`, 54)}${td(`<span style="color:${fix ? '#5aff8c' : '#ffc85a'}">${fix ? 'FIX' : 'est'}</span> ${f(sx[0])}×${f(sx[2])} m`, 104)}${td(q.cls ? `<span style="color:${q.cls.conf >= 0.6 ? '#8dffbe' : '#7f9fb0'}">${q.cls.name || q.cls.k} ${Math.round(q.cls.conf * 100)}%</span>` : '<span style="color:#5f6f78">?</span>', 96)}${td(`${(r / 1000).toFixed(2)} km ${side}`, 72)}${td(`${Math.round(rv.length())} m/s <span style="color:#7f9fb0">${vc >= 0 ? '+' : ''}${Math.round(vc)}</span>`, 92)}${td(ago < 0 ? '<span style="color:#7f9fb0">not yet</span>' : `<span style="color:${ago > 3 ? '#ffb040' : 'inherit'}">${ago.toFixed(1)} s ago</span>`, 70)}${td(`${Radar.rateOf(q, now).toFixed(1)}/s`, 40, 'color:#7f9fb0')}<td data-hb="a${q.n}" style="padding:0 5px;border:1px solid ${q.quiet ? 'rgba(141,255,190,0.5)' : 'rgba(255,176,64,0.45)'};color:${q.quiet ? '#8dffbe' : '#ffb040'};white-space:nowrap">${q.quiet ? 'LISTEN' : 'ACTIVE'}</td><td style="width:4px"></td><td data-hb="x${q.n}" style="color:#ff8070;padding:0 4px;border:1px solid rgba(255,128,112,0.35)">✕</td></tr>`;
+        }).join('');
+        return `<br><div style="display:inline-block;padding:3px 9px;border:1px solid rgba(120,180,210,0.18);background:rgba(4,12,18,0.32);border-radius:2px;font-weight:400"><div>TRACKS ${S0.tts.length}${S0.tts.length > 8 ? ' (8 shown)' : ''}${S0.reqs.length ? ' · <span style="color:#ffb040">' + S0.reqs.length + ' waiting</span>' : ''} <span style="font-size:11px;color:#7f9fb0">· shape: spread widest × thinnest · what the camera says it is · speed against us, closing · last seen · looks a second · ACTIVE / LISTEN: radar and camera, or the camera alone (click)</span></div><table style="border-collapse:separate;border-spacing:0 2px;font-size:12px">${rows}</table></div>`;
       })();
       if (H.scanUi.innerHTML !== html) H.scanUi.innerHTML = html;
     }
@@ -596,6 +667,25 @@ export const RadarView = (() => {
     }
     for (let i = nv; i < H.vels.length; i++) H.vels[i].visible = false;
     for (let i = items.length; i < H.dots.length; i++) H.dots[i].visible = false;
+    // her tracks: a ring round each thing the scheduler keeps, named as its track is (its belief's name: the same as the dot's), on its
+    // 3D point if it has one, else where the track's own solution has it (a track found before it has a point: its T name); the
+    // operator's white, a threat's red, her own picture's pale. And the camera's line of sight, green, out to what it's looking at
+    const X = H as any, xs: { ring: THREE.Mesh; sp: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[] = X.trk || (X.trk = []);
+    const mk = () => { const ring = new T.Mesh(new T.RingGeometry(R * 0.042, R * 0.05, 20), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, depthTest: false, side: T.DoubleSide })); ring.renderOrder = 17; H.inner.add(ring);
+      const cv = document.createElement('canvas'); cv.width = 320; cv.height = 40; const tex = new T.CanvasTexture(cv), sp = new T.Sprite(new T.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false })); sp.scale.set(R * 1.2, R * 0.15, 1); sp.renderOrder = 19; H.inner.add(sp); return { ring, sp, cv, tex, txt: '' }; };
+    let nt = 0;
+    if (su.sched) for (const tt of su.sched.tts) {
+      const f = tt.bel ? su.fus.find((q) => q.n === tt.bel) : null, ph = f ? f.p.clone() : Radar.ttAt(tt, now).sub(su.P).applyQuaternion(qn), pos = at(ph);
+      const m = xs[nt] || (xs[nt] = mk()); nt++; const col = tt.quiet ? 0x8dffbe : tt.pri >= 2 ? 0xff6050 : tt.op ? 0xffffff : 0x9fc2d4; // (listen only: green, the camera's)
+      m.ring.visible = m.sp.visible = true; m.ring.position.copy(pos); m.ring.quaternion.copy(faceCam); (m.ring.material as THREE.MeshBasicMaterial).color.setHex(col); (m.ring.material as THREE.MeshBasicMaterial).opacity = 0.9;
+      m.sp.position.copy(pos).add(new T.Vector3(R * 0.64, R * 0.06, 0).applyQuaternion(faceCam));
+      const txt = `${tt.op ? '★' : tt.pri >= 2 ? '⚠' : ''}${tt.n}${tt.quiet ? ' · listen' : ''}${f ? '' : ' · no 3D point: its own guess'}`; // (no placed belief for it: where its own solution has it)
+      if (m.txt !== txt + col) { m.txt = txt + col; const x = m.cv.getContext('2d')!; x.clearRect(0, 0, 320, 40); x.font = '500 22px Oxanium, Barlow, system-ui, sans-serif'; x.textBaseline = 'middle'; x.lineWidth = 3; x.strokeStyle = 'rgba(0,0,0,0.6)'; x.strokeText(txt, 4, 20); x.fillStyle = '#' + col.toString(16).padStart(6, '0'); x.fillText(txt, 4, 20); m.tex.needsUpdate = true; }
+    }
+    for (let i = nt; i < xs.length; i++) xs[i].ring.visible = xs[i].sp.visible = false;
+    { const o = su.opt; let ol: THREE.Line = X.optL; if (!ol) { ol = X.optL = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(6), 3)), new T.LineBasicMaterial({ color: 0x5aff8c, transparent: true, opacity: 0.95, depthWrite: false, depthTest: false })); H.inner.add(ol); }
+      ol.visible = !!o && !!o.job && o.rng > 0;
+      if (ol.visible) { const e = at(o!.b.clone().applyQuaternion(qn).multiplyScalar(o!.rng)), pa = ol.geometry.attributes.position as THREE.BufferAttribute; pa.setXYZ(0, 0, 0, 0); pa.setXYZ(1, e.x, e.y, e.z); pa.needsUpdate = true; ol.geometry.computeBoundingSphere(); ol.renderOrder = 16; } }
     H.items = items;
     // the one pointed at: ringed (facing the viewer), and named
     const p = pick && (pick.rwr ? H.rwrItems.find((q) => q.rwr && q.rwr.angleTo(pick.rwr!) < 0.05) : items.find((q) => q.plot === pick.plot && q.label.split(' ')[0] === pick.label.split(' ')[0]));
@@ -617,5 +707,5 @@ export const RadarView = (() => {
   }
   // where an item of the hologram is in the world (for the operator's cursor's halo round it)
   function holoWorld(it: HoloItem) { if (!holoG) return null; holoG.inner.updateWorldMatrix(true, false); return it.pos.clone().applyMatrix4(holoG.inner.matrixWorld); }
-  return { update, scope, pick, holo, holoPick, holoWorld };
+  return { dbg, update, scope, pick, holo, holoPick, holoWorld };
 })();

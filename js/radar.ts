@@ -19,26 +19,27 @@
 // Everything here is in the level's frame (the ship the mission's on is the level: js/space.ts), a ship's own frame being her
 // group's (forward -z, up +y, starboard +x).
 export interface RcsTable { s: Float32Array; max: number; mean: number }
-export interface RTarget { id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number; iff?: RIff | null; aff?: RAff; xon?: boolean; only?: RAff } // (only: its transponder answers only an interrogator of that side's (a torpedo's to its own ship's)) // (iso: a return the same every way, m2: a chaff cloud's, a missile's; iff: what its transponder answers an interrogation with, or nothing)
+export interface RTarget { sz?: number; kind?: 'ship' | 'rock' | 'torpedo' | 'missile' | 'chaff'; // (sz: how big it is, its half-size, m; kind: what it really is: what a camera can tell (js/radar.ts optical))
+  id: string; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; rcs: RcsTable; iso?: number; iff?: RIff | null; aff?: RAff; xon?: boolean; only?: RAff } // (only: its transponder answers only an interrogator of that side's (a torpedo's to its own ship's)) // (iso: a return the same every way, m2: a chaff cloud's, a missile's; iff: what its transponder answers an interrogation with, or nothing)
 export type RAff = 'civ' | 'navy' | 'pirate' | 'squad'; // (whose a ship is: a civilian's, a navy's, pirates', the squad's)
 export interface RIff { c: 'civ' | 'squad' | 'navy'; n: string } // (the answer: what it says it is, and its name) // (a civilian's, the squad's ship's, the mission's ship's; and the name it gives)
 export interface RPlot { k: number; phi: number; r: number; t: number; db: number; id: string; e: number; vr?: number; // (vr: its Doppler: how fast its range is opening (m/s; closing, below 0), measured on the one look)
   q?: THREE.Quaternion; o?: THREE.Vector3; iff?: RIff | null } // (q, o: how she was turned and where she was when it was made)
 export type RMode = 'round' | 'sector' | 'off'; // (a search radar's modes: js/space.ts modeSet)
 export type RAx = 'y' | 'x' | 'z'; // (the axis a scanner turns about, in her frame: 'y' her up (yaw), 'x' her beam (pitch), 'z' her length (roll))
-export interface RContact { n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null; trail: { A: number; r: number; t: number }[]; kA: KF1; kr: KF1; sg?: number } // (sg: the largest its returns have said it is, m2 (sigOf): a fade makes a look smaller, never bigger) // (kA, kr: its Kalman filters, on its angle and its range) // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
+export interface RContact { optNo?: number; n: string; A: number; r: number; vA: number; vr: number; t: number; hits: number; p: RPlot; iff?: RIff | null; trail: { A: number; r: number; t: number }[]; kA: KF1; kr: KF1; sg?: number } // (sg: the largest its returns have said it is, m2 (sigOf): a fade makes a look smaller, never bigger) // (kA, kr: its Kalman filters, on its angle and its range) // (iff: its answer to interrogation (undefined: not asked yet; null: no answer, unknown)) // (a peak followed from sweep to sweep: A its angle on the map, r its range, their rates; p the latest plot of it)
 export interface RScan {
   notch?: boolean; // (its Doppler notch: what closes at the clutter's rate (the asteroid field's, RSuite Vc) filtered out, js/space.ts modeSet)
   ax: RAx; th: number; rate: number; bw: number; fan: number; R0: number; plots: RPlot[]; at: THREE.Vector3; n: THREE.Vector3; mast: number; mask: number;
   map: Float32Array; age: Float32Array; off: number; col: number; cons: RContact[]; nid: number; tag: string; pend: { p: RPlot; A: number }[]; mode: RMode; rate0: number; sec: { on: boolean; c: number; h: number; dir: number }; // (mode: what it's doing (round, a sector, off: silent); rate0 its own turning rate; sec: a sector search: back and forth across c +- h (her angle), not round) // (its response map (MAP.na angle columns by MAP.nr range bins, in the noise's units), when each column was written, the map's angle against hers (her turning about its axis since), the last column written; its contacts)
 } // (n: the way its mast stands out of her hull, mast how far: it sees past her hull's plane there as far as over the hull's edge, mask (the sine of that angle))
 export interface RTrack {
-  fx?: { p: THREE.Vector3; R: number[]; v: THREE.Vector3; key: string; t: number; q: number } | null; // (its last revolution's fix, kept for the 3D picture (fuse) till it's taken: a scheduled look's over before fusion's next turn)
+  fx?: { p: THREE.Vector3; R: number[]; v: THREE.Vector3; key: string; t: number; q: number; tt?: RSTrack | null } | null; // (tt: the ship track it was looking at, if it was sent to one) (its last revolution's fix, kept for the 3D picture (fuse) till it's taken: a scheduled look's over before fusion's next turn)
   job?: RJob | null; jobRev?: number; jobT?: number; jobA?: number; // (jobA: how far it had to turn when the job began: its slew's progress) // (what the scheduler has it doing, and how far in)
   side: number; at: THREE.Vector3; b: THREE.Vector3; a: THREE.Vector3; st: 'idle' | 'slew' | 'acq' | 'track'; off?: boolean; // (off: switched off by its operator: silent, takes no cue)
   cue: { k: number; ax: RAx; phi: number; r: number; q: THREE.Quaternion; o: THREE.Vector3; con?: RContact | null } | null; spiral?: { t: number; best: number; b: THREE.Vector3; r: number; p: THREE.Vector3; v: THREE.Vector3; t0: number; ray?: boolean; span?: number; dr?: number; bt?: number; bv?: number | null } | null; sw: number; best: { db: number; b: THREE.Vector3; r: number; t?: number; v?: number | null }; ph: number; // (best.b: the way the sweep's peak was, in the level's frame: she may turn while it sweeps)
   tgt: string | null; lockT: number; lost: number; err: number; db: number; rng: number; est: { p: THREE.Vector3 | null; v: THREE.Vector3; q: number; kf?: KF3 | null };
-  hand: { p: THREE.Vector3; v: THREE.Vector3; t: number; ray?: boolean; sig?: number } | null; // (sig: how far out its place may be, m (the handing track's own uncertainty): how wide the spiral goes) // (ray: a way to look, not a place (a radar warning's bearing): its range not known) // (handed a track by the other tracker: where its solution has the target, slewed to straight)
+  hand: { p: THREE.Vector3; v: THREE.Vector3; t: number; ray?: boolean; sig?: number; sv?: number } | null; // (sig: how far out its place may be, m (the handing track's own uncertainty): how wide the spiral goes) // (ray: a way to look, not a place (a radar warning's bearing): its range not known) // (handed a track by the other tracker: where its solution has the target, slewed to straight)
   hist?: { t: number; p: THREE.Vector3 }[]; // (where its solution has had her, the last 8 s)
   dop?: number | null; // (its target's Doppler: the range's rate, opening)
   rev?: number; meas?: { p: THREE.Vector3; R: number[] } | null; // (its revolutions done, and the last one's measurement: where it put her, and how unsure)
@@ -49,16 +50,26 @@ export interface RTrack {
   dE: THREE.Vector3; dA: number; dP: number; w: THREE.Vector3; // (the conical scan's demodulator over the revolution under way, and the boresight's rate)
 }
 export interface KF1 { x: number; v: number; p11: number; p12: number; p22: number } // (a scalar's Kalman filter at constant velocity: its value, rate, and their covariance)
-export interface RFused { kf: KF3; trk?: RTrack | null; n: string; a: RContact | null; b: RContact | null; p: THREE.Vector3; pl: THREE.Vector3; res: number; r: number; iff: RIff | null; ea: number; eb: number; v: THREE.Vector3; hist: { t: number; p: THREE.Vector3 }[] } // (v its velocity (level frame), from hist: where it's been, the last 8 s) // (a contact of each scanner's that are one thing: where, in her frame (p) and the level's (pl); how far apart the two fans' points are there (res); ea, eb how far along each fan)
+export interface RFused { kf: KF3; trk?: RTrack | null; n: string; a: RContact | null; b: RContact | null; p: THREE.Vector3; pl: THREE.Vector3; res: number; r: number; iff: RIff | null; ea: number; eb: number; v: THREE.Vector3; hist: { t: number; p: THREE.Vector3 }[];
+  kind?: number; k?: number; con?: (RContact | null)[]; last?: number; t0?: number; sx?: number[]; axes?: THREE.Vector3[]; fix?: boolean; cls?: RCls; szE?: number; optT?: number; optNo?: number } // (a belief (js/radar.ts fuse): kind 1 a slab (one scanner's contact k), 2 placed, 3 a 3D fix; con its contacts, a scanner's each; sx, axes its shape: its spread along each axis, widest first; last when it was last measured) // (v its velocity (level frame), from hist: where it's been, the last 8 s) // (a contact of each scanner's that are one thing: where, in her frame (p) and the level's (pl); how far apart the two fans' points are there (res); ea, eb how far along each fan)
 export interface RAssess { key: string; n: string; f: RFused | null; c: RContact | null; iff: RIff | null; r: number; vc: number; tcpa: number; dcpa: number; score: number; hold: number; cls: 'HOSTILE' | 'SUSPECT' | 'WATCH' | 'NEUTRAL' | 'CIV' | 'FRIENDLY'; plot: RPlot | null; why: string }
 // The ship's own tracks, held by her, not by a tracker (js/radar.ts schedule): a solution (kf), worked on by whichever tracker the
 // scheduler sends to look; how often she wants it looked at (rate, a second), how much (pri: 0 her own picture, 1 her operator's
 // pick, 2 a threat her fire control's on), when it was last seen (t), the looks running without a return (miss), the tracker on it now
-export interface RSTrack { n: string; kf: KF3; est: { p: THREE.Vector3; v: THREE.Vector3; q: number; kf?: KF3 }; tgt: string | null; t: number; t0: number; pri: number; rate: number; op?: boolean; fc?: number; miss: number; looks: number; trk: RTrack | null; st?: 'track'; err?: number; lookT?: number[] } // (lookT: when it's been seen lately: how often it's really looked at) // (err: how far off its place may be, as an angle from her (what the guns' aim makes of it))
+export interface RSTrack { n: string; kf: KF3; est: { p: THREE.Vector3; v: THREE.Vector3; q: number; kf?: KF3 }; tgt: string | null; t: number; t0: number; pri: number; rate: number; op?: boolean; fc?: number; miss: number; looks: number; trk: RTrack | null; st?: 'track'; quiet?: boolean; bel?: string; // (quiet: listen only: no radar sent to it, the camera alone keeps it)
+  cls?: RCls; szE?: number; optT?: number; optNo?: number; // (cls: what the camera's made of it; optT its last optical look; optNo when it was last too small to see)
+  err?: number; lookT?: number[] } // (lookT: when it's been seen lately: how often it's really looked at) // (err: how far off its place may be, as an angle from her (what the guns' aim makes of it))
 // what a tracker's sent to do: look at a ship track (look), find what a scanner's plot is (acq), or search along a bearing (ray)
-export interface RJob { kind: 'look' | 'acq' | 'ray'; tt?: RSTrack; plot?: RPlot; d?: THREE.Vector3; t: number; pri: number; rate?: number; op?: boolean; fc?: number; trk?: RTrack | null }
+export interface RJob { at?: number; end?: number; // (at, end: when the plan has it starting (its slew) and done)
+  kind: 'look' | 'acq' | 'ray'; tt?: RSTrack; plot?: RPlot; d?: THREE.Vector3; t: number; pri: number; rate?: number; op?: boolean; fc?: number; trk?: RTrack | null }
+// the optical tracker (js/radar.ts optical): its cameras' places (her frame, one a quarter), the one in use, which way it looks (level
+// frame), its field of view and range; its job, from the scheduler; what it's seeing (the target nearest the middle, its size in pixels)
+export interface ROpt { mts: THREE.Vector3[]; quad: number; b: THREE.Vector3; fov: number; rng: number; st: 'idle' | 'slew' | 'look'; job: RJob | null; jobT: number; slew: number; next: number; free: number; seen: number; px: number; tgt: string | null; n: number; off?: boolean; fx?: RTrack['fx']; e?: number } // (e: how far along a contact's fan it's swept)
+export interface RCls { k: string; conf: number; t: number; name?: string } // (what a camera's told a track is, how sure (0..1), a ship's name if it's read it)
 export interface RSuite {
+  opt?: ROpt;
   sched?: { tts: RSTrack[]; reqs: RJob[]; n: number; ep: number; plan: Map<RTrack, RJob[]>; log?: { t: number; k: number; j: string }[] }; // (sched: her trackers run by the scheduler, not one target each)
+  bel?: RFused[]; belUsed?: WeakSet<RPlot>; // (bel: every belief, slabs too (fus: the placed ones); belUsed: the peaks gone into them)
   Vc?: THREE.Vector3; keep?: Set<string>; // (keep: targets her notch lets through: one she's tracking, or matched with)
   wpn?: Map<string, number>; aff?: RAff; hostNames?: Set<string>; fusSeen: Map<string, string>; ass: RAssess[]; assHold: Map<string, number>; fusKF: Map<string, KF3>; fusHist: Map<string, { t: number; p: THREE.Vector3 }[]>; fus: RFused[]; fusIds: Map<string, string>; fusN: number; fusT: number; id: string; name?: string; P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; scans: RScan[]; trks: RTrack[]; size: number; Pp: THREE.Vector3; Qp: THREE.Quaternion; init: boolean; dbg?: any } // (Pp, Qp: where she was and how she was turned at the last step)
 
@@ -96,8 +107,20 @@ export class KF3 {
     for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) { let a = 0; for (let k = 0; k < 3; k++) a += K[i * 3 + k] * HP[k * 6 + j]; P[i * 6 + j] -= a; }
     this.n++;
   }
+  // a scalar measurement z = h x (h over the six states), its variance r
+  upd1(h: number[], z: number, r: number) {
+    const P = this.P, Ph = new Float64Array(6); let S = r, y = z;
+    for (let i = 0; i < 6; i++) { let a = 0; for (let j = 0; j < 6; j++) a += P[i * 6 + j] * h[j]; Ph[i] = a; S += h[i] * a; y -= h[i] * this.x[i]; }
+    for (let i = 0; i < 6; i++) this.x[i] += Ph[i] / S * y;
+    for (let i = 0; i < 6; i++) for (let j = 0; j < 6; j++) P[i * 6 + j] -= Ph[i] * Ph[j] / S;
+  }
   // its frame moved (a new level's: x' = R x + t): its position moved with it, its velocity turned
-  move(R: THREE.Quaternion, t: THREE.Vector3) { const p = new THREE.Vector3(this.x[0], this.x[1], this.x[2]).applyQuaternion(R).add(t), v = new THREE.Vector3(this.x[3], this.x[4], this.x[5]).applyQuaternion(R); this.x.set([p.x, p.y, p.z, v.x, v.y, v.z]); }
+  move(R: THREE.Quaternion, t: THREE.Vector3) { const p = new THREE.Vector3(this.x[0], this.x[1], this.x[2]).applyQuaternion(R).add(t), v = new THREE.Vector3(this.x[3], this.x[4], this.x[5]).applyQuaternion(R); this.x.set([p.x, p.y, p.z, v.x, v.y, v.z]);
+    // (and its covariance turned with it: P' = M P M', M the rotation on each block)
+    const m = new THREE.Matrix4().makeRotationFromQuaternion(R).elements, M = [m[0], m[4], m[8], m[1], m[5], m[9], m[2], m[6], m[10]], P = this.P, Q = new Float64Array(36);
+    for (let bi = 0; bi < 2; bi++) for (let bj = 0; bj < 2; bj++) for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { let a = 0; for (let k = 0; k < 3; k++) for (let l = 0; l < 3; l++) a += M[i * 3 + k] * P[(bi * 3 + k) * 6 + bj * 3 + l] * M[j * 3 + l]; Q[(bi * 3 + i) * 6 + bj * 3 + j] = a; }
+    P.set(Q);
+  }
   pos(out = new THREE.Vector3()) { return out.set(this.x[0], this.x[1], this.x[2]); }
   clone() { const k = Object.create(KF3.prototype) as KF3; k.x = this.x.slice(); k.P = this.P.slice(); k.t = this.t; k.n = this.n; k.qb = this.qb; return k; }
   vel(out = new THREE.Vector3()) { return out.set(this.x[3], this.x[4], this.x[5]); }
@@ -182,10 +205,23 @@ export const Radar = (() => {
   const detRange = (R0: number, sig: number) => R0 * Math.pow(Math.max(1e-6, sig) / SIG0, 0.25); // (where it's even odds)
   const gauss = () => { let u = 0, v = 0; while (u === 0) u = Math.random(); while (v === 0) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(TAU * v); };
   // ---------------------------------------------------------------- the radars
-  const SCAN = { rate: TAU / 3, bw: 2 * D2R, fan: 45 * D2R, R0: 7500 }; // (a turn every 3 s; 2 degrees by 90)
-  const TRK = { bw: 3 * D2R, sq: 1 * D2R, hz: 6, slew: 75 * D2R, stab: 200 * D2R, acq: 60 * D2R, R0: 9000, gate: 0.06 }; // (conical scan at 6 Hz: slow enough to see in the debug view; stab: how fast the turret can turn to hold its beam still while she turns under it)
+  // The radar equation from the hardware: what range a 10 m2 target gives the detection threshold at (R0), from the transmitter's peak
+  // power (Pt, W), the antenna's gain (from its beam's widths: 0.6 of an ideal aperture's), and how many pulses are taken together
+  // while the beam's on a target (its dwell at the pulse rate; added up non-coherently, a gain of n^0.8). The rest is the receiver:
+  // X band (3 cm), 1 µs pulses (1 MHz), a 3 dB noise figure, 3 dB of losses, 2 kHz pulse rate. A scanner's dwell is its beam width over
+  // its sweep rate (slower, more pulses on each target: further); a tracker's, a turn of its conical scan.
+  const RF = { lam: 0.03, B: 1e6, F: 2, L: 2, T: 290, prf: 2000, k: 1.380649e-23 };
+  const gainOf = (a: number, b: number) => 0.6 * 4 * Math.PI / (a * b);
+  function r0Of(Pt: number, G: number, dwell: number) {
+    const n = Math.max(1, RF.prf * dwell), num = Pt * G * G * RF.lam * RF.lam * SIG0 * Math.pow(n, 0.8), den = Math.pow(4 * Math.PI, 3) * RF.k * RF.T * RF.F * RF.B * RF.L * Math.pow(10, THR / 10);
+    return Math.pow(num / den, 0.25);
+  }
+  const SCAN = { rate: TAU / 3, bw: 2 * D2R, fan: 45 * D2R, Pt: 100e3, R0: 0 }; // (a turn every 3 s; 2 degrees by 90; 100 kW peak: a warship's search radar's order)
+  SCAN.R0 = r0Of(SCAN.Pt, gainOf(SCAN.bw, 2 * SCAN.fan), SCAN.bw / SCAN.rate); // (some 26 km for 10 m2)
+  const TRK = { bw: 3 * D2R, sq: 1 * D2R, hz: 6, slew: 75 * D2R, stab: 200 * D2R, acq: 60 * D2R, Pt: 20e3, R0: 0, gate: 0.06 }; // (conical scan at 6 Hz: slow enough to see in the debug view; stab: how fast the turret can turn to hold its beam still while she turns under it)
   // a scanner's response map: MAP.na columns of angle round its axis (a degree each) by MAP.nr bins of range: 25 m each to R1 (10 km,
   // where a track's range is fine enough to fight with), 100 m each beyond, to Rmax (50 km: a big ship broadside on is seen that far)
+  TRK.R0 = r0Of(TRK.Pt, gainOf(TRK.bw, TRK.bw), 1 / TRK.hz); // (20 kW peak into a 3 degree pencil, a turn of its scan on it: some 120 km for 10 m2, past anything here)
   const MAP = { na: 360, nr: 800, dr: 25, R1: 10000, dr2: 100, Rmax: 50000, K: 24, floor: 12 };
   // (a range's place in the bins, continuous, and back; a bin's width there)
   const B1 = MAP.R1 / MAP.dr;
@@ -208,7 +244,8 @@ export const Radar = (() => {
       { ax: 'z', th: Math.PI, mode: 'round', rate0: SCAN.rate * 1.07, rate: SCAN.rate * 1.07, bw: SCAN.bw, fan: SCAN.fan, R0: SCAN.R0, plots: [], at: new T.Vector3(0, top * 0.75, -size - mast), n: new T.Vector3(0, 0, -1), mast, mask: over(mast, Math.max(top, -bot, beam)), ...mapOf('B') },
     ];
     const trks: RTrack[] = [1, -1].map((side) => ({ side, at: new T.Vector3(side * beam, 0, 0), b: new T.Vector3(side, 0, 0), a: new T.Vector3(side, 0, 0), st: 'idle', cue: null, sw: 0, best: { db: -99, b: new T.Vector3(), r: 0 }, ph: 0, tgt: null, lockT: 0, lost: 0, err: 0, db: -99, rng: 0, est: { p: null, v: new T.Vector3(), q: 0 }, hand: null, dE: new T.Vector3(), dA: 0, dP: 0, w: new T.Vector3() }));
-    return { id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false, fus: [], fusIds: new Map(), fusN: 0, fusT: -1, fusHist: new Map(), fusKF: new Map(), ass: [], assHold: new Map(), fusSeen: new Map() };
+    const opt: ROpt = { mts: [[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => new T.Vector3(x * beam, top * 0.6, z * size * 0.6)), quad: 0, b: new T.Vector3(0, 0, -1), fov: OPT.fovMax, rng: 0, st: 'idle', job: null, jobT: 0, slew: 0, next: 0, free: 0, seen: 0, px: 0, tgt: null, n: 0 };
+    return { opt, id, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), scans, trks, size, Pp: new T.Vector3(), Qp: new T.Quaternion(), init: false, fus: [], fusIds: new Map(), fusN: 0, fusT: -1, fusHist: new Map(), fusKF: new Map(), ass: [], assHold: new Map(), fusSeen: new Map() };
   }
   // a way out of the radar along a fan: ax its turning axis, phi how far round it's turned, e how far along the fan (her own frame)
   // ('y': phi round from her nose to starboard, e up; 'x': phi up from ahead, e to starboard; 'z': phi round her length from her
@@ -252,7 +289,8 @@ export const Radar = (() => {
     // the scanners: each sweeps its fan round, a column of its map at a time (scanStep)
     su.scans.forEach((sc, k) => scanStep(su, sc, k, dt, targets, now));
     if (now - su.fusT > 0.1) { const dt0 = su.fusT < 0 ? 0.1 : now - su.fusT; su.fusT = now; fuse(su, now); assess(su, dt0); } // (ten times a second)
-    schedule(su, now); // (her trackers' jobs, if they're scheduled: schedule)
+    schedule(su, now); if (su.opt && su.sched) { optSched(su, now); optStep(su, targets, now); } // (and its camera's)
+    // (her trackers' jobs, if they're scheduled: schedule)
     for (const tr of su.trks) trackStep(su, tr, dt, targets, now);
     su.Pp.copy(su.P); su.Qp.copy(su.Q);
   }
@@ -281,6 +319,7 @@ export const Radar = (() => {
   const perOf = (sc: RScan) => (sc.sec.on ? Math.max(0.3, 4 * sc.sec.h / sc.rate) : TAU / sc.rate);
   const wrapPi = (a: number) => { a = (a + Math.PI) % TAU; if (a < 0) a += TAU; return a - Math.PI; };
   function scanStep(su: RSuite, sc: RScan, k: number, dt: number, targets: RTarget[], now: number) {
+    sc.R0 = r0Of(SCAN.Pt, gainOf(sc.bw, 2 * sc.fan), sc.bw / Math.max(1e-3, sc.rate)); // (its reach at its sweep rate now)
     // (her turning about its axis since the last step: where its nose (turn 0) was, as she is now)
     angOf(sc.ax, _ref.copy(dirOf(sc.ax, 0, 0, _cd)).applyQuaternion(su.Qp).applyQuaternion(_qi.copy(su.Q).invert())); sc.off = wrap(sc.off + angOf(sc.ax, _ref)[0]);
     // what's out there for it this frame: each target's turn angle, how far along the fan, range and signal (or hidden)
@@ -416,53 +455,162 @@ export const Radar = (() => {
     arcAt(sa, pa, ra, best.ea, _pa); arcAt(sb, pb, rb, best.eb, _pb);
     return { res: best.d, ea: best.ea, eb: best.eb, p: _pa.clone().add(_pb).multiplyScalar(0.5) };
   }
-  function fuse(su: RSuite, now: number) {
-    const sa = su.scans.find((q) => q.ax === 'y'), sb = su.scans.find((q) => q.ax === 'z'); if (!sa || !sb) { su.fus = []; return; }
-    const live = (sc: RScan) => sc.cons.filter((c) => c.hits >= 2 && now - c.t < perOf(sc) * 1.5).map((c) => { const dt = now - c.t; return { c, phi: wrap(c.A + c.vA * dt + sc.off), r: c.r + c.vr * dt }; });
-    const A = live(sa), B = live(sb), sep = sa.at.distanceTo(sb.at), pairs: { a: typeof A[0]; b: typeof B[0]; s: ReturnType<typeof solve> }[] = [];
-    for (const a of A) for (const b of B) {
-      if (Math.abs(a.r - b.r) > sep + 150 + 0.05 * a.r) continue;
-      const s0 = solve(sa, a.phi, a.r, sb, b.phi, b.r); if (s0.res < Math.max(40, 0.04 * a.r)) pairs.push({ a, b, s: s0 });
-    }
-    pairs.sort((p, q) => p.s.res - q.s.res);
-    const usedA = new Set<RContact>(), usedB = new Set<RContact>(), out: RFused[] = [];
-    for (const pr of pairs) {
-      if (usedA.has(pr.a.c) || usedB.has(pr.b.c)) continue; usedA.add(pr.a.c); usedB.add(pr.b.c);
-      const key = pr.a.c.n + '|' + pr.b.c.n; let n = su.fusIds.get(key); if (!n) { n = 'F' + (++su.fusN); su.fusIds.set(key, n); }
-      // (its Kalman filter: the pair's point a measurement of it, unsure by its range bins along the line of sight and by about a
-      // third of a beam width across, and by however far the arcs missed)
-      const z = pr.s.p.clone().applyQuaternion(su.Q).add(su.P), l = z.clone().sub(su.P).normalize(), r0 = pr.s.p.length(), sr = SR + pr.s.res, sc0 = r0 * SA + pr.s.res;
-      // (updated only when either contact has a new peak: between sweeps the pair's point is the contacts' own predictions, the same
-      // information again, not a measurement)
-      const seenKey = pr.a.c.p.t + '|' + pr.b.c.p.t, fresh = su.fusSeen.get(n) !== seenKey; su.fusSeen.set(n, seenKey);
-      let kf = su.fusKF.get(n); if (!kf) { const rr = [pr.a.c, pr.b.c].map((c) => c.vr), v0 = su.V.clone().addScaledVector(l, rr.length ? rr.reduce((x, y) => x + y, 0) / rr.length : 0); kf = new KF3(z, v0, Math.max(sr, sc0), 150, now); su.fusKF.set(n, kf); } /* (a new one moving as its contacts' ranges are: along the line of sight, as fast as they're closing or opening; across it, not known) */ else { kf.pred(now, ACC3 * ACC3); if (fresh) kf.upd(z, Rlos(l, sr * 1.5, sc0 * 1.5)); }
-      const pl = kf.pos(); let hist = su.fusHist.get(n); if (!hist) { hist = []; su.fusHist.set(n, hist); }
-      hist.push({ t: now, p: pl.clone() }); while (hist.length && now - hist[0].t > 8) hist.shift();
-      out.push({ kf, trk: null, n, a: pr.a.c, b: pr.b.c, p: pl.clone().sub(su.P).applyQuaternion(su.Q.clone().invert()), pl, res: kf.sig(), r: r0, iff: pr.a.c.iff || pr.b.c.iff || null, ea: pr.s.ea, eb: pr.s.eb, v: kf.vel(), hist });
-    }
-    // the trackers' measurements: each locked one's solution (where it has its target: range from its gate, angle to a fraction
-    // of its beam) is joined to the track it falls in (inside 6% of the range, 60 m at least), the two weighted by how sure each
-    // is (the tracker's spread: its range times its angle error, and a few metres; the track's: how far its arcs missed, and 2%
-    // of its range); one that falls in none is a track of its own, from the tracker alone
-    for (const tr of su.trks) {
-      const fx = tr.fx; if (!fx || now - fx.t > 0.5 || fx.q < 0.15 || su.fusSeen.get('fx:' + tr.side) === fx.key) continue; // (its last fix, if it hasn't been taken: whether it's still on that target or gone on to the next)
-      // (its measurement: where its gate and boresight put the target now, unsure by a few metres in range and by its angle error
-      // across: a far better fix than the scanners'. Into the track it falls in (inside its gate: Mahalanobis, three dimensions,
-      // 25), as one more update of that track's filter)
-      const m = fx.p, R = fx.R, revKey = fx.key; su.fusSeen.set('fx:' + tr.side, fx.key); // (used once)
-      let f = null as RFused | null, bd = 25; for (const q of out) { if (q.trk) continue; const d = q.kf.innov(m, R).m; if (d < bd) { bd = d; f = q; } }
-      if (!f) { // (in none: a track of its own, the tracker's alone)
-        const key = 'trk' + tr.side; let n = su.fusIds.get(key); if (!n) { n = 'F' + (++su.fusN); su.fusIds.set(key, n); }
-        let kf = su.fusKF.get(n); if (!kf) { kf = new KF3(m, fx.v, 20, 100, now); su.fusKF.set(n, kf); } else kf.pred(now, ACC3 * ACC3);
-        let hist = su.fusHist.get(n); if (!hist) { hist = []; su.fusHist.set(n, hist); }
-        f = { kf, n, a: null, b: null, trk: null, p: new T.Vector3(), pl: kf.pos(), res: 0, r: m.distanceTo(su.P), iff: null, ea: 0, eb: 0, v: kf.vel(), hist }; out.push(f);
+  // ---------------------------------------------------------------- beliefs: what she makes of it all in 3D
+  // Each thing she believes is out there is a 3D Kalman filter (KF3, the level's frame), its covariance the shape of what's known.
+  // A scanner's peak is an angle and a range on one fan: sure in range (SR) and across the fan (a third of its beam width), not along
+  // it: a thin tall slab (slabOf). Peaks of one scanner alone leave a belief a slab (kind 1: a contact's arc, its place along the fan
+  // not known). Where a slab of each scanner cross (two contacts whose arcs meet, solve, and whose range rates agree) the belief is
+  // the two slabs' product: small every way (kind 2). Every later peak of either, fresh, is a Kalman update of it with its slab
+  // (made where the belief is, so the slab's straight line is the arc there). A tracker's revolution, its range gate's and its pencil
+  // beam's, is small every way: a sphere. A belief is a 3D FIX (kind 3) once its widest axis (its position covariance's largest
+  // eigenvalue's root) is under FIX: a firing solution.
+  //   - a fresh peak (a contact's newest plot, not yet used) is matched to the placed beliefs (kinds 2, 3) it falls in: its
+  //     Mahalanobis distance to the belief (the peak's slab and the belief's spread together, with its Doppler against the belief's
+  //     range rate), under GATE; best first, one peak a belief, its contact's own belief first. Two things in one cell of the fan
+  //     (the same bearing, the same range: one return) give one peak: it goes into each 3D fix it falls in, not only the first.
+  //   - a contact seen twice no placed belief has is a belief of its own: a slab.
+  //   - a tracker's fix goes into the placed belief it falls in; else a slab it falls in (that one placed by it); else it's one of
+  //     its own.
+  //   - a placed belief nothing's measured for KEEP_BEL s, or grown too wide to be placed, is let go.
+  // Ghosts: two things at one range, both seen by both scanners, make four crossings: their range rates tell them apart if they
+  // move differently, and a tracker sent to a ghost finds nothing there (and the belief, never measured again, goes).
+  const FIX = { s: 25, k: 0.004 }, B2 = { s: 150, k: 0.06 }, GATE = 14.2, KEEP_BEL = 7, FAN_S = 0.6;
+  // the symmetric 3x3's eigenvalues (largest first) and their axes: a belief's shape
+  function eig3(A: ArrayLike<number>) {
+    const a = Array.from(A), v = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+    for (let sw = 0; sw < 16; sw++) {
+      if (Math.abs(a[1]) + Math.abs(a[2]) + Math.abs(a[5]) < 1e-10 * (Math.abs(a[0]) + Math.abs(a[4]) + Math.abs(a[8]) + 1e-30)) break;
+      for (const [p, q] of [[0, 1], [0, 2], [1, 2]]) {
+        const apq = a[p * 3 + q]; if (Math.abs(apq) < 1e-300) continue;
+        const th = (a[q * 3 + q] - a[p * 3 + p]) / (2 * apq), t = (th >= 0 ? 1 : -1) / (Math.abs(th) + Math.sqrt(th * th + 1)), c = 1 / Math.sqrt(t * t + 1), s = t * c;
+        for (let k = 0; k < 3; k++) { const x = a[k * 3 + p], y = a[k * 3 + q]; a[k * 3 + p] = c * x - s * y; a[k * 3 + q] = s * x + c * y; }
+        for (let k = 0; k < 3; k++) { const x = a[p * 3 + k], y = a[q * 3 + k]; a[p * 3 + k] = c * x - s * y; a[q * 3 + k] = s * x + c * y; }
+        for (let k = 0; k < 3; k++) { const x = v[k * 3 + p], y = v[k * 3 + q]; v[k * 3 + p] = c * x - s * y; v[k * 3 + q] = s * x + c * y; }
       }
-      if (su.fusSeen.get(f.n + ':trk') !== revKey) { su.fusSeen.set(f.n + ':trk', revKey); f.kf.upd(m, R); } f.trk = tr.st === 'track' ? tr : null; f.kf.fxT = now; // (fxT, on its filter (the track's own object's made again each pass): when a tracker last fixed it) f.kf.pos(f.pl); f.kf.vel(f.v); f.res = f.kf.sig(); f.p.copy(f.pl).sub(su.P).applyQuaternion(su.Q.clone().invert());
-      const h = f.hist[f.hist.length - 1]; if (h && h.t === now) h.p.copy(f.pl); else { f.hist.push({ t: now, p: f.pl.clone() }); while (now - f.hist[0].t > 8) f.hist.shift(); }
     }
-    su.fus = out;
-    for (const [k, h] of su.fusHist) if (!h.length || now - h[h.length - 1].t > 3) { su.fusHist.delete(k); su.fusKF.delete(k); su.fusSeen.delete(k); su.fusSeen.delete(k + ':trk'); }
-    if (su.fusIds.size > 200) su.fusIds.clear();
+    return [0, 1, 2].map((i) => ({ l: Math.max(0, a[i * 4]), d: new T.Vector3(v[i], v[3 + i], v[6 + i]) })).sort((x, y) => y.l - x.l);
+  }
+  const posP = (kf: KF3) => { const P = kf.P; return [P[0], P[1], P[2], P[6], P[7], P[8], P[12], P[13], P[14]]; };
+  // (its position's covariance set (its velocity's and the two together left as they are, the cross terms cleared))
+  const setPosP = (kf: KF3, R: number[]) => { for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) { kf.P[i * 6 + j] = R[i * 3 + j]; kf.P[i * 6 + j + 3] = 0; kf.P[(i + 3) * 6 + j] = 0; } };
+  const prod3 = (A: number[], B: number[]) => inv3(add3(inv3(A), inv3(B))), add3 = (A: number[], B: number[]) => A.map((x, i) => x + B[i]);
+  // A scanner's measurement: its fan at angle phi, range r, from its mast (her frame then: Q, O), made a slab in the level's frame
+  // at the point of the arc nearest `near` (or the fan's middle): z the point, R its covariance, l the line of sight
+  function slabOf(sc: RScan, phi: number, r: number, Q: THREE.Quaternion, O: THREE.Vector3, near: THREE.Vector3 | null) {
+    const M = sc.at.clone().applyQuaternion(Q).add(O);
+    let e = 0; if (near) { const d = near.clone().sub(M).applyQuaternion(_qi.copy(Q).invert()).normalize(); e = Math.max(-sc.fan, Math.min(sc.fan, angOf(sc.ax, d)[1])); }
+    const l = dirOf(sc.ax, phi, e).applyQuaternion(Q), z = M.clone().addScaledVector(l, r);
+    const u = dirOf(sc.ax, phi, e + 0.01).sub(dirOf(sc.ax, phi, e - 0.01)).applyQuaternion(Q).normalize(), w = l.clone().cross(u).normalize();
+    const sl = SR * SR, sw = (r * SA) ** 2, sa = (r * sc.fan * FAN_S) ** 2, L = [l.x, l.y, l.z], U = [u.x, u.y, u.z], W = [w.x, w.y, w.z], R: number[] = [];
+    for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) R.push(sl * L[i] * L[j] + sw * W[i] * W[j] + sa * U[i] * U[j]);
+    return { z, R, l, e };
+  }
+  // its Doppler (the range rate it measured, her own motion in it) as a measurement of the belief's velocity along l
+  const dopH = (l: THREE.Vector3) => [0, 0, 0, l.x, l.y, l.z];
+  // a fresh peak against a placed belief: its slab where the belief is, moved on to the belief's time; how far, Mahalanobis
+  function gateOf(su: RSuite, sc: RScan, p: RPlot, b: RFused) {
+    const kf = b.kf, dt = p.t - kf.t, X = kf.pos(new T.Vector3()).addScaledVector(kf.vel(_w), dt);
+    const s = slabOf(sc, p.phi, p.r, p.q || su.Q, p.o || su.P, X), vv = (kf.P[21] + kf.P[28] + kf.P[35]) / 3 * dt * dt;
+    s.z.addScaledVector(kf.vel(_w), -dt); for (let i = 0; i < 3; i++) s.R[i * 4] += vv; // (where it was then, as it'd be now)
+    let m = kf.innov(s.z, s.R).m, d: number | null = null;
+    if (p.vr != null) { const h = dopH(s.l), L = s.l; let sv = DOP.sd * DOP.sd; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) sv += [L.x, L.y, L.z][i] * kf.P[(i + 3) * 6 + j + 3] * [L.x, L.y, L.z][j]; d = p.vr + s.l.dot(su.V); m += (d - (h[3] * kf.x[3] + h[4] * kf.x[4] + h[5] * kf.x[5])) ** 2 / sv; }
+    return { m, s, d };
+  }
+  function slabUpd(b: RFused, g: ReturnType<typeof gateOf>) { b.kf.upd(g.s.z, g.s.R); if (g.d != null) b.kf.upd1(dopH(g.s.l), g.d, DOP.sd * DOP.sd); }
+  const qOf = (b: RFused) => (b.con || []).some((c) => !!c && accR(c) > ACC * ACC) ? WACC * WACC : ACC3 * ACC3; // (a weapon's under a motor's push)
+  const conLive = (sc: RScan, c: RContact | null | undefined, now: number) => !!c && sc.cons.includes(c) && now - c.t < perOf(sc) * 1.5;
+  function newBel(su: RSuite, kf: KF3, kind: number, now: number, n?: string): RFused {
+    return { kf, n: n || 'F' + (++su.fusN), a: null, b: null, trk: null, p: new T.Vector3(), pl: kf.pos(), res: kf.sig(), r: 0, iff: null, ea: 0, eb: 0, v: kf.vel(), hist: [], kind, con: [null, null], last: now, t0: now };
+  }
+  // one scanner's contact, as a slab (kind 1) where its rates put it now: rebuilt from it each pass (its place along the fan's not known)
+  function slabBel(su: RSuite, k: number, c: RContact, now: number, b?: RFused) {
+    const sc = su.scans[k], dt = now - c.t, s = slabOf(sc, wrap(c.A + c.vA * dt + sc.off), c.r + c.vr * dt, su.Q, su.P, null);
+    const kf = new KF3(s.z, su.V.clone().addScaledVector(s.l, c.vr), 1, 150, now); setPosP(kf, s.R); kf.upd1(dopH(s.l), c.vr + s.l.dot(su.V), DOP.sd * DOP.sd);
+    if (b) { b.kf = kf; b.last = now; return b; }
+    const nb = newBel(su, kf, 1, now); nb.k = k; nb.con![k] = c; return nb;
+  }
+  function fuse(su: RSuite, now: number) {
+    const ka = su.scans.findIndex((q) => q.ax === 'y'), kb = su.scans.findIndex((q) => q.ax === 'z');
+    if (ka < 0 || kb < 0) { su.fus = []; su.bel = []; return; }
+    const used = su.belUsed || (su.belUsed = new WeakSet()); let bel = su.bel || (su.bel = []);
+    const placed = () => bel.filter((b) => b.kind! >= 2);
+    for (const b of bel) if (b.kind! >= 2) { b.kf.pred(now, qOf(b)); for (const k of [ka, kb]) if (!conLive(su.scans[k], b.con![k], now)) b.con![k] = null; }
+    // 1. each scanner's fresh peaks into the placed beliefs they fall in
+    for (const k of [ka, kb]) {
+      const sc = su.scans[k], fresh = sc.cons.filter((c) => !used.has(c.p) && now - c.p.t < perOf(sc) * 1.5), P0 = placed(), pairs: { c: RContact; b: RFused; g: ReturnType<typeof gateOf> }[] = [];
+      for (const c of fresh) for (const b of P0) { const g = gateOf(su, sc, c.p, b); if (g.m < GATE * (b.con![k] === c ? 1.5 : 1)) pairs.push({ c, b, g }); } // (its own contact's: a little more room)
+      pairs.sort((x, y) => (x.g.m - (x.b.con![k] === x.c ? 4 : 0)) - (y.g.m - (y.b.con![k] === y.c ? 4 : 0)));
+      const uc = new Set<RContact>(), ub = new Set<RFused>(), tk = new Map<RFused, RContact>();
+      for (const { c, b, g } of pairs) { if (uc.has(c) || ub.has(b)) continue; uc.add(c); ub.add(b); tk.set(b, c); slabUpd(b, g); b.con![k] = c; b.last = now; }
+      for (const b of P0) { const c = b.con![k]; if (c && fresh.includes(c) && tk.get(b) !== c) b.con![k] = null; } // (its contact's peak somewhere it can't be: that contact's no longer it)
+      // (one peak, two things in its cell: into each 3D fix it falls in that this scanner gave nothing else)
+      for (const { c, b, g } of pairs) if (!ub.has(b) && uc.has(c) && b.kind === 3) { ub.add(b); slabUpd(b, g); b.last = now; }
+      for (const c of fresh) used.add(c.p);
+    }
+    // 2. the slabs: each contact no placed belief has, seen twice, one; rebuilt where it is now
+    const held = new Set<RContact>(); for (const b of placed()) for (const c of b.con!) if (c) held.add(c);
+    bel = bel.filter((b) => b.kind! >= 2 || (conLive(su.scans[b.k!], b.con![b.k!], now) && !held.has(b.con![b.k!]!)));
+    for (const b of bel) if (b.kind === 1) slabBel(su, b.k!, b.con![b.k!]!, now, b);
+    for (const k of [ka, kb]) for (const c of su.scans[k].cons) if (c.hits >= 2 && conLive(su.scans[k], c, now) && !held.has(c) && !bel.some((b) => b.kind === 1 && b.con![k] === c)) bel.push(slabBel(su, k, c, now));
+    // 3. a slab of each scanner's that cross where their ranges and range rates agree: placed, the two slabs' product there
+    const sa = su.scans[ka], sb = su.scans[kb], sep = sa.at.distanceTo(sb.at), cand: { a: RFused; b: RFused; s: ReturnType<typeof solve> }[] = [];
+    const at = (sc: RScan, c: RContact) => { const dt = now - c.t; return { phi: wrap(c.A + c.vA * dt + sc.off), r: c.r + c.vr * dt }; };
+    for (const A of bel) if (A.kind === 1 && A.k === ka) for (const B of bel) if (B.kind === 1 && B.k === kb) {
+      const ca = A.con![ka]!, cb = B.con![kb]!, pa = at(sa, ca), pb = at(sb, cb);
+      if (Math.abs(pa.r - pb.r) > sep + 150 + 0.05 * pa.r || Math.abs(ca.vr - cb.vr) > 4 * DOP.sd + 0.02 * Math.abs(ca.vr)) continue; // (their range rates the same thing's: from two masts a few metres apart, near enough the same)
+      const s0 = solve(sa, pa.phi, pa.r, sb, pb.phi, pb.r); if (s0.res < Math.max(40, 0.04 * pa.r)) cand.push({ a: A, b: B, s: s0 });
+    }
+    cand.sort((x, y) => x.s.res - y.s.res);
+    const gone = new Set<RFused>();
+    for (const { a: A, b: B, s } of cand) {
+      if (gone.has(A) || gone.has(B)) continue; gone.add(A); gone.add(B);
+      const ca = A.con![ka]!, cb = B.con![kb]!, pa = at(sa, ca), pb = at(sb, cb), z = s.p.clone().applyQuaternion(su.Q).add(su.P);
+      const ra = slabOf(sa, pa.phi, pa.r, su.Q, su.P, z), rb = slabOf(sb, pb.phi, pb.r, su.Q, su.P, z), Rp = prod3(ra.R, rb.R), rr = s.res * s.res / 3; for (let i = 0; i < 3; i++) Rp[i * 4] += rr; // (and however far the arcs missed)
+      const kf = new KF3(z, su.V.clone().addScaledVector(ra.l, (ca.vr + cb.vr) / 2), 1, 150, now); setPosP(kf, Rp); kf.upd1(dopH(ra.l), ca.vr + ra.l.dot(su.V), DOP.sd * DOP.sd); kf.upd1(dopH(rb.l), cb.vr + rb.l.dot(su.V), DOP.sd * DOP.sd);
+      const old = A.t0! <= B.t0! ? A : B, nb = newBel(su, kf, 2, now, old.n); nb.t0 = old.t0; nb.hist = old.hist; nb.con![ka] = ca; nb.con![kb] = cb; bel.push(nb);
+    }
+    bel = bel.filter((b) => !gone.has(b));
+    // 4. the trackers' fixes: each one's last revolution, used once: into the placed belief it falls in (Mahalanobis, three
+    // dimensions, 25); else a slab it falls in (placed by it: the slab's and the sphere's product); else one of its own
+    // (and the camera's: a fine angle, its range weak: a long thin needle along the line of sight)
+    for (const [tr, fk] of [...su.trks.map((t) => [t, 'fx:' + t.side] as const), ...(su.opt ? [[null, 'fx:opt'] as const] : [])]) {
+      const fx = tr ? tr.fx : su.opt!.fx; if (!fx || now - fx.t > 0.5 || fx.q < 0.15 || su.fusSeen.get(fk) === fx.key) continue;
+      su.fusSeen.set(fk, fx.key);
+      // (the ship track it was looking at keeps to its belief: that one first, if it's anywhere near (a rock's return comes off its
+      // face, not its middle: a fix may sit metres off a sure belief); a small floor on the fix's spread for the gate, for the same)
+      const Rg = fx.R.slice(); for (let i = 0; i < 3; i++) Rg[i * 4] += 25;
+      let f: RFused | null = null, bd = 25; const own0 = fx.tt && fx.tt.bel ? bel.find((q) => q.n === fx.tt!.bel && q.kind! >= 2) : null;
+      if (own0 && own0.kf.innov(fx.p, Rg).m < 200) f = own0; else for (const q of bel) if (q.kind! >= 2) { const d = q.kf.innov(fx.p, Rg).m; if (d < bd) { bd = d; f = q; } }
+      if (f) f.kf.upd(fx.p, fx.R);
+      else {
+        let sl: RFused | null = null, Rs: number[] | null = null; bd = 25;
+        for (const q of bel) if (q.kind === 1) { const c = q.con![q.k!]!, sc = su.scans[q.k!], dt = now - c.t, s = slabOf(sc, wrap(c.A + c.vA * dt + sc.off), c.r + c.vr * dt, su.Q, su.P, fx.p), Si = inv3(add3(s.R, fx.R)), y = fx.p.clone().sub(s.z), Y = [y.x, y.y, y.z]; let m = 0; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) m += Y[i] * Si[i * 3 + j] * Y[j]; if (m < bd) { bd = m; sl = q; Rs = s.R; } }
+        const kf = new KF3(fx.p, fx.v, 1, 100, now); setPosP(kf, sl ? prod3(Rs!, fx.R) : fx.R.slice()); kf.n = 1;
+        f = newBel(su, kf, 2, now, sl ? sl.n : undefined); if (sl) { f.t0 = sl.t0; f.hist = sl.hist; f.con![sl.k!] = sl.con![sl.k!]; bel = bel.filter((b) => b !== sl); }
+        bel.push(f);
+      }
+      // (what the camera's told it is, the belief's too; and the ship track goes by its belief's name: one name for one thing, its 3D point and the trackers on it)
+      f.last = now; if (tr) { f.trk = tr.st === 'track' ? tr : null; f.kf.fxT = now; } if (fx.tt && fx.tt.cls) f.cls = fx.tt.cls; if (fx.tt) { fx.tt.bel = f.n; fx.tt.n = f.n; }
+    }
+    // (a belief a tracker's been sent to three times running and found nothing at, where it was sure enough to be looked for: a
+    // ghost (two slabs' crossing with nothing there), or gone behind something: let go, its contacts free to pair again)
+    if (su.sched) for (const tt of su.sched.tts.slice()) if (tt.miss >= 3 && tt.bel) { const b = bel.find((q) => q.n === tt.bel); if (b && b.kind === 2 && (b.kf.fxT == null || now - b.kf.fxT > 3)) { bel = bel.filter((q) => q !== b); if (!tt.looks) lose(su, tt); } tt.bel = undefined; } // (a track never once seen goes with its ghost)
+    // 5. what's placed: its shape, its kind; let go once nothing's measured it a while or it's grown too wide to be placed
+    const out: RFused[] = [], qi = su.Q.clone().invert();
+    bel = bel.filter((b) => {
+      b.kf.pos(b.pl); b.kf.vel(b.v); b.r = b.pl.distanceTo(su.P); b.p.copy(b.pl).sub(su.P).applyQuaternion(qi);
+      const e = eig3(posP(b.kf)), sx = e.map((q) => Math.sqrt(q.l)); b.sx = sx; b.axes = e.map((q) => q.d); b.res = b.kf.sig();
+      if (b.kind! >= 2) {
+        if (now - b.last! > KEEP_BEL || sx[0] > 0.3 * b.r + 500) return false;
+        b.kind = sx[0] < FIX.s + FIX.k * b.r ? 3 : 2; b.fix = b.kind === 3;
+        if (b.kf.fxT == null || now - b.kf.fxT > 1) b.trk = null;
+      }
+      b.a = b.con![ka] || null; b.b = b.con![kb] || null; b.iff = (b.a && b.a.iff) || (b.b && b.b.iff) || null;
+      const h = b.hist; h.push({ t: now, p: b.pl.clone() }); while (h.length && now - h[0].t > 8) h.shift();
+      if (b.kind! >= 2 && sx[0] < B2.s + B2.k * b.r) out.push(b);
+      return true;
+    });
+    su.bel = bel; su.fus = out;
   }
   // ---------------------------------------------------------------- hostile or not
   // Each 3D track (and each contact no 3D track has, from its range and range rate alone) is weighed, as the ship looking sees it:
@@ -505,9 +653,10 @@ export const Radar = (() => {
     if (iff.c === 'civ') return { p: 0.05, w: 'civilian' };
     return { p: 0.2, w: 'named' };
   }
+  const _zero = new T.Vector3();
   function assess(su: RSuite, dt: number) {
     const out: RAssess[] = [], seen = new Set<string>(), inF = new Set<RContact>();
-    const now = su.fusT, em = litOn(su.id, now), qi = su.Q.clone().invert(); // (the tracking radars on her now: her warning receiver's)
+    const now = su.fusT, em = litOn(su.id, now), qi = su.Q.clone().invert(), Vc = su.Vc || _zero; // (the tracking radars on her now: her warning receiver's)
     // (vc: how fast the range is closing, her own motion and all: how soon it reaches her (fire control's urgency). vo: how fast it's
     // coming at her itself, her own motion taken out: what it's doing, which is what hostility goes by; flying at something that's
     // sitting still makes the range close, and says nothing about it. tcpa, dcpa: its closest approach to where she is, on its own course)
@@ -518,26 +667,30 @@ export const Radar = (() => {
       // (once a weapon, still one while it's closing: a 3D track its contacts have let go of (her tracker alone holding it) has no
       // size of its own to go on; it's one if either contact it came of was, or the one its tracker was cued on)
       const was = W.has(key) || (!!f && (!!f.a && W.has('C:' + f.a.n) || !!f.b && W.has('C:' + f.b.n) || W.has('F:' + f.n) || (!!f.trk && !!f.trk.cue && !!f.trk.cue.con && W.has('C:' + f.trk.cue.con.n))));
-      const wpn = vo > WPN.vc && ((sg > 0 && sg < WPN.sig) || was); if (wpn) W.set(key, now);
+      // (what a camera's told it is, if it's sure enough: a torpedo or a missile is a weapon whatever it's doing; a rock or chaff is let be)
+      const oc = f && f.cls && f.cls.conf >= 0.6 ? f.cls : null, ow = !!oc && (oc.k === 'torpedo' || oc.k === 'missile'), inert = !!oc && (oc.k === 'rock' || oc.k === 'chaff');
+      const wpn = (vo > WPN.vc && ((sg > 0 && sg < WPN.sig) || was)) || (ow && vo > 0); if (wpn) W.set(key, now);
       const pr = prior(su, iff), kin = vo > 10 ? Math.min(1, (vo - 10) / 60) : 0, near = r < 4000 ? 1 - r / 4000 : 0, cpa = tcpa > 0 && tcpa < 90 && dcpa < 800 ? 1 - dcpa / 800 : 0;
-      const score = pr.p === 0 ? 0 : Math.min(1, pr.p + 0.35 * kin + 0.25 * near + 0.3 * cpa + (on ? 0.45 : 0));
+      const score = pr.p === 0 || inert ? 0.05 : Math.min(1, pr.p + 0.35 * kin + 0.25 * near + 0.3 * cpa + (on ? 0.45 : 0));
       let hold = wpn ? HOLD : su.assHold.get(key) ?? Math.max(0, ...[f && f.a, f && f.b].map((q) => (q ? su.assHold.get('C:' + q.n) || 0 : 0))); // (a new 3D track: as long held as its contacts were, alone)
       hold = wpn ? Math.max(hold, HOLD) : score >= 0.6 ? Math.min(HOLD * 2, hold + dt) : Math.max(0, hold - 2 * dt); su.assHold.set(key, hold); seen.add(key);
       const cls = pr.p === 0 ? 'FRIENDLY' : hold >= HOLD ? 'HOSTILE' : score >= 0.6 ? 'SUSPECT' : score >= 0.35 ? 'WATCH' : iff && iff.c === 'civ' ? 'CIV' : 'NEUTRAL';
-      const why = [pr.w, wpn ? `WEAPON: ${sg.toFixed(1)} m2 closing fast` : '', on ? 'TRACKING US' : '', kin > 0 ? `coming at us ${Math.round(vo)} m/s` : '', near > 0 ? 'near' : '', cpa > 0 ? `passes ${Math.round(dcpa)} m in ${Math.round(tcpa)} s` : ''].filter(Boolean).join(', ');
+      const why = [oc ? `OPTICAL: ${oc.k}${oc.name ? ' ' + oc.name : ''} (${Math.round(oc.conf * 100)}%)` : '', pr.w, wpn ? `WEAPON: ${sg.toFixed(1)} m2 closing fast` : '', on ? 'TRACKING US' : '', kin > 0 ? `coming at us ${Math.round(vo)} m/s` : '', near > 0 ? 'near' : '', cpa > 0 ? `passes ${Math.round(dcpa)} m in ${Math.round(tcpa)} s` : ''].filter(Boolean).join(', ');
       out.push({ key, n, f, c, iff, r, vc, tcpa, dcpa, score, hold, cls, plot, why });
     };
     for (const f of su.fus) {
       if (f.a) inF.add(f.a); if (f.b) inF.add(f.b);
       // (relative to her: where it is and how it's moving, its closest approach if it holds its course)
-      const rp = f.pl.clone().sub(su.P), rv = f.v.clone().sub(su.V), r = rp.length(), vc = -rv.dot(rp) / Math.max(1, r), vo = -f.v.dot(rp) / Math.max(1, r);
-      const v2 = f.v.lengthSq(), tc = v2 > 1 ? -rp.dot(f.v) / v2 : -1, dc = tc > 0 ? rp.clone().addScaledVector(f.v, tc).length() : r; // (its own course past where she is)
+      // (what it's doing itself is against the field it's in (su.Vc: the rocks drift as one; a rock sitting in it does nothing), not
+      // against the level's frame, which the field drifts through)
+      const rp = f.pl.clone().sub(su.P), rv = f.v.clone().sub(su.V), r = rp.length(), vf = f.v.clone().sub(Vc), vc = -rv.dot(rp) / Math.max(1, r), vo = -vf.dot(rp) / Math.max(1, r);
+      const v2 = vf.lengthSq(), tc = v2 > 1 ? -rp.dot(vf) / v2 : -1, dc = tc > 0 ? rp.clone().addScaledVector(vf, tc).length() : r; // (its own course (through the field) past where she is)
       const on = em.some((e) => e.from.clone().sub(su.P).angleTo(rp) < 4 * D2R && Math.abs(e.from.distanceTo(su.P) - r) < Math.max(150, 0.08 * r)); // (an emitter on her where this track is)
       add('F:' + f.n, f.n, f, null, f.iff || (f.a && f.a.iff) || (f.b && f.b.iff) || null, r, vc, vo, tc, dc, (f.a && f.a.p) || (f.b && f.b.p) || null, on);
     }
     // (one scanner's contact: only its range rate's known; her own speed along the way to it (the middle of its fan: near enough)
     // taken out of it, what's left is its own)
-    const own = (sc: RScan, c: RContact) => -(c.vr + dirOf(sc.ax, wrap(c.A + sc.off), 0, _w).applyQuaternion(su.Q).dot(su.V));
+    const own = (sc: RScan, c: RContact) => { const l = dirOf(sc.ax, wrap(c.A + sc.off), 0, _w).applyQuaternion(su.Q); return -(c.vr + l.dot(su.V) - l.dot(Vc)); }; // (and the field's taken out of it too)
     for (const sc of su.scans) for (const c of sc.cons) {
       if ((c.hits < 2 && !((c.sg || 0) > 0 && (c.sg || 0) < WPN.sig && own(sc, c) > WPN.vc)) || inF.has(c) || /* (one look's enough for a weapon: its Doppler says how fast it's closing) */ TAU / sc.rate * 1.5 < 0) continue;
       const on = em.some((e) => { const d = e.from.clone().sub(su.P), R = d.length(); d.applyQuaternion(qi); return Math.abs(wrapPi(angOf(sc.ax, d)[0] - wrap(c.A + sc.off))) < 4 * D2R && Math.abs(R - c.r) < Math.max(150, 0.08 * c.r); });
@@ -636,9 +789,9 @@ export const Radar = (() => {
   const acqGate = (vr: number | null | undefined, age = 0) => (vr == null ? null : { c: vr - WACC * Math.max(0, age) / 2, h: 150 + 0.4 * Math.abs(vr) + WACC * Math.max(0, age) / 2 }); // (age: how old the rate is; something under a motor may be closing up to WACC m/s2 faster by now: the gate widened that way only, its opening side where it was)
   // how far round a handed place to look, as an angle from here: three sigma of where it may be (its own uncertainty, grown by how
   // old it is: 30 m/s of not knowing a second), over the range; a bearing alone (a radar warning), three beams
-  function spanOf(h: { t: number; ray?: boolean; sig?: number }, rng: number, now: number) {
+  function spanOf(h: { t: number; ray?: boolean; sig?: number; sv?: number }, rng: number, now: number) {
     if (h.ray || h.sig == null) return 3 * TRK.bw;
-    const s = Math.hypot(h.sig, 30 * Math.max(0, now - h.t)) * 3 + 20;
+    const s = Math.hypot(h.sig, (h.sv ?? 30) * Math.max(0, now - h.t)) * 3 + 20; // (sv: how unsure its velocity is: what it may have moved on since, as the dish turned to it)
     return Math.min(3 * TRK.bw, Math.max(0.5 * TRK.bw, Math.atan2(s, Math.max(1, rng))));
   }
   // A track that's lost its return (behind a rock, a ship between, fading): held in MEMORY a while, on its solution. The boresight
@@ -653,9 +806,10 @@ export const Radar = (() => {
     if (tr.st === 'slew' && tr.hand) { // (a handover: straight onto where the other tracker's solution has her, and tracking)
       const h = tr.hand, mt = tr.at.clone().applyQuaternion(su.Q).add(su.P), pt = h.p.clone().addScaledVector(h.v, now - h.t), to = pt.clone().sub(mt).normalize().applyQuaternion(_qi.copy(su.Q).invert());
       if (now - h.t > 3) { drop(tr); return; } // (not there in 3 s: her solution's gone stale)
-      if (tr.job && tr.job.kind === 'look' && slewTo(tr, to, TRK.stab * dt) < 1 * D2R && spanOf(h, pt.distanceTo(mt), now) <= TRK.bw * 0.6) { // (a scheduled look at a track whose place is good to well inside the beam: straight on, the track's own solution its filter)
+      const off = slewTo(tr, to, TRK.stab * dt); // (turned toward it once a step: how far off it still is)
+      if (tr.job && tr.job.kind === 'look' && off < 1 * D2R && spanOf(h, pt.distanceTo(mt), now) <= TRK.bw * 0.6) { // (a scheduled look at a track whose place is good to well inside the beam: straight on, the track's own solution its filter)
         const tt = tr.job.tt!, l = pt.clone().sub(mt), R = l.length(); tr.st = 'track'; tr.est = { p: ttAt(tt, now), v: tt.kf.vel(new T.Vector3()), q: 0.5, kf: tt.kf }; tr.rng = R; tr.dop = h.v.clone().sub(su.V).dot(l.divideScalar(Math.max(1, R))); tr.lockT = 1.01; tr.lost = 0; tr.tgt = tt.tgt; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.hand = null; tr.a.copy(tr.b); return; }
-      if (slewTo(tr, to, TRK.stab * dt) < 1 * D2R) { tr.st = 'acq'; tr.spiral = { t: 0, best: -99, b: new T.Vector3(), r: pt.distanceTo(mt), p: h.p.clone(), v: h.v.clone(), t0: h.t, ray: h.ray, span: spanOf(h, pt.distanceTo(mt), now) }; tr.hand = null; }
+      if (off < 1 * D2R) { tr.st = 'acq'; tr.spiral = { t: 0, best: -99, b: new T.Vector3(), r: pt.distanceTo(mt), p: h.p.clone(), v: h.v.clone(), t0: h.t, ray: h.ray, span: spanOf(h, pt.distanceTo(mt), now) }; tr.hand = null; }
       tr.a.copy(tr.b); return;
     }
     if (tr.st === 'acq' && tr.spiral) {
@@ -763,8 +917,14 @@ export const Radar = (() => {
     // revolution: within one, the boresight's error is the same error, not a fresh one): unsure by a few metres in range and by
     // that revolution's angle uncertainty across; carried forward every step between)
     const l = tr.b.clone().applyQuaternion(su.Q), p = l.clone().multiplyScalar(tr.rng).add(tr.at.clone().applyQuaternion(su.Q).add(su.P)), es = tr.est;
-    if (!es.kf) es.kf = new KF3(p, new T.Vector3(), 10 + tr.rng * TRK.bw / 4, 150, now); else es.kf.pred(now, ACC3 * ACC3);
-    if (rev) { const R = Rlos(l, 3 + 0.002 * tr.rng, tr.rng * sa); es.kf.upd(p, R); tr.meas = { p: p.clone(), R }; tr.fx = { p: p.clone(), R, v: es.kf.vel(new T.Vector3()), key: 'trk' + tr.side + ':' + (tr.rev || 0), t: now, q: es.q }; }
+    // (a scheduled look that had to search for its track: found where the track's own solution allows (inside its spread, chi-squared,
+    // three dimensions, 1 in 10000 of its own outside), it goes on with that solution, the velocity its looks have learnt and all;
+    // a fresh filter (where it is, its velocity not known) only for what's new, or isn't where the track said)
+    if (!es.kf) { const tt = tr.job && tr.job.kind === 'look' ? tr.job.tt : null, k0 = tt ? tt.kf.clone() : null; if (k0) k0.pred(now, ACC3 * ACC3);
+      const r0 = 10 + tr.rng * TRK.bw / 4, R0 = Rlos(l, 3 + 0.002 * tr.rng, r0);
+      es.kf = tt && k0 && k0.innov(p, R0).m < 21 ? (tt.kf.pred(now, ACC3 * ACC3), tt.kf) : new KF3(p, new T.Vector3(), r0, 150, now); }
+    else es.kf.pred(now, ACC3 * ACC3);
+    if (rev) { const R = Rlos(l, 3 + 0.002 * tr.rng, tr.rng * sa); es.kf.upd(p, R); tr.meas = { p: p.clone(), R }; tr.fx = { p: p.clone(), R, v: es.kf.vel(new T.Vector3()), key: 'trk' + tr.side + ':' + (tr.rev || 0), t: now, q: Math.max(0, 1 - tr.err / (TRK.bw * 0.5)), tt: tr.job && tr.job.kind === 'look' ? tr.job.tt : null }; }
     if (rev && tr.job && tr.job.kind === 'look' && tr.job.tt) { const tt = tr.job.tt; tt.kf = es.kf; tt.t = now; tt.miss = 0; } // (a scheduled look's every revolution the ship's track's at once: fire control and the guns on the newest, not the last look's)
     es.p = es.kf.pos(es.p || new T.Vector3()); es.kf.vel(es.v);
     es.q = Math.min(1, tr.lockT / 1.5) * Math.max(0, 1 - tr.err / (TRK.bw * 0.5)) * (es.kf.n > 6 ? 1 : es.kf.n / 6);
@@ -786,7 +946,7 @@ export const Radar = (() => {
   // what her fire control's on) is never left waiting: one that can't be planned at once takes a dish off whatever's least wanted.
   // A track unseen SCH.stale s (or SCH.miss looks running), or its place grown too unsure to point at (MEM.sig beams), is
   // let go (her operator's are kept a little longer: SCH.staleOp).
-  const SCH = { ep: 1.0, revs: 1, settle: 0.06, miss: 14, stale: 6, staleOp: 10, w: [1, 4, 40], rate: [0.6, 2, 4], reqWait: 2 }; // (miss: looks running with no return before it's let go, about MEM.max at the rates asked: a ship behind a rock a few seconds is held, as a tracker's lock was)
+  const SCH = { ahead: 3, ep: 1.0, revs: 1, settle: 0.06, miss: 14, stale: 6, staleOp: 10, w: [1, 4, 40], rate: [0.6, 2, 4], reqWait: 2 }; // (miss: looks running with no return before it's let go, about MEM.max at the rates asked: a ship behind a rock a few seconds is held, as a tracker's lock was)
   const sched = (su: RSuite): NonNullable<RSuite['sched']> => su.sched || (su.sched = { tts: [] as RSTrack[], reqs: [] as RJob[], n: 0, ep: -1, plan: new Map<RTrack, RJob[]>() });
   const mountW = (su: RSuite, tr: RTrack) => _v.copy(tr.at).applyQuaternion(su.Q).add(su.P);
   const dirFrom = (su: RSuite, tr: RTrack, p: THREE.Vector3, out = new T.Vector3()) => out.copy(p).sub(mountW(su, tr)).normalize().applyQuaternion(_qi.copy(su.Q).invert());
@@ -808,12 +968,16 @@ export const Radar = (() => {
     // (one she holds already: near where it's wanted; or, asked from a plot (one scanner's: where along its fan isn't known), on that
     // plot's fan at its turn and range)
     const onPlot = (q: RSTrack, p: RPlot) => { const sc = su.scans[p.k], pq = p.q || su.Q, d = ttAt(q, now).sub(_w.copy(sc.at).applyQuaternion(pq).add(p.o || su.P)), R = d.length(); const [phi] = angOf(sc.ax, d.divideScalar(R || 1).applyQuaternion(_qi.copy(pq).invert())); return Math.abs(wrapPi(phi - p.phi)) < 3 * sc.bw + 2 * q.kf.sig() / Math.max(1, R) && Math.abs(R - p.r) < 300 + 0.05 * p.r + 3 * q.kf.sig(); }; // (in her frame as it was when the plot was made, as plotAt has it)
-    const near = S0.tts.find((q) => ttAt(q, now).distanceTo(at) < Math.max(150, 4 * q.kf.sig()) || (!o.f && !!o.plot && onPlot(q, o.plot)));
-    if (near) { near.pri = Math.max(near.pri, o.pri); near.rate = Math.max(near.rate, rate); if (o.op) near.op = true; if (o.fc != null) near.fc = o.fc; return near; }
+    const near = (o.f && S0.tts.find((q) => q.bel === o.f!.n)) || S0.tts.find((q) => ttAt(q, now).distanceTo(at) < Math.max(150, 4 * q.kf.sig() + (o.f ? 3 * o.f.kf.sig() : 0)) || (!o.f && !!o.plot && onPlot(q, o.plot))); // (its own belief's track first; else one where it's wanted, either's spread allowed)
+    if (near) { if (o.f && !near.bel) { near.bel = o.f.n; near.n = o.f.n; } near.pri = Math.max(near.pri, o.pri); near.rate = Math.max(near.rate, rate); if (o.op) near.op = true; if (o.fc != null) near.fc = o.fc; return near; }
     // (a 3D track, however young: its place is good enough to spiral round (spanOf), far better than sweeping a fan)
-    if (o.f && o.f.kf) { const tt = newTrack(su, o.f.kf.clone(), now, o.pri, rate); tt.op = !!o.op; if (o.fc != null) tt.fc = o.fc; tt.t = o.f.kf.t; return tt; }
+    if (o.f && o.f.kf) { const tt = newTrack(su, o.f.kf.clone(), now, o.pri, rate); tt.bel = o.f.n; tt.n = o.f.n; if (o.f.cls) tt.cls = o.f.cls; // (one name for the thing: its belief's)
+      tt.op = !!o.op; if (o.fc != null) tt.fc = o.fc; tt.t = o.f.kf.t; return tt; }
     const plot = o.plot; // (no 3D track: found along its plot's fan)
-    if (plot && !S0.reqs.some((r) => r.kind === 'acq' && r.plot === plot)) S0.reqs.push({ kind: 'acq', plot, t: now, pri: o.pri, rate, op: o.op, fc: o.fc });
+    // (one search a thing: a request already waiting on the same fan at the same range (an earlier sweep's plot of it) is that one, raised)
+    const same = plot && S0.reqs.find((r) => r.kind === 'acq' && !!r.plot && (r.plot === plot || (r.plot.k === plot.k && Math.abs(wrapPi(r.plot.phi - plot.phi)) < 3 * su.scans[plot.k].bw && Math.abs(r.plot.r - plot.r) < 300 + 0.03 * plot.r)));
+    if (same) { same.pri = Math.max(same.pri, o.pri); if (o.op) same.op = true; if (o.fc != null) same.fc = o.fc; same.plot = plot; }
+    else if (plot) S0.reqs.push({ kind: 'acq', plot, t: now, pri: o.pri, rate, op: o.op, fc: o.fc });
     return null;
   }
   function newTrack(su: RSuite, kf: KF3, now: number, pri: number, rate: number): RSTrack {
@@ -837,25 +1001,33 @@ export const Radar = (() => {
     } else v = SCH.w[j.pri] * (SCH.reqWait + (at - j.t)); // (a request: worth more the longer it's waited)
     return { v, cost, score: v / (cost + 0.05), d, end: at + cost };
   }
+  // How much each thing the scheduler holds wants doing now (whichever dish): its value as worth has it, the dish left out (from
+  // her middle; not due yet scores what it's due). For the operator's queue: one token a track, one a search, most wanted first
+  function urgency(su: RSuite, j: RJob, now: number) {
+    if (j.kind === 'look') { const tt = j.tt!, due = (now - tt.t) * tt.rate, p = ttAt(tt, now), unsure = tt.kf.sig() / Math.max(1, p.distanceTo(su.P)) / (TRK.bw * 0.5); return { v: SCH.w[tt.pri] * (due + 0.5 * unsure), due }; }
+    return { v: SCH.w[j.pri] * (SCH.reqWait + (now - j.t)), due: now - j.t };
+  }
   // Plan the next epoch: each dish's jobs, a dish at a time by who's free soonest, the best of what's left for it each time
+  // (planned SCH.ahead s on (what each dish will do next, as far as the plan sees), done again every epoch (SCH.ep): only its head's ever run before it's replanned)
   function plan(su: RSuite, now: number) {
     const S0 = sched(su), free = su.trks.filter((t) => !t.off), clock = new Map<RTrack, { t: number; b: THREE.Vector3 }>(), last = new Map<RSTrack, number>(), taken = new Set<RJob>();
     S0.plan.clear(); S0.ep = now;
     for (const tr of free) { const busy = tr.job ? Math.max(0, (tr.jobT ?? now) + jobDwell(su, tr.job) - now) : 0; clock.set(tr, { t: now + busy, b: tr.job ? dirFrom(su, tr, jobAt(su, tr.job, now)) : tr.b.clone() }); S0.plan.set(tr, []); if (tr.job && tr.job.tt) last.set(tr.job.tt, now + busy); }
-    const jobs: RJob[] = [...S0.tts.filter((tt) => !tt.trk).map((tt) => ({ kind: 'look' as const, tt, t: tt.t, pri: tt.pri })), ...S0.reqs.filter((r) => !r.trk)];
+    const jobs: RJob[] = [...S0.tts.filter((tt) => !tt.trk && !tt.quiet).map((tt) => ({ kind: 'look' as const, tt, t: tt.t, pri: tt.pri })), ...S0.reqs.filter((r) => !r.trk)];
     for (let guard = 0; guard < 200; guard++) {
-      let tr: RTrack | null = null; for (const t of free) if (clock.get(t)!.t < now + SCH.ep && (!tr || clock.get(t)!.t < clock.get(tr)!.t)) tr = t;
+      let tr: RTrack | null = null; for (const t of free) if (clock.get(t)!.t < now + SCH.ahead && (!tr || clock.get(t)!.t < clock.get(tr)!.t)) tr = t;
       if (!tr) break; const c = clock.get(tr)!;
       let best: { j: RJob; w: NonNullable<ReturnType<typeof worth>> } | null = null;
       for (const j of jobs) { if (j.kind !== 'look' && taken.has(j)) continue; const w = worth(su, tr, j, c.t, c.b, last); if (w && (!best || w.score > best.w.score)) best = { j, w }; }
       if (!best) { c.t += 0.1; continue; } // (nothing for it yet: a little later in the epoch, a look may be due)
-      S0.plan.get(tr)!.push(best.j); taken.add(best.j); c.t = best.w.end; c.b = best.w.d; if (best.j.tt) last.set(best.j.tt, best.w.end);
+      const pj = best.j.kind === 'look' ? { ...best.j } : best.j; pj.at = c.t; pj.end = best.w.end; // (a look may be planned more than once: each its own entry, its own times)
+      S0.plan.get(tr)!.push(pj); taken.add(best.j); c.t = best.w.end; c.b = best.w.d; if (best.j.tt) last.set(best.j.tt, best.w.end);
     }
   }
   // a dish set to a job (its slew, then what the job is: trackStep does the rest, as it does for any tracker)
   function startJob(su: RSuite, tr: RTrack, j: RJob, now: number) {
     drop(tr); tr.job = j; tr.jobT = now; tr.jobRev = -1; tr.jobA = undefined; j.trk = tr;
-    if (j.kind === 'look') { const tt = j.tt!; tt.trk = tr; tr.st = 'slew'; tr.hand = { p: ttAt(tt, now), v: tt.kf.vel(new T.Vector3()), t: now, sig: tt.kf.sig() }; dgOf(tr).sweep = []; return; }
+    if (j.kind === 'look') { const tt = j.tt!; tt.trk = tr; tr.st = 'slew'; const k0 = tt.kf.clone(); k0.pred(now, ACC3 * ACC3); tr.hand = { p: ttAt(tt, now), v: tt.kf.vel(new T.Vector3()), t: now, sig: k0.sig(), sv: Math.sqrt((k0.P[21] + k0.P[28] + k0.P[35]) / 3) }; dgOf(tr).sweep = []; return; } // (sig: its spread as it's grown since it was last seen, not as it was then)
     if (j.kind === 'ray') { tr.st = 'slew'; tr.hand = { p: su.P.clone().addScaledVector(j.d!, 5000), v: new T.Vector3(), t: now, ray: true }; return; }
     const p = j.plot!, sc = su.scans[p.k], pq = (p.q || su.Q).clone();
     tr.cue = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: pq, o: (p.o || su.P).clone().add(sc.at.clone().applyQuaternion(pq)), con: sc.cons.find((c) => c.p === p) || null };
@@ -883,13 +1055,16 @@ export const Radar = (() => {
   const jobName = (j: RJob) => (j.kind === 'look' ? 'LOOK ' + (j.tt ? j.tt.n : '') : j.kind === 'acq' ? 'FIND' : 'SEARCH BEARING');
   const jobPri = (j: RJob) => (j.tt ? j.tt.pri : j.pri);
   const rateOf = (tt: RSTrack, now: number) => (tt.lookT ? tt.lookT.filter((t) => now - t <= 4).length / 4 : 0); // (looks a second, the last 4 s)
+  // a filter's spread across a line of sight (its position covariance, less what's along it, per axis across): what matters for pointing
+  function crossSig(kf: KF3, l: THREE.Vector3) { const P = kf.P, L = [l.x, l.y, l.z]; let tr = P[0] + P[7] + P[14], ll = 0; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) ll += L[i] * P[i * 6 + j] * L[j]; return Math.sqrt(Math.max(0, tr - ll) / 2); }
   function schedule(su: RSuite, now: number) {
     const S0 = su.sched; if (!S0) return;
     // her tracks carried on (their place for whoever reads it: fire control, the guns, the hologram), the hopeless let go
     for (const tt of S0.tts.slice()) {
       const wpn = fastTT(su, tt); // (a weapon (a threat, or anything faster than a ship): its motor can push it WACC m/s² any way between looks, and its place's uncertainty grows to say so)
       tt.kf.pred(now, (wpn ? WACC : ACC3) ** 2); tt.kf.pos(tt.est.p); tt.kf.vel(tt.est.v); tt.est.kf = tt.kf;
-      const r = Math.max(1, tt.est.p.distanceTo(su.P)), unsure = tt.kf.sig() / r / TRK.bw, age = now - tt.t; tt.err = tt.kf.sig() / r;
+      // (listen only: how unsure is how far off it may be across the line of sight (where to point); its range the camera barely measures)
+      const r = Math.max(1, tt.est.p.distanceTo(su.P)), unsure = (tt.quiet ? crossSig(tt.kf, tt.est.p.clone().sub(su.P).normalize()) : tt.kf.sig()) / r / TRK.bw, age = now - tt.t; tt.err = tt.kf.sig() / r;
       tt.est.q = tt.looks < 2 ? 0.3 : Math.max(0, Math.min(1, 1 - unsure)) * Math.max(0, 1 - age / (tt.op ? SCH.staleOp : SCH.stale));
       if (!tt.trk && (tt.miss >= SCH.miss || ((tt.looks > 0 || tt.miss > 0) && unsure > MEM.sig) || age > (tt.op ? SCH.staleOp : SCH.stale))) lose(su, tt); // (a new one, from a young 3D track, gets its first look before it's judged too unsure: its spiral's there to find it)
     }
@@ -897,7 +1072,7 @@ export const Radar = (() => {
     // the dishes on their jobs: a look done after its revolutions (or lost), a search done when it's locked (and its revolution's in) or given up
     for (const tr of su.trks) {
       if (!tr.job) continue;
-      if (tr.off) { endJob(su, tr, now, false); continue; }
+      if (tr.off || (tr.job.tt && tr.job.tt.quiet)) { endJob(su, tr, now, false); continue; } // (off, or its track made listen only: the dish lets it go)
       if (tr.st === 'idle') { endJob(su, tr, now, false); continue; } // (it gave up: the spiral or the sweep found nothing, a lock was lost)
       if (tr.st === 'track') { if (tr.jobRev! < 0) tr.jobRev = tr.rev || 0; const revs = (tr.rev || 0) - tr.jobRev!;
         if (tr.lost > 0.35) endJob(su, tr, now, false);
@@ -924,6 +1099,103 @@ export const Radar = (() => {
     }
     if (S0.log && S0.log.length > 200) S0.log.splice(0, S0.log.length - 200);
   }
+  // ---------------------------------------------------------------- the optical tracker
+  // A camera at each quarter of her hull (forward and aft, each side): together all round her, but one picture's analysed at a time
+  // (the one the job's on, its view turned and zoomed onto the track: a steered mirror and a zoom lens, no turret). The scheduler
+  // gives it looks from the same tracks the radar dishes keep (optSched): what's not been told apart yet first, then angle updates.
+  // Its zoom is set for the track's estimated range: the field of view what its place may be off by, or twice its expected
+  // size (OPT.sz0 if it's not been told yet), whichever's wider. In the picture the target is 2 sz / r over fov / px pixels across:
+  //   - under OPT.det, nothing's there for it to report (too small to see at that zoom): no measurement, no class; not a miss;
+  //   - seen, a measurement: its angle to half a pixel (or its own size's spread, near), a fine angle; its range only from how big
+  //     it looks against what it is (15%, once it's told apart; else nothing new: the track's own range, unsure by 30%);
+  //   - a few pixels are a dot: where it is, not what (a ship and a rock look alike); OPT.cls pixels and more, what it is (rock, ship, torpedo, missile, chaff), surer each look; OPT.id and more, a ship's name.
+  const OPT = { cg: 0.15, sw: 0.4, mv: 0.2, dwell: 1.5, px: 1024, fovMax: 20 * D2R, fovMin: 0.5 * D2R, det: 2, cls: 16, id: 60, sz0: 30, hz: 2, w: [1, 3, 30] }; // (its processing: a look 1.5 s, two pictures analysed a second; cg: how much surer one picture makes it of what it is)
+  const QUAD = ['FWD PORT', 'FWD STBD', 'AFT PORT', 'AFT STBD'];
+  const quadOf = (d: THREE.Vector3) => (d.x > 0 ? 1 : 0) + (d.z > 0 ? 2 : 0); // (her frame: forward -z)
+  function optAt(su: RSuite, q: number, out = new T.Vector3()) { return out.copy(su.opt!.mts[q]).applyQuaternion(su.Q).add(su.P); }
+  function optFov(tt: RSTrack, r: number, sig: number) { const sz = tt.szE || (tt.cls && tt.cls.conf > 0.5 ? (SZ[tt.cls.k] || OPT.sz0) : OPT.sz0); // (its size as the camera's measured it, else what it's told it is, else a guess)
+    return Math.max(OPT.fovMin, Math.min(OPT.fovMax, 2 * Math.atan2(Math.max(3 * sig, 2 * sz), Math.max(1, r)))); }
+  const SZ: Record<string, number> = { rock: 60, ship: 40, torpedo: 3, missile: 1.5, chaff: 25 }; // (what each looks like it is, its half-size: for its range from how big it looks)
+  function optSched(su: RSuite, now: number) {
+    const o = su.opt!, S0 = su.sched!; if (o.off || o.job || now < o.free) return;
+    let best: RSTrack | null = null, bv = 0.2;
+    for (const tt of S0.tts) {
+      if (tt.optNo && now - tt.optNo < 3) continue; // (too small to see last time: not again for a while, till it's nearer)
+      const need = !tt.cls || tt.cls.conf < 0.85 ? 1.5 : 0, due = (now - (tt.optT ?? tt.t0 - 10)) * Math.max(0.5, tt.rate) * (tt.quiet ? 1.5 : 0.3); // (listen only: the camera's all it has, looked at as often as it's wanted, before anything else's angle update)
+      const v = OPT.w[Math.max(0, Math.min(2, tt.pri))] * (need + due); if (v > bv) { bv = v; best = tt; }
+    }
+    // (and what her picture has that nobody's tracking and the camera hasn't told yet: what's suspect first, a contact closing fast
+    // above all; looked at as itself (its belief), not made a track the dishes must keep)
+    let bf: RFused | null = null;
+    for (const a of su.ass) {
+      const f = a.f; if (!f || f.kind! < 2 || (f.cls && f.cls.conf >= 0.85) || (f.optNo && now - f.optNo < 3) || S0.tts.some((q) => q.bel === f.n) || a.cls === 'FRIENDLY' || a.cls === 'CIV') continue;
+      const pri = a.cls === 'HOSTILE' || a.cls === 'SUSPECT' || a.vc > WPN.vc ? 2 : a.cls === 'WATCH' ? 1 : 0, v = OPT.w[pri] * 1.5 * (1 + Math.min(1, (now - (f.optT ?? 0)) / 5)) * 0.8;
+      if (v > bv) { bv = v; bf = f; best = null; }
+    }
+    // (a contact one scanner has that's closing fast or is suspect: no 3D place yet, only its arc: swept along it at its widest, to find
+    // where on it it is (the radar dish's strip search, faster: a frame a step, not a turn of its beam). First of all: it may be a weapon)
+    let bc: RAssess | null = null;
+    for (const a of su.ass) { const c = a.c; if (a.f || !c || !a.plot || (c.optNo && now - c.optNo < 2) || a.cls === 'FRIENDLY' || a.cls === 'CIV') continue; const pri = a.cls === 'HOSTILE' || a.cls === 'SUSPECT' || -c.vr > WPN.vc ? 2 : 0; if (!pri) continue; const v = OPT.w[pri] * 4; if (v > bv) { bv = v; bc = a; } }
+    if (bc) { const c = bc.c!, k = bc.plot!.k; o.job = { kind: 'acq', plot: c.p, t: now, pri: 2 }; (o as any).con = { c, k }; o.jobT = now; o.st = 'slew'; o.slew = OPT.sw; o.seen = 0; o.next = now + o.slew; o.px = 0; o.tgt = null; o.e = -su.scans[k].fan; return; }
+    if (bf) { const f = bf, tt: RSTrack = { n: f.n, kf: f.kf, est: { p: f.pl, v: f.v, q: 0 }, tgt: null, t: f.kf.t, t0: now, pri: 1, rate: 1, miss: 0, looks: 0, trk: null, cls: f.cls, szE: f.szE }; f.optT = now; (tt as any).bf = f; best = tt; }
+    if (!best) return;
+    const p = ttAt(best, now), d = p.clone().sub(su.P).applyQuaternion(_qi.copy(su.Q).invert()).normalize(), q = quadOf(d);
+    o.job = { kind: 'look', tt: best, t: now, pri: best.pri }; o.jobT = now; o.st = 'slew'; o.slew = q !== o.quad ? OPT.sw : OPT.mv; o.quad = q; o.seen = 0; o.next = now + o.slew; o.px = 0; o.tgt = null; best.optT = now;
+  }
+  function optStep(su: RSuite, targets: RTarget[], now: number) {
+    const o = su.opt!; if (!o.job) { o.st = 'idle'; return; }
+    if (o.job.kind === 'acq') { optSweep(su, targets, now); return; }
+    const tt = o.job.tt!, bf: RFused | undefined = (tt as any).bf; if (bf ? !(su.bel || []).includes(bf) : !su.sched!.tts.includes(tt)) { o.job = null; o.st = 'idle'; return; } // (bf: a belief looked at as itself)
+    const M = optAt(su, o.quad), P = ttAt(tt, now), r = P.distanceTo(M), kc = tt.kf.clone(); kc.pred(now, ACC3 * ACC3);
+    const l0 = P.clone().sub(M).normalize(), L0 = [l0.x, l0.y, l0.z], Pp = kc.P; let tr0 = Pp[0] + Pp[7] + Pp[14], ll = 0; for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) ll += L0[i] * Pp[i * 6 + j] * L0[j];
+    // (zoomed for its spread across the line of sight: how far off the middle it may be; along it doesn't matter to a camera)
+    o.fov = optFov(tt, r, Math.sqrt(Math.max(0, tr0 - ll) / 2)); o.b.copy(P).sub(M).normalize(); o.rng = r;
+    if (now - o.jobT < o.slew) return; o.st = 'look';
+    if (now - o.jobT >= o.slew + OPT.dwell) { if (!o.seen) tt.optNo = now; else { tt.optNo = 0; if (!bf) { const L = tt.lookT || (tt.lookT = []); L.push(now); while (L.length && now - L[0] > 4) L.shift(); } } if (bf) bf.optNo = tt.optNo; /* (a look that saw it counts as one: its looks a second, the camera's with the dishes') */ o.job = null; o.st = 'idle'; o.free = now; return; }
+    if (now < o.next) return; o.next = now + 1 / OPT.hz;
+    // (what's in the picture: the target nearest its middle, within the frame, not hidden behind a rock)
+    let hit: RTarget | null = null, ba = o.fov / 2;
+    for (const t of targets) { if (t.id === su.id) continue; const d = t.p.clone().sub(M), a = d.angleTo(o.b); if (a < ba && !blocked(M, t.p, t.id)) { ba = a; hit = t; } }
+    const px = hit ? 2 * (hit.sz || 5) / Math.max(1, hit.p.distanceTo(M)) / (o.fov / OPT.px) : 0; o.px = px; o.tgt = hit ? hit.id : null;
+    if (!hit || px < OPT.det) return; // (too small to see at this zoom, or nothing there: nothing to report)
+    o.seen++; tt.szE = px / 2 * (o.fov / OPT.px) * hit.p.distanceTo(M); // (its half-size, as big as it looks at the range it's at: what the next look's zoom is for)
+    const R0 = hit.p.distanceTo(M), sa = Math.max(0.5 * o.fov / OPT.px, 0.1 * (hit.sz || 5) / R0), l = hit.p.clone().sub(M).normalize();
+    const u = new T.Vector3().crossVectors(l, Math.abs(l.y) < 0.9 ? new T.Vector3(0, 1, 0) : new T.Vector3(1, 0, 0)).normalize(), w = new T.Vector3().crossVectors(l, u);
+    const dir = l.clone().addScaledVector(u, gauss() * sa).addScaledVector(w, gauss() * sa).normalize();
+    // (what it is: told apart once it's big enough in the picture; surer each look; a ship's name once she's bigger still)
+    if (px >= OPT.cls && hit.kind) { const dc = OPT.cg * Math.min(1, (px - OPT.cls / 2) / OPT.cls);
+      // (a look that says it's something else weakens what it's been told it is (another thing in the frame: what it's near, a ship it was launched from), before it changes its mind)
+      if (tt.cls && tt.cls.k !== hit.kind && tt.cls.conf > dc) { tt.cls.conf -= dc; tt.cls.t = now; }
+      else { const c = tt.cls && tt.cls.k === hit.kind ? tt.cls : (tt.cls = { k: hit.kind, conf: 0, t: now }); c.conf = Math.min(1, c.conf + dc); c.t = now; if (hit.kind === 'ship' && px >= OPT.id && hit.iff) c.name = hit.iff.n; } }
+    const told = tt.cls && tt.cls.conf > 0.5, rr = told ? R0 * (1 + gauss() * 0.15) : r, sr = (told ? 0.15 : 0.3) * rr; // (its range: from how big it looks against what it is, or not measured)
+    const z = M.clone().addScaledVector(dir, rr), R = Rlos(dir, sr, rr * sa);
+    const k0 = tt.kf; k0.pred(now, ACC3 * ACC3); if (k0.innov(z, R).m < 30) { k0.upd(z, R); tt.t = now; tt.miss = 0; }
+    if (bf) { bf.cls = tt.cls; bf.szE = tt.szE; return; } // (a belief's own filter's had it already: not into fusion again)
+    o.fx = { p: z, R, v: k0.vel(new T.Vector3()), key: 'opt:' + (++o.n), t: now, q: 1, tt };
+  }
+  // a contact's arc swept: a frame at a time along its fan, at its range now, the camera at its widest (the quarter's camera that
+  // faces each step); what's in the frame at about the contact's range (its range gate, as the dish's) and big enough to see is it: a
+  // fix there (its angle fine, its range the contact's) to fusion, which places the contact's slab by it. Swept to the end, not found: let be a while
+  function optSweep(su: RSuite, targets: RTarget[], now: number) {
+    const o = su.opt!, cc = (o as any).con as { c: RContact; k: number }, sc = su.scans[cc.k], c = cc.c;
+    const end = (found: boolean) => { if (!found) c.optNo = now; o.job = null; o.st = 'idle'; o.free = now; };
+    if (!sc.cons.includes(c)) { end(false); return; }
+    if (now - o.jobT < o.slew || now < o.next) return; o.st = 'look'; o.next = now + 1 / OPT.hz;
+    if (o.e! > sc.fan) { end(false); return; }
+    const dt = now - c.t, phi = wrap(c.A + c.vA * dt + sc.off), rc = c.r + c.vr * dt, pt = arcAt(sc, phi, rc, o.e!, new T.Vector3()).applyQuaternion(su.Q).add(su.P);
+    o.fov = OPT.fovMax; o.e = o.e! + 0.8 * OPT.fovMax; // (the next step: a frame on, a little overlap)
+    const q = quadOf(pt.clone().sub(su.P).applyQuaternion(_qi.copy(su.Q).invert()).normalize()); if (q !== o.quad) { o.quad = q; o.next = now + OPT.sw; }
+    const M = optAt(su, o.quad); o.b.copy(pt).sub(M).normalize(); o.rng = rc;
+    let hit: RTarget | null = null, ba = o.fov / 2;
+    for (const t of targets) { if (t.id === su.id) continue; const d = t.p.clone().sub(M), a = d.angleTo(o.b), R = d.length(); if (a < ba && Math.abs(R - rc) < 300 + 0.05 * rc && !blocked(M, t.p, t.id)) { ba = a; hit = t; } }
+    const px = hit ? 2 * (hit.sz || 5) / Math.max(1, hit.p.distanceTo(M)) / (o.fov / OPT.px) : 0; o.px = px; o.tgt = hit ? hit.id : null;
+    if (!hit || px < OPT.det) return;
+    const R0 = hit.p.distanceTo(M), sa = Math.max(0.5 * o.fov / OPT.px, 0.1 * (hit.sz || 5) / R0), l = hit.p.clone().sub(M).normalize();
+    const u = new T.Vector3().crossVectors(l, Math.abs(l.y) < 0.9 ? new T.Vector3(0, 1, 0) : new T.Vector3(1, 0, 0)).normalize(), w = new T.Vector3().crossVectors(l, u);
+    const dir = l.clone().addScaledVector(u, gauss() * sa).addScaledVector(w, gauss() * sa).normalize(), z = M.clone().addScaledVector(dir, rc), R = Rlos(dir, SR * 2, rc * sa);
+    o.seen++; o.fx = { p: z, R, v: su.V.clone().addScaledVector(dir, c.vr), key: 'opt:' + (++o.n), t: now, q: 1, tt: null }; end(true);
+  }
+  const optProg = (su: RSuite, now: number) => { const o = su.opt; if (!o || !o.job) return 0; if (o.job.kind === 'acq') { const cc = (o as any).con, f = su.scans[cc.k].fan; return Math.max(0, Math.min(1, (o.e! + f) / (2 * f))); } return Math.min(1, (now - o.jobT) / (o.slew + OPT.dwell)); };
   // the best track she has on a target: a tracker holding it, and how good its solution is
   function lockOn(su: RSuite | null, id: string) { if (!su) return null; let b: RTrack | null = null; for (const t of su.trks) if (t.st === 'track' && t.tgt === id && (!b || t.est.q > b.est.q)) b = t; return b; } // (the truth: for the debug view)
   // her best track on whatever it's on (what her fire control has: it doesn't know what it is)
@@ -938,7 +1210,7 @@ export const Radar = (() => {
     mv(su.P); tq(su.Q); mv(su.Pp); tq(su.Qp); tv(su.V);
     const plots = new Set<RPlot>(); for (const sc of su.scans) { for (const p of sc.plots) plots.add(p); for (const q of sc.pend) plots.add(q.p); for (const c of sc.cons) plots.add(c.p); }
     for (const p of plots) { mv(p.o); tq(p.q); }
-    for (const f of su.fus) { mv(f.pl); tv(f.v); } for (const kf of su.fusKF.values()) kf.move(R, t); for (const h of su.fusHist.values()) for (const q of h) mv(q.p);
+    for (const f of su.bel || su.fus) { mv(f.pl); tv(f.v); f.kf.move(R, t); for (const q of f.hist) mv(q.p); }
     for (const tr of su.trks) {
       mv(tr.est.p); tv(tr.est.v); if (tr.est.kf) tr.est.kf.move(R, t); if (tr.hist) for (const q of tr.hist) mv(q.p);
       if (tr.hand) { mv(tr.hand.p); tv(tr.hand.v); } if (tr.spiral) { mv(tr.spiral.p); tv(tr.spiral.v); tq(tr.spiral.b ? null : null); if (tr.spiral.b) tr.spiral.b.applyQuaternion(R); }
@@ -946,5 +1218,5 @@ export const Radar = (() => {
     }
     lit.clear(); painted.clear(); // (who's on whom: heard again within a moment)
   }
-  return { want, wantRay, unwant, lose, sched, SCH, rateOf, plotAt, jobProg, jobName, jobPri, binOf, rangeOf, occ, blocked, rebase, canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { r0Of, RF, crossSig, OPT, QUAD, optProg, urgency, ttAt, eig3, FIX, want, wantRay, unwant, lose, sched, SCH, rateOf, plotAt, jobProg, jobName, jobPri, binOf, rangeOf, occ, blocked, rebase, canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

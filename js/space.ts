@@ -87,8 +87,13 @@ export const Space = (() => {
   const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000, 25000, 50000]; // (out to the scanners' reach: js/radar.ts MAP.Rmax)
   // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the number keys' presses (when each went
   // down, whether a hold's acted), and a sector changed by the keys not yet told to the crew (dirty)
-  // the tracking radars' keys: 3 the port tracker, 4 the starboard (their index in her set: TKEY), which is picked to be sent (sel)
-  const TRKK = { sel: -1, dn: [-1, -1], held: [false, false] }, TKEY = [1, 0];
+  // the sensor station's number keys past the scanners': 3 the optical tracker's picture (OPTV); dn: when it went down (a tap's one toggle)
+  const TRKK = { sel: -1, dn: [-1, -1], held: [false, false] };
+  // the optical tracker's picture (3 at the sensor station): what its camera's analysing, drawn from that quarter's camera with its
+  // zoom: the scene rendered into a target, read back into a canvas at the side, with the reticle and what it makes of it
+  const OPTV = { on: false, cv: null as HTMLCanvasElement | null, rt: null as THREE.WebGLRenderTarget | null, cam: null as THREE.PerspectiveCamera | null, buf: null as Uint8Array | null, img: null as ImageData | null, f: 0,
+    // (what the picture shows, eased toward where the tracker points and how far it's zoomed: the view's own way and field, its camera, its clock)
+    d: new T.Vector3(0, 0, -1), fov: 0, q: -1, t: -1, key: '' };
   const SEC = { sel: -1, open: -1, cur: 0, dn: [-1, -1], held: [false, false], lt: 0, dirty: -1, sent: 0 }; // (the range at the hologram's edge, scrolled through)
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
@@ -105,7 +110,7 @@ export const Space = (() => {
       // (her search radars as the operator left them, her drawing made again or not (a new level): off at first, she's silent till switched on)
       if (EW.own !== was) EW.own.scans.forEach((sc, k) => { const o = was && was.scans[k]; sc.mode = o ? o.mode : 'off'; if (o) { sc.notch = o.notch; sc.sec.on = o.sec.on; sc.sec.c = o.sec.c; sc.sec.h = o.sec.h; } });
       EW.own.trks.forEach((t, k) => { const o = was && was.trks[k]; t.off = !!(o && o.off); });
-      EW.ownT = { id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('ship:' + S.def.id, g, inv) };
+      EW.ownT = { sz: size, kind: 'ship', id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('ship:' + S.def.id, g, inv) };
       EW.scr = null; g.traverse((o: any) => { if (!EW.scr && o.isMesh && o.material && o.material.map === S.model!.screen.tex) EW.scr = o; }); { const sm = EW.scr as THREE.Mesh | null; if (sm) (sm.material as THREE.Material).side = T.DoubleSide; } // (its face is the one toward the operator, whichever way the model wound it)
       // (the sensor station's hologram where its screen was, the screen put away: its middle over the screen's, as big as it)
       { const sm = EW.scr as THREE.Mesh | null; if (sm) { sm.geometry.computeBoundingBox(); const bb = sm.geometry.boundingBox!.clone().applyMatrix4(new T.Matrix4().multiplyMatrices(inv, sm.matrixWorld)), sz = bb.getSize(new T.Vector3()); EW.holo.c.copy(bb.getCenter(new T.Vector3())).add(new T.Vector3(0, 0.1, 0)); EW.holo.R = Math.max(0.25, Math.min(0.45, Math.max(sz.x, sz.z) * 0.65)); sm.visible = false; } EW.holo.placed = false; }
@@ -120,7 +125,7 @@ export const Space = (() => {
         // (her radars' frame: her length runs along x, so her bow's -x and her starboard -z: a quarter turn about her up)
         EW.foe = Radar.suite('hull', (hb.x1 - hb.x0) / 2, h + 0.6, (hb.z1 - hb.z0) / 2 + 0.8, (box.isEmpty() ? -20 : box.min.y - c.y) - 0.6, 8); Radar.sched(EW.foe); EW.foe.P.copy(c); EW.foe.Q.setFromAxisAngle(new T.Vector3(0, 1, 0), Math.PI / 2);
         fitMounts(EW.foe, S.hull, g); EW.hw = radarKit(EW.foe, g);
-        EW.foeT = { id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
+        EW.foeT = { sz: Math.max((hb.x1 - hb.x0), (hb.z1 - hb.z0)) / 2, kind: 'ship', id: 'hull', p: c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: Radar.rcsOf('hull:' + S.map.seed + ':' + S.map.level + ':' + S.zact, g, inv) };
       }
     }
     const own = EW.own!, me = EW.ownT!; me.iff = { c: 'squad', n: S.def.name || 'squad' }; me.aff = 'squad'; me.xon = EW.xpdr; own.aff = 'squad'; own.hostNames = new Set([hullName()]);
@@ -231,7 +236,7 @@ export const Space = (() => {
     for (let i = 0; i < N * 3; i++) seeds[i] = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
     const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3));
     const pts = new T.Points(g, new T.PointsMaterial({ color: 0xdfe8f0, size: 2, sizeAttenuation: false, transparent: true, opacity: 0.9, depthWrite: false, blending: T.AdditiveBlending })); pts.frustumCulled = false; S.root.add(pts);
-    const t: RTarget = { id: 'chaff' + (++EW.chaffN), p: new T.Vector3(a[0], a[1], a[2]), v: new T.Vector3(a[3], a[4], a[5]), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0 };
+    const t: RTarget = { sz: 25, kind: 'chaff', id: 'chaff' + (++EW.chaffN), p: new T.Vector3(a[0], a[1], a[2]), v: new T.Vector3(a[3], a[4], a[5]), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0 };
     EW.chaff.push({ t, born: EW.rt, pts, seeds });
   }
   function chaffStep(dt: number) {
@@ -258,6 +263,15 @@ export const Space = (() => {
     HUD.toast('CHAFF', EW.chaffLeft + ' left', 1); Audio.click();
   }
   // the mission ship's transponder: her name, as the mission's ship (the squad's screen marks her; her own fire control knows itself)
+  // (the radar debug view's names for what its target ids are (js/radarview.ts truthOf))
+  RadarView.dbg.nameOf = (id: string) => {
+    if (id === 'own') return 'us';
+    if (id === 'hull') return hullName() + ' (mission)';
+    let m = /^t(\d+)$/.exec(id); if (m) { const q = S.traffic.find((x) => x.c.k === +m![1]); return (q && q.c.name) || 'ship ' + id; }
+    m = /^torp(\d+)$/.exec(id); if (m) { const tp = TP.list.find((x) => String(x.id) === m![1]); return tp ? (tp.mine ? 'our torpedo' : 'their torpedo') : 'torpedo'; }
+    m = /^(rock|chaff|missile)(\d*)$/.exec(id); if (m) return m[1] + (m[1] === 'rock' ? ' ' + m[2] : '');
+    return id;
+  };
   function hullName(): string { const q = S.traffic.find((x) => x.c.k === S.zact), ms = S.ms as any; return (q && q.c.name) || (ms && ms.name) || 'target'; }
   // whose the mission's ship is (by her class and the job: js/spacedata.ts wearOf): a navy's, pirates' (a ship they've taken is
   // theirs now: no answer), or a civilian's
@@ -269,7 +283,7 @@ export const Space = (() => {
     const out: RTarget[] = [], live = new Set<number>();
     for (const m of S.mis) {
       live.add(m.id); let t = EW.misT.get(m.id);
-      if (!t) { t = { id: 'missile' + m.id, p: m.o.position.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0.5, iff: null }; EW.misT.set(m.id, t); }
+      if (!t) { t = { sz: 1.5, kind: 'missile', id: 'missile' + m.id, p: m.o.position.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0.5, iff: null }; EW.misT.set(m.id, t); }
       if (dt > 0) t.v.copy(m.o.position).sub(t.p).divideScalar(dt); t.p.copy(m.o.position); out.push(t);
     }
     for (const k of [...EW.misT.keys()]) if (!live.has(k)) EW.misT.delete(k);
@@ -291,7 +305,8 @@ export const Space = (() => {
       const key = 'trf:' + (q.c.k ?? -1) + ':' + o.uuid + ':' + (q.real ? 1 : 0);
       if (!t || (t as any).key !== key) {
         const inv = o.matrixWorld.clone().invert(), rcs = Radar.rcsOf(key, o, inv);
-        t = { id: 't' + (q.c.k ?? o.id), p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs }; (t as any).key = key; (t as any).fresh = true; EW.trf.set(o, t);
+        const bb = new T.Box3().setFromObject(o), bs = bb.getSize(new T.Vector3()); // (how big she is: what a camera makes of her)
+        t = { sz: Math.max(4, Math.max(bs.x, bs.y, bs.z) / 2), kind: 'ship', id: 't' + (q.c.k ?? o.id), p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs }; (t as any).key = key; (t as any).fresh = true; EW.trf.set(o, t);
       }
       _m.decompose(_ps, t.q, _sc);
       if (!(t as any).fresh && dt > 0) t.v.copy(_ps).sub(t.p).divideScalar(dt); (t as any).fresh = false;
@@ -331,7 +346,7 @@ export const Space = (() => {
     if (on) {
       H.mx = innerWidth / 2; H.my = innerHeight / 2; H.ml = H.mr = false; me().mouse.l = me().mouse.r = false;
       H.hid = []; // (everything beside the canvas, at every level from it up to the page's body: the HUD's in with it)
-      for (let n: Element = cv; n.parentElement; n = n.parentElement) for (const el of n.parentElement.children) if (el !== n && el !== hint && el.id !== 'holo-cursor' && el.id !== 'holo-scan' && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') H.hid.push(el as HTMLElement);
+      for (let n: Element = cv; n.parentElement; n = n.parentElement) for (const el of n.parentElement.children) if (el !== n && el !== hint && el.id !== 'holo-cursor' && el.id !== 'holo-scan' && el.id !== 'opt-view' && el.tagName !== 'SCRIPT' && el.tagName !== 'STYLE') H.hid.push(el as HTMLElement);
       if (!document.getElementById('holo-hide-css')) { const st = document.createElement('style'); st.id = 'holo-hide-css'; st.textContent = '.holo-hide { visibility: hidden !important; }'; document.head.appendChild(st); } // (over whatever its own code sets each frame)
       for (const el of H.hid) el.classList.add('holo-hide');
       Game.holoCursor = true; Game.softLocked = true; if (document.pointerLockElement) document.exitPointerLock(); cv.style.cursor = 'none';
@@ -362,13 +377,9 @@ export const Space = (() => {
   //   turn it (to port and starboard; for the roll scanner, round her the one way and the other), as it searches if it is
   function scanKeys() {
     const dt = Math.min(0.1, Math.max(0, S.t - SEC.lt)); SEC.lt = S.t; if (!EW.own) return;
-    // (3 and 4, the trackers: tapped, picked to be sent where a left click says (tapped again, not); held, switched off, or on again)
-    ['Digit3', 'Digit4'].forEach((code, j) => {
-      const ti = TKEY[j], tr = EW.own!.trks[ti]; if (!tr) return;
-      if (K(code)) { if (TRKK.dn[j] < 0) { TRKK.dn[j] = S.t; TRKK.held[j] = false; }
-        if (!TRKK.held[j] && S.t - TRKK.dn[j] > 0.4) { TRKK.held[j] = true; trkOff(ti, !tr.off); } }
-      else if (TRKK.dn[j] >= 0) TRKK.dn[j] = -1; // (tapped: nothing, now the scheduler sends them)
-    });
+    // (3: the optical tracker's picture shown, or put away. The radar dishes are the scheduler's; one's switched off or on by
+    // clicking its state in the scheduler's box)
+    if (K('Digit3')) { if (TRKK.dn[0] < 0) { TRKK.dn[0] = S.t; OPTV.on = !OPTV.on; Audio.click(); } } else TRKK.dn[0] = -1;
     ['Digit1', 'Digit2'].forEach((code, k) => {
       const sc = EW.own!.scans[k]; if (!sc) return;
       if (K(code)) { if (SEC.dn[k] < 0) { SEC.dn[k] = S.t; SEC.held[k] = false; }
@@ -404,6 +415,8 @@ export const Space = (() => {
     for (const el of document.querySelectorAll<HTMLElement>('#holo-scan [data-hb]')) { const r = el.getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom && r.width * r.height < area) { area = r.width * r.height; hit = el; } }
     if (!hit) return false;
     const a = hit.dataset.hb!, kind = a[0], n = parseInt(a.slice(1), 10);
+    if (kind === 'a') { const tt = Radar.sched(own).tts.find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()); trkQuiet(p, !tt.quiet); Net.toHost({ t: 'strk', a: [-1, 7, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1), tt.quiet ? 1 : 0] }); HUD.toast('TRACKERS', tt.n + (tt.quiet ? ': listen only (the camera)' : ': active (radar and camera)'), 1.4); Audio.click(); } return true; }
+    if (kind === 'x') { const tt = Radar.sched(own).tts.find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()); trkDrop(p); Net.toHost({ t: 'strk', a: [-1, 6, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] }); HUD.toast('TRACKERS', tt.n + ' dropped', 1.2); Audio.click(); } return true; }
     if (kind === 's') { const sc = own.scans[n]; if (!sc) return true; if (SEC.open === n) SEC.open = -1; else { SEC.open = n; SEC.cur = MODES.indexOf(sc.mode); SEC.sel = n; } Audio.click(); }
     else if (kind === 'o' && parseInt(a.split(':')[1], 10) === NOTCH_OPT) { notchSet(n); SEC.open = -1; }
     else if (kind === 'o') { const i = parseInt(a.split(':')[1], 10), sc = own.scans[n]; if (sc && MODES[i]) { modeSet(n, MODES[i], sc.sec.c, sc.sec.h); SEC.open = -1; SEC.sel = MODES[i] === 'sector' ? n : SEC.sel; } }
@@ -417,10 +430,16 @@ export const Space = (() => {
   const fusAt = (at: THREE.Vector3) => (EW.own ? EW.own.fus.find((q) => q.pl.distanceTo(at) < Math.max(200, 0.04 * q.pl.distanceTo(S.P))) || null : null);
   function trkWant(p: RPlot, f: RFused | null, quiet = false) {
     const own = EW.own!, S0 = Radar.sched(own), at = f ? f.pl : Radar.plotAt(own, p);
-    const kept = S0.tts.find((q) => q.op && q.est.p.distanceTo(at) < Math.max(200, 4 * q.kf.sig()));
+    // (kept already: the track of its belief, or one where it is now (the track's newest solution, run on to now), either's spread allowed)
+    const kept = S0.tts.find((q) => q.op && ((!!f && q.bel === f.n) || Radar.ttAt(q, EW.rt).distanceTo(at) < Math.max(200, 4 * q.kf.sig() + (f ? 3 * f.kf.sig() : 0))));
     if (kept) { Radar.unwant(own, kept); if (!quiet) { HUD.toast('TRACKERS', kept.n + ' let go', 1.2); Audio.click(); } return 5; }
     const tt = Radar.want(own, { f, plot: p, pri: 1, op: true }, EW.rt); if (!quiet) { HUD.toast('TRACKERS', tt ? tt.n + ': kept tracked' : 'finding it', 1.2); Audio.click(); } return 3;
   }
+  // a track dropped from what her trackers keep (her operator's ✕ on it: the one at p, as each aboard has it); her fire control
+  // takes a threat back up if it's still one
+  // a track made listen only (no radar sent to it: the camera alone keeps it) or active again: the one at p, as each aboard has it
+  function trkQuiet(p: THREE.Vector3, on: boolean) { const own = EW.own; if (!own) return; let b: RSTrack | null = null, bd = 300; for (const q of Radar.sched(own).tts) { const d = q.kf.pos(new T.Vector3()).distanceTo(p); if (d < bd) { bd = d; b = q; } } if (b) b.quiet = on; }
+  function trkDrop(p: THREE.Vector3) { const own = EW.own; if (!own) return; let b: RSTrack | null = null, bd = 300; for (const q of Radar.sched(own).tts) { const d = q.kf.pos(new T.Vector3()).distanceTo(p); if (d < bd) { bd = d; b = q; } } if (b) Radar.lose(own, b); }
   function trkSend(): boolean {
     const H = EW.holo, it = H.pick; if (!EW.own || !it) return false;
     if (it.rwr) {
@@ -432,6 +451,39 @@ export const Space = (() => {
     const code = trkWant(p, f); Net.toHost({ t: 'strk', a: [-1, code, p.k, p.phi, p.r] }); return true;
   }
   const wrapA = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+  function optView() {
+    const seat = mySeat(), o = EW.own && EW.own.opt, show = OPTV.on && !!seat && seat.k === 'sensors' && !!o && !!S.root && !Game.menuOpen();
+    if (OPTV.cv) OPTV.cv.style.display = show ? '' : 'none'; if (!show || !o) return;
+    const W = 480, H = 360;
+    if (!OPTV.cv) { const c = document.createElement('canvas'); c.width = W; c.height = H; c.id = 'opt-view'; Object.assign(c.style, { position: 'fixed', right: '24px', top: '24px', width: W + 'px', height: H + 'px', border: '1px solid rgba(141,255,190,0.5)', background: '#000', zIndex: '36', pointerEvents: 'none' }); document.body.appendChild(c); OPTV.cv = c;
+      OPTV.rt = new T.WebGLRenderTarget(W, H); OPTV.rt.texture.colorSpace = T.SRGBColorSpace; OPTV.cam = new T.PerspectiveCamera(10, W / H, 1, 80000); OPTV.buf = new Uint8Array(W * H * 4); OPTV.img = new ImageData(W, H); }
+    // (the view eased onto where the tracker's pointing and its zoom, a fraction of a second behind: it turns and zooms as the job and
+    // its corrections do; another quarter's camera is a cut, not a pan)
+    const dtv = OPTV.t < 0 ? 1 : Math.min(0.25, Math.max(0, S.t - OPTV.t)); OPTV.t = S.t;
+    // (a cut whenever it's on something new: another target, the next step of a sweep along an arc, another quarter's camera; eased only while it stays on the one target)
+    const key = !o.job ? 'idle' : o.job.kind === 'acq' ? 'sweep:' + (o.e ?? 0).toFixed(3) : 'look:' + (o.job.tt ? o.job.tt.n : '') + ':' + o.jobT;
+    if (OPTV.q !== o.quad || OPTV.fov <= 0 || OPTV.key !== key) { OPTV.q = o.quad; OPTV.key = key; OPTV.d.copy(o.b); OPTV.fov = o.fov; }
+    else { const k = 1 - Math.exp(-dtv * 7); OPTV.d.lerp(o.b, k).normalize(); OPTV.fov = Math.exp(Math.log(OPTV.fov) + (Math.log(o.fov) - Math.log(OPTV.fov)) * k); }
+    OPTV.f++;
+    { // (every frame: the picture's read back from the GPU)
+      const cam = OPTV.cam!, rm = S.root!.matrixWorld, at = o.mts[o.quad].clone().applyQuaternion(S.Q).add(S.P), look = at.clone().addScaledVector(OPTV.d, 1000);
+      cam.position.copy(at).applyMatrix4(rm); cam.up.set(0, 1, 0).applyQuaternion(S.Q).transformDirection(rm); cam.lookAt(look.applyMatrix4(rm));
+      cam.fov = Math.max(0.02, OPTV.fov * 180 / Math.PI * (H / W)); cam.near = Math.max(1, (EW.own!.size || 10) * 0.4); cam.updateProjectionMatrix(); cam.updateMatrixWorld();
+      // (the rock field's detail and culling are the view's: made for this camera for its picture, and back for the main one after)
+      const lod = (c: THREE.Camera) => { if (ROCKS.obj && S.zone) { S.zone.updateWorldMatrix(true, false); ROCKS.obj.userData.lod(S.zone.worldToLocal(c.getWorldPosition(new T.Vector3())), c); } };
+      const r = G_R.renderer, prev = r.getRenderTarget(); lod(cam); r.setRenderTarget(OPTV.rt); r.clear(); r.render(G_R.scene, cam); r.readRenderTargetPixels(OPTV.rt!, 0, 0, W, H, OPTV.buf!); r.setRenderTarget(prev); lod(G_R.camera);
+      const d = OPTV.img!.data, b = OPTV.buf!; for (let y = 0; y < H; y++) d.set(b.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4); // (its rows bottom up: turned the right way)
+    }
+    const x = OPTV.cv!.getContext('2d')!; x.putImageData(OPTV.img!, 0, 0);
+    // (over it: the reticle (as big as what it expects to see), what it's on, through which camera, how wide, what it makes of it)
+    const tt = o.job && o.job.tt ? o.job.tt : null, c = tt && tt.cls, sz = c && c.conf > 0.5 ? ({ rock: 60, ship: 40, torpedo: 3, missile: 1.5, chaff: 25 } as Record<string, number>)[c.k] || 30 : 30, rp = Math.max(8, Math.min(W * 0.48, o.px >= Radar.OPT.det ? o.px / 2 * (W / Radar.OPT.px) : sz / Math.max(1, o.rng) / (o.fov / W))); // (as big as it's measured in the picture, or as it's expected)
+    // (the reticle where the tracker's pointing, in the eased picture: the view catching up to it; as big as what it's measured)
+    const cam0 = OPTV.cam!, tp = o.mts[o.quad].clone().applyQuaternion(S.Q).add(S.P).addScaledVector(o.b, 1000).applyMatrix4(S.root!.matrixWorld).project(cam0), cx = (tp.x + 1) / 2 * W, cy = (1 - tp.y) / 2 * H, rq = rp * (o.fov / Math.max(1e-6, OPTV.fov));
+    x.strokeStyle = 'rgba(141,255,190,0.8)'; x.lineWidth = 1; x.strokeRect(cx - rq, cy - rq, 2 * rq, 2 * rq); x.beginPath(); for (const [a, b2, c2, d2] of [[0, cy, cx - rq - 6, cy], [cx + rq + 6, cy, W, cy], [cx, 0, cx, cy - rq - 6], [cx, cy + rq + 6, cx, H]]) { x.moveTo(a, b2); x.lineTo(c2, d2); } x.stroke();
+    x.font = '500 13px Oxanium, system-ui, sans-serif'; x.fillStyle = '#8dffbe'; x.textBaseline = 'top';
+    const lines = [o.job && o.job.kind === 'acq' ? `SWEEPING ${(o as any).con ? (o as any).con.c.n : ''}'s arc: where on it is it?` : '', `OPTICAL · ${Radar.QUAD[o.quad]} camera · field ${(OPTV.fov * 180 / Math.PI).toFixed(OPTV.fov < 0.0175 ? 2 : 1)}°`, tt ? `${tt.n} · ${(o.rng / 1000).toFixed(2)} km (its track's)` : 'idle: nothing to look at', !tt ? '' : o.st === 'slew' ? 'turning to it' : o.px < Radar.OPT.det ? 'NO TARGET IN SIGHT (too small at this zoom, or nothing there)' : `${Math.round(o.px)} px across`, c ? `it's a ${c.k}${c.name ? ': ' + c.name : ''} · ${Math.round(c.conf * 100)}% sure` : tt && o.px >= Radar.OPT.det && o.px < Radar.OPT.cls ? 'a dot: too small to tell what it is' : ''];
+    lines.filter(Boolean).forEach((l, i) => { x.fillStyle = 'rgba(0,0,0,0.55)'; x.fillRect(4, 4 + i * 17, x.measureText(l).width + 6, 16); x.fillStyle = '#8dffbe'; x.fillText(l, 7, 5 + i * 17); });
+  }
   function sensorStep() {
     const seat = mySeat(), m = me(), H = EW.holo; EW.cu = null;
     if (seat && seat.k === 'sensors' && EW.own && !Game.menuOpen()) scanKeys(); else { SEC.sel = -1; SEC.open = -1; TRKK.sel = -1; }
@@ -524,7 +576,7 @@ export const Space = (() => {
       if (!su) continue;
       for (const sc of su.scans) { sc.age.fill(-1e9); sc.plots = []; sc.cons = []; sc.pend = []; sc.col = -1; }
       for (const t of su.trks) Radar.drop(t);
-      su.fus = []; su.fusHist.clear(); su.fusKF.clear(); su.fusSeen.clear(); su.fusIds.clear(); su.ass = []; su.assHold.clear(); su.fusT = -1; su.init = false;
+      su.fus = []; su.bel = []; su.fusHist.clear(); su.fusKF.clear(); su.fusSeen.clear(); su.fusIds.clear(); su.ass = []; su.assHold.clear(); su.fusT = -1; su.init = false;
     }
   }
   // The zone's ships the squad's ship is coming up with (within 5 km) or going away from (over 8 km), told to the host (by whoever
@@ -2186,7 +2238,7 @@ export const Space = (() => {
     pt = Prof.lap('space: view', pt);
     outside(); pt = Prof.lap('space: outside (sky, star, rocks)', pt);
     { const pc = cam as THREE.PerspectiveCamera, hgt = G_R.renderer.domElement.height || 720; InteriorCull.update(cam, hgt / 2 / Math.tan((pc.fov || 70) * Math.PI / 360)); pt = Prof.lap('space: interiors seen', pt); }
-    sensorStep(); // (after the view's placed: where the operator's looking is where the camera is now)
+    sensorStep(); optView(); // (after the view's placed: where the operator's looking is where the camera is now)
     ewCam();
     { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); if (H.focus) G_R.focusAmt = e;
       if (!H.focus && H.fO >= 0) { const o = (S.t - H.fO) / 0.3; if (o >= 1 || !seat) { G_R.focusBlur = false; H.fO = -1; } else G_R.focusAmt = 1 - o; } // (out: the blur fading away) // (going in: the world blurring out and the hologram opening, over 0.6 s)
@@ -2434,7 +2486,7 @@ export const Space = (() => {
   }
   function torpNew(id: number, p: THREE.Vector3, v: THREE.Vector3, q: THREE.Quaternion, mine: boolean, fus: string, est: THREE.Vector3, ev: THREE.Vector3): Torp {
     const k = torpMesh(); if (S.root) S.root.add(k.o); k.o.position.copy(p); k.o.quaternion.copy(q);
-    const tp: Torp = { id, ...k, p: p.clone(), v: v.clone(), q: q.clone(), ph: 0, t: 0, fus, est: est.clone(), ev: ev.clone(), side: new T.Vector3(), mine, sent: -1, lock: '', thr: 0, rcs: false, lf: new T.Vector3(), rt: { id: 'torp' + id, p: p.clone(), v: v.clone(), q: q.clone(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 1.5, iff: { c: 'squad', n: 'TORP ' + (id % 1000) }, aff: 'squad', only: 'squad' } }; // (its own ship's interrogator gets an answer, its datalink's; anyone else's, nothing)
+    const tp: Torp = { id, ...k, p: p.clone(), v: v.clone(), q: q.clone(), ph: 0, t: 0, fus, est: est.clone(), ev: ev.clone(), side: new T.Vector3(), mine, sent: -1, lock: '', thr: 0, rcs: false, lf: new T.Vector3(), rt: { sz: 3, kind: 'torpedo', id: 'torp' + id, p: p.clone(), v: v.clone(), q: q.clone(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 1.5, iff: { c: 'squad', n: 'TORP ' + (id % 1000) }, aff: 'squad', only: 'squad' } }; // (its own ship's interrogator gets an answer, its datalink's; anyone else's, nothing)
     TP.list.push(tp); return tp;
   }
   // the 3D fixes the pilot can see (her sensors' fused tracks), and the one looked at: nearest the middle of the view, within 7 degrees
@@ -2515,7 +2567,7 @@ export const Space = (() => {
       const p = ROCKS.p[k] || (ROCKS.p[k] = new T.Vector3()); p.set(q.p[0], q.p[1], q.p[2]).applyQuaternion(zq).add(zp);
       if (p.distanceTo(S.P) - q.r > ROCK_NEAR) return;
       ROCKS.near.push(k);
-      let t = ROCKS.tg.get(k); if (!t) { t = { id: 'rock' + k, p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: NO_RCS, iso: ROCK_SIG * Math.PI * q.r * q.r }; ROCKS.tg.set(k, t); ROCKS.r.set(t.id, q.r); }
+      let t = ROCKS.tg.get(k); if (!t) { t = { sz: q.r, kind: 'rock', id: 'rock' + k, p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: NO_RCS, iso: ROCK_SIG * Math.PI * q.r * q.r }; ROCKS.tg.set(k, t); ROCKS.r.set(t.id, q.r); }
       t.p.copy(p); t.v.copy(ROCKS.v); out.push(t); Radar.occ.push({ p: t.p, r: q.r * 0.85, id: t.id });
     });
     return out;
@@ -2813,6 +2865,8 @@ export const Space = (() => {
       case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5)) modeSet(m.a[0] | 0, MODES[m.a[1] | 0] || 'round', +m.a[2], +m.a[3], true, m.a.length === 5 ? !!m.a[4] : undefined); return true;
       case 'strk': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && EW.own) { const ti = m.a[0] | 0, tr = EW.own.trks[ti]; // (the sensor operator's: a tracker off or on (trkOff), a track kept or let go, a bearing searched (trkSend))
         if (m.a[1] === 0 && tr) trkOff(ti, !!m.a[2], true);
+        else if (m.a[1] === 7) trkQuiet(new T.Vector3(+m.a[2], +m.a[3], +m.a[4]), !!m.a[5]);
+        else if (m.a[1] === 6) trkDrop(new T.Vector3(+m.a[2], +m.a[3], +m.a[4]));
         else if (m.a[1] === 4) Radar.wantRay(EW.own, new T.Vector3(+m.a[2], +m.a[3], +m.a[4]), EW.rt);
         else if (m.a[1] === 3 || m.a[1] === 5) { const p: RPlot = { k: m.a[2] | 0, phi: +m.a[3], r: +m.a[4], t: EW.rt, db: 0, id: '', e: 0 }; trkWant(p, fusAt(Radar.plotAt(EW.own, p)), true); } } return true;
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
@@ -2892,6 +2946,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => zFrame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => zFrame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)
