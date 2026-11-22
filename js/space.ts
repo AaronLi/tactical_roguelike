@@ -91,7 +91,7 @@ export const Space = (() => {
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
   const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, rt: 0, ownDef: '', pre: null as null | { P: THREE.Vector3; Q: THREE.Quaternion }, chaff: [] as (SimChaff & { pts: THREE.Points | null; seeds: Float32Array })[], // (the simulation's clouds (js/spacesim.ts), and each one's drawing)
-    chaffLeft: 0, chaffN: 0, xpdr: false, holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, fO: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, cw: 14, ch: 14, ca: 0, zi: 4 } };
+    chaffLeft: 0, chaffN: 0, xpdr: false, holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, fO: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, zi: 4 } };
   const NO_RCS = { s: new Float32Array(1), max: 0, mean: 0 }; // (a radar target's return, for the targets the page keeps only to know where they are)
   const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000, 25000, 50000]; // (out to the scanners' reach: js/radar.ts MAP.Rmax)
   // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the number keys' presses (when each went
@@ -284,9 +284,9 @@ export const Space = (() => {
       for (const el of H.hid) el.classList.add('holo-hide');
       Game.holoCursor = true; Game.softLocked = true; if (document.pointerLockElement) document.exitPointerLock(); cv.style.cursor = 'none';
       if (!H.cur) { const c = document.createElement('div'); c.id = 'holo-cursor'; Object.assign(c.style, { position: 'fixed', left: '0', top: '0', width: '14px', height: '14px', border: '2px solid rgba(140,230,255,0.95)', borderRadius: '50%', boxShadow: '0 0 6px rgba(80,200,255,0.8)', pointerEvents: 'none', zIndex: '60', display: 'none' }); document.body.appendChild(c); H.cur = c; }
-      H.cx = H.mx; H.cy = H.my; H.cr = 7; H.cw = H.ch = 14; H.ca = 0; H.cur.style.display = '';
+      H.cx = H.mx; H.cy = H.my; H.cr = 7; H.cur.style.display = ''; TUBE.pts = null;
     } else {
-      for (const el of H.hid) el.classList.remove('holo-hide'); H.hid = []; cv.style.cursor = ''; if (H.cur) H.cur.style.display = 'none';
+      for (const el of H.hid) el.classList.remove('holo-hide'); H.hid = []; cv.style.cursor = ''; if (H.cur) H.cur.style.display = 'none'; TUBE.pts = null; if (TUBE.svg) TUBE.svg.style.display = 'none';
       Game.holoCursor = false; if (Game.softLocked) { Game.softLocked = false; Game.lock(); }
     }
   }
@@ -329,6 +329,36 @@ export const Space = (() => {
     }
     // (the crew told of a sector the keys have changed: five times a second at most)
     if (SEC.dirty >= 0 && S.t - SEC.sent > 0.2) { const sc = EW.own.scans[SEC.dirty]; Net.toHost({ t: 'ssec', a: ssecOf(SEC.dirty, sc) }); SEC.sent = S.t; SEC.dirty = -1; }
+  }
+  // The operator's cursor round one scanner's contact: an outline a little way out from its arc on the screen, all along it and round its
+  // ends, following its bend (an SVG mask: a wide stroke along the arc less a narrower one, filled with the contact's colour, glowing).
+  // Its points eased onto the arc's (grown out from the ring the first frame), or, with nothing under the mouse, back into the ring
+  // (cx, cy) and gone once they're there.
+  const TUBE = { svg: null as SVGSVGElement | null, o: null as SVGPathElement | null, i: null as SVGPathElement | null, r: null as SVGRectElement | null, pts: null as number[][] | null };
+  function holoResample(P: number[][], n: number): number[][] {
+    const L = [0]; for (let j = 1; j < P.length; j++) L.push(L[j - 1] + Math.hypot(P[j][0] - P[j - 1][0], P[j][1] - P[j - 1][1]));
+    const tot = L[L.length - 1] || 1, out: number[][] = []; let j = 1;
+    for (let q = 0; q < n; q++) { const d = tot * q / (n - 1); while (j < P.length - 1 && L[j] < d) j++; const f = L[j] > L[j - 1] ? (d - L[j - 1]) / (L[j] - L[j - 1]) : 0; out.push([P[j - 1][0] + (P[j][0] - P[j - 1][0]) * f, P[j - 1][1] + (P[j][1] - P[j - 1][1]) * f]); }
+    return out;
+  }
+  function holoTube(P: number[][] | null, cx: number, cy: number, col: string, k: number) {
+    if (!P && !TUBE.pts) return;
+    if (!TUBE.svg) {
+      const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg') as SVGSVGElement; svg.setAttribute('style', 'position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:60;overflow:visible');
+      const defs = document.createElementNS(NS, 'defs'), mask = document.createElementNS(NS, 'mask'); mask.setAttribute('id', 'holoTubeMask'); mask.setAttribute('maskUnits', 'userSpaceOnUse');
+      const o = document.createElementNS(NS, 'path'), i = document.createElementNS(NS, 'path');
+      for (const [e, c, wdt] of [[o, 'white', 24], [i, 'black', 19]] as [SVGPathElement, string, number][]) { e.setAttribute('fill', 'none'); e.setAttribute('stroke', c); e.setAttribute('stroke-width', '' + wdt); e.setAttribute('stroke-linecap', 'round'); e.setAttribute('stroke-linejoin', 'round'); mask.appendChild(e); }
+      const r = document.createElementNS(NS, 'rect'); r.setAttribute('x', '-10'); r.setAttribute('y', '-10'); r.setAttribute('width', '200%'); r.setAttribute('height', '200%'); r.setAttribute('mask', 'url(#holoTubeMask)');
+      defs.appendChild(mask); svg.appendChild(defs); svg.appendChild(r); document.body.appendChild(svg); Object.assign(TUBE, { svg, o, i, r });
+    }
+    const tgt = P || null;
+    if (!TUBE.pts) TUBE.pts = tgt!.map(() => [cx, cy]); // (grown out of the ring, where it is)
+    const pts = TUBE.pts; let far = 0;
+    for (let j = 0; j < pts.length; j++) { const t = tgt ? tgt[Math.min(j, tgt.length - 1)] : [cx, cy]; pts[j][0] += (t[0] - pts[j][0]) * k; pts[j][1] += (t[1] - pts[j][1]) * k; far = Math.max(far, Math.hypot(t[0] - pts[j][0], t[1] - pts[j][1])); }
+    if (!tgt && far < 2) { TUBE.pts = null; TUBE.svg!.style.display = 'none'; return; } // (drawn back into the ring)
+    const d = 'M' + pts.map((q) => q[0].toFixed(1) + ' ' + q[1].toFixed(1)).join('L');
+    TUBE.o!.setAttribute('d', d); TUBE.i!.setAttribute('d', d); TUBE.r!.setAttribute('fill', col);
+    TUBE.svg!.style.display = ''; TUBE.svg!.style.filter = `drop-shadow(0 0 4px ${col})`;
   }
   // A left click on a radar warning's chevron in the hologram: a tracker sent along its bearing (the one picked, or the one that
   // can see that way). A left click on a track with a tracker picked: that one sent on it. Nowhere else: a tracker's sent on
@@ -436,20 +466,19 @@ export const Space = (() => {
       if (H.mr && !EW.r) { H.rAt = S.t; H.moved = false; }
       _ray.setFromCamera(new T.Vector2(H.mx / innerWidth * 2 - 1, 1 - H.my / innerHeight * 2), G_R.camera); H.pick = RadarView.holoPick(_ray.ray, G_R.camera);
       // (the cursor: a small ring where the mouse is; over a track, it slides onto it and opens into a halo round it; over one scanner's
-      // contact (anywhere along its arc: it could be anywhere on it), it stretches into a capsule round the whole arc, along it)
+      // contact (anywhere along its arc: it could be anywhere on it), it grows out along the arc into an outline round the whole of it,
+      // bent as the arc is (holoTube), and draws back into the ring when the mouse leaves it)
       if (H.cur) {
-        let tx = H.mx, ty = H.my, tw = 14, th = 14, ta = 0; const w = H.pick && RadarView.holoWorld(H.pick), arc = H.pick && RadarView.holoArcWorld(H.pick);
+        let tx = H.mx, ty = H.my, tr = 7; const w = H.pick && RadarView.holoWorld(H.pick), arc = H.pick && RadarView.holoArcWorld(H.pick);
         const scr = (v: THREE.Vector3) => { const p = v.clone().project(G_R.camera); return [(p.x + 1) / 2 * innerWidth, (1 - p.y) / 2 * innerHeight]; };
-        if (arc && arc.length > 1) {
-          const P = arc.map(scr), a0 = P[0], a1 = P[P.length - 1], ang = Math.atan2(a1[1] - a0[1], a1[0] - a0[0]), ux = Math.cos(ang), uy = Math.sin(ang);
-          let lo = Infinity, hi = -Infinity, plo = Infinity, phi = -Infinity; for (const [x, y] of P) { const al = (x - a0[0]) * ux + (y - a0[1]) * uy, pe = -(x - a0[0]) * uy + (y - a0[1]) * ux; lo = Math.min(lo, al); hi = Math.max(hi, al); plo = Math.min(plo, pe); phi = Math.max(phi, pe); }
-          const am = (lo + hi) / 2, pm = (plo + phi) / 2, pad = 9; tx = a0[0] + ux * am - uy * pm; ty = a0[1] + uy * am + ux * pm; tw = hi - lo + 2 * pad; th = phi - plo + 2 * pad; ta = ang;
-        } else if (w) { [tx, ty] = scr(w); tw = th = 34; }
-        let da = ta - H.ca; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > Math.PI / 2) { da -= Math.sign(da) * Math.PI; } // (a capsule's the same turned half round: the shorter way)
-        const k = 0.35; H.cx += (tx - H.cx) * k; H.cy += (ty - H.cy) * k; H.cw += (tw - H.cw) * k; H.ch += (th - H.ch) * k; H.ca += da * k;
-        const st = H.cur.style; st.width = H.cw + 'px'; st.height = H.ch + 'px'; st.borderRadius = Math.min(H.cw, H.ch) / 2 + 2 + 'px';
-        st.transform = `translate(${H.cx - H.cw / 2 - 2}px, ${H.cy - H.ch / 2 - 2}px) rotate(${H.ca}rad)`;
-        st.borderColor = w ? (H.pick.col || '#ffffff') : 'rgba(140,230,255,0.95)'; st.borderWidth = w ? '2.5px' : '2px';
+        const k = 0.35, col = w ? (H.pick.col || '#ffffff') : 'rgba(140,230,255,0.95)';
+        let P: number[][] | null = null;
+        if (arc && arc.length > 1) { P = holoResample(arc.map(scr), 24); [tx, ty] = P[P.length >> 1]; tr = 4; }
+        else if (w) { [tx, ty] = scr(w); tr = 17; }
+        H.cx += (tx - H.cx) * k; H.cy += (ty - H.cy) * k; H.cr += (tr - H.cr) * k;
+        const st = H.cur.style; st.width = st.height = (2 * H.cr) + 'px'; st.transform = `translate(${H.cx - H.cr - 2}px, ${H.cy - H.cr - 2}px)`;
+        st.borderColor = col; st.borderWidth = w ? '2.5px' : '2px'; st.opacity = P ? '0' : '1';
+        holoTube(P, H.cx, H.cy, col, k);
       }
       if (H.ml && !EW.l && !boxClick(H.mx, H.my)) trkSend(); // (only with a tracker picked, 3 or 4: no picking one for you)
       EW.l = H.ml; EW.r = H.mr; return;
