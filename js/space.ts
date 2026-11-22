@@ -624,6 +624,17 @@ export const Space = (() => {
     svShown.clear();
   }
   const _svq = new T.Quaternion(), _sve1 = new T.Vector3(), _sve2 = new T.Vector3();
+  // where a slewing tracker's turning to, its way from its mount in her frame: a handover's place; a cue's contact's fan's start (where
+  // its filter has it now), or the cue's own plot's
+  function svSlewTo(su: RSuite, t: RSuite['trks'][0]) {
+    const v = new T.Vector3();
+    if (t.hand) v.copy(t.hand.p).sub(su.P).applyQuaternion(_svq);
+    else if (t.cue) { const c = t.cue, sc = su.scans[c.k]; if (!sc) return null;
+      if (c.con) { const dt = EW.rt - c.con.t; Radar.dirOf(sc.ax, c.con.A + c.con.vA * dt + sc.off, -sc.fan, v).multiplyScalar(c.con.r + c.con.vr * dt).add(sc.at); }
+      else Radar.dirOf(c.ax, c.phi, -sc.fan, v).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o).sub(su.P).applyQuaternion(_svq); }
+    else return null;
+    return v.sub(t.at).normalize();
+  }
   function svFill(su: RSuite) {
     const B = (su as any)._fill as SvBase | undefined; if (!B || B.at === EW.rt || !SVB.fill) return; B.at = EW.rt;
     const dt = Math.min(0.5, Math.max(0, EW.rt - B.rt));
@@ -634,7 +645,10 @@ export const Space = (() => {
     su.scans.forEach((sc, k) => { if (B.th[k] == null || sc.mode === 'off') return; sc.th = B.th[k]; sc.sec.dir = B.dir[k]; Radar.sweep(sc, dt); });
     su.trks.forEach((t, k) => {
       const q = B.tr[k]; if (!q) return;
-      t.b.copy(q.b); if (q.wb) t.b.applyAxisAngle(q.wb, q.rb * dt);
+      t.b.copy(q.b);
+      if (t.st === 'slew') { // (slewing: turned toward where it's going at its slew rate, as js/radar.ts trackStep turns it: a handover's place at its stab rate; a cue's fan's start at its slew rate)
+        const to = svSlewTo(su, t); if (to) { const ang = t.b.angleTo(to), mx = (t.hand ? Radar.TRK.stab : Radar.TRK.slew) * dt; if (ang <= mx) t.b.copy(to); else { const ax = _sve1.crossVectors(t.b, to); if (ax.lengthSq() > 1e-12) t.b.applyAxisAngle(ax.normalize(), mx); } }
+      } else if (q.wb) t.b.applyAxisAngle(q.wb, q.rb * dt);
       const hz = (Radar.TK as any)[t.kind || 'mono'].hz as number;
       if (t.st === 'track' && t.kind === 'conical') { // (its axis round the boresight at the squint angle, as js/radar.ts turns it)
         const e1 = (Math.abs(t.b.y) < 0.9 ? _sve1.set(0, 1, 0) : _sve1.set(1, 0, 0)).cross(t.b).normalize(), e2 = _sve2.crossVectors(t.b, e1), ph = (EW.rt * Math.PI * 2 * hz) % (Math.PI * 2);

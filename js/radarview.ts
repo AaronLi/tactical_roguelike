@@ -157,6 +157,7 @@ export const RadarView = (() => {
   // A scanner contact's arc now, in her frame: at the bearing and range its own filter has it at now, round the scanner as it sits on her
   // now. Where a tracker cued on it sweeps (js/radar.ts cueDir), so the contact's arc and the tracker's search strip are one line
   function conArc(sc: RScan, c: RContact, now: number, e: number, out = new T.Vector3()) { const dt = now - c.t; return Radar.dirOf(sc.ax, c.A + c.vA * dt + sc.off, e, out).multiplyScalar(c.r + c.vr * dt).add(sc.at); }
+  const _bc = new T.Color();
   function phiNow(su: RSuite, p: RPlot) { if (!p.q) return p.phi; const ax = su.scans[p.k].ax; Radar.dirOf(ax, p.phi, 0, _d).applyQuaternion(p.q).applyQuaternion(qi.copy(su.Q).invert()); return Radar.angOf(ax, _d)[0]; }
   const sOf = (ax: string) => (ax === 'y' ? 0 : 1);
   function polar(cx: number, cy: number, ax: string, a: number, r: number) { return ax !== 'x' ? [cx + Math.sin(a) * r, cy - Math.cos(a) * r] : [cx + Math.cos(a) * r, cy - Math.sin(a) * r]; }
@@ -542,7 +543,9 @@ export const RadarView = (() => {
     const ship = new T.Mesh(new T.ConeGeometry(R * 0.045, R * 0.16, 12), glow(0x60e0ff, 0.9)); ship.rotation.x = -Math.PI / 2; inner.add(ship);
     const fin = new T.Mesh(new T.BufferGeometry().setFromPoints([new T.Vector3(0, 0, R * 0.07), new T.Vector3(0, R * 0.07, R * 0.07), new T.Vector3(0, 0, -R * 0.02)]), glow(0x60e0ff, 0.8)); inner.add(fin);
     const fans = [0, 1].map((i) => { const m = new T.Mesh(fanGeo(), glow(i ? 0xe070ff : 0x50d8ff, 0.16)); inner.add(m); return m; });
-    const beams = [0, 1].map(() => { const l = new T.Line(new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -1)]), new T.LineBasicMaterial({ color: 0xff4030, transparent: true, opacity: 0.9, depthWrite: false })); inner.add(l); return l; });
+    // (a tracker's beam: a line from her out along its axis, its colour (and alpha) per end: solid to its range gate, or, slewing with no
+    // range to show, fading out to nothing at the hologram's edge)
+    const beams = [0, 1].map(() => { const g = new T.BufferGeometry().setFromPoints([new T.Vector3(), new T.Vector3(0, 0, -1)]); g.setAttribute('color', new T.BufferAttribute(new Float32Array(8).fill(1), 4)); const l = new T.Line(g, new T.LineBasicMaterial({ vertexColors: true, transparent: true, opacity: 1, depthWrite: false })); l.userData.d = new T.Vector3(0, 0, -1); l.userData.t = -1; inner.add(l); return l; });
     const strips = [0, 1].map(() => { const l = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(25 * 3), 3)), new T.LineDashedMaterial({ color: 0xffb040, dashSize: R * 0.03, gapSize: R * 0.02, transparent: true, opacity: 0.8, depthWrite: false })); inner.add(l); return l; });
     const ends = [0, 1].map(() => { const m = new T.Mesh(new T.RingGeometry(R * 0.02, R * 0.03, 16), glow(0xff4030, 0.9)); inner.add(m); return m; }); // (where a tracker's range gate is along its beam)
     const sel = new T.Mesh(new T.RingGeometry(R * 0.045, R * 0.055, 24), glow(0xffffff, 0.9)); inner.add(sel);
@@ -579,8 +582,15 @@ export const RadarView = (() => {
       const on = tr.st !== 'idle', len = on && tr.rng > 0 ? Math.sqrt(Math.min(1, tr.rng / zoom)) * R : R;
       // (its beam: along its axis as it is this instant, the conical scan's circling and all, out to its range gate)
       const picked = sv.trkSel === i; // (the one picked to be sent: shown, idle or not, bright and pulsing)
-      l.visible = (on || picked) && !tr.off; l.quaternion.setFromUnitVectors(Z, tr.st === 'track' ? tr.a : tr.b); l.scale.setScalar(on ? len : R * 0.6); (l.material as THREE.LineBasicMaterial).color.setHex(picked ? 0xffffff : tr.st === 'track' ? 0xff4030 : 0xffb040); (l.material as THREE.LineBasicMaterial).opacity = picked ? 0.7 + 0.3 * Math.sin(now * 6) : 0.9;
-      en.visible = on && tr.rng > 0; en.position.copy(tr.st === 'track' ? tr.a : tr.b).multiplyScalar(len); en.quaternion.copy(faceCam); (en.material as THREE.MeshBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040);
+      // (its way eased over a few hundredths of a second onto where it's pointing: what's left of a picture's correction smoothed out; a
+      // beam just shown, straight there)
+      const want = tr.st === 'track' ? tr.a : tr.b, bd = l.userData.d as THREE.Vector3, was = l.visible, dtf = Math.max(0, Math.min(0.1, now - l.userData.t)); l.userData.t = now;
+      if (!was || dtf <= 0) bd.copy(want); else bd.lerp(want, 1 - Math.exp(-dtf / 0.04)).normalize();
+      const blind = tr.st === 'slew'; // (slewing: between targets, no range to show)
+      l.visible = (on || picked) && !tr.off; l.quaternion.setFromUnitVectors(Z, bd); l.scale.setScalar(!on ? R * 0.6 : blind ? R : len);
+      { const hex = picked ? 0xffffff : tr.st === 'track' ? 0xff4030 : 0xffb040, a0 = picked ? 0.7 + 0.3 * Math.sin(now * 6) : 0.9, ca = l.geometry.attributes.color as THREE.BufferAttribute, c = _bc.setHex(hex);
+        ca.setXYZW(0, c.r, c.g, c.b, a0); ca.setXYZW(1, c.r, c.g, c.b, blind && !picked ? 0 : a0); ca.needsUpdate = true; }
+      en.visible = on && tr.rng > 0 && !blind; en.position.copy(bd).multiplyScalar(len); en.quaternion.copy(faceCam); (en.material as THREE.MeshBasicMaterial).color.setHex(tr.st === 'track' ? 0xff4030 : 0xffb040);
       // (sweeping: the strip it's searching along, the arc its cue's on)
       st.visible = (tr.st === 'slew' || tr.st === 'acq') && !!tr.cue;
       if (st.visible) { const c = tr.cue!, sc = su.scans[c.k], pa = st.geometry.attributes.position as THREE.BufferAttribute, qn = su.Q.clone().invert(), v = new T.Vector3();
