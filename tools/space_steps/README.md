@@ -12,3 +12,4 @@ Steps for tools/space_shot.mjs (a headless Chromium driving the game: `node serv
 | smoothness.mjs | `mute&board=small&seed=3` | the drawn world's movement frame to frame at speed (the steps blended) |
 | determinism.mjs | `mute&board=small&seed=3` | a fingerprint at a fixed step: two runs to compare |
 | perf.mjs | `mute&board=small`, env `PD_R=5000` | the profiler's sections and a CPU profile through a torpedo attack |
+| shapes_check.mjs | `mute&board=small&seed=3` (and other boards) | the shapes from data (js/hullshape.ts, js/rcstris.ts, assets/models/ships/space.json) against the live meshes: hull triangles, guns, mounts, radar tables, breach sites, stand-ins, the squad's ship; then the Node check on the same map (also on its own: `node tools/shapes_node_check.mjs`) |

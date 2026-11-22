@@ -5,6 +5,8 @@
   "description": "Peer-to-peer co-op roguelike tactical FPS that runs in the browser. TypeScript (js/*.ts, compiled to dist/js/), Three.js for rendering, WebRTC (via PeerJS) for networking.",
   "scripts": {
     "build": "node tools/build.mjs",
+    "bake:space-shapes": "tsc -p . && node tools/bake_space_shapes.mjs",
+    "check:space-shapes": "tsc -p . && node tools/shapes_node_check.mjs",
     "compile": "tsc -p . && tsc -p tsconfig.tools.json",
     "bundle": "tsc -p . && node tools/bundle.mjs",
     "dev": "node tools/dev.js",
