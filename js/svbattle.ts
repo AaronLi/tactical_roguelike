@@ -41,13 +41,13 @@ export const SvBattle = (() => {
   let OWN: { su: RSuite; t: RTarget; def: string; key: string; xpdr: boolean } | null = null;
   let rt = 0; // (the battle's clock, never started again in a session: a new world goes on from it)
   // her flight, the server's (docs/space-server.md C2): the pilot's steps as they come (sin: an input, or her state after a step of her
-  // own), flown in order, one a server step (two while more than 6 wait), starting once 3 are in hand (a little slack against the
+  // own), flown in order, one a server step (all but three at once when more wait), starting once 3 are in hand (a little slack against the
   // pages' steps coming in bursts); none waiting, she holds where she is till the next comes. ack: the last step flown, sh her state after it
   const FL = { on: false, q: new Map<number, any>(), next: -1, go: false, sh: null as FlyState | null, ack: -1, turn: 1 };
   function flyOn(W: SimWorld, dt: number) {
     if (!FL.go && FL.q.size >= 3) FL.go = true;
     if (!FL.go) return;
-    for (let k = FL.q.size > 6 ? 2 : 1; k > 0; k--) {
+    for (let k = Math.max(1, FL.q.size - 3); k > 0; k--) { // (one a step; more waiting than the slack of three: caught up at once)
       let e = FL.q.get(FL.next);
       if (!e) { if (!FL.q.size) break; const lo = Math.min(...FL.q.keys()); if (lo < FL.next) break; FL.next = lo; e = FL.q.get(lo); } // (a step never come: on from the next that has)
       FL.q.delete(FL.next);

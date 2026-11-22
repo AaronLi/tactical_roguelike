@@ -118,7 +118,9 @@ export const DebugStart = (() => {
 
   async function run() {
     const th = themeOf(q.get('play')), lvl = q.has('level') ? Math.max(1, +q.get('level')! || 1) : null;
-    Game.solo(); await sleep(0.8);
+    // (&host: a room others can join (its code in Net.code), not a solo game: for a test with a second player)
+    if (q.has('host')) { Game.host(); await until(() => !!Net.code, 30); } else Game.solo();
+    await sleep(0.8);
     // (the host's simulation is in its own thread, js/serverlink.ts: what's wanted of it is asked, as the lobby and the menus ask)
     const space = q.has('board') || q.has('assault') || q.has('fly');
     if (q.has('hangar') || space) {
