@@ -10,6 +10,8 @@ import { ShipGen } from './shipgen.js';
 import { Level } from './level.js';
 import { U } from './util.js';
 import { SpaceSim, FlyIn, FB } from './spacesim.js';
+import { HANGAR_ROWS } from './data.js';
+import { asteroidHeight, ASTEROID_R } from './asteroidshape.js';
 
 type SpWp = { id: string; name: string; sub?: string; p: THREE.Vector3; kind: string; i?: number; hide?: boolean };
 type ShSite = ReturnType<typeof ShipGen.sites>[number];
@@ -423,7 +425,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     const u = Math.min(1, a.t / a.T), e = u * u * (3 - 2 * u);
     if (a.mid) { const k = Math.min(1, u * 2), k2 = Math.max(0, u * 2 - 1), e1 = k * k * (3 - 2 * k), e2 = k2 * k2 * (3 - 2 * k2); S.P.copy(a.P0).lerp(a.mid, e1).lerp(a.P1, e2); S.Q.copy(a.Q0).slerp(a.Q1, e1); }
     else { S.P.copy(a.P0).lerp(a.P1, e); S.Q.copy(a.Q0).slerp(a.Q1, e); }
-    if (u >= 1) { S.auto = null; ev({ k: 'auto', then: a.then }); } // (what follows it: the caller's)
+    if (u >= 1) { S.auto = null; if (a.then.k === 'breach' || a.then.k === 'land') dock(true); ev({ k: 'auto', then: a.then }); } // (laid in the hole or set down: docked; the rest of what follows it, the caller's)
   }
   // she's against it (or off it): her flight's part (the page's: her inner door, her solids, who's seen)
   function dock(on: boolean) {
@@ -444,3 +446,105 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
   }
   return { fly, aim, squareUp, roundUp, warpGate, warpGo, warpAim, spinUp, collide, events, auto, autoStep, dock, land, launchAway, lookQ, tgtTrack, dbgBr, ROUND };
 }
+
+// ---------------------------------------------------------------- her helm's state, copied, compared, packed
+// What a step of the helm changes: her pose, way, turn rate, stick, her way's memory through the zone, and the modes' state. The rest
+// of S (her kind, stage, ship, level, waypoints, geometry) it only reads.
+const v3 = (v: THREE.Vector3) => [v.x, v.y, v.z], q4 = (q: THREE.Quaternion) => [q.x, q.y, q.z, q.w];
+const V3 = (a: number[]) => new THREE.Vector3(a[0], a[1], a[2]), Q4 = (a: number[]) => new THREE.Quaternion(a[0], a[1], a[2], a[3]);
+const nn = (x: number) => (Number.isNaN(x) ? null : x), un = (x: number | null) => (x == null ? NaN : x);
+type ZM = { vz: THREE.Vector3; v: THREE.Vector3 };
+/** dst's helm state made src's (dst: another S, or the shadow the page checks its own step on; zm: each one's way's memory) */
+export function helmCopy(dst: any, src: any, dzm: ZM, szm: ZM) {
+  dst.P.copy(src.P); dst.Q.copy(src.Q); dst.V.copy(src.V); dst.Wv.copy(src.Wv); dst.stick.copy(src.stick); dzm.vz.copy(szm.vz); dzm.v.copy(szm.v);
+  dst.docked = src.docked; dst.spin = src.spin; dst.cruise = src.cruise; dst.roundBrake = src.roundBrake; dst.brThrust = src.brThrust;
+  dst.tv.copy(src.tv); dst.tvP.copy(src.tvP); dst.tvJ = src.tvJ; dst.match = src.match; dst.tgt = src.tgt; dst.shake = src.shake;
+  dst.berth = { ...src.berth }; dst.Dp.copy(src.Dp); dst.Dq.copy(src.Dq);
+  dst.warp = src.warp ? { ...src.warp } : null;
+  const a = src.auto; dst.auto = a ? { ...a, P0: a.P0.clone(), Q0: a.Q0.clone(), P1: a.P1.clone(), Q1: a.Q1.clone(), mid: a.mid ? a.mid.clone() : null } : null;
+  const L = src.brLock; dst.brLock = L ? { ...L, q0: L.q0 ? L.q0.clone() : undefined, ra: L.ra ? L.ra.clone() : undefined } : null;
+  const R = src.brRound; dst.brRound = R ? { ...R, face: R.face.clone(), E: R.E.clone(), way: R.way.map((q: THREE.Vector3) => q.clone()), ra: R.ra ? R.ra.clone() : undefined } : null;
+}
+const siteKey = (s: any) => (s ? [s.c, s.nx, s.nz] : null);
+/** whether two helm states are the same (to the bit: the page's own step against its shadow's) */
+export function helmSame(a: any, b: any) {
+  if (!(a.P.equals(b.P) && a.Q.equals(b.Q) && a.V.equals(b.V) && a.Wv.equals(b.Wv))) return false;
+  if (a.docked !== b.docked || a.spin !== b.spin || a.cruise !== b.cruise || a.tvJ !== b.tvJ || a.match !== b.match || a.tgt !== b.tgt || !a.tv.equals(b.tv) || !a.Dp.equals(b.Dp) || !a.Dq.equals(b.Dq)) return false;
+  if (!!a.auto !== !!b.auto || !!a.warp !== !!b.warp || !!a.brLock !== !!b.brLock || !!a.brRound !== !!b.brRound) return false;
+  if (a.auto && (a.auto.t !== b.auto.t || a.auto.then.k !== b.auto.then.k)) return false;
+  if (a.warp && (a.warp.u !== b.warp.u || a.warp.t !== b.warp.t)) return false;
+  const sk = (x: any) => x.c + ',' + x.nx + ',' + x.nz;
+  if (a.brLock && (sk(a.brLock.site) !== sk(b.brLock.site) || a.brLock.hard !== b.brLock.hard || a.brLock.fa !== b.brLock.fa)) return false;
+  if (a.brRound && (sk(a.brRound.site) !== sk(b.brRound.site) || a.brRound.way.length !== b.brRound.way.length)) return false;
+  return true;
+}
+/** her helm state as plain numbers and strings (for the wire: the server's word of it, the page's own after a step it flew itself) */
+export function helmPack(S: any, zm: ZM) {
+  const a = S.auto, L = S.brLock, R = S.brRound;
+  return { P: v3(S.P), Q: q4(S.Q), V: v3(S.V), W: v3(S.Wv), k: [S.stick.x, S.stick.y], z: [...v3(zm.vz), ...v3(zm.v)].map(nn),
+    d: S.docked ? 1 : 0, sp: S.spin, cr: S.cruise ? 1 : 0, rb: S.roundBrake ? 1 : 0, bt: S.brThrust ? 1 : 0, tv: v3(S.tv), tvP: v3(S.tvP), tvJ: S.tvJ, m: S.match, tg: S.tgt,
+    be: S.berth, Dp: v3(S.Dp), Dq: q4(S.Dq), w: S.warp,
+    au: a ? { t: a.t, T: a.T, P0: v3(a.P0), Q0: q4(a.Q0), P1: v3(a.P1), Q1: q4(a.Q1), mid: a.mid ? v3(a.mid) : null, then: a.then } : null,
+    bl: L ? { s: siteKey(L.site), hard: L.hard, fa: L.fa, q0: L.q0 ? q4(L.q0) : null, T0: L.T0, rp: L.rp, ra: L.ra ? v3(L.ra) : null } : null,
+    br: R ? { s: siteKey(R.site), face: v3(R.face), E: v3(R.E), hard: R.hard, way: R.way.map(v3), ra: R.ra ? v3(R.ra) : null } : null };
+}
+/** S's helm state made the packed one's (siteAt: a site from its key, as the caller's geometry has it) */
+export function helmUnpack(S: any, o: any, zm: ZM, siteAt: (a: number[]) => any) {
+  S.P.copy(V3(o.P)); S.Q.copy(Q4(o.Q)); S.V.copy(V3(o.V)); S.Wv.copy(V3(o.W)); S.stick.set(o.k[0], o.k[1]); zm.vz.set(un(o.z[0]), un(o.z[1]), un(o.z[2])); zm.v.set(un(o.z[3]), un(o.z[4]), un(o.z[5]));
+  S.docked = !!o.d; S.spin = o.sp; S.cruise = !!o.cr; S.roundBrake = !!o.rb; S.brThrust = !!o.bt; S.tv.copy(V3(o.tv)); S.tvP.copy(V3(o.tvP)); S.tvJ = o.tvJ; S.match = o.m; S.tgt = o.tg;
+  S.berth = { ...o.be }; S.Dp.copy(V3(o.Dp)); S.Dq.copy(Q4(o.Dq)); S.warp = o.w ? { ...o.w } : null;
+  const a = o.au; S.auto = a ? { t: a.t, T: a.T, P0: V3(a.P0), Q0: Q4(a.Q0), P1: V3(a.P1), Q1: Q4(a.Q1), mid: a.mid ? V3(a.mid) : null, then: a.then } : null;
+  const L = o.bl; S.brLock = L && L.s ? { site: siteAt(L.s), map: S.map, hard: L.hard, fa: L.fa, q0: L.q0 ? Q4(L.q0) : undefined, T0: L.T0, rp: L.rp, ra: L.ra ? V3(L.ra) : undefined } : null;
+  const R = o.br; S.brRound = R && R.s ? { site: siteAt(R.s), face: V3(R.face), E: V3(R.E), hard: R.hard, map: S.map, way: R.way.map(V3), ra: R.ra ? V3(R.ra) : undefined } : null;
+}
+
+// ---------------------------------------------------------------- the places she flies in, as data
+// (what the page builds as it sets a place up, js/space.ts setupHub / setupBoard / setupAssault, and the server from the same data:
+// the boxes she mustn't fly through, the ground, the waypoints. Keep in step with those: tools/space_steps/helm_geo.mjs compares them)
+export type HelmPlace = { boxes: number[][]; floorAt: ((x: number, z: number) => number) | null; wps: SpWp[] };
+/** the hub: the hall and the range's walls north of the pad, the rock's ground and the hollow, home and the board's anchors */
+export function hubPlace(berth: { x: number; z: number }, board: { seed: number; level: number; picked: number[]; done: number[] }, gone: (i: number) => boolean): HelmPlace {
+  const T = THREE, TS = Level.TS, lay = Level.layHangar(), fk = Math.round(Level.CTS / Level.TS), Wm = lay.W * fk * TS, Hm = lay.H * fk * TS, // (the map's on the fine grid: fk of its tiles to the layout's)
+    RZ = HANGAR_ROWS * 2, R = ASTEROID_R, cx = Wm / 2, cz = Hm / 2;
+  const floorAt = (x: number, z: number) => { const hx = Math.hypot(x - cx, z - cz); return hx < 700 ? asteroidHeight(Wm, Hm, x, z) + (Math.abs(x - Wm / 2) < Wm / 2 + 60 && Math.abs(z - Hm / 2) < Hm / 2 + 60 ? 0.4 : 5) : hx < R + 150 ? Math.sqrt(Math.max(0, (R + 150) ** 2 - hx * hx)) - R : -1e9; };
+  const base = new T.Vector3(berth.x, 0, berth.z), wps: SpWp[] = [{ id: 'base', name: 'HOME', sub: 'Hangar pad', p: base.clone().setY(40), kind: 'base' }];
+  wps.push(...hubAnchors(berth, board, gone));
+  return { boxes: [[-6, -5, -20, Wm + 6, 11, RZ + 28.5]], floorAt, wps };
+}
+/** the board's missions' anchors out in the dark (those picked and not gone; done ones hidden) */
+export function hubAnchors(berth: { x: number; z: number }, board: { seed: number; level: number; picked: number[]; done: number[] }, gone: (i: number) => boolean): SpWp[] {
+  const T = THREE, offers = SD.offers(board.seed, board.level), base = new T.Vector3(berth.x, 0, berth.z), out: SpWp[] = [];
+  for (const i of board.picked) {
+    const ms = offers[i]; if (!ms || gone(i)) continue;
+    const done = board.done.includes(i), p = new T.Vector3(...(ms.anchor as [number, number, number])).add(base); p.y = Math.max(p.y, 900);
+    out.push({ id: 'a' + i, name: done ? ms.name + ' · DONE' : ms.name, sub: `Anchor · jump ${ms.ly.toFixed(1)} ly`, p, kind: 'anchor', i, hide: done });
+  }
+  return out;
+}
+/** a boarding zone's level: her rooms as boxes, the other hulls lying off her, the zone's ships, the mission ship, the anchor out
+ *  (the zone's ships' and the anchor's places set each step by boardMove) */
+export function boardPlace(map: LvMap, zdef: any[], zact: number, shipName: string): HelmPlace & { out0: THREE.Vector3 } {
+  const T = THREE, TS = Level.TS, sp = map.sp!, boxes: number[][] = [], wps: SpWp[] = [];
+  map.rooms.forEach((rm) => { const y = (rm.fl || 0) * Level.FLOOR_H; boxes.push([rm.x * TS - 1.2, y - 2.4, rm.z * TS - 1.2, (rm.x + rm.w) * TS + 1.2, y + Level.WALL_H + 1.2, (rm.z + rm.h) * TS + 1.2]); });
+  for (const hh of sp.hulls) if (!hh.main) wps.push({ id: 'other', name: SD.SIZES[hh.size].name.toUpperCase(), sub: 'Not the mission: board her for salvage, or leave her', p: new T.Vector3((hh.x0 + hh.x1) / 2, 6, (hh.z0 + hh.z1) / 2), kind: 'base' });
+  for (const c of zdef) { if (c.k === zact) continue; wps.push({ id: 't' + c.k, name: c.k === 0 ? c.name + ' · THE MISSION' : c.name, sub: (SD.SIZES as any)[c.size].name + (c.wing ? ', a flying wing' : ''), p: new T.Vector3(), kind: 'base' }); }
+  const zC = new T.Vector3((sp.hull.x0 + sp.hull.x1) / 2, 0, (sp.hull.z0 + sp.hull.z1) / 2);
+  wps.push({ id: 'ship', name: shipName.toUpperCase(), sub: 'Ram her hull nose-on to board: anywhere along it', p: new T.Vector3(zC.x, 2, zC.z), kind: 'base' }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: new T.Vector3(), kind: 'anchor', i: -1 });
+  return { boxes, floorAt: null, wps, out0: new T.Vector3(0, 150, 2600) };
+}
+/** the zone's ships' and the anchor's places at the zone's time zt, the zone placed at zp, zq (js/space.ts zoneStep, trafficLocal) */
+export function boardMove(wps: SpWp[], zdef: any[], out0: THREE.Vector3, zt: number, zp: THREE.Vector3, zq: THREE.Quaternion) {
+  for (const w of wps) {
+    if (w.id === 'out') { w.p.copy(out0).applyQuaternion(zq).add(zp); continue; }
+    const m = /^t(\d+)$/.exec(w.id); if (!m) continue;
+    const c = zdef.find((q) => q.k === +m[1]); if (!c) continue;
+    const z = SD.zonePos(c, zt); w.p.set(z.p[0], z.p[1], z.p[2]).applyQuaternion(zq).add(zp);
+  }
+}
+/** a base's: the ground near the pad (in the air only), the corridor down, the pad, the anchor out */
+export function assaultPlace(berth: { x: number; y: number; z: number }, stageOf: () => string): HelmPlace {
+  const T = THREE, out = new T.Vector3(berth.x - 900, 3200, berth.z + 2800);
+  const floorAt = (x: number, z: number) => { const d = Math.hypot(x - berth.x, z - berth.z); return stageOf() === 'atmo' ? berth.y + U.clamp((d - 14) * 0.9, 0.02, 16) : -1e9; };
+  return { boxes: [], floorAt, wps: [{ id: 'entry', name: 'DESCENT CORRIDOR', sub: 'Fly in to go down through the cloud', p: new T.Vector3(berth.x + 1500, -1800, berth.z - 6500), kind: 'entry' }, { id: 'lz', name: 'LANDING PAD', sub: 'Set down outside the base', p: new T.Vector3(berth.x, 3, berth.z), kind: 'lz', hide: true }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 }] };
+}
+

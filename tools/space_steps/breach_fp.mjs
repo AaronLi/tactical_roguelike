@@ -17,4 +17,6 @@ export default async ({ ev, sleep, log }) => {
   for (let k = 0; k < 60 && !(await ev('!!window.__brDone')); k++) await sleep(500);
   for (const l of await ev('window.__br')) log('BR ' + l);
   log('BR done ' + JSON.stringify(await ev('window.__brDone')));
+  await sleep(1500);
+  log('SERVER ' + await ev(`(async () => { const w = (await G.ServerLink.sworld()).w || {}, c = G.Space.C2(); return JSON.stringify({ docked: w.ship && w.ship.docked, fly: w.fly, acks: c.acks, fixes: c.fixes, states: c.states, errMax: c.errMax, cut: (G.Space.S.map.sp.cuts || []).length }); })()`));
 };

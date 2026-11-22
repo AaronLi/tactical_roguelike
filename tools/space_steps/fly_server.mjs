@@ -16,6 +16,7 @@ export default async ({ ev, sleep, log }) => {
   for (let k = 0; k < 30 && !(await ev('!!window.__flyDone')); k++) {
     await sleep(1000);
     if (k === 4) log('a prediction falsified (the server word on it should be taken, the steps since flown again to the same place): ' + await ev(`(() => { const h = G.Space.C2().hist; if (!h.length) return 'none waiting'; h[h.length - 1].post.P.x += 1; return 'step ' + h[h.length - 1].s; })()`));
-    log(await ev(`(async () => { const w = (await G.ServerLink.sworld()).w || {}, c = G.Space.C2(); return JSON.stringify({ step: G.Space.SIM.steps, page: G.Space.S.P.toArray().map(v => +v.toFixed(2)), server: w.fly, acks: c.acks, err: +c.err.toFixed(5), errMax: +c.errMax.toFixed(5), fixes: c.fixes, hist: c.hist.length }); })()`));
+    log(await ev(`(async () => { const w = (await G.ServerLink.sworld()).w || {}, c = G.Space.C2(); return JSON.stringify({ step: G.Space.SIM.steps, page: G.Space.S.P.toArray().map(v => +v.toFixed(2)), server: w.fly, acks: c.acks, err: +c.err.toFixed(5), errMax: +c.errMax.toFixed(5), fixes: c.fixes, states: c.states, hist: c.hist.length }); })()`));
   }
+  log('WHY ' + JSON.stringify(await ev('G.Space.C2().why')));
 };

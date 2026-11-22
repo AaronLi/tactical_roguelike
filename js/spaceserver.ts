@@ -971,10 +971,12 @@ export const SpaceSv = (() => {
     const crew = board ? { hostile: board.M.ms.obj === 'defend' ? 0 : board.M.ms.obj !== 'visit' || board.M.breached ? 1 : 0, gn: gunnersLeft(), arm: board.M.arm == null ? null : Math.ceil(board.M.arm), boom: board.M.boom } : null;
     const docked = kind === 'hub' ? !!st.ship.docked : !!(M && M.docked);
     if (kind === 'hub' && docked) SvBattle.repair(); // (docked at home: her hull made good, as the page has it)
-    SvBattle.step(bat, dt, sv.stepN, crew, docked, board ? board.Z.zt : 0, (kk) => { const c = sv.ctxs.get(kk); return c ? (c.sv.map as any) || null : null; }); // (a zone ship's level, made: her real hull for the radars)
+    // (her helm's: the fleet, the board's anchors, the pods on the hull, docking as the pilot's page asked it to: dock)
+    const hc = { fleet: st.fleet, board: st.board, gone: (i: number) => goneOf(st.board).includes(i), raid: (M && M.raid) || [], dock: (on: boolean, at?: number[]) => { if (st.ship.ctl) dock(on, st.ship.ctl, at); return sv.phase === 'shop' ? !!st.ship.docked : !!(st.M && st.M.docked); }, shipName: (M && M.ms && M.ms.name) || 'THE SHIP' };
+    SvBattle.step(bat, dt, sv.stepN, crew, docked, board ? board.Z.zt : 0, (kk) => { const c = sv.ctxs.get(kk); return c ? (c.sv.map as any) || null : null; }, hc); // (a zone ship's level, made: her real hull for the radars)
     SvBattle.out(bat, sv.stepN, board ? board.Z.zt : 0, (m) => net().broadcast(m), (b, ch) => net().fast(null, b, ch));
     // (her hull gone, by the server's count: the drive jumps her home by itself, as the pilot's page did (js/space.ts damage))
-    if (sv.stepN % 3 === 0 && st.ship.ctl) { const a = SvBattle.flyAck(); if (a) net().fast(st.ship.ctl, new TextEncoder().encode(JSON.stringify({ k: bat.k, s: a.s, st: a.st })).buffer as ArrayBuffer, 5); } // (where the server has her, to her pilot: js/space.ts c2Ack)
+    if (sv.stepN % 3 === 0 && st.ship.ctl) { const a = SvBattle.flyAck(); if (a) net().fast(st.ship.ctl, new TextEncoder().encode(JSON.stringify({ k: bat.k, s: a.s, h: a.h })).buffer as ArrayBuffer, 5); } // (where the server has her, to her pilot: js/space.ts c2Ack)
     if (SvBattle.failing() && !sv.leaving && !docked) { if (kind === 'hub') net().broadcast({ t: 'shit', i: -1, hp: SvBattle.patch() }); else { net().broadcast({ t: 'shit', i: -1, hp: 0 }); sv.overBlack(() => home(), 'ftl', -1); } } // (at home there's nowhere to jump: patched up to 30%) // (told at once: the jump's begun before the next snapshot)
     // (her radars' picture, as the server's battle has it (js/suiteview.ts pack): ten times a second on the fast channel's stream 1, to
     // everyone aboard (the sensor station, the hologram, the helm's targeting and her marks draw from it); k: which level's frame it's in)
