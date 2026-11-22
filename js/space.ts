@@ -26,7 +26,7 @@ import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
 import { SuiteView } from './suiteview.js';
-import { SpaceSim, ZMem, SimShip, SimGun, SimChaff } from './spacesim.js';
+import { SpaceSim, ZMem, SimShip, SimGun, SimChaff, FlyIn, FB } from './spacesim.js';
 import { SpaceNet, SssMsg, SevMsg } from './spacenet.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
@@ -1636,8 +1636,10 @@ export const Space = (() => {
 
   // ------------------------------------------------------------------ flying her
   const K = (c: string) => !!me().keys[c] && !Game.chatOpen && !Game.menuOpen();
+  // (the flight keys and the stick this step, as js/spacesim.ts FlyIn)
+  const flyIn = (): FlyIn => ({ b: (K('KeyW') ? FB.W : 0) | (K('KeyA') ? FB.A : 0) | (K('KeyS') ? FB.S : 0) | (K('KeyD') ? FB.D : 0) | (K('Space') ? FB.U : 0) | (K('KeyC') ? FB.C : 0) | (K('KeyX') ? FB.X : 0) | (K('KeyQ') ? FB.Q : 0) | (K('KeyE') ? FB.E : 0), sx: S.stick.x, sy: S.stick.y, base: null });
   // (her thrust, m/s²: the main engine's, the others', the brake's (all of them, to the field's way); her top speed off the field's way, m/s)
-  const FLY = { main: 30, side: 12, brake: 60, max: 300 }, shipZ = zmem();
+  const shipZ = zmem(); // (her flight's constants: js/spacesim.ts FLY)
   // the first of her trackers holding a track with a solution (where it is and how fast it goes, as her radar has it: js/radar.ts)
   function radarLock() { const o = shownOwn(); if (!o) return null; let b: RSTrack | null = null; for (const t of Radar.sched(o).tts) if (t.est.q > 0.1 && (!b || (t.op ? 1 : 0) > (b.op ? 1 : 0) || ((t.op ? 1 : 0) === (b.op ? 1 : 0) && t.est.q > b.est.q))) b = t; return b; } // (her best track: her operator's picks first)
   function fly(dt: number) {
@@ -1659,20 +1661,19 @@ export const Space = (() => {
     if (S.docked || S.ftl) { S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.spin = 0; S.warp = null; return; }
     if (S.warp) { warpStep(dt); return; }
     S.cruise = false;
-    const want = new T.Vector3(), wv = new T.Vector3();
+    const want = new T.Vector3();
     let acc = 26;
+    // (the pilot's input this step, as data: what the simulation's flight reads, js/spacesim.ts flyTurn / flyPush)
+    const I = helm ? flyIn() : null;
     if (helm) {
       const sp = S.stage === 'atmo' ? Math.min(d.speed, 110) : d.speed;
       want.set((K('KeyD') ? 1 : 0) - (K('KeyA') ? 1 : 0), (K('Space') ? 1 : 0) - (K('KeyC') ? 1 : 0), (K('KeyS') ? 1 : 0) - (K('KeyW') ? 1 : 0));
       want.x *= d.speed * 0.4; want.y *= d.speed * 0.4; want.z *= want.z < 0 ? sp : d.speed * 0.4;
       if (K('KeyX')) want.set(0, 0, 0);
       acc = K('KeyX') ? 60 : 30;
-      wv.set(S.stick.y * d.turn, S.stick.x * d.turn, ((K('KeyQ') ? 1 : 0) - (K('KeyE') ? 1 : 0)) * 1.3);
     }
     spinUp(dt, helm);
-    S.Wv.lerp(wv, Math.min(1, dt * 5));
-    const dq = new T.Quaternion().setFromEuler(new T.Euler(S.Wv.x * dt, S.Wv.y * dt, S.Wv.z * dt, 'YXZ'));
-    S.Q.multiply(dq).normalize();
+    SpaceSim.flyTurn(S.Q, S.Wv, d.turn, I, dt);
     // (the breach assist only while her pilot's opening the throttle: let go, and it lets go of her, whatever's coming her way; a ship
     // she's left closing on her, or drifting at one, is no call for it)
     if (helm && S.kind === 'board' && K('KeyW')) squareUp(dt); else if (S.brLock || S.brRound) { S.brLock = null; S.brRound = null; S.roundBrake = false; }
@@ -1685,6 +1686,7 @@ export const Space = (() => {
     const lk = S.match === 'radar' ? radarLock() : null; if (S.match === 'radar' && !lk) S.match = null; // (the lock lost: matched to nothing)
     const base = helm && S.match ? (lk ? lk.est.v : S.tv) : null;
     if (base) want.add(base);
+    if (I) I.base = base;
     // How she flies, tied to no one's frame: her thrusters push her (main engine along her nose, the others square to it), and let go she
     // keeps going as she was. X held: she brakes to the field's way (the zone's: the rocks and the stars, stood still among them). H on a
     // target (or Shift H on the radar's lock), with nothing pushed: she's kept matched to it. Never more than FLY.max off the field's way.
@@ -1695,13 +1697,8 @@ export const Space = (() => {
       if (helm && (S.brLock || S.brRound) && !K('KeyA') && !K('KeyD') && !K('Space') && !K('KeyC') && !K('KeyS') && !K('KeyX')) { const f = fwd(S.Q), k = S.brRound && S.roundBrake ? 0 : Math.max(0, dv.dot(f)); dv.copy(f).multiplyScalar(k); } // (and the throttle's yours on top of what the approach's engine gives: open it, and she goes in at her top speed) // (lined up on a site: her assist only ever speeds her along her nose, never brakes her, and stands down while the approach has her engine)
       const l = dv.length(), step = acc * dt * ((base ? S.V.clone().sub(base) : S.V).length() > d.speed * 1.2 ? 6 : 1) * (helm && S.brLock && S.brLock.rp != null ? S.brLock.rp : 1); // (handed on from being brought round: her throttle comes in over a second)
       if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, step / l));
-    } else if (helm) {
-      const ax = (K('KeyD') ? 1 : 0) - (K('KeyA') ? 1 : 0), ay = (K('Space') ? 1 : 0) - (K('KeyC') ? 1 : 0), az = (K('KeyS') ? 1 : 0) - (K('KeyW') ? 1 : 0), thr = ax !== 0 || ay !== 0 || az !== 0;
-      if (thr) S.V.addScaledVector(new T.Vector3(ax * FLY.side, ay * FLY.side, az < 0 ? -FLY.main : az * FLY.side).applyQuaternion(S.Q), dt);
-      const to = K('KeyX') ? fieldV : !thr && base ? base : null;
-      if (to) { const dv = to.clone().sub(S.V), l = dv.length(), st = (K('KeyX') ? FLY.brake : FLY.main) * dt; if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, st / l)); }
-    }
-    { const rel = S.V.clone().sub(fieldV); if (rel.length() > FLY.max) S.V.copy(fieldV).add(rel.setLength(FLY.max)); } // (her top speed, against the field)
+      SpaceSim.flyMax(S.V, fieldV);
+    } else SpaceSim.flyPush(S.V, S.Q, I, fieldV, dt); // (her thrusters, and her top speed against the field)
     if (assist) S.P.addScaledVector(S.V, dt); else { zstep(S.P, S.V, dt, shipZ); zturn(S.Q); } // (on the breach assist: in her frame, where the site is)
     collide(dt);
     events();

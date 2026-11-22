@@ -66,6 +66,10 @@ export interface SimWorld {
   rng: () => number; fc: any; out: SimEvent[]; tg: RTarget[];
   HG: Record<string, any>; // (js/spacedata.ts HULLGUN)
 }
+// The pilot's input for a step (js/space.ts fly samples it): keys as bits (FB), the stick (its x and y, -1 to 1, as it is this step), and
+// the way she's matched to (H on a target: its velocity, or none)
+export interface FlyIn { b: number; sx: number; sy: number; base: THREE.Vector3 | null }
+export const FB = { W: 1, A: 2, S: 4, D: 8, U: 16, C: 32, X: 64, Q: 128, E: 256 } as const; // (U: Space, up)
 export interface SimShip { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; size: number; docked: boolean; ftl: boolean }
 
 import { Radar, RSuite, RTarget, RAssess } from './radar.js';
@@ -108,6 +112,28 @@ export const SpaceSim = (() => {
   }
   // an attitude kept as it is in the zone while the level turns under it
   const zturn = (Z: SimZone | null, q: THREE.Quaternion) => { if (Z && Z.frame.ok) q.premultiply(Z.frame.turn); };
+  // ---------------------------------------------------------------- her flight, free (no assist, autopilot, warp; in space)
+  // Her thrusters push her (main engine along her nose, the others square to it), and let go she keeps going as she was. X held: she
+  // brakes to the field's way. Matched (base), with nothing pushed: she's kept to it. Never more than FLY.max off the field's way.
+  const FLY = { main: 30, side: 12, brake: 60, max: 300 };
+  const _fq = new T.Quaternion(), _fe = new T.Euler(), _fw = new T.Vector3(), _fv = new T.Vector3();
+  // her turning a step: the stick's pitch and yaw, Q / E's roll, eased in (Wv: her turn rate, kept); I null: nobody's at the helm
+  function flyTurn(Q: THREE.Quaternion, Wv: THREE.Vector3, turn: number, I: FlyIn | null, dt: number) {
+    if (I) _fw.set(I.sy * turn, I.sx * turn, ((I.b & FB.Q ? 1 : 0) - (I.b & FB.E ? 1 : 0)) * 1.3); else _fw.set(0, 0, 0);
+    Wv.lerp(_fw, Math.min(1, dt * 5));
+    Q.multiply(_fq.setFromEuler(_fe.set(Wv.x * dt, Wv.y * dt, Wv.z * dt, 'YXZ'))).normalize();
+  }
+  // her thrusters a step (not on the breach assist), then her top speed against the field
+  function flyPush(V: THREE.Vector3, Q: THREE.Quaternion, I: FlyIn | null, fieldV: THREE.Vector3, dt: number) {
+    if (I) {
+      const b = I.b, ax = (b & FB.D ? 1 : 0) - (b & FB.A ? 1 : 0), ay = (b & FB.U ? 1 : 0) - (b & FB.C ? 1 : 0), az = (b & FB.S ? 1 : 0) - (b & FB.W ? 1 : 0), thr = ax !== 0 || ay !== 0 || az !== 0;
+      if (thr) V.addScaledVector(_fv.set(ax * FLY.side, ay * FLY.side, az < 0 ? -FLY.main : az * FLY.side).applyQuaternion(Q), dt);
+      const to = b & FB.X ? fieldV : !thr && I.base ? I.base : null;
+      if (to) { const dv = _fv.copy(to).sub(V), l = dv.length(), st = (b & FB.X ? FLY.brake : FLY.main) * dt; if (l > 1e-4) V.addScaledVector(dv, Math.min(1, st / l)); }
+    }
+    flyMax(V, fieldV);
+  }
+  function flyMax(V: THREE.Vector3, fieldV: THREE.Vector3) { const rel = _fv.copy(V).sub(fieldV); if (rel.length() > FLY.max) V.copy(fieldV).add(rel.setLength(FLY.max)); }
   // ---------------------------------------------------------------- the rocks
   // Each step: every rock's place in the level's frame (the zone's, moved and turned as it is), and those within ROCK_NEAR of her made
   // radar targets (a return as big as its face: ROCK_SIG of its cross-section, the same every way) and the radars' cover (Radar.occ)
@@ -471,5 +497,5 @@ export const SpaceSim = (() => {
       if (r.hits) W.out.push({ k: 'damage', dmg: r.dmg, why: r.dmg > 4 ? 'Minigun fire' : undefined, hits: r.hits }); }
     if (W.shots.length) shotsStep(W, dt);
   }
-  return { world, worldStep, ztOf, zonePlace, yawQ, CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, SHOT, segNear, shotsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
+  return { world, worldStep, ztOf, zonePlace, yawQ, CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, FLY, flyTurn, flyPush, flyMax, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, SHOT, segNear, shotsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
 })();
