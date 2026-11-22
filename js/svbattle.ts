@@ -38,6 +38,7 @@ export const SvBattle = (() => {
   }
   // Her own set (radars, transponder): kept, all it holds, while she's the same ship (a new level isn't a new her: js/space.ts ewStep)
   let OWN: { su: RSuite; t: RTarget; def: string; key: string; xpdr: boolean } | null = null;
+  let rt = 0; // (the battle's clock, never started again in a session: a new world goes on from it)
   let pose: Pose | null = null, poseWas: Pose | null = null; // (the pilot's last word of her pose, and the server step it came at; the last one in another level's frame)
   const fitKey = (fleet: any, def: SpShipDef) => { const fit = ((fleet && fleet.fit && fleet.fit[def.id]) || []).slice(0, def.turrets); return Array.from({ length: def.turrets }, (_, i) => (fit[i] ? (fit[i] === 'rail' ? 'r' : 'g') : '-')).join(''); };
   function ownFor(fleet: any) {
@@ -70,6 +71,7 @@ export const SvBattle = (() => {
     // (the battle's random numbers from the level's seed, as the page has them: js/space.ts setup)
     Radar.seed(((map.seed || 1) * 31) + (((map as any).level) || 0));
     const W = SpaceSim.world(Radar.rngOf('space'));
+    W.t = rt; // (the radars' clock goes on from the last world's: what her own set holds is timed by it, js/space.ts EW.rt)
     const own = ownFor(fleet); if (own) Radar.reseed(own.su);
     W.own = own ? own.su : null; W.ownT = own ? own.t : null; W.xpdr = own ? own.xpdr : false;
     W.zone = { zdef: SD.zone(zms as any), zact: k, wing: !!sp.wing, zC: new T.Vector3((hb.x0 + hb.x1) / 2, 0, (hb.z0 + hb.z1) / 2), zt0: 0, ztAt: 0 };
@@ -114,7 +116,7 @@ export const SvBattle = (() => {
     SpaceNet.sevOf(W.out, n, B.ev);
     for (const e of W.out) { B.evc[e.k] = (B.evc[e.k] || 0) + 1; if (e.k === 'damage') B.dm += e.dmg; if (e.k === 'torpEnd') B.ended.add(e.id); if (e.k === 'torpEnd') mark(B, e.id, e.how === 1 ? 'shot down' : e.how === 2 ? 'hit ' + (e.on || '') : 'spent'); }
     if (fired.size) B.evc.fire = (B.evc.fire || 0) + fired.size;
-    watch(B);
+    watch(B); rt = W.t;
     const took = performance.now() - t0, P = B.prof; P.n++; P.ms += took; if (took > P.max) P.max = took;
     if (t0 - P.at > 1000) { if (P.at) P.last = { n: P.n, ms: P.ms, max: P.max }; P.n = 0; P.ms = 0; P.max = 0; P.at = t0; }
   }
@@ -220,6 +222,6 @@ export const SvBattle = (() => {
       torps: W.torps.map((tp) => ({ id: tp.id, mine: tp.mine, ph: tp.ph, t: +tp.t.toFixed(2), fus: tp.fus, lock: tp.lock, r: foeP ? Math.round(tp.p.distanceTo(foeP)) : null, e: foeP ? Math.round(tp.est.distanceTo(foeP)) : null, R: Math.round(tp.est.distanceTo(tp.p)), ev: tp.ev.toArray().map((v) => Math.round(v)), v: tp.v.toArray().map((v) => Math.round(v)), fixed: !!fixOf(W, tp), thr: +tp.thr.toFixed(2), dbg: tp.dbg ? Object.fromEntries(Object.entries(tp.dbg).map(([k, v]) => [k, +(+(v as number)).toFixed(3)])) : null })),
       marks: Object.fromEntries(B.marks), evc: B.evc, dm: +B.dm.toFixed(2), prof: B.prof.last };
   }
-  function reset() { OWN = null; pose = null; poseWas = null; }
+  function reset() { OWN = null; pose = null; poseWas = null; rt = 0; }
   return { load, make, step, heardPose, request, out, summary, reset, own: () => OWN, pose: () => pose };
 })();
