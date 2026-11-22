@@ -913,7 +913,8 @@ export const SpaceSv = (() => {
       case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'storp', a: m.a, by: from }, from); battleIn(m); } break; // (a torpedo in flight: js/space.ts torps)
       case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'schaff', a: m.a, by: from }, from); battleIn(m); } break; // (chaff thrown out of her: js/space.ts chaffGo)
       case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'srcue', a: m.a, by: from }, from); battleIn(m); } break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
-      case 'sdmg': if (p && st.ship.ctl === from) battleIn(m); break; // (what she hit herself, as the pilot's page saw it: the server's battle keeps her hull)
+      case 'sdmg': if (p && st.ship.ctl === from) battleIn(m); break;
+      case 'smatch': if (p && st.ship.ctl === from && typeof m.id === 'string' && m.id.length <= 40) battleIn(m); break; // (what the pilot's matched speed with: js/space.ts sendPose) // (what she hit herself, as the pilot's page saw it: the server's battle keeps her hull)
       case 'shit': if (p && Number.isFinite(m.i)) { net().broadcast({ t: 'shit', i: m.i | 0, hp: +m.hp || 0, by: from }, from); battleIn(m); } break; // (a hull gun hit by a turret, or the ship by one: told to all)
       case 'mobj': if (p) act(String(m.k), from, m.n); break;
       // the shipyard: a ship bought (paid for on the buyer's own screen, as the shop's stock is), taken out, fitted

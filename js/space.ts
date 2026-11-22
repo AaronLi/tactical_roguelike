@@ -2200,9 +2200,13 @@ export const Space = (() => {
   }
 
   // ------------------------------------------------------------------ the pose, told and heard
+  let matchSent = '';
   function sendPose(now?: boolean) {
     S.sendT -= 1; if (!now && S.sendT > 0) return; S.sendT = 4;
     const r3 = (v: number) => Math.round(v * 1000) / 1000;
+    // (what she's matched speed with, when it changes: the server's notch lets it through, as hers does above)
+    const mt = S.match && S.match !== 'radar' ? (S.match === 'ship' ? 'hull' : S.match) : '';
+    if (mt !== matchSent) { matchSent = mt; Net.toHost({ t: 'smatch', id: mt }); }
     Net.toHost({ t: 'spose', a: [r3(S.P.x), r3(S.P.y), r3(S.P.z), r3(S.Q.x), r3(S.Q.y), r3(S.Q.z), r3(S.Q.w), r3(S.V.x), r3(S.V.y), r3(S.V.z), S.stage === 'atmo' ? 1 : 0, Math.round(S.hp)] });
   }
   function heardPose(a: number[]) {

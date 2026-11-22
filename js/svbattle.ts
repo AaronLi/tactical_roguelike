@@ -40,6 +40,7 @@ export const SvBattle = (() => {
   // Her own set (radars, transponder): kept, all it holds, while she's the same ship (a new level isn't a new her: js/space.ts ewStep)
   let OWN: { su: RSuite; t: RTarget; def: string; key: string; xpdr: boolean } | null = null;
   let rt = 0; // (the battle's clock, never started again in a session: a new world goes on from it)
+  let match: string | null = null; // (what the pilot's matched speed with: her notch lets it through)
   const HP = { v: -1, lost: false, told: false }; // (her hull: hurt, failing)
   let pose: Pose | null = null, poseWas: Pose | null = null; // (the pilot's last word of her pose, and the server step it came at; the last one in another level's frame)
   const fitKey = (fleet: any, def: SpShipDef) => { const fit = ((fleet && fleet.fit && fleet.fit[def.id]) || []).slice(0, def.turrets); return Array.from({ length: def.turrets }, (_, i) => (fit[i] ? (fit[i] === 'rail' ? 'r' : 'g') : '-')).join(''); };
@@ -105,7 +106,7 @@ export const SvBattle = (() => {
     if (W.zone) { W.zone.zt0 = zt; W.zone.ztAt = W.t + dt; } // (worldStep's zone time, after its W.t += dt, is zt)
     if (W.own && OWN) { W.xpdr = OWN.xpdr; W.own.hostNames = new Set([hullName(B)]); }
     if (W.foe && W.foeT) { const af = missionAff(B.ms) as any; W.foeT.aff = af; W.foeT.iff = { c: af === 'navy' ? 'navy' : 'civ', n: hullName(B) }; W.foeT.xon = af !== 'pirate'; W.foe.aff = af; }
-    W.crew = crew;
+    W.crew = crew; W.keepTgt = match;
     // the guns' rounds this step, each gun's from a seed of its own (sent: a client flies the same ones)
     const fired = new Map<number, { s: number; rng: () => number; aim: THREE.Vector3; err: number; c: number }>();
     const fire = (from: THREE.Vector3, aim: THREE.Vector3, H: any, err: number) => {
@@ -173,6 +174,7 @@ export const SvBattle = (() => {
       case 'schaff': if (W) W.chaff.push(SpaceSim.chaffNew(a, ++W.chaffN, W.t)); break;
       case 'smis': if (W && a && a[4]) { const i = W.mis.findIndex((q) => q.id === a[0]); if (i >= 0) { W.mis.splice(i, 1); B!.ev.push({ k: 'misEnd', n: B!.sn, id: a[0], hit: 0 }); } } break; // (a missile a turret shot down, said by the screen that fired)
       case 'sfire': if (W && a && a.length >= 9 && W.shots.length < SpaceSim.SHOT.MAX) W.shots.push({ p: new T.Vector3(a[0], a[1], a[2]), v: new T.Vector3(a[3], a[4], a[5]), d: 0, life: Math.min(+a[6], 6000), dmg: Math.min(+a[8], 100) }); break; // (a round from one of her turrets: the server's to hit with)
+      case 'smatch': match = m.id || null; break;
       case 'sdmg': if (Number.isFinite(+m.d) && +m.d > 0) hurt(Math.min(+m.d, 1000)); break; // (what the pilot's page saw her take itself: the ground, a rock)
       case 'shit': if (W && m.i >= 0) { const g = W.guns[m.i | 0]; if (g) g.hp = Math.max(0, +m.hp || 0); } break;
       case 'storp': if (W) torpIn(B!, a, m.f); break;
@@ -224,12 +226,12 @@ export const SvBattle = (() => {
     if (!B) return { on: false, own: suiteSum(OWN && OWN.su), pose: pose ? { age: pose.n } : null };
     const W = B.W, foeP = W.foe ? W.foe.P : null;
     return { on: true, k: B.k, t: +W.t.toFixed(2), zt: W.zone ? +SpaceSim.ztOf(W).toFixed(2) : 0, built: +B.built.toFixed(1), ship: { P: W.ship.P.toArray().map((v) => Math.round(v)), docked: W.ship.docked, ftl: W.ship.ftl, d: foeP ? Math.round(foeP.distanceTo(W.ship.P)) : null },
-      crew: W.crew, own: suiteSum(W.own), foe: suiteSum(W.foe), fc: W.fc, tg: W.tg.map((t) => t.id), traffic: W.traffic.filter((q) => q.su).map((q) => q.c.k),
+      crew: W.crew, keep: W.keepTgt, own: suiteSum(W.own), foe: suiteSum(W.foe), fc: W.fc, tg: W.tg.map((t) => t.id), traffic: W.traffic.filter((q) => q.su).map((q) => q.c.k),
       guns: W.guns.map((g) => ({ k: g.k, hp: g.hp, bt: +(g.bt || 0).toFixed(2), cool: +(g.cool || 0).toFixed(2) })), rounds: W.rounds.length, mis: W.mis.length, chaff: W.chaff.length,
       torps: W.torps.map((tp) => ({ id: tp.id, mine: tp.mine, ph: tp.ph, t: +tp.t.toFixed(2), fus: tp.fus, lock: tp.lock, r: foeP ? Math.round(tp.p.distanceTo(foeP)) : null, e: foeP ? Math.round(tp.est.distanceTo(foeP)) : null, R: Math.round(tp.est.distanceTo(tp.p)), ev: tp.ev.toArray().map((v) => Math.round(v)), v: tp.v.toArray().map((v) => Math.round(v)), fixed: !!fixOf(W, tp), thr: +tp.thr.toFixed(2), dbg: tp.dbg ? Object.fromEntries(Object.entries(tp.dbg).map(([k, v]) => [k, +(+(v as number)).toFixed(3)])) : null })),
       marks: Object.fromEntries(B.marks), evc: B.evc, dm: +B.dm.toFixed(2), hp: HP.v, prof: B.prof.last };
   }
-  function reset() { OWN = null; pose = null; poseWas = null; rt = 0; HP.v = -1; HP.lost = false; HP.told = false; }
+  function reset() { OWN = null; pose = null; poseWas = null; rt = 0; match = null; HP.v = -1; HP.lost = false; HP.told = false; }
   // her hull, kept by the server while its battle's on (from the pilot's first pose, then by what hits her); at nothing, lost is set once
   // (js/spaceserver.ts battle: the emergency jump home); a new zone starts from the pilot's word again
   function hurt(d: number) { if (HP.v < 0) return; HP.v = Math.max(0, HP.v - d); if (HP.v <= 0 && !HP.lost) HP.lost = true; }
