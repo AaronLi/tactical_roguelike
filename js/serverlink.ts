@@ -88,7 +88,7 @@ export const ServerLink = {
         case 'to': Net.relayTo(c.id, c.m); break;
         case 'rec': this.save(c.name, c.data); break;
         case 'prof': this.prof = { n: c.n, ms: c.ms, max: c.max }; break;
-        case 'digest': case 'stat': { const f = this.asks.get(c.q); if (f) { this.asks.delete(c.q); f(c); } break; }
+        case 'digest': case 'stat': case 'sworld': { const f = this.asks.get(c.q); if (f) { this.asks.delete(c.q); f(c); } break; }
       }
     };
   },
@@ -130,7 +130,7 @@ export const ServerLink = {
   stickers(names: string[]) { this.names = names.slice(); this.post({ k: 'stickers', names: this.names }); },
 
   // ---------------------------------------------------------------- questions (tests, and hunting a desync)
-  ask(k: 'digest' | 'stat', o?: Record<string, unknown>): Promise<any> {
+  ask(k: 'digest' | 'stat' | 'sworld', o?: Record<string, unknown>): Promise<any> {
     const q = ++this.qn;
     return new Promise((res) => { this.asks.set(q, res); this.post(Object.assign({ k, q }, o || {})); });
   },
@@ -143,4 +143,6 @@ export const ServerLink = {
     return { server: s.d, client: mine, same, bytes: s.json ? s.json.length : 0, differ, seed: s.seed, level: s.level, th: s.th, night: s.night };
   },
   stat() { return this.ask('stat'); },
+  // the server's space battle (js/svbattle.ts summary): its suites' pictures, fire control, guns, torpedoes, events, step cost
+  sworld() { return this.ask('sworld'); },
 };

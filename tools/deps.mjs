@@ -56,7 +56,7 @@ const ROOTS = {
 // The simulation's files, stated: the layering rule needs them named (a simulation file importing a page file would otherwise make that
 // file part of the simulation, quietly). They must be exactly what the two workers' entry files reach (js/serverhost.ts, js/prepentry.ts):
 // checked below, so a file added to the simulation is added here on purpose.
-const SIMULATION = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'spaceserver', 'serverhost', 'furnmesh', 'lightgrid', 'prepentry'];
+const SIMULATION = ['util', 'medical', 'materials', 'data', 'spacedata', 'shipgen', 'callsigns', 'arsenal', 'parts', 'gear', 'sim', 'world', 'ballistics', 'leveldesc', 'level', 'furnspec', 'furniture', 'homes', 'residents', 'scars', 'damage', 'stickers', 'route', 'shop', 'recorder', 'server', 'spaceserver', 'serverhost', 'furnmesh', 'lightgrid', 'prepentry', 'radar', 'spacesim', 'hullshape', 'rcstris', 'spacenet', 'svbattle'];
 const SIM = new Set(SIMULATION);
 
 // ------------------------------------------------------------------ parsing

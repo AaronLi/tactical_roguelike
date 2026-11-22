@@ -414,8 +414,9 @@ export const SpaceSim = (() => {
   }
   // A step of the whole battle: the zone placed, the rocks, the radars (hers, the mission ship's, the zone's ships'), the mission
   // ship's fire control and guns, missiles, torpedoes (fix(n): where her sensors have the fix a torpedo was sent at), rounds.
-  // What happened goes to W.out. kindAff: whose a zone ship is (js/space.ts kindAff)
-  function worldStep(W: SimWorld, dt: number, o: { kindAff: (c: any) => string; fix: (tp: SimTorp) => { pl: THREE.Vector3; v: THREE.Vector3 } | null }) {
+  // What happened goes to W.out. kindAff: whose a zone ship is (js/space.ts kindAff); fire: a hull gun's round fired (the server's: each
+  // step's rounds off a gun from a seed of their own, so a client can fly the same ones: js/svbattle.ts), else fireRound on W.rng
+  function worldStep(W: SimWorld, dt: number, o: { kindAff: (c: any) => string; fix: (tp: SimTorp) => { pl: THREE.Vector3; v: THREE.Vector3 } | null; fire?: (from: THREE.Vector3, aim: THREE.Vector3, H: any, err: number) => void }) {
     W.t += dt;
     if (W.zone) { const zt = ztOf(W); if (zonePlace(W.zone.zdef, W.zone.zact, W.zone.wing, W.zone.zC, zt, W.zp, W.zq)) { W.zm.compose(W.zp, W.zq, new T.Vector3(1, 1, 1)); zoneAt(W.Z, zt, W.zp, W.zm); } }
     const Z = W.zone ? W.Z : null, own = W.own, me = W.ownT;
@@ -438,7 +439,7 @@ export const SpaceSim = (() => {
       let lk: any = null; const cr = W.crew;
       if (cr && cr.hostile !== 0 && cr.gn && cr.arm == null) for (const t of Radar.sched(W.foe).tts) if (t.est.q >= 0.15 && (!lk || trkUrg(W.foe, t) < trkUrg(W.foe, lk))) lk = t;
       if (lk && !lk.est.p) lk = null;
-      gunsStep(W.guns, lk, !!lk && trkUrg(W.foe, lk) < 4, W.foe.P, W.foe.V, W.HG, W.rng, dt, (from, aim, H, err) => { fireRound(W.rounds, W.roundsMax, W.rng, from, aim, H, err); }, (gn) => { const m: SimMissile = { id: W.misN++, p: new T.Vector3(gn.x, gn.y + 1.5, gn.z), v: new T.Vector3(0, 1, 0), t: 0 }; W.mis.push(m); W.out.push({ k: 'missile', m }); });
+      gunsStep(W.guns, lk, !!lk && trkUrg(W.foe, lk) < 4, W.foe.P, W.foe.V, W.HG, W.rng, dt, (from, aim, H, err) => { if (o.fire) o.fire(from, aim, H, err); else fireRound(W.rounds, W.roundsMax, W.rng, from, aim, H, err); }, (gn) => { const m: SimMissile = { id: W.misN++, p: new T.Vector3(gn.x, gn.y + 1.5, gn.z), v: new T.Vector3(0, 1, 0), t: 0 }; W.mis.push(m); W.out.push({ k: 'missile', m }); });
     }
     { const r = missilesStep(W.mis, W.ship, W.rocks, W.rockList, W.HG.missile, dt); for (const m of r.hit) { W.out.push({ k: 'missileEnd', id: m.id, hit: true }); W.out.push({ k: 'damage', dmg: W.HG.missile.dmg, why: 'A missile', hits: 1 }); } for (const m of r.gone) W.out.push({ k: 'missileEnd', id: m.id, hit: false }); }
     for (const tp of W.torps.slice()) {
