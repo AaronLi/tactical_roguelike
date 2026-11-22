@@ -866,31 +866,7 @@ export const SpaceSv = (() => {
       case 'jump': jump(m.to | 0, from); break;
       // the squad's ship has closed with another of the zone's ships (js/space.ts): she's the level now. The one left behind goes on
       // her way; the mission's keeps what's been done aboard her (not who was left standing: her crew are at their posts again).
-      case 'tboard': {
-        const M = st.M, k = m.k | 0;
-        if (!p || sv.phase !== 'level' || sv.leaving || !M || !M.meta || M.docked || M.boom || !Z || k === Z.active) break;
-        const c = SD.zone(Z.ms)[k]; if (!c) break;
-        const zz = Z, was = zz.active;
-        // Whoever's inside the ship being left stays there: the level stays live beside the one the squad's ship goes to (js/server.ts
-        // ctxs, docs/zone-levels.md), till nobody's in it. Nobody inside: it's kept as it is (putAway), all that's happened aboard it,
-        // as it was left if the squad comes back to it. Everyone aboard the squad's ship goes with it.
-        const here = [...sv.players.values()].filter((q) => sv.lvOf(q) === was); // (those in the level being left: others are aboard yet another, and stay)
-        const inside = here.filter((q: any) => q.st && q.st.p && !q.st.dd && (() => { const r = sv.roomOf(q.st.p[0], q.st.p[1] || 0, q.st.p[2]); return r >= 0 && M.meta!.hullOf[r] != null; })());
-        for (const q of here as any[]) q.lv = inside.includes(q) ? was : undefined;
-        (zz.casBy = zz.casBy || {})[was] = casNow(); // (what it cost aboard the ship being left, as it's left)
-        if (inside.length || nearK.has(was)) { const c = sv.ctxSave(); c.warm = nearK.has(was); sv.ctxs.set(was, c); } else putAway(); // (still near it: kept live too, warm)
-        { // (at once: nothing's drawn over it. Each screen carries the squad's ship across as she is: js/space.ts carry)
-          zz.active = k;
-          const live = sv.ctxs.get(k);
-          if (live) { // (the ship gone to is live already (someone's been left aboard it): it's the loaded level again, and they're with it)
-            sv.ctxs.delete(k); sv.ctxLoad(live); zz.active = k; st.ship.docked = false;
-            for (const q of sv.players.values() as Iterable<any>) if (q.lv === k) q.lv = undefined;
-            sv.toLevel(sv.phaseMsg(true, true)); break;
-          }
-          st.ship.docked = false; bringUp(k);
-        }
-        break;
-      }
+      case 'tboard': if (p) tboardTo(m.k | 0); break;
       case 'tnear': case 'tfar': if (p && Number.isFinite(m.k)) warm(m.k | 0, m.t === 'tnear'); break; // (the squad's ship coming up with a zone ship, or going from it: its level made ahead, or let go)
       case 'sdock': if (p) dock(!!m.on, from, m.site); break;
       case 'shatch': if (p) openHatch(from); break;
@@ -960,6 +936,33 @@ export const SpaceSv = (() => {
   // ---- the battle (js/svbattle.ts): the zone's, on the server. Made with a boarding mission's level, made again when the level's
   // another of the zone's ships (tboard) or come back to, dropped when the zone's over (home, a new run). Stepped once a server step,
   // after every level's (js/serverhost.ts step), with the loaded level's (the squad's ship's) crew state
+  // another of the zone's ships made the level (her helm's come up with her: js/helm.ts close; or the pilot's page asked)
+  function tboardTo(k: number) {
+    const sv = S();
+    { const M = st.M;
+        if (sv.phase !== 'level' || sv.leaving || !M || !M.meta || M.docked || M.boom || !Z || k === Z.active) return;
+        const c = SD.zone(Z.ms)[k]; if (!c) return;
+        const zz = Z, was = zz.active;
+        // Whoever's inside the ship being left stays there: the level stays live beside the one the squad's ship goes to (js/server.ts
+        // ctxs, docs/zone-levels.md), till nobody's in it. Nobody inside: it's kept as it is (putAway), all that's happened aboard it,
+        // as it was left if the squad comes back to it. Everyone aboard the squad's ship goes with it.
+        const here = [...sv.players.values()].filter((q) => sv.lvOf(q) === was); // (those in the level being left: others are aboard yet another, and stay)
+        const inside = here.filter((q: any) => q.st && q.st.p && !q.st.dd && (() => { const r = sv.roomOf(q.st.p[0], q.st.p[1] || 0, q.st.p[2]); return r >= 0 && M.meta!.hullOf[r] != null; })());
+        for (const q of here as any[]) q.lv = inside.includes(q) ? was : undefined;
+        (zz.casBy = zz.casBy || {})[was] = casNow(); // (what it cost aboard the ship being left, as it's left)
+        if (inside.length || nearK.has(was)) { const c = sv.ctxSave(); c.warm = nearK.has(was); sv.ctxs.set(was, c); } else putAway(); // (still near it: kept live too, warm)
+        { // (at once: nothing's drawn over it. Each screen carries the squad's ship across as she is: js/space.ts carry)
+          zz.active = k;
+          const live = sv.ctxs.get(k);
+          if (live) { // (the ship gone to is live already (someone's been left aboard it): it's the loaded level again, and they're with it)
+            sv.ctxs.delete(k); sv.ctxLoad(live); zz.active = k; st.ship.docked = false;
+            for (const q of sv.players.values() as Iterable<any>) if (q.lv === k) q.lv = undefined;
+            sv.toLevel(sv.phaseMsg(true, true)); return;
+          }
+          st.ship.docked = false; bringUp(k);
+        }
+        }
+  }
   let bat: SvBat | null = null;
   function battle(dt: number) {
     const sv = S(), M = st.M, map = sv.map;
@@ -972,7 +975,8 @@ export const SpaceSv = (() => {
     const docked = kind === 'hub' ? !!st.ship.docked : !!(M && M.docked);
     if (kind === 'hub' && docked) SvBattle.repair(); // (docked at home: her hull made good, as the page has it)
     // (her helm's: the fleet, the board's anchors, the pods on the hull, docking as the pilot's page asked it to: dock)
-    const hc = { fleet: st.fleet, board: st.board, gone: (i: number) => goneOf(st.board).includes(i), raid: (M && M.raid) || [], done: !!(M && M.done), dock: (on: boolean, at?: number[]) => { if (st.ship.ctl) dock(on, st.ship.ctl, at); return sv.phase === 'shop' ? !!st.ship.docked : !!(st.M && st.M.docked); }, shipName: (M && M.ms && M.ms.name) || 'THE SHIP' };
+    const hc = { fleet: st.fleet, board: st.board, gone: (i: number) => goneOf(st.board).includes(i), raid: (M && M.raid) || [], done: !!(M && M.done), jump: (to: number) => { if (st.ship.ctl) jump(to, st.ship.ctl); }, tboard: (k: number) => tboardTo(k), warm: (k: number, on: boolean) => warm(k, on), ready: (k: number) => !!sv.ctxs.get(k),
+      docked: kind === 'hub' ? !!st.ship.docked : !!(M && M.docked), at: st.ship.at, near: !!(Z && st.M && (Z.active !== 0 || !!st.M.revisit)), act: Z ? Z.active : 0, site: (M && M.site) || null, dock: (on: boolean, at?: number[]) => { if (st.ship.ctl) dock(on, st.ship.ctl, at); return sv.phase === 'shop' ? !!st.ship.docked : !!(st.M && st.M.docked); }, shipName: (M && M.ms && M.ms.name) || 'THE SHIP' };
     SvBattle.step(bat, dt, sv.stepN, crew, docked, board ? board.Z.zt : 0, (kk) => { const c = sv.ctxs.get(kk); return c ? (c.sv.map as any) || null : null; }, hc); // (a zone ship's level, made: her real hull for the radars)
     SvBattle.out(bat, sv.stepN, board ? board.Z.zt : 0, (m) => net().broadcast(m), (b, ch) => net().fast(null, b, ch));
     // (her hull gone, by the server's count: the drive jumps her home by itself, as the pilot's page did (js/space.ts damage))

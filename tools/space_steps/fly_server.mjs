@@ -19,4 +19,5 @@ export default async ({ ev, sleep, log }) => {
     log(await ev(`(async () => { const w = (await G.ServerLink.sworld()).w || {}, c = G.Space.C2(); return JSON.stringify({ step: G.Space.SIM.steps, page: G.Space.S.P.toArray().map(v => +v.toFixed(2)), server: w.fly, acks: c.acks, err: +c.err.toFixed(5), errMax: +c.errMax.toFixed(5), fixes: c.fixes, states: c.states, hist: c.hist.length }); })()`));
   }
   log('WHY ' + JSON.stringify(await ev('G.Space.C2().why')));
+  log('STATES ' + JSON.stringify(await ev('G.Space.C2().whyS')));
 };

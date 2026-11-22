@@ -13,6 +13,7 @@ import { SpaceSim, FlyIn, FB } from './spacesim.js';
 import { HANGAR_ROWS } from './data.js';
 import { Sim } from './sim.js';
 import { asteroidHeight, ASTEROID_R } from './asteroidshape.js';
+import { TrafficShape } from './hullshape.js';
 
 type SpWp = { id: string; name: string; sub?: string; p: THREE.Vector3; kind: string; i?: number; hide?: boolean };
 type ShSite = ReturnType<typeof ShipGen.sites>[number];
@@ -25,7 +26,7 @@ export type HelmEv =
   | { k: 'toast'; h: string; b: string; t: number } | { k: 'kick'; a: number } | { k: 'pose' }
   | { k: 'plan'; p: any } | { k: 'route'; pts: THREE.Vector3[]; n: THREE.Vector3 }
   | { k: 'dmg'; n: number; why: string } | { k: 'rebase'; b: { x: number; y: number; z: number; yaw: number; pt?: number } }
-  | { k: 'auto'; then: HelmThen } | { k: 'through'; to: 'orbit' | 'atmo' } | { k: 'stage'; to: 'orbit' | 'atmo' }; // (through: the cloud's edge met, the veil down; stage: through it, the other place shown)
+  | { k: 'auto'; then: HelmThen } | { k: 'through'; to: 'orbit' | 'atmo' } | { k: 'stage'; to: 'orbit' | 'atmo' } | { k: 'jump'; to: number } | { k: 'ftlOut' } | { k: 'tboard'; to: number }; // (tboard: come up with another of the zone's ships, she's to be the level) // (jump: spooled, the host asked to jump her; ftlOut: out of the tunnel) // (through: the cloud's edge met, the veil down; stage: through it, the other place shown)
 // the level's geometry and frame, as the caller has them
 export interface HelmG {
   sites: () => ShSite[]; // (every site she could be breached through now: js/space.ts siteList)
@@ -38,6 +39,10 @@ export interface HelmG {
   rockList: () => { r: number }[];
   boom: () => boolean; // (the mission ship blowing herself apart: no breaching her)
   done?: () => boolean; // (the mission's done: up out of the cloud, the anchor's what she steers for)
+  zC?: () => THREE.Vector3; // (a boarding zone: the level's ship's middle)
+  zoneDir?: (k: number) => THREE.Vector3; // (zone ship k's heading, level, in the level's frame)
+  ready?: (k: number) => boolean; // (zone ship k's level ready to be the level: on the server, made; on a page, her hull drawn)
+  zreset?: () => void; // (her way's memory through the zone begun again: a new place)
 }
 export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
   const T = THREE;
@@ -450,8 +455,55 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     else { const o = (S.wps as SpWp[]).find((w) => w.id === 'entry')!.p, a = (S.wps as SpWp[]).find((w) => w.id === 'out')!.p; S.P.copy(o).lerp(a, 0.25); const d = a.clone().sub(S.P).normalize(); S.Q.copy(lookQ(d)); S.V.copy(d).multiplyScalar(120); }
     ev({ k: 'stage', to });
   }
-  // a step of her helm: the target's own way followed, her flight, the cloud crossed
-  function step(I: HelmIn, dt: number) { tgtTrack(dt); const r = fly(I, dt); thruStep(dt); return r; }
+  // The jump drive's run (S.ftl): spooling up (she's stopped meanwhile, fly), then waiting on the host to make the jump (given up after
+  // six seconds), or, come out of it, the last of the tunnel; out of that she's going at 45 m/s along her nose
+  function ftlStep(dt: number) {
+    const f = S.ftl; if (!f) return;
+    f.t += dt;
+    if (f.st === 'spool') { S.V.multiplyScalar(Math.exp(-dt * 3)); if (f.t >= f.T) { f.st = 'wait'; ev({ k: 'jump', to: f.to }); } }
+    else if (f.st === 'wait') { if (f.t > f.T + 6) S.ftl = null; } // (the host never answered: back to flying)
+    else if (f.T - f.t <= 0) { S.ftl = null; S.V.copy(fwd(S.Q)).multiplyScalar(45); ev({ k: 'ftlOut' }); }
+  }
+  // Come up with another of the zone's ships (within ZONE_NOW, or ZONE_TAKE once her level's ready to be the level, and a fifth nearer
+  // than the level's own ship: no to and fro between two) for a third of a second: she's to be the level (tboard), the squad's ship
+  // carried across as she is by her (carry: where she is from her, which way she's headed, her own pose and way)
+  const ZONE_NOW = 400, ZONE_TAKE = 500;
+  function close(dt: number) {
+    if (S.kind !== 'board' || S.docked || S.ftl || S.warp || G.boom() || !G.zC) { S.tclose = null; return; }
+    let best: SpWp | null = null, bk = -1, bd = Math.min(ZONE_TAKE, S.P.distanceTo(G.zC()) * 0.8);
+    for (const w of S.wps as SpWp[]) { const m = /^t(\d+)$/.exec(w.id); if (!m) continue; const k = +m[1], d = S.P.distanceTo(w.p); if (d < bd && (d < ZONE_NOW || (G.ready && G.ready(k)))) { bd = d; best = w; bk = k; } }
+    if (!best) { S.tclose = null; return; }
+    if (!S.tclose || S.tclose.k !== bk) S.tclose = { k: bk, t: 0, name: best.name };
+    S.tclose.t += dt;
+    if (S.tclose.t > 0.35 && !S.tclose.sent) { S.tclose.sent = true; const d = G.zoneDir!(bk); S.carry = { k: bk, v: S.P.clone().sub(best.p), yaw: Math.atan2(d.x, d.z), Q: S.Q.clone(), V: S.V.clone() }; ev({ k: 'tboard', to: bk }); }
+  }
+  // Into a place: on her berth (docked), or come up with the ship that's the level now (near: carried across, else lying off her), or
+  // out of the jump by its arrival (the last of the tunnel: the hub's by the mission's anchor she left from, at). act: the zone ship
+  // that's the level
+  function arriveAt(p: THREE.Vector3, dir: THREE.Vector3) { S.P.copy(p); S.Q.copy(lookQ(dir)); S.V.copy(dir).multiplyScalar(60); S.docked = false; S.ftl = { st: 'tunnel', t: 0, to: 0, T: 4.5 }; }
+  function arrive(o: { docked: boolean; at: number | null; near: boolean; act: number }) {
+    S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1; S.brLock = null; S.brRound = null; S.thru = null; S.ftl = null; S.tclose = null; S.match = null; S.roundBrake = false; S.brThrust = false; if (G.zreset) G.zreset();
+    S.docked = o.docked;
+    const W3 = (x: number, y: number, z: number) => new T.Vector3(x, y, z);
+    if (S.kind === 'hub') {
+      const base = W3(S.berth.x, 0, S.berth.z), a = o.at != null ? (S.wps as SpWp[]).find((w) => w.kind === 'anchor' && w.i === o.at) : null;
+      if (!o.docked) { if (a) { const dir = base.clone().sub(a.p).normalize(); arriveAt(a.p.clone().addScaledVector(dir, 160), dir); } else arriveAt(base.clone().add(W3(-300, 260, 500)), W3(0.4, -0.3, -0.8).normalize()); }
+    } else if (S.kind === 'board' && S.map && S.map.sp) {
+      const sp = S.map.sp, b = sp.breach;
+      if (o.near) {
+        const c = S.carry && S.carry.k === o.act ? S.carry : null, zC = W3((sp.hull.x0 + sp.hull.x1) / 2, 0, (sp.hull.z0 + sp.hull.z1) / 2);
+        if (c) { const rot = yawQ((sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0)) - c.yaw); S.P.copy(c.v).applyQuaternion(rot).add(zC); S.Q.copy(rot).multiply(c.Q); S.V.copy(c.V).applyQuaternion(rot); }
+        else { S.P.set(b.x + 30, 28, b.face + 260); S.Q.copy(lookQ(W3(-0.1, -0.1, -1).normalize())); S.V.set(0, 0, 0); }
+        S.docked = false; S.carry = null;
+      } else arriveAt(W3(b.x + 260, 140, b.face + 1700), W3(-0.15, -0.08, -1).normalize());
+    } else if (S.kind === 'assault') {
+      const out = (S.wps as SpWp[]).find((w) => w.id === 'out');
+      if (out) arriveAt(out.p.clone().add(W3(120, -40, -260)), W3(0.2, -0.45, -0.85).normalize());
+    }
+    if (o.docked) { S.P.copy(S.Dp); S.Q.copy(S.Dq); }
+  }
+  // a step of her helm: the target's own way followed, her flight, the zone's ships come up with, the jump drive, the cloud crossed
+  function step(I: HelmIn, dt: number) { tgtTrack(dt); const r = fly(I, dt); close(dt); ftlStep(dt); thruStep(dt); return r; }
   function dock(on: boolean) {
     S.brLock = null; S.brRound = null;
     S.docked = on;
@@ -468,7 +520,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     S.P.copy(S.Dp); S.Q.copy(S.Dq);
     auto(away, S.Dq, S.kind === 'board' ? 2.5 : 3.2, null, { k: 'none' });
   }
-  return { step, through, thruStep, fly, aim, squareUp, roundUp, warpGate, warpGo, warpAim, spinUp, collide, events, auto, autoStep, dock, land, launchAway, lookQ, tgtTrack, dbgBr, ROUND };
+  return { step, close, arrive, ftlStep, through, thruStep, fly, aim, squareUp, roundUp, warpGate, warpGo, warpAim, spinUp, collide, events, auto, autoStep, dock, land, launchAway, lookQ, tgtTrack, dbgBr, ROUND };
 }
 
 // ---------------------------------------------------------------- her helm's state, copied, compared, packed
@@ -484,7 +536,7 @@ export function helmCopy(dst: any, src: any, dzm: ZM, szm: ZM) {
   dst.docked = src.docked; dst.spin = src.spin; dst.cruise = src.cruise; dst.roundBrake = src.roundBrake; dst.brThrust = src.brThrust;
   dst.tv.copy(src.tv); dst.tvP.copy(src.tvP); dst.tvJ = src.tvJ; dst.match = src.match; dst.tgt = src.tgt; dst.shake = src.shake;
   dst.berth = { ...src.berth }; dst.Dp.copy(src.Dp); dst.Dq.copy(src.Dq);
-  dst.warp = src.warp ? { ...src.warp } : null; dst.thru = src.thru ? { ...src.thru } : null; dst.stage = src.stage;
+  dst.warp = src.warp ? { ...src.warp } : null; dst.thru = src.thru ? { ...src.thru } : null; dst.stage = src.stage; dst.ftl = src.ftl ? { ...src.ftl } : null;
   const a = src.auto; dst.auto = a ? { ...a, P0: a.P0.clone(), Q0: a.Q0.clone(), P1: a.P1.clone(), Q1: a.Q1.clone(), mid: a.mid ? a.mid.clone() : null } : null;
   const L = src.brLock; dst.brLock = L ? { ...L, q0: L.q0 ? L.q0.clone() : undefined, ra: L.ra ? L.ra.clone() : undefined } : null;
   const R = src.brRound; dst.brRound = R ? { ...R, face: R.face.clone(), E: R.E.clone(), way: R.way.map((q: THREE.Vector3) => q.clone()), ra: R.ra ? R.ra.clone() : undefined } : null;
@@ -495,7 +547,7 @@ export function helmDiff(a: any, b: any) {
   const out: string[] = [], vq = (k: string) => { if (!a[k].equals(b[k])) out.push(k); };
   ['P', 'Q', 'V', 'Wv', 'tv', 'Dp', 'Dq'].forEach(vq);
   for (const k of ['docked', 'spin', 'cruise', 'tvJ', 'match', 'tgt', 'stage']) if (a[k] !== b[k]) out.push(k);
-  for (const k of ['auto', 'warp', 'brLock', 'brRound', 'thru']) if (!!a[k] !== !!b[k]) out.push(k);
+  for (const k of ['auto', 'warp', 'brLock', 'brRound', 'thru', 'ftl']) if (!!a[k] !== !!b[k]) out.push(k);
   if (a.thru && b.thru && a.thru.left !== b.thru.left) out.push('thru.left');
   return out;
 }
@@ -507,6 +559,7 @@ export function helmSame(a: any, b: any) {
   if (a.auto && (a.auto.t !== b.auto.t || a.auto.then.k !== b.auto.then.k)) return false;
   if (a.warp && (a.warp.u !== b.warp.u || a.warp.t !== b.warp.t)) return false;
   if (a.stage !== b.stage || !!a.thru !== !!b.thru || (a.thru && a.thru.left !== b.thru.left)) return false;
+  if (!!a.ftl !== !!b.ftl || (a.ftl && (a.ftl.st !== b.ftl.st || a.ftl.t !== b.ftl.t))) return false;
   const sk = (x: any) => x.c + ',' + x.nx + ',' + x.nz;
   if (a.brLock && (sk(a.brLock.site) !== sk(b.brLock.site) || a.brLock.hard !== b.brLock.hard || a.brLock.fa !== b.brLock.fa)) return false;
   if (a.brRound && (sk(a.brRound.site) !== sk(b.brRound.site) || a.brRound.way.length !== b.brRound.way.length)) return false;
@@ -517,7 +570,7 @@ export function helmPack(S: any, zm: ZM) {
   const a = S.auto, L = S.brLock, R = S.brRound;
   return { P: v3(S.P), Q: q4(S.Q), V: v3(S.V), W: v3(S.Wv), k: [S.stick.x, S.stick.y], z: [...v3(zm.vz), ...v3(zm.v)].map(nn),
     d: S.docked ? 1 : 0, sp: S.spin, cr: S.cruise ? 1 : 0, rb: S.roundBrake ? 1 : 0, bt: S.brThrust ? 1 : 0, tv: v3(S.tv), tvP: v3(S.tvP), tvJ: S.tvJ, m: S.match, tg: S.tgt,
-    be: S.berth, Dp: v3(S.Dp), Dq: q4(S.Dq), w: S.warp, st: S.stage, th: S.thru ? { to: S.thru.to, left: S.thru.left } : null,
+    be: S.berth, Dp: v3(S.Dp), Dq: q4(S.Dq), w: S.warp, st: S.stage, th: S.thru ? { to: S.thru.to, left: S.thru.left } : null, f: S.ftl ? { ...S.ftl } : null,
     au: a ? { t: a.t, T: a.T, P0: v3(a.P0), Q0: q4(a.Q0), P1: v3(a.P1), Q1: q4(a.Q1), mid: a.mid ? v3(a.mid) : null, then: a.then } : null,
     bl: L ? { s: siteKey(L.site), hard: L.hard, fa: L.fa, q0: L.q0 ? q4(L.q0) : null, T0: L.T0, rp: L.rp, ra: L.ra ? v3(L.ra) : null } : null,
     br: R ? { s: siteKey(R.site), face: v3(R.face), E: v3(R.E), hard: R.hard, way: R.way.map(v3), ra: R.ra ? v3(R.ra) : null } : null };
@@ -528,7 +581,7 @@ export function helmUnpack(S: any, o: any, zm: ZM, siteAt: (a: number[]) => any)
   S.docked = !!o.d; S.spin = o.sp; S.cruise = !!o.cr; S.roundBrake = !!o.rb; S.brThrust = !!o.bt; S.tv.copy(V3(o.tv)); S.tvP.copy(V3(o.tvP)); S.tvJ = o.tvJ; S.match = o.m; S.tgt = o.tg;
   S.berth = { ...o.be }; S.Dp.copy(V3(o.Dp)); S.Dq.copy(Q4(o.Dq)); S.warp = o.w ? { ...o.w } : null;
   if (o.st && o.st !== S.stage) { S.stage = o.st; const atmo = o.st === 'atmo'; for (const w of S.wps || []) w.hide = w.kind === 'lz' ? !atmo : atmo; }
-  S.thru = o.th ? { to: o.th.to, map: S.map, left: o.th.left } : null;
+  S.thru = o.th ? { to: o.th.to, map: S.map, left: o.th.left } : null; S.ftl = o.f ? { ...o.f } : null;
   const a = o.au; S.auto = a ? { t: a.t, T: a.T, P0: V3(a.P0), Q0: Q4(a.Q0), P1: V3(a.P1), Q1: Q4(a.Q1), mid: a.mid ? V3(a.mid) : null, then: a.then } : null;
   const L = o.bl; S.brLock = L && L.s ? { site: siteAt(L.s), map: S.map, hard: L.hard, fa: L.fa, q0: L.q0 ? Q4(L.q0) : undefined, T0: L.T0, rp: L.rp, ra: L.ra ? V3(L.ra) : undefined } : null;
   const R = o.br; S.brRound = R && R.s ? { site: siteAt(R.s), face: V3(R.face), E: V3(R.E), hard: R.hard, map: S.map, way: R.way.map(V3), ra: R.ra ? V3(R.ra) : undefined } : null;
@@ -582,5 +635,20 @@ export function assaultPlace(berth: { x: number; y: number; z: number }, stageOf
   const T = THREE, out = new T.Vector3(berth.x - 900, 3200, berth.z + 2800);
   const floorAt = (x: number, z: number) => { const d = Math.hypot(x - berth.x, z - berth.z); return stageOf() === 'atmo' ? berth.y + U.clamp((d - 14) * 0.9, 0.02, 16) : -1e9; };
   return { boxes: [], floorAt, wps: [{ id: 'entry', name: 'DESCENT CORRIDOR', sub: 'Fly in to go down through the cloud', p: new T.Vector3(berth.x + 1500, -1800, berth.z - 6500), kind: 'entry' }, { id: 'lz', name: 'LANDING PAD', sub: 'Set down outside the base', p: new T.Vector3(berth.x, 3, berth.z), kind: 'lz', hide: true }, { id: 'out', name: 'ANCHOR', sub: 'Jump home', p: out, kind: 'anchor', i: -1 }] };
+}
+/** her berth in a place, as she's set down or breached there first (js/space.ts setup): the hub's pad, her breach deck level with the
+ *  mission ship's at its breach, the pad outside a base */
+export function helmBerth(kind: string, map: LvMap | null, def: any) {
+  if (kind === 'hub' || !map) return Object.assign({}, SD.HUB_BERTH) as { x: number; y: number; z: number; yaw: number; pt?: number };
+  if (kind === 'board') { const b = map.sp!.breach, L = SD.layout(def); return { x: b.x, y: -L.lift, z: b.face + 0.03 - (L.zc - 0.22), yaw: 0 } as { x: number; y: number; z: number; yaw: number; pt?: number }; }
+  const lz = (map as any).lz || { x: map.spawn.x, y: 0, z: map.spawn.z }; return { x: lz.x + 3.2 + Math.max(0, def.z1 - 5) * 0.5, y: lz.y || 0, z: lz.z, yaw: Math.PI / 2 } as { x: number; y: number; z: number; yaw: number; pt?: number };
+}
+/** how far out from a zone ship's middle her hull reaches (warp brings her out that much short of it): her stand-in's box, from its
+ *  shape (js/hullshape.ts TrafficShape), the same on the page and the server whichever way she's drawn */
+const trafR = new Map<string, number>();
+export function trafficR(kind: string, seed: number) {
+  const key = kind + ':' + seed; let r = trafR.get(key);
+  if (r == null) { const b = TrafficShape.of(kind, seed).bbox, ok = b.max[0] >= b.min[0]; r = ok ? Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]) / 2 : 60; trafR.set(key, r); }
+  return r;
 }
 

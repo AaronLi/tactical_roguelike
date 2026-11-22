@@ -28,7 +28,7 @@ import { RadarView } from './radarview.js';
 import { SuiteView } from './suiteview.js';
 import { SpaceSim, ZMem, SimShip, SimChaff, FlyIn, FB } from './spacesim.js';
 import { SpaceNet, SssMsg, SevMsg } from './spacenet.js';
-import { helmOf, helmCopy, helmSame, helmDiff, helmPack, helmUnpack, HelmEv, HelmIn, HelmThen, hubPlace, boardPlace, boardMove, assaultPlace } from './helm.js';
+import { helmOf, helmBerth, trafficR, helmCopy, helmSame, helmDiff, helmPack, helmUnpack, HelmEv, HelmIn, HelmThen, hubPlace, boardPlace, boardMove, assaultPlace } from './helm.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -522,7 +522,7 @@ export const Space = (() => {
   // flies it): their levels made ahead, live, so coming up with one changes nothing that's seen (docs/zone-levels.md)
   const nearSent = new Set<number>(); let nearOf = -2;
   function ewNear() {
-    if (S.kind !== 'board' || !S.zinfo || !isCtl()) return;
+    if (S.kind !== 'board' || !S.zinfo || !isCtl() || C2.on) return; // (the server's, while it flies her: js/svbattle.ts near)
     if (nearOf !== S.zinfo.ms.seed) { nearSent.clear(); nearOf = S.zinfo.ms.seed; }
     if (!nearSent.has(S.zact)) { nearSent.add(S.zact); Net.toHost({ t: 'tnear', k: S.zact }); } // (the one she's at: near it, as she's at it)
     for (const q of S.traffic) {
@@ -579,7 +579,7 @@ export const Space = (() => {
     holoFocus(false); G_R.focusBlur = false; EW.holo.fO = -1;
     RadarView.update(null, false, [], [], '', 0); RadarView.holo(null, null, new T.Vector3(), 0, new T.Quaternion(), 0, false, null); for (const c of EW.chaff) if (c.pts) c.pts.removeFromParent(); EW.chaff = [];
     if (!S.on && !S.model) return;
-    if (S.on && S.kind === 'board' && S.tclose && S.zone) {
+    if (S.on && S.kind === 'board' && S.tclose && S.zone && !(S.carry && S.carry.k === S.tclose.k)) { // (the helm's, as it decided: js/helm.ts close; else as she is now)
       const q = S.traffic.find((o) => o.c.k === S.tclose!.k && o.wp);
       if (q) { const z = SD.zonePos(q.c, S.zt0 + (S.t - S.ztAt)), d = new T.Vector3(z.d[0], 0, z.d[2]).applyQuaternion(S.zone.quaternion); S.carry = { k: q.c.k!, v: S.P.clone().sub(q.wp!.p), yaw: Math.atan2(d.x, d.z), Q: S.Q.clone(), V: S.V.clone() }; }
     }
@@ -621,9 +621,7 @@ export const Space = (() => {
     if (sp && sp.board) setBoard(sp.board);
     // her berth
     const d = S.def;
-    if (kind === 'hub') S.berth = Object.assign({}, SD.HUB_BERTH);
-    else if (kind === 'board') { const b = map.sp!.breach, L = SD.layout(d); S.berth = { x: b.x, y: -L.lift, z: b.face + 0.03 - (L.zc - 0.22), yaw: 0 }; } // (her breach deck level with the hull's: the rest of her below it)
-    else { const lz = map.lz || { x: map.spawn.x, y: 0, z: map.spawn.z }; S.berth = { x: lz.x + 3.2 + Math.max(0, d.z1 - 5) * 0.5, y: lz.y || 0, z: lz.z, yaw: Math.PI / 2 }; }
+    S.berth = helmBerth(kind, map, d); // (the hub's pad; her breach deck level with the hull's, the rest of her below it; the pad outside a base: js/helm.ts)
     S.Dp.set(S.berth.x, S.berth.y, S.berth.z); S.Dq.copy(berthQ(S.berth));
     // the ship herself, and her deck in the world
     const m = S.model = ShipModel.ship(d, S.fleet); m.group.userData.prof = 'own ship';
@@ -648,7 +646,12 @@ export const Space = (() => {
     S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.net = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1;
     SpaceSim.zoneReset(ZS); S.zone = new T.Group(); S.zone.userData.prof = 'zone: other'; S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.match = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = S.t;
     if (kind === 'hub') setupHub(map, sp); else if (kind === 'board') setupBoard(map); else setupAssault(map);
-    if (docked) { S.P.copy(S.Dp); S.Q.copy(S.Dq); }
+    // where she is: her helm's arrival (js/helm.ts arrive: on her berth, come up with the ship that's the level now, or out of the jump),
+    // the server's the same from the same (told a new place's begun: C2.nl)
+    { const zi = S.zinfo, near = kind === 'board' && !!(zi && zi.near), carried = near && !!S.carry && S.carry.k === (zi ? zi.act : -1);
+      const ao = { docked, at: kind === 'hub' && sp && sp.ship && !sp.ship.docked ? sp.ship.at : null, near, act: zi ? zi.act : 0 }; (C2 as any).arr = { ...ao, carry: S.carry ? S.carry.k : null }; HM.arrive(ao);
+      if (kind === 'board') { if (carried) ewMove(); else if (!near) ewTimeReset(); } // (her radars' picture moved with her; come in by a jump, nothing out here seen yet)
+      C2.nl = ao; SpaceSim.zoneReset(ZS); } // (the host's word of the place, as it set her up here: the server puts her where the same says; the zone's frame begun at her first step, as the server's is)
     syncSolids();
     // the sky: space is black, and reaches a long way
     const cam = G_R.camera; cam.far = 60000; cam.updateProjectionMatrix();
@@ -985,12 +988,6 @@ export const Space = (() => {
     g.position.set(tx, 0, tz); G_R.levelRoot.add(g);
     S.term = { x: tx, z: tz + 0.9 };
     S.solids.push({ s: null, on: false, b: [tx - 0.6, 0, tz - 0.25, tx + 0.6, 1.0, tz + 0.25] }, { s: null, on: false, b: [tx - 1.9, 0, tz - 0.08, tx - 1.75, 3.4, tz + 0.08] }, { s: null, on: false, b: [tx + 1.75, 0, tz - 0.08, tx + 1.9, 3.4, tz + 0.08] });
-    // home from a mission: out of the tunnel by that mission's anchor, nose to the base
-    const at = sp && sp.ship && !sp.ship.docked ? sp.ship.at : null;
-    if (at != null && S.anchors.find((a) => a.i === at)) {
-      const a = S.anchors.find((q) => q.i === at)!, dir = base.clone().sub(a.p).normalize();
-      arriveAt(a.p.clone().addScaledVector(dir, 160), dir);
-    } else if (sp && sp.ship && !sp.ship.docked) arriveAt(base.clone().add(new T.Vector3(-300, 260, 500)), new T.Vector3(0.4, -0.3, -0.8).normalize());
   }
   function placeAnchors() {
     if (S.kind !== 'hub' || !S.root) return;
@@ -1009,7 +1006,7 @@ export const Space = (() => {
   }
   // -- a ship to board: her hull over the level, the plate to hit, the anchor to leave by
   function setupBoard(map: LvMap) {
-    const sp = map.sp!, b = sp.breach, zk = S.zinfo && S.zinfo.near && zoneHullsOf === S.zinfo.ms.seed ? S.zinfo.ms.seed + ':' + S.zinfo.act : null, kept = zk ? zoneHulls.get(zk) : null;
+    const sp = map.sp!, zk = S.zinfo && S.zinfo.near && zoneHullsOf === S.zinfo.ms.seed ? S.zinfo.ms.seed + ':' + S.zinfo.act : null, kept = zk ? zoneHulls.get(zk) : null;
     if (!zk) zoneClear(); // (jumped in: nothing's kept from before)
     // (her hull: the one she's been seen in from outside, if she has been)
     if (kept) { zoneHulls.delete(zk!); kept.holder.remove(kept.h.group); kept.h.group.position.set(0, 0, 0); kept.h.marker.visible = true; if (kept.map && kept.map !== map) viewDrop(kept.map); }
@@ -1044,13 +1041,6 @@ export const Space = (() => {
     // course); the level changed to another ship out here, whatever she was steering for still
     const want = zi && zi.near && tgtWas != null ? tgtWas : 0;
     S.tgt = Math.max(0, S.wps.findIndex((w) => w.id === (want === 'out' ? 'out' : want === S.zact ? 'ship' : 't' + want)));
-    if (zi && zi.near) { // (come up with her: no jump. The squad's ship is where she was by her, heading as she was)
-      const c = S.carry && S.carry.k === zi.act ? S.carry : null;
-      if (c) { const rot = yawQ((sp.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0)) - c.yaw); S.P.copy(c.v).applyQuaternion(rot).add(S.zC); S.Q.copy(rot).multiply(c.Q); S.V.copy(c.V).applyQuaternion(rot); ewMove(); }
-      else { S.P.set(b.x + 30, 28, b.face + 260); S.Q.copy(lookQ(new T.Vector3(-0.1, -0.1, -1).normalize())); S.V.set(0, 0, 0); }
-      S.docked = false; S.carry = null;
-    }
-    else { arriveAt(new T.Vector3(b.x + 260, 140, b.face + 1700), new T.Vector3(-0.15, -0.08, -1).normalize()); ewTimeReset(); } // (come in by a jump: nothing out here seen yet)
     things(map);
   }
   // what the mission wants aboard her: the artifact on its stand, the self-destruct's console, the pods' hatches, lights over the locked doors
@@ -1150,7 +1140,7 @@ export const Space = (() => {
   // (the zone's whole width: there are six of them at most, so what's made of each is kept while the squad's in it); to become
   // the level (zoneClose: once she's ready, or nearer than ZONE_NOW whether or not)
   const PAD_POINTS = 4; // (her own three lamps, and the artifact's glow)
-  const ZONE_REAL = 5000, ZONE_DROP = 60000, ZONE_TAKE = 500, ZONE_NOW = 400;
+  const ZONE_REAL = 5000, ZONE_DROP = 60000; // (come up with one: js/helm.ts close)
   function zoneReal(all: boolean) {
     if (S.kind !== 'board' || !S.zone) return;
     const zseed = S.zinfo ? S.zinfo.ms.seed : -2;
@@ -1260,18 +1250,6 @@ export const Space = (() => {
   // The squad's ship has come up with one of the zone's others (within 500 m, and well nearer her than the one that's the level), and
   // she's ready (zonePrep: so nothing stops), or within 400 m anyway: the host is asked to make her the level (js/spaceserver.ts
   // 'tboard'). Whoever's flying asks.
-  function zoneClose(dt: number) {
-    if (S.kind !== 'board' || S.docked || S.ftl || S.warp || (S.state && S.state.boom)) { S.tclose = null; return; }
-    let best: typeof S.traffic[0] | null = null, bd = Math.min(ZONE_TAKE, S.P.distanceTo(S.zC) * 0.8); // (and a fifth nearer than the ship that's the level now: no to and fro between two)
-    for (const q of S.traffic) {
-      if (!q.wp || q.c.k == null) continue; const d = S.P.distanceTo(q.wp.p);
-      if (d < bd && (d < ZONE_NOW || (S.zinfo && zoneReady(zoneHulls.get(S.zinfo.ms.seed + ':' + q.c.k))))) { bd = d; best = q; }
-    }
-    if (!best) { S.tclose = null; return; }
-    if (!S.tclose || S.tclose.k !== best.c.k) S.tclose = { k: best.c.k!, t: 0, name: best.wp!.name };
-    S.tclose.t += dt;
-    if (S.tclose.t > 0.35 && !S.tclose.sent) { S.tclose.sent = true; Net.toHost({ t: 'tboard', k: S.tclose.k }); }
-  }
   // -- a base on a planet: in orbit over it first (the level out of sight), then down through the cloud to its pad
   function setupAssault(map: LvMap) {
     const R = 60000;
@@ -1284,7 +1262,6 @@ export const Space = (() => {
     const gm = new T.Mesh(new T.CircleGeometry(9000, 48), new T.MeshStandardMaterial({ color: new T.Color(map.theme.floor as string).multiplyScalar(0.55), roughness: 1 })); gm.rotation.x = -Math.PI / 2; gm.position.set(S.berth.x, -0.45, S.berth.z); gm.visible = false; S.root!.add(gm); gm.userData.ground = 1;
     S.floorAt = (x, z) => { const d = Math.hypot(x - S.berth.x, z - S.berth.z); return S.stage === 'atmo' ? S.berth.y + U.clamp((d - 14) * 0.9, 0.02, 16) : -1e9; };
     stage('orbit');
-    arriveAt(out.clone().add(new T.Vector3(120, -40, -260)), new T.Vector3(0.2, -0.45, -0.85).normalize());
   }
   function stage(st: 'orbit' | 'atmo') {
     S.stage = st;
@@ -1320,10 +1297,6 @@ export const Space = (() => {
   }
   function lookQ(dir: THREE.Vector3) { const m = new T.Matrix4().lookAt(new T.Vector3(), dir, new T.Vector3(0, 1, 0)); return new T.Quaternion().setFromRotationMatrix(m); }
   // out of a jump here: in the tunnel a few seconds more (the place is built already: this is the last of the trip)
-  function arriveAt(p: THREE.Vector3, dir: THREE.Vector3) {
-    S.P.copy(p); S.Q.copy(lookQ(dir)); S.V.copy(dir).multiplyScalar(60); S.docked = false;
-    S.ftl = { st: 'tunnel', t: 0, to: 0, T: 4.5 };
-  }
 
   // ------------------------------------------------------------------ her deck in the world, her doors
   function syncSolids() {
@@ -1650,8 +1623,8 @@ export const Space = (() => {
   }
   /** how far out from a target's middle its hull reaches */
   function tgtR(w: SpWp) {
-    const q = S.traffic.find((x) => x.wp === w);
-    if (q) { const o = q.obj as THREE.Object3D & { _r?: number }; if (o._r == null) { const b = new T.Box3().setFromObject(o); o._r = b.isEmpty() ? 60 : b.getSize(new T.Vector3()).length() / 2; } return o._r; }
+    const q = S.traffic.find((x) => x.wp && x.wp.id === w.id); // (by its id: her helm's shadow has copies of the waypoints)
+    if (q) return trafficR((q.c as any).kind, (q.c as any).seed); // (her stand-in's reach, from its shape: the server's the same, js/helm.ts trafficR)
     if (w.id === 'ship' && S.map && S.map.sp) { const h = S.map.sp.hull; return Math.hypot(h.x1 - h.x0, h.z1 - h.z0) / 2; }
     return 0;
   }
@@ -1682,7 +1655,7 @@ export const Space = (() => {
   // her), what it does beyond her flight done here (helmEv)
   const HM = helmOf(S, {
     sites: () => siteList(), siteAt: (a) => siteAt(a), tgtR: (w) => tgtR(w as SpWp), fieldAt: (p) => fieldAt(p),
-    zstep: (p, v, dt) => zstep(p, v, dt, shipZ), zturn: (q) => zturn(q), rocks: () => ROCKS, rockList: () => S.rockList, boom: () => !!(S.state && S.state.boom), done: () => !!(S.state && S.state.done),
+    zstep: (p, v, dt) => zstep(p, v, dt, shipZ), zturn: (q) => zturn(q), rocks: () => ROCKS, rockList: () => S.rockList, boom: () => !!(S.state && S.state.boom), done: () => !!(S.state && S.state.done), zC: () => S.zC, zoneDir: (k: number) => zoneDir(k), ready: (k: number) => !!(S.zinfo && zoneReady(zoneHulls.get(S.zinfo.ms.seed + ':' + k))), zreset: () => { shipZ.v.set(NaN, 0, 0); },
   }, (e) => helmEv(e));
   function helmEv(e: HelmEv) {
     if (C2.replay) return; // (a step flown again: done once already)
@@ -1696,6 +1669,9 @@ export const Space = (() => {
       case 'rebase': rebase(e.b); break;
       case 'through': veilKind('cloud'); Game.veil(true); break; // (the veil down as she goes in: the crossing's her helm's)
       case 'stage': stage(e.to); S.net = null; Game.veilN = Game.VEIL_SMOOTH; break;
+      case 'jump': if (!C2.on) Net.toHost({ t: 'jump', to: e.to }); break; // (spooled: the host asked to jump her; the server, flying her, asks it itself)
+      case 'ftlOut': ftlOut(); break;
+      case 'tboard': if (!C2.on) Net.toHost({ t: 'tboard', k: e.to }); break; // (the server, flying her, boards her itself)
       case 'auto': {
         const t = e.then;
         // (the server, flying her, docks her itself on its own step: js/svbattle.ts helmEv; this page tells it only when it isn't)
@@ -1706,6 +1682,8 @@ export const Space = (() => {
     }
   }
   const aim = (maxT?: number, reach?: number, dir?: THREE.Vector3) => HM.aim(maxT, reach, dir);
+  // (zone ship k's heading, level, in the level's frame: the zone's maths at its time now)
+  function zoneDir(k: number) { const c = S.zdef.find((q) => q.k === k); if (!c || !S.zone) return new T.Vector3(0, 0, 1); const z = SD.zonePos(c, S.zt0 + (S.t - S.ztAt)); return new T.Vector3(z.d[0], 0, z.d[2]).applyQuaternion(S.zone.quaternion); }
   const warpGate = () => HM.warpGate(), warpGo = () => HM.warpGo(), tgtTrack = (dt: number) => HM.tgtTrack(dt);
   const dbgBr = (o: any) => HM.dbgBr(o);
   // ------------------------------------------------------------------ the jump
@@ -1733,7 +1711,11 @@ export const Space = (() => {
     hid = [];
     for (const root of [S.root, S.kind !== 'assault' ? G_R.levelRoot : null]) if (root) root.traverse((o: any) => { if ((o.isMesh || o.isPoints || o.isLine || o.isSprite) && o.visible) { o.visible = false; hid!.push(o); } });
   }
-  function ftlStep(dt: number) {
+  // out of the tunnel: what's seen (the tunnel put away; the view held veiled over a place not ready to draw yet, else the flash)
+  function ftlOut() { if (S.tunnel) S.tunnel.visible = false; if (isCtl() || !S.ctl) sendPose(true); if ((tunUp && tunUp.steps.length) || !G_R.progsReady()) S.veil = { t: 0 }; else SpaceUI.flash(); unseen(false); sky(); }
+  // (the jump drive's run as it's seen: its flight is her helm's, js/helm.ts ftlStep (the pilot's in her helm's step; the others' here))
+  function ftlStep(dt: number, flies: boolean) {
+    if (!flies) HM.ftlStep(dt);
     const f = S.ftl;
     if (!f && S.veil) { // (out of the tunnel, the view still veiled while what she sees is made ready: then the flash, and it's there)
       S.veil.t += dt; if (tunUp) while (tunUp.steps.length && tunUp.steps[0](3)) tunUp.steps.shift();
@@ -1745,15 +1727,12 @@ export const Space = (() => {
       smear(dt, S.warp ? Math.sqrt(U.clamp(S.warp.u / S.warp.top, 0, 1)) * 0.55 : S.spin * 0.015);
       return;
     }
-    f.t += dt;
     const tn = S.tunnel!, tex = tn.userData.tex as THREE.Texture, mat = tn.userData.mat as THREE.MeshBasicMaterial;
     tn.visible = false; // (no tube: the stars smear instead)
     { const k = f.st === 'spool' ? 0.35 * (f.t / f.T) ** 2 : f.st === 'wait' ? 0.45 : 0.7 * U.clamp((f.T - f.t) / 0.6, 0, 1); smear(dt, k, k); } // (the jump: motes going by too; the warp, a few kilometres, none)
     if (f.st === 'spool') {
       const u = Math.min(1, f.t / f.T); mat.opacity = u * 0.9; tex.offset.y -= dt * (0.4 + u * 3);
-      S.V.multiplyScalar(Math.exp(-dt * 3));
-      if (u >= 1) { f.st = 'wait'; Net.toHost({ t: 'jump', to: f.to }); }
-    } else if (f.st === 'wait') { mat.opacity = 0.9; tex.offset.y -= dt * 3.4; if (f.t > f.T + 6) S.ftl = null; } // (the host never answered: back to flying)
+    } else if (f.st === 'wait') { mat.opacity = 0.9; tex.offset.y -= dt * 3.4; }
     else {
       // the tunnel on the way out: the place is there already, out of sight till she drops out of it
       const left = f.T - f.t; mat.opacity = U.clamp(left / 0.5, 0, 1) * 0.95; tex.offset.y -= dt * 3.4;
@@ -1764,7 +1743,6 @@ export const Space = (() => {
       // (and she doesn't drop out till it is, its shaders made too, on the driver's threads: the clock's held short of the end, four seconds at most)
       // (she drops out on the trip's own clock; if what she'll see isn't ready to draw yet (its shaders still being made), the view keeps the
       // tunnel's look over it a little longer (S.veil, four seconds at most): the simulation goes on meanwhile)
-      if (left <= 0) { S.ftl = null; tn.visible = false; S.V.copy(fwd(S.Q)).multiplyScalar(45); if (isCtl() || !S.ctl) sendPose(true); if (tunUp.steps.length || !G_R.progsReady()) S.veil = { t: 0 }; else SpaceUI.flash(); }
     }
     // in the tunnel the place is out of sight (its meshes: its lights stay, or every shader would be made again for the change
     // in them when she drops out), the stars aren't: they're what's smeared
@@ -1785,14 +1763,14 @@ export const Space = (() => {
   // page had, it's taken and the steps since flown again from their inputs, each through its own step's zone frame.
   const FLYI = { ran: false, I: null as FlyIn | null }; // (the helm's free flight this step: js/helm.ts fly)
   type C2E = { s: number; I: HelmIn | null; tg: string | null; m: string | null; c: any[]; Z: any; post: any; free: boolean };
-  const C2 = { on: false, hist: [] as C2E[], out: [] as any[], cmd: [] as any[], fixes: 0, acks: 0, err: 0, errMax: 0, states: 0, why: [] as any[], whyS: [] as any[], lastI: null as HelmIn | null, replay: false };
-  const c2Want = () => S.on && isCtl() && !S.ftl; // (docked too: the server undocks her, on the pilot's word)
+  const C2 = { on: false, hist: [] as C2E[], out: [] as any[], cmd: [] as any[], fixes: 0, acks: 0, err: 0, errMax: 0, states: 0, why: [] as any[], whyS: [] as any[], nl: null as null | { docked: boolean; at: number | null; near: boolean; act: number }, lastI: null as HelmIn | null, replay: false };
+  const c2Want = () => S.on && isCtl(); // (docked too: the server undocks her, on the pilot's word)
   // (a command of the pilot's, given between steps: told with the next one)
   const helmCmd = (c: any[]) => { if (C2.on) C2.cmd.push(c); };
   // the shadow the page's own step is checked on: her helm state copied, flown by a helm of its own through the same geometry
   const SH: any = { P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(), tv: new T.Vector3(), tvP: new T.Vector3(), Dp: new T.Vector3(), Dq: new T.Quaternion(), berth: { x: 0, y: 0, z: 0, yaw: 0 } };
   const SHZ = zmem();
-  const HM2 = helmOf(SH, { sites: () => siteList(), siteAt: (a) => siteAt(a), tgtR: (w) => tgtR(w as SpWp), fieldAt: (p) => fieldAt(p), zstep: (p, v, dt) => zstep(p, v, dt, SHZ), zturn: (q) => zturn(q), rocks: () => ROCKS, rockList: () => S.rockList, boom: () => !!(S.state && S.state.boom), done: () => !!(S.state && S.state.done) }, () => {});
+  const HM2 = helmOf(SH, { sites: () => siteList(), siteAt: (a) => siteAt(a), tgtR: (w) => tgtR(w as SpWp), fieldAt: (p) => fieldAt(p), zstep: (p, v, dt) => zstep(p, v, dt, SHZ), zturn: (q) => zturn(q), rocks: () => ROCKS, rockList: () => S.rockList, boom: () => !!(S.state && S.state.boom), done: () => !!(S.state && S.state.done), zC: () => S.zC, zoneDir: (k: number) => zoneDir(k), ready: (k: number) => !!(S.zinfo && zoneReady(zoneHulls.get(S.zinfo.ms.seed + ':' + k))), zreset: () => { SHZ.v.set(NaN, 0, 0); } }, () => {});
   const shadowOf = (src: any = S, zm = shipZ) => { for (const k of ['kind', 'map', 'def', 'fleet', 'boxes', 'ftl', 'state']) SH[k] = (S as any)[k]; SH.stage = src.stage; SH.wps = S.wps.map((w) => ({ ...w })); SH.floorAt = S.floorAt ? (x: number, z: number) => S.floorAt!(x, z) : null; helmCopy(SH, src, SHZ, zm); };
   // (where the last step left her: anything that's moved her since (a level's change, a rebase, a test) but the pilot's commands makes
   // this step's entry her state)
@@ -1802,7 +1780,7 @@ export const Space = (() => {
   function c2Pre(): boolean {
     if (c2Want()) {
       // (moved since the last step? the last step's end with the pilot's commands since done on it, the target and match as they are now)
-      if (C2.on) { shadowOf(LAST, LASTZ); SH.tgt = S.tgt; SH.match = S.match; for (const c of C2.cmd) { if (c[0] === 'w') HM2.warpGo(); else if (c[0] === 'l') HM2.land(); else if (c[0] === 'u') { HM2.dock(false); HM2.launchAway(); } else if (c[0] === 't') SH.spin = 0; } moved = !helmSame(SH, S); if (moved && C2.whyS.length < 8) C2.whyS.push({ s: SIM.steps, moved: helmDiff(SH, S) }); }
+      if (C2.on && !C2.nl) { shadowOf(LAST, LASTZ); SH.tgt = S.tgt; SH.match = S.match; for (const c of C2.cmd) { if (c[0] === 'jw') { SH.ftl = { st: 'wait', t: 2.6, to: c[1] | 0, T: 2.6 }; SH.warp = null; SH.spin = 0; SH.auto = null; } else if (c[0] === 'j') SH.ftl = { st: 'spool', t: 0, to: c[1] | 0, T: 2.6 }; else if (c[0] === 'w') HM2.warpGo(); else if (c[0] === 'l') HM2.land(); else if (c[0] === 'u') { HM2.dock(false); HM2.launchAway(); } else if (c[0] === 't') SH.spin = 0; } moved = !helmSame(SH, S); if (moved && C2.whyS.length < 8) C2.whyS.push({ s: SIM.steps, moved: helmDiff(SH, S) }); }
       shadowOf(); return true;
     }
     if (C2.on) { C2.on = false; C2.hist = []; C2.out = []; C2.cmd = []; Net.toHost({ t: 'sin', off: 1 }); }
@@ -1813,13 +1791,17 @@ export const Space = (() => {
     if (!pre) return;
     const s = SIM.steps, I = C2.lastI, c = C2.cmd; C2.cmd = [];
     let free = false;
-    if (C2.on && I && !moved) { HM2.step(I, h); free = helmSame(SH, S); if (!free && C2.whyS.length < 8) C2.whyS.push({ s, step: helmDiff(SH, S) }); }
+    if (I && !moved) { HM2.step(I, h); free = helmSame(SH, S); if (!free && C2.whyS.length < 8) C2.whyS.push({ s, step: helmDiff(SH, S) }); }
     moved = false; helmCopy(LAST, S, LASTZ, shipZ);
     const Z = S.zone ? SpaceSim.zoneCopy(ZS) : null, post = helmPack(S, shipZ), tg = wpId();
     C2.on = true;
     C2.hist.push({ s, I, tg, m: S.match, c, Z, post, free }); if (C2.hist.length > 360) C2.hist.splice(0, C2.hist.length - 360);
-    if (free && I) C2.out.push({ s, i: [I.h ? 1 : 0, I.b, I.sx, I.sy], ...(I.rb ? { rb: I.rb.toArray() } : {}), tg, m: S.match, ...(c.length ? { c } : {}) });
-    else { C2.states++; C2.out.push({ s, st: post, turn: S.def.turn }); }
+    if (C2.nl) (C2 as any).nlS = s;
+    const nl = C2.nl ? { nl: C2.nl } : {}; C2.nl = null; // (a new place begun before this step: the server puts her where it says too)
+    const rd = S.kind === 'board' && S.zinfo ? S.traffic.map((q) => q.c.k as number).filter((k) => k != null && zoneReady(zoneHulls.get(S.zinfo!.ms.seed + ':' + k))) : [];
+    const zt = S.kind === 'board' && S.zone ? { zt: S.zt0 + (S.t - S.ztAt), ...(rd.length ? { rd } : {}) } : {}; // (rd: the zone's ships drawn here as they'd be as the level: her helm may make one the level from further off, js/helm.ts close) // (the zone's clock she was flown on: the server's helm places the zone by it, js/svbattle.ts flyOn)
+    if (free && I) C2.out.push({ s, ...nl, ...zt, i: [I.h ? 1 : 0, I.b, I.sx, I.sy], ...(I.rb ? { rb: I.rb.toArray() } : {}), tg, m: S.match, ...(c.length ? { c } : {}) });
+    else { C2.states++; C2.out.push({ s, ...nl, st: post, turn: S.def.turn }); }
     if (C2.out.length >= 3) { Net.toHost({ t: 'sin', a: C2.out }); C2.out = []; }
   }
   // the server's word: her helm state after step s
@@ -1829,8 +1811,9 @@ export const Space = (() => {
     const err = d3(e.post.P, o.P), verr = d3(e.post.V, o.V), qerr = 1 - Math.abs(e.post.Q[0] * o.Q[0] + e.post.Q[1] * o.Q[1] + e.post.Q[2] * o.Q[2] + e.post.Q[3] * o.Q[3]);
     const modes = e.post.d !== o.d || !!e.post.au !== !!o.au || !!e.post.w !== !!o.w || !!e.post.bl !== !!o.bl || !!e.post.br !== !!o.br || e.post.tg !== o.tg;
     C2.acks++; C2.err = err; C2.errMax = Math.max(C2.errMax, err);
+    { const n0 = (C2 as any).nlS; if (n0 != null && s >= n0 && s < n0 + 90) ((C2 as any).tr = (C2 as any).tr || []).push([s - n0, +err.toFixed(3), +verr.toFixed(3), e.post.P.map((x: number) => +x.toFixed(2)), o.P.map((x: number) => +x.toFixed(2))]); }
     const rest = C2.hist.slice(i + 1); C2.hist = rest;
-    if (err < 1e-3 && verr < 1e-3 && qerr < 1e-9 && !modes) return;
+    if (err < 1e-2 && verr < 1e-2 && qerr < 1e-7 && !modes) return; // (within a centimetre and a few hundredths of a degree: the zone's clock as each has it moves what she steers for a little)
     // (taken, and flown on again from the inputs since, each through its own frame (what it does beyond her flight not done again);
     // her own steps (not free) as she had them)
     C2.fixes++; if (C2.why.length < 12) C2.why.push({ s, err: +err.toFixed(3), verr: +verr.toFixed(3), page: { d: e.post.d, au: e.post.au && e.post.au.then, w: !!e.post.w, P: e.post.P.map((x: number) => +x.toFixed(2)), tg: e.post.tg }, server: { d: o.d, au: o.au && o.au.then, w: !!o.w, P: o.P.map((x: number) => +x.toFixed(2)), tg: o.tg } }); // (the first few put right, and why: for the step scripts)
@@ -1844,9 +1827,10 @@ export const Space = (() => {
         HM.step(q.I, STEP); q.post = helmPack(S, shipZ);
       }
     } finally { ZR = null; C2.replay = false; }
+    helmCopy(LAST, S, LASTZ, shipZ); // (put right: where the last step left her, as far as the next one's check goes)
   }
   // a command as the server does it too (js/svbattle.ts flyOn)
-  function helmDo(c: any[]) { if (c[0] === 'w') HM.warpGo(); else if (c[0] === 'l') HM.land(); else if (c[0] === 'u') { HM.dock(false); HM.launchAway(); } else if (c[0] === 't') S.spin = 0; }
+  function helmDo(c: any[]) { if (c[0] === 'jw') { S.ftl = { st: 'wait', t: 2.6, to: c[1] | 0, T: 2.6 }; S.warp = null; S.spin = 0; S.auto = null; } else if (c[0] === 'j') S.ftl = { st: 'spool', t: 0, to: c[1] | 0, T: 2.6 }; else if (c[0] === 'w') HM.warpGo(); else if (c[0] === 'l') HM.land(); else if (c[0] === 'u') { HM.dock(false); HM.launchAway(); } else if (c[0] === 't') S.spin = 0; }
   Net.onFast((buf, ch) => {
     if (ch !== 5 || !C2.on) return;
     try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k === S.zact && Number.isFinite(m.s) && m.h) c2Ack(m.s, m.h); } catch (e) { console.error('space: her helm from the server', e); }
@@ -1918,9 +1902,9 @@ export const Space = (() => {
       zoneStep(); pt = Prof.lap('space: zone', pt);
       const flies = isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2), pre = flies && c2Pre();
       if (!flies) tgtTrack(h); pt = Prof.lap('space: target', pt);
-      if (flies) { fly(h); zoneClose(h); c2Post(pre, h); } else { if (S.auto) S.auto = null; follow(h); S.stick.multiplyScalar(Math.exp(-h * 2.2)); }
+      if (flies) { fly(h); c2Post(pre, h); } else { if (S.auto) S.auto = null; follow(h); S.stick.multiplyScalar(Math.exp(-h * 2.2)); }
       pt = Prof.lap('space: flight', pt);
-      ftlStep(h); if (!flies) thruStep(h); // (the pilot's: her helm's, js/helm.ts step)
+      ftlStep(h, flies); if (!flies) thruStep(h); // (the pilot's: her helm's, js/helm.ts step)
       doors(h);
       turrets(h); shots(h); pt = Prof.lap('space: doors, turrets, jump', pt);
       ewStep(h); pt = Prof.lap('space: radar & fire control', pt);
@@ -2231,7 +2215,7 @@ export const Space = (() => {
           const a = nearAnchor(), slow = S.V.length() < 80;
           if (a) {
             const to = S.kind === 'hub' ? a.i : -1, name = S.kind === 'hub' ? (SD.offers(S.board.seed, S.board.level)[a.i] || { name: '?' }).name : 'home';
-            if (slow) { const p = holdFor('J', K('KeyJ'), dt, 1.2, () => { S.ftl = { st: 'spool', t: 0, to, T: 2.6 }; HUD.toast('JUMP', 'Spooling for ' + name, 2.4); }); if (p >= 0) { out.prog = p; out.label = 'Jump drive'; } lines.push(hint('Hold J', 'to jump to ' + U.esc(name))); }
+            if (slow) { const p = holdFor('J', K('KeyJ'), dt, 1.2, () => { S.ftl = { st: 'spool', t: 0, to, T: 2.6 }; helmCmd(['j', to]); HUD.toast('JUMP', 'Spooling for ' + name, 2.4); }); if (p >= 0) { out.prog = p; out.label = 'Jump drive'; } lines.push(hint('Hold J', 'to jump to ' + U.esc(name))); }
             else lines.push('Slow down to jump <small>(under 80 m/s)</small>');
           }
           if (S.kind !== 'board' && !(S.kind === 'assault' && S.stage !== 'atmo')) {
@@ -2328,7 +2312,8 @@ export const Space = (() => {
   // (C2), her hull; a boarding zone's mission ship's weapons are drawn from what it says: her guns (laid, firing, hit) and their rounds
   // (each gun's rounds of a step replayed from its seed: the same rounds the server flies), her missiles, the damage they do
   // (list: the zone's ships' radars the server has on, [id, name], nearest first: F8's to go through; stubs: a suite each, for its picture)
-  const SVB = { list: [] as [string, string][], stubs: new Map<string, RSuite>(), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, spAt: -1e9, own: null as RSuite | null, ownAt: -1e9, rwr: null as null | { trk: { k: string; f: number[]; lk: number }[]; scan: { k: string; f: number[]; a: number }[] } };
+  // (ztSync: the zone's clock kept to the server's; a fingerprint step script holds it still)
+  const SVB = { ztSync: true, list: [] as [string, string][], stubs: new Map<string, RSuite>(), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, spAt: -1e9, own: null as RSuite | null, ownAt: -1e9, rwr: null as null | { trk: { k: string; f: number[]; lk: number }[]; scan: { k: string; f: number[]; a: number }[] } };
   // her radars' picture from the server's battle (the fast channel's stream 1: js/spaceserver.ts battle): unpacked into the last one
   // (so what's picked and drawn keeps its identity), its times put on the page's own radar clock as it arrives
   // F8's picture of the suite it's showing, from the server's battle (asked for every couple of seconds while it's open: streams 2, 3)
@@ -2361,6 +2346,9 @@ export const Space = (() => {
     const r = SpaceNet.read(m); SVB.snap = r; SVB.n = m.n; SVB.at = S.t;
     // her hull, as the server keeps it (the emergency jump at nothing is the server's: js/spaceserver.ts battle)
     if (r.hp >= 0) hullIs(r.hp);
+    // (the zone's clock as the server has it, its snapshot's: the zone's ships where the server has them, so her helm here and there steer
+    // for the same places; run on here from it between snapshots)
+    if (S.kind === 'board' && Number.isFinite(m.zt) && SVB.ztSync) { const zt = S.zt0 + (S.t - S.ztAt); if (Math.abs(zt - m.zt) > 0.05) { S.zt0 = m.zt; S.ztAt = S.t; } }
     // her pose as the server flies her (C2): what the rest aboard follow (the pilot's own word of it, relayed, left aside meanwhile)
     if (r.sp && !isCtl()) { const a = r.sp; S.net = { P: new T.Vector3(a[0], a[1], a[2]), Q: new T.Quaternion(a[3], a[4], a[5], a[6]), V: new T.Vector3(a[7], a[8], a[9]) }; SVB.spAt = S.t; if (S.P.distanceTo(S.net.P) > 400) { S.P.copy(S.net.P); S.Q.copy(S.net.Q); } }
     if (S.hull) r.g.forEach((g, i) => { const gn = S.hull!.guns[i] as any; if (!gn) return; if (g.hp !== gn.hp) gunHit(i, g.hp); gn.yaw = g.yaw; gn.pitch = g.pitch; gn.rev = g.rev; });
@@ -2509,6 +2497,7 @@ export const Space = (() => {
   function joinJump(to: number) {
     if (!S.on || S.ftl || !aboard()) return;
     const T = 2.6; S.ftl = { st: 'wait', t: T, to, T }; S.warp = null; S.spin = 0; S.auto = null;
+    helmCmd(['jw', to]); // (the host's jump, joined: told the server with the next step, its helm the same)
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
