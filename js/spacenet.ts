@@ -12,7 +12,7 @@
 // a binary one, js/net.ts's fast channel, replaces them); what's built (sss, sev) and what's read back (read) don't change.
 import type { SimWorld, SimEvent } from './spacesim.js';
 
-export type SssMsg = { t: 'sss'; n: number; k: number; zt: number; mis: number[][]; tp: number[][]; ch: number[][]; g: number[][]; dm: number };
+export type SssMsg = { t: 'sss'; n: number; k: number; zt: number; mis: number[][]; tp: number[][]; ch: number[][]; g: number[][]; dm: number; hp?: number };
 export type SevE =
   | { k: 'dmg'; n: number; d: number; h: number; w?: string }
   | { k: 'mis'; n: number; id: number; a: number[] }
@@ -31,9 +31,10 @@ export const SpaceNet = {
   // The snapshot of world W at step n (k: the zone ship whose level it's in the frame of; zt: the zone's time; dm: damage she's done).
   // mis [id, x, y, z, vx, vy, vz, age]; tp [id, x, y, z, vx, vy, vz, qx, qy, qz, qw, flags (phase | motor 4 | RCS 8 | the server's 16)];
   // ch [n, x, y, z, vx, vy, vz, age]; g [hp, yaw, pitch, firing (an mg's burst on, 1), barrels' spin]
-  sss(W: SimWorld, n: number, k: number, zt: number, dm: number): SssMsg {
+  // (hp: her hull's, as the server keeps it; left out until it's heard one)
+  sss(W: SimWorld, n: number, k: number, zt: number, dm: number, hp = -1): SssMsg {
     return {
-      t: 'sss', n, k, zt: r2(zt), dm: r2(dm),
+      t: 'sss', n, k, zt: r2(zt), dm: r2(dm), ...(hp >= 0 ? { hp: r2(hp) } : {}),
       mis: W.mis.map((m) => [m.id, ...v3(m.p), ...v3(m.v, r4), r2(m.t)]),
       tp: W.torps.map((tp) => [tp.id, ...v3(tp.p), ...v3(tp.v), r4(tp.q.x), r4(tp.q.y), r4(tp.q.z), r4(tp.q.w), tp.ph | (tp.thr > 0.05 ? 4 : 0) | (tp.rcs ? 8 : 0) | (tp.mine ? 16 : 0)]),
       ch: W.chaff.map((c) => [+c.t.id.slice(5), ...v3(c.t.p), ...v3(c.t.v), r2(W.t - c.born)]),
@@ -59,7 +60,7 @@ export const SpaceNet = {
   read(m: SssMsg) {
     const T = THREE, V = (a: number[], i: number) => new T.Vector3(a[i], a[i + 1], a[i + 2]);
     return {
-      n: m.n, k: m.k, zt: m.zt, dm: m.dm,
+      n: m.n, k: m.k, zt: m.zt, dm: m.dm, hp: m.hp == null ? -1 : m.hp,
       mis: m.mis.map((a) => ({ id: a[0], p: V(a, 1), v: V(a, 4), t: a[7] })),
       tp: m.tp.map((a) => ({ id: a[0], p: V(a, 1), v: V(a, 4), q: new T.Quaternion(a[7], a[8], a[9], a[10]).normalize(), ph: a[11] & 3, thr: a[11] & 4 ? 1 : 0, rcs: !!(a[11] & 8), sv: !!(a[11] & 16) })),
       ch: m.ch.map((a) => ({ n: a[0], p: V(a, 1), v: V(a, 4), age: a[7] })),

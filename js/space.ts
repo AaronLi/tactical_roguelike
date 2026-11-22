@@ -2063,6 +2063,8 @@ export const Space = (() => {
   }
   function damage(n: number, why?: string) {
     if (!isCtl()) return;
+    // (the server's battle on: it keeps her hull; what she hit herself is told it, and her hull's as its snapshots say: svSss)
+    if (svbOn()) { Net.toHost({ t: 'sdmg', d: Math.round(n * 100) / 100 }); if (why && n > 4) HUD.toast('HULL ' + Math.round(Math.max(0, S.hp - n) / S.hpMax * 100) + '%', why, 1.5); return; }
     S.hp = Math.max(0, S.hp - n);
     Net.toHost({ t: 'shit', i: -1, hp: S.hp });
     if (why && n > 4) HUD.toast('HULL ' + Math.round(S.hp / S.hpMax * 100) + '%', why, 1.5);
@@ -2743,9 +2745,13 @@ export const Space = (() => {
     try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact || !m.s) return; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; SVB.rwr = m.w || null; } catch (e) { console.error('space: the picture of her radars from the server', e); }
   });
   const svbOn = () => SVB.on && S.on && S.kind === 'board' && !!S.hull;
+  // her hull as the server has it (its snapshot's, or its word as the emergency jump begins)
+  function hullIs(hp: number) { S.hp = U.clamp(hp, 0, S.hpMax); if (S.hp > 0) S.lostAt = 0; else if (!S.lostAt) { S.lostAt = S.t; HUD.toast('HULL FAILING', 'Emergency jump: the repairs come out of your pay', 3); } }
   function svSss(m: SssMsg) {
     if (!svbOn() || m.k !== S.zact) return; // (another level's frame: not this one's)
     const r = SpaceNet.read(m); SVB.snap = r; SVB.n = m.n; SVB.at = S.t;
+    // her hull, as the server keeps it (the emergency jump at nothing is the server's: js/spaceserver.ts battle)
+    if (r.hp >= 0) hullIs(r.hp);
     if (S.hull) r.g.forEach((g, i) => { const gn = S.hull!.guns[i] as any; if (!gn) return; if (g.hp !== gn.hp) gunHit(i, g.hp); gn.yaw = g.yaw; gn.pitch = g.pitch; gn.rev = g.rev; });
     // her missiles: as the server has them (a new one drawn, one gone taken away); flown on between snapshots
     const live = new Set(r.mis.map((q) => q.id));
@@ -2758,7 +2764,7 @@ export const Space = (() => {
     if (!svbOn()) return;
     const lag = (n: number) => Math.max(0, ((SVB.n >= 0 ? SVB.n : n) - n) * STEP + (S.t - SVB.at)); // (how long ago the server did it)
     for (const e of m.e) {
-      if (e.k === 'dmg') { if (isCtl()) damage(e.d, e.w); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + e.h * 0.1)); }
+      if (e.k === 'dmg') { if (e.w && e.d > 4) HUD.toast('HULL ' + Math.round(Math.max(0, S.hp - e.d) / S.hpMax * 100) + '%', e.w, 1.5); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + e.h * 0.1)); }
       else if (e.k === 'mis') { HUD.toast('MISSILE', 'Turn across it, or have a turret shoot it down', 2.2); Audio.deny(); }
       else if (e.k === 'misEnd') { const m0 = S.mis.find((x) => x.id === e.id); if (m0) { if (m0.o) m0.o.removeFromParent(); S.mis.splice(S.mis.indexOf(m0), 1); } if (e.hit) { S.shake = 1; SpaceUI.flash(0.35); Audio.boom(20); } }
       else if (e.k === 'gHit') gunHit(e.i, e.hp);
@@ -2828,7 +2834,7 @@ export const Space = (() => {
       case 'storp': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) torpMsg(m.a); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
       case 'sfire': if (S.on && m.by !== Net.myId && S.root) shot(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], 0, !!m.a[7], false); return true; // (another's round: flown to be seen)
-      case 'shit': if (m.i >= 0) gunHit(m.i, m.hp); else if (!isCtl()) S.hp = m.hp; return true;
+      case 'shit': if (m.i >= 0) gunHit(m.i, m.hp); else if (svbOn()) hullIs(m.hp); else if (!isCtl()) S.hp = m.hp; return true;
     }
     return false;
   }
