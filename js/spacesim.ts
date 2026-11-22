@@ -38,7 +38,7 @@ export interface SimTorp { id: number; p: THREE.Vector3; v: THREE.Vector3; q: TH
 export interface SimGun { k: string; x: number; y: number; z: number; inv?: boolean; hp: number; cool: number; bt?: number; acc?: number; rev?: number; yaw?: number; pitch?: number }
 export interface SimShip { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; size: number; docked: boolean; ftl: boolean }
 
-import { Radar, RSuite, RTarget } from './radar.js';
+import { Radar, RSuite, RTarget, RAssess } from './radar.js';
 
 export const SpaceSim = (() => {
   const T = THREE;
@@ -288,5 +288,31 @@ export const SpaceSim = (() => {
       fire(from, aim, H, lk.err || 0);
     }
   }
-  return { gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
+  // ---------------------------------------------------------------- her fire control (the mission ship's)
+  // She doesn't know which contact is what: her radars' threat assessment decides what's hostile. What it holds HOSTILE, painted
+  // lately, the most urgent (what reaches her soonest: its range over its closing speed; what isn't closing, after, nearest first)
+  // is asked for: a track of it kept by her scheduler, a threat (pri 2: never left waiting, a dish taken off anything else for it)
+  // if it reaches her inside FC_URG s, else a hostile she watches (pri 1). A threat that's no longer one goes back to being watched.
+  // And she doesn't keep tracking what isn't hostile (a ship's tracking radar on another is taken as hostility): a track of what her
+  // assessment no longer holds HOSTILE or SUSPECT (it turned away; it's chaff it was drawn onto) is let go. Unmanned (nobody at her
+  // gun control, counting down to blowing herself apart): her trackers dropped and her scheduler emptied.
+  // Returns what she's after (for the debug view), or null
+  const FC_URG = 12, TTI_FAR = 1e6;
+  const tti = (r: number, vc: number) => (vc > 10 ? r / vc : TTI_FAR + r);
+  // how soon a track reaches her (her own suite su): its range over its closing speed (not tracking: never; no place yet: its range)
+  const trkUrg = (su: RSuite, t: { st?: string; est: { p: THREE.Vector3 | null; v: THREE.Vector3 }; rng?: number }) => { if (t.st !== 'track') return Infinity; if (!t.est.p) return tti(t.rng || 0, 0); const rel = t.est.p.clone().sub(su.P), r = rel.length(); return tti(r, -t.est.v.clone().sub(su.V).dot(rel) / Math.max(1, r)); };
+  function fireControl(su: RSuite, manned: boolean, now: number) {
+    if (!manned) { for (const t of su.trks) { if (t.st !== 'idle') Radar.drop(t); t.job = null; } const S0 = Radar.sched(su); S0.tts.length = 0; S0.reqs.length = 0; S0.plan.clear(); return null; }
+    let bq = null as null | RAssess, bu = Infinity;
+    for (const q of su.ass) if (q.cls === 'HOSTILE' && q.plot && now - q.plot.t < 3.5) { const u = tti(q.r, q.vc); if (u < bu) { bu = u; bq = q; } }
+    const S0 = Radar.sched(su), on = !!bq && S0.tts.some((q) => q.est.p.distanceTo(bq!.f ? bq!.f.pl : q.est.p) < Math.max(150, 0.05 * bq!.r) && q.looks > 0);
+    if (bq) Radar.want(su, { f: bq.f || null, plot: bq.plot || null, pri: bu < FC_URG ? 2 : 1, rate: bu < FC_URG ? 4 : 1.5, fc: bu }, now);
+    for (const q of S0.tts) if (q.fc != null && q.pri === 2 && trkUrg(su, q) > FC_URG * 1.5) { q.pri = 1; q.rate = 1.5; }
+    for (const q of S0.tts.slice()) {
+      if (q.looks < 2) continue; const f = su.fus.find((x) => x.pl.distanceTo(q.est.p) < Math.max(150, 4 * q.kf.sig())), a = f && su.ass.find((x) => x.f === f);
+      if (a && a.cls !== 'HOSTILE' && a.cls !== 'SUSPECT') Radar.lose(su, q);
+    }
+    return bq ? { n: bq.n, r: Math.round(bq.r), vc: Math.round(bq.vc), u: Math.round(bu), id: bq.plot!.id, on } : null;
+  }
+  return { FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
 })();

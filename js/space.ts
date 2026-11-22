@@ -23,7 +23,7 @@ import { Game } from './game.js';
 import { Prof } from './profiler.js';
 import { InteriorCull } from './interiorcull.js';
 import { Me } from './player.js';
-import { Radar, RSuite, RTarget, RAssess, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
+import { Radar, RSuite, RTarget, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
 import { SpaceSim, ZMem, SimShip, SimGun } from './spacesim.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
@@ -148,37 +148,11 @@ export const Space = (() => {
       if (EW.hw && EW.hw.su === EW.foe) { const hw = EW.hw; EW.foe.scans.forEach((sc, k) => Radar.spin(sc.ax, sc.th, hw.rotors[k])); EW.foe.trks.forEach((tr, k) => hw.dishes[k].quaternion.setFromUnitVectors(_mz, tr.b)); }
       // her fire control: a tracker cued on the newest plot of the squad's ship whenever her scanners paint it and she's crewed (a
       // ship tracks what comes near her whether or not she means to shoot: guns, below, fire only when she's hostile)
-      const manned = !!(S.state && S.state.gn && S.state.arm == null && !S.state.boom);
-      if (!manned) { for (const t of EW.foe.trks) { if (t.st !== 'idle') Radar.drop(t); t.job = null; } const S0 = Radar.sched(EW.foe); S0.tts.length = 0; S0.reqs.length = 0; S0.plan.clear(); }
-      else {
-        // (she doesn't know which contact is what: her radars' threat assessment decides what's hostile. Cued when her trackers are free, or when one comes in much nearer than what she's tracking)
-        // (what her threat assessment holds HOSTILE (js/radar.ts assess), the nearest, if it's been painted lately)
-        // (the most urgent: what reaches her soonest (its range over its closing speed); what isn't closing, after, nearest first.
-        // A tracker's taken off what it holds for something at least twice as urgent (or, neither closing, much nearer); not for
-        // what a tracker's on already)
-        const su = EW.foe; let bq = null as null | RAssess, bu = Infinity;
-        for (const q of su.ass) if (q.cls === 'HOSTILE' && q.plot && EW.rt - q.plot.t < 3.5) { const u = tti(q.r, q.vc); if (u < bu) { bu = u; bq = q; } }
-        const S0 = Radar.sched(su), on = !!bq && S0.tts.some((q) => q.est.p.distanceTo(bq!.f ? bq!.f.pl : q.est.p) < Math.max(150, 0.05 * bq!.r) && q.looks > 0);
-        (EW as any).fc = bq ? { n: bq.n, r: Math.round(bq.r), vc: Math.round(bq.vc), u: Math.round(bu), id: bq.plot!.id, on } : null; // (what her fire control's after: the debug's)
-        // (what's hostile is asked for: a track of it kept, by its scheduler (js/radar.ts schedule), looked at as often as it's urgent: what
-        // reaches her inside FC_URG seconds, a threat (pri 2: never left waiting, a dish taken off anything else for it); the rest, a
-        // hostile she watches (pri 1). From its 3D track if her scanners have one, else found from its plot first)
-        if (bq) Radar.want(su, { f: bq.f || null, plot: bq.plot || null, pri: bu < FC_URG ? 2 : 1, rate: bu < FC_URG ? 4 : 1.5, fc: bu }, EW.rt);
-        // (and a threat that's no longer one goes back to being watched: its urgency over)
-        for (const q of S0.tts) if (q.fc != null && q.pri === 2 && trkUrg(su, q) > FC_URG * 1.5) { q.pri = 1; q.rate = 1.5; }
-        // (and she doesn't keep tracking what isn't hostile: a ship's tracking radar on another is taken as hostility. A track of what her
-        // assessment no longer holds HOSTILE or SUSPECT (it turned away; it's chaff it was drawn onto) is let go)
-        for (const q of Radar.sched(EW.foe).tts.slice()) {
-          if (q.looks < 2) continue; const f = EW.foe.fus.find((x) => x.pl.distanceTo(q.est.p) < Math.max(150, 4 * q.kf.sig())), a = f && EW.foe.ass.find((x) => x.f === f);
-          if (a && a.cls !== 'HOSTILE' && a.cls !== 'SUSPECT') Radar.lose(EW.foe, q);
-        }
-      }
+      // her fire control: the simulation's (js/spacesim.ts fireControl)
+      (EW as any).fc = SpaceSim.fireControl(EW.foe, !!(S.state && S.state.gn && S.state.arm == null && !S.state.boom), EW.rt); // (what she's after: the debug's)
     }
   }
-  // how soon something reaches her: its range over its closing speed; not closing, TTI_FAR plus its range (after anything that is, nearest first)
-  const FC_URG = 12; // (her fire control: what reaches her sooner than this many seconds is taken at once, a tracker pulled off whatever's least urgent)
-  const TTI_FAR = 1e6, tti = (r: number, vc: number) => (vc > 10 ? r / vc : TTI_FAR + r);
-  const trkUrg = (su: RSuite, t: { st?: string; est: { p: THREE.Vector3 | null; v: THREE.Vector3 }; rng?: number }) => { if (t.st !== 'track') return Infinity; if (!t.est.p) return tti(t.rng || 0, 0); const rel = t.est.p.clone().sub(su.P), r = rel.length(); return tti(r, -t.est.v.clone().sub(su.V).dot(rel) / Math.max(1, r)); };
+  const trkUrg = SpaceSim.trkUrg; // (how soon something reaches her: js/spacesim.ts)
   // Her radars' hardware on her hull (in her group, whose frame is the level's): each scanner an antenna on a post, turning with its
   // sweep (the 'y' one a long bar on her roof turning about her up; the 'x' one a long bar on a pylon under her keel turning about
   // her beam), each tracker a dish on her flank, pointed along its boresight
