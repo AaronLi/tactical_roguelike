@@ -147,6 +147,7 @@ export const Space = (() => {
     { const keep = own.keep || (own.keep = new Set<string>()); keep.clear(); for (const tr of own.trks) if (tr.st === 'track' && tr.tgt) keep.add(tr.tgt); for (const q of Radar.sched(own).tts) if (q.tgt) keep.add(q.tgt); if (S.match && S.match !== 'radar') keep.add(S.match === 'ship' ? 'hull' : S.match); } // (her notch doesn't take what she's holding or matched with: js/radar.ts) // (her scanners' clutter: the field, moving as the zone does; with no field, the level's frame)
     aiNotch(dt);
     chaffStep(dt); const tg = [me, ...(EW.foeT ? [EW.foeT] : []), ...rk, ...trafficTargets(dt), ...EW.chaff.map((c) => c.t), ...missileTargets(dt), ...torpTargets()]; EW.tg = tg;
+    if (svbOn()) return; // (the server's battle on: its radars (hers, the mission ship's, the zone's ships'), its fire control: the page steps none of them)
     Radar.step(own, dt, tg, EW.rt);
     if (EW.foe) {
       Radar.step(EW.foe, dt, tg, EW.rt);
@@ -419,13 +420,13 @@ export const Space = (() => {
   // A left click in the hologram, now her trackers are scheduled (js/radar.ts schedule): on a track, it's kept tracked (her operator's
   // pick: looked at a couple of times a second, before anything of her own picture's), or, kept already, let go; on a radar warning's
   // chevron, a search along its bearing. Which dish does it is the scheduler's business. Told to everyone aboard (strk).
-  const fusAt = (at: THREE.Vector3) => (EW.own ? EW.own.fus.find((q) => q.pl.distanceTo(at) < Math.max(200, 0.04 * q.pl.distanceTo(S.P))) || null : null);
+  const fusAt = (at: THREE.Vector3) => (EW.own ? shownOwn()!.fus.find((q) => q.pl.distanceTo(at) < Math.max(200, 0.04 * q.pl.distanceTo(S.P))) || null : null);
   function trkWant(p: RPlot, f: RFused | null, quiet = false) {
-    const own = EW.own!, S0 = Radar.sched(own), at = f ? f.pl : Radar.plotAt(own, p);
+    const sb = svbOn(), own = sb ? shownOwn()! : EW.own!, S0 = sb ? (own.sched || Radar.sched(EW.own!)) : Radar.sched(own), at = f ? f.pl : Radar.plotAt(EW.own!, p); // (the server's battle on: what it holds decides keep or let go, and only it does either: the request's sent by the caller)
     // (kept already: the track of its belief, or one where it is now (the track's newest solution, run on to now), either's spread allowed)
     const kept = S0.tts.find((q) => q.op && ((!!f && q.bel === f.n) || Radar.ttAt(q, EW.rt).distanceTo(at) < Math.max(200, 4 * q.kf.sig() + (f ? 3 * f.kf.sig() : 0))));
-    if (kept) { Radar.unwant(own, kept); if (!quiet) { HUD.toast('TRACKERS', kept.n + ' let go', 1.2); Audio.click(); } return 5; }
-    const tt = Radar.want(own, { f, plot: p, pri: 1, op: true }, EW.rt); if (!quiet) { HUD.toast('TRACKERS', tt ? tt.n + ': kept tracked' : 'finding it', 1.2); Audio.click(); } return 3;
+    if (kept) { if (!sb) Radar.unwant(own, kept); if (!quiet) { HUD.toast('TRACKERS', kept.n + ' let go', 1.2); Audio.click(); } return 5; }
+    const tt = sb ? null : Radar.want(own, { f, plot: p, pri: 1, op: true }, EW.rt); if (!quiet) { HUD.toast('TRACKERS', tt ? tt.n + ': kept tracked' : 'finding it', 1.2); Audio.click(); } return 3;
   }
   // a track dropped from what her trackers keep (her operator's ✕ on it: the one at p, as each aboard has it); her fire control
   // takes a threat back up if it's still one
@@ -558,6 +559,8 @@ export const Space = (() => {
     // (one a ship, the most she's doing: a lock over a tracker sweeping, over a scanner's paint)
     const by = new Map<string, typeof out[0]>(), rank = { lock: 3, trk: 2, scan: 1 } as const;
     const put = (k: string, w: typeof out[0]) => { const ship = k.split(':')[0], h = by.get(ship); if (!h || rank[w.kind] > rank[h.kind] || (w.kind === h.kind && w.age < h.age)) by.set(ship, w); };
+    const W0 = svbOn() && SVB.rwr && S.t - SVB.ownAt < 1 ? SVB.rwr : null; // (the server's battle on: its radars' word of who's on her)
+    if (W0) { for (const e of W0.trk) put(e.k, { d: new T.Vector3(e.f[0], e.f[1], e.f[2]).sub(S.P).applyQuaternion(qi), kind: e.lk ? 'lock' : 'trk', age: 0 }); for (const e of W0.scan) put(e.k, { d: new T.Vector3(e.f[0], e.f[1], e.f[2]).sub(S.P).applyQuaternion(qi), kind: 'scan', age: e.a }); out.push(...by.values()); return out.slice(0, 8); }
     for (const e of Radar.litTrk('own', EW.rt)) put(e.k, { d: e.from.clone().sub(S.P).applyQuaternion(qi), kind: e.lk ? 'lock' : 'trk', age: 0 });
     for (const e of Radar.paintsOn('own', EW.rt)) put(e.k, { d: e.from.clone().sub(S.P).applyQuaternion(qi), kind: 'scan', age: e.age });
     out.push(...by.values()); return out.slice(0, 8);
@@ -630,6 +633,7 @@ export const Space = (() => {
   // what a client of the server's battle would be sent (docs/space-server.md C1): packed, JSON both ways, unpacked into the last
   // frame's (F8's extras while it's shown; its maps and the dishes' debug ten times a second). Once a frame a suite
   const SVF = { f: 0, at: new Map<string, { f: number; v: RSuite }>(), mapsAt: new Map<string, number>() };
+  const shownOwn = () => sv(EW.own); // (her radars' picture as it's shown: the server's, its battle on)
   function sv(su: RSuite): RSuite; function sv(su: RSuite | null | undefined): RSuite | null;
   function sv(su: RSuite | null | undefined): RSuite | null {
     if (su && svbOn() && Radar.show) { const d = SVD.v.get(su.id); if (d && S.t - (SVD.at.get(su.id) ?? -1e9) < 1.5) return d; } // (F8 open: its own picture of the suite, extras and all)
@@ -1635,7 +1639,7 @@ export const Space = (() => {
   // (her thrust, m/s²: the main engine's, the others', the brake's (all of them, to the field's way); her top speed off the field's way, m/s)
   const FLY = { main: 30, side: 12, brake: 60, max: 300 }, shipZ = zmem();
   // the first of her trackers holding a track with a solution (where it is and how fast it goes, as her radar has it: js/radar.ts)
-  function radarLock() { const o = EW.own; if (!o) return null; let b: RSTrack | null = null; for (const t of Radar.sched(o).tts) if (t.est.q > 0.1 && (!b || (t.op ? 1 : 0) > (b.op ? 1 : 0) || ((t.op ? 1 : 0) === (b.op ? 1 : 0) && t.est.q > b.est.q))) b = t; return b; } // (her best track: her operator's picks first)
+  function radarLock() { const o = shownOwn(); if (!o) return null; let b: RSTrack | null = null; for (const t of Radar.sched(o).tts) if (t.est.q > 0.1 && (!b || (t.op ? 1 : 0) > (b.op ? 1 : 0) || ((t.op ? 1 : 0) === (b.op ? 1 : 0) && t.est.q > b.est.q))) b = t; return b; } // (her best track: her operator's picks first)
   function fly(dt: number) {
     const d = S.def, seat = mySeat(), helm = !!seat && seat.k === 'helm' && isCtl() && !me().dead && !me().down;
     // the mouse: what it's turned your view by since the last frame is the stick's push (it springs back)
@@ -2497,7 +2501,7 @@ export const Space = (() => {
     TP.look = ''; const seat = mySeat(); if (!seat || seat.k !== 'helm' || !EW.own || !S.model) return;
     const cam = G_R.camera, cp = cam.getWorldPosition(new T.Vector3()), cf = new T.Vector3(0, 0, -1).applyQuaternion(cam.getWorldQuaternion(new T.Quaternion()));
     const q = S.Q.clone().invert().premultiply(S.Dq); let best = Math.cos(7 * Math.PI / 180);
-    for (const f of EW.own.fus) { const v = f.pl.clone().sub(S.P).applyQuaternion(q).add(S.Dp).sub(cp).normalize(), c = v.dot(cf); if (c > best) { best = c; TP.look = f.n; } }
+    for (const f of shownOwn()!.fus) { const v = f.pl.clone().sub(S.P).applyQuaternion(q).add(S.Dp).sub(cp).normalize(), c = v.dot(cf); if (c > best) { best = c; TP.look = f.n; } }
   }
   function torpKeys() {
     const seat = mySeat(), m = me(); if (!seat || seat.k !== 'helm' || Game.menuOpen()) { TP.l = false; return; }
@@ -2506,7 +2510,7 @@ export const Space = (() => {
   }
   function torpFire() {
     const seat = mySeat(); if (!seat || seat.k !== 'helm' || !isCtl() || !EW.own || !TP.tube) return;
-    const n = TP.pick || TP.look, f = EW.own.fus.find((q) => q.n === n);
+    const n = TP.pick || TP.look, f = shownOwn()!.fus.find((q) => q.n === n);
     if (S.docked || S.ftl || S.warp) { HUD.toast('TORPEDO', 'Not while she\'s ' + (S.docked ? 'docked' : 'jumping'), 1.4); Audio.deny(); return; }
     if (!f) { HUD.toast('TORPEDO', 'No target: look at a 3D fix (hold right mouse), click to pick it', 2); Audio.deny(); return; }
     if (TP.left <= 0) { HUD.toast('TORPEDO', 'Tube empty', 1.4); Audio.deny(); return; }
@@ -2631,7 +2635,7 @@ export const Space = (() => {
           }
           const g = warpGate();
           if (g) lines.push(S.spin >= 1 ? hint('T', 'to warp to ' + U.esc(g.w.name)) : S.spin > 0 ? `Warp drive spinning up · ${Math.round(S.spin * 100)}% <small>(keep her on ${U.esc(g.w.name)})</small>` : `<small>Turn her nose onto ${U.esc(g.w.name)} to spin up the warp drive</small>`);
-          if (EW.own && EW.own.fus.length) lines.push(`<small><b>B</b> torpedo${TP.left === Infinity ? '' : ` <small>(${TP.left} left)</small>`}${TP.pick ? ' at ' + U.esc(TP.pick) : ' · hold right mouse to look at a fix, click to pick it'}</small>`);
+          if (EW.own && shownOwn()!.fus.length) lines.push(`<small><b>B</b> torpedo${TP.left === Infinity ? '' : ` <small>(${TP.left} left)</small>`}${TP.pick ? ' at ' + U.esc(TP.pick) : ' · hold right mouse to look at a fix, click to pick it'}</small>`);
           if (S.tclose) lines.push(`Matching course with ${U.esc(S.tclose.name)}…`);
           else if (S.match && S.wps[S.tgt]) lines.push(`Speed matched with ${U.esc(S.wps[S.tgt].name)} <small>(H to let go)</small>`);
           if (S.kind === 'board' && !(S.state && S.state.boom)) { const a = aim(300); if (a) lines.push(a.close < 4 ? 'Ram the hull: nose on, 5 m/s or more' : `Ram her: within ${SD.BREACH_ANG}° of square`); }
@@ -2718,7 +2722,7 @@ export const Space = (() => {
   // The host's worker runs the zone's battle (js/svbattle.ts); a boarding zone's mission ship's weapons are drawn from what it says:
   // her guns (laid, firing, hit) and their rounds (each gun's rounds of a step replayed from its seed: the same rounds the server
   // flies), her missiles, the damage they do. ?pagebattle: the page's own, as before (for comparing)
-  const SVB = { on: !new URLSearchParams(location.search).has('pagebattle'), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, own: null as RSuite | null, ownAt: -1e9 };
+  const SVB = { on: !new URLSearchParams(location.search).has('pagebattle'), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, own: null as RSuite | null, ownAt: -1e9, rwr: null as null | { trk: { k: string; f: number[]; lk: number }[]; scan: { k: string; f: number[]; a: number }[] } };
   // her radars' picture from the server's battle (the fast channel's stream 1: js/spaceserver.ts battle): unpacked into the last one
   // (so what's picked and drawn keeps its identity), its times put on the page's own radar clock as it arrives
   // F8's picture of the suite it's showing, from the server's battle (asked for every couple of seconds while it's open: streams 2, 3)
@@ -2736,7 +2740,7 @@ export const Space = (() => {
   });
   Net.onFast((buf, ch) => {
     if (ch !== 1 || !svbOn()) return;
-    try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact || !m.s) return; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; } catch (e) { console.error('space: the picture of her radars from the server', e); }
+    try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact || !m.s) return; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; SVB.rwr = m.w || null; } catch (e) { console.error('space: the picture of her radars from the server', e); }
   });
   const svbOn = () => SVB.on && S.on && S.kind === 'board' && !!S.hull;
   function svSss(m: SssMsg) {

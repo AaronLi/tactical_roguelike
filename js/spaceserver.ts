@@ -8,6 +8,7 @@ import { ShipGen } from './shipgen.js';
 import { SpaceData } from './spacedata.js';
 import { SvBattle, SvBat } from './svbattle.js';
 import { SuiteView } from './suiteview.js';
+import { Radar } from './radar.js';
 import { World } from './world.js';
 // The host's side of the space direction (docs/space.md), in the simulation's thread with js/server.ts and through its
 // SvNet: the missions board (what's offered this visit, which the squad has picked, which are done), the squad's fleet (the
@@ -903,7 +904,7 @@ export const SpaceSv = (() => {
         break;
       }
       case 'spose': if (p && (st.ship.ctl === from || !st.ship.ctl || !sv.players.has(st.ship.ctl)) && Array.isArray(m.a) && m.a.length <= 16 && m.a.every(Number.isFinite)) { st.ship.ctl = from; st.ship.pose = m.a; net().broadcast({ t: 'spose', a: m.a, by: from }, from); if (m.a.length >= 10) SvBattle.heardPose(m.a, sv.stepN, sv.map); } break;
-      case 'smis': if (p && Array.isArray(m.a) && m.a.length <= 8 && m.a.every(Number.isFinite)) net().broadcast({ t: 'smis', a: m.a, by: from }, from); break; // (a missile off her hull, or one shot down: told to all)
+      case 'smis': if (p && Array.isArray(m.a) && m.a.length <= 8 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'smis', a: m.a, by: from }, from); battleIn(m); } break; // (a missile off her hull, or one shot down: told to all)
       case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) net().broadcast({ t: 'sfire', a: m.a, by: from }, from); break;
       case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'strk', a: m.a, by: from }, from); battleIn(m); } break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
       case 'ssec': if (p && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5) && m.a.every(Number.isFinite)) { net().broadcast({ t: 'ssec', a: m.a, by: from }, from); battleIn(m); } break; // (a scanner's search set: js/space.ts secSet)
@@ -977,7 +978,8 @@ export const SpaceSv = (() => {
       net().fast(pid, enc({ k: bat.k, id: q.id, s: SuiteView.pack(su, W.t, { dbg: true }) }), 2);
       if (sv.stepN % 30 === 0) net().fast(pid, enc({ k: bat.k, id: q.id, m: SuiteView.packMaps(su, W.t) }), 3);
     }
-    if (sv.stepN % 6 === 0 && bat && bat.W.own) { const js = JSON.stringify({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t) }), u8 = new TextEncoder().encode(js); net().fast(null, u8.buffer as ArrayBuffer, 1); }
+    if (sv.stepN % 6 === 0 && bat && bat.W.own) { const t = bat.W.t, r1 = (v: THREE.Vector3) => [Math.round(v.x), Math.round(v.y), Math.round(v.z)], w = { trk: Radar.litTrk('own', t).map((e) => ({ k: e.k, f: r1(e.from), lk: e.lk ? 1 : 0 })), scan: Radar.paintsOn('own', t).map((e) => ({ k: e.k, f: r1(e.from), a: Math.round(e.age * 100) / 100 })) }; // (her warning receiver: who's tracking her, whose scanners are painting her: the server's radars')
+      const js = JSON.stringify({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t), w }), u8 = new TextEncoder().encode(js); net().fast(null, u8.buffer as ArrayBuffer, 1); }
   }
   const dbgReq = new Map<string, { id: string; at: number }>(); // (who's asked for F8's picture of which suite, and when)
   const battleIn = (m: any) => SvBattle.request(bat, m); // (a crew request, relayed as before (the pages still run their own battle), and done to the server's)

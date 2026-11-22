@@ -167,6 +167,7 @@ export const SvBattle = (() => {
         break;
       }
       case 'schaff': if (W) W.chaff.push(SpaceSim.chaffNew(a, ++W.chaffN, W.t)); break;
+      case 'smis': if (W && a && a[4]) { const i = W.mis.findIndex((q) => q.id === a[0]); if (i >= 0) { W.mis.splice(i, 1); B!.ev.push({ k: 'misEnd', n: B!.W.t | 0, id: a[0], hit: 0 }); } } break; // (a missile a turret shot down, said by the screen that fired)
       case 'shit': if (W && m.i >= 0) { const g = W.guns[m.i | 0]; if (g) g.hp = Math.max(0, +m.hp || 0); } break;
       case 'storp': if (W) torpIn(B!, a, m.f); break;
     }
