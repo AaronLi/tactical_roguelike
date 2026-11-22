@@ -25,6 +25,7 @@ import { InteriorCull } from './interiorcull.js';
 import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
+import { SuiteView } from './suiteview.js';
 import { SpaceSim, ZMem, SimShip, SimGun, SimChaff } from './spacesim.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
@@ -431,8 +432,8 @@ export const Space = (() => {
       const d = (it.rwr as THREE.Vector3).clone().applyQuaternion(S.Q).normalize();
       Radar.wantRay(EW.own, d, EW.rt); Net.toHost({ t: 'strk', a: [-1, 4, +d.x.toFixed(4), +d.y.toFixed(4), +d.z.toFixed(4)] }); HUD.toast('TRACKERS', 'searching that bearing', 1.2); Audio.click(); return true;
     }
-    if (!it.plot) return false; const p = it.plot as RPlot;
-    const f = EW.own.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p)) || null;
+    if (!it.plot) return false; const shown = sv(EW.own)!, p = SuiteView.on ? SuiteView.realPlot(EW.own, it.plot as RPlot) : it.plot as RPlot; // (the pick's the picture's: drawn from a round trip (SuiteView), its plot and belief found in the suite by where it is and its name, as the server would from what a page sends)
+    const f0 = shown.fus.find((q) => (q.a && q.a.p === it.plot) || (q.b && q.b.p === it.plot)) || null, f = f0 && (SuiteView.on ? EW.own.fus.find((q) => q.n === f0.n) || null : f0);
     const code = trkWant(p, f); Net.toHost({ t: 'strk', a: [-1, code, p.k, p.phi, p.r] }); return true;
   }
   const wrapA = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
@@ -473,10 +474,10 @@ export const Space = (() => {
     if (show && o) {
       const W = 480, H = 360;
       if (!OPTV.cv) { const c = document.createElement('canvas'); c.width = W; c.height = H; c.id = 'opt-view'; Object.assign(c.style, { position: 'fixed', right: '24px', top: '24px', width: W + 'px', height: H + 'px', border: '1px solid rgba(141,255,190,0.5)', background: '#000', zIndex: '36', pointerEvents: 'none' }); document.body.appendChild(c); OPTV.cv = c; }
-      camDraw(OPTV, EW.own!, OPTV.cv!, W, H);
+      camDraw(OPTV, sv(EW.own!), OPTV.cv!, W, H);
     }
     // (and the debug view's (F8): the camera of the ship whose radars it shows, drawn in its 3D panel)
-    const dsu = Radar.show && S.root ? ewList().find((q) => q.id === Radar.sel) : null;
+    const dsu = Radar.show && S.root ? sv(ewList().find((q) => q.id === Radar.sel)) : null;
     if (dsu && dsu.opt && dsu.sched) { if (DBGV.su !== dsu) { DBGV.su = dsu; DBGV.fov = 0; } if (!DBGV.cv) { const c = document.createElement('canvas'); c.width = 320; c.height = 240; DBGV.cv = c; } camDraw(DBGV, dsu, DBGV.cv!, 320, 240); RadarView.dbg.cam = DBGV.cv; }
     else RadarView.dbg.cam = null;
   }
@@ -538,10 +539,10 @@ export const Space = (() => {
   }
   // the sectors for the hologram: each scanner's searching one, and the one the keys are setting (selected)
   function secView() {
-    if (!EW.own) return { secs: [] as { k: number; c: number; h: number; on: boolean; sel: boolean }[], boxes: [] as { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[], trkSel: -1 };
+    const own = sv(EW.own); if (!own) return { secs: [] as { k: number; c: number; h: number; on: boolean; sel: boolean }[], boxes: [] as { mode: string; open: boolean; cur: number; opts: string[]; sel: boolean }[], trkSel: -1 };
     const secs: { k: number; c: number; h: number; on: boolean; sel: boolean }[] = [];
-    EW.own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k || (SEC.open === k && MODES[SEC.cur] === 'sector')) secs.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k || SEC.open === k }); }); // (searching a sector, or picked, or about to: its sector shown)
-    const boxes = EW.own.scans.map((sc, k) => ({ mode: sc.mode, notch: !!sc.notch, open: SEC.open === k, cur: SEC.open === k ? SEC.cur : MODES.indexOf(sc.mode), opts: optsOf(sc), sel: SEC.sel === k }));
+    own.scans.forEach((sc, k) => { if (sc.sec.on || SEC.sel === k || (SEC.open === k && MODES[SEC.cur] === 'sector')) secs.push({ k, c: sc.sec.c, h: sc.sec.h, on: sc.sec.on, sel: SEC.sel === k || SEC.open === k }); }); // (searching a sector, or picked, or about to: its sector shown)
+    const boxes = own.scans.map((sc, k) => ({ mode: sc.mode, notch: !!sc.notch, open: SEC.open === k, cur: SEC.open === k ? SEC.cur : MODES.indexOf(sc.mode), opts: optsOf(sc), sel: SEC.sel === k }));
     return { secs, boxes, trkSel: TRKK.sel };
   }
   // her warning receiver's picture: each radar on her and the way to it (in her frame), and what it's doing: a tracker locked on
@@ -594,7 +595,7 @@ export const Space = (() => {
   // hold in 3D is a track point (trkMarks: where, what it is to her, its colour), one on a waypoint already shown left out
   const TCOL: Record<string, string> = { HOSTILE: '#ff4a3a', SUSPECT: '#ffa040', WATCH: '#ffe070', NEUTRAL: '#a8b8c4', CIV: '#7f9fb0', FRIENDLY: '#70f090' };
   function ewMarks() {
-    const su = EW.own, names = new Set<string>(); S.trkMarks = [];
+    const su = sv(EW.own), names = new Set<string>(); S.trkMarks = [];
     if (su) for (const sc of su.scans) for (const c of sc.cons) if (c.hits >= 2 && c.iff) names.add(c.iff.n);
     for (const w of S.wps) if (/^t\d+$/.test(w.id) && w.id !== 't0') w.unseen = !names.has(w.name);
     if (S.wps[S.tgt] && S.wps[S.tgt].unseen) { const j = S.wps.findIndex((w) => !w.hide && !w.unseen && w.kind === 'anchor'); if (j >= 0) S.tgt = j; }
@@ -618,6 +619,18 @@ export const Space = (() => {
   function ewList(): RSuite[] {
     if (EW.own) EW.own.name = S.def.name; if (EW.foe) EW.foe.name = hullName();
     return [EW.own, EW.foe, ...[...EW.tsu.values()].map((q) => q.su).sort((a, b) => a.P.distanceTo(S.P) - b.P.distanceTo(S.P))].filter((q): q is RSuite => !!q);
+  }
+  // A suite as the page draws it: the suite itself, or (SuiteView.on: the debug switch) its round trip through js/suiteview.ts,
+  // what a client of the server's battle would be sent (docs/space-server.md C1): packed, JSON both ways, unpacked into the last
+  // frame's (F8's extras while it's shown; its maps and the dishes' debug ten times a second). Once a frame a suite
+  const SVF = { f: 0, at: new Map<string, { f: number; v: RSuite }>(), mapsAt: new Map<string, number>() };
+  function sv(su: RSuite): RSuite; function sv(su: RSuite | null | undefined): RSuite | null;
+  function sv(su: RSuite | null | undefined): RSuite | null {
+    if (!su || !SuiteView.on) return su || null;
+    const c = SVF.at.get(su.id); if (c && c.f === SVF.f) return c.v;
+    const dbg = !!Radar.show, v = SuiteView.unpack(JSON.parse(JSON.stringify(SuiteView.pack(su, EW.rt, { dbg }))), c ? c.v : null);
+    const wall = performance.now(); if (dbg && wall - (SVF.mapsAt.get(su.id) ?? -1e9) > 100) { SVF.mapsAt.set(su.id, wall); SuiteView.unpackMaps(JSON.parse(JSON.stringify(SuiteView.packMaps(su, EW.rt))), v); }
+    SVF.at.set(su.id, { f: SVF.f, v }); return v;
   }
   function ewCue(a: number[], q?: THREE.Quaternion) { if (!EW.own) return; if (a[0] < 0) { for (const t of EW.own.trks) Radar.drop(t); return; } Radar.cue(EW.own, { k: a[0] | 0, phi: a[1], r: a[2], t: EW.rt, db: 0, id: '', e: 0, q }); }
 
@@ -2221,13 +2234,13 @@ export const Space = (() => {
     if (IP.P0.distanceTo(IP.P1) < 300) { S.P.lerpVectors(IP.P0, IP.P1, a); S.Q.copy(IP.Q0).slerp(IP.Q1, a); }
     IP.dP.copy(S.P); IP.dQ.copy(S.Q);
   }
-  const SIM = { acc: 0, steps: 0, hook: null as null | { n: number; f: () => void } }; // (acc: the real time owed, not yet stepped; hook: a test's, called after step n)
+  const SIM = { acc: 0, steps: 0, hook: null as null | { n: number; f: () => void }, hold: false }; // (hold: a test's: no steps while it's set, the frame still drawn) // (acc: the real time owed, not yet stepped; hook: a test's, called after step n)
   function update(dt: number, raw = dt) {
     ipRestore(); // (the true state back, before anything steps or reads it)
     if (!S.on || !S.model || Game.map !== S.map) return;
     if (S.plan) S.plan.line.visible = S.plan.gates.visible = S.plan.end.visible = false; // (her plan's drawn again below while she's lined up: planDraw)
     const m = me(), h = STEP;
-    SIM.acc = Math.min(SIM.acc + Math.min(0.25, Math.max(dt, raw)), 0.25 + STEP);
+    SIM.acc = SIM.hold ? 0 : Math.min(SIM.acc + Math.min(0.25, Math.max(dt, raw)), 0.25 + STEP); SVF.f++;
     let pt = Prof.t(), n = 0;
     while (SIM.acc >= STEP) {
       SIM.acc -= STEP; n++; SIM.steps++;
@@ -2265,9 +2278,9 @@ export const Space = (() => {
     { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); if (H.focus) G_R.focusAmt = e;
       if (!H.focus && H.fO >= 0) { const o = (S.t - H.fO) / 0.3; if (o >= 1 || !seat) { G_R.focusBlur = false; H.fO = -1; } else G_R.focusAmt = 1 - o; } // (out: the blur fading away) // (going in: the world blurring out and the hologram opening, over 0.6 s)
       const lift = H.focus ? 0.2 * e : 0; // (focused: up from below the eyes to just under the middle of the view)
-      RadarView.holo(S.model ? S.model.group : null, EW.own, H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, EW.rt, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1, HOLO_ZOOM[H.zi], rwrNow(), secView()); }
+      RadarView.holo(S.model ? S.model.group : null, sv(EW.own), H.c.clone().add(new T.Vector3(0, lift, 0)), H.R, H.rot, EW.rt, !!seat && seat.k === 'sensors', H.pick, H.focus, H.focus ? e : 1, HOLO_ZOOM[H.zi], rwrNow(), secView()); }
     pt = Prof.lap('space: sensors, hologram', pt);
-    RadarView.update(S.root, Radar.show, ewList(), [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', EW.rt, G_R.camera, Radar.sel);
+    RadarView.update(S.root, Radar.show, Radar.show ? ewList().map((q) => sv(q)) : [], [EW.ownT, EW.foeT].filter((q): q is RTarget => !!q), 'own', EW.rt, G_R.camera, Radar.sel);
     // her engines, the status strip, the mission's things
     const th = S.docked ? 0 : U.clamp(S.V.length() / S.def.speed, 0.12, 1) * (S.cruise ? 1.3 : 0.75);
     S.model.thrust.opacity += (th - S.model.thrust.opacity) * Math.min(1, dt * 4);
@@ -2816,6 +2829,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, sv, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)
