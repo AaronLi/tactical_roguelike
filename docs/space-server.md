@@ -125,6 +125,31 @@ its own recorded zone frame. The others aboard follow the server's pose (in `sss
 exactly the page's prediction; a falsified one corrected and replayed to the same place. Not yet: the breach, landing and the rest
 decided on the server (the pilot's page still says them); a second player's page checked.
 
+### C3: the whole helm on the server (asked for 2026-11-22: the pilot's page sends inputs, nothing it decides)
+
+Everything the pilot's page still decides about her flight moves into one page-free module, js/helm.ts: her flight in every mode
+(free, the breach assist and being brought round (squareUp, roundUp, aim), warp (warpGate, spinUp, warpAim, warpStep), the autopilot
+(auto, autoStep: docking, landing, launching), the FTL run's flight, the assault's atmosphere stage (righting, the descent, landing on
+the pad), collisions (collide: the level's boxes, the floor, the rocks near her), and the events (the breach: where, at what angle;
+landing; the way up). It works on a helm state (her pose, way, turn rate, stick, and the modes' state: brLock, brRound, auto, warp,
+spin, cruise, stage, docked, match) and the level's geometry given as data (its map: breach sites, boxes, the hull; the berth and its
+poses; anchors; waypoints; the floor), and says what happens as events (no HUD, sound or network inside it). The server runs it as
+the authority (js/svbattle.ts, its geometry from the level map it has; the hub's layout made data for it), and its events do what the
+page's did (dock, the cut, the jump, the stage change); the pilot's page runs the same step to predict, sends its inputs (keys, the
+stick's push, and commands: warp, land, launch, dock, the H match), and is put right from the server's whole helm state. The plan
+drawings (planDraw, routeDraw) are drawn from the helm state on the page.
+
+Steps, each checked by fly_fp.mjs (unchanged), fly_server.mjs (every ack exact) and a step script of its own:
+1. js/helm.ts: the state and geometry types; the flight functions moved as they are (the page's S passed in as the state, its
+   side effects as an outbox), the page calling them. fly_fp identical.
+2. Collisions and the breach / landing events into it, as events; the page acting on its own events as now.
+3. The breach assist and the round-up into it (their plans as data for the drawings).
+4. Warp, the autopilot, docking, launching, landing, the FTL run's flight, the atmosphere stage.
+5. The input stream: keys, the stick's push and commands; the helm state packed for the ack; the page predicting the whole step and
+   replaying on a correction. No state entries left (every step's input is all the server needs).
+6. The server: the helm per world from its level's geometry (the hub's from data), its events acting on SpaceSv (sdock, the cut, the
+   jump, stage changes) and told to everyone; the pilot's page no longer sends sdock/jump/stage for her flight.
+
 ### E (maybe): the battle in the zone's frame
 
 Inertial: no frame turning, no rebasing when the squad boards another zone ship.
