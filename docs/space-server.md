@@ -221,6 +221,15 @@ against the rocks), three's vector maths 9.3%.
 Bandwidth (tools/space_steps/wire_sizes.mjs, flying with her scanners on): her radar picture 11 KB/s to everyone (deflated; 88 as
 JSON), the snapshot 2.4 KB/s, the pilot's acks 6.3 KB/s, the pilot's steps 4.3 KB/s up; F8's, while it's open, 12 + 132 KB/s.
 
+Compression (2026-11-23; tools/space_steps/snap_wire.mjs: a joined player aboard a boarding mission). The reliable connection is deflated
+each way, every message against the last 32 KB sent on it as its dictionary (js/net.ts zSend, zIn; fflate from jsDelivr, loaded when a
+connection opens; each side says it can with {t:'zhi'}): host to player 4.2-5.7 KB/s of JSON sent as 0.7-1.2, player to host 13.5-15
+as 0.25. The ground snapshot (was {t:'snap'} JSON on the reliable connection to everyone, 59 KB/s) goes to each remote player on the
+fast channel, stream 6, as what's changed since the last one they've said they have (js/snapdelta.ts; js/server.ts sendSnap, 'sack';
+js/game.ts puts it back): 4-8 KB/s, every one put back exactly the JSON the host's own page had (152/152), and with a fifth of the fast
+channel's packets lost still exact (115/115; a lost one only means the next is against an older base). A joined player's download
+all told: ~80 KB/s -> ~16-18 KB/s (radar picture 6-7, the space snapshot 2.5, the ground snapshot 4-8, the rest ~1).
+
 ## WebAssembly candidates
 
 From the profiles above (the worker's and Node's: that's where the battle runs now; the page draws):

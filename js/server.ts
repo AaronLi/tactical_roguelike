@@ -17,6 +17,8 @@ import { U as G_U } from './util.js';
 import { World } from './world.js';
 import { ServerHost } from './serverhost.js';
 import { SpaceSv } from './spaceserver.js';
+import { SpaceNet } from './spacenet.js';
+import { SnapDelta } from './snapdelta.js';
 // Host-authoritative simulation: lobby/phase flow, suspect + civilian AI, doors, compliance and arrests,
 // damage resolution, objectives and the vote to leave.
 // Only runs on the hosting peer, in a thread of its own (js/serverworker.ts; or on the page's, js/serverhost.ts: docs/threads.md).
@@ -24,7 +26,7 @@ import { SpaceSv } from './spaceserver.js';
 const STATE_CODE: Partial<Record<EnemyState, number>> = { normal: 0, flee: 0, surrender: 1, cuffed: 2, cower: 3 };
 interface Loose { [k: string]: any }
 // The kinds of message the host's handle() switches on (what an officer's game sends it with Net.toHost: the `t` field)
-type NetMsgKind = 'stk' | 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
+type NetMsgKind = 'stk' | 'hello' | 'st' | 'sack' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
 // A message off the wire: its kind, and whatever else that kind carries (dynamic: checked where it's read)
 interface NetMsg { t: NetMsgKind; [k: string]: any }
 type DamageMap = Parameters<typeof Damage.apply>[0]; // (what js/damage.ts takes for a map)
@@ -59,6 +61,11 @@ const SvNet = {
   fast: ((_to: string | null, _buf: ArrayBuffer, _ch?: number) => {}) as (to: string | null, buf: ArrayBuffer, ch?: number) => void,
 };
 
+// The ground snapshot to the remote players (sendSnap): each level's numbered (SNAPQ: its last 64 kept, as sent), and each player sent
+// what's changed since the last of them they've said they have (SNAPACK, by player and level: 'sack'), deflated, on the fast channel
+// (stream 6: unreliable, newest wins: a lost one only means the next is against an older one); one who's said nothing yet, or whose last
+// is too old to be kept, the whole of it. The host's own page has it whole, across the thread (js/serverhost.ts sendTo)
+const SNAPQ = new Map<string, { seq: number; ring: Map<number, any> }>(), SNAPACK = new Map<string, number>(), SNAP_KEEP = 64;
 // (a level context: the server's per-level fields and the space mission's (js/spaceserver.ts ctxSave))
 export interface LvCtx { sv: Record<string, unknown>; sp: unknown; warm?: boolean } // (warm: made ahead, the squad's ship coming up: kept live with nobody aboard)
 export const Server = {
@@ -163,6 +170,18 @@ export const Server = {
   },
   sendRoster() { SvNet.broadcast({ t: 'roster', roster: this.roster() }); },
 
+  // (the ground snapshot out: see SNAPQ)
+  sendSnap(m0: any) {
+    const m = JSON.parse(JSON.stringify(m0)); // (frozen as sent: it holds the players' own states, which may change after, and a base must be what they got)
+    const k = this.curK(), L = String(k); let q = SNAPQ.get(L); if (!q) SNAPQ.set(L, (q = { seq: 0, ring: new Map() }));
+    const sq = ++q.seq; q.ring.set(sq, m); q.ring.delete(sq - SNAP_KEEP);
+    for (const [id, pl] of this.allPlayers || this.players) {
+      if (id === SvNet.myId || this.lvOf(pl) !== k) continue;
+      const a = SNAPACK.get(id + '|' + L), base = a != null ? q.ring.get(a) : undefined;
+      SpaceNet.zpack(base ? { L: k, s: sq, b: a, d: SnapDelta.diff(base, m) } : { L: k, s: sq, b: -1, f: m }).then((buf) => SvNet.fast(id, buf, 6));
+    }
+    if (SvNet.myId) SvNet.sendTo(SvNet.myId, { ...m });
+  },
   handle(m: NetMsg, from: string) {
     { const q = (this.allPlayers || this.players).get(from); if (!this.allPlayers && q && this.lvOf(q) !== this.curK() && this.ctxs.has(this.lvOf(q))) { this.inCtx(this.lvOf(q), () => this.handle(m, from)); return; } } // (someone aboard another level: theirs loaded)
     const p = this.players.get(from) || (this.allPlayers ? this.allPlayers.get(from) : undefined); // (whoever sent it, even while their level isn't the one loaded)
@@ -199,6 +218,7 @@ export const Server = {
       }
       case 'acct': if (p && (p.anon ? 1 : 0) !== (m.anon === 1 ? 1 : 0)) { p.anon = m.anon === 1 ? 1 : 0; this.sendRoster(); } break; // (signed in or out of the cloud saves since their hello: the guest mark)
       case 'st': if (p) p.st = m.s; break;
+      case 'sack': { const key = from + '|' + String((m as any).L), sq = +(m as any).s; if (Number.isFinite(sq) && sq > (SNAPACK.get(key) ?? -1)) SNAPACK.set(key, sq); break; } // (the last ground snapshot they have: sendSnap)
       case 'rfx': if (p && Array.isArray(m.a)) SvNet.broadcast({ t: 'rfx', a: m.a.slice(0, 32) }, from); break; // (the marks a round left on what it went through or off)
       case 'bstk': if (p) SvNet.broadcast(m, from); break; // (a bolt that stuck: js/bolts.ts)
       case 'hole': // (what it took out of them, js/damage.ts: kept for whoever joins, and here for the suspects' eyes and rounds)
@@ -447,6 +467,7 @@ export const Server = {
     const p = this.players.get(id);
     if (!p) return;
     this.players.delete(id); if (this.allPlayers) this.allPlayers.delete(id); // (and from the whole squad, a level being stepped or not)
+    for (const k of [...SNAPACK.keys()]) if (k.startsWith(id + '|')) SNAPACK.delete(k);
     SvNet.broadcast({ t: 'left', id });
     SvNet.broadcast({ t: 'chat', id: null, m: p.name + ' left the squad.' });
     this.sendRoster();
@@ -1930,7 +1951,7 @@ export const Server = {
       }
       const p: Record<string, any> = {};
       for (const pl of all) p[pl.id] = pl.st;
-      SvNet.broadcast({ t: 'snap', e, p, x: [this.extract.active ? 1 : 0, this.extract.votes.size, all.filter((q) => !q.st.dd).length, this.report.civKilled || 0, all.filter((q) => this.extract.votes.has(q.id)).map((q) => q.id), this.unitsCleared()], n: this.remaining(false), c: this.remaining(true), b: this.openBodies(), w: this.openEvidence() });
+      this.sendSnap({ t: 'snap', e, p, x: [this.extract.active ? 1 : 0, this.extract.votes.size, all.filter((q) => !q.st.dd).length, this.report.civKilled || 0, all.filter((q) => this.extract.votes.has(q.id)).map((q) => q.id), this.unitsCleared()], n: this.remaining(false), c: this.remaining(true), b: this.openBodies(), w: this.openEvidence() });
     }
   },
 
@@ -1942,7 +1963,7 @@ export const Server = {
       this.snapT = 0.05;
       const p: Record<string, any> = {};
       for (const pl of this.players.values()) if (pl.st) p[pl.id] = pl.st;
-      SvNet.broadcast({ t: 'snap', e: [], p, x: [0, 0, this.players.size, 0, [], 0], n: 0, c: 0, b: 0, w: 0 });
+      this.sendSnap({ t: 'snap', e: [], p, x: [0, 0, this.players.size, 0, [], 0], n: 0, c: 0, b: 0, w: 0 });
     }
     if (this.liftT != null && (this.liftT -= dt) <= 0) { this.liftT = null; this.checkReady(true); }
   },

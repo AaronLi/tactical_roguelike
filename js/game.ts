@@ -58,6 +58,8 @@ import { Hooks, U } from './util.js';
 import { Views } from './views.js';
 import { World } from './world.js';
 import { Wind } from './wind.js';
+import { SpaceNet } from './spacenet.js';
+import { SnapDelta } from './snapdelta.js';
 // (js/profiler.ts wraps Game.loop and the Me methods when js/main.ts calls Prof.install(), after every file has run; this file imports it only for line/save/reset)
 // Glue: menus, lobby, phase transitions, message dispatch, pointer lock, main loop.
 // a DOM event whose target is known to be an element of type T (the handlers below are bound on a container, and read what was clicked)
@@ -187,6 +189,19 @@ export const Game = {
     // game (the host's own too) hears the host's word in onMsg
     Net.onServer = (m, from) => ServerLink.fromPeer(m, from);
     Net.onClient = (m) => this.onMsg(m);
+    // the ground snapshot on the fast channel (stream 6: js/server.ts sendSnap): what's changed since one this page has, put back on it (each
+    // level's last 64 kept) and handed on as if it had come whole; one older than the last handed on, or against one this page hasn't got,
+    // let go (the next is against one it has). Which it has, told the host ten times a second at most ('sack')
+    { const SD = { ring: new Map<string, Map<number, any>>(), last: new Map<string, number>(), ackAt: 0 };
+      Net.onFast((buf, ch) => { if (ch !== 6) return; SpaceNet.zunpack(buf).then((o: any) => {
+        const L = String(o.L); let ring = SD.ring.get(L); if (!ring) SD.ring.set(L, (ring = new Map()));
+        if (o.s <= (SD.last.get(L) ?? -1)) return;
+        let full: any; if (o.b < 0) full = o.f; else { const base = ring.get(o.b); if (!base) return; full = SnapDelta.apply(base, o.d); }
+        ring.set(o.s, full); for (const k of ring.keys()) if (k <= o.s - 64) ring.delete(k);
+        SD.last.set(L, o.s);
+        const now = performance.now(); if (now - SD.ackAt > 100) { SD.ackAt = now; Net.toHost({ t: 'sack', L: o.L, s: o.s }); }
+        const m = structuredClone(full); m.L = o.L; this.onMsg(m); // (a copy: what's kept as a base isn't touched)
+      }).catch((e: any) => console.warn('net: a ground snapshot read wrong', e)); }); }
     Net.onPeerJoin = (id) => ServerLink.join(id);
     Net.onPeerLeave = (id) => ServerLink.leave(id);
     // lost the host (they refreshed, or dropped): back to the menu, trying the same code again for a minute, so
