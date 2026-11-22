@@ -53,7 +53,7 @@ export const SpaceSv = (() => {
   // The zone the squad is in (js/spacedata.ts zone): the mission it came for (ms), which of the zone's ships the level is now
   // (active: 0 the mission's), the mission's own state while the squad is aboard another (main), the zone's clock, and what's
   // been carried off the others (loot: paid with the salvage at home).
-  interface SvZone { ms: SpMission; active: number; main: SvMission | null; zt: number; loot: number; cas?: SvCas; kept?: Map<number, SvMission>; casBy?: Record<number, SvCas> } // (kept: the others she's left, as they were left; casBy: what each ship's cost, as it stood when last left)
+  interface SvZone { stepN?: number; ms: SpMission; active: number; main: SvMission | null; zt: number; loot: number; cas?: SvCas; kept?: Map<number, SvMission>; casBy?: Record<number, SvCas> } // (kept: the others she's left, as they were left; casBy: what each ship's cost, as it stood when last left)
   // What a mission cost, for its debrief (js/space.ts debrief): the hostiles killed, put down (alive), in restraints; the civilians
   // dead (all of them, and how many by the squad's hand), safe at the end; the squad's own dead. Counted off each ship as she's
   // left (zone), and added up.
@@ -790,7 +790,7 @@ export const SpaceSv = (() => {
   function tick(dt: number) {
     const sv = S(), M = st.M;
     if (!M || sv.phase !== 'level' || !sv.map) return;
-    if (Z) Z.zt += dt;
+    if (Z && Z.stepN !== sv.stepN) { Z.zt += dt; Z.stepN = sv.stepN; } // (once a step: this runs once for each level kept live, and the zone's one clock)
     // a base on a planet: done when it's under control
     if (!M.meta) { if (!M.cleared && M.docked && sv.remaining(false) === 0) { M.cleared = true; M.done = true; say('The base is under control. Back to the ship.'); sync(); } return; }
     if (M.boom) return;
@@ -903,7 +903,7 @@ export const SpaceSv = (() => {
       case 'spose': if (p && (st.ship.ctl === from || !st.ship.ctl || !sv.players.has(st.ship.ctl)) && Array.isArray(m.a) && m.a.length <= 16 && m.a.every(Number.isFinite)) { st.ship.ctl = from; st.ship.pose = m.a; net().broadcast({ t: 'spose', a: m.a, by: from }, from); } break;
       case 'smis': if (p && Array.isArray(m.a) && m.a.length <= 8 && m.a.every(Number.isFinite)) net().broadcast({ t: 'smis', a: m.a, by: from }, from); break; // (a missile off her hull, or one shot down: told to all)
       case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) net().broadcast({ t: 'sfire', a: m.a, by: from }, from); break;
-      case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 5 && m.a.every(Number.isFinite)) net().broadcast({ t: 'strk', a: m.a, by: from }, from); break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
+      case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 6 && m.a.every(Number.isFinite)) net().broadcast({ t: 'strk', a: m.a, by: from }, from); break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
       case 'ssec': if (p && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5) && m.a.every(Number.isFinite)) net().broadcast({ t: 'ssec', a: m.a, by: from }, from); break; // (a scanner's search set: js/space.ts secSet)
       case 'sxpdr': if (p) net().broadcast({ t: 'sxpdr', on: m.on ? 1 : 0, by: from }, from); break; // (her transponder switched: js/space.ts xpdr)
       case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) net().broadcast({ t: 'storp', a: m.a, by: from }, from); break; // (a torpedo in flight: js/space.ts torps)

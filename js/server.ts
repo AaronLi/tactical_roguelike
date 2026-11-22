@@ -84,6 +84,7 @@ export const Server = {
   dmgMult: 1,
   skins: new Map<string, any>(), // the squad's guns' sticker lists by hash (js/stickers.ts share): kept for whoever joins
   // made as the run and the level go on (undefined until then)
+  stepN: 0, // (the server's steps so far: js/serverhost.ts step)
   clock: undefined as unknown as number, // the level's time, in seconds (set by the level's first tick)
   route: undefined as ServerRoute | null | undefined,
   routeMap: undefined as ReturnType<typeof Route.gen> | null | undefined,

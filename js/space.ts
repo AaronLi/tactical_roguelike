@@ -2231,8 +2231,33 @@ export const Space = (() => {
   // up to 0.25 s: a long stall isn't caught up all at once) to what's owed (acc), and as many whole steps as that covers are run;
   // then the view, once. The same battle at any frame rate. (The rest of the game clamps a slow frame to 50 ms: js/game.ts loop)
   const STEP = 1 / 60;
+  // What's drawn between steps: the steps come at 60 Hz, the frames as fast as the screen; each frame draws her pose, the zone's,
+  // its ships', the torpedoes' and the missiles' blended between the last two steps by how far into the next the frame is (one step
+  // behind the simulation, smooth at any refresh rate). The true state's put back before the next step (the simulation reads some of
+  // these transforms: the zone's ships' radar targets), unless something else (a message between frames) has written it since.
+  // A jump of 300 m or more (a rebase onto another ship, docking) isn't blended: it's a cut
+  type IpT = [THREE.Vector3, THREE.Quaternion];
+  const IP = { prev: new Map<THREE.Object3D, IpT>(), cur: new Map<THREE.Object3D, IpT>(), drawn: new Map<THREE.Object3D, IpT>(), P0: new T.Vector3(), Q0: new T.Quaternion(), P1: new T.Vector3(), Q1: new T.Quaternion(), dP: new T.Vector3(), dQ: new T.Quaternion(), on: false, off: false }; // (off: no blending, for comparing)
+  const ipObjs = () => { const a: THREE.Object3D[] = []; if (S.zone) a.push(S.zone); for (const q of S.traffic) if (q.obj) a.push(q.obj); for (const tp of TP.list) a.push(tp.o); for (const m of S.mis) a.push(m.o); return a; };
+  function ipSnap(into: Map<THREE.Object3D, IpT>) { into.clear(); for (const o of ipObjs()) into.set(o, [o.position.clone(), o.quaternion.clone()]); }
+  function ipRestore() {
+    if (!IP.on) return; IP.on = false;
+    for (const [o, [p, q]] of IP.cur) { const d = IP.drawn.get(o); if (d && o.position.equals(d[0]) && o.quaternion.equals(d[1])) { o.position.copy(p); o.quaternion.copy(q); } }
+    if (S.P.equals(IP.dP) && S.Q.equals(IP.dQ)) { S.P.copy(IP.P1); S.Q.copy(IP.Q1); }
+  }
+  function ipApply(a: number) {
+    IP.on = true; ipSnap(IP.cur); IP.P1.copy(S.P); IP.Q1.copy(S.Q); IP.drawn.clear();
+    for (const [o, [p1, q1]] of IP.cur) {
+      const pr = IP.prev.get(o);
+      if (pr && pr[0].distanceTo(p1) < 300) { o.position.copy(pr[0]).lerp(p1, a); o.quaternion.copy(pr[1]).slerp(q1, a); }
+      IP.drawn.set(o, [o.position.clone(), o.quaternion.clone()]);
+    }
+    if (IP.P0.distanceTo(IP.P1) < 300) { S.P.lerpVectors(IP.P0, IP.P1, a); S.Q.copy(IP.Q0).slerp(IP.Q1, a); }
+    IP.dP.copy(S.P); IP.dQ.copy(S.Q);
+  }
   const SIM = { acc: 0, steps: 0 }; // (acc: the real time owed, not yet stepped)
   function update(dt: number, raw = dt) {
+    ipRestore(); // (the true state back, before anything steps or reads it)
     if (!S.on || !S.model || Game.map !== S.map) return;
     if (S.plan) S.plan.line.visible = S.plan.gates.visible = S.plan.end.visible = false; // (her plan's drawn again below while she's lined up: planDraw)
     const m = me(), h = STEP;
@@ -2240,6 +2265,7 @@ export const Space = (() => {
     let pt = Prof.t(), n = 0;
     while (SIM.acc >= STEP) {
       SIM.acc -= STEP; n++; SIM.steps++;
+      ipSnap(IP.prev); IP.P0.copy(S.P); IP.Q0.copy(S.Q); // (the state before this step: the last one's is what the frame blends from)
       S.t += h;
       zoneStep(); pt = Prof.lap('space: zone', pt);
       tgtTrack(h); pt = Prof.lap('space: target', pt);
@@ -2256,6 +2282,7 @@ export const Space = (() => {
     dt = n * h; // (the view's easing by the simulation's time this frame: none, a frame faster than the steps)
     if ((isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2)) && !S.docked) sendPose();
     ewMarks(); ewNear(); pt = Prof.lap('space: radar marks', pt);
+    if (!IP.off) ipApply(SIM.acc / STEP); // (from here on, the frame's drawn: between the last two steps)
     if (!S.docked || S.auto) hideStrays();
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
     const seat = mySeat(), cam = G_R.camera;
@@ -2866,7 +2893,7 @@ export const Space = (() => {
         if (S.on && m.on && S.kind === 'board') { S.shake = 1; HUD.toast('BREACH', 'She\'s through the hull. Go.', 2.2); }
         return true;
       case 'unlock': unlocked(m.i); Audio.click(); return true;
-      case 'ms': if (m.zt != null && S.kind === 'board') { S.zt0 = m.zt; S.ztAt = performance.now(); } S.state = m; raidPods(m.raid); SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
+      case 'ms': if (m.zt != null && S.kind === 'board') { S.zt0 = m.zt; S.ztAt = S.t; } S.state = m; raidPods(m.raid); SpaceUI.objDraw(); cards(); if (S.kind === 'assault' && m.done && S.stage === 'atmo') { /* (the way home shows once she's up) */ } return true;
       case 'mdone': {
         if (m.ok === 2) { me().credits += m.pay || 0; Career.looted(m.pay || 0, m.ships || 0); HUD.chat(null, 0, `Salvage: +¢${U.fmt(m.pay || 0)}`); HUD.feed(`<span class="cr">Salvage +¢${U.fmt(m.pay || 0)}</span>`); }
         else if (m.ok) { const xp = Loadout ? Loadout.mission(me(), m.diff || 1) : 0; const n = (m.pay || 0) + (m.bonus || 0); me().credits += n; HUD.chat(null, 0, `Mission complete: +¢${U.fmt(n)}`); Audio.extract(); Career.mission(m, (m.ms && (SD.SIZES as Record<string, { tier: number }>)[m.ms.size]?.tier) || 0, Loadout ? Loadout.rank() : 0); debrief(Object.assign({ xp }, m)); }
@@ -2972,6 +2999,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => zFrame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { IP, SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => zFrame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)

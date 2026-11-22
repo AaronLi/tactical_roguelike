@@ -113,6 +113,7 @@ export const ServerHost = {
   // one fixed step of the simulation
   step() {
     const t0 = performance.now();
+    Server.stepN++; // (the step's number: what runs once a step, not once a level context (js/spaceserver.ts tick's zone clock))
     Server.update(this.STEP);
     Recorder.tick(Server, this.STEP);
     const P = this.prof, took = performance.now() - t0;
