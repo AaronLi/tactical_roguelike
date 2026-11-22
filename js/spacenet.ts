@@ -13,7 +13,7 @@
 import type { SimWorld, SimEvent } from './spacesim.js';
 import { SnapWriter, SnapReader } from './snapcodec.js';
 
-export type SssMsg = { t: 'sss'; n: number; k: number; zt: number; mis: number[][]; tp: number[][]; ch: number[][]; g: number[][]; dm: number; hp?: number };
+export type SssMsg = { t: 'sss'; n: number; k: number; zt: number; mis: number[][]; tp: number[][]; ch: number[][]; g: number[][]; dm: number; hp?: number; sp?: number[] };
 export type SevE =
   | { k: 'dmg'; n: number; d: number; h: number; w?: string }
   | { k: 'mis'; n: number; id: number; a: number[] }
@@ -33,9 +33,10 @@ export const SpaceNet = {
   // mis [id, x, y, z, vx, vy, vz, age]; tp [id, x, y, z, vx, vy, vz, qx, qy, qz, qw, flags (phase | motor 4 | RCS 8 | the server's 16)];
   // ch [n, x, y, z, vx, vy, vz, age]; g [hp, yaw, pitch, firing (an mg's burst on, 1), barrels' spin]
   // (hp: her hull's, as the server keeps it; left out until it's heard one)
-  sss(W: SimWorld, n: number, k: number, zt: number, dm: number, hp = -1): SssMsg {
+  // (sp: her pose and way [P, Q, V] while the server flies her: docs/space-server.md C2)
+  sss(W: SimWorld, n: number, k: number, zt: number, dm: number, hp = -1, flown = false): SssMsg {
     return {
-      t: 'sss', n, k, zt: r2(zt), dm: r2(dm), ...(hp >= 0 ? { hp: r2(hp) } : {}),
+      t: 'sss', n, k, zt: r2(zt), dm: r2(dm), ...(hp >= 0 ? { hp: r2(hp) } : {}), ...(flown ? { sp: [...W.ship.P.toArray(), ...W.ship.Q.toArray(), ...W.ship.V.toArray()] } : {}),
       mis: W.mis.map((m) => [m.id, ...v3(m.p), ...v3(m.v, r4), r2(m.t)]),
       tp: W.torps.map((tp) => [tp.id, ...v3(tp.p), ...v3(tp.v), r4(tp.q.x), r4(tp.q.y), r4(tp.q.z), r4(tp.q.w), tp.ph | (tp.thr > 0.05 ? 4 : 0) | (tp.rcs ? 8 : 0) | (tp.mine ? 16 : 0)]),
       ch: W.chaff.map((c) => [+c.t.id.slice(5), ...v3(c.t.p), ...v3(c.t.v), r2(W.t - c.born)]),
@@ -58,10 +59,11 @@ export const SpaceNet = {
   // sss as bytes (js/snapcodec.ts, format SSS_BIN), for the fast channel's stream SSS_CH (unreliable, the newest wins): the step, the
   // level, the zone's time, damage done, her hull (-1: not known), then each list with its count first; positions and velocities in
   // 32-bit floats (millimetres at 10 km), a torpedo's attitude in 16-bit steps, flags a byte
-  SSS_BIN: 1, SSS_CH: 4,
+  SSS_BIN: 2, SSS_CH: 4,
   sssBin(m: SssMsg): ArrayBuffer {
     const w = new SnapWriter(this.SSS_BIN, 64 + m.mis.length * 36 + m.tp.length * 40 + m.ch.length * 36 + m.g.length * 20);
     w.vu(m.n).vu(m.k).f64(m.zt).f32(m.dm).f32(m.hp == null ? -1 : m.hp);
+    w.bool(!!m.sp); if (m.sp) for (let j = 0; j < 10; j++) w.f64(m.sp[j]); // (her pose, flown by the server: full doubles, as it has her)
     const f = (a: number[], i: number, k: number) => { for (let j = 0; j < k; j++) w.f32(a[i + j]); };
     w.vu(m.mis.length); for (const a of m.mis) { w.vu(a[0]); f(a, 1, 7); }
     w.vu(m.tp.length); for (const a of m.tp) { w.vu(a[0]); f(a, 1, 6); for (let j = 7; j < 11; j++) w.q(a[j], -1, 1, 16); w.u8(a[11]); }
@@ -72,13 +74,13 @@ export const SpaceNet = {
   // (null: not a format this reads)
   sssUnbin(buf: ArrayBuffer | ArrayBufferView): SssMsg | null {
     const r = new SnapReader(buf); if (r.version !== this.SSS_BIN) return null;
-    const n = r.vu(), k = r.vu(), zt = r.f64(), dm = r.f32(), hp = r.f32();
+    const n = r.vu(), k = r.vu(), zt = r.f64(), dm = r.f32(), hp = r.f32(), sp = r.bool() ? Array.from({ length: 10 }, () => r.f64()) : null;
     const f = (a: number[], c: number) => { for (let j = 0; j < c; j++) a.push(r.f32()); return a; };
     const mis: number[][] = []; for (let i = r.vu(); i > 0; i--) mis.push(f([r.vu()], 7));
     const tp: number[][] = []; for (let i = r.vu(); i > 0; i--) { const a = f([r.vu()], 6); for (let j = 0; j < 4; j++) a.push(r.q(-1, 1, 16)); a.push(r.u8()); tp.push(a); }
     const ch: number[][] = []; for (let i = r.vu(); i > 0; i--) ch.push(f([r.vu()], 7));
     const g: number[][] = []; for (let i = r.vu(); i > 0; i--) g.push([r.f32(), r.f32(), r.f32(), r.u8(), r.f32()]);
-    return { t: 'sss', n, k, zt, dm, ...(hp >= 0 ? { hp } : {}), mis, tp, ch, g };
+    return { t: 'sss', n, k, zt, dm, ...(hp >= 0 ? { hp } : {}), ...(sp ? { sp } : {}), mis, tp, ch, g };
   },
   encode(m: SssMsg | SevMsg) { return this.codec.enc(m); },
   decode(m: any) { return this.codec.dec(m); },
@@ -86,7 +88,7 @@ export const SpaceNet = {
   read(m: SssMsg) {
     const T = THREE, V = (a: number[], i: number) => new T.Vector3(a[i], a[i + 1], a[i + 2]);
     return {
-      n: m.n, k: m.k, zt: m.zt, dm: m.dm, hp: m.hp == null ? -1 : m.hp,
+      n: m.n, k: m.k, zt: m.zt, dm: m.dm, hp: m.hp == null ? -1 : m.hp, sp: m.sp || null,
       mis: m.mis.map((a) => ({ id: a[0], p: V(a, 1), v: V(a, 4), t: a[7] })),
       tp: m.tp.map((a) => ({ id: a[0], p: V(a, 1), v: V(a, 4), q: new T.Quaternion(a[7], a[8], a[9], a[10]).normalize(), ph: a[11] & 3, thr: a[11] & 4 ? 1 : 0, rcs: !!(a[11] & 8), sv: !!(a[11] & 16) })),
       ch: m.ch.map((a) => ({ n: a[0], p: V(a, 1), v: V(a, 4), age: a[7] })),

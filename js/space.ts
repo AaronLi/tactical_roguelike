@@ -2254,6 +2254,7 @@ export const Space = (() => {
   }
   function heardPose(a: number[]) {
     if (!S.on || isCtl()) return;
+    if (svbOn() && S.t - SVB.spAt < 0.5) return; // (the server's flying her: its snapshots' pose is the one followed, svSss)
     S.net = { P: new T.Vector3(a[0], a[1], a[2]), Q: new T.Quaternion(a[3], a[4], a[5], a[6]), V: new T.Vector3(a[7], a[8], a[9]) };
     if (S.kind === 'assault' && !S.ftl) { const st = a[10] ? 'atmo' : 'orbit'; if (st !== S.stage) { through(st); S.P.copy(S.net.P); S.Q.copy(S.net.Q); } }
     if (Number.isFinite(a[11])) S.hp = a[11];
@@ -2771,7 +2772,7 @@ export const Space = (() => {
   // The host's worker runs the zone's battle (js/svbattle.ts); a boarding zone's mission ship's weapons are drawn from what it says:
   // her guns (laid, firing, hit) and their rounds (each gun's rounds of a step replayed from its seed: the same rounds the server
   // flies), her missiles, the damage they do. ?pagebattle: the page's own, as before (for comparing)
-  const SVB = { on: !new URLSearchParams(location.search).has('pagebattle'), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, own: null as RSuite | null, ownAt: -1e9, rwr: null as null | { trk: { k: string; f: number[]; lk: number }[]; scan: { k: string; f: number[]; a: number }[] } };
+  const SVB = { on: !new URLSearchParams(location.search).has('pagebattle'), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, spAt: -1e9, own: null as RSuite | null, ownAt: -1e9, rwr: null as null | { trk: { k: string; f: number[]; lk: number }[]; scan: { k: string; f: number[]; a: number }[] } };
   // her radars' picture from the server's battle (the fast channel's stream 1: js/spaceserver.ts battle): unpacked into the last one
   // (so what's picked and drawn keeps its identity), its times put on the page's own radar clock as it arrives
   // F8's picture of the suite it's showing, from the server's battle (asked for every couple of seconds while it's open: streams 2, 3)
@@ -2805,6 +2806,8 @@ export const Space = (() => {
     const r = SpaceNet.read(m); SVB.snap = r; SVB.n = m.n; SVB.at = S.t;
     // her hull, as the server keeps it (the emergency jump at nothing is the server's: js/spaceserver.ts battle)
     if (r.hp >= 0) hullIs(r.hp);
+    // her pose as the server flies her (C2): what the rest aboard follow (the pilot's own word of it, relayed, left aside meanwhile)
+    if (r.sp && !isCtl()) { const a = r.sp; S.net = { P: new T.Vector3(a[0], a[1], a[2]), Q: new T.Quaternion(a[3], a[4], a[5], a[6]), V: new T.Vector3(a[7], a[8], a[9]) }; SVB.spAt = S.t; if (S.P.distanceTo(S.net.P) > 400) { S.P.copy(S.net.P); S.Q.copy(S.net.Q); } }
     if (S.hull) r.g.forEach((g, i) => { const gn = S.hull!.guns[i] as any; if (!gn) return; if (g.hp !== gn.hp) gunHit(i, g.hp); gn.yaw = g.yaw; gn.pitch = g.pitch; gn.rev = g.rev; });
     // her missiles: as the server has them (a new one drawn, one gone taken away); flown on between snapshots
     const live = new Set(r.mis.map((q) => q.id));
@@ -2960,6 +2963,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, C2: () => C2, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, sv, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, C2: () => C2, svb: () => SVB, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, sv, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)

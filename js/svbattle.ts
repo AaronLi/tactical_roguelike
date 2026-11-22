@@ -272,7 +272,7 @@ export const SvBattle = (() => {
   // the snapshot due this step (every SSS_EVERY), and the events since the last
   function out(B: SvBat, n: number, zt: number, send: (m: any) => void, fast: (b: ArrayBuffer, ch: number) => void) {
     if (n % SpaceNet.SSS_EVERY) return;
-    fast(SpaceNet.sssBin(SpaceNet.sss(B.W, n, B.k, zt, B.dm, HP.v)), SpaceNet.SSS_CH); // (bytes, unreliable: js/spacenet.ts)
+    fast(SpaceNet.sssBin(SpaceNet.sss(B.W, n, B.k, zt, B.dm, HP.v, FL.on && !!FL.sh)), SpaceNet.SSS_CH); // (bytes, unreliable: js/spacenet.ts)
     if (B.ev.length) { send(SpaceNet.encode({ t: 'sev', n, e: B.ev })); B.ev = []; }
   }
   // what the server's world holds (the 'sworld' control query: js/serverhost.ts; tests compare it with the page's picture)
