@@ -386,5 +386,7 @@ export const SvBattle = (() => {
   function repair() { if (HP.max > 0) { HP.v = HP.max; HP.lost = false; HP.told = false; } }
   function patch() { HP.v = HP.max > 0 ? HP.max * 0.3 : 30; HP.lost = false; HP.told = false; return HP.v; }
   const failing = () => { if (HP.lost && !HP.told) { HP.told = true; return true; } return false; }; // (once: kept lost till the battle's over)
-  return { load, make, step, heardPose, request, out, summary, reset, hullReset, repair, patch, failing, flyAck, fly: () => ({ on: FL.on, go: FL.go, q: FL.q.size, next: FL.next, ack: FL.ack }), hp: () => HP.v, own: () => OWN, pose: () => pose };
+  // (for Node, tools/space_sim.mjs: space.json handed in, no fetch there; her helm state to read)
+  const useSpace = (j: any) => { space = j; };
+  return { useSpace, helmState: () => HS, load, make, step, heardPose, request, out, summary, reset, hullReset, repair, patch, failing, flyAck, fly: () => ({ on: FL.on, go: FL.go, q: FL.q.size, next: FL.next, ack: FL.ack }), hp: () => HP.v, own: () => OWN, pose: () => pose };
 })();

@@ -41,9 +41,9 @@ async function load(rndSeed) {
   vm.runInContext('Math', ctx).random = mulberry(rndSeed);
   await runScripts(ctx, DIST, ['prepentry'], { what: 'npx tsc -p .', locals: LOCALS });
   moduleOf(ctx, DIST + 'util.js').Hooks.hangarDecorate = () => {};
-  for (const f of ['radar', 'spacesim', 'hullshape', 'rcstris']) await runFile(ctx, DIST + f + '.js');
+  for (const f of ['radar', 'spacesim', 'hullshape', 'rcstris', 'asteroidshape', 'helm', 'snapcodec', 'spacenet', 'svbattle']) await runFile(ctx, DIST + f + '.js');
   const m = (f) => moduleOf(ctx, DIST + f + '.js');
-  return { ctx, T: ctx.THREE, Level: ctx.G.Level, SD: m('spacedata').SpaceData, Radar: m('radar').Radar, SpaceSim: m('spacesim').SpaceSim, HS: m('hullshape'), RT: m('rcstris') };
+  return { ctx, T: ctx.THREE, Level: ctx.G.Level, SD: m('spacedata').SpaceData, Radar: m('radar').Radar, SpaceSim: m('spacesim').SpaceSim, HS: m('hullshape'), RT: m('rcstris'), SvBattle: m('svbattle').SvBattle, Helm: m('helm'), ShipGen: ctx.G.ShipGen || m('shipgen').ShipGen };
 }
 
 // ---------------------------------------------------------------- a scenario -> a world (js/space.ts setupBoard and ewStep, from data)
@@ -193,10 +193,55 @@ async function run(sc, o = {}) {
   return { fps, pd, steps, simS: steps * DT, wall: (t1 - tl) / 1000, setup: (tl - t0) / 1000 };
 }
 
+// ---------------------------------------------------------------- a run of the server's own battle (docs/space-server.md C3)
+// The world made and stepped by js/svbattle.ts as the host's server worker does it, her helm flown on it from a scripted pilot's steps
+// (sin: as the pilot's page sends them, js/space.ts c2Post), what the host would do on its events stood in for (hc: docking, jumping,
+// another ship made the level). sc.pilot: { k: 'breach', out: metres } (from that far out from a breach site, square to it, W held).
+// Fingerprinted every second: her helm (pose, way, modes, docked) and the battle's events.
+async function runServer(sc, o = {}) {
+  const t0 = performance.now(), E = await load(sc.seed), { T, Level, SD, Radar, SvBattle, Helm } = E;
+  SvBattle.useSpace({ ships: SHIPS }); SvBattle.reset();
+  Radar.seed(sc.seed);
+  const mp = sc.map, map = Level.generate(mp.seed, mp.level, mp.th, false, { size: mp.size, obj: mp.obj, ship: sc.ship, other: null, wing: !!mp.wing }), sp = map.sp;
+  const zms = { seed: map.seed, size: sp.size, th: SD.themeIndex(map.theme), wing: !!sp.wing, name: mp.name || '' }, ms = { size: mp.size, obj: mp.obj, name: 'test' };
+  const fleet = { ship: sc.ship, owned: [sc.ship], fit: { [sc.ship]: sc.fit === 'g' ? ['pd'] : sc.fit === 'r' ? ['rail'] : [] } };
+  const B = SvBattle.make(map, zms, 0, ms, fleet, null, 'board');
+  const got = { docked: false, dockAt: null, events: {} };
+  const hc = { fleet, board: { seed: 1, level: 1, picked: [], done: [] }, gone: () => false, raid: [], done: false, say() {}, jump() {}, tboard() {}, warm() {}, ready: () => false,
+    docked: false, at: null, near: false, act: 0, site: null, shipName: 'test', dock: (on) => { got.docked = on; return on; } };
+  const crew = { hostile: 0, gn: 0, arm: null, boom: false }; // (her guns held: the breach alone)
+  // the pilot: her start as a state of her helm (from that far out from the site her nose line meets, square to it, at 20 m/s), then W
+  const def = SD.SHIPS[sc.ship], site = E.ShipGen.sites(map).sort((a, b) => b.nz - a.nz || a.c - b.c).find((st) => true), TS = Level.TS;
+  const fx = site.x + site.nx * TS / 2, fz = site.z + site.nz * TS / 2, P = new T.Vector3(fx + site.nx * sc.pilot.out, 0.2, fz + site.nz * sc.pilot.out);
+  const Q = new T.Quaternion().setFromRotationMatrix(new T.Matrix4().lookAt(new T.Vector3(), new T.Vector3(-site.nx, 0, -site.nz), new T.Vector3(0, 1, 0)));
+  const b = Helm.helmBerth('board', map, def), Dq = new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), b.yaw);
+  const S0 = { P, Q, V: new T.Vector3(-site.nx * 20, 0, -site.nz * 20), Wv: new T.Vector3(), stick: new T.Vector2(), tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1, docked: false, spin: 0, cruise: false, roundBrake: false, brThrust: false, match: null, tgt: 0, berth: b, Dp: new T.Vector3(b.x, b.y, b.z), Dq, warp: null, auto: null, brLock: null, brRound: null, stage: 'space', thru: null, ftl: null };
+  const zm = { vz: new T.Vector3(), v: new T.Vector3(NaN, 0, 0) };
+  let zt = 0, n = 0;
+  const send = (e) => SvBattle.request(B, { t: 'sin', by: 'node', a: [e] });
+  send({ s: 0, st: Helm.helmPack(S0, zm), turn: def.turn });
+  const fps = [], N = Math.round(sc.secs / DT); let next = 1, ev = [];
+  const r3 = (v) => v.toFixed(3);
+  for (let i = 0; i < N; i++) {
+    n++; zt += DT;
+    send({ s: n, i: [1, 1 /* W */, 0, 0], tg: null, m: null, zt }); // (the pilot's step: at the helm, W held)
+    SvBattle.step(B, DT, n, crew, got.docked, zt, () => null, hc);
+    for (const e of B.W.out) ev.push(e.k);
+    const H = SvBattle.helmState();
+    if (got.docked && got.dockAt == null) got.dockAt = +(i * DT).toFixed(3);
+    if (o.fp && (i + 1) * DT >= next - 1e-9) { const k = {}; for (const x of ev) k[x] = (k[x] || 0) + 1; ev = [];
+      fps.push([next, [H.P.x, H.P.y, H.P.z, H.Q.x, H.Q.y, H.Q.z, H.Q.w, H.V.x, H.V.y, H.V.z].map(r3).join(','), [H.brLock ? 'lock' : '', H.brRound ? 'round' : '', H.auto ? 'auto' : '', H.docked ? 'docked' : '', got.docked ? 'HOST-DOCKED' : ''].filter(Boolean).join('+'), JSON.stringify(k)].join(' | ')); next++; }
+  }
+  const t1 = performance.now();
+  return { fps, pd: { dockAt: got.dockAt, docked: got.docked, dmg: 0, hits: 0, launch: null, server: true }, steps: N, simS: N * DT, wall: (t1 - t0) / 1000, setup: 0 };
+}
+
 // ---------------------------------------------------------------- the scenarios
 const MAP0 = { seed: 3, level: 1, th: 1000, size: 'small', obj: 'artifact', wing: 0 };
 const pdScenario = (seed, range = 5000, map = MAP0) => ({ name: 'pd', seed, map, ship: 'kestrel', fit: 'g', start: { r: range, dir: [-0.87, -0.1, 0.5] }, pilot: { k: 'hold' }, sensors: { on: 0 }, helm: { at: 1.5 }, secs: 60 });
 const SCENARIOS = [
+  // the breach, on the server's own battle and helm: from 150 m out, square to a site, W held: breached, laid in, docked (tools/space_steps/breach_fp.mjs in the game)
+  { name: 'breach', server: true, seed: 3, map: MAP0, ship: 'kestrel', fit: 'g', pilot: { k: 'breach', out: 150 }, secs: 6 },
   // a torpedo at the mission ship from 5 km, her point defence against it (tools/space_steps/torpedo_defence.mjs)
   { ...pdScenario(1), secs: 45 },
   // flying in on her from 7 km at up to 150 m/s to 600 m off her beam, her operator keeping a track on what's HOSTILE; the mission ship's guns and missiles at her
@@ -213,10 +258,10 @@ function runIsolated(spec, o) {
     w.once('message', res); w.once('error', rej); w.once('exit', (c) => { if (c) rej(new Error('worker exit ' + c)); });
   });
 }
-export { load, build, run, runIsolated, SCENARIOS, pdScenario, pilotStep, sensorStep, helmStep, fingerprint, DT };
+export { load, build, run, runServer, runIsolated, SCENARIOS, pdScenario, pilotStep, sensorStep, helmStep, fingerprint, DT };
 
 if (!isMainThread && workerData && workerData.spaceSim) {
-  const r = await run(scenarioOf(workerData.spec), workerData.o);
+  const sc = scenarioOf(workerData.spec), r = await (sc.server ? runServer : run)(sc, workerData.o);
   parentPort.postMessage(r);
 }
 const MAIN = isMainThread && !!process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
@@ -250,7 +295,7 @@ if (MAIN) {
   for (const sc of SCENARIOS) {
     if (ONLY && sc.name !== ONLY) continue;
     const r = await runIsolated({ name: sc.name }, { fp: true }); out[sc.name] = r.fps;
-    console.log(`${sc.name}: ${r.steps} steps, ${r.simS.toFixed(0)} sim s in ${r.wall.toFixed(2)} s (${(r.simS / r.wall).toFixed(1)}x real time, ${(r.steps / r.wall).toFixed(0)} steps/s; setup ${r.setup.toFixed(2)} s); damage to her ${r.pd.dmg.toFixed(1)} (${r.pd.hits} hits)${r.pd.launch != null ? `; torpedo: ${r.pd.how ? ['', 'shot down', 'hit ' + r.pd.on, 'spent'][r.pd.how] : 'still going'}` : ''}`);
+    console.log(`${sc.name}: ${r.steps} steps, ${r.simS.toFixed(0)} sim s in ${r.wall.toFixed(2)} s (${(r.simS / r.wall).toFixed(1)}x real time, ${(r.steps / r.wall).toFixed(0)} steps/s; setup ${r.setup.toFixed(2)} s); ${r.pd.server ? (r.pd.docked ? 'docked by the host at ' + r.pd.dockAt + ' s' : 'not docked') : `damage to her ${r.pd.dmg.toFixed(1)} (${r.pd.hits} hits)`}${r.pd.launch != null ? `; torpedo: ${r.pd.how ? ['', 'shot down', 'hit ' + r.pd.on, 'spent'][r.pd.how] : 'still going'}` : ''}`);
     if (PRINT) { for (const l of r.fps) console.log('  ' + l); continue; }
     if (UPDATE) continue;
     const g = golden[sc.name];
