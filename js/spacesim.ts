@@ -21,6 +21,13 @@ export type ZMem = { vz: THREE.Vector3; v: THREE.Vector3 };
 // targets (tg) and the radars' cover (Radar.occ); the field's velocity (v), from the zone's placing step to step (zp, zt)
 export interface SimRocks { near: number[]; p: THREE.Vector3[]; tg: Map<number, RTarget>; r: Map<string, number>; v: THREE.Vector3; zp: THREE.Vector3; zt: number }
 export type RockList = { p: number[]; r: number; s: number }[];
+// A round in flight (a hull gun's): where it is, its velocity, how far it's flown, what it does, how far it flies before it destroys
+// itself; a missile: where it is, its heading, its age
+export interface SimRound { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: number; life: number; zm?: ZMem }
+export interface SimMissile { id: number; p: THREE.Vector3; v: THREE.Vector3; t: number }
+// her, as the battle sees her: her place, attitude and velocity (the level's frame), her size (a round's hit radius), whether she's
+// docked (nothing hits her) or in the FTL tunnel
+export interface SimShip { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; size: number; docked: boolean; ftl: boolean }
 
 import { Radar, RSuite, RTarget } from './radar.js';
 
@@ -104,5 +111,52 @@ export const SpaceSim = (() => {
       for (const sc of su.scans) { if (!sc.notch && n >= AI_NOTCH.on) sc.notch = true; else if (sc.notch && n <= AI_NOTCH.off) sc.notch = false; }
     }
   }
-  return { zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR };
+  // ---------------------------------------------------------------- rounds and missiles
+  // a round off a gun (the level's frame): along the aim, spread by the gun and by the track's own error (rng: the battle's stream).
+  // Returns the round, or null (rounds: at most max in flight)
+  function fireRound(rounds: SimRound[], max: number, rng: () => number, from: THREE.Vector3, aim: THREE.Vector3, H: { speed: number; spread: number; dmg: number; life: number }, err: number) {
+    const g = () => Math.sqrt(-2 * Math.log(1 - rng())) * Math.cos(2 * Math.PI * rng());
+    const spread = H.spread + err * 0.5, d = aim.clone().normalize(), e1 = new T.Vector3(0, 1, 0).cross(d), e2 = new T.Vector3();
+    if (e1.lengthSq() < 1e-6) e1.set(1, 0, 0); e1.normalize(); e2.crossVectors(d, e1);
+    d.addScaledVector(e1, g() * spread).addScaledVector(e2, g() * spread).normalize(); // (normal each way square to the aim)
+    if (rounds.length >= max) return null;
+    const q: SimRound = { p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life * Math.max(0.88, Math.min(1.12, 1 + g() * 0.04)) }; // (its self-destruct a little different round to round: some 200 m either way at 5 km, not a wall)
+    rounds.push(q); return q;
+  }
+  // the rounds in flight a step: each moves (through the zone), and hits her if it passes within her size of her middle this step
+  // (both moving); one into a rock is gone; one that's flown its life destroys itself. torp(a, b): whether it met a torpedo on the way
+  // (and that torpedo's done). Returns what she took (hits, damage) and where rounds ended (burst: self-destructed; rock: into a rock)
+  function roundsStep(Z: SimZone | null, rounds: SimRound[], ship: SimShip, R: SimRocks, list: RockList, dt: number, torp: ((a: THREE.Vector3, b: THREE.Vector3) => boolean) | null) {
+    const out = { hits: 0, dmg: 0, burst: [] as THREE.Vector3[], rock: [] as THREE.Vector3[] };
+    if (!rounds.length) return out;
+    const c1 = ship.P.clone().add(new T.Vector3(0, 1.5, 0)), c0 = c1.clone().addScaledVector(ship.V, -dt), Rh = Math.max(4, ship.size * 0.6);
+    const r0 = new T.Vector3(), r1 = new T.Vector3(), seg = new T.Vector3();
+    for (let i = rounds.length - 1; i >= 0; i--) {
+      const q = rounds[i], step = q.v.length() * dt, qa = torp ? q.p.clone() : null;
+      r0.copy(q.p).sub(c0); zstep(Z, q.p, q.v, dt, q.zm || (q.zm = zmem())); q.d += step; r1.copy(q.p).sub(c1);
+      if (qa && torp && torp(qa, q.p)) { rounds.splice(i, 1); continue; }
+      if (R.near.length && rockOn(R, list, q.p.clone().addScaledVector(q.v, -dt), q.p) < 1) { rounds.splice(i, 1); out.rock.push(q.p); continue; }
+      seg.subVectors(r1, r0); const L2 = seg.lengthSq(), t = L2 > 0 ? Math.max(0, Math.min(1, -r0.dot(seg) / L2)) : 0, miss = r0.addScaledVector(seg, t).length();
+      const hit = !ship.docked && miss < Rh, gone = hit || q.d >= q.life;
+      if (hit) { out.hits++; out.dmg += q.dmg; }
+      if (gone) { rounds.splice(i, 1); if (!hit) out.burst.push(q.p); }
+    }
+    return out;
+  }
+  // the missiles a step: each turns toward her no faster than it can (a hard turn across its nose leaves it behind), and flies on;
+  // returns those that reached her (inside 9 m) and those gone otherwise (spent, into a rock, she's docked or jumped), each taken out
+  function missilesStep(mis: SimMissile[], ship: SimShip, R: SimRocks, list: RockList, H: { speed: number; turn: number; life: number }, dt: number) {
+    const out = { hit: [] as SimMissile[], gone: [] as SimMissile[] };
+    for (let i = mis.length - 1; i >= 0; i--) {
+      const m = mis[i], to = ship.P.clone().add(new T.Vector3(0, 1.4, 0)).sub(m.p), d = to.length();
+      m.t += dt;
+      const want = to.normalize(), ang = m.v.angleTo(want), k = ang > 1e-4 ? Math.min(1, H.turn * dt / ang) : 1;
+      m.v.lerp(want, m.t < 1.2 ? k * 0.4 : k).normalize();
+      m.p.addScaledVector(m.v, H.speed * (m.t < 1.2 ? 0.45 : 1) * dt);
+      const gone = m.t > H.life || ship.docked || ship.ftl || (R.near.length > 0 && rockOn(R, list, m.p.clone().addScaledVector(m.v, -H.speed * dt), m.p) < 1);
+      if (d < 9) { mis.splice(i, 1); out.hit.push(m); } else if (gone) { mis.splice(i, 1); out.gone.push(m); }
+    }
+    return out;
+  }
+  return { zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep };
 })();

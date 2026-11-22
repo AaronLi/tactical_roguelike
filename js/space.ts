@@ -25,7 +25,7 @@ import { InteriorCull } from './interiorcull.js';
 import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RAssess, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
-import { SpaceSim, ZMem } from './spacesim.js';
+import { SpaceSim, ZMem, SimShip } from './spacesim.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -2440,39 +2440,21 @@ export const Space = (() => {
     }
     rPts.removeFromParent(); if (S.root) S.root.add(rPts); return rPts;
   }
-  const gauss = () => Math.sqrt(-2 * Math.log(1 - SR())) * Math.cos(2 * Math.PI * SR()); // (the battle's stream: a round's spread and self-destruct)
-  function fireRound(from: THREE.Vector3, aim: THREE.Vector3, H: { speed: number; spread: number; dmg: number; life: number }, err: number) {
-    if (!S.root) return;
-    const spread = H.spread + err * 0.5, d = aim.clone().normalize(), e1 = new T.Vector3(0, 1, 0).cross(d), e2 = new T.Vector3();
-    if (e1.lengthSq() < 1e-6) e1.set(1, 0, 0); e1.normalize(); e2.crossVectors(d, e1);
-    d.addScaledVector(e1, gauss() * spread).addScaledVector(e2, gauss() * spread).normalize(); // (normal each way square to the aim)
-    if (S.rounds.length >= RMAX) return;
-    S.rounds.push({ p: from.clone(), v: d.multiplyScalar(H.speed), d: 0, dmg: H.dmg, life: H.life * U.clamp(1 + gauss() * 0.04, 0.88, 1.12) }); // (its self-destruct's timing a little different round to round: some 80 m either way at 2 km, not a wall)
-  }
+  // a round off one of her guns: the simulation's (js/spacesim.ts fireRound), from the battle's stream
+  const fireRound = (from: THREE.Vector3, aim: THREE.Vector3, H: { speed: number; spread: number; dmg: number; life: number }, err: number) => { SpaceSim.fireRound(S.rounds, RMAX, SR, from, aim, H, err); };
   // the rounds in flight: each moves, and hits her if it passes within her size of her middle this step (both moving); one that's
   // flown its life (2 km) blows itself apart, so nothing she fires is left flying through the zone
   const FLASH = new T.SphereGeometry(1, 8, 6);
+  // her as the battle sees her (js/spacesim.ts SimShip)
+  const simShip = (): SimShip => ({ P: S.P, Q: S.Q, V: S.V, size: EW.own ? EW.own.size : 5 / 0.6, docked: S.docked, ftl: !!S.ftl });
   function rounds(dt: number) {
     if (!S.rounds.length) { if (rPts) rPts.geometry.setDrawRange(0, 0); return; }
-    const c1 = S.P.clone().add(new T.Vector3(0, 1.5, 0)), c0 = c1.clone().addScaledVector(S.V, -dt), R = Math.max(4, EW.own ? EW.own.size * 0.6 : 5);
-    const r0 = new T.Vector3(), r1 = new T.Vector3(), seg = new T.Vector3(); let hits = 0, dmg = 0;
-    for (let i = S.rounds.length - 1; i >= 0; i--) {
-      const q = S.rounds[i], step = q.v.length() * dt;
-      const qa = TP.list.length ? q.p.clone() : null;
-      r0.copy(q.p).sub(c0); zstep(q.p, q.v, dt, (q as any).zm || ((q as any).zm = zmem())); q.d += step; r1.copy(q.p).sub(c1);
-      if (qa && isCtl() && roundTorp(qa, q.p, dt)) { S.rounds.splice(i, 1); continue; }
-      if (ROCKS.near.length && rockOn(q.p.clone().addScaledVector(q.v, -dt), q.p) < 1) { S.rounds.splice(i, 1); rockFlash(q.p); continue; } // (into a rock)
-      seg.subVectors(r1, r0); const L2 = seg.lengthSq(), t = L2 > 0 ? U.clamp(-r0.dot(seg) / L2, 0, 1) : 0, miss = r0.addScaledVector(seg, t).length();
-      const hit = !S.docked && miss < R, gone = hit || q.d >= q.life;
-      if (hit) { hits++; dmg += q.dmg; }
-      if (gone) {
-        S.rounds.splice(i, 1);
-        if (!hit && S.root) { const f = new T.Mesh(FLASH, new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending })); f.position.copy(q.p); f.scale.setScalar(2.5); f.frustumCulled = false; S.root.add(f); S.tracers.push({ m: f, t: 0.12 }); }
-        continue;
-      }
-    }
+    // (the simulation's step: js/spacesim.ts roundsStep; a round that meets a torpedo kills it, told by the screen that flies it)
+    const r = SpaceSim.roundsStep(S.zone ? ZS : null, S.rounds, simShip(), ROCKS, S.rockList, dt, TP.list.length && isCtl() ? (a: THREE.Vector3, b: THREE.Vector3) => roundTorp(a, b, dt) : null);
+    for (const p of r.rock) rockFlash(p);
+    if (S.root) for (const p of r.burst) { const f = new T.Mesh(FLASH, new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending })); f.position.copy(p); f.scale.setScalar(2.5); f.frustumCulled = false; S.root.add(f); S.tracers.push({ m: f, t: 0.12 }); }
     if (S.root) { const pts = roundPts(), pa = pts.geometry.attributes.position as THREE.BufferAttribute; S.rounds.forEach((q, i) => pa.setXYZ(i, q.p.x, q.p.y, q.p.z)); pa.needsUpdate = true; pts.geometry.setDrawRange(0, S.rounds.length); }
-    if (hits && isCtl()) { damage(dmg, dmg > 4 ? 'Minigun fire' : undefined); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + hits * 0.1)); }
+    if (r.hits && isCtl()) { damage(r.dmg, r.dmg > 4 ? 'Minigun fire' : undefined); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + r.hits * 0.1)); }
   }
   // a missile: a[0] its number, where it left her; a[4] 1: it's been shot down
   function missile(a: number[]) {
@@ -2487,20 +2469,10 @@ export const Space = (() => {
     o.position.copy(m.p); o.frustumCulled = false; S.root.add(o); m.o = o;
   }
   function missiles(dt: number) {
-    const H = SD.HULLGUN.missile;
-    for (let i = S.mis.length - 1; i >= 0; i--) {
-      const m = S.mis[i], to = S.P.clone().add(new T.Vector3(0, 1.4, 0)).sub(m.p), d = to.length();
-      m.t += dt;
-      // it turns toward her no faster than it can; a hard turn across its nose leaves it behind
-      const want = to.normalize(), ang = m.v.angleTo(want), k = ang > 1e-4 ? Math.min(1, H.turn * dt / ang) : 1;
-      m.v.lerp(want, m.t < 1.2 ? k * 0.4 : k).normalize();
-      m.p.addScaledVector(m.v, H.speed * (m.t < 1.2 ? 0.45 : 1) * dt); if (m.o) { m.o.position.copy(m.p); m.o.lookAt(m.p.clone().add(m.v)); } // (its drawing put where it is)
-      const gone = m.t > H.life || S.docked || !!S.ftl || (ROCKS.near.length > 0 && rockOn(m.p.clone().addScaledVector(m.v, -H.speed * dt), m.p) < 1); // (into a rock)
-      if (d < 9 || gone) {
-        if (d < 9) { if (isCtl()) damage(H.dmg, 'A missile'); S.shake = 1; SpaceUI.flash(0.35); Audio.boom(20); }
-        if (m.o) m.o.removeFromParent(); S.mis.splice(i, 1);
-      }
-    }
+    const r = SpaceSim.missilesStep(S.mis, simShip(), ROCKS, S.rockList, SD.HULLGUN.missile, dt); // (the simulation's: js/spacesim.ts)
+    for (const m of S.mis) if (m.o) { m.o.position.copy(m.p); m.o.lookAt(m.p.clone().add(m.v)); } // (their drawings put where they are)
+    if (r.hit.length) { if (isCtl()) for (let i = 0; i < r.hit.length; i++) damage(SD.HULLGUN.missile.dmg, 'A missile'); S.shake = 1; SpaceUI.flash(0.35); Audio.boom(20); }
+    for (const m of [...r.hit, ...r.gone]) if ((m as any).o) (m as any).o.removeFromParent();
   }
   // ------------------------------------------------------------------ the torpedo tube
   // One tube under her keel (tubeKit), TORP.loads a sortie. The pilot looks at a 3D fix of her sensors' (right mouse held: the head
