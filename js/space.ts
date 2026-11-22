@@ -2605,45 +2605,15 @@ export const Space = (() => {
   // made radar targets (a return as big as its face: ROCK_SIG of its cross-section, the same every way) and the radars' cover
   // (Radar.occ: a sphere a little inside its lumps); their velocity the zone's going by. Rounds, shots, torpedoes, missiles and
   // she herself are stopped by the near ones (rockOn, collide).
-  const ROCK_NEAR = 14000, ROCK_SIG = 0.25, ROCKS = { near: [] as number[], p: [] as THREE.Vector3[], tg: new Map<number, RTarget>(), r: new Map<string, number>(), v: new T.Vector3(), zp: new T.Vector3(), zt: -1, obj: null as THREE.Object3D | null };
-  const NO_RCS = { s: new Float32Array(1), max: 0, mean: 0 };
-  function rocksStep(dt: number): RTarget[] {
-    const out: RTarget[] = []; ROCKS.near = []; Radar.occ.length = 0;
-    if (!S.zone || !S.rockList.length) return out;
-    // (the zone's velocity in the level's frame: how its middle's moved since the last step)
-    if (ROCKS.zt >= 0 && dt > 0) { ROCKS.v.copy(S.zone.position).sub(ROCKS.zp).divideScalar(dt); if (ROCKS.v.length() > 400) ROCKS.v.set(0, 0, 0); } ROCKS.zp.copy(S.zone.position); ROCKS.zt = S.t;
-    const zq = S.zone.quaternion, zp = S.zone.position;
-    S.rockList.forEach((q, k) => {
-      const p = ROCKS.p[k] || (ROCKS.p[k] = new T.Vector3()); p.set(q.p[0], q.p[1], q.p[2]).applyQuaternion(zq).add(zp);
-      if (p.distanceTo(S.P) - q.r > ROCK_NEAR) return;
-      ROCKS.near.push(k);
-      let t = ROCKS.tg.get(k); if (!t) { t = { sz: q.r, kind: 'rock', id: 'rock' + k, p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: NO_RCS, iso: ROCK_SIG * Math.PI * q.r * q.r }; ROCKS.tg.set(k, t); ROCKS.r.set(t.id, q.r); }
-      t.p.copy(p); t.v.copy(ROCKS.v); out.push(t); Radar.occ.push({ p: t.p, r: q.r * 0.85, id: t.id });
-    });
-    return out;
-  }
+  const ROCKS = Object.assign(SpaceSim.rocks(), { obj: null as THREE.Object3D | null }); // (the simulation's (js/spacesim.ts), and the field's drawing)
+  // (the zone's rocks as radar targets and cover, the field's velocity: js/spacesim.ts rocksStep)
+  const rocksStep = (dt: number) => SpaceSim.rocksStep(ROCKS, S.rockList, S.zone ? S.zone.position : null, S.zone ? S.zone.quaternion : null, S.P, dt, S.t);
   // The other ships' scanners: in a crowded field (AI_NOTCH.on or more rocks inside AI_NOTCH.r of her) both put their Doppler notch
   // on, and take it off once it's thinned out (AI_NOTCH.off or fewer): so in among the rocks a ship that drifts with them is lost to
   // their search, as it is to yours. Looked at once a second. Their trackers have their own velocity gate and keep what they hold.
-  const AI_NOTCH = { r: 9000, on: 14, off: 7, t: 0 };
-  function aiNotch(dt: number) {
-    AI_NOTCH.t -= dt; if (AI_NOTCH.t > 0) return; AI_NOTCH.t = 1;
-    const sus = [...(EW.foe ? [EW.foe] : []), ...[...EW.tsu.values()].map((x) => x.su)];
-    for (const su of sus) {
-      su.Vc = ROCKS.v; let n = 0;
-      if (S.zone && S.rockList.length) { const zq = S.zone.quaternion, zp = S.zone.position, p = new T.Vector3(); for (const q of S.rockList) { if (p.set(q.p[0], q.p[1], q.p[2]).applyQuaternion(zq).add(zp).distanceTo(su.P) < AI_NOTCH.r) n++; } }
-      for (const sc of su.scans) { if (!sc.notch && n >= AI_NOTCH.on) sc.notch = true; else if (sc.notch && n <= AI_NOTCH.off) sc.notch = false; }
-    }
-  }
-  // how far along from a to b (0..1) the first near rock is met; 1 if none
-  function rockOn(a: THREE.Vector3, b: THREE.Vector3) {
-    let best = 1; const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, L2 = dx * dx + dy * dy + dz * dz; if (L2 <= 0) return 1;
-    for (const k of ROCKS.near) {
-      const c = ROCKS.p[k], r = S.rockList[k].r * 0.9, wx = c.x - a.x, wy = c.y - a.y, wz = c.z - a.z, m = (wx * dx + wy * dy + wz * dz) / L2, e2 = wx * wx + wy * wy + wz * wz - m * m * L2;
-      if (e2 >= r * r) continue; const h = Math.sqrt((r * r - e2) / L2), f = m - h; if (f >= 0 && f < best) best = f; else if (f < 0 && m + h > 0) best = 0;
-    }
-    return best;
-  }
+  const AI_NOTCH = { t: 0 };
+  const aiNotch = (dt: number) => SpaceSim.aiNotch(ROCKS, S.rockList, [...(EW.foe ? [EW.foe] : []), ...[...EW.tsu.values()].map((x) => x.su)], S.zone ? S.zone.position : null, S.zone ? S.zone.quaternion : null, AI_NOTCH, dt);
+  const rockOn = (a: THREE.Vector3, b: THREE.Vector3) => SpaceSim.rockOn(ROCKS, S.rockList, a, b); // (how far along from a to b the first near rock is met)
   function rockFlash(p: THREE.Vector3) { if (!S.root) return; const f = new T.Mesh(FLASH, new T.MeshBasicMaterial({ color: 0xc8b090, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending })); f.position.copy(p); f.scale.setScalar(2); f.frustumCulled = false; S.root.add(f); S.tracers.push({ m: f, t: 0.1 }); }
   function seekStep(tp: Torp): RTarget | null {
     const to = tp.est.clone().sub(tp.p), R = to.length(); if (R < 1) return null; to.divideScalar(R);

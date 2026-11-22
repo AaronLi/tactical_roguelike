@@ -17,6 +17,12 @@ export interface SimZone {
 // (a thing's own record of its velocity in the zone, and the level-frame velocity it was last given from it: it goes on with that,
 // and whatever's changed its level velocity since as a push, not a velocity worked back out of the level's each step)
 export type ZMem = { vz: THREE.Vector3; v: THREE.Vector3 };
+// The zone's rocks: each one's place in the level's frame (p: by its index in list), those within ROCK_NEAR of her (near) radar
+// targets (tg) and the radars' cover (Radar.occ); the field's velocity (v), from the zone's placing step to step (zp, zt)
+export interface SimRocks { near: number[]; p: THREE.Vector3[]; tg: Map<number, RTarget>; r: Map<string, number>; v: THREE.Vector3; zp: THREE.Vector3; zt: number }
+export type RockList = { p: number[]; r: number; s: number }[];
+
+import { Radar, RSuite, RTarget } from './radar.js';
 
 export const SpaceSim = (() => {
   const T = THREE;
@@ -55,5 +61,48 @@ export const SpaceSim = (() => {
   }
   // an attitude kept as it is in the zone while the level turns under it
   const zturn = (Z: SimZone | null, q: THREE.Quaternion) => { if (Z && Z.frame.ok) q.premultiply(Z.frame.turn); };
-  return { zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn };
+  // ---------------------------------------------------------------- the rocks
+  // Each step: every rock's place in the level's frame (the zone's, moved and turned as it is), and those within ROCK_NEAR of her made
+  // radar targets (a return as big as its face: ROCK_SIG of its cross-section, the same every way) and the radars' cover (Radar.occ)
+  const ROCK_NEAR = 14000, ROCK_SIG = 0.25, NO_RCS = { s: new Float32Array(1), max: 0, mean: 0 };
+  const rocks = (): SimRocks => ({ near: [], p: [], tg: new Map(), r: new Map(), v: new T.Vector3(), zp: new T.Vector3(), zt: -1 });
+  function rocksReset(R: SimRocks) { R.near = []; R.tg.clear(); R.r.clear(); R.zt = -1; R.v.set(0, 0, 0); Radar.occ.length = 0; }
+  // (zp, zq: the zone's placing; at: her place; t: the simulation's time)
+  function rocksStep(R: SimRocks, list: RockList, zp: THREE.Vector3 | null, zq: THREE.Quaternion | null, at: THREE.Vector3, dt: number, t: number): RTarget[] {
+    const out: RTarget[] = []; R.near = []; Radar.occ.length = 0;
+    if (!zp || !zq || !list.length) return out;
+    // (the zone's velocity in the level's frame: how its middle's moved since the last step)
+    if (R.zt >= 0 && dt > 0) { R.v.copy(zp).sub(R.zp).divideScalar(dt); if (R.v.length() > 400) R.v.set(0, 0, 0); } R.zp.copy(zp); R.zt = t;
+    list.forEach((q, k) => {
+      const p = R.p[k] || (R.p[k] = new T.Vector3()); p.set(q.p[0], q.p[1], q.p[2]).applyQuaternion(zq).add(zp);
+      if (p.distanceTo(at) - q.r > ROCK_NEAR) return;
+      R.near.push(k);
+      let tg = R.tg.get(k); if (!tg) { tg = { sz: q.r, kind: 'rock', id: 'rock' + k, p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: NO_RCS, iso: ROCK_SIG * Math.PI * q.r * q.r }; R.tg.set(k, tg); R.r.set(tg.id, q.r); }
+      tg.p.copy(p); tg.v.copy(R.v); out.push(tg); Radar.occ.push({ p: tg.p, r: q.r * 0.85, id: tg.id });
+    });
+    return out;
+  }
+  // how far along from a to b (0..1) the first near rock is met; 1 if none
+  function rockOn(R: SimRocks, list: RockList, a: THREE.Vector3, b: THREE.Vector3) {
+    let best = 1; const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, L2 = dx * dx + dy * dy + dz * dz; if (L2 <= 0) return 1;
+    for (const k of R.near) {
+      const c = R.p[k], r = list[k].r * 0.9, wx = c.x - a.x, wy = c.y - a.y, wz = c.z - a.z, m = (wx * dx + wy * dy + wz * dz) / L2, e2 = wx * wx + wy * wy + wz * wz - m * m * L2;
+      if (e2 >= r * r) continue; const h = Math.sqrt((r * r - e2) / L2), f = m - h; if (f >= 0 && f < best) best = f; else if (f < 0 && m + h > 0) best = 0;
+    }
+    return best;
+  }
+  // The other ships' scanners: in a crowded field (AI_NOTCH.on or more rocks inside AI_NOTCH.r of her) both put their Doppler notch on,
+  // and take it off once it's thinned out (AI_NOTCH.off or fewer): so in among the rocks a ship that drifts with them is lost to their
+  // search, as it is to yours. Looked at once a second. Their trackers have their own velocity gate and keep what they hold
+  const AI_NOTCH = { r: 9000, on: 14, off: 7 };
+  function aiNotch(R: SimRocks, list: RockList, sus: RSuite[], zp: THREE.Vector3 | null, zq: THREE.Quaternion | null, clock: { t: number }, dt: number) {
+    clock.t -= dt; if (clock.t > 0) return; clock.t = 1;
+    const p = new T.Vector3();
+    for (const su of sus) {
+      su.Vc = R.v; let n = 0;
+      if (zp && zq && list.length) for (const q of list) { if (p.set(q.p[0], q.p[1], q.p[2]).applyQuaternion(zq).add(zp).distanceTo(su.P) < AI_NOTCH.r) n++; }
+      for (const sc of su.scans) { if (!sc.notch && n >= AI_NOTCH.on) sc.notch = true; else if (sc.notch && n <= AI_NOTCH.off) sc.notch = false; }
+    }
+  }
+  return { zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR };
 })();
