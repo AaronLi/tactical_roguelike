@@ -25,7 +25,7 @@ import { InteriorCull } from './interiorcull.js';
 import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
-import { SpaceSim, ZMem, SimShip, SimGun } from './spacesim.js';
+import { SpaceSim, ZMem, SimShip, SimGun, SimChaff } from './spacesim.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -87,7 +87,8 @@ export const Space = (() => {
   // Every ship carries two scanning radars and two tracking radars. Hers are the sensor station's (sensorStep: its screen, the operator
   // cues a tracker on what they click); the mission ship's are her own (her fire control cues hers on what her scanners paint), and her
   // guns fire only on a track: what a track gives (where the squad's ship will be) is what they aim at (guns).
-  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, rt: 0, ownDef: '', pre: null as null | { P: THREE.Vector3; Q: THREE.Quaternion }, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as { t: RTarget; born: number; pts: THREE.Points; seeds: Float32Array }[], chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tg: [] as RTarget[], tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, fO: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, zi: 4 } };
+  const EW = { own: null as RSuite | null, foe: null as RSuite | null, ownT: null as RTarget | null, foeT: null as RTarget | null, modelFor: null as object | null, hullFor: null as object | null, scr: null as THREE.Mesh | null, cu: null as number[] | null, l: false, r: false, plan: false, rt: 0, ownDef: '', pre: null as null | { P: THREE.Vector3; Q: THREE.Quaternion }, trf: new Map<THREE.Object3D, RTarget>(), hw: null as null | { su: RSuite; rotors: THREE.Object3D[]; dishes: THREE.Object3D[] }, chaff: [] as (SimChaff & { pts: THREE.Points | null; seeds: Float32Array })[], // (the simulation's clouds (js/spacesim.ts), and each one's drawing)
+    chaffLeft: 0, chaffN: 0, xpdr: false, misT: new Map<number, RTarget>(), tg: [] as RTarget[], tsu: new Map<THREE.Object3D, { su: RSuite; t: RTarget; turn: THREE.Quaternion }>(), holo: { c: new T.Vector3(), R: 0.3, rot: new T.Quaternion(), pick: null as any, rAt: 0, moved: false, y0: 0, p0: 0, placed: false, sy: 0, sat: -1, focus: false, gT: 0, gDone: false, mx: 0, my: 0, ml: false, mr: false, dx: 0, dy: 0, hid: [] as HTMLElement[], inputOn: false, fT: -1, fO: -1, auto: false, cur: null as HTMLElement | null, cx: 0, cy: 0, cr: 7, zi: 4 } };
   const HOLO_ZOOM = [500, 1000, 2500, 5000, 10000, 25000, 50000]; // (out to the scanners' reach: js/radar.ts MAP.Rmax)
   // the sensor operator's scan controls: which scanner the keys work (sel: -1 none), the number keys' presses (when each went
   // down, whether a hold's acted), and a sector changed by the keys not yet told to the crew (dirty)
@@ -208,22 +209,21 @@ export const Space = (() => {
   // (half a second), holds, and fades as it thins. To a scanner it's another peak; to a tracker it's more return in the beam:
   // a tracker on her when it blooms steers to the middle of the two, and as she leaves it, if it's the stronger, its range gate
   // goes with it (js/radar.ts beam). Everyone aboard sees it (schaff).
-  const CHAFF = { loads: 12, sig: 250, bloom: 0.5, hold: 5, fade: 2.5, life: 10, v: 22 };
+  const CHAFF = SpaceSim.CHAFF; // (its figures: the simulation's)
+  // a cloud thrown (a: its place and velocity): the simulation's cloud (js/spacesim.ts chaffNew), and its drawing: points scattered about it
   function chaffOut(a: number[]) {
-    if (!S.root || a.length < 6) return;
-    const N = 90, pos = new Float32Array(N * 3), seeds = new Float32Array(N * 3);
-    for (let i = 0; i < N * 3; i++) seeds[i] = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
-    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(pos, 3));
-    const pts = new T.Points(g, new T.PointsMaterial({ color: 0xdfe8f0, size: 2, sizeAttenuation: false, transparent: true, opacity: 0.9, depthWrite: false, blending: T.AdditiveBlending })); pts.frustumCulled = false; S.root.add(pts);
-    const t: RTarget = { sz: 25, kind: 'chaff', id: 'chaff' + (++EW.chaffN), p: new T.Vector3(a[0], a[1], a[2]), v: new T.Vector3(a[3], a[4], a[5]), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0 };
-    EW.chaff.push({ t, born: EW.rt, pts, seeds });
+    if (a.length < 6) return;
+    const c = Object.assign(SpaceSim.chaffNew(a, ++EW.chaffN, EW.rt), { pts: null as THREE.Points | null, seeds: new Float32Array(0) });
+    const N = 90, seeds = new Float32Array(N * 3); for (let i = 0; i < N * 3; i++) seeds[i] = (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
+    c.seeds = seeds; EW.chaff.push(c);
+    if (!S.root) return;
+    const g = new T.BufferGeometry(); g.setAttribute('position', new T.BufferAttribute(new Float32Array(N * 3), 3));
+    c.pts = new T.Points(g, new T.PointsMaterial({ color: 0xdfe8f0, size: 2, sizeAttenuation: false, transparent: true, opacity: 0.9, depthWrite: false, blending: T.AdditiveBlending })); c.pts.frustumCulled = false; S.root.add(c.pts);
   }
   function chaffStep(dt: number) {
-    for (let i = EW.chaff.length - 1; i >= 0; i--) {
-      const c = EW.chaff[i], age = EW.rt - c.born;
-      if (age > CHAFF.life) { c.pts.removeFromParent(); c.pts.geometry.dispose(); EW.chaff.splice(i, 1); continue; } // (by its age alone: drawn or not, it's the simulation's)
-      zstep(c.t.p, c.t.v, dt, (c as any).zm || ((c as any).zm = zmem()));
-      const k = (1 - Math.exp(-age / CHAFF.bloom)) * (age > CHAFF.hold ? Math.exp(-(age - CHAFF.hold) / CHAFF.fade) : 1); c.t.iso = CHAFF.sig * k;
+    for (const c of SpaceSim.chaffStep(S.zone ? ZS : null, EW.chaff, EW.rt, dt) as typeof EW.chaff) if (c.pts) { c.pts.removeFromParent(); c.pts.geometry.dispose(); } // (the simulation's step: js/spacesim.ts)
+    for (const c of EW.chaff) { // (the clouds' drawings: the points spread as it blooms, and fading)
+      if (!c.pts) continue; const age = EW.rt - c.born, k = SpaceSim.chaffK(age);
       const pa = c.pts.geometry.attributes.position as THREE.BufferAttribute, sp = 1.5 + Math.min(age, 4) * 5;
       for (let j = 0; j < pa.count; j++) pa.setXYZ(j, c.t.p.x + c.seeds[j * 3] * sp + (Math.random() - 0.5) * 0.3, c.t.p.y + c.seeds[j * 3 + 1] * sp, c.t.p.z + c.seeds[j * 3 + 2] * sp);
       pa.needsUpdate = true; (c.pts.material as THREE.PointsMaterial).opacity = 0.25 + 0.7 * k * (0.6 + 0.4 * Math.random());
@@ -236,9 +236,7 @@ export const Space = (() => {
     if (!S.model || S.docked || S.ftl) return;
     if (EW.chaffLeft <= 0) { HUD.toast('CHAFF', 'None left', 1.2); Audio.deny(); return; }
     EW.chaffLeft--;
-    const up = new T.Vector3(0, 1, 0).applyQuaternion(S.Q), back = new T.Vector3(0, 0, 1).applyQuaternion(S.Q), side = new T.Vector3(SR() - 0.5, 0, 0).applyQuaternion(S.Q);
-    const p = S.P.clone().addScaledVector(up, 2).addScaledVector(back, 3), v = S.V.clone().addScaledVector(up.multiplyScalar(0.6).add(back.multiplyScalar(0.8)).add(side).normalize(), CHAFF.v);
-    const a = [p.x, p.y, p.z, v.x, v.y, v.z].map((x) => Math.round(x * 100) / 100); chaffOut(a); Net.toHost({ t: 'schaff', a });
+    const a = SpaceSim.chaffThrow(simShip(), SR); chaffOut(a); Net.toHost({ t: 'schaff', a });
     HUD.toast('CHAFF', EW.chaffLeft + ' left', 1); Audio.click();
   }
   // the mission ship's transponder: her name, as the mission's ship (the squad's screen marks her; her own fire control knows itself)
@@ -627,7 +625,7 @@ export const Space = (() => {
   function leave() {
     InteriorCull.clear();
     holoFocus(false); G_R.focusBlur = false; EW.holo.fO = -1;
-    RadarView.update(null, false, [], [], '', 0); RadarView.holo(null, null, new T.Vector3(), 0, new T.Quaternion(), 0, false, null); for (const c of EW.chaff) c.pts.removeFromParent(); EW.chaff = [];
+    RadarView.update(null, false, [], [], '', 0); RadarView.holo(null, null, new T.Vector3(), 0, new T.Quaternion(), 0, false, null); for (const c of EW.chaff) if (c.pts) c.pts.removeFromParent(); EW.chaff = [];
     if (!S.on && !S.model) return;
     if (S.on && S.kind === 'board' && S.tclose && S.zone) {
       const q = S.traffic.find((o) => o.c.k === S.tclose!.k && o.wp);

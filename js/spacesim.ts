@@ -36,6 +36,8 @@ export interface SimTorp { id: number; p: THREE.Vector3; v: THREE.Vector3; q: TH
 // the level's), whether it hangs under her keel (inv), its health, its cooldown; an mg's burst left (bt), rounds owed (acc), barrels'
 // spin (rev); where it's laid (yaw, pitch: for its drawing)
 export interface SimGun { k: string; x: number; y: number; z: number; inv?: boolean; hp: number; cool: number; bt?: number; acc?: number; rev?: number; yaw?: number; pitch?: number }
+// A cloud of chaff: its radar target (its return blooming and fading: t.iso), when it was thrown (the simulation's time)
+export interface SimChaff { t: RTarget; born: number; zm?: ZMem }
 export interface SimShip { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; size: number; docked: boolean; ftl: boolean }
 
 import { Radar, RSuite, RTarget, RAssess } from './radar.js';
@@ -314,5 +316,29 @@ export const SpaceSim = (() => {
     }
     return bq ? { n: bq.n, r: Math.round(bq.r), vc: Math.round(bq.vc), u: Math.round(bu), id: bq.plot!.id, on } : null;
   }
-  return { FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
+  // ---------------------------------------------------------------- chaff
+  // Thrown up and back from her (thrown: its place and velocity, as chaffThrow gives them), it blooms to sig m² in bloom s, holds, then
+  // fades, and is gone at life (its age alone). n: its number (its target's id)
+  const CHAFF = { loads: 12, sig: 250, bloom: 0.5, hold: 5, fade: 2.5, life: 10, v: 22 };
+  function chaffThrow(ship: SimShip, rng: () => number) {
+    const up = new T.Vector3(0, 1, 0).applyQuaternion(ship.Q), back = new T.Vector3(0, 0, 1).applyQuaternion(ship.Q), side = new T.Vector3(rng() - 0.5, 0, 0).applyQuaternion(ship.Q);
+    const p = ship.P.clone().addScaledVector(up, 2).addScaledVector(back, 3), v = ship.V.clone().addScaledVector(up.multiplyScalar(0.6).add(back.multiplyScalar(0.8)).add(side).normalize(), CHAFF.v);
+    return [p.x, p.y, p.z, v.x, v.y, v.z].map((x) => Math.round(x * 100) / 100);
+  }
+  function chaffNew(a: number[], n: number, now: number): SimChaff {
+    return { t: { sz: 25, kind: 'chaff', id: 'chaff' + n, p: new T.Vector3(a[0], a[1], a[2]), v: new T.Vector3(a[3], a[4], a[5]), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0 }, born: now };
+  }
+  // a step of the clouds: each drifts (through the zone) and blooms or fades; returns those gone (taken out)
+  function chaffStep(Z: SimZone | null, list: SimChaff[], now: number, dt: number) {
+    const gone: SimChaff[] = [];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const c = list[i], age = now - c.born;
+      if (age > CHAFF.life) { list.splice(i, 1); gone.push(c); continue; }
+      zstep(Z, c.t.p, c.t.v, dt, c.zm || (c.zm = zmem()));
+      c.t.iso = CHAFF.sig * chaffK(age);
+    }
+    return gone;
+  }
+  const chaffK = (age: number) => (1 - Math.exp(-age / CHAFF.bloom)) * (age > CHAFF.hold ? Math.exp(-(age - CHAFF.hold) / CHAFF.fade) : 1); // (how bloomed it is, 0..1)
+  return { CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
 })();
