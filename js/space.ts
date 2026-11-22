@@ -565,16 +565,28 @@ export const Space = (() => {
   // A new picture puts it all back to the server's (svBase: as it came, and when), a belief's new place eased in over a sixth of a second
   // from where it was drawn (off: the difference, fading) rather than jumped to: a new measurement moves the server's estimate. At most
   // half a second on: a picture late longer than that holds where it got to.
-  type SvBase = { rt: number; pl: THREE.Vector3[]; off: (THREE.Vector3 | null)[]; th: number[]; dir: number[]; at: number };
+  // (her trackers: a beam's pointing has no rate of its own in the picture, so each is turned on at the rate it turned between the last
+  // two pictures, about the axis it turned about, while it's in the same state, 90 degrees a second at most; a conical scan's circling
+  // round its boresight made here (too quick to take from pictures a tenth of a second apart); and what its job's progress counts run
+  // on as the server's do: the scan's phase (dP), the spiral search's time, the acquiring sweep)
+  type SvTurn = { a: THREE.Vector3; b: THREE.Vector3; st: string; jk: string; wa: THREE.Vector3 | null; ra: number; wb: THREE.Vector3 | null; rb: number; dP: number; rev: number; spT: number | null; sw: number };
+  type SvBase = { rt: number; pl: THREE.Vector3[]; off: (THREE.Vector3 | null)[]; th: number[]; dir: number[]; at: number; tr: SvTurn[] };
   const svShown = new Map<string, THREE.Vector3>(); // (each belief where it was last drawn, by name)
   function svBase(su: RSuite) {
     const bel = su.bel || [];
     const off = bel.map((b) => { const w = svShown.get(b.n); if (!w) return null; const d = w.clone().sub(b.pl); return d.length() < 300 ? d : null; }); // (far off: a different thing under the name now, or a fresh fix: jumped to)
-    const B: SvBase = { rt: EW.rt, pl: bel.map((b) => b.pl.clone()), off, th: su.scans.map((sc) => sc.th), dir: su.scans.map((sc) => sc.sec.dir), at: -1 };
+    const was = (su as any)._fill as SvBase | undefined, gap = was ? EW.rt - was.rt : 0;
+    const turn = (u: THREE.Vector3, v: THREE.Vector3): [THREE.Vector3 | null, number] => { const ang = u.angleTo(v); if (!(gap > 0.02) || !(ang > 1e-5)) return [null, 0]; const ax = new T.Vector3().crossVectors(u, v); if (ax.lengthSq() < 1e-12) return [null, 0]; return [ax.normalize(), Math.min(ang / gap, Math.PI / 2)]; };
+    // (a job by what it's on: a rate's only taken across two pictures of the same one, a dish going from one job to the next mid-slew not)
+    const jobKey = (t: RSuite['trks'][0]) => { const j = t.job; return !j ? '' : j.kind + ':' + (j.tt ? j.tt.n : j.plot ? j.plot.k + '|' + j.plot.phi + '|' + j.plot.r : j.d ? j.d.x.toFixed(3) + ',' + j.d.y.toFixed(3) : ''); };
+    const tr: SvTurn[] = su.trks.map((t, k) => { const p = was && was.tr[k], a = t.a.clone(), b = t.b.clone(), jk = jobKey(t), q = { dP: t.dP || 0, rev: t.rev || 0, spT: t.spiral ? t.spiral.t : null, sw: t.sw || 0, jk };
+      if (!p || p.st !== t.st || p.jk !== jk) return { a, b, st: t.st, wa: null, ra: 0, wb: null, rb: 0, ...q };
+      const [wa, ra] = turn(p.a, a), [wb, rb] = turn(p.b, b); return { a, b, st: t.st, wa, ra, wb, rb, ...q }; });
+    const B: SvBase = { rt: EW.rt, pl: bel.map((b) => b.pl.clone()), off, th: su.scans.map((sc) => sc.th), dir: su.scans.map((sc) => sc.sec.dir), at: -1, tr };
     (su as any)._fill = B;
     svShown.clear();
   }
-  const _svq = new T.Quaternion();
+  const _svq = new T.Quaternion(), _sve1 = new T.Vector3(), _sve2 = new T.Vector3();
   function svFill(su: RSuite) {
     const B = (su as any)._fill as SvBase | undefined; if (!B || B.at === EW.rt || !SVB.fill) return; B.at = EW.rt;
     const dt = Math.min(0.5, Math.max(0, EW.rt - B.rt));
@@ -583,6 +595,20 @@ export const Space = (() => {
     (su.bel || []).forEach((b, i) => { const p0 = B.pl[i]; if (!p0) return; b.pl.copy(p0).addScaledVector(b.v, dt); const o = B.off[i]; if (o) b.pl.addScaledVector(o, fade);
       b.p.copy(b.pl).sub(su.P).applyQuaternion(_svq); b.r = b.pl.distanceTo(su.P); let w = svShown.get(b.n); if (!w) svShown.set(b.n, (w = new T.Vector3())); w.copy(b.pl); });
     su.scans.forEach((sc, k) => { if (B.th[k] == null || sc.mode === 'off') return; sc.th = B.th[k]; sc.sec.dir = B.dir[k]; Radar.sweep(sc, dt); });
+    su.trks.forEach((t, k) => {
+      const q = B.tr[k]; if (!q) return;
+      t.b.copy(q.b); if (q.wb) t.b.applyAxisAngle(q.wb, q.rb * dt);
+      const hz = (Radar.TK as any)[t.kind || 'mono'].hz as number;
+      if (t.st === 'track' && t.kind === 'conical') { // (its axis round the boresight at the squint angle, as js/radar.ts turns it)
+        const e1 = (Math.abs(t.b.y) < 0.9 ? _sve1.set(0, 1, 0) : _sve1.set(1, 0, 0)).cross(t.b).normalize(), e2 = _sve2.crossVectors(t.b, e1), ph = (EW.rt * Math.PI * 2 * hz) % (Math.PI * 2);
+        t.a.copy(t.b).addScaledVector(e1.multiplyScalar(Math.cos(ph)).addScaledVector(e2, Math.sin(ph)), Math.tan(Radar.TRK.sq)).normalize();
+      } else { t.a.copy(q.a); if (q.wa) t.a.applyAxisAngle(q.wa, q.ra * dt); }
+      if (t.st === 'track') { // (its turns go on at the scan's rate: whole ones counted (rev), the one under way its share (dP: a phase, conical; seconds, monopulse))
+        const con = t.kind === 'conical', u = (con ? q.dP / (Math.PI * 2) : q.dP * hz) + hz * dt, n = Math.floor(u);
+        t.rev = q.rev + n; t.dP = con ? (u - n) * Math.PI * 2 : (u - n) / hz;
+      }
+      if (t.st === 'acq') { if (t.spiral && q.spT != null) t.spiral.t = q.spT + dt; else t.sw = q.sw + Radar.TRK.acq * dt; }
+    });
   }
   function sv(su: RSuite): RSuite; function sv(su: RSuite | null | undefined): RSuite | null;
   function sv(su: RSuite | null | undefined): RSuite | null {
