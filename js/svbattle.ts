@@ -23,6 +23,7 @@ export interface SvBat {
   marks: Map<number, Record<string, number>>; tAt: Map<number, number>; // (each torpedo's timeline: when it was in her picture, HOSTILE, ...; when it was launched)
   evc: Record<string, number>; adopt: Map<number, number>; ended: Set<number>; // (events by kind, all of them; a torpedo still to be taken over: when its report first said phase 2)
   prof: { n: number; ms: number; max: number; at: number; last: { n: number; ms: number; max: number } | null };
+  sn: number; // (the server step it was last stepped at: what an event from a request is stamped with)
 }
 type ShipFit = { rcs: string; max: number; mean: number; size: number; top: number; beam: number; bot: number; box: number[]; tube: number[] };
 type Pose = { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; n: number; map: LvMap | null };
@@ -84,7 +85,7 @@ export const SvBattle = (() => {
     W.foeT = { sz: h.sz, kind: 'ship', id: 'hull', p: h.c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: h.rcs };
     W.hb = hb;
     W.guns = sh.guns.map((g, i) => ({ k: g.k, x: g.x, y: h.fit.guns[i].y, z: g.z, inv: g.inv, hp: g.hp, cool: g.cool }));
-    const B: SvBat = { W, k, map, ms, built: 0, pre: preOf(was), ev: [], dm: 0, marks: new Map(), tAt: new Map(), evc: {}, adopt: new Map(), ended: new Set(), prof: { n: 0, ms: 0, max: 0, at: 0, last: null } };
+    const B: SvBat = { W, k, map, ms, built: 0, pre: preOf(was), ev: [], dm: 0, marks: new Map(), tAt: new Map(), evc: {}, adopt: new Map(), ended: new Set(), prof: { n: 0, ms: 0, max: 0, at: 0, last: null }, sn: 0 };
     B.built = performance.now() - t0;
     return B;
   }
@@ -94,6 +95,7 @@ export const SvBattle = (() => {
   // crew: the mission ship's (js/spaceserver.ts), docked: the squad's ship docked in her breach; zt: the zone's time now (stepped)
   function step(B: SvBat, dt: number, n: number, crew: SimWorld['crew'], docked: boolean, zt: number) {
     const t0 = performance.now(), W = B.W;
+    B.sn = n;
     // her pose: the pilot's last word of it, run on by its velocity to this step (none yet, as if in the tunnel: nothing's seen)
     const ps = pose && pose.map === B.map ? pose : null;
     if (ps && B.pre && W.own) { const R = ps.Q.clone().multiply(B.pre.Q.clone().invert()), t = ps.P.clone().sub(B.pre.P.clone().applyQuaternion(R)); Radar.rebase(W.own, R, t); B.pre = null; }
@@ -167,7 +169,7 @@ export const SvBattle = (() => {
         break;
       }
       case 'schaff': if (W) W.chaff.push(SpaceSim.chaffNew(a, ++W.chaffN, W.t)); break;
-      case 'smis': if (W && a && a[4]) { const i = W.mis.findIndex((q) => q.id === a[0]); if (i >= 0) { W.mis.splice(i, 1); B!.ev.push({ k: 'misEnd', n: B!.W.t | 0, id: a[0], hit: 0 }); } } break; // (a missile a turret shot down, said by the screen that fired)
+      case 'smis': if (W && a && a[4]) { const i = W.mis.findIndex((q) => q.id === a[0]); if (i >= 0) { W.mis.splice(i, 1); B!.ev.push({ k: 'misEnd', n: B!.sn, id: a[0], hit: 0 }); } } break; // (a missile a turret shot down, said by the screen that fired)
       case 'shit': if (W && m.i >= 0) { const g = W.guns[m.i | 0]; if (g) g.hp = Math.max(0, +m.hp || 0); } break;
       case 'storp': if (W) torpIn(B!, a, m.f); break;
     }
