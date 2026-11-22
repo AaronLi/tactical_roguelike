@@ -56,7 +56,7 @@ export const SvBattle = (() => {
     return OWN;
   }
   // a zone ship's stand-in (js/hullshape.ts TrafficShape), as a radar target: her return, her size, her box (her stand-in lies along z).
-  // (The page has her real hull's return inside 5 km, js/space.ts zoneReal; here it's always her stand-in's)
+  // (inside 5 km, once the server's made her level (js/spaceserver.ts warm), her real hull's instead: realShape)
   const tshapes = new Map<string, SimTraffic['shape']>();
   function trafficShape(c: any): SimTraffic['shape'] {
     const key = c.kind + ':' + c.seed, had = tshapes.get(key); if (had) return had;
@@ -64,6 +64,28 @@ export const SvBattle = (() => {
     const sz = empty ? [20, 10, 40] : [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
     const out = { rcs: rcsOfTris(sh.exact, sh.flags), sz: Math.max(4, Math.max(all.max[0] - all.min[0], all.max[1] - all.min[1], all.max[2] - all.min[2]) / 2), long: sz[2], wide: sz[0], tall: sz[1], ctr: empty ? new T.Vector3() : new T.Vector3((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2), real: false };
     tshapes.set(key, out); return out;
+  }
+  // a zone ship's real hull (her level's, js/hullshape.ts HullShape), as the page draws her once she's inside 5 km (js/space.ts zoneReal):
+  // centred on her hull's middle as the page's holder is; her return, size and box from all of it (her real hull lies along x)
+  const rshapes = new Map<string, SimTraffic['shape']>();
+  function realShape(map: LvMap, key: string): SimTraffic['shape'] {
+    const had = rshapes.get(key); if (had) return had;
+    const sh = HullShape.of(map), hb = map.sp!.hull, cx = (hb.x0 + hb.x1) / 2, cz = (hb.z0 + hb.z1) / 2, ex = sh.exact.slice();
+    for (let i = 0; i < ex.length; i += 3) { ex[i] -= cx; ex[i + 2] -= cz; }
+    const b = sh.bbox, all = sh.bboxAll, empty = !(b.max[0] >= b.min[0]);
+    const sz = empty ? [40, 10, 20] : [b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]];
+    const out = { rcs: rcsOfTris(ex, sh.flags), sz: Math.max(4, Math.max(all.max[0] - all.min[0], all.max[1] - all.min[1], all.max[2] - all.min[2]) / 2), long: sz[0], wide: sz[2], tall: sz[1], ctr: empty ? new T.Vector3() : new T.Vector3((b.min[0] + b.max[0]) / 2 - cx, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2 - cz), real: true };
+    if (rshapes.size > 16) rshapes.clear();
+    rshapes.set(key, out); return out;
+  }
+  // (each zone ship inside 5 km whose level the server has made: her real hull swapped in, her radar target and radars made again for it)
+  function zoneReal(W: SimWorld, mapOf: (k: number) => LvMap | null) {
+    if (!W.zone) return;
+    for (const q of W.traffic) {
+      if (!q.shape || q.shape.real || !q.t || q.c.k == null || q.c.k === W.zone.zact || q.t.p.distanceTo(W.ship.P) > 5000) continue;
+      const m = mapOf(q.c.k); if (!m || !m.sp) continue;
+      q.shape = realShape(m, (m.seed || 0) + ':' + ((m as any).level || 0) + ':' + q.c.k); q.t = undefined; q.su = null;
+    }
   }
   // whose the level's ship is (js/space.ts missionAff: by her class and the job), and a zone ship's by her kind
   const missionAff = (ms: SpMission | null) => { const w = ms ? SD.wearOf(ms.size as any, ms.obj) : null; return w === 'navy' ? 'navy' : w === 'pirate' ? 'pirate' : 'civ'; };
@@ -95,7 +117,7 @@ export const SvBattle = (() => {
   const preOf = (was: SvBat | null) => { const q = !was ? null : pose && pose.map === was.map ? pose : poseWas && poseWas.map === was.map ? poseWas : null; return q ? { P: q.P.clone(), Q: q.Q.clone() } : null; };
   // ---------------------------------------------------------------- a step
   // crew: the mission ship's (js/spaceserver.ts), docked: the squad's ship docked in her breach; zt: the zone's time now (stepped)
-  function step(B: SvBat, dt: number, n: number, crew: SimWorld['crew'], docked: boolean, zt: number) {
+  function step(B: SvBat, dt: number, n: number, crew: SimWorld['crew'], docked: boolean, zt: number, mapOf?: (k: number) => LvMap | null) {
     const t0 = performance.now(), W = B.W;
     B.sn = n;
     // her pose: the pilot's last word of it, run on by its velocity to this step (none yet, as if in the tunnel: nothing's seen)
@@ -107,6 +129,7 @@ export const SvBattle = (() => {
     if (W.own && OWN) { W.xpdr = OWN.xpdr; W.own.hostNames = new Set([hullName(B)]); }
     if (W.foe && W.foeT) { const af = missionAff(B.ms) as any; W.foeT.aff = af; W.foeT.iff = { c: af === 'navy' ? 'navy' : 'civ', n: hullName(B) }; W.foeT.xon = af !== 'pirate'; W.foe.aff = af; }
     W.crew = crew; W.keepTgt = match;
+    if (mapOf && n % 30 === 0) zoneReal(W, mapOf);
     // the guns' rounds this step, each gun's from a seed of its own (sent: a client flies the same ones)
     const fired = new Map<number, { s: number; rng: () => number; aim: THREE.Vector3; err: number; c: number }>();
     const fire = (from: THREE.Vector3, aim: THREE.Vector3, H: any, err: number) => {
@@ -226,7 +249,7 @@ export const SvBattle = (() => {
     if (!B) return { on: false, own: suiteSum(OWN && OWN.su), pose: pose ? { age: pose.n } : null };
     const W = B.W, foeP = W.foe ? W.foe.P : null;
     return { on: true, k: B.k, t: +W.t.toFixed(2), zt: W.zone ? +SpaceSim.ztOf(W).toFixed(2) : 0, built: +B.built.toFixed(1), ship: { P: W.ship.P.toArray().map((v) => Math.round(v)), docked: W.ship.docked, ftl: W.ship.ftl, d: foeP ? Math.round(foeP.distanceTo(W.ship.P)) : null },
-      crew: W.crew, keep: W.keepTgt, own: suiteSum(W.own), foe: suiteSum(W.foe), fc: W.fc, tg: W.tg.map((t) => t.id), traffic: W.traffic.filter((q) => q.su).map((q) => q.c.k),
+      crew: W.crew, keep: W.keepTgt, own: suiteSum(W.own), foe: suiteSum(W.foe), fc: W.fc, tg: W.tg.map((t) => t.id), traffic: W.traffic.filter((q) => q.su).map((q) => q.c.k), real: W.traffic.filter((q) => q.shape && q.shape.real).map((q) => ({ k: q.c.k, mean: +q.shape!.rcs.mean.toFixed(3), max: +q.shape!.rcs.max.toFixed(3), sz: +q.shape!.sz.toFixed(2) })),
       guns: W.guns.map((g) => ({ k: g.k, hp: g.hp, bt: +(g.bt || 0).toFixed(2), cool: +(g.cool || 0).toFixed(2) })), rounds: W.rounds.length, mis: W.mis.length, chaff: W.chaff.length,
       torps: W.torps.map((tp) => ({ id: tp.id, mine: tp.mine, ph: tp.ph, t: +tp.t.toFixed(2), fus: tp.fus, lock: tp.lock, r: foeP ? Math.round(tp.p.distanceTo(foeP)) : null, e: foeP ? Math.round(tp.est.distanceTo(foeP)) : null, R: Math.round(tp.est.distanceTo(tp.p)), ev: tp.ev.toArray().map((v) => Math.round(v)), v: tp.v.toArray().map((v) => Math.round(v)), fixed: !!fixOf(W, tp), thr: +tp.thr.toFixed(2), dbg: tp.dbg ? Object.fromEntries(Object.entries(tp.dbg).map(([k, v]) => [k, +(+(v as number)).toFixed(3)])) : null })),
       marks: Object.fromEntries(B.marks), evc: B.evc, dm: +B.dm.toFixed(2), hp: HP.v, prof: B.prof.last };
