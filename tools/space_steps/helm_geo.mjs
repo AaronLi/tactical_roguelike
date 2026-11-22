@@ -7,7 +7,7 @@ export default async ({ ev, sleep, log }) => {
   log('GEO ' + await ev(`(() => { const Sp = G.Space, S = Sp.S, H = Sp.helmGeo, SD = G.SpaceData;
     let P;
     if (S.kind === 'hub') P = H.hubPlace(SD.HUB_BERTH, S.board, (i) => Sp.isGone(i));
-    else if (S.kind === 'board') { P = H.boardPlace(S.map, S.zdef, S.zact, 'x'); H.boardMove(P.wps, S.zdef, P.out0, S.zt0 + (S.t - S.ztAt), S.zone.position, S.zone.quaternion); }
+    else if (S.kind === 'board') { P = H.boardPlace(S.map, S.zdef, S.zact, 'x'); H.boardMove(P.wps, S.zdef, P.out0, Sp.ztUsed ? Sp.ztUsed() : S.zt0 + (S.t - S.ztAt), S.zone.position, S.zone.quaternion); }
     else P = H.assaultPlace(S.berth, () => S.stage);
     const pw = S.wps.filter((w) => w.kind !== 'anchor' || S.kind !== 'hub' || true), ids = (l) => l.map((w) => w.id + ':' + w.kind + (w.hide ? '-' : '')).join(' ');
     const dp = Math.max(0, ...pw.map((w, i) => P.wps[i] ? w.p.distanceTo(P.wps[i].p) : 1e9));

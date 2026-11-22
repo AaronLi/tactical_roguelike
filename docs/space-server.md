@@ -186,24 +186,51 @@ pilot flies in the level's frame through the same hook. Point defence over 20 se
 `sss` 7-10 KB/s a client; the HUD's picture 5 KB/s; events under 2 KB/s; `ssen` 15-40 KB/s to the sensor operator; inputs 1 KB/s up.
 The host's upload with three others aboard: 50-100 KB/s.
 
-## Performance (2026-11-21, a 5 km torpedo attack, headless with the GPU, the page at ~97 fps)
+## Before and after the migration (2026-11-22, 60da28b5 against a6ced288)
 
-Per frame: rendering the scene 2.3 ms, the space HUD 0.46 ms, rigs 0.36 ms, radar and fire control 0.25 ms, the hologram and sensor
-station 0.17 ms, the rest of space ~0.2 ms. CPU profile of the page's thread: browser internals and three.js ~79%,
-js/spaceui.ts 7% (its `update`, 6%, the most expensive single function of the game's own), js/radar.ts 5.8% (`scanStep` 1.6%,
-`dirOf` 1.2%, `blocked` 0.7%), js/space.ts 2.6%.
+The same torpedo attack (tools/space_steps/compare_pd.mjs: 5 km off the mission ship, her scanners on, a torpedo at her first 3D fix,
+F8 open on the mission ship), six runs of each, headless with the GPU:
 
-The battle's simulation is ~0.3-0.5 ms a step, most of it radar: in the worker that's off the page's frame, and in Node one battle
-should step 30-50 times faster than real time before any optimisation.
+|                          | before (the page's battle) | after (the server's) |
+|--------------------------|----------------------------|----------------------|
+| shot down                | 6 / 6                      | 4 / 6                |
+| HOSTILE after launch     | 6.81 s                     | 6.58 s               |
+| torpedo's end            | 12.12 s                    | 11.97 s              |
+| frames a second          | 83.2                       | 80.0                 |
+| frame (avg, p95)         | 15.4, 17.5 ms              | 16.4, 18.9 ms        |
+| page CPU a frame         | 10.8 ms                    | 11.3 ms              |
+| page's radar & fire ctl  | 0.30 ms                    | none                 |
+
+Over twenty seeds in Node (tools/space_sim.mjs --metrics 20, the same battle as the server's): before E 15 shot down, HOSTILE 6.87 s,
+gun track 8.92 s, first round 10.79 s; after E 16, 6.87, 8.90, 9.11 (her guns laid on a physical track). The frame's the same within
+the runs' spread (the scene's rendering, 5.8 against 6.3 ms, is most of the difference: the GPU's): the page gave up its radars
+(radar.js 6.5% of its busy time to 1.9%, what's left the drawing's dirOf) and took on the helm's prediction (its shadow, 0.03 ms a
+step). The ground game's simulation is untouched: tools/check_sim_golden.mjs fails the same way on both (its golden's stale).
+
+## Performance (2026-11-22, a6ced288)
+
+Profiles through the attack (tools/space_steps/profile_both.mjs, F8 shut): the page's thread 66% busy (three.js and the browser
+~69% of that, js/spaceui.ts update 8.5%, rig.js 4.6%, space.js 3.7%, radar.js 1.9%), frames 12.2 ms avg (11.9 before); the server
+worker 6% busy (1% before: it ran only the people and the AI), its battle 0.84 ms a step on average, 1.8 ms at most (the whole worker
+step 1.1 ms). Of the worker's busy time the radars are 62.7%: scanStep 18.5%, blocked 9.3%, stepIn 3.0%, cfar 2.5%, the noise's
+mulberry32 (mul32, rnd) 3.1%, angOf / dirOf 3.4%, the scheduler and fusion (plan, schedule, fuse) ~4%; packing the pictures (zpack,
+SuiteView.pack) ~4%. In Node (tools/space_profile.mjs, the approach scenario 90 s: 28.6x real time on one thread): radar.js 71.7%
+(scanStep 25.1%, blocked 12.8%, cfar 4.1%, look 2.9%, stepIn 2.2%, eig3 1.6%, angOf 1.6%), spacesim.js 9.6% (rockOn 5.0%: rounds
+against the rocks), three's vector maths 9.3%.
+
+Bandwidth (tools/space_steps/wire_sizes.mjs, flying with her scanners on): her radar picture 11 KB/s to everyone (deflated; 88 as
+JSON), the snapshot 2.4 KB/s, the pilot's acks 6.3 KB/s, the pilot's steps 4.3 KB/s up; F8's, while it's open, 12 + 132 KB/s.
 
 ## WebAssembly candidates
 
-Watched as the battle module is extracted (keep its hot data in flat arrays):
+From the profiles above (the worker's and Node's: that's where the battle runs now; the page draws):
 
-1. The scanners' map and its CFAR (`scanStep`, `cfar`): flat arrays, tight loops; experiment/radar-wasm moved them and measured a
-   step 0.48 -> 0.26 ms. Its mulberry32 and `Radar.seed` API shape and its record-and-replay parity harness
-   (tools/radar_parity_steps.mjs, 4e67887e) are reusable; its fusion-pairing loop is obsolete (the belief model replaced it).
-2. Occlusion (`blocked`): ray tests against the rocks, growing with rocks times targets.
-3. Beam geometry (`dirOf`, `angOf`): better folded into its callers than a call of its own.
+1. The scanners' map and CFAR (scanStep, stepIn, cfar, look, with their noise: mul32 / rnd): ~30% of the battle's step in both
+   profiles. Flat arrays and tight loops; experiment/radar-wasm moved them and measured a step 0.48 -> 0.26 ms. Its mulberry32 and
+   Radar.seed API shape and its record-and-replay parity harness (tools/radar_parity_steps.mjs, 4e67887e) are reusable.
+2. Occlusion (blocked; rockOn for rounds, the same test): 13-18%, growing with rocks times targets; a grid of the rocks near her
+   would cut it before any WebAssembly.
+3. Beam geometry (dirOf, angOf, azOf): 3-5%, best folded into its callers (1) rather than a call of its own.
+4. three's vector maths in the hot loops (applyQuaternion, length, copy: ~9% in Node): goes with whichever of 1-2 moves.
 
-The case is strongest in the worker and in Node (several suites, many battles at once), not the page.
+The case is strongest in the worker and Node (several suites, many battles at once); the page no longer steps any of it.
