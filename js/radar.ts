@@ -228,8 +228,8 @@ export const Radar = (() => {
     const n = Math.max(1, RF.prf * dwell), num = Pt * G * G * RF.lam * RF.lam * SIG0 * Math.pow(n, 0.8), den = Math.pow(4 * Math.PI, 3) * RF.k * RF.T * RF.F * RF.B * RF.L * Math.pow(10, THR / 10);
     return Math.pow(num / den, 0.25);
   }
-  const SCAN = { rate: TAU / 3, bw: 2 * D2R, fan: 45 * D2R, Pt: 100e3, R0: 0 }; // (a turn every 3 s; 2 degrees by 90; 100 kW peak: a warship's search radar's order)
-  SCAN.R0 = r0Of(SCAN.Pt, gainOf(SCAN.bw, 2 * SCAN.fan), SCAN.bw / SCAN.rate); // (some 26 km for 10 m2)
+  const SCAN = { rate: TAU / 3, bw: 2 * D2R, fan: 60 * D2R, Pt: 100e3, R0: 0 }; // (a turn every 3 s; 2 degrees by 120; 100 kW peak: a warship's search radar's order)
+  SCAN.R0 = r0Of(SCAN.Pt, gainOf(SCAN.bw, 2 * SCAN.fan), SCAN.bw / SCAN.rate); // (some 24 km for 10 m2: the wider the fan, the less gain)
   const TRK = { bw: 3 * D2R, sq: 1 * D2R, hz: 20, km: 1.6, slew: 75 * D2R, stab: 200 * D2R, acq: 60 * D2R, Pt: 20e3, R0: 0, gate: 0.06 }; // (monopulse: a reading every 1/hz s (50 ms of pulses); km: the slope of its difference channels (its angle error is about bw / (km sqrt(2 S/N))); sq: unused since conical scan; stab: how fast the turret can turn to hold its beam still while she turns under it)
   // a scanner's response map: MAP.na columns of angle round its axis (a degree each) by MAP.nr bins of range: 25 m each to R1 (10 km,
   // where a track's range is fine enough to fight with), 100 m each beyond, to Rmax (50 km: a big ship broadside on is seen that far)
@@ -247,6 +247,7 @@ export const Radar = (() => {
   const binW = (R: number) => (R < MAP.R1 ? MAP.dr : MAP.dr2); // (K: how far over the noise round it a cell must stand to be a peak (CFAR); floor: below that, not even looked at)
   const mapOf = (tag: string) => ({ map: new Float32Array(MAP.na * MAP.nr), age: new Float32Array(MAP.na).fill(-1e9), off: 0, col: -1, cons: [] as RContact[], nid: 0, tag, pend: [] as { p: RPlot; A: number }[], sec: { on: false, c: 0, h: Math.PI / 4, dir: 1 } });
   const MASK = Math.sin(10 * D2R); // (how far past its own side of her hull a mount can see: over the hull's edge, a little)
+  const TRK_SIDE = Math.sin(20 * D2R); // (how far a tracker's dish turns past her middle line to the other side)
   const AG = 4 * Math.LN2 / (TRK.bw * TRK.bw); // (the beam's shape: exp(-AG theta^2), half power at bw/2)
   // a ship's set: scanners on her top amidships, trackers each side; size her half length (where they're mounted, and how far the
   // debug view draws things for her)
@@ -788,7 +789,7 @@ export const Radar = (() => {
   const drop = (tr: RTrack) => { tr.dop = null; tr.spiral = null; tr.meas = null; tr.hist = []; if (tr.dg) { tr.dg.series = []; tr.dg.errs = []; } tr.hand = null; tr.w.set(0, 0, 0); tr.dE.set(0, 0, 0); tr.dA = 0; tr.dP = 0; tr.st = 'idle'; tr.cue = null; tr.tgt = null; tr.lockT = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; tr.db = -99; };
   // the boresight turned toward `to` no faster than the turret can
   function slewTo(tr: RTrack, to: THREE.Vector3, max: number) { const ang = tr.b.angleTo(to); if (ang <= max) tr.b.copy(to); else { const ax = _w.crossVectors(tr.b, to); if (ax.lengthSq() < 1e-12) ax.set(0, 1, 0); tr.b.applyAxisAngle(ax.normalize(), max); } tr.b.normalize(); return ang; }
-  const inSide = (tr: RTrack, b: THREE.Vector3) => b.x * tr.side > -MASK; // (a tracker sees its own flank's half of the sky)
+  const inSide = (tr: RTrack, b: THREE.Vector3) => b.x * tr.side > -TRK_SIDE; // (a tracker sees its own flank's half of the sky, and 20 degrees across her middle line)
   const dgOf = (tr: RTrack) => tr.dg || (tr.dg = { ring: new Float32Array(32), gate: new Float32Array(41), errs: [], rerr: 0, series: [], sweep: [] });
   // What the tracker's beam (axis a) gets back from everything in its range gate: the returns (each one's way from the mount, its
   // signal over the noise at the beam's middle, its range) and their sum through the beam that way (the beam's gain off its axis,
