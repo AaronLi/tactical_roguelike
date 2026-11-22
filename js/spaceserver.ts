@@ -8,6 +8,7 @@ import { ShipGen } from './shipgen.js';
 import { SpaceData } from './spacedata.js';
 import { SvBattle, SvBat } from './svbattle.js';
 import { SuiteView } from './suiteview.js';
+import { SpaceNet } from './spacenet.js';
 import { Radar } from './radar.js';
 import { World } from './world.js';
 // The host's side of the space direction (docs/space.md), in the simulation's thread with js/server.ts and through its
@@ -980,7 +981,7 @@ export const SpaceSv = (() => {
     SvBattle.step(bat, dt, sv.stepN, crew, docked, board ? board.Z.zt : 0, (kk) => { const c = sv.ctxs.get(kk); return c ? (c.sv.map as any) || null : null; }, hc); // (a zone ship's level, made: her real hull for the radars)
     SvBattle.out(bat, sv.stepN, board ? board.Z.zt : 0, (m) => net().broadcast(m), (b, ch) => net().fast(null, b, ch));
     // (her hull gone, by the server's count: the drive jumps her home by itself, as the pilot's page did (js/space.ts damage))
-    if (sv.stepN % 3 === 0 && st.ship.ctl) { const a = SvBattle.flyAck(); if (a) net().fast(st.ship.ctl, new TextEncoder().encode(JSON.stringify({ k: bat.k, s: a.s, h: a.h })).buffer as ArrayBuffer, 5); } // (where the server has her, to her pilot: js/space.ts c2Ack)
+    if (sv.stepN % 6 === 0 && st.ship.ctl) { const a = SvBattle.flyAck(); if (a) net().fast(st.ship.ctl, new TextEncoder().encode(JSON.stringify({ k: bat.k, s: a.s, h: a.h })).buffer as ArrayBuffer, 5); } // (where the server has her, to her pilot: js/space.ts c2Ack)
     if (SvBattle.failing() && !sv.leaving && !docked) { if (kind === 'hub') net().broadcast({ t: 'shit', i: -1, hp: SvBattle.patch() }); else { net().broadcast({ t: 'shit', i: -1, hp: 0 }); sv.overBlack(() => home(), 'ftl', -1); } } // (at home there's nowhere to jump: patched up to 30%) // (told at once: the jump's begun before the next snapshot)
     // (her radars' picture, as the server's battle has it (js/suiteview.ts pack): ten times a second on the fast channel's stream 1, to
     // everyone aboard (the sensor station, the hologram, the helm's targeting and her marks draw from it); k: which level's frame it's in)
@@ -989,13 +990,12 @@ export const SpaceSv = (() => {
     if (bat && sv.stepN % 15 === 0) for (const [pid, q] of [...dbgReq]) {
       if (sv.stepN - q.at > 240) { dbgReq.delete(pid); continue; }
       const W = bat.W, su = q.id === 'own' ? W.own : q.id === 'hull' ? W.foe : (W.traffic.find((x) => x.t && x.t.id === q.id) || { su: null }).su; if (!su) continue;
-      const enc = (o: any) => new TextEncoder().encode(JSON.stringify(o)).buffer as ArrayBuffer;
-      net().fast(pid, enc({ k: bat.k, id: q.id, s: SuiteView.pack(su, W.t, { dbg: true }) }), 2);
-      if (sv.stepN % 30 === 0) net().fast(pid, enc({ k: bat.k, id: q.id, m: SuiteView.packMaps(su, W.t) }), 3);
+      SpaceNet.zpack({ k: bat.k, id: q.id, s: SuiteView.pack(su, W.t, { dbg: true }) }).then((b) => net().fast(pid, b, 2));
+      if (sv.stepN % 30 === 0) SpaceNet.zpack({ k: bat.k, id: q.id, m: SuiteView.packMaps(su, W.t) }).then((b) => net().fast(pid, b, 3)); // (deflated: js/spacenet.ts zpack)
     }
     if (sv.stepN % 6 === 0 && bat && bat.W.own) { const t = bat.W.t, r1 = (v: THREE.Vector3) => [Math.round(v.x), Math.round(v.y), Math.round(v.z)], w = { trk: Radar.litTrk('own', t).map((e) => ({ k: e.k, f: r1(e.from), lk: e.lk ? 1 : 0 })), scan: Radar.paintsOn('own', t).map((e) => ({ k: e.k, f: r1(e.from), a: Math.round(e.age * 100) / 100 })) }; // (her warning receiver: who's tracking her, whose scanners are painting her: the server's radars')
       const P0 = bat.W.ship.P, l = bat.W.traffic.filter((q) => q.su && q.t).sort((a, b) => a.t!.p.distanceTo(P0) - b.t!.p.distanceTo(P0)).map((q) => [q.t!.id, q.su!.name || q.t!.id]); // (the zone's ships' radars it has on, nearest first: F8's list)
-      const js = JSON.stringify({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t), w, l }), u8 = new TextEncoder().encode(js); net().fast(null, u8.buffer as ArrayBuffer, 1); }
+      SpaceNet.zpack({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t), w, l }).then((b) => net().fast(null, b, 1)); } // (deflated: js/spacenet.ts zpack)
   }
   const dbgReq = new Map<string, { id: string; at: number }>(); // (who's asked for F8's picture of which suite, and when)
   const battleIn = (m: any) => SvBattle.request(bat, m); // (a crew request: done to the server's battle)

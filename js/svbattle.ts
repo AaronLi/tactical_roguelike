@@ -24,7 +24,7 @@ export type HelmCtx = { fleet: any; board: { seed: number; level: number; picked
   docked: boolean; at: number | null; near: boolean; act: number; site: number[] | null; dock: (on: boolean, at?: number[]) => boolean; shipName: string }; // (dock: done as the host does it; whether she's docked after)
 export interface SvBat {
   W: SimWorld; k: number; map: LvMap | null; ms: SpMission | null; kind: 'board' | 'assault' | 'hub';
-  wait?: boolean; chaffLeft?: number; hzt?: number; Hz?: SimZone; hzp?: THREE.Vector3; hzq?: THREE.Quaternion; hzm?: THREE.Matrix4; hm?: ReturnType<typeof helmOf>; siteAt?: (a: number[]) => any; clear?: ClearPrep; out0?: THREE.Vector3; // (her helm in this world, its hull's clearance, the anchor's place in the zone)
+  wait?: boolean; arrived?: boolean; chaffLeft?: number; hzt?: number; Hz?: SimZone; hzp?: THREE.Vector3; hzq?: THREE.Quaternion; hzm?: THREE.Matrix4; hm?: ReturnType<typeof helmOf>; siteAt?: (a: number[]) => any; clear?: ClearPrep; out0?: THREE.Vector3; // (her helm in this world, its hull's clearance, the anchor's place in the zone)
   Zi: SimZone | null; // (Zi: with no zone (the hub, a base's orbit), the still frame her flight's stepped through, as the page's level is)
   built: number; // (k: the zone ship whose level it is; built: ms it took to make)
   pre: { P: THREE.Vector3; Q: THREE.Quaternion } | null; // (her pose in the last world's frame: what her radars hold is moved to this one's when the first pose in it comes)
@@ -115,7 +115,9 @@ export const SvBattle = (() => {
       let e = FL.q.get(FL.next);
       if (!e) { if (!FL.q.size) break; const lo = Math.min(...FL.q.keys()); if (lo < FL.next) break; FL.next = lo; e = FL.q.get(lo); } // (a step never come: on from the next that has)
       FL.q.delete(FL.next);
-      if (e.nl && hctx) { const o = typeof e.nl === 'object' ? e.nl : hctx; FL.has = true; helmFor(B).arrive({ docked: !!o.docked, at: Number.isFinite(o.at) ? o.at | 0 : null, near: !!o.near, act: o.act | 0 }); near(B, true); } // (as the host's word the page set her up from said: not the host's now, which may be on to the next) // (into the new place as the page put her: js/helm.ts arrive)
+      if (!e.st && !e.nl && !FL.has) e.nl = true; // (a pilot's first step with nothing of hers yet: put where the host's word has her)
+      if (e.nl && B.arrived && FL.has) e.nl = null; // (a place's arrival word come again (another pilot's, from when they set it up): she's in it already)
+      if (e.nl && hctx) { B.arrived = true; const o = typeof e.nl === 'object' ? e.nl : hctx; FL.has = true; helmFor(B).arrive({ docked: !!o.docked, at: Number.isFinite(o.at) ? o.at | 0 : null, near: !!o.near, act: o.act | 0 }); near(B, true); } // (as the host's word the page set her up from said: not the host's now, which may be on to the next) // (into the new place as the page put her: js/helm.ts arrive)
       if (e.st) { helmUnpack(HS, e.st, HZ, B.siteAt!); FL.has = true; }
       else if (FL.has) {
         const hm = helmFor(B); helmZone(+e.zt); HRD.clear(); if (Array.isArray(e.rd)) for (const k of e.rd) if (Number.isInteger(k)) HRD.add(k); // (made once she's known: her berth's in her first state)
@@ -164,7 +166,7 @@ export const SvBattle = (() => {
     for (const e of m.a) {
       const s = e && +e.s; if (!Number.isFinite(s)) continue;
       if (!e.st && !(Array.isArray(e.i) && e.i.length === 4 && e.i.every(Number.isFinite))) continue;
-      if (!FL.on) { if (!e.st && !e.nl && !FL.has) continue; FL.on = true; FL.next = s; FL.go = false; } // (begun from her state, a new place, or where the server has her already)
+      if (!FL.on) { FL.on = true; FL.next = s; FL.go = false; } // (begun from her state, a new place, where the server has her already, or (none of those) where the host says she is: flyOn)
       if (s >= FL.next) FL.q.set(s, e);
     }
     if (FL.q.size > 600) { FL.q.clear(); FL.on = false; } // (a pilot gone quiet then flooding: begun again from her next state)

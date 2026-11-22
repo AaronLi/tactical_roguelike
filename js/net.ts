@@ -12,6 +12,28 @@ import { FastLink } from './netfast.js';
 // snapshots (docs/space-server.md, C1). The simulation sends them with ServerHost.fast (to one player or everyone, a stream of its
 // own each); the host's own page gets them across the thread's port (js/serverlink.ts), the remote players on their fast
 // channel (or the reliable one, base64, where there's no fast one); every page hands them to onFast.
+// PeerJS 1.5's JSON connection refuses a message of 16300 bytes or more, with an error that drops the player. One bigger goes in
+// pieces (_pc: its JSON's UTF-8 bytes in base64, 11000 bytes a piece, as js/netfast.ts's slow way), put together again where it
+// arrives (bigIn: the message whole, or null while pieces are still to come)
+const BIG = 15000, BIG_PIECE = 11000;
+let bigN = 0;
+const bigParts = new Map<string, { n: number; got: number; d: string[]; at: number }>();
+function bigSend(conn: any, msg: any) {
+  const js = JSON.stringify(msg);
+  if (js.length < BIG / 3 || new TextEncoder().encode(js).length < BIG) { conn.send(msg); return; }
+  const u = new TextEncoder().encode(js), n = Math.ceil(u.length / BIG_PIECE), id = (++bigN).toString(36) + ':' + Date.now().toString(36);
+  for (let i = 0; i < n; i++) { let b = ''; const part = u.subarray(i * BIG_PIECE, (i + 1) * BIG_PIECE); for (let j = 0; j < part.length; j++) b += String.fromCharCode(part[j]); conn.send({ t: '_pc', id, i, n, d: btoa(b) }); }
+}
+function bigIn(d: any, from: string): any {
+  if (!d || d.t !== '_pc') return d;
+  const key = from + '|' + d.id, now = Date.now(); let p = bigParts.get(key);
+  if (!p) { p = { n: d.n | 0, got: 0, d: [], at: now }; bigParts.set(key, p); for (const [k, q] of bigParts) if (now - q.at > 30000) bigParts.delete(k); } // (one never finished: let go)
+  if (p.d[d.i] == null && typeof d.d === 'string') { p.d[d.i] = d.d; p.got++; }
+  if (p.got < p.n) return null;
+  bigParts.delete(key);
+  const bin = p.d.map((x) => atob(x)).join(''), u = new Uint8Array(bin.length); for (let j = 0; j < bin.length; j++) u[j] = bin.charCodeAt(j);
+  try { return JSON.parse(new TextDecoder().decode(u)); } catch (e) { console.error('net: a message in pieces put together wrong', e); return null; }
+}
 export const Net = {
   PREFIX: 'breachproto-v1-',
   peer: null as any,
@@ -87,7 +109,7 @@ export const Net = {
         this.fast.set(conn.peer, (fl = new FastLink(conn, () => { /* (nothing comes up this way yet) */ })));
         this.onPeerJoin(conn.peer);
       });
-      conn.on('data', (d: any) => { if (d && typeof d === 'object') { if (d.t === 'fastb') { if (fl) fl.fallback(d); } else this.onServer(d, conn.peer); } });
+      conn.on('data', (d0: any) => { const d = bigIn(d0, conn.peer); if (d && typeof d === 'object') { if (d.t === 'fastb') { if (fl) fl.fallback(d); } else this.onServer(d, conn.peer); } });
       const drop = () => {
         if (fl) { fl.close(); if (this.fast.get(conn.peer) === fl) this.fast.delete(conn.peer); fl = null; }
         if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); this.onPeerLeave(conn.peer); }
@@ -125,7 +147,7 @@ export const Net = {
         this.hostFast = fl = new FastLink(conn, (buf, ch) => { if (this.hostConn === conn) this.gotFast(buf, ch); });
         finish(null);
       });
-      conn.on('data', (d: any) => { if (d && typeof d === 'object') { if (d.t === 'fastb') { if (fl) fl.fallback(d); } else this.onClient(d); } });
+      conn.on('data', (d0: any) => { const d = bigIn(d0, 'host'); if (d && typeof d === 'object') { if (d.t === 'fastb') { if (fl) fl.fallback(d); } else this.onClient(d); } });
       conn.on('close', () => {
         if (fl) { fl.close(); if (this.hostFast === fl) this.hostFast = null; fl = null; }
         if (this.hostConn === conn) { this.hostConn = null; this.onHostLost(); }
@@ -212,15 +234,15 @@ export const Net = {
 
   toHost(msg: any) {
     if (this.isHost) ServerLink.toServer(msg); // (the simulation's thread: js/serverlink.ts)
-    else if (this.hostConn && this.hostConn.open) this.hostConn.send(msg);
+    else if (this.hostConn && this.hostConn.open) bigSend(this.hostConn, msg);
   },
   // host only: what the simulation says to every remote player (but exceptId), and to one of them (js/serverlink.ts)
   relay(msg: any, exceptId?: string | null) {
-    for (const [id, c] of this.conns) if (id !== exceptId && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }
+    for (const [id, c] of this.conns) if (id !== exceptId && c.open) { try { bigSend(c, msg); } catch (e) { /* closing */ } }
   },
   relayTo(id: string, msg: any) {
     const c = this.conns.get(id);
-    if (c && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }
+    if (c && c.open) { try { bigSend(c, msg); } catch (e) { /* closing */ } }
   },
   leave() {
     this.stopBeacon();

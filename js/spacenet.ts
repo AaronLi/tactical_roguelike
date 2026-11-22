@@ -82,6 +82,21 @@ export const SpaceNet = {
     const g: number[][] = []; for (let i = r.vu(); i > 0; i--) g.push([r.f32(), r.f32(), r.f32(), r.u8(), r.f32()]);
     return { t: 'sss', n, k, zt, dm, ...(hp >= 0 ? { hp } : {}), ...(sp ? { sp } : {}), mis, tp, ch, g };
   },
+  // A picture for the fast channel (her radars', F8's): its JSON deflated (the browser's own compressor, CompressionStream
+  // 'deflate-raw', in the worker; a first byte 1 says so, 0 the JSON as it is where there's none), numbered (q) so one that's inflated
+  // after a later one is let go
+  zq: 0,
+  async zpack(o: any): Promise<ArrayBuffer> {
+    const raw = new TextEncoder().encode(JSON.stringify({ ...o, q: ++this.zq })), CS = (globalThis as any).CompressionStream;
+    let body = raw, flag = 0;
+    if (typeof CS === 'function') { const z = new Uint8Array(await new Response(new Blob([raw]).stream().pipeThrough(new CS('deflate-raw'))).arrayBuffer()); if (z.length < raw.length) { body = z; flag = 1; } }
+    const out = new Uint8Array(body.length + 1); out[0] = flag; out.set(body, 1); return out.buffer;
+  },
+  async zunpack(buf: ArrayBuffer): Promise<any> {
+    const u = new Uint8Array(buf), body = u.subarray(1);
+    const raw = u[0] === 1 ? new Uint8Array(await new Response(new Blob([body]).stream().pipeThrough(new (globalThis as any).DecompressionStream('deflate-raw'))).arrayBuffer()) : body;
+    return JSON.parse(new TextDecoder().decode(raw));
+  },
   encode(m: SssMsg | SevMsg) { return this.codec.enc(m); },
   decode(m: any) { return this.codec.dec(m); },
   // a snapshot read back into vectors (for a client to draw from)

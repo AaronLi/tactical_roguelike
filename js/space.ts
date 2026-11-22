@@ -1785,7 +1785,6 @@ export const Space = (() => {
       shadowOf(); return true;
     }
     if (C2.on) { C2.on = false; C2.hist = []; C2.out = []; C2.cmd = []; Net.toHost({ t: 'sin', off: 1 }); }
-    C2.nl = null; // (a new place set up while not flying her: the server has her already)
     return false;
   }
   // (after the page's own step: tgtTrack, fly, zoneClose)
@@ -2319,6 +2318,7 @@ export const Space = (() => {
   // her radars' picture from the server's battle (the fast channel's stream 1: js/spaceserver.ts battle): unpacked into the last one
   // (so what's picked and drawn keeps its identity), its times put on the page's own radar clock as it arrives
   // F8's picture of the suite it's showing, from the server's battle (asked for every couple of seconds while it's open: streams 2, 3)
+  const ZQ: Record<number, number> = {}; // (the newest of each deflated stream's pictures taken: js/spacenet.ts zpack's q)
   const SVD = { v: new Map<string, RSuite>(), at: new Map<string, number>(), asked: '', askedAt: -1e9 };
   function svDbgAsk() {
     if (!S.on) return; const on = !!Radar.show, id = on ? Radar.sel : '';
@@ -2326,10 +2326,10 @@ export const Space = (() => {
   }
   Net.onFast((buf, ch) => {
     if ((ch !== 2 && ch !== 3) || !S.on) return;
-    try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact) return;
+    SpaceNet.zunpack(buf).then((m) => { if (!S.on || m.k !== S.zact || m.q <= (ZQ[ch] || 0)) return; ZQ[ch] = m.q; // (inflated: js/spacenet.ts zunpack; one come later than a newer let go)
       if (ch === 2 && m.s) { m.s.t = EW.rt; SVD.v.set(m.id, SuiteView.unpack(m.s, SVD.v.get(m.id) || null)); SVD.at.set(m.id, S.t); }
       if (ch === 3 && m.m) { const v = SVD.v.get(m.id); if (v) SuiteView.unpackMaps(m.m, v); }
-    } catch (e) { console.error('space: F8 picture from the server', e); }
+    }).catch((e) => console.error('space: F8 picture from the server', e));
   });
   // (the core snapshot, as bytes: js/spacenet.ts sssBin)
   Net.onFast((buf, ch) => {
@@ -2338,7 +2338,7 @@ export const Space = (() => {
   });
   Net.onFast((buf, ch) => {
     if (ch !== 1 || !S.on) return;
-    try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact || !m.s) return; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; SVB.rwr = m.w || null; SVB.list = Array.isArray(m.l) ? m.l : []; } catch (e) { console.error('space: the picture of her radars from the server', e); }
+    SpaceNet.zunpack(buf).then((m) => { if (!S.on || m.k !== S.zact || !m.s || m.q <= (ZQ[1] || 0)) return; ZQ[1] = m.q; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; SVB.rwr = m.w || null; SVB.list = Array.isArray(m.l) ? m.l : []; }).catch((e) => console.error('space: the picture of her radars from the server', e));
   });
   // her hull as the server has it (its snapshot's, or its word as the emergency jump begins)
   function hullIs(hp: number) { S.hp = U.clamp(hp, 0, S.hpMax); if (S.hp > 0) S.lostAt = 0; else if (!S.lostAt) { S.lostAt = S.t; HUD.toast('HULL FAILING', 'Emergency jump: the repairs come out of your pay', 3); } }
