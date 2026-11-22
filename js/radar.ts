@@ -356,13 +356,8 @@ export const Radar = (() => {
     if (sc.mode === 'off') { // (off: silent; nothing sent, nothing heard, what it held fading out)
       const keep0 = perOf(sc); sc.plots = sc.plots.filter((p) => now - p.t < keep0); sc.cons = sc.cons.filter((c) => now - c.t < Math.max(keep0 * 2.1, 3.5)); sc.pend = []; return;
     }
-    const th0 = sc.th, Sx = sc.sec;
-    if (!Sx.on) sc.th = wrap(sc.th + sc.rate * dt);
-    else { // (a sector: back and forth across it, turning back at each edge; from outside it, in toward it the short way)
-      const d = wrapPi(sc.th - Sx.c), st = sc.rate * dt;
-      if (Math.abs(d) > Sx.h + st) { Sx.dir = d > 0 ? -1 : 1; sc.th = wrap(sc.th + Sx.dir * st); }
-      else { let nd = d + Sx.dir * st; if (nd > Sx.h) { nd = 2 * Sx.h - nd; Sx.dir = -1; } else if (nd < -Sx.h) { nd = -2 * Sx.h - nd; Sx.dir = 1; } sc.th = wrap(Sx.c + nd); }
-    }
+    const th0 = sc.th;
+    sweep(sc, dt);
     const sw = wrapPi(sc.th - th0), sg = sw >= 0 ? 1 : -1, mid = wrap(th0 + sw / 2);
     for (const q of seen) if (Math.abs(wrapPi(q.phi - mid)) <= Math.abs(sw) / 2 + sc.bw) paint(q.id, su, sc, k, now); // (her beam over it this frame: its warning receiver hears it)
     // the columns its middle crossed this frame (in her angle, either way), each written where it goes on the map
@@ -382,7 +377,7 @@ export const Radar = (() => {
     // (once the oldest peak waiting is 60 degrees behind the beam: all the waiting peaks matched together, so a peak isn't taken by
     // another's contact before that one's own peak is in)
     const beamA = wrap(sc.th - sc.off);
-    if (sc.pend.some((q) => { const b = wrap(sg * (beamA - q.A)); return (b > 60 * D2R && b < Math.PI) || (Sx.on && now - q.p.t > 0.3); })) { const ready = sc.pend; sc.pend = []; associate(sc, ready, now); } // (all of them together, those since too)
+    if (sc.pend.some((q) => { const b = wrap(sg * (beamA - q.A)); return (b > 60 * D2R && b < Math.PI) || (sc.sec.on && now - q.p.t > 0.3); })) { const ready = sc.pend; sc.pend = []; associate(sc, ready, now); } // (all of them together, those since too)
     const keep = perOf(sc) * 1.05; sc.plots = sc.plots.filter((p) => now - p.t < keep);
     sc.cons = sc.cons.filter((c) => now - c.t < Math.max(keep * 2.1, 3.5)); // (a contact missed twice running is let go; searching a sector, not before 3.5 s)
   }
@@ -1022,6 +1017,15 @@ export const Radar = (() => {
     S0.tts.push(tt); return tt;
   }
   // a search along a bearing (a radar warning's: from her, the way d, level frame); and a track let go (her operator's: unwanted)
+  // A scanner's beam turned on by dt: round, at its rate; a sector, back and forth across it, turning back at each edge (from outside
+  // it, in toward it the short way). The step's own, and a page's between the server's pictures (js/space.ts svFill)
+  function sweep(sc: RScan, dt: number) {
+    const Sx = sc.sec;
+    if (!Sx.on) { sc.th = wrap(sc.th + sc.rate * dt); return; }
+    const d = wrapPi(sc.th - Sx.c), st = sc.rate * dt;
+    if (Math.abs(d) > Sx.h + st) { Sx.dir = d > 0 ? -1 : 1; sc.th = wrap(sc.th + Sx.dir * st); }
+    else { let nd = d + Sx.dir * st; if (nd > Sx.h) { nd = 2 * Sx.h - nd; Sx.dir = -1; } else if (nd < -Sx.h) { nd = -2 * Sx.h - nd; Sx.dir = 1; } sc.th = wrap(Sx.c + nd); }
+  }
   function wantRay(su: RSuite, d: THREE.Vector3, now: number, pri = 1) { sched(su).reqs.push({ kind: 'ray', d: d.clone().normalize(), t: now, pri, op: true }); }
   function unwant(su: RSuite, tt: RSTrack) { void su; tt.op = false; tt.pri = tt.fc != null ? 2 : 0; tt.rate = SCH.rate[tt.pri]; }
   function lose(su: RSuite, tt: RSTrack) { const S0 = sched(su); S0.tts.splice(S0.tts.indexOf(tt), 1); for (const [tr, pl] of S0.plan) { S0.plan.set(tr, pl.filter((j) => j.tt !== tt)); if (tr.job && tr.job.tt === tt) { drop(tr); tr.job = null; } } }
@@ -1268,5 +1272,5 @@ export const Radar = (() => {
     }
     lit.clear(); painted.clear(); // (who's on whom: heard again within a moment)
   }
-  return { seed, rngOf, reseed, TK, r0Of, RF, crossSig, OPT, QUAD, optProg, urgency, ttAt, eig3, FIX, want, wantRay, unwant, lose, sched, SCH, rateOf, plotAt, jobProg, jobName, jobPri, binOf, rangeOf, occ, blocked, rebase, canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
+  return { sweep, seed, rngOf, reseed, TK, r0Of, RF, crossSig, OPT, QUAD, optProg, urgency, ttAt, eig3, FIX, want, wantRay, unwant, lose, sched, SCH, rateOf, plotAt, jobProg, jobName, jobPri, binOf, rangeOf, occ, blocked, rebase, canSee, cueRay, cueOne, warnClear, perOf, show: 0, sel: 'own', litOn, litTrk, paintsOn, arcAt, AG, spin, rcsOf, rcsAt, rcsToward, suite, step, cue, drop, lockOn, best, MAP, wrapPi, dirOf, angOf, snrDb, detRange, THR, SCAN, TRK, NAZ, NEL, cache };
 })();

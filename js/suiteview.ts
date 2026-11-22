@@ -110,7 +110,7 @@ export const SuiteView = (() => {
     };
     const sc = su.scans.map((s) => {
       const co = s.cons.map((c) => { const p = c.p, a: (number | string)[] = [+c.n.slice(s.tag.length), rd(c.A, 1e4), Math.round(c.r), rd(c.vA, 1e5), rd(c.vr, 10), rt(c.t), c.hits, iff(c.iff), rd(p.phi, 1e4), Math.round(p.r), Math.round(p.db), pose(p.q, p.o)]; if (dbg) a.push(p.id || ''); return a; });
-      return { ax: s.ax, th: rd(s.th, 1e4), rt: rd(s.rate, 1e4), r0rt: rd(s.rate0, 1e4), fan: rd(s.fan, 1e4), R0: Math.round(s.R0), at: v3(s.at, 100), n: v3(s.n, 1e4), mask: rd(s.mask, 1e4), mode: s.mode, sec: [s.sec.on ? 1 : 0, rd(s.sec.c, 1e4), rd(s.sec.h, 1e4)], no: s.notch ? 1 : 0, tag: s.tag, off: rd(s.off, 1e4), co, px: [] as (number | string)[][] } as SVMsg['sc'][0];
+      return { ax: s.ax, th: rd(s.th, 1e4), rt: rd(s.rate, 1e4), r0rt: rd(s.rate0, 1e4), fan: rd(s.fan, 1e4), R0: Math.round(s.R0), at: v3(s.at, 100), n: v3(s.n, 1e4), mask: rd(s.mask, 1e4), mode: s.mode, sec: [s.sec.on ? 1 : 0, rd(s.sec.c, 1e4), rd(s.sec.h, 1e4), s.sec.dir < 0 ? -1 : 1], no: s.notch ? 1 : 0, tag: s.tag, off: rd(s.off, 1e4), co, px: [] as (number | string)[][] } as SVMsg['sc'][0];
     });
     if (dbg) su.scans.forEach((s, k) => { sc[k].ps = s.plots.map((p) => plot(p)![1]); sc[k].tr = s.cons.map((c) => c.trail.map((q) => [rd(q.A, 1e4), Math.round(q.r), rt(q.t)])); });
     // (a job: one of the scheduler's requests by its place in the list (the same object there, on the dish and in the plan), else as itself)
@@ -186,7 +186,7 @@ export const SuiteView = (() => {
       const mp = C.maps[k] || (C.maps[k] = { map: new Float32Array(Radar.MAP.na * Radar.MAP.nr), age: new Float32Array(Radar.MAP.na).fill(-1e9) });
       const cons: RContact[] = s.co.map((a, i) => { const t = at(a[5] as number), c = { n: s.tag + a[0], A: a[1] as number, r: a[2] as number, vA: a[3] as number, vr: a[4] as number, t, hits: a[6] as number, iff: ff(a[7] as number), p: mkPlot(k, a[8] as number, a[9] as number, t, a[10] as number, a[11] as number, (a[12] as string) || ''), trail: s.tr ? s.tr[i].map((q) => ({ A: q[0], r: q[1], t: at(q[2]) })) : [] } as unknown as RContact; conBy.set(c.n, c); return c; });
       plots[k] = [...cons.map((c) => c.p), ...s.px.map((a) => mkPlot(k, a[0] as number, a[1] as number, at(a[2] as number), a[3] as number, a[4] as number, (a[5] as string) || ''))];
-      return { ax: s.ax, th: s.th, rate: s.rt, rate0: s.r0rt, bw: Radar.SCAN.bw, fan: s.fan, R0: s.R0, at: V(s.at), n: V(s.n), mast: 0, mask: s.mask, mode: s.mode, sec: { on: !!s.sec[0], c: s.sec[1], h: s.sec[2], dir: 1 }, notch: !!s.no, tag: s.tag, off: s.off,
+      return { ax: s.ax, th: s.th, rate: s.rt, rate0: s.r0rt, bw: Radar.SCAN.bw, fan: s.fan, R0: s.R0, at: V(s.at), n: V(s.n), mast: 0, mask: s.mask, mode: s.mode, sec: { on: !!s.sec[0], c: s.sec[1], h: s.sec[2], dir: s.sec[3] < 0 ? -1 : 1 }, notch: !!s.no, tag: s.tag, off: s.off,
         plots: s.ps ? s.ps.map((i) => plots[k][i]) : [], cons, map: mp.map, age: mp.age, col: -1, nid: 0, pend: [] } as unknown as RScan;
     });
     C.pc = pc;

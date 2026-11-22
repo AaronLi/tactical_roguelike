@@ -558,11 +558,37 @@ export const Space = (() => {
   // A suite as the page draws it: the server's picture of it (js/suiteview.ts, sent by js/spaceserver.ts battle): hers ten times a
   // second to everyone aboard, F8's with its extras to whoever has it open
   const shownOwn = () => sv(EW.own); // (her radars' picture as it's shown: the server's)
+  // Her radars' picture comes ten times a second; between pictures it's run on here, a frame at a time, so what's drawn from it moves
+  // smoothly instead of in tenth-of-a-second steps: her own place and heading the page's (she's flown here, every frame), each belief
+  // carried on by its velocity, and each scanner's beam turned on as the server turns it (Radar.sweep: round, or back and forth across
+  // its sector). What's timed in it already runs on by the radars' clock (EW.rt: contacts' bearings, tracks' filters, jobs' progress).
+  // A new picture puts it all back to the server's (svBase: as it came, and when), a belief's new place eased in over a sixth of a second
+  // from where it was drawn (off: the difference, fading) rather than jumped to: a new measurement moves the server's estimate. At most
+  // half a second on: a picture late longer than that holds where it got to.
+  type SvBase = { rt: number; pl: THREE.Vector3[]; off: (THREE.Vector3 | null)[]; th: number[]; dir: number[]; at: number };
+  const svShown = new Map<string, THREE.Vector3>(); // (each belief where it was last drawn, by name)
+  function svBase(su: RSuite) {
+    const bel = su.bel || [];
+    const off = bel.map((b) => { const w = svShown.get(b.n); if (!w) return null; const d = w.clone().sub(b.pl); return d.length() < 300 ? d : null; }); // (far off: a different thing under the name now, or a fresh fix: jumped to)
+    const B: SvBase = { rt: EW.rt, pl: bel.map((b) => b.pl.clone()), off, th: su.scans.map((sc) => sc.th), dir: su.scans.map((sc) => sc.sec.dir), at: -1 };
+    (su as any)._fill = B;
+    svShown.clear();
+  }
+  const _svq = new T.Quaternion();
+  function svFill(su: RSuite) {
+    const B = (su as any)._fill as SvBase | undefined; if (!B || B.at === EW.rt || !SVB.fill) return; B.at = EW.rt;
+    const dt = Math.min(0.5, Math.max(0, EW.rt - B.rt));
+    su.P.copy(S.P); su.Q.copy(S.Q); su.V.copy(S.V); _svq.copy(su.Q).invert();
+    const fade = Math.exp(-dt / 0.06);
+    (su.bel || []).forEach((b, i) => { const p0 = B.pl[i]; if (!p0) return; b.pl.copy(p0).addScaledVector(b.v, dt); const o = B.off[i]; if (o) b.pl.addScaledVector(o, fade);
+      b.p.copy(b.pl).sub(su.P).applyQuaternion(_svq); b.r = b.pl.distanceTo(su.P); let w = svShown.get(b.n); if (!w) svShown.set(b.n, (w = new T.Vector3())); w.copy(b.pl); });
+    su.scans.forEach((sc, k) => { if (B.th[k] == null || sc.mode === 'off') return; sc.th = B.th[k]; sc.sec.dir = B.dir[k]; Radar.sweep(sc, dt); });
+  }
   function sv(su: RSuite): RSuite; function sv(su: RSuite | null | undefined): RSuite | null;
   function sv(su: RSuite | null | undefined): RSuite | null {
     if (!su) return null;
     if (Radar.show) { const d = SVD.v.get(su.id); if (d && S.t - (SVD.at.get(su.id) ?? -1e9) < 1.5) return d; } // (F8 open: its own picture of the suite, extras and all)
-    if (su === EW.own) return SVB.own || su; // (her radars' picture: the server's (svOwn); none come yet, her set as the crew have it, empty)
+    if (su === EW.own) { if (SVB.own) svFill(SVB.own); return SVB.own || su; } // (her radars' picture: the server's (svOwn), run on to now (svFill); none come yet, her set as the crew have it, empty)
     return SVD.v.get(su.id) || su;
   }
 
@@ -2310,7 +2336,7 @@ export const Space = (() => {
   // (each gun's rounds of a step replayed from its seed: the same rounds the server flies), her missiles, the damage they do
   // (list: the zone's ships' radars the server has on, [id, name], nearest first: F8's to go through; stubs: a suite each, for its picture)
   // (ztSync: the zone's clock kept to the server's; a fingerprint step script holds it still)
-  const SVB = { ztSync: true, list: [] as [string, string][], stubs: new Map<string, RSuite>(), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, spAt: -1e9, own: null as RSuite | null, ownAt: -1e9, rwr: null as null | { trk: { k: string; f: number[]; lk: number }[]; scan: { k: string; f: number[]; a: number }[] } };
+  const SVB = { fill: true, ztSync: true, list: [] as [string, string][], stubs: new Map<string, RSuite>(), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, spAt: -1e9, own: null as RSuite | null, ownAt: -1e9, rwr: null as null | { trk: { k: string; f: number[]; lk: number }[]; scan: { k: string; f: number[]; a: number }[] } };
   // her radars' picture from the server's battle (the fast channel's stream 1: js/spaceserver.ts battle): unpacked into the last one
   // (so what's picked and drawn keeps its identity), its times put on the page's own radar clock as it arrives
   // F8's picture of the suite it's showing, from the server's battle (asked for every couple of seconds while it's open: streams 2, 3)
@@ -2334,7 +2360,7 @@ export const Space = (() => {
   });
   Net.onFast((buf, ch) => {
     if (ch !== 1 || !S.on) return;
-    SpaceNet.zunpack(buf).then((m) => { if (!S.on || m.k !== S.zact || !m.s || m.q <= (ZQ[1] || 0)) return; ZQ[1] = m.q; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; SVB.rwr = m.w || null; SVB.list = Array.isArray(m.l) ? m.l : []; }).catch((e) => console.error('space: the picture of her radars from the server', e));
+    SpaceNet.zunpack(buf).then((m) => { if (!S.on || m.k !== S.zact || !m.s || m.q <= (ZQ[1] || 0)) return; ZQ[1] = m.q; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; svBase(SVB.own); SVB.rwr = m.w || null; SVB.list = Array.isArray(m.l) ? m.l : []; }).catch((e) => console.error('space: the picture of her radars from the server', e));
   });
   // her hull as the server has it (its snapshot's, or its word as the emergency jump begins)
   function hullIs(hp: number) { S.hp = U.clamp(hp, 0, S.hpMax); if (S.hp > 0) S.lostAt = 0; else if (!S.lostAt) { S.lostAt = S.t; HUD.toast('HULL FAILING', 'Emergency jump: the repairs come out of your pay', 3); } }
