@@ -17,8 +17,6 @@ export default async ({ ev, sleep, log }) => {
     const r = await ev(`(async () => { const w = (await G.ServerLink.sworld()).w || {}, c = G.Space.C2(), S = G.Space.S, t1 = S.wps.find(q => q.id === 't1'); return JSON.stringify({ zact: S.zact, kind: S.kind, d: t1 ? Math.round(S.P.distanceTo(t1.p)) : null, tclose: S.tclose && +S.tclose.t.toFixed(2), serverK: w.k, stc: w.fly && w.fly.tclose, tb: w.evc && w.evc.tboard, acks: c.acks, fixes: c.fixes, states: c.states, errMax: +c.errMax.toFixed(3) }); })()`);
     log(r); if (JSON.parse(r).zact === 1 && i > 3) { await sleep(3000); log(await ev(`(async () => { const w = (await G.ServerLink.sworld()).w || {}, c = G.Space.C2(); return JSON.stringify({ zact: G.Space.S.zact, serverK: w.k, acks: c.acks, fixes: c.fixes, states: c.states, errMax: +c.errMax.toFixed(3) }); })()`)); break; }
   }
-  log('ARR ' + JSON.stringify(await ev('G.Space.C2().arr')));
-  log('TRACE ' + JSON.stringify(await ev('(G.Space.C2().tr || []).slice(-30)')));
   log('WHY ' + JSON.stringify(await ev('G.Space.C2().why')));
   log('STATES ' + JSON.stringify(await ev('G.Space.C2().whyS')));
 };

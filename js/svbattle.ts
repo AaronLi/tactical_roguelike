@@ -20,11 +20,11 @@ import { SpaceNet, SevE } from './spacenet.js';
 
 // a world, with what the server keeps beside it
 // (what the place she's in gives her helm from outside the battle: js/spaceserver.ts battle)
-export type HelmCtx = { fleet: any; board: { seed: number; level: number; picked: number[]; done: number[] }; gone: (i: number) => boolean; raid: number[][]; done: boolean; jump: (to: number) => void; tboard: (k: number) => void; warm: (k: number, on: boolean) => void; ready: (k: number) => boolean;
+export type HelmCtx = { fleet: any; board: { seed: number; level: number; picked: number[]; done: number[] }; gone: (i: number) => boolean; raid: number[][]; done: boolean; say: (m: any) => void; jump: (to: number) => void; tboard: (k: number) => void; warm: (k: number, on: boolean) => void; ready: (k: number) => boolean;
   docked: boolean; at: number | null; near: boolean; act: number; site: number[] | null; dock: (on: boolean, at?: number[]) => boolean; shipName: string }; // (dock: done as the host does it; whether she's docked after)
 export interface SvBat {
   W: SimWorld; k: number; map: LvMap | null; ms: SpMission | null; kind: 'board' | 'assault' | 'hub';
-  wait?: boolean; hzt?: number; Hz?: SimZone; hzp?: THREE.Vector3; hzq?: THREE.Quaternion; hzm?: THREE.Matrix4; hm?: ReturnType<typeof helmOf>; siteAt?: (a: number[]) => any; clear?: ClearPrep; out0?: THREE.Vector3; // (her helm in this world, its hull's clearance, the anchor's place in the zone)
+  wait?: boolean; chaffLeft?: number; hzt?: number; Hz?: SimZone; hzp?: THREE.Vector3; hzq?: THREE.Quaternion; hzm?: THREE.Matrix4; hm?: ReturnType<typeof helmOf>; siteAt?: (a: number[]) => any; clear?: ClearPrep; out0?: THREE.Vector3; // (her helm in this world, its hull's clearance, the anchor's place in the zone)
   Zi: SimZone | null; // (Zi: with no zone (the hub, a base's orbit), the still frame her flight's stepped through, as the page's level is)
   built: number; // (k: the zone ship whose level it is; built: ms it took to make)
   pre: { P: THREE.Vector3; Q: THREE.Quaternion } | null; // (her pose in the last world's frame: what her radars hold is moved to this one's when the first pose in it comes)
@@ -47,7 +47,7 @@ export const SvBattle = (() => {
     fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)))).then((j) => { space = j; }).catch((e) => console.warn('server battle: no space.json (' + e + '): the squad\'s ship has no radars on the server'));
   }
   // Her own set (radars, transponder): kept, all it holds, while she's the same ship (a new level isn't a new her: js/space.ts ewStep)
-  let OWN: { su: RSuite; t: RTarget; def: string; key: string; xpdr: boolean } | null = null;
+  let OWN: { su: RSuite; t: RTarget; def: string; key: string; xpdr: boolean; tube: THREE.Vector3; torps: number } | null = null; // (tube: where her torpedo tube is on her, js/space.ts tubeKit; torps: the loads left)
   let rt = 0; // (the battle's clock, never started again in a session: a new world goes on from it)
   // her helm, the server's (docs/space-server.md C2, C3): the pilot's steps as they come (sin: an input, or her state after a step of
   // her own), flown in order by js/helm.ts on the server's own helm state, one a server step (all but three at once when more wait),
@@ -120,8 +120,9 @@ export const SvBattle = (() => {
       else if (FL.has) {
         const hm = helmFor(B); helmZone(+e.zt); HRD.clear(); if (Array.isArray(e.rd)) for (const k of e.rd) if (Number.isInteger(k)) HRD.add(k); // (made once she's known: her berth's in her first state)
         const j = HS.wps.findIndex((w: any) => w.id === e.tg); if (j >= 0) HS.tgt = j; HS.match = e.m == null ? null : String(e.m);
-        for (const c of e.c || []) { if (c[0] === 'jw') { HS.ftl = { st: 'wait', t: 2.6, to: c[1] | 0, T: 2.6 }; HS.warp = null; HS.spin = 0; HS.auto = null; } else if (c[0] === 'j') HS.ftl = { st: 'spool', t: 0, to: c[1] | 0, T: 2.6 }; else if (c[0] === 'w') hm.warpGo(); else if (c[0] === 'l') hm.land(); else if (c[0] === 't') HS.spin = 0; else if (c[0] === 'u' && hctx && !hctx.dock(false)) { hm.dock(false); hm.launchAway(); } } // (u: off her berth, if the host lets her go: everyone aboard)
-        const I: HelmIn = { h: !!e.i[0], b: e.i[1] | 0, sx: +e.i[2], sy: +e.i[3], rb: Array.isArray(e.rb) ? new T.Vector3(+e.rb[0], +e.rb[1], +e.rb[2]) : null };
+        for (const c of e.c || []) { if (c[0] === 'tp') launch(B, c); else if (c[0] === 'ch') chaff(B); else if (c[0] === 'jw') { HS.ftl = { st: 'wait', t: 2.6, to: c[1] | 0, T: 2.6 }; HS.warp = null; HS.spin = 0; HS.auto = null; } else if (c[0] === 'j') HS.ftl = { st: 'spool', t: 0, to: c[1] | 0, T: 2.6 }; else if (c[0] === 'w') hm.warpGo(); else if (c[0] === 'l') hm.land(); else if (c[0] === 't') HS.spin = 0; else if (c[0] === 'u' && hctx && !hctx.dock(false)) { hm.dock(false); hm.launchAway(); } } // (u: off her berth, if the host lets her go: everyone aboard)
+        const lk = HS.match === 'radar' ? radarLock(W) : null; // (matched to her radar's lock: her best track, as the server's radars have it)
+        const I: HelmIn = { h: !!e.i[0], b: e.i[1] | 0, sx: +e.i[2], sy: +e.i[3], rb: lk ? lk.est.v.clone() : null };
         hm.step(I, dt);
       }
       FL.ack = FL.next; FL.next++;
@@ -137,6 +138,24 @@ export const SvBattle = (() => {
     const act = B.W.zone.zact; if (!nearSent.has(act)) { nearSent.add(act); hctx.warm(act, true); }
     for (const w of HS.wps) { const m = /^t(\d+)$/.exec(w.id); if (!m) continue; const k = +m[1], d = HS.P.distanceTo(w.p);
       if (d < 5000 && !nearSent.has(k)) { nearSent.add(k); hctx.warm(k, true); } else if (d > 8000 && nearSent.has(k)) { nearSent.delete(k); hctx.warm(k, false); } }
+  }
+  // her best track (js/space.ts radarLock): what Shift H matches her to
+  function radarLock(W: SimWorld) { const o = W.own; if (!o) return null; let b: any = null; for (const t of Radar.sched(o).tts) if (t.est.q > 0.1 && (!b || (t.op ? 1 : 0) > (b.op ? 1 : 0) || ((t.op ? 1 : 0) === (b.op ? 1 : 0) && t.est.q > b.est.q))) b = t; return b; }
+  // a torpedo out of her tube, as the pilot asked at this step (c: ['tp', its id, the fix it's sent at]): from the tube where she is,
+  // pushed down out of it (js/space.ts torpFire); a load gone
+  function launch(B: SvBat, c: any[]) {
+    if (!OWN || OWN.torps <= 0 || HS.docked || HS.ftl || HS.warp || c.length !== 8 || !c.every((x: any, i: number) => i === 0 || Number.isFinite(x))) return;
+    OWN.torps--;
+    const p = OWN.tube.clone().applyQuaternion(HS.Q).add(HS.P), v = HS.V.clone().addScaledVector(new T.Vector3(0, -1, 0).applyQuaternion(HS.Q), SpaceSim.TORP.eject), q = HS.Q;
+    torpIn(B, [c[1], p.x, p.y, p.z, v.x, v.y, v.z, q.x, q.y, q.z, q.w, 0, 0], c.slice(2));
+  }
+  // chaff thrown out of her, as the pilot asked at this step: from where she is, by the battle's own random numbers; told to everyone
+  function chaff(B: SvBat) {
+    const W = B.W; if (HS.docked || HS.ftl || (B.chaffLeft ?? SpaceSim.CHAFF.loads) <= 0) return;
+    B.chaffLeft = (B.chaffLeft ?? SpaceSim.CHAFF.loads) - 1;
+    const a = SpaceSim.chaffThrow({ P: HS.P, Q: HS.Q, V: HS.V, size: W.ship.size, docked: HS.docked, ftl: !!HS.ftl }, W.rng);
+    W.chaff.push(SpaceSim.chaffNew(a, ++W.chaffN, W.t));
+    if (hctx) hctx.say({ t: 'schaff', a, by: '' });
   }
   function flyIn(m: any) {
     if (m.off) { FL.on = false; FL.q.clear(); FL.next = -1; FL.go = false; return; } // (her helm state kept: the next pilot goes on from it)
@@ -161,7 +180,7 @@ export const SvBattle = (() => {
     if (!OWN || OWN.def !== def.id) {
       const su = Radar.suite('own', f.size, f.top, f.beam, f.bot); Radar.sched(su);
       su.scans.forEach((sc) => { sc.mode = 'off'; }); // (silent till her sensor operator switches them on)
-      OWN = { su, t: { sz: f.size, kind: 'ship', id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: rcsFromB64(f.rcs) }, def: def.id, key, xpdr: OWN ? OWN.xpdr : false };
+      OWN = { su, t: { sz: f.size, kind: 'ship', id: 'own', p: new T.Vector3(), v: new T.Vector3(), q: new T.Quaternion(), rcs: rcsFromB64(f.rcs) }, def: def.id, key, xpdr: OWN ? OWN.xpdr : false, tube: new T.Vector3(f.tube[0], f.tube[1], f.tube[2]), torps: SpaceSim.TORP.loads };
     } else if (OWN.key !== key) { OWN.t.rcs = rcsFromB64(f.rcs); OWN.key = key; }
     OWN.t.iff = { c: 'squad', n: def.name || 'squad' }; OWN.t.aff = 'squad'; OWN.su.aff = 'squad';
     return OWN;
