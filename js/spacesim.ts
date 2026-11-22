@@ -62,7 +62,7 @@ export interface SimWorld {
   foe: RSuite | null; foeT: RTarget | null; hb: { x0: number; x1: number; z0: number; z1: number } | null; guns: SimGun[];
   crew: { hostile: number | null; gn: number; arm: number | null; boom: boolean } | null; // (the mission ship's: js/spaceserver.ts)
   traffic: SimTraffic[]; trafficShape: ((c: any) => SimTraffic['shape']) | null; // (a zone ship's shape when she's first seen)
-  chaff: SimChaff[]; chaffN: number; mis: SimMissile[]; misN: number; torps: SimTorp[]; rounds: SimRound[]; roundsMax: number; shots: SimShot[];
+  chaff: SimChaff[]; chaffN: number; mis: SimMissile[]; misN: number; torps: SimTorp[]; rounds: SimRound[]; roundsMax: number; shots: SimShot[]; misT?: Map<number, RTarget>;
   rng: () => number; fc: any; out: SimEvent[]; tg: RTarget[];
   HG: Record<string, any>; // (js/spacedata.ts HULLGUN)
 }
@@ -241,7 +241,7 @@ export const SpaceSim = (() => {
     for (const t of tg) {
       if (t.id === 'own' || t.id.startsWith('torp')) continue;
       if (t.id === 'hull' && hb) { const y = t.p.y, x = tp.p.x, z = tp.p.z; if (x > hb.x0 - 4 && x < hb.x1 + 4 && z > hb.z0 - 4 && z < hb.z1 + 4 && Math.abs(tp.p.y - y) < 25) return t; continue; }
-      const Rr = t.id.startsWith('trf') ? 30 : t.id.startsWith('rock') ? (R.r.get(t.id) || 30) : 7, seg = tp.p.clone().sub(p0), w = t.p.clone().sub(p0), L2 = seg.lengthSq(), k = L2 > 0 ? Math.max(0, Math.min(1, w.dot(seg) / L2)) : 0;
+      const Rr = /^t\d/.test(t.id) ? 30 : t.id.startsWith('rock') ? (R.r.get(t.id) || 30) : 7, seg = tp.p.clone().sub(p0), w = t.p.clone().sub(p0), L2 = seg.lengthSq(), k = L2 > 0 ? Math.max(0, Math.min(1, w.dot(seg) / L2)) : 0;
       if (w.addScaledVector(seg, -k).length() < Rr) return t;
     }
     return null;
@@ -399,7 +399,7 @@ export const SpaceSim = (() => {
     return true;
   }
   // ---------------------------------------------------------------- the whole battle, a step
-  const world = (rng: () => number): SimWorld => ({ t: 0, Z: zone(), zp: new T.Vector3(), zq: new T.Quaternion(), zm: new T.Matrix4(), zone: null, rocks: rocks(), rockList: [], notch: { t: 0 }, ship: { P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), size: 5 / 0.6, docked: true, ftl: false }, own: null, ownT: null, xpdr: true, keepTgt: null, foe: null, foeT: null, hb: null, guns: [], crew: null, traffic: [], trafficShape: null, chaff: [], chaffN: 0, mis: [], misN: 1, torps: [], rounds: [], roundsMax: 4096, shots: [], rng, fc: null, out: [], tg: [], HG: SD.HULLGUN as any });
+  const world = (rng: () => number): SimWorld => ({ t: 0, Z: zone(), zp: new T.Vector3(), zq: new T.Quaternion(), zm: new T.Matrix4(), zone: null, rocks: rocks(), rockList: [], notch: { t: 0 }, ship: { P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), size: 5 / 0.6, docked: true, ftl: false }, own: null, ownT: null, xpdr: false, keepTgt: null, foe: null, foeT: null, hb: null, guns: [], crew: null, traffic: [], trafficShape: null, chaff: [], chaffN: 0, mis: [], misN: 1, torps: [], rounds: [], roundsMax: 4096, shots: [], rng, fc: null, out: [], tg: [], HG: SD.HULLGUN as any });
   const ztOf = (W: SimWorld) => (W.zone ? W.zone.zt0 + (W.t - W.zone.ztAt) : 0);
   // the zone's ships as radar targets: each where her course puts her now (in the level's frame), her velocity from step to step, her
   // return and size from her shape; her own radars within 12 km (a civilian's: conical scan; no fire control)
@@ -424,9 +424,8 @@ export const SpaceSim = (() => {
     return out;
   }
   // the missiles in flight as radar targets: small (half a square metre every way), no transponder
-  const misT = new Map<number, RTarget>();
   function missileTargets(W: SimWorld, dt: number) {
-    const out: RTarget[] = [], live = new Set<number>();
+    const out: RTarget[] = [], live = new Set<number>(), misT = W.misT || (W.misT = new Map<number, RTarget>()); // (each world's own)
     for (const m of W.mis) { live.add(m.id); let t = misT.get(m.id); if (!t) { t = { sz: 1.5, kind: 'missile', id: 'missile' + m.id, p: m.p.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 0.5, iff: null }; misT.set(m.id, t); } if (dt > 0) t.v.copy(m.p).sub(t.p).divideScalar(dt); t.p.copy(m.p); out.push(t); }
     for (const k of [...misT.keys()]) if (!live.has(k)) misT.delete(k);
     return out;

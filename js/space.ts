@@ -2586,7 +2586,7 @@ export const Space = (() => {
   }
   function torpHit(tp: Torp, t: RTarget) {
     torpGone(tp, 2, true);
-    const nm = t.id === 'hull' ? hullName() : t.id.startsWith('trf') ? 'a ship' : t.id.startsWith('chaff') ? 'chaff' : t.id.startsWith('missile') ? 'a missile' : t.id.startsWith('rock') ? 'an asteroid' : 'something';
+    const nm = t.id === 'hull' ? hullName() : /^t\d/.test(t.id) ? 'a ship' : t.id.startsWith('chaff') ? 'chaff' : t.id.startsWith('missile') ? 'a missile' : t.id.startsWith('rock') ? 'an asteroid' : 'something';
     HUD.feed(`<b>Torpedo hit ${U.esc(nm)}</b>`);
     if (t.id === 'hull' && S.hull) S.hull.guns.forEach((gn, i) => { if (gn.hp > 0 && new T.Vector3(gn.x, gn.y, gn.z).distanceTo(tp.p) < TORP.blast) { gunHit(i, 0); Net.toHost({ t: 'shit', i, hp: 0 }); } }); // (her guns right by the blast)
   }
