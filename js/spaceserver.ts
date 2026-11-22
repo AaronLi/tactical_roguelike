@@ -968,7 +968,7 @@ export const SpaceSv = (() => {
     if (!bat || bat.map !== map || bat.k !== Z.active) bat = SvBattle.make(map, Z.ms, Z.active, M.ms, st.fleet, bat);
     const hostile = M.ms.obj === 'defend' ? 0 : M.ms.obj !== 'visit' || M.breached ? 1 : 0;
     SvBattle.step(bat, dt, sv.stepN, { hostile, gn: gunnersLeft(), arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom }, M.docked, Z.zt, (k) => { const c = sv.ctxs.get(k); return c ? (c.sv.map as any) || null : null; }); // (a zone ship's level, made: her real hull for the radars)
-    SvBattle.out(bat, sv.stepN, Z.zt, (m) => net().broadcast(m));
+    SvBattle.out(bat, sv.stepN, Z.zt, (m) => net().broadcast(m), (b, ch) => net().fast(null, b, ch));
     // (her hull gone, by the server's count: the drive jumps her home by itself, as the pilot's page did (js/space.ts damage))
     if (SvBattle.failing() && !sv.leaving && !M.docked) { net().broadcast({ t: 'shit', i: -1, hp: 0 }); sv.overBlack(() => home(), 'ftl', -1); } // (told at once: the jump's begun before the next snapshot)
     // (her radars' picture, as the server's battle has it (js/suiteview.ts pack): ten times a second on the fast channel's stream 1, to

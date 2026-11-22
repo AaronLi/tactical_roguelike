@@ -8,9 +8,10 @@
 //        to the squad's ship, a missile launched or ended, a torpedo ended, a hull gun hit, a gun's rounds fired this step (fire: the gun,
 //        its aim, the track's error, a seed and how many: a client flies the same rounds, js/spacesim.ts fireRound on mulberry32(seed),
 //        rather than each round being sent). A round's end (a burst, a rock) isn't sent: the client's own copy of it gets there too.
-// encode / decode: JSON's plain arrays today (the PeerJS connection serialises them). The codec is swappable (codec.enc / codec.dec:
-// a binary one, js/net.ts's fast channel, replaces them); what's built (sss, sev) and what's read back (read) don't change.
+// sss goes as bytes on the fast channel (sssBin / sssUnbin: js/snapcodec.ts; js/netfast.ts, unreliable, the newest wins); sev, as JSON's
+// plain arrays on the reliable one (encode / decode, a swappable codec).
 import type { SimWorld, SimEvent } from './spacesim.js';
+import { SnapWriter, SnapReader } from './snapcodec.js';
 
 export type SssMsg = { t: 'sss'; n: number; k: number; zt: number; mis: number[][]; tp: number[][]; ch: number[][]; g: number[][]; dm: number; hp?: number };
 export type SevE =
@@ -54,6 +55,31 @@ export const SpaceNet = {
   },
   // a gun's rounds this step (i its index, aim the unrounded vector it fired along, err, the rounds' seed and count)
   fireOf(n: number, i: number, aim: THREE.Vector3, err: number, s: number, c: number): SevE { return { k: 'fire', n, i, a: [aim.x, aim.y, aim.z], e: err, s, c }; },
+  // sss as bytes (js/snapcodec.ts, format SSS_BIN), for the fast channel's stream SSS_CH (unreliable, the newest wins): the step, the
+  // level, the zone's time, damage done, her hull (-1: not known), then each list with its count first; positions and velocities in
+  // 32-bit floats (millimetres at 10 km), a torpedo's attitude in 16-bit steps, flags a byte
+  SSS_BIN: 1, SSS_CH: 4,
+  sssBin(m: SssMsg): ArrayBuffer {
+    const w = new SnapWriter(this.SSS_BIN, 64 + m.mis.length * 36 + m.tp.length * 40 + m.ch.length * 36 + m.g.length * 20);
+    w.vu(m.n).vu(m.k).f64(m.zt).f32(m.dm).f32(m.hp == null ? -1 : m.hp);
+    const f = (a: number[], i: number, k: number) => { for (let j = 0; j < k; j++) w.f32(a[i + j]); };
+    w.vu(m.mis.length); for (const a of m.mis) { w.vu(a[0]); f(a, 1, 7); }
+    w.vu(m.tp.length); for (const a of m.tp) { w.vu(a[0]); f(a, 1, 6); for (let j = 7; j < 11; j++) w.q(a[j], -1, 1, 16); w.u8(a[11]); }
+    w.vu(m.ch.length); for (const a of m.ch) { w.vu(a[0]); f(a, 1, 7); }
+    w.vu(m.g.length); for (const a of m.g) { w.f32(a[0]); w.f32(a[1]); w.f32(a[2]); w.u8(a[3]); w.f32(a[4]); }
+    return w.done();
+  },
+  // (null: not a format this reads)
+  sssUnbin(buf: ArrayBuffer | ArrayBufferView): SssMsg | null {
+    const r = new SnapReader(buf); if (r.version !== this.SSS_BIN) return null;
+    const n = r.vu(), k = r.vu(), zt = r.f64(), dm = r.f32(), hp = r.f32();
+    const f = (a: number[], c: number) => { for (let j = 0; j < c; j++) a.push(r.f32()); return a; };
+    const mis: number[][] = []; for (let i = r.vu(); i > 0; i--) mis.push(f([r.vu()], 7));
+    const tp: number[][] = []; for (let i = r.vu(); i > 0; i--) { const a = f([r.vu()], 6); for (let j = 0; j < 4; j++) a.push(r.q(-1, 1, 16)); a.push(r.u8()); tp.push(a); }
+    const ch: number[][] = []; for (let i = r.vu(); i > 0; i--) ch.push(f([r.vu()], 7));
+    const g: number[][] = []; for (let i = r.vu(); i > 0; i--) g.push([r.f32(), r.f32(), r.f32(), r.u8(), r.f32()]);
+    return { t: 'sss', n, k, zt, dm, ...(hp >= 0 ? { hp } : {}), mis, tp, ch, g };
+  },
   encode(m: SssMsg | SevMsg) { return this.codec.enc(m); },
   decode(m: any) { return this.codec.dec(m); },
   // a snapshot read back into vectors (for a client to draw from)

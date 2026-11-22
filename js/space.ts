@@ -2744,6 +2744,11 @@ export const Space = (() => {
       if (ch === 3 && m.m) { const v = SVD.v.get(m.id); if (v) SuiteView.unpackMaps(m.m, v); }
     } catch (e) { console.error('space: F8 picture from the server', e); }
   });
+  // (the core snapshot, as bytes: js/spacenet.ts sssBin)
+  Net.onFast((buf, ch) => {
+    if (ch !== SpaceNet.SSS_CH || !svbOn()) return;
+    try { const m = SpaceNet.sssUnbin(buf); if (m) svSss(m); } catch (e) { console.error('space: the snapshot from the server', e); }
+  });
   Net.onFast((buf, ch) => {
     if (ch !== 1 || !svbOn()) return;
     try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact || !m.s) return; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; SVB.rwr = m.w || null; } catch (e) { console.error('space: the picture of her radars from the server', e); }
@@ -2753,6 +2758,7 @@ export const Space = (() => {
   function hullIs(hp: number) { S.hp = U.clamp(hp, 0, S.hpMax); if (S.hp > 0) S.lostAt = 0; else if (!S.lostAt) { S.lostAt = S.t; HUD.toast('HULL FAILING', 'Emergency jump: the repairs come out of your pay', 3); } }
   function svSss(m: SssMsg) {
     if (!svbOn() || m.k !== S.zact) return; // (another level's frame: not this one's)
+    if (SVB.snap && SVB.snap.k === m.k && m.n <= SVB.n && SVB.n - m.n < 600) return; // (an older one, come late; far older: the server's begun again)
     const r = SpaceNet.read(m); SVB.snap = r; SVB.n = m.n; SVB.at = S.t;
     // her hull, as the server keeps it (the emergency jump at nothing is the server's: js/spaceserver.ts battle)
     if (r.hp >= 0) hullIs(r.hp);
