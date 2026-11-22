@@ -25,6 +25,7 @@
     "test:models:full": "tsc -p . && tsc -p tsconfig.tools.json && node tools/check_model_cases.mjs --quiet --sweep --held 10000",
     "test:level": "tsc -p . && node tools/check_level_golden.mjs --quiet",
     "test:sim": "tsc -p . && node tools/check_sim_golden.mjs",
+    "test:space": "tsc -p . && node tools/space_sim.mjs",
     "build:wasm": "node tools/build_wasm.mjs",
     "test:acoustics": "tsc -p . && node tools/build_wasm.mjs && node tools/acoustics_wasm.test.mjs",
     "check:gunao": "tsc -p . && node tools/build_wasm.mjs && node tools/space_shot.mjs \"mute&hangar\" tools/gunao_wasm_check.mjs",
