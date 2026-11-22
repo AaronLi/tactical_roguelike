@@ -27,6 +27,7 @@ import { Radar, RSuite, RTarget, RSTrack, RAff, RMode, RPlot, RFused } from './r
 import { RadarView } from './radarview.js';
 import { SuiteView } from './suiteview.js';
 import { SpaceSim, ZMem, SimShip, SimGun, SimChaff } from './spacesim.js';
+import { SpaceNet, SssMsg, SevMsg } from './spacenet.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -101,7 +102,7 @@ export const Space = (() => {
     // (what the picture shows, eased toward where the tracker points and how far it's zoomed: the view's own way and field, its camera, its clock)
     d: new T.Vector3(0, 0, -1), fov: 0, q: -1, t: -1, key: '', su: null as RSuite | null };
   const DBGV: typeof OPTV = { ...OPTV, d: new T.Vector3(0, 0, -1) }; // (the F8 view's: the same, for whichever ship it shows)
-  const SEC = { sel: -1, open: -1, cur: 0, dn: [-1, -1], held: [false, false], lt: 0, dirty: -1, sent: 0 }; // (the range at the hologram's edge, scrolled through)
+  const SEC = { sel: -1, open: -1, cur: 0, dn: [-1, -1], held: [false, false], lt: 0, dirty: -1, sent: 0, sync: 0, told: [] as string[] }; // (the range at the hologram's edge, scrolled through)
   const _ray = new T.Raycaster();
   // (a glow, a beam or a screen: not her plating, and some reach far beyond her, so they're left out of her size)
   const glowy = (o: any) => { const m = Array.isArray(o.material) ? o.material[0] : o.material; return !!m && (m.transparent || m.isMeshBasicMaterial); };
@@ -138,6 +139,9 @@ export const Space = (() => {
     const own = EW.own!, me = EW.ownT!; me.iff = { c: 'squad', n: S.def.name || 'squad' }; me.aff = 'squad'; me.xon = EW.xpdr; own.aff = 'squad'; own.hostNames = new Set([hullName()]);
     if (EW.foeT && EW.foe) { const af = missionAff(); EW.foeT.aff = af; EW.foeT.iff = { c: af === 'navy' ? 'navy' : 'civ', n: hullName() }; EW.foeT.xon = af !== 'pirate'; EW.foe.aff = af; }
     own.P.copy(S.P); own.Q.copy(S.Q); own.V.copy(S.V); me.p.copy(S.P); me.v.copy(S.V); me.q.copy(S.Q);
+    // (the server's battle on: its copy of her scanners kept as hers are, whatever set them (a key, a test): told when they differ, twice a second at most)
+    if (svbOn() && isCtl() && S.t - SEC.sync > 0.5) { SEC.sync = S.t; own.scans.forEach((sc, k) => { const a = ssecOf(k, sc), key = a.join(','); if (SEC.told[k] !== key) { SEC.told[k] = key; Net.toHost({ t: 'ssec', a }); } }); }
+
     if (S.ftl) { for (const su of [own, EW.foe]) if (su) { for (const t of su.trks) { Radar.drop(t); t.job = null; } if (su.sched) { su.sched.tts.length = 0; su.sched.reqs.length = 0; su.sched.plan.clear(); } } return; } // (jumping between levels: nothing to look at. Docked in a breach, or at warp within the level: everything runs, in real time)
     const rk = rocksStep(dt); own.Vc = ROCKS.v;
     { const keep = own.keep || (own.keep = new Set<string>()); keep.clear(); for (const tr of own.trks) if (tr.st === 'track' && tr.tgt) keep.add(tr.tgt); for (const q of Radar.sched(own).tts) if (q.tgt) keep.add(q.tgt); if (S.match && S.match !== 'radar') keep.add(S.match === 'ship' ? 'hull' : S.match); } // (her notch doesn't take what she's holding or matched with: js/radar.ts) // (her scanners' clutter: the field, moving as the zone does; with no field, the level's frame)
@@ -2374,8 +2378,9 @@ export const Space = (() => {
     let lk: RSTrack | null = null;
     if (S.state && S.state.hostile !== 0 && S.state.gn && S.state.arm == null) for (const t of Radar.sched(EW.foe!).tts) if (t.est.q >= 0.15 && (!lk || trkUrg(EW.foe!, t) < trkUrg(EW.foe!, lk))) lk = t; // (the most urgent of her tracks: what reaches her soonest; on whatever her best track's on: chaff, if it's been drawn off)
     if (lk && !lk.est.p) lk = null;
-    // (the simulation's step: js/spacesim.ts gunsStep; a missile launched by the screen that's in control, and told)
-    SpaceSim.gunsStep(gs, lk, !!lk && trkUrg(EW.foe!, lk) < 4, EW.foe!.P, EW.foe!.V, SD.HULLGUN as any, SR, dt, fireRound, (gn) => { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); Net.toHost({ t: 'smis', a }); } });
+    // (the simulation's step: js/spacesim.ts gunsStep; a missile launched by the screen that's in control, and told. The server's
+    // battle on: its guns, laid and fired by it (svSss, svSev): only their drawings here)
+    if (!svbOn()) SpaceSim.gunsStep(gs, lk, !!lk && trkUrg(EW.foe!, lk) < 4, EW.foe!.P, EW.foe!.V, SD.HULLGUN as any, SR, dt, fireRound, (gn) => { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); Net.toHost({ t: 'smis', a }); } });
     for (const gn of S.hull.guns) { // (their drawings: laid as they're aimed, the barrels turning as they're spun)
       const g = gn as any, sp = gn.gun.userData.spin as THREE.Object3D | undefined;
       if (g.yaw != null && gn.k !== 'missile') { gn.obj.rotation.y = g.yaw; gn.gun.rotation.x = g.pitch; }
@@ -2406,25 +2411,26 @@ export const Space = (() => {
   function rounds(dt: number) {
     if (!S.rounds.length) { if (rPts) rPts.geometry.setDrawRange(0, 0); return; }
     // (the simulation's step: js/spacesim.ts roundsStep; a round that meets a torpedo kills it, told by the screen that flies it)
-    const r = SpaceSim.roundsStep(S.zone ? ZS : null, S.rounds, simShip(), ROCKS, S.rockList, dt, TP.list.length && isCtl() ? (a: THREE.Vector3, b: THREE.Vector3) => roundTorp(a, b, dt) : null);
+    const r = SpaceSim.roundsStep(S.zone ? ZS : null, S.rounds, simShip(), ROCKS, S.rockList, dt, TP.list.length && isCtl() && !svbOn() ? (a: THREE.Vector3, b: THREE.Vector3) => roundTorp(a, b, dt) : null); // (the server's battle on: it says what's shot down)
     for (const p of r.rock) rockFlash(p);
     if (S.root) for (const p of r.burst) { const f = new T.Mesh(FLASH, new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 1, depthWrite: false, blending: T.AdditiveBlending })); f.position.copy(p); f.scale.setScalar(2.5); f.frustumCulled = false; S.root.add(f); S.tracers.push({ m: f, t: 0.12 }); }
     if (S.root) { const pts = roundPts(), pa = pts.geometry.attributes.position as THREE.BufferAttribute; S.rounds.forEach((q, i) => pa.setXYZ(i, q.p.x, q.p.y, q.p.z)); pa.needsUpdate = true; pts.geometry.setDrawRange(0, S.rounds.length); }
-    if (r.hits && isCtl()) { damage(r.dmg, r.dmg > 4 ? 'Minigun fire' : undefined); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + r.hits * 0.1)); }
+    if (r.hits && isCtl() && !svbOn()) { damage(r.dmg, r.dmg > 4 ? 'Minigun fire' : undefined); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + r.hits * 0.1)); }
   }
   // a missile: a[0] its number, where it left her; a[4] 1: it's been shot down
-  function missile(a: number[]) {
+  function missile(a: number[], quiet = false) {
     const was = S.mis.find((q) => q.id === a[0]);
     if (a[4]) { if (was) { if (was.o) was.o.removeFromParent(); S.mis.splice(S.mis.indexOf(was), 1); HUD.feed('<b>Missile shot down</b>'); } return; }
     if (was) return;
     const m = { id: a[0], o: null as THREE.Group | null, p: new T.Vector3(a[1], a[2], a[3]), v: new T.Vector3(0, 1, 0), t: 0 }; S.mis.push(m);
-    HUD.toast('MISSILE', 'Turn across it, or have a turret shoot it down', 2.2); Audio.deny();
+    if (!quiet) { HUD.toast('MISSILE', 'Turn across it, or have a turret shoot it down', 2.2); Audio.deny(); }
     if (!S.root) return; // (its drawing, where there's a scene to put it in)
     const o = new T.Group(), body = new T.Mesh(new T.ConeGeometry(0.5, 3.4, 8), ShipModel.M(0xd8dde2, { emissive: 0x30343a })); body.rotation.x = -Math.PI / 2; o.add(body);
     const fl = new T.Mesh(new T.ConeGeometry(0.7, 9, 8, 1, true), new T.MeshBasicMaterial({ color: 0xffb060, transparent: true, opacity: 0.7, depthWrite: false, blending: T.AdditiveBlending, side: T.DoubleSide })); fl.rotation.x = Math.PI / 2; fl.position.z = 6; o.add(fl);
     o.position.copy(m.p); o.frustumCulled = false; S.root.add(o); m.o = o;
   }
   function missiles(dt: number) {
+    if (svbOn()) { const sp = SD.HULLGUN.missile.speed; for (const m of S.mis) { m.p.addScaledVector(m.v, sp * (m.t < 1.2 ? 0.45 : 1) * dt); m.t += dt; if (m.o) { m.o.position.copy(m.p); m.o.lookAt(m.p.clone().add(m.v)); } } return; } // (the server's: flown on between its snapshots)
     const r = SpaceSim.missilesStep(S.mis, simShip(), ROCKS, S.rockList, SD.HULLGUN.missile, dt); // (the simulation's: js/spacesim.ts)
     for (const m of S.mis) if (m.o) { m.o.position.copy(m.p); m.o.lookAt(m.p.clone().add(m.v)); } // (their drawings put where they are)
     if (r.hit.length) { if (isCtl()) for (let i = 0; i < r.hit.length; i++) damage(SD.HULLGUN.missile.dmg, 'A missile'); S.shake = 1; SpaceUI.flash(0.35); Audio.boom(20); }
@@ -2442,7 +2448,7 @@ export const Space = (() => {
   // transponder), so a ship's own threat assessment and fire control deal with it as they would anything coming at her: a
   // round that meets it (rounds) kills it. The pilot's screen flies it and tells everyone aboard (storp, ten times a second).
   const TORP = SpaceSim.TORP; // (its figures: the simulation's)
-  type Torp = { id: number; o: THREE.Group; fl: THREE.Mesh; puffs: THREE.Mesh[]; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; sent: number; lock: string; rt: RTarget; thr: number; rcs: boolean; lf: THREE.Vector3 }; // (thr: its motor's push (0..1); rcs: its thrusters firing)
+  type Torp = { zm?: ZMem; id: number; o: THREE.Group; fl: THREE.Mesh; puffs: THREE.Mesh[]; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; sent: number; lock: string; rt: RTarget; thr: number; rcs: boolean; lf: THREE.Vector3 }; // (thr: its motor's push (0..1); rcs: its thrusters firing)
   const TP = { list: [] as Torp[], n: 1, base: 1 + Math.floor(Math.random() * 1e6), left: TORP.loads, look: '', pick: '', l: false, cool: 0, tube: null as null | { at: THREE.Vector3; m: THREE.Object3D } };
   function tubeKit(g: THREE.Object3D, box: THREE.Box3, size: number) {
     if (TP.tube && TP.tube.m.parent === g) return;
@@ -2504,11 +2510,12 @@ export const Space = (() => {
     if (TP.left !== Infinity) TP.left--; TP.cool = 2.5;
     const p = TP.tube.at.clone().applyQuaternion(S.Q).add(S.P), v = S.V.clone().addScaledVector(new T.Vector3(0, -1, 0).applyQuaternion(S.Q), TORP.eject);
     const tp = torpNew(TP.base * 1000 + TP.n++, p, v, S.Q, true, f.n, f.pl, f.v);
+    if (svbOn()) torpSend(tp, 0, [...f.pl.toArray(), ...f.v.toArray()].map((x) => Math.round(x * 100) / 100)); // (the server flies it from the start, on its own fix nearest this one)
     torpSend(tp, 0); HUD.toast('TORPEDO', `Away on ${f.n}${TP.left === Infinity ? '' : ' · ' + TP.left + ' left'}`, 1.6); Audio.click();
   }
-  function torpSend(tp: Torp, gone: number) {
+  function torpSend(tp: Torp, gone: number, f?: number[]) {
     tp.sent = S.t; const r = (x: number) => Math.round(x * 100) / 100;
-    Net.toHost({ t: 'storp', a: [tp.id, ...tp.p.toArray().map(r), ...tp.v.toArray().map(r), ...tp.q.toArray().map((x) => Math.round(x * 1e4) / 1e4), tp.ph | (tp.thr > 0.05 ? 4 : 0) | (tp.rcs ? 8 : 0), gone] }); // (its phase, and whether its motor and its thrusters are firing)
+    Net.toHost({ ...(f ? { f } : {}), t: 'storp', a: [tp.id, ...tp.p.toArray().map(r), ...tp.v.toArray().map(r), ...tp.q.toArray().map((x) => Math.round(x * 1e4) / 1e4), tp.ph | (tp.thr > 0.05 ? 4 : 0) | (tp.rcs ? 8 : 0), gone] }); // (its phase, and whether its motor and its thrusters are firing)
   }
   function torpMsg(a: number[]) {
     if (!S.root || a.length !== 13 || !a.every(Number.isFinite)) return;
@@ -2547,6 +2554,8 @@ export const Space = (() => {
     TP.cool = Math.max(0, TP.cool - dt); torpSee(); torpKeys();
     for (const tp of TP.list.slice()) {
       if (S.root && tp.o.parent !== S.root) S.root.add(tp.o);
+      if (svbOn()) { zstep(tp.p, tp.v, dt, tp.zm || (tp.zm = zmem())); tp.t += dt; } // (the server's: carried on between its snapshots)
+      else {
       // (a step of its flight: js/spacesim.ts torpStep; the fix it was sent at, as her radars hold it now)
       const f = tp.mine && EW.own ? EW.own.fus.find((q) => q.n === tp.fus) || null : null;
       const r = SpaceSim.torpStep(S.zone ? ZS : null, tp, dt, { tg: EW.tg, fix: f, shipP: S.P, shipQ: S.Q, hb: S.map && S.map.sp ? S.map.sp.hull : null, R: ROCKS });
@@ -2554,6 +2563,7 @@ export const Space = (() => {
         if (r && r !== 'spent') { torpHit(tp, r); continue; }
         if (r === 'spent' || S.ftl) { torpGone(tp, 3, true); continue; }
         if (S.t - tp.sent > TORP.send) torpSend(tp, 0);
+      }
       }
       tp.o.position.copy(tp.p); tp.o.quaternion.copy(tp.q);
       tp.fl.visible = tp.thr > 0.05; if (tp.fl.visible) tp.fl.scale.set(1, (0.4 + 0.6 * tp.thr) * (0.8 + Math.random() * 0.4), 1);
@@ -2700,8 +2710,43 @@ export const Space = (() => {
     S.board = { seed: b.seed | 0, level: b.level | 0, picked: (b.picked || []).slice(), done: (b.done || []).slice(), gone: (b.gone || b.done || []).slice() };
     placeAnchors(); SpaceUI.boardDraw(); SpaceUI.opsRender();
   }
+  // ------------------------------------------------------------------ the server's battle (docs/space-server.md C1)
+  // The host's worker runs the zone's battle (js/svbattle.ts); a boarding zone's mission ship's weapons are drawn from what it says:
+  // her guns (laid, firing, hit) and their rounds (each gun's rounds of a step replayed from its seed: the same rounds the server
+  // flies), her missiles, the damage they do. ?pagebattle: the page's own, as before (for comparing)
+  const SVB = { on: !new URLSearchParams(location.search).has('pagebattle'), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0 };
+  const svbOn = () => SVB.on && S.on && S.kind === 'board' && !!S.hull;
+  function svSss(m: SssMsg) {
+    if (!svbOn() || m.k !== S.zact) return; // (another level's frame: not this one's)
+    const r = SpaceNet.read(m); SVB.snap = r; SVB.n = m.n; SVB.at = S.t;
+    if (S.hull) r.g.forEach((g, i) => { const gn = S.hull!.guns[i] as any; if (!gn) return; if (g.hp !== gn.hp) gunHit(i, g.hp); gn.yaw = g.yaw; gn.pitch = g.pitch; gn.rev = g.rev; });
+    // her missiles: as the server has them (a new one drawn, one gone taken away); flown on between snapshots
+    const live = new Set(r.mis.map((q) => q.id));
+    for (const m0 of S.mis.slice()) if (!live.has(m0.id)) { if (m0.o) m0.o.removeFromParent(); S.mis.splice(S.mis.indexOf(m0), 1); }
+    // the torpedoes: where the server has them (a new one, another's, drawn)
+    for (const q of r.tp) { let tp = TP.list.find((x) => x.id === q.id); if (!tp) tp = torpNew(q.id, q.p, q.v, q.q, false, '', q.p, q.v); tp.p.copy(q.p); tp.v.copy(q.v); tp.q.copy(q.q); tp.ph = q.ph; tp.thr = q.thr; tp.rcs = q.rcs; tp.zm = undefined; }
+    for (const q of r.mis) { let m0 = S.mis.find((x) => x.id === q.id); if (!m0) { missile([q.id, q.p.x, q.p.y, q.p.z, 0], true); m0 = S.mis.find((x) => x.id === q.id); } if (m0) { m0.p.copy(q.p); m0.v.copy(q.v); m0.t = q.t; } }
+  }
+  function svSev(m: SevMsg) {
+    if (!svbOn()) return;
+    const lag = (n: number) => Math.max(0, ((SVB.n >= 0 ? SVB.n : n) - n) * STEP + (S.t - SVB.at)); // (how long ago the server did it)
+    for (const e of m.e) {
+      if (e.k === 'dmg') { if (isCtl()) damage(e.d, e.w); S.shake = Math.max(S.shake, Math.min(0.6, 0.15 + e.h * 0.1)); }
+      else if (e.k === 'mis') { HUD.toast('MISSILE', 'Turn across it, or have a turret shoot it down', 2.2); Audio.deny(); }
+      else if (e.k === 'misEnd') { const m0 = S.mis.find((x) => x.id === e.id); if (m0) { if (m0.o) m0.o.removeFromParent(); S.mis.splice(S.mis.indexOf(m0), 1); } if (e.hit) { S.shake = 1; SpaceUI.flash(0.35); Audio.boom(20); } }
+      else if (e.k === 'gHit') gunHit(e.i, e.hp);
+      else if (e.k === 'tEnd') { const tp = TP.list.find((x) => x.id === e.id); if (tp) torpGone(tp, e.how, false); if (e.how === 2 && e.on) HUD.feed(`<b>Torpedo hit ${U.esc(e.on === 'hull' ? hullName() : e.on.startsWith('rock') ? 'an asteroid' : e.on.startsWith('chaff') ? 'chaff' : e.on.startsWith('missile') ? 'a missile' : 'a ship')}</b>`); }
+      else if (e.k === 'fire' && S.hull) { // (a gun's rounds this step: the same ones, flown on to now)
+        const gn = S.hull.guns[e.i]; if (!gn) continue;
+        const H = (SD.HULLGUN as any)[gn.k], rng = SpaceNet.rng(e.s), from = new T.Vector3(gn.x, gn.y, gn.z), aim = new T.Vector3(e.a[0], e.a[1], e.a[2]), dt = lag(e.n);
+        for (let i = 0; i < e.c; i++) { const q = SpaceSim.fireRound(S.rounds, RMAX, rng, from, aim, H, e.e); if (q && dt > 0) { q.p.addScaledVector(q.v, dt); q.d += q.v.length() * dt; } }
+      }
+    }
+  }
   function onMsg(m: any): boolean {
     switch (m.t) {
+      case 'sss': svSss(SpaceNet.decode(m) as SssMsg); return true;
+      case 'sev': svSev(SpaceNet.decode(m) as SevMsg); return true;
       case 'board': setBoard(m); return true;
       case 'fleet': {
         const was = S.fleet.ship; S.fleet = SD.cleanFleet(m.f);
