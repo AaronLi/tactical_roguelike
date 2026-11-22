@@ -915,7 +915,10 @@ export const Views = {
       // (the body's physics only near you: farther off they're animated, which no one can tell apart; but one you've
       // hit in the last 8 s is yours to watch wherever it is, so a long shot's hits rock it and it falls from where they
       // left it: the recording of its fall, js/highlights.ts, is yours)
-      const near = ev.pos.distanceToSquared(R.camera.position) < 40 * 40 || (ev.engagedT && performance.now() - ev.engagedT < 8000);
+      // Hidden whole (js/space.ts hideStrays: she's flying, and they're aboard what she's left): not looked for, no body's physics, posed
+      // once, with the time since (at most a tenth of a second of it: their bodies are stepped as for a few frames deferred), the frame they're shown again or anything asks where they are (js/rig.ts catchUp)
+      const parked = !ev.rig.root.visible;
+      const near = !parked && (ev.pos.distanceToSquared(R.camera.position) < 40 * 40 || (ev.engagedT && performance.now() - ev.engagedT < 8000));
       if (ev.down && ev.alive) ev.rig.goLimp(); // (down for good: a limp body, bleeding out)
       // (what they're aiming at: a weakened or downed suspect points the gun at it from the hand, js/rig.ts)
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
@@ -927,7 +930,7 @@ export const Views = {
       // Nor behind a wall, floor or ceiling (furniture, doors, glass, rails and stairs don't count: you might see them
       // round, over or through it).
       const fog = R.scene.fog, cam = R.camera;
-      if (fog) {
+      if (fog && !parked) {
         const e = cam.matrixWorld.elements, depth = -((at.x - e[12]) * e[8] + (at.y - e[13]) * e[9] + (at.z - e[14]) * e[10]); // (along the view, as the fog's reckoned)
         // (through a magnified scope the fog's stretched in its picture, js/render.ts scopeReach: they're drawn out to there)
         const pip = R.vm && R.vm.visible && R.vm.userData.pip, sk = pip && (R.pipLive || 0) > 0.35 ? R.scopeReach(pip.mag).k : 1;
@@ -940,7 +943,8 @@ export const Views = {
       const rp = { feet: ev.alive && !ev.down ? (ev.feet ||= Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, shieldUp: !!ev.alert && ev.alive && !ev.down && !ev.surp, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 };
       const unseen = (fog ? !ev.rig.body.visible : false) || !inView(at), watched = !!(ev.engagedT && performance.now() - ev.engagedT < 8000);
-      if (unseen && !watched && ((ev.rigSkip = (ev.rigSkip || 0) + 1) & 3)) ev.rig.defer(dt, rp); else { ev.rigSkip = 0; ev.rig.update(dt, rp); }
+      if (parked) { ev.rig.defer(dt, rp); if (ev.rig.pend!.dt > 0.1) ev.rig.pend!.dt = 0.1; }
+      else if (unseen && !watched && ((ev.rigSkip = (ev.rigSkip || 0) + 1) & 3)) ev.rig.defer(dt, rp); else { ev.rigSkip = 0; ev.rig.update(dt, rp); }
       if (rt0) { const ms = performance.now() - rt0; Prof.add('rigs: people', ms); if (!inView(ev.pos)) Prof.add('rigs: people off screen', ms); } // (js/profiler.ts)
       // bleeding: drips falling from them as they go; down for good, from the body where it lies (its ragdoll's hips,
       // not where they last stood)
@@ -1036,7 +1040,7 @@ export const Views = {
     // and suspects': the light's on with the gun out, the laser once they're alert; the nearest get what's left of the pool
     const tac: [number, VwEnemy, number][] = [];
     if (Game.phase === 'level') for (const ev of this.enemies.values()) {
-      if (!ev.tac || !ev.alive || ev.down || ev.scode || !ev.rig.gun || ev.rig.slung) continue;
+      if (!ev.tac || !ev.alive || ev.down || ev.scode || !ev.rig.gun || ev.rig.slung || !ev.rig.root.visible) continue;
       const d = ev.pos.distanceToSquared(R.camera.position), f = ev.tac & (ev.alert ? 15 : 9);
       if (f && d < 2500) tac.push([d, ev, f]);
     }

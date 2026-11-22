@@ -1465,6 +1465,9 @@ export const Space = (() => {
     if (!S.hidden) return;
     for (const [o, v] of S.hidden) o.visible = v;
     S.hidden = null;
+    // (the people hidden with them were only deferred while they were (js/views.ts, parked): posed now, as they're about to be drawn, not
+    // a frame later where their rig was last left)
+    for (const ev of Views.enemies.values()) if (ev.rig.pend) ev.rig.update(0, ev.rig.pend.p);
   }
 
   // ------------------------------------------------------------------ seats

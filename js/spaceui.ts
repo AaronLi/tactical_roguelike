@@ -93,6 +93,42 @@ export const SpaceUI = (() => {
 
   // ------------------------------------------------------------------ the flight display
   const _v = new T.Vector3(), _q = new T.Quaternion();
+  // The marks over the view are kept elements, not made again each frame: each frame's marks are laid over the ones there, in order,
+  // each moved by its transform (no layout), its class, colour and contents written only when they've changed; those left over hidden.
+  // (Writing the whole overlay as HTML every frame had the browser parse, style and lay it out again every frame.)
+  type MkEl = HTMLDivElement & { _c?: string; _h?: string; _k?: string; _t?: string };
+  const MK = { n: 0, els: [] as MkEl[], svg: null as SVGSVGElement | null, svgWH: '', ln: 0, lns: [] as SVGPolylineElement[] };
+  function mark(cls: string, x: number, y: number, col: string, inner: string) {
+    let e = MK.els[MK.n];
+    if (!e) { e = document.createElement('div') as MkEl; e.style.left = '0'; e.style.top = '0'; marks.appendChild(e); MK.els.push(e); }
+    MK.n++;
+    if (e._c !== cls) { e._c = cls; e.className = cls; }
+    if (e._k !== col) { e._k = col; e.style.color = col; }
+    if (e._h !== inner) { e._h = inner; e.innerHTML = inner; }
+    // (.sp-mark is centred on its point by its own translate(-50%, -50%), kept after the move; the bore and velocity rings by their margins)
+    const t = `translate(${x.toFixed(0)}px,${y.toFixed(0)}px)${cls.startsWith('sp-mark') ? ' translate(-50%,-50%)' : ''}`;
+    if (e._t !== t) { e._t = t; e.style.transform = t; }
+    if (e.style.display) e.style.display = '';
+  }
+  function marksEnd() { for (let i = MK.n; i < MK.els.length; i++) { const e = MK.els[i]; if (e.style.display !== 'none') e.style.display = 'none'; } }
+  // the contacts' arcs: one svg under the marks, its lines kept as the marks are (each one's points and colour written only when they've changed)
+  type LnEl = SVGPolylineElement & { _p?: string; _k?: string };
+  function arcLine(pts: string, col: string) {
+    if (!MK.svg) { MK.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); MK.svg.setAttribute('style', 'position:absolute;left:0;top:0;overflow:visible;pointer-events:none'); marks.prepend(MK.svg); }
+    let e = MK.lns[MK.ln] as LnEl;
+    if (!e) { e = document.createElementNS('http://www.w3.org/2000/svg', 'polyline') as LnEl; for (const [k, v] of [['fill', 'none'], ['stroke-opacity', '0.35'], ['stroke-width', '1.5'], ['stroke-linecap', 'round']]) e.setAttribute(k, v); MK.svg.appendChild(e); MK.lns.push(e); }
+    MK.ln++;
+    if (e._p !== pts) { e._p = pts; e.setAttribute('points', pts); }
+    if (e._k !== col) { e._k = col; e.setAttribute('stroke', col); }
+    if (e.style.display) e.style.display = '';
+  }
+  function arcsEnd(W: number, H: number) {
+    for (let i = MK.ln; i < MK.lns.length; i++) { const e = MK.lns[i]; if (e.style.display !== 'none') e.style.display = 'none'; }
+    if (!MK.svg) return;
+    const wh = W + 'x' + H; if (MK.svgWH !== wh) { MK.svgWH = wh; MK.svg.setAttribute('width', '' + W); MK.svg.setAttribute('height', '' + H); }
+  }
+  // (an element's contents written only when they're not what it already holds)
+  function setHTML(e: HTMLElement & { _h?: string }, h: string) { if (e._h !== h) { e._h = h; e.innerHTML = h; } }
   function update(dt: number) {
     const s = S(); if (!s.on || !made) return;
     hud.style.visibility = Game.invOpen || Game.shopOpen ? 'hidden' : ''; // (under the Tab screen and the shop, as the rest of the HUD is: #hud holds them, and this isn't in it)
@@ -103,18 +139,18 @@ export const SpaceUI = (() => {
     top.style.display = showTop ? '' : 'none';
     if (showTop) {
       const f = s.ftl;
-      top.innerHTML = f ? (f.st === 'tunnel' ? `<b>IN TRANSIT</b> · dropping out in ${Math.max(0, f.T - f.t).toFixed(0)} s` : `<b>JUMP DRIVE</b> · ${f.st === 'spool' ? 'spooling ' + Math.round(Math.min(1, f.t / f.T) * 100) + '%' : 'engaged'}`)
-        : `<b>${s.warp ? 'WARP' : s.spin >= 1 ? 'WARP READY' : s.spin > 0 ? 'SPINNING UP ' + Math.round(s.spin * 100) + '%' : s.kind === 'assault' && s.stage === 'atmo' ? 'IN ATMOSPHERE' : 'UNDER WAY'}</b>` + (wp ? ` · ${U.esc(wp.name)} <b>${SD.dist(dist)}</b>${close > 2 ? ' · ETA ' + SD.eta(dist / close) : ''}` : '') + (s.hp < s.hpMax * 0.5 ? ` · <span class="warn">HULL ${Math.round(s.hp / s.hpMax * 100)}%</span>` : '');
+      setHTML(top, f ? (f.st === 'tunnel' ? `<b>IN TRANSIT</b> · dropping out in ${Math.max(0, f.T - f.t).toFixed(0)} s` : `<b>JUMP DRIVE</b> · ${f.st === 'spool' ? 'spooling ' + Math.round(Math.min(1, f.t / f.T) * 100) + '%' : 'engaged'}`)
+        : `<b>${s.warp ? 'WARP' : s.spin >= 1 ? 'WARP READY' : s.spin > 0 ? 'SPINNING UP ' + Math.round(s.spin * 100) + '%' : s.kind === 'assault' && s.stage === 'atmo' ? 'IN ATMOSPHERE' : 'UNDER WAY'}</b>` + (wp ? ` · ${U.esc(wp.name)} <b>${SD.dist(dist)}</b>${close > 2 ? ' · ETA ' + SD.eta(dist / close) : ''}` : '') + (s.hp < s.hpMax * 0.5 ? ` · <span class="warn">HULL ${Math.round(s.hp / s.hpMax * 100)}%</span>` : ''));
     }
     // the helm's own instruments
     const atHelm = !!seat && seat.k === 'helm';
     helm.style.display = atHelm && !s.docked ? '' : 'none';
-    if (atHelm && !s.docked) helm.innerHTML = `<div class="${s.cruise ? 'cr' : ''}"><small>SPEED</small><span>${SD.speed(speed)}</span></div><div><small>TARGET</small><span>${wp ? SD.dist(dist) : '—'}</span></div><div><small>ETA</small><span>${wp && close > 2 ? SD.eta(dist / close) : '--:--'}</span></div><div class="${s.hp < s.hpMax * 0.35 ? 'bad' : ''}"><small>HULL</small><span>${Math.round(s.hp / s.hpMax * 100)}%</span></div>`;
+    if (atHelm && !s.docked) setHTML(helm, `<div class="${s.cruise ? 'cr' : ''}"><small>SPEED</small><span>${SD.speed(speed)}</span></div><div><small>TARGET</small><span>${wp ? SD.dist(dist) : '—'}</span></div><div><small>ETA</small><span>${wp && close > 2 ? SD.eta(dist / close) : '--:--'}</span></div><div class="${s.hp < s.hpMax * 0.35 ? 'bad' : ''}"><small>HULL</small><span>${Math.round(s.hp / s.hpMax * 100)}%</span></div>`);
     // the waypoints, where they are on the view (at the edge, a round mark, if they're off it)
     const showMarks = (!!seat && seat.k !== 'jump' || aboard) && flying && !s.ftl;
     marks.style.display = showMarks ? '' : 'none';
     if (showMarks) {
-      const cam = G_R.camera, W = window.innerWidth, H = window.innerHeight; let html = '';
+      const cam = G_R.camera, W = window.innerWidth, H = window.innerHeight; MK.n = 0;
       _q.copy(s.Q).invert().premultiply(s.Dq);
       s.wps.forEach((w, i) => {
         if (w.hide || w.unseen) return;
@@ -123,16 +159,16 @@ export const SpaceUI = (() => {
         let x = (_v.x * 0.5 + 0.5) * W, y = (-_v.y * 0.5 + 0.5) * H, off = behind;
         if (behind) { x = W - x; y = H - y; if (Math.hypot(x - W / 2, y - H / 2) < 60) y = H; } // (astern: its mark at the edge it's nearest round to)
         if (off || x < 40 || x > W - 40 || y < 40 || y > H - 60) { const a = Math.atan2(y - H / 2, x - W / 2); x = W / 2 + Math.cos(a) * (W / 2 - 60); y = H / 2 + Math.sin(a) * (H / 2 - 70); off = true; }
-        html += `<div class="sp-mark${i === s.tgt ? ' sel' : ''}${off ? ' off' : ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px"><i></i>${U.esc(w.name)} · ${SD.dist(d)}${i === s.tgt ? `<small>${U.esc(w.sub)}</small>` : ''}</div>`;
+        mark(`sp-mark${i === s.tgt ? ' sel' : ''}${off ? ' off' : ''}`, x, y, '', `<i></i>${U.esc(w.name)} · ${SD.dist(d)}${i === s.tgt ? `<small>${U.esc(w.sub)}</small>` : ''}`);
       });
       // the track points: what her radars hold that isn't a waypoint shown (js/space.ts ewMarks), a ring in its colour
-      let svg = '';
+      MK.ln = 0;
       for (const t of s.trkMarks) {
         if (t.arc) { // (one scanner's contact: a faint line along where it could be, its label at the middle if that's in view)
           const P = t.arc.map((q) => { const v = q.clone().sub(s.P).applyQuaternion(_q).add(s.Dp); if (v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0) return null; v.project(cam); return [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H]; });
-          let run: string[] = []; const flush = () => { if (run.length > 1) svg += `<polyline points="${run.join(' ')}" fill="none" stroke="${t.col}" stroke-opacity="0.35" stroke-width="1.5" stroke-linecap="round"/>`; run = []; };
+          let run: string[] = []; const flush = () => { if (run.length > 1) arcLine(run.join(' '), t.col); run = []; };
           for (const q of P) { if (q) run.push(q[0].toFixed(0) + ',' + q[1].toFixed(0)); else flush(); } flush();
-          const m = P[8]; if (m && m[0] > 0 && m[0] < W && m[1] > 0 && m[1] < H) html += `<div class="sp-mark arcl" style="left:${m[0].toFixed(0)}px;top:${m[1].toFixed(0)}px;color:${t.col}">${U.esc(t.label)} · ${SD.dist(s.P.distanceTo(t.p))}</div>`;
+          const m = P[8]; if (m && m[0] > 0 && m[0] < W && m[1] > 0 && m[1] < H) mark('sp-mark arcl', m[0], m[1], t.col, `${U.esc(t.label)} · ${SD.dist(s.P.distanceTo(t.p))}`);
           continue;
         }
         _v.copy(t.p).sub(s.P).applyQuaternion(_q).add(s.Dp);
@@ -140,17 +176,17 @@ export const SpaceUI = (() => {
         let x = (_v.x * 0.5 + 0.5) * W, y = (-_v.y * 0.5 + 0.5) * H, off = behind;
         if (behind) { x = W - x; y = H - y; if (Math.hypot(x - W / 2, y - H / 2) < 60) y = H; }
         if (off || x < 40 || x > W - 40 || y < 40 || y > H - 60) { const a = Math.atan2(y - H / 2, x - W / 2); x = W / 2 + Math.cos(a) * (W / 2 - 60); y = H / 2 + Math.sin(a) * (H / 2 - 70); off = true; }
-        html += `<div class="sp-mark trk${off ? ' off' : ''}${t.pick ? ' tp' : t.look ? ' tl' : ''}" style="left:${x.toFixed(0)}px;top:${y.toFixed(0)}px;color:${t.col}"><i style="border-color:${t.col}"></i>${U.esc(t.label)} · ${SD.dist(d)}</div>`;
+        mark(`sp-mark trk${off ? ' off' : ''}${t.pick ? ' tp' : t.look ? ' tl' : ''}`, x, y, t.col, `<i style="border-color:${t.col}"></i>${U.esc(t.label)} · ${SD.dist(d)}`);
       }
-      if (svg) html = `<svg style="position:absolute;left:0;top:0;width:${W}px;height:${H}px;overflow:visible;pointer-events:none">${svg}</svg>` + html;
+      arcsEnd(W, H);
       // at the helm: where her nose points, and where she's actually going
       if (atHelm) {
         const pr = (v: THREE.Vector3) => { const b = v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0; v.project(cam); return b ? null : [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H]; };
         const eye = cam.position, b = pr(new T.Vector3(0, 0, -4000).applyQuaternion(s.Dq).add(eye));
-        if (b) html += `<div class="sp-bore" style="left:${b[0].toFixed(0)}px;top:${b[1].toFixed(0)}px"></div>`;
-        if (speed > 3) { const p = pr(s.V.clone().normalize().multiplyScalar(4000).applyQuaternion(_q).add(eye)); if (p) html += `<div class="sp-vel" style="left:${p[0].toFixed(0)}px;top:${p[1].toFixed(0)}px"></div>`; }
+        if (b) mark('sp-bore', b[0], b[1], '', '');
+        if (speed > 3) { const p = pr(s.V.clone().normalize().multiplyScalar(4000).applyQuaternion(_q).add(eye)); if (p) mark('sp-vel', p[0], p[1], '', ''); }
       }
-      marks.innerHTML = html;
+      marksEnd();
     }
     // the navigation screen: on the helm's console, and on the glass for whoever has the helm
     nav.style.display = atHelm && !s.docked ? '' : 'none';
