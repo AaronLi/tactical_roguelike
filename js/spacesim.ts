@@ -69,6 +69,8 @@ export interface SimWorld {
 // The pilot's input for a step (js/space.ts fly samples it): keys as bits (FB), the stick (its x and y, -1 to 1, as it is this step), and
 // the way she's matched to (H on a target: its velocity, or none)
 export interface FlyIn { b: number; sx: number; sy: number; base: THREE.Vector3 | null }
+// her flight's state (her pose, way, turn rate, and her way's memory through the zone's frame, zstep's)
+export interface FlyState { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; Wv: THREE.Vector3; zm: ZMem }
 export const FB = { W: 1, A: 2, S: 4, D: 8, U: 16, C: 32, X: 64, Q: 128, E: 256 } as const; // (U: Space, up)
 export interface SimShip { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; size: number; docked: boolean; ftl: boolean }
 
@@ -133,6 +135,20 @@ export const SpaceSim = (() => {
     }
     flyMax(V, fieldV);
   }
+  // a whole free step (as js/space.ts fly does it, nothing else touching her): turned, pushed, carried through the zone's frame Z
+  const _ff = new T.Vector3();
+  function flyStep(st: FlyState, turn: number, I: FlyIn | null, Z: SimZone | null, dt: number) {
+    flyTurn(st.Q, st.Wv, turn, I, dt);
+    flyPush(st.V, st.Q, I, fieldAt(Z, st.P, _ff), dt);
+    zstep(Z, st.P, st.V, dt, st.zm); zturn(Z, st.Q);
+  }
+  const flyClone = (s: FlyState): FlyState => ({ P: s.P.clone(), Q: s.Q.clone(), V: s.V.clone(), Wv: s.Wv.clone(), zm: { vz: s.zm.vz.clone(), v: s.zm.v.clone() } });
+  // (as 19 numbers for the wire: a NaN (no memory yet) as null)
+  const flyPack = (s: FlyState) => [...s.P.toArray(), ...s.Q.toArray(), ...s.V.toArray(), ...s.Wv.toArray(), ...s.zm.vz.toArray(), ...s.zm.v.toArray()].map((x) => (Number.isNaN(x) ? null : x));
+  const flyUnpack = (a: (number | null)[]): FlyState => { const n = (i: number) => (a[i] == null ? NaN : (a[i] as number)), v = (i: number) => new T.Vector3(n(i), n(i + 1), n(i + 2));
+    return { P: v(0), Q: new T.Quaternion(n(3), n(4), n(5), n(6)), V: v(7), Wv: v(10), zm: { vz: v(13), v: v(16) } }; };
+  // (a copy of what a step's free flight reads of the zone: its frame and velocity, to fly a step again later through)
+  const zoneCopy = (Z: SimZone | null): SimZone | null => { if (!Z) return null; const F = Z.frame; return { frame: { prev: F.prev.clone(), cur: F.cur.clone(), inv: F.inv.clone(), pinv: F.pinv.clone(), turn: F.turn.clone(), dt: F.dt, ok: F.ok }, v: Z.v.clone() } as unknown as SimZone; };
   function flyMax(V: THREE.Vector3, fieldV: THREE.Vector3) { const rel = _fv.copy(V).sub(fieldV); if (rel.length() > FLY.max) V.copy(fieldV).add(rel.setLength(FLY.max)); }
   // ---------------------------------------------------------------- the rocks
   // Each step: every rock's place in the level's frame (the zone's, moved and turned as it is), and those within ROCK_NEAR of her made
@@ -497,5 +513,5 @@ export const SpaceSim = (() => {
       if (r.hits) W.out.push({ k: 'damage', dmg: r.dmg, why: r.dmg > 4 ? 'Minigun fire' : undefined, hits: r.hits }); }
     if (W.shots.length) shotsStep(W, dt);
   }
-  return { world, worldStep, ztOf, zonePlace, yawQ, CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, FLY, flyTurn, flyPush, flyMax, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, SHOT, segNear, shotsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
+  return { world, worldStep, ztOf, zonePlace, yawQ, CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, FLY, flyTurn, flyPush, flyMax, flyStep, flyClone, flyPack, flyUnpack, zoneCopy, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, SHOT, segNear, shotsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
 })();

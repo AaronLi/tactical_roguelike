@@ -9,7 +9,7 @@
 // sensor operator's picks, the helm's torpedoes, chaff) and says what happens (js/spacenet.ts sss, sev).
 // Until the pages draw it (the page integration), every page still runs its own battle too: these requests are relayed as before.
 import { Radar, RSuite, RTarget, RPlot, RFused, RMode } from './radar.js';
-import { SpaceSim, SimWorld, SimTorp, SimTraffic } from './spacesim.js';
+import { SpaceSim, SimWorld, SimTorp, SimTraffic, FlyIn, FlyState } from './spacesim.js';
 import { SpaceData as SD } from './spacedata.js';
 import { HullShape, TrafficShape } from './hullshape.js';
 import { hullRcs, rcsFromB64, rcsOfTris } from './rcstris.js';
@@ -40,6 +40,37 @@ export const SvBattle = (() => {
   // Her own set (radars, transponder): kept, all it holds, while she's the same ship (a new level isn't a new her: js/space.ts ewStep)
   let OWN: { su: RSuite; t: RTarget; def: string; key: string; xpdr: boolean } | null = null;
   let rt = 0; // (the battle's clock, never started again in a session: a new world goes on from it)
+  // her flight, the server's (docs/space-server.md C2): the pilot's steps as they come (sin: an input, or her state after a step of her
+  // own), flown in order, one a server step (two while more than 6 wait), starting once 3 are in hand (a little slack against the
+  // pages' steps coming in bursts); none waiting, she holds where she is till the next comes. ack: the last step flown, sh her state after it
+  const FL = { on: false, q: new Map<number, any>(), next: -1, go: false, sh: null as FlyState | null, ack: -1, turn: 1 };
+  function flyOn(W: SimWorld, dt: number) {
+    if (!FL.go && FL.q.size >= 3) FL.go = true;
+    if (!FL.go) return;
+    for (let k = FL.q.size > 6 ? 2 : 1; k > 0; k--) {
+      let e = FL.q.get(FL.next);
+      if (!e) { if (!FL.q.size) break; const lo = Math.min(...FL.q.keys()); if (lo < FL.next) break; FL.next = lo; e = FL.q.get(lo); } // (a step never come: on from the next that has)
+      FL.q.delete(FL.next);
+      if (!Array.isArray(e)) { FL.sh = SpaceSim.flyUnpack(e.st); if (Number.isFinite(+e.turn)) FL.turn = +e.turn; }
+      else if (FL.sh) { const I: FlyIn | null = e[1] < 0 ? null : { b: e[1] | 0, sx: +e[2], sy: +e[3], base: e.length >= 7 ? new T.Vector3(+e[4], +e[5], +e[6]) : null }; SpaceSim.flyStep(FL.sh, FL.turn, I, W.zone ? W.Z : null, dt); }
+      FL.ack = FL.next; FL.next++;
+    }
+    if (FL.sh) { W.ship.P.copy(FL.sh.P); W.ship.Q.copy(FL.sh.Q); W.ship.V.copy(FL.sh.V); }
+  }
+  function flyIn(m: any) {
+    if (m.off) { FL.on = false; FL.q.clear(); FL.next = -1; FL.go = false; FL.sh = null; return; }
+    if (!Array.isArray(m.a) || m.a.length > 64) return;
+    for (const e of m.a) {
+      const s = Array.isArray(e) ? +e[0] : e && +e.s; if (!Number.isFinite(s)) continue;
+      if (!Array.isArray(e) && (!Array.isArray(e.st) || e.st.length !== 19)) continue;
+      if (Array.isArray(e) && (e.length > 7 || !e.every(Number.isFinite))) continue;
+      if (!FL.on) { if (Array.isArray(e)) continue; FL.on = true; FL.next = s; FL.go = false; FL.sh = null; } // (begun from a state)
+      if (s >= FL.next) FL.q.set(s, e);
+    }
+    if (FL.q.size > 600) { FL.q.clear(); FL.on = false; } // (a pilot gone quiet then flooding: begun again from her next state)
+  }
+  // (what the pilot's page is told every few steps: the last step flown and her state after it)
+  const flyAck = () => (FL.on && FL.sh && FL.ack >= 0 ? { s: FL.ack, st: SpaceSim.flyPack(FL.sh) } : null);
   let match: string | null = null; // (what the pilot's matched speed with: her notch lets it through)
   const HP = { v: -1, lost: false, told: false }; // (her hull: hurt, failing)
   let pose: Pose | null = null, poseWas: Pose | null = null; // (the pilot's last word of her pose, and the server step it came at; the last one in another level's frame)
@@ -123,7 +154,7 @@ export const SvBattle = (() => {
     // her pose: the pilot's last word of it, run on by its velocity to this step (none yet, as if in the tunnel: nothing's seen)
     const ps = pose && pose.map === B.map ? pose : null;
     if (ps && B.pre && W.own) { const R = ps.Q.clone().multiply(B.pre.Q.clone().invert()), t = ps.P.clone().sub(B.pre.P.clone().applyQuaternion(R)); Radar.rebase(W.own, R, t); B.pre = null; }
-    if (ps) { W.ship.P.copy(ps.P).addScaledVector(ps.V, (n - ps.n) * dt); W.ship.Q.copy(ps.Q); W.ship.V.copy(ps.V); }
+    if (ps && !(FL.on && FL.sh)) { W.ship.P.copy(ps.P).addScaledVector(ps.V, (n - ps.n) * dt); W.ship.Q.copy(ps.Q); W.ship.V.copy(ps.V); } // (flying her itself: flyOn, after the step)
     W.ship.ftl = !ps; W.ship.docked = docked; if (W.own) W.ship.size = W.own.size;
     if (W.zone) { W.zone.zt0 = zt; W.zone.ztAt = W.t + dt; } // (worldStep's zone time, after its W.t += dt, is zt)
     if (W.own && OWN) { W.xpdr = OWN.xpdr; W.own.hostNames = new Set([hullName(B)]); }
@@ -139,6 +170,7 @@ export const SvBattle = (() => {
     };
     W.out.length = 0;
     SpaceSim.worldStep(W, dt, { kindAff: (c: any) => (c.k === 0 ? missionAff(B.ms) : c.kind === 'navy' || c.kind === 'wing' ? 'navy' : c.kind === 'pirate' ? 'pirate' : 'civ'), fix: (tp) => fixOf(W, tp), fire });
+    if (FL.on) flyOn(W, dt); // (her flight: after the world's step, through this step's zone frame, as the page flies her after its zone's step)
     for (const [i, f] of fired) B.ev.push(SpaceNet.fireOf(n, i, f.aim, f.err, f.s, f.c));
     SpaceNet.sevOf(W.out, n, B.ev);
     for (const e of W.out) { B.evc[e.k] = (B.evc[e.k] || 0) + 1; if (e.k === 'damage') { B.dm += e.dmg; hurt(e.dmg); } if (e.k === 'torpEnd') B.ended.add(e.id); if (e.k === 'torpEnd') mark(B, e.id, e.how === 1 ? 'shot down' : e.how === 2 ? 'hit ' + (e.on || '') : 'spent'); }
@@ -198,6 +230,7 @@ export const SvBattle = (() => {
       case 'smis': if (W && a && a[4]) { const i = W.mis.findIndex((q) => q.id === a[0]); if (i >= 0) { W.mis.splice(i, 1); B!.ev.push({ k: 'misEnd', n: B!.sn, id: a[0], hit: 0 }); } } break; // (a missile a turret shot down, said by the screen that fired)
       case 'sfire': if (W && a && a.length >= 9 && W.shots.length < SpaceSim.SHOT.MAX) W.shots.push({ p: new T.Vector3(a[0], a[1], a[2]), v: new T.Vector3(a[3], a[4], a[5]), d: 0, life: Math.min(+a[6], 6000), dmg: Math.min(+a[8], 100) }); break; // (a round from one of her turrets: the server's to hit with)
       case 'smatch': match = m.id || null; break;
+      case 'sin': flyIn(m); break;
       case 'sdmg': if (Number.isFinite(+m.d) && +m.d > 0) hurt(Math.min(+m.d, 1000)); break; // (what the pilot's page saw her take itself: the ground, a rock)
       case 'shit': if (W && m.i >= 0) { const g = W.guns[m.i | 0]; if (g) g.hp = Math.max(0, +m.hp || 0); } break;
       case 'storp': if (W) torpIn(B!, a, m.f); break;
@@ -252,13 +285,13 @@ export const SvBattle = (() => {
       crew: W.crew, keep: W.keepTgt, own: suiteSum(W.own), foe: suiteSum(W.foe), fc: W.fc, tg: W.tg.map((t) => t.id), traffic: W.traffic.filter((q) => q.su).map((q) => q.c.k), real: W.traffic.filter((q) => q.shape && q.shape.real).map((q) => ({ k: q.c.k, mean: +q.shape!.rcs.mean.toFixed(3), max: +q.shape!.rcs.max.toFixed(3), sz: +q.shape!.sz.toFixed(2) })),
       guns: W.guns.map((g) => ({ k: g.k, hp: g.hp, bt: +(g.bt || 0).toFixed(2), cool: +(g.cool || 0).toFixed(2) })), rounds: W.rounds.length, mis: W.mis.length, chaff: W.chaff.length,
       torps: W.torps.map((tp) => ({ id: tp.id, mine: tp.mine, ph: tp.ph, t: +tp.t.toFixed(2), fus: tp.fus, lock: tp.lock, r: foeP ? Math.round(tp.p.distanceTo(foeP)) : null, e: foeP ? Math.round(tp.est.distanceTo(foeP)) : null, R: Math.round(tp.est.distanceTo(tp.p)), ev: tp.ev.toArray().map((v) => Math.round(v)), v: tp.v.toArray().map((v) => Math.round(v)), fixed: !!fixOf(W, tp), thr: +tp.thr.toFixed(2), dbg: tp.dbg ? Object.fromEntries(Object.entries(tp.dbg).map(([k, v]) => [k, +(+(v as number)).toFixed(3)])) : null })),
-      marks: Object.fromEntries(B.marks), evc: B.evc, dm: +B.dm.toFixed(2), hp: HP.v, prof: B.prof.last };
+      marks: Object.fromEntries(B.marks), evc: B.evc, dm: +B.dm.toFixed(2), hp: HP.v, fly: { on: FL.on, go: FL.go, q: FL.q.size, next: FL.next, ack: FL.ack, P: FL.sh ? FL.sh.P.toArray().map((v) => +v.toFixed(2)) : null }, prof: B.prof.last };
   }
-  function reset() { OWN = null; pose = null; poseWas = null; rt = 0; match = null; HP.v = -1; HP.lost = false; HP.told = false; }
+  function reset() { OWN = null; pose = null; poseWas = null; rt = 0; match = null; flyIn({ off: 1 }); HP.v = -1; HP.lost = false; HP.told = false; }
   // her hull, kept by the server while its battle's on (from the pilot's first pose, then by what hits her); at nothing, lost is set once
   // (js/spaceserver.ts battle: the emergency jump home); a new zone starts from the pilot's word again
   function hurt(d: number) { if (HP.v < 0) return; HP.v = Math.max(0, HP.v - d); if (HP.v <= 0 && !HP.lost) HP.lost = true; }
   function hullReset() { HP.v = -1; HP.lost = false; HP.told = false; }
   const failing = () => { if (HP.lost && !HP.told) { HP.told = true; return true; } return false; }; // (once: kept lost till the battle's over)
-  return { load, make, step, heardPose, request, out, summary, reset, hullReset, failing, hp: () => HP.v, own: () => OWN, pose: () => pose };
+  return { load, make, step, heardPose, request, out, summary, reset, hullReset, failing, flyAck, fly: () => ({ on: FL.on, go: FL.go, q: FL.q.size, next: FL.next, ack: FL.ack }), hp: () => HP.v, own: () => OWN, pose: () => pose };
 })();

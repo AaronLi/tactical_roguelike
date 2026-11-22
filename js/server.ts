@@ -134,7 +134,7 @@ export const Server = {
   ctxs: new Map<number, LvCtx>(),
   quiet: false, // (a level being made ahead (js/spaceserver.ts warm): nobody told, nobody's state touched)
   allPlayers: null as Map<string, Player> | null,
-  GLOBAL_T: new Set(['sdbgq', 'sdmg', 'smatch', 'seats', 'mdone', 'fleet', 'sdock', 'sxpdr', 'strk', 'ssec', 'srcue', 'smis', 'shit', 'shatch', 'sfire', 'schaff', 'storp', 'sss', 'sev', 'sboom', 'newrun', 'chat', 'phase', 'board', 'ship', 'lobby', 'hello', 'welcome', 'join', 'left', 'ready', 'route', 'shop', 'prof', 'skins', 'stickers']),
+  GLOBAL_T: new Set(['sdbgq', 'sdmg', 'smatch', 'sin', 'seats', 'mdone', 'fleet', 'sdock', 'sxpdr', 'strk', 'ssec', 'srcue', 'smis', 'shit', 'shatch', 'sfire', 'schaff', 'storp', 'sss', 'sev', 'sboom', 'newrun', 'chat', 'phase', 'board', 'ship', 'lobby', 'hello', 'welcome', 'join', 'left', 'ready', 'route', 'shop', 'prof', 'skins', 'stickers']),
   curK() { return SpaceSv.ctxSave().active; },
   lvOf(p: Player) { return (p as any).lv == null ? this.curK() : (p as any).lv; },
   // (the players aboard the loaded level only, while fn runs)

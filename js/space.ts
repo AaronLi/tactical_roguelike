@@ -26,7 +26,7 @@ import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
 import { SuiteView } from './suiteview.js';
-import { SpaceSim, ZMem, SimShip, SimGun, SimChaff, FlyIn, FB } from './spacesim.js';
+import { SpaceSim, ZMem, SimShip, SimGun, SimChaff, FlyIn, FB, FlyState } from './spacesim.js';
 import { SpaceNet, SssMsg, SevMsg } from './spacenet.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
@@ -1643,6 +1643,7 @@ export const Space = (() => {
   // the first of her trackers holding a track with a solution (where it is and how fast it goes, as her radar has it: js/radar.ts)
   function radarLock() { const o = shownOwn(); if (!o) return null; let b: RSTrack | null = null; for (const t of Radar.sched(o).tts) if (t.est.q > 0.1 && (!b || (t.op ? 1 : 0) > (b.op ? 1 : 0) || ((t.op ? 1 : 0) === (b.op ? 1 : 0) && t.est.q > b.est.q))) b = t; return b; } // (her best track: her operator's picks first)
   function fly(dt: number) {
+    FLYI.ran = false; FLYI.I = null;
     const d = S.def, seat = mySeat(), helm = !!seat && seat.k === 'helm' && isCtl() && !me().dead && !me().down;
     // the mouse: what it's turned your view by since the last frame is the stick's push (it springs back)
     // (the right button held: your head turns instead, to look about the cockpit and out of its glass)
@@ -1673,7 +1674,7 @@ export const Space = (() => {
       acc = K('KeyX') ? 60 : 30;
     }
     spinUp(dt, helm);
-    SpaceSim.flyTurn(S.Q, S.Wv, d.turn, I, dt);
+    SpaceSim.flyTurn(S.Q, S.Wv, d.turn, I, dt); FLYI.ran = true; FLYI.I = I;
     // (the breach assist only while her pilot's opening the throttle: let go, and it lets go of her, whatever's coming her way; a ship
     // she's left closing on her, or drifting at one, is no call for it)
     if (helm && S.kind === 'board' && K('KeyW')) squareUp(dt); else if (S.brLock || S.brRound) { S.brLock = null; S.brRound = null; S.roundBrake = false; }
@@ -2198,6 +2199,51 @@ export const Space = (() => {
 
   // ------------------------------------------------------------------ the pose, told and heard
   let matchSent = '';
+  // ---- her flight on the server (docs/space-server.md C2). While the server's battle's on, the pilot's page sends each step's input
+  // (sin), numbered by its step, and the server flies her from them (js/svbattle.ts) and says where it has her after each (fast stream
+  // 5). Each step's checked here: flown free (nothing but js/spacesim.ts flyStep touched her: no assist, warp gate, collision, rebase),
+  // its input's sent; else her state after it is, and the server takes that. The page flies ahead of the server as before (it's
+  // predicting); when the server's word for a step differs from what the page had then, it's taken and the steps since flown again
+  // from their inputs, each through its own step's zone frame.
+  const FLYI = { ran: false, I: null as FlyIn | null }; // (fly's this step: whether it flew her free, and from what)
+  type C2E = { s: number; I: FlyIn | null; Z: any; post: FlyState; free: boolean };
+  const C2 = { on: false, hist: [] as C2E[], out: [] as any[], fixes: 0, acks: 0, err: 0, errMax: 0 };
+  const c2Want = () => svbOn() && isCtl() && S.stage !== 'atmo' && !S.docked && !S.ftl;
+  const herState = (): FlyState => ({ P: S.P.clone(), Q: S.Q.clone(), V: S.V.clone(), Wv: S.Wv.clone(), zm: { vz: shipZ.vz.clone(), v: shipZ.v.clone() } });
+  function c2Pre(): FlyState | null {
+    if (c2Want()) return herState();
+    if (C2.on) { C2.on = false; C2.hist = []; C2.out = []; Net.toHost({ t: 'sin', off: 1 }); }
+    return null;
+  }
+  const same = (a: FlyState, b: FlyState) => a.P.equals(b.P) && a.Q.equals(b.Q) && a.V.equals(b.V) && a.Wv.equals(b.Wv);
+  function c2Post(pre: FlyState | null, h: number) {
+    if (!pre) return;
+    const s = SIM.steps, now = herState(), Z = S.zone ? SpaceSim.zoneCopy(ZS) : null;
+    let free = false;
+    if (C2.on && FLYI.ran) { const st = SpaceSim.flyClone(pre); SpaceSim.flyStep(st, S.def.turn, FLYI.I, S.zone ? ZS : null, h); free = same(st, now); }
+    const I = FLYI.I ? { ...FLYI.I, base: FLYI.I.base ? FLYI.I.base.clone() : null } : null;
+    C2.on = true;
+    C2.hist.push({ s, I, Z, post: now, free }); if (C2.hist.length > 360) C2.hist.splice(0, C2.hist.length - 360);
+    C2.out.push(free ? (I ? [s, I.b, I.sx, I.sy, ...(I.base ? I.base.toArray() : [])] : [s, -1]) : { s, st: SpaceSim.flyPack(now), turn: S.def.turn });
+    if (C2.out.length >= 3) { Net.toHost({ t: 'sin', a: C2.out }); C2.out = []; }
+  }
+  // the server's word: where it has her after step s
+  function c2Ack(s: number, a: (number | null)[]) {
+    const i = C2.hist.findIndex((e) => e.s === s); if (i < 0) return;
+    const sv = SpaceSim.flyUnpack(a), e = C2.hist[i], err = e.post.P.distanceTo(sv.P), verr = e.post.V.distanceTo(sv.V), qerr = 1 - Math.abs(e.post.Q.dot(sv.Q));
+    C2.acks++; C2.err = err; C2.errMax = Math.max(C2.errMax, err);
+    const rest = C2.hist.slice(i + 1); C2.hist = rest;
+    if (err < 1e-3 && verr < 1e-3 && qerr < 1e-9) return;
+    // (taken, and flown on again from the inputs since: her own steps (not free) as she had them)
+    C2.fixes++;
+    let cur = sv;
+    for (const q of rest) { if (q.free) { SpaceSim.flyStep(cur, S.def.turn, q.I, q.Z, STEP); q.post = SpaceSim.flyClone(cur); } else cur = SpaceSim.flyClone(q.post); }
+    S.P.copy(cur.P); S.Q.copy(cur.Q); S.V.copy(cur.V); S.Wv.copy(cur.Wv); shipZ.vz.copy(cur.zm.vz); shipZ.v.copy(cur.zm.v);
+  }
+  Net.onFast((buf, ch) => {
+    if (ch !== 5 || !C2.on) return;
+    try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k === S.zact && Number.isFinite(m.s) && Array.isArray(m.st)) c2Ack(m.s, m.st); } catch (e) { console.error('space: her flight from the server', e); }
+  });
   function sendPose(now?: boolean) {
     S.sendT -= 1; if (!now && S.sendT > 0) return; S.sendT = 4;
     const r3 = (v: number) => Math.round(v * 1000) / 1000;
@@ -2263,7 +2309,7 @@ export const Space = (() => {
       S.t += h;
       zoneStep(); pt = Prof.lap('space: zone', pt);
       tgtTrack(h); pt = Prof.lap('space: target', pt);
-      if (isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2)) { fly(h); zoneClose(h); } else { if (S.auto) S.auto = null; follow(h); S.stick.multiplyScalar(Math.exp(-h * 2.2)); }
+      if (isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2)) { const pre = c2Pre(); fly(h); zoneClose(h); c2Post(pre, h); } else { if (S.auto) S.auto = null; follow(h); S.stick.multiplyScalar(Math.exp(-h * 2.2)); }
       pt = Prof.lap('space: flight', pt);
       ftlStep(h); thruStep(h);
       doors(h);
@@ -2914,6 +2960,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, sv, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, C2: () => C2, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, sv, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)

@@ -914,6 +914,7 @@ export const SpaceSv = (() => {
       case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'schaff', a: m.a, by: from }, from); battleIn(m); } break; // (chaff thrown out of her: js/space.ts chaffGo)
       case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'srcue', a: m.a, by: from }, from); battleIn(m); } break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
       case 'sdmg': if (p && st.ship.ctl === from) battleIn(m); break;
+      case 'sin': if (p && st.ship.ctl === from) battleIn(m); break; // (the pilot's steps: js/space.ts c2Post)
       case 'smatch': if (p && st.ship.ctl === from && typeof m.id === 'string' && m.id.length <= 40) battleIn(m); break; // (what the pilot's matched speed with: js/space.ts sendPose) // (what she hit herself, as the pilot's page saw it: the server's battle keeps her hull)
       case 'shit': if (p && Number.isFinite(m.i)) { net().broadcast({ t: 'shit', i: m.i | 0, hp: +m.hp || 0, by: from }, from); battleIn(m); } break; // (a hull gun hit by a turret, or the ship by one: told to all)
       case 'mobj': if (p) act(String(m.k), from, m.n); break;
@@ -970,6 +971,7 @@ export const SpaceSv = (() => {
     SvBattle.step(bat, dt, sv.stepN, { hostile, gn: gunnersLeft(), arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom }, M.docked, Z.zt, (k) => { const c = sv.ctxs.get(k); return c ? (c.sv.map as any) || null : null; }); // (a zone ship's level, made: her real hull for the radars)
     SvBattle.out(bat, sv.stepN, Z.zt, (m) => net().broadcast(m), (b, ch) => net().fast(null, b, ch));
     // (her hull gone, by the server's count: the drive jumps her home by itself, as the pilot's page did (js/space.ts damage))
+    if (sv.stepN % 3 === 0 && st.ship.ctl) { const a = SvBattle.flyAck(); if (a) net().fast(st.ship.ctl, new TextEncoder().encode(JSON.stringify({ k: bat.k, s: a.s, st: a.st })).buffer as ArrayBuffer, 5); } // (where the server has her, to her pilot: js/space.ts c2Ack)
     if (SvBattle.failing() && !sv.leaving && !M.docked) { net().broadcast({ t: 'shit', i: -1, hp: 0 }); sv.overBlack(() => home(), 'ftl', -1); } // (told at once: the jump's begun before the next snapshot)
     // (her radars' picture, as the server's battle has it (js/suiteview.ts pack): ten times a second on the fast channel's stream 1, to
     // everyone aboard (the sensor station, the hologram, the helm's targeting and her marks draw from it); k: which level's frame it's in)
