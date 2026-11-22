@@ -172,6 +172,7 @@ export const SvBattle = (() => {
       }
       case 'schaff': if (W) W.chaff.push(SpaceSim.chaffNew(a, ++W.chaffN, W.t)); break;
       case 'smis': if (W && a && a[4]) { const i = W.mis.findIndex((q) => q.id === a[0]); if (i >= 0) { W.mis.splice(i, 1); B!.ev.push({ k: 'misEnd', n: B!.sn, id: a[0], hit: 0 }); } } break; // (a missile a turret shot down, said by the screen that fired)
+      case 'sfire': if (W && a && a.length >= 9 && W.shots.length < SpaceSim.SHOT.MAX) W.shots.push({ p: new T.Vector3(a[0], a[1], a[2]), v: new T.Vector3(a[3], a[4], a[5]), d: 0, life: Math.min(+a[6], 6000), dmg: Math.min(+a[8], 100) }); break; // (a round from one of her turrets: the server's to hit with)
       case 'sdmg': if (Number.isFinite(+m.d) && +m.d > 0) hurt(Math.min(+m.d, 1000)); break; // (what the pilot's page saw her take itself: the ground, a rock)
       case 'shit': if (W && m.i >= 0) { const g = W.guns[m.i | 0]; if (g) g.hp = Math.max(0, +m.hp || 0); } break;
       case 'storp': if (W) torpIn(B!, a, m.f); break;

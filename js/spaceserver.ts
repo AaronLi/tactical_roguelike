@@ -905,7 +905,7 @@ export const SpaceSv = (() => {
       }
       case 'spose': if (p && (st.ship.ctl === from || !st.ship.ctl || !sv.players.has(st.ship.ctl)) && Array.isArray(m.a) && m.a.length <= 16 && m.a.every(Number.isFinite)) { st.ship.ctl = from; st.ship.pose = m.a; net().broadcast({ t: 'spose', a: m.a, by: from }, from); if (m.a.length >= 10) SvBattle.heardPose(m.a, sv.stepN, sv.map); } break;
       case 'smis': if (p && Array.isArray(m.a) && m.a.length <= 8 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'smis', a: m.a, by: from }, from); battleIn(m); } break; // (a missile off her hull, or one shot down: told to all)
-      case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) net().broadcast({ t: 'sfire', a: m.a, by: from }, from); break;
+      case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'sfire', a: m.a, by: from }, from); battleIn(m); } break;
       case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'strk', a: m.a, by: from }, from); battleIn(m); } break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
       case 'ssec': if (p && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5) && m.a.every(Number.isFinite)) { net().broadcast({ t: 'ssec', a: m.a, by: from }, from); battleIn(m); } break; // (a scanner's search set: js/space.ts secSet)
       case 'sdbgq': if (p) { if (m.on && typeof m.id === 'string') dbgReq.set(from, { id: m.id, at: sv.stepN }); else dbgReq.delete(from); } break; // (F8 open on a suite: its debug picture to that player (battle))

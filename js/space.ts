@@ -2336,8 +2336,8 @@ export const Space = (() => {
     // a round from the muzzle at the gun's own speed and her own way (a railgun's slug at 5 km/s, an autocannon's at 1.1), flown
     // step by step (shots(): a rock stops it, a gun on her hull or a missile it passes close to is hit), gone at the gun's range
     const heavy = e.id === 'rail', v = d.clone().multiplyScalar(heavy ? SHOT.rail : SHOT.pd).add(S.V), range = e.range || 1500;
-    shot(o, v, range, e.dmg || 5, heavy, true);
-    Net.toHost({ t: 'sfire', a: [o.x, o.y, o.z, v.x, v.y, v.z, range, heavy ? 1 : 0] }); // (the others fly it too, to see: only the one who fired it hits with it)
+    shot(o, v, range, e.dmg || 5, heavy, !svbOn());
+    Net.toHost({ t: 'sfire', a: [o.x, o.y, o.z, v.x, v.y, v.z, range, heavy ? 1 : 0, e.dmg || 5] }); // (the others fly it too, to see: only the one who fired it hits with it; the server's battle on, the server: js/spacesim.ts shotsStep)
     Audio.click();
   }
   // The squad's own rounds in flight (her turrets': turrets above). Each moves; the gun on her hull it passes within GUN_R of, or the
