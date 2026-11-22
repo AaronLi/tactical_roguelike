@@ -25,7 +25,7 @@ import { InteriorCull } from './interiorcull.js';
 import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RAssess, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
-import { SpaceSim, ZMem, SimShip } from './spacesim.js';
+import { SpaceSim, ZMem, SimShip, SimGun } from './spacesim.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -2384,46 +2384,19 @@ export const Space = (() => {
   // while there's anyone at her gun control (js/spaceserver.ts gunnersLeft) and she isn't counting down to her self-destruct.
   // Every round is a real one (rounds()): fired along the aim, it flies, and hits only if it really meets her.
   function guns(dt: number) {
-    const spinDown = () => { for (const gn of S.hull!.guns) { const sp = gn.gun.userData.spin as THREE.Object3D | undefined; if (sp) sp.rotation.z += dt * 30 * Math.max(0, (gn as any).rev = Math.max(0, ((gn as any).rev || 0) - dt)); } };
     if (!S.hull || S.docked || S.ftl || (S.state && S.state.boom)) return;
-    if (S.state && S.state.hostile === 0) { spinDown(); return; } // (a ship that isn't the mission's holds her fire till she's breached)
-    if (!S.state || !S.state.gn || S.state.arm != null) { spinDown(); return; } // (nobody left at her gun control, or she's counting down to blowing herself apart: her guns are silent)
-    let lk: RSTrack | null = null; for (const t of Radar.sched(EW.foe!).tts) if (t.est.q >= 0.15 && (!lk || trkUrg(EW.foe!, t) < trkUrg(EW.foe!, lk))) lk = t; // (the most urgent of her tracks: what reaches her soonest)
-    if (!lk || !lk.est.p) { spinDown(); return; } // (on whatever her best track's on: chaff, if it's been drawn off)
-    const urgent = trkUrg(EW.foe!, lk) < 4; // (something reaching her inside 4 s: no pause between bursts)
-    // (a weapon coming at her (closing faster than any ship flies) on a collision course (hardly moving across her line of sight):
-    // its course is the line of sight, so the lead's only along it. Across it, what the solution has is mostly its own noise, and
-    // tens of m/s of that over a second's flight is tens of metres off something three across. And no lift: it's a point, not a hull)
-    const los = lk.est.p.clone().sub(EW.foe!.P), lr = los.length(); los.divideScalar(lr || 1);
-    const rv = lk.est.v.clone().sub(EW.foe!.V), vcl = -rv.dot(los), vlat = rv.clone().addScaledVector(los, vcl).length();
-    const head = vcl > 250 && vlat < 0.15 * vcl, vAim = head ? EW.foe!.V.clone().addScaledVector(los, -vcl) : lk.est.v;
-    const up = new T.Vector3(0, head ? 0 : 1.5, 0);
-    for (const gn of S.hull.guns) {
-      if (gn.hp <= 0) continue;
-      const g = gn as any, H = SD.HULLGUN[gn.k] as any, sp = gn.gun.userData.spin as THREE.Object3D | undefined, from = new T.Vector3(gn.x, gn.y, gn.z), to = lk.est.p.clone().add(up).sub(from), dist = to.length(); // (what it's shooting at: whatever her track's on)
-      if (sp) { g.rev = Math.max(0, (g.rev || 0) - dt); sp.rotation.z += dt * 30 * Math.min(1, g.rev); }
-      if (dist > H.range) { g.bt = 0; continue; }
-      const up1 = gn.inv ? -1 : 1; // (a gun under her keel hangs upside down: its up is her down)
-      if (gn.k !== 'missile' && up1 * to.y / dist < -0.17) { g.bt = 0; continue; } // (more than 10 degrees past its own side of her hull: the hull's in the way)
-      // where the track says she'll be when the round gets there (its flight time)
-      const tof = gn.k === 'missile' ? 0 : dist / H.speed, aim = lk.est.p.clone().addScaledVector(vAim, tof).add(up).sub(from);
-      if (gn.k !== 'missile') { const ad = aim.length(); gn.obj.rotation.y = Math.atan2(-aim.x, -aim.z); gn.gun.rotation.x = Math.asin(U.clamp(up1 * aim.y / ad, -0.2, 1)); }
-      if (gn.k === 'mg') {
-        // bursts: the barrels spin up, it fires H.rps for a second or two, then a pause
-        if (g.bt > 0) {
-          g.bt -= dt; g.rev = 1.5; g.acc = (g.acc || 0) + H.rps * dt;
-          while (g.acc >= 1) { g.acc -= 1; fireRound(from, aim, H, lk.err || 0); }
-          if (g.bt <= 0) gn.cool = H.pause[0] + SR() * (H.pause[1] - H.pause[0]);
-          continue;
-        }
-        gn.cool -= dt; if (urgent) gn.cool = Math.min(gn.cool, 0); if (gn.cool <= 0) { g.bt = H.burst[0] + SR() * (H.burst[1] - H.burst[0]); g.acc = 0; }
-        continue;
-      }
-      gn.cool -= dt;
-      if (gn.cool > 0) continue;
-      gn.cool = H.cool[0] + SR() * (H.cool[1] - H.cool[0]);
-      if (gn.k === 'missile') { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); Net.toHost({ t: 'smis', a }); } continue; }
-      fireRound(from, aim, H, lk.err || 0);
+    const gs = S.hull.guns as unknown as SimGun[];
+    // (a ship that isn't the mission's holds her fire till she's breached; nobody left at her gun control, or she's counting down to
+    // blowing herself apart: her guns are silent)
+    let lk: RSTrack | null = null;
+    if (S.state && S.state.hostile !== 0 && S.state.gn && S.state.arm == null) for (const t of Radar.sched(EW.foe!).tts) if (t.est.q >= 0.15 && (!lk || trkUrg(EW.foe!, t) < trkUrg(EW.foe!, lk))) lk = t; // (the most urgent of her tracks: what reaches her soonest; on whatever her best track's on: chaff, if it's been drawn off)
+    if (lk && !lk.est.p) lk = null;
+    // (the simulation's step: js/spacesim.ts gunsStep; a missile launched by the screen that's in control, and told)
+    SpaceSim.gunsStep(gs, lk, !!lk && trkUrg(EW.foe!, lk) < 4, EW.foe!.P, EW.foe!.V, SD.HULLGUN as any, SR, dt, fireRound, (gn) => { if (isCtl()) { const a = [S.misN++, gn.x, gn.y + 1.5, gn.z, 0]; missile(a); Net.toHost({ t: 'smis', a }); } });
+    for (const gn of S.hull.guns) { // (their drawings: laid as they're aimed, the barrels turning as they're spun)
+      const g = gn as any, sp = gn.gun.userData.spin as THREE.Object3D | undefined;
+      if (g.yaw != null && gn.k !== 'missile') { gn.obj.rotation.y = g.yaw; gn.gun.rotation.x = g.pitch; }
+      if (sp) sp.rotation.z += dt * 30 * Math.min(1, g.rev || 0);
     }
   }
   // a round off one of her guns (in the level's frame): along the aim, spread by the gun and by the track's own error

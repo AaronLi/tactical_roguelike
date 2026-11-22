@@ -32,6 +32,10 @@ export interface SimMissile { id: number; p: THREE.Vector3; v: THREE.Vector3; t:
 // is (mine: this side flies it; another's is dead-reckoned), what its seeker's locked on, its motor (thr 0..1) and RCS (rcs), its
 // smoothed lateral demand (lf), its radar target (rt)
 export interface SimTorp { id: number; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; lock: string; rt: RTarget; thr: number; rcs: boolean; lf: THREE.Vector3; zm?: ZMem; dbg?: any }
+// One of the mission ship's hull guns (js/spacedata.ts HULLGUN by kind: 'pd', 'mg', 'missile'): where it's mounted (her frame:
+// the level's), whether it hangs under her keel (inv), its health, its cooldown; an mg's burst left (bt), rounds owed (acc), barrels'
+// spin (rev); where it's laid (yaw, pitch: for its drawing)
+export interface SimGun { k: string; x: number; y: number; z: number; inv?: boolean; hp: number; cool: number; bt?: number; acc?: number; rev?: number; yaw?: number; pitch?: number }
 export interface SimShip { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; size: number; docked: boolean; ftl: boolean }
 
 import { Radar, RSuite, RTarget } from './radar.js';
@@ -245,5 +249,44 @@ export const SpaceSim = (() => {
     return null;
   }
   const torpTargets = (torps: SimTorp[]) => torps.map((tp) => { tp.rt.v.copy(tp.v); tp.rt.p.copy(tp.p); tp.rt.q.copy(tp.q); return tp.rt; });
-  return { zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
+  // ---------------------------------------------------------------- the hull guns
+  // A step of her guns: on her most urgent track (lk: its solution, its angle error; urgent: reaching her inside 4 s, no pause
+  // between bursts), or idle (lk null: the barrels spin down). Point defence: single shots; miniguns: bursts; missile launchers:
+  // a launch (launch(gun)). A gun shoots only inside its range and on its own side of her hull (ten degrees past it, the hull's in
+  // the way). A weapon coming at her on a collision course (closing faster than any ship flies, hardly moving across her line of
+  // sight) is led along the line of sight only (across it the solution's mostly its own noise), and aimed at its point, not above it
+  // (her own place and velocity: P, V). fire(from, aim, H, err): a round (fireRound); rng: the battle's stream
+  function gunsStep(guns: SimGun[], lk: { est: { p: THREE.Vector3; v: THREE.Vector3 }; err?: number } | null, urgent: boolean, P: THREE.Vector3, V: THREE.Vector3, HG: Record<string, any>, rng: () => number, dt: number, fire: (from: THREE.Vector3, aim: THREE.Vector3, H: any, err: number) => void, launch: (gn: SimGun) => void) {
+    if (!lk) { for (const gn of guns) gn.rev = Math.max(0, (gn.rev || 0) - dt); return; }
+    const los = lk.est.p.clone().sub(P), lr = los.length(); los.divideScalar(lr || 1);
+    const rv = lk.est.v.clone().sub(V), vcl = -rv.dot(los), vlat = rv.clone().addScaledVector(los, vcl).length();
+    const head = vcl > 250 && vlat < 0.15 * vcl, vAim = head ? V.clone().addScaledVector(los, -vcl) : lk.est.v;
+    const up = new T.Vector3(0, head ? 0 : 1.5, 0);
+    for (const gn of guns) {
+      if (gn.hp <= 0) continue;
+      const H = HG[gn.k], from = new T.Vector3(gn.x, gn.y, gn.z), to = lk.est.p.clone().add(up).sub(from), dist = to.length();
+      gn.rev = Math.max(0, (gn.rev || 0) - dt);
+      if (dist > H.range) { gn.bt = 0; continue; }
+      const up1 = gn.inv ? -1 : 1; // (a gun under her keel hangs upside down: its up is her down)
+      if (gn.k !== 'missile' && up1 * to.y / dist < -0.17) { gn.bt = 0; continue; }
+      const tof = gn.k === 'missile' ? 0 : dist / H.speed, aim = lk.est.p.clone().addScaledVector(vAim, tof).add(up).sub(from); // (where the track says it'll be when the round gets there)
+      if (gn.k !== 'missile') { const ad = aim.length(); gn.yaw = Math.atan2(-aim.x, -aim.z); gn.pitch = Math.asin(Math.max(-0.2, Math.min(1, up1 * aim.y / ad))); }
+      if (gn.k === 'mg') {
+        if ((gn.bt || 0) > 0) {
+          gn.bt! -= dt; gn.rev = 1.5; gn.acc = (gn.acc || 0) + H.rps * dt;
+          while (gn.acc >= 1) { gn.acc -= 1; fire(from, aim, H, lk.err || 0); }
+          if (gn.bt! <= 0) gn.cool = H.pause[0] + rng() * (H.pause[1] - H.pause[0]);
+          continue;
+        }
+        gn.cool -= dt; if (urgent) gn.cool = Math.min(gn.cool, 0); if (gn.cool <= 0) { gn.bt = H.burst[0] + rng() * (H.burst[1] - H.burst[0]); gn.acc = 0; }
+        continue;
+      }
+      gn.cool -= dt;
+      if (gn.cool > 0) continue;
+      gn.cool = H.cool[0] + rng() * (H.cool[1] - H.cool[0]);
+      if (gn.k === 'missile') { launch(gn); continue; }
+      fire(from, aim, H, lk.err || 0);
+    }
+  }
+  return { gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
 })();
