@@ -25,6 +25,7 @@ import { InteriorCull } from './interiorcull.js';
 import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RAssess, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
+import { SpaceSim, ZMem } from './spacesim.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -721,7 +722,7 @@ export const Space = (() => {
     S.docked = docked; S.noseT = 0; S.rampT = docked && kind !== 'board' ? 1 : 0;
     S.hatchOpen = !(sp && sp.ship && sp.ship.hatch === 0); S.hatchT = S.hatchOpen ? 1 : 0; // (as the host has it: shut by a breach till its button's pressed)
     S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.net = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1;
-    zFrame.ok = false; zPrev.t = -1; S.zone = new T.Group(); S.zone.userData.prof = 'zone: other'; S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.match = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = S.t;
+    SpaceSim.zoneReset(ZS); S.zone = new T.Group(); S.zone.userData.prof = 'zone: other'; S.root.add(S.zone); S.zoneV.set(0, 0, 0); S.traffic = []; S.zdef = []; S.zact = 0; S.tclose = null; S.match = null; S.zt0 = (Date.now() / 1000) % 86400; S.ztAt = S.t;
     if (kind === 'hub') setupHub(map, sp); else if (kind === 'board') setupBoard(map); else setupAssault(map);
     if (docked) { S.P.copy(S.Dp); S.Q.copy(S.Dq); }
     syncSolids();
@@ -1185,38 +1186,14 @@ export const Space = (() => {
   // Where everything in the zone is now. On a mission the level is one of the zone's ships (zact), under way on her own course:
   // the zone is drawn from her (it goes by, and turns when she does), so the others, the anchor and the stars are where they'd be
   // seen from her deck or from the squad's ship keeping her company.
-  const _zd = new T.Vector3(), _zq = new T.Quaternion(), zPrev = { p: new T.Vector3(), t: -1, m: new T.Matrix4() };
-  // The field's velocity at a place in the level's frame: the point of the zone that's there now, where it was a step ago. The zone
-  // turns when the ship that's the level does (it's drawn from her), so away from its middle the field doesn't go by at one speed:
-  // what she brakes to and her speed's held against (fly) is the field's where she is. (No zone: the level's own frame, still.)
-  const zFrame = { prev: new T.Matrix4(), cur: new T.Matrix4(), inv: new T.Matrix4(), pinv: new T.Matrix4(), turn: new T.Quaternion(), dt: 0, ok: false }, _fa = new T.Vector3(), _zv = new T.Vector3(), _zr = new T.Quaternion();
-  // A thing flying free in space (her, a round, a torpedo, chaff), moved a step dt as what it is: going straight through the zone, whatever
-  // the ship that's the level is doing. Its place and velocity are the level's, as everything's here: taken into the zone as it was
-  // placed last frame, moved on there, and brought back as it's placed now (velocity: the zone's own turn, and the field's going-by
-  // where it is, put back on). The level ship going straight at her steady speed, that's p += v dt exactly; her turning, it isn't
-  // turned with her. (zturn: an attitude, kept as it is in the zone while the level turns under it)
-  // (m: the thing's own record of its velocity in the zone, and the level-frame velocity it was last given from it: it goes on with
-  // that, and what's changed its level velocity since as a push, not a velocity worked back out of the level's each step (which, with
-  // the field's going-by reckoned over a step, would drift a little each step the level ship's turn changes))
-  type ZMem = { vz: THREE.Vector3; v: THREE.Vector3 };
-  function zstep(p: THREE.Vector3, v: THREE.Vector3, dt: number, m?: ZMem) {
-    if (!zFrame.ok) { p.addScaledVector(v, dt); if (m) m.v.set(NaN, 0, 0); return; }
-    _zr.setFromRotationMatrix(zFrame.prev).invert();
-    // (its velocity in the zone: what it had, and whatever's been done to it since in the level's frame (a thruster's push, a hit) put
-    // on as a push; a new one's from the level's)
-    const vz = m && !isNaN(m.v.x) ? _zv.copy(m.vz).add(_fa.copy(v).sub(m.v).applyQuaternion(_zr)) : _zv.copy(v).sub(fieldAt(p)).applyQuaternion(_zr);
-    p.applyMatrix4(zFrame.pinv).addScaledVector(vz, dt).applyMatrix4(zFrame.cur);
-    if (m) m.vz.copy(vz);
-    v.copy(vz.applyQuaternion(_zr.setFromRotationMatrix(zFrame.cur))).add(fieldAt(p, _fa.clone()));
-    if (m) m.v.copy(v);
-  }
-  const zmem = (): ZMem => ({ vz: new T.Vector3(), v: new T.Vector3(NaN, 0, 0) });
-  const zturn = (q: THREE.Quaternion) => { if (zFrame.ok) q.premultiply(zFrame.turn); };
-  function fieldAt(p: THREE.Vector3, out = new T.Vector3()) {
-    if (!S.zone || !zFrame.ok) return out.copy(S.zoneV);
-    _fa.copy(p).applyMatrix4(zFrame.inv).applyMatrix4(zFrame.prev); // (where that point of the zone was a step ago)
-    return out.copy(p).sub(_fa).divideScalar(zFrame.dt); // (far from the level ship as she turns, that's fast: the level's frame turns about her)
-  }
+  const _zd = new T.Vector3(), _zq = new T.Quaternion();
+  // The zone's frame, and a thing flying free through it (zstep), kept as it is in the zone while the level turns (zturn), the field's
+  // velocity at a place (fieldAt): the simulation's (js/spacesim.ts), the zone's placing given it each step (zoneStep)
+  const ZS = SpaceSim.zone();
+  const zstep = (p: THREE.Vector3, v: THREE.Vector3, dt: number, m?: ZMem) => SpaceSim.zstep(S.zone ? ZS : null, p, v, dt, m);
+  const zmem = SpaceSim.zmem;
+  const zturn = (q: THREE.Quaternion) => SpaceSim.zturn(S.zone ? ZS : null, q);
+  const fieldAt = (p: THREE.Vector3, out = new T.Vector3()) => (S.zone ? SpaceSim.fieldAt(ZS, p, out) : out.copy(S.zoneV));
   function zoneStep() {
     if (!S.zone) return;
     const t = S.zt0 + (S.t - S.ztAt);
@@ -1225,17 +1202,14 @@ export const Space = (() => {
       S.zone.quaternion.copy(yawQ(-(Math.atan2(a.d[0], a.d[2]) - bow)));
       S.zone.position.set(-a.p[0], -a.p[1], -a.p[2]).applyQuaternion(S.zone.quaternion).add(S.zC);
     }
-    // (the zone's velocity in the level's frame: the field's and the stars', what she brakes to and her speed's held against: fly)
-    if (zPrev.t >= 0 && t > zPrev.t) { const v = _zd.copy(S.zone.position).sub(zPrev.p).divideScalar(t - zPrev.t); if (v.length() < 400) S.zoneV.copy(v); } zPrev.p.copy(S.zone.position); // (by the zone's own clock, as it's placed by)
-    // (and the zone's placing then and now: where a point of the field was a step ago, for the field's velocity at a place, fieldAt)
-    S.zone.updateMatrix(); zFrame.ok = false; if (zPrev.t >= 0 && t > zPrev.t && t - zPrev.t < 0.25) { zFrame.prev.copy(zPrev.m); zFrame.cur.copy(S.zone.matrix); zFrame.inv.copy(S.zone.matrix).invert(); zFrame.pinv.copy(zPrev.m).invert(); zFrame.turn.setFromRotationMatrix(zFrame.cur).multiply(_zq.setFromRotationMatrix(zFrame.prev).invert()); zFrame.dt = t - zPrev.t; zFrame.ok = true; } zPrev.m.copy(S.zone.matrix); zPrev.t = t; // (a jump in the zone's clock (put right from the host, a new level) isn't the zone moving: nothing's carried with it)
+    // (the zone's velocity in the level's frame, and its placing then and now: js/spacesim.ts zoneAt)
+    S.zone.updateMatrix(); SpaceSim.zoneAt(ZS, t, S.zone.position, S.zone.matrix); S.zoneV.copy(ZS.v);
     for (const q of S.anchors) if (q.p0) q.p.copy(q.p0).applyQuaternion(S.zone.quaternion).add(S.zone.position);
     for (const q of S.traffic) {
       trafficLocal(q, t, q.obj.position, q.obj.quaternion);
       if (q.wp) q.wp.p.copy(q.obj.position).applyQuaternion(S.zone.quaternion).add(S.zone.position);
       const st = q.obj.userData.strobe as THREE.Object3D | undefined; if (st) st.visible = (t + q.ph) % 1.6 < 0.18;
     }
-    void _zq;
     zoneReal(false);
   }
   // A ship of the zone's that's come within five kilometres is drawn as herself: her own hull (the level she'd be, laid out
@@ -3022,6 +2996,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => zFrame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)
