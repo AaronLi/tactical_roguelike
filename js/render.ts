@@ -997,9 +997,12 @@ export const R = {
       const leaf = pivot.userData && pivot.userData.leaf;
       if (!leaf || pivot.getWorldPosition(_tv).distanceTo(p) > 2.6) continue; // (its world position: a door upstairs sits in its floor's group)
       leaf.updateMatrixWorld(true);
-      const l = leaf.worldToLocal(p.clone()), g = leaf.geometry.parameters;
+      // (the leaf's own extent: its bounding box, whatever its shape (a box made here, or the level's own geometry: js/levelview.ts))
+      const geo = leaf.geometry as THREE.BufferGeometry | undefined; if (!geo) continue;
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      const bb = geo.boundingBox!, l = leaf.worldToLocal(p.clone()), cz = (bb.min.z + bb.max.z) / 2, hz = (bb.max.z - bb.min.z) / 2;
       // (a door's solid is thicker than its leaf: on the leaf's own face, not in the air in front of it)
-      if (Math.abs(l.x) <= g.width / 2 + 0.03 && Math.abs(l.y) <= g.height / 2 + 0.03 && Math.abs(l.z) <= 0.09) { leaf.attach(m); m.position.z = Math.sign(l.z || 1) * (g.depth / 2 + 0.004); return; }
+      if (l.x >= bb.min.x - 0.03 && l.x <= bb.max.x + 0.03 && l.y >= bb.min.y - 0.03 && l.y <= bb.max.y + 0.03 && Math.abs(l.z - cz) <= Math.max(0.09, hz + 0.03)) { leaf.attach(m); m.position.z = cz + Math.sign(l.z - cz || 1) * (hz + 0.004); return; }
     }
   },
   // ------------------------------------------------------------ frag grenade marks
