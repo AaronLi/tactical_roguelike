@@ -66,7 +66,7 @@ function build(E, sc) {
   const sh = HS.HullShape.of(map), ch = RT.hullRcs(map, sh);
   W.foe = ch.su; Radar.sched(W.foe); W.foe.aff = missionAff;
   W.foeT = { sz: ch.sz, kind: 'ship', id: 'hull', p: ch.c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: ch.rcs, aff: missionAff, iff: { c: missionAff === 'navy' ? 'navy' : 'civ', n: hullName }, xon: missionAff !== 'pirate' };
-  W.hb = hb;
+  W.hb = hb; W.foeL = { P: W.foe.P.clone(), Q: W.foe.Q.clone(), Tp: W.foeT.p.clone(), Tq: W.foeT.q.clone() }; // (as her level has her: carried through the zone, js/spacesim.ts worldStep)
   W.guns = sh.guns.map((g, i) => ({ k: g.k, x: g.x, y: ch.fit.guns[i].y, z: g.z, inv: g.inv, hp: g.hp, cool: g.cool }));
   // her crew (js/spaceserver.ts's for a crewed hostile ship: two at gun control, no countdown)
   W.crew = { hostile: obj === 'defend' ? 0 : 1, gn: sh.guns.length ? 2 : 0, arm: null, boom: false };
@@ -87,21 +87,22 @@ function build(E, sc) {
     const s = HS.TrafficShape.of(c.kind, c.seed), b = s.bbox, a = s.bboxAll, sz = [0, 1, 2].map((k) => b.max[k] - b.min[k]), all = [0, 1, 2].map((k) => a.max[k] - a.min[k]);
     return { rcs: RT.rcsOfTris(s.exact, s.flags), sz: Math.max(4, Math.max(...all) / 2), long: sz[2], wide: sz[0], tall: sz[1], ctr: new T.Vector3((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2), real: false };
   };
-  return { W, map, kindAff, tube: new T.Vector3(...F.tube), hullName, missionAff, TP: { n: 1 } };
+  return { W, map, kindAff, tube: new T.Vector3(...F.tube), hullName, missionAff, TP: { n: 1 }, lv: { P: W.ship.P.clone(), Q: W.ship.Q.clone(), V: W.ship.V.clone() } }; // (lv: her pose in the level's frame, as the pilot flies her)
 }
 
 // ---------------------------------------------------------------- the crew, scripted
 // the pilot: { k: 'hold' } (still in the level's frame), { k: 'goto', to: [x, y, z] | 'hull', off, v, a } (accelerates at a to at most
 // v, brakes to stop there), { k: 'script', f(t, ship, T) } (sets P, V, Q itself). face: her nose kept on the mission ship, else as she was
+// (her pose's the level's, as a pilot flies her (B.lv): brought into the battle's frame, the zone's, as each step begins: run)
 function pilotStep(E, B, pl, dt) {
-  const { T } = E, S = B.W.ship, W = B.W;
+  const { T } = E, S = B.lv, W = B.W, hullP = W.foeL ? W.foeL.Tp : W.foeT.p;
   if (!pl || pl.k === 'hold') { S.V.set(0, 0, 0); }
   else if (pl.k === 'goto') {
-    const to = pl.to === 'hull' ? W.foeT.p.clone().add(new T.Vector3(...(pl.off || [0, 0, 0]))) : new T.Vector3(...pl.to), d = to.sub(S.P), L = d.length(), a = pl.a || 30;
+    const to = pl.to === 'hull' ? hullP.clone().add(new T.Vector3(...(pl.off || [0, 0, 0]))) : new T.Vector3(...pl.to), d = to.sub(S.P), L = d.length(), a = pl.a || 30;
     const want = L > 0.5 ? d.multiplyScalar(Math.min(pl.v || 100, Math.sqrt(2 * a * L * 0.8)) / L) : new T.Vector3(), dv = want.sub(S.V), m = a * dt;
     if (dv.length() > m) dv.setLength(m); S.V.add(dv); S.P.addScaledVector(S.V, dt);
   } else if (pl.k === 'script') pl.f(W.t, S, T);
-  if (pl && pl.face && S.P.distanceTo(W.foeT.p) > 1) S.Q.setFromRotationMatrix(new T.Matrix4().lookAt(S.P, W.foeT.p, new T.Vector3(0, 1, 0))); // (face: her nose on the mission ship)
+  if (pl && pl.face && S.P.distanceTo(hullP) > 1) S.Q.setFromRotationMatrix(new T.Matrix4().lookAt(S.P, hullP, new T.Vector3(0, 1, 0))); // (face: her nose on the mission ship)
 }
 // the sensor operator: her scanners on (at on, s), then (keep) a track kept (Radar.want, her pick: pri 1, op) on the nearest HOSTILE
 // belief she isn't keeping already, looked at once a second (as a person would)
@@ -168,7 +169,7 @@ async function run(sc, o = {}) {
     pilotStep(E, B, sc.pilot, DT); sensorStep(E, B, so);
     const fired = helmStep(E, B, hm); if (fired) { tp = fired; pd.launch = W.t; }
     rounds0 = W.rounds.length;
-    E.SpaceSim.worldStep(W, DT, { kindAff: B.kindAff, fix: (t) => W.own.fus.find((q) => q.n === t.fus) || null });
+    E.SpaceSim.worldStep(W, DT, { kindAff: B.kindAff, fix: (t) => W.own.fus.find((q) => q.n === t.fus) || null, ship: (L) => { L.toZ(B.lv.P, W.ship.P); W.ship.Q.copy(L.qz).multiply(B.lv.Q); L.vToZ(B.lv.P, B.lv.V, W.ship.V); } });
     steps++;
     for (const e of W.out) {
       ev.push(e);

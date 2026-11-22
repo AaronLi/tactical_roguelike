@@ -53,6 +53,16 @@ export type SimEvent =
 export interface SimTraffic { c: any; shape: { rcs: RcsTableT; sz: number; long: number; wide: number; tall: number; ctr: THREE.Vector3; real: boolean } | null; t?: RTarget; su?: RSuite | null; turn?: THREE.Quaternion; fresh?: boolean }
 type RcsTableT = RTarget['rcs'];
 // The whole battle (docs/space-server.md): what one step needs and changes. On the server, one a zone
+// The battle runs in the zone's frame (docs/space-server.md E): inertial, nothing turning it; what's fixed to the level (the mission
+// ship: her hull, guns, radars, breach sites) is carried through it by the level's placing, and what comes from or goes to the level's
+// frame (her pose as her helm flies it, the pages' pictures and snapshots, a turret's round) is turned from one to the other by this.
+// toZ / toL: a place; vToZ / vToL: a velocity at a place in the level's frame (pl), the zone's own way there taken out or put back;
+// qz / ql: the turn from the level's axes to the zone's, and back
+export interface SimFrame {
+  qz: THREE.Quaternion; ql: THREE.Quaternion;
+  toZ: (p: THREE.Vector3, out?: THREE.Vector3) => THREE.Vector3; toL: (p: THREE.Vector3, out?: THREE.Vector3) => THREE.Vector3;
+  vToZ: (pl: THREE.Vector3, v: THREE.Vector3, out?: THREE.Vector3) => THREE.Vector3; vToL: (pl: THREE.Vector3, v: THREE.Vector3, out?: THREE.Vector3) => THREE.Vector3;
+}
 export interface SimWorld {
   t: number; // (the simulation's time: the radars' clock)
   Z: SimZone; zp: THREE.Vector3; zq: THREE.Quaternion; zm: THREE.Matrix4; // (the zone's frame and its placing now)
@@ -60,6 +70,8 @@ export interface SimWorld {
   rocks: SimRocks; rockList: RockList; notch: { t: number };
   ship: SimShip; own: RSuite | null; ownT: RTarget | null; xpdr: boolean; keepTgt: string | null; // (keepTgt: what she's matched speed with: her notch lets it through)
   foe: RSuite | null; foeT: RTarget | null; hb: { x0: number; x1: number; z0: number; z1: number } | null; guns: SimGun[];
+  foeL: { P: THREE.Vector3; Q: THREE.Quaternion; Tp: THREE.Vector3; Tq: THREE.Quaternion } | null; // (the mission ship's suite and return as they sit in her level: carried through the zone with it each step)
+  L: SimFrame; // (the level and the zone, this step: worldStep)
   crew: { hostile: number | null; gn: number; arm: number | null; boom: boolean } | null; // (the mission ship's: js/spaceserver.ts)
   traffic: SimTraffic[]; trafficShape: ((c: any) => SimTraffic['shape']) | null; // (a zone ship's shape when she's first seen)
   chaff: SimChaff[]; chaffN: number; mis: SimMissile[]; misN: number; torps: SimTorp[]; rounds: SimRound[]; roundsMax: number; shots: SimShot[]; misT?: Map<number, RTarget>;
@@ -217,10 +229,10 @@ export const SpaceSim = (() => {
   // gunHit, missileEnd), at its range it's spent
   function shotsStep(W: SimWorld, dt: number) {
     for (let i = W.shots.length - 1; i >= 0; i--) {
-      const q = W.shots[i], a = q.p.clone(); zstep(W.zone ? W.Z : null, q.p, q.v, dt, q.zm || (q.zm = zmem())); q.d += a.distanceTo(q.p);
+      const q = W.shots[i], a = q.p.clone(); q.p.addScaledVector(q.v, dt); q.d += a.distanceTo(q.p); // (straight through the zone)
       let gone = q.d >= q.life;
       if (!gone && W.rocks.near.length && rockOn(W.rocks, W.rockList, a, q.p) < 1) { gone = true; W.out.push({ k: 'rockHit', p: q.p.clone() }); }
-      if (!gone) for (let gi = 0; gi < W.guns.length; gi++) { const gn = W.guns[gi]; if (gn.hp <= 0) continue; if (segNear(a, q.p, _sg.set(gn.x, gn.y, gn.z)) < SHOT.GUN_R) { gn.hp = Math.max(0, gn.hp - q.dmg); W.out.push({ k: 'gunHit', i: gi, hp: gn.hp }); gone = true; break; } }
+      if (!gone) for (let gi = 0; gi < W.guns.length; gi++) { const gn = W.guns[gi]; if (gn.hp <= 0) continue; if (segNear(a, q.p, W.L.toZ(_sg.set(gn.x, gn.y, gn.z), _sg)) < SHOT.GUN_R) { gn.hp = Math.max(0, gn.hp - q.dmg); W.out.push({ k: 'gunHit', i: gi, hp: gn.hp }); gone = true; break; } }
       if (!gone) for (let mi = 0; mi < W.mis.length; mi++) { const ms = W.mis[mi]; if (segNear(a, q.p, ms.p) < SHOT.MIS_R) { W.mis.splice(mi, 1); W.out.push({ k: 'missileEnd', id: ms.id, hit: false }); gone = true; break; } }
       if (gone) W.shots.splice(i, 1);
     }
@@ -279,10 +291,10 @@ export const SpaceSim = (() => {
   }
   // has it met something (its proximity fuse): a hull by her box (hb: the mission ship's footprint), a ship by her size, anything small
   // within a few metres (rocks by their radius)
-  function torpFuse(tp: SimTorp, p0: THREE.Vector3, tg: RTarget[], hb: { x0: number; x1: number; z0: number; z1: number } | null, R: SimRocks): RTarget | null {
+  function torpFuse(tp: SimTorp, p0: THREE.Vector3, tg: RTarget[], hb: { x0: number; x1: number; z0: number; z1: number } | null, R: SimRocks, toL?: (p: THREE.Vector3, out?: THREE.Vector3) => THREE.Vector3): RTarget | null {
     for (const t of tg) {
       if (t.id === 'own' || t.id.startsWith('torp')) continue;
-      if (t.id === 'hull' && hb) { const y = t.p.y, x = tp.p.x, z = tp.p.z; if (x > hb.x0 - 4 && x < hb.x1 + 4 && z > hb.z0 - 4 && z < hb.z1 + 4 && Math.abs(tp.p.y - y) < 25) return t; continue; }
+      if (t.id === 'hull' && hb) { const pl = toL ? toL(tp.p, new T.Vector3()) : tp.p, y = toL ? toL(t.p, new T.Vector3()).y : t.p.y, x = pl.x, z = pl.z; if (x > hb.x0 - 4 && x < hb.x1 + 4 && z > hb.z0 - 4 && z < hb.z1 + 4 && Math.abs(pl.y - y) < 25) return t; continue; } // (her footprint's the level's)
       const Rr = /^t\d/.test(t.id) ? 30 : t.id.startsWith('rock') ? (R.r.get(t.id) || 30) : 7, seg = tp.p.clone().sub(p0), w = t.p.clone().sub(p0), L2 = seg.lengthSq(), k = L2 > 0 ? Math.max(0, Math.min(1, w.dot(seg) / L2)) : 0;
       if (w.addScaledVector(seg, -k).length() < Rr) return t;
     }
@@ -290,7 +302,7 @@ export const SpaceSim = (() => {
   }
   // a torpedo a step. Another side's: on as it goes (put right by its owner's word). This side's: guided (fix: where her sensors have
   // the target it was sent at now, or null), moved, its fuse tried. Returns what it hit, 'spent' (flown its life), or null
-  function torpStep(Z: SimZone | null, tp: SimTorp, dt: number, c: { tg: RTarget[]; fix: { pl: THREE.Vector3; v: THREE.Vector3 } | null; shipP: THREE.Vector3; shipQ: THREE.Quaternion; hb: { x0: number; x1: number; z0: number; z1: number } | null; R: SimRocks }): RTarget | 'spent' | null {
+  function torpStep(Z: SimZone | null, tp: SimTorp, dt: number, c: { tg: RTarget[]; fix: { pl: THREE.Vector3; v: THREE.Vector3 } | null; shipP: THREE.Vector3; shipQ: THREE.Quaternion; hb: { x0: number; x1: number; z0: number; z1: number } | null; R: SimRocks; toL?: (p: THREE.Vector3, out?: THREE.Vector3) => THREE.Vector3 }): RTarget | 'spent' | null {
     tp.t += dt; const p0 = tp.p.clone();
     if (!tp.mine) { zstep(Z, tp.p, tp.v, dt, tp.zm || (tp.zm = zmem())); return null; }
     if (c.fix) { tp.est.copy(c.fix.pl); tp.ev.copy(c.fix.v); } else tp.est.addScaledVector(tp.ev, dt);
@@ -325,7 +337,7 @@ export const SpaceSim = (() => {
       tp.dbg = { R, vc, om: om.length(), raw: om.clone().cross(u).multiplyScalar(TORP.N * Math.max(vc, 50)).length(), lat: lat.length(), got: acc.clone().addScaledVector(u, -acc.dot(u)).length(), nose: n2.angleTo(u), ph: tp.ph }; // (the debug's: the turn asked for (raw, and smoothed: lat) against what it got across its line of sight)
     }
     tp.v.addScaledVector(acc, dt); zstep(Z, tp.p, tp.v, dt, tp.zm || (tp.zm = zmem()));
-    if (tp.ph >= 2) { const hit = torpFuse(tp, p0, c.tg, c.hb, c.R); if (hit) return hit; }
+    if (tp.ph >= 2) { const hit = torpFuse(tp, p0, c.tg, c.hb, c.R, c.toL); if (hit) return hit; }
     if (tp.t > TORP.life) return 'spent';
     return null;
   }
@@ -441,7 +453,17 @@ export const SpaceSim = (() => {
     return true;
   }
   // ---------------------------------------------------------------- the whole battle, a step
-  const world = (rng: () => number): SimWorld => ({ t: 0, Z: zone(), zp: new T.Vector3(), zq: new T.Quaternion(), zm: new T.Matrix4(), zone: null, rocks: rocks(), rockList: [], notch: { t: 0 }, ship: { P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), size: 5 / 0.6, docked: true, ftl: false }, own: null, ownT: null, xpdr: false, keepTgt: null, foe: null, foeT: null, hb: null, guns: [], crew: null, traffic: [], trafficShape: null, chaff: [], chaffN: 0, mis: [], misN: 1, torps: [], rounds: [], roundsMax: 4096, shots: [], rng, fc: null, out: [], tg: [], HG: SD.HULLGUN as any });
+  // (the frame helpers for world W's zone as placed now; none, or no zone: the level is the zone)
+  const _ZP0 = new T.Vector3(), _ZQ1 = new T.Quaternion(), _fv1 = new T.Vector3();
+  function frameOf(W: SimWorld | null): SimFrame {
+    const has = !!(W && W.zone), zp = has ? W!.zp.clone() : _ZP0, ql = has ? W!.zq.clone() : _ZQ1.clone(), qz = ql.clone().invert(), Z = has ? W!.Z : null;
+    return { qz, ql,
+      toZ: (p, out = new T.Vector3()) => out.copy(p).sub(zp).applyQuaternion(qz),
+      toL: (p, out = new T.Vector3()) => out.copy(p).applyQuaternion(ql).add(zp),
+      vToZ: (pl, v, out = new T.Vector3()) => out.copy(v).sub(fieldAt(Z, pl, _fv1)).applyQuaternion(qz),
+      vToL: (pl, v, out = new T.Vector3()) => out.copy(v).applyQuaternion(ql).add(fieldAt(Z, pl, _fv1)) };
+  }
+  const world = (rng: () => number): SimWorld => ({ t: 0, Z: zone(), zp: new T.Vector3(), zq: new T.Quaternion(), zm: new T.Matrix4(), zone: null, rocks: rocks(), rockList: [], notch: { t: 0 }, ship: { P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), size: 5 / 0.6, docked: true, ftl: false }, own: null, ownT: null, xpdr: false, keepTgt: null, foe: null, foeT: null, hb: null, guns: [], foeL: null, L: frameOf(null), crew: null, traffic: [], trafficShape: null, chaff: [], chaffN: 0, mis: [], misN: 1, torps: [], rounds: [], roundsMax: 4096, shots: [], rng, fc: null, out: [], tg: [], HG: SD.HULLGUN as any });
   const ztOf = (W: SimWorld) => (W.zone ? W.zone.zt0 + (W.t - W.zone.ztAt) : 0);
   // the zone's ships as radar targets: each where her course puts her now (in the level's frame), her velocity from step to step, her
   // return and size from her shape; her own radars within 12 km (a civilian's: conical scan; no fire control)
@@ -452,9 +474,8 @@ export const SpaceSim = (() => {
     for (const q of W.traffic) {
       if (q.c.k === W.zone.zact) continue; // (the one that's the level: she's the mission ship's target already)
       if (!q.shape && W.trafficShape) q.shape = W.trafficShape(q.c); if (!q.shape) continue;
-      const z = SD.zonePos(q.c, zt); _tp.set(z.p[0], z.p[1], z.p[2]).applyQuaternion(W.zq).add(W.zp);
+      const z = SD.zonePos(q.c, zt); _tp.set(z.p[0], z.p[1], z.p[2]); // (in the zone, as she is)
       if (q.shape.real) yawQ(Math.atan2(z.d[0], z.d[2]) - (q.c.wing ? Math.atan2(-1, -1) : Math.atan2(-1, 0)), _tq); else _tq.setFromRotationMatrix(new T.Matrix4().lookAt(new T.Vector3(), new T.Vector3(z.d[0], z.d[1], z.d[2]), new T.Vector3(0, 1, 0)));
-      _tq.premultiply(W.zq);
       let t = q.t; if (!t) { t = q.t = { sz: q.shape.sz, kind: 'ship', id: 't' + q.c.k, p: _tp.clone(), v: new T.Vector3(), q: _tq.clone(), rcs: q.shape.rcs }; q.fresh = true; }
       if (!q.fresh && dt > 0) t.v.copy(_tp).sub(t.p).divideScalar(dt); q.fresh = false; t.p.copy(_tp); t.q.copy(_tq);
       const af = kindAff(q.c) as any; t.aff = af; t.iff = { c: af === 'navy' ? 'navy' : 'civ', n: q.c.name || 'unnamed' }; t.xon = af !== 'pirate'; out.push(t);
@@ -476,16 +497,20 @@ export const SpaceSim = (() => {
   // ship's fire control and guns, missiles, torpedoes (fix(n): where her sensors have the fix a torpedo was sent at), rounds.
   // What happened goes to W.out. kindAff: whose a zone ship is (js/space.ts kindAff); fire: a hull gun's round fired (the server's: each
   // step's rounds off a gun from a seed of their own, so a client can fly the same ones: js/svbattle.ts), else fireRound on W.rng
-  function worldStep(W: SimWorld, dt: number, o: { kindAff: (c: any) => string; fix: (tp: SimTorp) => { pl: THREE.Vector3; v: THREE.Vector3 } | null; fire?: (from: THREE.Vector3, aim: THREE.Vector3, H: any, err: number) => void }) {
+  function worldStep(W: SimWorld, dt: number, o: { kindAff: (c: any) => string; fix: (tp: SimTorp) => { pl: THREE.Vector3; v: THREE.Vector3 } | null; fire?: (from: THREE.Vector3, aim: THREE.Vector3, H: any, err: number) => void; ship?: (L: SimFrame) => void }) {
     W.t += dt;
     if (W.zone) { const zt = ztOf(W); if (zonePlace(W.zone.zdef, W.zone.zact, W.zone.wing, W.zone.zC, zt, W.zp, W.zq)) { W.zm.compose(W.zp, W.zq, new T.Vector3(1, 1, 1)); zoneAt(W.Z, zt, W.zp, W.zm); } }
-    const Z = W.zone ? W.Z : null, own = W.own, me = W.ownT;
+    const L = W.L = frameOf(W), Z: SimZone | null = null, own = W.own, me = W.ownT; // (Z: none, the zone's frame is the battle's: what flies, flies straight)
+    if (o.ship) o.ship(L); // (her pose this step, as the caller has it in the level's frame: brought into the zone's)
+    // (the mission ship, where her level has her in the zone now: her radars and her return, and the way she's going)
+    if (W.foe && W.foeL) { L.toZ(W.foeL.P, W.foe.P); W.foe.Q.copy(L.qz).multiply(W.foeL.Q); L.vToZ(W.foeL.P, _ZP0, W.foe.V); }
+    if (W.foeT && W.foeL) { L.toZ(W.foeL.Tp, W.foeT.p); W.foeT.q.copy(L.qz).multiply(W.foeL.Tq); L.vToZ(W.foeL.Tp, _ZP0, W.foeT.v); }
     if (own && me) { own.P.copy(W.ship.P); own.Q.copy(W.ship.Q); own.V.copy(W.ship.V); me.p.copy(W.ship.P); me.v.copy(W.ship.V); me.q.copy(W.ship.Q); me.xon = W.xpdr; }
     if (W.ship.ftl) { for (const su of [own, W.foe]) if (su) { for (const t of su.trks) { Radar.drop(t); t.job = null; } if (su.sched) { su.sched.tts.length = 0; su.sched.reqs.length = 0; su.sched.plan.clear(); } } return; }
-    const rk = rocksStep(W.rocks, W.rockList, W.zone ? W.zp : null, W.zone ? W.zq : null, W.ship.P, dt, W.t);
+    const rk = rocksStep(W.rocks, W.rockList, W.zone ? _ZP0 : null, W.zone ? _ZQ1 : null, W.ship.P, dt, W.t); // (where they lie in the zone)
     if (own) { own.Vc = W.rocks.v; const keep = own.keep || (own.keep = new Set<string>()); keep.clear(); for (const tr of own.trks) if (tr.st === 'track' && tr.tgt) keep.add(tr.tgt); for (const q of Radar.sched(own).tts) if (q.tgt) keep.add(q.tgt); if (W.keepTgt) keep.add(W.keepTgt); }
     const sus = [...(W.foe ? [W.foe] : []), ...W.traffic.filter((q) => q.su).map((q) => q.su!)];
-    aiNotch(W.rocks, W.rockList, sus, W.zone ? W.zp : null, W.zone ? W.zq : null, W.notch, dt);
+    aiNotch(W.rocks, W.rockList, sus, W.zone ? _ZP0 : null, W.zone ? _ZQ1 : null, W.notch, dt);
     for (const c of chaffStep(Z, W.chaff, W.t, dt)) void c;
     const tg = [...(me ? [me] : []), ...(W.foeT ? [W.foeT] : []), ...rk, ...trafficStep(W, dt, o.kindAff), ...W.chaff.map((c) => c.t), ...missileTargets(W, dt), ...torpTargets(W.torps)]; W.tg = tg;
     if (own) Radar.step(own, dt, tg, W.t);
@@ -499,13 +524,17 @@ export const SpaceSim = (() => {
       let lk: any = null; const cr = W.crew;
       if (cr && cr.hostile !== 0 && cr.gn && cr.arm == null) for (const t of Radar.sched(W.foe).tts) if (t.est.q >= 0.15 && (!lk || trkUrg(W.foe, t) < trkUrg(W.foe, lk))) lk = t;
       if (lk && !lk.est.p) lk = null;
-      gunsStep(W.guns, lk, !!lk && trkUrg(W.foe, lk) < 4, W.foe.P, W.foe.V, W.HG, W.rng, dt, (from, aim, H, err) => { if (o.fire) o.fire(from, aim, H, err); else fireRound(W.rounds, W.roundsMax, W.rng, from, aim, H, err); }, (gn) => { const m: SimMissile = { id: W.misN++, p: new T.Vector3(gn.x, gn.y + 1.5, gn.z), v: new T.Vector3(0, 1, 0), t: 0 }; W.mis.push(m); W.out.push({ k: 'missile', m }); });
+      // (laid as her level has her guns: the track brought into the level's frame; what they put out, rounds and missiles, into the zone)
+      const lp = lk ? L.toL(lk.est.p) : null, lkL = lk && lp ? { est: { p: lp, v: L.vToL(lp, lk.est.v) }, err: lk.err } : null, n0 = W.rounds.length, m0 = W.mis.length;
+      gunsStep(W.guns, lkL, !!lk && trkUrg(W.foe, lk) < 4, W.foeL ? W.foeL.P : W.foe.P, _ZP0, W.HG, W.rng, dt, (from, aim, H, err) => { if (o.fire) o.fire(from, aim, H, err); else fireRound(W.rounds, W.roundsMax, W.rng, from, aim, H, err); }, (gn) => { const m: SimMissile = { id: W.misN++, p: new T.Vector3(gn.x, gn.y + 1.5, gn.z), v: new T.Vector3(0, 1, 0), t: 0 }; W.mis.push(m); W.out.push({ k: 'missile', m }); });
+      for (let i = n0; i < W.rounds.length; i++) { const q = W.rounds[i], pl = q.p.clone(); L.toZ(pl, q.p); L.vToZ(pl, q.v, q.v); q.zm = undefined; }
+      for (let i = m0; i < W.mis.length; i++) { const m = W.mis[i]; L.toZ(m.p.clone(), m.p); m.v.applyQuaternion(L.qz); }
     }
     { const r = missilesStep(W.mis, W.ship, W.rocks, W.rockList, W.HG.missile, dt); for (const m of r.hit) { W.out.push({ k: 'missileEnd', id: m.id, hit: true }); W.out.push({ k: 'damage', dmg: W.HG.missile.dmg, why: 'A missile', hits: 1 }); } for (const m of r.gone) W.out.push({ k: 'missileEnd', id: m.id, hit: false }); }
     for (const tp of W.torps.slice()) {
-      const r = torpStep(Z, tp, dt, { tg, fix: tp.mine ? o.fix(tp) : null, shipP: W.ship.P, shipQ: W.ship.Q, hb: W.hb, R: W.rocks });
+      const r = torpStep(Z, tp, dt, { tg, fix: tp.mine ? o.fix(tp) : null, shipP: W.ship.P, shipQ: W.ship.Q, hb: W.hb, R: W.rocks, toL: L.toL });
       if (!tp.mine) continue;
-      if (r && r !== 'spent') { W.torps.splice(W.torps.indexOf(tp), 1); W.out.push({ k: 'torpEnd', id: tp.id, how: 2, on: r.id }); if (r.id === 'hull') W.guns.forEach((gn, i) => { if (gn.hp > 0 && new T.Vector3(gn.x, gn.y, gn.z).distanceTo(tp.p) < TORP.blast) { gn.hp = 0; W.out.push({ k: 'gunHit', i, hp: 0 }); } }); }
+      if (r && r !== 'spent') { W.torps.splice(W.torps.indexOf(tp), 1); W.out.push({ k: 'torpEnd', id: tp.id, how: 2, on: r.id }); if (r.id === 'hull') W.guns.forEach((gn, i) => { if (gn.hp > 0 && new T.Vector3(gn.x, gn.y, gn.z).distanceTo(L.toL(tp.p)) < TORP.blast) { gn.hp = 0; W.out.push({ k: 'gunHit', i, hp: 0 }); } }); }
       else if (r === 'spent') { W.torps.splice(W.torps.indexOf(tp), 1); W.out.push({ k: 'torpEnd', id: tp.id, how: 3 }); }
     }
     { const r = roundsStep(Z, W.rounds, W.ship, W.rocks, W.rockList, dt, W.torps.length ? (a, b) => { const tp = roundMeetsTorp(W.torps, a, b, dt); if (tp) { W.torps.splice(W.torps.indexOf(tp), 1); W.out.push({ k: 'torpEnd', id: tp.id, how: 1 }); } return !!tp; } : null);
@@ -513,5 +542,5 @@ export const SpaceSim = (() => {
       if (r.hits) W.out.push({ k: 'damage', dmg: r.dmg, why: r.dmg > 4 ? 'Minigun fire' : undefined, hits: r.hits }); }
     if (W.shots.length) shotsStep(W, dt);
   }
-  return { world, worldStep, ztOf, zonePlace, yawQ, CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, FLY, flyTurn, flyPush, flyMax, flyStep, flyClone, flyPack, flyUnpack, zoneCopy, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, SHOT, segNear, shotsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
+  return { frameOf, world, worldStep, ztOf, zonePlace, yawQ, CHAFF, chaffThrow, chaffNew, chaffStep, chaffK, FC_URG, tti, trkUrg, fireControl, gunsStep, zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, FLY, flyTurn, flyPush, flyMax, flyStep, flyClone, flyPack, flyUnpack, zoneCopy, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, SHOT, segNear, shotsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
 })();

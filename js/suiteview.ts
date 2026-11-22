@@ -53,6 +53,11 @@ const CLS = ['HOSTILE', 'SUSPECT', 'WATCH', 'NEUTRAL', 'CIV', 'FRIENDLY'] as con
 export const SuiteView = (() => {
   const T = THREE;
   const rd = (x: number, k: number) => Math.round(x * k) / k;
+  // (the frame the picture's sent in, while one's packed: xf (js/spacesim.ts SimFrame's toL, ql, vToL: the server's battle is in the
+  // zone's frame, the pages draw in the level's); none, as it is. XP a place, XD a direction, XQ an attitude, XV a velocity at a place)
+  let XF: { toL: (p: THREE.Vector3, out?: THREE.Vector3) => THREE.Vector3; ql: THREE.Quaternion; vToL: (pl: THREE.Vector3, v: THREE.Vector3, out?: THREE.Vector3) => THREE.Vector3 } | null = null;
+  const XP = (v: THREE.Vector3) => (XF ? XF.toL(v, new THREE.Vector3()) : v), XD = (v: THREE.Vector3) => (XF ? v.clone().applyQuaternion(XF.ql) : v);
+  const XQ = (q: THREE.Quaternion) => (XF ? XF.ql.clone().multiply(q) : q), XV = (p: THREE.Vector3, v: THREE.Vector3) => (XF ? XF.vToL(XF.toL(p, new THREE.Vector3()), v, new THREE.Vector3()) : v);
   const v3 = (v: THREE.Vector3, k = 10): V3 => [rd(v.x, k), rd(v.y, k), rd(v.z, k)];
   const q4 = (q: THREE.Quaternion, k = 1e4): Q4 => [rd(q.x, k), rd(q.y, k), rd(q.z, k), rd(q.w, k)];
   const tm = (t: number) => rd(t, 1000);
@@ -70,7 +75,7 @@ export const SuiteView = (() => {
   const posP = (P: ArrayLike<number>) => [P[0], P[1], P[2], P[6], P[7], P[8], P[12], P[13], P[14]];
   // (a filter: its state, its time and count, its position's covariance as its shape; its velocity's left out, nothing drawn reads it)
   function kfPack(kf: KF3, rt: (t: number) => number) {
-    const e = Radar.eig3(posP(kf.P)), o: Record<string, unknown> = { x: [...v3(kf.pos()), ...v3(kf.vel(), 100)], t: rt(kf.t), n: kf.n, P: shapeOf(e.map((q) => q.d), e.map((q) => Math.sqrt(q.l))) };
+    const e = Radar.eig3(posP(kf.P)), kp = kf.pos(), o: Record<string, unknown> = { x: [...v3(XP(kp)), ...v3(XV(kp, kf.vel()), 100)], t: rt(kf.t), n: kf.n, P: shapeOf(e.map((q) => XD(q.d)), e.map((q) => Math.sqrt(q.l))) };
     if (kf.fxT != null) o.fx = rt(kf.fxT);
     return o;
   }
@@ -83,15 +88,19 @@ export const SuiteView = (() => {
   const clsP = (c: RCls | undefined, rt: (t: number) => number) => (c ? [c.k, rd(c.conf, 1e3), rt(c.t), ...(c.name ? [c.name] : [])] : 0);
   const clsU = (o: any, at: (t: number) => number): RCls | undefined => (o ? { k: o[0], conf: o[1], t: at(o[2]), ...(o[3] ? { name: o[3] } : {}) } : undefined);
   // (a trajectory, a point every half second and its newest: what's drawn of it)
-  function thin(h: { t: number; p: THREE.Vector3 }[], rt: (t: number) => number) { const out: number[][] = []; let last = -1e9; h.forEach((q, i) => { if (q.t - last >= 0.5 || i === h.length - 1) { out.push([rt(q.t), ...v3(q.p)]); last = q.t; } }); return out; }
+  function thin(h: { t: number; p: THREE.Vector3 }[], rt: (t: number) => number) { const out: number[][] = []; let last = -1e9; h.forEach((q, i) => { if (q.t - last >= 0.5 || i === h.length - 1) { out.push([rt(q.t), ...v3(XP(q.p))]); last = q.t; } }); return out; }
   const thinU = (a: number[][] | undefined, at: (t: number) => number) => (a || []).map((q) => ({ t: at(q[0]), p: new T.Vector3(q[1], q[2], q[3]) }));
   // ---------------------------------------------------------------- pack
-  function pack(su: RSuite, now: number, opts: { dbg?: boolean } = {}): SVMsg {
+  function pack(su: RSuite, now: number, opts: { dbg?: boolean; xf?: typeof XF } = {}): SVMsg {
+    XF = opts.xf || null;
+    try { return pack0(su, now, opts); } finally { XF = null; }
+  }
+  function pack0(su: RSuite, now: number, opts: { dbg?: boolean } = {}): SVMsg {
     const dbg = !!opts.dbg, t0 = tm(now), rt = (t: number) => Math.round((t - t0) * 1000);
     const ff: string[][] = [], ffK = new Map<string, number>();
     const iff = (f: RIff | null | undefined) => { if (!f) return -1; const k = f.c + '|' + f.n; let i = ffK.get(k); if (i == null) { i = ff.length; ff.push([f.c, f.n]); ffK.set(k, i); } return i; };
     const po: number[][] = [], poK = new Map<string, number>();
-    const pose = (q: THREE.Quaternion | undefined, o: THREE.Vector3 | undefined) => { if (!q || !o) return -1; const a = [...q4(q, 1e6), ...v3(o, 100)], k = a.join(','); let i = poK.get(k); if (i == null) { i = po.length; po.push(a); poK.set(k, i); } return i; };
+    const pose = (q: THREE.Quaternion | undefined, o: THREE.Vector3 | undefined) => { if (!q || !o) return -1; const a = [...q4(XQ(q), 1e6), ...v3(XP(o), 100)], k = a.join(','); let i = poK.get(k); if (i == null) { i = po.length; po.push(a); poK.set(k, i); } return i; };
     // (a plot's reference: its contact's place if it's a contact's latest, else its place in the scanner's table of the others, past the contacts)
     const plI = su.scans.map((s) => new Map<RPlot, number>(s.cons.map((c, i) => [c.p, i]))), px = su.scans.map(() => [] as (number | string)[][]);
     const plot = (p: RPlot | null | undefined): number[] | null => {
@@ -111,17 +120,17 @@ export const SuiteView = (() => {
       if (!j) return null; const ri = reqs.indexOf(j); if (ri >= 0) return ri;
       const o: Record<string, unknown> = { k: j.kind, t: rt(j.t), pri: j.pri };
       if (j.tt) o.tt = S0 && S0.tts.includes(j.tt) ? j.tt.n : ttMini(j.tt);
-      if (j.plot) o.pl = plot(j.plot); if (j.d) o.d = v3(j.d, 1e4); if (j.at != null) o.at = rt(j.at); if (j.end != null) o.end = rt(j.end); if (j.op) o.op = 1;
+      if (j.plot) o.pl = plot(j.plot); if (j.d) o.d = v3(XD(j.d), 1e4); if (j.at != null) o.at = rt(j.at); if (j.end != null) o.end = rt(j.end); if (j.op) o.op = 1;
       return o;
     };
     const trkI = (tr: RTrack | null | undefined) => (tr ? su.trks.indexOf(tr) : -1);
     const tk = su.trks.map((tr) => {
       if (tr.job) Radar.jobProg(su, tr, now); // (its slew's start, which the progress bar measures from, set as the page's view would)
-      const o: Record<string, unknown> = { sd: tr.side, at: v3(tr.at, 100), b: v3(tr.b, 1e4), a: v3(tr.a, 1e4), st: tr.st, rng: rd(tr.rng, 10), db: rd(tr.db, 10), err: rd(tr.err, 1e5), eq: rd(tr.est.q, 1e3), lk: rd(tr.lockT, 100), bdb: rd(tr.best.db, 10) };
+      const o: Record<string, unknown> = { sd: tr.side, at: v3(tr.at, 100), b: v3(tr.b, 1e4), a: v3(tr.a, 1e4), /* (a dish's boresight: in her own frame) */ st: tr.st, rng: rd(tr.rng, 10), db: rd(tr.db, 10), err: rd(tr.err, 1e5), eq: rd(tr.est.q, 1e3), lk: rd(tr.lockT, 100), bdb: rd(tr.best.db, 10) };
       if (tr.kind) o.kd = tr.kind; if (tr.off) o.off = 1; if (tr.tgt) o.tgt = tr.tgt;
-      if (tr.est.p) { o.ep = v3(tr.est.p); o.ev = v3(tr.est.v); }
-      if (tr.hand) o.hp = v3(tr.hand.p);
-      if (tr.cue) { const c = tr.cue; o.cue = { k: c.k, ax: c.ax, phi: rd(c.phi, 1e4), r: rd(c.r, 10), q: q4(c.q), o: v3(c.o), con: c.con ? c.con.n : 0 }; }
+      if (tr.est.p) { o.ep = v3(XP(tr.est.p)); o.ev = v3(XV(tr.est.p, tr.est.v)); }
+      if (tr.hand) o.hp = v3(XP(tr.hand.p));
+      if (tr.cue) { const c = tr.cue; o.cue = { k: c.k, ax: c.ax, phi: rd(c.phi, 1e4), r: rd(c.r, 10), q: q4(XQ(c.q)), o: v3(XP(c.o)), con: c.con ? c.con.n : 0 }; }
       if (tr.job) { o.job = job(tr.job); o.jT = rt(tr.jobT ?? 0); if (tr.jobA != null) o.jA = rd(tr.jobA, 1e5); o.jR = tr.jobRev ?? -1; }
       o.rev = tr.rev || 0; o.dP = rd(tr.dP || 0, 1e4); o.sw = rd(tr.sw, 1e4);
       if (tr.spiral) o.sp = [rd(tr.spiral.t, 1e3), tr.spiral.span != null ? rd(tr.spiral.span, 1e5) : -1];
@@ -130,23 +139,23 @@ export const SuiteView = (() => {
     });
     // (the placed beliefs (su.fus), what the readers outside F8 go by; F8, every belief, its shape and its trajectory too)
     const fus = new Set(su.fus), bels = dbg ? (su.bel || su.fus) : su.fus;
-    const bel = bels.map((b) => { const a: any[] = [b.n, b.kind ?? 2, v3(b.pl), v3(b.v), trkI(b.trk), b.a ? b.a.n : 0, b.b ? b.b.n : 0]; if (dbg) a.push(b.sx && b.axes ? shapeOf(b.axes, b.sx) : 0, thin(b.hist, rt)); return a; });
+    const bel = bels.map((b) => { const a: any[] = [b.n, b.kind ?? 2, v3(XP(b.pl)), v3(XV(b.pl, b.v)), trkI(b.trk), b.a ? b.a.n : 0, b.b ? b.b.n : 0]; if (dbg) a.push(b.sx && b.axes ? shapeOf(b.axes.map(XD), b.sx) : 0, thin(b.hist, rt)); return a; });
     const fu = bels.map((b, i) => (fus.has(b) ? i : -1)).filter((i) => i >= 0);
     // (its plot: the one its contact had when it was assessed (ten times a second; a contact's newest may have come since), sent only when that's not its contact's newest)
     const as = su.ass.map((a) => { const r: (number | string)[] = [a.n, a.f ? 1 : 0, rd(a.r, 10), rd(a.vc, 10), rd(a.score, 1e3), rd(a.hold, 100), CLS.indexOf(a.cls)], d = a.f ? (a.f.a && a.f.a.p) || (a.f.b && a.f.b.p) || null : a.c ? a.c.p : null; if (a.plot !== d) r.push(...(plot(a.plot) || [-1, -1])); return r; });
-    const msg: SVMsg = { v: 2, id: su.id, t: t0, P: v3(su.P, 100), Q: q4(su.Q, 1e6), V: v3(su.V, 100), sz: rd(su.size, 100), ff, po, sc, tk, bel, fu, as };
+    const msg: SVMsg = { v: 2, id: su.id, t: t0, P: v3(XP(su.P), 100), Q: q4(XQ(su.Q), 1e6), V: v3(XV(su.P, su.V), 100), sz: rd(su.size, 100), ff, po, sc, tk, bel, fu, as };
     if (su.name) msg.nm = su.name; if (su.aff) msg.aff = su.aff; if (su.hostNames && su.hostNames.size) msg.hn = [...su.hostNames];
     if (dbg) msg.why = su.ass.map((a) => a.why);
     if (S0) msg.sch = {
       tts: S0.tts.map((tt) => { const o: Record<string, unknown> = { n: tt.n, kf: kfPack(tt.kf, rt), pri: tt.pri, t: rt(tt.t), t0: rt(tt.t0), lo: tt.looks, mi: tt.miss, rate: rd(tt.rate, 1e3) };
         if (tt.op) o.op = 1; if (tt.quiet) o.qu = 1; if (tt.bel) o.bel = tt.bel; if (tt.cls) o.cls = clsP(tt.cls, rt); if (tt.szE) o.szE = rd(tt.szE, 10); if (tt.fc != null) o.fc = tt.fc; if (tt.est && tt.est.q) o.q = rd(tt.est.q, 1e3); if (dbg && tt.tgt) o.tg = tt.tgt; // (q: how good it is: what the guns fire on; tg, F8's: what it's really on)
         const ti = trkI(tt.trk); if (ti >= 0) o.tk = ti; if (tt.lookT && tt.lookT.length) o.lt = tt.lookT.filter((t) => now - t <= 4.05).map(rt); return o; }),
-      rq: S0.reqs.map((j) => { const o: Record<string, unknown> = { k: j.kind, t: rt(j.t), pri: j.pri }; if (j.plot) o.pl = plot(j.plot); if (j.d) o.d = v3(j.d, 1e4); if (j.at != null) o.at = rt(j.at); if (j.op) o.op = 1; const ti = trkI(j.trk); if (ti >= 0) o.tk = ti; return o; }),
+      rq: S0.reqs.map((j) => { const o: Record<string, unknown> = { k: j.kind, t: rt(j.t), pri: j.pri }; if (j.plot) o.pl = plot(j.plot); if (j.d) o.d = v3(XD(j.d), 1e4); if (j.at != null) o.at = rt(j.at); if (j.op) o.op = 1; const ti = trkI(j.trk); if (ti >= 0) o.tk = ti; return o; }),
       plan: su.trks.map((tr) => (S0.plan.get(tr) || []).map((j) => { const ri = reqs.indexOf(j); return [ri >= 0 ? ri : j.tt ? j.tt.n : -1, rt(j.at ?? now)]; })), // (what the queue reads of it: what each entry is, when it starts)
     };
     const op = su.opt;
     if (op) {
-      const o: Record<string, unknown> = { mts: op.mts.map((m) => v3(m, 100)), qd: op.quad, b: v3(op.b, 1e4), fov: +op.fov.toPrecision(4), rng: rd(op.rng, 10), st: op.st, jT: rt(op.jobT), sl: rd(op.slew, 1e3), px: rd(op.px, 10) };
+      const o: Record<string, unknown> = { mts: op.mts.map((m) => v3(m, 100)), qd: op.quad, b: v3(XD(op.b), 1e4), fov: +op.fov.toPrecision(4), rng: rd(op.rng, 10), st: op.st, jT: rt(op.jobT), sl: rd(op.slew, 1e3), px: rd(op.px, 10) };
       if (op.off) o.off = 1; if (op.e != null) o.e = rd(op.e, 1e4); if (op.tgt) o.tgt = op.tgt;
       if (op.job) o.job = job(op.job);
       const cc = (op as any).con as { c: RContact; k: number } | undefined; if (cc) o.con = [cc.k, cc.c.n];

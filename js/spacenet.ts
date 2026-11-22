@@ -10,7 +10,7 @@
 //        rather than each round being sent). A round's end (a burst, a rock) isn't sent: the client's own copy of it gets there too.
 // sss goes as bytes on the fast channel (sssBin / sssUnbin: js/snapcodec.ts; js/netfast.ts, unreliable, the newest wins); sev, as JSON's
 // plain arrays on the reliable one (encode / decode, a swappable codec).
-import type { SimWorld, SimEvent } from './spacesim.js';
+import type { SimWorld, SimEvent, SimFrame } from './spacesim.js';
 import { SnapWriter, SnapReader } from './snapcodec.js';
 
 export type SssMsg = { t: 'sss'; n: number; k: number; zt: number; mis: number[][]; tp: number[][]; ch: number[][]; g: number[][]; dm: number; hp?: number; sp?: number[] };
@@ -34,20 +34,24 @@ export const SpaceNet = {
   // ch [n, x, y, z, vx, vy, vz, age]; g [hp, yaw, pitch, firing (an mg's burst on, 1), barrels' spin]
   // (hp: her hull's, as the server keeps it; left out until it's heard one)
   // (sp: her pose and way [P, Q, V] while the server flies her: docs/space-server.md C2)
-  sss(W: SimWorld, n: number, k: number, zt: number, dm: number, hp = -1, flown = false): SssMsg {
+  // (L: the battle's frame (the zone's) to the level's, which the pages draw in: what's sent is in that)
+  sss(W: SimWorld, n: number, k: number, zt: number, dm: number, hp = -1, flown = false, L?: SimFrame): SssMsg {
+    const T = THREE, P = (p: THREE.Vector3) => (L ? L.toL(p, new T.Vector3()) : p), Vv = (p: THREE.Vector3, v: THREE.Vector3) => (L ? L.vToL(L.toL(p, new T.Vector3()), v, new T.Vector3()) : v);
+    const D = (v: THREE.Vector3) => (L ? v.clone().applyQuaternion(L.ql) : v), Qq = (q: THREE.Quaternion) => (L ? L.ql.clone().multiply(q) : q);
+    const sP = P(W.ship.P), sQ = Qq(W.ship.Q), sV = Vv(W.ship.P, W.ship.V);
     return {
-      t: 'sss', n, k, zt: r2(zt), dm: r2(dm), ...(hp >= 0 ? { hp: r2(hp) } : {}), ...(flown ? { sp: [...W.ship.P.toArray(), ...W.ship.Q.toArray(), ...W.ship.V.toArray()] } : {}),
-      mis: W.mis.map((m) => [m.id, ...v3(m.p), ...v3(m.v, r4), r2(m.t)]),
-      tp: W.torps.map((tp) => [tp.id, ...v3(tp.p), ...v3(tp.v), r4(tp.q.x), r4(tp.q.y), r4(tp.q.z), r4(tp.q.w), tp.ph | (tp.thr > 0.05 ? 4 : 0) | (tp.rcs ? 8 : 0) | (tp.mine ? 16 : 0)]),
-      ch: W.chaff.map((c) => [+c.t.id.slice(5), ...v3(c.t.p), ...v3(c.t.v), r2(W.t - c.born)]),
+      t: 'sss', n, k, zt: r2(zt), dm: r2(dm), ...(hp >= 0 ? { hp: r2(hp) } : {}), ...(flown ? { sp: [...sP.toArray(), ...sQ.toArray(), ...sV.toArray()] } : {}),
+      mis: W.mis.map((m) => [m.id, ...v3(P(m.p)), ...v3(D(m.v), r4), r2(m.t)]),
+      tp: W.torps.map((tp) => { const q = Qq(tp.q); return [tp.id, ...v3(P(tp.p)), ...v3(Vv(tp.p, tp.v)), r4(q.x), r4(q.y), r4(q.z), r4(q.w), tp.ph | (tp.thr > 0.05 ? 4 : 0) | (tp.rcs ? 8 : 0) | (tp.mine ? 16 : 0)]; }),
+      ch: W.chaff.map((c) => [+c.t.id.slice(5), ...v3(P(c.t.p)), ...v3(Vv(c.t.p, c.t.v)), r2(W.t - c.born)]),
       g: W.guns.map((gn) => [r2(gn.hp), r4(gn.yaw || 0), r4(gn.pitch || 0), (gn.bt || 0) > 0 ? 1 : 0, r2(gn.rev || 0)]),
     };
   },
   // a step's events (W.out) as sev entries; what isn't sent (burst, rockHit: a client's own copy of the round gets there) left out
-  sevOf(out: SimEvent[], n: number, into: SevE[]) {
+  sevOf(out: SimEvent[], n: number, into: SevE[], L?: SimFrame) {
     for (const e of out) {
       if (e.k === 'damage') into.push(e.why ? { k: 'dmg', n, d: r2(e.dmg), h: e.hits, w: e.why } : { k: 'dmg', n, d: r2(e.dmg), h: e.hits });
-      else if (e.k === 'missile') into.push({ k: 'mis', n, id: e.m.id, a: [...v3(e.m.p, r2), ...v3(e.m.v, r4)] });
+      else if (e.k === 'missile') into.push({ k: 'mis', n, id: e.m.id, a: [...v3(L ? L.toL(e.m.p, new THREE.Vector3()) : e.m.p, r2), ...v3(L ? e.m.v.clone().applyQuaternion(L.ql) : e.m.v, r4)] }); // (in the level's frame: L)
       else if (e.k === 'missileEnd') into.push({ k: 'misEnd', n, id: e.id, hit: e.hit ? 1 : 0 });
       else if (e.k === 'torpEnd') into.push(e.on ? { k: 'tEnd', n, id: e.id, how: e.how, on: e.on } : { k: 'tEnd', n, id: e.id, how: e.how });
       else if (e.k === 'gunHit') into.push({ k: 'gHit', n, i: e.i, hp: r2(e.hp) });

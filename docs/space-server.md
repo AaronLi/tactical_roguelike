@@ -164,9 +164,22 @@ predicts and replays. Step scripts: fly_server, breach_fp, descent_server, tboar
 Left on the page: drawing all of it (the plan, the veil, the tunnel, the stage's look), the mouse's push on the stick, and the zone
 ships' readiness (what's drawn). Not checked yet: setting down on a base's pad from the air, a pilot taking the helm mid-flight.
 
-### E (maybe): the battle in the zone's frame
+### E: the battle in the zone's frame
 
 Inertial: no frame turning, no rebasing when the squad boards another zone ship.
+
+Status (2026-11-22): done on the server. js/spacesim.ts worldStep runs in the zone's frame: what flies (rounds, torpedoes, missiles,
+chaff, her turrets' rounds) flies straight; the rocks and the zone's ships are where the zone has them; the mission ship's suite and
+return are carried through the zone by her level's placing each step (foeL), her guns laid in the level's frame (her up is the
+level's) and what they fire brought into the zone, a torpedo's fuse tested against her hull's footprint in the level's frame. W.L
+(SimFrame) turns places, velocities (the zone's own way taken out or put back) and attitudes between the two. Her helm stays in the
+level's frame (the breach's geometry is the level's): her pose goes into the battle each step through worldStep's ship hook. What
+crosses the wire stays in the level's frame: the snapshot, the events, her radar picture and F8's (js/suiteview.ts pack's xf), the
+warning receiver's bearings; and what comes in from the pages (a turret's round, chaff, a torpedo and the fix it's sent at) is
+brought into the zone. Boarding another zone ship moves nothing of her radars' (Radar.rebase gone from the server). The Node runner's
+pilot flies in the level's frame through the same hook. Point defence over 20 seeds: 16 shot down (15 before), HOSTILE 6.87 s
+(6.87), a gun-quality track 8.90 s (8.92), the first round 9.11 s (10.79: her guns laid on a physical track); the approach scenario
+95.4 damage (84.8).
 
 ## Bandwidth (rough, binary)
 

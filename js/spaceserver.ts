@@ -990,12 +990,13 @@ export const SpaceSv = (() => {
     if (bat && sv.stepN % 15 === 0) for (const [pid, q] of [...dbgReq]) {
       if (sv.stepN - q.at > 240) { dbgReq.delete(pid); continue; }
       const W = bat.W, su = q.id === 'own' ? W.own : q.id === 'hull' ? W.foe : (W.traffic.find((x) => x.t && x.t.id === q.id) || { su: null }).su; if (!su) continue;
-      SpaceNet.zpack({ k: bat.k, id: q.id, s: SuiteView.pack(su, W.t, { dbg: true }) }).then((b) => net().fast(pid, b, 2));
+      SpaceNet.zpack({ k: bat.k, id: q.id, s: SuiteView.pack(su, W.t, { dbg: true, xf: W.L }) }).then((b) => net().fast(pid, b, 2));
       if (sv.stepN % 30 === 0) SpaceNet.zpack({ k: bat.k, id: q.id, m: SuiteView.packMaps(su, W.t) }).then((b) => net().fast(pid, b, 3)); // (deflated: js/spacenet.ts zpack)
     }
-    if (sv.stepN % 6 === 0 && bat && bat.W.own) { const t = bat.W.t, r1 = (v: THREE.Vector3) => [Math.round(v.x), Math.round(v.y), Math.round(v.z)], w = { trk: Radar.litTrk('own', t).map((e) => ({ k: e.k, f: r1(e.from), lk: e.lk ? 1 : 0 })), scan: Radar.paintsOn('own', t).map((e) => ({ k: e.k, f: r1(e.from), a: Math.round(e.age * 100) / 100 })) }; // (her warning receiver: who's tracking her, whose scanners are painting her: the server's radars')
+    // (her radars' picture, the warning receiver's word: in the level's frame, which the pages draw in; the battle's is the zone's)
+    if (sv.stepN % 6 === 0 && bat && bat.W.own) { const t = bat.W.t, L = bat.W.L, r1 = (v: THREE.Vector3) => { const l = L.toL(v); return [Math.round(l.x), Math.round(l.y), Math.round(l.z)]; }, w = { trk: Radar.litTrk('own', t).map((e) => ({ k: e.k, f: r1(e.from), lk: e.lk ? 1 : 0 })), scan: Radar.paintsOn('own', t).map((e) => ({ k: e.k, f: r1(e.from), a: Math.round(e.age * 100) / 100 })) }; // (her warning receiver: who's tracking her, whose scanners are painting her: the server's radars')
       const P0 = bat.W.ship.P, l = bat.W.traffic.filter((q) => q.su && q.t).sort((a, b) => a.t!.p.distanceTo(P0) - b.t!.p.distanceTo(P0)).map((q) => [q.t!.id, q.su!.name || q.t!.id]); // (the zone's ships' radars it has on, nearest first: F8's list)
-      SpaceNet.zpack({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t), w, l }).then((b) => net().fast(null, b, 1)); } // (deflated: js/spacenet.ts zpack)
+      SpaceNet.zpack({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t, { xf: bat.W.L }), w, l }).then((b) => net().fast(null, b, 1)); } // (deflated: js/spacenet.ts zpack)
   }
   const dbgReq = new Map<string, { id: string; at: number }>(); // (who's asked for F8's picture of which suite, and when)
   const battleIn = (m: any) => SvBattle.request(bat, m); // (a crew request: done to the server's battle)
