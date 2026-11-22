@@ -4,7 +4,9 @@
 // field, in the same order on both sides); this is only the means: fixed-size ints and floats, variable-length unsigned ints, strings
 // (UTF-8, their length first), raw bytes, and a float quantised into an int over a range.
 // It runs anywhere: the page, the server's thread, and Node (tools/snapcodec_test.mjs).
-const enc = new TextEncoder(), dec = new TextDecoder();
+// (made when first wanted: the file's loaded with the server's, in places that have no TextEncoder till a snapshot's written)
+let encC: TextEncoder | null = null, decC: TextDecoder | null = null;
+const enc = { encode: (s: string) => (encC || (encC = new TextEncoder())).encode(s) }, dec = { decode: (b: Uint8Array) => (decC || (decC = new TextDecoder())).decode(b) };
 
 export class SnapWriter {
   buf: ArrayBuffer;

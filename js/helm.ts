@@ -44,7 +44,7 @@ export interface HelmG {
   ready?: (k: number) => boolean; // (zone ship k's level ready to be the level: on the server, made; on a page, her hull drawn)
   zreset?: () => void; // (her way's memory through the zone begun again: a new place)
 }
-export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
+export function helmOf(S: any, GE: HelmG, ev: (e: HelmEv) => void) {
   const T = THREE;
   const fwd = (q: THREE.Quaternion) => new T.Vector3(0, 0, -1).applyQuaternion(q);
   const yawQ = (yaw: number) => new T.Quaternion().setFromAxisAngle(new T.Vector3(0, 1, 0), yaw);
@@ -57,7 +57,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     if (S.kind !== 'board' || !S.map || !S.map.sp) return null;
     const L = SD.layout(S.def), zn = L.zc - 0.22, N = new T.Vector3(0, L.FB + 1.16, zn).applyQuaternion(S.Q).add(S.P), f = dir ? dir.clone().normalize() : fwd(S.Q), TS = Level.TS; // (the collar's middle: 1.4 over the deck she breaches when she's level with it)
     let best: ShSite | null = null, bo = reach, bt = 0; // (the nearest site the line passes within reach of: the collar pulls her onto it)
-    const list = G.sites();
+    const list = GE.sites();
     for (const s of list) {
       const dn = f.x * s.nx + f.z * s.nz; if (dn > -0.34) continue; // (her nose on it within 70 degrees)
       const px = s.x + s.nx * TS / 2, pz = s.z + s.nz * TS / 2, t = ((px - N.x) * s.nx + (pz - N.z) * s.nz) / dn;
@@ -108,7 +108,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     // keeps going as she was. X held: she brakes to the field's way (the zone's: the rocks and the stars, stood still among them). H on a
     // target (or Shift H on the radar's lock), with nothing pushed: she's kept matched to it. Never more than FLY.max off the field's way.
     // (The breach assist, while it has her (W held, lined up on a site), flies as it did: its plan's in velocities.)
-    const fieldV = G.fieldAt(S.P), assist = helm && (S.brLock || S.brRound) && kb(FB.W) && !kb(FB.A) && !kb(FB.D) && !kb(FB.U) && !kb(FB.C) && !kb(FB.S) && !kb(FB.X);
+    const fieldV = GE.fieldAt(S.P), assist = helm && (S.brLock || S.brRound) && kb(FB.W) && !kb(FB.A) && !kb(FB.D) && !kb(FB.U) && !kb(FB.C) && !kb(FB.S) && !kb(FB.X);
     if (assist) {
       const dv = want.sub(S.V);
       if (helm && (S.brLock || S.brRound) && !kb(FB.A) && !kb(FB.D) && !kb(FB.U) && !kb(FB.C) && !kb(FB.S) && !kb(FB.X)) { const f = fwd(S.Q), k = S.brRound && S.roundBrake ? 0 : Math.max(0, dv.dot(f)); dv.copy(f).multiplyScalar(k); } // (and the throttle's yours on top of what the approach's engine gives: open it, and she goes in at her top speed) // (lined up on a site: her assist only ever speeds her along her nose, never brakes her, and stands down while the approach has her engine)
@@ -116,7 +116,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
       if (l > 1e-4) S.V.addScaledVector(dv, Math.min(1, step / l));
       SpaceSim.flyMax(S.V, fieldV);
     } else SpaceSim.flyPush(S.V, S.Q, FI, fieldV, dt); // (her thrusters, and her top speed against the field)
-    if (assist) S.P.addScaledVector(S.V, dt); else { G.zstep(S.P, S.V, dt); G.zturn(S.Q); } // (on the breach assist: in her frame, where the site is)
+    if (assist) S.P.addScaledVector(S.V, dt); else { GE.zstep(S.P, S.V, dt); GE.zturn(S.Q); } // (on the breach assist: in her frame, where the site is)
     collide(dt);
     events();
     return { I: FI }; // (flown free this step (no autopilot, warp, docked), from this: the page's check of its own step, js/space.ts c2Post)
@@ -251,7 +251,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
       const ok = (a: ReturnType<typeof aim>) => !!a && a.range >= -0.5 && a.align >= 0.34 && a.close > 0;
       if ([aim(ROUND.R + 20, 25, S.V)].find(ok) || [aim(ROUND.R + 20, 25)].find(ok)) return;
       let pick: { site: ShSite; face: THREE.Vector3; E: THREE.Vector3 } | null = null, bc = Infinity;
-      for (const st of G.sites()) {
+      for (const st of GE.sites()) {
         // (the point she turns in from: out on the line, and off it to her side by her turning circle's width, so she's still short of the
         // line when the turn in starts and comes out of it on the line, not swung across it)
         const face = new T.Vector3(st.x + st.nx * TS / 2, 1.4, st.z + st.nz * TS / 2), sg = Math.sign((N.x - face.x) * -st.nz + (N.z - face.z) * st.nx) || 1;
@@ -325,7 +325,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     S.tvP.copy(w.p); S.tvJ = S.tgt;
   }
   // (how far out from a target's middle its hull reaches: the caller's, from its shapes)
-  const tgtR = (w: SpWp) => G.tgtR(w);
+  const tgtR = (w: SpWp) => GE.tgtR(w);
   /** the target, if she can warp to it from here: where it is, how far, how square she's on it */
   function warpGate() {
     if (S.docked || S.auto || S.ftl || (S.kind === 'assault' && S.stage === 'atmo')) return null;
@@ -387,7 +387,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
       if (vn < 0) { hit = Math.max(hit, -vn); S.V.addScaledVector(n, -vn * 1.3); }
     }
     // (a rock: thrown off it, and it hurts as the ground does)
-    const RK = G.rocks(), RL = G.rockList();
+    const RK = GE.rocks(), RL = GE.rockList();
     for (const k of RK.near) {
       const c = RK.p[k], rr = RL[k].r * 0.92 + R, dd = P.distanceTo(c); if (dd >= rr) continue;
       const n = dd > 1e-3 ? P.clone().sub(c).divideScalar(dd) : new T.Vector3(0, 1, 0), vn = S.V.clone().sub(RK.v).dot(n);
@@ -399,7 +399,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
   }
   // what happens as she flies: the breach, the descent, the way up
   function events() {
-    if (S.kind === 'board' && S.map && !G.boom()) {
+    if (S.kind === 'board' && S.map && !GE.boom()) {
       // her nose into the hull, within 60 degrees of square and fast enough: she's through, wherever that is along it; the collar
       // pulls her square as it seals (the further off she came in, the longer that takes)
       // (no speed is too high for it: the collar takes it. Fast, she covers metres a frame, so the plate's looked for that much further ahead)
@@ -413,7 +413,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
         // (and nose up or down: she stays tilted as she hit, about her collar)
         const pt = Math.round(U.clamp(Math.asin(U.clamp(f.y, -1, 1)) * 180 / Math.PI, -SD.BREACH_PITCH, SD.BREACH_PITCH));
         const at = was ? was.slice() : ShipGen.cutKey({ ...a.site, ang: Math.abs(ang) >= 3 ? ang : 0, pt: Math.abs(pt) >= 3 ? pt : 0 });
-        const b = SD.berthAt(S.def, G.siteAt(at)); S.berth = b; S.Dp.set(b.x, b.y, b.z); S.Dq.copy(berthQ(b)); ev({ k: 'rebase', b }); // (she lies where she's breached: her deck and whoever's aboard with her, the page's)
+        const b = SD.berthAt(S.def, GE.siteAt(at)); S.berth = b; S.Dp.set(b.x, b.y, b.z); S.Dq.copy(berthQ(b)); ev({ k: 'rebase', b }); // (she lies where she's breached: her deck and whoever's aboard with her, the page's)
         auto(S.Dp, S.Dq, 0.35, null, { k: 'breach', at });
         ev({ k: 'kick', a: 2 });
       }
@@ -450,7 +450,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     S.thru = null; const to = th.to, atmo = to === 'atmo';
     S.stage = to;
     for (const w of S.wps as SpWp[]) w.hide = w.kind === 'lz' ? !atmo : atmo;
-    S.tgt = (S.wps as SpWp[]).findIndex((w) => !w.hide && (atmo ? w.kind === 'lz' : G.done && G.done() ? w.kind === 'anchor' : w.kind === 'entry'));
+    S.tgt = (S.wps as SpWp[]).findIndex((w) => !w.hide && (atmo ? w.kind === 'lz' : GE.done && GE.done() ? w.kind === 'anchor' : w.kind === 'entry'));
     if (atmo) { S.P.set(S.berth.x + 500, 900, S.berth.z + 900); const d = new T.Vector3(-0.42, -0.5, -0.75).normalize(); S.Q.copy(lookQ(d)); S.V.copy(d).multiplyScalar(90); }
     else { const o = (S.wps as SpWp[]).find((w) => w.id === 'entry')!.p, a = (S.wps as SpWp[]).find((w) => w.id === 'out')!.p; S.P.copy(o).lerp(a, 0.25); const d = a.clone().sub(S.P).normalize(); S.Q.copy(lookQ(d)); S.V.copy(d).multiplyScalar(120); }
     ev({ k: 'stage', to });
@@ -469,20 +469,20 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
   // carried across as she is by her (carry: where she is from her, which way she's headed, her own pose and way)
   const ZONE_NOW = 400, ZONE_TAKE = 500;
   function close(dt: number) {
-    if (S.kind !== 'board' || S.docked || S.ftl || S.warp || G.boom() || !G.zC) { S.tclose = null; return; }
-    let best: SpWp | null = null, bk = -1, bd = Math.min(ZONE_TAKE, S.P.distanceTo(G.zC()) * 0.8);
-    for (const w of S.wps as SpWp[]) { const m = /^t(\d+)$/.exec(w.id); if (!m) continue; const k = +m[1], d = S.P.distanceTo(w.p); if (d < bd && (d < ZONE_NOW || (G.ready && G.ready(k)))) { bd = d; best = w; bk = k; } }
+    if (S.kind !== 'board' || S.docked || S.ftl || S.warp || GE.boom() || !GE.zC) { S.tclose = null; return; }
+    let best: SpWp | null = null, bk = -1, bd = Math.min(ZONE_TAKE, S.P.distanceTo(GE.zC()) * 0.8);
+    for (const w of S.wps as SpWp[]) { const m = /^t(\d+)$/.exec(w.id); if (!m) continue; const k = +m[1], d = S.P.distanceTo(w.p); if (d < bd && (d < ZONE_NOW || (GE.ready && GE.ready(k)))) { bd = d; best = w; bk = k; } }
     if (!best) { S.tclose = null; return; }
     if (!S.tclose || S.tclose.k !== bk) S.tclose = { k: bk, t: 0, name: best.name };
     S.tclose.t += dt;
-    if (S.tclose.t > 0.35 && !S.tclose.sent) { S.tclose.sent = true; const d = G.zoneDir!(bk); S.carry = { k: bk, v: S.P.clone().sub(best.p), yaw: Math.atan2(d.x, d.z), Q: S.Q.clone(), V: S.V.clone() }; ev({ k: 'tboard', to: bk }); }
+    if (S.tclose.t > 0.35 && !S.tclose.sent) { S.tclose.sent = true; const d = GE.zoneDir!(bk); S.carry = { k: bk, v: S.P.clone().sub(best.p), yaw: Math.atan2(d.x, d.z), Q: S.Q.clone(), V: S.V.clone() }; ev({ k: 'tboard', to: bk }); }
   }
   // Into a place: on her berth (docked), or come up with the ship that's the level now (near: carried across, else lying off her), or
   // out of the jump by its arrival (the last of the tunnel: the hub's by the mission's anchor she left from, at). act: the zone ship
   // that's the level
   function arriveAt(p: THREE.Vector3, dir: THREE.Vector3) { S.P.copy(p); S.Q.copy(lookQ(dir)); S.V.copy(dir).multiplyScalar(60); S.docked = false; S.ftl = { st: 'tunnel', t: 0, to: 0, T: 4.5 }; }
   function arrive(o: { docked: boolean; at: number | null; near: boolean; act: number }) {
-    S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1; S.brLock = null; S.brRound = null; S.thru = null; S.ftl = null; S.tclose = null; S.match = null; S.roundBrake = false; S.brThrust = false; if (G.zreset) G.zreset();
+    S.V.set(0, 0, 0); S.Wv.set(0, 0, 0); S.stick.set(0, 0); S.auto = null; S.cruise = false; S.warp = null; S.spin = 0; S.tvJ = -1; S.brLock = null; S.brRound = null; S.thru = null; S.ftl = null; S.tclose = null; S.match = null; S.roundBrake = false; S.brThrust = false; if (GE.zreset) GE.zreset();
     S.docked = o.docked;
     const W3 = (x: number, y: number, z: number) => new T.Vector3(x, y, z);
     if (S.kind === 'hub') {
