@@ -34,6 +34,7 @@
     "smoke": "node tools/smoke.mjs",
     "test": "npm run test:models && npm run test:level && npm run test:sim",
     "test:cloud": "tsc -p . && node tools/cloud.test.mjs",
+    "test:snapcodec": "tsc -p . && node tools/snapcodec_test.mjs",
     "cases:models": "tsc -p . && tsc -p tsconfig.tools.json && node tools/model_cases.mjs"
   },
   "license": "ISC",

@@ -2,11 +2,16 @@
 import { ReplayEnv } from './replayenv.js';
 import { Hooks, U } from './util.js';
 import { ServerLink } from './serverlink.js';
+import { FastLink } from './netfast.js';
 // Peer-to-peer transport (WebRTC via PeerJS). Star topology: the host is the authority,
 // clients talk only to the host and the host relays. The host's authority is its simulation, in a thread of its own
 // (js/serverlink.ts, docs/threads.md), and the host's game is a client of it like any other: toHost() goes to it on a port
 // of its own, and its word comes back to onClient. What it says to the remote players is sent from here (relay, relayTo),
 // and what they send comes in to onServer (js/game.ts hands it on to the simulation).
+// Beside each connection, a fast one (js/netfast.ts): binary, unordered, unreliable, newest wins, for the simulation's high-rate
+// snapshots (docs/space-server.md, C1). The simulation sends them with ServerHost.fast (to one player or everyone, a stream of its
+// own each); the host's own page gets them across the thread's port (js/serverlink.ts), the remote players on their fast
+// channel (or the reliable one, base64, where there's no fast one); every page hands them to onFast.
 export const Net = {
   PREFIX: 'breachproto-v1-',
   peer: null as any,
@@ -21,6 +26,26 @@ export const Net = {
   onPeerJoin: (() => {}) as (id: string) => void, // (id)            — host only
   onPeerLeave: (() => {}) as (id: string) => void,// (id)            — host only
   onHostLost: () => {}, //                 — clients only
+  fast: new Map<string, FastLink>(), // (host: each remote player's fast channel)
+  hostFast: null as FastLink | null, // (client: the one to the host)
+  fastFns: [] as ((buf: ArrayBuffer, ch: number) => void)[],
+  // a snapshot from the simulation (every page, the host's too): buf is the handler's to keep; ch its stream
+  onFast(fn: (buf: ArrayBuffer, ch: number) => void) { this.fastFns.push(fn); return () => { this.fastFns = this.fastFns.filter((f) => f !== fn); }; },
+  gotFast(buf: ArrayBuffer, ch: number) { for (const f of this.fastFns) { try { f(buf, ch); } catch (e) { console.error('net: an onFast handler threw', e); } } },
+  // host only: the simulation's snapshot (js/serverlink.ts, {k:'fast'}) to a remote player, or to every remote player (to null);
+  // own: whether it's the host's own page's too (it's handed to onFast last: the remotes' copies are made first)
+  fastOut(to: string | null, buf: ArrayBuffer, ch: number, own: boolean) {
+    if (to === null) { for (const l of this.fast.values()) l.send(buf, ch); }
+    else { const l = this.fast.get(to); if (l) l.send(buf, ch); }
+    if (own) this.gotFast(buf, ch);
+  },
+  // (tests and F8: how each fast channel is doing)
+  fastStats() {
+    const r: Record<string, unknown> = {};
+    for (const [id, l] of this.fast) r[id] = { mode: l.mode, ...l.st };
+    if (this.hostFast) r.host = { mode: this.hostFast.mode, ...this.hostFast.st };
+    return r;
+  },
 
   available() { return typeof window.Peer === 'function'; },
   // How peers find a way to each other: several public STUN servers (a direct path through each side's router),
@@ -55,9 +80,18 @@ export const Net = {
       cb(null, code);
     });
     peer.on('connection', (conn: any) => {
-      conn.on('open', () => { this.conns.set(conn.peer, conn); this.onPeerJoin(conn.peer); });
-      conn.on('data', (d: any) => { if (d && typeof d === 'object') this.onServer(d, conn.peer); });
-      const drop = () => { if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); this.onPeerLeave(conn.peer); } };
+      let fl: FastLink | null = null;
+      conn.on('open', () => {
+        this.conns.set(conn.peer, conn);
+        const old = this.fast.get(conn.peer); if (old) old.close();
+        this.fast.set(conn.peer, (fl = new FastLink(conn, () => { /* (nothing comes up this way yet) */ })));
+        this.onPeerJoin(conn.peer);
+      });
+      conn.on('data', (d: any) => { if (d && typeof d === 'object') { if (d.t === 'fastb') { if (fl) fl.fallback(d); } else this.onServer(d, conn.peer); } });
+      const drop = () => {
+        if (fl) { fl.close(); if (this.fast.get(conn.peer) === fl) this.fast.delete(conn.peer); fl = null; }
+        if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); this.onPeerLeave(conn.peer); }
+      };
       conn.on('close', drop);
       conn.on('error', drop);
     });
@@ -84,9 +118,18 @@ export const Net = {
     peer.on('open', (id: string) => {
       this.myId = id;
       const conn = peer.connect(this.PREFIX + code, { reliable: true, serialization: 'json' });
-      conn.on('open', () => { this.hostConn = conn; this.code = code; finish(null); });
-      conn.on('data', (d: any) => { if (d && typeof d === 'object') this.onClient(d); });
-      conn.on('close', () => { if (this.hostConn === conn) { this.hostConn = null; this.onHostLost(); } });
+      let fl: FastLink | null = null;
+      conn.on('open', () => {
+        this.hostConn = conn; this.code = code;
+        if (this.hostFast) this.hostFast.close();
+        this.hostFast = fl = new FastLink(conn, (buf, ch) => { if (this.hostConn === conn) this.gotFast(buf, ch); });
+        finish(null);
+      });
+      conn.on('data', (d: any) => { if (d && typeof d === 'object') { if (d.t === 'fastb') { if (fl) fl.fallback(d); } else this.onClient(d); } });
+      conn.on('close', () => {
+        if (fl) { fl.close(); if (this.hostFast === fl) this.hostFast = null; fl = null; }
+        if (this.hostConn === conn) { this.hostConn = null; this.onHostLost(); }
+      });
       conn.on('error', () => finish(this.noRoute));
     });
     peer.on('error', (e: any) => {
@@ -182,6 +225,9 @@ export const Net = {
   leave() {
     this.stopBeacon();
     const peer = this.peer;
+    for (const l of this.fast.values()) l.close();
+    this.fast.clear();
+    if (this.hostFast) { this.hostFast.close(); this.hostFast = null; }
     this.peer = null; this.hostConn = null; // (first: closing the connection below isn't losing the host, it's leaving)
     try { if (peer) peer.destroy(); } catch (e) { /* already gone */ }
     this.conns.clear();

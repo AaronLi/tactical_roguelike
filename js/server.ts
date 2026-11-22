@@ -54,6 +54,9 @@ const SvNet = {
   myId: null as string | null,
   broadcast: ((_msg: any, _exceptId?: string | null) => {}) as (msg: any, exceptId?: string | null) => void,
   sendTo: ((_id: string, _msg: any) => {}) as (id: string, msg: any) => void,
+  // a high-rate snapshot's bytes (js/snapcodec.ts) to one player or everyone (null), on stream ch; unreliable, newest wins
+  // (js/serverhost.ts fast, js/netfast.ts). The buffer is handed over.
+  fast: ((_to: string | null, _buf: ArrayBuffer, _ch?: number) => {}) as (to: string | null, buf: ArrayBuffer, ch?: number) => void,
 };
 
 // (a level context: the server's per-level fields and the space mission's (js/spaceserver.ts ctxSave))

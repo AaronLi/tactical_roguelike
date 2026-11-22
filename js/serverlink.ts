@@ -15,6 +15,7 @@ export const ServerLink = {
   worker: null as Worker | null,
   ctl: null as MessagePort | null, // (the control port: for as long as the simulation's thread runs)
   cli: null as MessagePort | null, // (the host's own player's port: this session's)
+  id: null as string | null, // (the host's own player: this session's)
   up: false,
   ready: null as Promise<void> | null,
   pend: [] as [any, Transferable[]][], // (said before the simulation was up: sent once it is)
@@ -86,6 +87,14 @@ export const ServerLink = {
         case 'ready': this.up = true; for (const [m, tr] of this.pend.splice(0)) port.postMessage(m, tr); onReady(); break;
         case 'bc': Net.relay(c.m, c.x); break;
         case 'to': Net.relayTo(c.id, c.m); break;
+        case 'fast': { // (a snapshot: to everyone (to null), the host's own page, or one remote player; js/serverhost.ts fast)
+          if (!this.cli || !(c.buf instanceof ArrayBuffer)) break;
+          const ch = (+c.ch | 0) & 255;
+          if (c.to == null) Net.fastOut(null, c.buf, ch, true);
+          else if (String(c.to) === this.id) Net.gotFast(c.buf, ch);
+          else Net.fastOut(String(c.to), c.buf, ch, false);
+          break;
+        }
         case 'rec': this.save(c.name, c.data); break;
         case 'prof': this.prof = { n: c.n, ms: c.ms, max: c.max }; break;
         case 'digest': case 'stat': { const f = this.asks.get(c.q); if (f) { this.asks.delete(c.q); f(c); } break; }
@@ -101,7 +110,7 @@ export const ServerLink = {
     this.boot();
     this.close();
     const ch = new MessageChannel(), port = ch.port1;
-    this.cli = port;
+    this.cli = port; this.id = id;
     port.onmessage = (e: MessageEvent) => { if (this.cli === port && e.data && typeof e.data === 'object') Net.onClient(e.data); };
     this.post({ k: 'init', id, cli: ch.port2, rec: this.recording() }, [ch.port2]);
     if (this.names) this.post({ k: 'stickers', names: this.names });
