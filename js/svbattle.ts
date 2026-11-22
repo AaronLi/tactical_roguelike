@@ -53,7 +53,7 @@ export const SvBattle = (() => {
   // her own), flown in order by js/helm.ts on the server's own helm state, one a server step (all but three at once when more wait),
   // starting once 3 are in hand (a little slack against the pages' steps coming in bursts); none waiting, she holds where she is till
   // the next comes. ack: the last step flown
-  const FL = { on: false, q: new Map<number, any>(), next: -1, go: false, has: false, ack: -1 };
+  const FL = { on: false, q: new Map<number, any>(), next: -1, go: false, has: false, ack: -1, by: '' as string };
   // her helm state (kept across worlds: she's the same ship) and its way's memory through the zone; a helm for each world (its geometry)
   const HS: any = { kind: 'board', stage: 'space', map: null, def: SD.SHIPS.kestrel, fleet: null, docked: false, P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(),
     auto: null, ftl: null, warp: null, spin: 0, cruise: false, brLock: null, brRound: null, roundBrake: false, brThrust: false, tv: new T.Vector3(), tvP: new T.Vector3(), tvJ: -1, match: null, tgt: 0,
@@ -158,6 +158,7 @@ export const SvBattle = (() => {
     if (hctx) hctx.say({ t: 'schaff', a, by: '' });
   }
   function flyIn(m: any) {
+    if (m.by && FL.by !== m.by) { FL.on = false; FL.q.clear(); FL.next = -1; FL.go = false; FL.by = m.by; } // (another pilot: their steps, numbered their own way, begun afresh; her helm state as the server has it)
     if (m.off) { FL.on = false; FL.q.clear(); FL.next = -1; FL.go = false; return; } // (her helm state kept: the next pilot goes on from it)
     if (!Array.isArray(m.a) || m.a.length > 64) return;
     for (const e of m.a) {

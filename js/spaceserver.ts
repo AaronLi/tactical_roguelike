@@ -889,7 +889,7 @@ export const SpaceSv = (() => {
       case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'schaff', a: m.a, by: from }, from); battleIn(m); } break; // (chaff thrown out of her: js/space.ts chaffGo)
       case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) battleIn(m); break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
       case 'sdmg': if (p && st.ship.ctl === from) battleIn(m); break;
-      case 'sin': if (p && st.ship.ctl === from) battleIn(m); break; // (the pilot's steps: js/space.ts c2Post)
+      case 'sin': if (p && st.ship.ctl === from) battleIn({ ...m, by: from }); break; // (by: whose steps: a new pilot's are counted from their own start) // (the pilot's steps: js/space.ts c2Post)
       case 'smatch': if (p && st.ship.ctl === from && typeof m.id === 'string' && m.id.length <= 40) battleIn(m); break; // (what the pilot's matched speed with: js/space.ts sendPose) // (what she hit herself, as the pilot's page saw it: the server's battle keeps her hull)
       case 'mobj': if (p) act(String(m.k), from, m.n); break;
       // the shipyard: a ship bought (paid for on the buyer's own screen, as the shop's stock is), taken out, fitted

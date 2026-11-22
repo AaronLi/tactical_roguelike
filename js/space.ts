@@ -1785,6 +1785,7 @@ export const Space = (() => {
       shadowOf(); return true;
     }
     if (C2.on) { C2.on = false; C2.hist = []; C2.out = []; C2.cmd = []; Net.toHost({ t: 'sin', off: 1 }); }
+    C2.nl = null; // (a new place set up while not flying her: the server has her already)
     return false;
   }
   // (after the page's own step: tgtTrack, fly, zoneClose)
@@ -1899,7 +1900,7 @@ export const Space = (() => {
       ipSnap(IP.prev); IP.P0.copy(S.P); IP.Q0.copy(S.Q); // (the state before this step: the last one's is what the frame blends from)
       S.t += h;
       zoneStep(); pt = Prof.lap('space: zone', pt);
-      const flies = isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2), pre = flies && c2Pre();
+      const flies = isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2), pre = flies ? c2Pre() : (c2Pre(), false); // (not flying her: its steps stopped, js/space.ts c2Pre)
       if (!flies) tgtTrack(h); pt = Prof.lap('space: target', pt);
       if (flies) { fly(h); c2Post(pre, h); } else { if (S.auto) S.auto = null; follow(h); S.stick.multiplyScalar(Math.exp(-h * 2.2)); }
       pt = Prof.lap('space: flight', pt);
