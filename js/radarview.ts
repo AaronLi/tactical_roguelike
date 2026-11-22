@@ -518,7 +518,7 @@ export const RadarView = (() => {
   // scanners' fans sweeping out from the middle (cyan the bearing scanner's, magenta the roll scanner's), and each tracker's
   // beam a line from the middle along its boresight (amber slewing or sweeping, red tracking). The operator turns it (rot) and
   // points at a track with the middle of their view (holoPick).
-  type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string; rwr?: THREE.Vector3 }; // (rwr: a radar warning's bearing (her frame), to send a tracker along)
+  type HoloItem = { pos: THREE.Vector3; plot: RPlot | null; label: string; col: string; rwr?: THREE.Vector3; arc?: THREE.Vector3[]; arcL?: THREE.Line }; // (rwr: a radar warning's bearing (her frame), to send a tracker along; arc: one scanner's contact, anywhere along its fan: the line it's on, and its drawing)
   let holoG: { vels: THREE.Line[]; rwrItems: HoloItem[]; scanUi: HTMLElement; secs: { patch: THREE.Mesh; edges: THREE.Mesh }[]; rwr: { cone: THREE.Mesh; line: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture; txt: string }[]; zoom: number; rings: { l: THREE.Line; s: THREE.Sprite; cv: HTMLCanvasElement; tex: THREE.CanvasTexture }[]; focus: boolean | null; arcs: THREE.Line[]; strips: THREE.Line[]; ends: THREE.Mesh[]; g: THREE.Group; inner: THREE.Group; fans: THREE.Mesh[]; beams: THREE.Line[]; dots: THREE.Mesh[]; sel: THREE.Mesh; label: THREE.Sprite; lcv: HTMLCanvasElement; ltex: THREE.CanvasTexture; ltext: string; items: HoloItem[]; R: number; hint: HTMLElement } | null = null;
   // (a track's velocity line: from its dot to where it'll be in VT seconds at its velocity against hers, so what's coming at
   // her points at the middle)
@@ -648,7 +648,7 @@ export const RadarView = (() => {
         const chips = toks.map((t) => `<div style="flex:0 0 auto;width:84px;padding:2px 5px;border:1px solid ${t.c0}55;border-left:3px solid ${t.c0};background:${t.on.startsWith('on') ? 'rgba(255,176,64,0.12)' : 'rgba(4,12,18,0.4)'}"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:${t.c0}">${t.name}</span> <span style="float:right;font-size:11px;color:${t.on.startsWith('on') ? '#ffb040' : '#7f9fb0'}">${t.on}</span></div><div style="font-size:11px;color:#7f9fb0;white-space:nowrap">${t.sub}</div></div>`).join('');
         const waiting = toks.filter((t) => t.on === 'waiting').length;
         return `<div style="display:inline-block;margin-bottom:6px;padding:3px 9px;border:1px solid rgba(120,180,210,0.18);background:rgba(4,12,18,0.32);border-radius:2px;font-weight:400;min-width:420px;max-width:860px">`
-          + `<div><span style="color:#ffb040">TRACKER SCHEDULER</span> <span style="font-size:11px;color:#7f9fb0">· click a dish's state: off or on · 3: the camera's picture</span></div>`
+          + `<div><span style="color:#ffb040">TRACKER SCHEDULER</span> <span style="font-size:11px;color:#7f9fb0">· 3: the camera's picture</span></div>`
           + `<div style="display:flex;gap:6px;margin:3px 0">${slots}</div>`
           + `<div style="font-size:11px;color:#7f9fb0">QUEUE · a token a track and a search, most wanted first · due: how overdue its next look is (1×: as often as it's wanted) · its dish now (on) or planned next (→)${waiting ? ` · <span style="color:#ffb040">${waiting} waiting</span>` : ''}</div>`
           + `<div style="display:flex;flex-wrap:wrap;gap:3px;margin-top:2px;font-size:12px;line-height:1.35">${chips || '<span style="color:#5f8fa4">nothing held</span>'}</div></div>`;
@@ -705,12 +705,15 @@ export const RadarView = (() => {
         for (let j = 0; j <= 16; j++) { const e = -sc.fan + 2 * sc.fan * j / 16, d = Radar.dirOf(sc.ax, ph, e); if (d.dot(sc.n) < -sc.mask) continue; arc.push(at(d.multiplyScalar(a.plot.r).add(sc.at))); }
       }
       if (!pos) continue;
+      let arcL: THREE.Line | undefined;
       if (arc && arc.length > 1) { const k = H.arcs.findIndex((q) => !q.visible); const l = k >= 0 ? H.arcs[k] : (() => { const n = new T.Line(new T.BufferGeometry().setAttribute('position', new T.BufferAttribute(new Float32Array(17 * 3), 3)), new T.LineBasicMaterial({ transparent: true, opacity: 0.55, depthWrite: false, blending: T.AdditiveBlending })); H.inner.add(n); H.arcs.push(n); return n; })();
-        const pa = l.geometry.attributes.position as THREE.BufferAttribute; arc.forEach((q, j) => pa.setXYZ(j, q.x, q.y, q.z)); pa.needsUpdate = true; l.geometry.setDrawRange(0, arc.length); l.visible = true; (l.material as THREE.LineBasicMaterial).color.setHex(HCOL[a.cls] || 0xffffff); }
+        const pa = l.geometry.attributes.position as THREE.BufferAttribute; arc.forEach((q, j) => pa.setXYZ(j, q.x, q.y, q.z)); pa.needsUpdate = true; l.geometry.setDrawRange(0, arc.length); l.geometry.computeBoundingSphere(); l.visible = true; (l.material as THREE.LineBasicMaterial).color.setHex(HCOL[a.cls] || 0xffffff); (l.material as THREE.LineBasicMaterial).opacity = 0.55; arcL = l; }
       const nm = a.iff ? (a.iff.c === 'civ' ? 'CIV ' : a.iff.c === 'navy' ? 'NAVY ' : '') + a.iff.n : 'no IFF';
-      items.push({ pos: at(pos), plot: a.plot, label: `${a.n} ${a.cls} · ${nm} · ${(a.r / 1000).toFixed(2)} km ${a.vc >= 0 ? '+' : ''}${Math.round(a.vc)} m/s`, col: '#' + (HCOL[a.cls] || 0xffffff).toString(16).padStart(6, '0') });
+      // (one scanner's contact: its arc is its mark, the whole of it a place it may be, so no dot on it; it's picked anywhere along it)
+      const one = !!arcL;
+      items.push({ pos: at(pos), plot: a.plot, ...(one && arc ? { arc, arcL } : {}), label: `${a.n} ${a.cls} · ${nm} · ${(a.r / 1000).toFixed(2)} km ${a.vc >= 0 ? '+' : ''}${Math.round(a.vc)} m/s`, col: '#' + (HCOL[a.cls] || 0xffffff).toString(16).padStart(6, '0') });
       const m = H.dots[items.length - 1] || (() => { const d = new T.Mesh(new T.SphereGeometry(R * 0.032, 10, 8), new T.MeshBasicMaterial({ color: 0xffffff, transparent: true, depthWrite: false, blending: T.AdditiveBlending })); H.inner.add(d); H.dots.push(d); return d; })();
-      m.visible = true; m.position.copy(items[items.length - 1].pos); (m.material as THREE.MeshBasicMaterial).color.setHex(HCOL[a.cls] || 0xffffff); (m.material as THREE.MeshBasicMaterial).opacity = a.f ? 0.95 : 0.4; m.scale.setScalar(a.f ? 1 : 0.7);
+      m.visible = !one; m.position.copy(items[items.length - 1].pos); (m.material as THREE.MeshBasicMaterial).color.setHex(HCOL[a.cls] || 0xffffff); (m.material as THREE.MeshBasicMaterial).opacity = a.f ? 0.95 : 0.4; m.scale.setScalar(a.f ? 1 : 0.7);
       // (its velocity against hers, in her frame: a 3D track's whole; one scanner's, only its Doppler's along the line of sight)
       const vr = a.f ? a.f.v.clone().sub(su.V).applyQuaternion(qn) : a.c && a.plot ? pos.clone().sub(su.scans[a.plot.k].at).normalize().multiplyScalar(a.c.vr) : null;
       if (vr && vr.lengthSq() > 1) {
@@ -744,7 +747,8 @@ export const RadarView = (() => {
     H.items = items;
     // the one pointed at: ringed (facing the viewer), and named
     const p = pick && (pick.rwr ? H.rwrItems.find((q) => q.rwr && q.rwr.angleTo(pick.rwr!) < 0.05) : items.find((q) => q.plot === pick.plot && q.label.split(' ')[0] === pick.label.split(' ')[0]));
-    H.sel.visible = !!p && !focus; H.label.visible = !!p;
+    H.sel.visible = !!p && !focus && !p.arc; H.label.visible = !!p; // (one scanner's contact picked: its arc lit instead of a ring on its middle)
+    if (p && p.arcL) (p.arcL.material as THREE.LineBasicMaterial).opacity = 1;
     if (p) {
       H.sel.position.copy(p.pos); const camQ = new T.Quaternion(); (parent as any).updateWorldMatrix?.(true, false); H.inner.getWorldQuaternion(camQ); H.sel.quaternion.copy(camQ.invert().multiply(G_cam.quaternion)); H.sel.scale.setScalar(1 + 0.15 * Math.sin(now * 8));
       H.label.position.copy(p.pos).add(new T.Vector3(0, R * 0.12, 0).applyQuaternion(rot.clone().invert()));
@@ -757,10 +761,19 @@ export const RadarView = (() => {
     if (!holoG || !holoG.g.parent) return null; G_cam.quaternion.copy(cam.quaternion);
     let best: HoloItem | null = null, bd = 4 * D2R; const w = new T.Vector3();
     holoG.inner.updateWorldMatrix(true, false);
-    for (const it of [...holoG.items, ...holoG.rwrItems]) { w.copy(it.pos).applyMatrix4(holoG.inner.matrixWorld).sub(ray.origin); const a = w.angleTo(ray.direction); if (a < bd) { bd = a; best = it; } }
+    const M = holoG.inner.matrixWorld, u = new T.Vector3(), v = new T.Vector3();
+    for (const it of [...holoG.items, ...holoG.rwrItems]) {
+      if (it.arc) { // (along its arc: each piece of it, the point of the piece nearest the ray)
+        for (let j = 0; j + 1 < it.arc.length; j++) { u.copy(it.arc[j]).applyMatrix4(M); v.copy(it.arc[j + 1]).applyMatrix4(M); for (let s = 0; s <= 4; s++) { w.copy(u).lerp(v, s / 4).sub(ray.origin); const a = w.angleTo(ray.direction); if (a < bd) { bd = a; best = it; } } }
+        continue;
+      }
+      w.copy(it.pos).applyMatrix4(M).sub(ray.origin); const a = w.angleTo(ray.direction); if (a < bd) { bd = a; best = it; }
+    }
     return best;
   }
+  // (an item's arc in the world, if it's one scanner's: for the cursor to wrap itself round)
+  function holoArcWorld(it: HoloItem) { if (!holoG || !it.arc) return null; holoG.inner.updateWorldMatrix(true, false); return it.arc.map((q) => q.clone().applyMatrix4(holoG!.inner.matrixWorld)); }
   // where an item of the hologram is in the world (for the operator's cursor's halo round it)
   function holoWorld(it: HoloItem) { if (!holoG) return null; holoG.inner.updateWorldMatrix(true, false); return it.pos.clone().applyMatrix4(holoG.inner.matrixWorld); }
-  return { dbg, update, scope, pick, holo, holoPick, holoWorld };
+  return { dbg, update, scope, pick, holo, holoPick, holoWorld, holoArcWorld };
 })();
