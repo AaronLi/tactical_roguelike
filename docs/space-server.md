@@ -83,8 +83,9 @@ The world in SpaceSv (one per zone, and the hub's), stepped once per server step
 SpaceSv directly (a breach to `dock`, hull failure to `jump`, a zone ship boarded to the `tboard` path, near ships to `warm`).
 Pages draw snapshots and events; the pilot's page still flies her and sends her pose stamped with its step (the server extrapolates
 it for hit tests). Messages: `sss` (the core snapshot, 20 Hz, all), `sev` (events, reliable), `ssen` (the sensor station's
-picture, 10 Hz, its operator only), `sdbg` (F8's, on request), `sin` (inputs). A second, unreliable binary PeerJS connection for
-the snapshots; the JSON one for events and requests. Rounds aren't streamed: a burst's seed, and every side flies the same rounds.
+picture, 10 Hz, its operator only), `sdbg` (F8's, on request), `sin` (inputs). A second, unreliable binary channel for
+the snapshots (built: `ServerHost.fast` / `SvNet.fast`, `Net.onFast`, js/netfast.ts, js/snapcodec.ts; docs/threads.md, "The fast
+channel"); the JSON one for events and requests. Rounds aren't streamed: a burst's seed, and every side flies the same rounds.
 
 ### C2: the pilot's inputs, predicted
 

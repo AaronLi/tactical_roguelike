@@ -1,7 +1,7 @@
 // Drives the game in a headless Chromium (as tools/bake_hangar.mjs does: the DevTools protocol, no dependencies) for a look
 // at the space direction without a window: opens a debug-start URL (js/debugstart.ts), waits till it's ready, runs steps,
 // saves screenshots. The page's console errors and exceptions are printed.
-//   node tools/space_shot.mjs "<query>" <steps.mjs> [--port 8151] [--out dir] [--gpu]
+//   node tools/space_shot.mjs "<query>" <steps.mjs> [--port 8151] [--out dir] [--gpu] [--nowait]   (--nowait: don't wait for the debug start)
 // steps.mjs: export default async ({ ev, shot, sleep, key, log }) => { ... }
 //   ev(js): evaluate in the page (a promise is awaited); shot(name): a PNG in the out dir; key(code, down): a key held or let go
 //   send(method, params): a DevTools protocol command of your own (Profiler.start, ...); on(method, fn): its events; out: the out dir
@@ -48,7 +48,7 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 720, deviceScaleFactor: 1, mobile: false });
   await send('Page.navigate', { url: `http://127.0.0.1:${port}/?${query}` });
   const t0 = Date.now();
-  while (Date.now() - t0 < 120000) { await sleep(500); if (await ev('!!window.__debugReady').catch(() => false)) break; }
+  while (!process.argv.includes('--nowait') && Date.now() - t0 < 120000) { await sleep(500); if (await ev('!!window.__debugReady').catch(() => false)) break; }
   console.log('ready after', ((Date.now() - t0) / 1000).toFixed(1), 's:', await ev('!!window.__debugReady'));
   if (stepsFile) await (await import(pathToFileURL(path.resolve(stepsFile)).href)).default({ ev, shot, sleep, key, send, on: (method, fn) => subs.set(method, fn), out, log: console.log });
   else await shot('page');

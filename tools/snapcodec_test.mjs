@@ -84,10 +84,13 @@ const same = (a, b) => a.byteLength === b.byteLength && new Uint8Array(a).every(
   ok(same(unb64(b64(f)).buffer, f), 'base64 round trip');
   L.fallback({ t: 'fastb', c: 0, s: 9, b: b64(f) }); ok(got.length === 7 && same(got[6].buf, f), 'a message the slow way');
   L.fallback({ t: 'fastb', c: 0, s: 8, b: b64(f) }); ok(got.length === 7, 'the slow way is newest-wins too');
+  const g = msg(25000, 11), gp = [g.subarray(0, 11000), g.subarray(11000, 22000), g.subarray(22000)];
+  gp.forEach((p, i) => { ok(got.length === 7, 'the slow way in pieces: not before the last'); L.fallback({ t: 'fastb', c: 0, s: 10, i, n: 3, b: b64(p) }); });
+  ok(got.length === 8 && same(got[7].buf, g), 'the slow way in pieces, put together');
   // a snapshot round trip through both
   const w = new SnapWriter(1); w.u32(1234).f32(1.5).str('ok'); const snap = w.done();
   L.packet(pieces(new Uint8Array(snap), 3, 1)[0]);
-  const r = new SnapReader(got[7].buf); ok(r.version === 1 && r.u32() === 1234 && r.f32() === 1.5 && r.str() === 'ok', 'a snapshot through the channel');
+  const r = new SnapReader(got[8].buf); ok(r.version === 1 && r.u32() === 1234 && r.f32() === 1.5 && r.str() === 'ok', 'a snapshot through the channel');
 }
 console.log(`${n - fails}/${n} ok`);
 process.exit(fails ? 1 : 0);

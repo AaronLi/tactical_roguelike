@@ -11,7 +11,8 @@
 //
 // A negotiated channel opens on one side whether or not the other made one, so each side says hello on it (every 250 ms) until it
 // hears from the other (a hello is answered); until then, or if it never does (an older game, a browser that won't), what's sent
-// goes over the reliable JSON connection instead, as base64 ({t:'fastb'}), so nothing is lost but the speed.
+// goes over the reliable JSON connection instead, as base64 ({t:'fastb', c, s, b}, or in pieces {..., i, n}: PeerJS won't send a JSON
+// message of 16300 bytes or more), so nothing is lost but the speed.
 //
 // On the wire (the fast channel), one packet each: [1] hello, [2] its answer, or a piece of a message:
 //   [3][ch u8][seq u32][i u16][n u16][bytes...]
@@ -22,6 +23,7 @@
 export const FAST_ID = 9; // (the channel's stream id: PeerJS's own channel is 0 or 1, one a connection)
 export const CHUNK = 16000; // (bytes a packet at most, its header too)
 const HEAD = 10, HELLO = 1, ACK = 2, DATA = 3;
+const FB_CHUNK = 11000; // (bytes a piece the slow way: ~14.7 KB of base64, under PeerJS's 16300 for a JSON message)
 const newer = (a: number, b: number) => ((a - b) | 0) > 0; // (a after b, in a u32 that wraps)
 
 export interface FastStats { sent: number; sentB: number; pkts: number; fb: number; skipped: number; got: number; gotB: number; late: number; partial: number; dropped: number }
@@ -38,7 +40,7 @@ export class FastLink {
   hello = 0 as unknown as ReturnType<typeof setInterval>;
   helloUntil = 0;
   drop = 0; // (tests: the share of packets sent on the fast channel thrown away instead)
-  maxQueue = 256 * 1024; // (bytes waiting on a channel past which a message is skipped rather than queued: it'd be stale by its turn)
+  maxQueue = 256 * 1024; // (bytes waiting on a channel past which a message waits on its own, newest wins, rather than queued: it'd be stale by its turn)
   st: FastStats = { sent: 0, sentB: 0, pkts: 0, fb: 0, skipped: 0, got: 0, gotB: 0, late: 0, partial: 0, dropped: 0 };
 
   constructor(conn: any, onMsg: (buf: ArrayBuffer, ch: number) => void, opts: { fast?: boolean } = {}) {
@@ -51,6 +53,8 @@ export class FastLink {
     let dc: RTCDataChannel;
     try { dc = pc.createDataChannel('fast', { negotiated: true, id: FAST_ID, ordered: false, maxRetransmits: 0 }); } catch (e) { console.warn('net: no fast channel (' + e + '): snapshots go over the reliable one', e); return; }
     dc.binaryType = 'arraybuffer';
+    dc.bufferedAmountLowThreshold = this.maxQueue >> 2;
+    dc.onbufferedamountlow = () => { if (this.pend.size) this.flush(); };
     this.dc = dc;
     dc.onmessage = (e: MessageEvent) => { if (e.data instanceof ArrayBuffer) this.packet(e.data); };
     dc.onclose = () => { if (this.dc === dc) { this.dc = null; this.ok = false; clearInterval(this.hello); } };
@@ -62,9 +66,9 @@ export class FastLink {
     if (dc.readyState === 'open') start(); else dc.onopen = start;
   }
   close() {
-    clearInterval(this.hello);
+    clearInterval(this.hello); clearTimeout(this.flushT); this.pend.clear();
     const dc = this.dc; this.dc = null; this.ok = false;
-    if (dc) { dc.onmessage = dc.onopen = dc.onclose = null; try { dc.close(); } catch (e) { /* gone */ } }
+    if (dc) { dc.onmessage = dc.onopen = dc.onclose = dc.onbufferedamountlow = null; try { dc.close(); } catch (e) { /* gone */ } }
   }
   get mode() { return this.dc && this.ok && this.dc.readyState === 'open' ? 'fast' : 'reliable'; }
 
@@ -76,14 +80,40 @@ export class FastLink {
   }
 
   // a message (an ArrayBuffer, or a view of one) to the other side, on stream ch (0-255). It isn't kept: the caller's to reuse.
+  // When the way out is backed up (more than maxQueue bytes waiting), it isn't queued behind the stale ones: it waits on its own,
+  // replaced by a newer one of its stream if one comes first (skipped), and goes when the way clears.
   send(buf: ArrayBuffer | Uint8Array, ch = 0) {
     const b = buf instanceof Uint8Array ? buf : new Uint8Array(buf);
     const s = ((this.seq.get(ch) || 0) + 1) >>> 0;
     this.seq.set(ch, s);
     this.st.sent++; this.st.sentB += b.length;
+    if (this.pend.size || this.backed()) { this.hold(ch, s, b.slice()); return; }
+    this.out(ch, s, b);
+  }
+  pend = new Map<number, { s: number; b: Uint8Array }>(); // (each stream's newest, waiting for the way to clear)
+  flushT = 0 as unknown as ReturnType<typeof setTimeout>;
+  backed() {
+    if (this.mode === 'fast') return this.dc!.bufferedAmount > this.maxQueue;
+    const c = this.conn, q = c && c.dataChannel ? c.dataChannel.bufferedAmount : 0;
+    return q > this.maxQueue || (c && c.bufferSize > 0); // (PeerJS's own queue, past the channel's: js/net.ts's connection)
+  }
+  hold(ch: number, s: number, b: Uint8Array) {
+    if (this.pend.has(ch)) this.st.skipped++;
+    this.pend.set(ch, { s, b });
+    clearTimeout(this.flushT);
+    this.flushT = setTimeout(() => this.flush(), 20); // (also on the channel's bufferedamountlow, when it's the fast one)
+  }
+  flush() {
+    clearTimeout(this.flushT);
+    for (const [ch, p] of this.pend) {
+      if (this.backed()) break;
+      this.pend.delete(ch);
+      this.out(ch, p.s, p.b);
+    }
+    if (this.pend.size) this.flushT = setTimeout(() => this.flush(), 20);
+  }
+  out(ch: number, s: number, b: Uint8Array) {
     if (this.mode === 'fast') {
-      const dc = this.dc!;
-      if (dc.bufferedAmount > this.maxQueue) { this.st.skipped++; return; }
       const per = CHUNK - HEAD, n = Math.max(1, Math.ceil(b.length / per));
       if (n > 0xffff) { this.st.skipped++; return; }
       for (let i = 0; i < n; i++) {
@@ -96,22 +126,25 @@ export class FastLink {
       }
       return;
     }
-    // (the fallback: the reliable connection, base64; skipped too if it's backed up)
+    // (the fallback: the reliable connection, base64)
     const c = this.conn;
     if (!c || !c.open) { this.st.skipped++; return; }
-    const q = c.dataChannel && c.dataChannel.bufferedAmount;
-    if (q > this.maxQueue) { this.st.skipped++; return; }
+    // (in pieces too: PeerJS 1.5's JSON connection refuses a message of 16300 bytes or more, with an error that drops the player)
+    const n = Math.max(1, Math.ceil(b.length / FB_CHUNK));
+    if (n > 0xffff) { this.st.skipped++; return; }
     this.st.fb++;
-    try { c.send({ t: 'fastb', c: ch, s, b: b64(b) }); } catch (e) { /* closing */ }
+    for (let i = 0; i < n; i++) {
+      try { c.send(n > 1 ? { t: 'fastb', c: ch, s, i, n, b: b64(b.subarray(i * FB_CHUNK, (i + 1) * FB_CHUNK)) } : { t: 'fastb', c: ch, s, b: b64(b) }); } catch (e) { /* closing */ }
+    }
   }
 
-  // the reliable connection's {t:'fastb'}: a message that came the slow way
+  // the reliable connection's {t:'fastb'}: a message, or a piece of one (i of n), that came the slow way
   fallback(m: any) {
     if (!m || typeof m.b !== 'string') return;
-    const ch = (+m.c | 0) & 255, s = m.s >>> 0;
+    const ch = (+m.c | 0) & 255, s = m.s >>> 0, n = m.n == null ? 1 : m.n >>> 0, i = m.i == null ? 0 : m.i >>> 0;
     let bytes: Uint8Array;
     try { bytes = unb64(m.b); } catch (e) { return; }
-    this.deliver(ch, s, bytes);
+    this.piece(ch, s, i, n, bytes);
   }
 
   packet(buf: ArrayBuffer) {
@@ -123,9 +156,12 @@ export class FastLink {
     if (k !== DATA || dv.byteLength < HEAD) return;
     this.ok = true; // (anything from the other side: it has the channel)
     const ch = dv.getUint8(1), s = dv.getUint32(2, true), i = dv.getUint16(6, true), n = dv.getUint16(8, true);
+    this.piece(ch, s, i, n, new Uint8Array(buf, HEAD));
+  }
+  // piece i of n of stream ch's message s (either way it came)
+  piece(ch: number, s: number, i: number, n: number, part: Uint8Array) {
     const last = this.last.get(ch);
     if (last !== undefined && !newer(s, last)) { this.st.late++; return; }
-    const part = new Uint8Array(buf, HEAD);
     if (n <= 1) { this.deliver(ch, s, part); return; }
     if (i >= n) return;
     let r = this.rx.get(ch);
