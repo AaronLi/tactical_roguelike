@@ -82,6 +82,7 @@ import { Sim } from './sim.js';
 import { Space } from './space.js';
 import { Radar } from './radar.js';
 import { RadarView } from './radarview.js';
+import { SuiteView } from './suiteview.js';
 import { SpaceData } from './spacedata.js';
 import { SpaceSv } from './spaceserver.js';
 import { SpaceUI } from './spaceui.js';
@@ -107,5 +108,5 @@ import { Zip } from './zip.js';
   Callsigns, Arsenal, Acoustics, Ambience, GunAudio, Footsteps, Audio, GunMaterials, Models, GunRig, HumanData, Humans, Headgear, FurnSpec, FurnMesh,
   LightGrid, GpuAo, GunAo, LevelView, Wind, Rig, VMAnim, Highlights, R, Viewmodel, GunModels, Icons, Bolts, Route, Shop, Recorder, SpaceSv, Server, ServerHost,
   ServerLink, Net, Career, CloudConfig, Handling, Loot, Casings, Range, Course, GunsmithUI, Hangar, ZeroUI, ShopUI, InvUI, Touch, Pad, Landing, Prep,
-  ShipModel, InteriorCull, SpaceUI, Radar, RadarView, Space, Me, Cloud, MenuShow, Prof, Game, Glare, Views, ShotLog, HUD, Loadout, Demo, DebugStart,
+  ShipModel, InteriorCull, SpaceUI, Radar, RadarView, SuiteView, Space, Me, Cloud, MenuShow, Prof, Game, Glare, Views, ShotLog, HUD, Loadout, Demo, DebugStart,
 };
