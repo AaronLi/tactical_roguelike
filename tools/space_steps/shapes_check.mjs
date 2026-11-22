@@ -1,14 +1,15 @@
 // The shape providers (js/hullshape.ts, js/rcstris.ts; assets/models/ships/space.json from tools/bake_space_shapes.mjs) against
 // what the live page works out from its meshes (docs/space-server.md phase B): the mission ship's triangles, box, guns, radar
-// table (EW.foeT.rcs), radar mounts (EW.foe), hull guns' fitted heights, hullClear at every site (Space.dbgClear); the zone's
-// stand-ins (their meshes, EW.trf's tables); the squad's ship (EW.ownT.rcs, her box, the torpedo tube, the turrets).
+// table (Radar.rcsOf on her drawing, as the page once made it), radar mounts (EW.foe), hull guns' fitted heights, hullClear at every
+// site (Space.dbgClear); the zone's stand-ins (their meshes, rcsOf on each); the squad's ship (space.json, her box, the torpedo tube,
+// the turrets). (The page keeps none of these tables now: the server's battle has them from the data, js/svbattle.ts.)
 //   node tools/space_shot.mjs "mute&board=small&seed=3" tools/space_steps/shapes_check.mjs --port 8151
 // Prints MATCH / DIFF lines, then the map's line for tools/shapes_node_check.mjs (--map ...) and the shape fingerprint (FP) it
 // should print the same.
 import { shapeFp, trafficFp } from './shapes_fp.mjs';
 import { spawnSync } from 'node:child_process'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
 export default async ({ ev, sleep, log }) => {
-  for (let i = 0; i < 40 && !(await ev('!!(G.Space.ew().foeT && G.Space.S.hull && G.Space.ew().ownT)')); i++) await sleep(500);
+  for (let i = 0; i < 40 && !(await ev('!!(G.Space.ew().foeT && G.Space.S.hull)')); i++) await sleep(500);
   await sleep(1500);
   const pre = `
     const H = await import('/dist/js/hullshape.js'), RT = await import('/dist/js/rcstris.js'), Sp = G.Space, S = Sp.S, EW = Sp.ew(), SD = G.SpaceData, T = THREE, L = [];
@@ -57,7 +58,7 @@ export default async ({ ev, sleep, log }) => {
       say(!gd.length || Math.max(...gd) < 1e-6, 'hull guns fitted (mount y, gun y): ' + (gd.map((v) => v.toExponential(1)).join(' ') || 'none') + ' m off'); }
     { const fx = EW.foeT.sz, c = EW.foeT.p; say(Math.abs(fx - ch.sz) < 1e-9 && c.distanceTo(ch.c) < 1e-9, 'EW.foeT sz ' + fx + ' / ' + ch.sz + ', p ' + c.toArray().map((v) => v.toFixed(5)) + ' / ' + ch.c.toArray().map((v) => v.toFixed(5))); }
     same("her group live (fitted guns, the radars' kit)", meshTris(S.hull.group), ch.tris, ch.flags);
-    { const d = rdiff(EW.foeT.rcs.s, ch.rcs.s); say(d.rel < 1e-4, 'EW.foeT.rcs vs hullRcs: worst abs ' + d.abs.toExponential(2) + ' rel ' + d.rel.toExponential(2) + ', max ' + EW.foeT.rcs.max.toPrecision(8) + ' / ' + ch.rcs.max.toPrecision(8) + ', mean ' + EW.foeT.rcs.mean.toPrecision(8) + ' / ' + ch.rcs.mean.toPrecision(8)); }
+    { const hg = S.hull.group; hg.updateMatrixWorld(true); const live = G.Radar.rcsOf('shapechk:' + Math.random(), hg, hg.matrixWorld.clone().invert()); EW.foeT.rcs = live; const d = rdiff(live.s, ch.rcs.s); say(d.rel < 1e-4, 'EW.foeT.rcs vs hullRcs: worst abs ' + d.abs.toExponential(2) + ' rel ' + d.rel.toExponential(2) + ', max ' + EW.foeT.rcs.max.toPrecision(8) + ' / ' + ch.rcs.max.toPrecision(8) + ', mean ' + EW.foeT.rcs.mean.toPrecision(8) + ' / ' + ch.rcs.mean.toPrecision(8)); }
     { const sites = G.ShipGen.sites(map), live = sites.map((s) => (Sp.dbgClear(s) ? '1' : '0')).join(''), fp = shapeFp(X, map, S.def);
       say(live === fp.clearKit || live === fp.clear, 'hullClear at ' + sites.length + ' sites: live ' + live + (live === fp.clearKit ? ' = the shape with the kit' : live === fp.clear ? ' = the shape without the kit' : ' / shape (kit) ' + fp.clearKit + ' / (no kit) ' + fp.clear));
       // (the map again, from the arguments a node run would take: so tools/shapes_node_check.mjs --map makes the same one)
@@ -71,8 +72,8 @@ export default async ({ ev, sleep, log }) => {
     return L.join('\\n');
   })()`, 180000);
   log(A);
-  // (out of the jump: the radars run, and the zone's ships are radar targets, EW.trf)
-  for (let i = 0; i < 120 && !(await ev('!G.Space.S.ftl && G.Space.ew().trf.size > 0')); i++) await sleep(500);
+  // (out of the jump: the zone's ships drawn)
+  for (let i = 0; i < 120 && !(await ev('!G.Space.S.ftl && G.Space.S.traffic.length > 0')); i++) await sleep(500);
   await sleep(1000);
   const B = await ev(`(async () => { ${pre}
     // ---- the zone's stand-ins
@@ -81,9 +82,9 @@ export default async ({ ev, sleep, log }) => {
       if (q.real || !q.obj) continue; nT++;
       const ts = H.TrafficShape.of(q.c.kind, q.c.seed), o = q.obj;
       same('stand-in ' + q.c.kind + ' ' + q.c.seed, meshTris(o), ts.tris, ts.flags);
-      const t = EW.trf.get(o);
+      o.updateMatrixWorld(true); const t = { rcs: G.Radar.rcsOf('shapechk:' + Math.random(), o, o.matrixWorld.clone().invert()), sz: Math.max(4, Math.max(...new T.Box3().setFromObject(o).getSize(new T.Vector3()).toArray()) / 2) }; // (her table from her drawing, as the page once made it)
       if (t) { const d = rdiff(t.rcs.s, RT.rcsOfTris(ts.exact, ts.flags).s), w = new T.Box3().setFromObject(o).getSize(new T.Vector3()), la = ts.bboxAll, ls = [la.max[0] - la.min[0], la.max[1] - la.min[1], la.max[2] - la.min[2]];
-        say(d.rel < 1e-4, '  its EW.trf table: worst abs ' + d.abs.toExponential(2) + ' rel ' + d.rel.toExponential(2));
+        say(d.rel < 1e-4, '  its table (rcsOf on her drawing): worst abs ' + d.abs.toExponential(2) + ' rel ' + d.rel.toExponential(2));
         if (d.rel >= 1e-4) { // (the same stand-in made now, in no frame but its own: rcsOf's toLocal times its matrix is the identity there, not a rotation and its inverse)
           const fr = G.ShipModel.traffic(q.c.kind, q.c.seed).group; fr.updateMatrixWorld(true); const d2 = rdiff(G.Radar.rcsOf('shapechk:' + Math.random(), fr, fr.matrixWorld.clone().invert()).s, RT.rcsOfTris(ts.exact, ts.flags).s);
           L.push('  NOTE the same stand-in made now, at the origin, unturned: rcsOf vs the shape worst rel ' + d2.rel.toExponential(2) + ' (the live one is read through her place in the zone, a rotation and its inverse: their rounding moves normals that lie on a bin edge)'); }
@@ -98,13 +99,13 @@ export default async ({ ev, sleep, log }) => {
     const fit = (S.fleet.fit[S.def.id] || []).slice(0, S.def.turrets), key = Array.from({ length: S.def.turrets }, (_, i) => (fit[i] ? (fit[i] === 'rail' ? 'r' : 'g') : '-')).join(''), f = sd && sd.fits[key];
     L.push('SQUAD ' + S.def.id + ' (' + (G.ShipModel.has(S.def.id) ? 'glb' : 'recipe') + ', space.json says ' + (sd && sd.model) + '), fit ' + JSON.stringify(fit) + ' -> ' + key);
     if (f) {
-      const r = RT.rcsFromB64(f.rcs), d = rdiff(EW.ownT.rcs.s, r.s); say(d.rel < 1e-4, '  rcs (EW.ownT.rcs, cached once a session, vs space.json): worst abs ' + d.abs.toExponential(2) + ' rel ' + d.rel.toExponential(2) + ', max ' + EW.ownT.rcs.max.toPrecision(8) + ' / ' + f.max.toPrecision(8));
+      const r = RT.rcsFromB64(f.rcs);
       { // (her drawing made now, as ShipModel.ship makes it, against space.json; and with her ramp down, as she was in the hangar)
         const fr = G.ShipModel.ship(S.def, S.fleet), fg = fr.group; fg.updateMatrixWorld(true);
         const q = G.Radar.rcsOf('shapechk:' + Math.random(), fg, fg.matrixWorld.clone().invert()), d2 = rdiff(q.s, r.s); say(d2.rel < 1e-4, '  rcs (ShipModel.ship now, as built, vs space.json): worst abs ' + d2.abs.toExponential(2) + ' rel ' + d2.rel.toExponential(2));
         fr.ramp.rotation.x = fr.ramp.userData.open || Math.PI / 2 + 0.1; fg.updateMatrixWorld(true);
-        const q2 = G.Radar.rcsOf('shapechk:' + Math.random(), fg, fg.matrixWorld.clone().invert()), d3 = rdiff(EW.ownT.rcs.s, q2.s);
-        L.push('  NOTE EW.ownT.rcs against her drawing with the ramp down (rampT 1): worst rel ' + d3.rel.toExponential(2));
+        const q2 = G.Radar.rcsOf('shapechk:' + Math.random(), fg, fg.matrixWorld.clone().invert()), d3 = rdiff(r.s, q2.s);
+        L.push('  NOTE space.json against her drawing with the ramp down (rampT 1): worst rel ' + d3.rel.toExponential(2));
         fg.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
       const g = S.model.group, tube = Sp.dbgTorp().TP.tube, skip = new Set(); if (tube) tube.m.traverse((o) => skip.add(o));
       const mb = meshBox(g, (o) => skip.has(o)), want = f.box.map((v) => v.toFixed(5)).join(',');

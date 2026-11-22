@@ -903,20 +903,18 @@ export const SpaceSv = (() => {
         net().broadcast({ t: 'seats', s: st.seats, ctl: st.ship.ctl });
         break;
       }
-      case 'spose': if (p && (st.ship.ctl === from || !st.ship.ctl || !sv.players.has(st.ship.ctl)) && Array.isArray(m.a) && m.a.length <= 16 && m.a.every(Number.isFinite)) { st.ship.ctl = from; st.ship.pose = m.a; net().broadcast({ t: 'spose', a: m.a, by: from }, from); if (m.a.length >= 10) SvBattle.heardPose(m.a, sv.stepN, sv.map); } break;
-      case 'smis': if (p && Array.isArray(m.a) && m.a.length <= 8 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'smis', a: m.a, by: from }, from); battleIn(m); } break; // (a missile off her hull, or one shot down: told to all)
+      case 'spose': if (p && (st.ship.ctl === from || !st.ship.ctl || !sv.players.has(st.ship.ctl)) && Array.isArray(m.a) && m.a.length <= 16 && m.a.every(Number.isFinite)) { st.ship.ctl = from; st.ship.pose = m.a; net().broadcast({ t: 'spose', a: m.a, by: from }, from); if (m.a.length >= 10) SvBattle.heardPose(m.a, sv.stepN, sv.phase === 'shop' ? null : sv.map); } break;
       case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'sfire', a: m.a, by: from }, from); battleIn(m); } break;
       case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'strk', a: m.a, by: from }, from); battleIn(m); } break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
       case 'ssec': if (p && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5) && m.a.every(Number.isFinite)) { net().broadcast({ t: 'ssec', a: m.a, by: from }, from); battleIn(m); } break; // (a scanner's search set: js/space.ts secSet)
       case 'sdbgq': if (p) { if (m.on && typeof m.id === 'string') dbgReq.set(from, { id: m.id, at: sv.stepN }); else dbgReq.delete(from); } break; // (F8 open on a suite: its debug picture to that player (battle))
       case 'sxpdr': if (p) { net().broadcast({ t: 'sxpdr', on: m.on ? 1 : 0, by: from }, from); battleIn(m); } break; // (her transponder switched: js/space.ts xpdr)
-      case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'storp', a: m.a, by: from }, from); battleIn(m); } break; // (a torpedo in flight: js/space.ts torps)
+      case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) battleIn(m); break; // (a torpedo launched: the server's from there, js/svbattle.ts torpIn)
       case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'schaff', a: m.a, by: from }, from); battleIn(m); } break; // (chaff thrown out of her: js/space.ts chaffGo)
-      case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'srcue', a: m.a, by: from }, from); battleIn(m); } break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
+      case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) battleIn(m); break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
       case 'sdmg': if (p && st.ship.ctl === from) battleIn(m); break;
       case 'sin': if (p && st.ship.ctl === from) battleIn(m); break; // (the pilot's steps: js/space.ts c2Post)
       case 'smatch': if (p && st.ship.ctl === from && typeof m.id === 'string' && m.id.length <= 40) battleIn(m); break; // (what the pilot's matched speed with: js/space.ts sendPose) // (what she hit herself, as the pilot's page saw it: the server's battle keeps her hull)
-      case 'shit': if (p && Number.isFinite(m.i)) { net().broadcast({ t: 'shit', i: m.i | 0, hp: +m.hp || 0, by: from }, from); battleIn(m); } break; // (a hull gun hit by a turret, or the ship by one: told to all)
       case 'mobj': if (p) act(String(m.k), from, m.n); break;
       // the shipyard: a ship bought (paid for on the buyer's own screen, as the shop's stock is), taken out, fitted
       case 'fbuy': if (p && sv.phase === 'shop' && SD.SHIPS[m.id] && !F.owned.includes(m.id)) { F.owned.push(m.id); st.fleet = SD.cleanFleet(F); net().broadcast({ t: 'fleet', f: st.fleet, by: from, got: m.id }); } break;
@@ -965,14 +963,19 @@ export const SpaceSv = (() => {
   let bat: SvBat | null = null;
   function battle(dt: number) {
     const sv = S(), M = st.M, map = sv.map;
-    if (!Z || Z.ms.kind !== 'board' || sv.phase !== 'level' || !M || !M.meta || !map || !map.sp || !map.sp.hull) { bat = null; SvBattle.hullReset(); return; } // (her hull: the pilot's page's word again in the next battle)
-    if (!bat || bat.map !== map || bat.k !== Z.active) bat = SvBattle.make(map, Z.ms, Z.active, M.ms, st.fleet, bat);
-    const hostile = M.ms.obj === 'defend' ? 0 : M.ms.obj !== 'visit' || M.breached ? 1 : 0;
-    SvBattle.step(bat, dt, sv.stepN, { hostile, gn: gunnersLeft(), arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom }, M.docked, Z.zt, (k) => { const c = sv.ctxs.get(k); return c ? (c.sv.map as any) || null : null; }); // (a zone ship's level, made: her real hull for the radars)
-    SvBattle.out(bat, sv.stepN, Z.zt, (m) => net().broadcast(m), (b, ch) => net().fast(null, b, ch));
+    // (wherever she is in space: the hub (no level of the server's: the page's own), a boarding zone's level, a base's)
+    const kind = !SD.ON ? null : sv.phase === 'shop' ? 'hub' : sv.phase === 'level' && Z && M && map ? (Z.ms.kind === 'board' ? (M.meta && map.sp && map.sp.hull ? 'board' : null) : 'assault') : null;
+    if (!kind) { bat = null; SvBattle.hullReset(); return; } // (her hull: the pilot's page's word again in the next battle)
+    const board = kind === 'board' && Z && M ? { Z, M } : null, k = board ? board.Z.active : 0, bmap = kind === 'hub' ? null : map;
+    if (!bat || bat.kind !== kind || bat.map !== bmap || bat.k !== k) bat = SvBattle.make(bmap, board ? board.Z.ms : null, k, M ? M.ms : null, st.fleet, bat, kind);
+    const crew = board ? { hostile: board.M.ms.obj === 'defend' ? 0 : board.M.ms.obj !== 'visit' || board.M.breached ? 1 : 0, gn: gunnersLeft(), arm: board.M.arm == null ? null : Math.ceil(board.M.arm), boom: board.M.boom } : null;
+    const docked = kind === 'hub' ? !!st.ship.docked : !!(M && M.docked);
+    if (kind === 'hub' && docked) SvBattle.repair(); // (docked at home: her hull made good, as the page has it)
+    SvBattle.step(bat, dt, sv.stepN, crew, docked, board ? board.Z.zt : 0, (kk) => { const c = sv.ctxs.get(kk); return c ? (c.sv.map as any) || null : null; }); // (a zone ship's level, made: her real hull for the radars)
+    SvBattle.out(bat, sv.stepN, board ? board.Z.zt : 0, (m) => net().broadcast(m), (b, ch) => net().fast(null, b, ch));
     // (her hull gone, by the server's count: the drive jumps her home by itself, as the pilot's page did (js/space.ts damage))
     if (sv.stepN % 3 === 0 && st.ship.ctl) { const a = SvBattle.flyAck(); if (a) net().fast(st.ship.ctl, new TextEncoder().encode(JSON.stringify({ k: bat.k, s: a.s, st: a.st })).buffer as ArrayBuffer, 5); } // (where the server has her, to her pilot: js/space.ts c2Ack)
-    if (SvBattle.failing() && !sv.leaving && !M.docked) { net().broadcast({ t: 'shit', i: -1, hp: 0 }); sv.overBlack(() => home(), 'ftl', -1); } // (told at once: the jump's begun before the next snapshot)
+    if (SvBattle.failing() && !sv.leaving && !docked) { if (kind === 'hub') net().broadcast({ t: 'shit', i: -1, hp: SvBattle.patch() }); else { net().broadcast({ t: 'shit', i: -1, hp: 0 }); sv.overBlack(() => home(), 'ftl', -1); } } // (at home there's nowhere to jump: patched up to 30%) // (told at once: the jump's begun before the next snapshot)
     // (her radars' picture, as the server's battle has it (js/suiteview.ts pack): ten times a second on the fast channel's stream 1, to
     // everyone aboard (the sensor station, the hologram, the helm's targeting and her marks draw from it); k: which level's frame it's in)
     // (F8's, to a player who's asked (sdbgq, renewed every couple of seconds): the suite they're looking at with its debug extras (fast
@@ -985,10 +988,11 @@ export const SpaceSv = (() => {
       if (sv.stepN % 30 === 0) net().fast(pid, enc({ k: bat.k, id: q.id, m: SuiteView.packMaps(su, W.t) }), 3);
     }
     if (sv.stepN % 6 === 0 && bat && bat.W.own) { const t = bat.W.t, r1 = (v: THREE.Vector3) => [Math.round(v.x), Math.round(v.y), Math.round(v.z)], w = { trk: Radar.litTrk('own', t).map((e) => ({ k: e.k, f: r1(e.from), lk: e.lk ? 1 : 0 })), scan: Radar.paintsOn('own', t).map((e) => ({ k: e.k, f: r1(e.from), a: Math.round(e.age * 100) / 100 })) }; // (her warning receiver: who's tracking her, whose scanners are painting her: the server's radars')
-      const js = JSON.stringify({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t), w }), u8 = new TextEncoder().encode(js); net().fast(null, u8.buffer as ArrayBuffer, 1); }
+      const P0 = bat.W.ship.P, l = bat.W.traffic.filter((q) => q.su && q.t).sort((a, b) => a.t!.p.distanceTo(P0) - b.t!.p.distanceTo(P0)).map((q) => [q.t!.id, q.su!.name || q.t!.id]); // (the zone's ships' radars it has on, nearest first: F8's list)
+      const js = JSON.stringify({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t), w, l }), u8 = new TextEncoder().encode(js); net().fast(null, u8.buffer as ArrayBuffer, 1); }
   }
   const dbgReq = new Map<string, { id: string; at: number }>(); // (who's asked for F8's picture of which suite, and when)
-  const battleIn = (m: any) => SvBattle.request(bat, m); // (a crew request, relayed as before (the pages still run their own battle), and done to the server's)
+  const battleIn = (m: any) => SvBattle.request(bat, m); // (a crew request: done to the server's battle)
   const battleSum = () => SvBattle.summary(bat);
   function ctxSave() { return { M: st.M, active: Z ? Z.active : 0, hostShip, breachedOf }; }
   function ctxLoad(c: any) { if (!c) return; st.M = c.M; if (Z) Z.active = c.active; hostShip = c.hostShip; breachedOf = c.breachedOf; }

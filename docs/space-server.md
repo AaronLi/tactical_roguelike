@@ -2,9 +2,9 @@
 
 Where the space battle runs, and the plan to move it. Written 2026-11-21 at 60da28b5.
 
-## Now
+## Before (2026-11-21, at 60da28b5)
 
-Every player's page runs the whole battle itself, in js/space.ts `update` (fixed 1/60 s steps from an accumulator): the zone,
+Every player's page ran the whole battle itself (what follows is how it was; it's all on the server now: Where it goes, C1, C2), in js/space.ts `update` (fixed 1/60 s steps from an accumulator): the zone,
 flight, the radar suites (her own `EW.own`, the mission ship's `EW.foe`, the zone's ships' `EW.tsu`), fire control, the hull guns,
 rounds, missiles, torpedoes, chaff. The page whose `isCtl()` is true is authoritative for damage, missile launches, a round killing
 a torpedo, and her flight; it tells the others (`sfire`, `shit`, `smis`, `storp`, `strk`, ...). The radar's noise is `Math.random`,
@@ -98,14 +98,17 @@ and flown as its owner reports it until it comes onto its datalink, when the ser
 `f: [x, y, z, vx, vy, vz]` on the first `storp`, the fix it was sent at, makes it the server's from launch). Out: `sss` every 3 steps,
 `sev` with it (a gun's rounds a step as `fire`: gun, aim, error, seed, count, flown by `fireRound` on `SpaceNet.rng(seed)`; rounds'
 ends not sent). `G.ServerLink.sworld()` sums the server's world up; tools/space_steps/server_battle.mjs sets it beside the page's.
-Then the pages stopped running it (2026-11-21, f3cfce7d on): with the server's battle on (a boarding zone; `?pagebattle` for the old
-way), no page steps any radar or fire control; the HUD, the hologram, the sensor station, the helm's targeting, her warning receiver
+Then the pages stopped running it (2026-11-21, f3cfce7d on; 2026-11-22 everywhere in space, the page's own battle and its
+`?pagebattle` switch deleted): the server makes a world wherever she is in space (a boarding zone's, with the mission ship, the zone's
+ships and rocks; a base's orbit; the hub, where it has no level of its own: her and what she puts out), and no page steps any radar
+or fire control, flies a torpedo or a missile, or decides a hit; the HUD, the hologram, the sensor station, the helm's targeting, her warning receiver
 and F8 draw the server's pictures (fast streams 1-3). The server keeps her hull (from the pilot's first pose; `sdmg` for what she hits
 herself; at nothing it jumps her home itself), flies her turrets' rounds and decides their hits (`sfire` with its damage:
 js/spacesim.ts shotsStep), takes what she's matched speed with into its notch (`smatch`), swaps a zone ship's real hull in inside 5 km
 once it's made her level (js/svbattle.ts realShape, from js/spaceserver.ts warm), and sends `sss` as bytes on fast stream 4
 (js/spacenet.ts sssBin). Step scripts: hull_server, turret_server, zone_real, torpedo_defence, server_battle (tools/space_steps/).
-Still the page's: the hub's world (no battle there), discrete flight events (the breach, landing, launch, warp, FTL).
+Still the page's: discrete flight events (the breach, landing, launch, warp, FTL) and the atmosphere stage of an assault (her pose
+from the pilot's page, as before C2); collisions (told the server: `sdmg`, and her state after them).
 
 ### C2: the pilot's inputs, predicted
 

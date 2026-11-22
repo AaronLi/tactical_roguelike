@@ -1,6 +1,6 @@
-// The server's battle (js/svbattle.ts, docs/space-server.md phase C1) against the page's: both pictures side by side as the squad's ship
+// The server's battle (js/svbattle.ts, docs/space-server.md phase C1), and what the page is shown of it (PAGE: its pictures, sv) as the squad's ship
 // sits off the mission ship with her scanners on, then a torpedo (fired on the page's fix, as torpedo_defence.mjs does: the page's storp
-// makes it on the server too, taken over there when it comes onto its datalink), each side's timeline of it in the mission ship's
+// makes it on the server, the server's from launch), each side's timeline of it in the mission ship's
 // picture; the snapshots and events the server sends (sss, sev: counted and sized off the host's own port); the worker's step cost.
 //   node tools/space_shot.mjs "mute&board=small&seed=3" tools/space_steps/server_battle.mjs --port 8163 --gpu      (env PD_R: the range, default 5000)
 export default async ({ ev, sleep, log }) => {
@@ -12,7 +12,7 @@ export default async ({ ev, sleep, log }) => {
   log(await ev(`(() => { const Sp = G.Space, S = Sp.S, foe = Sp.ew().foe, d = new THREE.Vector3(-0.87, -0.1, 0.5).normalize().applyQuaternion(S.Q); S.P.copy(foe.P).addScaledVector(d, ${+(process.env.PD_R || 5000)}); S.V.set(0, 0, 0); return 'moved to ' + Math.round(S.P.distanceTo(foe.P)); })()`));
   // the two pictures, side by side
   const pageSum = `(() => { const ew = G.Space.ew(), sum = (su) => su ? { modes: su.scans.map(s => s.mode), plots: su.scans.map(s => s.plots.length), cons: su.scans.map(s => s.cons.length), fus: su.fus.length, bel: (su.bel || []).length, ass: su.ass.map(a => a.n + ':' + a.cls), trks: su.trks.map(t => t.st + (t.tgt ? ':' + t.tgt : '')), tts: su.sched ? su.sched.tts.map(q => q.n + (q.tgt ? ':' + q.tgt : '') + ' q' + (+q.est.q).toFixed(2)) : [] } : null;
-    return { rt: +ew.rt.toFixed(2), own: sum(ew.own), foe: sum(ew.foe), fc: ew.fc, tg: ew.tg.map(t => t.id), guns: G.Space.S.hull ? G.Space.S.hull.guns.map(g => ({ k: g.k, hp: g.hp, bt: +(g.bt || 0).toFixed(2) })) : [], rounds: G.Space.S.rounds.length, torps: G.Space.dbgTorp().TP.list.map(tp => ({ id: tp.id, ph: tp.ph, lock: tp.lock })) }; })()`;
+    return { rt: +ew.rt.toFixed(2), own: sum(G.Space.sv(ew.own)), foe: sum(ew.foe && G.Space.sv(ew.foe)), fc: null, tg: [], guns: G.Space.S.hull ? G.Space.S.hull.guns.map(g => ({ k: g.k, hp: g.hp, bt: +(g.bt || 0).toFixed(2) })) : [], rounds: G.Space.S.rounds.length, torps: G.Space.dbgTorp().TP.list.map(tp => ({ id: tp.id, ph: tp.ph, lock: tp.lock })) }; })()`;
   const both = async (tag) => { const [p, s] = await Promise.all([ev(pageSum), ev('G.ServerLink.sworld()')]); const w = s.w;
     const line = (n, a) => a ? `${n} fus ${a.fus} bel ${a.bel} cons ${a.cons.join('/')} plots ${a.plots.join('/')} ass [${a.ass.join(' ')}] trks [${a.trks.join(' ')}] tts [${a.tts.join(' ')}]` : n + ' -';
     log(`--- ${tag}: page rt ${p.rt}, server t ${w && w.t} (world ${w && w.on ? 'on, k ' + w.k + ', built in ' + w.built + ' ms, ship ' + JSON.stringify(w.ship) : 'OFF'})`);
@@ -23,7 +23,7 @@ export default async ({ ev, sleep, log }) => {
     return { p, w }; };
   for (let i = 0; i < 4; i++) { await sleep(3000); await both('settling ' + (i + 1)); }
   // a 3D fix on her on the page, then the torpedo
-  let fix = null; for (let i = 0; i < 80 && !fix; i++) { await sleep(500); fix = await ev(`(() => { const f = G.Space.ew().own.fus.find(q => G.Space.ew().foe && q.pl.distanceTo(G.Space.ew().foe.P) < 600); return f ? f.n : null; })()`); }
+  let fix = null; for (let i = 0; i < 80 && !fix; i++) { await sleep(500); fix = await ev(`(() => { const f = G.Space.sv(G.Space.ew().own).fus.find(q => G.Space.ew().foe && q.pl.distanceTo(G.Space.ew().foe.P) < 600); return f ? f.n : null; })()`); }
   await both('page fix ' + fix); if (!fix) return;
   await ev(`(() => { const Sp = G.Space, d = Sp.dbgTorp(); d.TP.pick = ${JSON.stringify(fix)}; d.TP.cool = 0; d.fire(); const ew = Sp.ew(); window.__pd = { t0: ew.rt, T: {} };
     window.__piv = setInterval(() => { const ew = Sp.ew(), su = ew.foe, tp = d.TP.list[0]; if (!su) return; const t = +(ew.rt - window.__pd.t0).toFixed(2), mk = (k) => { if (window.__pd.T[k] == null) window.__pd.T[k] = t; };

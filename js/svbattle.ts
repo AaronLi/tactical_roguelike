@@ -9,7 +9,7 @@
 // sensor operator's picks, the helm's torpedoes, chaff) and says what happens (js/spacenet.ts sss, sev).
 // Until the pages draw it (the page integration), every page still runs its own battle too: these requests are relayed as before.
 import { Radar, RSuite, RTarget, RPlot, RFused, RMode } from './radar.js';
-import { SpaceSim, SimWorld, SimTorp, SimTraffic, FlyIn, FlyState } from './spacesim.js';
+import { SpaceSim, SimWorld, SimTorp, SimTraffic, SimZone, FlyIn, FlyState } from './spacesim.js';
 import { SpaceData as SD } from './spacedata.js';
 import { HullShape, TrafficShape } from './hullshape.js';
 import { hullRcs, rcsFromB64, rcsOfTris } from './rcstris.js';
@@ -17,11 +17,13 @@ import { SpaceNet, SevE } from './spacenet.js';
 
 // a world, with what the server keeps beside it
 export interface SvBat {
-  W: SimWorld; k: number; map: LvMap; ms: SpMission | null; built: number; // (k: the zone ship whose level it is; built: ms it took to make)
+  W: SimWorld; k: number; map: LvMap | null; ms: SpMission | null; kind: 'board' | 'assault' | 'hub';
+  Zi: SimZone | null; // (Zi: with no zone (the hub, a base's orbit), the still frame her flight's stepped through, as the page's level is)
+  built: number; // (k: the zone ship whose level it is; built: ms it took to make)
   pre: { P: THREE.Vector3; Q: THREE.Quaternion } | null; // (her pose in the last world's frame: what her radars hold is moved to this one's when the first pose in it comes)
   ev: SevE[]; dm: number; // (the events since the last snapshot; damage she's done the squad's ship)
   marks: Map<number, Record<string, number>>; tAt: Map<number, number>; // (each torpedo's timeline: when it was in her picture, HOSTILE, ...; when it was launched)
-  evc: Record<string, number>; adopt: Map<number, number>; ended: Set<number>; // (events by kind, all of them; a torpedo still to be taken over: when its report first said phase 2)
+  evc: Record<string, number>; ended: Set<number>; // (events by kind, all of them; the torpedoes done with)
   prof: { n: number; ms: number; max: number; at: number; last: { n: number; ms: number; max: number } | null };
   sn: number; // (the server step it was last stepped at: what an event from a request is stamped with)
 }
@@ -44,7 +46,8 @@ export const SvBattle = (() => {
   // own), flown in order, one a server step (all but three at once when more wait), starting once 3 are in hand (a little slack against the
   // pages' steps coming in bursts); none waiting, she holds where she is till the next comes. ack: the last step flown, sh her state after it
   const FL = { on: false, q: new Map<number, any>(), next: -1, go: false, sh: null as FlyState | null, ack: -1, turn: 1 };
-  function flyOn(W: SimWorld, dt: number) {
+  const _o0 = new T.Vector3(), _m1 = new T.Matrix4();
+  function flyOn(W: SimWorld, dt: number, Z: SimZone | null) {
     if (!FL.go && FL.q.size >= 3) FL.go = true;
     if (!FL.go) return;
     for (let k = Math.max(1, FL.q.size - 3); k > 0; k--) { // (one a step; more waiting than the slack of three: caught up at once)
@@ -52,7 +55,7 @@ export const SvBattle = (() => {
       if (!e) { if (!FL.q.size) break; const lo = Math.min(...FL.q.keys()); if (lo < FL.next) break; FL.next = lo; e = FL.q.get(lo); } // (a step never come: on from the next that has)
       FL.q.delete(FL.next);
       if (!Array.isArray(e)) { FL.sh = SpaceSim.flyUnpack(e.st); if (Number.isFinite(+e.turn)) FL.turn = +e.turn; }
-      else if (FL.sh) { const I: FlyIn | null = e[1] < 0 ? null : { b: e[1] | 0, sx: +e[2], sy: +e[3], base: e.length >= 7 ? new T.Vector3(+e[4], +e[5], +e[6]) : null }; SpaceSim.flyStep(FL.sh, FL.turn, I, W.zone ? W.Z : null, dt); }
+      else if (FL.sh) { const I: FlyIn | null = e[1] < 0 ? null : { b: e[1] | 0, sx: +e[2], sy: +e[3], base: e.length >= 7 ? new T.Vector3(+e[4], +e[5], +e[6]) : null }; SpaceSim.flyStep(FL.sh, FL.turn, I, Z, dt); }
       FL.ack = FL.next; FL.next++;
     }
     if (FL.sh) { W.ship.P.copy(FL.sh.P); W.ship.Q.copy(FL.sh.Q); W.ship.V.copy(FL.sh.V); }
@@ -72,7 +75,7 @@ export const SvBattle = (() => {
   // (what the pilot's page is told every few steps: the last step flown and her state after it)
   const flyAck = () => (FL.on && FL.sh && FL.ack >= 0 ? { s: FL.ack, st: SpaceSim.flyPack(FL.sh) } : null);
   let match: string | null = null; // (what the pilot's matched speed with: her notch lets it through)
-  const HP = { v: -1, lost: false, told: false }; // (her hull: hurt, failing)
+  const HP = { v: -1, lost: false, told: false, max: 0 }; // (her hull: hurt, failing)
   let pose: Pose | null = null, poseWas: Pose | null = null; // (the pilot's last word of her pose, and the server step it came at; the last one in another level's frame)
   const fitKey = (fleet: any, def: SpShipDef) => { const fit = ((fleet && fleet.fit && fleet.fit[def.id]) || []).slice(0, def.turrets); return Array.from({ length: def.turrets }, (_, i) => (fit[i] ? (fit[i] === 'rail' ? 'r' : 'g') : '-')).join(''); };
   function ownFor(fleet: any) {
@@ -122,25 +125,31 @@ export const SvBattle = (() => {
   const missionAff = (ms: SpMission | null) => { const w = ms ? SD.wearOf(ms.size as any, ms.obj) : null; return w === 'navy' ? 'navy' : w === 'pirate' ? 'pirate' : 'civ'; };
 
   // ---------------------------------------------------------------- made, for the level k of zone zms (map: the level's)
-  function make(map: LvMap, zms: SpMission, k: number, ms: SpMission | null, fleet: any, was: SvBat | null): SvBat {
-    const t0 = performance.now(), sp = map.sp!, hb = sp.hull;
+  // (kind: a boarding zone (the mission ship, the zone's ships and rocks), a base's orbit or the hub (her and what she puts out: chaff,
+  // torpedoes); map: the level's, none at the hub)
+  function make(map: LvMap | null, zms: SpMission | null, k: number, ms: SpMission | null, fleet: any, was: SvBat | null, kind: SvBat['kind'] = 'board'): SvBat {
+    const t0 = performance.now();
     // (the battle's random numbers from the level's seed, as the page has them: js/space.ts setup)
-    Radar.seed(((map.seed || 1) * 31) + (((map as any).level) || 0));
+    Radar.seed(map ? ((map.seed || 1) * 31) + (((map as any).level) || 0) : 7);
     const W = SpaceSim.world(Radar.rngOf('space'));
     W.t = rt; // (the radars' clock goes on from the last world's: what her own set holds is timed by it, js/space.ts EW.rt)
     const own = ownFor(fleet); if (own) Radar.reseed(own.su);
     W.own = own ? own.su : null; W.ownT = own ? own.t : null; W.xpdr = own ? own.xpdr : false;
-    W.zone = { zdef: SD.zone(zms as any), zact: k, wing: !!sp.wing, zC: new T.Vector3((hb.x0 + hb.x1) / 2, 0, (hb.z0 + hb.z1) / 2), zt0: 0, ztAt: 0 };
-    W.rockList = SD.rocks(zms as any) as any;
-    W.traffic = W.zone.zdef.map((c: any) => ({ c, shape: null }));
-    W.trafficShape = trafficShape;
-    // the mission ship (the level's): her suite on her hull (its mounts fitted), her return with her guns and radars' kit, her guns
-    const sh = HullShape.of(map), h = hullRcs(map, sh);
-    W.foe = h.su; Radar.sched(W.foe);
-    W.foeT = { sz: h.sz, kind: 'ship', id: 'hull', p: h.c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: h.rcs };
-    W.hb = hb;
-    W.guns = sh.guns.map((g, i) => ({ k: g.k, x: g.x, y: h.fit.guns[i].y, z: g.z, inv: g.inv, hp: g.hp, cool: g.cool }));
-    const B: SvBat = { W, k, map, ms, built: 0, pre: preOf(was), ev: [], dm: 0, marks: new Map(), tAt: new Map(), evc: {}, adopt: new Map(), ended: new Set(), prof: { n: 0, ms: 0, max: 0, at: 0, last: null }, sn: 0 };
+    const sp = map && map.sp, hb = sp && sp.hull;
+    if (kind === 'board' && map && sp && hb && zms) {
+      W.zone = { zdef: SD.zone(zms as any), zact: k, wing: !!sp.wing, zC: new T.Vector3((hb.x0 + hb.x1) / 2, 0, (hb.z0 + hb.z1) / 2), zt0: 0, ztAt: 0 };
+      W.rockList = SD.rocks(zms as any) as any;
+      W.traffic = W.zone.zdef.map((c: any) => ({ c, shape: null }));
+      W.trafficShape = trafficShape;
+      // the mission ship (the level's): her suite on her hull (its mounts fitted), her return with her guns and radars' kit, her guns
+      const sh = HullShape.of(map), h = hullRcs(map, sh);
+      W.foe = h.su; Radar.sched(W.foe);
+      W.foeT = { sz: h.sz, kind: 'ship', id: 'hull', p: h.c.clone(), v: new T.Vector3(), q: new T.Quaternion(), rcs: h.rcs };
+      W.hb = hb;
+      W.guns = sh.guns.map((g, i) => ({ k: g.k, x: g.x, y: h.fit.guns[i].y, z: g.z, inv: g.inv, hp: g.hp, cool: g.cool }));
+    }
+    if (!was || was.kind !== kind) { HP.lost = false; HP.told = false; } // (a hull failing in the last place's done with)
+    const B: SvBat = { W, k, map, ms, kind, Zi: W.zone ? null : SpaceSim.zone(), built: 0, pre: preOf(was), ev: [], dm: 0, marks: new Map(), tAt: new Map(), evc: {}, ended: new Set(), prof: { n: 0, ms: 0, max: 0, at: 0, last: null }, sn: 0 };
     B.built = performance.now() - t0;
     return B;
   }
@@ -170,7 +179,8 @@ export const SvBattle = (() => {
     };
     W.out.length = 0;
     SpaceSim.worldStep(W, dt, { kindAff: (c: any) => (c.k === 0 ? missionAff(B.ms) : c.kind === 'navy' || c.kind === 'wing' ? 'navy' : c.kind === 'pirate' ? 'pirate' : 'civ'), fix: (tp) => fixOf(W, tp), fire });
-    if (FL.on) flyOn(W, dt); // (her flight: after the world's step, through this step's zone frame, as the page flies her after its zone's step)
+    if (B.Zi) SpaceSim.zoneAt(B.Zi, W.t, _o0, _m1); // (no zone: the still frame, placed each step as the page's level's is: js/space.ts zoneStep)
+    if (FL.on) flyOn(W, dt, W.zone ? W.Z : B.Zi); // (her flight: after the world's step, through this step's zone frame, as the page flies her after its zone's step)
     for (const [i, f] of fired) B.ev.push(SpaceNet.fireOf(n, i, f.aim, f.err, f.s, f.c));
     SpaceNet.sevOf(W.out, n, B.ev);
     for (const e of W.out) { B.evc[e.k] = (B.evc[e.k] || 0) + 1; if (e.k === 'damage') { B.dm += e.dmg; hurt(e.dmg); } if (e.k === 'torpEnd') B.ended.add(e.id); if (e.k === 'torpEnd') mark(B, e.id, e.how === 1 ? 'shot down' : e.how === 2 ? 'hit ' + (e.on || '') : 'spent'); }
@@ -202,6 +212,7 @@ export const SvBattle = (() => {
   // ---------------------------------------------------------------- what the crew asks for
   // the pilot's pose (js/space.ts sendPose: [P, Q, V, atmo, hp], in the level's frame), at server step n; map: the level it's in
   function heardPose(a: number[], n: number, map: LvMap | null) {
+    if (Number.isFinite(a[12]) && a[12] > 0) HP.max = a[12];
     if (HP.v < 0 && Number.isFinite(a[11])) HP.v = Math.max(0, a[11]); // (her hull as the pilot's page had it when the server's battle began)
     if (pose && pose.map !== map) poseWas = pose;
     pose = { P: new T.Vector3(a[0], a[1], a[2]), Q: new T.Quaternion(a[3], a[4], a[5], a[6]).normalize(), V: new T.Vector3(a[7], a[8], a[9]), n, map };
@@ -227,45 +238,25 @@ export const SvBattle = (() => {
         break;
       }
       case 'schaff': if (W) W.chaff.push(SpaceSim.chaffNew(a, ++W.chaffN, W.t)); break;
-      case 'smis': if (W && a && a[4]) { const i = W.mis.findIndex((q) => q.id === a[0]); if (i >= 0) { W.mis.splice(i, 1); B!.ev.push({ k: 'misEnd', n: B!.sn, id: a[0], hit: 0 }); } } break; // (a missile a turret shot down, said by the screen that fired)
       case 'sfire': if (W && a && a.length >= 9 && W.shots.length < SpaceSim.SHOT.MAX) W.shots.push({ p: new T.Vector3(a[0], a[1], a[2]), v: new T.Vector3(a[3], a[4], a[5]), d: 0, life: Math.min(+a[6], 6000), dmg: Math.min(+a[8], 100) }); break; // (a round from one of her turrets: the server's to hit with)
       case 'smatch': match = m.id || null; break;
       case 'sin': flyIn(m); break;
       case 'sdmg': if (Number.isFinite(+m.d) && +m.d > 0) hurt(Math.min(+m.d, 1000)); break; // (what the pilot's page saw her take itself: the ground, a rock)
-      case 'shit': if (W && m.i >= 0) { const g = W.guns[m.i | 0]; if (g) g.hp = Math.max(0, +m.hp || 0); } break;
       case 'storp': if (W) torpIn(B!, a, m.f); break;
     }
   }
-  // A torpedo the helm launched (js/space.ts torpFire; its owner's page reports it each 0.1 s: storp [id, p, v, q, flags, gone]).
-  // The server's made on the first report. Sent with its fix (f: [x, y, z, vx, vy, vz], the page integration's), it's the server's to fly
-  // from the start, on the server's fix nearest that. Without (today's page), it's flown as its owner reports it, till the report that
-  // it's on its datalink (phase 2: its nose has just come onto its target): then on whichever of the server's fixes is nearest its nose,
-  // the server's from there on (guided, fused and shot at in the server's world; its owner's reports of it no longer change it).
+  // a torpedo launched (storp: its place, velocity, attitude, flags; f, the fix it was sent at, [x, y, z, vx, vy, vz]): the server's
+  // from the start, flown on its own fix nearest that one (guided, fused and shot at in its world; every page draws it from the snapshots)
   function torpIn(B: SvBat, a: number[], f?: unknown) {
-    const W = B.W, id = a[0], gone = a[12];
-    let tp = W.torps.find((q) => q.id === id) || null;
-    if (!tp) {
-      if (gone || B.ended.has(id)) return; // (one the server's done with: its owner's page flies its own on a while yet)
-      const p = new T.Vector3(a[1], a[2], a[3]), v = new T.Vector3(a[4], a[5], a[6]), q = new T.Quaternion(a[7], a[8], a[9], a[10]).normalize();
-      tp = { id, p, v, q, ph: a[11] & 3, t: 0, fus: '', est: p.clone(), ev: v.clone(), side: new T.Vector3(), mine: false, lock: '', thr: a[11] & 4 ? 1 : 0, rcs: !!(a[11] & 8), lf: new T.Vector3(),
-        rt: { sz: 3, kind: 'torpedo', id: 'torp' + id, p: p.clone(), v: v.clone(), q: q.clone(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 1.5, iff: { c: 'squad', n: 'TORP ' + (id % 1000) }, aff: 'squad', only: 'squad' } };
-      W.torps.push(tp); B.tAt.set(id, W.t); B.evc.torp = (B.evc.torp || 0) + 1;
-      if (Array.isArray(f) && f.length === 6 && f.every(Number.isFinite)) {
-        const at = new T.Vector3(f[0], f[1], f[2]), fv = new T.Vector3(f[3], f[4], f[5]), own = W.own;
-        const fx = own ? own.fus.reduce((b: RFused | null, x) => (x.pl.distanceTo(at) < Math.max(300, 0.05 * at.distanceTo(W.ship.P)) && (!b || x.pl.distanceTo(at) < b.pl.distanceTo(at)) ? x : b), null) : null;
-        tp.mine = true; tp.fus = fx ? fx.n : ''; tp.est.copy(fx ? fx.pl : at); tp.ev.copy(fx ? fx.v : fv); mark(B, id, 'server flies it (its fix ' + (fx ? fx.n : 'not held') + ')');
-        return;
-      }
-    }
-    if (tp.mine) return;
-    tp.p.set(a[1], a[2], a[3]); tp.v.set(a[4], a[5], a[6]); tp.q.set(a[7], a[8], a[9], a[10]).normalize(); tp.ph = a[11] & 3; tp.thr = a[11] & 4 ? 1 : 0; tp.rcs = !!(a[11] & 8); tp.zm = undefined;
-    if (gone) { W.torps.splice(W.torps.indexOf(tp), 1); mark(B, id, 'gone (its owner said: ' + gone + ')'); return; }
-    if (tp.ph >= 2 && W.own) {
-      const t1 = B.adopt.get(id) ?? W.t; B.adopt.set(id, t1); if (W.t - t1 > 1.5) return; // (its nose is on its target only as it comes onto its datalink)
-      const nose = new T.Vector3(0, 0, -1).applyQuaternion(tp.q); let best: RFused | null = null, ba = 0.2;
-      for (const x of W.own.fus) { const ang = nose.angleTo(x.pl.clone().sub(tp.p)); if (ang < ba) { ba = ang; best = x; } }
-      if (best) { tp.mine = true; tp.fus = best.n; tp.est.copy(best.pl); tp.ev.copy(best.v); tp.t = W.t - (B.tAt.get(id) ?? W.t); B.adopt.delete(id); mark(B, id, 'server flies it (' + best.n + ', ' + (ba * 180 / Math.PI).toFixed(1) + ' deg off its nose)'); }
-    }
+    const W = B.W, id = a[0];
+    if (W.torps.some((q) => q.id === id) || B.ended.has(id) || a[12] || !Array.isArray(f) || f.length !== 6 || !f.every(Number.isFinite)) return;
+    const p = new T.Vector3(a[1], a[2], a[3]), v = new T.Vector3(a[4], a[5], a[6]), q = new T.Quaternion(a[7], a[8], a[9], a[10]).normalize();
+    const tp: SimTorp = { id, p, v, q, ph: a[11] & 3, t: 0, fus: '', est: p.clone(), ev: v.clone(), side: new T.Vector3(), mine: true, lock: '', thr: a[11] & 4 ? 1 : 0, rcs: !!(a[11] & 8), lf: new T.Vector3(),
+      rt: { sz: 3, kind: 'torpedo', id: 'torp' + id, p: p.clone(), v: v.clone(), q: q.clone(), rcs: { s: new Float32Array(1), max: 0, mean: 0 }, iso: 1.5, iff: { c: 'squad', n: 'TORP ' + (id % 1000) }, aff: 'squad', only: 'squad' } };
+    W.torps.push(tp); B.tAt.set(id, W.t); B.evc.torp = (B.evc.torp || 0) + 1;
+    const at = new T.Vector3(f[0], f[1], f[2]), fv = new T.Vector3(f[3], f[4], f[5]), own = W.own;
+    const fx = own ? own.fus.reduce((b: RFused | null, x) => (x.pl.distanceTo(at) < Math.max(300, 0.05 * at.distanceTo(W.ship.P)) && (!b || x.pl.distanceTo(at) < b.pl.distanceTo(at)) ? x : b), null) : null;
+    tp.fus = fx ? fx.n : ''; tp.est.copy(fx ? fx.pl : at); tp.ev.copy(fx ? fx.v : fv); mark(B, id, 'server flies it (its fix ' + (fx ? fx.n : 'not held') + ')');
   }
 
   // ---------------------------------------------------------------- out
@@ -292,6 +283,9 @@ export const SvBattle = (() => {
   // (js/spaceserver.ts battle: the emergency jump home); a new zone starts from the pilot's word again
   function hurt(d: number) { if (HP.v < 0) return; HP.v = Math.max(0, HP.v - d); if (HP.v <= 0 && !HP.lost) HP.lost = true; }
   function hullReset() { HP.v = -1; HP.lost = false; HP.told = false; }
+  // (docked at home: made good; failing at home: patched up to 30%, the drive having nowhere to jump her)
+  function repair() { if (HP.max > 0) { HP.v = HP.max; HP.lost = false; HP.told = false; } }
+  function patch() { HP.v = HP.max > 0 ? HP.max * 0.3 : 30; HP.lost = false; HP.told = false; return HP.v; }
   const failing = () => { if (HP.lost && !HP.told) { HP.told = true; return true; } return false; }; // (once: kept lost till the battle's over)
-  return { load, make, step, heardPose, request, out, summary, reset, hullReset, failing, flyAck, fly: () => ({ on: FL.on, go: FL.go, q: FL.q.size, next: FL.next, ack: FL.ack }), hp: () => HP.v, own: () => OWN, pose: () => pose };
+  return { load, make, step, heardPose, request, out, summary, reset, hullReset, repair, patch, failing, flyAck, fly: () => ({ on: FL.on, go: FL.go, q: FL.q.size, next: FL.next, ack: FL.ack }), hp: () => HP.v, own: () => OWN, pose: () => pose };
 })();

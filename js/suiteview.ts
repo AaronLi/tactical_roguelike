@@ -16,8 +16,6 @@
 //   packMaps(su, now): F8's on request: each scanner's map, 360 angle columns by 100 range bins (as the square root of the range:
 //     where the views sample it), its dB over the noise a byte (0.25 dB a step), when each column was last written; and the
 //     dishes' debug (dg). unpackMaps(msg, su): into an unpacked suite, the map back on the scanner's own bins
-// SuiteView.on (?suiteview in the URL, or G.SuiteView.on = true): the page draws its sensor station, hologram and F8 from the round
-// trip, unpack(JSON.parse(JSON.stringify(pack(...)))), every frame, not from the suites themselves (js/space.ts sv).
 import { Radar, KF3, RSuite, RScan, RTrack, RPlot, RContact, RFused, RSTrack, RJob, ROpt, RIff, RCls } from './radar.js';
 
 // (the filter as the readers use it: its state, its position's covariance (the velocity's not sent: nothing drawn reads it), its
@@ -54,8 +52,6 @@ const CLS = ['HOSTILE', 'SUSPECT', 'WATCH', 'NEUTRAL', 'CIV', 'FRIENDLY'] as con
 
 export const SuiteView = (() => {
   const T = THREE;
-  const on = { on: false };
-  try { on.on = typeof location !== 'undefined' && /[?&]suiteview\b/.test(location.search); } catch { /* (a worker, Node) */ }
   const rd = (x: number, k: number) => Math.round(x * k) / k;
   const v3 = (v: THREE.Vector3, k = 10): V3 => [rd(v.x, k), rd(v.y, k), rd(v.z, k)];
   const q4 = (q: THREE.Quaternion, k = 1e4): Q4 => [rd(q.x, k), rd(q.y, k), rd(q.z, k), rd(q.w, k)];
@@ -263,15 +259,7 @@ export const SuiteView = (() => {
     mm.dg.forEach((g, i) => { const tr = su.trks[i]; if (!tr) return; if (!g) { tr.dg = undefined; return; }
       tr.dg = { mono: g.mono.map((q) => ({ s: q[0], x: q[1], y: q[2] })), nz: g.nz, gl: g.gl, ring: Float32Array.from(g.ring), gate: Float32Array.from(g.gate), errs: g.errs, rerr: g.rerr, series: g.series.map((q) => ({ t: q[0], err: q[1], q: q[2] })), sweep: g.sweep.map((q) => ({ e: q[0], db: q[1] })) }; });
   }
-  // the plot of the suite itself an unpacked one stands for (a pick the hologram made, as the server would find it from what a page sends)
-  function realPlot(su: RSuite, p: RPlot): RPlot {
-    const sc = su.scans[p.k]; if (!sc) return p;
-    const same = (q: RPlot) => Math.abs(q.t - p.t) < 2e-3 && Math.abs(q.r - p.r) < 0.6 && Math.abs(q.phi - p.phi) < 2e-4;
-    for (const c of sc.cons) if (same(c.p)) return c.p;
-    for (const q of sc.plots) if (same(q)) return q;
-    return p;
-  }
   // (the sizes of what'd be sent: JSON bytes)
   function sizes(su: RSuite, now: number) { const j = (x: unknown) => JSON.stringify(x).length; return { core: j(pack(su, now)), dbg: j(pack(su, now, { dbg: true })), maps: j(packMaps(su, now)), cons: su.scans.reduce((a, s) => a + s.cons.length, 0), bel: (su.bel || []).length, fus: su.fus.length, ass: su.ass.length, tts: su.sched ? su.sched.tts.length : 0 }; }
-  return Object.assign(on, { pack, unpack, packMaps, unpackMaps, realPlot, sizes, KFV });
+  return { pack, unpack, packMaps, unpackMaps, sizes, KFV };
 })();
