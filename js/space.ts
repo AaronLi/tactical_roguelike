@@ -879,7 +879,9 @@ export const Space = (() => {
       }
       if (!changed) return;
       names.forEach((n, j) => g.setAttribute(n, new T.Float32BufferAttribute(out[j], atts[j].itemSize, atts[j].normalized)));
-      g.computeBoundingBox(); g.computeBoundingSphere(); o.geometry = g;
+      g.computeBoundingBox(); g.computeBoundingSphere();
+      if ((o.geometry as any).parameters) (g as any).parameters = (o.geometry as any).parameters; // (what it was made as kept: a door's leaf is rebuilt from its box's size when a shot holes it, js/damage.ts leafMesh)
+      o.geometry = g;
     });
   }
   // What the breach destroyed inside (js/shipgen.ts cut: sp.gone, a box round each piece that's gone): its picture cleared out of
