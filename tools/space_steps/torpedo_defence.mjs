@@ -30,7 +30,7 @@ export default async ({ ev, shot, sleep, log }) => {
       if (ew.fc && ew.fc.id === tid) mark('fire control after it');
       foe.trks.forEach((tr, i) => { if (tr.tgt === tid) mark('trk' + i + ' on it (' + tr.st + ')'); if (tr.tgt === tid && tr.est.q >= 0.15) mark('trk' + i + ' q>=0.15'); });
       foe.trks.forEach((tr, i) => { const k = 'trk' + i + ' st=' + tr.st + ' tgt=' + (tr.tgt || '-'); if (W['s' + i] !== k) { W['s' + i] = k; W.log.push(t + ' r=' + r + ' ' + k + ' lockT=' + tr.lockT.toFixed(1) + ' q=' + (+tr.est.q).toFixed(2)); } });
-      (S.hull ? S.hull.guns : []).forEach((g, i) => { if (g.bt > 0) mark('first burst'); });
+      (S.hull ? S.hull.guns : []).forEach((g, i) => { if (g.bt > 0) mark('first burst'); }); if (S.rounds.length) mark('first burst'); // (or rounds in the air: every page flies the server's, its fire events)
       if (r < 1500) mark('inside 1.5 km');
       { const lk = foe.trks.find(tr => tr.tgt === tid && tr.st === 'track' && tr.est.p); if (lk && r < 2200 && (!W.lastE || t - W.lastE >= 0.2)) { W.lastE = t; const los = tp.p.clone().sub(foe.P).normalize(), e = lk.est.p.clone().sub(tp.p), ev = lk.est.v.clone().sub(tp.v), lat = e.clone().sub(los.clone().multiplyScalar(e.dot(los))), latv = ev.clone().sub(los.clone().multiplyScalar(ev.dot(los)));
         const tof = r / 1000, aimMiss = e.clone().addScaledVector(ev, tof).add(new THREE.Vector3(0, 1.5, 0)); const latAim = aimMiss.clone().sub(los.clone().multiplyScalar(aimMiss.dot(los)));

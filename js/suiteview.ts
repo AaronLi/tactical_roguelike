@@ -139,7 +139,7 @@ export const SuiteView = (() => {
     if (dbg) msg.why = su.ass.map((a) => a.why);
     if (S0) msg.sch = {
       tts: S0.tts.map((tt) => { const o: Record<string, unknown> = { n: tt.n, kf: kfPack(tt.kf, rt), pri: tt.pri, t: rt(tt.t), t0: rt(tt.t0), lo: tt.looks, mi: tt.miss, rate: rd(tt.rate, 1e3) };
-        if (tt.op) o.op = 1; if (tt.quiet) o.qu = 1; if (tt.bel) o.bel = tt.bel; if (tt.cls) o.cls = clsP(tt.cls, rt); if (tt.szE) o.szE = rd(tt.szE, 10); if (tt.fc != null) o.fc = tt.fc;
+        if (tt.op) o.op = 1; if (tt.quiet) o.qu = 1; if (tt.bel) o.bel = tt.bel; if (tt.cls) o.cls = clsP(tt.cls, rt); if (tt.szE) o.szE = rd(tt.szE, 10); if (tt.fc != null) o.fc = tt.fc; if (tt.est && tt.est.q) o.q = rd(tt.est.q, 1e3); if (dbg && tt.tgt) o.tg = tt.tgt; // (q: how good it is: what the guns fire on; tg, F8's: what it's really on)
         const ti = trkI(tt.trk); if (ti >= 0) o.tk = ti; if (tt.lookT && tt.lookT.length) o.lt = tt.lookT.filter((t) => now - t <= 4.05).map(rt); return o; }),
       rq: S0.reqs.map((j) => { const o: Record<string, unknown> = { k: j.kind, t: rt(j.t), pri: j.pri }; if (j.plot) o.pl = plot(j.plot); if (j.d) o.d = v3(j.d, 1e4); if (j.at != null) o.at = rt(j.at); if (j.op) o.op = 1; const ti = trkI(j.trk); if (ti >= 0) o.tk = ti; return o; }),
       plan: su.trks.map((tr) => (S0.plan.get(tr) || []).map((j) => { const ri = reqs.indexOf(j); return [ri >= 0 ? ri : j.tt ? j.tt.n : -1, rt(j.at ?? now)]; })), // (what the queue reads of it: what each entry is, when it starts)
@@ -203,7 +203,7 @@ export const SuiteView = (() => {
       return { n, key: (f ? 'F:' : 'C:') + n, f, c, iff: f ? f.iff || (f.a && f.a.iff) || (f.b && f.b.iff) || null : c ? c.iff || null : null, r: a[2] as number, vc: a[3] as number, score: a[4] as number, hold: a[5] as number, cls: CLS[a[6] as number], plot: a.length > 7 ? pl([a[7] as number, a[8] as number]) : f ? (f.a && f.a.p) || (f.b && f.b.p) || null : c ? c.p : null, why: m.why ? m.why[i] : '', tcpa: -1, dcpa: 0 };
     });
     // (the scheduler: her tracks, the searches asked for, each dish's plan; the jobs the dishes and the camera are on)
-    const ttU = (o: any): RSTrack => ({ n: o.n, kf: o.kf ? kfUnpack(o.kf, at) as unknown as KF3 : (undefined as unknown as KF3), pri: o.pri, t: o.t != null ? at(o.t) : 0, t0: o.t0 != null ? at(o.t0) : 0, looks: o.lo ?? 0, miss: o.mi ?? 0, rate: o.rate ?? 1, op: !!o.op, quiet: !!o.qu, bel: o.bel, cls: clsU(o.cls, at), szE: o.szE, tgt: null, fc: o.fc, trk: tkOf(o.tk), lookT: o.lt ? o.lt.map(at) : undefined, est: { p: new T.Vector3(), v: new T.Vector3(), q: 0 } });
+    const ttU = (o: any): RSTrack => ({ n: o.n, kf: o.kf ? kfUnpack(o.kf, at) as unknown as KF3 : (undefined as unknown as KF3), pri: o.pri, t: o.t != null ? at(o.t) : 0, t0: o.t0 != null ? at(o.t0) : 0, looks: o.lo ?? 0, miss: o.mi ?? 0, rate: o.rate ?? 1, op: !!o.op, quiet: !!o.qu, bel: o.bel, cls: clsU(o.cls, at), szE: o.szE, tgt: o.tg || null, fc: o.fc, trk: tkOf(o.tk), lookT: o.lt ? o.lt.map(at) : undefined, est: { p: new T.Vector3(), v: new T.Vector3(), q: o.q || 0 } });
     const tts = m.sch ? m.sch.tts.map(ttU) : [], ttBy = new Map(tts.map((q) => [q.n, q]));
     for (const tt of tts) if (tt.kf) { tt.kf.pos(tt.est.p); tt.kf.vel(tt.est.v); }
     const reqs: RJob[] = m.sch ? m.sch.rq.map((o: any) => ({ kind: o.k, t: at(o.t), pri: o.pri, plot: o.pl ? pl(o.pl) || undefined : undefined, d: o.d ? V(o.d) : undefined, at: o.at != null ? at(o.at) : undefined, op: !!o.op, trk: tkOf(o.tk) })) : [];

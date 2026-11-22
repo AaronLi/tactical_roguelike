@@ -2353,7 +2353,7 @@ export const Space = (() => {
     if (S.kind === 'board' && Number.isFinite(m.zt) && SVB.ztSync) { const zt = S.zt0 + (S.t - S.ztAt); if (Math.abs(zt - m.zt) > 0.05) { S.zt0 = m.zt; S.ztAt = S.t; } }
     // her pose as the server flies her (C2): what the rest aboard follow (the pilot's own word of it, relayed, left aside meanwhile)
     if (r.sp && !isCtl()) { const a = r.sp; S.net = { P: new T.Vector3(a[0], a[1], a[2]), Q: new T.Quaternion(a[3], a[4], a[5], a[6]), V: new T.Vector3(a[7], a[8], a[9]) }; SVB.spAt = S.t; if (S.P.distanceTo(S.net.P) > 400) { S.P.copy(S.net.P); S.Q.copy(S.net.Q); } }
-    if (S.hull) r.g.forEach((g, i) => { const gn = S.hull!.guns[i] as any; if (!gn) return; if (g.hp !== gn.hp) gunHit(i, g.hp); gn.yaw = g.yaw; gn.pitch = g.pitch; gn.rev = g.rev; });
+    if (S.hull) r.g.forEach((g, i) => { const gn = S.hull!.guns[i] as any; if (!gn) return; if (g.hp !== gn.hp) gunHit(i, g.hp); gn.yaw = g.yaw; gn.pitch = g.pitch; gn.rev = g.rev; gn.bt = g.fire ? 1 : 0; });
     // her missiles: as the server has them (a new one drawn, one gone taken away); flown on between snapshots
     const live = new Set(r.mis.map((q) => q.id));
     for (const m0 of S.mis.slice()) if (!live.has(m0.id)) { if (m0.o) m0.o.removeFromParent(); S.mis.splice(S.mis.indexOf(m0), 1); }
