@@ -632,6 +632,7 @@ export const Space = (() => {
   const SVF = { f: 0, at: new Map<string, { f: number; v: RSuite }>(), mapsAt: new Map<string, number>() };
   function sv(su: RSuite): RSuite; function sv(su: RSuite | null | undefined): RSuite | null;
   function sv(su: RSuite | null | undefined): RSuite | null {
+    if (su && svbOn() && Radar.show) { const d = SVD.v.get(su.id); if (d && S.t - (SVD.at.get(su.id) ?? -1e9) < 1.5) return d; } // (F8 open: its own picture of the suite, extras and all)
     if (su && su === EW.own && svbOn() && SVB.own && S.t - SVB.ownAt < 1) return SVB.own; // (the server's battle on: her picture's the server's (svOwn))
     if (!su || !SuiteView.on) return su || null;
     const c = SVF.at.get(su.id); if (c && c.f === SVF.f) return c.v;
@@ -2281,7 +2282,7 @@ export const Space = (() => {
     outside(); pt = Prof.lap('space: outside (sky, star, rocks)', pt);
     { const pc = cam as THREE.PerspectiveCamera, hgt = G_R.renderer.domElement.height || 720; InteriorCull.update(cam, hgt / 2 / Math.tan((pc.fov || 70) * Math.PI / 360)); pt = Prof.lap('space: interiors seen', pt); }
     sensorStep(); optView(); // (after the view's placed: where the operator's looking is where the camera is now)
-    ewCam();
+    ewCam(); svDbgAsk();
     { const seat = mySeat(); const H = EW.holo, k = H.fT < 0 ? 1 : Math.min(1, (S.t - H.fT) / 0.6), e = 1 - (1 - k) * (1 - k) * (1 - k); if (H.focus) G_R.focusAmt = e;
       if (!H.focus && H.fO >= 0) { const o = (S.t - H.fO) / 0.3; if (o >= 1 || !seat) { G_R.focusBlur = false; H.fO = -1; } else G_R.focusAmt = 1 - o; } // (out: the blur fading away) // (going in: the world blurring out and the hologram opening, over 0.6 s)
       const lift = H.focus ? 0.2 * e : 0; // (focused: up from below the eyes to just under the middle of the view)
@@ -2720,6 +2721,19 @@ export const Space = (() => {
   const SVB = { on: !new URLSearchParams(location.search).has('pagebattle'), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, own: null as RSuite | null, ownAt: -1e9 };
   // her radars' picture from the server's battle (the fast channel's stream 1: js/spaceserver.ts battle): unpacked into the last one
   // (so what's picked and drawn keeps its identity), its times put on the page's own radar clock as it arrives
+  // F8's picture of the suite it's showing, from the server's battle (asked for every couple of seconds while it's open: streams 2, 3)
+  const SVD = { v: new Map<string, RSuite>(), at: new Map<string, number>(), asked: '', askedAt: -1e9 };
+  function svDbgAsk() {
+    if (!svbOn()) return; const on = !!Radar.show, id = on ? Radar.sel : '';
+    if (id !== SVD.asked || (on && S.t - SVD.askedAt > 2)) { SVD.asked = id; SVD.askedAt = S.t; Net.toHost({ t: 'sdbgq', on: on ? 1 : 0, id }); }
+  }
+  Net.onFast((buf, ch) => {
+    if ((ch !== 2 && ch !== 3) || !svbOn()) return;
+    try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact) return;
+      if (ch === 2 && m.s) { m.s.t = EW.rt; SVD.v.set(m.id, SuiteView.unpack(m.s, SVD.v.get(m.id) || null)); SVD.at.set(m.id, S.t); }
+      if (ch === 3 && m.m) { const v = SVD.v.get(m.id); if (v) SuiteView.unpackMaps(m.m, v); }
+    } catch (e) { console.error('space: F8 picture from the server', e); }
+  });
   Net.onFast((buf, ch) => {
     if (ch !== 1 || !svbOn()) return;
     try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact || !m.s) return; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; } catch (e) { console.error('space: the picture of her radars from the server', e); }

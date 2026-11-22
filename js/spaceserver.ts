@@ -907,6 +907,7 @@ export const SpaceSv = (() => {
       case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) net().broadcast({ t: 'sfire', a: m.a, by: from }, from); break;
       case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'strk', a: m.a, by: from }, from); battleIn(m); } break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
       case 'ssec': if (p && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5) && m.a.every(Number.isFinite)) { net().broadcast({ t: 'ssec', a: m.a, by: from }, from); battleIn(m); } break; // (a scanner's search set: js/space.ts secSet)
+      case 'sdbgq': if (p) { if (m.on && typeof m.id === 'string') dbgReq.set(from, { id: m.id, at: sv.stepN }); else dbgReq.delete(from); } break; // (F8 open on a suite: its debug picture to that player (battle))
       case 'sxpdr': if (p) { net().broadcast({ t: 'sxpdr', on: m.on ? 1 : 0, by: from }, from); battleIn(m); } break; // (her transponder switched: js/space.ts xpdr)
       case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'storp', a: m.a, by: from }, from); battleIn(m); } break; // (a torpedo in flight: js/space.ts torps)
       case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'schaff', a: m.a, by: from }, from); battleIn(m); } break; // (chaff thrown out of her: js/space.ts chaffGo)
@@ -967,8 +968,18 @@ export const SpaceSv = (() => {
     SvBattle.out(bat, sv.stepN, Z.zt, (m) => net().broadcast(m));
     // (her radars' picture, as the server's battle has it (js/suiteview.ts pack): ten times a second on the fast channel's stream 1, to
     // everyone aboard (the sensor station, the hologram, the helm's targeting and her marks draw from it); k: which level's frame it's in)
+    // (F8's, to a player who's asked (sdbgq, renewed every couple of seconds): the suite they're looking at with its debug extras (fast
+    // stream 2, four times a second) and its scanners' maps and dishes' debug (stream 3, twice a second))
+    if (bat && sv.stepN % 15 === 0) for (const [pid, q] of [...dbgReq]) {
+      if (sv.stepN - q.at > 240) { dbgReq.delete(pid); continue; }
+      const W = bat.W, su = q.id === 'own' ? W.own : q.id === 'hull' ? W.foe : (W.traffic.find((x) => x.t && x.t.id === q.id) || { su: null }).su; if (!su) continue;
+      const enc = (o: any) => new TextEncoder().encode(JSON.stringify(o)).buffer as ArrayBuffer;
+      net().fast(pid, enc({ k: bat.k, id: q.id, s: SuiteView.pack(su, W.t, { dbg: true }) }), 2);
+      if (sv.stepN % 30 === 0) net().fast(pid, enc({ k: bat.k, id: q.id, m: SuiteView.packMaps(su, W.t) }), 3);
+    }
     if (sv.stepN % 6 === 0 && bat && bat.W.own) { const js = JSON.stringify({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t) }), u8 = new TextEncoder().encode(js); net().fast(null, u8.buffer as ArrayBuffer, 1); }
   }
+  const dbgReq = new Map<string, { id: string; at: number }>(); // (who's asked for F8's picture of which suite, and when)
   const battleIn = (m: any) => SvBattle.request(bat, m); // (a crew request, relayed as before (the pages still run their own battle), and done to the server's)
   const battleSum = () => SvBattle.summary(bat);
   function ctxSave() { return { M: st.M, active: Z ? Z.active : 0, hostShip, breachedOf }; }
