@@ -1631,16 +1631,7 @@ export const Space = (() => {
     const seat = mySeat(), helm = !!seat && seat.k === 'helm' && isCtl() && !me().dead && !me().down;
     // the mouse: what it's turned your view by since the last frame is the stick's push (it springs back)
     // (the right button held: your head turns instead, to look about the cockpit and out of its glass)
-    if (helm && !me().mouse.r) {
-      const sy = seatPos(me().seat as number).yaw, dy = U.angDiff(sy, me().yaw), dp = me().pitch - S.lookP;
-      me().yaw = sy; me().pitch = S.lookP = 0;
-      S.stick.x = U.clamp(S.stick.x + dy * 2.2, -1, 1); S.stick.y = U.clamp(S.stick.y + dp * 2.2, -1, 1);
-    } else if (helm) {
-      // (looking about, zoomed: the head turns that much slower, so what's looked at stays under the mouse)
-      const m = me(); if (!ZM.on) { ZM.on = true; ZM.y = m.yaw; ZM.p = m.pitch; }
-      if (ZM.z > 1) { m.yaw = ZM.y + U.angDiff(ZM.y, m.yaw) / ZM.z; m.pitch = ZM.p + (m.pitch - ZM.p) / ZM.z; }
-      ZM.y = m.yaw; ZM.p = m.pitch; S.lookP = m.pitch;
-    }
+    helmMouse(); // (what's come since the last frame: a step's own, as the frame's are: helmMouse)
     // (the rest is her helm's: js/helm.ts, from this step's input)
     const lk = S.match === 'radar' ? radarLock() : null;
     const I: HelmIn = { h: helm, b: flyIn().b, sx: S.stick.x, sy: S.stick.y, rb: lk ? lk.est.v.clone() : null }; C2.lastI = I;
@@ -2021,7 +2012,7 @@ export const Space = (() => {
     // the view is your own, from the seat you're in (the helm's through her glass; a turret's from its gun)
     const seat = mySeat(), cam = G_R.camera;
     if (seat && seat.k === 'turret') turretView(seat);
-    helmZoom(dt);
+    helmMouse(); helmZoom(dt);
     if (S.shake > 0.01) { cam.position.x += (Math.random() - 0.5) * S.shake * 0.25; cam.position.y += (Math.random() - 0.5) * S.shake * 0.25; S.shake *= Math.exp(-dt * 4); }
     cam.updateMatrixWorld();
     pt = Prof.lap('space: view', pt);
@@ -2209,6 +2200,18 @@ export const Space = (() => {
   // The pilot's zoom: right mouse held (looking about), the wheel zooms the view in, up to 100 times (each notch a quarter more or
   // less); let go of the right button, it's back to 1
   const ZM = { k: 1, z: 1, on: false, y: 0, p: 0, wheel: false }; // (k: the zoom scrolled to; z: the zoom shown, easing onto it)
+  // The mouse at the helm, every frame (and each step, for what's come between): unheld, its turn is the stick's push and the view's put
+  // back on the seat's way; the right button held, the head's turned (slowed by the zoom: helmZoom). A frame at a time, not only in the
+  // simulation's steps: a frame with no step in it (half of them at 120 Hz) would show the view turned by the mouse, for a frame
+  function helmMouse() {
+    const seat = mySeat(), m = me(); if (!seat || seat.k !== 'helm' || !isCtl() || m.dead || m.down) return;
+    if (!m.mouse.r) {
+      const sy = seatPos(m.seat as number).yaw, dy = U.angDiff(sy, m.yaw), dp = m.pitch - S.lookP;
+      m.yaw = sy; m.pitch = S.lookP = 0;
+      S.stick.x = U.clamp(S.stick.x + dy * 2.2, -1, 1); S.stick.y = U.clamp(S.stick.y + dp * 2.2, -1, 1);
+      if ((dy || dp) && ZM.z <= 1.001) Me.updateCamera(1 / 60); // (the view, made this frame (js/player.ts) from the head as the mouse turned it, made again from the seat's way)
+    } else S.lookP = m.pitch;
+  }
   function helmZoom(dt: number) {
     const seat = mySeat(), m = me(), on = !!seat && seat.k === 'helm' && !!m.mouse.r && !Game.menuOpen();
     if (!ZM.wheel) { ZM.wheel = true; window.addEventListener('wheel', (e) => {
@@ -2218,6 +2221,13 @@ export const Space = (() => {
       HUD.toast('ZOOM', ZM.k >= 10 ? Math.round(ZM.k) + '×' : ZM.k.toFixed(1) + '×', 0.6);
     }, { capture: true }); }
     if (!on) { ZM.k = 1; ZM.on = false; }
+    else { // (looking about, zoomed: the head turns that much slower, so what's looked at stays under the mouse. Every frame, before the view's
+      // made from it: in the simulation's step it missed the frames with no step in them (half of them at 120 Hz), and those showed the
+      // mouse's whole turn, a hundred times too far at 100x, for a frame)
+      if (!ZM.on) { ZM.on = true; ZM.y = m.yaw; ZM.p = m.pitch; }
+      if (ZM.z > 1) { m.yaw = ZM.y + U.angDiff(ZM.y, m.yaw) / ZM.z; m.pitch = ZM.p + (m.pitch - ZM.p) / ZM.z; }
+      ZM.y = m.yaw; ZM.p = m.pitch;
+    }
     ZM.z = Math.exp(Math.log(ZM.z) + (Math.log(ZM.k) - Math.log(ZM.z)) * (1 - Math.exp(-dt * 12))); if (Math.abs(ZM.z / ZM.k - 1) < 0.002) ZM.z = ZM.k; // (eased, by ratios: 1x to 2x as quick as 50x to 100x; about 0.25 s)
     if (ZM.z > 1.001) { if (on) Me.updateCamera(1 / 60); /* (the view again from the head as slowed this frame: not a frame late, which at 100x is a shake) */ const cam = G_R.camera as THREE.PerspectiveCamera, f0 = Game.settings.fov * Math.PI / 180; cam.fov = 2 * Math.atan(Math.tan(f0 / 2) / ZM.z) * 180 / Math.PI; cam.updateProjectionMatrix(); }
   }
@@ -2603,6 +2613,6 @@ export const Space = (() => {
   }
   // (which level this screen's in: the zone's ship it is, 0 the mission's or anything else's; js/game.ts onMsg)
   const levelK = () => (S.on && S.kind === 'board' ? S.zact : 0);
-  return { ztUsed: () => ZT.used, helmGeo: { hubPlace, boardPlace, boardMove, assaultPlace }, dbgRocks: () => ROCKS, dbgLand: () => land(), dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, C2: () => C2, svb: () => SVB, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, sv, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgLaunch: launch };
+  return { ztUsed: () => ZT.used, helmGeo: { hubPlace, boardPlace, boardMove, assaultPlace }, dbgRocks: () => ROCKS, dbgLand: () => land(), dbgMissile: (a: number[]) => missile(a), IP, SIM, STEP, C2: () => C2, svb: () => SVB, dbgOpt: () => OPTV, dbgWant: (p: RPlot, f: RFused | null) => trkWant(p, f, true), joinJump, dbgTorp: () => ({ TP, TORP, fire: torpFire, box: boxClick }), dbgShots: () => ({ list: myShots, shot, SHOT }), beltV: () => fieldAt(S.P), dbgZone: () => ZS.frame, dbgZstep: (p: THREE.Vector3, v: THREE.Vector3, dt: number) => zstep(p, v, dt), levelK, ew: () => EW, ewList, sv, dbgSit: (i: number) => sit(i), debrief: () => debrief(), debriefOpen: () => { const d = document.getElementById('debrief'); return !!d && !d.classList.contains('hidden'); }, isGone, sound, dbgClear: (s: ShSite) => hullClear(s), dbgSeat: () => seatLooked(), dbgPrep, prep: () => { jumpPrep(); zonePrep(); }, jumping, dbgJump: () => jumpPre && { key: jumpPre.key, map: !!jumpPre.map, built: !!(jumpPre.map && (jumpPre.map as any).viewPre && (jumpPre.map as any).viewPre.up === true) }, takeMap, S, on, sealed, aboard, seatPos, interact, key, update, enterHub, enterLevel, leave, reset, onMsg, veilKind, isCtl, mySeat, nearAnchor, clearOf, warpGate, crewAboard, aim, dbgBr, dbgDock: () => { if (S.kind === 'board' && S.map && S.map.sp) { const b = S.map.sp.breach, s = ShipGen.sites(S.map).filter((q) => q.nz > 0).sort((p, q) => Math.hypot(p.x - b.x, p.z - b.z) - Math.hypot(q.x - b.x, q.z - b.z))[0]; if (s) { const at = [s.c, s.nx, s.nz]; rebase(berthAt(s)); Net.toHost({ t: 'sdock', on: 1, site: at }); cutHere(at); } } dockLocal(true); }, dbgStage: (s: 'orbit' | 'atmo') => stage(s), dbgZoom: (k: number) => { ZM.k = k; }, dbgLaunch: launch };
 })();
 AudioEnv.Space = Space; // (what sound asks of it: js/audioenv.ts)
