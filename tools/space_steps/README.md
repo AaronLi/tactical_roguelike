@@ -16,6 +16,10 @@ Steps for tools/space_shot.mjs (a headless Chromium driving the game: `node serv
 | zone_real.mjs | `mute&board=small&seed=3` | a zone ship's real hull on the server inside 5 km: her return and size, server against page |
 | fly_fp.mjs | `mute&board=small&seed=3` | her flight's fingerprint: a scripted input from a set start, her pose and way at fixed steps (compare two runs, or before and after a change) |
 | fly_server.mjs | `mute&board=small&seed=3` | her flight on the server (C2): the server's against the page's, acks, prediction errors, corrections (one forced) |
+| breach_fp.mjs | `mute&board=small&seed=3` | the breach flown from a set start 150 m out (W held): pose and modes every 30 steps, the step and berth she docked at; the server's docking and acks after |
+| descent_server.mjs | `mute&assault` | down through the cloud on the server: the stage on page and server, acks, corrections, states |
+| tboard_server.mjs | `mute&board=small&seed=3` | coming up with zone ship t1 from 450 m: made the level by the server, carried across, the acks after the arrival |
+| helm_geo.mjs | `mute&board=small&seed=3`, `mute&fly`, `mute&assault` | js/helm.ts's places as data against the page's: waypoints, boxes, the ground |
 
 
 The page runs no battle of its own (it draws the server's: docs/space-server.md), so what it shows is checked here and what the

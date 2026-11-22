@@ -150,6 +150,20 @@ Steps, each checked by fly_fp.mjs (unchanged), fly_server.mjs (every ack exact) 
 6. The server: the helm per world from its level's geometry (the hub's from data), its events acting on SpaceSv (sdock, the cut, the
    jump, stage changes) and told to everyone; the pilot's page no longer sends sdock/jump/stage for her flight.
 
+Status (2026-11-22, f47ee60d .. d5a826b7): done. The server runs js/helm.ts on its own helm state (js/svbattle.ts flyOn, helmFor),
+each world's geometry built from data (hubPlace, boardPlace + boardMove, assaultPlace, helmBerth; breach sites cleared against the
+hull's triangles), and its helm's events act on the host: the breach and setting down dock her (js/spaceserver.ts dock), off her berth
+undocks her (if everyone's aboard), the jump is asked (jump), another zone ship is made the level (tboardTo), the zone's ships near her
+are made ahead (warm), what she runs into hurts her hull. The pilot's page sends its steps: the input (at the helm, keys, the stick
+as pushed, her radar lock's way as shown) and what only it knows: the target picked and the match, the commands given between steps
+(warp, set down, off her berth, the drive spooled, the host's jump joined, the drive spun down), the zone's time it flew the step on
+(the server's helm places the zone by it), the zone ships it has drawn ready, and the host's word of a new place it set her up from
+(the server puts her where js/helm.ts arrive says for the same). Each step's checked on a shadow of the helm and against where the
+last left her; a state is sent only when something else moved her (a test). The server's word is her whole helm state; the page
+predicts and replays. Step scripts: fly_server, breach_fp, descent_server, tboard_server, helm_geo, fly_fp (tools/space_steps/).
+Left on the page: drawing all of it (the plan, the veil, the tunnel, the stage's look), the mouse's push on the stick, and the zone
+ships' readiness (what's drawn). Not checked yet: setting down on a base's pad from the air, a pilot taking the helm mid-flight.
+
 ### E (maybe): the battle in the zone's frame
 
 Inertial: no frame turning, no rebasing when the squad boards another zone ship.
