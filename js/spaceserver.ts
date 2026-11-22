@@ -6,6 +6,7 @@ import { Materials } from './materials.js';
 import { Server } from './server.js';
 import { ShipGen } from './shipgen.js';
 import { SpaceData } from './spacedata.js';
+import { SvBattle, SvBat } from './svbattle.js';
 import { World } from './world.js';
 // The host's side of the space direction (docs/space.md), in the simulation's thread with js/server.ts and through its
 // SvNet: the missions board (what's offered this visit, which the squad has picked, which are done), the squad's fleet (the
@@ -900,16 +901,16 @@ export const SpaceSv = (() => {
         net().broadcast({ t: 'seats', s: st.seats, ctl: st.ship.ctl });
         break;
       }
-      case 'spose': if (p && (st.ship.ctl === from || !st.ship.ctl || !sv.players.has(st.ship.ctl)) && Array.isArray(m.a) && m.a.length <= 16 && m.a.every(Number.isFinite)) { st.ship.ctl = from; st.ship.pose = m.a; net().broadcast({ t: 'spose', a: m.a, by: from }, from); } break;
+      case 'spose': if (p && (st.ship.ctl === from || !st.ship.ctl || !sv.players.has(st.ship.ctl)) && Array.isArray(m.a) && m.a.length <= 16 && m.a.every(Number.isFinite)) { st.ship.ctl = from; st.ship.pose = m.a; net().broadcast({ t: 'spose', a: m.a, by: from }, from); if (m.a.length >= 10) SvBattle.heardPose(m.a, sv.stepN, sv.map); } break;
       case 'smis': if (p && Array.isArray(m.a) && m.a.length <= 8 && m.a.every(Number.isFinite)) net().broadcast({ t: 'smis', a: m.a, by: from }, from); break; // (a missile off her hull, or one shot down: told to all)
       case 'sfire': if (p && Array.isArray(m.a) && m.a.length <= 12 && m.a.every(Number.isFinite)) net().broadcast({ t: 'sfire', a: m.a, by: from }, from); break;
-      case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 6 && m.a.every(Number.isFinite)) net().broadcast({ t: 'strk', a: m.a, by: from }, from); break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
-      case 'ssec': if (p && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5) && m.a.every(Number.isFinite)) net().broadcast({ t: 'ssec', a: m.a, by: from }, from); break; // (a scanner's search set: js/space.ts secSet)
-      case 'sxpdr': if (p) net().broadcast({ t: 'sxpdr', on: m.on ? 1 : 0, by: from }, from); break; // (her transponder switched: js/space.ts xpdr)
-      case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) net().broadcast({ t: 'storp', a: m.a, by: from }, from); break; // (a torpedo in flight: js/space.ts torps)
-      case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) net().broadcast({ t: 'schaff', a: m.a, by: from }, from); break; // (chaff thrown out of her: js/space.ts chaffGo)
-      case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) net().broadcast({ t: 'srcue', a: m.a, by: from }, from); break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
-      case 'shit': if (p && Number.isFinite(m.i)) net().broadcast({ t: 'shit', i: m.i | 0, hp: +m.hp || 0, by: from }, from); break; // (a hull gun hit by a turret, or the ship by one: told to all)
+      case 'strk': if (p && Array.isArray(m.a) && m.a.length <= 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'strk', a: m.a, by: from }, from); battleIn(m); } break; // (a tracker switched or sent: js/space.ts trkOff, trkSend)
+      case 'ssec': if (p && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5) && m.a.every(Number.isFinite)) { net().broadcast({ t: 'ssec', a: m.a, by: from }, from); battleIn(m); } break; // (a scanner's search set: js/space.ts secSet)
+      case 'sxpdr': if (p) { net().broadcast({ t: 'sxpdr', on: m.on ? 1 : 0, by: from }, from); battleIn(m); } break; // (her transponder switched: js/space.ts xpdr)
+      case 'storp': if (p && Array.isArray(m.a) && m.a.length === 13 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'storp', a: m.a, by: from }, from); battleIn(m); } break; // (a torpedo in flight: js/space.ts torps)
+      case 'schaff': if (p && Array.isArray(m.a) && m.a.length === 6 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'schaff', a: m.a, by: from }, from); battleIn(m); } break; // (chaff thrown out of her: js/space.ts chaffGo)
+      case 'srcue': if (p && Array.isArray(m.a) && m.a.length <= 3 && m.a.every(Number.isFinite)) { net().broadcast({ t: 'srcue', a: m.a, by: from }, from); battleIn(m); } break; // (the sensor station's operator cued a tracker on a plot, or dropped them: js/space.ts sensorStep)
+      case 'shit': if (p && Number.isFinite(m.i)) { net().broadcast({ t: 'shit', i: m.i | 0, hp: +m.hp || 0, by: from }, from); battleIn(m); } break; // (a hull gun hit by a turret, or the ship by one: told to all)
       case 'mobj': if (p) act(String(m.k), from, m.n); break;
       // the shipyard: a ship bought (paid for on the buyer's own screen, as the shop's stock is), taken out, fitted
       case 'fbuy': if (p && sv.phase === 'shop' && SD.SHIPS[m.id] && !F.owned.includes(m.id)) { F.owned.push(m.id); st.fleet = SD.cleanFleet(F); net().broadcast({ t: 'fleet', f: st.fleet, by: from, got: m.id }); } break;
@@ -952,7 +953,21 @@ export const SpaceSv = (() => {
     if (M.ms.obj === 'visit') (Z.kept = Z.kept || new Map()).set(k, M); else Z.main = M;
     sv.ctxs.delete(k);
   }
+  // ---- the battle (js/svbattle.ts): the zone's, on the server. Made with a boarding mission's level, made again when the level's
+  // another of the zone's ships (tboard) or come back to, dropped when the zone's over (home, a new run). Stepped once a server step,
+  // after every level's (js/serverhost.ts step), with the loaded level's (the squad's ship's) crew state
+  let bat: SvBat | null = null;
+  function battle(dt: number) {
+    const sv = S(), M = st.M, map = sv.map;
+    if (!Z || Z.ms.kind !== 'board' || sv.phase !== 'level' || !M || !M.meta || !map || !map.sp || !map.sp.hull) { bat = null; return; }
+    if (!bat || bat.map !== map || bat.k !== Z.active) bat = SvBattle.make(map, Z.ms, Z.active, M.ms, st.fleet, bat);
+    const hostile = M.ms.obj === 'defend' ? 0 : M.ms.obj !== 'visit' || M.breached ? 1 : 0;
+    SvBattle.step(bat, dt, sv.stepN, { hostile, gn: gunnersLeft(), arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom }, M.docked, Z.zt);
+    SvBattle.out(bat, sv.stepN, Z.zt, (m) => net().broadcast(m));
+  }
+  const battleIn = (m: any) => SvBattle.request(bat, m); // (a crew request, relayed as before (the pages still run their own battle), and done to the server's)
+  const battleSum = () => SvBattle.summary(bat);
   function ctxSave() { return { M: st.M, active: Z ? Z.active : 0, hostShip, breachedOf }; }
   function ctxLoad(c: any) { if (!c) return; st.M = c.M; if (Z) Z.active = c.active; hostShip = c.hostShip; breachedOf = c.breachedOf; }
-  return { putAway, ctxSave, ctxLoad, st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
+  return { battle, battleSum, putAway, ctxSave, ctxLoad, st, offLimits, startRun, populate, crew, restore, tick, handle, left, glass, mayOpen, crewMayOpen, shopMsg, levelMsg, genOf, msMsg, vent };
 })();

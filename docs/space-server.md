@@ -91,6 +91,16 @@ picture, 10 Hz, its operator only), `sdbg` (F8's, on request), `sin` (inputs). A
 the snapshots (built: `ServerHost.fast` / `SvNet.fast`, `Net.onFast`, js/netfast.ts, js/snapcodec.ts; docs/threads.md, "The fast
 channel"); the JSON one for events and requests. Rounds aren't streamed: a burst's seed, and every side flies the same rounds.
 
+Server side done (2026-11-21, js/svbattle.ts, js/spacenet.ts): SpaceSv makes the world with a board zone's level (again on tboard or
+a level come back to; dropped with the zone) and js/serverhost.ts steps it once a step after every level's. The pilot's `spose`, and
+`strk` `ssec` `srcue` `sxpdr` `schaff` `shit` `storp` act on it as well as being relayed. A torpedo is made from the first `storp`
+and flown as its owner reports it until it comes onto its datalink, when the server takes it over on its own fix nearest its nose (an
+`f: [x, y, z, vx, vy, vz]` on the first `storp`, the fix it was sent at, makes it the server's from launch). Out: `sss` every 3 steps,
+`sev` with it (a gun's rounds a step as `fire`: gun, aim, error, seed, count, flown by `fireRound` on `SpaceNet.rng(seed)`; rounds'
+ends not sent). `G.ServerLink.sworld()` sums the server's world up; tools/space_steps/server_battle.mjs sets it beside the page's.
+Still the page's: her hp, damage, the turrets' rounds, missiles shot down, `smis`; zone ships' real hulls inside 5 km (the server has
+their stand-ins); the hub's world.
+
 ### C2: the pilot's inputs, predicted
 
 The pilot's page sends inputs; it predicts her flight with the same step, and replays its inputs from the server's state when a
