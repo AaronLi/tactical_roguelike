@@ -48,10 +48,11 @@ import { Stickers } from './stickers.js';
 //     for one of them, {k:'rec', name, data} a level's recording, the answers, and {k:'prof'} each second (how long the ticks took).
 //   cli, the host's own player's port (a new one each session): the same messages any player's game sends and gets over the
 //     network, both ways.
-// It ticks on its own timer, TICK_MS apart (as fast as the frames used to come), dt the time since the last (at most 0.1 s),
-// whether or not the page is drawing.
+// It ticks on its own timer, TICK_MS apart, whether or not the page is drawing; each tick runs as many fixed steps of STEP (1/60 s)
+// as the time since the last covers (at most 0.25 s of them: a long stall isn't caught up at once).
 export const ServerHost = {
   TICK_MS: 1000 / 60,
+  STEP: 1 / 60, acc: 0,
   ctl: null as MessagePort | null,
   cli: null as MessagePort | null,
   id: null as string | null, // (the host's own player: Server.net.myId)
@@ -105,13 +106,18 @@ export const ServerHost = {
   },
   tick() {
     if (!this.on) return;
-    const now = performance.now(), dt = Math.min((now - this.last) / 1000, 0.1);
-    this.last = now;
-    Server.update(dt);
-    Recorder.tick(Server, dt);
-    const P = this.prof, took = performance.now() - now;
+    const now = performance.now();
+    this.acc = Math.min(this.acc + (now - this.last) / 1000, 0.25 + this.STEP); this.last = now;
+    while (this.on && this.acc >= this.STEP) { this.acc -= this.STEP; this.step(); }
+  },
+  // one fixed step of the simulation
+  step() {
+    const t0 = performance.now();
+    Server.update(this.STEP);
+    Recorder.tick(Server, this.STEP);
+    const P = this.prof, took = performance.now() - t0;
     this.ticks++; P.n++; P.ms += took; if (took > P.max) P.max = took;
-    if (now - P.at > 1000) { if (P.at) this.ctl!.postMessage({ k: 'prof', n: P.n, ms: P.ms, max: P.max }); P.n = 0; P.ms = 0; P.max = 0; P.at = now; }
+    if (t0 - P.at > 1000) { if (P.at) this.ctl!.postMessage({ k: 'prof', n: P.n, ms: P.ms, max: P.max }); P.n = 0; P.ms = 0; P.max = 0; P.at = t0; }
   },
 
   // ---------------------------------------------------------------- the simulation's word, out (SvNet)

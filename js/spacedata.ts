@@ -303,7 +303,8 @@ export const SpaceData = (() => {
   // the hull's weapons: what each does to the squad's ship (js/space.ts guns)
   // (rounds: speed m/s, spread the gun's own inaccuracy, radians (one standard deviation each way square to the aim), a round's life in metres flown before it blows itself apart; the minigun's rps in bursts of
   // burst seconds, pause seconds between)
-  const HULLGUN = { pd: { range: 1300, cool: [0.8, 1.7], dmg: 2.2, speed: 1100, spread: 0.004, life: 2000 }, mg: { range: 1500, rps: 50, burst: [2.5, 4.0], pause: [1.2, 2.6], cool: [1.2, 2.6], dmg: 0.2, speed: 1000, spread: 0.0006, life: 2000 }, missile: { range: 6500, cool: [9, 14], dmg: 24, speed: 230, turn: 0.85, life: 34 } };
+  // (HULLGUN: range, what a gun engages inside, m; life, how far its round flies before it destroys itself)
+  const HULLGUN = { pd: { range: 4000, cool: [0.8, 1.7], dmg: 2.2, speed: 1100, spread: 0.004, life: 5000 }, mg: { range: 4000, rps: 50, burst: [2.5, 4.0], pause: [1.2, 2.6], cool: [1.2, 2.6], dmg: 0.2, speed: 1000, spread: 0.0006, life: 5000 }, missile: { range: 6500, cool: [9, 14], dmg: 24, speed: 230, turn: 0.85, life: 34 } };
   const OBJ: Record<SpObj, { name: string; pay: number; line: string }> = {
     artifact: { name: 'Recover the artifact', pay: 500, line: 'Something old and valuable is locked aboard. Find it, carry it back to your ship and get clear.' },
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },

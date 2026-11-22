@@ -104,7 +104,7 @@ export const RadarView = (() => {
         o.gl.visible = tr.st !== 'idle'; o.gl.position.copy(tr.at); (o.gl.material as THREE.SpriteMaterial).color.setHex(hue); o.gl.scale.setScalar(tr.st === 'track' ? 0.03 + 0.012 * Math.sin(now * 12) : 0.025);
         o.cn.position.copy(tr.at); o.cn.quaternion.setFromUnitVectors(Z, tr.a); o.cn.scale.setScalar(Math.max(1, len));
         o.bl.position.copy(tr.at); o.bl.quaternion.setFromUnitVectors(Z, tr.b); o.bl.scale.setScalar(Math.max(60, len));
-        if (tr.st === 'track') { o.rg.position.copy(tr.b).multiplyScalar(len).add(tr.at); o.rg.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), tr.b); o.rg.scale.setScalar(len * Math.tan(Radar.TRK.sq)); }
+        if (tr.st === 'track') { o.rg.position.copy(tr.b).multiplyScalar(len).add(tr.at); o.rg.quaternion.setFromUnitVectors(new T.Vector3(0, 0, 1), tr.b); o.rg.scale.setScalar(len * Math.tan(tr.kind === 'conical' ? Radar.TRK.sq : Radar.TRK.bw * 0.5)); }
         const nm = `${su.id} ${tr.side > 0 ? 'stbd' : 'port'}`;
         if (!own && cam && tr.st !== 'idle') trackMark(tr, D, cam, ownId, now);
         // its solution's trajectory in space: where it's had its target (solid) and where it has it going, 10 s (dashed)
@@ -256,7 +256,7 @@ export const RadarView = (() => {
   // Redrawn ten times a second.
   let pipeCv: HTMLCanvasElement | null = null, pipeImg: ImageData | null = null, pipeAt = -1, pipeFor = '';
   function pipeline(su: RSuite, now: number, width: number) {
-    const M = Radar.MAP, K = 5, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / 7.2), cw3 = Math.floor(cw * 1.8), cw5 = Math.floor(cw * 1.4), ch = 108, top = 16, rh = ch + 16, tch = 78, trh = tch + 16, CH = top + su.scans.length * rh + su.trks.length * trh;
+    const M = Radar.MAP, K = 5, gap = 10, CW = Math.max(600, Math.min(1700, Math.floor(width))), cw = Math.floor((CW - gap * (K - 1)) / 7.2), cw3 = Math.floor(cw * 1.8), cw5 = Math.floor(cw * 1.4), ch = 108, top = 16, rh = ch + 16, tch = 78, trh = tch + 16, och = 90, orh = su.opt && su.sched ? och + 16 : 0, CH = top + su.scans.length * rh + su.trks.length * trh + orh; // (och: the camera's row, when she's one)
     if (!pipeCv) { pipeCv = document.createElement('canvas'); pipeCv.style.display = 'block'; pipeCv.style.marginTop = '4px'; }
     if (pipeCv.width !== CW || pipeCv.height !== CH) { pipeCv.width = CW; pipeCv.height = CH; pipeImg = null; pipeAt = -1; }
     if (now - pipeAt < 0.1 && pipeFor === su.id) return pipeCv;
@@ -302,21 +302,22 @@ export const RadarView = (() => {
     });
     // the trackers' rows: each its own pipeline
     su.trks.forEach((tr, i) => trackRow(c, su, tr, now, top + su.scans.length * rh + i * trh + 14, tch, X, cw, cw5));
+    if (orh) camRow(c, su, now, top + su.scans.length * rh + su.trks.length * trh + 14, och, X, cw, cw5);
     assessTable(c, su, X(4), top + 14, cw5, su.scans.length * rh - 16);
     corr3d(c, su, now, X(3), top + 14, cw3, CH - top - 16);
     return pipeCv;
   }
   // A tracker's row of the pipeline:
-  //   1 RAW: tracking, the return round its last nutation circle (a ring: further out where it came back stronger, so the side the
-  //     target's on bulges) and the power across its range gate (10 m bins; the gate's middle the line, its early and late
+  //   1 RAW: tracking, its monopulse channels step by step (the sum, and the two differences over it: the target's offset each way)
+  //     and the power across its range gate (10 m bins; the gate's middle the line, its early and late
   //     halves either side); acquiring, the sweep's returns along the strip, the strongest marked
-  //   2 DISCRIMINATE: the angle errors the demodulator found, a revolution each (in beam widths; the last one biggest), the range
+  //   2 DISCRIMINATE: the angle errors its readings found, one a reading (50 ms of pulses) (in beam widths; the last one biggest), the range
   //     gate's error, and its signal over the noise
   //   3 TRACK: its error and its solution's quality over the last 8 s
   //   (4 is the 3D stage, where its solution joins the track it's on)
   //   5 IDENTIFY: the track it's on, what that track answers, its range, closing speed and quality
   function trackRow(c: CanvasRenderingContext2D, su: RSuite, tr: RSuite['trks'][0], now: number, y0: number, h: number, X: (k: number) => number, cw: number, cw5: number) {
-    const dg = tr.dg, nm = `TRK ${tr.side > 0 ? 'STBD' : 'PORT'} · ${tr.st === 'track' ? 'LOCK' : tr.st === 'acq' ? 'SWEEP' : tr.st === 'slew' ? 'SLEW' : 'IDLE'}`;
+    const dg = tr.dg, nm = `TRK ${tr.side > 0 ? 'STBD' : 'PORT'} · ${tr.kind === 'conical' ? 'CONICAL SCAN' : 'MONOPULSE'} · ${tr.st === 'track' ? 'LOCK' : tr.st === 'acq' ? 'SWEEP' : tr.st === 'slew' ? 'SLEW' : 'IDLE'}`;
     c.fillStyle = tr.st === 'track' ? '#ff8070' : tr.st === 'idle' ? '#6f8f9f' : '#ffc060'; c.fillText(nm, X(0) + 2, y0 - 13);
     for (const k of [0, 1, 2, 4]) { c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, (k === 4 ? cw5 : cw) - 1, h - 1); }
     if (!dg || tr.st === 'idle') return;
@@ -327,20 +328,33 @@ export const RadarView = (() => {
       c.fillStyle = '#ffc060'; c.fillText('sweeping the strip: return along it', X(0) + 4, y0 + 3);
       return;
     }
-    // 1: the nutation ring and the range gate
-    const rcx = X(0) + h / 2 + 4, rcy = y0 + h / 2, r0 = h * 0.22, mx = Math.max(1e-6, ...Array.from(dg.ring)), mn = Math.min(...Array.from(dg.ring));
-    c.strokeStyle = '#1f4a5c'; c.beginPath(); c.arc(rcx, rcy, r0, 0, TAU); c.stroke();
-    c.strokeStyle = '#ff8070'; c.beginPath(); for (let i = 0; i <= 32; i++) { const a = (i % 32 + 0.5) / 32 * TAU, k = (dg.ring[i % 32] - mn) / Math.max(1e-6, mx - mn), r = r0 + k * h * 0.22; const x = rcx + Math.cos(a) * r, y = rcy - Math.sin(a) * r; if (i) c.lineTo(x, y); else c.moveTo(x, y); } c.stroke();
-    const gx = X(0) + h + 10, gw = cw - h - 14, GT = dg.gate, gmx = Math.max(...Array.from(GT));
+    // 1: the monopulse channels, step by step (the last 48): the sum (its signal, white, top half: how strong), and the two differences
+    // over it (left less right cyan, top less bottom magenta: the target's offset that way, in beam widths; the band is ±½ beam, where
+    // they're in proportion); and the range gate
+    const mo = dg.mono || [], mw = h + 4, mx0 = X(0) + 4, myc = y0 + h * 0.68, mk = h * 0.55;
+    if (tr.kind === 'conical') { // (conical scan: the return round its last nutation circle: further out where it came back stronger, so the side the target's on bulges)
+      const rcx = X(0) + h / 2 + 4, rcy = y0 + h / 2 + 4, r0 = h * 0.2, mx = Math.max(1e-6, ...Array.from(dg.ring)), mn = Math.min(...Array.from(dg.ring));
+      c.strokeStyle = '#1f4a5c'; c.beginPath(); c.arc(rcx, rcy, r0, 0, TAU); c.stroke();
+      c.strokeStyle = '#ff8070'; c.beginPath(); for (let i = 0; i <= 32; i++) { const a = (i % 32 + 0.5) / 32 * TAU, k = (dg.ring[i % 32] - mn) / Math.max(1e-6, mx - mn), r = r0 + k * h * 0.2; const x = rcx + Math.cos(a) * r, y = rcy - Math.sin(a) * r; if (i) c.lineTo(x, y); else c.moveTo(x, y); } c.stroke();
+    } else {
+    c.strokeStyle = '#1f4a5c'; c.strokeRect(mx0 + 0.5, y0 + 14.5, mw, h - 18); c.fillStyle = 'rgba(60,120,150,0.18)'; c.fillRect(mx0, myc - 0.5 * mk * 0.5, mw, 0.5 * mk);
+    c.strokeStyle = '#1f4a5c'; c.beginPath(); c.moveTo(mx0, myc); c.lineTo(mx0 + mw, myc); c.stroke();
+    if (mo.length > 1) {
+      const sm = Math.max(1e-9, ...mo.map((q) => q.s)), xs = (i: number) => mx0 + i / 47 * mw;
+      c.strokeStyle = 'rgba(255,255,255,0.8)'; c.beginPath(); mo.forEach((q, i) => { const y = y0 + 15 + (1 - q.s / sm) * (h * 0.3); if (i) c.lineTo(xs(i), y); else c.moveTo(xs(i), y); }); c.stroke();
+      for (const [k, col] of [['x', '#50d8ff'], ['y', '#e070ff']] as const) { c.strokeStyle = col; c.beginPath(); mo.forEach((q, i) => { const y = myc - Math.max(-1, Math.min(1, q[k] / 0.5)) * mk * 0.5; if (i) c.lineTo(xs(i), y); else c.moveTo(xs(i), y); }); c.stroke(); }
+    }
+    }
+    const gx = X(0) + h + 14, gw = cw - h - 18, GT = dg.gate, gmx = Math.max(...Array.from(GT));
     for (let j = 0; j < GT.length; j++) { const v = 10 * Math.log10(Math.max(1, GT[j])) / Math.max(1, 10 * Math.log10(gmx)), bh = v * (h - 14), x = gx + j / GT.length * gw; c.fillStyle = Math.abs(j - 20) <= 2 ? '#ff8070' : '#3d7f96'; c.fillRect(x, y0 + h - 4 - bh, gw / GT.length - 1, bh); }
     c.strokeStyle = '#ffffff'; c.beginPath(); c.moveTo(gx + 20.5 / GT.length * gw, y0 + 2); c.lineTo(gx + 20.5 / GT.length * gw, y0 + h - 2); c.stroke();
-    c.fillStyle = '#8fb3c4'; c.fillText('conical scan', rcx - r0 - 2, y0 + 2); c.fillText('range gate ±200 m', gx, y0 + 2);
+    c.fillStyle = '#8fb3c4'; c.fillText(tr.kind === 'conical' ? 'conical scan' : 'monopulse Σ Δ', mx0, y0 + 2); c.fillText('range gate ±200 m', gx, y0 + 2);
     // 2: the angle errors and the range error
     const ex = X(1) + h / 2 + 4, ey = y0 + h / 2, es = h * 0.4;
     c.strokeStyle = '#1f4a5c'; c.strokeRect(ex - es, ey - es, 2 * es, 2 * es); c.beginPath(); c.moveTo(ex - es, ey); c.lineTo(ex + es, ey); c.moveTo(ex, ey - es); c.lineTo(ex, ey + es); c.stroke();
     dg.errs.forEach((e, i) => { const a = (i + 1) / dg.errs.length; c.fillStyle = `rgba(255,128,112,${a})`; c.beginPath(); c.arc(ex + Math.max(-1, Math.min(1, e[0] * 2)) * es, ey - Math.max(-1, Math.min(1, e[1] * 2)) * es, i === dg.errs.length - 1 ? 3 : 1.6, 0, TAU); c.fill(); });
     c.fillStyle = '#cfe8f5'; const tx = X(1) + h + 10;
-    c.fillText(`angle err ${(tr.err / D2R).toFixed(2)}°`, tx, y0 + 6); c.fillText(`(±½ beam: box)`, tx, y0 + 20); c.fillText(`range err ${dg.rerr >= 0 ? '+' : ''}${dg.rerr.toFixed(1)} m`, tx, y0 + 36); c.fillText(`S/N ${tr.db.toFixed(0)} dB`, tx, y0 + 52);
+    c.fillText(`angle err ${(tr.err / D2R).toFixed(2)}°`, tx, y0 + 6); c.fillText(`noise ${((dg.nz || 0) / D2R).toFixed(3)}° glint ${((dg.gl || 0) / D2R).toFixed(3)}°`, tx, y0 + 20); c.fillText(`range err ${dg.rerr >= 0 ? '+' : ''}${dg.rerr.toFixed(1)} m`, tx, y0 + 36); c.fillText(`S/N ${tr.db.toFixed(0)} dB`, tx, y0 + 52);
     // 3: error and quality over time
     const se = dg.series; if (se.length > 1) {
       const t0 = now - 8, xs = (t: number) => X(2) + (t - t0) / 8 * cw;
@@ -355,11 +369,52 @@ export const RadarView = (() => {
     c.fillStyle = iff ? `rgb(${iffCol({ iff } as RContact, su)})` : '#ffc860'; c.fillText(iff ? (iff.c === 'civ' ? 'CIV ' : '') + iff.n : 'no IFF answer', X(4) + 4, y0 + 20);
     c.fillStyle = '#cfe8f5'; c.fillText(`${(tr.rng / 1000).toFixed(2)} km · closing ${close >= 0 ? '+' : ''}${Math.round(close)} m/s`, X(4) + 4, y0 + 36); c.fillText(`solution ${Math.round(tr.est.q * 100)}%${tr.tgt ? ' [' + tr.tgt + ']' : ''}`, X(4) + 4, y0 + 52);
   }
+  // The camera's row (js/radar.ts optical): a sensor with no filtering of its own to show (its reading's simulated straight from what's
+  // in the frame), so its stages are:
+  //   1 PICTURE: what it sees (js/space.ts camDraw), the reticle where it's pointing
+  //   2 POINTING: which quarter's camera, which way it looks (bearing and elevation, her frame), its field and zoom, a pixel's angle
+  //   3 ESTIMATE: how big the target is in the picture, its size from that, its range from its size (once it's told what it is), the
+  //     track's range against it
+  //   5 IDENTIFY: what it's on, and what it's told it is (how sure: a bar), a ship's name
+  function camRow(c: CanvasRenderingContext2D, su: RSuite, now: number, y0: number, h: number, X: (k: number) => number, cw: number, cw5: number) {
+    const o = su.opt!, j = o.job, tt = j && j.tt ? j.tt : null, G = '#8dffbe', D2 = 180 / Math.PI, L = (i: number) => y0 + 5 + i * 13; // (L: a line's place in a stage's box)
+    const st = o.off ? 'OFF' : !j ? 'IDLE' : j.kind === 'acq' ? 'SWEEP' : o.st === 'slew' ? 'TURNING' : o.px < Radar.OPT.det ? 'NOTHING IN SIGHT' : 'LOOK';
+    c.fillStyle = G; c.fillText(`OPTICAL · ${Radar.QUAD[o.quad]} camera · ${st}`, X(0) + 2, y0 - 13);
+    for (const k of [0, 1, 2, 4]) { c.strokeStyle = '#1b3a48'; c.strokeRect(X(k) + 0.5, y0 + 0.5, (k === 4 ? cw5 : cw) - 1, h - 1); }
+    // 1: the picture
+    if (dbg.cam) { const iw = Math.min(cw - 4, (h - 4) * 4 / 3), ih = iw * 0.75; c.drawImage(dbg.cam, X(0) + 2, y0 + 2 + (h - 4 - ih) / 2, iw, ih); }
+    else { c.fillStyle = '#5f8fa4'; c.fillText('no picture', X(0) + 6, L(0)); }
+    // 2: where it's pointing (her frame), how far it's zoomed (a bar: widest left, tightest right, log), a pixel's angle
+    const b = o.b.clone().applyQuaternion(su.Q.clone().invert()), az = Math.atan2(b.x, -b.z) * D2, el = Math.asin(Math.max(-1, Math.min(1, b.y))) * D2, zoom = Radar.OPT.fovMax / Math.max(1e-6, o.fov), ifov = o.fov / Radar.OPT.px * 1e6;
+    const tx1 = X(1) + 6, sg = (x: number) => (x >= 0 ? '+' : '') + x.toFixed(1); c.fillStyle = '#cfe8f5';
+    c.fillText(`brg ${sg(az)}° el ${sg(el)}°`, tx1, L(0));
+    c.fillText(`field ${(o.fov * D2).toFixed(o.fov * D2 < 1 ? 2 : 1)}° · zoom ×${zoom.toFixed(1)}`, tx1, L(1));
+    c.fillText(`${ifov.toFixed(0)} µrad a pixel`, tx1, L(2));
+    const zb = Math.log(zoom) / Math.log(Radar.OPT.fovMax / Radar.OPT.fovMin); c.fillStyle = '#16303c'; c.fillRect(tx1, L(3) + 3, cw - 14, 5); c.fillStyle = G; c.fillRect(tx1, L(3) + 3, (cw - 14) * Math.max(0, Math.min(1, zb)), 5);
+    c.fillStyle = '#7f9fb0'; c.fillText('wide', tx1, L(4)); c.fillText('tight', tx1 + cw - 44, L(4));
+    if (j && j.kind === 'acq') { const cc = (o as any).con, f = cc ? su.scans[cc.k].fan : 1; c.fillStyle = '#ffc060'; c.fillText(`sweeping ${cc ? cc.c.n : ''}: ${Math.round(((o.e ?? 0) + f) / (2 * f) * 100)}%`, tx1, L(5)); }
+    // 3: how big it is in the picture, its size from that, its range (the track's; from its size once it's told what it is)
+    const tx2 = X(2) + 6, seen = o.px >= Radar.OPT.det; c.fillStyle = '#cfe8f5'; c.fillText(seen ? `${Math.round(o.px)} px across` : 'nothing in sight', tx2, L(0));
+    if (tt) {
+      const told = tt.cls && tt.cls.conf > 0.5; c.fillStyle = '#cfe8f5';
+      c.fillText(`size ${tt.szE ? '≈ ' + Math.round(2 * tt.szE) + ' m' : 'not measured'}`, tx2, L(1));
+      c.fillText(`track: ${(o.rng / 1000).toFixed(2)} km`, tx2, L(2));
+      c.fillStyle = told ? G : '#7f9fb0'; c.fillText(told ? 'range from size ±15%' : 'range: not measured', tx2, L(3));
+      if (seen) { c.fillStyle = o.px >= Radar.OPT.cls ? G : '#ffc060'; c.fillText(o.px >= Radar.OPT.id ? "a ship's name readable" : o.px >= Radar.OPT.cls ? 'big enough to tell' : 'a dot: where, not what', tx2, L(4)); }
+    }
+    // 5: what it's on, what it's told it is (how sure: a bar; 60% is what's acted on), how far through the look
+    const tx4 = X(4) + 4; c.fillStyle = G;
+    c.fillText(!j ? 'idle' : j.kind === 'acq' ? 'placing a contact' : `on ${tt ? tt.n : ''}${tt && tt.quiet ? ' · listen only' : ''}`, tx4, L(0));
+    const cl = tt && tt.cls;
+    if (cl) { c.fillStyle = '#cfe8f5'; c.fillText(`it's a ${cl.k}${cl.name ? ': ' + cl.name : ''}`, tx4, L(1)); c.fillStyle = '#16303c'; c.fillRect(tx4, L(2) + 3, cw5 - 12, 5); c.fillStyle = cl.conf >= 0.6 ? G : '#ffc060'; c.fillRect(tx4, L(2) + 3, (cw5 - 12) * cl.conf, 5); c.fillStyle = '#7f9fb0'; c.fillText(`${Math.round(cl.conf * 100)}% sure (60%: acted on)`, tx4, L(3)); }
+    else if (tt) { c.fillStyle = '#7f9fb0'; c.fillText('not told what it is yet', tx4, L(1)); }
+    if (j) { c.fillStyle = '#7f9fb0'; c.fillText(`${Math.round(Radar.optProg(su, now) * 100)}% through the look`, tx4, L(4)); }
+  }
   // Stage 5: hostile or not (js/radar.ts assess): every track she holds, worst first: what it is to her, its range, how fast it's
   // closing, where its course passes her, the score (a bar, the line at 0.6) and the confirmation's progress (the bar under it,
   // full at 3 s), and why
   // (the debug view's truth: what a target id is, in words (js/space.ts sets it: the zone's ships by name, a torpedo whose))
-  const dbg = { nameOf: (id: string) => id };
+  const dbg = { nameOf: (id: string) => id, cam: null as HTMLCanvasElement | null }; // (cam: the shown ship's camera picture (js/space.ts optView))
   // what a row really is (debug only: the ids the radar's peaks carry for this view, nothing decides by them): the things its
   // contacts' latest peaks and its tracker were on. Two different things: a ghost (two contacts' crossing, nothing there); none: noise
   function truthOf(a: RAssess) {

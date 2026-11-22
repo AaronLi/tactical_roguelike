@@ -1941,7 +1941,7 @@ export const Game = {
       Views.update(dt);
       Wind.update(dt); // (the flags)
       if (!this.hub) Landing.update(dt); // (after everyone's posed: in the air it moves the camera, and hides who's riding with you)
-      Space.update(dt); // (the squad's ship: flown, and what's outside her moved: js/space.ts)
+      Space.update(dt, raw / 1000); // (the squad's ship: flown, and what's outside her moved, stepped to the time that's really passed: js/space.ts)
       if (G_Me.dead) G_Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
       GunAudio.updateListener(G_R.camera); // (after that: dead, you hear from where the camera is, not where you fell)
       G_Me.flushHits();
