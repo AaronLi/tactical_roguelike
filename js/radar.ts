@@ -747,11 +747,20 @@ export const Radar = (() => {
     out.divideScalar(R || 1).applyQuaternion(_qi.copy(su.Q).invert()); return R;
   }
   // cue a tracker on a plot: the one whose side it's on, an idle one first
+  // the contact a plot is of: the one it's the latest plot of; else (a plot sent by the operator: its bearing and range only, js/space.ts
+  // trkSend) the one at that bearing and range on its scanner (within 3 degrees and 5% of the range, its filter run to the plot's time),
+  // so a tracker sent on it sweeps where the contact's filter has it, as one cued by the scanner does (cueDir)
+  function conOf(su: RSuite, p: RPlot): RContact | null {
+    const sc = su.scans[p.k]; const own = sc.cons.find((c) => c.p === p); if (own) return own;
+    let best: RContact | null = null, bd = 1;
+    for (const c of sc.cons) { const dt = p.t - c.t, dA = Math.abs(wrapPi(c.A + c.vA * dt + sc.off - p.phi)) / (3 * D2R), dr = Math.abs(c.r + c.vr * dt - p.r) / Math.max(150, 0.05 * p.r), d = Math.max(dA, dr); if (d < bd) { bd = d; best = c; } }
+    return best;
+  }
   function cue(su: RSuite, p: RPlot) {
     // (a contact that's part of a 3D track: the tracker that can see it is pointed straight at where the track has it going, and
     // locks there if the return's there (a spiral round it only if it isn't); no sweep along the strip. Only a contact without
     // a 3D fix (one scanner's: a fan, its place along it not known) is swept for)
-    const con = su.scans[p.k].cons.find((c) => c.p === p);
+    const con = conOf(su, p);
     const f = su.fus.find((q) => (q.a && q.a.p === p) || (q.b && q.b.p === p) || (!!con && ((q.a && q.a.n === con.n) || (q.b && q.b.n === con.n))));
     if (f) {
       const tr = su.trks.filter((t) => t.st !== 'track' && !t.off).find((t) => inSide(t, f.pl.clone().sub(t.at.clone().applyQuaternion(su.Q).add(su.P)).normalize().applyQuaternion(su.Q.clone().invert())));
@@ -762,7 +771,7 @@ export const Radar = (() => {
     // (a 'y' plot's side is known: its tracker's cued. An 'x' plot's fan runs across her, either side: every tracker not already
     // tracking is cued, each sweeps its own half, and the first to find her keeps it (trackStep drops the others))
     const free = ok.filter((t) => t.st !== 'track'), use = want ? [free.find((t) => t.st === 'idle') || free[0] || ok[0]] : free.length ? free : [ok[0]];
-    const pq = (p.q || su.Q).clone(), cueOf = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: pq, o: (p.o || su.P).clone().add(sc.at.clone().applyQuaternion(pq)), con: sc.cons.find((c) => c.p === p) || null };
+    const pq = (p.q || su.Q).clone(), cueOf = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: pq, o: (p.o || su.P).clone().add(sc.at.clone().applyQuaternion(pq)), con };
     for (const tr of use) { if (!tr) continue; tr.hand = null; dgOf(tr).sweep = []; tr.st = 'slew'; tr.cue = cueOf; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3(), r: p.r }; tr.tgt = null; tr.lockT = 0; tr.lost = 0; tr.est = { p: null, v: new T.Vector3(), q: 0 }; }
     return use[0] || null;
   }
@@ -1071,7 +1080,7 @@ export const Radar = (() => {
     if (j.kind === 'look') { const tt = j.tt!; tt.trk = tr; tr.st = 'slew'; const k0 = tt.kf.clone(); k0.pred(now, ACC3 * ACC3); tr.hand = { p: ttAt(tt, now), v: tt.kf.vel(new T.Vector3()), t: now, sig: k0.sig(), sv: Math.sqrt((k0.P[21] + k0.P[28] + k0.P[35]) / 3) }; dgOf(tr).sweep = []; return; } // (sig: its spread as it's grown since it was last seen, not as it was then)
     if (j.kind === 'ray') { tr.st = 'slew'; tr.hand = { p: su.P.clone().addScaledVector(j.d!, 5000), v: new T.Vector3(), t: now, ray: true }; return; }
     const p = j.plot!, sc = su.scans[p.k], pq = (p.q || su.Q).clone();
-    tr.cue = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: pq, o: (p.o || su.P).clone().add(sc.at.clone().applyQuaternion(pq)), con: sc.cons.find((c) => c.p === p) || null };
+    tr.cue = { k: p.k, ax: sc.ax, phi: p.phi, r: p.r, q: pq, o: (p.o || su.P).clone().add(sc.at.clone().applyQuaternion(pq)), con: conOf(su, p) };
     tr.st = 'slew'; tr.sw = -sc.fan; tr.best = { db: -99, b: new T.Vector3(), r: p.r }; dgOf(tr).sweep = [];
   }
   // a dish done with its job (seen what it looked for, or not): what it's learnt left with the ship's track, the dish free again

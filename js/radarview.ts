@@ -154,6 +154,9 @@ export const RadarView = (() => {
   // a plot's turn angle as she's turned now (the middle of its fan, made when she was turned p.q, in her frame now), so what she's
   // painted stays where it is in space while she turns
   const qi = new T.Quaternion(), _d = new T.Vector3();
+  // A scanner contact's arc now, in her frame: at the bearing and range its own filter has it at now, round the scanner as it sits on her
+  // now. Where a tracker cued on it sweeps (js/radar.ts cueDir), so the contact's arc and the tracker's search strip are one line
+  function conArc(sc: RScan, c: RContact, now: number, e: number, out = new T.Vector3()) { const dt = now - c.t; return Radar.dirOf(sc.ax, c.A + c.vA * dt + sc.off, e, out).multiplyScalar(c.r + c.vr * dt).add(sc.at); }
   function phiNow(su: RSuite, p: RPlot) { if (!p.q) return p.phi; const ax = su.scans[p.k].ax; Radar.dirOf(ax, p.phi, 0, _d).applyQuaternion(p.q).applyQuaternion(qi.copy(su.Q).invert()); return Radar.angOf(ax, _d)[0]; }
   const sOf = (ax: string) => (ax === 'y' ? 0 : 1);
   function polar(cx: number, cy: number, ax: string, a: number, r: number) { return ax !== 'x' ? [cx + Math.sin(a) * r, cy - Math.cos(a) * r] : [cx + Math.cos(a) * r, cy - Math.sin(a) * r]; }
@@ -581,7 +584,7 @@ export const RadarView = (() => {
       // (sweeping: the strip it's searching along, the arc its cue's on)
       st.visible = (tr.st === 'slew' || tr.st === 'acq') && !!tr.cue;
       if (st.visible) { const c = tr.cue!, sc = su.scans[c.k], pa = st.geometry.attributes.position as THREE.BufferAttribute, qn = su.Q.clone().invert(), v = new T.Vector3();
-        for (let j = 0; j <= 24; j++) { Radar.dirOf(c.ax, c.phi, -sc.fan + 2 * sc.fan * j / 24, v).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o).sub(su.P).applyQuaternion(qn); at(v, v); pa.setXYZ(j, v.x, v.y, v.z); }
+        for (let j = 0; j <= 24; j++) { const e = -sc.fan + 2 * sc.fan * j / 24; if (c.con) conArc(sc, c.con, now, e, v); else Radar.dirOf(c.ax, c.phi, e, v).applyQuaternion(c.q).multiplyScalar(c.r).add(c.o).sub(su.P).applyQuaternion(qn); at(v, v); pa.setXYZ(j, v.x, v.y, v.z); } // (its contact's arc, as it's swept: conArc; a cue with none, where its plot was)
         pa.needsUpdate = true; st.computeLineDistances(); }
     });
     // the search cones: the space a scanner's fan sweeps across its sector, a patch at the edge and the two fans at its sides from
@@ -701,8 +704,8 @@ export const RadarView = (() => {
       let arc: THREE.Vector3[] | null = null;
       if (a.f) pos = a.f.p.clone(); else if (a.c && a.plot) {
         // (one scanner's: it's somewhere on its arc, the fan at its range (where her hull doesn't hide it): the arc drawn, its middle the point to aim at)
-        const sc = su.scans[a.plot.k], ph = phiNow(su, a.plot); pos = Radar.dirOf(sc.ax, ph, 0).multiplyScalar(a.plot.r).add(sc.at); arc = [];
-        for (let j = 0; j <= 16; j++) { const e = -sc.fan + 2 * sc.fan * j / 16, d = Radar.dirOf(sc.ax, ph, e); if (d.dot(sc.n) < -sc.mask) continue; arc.push(at(d.multiplyScalar(a.plot.r).add(sc.at))); }
+        const sc = su.scans[a.plot.k], ph = phiNow(su, a.plot), cn = a.c; pos = cn ? conArc(sc, cn, now, 0) : Radar.dirOf(sc.ax, ph, 0).multiplyScalar(a.plot.r).add(sc.at); arc = [];
+        for (let j = 0; j <= 16; j++) { const e = -sc.fan + 2 * sc.fan * j / 16, d = cn ? Radar.dirOf(sc.ax, cn.A + cn.vA * (now - cn.t) + sc.off, e) : Radar.dirOf(sc.ax, ph, e); if (d.dot(sc.n) < -sc.mask) continue; if (cn) { arc.push(at(conArc(sc, cn, now, e))); continue; } arc.push(at(d.multiplyScalar(a.plot.r).add(sc.at))); }
       }
       if (!pos) continue;
       let arcL: THREE.Line | undefined;
