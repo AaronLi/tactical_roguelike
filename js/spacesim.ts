@@ -27,6 +27,11 @@ export interface SimRound { p: THREE.Vector3; v: THREE.Vector3; d: number; dmg: 
 export interface SimMissile { id: number; p: THREE.Vector3; v: THREE.Vector3; t: number }
 // her, as the battle sees her: her place, attitude and velocity (the level's frame), her size (a round's hit radius), whether she's
 // docked (nothing hits her) or in the FTL tunnel
+// A torpedo (js/space.ts torpFire): where it is, its velocity and attitude, its phase (0 cold launch, 1 RCS turn, 2 on the datalink,
+// 3 on its own radar), its age, the fix it was sent at (fus) and where it has the target (est, ev), the side it moves off to, whose it
+// is (mine: this side flies it; another's is dead-reckoned), what its seeker's locked on, its motor (thr 0..1) and RCS (rcs), its
+// smoothed lateral demand (lf), its radar target (rt)
+export interface SimTorp { id: number; p: THREE.Vector3; v: THREE.Vector3; q: THREE.Quaternion; ph: number; t: number; fus: string; est: THREE.Vector3; ev: THREE.Vector3; side: THREE.Vector3; mine: boolean; lock: string; rt: RTarget; thr: number; rcs: boolean; lf: THREE.Vector3; zm?: ZMem; dbg?: any }
 export interface SimShip { P: THREE.Vector3; Q: THREE.Quaternion; V: THREE.Vector3; size: number; docked: boolean; ftl: boolean }
 
 import { Radar, RSuite, RTarget } from './radar.js';
@@ -158,5 +163,87 @@ export const SpaceSim = (() => {
     }
     return out;
   }
-  return { zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep };
+  // ---------------------------------------------------------------- torpedoes
+  // One tube under her keel. A cold launch: pushed out of the tube downward at eject and coasting clear (cold); then its RCS thrusters
+  // move it off to the side away from her and turn its nose onto the target; then its main motor lights. It flies on her sensors'
+  // picture of the target (the fix it was sent at: a datalink), dead reckoning when she loses it, till it's within seek; then on its
+  // own radar (seekStep). Proportional navigation (N), the motor (burn, m/s²) along its nose only, the RCS (rcsA) across it
+  const TORP = { loads: Infinity, eject: 7, cold: 1.1, rcsA: 7, turn: 1.1, turn2: 1.6, off: 0.6, turnT: 3, offT: 1.3, blast: 15, burn: 150, vc: 700, N: 4, seek: 2000, cone: 0.35, dop: 80, gate: 300, life: 90, r: 3, send: 0.1 };
+  // its own radar: the strongest return inside its cone and range gate, closing at about the rate the target's expected to (chaff,
+  // falling behind, isn't), not behind a rock
+  function seekStep(tp: SimTorp, tg: RTarget[]): RTarget | null {
+    const to = tp.est.clone().sub(tp.p), R = to.length(); if (R < 1) return null; to.divideScalar(R);
+    let best: RTarget | null = null, bs = 0;
+    for (const t of tg) {
+      if (t.id === 'own' || t.id.startsWith('torp')) continue;
+      const d = t.p.clone().sub(tp.p), r = d.length(); if (r < 1 || Math.abs(r - R) > TORP.gate || d.divideScalar(r).dot(to) < Math.cos(TORP.cone)) continue;
+      if (Math.abs(t.v.clone().sub(tp.v).dot(d) - tp.ev.clone().sub(tp.v).dot(to)) > TORP.dop) continue;
+      if (Radar.blocked(tp.p, t.p, t.id)) continue;
+      const s = (t.iso != null ? t.iso : Radar.rcsToward(t, tp.p)) / (r * r * r * r); if (s > bs) { bs = s; best = t; }
+    }
+    return best;
+  }
+  // has it met something (its proximity fuse): a hull by her box (hb: the mission ship's footprint), a ship by her size, anything small
+  // within a few metres (rocks by their radius)
+  function torpFuse(tp: SimTorp, p0: THREE.Vector3, tg: RTarget[], hb: { x0: number; x1: number; z0: number; z1: number } | null, R: SimRocks): RTarget | null {
+    for (const t of tg) {
+      if (t.id === 'own' || t.id.startsWith('torp')) continue;
+      if (t.id === 'hull' && hb) { const y = t.p.y, x = tp.p.x, z = tp.p.z; if (x > hb.x0 - 4 && x < hb.x1 + 4 && z > hb.z0 - 4 && z < hb.z1 + 4 && Math.abs(tp.p.y - y) < 25) return t; continue; }
+      const Rr = t.id.startsWith('trf') ? 30 : t.id.startsWith('rock') ? (R.r.get(t.id) || 30) : 7, seg = tp.p.clone().sub(p0), w = t.p.clone().sub(p0), L2 = seg.lengthSq(), k = L2 > 0 ? Math.max(0, Math.min(1, w.dot(seg) / L2)) : 0;
+      if (w.addScaledVector(seg, -k).length() < Rr) return t;
+    }
+    return null;
+  }
+  // a torpedo a step. Another side's: on as it goes (put right by its owner's word). This side's: guided (fix: where her sensors have
+  // the target it was sent at now, or null), moved, its fuse tried. Returns what it hit, 'spent' (flown its life), or null
+  function torpStep(Z: SimZone | null, tp: SimTorp, dt: number, c: { tg: RTarget[]; fix: { pl: THREE.Vector3; v: THREE.Vector3 } | null; shipP: THREE.Vector3; shipQ: THREE.Quaternion; hb: { x0: number; x1: number; z0: number; z1: number } | null; R: SimRocks }): RTarget | 'spent' | null {
+    tp.t += dt; const p0 = tp.p.clone();
+    if (!tp.mine) { zstep(Z, tp.p, tp.v, dt, tp.zm || (tp.zm = zmem())); return null; }
+    if (c.fix) { tp.est.copy(c.fix.pl); tp.ev.copy(c.fix.v); } else tp.est.addScaledVector(tp.ev, dt);
+    if (tp.est.distanceTo(tp.p) < TORP.seek && tp.ph >= 2) { const sk = seekStep(tp, c.tg); if (sk) { tp.est.copy(sk.p); tp.ev.copy(sk.v); tp.lock = sk.id; tp.ph = 3; } }
+    const rel = tp.est.clone().sub(tp.p), R = rel.length(), u = rel.clone().divideScalar(Math.max(1, R)), vrel = tp.ev.clone().sub(tp.v), vc = -vrel.dot(u);
+    const nose = new T.Vector3(0, 0, -1).applyQuaternion(tp.q);
+    if (tp.ph === 0 && tp.t > TORP.cold) {
+      tp.ph = 1; const sf = new T.Vector3(0, 0, -1).applyQuaternion(c.shipQ); tp.side.copy(u).addScaledVector(sf, -u.dot(sf)); if (tp.side.lengthSq() < 0.01) tp.side.set(1, 0, 0).applyQuaternion(c.shipQ); tp.side.normalize(); // (off to the side of her path, the target's side)
+    }
+    const acc = new T.Vector3();
+    if (tp.ph === 1) {
+      acc.copy(tp.side).multiplyScalar(TORP.rcsA); tp.rcs = true; tp.thr = 0;
+      const aim = u, ang = nose.angleTo(aim); if (ang > 1e-3) { const k = Math.min(1, TORP.turn * dt / ang); tp.q.slerp(new T.Quaternion().setFromUnitVectors(new T.Vector3(0, 0, -1), nose.clone().lerp(aim, k).normalize()), 1); }
+      if ((ang < 0.1 && tp.t > TORP.cold + 1.2 && tp.p.distanceTo(c.shipP) > 35) || tp.t > TORP.cold + 6) tp.ph = 2;
+    } else if (tp.ph >= 2) {
+      // proportional navigation: across the line of sight, N times the closing speed times its turning rate (smoothed: the fix it's
+      // flying on jitters); the motor when it's closing too slowly or the turn's more than the RCS can push, its nose at the angle
+      // off the line of sight that gives the turn asked for; otherwise the motor's off, the nose on the target, the RCS across
+      const om = rel.clone().cross(vrel).divideScalar(Math.max(1, R * R)), lat = om.clone().cross(u).multiplyScalar(TORP.N * Math.max(vc, 50));
+      if (lat.length() > TORP.burn) lat.setLength(TORP.burn);
+      tp.lf.lerp(lat, 1 - Math.exp(-dt * (tp.ph === 3 ? 8 : 3))); lat.copy(tp.lf);
+      const latN = lat.length(), needLat = latN > TORP.rcsA * (tp.ph === 3 ? 1 : 2), main0 = needLat || vc < TORP.vc;
+      const want = main0 ? lat.clone().addScaledVector(u, Math.sqrt(Math.max(0, TORP.burn * TORP.burn - latN * latN))) : lat.clone();
+      const main = main0, aim = main ? want.clone().normalize() : u.clone();
+      { const lim = tp.ph === 3 ? TORP.offT : TORP.off, off = aim.angleTo(u); if (off > lim) { const ax = u.clone().cross(aim); if (ax.lengthSq() > 1e-8) aim.copy(u).applyAxisAngle(ax.normalize(), lim); } }
+      const ang = nose.angleTo(aim);
+      if (ang > 1e-4) { const ax = nose.clone().cross(aim); if (ax.lengthSq() < 1e-8) ax.set(1, 0, 0).applyQuaternion(tp.q); tp.q.premultiply(new T.Quaternion().setFromAxisAngle(ax.normalize(), Math.min(ang, (tp.ph === 3 ? TORP.turnT : TORP.turn2) * dt))); }
+      const n2 = new T.Vector3(0, 0, -1).applyQuaternion(tp.q), push = main && n2.angleTo(aim) < 0.35 ? Math.max(0, Math.min(TORP.burn, want.dot(n2))) : 0;
+      acc.copy(n2).multiplyScalar(push);
+      const rest = want.clone().addScaledVector(n2, -push); rest.addScaledVector(n2, -rest.dot(n2)); if (rest.length() > TORP.rcsA) rest.setLength(TORP.rcsA); acc.add(rest);
+      tp.thr = push / TORP.burn; tp.rcs = ang > 0.03 || rest.length() > 1.5;
+      tp.dbg = { R, vc, om: om.length(), raw: om.clone().cross(u).multiplyScalar(TORP.N * Math.max(vc, 50)).length(), lat: lat.length(), got: acc.clone().addScaledVector(u, -acc.dot(u)).length(), nose: n2.angleTo(u), ph: tp.ph }; // (the debug's: the turn asked for (raw, and smoothed: lat) against what it got across its line of sight)
+    }
+    tp.v.addScaledVector(acc, dt); zstep(Z, tp.p, tp.v, dt, tp.zm || (tp.zm = zmem()));
+    if (tp.ph >= 2) { const hit = torpFuse(tp, p0, c.tg, c.hb, c.R); if (hit) return hit; }
+    if (tp.t > TORP.life) return 'spent';
+    return null;
+  }
+  // a round's step a..b meeting a torpedo of this side's (both moving): returns the torpedo it met
+  function roundMeetsTorp(torps: SimTorp[], a: THREE.Vector3, b: THREE.Vector3, dt: number): SimTorp | null {
+    for (const tp of torps) {
+      if (!tp.mine) continue;
+      const c1 = tp.p, c0 = tp.p.clone().addScaledVector(tp.v, -dt), r0 = a.clone().sub(c0), seg = b.clone().sub(c1).sub(r0), L2 = seg.lengthSq(), k = L2 > 0 ? Math.max(0, Math.min(1, -r0.dot(seg) / L2)) : 0;
+      if (r0.addScaledVector(seg, k).length() < TORP.r) return tp;
+    }
+    return null;
+  }
+  const torpTargets = (torps: SimTorp[]) => torps.map((tp) => { tp.rt.v.copy(tp.v); tp.rt.p.copy(tp.p); tp.rt.q.copy(tp.q); return tp.rt; });
+  return { zone, zmem, zoneReset, zoneAt, fieldAt, zstep, zturn, rocks, rocksReset, rocksStep, rockOn, aiNotch, ROCK_NEAR, fireRound, roundsStep, missilesStep, TORP, seekStep, torpFuse, torpStep, roundMeetsTorp, torpTargets };
 })();
