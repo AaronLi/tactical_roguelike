@@ -972,7 +972,7 @@ export const SpaceSv = (() => {
     const docked = kind === 'hub' ? !!st.ship.docked : !!(M && M.docked);
     if (kind === 'hub' && docked) SvBattle.repair(); // (docked at home: her hull made good, as the page has it)
     // (her helm's: the fleet, the board's anchors, the pods on the hull, docking as the pilot's page asked it to: dock)
-    const hc = { fleet: st.fleet, board: st.board, gone: (i: number) => goneOf(st.board).includes(i), raid: (M && M.raid) || [], dock: (on: boolean, at?: number[]) => { if (st.ship.ctl) dock(on, st.ship.ctl, at); return sv.phase === 'shop' ? !!st.ship.docked : !!(st.M && st.M.docked); }, shipName: (M && M.ms && M.ms.name) || 'THE SHIP' };
+    const hc = { fleet: st.fleet, board: st.board, gone: (i: number) => goneOf(st.board).includes(i), raid: (M && M.raid) || [], done: !!(M && M.done), dock: (on: boolean, at?: number[]) => { if (st.ship.ctl) dock(on, st.ship.ctl, at); return sv.phase === 'shop' ? !!st.ship.docked : !!(st.M && st.M.docked); }, shipName: (M && M.ms && M.ms.name) || 'THE SHIP' };
     SvBattle.step(bat, dt, sv.stepN, crew, docked, board ? board.Z.zt : 0, (kk) => { const c = sv.ctxs.get(kk); return c ? (c.sv.map as any) || null : null; }, hc); // (a zone ship's level, made: her real hull for the radars)
     SvBattle.out(bat, sv.stepN, board ? board.Z.zt : 0, (m) => net().broadcast(m), (b, ch) => net().fast(null, b, ch));
     // (her hull gone, by the server's count: the drive jumps her home by itself, as the pilot's page did (js/space.ts damage))

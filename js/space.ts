@@ -28,7 +28,7 @@ import { RadarView } from './radarview.js';
 import { SuiteView } from './suiteview.js';
 import { SpaceSim, ZMem, SimShip, SimChaff, FlyIn, FB } from './spacesim.js';
 import { SpaceNet, SssMsg, SevMsg } from './spacenet.js';
-import { helmOf, helmCopy, helmSame, helmPack, helmUnpack, HelmEv, HelmIn, HelmThen, hubPlace, boardPlace, boardMove, assaultPlace } from './helm.js';
+import { helmOf, helmCopy, helmSame, helmDiff, helmPack, helmUnpack, HelmEv, HelmIn, HelmThen, hubPlace, boardPlace, boardMove, assaultPlace } from './helm.js';
 // The game in space, on a screen (docs/space.md; the host's side is js/spaceserver.ts, what's drawn js/shipmodel.ts, the
 // panels js/spaceui.ts). The squad's ship stands in the level at her BERTH: on the pad in the hangar, nose-on to the hull
 // of a ship she's boarding, on the landing pad outside a base. Her deck is solid there (js/spacedata.ts boxes, added to the
@@ -1569,7 +1569,7 @@ export const Space = (() => {
     // (the rest is her helm's: js/helm.ts, from this step's input)
     const lk = S.match === 'radar' ? radarLock() : null;
     const I: HelmIn = { h: helm, b: flyIn().b, sx: S.stick.x, sy: S.stick.y, rb: lk ? lk.est.v.clone() : null }; C2.lastI = I;
-    const r = HM.fly(I, dt);
+    const r = HM.step(I, dt); // (with the target's own way followed, and the cloud crossed: js/helm.ts step)
     if (r) { FLYI.ran = true; FLYI.I = r.I; }
   }
   // The plan she's flying, drawn for her pilot: her breaching door's way from where it is to where it meets the hull, as the outline
@@ -1682,7 +1682,7 @@ export const Space = (() => {
   // her), what it does beyond her flight done here (helmEv)
   const HM = helmOf(S, {
     sites: () => siteList(), siteAt: (a) => siteAt(a), tgtR: (w) => tgtR(w as SpWp), fieldAt: (p) => fieldAt(p),
-    zstep: (p, v, dt) => zstep(p, v, dt, shipZ), zturn: (q) => zturn(q), rocks: () => ROCKS, rockList: () => S.rockList, boom: () => !!(S.state && S.state.boom),
+    zstep: (p, v, dt) => zstep(p, v, dt, shipZ), zturn: (q) => zturn(q), rocks: () => ROCKS, rockList: () => S.rockList, boom: () => !!(S.state && S.state.boom), done: () => !!(S.state && S.state.done),
   }, (e) => helmEv(e));
   function helmEv(e: HelmEv) {
     if (C2.replay) return; // (a step flown again: done once already)
@@ -1694,7 +1694,8 @@ export const Space = (() => {
       case 'route': routeDraw(e.pts, e.n); break;
       case 'dmg': damage(e.n, e.why); break;
       case 'rebase': rebase(e.b); break;
-      case 'through': through(e.to); break;
+      case 'through': veilKind('cloud'); Game.veil(true); break; // (the veil down as she goes in: the crossing's her helm's)
+      case 'stage': stage(e.to); S.net = null; Game.veilN = Game.VEIL_SMOOTH; break;
       case 'auto': {
         const t = e.then;
         // (the server, flying her, docks her itself on its own step: js/svbattle.ts helmEv; this page tells it only when it isn't)
@@ -1784,15 +1785,15 @@ export const Space = (() => {
   // page had, it's taken and the steps since flown again from their inputs, each through its own step's zone frame.
   const FLYI = { ran: false, I: null as FlyIn | null }; // (the helm's free flight this step: js/helm.ts fly)
   type C2E = { s: number; I: HelmIn | null; tg: string | null; m: string | null; c: any[]; Z: any; post: any; free: boolean };
-  const C2 = { on: false, hist: [] as C2E[], out: [] as any[], cmd: [] as any[], fixes: 0, acks: 0, err: 0, errMax: 0, states: 0, why: [] as any[], lastI: null as HelmIn | null, replay: false };
-  const c2Want = () => S.on && isCtl() && S.stage !== 'atmo' && !S.ftl; // (docked too: the server undocks her, on the pilot's word)
+  const C2 = { on: false, hist: [] as C2E[], out: [] as any[], cmd: [] as any[], fixes: 0, acks: 0, err: 0, errMax: 0, states: 0, why: [] as any[], whyS: [] as any[], lastI: null as HelmIn | null, replay: false };
+  const c2Want = () => S.on && isCtl() && !S.ftl; // (docked too: the server undocks her, on the pilot's word)
   // (a command of the pilot's, given between steps: told with the next one)
   const helmCmd = (c: any[]) => { if (C2.on) C2.cmd.push(c); };
   // the shadow the page's own step is checked on: her helm state copied, flown by a helm of its own through the same geometry
   const SH: any = { P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(), tv: new T.Vector3(), tvP: new T.Vector3(), Dp: new T.Vector3(), Dq: new T.Quaternion(), berth: { x: 0, y: 0, z: 0, yaw: 0 } };
   const SHZ = zmem();
-  const HM2 = helmOf(SH, { sites: () => siteList(), siteAt: (a) => siteAt(a), tgtR: (w) => tgtR(w as SpWp), fieldAt: (p) => fieldAt(p), zstep: (p, v, dt) => zstep(p, v, dt, SHZ), zturn: (q) => zturn(q), rocks: () => ROCKS, rockList: () => S.rockList, boom: () => !!(S.state && S.state.boom) }, () => {});
-  const shadowOf = (src: any = S, zm = shipZ) => { for (const k of ['kind', 'stage', 'map', 'def', 'fleet', 'wps', 'boxes', 'floorAt', 'ftl', 'state']) SH[k] = (S as any)[k]; helmCopy(SH, src, SHZ, zm); };
+  const HM2 = helmOf(SH, { sites: () => siteList(), siteAt: (a) => siteAt(a), tgtR: (w) => tgtR(w as SpWp), fieldAt: (p) => fieldAt(p), zstep: (p, v, dt) => zstep(p, v, dt, SHZ), zturn: (q) => zturn(q), rocks: () => ROCKS, rockList: () => S.rockList, boom: () => !!(S.state && S.state.boom), done: () => !!(S.state && S.state.done) }, () => {});
+  const shadowOf = (src: any = S, zm = shipZ) => { for (const k of ['kind', 'map', 'def', 'fleet', 'boxes', 'ftl', 'state']) SH[k] = (S as any)[k]; SH.stage = src.stage; SH.wps = S.wps.map((w) => ({ ...w })); SH.floorAt = S.floorAt ? (x: number, z: number) => S.floorAt!(x, z) : null; helmCopy(SH, src, SHZ, zm); };
   // (where the last step left her: anything that's moved her since (a level's change, a rebase, a test) but the pilot's commands makes
   // this step's entry her state)
   const LAST: any = { P: new T.Vector3(), Q: new T.Quaternion(), V: new T.Vector3(), Wv: new T.Vector3(), stick: new T.Vector2(), tv: new T.Vector3(), tvP: new T.Vector3(), Dp: new T.Vector3(), Dq: new T.Quaternion(), berth: { x: 0, y: 0, z: 0, yaw: 0 } };
@@ -1801,7 +1802,7 @@ export const Space = (() => {
   function c2Pre(): boolean {
     if (c2Want()) {
       // (moved since the last step? the last step's end with the pilot's commands since done on it, the target and match as they are now)
-      if (C2.on) { shadowOf(LAST, LASTZ); SH.tgt = S.tgt; SH.match = S.match; for (const c of C2.cmd) { if (c[0] === 'w') HM2.warpGo(); else if (c[0] === 'l') HM2.land(); else if (c[0] === 'u') { HM2.dock(false); HM2.launchAway(); } else if (c[0] === 't') SH.spin = 0; } moved = !helmSame(SH, S); }
+      if (C2.on) { shadowOf(LAST, LASTZ); SH.tgt = S.tgt; SH.match = S.match; for (const c of C2.cmd) { if (c[0] === 'w') HM2.warpGo(); else if (c[0] === 'l') HM2.land(); else if (c[0] === 'u') { HM2.dock(false); HM2.launchAway(); } else if (c[0] === 't') SH.spin = 0; } moved = !helmSame(SH, S); if (moved && C2.whyS.length < 8) C2.whyS.push({ s: SIM.steps, moved: helmDiff(SH, S) }); }
       shadowOf(); return true;
     }
     if (C2.on) { C2.on = false; C2.hist = []; C2.out = []; C2.cmd = []; Net.toHost({ t: 'sin', off: 1 }); }
@@ -1812,7 +1813,7 @@ export const Space = (() => {
     if (!pre) return;
     const s = SIM.steps, I = C2.lastI, c = C2.cmd; C2.cmd = [];
     let free = false;
-    if (C2.on && I && !moved) { HM2.tgtTrack(h); HM2.fly(I, h); free = helmSame(SH, S); }
+    if (C2.on && I && !moved) { HM2.step(I, h); free = helmSame(SH, S); if (!free && C2.whyS.length < 8) C2.whyS.push({ s, step: helmDiff(SH, S) }); }
     moved = false; helmCopy(LAST, S, LASTZ, shipZ);
     const Z = S.zone ? SpaceSim.zoneCopy(ZS) : null, post = helmPack(S, shipZ), tg = wpId();
     C2.on = true;
@@ -1840,7 +1841,7 @@ export const Space = (() => {
         if (!q.free || !q.I) { helmUnpack(S, q.post, shipZ, siteAt); continue; }
         ZR = q.Z; const j = S.wps.findIndex((w) => w.id === q.tg); if (j >= 0) S.tgt = j; S.match = q.m;
         for (const c of q.c) helmDo(c);
-        HM.tgtTrack(STEP); HM.fly(q.I, STEP); q.post = helmPack(S, shipZ);
+        HM.step(q.I, STEP); q.post = helmPack(S, shipZ);
       }
     } finally { ZR = null; C2.replay = false; }
   }
@@ -1916,10 +1917,10 @@ export const Space = (() => {
       S.t += h;
       zoneStep(); pt = Prof.lap('space: zone', pt);
       const flies = isCtl() || (!S.ctl && Object.keys(Game.roster || {}).length < 2), pre = flies && c2Pre();
-      tgtTrack(h); pt = Prof.lap('space: target', pt);
+      if (!flies) tgtTrack(h); pt = Prof.lap('space: target', pt);
       if (flies) { fly(h); zoneClose(h); c2Post(pre, h); } else { if (S.auto) S.auto = null; follow(h); S.stick.multiplyScalar(Math.exp(-h * 2.2)); }
       pt = Prof.lap('space: flight', pt);
-      ftlStep(h); thruStep(h);
+      ftlStep(h); if (!flies) thruStep(h); // (the pilot's: her helm's, js/helm.ts step)
       doors(h);
       turrets(h); shots(h); pt = Prof.lap('space: doors, turrets, jump', pt);
       ewStep(h); pt = Prof.lap('space: radar & fire control', pt);

@@ -11,6 +11,7 @@ import { Level } from './level.js';
 import { U } from './util.js';
 import { SpaceSim, FlyIn, FB } from './spacesim.js';
 import { HANGAR_ROWS } from './data.js';
+import { Sim } from './sim.js';
 import { asteroidHeight, ASTEROID_R } from './asteroidshape.js';
 
 type SpWp = { id: string; name: string; sub?: string; p: THREE.Vector3; kind: string; i?: number; hide?: boolean };
@@ -24,7 +25,7 @@ export type HelmEv =
   | { k: 'toast'; h: string; b: string; t: number } | { k: 'kick'; a: number } | { k: 'pose' }
   | { k: 'plan'; p: any } | { k: 'route'; pts: THREE.Vector3[]; n: THREE.Vector3 }
   | { k: 'dmg'; n: number; why: string } | { k: 'rebase'; b: { x: number; y: number; z: number; yaw: number; pt?: number } }
-  | { k: 'auto'; then: HelmThen } | { k: 'through'; to: 'orbit' | 'atmo' };
+  | { k: 'auto'; then: HelmThen } | { k: 'through'; to: 'orbit' | 'atmo' } | { k: 'stage'; to: 'orbit' | 'atmo' }; // (through: the cloud's edge met, the veil down; stage: through it, the other place shown)
 // the level's geometry and frame, as the caller has them
 export interface HelmG {
   sites: () => ShSite[]; // (every site she could be breached through now: js/space.ts siteList)
@@ -36,6 +37,7 @@ export interface HelmG {
   rocks: () => { near: number[]; p: THREE.Vector3[]; v: THREE.Vector3 };
   rockList: () => { r: number }[];
   boom: () => boolean; // (the mission ship blowing herself apart: no breaching her)
+  done?: () => boolean; // (the mission's done: up out of the cloud, the anchor's what she steers for)
 }
 export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
   const T = THREE;
@@ -412,8 +414,8 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
       }
     }
     if (S.kind === 'assault') {
-      if (S.stage === 'orbit') { const e = (S.wps as SpWp[]).find((w) => w.id === 'entry'); if (e && S.P.distanceTo(e.p) < 700) ev({ k: 'through', to: 'atmo' }); }
-      else if (S.P.y > 1500 && S.V.y > 0) ev({ k: 'through', to: 'orbit' });
+      if (S.stage === 'orbit') { const e = (S.wps as SpWp[]).find((w) => w.id === 'entry'); if (e && S.P.distanceTo(e.p) < 700) through('atmo'); }
+      else if (S.P.y > 1500 && S.V.y > 0) through('orbit');
     }
   }
   // an eased move to a pose (setting down, lifting off, the last of a breach), then what follows
@@ -428,6 +430,28 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     if (u >= 1) { S.auto = null; if (a.then.k === 'breach' || a.then.k === 'land') dock(true); ev({ k: 'auto', then: a.then }); } // (laid in the hole or set down: docked; the rest of what follows it, the caller's)
   }
   // she's against it (or off it): her flight's part (the page's: her inner door, her solids, who's seen)
+  // Down through the cloud (or up out of it): the veil comes down (the page's), and once it's down (THRU: the wipe on, and a frame or
+  // so), she's in the other place: the stage changed (what's shown and steered for with it), and she comes out of the cloud where its
+  // other side is, headed down to the base or up to the anchor
+  const THRU = (Sim.VEIL_MS + 250) / 1000;
+  function through(to: 'orbit' | 'atmo') {
+    if (S.stage === to || (S.thru && S.thru.to === to && S.thru.map === S.map)) return; // (once: the veil's coming down already)
+    S.thru = { to, map: S.map, left: THRU }; ev({ k: 'through', to });
+  }
+  function thruStep(dt: number) {
+    const th = S.thru; if (!th) return;
+    if (th.map !== S.map) { S.thru = null; return; }
+    if ((th.left -= dt) > 0) return;
+    S.thru = null; const to = th.to, atmo = to === 'atmo';
+    S.stage = to;
+    for (const w of S.wps as SpWp[]) w.hide = w.kind === 'lz' ? !atmo : atmo;
+    S.tgt = (S.wps as SpWp[]).findIndex((w) => !w.hide && (atmo ? w.kind === 'lz' : G.done && G.done() ? w.kind === 'anchor' : w.kind === 'entry'));
+    if (atmo) { S.P.set(S.berth.x + 500, 900, S.berth.z + 900); const d = new T.Vector3(-0.42, -0.5, -0.75).normalize(); S.Q.copy(lookQ(d)); S.V.copy(d).multiplyScalar(90); }
+    else { const o = (S.wps as SpWp[]).find((w) => w.id === 'entry')!.p, a = (S.wps as SpWp[]).find((w) => w.id === 'out')!.p; S.P.copy(o).lerp(a, 0.25); const d = a.clone().sub(S.P).normalize(); S.Q.copy(lookQ(d)); S.V.copy(d).multiplyScalar(120); }
+    ev({ k: 'stage', to });
+  }
+  // a step of her helm: the target's own way followed, her flight, the cloud crossed
+  function step(I: HelmIn, dt: number) { tgtTrack(dt); const r = fly(I, dt); thruStep(dt); return r; }
   function dock(on: boolean) {
     S.brLock = null; S.brRound = null;
     S.docked = on;
@@ -444,7 +468,7 @@ export function helmOf(S: any, G: HelmG, ev: (e: HelmEv) => void) {
     S.P.copy(S.Dp); S.Q.copy(S.Dq);
     auto(away, S.Dq, S.kind === 'board' ? 2.5 : 3.2, null, { k: 'none' });
   }
-  return { fly, aim, squareUp, roundUp, warpGate, warpGo, warpAim, spinUp, collide, events, auto, autoStep, dock, land, launchAway, lookQ, tgtTrack, dbgBr, ROUND };
+  return { step, through, thruStep, fly, aim, squareUp, roundUp, warpGate, warpGo, warpAim, spinUp, collide, events, auto, autoStep, dock, land, launchAway, lookQ, tgtTrack, dbgBr, ROUND };
 }
 
 // ---------------------------------------------------------------- her helm's state, copied, compared, packed
@@ -460,12 +484,21 @@ export function helmCopy(dst: any, src: any, dzm: ZM, szm: ZM) {
   dst.docked = src.docked; dst.spin = src.spin; dst.cruise = src.cruise; dst.roundBrake = src.roundBrake; dst.brThrust = src.brThrust;
   dst.tv.copy(src.tv); dst.tvP.copy(src.tvP); dst.tvJ = src.tvJ; dst.match = src.match; dst.tgt = src.tgt; dst.shake = src.shake;
   dst.berth = { ...src.berth }; dst.Dp.copy(src.Dp); dst.Dq.copy(src.Dq);
-  dst.warp = src.warp ? { ...src.warp } : null;
+  dst.warp = src.warp ? { ...src.warp } : null; dst.thru = src.thru ? { ...src.thru } : null; dst.stage = src.stage;
   const a = src.auto; dst.auto = a ? { ...a, P0: a.P0.clone(), Q0: a.Q0.clone(), P1: a.P1.clone(), Q1: a.Q1.clone(), mid: a.mid ? a.mid.clone() : null } : null;
   const L = src.brLock; dst.brLock = L ? { ...L, q0: L.q0 ? L.q0.clone() : undefined, ra: L.ra ? L.ra.clone() : undefined } : null;
   const R = src.brRound; dst.brRound = R ? { ...R, face: R.face.clone(), E: R.E.clone(), way: R.way.map((q: THREE.Vector3) => q.clone()), ra: R.ra ? R.ra.clone() : undefined } : null;
 }
 const siteKey = (s: any) => (s ? [s.c, s.nx, s.nz] : null);
+/** what differs between two helm states (for the step scripts: why a step wasn't the shadow's) */
+export function helmDiff(a: any, b: any) {
+  const out: string[] = [], vq = (k: string) => { if (!a[k].equals(b[k])) out.push(k); };
+  ['P', 'Q', 'V', 'Wv', 'tv', 'Dp', 'Dq'].forEach(vq);
+  for (const k of ['docked', 'spin', 'cruise', 'tvJ', 'match', 'tgt', 'stage']) if (a[k] !== b[k]) out.push(k);
+  for (const k of ['auto', 'warp', 'brLock', 'brRound', 'thru']) if (!!a[k] !== !!b[k]) out.push(k);
+  if (a.thru && b.thru && a.thru.left !== b.thru.left) out.push('thru.left');
+  return out;
+}
 /** whether two helm states are the same (to the bit: the page's own step against its shadow's) */
 export function helmSame(a: any, b: any) {
   if (!(a.P.equals(b.P) && a.Q.equals(b.Q) && a.V.equals(b.V) && a.Wv.equals(b.Wv))) return false;
@@ -473,6 +506,7 @@ export function helmSame(a: any, b: any) {
   if (!!a.auto !== !!b.auto || !!a.warp !== !!b.warp || !!a.brLock !== !!b.brLock || !!a.brRound !== !!b.brRound) return false;
   if (a.auto && (a.auto.t !== b.auto.t || a.auto.then.k !== b.auto.then.k)) return false;
   if (a.warp && (a.warp.u !== b.warp.u || a.warp.t !== b.warp.t)) return false;
+  if (a.stage !== b.stage || !!a.thru !== !!b.thru || (a.thru && a.thru.left !== b.thru.left)) return false;
   const sk = (x: any) => x.c + ',' + x.nx + ',' + x.nz;
   if (a.brLock && (sk(a.brLock.site) !== sk(b.brLock.site) || a.brLock.hard !== b.brLock.hard || a.brLock.fa !== b.brLock.fa)) return false;
   if (a.brRound && (sk(a.brRound.site) !== sk(b.brRound.site) || a.brRound.way.length !== b.brRound.way.length)) return false;
@@ -483,7 +517,7 @@ export function helmPack(S: any, zm: ZM) {
   const a = S.auto, L = S.brLock, R = S.brRound;
   return { P: v3(S.P), Q: q4(S.Q), V: v3(S.V), W: v3(S.Wv), k: [S.stick.x, S.stick.y], z: [...v3(zm.vz), ...v3(zm.v)].map(nn),
     d: S.docked ? 1 : 0, sp: S.spin, cr: S.cruise ? 1 : 0, rb: S.roundBrake ? 1 : 0, bt: S.brThrust ? 1 : 0, tv: v3(S.tv), tvP: v3(S.tvP), tvJ: S.tvJ, m: S.match, tg: S.tgt,
-    be: S.berth, Dp: v3(S.Dp), Dq: q4(S.Dq), w: S.warp,
+    be: S.berth, Dp: v3(S.Dp), Dq: q4(S.Dq), w: S.warp, st: S.stage, th: S.thru ? { to: S.thru.to, left: S.thru.left } : null,
     au: a ? { t: a.t, T: a.T, P0: v3(a.P0), Q0: q4(a.Q0), P1: v3(a.P1), Q1: q4(a.Q1), mid: a.mid ? v3(a.mid) : null, then: a.then } : null,
     bl: L ? { s: siteKey(L.site), hard: L.hard, fa: L.fa, q0: L.q0 ? q4(L.q0) : null, T0: L.T0, rp: L.rp, ra: L.ra ? v3(L.ra) : null } : null,
     br: R ? { s: siteKey(R.site), face: v3(R.face), E: v3(R.E), hard: R.hard, way: R.way.map(v3), ra: R.ra ? v3(R.ra) : null } : null };
@@ -493,6 +527,8 @@ export function helmUnpack(S: any, o: any, zm: ZM, siteAt: (a: number[]) => any)
   S.P.copy(V3(o.P)); S.Q.copy(Q4(o.Q)); S.V.copy(V3(o.V)); S.Wv.copy(V3(o.W)); S.stick.set(o.k[0], o.k[1]); zm.vz.set(un(o.z[0]), un(o.z[1]), un(o.z[2])); zm.v.set(un(o.z[3]), un(o.z[4]), un(o.z[5]));
   S.docked = !!o.d; S.spin = o.sp; S.cruise = !!o.cr; S.roundBrake = !!o.rb; S.brThrust = !!o.bt; S.tv.copy(V3(o.tv)); S.tvP.copy(V3(o.tvP)); S.tvJ = o.tvJ; S.match = o.m; S.tgt = o.tg;
   S.berth = { ...o.be }; S.Dp.copy(V3(o.Dp)); S.Dq.copy(Q4(o.Dq)); S.warp = o.w ? { ...o.w } : null;
+  if (o.st && o.st !== S.stage) { S.stage = o.st; const atmo = o.st === 'atmo'; for (const w of S.wps || []) w.hide = w.kind === 'lz' ? !atmo : atmo; }
+  S.thru = o.th ? { to: o.th.to, map: S.map, left: o.th.left } : null;
   const a = o.au; S.auto = a ? { t: a.t, T: a.T, P0: V3(a.P0), Q0: Q4(a.Q0), P1: V3(a.P1), Q1: Q4(a.Q1), mid: a.mid ? V3(a.mid) : null, then: a.then } : null;
   const L = o.bl; S.brLock = L && L.s ? { site: siteAt(L.s), map: S.map, hard: L.hard, fa: L.fa, q0: L.q0 ? Q4(L.q0) : undefined, T0: L.T0, rp: L.rp, ra: L.ra ? V3(L.ra) : undefined } : null;
   const R = o.br; S.brRound = R && R.s ? { site: siteAt(R.s), face: V3(R.face), E: V3(R.E), hard: R.hard, map: S.map, way: R.way.map(V3), ra: R.ra ? V3(R.ra) : undefined } : null;

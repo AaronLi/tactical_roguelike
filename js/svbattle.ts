@@ -20,7 +20,7 @@ import { SpaceNet, SevE } from './spacenet.js';
 
 // a world, with what the server keeps beside it
 // (what the place she's in gives her helm from outside the battle: js/spaceserver.ts battle)
-export type HelmCtx = { fleet: any; board: { seed: number; level: number; picked: number[]; done: number[] }; gone: (i: number) => boolean; raid: number[][]; dock: (on: boolean, at?: number[]) => boolean; shipName: string }; // (dock: done as the host does it; whether she's docked after)
+export type HelmCtx = { fleet: any; board: { seed: number; level: number; picked: number[]; done: number[] }; gone: (i: number) => boolean; raid: number[][]; done: boolean; dock: (on: boolean, at?: number[]) => boolean; shipName: string }; // (dock: done as the host does it; whether she's docked after)
 export interface SvBat {
   W: SimWorld; k: number; map: LvMap | null; ms: SpMission | null; kind: 'board' | 'assault' | 'hub';
   hm?: ReturnType<typeof helmOf>; siteAt?: (a: number[]) => any; clear?: ClearPrep; out0?: THREE.Vector3; // (her helm in this world, its hull's clearance, the anchor's place in the zone)
@@ -83,7 +83,7 @@ export const SvBattle = (() => {
     const Z = () => (W.zone ? W.Z : B.Zi);
     const tgtR = (w: any) => { const m = /^t(\d+)$/.exec(w.id); if (m) { const q = W.traffic.find((x) => x.c.k === +m[1]); const b = q && q.shape ? q.shape : null; return b ? Math.hypot(b.long, b.wide, b.tall) / 2 : 60; } if (w.id === 'ship' && map && map.sp) { const h = map.sp.hull; return Math.hypot(h.x1 - h.x0, h.z1 - h.z0) / 2; } return 0; };
     B.hm = helmOf(HS, { sites, siteAt, tgtR, fieldAt: (p) => SpaceSim.fieldAt(Z(), p, new T.Vector3()), zstep: (p, v, dt) => SpaceSim.zstep(Z(), p, v, dt, HZ), zturn: (q) => SpaceSim.zturn(Z(), q),
-      rocks: () => W.rocks, rockList: () => W.rockList as any, boom: () => !!(W.crew && W.crew.boom) }, (e: HelmEv) => {
+      rocks: () => W.rocks, rockList: () => W.rockList as any, boom: () => !!(W.crew && W.crew.boom), done: () => !!(hctx && hctx.done) }, (e: HelmEv) => {
       if (e.k === 'dmg') hurt(e.n);
       else if (e.k === 'auto' && hctx) { if (e.then.k === 'breach') hctx.dock(true, e.then.at); else if (e.then.k === 'land') hctx.dock(true); }
     });
@@ -104,7 +104,7 @@ export const SvBattle = (() => {
         const j = HS.wps.findIndex((w: any) => w.id === e.tg); if (j >= 0) HS.tgt = j; HS.match = e.m == null ? null : String(e.m);
         for (const c of e.c || []) { if (c[0] === 'w') hm.warpGo(); else if (c[0] === 'l') hm.land(); else if (c[0] === 't') HS.spin = 0; else if (c[0] === 'u' && hctx && !hctx.dock(false)) { hm.dock(false); hm.launchAway(); } } // (u: off her berth, if the host lets her go: everyone aboard)
         const I: HelmIn = { h: !!e.i[0], b: e.i[1] | 0, sx: +e.i[2], sy: +e.i[3], rb: Array.isArray(e.rb) ? new T.Vector3(+e.rb[0], +e.rb[1], +e.rb[2]) : null };
-        hm.tgtTrack(dt); hm.fly(I, dt);
+        hm.step(I, dt);
       }
       FL.ack = FL.next; FL.next++;
     }
@@ -327,7 +327,7 @@ export const SvBattle = (() => {
       crew: W.crew, keep: W.keepTgt, own: suiteSum(W.own), foe: suiteSum(W.foe), fc: W.fc, tg: W.tg.map((t) => t.id), traffic: W.traffic.filter((q) => q.su).map((q) => q.c.k), real: W.traffic.filter((q) => q.shape && q.shape.real).map((q) => ({ k: q.c.k, mean: +q.shape!.rcs.mean.toFixed(3), max: +q.shape!.rcs.max.toFixed(3), sz: +q.shape!.sz.toFixed(2) })),
       guns: W.guns.map((g) => ({ k: g.k, hp: g.hp, bt: +(g.bt || 0).toFixed(2), cool: +(g.cool || 0).toFixed(2) })), rounds: W.rounds.length, mis: W.mis.length, chaff: W.chaff.length,
       torps: W.torps.map((tp) => ({ id: tp.id, mine: tp.mine, ph: tp.ph, t: +tp.t.toFixed(2), fus: tp.fus, lock: tp.lock, r: foeP ? Math.round(tp.p.distanceTo(foeP)) : null, e: foeP ? Math.round(tp.est.distanceTo(foeP)) : null, R: Math.round(tp.est.distanceTo(tp.p)), ev: tp.ev.toArray().map((v) => Math.round(v)), v: tp.v.toArray().map((v) => Math.round(v)), fixed: !!fixOf(W, tp), thr: +tp.thr.toFixed(2), dbg: tp.dbg ? Object.fromEntries(Object.entries(tp.dbg).map(([k, v]) => [k, +(+(v as number)).toFixed(3)])) : null })),
-      marks: Object.fromEntries(B.marks), evc: B.evc, dm: +B.dm.toFixed(2), hp: HP.v, fly: { on: FL.on, go: FL.go, q: FL.q.size, next: FL.next, ack: FL.ack, P: FL.has ? HS.P.toArray().map((v: number) => +v.toFixed(2)) : null }, prof: B.prof.last };
+      marks: Object.fromEntries(B.marks), evc: B.evc, dm: +B.dm.toFixed(2), hp: HP.v, fly: { on: FL.on, go: FL.go, q: FL.q.size, next: FL.next, ack: FL.ack, stage: HS.stage, docked: HS.docked, P: FL.has ? HS.P.toArray().map((v: number) => +v.toFixed(2)) : null }, prof: B.prof.last };
   }
   function reset() { OWN = null; pose = null; poseWas = null; rt = 0; match = null; flyIn({ off: 1 }); HP.v = -1; HP.lost = false; HP.told = false; }
   // her hull, kept by the server while its battle's on (from the pilot's first pose, then by what hits her); at nothing, lost is set once
