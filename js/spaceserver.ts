@@ -7,6 +7,7 @@ import { Server } from './server.js';
 import { ShipGen } from './shipgen.js';
 import { SpaceData } from './spacedata.js';
 import { SvBattle, SvBat } from './svbattle.js';
+import { SuiteView } from './suiteview.js';
 import { World } from './world.js';
 // The host's side of the space direction (docs/space.md), in the simulation's thread with js/server.ts and through its
 // SvNet: the missions board (what's offered this visit, which the squad has picked, which are done), the squad's fleet (the
@@ -964,6 +965,9 @@ export const SpaceSv = (() => {
     const hostile = M.ms.obj === 'defend' ? 0 : M.ms.obj !== 'visit' || M.breached ? 1 : 0;
     SvBattle.step(bat, dt, sv.stepN, { hostile, gn: gunnersLeft(), arm: M.arm == null ? null : Math.ceil(M.arm), boom: M.boom }, M.docked, Z.zt);
     SvBattle.out(bat, sv.stepN, Z.zt, (m) => net().broadcast(m));
+    // (her radars' picture, as the server's battle has it (js/suiteview.ts pack): ten times a second on the fast channel's stream 1, to
+    // everyone aboard (the sensor station, the hologram, the helm's targeting and her marks draw from it); k: which level's frame it's in)
+    if (sv.stepN % 6 === 0 && bat && bat.W.own) { const js = JSON.stringify({ k: bat.k, s: SuiteView.pack(bat.W.own, bat.W.t) }), u8 = new TextEncoder().encode(js); net().fast(null, u8.buffer as ArrayBuffer, 1); }
   }
   const battleIn = (m: any) => SvBattle.request(bat, m); // (a crew request, relayed as before (the pages still run their own battle), and done to the server's)
   const battleSum = () => SvBattle.summary(bat);

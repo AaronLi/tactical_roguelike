@@ -405,8 +405,10 @@ export const Space = (() => {
     for (const el of document.querySelectorAll<HTMLElement>('#holo-scan [data-hb]')) { const r = el.getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom && r.width * r.height < area) { area = r.width * r.height; hit = el; } }
     if (!hit) return false;
     const a = hit.dataset.hb!, kind = a[0], n = parseInt(a.slice(1), 10);
-    if (kind === 'a') { const tt = Radar.sched(own).tts.find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()); trkQuiet(p, !tt.quiet); Net.toHost({ t: 'strk', a: [-1, 7, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1), tt.quiet ? 1 : 0] }); HUD.toast('TRACKERS', tt.n + (tt.quiet ? ': listen only (the camera)' : ': active (radar and camera)'), 1.4); Audio.click(); } return true; }
-    if (kind === 'x') { const tt = Radar.sched(own).tts.find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()); trkDrop(p); Net.toHost({ t: 'strk', a: [-1, 6, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] }); HUD.toast('TRACKERS', tt.n + ' dropped', 1.2); Audio.click(); } return true; }
+    // (the track clicked: in the suite as it's shown (the server's picture, its battle on), sent by where it is)
+    const shownTts = () => { const v = sv(own); return v && v.sched ? v.sched.tts : Radar.sched(own).tts; };
+    if (kind === 'a') { const tt = shownTts().find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()), qu = !tt.quiet; trkQuiet(p, qu); tt.quiet = qu; Net.toHost({ t: 'strk', a: [-1, 7, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1), qu ? 1 : 0] }); HUD.toast('TRACKERS', tt.n + (tt.quiet ? ': listen only (the camera)' : ': active (radar and camera)'), 1.4); Audio.click(); } return true; }
+    if (kind === 'x') { const tt = shownTts().find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()); trkDrop(p); Net.toHost({ t: 'strk', a: [-1, 6, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] }); HUD.toast('TRACKERS', tt.n + ' dropped', 1.2); Audio.click(); } return true; }
     if (kind === 's') { const sc = own.scans[n]; if (!sc) return true; if (SEC.open === n) SEC.open = -1; else { SEC.open = n; SEC.cur = MODES.indexOf(sc.mode); SEC.sel = n; } Audio.click(); }
     else if (kind === 'o' && parseInt(a.split(':')[1], 10) === NOTCH_OPT) { notchSet(n); SEC.open = -1; }
     else if (kind === 'o') { const i = parseInt(a.split(':')[1], 10), sc = own.scans[n]; if (sc && MODES[i]) { modeSet(n, MODES[i], sc.sec.c, sc.sec.h); SEC.open = -1; SEC.sel = MODES[i] === 'sector' ? n : SEC.sel; } }
@@ -630,6 +632,7 @@ export const Space = (() => {
   const SVF = { f: 0, at: new Map<string, { f: number; v: RSuite }>(), mapsAt: new Map<string, number>() };
   function sv(su: RSuite): RSuite; function sv(su: RSuite | null | undefined): RSuite | null;
   function sv(su: RSuite | null | undefined): RSuite | null {
+    if (su && su === EW.own && svbOn() && SVB.own && S.t - SVB.ownAt < 1) return SVB.own; // (the server's battle on: her picture's the server's (svOwn))
     if (!su || !SuiteView.on) return su || null;
     const c = SVF.at.get(su.id); if (c && c.f === SVF.f) return c.v;
     const dbg = !!Radar.show, v = SuiteView.unpack(JSON.parse(JSON.stringify(SuiteView.pack(su, EW.rt, { dbg }))), c ? c.v : null);
@@ -2714,7 +2717,13 @@ export const Space = (() => {
   // The host's worker runs the zone's battle (js/svbattle.ts); a boarding zone's mission ship's weapons are drawn from what it says:
   // her guns (laid, firing, hit) and their rounds (each gun's rounds of a step replayed from its seed: the same rounds the server
   // flies), her missiles, the damage they do. ?pagebattle: the page's own, as before (for comparing)
-  const SVB = { on: !new URLSearchParams(location.search).has('pagebattle'), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0 };
+  const SVB = { on: !new URLSearchParams(location.search).has('pagebattle'), snap: null as ReturnType<typeof SpaceNet.read> | null, n: -1, at: 0, own: null as RSuite | null, ownAt: -1e9 };
+  // her radars' picture from the server's battle (the fast channel's stream 1: js/spaceserver.ts battle): unpacked into the last one
+  // (so what's picked and drawn keeps its identity), its times put on the page's own radar clock as it arrives
+  Net.onFast((buf, ch) => {
+    if (ch !== 1 || !svbOn()) return;
+    try { const m = JSON.parse(new TextDecoder().decode(buf)); if (m.k !== S.zact || !m.s) return; m.s.t = EW.rt; SVB.own = SuiteView.unpack(m.s, SVB.own); SVB.ownAt = S.t; } catch (e) { console.error('space: the picture of her radars from the server', e); }
+  });
   const svbOn = () => SVB.on && S.on && S.kind === 'board' && !!S.hull;
   function svSss(m: SssMsg) {
     if (!svbOn() || m.k !== S.zact) return; // (another level's frame: not this one's)
