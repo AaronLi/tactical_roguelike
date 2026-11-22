@@ -98,14 +98,29 @@ and flown as its owner reports it until it comes onto its datalink, when the ser
 `f: [x, y, z, vx, vy, vz]` on the first `storp`, the fix it was sent at, makes it the server's from launch). Out: `sss` every 3 steps,
 `sev` with it (a gun's rounds a step as `fire`: gun, aim, error, seed, count, flown by `fireRound` on `SpaceNet.rng(seed)`; rounds'
 ends not sent). `G.ServerLink.sworld()` sums the server's world up; tools/space_steps/server_battle.mjs sets it beside the page's.
-Still the page's: her hp, damage, the turrets' rounds, missiles shot down, `smis`; zone ships' real hulls inside 5 km (the server has
-their stand-ins); the hub's world.
+Then the pages stopped running it (2026-11-21, f3cfce7d on): with the server's battle on (a boarding zone; `?pagebattle` for the old
+way), no page steps any radar or fire control; the HUD, the hologram, the sensor station, the helm's targeting, her warning receiver
+and F8 draw the server's pictures (fast streams 1-3). The server keeps her hull (from the pilot's first pose; `sdmg` for what she hits
+herself; at nothing it jumps her home itself), flies her turrets' rounds and decides their hits (`sfire` with its damage:
+js/spacesim.ts shotsStep), takes what she's matched speed with into its notch (`smatch`), swaps a zone ship's real hull in inside 5 km
+once it's made her level (js/svbattle.ts realShape, from js/spaceserver.ts warm), and sends `sss` as bytes on fast stream 4
+(js/spacenet.ts sssBin). Step scripts: hull_server, turret_server, zone_real, torpedo_defence, server_battle (tools/space_steps/).
+Still the page's: the hub's world (no battle there), discrete flight events (the breach, landing, launch, warp, FTL).
 
 ### C2: the pilot's inputs, predicted
 
 The pilot's page sends inputs; it predicts her flight with the same step, and replays its inputs from the server's state when a
 snapshot arrives. Discrete events (the breach, landing, launch, warp, FTL) are the server's. Others aboard draw her interpolated a
 little behind.
+
+Status (2026-11-21, f071ba39, 70dcc5ac, 043bbea7): her free flight is js/spacesim.ts flyStep (flyTurn, flyPush, from a step's FlyIn).
+While the server's battle's on, the pilot's page sends each step (`sin`): its input if the step was flown free (checked against flyStep
+from her state before it, bit for bit), else her state after it (the breach assist, the warp gate's pull, a collision, a rebase: the
+page's still, and the server takes them). The server flies the inputs in order after its world's step (a jitter buffer of three) and
+tells the pilot where it has her (fast stream 5); the pilot's page replays from the server's word when it differs, each step through
+its own recorded zone frame. The others aboard follow the server's pose (in `sss`). tools/space_steps/fly_server.mjs: every ack
+exactly the page's prediction; a falsified one corrected and replayed to the same place. Not yet: the breach, landing and the rest
+decided on the server (the pilot's page still says them); a second player's page checked.
 
 ### E (maybe): the battle in the zone's frame
 
