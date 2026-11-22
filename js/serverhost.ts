@@ -45,7 +45,8 @@ import { Stickers } from './stickers.js';
 //     connection), {k:'join' | 'leave', id} a remote player's connection opened or dropped, {k:'stickers', names} the stickers
 //     there are (js/stickers.ts load, on the page), {k:'digest'} / {k:'stat'} questions (for tests and desync hunting).
 //     Back on it: {k:'ready'} once, {k:'on'} a session's started, {k:'bc', m, x} for every remote player but x, {k:'to', id, m}
-//     for one of them, {k:'rec', name, data} a level's recording, the answers, and {k:'prof'} each second (how long the ticks took).
+//     for one of them, {k:'fast', to, ch, buf} a snapshot (an ArrayBuffer, transferred: to everyone when to is null, the host's own page
+//     too; the page sends it on the remote players' fast channels, js/netfast.ts), {k:'rec', name, data} a level's recording, the answers, and {k:'prof'} each second (how long the ticks took).
 //   cli, the host's own player's port (a new one each session): the same messages any player's game sends and gets over the
 //     network, both ways.
 // It ticks on its own timer, TICK_MS apart, whether or not the page is drawing; each tick runs as many fixed steps of STEP (1/60 s)
@@ -69,6 +70,7 @@ export const ServerHost = {
     ctl.onmessage = (e: MessageEvent) => this.control(e.data);
     Server.net.broadcast = (m, x) => this.broadcast(m, x);
     Server.net.sendTo = (id, m) => this.sendTo(id, m);
+    Server.net.fast = (to, buf, ch) => this.fast(to, buf, ch);
     Recorder.out = (name, data) => this.ctl!.postMessage({ k: 'rec', name, data }); // (a level's recording: js/recorder.ts)
     ctl.postMessage({ k: 'ready' });
   },
@@ -133,6 +135,14 @@ export const ServerHost = {
     this.tag(m);
     if (id === this.id) { if (this.cli) this.post(this.cli, m); }
     else if (this.remotes.has(id)) this.post(this.ctl!, { k: 'to', id, m });
+  },
+  // A high-rate snapshot (docs/space-server.md, C1): bytes (js/snapcodec.ts), to one player (to: an id) or everyone (null), on
+  // stream ch (0-255: each its own newest, as it arrives). The buffer is handed over (transferred): it's gone from here after.
+  // Over the network it's unreliable: a snapshot can be lost, or dropped for a newer one; never late or half.
+  fast(to: string | null, buf: ArrayBuffer, ch = 0) {
+    if (!this.on || !this.ctl) return;
+    if (to !== null && to !== this.id && !this.remotes.has(to)) return;
+    this.ctl.postMessage({ k: 'fast', to, ch, buf }, [buf]);
   },
   // A message is copied across (structured clone). One that can't be (a function in it, say) goes as the network has it, through
   // JSON: what a remote player would get. (Said once a kind, so it can be put right.)
