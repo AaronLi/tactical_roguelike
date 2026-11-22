@@ -77,6 +77,10 @@ tools/vm_game.mjs), a world from a scenario, scripted pilot / sensor operator / 
 A golden of its own, and metrics over many seeds (time to a first track, torpedoes shot down, damage taken). `npm run test:space`.
 Its fingerprint must match the browser's for the same scenario: the proof the page no longer feeds outcomes.
 
+Status (2026-11-21): tools/space_sim.mjs runs it (scenarios `pd`, `approach`; `--metrics N` the point-defence table), golden
+tests/space-golden-node.json, `npm run test:space`. About 30-37 sim s per wall s for one battle on one thread (a run a worker
+thread: its own three and vm), ~110x over 12 threads. Not yet compared against the page's fingerprint for the same scenario.
+
 ### C1: in the worker, the server authoritative for combat
 
 The world in SpaceSv (one per zone, and the hub's), stepped once per server step (not once per level context). Its events go to
