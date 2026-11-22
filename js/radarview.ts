@@ -626,7 +626,7 @@ export const RadarView = (() => {
         const slots = [1, 0].map((ti, j) => {
           const tr = su.trks[ti]; if (!tr) return ''; const j0 = tr.job, col = tr.off ? '#5f6f78' : j0 ? pc(Radar.jobPri(j0)) : '#9fc2d4', prog = j0 ? Radar.jobProg(su, tr, now) : 0;
           const what = tr.off ? 'OFF' : j0 ? Radar.jobName(j0) : 'IDLE', how = tr.off ? 'switched off' : j0 ? (tr.st === 'slew' ? 'slewing' : tr.st === 'track' ? 'locked' : tr.st === 'acq' ? 'searching' : '') : 'free';
-          return `<div data-hb="t${ti}" style="flex:1 1 0;min-width:150px;padding:3px 7px;border:1px solid ${col}66;border-left:3px solid ${col};background:rgba(4,12,18,0.4)"><div><span style="color:#ffb040">${j + 3} ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span data-hb="p${ti}" style="float:right;color:${col}">${what}</span></div>`
+          return `<div data-hb="t${ti}" style="flex:1 1 0;min-width:150px;padding:3px 7px;border:1px solid ${col}66;border-left:3px solid ${col};background:rgba(4,12,18,0.4)"><div><span style="color:#ffb040">${j + 3} ${tr.side > 0 ? 'STBD' : 'PORT'}</span> <span style="float:right;color:${col}">${what}</span></div>`
             + `<div style="height:5px;margin:3px 0;background:rgba(120,180,210,0.15)"><div style="height:5px;width:${(prog * 100).toFixed(1)}%;background:${col}"></div></div><div style="font-size:11px;color:#7f9fb0">${how}</div></div>`;
         }).join('') + (() => { // (and the camera: what it's looking at, through which quarter's camera, how big the target is in its picture)
           const o = su.opt; if (!o) return ''; const j0 = o.job, col = o.off ? '#5f6f78' : j0 ? '#8dffbe' : '#9fc2d4', prog = Radar.optProg(su, now);

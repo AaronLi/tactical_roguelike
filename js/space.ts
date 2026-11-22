@@ -330,18 +330,12 @@ export const Space = (() => {
     // (the crew told of a sector the keys have changed: five times a second at most)
     if (SEC.dirty >= 0 && S.t - SEC.sent > 0.2) { const sc = EW.own.scans[SEC.dirty]; Net.toHost({ t: 'ssec', a: ssecOf(SEC.dirty, sc) }); SEC.sent = S.t; SEC.dirty = -1; }
   }
-  // a tracker switched off (silent: it lets go of what it had and takes no cue) or on (told to everyone aboard: strk)
-  function trkOff(ti: number, off: boolean, quiet = false) {
-    const tr = EW.own && EW.own.trks[ti]; if (!tr) return;
-    if (off) Radar.drop(tr); tr.off = off;
-    if (!quiet) { Net.toHost({ t: 'strk', a: [ti, 0, off ? 1 : 0] }); Audio.click(); HUD.toast('TRK ' + (tr.side > 0 ? 'STBD' : 'PORT'), off ? 'off' : 'on', 1.2); }
-  }
   // A left click on a radar warning's chevron in the hologram: a tracker sent along its bearing (the one picked, or the one that
   // can see that way). A left click on a track with a tracker picked: that one sent on it. Nowhere else: a tracker's sent on
   // something, a track or a radar it can hear, not at an empty place.
   // A left click on the boxes in the corner (js/radarview.ts holo, data-hb): a scanner's box opens its list of modes (and it's the
-  // one W A S D work), or closes it; a mode in the list sets it; a tracker's box picks it to be sent (again: not); its state
-  // switches it off or on
+  // one W A S D work), or closes it; a mode in the list sets it; a tracker's box does nothing (the scheduler sends them, and they
+  // can't be switched off)
   function boxClick(x: number, y: number): boolean {
     const own = EW.own; if (!own) return false;
     let hit: HTMLElement | null = null, area = Infinity;
@@ -350,13 +344,11 @@ export const Space = (() => {
     const a = hit.dataset.hb!, kind = a[0], n = parseInt(a.slice(1), 10);
     // (the track clicked: in the suite as it's shown (the server's picture, its battle on), sent by where it is)
     const shownTts = () => { const v = sv(own); return v && v.sched ? v.sched.tts : Radar.sched(own).tts; };
-    if (kind === 'a') { const tt = shownTts().find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()), qu = !tt.quiet; tt.quiet = qu; Net.toHost({ t: 'strk', a: [-1, 7, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1), qu ? 1 : 0] }); HUD.toast('TRACKERS', tt.n + (tt.quiet ? ': listen only (the camera)' : ': active (radar and camera)'), 1.4); Audio.click(); } return true; }
-    if (kind === 'x') { const tt = shownTts().find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()); Net.toHost({ t: 'strk', a: [-1, 6, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1)] }); HUD.toast('TRACKERS', tt.n + ' dropped', 1.2); Audio.click(); } return true; }
+    if (kind === 'a') { const tt = shownTts().find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()), qu = !tt.quiet; tt.quiet = qu; Net.toHost({ t: 'strk', a: [-1, 7, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1), qu ? 1 : 0, tt.n] }); HUD.toast('TRACKERS', tt.n + (tt.quiet ? ': listen only (the camera)' : ': active (radar and camera)'), 1.4); Audio.click(); } return true; }
+    if (kind === 'x') { const tt = shownTts().find((q) => q.n === a.slice(1)); if (tt) { const p = tt.kf.pos(new T.Vector3()); Net.toHost({ t: 'strk', a: [-1, 6, +p.x.toFixed(1), +p.y.toFixed(1), +p.z.toFixed(1), tt.n] }); HUD.toast('TRACKERS', tt.n + ' dropped', 1.2); Audio.click(); } return true; }
     if (kind === 's') { const sc = own.scans[n]; if (!sc) return true; if (SEC.open === n) SEC.open = -1; else { SEC.open = n; SEC.cur = MODES.indexOf(sc.mode); SEC.sel = n; } Audio.click(); }
     else if (kind === 'o' && parseInt(a.split(':')[1], 10) === NOTCH_OPT) { notchSet(n); SEC.open = -1; }
     else if (kind === 'o') { const i = parseInt(a.split(':')[1], 10), sc = own.scans[n]; if (sc && MODES[i]) { modeSet(n, MODES[i], sc.sec.c, sc.sec.h); SEC.open = -1; SEC.sel = MODES[i] === 'sector' ? n : SEC.sel; } }
-    else if (kind === 't') { /* (a tracker's box: nothing to pick, the scheduler sends them) */ }
-    else if (kind === 'p') { const tr = own.trks[n]; if (tr) trkOff(n, !tr.off); }
     return true;
   }
   // A left click in the hologram, now her trackers are scheduled (js/radar.ts schedule): on a track, it's kept tracked (her operator's
@@ -2428,9 +2420,7 @@ export const Space = (() => {
         return true;
       }
       case 'ssec': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && (m.a.length === 4 || m.a.length === 5)) modeSet(m.a[0] | 0, MODES[m.a[1] | 0] || 'round', +m.a[2], +m.a[3], true, m.a.length === 5 ? !!m.a[4] : undefined); return true;
-      case 'strk': if (S.on && m.by !== Net.myId && Array.isArray(m.a) && EW.own) { const ti = m.a[0] | 0, tr = EW.own.trks[ti]; // (the sensor operator's tracker switched off or on (trkOff): kept here as the crew set it)
-        if (m.a[1] === 0 && tr) trkOff(ti, !!m.a[2], true);
-      } return true; // (a track kept, let go, made listen only, a bearing searched: the server's, shown in its picture)
+      case 'strk': return true; // (a track kept, let go, made listen only, a bearing searched: the server's, shown in its picture)
       case 'sxpdr': if (S.on && m.by !== Net.myId) xpdr(!!m.on); return true;
       case 'schaff': if (S.on && m.by !== Net.myId && Array.isArray(m.a)) chaffOut(m.a); return true;
       case 'sfire': if (S.on && m.by !== Net.myId && S.root) shot(new T.Vector3(m.a[0], m.a[1], m.a[2]), new T.Vector3(m.a[3], m.a[4], m.a[5]), m.a[6], !!m.a[7]); return true; // (another's round: drawn)

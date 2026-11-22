@@ -327,10 +327,16 @@ export const SvBattle = (() => {
       case 'sxpdr': if (OWN) OWN.xpdr = !!m.on; if (W) W.xpdr = !!m.on; break;
       case 'srcue': { if (!own) break; if (a[0] < 0) { for (const t of own.trks) Radar.drop(t); break; } Radar.cue(own, { k: a[0] | 0, phi: +a[1], r: +a[2], t: W ? W.t : 0, db: 0, id: '', e: 0 }); break; }
       case 'strk': {
-        if (!own) break; const ti = a[0] | 0, tr = own.trks[ti], now = W ? W.t : 0, P = W ? W.ship.P : new T.Vector3();
-        if (a[1] === 0 && tr) { if (a[2]) Radar.drop(tr); tr.off = !!a[2]; }
-        else if (a[1] === 7 || a[1] === 6) { const p = new T.Vector3(+a[2], +a[3], +a[4]); let b = null as any, bd = 300; for (const q of Radar.sched(own).tts) { const d = q.kf.pos(new T.Vector3()).distanceTo(p); if (d < bd) { bd = d; b = q; } } if (b) { if (a[1] === 7) b.quiet = !!a[5]; else Radar.lose(own, b); } }
-        else if (a[1] === 4) Radar.wantRay(own, new T.Vector3(+a[2], +a[3], +a[4]), now);
+        if (!own) break; const now = W ? W.t : 0, P = W ? W.ship.P : new T.Vector3();
+        // (a track made listen only or active (7), or dropped (6): by its name in the picture the operator clicked; failing that, the
+        // nearest to where the picture had it, within 300 m (the picture's in the level's frame, the battle's in the zone's: W.L))
+        if (a[1] === 7 || a[1] === 6) {
+          const tts = Radar.sched(own).tts, nm = a[1] === 7 ? a[6] : a[5];
+          let b = typeof nm === 'string' ? tts.find((q) => q.n === nm) || null : null;
+          if (!b) { const pl = new T.Vector3(+a[2], +a[3], +a[4]), p = W ? W.L.toZ(pl) : pl; let bd = 300; for (const q of tts) { const d = q.kf.pos(new T.Vector3()).distanceTo(p); if (d < bd) { bd = d; b = q; } } }
+          if (b) { if (a[1] === 7) b.quiet = !!a[5]; else Radar.lose(own, b); }
+        }
+        else if (a[1] === 4) { const d = new T.Vector3(+a[2], +a[3], +a[4]); if (W) d.applyQuaternion(W.L.qz); Radar.wantRay(own, d, now); } // (a bearing searched: the level's way, turned to the zone's)
         else if (a[1] === 3 || a[1] === 5) { // (a track kept, or let go: js/space.ts trkWant)
           const p: RPlot = { k: a[2] | 0, phi: +a[3], r: +a[4], t: now, db: 0, id: '', e: 0 }, at0 = Radar.plotAt(own, p);
           const f = own.fus.find((q) => q.pl.distanceTo(at0) < Math.max(200, 0.04 * q.pl.distanceTo(P))) || null, at = f ? f.pl : at0, S0 = Radar.sched(own);
