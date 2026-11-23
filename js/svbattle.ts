@@ -339,7 +339,10 @@ export const SvBattle = (() => {
         else if (a[1] === 4) { const d = new T.Vector3(+a[2], +a[3], +a[4]); if (W) d.applyQuaternion(W.L.qz); Radar.wantRay(own, d, now); } // (a bearing searched: the level's way, turned to the zone's)
         else if (a[1] === 3 || a[1] === 5) { // (a track kept, or let go: js/space.ts trkWant)
           const p: RPlot = { k: a[2] | 0, phi: +a[3], r: +a[4], t: now, db: 0, id: '', e: 0 }, at0 = Radar.plotAt(own, p);
-          const f = own.fus.find((q) => q.pl.distanceTo(at0) < Math.max(200, 0.04 * q.pl.distanceTo(P))) || null, at = f ? f.pl : at0, S0 = Radar.sched(own);
+          // (a placed belief the operator clicked (a 3D fix: its name and place, the level's frame, sent with it): that one, by name, else the
+          // nearest to where the picture had it; else what's near the plot (placed at its fan's middle: a fix well off it isn't found that way))
+          const bn = typeof a[8] === 'string' ? a[8] : null, bp = a.length >= 8 ? (() => { const pl = new T.Vector3(+a[5], +a[6], +a[7]); return W ? W.L.toZ(pl) : pl; })() : null;
+          const f = (bn && own.fus.find((q) => q.n === bn)) || (bp && own.fus.filter((q) => q.pl.distanceTo(bp) < Math.max(300, 0.04 * q.pl.distanceTo(P))).sort((x, y) => x.pl.distanceTo(bp) - y.pl.distanceTo(bp))[0]) || own.fus.find((q) => q.pl.distanceTo(at0) < Math.max(200, 0.04 * q.pl.distanceTo(P))) || null, at = f ? f.pl : at0, S0 = Radar.sched(own);
           const kept = S0.tts.find((q) => q.op && ((!!f && q.bel === f.n) || Radar.ttAt(q, now).distanceTo(at) < Math.max(200, 4 * q.kf.sig() + (f ? 3 * f.kf.sig() : 0))));
           if (kept) Radar.unwant(own, kept); else Radar.want(own, { f, plot: p, pri: 1, op: true }, now);
         }

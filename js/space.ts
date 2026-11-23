@@ -399,7 +399,7 @@ export const Space = (() => {
     }
     if (!it.plot) return false; const shown = sv(EW.own)!, p = it.plot as RPlot; // (the pick's in the server's picture: its plot and belief)
     const f = shown.fus.find((q) => (q.a && q.a.p === it.plot) || (q.b && q.b.p === it.plot)) || null;
-    const code = trkWant(p, f); Net.toHost({ t: 'strk', a: [-1, code, p.k, p.phi, p.r] }); return true;
+    const code = trkWant(p, f); Net.toHost({ t: 'strk', a: f ? [-1, code, p.k, p.phi, p.r, +f.pl.x.toFixed(1), +f.pl.y.toFixed(1), +f.pl.z.toFixed(1), f.n] : [-1, code, p.k, p.phi, p.r] }); return true; // (a placed belief's (a 3D fix's) name and place with it: the server's tracker pointed at it and searching round it, not swept along the plot's fan)
   }
   const wrapA = (a: number) => ((a % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
   // a ship's camera picture (js/radar.ts optical): what its quarter's camera sees with its zoom, eased while on one target and cut
