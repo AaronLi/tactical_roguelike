@@ -133,7 +133,7 @@ export const SpaceUI = (() => {
     const s = S(); if (!s.on || !made) return;
     hud.style.visibility = Game.invOpen || Game.shopOpen ? 'hidden' : ''; // (under the Tab screen and the shop, as the rest of the HUD is: #hud holds them, and this isn't in it)
     const seat = Space.mySeat(), flying = !s.docked || !!s.auto, aboard = Space.aboard(), wp = s.wps[s.tgt] && !s.wps[s.tgt].hide && !s.wps[s.tgt].unseen ? s.wps[s.tgt] : null;
-    const speed = s.V.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(_v.copy(s.P).sub(wp.p).normalize()) : 0;
+    const vf = s.V.clone().sub(Space.beltV()), speed = vf.length(), dist = wp ? s.P.distanceTo(wp.p) : 0, close = wp && dist > 1 ? -s.V.dot(_v.copy(s.P).sub(wp.p).normalize()) : 0; // (speed and the velocity mark against the field she's in, as the pilot's scope has it; closing against the target)
     // the line at the top: for everyone aboard while she's under way
     const showTop = aboard && (flying || !!s.ftl);
     top.style.display = showTop ? '' : 'none';
@@ -184,7 +184,7 @@ export const SpaceUI = (() => {
         const pr = (v: THREE.Vector3) => { const b = v.clone().applyMatrix4(cam.matrixWorldInverse).z > 0; v.project(cam); return b ? null : [(v.x * 0.5 + 0.5) * W, (-v.y * 0.5 + 0.5) * H]; };
         const eye = cam.position, b = pr(new T.Vector3(0, 0, -4000).applyQuaternion(s.Dq).add(eye));
         if (b) mark('sp-bore', b[0], b[1], '', '');
-        if (speed > 3) { const p = pr(s.V.clone().normalize().multiplyScalar(4000).applyQuaternion(_q).add(eye)); if (p) mark('sp-vel', p[0], p[1], '', ''); }
+        if (speed > 3) { const p = pr(vf.clone().normalize().multiplyScalar(4000).applyQuaternion(_q).add(eye)); if (p) mark('sp-vel', p[0], p[1], '', ''); }
       }
       marksEnd();
     }
