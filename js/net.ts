@@ -22,10 +22,11 @@ let bigN = 0;
 // costs little more than what changed (a snapshot 2.3 KB as JSON: some 90 bytes). One message at a time and at once (not a stream:
 // fflate's streaming inflate holds back a message's end till more comes). On the wire {t:'z', d: base64}. Each side says it can ({t:'zhi'},
 // once fflate's loaded); till the other's said so, what's sent to it is JSON as it is. fflate from jsDelivr, pinned, loaded when a
-// connection opens (the game runs without it: nothing's compressed)
+// page loads (preloaded by index.html; the game runs without it: nothing's compressed)
 const FF_URL = 'https://cdn.jsdelivr.net/npm/fflate@0.8.3/+esm', Z_HIST = 32768;
 let FF: any = null, ffP: Promise<any> | null = null;
 function ffLoad(): Promise<any> { if (!ffP) ffP = import(/* @vite-ignore */ FF_URL as string).then((m) => (FF = m)).catch((e) => { console.warn('net: no compression (fflate did not load)', e); return null; }); return ffP; }
+if (typeof document !== 'undefined') ffLoad(); // (at once on a page: ready long before a connection opens)
 type ZSide = { on: boolean; sent: Uint8Array; got: Uint8Array; inB: number; outB: number; rawB: number };
 const zOf = (conn: any): ZSide => conn._z || (conn._z = { on: false, sent: new Uint8Array(0), got: new Uint8Array(0), inB: 0, outB: 0, rawB: 0 });
 const zHist = (h: Uint8Array, u: Uint8Array) => { const c = new Uint8Array(Math.min(Z_HIST, h.length + u.length)), keep = c.length - u.length; if (keep > 0) c.set(h.subarray(h.length - keep), 0); c.set(keep >= 0 ? u : u.subarray(-keep), Math.max(0, keep)); return c; };
