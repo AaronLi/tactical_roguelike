@@ -240,8 +240,8 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
               float cs = den > 1e-5 ? (cuv * dot(cv, cw) - cvv * dot(lgu, cw)) / den : 0.0; cs = clamp(cs, 0.0, lgd);
               float ct = clamp((dot(cv, cw) + cuv * cs) / cvv, 0.0, 1.0);
               cs = clamp(dot(ca.xyz + cv * ct - vLgP, lgu), 0.0, lgd);
-              float ch = length(vLgP + lgu * cs - (ca.xyz + cv * ct)), cpen = 0.04 + 0.16 * cs / max(lgd - cs, 0.15);
-              lgv1 *= mix(0.15, 1.0, smoothstep(ca.w - cpen * 0.5, ca.w + cpen, ch));
+              float ch = length(vLgP + lgu * cs - (ca.xyz + cv * ct)), cpen = 0.1 + 0.55 * cs / max(lgd - cs, 0.2); // (a lamp's a panel of light some 0.5 m across, not a point: the penumbra by the ratio of the distances)
+              lgv1 *= mix(0.35, 1.0, smoothstep(ca.w - cpen * 0.6, ca.w + cpen, ch)); // (a body never hides the whole panel)
             }
             float lgiw = (lgc4.r + lgc4.g + lgc4.b) * lgfall * clamp(0.5 + 0.5 * dot(lgn, lgu), 0.0, 1.0) * lgwts[m];
             lgvs += lgiw * lgv1; lgvw += lgiw;
@@ -257,7 +257,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
             }
             #endif
           }
-          if (lgvw > 1e-4) lgvis = mix(1.0, lgvs / lgvw, 0.8); // (the grid's light is the lamps' and what bounces off the room: the bounce isn't shadowed)
+          if (lgvw > 1e-4) lgvis = mix(1.0, lgvs / lgvw, 0.6); // (the grid's light is the lamps' and what bounces off the room: the bounce isn't shadowed)
         }
         reflectedLight.directDiffuse += diffuseColor.rgb * (lgL.rgb / lgL.a) * lgturn * lgao * lgvis;
       }
