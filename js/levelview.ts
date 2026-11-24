@@ -427,8 +427,8 @@ export const LevelView = {
       const k = (y * W + x) << 2; o[k] = (nx * 0.5 + 0.5) * 255; o[k + 1] = (ny * 0.5 + 0.5) * 255; o[k + 2] = (nz * 0.5 + 0.5) * 255; o[k + 3] = 255;
     }
     h.putImageData(out, 0, 0);
-    const t = (c: HTMLCanvasElement) => { const x = new THREE.CanvasTexture(c); x.wrapS = x.wrapT = THREE.RepeatWrapping; x.anisotropy = 8; return x; };
-    return { nrm: t(hc), rgh: t(rc) };
+    const t = (c: HTMLCanvasElement) => { const x = new THREE.CanvasTexture(c); x.colorSpace = THREE.NoColorSpace; x.wrapS = x.wrapT = THREE.RepeatWrapping; x.anisotropy = 8; return x; };
+    return { nrm: t(hc), rgh: t(rc) }; // (data, not colour: read as they are, where js/util.ts makes a canvas's texture sRGB)
   },
   // how steep the deck's relief: a step of the height's 0..255 over a pixel (8 mm) as a slope (?bump=k in the URL scales it, for comparing)
   BUMP: 0.012 * (typeof location !== 'undefined' ? +(new URLSearchParams(location.search).get('bump') || 1) : 1),
