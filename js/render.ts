@@ -11,6 +11,7 @@ import { Highlights } from './highlights.js';
 import { LightGrid } from './lightgrid.js';
 import { GpuAo } from './gpuao.js';
 import { Probes } from './probes.js';
+import { EntShadows } from './entshadows.js';
 import { ReplayEnv } from './replayenv.js';
 import { Rig } from './rig.js';
 import { TONE } from './tone.js';
@@ -148,6 +149,8 @@ export const R = {
     r.shadowMap.enabled = true; // (only the weapon lights cast any: this.spots)
     document.body.prepend(r.domElement);
     this.scene = new THREE.Scene();
+    this.scene.onBeforeRender = () => { Probes.before(); EntShadows.before(); }; // (what's only for the level's scene: the room's reflection, the people's shadows)
+    this.scene.onAfterRender = () => { Probes.after(); EntShadows.after(); };
     this.scene.background = new THREE.Color(0x0b0d10);
     this.scene.fog = new THREE.Fog(0x0b0d10, 8, 60);
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.03, 280);
@@ -2050,6 +2053,7 @@ export const R = {
       this._nvTargets(sz.x, sz.y);
       this.nvRT!.texture.generateMipmaps = false; // (made once, after the last of the frame's drawn into it)
     } else { this.nvFrame = 0; this.nvHeatAt = -1; }
+    EntShadows.frame(this.scene, this.camera.position); // (the people's shadows: js/entshadows.ts)
     if (ReplayEnv.Game && ReplayEnv.Game.phase === 'level') Probes.frame(r, this.scene, this.camera.position, this.levelRoot); // (the room's reflection: its picture taken a face a frame, js/probes.ts)
     for (const f of this.feeds) f(r);
     // the scope picture: only rendered while you're bringing the gun up or looking through it

@@ -1,5 +1,6 @@
 'use strict';
 import { Callsigns } from './callsigns.js';
+import { EntShadows } from './entshadows.js';
 import { SHIELDS } from './data.js';
 import { Gear } from './gear.js';
 import { GunModels } from './gunmodels.js';
@@ -790,6 +791,7 @@ export const Rig = (() => {
       state: 'alive', deadT: 0, fallX: 1, fallZ: 0, downW: 0,
       hb: null, dbg: null, curl: [CURL_REST, CURL_REST], fingers: [],
     } as unknown as Rig;
+    EntShadows.track(rig); // (their shadow from the lamps)
     for (const [par, m] of fits) fitPart(rig, par, m);
     for (const m of [slingMount, hipMount]) fitPart(rig, m.parent!, m);
     if (hid) {

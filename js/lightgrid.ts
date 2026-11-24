@@ -48,6 +48,9 @@ export const LightGrid = (() => {
     // studio), lgEnvK how much, lgEnvR how much less on a rough surface, the room's box the picture's projected on (lgEnvMin, lgEnvMax)
     // and where it was taken from (lgEnvC)
     lgGrime: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('grime') : null; return q != null && Number.isFinite(+q) ? +q : 2.5; })() }, // (the level's grime, FS_BODY: 0 none; ?grime=k in the URL)
+    // the people's shadows (js/entshadows.ts): lgLevel the level's scene is being drawn (1; 0 any other: the gun's), lgCapN how many
+    // capsules, each from lgCapA (xyz, w its radius) to lgCapB
+    lgLevel: { value: 0 }, lgCapN: { value: 0 }, lgCapA: { value: Array.from({ length: 48 }, () => new T.Vector4()) }, lgCapB: { value: Array.from({ length: 48 }, () => new T.Vector4()) },
     lgEnvOn: { value: 0 }, lgEnvK: { value: 0 }, lgEnvR: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('reflr') : null; return q != null && Number.isFinite(+q) ? +q : 0.6; })() }, lgEnvMin: { value: new T.Vector3() }, lgEnvMax: { value: new T.Vector3(1, 1, 1) }, lgEnvC: { value: new T.Vector3() },
     lgBand: { value: new T.Vector4(1, 0.5, 1, 0) }, // the slabs of a floor: how many, the first one's middle, each one's height (m) // (z: the baked one's in; else the open share, below)
   };
@@ -76,7 +79,7 @@ export const LightGrid = (() => {
       #endif
       lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc + aOccD * lgAoK[int(aOccI + 0.5)]; }`; // (a moving part's occlusion on what's round it, as the part is in place: js/gunao.ts layers)
   const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nvarying float vOcc;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
-uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform vec2 lgLampAt;\nuniform float lgGrime;\nfloat lgHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\nfloat lgNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(lgHash(i), lgHash(i + vec2(1.0, 0.0)), f.x), mix(lgHash(i + vec2(0.0, 1.0)), lgHash(i + vec2(1.0, 1.0)), f.x), f.y); }\nfloat lgFbm(vec2 p) { return 0.5 * lgNoise(p) + 0.3 * lgNoise(p * 2.7 + 3.1) + 0.2 * lgNoise(p * 6.3 - 1.7); }\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\nuniform float lgEnvOn;\nuniform float lgEnvK;\nuniform float lgEnvR;\nuniform vec3 lgEnvMin;\nuniform vec3 lgEnvMax;\nuniform vec3 lgEnvC;\n`;
+uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform vec2 lgLampAt;\nuniform float lgGrime;\nuniform float lgLevel;\nuniform float lgCapN;\nuniform vec4 lgCapA[48];\nuniform vec4 lgCapB[48];\nfloat lgHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\nfloat lgNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(lgHash(i), lgHash(i + vec2(1.0, 0.0)), f.x), mix(lgHash(i + vec2(0.0, 1.0)), lgHash(i + vec2(1.0, 1.0)), f.x), f.y); }\nfloat lgFbm(vec2 p) { return 0.5 * lgNoise(p) + 0.3 * lgNoise(p * 2.7 + 3.1) + 0.2 * lgNoise(p * 6.3 - 1.7); }\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\nuniform float lgEnvOn;\nuniform float lgEnvK;\nuniform float lgEnvR;\nuniform vec3 lgEnvMin;\nuniform vec3 lgEnvMax;\nuniform vec3 lgEnvC;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
   // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
   // its own side, as it does the light, so the room next door keeps its own, and so do a wall's faces once they've been
@@ -168,19 +171,39 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
       #if defined( RE_IndirectDiffuse )
       irradiance *= lgg;
       #endif
+      // The people (js/entshadows.ts): each a few capsules (the body, each leg). What's near one (within 3 m of it, and not on it: its own
+      // surface isn't shadowed by itself) is shadowed from each lamp that lights the cell by them, softly (the lamp's not a point: the
+      // further the shadow falls from what casts it, the softer), and a little darkened under and round them (the fill they keep off the
+      // floor at their feet: what grounds them). Only on the level's drawing (lgLevel), never the gun's in your hands.
+      int lgcn = 0; int lgci[8];
+      if (lgLevel > 0.5) {
+        for (int c = 0; c < 48; c++) {
+          if (c >= int(lgCapN)) break;
+          vec4 ca = lgCapA[c], cb = lgCapB[c]; vec3 cv = cb.xyz - ca.xyz;
+          float ct = clamp(dot(vLgP - ca.xyz, cv) / max(dot(cv, cv), 1e-4), 0.0, 1.0); vec3 cq = vLgP - (ca.xyz + cv * ct); float cd = length(cq);
+          if (cd > 3.0 || (cd < ca.w * 1.3 && dot(lgn, cq) > 0.4 * cd)) continue; // (too far to matter, or its own surface: on it and facing out of it; the floor under a foot faces up, not out, and is shadowed)
+          if (lgcn < 8) { lgci[lgcn] = c; lgcn++; }
+          // (the fill: a sphere's worth of sky kept off, by how much of the view up it takes and how it faces it)
+          float cao = clamp(ca.w * ca.w / max(cd * cd, 1e-4), 0.0, 1.0) * clamp(0.6 + 0.6 * dot(lgn, -cq / cd), 0.0, 1.0);
+          lgao *= 1.0 - 0.7 * cao;
+          #if defined( RE_IndirectDiffuse )
+          irradiance *= 1.0 - 0.7 * cao;
+          #endif
+        }
+      }
       if (lgL.a > 0.02) {
         vec3 lgdir = lgD.rgb / lgL.a;
         float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir), 0.0, 1.0);
-        reflectedLight.directDiffuse += diffuseColor.rgb * (lgL.rgb / lgL.a) * lgturn * lgao;
-        // The lamps' highlight: the four lamps that light this cell most (the build's, js/lightgrid.ts compute: each reaching it past
-        // every wall), each a point light where it really hangs, reflected by the surface's own roughness and metalness (three's GGX,
-        // as a real light's is). So a floor shows each lamp's sheen where it would be, sliding as you walk, and metal reads as metal.
-        // The grid's averaged direction can't: lamps on every side of a corridor average to straight up. Taken by the occlusion as
-        // the rest of the grid's light is; nothing through a shut door.
+        // The four lamps that light this cell most (the build's, js/lightgrid.ts compute: each reaching it past every wall), for the
+        // people's shadows and the lamps' highlight: the four cells round the spot, each by how near it is, as the grid's light is
+        // filtered, wall cells left out (a lamp that only some of them have fades across a cell, not cut off at its edge); each lamp once,
+        // by its share of them.
+        bool lgwantSpec = false;
         #ifdef STANDARD
-        if (lgSpec > 0.0) {
-          // (the four cells round the spot, each by how near it is, as the grid's light is filtered, wall cells left out: a lamp
-          // that only some of them have fades across a cell, not cut off at its edge. Each lamp once, by its share of them)
+        lgwantSpec = lgSpec > 0.0;
+        #endif
+        float lgvis = 1.0;
+        if (lgwantSpec || lgcn > 0) {
           float lgtb = floor(clamp(lgbp + 0.5, 0.0, lgBand.x - 1.0));
           vec2 lgq = vec2(lgc.x, lgcy) - 0.5, lgq0 = floor(lgq), lgqf = lgq - lgq0;
           int lgrow = int((lgf * lgBand.x + lgtb) * lgSize.y);
@@ -199,18 +222,44 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
               if (!lgseen && lgn8 < 12) { lgids[lgn8] = lgid; lgwts[lgn8] = lgw0; lgn8++; }
             }
           }
+          float lgvs = 0.0, lgvw = 0.0;
           for (int m = 0; m < 12; m++) {
             if (m >= lgn8) break;
             int lgii = int(lgids[m]) - 1;
             int lglw = int(lgLampAt.x); ivec2 lgla = ivec2(lgii - (lgii / lglw) * lglw, int(lgLampAt.y) + (lgii / lglw) * 2);
             vec4 lgp4 = texelFetch(lgTop, lgla, 0), lgc4 = texelFetch(lgTop, lgla + ivec2(0, 1), 0);
             vec3 lgw = lgp4.xyz - vLgP; float lgd = length(lgw); if (lgd >= lgp4.w || lgd < 1e-3) continue;
-            vec3 lgv = normalize((viewMatrix * vec4(lgw / lgd, 0.0)).xyz);
-            float lgnl = clamp(dot(normal, lgv), 0.0, 1.0) * smoothstep(0.0, 0.3, lgw.y / lgd); // (a lamp shines down out of its fitting: what's level with it or over it (the ceiling round it) takes no glint)
-            reflectedLight.directSpecular += lgc4.rgb * pow(1.0 - lgd / lgp4.w, 1.6) * lgnl * BRDF_GGX(lgv, geometryViewDir, normal, material) * lgao * lgSpec * lgwts[m] / max(lgws, 1e-3);
+            vec3 lgu = lgw / lgd; float lgfall = pow(1.0 - lgd / lgp4.w, 1.6);
+            // (the people between it and here: the nearest point of each capsule to the ray, how far off the ray it is against its
+            // radius and the shadow's softening with the distance it's thrown)
+            float lgv1 = 1.0;
+            for (int i = 0; i < 8; i++) {
+              if (i >= lgcn) break;
+              vec4 ca = lgCapA[lgci[i]], cb = lgCapB[lgci[i]]; vec3 cv = cb.xyz - ca.xyz, cw = vLgP - ca.xyz;
+              float cvv = max(dot(cv, cv), 1e-4), cuv = dot(lgu, cv), den = cvv - cuv * cuv;
+              float cs = den > 1e-5 ? (cuv * dot(cv, cw) - cvv * dot(lgu, cw)) / den : 0.0; cs = clamp(cs, 0.0, lgd);
+              float ct = clamp((dot(cv, cw) + cuv * cs) / cvv, 0.0, 1.0);
+              cs = clamp(dot(ca.xyz + cv * ct - vLgP, lgu), 0.0, lgd);
+              float ch = length(vLgP + lgu * cs - (ca.xyz + cv * ct)), cpen = 0.04 + 0.16 * cs / max(lgd - cs, 0.15);
+              lgv1 *= mix(0.15, 1.0, smoothstep(ca.w - cpen * 0.5, ca.w + cpen, ch));
+            }
+            float lgiw = (lgc4.r + lgc4.g + lgc4.b) * lgfall * clamp(0.5 + 0.5 * dot(lgn, lgu), 0.0, 1.0) * lgwts[m];
+            lgvs += lgiw * lgv1; lgvw += lgiw;
+            // The lamps' highlight: each a point light where it really hangs, reflected by the surface's own roughness and metalness
+            // (three's GGX, as a real light's is). So a floor shows each lamp's sheen where it would be, sliding as you walk, and metal
+            // reads as metal. The grid's averaged direction can't: lamps on every side of a corridor average to straight up. Taken by
+            // the occlusion as the rest of the grid's light is, and by the people's shadows; nothing through a shut door.
+            #ifdef STANDARD
+            if (lgwantSpec) {
+              vec3 lgv = normalize((viewMatrix * vec4(lgu, 0.0)).xyz);
+              float lgnl = clamp(dot(normal, lgv), 0.0, 1.0) * smoothstep(0.0, 0.3, lgu.y); // (a lamp shines down out of its fitting: what's level with it or over it (the ceiling round it) takes no glint)
+              reflectedLight.directSpecular += lgc4.rgb * lgfall * lgnl * BRDF_GGX(lgv, geometryViewDir, normal, material) * lgao * lgSpec * lgv1 * lgwts[m] / max(lgws, 1e-3);
+            }
+            #endif
           }
+          if (lgvw > 1e-4) lgvis = mix(1.0, lgvs / lgvw, 0.8); // (the grid's light is the lamps' and what bounces off the room: the bounce isn't shadowed)
         }
-        #endif
+        reflectedLight.directDiffuse += diffuseColor.rgb * (lgL.rgb / lgL.a) * lgturn * lgao * lgvis;
       }
     }
     // (night vision's IR illuminator: a cone from the eye, soft-edged, out to about 18 m, on what faces it; what's behind a

@@ -11,6 +11,7 @@ import { LightGrid } from './lightgrid.js';
 //                                compiled once, with a reflection in it)
 //   frame(r, scene, at, levelRoot) each frame, before it's drawn: the room at `at` (the eye); its picture taken if it isn't yet, a face
 //                                a frame (six level renders spread out, then the prefilter), then its neighbours' as the time's spare
+//   before(), after()            the level's scene's drawing: js/render.ts hooks it
 //   clear()                      the level's gone
 // ?refl=k in the URL scales how much (0 off).
 export const Probes = (() => {
@@ -43,8 +44,6 @@ export const Probes = (() => {
     black = pmrem.fromCubemap(cubeRT.texture as unknown as THREE.CubeTexture);
     scene.environment = black.texture; scene.environmentIntensity = 1;
     hooked = scene;
-    scene.onBeforeRender = () => { U.lgEnvOn.value = 1; U.lgEnvK.value = capturing ? 0 : k * K0; }; // (a flag of its own: a tiny strength would round to nothing at a GPU's medium precision and read as off)
-    scene.onAfterRender = () => { U.lgEnvOn.value = 0; U.lgEnvK.value = 0; };
   }
 
   // the room at p (on its floor): the smallest that holds it (a corridor running into a room's edge), else none
@@ -116,8 +115,12 @@ export const Probes = (() => {
     if (black) { black.dispose(); black = null; }
     if (cubeRT) { cubeRT.dispose(); cubeRT = null; } cubeCam = null;
     if (pmrem) { pmrem.dispose(); pmrem = null; }
-    if (hooked) { if (hooked.environment) hooked.environment = null; hooked.onBeforeRender = () => {}; hooked.onAfterRender = () => {}; hooked = null; }
+    if (hooked) { if (hooked.environment) hooked.environment = null; hooked = null; }
     U.lgEnvOn.value = 0; U.lgEnvK.value = 0;
   }
-  return { level, frame, clear, get stats() { return { boxes: boxes.length, probes: probes.size, cur: cur ? cur.box.r : -1, k, job: job ? job.box.r + ':' + job.face : null, ms }; } };
+  // the level's scene's drawing (js/render.ts hooks it): the reflection on for it (a flag of its own: a tiny strength would round to nothing
+  // at a GPU's medium precision and read as off), off for any other scene (the gun's studio)
+  function before() { U.lgEnvOn.value = 1; U.lgEnvK.value = hooked && !capturing ? k * K0 : 0; }
+  function after() { U.lgEnvOn.value = 0; U.lgEnvK.value = 0; }
+  return { level, frame, clear, before, after, get stats() { return { boxes: boxes.length, probes: probes.size, cur: cur ? cur.box.r : -1, k, job: job ? job.box.r + ':' + job.face : null, ms }; } };
 })();
