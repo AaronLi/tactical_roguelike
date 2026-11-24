@@ -144,22 +144,41 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
         vec3 lgdir = lgD.rgb / lgL.a;
         float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir), 0.0, 1.0);
         reflectedLight.directDiffuse += diffuseColor.rgb * (lgL.rgb / lgL.a) * lgturn * lgao;
-        // The lamps' highlight: the two lamps that light this cell most (the build's, js/lightgrid.ts compute: each reaching it past
+        // The lamps' highlight: the four lamps that light this cell most (the build's, js/lightgrid.ts compute: each reaching it past
         // every wall), each a point light where it really hangs, reflected by the surface's own roughness and metalness (three's GGX,
         // as a real light's is). So a floor shows each lamp's sheen where it would be, sliding as you walk, and metal reads as metal.
         // The grid's averaged direction can't: lamps on every side of a corridor average to straight up. Taken by the occlusion as
         // the rest of the grid's light is; nothing through a shut door.
         #ifdef STANDARD
         if (lgSpec > 0.0) {
+          // (the four cells round the spot, each by how near it is, as the grid's light is filtered, wall cells left out: a lamp
+          // that only some of them have fades across a cell, not cut off at its edge. Each lamp once, by its share of them)
           float lgtb = floor(clamp(lgbp + 0.5, 0.0, lgBand.x - 1.0));
-          vec4 lgt = texelFetch(lgTop, ivec2(int(clamp(lgc.x, 0.0, lgSize.x - 1.0)), int(lgcy) + int((lgf * lgBand.x + lgtb) * lgSize.y)), 0);
-          for (int lgi = 0; lgi < 2; lgi++) {
-            float lgid = lgi == 0 ? lgt.r : lgt.g; if (lgid < 0.5) continue;
-            vec4 lgp4 = texelFetch(lgLamps, ivec2(int(lgid) - 1, 0), 0), lgc4 = texelFetch(lgLamps, ivec2(int(lgid) - 1, 1), 0);
+          vec2 lgq = vec2(lgc.x, lgcy) - 0.5, lgq0 = floor(lgq), lgqf = lgq - lgq0;
+          int lgrow = int((lgf * lgBand.x + lgtb) * lgSize.y);
+          float lgids[12], lgwts[12], lgws = 0.0; int lgn8 = 0;
+          for (int k = 0; k < 4; k++) {
+            vec2 lgo = vec2(float(k & 1), float(k >> 1));
+            ivec2 lgcc = ivec2(clamp(lgq0 + lgo, vec2(0.0), lgSize.xy - 1.0));
+            float lgw0 = (lgo.x > 0.5 ? lgqf.x : 1.0 - lgqf.x) * (lgo.y > 0.5 ? lgqf.y : 1.0 - lgqf.y);
+            vec4 lgt = texelFetch(lgTop, ivec2(lgcc.x, lgcc.y + lgrow), 0);
+            if (lgt.r < -0.5) continue;
+            lgws += lgw0;
+            for (int j = 0; j < 4; j++) {
+              float lgid = lgt[j]; if (lgid < 0.5) continue;
+              bool lgseen = false;
+              for (int m = 0; m < 12; m++) { if (m >= lgn8) break; if (lgids[m] == lgid) { lgwts[m] += lgw0; lgseen = true; break; } }
+              if (!lgseen && lgn8 < 12) { lgids[lgn8] = lgid; lgwts[lgn8] = lgw0; lgn8++; }
+            }
+          }
+          for (int m = 0; m < 12; m++) {
+            if (m >= lgn8) break;
+            int lgii = int(lgids[m]) - 1;
+            vec4 lgp4 = texelFetch(lgLamps, ivec2(lgii, 0), 0), lgc4 = texelFetch(lgLamps, ivec2(lgii, 1), 0);
             vec3 lgw = lgp4.xyz - vLgP; float lgd = length(lgw); if (lgd >= lgp4.w || lgd < 1e-3) continue;
             vec3 lgv = normalize((viewMatrix * vec4(lgw / lgd, 0.0)).xyz);
-            float lgnl = clamp(dot(normal, lgv), 0.0, 1.0) * smoothstep(0.02, 0.2, dot(lgv, normal)); // (light skimming a surface (a ceiling a fitting's set into) gives no glint)
-            reflectedLight.directSpecular += lgc4.rgb * pow(1.0 - lgd / lgp4.w, 1.6) * lgnl * BRDF_GGX(lgv, geometryViewDir, normal, material) * lgao * lgSpec;
+            float lgnl = clamp(dot(normal, lgv), 0.0, 1.0) * smoothstep(0.0, 0.3, lgw.y / lgd); // (a lamp shines down out of its fitting: what's level with it or over it (the ceiling round it) takes no glint)
+            reflectedLight.directSpecular += lgc4.rgb * pow(1.0 - lgd / lgp4.w, 1.6) * lgnl * BRDF_GGX(lgv, geometryViewDir, normal, material) * lgao * lgSpec * lgwts[m] / max(lgws, 1e-3);
           }
         }
         #endif
@@ -328,7 +347,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
   function compute(map: LvMap): LgData {
     const L = Level, TS = L.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, N = W * H;
     const col = new T.Color(), DECAY = 1.6, t0 = performance.now();
-    const top = new Float32Array(N * NF * BANDS * 4), allLamps = map.lamps || []; // (top: per cell, the two lamps lighting it most: their numbers + 1, how much)
+    const TOPN = 4, top = new Float32Array(N * NF * BANDS * TOPN * 2), allLamps = map.lamps || []; // (top: per cell, the four lamps lighting it most: their numbers + 1, then how much each)
     const cur = new Float32Array(N * NF * BANDS * K), doors = map.doors || [], layers: (Map<number, Float32Array> | null)[] = doors.map(() => null), shutAt: Map<number, LvDoor>[] = [], winAt: Set<number>[] = [];
     // the sky: the theme's fill (as js/render.ts had it everywhere), on what's open to it (not the hangar's: its
     // daylight stays the flat fill)
@@ -377,7 +396,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
           if (blocked) continue;
           const a = Math.pow(1 - d / r, DECAY) * k;
           into(via, base + i, a, dx / d, dy / d, dz / d, a * (col.r + col.g + col.b) / 3);
-          if (!via) { const q = (base + i) * 4, lum = a * (col.r + col.g + col.b), n = allLamps.indexOf(l) + 1; if (lum > top[q + 1]) { top[q + 2] = top[q]; top[q + 3] = top[q + 1]; top[q] = n; top[q + 1] = lum; } else if (lum > top[q + 3]) { top[q + 2] = n; top[q + 3] = lum; } }
+          if (!via) { const q = (base + i) * TOPN * 2, lum = a * (col.r + col.g + col.b); let j = TOPN; while (j > 0 && lum > top[q + TOPN + j - 1]) j--; if (j < TOPN) { for (let m = TOPN - 1; m > j; m--) { top[q + m] = top[q + m - 1]; top[q + TOPN + m] = top[q + TOPN + m - 1]; } top[q + j] = allLamps.indexOf(l) + 1; top[q + TOPN + j] = lum; } }
         }
       }
       // the sky: straight down on whatever's open to it; through an outside window (the city's glow), onto the room's
@@ -533,11 +552,11 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
     flush();
     U.lgLight.value = G0.tl; U.lgDir.value = G0.td;
     U.lgPaint.value = Homes.paint(map) || blank;
-    // the lamps' highlight (FS_BODY): each cell's two lamps by number (nearest: a number isn't blended), and the lamps (row 0 where,
+    // the lamps' highlight (FS_BODY): each cell's four lamps by number (read unfiltered: a number isn't blended; the shader blends their light), a wall's -1, and the lamps (row 0 where,
     // in the level's frame, and how far it reaches; row 1 its light, as the grid has it)
     const lamps = map.lamps || [];
     if (d.top && lamps.length) {
-      const ti = new Float32Array(N * NF * BANDS * 4); for (let i = 0; i < N * NF * BANDS; i++) { ti[i * 4] = d.top[i * 4]; ti[i * 4 + 1] = d.top[i * 4 + 2]; }
+      const ti = new Float32Array(N * NF * BANDS * 4); for (let i = 0; i < N * NF * BANDS; i++) { if (cur[i * K + 7] > 0.5) for (let j = 0; j < 4; j++) ti[i * 4 + j] = d.top[i * 8 + j]; else ti[i * 4] = -1; } // (a wall's cell -1: left out of the blend)
       const tt = new T.DataTexture(ti, W, H * NF * BANDS, T.RGBAFormat, T.FloatType); tt.magFilter = tt.minFilter = T.NearestFilter; tt.generateMipmaps = false; tt.needsUpdate = true;
       const lp = new Float32Array(lamps.length * 8), c = new T.Color();
       lamps.forEach((l: LvLight, i: number) => { c.setHex(l.color!, T.LinearSRGBColorSpace); lp.set([l.x, l.y!, l.z, l.d!], i * 4); lp.set([c.r * l.i!, c.g * l.i!, c.b * l.i!, 0], (lamps.length + i) * 4); });
