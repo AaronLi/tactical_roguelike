@@ -142,15 +142,22 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
       }
       float lgg = 1.0 - clamp(vOcc, 0.0, 1.0) * clamp(lgAo.x, 0.0, 1.0); // (a gun's own occlusion, js/gunao.ts: the fill and the grid's light)
       lgao *= lgg;
-      // Grime (the level's own surfaces: LG_GRIME, js/levelview.ts): dirt gathers where the room closes in (the occlusion: a wall's foot,
-      // a floor's edge, the corners, round and under what stands there), broken up by a noise in the world (on a wall stretched up and
-      // down: streaks), and a little everywhere in blotches. Dirt is darker and rougher than what it's on, and reflects less.
+      // Grime (the level's own surfaces: LG_GRIME, js/levelview.ts): dirt gathers low down where the room closes in: along a wall's foot
+      // (strongest at the floor, gone by a metre up, more in a corner), on a floor in the band at a wall's foot (the occlusion there), round
+      // and under what stands about; never on a ceiling. It lies in patches with edges (the noise against how much there'd be: not a soft
+      // gradient, which reads as a shadow of something that isn't there), on a wall streaked up and down; and a few faint blotches anywhere.
+      // Dirt is darker and rougher than what it's on, and reflects less.
       #if defined( LG_GRIME ) && defined( STANDARD )
-      if (lgGrime > 0.0) {
-        vec2 lgnp = abs(lgn.y) > 0.5 ? vLgP.xz * 2.2 : vec2((abs(lgn.x) > 0.5 ? vLgP.z : vLgP.x) * 3.2, vLgP.y * 0.8);
+      if (lgGrime > 0.0 && lgn.y > -0.5) {
+        float lgy2 = vLgP.y - (lgSize.w + lgf * lgFloorH) - lgAo.w; // (its height over the floor it's on)
+        vec2 lgnp = lgn.y > 0.5 ? vLgP.xz * 2.2 : vec2((abs(lgn.x) > 0.5 ? vLgP.z : vLgP.x) * 3.2, vLgP.y * 0.8);
         float lgn1 = lgFbm(lgnp), lgn2 = lgFbm(lgnp * 0.31 + 17.0);
-        float lggr = clamp(lgGrime * (smoothstep(0.04, 0.5, 1.0 - lgao) * (0.35 + 1.1 * lgn1) + 0.22 * smoothstep(0.55, 0.85, lgn2)), 0.0, 1.0);
-        vec3 lggc = mix(vec3(1.0), vec3(0.45, 0.41, 0.36), lggr);
+        float lgocc = smoothstep(0.15, 0.55, 1.0 - lgao); // (how boxed in: the foot of a wall, a corner; not the broad falloff across a room)
+        float lgamt = lgn.y > 0.5 ? lgocc : lgocc * (1.0 - smoothstep(0.1, 1.0, lgy2)) + 0.5 * (1.0 - smoothstep(0.0, 0.22, lgy2)); // (a wall: low down only, and a little all along its foot)
+        lgamt *= 0.4 * lgGrime;
+        float lggr = smoothstep(0.0, 0.18, lgamt - (1.0 - lgn1) * 0.55) * 0.85 + 0.12 * lgGrime / 2.5 * smoothstep(0.62, 0.8, lgn2);
+        lggr = clamp(lggr, 0.0, 1.0);
+        vec3 lggc = mix(vec3(1.0), vec3(0.55, 0.5, 0.44), lggr);
         diffuseColor.rgb *= lggc; material.diffuseColor *= lggc; material.diffuseContribution *= lggc;
         material.roughness = mix(material.roughness, 1.0, 0.75 * lggr);
         #if defined( RE_IndirectSpecular )
