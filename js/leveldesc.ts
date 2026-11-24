@@ -199,13 +199,13 @@ export const LevelDesc = (() => {
     const hf = <N extends LdNode>(n: N): N => (map.hub ? Object.assign(n, { hf: 1 }) : n);
     // floor + ceiling (upstairs, the floor only where there is one: not over a drop, and steel grating where it's a catwalk)
     if (!t.includes(5) && !gr) {
-      const fmat = B.std({ map: lvTex(B, ship ? sk + 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [W / K, H / K]), roughness: ship ? 0.7 : 0.92 });
+      const fmat = B.std({ map: lvTex(B, ship ? sk + 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [W / K, H / K]), roughness: ship ? 0.45 : 0.92 });
       root.push(hf(B.mesh(B.geo('plane', [W * TS, H * TS]), fmat, { r: [-PI / 2, 0, 0], p: [(W * TS) / 2, 0, (H * TS) / 2], l1: 1 }))); // (layer 1: what hides the evidence glow: walls, floors, doors)
     } else {
       const cells: number[] = [], tr = map.terrain, hills: number[] = [];
       const raised = (i: number) => { const k = ((i / W) | 0) * tr.VW + (i % W); return Math.abs(tr.v[k]) > 1e-3 || Math.abs(tr.v[k + 1]) > 1e-3 || Math.abs(tr.v[k + tr.VW]) > 1e-3 || Math.abs(tr.v[k + tr.VW + 1]) > 1e-3; }; // (off level at 0: up or down)
       for (let i = 0; i < W * H; i++) if (t[i] !== 5 && !(gr && gr[i])) (tr && raised(i) ? hills : cells).push(i);
-      const fm = B.std({ map: lvTex(B, ship ? sk + 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [1 / K, 1 / K]), roughness: ship ? 0.7 : 0.92 });
+      const fm = B.std({ map: lvTex(B, ship ? sk + 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [1 / K, 1 / K]), roughness: ship ? 0.45 : 0.92 });
       root.push({ t: 'i', g: B.geo('plane', [TS, TS], [['rx', -PI / 2]]), m: fm, n: cells.length, tr: cells.flatMap((i) => cell(i, 0)), l1: 1 });
       // the rolling ground (map.terrain: crestGround): those cells as one surface over their corners' heights (a procedural
       // surface, made from the description: proc 'terrain')

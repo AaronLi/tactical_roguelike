@@ -34,6 +34,9 @@ export const LightGrid = (() => {
     lgGrid: { value: new T.Vector4(0, 0, 1, 0) }, // x0, z0 (the map's corner, metres), cell size, on (0/1)
     lgSize: { value: new T.Vector4(1, 1, 1, 0) }, // W, H (cells), floors, where the lowest floor's layer starts (y)
     lgFloorH: { value: 4.3 },
+    // the lamps' highlight's strength (FS_BODY: 0 none, 1 as a lamp's own would be; ?spec=k in the URL for comparing)
+    lgTop: { value: blank }, lgLamps: { value: blank }, // (the two lamps that light each cell most, by number; the lamps: where, how far, their light)
+    lgSpec: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('spec') : null; return q != null && Number.isFinite(+q) ? +q : 1; })() },
     lgPaint: { value: blank }, // (residents' wall colours, a cell of the floor plan each: js/homes.ts paint)
     // night vision's IR illuminator (js/render.ts), only on a frame drawn for the goggles with it switched on: lgNv where it
     // is (the eye: x, y, z) and how bright (w, 0 off), lgNvD which way it points (x, y, z) and the cosine of its cone's half-angle (w)
@@ -68,7 +71,7 @@ export const LightGrid = (() => {
       #endif
       lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc + aOccD * lgAoK[int(aOccI + 0.5)]; }`; // (a moving part's occlusion on what's round it, as the part is in place: js/gunao.ts layers)
   const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nvarying float vOcc;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
-uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\n`;
+uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform sampler2D lgLamps;\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
   // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
   // its own side, as it does the light, so the room next door keeps its own, and so do a wall's faces once they've been
@@ -141,6 +144,25 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
         vec3 lgdir = lgD.rgb / lgL.a;
         float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir), 0.0, 1.0);
         reflectedLight.directDiffuse += diffuseColor.rgb * (lgL.rgb / lgL.a) * lgturn * lgao;
+        // The lamps' highlight: the two lamps that light this cell most (the build's, js/lightgrid.ts compute: each reaching it past
+        // every wall), each a point light where it really hangs, reflected by the surface's own roughness and metalness (three's GGX,
+        // as a real light's is). So a floor shows each lamp's sheen where it would be, sliding as you walk, and metal reads as metal.
+        // The grid's averaged direction can't: lamps on every side of a corridor average to straight up. Taken by the occlusion as
+        // the rest of the grid's light is; nothing through a shut door.
+        #ifdef STANDARD
+        if (lgSpec > 0.0) {
+          float lgtb = floor(clamp(lgbp + 0.5, 0.0, lgBand.x - 1.0));
+          vec4 lgt = texelFetch(lgTop, ivec2(int(clamp(lgc.x, 0.0, lgSize.x - 1.0)), int(lgcy) + int((lgf * lgBand.x + lgtb) * lgSize.y)), 0);
+          for (int lgi = 0; lgi < 2; lgi++) {
+            float lgid = lgi == 0 ? lgt.r : lgt.g; if (lgid < 0.5) continue;
+            vec4 lgp4 = texelFetch(lgLamps, ivec2(int(lgid) - 1, 0), 0), lgc4 = texelFetch(lgLamps, ivec2(int(lgid) - 1, 1), 0);
+            vec3 lgw = lgp4.xyz - vLgP; float lgd = length(lgw); if (lgd >= lgp4.w || lgd < 1e-3) continue;
+            vec3 lgv = normalize((viewMatrix * vec4(lgw / lgd, 0.0)).xyz);
+            float lgnl = clamp(dot(normal, lgv), 0.0, 1.0) * smoothstep(0.02, 0.2, dot(lgv, normal)); // (light skimming a surface (a ceiling a fitting's set into) gives no glint)
+            reflectedLight.directSpecular += lgc4.rgb * pow(1.0 - lgd / lgp4.w, 1.6) * lgnl * BRDF_GGX(lgv, geometryViewDir, normal, material) * lgao * lgSpec;
+          }
+        }
+        #endif
       }
     }
     // (night vision's IR illuminator: a cone from the eye, soft-edged, out to about 18 m, on what faces it; what's behind a
@@ -187,7 +209,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   // build = compute + install. compute is the sums alone (no texture, nothing of the renderer's): it's most of what building a
   // level costs a screen (a second, for a cruiser), so it can be done ahead on another thread (js/prepworker.ts, js/prep.ts)
   // and handed over (map.lgPre), and then install is all that's left for the frame the level's put up in.
-  interface LgData { W: number; H: number; NF: number; NB?: number; cur: Float32Array; layers: ({ at: Int32Array; v: Float32Array } | null)[]; bounces: number[]; ms: number; ao?: LgAo }
+  interface LgData { W: number; H: number; NF: number; NB?: number; cur: Float32Array; top?: Float32Array; layers: ({ at: Int32Array; v: Float32Array } | null)[]; bounces: number[]; ms: number; ao?: LgAo }
   function build(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[]; lgPre?: LgData | null }) {
     const floors = map.floors || [map], pre = map.lgPre; map.lgPre = null;
     const d = pre && pre.W === map.W && pre.H === map.H && pre.NF === floors.length && pre.NB === BANDS && pre.layers.length === (map.doors || []).length ? pre : compute(map);
@@ -306,6 +328,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   function compute(map: LvMap): LgData {
     const L = Level, TS = L.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, N = W * H;
     const col = new T.Color(), DECAY = 1.6, t0 = performance.now();
+    const top = new Float32Array(N * NF * BANDS * 4), allLamps = map.lamps || []; // (top: per cell, the two lamps lighting it most: their numbers + 1, how much)
     const cur = new Float32Array(N * NF * BANDS * K), doors = map.doors || [], layers: (Map<number, Float32Array> | null)[] = doors.map(() => null), shutAt: Map<number, LvDoor>[] = [], winAt: Set<number>[] = [];
     // the sky: the theme's fill (as js/render.ts had it everywhere), on what's open to it (not the hangar's: its
     // daylight stays the flat fill)
@@ -354,6 +377,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
           if (blocked) continue;
           const a = Math.pow(1 - d / r, DECAY) * k;
           into(via, base + i, a, dx / d, dy / d, dz / d, a * (col.r + col.g + col.b) / 3);
+          if (!via) { const q = (base + i) * 4, lum = a * (col.r + col.g + col.b), n = allLamps.indexOf(l) + 1; if (lum > top[q + 1]) { top[q + 2] = top[q]; top[q + 3] = top[q + 1]; top[q] = n; top[q + 1] = lum; } else if (lum > top[q + 3]) { top[q + 2] = n; top[q + 3] = lum; } }
         }
       }
       // the sky: straight down on whatever's open to it; through an outside window (the city's glow), onto the room's
@@ -491,7 +515,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
       for (let i = 0; i < N; i++) { const o = (base + i) * K, k = keep(i); if (!lit[i]) continue; cur[o] += out[i * 4] * k; cur[o + 1] += out[i * 4 + 1] * k; cur[o + 2] += out[i * 4 + 2] * k; cur[o + 4] -= out[i * 4 + 3] * UP * k; cur[o + 6] += out[i * 4 + 3] * k; }
     }
     const ao = bakeAO(map);
-    return { W, H, NF, NB: BANDS, cur, bounces: bouncesUsed, ms: Math.round(performance.now() - t0), ao,
+    return { W, H, NF, NB: BANDS, cur, top, bounces: bouncesUsed, ms: Math.round(performance.now() - t0), ao,
       layers: layers.map((ly) => { if (!ly) return null; const at = Int32Array.from(ly.keys()), v = new Float32Array(at.length * K); let n = 0; for (const o of ly.values()) v.set(o, K * n++); return { at, v }; }) };
   }
   function install(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[] }, d: LgData) {
@@ -509,6 +533,17 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
     flush();
     U.lgLight.value = G0.tl; U.lgDir.value = G0.td;
     U.lgPaint.value = Homes.paint(map) || blank;
+    // the lamps' highlight (FS_BODY): each cell's two lamps by number (nearest: a number isn't blended), and the lamps (row 0 where,
+    // in the level's frame, and how far it reaches; row 1 its light, as the grid has it)
+    const lamps = map.lamps || [];
+    if (d.top && lamps.length) {
+      const ti = new Float32Array(N * NF * BANDS * 4); for (let i = 0; i < N * NF * BANDS; i++) { ti[i * 4] = d.top[i * 4]; ti[i * 4 + 1] = d.top[i * 4 + 2]; }
+      const tt = new T.DataTexture(ti, W, H * NF * BANDS, T.RGBAFormat, T.FloatType); tt.magFilter = tt.minFilter = T.NearestFilter; tt.generateMipmaps = false; tt.needsUpdate = true;
+      const lp = new Float32Array(lamps.length * 8), c = new T.Color();
+      lamps.forEach((l: LvLight, i: number) => { c.setHex(l.color!, T.LinearSRGBColorSpace); lp.set([l.x, l.y!, l.z, l.d!], i * 4); lp.set([c.r * l.i!, c.g * l.i!, c.b * l.i!, 0], (lamps.length + i) * 4); });
+      const lt = new T.DataTexture(lp, lamps.length, 2, T.RGBAFormat, T.FloatType); lt.magFilter = lt.minFilter = T.NearestFilter; lt.generateMipmaps = false; lt.needsUpdate = true;
+      U.lgTop.value = tt; U.lgLamps.value = lt;
+    }
     if (d.ao) {
       const aoTex = (data: Uint8Array) => { const tx = new T.DataTexture(data as Uint8Array<ArrayBuffer>, d.ao!.AW, d.ao!.AH * NF, T.RGBAFormat, T.UnsignedByteType); tx.magFilter = tx.minFilter = T.LinearFilter; tx.wrapS = tx.wrapT = T.ClampToEdgeWrapping; tx.generateMipmaps = false; tx.needsUpdate = true; return tx; };
       U.lgAoA.value = aoTex(d.ao.a); U.lgAoB.value = aoTex(d.ao.b); U.lgAo.value.z = 1; U.lgAo.value.w = L.FLOOR_H - L.WALL_H - 0.02; U.lgAo.value.y = L.WALL_H; // (w: the layer's start is this far under the floor)
@@ -552,7 +587,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   }
   function dispose() {
     if (held) { for (const t of [...held.cpu, ...held.gpu]) if (t && t !== blank) t.dispose(); held = null; }
-    for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoA', 'lgAoB'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
+    for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoA', 'lgAoB', 'lgTop', 'lgLamps'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
     U.lgAo.value.z = 0;
     G0 = null; built = false;
   }
