@@ -47,6 +47,7 @@ export const LightGrid = (() => {
     // reflections (js/probes.ts): lgEnvOn the level's being drawn (1; 0: three's own, as in a scene that isn't the level's: the gun's
     // studio), lgEnvK how much, lgEnvR how much less on a rough surface, the room's box the picture's projected on (lgEnvMin, lgEnvMax)
     // and where it was taken from (lgEnvC)
+    lgGrime: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('grime') : null; return q != null && Number.isFinite(+q) ? +q : 2.5; })() }, // (the level's grime, FS_BODY: 0 none; ?grime=k in the URL)
     lgEnvOn: { value: 0 }, lgEnvK: { value: 0 }, lgEnvR: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('reflr') : null; return q != null && Number.isFinite(+q) ? +q : 0.6; })() }, lgEnvMin: { value: new T.Vector3() }, lgEnvMax: { value: new T.Vector3(1, 1, 1) }, lgEnvC: { value: new T.Vector3() },
     lgBand: { value: new T.Vector4(1, 0.5, 1, 0) }, // the slabs of a floor: how many, the first one's middle, each one's height (m) // (z: the baked one's in; else the open share, below)
   };
@@ -75,7 +76,7 @@ export const LightGrid = (() => {
       #endif
       lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc + aOccD * lgAoK[int(aOccI + 0.5)]; }`; // (a moving part's occlusion on what's round it, as the part is in place: js/gunao.ts layers)
   const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nvarying float vOcc;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
-uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform vec2 lgLampAt;\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\nuniform float lgEnvOn;\nuniform float lgEnvK;\nuniform float lgEnvR;\nuniform vec3 lgEnvMin;\nuniform vec3 lgEnvMax;\nuniform vec3 lgEnvC;\n`;
+uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform vec2 lgLampAt;\nuniform float lgGrime;\nfloat lgHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\nfloat lgNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(lgHash(i), lgHash(i + vec2(1.0, 0.0)), f.x), mix(lgHash(i + vec2(0.0, 1.0)), lgHash(i + vec2(1.0, 1.0)), f.x), f.y); }\nfloat lgFbm(vec2 p) { return 0.5 * lgNoise(p) + 0.3 * lgNoise(p * 2.7 + 3.1) + 0.2 * lgNoise(p * 6.3 - 1.7); }\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\nuniform float lgEnvOn;\nuniform float lgEnvK;\nuniform float lgEnvR;\nuniform vec3 lgEnvMin;\nuniform vec3 lgEnvMax;\nuniform vec3 lgEnvC;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
   // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
   // its own side, as it does the light, so the room next door keeps its own, and so do a wall's faces once they've been
@@ -141,6 +142,22 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
       }
       float lgg = 1.0 - clamp(vOcc, 0.0, 1.0) * clamp(lgAo.x, 0.0, 1.0); // (a gun's own occlusion, js/gunao.ts: the fill and the grid's light)
       lgao *= lgg;
+      // Grime (the level's own surfaces: LG_GRIME, js/levelview.ts): dirt gathers where the room closes in (the occlusion: a wall's foot,
+      // a floor's edge, the corners, round and under what stands there), broken up by a noise in the world (on a wall stretched up and
+      // down: streaks), and a little everywhere in blotches. Dirt is darker and rougher than what it's on, and reflects less.
+      #if defined( LG_GRIME ) && defined( STANDARD )
+      if (lgGrime > 0.0) {
+        vec2 lgnp = abs(lgn.y) > 0.5 ? vLgP.xz * 2.2 : vec2((abs(lgn.x) > 0.5 ? vLgP.z : vLgP.x) * 3.2, vLgP.y * 0.8);
+        float lgn1 = lgFbm(lgnp), lgn2 = lgFbm(lgnp * 0.31 + 17.0);
+        float lggr = clamp(lgGrime * (smoothstep(0.04, 0.5, 1.0 - lgao) * (0.35 + 1.1 * lgn1) + 0.22 * smoothstep(0.55, 0.85, lgn2)), 0.0, 1.0);
+        vec3 lggc = mix(vec3(1.0), vec3(0.45, 0.41, 0.36), lggr);
+        diffuseColor.rgb *= lggc; material.diffuseColor *= lggc; material.diffuseContribution *= lggc;
+        material.roughness = mix(material.roughness, 1.0, 0.75 * lggr);
+        #if defined( RE_IndirectSpecular )
+        radiance *= 1.0 - 0.7 * lggr;
+        #endif
+      }
+      #endif
       #if defined( RE_IndirectDiffuse )
       irradiance *= lgg;
       #endif

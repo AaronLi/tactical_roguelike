@@ -205,7 +205,7 @@ export const LevelView = {
     }
     let m: THREE.Material;
     switch (sp.k) {
-      case 'std': m = new T.MeshStandardMaterial(o); if (sp.paint) (m as THREE.MeshStandardMaterial).defines!.LG_PAINT = 1; break; // (a resident's wallpaper: js/homes.ts paint)
+      case 'std': m = new T.MeshStandardMaterial(o); if (sp.paint) (m as THREE.MeshStandardMaterial).defines!.LG_PAINT = 1; if (!o.transparent) (m as THREE.MeshStandardMaterial).defines!.LG_GRIME = 1; break; // (grime on what's solid: js/lightgrid.ts) // (a resident's wallpaper: js/homes.ts paint)
       case 'basic': m = new T.MeshBasicMaterial(o); break;
       case 'points': m = new T.PointsMaterial(o); break;
       case 'line': m = new T.LineBasicMaterial(o); break;
@@ -363,8 +363,10 @@ export const LevelView = {
       band(1.04, 1.2, dk(0.5)); band(1.09, 1.15, acc); band(1.2, 1.21, lt(0.1)); // the rail
       band(0.25, 1.04, dk(0.1)); inset(8, Y(0.98), W - 16, Y(0.31) - Y(0.98)); for (const x of [15, W - 15]) for (const m of [0.92, 0.37]) bolt(x, Y(m));
       band(0, 0.25, dk(0.52)); for (let m = 0.04; m < 0.24; m += 0.05) band(m, m + 0.008, lt(0.07)); // the kick plate
-      for (let i = 0; i < 26; i++) { g.fillStyle = dk(0.05 + R() * 0.08); g.fillRect(R() * W, Y(0.25 + R() * 0.9), 4 + R() * 22, 1 + R() * 2); } // (scuffed, low down)
+      const scuffs: number[][] = [];
+      for (let i = 0; i < 26; i++) { const sc = [R() * W, Y(0.25 + R() * 0.9), 4 + R() * 22, 1 + R() * 2]; scuffs.push(sc); g.fillStyle = dk(0.05 + R() * 0.08); g.fillRect(sc[0], sc[1], sc[2], sc[3]); } // (scuffed, low down)
       rect(0, 0, 2, H, dk(0.42)); rect(W - 2, 0, 2, H, dk(0.42)); rect(2, 0, 1, H, lt(0.08)); // the joint with the next
+      extra = this._bulkheadMaps(W, H, scuffs);
     } else if (kd === 'deck') {
       const P = W / 2;
       for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {
@@ -403,7 +405,7 @@ export const LevelView = {
   // its pixels multiplied by their alpha, and the normals would lose their precision where the steel's polished.
   _deckMaps(W: number, P: number, scuffs: number[][]) {
     const mk = () => { const c = document.createElement('canvas'); c.width = c.height = W; return [c, c.getContext('2d')!] as const; };
-    const [hc, h] = mk(), [, r] = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
+    const [, h] = mk(), [, r] = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
     const box = (g: CanvasRenderingContext2D, x: number, y: number, w: number, hh: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, hh); };
     box(h, 0, 0, W, W, gv(128)); box(r, 0, 0, W, W, gv(176));
     for (let i = 0; i < 7; i++) { const x = R() * W, y = R() * W, rad = 30 + R() * 70, gr = r.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(110, 0.55)); gr.addColorStop(1, gv(110, 0)); r.fillStyle = gr; r.fillRect(0, 0, W, W); } // (worn)
@@ -420,18 +422,53 @@ export const LevelView = {
       h.lineWidth = 1; h.strokeStyle = gv(100); h.strokeRect(x0 + 3.5, y0 + 3.5, P - 7, P - 7); // (the plate's edge chamfered down to the seam)
       for (const [bx, by] of [[9, 9], [P - 9, 9], [9, P - 9], [P - 9, P - 9]]) dome(x0 + bx, y0 + by, 3.2);
     }
-    // the height as a normal: its slope each way (the tile repeats: the neighbours wrap), canvas y down being the texture's v down
-    { const [bc, b] = mk(); b.filter = 'blur(0.9px)'; b.drawImage(hc, 0, 0); h.drawImage(bc, 0, 0); } // (softened: a stud's edge a pixel wide glitters, sharp)
-    const hd = h.getImageData(0, 0, W, W).data, rd = r.getImageData(0, 0, W, W).data, o = new Uint8Array(W * W * 4), S = LevelView.BUMP, at = (x: number, y: number) => hd[((((y + W) % W) * W + ((x + W) % W)) << 2)];
-    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+    return { nrm: this._relief(h, r, W, W, LevelView.BUMP) };
+  },
+  // A ship's wall (_shipTex 'bulkhead': a tile's width, 128 px, by the wall's 4 m, 768: about 5 mm a pixel), as the deck's (_deckMaps), over
+  // the same bands as its paint: the ribbed plating's grooves, the vent's slots, the trunking and the rail standing out, the strip of light
+  // in its channel, the panels' edges sunk, the bolts' heads, the kick plate's ribs, the joint with the next. Painted steel 0.72; the rail
+  // worn smooth (0.4), the light's diffuser 0.3, the kick plate and the scuffs low down rubbed (0.55), dirt in the vent's slots and the joints.
+  _bulkheadMaps(W: number, H: number, scuffs: number[][]) {
+    const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c.getContext('2d')!; };
+    const h = mk(), r = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
+    const Y = (m: number) => Math.round(H * (1 - m / 4));
+    const both = (x: number, y: number, w: number, hh: number, hv: number, rv: number) => { if (hv >= 0) { h.fillStyle = gv(hv); h.fillRect(x, y, w, hh); } if (rv >= 0) { r.fillStyle = gv(rv); r.fillRect(x, y, w, hh); } };
+    const band = (m0: number, m1: number, hv: number, rv: number) => both(0, Y(m1), W, Y(m0) - Y(m1), hv, rv);
+    const inset = (x: number, y: number, w: number, hh: number) => { h.lineWidth = 2; h.strokeStyle = gv(70); h.strokeRect(x, y, w, hh); r.lineWidth = 2; r.strokeStyle = gv(220); r.strokeRect(x, y, w, hh); }; // (a panel's edge: a groove, dirty)
+    const bolt = (x: number, y: number, rad = 2.8) => { const gr = h.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(215)); gr.addColorStop(0.7, gv(185)); gr.addColorStop(1, gv(128, 0)); h.fillStyle = gr; h.beginPath(); h.arc(x, y, rad, 0, 7); h.fill(); r.fillStyle = gv(120); r.beginPath(); r.arc(x, y, rad * 0.8, 0, 7); r.fill(); };
+    both(0, 0, W, H, 128, 184);
+    for (let i = 0; i < W * H / 80; i++) { const v = R() * 2 - 1; r.fillStyle = v > 0 ? gv(255, v * 0.07) : gv(0, -v * 0.07); r.fillRect(R() * W, R() * H, 1, 6 + R() * 26); } // (brushed, up and down)
+    for (let m = 2.75; m < 3.7; m += 0.25) band(m, m + 0.012, 85, 210); // the plating's ribs: grooves
+    for (let x = 22; x < W - 22; x += 12) both(x, Y(3.4), 6, Y(3.06) - Y(3.4), 30, 235); // the vent's slots
+    inset(14, Y(3.46), W - 28, Y(3.0) - Y(3.46));
+    band(3.68, 3.86, 175, 170); band(3.86, 3.875, 150, -1); // the trunking, standing out, its lip
+    band(2.34, 2.5, 85, 200); band(2.37, 2.47, 115, 77); // the strip of light, in its channel: the diffuser smooth
+    inset(8, Y(2.28), W - 16, Y(1.26) - Y(2.28)); for (const x of [15, W - 15]) for (const m of [2.22, 1.32]) bolt(x, Y(m));
+    both(W - 46, Y(2.12), 28, 14, 140, 150); // the stencilled plate
+    band(1.04, 1.2, 200, 102); band(1.19, 1.2, 175, -1); band(1.04, 1.05, 175, -1); // the rail: standing out, its edges rounded, worn smooth
+    inset(8, Y(0.98), W - 16, Y(0.31) - Y(0.98)); for (const x of [15, W - 15]) for (const m of [0.92, 0.37]) bolt(x, Y(m));
+    band(0, 0.25, 150, 140); for (let m = 0.04; m < 0.24; m += 0.05) band(m, m + 0.008, 175, -1); // the kick plate, its ribs, rubbed
+    for (const sc of scuffs) both(sc[0], sc[1], sc[2], sc[3], -1, 140);
+    both(0, 0, 2, H, 60, 230); both(W - 2, 0, 2, H, 60, 230); // the joint with the next
+    return { nrm: this._relief(h, r, W, H, LevelView.BUMP * 1.5) }; // (its pixels 5 mm to the deck's 8: as steep for the same height)
+  },
+  // A relief and a roughness, drawn in grey (h: the height, 128 level; r: the roughness, 255 = 1), as one texture: rgb the normal (the
+  // height's slope each way, softened a little: a pixel-wide edge glitters; the tile repeats, so the neighbours wrap), a the roughness.
+  // Data, not colour (read as it is, where js/util.ts makes a canvas's texture sRGB), and made from the bytes, not a canvas: a canvas keeps
+  // its pixels multiplied by their alpha, and the normals would lose their precision where the steel's polished. S: how steep a step of
+  // the height is over a pixel.
+  _relief(h: CanvasRenderingContext2D, r: CanvasRenderingContext2D, W: number, H: number, S: number) {
+    { const c = document.createElement('canvas'); c.width = W; c.height = H; const b = c.getContext('2d')!; b.filter = 'blur(0.9px)'; b.drawImage(h.canvas, 0, 0); h.drawImage(c, 0, 0); }
+    const hd = h.getImageData(0, 0, W, H).data, rd = r.getImageData(0, 0, W, H).data, o = new Uint8Array(W * H * 4), at = (x: number, y: number) => hd[((((y + H) % H) * W + ((x + W) % W)) << 2)];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
       const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) / 8;
       const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) / 8;
       let nx = -dx * S, ny = dy * S, nz = 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
-      const k = ((W - 1 - y) * W + x) << 2; o[k] = Math.round((nx * 0.5 + 0.5) * 255); o[k + 1] = Math.round((ny * 0.5 + 0.5) * 255); o[k + 2] = Math.round((nz * 0.5 + 0.5) * 255); o[k + 3] = rd[((y * W + x) << 2) + 1]; // (rows bottom up: a canvas's texture is flipped, a texture of bytes isn't)
+      const k = ((H - 1 - y) * W + x) << 2; o[k] = Math.round((nx * 0.5 + 0.5) * 255); o[k + 1] = Math.round((ny * 0.5 + 0.5) * 255); o[k + 2] = Math.round((nz * 0.5 + 0.5) * 255); o[k + 3] = rd[((y * W + x) << 2) + 1]; // (rows bottom up: a canvas's texture is flipped, a texture of bytes isn't)
     }
-    const T = THREE, x = new T.DataTexture(o, W, W, T.RGBAFormat, T.UnsignedByteType);
+    const T = THREE, x = new T.DataTexture(o, W, H, T.RGBAFormat, T.UnsignedByteType);
     x.colorSpace = T.NoColorSpace; x.wrapS = x.wrapT = T.RepeatWrapping; x.anisotropy = 8; x.magFilter = T.LinearFilter; x.minFilter = T.LinearMipmapLinearFilter; x.generateMipmaps = true; x.needsUpdate = true;
-    return { nrm: x };
+    return x;
   },
   // how steep the deck's relief: a step of the height's 0..255 over a pixel (8 mm) as a slope (?bump=k in the URL scales it, for comparing)
   BUMP: 0.012 * (typeof location !== 'undefined' ? +(new URLSearchParams(location.search).get('bump') || 1) : 1),
