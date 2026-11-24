@@ -212,6 +212,8 @@ export const LevelView = {
       case 'outside': m = FurnMesh.outsideMaterial(U.rng(sp.seed), sp.drop); break; // (the city past an outside window: js/furnmesh.ts)
       default: throw new Error('level: no material ' + sp.k);
     }
+    const ex = o.map && o.map.userData && o.map.userData.maps; // (a ship's deck: its relief and wear, _deckMaps, repeated as its colour is)
+    if (ex && m instanceof T.MeshStandardMaterial) { ex.nrm.repeat.copy(o.map.repeat); ex.rgh.repeat.copy(o.map.repeat); m.normalMap = ex.nrm; m.roughnessMap = ex.rgh; m.roughness = 1; }
     if (sp.dim != null) (m as THREE.MeshStandardMaterial).color.multiplyScalar(sp.dim); // (dead glass: its colour dimmed in linear light, as three's Color(hex).multiplyScalar)
     return (ctx.mats[i] = m);
   },
@@ -310,6 +312,7 @@ export const LevelView = {
   //   cargo     a container's side: corrugated, framed, a band of her colour and a label
   _shipTex(kd: string, base: string, acc: string) {
     const wallK = kd === 'bulkhead' || kd === 'lbulkhead', W = wallK ? 128 : 256, H = wallK ? 768 : 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+    let extra: { nrm: THREE.Texture; rgh: THREE.Texture } | null = null;
     const g = c.getContext('2d')!, dk = (a: number) => `rgba(0,0,0,${a})`, lt = (a: number) => `rgba(255,255,255,${a})`, R = Math.random;
     const rect = (x: number, y: number, w: number, h: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, h); };
     const inset = (x: number, y: number, w: number, h: number) => { g.lineWidth = 2; g.strokeStyle = dk(0.3); g.strokeRect(x, y, w, h); g.lineWidth = 1; g.strokeStyle = lt(0.1); g.strokeRect(x + 2, y + 2, w - 4, h - 4); };
@@ -373,7 +376,9 @@ export const LevelView = {
         g.lineWidth = 3; g.strokeStyle = dk(0.5); g.strokeRect(x0 + 1.5, y0 + 1.5, P - 3, P - 3); g.lineWidth = 1; g.strokeStyle = lt(0.09); g.strokeRect(x0 + 4.5, y0 + 4.5, P - 9, P - 9);
         for (const [bx, by] of [[9, 9], [P - 9, 9], [9, P - 9], [P - 9, P - 9]]) bolt(x0 + bx, y0 + by, 2.6);
       }
-      for (let i = 0; i < 40; i++) { g.fillStyle = dk(0.04 + R() * 0.07); g.fillRect(R() * W, R() * H, 8 + R() * 40, 1 + R() * 2); } // (walked on)
+      const scuffs: number[][] = [];
+      for (let i = 0; i < 40; i++) { const sc = [R() * W, R() * H, 8 + R() * 40, 1 + R() * 2]; scuffs.push(sc); g.fillStyle = dk(0.04 + R() * 0.07); g.fillRect(sc[0], sc[1], sc[2], sc[3]); } // (walked on)
+      extra = this._deckMaps(W, P, scuffs);
     } else if (kd === 'overhead') {
       rect(0, 0, W, 18, dk(0.4)); rect(0, 18, W, 2, lt(0.08)); rect(0, 0, 18, H, dk(0.4)); rect(18, 0, 2, H, lt(0.08)); // the frames
       inset(34, 34, W - 50, H - 50); rect(W / 2 + 20, 20, 22, H - 20, dk(0.32)); for (let y = 30; y < H; y += 22) rect(W / 2 + 22, y, 18, 2, lt(0.08)); // a cable run
@@ -386,8 +391,47 @@ export const LevelView = {
       rect(34, 38, 74, 44, '#e6e8e4'); for (let x = 40; x < 100; x += 3 + ((x * 7) % 5)) rect(x, 44, 1 + (x % 3), 20, '#15181a'); rect(40, 69, 46, 5, '#15181a'); // a label
     }
     const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
+    if (extra) tex.userData.maps = extra; // (the deck's relief and wear: mat puts them on its material)
     return tex;
   },
+  // A deck's relief and wear, drawn over the same plates as its colour (_shipTex 'deck'; scuffs: where it drew the marks of boots):
+  //   nrm  a normal map from a height: the seams sunk ~2 mm, the studs and bolts' heads standing ~2 mm, the grating's slots through
+  //   rgh  its roughness (three reads green, times the material's, which is 1 with it): steel 0.69 and brushed, polished where
+  //        boots go (a few broad patches, the studs' tops a little, the scuffs, the bolts' heads), dirt rough in the seams and the slots
+  _deckMaps(W: number, P: number, scuffs: number[][]) {
+    const mk = () => { const c = document.createElement('canvas'); c.width = c.height = W; return [c, c.getContext('2d')!] as const; };
+    const [hc, h] = mk(), [rc, r] = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
+    const box = (g: CanvasRenderingContext2D, x: number, y: number, w: number, hh: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, hh); };
+    box(h, 0, 0, W, W, gv(128)); box(r, 0, 0, W, W, gv(176));
+    for (let i = 0; i < 7; i++) { const x = R() * W, y = R() * W, rad = 30 + R() * 70, gr = r.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(110, 0.55)); gr.addColorStop(1, gv(110, 0)); r.fillStyle = gr; r.fillRect(0, 0, W, W); } // (worn)
+    for (let i = 0; i < W * W / 60; i++) { const v = R() * 2 - 1; r.fillStyle = v > 0 ? gv(255, v * 0.08) : gv(0, -v * 0.08); r.fillRect(R() * W, R() * W, 3 + R() * 14, 1); } // (brushed)
+    for (const sc of scuffs) box(r, sc[0], sc[1], sc[2], sc[3], gv(100, 0.5));
+    const dome = (x: number, y: number, rad: number) => { const gr = h.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(215)); gr.addColorStop(0.7, gv(185)); gr.addColorStop(1, gv(128, 0)); h.fillStyle = gr; h.beginPath(); h.arc(x, y, rad, 0, 7); h.fill(); r.fillStyle = gv(115); r.beginPath(); r.arc(x, y, rad * 0.8, 0, 7); r.fill(); };
+    for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {
+      const x0 = px * P, y0 = py * P;
+      if (px === 1 && py === 0) {
+        box(h, x0 + 6, y0 + 6, P - 12, P - 12, gv(100)); box(r, x0 + 6, y0 + 6, P - 12, P - 12, gv(200));
+        for (let y = y0 + 12; y < y0 + P - 12; y += 9) for (let x = x0 + 12; x < x0 + P - 14; x += 26) { box(h, x, y, 20, 4, gv(20)); box(r, x, y, 20, 4, gv(240)); }
+      } else for (let y = y0 + 14; y < y0 + P - 10; y += 12) for (let x = x0 + 14 + ((y / 12) & 1) * 6; x < x0 + P - 10; x += 12) { box(h, x, y, 4, 2, gv(195)); box(r, x, y, 4, 2, gv(145)); }
+      for (const [g, v, lw] of [[h, 50, 3], [r, 240, 3]] as const) { g.lineWidth = lw; g.strokeStyle = gv(v); g.strokeRect(x0 + 1.5, y0 + 1.5, P - 3, P - 3); }
+      h.lineWidth = 1; h.strokeStyle = gv(100); h.strokeRect(x0 + 3.5, y0 + 3.5, P - 7, P - 7); // (the plate's edge chamfered down to the seam)
+      for (const [bx, by] of [[9, 9], [P - 9, 9], [9, P - 9], [P - 9, P - 9]]) dome(x0 + bx, y0 + by, 3.2);
+    }
+    // the height as a normal: its slope each way (the tile repeats: the neighbours wrap), canvas y down being the texture's v down
+    { const [bc, b] = mk(); b.filter = 'blur(0.9px)'; b.drawImage(hc, 0, 0); h.drawImage(bc, 0, 0); } // (softened: a stud's edge a pixel wide glitters, sharp)
+    const hd = h.getImageData(0, 0, W, W).data, out = h.createImageData(W, W), o = out.data, S = LevelView.BUMP, at = (x: number, y: number) => hd[((((y + W) % W) * W + ((x + W) % W)) << 2)];
+    for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
+      const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) / 8;
+      const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) / 8;
+      let nx = -dx * S, ny = dy * S, nz = 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+      const k = (y * W + x) << 2; o[k] = (nx * 0.5 + 0.5) * 255; o[k + 1] = (ny * 0.5 + 0.5) * 255; o[k + 2] = (nz * 0.5 + 0.5) * 255; o[k + 3] = 255;
+    }
+    h.putImageData(out, 0, 0);
+    const t = (c: HTMLCanvasElement) => { const x = new THREE.CanvasTexture(c); x.wrapS = x.wrapT = THREE.RepeatWrapping; x.anisotropy = 8; return x; };
+    return { nrm: t(hc), rgh: t(rc) };
+  },
+  // how steep the deck's relief: a step of the height's 0..255 over a pixel (8 mm) as a slope (?bump=k in the URL scales it, for comparing)
+  BUMP: 0.012 * (typeof location !== 'undefined' ? +(new URLSearchParams(location.search).get('bump') || 1) : 1),
   _tex(kind: string, base: string) {
     if (kind.indexOf(':') > 0) { const [kd, acc] = kind.split(':'); return this._shipTex(kd, base, acc); }
     const c = document.createElement('canvas');
