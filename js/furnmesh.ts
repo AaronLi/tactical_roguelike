@@ -141,6 +141,8 @@ export const FurnMesh = (() => {
           const extra: Record<string, any> = {};
           if (x) for (const key of Object.keys(x)) extra[key] = key === 'map' ? texOf(x.map) : x[key];
           b = new T.MeshStandardMaterial(Object.assign({ color: 0xffffff, roughness: m.r, metalness: m.m, vertexColors: true }, extra));
+          const rel = extra.map && extra.map.userData && extra.map.userData.maps; // (a ship's container: its relief and wear, js/levelview.ts _shipMaps; roughness in the alpha)
+          if (rel) { const sm = b as THREE.MeshStandardMaterial; rel.nrm.repeat.copy(extra.map.repeat); sm.normalMap = rel.nrm; sm.roughness = 1; sm.defines!.LG_RGH_NA = 1; }
           finish.set(fk, b);
         }
         bases[i] = b; cols[i] = new T.Color(m.c);

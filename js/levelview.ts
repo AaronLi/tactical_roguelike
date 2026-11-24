@@ -392,6 +392,7 @@ export const LevelView = {
       for (const [x, y] of [[0, 0], [W - 22, 0], [0, H - 22], [W - 22, H - 22]]) { rect(x, y, 22, 22, dk(0.35)); rect(x + 7, y + 7, 8, 8, dk(0.5)); } // corner castings
       rect(34, 38, 74, 44, '#e6e8e4'); for (let x = 40; x < 100; x += 3 + ((x * 7) % 5)) rect(x, 44, 1 + (x % 3), 20, '#15181a'); rect(40, 69, 46, 5, '#15181a'); // a label
     }
+    if (!extra) extra = this._shipMaps(kd, W, H); // (the rest of her surfaces' relief and wear)
     const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
     if (extra) tex.userData.maps = extra; // (the deck's relief and wear: mat puts them on its material)
     return tex;
@@ -451,6 +452,61 @@ export const LevelView = {
     for (const sc of scuffs) both(sc[0], sc[1], sc[2], sc[3], -1, 140);
     both(0, 0, 2, H, 60, 230); both(W - 2, 0, 2, H, 60, 230); // the joint with the next
     return { nrm: this._relief(h, r, W, H, LevelView.BUMP * 1.5) }; // (its pixels 5 mm to the deck's 8: as steep for the same height)
+  },
+  // The rest of a ship's surfaces' relief and wear (as _deckMaps, _bulkheadMaps: over the same layout as _shipTex paints; h the height,
+  // 128 level, r the roughness, 255 = 1):
+  //   lbulkhead  a liner's wall: the plinth sunk under its line of light, the walnut slats standing out of their dark gaps (rounded,
+  //              oiled: 0.5), the brass inlay polished (0.25), the stone panel honed (0.4), the cove's slot and its shadow gap sunk
+  //   ldeck      her carpet: a pile (a fine roughness of height, 0.95), the bands' tufts a little higher, the brass hairline (0.35)
+  //   loverhead  her ceiling: matte panels (0.85), the joints sunk, the slot of light sunk behind a smooth diffuser, its brass lips
+  //   overhead   a ship's ceiling: the frames standing out (0.55), the recessed panel, the cable run and its ties, the bolts
+  //   cargo      a container's side: corrugated (ridges and valleys, painted 0.6), the frame and the corner castings standing out,
+  //              their pockets sunk, the label a smooth sticker (0.35)
+  // A wall's pixels and a ceiling's are about 5 mm (the deck's 8); the container's about 9.
+  _shipMaps(kd: string, W: number, H: number): { nrm: THREE.Texture } | null {
+    if (!['lbulkhead', 'ldeck', 'loverhead', 'overhead', 'cargo'].includes(kd)) return null;
+    const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c.getContext('2d')!; };
+    const h = mk(), r = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
+    const both = (x: number, y: number, w: number, hh: number, hv: number, rv: number) => { if (hv >= 0) { h.fillStyle = gv(hv); h.fillRect(x, y, w, hh); } if (rv >= 0) { r.fillStyle = gv(rv); r.fillRect(x, y, w, hh); } };
+    const groove = (x: number, y: number, w: number, hh: number, hv = 70, rv = 220, lw = 2) => { h.lineWidth = lw; h.strokeStyle = gv(hv); h.strokeRect(x, y, w, hh); r.lineWidth = lw; r.strokeStyle = gv(rv); r.strokeRect(x, y, w, hh); };
+    const bolt = (x: number, y: number, rad = 3) => { const gr = h.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(215)); gr.addColorStop(0.7, gv(185)); gr.addColorStop(1, gv(128, 0)); h.fillStyle = gr; h.beginPath(); h.arc(x, y, rad, 0, 7); h.fill(); r.fillStyle = gv(120); r.beginPath(); r.arc(x, y, rad * 0.8, 0, 7); r.fill(); };
+    const grain = (n: number, a: number, vert: boolean) => { for (let i = 0; i < n; i++) { const v = R() * 2 - 1; r.fillStyle = v > 0 ? gv(255, v * a) : gv(0, -v * a); if (vert) r.fillRect(R() * W, R() * H, 1, 6 + R() * 26); else r.fillRect(R() * W, R() * H, 3 + R() * 14, 1); } };
+    let S = LevelView.BUMP * 1.5;
+    if (kd === 'lbulkhead') {
+      const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, hv: number, rv: number) => both(0, Y(m1), W, Y(m0) - Y(m1), hv, rv);
+      both(0, 0, W, H, 128, 102); // (the stone, honed)
+      band(3.72, 4, 40, 230); band(3.66, 3.72, 70, 77); // the shadow gap, the cove's slot
+      band(0.12, 2.56, 70, 215); // the slats' gaps
+      for (let x = 0; x < W; x += 16) { both(x + 2, Y(2.56), 11, Y(0.12) - Y(2.56), 165, 128); both(x + 2, Y(2.56), 2, Y(0.12) - Y(2.56), 148, -1); both(x + 11, Y(2.56), 2, Y(0.12) - Y(2.56), 148, -1); } // (rounded at their edges)
+      for (let i = 0; i < 90; i++) { const x = Math.floor(R() * W / 16) * 16 + 3 + R() * 9; r.fillStyle = gv(R() < 0.5 ? 150 : 110, 0.5); r.fillRect(x, Y(2.56) + R() * (Y(0.12) - Y(2.56)), 1, 14 + R() * 60); } // (the walnut's grain)
+      band(2.56, 2.6, 142, 64); // the brass inlay
+      band(0, 0.1, 95, 205); band(0.1, 0.125, 110, 77); // the plinth, its line of light
+    } else if (kd === 'ldeck') {
+      S = LevelView.BUMP * 0.6; // (soft: a pile, not steel)
+      both(0, 0, W, H, 128, 242);
+      for (let i = 0; i < 9000; i++) { h.fillStyle = gv(R() < 0.5 ? 150 : 106, 0.6); h.fillRect(R() * W, R() * H, 1 + R(), 1 + R()); } // the pile
+      for (let y = 0; y < H; y += 64) { h.fillStyle = gv(140, 0.5); h.fillRect(0, y, W, 30); } // the bands' tufts, a little higher
+      groove(0.75, 0.75, W - 1.5, H - 1.5, 140, 90, 1.5); // the brass hairline
+    } else if (kd === 'loverhead') {
+      both(0, 0, W, H, 128, 216); grain(W * H / 200, 0.04, false);
+      groove(0.5, 0.5, W - 1, H - 1, 60, 230, 2); both(W / 2 - 1, 0, 2, H, 60, 230); // the panels' joints
+      both(0, H / 2 - 5, W, 10, 60, 230); both(0, H / 2 - 3, W, 6, 95, 70); both(0, H / 2 - 5, W, 1, 150, 64); both(0, H / 2 + 4, W, 1, 150, 64); // the slot of light: its diffuser, the brass lips
+    } else if (kd === 'overhead') {
+      both(0, 0, W, H, 128, 190); grain(W * H / 60, 0.07, false);
+      both(0, 0, W, 18, 175, 140); both(0, 0, 18, H, 175, 140); both(0, 18, W, 2, 150, -1); both(18, 0, 2, H, 150, -1); // the frames
+      both(36, 36, W - 54, H - 54, 105, -1); groove(34, 34, W - 50, H - 50, 70, 220, 2); // the recessed panel
+      both(W / 2 + 20, 20, 22, H - 20, 180, 175); for (let y = 30; y < H; y += 22) both(W / 2 + 20, y, 22, 2, 200, 150); // the cable run, its ties
+      for (const [x, y] of [[9, 9], [42, 42], [W - 24, 42], [42, H - 24], [W - 24, H - 24]]) bolt(x, y);
+    } else { // cargo
+      S = LevelView.BUMP * 0.9;
+      both(0, 0, W, H, 150, 154); grain(W * H / 80, 0.06, true);
+      for (let x = 14; x < W - 14; x += 16) { both(x, 14, 8, H - 28, 95, 160); both(x - 1, 14, 1, H - 28, 115, -1); both(x + 8, 14, 1, H - 28, 125, -1); } // corrugated: the valleys, their sloped sides
+      h.lineWidth = 14; h.strokeStyle = gv(205); h.strokeRect(7, 7, W - 14, H - 14); r.lineWidth = 14; r.strokeStyle = gv(170); r.strokeRect(7, 7, W - 14, H - 14); // the frame
+      for (const [x, y] of [[0, 0], [W - 22, 0], [0, H - 22], [W - 22, H - 22]]) { both(x, y, 22, 22, 225, 150); both(x + 7, y + 7, 8, 8, 60, 230); } // corner castings, their pockets
+      both(34, 38, 74, 44, -1, 90); // the label
+      for (let i = 0; i < 30; i++) both(R() * W, R() * H, 2 + R() * 30, 1 + R() * 2, -1, 120); // (scraped: bare and smooth)
+    }
+    return { nrm: this._relief(h, r, W, H, S) };
   },
   // A relief and a roughness, drawn in grey (h: the height, 128 level; r: the roughness, 255 = 1), as one texture: rgb the normal (the
   // height's slope each way, softened a little: a pixel-wide edge glitters; the tile repeats, so the neighbours wrap), a the roughness.
