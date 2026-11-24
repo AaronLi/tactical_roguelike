@@ -12,6 +12,7 @@ import { LightGrid } from './lightgrid.js';
 import { GpuAo } from './gpuao.js';
 import { Probes } from './probes.js';
 import { EntShadows } from './entshadows.js';
+import { ProxyDraw } from './proxydraw.js';
 import { ReplayEnv } from './replayenv.js';
 import { Rig } from './rig.js';
 import { TONE } from './tone.js';
@@ -149,7 +150,7 @@ export const R = {
     r.shadowMap.enabled = true; // (only the weapon lights cast any: this.spots)
     document.body.prepend(r.domElement);
     this.scene = new THREE.Scene();
-    this.scene.onBeforeRender = () => { Probes.before(); EntShadows.before(); }; // (what's only for the level's scene: the room's reflection, the people's shadows)
+    this.scene.onBeforeRender = () => { ProxyDraw.sync(); Probes.before(); EntShadows.before(); }; // (what's only for the level's scene: the room's reflection, the people's shadows)
     this.scene.onAfterRender = () => { Probes.after(); EntShadows.after(); };
     this.scene.background = new THREE.Color(0x0b0d10);
     this.scene.fog = new THREE.Fog(0x0b0d10, 8, 60);
@@ -401,7 +402,7 @@ export const R = {
   // What's left of the level's static pieces after LevelView's merge (alone in their block with their material, and the merged
   // blocks themselves) drawn as BatchedMeshes, a call a material (js/levelview.ts batchStatic): not what moves or changes (keepOf).
   // Once nothing else is going to cut or reshape its meshes (js/space.ts does, putting a ship together): they're out of the scene after.
-  batchLevel(map: LvMap) { if (new URLSearchParams(location.search).has('nolvbatch')) return; /* (?nolvbatch: as merged, for comparing) */ if (this.levelView && this.levelView.parent === this.levelRoot) LevelView.batchStatic(this.levelView, LevelView.keepOf(map)); },
+  batchLevel(map: LvMap) { if (new URLSearchParams(location.search).has('nolvbatch')) return; /* (?nolvbatch: as merged, for comparing) */ if (this.levelView && this.levelView.parent === this.levelRoot) { LevelView.batchStatic(this.levelView, LevelView.keepOf(map)); ProxyDraw.doors(map, this.levelRoot); } }, // (and the doors, a call a material: js/proxydraw.ts)
   clearLevel() {
     for (const tr of this.trails || []) this.trailDrop(tr);
     this.trails = []; this.lastShot = null;
@@ -422,7 +423,7 @@ export const R = {
       });
     };
     GpuAo.dispose();
-    Probes.clear();
+    Probes.clear(); ProxyDraw.clear();
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
     this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false)); this.craters.forEach((m) => (m.visible = false));
@@ -631,6 +632,7 @@ export const R = {
     this.bloodIdx = 0;
     this.pools = [];
     for (let i = 0; i < 24; i++) { const m = new THREE.Mesh(bgeo, this.bloodMats.pool); m.visible = false; m.rotation.x = -Math.PI / 2; m.userData = {}; this.scene.add(m); this.pools.push(m); }
+    ProxyDraw.marks(this.bloodMarks, this.scene, [this.bloodMats.drop, this.bloodMats.spatter, this.bloodMats.pool]); ProxyDraw.marks(this.pools, this.scene, [this.bloodMats.pool]); // (each pool a call a material: js/proxydraw.ts)
     this.poolIdx = 0;
     this.pBlood = new Uint8Array(this.PN);
     // a wound's stream: fine drops, many of them, in a pool of their own (a few bleeding bodies would otherwise use up the shared

@@ -37,7 +37,7 @@ export const InteriorCull = (() => {
     const units: Unit[] = [], inv = new T.Matrix4(), M = new T.Matrix4(), s = new T.Sphere();
     t.root.updateMatrixWorld(true); inv.copy(t.root.matrixWorld).invert();
     t.root.traverse((o: any) => {
-      if (!o.isMesh || o.isInstancedMesh) return; // (an instanced mesh, her walls, is everywhere: always drawn)
+      if (!o.isMesh || o.isInstancedMesh || o.userData.proxied) return; // (an instanced mesh, her walls, is everywhere: always drawn; a door drawn in a batch of js/proxydraw.ts isn't drawn itself)
       if (o.isBatchedMesh) {
         const bm = o as THREE.BatchedMesh, n = (bm as any)._instanceInfo ? (bm as any)._instanceInfo.length : 0;
         for (let id = 0; id < n; id++) {
