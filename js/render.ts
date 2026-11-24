@@ -10,6 +10,7 @@ import { GunModels } from './gunmodels.js';
 import { Highlights } from './highlights.js';
 import { LightGrid } from './lightgrid.js';
 import { GpuAo } from './gpuao.js';
+import { Probes } from './probes.js';
 import { ReplayEnv } from './replayenv.js';
 import { Rig } from './rig.js';
 import { TONE } from './tone.js';
@@ -295,6 +296,7 @@ export const R = {
     // what stops a weapon light: the level, bar what you can see through (glass, a grating)
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
+    Probes.level(map, this.scene, this.renderer); // (reflections: js/probes.ts)
     { const gpu = GpuAo.bake(this.renderer, this.scene, this.levelRoot, map); if (gpu) { LightGrid.useGpuAo(gpu.a, gpu.b); (map as any).gpuAoMs = gpu.ms; } } // (the occlusion from the meshes on the GPU: ?gpuao=1, js/gpuao.ts)
     if (!map.sp && !map.theme.hub) this.batchLevel(map); // (a ship's: once she's all put together, js/space.ts enter)
     const th = map.theme;
@@ -413,10 +415,11 @@ export const R = {
         // (its textures freed, not the material: disposing one has three drop its shader once nothing else uses it, and the next
         // level, drawn with the same lights and materials of the same kinds, would build the same shader again. Kept, every
         // shader's built once a session: lightPad)
-        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); }); // (keepMat: shared, js/scars.ts's)
+        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null; normalMap?: THREE.Texture | null; roughnessMap?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); if (m.normalMap) m.normalMap.dispose(); if (m.roughnessMap) m.roughnessMap.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
     };
     GpuAo.dispose();
+    Probes.clear();
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
     this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false)); this.craters.forEach((m) => (m.visible = false));
@@ -2047,6 +2050,7 @@ export const R = {
       this._nvTargets(sz.x, sz.y);
       this.nvRT!.texture.generateMipmaps = false; // (made once, after the last of the frame's drawn into it)
     } else { this.nvFrame = 0; this.nvHeatAt = -1; }
+    if (ReplayEnv.Game && ReplayEnv.Game.phase === 'level') Probes.frame(r, this.scene, this.camera.position, this.levelRoot); // (the room's reflection: its picture taken a face a frame, js/probes.ts)
     for (const f of this.feeds) f(r);
     // the scope picture: only rendered while you're bringing the gun up or looking through it
     const pip = this.vm && this.vm.visible && this.vm.userData.pip, live = this.pipLive || 0;

@@ -213,7 +213,7 @@ export const LevelView = {
       default: throw new Error('level: no material ' + sp.k);
     }
     const ex = o.map && o.map.userData && o.map.userData.maps; // (a ship's deck: its relief and wear, _deckMaps, repeated as its colour is)
-    if (ex && m instanceof T.MeshStandardMaterial) { ex.nrm.repeat.copy(o.map.repeat); ex.rgh.repeat.copy(o.map.repeat); m.normalMap = ex.nrm; m.roughnessMap = ex.rgh; m.roughness = 1; }
+    if (ex && m instanceof T.MeshStandardMaterial) { ex.nrm.repeat.copy(o.map.repeat); m.normalMap = ex.nrm; m.roughness = 1; m.defines!.LG_RGH_NA = 1; } // (its roughness in the normal map's alpha: js/lightgrid.ts)
     if (sp.dim != null) (m as THREE.MeshStandardMaterial).color.multiplyScalar(sp.dim); // (dead glass: its colour dimmed in linear light, as three's Color(hex).multiplyScalar)
     return (ctx.mats[i] = m);
   },
@@ -312,7 +312,7 @@ export const LevelView = {
   //   cargo     a container's side: corrugated, framed, a band of her colour and a label
   _shipTex(kd: string, base: string, acc: string) {
     const wallK = kd === 'bulkhead' || kd === 'lbulkhead', W = wallK ? 128 : 256, H = wallK ? 768 : 256, c = document.createElement('canvas'); c.width = W; c.height = H;
-    let extra: { nrm: THREE.Texture; rgh: THREE.Texture } | null = null;
+    let extra: { nrm: THREE.Texture } | null = null;
     const g = c.getContext('2d')!, dk = (a: number) => `rgba(0,0,0,${a})`, lt = (a: number) => `rgba(255,255,255,${a})`, R = Math.random;
     const rect = (x: number, y: number, w: number, h: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, h); };
     const inset = (x: number, y: number, w: number, h: number) => { g.lineWidth = 2; g.strokeStyle = dk(0.3); g.strokeRect(x, y, w, h); g.lineWidth = 1; g.strokeStyle = lt(0.1); g.strokeRect(x + 2, y + 2, w - 4, h - 4); };
@@ -394,13 +394,16 @@ export const LevelView = {
     if (extra) tex.userData.maps = extra; // (the deck's relief and wear: mat puts them on its material)
     return tex;
   },
-  // A deck's relief and wear, drawn over the same plates as its colour (_shipTex 'deck'; scuffs: where it drew the marks of boots):
-  //   nrm  a normal map from a height: the seams sunk ~2 mm, the studs and bolts' heads standing ~2 mm, the grating's slots through
-  //   rgh  its roughness (three reads green, times the material's, which is 1 with it): steel 0.69 and brushed, polished where
+  // A deck's relief and wear, drawn over the same plates as its colour (_shipTex 'deck'; scuffs: where it drew the marks of boots), as one
+  // texture (a shader can read only 16: the light grid's, a weapon light's shadows and the room's reflection leave a deck room for two):
+  //   rgb  a normal map from a height: the seams sunk ~2 mm, the studs and bolts' heads standing ~2 mm, the grating's slots through
+  //   a    its roughness (js/lightgrid.ts LG_RGH_NA: times the material's, which is 1 with it): steel 0.69 and brushed, polished where
   //        boots go (a few broad patches, the studs' tops a little, the scuffs, the bolts' heads), dirt rough in the seams and the slots
+  // Data, not colour (read as it is, where js/util.ts makes a canvas's texture sRGB), and made from the bytes, not a canvas: a canvas keeps
+  // its pixels multiplied by their alpha, and the normals would lose their precision where the steel's polished.
   _deckMaps(W: number, P: number, scuffs: number[][]) {
     const mk = () => { const c = document.createElement('canvas'); c.width = c.height = W; return [c, c.getContext('2d')!] as const; };
-    const [hc, h] = mk(), [rc, r] = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
+    const [hc, h] = mk(), [, r] = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
     const box = (g: CanvasRenderingContext2D, x: number, y: number, w: number, hh: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, hh); };
     box(h, 0, 0, W, W, gv(128)); box(r, 0, 0, W, W, gv(176));
     for (let i = 0; i < 7; i++) { const x = R() * W, y = R() * W, rad = 30 + R() * 70, gr = r.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(110, 0.55)); gr.addColorStop(1, gv(110, 0)); r.fillStyle = gr; r.fillRect(0, 0, W, W); } // (worn)
@@ -419,16 +422,16 @@ export const LevelView = {
     }
     // the height as a normal: its slope each way (the tile repeats: the neighbours wrap), canvas y down being the texture's v down
     { const [bc, b] = mk(); b.filter = 'blur(0.9px)'; b.drawImage(hc, 0, 0); h.drawImage(bc, 0, 0); } // (softened: a stud's edge a pixel wide glitters, sharp)
-    const hd = h.getImageData(0, 0, W, W).data, out = h.createImageData(W, W), o = out.data, S = LevelView.BUMP, at = (x: number, y: number) => hd[((((y + W) % W) * W + ((x + W) % W)) << 2)];
+    const hd = h.getImageData(0, 0, W, W).data, rd = r.getImageData(0, 0, W, W).data, o = new Uint8Array(W * W * 4), S = LevelView.BUMP, at = (x: number, y: number) => hd[((((y + W) % W) * W + ((x + W) % W)) << 2)];
     for (let y = 0; y < W; y++) for (let x = 0; x < W; x++) {
       const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) / 8;
       const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) / 8;
       let nx = -dx * S, ny = dy * S, nz = 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
-      const k = (y * W + x) << 2; o[k] = (nx * 0.5 + 0.5) * 255; o[k + 1] = (ny * 0.5 + 0.5) * 255; o[k + 2] = (nz * 0.5 + 0.5) * 255; o[k + 3] = 255;
+      const k = ((W - 1 - y) * W + x) << 2; o[k] = Math.round((nx * 0.5 + 0.5) * 255); o[k + 1] = Math.round((ny * 0.5 + 0.5) * 255); o[k + 2] = Math.round((nz * 0.5 + 0.5) * 255); o[k + 3] = rd[((y * W + x) << 2) + 1]; // (rows bottom up: a canvas's texture is flipped, a texture of bytes isn't)
     }
-    h.putImageData(out, 0, 0);
-    const t = (c: HTMLCanvasElement) => { const x = new THREE.CanvasTexture(c); x.colorSpace = THREE.NoColorSpace; x.wrapS = x.wrapT = THREE.RepeatWrapping; x.anisotropy = 8; return x; };
-    return { nrm: t(hc), rgh: t(rc) }; // (data, not colour: read as they are, where js/util.ts makes a canvas's texture sRGB)
+    const T = THREE, x = new T.DataTexture(o, W, W, T.RGBAFormat, T.UnsignedByteType);
+    x.colorSpace = T.NoColorSpace; x.wrapS = x.wrapT = T.RepeatWrapping; x.anisotropy = 8; x.magFilter = T.LinearFilter; x.minFilter = T.LinearMipmapLinearFilter; x.generateMipmaps = true; x.needsUpdate = true;
+    return { nrm: x };
   },
   // how steep the deck's relief: a step of the height's 0..255 over a pixel (8 mm) as a slope (?bump=k in the URL scales it, for comparing)
   BUMP: 0.012 * (typeof location !== 'undefined' ? +(new URLSearchParams(location.search).get('bump') || 1) : 1),

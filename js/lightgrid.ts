@@ -35,7 +35,7 @@ export const LightGrid = (() => {
     lgSize: { value: new T.Vector4(1, 1, 1, 0) }, // W, H (cells), floors, where the lowest floor's layer starts (y)
     lgFloorH: { value: 4.3 },
     // the lamps' highlight's strength (FS_BODY: 0 none, 1 as a lamp's own would be; ?spec=k in the URL for comparing)
-    lgTop: { value: blank }, lgLamps: { value: blank }, // (the two lamps that light each cell most, by number; the lamps: where, how far, their light)
+    lgTop: { value: blank }, lgLampAt: { value: new T.Vector2(1, 0) }, // (the four lamps that light each cell most, by number, and under them the lamps: where, how far, their light; lgLampAt: the lamps' rows' width, the first's row)
     lgSpec: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('spec') : null; return q != null && Number.isFinite(+q) ? +q : 1; })() },
     lgPaint: { value: blank }, // (residents' wall colours, a cell of the floor plan each: js/homes.ts paint)
     // night vision's IR illuminator (js/render.ts), only on a frame drawn for the goggles with it switched on: lgNv where it
@@ -44,6 +44,10 @@ export const LightGrid = (() => {
     // ambient occlusion (below): x how much (0 off, 1 as made), y the walls' height (m); js/render.ts setAO
     lgAoK: { value: new Float32Array(8).fill(1) }, // (the moving parts' layers of the occlusion: 1 in place, 0 away; js/gunao.ts)
     lgAo: { value: new T.Vector4(1, 4, 0, 0.28) }, lgAoA: { value: blank }, lgAoB: { value: blank },
+    // reflections (js/probes.ts): lgEnvOn the level's being drawn (1; 0: three's own, as in a scene that isn't the level's: the gun's
+    // studio), lgEnvK how much, lgEnvR how much less on a rough surface, the room's box the picture's projected on (lgEnvMin, lgEnvMax)
+    // and where it was taken from (lgEnvC)
+    lgEnvOn: { value: 0 }, lgEnvK: { value: 0 }, lgEnvR: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('reflr') : null; return q != null && Number.isFinite(+q) ? +q : 0.6; })() }, lgEnvMin: { value: new T.Vector3() }, lgEnvMax: { value: new T.Vector3(1, 1, 1) }, lgEnvC: { value: new T.Vector3() },
     lgBand: { value: new T.Vector4(1, 0.5, 1, 0) }, // the slabs of a floor: how many, the first one's middle, each one's height (m) // (z: the baked one's in; else the open share, below)
   };
   let built = false;
@@ -71,7 +75,7 @@ export const LightGrid = (() => {
       #endif
       lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc + aOccD * lgAoK[int(aOccI + 0.5)]; }`; // (a moving part's occlusion on what's round it, as the part is in place: js/gunao.ts layers)
   const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nvarying float vOcc;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
-uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform sampler2D lgLamps;\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\n`;
+uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform vec2 lgLampAt;\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\nuniform float lgEnvOn;\nuniform float lgEnvK;\nuniform float lgEnvR;\nuniform vec3 lgEnvMin;\nuniform vec3 lgEnvMax;\nuniform vec3 lgEnvC;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
   // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
   // its own side, as it does the light, so the room next door keeps its own, and so do a wall's faces once they've been
@@ -174,7 +178,8 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
           for (int m = 0; m < 12; m++) {
             if (m >= lgn8) break;
             int lgii = int(lgids[m]) - 1;
-            vec4 lgp4 = texelFetch(lgLamps, ivec2(lgii, 0), 0), lgc4 = texelFetch(lgLamps, ivec2(lgii, 1), 0);
+            int lglw = int(lgLampAt.x); ivec2 lgla = ivec2(lgii - (lgii / lglw) * lglw, int(lgLampAt.y) + (lgii / lglw) * 2);
+            vec4 lgp4 = texelFetch(lgTop, lgla, 0), lgc4 = texelFetch(lgTop, lgla + ivec2(0, 1), 0);
             vec3 lgw = lgp4.xyz - vLgP; float lgd = length(lgw); if (lgd >= lgp4.w || lgd < 1e-3) continue;
             vec3 lgv = normalize((viewMatrix * vec4(lgw / lgd, 0.0)).xyz);
             float lgnl = clamp(dot(normal, lgv), 0.0, 1.0) * smoothstep(0.0, 0.3, lgw.y / lgd); // (a lamp shines down out of its fitting: what's level with it or over it (the ceiling round it) takes no glint)
@@ -198,11 +203,41 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
       reflectedLight.directDiffuse *= lgg2;
       #endif
       if (lgGrid.w < 0.5) reflectedLight.indirectDiffuse *= lgg2; }`;
+  // the environment's reflection in the level (js/probes.ts, lgEnvOn 1): the direction onto the room's box, fading out past its
+  // walls; and none of the environment's own light (the light grid's is what lights the room)
+  const ENV = (() => {
+    const c = (T as any).ShaderChunk && (T as any).ShaderChunk.envmap_physical_pars_fragment as string; if (!c) return null; // (a worker's three: nothing drawn)
+    const fn = `vec3 getIBLRadiance( const in vec3 viewDir, const in vec3 normal, const in float roughness ) {
+		#ifdef ENVMAP_TYPE_CUBE_UV
+			vec3 reflectVec = reflect( - viewDir, normal );
+			reflectVec = normalize( mix( reflectVec, normal, pow4( roughness ) ) );
+			reflectVec = transformDirectionByInverseViewMatrix( reflectVec, viewMatrix );
+			float lgek = 1.0;
+			if ( lgEnvOn > 0.5 ) {
+				vec3 lgo = max( lgEnvMin - vLgP, 0.0 ) + max( vLgP - lgEnvMax, 0.0 ), lgq = clamp( vLgP, lgEnvMin, lgEnvMax );
+				vec3 lgr = reflectVec + 1e-5 * step( abs( reflectVec ), vec3( 1e-5 ) ), lgf = max( ( lgEnvMax - lgq ) / lgr, ( lgEnvMin - lgq ) / lgr );
+				reflectVec = normalize( lgq + lgr * min( min( lgf.x, lgf.y ), lgf.z ) - lgEnvC );
+				lgek = lgEnvK * ( 1.0 - smoothstep( 0.3, 2.5, length( lgo ) ) ) * ( 1.0 - lgEnvR * smoothstep( 0.3, 0.85, roughness ) ); // (a rough surface's is a haze of the walls over all of it: kept faint, the lamps' highlight its sheen)
+			}
+			vec4 envMapColor = textureCubeUV( envMap, envMapRotation * reflectVec, roughness );
+			return envMapColor.rgb * envMapIntensity * lgek;
+		#else
+			return vec3( 0.0 );
+		#endif
+	}
+`;
+    const re = /vec3 getIBLRadiance\( const in vec3 viewDir[\s\S]*?\n\t}\n/;
+    if (!re.test(c) || !c.includes('vec3 getIBLIrradiance( const in vec3 normal ) {')) { console.warn("lightgrid: three's envmap_physical_pars_fragment has changed: no reflections"); return null; }
+    return c.replace(re, fn).replace('vec3 getIBLIrradiance( const in vec3 normal ) {', 'vec3 getIBLIrradiance( const in vec3 normal ) {\n\t\tif ( lgEnvOn > 0.5 ) return vec3( 0.0 );');
+  })();
   function patch(shader: THREE.WebGLProgramParametersWithUniforms) {
     if (!shader.fragmentShader.includes('#include <lights_fragment_end>') || !shader.vertexShader.includes('#include <worldpos_vertex>')) return;
     Object.assign(shader.uniforms, U);
     shader.vertexShader = VS_HEAD + shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + VS_BODY);
     shader.fragmentShader = FS_HEAD + shader.fragmentShader.replace('#include <color_fragment>', FS_PAINT).replace('#include <lights_fragment_end>', FS_BODY);
+    if (ENV) shader.fragmentShader = shader.fragmentShader.replace('#include <envmap_physical_pars_fragment>', ENV);
+    // (a ship's deck: its roughness in its normal map's alpha, js/levelview.ts _deckMaps: one texture, not two)
+    shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#ifdef LG_RGH_NA\n\tfloat roughnessFactor = roughness * texture2D( normalMap, vNormalMapUv ).a;\n#else\n#include <roughnessmap_fragment>\n#endif');
   }
   // (and a Lambert or Phong material takes nothing from the scene's environment, as in three r149: only a standard one did. three
   // now lights them by it too, and reflects it in them: the gun's scene has one for its metal (js/render.ts), and the hands and
@@ -552,16 +587,18 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
     flush();
     U.lgLight.value = G0.tl; U.lgDir.value = G0.td;
     U.lgPaint.value = Homes.paint(map) || blank;
-    // the lamps' highlight (FS_BODY): each cell's four lamps by number (read unfiltered: a number isn't blended; the shader blends their light), a wall's -1, and the lamps (row 0 where,
-    // in the level's frame, and how far it reaches; row 1 its light, as the grid has it)
+    // the lamps' highlight (FS_BODY): each cell's four lamps by number (read unfiltered: a number isn't blended; the shader blends their light), a wall's -1, and the lamps (a row where,
+    // in the level's frame, and how far it reaches; the row under it its light, as the grid has it)
     const lamps = map.lamps || [];
     if (d.top && lamps.length) {
-      const ti = new Float32Array(N * NF * BANDS * 4); for (let i = 0; i < N * NF * BANDS; i++) { if (cur[i * K + 7] > 0.5) for (let j = 0; j < 4; j++) ti[i * 4 + j] = d.top[i * 8 + j]; else ti[i * 4] = -1; } // (a wall's cell -1: left out of the blend)
-      const tt = new T.DataTexture(ti, W, H * NF * BANDS, T.RGBAFormat, T.FloatType); tt.magFilter = tt.minFilter = T.NearestFilter; tt.generateMipmaps = false; tt.needsUpdate = true;
-      const lp = new Float32Array(lamps.length * 8), c = new T.Color();
-      lamps.forEach((l: LvLight, i: number) => { c.setHex(l.color!, T.LinearSRGBColorSpace); lp.set([l.x, l.y!, l.z, l.d!], i * 4); lp.set([c.r * l.i!, c.g * l.i!, c.b * l.i!, 0], (lamps.length + i) * 4); });
-      const lt = new T.DataTexture(lp, lamps.length, 2, T.RGBAFormat, T.FloatType); lt.magFilter = lt.minFilter = T.NearestFilter; lt.generateMipmaps = false; lt.needsUpdate = true;
-      U.lgTop.value = tt; U.lgLamps.value = lt;
+      // (one texture: a shader can read only 16. The cells' rows, then each lamp two rows of LW across: where, how far; its light)
+      const R0 = H * NF * BANDS, LW = Math.max(W, Math.min(lamps.length, 1024)), LR = Math.ceil(lamps.length / LW) * 2;
+      const ti = new Float32Array(LW * (R0 + LR) * 4);
+      for (let i = 0; i < N * NF * BANDS; i++) { const at = (Math.floor(i / W) * LW + (i % W)) * 4; if (cur[i * K + 7] > 0.5) for (let j = 0; j < 4; j++) ti[at + j] = d.top[i * 8 + j]; else ti[at] = -1; } // (a wall's cell -1: left out of the blend)
+      const c = new T.Color();
+      lamps.forEach((l: LvLight, i: number) => { c.setHex(l.color!, T.LinearSRGBColorSpace); const row = R0 + Math.floor(i / LW) * 2, col = i % LW; ti.set([l.x, l.y!, l.z, l.d!], (row * LW + col) * 4); ti.set([c.r * l.i!, c.g * l.i!, c.b * l.i!, 0], ((row + 1) * LW + col) * 4); });
+      const tt = new T.DataTexture(ti, LW, R0 + LR, T.RGBAFormat, T.FloatType); tt.magFilter = tt.minFilter = T.NearestFilter; tt.generateMipmaps = false; tt.needsUpdate = true;
+      U.lgTop.value = tt; U.lgLampAt.value.set(LW, R0);
     }
     if (d.ao) {
       const aoTex = (data: Uint8Array) => { const tx = new T.DataTexture(data as Uint8Array<ArrayBuffer>, d.ao!.AW, d.ao!.AH * NF, T.RGBAFormat, T.UnsignedByteType); tx.magFilter = tx.minFilter = T.LinearFilter; tx.wrapS = tx.wrapT = T.ClampToEdgeWrapping; tx.generateMipmaps = false; tx.needsUpdate = true; return tx; };
@@ -606,7 +643,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
   }
   function dispose() {
     if (held) { for (const t of [...held.cpu, ...held.gpu]) if (t && t !== blank) t.dispose(); held = null; }
-    for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoA', 'lgAoB', 'lgTop', 'lgLamps'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
+    for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoA', 'lgAoB', 'lgTop'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
     U.lgAo.value.z = 0;
     G0 = null; built = false;
   }
