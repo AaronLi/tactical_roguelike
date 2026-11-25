@@ -2068,8 +2068,8 @@ export const Server = {
           }
         }
       } else e.spot = Math.max(0, e.spot - dt * 0.3);
-      if ((e.dp || e.suspicious || e.heard) && this.doorPeek(e, dt)) return;
-      if (e.suspicious) {
+      if (!e.raid && (e.dp || e.suspicious || e.heard) && this.doorPeek(e, dt)) return;
+      if (e.suspicious && !e.raid) { // (a boarder on a raid (js/spaceserver.ts defendTick) doesn't stop for what they hear: on to where they're going, gun out)
         // weapon out, watching where the noise came from; settles back down if nothing else happens
         if (e.noise) e.idleYaw = Math.atan2(-(e.noise.x - e.x), -(e.noise.z - e.z));
         e.calmT -= dt;
@@ -2117,7 +2117,7 @@ export const Server = {
     e.coverT -= dt;
     e.nadeT -= dt;
     const usesCover = !def.boss && e.type !== 'rusher';
-    if (st && e.canSee) { if (e.dp) this.doorShot(e); } else if (this.doorPeek(e, dt)) return;
+    if (st && e.canSee) { if (e.dp) this.doorShot(e); } else if (!e.raid && this.doorPeek(e, dt)) return;
     // lurking: heard the police but hasn't seen them, so it hides and peeks like anyone else would, gun still
     // away. The moment it sees an officer it draws.
     if (e.lurk) {
@@ -2258,7 +2258,7 @@ export const Server = {
         e.lowRun = false; // (orderStep says if they're running)
         const os = this.orderStep(e, dt);
         if (os) { mx = os.mx; mz = os.mz; sp = os.sp; e.holding = false; if (os.yaw != null) faceTo = os.yaw; } else e.holding = true;
-      } else if (e.post && !e.canSee && (!e.lastSeen || e.lostT > 5) && Math.hypot(e.post.x - e.x, e.post.z - e.z) > 0.6) {
+      } else if (e.post && !e.canSee && (!e.lastSeen || e.lostT > (e.raid ? 1.5 : 5)) && Math.hypot(e.post.x - e.x, e.post.z - e.z) > 0.6) { // (a raider: on again almost at once, not dug in where they lost them)
         // posted (a ship's response) and lost them: back to the doorway they were put on
         const L2 = Level, map2 = this.map!, g = e.post; if (!g.flow) g.flow = L2.flow(map2, [L2.src(map2, g.x, g.y, g.z)]);
         const d = Math.hypot(g.x - e.x, g.z - e.z), step = d > 3 || !this.clearTo(e, g) ? L2.flowStep(map2, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dd = Math.hypot(tx - e.x, tz - e.z) || 1;

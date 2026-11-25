@@ -581,7 +581,7 @@ export const SpaceSv = (() => {
           for (let k = 0; k < n; k++) {
             const q = spots[k % Math.max(1, spots.length)], x = q ? (q[0] + 0.5) * TS : s.x - s.nx * 2 + ax * (k - n / 2) * 0.7, z = q ? (q[1] + 0.5) * TS : s.z - s.nz * 2 + az * (k - n / 2) * 0.7;
             const e = sv.addEnemy(k % 3 === 0 ? 'grunt' : k % 3 === 1 ? 'suspect' : 'rusher', x, z, 0);
-            e.wear = 'pirate'; e.bold = true; e.drawn = true;
+            e.wear = 'pirate'; e.bold = true; e.drawn = true; e.raid = true; // (raid: on their way to her shelter whatever they hear, js/server.ts think)
             e.post = { x: cx + (Math.random() - 0.5) * 2, y: fy, z: cz + (Math.random() - 0.5) * 2, yaw: Math.random() * 6.28, flow }; e.home = { x: e.post.x, y: fy, z: e.post.z };
           }
           say(D.pods >= C.pods ? 'The last pod is through her hull.' : `A pirate pod is through her hull: ${n} boarders. ${C.pods - D.pods} more to come.`);
