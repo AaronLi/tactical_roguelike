@@ -3381,7 +3381,7 @@ export const Server = {
       let claimed = false;
       for (const o of this.enemies.values()) if (o !== e && !o.down && o.hp > 0 && ((o.cover && Math.hypot(o.cover.x - c.x, o.cover.z - c.z) < 1.2) || Math.hypot(o.x - c.x, o.z - c.z) < 0.9)) { claimed = true; break; } // (someone's going there, or standing on it)
       if (claimed) continue;
-      if (!L.los(map, c.x, (c.y || 0) + 1.6 * def.scale, c.z, st.p[0], st.p[1] + 1.2, st.p[2])) continue; // can shoot when peeking
+      if (!this.shotClear(c.x, (c.y || 0) + 1.6 * def.scale, c.z, st.p[0], st.p[1] + 1.2, st.p[2])) continue; // can shoot when peeking (through glass too)
       best = c as EnemyCover; bs = score;
     }
     // Corners: stand hidden beside a wall edge, lean out sideways to shoot.
@@ -3398,13 +3398,13 @@ export const Server = {
       for (const o of this.enemies.values()) if (o !== e && o.cover && Math.hypot(o.cover.x - w.x, o.cover.z - w.z) < 1.2) { claimed = true; break; }
       if (claimed) continue;
       tried++;
-      if (L.los(map, w.x, ey, w.z, st.p[0], ty, st.p[2])) continue; // must be hidden when standing at the spot
+      if (this.shotClear(w.x, ey, w.z, st.p[0], ty, st.p[2])) continue; // must be hidden when standing at the spot (not behind glass: they'd be seen and shot through it)
       const nx = -(st.p[2] - w.z) / dt, nz = (st.p[0] - w.x) / dt;
       for (const side of [1, -1]) {
         const px = w.x + nx * side * 0.55, pz = w.z + nz * side * 0.55;
         if (L.tile(L.floorMap(map, w.fl || 0), Math.floor(px / L.TS), Math.floor(pz / L.TS)) !== 0) continue;
         if (!this.leanClear(w.x, w.z, px, pz, ey, w.y || 0)) continue; // (round the edge, not through a door jamb or a thin wall)
-        if (!L.los(map, px, ey, pz, st.p[0], ty, st.p[2])) continue;
+        if (!this.shotClear(px, ey, pz, st.p[0], ty, st.p[2])) continue;
         best = { x: w.x, y: w.y || 0, z: w.z, lean: side, px, pz, fl: w.fl || 0 }; bs = score;
         break;
       }
@@ -3413,8 +3413,15 @@ export const Server = {
   },
   coverValid(c: EnemyCover, st: PState, def: EnemyDef) {
     if (!c.lean) return this.coverProtects(c, st);
-    const L = Level, map = this.map!, ey = (c.y || 0) + 1.6 * def.scale, ty = st.p[1] + 1.4;
-    return !L.los(map, c.x, ey, c.z, st.p[0], ty, st.p[2]) && this.leanClear(c.x, c.z, c.px!, c.pz!, ey, c.y || 0) && L.los(map, c.px!, ey, c.pz!, st.p[0], ty, st.p[2]);
+    const ey = (c.y || 0) + 1.6 * def.scale, ty = st.p[1] + 1.4;
+    return !this.shotClear(c.x, ey, c.z, st.p[0], ty, st.p[2]) && this.leanClear(c.x, c.z, c.px!, c.pz!, ey, c.y || 0) && this.shotClear(c.px!, ey, c.pz!, st.p[0], ty, st.p[2]);
+  },
+  // Would a round get from a to b: nothing solid between, glass a round goes through (a window's, a display case's) no matter, bulletproof
+  // glass does (js/world.ts raycast). For cover: what hides someone, and where they can shoot from. (A body leaning out can't go through
+  // a pane: leanClear's still Level.los.)
+  shotClear(ax: number, ay: number, az: number, bx: number, by: number, bz: number) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az, d = Math.hypot(dx, dy, dz); if (d < 0.01) return true;
+    return Level.raycast(this.map!, ax, ay, az, dx / d, dy / d, dz / d, d, { glass: true }).t >= d - 0.05;
   },
   // Can someone standing at (x, z) actually lean out to (px, pz)? Nothing solid between: a corner's edge, not a
   // door jamb, a door leaf or a thin wall to the next room (at chest and at eye height; and the way the head
