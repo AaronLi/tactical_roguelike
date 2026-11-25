@@ -1602,7 +1602,7 @@ const G_GunRecipes = (() => {
       k.cyl(0.0235, 0.012, M.black(), end, by);
       k.ringZ(0.0235, 0.0012, M.steel(), end + 0.012, by);
     }
-    if (A && o.hg && own('handguard')) { k.tag('handguard'); authored(k, A, (e) => e.slot === 'handguard'); hgLen = A.rig.hgEnd - hgF; }
+    if (A && o.hg && own('handguard')) { k.tag('handguard'); authored(k, A, (e) => e.slot === 'handguard', undefined, o.hg.m ? { on: 'black', m: o.hg.m } : null); hgLen = A.rig.hgEnd - hgF; } // (in the factory part's finish, if it names one: the Mk18's copper rail)
     else if (o.hg) {
       k.tag('handguard');
       const hg = Object.assign({}, o.hg, o.barrels ? { under: true } : {}); // (built at its own length: a part's, and one that doesn't fit its barrel isn't offered, js/parts.ts hgRoom)
@@ -1925,10 +1925,11 @@ const G_GunRecipes = (() => {
   }
   // an authored gun's meshes that pass `which`, in the kit's current slot (or each its own: `own`), placed where they were made (a
   // copy of the geometry when `bend` reshapes it: the barrel's tube set to its length). A gun with a reload sequence puts the meshes of a part_ node in it.
-  function authored(k: Kit, A: AuthoredGun, which: (e: AuthoredMesh) => boolean, bend?: (e: AuthoredMesh, g: THREE.BufferGeometry) => THREE.BufferGeometry) {
+  // (finish: the catalogue entry's finish over what the file has in `finish.on` (an authored gun's own handguard in its factory part's hg.m: the black of the model, the rail's colour))
+  function authored(k: Kit, A: AuthoredGun, which: (e: AuthoredMesh) => boolean, bend?: (e: AuthoredMesh, g: THREE.BufferGeometry) => THREE.BufferGeometry, finish?: { on: string; m: THREE.Material } | null) {
     for (const e of A.meshes) {
       if (!which(e)) continue;
-      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : G.GunMaterials.byName(e.mat); // (a display surface: the game paints it, whatever material the file names)
+      const g = bend ? bend(e, geoOf(e)) : geoOf(e), mat = e.display ? Object.assign(M.black().clone(), { name: 'black' }) : finish && e.mat === finish.on ? finish.m : G.GunMaterials.byName(e.mat); // (a display surface: the game paints it, whatever material the file names)
       let m: THREE.Mesh;
       if (A.hinge && e.part) { const at = A.parts[e.part].at; k.into(partNode(k, A, e.part), -at[2], at[1]); m = placeAuthored(k, e, g, mat); k.into(null); }
       else m = placeAuthored(k, e, g, mat);
