@@ -122,6 +122,7 @@ export const Server = {
   nadeT: undefined as unknown as number, // the next time a suspect may throw one (the level's)
   noiseT: undefined as number | undefined,
   teamT: undefined as number | undefined, // (till the fireteams are next looked over: teamForm)
+  contacts: new Map<number, { sup: number; t0: number; seen: number; firedAt: number | null }>(), // (each fireteam's contact drill: contactOf)
   eSid: undefined as number | undefined, // the suspects' shots' ids
   _sound: undefined as SoundCache | undefined,
 
@@ -565,7 +566,7 @@ export const Server = {
     this.aiMask(this.map);
     this.enemies = new Map(); this.cleared = new Map(); // (new, not cleared: a level context kept holds the one it had, js/server.ts ctxSave)
     this.extract = { active: false, votes: new Set() };
-    this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8; this.live = [];
+    this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.contacts.clear(); this.nadeT = 8; this.live = [];
     this.windT = 0; this.windSend = 0; // (the wind's own clock, from the level's start: windTick)
     this.report = { incap: 0, bleedouts: 0, bleedBy: {}, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0, stronghold: this.isStronghold() };
     this.evidence = []; // weapons on the floor: { i, wpn, x, z, owner, secured, taken }
@@ -2117,6 +2118,10 @@ export const Server = {
     e.coverT -= dt;
     e.nadeT -= dt;
     const usesCover = !def.boss && e.type !== 'rusher';
+    // (a fireteam that's just made contact: one of them, the first to see them, puts fire on them at once; the rest hold where they are till
+    // he has, and only then make for cover, he after his burst: contactOf)
+    const ct = this.contactOf(e, st), sup = !!ct && ct.sup === e.id;
+    const held = !!ct && (sup ? !(ct.firedAt != null && this.clock - ct.firedAt > this.CONTACT.SUP_T) && this.clock - ct.t0 < this.CONTACT.SUP_MAX : ct.firedAt == null && this.clock - ct.t0 < this.CONTACT.WAIT);
     if (st && e.canSee) { if (e.dp) this.doorShot(e); } else if (!e.raid && this.doorPeek(e, dt)) return;
     // lurking: heard the police but hasn't seen them, so it hides and peeks like anyone else would, gun still
     // away. The moment it sees an officer it draws.
@@ -2159,7 +2164,7 @@ export const Server = {
       if (bs) { e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; }
       // Cover: move to a spot with a crate between us and the target, crouch, pop up to shoot. (Behind a borrowed shield, still
       // looking now and then: cover of their own found, they leave him for it.) None to be had: in behind a shield man near, if any
-      if (!bo && !po && (!bs || e.shieldBy != null) && usesCover && !e.cover && e.coverT <= 0) {
+      if (!bo && !po && (!bs || e.shieldBy != null) && usesCover && !e.cover && e.coverT <= 0 && !held) {
         e.coverT = 3 + Math.random() * 3;
         e.cover = this.findCover(e, st);
         e.coverStuck = 0;
@@ -2228,7 +2233,7 @@ export const Server = {
               if (e.aimT <= 0 && this.onTarget(e, st, dt)) { this.fire(e, p as LivePlayer); e.aiming = false; e.peekDone = true; e.cool = U.rf(def.pause[0], def.pause[1]); }
             }
           } else if (e.cool <= 0 && this.onTarget(e, st, dt)) {
-            if (e.burstLeft <= 0) e.burstLeft = def.burst[0] + Math.floor(Math.random() * (def.burst[1] - def.burst[0] + 1));
+            if (e.burstLeft <= 0) e.burstLeft = sup && ct!.firedAt == null ? def.burst[1] + 2 : def.burst[0] + Math.floor(Math.random() * (def.burst[1] - def.burst[0] + 1)); // (the suppressor's first: a long one)
             this.fire(e, p as LivePlayer);
             e.burstLeft--;
             if (e.burstLeft > 0) e.cool = def.rof;
@@ -2242,7 +2247,7 @@ export const Server = {
       // they were, blind. Rounds rarely land, and only if you're still there and in the open.
       if (e.lostT === 0) {
         e.pushing = false; e.pushWait = 0; // (lost sight again: a new push, if they make one)
-        e.blind = !def.aimTime && Math.random() < 0.5;
+        e.blind = !def.aimTime && (Math.random() < 0.5 || sup); // (the one suppressing them keeps it up on where they were)
         if (e.order && this.inBreach(e.order)) { if ((e.sawAt ?? -99) > (e.order.resAt ?? e.order.at)) this.resumeBreach(e); } // (on a breach: fought whoever it was, and back to it)
         else if (e.order && !e.order.cordon && e.lastSeen && (e.sawAt || -99) > e.order.at && this.clock - e.order.rt > 4) this.retarget(e, e.lastSeen); // (one holding a cordon stays on it) // (the search starts again from where they were seen)
       }
@@ -2852,6 +2857,26 @@ export const Server = {
     const map = this.map, sp = map && map.sp; if (!sp) return true;
     const ra = ShipGen.roomAt(map!, a.x, a.z, a.fl || 0), rb = ShipGen.roomAt(map!, b.x, b.z, b.fl || 0);
     return ra < 0 || rb < 0 || sp.hullOf[ra] === sp.hullOf[rb];
+  },
+  // A fireteam's contact drill. The first of a team to see one of the squad (or someone of the other side) while the team's had nobody in
+  // sight for CONTACT.LOST seconds is its suppressor (not a shotgunner, if another of them can see them too): his hesitation cut to a reaction (REACT), a long first burst, kept up blind on where
+  // they were if they duck. The others hold where they are (no move to cover) till he's fired, or WAIT seconds; he holds SUP_T seconds
+  // past his first round (SUP_MAX at most), then makes for cover himself.
+  CONTACT: { LOST: 10, REACT: [0.2, 0.4], WAIT: 2, SUP_T: 1.2, SUP_MAX: 3.5 },
+  contactOf(e: Enemy, st: PState | null | undefined) {
+    if (e.team == null || !this.enemies.has(e.team)) return null;
+    const C = this.CONTACT; let c = this.contacts.get(e.team);
+    if (c && this.clock - c.seen > C.LOST) { this.contacts.delete(e.team); c = undefined; }
+    if (!c && st && e.canSee && e.armed && this.able(e)) {
+      // (him, unless he's a shotgunner (a rusher charges, he doesn't hold and fire) and another of them can see them too)
+      const fit = (o: Enemy) => o.team === e.team && o.armed && this.able(o) && o.type !== 'rusher', mates = [...this.enemies.values()].filter(fit);
+      const s0 = fit(e) ? e : mates.find((o) => o.canSee) || e; // (one who can see them: someone who can't would hold them all up)
+      c = { sup: s0.id, t0: this.clock, seen: this.clock, firedAt: null }; this.contacts.set(e.team, c);
+      s0.cool = Math.min(s0.cool, G_U.rf(C.REACT[0], C.REACT[1])); s0.burstLeft = 0;
+    }
+    if (c && e.canSee) c.seen = this.clock;
+    if (c && c.sup === e.id && !this.able(e)) c.firedAt = c.firedAt ?? this.clock - C.SUP_T; // (down before he'd fired: the rest go)
+    return c || null;
   },
   teamForm() {
     const T = this.TEAM, all = [...this.enemies.values()].filter((e) => this.teamable(e) && this.able(e));
@@ -3645,6 +3670,7 @@ export const Server = {
     if (blind || e.engTgt !== p.id || !(this.clock - (e.firedAt || -9) < 1.0)) { e.engAt = this.clock; e.engTgt = p.id; e.headDelay = 0.3 + Math.random() * 0.2; }
     const up = blind ? 0 : G_U.clamp((this.clock - e.engAt! - e.headDelay!) / 0.5, 0, 1); // 0 body .. 1 head
     e.firedAt = this.clock;
+    { const ct = e.team != null ? this.contacts.get(e.team) : null; if (ct && ct.sup === e.id && ct.firedAt == null) ct.firedAt = this.clock; } // (the suppressor's opened up: the rest move)
     const kickNow = e.kick || 0; // (still coming back from the last one: a snap shot)
     e.kick = kickNow + this.kickOf(e, WEAPONS[e.def.wpn] || { recoil: 1 });
     const def = e.def, s = def.scale, st = p.st, L = Level, map = this.map!;
