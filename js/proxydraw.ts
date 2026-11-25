@@ -112,7 +112,7 @@ export const ProxyDraw = (() => {
       S.own.push(mt);
       const bm = new T.BatchedMesh(l.length, nv, ni, mt);
       bm.sortObjects = false; bm.perObjectFrustumCulled = l[0].frustumCulled; bm.frustumCulled = l[0].frustumCulled; bm.castShadow = l[0].castShadow; bm.receiveShadow = l[0].receiveShadow;
-      bm.layers.mask = l[0].layers.mask | 1; bm.matrixAutoUpdate = false; bm.matrixWorldAutoUpdate = false; bm.matrixWorld.copy(parent.matrixWorld); bm.name = 'follow'; bm.userData.keepMat = true; bm.userData.inLevel = level; // (its material's its own: let go in release)
+      bm.layers.mask = l[0].layers.mask | 1; bm.matrixAutoUpdate = false; bm.matrixWorldAutoUpdate = false; bm.matrixWorld.copy(parent.matrixWorld); bm.name = 'follow'; bm.userData.keepMat = true; bm.userData.proxy = true; bm.userData.inLevel = level; // (its material's its own: let go in release)
       for (const c of l) {
         let gid = geos.get(c.geometry)!; if (gid < 0) { gid = bm.addGeometry(c.geometry); geos.set(c.geometry, gid); }
         const id = bm.addInstance(gid); c.updateWorldMatrix(true, false); M.multiplyMatrices(inv, c.matrixWorld); bm.setMatrixAt(id, M);
@@ -150,7 +150,7 @@ export const ProxyDraw = (() => {
     const s: MarkSet = { list, geo: list[0].geometry, by: new Map(), scene };
     for (const mt of mats) {
       const im = new T.InstancedMesh(s.geo, mt, list.length); im.count = 0; im.frustumCulled = false; im.renderOrder = list[0].renderOrder;
-      im.userData.keepMat = true; im.matrixAutoUpdate = false; im.name = 'marks';
+      im.userData.keepMat = true; im.userData.proxy = true; im.matrixAutoUpdate = false; im.name = 'marks';
       scene.add(im); s.by.set(mt, im);
     }
     marks.push(s);

@@ -1550,7 +1550,7 @@ export const Space = (() => {
     const sc = G_R.scene, keep = new Set<THREE.Object3D>([G_R.camera, G_R.levelRoot, G_R.dynRoot, S.root!, S.model!.group, S.stars!, S.sun!, S.sun!.target, ...(S.starObj ? [S.starObj] : [])]);
     if (!S.hidden) S.hidden = new Map();
     for (const c of sc.children) {
-      if (keep.has(c) || (c as any).isLight) continue; // (every light stays: the weapon lights' and muzzle flashes' pools are dark till used, and one light more or less when they came back at the breach had every shader made again)
+      if (keep.has(c) || (c as any).isLight || c.userData.proxy) continue; // (batches, js/proxydraw.ts: hidden with what they follow, themselves) (every light stays: the weapon lights' and muzzle flashes' pools are dark till used, and one light more or less when they came back at the breach had every shader made again)
       if (!S.hidden.has(c)) S.hidden.set(c, c.visible);
       c.visible = false;
     }
