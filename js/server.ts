@@ -3179,7 +3179,7 @@ export const Server = {
     if (e.collapsed) return; // legs gone: they're on the floor
     speed *= this.injSpeed(e) * (e.str == null || e.str >= 0.6 ? 1 : 0.3 + 0.7 * e.str / 0.6); // a broken leg limps; blood loss slows
     e.x += mx * speed * dt; e.z += mz * speed * dt;
-    this.settle(e, 0.38 * e.def.scale);
+    this.settle(e, 0.3 * e.def.scale); // (their body to the level: a column this wide, js/world.ts resolve; was 0.38)
   },
   // someone who's moved: out of what they walked into (stepping up onto anything low), and onto the floor or step
   // under them
@@ -3199,7 +3199,7 @@ export const Server = {
     if (e.dragTo) { // being pulled back by an officer
       const dx = e.dragTo.x - e.x, dz = e.dragTo.z - e.z, d = Math.hypot(dx, dz), st = Math.min(d, 1.3 * dt);
       const ox = e.x, oz = e.z;
-      if (d > 0.02) { e.x += (dx / d) * st; e.z += (dz / d) * st; this.settle(e, 0.3); }
+      if (d > 0.02) { e.x += (dx / d) * st; e.z += (dz / d) * st; this.settle(e, 0.25); }
       // there, or up against something (it isn't getting any closer)
       if (d <= 0.02 || Math.hypot(e.x - ox, e.z - oz) < st * 0.2) e.dragTo = null;
       return true;

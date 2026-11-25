@@ -808,14 +808,14 @@ export const Me = {
     const prevY = this.pos.y, STEP = World.STEP, was = this.onGround, x0 = this.pos.x, z0 = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
-    Level.resolve(map, this.pos, 0.35, prevY, STEP, true); // (anything a step high or less: walked up onto, not into; stairs as slopes)
+    Level.resolve(map, this.pos, this.R, prevY, STEP, true); // (anything a step high or less: walked up onto, not into; stairs as slopes)
     this.pos.y += this.vel.y * dt;
     // (shoulder a fractured pane and it comes down)
     if (map.cracked && this.vel.x * this.vel.x + this.vel.z * this.vel.z > 0.5) {
       const sp = Math.hypot(this.vel.x, this.vel.z), ux = this.vel.x / sp, uz = this.vel.z / sp, h = Level.raycast(map, this.pos.x, this.pos.y + 1.1, this.pos.z, ux, 0, uz, 0.8); // (past the sill you're stopped by: a pane's set back in its wall)
       if (h.pane != null && map.windows[h.pane] && map.windows[h.pane].cracked) this.roundPane(h.pane, new THREE.Vector3(this.pos.x + ux * h.t, this.pos.y + 1.1, this.pos.z + uz * h.t), new THREE.Vector3(ux, 0, uz), true);
     }
-    const g = Level.groundAt(map, this.pos.x, this.pos.z, 0.35, prevY, STEP, true);
+    const g = Level.groundAt(map, this.pos.x, this.pos.z, this.R, prevY, STEP, true);
     // on the ground, or a step down from it (walking down stairs: stay on them, don't hop from tread to tread)
     if (this.pos.y <= g || (was && this.vel.y <= 0 && prevY - g <= STEP + 0.02)) { this.pos.y = g; this.vel.y = 0; this.onGround = true; } else this.onGround = false;
     let eyeTarget = this.down ? 0.45 : this.prone ? 0.36 : this.crouch ? 1.0 : 1.62;
@@ -895,6 +895,7 @@ export const Me = {
   // The ladders up the Crest House and the viewing building (crest.ladders: js/level.ts crestLadder): hold F at one's foot to
   // climb onto the roof, or at its head on the roof to climb down (over a parapet: lifted over it, l.over). Onto it (ON s), carried up or down it (CLIMB m/s), off it onto the roof or the ground (OFF
   // s); the weapon's away till you're off, and you can look round. REACH: how close to an end you have to be.
+  R: 0.25, // (your body to the level: a column this wide (m), from your feet up (js/world.ts resolve); the camera's near plane (0.03 m) is well inside it, and a lean keeps your head off a wall on its own)
   LADDER: { CLIMB: 1.3, ON: 0.35, OFF: 0.45, REACH: 1.1, HOLD: 0.3, OUT: 0.42 },
   ladderNear(map: LvMap) {
     const R = this.LADDER.REACH;
@@ -2629,7 +2630,7 @@ export const Me = {
         if (d > 0.05) {
           const step = Math.min(d, this.SPEED.walk * dt);
           this.pos.x += (dx / d) * step; this.pos.z += (dz / d) * step;
-          Level.resolve(map, this.pos, 0.35, this.pos.y);
+          Level.resolve(map, this.pos, this.R, this.pos.y);
         }
         if (a.face) this.yaw += U.angDiff(this.yaw, Math.atan2(-(a.face.x - this.pos.x), -(a.face.z - this.pos.z))) * Math.min(1, dt * 6);
         a.stuck = this.pos.distanceTo(was) < 0.004 ? (a.stuck || 0) + dt : 0;
@@ -2644,13 +2645,13 @@ export const Me = {
         pl.t = Math.min(1, pl.t + dt / pl.dur);
         const k = U.smooth(0, 1, pl.t);
         this.pos.x = pl.me.x + pl.dx * k; this.pos.z = pl.me.z + pl.dz * k;
-        Level.resolve(map, this.pos, 0.35, this.pos.y);
+        Level.resolve(map, this.pos, this.R, this.pos.y);
         if (pl.t >= 1) { a.pull = null; a.start = this.pos.clone(); a.spot = { x: pl.to.x + pl.fx * 0.75, z: pl.to.z + pl.fz * 0.75 }; }
       }
       else if (a.spot) { // follow them down: step in over their legs as they fall
         const k = U.smooth(0.1, 0.5, a.t / a.dur);
         this.pos.x = a.start!.x + (a.spot.x - a.start!.x) * k; this.pos.z = a.start!.z + (a.spot.z - a.start!.z) * k;
-        Level.resolve(map, this.pos, 0.35, this.pos.y);
+        Level.resolve(map, this.pos, this.R, this.pos.y);
       }
       if (this.action && !a.approach && !a.pull) {
         const was = a.t / a.dur;
