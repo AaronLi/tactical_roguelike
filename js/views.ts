@@ -196,8 +196,8 @@ export const Views = {
         if (this.slowFill && performance.now() - fillT > 4) continue;
         // the type, with this suspect's kit (weapon | vest | helmet | face | tac | what's mounted) laid over it
         const def = Object.create((ENEMIES as Record<string, any>)[type]);
-        if (kit) { const [wpn, vest, helmet, face, tac, ex, , shield] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; def.shield = shield || null; }
-        const rig = G_Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true });
+        if (kit) { const [wpn, vest, helmet, face, tac, ex, , shield, wear] = kit.split('|'); def.wpn = wpn; if (wear) def.wear = wear; /* (their own side's clothes: a pirate boarding a liner isn't in her security's) */ def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; def.shield = shield || null; }
+        const rig = G_Rig.create(Object.assign({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true }, def.wear ? { wear: def.wear } : null));
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.ts powerStep)
         if (!def.civ) rig.setKit(G_Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face, def.ex)); // their armour, as an officer's would look
         if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); this.tacOnGun(rig, def.tac); }
@@ -396,13 +396,14 @@ export const Views = {
     if (Game.caseOpen) cv.open = 1; // joined with it already open
   },
   // a body that died before we joined: lay it out where it fell
-  addBody(id: number, type: string, x: number, z: number, yaw: number, secured: number, y = 0, nm: string | null = null) {
+  addBody(id: number, type: string, x: number, z: number, yaw: number, secured: number, y = 0, nm: string | null = null, wear: string | null = null) {
     if (this.enemies.has(id)) return;
     const def0 = (ENEMIES as Record<string, any>)[type];
     if (!def0) return;
     const def = Object.create(def0); // (their own: what they were called aboard her, nm, js/server.ts titleOf)
     if (nm) def.name = nm;
-    const rig = G_Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true });
+    if (wear) def.wear = wear;
+    const rig = G_Rig.create(Object.assign({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true }, wear ? { wear } : null)); // (dressed as their side was: a pirate's body aboard a liner isn't in her security's clothes)
     if (!def.civ) rig.setKit(G_Rig.armourKit(def.vest, def.helmet, def.style === 'armored'));
     R.dynRoot.add(rig.root);
     const ev = { id, type, def, rig, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp: 0, alive: false, deadT: 0, lean: 0 } as VwEnemy;

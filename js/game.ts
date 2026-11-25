@@ -882,7 +882,7 @@ export const Game = {
         else if (m.phase === 'level') {
           this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp);
           this.levelWas(m);
-          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
+          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm, wr]: [number, string, number, number, number, number, number, string | 0, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null, wr || null));
           this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
           this.cabs = m.cabs || []; Views.syncCabs();
           Loot.clear(); for (const a of m.loot || []) Loot.add(...(a as [any, any, any, any, any, any, any]));
@@ -914,7 +914,7 @@ export const Game = {
       case 'phase':
         if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined; // (none: the game in space's sidearm picker)
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm, wr]: [number, string, number, number, number, number, number, string | 0, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null, wr || null));
           if (m.doors) { this.levelWas(m); if (m.loot) { Loot.clear(); for (const a of m.loot) Loot.add(...(a as [any, any, any, any, any, any, any])); } this.glassWas(m); } } // (a ship come back to, as she was left: js/spaceserver.ts restore)
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock, m.sp);
         else if (m.phase === 'gameover') this.enterGameover(m);

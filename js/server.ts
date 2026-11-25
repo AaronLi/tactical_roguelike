@@ -205,7 +205,7 @@ export const Server = {
           doors: this.map && this.phase === 'level' ? this.map.doors.map((d: Door) => (d.open ? 1 : 0)) : null,
           holes: this.phase === 'level' ? this.holes || null : null, fallen: this.phase === 'level' ? this.fallen || null : null,
           evidence: this.phase === 'level' && this.evidence ? this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]) : null,
-          bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : null,
+          bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0, (b.rec && b.rec.wear) || 0]) : null,
           wcase: this.phase === 'level' ? this.caseMsg() : null, wc: this.phase === 'level' ? this.caseGun() : null, cabs: this.phase === 'level' ? this.cabMsg() : null, abox: this.phase === 'level' ? this.aboxMsg() : null,
           loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => this.lootMsg(l)) : null,
           glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null, cracked: this.phase === 'level' ? this.glassCracked || null : null,
@@ -593,7 +593,7 @@ export const Server = {
     const was = kept ? { doors: this.map!.doors.map((d: Door) => (d.open ? 1 : 0)), holes: this.holes, fallen: this.fallen, evidence: this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]),
       loot: [...this.loot.values()].map((l) => this.lootMsg(l)), glass: [...this.glassBroken], cracked: this.glassCracked } : {};
     return { t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: space ? SpaceSv.levelMsg() : undefined, ...was,
-      bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : undefined }; // (the dead she's come back to with: js/spaceserver.ts populate)
+      bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0, (b.rec && b.rec.wear) || 0]) : undefined }; // (the dead she's come back to with: js/spaceserver.ts populate)
   },
   // a message to everyone in the loaded level (all of them, but those aboard another of the zone's levels)
   toLevel(m: any) { if (this.quiet) return; const k = this.curK(); for (const [id, p] of this.allPlayers || this.players) if (this.lvOf(p) === k) this.net.sendTo(id, m); },
@@ -1947,7 +1947,7 @@ export const Server = {
       const r2 = (v: number) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert && !en.lowRun ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}|${en.wear ? this.titleOf(en) : ''}|${en.def.shield || ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert && !en.lowRun ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}|${en.wear ? this.titleOf(en) : ''}|${en.def.shield || ''}|${en.wear || ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
       }
       const p: Record<string, any> = {};
       for (const pl of all) p[pl.id] = pl.st;
