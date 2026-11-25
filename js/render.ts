@@ -1471,12 +1471,17 @@ export const R = {
   heatFx: null as null | { scene: THREE.Scene; spots: THREE.Mesh[] },
   // (heat < 0: the room's own temperature, as the cold things are: a little warmer facing up (the warm air under the ceiling,
   // the floor's own), a slow mottle over it, so a thermal picture has walls and floors to it)
-  // (one program for all of them, instanced or not: the heat and a fixed distance are uniforms, dq < 0 the real distance)
+  // (one program for all of them, instanced, batched or skinned: the heat and a fixed distance are uniforms, dq < 0 the real distance)
   _heatMat(heat: number, d: number | null, opts: THREE.ShaderMaterialParameters = {}) {
     return new THREE.ShaderMaterial(Object.assign({ toneMapped: false, fog: false,
       uniforms: { heat: { value: heat }, dq: { value: d == null ? -1 : d === Infinity ? 0 : 1 / (1 + d) } },
       vertexShader: `#include <batching_pars_vertex>
-        varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
+        #include <skinning_pars_vertex>
+        varying float vD; varying vec3 vW; varying float vN; void main() { vec3 transformed = position, objectNormal = normal;
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
+        #include <skinning_vertex>
+        vec4 p = vec4(transformed, 1.0); vec3 n = objectNormal; // (a skinned body as it's posed, not standing in its bind pose: js/rig.ts)
         #include <batching_vertex>
         #ifdef USE_BATCHING
         p = batchingMatrix * p; n = mat3(batchingMatrix) * n;
