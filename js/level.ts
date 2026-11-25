@@ -591,12 +591,12 @@ export const Level = {
       }
       if (rm.tall) { // a hall the building's full height: high-bay lamps under its roof, a grid of them (lighting the catwalks too: stack)
         if (map.theme.layout === 'ship') { // (a cruiser's hall, two decks high, js/shipgen.ts HALLS: hers every eight metres, and bright enough at that height to light its floor as her other compartments' lamps do theirs)
-          // (a liner's court: ring pendants, fewer and lower, a warm light and not much of it)
+          // (a liner's court: ring pendants, fewer and lower, a warm light and not much of it: dimmer than a working hall's by a good deal, 0.65)
           // (none where a pier stands)
           // (her pendants hang over the open part only; under her mezzanine, lamps in its underside as any compartment's)
           const mall = rm.type === 'mall', gap = mall ? 10 : 8, rw = mall && (rm as any).mz ? (rm as any).mz * this.K - rm.x : rm.w, nx = Math.max(1, Math.round(rw * TS / gap)), nz = Math.max(1, Math.round(rm.h * TS / gap));
           if (rw < rm.w) for (let z = rm.z + 5; z < rm.z + rm.h - 2; z += 10) for (let x = rm.x + rw + 4; x < rm.x + rm.w - 1; x += 9) map.lights.push({ x: (x + 0.5) * TS, z: (z + 0.5) * TS });
-          for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (map.t[Math.floor(rm.z + (j + 0.5) * rm.h / nz) * W + Math.floor(rm.x + (i + 0.5) * rw / nx)] !== 1) map.lights.push(Object.assign({ kind: 'highbay', x: (rm.x + (i + 0.5) * rw / nx) * TS, z: (rm.z + (j + 0.5) * rm.h / nz) * TS, y: this.FLOOR_H + this.WALL_H - (mall ? 1.7 : 0.6), color: map.theme.light, i: mall ? 0.95 : 1.5, d: mall ? 20 : 24, up: 1 }, mall ? { chand: 1 } : {}) as LvLight);
+          for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) if (map.t[Math.floor(rm.z + (j + 0.5) * rm.h / nz) * W + Math.floor(rm.x + (i + 0.5) * rw / nx)] !== 1) map.lights.push(Object.assign({ kind: 'highbay', x: (rm.x + (i + 0.5) * rw / nx) * TS, z: (rm.z + (j + 0.5) * rm.h / nz) * TS, y: this.FLOOR_H + this.WALL_H - (mall ? 1.7 : 0.6), color: map.theme.light, i: mall ? 0.65 : 1.5, d: mall ? 20 : 24, up: 1 }, mall ? { chand: 1 } : {}) as LvLight);
           continue;
         }
         for (let z = rm.z + 5; z < rm.z + rm.h - 2; z += 12) for (let x = rm.x + 6; x < rm.x + rm.w - 2; x += 15) map.lights.push({ kind: 'highbay', x: (x + 0.5) * TS, z: (z + 0.5) * TS, y: this.FLOOR_H + this.WALL_H - 0.6, color: 0xffe2b8, i: 0.5, d: 17, up: 1 });
