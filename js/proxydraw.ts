@@ -28,7 +28,11 @@ export const ProxyDraw = (() => {
 
   // shown: it and everything it hangs from, up to the scene, visible
   const shown = (o: THREE.Object3D) => { for (let p: THREE.Object3D | null = o; p; p = p.parent) { if (!p.visible) return false; if ((p as any).isScene) return true; } return false; };
-  const plain = (mt: any) => mt && !Array.isArray(mt) && (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && !mt.transparent && mt.visible !== false && !mt.hasOwnProperty('onBeforeCompile');
+  const plain = (mt: any, glass = false) => mt && !Array.isArray(mt) && (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && (!mt.transparent || (glass && seeThru(mt))) && mt.visible !== false && !mt.hasOwnProperty('onBeforeCompile');
+  // see-through glass (a level's panes: a window's, a railing's, a display case's), batched too when it's the level's: blended, writing no
+  // depth, so the order its panes are drawn in matters little (the batch sorts them back to front anyway, sortObjects). A pane's drawn
+  // after what's solid (its renderOrder, kept: the batch's)
+  const seeThru = (mt: any) => mt.transparent && mt.depthWrite === false;
   const sig = (g: THREE.BufferGeometry) => Object.keys(g.attributes).sort().map((n) => n + ':' + g.attributes[n].itemSize).join(',') + (g.index ? '|i' : '|n');
   const flat = (g: THREE.BufferGeometry) => Object.values(g.attributes).every((a: any) => a.array instanceof Float32Array && !a.isInterleavedBufferAttribute && !a.normalized);
   const ver = (g: THREE.BufferGeometry) => (g.attributes.position as THREE.BufferAttribute).version + (g.index ? g.index.version * 7919 : 0);
@@ -103,10 +107,11 @@ export const ProxyDraw = (() => {
     const bins = new Map<string, THREE.Mesh[]>(), seen = new Set<THREE.Object3D>();
     for (const root of roots) root.traverse((c: any) => {
       if (seen.has(c)) return; seen.add(c);
-      if (!c.isMesh || c.isInstancedMesh || c.isBatchedMesh || c.isSkinnedMesh || c.isPoints || c.isLine || c.renderOrder || c.morphTargetInfluences || c.userData.proxied || c.hasOwnProperty('onBeforeRender')) return;
-      if (!plain(c.material) || !c.geometry.attributes.position || !flat(c.geometry) || c.geometry.attributes.position.count === 0) return; // (a box's six groups are nothing to one material)
+      const gl = level && seeThru(c.material || {}); // (the level's glass: js/levelview.ts, its panes map.winMeshes)
+      if (!c.isMesh || c.isInstancedMesh || c.isBatchedMesh || c.isSkinnedMesh || c.isPoints || c.isLine || (c.renderOrder && !gl) || c.morphTargetInfluences || c.userData.proxied || c.hasOwnProperty('onBeforeRender')) return;
+      if (!plain(c.material, gl) || !c.geometry.attributes.position || !flat(c.geometry) || c.geometry.attributes.position.count === 0) return; // (a box's six groups are nothing to one material)
       if (c.userData.marks || c.userData.lining || c.userData.noProxy) return; // (already shot: drawn as itself; noProxy: its material's hidden now and then, js/space.ts feed)
-      const cm0 = c.material as any, k = kindOf(cm0) + (heavy(cm0) && cm0.color ? '#' + cm0.color.getHexString() : '') + '|' + c.layers.mask + '|' + sig(c.geometry) + '|' + (c.castShadow ? 1 : 0) + (c.frustumCulled ? 1 : 0); let l = bins.get(k); if (!l) bins.set(k, (l = [])); l.push(c);
+      const cm0 = c.material as any, k = kindOf(cm0) + (heavy(cm0) && cm0.color ? '#' + cm0.color.getHexString() : '') + '|' + c.layers.mask + '|' + sig(c.geometry) + '|' + (c.castShadow ? 1 : 0) + (c.frustumCulled ? 1 : 0) + (gl ? '|T' + c.renderOrder : ''); let l = bins.get(k); if (!l) bins.set(k, (l = [])); l.push(c);
     });
     const S: FSet = { parent, inst: [], bms: [], own: [], mats: [], keep, hidden: false, tinted: new Set() };
     const mw = new Map<THREE.Material, MatW>();
@@ -118,7 +123,7 @@ export const ProxyDraw = (() => {
       const tint = !!src.color && l.some((c) => !(c.material as any).color.equals(src.color)); if (tint) mt.color.set(0xffffff); // (all one colour: the batch's material's, no texture of colours)
       S.own.push(mt);
       const bm = new T.BatchedMesh(l.length, nv, ni, mt);
-      bm.sortObjects = false; bm.perObjectFrustumCulled = l[0].frustumCulled; bm.frustumCulled = l[0].frustumCulled; bm.castShadow = l[0].castShadow; bm.receiveShadow = l[0].receiveShadow;
+      bm.sortObjects = !!src.transparent; bm.renderOrder = l[0].renderOrder; bm.perObjectFrustumCulled = l[0].frustumCulled; bm.frustumCulled = l[0].frustumCulled; bm.castShadow = l[0].castShadow; bm.receiveShadow = l[0].receiveShadow;
       bm.layers.mask = l[0].layers.mask | 1; bm.matrixAutoUpdate = false; bm.matrixWorldAutoUpdate = false; bm.matrixWorld.copy(parent.matrixWorld); bm.name = 'follow'; bm.userData.keepMat = true; bm.userData.proxy = true; bm.userData.inLevel = level; // (its material's its own: let go in release)
       for (const c of l) {
         let gid = geos.get(c.geometry)!; if (gid < 0) { gid = bm.addGeometry(c.geometry); geos.set(c.geometry, gid); }
@@ -180,7 +185,7 @@ export const ProxyDraw = (() => {
     let moved: Set<THREE.BatchedMesh> | null = null;
     for (const d of S.inst) {
       if (d.gone) continue;
-      if (d.o.geometry !== d.geo || ver(d.o.geometry) !== d.ver || d.o.material !== d.mat || d.o.renderOrder) { letGo(d); continue; } // (made again or changed: drawn as itself from now on)
+      if (d.o.geometry !== d.geo || ver(d.o.geometry) !== d.ver || d.o.material !== d.mat || d.o.renderOrder !== d.bm.renderOrder) { letGo(d); continue; } // (a pane's renderOrder is its batch's) // (made again or changed: drawn as itself from now on)
       const vis = shown(d.o);
       if (vis !== d.vis) { d.vis = vis; d.bm.setVisibleAt(d.id, vis); }
       if (!vis) continue;
