@@ -3731,7 +3731,9 @@ export const Server = {
     const npc = (p as any).npc as Enemy | undefined;
     if (npc) {
       const c = (1 - Math.pow(1 - G_U.clamp(chance, 0.01, 0.97), 1 / (ks * ks))) * (pellets > 1 ? 0.6 : 1); let n = 0; /* (the same aim as a round flown: its spread ks of chance's) */ for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
-      if (n && L.los(map, from[0], from[1], from[2], npc.x, (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), npc.z)) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)), byn: e.wear ? this.titleOf(e) : e.def.name }, null);
+      const cy = (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), cdx = npc.x - from[0], cdy = cy - from[1], cdz = npc.z - from[2], cd = Math.hypot(cdx, cdy, cdz) || 1;
+      // (clear to their chest: glass a round goes through doesn't stop it (a display case's, a window's), bulletproof glass does)
+      if (n && L.raycast(map, from[0], from[1], from[2], cdx / cd, cdy / cd, cdz / cd, cd, { glass: true }).t >= cd - 0.05) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)), byn: e.wear ? this.titleOf(e) : e.def.name }, null);
     }
   },
   // ---- Sides (a ship's people: js/spaceserver.ts, who each is dressed as, wear). Pirates fight everyone: a navy's people, a
