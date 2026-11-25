@@ -43,7 +43,7 @@ export const LightGrid = (() => {
     lgNv: { value: new T.Vector4(0, 0, 0, 0) }, lgNvD: { value: new T.Vector4(0, 0, -1, 0.9) },
     // ambient occlusion (below): x how much (0 off, 1 as made), y the walls' height (m); js/render.ts setAO
     lgAoK: { value: new Float32Array(8).fill(1) }, // (the moving parts' layers of the occlusion: 1 in place, 0 away; js/gunao.ts)
-    lgAo: { value: new T.Vector4(1, 4, 0, 0.28) }, lgAoA: { value: blank }, lgAoB: { value: blank },
+    lgAo: { value: new T.Vector4(1, 4, 0, 0.28) }, lgAoAB: { value: blank }, // (the two occlusion bakes side by side in one texture: a shader can read only 16)
     // reflections (js/probes.ts): lgEnvOn the level's being drawn (1; 0: three's own, as in a scene that isn't the level's: the gun's
     // studio), lgEnvK how much, lgEnvR how much less on a rough surface, the room's box the picture's projected on (lgEnvMin, lgEnvMax)
     // and where it was taken from (lgEnvC)
@@ -79,7 +79,7 @@ export const LightGrid = (() => {
       #endif
       lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc + aOccD * lgAoK[int(aOccI + 0.5)]; }`; // (a moving part's occlusion on what's round it, as the part is in place: js/gunao.ts layers)
   const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nvarying float vOcc;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
-uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform vec2 lgLampAt;\nuniform float lgGrime;\nuniform float lgLevel;\nuniform float lgCapN;\nuniform vec4 lgCapA[48];\nuniform vec4 lgCapB[48];\nfloat lgHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\nfloat lgNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(lgHash(i), lgHash(i + vec2(1.0, 0.0)), f.x), mix(lgHash(i + vec2(0.0, 1.0)), lgHash(i + vec2(1.0, 1.0)), f.x), f.y); }\nfloat lgFbm(vec2 p) { return 0.5 * lgNoise(p) + 0.3 * lgNoise(p * 2.7 + 3.1) + 0.2 * lgNoise(p * 6.3 - 1.7); }\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\nuniform float lgEnvOn;\nuniform float lgEnvK;\nuniform float lgEnvR;\nuniform vec3 lgEnvMin;\nuniform vec3 lgEnvMax;\nuniform vec3 lgEnvC;\n`;
+uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform vec2 lgLampAt;\nuniform float lgGrime;\nuniform float lgLevel;\nuniform float lgCapN;\nuniform vec4 lgCapA[48];\nuniform vec4 lgCapB[48];\nfloat lgHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\nfloat lgNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(lgHash(i), lgHash(i + vec2(1.0, 0.0)), f.x), mix(lgHash(i + vec2(0.0, 1.0)), lgHash(i + vec2(1.0, 1.0)), f.x), f.y); }\nfloat lgFbm(vec2 p) { return 0.5 * lgNoise(p) + 0.3 * lgNoise(p * 2.7 + 3.1) + 0.2 * lgNoise(p * 6.3 - 1.7); }\nuniform sampler2D lgAoAB;\nuniform float lgEnvOn;\nuniform float lgEnvK;\nuniform float lgEnvR;\nuniform vec3 lgEnvMin;\nuniform vec3 lgEnvMax;\nuniform vec3 lgEnvC;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
   // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
   // its own side, as it does the light, so the room next door keeps its own, and so do a wall's faces once they've been
@@ -122,7 +122,8 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
       if (lgAo.x > 0.0) {
         float lgy = vLgP.y - (lgSize.w + lgf * lgFloorH) - lgAo.w; // (its height over the floor it's on)
         if (lgAo.z > 0.5) { // (the baked: js ambient occlusion above, the floor, the ceiling or the wall facing the way this one does)
-          vec4 lga = texture2D(lgAoA, lguv), lgb = texture2D(lgAoB, lguv);
+          float lgah = 0.5 / float(textureSize(lgAoAB, 0).x / 2), lgax = clamp(lguv.x, lgah, 1.0 - lgah) * 0.5; // (each half's own edge: nothing filtered across from the other)
+          vec4 lga = texture2D(lgAoAB, vec2(lgax, lguv.y)), lgb = texture2D(lgAoAB, vec2(0.5 + lgax, lguv.y));
           float lgk = 1.0;
           if (lgn.y > 0.5) {
             // up: the floor at the floor; the top of a piece standing here at its height (the floor's was baked at the floor itself)
@@ -692,8 +693,9 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
       U.lgTop.value = tt; U.lgLampAt.value.set(LW, R0);
     }
     if (d.ao) {
-      const aoTex = (data: Uint8Array) => { const tx = new T.DataTexture(data as Uint8Array<ArrayBuffer>, d.ao!.AW, d.ao!.AH * NF, T.RGBAFormat, T.UnsignedByteType); tx.magFilter = tx.minFilter = T.LinearFilter; tx.wrapS = tx.wrapT = T.ClampToEdgeWrapping; tx.generateMipmaps = false; tx.needsUpdate = true; return tx; };
-      U.lgAoA.value = aoTex(d.ao.a); U.lgAoB.value = aoTex(d.ao.b); U.lgAo.value.z = 1; U.lgAo.value.w = L.FLOOR_H - L.WALL_H - 0.02; U.lgAo.value.y = L.WALL_H; // (w: the layer's start is this far under the floor)
+      const aoTex = (a: Uint8Array, b: Uint8Array) => { const AW = d.ao!.AW, R = d.ao!.AH * NF, data = new Uint8Array(AW * 2 * R * 4); for (let y = 0; y < R; y++) { data.set(a.subarray(y * AW * 4, (y + 1) * AW * 4), y * AW * 8); data.set(b.subarray(y * AW * 4, (y + 1) * AW * 4), y * AW * 8 + AW * 4); } // (side by side, a row of each)
+        const tx = new T.DataTexture(data, AW * 2, R, T.RGBAFormat, T.UnsignedByteType); tx.magFilter = tx.minFilter = T.LinearFilter; tx.wrapS = tx.wrapT = T.ClampToEdgeWrapping; tx.generateMipmaps = false; tx.needsUpdate = true; return tx; };
+      U.lgAoAB.value = aoTex(d.ao.a, d.ao.b); U.lgAo.value.z = 1; U.lgAo.value.w = L.FLOOR_H - L.WALL_H - 0.02; U.lgAo.value.y = L.WALL_H; // (w: the layer's start is this far under the floor)
       (map as any).aoBakeMs = d.ao.ms;
     }
     U.lgGrid.value.set(0, 0, TS, 0);
@@ -734,7 +736,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
   }
   function dispose() {
     if (held) { for (const t of [...held.cpu, ...held.gpu]) if (t && t !== blank) t.dispose(); held = null; }
-    for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoA', 'lgAoB', 'lgTop'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
+    for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoAB', 'lgTop'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
     U.lgAo.value.z = 0;
     G0 = null; built = false;
   }
@@ -769,10 +771,10 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
   // the occlusion baked on the GPU in place of the box bake's (js/gpuao.ts): its textures, which the grid then holds and lets go of
   // (the box bake's are kept beside them, for swapAo: to see the two on the same level)
   let held: { cpu: any[]; gpu: any[] } | null = null;
-  function useGpuAo(a: THREE.Texture, b: THREE.Texture) {
-    held = { cpu: [U.lgAoA.value, U.lgAoB.value], gpu: [a, b] };
-    U.lgAoA.value = a as any; U.lgAoB.value = b as any; U.lgAo.value.z = 1; U.lgAo.value.w = Level.FLOOR_H - Level.WALL_H - 0.02; U.lgAo.value.y = Level.WALL_H;
+  function useGpuAo(ab: THREE.Texture) {
+    held = { cpu: [U.lgAoAB.value], gpu: [ab] };
+    U.lgAoAB.value = ab as any; U.lgAo.value.z = 1; U.lgAo.value.w = Level.FLOOR_H - Level.WALL_H - 0.02; U.lgAo.value.y = Level.WALL_H;
   }
-  function swapAo(gpu: boolean) { if (!held) return false; const [a, b] = gpu ? held.gpu : held.cpu; U.lgAoA.value = a; U.lgAoB.value = b; return true; }
+  function swapAo(gpu: boolean) { if (!held) return false; U.lgAoAB.value = (gpu ? held.gpu : held.cpu)[0]; return true; }
   return { build, compute, dispose, on, at, useGpuAo, swapAo, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();

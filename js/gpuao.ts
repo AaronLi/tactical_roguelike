@@ -16,7 +16,7 @@ export const GpuAo = (() => {
   const T = THREE;
   const S = 4, NDIR = 20, LAYER = 6;
   const on = () => new URLSearchParams(location.search).get('gpuao') === '1';
-  let rtA: THREE.WebGLRenderTarget | null = null, rtB: THREE.WebGLRenderTarget | null = null;
+  let rtAB: THREE.WebGLRenderTarget | null = null; // (both bakes side by side, the up/down one on the left, the walls' on the right: one texture, js/lightgrid.ts lgAoAB)
   let heightMat: THREE.ShaderMaterial | null = null, aoMat: THREE.ShaderMaterial | null = null, quad: THREE.Mesh | null = null, qScene: THREE.Scene | null = null, qCam: THREE.OrthographicCamera | null = null;
 
   const VS = `
@@ -120,7 +120,7 @@ export const GpuAo = (() => {
     });
   }
 
-  function bake(r: THREE.WebGLRenderer, scene: THREE.Scene, root: THREE.Object3D, map: LvMap): { a: THREE.Texture; b: THREE.Texture; ms: number } | null {
+  function bake(r: THREE.WebGLRenderer, scene: THREE.Scene, root: THREE.Object3D, map: LvMap): { ab: THREE.Texture; ms: number } | null {
     if (!on() || !supported(r)) return null;
     const t0 = performance.now(), TS = Level.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, WH = Level.WALL_H, AW = W * S, AH = H * S, s = TS / S, MW = W * TS, MH = H * TS;
     dispose();
@@ -129,7 +129,7 @@ export const GpuAo = (() => {
     // (the heights at a finer grain than the occlusion (SH a tile: 8 cm): a door frame or a post a few centimetres across is a few of the rays' steps, not a whole cell)
     const SH = Math.max(S, Math.min(8, Math.floor(Math.sqrt(2.5e6 / (W * H))))), rtTop = new T.WebGLRenderTarget(W * SH, H * SH, rtOpt), rtBot = new T.WebGLRenderTarget(W * SH, H * SH, rtOpt);
     const outOpt = { type: T.UnsignedByteType, format: T.RGBAFormat, minFilter: T.LinearFilter, magFilter: T.LinearFilter, depthBuffer: false, generateMipmaps: false };
-    rtA = new T.WebGLRenderTarget(AW, AH * NF, outOpt); rtB = new T.WebGLRenderTarget(AW, AH * NF, outOpt);
+    rtAB = new T.WebGLRenderTarget(AW * 2, AH * NF, outOpt);
     heightMat = new T.ShaderMaterial({ vertexShader: VS, fragmentShader: FS, uniforms: { uRange: { value: new T.Vector2() } }, side: T.FrontSide });
     heightMat.toneMapped = false;
     const tiles = new T.DataTexture(new Uint8Array(W * H), W, H, T.RedFormat, T.UnsignedByteType); tiles.minFilter = tiles.magFilter = T.NearestFilter; tiles.wrapS = tiles.wrapT = T.ClampToEdgeWrapping;
@@ -157,28 +157,28 @@ export const GpuAo = (() => {
         r.setRenderTarget(rtBot); r.clear(); r.render(scene, camUp);
         scene.overrideMaterial = null;
         // the occlusion, into this floor's rows
-        for (const [rt, pass] of [[rtA, 0], [rtB, 1]] as [THREE.WebGLRenderTarget, number][]) {
-          aoMat.uniforms.uPass.value = pass;
-          rt.viewport.set(0, f * AH, AW, AH); rt.scissor.set(0, f * AH, AW, AH); rt.scissorTest = true;
+        for (const pass of [0, 1]) {
+          const rt = rtAB!; aoMat.uniforms.uPass.value = pass;
+          rt.viewport.set(pass * AW, f * AH, AW, AH); rt.scissor.set(pass * AW, f * AH, AW, AH); rt.scissorTest = true;
           r.setRenderTarget(rt); r.render(qScene, qCam);
         }
       }
     } finally {
       scene.overrideMaterial = prevOver; scene.background = prevBg; scene.fog = prevFog; r.shadowMap.autoUpdate = prevShadow; r.autoClear = prevAuto; r.info.autoReset = prevAutoInfo;
       r.setRenderTarget(prevRT); r.setClearColor(prevClear, prevAlpha);
-      rtA.scissorTest = false; rtB.scissorTest = false;
+      rtAB.scissorTest = false;
       rtTop.dispose(); rtBot.dispose(); tiles.dispose();
     }
     r.getContext().finish(); // (the GPU's work counted too: what the cost is; the frame would wait on it anyway)
-    return { a: rtA.texture, b: rtB.texture, ms: Math.round(performance.now() - t0) };
+    return { ab: rtAB.texture, ms: Math.round(performance.now() - t0) };
   }
 
   function dispose() {
-    for (const x of [rtA, rtB]) if (x) x.dispose();
-    rtA = rtB = null;
+    if (rtAB) rtAB.dispose();
+    rtAB = null;
     if (heightMat) { heightMat.dispose(); heightMat = null; }
     if (aoMat) { aoMat.dispose(); aoMat = null; }
     if (quad) { quad.geometry.dispose(); quad = null; }
   }
-  return { bake, dispose, on, S, targets: () => ({ a: rtA, b: rtB }) };
+  return { bake, dispose, on, S, targets: () => ({ ab: rtAB }) };
 })();

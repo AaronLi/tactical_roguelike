@@ -1477,7 +1477,7 @@ export const Space = (() => {
         const o8 = (w: number, hh: number, k: number) => [[-w + k, -hh], [w - k, -hh], [w, -hh + k], [w, hh - k], [w - k, hh], [-w + k, hh], [-w, hh - k], [-w, -hh + k]];
         const bo = ext(o8(0.6, b, 0.14), 0.04, dark); bo.position.set(0, q / 2, T0 / 2 + 0.02); inner.add(bo);
         const bi = ext(o8(0.5, b - 0.08, 0.1), 0.02, accent); bi.position.set(0, q / 2, T0 / 2 + 0.05); inner.add(bi);
-        const sw = 0.48, sc = new T.Mesh(new T.PlaneGeometry(sw, sw * CAM_H / CAM_W), screen); sc.position.set(0, q / 2, T0 / 2 + 0.062); inner.add(sc); // (the camera's picture on the boss, on your side)
+        const sw = 0.48, sc = new T.Mesh(new T.PlaneGeometry(sw, sw * CAM_H / CAM_W), screen); sc.position.set(0, q / 2, T0 / 2 + 0.062); sc.userData.noProxy = true; inner.add(sc); // (the camera's picture on the boss, on your side)
         // the camera: in the middle of the door's outer face, just under the seam, looking straight out through her breaching door
         // into whatever's there; it rides with the panel, and it's off once the door's open (feed)
         const housing = new T.Mesh(new T.BoxGeometry(0.12, 0.08, 0.05), dark); housing.position.set(0, q / 2 - 0.06, -T0 / 2 - 0.025); inner.add(housing);
@@ -1493,7 +1493,7 @@ export const Space = (() => {
     // the door camera's picture also on screens on the cover either side of the tunnel's mouth (facing the staging space) and beside the button
     const panel = (x: number, y: number, z: number, w: number, ry: number) => {
       const h = w * CAM_H / CAM_W, bz = new T.Mesh(new T.BoxGeometry(w + 0.05, h + 0.05, 0.025), dark); bz.position.set(x, y, z); bz.rotation.y = ry; m.group.add(bz);
-      const sc = new T.Mesh(new T.PlaneGeometry(w, h), screen); sc.position.set(x + Math.sin(ry) * 0.014, y, z + Math.cos(ry) * 0.014); sc.rotation.y = ry; m.group.add(sc); // (just off the bezel's face, the way it faces)
+      const sc = new T.Mesh(new T.PlaneGeometry(w, h), screen); sc.userData.noProxy = true; sc.position.set(x + Math.sin(ry) * 0.014, y, z + Math.cos(ry) * 0.014); sc.rotation.y = ry; m.group.add(sc); // (just off the bezel's face, the way it faces)
     };
     const cw = Math.min(0.5, L.sw - L.tw - 0.2), cx = (L.tw + L.sw) / 2;
     if (cw > 0.2) for (const s of [-1, 1]) panel(s * cx, L.FB + 1.45, L.zt + 0.013, cw, 0); // (on the cover, its face toward the staging space)
@@ -1512,7 +1512,9 @@ export const Space = (() => {
     H.screen.color.setHex(live ? 0xd8e8f0 : 0x0b0f12);
     if (!live || H.n++ % 3) return;
     const au = r.shadowMap.autoUpdate; r.shadowMap.autoUpdate = false;
+    H.screen.visible = false; // (the screens showing it, out of its own picture: drawn into the texture they show, the GL refuses the draw, a feedback loop)
     H.cam.updateMatrixWorld(); r.setRenderTarget(feedRT); r.clear(); r.render(G_R.scene, H.cam); r.setRenderTarget(null);
+    H.screen.visible = true;
     r.shadowMap.autoUpdate = au;
   }
   // her inner door's sound, from the middle of it: the heavy sliding door's (js/audio.ts slideDoor), as long as it takes on its rails (1.3 s)

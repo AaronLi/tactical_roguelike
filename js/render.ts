@@ -301,7 +301,7 @@ export const R = {
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
     Probes.level(map, this.scene, this.renderer); // (reflections: js/probes.ts)
-    { const gpu = GpuAo.bake(this.renderer, this.scene, this.levelRoot, map); if (gpu) { LightGrid.useGpuAo(gpu.a, gpu.b); (map as any).gpuAoMs = gpu.ms; } } // (the occlusion from the meshes on the GPU: ?gpuao=1, js/gpuao.ts)
+    { const gpu = GpuAo.bake(this.renderer, this.scene, this.levelRoot, map); if (gpu) { LightGrid.useGpuAo(gpu.ab); (map as any).gpuAoMs = gpu.ms; } } // (the occlusion from the meshes on the GPU: ?gpuao=1, js/gpuao.ts)
     if (!map.sp && !map.theme.hub) this.batchLevel(map); // (a ship's: once she's all put together, js/space.ts enter)
     const th = map.theme;
     (this.scene.fog as THREE.Fog).color.setHex(th.fog);

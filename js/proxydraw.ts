@@ -21,7 +21,7 @@ export const ProxyDraw = (() => {
   const T = THREE, OFF = typeof location !== 'undefined' && new URLSearchParams(location.search).has('noproxy');
   interface Inst { o: THREE.Mesh; bm: THREE.BatchedMesh; id: number; geo: THREE.BufferGeometry; ver: number; mat: THREE.Material; M: Float32Array; vis: boolean; gone: boolean }
   interface MatW { m: any; r: number; g: number; b: number; e: number; ins: Inst[] }
-  interface FSet { parent: THREE.Object3D; inst: Inst[]; bms: THREE.BatchedMesh[]; own: THREE.Material[]; mats: MatW[]; keep: boolean; hidden: boolean }
+  interface FSet { parent: THREE.Object3D; inst: Inst[]; bms: THREE.BatchedMesh[]; own: THREE.Material[]; mats: MatW[]; keep: boolean; hidden: boolean; tinted: Set<THREE.BatchedMesh> }
   interface MarkSet { list: THREE.Mesh[]; geo: THREE.BufferGeometry; by: Map<THREE.Material, THREE.InstancedMesh>; scene: THREE.Scene }
   const sets: FSet[] = [], marks: MarkSet[] = [];
   const inv = new T.Matrix4(), M = new T.Matrix4(), C = new T.Color();
@@ -45,6 +45,12 @@ export const ProxyDraw = (() => {
     return k;
   };
 
+  // a material with two or more textures of its own (its picture and its relief, its picture and the residents' paint) isn't one a batch
+  // gives its pieces' colours: their colours are a texture more (BatchedMesh's colorsTexture), and the level's shader, with its grid,
+  // its reflection and the six weapon lights' shadows, would read more than the 16 a GPU can (js/lightgrid.ts). Its pieces are batched
+  // a colour at a time instead
+  const MAPN = ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap', 'alphaMap', 'bumpMap', 'lightMap'];
+  const heavy = (m: any) => MAPN.filter((n) => m[n]).length + (m.defines && m.defines.LG_PAINT ? 1 : 0) >= 2;
   // pieces of one material, one geometry (in their parent's frame): position and normal moved with each piece, the rest as it is
   function merge(ms: THREE.Mesh[]) {
     const names = Object.keys(ms[0].geometry.attributes), idx = !!ms[0].geometry.index;
@@ -99,16 +105,17 @@ export const ProxyDraw = (() => {
       if (seen.has(c)) return; seen.add(c);
       if (!c.isMesh || c.isInstancedMesh || c.isBatchedMesh || c.isSkinnedMesh || c.isPoints || c.isLine || c.renderOrder || c.morphTargetInfluences || c.userData.proxied || c.hasOwnProperty('onBeforeRender')) return;
       if (!plain(c.material) || !c.geometry.attributes.position || !flat(c.geometry) || c.geometry.attributes.position.count === 0) return; // (a box's six groups are nothing to one material)
-      if (c.userData.marks || c.userData.lining) return; // (already shot: drawn as itself)
-      const k = kindOf(c.material) + '|' + c.layers.mask + '|' + sig(c.geometry) + '|' + (c.castShadow ? 1 : 0) + (c.frustumCulled ? 1 : 0); let l = bins.get(k); if (!l) bins.set(k, (l = [])); l.push(c);
+      if (c.userData.marks || c.userData.lining || c.userData.noProxy) return; // (already shot: drawn as itself; noProxy: its material's hidden now and then, js/space.ts feed)
+      const cm0 = c.material as any, k = kindOf(cm0) + (heavy(cm0) && cm0.color ? '#' + cm0.color.getHexString() : '') + '|' + c.layers.mask + '|' + sig(c.geometry) + '|' + (c.castShadow ? 1 : 0) + (c.frustumCulled ? 1 : 0); let l = bins.get(k); if (!l) bins.set(k, (l = [])); l.push(c);
     });
-    const S: FSet = { parent, inst: [], bms: [], own: [], mats: [], keep, hidden: false };
+    const S: FSet = { parent, inst: [], bms: [], own: [], mats: [], keep, hidden: false, tinted: new Set() };
     const mw = new Map<THREE.Material, MatW>();
     for (const l of bins.values()) {
       if (l.length < 2) continue; // (alone of its kind: nothing to save)
       const geos = new Map<THREE.BufferGeometry, number>(); let nv = 0, ni = 0;
       for (const c of l) if (!geos.has(c.geometry)) { geos.set(c.geometry, -1); nv += c.geometry.attributes.position.count; ni += c.geometry.index ? c.geometry.index.count : 0; }
-      const src = l[0].material as any, mt = src.clone(); mt.defines = Object.assign({}, src.defines); if (mt.color) mt.color.set(0xffffff); // (a clone loses its defines)
+      const src = l[0].material as any, mt = src.clone(); mt.defines = Object.assign({}, src.defines); // (a clone loses its defines)
+      const tint = !!src.color && l.some((c) => !(c.material as any).color.equals(src.color)); if (tint) mt.color.set(0xffffff); // (all one colour: the batch's material's, no texture of colours)
       S.own.push(mt);
       const bm = new T.BatchedMesh(l.length, nv, ni, mt);
       bm.sortObjects = false; bm.perObjectFrustumCulled = l[0].frustumCulled; bm.frustumCulled = l[0].frustumCulled; bm.castShadow = l[0].castShadow; bm.receiveShadow = l[0].receiveShadow;
@@ -116,7 +123,7 @@ export const ProxyDraw = (() => {
       for (const c of l) {
         let gid = geos.get(c.geometry)!; if (gid < 0) { gid = bm.addGeometry(c.geometry); geos.set(c.geometry, gid); }
         const id = bm.addInstance(gid); c.updateWorldMatrix(true, false); M.multiplyMatrices(inv, c.matrixWorld); bm.setMatrixAt(id, M);
-        const cm = c.material as any; bm.setColorAt(id, cm.color || C.set(0xffffff));
+        const cm = c.material as any; if (tint) bm.setColorAt(id, cm.color || C.set(0xffffff));
         const vis = shown(c); bm.setVisibleAt(id, vis);
         const d: Inst = { o: c, bm, id, geo: c.geometry, ver: ver(c.geometry), mat: cm, M: new Float32Array(M.elements), vis, gone: false };
         S.inst.push(d);
@@ -125,7 +132,7 @@ export const ProxyDraw = (() => {
         c.layers.disable(0); c.userData.proxied = true;
       }
       bm.computeBoundingBox(); bm.computeBoundingSphere();
-      S.bms.push(bm);
+      S.bms.push(bm); if (tint) S.tinted.add(bm);
     }
     S.mats = [...mw.values()];
     if (!S.inst.length) return null;
@@ -167,7 +174,7 @@ export const ProxyDraw = (() => {
     for (const w of S.mats) {
       const m = w.m;
       if (m.emissive && m.emissive.getHex() * 1 + m.emissiveIntensity !== w.e) { for (const d of w.ins) letGo(d); w.e = m.emissive.getHex() * 1 + m.emissiveIntensity; continue; }
-      if (m.color && (m.color.r !== w.r || m.color.g !== w.g || m.color.b !== w.b)) { w.r = m.color.r; w.g = m.color.g; w.b = m.color.b; for (const d of w.ins) if (!d.gone) d.bm.setColorAt(d.id, m.color); }
+      if (m.color && (m.color.r !== w.r || m.color.g !== w.g || m.color.b !== w.b)) { w.r = m.color.r; w.g = m.color.g; w.b = m.color.b; for (const d of w.ins) if (!d.gone) { if (S.tinted.has(d.bm)) d.bm.setColorAt(d.id, m.color); else letGo(d); } } // (a batch of one colour: the piece drawn as itself)
     }
     inv.copy(S.parent.matrixWorld).invert();
     let moved: Set<THREE.BatchedMesh> | null = null;
@@ -203,7 +210,7 @@ export const ProxyDraw = (() => {
   // colour changed, the piece takes it)
   const watched = new Map<THREE.Material, { r: number; g: number; b: number; at: [THREE.BatchedMesh, number][] }>();
   function tone(m: any): string | null {
-    if (OFF || !m || !m.color || m.transparent || m.hasOwnProperty('onBeforeCompile') || (m.emissive && m.emissive.getHex() !== 0)) return null;
+    if (OFF || !m || !m.color || m.transparent || m.hasOwnProperty('onBeforeCompile') || (m.emissive && m.emissive.getHex() !== 0) || heavy(m)) return null;
     return kindOf(m);
   }
   function white(src: any) { const mt = src.clone(); mt.defines = Object.assign({}, src.defines); mt.color.set(0xffffff); return mt; } // (a clone loses its defines)
