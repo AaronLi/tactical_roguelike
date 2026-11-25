@@ -2331,7 +2331,7 @@ export const Space = (() => {
           if (p >= 0) { out.prog = p; out.label = S.kind === 'board' ? 'Undocking' : 'Lifting off'; }
           lines.push(hint('Hold G', S.kind === 'board' ? 'to undock' : 'to lift off'));
         } else {
-          const a = nearAnchor(), slow = S.V.length() < 80;
+          const a = nearAnchor(), slow = S.V.distanceTo(fieldAt(S.P)) < 80; // (against the field: the rocks and the stars, not the mission's ship)
           if (a) {
             const to = S.kind === 'hub' ? a.i : -1, name = S.kind === 'hub' ? (SD.offers(S.board.seed, S.board.level)[a.i] || { name: '?' }).name : 'home';
             if (slow) { const p = holdFor('J', K('KeyJ'), dt, 1.2, () => { S.ftl = { st: 'spool', t: 0, to, T: 2.6 }; helmCmd(['j', to]); HUD.toast('JUMP', 'Spooling for ' + name, 2.4); }); if (p >= 0) { out.prog = p; out.label = 'Jump drive'; } lines.push(hint('Hold J', 'to jump to ' + U.esc(name))); }
@@ -2591,20 +2591,24 @@ export const Space = (() => {
   }
   // How she's flying, for her sound (js/ambience.ts shipVoice), each frame: null with no ship here. Aboard her you hear all of
   // her; off her (the hangar's floor, the deck of what she's against) less with distance, and dulled.
-  const snd = { v: new T.Vector3(), docked: true, ftl: 0, has: false };
+  const snd = { v: new T.Vector3(), docked: true, ftl: 0, has: false, acc: 0 }, _sv = new T.Vector3();
   function sound(dt: number): AmbShipState | null {
     if (!S.on || !S.model || !me().pos) { snd.has = false; return null; }
     const ab = aboard(), d = me().pos.distanceTo(S.Dp), k = ab ? 1 : U.clamp(1 - (d - 5) / 26, 0, 1) * 0.7;
-    const sp = S.V.length(), acc = snd.has ? snd.v.sub(S.V).length() / Math.max(dt, 1e-3) : 0, ftl = S.ftl ? (S.ftl.st === 'tunnel' ? 2 : 1) : 0;
+    // (against the field, not the mission's ship: her speed through the rocks, and how hard her engines push her through them, smoothed
+    // over a tenth of a second or so (a frame's own is ragged); her engines' sound is the push, at full for her main engine's, SpaceSim FLY.main)
+    const rv = S.docked ? _sv.set(0, 0, 0) : fieldAt(S.P, _sv).negate().add(S.V), sp = rv.length();
+    const a0 = snd.has && !S.ftl && !S.warp ? snd.v.sub(rv).length() / Math.max(dt, 1e-3) : 0; snd.acc += (Math.min(a0, 120) - snd.acc) * Math.min(1, dt / 0.12); const acc = snd.acc;
+    const ftl = S.ftl ? (S.ftl.st === 'tunnel' ? 2 : 1) : 0;
     let ev: string | null = null;
     if (snd.has) {
       if (S.docked && !snd.docked) ev = S.kind === 'board' ? 'ram' : 'clamp';
       else if (!S.docked && snd.docked) ev = 'release';
       else if (!ftl && snd.ftl === 2) ev = 'drop';
     }
-    snd.v.copy(S.V); snd.docked = S.docked; snd.ftl = ftl; snd.has = true;
+    snd.v.copy(rv); snd.docked = S.docked; snd.ftl = ftl; snd.has = true;
     const flying = !S.docked || !!S.auto;
-    return { k, muf: ab ? 0 : 0.45 + 0.3 * U.clamp(d / 30, 0, 1), thr: flying ? Math.min(1.3, sp / S.def.speed) : 0, cruise: S.cruise || sp > S.def.speed * 2 ? 1 : S.spin * 0.5, burn: flying ? U.clamp(acc / 45, 0, 1) : 0,
+    return { k, muf: ab ? 0 : 0.45 + 0.3 * U.clamp(d / 30, 0, 1), thr: flying ? Math.min(1.3, acc / 30) : 0, cruise: S.cruise || sp > S.def.speed * 2 ? 1 : S.spin * 0.5, burn: flying ? U.clamp(acc / 45, 0, 1) : 0,
       turn: flying ? U.clamp(S.Wv.length() / Math.max(0.3, S.def.turn) + S.stick.length() * 0.6, 0, 1) : 0, ftl, ftlK: S.ftl && ftl === 1 ? U.clamp(S.ftl.t / Math.max(0.1, S.ftl.T), 0, 1) : 0, ev };
   }
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
