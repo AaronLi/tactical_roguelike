@@ -786,10 +786,13 @@ export const Furniture = (() => {
     k.ico(leaf, 0.2, 0, 2.1, 0);
   } };
   // A display case: a block of black stone, a glazed case over it framed in thin brass, what's shown inside lit from under.
-  R.vitrine = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.8, 0.8, 1.45]], build(k: Kit) {
-    const stone = k.mat(0x1d1e21, 0.25, 0.1), brass = k.mat(0xb8935a, 0.25, 0.9), glass = k.mat(0xdde9ec, 0.05, 0.1, { transparent: true, opacity: 0.1, depthWrite: false }), pad = k.mat(0xfff0d8, 0.6, 0, { emissive: 0xffe2b8, emissiveIntensity: 0.6 });
+  // You can't walk through it (boxes), but only the stone stops a round or a look (ray); the glazing over it is a pane
+  // (glass: its box, js/level.ts placeCases), seen and shot through and shot out as a window's is, and drawn as one
+  // (js/leveldesc.ts windows), not here
+  R.vitrine = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.8, 0.8, 1.45]], ray: () => [[0, 0, 1.8, 0.8, 0.86]], glass: [[0, 0, 1.7, 0.7, 1.415, 0.865]], build(k: Kit) {
+    const stone = k.mat(0x1d1e21, 0.25, 0.1), brass = k.mat(0xb8935a, 0.25, 0.9), pad = k.mat(0xfff0d8, 0.6, 0, { emissive: 0xffe2b8, emissiveIntensity: 0.6 });
     k.box(stone, 1.8, 0.84, 0.8, 0, 0.42, 0); k.box(pad, 1.6, 0.03, 0.6, 0, 0.86, 0);
-    k.box(glass, 1.7, 0.55, 0.7, 0, 1.14, 0); // (glazed all round and over the top: the brass only a thin frame at its edges, nothing solid over what's shown)
+    // (glazed all round and over the top, 1.7 x 0.55 x 0.7 centred 1.14 up: the pane's; the brass only a thin frame at its edges, nothing solid over what's shown)
     for (const sz of [-0.36, 0.36]) k.box(brass, 1.74, 0.02, 0.02, 0, 1.42, sz); for (const sx of [-0.86, 0.86]) k.box(brass, 0.02, 0.02, 0.74, sx, 1.42, 0);
     for (const sx of [-0.86, 0.86]) for (const sz of [-0.36, 0.36]) k.box(brass, 0.02, 0.58, 0.02, sx, 1.14, sz);
     for (let i = 0; i < 4; i++) k.ico(k.mat(k.pick([0xb8935a, 0xe8e4da, 0x9fd0e0, 0x1d1e21]), 0.2, 0.7), 0.06 + k.rnd() * 0.04, -0.6 + i * 0.4, 0.96, (k.rnd() - 0.5) * 0.3);
@@ -1468,6 +1471,15 @@ export const Furniture = (() => {
     }
     return out;
   }
+  // a piece's glass parts (rec.glass: [x, z, w, d, top, bottom] in its frame) placed at (x, z) turned q: [x0, y0, z0, x1, y1, z1],
+  // y up from its foot (js/level.ts placeCases: each a pane)
+  function glassBoxes(rec: PieceRec, x: number, z: number, q: number): number[][] {
+    const s = Math.round(Math.sin(q * Math.PI / 2)), c = Math.round(Math.cos(q * Math.PI / 2));
+    return (rec.glass || []).map(([lx, lz, w, d, h, y0]: number[]) => {
+      const cx = x + lx * c + lz * s, cz = z - lx * s + lz * c, hx = (c ? w : d) / 2, hz = (c ? d : w) / 2;
+      return [cx - hx, y0, cz - hz, cx + hx, h, cz + hz];
+    });
+  }
   // quarter-turns that put the back (-z) of a piece against the wall in direction (dx, dz)
   const facing = (dx: number, dz: number) => ((Math.round(Math.atan2(-dx, -dz) / (Math.PI / 2)) % 4) + 4) % 4;
 
@@ -2009,6 +2021,6 @@ export const Furniture = (() => {
     }
     if (cst) cst.flags(); // (the Sandia Crest's flags: last, from their own stream)
   }
-  return { plan, R, ROOMS, solids, worldBoxes, facing };
+  return { plan, R, ROOMS, solids, worldBoxes, glassBoxes, facing };
 })();
 

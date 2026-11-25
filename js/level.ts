@@ -669,6 +669,7 @@ export const Level = {
       for (let i = 0; i < W * H; i++) if (map.unitAt[i] === -2) map.unitAt[i] = -1;
     }
     this.placeWindows(map);
+    this.placeCases(map);
     map.spawn = { x: (spawnRoom.cx + 0.5) * TS, z: (spawnRoom.cz + 0.5) * TS };
     map.extract = { x: (exitRoom.cx + 0.5) * TS, z: (exitRoom.cz + 0.5) * TS, r: 3 };
     return map;
@@ -738,13 +739,28 @@ export const Level = {
   // From the level's own random stream, so every peer has the same windows. map.windows[id], map.winAt: cell -> ray boxes.
   SILL: 0.95, TOP: 2.25,
   CRACKS: 1, // (rounds that fracture a pane without bringing it down: the next one breaks it, js/player.ts roundPane. One: a second round brings it down)
-  // A ship's glass (w.ship: js/shipgen.ts finish) never comes down: rounds don't go through it (its material's armour glass's, js/materials.ts),
+  // A ship's hull glass (w.ship: a pane in her outer skin, js/shipgen.ts finish; the glass inside her is ordinary glass) never comes down: rounds don't go through it (its material's armour glass's, js/materials.ts),
   // each one fractures it more, up to CRACK_MAX cracks drawn, and nothing breaks it (rounds, blasts, someone walking into it fractured).
   // Anywhere else glass is as it was: CRACKS rounds fracture a pane, the next one, a blast, or walking into it fractured brings it down.
   CRACK_MAX: 6,
   paneBreaks(w: { ship?: boolean } | null | undefined) { return !(w && w.ship); },
   // how many cracks a pane can take
   crackCap(w: { ship?: boolean } | null | undefined) { return this.paneBreaks(w) ? this.CRACKS : this.CRACK_MAX; },
+  // The glass of a piece of furniture (a display case's glazing: its recipe's glass, js/furniture.ts glassBoxes): each part a pane
+  // like a window's (map.windows, after the walls' own), with no cells: case, its box [x0, y0, z0, x1, y1, z1] (y up from the
+  // floor), prop, the piece it's part of. Shot through, seen through less well while it's whole, fractured and shot out as
+  // ordinary glass is, aboard a ship too (it isn't the hull's: js/shipgen.ts finish). Its solid: js/world.ts windowSolids.
+  placeCases(map: LvMap) {
+    const R = Furniture.R;
+    for (const p of map.propList || []) {
+      const rec = R[p.name];
+      if (!rec || !rec.glass) continue;
+      for (const b of Furniture.glassBoxes(rec, p.x, p.z, p.q)) {
+        const alongX = b[3] - b[0] >= b[5] - b[2];
+        map.windows.push({ id: map.windows.length, case: b, prop: p, x: (b[0] + b[3]) / 2, z: (b[2] + b[5]) / 2, len: alongX ? b[3] - b[0] : b[5] - b[2], nx: alongX ? 0 : 1, nz: alongX ? 1 : 0, sill: b[1], top: b[4], ext: false, broken: false, cells: [] });
+      }
+    }
+  },
   placeWindows(map: LvMap) {
     const { W, H, t, out, rooms } = map, TS = this.TS, K = this.K, U = G_U, rw = U.rng((map.seed ^ 0x51d0b0) >>> 0);
     map.windows = []; map.winAt = new Map();

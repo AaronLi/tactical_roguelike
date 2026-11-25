@@ -357,8 +357,15 @@ export const ShipGen = (() => {
 
   // After the plan (and the stacking of her decks): map.sp
   function finish(map: LvMap, lay: LvLay) {
-    for (const w of map.windows || []) (w as any).ship = true; // (a ship's glass: rounds don't go through it and it never comes down, js/level.ts paneBreaks)
     const L = Level, TS = L.TS, CT = L.CTS, src = (lay as any).sp, S = SPEC[src.size as SpSize], floors = map.floors || [map];
+    // her hull's glass (a pane in her outer skin, open space on one side of it, or looking out: ext): rounds don't go through it
+    // and it never comes down (js/level.ts paneBreaks, js/materials.ts); the glass inside her (doors, rooms' windows, railings,
+    // display cases) is ordinary glass
+    for (const w of map.windows || []) {
+      if (w.case || w.rail || w.door || !w.cells || !w.cells.length) continue;
+      const fm = floors[w.fl || 0], W = fm.W, c = w.cells[0], space = (i: number) => fm.t[i] === 5 && !!(fm.out && fm.out[i]);
+      if (w.ext || space(c - w.nx - w.nz * W) || space(c + w.nx + w.nz * W)) w.ship = true;
+    }
     const fl = (rm: { fl?: number }) => floors[rm.fl || 0], roles = map.rooms.map((rm) => (rm.ship as ShRole) || null), hullOf = map.rooms.map((rm) => (rm as any).hull || 0);
     const locks: Record<number, string> = {};
     for (const [f, x, z, key] of src.locks as [number, number, number, string][]) {
@@ -608,6 +615,8 @@ export const ShipGen = (() => {
         map.props.delete(i); if (i < W * map.H && (map.t[i] === 2 || map.t[i] === 4)) map.t[i] = 0;
       }
       if (map.propList) map.propList = map.propList.filter((p: LvProp) => !gone.has(p));
+      // (a piece's glass goes with it: a display case's, js/level.ts placeCases)
+      for (const win of map.windows) if (win.prop && gone.has(win.prop) && !win.gone) { for (const q of win.solids || []) Wd.remove(w, q); win.solids = []; win.broken = true; win.gone = true; wins.push(win.id); }
     }
     (sp as any).gone = boxes;
     map.doorVer = (map.doorVer || 0) + 1; // (sound gets through it now)

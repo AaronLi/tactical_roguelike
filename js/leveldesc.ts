@@ -87,8 +87,8 @@ export const LevelDesc = (() => {
       chasm: map.chasm || 0, minY: map.minY || 0, ...(map.glassRoofs ? { glassRoofs: map.glassRoofs } : {}), // (glass roofs: [x0, z0, x1, z1, top] m; under one, no wind: Sim.windy)
       rooms: (map.rooms || []).map((r) => ({ fl: r.fl || 0, type: r.type, x: r.x, z: r.z, w: r.w, h: r.h, cx: r.cx, cz: r.cz, out: !!r.out, unit: r.unit != null ? r.unit : null })),
       doors: map.doors.map((d) => ({ id: d.id, fl: d.fl || 0, fy: d.fy || 0, cells: d.cells || [d.i], x: d.x, z: d.z, axis: d.axis, w: d.w || TS, mirror: !!d.mirror, kind: d.kind || null, open: !!d.open, leaf: d.leaf || null, pane: d.pane ? d.pane.id : null })),
-      windows: (map.windows || []).map((w) => ({ id: w.id, fl: w.fl || 0, fy: w.fy || 0, x: w.x, z: w.z, len: w.len, cells: w.cells, nx: w.nx || 0, nz: w.nz || 0, ext: !!w.ext, armor: !!w.armor, cooler: !!w.cooler,
-        sill: w.sill != null ? w.sill : w.door || w.rail ? null : L.SILL, top: w.top != null ? w.top : w.door || w.rail ? null : L.TOP, broken: !!w.broken, door: w.door ? w.door.id : null, rail: w.rail ? map.rails.indexOf(w.rail) : null })),
+      windows: (map.windows || []).map((w) => Object.assign({ id: w.id, fl: w.fl || 0, fy: w.fy || 0, x: w.x, z: w.z, len: w.len, cells: w.cells, nx: w.nx || 0, nz: w.nz || 0, ext: !!w.ext, armor: !!w.armor, cooler: !!w.cooler,
+        sill: w.sill != null ? w.sill : w.door || w.rail ? null : L.SILL, top: w.top != null ? w.top : w.door || w.rail ? null : L.TOP, broken: !!w.broken, door: w.door ? w.door.id : null, rail: w.rail ? map.rails.indexOf(w.rail) : null }, w.case ? { case: w.case } : {})),
       stairs: (map.stairs || []).map((s) => ({ f: s.f, y0: s.y0, rise: s.rise, axis: s.axis, up: s.up, x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1 })),
       rails: (map.rails || []).map((r: any) => ({ f: r.f, y: r.y, x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, pane: r.pane ? r.pane.id : null })),
       railSteel: !!map.railSteel,
@@ -448,7 +448,10 @@ export const LevelDesc = (() => {
     const wiredMat = map.windows.some((w) => w.armor) ? B.std({ color: 0x9fb2b8, map: B.tex('wired', { rep: [4, 4] }), transparent: true, opacity: 0.5, roughness: 0.2, metalness: 0.4, depthWrite: false, side: 2 }) : -1;
     const coolerMat = map.windows.some((w) => w.cooler) ? B.std({ color: 0xbfe6ff, transparent: true, opacity: 0.32, roughness: 0.05, metalness: 0.3, emissive: 0x0d2a3a, depthWrite: false, side: 2 }) : -1;
     const steelFrame = B.std({ color: 0x6a7076, roughness: 0.45, metalness: 0.6 }), whiteFrame = B.std({ color: 0xf0f2f2, roughness: 0.4 });
+    // a piece of furniture's glass (a display case's: js/level.ts placeCases): its box, all of it the pane (no wall, no frame: the piece's)
+    const caseMat = map.windows.some((w) => w.case) ? B.std({ color: 0xdde9ec, transparent: true, opacity: 0.1, roughness: 0.05, metalness: 0.1, depthWrite: false }) : -1;
     for (const w of map.windows) {
+      if (w.case) { const b = w.case; out.push(B.mesh(B.geo('box', [b[3] - b[0], b[4] - b[1], b[5] - b[2]]), caseMat, Object.assign({ p: [(b[0] + b[3]) / 2, (map.terrain ? w.fy || 0 : 0) + (b[1] + b[4]) / 2, (b[2] + b[5]) / 2], ro: 2, h: 'pane:' + w.id }, w.broken ? { hid: 1 } : {}))); continue; }
       const SL = w.sill != null ? w.sill : L.SILL, TP = w.top != null ? w.top : L.TOP, opening = TP - SL; // (its own, or the usual)
       const c: LdNode[] = [], SK = map.skirt || 0;
       // (local: x along the wall, z out of it toward -n; on rolling ground, the ground it's in) the wall below and above (the cell's full depth)
