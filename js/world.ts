@@ -632,6 +632,12 @@ export const World = (() => {
   function windowSolids(w: WorldT, map: any, win: any) {
     if (win.gone) { for (const s of win.solids || []) remove(w, s); win.solids = []; return; } // (a breach took it: js/shipgen.ts cut)
     if (win.door) return door(w, map, win.door); // (a glass door's pane: its door's solids)
+    if (win.case) { // a piece of furniture's glass (a display case's): its box, while it's whole (the piece's own boxes stop people)
+      for (const s of win.solids || []) remove(w, s);
+      const b = win.case, Y = win.fy || 0; // (its floor's: on rolling ground, the ground under it, js/level.ts)
+      win.solids = win.broken ? [] : [add(w, box(b[0], Y + b[1], b[2], b[3], Y + b[4], b[5], { kind: 'glass', glass: win.id, move: false, win }))];
+      return;
+    }
     if (win.rail) { // a railing's glass: under its handrail, while it's whole (it never stopped anyone walking: the drop's edge does)
       for (const s of win.solids || []) remove(w, s);
       const r = win.rail, Y = r.y, H = Level.RAIL_H;

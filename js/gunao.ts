@@ -6,9 +6,17 @@
 // It is worked out for the assembled build, whatever parts are on it, so what one part does to its neighbour is in it (a bake of each
 // part alone, as they're baked, couldn't): every mesh of the gun is stood in a grid of 3 mm cells, a cell any triangle's surface passes
 // through marked; from each vertex a few rays leave over the hemisphere its normal faces, a few centimetres long, and what they meet
-// is how shut in it is. About 40 ms for a rifle (23 000 vertices), done once for a build (the result's kept by its code), so the gun in
-// the hands, in the world, in the gunsmith and on the hangar's wall all take the same numbers. A part that moves (a bolt, a slide, the
-// magazine) takes its darkening along as it was in the gun at rest; the muzzle flash's, the lenses' and anything see-through has none.
+// is how shut in it is. Done once for a build (the result's kept by its code), so the gun in the hands, in the world, in the gunsmith and
+// on the hangar's wall all take the same numbers. A part that moves (a bolt, a slide, the magazine) takes its darkening along as it was in
+// the gun at rest; the muzzle flash's, the lenses' and anything see-through has none.
+//
+// What it costs: a rifle (an M4, 21 000 vertices refined to 24 000; 111 meshes) is 148 ms in JavaScript, nearly all of it refine's rays
+// (136 000 occlusions asked for; the grid's marking 11 ms, the weld 15). The numeric core has a second implementation in WebAssembly
+// (js/gunaowasm.ts, wasm/gunao: docs/wasm.md), the same numbers bit for bit, used when the module has loaded: 60 ms. And the gun in the hands
+// (GUN_ASYNC: js/gunmodels.ts viewmodel) isn't worked out in the frame that draws it: refineNow takes a few ms a frame for it, the gun drawn
+// without its darkening for the 6-8 frames that takes (a frame of 60-190 ms on drawing a gun not drawn before, before). The JavaScript stays
+// as the fallback (no module yet, the node tools, ?aojs) and the reference.
+import { AoWasm, type AoRefineJob } from './gunaowasm.js';
 export const GunAo = (() => {
   const T = THREE;
   /** What a thing's occlusion is made of: how far a ray reaches (m), how many rays, the finest cell (m) and the most cells along its longest side, the longest an edge may be before it is split (m), how much the shut-in share is scaled and its cap. */
@@ -17,6 +25,9 @@ export const GunAo = (() => {
   /** A gun's far levels of detail (models/lod_kit.py: level 2 on): the same rays, but no triangle is split: each vertex the level has takes its own occlusion and that is all (a split
    *  would put back the triangles the level took out: an M4's 20 m level 1,033 -> 3,966). edge 0: nothing is split. */
   const GUN_FAR: Opts = { ...GUN, adaptive: false, edge: 0, fine: 0, tol: 0 };
+  /** The gun in the hands (js/gunmodels.ts viewmodel): GUN's numbers, worked out a few ms a frame when the build's aren't kept (see refineNow): drawing a gun not drawn
+   *  before was one frame of 60-190 ms, nearly all of it this. */
+  const GUN_ASYNC: Opts = { ...GUN, async: true };
   /** The squad's ship (inside and out): rooms and hull plates metres across, so a ray reaches a metre and a half, cells of 8 cm. */
   const SHIP: Opts = { reach: 1.5, rays: 16, cell: 0.08, cells: 400, edge: 0.7, strength: 1.4, max: 0.75, direct: true, async: true, adaptive: false, fine: 0, tol: 0 };
   const cache = new Map<string, Float32Array[]>();
@@ -68,7 +79,8 @@ export const GunAo = (() => {
     return bg;
   }
 
-  interface M { mesh: THREE.Mesh; pos: Float32Array; nor: Float32Array; idx: ArrayLike<number> | null; n: number }
+  /** a mesh as the occlusion sees it: its world positions and normals, and its world and normal matrices as they were then (a refine worked out over frames reads these, not the mesh's, which has moved on) */
+  interface M { mesh: THREE.Mesh; pos: Float32Array; nor: Float32Array; idx: ArrayLike<number> | null; n: number; mw: number[]; nmx: number[] }
   function collect(group: THREE.Object3D, split: Opts | null = null): M[] {
     group.updateMatrixWorld(true);
     const out: M[] = [], v = new T.Vector3(), nm = new T.Matrix3();
@@ -83,14 +95,14 @@ export const GunAo = (() => {
         v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); pos[i * 3] = v.x; pos[i * 3 + 1] = v.y; pos[i * 3 + 2] = v.z;
         v.fromBufferAttribute(nn, i).applyMatrix3(nm).normalize(); nor[i * 3] = v.x; nor[i * 3 + 1] = v.y; nor[i * 3 + 2] = v.z;
       }
-      out.push({ mesh: o, pos, nor, idx: g.index ? g.index.array : null, n });
+      out.push({ mesh: o, pos, nor, idx: g.index ? g.index.array : null, n, mw: o.matrixWorld.elements.slice(), nmx: nm.elements.slice() });
     });
     return out;
   }
 
   // The grid: the cells of 3 mm (a ship: 8 cm) any triangle's surface passes through are marked.
   interface Grid { occ: Uint8Array; x0: number; y0: number; z0: number; nx: number; ny: number; nz: number; c: number; ic: number }
-  function makeGrid(ms: M[], o: Opts): Grid | null {
+  function makeGrid(ms: M[], o: Opts, alloc = true): Grid | null { // (alloc false: the numbers only, for a grid in the WebAssembly module's memory)
     let x0 = 1e9, y0 = 1e9, z0 = 1e9, x1 = -1e9, y1 = -1e9, z1 = -1e9;
     for (const m of ms) for (let i = 0; i < m.n; i++) {
       const x = m.pos[i * 3], y = m.pos[i * 3 + 1], z = m.pos[i * 3 + 2];
@@ -100,7 +112,7 @@ export const GunAo = (() => {
     const pad = o.reach + 0.02, c = Math.max(o.cell, Math.max(x1 - x0, y1 - y0, z1 - z0) / o.cells), ic = 1 / c;
     x0 -= pad; y0 -= pad; z0 -= pad;
     const nx = Math.ceil((x1 + pad - x0) * ic) + 1, ny = Math.ceil((y1 + pad - y0) * ic) + 1, nz = Math.ceil((z1 + pad - z0) * ic) + 1;
-    return { occ: new Uint8Array(nx * ny * nz), x0, y0, z0, nx, ny, nz, c, ic };
+    return { occ: new Uint8Array(alloc ? nx * ny * nz : 0), x0, y0, z0, nx, ny, nz, c, ic };
   }
   /** A mesh's surfaces into the grid: each triangle sampled finely enough to leave no cell unmarked. */
   function mark(g: Grid, m: M) {
@@ -154,6 +166,7 @@ export const GunAo = (() => {
   function drain<R>(gen: Generator<void, R, void>): R { for (;;) { const r = gen.next(); if (r.done) return r.value; } }
   const trace = (g: Grid, ms: M[], o: Opts, want?: (mi: number) => boolean, box?: number[]) => drain(traceG(g, ms, o, want, box));
   function compute(ms: M[], o: Opts): Float32Array[] {
+    if (AoWasm.ready) { try { return computeW(ms, o); } catch (e) { AoWasm.fail(String((e as Error)?.message || e)); } }
     const g = makeGrid(ms, o); if (!g) return ms.map((m) => new Float32Array(m.n));
     for (const m of ms) mark(g, m);
     return trace(g, ms, o);
@@ -171,7 +184,7 @@ export const GunAo = (() => {
     for (const n of names) { offs.push(stride); sizes.push(src.attributes[n].itemSize); stride += src.attributes[n].itemSize; }
     const pi = names.indexOf('position'), ni = names.indexOf('normal');
     if (pi < 0 || ni < 0) return null;
-    const po = offs[pi], no = offs[ni], cnt = src.attributes.position.count, W = stride + 1, mw = m.mesh.matrixWorld.elements, nm = new T.Matrix3().getNormalMatrix(m.mesh.matrixWorld).elements;
+    const po = offs[pi], no = offs[ni], cnt = src.attributes.position.count, W = stride + 1, mw = m.mw, nm = m.nmx;
     const cur = new Float32Array(cnt * W);
     names.forEach((nme, k) => { const a = src.attributes[nme] as THREE.BufferAttribute; for (let i = 0; i < cnt; i++) for (let c = 0; c < sizes[k]; c++) cur[i * W + offs[k] + c] = a.getComponent(i, c); });
     const aoOf = (v: Float32Array) => {
@@ -251,6 +264,87 @@ export const GunAo = (() => {
   }
   const refCache = new Map<string, { n: number; geo: THREE.BufferGeometry }[]>(), REF_KEEP = 6;
 
+  // ---------------------------------------------------------------- the same in WebAssembly (js/gunaowasm.ts, wasm/gunao: docs/wasm.md)
+  // makeGrid, mark, shut, the trace loop and refine's triangle loop and weld are the module's when it's loaded (AoWasm.ready), the functions above
+  // otherwise: the same numbers and the same mesh, bit for bit (tools/gunao_wasm_check.mjs compares them), an M4 in 60 ms against 148 (the module
+  // also remembers each vertex's occlusion within a mesh, so a corner shared by several triangles is traced once: 136 000 asks, 76 000 traced).
+  // What stays JavaScript is three.js's side: the meshes' world positions (collect), the attributes laid out in a row for the module, and the new
+  // geometry made from what comes back.
+  /** The grid in the module's memory, every mesh marked (but those `skip` says): its handle, which the caller frees (AoWasm.gridFree). */
+  function gridW(ms: M[], o: Opts, skip?: (i: number) => boolean): number {
+    const g = makeGrid(ms, o, false); if (!g) return 0;
+    const gp = AoWasm.grid(g, o, dirsOf(o.rays));
+    try { ms.forEach((m, i) => { if (!skip || !skip(i)) AoWasm.mark(gp, m.pos, m.idx); }); } catch (e) { AoWasm.gridFree(gp); throw e; }
+    return gp;
+  }
+  type Ref = { geo: THREE.BufferGeometry; ao: Float32Array } | null;
+  /** refine() with the module doing the work: the attributes laid out as refine lays them (toNonIndexed's values, getComponent's), the triangle loop and the weld in the module, and the geometry made from what comes back. */
+  function refineW(m: M, geo: THREE.BufferGeometry, gp: number, o: Opts): { job: AoRefineJob; end: () => Ref } | null {
+    const names = Object.keys(geo.attributes), offs: number[] = [], sizes: number[] = [];
+    if (geo.groups && geo.groups.length > 1) return null;
+    let stride = 0;
+    for (const n of names) { offs.push(stride); sizes.push(geo.attributes[n].itemSize); stride += geo.attributes[n].itemSize; }
+    const pi = names.indexOf('position'), ni = names.indexOf('normal');
+    if (pi < 0 || ni < 0) return null;
+    const ix = geo.index ? geo.index.array : null, cnt = ix ? ix.length : geo.attributes.position.count, W = stride + 1, mt = [...m.mw, ...m.nmx];
+    const job = AoWasm.refine(gp, cnt, W, offs[pi], offs[ni], mt, o.edge, o.fine, o.tol, !!geo.index, (cur) => names.forEach((nme, k) => {
+      const a = geo.attributes[nme] as THREE.BufferAttribute, sz = sizes[k], of = offs[k];
+      if (!(a as any).isInterleavedBufferAttribute && !a.normalized) { const arr = a.array; for (let i = 0; i < cnt; i++) { const s = (ix ? ix[i] : i) * sz, d = i * W + of; for (let c = 0; c < sz; c++) cur[d + c] = arr[s + c]; } }
+      else for (let i = 0; i < cnt; i++) for (let c = 0; c < sz; c++) cur[i * W + of + c] = a.getComponent(ix ? ix[i] : i, c);
+    }));
+    return { job, end: () => job.end((r) => {
+      const rows = r.rows, nv = r.nv;
+      if (!r.changed && !geo.index) { const ao = new Float32Array(r.nt); for (let i = 0; i < r.nt; i++) ao[i] = rows[i * W + stride]; return { geo, ao }; }
+      const bg = new THREE.BufferGeometry(), ao = new Float32Array(nv);
+      names.forEach((nme, k) => { const sz = sizes[k], of = offs[k], arr = new Float32Array(nv * sz); for (let i = 0; i < nv; i++) for (let c = 0; c < sz; c++) arr[i * sz + c] = rows[i * W + of + c]; bg.setAttribute(nme, new THREE.BufferAttribute(arr, sz)); });
+      for (let i = 0; i < nv; i++) ao[i] = rows[i * W + stride];
+      bg.setIndex(new THREE.BufferAttribute(nv > 65535 ? r.idx.slice() : new Uint16Array(r.idx), 1));
+      bg.userData = geo.userData; bg.computeBoundingBox(); bg.computeBoundingSphere();
+      return { geo: bg, ao };
+    }) };
+  }
+  const TRIS = 256; // (the module's triangles between stops: a fraction of a millisecond)
+  /** Every mesh refined, as a piece of work with places to stop: the grid and the triangles in the module (`useW`), or in JavaScript a mesh at a time. `geos`: the meshes' geometries when it began. */
+  function* refineAllG(ms: M[], o: Opts, geos: THREE.BufferGeometry[], useW: boolean): Generator<void, Ref[] | null, void> {
+    if (useW) {
+      let gp = 0, cur: AoRefineJob | null = null;
+      try {
+        const g = makeGrid(ms, o, false); if (!g) return null;
+        gp = AoWasm.grid(g, o, dirsOf(o.rays));
+        for (const m of ms) { AoWasm.mark(gp, m.pos, m.idx); yield; }
+        const res: Ref[] = [];
+        for (let i = 0; i < ms.length; i++) {
+          const w = refineW(ms[i], geos[i], gp, o); if (!w) { res.push(null); continue; }
+          cur = w.job;
+          while (!w.job.run(TRIS)) yield;
+          cur = null; res.push(w.end());
+        }
+        return res;
+      } finally { if (cur) cur.drop(); if (gp) AoWasm.gridFree(gp); }
+    }
+    const g = makeGrid(ms, o); if (!g) return null;
+    for (const m of ms) mark(g, m);
+    const res: Ref[] = [];
+    for (const m of ms) { yield; res.push(refine(m, g, o)); }
+    return res;
+  }
+  /** traceG over a grid of the module's: a few thousand vertices between stops (each a fraction of a millisecond) */
+  function* traceWG(gp: number, ms: M[], want?: (mi: number) => boolean, box?: number[]): Generator<void, Float32Array[], void> {
+    const res: Float32Array[] = [];
+    for (let mi = 0; mi < ms.length; mi++) {
+      const m = ms[mi], out = new Float32Array(m.n);
+      if (want && !want(mi)) { res.push(out); continue; }
+      const tr = AoWasm.tracer(gp, m.pos, m.nor);
+      try { for (let i = 0; i < m.n; i += 4096) { tr.run(i, Math.min(m.n, i + 4096), out, box); yield; } } finally { tr.free(); }
+      res.push(out);
+    }
+    return res;
+  }
+  function computeW(ms: M[], o: Opts): Float32Array[] {
+    const gp = gridW(ms, o); if (!gp) return ms.map((m) => new Float32Array(m.n));
+    try { return drain(traceWG(gp, ms)); } finally { AoWasm.gridFree(gp); }
+  }
+
   /** The numbers of a thing with moving parts: `base` with every one of them away (and each one's own surfaces against what stays), and for each layer (a door, a ramp: its meshes) what it adds to a vertex of what stays when it's in place: `d`, and `l` the layer's number (1 up; the vertex's strongest). */
   interface Layered { base: Float32Array[]; d: Float32Array[]; l: Float32Array[] }
   function* layeredG(ms: M[], o: Opts, layers: Set<THREE.Object3D>[]): Generator<void, Layered, void> {
@@ -273,6 +367,98 @@ export const GunAo = (() => {
     }
     return { base, d, l };
   }
+  /** layeredG with the module's grids (the grid with what stays, and a copy of it for each layer with the layer's meshes marked in) */
+  function* layeredWG(ms: M[], o: Opts, layers: Set<THREE.Object3D>[]): Generator<void, Layered, void> {
+    const which = ms.map((m) => layers.findIndex((s) => s.has(m.mesh)));
+    const zeros = () => ms.map((m) => new Float32Array(m.n));
+    const gp = gridW(ms, o, (i) => which[i] >= 0);
+    if (!gp) return { base: zeros(), d: zeros(), l: zeros() };
+    try {
+      const base = yield* traceWG(gp, ms), d = zeros(), l = zeros();
+      for (let j = 0; j < layers.length; j++) {
+        const g2 = AoWasm.gridClone(gp);
+        try {
+          let bx0 = 1e9, by0 = 1e9, bz0 = 1e9, bx1 = -1e9, by1 = -1e9, bz1 = -1e9;
+          ms.forEach((m, i) => {
+            if (which[i] !== j) return;
+            AoWasm.mark(g2, m.pos, m.idx);
+            for (let v = 0; v < m.n; v++) { const x = m.pos[v * 3], y = m.pos[v * 3 + 1], z = m.pos[v * 3 + 2]; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; if (z < bz0) bz0 = z; if (z > bz1) bz1 = z; }
+          });
+          if (bx1 < bx0) continue;
+          const r = o.reach, withIt = yield* traceWG(g2, ms, (i) => which[i] < 0, [bx0 - r, by0 - r, bz0 - r, bx1 + r, by1 + r, bz1 + r]);
+          ms.forEach((m, i) => { if (which[i] >= 0) return; for (let v = 0; v < m.n; v++) { const dd = withIt[i][v] - base[i][v]; if (dd > 0.004 && dd > d[i][v]) { d[i][v] = dd; l[i][v] = j + 1; } } });
+        } finally { AoWasm.gridFree(g2); }
+      }
+      return { base, d, l };
+    } finally { AoWasm.gridFree(gp); }
+  }
+
+  // ---------------------------------------------------------------- the refined gun: worked out now, or (Opts.async: the gun in the hands) a few ms a frame
+  const isMagNode = (x: THREE.Object3D | null) => { for (; x; x = x.parent) if (x.userData && (x.userData.slot === 'mag' || x.userData.part === 'mag')) return true; return false; };
+  /** A build's refined meshes from the cache onto these (the build's own meshes, in the same order): false if it isn't there or doesn't fit. */
+  function fromCache(ms: M[], key: string): boolean {
+    const hit = refCache.get(key);
+    if (!(hit && hit.length === ms.length && hit.every((h, i) => h.n === ms[i].n))) return false;
+    refCache.delete(key); refCache.set(key, hit); // (the most recently used goes to the end)
+    ms.forEach((m, i) => { m.mesh.geometry.dispose(); const gm = hit[i].geo.clone(); m.mesh.geometry = gm; if (isMagNode(m.mesh)) gm.setAttribute('aOcc', new T.BufferAttribute(new Float32Array(gm.attributes.position.count), 1)); });
+    return true;
+  }
+  /** What came out onto the meshes (each its own copy; a magazine's occlusion 0) and into the cache. A mesh whose geometry isn't the one it began with (`geos`) is left alone. */
+  function adopt(ms: M[], res: Ref[], key: string | undefined, geos: THREE.BufferGeometry[]) {
+    const made: { n: number; geo: THREE.BufferGeometry }[] = [];
+    ms.forEach((m, i) => {
+      const r = res[i];
+      if (!r) { made.push({ n: m.n, geo: geos[i].clone() }); return; }
+      const gm = r.geo; gm.setAttribute('aOcc', new T.BufferAttribute(r.ao, 1));
+      made.push({ n: m.n, geo: gm });
+      if (m.mesh.geometry !== geos[i]) return;
+      const own = gm.clone(); if (isMagNode(m.mesh)) own.setAttribute('aOcc', new T.BufferAttribute(new Float32Array(own.attributes.position.count), 1));
+      if (m.mesh.geometry !== gm) m.mesh.geometry.dispose();
+      m.mesh.geometry = own;
+    });
+    if (key) {
+      refCache.set(key, made);
+      // (a refined gun is megabytes of geometry: only the last few builds are kept, the oldest let go)
+      while (refCache.size > REF_KEEP) { const k = refCache.keys().next().value as string; for (const h of refCache.get(k)!) h.geo.dispose(); refCache.delete(k); }
+    }
+  }
+  /** builds being refined a few ms a frame: whoever else asks for one waits for it (`waiters`, their meshes), or has it finished there and then */
+  const refJobs = new Map<string, { waiters: M[][]; finish: () => void }>(), SLICE = 6;
+  /**
+   * Refines a build's meshes: at once, or (o.async, with a key) a few ms at a time (SLICE) between frames, the meshes shown as they are (no aOcc: none
+   * of the darkening) till it's done, when they take it as they would have at once: the numbers are the same, worked out from the meshes as they were
+   * when asked (collect's positions and matrices, the geometries then), not as they've moved since. The module's when it's there; if it fails on the
+   * way, the work starts again in JavaScript.
+   */
+  function refineNow(ms: M[], o: Opts, key: string | undefined, t0: number) {
+    const geos = ms.map((m) => m.mesh.geometry);
+    let useW = AoWasm.ready, gen = refineAllG(ms, o, geos, useW), fin = false;
+    const next = () => {
+      try { return gen.next(); } catch (e) {
+        if (!useW) throw e;
+        AoWasm.fail(String((e as Error)?.message || e)); useW = false; gen = refineAllG(ms, o, geos, false); return gen.next();
+      }
+    };
+    const job = { waiters: [] as M[][], finish: () => { if (!fin) { fin = true; while (!step(Infinity)); } } };
+    const step = (budget: number) => {
+      const t = performance.now();
+      for (;;) {
+        const r = next();
+        if (r.done) {
+          if (key) refJobs.delete(key);
+          if (r.value) adopt(ms, r.value, key, geos);
+          if (key) for (const w of job.waiters) if (!fromCache(w, key)) refineNow(w, GUN, undefined, performance.now()); // (one that doesn't fit what was made: its own, now)
+          last = Math.round(performance.now() - t0);
+          return true;
+        }
+        if (performance.now() - t > budget) return false;
+      }
+    };
+    if (!(o.async && key)) { fin = true; step(Infinity); return; }
+    refJobs.set(key, job);
+    const tick = () => { if (fin) return; if (step(SLICE)) { fin = true; return; } setTimeout(tick, 0); };
+    setTimeout(tick, 0);
+  }
 
   const layerCache = new Map<string, Layered>(), pending = new Map<string, ((r: Layered) => void)[]>();
   /**
@@ -280,7 +466,8 @@ export const GunAo = (() => {
    * `layers`: the parts that move (each layer a list of nodes: a door's leaves, a ramp): their occlusion on what's round them is kept
    * apart, as aOccD (how much) and aOccI (which layer), and the lit materials take it times the layer's closedness (js/lightgrid.ts
    * U.lgAoK[1..]: 1 shut, 0 open: the game sets it as the part moves), so an open door leaves no shade where it was. Opts.async: it's
-   * worked out a few ms a frame (a ship: a couple of seconds all told), and takes hold when it's done.
+   * worked out a few ms a frame (a ship: a couple of seconds all told; a gun, GUN_ASYNC: 6-8 frames), and takes hold when it's done. GunAo.busy:
+   * how many builds are under way so.
    */
   function apply(group: THREE.Object3D, key?: string, o: Opts = GUN, layers?: THREE.Object3D[][]) {
     const t0 = performance.now(), ms = collect(group, o.adaptive || !(o.edge > 0) ? null : o);
@@ -298,31 +485,10 @@ export const GunAo = (() => {
       last = Math.round(performance.now() - t0);
     };
     if (o.adaptive && !(layers && layers.length)) {
-      const isMag2 = (x: THREE.Object3D | null) => { for (; x; x = x.parent) if (x.userData && (x.userData.slot === 'mag' || x.userData.part === 'mag')) return true; return false; };
-      const hit = key ? refCache.get(key) : undefined;
-      if (hit && key && hit.length === ms.length && hit.every((h, i) => h.n === ms[i].n)) {
-        refCache.delete(key); refCache.set(key, hit); // (the most recently used goes to the end)
-        ms.forEach((m, i) => { m.mesh.geometry.dispose(); const gm = hit[i].geo.clone(); m.mesh.geometry = gm; if (isMag2(m.mesh)) gm.setAttribute('aOcc', new T.BufferAttribute(new Float32Array(gm.attributes.position.count), 1)); });
-      } else {
-        const g = makeGrid(ms, o); if (!g) return;
-        for (const m of ms) mark(g, m);
-        const made: { n: number; geo: THREE.BufferGeometry }[] = [];
-        ms.forEach((m) => {
-          const r = refine(m, g, o);
-          if (!r) { made.push({ n: m.n, geo: m.mesh.geometry.clone() }); return; }
-          const gm = r.geo; gm.setAttribute('aOcc', new T.BufferAttribute(r.ao, 1));
-          made.push({ n: m.n, geo: gm });
-          const own = gm.clone(); if (isMag2(m.mesh)) own.setAttribute('aOcc', new T.BufferAttribute(new Float32Array(own.attributes.position.count), 1));
-          if (m.mesh.geometry !== gm) m.mesh.geometry.dispose();
-          m.mesh.geometry = own;
-        });
-        if (key) {
-          refCache.set(key, made);
-          // (a refined gun is megabytes of geometry: only the last few builds are kept, the oldest let go)
-          while (refCache.size > REF_KEEP) { const k = refCache.keys().next().value as string; for (const h of refCache.get(k)!) h.geo.dispose(); refCache.delete(k); }
-        }
-      }
-      last = Math.round(performance.now() - t0);
+      const job = key ? refJobs.get(key) : undefined;
+      if (job) { if (o.async) { job.waiters.push(ms); return; } job.finish(); } // (the same build under way: wait for it, or (asked for now) see it done now)
+      if (key && fromCache(ms, key)) { last = Math.round(performance.now() - t0); return; }
+      refineNow(ms, o, key, t0);
       return;
     }
     if (layers && layers.length) {
@@ -331,16 +497,19 @@ export const GunAo = (() => {
       if (key && pending.has(key)) { pending.get(key)!.push((r) => { if (same(r.base)) put(r); }); return; }
       const sets = layers.map((ns) => { const st = new Set<THREE.Object3D>(); for (const n of ns) n.traverse((x) => st.add(x)); return st; }), waiters: ((r: Layered) => void)[] = [];
       if (key) pending.set(key, waiters);
-      const gen = layeredG(ms, o, sets), done = (r: Layered) => { if (key) { layerCache.set(key, r); pending.delete(key); } put(r); for (const w of waiters) w(r); };
+      // (the module's when it's there; if it fails on the way, the work starts again in JavaScript)
+      let useW = AoWasm.ready, gen = useW ? layeredWG(ms, o, sets) : layeredG(ms, o, sets);
+      const next = () => { try { return gen.next(); } catch (e) { if (!useW) throw e; AoWasm.fail(String((e as Error)?.message || e)); useW = false; gen = layeredG(ms, o, sets); return gen.next(); } };
+      const done = (r: Layered) => { if (key) { layerCache.set(key, r); pending.delete(key); } put(r); for (const w of waiters) w(r); };
       if (o.async) {
-        const step = () => { const t = performance.now(); for (;;) { const r = gen.next(); if (r.done) { done(r.value); return; } if (performance.now() - t > 6) break; } setTimeout(step, 0); };
+        const step = () => { const t = performance.now(); for (;;) { const r = next(); if (r.done) { done(r.value); return; } if (performance.now() - t > 6) break; } setTimeout(step, 0); };
         setTimeout(step, 0);
-      } else done(drain(gen));
+      } else { for (;;) { const r = next(); if (r.done) { done(r.value); break; } } }
       return;
     }
     let occ = key ? cache.get(key) : undefined;
     if (!same(occ)) { occ = compute(ms, o); if (key) cache.set(key, occ); }
     put({ base: occ! });
   }
-  return { apply, GUN, GUN_FAR, SHIP, get lastMs() { return last; }, compute: (g: THREE.Object3D, o: Opts = GUN) => compute(collect(g), o) };
+  return { apply, GUN, GUN_FAR, GUN_ASYNC, SHIP, wasm: AoWasm, get lastMs() { return last; }, /** builds being refined across frames (GUN_ASYNC) */ get busy() { return refJobs.size; }, compute: (g: THREE.Object3D, o: Opts = GUN) => compute(collect(g), o) };
 })();

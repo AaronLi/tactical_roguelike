@@ -35,12 +35,17 @@ if (!vm.SourceTextModule) {
 delete process.env.BP_VM_MODULES_REEXEC;
 
 const caches = new WeakMap(); // context -> Map(absolute path -> module)
+// A context's globals as module-locals (runFile's locals: a list of names): each module it loads gets 'const Math = globalThis.Math, ...;'
+// put before its first line (on that line: its line numbers stay as they are). A global read in a vm context goes through the context's
+// interceptor, some 20 to 30 times slower than a local's; in a hot loop (the radars' noise: Math.imul, Math.log per cell) it's most of
+// the time. Opt-in: a module that assigned one of them as a global would no longer see the change (none of the game's do).
+const preludes = new WeakMap(); // context -> the text put before each module's source
 const isModule = (src) => /^\s*(import\s*[\w{*'"]|export\s)/m.test(src);
 
 async function load(ctx, file, cache) {
   file = path.resolve(file);
   if (cache.has(file)) return cache.get(file);
-  const src = fs.readFileSync(file, 'utf8');
+  const src = (preludes.get(ctx) || '') + fs.readFileSync(file, 'utf8');
   const m = new vm.SourceTextModule(src, { context: ctx, identifier: file });
   cache.set(file, m);
   return m;
@@ -95,7 +100,8 @@ function syncG(ctx) {
 }
 
 /** Runs one compiled file in the context: as an ES module (its imports from the same folder, in the same context) if it is one, else as a script. */
-export async function runFile(ctx, file, { stubs } = {}) {
+export async function runFile(ctx, file, { stubs, locals } = {}) {
+  if (locals && !preludes.has(ctx)) preludes.set(ctx, 'const ' + locals.map((k) => k + ' = globalThis.' + k).join(', ') + ';');
   const src = fs.readFileSync(file, 'utf8');
   if (!isModule(src)) { vm.runInContext(src, ctx, { filename: path.basename(file) }); syncG(ctx); return; }
   let cache = caches.get(ctx); if (!cache) caches.set(ctx, cache = new Map());
@@ -114,10 +120,10 @@ export function moduleOf(ctx, file) {
 }
 
 /** Each dist/<name>.js in order (a missing one stops the tool: tsc first). */
-export async function runScripts(ctx, dir, names, { what = 'npm run compile', stubs } = {}) {
+export async function runScripts(ctx, dir, names, { what = 'npm run compile', stubs, locals } = {}) {
   for (const f of names) {
     const file = path.join(dir, f + '.js');
     if (!fs.existsSync(file)) { console.error(`${path.relative(process.cwd(), file)} missing: run tsc first (${what})`); process.exit(1); }
-    await runFile(ctx, file, { stubs });
+    await runFile(ctx, file, { stubs, locals });
   }
 }

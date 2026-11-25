@@ -52,6 +52,9 @@ import { LevelDesc } from './leveldesc.js';
 import { LevelView } from './levelview.js';
 import { LightGrid } from './lightgrid.js';
 import { GpuAo } from './gpuao.js';
+import { EntShadows } from './entshadows.js';
+import { Probes } from './probes.js';
+import { ProxyDraw } from './proxydraw.js';
 import { GunAo } from './gunao.js';
 import { Loadout } from './loadout.js';
 import { Loot } from './loot.js';
@@ -74,11 +77,15 @@ import { ServerHost } from './serverhost.js';
 import { ServerLink } from './serverlink.js';
 import { ShipGen } from './shipgen.js';
 import { ShipModel } from './shipmodel.js';
+import { InteriorCull } from './interiorcull.js';
 import { Shop } from './shop.js';
 import { ShopUI } from './shopui.js';
 import { ShotLog } from './shotlog.js';
 import { Sim } from './sim.js';
 import { Space } from './space.js';
+import { Radar } from './radar.js';
+import { RadarView } from './radarview.js';
+import { SuiteView } from './suiteview.js';
 import { SpaceData } from './spacedata.js';
 import { SpaceSv } from './spaceserver.js';
 import { SpaceUI } from './spaceui.js';
@@ -102,7 +109,7 @@ import { Zip } from './zip.js';
   sightH, ROUND_LIFE, ballistics, flight, zeroSlope, CLICK, boreTip, ballFor, loadFor, AMMO_RARITY, rollAmmo, ammoOk, roundDef, gearTier, ENEMY_GEAR,
   Gunsmith, Scars, Damage, LevelDesc, World, ShipGen, Furniture, Homes, Level, Materials, SpaceData, Sim, Stickers, Gear, Ballistics, Med, Zip,
   Callsigns, Arsenal, Acoustics, Ambience, GunAudio, Footsteps, Audio, GunMaterials, Models, GunRig, HumanData, Humans, Headgear, FurnSpec, FurnMesh,
-  LightGrid, GpuAo, GunAo, LevelView, Wind, Rig, VMAnim, Highlights, R, Viewmodel, GunModels, Icons, Bolts, Route, Shop, Recorder, SpaceSv, Server, ServerHost,
+  LightGrid, GpuAo, Probes, EntShadows, ProxyDraw, GunAo, LevelView, Wind, Rig, VMAnim, Highlights, R, Viewmodel, GunModels, Icons, Bolts, Route, Shop, Recorder, SpaceSv, Server, ServerHost,
   ServerLink, Net, Career, CloudConfig, Handling, Loot, Casings, Range, Course, GunsmithUI, Hangar, ZeroUI, ShopUI, InvUI, Touch, Pad, Landing, Prep,
-  ShipModel, SpaceUI, Space, Me, Cloud, MenuShow, Prof, Game, Glare, Views, ShotLog, HUD, Loadout, Demo, DebugStart,
+  ShipModel, InteriorCull, SpaceUI, Radar, RadarView, SuiteView, Space, Me, Cloud, MenuShow, Prof, Game, Glare, Views, ShotLog, HUD, Loadout, Demo, DebugStart,
 };

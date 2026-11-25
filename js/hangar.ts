@@ -1035,14 +1035,20 @@ export const Hangar = (() => {
     const parts0 = [...(Sh.partStock || [])].sort((a, b) => +Sh.wished(b as string) - +Sh.wished(a as string)), prec0 = [...(Sh.precStock || [])], key = JSON.stringify([O.gear, O.nvg, O.njParts, parts0, prec0, Sh.stock, parts0.concat(prec0).filter((i) => Sh.wished(i as string))]);
     if (!force && key === S.key) { vending(false); return; }
     S.key = key;
+    // (and each stand only if what it shows has changed: a purchase changes the stock, and drawing every part again means building
+    // a gun for each and its occlusion (js/gunao.ts, more builds than its cache keeps): a second and a half at once)
+    const stands = [...S.stands, ...(S.njStands || []), ...(S.njPart ? [S.njPart] : []), ...(S.partStands || []), ...(S.precStands || [])] as HangarTarget[];
+    if (force) for (const tg of stands) { tg.showK = undefined; tg.signK = undefined; }
+    const changed = (tg: HangarTarget, k: string) => { if (tg.showK === k) return false; tg.showK = k; return true; };
+    const resign = (tg: HangarTarget, k: string) => { if (tg.signK === k) return false; tg.signK = k; return true; };
     // the pedestals: the five pieces of gear
     S.stands.forEach((tg: HangarTarget, i: number) => {
       const id = O.gear[i];
       tg.key = id || null;
       tg.sold = !id || !Sh.inStock('gear:' + id);
-      clear(tg.disp!); tg.spin = null;
-      if (id && !tg.sold) { const sh = showPiece(id); tg.disp!.add(sh.root); tg.spin = sh.spin; }
+      if (changed(tg, id + '|' + tg.sold)) { clear(tg.disp!); tg.spin = null; if (id && !tg.sold) { const sh = showPiece(id); tg.disp!.add(sh.root); tg.spin = sh.spin; } }
       const lines = id ? signFor(id, tg.sold) : ['—'], n = lines.length, SH = Math.min(0.78, 0.3 + 0.17 * n); // (as tall as its lines need)
+      if (!resign(tg, JSON.stringify(lines) + tg.sold)) return;
       if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
       tg.sign!.material = signMat(lines, 512, Math.round(512 * SH / 0.94), '#101418', tg.sold ? '#ff6a5a' : '#ffd24a', '#ffffff');
       tg.sign!.scale.set(1, SH / 0.5, 1);
@@ -1054,10 +1060,10 @@ export const Hangar = (() => {
       const d = nvAll[i], stocked = !!d && (O.nvg || []).includes(d.id);
       tg.key = stocked ? d.id : null;
       tg.sold = !stocked || !Sh.inStock('gear:' + d.id);
-      clear(tg.disp!); tg.spin = null;
-      if (d && (!tg.sold || !stocked)) { const sh = nvPiece(d.id); tg.disp!.add(sh.root); tg.spin = sh.spin; } // (one not in this visit's still on show: it's their window)
+      if (changed(tg, (d ? d.id : '') + '|' + tg.sold + '|' + stocked)) { clear(tg.disp!); tg.spin = null; if (d && (!tg.sold || !stocked)) { const sh = nvPiece(d.id); tg.disp!.add(sh.root); tg.spin = sh.spin; } } // (one not in this visit's still on show: it's their window)
       const out = !d ? null : stocked ? null : (Sh.level || 0) < (d.lv || 0) || d.tier > Math.min(4, 1 + Math.ceil((Sh.level || 0) / 2)) ? `from level ${Math.max(d.lv || 0, 2 * d.tier - 3)}` : 'NOT IN THIS VISIT';
       const lines = d ? njSign(d.id, tg.sold, out) : ['—'], SH = Math.min(0.62, 0.24 + 0.1 * lines.length);
+      if (!resign(tg, JSON.stringify(lines) + tg.sold + out)) return;
       if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
       tg.sign!.material = signMat(lines, 600, Math.round(600 * SH / 1.2), '#0a0d0f', out ? '#7a8a90' : tg.sold ? '#ff6a5a' : '#8dffbe', '#ffffff');
       tg.sign!.scale.set(1, SH / 0.5, 1);
@@ -1067,11 +1073,10 @@ export const Hangar = (() => {
     if (S.njPart) {
       const tg = S.njPart, id = (O.njParts || [])[0], p = id && Gunsmith.PARTS[id], left = p ? Sh.count('part:' + id) : 0;
       tg.key = id || null; tg.sold = !p || !left;
-      clear(tg.disp!); tg.spin = null;
-      if (p && left) { const sh = partPiece(id, 0.36, NJ.counter.h); tg.disp!.add(sh.root); tg.spin = sh.spin; }
+      if (changed(tg, (id || '') + '|' + !!left)) { clear(tg.disp!); tg.spin = null; if (p && left) { const sh = partPiece(id, 0.36, NJ.counter.h); tg.disp!.add(sh.root); tg.spin = sh.spin; } }
       const all = Gunsmith.LIST.find((q) => q.seller === 'nj'), lines = p ? (left ? [p.name, money(p.price), 'digital thermal · 2-4-8×'] : [p.name, 'SOLD']) : all ? [all.name, `from level ${2 * all.tier - 3}`] : ['—'];
-      if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
-      tg.sign!.material = signMat(lines, 512, 256, '#0a0d0f', p && left ? '#8dffbe' : p ? '#ff6a5a' : '#7a8a90', '#ffffff');
+      if (resign(tg, JSON.stringify(lines))) { if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
+      tg.sign!.material = signMat(lines, 512, 256, '#0a0d0f', p && left ? '#8dffbe' : p ? '#ff6a5a' : '#7a8a90', '#ffffff'); }
     }
     // the parts pedestals, and the precision showcase's stumps
     const onShow = (S.partStands || []).map((tg: HangarTarget, i: number) => [tg, parts0[i]]).concat((S.precStands || []).map((tg: HangarTarget, i: number) => [tg, prec0[i]])) as [HangarTarget, string][];
@@ -1079,11 +1084,11 @@ export const Hangar = (() => {
       const p = id && Gunsmith.PARTS[id];
       const left = p ? Sh.count('part:' + id) : 0, wish = !!p && Sh.wished(id);
       tg.key = id || null; tg.sold = !p || !left;
-      clear(tg.disp!); tg.spin = null;
-      if (p && left) { const sh = tg.signTop ? partPiece(id, OUT.size, tg.signTop) : partPiece(id); tg.disp!.add(sh.root); tg.spin = sh.spin; }
+      if (changed(tg, (id || '') + '|' + !!left)) { clear(tg.disp!); tg.spin = null; if (p && left) { const sh = tg.signTop ? partPiece(id, OUT.size, tg.signTop) : partPiece(id); tg.disp!.add(sh.root); tg.spin = sh.spin; } }
       const n = p ? Gunsmith.fitsPart(p).length : 0;
       const lines = !p ? ['—'] : !left ? [p.name, 'SOLD'] : [(wish ? '★ ' : '') + p.name, money(p.price) + (left > 1 ? ' · ' + left + ' left' : ''), `${Gunsmith.SLOT_LABEL[p.slot]}${n ? ' · fits ' + n + (n > 1 ? ' weapons' : ' weapon') : ''}`];
       const SH = Math.min(0.62, 0.22 + 0.12 * lines.length);
+      if (!resign(tg, JSON.stringify(lines) + left + wish)) return;
       if (tg.sign!.material.map) tg.sign!.material.map.dispose(); tg.sign!.material.dispose();
       tg.sign!.material = signMat(lines, 384, Math.round(384 * SH / 0.6), '#101418', left ? (wish ? '#ffffff' : '#ffd24a') : '#ff6a5a', '#ffffff');
       tg.sign!.scale.set(1, SH / 0.4, 1);

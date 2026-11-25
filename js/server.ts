@@ -17,6 +17,8 @@ import { U as G_U } from './util.js';
 import { World } from './world.js';
 import { ServerHost } from './serverhost.js';
 import { SpaceSv } from './spaceserver.js';
+import { SpaceNet } from './spacenet.js';
+import { SnapDelta } from './snapdelta.js';
 // Host-authoritative simulation: lobby/phase flow, suspect + civilian AI, doors, compliance and arrests,
 // damage resolution, objectives and the vote to leave.
 // Only runs on the hosting peer, in a thread of its own (js/serverworker.ts; or on the page's, js/serverhost.ts: docs/threads.md).
@@ -24,7 +26,7 @@ import { SpaceSv } from './spaceserver.js';
 const STATE_CODE: Partial<Record<EnemyState, number>> = { normal: 0, flee: 0, surrender: 1, cuffed: 2, cower: 3 };
 interface Loose { [k: string]: any }
 // The kinds of message the host's handle() switches on (what an officer's game sends it with Net.toHost: the `t` field)
-type NetMsgKind = 'stk' | 'hello' | 'st' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
+type NetMsgKind = 'stk' | 'hello' | 'st' | 'sack' | 'rfx' | 'bstk' | 'hole' | 'dhit' | 'rpath' | 'npath' | 'skin' | 'skinReq' | 'hit' | 'saved' | 'shot' | 'nade' | 'flash' | 'glass' | 'crack' | 'boom' | 'revive' | 'course' | 'crun' | 'treat' | 'applying' | 'vote' | 'ready' | 'arm' | 'pick' | 'chat' | 'ff' | 'ping' | 'drop' | 'take' | 'useDoor' | 'kickDoor' | 'shout' | 'openCase' | 'openAbox' | 'takeAbox' | 'openSbox' | 'teamEdit' | 'openCab' | 'cabEdit' | 'turn' | 'drag' | 'cuff' | 'stake' | 'sgive' | 'secure' | 'startRun' | 'toLobby' | 'toShop' | 'noFoes' | 'eboom' | 'bores' | 'eInfo' | 'acct';
 // A message off the wire: its kind, and whatever else that kind carries (dynamic: checked where it's read)
 interface NetMsg { t: NetMsgKind; [k: string]: any }
 type DamageMap = Parameters<typeof Damage.apply>[0]; // (what js/damage.ts takes for a map)
@@ -38,7 +40,7 @@ type ServerPhase = 'lobby' | 'route' | 'level' | 'shop' | 'gameover';
 interface Evidence { i: number; wpn: string; x: number; y: number; z: number; owner: number; secured: boolean; taken: boolean }
 interface Loot { id: number; x: number; y: number; z: number; item: any; yaw: number; fit?: number }
 interface Cab { open: boolean; ver: number; items: any[][] }
-interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; civ: boolean; secured: boolean; rec: Enemy } // (the dead, until secured)
+interface EnemyBody { id: number; type: EnemyKind; def: EnemyDef; x: number; y: number; z: number; yaw: number; civ: boolean; secured: boolean; rec: Enemy; pre?: boolean } // (the dead, until secured)
 interface ServerReport { incap: number; bleedouts: number; bleedBy: Record<string, number>; arrests: number; rescued: number; civKilled: number; unauth: number; evidence: number; bodies: number; allRescued?: boolean; stronghold?: boolean }
 interface ServerRoute { seed: number; act: number; path: number[]; votes: Record<string, number> }
 interface TeamLocker { ver: number; items: any[][] }
@@ -54,8 +56,18 @@ const SvNet = {
   myId: null as string | null,
   broadcast: ((_msg: any, _exceptId?: string | null) => {}) as (msg: any, exceptId?: string | null) => void,
   sendTo: ((_id: string, _msg: any) => {}) as (id: string, msg: any) => void,
+  // a high-rate snapshot's bytes (js/snapcodec.ts) to one player or everyone (null), on stream ch; unreliable, newest wins
+  // (js/serverhost.ts fast, js/netfast.ts). The buffer is handed over.
+  fast: ((_to: string | null, _buf: ArrayBuffer, _ch?: number) => {}) as (to: string | null, buf: ArrayBuffer, ch?: number) => void,
 };
 
+// The ground snapshot to the remote players (sendSnap): each level's numbered (SNAPQ: its last 64 kept, as sent), and each player sent
+// what's changed since the last of them they've said they have (SNAPACK, by player and level: 'sack'), deflated, on the fast channel
+// (stream 6: unreliable, newest wins: a lost one only means the next is against an older one); one who's said nothing yet, or whose last
+// is too old to be kept, the whole of it. The host's own page has it whole, across the thread (js/serverhost.ts sendTo)
+const SNAPQ = new Map<string, { seq: number; ring: Map<number, any> }>(), SNAPACK = new Map<string, number>(), SNAP_KEEP = 64;
+// (a level context: the server's per-level fields and the space mission's (js/spaceserver.ts ctxSave))
+export interface LvCtx { sv: Record<string, unknown>; sp: unknown; warm?: boolean } // (warm: made ahead, the squad's ship coming up: kept live with nobody aboard)
 export const Server = {
   net: SvNet,
   players: new Map<string, Player>(),
@@ -82,6 +94,7 @@ export const Server = {
   dmgMult: 1,
   skins: new Map<string, any>(), // the squad's guns' sticker lists by hash (js/stickers.ts share): kept for whoever joins
   // made as the run and the level go on (undefined until then)
+  stepN: 0, // (the server's steps so far: js/serverhost.ts step)
   clock: undefined as unknown as number, // the level's time, in seconds (set by the level's first tick)
   route: undefined as ServerRoute | null | undefined,
   routeMap: undefined as ReturnType<typeof Route.gen> | null | undefined,
@@ -109,11 +122,46 @@ export const Server = {
   nadeT: undefined as unknown as number, // the next time a suspect may throw one (the level's)
   noiseT: undefined as number | undefined,
   teamT: undefined as number | undefined, // (till the fireteams are next looked over: teamForm)
+  contacts: new Map<number, { sup: number; t0: number; seen: number; firedAt: number | null }>(), // (each fireteam's contact drill: contactOf)
   eSid: undefined as number | undefined, // the suspects' shots' ids
   _sound: undefined as SoundCache | undefined,
 
+  // A LEVEL CONTEXT (docs/zone-levels.md): everything the server holds that's one ship's interior and what's going on in it, kept
+  // as a record so several can be held and each swapped in to be stepped (ctxSave, ctxLoad). The run's (players, the route, the
+  // shop, the squad's guns' stickers) stays the server's own.
+  // (the ids it gives (nextEid, lootId, eSid) aren't in it: the server's own, so no two contexts' ids are the same)
+  LVL_KEYS: ['map', 'seed', 'level', 'theme', 'night', 'enemies', 'cleared', 'extract', 'flow', 'flowT', 'snapT', 'wipeT', 'summons',
+    'nadeT', 'noiseT', 'teamT', 'live', 'windT', 'windSend', 'clock', 'report', 'evidence', 'loot', 'bodies', 'glassBroken',
+    'glassCracked', 'holes', 'fallen', 'wcase', 'caseOpen', 'cabs', 'abox', 'sbox', 'unitsSeen', 'kickAt', 'aiProp', 'bores', 'team', 'topId',
+    'proxies', 'pirFlow', 'civT', 'liftT'] as const,
+  // The other levels live beside the one loaded (ctxs: by the zone ship each is; the loaded one's own is SpaceSv's active), each
+  // stepped in its turn (update), and the messages of whoever's aboard one handled with it loaded (handle). While one's loaded,
+  // the players are only those aboard it (lvOf: a player's level, the loaded one's if not set), so its crew sees no one from
+  // another, in another's frame. What's sent while it's loaded says which it is (L: js/serverhost.ts broadcast), but for what's
+  // everyone's (GLOBAL_T: the space side, the run's; but the squad's ship's pose (spose), which is in its level's frame).
+  ctxs: new Map<number, LvCtx>(),
+  quiet: false, // (a level being made ahead (js/spaceserver.ts warm): nobody told, nobody's state touched)
+  allPlayers: null as Map<string, Player> | null,
+  GLOBAL_T: new Set(['sdbgq', 'sdmg', 'smatch', 'sin', 'seats', 'mdone', 'fleet', 'sdock', 'sxpdr', 'strk', 'ssec', 'srcue', 'shit', 'shatch', 'sfire', 'schaff', 'storp', 'sss', 'sev', 'sboom', 'newrun', 'chat', 'phase', 'board', 'ship', 'lobby', 'hello', 'welcome', 'join', 'left', 'ready', 'route', 'shop', 'prof', 'skins', 'stickers']),
+  curK() { return SpaceSv.ctxSave().active; },
+  lvOf(p: Player) { return (p as any).lv == null ? this.curK() : (p as any).lv; },
+  // (the players aboard the loaded level only, while fn runs)
+  scoped(fn: () => void) {
+    if (this.allPlayers) { fn(); return; }
+    const all = this.players, k = this.curK(), mine = new Map<string, Player>(); for (const [id, p] of all) if (this.lvOf(p) === k) mine.set(id, p);
+    this.allPlayers = all; this.players = mine; try { fn(); } finally { this.players = all; this.allPlayers = null; }
+  },
+  // fn with level k loaded (and its players), then the one that was loaded back
+  inCtx(k: number, fn: () => void) {
+    if (k === this.curK()) { this.scoped(fn); return; }
+    const c = this.ctxs.get(k); if (!c) return;
+    const home = this.ctxSave(); this.ctxLoad(c);
+    try { this.scoped(fn); } finally { const was = this.ctxs.get(k); if (was) { const n = this.ctxSave(); n.warm = was.warm; this.ctxs.set(k, n); } this.ctxLoad(home); } // (unless it was put away meanwhile)
+  },
+  ctxSave(): LvCtx { const sv: Record<string, unknown> = {}, me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) sv[k] = me[k]; return { sv, sp: SpaceSv.ctxSave() }; },
+  ctxLoad(c: LvCtx) { const me = this as unknown as Record<string, unknown>; for (const k of this.LVL_KEYS) me[k] = c.sv[k]; SpaceSv.ctxLoad(c.sp); },
   reset() {
-    this.players.clear(); this.enemies.clear();
+    this.players.clear(); this.enemies.clear(); this.ctxs.clear(); this.allPlayers = null;
     this.phase = 'lobby'; this.level = 0; this.map = null; this.leaving = null;
   },
   roster() {
@@ -123,8 +171,21 @@ export const Server = {
   },
   sendRoster() { SvNet.broadcast({ t: 'roster', roster: this.roster() }); },
 
+  // (the ground snapshot out: see SNAPQ)
+  sendSnap(m0: any) {
+    const m = JSON.parse(JSON.stringify(m0)); // (frozen as sent: it holds the players' own states, which may change after, and a base must be what they got)
+    const k = this.curK(), L = String(k); let q = SNAPQ.get(L); if (!q) SNAPQ.set(L, (q = { seq: 0, ring: new Map() }));
+    const sq = ++q.seq; q.ring.set(sq, m); q.ring.delete(sq - SNAP_KEEP);
+    for (const [id, pl] of this.allPlayers || this.players) {
+      if (id === SvNet.myId || this.lvOf(pl) !== k) continue;
+      const a = SNAPACK.get(id + '|' + L), base = a != null ? q.ring.get(a) : undefined;
+      SpaceNet.zpack(base ? { L: k, s: sq, b: a, d: SnapDelta.diff(base, m) } : { L: k, s: sq, b: -1, f: m }).then((buf) => SvNet.fast(id, buf, 6));
+    }
+    if (SvNet.myId) SvNet.sendTo(SvNet.myId, { ...m });
+  },
   handle(m: NetMsg, from: string) {
-    const p = this.players.get(from);
+    { const q = (this.allPlayers || this.players).get(from); if (!this.allPlayers && q && this.lvOf(q) !== this.curK() && this.ctxs.has(this.lvOf(q))) { this.inCtx(this.lvOf(q), () => this.handle(m, from)); return; } } // (someone aboard another level: theirs loaded)
+    const p = this.players.get(from) || (this.allPlayers ? this.allPlayers.get(from) : undefined); // (whoever sent it, even while their level isn't the one loaded)
     switch (m.t) {
       case 'hello': {
         const name = String(m.name || 'Operator').slice(0, 16);
@@ -137,7 +198,7 @@ export const Server = {
         if (!animal) animal = (CS.LIST.find((a) => !taken.has(a.id)) || CS.of(prefs[0] || CS.LIST[0].id)).id;
         const color = CS.of(animal).color;
         // anon: signed in to the cloud saves as a guest (js/cloud.ts; optional: an older client sends nothing, and shows nothing)
-        this.players.set(from, { id: from, name, color, animal, look: Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });
+        (this.allPlayers || this.players).set(from, { id: from, name, color, animal, look: Sim.cleanLook(m.look), ready: false, st: null, anon: m.anon === 1 ? 1 : 0 });
         SvNet.sendTo(from, {
           t: 'welcome', id: from, roster: this.roster(), phase: this.phase, level: this.level,
           sp: !SpaceData.ON ? undefined : this.phase === 'shop' ? SpaceSv.shopMsg() : this.phase === 'level' ? SpaceSv.levelMsg() : undefined, // (the game in space: js/spaceserver.ts)
@@ -145,7 +206,7 @@ export const Server = {
           doors: this.map && this.phase === 'level' ? this.map.doors.map((d: Door) => (d.open ? 1 : 0)) : null,
           holes: this.phase === 'level' ? this.holes || null : null, fallen: this.phase === 'level' ? this.fallen || null : null,
           evidence: this.phase === 'level' && this.evidence ? this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]) : null,
-          bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : null,
+          bodies: this.phase === 'level' && this.bodies ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0, (b.rec && b.rec.wear) || 0]) : null,
           wcase: this.phase === 'level' ? this.caseMsg() : null, wc: this.phase === 'level' ? this.caseGun() : null, cabs: this.phase === 'level' ? this.cabMsg() : null, abox: this.phase === 'level' ? this.aboxMsg() : null,
           loot: this.phase === 'level' && this.loot ? [...this.loot.values()].map((l) => this.lootMsg(l)) : null,
           glass: this.phase === 'level' && this.glassBroken ? [...this.glassBroken] : null, cracked: this.phase === 'level' ? this.glassCracked || null : null,
@@ -158,6 +219,7 @@ export const Server = {
       }
       case 'acct': if (p && (p.anon ? 1 : 0) !== (m.anon === 1 ? 1 : 0)) { p.anon = m.anon === 1 ? 1 : 0; this.sendRoster(); } break; // (signed in or out of the cloud saves since their hello: the guest mark)
       case 'st': if (p) p.st = m.s; break;
+      case 'sack': { const key = from + '|' + String((m as any).L), sq = +(m as any).s; if (Number.isFinite(sq) && sq > (SNAPACK.get(key) ?? -1)) SNAPACK.set(key, sq); break; } // (the last ground snapshot they have: sendSnap)
       case 'rfx': if (p && Array.isArray(m.a)) SvNet.broadcast({ t: 'rfx', a: m.a.slice(0, 32) }, from); break; // (the marks a round left on what it went through or off)
       case 'bstk': if (p) SvNet.broadcast(m, from); break; // (a bolt that stuck: js/bolts.ts)
       case 'hole': // (what it took out of them, js/damage.ts: kept for whoever joins, and here for the suspects' eyes and rounds)
@@ -405,7 +467,8 @@ export const Server = {
   onLeave(id: string) {
     const p = this.players.get(id);
     if (!p) return;
-    this.players.delete(id);
+    this.players.delete(id); if (this.allPlayers) this.allPlayers.delete(id); // (and from the whole squad, a level being stepped or not)
+    for (const k of [...SNAPACK.keys()]) if (k.startsWith(id + '|')) SNAPACK.delete(k);
     SvNet.broadcast({ t: 'left', id });
     SvNet.broadcast({ t: 'chat', id: null, m: p.name + ' left the squad.' });
     this.sendRoster();
@@ -461,10 +524,10 @@ export const Server = {
   },
   // Building the next place stalls the host, and it's built before anyone's told: so everyone's screen goes black first
   // (js/game.ts veil), and go runs once it has, if the phase is still the one it was asked from. Only one at a time.
-  overBlack(go: () => void, kind?: string) { // (kind 'ftl': a jump, not a black panel: js/space.ts)
+  overBlack(go: () => void, kind?: string, to?: number) { // (kind 'ftl': a jump, not a black panel, to where (to): js/space.ts joinJump)
     if (this.leaving) return;
     const run = this.leaving = {}, from = this.phase;
-    SvNet.broadcast({ t: 'veil', k: kind });
+    SvNet.broadcast(to == null ? { t: 'veil', k: kind } : { t: 'veil', k: kind, to });
     setTimeout(() => {
       if (this.leaving !== run) return; // (gone back to the menu)
       this.leaving = null;
@@ -499,11 +562,11 @@ export const Server = {
     if (ms) { this.level = ms.diff; this.theme = ms.th; }
     this.night = ms ? ms.night : this.isNight();
     this.map = Level.generate(this.seed, this.level, this.theme as number, this.night, ms ? SpaceSv.genOf(ms) : null);
-    ServerHost.born(this.map); // (what it was built with: ServerLink.digest)
+    if (!this.quiet) ServerHost.born(this.map); // (what it was built with: ServerLink.digest)
     this.aiMask(this.map);
-    this.enemies.clear(); this.cleared = new Map();
+    this.enemies = new Map(); this.cleared = new Map(); // (new, not cleared: a level context kept holds the one it had, js/server.ts ctxSave)
     this.extract = { active: false, votes: new Set() };
-    this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.nadeT = 8; this.live = [];
+    this.flow = null; this.flowT = 0; this.wipeT = 0; this.summons = 0; this.contacts.clear(); this.nadeT = 8; this.live = [];
     this.windT = 0; this.windSend = 0; // (the wind's own clock, from the level's start: windTick)
     this.report = { incap: 0, bleedouts: 0, bleedBy: {}, arrests: 0, rescued: 0, civKilled: 0, unauth: 0, evidence: 0, bodies: 0, stronghold: this.isStronghold() };
     this.evidence = []; // weapons on the floor: { i, wpn, x, z, owner, secured, taken }
@@ -511,7 +574,7 @@ export const Server = {
     this.glassBroken = new Set(); this.glassCracked = []; // windows broken (map.windows ids), and fractured ([id, where])
     this.holes = []; this.fallen = []; // (what's been shot out of the place: js/damage.ts)
     this.bodies = new Map(); // the dead, until secured: id -> { id, type, x, z, yaw, civ, secured }
-    for (const p of this.players.values()) { p.ready = false; p.st = null; }
+    if (!this.quiet) for (const p of this.players.values()) { p.ready = false; p.st = null; } // (made ahead, quietly: nobody's in it yet)
     // (a ship has her own complement, by her class: js/spaceserver.ts crew)
     if (ms && this.map.sp) SpaceSv.crew(); else this.spawnEnemies();
     if (ms) SpaceSv.populate();
@@ -524,11 +587,17 @@ export const Server = {
     this.sbox = this.map.sbox && sn.length ? { s: sn[Math.floor(Math.random() * sn.length)], by: null } : null;
     // (a ship of the zone's come back to: as she was left, js/spaceserver.ts restore; and everyone's told all of it, as whoever joins is)
     const kept = !!ms && SpaceSv.restore();
-    const was = kept ? { doors: this.map.doors.map((d: Door) => (d.open ? 1 : 0)), holes: this.holes, fallen: this.fallen, evidence: this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]),
-      loot: [...this.loot.values()].map((l) => this.lootMsg(l)), glass: [...this.glassBroken], cracked: this.glassCracked } : {};
-    SvNet.broadcast({ t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: ms ? SpaceSv.levelMsg() : undefined, ...was,
-      bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0]) : undefined }); // (the dead she's come back to with: js/spaceserver.ts populate)
+    this.toLevel(this.phaseMsg(!!ms, kept)); // (to those in the loaded level: whoever's aboard another of the zone's ships stays there)
   },
+  // the level as it is, for a screen coming into it: everything if it's been played (kept: come back to, or live), else its start
+  phaseMsg(space: boolean, kept: boolean) {
+    const was = kept ? { doors: this.map!.doors.map((d: Door) => (d.open ? 1 : 0)), holes: this.holes, fallen: this.fallen, evidence: this.evidence.filter((v: Evidence) => !v.taken).map((v: Evidence) => [v.i, v.wpn, v.x, v.z, v.secured ? 1 : 0, v.y || 0]),
+      loot: [...this.loot.values()].map((l) => this.lootMsg(l)), glass: [...this.glassBroken], cracked: this.glassCracked } : {};
+    return { t: 'phase', phase: 'level', level: this.level, seed: this.seed, th: this.theme, night: this.night ? 1 : 0, route: this.routeMsg(), wcase: this.caseMsg(), wc: this.caseGun(), cabs: this.cabMsg(), abox: this.aboxMsg(), sbox: this.sboxMsg(), sp: space ? SpaceSv.levelMsg() : undefined, ...was,
+      bodies: this.bodies.size ? [...this.bodies.values()].map((b) => [b.id, b.type, b.x, b.z, b.yaw, b.secured ? 1 : 0, b.y || 0, (b.rec && b.rec.title) || 0, (b.rec && b.rec.wear) || 0]) : undefined }; // (the dead she's come back to with: js/spaceserver.ts populate)
+  },
+  // a message to everyone in the loaded level (all of them, but those aboard another of the zone's levels)
+  toLevel(m: any) { if (this.quiet) return; const k = this.curK(); for (const [id, p] of this.allPlayers || this.players) if (this.lvOf(p) === k) this.net.sendTo(id, m); },
   // The level's weapon case: a weapon in its standard build, fully loaded, picked by rarity. Each tier has a
   // share (CASE_RARITY), split evenly between that tier's weapons so a tier with many weapons isn't more
   // likely; deeper levels shift the odds toward rarer tiers, and legendaries only turn up from level 3.
@@ -761,7 +830,6 @@ export const Server = {
   spawnEnemies() {
     const L = this.level, np = Math.max(1, this.players.size), U = G_U;
     const big = this.map!.theme.big || 1, hold = this.report.stronghold, count = Math.min(Math.round((4 + Math.floor(L * 1.5) + (np - 1) * 2) * (this.map!.theme.foes || 1) * (hold ? 1.5 : 1)), (hold ? 44 : 32) * big); // (a bigger map: more of them, and room for more)
-    const hpMult = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     this.accMult = Math.min(1 + 0.03 * (L - 1), 1.5);
     this.dmgMult = 1 + 0.07 * (L - 1);
     const weights: [EnemyKind, number][] = [['suspect', 4], ['grunt', 2.5 + L * 0.2], ['rusher', 1 + L * 0.2], ['marksman', L >= 2 ? (0.8 + L * 0.15) * (this.map!.theme.lookouts || 1) : this.map!.theme.lookouts ? 0.6 : 0], ['heavy', L >= 3 ? 0.4 + L * 0.2 : 0]];
@@ -789,7 +857,7 @@ export const Server = {
       used.push([tx, tz, tf]);
       let roll = Math.random() * total, type: EnemyKind = 'grunt';
       for (const [ty, w] of weights) { if (roll < w) { type = ty; break; } roll -= w; }
-      const se = this.addEnemy(type, (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, hpMult, fy(tf));
+      const se = this.addEnemy(type, (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, fy(tf));
       if (hold) se.drawn = true; // (a stronghold's suspects have their weapons out already, not holstered)
     }
     // a leader, one at most, from level 2: more likely the bigger the map and in a stronghold. He takes the place of the suspect furthest from the
@@ -799,7 +867,7 @@ export const Server = {
       const sp = this.map!.spawn || { x: 0, z: 0 };
       let far: Enemy | null = null, fd = -1;
       for (const o of this.enemies.values()) { const d = Math.hypot(o.x - sp.x, o.z - sp.z); if (!o.def.civ && !o.def.boss && d > fd) { fd = d; far = o; } }
-      if (far) { this.enemies.delete(far.id); const le = this.addEnemy('leader', far.x, far.z, hpMult, far.y || 0); le.drawn = true; }
+      if (far) { this.enemies.delete(far.id); const le = this.addEnemy('leader', far.x, far.z, far.y || 0); le.drawn = true; }
     }
     // civilians caught up in it (more at a festival: some of them hiding behind the stalls' counters; the other
     // stalls were left as they ran)
@@ -810,7 +878,7 @@ export const Server = {
       const tx = Math.floor(s.x / TS), tz = Math.floor(s.z / TS);
       if (this.map!.t[tz * this.map!.W + tx] !== 0 || close(tx, tz, 0)) continue;
       used.push([tx, tz]);
-      const c = this.addEnemy('civ', s.x, s.z, 1);
+      const c = this.addEnemy('civ', s.x, s.z);
       c.state = 'hide'; c.hide = { x: s.x, z: s.z, lean: 0 }; c.crouch = true; c.yaw = s.yaw; c.peekT = 1 + Math.random() * 3;
       placed++;
     }
@@ -828,12 +896,12 @@ export const Server = {
       if (placed >= civs) break;
       if (close(tx, tz, tf)) continue;
       used.push([tx, tz, tf]);
-      this.addEnemy('civ', (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, 1, fy(tf));
+      this.addEnemy('civ', (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, fy(tf));
       placed++;
     }
     if (Route.isBoss(L) && !SpaceSv.st.M) {
       const ex = this.map!.extract;
-      const b = this.addEnemy('warden', ex.x, ex.z, (1 + 0.5 * (Route.actOf(L) - 1)) * (1 + 0.35 * (np - 1)));
+      const b = this.addEnemy('warden', ex.x, ex.z);
       b.guard = true;
     }
   },
@@ -934,12 +1002,12 @@ export const Server = {
     d.shield = id; d.speed = d.speed * sd.speed; e.point = true;
     if (e.wear === 'navy') d.tac = (d.tac || 0) | 2 | 4; // (a navy's: a green laser on the pistol)
   },
-  addEnemy(type: EnemyKind, x: number, z: number, hpMult: number, y = 0) {
+  addEnemy(type: EnemyKind, x: number, z: number, y = 0) { // (everyone their type's health (js/data.ts ENEMIES hp), however far the run's got or however many the squad: nothing scales it)
     if (this.map && this.map.terrain) y = Level.groundHeight(this.map, x, z); // (on the ground where it rolls, high or low: the Sandia Crest's)
     const def = this.equip(type);
     const e: Enemy = {
       id: this.nextEid++, type, def, x, z, yaw: Math.random() * Math.PI * 2,
-      hp: def.hp * hpMult, maxHp: def.hp * hpMult, alert: false, spot: 0, tgt: null, tgtD: 99, canSee: false,
+      hp: def.hp, maxHp: def.hp, alert: false, spot: 0, tgt: null, tgtD: 99, canSee: false,
       percT: Math.random() * 0.3, cool: 1, burstLeft: 0, aiming: false, aimT: 0, strafe: 0, strafeT: 0,
       idleT: Math.random() * 3, idleYaw: 0, pendingAlert: -1, lostT: 0, lastHit: null,
       cover: null, inCover: false, peek: false, peekT: 0, coverT: Math.random(), coverStuck: 0, crouch: false,
@@ -1298,7 +1366,7 @@ export const Server = {
     }
   },
   // (a suspect down and bleeding out is dealt with: they never get up again. A civilian down still needs rescuing.)
-  remaining(civ: boolean | null = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ)) n++; return n; },
+  remaining(civ: boolean | null = null) { let n = 0; for (const e of this.enemies.values()) if (e.state !== 'cuffed' && !(e.down && !e.def.civ) && (civ === null || !!e.def.civ === civ) && !(e.ally && civ === false)) n++; return n; }, // (ally: armed, and on the squad's side: not one of the hostiles left)
   openBodies() { let n = 0; for (const b of this.bodies.values()) if (!b.secured) n++; return n; },
   openEvidence() { let n = 0; for (const v of this.evidence) if (!v.secured && !v.taken) n++; return n; },
   // Objectives. "Bring Order to Chaos" (required): every suspect zip-tied, down or dead. "Rescue All of the
@@ -1318,7 +1386,7 @@ export const Server = {
     const officers = [...this.players.values()].filter((q: Player) => q.st && !q.st.dn && !q.st.dd) as LivePlayer[];
     let complied = 0;
     for (const e of this.enemies.values()) {
-      if (!(e.state === 'normal' || e.state === 'cower' || e.state === 'flee' || e.state === 'hide')) continue;
+      if (!(e.state === 'normal' || e.state === 'cower' || e.state === 'flee' || e.state === 'hide') || e.ally) continue; // (ally: on the squad's side, not theirs to order about)
       const d = Math.hypot(e.x - px, e.z - pz);
       const eh = (e.y || 0) + 1.4 * e.def.scale;
       if (d > 16 || e.complyCd > 0 || !L.los(map, px, ey, pz, e.x, eh, e.z)) continue;
@@ -1692,7 +1760,7 @@ export const Server = {
     const d = m.k ? e.hp + 1 : Math.min(5000, (+m.d || 0) + Math.min(5, Math.max(0, +m.f || 0)) * person);
     if (!(d > 0)) return;
     e.hp -= d;
-    if (!m.bo) { e.lastHit = from; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
+    if (!m.bo) { e.lastHit = from; e.lastHitN = from ? null : m.byn || null; e.lastHitAt = this.clock || 0; e.lastH = !!m.h; e.lastAp = !!m.ap; e.hitState = e.state; e.hitUnaware = !e.alert || (e.surprisedT || 0) > 0; e.hitYield = this.wouldYield(e);
       if (Array.isArray(m.tb) && m.tb.length === 2 && m.tb.every(Number.isFinite)) { const t = e.tb || (e.tb = { burn: 0, blast: 0, n: 0 }); t.burn += G_U.clamp(m.tb[0], 0, 2); t.blast += G_U.clamp(m.tb[1], 0, 2); t.n++; } // (a thermobaric's burns and blast: injuries of their own, injuryTick; and for F9, js/hud.ts)
       e.lastGr = Number.isFinite(m.gr) ? m.gr : 0; e.lastFb = e.flashT! > 0 ? e.flashId || 0 : 0; } // bleeding out is judged by what they were doing when shot (and for the highlights: a frag grenade's, gr its seed; blind from a flashbang, which)
     // Shock: being hit wrecks your aim for a moment (most of it, for a hard hit), throws off the shot you were
@@ -1713,7 +1781,7 @@ export const Server = {
         this.summons++;
         for (let i = 0; i < 3 + this.players.size; i++) {
           const a = Math.random() * Math.PI * 2;
-          const n = this.addEnemy('grunt', e.x + Math.cos(a) * 2.5, e.z + Math.sin(a) * 2.5, 1 + 0.1 * this.level, e.y || 0);
+          const n = this.addEnemy('grunt', e.x + Math.cos(a) * 2.5, e.z + Math.sin(a) * 2.5, e.y || 0);
           this.settle(n, 0.4);
           this.alertEnemy(n, false);
         }
@@ -1746,7 +1814,7 @@ export const Server = {
       if (!hl.bo && e.lastGr) hl.gr = e.lastGr; // (a frag grenade did it: which)
       if (!hl.bo && e.lastFb) hl.fb = e.lastFb; // (blind from a flashbang when it was done: which)
       if (m.cz === 'burns' || m.cz === 'blast') { hl.cz = m.cz; if (e.lastGr) hl.gr = e.lastGr; } // (died of a thermobaric's burns or blast lung: injuryTick; the grenade's)
-      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, cr: this.pay(cr), h: !!m.h, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
+      SvNet.broadcast(Object.assign({ t: 'kill', e: e.id, by: from, bn: from ? undefined : m.byn || e.lastHitN || undefined, cr: this.pay(cr), h: !!m.h, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, inc: inc ? 1 : 0, wd: e.wnd && e.wnd.length ? e.wnd : undefined }, hl));
       this.checkClear();
     }
   },
@@ -1767,7 +1835,7 @@ export const Server = {
   incapMsg(e: Enemy) {
     if (e.def.civ || e.incap) return; // (a civilian down still needs rescuing)
     const { cr, why } = this.incapacitate(e, e.lastHit, e.hitState || e.state);
-    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, cr: this.pay(cr), h: !!e.lastH, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
+    SvNet.broadcast({ t: 'incap', e: e.id, by: e.lastHit || null, bn: e.lastHit ? undefined : e.lastHitN || undefined, cr: this.pay(cr), h: !!e.lastH, ty: e.type, nm: e.title || this.titleOf(e), ld: this.leadsMen(e) ? 1 : undefined, why, sur: e.hitUnaware ? 1 : 0, gr: e.lastGr || undefined }); // (gr: a grenade put them down, frag or thermobaric: not the gun's, js/arsenal.ts kill)
   },
   // A suspect down for good, for the highlights (js/highlights.ts suspectDown): incapacitated, their clip. The round
   // that put them down, with what a kill of it would carry; or, more than 4 s after a round last hit them, a bleed-out
@@ -1813,6 +1881,13 @@ export const Server = {
   },
   update(dt: number) {
     if (this.phase === 'shop') return this.updateHub(dt);
+    if (!this.allPlayers) { // (each level stepped, the loaded one first, with only its own players)
+      this.scoped(() => this.update(dt));
+      for (const k of [...this.ctxs.keys()]) this.inCtx(k, () => { const c = this.ctxs; this.ctxs = new Map(); try { this.update(dt); } finally { this.ctxs = c; } });
+      // (a level kept live that nobody's in any more: put away as it is (dormant, js/spaceserver.ts keepOf), to come back to)
+      for (const k of [...this.ctxs.keys()]) { let n = 0; for (const p of this.players.values()) if (this.lvOf(p) === k) n++; if (!n && !this.ctxs.get(k)!.warm) this.inCtx(k, () => SpaceSv.putAway()); } // (but one made ahead, the squad's ship near)
+      return;
+    }
     if (this.phase !== 'level' || !this.map) return;
     this.clock = (this.clock || 0) + dt;
     SpaceSv.tick(dt);
@@ -1835,7 +1910,10 @@ export const Server = {
     const onFoot = alive.filter((p) => !p.st.se); // (se: still in the helicopter that brought them: nobody's to aim at yet, js/landing.ts)
     this.teamCheck();
     this.teamT = (this.teamT || 0) - dt; if (this.teamT <= 0) { this.teamT = this.TEAM.T; this.teamForm(); this.pointSwap(); }
-    for (const e of this.enemies.values()) this.think(e, dt, onFoot);
+    // (pirates aboard with anyone they'd fight: each of them has the other's people to pick out and shoot as well as the squad, npcFoes)
+    const foes = this.npcFoes();
+    if (foes) this.civFlee(dt);
+    for (const e of this.enemies.values()) this.think(e, dt, foes ? this.foesOf(e, onFoot, foes) : e.ally ? this.NOBODY : onFoot);
 
     // keep enemies from stacking
     const es = [...this.enemies.values()];
@@ -1869,11 +1947,11 @@ export const Server = {
       const r2 = (v: number) => Math.round(v * 100) / 100;
       const e = [];
       for (const en of this.enemies.values()) {
-        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert && !en.lowRun ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}|${en.wear ? this.titleOf(en) : ''}|${en.def.shield || ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
+        e.push([en.id, en.type, r2(en.x), r2(en.z), r2(en.yaw), Math.max(1, Math.round((en.hp / en.maxHp) * 100)), en.aiming ? en.tgt : 0, en.alert && !en.lowRun ? 1 : 0, en.crouch ? 1 : 0, en.leanOut || 0, en.armed ? (en.drawn ? 2 : 1) : 0, STATE_CODE[en.state] || 0, en.surprisedT > 0 ? 1 : 0, en.doorWait > 0 ? 1 : 0, en.def.civ ? 0 : `${en.def.wpn}|${en.def.vest}|${en.def.helmet}|${en.def.face || ''}|${en.def.tac || 0}|${(en.def.ex || []).join(',')}|${en.wear ? this.titleOf(en) : ''}|${en.def.shield || ''}|${en.wear || ''}|${en.ally ? 1 : ''}`, ((en.bleedH || en.bleedL) ? 1 : 0) | (en.legs ? 2 : 0) | (en.reloadT > 0 ? 4 : 0) | (en.down ? 8 : 0), Math.round(Math.min(en.down ? 0.25 : 1, en.str == null ? 1 : en.str) * 100), r2(en.y || 0), en.wnd && en.wnd.length ? en.wnd : 0, en.flashT! > 0 ? 1 : en.flashRec! > 0 ? 2 : 0, en.radioT! > 0 ? 1 : 0]); // (wounds for the bleeding streams, then the flash state, then on the radio)
       }
       const p: Record<string, any> = {};
       for (const pl of all) p[pl.id] = pl.st;
-      SvNet.broadcast({ t: 'snap', e, p, x: [this.extract.active ? 1 : 0, this.extract.votes.size, all.filter((q) => !q.st.dd).length, this.report.civKilled || 0, all.filter((q) => this.extract.votes.has(q.id)).map((q) => q.id), this.unitsCleared()], n: this.remaining(false), c: this.remaining(true), b: this.openBodies(), w: this.openEvidence() });
+      this.sendSnap({ t: 'snap', e, p, x: [this.extract.active ? 1 : 0, this.extract.votes.size, all.filter((q) => !q.st.dd).length, this.report.civKilled || 0, all.filter((q) => this.extract.votes.has(q.id)).map((q) => q.id), this.unitsCleared()], n: this.remaining(false), c: this.remaining(true), b: this.openBodies(), w: this.openEvidence() });
     }
   },
 
@@ -1885,7 +1963,7 @@ export const Server = {
       this.snapT = 0.05;
       const p: Record<string, any> = {};
       for (const pl of this.players.values()) if (pl.st) p[pl.id] = pl.st;
-      SvNet.broadcast({ t: 'snap', e: [], p, x: [0, 0, this.players.size, 0, [], 0], n: 0, c: 0, b: 0, w: 0 });
+      this.sendSnap({ t: 'snap', e: [], p, x: [0, 0, this.players.size, 0, [], 0], n: 0, c: 0, b: 0, w: 0 });
     }
     if (this.liftT != null && (this.liftT -= dt) <= 0) { this.liftT = null; this.checkReady(true); }
   },
@@ -1956,7 +2034,7 @@ export const Server = {
         // (through a window: k < 1; through bulletproof glass, seen but not to be shot: no round gets through it)
         let proof = false;
         if (k > 0 && k < 1) { const dx = hx - lx, dy = hy - ey, dz = hz - lz, dd = Math.hypot(dx, dy, dz) || 1; proof = L.raycast(map, lx, ey, lz, dx / dd, dy / dd, dz / dd, dd, { glass: true }).t < dd - 0.1; }
-        const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0);
+        const vis = k > 0 && !proof, score = d + (vis ? 0 : proof ? 30 : 40) + (k < 1 && vis ? 8 : 0) + ((p as any).npc && (p as any).npc.def.civ ? 6 : 0); // (someone unarmed: after anyone with a gun as near)
         if (score < bs) { bs = score; best = p; bvis = vis; bd = d; bk = lk; e.proof = proof; }
       }
       e.tgt = best ? best.id : null; e.canSee = bvis; e.tgtD = bd; e.visK = best && bvis ? bk : 0;
@@ -1966,7 +2044,7 @@ export const Server = {
       // seen behind bulletproof glass: they know where you are (and that shooting's no use): they come round for you
       if (best && e.proof) { e.alert = true; e.lostT = G_U.clamp(e.lostT || 0, 0.01, 1); e.blind = false; e.lastSeen = { x: best.st.p[0], y: best.st.p[1], z: best.st.p[2] }; }
     }
-    const p = e.tgt ? this.players.get(e.tgt) : null;
+    const p = e.tgt ? this.players.get(e.tgt) || (this.proxies && this.proxies.get(e.tgt)) || null : null; // (an officer, or someone of another side's: npcFoes)
     const st = p && p.st && !p.st.dn && !p.st.dd ? p.st : null;
     if (!st) { e.canSee = false; e.aiming = false; }
 
@@ -1991,8 +2069,8 @@ export const Server = {
           }
         }
       } else e.spot = Math.max(0, e.spot - dt * 0.3);
-      if ((e.dp || e.suspicious || e.heard) && this.doorPeek(e, dt)) return;
-      if (e.suspicious) {
+      if (!e.raid && (e.dp || e.suspicious || e.heard) && this.doorPeek(e, dt)) return;
+      if (e.suspicious && !e.raid) { // (a boarder on a raid (js/spaceserver.ts defendTick) doesn't stop for what they hear: on to where they're going, gun out)
         // weapon out, watching where the noise came from; settles back down if nothing else happens
         if (e.noise) e.idleYaw = Math.atan2(-(e.noise.x - e.x), -(e.noise.z - e.z));
         e.calmT -= dt;
@@ -2040,7 +2118,11 @@ export const Server = {
     e.coverT -= dt;
     e.nadeT -= dt;
     const usesCover = !def.boss && e.type !== 'rusher';
-    if (st && e.canSee) { if (e.dp) this.doorShot(e); } else if (this.doorPeek(e, dt)) return;
+    // (a fireteam that's just made contact: one of them, the first to see them, puts fire on them at once; the rest hold where they are till
+    // he has, and only then make for cover, he after his burst: contactOf)
+    const ct = this.contactOf(e, st), sup = !!ct && ct.sup === e.id;
+    const held = !!ct && (sup ? !(ct.firedAt != null && this.clock - ct.firedAt > this.CONTACT.SUP_T) && this.clock - ct.t0 < this.CONTACT.SUP_MAX : ct.firedAt == null && this.clock - ct.t0 < this.CONTACT.WAIT);
+    if (st && e.canSee) { if (e.dp) this.doorShot(e); } else if (!e.raid && this.doorPeek(e, dt)) return;
     // lurking: heard the police but hasn't seen them, so it hides and peeks like anyone else would, gun still
     // away. The moment it sees an officer it draws.
     if (e.lurk) {
@@ -2082,7 +2164,7 @@ export const Server = {
       if (bs) { e.cover = null; e.inCover = false; e.peek = false; e.leanOut = 0; }
       // Cover: move to a spot with a crate between us and the target, crouch, pop up to shoot. (Behind a borrowed shield, still
       // looking now and then: cover of their own found, they leave him for it.) None to be had: in behind a shield man near, if any
-      if (!bo && !po && (!bs || e.shieldBy != null) && usesCover && !e.cover && e.coverT <= 0) {
+      if (!bo && !po && (!bs || e.shieldBy != null) && usesCover && !e.cover && e.coverT <= 0 && !held) {
         e.coverT = 3 + Math.random() * 3;
         e.cover = this.findCover(e, st);
         e.coverStuck = 0;
@@ -2151,7 +2233,7 @@ export const Server = {
               if (e.aimT <= 0 && this.onTarget(e, st, dt)) { this.fire(e, p as LivePlayer); e.aiming = false; e.peekDone = true; e.cool = U.rf(def.pause[0], def.pause[1]); }
             }
           } else if (e.cool <= 0 && this.onTarget(e, st, dt)) {
-            if (e.burstLeft <= 0) e.burstLeft = def.burst[0] + Math.floor(Math.random() * (def.burst[1] - def.burst[0] + 1));
+            if (e.burstLeft <= 0) e.burstLeft = sup && ct!.firedAt == null ? def.burst[1] + 2 : def.burst[0] + Math.floor(Math.random() * (def.burst[1] - def.burst[0] + 1)); // (the suppressor's first: a long one)
             this.fire(e, p as LivePlayer);
             e.burstLeft--;
             if (e.burstLeft > 0) e.cool = def.rof;
@@ -2165,7 +2247,7 @@ export const Server = {
       // they were, blind. Rounds rarely land, and only if you're still there and in the open.
       if (e.lostT === 0) {
         e.pushing = false; e.pushWait = 0; // (lost sight again: a new push, if they make one)
-        e.blind = !def.aimTime && Math.random() < 0.5;
+        e.blind = !def.aimTime && (Math.random() < 0.5 || sup); // (the one suppressing them keeps it up on where they were)
         if (e.order && this.inBreach(e.order)) { if ((e.sawAt ?? -99) > (e.order.resAt ?? e.order.at)) this.resumeBreach(e); } // (on a breach: fought whoever it was, and back to it)
         else if (e.order && !e.order.cordon && e.lastSeen && (e.sawAt || -99) > e.order.at && this.clock - e.order.rt > 4) this.retarget(e, e.lastSeen); // (one holding a cordon stays on it) // (the search starts again from where they were seen)
       }
@@ -2181,7 +2263,7 @@ export const Server = {
         e.lowRun = false; // (orderStep says if they're running)
         const os = this.orderStep(e, dt);
         if (os) { mx = os.mx; mz = os.mz; sp = os.sp; e.holding = false; if (os.yaw != null) faceTo = os.yaw; } else e.holding = true;
-      } else if (e.post && !e.canSee && (!e.lastSeen || e.lostT > 5) && Math.hypot(e.post.x - e.x, e.post.z - e.z) > 0.6) {
+      } else if (e.post && !e.canSee && (!e.lastSeen || e.lostT > (e.raid ? 1.5 : 5)) && Math.hypot(e.post.x - e.x, e.post.z - e.z) > 0.6) { // (a raider: on again almost at once, not dug in where they lost them)
         // posted (a ship's response) and lost them: back to the doorway they were put on
         const L2 = Level, map2 = this.map!, g = e.post; if (!g.flow) g.flow = L2.flow(map2, [L2.src(map2, g.x, g.y, g.z)]);
         const d = Math.hypot(g.x - e.x, g.z - e.z), step = d > 3 || !this.clearTo(e, g) ? L2.flowStep(map2, g.flow, e.x, e.z, e.y) : null, tx = step ? step.x : g.x, tz = step ? step.z : g.z, dd = Math.hypot(tx - e.x, tz - e.z) || 1;
@@ -2674,6 +2756,7 @@ export const Server = {
   // What they're called (js/spacedata.ts TITLES): aboard a ship, by whose she is and where they stand in her; anywhere else, their type's
   // name. Kept on them (e.title) for the feed once they're gone.
   titleOf(e: Enemy) {
+    if (e.named) return (e.title = e.named); // (someone with a name of their own: a liner's security beside the squad, js/spaceserver.ts)
     const T = e.wear && !e.def.civ ? (SpaceData.TITLES as Record<string, Record<string, string>>)[e.wear] : null;
     if (!T) return e.def.name;
     const M = SpaceSv.st.M, lead = this.leads(e) && [...this.enemies.values()].some((o) => o !== e && o.team === e.id);
@@ -2774,6 +2857,26 @@ export const Server = {
     const map = this.map, sp = map && map.sp; if (!sp) return true;
     const ra = ShipGen.roomAt(map!, a.x, a.z, a.fl || 0), rb = ShipGen.roomAt(map!, b.x, b.z, b.fl || 0);
     return ra < 0 || rb < 0 || sp.hullOf[ra] === sp.hullOf[rb];
+  },
+  // A fireteam's contact drill. The first of a team to see one of the squad (or someone of the other side) while the team's had nobody in
+  // sight for CONTACT.LOST seconds is its suppressor (not a shotgunner, if another of them can see them too): his hesitation cut to a reaction (REACT), a long first burst, kept up blind on where
+  // they were if they duck. The others hold where they are (no move to cover) till he's fired, or WAIT seconds; he holds SUP_T seconds
+  // past his first round (SUP_MAX at most), then makes for cover himself.
+  CONTACT: { LOST: 10, REACT: [0.2, 0.4], WAIT: 2, SUP_T: 1.2, SUP_MAX: 3.5 },
+  contactOf(e: Enemy, st: PState | null | undefined) {
+    if (e.team == null || !this.enemies.has(e.team)) return null;
+    const C = this.CONTACT; let c = this.contacts.get(e.team);
+    if (c && this.clock - c.seen > C.LOST) { this.contacts.delete(e.team); c = undefined; }
+    if (!c && st && e.canSee && e.armed && this.able(e)) {
+      // (him, unless he's a shotgunner (a rusher charges, he doesn't hold and fire) and another of them can see them too)
+      const fit = (o: Enemy) => o.team === e.team && o.armed && this.able(o) && o.type !== 'rusher', mates = [...this.enemies.values()].filter(fit);
+      const s0 = fit(e) ? e : mates.find((o) => o.canSee) || e; // (one who can see them: someone who can't would hold them all up)
+      c = { sup: s0.id, t0: this.clock, seen: this.clock, firedAt: null }; this.contacts.set(e.team, c);
+      s0.cool = Math.min(s0.cool, G_U.rf(C.REACT[0], C.REACT[1])); s0.burstLeft = 0;
+    }
+    if (c && e.canSee) c.seen = this.clock;
+    if (c && c.sup === e.id && !this.able(e)) c.firedAt = c.firedAt ?? this.clock - C.SUP_T; // (down before he'd fired: the rest go)
+    return c || null;
   },
   teamForm() {
     const T = this.TEAM, all = [...this.enemies.values()].filter((e) => this.teamable(e) && this.able(e));
@@ -3093,13 +3196,14 @@ export const Server = {
   moveEntity(e: Enemy, mx: number, mz: number, speed: number, dt: number) {
     const map = this.map!;
     if (e.doorWait > 0) { e.doorWait -= dt; return; }
+    { const a = this.apart(e, mx, mz); mx = a[0]; mz = a[1]; }
     const ahead = map.world && World.raycast(map.world, e.x, (e.y || 0) + 1.0, e.z, mx, 0, mz, 0.9, { move: true }); // (what they'd walk into)
     const d = ahead && ahead.solid && ahead.solid.kind === 'door' ? ahead.solid.door : null;
     if (d && !d.open) { if (!SpaceSv.crewMayOpen(d, e)) return; this.setDoor(d.id, true); e.doorWait = 0.5; return; } // (a locked or sealed door: they hold where they are)
     if (e.collapsed) return; // legs gone: they're on the floor
     speed *= this.injSpeed(e) * (e.str == null || e.str >= 0.6 ? 1 : 0.3 + 0.7 * e.str / 0.6); // a broken leg limps; blood loss slows
     e.x += mx * speed * dt; e.z += mz * speed * dt;
-    this.settle(e, 0.38 * e.def.scale);
+    this.settle(e, 0.3 * e.def.scale); // (their body to the level: a column this wide, js/world.ts resolve; was 0.38)
   },
   // someone who's moved: out of what they walked into (stepping up onto anything low), and onto the floor or step
   // under them
@@ -3119,7 +3223,7 @@ export const Server = {
     if (e.dragTo) { // being pulled back by an officer
       const dx = e.dragTo.x - e.x, dz = e.dragTo.z - e.z, d = Math.hypot(dx, dz), st = Math.min(d, 1.3 * dt);
       const ox = e.x, oz = e.z;
-      if (d > 0.02) { e.x += (dx / d) * st; e.z += (dz / d) * st; this.settle(e, 0.3); }
+      if (d > 0.02) { e.x += (dx / d) * st; e.z += (dz / d) * st; this.settle(e, 0.25); }
       // there, or up against something (it isn't getting any closer)
       if (d <= 0.02 || Math.hypot(e.x - ox, e.z - oz) < st * 0.2) e.dragTo = null;
       return true;
@@ -3192,7 +3296,7 @@ export const Server = {
     if (e.state === 'cuffed' || e.state === 'surrender') return;
     if (!e.down && this.clearLine(e, dt)) return; // (out of a shooter's way, before anything else)
     // sent to shelter (a ship's response): fleeing, hiding or frozen, they make for it once there's no officer on top of them
-    if (e.shelter && (e.state === 'cower' || e.state === 'hide' || e.state === 'flee')) { const near = this.nearestOfficer(e); if (!near || near.d > 6) { e.state = 'normal'; e.hide = null; e.crouch = false; e.leanOut = 0; } }
+    if (e.shelter && !e.fromPir && (e.state === 'cower' || e.state === 'hide' || e.state === 'flee')) { const near = this.nearestOfficer(e); if (!near || near.d > 6) { e.state = 'normal'; e.hide = null; e.crouch = false; e.leanOut = 0; } }
     if (e.state === 'cower') return;
     if (e.state === 'hide') {
       if (!e.hide && !this.seekHide(e)) { e.state = 'cower'; e.crouch = false; e.leanOut = 0; return; }
@@ -3205,7 +3309,7 @@ export const Server = {
     }
     if (e.state === 'flee') {
       e.fleeT -= dt;
-      const step = this.flow ? L.flowAway(this.map!, this.flow, e.x, e.z) : null;
+      const away = e.fromPir && this.pirFlow ? this.pirFlow : this.flow, step = away ? L.flowAway(this.map!, away, e.x, e.z) : null; // (from the pirates, if it's them they're running from: civFlee)
       if (step) {
         const dx = step.x - e.x, dz = step.z - e.z, d = Math.hypot(dx, dz) || 1;
         e.yaw += U.angDiff(e.yaw, Math.atan2(-dx, -dz)) * Math.min(1, dt * 8);
@@ -3241,6 +3345,27 @@ export const Server = {
     const kx = c.cx! - c.x, kz = c.cz! - c.z, kd = Math.hypot(kx, kz);
     return (tx * kx + tz * kz) / (td * kd) > 0.55;
   },
+  // Spacing as they move (moveEntity): no one walks in someone's footsteps. Each of their side within APART.R of them pushes them off
+  // (harder the nearer); one ahead of them on the way they're going also sends them out to a side of their own (by their id), so a group
+  // moves as a spread, not a file. The way they're going stays the way they're going: it only bends.
+  APART: { R: 1.7, AHEAD: 3.2, PUSH: 1.3, SIDE: 0.7 },
+  apart(e: Enemy, mx: number, mz: number): [number, number] {
+    const A = this.APART, m = Math.hypot(mx, mz); if (!m || e.def.civ) return [mx, mz];
+    const fx = mx / m, fz = mz / m, side = e.id % 2 ? 1 : -1;
+    let ax = 0, az = 0;
+    for (const o of this.enemies.values()) {
+      if (o === e || o.team !== e.team || !o.ally !== !e.ally || o.down || o.hp <= 0 || o.state === 'dead' || o.def.civ || Math.abs((o.y || 0) - (e.y || 0)) > 1.5) continue;
+      const dx = e.x - o.x, dz = e.z - o.z, d = Math.hypot(dx, dz);
+      if (d > A.AHEAD || d < 0.01) continue;
+      if (d < A.R) { const w = (A.R - d) / A.R * A.PUSH; ax += dx / d * w; az += dz / d * w; }
+      const on = -(dx * fx + dz * fz); // (how far ahead of them, on their way)
+      if (on > 0 && Math.abs(dx * fz - dz * fx) < 0.9) { const w = (1 - d / A.AHEAD) * A.SIDE; ax += -fz * side * w; az += fx * side * w; }
+    }
+    if (!ax && !az) return [mx, mz];
+    let nx = fx + ax, nz = fz + az;
+    const fw = nx * fx + nz * fz; if (fw < 0.25) { nx += fx * (0.25 - fw); nz += fz * (0.25 - fw); } // (never back the way they came: they bend round, they don't turn about)
+    const n = Math.hypot(nx, nz) || 1; return [nx / n * m, nz / n * m];
+  },
   findCover(e: Enemy, st: PState) {
     if (e.def.shield) return null; // (a handheld shield is their cover: they stand behind it and fight)
     const L = Level, map = this.map!, def = e.def, ground = this.ground(), now = Math.hypot(e.x - st.p[0], e.z - st.p[2]); // (now: how far off the police are)
@@ -3248,15 +3373,15 @@ export const Server = {
     const here = (q: { x: number; y?: number; z: number }) => Math.abs((q.y || 0) - (e.y || 0)) < 1.5 && !(SpaceData.ON && SpaceSv.offLimits(e, q.x, q.z)); // (on their own floor; not in a ship's shelter unless they're of it)
     for (const c of map.cover as FlPt[]) {
       const d = Math.hypot(c.x - e.x, c.z - e.z);
-      if (d > 12 || !here(c)) continue;
+      if (d > 16 || !here(c)) continue;
       const dt = Math.hypot(c.x - st.p[0], c.z - st.p[2]);
       if (dt < 4 || dt > def.range * 0.9 || (ground && dt < now - 1)) continue; // (on the ground: none nearer the police than where they are)
       const score = d + Math.abs(dt - def.pref) * 0.4;
       if (score >= bs || !this.coverProtects(c as EnemyCover, st)) continue;
       let claimed = false;
-      for (const o of this.enemies.values()) if (o !== e && o.cover && Math.hypot(o.cover.x - c.x, o.cover.z - c.z) < 1.2) { claimed = true; break; }
+      for (const o of this.enemies.values()) if (o !== e && !o.down && o.hp > 0 && ((o.cover && Math.hypot(o.cover.x - c.x, o.cover.z - c.z) < 1.2) || Math.hypot(o.x - c.x, o.z - c.z) < 0.9)) { claimed = true; break; } // (someone's going there, or standing on it)
       if (claimed) continue;
-      if (!L.los(map, c.x, (c.y || 0) + 1.6 * def.scale, c.z, st.p[0], st.p[1] + 1.2, st.p[2])) continue; // can shoot when peeking
+      if (!this.shotClear(c.x, (c.y || 0) + 1.6 * def.scale, c.z, st.p[0], st.p[1] + 1.2, st.p[2])) continue; // can shoot when peeking (through glass too)
       best = c as EnemyCover; bs = score;
     }
     // Corners: stand hidden beside a wall edge, lean out sideways to shoot.
@@ -3273,13 +3398,13 @@ export const Server = {
       for (const o of this.enemies.values()) if (o !== e && o.cover && Math.hypot(o.cover.x - w.x, o.cover.z - w.z) < 1.2) { claimed = true; break; }
       if (claimed) continue;
       tried++;
-      if (L.los(map, w.x, ey, w.z, st.p[0], ty, st.p[2])) continue; // must be hidden when standing at the spot
+      if (this.shotClear(w.x, ey, w.z, st.p[0], ty, st.p[2])) continue; // must be hidden when standing at the spot (not behind glass: they'd be seen and shot through it)
       const nx = -(st.p[2] - w.z) / dt, nz = (st.p[0] - w.x) / dt;
       for (const side of [1, -1]) {
         const px = w.x + nx * side * 0.55, pz = w.z + nz * side * 0.55;
         if (L.tile(L.floorMap(map, w.fl || 0), Math.floor(px / L.TS), Math.floor(pz / L.TS)) !== 0) continue;
         if (!this.leanClear(w.x, w.z, px, pz, ey, w.y || 0)) continue; // (round the edge, not through a door jamb or a thin wall)
-        if (!L.los(map, px, ey, pz, st.p[0], ty, st.p[2])) continue;
+        if (!this.shotClear(px, ey, pz, st.p[0], ty, st.p[2])) continue;
         best = { x: w.x, y: w.y || 0, z: w.z, lean: side, px, pz, fl: w.fl || 0 }; bs = score;
         break;
       }
@@ -3288,8 +3413,15 @@ export const Server = {
   },
   coverValid(c: EnemyCover, st: PState, def: EnemyDef) {
     if (!c.lean) return this.coverProtects(c, st);
-    const L = Level, map = this.map!, ey = (c.y || 0) + 1.6 * def.scale, ty = st.p[1] + 1.4;
-    return !L.los(map, c.x, ey, c.z, st.p[0], ty, st.p[2]) && this.leanClear(c.x, c.z, c.px!, c.pz!, ey, c.y || 0) && L.los(map, c.px!, ey, c.pz!, st.p[0], ty, st.p[2]);
+    const ey = (c.y || 0) + 1.6 * def.scale, ty = st.p[1] + 1.4;
+    return !this.shotClear(c.x, ey, c.z, st.p[0], ty, st.p[2]) && this.leanClear(c.x, c.z, c.px!, c.pz!, ey, c.y || 0) && this.shotClear(c.px!, ey, c.pz!, st.p[0], ty, st.p[2]);
+  },
+  // Would a round get from a to b: nothing solid between, glass a round goes through (a window's, a display case's) no matter, bulletproof
+  // glass does (js/world.ts raycast). For cover: what hides someone, and where they can shoot from. (A body leaning out can't go through
+  // a pane: leanClear's still Level.los.)
+  shotClear(ax: number, ay: number, az: number, bx: number, by: number, bz: number) {
+    const dx = bx - ax, dy = by - ay, dz = bz - az, d = Math.hypot(dx, dy, dz); if (d < 0.01) return true;
+    return Level.raycast(this.map!, ax, ay, az, dx / d, dy / d, dz / d, d, { glass: true }).t >= d - 0.05;
   },
   // Can someone standing at (x, z) actually lean out to (px, pz)? Nothing solid between: a corner's edge, not a
   // door jamb, a door leaf or a thin wall to the next room (at chest and at eye height; and the way the head
@@ -3545,6 +3677,7 @@ export const Server = {
     if (blind || e.engTgt !== p.id || !(this.clock - (e.firedAt || -9) < 1.0)) { e.engAt = this.clock; e.engTgt = p.id; e.headDelay = 0.3 + Math.random() * 0.2; }
     const up = blind ? 0 : G_U.clamp((this.clock - e.engAt! - e.headDelay!) / 0.5, 0, 1); // 0 body .. 1 head
     e.firedAt = this.clock;
+    { const ct = e.team != null ? this.contacts.get(e.team) : null; if (ct && ct.sup === e.id && ct.firedAt == null) ct.firedAt = this.clock; } // (the suppressor's opened up: the rest move)
     const kickNow = e.kick || 0; // (still coming back from the last one: a snap shot)
     e.kick = kickNow + this.kickOf(e, WEAPONS[e.def.wpn] || { recoil: 1 });
     const def = e.def, s = def.scale, st = p.st, L = Level, map = this.map!;
@@ -3579,7 +3712,7 @@ export const Server = {
     // there: how much of you shows, what's in the way, what the round does.
     const wdef = WEAPONS[def.wpn] || WEAPONS.p9, am = ballFor(calOf(wdef)), v0 = roundSpeed(wdef, am) || 400;
     const norm = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
-    const sd = this.BODY_R / Math.sqrt(-2 * Math.log(1 - G_U.clamp(chance, 0.01, 0.97))), ex = norm() * sd, ey = norm() * sd;
+    const ks = this.aimSpread(d), sd = ks * this.BODY_R / Math.sqrt(-2 * Math.log(1 - G_U.clamp(chance, 0.01, 0.97))), ex = norm() * sd, ey = norm() * sd;
     const fv = new THREE.Vector3(...from), aim = new THREE.Vector3(tx + (-dz / d) * ex, ty + ey, tz + (dx / d) * ex).sub(fv), far = aim.length();
     aim.divideScalar(far); aim.y += GRAVITY * far / (2 * v0 * v0); // (held up for the drop: they've used this gun before)
     const wind = this.windNow(), wdrag = dragOf(wdef, am);
@@ -3598,7 +3731,66 @@ export const Server = {
     if (SvNet.myId) SvNet.sendTo(SvNet.myId, { t: 'eround', e: e.id, wp: def.wpn, am, sid, f: from, ds }); // (js/player.ts enemyRounds)
     const to = Sim.predictEnd(fv, aim.clone().multiplyScalar(v0), wdrag, GRAVITY, map, wind).toArray();
     SvNet.broadcast({ t: 'eshot', e: e.id, ty: e.type, w: def.wpn, f: from.map(r2), to: to.map(r2), tg: p.id, sid });
+    // At one of another side's (npcFoes), not an officer: nobody's screen flies that round into them (a suspect's round goes by
+    // suspects and civilians there), so it's settled here. Each pellet lands with the chance worked out above, if the way from the
+    // muzzle to their chest is clear; a hit is a share of a person's life: a rifle's or a submachine gun's round near half, a
+    // pistol's a third, a pellet a seventh.
+    const npc = (p as any).npc as Enemy | undefined;
+    if (npc) {
+      const c = (1 - Math.pow(1 - G_U.clamp(chance, 0.01, 0.97), 1 / (ks * ks))) * (pellets > 1 ? 0.6 : 1); let n = 0; /* (the same aim as a round flown: its spread ks of chance's) */ for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
+      const cy = (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), cdx = npc.x - from[0], cdy = cy - from[1], cdz = npc.z - from[2], cd = Math.hypot(cdx, cdy, cdz) || 1;
+      // (clear to their chest: glass a round goes through doesn't stop it (a display case's, a window's), bulletproof glass does)
+      if (n && L.raycast(map, from[0], from[1], from[2], cdx / cd, cdy / cd, cdz / cd, cd, { glass: true }).t >= cd - 0.05) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)), byn: e.wear ? this.titleOf(e) : e.def.name }, null);
+    }
+  },
+  // ---- Sides (a ship's people: js/spaceserver.ts, who each is dressed as, wear). Pirates fight everyone: a navy's people, a
+  // civilian ship's own armed hands, and the unarmed (her passengers and crew, unless tied: hostages are worth more alive). A navy's
+  // people and a civilian ship's fight pirates and nobody else of a ship's: never each other, never the unarmed. Everyone armed still
+  // fights the squad. Who's on no side (a building's suspects) is as ever.
+  facOf(e: Enemy): 'civ' | 'pirate' | 'navy' | 'civil' | null { return e.def.civ ? 'civ' : e.wear === 'pirate' ? 'pirate' : e.wear === 'navy' ? 'navy' : e.wear === 'civil' ? 'civil' : null; },
+  proxies: null as Map<string, any> | null, NOBODY: [] as LivePlayer[],
+  // The unarmed run from pirates (when they're aboard together: called with npcFoes). Three times a second: anyone unarmed, on their
+  // feet and not tied, with a pirate in sight within 12 m on their deck, runs: away from the pirates (pirFlow: the way to the
+  // nearest of them, gone the other way: flee), for a few seconds, then hides or cowers where they've got to as anyone running
+  // does; and again when one comes in sight again. Running, they've left wherever they were sheltering.
+  pirFlow: null as Int16Array | null, civT: 0,
+  civFlee(dt: number) {
+    this.civT -= dt; if (this.civT > 0) return; this.civT = 0.33;
+    const map = this.map!, L = Level, pir = [...this.enemies.values()].filter((e) => this.facOf(e) === 'pirate' && this.able(e));
+    this.pirFlow = pir.length ? L.flow(map, pir.map((e) => L.src(map, e.x, e.y || 0, e.z))) : null;
+    for (const e of this.enemies.values()) {
+      if (!e.def.civ || e.down || e.hp <= 0 || !(e.state === 'normal' || e.state === 'cower' || e.state === 'hide')) continue;
+      const near = pir.find((o) => Math.abs((o.y || 0) - (e.y || 0)) < 3 && Math.hypot(o.x - e.x, o.z - e.z) < 12 && L.see(map, e.x, (e.y || 0) + 1.5, e.z, o.x, (o.y || 0) + 1.4, o.z) > 0);
+      if (!near) { if (e.fromPir && !pir.some((o) => Math.hypot(o.x - e.x, o.z - e.z) < 25)) e.fromPir = false; continue; }
+      e.fromPir = true; e.shelter = null; e.hide = null; e.crouch = false; e.threat = { x: near.x, z: near.z }; e.state = 'flee'; e.fleeT = 4 + Math.random() * 3;
+    }
+  },
+  // Everyone aboard who could be a target for another side, each as an officer is to the one looking (where they are, how they
+  // stand: what think and fire read of a player's state), under an id of their own; null unless pirates and someone they'd fight
+  // are aboard together (so nothing changes anywhere else). Made afresh every tick.
+  npcFoes() {
+    let pir = false, oth = false;
+    for (const e of this.enemies.values()) { const f = this.facOf(e); if (f === 'pirate') pir = true; else if (f) oth = true; }
+    if (!pir || !oth) { this.proxies = null; return null; }
+    const m = new Map<string, any>();
+    for (const e of this.enemies.values()) {
+      if (!this.facOf(e) || e.down || e.hp <= 0 || e.state === 'cuffed' || e.state === 'surrender' || e.state === 'dead') continue;
+      const id = 'npc:' + e.id;
+      m.set(id, { id, name: '', npc: e, st: { p: [e.x, e.y || 0, e.z], yw: e.yaw, pt: 0, cr: e.crouch ? 1 : 0, pr: 0, ln: 0, sd: 0, se: 0, lr: 0, dd: 0, dn: 0, mv: 0, tl: 0, w: e.def.wpn || '', hp: e.hp, mhp: e.maxHp } });
+    }
+    return (this.proxies = m);
+  },
+  // who e has to pick a target from: the squad, and (armed, and of a side) those of the other side's within 45 m on its deck or the next
+  foesOf(e: Enemy, onFoot: LivePlayer[], prox: Map<string, any>): LivePlayer[] {
+    const f = this.facOf(e); if (!f || f === 'civ' || !e.armed) return e.ally ? this.NOBODY : onFoot;
+    const out = e.ally ? [] : onFoot.slice(); // (ally: armed and on the squad's side, a liner's security when she's being held: the squad's no target of theirs)
+    for (const q of prox.values()) { const o = q.npc as Enemy, g = this.facOf(o); if (o === e || !(f === 'pirate' ? g !== 'pirate' : g === 'pirate')) continue; if (Math.hypot(o.x - e.x, o.z - e.z) < 45 && Math.abs((o.y || 0) - (e.y || 0)) < 6) out.push(q); }
+    return out;
   },
   BODY_R: 0.24,
+  // their aim's spread, times what chance alone gives (fire): AIM_SPREAD up close (within AIM_NEAR metres), as it was (1) from AIM_FAR out,
+  // between the two as far as they are (a gunman's first shot at 5 m about 2.6 degrees off, at 20 m as ever)
+  AIM_SPREAD: 0.75, AIM_NEAR: 8, AIM_FAR: 20,
+  aimSpread(d: number) { return G_U.lerp(this.AIM_SPREAD, 1, G_U.clamp((d - this.AIM_NEAR) / (this.AIM_FAR - this.AIM_NEAR), 0, 1)); },
 };
 // (what it gets as it runs: the dead, until secured)

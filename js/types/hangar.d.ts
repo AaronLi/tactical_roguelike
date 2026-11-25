@@ -23,6 +23,7 @@
 // port). The solids (decorate) and what you can look at and press F on (the targets) stay here, as data.
 // one thing for sale or to use (see addTarget); the fields vary with its kind
 interface HangarTarget {
+  showK?: string; signK?: string; // (what its display and its sign were last drawn for: js/hangar.ts refresh draws again only what's changed)
   id: string; kind: HangarKind; box: number[]; what?: HangarWhat; key?: string | null; sold?: boolean; reach?: number; // (reach: further, a TV on the wall)
   label?: string; title?: string; tab?: string; who?: string; mine?: boolean; run?: () => void; runText?: string; // (a use target: 'pos')
   disp?: THREE.Group; sign?: THREE.Mesh<any, any>; spin?: THREE.Object3D | null; signTop?: number; slot?: THREE.Group; idx?: number; // (a thing on show)

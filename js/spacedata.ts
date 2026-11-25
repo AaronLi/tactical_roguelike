@@ -6,7 +6,7 @@ import { Level } from './level.js';
 import { World } from './world.js';
 // what a class carries on her hull, and who's aboard her: light guards posted singly, security squads (four, armed and armoured), breach
 // response squads (three, lighter: they come to where the hull is breached), and those who don't fight
-interface SpClass { name: string; tier: number; pay: number; diff: number; guns: { pd: number; cannon: number; missile: number }; crew: { guard: number; squads: number; resp: number; civ: number } }
+interface SpClass { name: string; tier: number; pay: number; diff: number; guns: { pd: number; mg: number; missile: number }; crew: { guard: number; squads: number; resp: number; civ: number } }
 /** The squad's ship as she's laid out (js/spacedata.ts layout): three levels. Her frame: x to starboard, y up from her keel, z aft (her nose to -z). */
 interface SpLayout {
   fw: number; tw: number; sw: number; hw: number; // half-widths: the cockpit, the breach tunnel, the staging space behind it, the crew deck
@@ -224,8 +224,11 @@ export const SpaceData = (() => {
     { name: 'Freighter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.3, floor: '#4a4e52', wall: '#868b8c', crate: '#b0702c', accent: '#e8922a', fog: 0x020306, light: 0xffe2c0, ceil: '#5a5f66', hemi: 0x8fa6c8, hemiI: 0.35, far: 30000 },
     { name: 'Corporate cutter', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.14, foes: 1.1, crowd: 0.8, home: 0, reflect: 0.4, floor: '#a9afb4', wall: '#dde2e4', crate: '#4f7896', accent: '#2fc6d6', fog: 0x020306, light: 0xeef4ff, ceil: '#cfd5d8', hemi: 0x9fb4d8, hemiI: 0.4, far: 30000 },
     { name: 'Navy warship', layout: 'ship', space: 1, noFog: true, winRate: 0, thru: 0.07, foes: 1.35, crowd: 0.4, home: 0, reflect: 0.3, floor: '#3a4149', wall: '#65717b', crate: '#566650', accent: '#d23a30', fog: 0x020306, light: 0xdfe8ff, ceil: '#4a525b', hemi: 0x8fa6c8, hemiI: 0.3, far: 30000 },
+    // (a cruise liner: a cruiser with a promenade court, js/shipgen.ts HALLS mall. Never drawn by lot: LOT below. liner: her surfaces are
+    // walnut slats and stone, charcoal carpet and dark ceilings with slots of light, js/levelview.ts _shipTex; warm and low lit)
+    { name: 'Luxury cruiser', layout: 'ship', space: 1, liner: 1, noFog: true, winRate: 0, thru: 0.1, foes: 1.0, crowd: 1.2, home: 0, reflect: 0.25, floor: '#2a2c30', wall: '#9a948a', crate: '#3a3d42', accent: '#b8935a', fog: 0x020306, light: 0xffdfb8, ceil: '#232427', hemi: 0xa8a098, hemiI: 0.16, far: 30000 },
   ];
-  const TH0 = 1000;
+  const TH0 = 1000, LOT = 3, LINER = TH0 + 3; // (LOT: the ships' themes a board's offers are drawn from, the first of them; LINER: a cruise liner's)
   const themeAt = (th: number | null | undefined): ThemeDef | null => (th == null ? null : th >= TH0 ? THEMES[th - TH0] || null : G_THEMES[th] || null);
   const themeIndex = (T: ThemeDef | null | undefined) => { if (!T) return -1; const i = G_THEMES.findIndex((q) => q.name === T.name); return i >= 0 ? i : THEMES.findIndex((q) => q.name === T.name) >= 0 ? TH0 + THEMES.findIndex((q) => q.name === T.name) : -1; };
 
@@ -234,6 +237,7 @@ export const SpaceData = (() => {
   // its own; the first of them comes within a few kilometres). Any of them can be closed with and boarded (js/spaceserver.ts
   // 'tboard'): each is a ship of her own class, theme and seed, so she's the same ship whenever she's looked at.
   // The zone's frame: the mission ship's own at the moment the squad came out of the jump, its middle the origin.
+  const MS_RUN = 200000, msSpeed = (seed: number) => 30 + G_U.rng((seed ^ 0x5eed) >>> 0)() * 40;
   function zone(ms: { seed: number; size: SpSize | null; th: number; wing?: boolean; name: string }): SpContact[] {
     const r = G_U.rng((ms.seed ^ 0x20e5) >>> 0), U = G_U, out: SpContact[] = [];
     const mk = (kind: string, size: SpSize, th: number, seed: number, wing: boolean, name: string, pts: number[][], speed: number, off: number) => {
@@ -241,21 +245,28 @@ export const SpaceData = (() => {
       out.push({ k: out.length, kind, size, th, seed, wing, name, pts, lens, total: lens.reduce((a, b) => a + b, 0), speed, off });
     };
     const wing = !!ms.wing, size = ms.size || 'small', d = wing ? [-0.7071, 0, -0.7071] : [-1, 0, 0], T0 = themeAt(ms.th);
+    const field = hasField(ms); // (whether her zone has a rock field: rocks)
+    // (she's under way at her own pace, 30 to 70 m/s by her seed (a stream of its own: the rest of the zone as it always was), fast
+    // enough to show against an asteroid field's drift through a Doppler notch from most ways; her course long enough for an hour)
     mk(wing ? 'wing' : size === 'transport' ? (T0 && T0.name === 'Corporate cutter' ? 'cutter' : 'freighter') : size === 'large' || size === 'capital' ? 'navy' : 'pirate', size, ms.th, ms.seed, wing, ms.name,
-      [[-d[0] * 60000, 0, -d[2] * 60000], [d[0] * 60000, 0, d[2] * 60000]], 12, 60000);
+      [[-d[0] * MS_RUN, 0, -d[2] * MS_RUN], [d[0] * MS_RUN, 0, d[2] * MS_RUN]], msSpeed(ms.seed), MS_RUN);
     const n = 4 + (r() < 0.5 ? 1 : 0), n0 = U.ri(r, 0, SHIP_NAMES.length - 1); // (no two of them of a name)
     for (let i = 1; i <= n; i++) {
       const kind = U.pick(r, ['freighter', 'freighter', 'cutter', 'pirate', 'navy', 'wing']), sz: SpSize = kind === 'freighter' || kind === 'cutter' ? 'transport' : kind === 'navy' ? 'large' : r() < 0.5 ? 'small' : 'medium';
       const th = kind === 'freighter' ? TH0 : kind === 'cutter' ? TH0 + 1 : kind === 'navy' ? TH0 + 2 : TH0 + U.ri(r, 0, 2);
       const m = 3 + Math.floor(r() * 3), rad = i === 1 ? 2200 + r() * 1200 : 5000 + r() * 20000, a0 = r() * 6.283, tilt = (r() - 0.5) * 0.3, pts: number[][] = [];
-      for (let k = 0; k < m; k++) { const an = a0 + k * 6.283 / m + (r() - 0.5) * 0.4, rr = rad * (0.85 + r() * 0.3); pts.push([Math.cos(an) * rr, Math.sin(an) * rr * tilt + (r() - 0.5) * 300, Math.sin(an) * rr]); }
+      // (where there's a field, her loop's level and clear of it, above or below: she goes along with the mission's ship, through
+      // where the field is, so it's kept out of her way by height (the rocks reach FIELD_Y and no further), not by where she flies)
+      const lane = field ? (r() < 0.5 ? -1 : 1) * (FIELD_Y + 300 + r() * 1500) : 0;
+      for (let k = 0; k < m; k++) { const an = a0 + k * 6.283 / m + (r() - 0.5) * 0.4, rr = rad * (0.85 + r() * 0.3); pts.push([Math.cos(an) * rr, field ? lane + (r() - 0.5) * 300 : Math.sin(an) * rr * tilt + (r() - 0.5) * 300, Math.sin(an) * rr]); }
       mk(kind, sz, th, (ms.seed ^ Math.imul(i, 0x9e3779b1)) >>> 0 & 0x7fffffff, kind === 'wing', (kind === 'navy' ? 'NSV ' : kind === 'freighter' ? 'MV ' : 'CSV ') + SHIP_NAMES[(n0 + i * 5) % SHIP_NAMES.length],
         pts, kind === 'freighter' ? 35 + r() * 25 : kind === 'navy' ? 50 + r() * 30 : 60 + r() * 50, r() * 1e5);
+      out[out.length - 1].follow = out[0]; // (her loop goes along with the mission's ship: the zone's ships keep her company, however far she's gone)
     }
     return out;
   }
   /** Where a contact is at the zone's time t, and the way she's heading (her head comes round over the last and first of each leg). */
-  function zonePos(c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number }, t: number): { p: number[]; d: number[] } {
+  function zonePos(c: { pts: number[][]; lens: number[]; total: number; speed: number; off: number; follow?: SpContact }, t: number): { p: number[]; d: number[] } {
     let s = (t * c.speed + c.off) % c.total, k = 0;
     while (s > c.lens[k]) { s -= c.lens[k]; k = (k + 1) % c.lens.length; }
     const n = c.pts.length, a = c.pts[k], b = c.pts[(k + 1) % n], u = s / c.lens[k], turn = Math.min(0.5, 1500 / c.lens[k]);
@@ -263,10 +274,15 @@ export const SpaceData = (() => {
     let d = dir(a, b), w = 0, o = d;
     if (u > 1 - turn) { o = dir(b, c.pts[(k + 2) % n]); w = (u - (1 - turn)) / turn * 0.5; } else if (u < turn) { o = dir(c.pts[(k + n - 1) % n], a); w = (1 - u / turn) * 0.5; }
     if (w > 0) { d = [d[0] + (o[0] - d[0]) * w, d[1] + (o[1] - d[1]) * w, d[2] + (o[2] - d[2]) * w]; const l = Math.hypot(d[0], d[1], d[2]) || 1; d = [d[0] / l, d[1] / l, d[2] / l]; }
-    return { p: [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u], d };
+    const p = [a[0] + (b[0] - a[0]) * u, a[1] + (b[1] - a[1]) * u, a[2] + (b[2] - a[2]) * u];
+    if (c.follow) { // (her loop carried along with whose she follows: where she is, and the way she's going is both together)
+      const f = zonePos(c.follow, t), sp = c.speed, fs = c.follow.speed; p[0] += f.p[0]; p[1] += f.p[1]; p[2] += f.p[2];
+      const vx = d[0] * sp + f.d[0] * fs, vy = d[1] * sp + f.d[1] * fs, vz = d[2] * sp + f.d[2] * fs, l = Math.hypot(vx, vy, vz) || 1; d = [vx / l, vy / l, vz / l];
+    }
+    return { p, d };
   }
   /** What a ship's people wear, by her class (js/rig.ts create): a liner's are civilians, the big warships a navy's, the rest pirates'. */
-  const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
+  const wearOf = (size: string | null | undefined, obj?: string | null): string | null => (!size ? null : obj === 'hostage' ? 'pirate' : obj === 'defend' ? 'civil' : size === 'transport' ? 'civil' : size === 'large' || size === 'capital' ? 'navy' : 'pirate');
   /** What her armed people are called aboard a ship, by whose she is (wearOf) and where they stand in her (js/server.ts titleOf): the
    *  officer the mission's after (hvt), her highest-ranked fighter (top, when that officer isn't aboard), a Leader (leader), anyone else
    *  leading a fireteam (tl), and the rest by what they are, the strongest of them (vet: the prefix) a step up. */
@@ -278,19 +294,23 @@ export const SpaceData = (() => {
   /** ...aboard the ship being boarded now (null anywhere else). */
   const wearNow = (g: { map?: { sp?: { size: string; obj?: string | null } | null } | null } | null | undefined): string | null => { const sp = g && g.map && g.map.sp; return sp ? wearOf(sp.size, sp.obj) : null; }; // (g: the game; the page's files ask with ReplayEnv.Game, the export worker's has no map)
   const SIZES: Record<SpSize, SpClass> = {
-    transport: { name: 'civilian transport', tier: 1, pay: 600, diff: -1, guns: { pd: 0, cannon: 0, missile: 0 }, crew: { guard: 3, squads: 0, resp: 0, civ: 6 } },
-    small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 1, cannon: 0, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
-    medium: { name: 'frigate', tier: 3, pay: 1700, diff: 1, guns: { pd: 2, cannon: 1, missile: 0 }, crew: { guard: 4, squads: 1, resp: 1, civ: 5 } },
-    large: { name: 'cruiser', tier: 4, pay: 2800, diff: 2, guns: { pd: 3, cannon: 2, missile: 1 }, crew: { guard: 5, squads: 2, resp: 2, civ: 7 } },
-    capital: { name: 'capital ship', tier: 5, pay: 4600, diff: 3, guns: { pd: 5, cannon: 3, missile: 2 }, crew: { guard: 6, squads: 4, resp: 3, civ: 10 } },
+    transport: { name: 'civilian transport', tier: 1, pay: 600, diff: -1, guns: { pd: 0, mg: 0, missile: 0 }, crew: { guard: 3, squads: 0, resp: 0, civ: 6 } },
+    small: { name: 'corvette', tier: 2, pay: 900, diff: 0, guns: { pd: 0, mg: 1, missile: 0 }, crew: { guard: 4, squads: 0, resp: 1, civ: 3 } },
+    medium: { name: 'frigate', tier: 3, pay: 1700, diff: 1, guns: { pd: 0, mg: 3, missile: 0 }, crew: { guard: 4, squads: 1, resp: 1, civ: 5 } },
+    large: { name: 'cruiser', tier: 4, pay: 2800, diff: 2, guns: { pd: 0, mg: 5, missile: 1 }, crew: { guard: 5, squads: 2, resp: 2, civ: 7 } },
+    capital: { name: 'capital ship', tier: 5, pay: 4600, diff: 3, guns: { pd: 0, mg: 8, missile: 2 }, crew: { guard: 6, squads: 4, resp: 3, civ: 10 } },
   };
   // the hull's weapons: what each does to the squad's ship (js/space.ts guns)
-  const HULLGUN = { pd: { range: 1300, cool: [0.8, 1.7], dmg: 2.2 }, cannon: { range: 4500, cool: [3.5, 5.5], dmg: 10 }, missile: { range: 6500, cool: [9, 14], dmg: 24, speed: 230, turn: 0.85, life: 34 } };
+  // (rounds: speed m/s, spread the gun's own inaccuracy, radians (one standard deviation each way square to the aim), a round's life in metres flown before it blows itself apart; the minigun's rps in bursts of
+  // burst seconds, pause seconds between)
+  // (HULLGUN: range, what a gun engages inside, m; life, how far its round flies before it destroys itself)
+  const HULLGUN = { pd: { range: 4000, cool: [0.8, 1.7], dmg: 2.2, speed: 1100, spread: 0.004, life: 5000 }, mg: { range: 4000, rps: 50, burst: [2.5, 4.0], pause: [1.2, 2.6], cool: [1.2, 2.6], dmg: 0.2, speed: 1000, spread: 0.0006, life: 5000 }, missile: { range: 6500, cool: [9, 14], dmg: 24, speed: 230, turn: 0.85, life: 34 } };
   const OBJ: Record<SpObj, { name: string; pay: number; line: string }> = {
     artifact: { name: 'Recover the artifact', pay: 500, line: 'Something old and valuable is locked aboard. Find it, carry it back to your ship and get clear.' },
     hvt: { name: 'High value target', pay: 400, line: 'One of the ship\'s officers is wanted. Dead pays; in restraints pays half as much again.' },
     destruct: { name: 'Scuttle her', pay: 700, line: 'Reach the bridge, start the self-destruct, and be off the ship (yours, or one of her escape pods) before it runs out.' },
     hostage: { name: 'Retake the ship', pay: 600, line: 'Pirates have boarded her (their pods are still in her hull) and hold her people tied in one compartment. Clear every pirate off her: dead, down or in restraints. Each hostage alive at the end pays.' },
+    defend: { name: 'Hold the cruiser', pay: 900, line: 'Pirates are closing on a luxury cruiser. Her passengers are shut in the shelter at the back of her upper deck, behind the mezzanine. They have been aboard once already: most of her security died throwing them off. She is expecting you: board her anywhere but her court (it is armoured), and nobody will take it for an attack. What is left of her security will be waiting in the court to fight beside you. For three minutes pirate pods will come through her hull, one after another. Every passenger unhurt at the end pays.' },
     visit: { name: 'Unlisted ship', pay: 0, line: 'Not the mission: a ship that happened to be passing. What is in her hold is worth carrying off. A breach is an attack: she will fight.' },
     assault: { name: 'Planetary assault', pay: 300, line: 'Land at the pad outside the base and bring it under control: every hostile down or in restraints.' },
   };
@@ -309,7 +329,7 @@ export const SpaceData = (() => {
       const assault = i === 2 || (i === 5 && r() < 0.5), taken = i === 4, size = assault ? null : taken ? 'transport' : i === 0 ? sizes[0] : U.pick(r, sizes);
       // (scuttling's a job against a navy or a pirate: never a civilian transport)
       const obj: SpObj = assault ? 'assault' : taken ? 'hostage' : i === 0 ? 'artifact' : U.pick(r, (size === 'transport' ? ['artifact', 'hvt'] : ['artifact', 'hvt', 'destruct']) as SpObj[]);
-      const rth = TH0 + U.ri(r, 0, THEMES.length - 1), th = assault ? U.pick(r, planets) : size === 'transport' ? TH0 + U.ri(r, 0, 1) : size === 'capital' ? TH0 + 2 : rth, T = themeAt(th)!;
+      const rth = TH0 + U.ri(r, 0, LOT - 1), th = assault ? U.pick(r, planets) : size === 'transport' ? TH0 + U.ri(r, 0, 1) : size === 'capital' ? TH0 + 2 : rth, T = themeAt(th)!;
       void (!assault && size !== 'capital' && r() < 0.4 ? level >= 4 && r() < 0.35 : 0); const other: SpSize | null = null; // (no second ship lying off her any more: its draws kept, so every board's the same otherwise)
       const wing = (size === 'small' || size === 'medium') && r() < 0.3; // (some corvettes and frigates are flying wings: two arms swept back from a glazed corner)
       const diff = Math.max(1, level + (size ? SIZES[size].diff : 1) + (r() < 0.3 ? 1 : 0) - (i === 0 ? 1 : 0));
@@ -317,19 +337,33 @@ export const SpaceData = (() => {
       // its anchor: a direction off the golden angle, a little above or below the plane, 7 to 13 km out
       const a = i * 2.39996 + r() * 0.5, el = (r() - 0.5) * 0.7, d = 7000 + r() * 6000;
       const name = assault ? U.pick(r, WORLDS) : (T.name === 'Navy warship' ? 'NSV ' : T.name === 'Freighter' ? 'MV ' : 'CSV ') + U.pick(r, SHIP_NAMES);
+      // (a cruiser with a promenade court is a cruise liner, a civilian ship in her own livery, LINER: below, once her seed's drawn)
       out.push({ i, kind: assault ? 'assault' : 'board', obj, size, th, seed: (r() * 2 ** 31) | 0, diff, pay, name, wing, where: assault ? T.name + ' on ' + name : T.name + ', ' + SIZES[size!].name + (wing ? ' (a flying wing)' : ''), brief: OBJ[obj].line, other, night: assault && !T.night && r() < 0.25,
         ly: Math.round((3 + r() * 40) * 10) / 10, anchor: [Math.cos(a) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(a) * Math.cos(el) * d] });
+      { const o = out[out.length - 1]; if (o.kind === 'board' && hallOf(o.seed, o.size) === 'mall') { // (and what's wanted of the squad aboard her goes by her seed, a third each: she's to be held; she's been taken; or the job she'd have been anyway, against her own security and her alarms, never a scuttling)
+        o.th = LINER; o.name = 'SS ' + o.name.replace(/^\S+ /, ''); o.where = 'Luxury cruiser'; { const way = (o.seed >>> 4) % 3; o.obj = way === 0 ? 'defend' : way === 1 ? 'hostage' : o.obj === 'destruct' ? 'hvt' : o.obj; } o.brief = OBJ[o.obj].line; o.pay = Math.round((SIZES.large.pay + OBJ[o.obj].pay + 160 * o.diff) / 50) * 50; } }
     }
     return out;
   }
   // How a ship answers being boarded, by her size (js/spaceserver.ts doctrine): a transport or a corvette's is informal (her people
   // shelter, under guard), a frigate's and up practiced (her teams sweep for the squad); and as the mission board says it
+  // Which hall two decks high a cruiser has, if any (js/shipgen.ts HALLS): from her seed alone, so every machine lays her out the
+  // same without being told. Eight cruisers in ten have one: a hangar bay, an arboretum, machinery halls or (a cruise liner) a promenade court, as likely as each other.
+  const HALL_KINDS: ShHallKind[] = ['bay', 'grove', 'works', 'mall'];
+  // (what the terminal says of a cruiser that has one, and the objective's panel aboard her)
+  const HALL_LINE: Record<ShHallKind, { brief: string; offer: string }> = {
+    bay: { brief: 'a hangar bay', offer: 'Two decks, with a hangar bay right across her, open through both: a gallery round it looks down on its floor.' },
+    grove: { brief: 'an arboretum', offer: 'Two decks, with an arboretum down her port side, open through both: a gallery round it looks down on its floor.' },
+    mall: { brief: 'a promenade court', offer: 'A luxury cruiser, unarmed. Two decks, with a promenade court right across her forward, open through both: shops, a fountain, a gallery round it looking down on its floor.' },
+    works: { brief: 'machinery halls', offer: 'Two decks, with machinery halls fore and aft, open through both: a gallery round each looks down on its floor.' },
+  };
+  const hallOf = (seed: number, size: SpSize | null | undefined): ShHallKind | null => { if (size !== 'large') return null; const q = (Math.imul(seed ^ 0x5ca1ab1e, 0x9e3779b1) >>> 0) % 10; return q < 8 ? HALL_KINDS[q >> 1] : null; };
   const drill = (size: SpSize | null | undefined, wing = false): 'informal' | 'practiced' => (!wing && (!size || size === 'transport' || size === 'small') ? 'informal' : 'practiced'); // (a flying wing: a warship's crew, even a corvette's, with her own security office: js/shipgen.ts wingDeck)
   const DRILL_LINE = {
     informal: 'Her breach response is informal: her people shelter in her safest compartment, under guard, and nobody comes looking for you.',
     practiced: 'Her breach response is practiced: her teams sweep the ship for you, on her security cameras while someone is at them.',
   };
-  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' ? DRILL_LINE[drill(m.size, !!m.wing)] : ''); // (a pirate-held ship answers nobody)
+  const drillLine = (m: SpMission) => (m.kind === 'board' && m.obj !== 'hostage' && m.obj !== 'defend' ? DRILL_LINE[drill(m.size, !!m.wing)] : ''); // (a pirate-held ship answers nobody)
   // A distance, written: metres under a kilometre, then kilometres, megametres, light-seconds; a jump's in light-years.
   function dist(m: number): string {
     m = Math.abs(m);
@@ -341,5 +375,62 @@ export const SpaceData = (() => {
   }
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
-  return { BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, hatchButton, HATCH_Z, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos };
+  // Holding a liner (obj defend, js/spaceserver.ts defendTick): how long the squad has to get to her court, how long she's then to be held, how many pods in that time, the first of them after how long
+  const DEFEND = { lead: 20, secs: 180, pods: 5, first: 2, per: 5 }; // (lead: from the squad coming aboard to the first pod, to get to her court in; then secs, the first pod first seconds into it; per: boarders out of a pod, before the level's and the squad's size add to it)
+  // A luxury cruiser (a cruiser with a promenade court): what she's called, and no guns on her hull. guns, className: any ship's, by her
+  // class and whether she's one. STAFF: the family names of her security, for those who fight beside the squad (js/spaceserver.ts).
+  // ---- The system's star: what the level's out here is lit by. Each mission's system has its own, at some stage of its life
+  // (by the mission's seed: the same on every screen and every time it's come to); the base's is an ordinary one. Its look:
+  // col the disc's colour, size its angular radius (radians), glow how far its corona reaches (in its radii), neb a cloud round
+  // it (a protostar's dust; a planetary nebula round a white dwarf: ring); its light: light the sunlight's colour, I its
+  // strength (the directional light's), dir the way to it in the zone's frame.
+  type StarStage = 'protostar' | 'main' | 'redgiant' | 'bluegiant' | 'whitedwarf' | 'reddwarf';
+  interface StarDef { stage: StarStage; name: string; col: number; light: number; I: number; size: number; glow: number; neb: number | null; ring: boolean; dir: number[] }
+  const STARS: Record<StarStage, Omit<StarDef, 'stage' | 'dir'> & { w: number }> = {
+    protostar: { w: 1, name: 'Protostar', col: 0xffa860, light: 0xffb47c, I: 2.8, size: 1.3 * Math.PI / 180, glow: 5, neb: 0x8a4a2c, ring: false },
+    main: { w: 4, name: 'Main-sequence star', col: 0xfff2dc, light: 0xfff1dc, I: 4.4, size: 0.9 * Math.PI / 180, glow: 4, neb: null, ring: false },
+    redgiant: { w: 2, name: 'Red giant', col: 0xff7a3c, light: 0xffa070, I: 3.8, size: 9 * Math.PI / 180, glow: 1.6, neb: null, ring: false },
+    bluegiant: { w: 1, name: 'Blue supergiant', col: 0xcfe0ff, light: 0xc6d6ff, I: 5.8, size: 2.4 * Math.PI / 180, glow: 4.5, neb: null, ring: false },
+    whitedwarf: { w: 1, name: 'White dwarf', col: 0xeef4ff, light: 0xdde9ff, I: 2.6, size: 0.14 * Math.PI / 180, glow: 26, neb: 0x40c0b0, ring: true },
+    reddwarf: { w: 2, name: 'Red dwarf', col: 0xff6634, light: 0xff9468, I: 2.3, size: 0.7 * Math.PI / 180, glow: 4, neb: null, ring: false },
+  };
+  function star(seed: number | null): StarDef {
+    if (seed == null) return { stage: 'main', ...STARS.main, dir: [0.5 / 1.0, 0.62, 0.6].map((x) => x / Math.hypot(0.5, 0.62, 0.6)) }; // (the base's: as it always was)
+    const r = G_U.rng((seed ^ 0x57a2) >>> 0), keys = Object.keys(STARS) as StarStage[], tot = keys.reduce((a, k) => a + STARS[k].w, 0);
+    let x = r() * tot, stage: StarStage = 'main'; for (const k of keys) { x -= STARS[k].w; if (x < 0) { stage = k; break; } }
+    const az = r() * Math.PI * 2, el = (12 + r() * 48) * Math.PI / 180; // (somewhere between low on her horizon and high over her)
+    return { stage, ...STARS[stage], dir: [Math.cos(el) * Math.sin(az), Math.sin(el), Math.cos(el) * Math.cos(az)] };
+  }
+  // ---- A mission's asteroids: a field the zone lies in (by the mission's seed), the rocks scattered along the mission ship's
+  // course and either side of it, thicker near it, none in her way or any of the others' (their courses kept clear by ROCK_CLEAR
+  // past a rock's own size) nor round where the squad comes out of the jump (the zone's middle). Each: p its place in the zone's
+  // frame, r its size (m, its mean radius), s its own seed (its shape and turn). Near half are some tens of metres, most of the rest a hundred or two, one in seven some hundreds.
+  const ROCK_CLEAR = 450;
+  // how high or low a rock of a field can be, its own size and its clearance in: (rocks: up to 3 km off her course's plane, 800 m
+  // through); and whether a zone has a field at all (rocks' own first roll: some zones are open space)
+  const FIELD_Y = 3000 + 800 + ROCK_CLEAR;
+  const hasField = (ms: { seed: number }) => !(G_U.rng((ms.seed ^ 0x7a57e) >>> 0)() < 0.15);
+  interface Rock { p: number[]; r: number; s: number }
+  function rocks(ms: { seed: number; size: SpSize | null; th: number; wing?: boolean; name: string }): Rock[] {
+    const r = G_U.rng((ms.seed ^ 0x7a57e) >>> 0), cs = zone(ms), out: Rock[] = [];
+    if (r() < 0.15) return out; // (some zones are open space)
+    const d0 = cs[0].pts, dx = d0[1][0] - d0[0][0], dz = d0[1][2] - d0[0][2], dl = Math.hypot(dx, dz), ux = dx / dl, uz = dz / dl; // (her course's way)
+    const segs: number[][][] = []; for (const c of cs) for (let i = 0; i < c.pts.length; i++) segs.push([c.pts[i], c.pts[(i + 1) % c.pts.length]]);
+    const segD = (p: number[], a: number[], b: number[]) => { const vx = b[0] - a[0], vy = b[1] - a[1], vz = b[2] - a[2], L2 = vx * vx + vy * vy + vz * vz, k = L2 > 0 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy + (p[2] - a[2]) * vz) / L2)) : 0; return Math.hypot(p[0] - a[0] - vx * k, p[1] - a[1] - vy * k, p[2] - a[2] - vz * k); };
+    // (as far along her course as she goes in some forty minutes, as thick all the way as it was over sixty kilometres)
+    const L = 15000 + cs[0].speed * 2400, dense = 0.6 + r() * 0.8, n = Math.round(140 * dense * (L + 15000) / 60000); // (fewer than once, but bigger: as much cover all told, a third more)
+    for (let i = 0, tries = 0; i < n && tries < n * 6; tries++) {
+      const along = -15000 + r() * (L + 15000), side = (r() < 0.5 ? -1 : 1) * (Math.pow(r(), 1.6) * 9000), up = (r() - 0.5) * 2 * (400 + Math.pow(r(), 2) * 2600);
+      const p = [ux * along - uz * side, up, uz * along + ux * side], q = r(), rad = q < 0.45 ? 30 + r() * 70 : q < 0.85 ? 100 + r() * 200 : 300 + r() * 500;
+      if (Math.hypot(p[0], p[1], p[2]) < 3200 + rad) continue;
+      if (segs.some(([a, b]) => segD(p, a, b) < ROCK_CLEAR + rad)) continue;
+      if (out.some((o) => Math.hypot(o.p[0] - p[0], o.p[1] - p[1], o.p[2] - p[2]) < (o.r + rad) * 1.15)) continue;
+      out.push({ p, r: rad, s: (r() * 0x7fffffff) | 0 }); i++;
+    }
+    return out;
+  }
+  const NOGUNS = { pd: 0, mg: 0, missile: 0 };
+  const gunsOf = (size: SpSize, liner?: boolean) => (liner ? NOGUNS : SIZES[size].guns), className = (size: SpSize, liner?: boolean) => (liner ? 'luxury cruiser' : SIZES[size].name);
+  const STAFF = ['Okafor', 'Reyes', 'Lindqvist', 'Tanaka', 'Moreau', 'Abara', 'Castellanos', 'Novak', 'Haddad', 'Ferreira', 'Kowalczyk', 'Iyer', 'Marchetti', 'Osei', 'Brandt', 'Yilmaz'];
+  return { gunsOf, className, STAFF, DEFEND, LINER, hallOf, HALL_KINDS, HALL_LINE, BREACH_ANG, BREACH_PITCH, solidOf, frameWorld, ON, FLOOR, HEAD, SHIPS, EQUIP, fleet0, cleanFleet, fitted, layout, seats, boxes, flights, hatchButton, HATCH_Z, berthAt, worldBoxes, toWorld, toShip, aboard, HUB_BERTH, THEMES, TH0, themeAt, themeIndex, SIZES, HULLGUN, OBJ, OFFERS, PICKS, offers, drill, drillLine, dist, speed, eta, wearOf, TITLES, wearNow, zone, zonePos, star, rocks, ROCK_CLEAR };
 })();

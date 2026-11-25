@@ -65,7 +65,9 @@ export const Scars = (() => {
     at(CELL.dent, dent(true)); at(CELL.dentStop, dent(false));
     at(CELL.gouge, (rnd: Rnd) => {
       g.save(); g.scale(1.3, 0.34); blob(92, rnd, 0.1); g.fillStyle = radial(92, [[0, '#f0f4f8'], [0.55, '#b8c2cc'], [0.86, 'rgba(120,128,136,0.8)'], [1, 'rgba(60,62,66,0)']]); g.fill(); g.restore();
-      g.strokeStyle = 'rgba(30,32,36,0.5)'; g.lineWidth = 2; for (let i = 0; i < 7; i++) { const y = -18 + i * 6 + rnd() * 3; g.beginPath(); g.moveTo(-90 + rnd() * 40, y); g.lineTo(90 - rnd() * 40, y); g.stroke(); }
+      // (one groove down it: shadowed along its top edge, catching the light along its bottom one; a few faint scratches in it)
+      g.save(); g.scale(1.2, 0.16); blob(88, rnd, 0.06); const gr = g.createLinearGradient(0, -88, 0, 88); gr.addColorStop(0, 'rgba(40,44,50,0.75)'); gr.addColorStop(0.45, 'rgba(96,104,112,0.6)'); gr.addColorStop(1, 'rgba(236,242,248,0.7)'); g.fillStyle = gr; g.fill(); g.restore();
+      g.strokeStyle = 'rgba(40,42,46,0.16)'; g.lineWidth = 1; for (let i = 0; i < 4; i++) { const y = -8 + i * 5 + rnd() * 2; g.beginPath(); g.moveTo(-70 + rnd() * 30, y); g.lineTo(70 - rnd() * 30, y); g.stroke(); }
     });
     const crater = (r: number, base: string, deep: string, nCr: number, rCr: number, crack: string) => (rnd: Rnd) => {
       cracks(nCr, r * 0.7, rCr, crack, 3, rnd);
@@ -94,12 +96,55 @@ export const Scars = (() => {
     at(CELL.plastic, (rnd: Rnd) => { g.fillStyle = radial(84, [[0, 'rgba(250,250,250,0.85)'], [0.6, 'rgba(236,236,236,0.5)'], [1, 'rgba(230,230,230,0)']]); g.fillRect(-100, -100, 200, 200); cracks(7, 14, 84, 'rgba(20,20,22,0.8)', 3, rnd); hole(18, rnd, 0.42); });
     at(CELL.soil, (rnd: Rnd) => { blob(100, rnd, 0.24); g.fillStyle = radial(100, [[0, '#2c2014'], [0.55, '#54412c'], [1, 'rgba(92,72,50,0)']]); g.fill(); for (let i = 0; i < 40; i++) { const a = rnd() * 7, q = 40 + rnd() * 80; g.fillStyle = 'rgba(60,44,28,0.75)'; g.fillRect(Math.cos(a) * q, Math.sin(a) * q, 3 + rnd() * 6, 3 + rnd() * 6); } });
     const tex = new T.CanvasTexture(cv); tex.anisotropy = 4;
-    return tex;
+    return { tex, nrm: relief(g, W, Hh) };
   }
-  let matD: THREE.Texture | null = null; const geos = new Map(), mats = new Map();
+  // The sheet's relief: its normals (and its roughness, in alpha), from the picture itself. Where it's dark it's deep (a hole, a
+  // crater's floor, a crack, the dimple's shadowed side), where it's bright it's proud (a dent's rim, the lip round a crater);
+  // where it's clear, level with the surface. Each cell on its own (nothing across a cell's edge). Rows bottom up: a canvas's
+  // texture is turned over, a DataTexture isn't.
+  const BUMP = 0.1 * (typeof location !== 'undefined' ? +(new URLSearchParams(location.search).get('scarbump') || 1) : 1);
+  const RGH: Record<number, number> = { [CELL.dent]: 0.35, [CELL.dentStop]: 0.35, [CELL.gouge]: 0.3, [CELL.star]: 0.12, [CELL.plastic]: 0.4, [CELL.tile]: 0.5 }; // (else 0.85: bare metal, glass and glaze shine)
+  function relief(g: CanvasRenderingContext2D, W: number, H: number) {
+    const d = g.getImageData(0, 0, W, H).data, h0 = new Float32Array(W * H), h = new Float32Array(W * H);
+    for (let i = 0, j = 0; i < W * H; i++, j += 4) { const a = d[j + 3] / 255, l = 0.3 * d[j] + 0.59 * d[j + 1] + 0.11 * d[j + 2]; h0[i] = 128 + (l - 128) * a; }
+    { // (a skid's gouge: one trough, deepest down its middle, from its outline (what's painted in it is only its colour); softened more)
+      const x0 = (CELL.gouge % CELLS) * PX, y0 = Math.floor(CELL.gouge / CELLS) * PX, R = 6, a0 = new Float32Array(PX * PX);
+      for (let v = 0; v < PX; v++) for (let u = 0; u < PX; u++) a0[v * PX + u] = d[((y0 + v) * W + x0 + u) * 4 + 3] / 255;
+      for (let v = 0; v < PX; v++) for (let u = 0; u < PX; u++) {
+        let s = 0, n = 0; for (let q = Math.max(0, v - R); q <= Math.min(PX - 1, v + R); q++) { s += a0[q * PX + u]; n++; }
+        h0[(y0 + v) * W + x0 + u] = 128 - 110 * Math.pow(s / n, 1.5);
+      }
+    }
+    const cx = (x: number) => Math.floor(x / PX) * PX, cy = (y: number) => Math.floor(y / PX) * PX;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { // (softened: a 3x3 box, in the cell)
+      const x0 = cx(x), y0 = cy(y); let s = 0, n = 0;
+      for (let v = Math.max(y0, y - 1); v <= Math.min(y0 + PX - 1, y + 1); v++) for (let u = Math.max(x0, x - 1); u <= Math.min(x0 + PX - 1, x + 1); u++) { s += h0[v * W + u]; n++; }
+      h[y * W + x] = s / n;
+    }
+    const o = new Uint8Array(W * H * 4);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const x0 = cx(x), y0 = cy(y), at = (u: number, v: number) => h[Math.min(y0 + PX - 1, Math.max(y0, v)) * W + Math.min(x0 + PX - 1, Math.max(x0, u))];
+      const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) / 8;
+      const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) / 8;
+      let nx = -dx * BUMP, ny = dy * BUMP, nz = 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+      const cell = (y0 / PX) * CELLS + x0 / PX, r = RGH[cell] != null ? RGH[cell] : 0.85;
+      const k = ((H - 1 - y) * W + x) << 2; o[k] = Math.round((nx * 0.5 + 0.5) * 255); o[k + 1] = Math.round((ny * 0.5 + 0.5) * 255); o[k + 2] = Math.round((nz * 0.5 + 0.5) * 255); o[k + 3] = Math.round(r * 255);
+    }
+    const x = new T.DataTexture(o, W, H, T.RGBAFormat, T.UnsignedByteType);
+    x.colorSpace = T.NoColorSpace; x.anisotropy = 4; x.magFilter = T.LinearFilter; x.minFilter = T.LinearMipmapLinearFilter; x.generateMipmaps = true; x.needsUpdate = true;
+    return x;
+  }
+  let matD: { tex: THREE.Texture; nrm: THREE.DataTexture } | null = null; const geos = new Map(), mats = new Map();
+  // a mark's material: the sheet, its relief, lit as the level is (the grid's light turned by the relief too: LG_NDIFF, js/lightgrid.ts;
+  // its roughness the relief's alpha: LG_RGH_NA)
   const decalMat = (tint?: number) => {
     const k = tint || 0xffffff;
-    if (!mats.has(k)) { matD = matD || sheet(); mats.set(k, new T.MeshLambertMaterial({ map: matD, color: k, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 })); }
+    if (!mats.has(k)) {
+      matD = matD || sheet();
+      const m = new T.MeshStandardMaterial({ map: matD.tex, normalMap: matD.nrm, color: k, roughness: 1, metalness: 0, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+      m.defines = { LG_RGH_NA: 1, LG_NDIFF: '2.5' };
+      mats.set(k, m);
+    }
     return mats.get(k);
   };
   function cellGeo(i: number) {

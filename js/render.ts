@@ -10,6 +10,9 @@ import { GunModels } from './gunmodels.js';
 import { Highlights } from './highlights.js';
 import { LightGrid } from './lightgrid.js';
 import { GpuAo } from './gpuao.js';
+import { Probes } from './probes.js';
+import { EntShadows } from './entshadows.js';
+import { ProxyDraw } from './proxydraw.js';
 import { ReplayEnv } from './replayenv.js';
 import { Rig } from './rig.js';
 import { TONE } from './tone.js';
@@ -51,6 +54,7 @@ export const R = {
   vmPts: [] as THREE.PointLight[], vmSpots: [] as THREE.SpotLight[], // (the dynamic lights' stand-ins for it: eyeLight)
   vmDark: false, // (no light of its own: the level's light at the eye is all it gets, eyeLight)
   levelRoot: undefined as unknown as THREE.Group,
+  levelView: null as THREE.Object3D | null, // (what LevelView.build made of the level: its static pieces batched, batchLevel)
   dynRoot: undefined as unknown as THREE.Group,
   flashTex: undefined as unknown as THREE.CanvasTexture,
   tracers: undefined as unknown as THREE.Mesh<THREE.BoxGeometry, THREE.MeshBasicMaterial>[],
@@ -146,6 +150,8 @@ export const R = {
     r.shadowMap.enabled = true; // (only the weapon lights cast any: this.spots)
     document.body.prepend(r.domElement);
     this.scene = new THREE.Scene();
+    this.scene.onBeforeRender = () => { ProxyDraw.sync(this.scene); Probes.before(); EntShadows.before(); }; // (what's only for the level's scene: the room's reflection, the people's shadows)
+    this.scene.onAfterRender = () => { Probes.after(); EntShadows.after(); };
     this.scene.background = new THREE.Color(0x0b0d10);
     this.scene.fog = new THREE.Fog(0x0b0d10, 8, 60);
     this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.03, 280);
@@ -168,7 +174,7 @@ export const R = {
 
     // the viewmodel is drawn in its own pass after clearing depth, so guns never clip into walls
     r.autoClear = false;
-    this.vmScene = new THREE.Scene();
+    this.vmScene = new THREE.Scene(); this.vmScene.userData.prof = 'gun in hand';
     this.vmHolder = new THREE.Group();
     this.vmHolder.matrixAutoUpdate = false;
     this.vmScene.add(this.vmHolder);
@@ -186,9 +192,26 @@ export const R = {
     this.vmPts = [0, 1, 2].map(() => { const l = new THREE.PointLight(0xffffff, 0, 1, 2); this.vmScene.add(l); return l; });
     this.vmSpots = [0, 1].map(() => { const s = new THREE.SpotLight(0xffffff, 0, 1, 0.3, 0.6, 1.6); s.target = new THREE.Object3D(); this.vmScene.add(s, s.target); return s; });
 
-    this.levelRoot = new THREE.Group();
+    this.levelRoot = new THREE.Group(); this.levelRoot.userData.prof = 'level: other'; // (the profiler's draw counts: js/profiler.ts)
     this.scene.add(this.levelRoot);
-    this.dynRoot = new THREE.Group();
+    this.dynRoot = new THREE.Group(); this.dynRoot.userData.prof = 'people & effects';
+    // Not showing, not brought up to date: three works out every object's world matrix every frame, shown or not, and some 3,000 of
+    // the scene's aren't (the pools of marks, tracers and flares waiting to be used; whoever's hidden under dynRoot). One that works out
+    // its own matrix (matrixAutoUpdate) is skipped while it's hidden: the frame it's shown it's worked out again from where it is and
+    // where its parent is then, before it's drawn. (Only the pools, marked userData.pool, and what's under dynRoot: nothing that's read
+    // while hidden.) three's own updateMatrixWorld (r186) otherwise, as it is.
+    const skipHidden = (g: THREE.Object3D, which: (c: THREE.Object3D) => boolean) => {
+      g.updateMatrixWorld = function (this: THREE.Object3D, force?: boolean) {
+        if (this.matrixAutoUpdate) this.updateMatrix();
+        if (this.matrixWorldNeedsUpdate || force) {
+          if (this.matrixWorldAutoUpdate === true) { if (this.parent === null) this.matrixWorld.copy(this.matrix); else this.matrixWorld.multiplyMatrices(this.parent.matrixWorld, this.matrix); }
+          this.matrixWorldNeedsUpdate = false; force = true;
+        }
+        const ch = this.children;
+        for (let i = 0, l = ch.length; i < l; i++) { const c = ch[i]; if (!c.visible && c.matrixAutoUpdate && which(c)) continue; c.updateMatrixWorld(force); }
+      };
+    };
+    skipHidden(this.scene, (c) => !!c.userData.pool); skipHidden(this.dynRoot, () => true);
     this.scene.add(this.dynRoot);
 
     this._initFx();
@@ -272,12 +295,14 @@ export const R = {
   },
   setLevel(map: LvMap) {
     this.clearLevel();
-    this.levelRoot.add(LevelView.build(map));
+    this.levelView = LevelView.build(map); this.levelView.userData.prof = 'level interior'; this.levelRoot.add(this.levelView);
     this.levelRoot.add(Wind.level(map)); // (calm till the host says, and the flags: js/wind.ts)
     // what stops a weapon light: the level, bar what you can see through (glass, a grating)
     const solid = (mt: THREE.Material) => !mt.transparent && !mt.alphaTest;
     this.levelRoot.traverse((o: any) => { if (o.isMesh) o.castShadow = Array.isArray(o.material) ? o.material.every(solid) : solid(o.material); });
-    { const gpu = GpuAo.bake(this.renderer, this.scene, this.levelRoot, map); if (gpu) { LightGrid.useGpuAo(gpu.a, gpu.b); (map as any).gpuAoMs = gpu.ms; } } // (the occlusion from the meshes on the GPU: ?gpuao=1, js/gpuao.ts)
+    Probes.level(map, this.scene, this.renderer); // (reflections: js/probes.ts)
+    { const gpu = GpuAo.bake(this.renderer, this.scene, this.levelRoot, map); if (gpu) { LightGrid.useGpuAo(gpu.ab); (map as any).gpuAoMs = gpu.ms; } } // (the occlusion from the meshes on the GPU: ?gpuao=1, js/gpuao.ts)
+    if (!map.sp && !map.theme.hub) this.batchLevel(map); // (a ship's: once she's all put together, js/space.ts enter)
     const th = map.theme;
     (this.scene.fog as THREE.Fog).color.setHex(th.fog);
     const fog = this.scene.fog as THREE.Fog; fog.near = th.noFog ? 1e4 : th.fogNear || 8; fog.far = th.noFog ? 2e4 : th.fogFar || 60; // (no fog: pushed out of reach, so the shaders stay the same)
@@ -374,6 +399,10 @@ export const R = {
     for (const c of out) this.levelRoot.remove(c);
     return out;
   },
+  // What's left of the level's static pieces after LevelView's merge (alone in their block with their material, and the merged
+  // blocks themselves) drawn as BatchedMeshes, a call a material (js/levelview.ts batchStatic): not what moves or changes (keepOf).
+  // Once nothing else is going to cut or reshape its meshes (js/space.ts does, putting a ship together): they're out of the scene after.
+  batchLevel(map: LvMap) { if (new URLSearchParams(location.search).has('nolvbatch')) return; /* (?nolvbatch: as merged, for comparing) */ if (this.levelView && this.levelView.parent === this.levelRoot) { const keep = LevelView.keepOf(map); LevelView.batchStatic(this.levelView, keep); ProxyDraw.doors(map, this.levelRoot, keep); ProxyDraw.follow(this.levelRoot.children.filter((c) => c !== this.levelView && !c.userData.prof), this.levelRoot, false, true); } }, // (and what of it moves, the doors, the case, the boxes, a call a kind of material: js/proxydraw.ts)
   clearLevel() {
     for (const tr of this.trails || []) this.trailDrop(tr);
     this.trails = []; this.lastShot = null;
@@ -390,10 +419,11 @@ export const R = {
         // (its textures freed, not the material: disposing one has three drop its shader once nothing else uses it, and the next
         // level, drawn with the same lights and materials of the same kinds, would build the same shader again. Kept, every
         // shader's built once a session: lightPad)
-        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); }); // (keepMat: shared, js/scars.ts's)
+        if (c.material && !c.userData.keepMat) (Array.isArray(c.material) ? c.material : [c.material]).forEach((m: THREE.Material & { map?: THREE.Texture | null; normalMap?: THREE.Texture | null; roughnessMap?: THREE.Texture | null }) => { if (m.map) m.map.dispose(); if (m.normalMap) m.normalMap.dispose(); if (m.roughnessMap) m.roughnessMap.dispose(); }); // (keepMat: shared, js/scars.ts's)
       });
     };
     GpuAo.dispose();
+    Probes.clear(); ProxyDraw.clear();
     while (this.levelRoot.children.length) { const c = this.levelRoot.children[0]; dispose(c); this.levelRoot.remove(c); }
     this.decals.forEach((d: THREE.Object3D) => (d.visible = false));
     this.fragMarks.count = 0; this.fragN = 0; this.scorches.forEach((m) => (m.visible = false)); this.craters.forEach((m) => (m.visible = false));
@@ -602,6 +632,7 @@ export const R = {
     this.bloodIdx = 0;
     this.pools = [];
     for (let i = 0; i < 24; i++) { const m = new THREE.Mesh(bgeo, this.bloodMats.pool); m.visible = false; m.rotation.x = -Math.PI / 2; m.userData = {}; this.scene.add(m); this.pools.push(m); }
+    ProxyDraw.marks(this.bloodMarks, this.scene, [this.bloodMats.drop, this.bloodMats.spatter, this.bloodMats.pool]); ProxyDraw.marks(this.pools, this.scene, [this.bloodMats.pool]); // (each pool a call a material: js/proxydraw.ts)
     this.poolIdx = 0;
     this.pBlood = new Uint8Array(this.PN);
     // a wound's stream: fine drops, many of them, in a pool of their own (a few bleeding bodies would otherwise use up the shared
@@ -626,6 +657,8 @@ export const R = {
       m.visible = false; m.userData.life = 0;
       this.scene.add(m); this.blasts.push(m);
     }
+    // (the pools: marked, so the scene's matrices aren't brought up to date for the ones not showing: skipHidden, below)
+    for (const a of [this.tracers, this.streaks, this.flares, this.decals, this.scorches || [], this.craters || [], this.bloodMarks, this.pools, this.blasts]) for (const o of a as THREE.Object3D[]) o.userData.pool = true;
     // a thermobaric's fireball and smoke (fireball), one of each drawn always, too small to see: their shaders are built with the
     // level's, not on the frame the first one goes off (a hitch, on some machines a long one, just when it's least wanted)
     for (const add of [true, false]) {
@@ -972,9 +1005,12 @@ export const R = {
       const leaf = pivot.userData && pivot.userData.leaf;
       if (!leaf || pivot.getWorldPosition(_tv).distanceTo(p) > 2.6) continue; // (its world position: a door upstairs sits in its floor's group)
       leaf.updateMatrixWorld(true);
-      const l = leaf.worldToLocal(p.clone()), g = leaf.geometry.parameters;
+      // (the leaf's own extent: its bounding box, whatever its shape (a box made here, or the level's own geometry: js/levelview.ts))
+      const geo = leaf.geometry as THREE.BufferGeometry | undefined; if (!geo) continue;
+      if (!geo.boundingBox) geo.computeBoundingBox();
+      const bb = geo.boundingBox!, l = leaf.worldToLocal(p.clone()), cz = (bb.min.z + bb.max.z) / 2, hz = (bb.max.z - bb.min.z) / 2;
       // (a door's solid is thicker than its leaf: on the leaf's own face, not in the air in front of it)
-      if (Math.abs(l.x) <= g.width / 2 + 0.03 && Math.abs(l.y) <= g.height / 2 + 0.03 && Math.abs(l.z) <= 0.09) { leaf.attach(m); m.position.z = Math.sign(l.z || 1) * (g.depth / 2 + 0.004); return; }
+      if (l.x >= bb.min.x - 0.03 && l.x <= bb.max.x + 0.03 && l.y >= bb.min.y - 0.03 && l.y <= bb.max.y + 0.03 && Math.abs(l.z - cz) <= Math.max(0.09, hz + 0.03)) { leaf.attach(m); m.position.z = cz + Math.sign(l.z - cz || 1) * (hz + 0.004); return; }
     }
   },
   // ------------------------------------------------------------ frag grenade marks
@@ -1435,12 +1471,17 @@ export const R = {
   heatFx: null as null | { scene: THREE.Scene; spots: THREE.Mesh[] },
   // (heat < 0: the room's own temperature, as the cold things are: a little warmer facing up (the warm air under the ceiling,
   // the floor's own), a slow mottle over it, so a thermal picture has walls and floors to it)
-  // (one program for all of them, instanced or not: the heat and a fixed distance are uniforms, dq < 0 the real distance)
+  // (one program for all of them, instanced, batched or skinned: the heat and a fixed distance are uniforms, dq < 0 the real distance)
   _heatMat(heat: number, d: number | null, opts: THREE.ShaderMaterialParameters = {}) {
     return new THREE.ShaderMaterial(Object.assign({ toneMapped: false, fog: false,
       uniforms: { heat: { value: heat }, dq: { value: d == null ? -1 : d === Infinity ? 0 : 1 / (1 + d) } },
       vertexShader: `#include <batching_pars_vertex>
-        varying float vD; varying vec3 vW; varying float vN; void main() { vec4 p = vec4(position, 1.0); vec3 n = normal;
+        #include <skinning_pars_vertex>
+        varying float vD; varying vec3 vW; varying float vN; void main() { vec3 transformed = position, objectNormal = normal;
+        #include <skinbase_vertex>
+        #include <skinnormal_vertex>
+        #include <skinning_vertex>
+        vec4 p = vec4(transformed, 1.0); vec3 n = objectNormal; // (a skinned body as it's posed, not standing in its bind pose: js/rig.ts)
         #include <batching_vertex>
         #ifdef USE_BATCHING
         p = batchingMatrix * p; n = mat3(batchingMatrix) * n;
@@ -2019,6 +2060,8 @@ export const R = {
       this._nvTargets(sz.x, sz.y);
       this.nvRT!.texture.generateMipmaps = false; // (made once, after the last of the frame's drawn into it)
     } else { this.nvFrame = 0; this.nvHeatAt = -1; }
+    EntShadows.frame(this.scene, this.camera.position); // (the people's shadows: js/entshadows.ts)
+    if (ReplayEnv.Game && ReplayEnv.Game.phase === 'level') Probes.frame(r, this.scene, this.camera.position, this.levelRoot); // (the room's reflection: its picture taken a face a frame, js/probes.ts)
     for (const f of this.feeds) f(r);
     // the scope picture: only rendered while you're bringing the gun up or looking through it
     const pip = this.vm && this.vm.visible && this.vm.userData.pip, live = this.pipLive || 0;
@@ -2039,7 +2082,7 @@ export const R = {
     }
     // a full-screen menu up (the Tab screen, the shop): the frame drawn at half the render resolution and blurred here, behind it,
     // rather than by the page (a backdrop-filter is done at the screen's own resolution, every frame)
-    const blur = !nv && !fish && (!!this._forceBlur || (ReplayEnv.Game && (ReplayEnv.Game.invOpen || ReplayEnv.Game.shopOpen))) && dbs.x >= 16 && dbs.y >= 16;
+    const blur = !nv && !fish && (!!this._forceBlur || this.focusBlur || (ReplayEnv.Game && (ReplayEnv.Game.invOpen || ReplayEnv.Game.shopOpen))) && dbs.x >= 16 && dbs.y >= 16;
     if (blur) r.setRenderTarget(this._blurTargets(Math.max(1, dbs.x >> 1), Math.max(1, dbs.y >> 1))[0]);
     if (nv) r.setRenderTarget(this.nvRT!);
     r.clear();
@@ -2074,6 +2117,9 @@ export const R = {
     r.render(this.vmScene, this.camera);
     if (nv) { LU.lgNv.value.w = 0; this._nvComposite(); }
     if (blur) this._blurPasses();
+    // (focused on something (focusBlur: the sensor station's hologram, js/space.ts sensorStep): what's on layer 6 drawn sharp over the
+    // blurred frame, against nothing but itself)
+    if (blur && this.focusBlur) { const sc = this.scene, bg = sc.background, cam = this.camera; sc.background = null; r.setRenderTarget(null); r.clearDepth(); cam.layers.set(6); r.render(sc, cam); cam.layers.set(0); sc.background = bg; }
     LightGrid.on(false);
     r.info.autoReset = true;
     this._shaderGuard();
@@ -2082,7 +2128,7 @@ export const R = {
   // lightPad), and three builds what's missing in the frame that first draws it, a stop of tens to hundreds of ms a shader on
   // Windows. So, in a level with nothing being warmed and no veil up: each new one logged with what it was built for (its kind,
   // the start of three's key for it, the scene's light counts then) and counted (shadersInPlay: js/profiler.ts context).
-  shadersInPlay: 0, shaderLog: [] as string[], _forceBlur: null as boolean | null, // (the warm-up's one frame through the blur: warmStep)
+  shadersInPlay: 0, shaderLog: [] as string[], focusBlur: false, focusAmt: 1, _forceBlur: null as boolean | null, // (the warm-up's one frame through the blur: warmStep)
   _sg: { n: 0, map: null as unknown },
   _shaderGuard() {
     const ps = (this.renderer.info.programs || []) as any[], Gm = ReplayEnv.Game, S = this._sg;
@@ -2139,8 +2185,9 @@ export const R = {
   },
   _blurPasses() {
     const r = this.renderer, B = this._blur!, u = B.mat.uniforms;
-    u.map.value = B.a.texture; u.dir.value.set(1 / B.a.width, 0); u.fin.value = 0; r.setRenderTarget(B.b); r.render(B.scene, B.cam);
-    u.map.value = B.b.texture; u.dir.value.set(0, 1 / B.b.height); u.fin.value = 1; r.setRenderTarget(null); r.render(B.scene, B.cam);
+    const k = this.focusBlur ? Math.max(0.05, this.focusAmt) : 1; // (focusing: the blur coming in by degrees, focusAmt 0 to 1)
+    u.map.value = B.a.texture; u.dir.value.set(k / B.a.width, 0); u.fin.value = 0; r.setRenderTarget(B.b); r.render(B.scene, B.cam);
+    u.map.value = B.b.texture; u.dir.value.set(0, k / B.b.height); u.fin.value = 1; r.setRenderTarget(null); r.render(B.scene, B.cam);
   },
 };
 AudioEnv.R = R; // (what sound asks of it: js/audioenv.ts)

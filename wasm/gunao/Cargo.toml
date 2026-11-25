@@ -1,0 +1,17 @@
+[package]
+name = "gunao"
+version = "0.1.0"
+edition = "2021"
+description = "A gun's (and the ship's) per-vertex ambient occlusion: the grid, the rays and the adaptive refinement of js/gunao.ts, for js/gunaowasm.ts. No dependencies."
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
+panic = "abort"
+codegen-units = 1

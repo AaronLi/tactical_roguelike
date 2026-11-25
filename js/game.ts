@@ -58,6 +58,8 @@ import { Hooks, U } from './util.js';
 import { Views } from './views.js';
 import { World } from './world.js';
 import { Wind } from './wind.js';
+import { SpaceNet } from './spacenet.js';
+import { SnapDelta } from './snapdelta.js';
 // (js/profiler.ts wraps Game.loop and the Me methods when js/main.ts calls Prof.install(), after every file has run; this file imports it only for line/save/reset)
 // Glue: menus, lobby, phase transitions, message dispatch, pointer lock, main loop.
 // a DOM event whose target is known to be an element of type T (the handlers below are bound on a container, and read what was clicked)
@@ -104,6 +106,7 @@ export const Game = {
   locked: false,
   escHeld: false, escAt: -1e9, lockAt: -1e9, lockOnEscUp: false, pauseAt: -1e9, // (Esc down now, when it last went down, when the mouse was last captured, a capture waiting for Esc to come up: lock; when the pause menu last came up)
   softLocked: false, // (playing on a controller or a touch screen, with no pointer lock to be had: counts as locked; js/gamepad.ts, js/touch.ts)
+  holoCursor: false, // (focused on the sensor station's hologram: the mouse let go to point at it, still counted as locked: js/space.ts holoFocus)
   runStarted: false,
   // the rest of what it keeps, made as it goes (init and the methods below): all here, so its whole shape is in one place. Those marked (init)
   // are always set before anything reads them.
@@ -186,6 +189,19 @@ export const Game = {
     // game (the host's own too) hears the host's word in onMsg
     Net.onServer = (m, from) => ServerLink.fromPeer(m, from);
     Net.onClient = (m) => this.onMsg(m);
+    // the ground snapshot on the fast channel (stream 6: js/server.ts sendSnap): what's changed since one this page has, put back on it (each
+    // level's last 64 kept) and handed on as if it had come whole; one older than the last handed on, or against one this page hasn't got,
+    // let go (the next is against one it has). Which it has, told the host ten times a second at most ('sack')
+    { const SD = { ring: new Map<string, Map<number, any>>(), last: new Map<string, number>(), ackAt: 0 };
+      Net.onFast((buf, ch) => { if (ch !== 6) return; SpaceNet.zunpack(buf).then((o: any) => {
+        const L = String(o.L); let ring = SD.ring.get(L); if (!ring) SD.ring.set(L, (ring = new Map()));
+        if (o.s <= (SD.last.get(L) ?? -1)) return;
+        let full: any; if (o.b < 0) full = o.f; else { const base = ring.get(o.b); if (!base) return; full = SnapDelta.apply(base, o.d); }
+        ring.set(o.s, full); for (const k of ring.keys()) if (k <= o.s - 64) ring.delete(k);
+        SD.last.set(L, o.s);
+        const now = performance.now(); if (now - SD.ackAt > 100) { SD.ackAt = now; Net.toHost({ t: 'sack', L: o.L, s: o.s }); }
+        const m = structuredClone(full); m.L = o.L; this.onMsg(m); // (a copy: what's kept as a base isn't touched)
+      }).catch((e: any) => console.warn('net: a ground snapshot read wrong', e)); }); }
     Net.onPeerJoin = (id) => ServerLink.join(id);
     Net.onPeerLeave = (id) => ServerLink.leave(id);
     // lost the host (they refreshed, or dropped): back to the menu, trying the same code again for a minute, so
@@ -539,7 +555,7 @@ export const Game = {
     this.$('btnNewRun').onclick = () => { if (Net.isHost) Net.toHost({ t: 'toLobby' }); };
     this.$('btnMenu').onclick = () => this.toMenu();
     this.$('clickToPlay').onclick = () => this.lock();
-    G_R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked)) this.lock(); });
+    G_R.renderer.domElement.addEventListener('click', () => { if (this.phase === 'level' && (!this.locked || this.softLocked) && !this.holoCursor) this.lock(); });
 
     document.addEventListener('pointerlockchange', () => this.lockChanged());
     // Esc, held and let go: a menu shut with it takes the mouse back once it's up (lock), not while the browser's still treating the
@@ -563,6 +579,7 @@ export const Game = {
         if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat) { if (this.shopOpen) this.closeShop(); else if (G_Me.seat == null) this.openShop('kit', 'your stash and loadout'); } return; }
       }
       if (e.code === 'Tab' && this.aboxOpen) { e.preventDefault(); if (!this.chatOpen && !e.repeat) this.aboxHide(); return; } // (the attachment box open: Tab shuts it, like Esc, not the inventory under it)
+      if (e.code === 'Tab' && this.holoCursor) { e.preventDefault(); return; } // (at the sensor station's hologram: its own screen, no inventory over it)
       if (e.code === 'Tab') { e.preventDefault(); if (!this.chatOpen && !e.repeat && !(G_Me.out && !this.invOpen)) this.toggleInv(!this.invOpen); return; } // (out cold: nothing to do but wait)
       if (e.code === 'Escape' && this.invOpen) { this.toggleInv(false); return; }
       if (e.code === 'Escape' && this.aboxOpen) { this.aboxHide(); return; }
@@ -851,6 +868,7 @@ export const Game = {
 
   // ------------------------------------------------------------- messages
   onMsg(m: any) { // (m: straight off the wire, so as dynamic as the host's word: its kind is checked, below)
+    if (m && m.L != null && m.L !== Space.levelK()) return; // (another level's: someone else's, aboard another of the zone's ships, docs/zone-levels.md)
     switch (m.t as GmMsgKind) {
       case 'welcome':
         Stickers.joined(m.skins); // (the stickers on the squad's guns: js/stickers.ts)
@@ -864,7 +882,7 @@ export const Game = {
         else if (m.phase === 'level') {
           this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp);
           this.levelWas(m);
-          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
+          if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm, wr]: [number, string, number, number, number, number, number, string | 0, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null, wr || null));
           this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null;
           this.cabs = m.cabs || []; Views.syncCabs();
           Loot.clear(); for (const a of m.loot || []) Loot.add(...(a as [any, any, any, any, any, any, any]));
@@ -892,11 +910,11 @@ export const Game = {
         this.tGrid = null; this.arms = {}; this.armSel = null;
         G_Me.newRun();
             break;
-      case 'veil': if (m.k === 'ftl' && Space.jumping()) break; Space.veilKind(m.k); this.veil(true); break; // (a jump with you aboard: the pod and the tunnel, no veil: js/space.ts) // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
+      case 'veil': if (m.k === 'ftl') Space.joinJump(typeof m.to === 'number' ? m.to : -1); if (m.k === 'ftl' && Space.jumping()) break; Space.veilKind(m.k); this.veil(true); break; // (a jump with you aboard: the pod and the tunnel, no veil: js/space.ts) // (k 'ftl': a jump's light, not the black panel: js/spaceui.ts)
       case 'phase':
         if (m.route) this.setRoute(m.route); else if (m.phase === 'route') this.routeSt = undefined; // (none: the game in space's sidearm picker)
         if (m.phase === 'route') (this.enterRoute as (level: number, route?: unknown) => void)(m.level, m.route);
-        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm]: [number, string, number, number, number, number, number, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null));
+        else if (m.phase === 'level') { this.aboxHide(); this.enterLevel(m.level, m.seed, m.th, !!m.night, m.wc, m.sp); this.setCase(m.wcase); this.abox = m.abox || null; this.sbox = m.sbox || null; this.cabs = m.cabs || []; Views.syncCabs(); if (m.bodies) m.bodies.forEach(([id, type, x, z, yaw, sec, y, nm, wr]: [number, string, number, number, number, number, number, string | 0, string | 0]) => Views.addBody(id, type, x, z, yaw, sec, y, nm || null, wr || null));
           if (m.doors) { this.levelWas(m); if (m.loot) { Loot.clear(); for (const a of m.loot) Loot.add(...(a as [any, any, any, any, any, any, any])); } this.glassWas(m); } } // (a ship come back to, as she was left: js/spaceserver.ts restore)
         else if (m.phase === 'shop') this.enterShop(m.level, m.shopSeed, m.report, m.stock, m.sp);
         else if (m.phase === 'gameover') this.enterGameover(m);
@@ -1164,7 +1182,7 @@ export const Game = {
   // the feed and, for whoever did it, the credits and their tally: a kill, or a suspect incapacitated
   credit(m: any, kind: 'kill' | 'incap' = 'kill') {
     const Me = G_Me, def = (ENEMIES as Record<string, any>)[m.ty];
-    const killer = this.nameOf(m.by);
+    const killer = m.by ? this.nameOf(m.by) : m.bn || '???'; // (bn: one of a ship's people shot by another side's, js/server.ts fire: who)
     const kc = m.by === Net.myId ? '#ffd24a' : this.roster[m.by] ? U.hex(this.roster[m.by].color) : '#fff';
     HUD.feed(`<b style="color:${kc}">${U.esc(killer)}</b> ${m.h ? '<span class="hs">⌖</span>' : '✕'} ${m.nm || (def ? def.name : 'hostile')}`);
     if (m.why) {
@@ -1938,7 +1956,7 @@ export const Game = {
       Views.update(dt);
       Wind.update(dt); // (the flags)
       if (!this.hub) Landing.update(dt); // (after everyone's posed: in the air it moves the camera, and hides who's riding with you)
-      Space.update(dt); // (the squad's ship: flown, and what's outside her moved: js/space.ts)
+      Space.update(dt, raw / 1000); // (the squad's ship: flown, and what's outside her moved, stepped to the time that's really passed: js/space.ts)
       if (G_Me.dead) G_Me.spectate(dt); // (after the rigs are posed: the helmet camera's on a head as it is this frame)
       GunAudio.updateListener(G_R.camera); // (after that: dead, you hear from where the camera is, not where you fell)
       G_Me.flushHits();

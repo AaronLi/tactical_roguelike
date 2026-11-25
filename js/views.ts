@@ -1,5 +1,6 @@
 'use strict';
 import { ReplayEnv } from './replayenv.js';
+import { Prof } from './profiler.js';
 import { Audio } from './audio.js';
 import { Ballistics } from './ballistics.js';
 import { Bolts } from './bolts.js';
@@ -47,6 +48,13 @@ interface VwAct { kind: VwActKind; t: number; hand: 'L' | 'R'; pt?: THREE.Vector
 type VwNadeKind = 'frag' | 'flash' | 'tb' | 'sticky'; // (sticky: holds to what it hits first: stickStep)
 interface VwAboxView extends VwLid { key: string | null; lights: THREE.Group }
 interface VwSboxView extends VwLid { name: string | null; card: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial> }
+// (whether a body at p is in the camera's view: the view's frustum worked out once a frame)
+const _pf = { f: new THREE.Frustum(), m: new THREE.Matrix4(), at: -1, s: new THREE.Sphere(new THREE.Vector3(), 1.4) };
+function inView(p: { x: number; y: number; z: number }) {
+  const cam = R.camera, fr = R.renderer ? R.renderer.info.render.frame : 0;
+  if (_pf.at !== fr) { _pf.at = fr; cam.updateMatrixWorld(); _pf.f.setFromProjectionMatrix(_pf.m.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse)); }
+  _pf.s.center.set(p.x, p.y + 0.9, p.z); return _pf.f.intersectsSphere(_pf.s);
+}
 export const Views = {
   players: new Map<string, VwPlayer>(),
   enemies: new Map<number, VwEnemy>(),
@@ -188,8 +196,8 @@ export const Views = {
         if (this.slowFill && performance.now() - fillT > 4) continue;
         // the type, with this suspect's kit (weapon | vest | helmet | face | tac | what's mounted) laid over it
         const def = Object.create((ENEMIES as Record<string, any>)[type]);
-        if (kit) { const [wpn, vest, helmet, face, tac, ex, , shield] = kit.split('|'); def.wpn = wpn; def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; def.shield = shield || null; }
-        const rig = G_Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true });
+        if (kit) { const [wpn, vest, helmet, face, tac, ex, , shield, wear, ally] = kit.split('|'); def.wpn = wpn; if (wear) def.wear = wear; if (ally) def.ally = true; /* (on the squad's side: a held liner's security) */ /* (their own side's clothes: a pirate boarding a liner isn't in her security's) */ def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; def.shield = shield || null; }
+        const rig = G_Rig.create(Object.assign({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true }, def.wear ? { wear: def.wear } : null));
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.ts powerStep)
         if (!def.civ) rig.setKit(G_Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face, def.ex)); // their armour, as an officer's would look
         if (def.wpn && armed) { rig.setGun(def.wpn); rig.holster(armed === 1); this.tacOnGun(rig, def.tac); }
@@ -388,13 +396,14 @@ export const Views = {
     if (Game.caseOpen) cv.open = 1; // joined with it already open
   },
   // a body that died before we joined: lay it out where it fell
-  addBody(id: number, type: string, x: number, z: number, yaw: number, secured: number, y = 0, nm: string | null = null) {
+  addBody(id: number, type: string, x: number, z: number, yaw: number, secured: number, y = 0, nm: string | null = null, wear: string | null = null) {
     if (this.enemies.has(id)) return;
     const def0 = (ENEMIES as Record<string, any>)[type];
     if (!def0) return;
     const def = Object.create(def0); // (their own: what they were called aboard her, nm, js/server.ts titleOf)
     if (nm) def.name = nm;
-    const rig = G_Rig.create({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true });
+    if (wear) def.wear = wear;
+    const rig = G_Rig.create(Object.assign({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true }, wear ? { wear } : null)); // (dressed as their side was: a pirate's body aboard a liner isn't in her security's clothes)
     if (!def.civ) rig.setKit(G_Rig.armourKit(def.vest, def.helmet, def.style === 'armored'));
     R.dynRoot.add(rig.root);
     const ev = { id, type, def, rig, pos: new THREE.Vector3(x, y, z), tgt: new THREE.Vector3(x, y, z), yaw, tgtYaw: yaw, hp: 0, alive: false, deadT: 0, lean: 0 } as VwEnemy;
@@ -860,8 +869,11 @@ export const Views = {
       }
       // aim pitch toward whoever they're engaging
       let pitch = 0;
-      const aimed = ev.aim === Net.myId ? Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
-      const tgt = aimed || (ev.alert ? this.nearestPlayer(ev.pos) : null);
+      // (whoever the host has them on: one of the squad, or someone of the other side aboard, 'npc:<id>' (js/server.ts foesOf: pirates and a liner's
+      // security at each other). Not on anyone, an alert one looks to the nearest of the squad, as if expecting them: not the squad's own allies)
+      const aimNpc = typeof ev.aim === 'string' && ev.aim.startsWith('npc:') ? this.enemies.get(+ev.aim.slice(4)) : null;
+      const aimed = ev.aim === Net.myId ? Me.pos : aimNpc ? aimNpc.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
+      const tgt = aimed || (ev.alert && !ev.def.ally ? this.nearestPlayer(ev.pos) : null);
       if (tgt) pitch = Math.atan2(tgt.y + 1.2 - (ev.pos.y + 1.4 * ev.def.scale), Math.max(1, Math.hypot(tgt.x - ev.pos.x, tgt.z - ev.pos.z))); // (from their own height: upstairs, level)
       ev.recPitch = pitch; // (for the highlights: js/highlights.ts)
       let pose: VwPose | null = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 ? 'cower' : null;
@@ -907,25 +919,41 @@ export const Views = {
       // (the body's physics only near you: farther off they're animated, which no one can tell apart; but one you've
       // hit in the last 8 s is yours to watch wherever it is, so a long shot's hits rock it and it falls from where they
       // left it: the recording of its fall, js/highlights.ts, is yours)
-      const near = ev.pos.distanceToSquared(R.camera.position) < 40 * 40 || (ev.engagedT && performance.now() - ev.engagedT < 8000);
+      // Hidden whole (js/space.ts hideStrays: she's flying, and they're aboard what she's left): not looked for, no body's physics, posed
+      // once, with the time since (at most a tenth of a second of it: their bodies are stepped as for a few frames deferred), the frame they're shown again or anything asks where they are (js/rig.ts catchUp)
+      const parked = !ev.rig.root.visible;
+      const near = !parked && (ev.pos.distanceToSquared(R.camera.position) < 40 * 40 || (ev.engagedT && performance.now() - ev.engagedT < 8000));
       if (ev.down && ev.alive) ev.rig.goLimp(); // (down for good: a limp body, bleeding out)
       // (what they're aiming at: a weakened or downed suspect points the gun at it from the hand, js/rig.ts)
       const aimAt = tgt && ev.armed === 2 && ev.alert && !ev.surp && !ev.reloading && !pose && !ev.down ? new THREE.Vector3(tgt.x, tgt.y + 1.2, tgt.z) : null;
       const rlP = ev.reloadAt && ev.reloading ? (performance.now() - ev.reloadAt) / ev.reloadDur : -1; // (how far into a magazine change)
       ev.aimP = aimed ? aimAt : null; // (who they're on: where their light and laser go)
-      ev.rig.update(dt, { feet: ev.alive && !ev.down ? (ev.feet ||= Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, shieldUp: !!ev.alert && ev.alive && !ev.down && !ev.surp, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
-        reload: rlP >= 0 && rlP < 1 ? rlP : -1 });
-      // past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
+      // (whether they can be seen this frame, before they're posed: past the fog or behind a wall they aren't drawn, below)
+      // Past the fog (it's the background's colour out there: nothing to see) they aren't drawn, each one's forty-odd
       // pieces a draw call. The body, not the root: the root's what a shot checks for (js/player.ts), and it still hits.
       // Nor behind a wall, floor or ceiling (furniture, doors, glass, rails and stairs don't count: you might see them
       // round, over or through it).
       const fog = R.scene.fog, cam = R.camera;
-      if (fog) {
-        const e = cam.matrixWorld.elements, depth = -((at.x - e[12]) * e[8] + (at.y - e[13]) * e[9] + (at.z - e[14]) * e[10]); // (along the view, as the fog's reckoned)
-        // (through a magnified scope the fog's stretched in its picture, js/render.ts scopeReach: they're drawn out to there)
-        const pip = R.vm && R.vm.visible && R.vm.userData.pip, sk = pip && (R.pipLive || 0) > 0.35 ? R.scopeReach(pip.mag).k : 1;
-        ev.rig.body.visible = depth < (fog as THREE.Fog).far * sk + 2.5 && this.inSight(ev.rig, at);
+      if (!parked) { // (behind a wall: aboard a liner too, which has no fog (noFog): before, nobody was hidden there behind anything, her shelter's crowd drawn through her decks)
+        let far = true;
+        if (fog) {
+          const e = cam.matrixWorld.elements, depth = -((at.x - e[12]) * e[8] + (at.y - e[13]) * e[9] + (at.z - e[14]) * e[10]); // (along the view, as the fog's reckoned)
+          // (through a magnified scope the fog's stretched in its picture, js/render.ts scopeReach: they're drawn out to there)
+          const pip = R.vm && R.vm.visible && R.vm.userData.pip, sk = pip && (R.pipLive || 0) > 0.35 ? R.scopeReach(pip.mag).k : 1;
+          far = depth < (fog as THREE.Fog).far * sk + 2.5;
+        }
+        ev.rig.body.visible = far && this.inSight(ev.rig, at);
       }
+      // Someone who can't be seen (not drawn, or out of the view) is posed every fourth frame, with the time since: their body caught up
+      // the moment it's seen again, or anything asks where it is (a shot, a hit test: js/rig.ts catchUp). Not one shot at lately (their
+      // fall's being watched: near, above).
+      const rt0 = Prof.t();
+      const rp = { feet: ev.alive && !ev.down ? (ev.feet ||= Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, shieldUp: !!ev.alert && ev.alive && !ev.down && !ev.surp, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
+        reload: rlP >= 0 && rlP < 1 ? rlP : -1 };
+      const unseen = (!parked && !ev.rig.body.visible) || !inView(at), watched = !!(ev.engagedT && performance.now() - ev.engagedT < 8000);
+      if (parked) { ev.rig.defer(dt, rp); if (ev.rig.pend!.dt > 0.1) ev.rig.pend!.dt = 0.1; }
+      else if (unseen && !watched && ((ev.rigSkip = (ev.rigSkip || 0) + 1) & 3)) ev.rig.defer(dt, rp); else { ev.rigSkip = 0; ev.rig.update(dt, rp); }
+      if (rt0) { const ms = performance.now() - rt0; Prof.add('rigs: people', ms); if (!inView(ev.pos)) Prof.add('rigs: people off screen', ms); } // (js/profiler.ts)
       // bleeding: drips falling from them as they go; down for good, from the body where it lies (its ragdoll's hips,
       // not where they last stood)
       if (ev.alive && ev.bleed && !(ev.wnd && ev.wnd.length) && (ev.dripT = (ev.dripT || 0) - dt) <= 0) {
@@ -965,8 +993,10 @@ export const Views = {
       pv.lastRa = st.ra == null ? -1 : st.ra;
       const kneel = (st.act === 'z' && (st.ap || 0) > 0.3) || st.act === 'b';
       const hold = st.hk ? { kind: st.hk === 2 ? 'flash' : st.hk === 3 ? 'tb' : st.hk === 4 ? 'sticky' : 'frag', cock: !!st.hc, str: st.hs == null ? 2 : st.hs } : null; // (a grenade in their hand)
+      const rt1 = Prof.t();
       pv.rig.update(dt, { feet: st.dn || st.dd ? undefined : { sole: 'boot', kit: 'heavy', careful: !!st.sd, low: !!st.lr }, pos: pv.pos, yaw: pv.yaw, pitch: pv.pitch, crouch: (!!st.cr || kneel) && !st.dn, prone: !!st.pr, bipod: !!st.bp, climb: st.cl ? Level.ladderAt(Game.map, pv.pos.x, pv.pos.z) : null, zip: !!st.zp, aim: !!st.ad, alert: !st.lr && !st.sw, atak: !!st.mn, lean: st.ln || 0, state: st.dn ? 'down' : 'alive', act,
         hold, rack: st.ra == null ? -1 : st.ra, reload: st.rl == null ? -1 : st.rl, loaded: st.ld == null ? null : !!st.ld, nomag: !!st.nm, inspect: st.in == null ? -1 : st.in, magChk: st.mc == null ? -1 : st.mc });
+      if (rt1) { const ms = performance.now() - rt1; Prof.add('rigs: players', ms); if (!inView(pv.pos)) Prof.add('rigs: players off screen', ms); }
       if (pv.tag) pv.tag.position.y = st.dn ? 0.8 : st.cr ? 1.7 : 2.15;
     }
 
@@ -1018,7 +1048,7 @@ export const Views = {
     // and suspects': the light's on with the gun out, the laser once they're alert; the nearest get what's left of the pool
     const tac: [number, VwEnemy, number][] = [];
     if (Game.phase === 'level') for (const ev of this.enemies.values()) {
-      if (!ev.tac || !ev.alive || ev.down || ev.scode || !ev.rig.gun || ev.rig.slung) continue;
+      if (!ev.tac || !ev.alive || ev.down || ev.scode || !ev.rig.gun || ev.rig.slung || !ev.rig.root.visible) continue;
       const d = ev.pos.distanceToSquared(R.camera.position), f = ev.tac & (ev.alert ? 15 : 9);
       if (f && d < 2500) tac.push([d, ev, f]);
     }

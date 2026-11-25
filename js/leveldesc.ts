@@ -87,8 +87,8 @@ export const LevelDesc = (() => {
       chasm: map.chasm || 0, minY: map.minY || 0, ...(map.glassRoofs ? { glassRoofs: map.glassRoofs } : {}), // (glass roofs: [x0, z0, x1, z1, top] m; under one, no wind: Sim.windy)
       rooms: (map.rooms || []).map((r) => ({ fl: r.fl || 0, type: r.type, x: r.x, z: r.z, w: r.w, h: r.h, cx: r.cx, cz: r.cz, out: !!r.out, unit: r.unit != null ? r.unit : null })),
       doors: map.doors.map((d) => ({ id: d.id, fl: d.fl || 0, fy: d.fy || 0, cells: d.cells || [d.i], x: d.x, z: d.z, axis: d.axis, w: d.w || TS, mirror: !!d.mirror, kind: d.kind || null, open: !!d.open, leaf: d.leaf || null, pane: d.pane ? d.pane.id : null })),
-      windows: (map.windows || []).map((w) => ({ id: w.id, fl: w.fl || 0, fy: w.fy || 0, x: w.x, z: w.z, len: w.len, cells: w.cells, nx: w.nx || 0, nz: w.nz || 0, ext: !!w.ext, armor: !!w.armor, cooler: !!w.cooler,
-        sill: w.sill != null ? w.sill : w.door || w.rail ? null : L.SILL, top: w.top != null ? w.top : w.door || w.rail ? null : L.TOP, broken: !!w.broken, door: w.door ? w.door.id : null, rail: w.rail ? map.rails.indexOf(w.rail) : null })),
+      windows: (map.windows || []).map((w) => Object.assign({ id: w.id, fl: w.fl || 0, fy: w.fy || 0, x: w.x, z: w.z, len: w.len, cells: w.cells, nx: w.nx || 0, nz: w.nz || 0, ext: !!w.ext, armor: !!w.armor, cooler: !!w.cooler,
+        sill: w.sill != null ? w.sill : w.door || w.rail ? null : L.SILL, top: w.top != null ? w.top : w.door || w.rail ? null : L.TOP, broken: !!w.broken, door: w.door ? w.door.id : null, rail: w.rail ? map.rails.indexOf(w.rail) : null }, w.case ? { case: w.case } : {})),
       stairs: (map.stairs || []).map((s) => ({ f: s.f, y0: s.y0, rise: s.rise, axis: s.axis, up: s.up, x0: s.x0, x1: s.x1, z0: s.z0, z1: s.z1 })),
       rails: (map.rails || []).map((r: any) => ({ f: r.f, y: r.y, x0: r.x0, x1: r.x1, z0: r.z0, z1: r.z1, pane: r.pane ? r.pane.id : null })),
       railSteel: !!map.railSteel,
@@ -190,7 +190,7 @@ export const LevelDesc = (() => {
   function floorNodes(map: LvMap, B: LdB): LdNode[] {
     const L = Level, TS = L.TS, K = L.K, WALL_H = L.WALL_H, th = map.theme, root: LdNode[] = [];
     const { W, H, t } = map, SK = map.skirt || 0, va = map.voidAbove, gr = map.grate;
-    const ship = th.space ? ':' + (th.accent || '#e8922a') : ''; // (a ship: her own surfaces, js/levelview.ts _shipTex, in her colour)
+    const ship = th.space ? ':' + (th.accent || '#e8922a') : '', sk = th.liner ? 'l' : ''; // (a ship: her own surfaces, js/levelview.ts _shipTex, in her colour; a liner's: panelling, carpet, coffers)
     const cell = (i: number, y: number) => [((i % W) + 0.5) * TS, y, (Math.floor(i / W) + 0.5) * TS];
     // The hangar's fixed shell (its floor, ceiling, roof, lamps' fittings and roller doors) is baked with the rest of its fittings
     // (js/hangar.ts, tools/bake_hangar.mjs): marked hf, a screen with the baked hangar loaded leaves it out (js/levelview.ts).
@@ -199,13 +199,13 @@ export const LevelDesc = (() => {
     const hf = <N extends LdNode>(n: N): N => (map.hub ? Object.assign(n, { hf: 1 }) : n);
     // floor + ceiling (upstairs, the floor only where there is one: not over a drop, and steel grating where it's a catwalk)
     if (!t.includes(5) && !gr) {
-      const fmat = B.std({ map: lvTex(B, ship ? 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [W / K, H / K]), roughness: ship ? 0.7 : 0.92 });
+      const fmat = B.std({ map: lvTex(B, ship ? sk + 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [W / K, H / K]), roughness: ship ? 0.8 : 0.92 });
       root.push(hf(B.mesh(B.geo('plane', [W * TS, H * TS]), fmat, { r: [-PI / 2, 0, 0], p: [(W * TS) / 2, 0, (H * TS) / 2], l1: 1 }))); // (layer 1: what hides the evidence glow: walls, floors, doors)
     } else {
       const cells: number[] = [], tr = map.terrain, hills: number[] = [];
       const raised = (i: number) => { const k = ((i / W) | 0) * tr.VW + (i % W); return Math.abs(tr.v[k]) > 1e-3 || Math.abs(tr.v[k + 1]) > 1e-3 || Math.abs(tr.v[k + tr.VW]) > 1e-3 || Math.abs(tr.v[k + tr.VW + 1]) > 1e-3; }; // (off level at 0: up or down)
       for (let i = 0; i < W * H; i++) if (t[i] !== 5 && !(gr && gr[i])) (tr && raised(i) ? hills : cells).push(i);
-      const fm = B.std({ map: lvTex(B, ship ? 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [1 / K, 1 / K]), roughness: ship ? 0.7 : 0.92 });
+      const fm = B.std({ map: lvTex(B, ship ? sk + 'deck' + ship : th.rock ? 'rock' : 'floor', th.floor, [1 / K, 1 / K]), roughness: ship ? 0.8 : 0.92 });
       root.push({ t: 'i', g: B.geo('plane', [TS, TS], [['rx', -PI / 2]]), m: fm, n: cells.length, tr: cells.flatMap((i) => cell(i, 0)), l1: 1 });
       // the rolling ground (map.terrain: crestGround): those cells as one surface over their corners' heights (a procedural
       // surface, made from the description: proc 'terrain')
@@ -230,7 +230,7 @@ export const LevelDesc = (() => {
     if (caps.length) root.push({ t: 'i', g: B.geo('box', [TS, capUp!.skirt, TS]), m: B.std({ color: 0xbdb6aa, roughness: 0.9 }), n: caps.length, tr: caps.flatMap((i) => cell(i, WALL_H + capUp!.skirt / 2)), l1: 1 });
     if (gr) root.push(...grate(map, B));
     // ceiling over everything indoors (gardens are open to the night sky; nor under a drop in the floor above)
-    const ctex = lvTex(B, ship ? 'overhead' + ship : 'floor', th.ceil, [0.5, 0.5]);
+    const ctex = lvTex(B, ship ? sk + 'overhead' + ship : 'floor', th.ceil, [0.5, 0.5]);
     const roofed: number[] = [];
     for (let i = 0; i < W * H; i++) if (!map.out[i] && !(va && va[i])) roofed.push(i);
     // the top of it, for what's looking down from the air (you ride in over the roofs: js/landing.ts), wherever nothing's
@@ -258,7 +258,7 @@ export const LevelDesc = (() => {
       if (vis) walls.push(z * W + x);
     }
     const heads = map.rooms.some((q) => q.lid); // (a roof's stair heads: bare grey render, a flat top, not the homes' paint and a pitched roof)
-    const wtex = ship ? lvTex(B, 'bulkhead' + ship, th.wall, [1, 1]) : lvTex(B, heads || th.home >= 1 ? 'plaster' : th.rock ? 'rock' : 'wall', heads ? '#7f807c' : th.wall, [1, 2]);
+    const wtex = ship ? lvTex(B, sk + 'bulkhead' + ship, th.wall, [1, 1]) : lvTex(B, heads || th.home >= 1 ? 'plaster' : th.rock ? 'rock' : 'wall', heads ? '#7f807c' : th.wall, [1, 2]);
     const paintWalls = map.rooms.some((rm) => rm.dress);
     const wallMat = B.std(Object.assign({ map: wtex, roughness: 0.85 }, paintWalls ? { paint: 1 } : {})); // (paint: a resident's wallpaper, js/homes.ts paint)
     const rs = U.rng((map.seed ^ 0x3a11c0 ^ Math.imul((map.fl || 0) + 1, 0x9e3779b1)) >>> 0), wcol: number[] = [];
@@ -311,7 +311,8 @@ export const LevelDesc = (() => {
 
     // ceiling lamps' fittings (the light grid lights the level from the lamps: js/lightgrid.ts)
     // (a lamp that's off, a night level's: its fitting unlit, a dull glass; an exit sign: a lit panel over a doorway)
-    let lampMat = -1, bayMat = -1, panelMat = -1, porchMat = -1, porchBox = -1, offMat = -1, barBox = -1;
+    let ringM = -1; const ringMat = () => (ringM >= 0 ? ringM : (ringM = B.basic({ color: th.light, side: 2 }))); // (a ring pendant's lit face, seen from inside the ring)
+    let gilt = -1, lampMat = -1, bayMat = -1, panelMat = -1, porchMat = -1, porchBox = -1, offMat = -1, barBox = -1;
     const lampGeo = B.geo('sphere', [0.32, 16, 8, 0, PI * 2, 0, PI / 2], [['s', 1, 0.45, 1], ['rx', PI]]), bayGeo = B.geo('cyl', [0.1, 0.42, 0.32, 16, 1, 1]), bayLens = B.geo('circle', [0.38, 16], [['rx', PI / 2]]);
     const panelGeo = B.geo('box', [1.2, 0.04, 0.6]), signGeo = B.geo('box', [0.36, 0.15, 0.05]), signMats = new Map<number, number>();
     const M0 = () => { if (lampMat >= 0) return; lampMat = B.basic({ color: th.light }); bayMat = B.std({ color: 0x3a3e42, roughness: 0.5, metalness: 0.6, side: 2 }); panelMat = B.basic({ color: 0xf4f8ff }); porchMat = B.basic({ color: 0xffe2a8 }); porchBox = B.std({ color: 0x1c1c1e, roughness: 0.6 }); offMat = B.std({ color: 0x4a4844, roughness: 0.4 }); };
@@ -330,6 +331,16 @@ export const LevelDesc = (() => {
         continue;
       }
       if (l.kind === 'panel') { root.push(hf(B.mesh(panelGeo, lit ? panelMat : offMat, { p: [l.x, (l.gy || 0) + WALL_H - 0.02, l.z] }))); continue; } // a shop's flat ceiling panel
+      if (l.kind === 'highbay' && (l as any).chand) { // a liner's court: a pendant of three rings of light, brass outside and lit within, hung on wires at their own heights and tilts
+        const roof = L.FLOOR_H + WALL_H, y = l.y!;
+        if (gilt < 0) gilt = B.std({ color: 0xb8935a, roughness: 0.25, metalness: 0.9, side: 2 });
+        [[1.5, 0.35, 0.1, 0.06], [1.05, -0.1, -0.14, 0.1], [0.62, -0.5, 0.08, -0.12]].forEach(([rr, dy, tx, tz], q) => {
+          root.push(B.mesh(B.geo('cyl', [rr, rr, 0.09, 40, 1, 1]), gilt, { p: [l.x, y + dy, l.z], r: [tx, 0, tz] }));
+          root.push(B.mesh(B.geo('cyl', [rr - 0.012, rr - 0.012, 0.06, 40, 1, 1]), lit ? ringMat() : offMat, { p: [l.x, y + dy, l.z], r: [tx, 0, tz] }));
+          for (let w = 0; w < 3; w++) { const a = (w / 3) * PI * 2 + q; root.push(B.mesh(B.geo('cyl', [0.006, 0.006, roof - y - dy]), gilt, { p: [l.x + Math.cos(a) * rr, (roof + y + dy) / 2, l.z + Math.sin(a) * rr] })); }
+        });
+        continue;
+      }
       if (l.kind === 'highbay') { // a hall's: a dome on a rod down from the roof (the floor above's ceiling)
         const roof = L.FLOOR_H + WALL_H;
         root.push(hf(B.mesh(B.geo('cyl', [0.012, 0.012, roof - l.y!]), bayMat, { p: [l.x, (roof + l.y!) / 2, l.z] })));
@@ -437,7 +448,10 @@ export const LevelDesc = (() => {
     const wiredMat = map.windows.some((w) => w.armor) ? B.std({ color: 0x9fb2b8, map: B.tex('wired', { rep: [4, 4] }), transparent: true, opacity: 0.5, roughness: 0.2, metalness: 0.4, depthWrite: false, side: 2 }) : -1;
     const coolerMat = map.windows.some((w) => w.cooler) ? B.std({ color: 0xbfe6ff, transparent: true, opacity: 0.32, roughness: 0.05, metalness: 0.3, emissive: 0x0d2a3a, depthWrite: false, side: 2 }) : -1;
     const steelFrame = B.std({ color: 0x6a7076, roughness: 0.45, metalness: 0.6 }), whiteFrame = B.std({ color: 0xf0f2f2, roughness: 0.4 });
+    // a piece of furniture's glass (a display case's: js/level.ts placeCases): its box, all of it the pane (no wall, no frame: the piece's)
+    const caseMat = map.windows.some((w) => w.case) ? B.std({ color: 0xdde9ec, transparent: true, opacity: 0.1, roughness: 0.05, metalness: 0.1, depthWrite: false }) : -1;
     for (const w of map.windows) {
+      if (w.case) { const b = w.case; out.push(B.mesh(B.geo('box', [b[3] - b[0], b[4] - b[1], b[5] - b[2]]), caseMat, Object.assign({ p: [(b[0] + b[3]) / 2, (map.terrain ? w.fy || 0 : 0) + (b[1] + b[4]) / 2, (b[2] + b[5]) / 2], ro: 2, h: 'pane:' + w.id }, w.broken ? { hid: 1 } : {}))); continue; }
       const SL = w.sill != null ? w.sill : L.SILL, TP = w.top != null ? w.top : L.TOP, opening = TP - SL; // (its own, or the usual)
       const c: LdNode[] = [], SK = map.skirt || 0;
       // (local: x along the wall, z out of it toward -n; on rolling ground, the ground it's in) the wall below and above (the cell's full depth)
@@ -474,7 +488,8 @@ export const LevelDesc = (() => {
     for (const d of map.doors) {
       const dw = d.w || TS, half = dw / 2, leafL = dw - 0.05, gy = map.terrain ? d.fy || 0 : 0; // (on rolling ground, the ground it's in: a storey's floor is its whole group's)
       const lb = shipAcc >= 0 && d.kind !== 'stair' ? L.DOOR_H + 0.18 : L.DOOR_H; // (the wall over the opening: on a ship it starts at the top of the frame's head, which would otherwise run into it)
-      out.push(B.mesh(d.axis === 'x' ? B.geo('box', [TS, L.WALL_H - lb, dw]) : B.geo('box', [dw, L.WALL_H - lb, TS]), lintelMat, { p: [d.x, gy + (L.WALL_H + lb) / 2, d.z], l1: 1 }));
+      const SK = map.skirt || 0, uvw = [['uvw', dw / TS, (lb + SK) / (L.WALL_H + SK), 1]]; // (the wall's picture over it, as the wall beside it has it there: js/levelview.ts geo)
+      out.push(B.mesh(d.axis === 'x' ? B.geo('box', [TS, L.WALL_H - lb, dw], uvw) : B.geo('box', [dw, L.WALL_H - lb, TS], uvw), lintelMat, { p: [d.x, gy + (L.WALL_H + lb) / 2, d.z], l1: 1 }));
       if (shipAcc >= 0 && d.kind !== 'stair') { // (a ship's: a frame proud of the bulkhead either side, a lit bar of her colour over the opening)
         const ax = d.axis === 'x', fr = (along: number, y: number, h: number, w: number, deep: number, m: number) => out.push(B.mesh(ax ? B.geo('box', [deep, h, w]) : B.geo('box', [w, h, deep]), m, { p: [d.x + (ax ? 0 : along), gy + y, d.z + (ax ? along : 0)] }));
         for (const sd of [-1, 1]) fr(sd * (half - 0.04), L.DOOR_H / 2, L.DOOR_H, 0.09, TS + 0.14, frameMat);

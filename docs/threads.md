@@ -43,7 +43,32 @@ object here and on every screen, and the world the simulation collides with is b
 - **ctl**, the control port, for as long as the worker runs. Page to simulation: `{k:'init', id, cli}` (a session, your
   player's id and its port), `{k:'stop'}`, `{k:'in', from, m}` (a remote player's message), `{k:'join'|'leave', id}`,
   `{k:'stickers', names}`, `{k:'digest'}`, `{k:'stat'}`. Back: `{k:'ready'}`, `{k:'on'}`, `{k:'bc', m, x}` (to every remote
-  player but `x`), `{k:'to', id, m}`, the answers, and `{k:'prof'}` once a second (the ticks' time).
+  player but `x`), `{k:'to', id, m}`, `{k:'fast', to, ch, buf}` (a snapshot, below), the answers, and `{k:'prof'}` once a second
+  (the ticks' time).
+
+## The fast channel (snapshots)
+
+For what the simulation streams many times a second and is stale once a newer one is out (the space battle's core snapshot to
+everyone, a sensor picture to one player: [space-server.md](space-server.md), C1), there's a second way out beside the messages:
+`G.ServerHost.fast(to, buf, ch)` (or `SvNet.fast` in js/server.ts), bytes (an ArrayBuffer, written with `js/snapcodec.ts`'s
+SnapWriter) to one player's id or everyone (`to` null), on stream `ch` (0-255, each its own newest). The buffer is transferred to
+the page on the ctl port (`{k:'fast'}`); `js/serverlink.ts` hands the host's own player's copy straight to `G.Net.onFast` (no
+PeerJS), and `G.Net.fastOut` sends the remote players theirs on their fast channel (`js/netfast.ts`); on every page,
+`G.Net.onFast((buf, ch) => ...)` gets them.
+
+The fast channel is a second data channel on each PeerJS connection's own RTCPeerConnection, made on both sides with a fixed id
+(`negotiated: true, id: 9, ordered: false, maxRetransmits: 0`): no signalling, the same path as the reliable one, and truly
+unreliable. (PeerJS 1.5's own `reliable: false` is only unordered, still retransmitted, and every DataConnection is a separate
+RTCPeerConnection.) Messages over 16 KB are cut into pieces (16000 bytes a packet with its 10-byte header) and put together again;
+a message is handed on only whole and only if it's newer than the last of its stream (a lost piece loses the message; a newer
+message's piece gives up an older one being put together; nothing is sent again). Sending, a message that finds the channel
+backed up (256 KB waiting) waits on its own, replaced by its stream's newer ones, until the channel drains. Each side says hello on
+the channel until the other answers; until then, or if it never does (an older game), messages go over the reliable JSON
+connection as base64 (`{t:'fastb', c, s, b}`, in pieces of 11000 bytes `{..., i, n}`: PeerJS 1.5 refuses a JSON message of 16300
+bytes or more, with an error that drops the connection). Tests: `npm run test:snapcodec` (the codec, the reassembly by hand), and
+in a browser `node tools/space_shot.mjs "mute" tools/netfast_steps.mjs --port 8162 --nowait --gpu` (tools/netfast_test.html: two
+peers in one page, joined directly and through PeerJS; then the game hosting and a second game in an iframe joined to it, the
+simulation on the page and in its worker).
 
 The wire between a host and the players who join it hasn't changed: an older client can join a host on this code. A few
 messages were added, all ignored by a game that doesn't know them; the simulation takes the ones marked *host* only

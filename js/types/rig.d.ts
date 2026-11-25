@@ -10,7 +10,7 @@ interface Rig { // a character's skeleton and its meshes (what create makes, and
   hb: any[] | null; dbg: THREE.Mesh[] | null; rd: Ragdoll; hitKit?: THREE.Mesh[] | null; dbgKit?: THREE.Mesh[] | null;
   curl: number[]; fingers: { hand: number; thumb: boolean; bones: THREE.Bone[]; rest: THREE.Matrix4[]; step: THREE.Matrix4[] }[]; // (how closed each hand is, the right's then the left's: 0 open, 1 round a grip; and the body's fingers that show it: poseFingers)
   // (set by create)
-  setGun(code: any, skin?: any): void; update(dt: number, p: any): void; hitboxes(): any[]; recoil(deg?: number): void; hit(dir: any, mv?: number): void; dropGun(): void; goLimp(): void;
+  setGun(code: any, skin?: any): void; update(dt: number, p: any): void; defer(dt: number, p: any): void; pend?: { dt: number; p: any } | null; hitboxes(): any[]; recoil(deg?: number): void; hit(dir: any, mv?: number): void; dropGun(): void; goLimp(): void;
   die(dir: any): void; throwNade(str?: number): void; setKit(k: any): void; setCallsign(id: string, name: string): void; holster(on: boolean, anim?: boolean): void; swap?: { on: boolean; t: number; Rs: THREE.Matrix4 } | null; slingWant?: boolean | null; zip(on: boolean, instant?: boolean): void;
   secure(t: number): void; settle(sec?: number): void; startle(): void; dispose(): void;
   shield?: THREE.Object3D | null; shieldDropped?: THREE.Object3D | null; shieldMount?: THREE.Object3D; shieldW?: number; setShield(id: string | null): void; dropShield(): THREE.Object3D | null; // (a handheld ballistic shield on the left arm: setShield, its pose in update)

@@ -37,6 +37,11 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      # Rust, for the acoustic tracer's WebAssembly module (npm run build makes it, assets/wasm: not kept in the repo; docs/wasm.md): the
+      # runner has rustup, and this installs the compiler and target wasm/acoustics/rust-toolchain.toml pins
+      - name: Rust (the WebAssembly module's)
+        run: rustup toolchain install
+        working-directory: wasm/acoustics
       - run: npm run typecheck
       # the layering rule (docs/modules-plan.md, phase 3): no file the server's thread loads names a page-only module
       - run: npm run deps:check
@@ -67,6 +72,8 @@ jobs:
         if: steps.models.outputs.cache-hit != 'true'
         run: npm run bake:models -- -j 4
       - run: npm run test:models
+      # the acoustic ray tracer in WebAssembly (assets/wasm/acoustics.wasm, built above by npm run build) against the JavaScript one, same seeds (docs/wasm.md)
+      - run: npm run test:acoustics
       # the gun sounds' prewarming: the sound keys a gun can have, the cache's synth hash against js/gunshot-synth.ts (docs/acoustics.md)
       - run: npm run test:gunsounds
       # the release bundles build (and are not published from here: the site job does that)

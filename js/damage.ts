@@ -174,7 +174,7 @@ export const Damage = (() => {
   const floorOf = (map: DmgMap, y: number): FloorMap => (map.floors ? map.floors.find((f) => y >= (f.fy || 0) - 0.5 && y < (f.fy || 0) + Level.WALL_H + 0.3) || map.floors[0] : map);
   const liningMat = (map: DmgMap, col: number) => {
     const D = st(map);
-    if (!D.mats.has(col)) D.mats.set(col, new T.MeshLambertMaterial({ color: col, vertexColors: true, side: T.DoubleSide }));
+    if (!D.mats.has(col)) { const m = new T.MeshLambertMaterial({ color: col, vertexColors: true, side: T.DoubleSide }); m.defines = { LG_BUMP: '18.0', LG_BUMP_D: '0.007', LG_NDIFF: '1.2' }; D.mats.set(col, m); } // (broken, not smooth: small bumps a few millimetres deep, js/lightgrid.ts)
     return D.mats.get(col)!;
   };
   // a wall's material, in the tile's shade (the cube was one of many, each its own: js/level.ts)
@@ -833,7 +833,10 @@ export const Damage = (() => {
     const key = [at.x, at.y, at.z].map((v) => v.toFixed(2)).join(','), cracks = (pane.userData.cracks = pane.userData.cracks || {}); // (one fracture for each point struck)
     if (cracks[key]) return cracks[key];
     const g = pane.geometry; if (!g.boundingBox) g.computeBoundingBox();
-    const b = g.boundingBox!, sx = b.max.x - b.min.x, sz = b.max.z - b.min.z, side = sx < sz && sx < 0.2, A = side ? sz : sx, H = b.max.y - b.min.y, l = pane.worldToLocal(at.clone()), lo = side ? b.min.z : b.min.x;
+    const b = g.boundingBox!, sx = b.max.x - b.min.x, sz = b.max.z - b.min.z, l = pane.worldToLocal(at.clone());
+    // (a pane with depth, a display case's glazing: the fracture's on the face it was struck through, the nearest of its four sides)
+    const thick = Math.min(sx, sz) > 0.2, fx = Math.abs(l.x - b.min.x) < Math.abs(l.x - b.max.x) ? b.min.x : b.max.x, fz = Math.abs(l.z - b.min.z) < Math.abs(l.z - b.max.z) ? b.min.z : b.max.z;
+    const side = thick ? Math.abs(l.x - fx) < Math.abs(l.z - fz) : sx < sz && sx < 0.2, A = side ? sz : sx, H = b.max.y - b.min.y, lo = side ? b.min.z : b.min.x;
     const W = 512, Hp = Math.max(64, Math.min(1024, Math.round((W * H) / A))), cv = typeof document !== 'undefined' ? Object.assign(document.createElement('canvas'), { width: W, height: Hp }) : new OffscreenCanvas(W, Hp), c = cv.getContext('2d')!;
     const hx = U.clamp(((side ? l.z : l.x) - lo) / A, 0.02, 0.98) * W, hy = (1 - U.clamp((l.y - b.min.y) / H, 0.02, 0.98)) * Hp, rnd = rngOf(seedOf([at.x, at.y, at.z])), R = Math.hypot(W, Hp) * 1.1, n = 15 + Math.floor(rnd() * 6), arms = [];
     c.fillStyle = 'rgba(214,230,238,0.07)'; c.fillRect(0, 0, W, Hp);
@@ -865,7 +868,7 @@ export const Damage = (() => {
     c.globalCompositeOperation = 'destination-out'; c.beginPath(); c.arc(hx, hy, 5, 0, 7); c.fill();
     const tex = new T.CanvasTexture(cv);
     const m = new T.Mesh(new T.PlaneGeometry(A, H), new T.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, side: T.DoubleSide }));
-    m.position.set((b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, (b.min.z + b.max.z) / 2); if (side) m.rotation.y = Math.PI / 2;
+    m.position.set(thick && side ? fx : (b.min.x + b.max.x) / 2, (b.min.y + b.max.y) / 2, thick && !side ? fz : (b.min.z + b.max.z) / 2); if (side) m.rotation.y = Math.PI / 2;
     m.renderOrder = 3; pane.add(m); cracks[key] = m;
     return m;
   }

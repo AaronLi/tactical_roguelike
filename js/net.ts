@@ -2,11 +2,73 @@
 import { ReplayEnv } from './replayenv.js';
 import { Hooks, U } from './util.js';
 import { ServerLink } from './serverlink.js';
+import { FastLink } from './netfast.js';
 // Peer-to-peer transport (WebRTC via PeerJS). Star topology: the host is the authority,
 // clients talk only to the host and the host relays. The host's authority is its simulation, in a thread of its own
 // (js/serverlink.ts, docs/threads.md), and the host's game is a client of it like any other: toHost() goes to it on a port
 // of its own, and its word comes back to onClient. What it says to the remote players is sent from here (relay, relayTo),
 // and what they send comes in to onServer (js/game.ts hands it on to the simulation).
+// Beside each connection, a fast one (js/netfast.ts): binary, unordered, unreliable, newest wins, for the simulation's high-rate
+// snapshots (docs/space-server.md, C1). The simulation sends them with ServerHost.fast (to one player or everyone, a stream of its
+// own each); the host's own page gets them across the thread's port (js/serverlink.ts), the remote players on their fast
+// channel (or the reliable one, base64, where there's no fast one); every page hands them to onFast.
+// PeerJS 1.5's JSON connection refuses a message of 16300 bytes or more, with an error that drops the player. One bigger goes in
+// pieces (_pc: its JSON's UTF-8 bytes in base64, 11000 bytes a piece, as js/netfast.ts's slow way), put together again where it
+// arrives (bigIn: the message whole, or null while pieces are still to come)
+const BIG = 15000, BIG_PIECE = 11000;
+let bigN = 0;
+// The reliable connection compressed (each way on its own): every message deflated with what's gone before on it as its dictionary (the
+// last 32 KB of the messages sent that way, the same on both sides: the connection's in order and nothing's lost), so one like the last
+// costs little more than what changed (a snapshot 2.3 KB as JSON: some 90 bytes). One message at a time and at once (not a stream:
+// fflate's streaming inflate holds back a message's end till more comes). On the wire {t:'z', d: base64}. Each side says it can ({t:'zhi'},
+// once fflate's loaded); till the other's said so, what's sent to it is JSON as it is. fflate from jsDelivr, pinned, loaded when a
+// page loads (preloaded by index.html; the game runs without it: nothing's compressed)
+const FF_URL = 'https://cdn.jsdelivr.net/npm/fflate@0.8.3/+esm', Z_HIST = 32768;
+let FF: any = null, ffP: Promise<any> | null = null;
+function ffLoad(): Promise<any> { if (!ffP) ffP = import(/* @vite-ignore */ FF_URL as string).then((m) => (FF = m)).catch((e) => { console.warn('net: no compression (fflate did not load)', e); return null; }); return ffP; }
+if (typeof document !== 'undefined') ffLoad(); // (at once on a page: ready long before a connection opens)
+type ZSide = { on: boolean; sent: Uint8Array; got: Uint8Array; inB: number; outB: number; rawB: number };
+const zOf = (conn: any): ZSide => conn._z || (conn._z = { on: false, sent: new Uint8Array(0), got: new Uint8Array(0), inB: 0, outB: 0, rawB: 0 });
+const zHist = (h: Uint8Array, u: Uint8Array) => { const c = new Uint8Array(Math.min(Z_HIST, h.length + u.length)), keep = c.length - u.length; if (keep > 0) c.set(h.subarray(h.length - keep), 0); c.set(keep >= 0 ? u : u.subarray(-keep), Math.max(0, keep)); return c; };
+const b64 = (u: Uint8Array) => { let b = ''; for (let i = 0; i < u.length; i += 0x8000) b += String.fromCharCode.apply(null, Array.from(u.subarray(i, i + 0x8000))); return btoa(b); };
+const unb64 = (s: string) => { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; };
+// (said once a connection's open: this side can read what's deflated)
+function zHello(conn: any) { ffLoad().then(() => { if (FF && conn.open) { try { conn.send({ t: 'zhi' }); } catch (e) { /* gone */ } } }); }
+// (a message come: a hello noted (null back), a deflated one inflated, anything else as it is)
+function zIn(conn: any, d: any): any {
+  if (!d || typeof d !== 'object') return d;
+  if (d.t === 'zhi') { zOf(conn).on = true; return null; }
+  if (d.t !== 'z' || typeof d.d !== 'string') return d;
+  if (!FF) { console.error('net: a deflated message and no fflate to read it'); return null; }
+  const z = zOf(conn), u = FF.inflateSync(unb64(d.d), z.got.length ? { dictionary: z.got } : undefined);
+  z.got = zHist(z.got, u);
+  try { return JSON.parse(new TextDecoder().decode(u)); } catch (e) { console.error('net: a deflated message read wrong', e); return null; }
+}
+// (a message out: deflated where the other side can read it)
+function zSend(conn: any, msg: any) {
+  const z = conn._z as ZSide | undefined;
+  if (!FF || !z || !z.on) { bigSend(conn, msg); return; }
+  const u = new TextEncoder().encode(JSON.stringify(msg)), d = FF.deflateSync(u, z.sent.length ? { level: 6, dictionary: z.sent } : { level: 6 });
+  z.sent = zHist(z.sent, u); z.rawB += u.length; z.outB += d.length;
+  bigSend(conn, { t: 'z', d: b64(d) });
+}
+const bigParts = new Map<string, { n: number; got: number; d: string[]; at: number }>();
+function bigSend(conn: any, msg: any) {
+  const js = JSON.stringify(msg);
+  if (js.length < BIG / 3 || new TextEncoder().encode(js).length < BIG) { conn.send(msg); return; }
+  const u = new TextEncoder().encode(js), n = Math.ceil(u.length / BIG_PIECE), id = (++bigN).toString(36) + ':' + Date.now().toString(36);
+  for (let i = 0; i < n; i++) { let b = ''; const part = u.subarray(i * BIG_PIECE, (i + 1) * BIG_PIECE); for (let j = 0; j < part.length; j++) b += String.fromCharCode(part[j]); conn.send({ t: '_pc', id, i, n, d: btoa(b) }); }
+}
+function bigIn(d: any, from: string): any {
+  if (!d || d.t !== '_pc') return d;
+  const key = from + '|' + d.id, now = Date.now(); let p = bigParts.get(key);
+  if (!p) { p = { n: d.n | 0, got: 0, d: [], at: now }; bigParts.set(key, p); for (const [k, q] of bigParts) if (now - q.at > 30000) bigParts.delete(k); } // (one never finished: let go)
+  if (p.d[d.i] == null && typeof d.d === 'string') { p.d[d.i] = d.d; p.got++; }
+  if (p.got < p.n) return null;
+  bigParts.delete(key);
+  const bin = p.d.map((x) => atob(x)).join(''), u = new Uint8Array(bin.length); for (let j = 0; j < bin.length; j++) u[j] = bin.charCodeAt(j);
+  try { return JSON.parse(new TextDecoder().decode(u)); } catch (e) { console.error('net: a message in pieces put together wrong', e); return null; }
+}
 export const Net = {
   PREFIX: 'breachproto-v1-',
   peer: null as any,
@@ -21,6 +83,33 @@ export const Net = {
   onPeerJoin: (() => {}) as (id: string) => void, // (id)            — host only
   onPeerLeave: (() => {}) as (id: string) => void,// (id)            — host only
   onHostLost: () => {}, //                 — clients only
+  fast: new Map<string, FastLink>(), // (host: each remote player's fast channel)
+  hostFast: null as FastLink | null, // (client: the one to the host)
+  fastFns: [] as ((buf: ArrayBuffer, ch: number) => void)[],
+  // a snapshot from the simulation (every page, the host's too): buf is the handler's to keep; ch its stream
+  onFast(fn: (buf: ArrayBuffer, ch: number) => void) { this.fastFns.push(fn); return () => { this.fastFns = this.fastFns.filter((f) => f !== fn); }; },
+  gotFast(buf: ArrayBuffer, ch: number) { for (const f of this.fastFns) { try { f(buf, ch); } catch (e) { console.error('net: an onFast handler threw', e); } } },
+  // host only: the simulation's snapshot (js/serverlink.ts, {k:'fast'}) to a remote player, or to every remote player (to null);
+  // own: whether it's the host's own page's too (it's handed to onFast last: the remotes' copies are made first)
+  fastOut(to: string | null, buf: ArrayBuffer, ch: number, own: boolean) {
+    if (to === null) { for (const l of this.fast.values()) l.send(buf, ch); }
+    else { const l = this.fast.get(to); if (l) l.send(buf, ch); }
+    if (own) this.gotFast(buf, ch);
+  },
+  // (tests and F8: how each fast channel is doing)
+  fastStats() {
+    const r: Record<string, unknown> = {};
+    for (const [id, l] of this.fast) r[id] = { mode: l.mode, ...l.st };
+    if (this.hostFast) r.host = { mode: this.hostFast.mode, ...this.hostFast.st };
+    return r;
+  },
+  // (tests: the reliable connections' compression: bytes of JSON sent, and deflated)
+  zStats() {
+    const r: Record<string, unknown> = {}, one = (c: any) => (c && c._z ? { on: c._z.on, json: c._z.rawB, sent: c._z.outB } : null);
+    for (const [id, c] of this.conns) r[id] = one(c);
+    if (this.hostConn) r.host = one(this.hostConn);
+    return r;
+  },
 
   available() { return typeof window.Peer === 'function'; },
   // How peers find a way to each other: several public STUN servers (a direct path through each side's router),
@@ -55,9 +144,19 @@ export const Net = {
       cb(null, code);
     });
     peer.on('connection', (conn: any) => {
-      conn.on('open', () => { this.conns.set(conn.peer, conn); this.onPeerJoin(conn.peer); });
-      conn.on('data', (d: any) => { if (d && typeof d === 'object') this.onServer(d, conn.peer); });
-      const drop = () => { if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); this.onPeerLeave(conn.peer); } };
+      let fl: FastLink | null = null;
+      conn.on('open', () => {
+        this.conns.set(conn.peer, conn);
+        const old = this.fast.get(conn.peer); if (old) old.close();
+        this.fast.set(conn.peer, (fl = new FastLink(conn, () => { /* (nothing comes up this way yet) */ })));
+        zHello(conn);
+        this.onPeerJoin(conn.peer);
+      });
+      conn.on('data', (d0: any) => { const d = zIn(conn, bigIn(d0, conn.peer)); if (d && typeof d === 'object') { if (d.t === 'fastb') { if (fl) fl.fallback(d); } else this.onServer(d, conn.peer); } });
+      const drop = () => {
+        if (fl) { fl.close(); if (this.fast.get(conn.peer) === fl) this.fast.delete(conn.peer); fl = null; }
+        if (this.conns.get(conn.peer) === conn) { this.conns.delete(conn.peer); this.onPeerLeave(conn.peer); }
+      };
       conn.on('close', drop);
       conn.on('error', drop);
     });
@@ -84,9 +183,19 @@ export const Net = {
     peer.on('open', (id: string) => {
       this.myId = id;
       const conn = peer.connect(this.PREFIX + code, { reliable: true, serialization: 'json' });
-      conn.on('open', () => { this.hostConn = conn; this.code = code; finish(null); });
-      conn.on('data', (d: any) => { if (d && typeof d === 'object') this.onClient(d); });
-      conn.on('close', () => { if (this.hostConn === conn) { this.hostConn = null; this.onHostLost(); } });
+      let fl: FastLink | null = null;
+      conn.on('open', () => {
+        this.hostConn = conn; this.code = code;
+        if (this.hostFast) this.hostFast.close();
+        this.hostFast = fl = new FastLink(conn, (buf, ch) => { if (this.hostConn === conn) this.gotFast(buf, ch); });
+        zHello(conn);
+        finish(null);
+      });
+      conn.on('data', (d0: any) => { const d = zIn(conn, bigIn(d0, 'host')); if (d && typeof d === 'object') { if (d.t === 'fastb') { if (fl) fl.fallback(d); } else this.onClient(d); } });
+      conn.on('close', () => {
+        if (fl) { fl.close(); if (this.hostFast === fl) this.hostFast = null; fl = null; }
+        if (this.hostConn === conn) { this.hostConn = null; this.onHostLost(); }
+      });
       conn.on('error', () => finish(this.noRoute));
     });
     peer.on('error', (e: any) => {
@@ -169,19 +278,22 @@ export const Net = {
 
   toHost(msg: any) {
     if (this.isHost) ServerLink.toServer(msg); // (the simulation's thread: js/serverlink.ts)
-    else if (this.hostConn && this.hostConn.open) this.hostConn.send(msg);
+    else if (this.hostConn && this.hostConn.open) zSend(this.hostConn, msg);
   },
   // host only: what the simulation says to every remote player (but exceptId), and to one of them (js/serverlink.ts)
   relay(msg: any, exceptId?: string | null) {
-    for (const [id, c] of this.conns) if (id !== exceptId && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }
+    for (const [id, c] of this.conns) if (id !== exceptId && c.open) { try { zSend(c, msg); } catch (e) { /* closing */ } }
   },
   relayTo(id: string, msg: any) {
     const c = this.conns.get(id);
-    if (c && c.open) { try { c.send(msg); } catch (e) { /* closing */ } }
+    if (c && c.open) { try { zSend(c, msg); } catch (e) { /* closing */ } }
   },
   leave() {
     this.stopBeacon();
     const peer = this.peer;
+    for (const l of this.fast.values()) l.close();
+    this.fast.clear();
+    if (this.hostFast) { this.hostFast.close(); this.hostFast = null; }
     this.peer = null; this.hostConn = null; // (first: closing the connection below isn't losing the host, it's leaving)
     try { if (peer) peer.destroy(); } catch (e) { /* already gone */ }
     this.conns.clear();

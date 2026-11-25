@@ -39,6 +39,7 @@ const M = {
   plum: () => std('plum', 0x3a201d, 0.5, 0), // (bakelite: an AK-74's grip)
   woodRed: () => std('woodRed', 0x8b4023, 0.55, 0),
   brass: () => std('brass', 0xbb933d, 0.3, 0.9),
+  copper: () => std('copper', 0x5c4434, 0.45, 0.8), // (dark copper anodising: the Mk18's quad rail)
   rubber: () => std('rubber', 0x161616, 0.95, 0),
   stipple: () => std('stipple', 0x232326, 0.95, 0.02, { bumpMap: relief('stp', 0.006), bumpScale: 0.2 }), // (a polymer grip's texture)
   chequer: () => std('chequer', 0x1c1c1e, 0.8, 0.05, { bumpMap: relief('chq', 0.0028), bumpScale: 0.22 }),

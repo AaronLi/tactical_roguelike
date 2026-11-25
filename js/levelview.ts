@@ -3,6 +3,7 @@ import { FurnMesh } from './furnmesh.js';
 import { Level } from './level.js';
 import { LevelDesc } from './leveldesc.js';
 import { LightGrid } from './lightgrid.js';
+import { ProxyDraw } from './proxydraw.js';
 import { ReplayEnv } from './replayenv.js';
 import { U } from './util.js';
 interface LvViewCtx { fm: LvMap; reg: Map<string, LvObj[]>; door: Record<string, LvObj[]> | null; geos: Map<LdGeo, THREE.BufferGeometry>; mats: (THREE.Material | null)[]; texs: (THREE.Texture | null)[]; D: LdDraw; map: LvMap }
@@ -189,6 +190,7 @@ export const LevelView = {
         case 't': G0.translate(op[1], op[2], op[3]); break;
         case 'q': G0.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion(op[1], op[2], op[3], op[4]))); break;
         case 'ni': { const q = G0.toNonIndexed(); G0.dispose(); G0 = q; break; }
+        case 'uvw': { const uv = G0.attributes.uv as THREE.BufferAttribute, nr = G0.attributes.normal as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) { if (Math.abs(nr.getY(i)) > 0.5) continue; uv.setXY(i, uv.getX(i) * op[1], op[2] + uv.getY(i) * (op[3] - op[2])); } break; } // (a piece of a wall: its sides' picture the part of the wall's it stands for, op[1] cells across, op[2]..op[3] of its height)
       }
     }
     if (g.col) G0.setAttribute('color', new T.BufferAttribute(new Float32Array(g.col), 3)); // (a colour a vertex)
@@ -205,13 +207,15 @@ export const LevelView = {
     }
     let m: THREE.Material;
     switch (sp.k) {
-      case 'std': m = new T.MeshStandardMaterial(o); if (sp.paint) (m as THREE.MeshStandardMaterial).defines!.LG_PAINT = 1; break; // (a resident's wallpaper: js/homes.ts paint)
+      case 'std': m = new T.MeshStandardMaterial(o); if (sp.paint) (m as THREE.MeshStandardMaterial).defines!.LG_PAINT = 1; if (!o.transparent) (m as THREE.MeshStandardMaterial).defines!.LG_GRIME = 1; break; // (grime on what's solid: js/lightgrid.ts) // (a resident's wallpaper: js/homes.ts paint)
       case 'basic': m = new T.MeshBasicMaterial(o); break;
       case 'points': m = new T.PointsMaterial(o); break;
       case 'line': m = new T.LineBasicMaterial(o); break;
       case 'outside': m = FurnMesh.outsideMaterial(U.rng(sp.seed), sp.drop); break; // (the city past an outside window: js/furnmesh.ts)
       default: throw new Error('level: no material ' + sp.k);
     }
+    const ex = o.map && o.map.userData && o.map.userData.maps; // (a ship's deck: its relief and wear, _deckMaps, repeated as its colour is)
+    if (ex && m instanceof T.MeshStandardMaterial) { ex.nrm.repeat.copy(o.map.repeat); m.normalMap = ex.nrm; m.roughness = 1; m.defines!.LG_RGH_NA = 1; } // (its roughness in the normal map's alpha: js/lightgrid.ts)
     if (sp.dim != null) (m as THREE.MeshStandardMaterial).color.multiplyScalar(sp.dim); // (dead glass: its colour dimmed in linear light, as three's Color(hex).multiplyScalar)
     return (ctx.mats[i] = m);
   },
@@ -309,14 +313,46 @@ export const LevelView = {
   //   overhead  frames crossing, a recessed panel between them, a cable run
   //   cargo     a container's side: corrugated, framed, a band of her colour and a label
   _shipTex(kd: string, base: string, acc: string) {
-    const W = kd === 'bulkhead' ? 128 : 256, H = kd === 'bulkhead' ? 768 : 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+    const wallK = kd === 'bulkhead' || kd === 'lbulkhead', W = wallK ? 128 : 256, H = wallK ? 768 : 256, c = document.createElement('canvas'); c.width = W; c.height = H;
+    let extra: { nrm: THREE.Texture } | null = null;
     const g = c.getContext('2d')!, dk = (a: number) => `rgba(0,0,0,${a})`, lt = (a: number) => `rgba(255,255,255,${a})`, R = Math.random;
     const rect = (x: number, y: number, w: number, h: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, h); };
     const inset = (x: number, y: number, w: number, h: number) => { g.lineWidth = 2; g.strokeStyle = dk(0.3); g.strokeRect(x, y, w, h); g.lineWidth = 1; g.strokeStyle = lt(0.1); g.strokeRect(x + 2, y + 2, w - 4, h - 4); };
     const bolt = (x: number, y: number, r = 2.2) => { g.fillStyle = dk(0.4); g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); g.fillStyle = lt(0.16); g.beginPath(); g.arc(x - 0.6, y - 0.6, r * 0.45, 0, 7); g.fill(); };
     rect(0, 0, W, H, base);
     for (let i = 0; i < W * H / 50; i++) { const v = R() * 2 - 1; g.fillStyle = v > 0 ? lt(v * 0.05) : dk(-v * 0.07); if (kd === 'bulkhead' || kd === 'cargo') g.fillRect(R() * W, R() * H, 1, 6 + R() * 26); else g.fillRect(R() * W, R() * H, 3 + R() * 14, 1); } // (brushed: its grain)
-    if (kd === 'bulkhead') {
+    if (kd === 'lbulkhead' || kd === 'ldeck' || kd === 'loverhead') {
+      // A cruise liner's (a theme with liner set): modern. base is the wall's stone, the carpet's charcoal or the ceiling's dark, acc her brass.
+      //   lbulkhead  a black recessed plinth with a line of warm light over it; walnut slats to above the doors' height; a brass
+      //              inlay; a smooth stone panel, faintly veined; a cove of warm light under a dark shadow gap at the top
+      //   ldeck      carpet: charcoal, a fine pile, broad tone-on-tone bands, a hairline of brass round every two metres
+      //   loverhead  dark matte panels, a slot of warm light across each, hairline joints
+      const warm = (a: number) => `rgba(255,214,160,${a})`, brass = (a: number) => { g.globalAlpha = a; return acc; }, done = () => { g.globalAlpha = 1; };
+      if (kd === 'lbulkhead') {
+        const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, f: string) => rect(0, Y(m1), W, Y(m0) - Y(m1), f);
+        // the stone panel: a few faint veins across it
+        for (let i = 0; i < 5; i++) { g.strokeStyle = i & 1 ? lt(0.07) : dk(0.07); g.lineWidth = 1 + R(); g.beginPath(); let x = R() * W, y = Y(3.6); g.moveTo(x, y); while (y < Y(2.6)) { x += (R() - 0.5) * 26; y += 12 + R() * 18; g.lineTo(x, y); } g.stroke(); }
+        // the cove: a slot of light, its glow down the stone under it, the shadow gap over it
+        { const gr = g.createLinearGradient(0, Y(3.66), 0, Y(2.9)); gr.addColorStop(0, warm(0.5)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, Y(3.66), W, Y(2.9) - Y(3.66)); }
+        band(3.66, 3.72, '#ffe6c0'); band(3.72, 4, '#141416');
+        // the slats: walnut, a dark gap between each, lit a little from the plinth's line below
+        band(0.12, 2.56, '#3a2a1e');
+        for (let x = 0; x < W; x += 16) { rect(x + 2, Y(2.56), 11, Y(0.12) - Y(2.56), '#6a4a32'); rect(x + 2, Y(2.56), 2, Y(0.12) - Y(2.56), lt(0.12)); rect(x + 11, Y(2.56), 2, Y(0.12) - Y(2.56), dk(0.22)); }
+        for (let i = 0; i < 70; i++) { g.fillStyle = i & 1 ? lt(0.04) : dk(0.08); g.fillRect(R() * W, Y(2.56) + R() * (Y(0.12) - Y(2.56)), 1, 14 + R() * 60); } // their grain
+        { const gr = g.createLinearGradient(0, Y(0.12), 0, Y(0.7)); gr.addColorStop(0, warm(0.4)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, Y(0.7), W, Y(0.12) - Y(0.7)); }
+        band(2.56, 2.6, brass(1)); done(); band(2.56, 2.567, dk(0.35)); // the inlay
+        band(0, 0.1, '#101012'); band(0.1, 0.125, '#ffe2b8'); // the plinth, its line of light
+      } else if (kd === 'ldeck') {
+        for (let i = 0; i < 3000; i++) { g.fillStyle = R() < 0.5 ? lt(0.03) : dk(0.08); g.fillRect(R() * W, R() * H, 2, 2); } // its pile
+        for (let y = 0; y < H; y += 64) { rect(0, y, W, 30, lt(0.035)); rect(0, y + 30, W, 2, dk(0.12)); } // broad bands, tone on tone
+        g.lineWidth = 1.5; g.strokeStyle = brass(0.55); g.strokeRect(0.75, 0.75, W - 1.5, H - 1.5); done();
+      } else {
+        for (let i = 0; i < 900; i++) { g.fillStyle = R() < 0.5 ? lt(0.02) : dk(0.06); g.fillRect(R() * W, R() * H, 3, 3); }
+        g.lineWidth = 1; g.strokeStyle = dk(0.5); g.strokeRect(0.5, 0.5, W - 1, H - 1); g.beginPath(); g.moveTo(W / 2, 0); g.lineTo(W / 2, H); g.stroke(); // the panels' joints
+        { const gr = g.createLinearGradient(0, H / 2 - 30, 0, H / 2 + 30); gr.addColorStop(0, warm(0)); gr.addColorStop(0.5, warm(0.35)); gr.addColorStop(1, warm(0)); g.fillStyle = gr; g.fillRect(0, H / 2 - 30, W, 60); }
+        rect(0, H / 2 - 5, W, 10, '#0c0c0e'); rect(0, H / 2 - 3, W, 6, '#ffe6c0'); rect(0, H / 2 - 5, W, 1, brass(0.8)); rect(0, H / 2 + 4, W, 1, brass(0.8)); done(); // the slot of light, a brass lip either side
+      }
+    } else if (kd === 'bulkhead') {
       const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, f: string) => rect(0, Y(m1), W, Y(m0) - Y(m1), f);
       band(2.5, 4, dk(0.34)); // the plating over the light
       for (let m = 2.75; m < 3.7; m += 0.25) { band(m, m + 0.012, dk(0.3)); band(m - 0.012, m, lt(0.05)); }
@@ -329,8 +365,10 @@ export const LevelView = {
       band(1.04, 1.2, dk(0.5)); band(1.09, 1.15, acc); band(1.2, 1.21, lt(0.1)); // the rail
       band(0.25, 1.04, dk(0.1)); inset(8, Y(0.98), W - 16, Y(0.31) - Y(0.98)); for (const x of [15, W - 15]) for (const m of [0.92, 0.37]) bolt(x, Y(m));
       band(0, 0.25, dk(0.52)); for (let m = 0.04; m < 0.24; m += 0.05) band(m, m + 0.008, lt(0.07)); // the kick plate
-      for (let i = 0; i < 26; i++) { g.fillStyle = dk(0.05 + R() * 0.08); g.fillRect(R() * W, Y(0.25 + R() * 0.9), 4 + R() * 22, 1 + R() * 2); } // (scuffed, low down)
+      const scuffs: number[][] = [];
+      for (let i = 0; i < 26; i++) { const sc = [R() * W, Y(0.25 + R() * 0.9), 4 + R() * 22, 1 + R() * 2]; scuffs.push(sc); g.fillStyle = dk(0.05 + R() * 0.08); g.fillRect(sc[0], sc[1], sc[2], sc[3]); } // (scuffed, low down)
       rect(0, 0, 2, H, dk(0.42)); rect(W - 2, 0, 2, H, dk(0.42)); rect(2, 0, 1, H, lt(0.08)); // the joint with the next
+      extra = this._bulkheadMaps(W, H, scuffs);
     } else if (kd === 'deck') {
       const P = W / 2;
       for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {
@@ -342,7 +380,9 @@ export const LevelView = {
         g.lineWidth = 3; g.strokeStyle = dk(0.5); g.strokeRect(x0 + 1.5, y0 + 1.5, P - 3, P - 3); g.lineWidth = 1; g.strokeStyle = lt(0.09); g.strokeRect(x0 + 4.5, y0 + 4.5, P - 9, P - 9);
         for (const [bx, by] of [[9, 9], [P - 9, 9], [9, P - 9], [P - 9, P - 9]]) bolt(x0 + bx, y0 + by, 2.6);
       }
-      for (let i = 0; i < 40; i++) { g.fillStyle = dk(0.04 + R() * 0.07); g.fillRect(R() * W, R() * H, 8 + R() * 40, 1 + R() * 2); } // (walked on)
+      const scuffs: number[][] = [];
+      for (let i = 0; i < 40; i++) { const sc = [R() * W, R() * H, 8 + R() * 40, 1 + R() * 2]; scuffs.push(sc); g.fillStyle = dk(0.04 + R() * 0.07); g.fillRect(sc[0], sc[1], sc[2], sc[3]); } // (walked on)
+      extra = this._deckMaps(W, P, scuffs);
     } else if (kd === 'overhead') {
       rect(0, 0, W, 18, dk(0.4)); rect(0, 18, W, 2, lt(0.08)); rect(0, 0, 18, H, dk(0.4)); rect(18, 0, 2, H, lt(0.08)); // the frames
       inset(34, 34, W - 50, H - 50); rect(W / 2 + 20, 20, 22, H - 20, dk(0.32)); for (let y = 30; y < H; y += 22) rect(W / 2 + 22, y, 18, 2, lt(0.08)); // a cable run
@@ -354,9 +394,142 @@ export const LevelView = {
       for (const [x, y] of [[0, 0], [W - 22, 0], [0, H - 22], [W - 22, H - 22]]) { rect(x, y, 22, 22, dk(0.35)); rect(x + 7, y + 7, 8, 8, dk(0.5)); } // corner castings
       rect(34, 38, 74, 44, '#e6e8e4'); for (let x = 40; x < 100; x += 3 + ((x * 7) % 5)) rect(x, 44, 1 + (x % 3), 20, '#15181a'); rect(40, 69, 46, 5, '#15181a'); // a label
     }
+    if (!extra) extra = this._shipMaps(kd, W, H); // (the rest of her surfaces' relief and wear)
     const tex = new THREE.CanvasTexture(c); tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.anisotropy = 8;
+    if (extra) tex.userData.maps = extra; // (the deck's relief and wear: mat puts them on its material)
     return tex;
   },
+  // A deck's relief and wear, drawn over the same plates as its colour (_shipTex 'deck'; scuffs: where it drew the marks of boots), as one
+  // texture (a shader can read only 16: the light grid's, a weapon light's shadows and the room's reflection leave a deck room for two):
+  //   rgb  a normal map from a height: the seams sunk ~2 mm, the studs and bolts' heads standing ~2 mm, the grating's slots through
+  //   a    its roughness (js/lightgrid.ts LG_RGH_NA: times the material's, which is 1 with it): steel 0.69 and brushed, polished where
+  //        boots go (a few broad patches, the studs' tops a little, the scuffs, the bolts' heads), dirt rough in the seams and the slots
+  // Data, not colour (read as it is, where js/util.ts makes a canvas's texture sRGB), and made from the bytes, not a canvas: a canvas keeps
+  // its pixels multiplied by their alpha, and the normals would lose their precision where the steel's polished.
+  _deckMaps(W: number, P: number, scuffs: number[][]) {
+    const mk = () => { const c = document.createElement('canvas'); c.width = c.height = W; return [c, c.getContext('2d')!] as const; };
+    const [, h] = mk(), [, r] = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
+    const box = (g: CanvasRenderingContext2D, x: number, y: number, w: number, hh: number, f: string) => { g.fillStyle = f; g.fillRect(x, y, w, hh); };
+    box(h, 0, 0, W, W, gv(128)); box(r, 0, 0, W, W, gv(176));
+    for (let i = 0; i < 7; i++) { const x = R() * W, y = R() * W, rad = 30 + R() * 70, gr = r.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(110, 0.55)); gr.addColorStop(1, gv(110, 0)); r.fillStyle = gr; r.fillRect(0, 0, W, W); } // (worn)
+    for (let i = 0; i < W * W / 60; i++) { const v = R() * 2 - 1; r.fillStyle = v > 0 ? gv(255, v * 0.08) : gv(0, -v * 0.08); r.fillRect(R() * W, R() * W, 3 + R() * 14, 1); } // (brushed)
+    for (const sc of scuffs) box(r, sc[0], sc[1], sc[2], sc[3], gv(100, 0.5));
+    const dome = (x: number, y: number, rad: number) => { const gr = h.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(215)); gr.addColorStop(0.7, gv(185)); gr.addColorStop(1, gv(128, 0)); h.fillStyle = gr; h.beginPath(); h.arc(x, y, rad, 0, 7); h.fill(); r.fillStyle = gv(115); r.beginPath(); r.arc(x, y, rad * 0.8, 0, 7); r.fill(); };
+    for (let py = 0; py < 2; py++) for (let px = 0; px < 2; px++) {
+      const x0 = px * P, y0 = py * P;
+      if (px === 1 && py === 0) {
+        box(h, x0 + 6, y0 + 6, P - 12, P - 12, gv(100)); box(r, x0 + 6, y0 + 6, P - 12, P - 12, gv(200));
+        for (let y = y0 + 12; y < y0 + P - 12; y += 9) for (let x = x0 + 12; x < x0 + P - 14; x += 26) { box(h, x, y, 20, 4, gv(20)); box(r, x, y, 20, 4, gv(240)); }
+      } else for (let y = y0 + 14; y < y0 + P - 10; y += 12) for (let x = x0 + 14 + ((y / 12) & 1) * 6; x < x0 + P - 10; x += 12) { box(h, x, y, 4, 2, gv(195)); box(r, x, y, 4, 2, gv(145)); }
+      for (const [g, v, lw] of [[h, 50, 3], [r, 240, 3]] as const) { g.lineWidth = lw; g.strokeStyle = gv(v); g.strokeRect(x0 + 1.5, y0 + 1.5, P - 3, P - 3); }
+      h.lineWidth = 1; h.strokeStyle = gv(100); h.strokeRect(x0 + 3.5, y0 + 3.5, P - 7, P - 7); // (the plate's edge chamfered down to the seam)
+      for (const [bx, by] of [[9, 9], [P - 9, 9], [9, P - 9], [P - 9, P - 9]]) dome(x0 + bx, y0 + by, 3.2);
+    }
+    return { nrm: this._relief(h, r, W, W, LevelView.BUMP) };
+  },
+  // A ship's wall (_shipTex 'bulkhead': a tile's width, 128 px, by the wall's 4 m, 768: about 5 mm a pixel), as the deck's (_deckMaps), over
+  // the same bands as its paint: the ribbed plating's grooves, the vent's slots, the trunking and the rail standing out, the strip of light
+  // in its channel, the panels' edges sunk, the bolts' heads, the kick plate's ribs, the joint with the next. Painted steel 0.72; the rail
+  // worn smooth (0.4), the light's diffuser 0.3, the kick plate and the scuffs low down rubbed (0.55), dirt in the vent's slots and the joints.
+  _bulkheadMaps(W: number, H: number, scuffs: number[][]) {
+    const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c.getContext('2d')!; };
+    const h = mk(), r = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
+    const Y = (m: number) => Math.round(H * (1 - m / 4));
+    const both = (x: number, y: number, w: number, hh: number, hv: number, rv: number) => { if (hv >= 0) { h.fillStyle = gv(hv); h.fillRect(x, y, w, hh); } if (rv >= 0) { r.fillStyle = gv(rv); r.fillRect(x, y, w, hh); } };
+    const band = (m0: number, m1: number, hv: number, rv: number) => both(0, Y(m1), W, Y(m0) - Y(m1), hv, rv);
+    const inset = (x: number, y: number, w: number, hh: number) => { h.lineWidth = 2; h.strokeStyle = gv(70); h.strokeRect(x, y, w, hh); r.lineWidth = 2; r.strokeStyle = gv(220); r.strokeRect(x, y, w, hh); }; // (a panel's edge: a groove, dirty)
+    const bolt = (x: number, y: number, rad = 2.8) => { const gr = h.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(215)); gr.addColorStop(0.7, gv(185)); gr.addColorStop(1, gv(128, 0)); h.fillStyle = gr; h.beginPath(); h.arc(x, y, rad, 0, 7); h.fill(); r.fillStyle = gv(120); r.beginPath(); r.arc(x, y, rad * 0.8, 0, 7); r.fill(); };
+    both(0, 0, W, H, 128, 184);
+    for (let i = 0; i < W * H / 80; i++) { const v = R() * 2 - 1; r.fillStyle = v > 0 ? gv(255, v * 0.07) : gv(0, -v * 0.07); r.fillRect(R() * W, R() * H, 1, 6 + R() * 26); } // (brushed, up and down)
+    for (let m = 2.75; m < 3.7; m += 0.25) band(m, m + 0.012, 85, 210); // the plating's ribs: grooves
+    for (let x = 22; x < W - 22; x += 12) both(x, Y(3.4), 6, Y(3.06) - Y(3.4), 30, 235); // the vent's slots
+    inset(14, Y(3.46), W - 28, Y(3.0) - Y(3.46));
+    band(3.68, 3.86, 175, 170); band(3.86, 3.875, 150, -1); // the trunking, standing out, its lip
+    band(2.34, 2.5, 85, 200); band(2.37, 2.47, 115, 77); // the strip of light, in its channel: the diffuser smooth
+    inset(8, Y(2.28), W - 16, Y(1.26) - Y(2.28)); for (const x of [15, W - 15]) for (const m of [2.22, 1.32]) bolt(x, Y(m));
+    both(W - 46, Y(2.12), 28, 14, 140, 150); // the stencilled plate
+    band(1.04, 1.2, 200, 102); band(1.19, 1.2, 175, -1); band(1.04, 1.05, 175, -1); // the rail: standing out, its edges rounded, worn smooth
+    inset(8, Y(0.98), W - 16, Y(0.31) - Y(0.98)); for (const x of [15, W - 15]) for (const m of [0.92, 0.37]) bolt(x, Y(m));
+    band(0, 0.25, 150, 140); for (let m = 0.04; m < 0.24; m += 0.05) band(m, m + 0.008, 175, -1); // the kick plate, its ribs, rubbed
+    for (const sc of scuffs) both(sc[0], sc[1], sc[2], sc[3], -1, 140);
+    both(0, 0, 2, H, 60, 230); both(W - 2, 0, 2, H, 60, 230); // the joint with the next
+    return { nrm: this._relief(h, r, W, H, LevelView.BUMP * 1.5) }; // (its pixels 5 mm to the deck's 8: as steep for the same height)
+  },
+  // The rest of a ship's surfaces' relief and wear (as _deckMaps, _bulkheadMaps: over the same layout as _shipTex paints; h the height,
+  // 128 level, r the roughness, 255 = 1):
+  //   lbulkhead  a liner's wall: the plinth sunk under its line of light, the walnut slats standing out of their dark gaps (rounded,
+  //              oiled: 0.5), the brass inlay polished (0.25), the stone panel honed (0.4), the cove's slot and its shadow gap sunk
+  //   ldeck      her carpet: a pile (a fine roughness of height, 0.95), the bands' tufts a little higher, the brass hairline (0.35)
+  //   loverhead  her ceiling: matte panels (0.85), the joints sunk, the slot of light sunk behind a smooth diffuser, its brass lips
+  //   overhead   a ship's ceiling: the frames standing out (0.55), the recessed panel, the cable run and its ties, the bolts
+  //   cargo      a container's side: corrugated (ridges and valleys, painted 0.6), the frame and the corner castings standing out,
+  //              their pockets sunk, the label a smooth sticker (0.35)
+  // A wall's pixels and a ceiling's are about 5 mm (the deck's 8); the container's about 9.
+  _shipMaps(kd: string, W: number, H: number): { nrm: THREE.Texture } | null {
+    if (!['lbulkhead', 'ldeck', 'loverhead', 'overhead', 'cargo'].includes(kd)) return null;
+    const mk = () => { const c = document.createElement('canvas'); c.width = W; c.height = H; return c.getContext('2d')!; };
+    const h = mk(), r = mk(), R = Math.random, gv = (v: number, a = 1) => `rgba(${v},${v},${v},${a})`;
+    const both = (x: number, y: number, w: number, hh: number, hv: number, rv: number) => { if (hv >= 0) { h.fillStyle = gv(hv); h.fillRect(x, y, w, hh); } if (rv >= 0) { r.fillStyle = gv(rv); r.fillRect(x, y, w, hh); } };
+    const groove = (x: number, y: number, w: number, hh: number, hv = 70, rv = 220, lw = 2) => { h.lineWidth = lw; h.strokeStyle = gv(hv); h.strokeRect(x, y, w, hh); r.lineWidth = lw; r.strokeStyle = gv(rv); r.strokeRect(x, y, w, hh); };
+    const bolt = (x: number, y: number, rad = 3) => { const gr = h.createRadialGradient(x, y, 0, x, y, rad); gr.addColorStop(0, gv(215)); gr.addColorStop(0.7, gv(185)); gr.addColorStop(1, gv(128, 0)); h.fillStyle = gr; h.beginPath(); h.arc(x, y, rad, 0, 7); h.fill(); r.fillStyle = gv(120); r.beginPath(); r.arc(x, y, rad * 0.8, 0, 7); r.fill(); };
+    const grain = (n: number, a: number, vert: boolean) => { for (let i = 0; i < n; i++) { const v = R() * 2 - 1; r.fillStyle = v > 0 ? gv(255, v * a) : gv(0, -v * a); if (vert) r.fillRect(R() * W, R() * H, 1, 6 + R() * 26); else r.fillRect(R() * W, R() * H, 3 + R() * 14, 1); } };
+    let S = LevelView.BUMP * 1.5;
+    if (kd === 'lbulkhead') {
+      const Y = (m: number) => Math.round(H * (1 - m / 4)), band = (m0: number, m1: number, hv: number, rv: number) => both(0, Y(m1), W, Y(m0) - Y(m1), hv, rv);
+      both(0, 0, W, H, 128, 102); // (the stone, honed)
+      band(3.72, 4, 40, 230); band(3.66, 3.72, 70, 77); // the shadow gap, the cove's slot
+      band(0.12, 2.56, 70, 215); // the slats' gaps
+      for (let x = 0; x < W; x += 16) { both(x + 2, Y(2.56), 11, Y(0.12) - Y(2.56), 165, 128); both(x + 2, Y(2.56), 2, Y(0.12) - Y(2.56), 148, -1); both(x + 11, Y(2.56), 2, Y(0.12) - Y(2.56), 148, -1); } // (rounded at their edges)
+      for (let i = 0; i < 90; i++) { const x = Math.floor(R() * W / 16) * 16 + 3 + R() * 9; r.fillStyle = gv(R() < 0.5 ? 150 : 110, 0.5); r.fillRect(x, Y(2.56) + R() * (Y(0.12) - Y(2.56)), 1, 14 + R() * 60); } // (the walnut's grain)
+      band(2.56, 2.6, 142, 64); // the brass inlay
+      band(0, 0.1, 95, 205); band(0.1, 0.125, 110, 77); // the plinth, its line of light
+    } else if (kd === 'ldeck') {
+      S = LevelView.BUMP * 0.6; // (soft: a pile, not steel)
+      both(0, 0, W, H, 128, 242);
+      for (let i = 0; i < 9000; i++) { h.fillStyle = gv(R() < 0.5 ? 150 : 106, 0.6); h.fillRect(R() * W, R() * H, 1 + R(), 1 + R()); } // the pile
+      for (let y = 0; y < H; y += 64) { h.fillStyle = gv(140, 0.5); h.fillRect(0, y, W, 30); } // the bands' tufts, a little higher
+      groove(0.75, 0.75, W - 1.5, H - 1.5, 140, 90, 1.5); // the brass hairline
+    } else if (kd === 'loverhead') {
+      both(0, 0, W, H, 128, 216); grain(W * H / 200, 0.04, false);
+      groove(0.5, 0.5, W - 1, H - 1, 60, 230, 2); both(W / 2 - 1, 0, 2, H, 60, 230); // the panels' joints
+      both(0, H / 2 - 5, W, 10, 60, 230); both(0, H / 2 - 3, W, 6, 95, 70); both(0, H / 2 - 5, W, 1, 150, 64); both(0, H / 2 + 4, W, 1, 150, 64); // the slot of light: its diffuser, the brass lips
+    } else if (kd === 'overhead') {
+      both(0, 0, W, H, 128, 190); grain(W * H / 60, 0.07, false);
+      both(0, 0, W, 18, 175, 140); both(0, 0, 18, H, 175, 140); both(0, 18, W, 2, 150, -1); both(18, 0, 2, H, 150, -1); // the frames
+      both(36, 36, W - 54, H - 54, 105, -1); groove(34, 34, W - 50, H - 50, 70, 220, 2); // the recessed panel
+      both(W / 2 + 20, 20, 22, H - 20, 180, 175); for (let y = 30; y < H; y += 22) both(W / 2 + 20, y, 22, 2, 200, 150); // the cable run, its ties
+      for (const [x, y] of [[9, 9], [42, 42], [W - 24, 42], [42, H - 24], [W - 24, H - 24]]) bolt(x, y);
+    } else { // cargo
+      S = LevelView.BUMP * 0.9;
+      both(0, 0, W, H, 150, 154); grain(W * H / 80, 0.06, true);
+      for (let x = 14; x < W - 14; x += 16) { both(x, 14, 8, H - 28, 95, 160); both(x - 1, 14, 1, H - 28, 115, -1); both(x + 8, 14, 1, H - 28, 125, -1); } // corrugated: the valleys, their sloped sides
+      h.lineWidth = 14; h.strokeStyle = gv(205); h.strokeRect(7, 7, W - 14, H - 14); r.lineWidth = 14; r.strokeStyle = gv(170); r.strokeRect(7, 7, W - 14, H - 14); // the frame
+      for (const [x, y] of [[0, 0], [W - 22, 0], [0, H - 22], [W - 22, H - 22]]) { both(x, y, 22, 22, 225, 150); both(x + 7, y + 7, 8, 8, 60, 230); } // corner castings, their pockets
+      both(34, 38, 74, 44, -1, 90); // the label
+      for (let i = 0; i < 30; i++) both(R() * W, R() * H, 2 + R() * 30, 1 + R() * 2, -1, 120); // (scraped: bare and smooth)
+    }
+    return { nrm: this._relief(h, r, W, H, S) };
+  },
+  // A relief and a roughness, drawn in grey (h: the height, 128 level; r: the roughness, 255 = 1), as one texture: rgb the normal (the
+  // height's slope each way, softened a little: a pixel-wide edge glitters; the tile repeats, so the neighbours wrap), a the roughness.
+  // Data, not colour (read as it is, where js/util.ts makes a canvas's texture sRGB), and made from the bytes, not a canvas: a canvas keeps
+  // its pixels multiplied by their alpha, and the normals would lose their precision where the steel's polished. S: how steep a step of
+  // the height is over a pixel.
+  _relief(h: CanvasRenderingContext2D, r: CanvasRenderingContext2D, W: number, H: number, S: number) {
+    { const c = document.createElement('canvas'); c.width = W; c.height = H; const b = c.getContext('2d')!; b.filter = 'blur(0.9px)'; b.drawImage(h.canvas, 0, 0); h.drawImage(c, 0, 0); }
+    const hd = h.getImageData(0, 0, W, H).data, rd = r.getImageData(0, 0, W, H).data, o = new Uint8Array(W * H * 4), at = (x: number, y: number) => hd[((((y + H) % H) * W + ((x + W) % W)) << 2)];
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const dx = (at(x + 1, y - 1) + 2 * at(x + 1, y) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x - 1, y) - at(x - 1, y + 1)) / 8;
+      const dy = (at(x - 1, y + 1) + 2 * at(x, y + 1) + at(x + 1, y + 1) - at(x - 1, y - 1) - 2 * at(x, y - 1) - at(x + 1, y - 1)) / 8;
+      let nx = -dx * S, ny = dy * S, nz = 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
+      const k = ((H - 1 - y) * W + x) << 2; o[k] = Math.round((nx * 0.5 + 0.5) * 255); o[k + 1] = Math.round((ny * 0.5 + 0.5) * 255); o[k + 2] = Math.round((nz * 0.5 + 0.5) * 255); o[k + 3] = rd[((y * W + x) << 2) + 1]; // (rows bottom up: a canvas's texture is flipped, a texture of bytes isn't)
+    }
+    const T = THREE, x = new T.DataTexture(o, W, H, T.RGBAFormat, T.UnsignedByteType);
+    x.colorSpace = T.NoColorSpace; x.wrapS = x.wrapT = T.RepeatWrapping; x.anisotropy = 8; x.magFilter = T.LinearFilter; x.minFilter = T.LinearMipmapLinearFilter; x.generateMipmaps = true; x.needsUpdate = true;
+    return x;
+  },
+  // how steep the deck's relief: a step of the height's 0..255 over a pixel (8 mm) as a slope (?bump=k in the URL scales it, for comparing)
+  BUMP: 0.012 * (typeof location !== 'undefined' ? +(new URLSearchParams(location.search).get('bump') || 1) : 1),
   _tex(kind: string, base: string) {
     if (kind.indexOf(':') > 0) { const [kd, acc] = kind.split(':'); return this._shipTex(kd, base, acc); }
     const c = document.createElement('canvas');
@@ -490,9 +663,9 @@ export const LevelView = {
     wheel.position.z = 0.09; const w2 = wheel.clone(); w2.position.z = -0.09; g.add(w2);
     return g;
   },
-  mergeStatic(root: THREE.Object3D, map: LvMap, CH = 24) { const it = this.mergeSteps(root, map, CH); let r = it.next(); while (!r.done) r = it.next(); return r.value; },
-  *mergeSteps(root: THREE.Object3D, map: LvMap, CH = 24): Generator<void, number, void> {
-    const T = THREE, keep = new Set();
+  // what of a level moves or changes while it's played (its doors, windows, the case, the boxes, the cabinets): never merged or batched
+  keepOf(map: LvMap) {
+    const keep = new Set<THREE.Object3D>();
     for (const m of [map, ...(map.floors || [])]) {
       for (const o of m.doorMeshes || []) keep.add(o);
       for (const o of m.winMeshes || []) if (o) keep.add(o);
@@ -501,6 +674,11 @@ export const LevelView = {
       if (m.sboxView) keep.add(m.sboxView.g);
       for (const c of m.cabViews || []) keep.add(c.g);
     }
+    return keep;
+  },
+  mergeStatic(root: THREE.Object3D, map: LvMap, CH = 24) { const it = this.mergeSteps(root, map, CH); let r = it.next(); while (!r.done) r = it.next(); return r.value; },
+  *mergeSteps(root: THREE.Object3D, map: LvMap, CH = 24): Generator<void, number, void> {
+    const T = THREE, keep = this.keepOf(map);
     const plain = (mt: Record<string, any>) => (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && !mt.transparent
       && (!mt.hasOwnProperty('onBeforeCompile'));
     root.updateMatrixWorld(true);
@@ -570,8 +748,8 @@ export const LevelView = {
     const plain = (mt: Record<string, any>) => (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && !mt.transparent
       && (!mt.hasOwnProperty('onBeforeCompile'));
     root.updateMatrixWorld(true);
-    interface BEntry { g: THREE.BufferGeometry; o: LvObj; M: THREE.Matrix4 }
-    interface Bin { mt: THREE.Material; mask: number; cast: boolean; culled: boolean; keepMat: boolean; multi: boolean; list: BEntry[] }
+    interface BEntry { g: THREE.BufferGeometry; o: LvObj; M: THREE.Matrix4; mt: THREE.Material }
+    interface Bin { mt: THREE.Material; mask: number; cast: boolean; culled: boolean; keepMat: boolean; multi: boolean; tint: boolean; list: BEntry[] }
     const inv = new T.Matrix4().copy(root.matrixWorld).invert(), bins = new Map<string, Bin>(), took: LvObj[] = [];
     const ids = new Map<unknown, number>(), idOf = (mt: unknown) => { if (!ids.has(mt)) ids.set(mt, ids.size); return ids.get(mt); }; // (by the material itself, not its uuid)
     // a mesh of several materials (a stair's step: tread and risers): each material's part a geometry of its own, made once
@@ -600,10 +778,12 @@ export const LevelView = {
       const multi = Array.isArray(o.material) && g.groups.length > 0, ps = multi ? g.groups : [{ start: 0, count: Infinity, materialIndex: 0 }];
       for (const p of ps) {
         const mt = mats[p.materialIndex!] || mats[0], pg = multi ? partOf(g, p) : g;
-        const key = idOf(mt) + '|' + o.layers.mask + '|' + names + '|' + (pg.index ? 'i' : 'n') + '|' + (o.castShadow ? 1 : 0) + (o.frustumCulled ? 1 : 0);
+        // (materials alike in all but their colour, one batch: each piece its own colour, ProxyDraw.tone. Not one that's kept past the level)
+        const tone = o.userData.keepMat ? null : ProxyDraw.tone(mt);
+        const key = (tone ? 't' + tone : idOf(mt)) + '|' + o.layers.mask + '|' + names + '|' + (pg.index ? 'i' : 'n') + '|' + (o.castShadow ? 1 : 0) + (o.frustumCulled ? 1 : 0);
         let b = bins.get(key);
-        if (!b) bins.set(key, (b = { mt, mask: o.layers.mask, cast: o.castShadow, culled: o.frustumCulled, keepMat: false, multi: false, list: [] }));
-        b.list.push({ g: pg, o, M });
+        if (!b) bins.set(key, (b = { mt, mask: o.layers.mask, cast: o.castShadow, culled: o.frustumCulled, keepMat: false, multi: false, tint: !!tone, list: [] }));
+        b.list.push({ g: pg, o, M, mt });
         if (multi) b.multi = true; // (built however few: the mesh's other parts go into theirs)
         if (o.userData.keepMat) b.keepMat = true;
       }
@@ -616,12 +796,14 @@ export const LevelView = {
       const geos = new Map<THREE.BufferGeometry, number>();
       let nv = 0, ni = 0;
       for (const e of b.list) if (!geos.has(e.g)) { geos.set(e.g, -1); nv += e.g.attributes.position.count; ni += e.g.index ? e.g.index.count : 0; }
-      const bm = new T.BatchedMesh(b.list.length, nv, ni, b.mt);
+      const tint = b.tint && b.list.some((e) => e.mt !== b.mt); // (more than one colour in it: drawn white, each piece its colour)
+      const bm = new T.BatchedMesh(b.list.length, nv, ni, tint ? ProxyDraw.white(b.mt) : b.mt);
       for (const e of b.list) {
         try {
           let gid = geos.get(e.g)!;
           if (gid < 0) { gid = bm.addGeometry(e.g); geos.set(e.g, gid); }
           const id = bm.addInstance(gid); bm.setMatrixAt(id, e.M);
+          if (tint) { bm.setColorAt(id, (e.mt as THREE.MeshStandardMaterial).color); ProxyDraw.watch(e.mt, bm, id); }
           inst.push([bm, id, e.o]); merged.add(e.o);
         } catch (err) { failed.add(e.o); console.warn('batchStatic', err); }
       }

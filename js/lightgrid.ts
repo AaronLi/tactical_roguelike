@@ -34,13 +34,24 @@ export const LightGrid = (() => {
     lgGrid: { value: new T.Vector4(0, 0, 1, 0) }, // x0, z0 (the map's corner, metres), cell size, on (0/1)
     lgSize: { value: new T.Vector4(1, 1, 1, 0) }, // W, H (cells), floors, where the lowest floor's layer starts (y)
     lgFloorH: { value: 4.3 },
+    // the lamps' highlight's strength (FS_BODY: 0 none, 1 as a lamp's own would be; ?spec=k in the URL for comparing)
+    lgTop: { value: blank }, lgLampAt: { value: new T.Vector2(1, 0) }, // (the four lamps that light each cell most, by number, and under them the lamps: where, how far, their light; lgLampAt: the lamps' rows' width, the first's row)
+    lgSpec: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('spec') : null; return q != null && Number.isFinite(+q) ? +q : 1; })() },
     lgPaint: { value: blank }, // (residents' wall colours, a cell of the floor plan each: js/homes.ts paint)
     // night vision's IR illuminator (js/render.ts), only on a frame drawn for the goggles with it switched on: lgNv where it
     // is (the eye: x, y, z) and how bright (w, 0 off), lgNvD which way it points (x, y, z) and the cosine of its cone's half-angle (w)
     lgNv: { value: new T.Vector4(0, 0, 0, 0) }, lgNvD: { value: new T.Vector4(0, 0, -1, 0.9) },
     // ambient occlusion (below): x how much (0 off, 1 as made), y the walls' height (m); js/render.ts setAO
     lgAoK: { value: new Float32Array(8).fill(1) }, // (the moving parts' layers of the occlusion: 1 in place, 0 away; js/gunao.ts)
-    lgAo: { value: new T.Vector4(1, 4, 0, 0.28) }, lgAoA: { value: blank }, lgAoB: { value: blank },
+    lgAo: { value: new T.Vector4(1, 4, 0, 0.28) }, lgAoAB: { value: blank }, // (the two occlusion bakes side by side in one texture: a shader can read only 16)
+    // reflections (js/probes.ts): lgEnvOn the level's being drawn (1; 0: three's own, as in a scene that isn't the level's: the gun's
+    // studio), lgEnvK how much, lgEnvR how much less on a rough surface, the room's box the picture's projected on (lgEnvMin, lgEnvMax)
+    // and where it was taken from (lgEnvC)
+    lgGrime: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('grime') : null; return q != null && Number.isFinite(+q) ? +q : 2.5; })() }, // (the level's grime, FS_BODY: 0 none; ?grime=k in the URL)
+    // the people's shadows (js/entshadows.ts): lgLevel the level's scene is being drawn (1; 0 any other: the gun's), lgCapN how many
+    // capsules, each from lgCapA (xyz, w its radius) to lgCapB
+    lgLevel: { value: 0 }, lgCapN: { value: 0 }, lgCapA: { value: Array.from({ length: 48 }, () => new T.Vector4()) }, lgCapB: { value: Array.from({ length: 48 }, () => new T.Vector4()) },
+    lgEnvOn: { value: 0 }, lgEnvK: { value: 0 }, lgEnvR: { value: (() => { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('reflr') : null; return q != null && Number.isFinite(+q) ? +q : 0.6; })() }, lgEnvMin: { value: new T.Vector3() }, lgEnvMax: { value: new T.Vector3(1, 1, 1) }, lgEnvC: { value: new T.Vector3() },
     lgBand: { value: new T.Vector4(1, 0.5, 1, 0) }, // the slabs of a floor: how many, the first one's middle, each one's height (m) // (z: the baked one's in; else the open share, below)
   };
   let built = false;
@@ -68,7 +79,7 @@ export const LightGrid = (() => {
       #endif
       lgp = modelMatrix * lgp; vLgP = lgp.xyz; vLgN = normalize(mat3(modelMatrix) * lgn); vOcc = aOcc + aOccD * lgAoK[int(aOccI + 0.5)]; }`; // (a moving part's occlusion on what's round it, as the part is in place: js/gunao.ts layers)
   const FS_HEAD = `varying vec3 vLgP;\nvarying vec3 vLgN;\nvarying float vOcc;\nuniform sampler2D lgLight;\nuniform sampler2D lgDir;\nuniform vec4 lgGrid;\nuniform vec4 lgSize;\nuniform float lgFloorH;\nuniform sampler2D lgPaint;\nuniform vec4 lgNv;\nuniform vec4 lgNvD;
-uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform sampler2D lgAoB;\n`;
+uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler2D lgTop;\nuniform vec2 lgLampAt;\nuniform float lgGrime;\nuniform float lgLevel;\nuniform float lgCapN;\nuniform vec4 lgCapA[48];\nuniform vec4 lgCapB[48];\nfloat lgHash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }\nfloat lgNoise(vec2 p) { vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f); return mix(mix(lgHash(i), lgHash(i + vec2(1.0, 0.0)), f.x), mix(lgHash(i + vec2(0.0, 1.0)), lgHash(i + vec2(1.0, 1.0)), f.x), f.y); }\nfloat lgFbm(vec2 p) { return 0.5 * lgNoise(p) + 0.3 * lgNoise(p * 2.7 + 3.1) + 0.2 * lgNoise(p * 6.3 - 1.7); }\nuniform sampler2D lgAoAB;\nuniform float lgEnvOn;\nuniform float lgEnvK;\nuniform float lgEnvR;\nuniform vec3 lgEnvMin;\nuniform vec3 lgEnvMax;\nuniform vec3 lgEnvC;\n`;
   // A wall's colour by the room it faces (a material with LG_PAINT: only a level with a resident's room). A wall cell is one
   // box with a room on each side, so the box can't be tinted: each face takes it from the floor plan, just off the face on
   // its own side, as it does the light, so the room next door keeps its own, and so do a wall's faces once they've been
@@ -111,7 +122,8 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
       if (lgAo.x > 0.0) {
         float lgy = vLgP.y - (lgSize.w + lgf * lgFloorH) - lgAo.w; // (its height over the floor it's on)
         if (lgAo.z > 0.5) { // (the baked: js ambient occlusion above, the floor, the ceiling or the wall facing the way this one does)
-          vec4 lga = texture2D(lgAoA, lguv), lgb = texture2D(lgAoB, lguv);
+          float lgah = 0.5 / float(textureSize(lgAoAB, 0).x / 2), lgax = clamp(lguv.x, lgah, 1.0 - lgah) * 0.5; // (each half's own edge: nothing filtered across from the other)
+          vec4 lga = texture2D(lgAoAB, vec2(lgax, lguv.y)), lgb = texture2D(lgAoAB, vec2(0.5 + lgax, lguv.y));
           float lgk = 1.0;
           if (lgn.y > 0.5) {
             // up: the floor at the floor; the top of a piece standing here at its height (the floor's was baked at the floor itself)
@@ -134,13 +146,125 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
       }
       float lgg = 1.0 - clamp(vOcc, 0.0, 1.0) * clamp(lgAo.x, 0.0, 1.0); // (a gun's own occlusion, js/gunao.ts: the fill and the grid's light)
       lgao *= lgg;
+      // Grime (the level's own surfaces: LG_GRIME, js/levelview.ts): dirt gathers low down where the room closes in: along a wall's foot
+      // (strongest at the floor, gone by a metre up, more in a corner), on a floor in the band at a wall's foot (the occlusion there), round
+      // and under what stands about; never on a ceiling. It lies in patches with edges (the noise against how much there'd be: not a soft
+      // gradient, which reads as a shadow of something that isn't there), on a wall streaked up and down; and a few faint blotches anywhere.
+      // Dirt is darker and rougher than what it's on, and reflects less.
+      #if defined( LG_GRIME ) && defined( STANDARD )
+      if (lgGrime > 0.0 && lgn.y > -0.5) {
+        float lgy2 = vLgP.y - (lgSize.w + lgf * lgFloorH) - lgAo.w; // (its height over the floor it's on)
+        vec2 lgnp = lgn.y > 0.5 ? vLgP.xz * 2.2 : vec2((abs(lgn.x) > 0.5 ? vLgP.z : vLgP.x) * 3.2, vLgP.y * 0.8);
+        float lgn1 = lgFbm(lgnp), lgn2 = lgFbm(lgnp * 0.31 + 17.0);
+        float lgocc = smoothstep(0.15, 0.55, 1.0 - lgao); // (how boxed in: the foot of a wall, a corner; not the broad falloff across a room)
+        float lgamt = lgn.y > 0.5 ? lgocc : lgocc * (1.0 - smoothstep(0.1, 1.0, lgy2)) + 0.5 * (1.0 - smoothstep(0.0, 0.22, lgy2)); // (a wall: low down only, and a little all along its foot)
+        lgamt *= 0.4 * lgGrime;
+        float lggr = smoothstep(0.0, 0.18, lgamt - (1.0 - lgn1) * 0.55) * 0.85 + 0.12 * lgGrime / 2.5 * smoothstep(0.62, 0.8, lgn2);
+        lggr = clamp(lggr, 0.0, 1.0);
+        vec3 lggc = mix(vec3(1.0), vec3(0.55, 0.5, 0.44), lggr);
+        diffuseColor.rgb *= lggc; material.diffuseColor *= lggc; material.diffuseContribution *= lggc;
+        material.roughness = mix(material.roughness, 1.0, 0.75 * lggr);
+        #if defined( RE_IndirectSpecular )
+        radiance *= 1.0 - 0.7 * lggr;
+        #endif
+      }
+      #endif
       #if defined( RE_IndirectDiffuse )
       irradiance *= lgg;
       #endif
+      // The people (js/entshadows.ts): each a few capsules (the body, each leg). What's near one (within 3 m of it, and not on it: its own
+      // surface isn't shadowed by itself) is shadowed from each lamp that lights the cell by them, softly (the lamp's not a point: the
+      // further the shadow falls from what casts it, the softer), and a little darkened under and round them (the fill they keep off the
+      // floor at their feet: what grounds them). Only on the level's drawing (lgLevel), never the gun's in your hands.
+      int lgcn = 0; int lgci[8];
+      if (lgLevel > 0.5) {
+        for (int c = 0; c < 48; c++) {
+          if (c >= int(lgCapN)) break;
+          vec4 ca = lgCapA[c], cb = lgCapB[c]; vec3 cv = cb.xyz - ca.xyz;
+          float ct = clamp(dot(vLgP - ca.xyz, cv) / max(dot(cv, cv), 1e-4), 0.0, 1.0); vec3 cq = vLgP - (ca.xyz + cv * ct); float cd = length(cq);
+          if (cd > 3.0 || (cd < ca.w * 1.3 && dot(lgn, cq) > 0.4 * cd)) continue; // (too far to matter, or its own surface: on it and facing out of it; the floor under a foot faces up, not out, and is shadowed)
+          if (lgcn < 8) { lgci[lgcn] = c; lgcn++; }
+          // (the fill: a sphere's worth of sky kept off, by how much of the view up it takes and how it faces it)
+          float cao = clamp(ca.w * ca.w / max(cd * cd, 1e-4), 0.0, 1.0) * clamp(0.6 + 0.6 * dot(lgn, -cq / cd), 0.0, 1.0);
+          lgao *= 1.0 - 0.7 * cao;
+          #if defined( RE_IndirectDiffuse )
+          irradiance *= 1.0 - 0.7 * cao;
+          #endif
+        }
+      }
       if (lgL.a > 0.02) {
         vec3 lgdir = lgD.rgb / lgL.a;
+        #ifdef LG_NDIFF
+        float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir) + float(LG_NDIFF) * 0.5 * dot(normalize(inverseTransformDirection(normal, viewMatrix)) - lgn, normalize(lgdir + vec3(0.0, 1.5, 0.0))), 0.0, 1.0); // (a mark's relief, a gash's bumps: turned by them, LG_NDIFF times over, as if lit from above (the room's light comes from all round it: a dent tipped any way would only darken; it's the lamps overhead that show its shape), not only the lamps' glint)
+        #else
         float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir), 0.0, 1.0);
-        reflectedLight.directDiffuse += diffuseColor.rgb * (lgL.rgb / lgL.a) * lgturn * lgao;
+        #endif
+        // The four lamps that light this cell most (the build's, js/lightgrid.ts compute: each reaching it past every wall), for the
+        // people's shadows and the lamps' highlight: the four cells round the spot, each by how near it is, as the grid's light is
+        // filtered, wall cells left out (a lamp that only some of them have fades across a cell, not cut off at its edge); each lamp once,
+        // by its share of them.
+        bool lgwantSpec = false;
+        #ifdef STANDARD
+        lgwantSpec = lgSpec > 0.0;
+        #endif
+        float lgvis = 1.0;
+        if (lgwantSpec || lgcn > 0) {
+          float lgtb = floor(clamp(lgbp + 0.5, 0.0, lgBand.x - 1.0));
+          vec2 lgq = vec2(lgc.x, lgcy) - 0.5, lgq0 = floor(lgq), lgqf = lgq - lgq0;
+          int lgrow = int((lgf * lgBand.x + lgtb) * lgSize.y);
+          float lgids[12], lgwts[12], lgws = 0.0; int lgn8 = 0;
+          for (int k = 0; k < 4; k++) {
+            vec2 lgo = vec2(float(k & 1), float(k >> 1));
+            ivec2 lgcc = ivec2(clamp(lgq0 + lgo, vec2(0.0), lgSize.xy - 1.0));
+            float lgw0 = (lgo.x > 0.5 ? lgqf.x : 1.0 - lgqf.x) * (lgo.y > 0.5 ? lgqf.y : 1.0 - lgqf.y);
+            vec4 lgt = texelFetch(lgTop, ivec2(lgcc.x, lgcc.y + lgrow), 0);
+            if (lgt.r < -0.5) continue;
+            lgws += lgw0;
+            for (int j = 0; j < 4; j++) {
+              float lgid = lgt[j]; if (lgid < 0.5) continue;
+              bool lgseen = false;
+              for (int m = 0; m < 12; m++) { if (m >= lgn8) break; if (lgids[m] == lgid) { lgwts[m] += lgw0; lgseen = true; break; } }
+              if (!lgseen && lgn8 < 12) { lgids[lgn8] = lgid; lgwts[lgn8] = lgw0; lgn8++; }
+            }
+          }
+          float lgvs = 0.0, lgvw = 0.0;
+          for (int m = 0; m < 12; m++) {
+            if (m >= lgn8) break;
+            int lgii = int(lgids[m]) - 1;
+            int lglw = int(lgLampAt.x); ivec2 lgla = ivec2(lgii - (lgii / lglw) * lglw, int(lgLampAt.y) + (lgii / lglw) * 2);
+            vec4 lgp4 = texelFetch(lgTop, lgla, 0), lgc4 = texelFetch(lgTop, lgla + ivec2(0, 1), 0);
+            vec3 lgw = lgp4.xyz - vLgP; float lgd = length(lgw); if (lgd >= lgp4.w || lgd < 1e-3) continue;
+            vec3 lgu = lgw / lgd; float lgfall = pow(1.0 - lgd / lgp4.w, 1.6);
+            // (the people between it and here: the nearest point of each capsule to the ray, how far off the ray it is against its
+            // radius and the shadow's softening with the distance it's thrown)
+            float lgv1 = 1.0;
+            for (int i = 0; i < 8; i++) {
+              if (i >= lgcn) break;
+              vec4 ca = lgCapA[lgci[i]], cb = lgCapB[lgci[i]]; vec3 cv = cb.xyz - ca.xyz, cw = vLgP - ca.xyz;
+              float cvv = max(dot(cv, cv), 1e-4), cuv = dot(lgu, cv), den = cvv - cuv * cuv;
+              float cs = den > 1e-5 ? (cuv * dot(cv, cw) - cvv * dot(lgu, cw)) / den : 0.0; cs = clamp(cs, 0.0, lgd);
+              float ct = clamp((dot(cv, cw) + cuv * cs) / cvv, 0.0, 1.0);
+              cs = clamp(dot(ca.xyz + cv * ct - vLgP, lgu), 0.0, lgd);
+              float ch = length(vLgP + lgu * cs - (ca.xyz + cv * ct)), cpen = 0.1 + 0.55 * cs / max(lgd - cs, 0.2); // (a lamp's a panel of light some 0.5 m across, not a point: the penumbra by the ratio of the distances)
+              lgv1 *= mix(0.35, 1.0, smoothstep(ca.w - cpen * 0.6, ca.w + cpen, ch)); // (a body never hides the whole panel)
+            }
+            float lgiw = (lgc4.r + lgc4.g + lgc4.b) * lgfall * clamp(0.5 + 0.5 * dot(lgn, lgu), 0.0, 1.0) * lgwts[m];
+            lgvs += lgiw * lgv1; lgvw += lgiw;
+            // The lamps' highlight: each a point light where it really hangs, reflected by the surface's own roughness and metalness
+            // (three's GGX, as a real light's is). So a floor shows each lamp's sheen where it would be, sliding as you walk, and metal
+            // reads as metal. The grid's averaged direction can't: lamps on every side of a corridor average to straight up. Taken by
+            // the occlusion as the rest of the grid's light is, and by the people's shadows; nothing through a shut door.
+            #ifdef STANDARD
+            if (lgwantSpec) {
+              vec3 lgv = normalize((viewMatrix * vec4(lgu, 0.0)).xyz);
+              float lgnl = clamp(dot(normal, lgv), 0.0, 1.0) * smoothstep(0.0, 0.3, lgu.y); // (a lamp shines down out of its fitting: what's level with it or over it (the ceiling round it) takes no glint)
+              reflectedLight.directSpecular += lgc4.rgb * lgfall * lgnl * BRDF_GGX(lgv, geometryViewDir, normal, material) * lgao * lgSpec * lgv1 * lgwts[m] / max(lgws, 1e-3);
+            }
+            #endif
+          }
+          if (lgvw > 1e-4) lgvis = mix(1.0, lgvs / lgvw, 0.6); // (the grid's light is the lamps' and what bounces off the room: the bounce isn't shadowed)
+        }
+        reflectedLight.directDiffuse += diffuseColor.rgb * (lgL.rgb / lgL.a) * lgturn * lgao * lgvis;
       }
     }
     // (night vision's IR illuminator: a cone from the eye, soft-edged, out to about 18 m, on what faces it; what's behind a
@@ -157,11 +281,55 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
       reflectedLight.directDiffuse *= lgg2;
       #endif
       if (lgGrid.w < 0.5) reflectedLight.indirectDiffuse *= lgg2; }`;
+  // the environment's reflection in the level (js/probes.ts, lgEnvOn 1): the direction onto the room's box, fading out past its
+  // walls; and none of the environment's own light (the light grid's is what lights the room)
+  const ENV = (() => {
+    const c = (T as any).ShaderChunk && (T as any).ShaderChunk.envmap_physical_pars_fragment as string; if (!c) return null; // (a worker's three: nothing drawn)
+    const fn = `vec3 getIBLRadiance( const in vec3 viewDir, const in vec3 normal, const in float roughness ) {
+		#ifdef ENVMAP_TYPE_CUBE_UV
+			vec3 reflectVec = reflect( - viewDir, normal );
+			reflectVec = normalize( mix( reflectVec, normal, pow4( roughness ) ) );
+			reflectVec = transformDirectionByInverseViewMatrix( reflectVec, viewMatrix );
+			float lgek = 1.0;
+			if ( lgEnvOn > 0.5 ) {
+				vec3 lgo = max( lgEnvMin - vLgP, 0.0 ) + max( vLgP - lgEnvMax, 0.0 ), lgq = clamp( vLgP, lgEnvMin, lgEnvMax );
+				vec3 lgr = reflectVec + 1e-5 * step( abs( reflectVec ), vec3( 1e-5 ) ), lgf = max( ( lgEnvMax - lgq ) / lgr, ( lgEnvMin - lgq ) / lgr );
+				reflectVec = normalize( lgq + lgr * min( min( lgf.x, lgf.y ), lgf.z ) - lgEnvC );
+				lgek = lgEnvK * ( 1.0 - smoothstep( 0.3, 2.5, length( lgo ) ) ) * ( 1.0 - lgEnvR * smoothstep( 0.3, 0.85, roughness ) ); // (a rough surface's is a haze of the walls over all of it: kept faint, the lamps' highlight its sheen)
+			}
+			vec4 envMapColor = textureCubeUV( envMap, envMapRotation * reflectVec, roughness );
+			return envMapColor.rgb * envMapIntensity * lgek;
+		#else
+			return vec3( 0.0 );
+		#endif
+	}
+`;
+    const re = /vec3 getIBLRadiance\( const in vec3 viewDir[\s\S]*?\n\t}\n/;
+    if (!re.test(c) || !c.includes('vec3 getIBLIrradiance( const in vec3 normal ) {')) { console.warn("lightgrid: three's envmap_physical_pars_fragment has changed: no reflections"); return null; }
+    return c.replace(re, fn).replace('vec3 getIBLIrradiance( const in vec3 normal ) {', 'vec3 getIBLIrradiance( const in vec3 normal ) {\n\t\tif ( lgEnvOn > 0.5 ) return vec3( 0.0 );');
+  })();
+  const BUMP = `#include <normal_fragment_maps>
+    #ifdef LG_BUMP
+    { vec3 lgbn = normalize(vLgN), lgbp = vLgP * float(LG_BUMP);
+      vec2 lgb2 = abs(lgbn.y) > 0.6 ? lgbp.xz : abs(lgbn.x) > abs(lgbn.z) ? lgbp.zy : lgbp.xy;
+      float lgbh = (lgFbm(lgb2) + 0.45 * lgFbm(lgb2 * 3.1 + 7.3)) * float(LG_BUMP_D) * (1.0 - smoothstep(0.25, 0.7, length(fwidth(lgb2)))); // (faded out where a bump's smaller than a pixel or two: it'd only glitter)
+      vec3 lgsx = dFdx(-vViewPosition), lgsy = dFdy(-vViewPosition), lgR1 = cross(lgsy, normal), lgR2 = cross(normal, lgsx);
+      float lgdet = dot(lgsx, lgR1) * faceDirection;
+      vec3 lggr = sign(lgdet) * (dFdx(lgbh) * lgR1 + dFdy(lgbh) * lgR2);
+      normal = normalize(abs(lgdet) * normal - lggr); }
+    #endif`;
   function patch(shader: THREE.WebGLProgramParametersWithUniforms) {
     if (!shader.fragmentShader.includes('#include <lights_fragment_end>') || !shader.vertexShader.includes('#include <worldpos_vertex>')) return;
     Object.assign(shader.uniforms, U);
     shader.vertexShader = VS_HEAD + shader.vertexShader.replace('#include <worldpos_vertex>', '#include <worldpos_vertex>' + VS_BODY);
     shader.fragmentShader = FS_HEAD + shader.fragmentShader.replace('#include <color_fragment>', FS_PAINT).replace('#include <lights_fragment_end>', FS_BODY);
+    if (ENV) shader.fragmentShader = shader.fragmentShader.replace('#include <envmap_physical_pars_fragment>', ENV);
+    // (a ship's deck: its roughness in its normal map's alpha, js/levelview.ts _deckMaps: one texture, not two)
+    // (a surface's own small bumps, worked out here, no texture: LG_BUMP (how many a metre) and LG_BUMP_D (how deep, m): a gash's broken
+    // faces, js/damage.ts. The noise on the plane the surface most faces, as the grime's; the normal tipped by how it climbs across the
+    // pixel (three's bump mapping, its slope from the screen's own derivatives))
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', BUMP);
+    shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#ifdef LG_RGH_NA\n\tfloat roughnessFactor = roughness * texture2D( normalMap, vNormalMapUv ).a;\n#else\n#include <roughnessmap_fragment>\n#endif');
   }
   // (and a Lambert or Phong material takes nothing from the scene's environment, as in three r149: only a standard one did. three
   // now lights them by it too, and reflects it in them: the gun's scene has one for its metal (js/render.ts), and the hands and
@@ -187,7 +355,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   // build = compute + install. compute is the sums alone (no texture, nothing of the renderer's): it's most of what building a
   // level costs a screen (a second, for a cruiser), so it can be done ahead on another thread (js/prepworker.ts, js/prep.ts)
   // and handed over (map.lgPre), and then install is all that's left for the frame the level's put up in.
-  interface LgData { W: number; H: number; NF: number; NB?: number; cur: Float32Array; layers: ({ at: Int32Array; v: Float32Array } | null)[]; bounces: number[]; ms: number; ao?: LgAo }
+  interface LgData { W: number; H: number; NF: number; NB?: number; cur: Float32Array; top?: Float32Array; layers: ({ at: Int32Array; v: Float32Array } | null)[]; bounces: number[]; ms: number; ao?: LgAo }
   function build(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[]; lgPre?: LgData | null }) {
     const floors = map.floors || [map], pre = map.lgPre; map.lgPre = null;
     const d = pre && pre.W === map.W && pre.H === map.H && pre.NF === floors.length && pre.NB === BANDS && pre.layers.length === (map.doors || []).length ? pre : compute(map);
@@ -306,6 +474,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   function compute(map: LvMap): LgData {
     const L = Level, TS = L.TS, floors = map.floors || [map], NF = floors.length, W = map.W, H = map.H, N = W * H;
     const col = new T.Color(), DECAY = 1.6, t0 = performance.now();
+    const TOPN = 4, top = new Float32Array(N * NF * BANDS * TOPN * 2), allLamps = map.lamps || []; // (top: per cell, the four lamps lighting it most: their numbers + 1, then how much each)
     const cur = new Float32Array(N * NF * BANDS * K), doors = map.doors || [], layers: (Map<number, Float32Array> | null)[] = doors.map(() => null), shutAt: Map<number, LvDoor>[] = [], winAt: Set<number>[] = [];
     // the sky: the theme's fill (as js/render.ts had it everywhere), on what's open to it (not the hangar's: its
     // daylight stays the flat fill)
@@ -354,6 +523,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
           if (blocked) continue;
           const a = Math.pow(1 - d / r, DECAY) * k;
           into(via, base + i, a, dx / d, dy / d, dz / d, a * (col.r + col.g + col.b) / 3);
+          if (!via) { const q = (base + i) * TOPN * 2, lum = a * (col.r + col.g + col.b); let j = TOPN; while (j > 0 && lum > top[q + TOPN + j - 1]) j--; if (j < TOPN) { for (let m = TOPN - 1; m > j; m--) { top[q + m] = top[q + m - 1]; top[q + TOPN + m] = top[q + TOPN + m - 1]; } top[q + j] = allLamps.indexOf(l) + 1; top[q + TOPN + j] = lum; } }
         }
       }
       // the sky: straight down on whatever's open to it; through an outside window (the city's glow), onto the room's
@@ -491,7 +661,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
       for (let i = 0; i < N; i++) { const o = (base + i) * K, k = keep(i); if (!lit[i]) continue; cur[o] += out[i * 4] * k; cur[o + 1] += out[i * 4 + 1] * k; cur[o + 2] += out[i * 4 + 2] * k; cur[o + 4] -= out[i * 4 + 3] * UP * k; cur[o + 6] += out[i * 4 + 3] * k; }
     }
     const ao = bakeAO(map);
-    return { W, H, NF, NB: BANDS, cur, bounces: bouncesUsed, ms: Math.round(performance.now() - t0), ao,
+    return { W, H, NF, NB: BANDS, cur, top, bounces: bouncesUsed, ms: Math.round(performance.now() - t0), ao,
       layers: layers.map((ly) => { if (!ly) return null; const at = Int32Array.from(ly.keys()), v = new Float32Array(at.length * K); let n = 0; for (const o of ly.values()) v.set(o, K * n++); return { at, v }; }) };
   }
   function install(map: LvMap & { lightGridMs?: number; lightLayers?: number; lightBounces?: number[] }, d: LgData) {
@@ -509,9 +679,23 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
     flush();
     U.lgLight.value = G0.tl; U.lgDir.value = G0.td;
     U.lgPaint.value = Homes.paint(map) || blank;
+    // the lamps' highlight (FS_BODY): each cell's four lamps by number (read unfiltered: a number isn't blended; the shader blends their light), a wall's -1, and the lamps (a row where,
+    // in the level's frame, and how far it reaches; the row under it its light, as the grid has it)
+    const lamps = map.lamps || [];
+    if (d.top && lamps.length) {
+      // (one texture: a shader can read only 16. The cells' rows, then each lamp two rows of LW across: where, how far; its light)
+      const R0 = H * NF * BANDS, LW = Math.max(W, Math.min(lamps.length, 1024)), LR = Math.ceil(lamps.length / LW) * 2;
+      const ti = new Float32Array(LW * (R0 + LR) * 4);
+      for (let i = 0; i < N * NF * BANDS; i++) { const at = (Math.floor(i / W) * LW + (i % W)) * 4; if (cur[i * K + 7] > 0.5) for (let j = 0; j < 4; j++) ti[at + j] = d.top[i * 8 + j]; else ti[at] = -1; } // (a wall's cell -1: left out of the blend)
+      const c = new T.Color();
+      lamps.forEach((l: LvLight, i: number) => { c.setHex(l.color!, T.LinearSRGBColorSpace); const row = R0 + Math.floor(i / LW) * 2, col = i % LW; ti.set([l.x, l.y!, l.z, l.d!], (row * LW + col) * 4); ti.set([c.r * l.i!, c.g * l.i!, c.b * l.i!, 0], ((row + 1) * LW + col) * 4); });
+      const tt = new T.DataTexture(ti, LW, R0 + LR, T.RGBAFormat, T.FloatType); tt.magFilter = tt.minFilter = T.NearestFilter; tt.generateMipmaps = false; tt.needsUpdate = true;
+      U.lgTop.value = tt; U.lgLampAt.value.set(LW, R0);
+    }
     if (d.ao) {
-      const aoTex = (data: Uint8Array) => { const tx = new T.DataTexture(data as Uint8Array<ArrayBuffer>, d.ao!.AW, d.ao!.AH * NF, T.RGBAFormat, T.UnsignedByteType); tx.magFilter = tx.minFilter = T.LinearFilter; tx.wrapS = tx.wrapT = T.ClampToEdgeWrapping; tx.generateMipmaps = false; tx.needsUpdate = true; return tx; };
-      U.lgAoA.value = aoTex(d.ao.a); U.lgAoB.value = aoTex(d.ao.b); U.lgAo.value.z = 1; U.lgAo.value.w = L.FLOOR_H - L.WALL_H - 0.02; U.lgAo.value.y = L.WALL_H; // (w: the layer's start is this far under the floor)
+      const aoTex = (a: Uint8Array, b: Uint8Array) => { const AW = d.ao!.AW, R = d.ao!.AH * NF, data = new Uint8Array(AW * 2 * R * 4); for (let y = 0; y < R; y++) { data.set(a.subarray(y * AW * 4, (y + 1) * AW * 4), y * AW * 8); data.set(b.subarray(y * AW * 4, (y + 1) * AW * 4), y * AW * 8 + AW * 4); } // (side by side, a row of each)
+        const tx = new T.DataTexture(data, AW * 2, R, T.RGBAFormat, T.UnsignedByteType); tx.magFilter = tx.minFilter = T.LinearFilter; tx.wrapS = tx.wrapT = T.ClampToEdgeWrapping; tx.generateMipmaps = false; tx.needsUpdate = true; return tx; };
+      U.lgAoAB.value = aoTex(d.ao.a, d.ao.b); U.lgAo.value.z = 1; U.lgAo.value.w = L.FLOOR_H - L.WALL_H - 0.02; U.lgAo.value.y = L.WALL_H; // (w: the layer's start is this far under the floor)
       (map as any).aoBakeMs = d.ao.ms;
     }
     U.lgGrid.value.set(0, 0, TS, 0);
@@ -552,7 +736,7 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   }
   function dispose() {
     if (held) { for (const t of [...held.cpu, ...held.gpu]) if (t && t !== blank) t.dispose(); held = null; }
-    for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoA', 'lgAoB'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
+    for (const k of ['lgLight', 'lgDir', 'lgPaint', 'lgAoAB', 'lgTop'] as const) if (U[k].value !== blank) { U[k].value.dispose(); U[k].value = blank; }
     U.lgAo.value.z = 0;
     G0 = null; built = false;
   }
@@ -587,10 +771,10 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform sampler2D lgAoA;\nuniform samp
   // the occlusion baked on the GPU in place of the box bake's (js/gpuao.ts): its textures, which the grid then holds and lets go of
   // (the box bake's are kept beside them, for swapAo: to see the two on the same level)
   let held: { cpu: any[]; gpu: any[] } | null = null;
-  function useGpuAo(a: THREE.Texture, b: THREE.Texture) {
-    held = { cpu: [U.lgAoA.value, U.lgAoB.value], gpu: [a, b] };
-    U.lgAoA.value = a as any; U.lgAoB.value = b as any; U.lgAo.value.z = 1; U.lgAo.value.w = Level.FLOOR_H - Level.WALL_H - 0.02; U.lgAo.value.y = Level.WALL_H;
+  function useGpuAo(ab: THREE.Texture) {
+    held = { cpu: [U.lgAoAB.value], gpu: [ab] };
+    U.lgAoAB.value = ab as any; U.lgAo.value.z = 1; U.lgAo.value.w = Level.FLOOR_H - Level.WALL_H - 0.02; U.lgAo.value.y = Level.WALL_H;
   }
-  function swapAo(gpu: boolean) { if (!held) return false; const [a, b] = gpu ? held.gpu : held.cpu; U.lgAoA.value = a; U.lgAoB.value = b; return true; }
+  function swapAo(gpu: boolean) { if (!held) return false; U.lgAoAB.value = (gpu ? held.gpu : held.cpu)[0]; return true; }
   return { build, compute, dispose, on, at, useGpuAo, swapAo, setDoor: (id: number, k: number) => { if (built) setDoor(id, k); }, flush, U, opts, get built() { return built; }, get layers() { return G0 && G0.layers; } };
 })();

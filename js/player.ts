@@ -44,6 +44,7 @@ import { Landing } from './landing.js';
 import { Loot } from './loot.js';
 import { Range } from './range.js';
 import { Space } from './space.js';
+import { Radar } from './radar.js';
 import { Views } from './views.js';
 import { Wind } from './wind.js';
 const _shC = new THREE.Vector3(), _shS = new THREE.Vector3(), _shA = new THREE.Vector3(); // (shieldHit's)
@@ -558,7 +559,11 @@ export const Me = {
         case 'KeyM': Game.setMuted(!Audio.muted); HUD.toast('', Audio.muted ? 'Sound muted' : 'Sound on', 1); break;
         case 'KeyF': this.fEdge = true; break;
         case 'Space': this.lowToggle = !this.lowToggle; break;
-        case 'F8': GunAudio.debugEchoes = !GunAudio.debugEchoes; HUD.toast('', GunAudio.debugEchoes ? 'Echo paths shown' : 'Echo paths hidden', 1); break;
+        case 'F8': { // (js/radarview.ts: a ship's radars at work, each tap the next ship's: hers, the mission ship's, the zone's near ones; then off. The echo paths are ?echoes)
+          const L = Space.on() ? Space.ewList() : [], i = L.findIndex((q) => q.id === Radar.sel);
+          if (!Radar.show) { Radar.show = L.length ? 1 : 0; Radar.sel = L.length ? L[0].id : 'own'; } else if (i >= 0 && i + 1 < L.length) Radar.sel = L[i + 1].id; else { Radar.show = 0; Radar.sel = 'own'; }
+          const su = L.find((q) => q.id === Radar.sel); HUD.toast('', Radar.show && su ? 'Electronic warfare: ' + (su.id === 'own' ? 'your ship' : su.name || su.id) : 'Electronic warfare view off', 1.4); break;
+        }
         case 'F9': HUD.toast('', G_Rig.toggleDebug() ? 'Hitboxes shown' : 'Hitboxes hidden', 1); break;
       }
     });
@@ -591,6 +596,7 @@ export const Me = {
     // swaps weapons
     window.addEventListener('wheel', (e) => {
       if (!Game.locked || Game.phase !== 'level' || Math.abs(e.deltaY) <= 5 || (e.isTrusted && Game.softLocked)) return;
+      if (Space.mySeat()) return; // (in a seat of the squad's ship: the wheel's the seat's (the helm's zoom: js/space.ts helmZoom), the weapons are stowed)
       const w = this.cur(), L = w && w.def.magLevels;
       if (L && this.ads && this.adsT > 0.5) {
         const i = this.sight(w).i, n = U.clamp(i + (e.deltaY < 0 ? 1 : -1), 0, L.length - 1);
@@ -753,7 +759,9 @@ export const Me = {
       this.pos.set(sp.x, sp.y, sp.z); this.vel.set(0, 0, 0); this.onGround = true; this.hspeed = 0;
       this.crouch = true; this.stowed = true; this.lowToggle = false;
       this.yaw = sp.yaw + U.clamp(U.angDiff(sp.yaw, this.yaw), -1.9, 1.9);
-      this.pitch = U.clamp(this.pitch, -0.7, 0.6);
+      // (at the sensor station you can look down at its screen on the console by your knees: js/space.ts sensorStep)
+      const sens = Space.on() && (Space.mySeat() as any)?.k === 'sensors';
+      this.pitch = U.clamp(this.pitch, sens ? -1.25 : -0.7, 0.6);
       this.eyeH += (1.12 - this.eyeH) * Math.min(1, dt * 12);
       return;
     }
@@ -800,14 +808,14 @@ export const Me = {
     const prevY = this.pos.y, STEP = World.STEP, was = this.onGround, x0 = this.pos.x, z0 = this.pos.z;
     this.pos.x += this.vel.x * dt;
     this.pos.z += this.vel.z * dt;
-    Level.resolve(map, this.pos, 0.35, prevY, STEP, true); // (anything a step high or less: walked up onto, not into; stairs as slopes)
+    Level.resolve(map, this.pos, this.R, prevY, STEP, true); // (anything a step high or less: walked up onto, not into; stairs as slopes)
     this.pos.y += this.vel.y * dt;
     // (shoulder a fractured pane and it comes down)
     if (map.cracked && this.vel.x * this.vel.x + this.vel.z * this.vel.z > 0.5) {
       const sp = Math.hypot(this.vel.x, this.vel.z), ux = this.vel.x / sp, uz = this.vel.z / sp, h = Level.raycast(map, this.pos.x, this.pos.y + 1.1, this.pos.z, ux, 0, uz, 0.8); // (past the sill you're stopped by: a pane's set back in its wall)
       if (h.pane != null && map.windows[h.pane] && map.windows[h.pane].cracked) this.roundPane(h.pane, new THREE.Vector3(this.pos.x + ux * h.t, this.pos.y + 1.1, this.pos.z + uz * h.t), new THREE.Vector3(ux, 0, uz), true);
     }
-    const g = Level.groundAt(map, this.pos.x, this.pos.z, 0.35, prevY, STEP, true);
+    const g = Level.groundAt(map, this.pos.x, this.pos.z, this.R, prevY, STEP, true);
     // on the ground, or a step down from it (walking down stairs: stay on them, don't hop from tread to tread)
     if (this.pos.y <= g || (was && this.vel.y <= 0 && prevY - g <= STEP + 0.02)) { this.pos.y = g; this.vel.y = 0; this.onGround = true; } else this.onGround = false;
     let eyeTarget = this.down ? 0.45 : this.prone ? 0.36 : this.crouch ? 1.0 : 1.62;
@@ -887,6 +895,7 @@ export const Me = {
   // The ladders up the Crest House and the viewing building (crest.ladders: js/level.ts crestLadder): hold F at one's foot to
   // climb onto the roof, or at its head on the roof to climb down (over a parapet: lifted over it, l.over). Onto it (ON s), carried up or down it (CLIMB m/s), off it onto the roof or the ground (OFF
   // s); the weapon's away till you're off, and you can look round. REACH: how close to an end you have to be.
+  R: 0.25, // (your body to the level: a column this wide (m), from your feet up (js/world.ts resolve); the camera's near plane (0.03 m) is well inside it, and a lean keeps your head off a wall on its own)
   LADDER: { CLIMB: 1.3, ON: 0.35, OFF: 0.45, REACH: 1.1, HOLD: 0.3, OUT: 0.42 },
   ladderNear(map: LvMap) {
     const R = this.LADDER.REACH;
@@ -2621,7 +2630,7 @@ export const Me = {
         if (d > 0.05) {
           const step = Math.min(d, this.SPEED.walk * dt);
           this.pos.x += (dx / d) * step; this.pos.z += (dz / d) * step;
-          Level.resolve(map, this.pos, 0.35, this.pos.y);
+          Level.resolve(map, this.pos, this.R, this.pos.y);
         }
         if (a.face) this.yaw += U.angDiff(this.yaw, Math.atan2(-(a.face.x - this.pos.x), -(a.face.z - this.pos.z))) * Math.min(1, dt * 6);
         a.stuck = this.pos.distanceTo(was) < 0.004 ? (a.stuck || 0) + dt : 0;
@@ -2636,13 +2645,13 @@ export const Me = {
         pl.t = Math.min(1, pl.t + dt / pl.dur);
         const k = U.smooth(0, 1, pl.t);
         this.pos.x = pl.me.x + pl.dx * k; this.pos.z = pl.me.z + pl.dz * k;
-        Level.resolve(map, this.pos, 0.35, this.pos.y);
+        Level.resolve(map, this.pos, this.R, this.pos.y);
         if (pl.t >= 1) { a.pull = null; a.start = this.pos.clone(); a.spot = { x: pl.to.x + pl.fx * 0.75, z: pl.to.z + pl.fz * 0.75 }; }
       }
       else if (a.spot) { // follow them down: step in over their legs as they fall
         const k = U.smooth(0.1, 0.5, a.t / a.dur);
         this.pos.x = a.start!.x + (a.spot.x - a.start!.x) * k; this.pos.z = a.start!.z + (a.spot.z - a.start!.z) * k;
-        Level.resolve(map, this.pos, 0.35, this.pos.y);
+        Level.resolve(map, this.pos, this.R, this.pos.y);
       }
       if (this.action && !a.approach && !a.pull) {
         const was = a.t / a.dur;

@@ -33,6 +33,8 @@ import { Views } from './views.js';
 //                         &dock: already against her hull, standing in the airlock; &ship=<id> the squad's ship (kestrel, atlas, wraith)
 //   ?mousedbg             (with any of these, or alone) a panel of what the browser reports the mouse moved, with and without a button held
 //   ?assault=<place>      straight to a planetary assault on that kind of place (&dock: set down on its pad)
+//   ?spectate             (with &board...&dock) a free camera to watch the fight from: you stay in the squad's ship, out of it, and the
+//                         camera flies (WASD, Space up, C down, Shift faster, the mouse to look)
 //   ?tick                 stepped by a timer, not animation frames: it keeps running in a window that isn't shown (scripts, agents)
 // It plays as if the mouse were captured (no click-to-play screen). When it's there, window.__debugReady is true and
 // DebugStart.ready resolves: scripts wait on that. Add ?mute to keep it quiet.
@@ -106,19 +108,41 @@ export const DebugStart = (() => {
   function captured() {
     const g = Game, cv = R.renderer.domElement;
     let real = false;
-    Object.defineProperty(g, 'locked', { get: () => (real ? document.pointerLockElement === cv : true), set: () => {}, configurable: true });
+    Object.defineProperty(g, 'locked', { get: () => (real ? document.pointerLockElement === cv || !!g.softLocked : true), set: () => {}, configurable: true }); // (soft-locked counts: the sensor station's hologram lets the mouse go, js/space.ts holoFocus)
     document.addEventListener('pointerlockchange', () => { if (document.pointerLockElement === cv) real = true; });
     window.addEventListener('mousedown', (e) => {
-      if (g.phase !== 'level' || document.pointerLockElement === cv || (e.target !== cv && e.target !== document.body)) return;
+      if (g.phase !== 'level' || document.pointerLockElement === cv || (g as any).holoCursor || (e.target !== cv && e.target !== document.body)) return;
       if (real) return; // (once captured for real, the game's own click-to-play does it)
       e.stopImmediatePropagation(); e.preventDefault(); g.lock();
     }, true);
     for (const id of ['pause', 'clickToPlay']) { const e = g.$(id); if (e) e.classList.add('hidden'); }
   }
 
+  // ?spectate: you're put out of the way in the squad's own ship (where nobody aboard her comes looking: the mission goes on, the
+  // ship's docked), standing still and unarmed, and the camera's your own: flown with the movement keys, looked round with the mouse.
+  function spectate() {
+    const Me = G_Me as any, Sp = Space as any, cam = R.camera, at = new THREE.Vector3(), f = new THREE.Vector3(), rt = new THREE.Vector3();
+    at.set(Me.pos.x, Me.pos.y + 1.6, Me.pos.z); // (the camera starts where you stood: in her airlock, with &dock)
+    if (Sp.S && Sp.S.on) { const p = Sp.seatPos(0); Me.seat = null; Me.pos.set(p.x, p.y, p.z); }
+    Me.stowed = true;
+    const place = () => { cam.position.copy(at); cam.rotation.set(Me.pitch, Me.yaw, 0); if (R.vm) R.vm.visible = false; };
+    Me.update = function (dt: number) {
+      const k = this.keys || {}, v = (k.ShiftLeft || k.ShiftRight ? 24 : 7) * dt;
+      f.set(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch)); rt.set(Math.cos(this.yaw), 0, -Math.sin(this.yaw));
+      if (k.KeyW) at.addScaledVector(f, v); if (k.KeyS) at.addScaledVector(f, -v);
+      if (k.KeyD) at.addScaledVector(rt, v); if (k.KeyA) at.addScaledVector(rt, -v);
+      if (k.Space) at.y += v; if (k.KeyC) at.y -= v;
+      this.mouse.l = this.mouse.r = false;
+      this.sendState(dt); place();
+    };
+    const up = Sp.update; Sp.update = function (...a: unknown[]) { const r = up.apply(this, a); place(); return r; }; // (after the ship's own camera, if it sets one)
+    say('spectating: WASD, Space/C, Shift, the mouse');
+  }
   async function run() {
     const th = themeOf(q.get('play')), lvl = q.has('level') ? Math.max(1, +q.get('level')! || 1) : null;
-    Game.solo(); await sleep(0.8);
+    // (&host: a room others can join (its code in Net.code), not a solo game: for a test with a second player)
+    if (q.has('host')) { Game.host(); await until(() => !!Net.code, 30); } else Game.solo();
+    await sleep(0.8);
     // (the host's simulation is in its own thread, js/serverlink.ts: what's wanted of it is asked, as the lobby and the menus ask)
     const space = q.has('board') || q.has('assault') || q.has('fly');
     if (q.has('hangar') || space) {
@@ -167,6 +191,7 @@ export const DebugStart = (() => {
       if (q.has('nofoes')) { Net.toHost({ t: 'noFoes' }); await until(() => ![...Views.enemies.values()].some((e) => e.alive), 5); }
     }
     captured();
+    if (q.has('spectate')) spectate();
     (window as any).__debugReady = true;
     say(`ready: ${Game.hub ? 'the hangar' : `level ${Game.level}, ${(Game.map && Game.map.theme && Game.map.theme.name) || '?'}`}`);
     done();

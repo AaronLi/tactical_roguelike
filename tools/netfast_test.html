@@ -1,0 +1,141 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Fast channel test</title>
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+</head>
+<body style="font: 13px monospace; background: #111; color: #ddd">
+<pre id="out">js/netfast.ts in a browser: open this page from `node serve.js` (after `npx tsc -p .`) and press Run, or run
+  node tools/space_shot.mjs "mute" tools/netfast_steps.mjs --port 8162 --nowait
+<button id="run">Run</button></pre>
+<script type="module">
+// The fast channel (js/netfast.ts) between two peers in one page: first two RTCPeerConnections joined directly (no signalling: a
+// stand-in for PeerJS's connection, a reliable JSON channel and its peerConnection), then two real PeerJS peers through its
+// matchmaking server, as js/net.ts makes them. Checks: messages arrive whole at 20 Hz and 10 Hz, 600 B to 40 KB (cut in pieces),
+// how long they take; a burst far beyond what the channel carries (skipped, newest wins, never corrupt); lost packets (the
+// sender's `drop`); the fallback over the reliable channel when the other side has no fast one.
+import { FastLink } from '../dist/js/netfast.js';
+const out = document.getElementById('out'), log = (s) => { out.textContent += '\n' + s; console.log(s); };
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (f, ms = 10000) => { const t = performance.now(); while (!f()) { if (performance.now() - t > ms) return false; await sleep(20); } return true; };
+
+// a message: [seq u32][size u32][sent f64][bytes from seq]; check() says if it's whole and its own
+const make = (seq, size) => { const b = new Uint8Array(Math.max(16, size)), dv = new DataView(b.buffer); dv.setUint32(0, seq, true); dv.setUint32(4, b.length, true); dv.setFloat64(8, performance.now(), true); for (let i = 16; i < b.length; i++) b[i] = (i * 31 + seq) & 255; return b.buffer; };
+const check = (buf) => { const b = new Uint8Array(buf), dv = new DataView(buf), seq = dv.getUint32(0, true); if (dv.getUint32(4, true) !== b.length) return null; for (let i = 16; i < b.length; i++) if (b[i] !== ((i * 31 + seq) & 255)) return null; return { seq, ms: performance.now() - dv.getFloat64(8, true), size: b.length }; };
+
+// a receiver's tally per stream
+function tally() {
+  const t = { n: 0, bad: 0, bytes: 0, ms: [], seqs: {}, add(buf, ch) { const c = check(buf); if (!c) { t.bad++; return; } t.n++; t.bytes += c.size; t.ms.push(c.ms); (t.seqs[ch] = t.seqs[ch] || []).push(c.seq); } };
+  t.sum = () => { const m = t.ms.slice().sort((a, b) => a - b); return { n: t.n, bad: t.bad, kb: +(t.bytes / 1024).toFixed(1), ms50: +(m[m.length >> 1] || 0).toFixed(1), ms95: +(m[Math.floor(m.length * 0.95)] || 0).toFixed(1), msMax: +(m[m.length - 1] || 0).toFixed(1) }; };
+  return t;
+}
+// (the stand-in for a PeerJS DataConnection: what FastLink uses of it)
+function wrap(pc, ch, onFb) {
+  const c = { peerConnection: pc, dataChannel: ch, get open() { return ch.readyState === 'open'; }, send(o) { const j = JSON.stringify(o); if (j.length >= 16300) throw new Error('over the JSON limit of PeerJS 1.5 (16300): ' + j.length); ch.send(j); } };
+  ch.onmessage = (e) => { const m = JSON.parse(e.data); if (m.t === 'fastb') onFb(m); };
+  return c;
+}
+async function loopPair(opts = {}) {
+  const a = new RTCPeerConnection(), b = new RTCPeerConnection();
+  a.onicecandidate = (e) => e.candidate && b.addIceCandidate(e.candidate).catch(() => {});
+  b.onicecandidate = (e) => e.candidate && a.addIceCandidate(e.candidate).catch(() => {});
+  const ca = a.createDataChannel('rel', { ordered: true }), gotB = new Promise((r) => (b.ondatachannel = (e) => r(e.channel)));
+  await a.setLocalDescription(await a.createOffer()); await b.setRemoteDescription(a.localDescription);
+  await b.setLocalDescription(await b.createAnswer()); await a.setRemoteDescription(b.localDescription);
+  const cb = await gotB;
+  await until(() => ca.readyState === 'open' && cb.readyState === 'open');
+  const rx = tally(), tx = tally();
+  let A, B;
+  const ka = wrap(a, ca, (m) => A.fallback(m)), kb = wrap(b, cb, (m) => B.fallback(m));
+  A = new FastLink(ka, (buf, ch) => tx.add(buf, ch), { fast: opts.fastA !== false });
+  B = new FastLink(kb, (buf, ch) => rx.add(buf, ch), { fast: opts.fastB !== false });
+  return { A, B, rx, tx, close() { A.close(); B.close(); a.close(); b.close(); } };
+}
+// paced sending: each stream its size and rate, for ms
+async function stream(L, plan, ms) {
+  const t0 = performance.now(), next = plan.map(() => t0), seq = plan.map(() => 0);
+  while (performance.now() - t0 < ms) {
+    const now = performance.now();
+    plan.forEach((p, i) => { if (now >= next[i]) { next[i] += 1000 / p.hz; L.send(make(++seq[i], p.size), p.ch); } });
+    await sleep(5);
+  }
+  await sleep(300);
+  return seq;
+}
+
+async function suite(name, mk) {
+  const R = {};
+  // 1. rates and sizes: the core snapshot (20 Hz, 600 B and 40 KB alternately on ch 0) and a sensor picture (10 Hz, 30 KB, ch 1)
+  {
+    const P = await mk();
+    const up = await until(() => P.A.mode === 'fast' && P.B.mode === 'fast', 5000);
+    R.handshake = { up, A: P.A.mode, B: P.B.mode };
+    const t0 = performance.now(), sent = await stream(P.A, [{ ch: 0, hz: 20, size: 40000 }, { ch: 1, hz: 10, size: 30000 }, { ch: 2, hz: 20, size: 600 }], 3000);
+    R.rates = { sent, secs: +((performance.now() - t0) / 1000).toFixed(2), got: P.rx.sum(), perCh: Object.fromEntries(Object.entries(P.rx.seqs).map(([k, v]) => [k, v.length])), st: { ...P.A.st }, rst: { ...P.B.st } };
+    // 2. a burst: 300 x 40 KB at once (12 MB): what the channel can't carry is skipped, the last one arrives, nothing corrupt
+    const n0 = P.rx.n; let last = 0;
+    for (let i = 0; i < 300; i++) P.A.send(make((last = 1000 + i), 40000), 3);
+    await until(() => (P.rx.seqs[3] || []).includes(last), 4000);
+    const s3 = P.rx.seqs[3] || [];
+    R.burst = { sent: 300, got: P.rx.n - n0, lastArrived: s3.includes(last), inOrder: s3.every((v, i) => !i || v > s3[i - 1]), skipped: P.A.st.skipped, bad: P.rx.bad, queued: P.A.dc && P.A.dc.bufferedAmount };
+    // 3. loss: 20% of packets thrown away by the sender: a 40 KB message (3 pieces) lives ~0.8^3, a 600 B one ~0.8
+    P.A.drop = 0.2; const g0 = { ...(P.rx.seqs) }, before = (c) => (g0[c] || []).length;
+    for (let i = 0; i < 200; i++) { P.A.send(make(5000 + i, 40000), 4); P.A.send(make(5000 + i, 600), 5); await sleep(10); }
+    await sleep(300); P.A.drop = 0;
+    R.loss = { big: (P.rx.seqs[4] || []).length - before(4), small: (P.rx.seqs[5] || []).length - before(5), of: 200, expectBig: Math.round(200 * 0.8 ** 3), expectSmall: 160, partial: P.B.st.partial, bad: P.rx.bad };
+    // 4. back the other way (B to A)
+    for (let i = 0; i < 20; i++) { P.B.send(make(i + 1, 40000), 0); await sleep(50); }
+    await sleep(300);
+    R.reverse = P.tx.sum();
+    P.close();
+  }
+  log(name + ' ' + JSON.stringify(R));
+  return R;
+}
+
+async function fallbackSuite() {
+  // the other side never makes a fast channel (an older game): A's never answered, so it sends over the reliable channel
+  const P = await loopPair({ fastB: false });
+  await sleep(1500);
+  const R = { modeA: P.A.mode, modeB: P.B.mode };
+  await stream(P.A, [{ ch: 0, hz: 20, size: 40000 }, { ch: 1, hz: 20, size: 600 }], 2000);
+  R.got = P.rx.sum(); R.st = { ...P.A.st };
+  // and a fast channel that closes mid-way: the rest goes the slow way
+  const Q = await loopPair();
+  await until(() => Q.A.mode === 'fast');
+  await stream(Q.A, [{ ch: 0, hz: 20, size: 20000 }], 500);
+  Q.A.dc.close(); await until(() => Q.A.mode === 'reliable', 2000);
+  await stream(Q.A, [{ ch: 0, hz: 20, size: 20000 }], 500);
+  R.closed = { got: Q.rx.sum(), st: { ...Q.A.st } };
+  P.close(); Q.close();
+  log('fallback ' + JSON.stringify(R));
+  return R;
+}
+
+// two PeerJS peers in this page, through its matchmaking server, as js/net.ts connects them
+async function peerPair() {
+  if (typeof Peer !== 'function') throw new Error('PeerJS did not load');
+  const hostId = 'breachproto-v1-fasttest-' + Math.random().toString(36).slice(2, 8);
+  const h = new Peer(hostId, { debug: 1 });
+  await new Promise((res, rej) => { h.on('open', res); h.on('error', rej); setTimeout(() => rej(new Error('host: matchmaking timeout')), 15000); });
+  const c = new Peer({ debug: 1 });
+  await new Promise((res, rej) => { c.on('open', res); c.on('error', rej); setTimeout(() => rej(new Error('client: matchmaking timeout')), 15000); });
+  const rx = tally(), tx = tally();
+  let A, B;
+  const hostSide = new Promise((res) => h.on('connection', (conn) => conn.on('open', () => { A = new FastLink(conn, (buf, ch) => tx.add(buf, ch)); conn.on('data', (d) => d && d.t === 'fastb' && A.fallback(d)); res(); })));
+  const conn = c.connect(hostId, { reliable: true, serialization: 'json' });
+  await new Promise((res, rej) => { conn.on('open', res); conn.on('error', rej); setTimeout(() => rej(new Error('connect timeout')), 15000); });
+  B = new FastLink(conn, (buf, ch) => rx.add(buf, ch)); conn.on('data', (d) => d && d.t === 'fastb' && B.fallback(d));
+  await hostSide;
+  return { A, B, rx, tx, close() { A.close(); B.close(); h.destroy(); c.destroy(); } };
+}
+
+window.runTests = async (which = 'all') => {
+  const R = {};
+  if (which === 'all' || which === 'loop') R.loop = await suite('loopback', () => loopPair());
+  if (which === 'all' || which === 'fallback') R.fallback = await fallbackSuite();
+  if (which === 'all' || which === 'peerjs') { try { R.peerjs = await suite('peerjs', peerPair); } catch (e) { R.peerjs = { error: String(e && e.message || e) }; log('peerjs ' + R.peerjs.error); } }
+  return R;
+};
+document.getElementById('run').onclick = () => window.runTests();
+window.__netfastReady = true;
+</script>
+</body></html>

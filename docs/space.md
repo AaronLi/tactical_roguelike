@@ -44,7 +44,7 @@ off: the game is then the route map and the helicopter, as it was. A debug start
    breaching door opens, but her inner door, at the tunnel's far end just inside it, shuts with every breach: it stays shut,
    for the whole squad, till someone presses its button on the left wall at the top of the stairs (F; its lamp goes from red
    to green). A camera on its far side shows what's out there on screens on the cover either side of the tunnel's mouth
-   and beside the button. Then it's the CQB game. Hold G at the helm to undock: the compartment she backs out of
+   and beside the button. Then it's the CQB game. Hold G at the helm to undock, once everyone living is back aboard (down counts; the host refuses otherwise, js/spaceserver.ts dock): the compartment she backs out of
    is open to space. She can go in again somewhere else.
 6. **A planet.** She arrives in orbit. Fly into the descent corridor: cloud covers the change, and she comes out above the
    base. Within 160 m of the pad, under 45 m/s, hold L to set down. To leave, lift off and climb past 1500 m.
@@ -72,19 +72,21 @@ space round her is tile 5, open to the sky, with `chasm` 300 so nothing is drawn
 | Class | Hull | Aboard | On her hull |
 | --- | --- | --- | --- |
 | civilian transport | about 34 x 18 m | bridge, engine room, a hold, cabins, a mess. 6 crew, 3 light guards | nothing |
-| corvette | about 40 x 20 m | the same, larger. 4 guards, one breach response squad | 1 point-defence gun |
-| frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 2 point defence, 1 cannon |
-| cruiser | about 100 x 36 m | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 3 point defence, 2 cannon, 1 missile launcher |
-| capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 5 point defence, 3 cannon, 2 missile launchers |
+| corvette | about 40 x 20 m | the same, larger. 4 guards, one breach response squad | 1 minigun |
+| frigate | about 65 x 28 m | adds an armoury, barracks, a sick bay, a magazine, escape pods; the bridge is locked. One security squad | 3 miniguns |
+| cruiser | about 100 x 36 m; eight in ten **two decks** with a hall the height of both (below) | adds a galley, a brig, a reactor, a vault; deeper sides split in two. Two security squads, two response squads | 5 miniguns, 1 missile launcher |
+| capital ship | about 128 x 36 m, **two decks** | the bridge and cabins on the upper deck, a forward magazine under it, the reactor over the engine room, two stairwells. Four security squads, three response squads, 10 crew | 8 miniguns, 2 missile launchers |
 
 What the board offers goes by how far the squad has got: transports and corvettes first, capital ships from the fifth rank.
 
 - **Her complement** (`G.SpaceSv.crew`, by `G.SpaceData.SIZES`): those who don't fight; light guards posted singly; security
   squads of four, armed and armoured, their chief with the first; breach response squads of three, lighter, who come to
   where the hull is breached (the comms jammer stops them being called).
-- **Her weapons** (`HULLGUN`, js/space.ts guns): point defence (1.3 km, blind under its own deck within 90 m); cannon (4.5 km,
-  10 a hit, poor against anything quick or close in); missiles (6.5 km: they home, a hard turn across the nose shakes
-  one, a turret can shoot one down, 24 a hit). All can be destroyed from a turret seat.
+- **Her weapons** (`HULLGUN`, js/space.ts guns): her point defence is miniguns (six-barrelled rotary guns: bursts of 2.5 to 4 s at 3,000 rounds a minute inside 1.5 km, 0.6 mrad of their own inaccuracy, the barrels
+  spinning while they fire); missiles (6.5 km: they home, a hard turn across the nose shakes one, a turret can shoot one
+  down, 24 a hit). Guns fire only on a radar lock, leading where the track has her going. Every round is a real one
+  (`rounds`): fired at 1,000 to 1,100 m/s, it flies, and hits only if it really passes within her size. A round that has
+  flown 2 km blows itself apart. Her miniguns alternate between her roof and under her keel (the keel ones hang upside down). Each fires only into its own side of her hull, at most 10° past it. All of her weapons can be destroyed from a turret seat.
 - **A second ship** (`sp.other`, four offers in ten except with a capital ship): a transport or corvette lying 44 m off the
   target's port side, nothing to do with the mission. She has her own crew and a cargo manifest in her hold: take it
   (hold F) for salvage money, paid at the jump home whether or not the mission is done.
@@ -126,9 +128,234 @@ the PD-20 autocannon or the Lancet railgun; bays take the deck scanner (the sens
 3 km, and who's aboard inside 900 m), ablative plating, a tuned warp drive, a comms jammer (the breach is heard 14 m off,
 not 45). The host's fleet is kept in its browser (`fleet`).
 
+## Radar (`js/radar.ts`, `js/radarview.ts`)
+
+A ship knows where another ship is only from what her radars tell her. Every ship carries the same set:
+
+- **Two scanning radars.** These are mechanically steered pulse radars with a fan beam 2° wide and ±45° along the fan,
+  each making one turn every 3 s. Scanner A turns about her up axis and gives bearing. Scanner B turns about her
+  athwartships axis and gives elevation. A plot is (scanner, angle of the turn, range). Where along the fan the echo came
+  from is unknown.
+- **Two tracking radars,** port and starboard, each covering its own half of the sky. Each is a turret with a 3° pencil
+  beam. A cue on a plot works in three steps:
+  - The turret slews to the plot.
+  - It sweeps along the fan's long axis inside a range gate and takes the peak (`acq`).
+  - It tracks by conical scan. The beam is squinted 1° and nutates at 6 Hz. The echo's modulation over each turn gives
+    the pointing error, which is corrected once per turn and rate-aided.
+
+  The track's alpha-beta filter gives the firing solution (`est.p`, `est.v`, `q`).
+
+  A tracker knows its own ship's motion. Each step, before it looks, the turret undoes her rotation since the last step and
+  keeps the beam on the point at the gated range as she moves (`stabilise`, up to `TRK.stab`, 200°/s). The conical scan only
+  has to follow the target's own motion. When the target crosses toward the other half of the sky, a free tracker on that
+  side is handed the track: it slews straight to where the solution has her and tracks. Tested by spinning her under a lock:
+  - at 30°/s the lock holds;
+  - at 60°/s the lock holds and is handed across;
+  - at 90°/s and faster it's lost.
+- **What a scanner sees is a map** (`scanStep`). As its beam turns it fills a map of response, a column per degree of its turn
+  by 25 m range bins out to 10 km. Each column holds the receiver's noise plus every return in the fan there: the radar
+  equation's signal, the beam's gain off its middle, the fan's gain along it, and a fresh fluctuation each look. The map is
+  held still in space about the scanner's axis while the ship turns. Peaks are found by cell-averaging CFAR (`cfar`): a cell
+  biggest within two columns and three bins, standing 24 times over the noise either side of it in range. Each is refined to
+  a centroid and becomes a plot. Two ships closer than a beam width and a few bins make one peak; noise rarely makes one.
+  Plots are followed from sweep to sweep as numbered contacts (`associate`: the peaks waiting are matched together once the
+  oldest is 60° behind the beam, every peak-contact pair inside the contact's Kalman gate best first, each once; A on the bearing map, B on the roll map), and a
+  tracker is cued on a contact's latest plot. The sensor screen draws the maps as PPIs, range as its square root, with the
+  contacts boxed; the F8 panel shows each ship's maps as angle by range.
+- **IFF.** Each peak's interrogated (out to 12 km) and a transponder there answers with its class and name, by whose it is
+  (`answers`; js/space.ts missionAff, kindAff): a civilian's (freighters, cutters, liners) always; a navy's (warships, flying
+  wings) only a navy's interrogation; pirates' (and a ship they've taken) never; the squad's only while its transponder's on
+  (I at the sensor station; off by default: she runs silent). So to the squad, a navy or pirate mission ship is an unknown;
+  it's known for the target only if it answers to the mission's name. Chaff and missiles don't answer. On the sensor screen the
+  mission ship's contact is red (TGT and her name), civilians grey-blue, unknowns amber. A hostile's fire control cues on the
+  nearest contact that doesn't answer as a civilian, and moves to a much nearer one when it appears.
+- **What has a return:** the squad's ship, the mission ship, the zone's ships in view (each from its own drawing), chaff,
+  and missiles in flight (0.5 m²). Not yet: stations, anchors, the planet, rounds.
+- **A tracker gets everything in its beam and range gate** (`beam`): the conical scan steers to their power-weighted middle,
+  and the gate follows their power-weighted range.
+- **Chaff** (V at the helm or the sensor station, 12 loads; `chaffGo`). A cloud keeps the ship's velocity plus 22 m/s. Its
+  return blooms to 250 m² in about half a second, holds for 5 s and fades. It's a peak on the scanners' maps and more return
+  in a tracker's beam. Tested on the frigate's lock at 670 m, launching while pulling away at 60 m/s: her tracker went to
+  the cloud and her estimate drifted off at the ship's speed, and her guns stopped hitting.
+- **Where they're mounted.** Each ship has two scanners, each on a mast. The 'y' scanner stands over her roof: it sees round her
+  horizon, and below her deck only as far as its mast lets it see over her sides, so it's blind under her keel. The 'z' scanner
+  stands off her bow and turns about her length (roll), its fan lying along her length: a plot is the angle round her and the
+  range. It sees all round her ahead of her bow, and is blind astern of her where her hull is in the way.
+  How far past its mast's plane each can see is the angle over the hull's edge from the mast's top (`mask`). Her two trackers
+  are on her flanks, each seeing its own half of the sky and 10° past it. A cue on a plot near her middle line (a 'z' plot
+  over or under her, a 'y' plot ahead or astern) can't tell which side the target is on, so both free trackers sweep their own halves of the fan and the first to find the target keeps it. The mission
+  ship's mounts are set on her plating by raycasting her hull (`fitMounts`). Her hardware is drawn and moves with the radars
+  (`radarKit`): lattice masts, antennas turning with their sweeps, and each tracker's dish pointing along its boresight.
+- **What the pilot's shown** (js/space.ts ewMarks; js/spaceui.ts): her sensors' picture, not knowing. A ship of the zone's is a
+  waypoint (marked, on the nav screen, to be picked with T and warped to) only once a contact of her radars answers to its
+  name; the mission's ship's place is known from the mission. Everything else her radars hold is a track point, a ring in
+  its colour (hostile red to friendly green) with its number, class and IFF: a 3D track where it is. A contact only one
+  scanner holds is a faint line in its colour along everywhere it could be (its fan at its angle and range: for the bearing
+  scanner, every height; for the roll scanner, fore to aft), its label at the line's middle (height ? or fore-aft ?), shown
+  even over a waypoint. With her search radars off, she's shown only
+  the mission's ship and the anchors.
+- **Targets** are the mission ship and every ship of the zone that's shown, each with a return from her own drawing (the
+  stand-in far off, her own hull near).
+
+Detection follows the radar equation: SNR ∝ σ/R⁴, so range ∝ σ^¼. A ship's radar cross-section σ comes from her hull's own
+triangles. Each facet gives a specular flash toward its normal and a little diffuse return. The result is tabulated by
+aspect, every 5°, and cached per hull. Turning her nose toward a scanner shrinks her return, and so the range at which
+she's painted. The Kestrel is about 12 m² at 30° off the nose (painted at 6 km) and about 400 m² broadside (15 km).
+
+- **The mission ship's fire control** cues a tracker on the newest plot of the squad's ship. Her guns and missiles fire
+  only while a tracker holds a lock (`q ≥ 0.15`). They aim at the predicted point, and a hit is judged against where the
+  squad's ship really is, so a poor track misses.
+- **The sensor station's hologram** (js/radarview.ts holo) takes the place of its screen: a sphere's worth of space (its shell
+  not drawn) centred in front of the seat just below the operator's eyes (placed when someone first sits there).
+  - **What's in it.** Her ship at the middle (a cone, her nose its point, a fin on her back: how it's turned reads off her).
+    Every track her radars hold round her where it is (its true way from her, its distance as the square root, 10 km at
+    the edge): a 3D track solid and coloured by her assessment (hostile red, suspect orange, watch yellow, neutral grey,
+    civilian grey-blue, friendly green); a contact only one scanner holds drawn as the arc it could be on (its fan at its
+    range, where her hull doesn't hide it). Her scanners' fans sweeping out from the middle (cyan bearing, magenta roll).
+    Each tracker's beam a line from the middle along its axis as it is that instant (the conical scan's circling shows), out
+    to its range gate (a ring), amber acquiring and red tracking; while it slews and sweeps, the strip it's searching dashed.
+  - **Radar warning:** each ship's radar on her, at the edge the way it is (her warning receiver hears its direction, not
+    its range), one marker a ship for the most it's doing: a tracker locked on her a pulsing red chevron with a dashed line
+    in to her and LOCK; a tracker sweeping for her amber, TRK; a scanner's beam going over her a brief amber ping, SRCH,
+    fading over a second (js/radar.ts litTrk, paintsOn).
+  - **Search radar modes** (js/space.ts scanKeys, modeSet; js/radar.ts scanStep `mode`, `sec`): **1** and **2** are the
+    bearing and roll scanners, each a box in the corner showing its mode. Held, its box opens on the list of its modes; tapped
+    while open, the next is picked; held again, it closes and the radar's set to it. The modes:
+    - **ROUND:** turning all round, a look every 3 s.
+    - **SECTOR:** back and forth across its sector, turning at its edges: what's in it seen often (the frigate at 2 km in a 37
+      degree sector: two looks a second), nothing outside it.
+    - **OFF:** silent: nothing sent (no warning receiver hears it), nothing seen; what it held fades out. The squad's ship's
+      search radars start off: she's silent till her sensor operator switches them on.
+
+    The boxes can be clicked too (js/space.ts boxClick): a scanner's box opens its list (and it's the radar the keys work) or
+    closes it, a mode in the list sets it, a tracker's box picks it, and a tracker's state (IDLE, LOCK ...) switches it off or on.
+
+    Tapped while closed, it's the radar **W**/**S** (its sector's width) and **A**/**D** (its direction: port and starboard; for
+    the roll scanner, round her one way and the other) work, as it searches if it is. In the hologram, a sector's search cone:
+    the space its fan sweeps across it (a patch at the edge and the fans at its sides), brighter for the radar the keys work or
+    whose box is open, fainter while it's not searching it yet; that radar's fan bright and pulsing, the other's dim. Everyone aboard gets it (`ssec`). A sector's revisit is there
+    and back across it (`perOf`); a peak at its edge is compared only with the fresh columns beside it, and one seen again at
+    once (its edge crossed there and back) is taken for the same contact.
+  - **Tracking radars** (js/space.ts trkOff, trkSend; js/radar.ts cueOne, cueAt): **3** the port tracker, **4** the starboard,
+    each a box in the corner (OFF, IDLE, SLEW, SEARCH, LOCK and the track it's on). Tapped, it's picked to be sent (tapped
+    again, not): its beam bright in the hologram, and a left click sends it on the track under the cursor (tracking it). A left
+    click on a radar warning's chevron sends it (or, none picked, the one that can see that way) along that bearing: a spiral
+    round it with its range gate open, locking the strongest return at whatever range (`cueRay`). Not at an empty place:
+    a tracker goes after something it's been told of. Somewhere it can't see (the other side of her hull) it says so. Held, it's switched off
+    (silent: it lets go and takes no cue) or on again. Everyone aboard gets it (`strk`). With none picked, a left click does
+    nothing: a tracker's only sent once it's picked.
+  - **Range:** rings in her plane at a quarter, half and all of the range shown, each named; the wheel zooms the range at the
+    edge through 0.5, 1, 2.5, 5 and 10 km (anything further sits at the edge).
+  - **Sitting down goes straight into it** (`holoFocus`): the world blurs out by degrees (js/render.ts focusBlur, focusAmt)
+    and the hologram rises out of the console and opens (0.6 s) to just under the middle of the view, the view eased onto
+    it. The rest of the screen's UI is put away, and the mouse is let go (still counted as captured: js/game.ts holoCursor,
+    softLocked) to work its own cursor: a small ring where the mouse is, which slides onto a track under it and opens into a
+    halo round it in the track's colour, the track named over it. A left click sends the picked tracker on it (3 or 4
+    first); dragging with the right button turns the hologram; a tap of the right button drops the trackers.
+  - **Out:** getting up (hold F), or Esc (the pause menu); holding **G** looks round the room (the hologram stays, below
+    the eyes; the middle of the view points at a track, the right button held turns it); let go, back in. The deck
+    plan the deck scanner gives is behind **M**.
+- **F8** shows a ship's radars, each tap the next ship's: the squad's (from where you are), the mission ship's, then the
+  zone's ships within 12 km, nearest first (each has its own radars there: scanners, trackers and a transponder, but a
+  civilian has no fire control), then off. It replaced the echo view, still at `?echoes`. On another ship's radars, the camera
+  is off her quarter looking at her. Across the top of the screen is her radars' pipeline, a row per scanner, four stages:
+  1. **Raw return:** her map as the sweep left it, in dB over the noise.
+  2. **Filter:** each cell over the noise round it in range (CA-CFAR's ratio), orange over the threshold, this sweep's peaks
+     ringed.
+  3. **Track:** the plots of the last eight sweeps, each contact's joined; hollow while it's been seen once.
+  **Kalman filters** (`KF1`, `KF3`, constant velocity, up to some 30 m/s² of acceleration): a contact's angle and range each
+  have one (its sweep-to-sweep gate is the filter's: chi-squared, 16), each 3D track has one in full 3D, and each tracker's
+  firing solution has one. A measurement's uncertainty is along the line of sight (range bins: small) and across it (angle
+  times range: larger). A locked tracker's measurement is one more update of the 3D track it falls in (its gate: 25), so the
+  scanners' pair and the tracker are fused into one track; one in no track makes a track of its own. A cue on a contact in a
+  3D track whose filter has settled points a tracker straight at where the track has it going, without the sweep along the
+  strip: so a crossing target is locked (the sweep took long enough for it to leave the strip).
+  Against the truth: the mission ship's track on the squad's ship at 650 m with her tracker fused in, within 4 m (it was
+  about 120 m from the scanners alone); far ships settle to tens of metres, their velocities to 10 to 20 m/s.
+  4. **Correlate 3D** (`fuse`, ten times a second): a 'y' contact is on an arc (its bearing and range known, how high not) and
+     a 'z' contact on another (its angle round her and range known, how far fore or aft not). Each pair whose ranges could
+     agree is solved for where their arcs come nearest; a pair within 4% of the range (40 m at least) is one thing, a
+     numbered 3D track (F), best pairs first. Drawn in
+     3D round her, turning slowly: the arcs (cyan A, magenta B), the tracks with their paths and 10 s ahead dashed, and each
+     tracker's solution with its path (red). Against the truth in a pass at 70 m/s: velocities within 10 to 30 m/s, positions
+     within 2 to 4% of the range at 7 km but 15 to 20% at 700 m (the contacts are up to a sweep old). Each tracker's solution's
+     path and 10 s ahead are also drawn in the world.
+  Each tracker has a row of its own: its raw return (tracking: the return round its nutation circle, bulging toward the
+  target, and the power across its range gate; acquiring: its sweep along the strip), its discriminator (the angle errors a
+  revolution each, in beam widths; the range gate's error; S/N), its error and solution quality over 8 s, and what it's on
+  (the 3D track, its IFF answer, range, closing speed, solution).
+  5. **Assess** (`assess`): hostile or not, every track she holds, as she sees it. Its score is its transponder's answer
+     (to the squad's ship the mission ship is a known hostile, 0.7, and to the mission ship the squad's is; no answer 0.3;
+     another name 0.2; a civilian 0.05), plus how fast it's closing (from 10 m/s), how near it is (inside 4 km), whether its
+     course passes inside 800 m within 90 s, and whether it's tracking her (her radar warning receiver hears a tracking radar
+     on her, and from where: +0.45). From 0.6 it's SUSPECT; held for 3 s, HOSTILE; under, WATCH (from 0.35), NEUTRAL or CIV.
+     Her fire control goes for the most urgent HOSTILE track: what reaches her soonest (its range over its closing speed), then
+     what isn't closing, nearest first. A tracker is taken off what it holds for something at least twice as urgent (neither
+     closing: much nearer); a lock under a second old is left to settle. Her guns fire on the most urgent of her locks. A
+     tracker cued on a contact that's part of a 3D track points straight at the track and locks there (a spiral round it only
+     if the return isn't there); only a one-scanner contact is swept for along its fan. Tested: the frigate locked on the
+     squad's ship at 3.6 km in 0.07 s; a torpedo from her went HOSTILE at 1.9 km (its returns in her contact till it's clear),
+     the frigate switched to it and locked at 1.1 km, and shot it down.
+     Her fire control cues only on what's HOSTILE, and lets a lock go (after 2 s) when what it's on is no longer HOSTILE or
+     SUSPECT: a tracking radar on a ship is taken as hostility, so she keeps hers off what isn't. Tested: the squad's ship
+     silent and still at 2.5 km is WATCH and left alone; running in at 90 m/s it's SUSPECT at once and HOSTILE 3 s later; its
+     own tracker locked on her makes it SUSPECT, then HOSTILE, and she locks it back.
+     **A weapon** (js/radar.ts WPN): a return under 30 m² closing faster than 150 m/s is HOSTILE at once, no 3 s wait. Its
+     size is the radar equation run backwards on its strength and range (`sigOf`), the largest any look has given (a fade or the
+     edge of the fan makes a look smaller, never bigger): ships come out at 60-5000 m², a torpedo at 1-2.5 m². Not for what
+     answers as a friend.
+     A scanner contact taken into a 3D track hands the track how long it's been held SUSPECT (its 3 s isn't started again), and
+     a new 3D track starts moving as its contacts' ranges are (closing or opening along the line of sight), not still. A new
+     contact allows for 400 m/s along the line of sight, so something fast (a torpedo) is the same contact on its second
+     sweep. A tracker that's found its target puts its range gate where the target is now, not where its best return was a
+     second before.
+
+  The squad's ship is drawn in blues (cyan fans, teal acquiring, blue tracking) and every other ship in reds (red fans, amber
+  acquiring, red tracking). Another ship's tracker gets a marker on the screen at its turret (ACQ, TRK, or a pulsing TRK
+  LOCK when it's on you): a beam pointed at you is only a point from where you sit.
+  It shows the scanners' fans with trails (none of a fan drawn where her own hull hides it), each tracker's cone, boresight and nutation ring, the plots, the squad ship's
+  detection envelope against the mission ship's scanner, and a panel with her RCS toward it, the range she'd be painted at
+  and whether she's painted or locked.
+
+Not yet: stealth fittings, infrared and optical sensors, jamming, and the radar in co-op. Each client runs its own radars
+with its own noise, so plots can differ between screens.
+
+## The torpedo (js/space.ts torps, TORP)
+
+- **The tube:** one, under her keel (`tubeKit`), as many torpedoes as you like for now (TORP.loads: Infinity, for testing), one every 2.5 s.
+- **Aiming:** the pilot's HUD shows her sensors' 3D fixes in space (rings). Holding right mouse turns the head; the fix
+  nearest the middle of the view (within 7°) is the one looked at (`torpSee`: a dashed ring, "click: pick"). A left click picks
+  it ("TORPEDO TARGET"), again lets it go. **B** fires at the one picked, or the one looked at. A fix ahead in the bow
+  scanner's blind cone isn't a 3D fix, so it can't be fired at.
+- **Zoom** (js/space.ts helmZoom): at the helm, holding right mouse (looking about), the wheel zooms the view up to 100×, a
+  quarter a notch, eased (about 0.25 s); the head turns that much slower. Let go of the right button and it eases back to 1×. The wheel doesn't swap
+  weapons in any of her seats.
+- **Flight:** a cold launch (pushed out downward at 7 m/s, coasting 1.1 s), then its RCS thrusters push it off to the side
+  away from her path while turning its nose onto the target, then its motor (150 m/s², closing speed held to 700 m/s;
+  steering by proportional navigation, N = 4, its command smoothed: less once it's on its own radar). The motor pushes only
+  along the nose. When it's needed (closing too slowly, or a turn more than the RCS can give) it fires at full, the nose at
+  the angle off the line of sight that gives the turn asked for, the rest along it (past 700 m/s if the turn needs it): the
+  turn comes first, and the nose never has to swing across before it can push. Otherwise the motor's off, the nose on the
+  target, and the RCS pushes it across (up to 7 m/s²). The RCS turns the nose at 1.6 rad/s (3 on its own radar), never more
+  than 35° off the target (75° on its own radar). The flame shows the motor's push, the puffs the RCS firing.
+- **Guidance:** her sensors' fix as they hold it now (a datalink), dead reckoning when they lose it; inside 2 km, its own
+  radar: the strongest return in a 20° cone and a 300 m range gate round where it expects the target (chaff can draw it).
+  At 1 km the handover came 1.4 s out at 700 m/s, and her fix of a frigate can be 100 m off: the line of sight's rate jumped
+  from 17 to 85 mrad/s and it couldn't turn in time (more than its 150 m/s²). At 2 km it peaks at 10-22 mrad/s and it hits
+  (three of three, 31-55 m from her middle, inside her hull).
+  A proximity fuse: a hull by her box, a ship within 30 m, anything small within 7 m. On the mission's ship it knocks out
+  her guns within 15 m (TORP.blast; at 45 m one hit took all three of a frigate's). It self-destructs after 90 s.
+- **Its return:** 1.5 m². To her own interrogator it answers (`only: 'squad'`), so her radars show it as FRIENDLY, "TORP n"; to anyone else's, nothing. Nothing special-cases it: the enemy's scanners, threat assessment and fire control
+  see it as they see anything, and a minigun round passing within 3 m kills it. The pilot's screen flies it and tells everyone
+  aboard (`storp`, ten times a second).
+- **Tested:** from 5 km side-on to the frigate. Before the weapon rule: HOSTILE at 2 km, a tracker locked at 1.5 km, her
+  miniguns firing from 600 m; of three runs it hit twice. With it: HOSTILE at 3.1, 2.1 and 3.1 km (its second look), locked
+  at 2.4, 1.5 and 2.4 km, firing from 600 m; shot down all three times.
+
 ## Checking it
 
 - `node tools/ship_dump.mjs <small|medium|large> <seed> [level] [obj]`: a generated deck plan as text.
+- `node tools/ship_halls.mjs [seeds] [--hall=bay|grove|works|mall]`: how much of each cruiser's hall can be seen from one place in it.
 - `node tools/space_shot.mjs "<query>" <steps.mjs> --gpu`: the game in a headless Chromium against a running
   `node serve.js` (`--port`), with screenshots. Queries: `mute&hangar`, `mute&fly`, `mute&board=medium&obj=destruct&dock&nofoes&fuse=25`,
   `mute&assault=warehouse` (js/debugstart.ts).
@@ -183,6 +410,106 @@ ship (cruisers, capital ships) a long wedge bow, armour sloped over her roof's e
 with masts, tail fins, and on two decks a chine between them. Every inside corner of her plan is faired in. What's over her
 sides is smashed away where she's rammed (`cutAt`, called from `js/space.ts` cutHere and for the pirates' pods).
 `node tools/space_shot.mjs "mute&board=large&hull=2" tools/hull_views.mjs --out <dir> --gpu` looks at one from outside.
+
+## A cruiser's halls (`sp.hall`)
+
+Eight cruisers in ten have **two decks** and a compartment or two the height of both (`js/shipgen.ts` HALLS, halls; which, if any,
+goes by her seed alone, `G.SpaceData.hallOf`, so every machine lays her out the same without being told). The rest are as they
+were, one deck. A hall is open from the lower deck's floor to the upper deck's roof. On the upper deck a **gallery** runs round it
+against the walls, a tile (2 m) wide, a steel rail along its edge (open between its rails: seen and shot through, as a foundry's
+catwalks; a liner's court has glass balustrades instead), looking down on the floor; a flight or two inside the hall climbs to it, and both decks have doors into it.
+
+| Hall | Where | What's in it |
+| --- | --- | --- |
+| hangar bay (`bay`) | right across her amidships, about 30 x 32 m. The spine runs into it at each end, and crosses it on the upper deck as a bridge of grating | containers, pallet racking, forklifts, stacked crates and drums |
+| arboretum (`grove`) | down her port side amidships, about 30 x 12 m | a fountain, tanks, sheds, raised beds with fruit trees, hedges, junipers and boulders, benches |
+| promenade court (`mall`) | a **cruise liner's** (her spine is cut to fit it: a compartment's length forward of it and one aft, a hull of 94 to 98 m): right across her, hull to hull, 41 to 49 m long and 33 m across. A **cross passage** 3 m wide runs right across her against its forward wall (the end away from its mezzanine), on both decks: the spine runs into it, and the compartments forward of it open onto it. **No gallery round it**: a **mezzanine** across its after third (12 to 14 m deep, a lounge and a bar's tables), all of it open to the roof forward of that. The spine crosses the open part on the upper deck as a bridge to the mezzanine (the only way aft from her bridge and forward cabins on that deck), and a pair of **grand flights**, 4 m wide each, climb to the mezzanine's edge either side of it. **Side doors**: on the lower deck a door from the cross passage into the court to port and to starboard, halfway out to her sides, besides the spine's in the middle; and through its after wall a door either side of the spine's into the compartment beyond (locked where that's an armoury or a vault) | pale marble underfoot, a colonnade of slim square columns clad in black stone with a brass inlay down each face (`gcolumn`: furniture, not bulkhead), pendants of three rings of light over the open part, glass balustrades. A fountain in the middle of the open part with benches and palms round it, a brass sculpture forward of it; boutique islands under canopies (`pavilion`), display cases, free-standing screens of walnut slats, a cafe's tables, sofas and armchairs, a piano, palms in black planters: about one thing to every five tiles of floor. No frames on its floor, but standing **floor to roof** in its open part: two piers four metres square, one to port and one to starboard, and a fin of wall six metres long across from each |
+| machinery halls (`works`) | one to starboard aft, next the engine room, a smaller one to port forward, about 20 x 12 m each | reactor cores, presses and mills, screens of panels, coolant tanks, turbines |
+
+So that nowhere on a hall's floor sees all of it: columns stand under the gallery's edge (up through both decks), **frames** (lengths
+of bulkhead two or three tiles long) stand free on the floor, turn and turn about, one half across the spine's line at each end of
+a hangar bay, and most of what's stowed there is taller than a head (`js/furniture.ts` shipHalls; nothing is put down that would
+shut any of the floor off, and the tile under the gallery is kept clear all round). `node tools/ship_halls.mjs` measures it: from
+every place on each hall's floor, the share of that floor in sight. Over 32 halls it's at most 71%, and about 25 to 35% on average
+(a liner's court: at most 47% over eight).
+Her ordinary stairwells are moved clear of the halls (one or two, toward her ends), her lower deck is her working one (armoury,
+vault, magazines, brig), and her people live on the upper (quarters, mess, galley). High-bay lamps hang under the hall's roof
+and light the gallery too. On the terminal a cruiser with a hall says so, and the objective's panel aboard names it.
+A cruiser with a promenade court is a **cruise liner** all through: she takes a theme of her own (`G.SpaceData.LINER`, never drawn
+by lot; `js/level.ts` gives it to her whatever she was offered as), modern: her bulkheads walnut slats over a lit plinth, a brass
+inlay, smooth stone above with a cove of warm light; her decks charcoal carpet; her ceilings dark with a slot of light across
+each panel (`js/levelview.ts` _shipTex: lbulkhead, ldeck, loverhead); her light warm and low.
+Outside (`js/shipmodel.ts`, the 'liner' language) she is white: a raked bow, rounded shoulders, a blue keel and band at her waterline
+with a line of brass over it, a glazed roof over the open part of her court, two set-back tiers of superstructure aft of it with a
+band of lit windows round each, a raked blue funnel, a wheelhouse tier over her bridge. She still carries a cruiser's guns.
+`?board=large&seed=11` is a hangar bay, `&seed=6` an arboretum, `&seed=1` machinery halls, `&seed=9` a liner's court, `&seed=3` none;
+`node tools/ship_dump.mjs large 7 2 artifact --hall=bay` prints one of any seed (`--hall=` for none).
+
+## A liner's shelter, and holding her (`obj: 'defend'`)
+
+On a cruise liner's upper deck the compartment aft of her court to port is her **shelter** (`meta.shelter`, role `shelter`): one
+door, through the court's after wall at the back of the mezzanine; none onto the spine. Benches round its walls.
+
+On every screen she is a **luxury cruiser** (the theme's name, the board, the objective's panel; `G.SpaceData.className`), and she
+has **no guns on her hull** (`gunsOf`: none drawn, none manned, "unarmed" in the panel) and no gun control, magazines, barracks
+or brig inside (`js/shipgen.ts` PROGRAM liner: a security office and armoury, a purser's vault, sick bay, galley, mess, cabins,
+baggage under her bridge).
+
+A liner is a **high-security ship**: her own people are a civilian ship's (security guards and officers, not a navy's), with two
+more guards and a security squad more than a cruiser's (34 armed aboard one, in the simulation), and boarding her is an attack
+like any other: her cameras, her alarm, her response teams. Only on the one job below is she expecting the squad.
+
+A liner on the board is one of three jobs, a third each by her seed (`G.SpaceData.offers`): the job she'd have been anyway
+(an artifact or a wanted officer, against all of that); **retake her** (`hostage`: pirates hold her, her people tied in her court);
+or **hold her** (`defend`, `js/spaceserver.ts` defendTick):
+
+- **There's been a fight already.** Ten of her security and eight pirates lie dead about her from the start (not in the shelter;
+  nobody's kill in the debrief): why only a handful of her people are left.
+
+- **She's expecting the squad.** Boarding her is no attack: no alarm, no drill, her hull guns hold their fire, nobody carries a
+  keycard. Her passengers and hands (her class's civilians and four more) are in the shelter from the start.
+- **Her security** (four, one more for each officer past the first; rifles), each with a rank and a name of their own (a Security
+  Lead, Security Officers, a Senior Security Officer; family names from `G.SpaceData.STAFF`: what they're called wherever a
+  title shows, named in the radio call when the squad comes aboard, and in the feed when one of them shoots a pirate or is shot:
+  `bn`, who did it when it wasn't an officer), wait in her court, on the squad's side (`ally`,
+  `js/server.ts` foesOf): the squad is no target of theirs, a shout doesn't order them about, they aren't counted among the
+  hostiles left. They fight the pirates where they stand. Alone they hold the court for about two and a half minutes.
+- **Her court, its mezzanine and her shelter are armoured**: no breach site opens into the court or within a cell of it along her
+  side (`G.ShipGen.sites`: the squad's ship and the pirates' pods both come through her forward and after compartments or her
+  cross passage; 85 to 102 sites a liner), and none of the three ever loses its air (`vent`).
+- From when the squad is aboard there are **20 seconds** before anything comes (`G.SpaceData.DEFEND.lead`: counted down in the
+  panel, to get to her court in). Then, for three minutes (180 s, 5 pods, the first 2 s in, then every 39 s or so), a pirate pod comes through her hull on her lower deck, clear of the squad's ship and of the pods already in her. Its
+  boarders (three, one more for every three levels of the mission's danger and for each officer past the first) come out inside her
+  and make for the shelter, fighting whoever they meet. From her hull to the shelter's door is about forty seconds unopposed.
+- Pirates shoot her passengers as they'd shoot anyone not their own (Sides, below). One shot down is a casualty, living or not:
+  what counts is how many are still on their feet.
+- When the time is up and the last pirate aboard is dead, down or tied, she's held: the fee, and 120 for each of her people unhurt.
+  If the last of them is shot down first the job has failed.
+- The objective's panel counts the time down and shows the pods come, the pirates aboard and the passengers unhurt.
+
+`?board=large&seed=9&obj=defend&dock` starts one aboard. `node tools/defend_sim.mjs [passive|win] [seed]` runs one in node (the
+simulation alone): passive, the officer stands where he came aboard and the pirates reach the shelter; win, every boarder dies
+twelve seconds after he comes aboard and she's held.
+
+## Sides (`js/server.ts` facOf, npcFoes)
+
+A ship's people are of a side, by how they're dressed (`wear`): **pirates**, a **navy's**, a **civilian ship's** armed hands, and
+the **unarmed** (passengers, crew who don't fight).
+
+| | fights |
+| --- | --- |
+| pirates | a navy's people, a civilian ship's armed hands, and the unarmed (not those tied: hostages are worth more alive) |
+| a navy's people, a civilian ship's armed hands | pirates. Never each other, never the unarmed |
+| the unarmed | nobody. They **run** from a pirate in sight within 12 m (`civFlee`: away from the pirates, a few seconds, then hide or cower where they've got to; again when one comes in sight again), leaving wherever they were sheltering |
+
+Everyone armed still fights the squad, and a building's suspects are of no side: nothing there has changed. It only comes into it
+when pirates are aboard with someone they'd fight (so every other level runs exactly as before): then each of them has the other
+side's people within 45 m to pick a target from as well as the squad, by the same eyes and the same rules (nearest in sight first,
+the unarmed after anyone with a gun as near), takes cover from them and shoots at them as at an officer. A shot at one of another
+side is settled by the host: each round lands with the chance its aim gives it if the way from the muzzle is clear, and takes
+near half of a person's life (a pistol's a third, a pellet a seventh). They fight where they meet: nobody goes hunting another
+side through the ship. Checked in the simulation: eight pirates put in a navy cruiser's busiest compartment left five of hers
+down and one dead for one of theirs in the first quarter of a minute, and nobody picked a target on their own side.
 
 ## A flying wing (`sp.wing`)
 
