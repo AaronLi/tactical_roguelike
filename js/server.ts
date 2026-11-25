@@ -3172,6 +3172,7 @@ export const Server = {
   moveEntity(e: Enemy, mx: number, mz: number, speed: number, dt: number) {
     const map = this.map!;
     if (e.doorWait > 0) { e.doorWait -= dt; return; }
+    { const a = this.apart(e, mx, mz); mx = a[0]; mz = a[1]; }
     const ahead = map.world && World.raycast(map.world, e.x, (e.y || 0) + 1.0, e.z, mx, 0, mz, 0.9, { move: true }); // (what they'd walk into)
     const d = ahead && ahead.solid && ahead.solid.kind === 'door' ? ahead.solid.door : null;
     if (d && !d.open) { if (!SpaceSv.crewMayOpen(d, e)) return; this.setDoor(d.id, true); e.doorWait = 0.5; return; } // (a locked or sealed door: they hold where they are)
@@ -3320,6 +3321,27 @@ export const Server = {
     const kx = c.cx! - c.x, kz = c.cz! - c.z, kd = Math.hypot(kx, kz);
     return (tx * kx + tz * kz) / (td * kd) > 0.55;
   },
+  // Spacing as they move (moveEntity): no one walks in someone's footsteps. Each of their side within APART.R of them pushes them off
+  // (harder the nearer); one ahead of them on the way they're going also sends them out to a side of their own (by their id), so a group
+  // moves as a spread, not a file. The way they're going stays the way they're going: it only bends.
+  APART: { R: 1.7, AHEAD: 3.2, PUSH: 1.3, SIDE: 0.7 },
+  apart(e: Enemy, mx: number, mz: number): [number, number] {
+    const A = this.APART, m = Math.hypot(mx, mz); if (!m || e.def.civ) return [mx, mz];
+    const fx = mx / m, fz = mz / m, side = e.id % 2 ? 1 : -1;
+    let ax = 0, az = 0;
+    for (const o of this.enemies.values()) {
+      if (o === e || o.team !== e.team || !o.ally !== !e.ally || o.down || o.hp <= 0 || o.state === 'dead' || o.def.civ || Math.abs((o.y || 0) - (e.y || 0)) > 1.5) continue;
+      const dx = e.x - o.x, dz = e.z - o.z, d = Math.hypot(dx, dz);
+      if (d > A.AHEAD || d < 0.01) continue;
+      if (d < A.R) { const w = (A.R - d) / A.R * A.PUSH; ax += dx / d * w; az += dz / d * w; }
+      const on = -(dx * fx + dz * fz); // (how far ahead of them, on their way)
+      if (on > 0 && Math.abs(dx * fz - dz * fx) < 0.9) { const w = (1 - d / A.AHEAD) * A.SIDE; ax += -fz * side * w; az += fx * side * w; }
+    }
+    if (!ax && !az) return [mx, mz];
+    let nx = fx + ax, nz = fz + az;
+    const fw = nx * fx + nz * fz; if (fw < 0.25) { nx += fx * (0.25 - fw); nz += fz * (0.25 - fw); } // (never back the way they came: they bend round, they don't turn about)
+    const n = Math.hypot(nx, nz) || 1; return [nx / n * m, nz / n * m];
+  },
   findCover(e: Enemy, st: PState) {
     if (e.def.shield) return null; // (a handheld shield is their cover: they stand behind it and fight)
     const L = Level, map = this.map!, def = e.def, ground = this.ground(), now = Math.hypot(e.x - st.p[0], e.z - st.p[2]); // (now: how far off the police are)
@@ -3327,13 +3349,13 @@ export const Server = {
     const here = (q: { x: number; y?: number; z: number }) => Math.abs((q.y || 0) - (e.y || 0)) < 1.5 && !(SpaceData.ON && SpaceSv.offLimits(e, q.x, q.z)); // (on their own floor; not in a ship's shelter unless they're of it)
     for (const c of map.cover as FlPt[]) {
       const d = Math.hypot(c.x - e.x, c.z - e.z);
-      if (d > 12 || !here(c)) continue;
+      if (d > 16 || !here(c)) continue;
       const dt = Math.hypot(c.x - st.p[0], c.z - st.p[2]);
       if (dt < 4 || dt > def.range * 0.9 || (ground && dt < now - 1)) continue; // (on the ground: none nearer the police than where they are)
       const score = d + Math.abs(dt - def.pref) * 0.4;
       if (score >= bs || !this.coverProtects(c as EnemyCover, st)) continue;
       let claimed = false;
-      for (const o of this.enemies.values()) if (o !== e && o.cover && Math.hypot(o.cover.x - c.x, o.cover.z - c.z) < 1.2) { claimed = true; break; }
+      for (const o of this.enemies.values()) if (o !== e && !o.down && o.hp > 0 && ((o.cover && Math.hypot(o.cover.x - c.x, o.cover.z - c.z) < 1.2) || Math.hypot(o.x - c.x, o.z - c.z) < 0.9)) { claimed = true; break; } // (someone's going there, or standing on it)
       if (claimed) continue;
       if (!L.los(map, c.x, (c.y || 0) + 1.6 * def.scale, c.z, st.p[0], st.p[1] + 1.2, st.p[2])) continue; // can shoot when peeking
       best = c as EnemyCover; bs = score;
