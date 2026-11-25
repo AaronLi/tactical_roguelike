@@ -172,7 +172,7 @@ const CONTRACT_CORE = {
     names: {
       black: { doc: 'Black anodised metal.' }, gunmetal: { doc: 'Grey phosphate metal.' }, steel: { doc: 'Bright steel.' }, blued: { doc: 'Blued steel.' }, park: { doc: 'Parkerised finish.' },
       polymer: { doc: 'Black polymer.' }, tan: { doc: 'Tan polymer.' }, od: { doc: 'Olive drab polymer.' }, green: { doc: 'Green paint.' }, wood: { doc: 'Wood.' }, woodDark: { doc: 'Dark wood.' },
-      plum: { doc: 'Plum bakelite (an AK-74 grip).' }, woodRed: { doc: 'Red-brown wood.' }, brass: { doc: 'Brass.' }, rubber: { doc: 'Black rubber.' },
+      plum: { doc: 'Plum bakelite (an AK-74 grip).' }, woodRed: { doc: 'Red-brown wood.' }, brass: { doc: 'Brass.' }, copper: { doc: 'Dark copper anodised metal.' }, rubber: { doc: 'Black rubber.' },
       stipple: { doc: 'Stippled polymer grip.', bump: 'stp' }, chequer: { doc: 'Chequered metal or polymer.', bump: 'chq' }, chequerWood: { doc: 'Chequered wood.', bump: 'chq' },
       rust: { doc: 'Rusted metal.' }, tape: { doc: 'Wrapped tape.' }, clear: { doc: 'Translucent plastic (a see-through magazine).' }, glass: { doc: 'Dark glass.' },
       tubeDS: { doc: 'Double-sided black (a tube you see inside).' }, lens: { doc: 'Blue-coated lens.' }, germanium: { doc: 'A thermal sight\'s germanium objective: dark grey, a purple sheen.' }, reflexLens: { doc: 'Reflex sight glass.' }, clearLens: { doc: 'Clear lens.' },

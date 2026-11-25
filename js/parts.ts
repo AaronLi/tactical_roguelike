@@ -722,7 +722,7 @@ export const Gunsmith = (() => {
   // they were (a part's id in a code is its place in the list), then retired at the end and the slot moved to STANAG.
   const NATO_LATE = new Set(['g36', 'aug']);
   // Rifles (archetype: rifle). Receivers keep what isn't a part (bullpup shell, carry handles, bolts, levers, bipods on fixed forends).
-  P('m4', 'rifle', { optFMag: 0.1607, optF: 0.1035, rcv: 'authored', authored: 'm4', L: 0.2069, hgMax: 0.2401, mag: { f: 0.1643, y: -0.0503 } }, { /* (the Mk18 modelled in Blender: models/m4, built by models/ar_kit.py; L, hgMax and mag from its anchors) */ barrel: { len: 0.256 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.24 }], /* (an Mk18: a 10.3" barrel under a quad rail; 0.24 m is about the longest that leaves the 15 mm of barrel a muzzle device needs, hgRoom) */ stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, optic: ['pic', { optic: 'reddot' }], charging: 'ar' });
+  P('m4', 'rifle', { optFMag: 0.1607, optF: 0.1035, rcv: 'authored', authored: 'm4', L: 0.2069, hgMax: 0.2401, mag: { f: 0.1643, y: -0.0503 } }, { /* (the Mk18 modelled in Blender: models/m4, built by models/ar_kit.py; L, hgMax and mag from its anchors) */ barrel: { len: 0.256 }, thread: 'r556', muzzle: 'flash', handguard: ['ar', { t: 'rail', len: 0.24, m: 'copper' }], /* (an Mk18: a 10.3" barrel under a quad rail; 0.24 m is about the longest that leaves the 15 mm of barrel a muzzle device needs, hgRoom) */ stock: ['tube', 'm4'], grip: ['ar', 'ar'], mag: { t: 'curved', len: 0.19, d: 0.064, c: 0.03, well: 'black' }, optic: ['pic', { optic: 'reddot' }], charging: 'ar' });
   // the AK family modelled in Blender (models/ak, models/ak74, models/rpk, built by models/ak_kit.py; L, hgMax and mag from their anchors): the stamped receiver,
   // the gas block and front sight base fixed on the barrel (the receiver's: LEN_MIN_IN), the factory furniture; a railed dust cover is the optic mount
   // (extras.mount, mount_optic_rail 0.038 to 0.226, its top 0.0411: the irons sight over it), the sight at optF on it, at optFMag with a magnifier behind it
@@ -1407,7 +1407,7 @@ export const Gunsmith = (() => {
       'hg:classic': { stockfore: [0.36, 0.4, 0.48, 0.62], wood: [0.12, 0.18, 0.22, 0.24] },
       'hg:shroud': { slim: [0.18], shroud: [0.22, 0.25], fins: [0.12, 0.14] },
     };
-    const FINISH: Record<string, string> = { f: 'Factory finish', tan: 'FDE', polymer: 'Polymer', woodRed: 'Laminate', woodDark: 'Walnut', wood: 'Wood', park: 'Parkerized', black: 'Black', blued: 'Blued', od: 'OD' };
+    const FINISH: Record<string, string> = { f: 'Factory finish', tan: 'FDE', polymer: 'Polymer', woodRed: 'Laminate', woodDark: 'Walnut', wood: 'Wood', copper: 'Copper', park: 'Parkerized', black: 'Black', blued: 'Blued', od: 'OD' };
     for (const p of LIST) { // (a rail-less handguard in the nearest length its type comes in on its mount: the old ones' that are no gun's own, to one of those)
       const t = p.slot === 'handguard' && !p.retired && p.model && p.model.hg && p.model.hg.t;
       if (!t || !PLAIN_HG.has(t)) continue;
