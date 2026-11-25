@@ -787,9 +787,10 @@ export const Furniture = (() => {
   } };
   // A display case: a block of black stone, a glazed case over it framed in thin brass, what's shown inside lit from under.
   R.vitrine = { w: 1.9, d: 0.9, cover: 1, boxes: [[0, 0, 1.8, 0.8, 1.45]], build(k: Kit) {
-    const stone = k.mat(0x1d1e21, 0.25, 0.1), brass = k.mat(0xb8935a, 0.25, 0.9), glass = k.mat(0xcfe0e4, 0.05, 0.1, { transparent: true, opacity: 0.22 }), pad = k.mat(0xfff0d8, 0.6, 0, { emissive: 0xffe2b8, emissiveIntensity: 0.6 });
+    const stone = k.mat(0x1d1e21, 0.25, 0.1), brass = k.mat(0xb8935a, 0.25, 0.9), glass = k.mat(0xdde9ec, 0.05, 0.1, { transparent: true, opacity: 0.1, depthWrite: false }), pad = k.mat(0xfff0d8, 0.6, 0, { emissive: 0xffe2b8, emissiveIntensity: 0.6 });
     k.box(stone, 1.8, 0.84, 0.8, 0, 0.42, 0); k.box(pad, 1.6, 0.03, 0.6, 0, 0.86, 0);
-    k.box(glass, 1.7, 0.55, 0.7, 0, 1.14, 0); k.box(brass, 1.74, 0.02, 0.74, 0, 1.43, 0);
+    k.box(glass, 1.7, 0.55, 0.7, 0, 1.14, 0); // (glazed all round and over the top: the brass only a thin frame at its edges, nothing solid over what's shown)
+    for (const sz of [-0.36, 0.36]) k.box(brass, 1.74, 0.02, 0.02, 0, 1.42, sz); for (const sx of [-0.86, 0.86]) k.box(brass, 0.02, 0.02, 0.74, sx, 1.42, 0);
     for (const sx of [-0.86, 0.86]) for (const sz of [-0.36, 0.36]) k.box(brass, 0.02, 0.58, 0.02, sx, 1.14, sz);
     for (let i = 0; i < 4; i++) k.ico(k.mat(k.pick([0xb8935a, 0xe8e4da, 0x9fd0e0, 0x1d1e21]), 0.2, 0.7), 0.06 + k.rnd() * 0.04, -0.6 + i * 0.4, 0.96, (k.rnd() - 0.5) * 0.3);
   } };

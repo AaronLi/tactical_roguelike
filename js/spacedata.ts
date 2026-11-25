@@ -376,7 +376,7 @@ export const SpaceData = (() => {
   const speed = (v: number) => (Math.abs(v) < 995 ? Math.round(Math.abs(v)) + ' m/s' : (Math.abs(v) / 1000).toFixed(2) + ' km/s');
   const eta = (s: number) => (!isFinite(s) || s > 5999 ? '--:--' : Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0'));
   // Holding a liner (obj defend, js/spaceserver.ts defendTick): how long the squad has to get to her court, how long she's then to be held, how many pods in that time, the first of them after how long
-  const DEFEND = { lead: 20, secs: 180, pods: 5, first: 2 }; // (lead: from the squad coming aboard to the first pod, to get to her court in; then secs, the first pod first seconds into it)
+  const DEFEND = { lead: 20, secs: 180, pods: 5, first: 2, per: 5 }; // (lead: from the squad coming aboard to the first pod, to get to her court in; then secs, the first pod first seconds into it; per: boarders out of a pod, before the level's and the squad's size add to it)
   // A luxury cruiser (a cruiser with a promenade court): what she's called, and no guns on her hull. guns, className: any ship's, by her
   // class and whether she's one. STAFF: the family names of her security, for those who fight beside the squad (js/spaceserver.ts).
   // ---- The system's star: what the level's out here is lit by. Each mission's system has its own, at some stage of its life
