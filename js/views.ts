@@ -931,11 +931,15 @@ export const Views = {
       // Nor behind a wall, floor or ceiling (furniture, doors, glass, rails and stairs don't count: you might see them
       // round, over or through it).
       const fog = R.scene.fog, cam = R.camera;
-      if (fog && !parked) {
-        const e = cam.matrixWorld.elements, depth = -((at.x - e[12]) * e[8] + (at.y - e[13]) * e[9] + (at.z - e[14]) * e[10]); // (along the view, as the fog's reckoned)
-        // (through a magnified scope the fog's stretched in its picture, js/render.ts scopeReach: they're drawn out to there)
-        const pip = R.vm && R.vm.visible && R.vm.userData.pip, sk = pip && (R.pipLive || 0) > 0.35 ? R.scopeReach(pip.mag).k : 1;
-        ev.rig.body.visible = depth < (fog as THREE.Fog).far * sk + 2.5 && this.inSight(ev.rig, at);
+      if (!parked) { // (behind a wall: aboard a liner too, which has no fog (noFog): before, nobody was hidden there behind anything, her shelter's crowd drawn through her decks)
+        let far = true;
+        if (fog) {
+          const e = cam.matrixWorld.elements, depth = -((at.x - e[12]) * e[8] + (at.y - e[13]) * e[9] + (at.z - e[14]) * e[10]); // (along the view, as the fog's reckoned)
+          // (through a magnified scope the fog's stretched in its picture, js/render.ts scopeReach: they're drawn out to there)
+          const pip = R.vm && R.vm.visible && R.vm.userData.pip, sk = pip && (R.pipLive || 0) > 0.35 ? R.scopeReach(pip.mag).k : 1;
+          far = depth < (fog as THREE.Fog).far * sk + 2.5;
+        }
+        ev.rig.body.visible = far && this.inSight(ev.rig, at);
       }
       // Someone who can't be seen (not drawn, or out of the view) is posed every fourth frame, with the time since: their body caught up
       // the moment it's seen again, or anything asks where it is (a shot, a hit test: js/rig.ts catchUp). Not one shot at lately (their
@@ -943,7 +947,7 @@ export const Views = {
       const rt0 = Prof.t();
       const rp = { feet: ev.alive && !ev.down ? (ev.feet ||= Footsteps.feetOf(ev.def, ev.id, ev.armed === 2, ev.rig.shoe)) : undefined, pos: at, yaw: ev.yaw, pitch, crouch: ev.crouch || (ev.str != null && ev.str < 0.4), rise: 3.5, alert: !!ev.alert && ev.armed === 2 && !ev.surp && !ev.reloading, shieldUp: !!ev.alert && ev.alive && !ev.down && !ev.surp, lean: ev.leanS, pose, radio: ev.radio && ev.alive && !ev.down, blind: ev.alive && !ev.down && ev.scode !== 1 && ev.scode !== 2 && !ev.arrested ? ev.fc || 0 : 0, tk, act, str: near ? (ev.str == null ? 1 : ev.str) : null, aimAt,
         reload: rlP >= 0 && rlP < 1 ? rlP : -1 };
-      const unseen = (fog ? !ev.rig.body.visible : false) || !inView(at), watched = !!(ev.engagedT && performance.now() - ev.engagedT < 8000);
+      const unseen = (!parked && !ev.rig.body.visible) || !inView(at), watched = !!(ev.engagedT && performance.now() - ev.engagedT < 8000);
       if (parked) { ev.rig.defer(dt, rp); if (ev.rig.pend!.dt > 0.1) ev.rig.pend!.dt = 0.1; }
       else if (unseen && !watched && ((ev.rigSkip = (ev.rigSkip || 0) + 1) & 3)) ev.rig.defer(dt, rp); else { ev.rigSkip = 0; ev.rig.update(dt, rp); }
       if (rt0) { const ms = performance.now() - rt0; Prof.add('rigs: people', ms); if (!inView(ev.pos)) Prof.add('rigs: people off screen', ms); } // (js/profiler.ts)
