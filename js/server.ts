@@ -3754,7 +3754,7 @@ export const Server = {
     return out;
   },
   BODY_R: 0.24,
-  // their aim's spread, times what chance alone gives (fire): 0.5, half (a gunman's first shot at 10 m about 1 degree off, 0.17 m at the target)
-  AIM_SPREAD: 0.5,
+  // their aim's spread, times what chance alone gives (fire): 0.75 (a gunman's first shot at 10 m about 1.4 degrees off, 0.25 m at the target)
+  AIM_SPREAD: 0.75,
 };
 // (what it gets as it runs: the dead, until secured)
