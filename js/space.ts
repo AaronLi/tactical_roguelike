@@ -22,6 +22,7 @@ import { Net } from './net.js';
 import { Game } from './game.js';
 import { Prof } from './profiler.js';
 import { InteriorCull } from './interiorcull.js';
+import { ProxyDraw } from './proxydraw.js';
 import { Me } from './player.js';
 import { Radar, RSuite, RTarget, RSTrack, RAff, RMode, RPlot, RFused } from './radar.js';
 import { RadarView } from './radarview.js';
@@ -690,6 +691,7 @@ export const Space = (() => {
     // changes when she becomes the level, enterLevel)
     { const m = me(); S.look = S.on && S.kind === 'board' && S.tclose && m.pos ? { yaw: m.yaw - S.berth.yaw, pitch: m.pitch, eyeH: m.eyeH, stowW: m.stowW || 0, crouch: m.crouch, stowed: !!m.stowed } : null; }
     unhide();
+    ProxyDraw.release(ownDraw); ownDraw = null;
     for (const o of [S.model && S.model.group, S.root, S.stars, S.tunnel, S.sun, S.starObj]) if (o && o.parent) o.parent.remove(o);
     S.starObj = null; S.star = null; S.rockList = []; ROCKS.near = []; ROCKS.tg.clear(); ROCKS.r.clear(); ROCKS.zt = -1; ROCKS.obj = null; ROCKS.v.set(0, 0, 0); Radar.occ.length = 0;
     litSeat = -1;
@@ -724,6 +726,7 @@ export const Space = (() => {
     m.group.position.copy(S.Dp); m.group.quaternion.copy(S.Dq); G_R.scene.add(m.group);
     S.solids = []; deck();
     hatchMesh();
+    ownDraw = ProxyDraw.follow([m.group], m.group, true);
     // what's out there
     S.root = new T.Group(); S.root.userData.prof = 'space: other'; G_R.scene.add(S.root);
     S.stars = ShipModel.stars(7); S.stars.userData.prof = 'sky'; G_R.scene.add(S.stars);
@@ -1110,6 +1113,7 @@ export const Space = (() => {
     if (kept) { zoneHulls.delete(zk!); kept.holder.remove(kept.h.group); kept.h.group.position.set(0, 0, 0); kept.h.marker.visible = true; if (kept.map && kept.map !== map) viewDrop(kept.map); }
     const h = S.hull = kept ? kept.h : ShipModel.hull(map); h.group.userData.prof = 'level hull';
     G_R.levelRoot.add(h.group);
+    ProxyDraw.follow([h.group], h.group, false, true); // (her plating, her guns, a call a kind of material: let go with the level, js/proxydraw.ts)
     const TS = Level.TS;
     map.rooms.forEach((rm) => { const y = (rm.fl || 0) * Level.FLOOR_H; S.boxes.push([rm.x * TS - 1.2, y - 2.4, rm.z * TS - 1.2, (rm.x + rm.w) * TS + 1.2, y + Level.WALL_H + 1.2, (rm.z + rm.h) * TS + 1.2]); });
     // a ship that isn't the mission's, lying off her: marked, to be boarded or left
@@ -1587,6 +1591,7 @@ export const Space = (() => {
     return best;
   }
   let litSeat = -1;
+  let ownDraw: ReturnType<typeof ProxyDraw.follow> = null; // (her own pieces, a call a kind of material: js/proxydraw.ts)
   function seatLit(i: number) {
     const ms = S.model && S.model.seats; if (!ms || i === litSeat) return;
     for (const m of ms[litSeat] || []) m.emissive.setHex(m.userData.e0);

@@ -66,7 +66,8 @@ export const Probes = (() => {
       if ((cam as any).coordinateSystem !== r.coordinateSystem) { (cam as any).coordinateSystem = r.coordinateSystem; cam.updateCoordinateSystem(); }
     }
     const hid: THREE.Object3D[] = [];
-    for (const o of scene.children) if (o.visible && o !== keep && !(o as any).isLight) { o.visible = false; hid.push(o); }
+    for (const o of scene.children) if (o.visible && o !== keep && !(o as any).isLight && !o.userData.inLevel) { // (inLevel: the level's moving pieces' batches, js/proxydraw.ts)
+       o.visible = false; hid.push(o); }
     const was = r.getRenderTarget(), bg = scene.background;
     capturing = true;
     r.setRenderTarget(cubeRT, jb.face); r.clear(); r.render(scene, cam.children[jb.face] as THREE.Camera);

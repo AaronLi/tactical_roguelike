@@ -174,7 +174,7 @@ export const Damage = (() => {
   const floorOf = (map: DmgMap, y: number): FloorMap => (map.floors ? map.floors.find((f) => y >= (f.fy || 0) - 0.5 && y < (f.fy || 0) + Level.WALL_H + 0.3) || map.floors[0] : map);
   const liningMat = (map: DmgMap, col: number) => {
     const D = st(map);
-    if (!D.mats.has(col)) D.mats.set(col, new T.MeshLambertMaterial({ color: col, vertexColors: true, side: T.DoubleSide }));
+    if (!D.mats.has(col)) { const m = new T.MeshLambertMaterial({ color: col, vertexColors: true, side: T.DoubleSide }); m.defines = { LG_BUMP: '18.0', LG_BUMP_D: '0.007', LG_NDIFF: '1.2' }; D.mats.set(col, m); } // (broken, not smooth: small bumps a few millimetres deep, js/lightgrid.ts)
     return D.mats.get(col)!;
   };
   // a wall's material, in the tile's shade (the cube was one of many, each its own: js/level.ts)

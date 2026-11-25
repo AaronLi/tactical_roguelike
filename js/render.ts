@@ -150,7 +150,7 @@ export const R = {
     r.shadowMap.enabled = true; // (only the weapon lights cast any: this.spots)
     document.body.prepend(r.domElement);
     this.scene = new THREE.Scene();
-    this.scene.onBeforeRender = () => { ProxyDraw.sync(); Probes.before(); EntShadows.before(); }; // (what's only for the level's scene: the room's reflection, the people's shadows)
+    this.scene.onBeforeRender = () => { ProxyDraw.sync(this.scene); Probes.before(); EntShadows.before(); }; // (what's only for the level's scene: the room's reflection, the people's shadows)
     this.scene.onAfterRender = () => { Probes.after(); EntShadows.after(); };
     this.scene.background = new THREE.Color(0x0b0d10);
     this.scene.fog = new THREE.Fog(0x0b0d10, 8, 60);
@@ -402,7 +402,7 @@ export const R = {
   // What's left of the level's static pieces after LevelView's merge (alone in their block with their material, and the merged
   // blocks themselves) drawn as BatchedMeshes, a call a material (js/levelview.ts batchStatic): not what moves or changes (keepOf).
   // Once nothing else is going to cut or reshape its meshes (js/space.ts does, putting a ship together): they're out of the scene after.
-  batchLevel(map: LvMap) { if (new URLSearchParams(location.search).has('nolvbatch')) return; /* (?nolvbatch: as merged, for comparing) */ if (this.levelView && this.levelView.parent === this.levelRoot) { LevelView.batchStatic(this.levelView, LevelView.keepOf(map)); ProxyDraw.doors(map, this.levelRoot); } }, // (and the doors, a call a material: js/proxydraw.ts)
+  batchLevel(map: LvMap) { if (new URLSearchParams(location.search).has('nolvbatch')) return; /* (?nolvbatch: as merged, for comparing) */ if (this.levelView && this.levelView.parent === this.levelRoot) { const keep = LevelView.keepOf(map); LevelView.batchStatic(this.levelView, keep); ProxyDraw.doors(map, this.levelRoot, keep); ProxyDraw.follow(this.levelRoot.children.filter((c) => c !== this.levelView && !c.userData.prof), this.levelRoot, false, true); } }, // (and what of it moves, the doors, the case, the boxes, a call a kind of material: js/proxydraw.ts)
   clearLevel() {
     for (const tr of this.trails || []) this.trailDrop(tr);
     this.trails = []; this.lastShot = null;

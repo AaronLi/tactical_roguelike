@@ -193,7 +193,11 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
       }
       if (lgL.a > 0.02) {
         vec3 lgdir = lgD.rgb / lgL.a;
+        #ifdef LG_NDIFF
+        float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir) + float(LG_NDIFF) * 0.5 * dot(normalize(inverseTransformDirection(normal, viewMatrix)) - lgn, normalize(lgdir + vec3(0.0, 1.5, 0.0))), 0.0, 1.0); // (a mark's relief, a gash's bumps: turned by them, LG_NDIFF times over, as if lit from above (the room's light comes from all round it: a dent tipped any way would only darken; it's the lamps overhead that show its shape), not only the lamps' glint)
+        #else
         float lgturn = clamp(0.5 + 0.5 * dot(lgn, lgdir), 0.0, 1.0);
+        #endif
         // The four lamps that light this cell most (the build's, js/lightgrid.ts compute: each reaching it past every wall), for the
         // people's shadows and the lamps' highlight: the four cells round the spot, each by how near it is, as the grid's light is
         // filtered, wall cells left out (a lamp that only some of them have fades across a cell, not cut off at its edge); each lamp once,
@@ -303,6 +307,16 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
     if (!re.test(c) || !c.includes('vec3 getIBLIrradiance( const in vec3 normal ) {')) { console.warn("lightgrid: three's envmap_physical_pars_fragment has changed: no reflections"); return null; }
     return c.replace(re, fn).replace('vec3 getIBLIrradiance( const in vec3 normal ) {', 'vec3 getIBLIrradiance( const in vec3 normal ) {\n\t\tif ( lgEnvOn > 0.5 ) return vec3( 0.0 );');
   })();
+  const BUMP = `#include <normal_fragment_maps>
+    #ifdef LG_BUMP
+    { vec3 lgbn = normalize(vLgN), lgbp = vLgP * float(LG_BUMP);
+      vec2 lgb2 = abs(lgbn.y) > 0.6 ? lgbp.xz : abs(lgbn.x) > abs(lgbn.z) ? lgbp.zy : lgbp.xy;
+      float lgbh = (lgFbm(lgb2) + 0.45 * lgFbm(lgb2 * 3.1 + 7.3)) * float(LG_BUMP_D) * (1.0 - smoothstep(0.25, 0.7, length(fwidth(lgb2)))); // (faded out where a bump's smaller than a pixel or two: it'd only glitter)
+      vec3 lgsx = dFdx(-vViewPosition), lgsy = dFdy(-vViewPosition), lgR1 = cross(lgsy, normal), lgR2 = cross(normal, lgsx);
+      float lgdet = dot(lgsx, lgR1) * faceDirection;
+      vec3 lggr = sign(lgdet) * (dFdx(lgbh) * lgR1 + dFdy(lgbh) * lgR2);
+      normal = normalize(abs(lgdet) * normal - lggr); }
+    #endif`;
   function patch(shader: THREE.WebGLProgramParametersWithUniforms) {
     if (!shader.fragmentShader.includes('#include <lights_fragment_end>') || !shader.vertexShader.includes('#include <worldpos_vertex>')) return;
     Object.assign(shader.uniforms, U);
@@ -310,6 +324,10 @@ uniform vec4 lgAo;\nuniform vec4 lgBand;\nuniform float lgSpec;\nuniform sampler
     shader.fragmentShader = FS_HEAD + shader.fragmentShader.replace('#include <color_fragment>', FS_PAINT).replace('#include <lights_fragment_end>', FS_BODY);
     if (ENV) shader.fragmentShader = shader.fragmentShader.replace('#include <envmap_physical_pars_fragment>', ENV);
     // (a ship's deck: its roughness in its normal map's alpha, js/levelview.ts _deckMaps: one texture, not two)
+    // (a surface's own small bumps, worked out here, no texture: LG_BUMP (how many a metre) and LG_BUMP_D (how deep, m): a gash's broken
+    // faces, js/damage.ts. The noise on the plane the surface most faces, as the grime's; the normal tipped by how it climbs across the
+    // pixel (three's bump mapping, its slope from the screen's own derivatives))
+    shader.fragmentShader = shader.fragmentShader.replace('#include <normal_fragment_maps>', BUMP);
     shader.fragmentShader = shader.fragmentShader.replace('#include <roughnessmap_fragment>', '#ifdef LG_RGH_NA\n\tfloat roughnessFactor = roughness * texture2D( normalMap, vNormalMapUv ).a;\n#else\n#include <roughnessmap_fragment>\n#endif');
   }
   // (and a Lambert or Phong material takes nothing from the scene's environment, as in three r149: only a standard one did. three

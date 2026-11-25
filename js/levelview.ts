@@ -3,6 +3,7 @@ import { FurnMesh } from './furnmesh.js';
 import { Level } from './level.js';
 import { LevelDesc } from './leveldesc.js';
 import { LightGrid } from './lightgrid.js';
+import { ProxyDraw } from './proxydraw.js';
 import { ReplayEnv } from './replayenv.js';
 import { U } from './util.js';
 interface LvViewCtx { fm: LvMap; reg: Map<string, LvObj[]>; door: Record<string, LvObj[]> | null; geos: Map<LdGeo, THREE.BufferGeometry>; mats: (THREE.Material | null)[]; texs: (THREE.Texture | null)[]; D: LdDraw; map: LvMap }
@@ -746,8 +747,8 @@ export const LevelView = {
     const plain = (mt: Record<string, any>) => (mt.isMeshStandardMaterial || mt.isMeshBasicMaterial || mt.isMeshLambertMaterial || mt.isMeshPhongMaterial) && !mt.transparent
       && (!mt.hasOwnProperty('onBeforeCompile'));
     root.updateMatrixWorld(true);
-    interface BEntry { g: THREE.BufferGeometry; o: LvObj; M: THREE.Matrix4 }
-    interface Bin { mt: THREE.Material; mask: number; cast: boolean; culled: boolean; keepMat: boolean; multi: boolean; list: BEntry[] }
+    interface BEntry { g: THREE.BufferGeometry; o: LvObj; M: THREE.Matrix4; mt: THREE.Material }
+    interface Bin { mt: THREE.Material; mask: number; cast: boolean; culled: boolean; keepMat: boolean; multi: boolean; tint: boolean; list: BEntry[] }
     const inv = new T.Matrix4().copy(root.matrixWorld).invert(), bins = new Map<string, Bin>(), took: LvObj[] = [];
     const ids = new Map<unknown, number>(), idOf = (mt: unknown) => { if (!ids.has(mt)) ids.set(mt, ids.size); return ids.get(mt); }; // (by the material itself, not its uuid)
     // a mesh of several materials (a stair's step: tread and risers): each material's part a geometry of its own, made once
@@ -776,10 +777,12 @@ export const LevelView = {
       const multi = Array.isArray(o.material) && g.groups.length > 0, ps = multi ? g.groups : [{ start: 0, count: Infinity, materialIndex: 0 }];
       for (const p of ps) {
         const mt = mats[p.materialIndex!] || mats[0], pg = multi ? partOf(g, p) : g;
-        const key = idOf(mt) + '|' + o.layers.mask + '|' + names + '|' + (pg.index ? 'i' : 'n') + '|' + (o.castShadow ? 1 : 0) + (o.frustumCulled ? 1 : 0);
+        // (materials alike in all but their colour, one batch: each piece its own colour, ProxyDraw.tone. Not one that's kept past the level)
+        const tone = o.userData.keepMat ? null : ProxyDraw.tone(mt);
+        const key = (tone ? 't' + tone : idOf(mt)) + '|' + o.layers.mask + '|' + names + '|' + (pg.index ? 'i' : 'n') + '|' + (o.castShadow ? 1 : 0) + (o.frustumCulled ? 1 : 0);
         let b = bins.get(key);
-        if (!b) bins.set(key, (b = { mt, mask: o.layers.mask, cast: o.castShadow, culled: o.frustumCulled, keepMat: false, multi: false, list: [] }));
-        b.list.push({ g: pg, o, M });
+        if (!b) bins.set(key, (b = { mt, mask: o.layers.mask, cast: o.castShadow, culled: o.frustumCulled, keepMat: false, multi: false, tint: !!tone, list: [] }));
+        b.list.push({ g: pg, o, M, mt });
         if (multi) b.multi = true; // (built however few: the mesh's other parts go into theirs)
         if (o.userData.keepMat) b.keepMat = true;
       }
@@ -792,12 +795,14 @@ export const LevelView = {
       const geos = new Map<THREE.BufferGeometry, number>();
       let nv = 0, ni = 0;
       for (const e of b.list) if (!geos.has(e.g)) { geos.set(e.g, -1); nv += e.g.attributes.position.count; ni += e.g.index ? e.g.index.count : 0; }
-      const bm = new T.BatchedMesh(b.list.length, nv, ni, b.mt);
+      const tint = b.tint && b.list.some((e) => e.mt !== b.mt); // (more than one colour in it: drawn white, each piece its colour)
+      const bm = new T.BatchedMesh(b.list.length, nv, ni, tint ? ProxyDraw.white(b.mt) : b.mt);
       for (const e of b.list) {
         try {
           let gid = geos.get(e.g)!;
           if (gid < 0) { gid = bm.addGeometry(e.g); geos.set(e.g, gid); }
           const id = bm.addInstance(gid); bm.setMatrixAt(id, e.M);
+          if (tint) { bm.setColorAt(id, (e.mt as THREE.MeshStandardMaterial).color); ProxyDraw.watch(e.mt, bm, id); }
           inst.push([bm, id, e.o]); merged.add(e.o);
         } catch (err) { failed.add(e.o); console.warn('batchStatic', err); }
       }
