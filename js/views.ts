@@ -196,7 +196,7 @@ export const Views = {
         if (this.slowFill && performance.now() - fillT > 4) continue;
         // the type, with this suspect's kit (weapon | vest | helmet | face | tac | what's mounted) laid over it
         const def = Object.create((ENEMIES as Record<string, any>)[type]);
-        if (kit) { const [wpn, vest, helmet, face, tac, ex, , shield, wear] = kit.split('|'); def.wpn = wpn; if (wear) def.wear = wear; /* (their own side's clothes: a pirate boarding a liner isn't in her security's) */ def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; def.shield = shield || null; }
+        if (kit) { const [wpn, vest, helmet, face, tac, ex, , shield, wear, ally] = kit.split('|'); def.wpn = wpn; if (wear) def.wear = wear; if (ally) def.ally = true; /* (on the squad's side: a held liner's security) */ /* (their own side's clothes: a pirate boarding a liner isn't in her security's) */ def.vest = vest; def.helmet = helmet; def.face = face || 0; def.tac = +tac || 0; def.ex = ex ? ex.split(',') : []; def.shield = shield || null; }
         const rig = G_Rig.create(Object.assign({ style: def.style, scale: def.scale, boss: !!def.boss, leader: !!def.leader, seed: id * 7919 + 13, dressed: true }, def.wear ? { wear: def.wear } : null));
         rig.powered = true; // a physically simulated body, held up by its muscles (js/rig.ts powerStep)
         if (!def.civ) rig.setKit(G_Rig.armourKit(def.vest, def.helmet, def.style === 'armored', def.face, def.ex)); // their armour, as an officer's would look
@@ -869,8 +869,11 @@ export const Views = {
       }
       // aim pitch toward whoever they're engaging
       let pitch = 0;
-      const aimed = ev.aim === Net.myId ? Me.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
-      const tgt = aimed || (ev.alert ? this.nearestPlayer(ev.pos) : null);
+      // (whoever the host has them on: one of the squad, or someone of the other side aboard, 'npc:<id>' (js/server.ts foesOf: pirates and a liner's
+      // security at each other). Not on anyone, an alert one looks to the nearest of the squad, as if expecting them: not the squad's own allies)
+      const aimNpc = typeof ev.aim === 'string' && ev.aim.startsWith('npc:') ? this.enemies.get(+ev.aim.slice(4)) : null;
+      const aimed = ev.aim === Net.myId ? Me.pos : aimNpc ? aimNpc.pos : ev.aim && this.players.get(ev.aim) ? this.players.get(ev.aim)!.pos : null;
+      const tgt = aimed || (ev.alert && !ev.def.ally ? this.nearestPlayer(ev.pos) : null);
       if (tgt) pitch = Math.atan2(tgt.y + 1.2 - (ev.pos.y + 1.4 * ev.def.scale), Math.max(1, Math.hypot(tgt.x - ev.pos.x, tgt.z - ev.pos.z))); // (from their own height: upstairs, level)
       ev.recPitch = pitch; // (for the highlights: js/highlights.ts)
       let pose: VwPose | null = ev.scode === 1 ? 'handsup' : ev.scode === 2 ? 'cuffed' : ev.scode === 3 ? 'cower' : null;
