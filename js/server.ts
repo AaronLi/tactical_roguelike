@@ -3680,7 +3680,7 @@ export const Server = {
     // there: how much of you shows, what's in the way, what the round does.
     const wdef = WEAPONS[def.wpn] || WEAPONS.p9, am = ballFor(calOf(wdef)), v0 = roundSpeed(wdef, am) || 400;
     const norm = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(Math.PI * 2 * Math.random());
-    const sd = this.AIM_SPREAD * this.BODY_R / Math.sqrt(-2 * Math.log(1 - G_U.clamp(chance, 0.01, 0.97))), ex = norm() * sd, ey = norm() * sd;
+    const ks = this.aimSpread(d), sd = ks * this.BODY_R / Math.sqrt(-2 * Math.log(1 - G_U.clamp(chance, 0.01, 0.97))), ex = norm() * sd, ey = norm() * sd;
     const fv = new THREE.Vector3(...from), aim = new THREE.Vector3(tx + (-dz / d) * ex, ty + ey, tz + (dx / d) * ex).sub(fv), far = aim.length();
     aim.divideScalar(far); aim.y += GRAVITY * far / (2 * v0 * v0); // (held up for the drop: they've used this gun before)
     const wind = this.windNow(), wdrag = dragOf(wdef, am);
@@ -3705,7 +3705,7 @@ export const Server = {
     // pistol's a third, a pellet a seventh.
     const npc = (p as any).npc as Enemy | undefined;
     if (npc) {
-      const c = (1 - Math.pow(1 - G_U.clamp(chance, 0.01, 0.97), 1 / (this.AIM_SPREAD * this.AIM_SPREAD))) * (pellets > 1 ? 0.6 : 1); let n = 0; /* (the same aim as a round flown: its spread AIM_SPREAD of chance's) */ for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
+      const c = (1 - Math.pow(1 - G_U.clamp(chance, 0.01, 0.97), 1 / (ks * ks))) * (pellets > 1 ? 0.6 : 1); let n = 0; /* (the same aim as a round flown: its spread ks of chance's) */ for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
       if (n && L.los(map, from[0], from[1], from[2], npc.x, (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), npc.z)) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)), byn: e.wear ? this.titleOf(e) : e.def.name }, null);
     }
   },
@@ -3754,7 +3754,9 @@ export const Server = {
     return out;
   },
   BODY_R: 0.24,
-  // their aim's spread, times what chance alone gives (fire): 0.75 (a gunman's first shot at 10 m about 1.4 degrees off, 0.25 m at the target)
-  AIM_SPREAD: 0.75,
+  // their aim's spread, times what chance alone gives (fire): AIM_SPREAD up close (within AIM_NEAR metres), as it was (1) from AIM_FAR out,
+  // between the two as far as they are (a gunman's first shot at 5 m about 2.6 degrees off, at 20 m as ever)
+  AIM_SPREAD: 0.75, AIM_NEAR: 8, AIM_FAR: 20,
+  aimSpread(d: number) { return G_U.lerp(this.AIM_SPREAD, 1, G_U.clamp((d - this.AIM_NEAR) / (this.AIM_FAR - this.AIM_NEAR), 0, 1)); },
 };
 // (what it gets as it runs: the dead, until secured)
