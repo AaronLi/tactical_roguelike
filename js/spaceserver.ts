@@ -577,7 +577,7 @@ export const SpaceSv = (() => {
         D.pods++; ch = true;
         if (s) {
           M.raid.push([s.c, s.nx, s.nz]);
-          const n = 3 + Math.floor(sv.level / 3) + (Math.max(1, sv.players.size) - 1), hp = 1 + 0.04 * (sv.level - 1), ax = s.nz ? 1 : 0, az = s.nx ? 1 : 0;
+          const n = C.per + Math.floor(sv.level / 3) + (Math.max(1, sv.players.size) - 1), hp = 1 + 0.04 * (sv.level - 1), ax = s.nz ? 1 : 0, az = s.nx ? 1 : 0;
           const spots = map.enemySpots.filter(([x, z, f]) => !(f || 0) && Math.hypot((x + 0.5) * TS - (s.x - s.nx * 3), (z + 0.5) * TS - (s.z - s.nz * 3)) < 5).sort(() => Math.random() - 0.5);
           const cx = rm ? (rm.cx + 0.5) * TS : s.x, cz = rm ? (rm.cz + 0.5) * TS : s.z, flow = sv.flowTo(cx, fy, cz);
           for (let k = 0; k < n; k++) {
