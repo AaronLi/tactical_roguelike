@@ -3705,7 +3705,7 @@ export const Server = {
     // pistol's a third, a pellet a seventh.
     const npc = (p as any).npc as Enemy | undefined;
     if (npc) {
-      const c = (1 - Math.pow(1 - G_U.clamp(chance, 0.01, 0.97), 1 / (this.AIM_SPREAD * this.AIM_SPREAD))) * (pellets > 1 ? 0.6 : 1); let n = 0; // (the same aim as a round flown: its spread AIM_SPREAD of chance's) for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
+      const c = (1 - Math.pow(1 - G_U.clamp(chance, 0.01, 0.97), 1 / (this.AIM_SPREAD * this.AIM_SPREAD))) * (pellets > 1 ? 0.6 : 1); let n = 0; /* (the same aim as a round flown: its spread AIM_SPREAD of chance's) */ for (let i = 0; i < pellets; i++) if (Math.random() < c) n++;
       if (n && L.los(map, from[0], from[1], from[2], npc.x, (npc.y || 0) + (npc.crouch ? 0.7 : 1.1), npc.z)) this.applyHit({ e: npc.id, f: Math.min(1.2, n * (pellets > 1 ? 0.14 : wdef.cls === 'PST' ? 0.3 : 0.45)), byn: e.wear ? this.titleOf(e) : e.def.name }, null);
     }
   },
