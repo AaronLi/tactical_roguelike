@@ -838,17 +838,19 @@ export const Space = (() => {
     const hole = [...got.cells, ...got.walls].map((c) => { const x = (c % W) * TS, z = ((c / W) | 0) * TS; return [x - 0.06, 0.05, z - 0.06, x + TS + 0.06, L.DOOR_H + 0.1, z + TS + 0.06]; }); // (a little past its cells: the faces of the walls either side of them, on their edges)
     carve(hole);
     wreck(((map.sp as any).gone || []) as number[][], s);
-    const g = new T.Group(), along = s.nz ? 1 : 0, wall = ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 }), torn = ShipModel.M(0x1a1c1f, { metalness: 0.6 }), hot = ShipModel.lit(0xff7a1a);
+    const SK = f0.skirt || 0, wmat = wm && !Array.isArray(wm.material) ? wm.material : null; // (over the hole, the wall itself: its material, its picture where the wall has it, js/levelview.ts geo uvw)
+    const wallGeo = (geo: THREE.BoxGeometry, cells: number, y0: number) => { const uv = geo.attributes.uv as THREE.BufferAttribute, nr = geo.attributes.normal as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) if (Math.abs(nr.getY(i)) < 0.5) uv.setXY(i, uv.getX(i) * cells, (y0 + SK) / (L.WALL_H + SK) + uv.getY(i) * (1 - (y0 + SK) / (L.WALL_H + SK))); return geo; };
+    const g = new T.Group(), along = s.nz ? 1 : 0, wall = wmat || ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 }), torn = ShipModel.M(0x1a1c1f, { metalness: 0.6 }), hot = ShipModel.lit(0xff7a1a);
     const bx = (mt: THREE.Material, u0: number, y0: number, u1: number, y1: number, d0 = -TS / 2, d1 = TS / 2) => { const mm = new T.Mesh(new T.BoxGeometry(along ? u1 - u0 : d1 - d0, y1 - y0, along ? d1 - d0 : u1 - u0), mt); mm.position.set(along ? (u0 + u1) / 2 : (d0 + d1) / 2, (y0 + y1) / 2, along ? (d0 + d1) / 2 : (u0 + u1) / 2); g.add(mm); };
-    bx(wall, -1.5 * TS, L.DOOR_H + 0.1, 1.5 * TS, L.WALL_H);
+    bx(wall, -1.5 * TS, L.DOOR_H + 0.1, 1.5 * TS, L.WALL_H); wallGeo((g.children[g.children.length - 1] as THREE.Mesh).geometry as THREE.BoxGeometry, 3, L.DOOR_H + 0.1);
     for (const sd of [-1, 1]) { bx(torn, sd * 1.5 * TS - 0.06, 0, sd * 1.5 * TS + 0.06, L.DOOR_H + 0.1, -TS / 2 - 0.04, TS / 2 + 0.04); bx(hot, sd * 1.5 * TS - 0.02, 0.1, sd * 1.5 * TS + 0.02, L.DOOR_H, -TS / 2 - 0.06, -TS / 2 - 0.04); }
     bx(torn, -1.5 * TS, L.DOOR_H + 0.04, 1.5 * TS, L.DOOR_H + 0.16, -TS / 2 - 0.04, TS / 2 + 0.04);
     g.position.set(s.x, 0, s.z); G_R.levelRoot.add(g);
     if (ShipGen.bent(s)) G_R.levelRoot.add(tunnelMesh(s)); // (an angled breach: the crumpled tunnel she drove in)
     // each bulkhead it broke through: the wall over the gap, a torn edge under it, and its broken end where it stops
-    const bk = new T.Group(), bw = ShipModel.M(new T.Color(map.theme.wall as string).getHex(), { roughness: 0.9 });
+    const bk = new T.Group(), bw = wall;
     for (const c of got.walls) {
-      const x = (c % W + 0.5) * TS, z = (((c / W) | 0) + 0.5) * TS, lin = new T.Mesh(new T.BoxGeometry(TS, L.WALL_H - L.DOOR_H - 0.1, TS), bw); lin.position.set(x, (L.WALL_H + L.DOOR_H + 0.1) / 2, z); bk.add(lin);
+      const x = (c % W + 0.5) * TS, z = (((c / W) | 0) + 0.5) * TS, lin = new T.Mesh(wallGeo(new T.BoxGeometry(TS, L.WALL_H - L.DOOR_H - 0.1, TS), 1, L.DOOR_H + 0.1), bw); lin.position.set(x, (L.WALL_H + L.DOOR_H + 0.1) / 2, z); bk.add(lin);
       const e = new T.Mesh(new T.BoxGeometry(TS + 0.08, 0.12, TS + 0.08), torn); e.position.set(x, L.DOOR_H + 0.1, z); bk.add(e);
       if (!got.walls.includes(c - s.nx - s.nz * W)) { const j = new T.Mesh(new T.BoxGeometry(s.nx ? 0.08 : TS + 0.06, L.DOOR_H + 0.1, s.nz ? 0.08 : TS + 0.06), torn); j.position.set(x - s.nx * TS / 2, (L.DOOR_H + 0.1) / 2, z - s.nz * TS / 2); bk.add(j); }
     }

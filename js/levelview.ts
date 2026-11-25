@@ -190,6 +190,7 @@ export const LevelView = {
         case 't': G0.translate(op[1], op[2], op[3]); break;
         case 'q': G0.applyMatrix4(new T.Matrix4().makeRotationFromQuaternion(new T.Quaternion(op[1], op[2], op[3], op[4]))); break;
         case 'ni': { const q = G0.toNonIndexed(); G0.dispose(); G0 = q; break; }
+        case 'uvw': { const uv = G0.attributes.uv as THREE.BufferAttribute, nr = G0.attributes.normal as THREE.BufferAttribute; for (let i = 0; i < uv.count; i++) { if (Math.abs(nr.getY(i)) > 0.5) continue; uv.setXY(i, uv.getX(i) * op[1], op[2] + uv.getY(i) * (op[3] - op[2])); } break; } // (a piece of a wall: its sides' picture the part of the wall's it stands for, op[1] cells across, op[2]..op[3] of its height)
       }
     }
     if (g.col) G0.setAttribute('color', new T.BufferAttribute(new Float32Array(g.col), 3)); // (a colour a vertex)
