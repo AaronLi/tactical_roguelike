@@ -129,7 +129,7 @@ export const SpaceSim = (() => {
   // ---------------------------------------------------------------- her flight, free (no assist, autopilot, warp; in space)
   // Her thrusters push her (main engine along her nose, the others square to it), and let go she keeps going as she was. X held: she
   // brakes to the field's way. Matched (base), with nothing pushed: she's kept to it. Never more than FLY.max off the field's way.
-  const FLY = { main: 30, side: 12, brake: 60, max: 300 };
+  const FLY = { main: 60, side: 60, brake: 60, max: 300 }; // (every thruster as strong as her brake: she's as quick to manoeuvre as to stop)
   const _fq = new T.Quaternion(), _fe = new T.Euler(), _fw = new T.Vector3(), _fv = new T.Vector3();
   // her turning a step: the stick's pitch and yaw, Q / E's roll, eased in (Wv: her turn rate, kept); I null: nobody's at the helm
   function flyTurn(Q: THREE.Quaternion, Wv: THREE.Vector3, turn: number, I: FlyIn | null, dt: number) {

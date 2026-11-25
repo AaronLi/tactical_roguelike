@@ -87,7 +87,7 @@ export function helmOf(S: any, GE: HelmG, ev: (e: HelmEv) => void) {
       want.set((kb(FB.D) ? 1 : 0) - (kb(FB.A) ? 1 : 0), (kb(FB.U) ? 1 : 0) - (kb(FB.C) ? 1 : 0), (kb(FB.S) ? 1 : 0) - (kb(FB.W) ? 1 : 0));
       want.x *= d.speed * 0.4; want.y *= d.speed * 0.4; want.z *= want.z < 0 ? sp : d.speed * 0.4;
       if (kb(FB.X)) want.set(0, 0, 0);
-      acc = kb(FB.X) ? 60 : 30;
+      acc = SpaceSim.FLY.main; // (as her thrusters push her, js/spacesim.ts FLY)
     }
     spinUp(dt, helm);
     SpaceSim.flyTurn(S.Q, S.Wv, d.turn, FI, dt);

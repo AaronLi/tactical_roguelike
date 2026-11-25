@@ -2591,14 +2591,15 @@ export const Space = (() => {
   }
   // How she's flying, for her sound (js/ambience.ts shipVoice), each frame: null with no ship here. Aboard her you hear all of
   // her; off her (the hangar's floor, the deck of what she's against) less with distance, and dulled.
-  const snd = { v: new T.Vector3(), docked: true, ftl: 0, has: false, acc: 0 }, _sv = new T.Vector3();
+  const snd = { v: new T.Vector3(), docked: true, ftl: 0, has: false, acc: 0, n: 0 }, _sv = new T.Vector3();
   function sound(dt: number): AmbShipState | null {
     if (!S.on || !S.model || !me().pos) { snd.has = false; return null; }
     const ab = aboard(), d = me().pos.distanceTo(S.Dp), k = ab ? 1 : U.clamp(1 - (d - 5) / 26, 0, 1) * 0.7;
     // (against the field, not the mission's ship: her speed through the rocks, and how hard her engines push her through them, smoothed
     // over a tenth of a second or so (a frame's own is ragged); her engines' sound is the push, at full for her main engine's, SpaceSim FLY.main)
     const rv = S.docked ? _sv.set(0, 0, 0) : fieldAt(S.P, _sv).negate().add(S.V), sp = rv.length();
-    const a0 = snd.has && !S.ftl && !S.warp ? snd.v.sub(rv).length() / Math.max(dt, 1e-3) : 0; snd.acc += (Math.min(a0, 120) - snd.acc) * Math.min(1, dt / 0.12); const acc = snd.acc;
+    const ns = SIM.steps - snd.n, a0 = snd.has && !S.ftl && !S.warp && ns > 0 ? snd.v.sub(rv).length() / (ns * STEP) : null; // (over the flight's own steps since, not the frame's time: a frame may take none, or several)
+    if (a0 != null || !snd.has) { snd.acc += (Math.min(a0 || 0, 600) - snd.acc) * Math.min(1, dt / 0.12); snd.v.copy(rv); snd.n = SIM.steps; } const acc = snd.acc;
     const ftl = S.ftl ? (S.ftl.st === 'tunnel' ? 2 : 1) : 0;
     let ev: string | null = null;
     if (snd.has) {
@@ -2606,9 +2607,9 @@ export const Space = (() => {
       else if (!S.docked && snd.docked) ev = 'release';
       else if (!ftl && snd.ftl === 2) ev = 'drop';
     }
-    snd.v.copy(rv); snd.docked = S.docked; snd.ftl = ftl; snd.has = true;
+    snd.docked = S.docked; snd.ftl = ftl; snd.has = true;
     const flying = !S.docked || !!S.auto;
-    return { k, muf: ab ? 0 : 0.45 + 0.3 * U.clamp(d / 30, 0, 1), thr: flying ? Math.min(1.3, acc / 30) : 0, cruise: S.cruise || sp > S.def.speed * 2 ? 1 : S.spin * 0.5, burn: flying ? U.clamp(acc / 45, 0, 1) : 0,
+    return { k, muf: ab ? 0 : 0.45 + 0.3 * U.clamp(d / 30, 0, 1), thr: flying ? Math.min(1.3, acc / SpaceSim.FLY.main) : 0, cruise: S.cruise || sp > S.def.speed * 2 ? 1 : S.spin * 0.5, burn: flying ? U.clamp(acc / 45, 0, 1) : 0,
       turn: flying ? U.clamp(S.Wv.length() / Math.max(0.3, S.def.turn) + S.stick.length() * 0.6, 0, 1) : 0, ftl, ftlK: S.ftl && ftl === 1 ? U.clamp(S.ftl.t / Math.max(0.1, S.ftl.T), 0, 1) : 0, ev };
   }
   const dbgPrep = () => [...zoneHulls].map(([k, h]) => { const p = h.map && (h.map as any).viewPre as LvViewPre | null; return k + (h.map ? ' map' : '') + (p ? (p.done ? ' built' : ' building') + (p.up === true ? ' sent' : p.up ? ' sending' : '') : ''); }); // (tools: how far zonePrep has got)
