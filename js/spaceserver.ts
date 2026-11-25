@@ -171,7 +171,6 @@ export const SpaceSv = (() => {
   function crew() {
     const sv = S(), map = sv.map!, meta = map.sp!, M = st.M, TS = Level.TS, L = sv.level, np = Math.max(1, sv.players.size);
     if (M && M.revisit && M.cleared) return; // (come back to, and already hers no longer: nobody's left to fight)
-    const hp = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     sv.accMult = Math.min(1 + 0.03 * (L - 1), 1.5); sv.dmgMult = 1 + 0.07 * (L - 1); sv.unitsSeen = new Set();
     if (M && M.keep) return; // (come back to: her people are as they were left, restore)
     const used = new Set<string>(), fy = (f: number) => Level.floorMap(map, f).fy || 0;
@@ -190,7 +189,7 @@ export const SpaceSv = (() => {
       const rooms = (...roles: string[]) => { const out: number[] = []; for (const role of roles) map.rooms.forEach((rm, i) => { if (meta.hullOf[i] === h && meta.roles[i] === role) out.push(i); }); return out; };
       const all = rooms('spine', 'cargo', 'quarters', 'mess', 'barracks', 'engine', 'magazine', 'galley', 'medbay', 'reactor', 'brig');
       const wear = liner && !(M && M.ms.obj === 'hostage') ? 'civil' : SD.wearOf(meta.hulls[h].size, M && M.ms.obj); // (whose she is: what her people are called, js/server.ts titleOf)
-      const put = (type: EnemyKind, list: number[], k: number) => { for (let a = 0; a < list.length + all.length; a++) { const ri = a < list.length ? list[(k + a) % list.length] : all[(k + a) % all.length], p = spot(ri); if (p) { const e = sv.addEnemy(type, p.x, p.z, hp, p.y); e.wear = wear; return e; } } return null; };
+      const put = (type: EnemyKind, list: number[], k: number) => { for (let a = 0; a < list.length + all.length; a++) { const ri = a < list.length ? list[(k + a) % list.length] : all[(k + a) % all.length], p = spot(ri); if (p) { const e = sv.addEnemy(type, p.x, p.z, p.y); e.wear = wear; return e; } } return null; };
       // a ship pirates have taken: her people tied in her biggest compartment with three of them standing over it, the rest about
       // the ship, their leader on the bridge. No crew of her own is left to fight, and nobody answers a breach.
       if (M && M.ms.obj === 'hostage' && h === 0) {
@@ -217,7 +216,7 @@ export const SpaceSv = (() => {
         // in the shelter): ten of hers and eight of theirs. Why there's only a handful of her people left to help. Bodies from the
         // start (pre: nobody's kill, js/server.ts bodies), each as they'd be called and dressed alive.
         { const where = map.rooms.map((_r, i) => i).filter((i) => meta.hullOf[i] === 0 && i !== sh && !['stairs', 'pods'].includes(meta.roles[i] || ''));
-          const dead = (type: EnemyKind, as: string, k: number) => { for (let a = 0; a < where.length; a++) { const p = spot(where[(k * 5 + a * 3) % where.length]); if (!p) continue; const e = sv.addEnemy(type, p.x, p.z, 1, p.y); e.wear = as; e.title = sv.titleOf(e); sv.enemies.delete(e.id); sv.bodies.set(e.id, { id: e.id, type: e.type, def: e.def, x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, civ: false, secured: false, rec: e, pre: true } as any); return; } }; // (as they fell: not tied, as a body the squad has secured is)
+          const dead = (type: EnemyKind, as: string, k: number) => { for (let a = 0; a < where.length; a++) { const p = spot(where[(k * 5 + a * 3) % where.length]); if (!p) continue; const e = sv.addEnemy(type, p.x, p.z, p.y); e.wear = as; e.title = sv.titleOf(e); sv.enemies.delete(e.id); sv.bodies.set(e.id, { id: e.id, type: e.type, def: e.def, x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, civ: false, secured: false, rec: e, pre: true } as any); return; } }; // (as they fell: not tied, as a body the squad has secured is)
           for (let k = 0; k < 10; k++) dead(k % 3 === 2 ? 'suspect' : 'grunt', 'civil', k);
           for (let k = 0; k < 8; k++) dead(k % 3 === 0 ? 'grunt' : k % 3 === 1 ? 'suspect' : 'rusher', 'pirate', k + 3); }
         for (let k = 0; k < 4 + (np - 1); k++) { const e = put('grunt', court.length ? court : all, 0); if (e) { e.ally = true; e.named = `${k === 0 ? 'Security Lead' : k % 3 === 0 ? 'Senior Security Officer' : 'Security Officer'} ${names[k % names.length]}`; e.title = e.named; staff.push(e.named); e.drawn = true; e.guard = true; e.post = { x: e.x, y: e.y || 0, z: e.z, yaw: e.yaw, flow: sv.flowTo(e.x, e.y || 0, e.z) }; e.home = { x: e.x, y: e.y || 0, z: e.z }; } }
@@ -487,7 +486,6 @@ export const SpaceSv = (() => {
     const meta = M.meta = map.sp || null, TS = Level.TS;
     if (!meta) return; // (a base on a planet: nothing but the people in it)
     const spotIn = (ri: number) => { const rm = map.rooms[ri]; if (!rm) return null; const c = map.enemySpots.filter(([x, z, f]) => (f || 0) === (rm.fl || 0) && x >= rm.x && x < rm.x + rm.w && z >= rm.z && z < rm.z + rm.h); const s = c.length ? c[Math.floor(Math.random() * c.length)] : [rm.cx, rm.cz]; return { x: (s[0] + 0.5) * TS, z: (s[1] + 0.5) * TS, y: Level.floorMap(map, rm.fl || 0).fy || 0 }; };
-    const hp = 1 + 0.04 * (sv.level - 1) + 0.1 * (Math.max(1, sv.players.size) - 1);
     // (come back to: the holes the squad left in her are still there)
     for (const q of M.cutsWas || []) ShipGen.cut(map, ShipGen.siteAt(map, q));
     M.cutsWas = undefined;
@@ -500,12 +498,12 @@ export const SpaceSv = (() => {
     if (M.keep) return; // (come back to: he and the keycards' carriers are where they were, restore)
     if (M.ms.obj === 'hvt' && M.hvtSt === 0) {
       const p = spotIn(meta.hvtRoom);
-      if (p) { const e = sv.addEnemy('leader', p.x, p.z, hp * 1.4, p.y); e.guard = true; e.drawn = true; M.hvt = e.id; e.wear = SD.wearOf(meta.hulls[meta.hullOf[meta.hvtRoom] || 0].size, M.ms.obj); }
+      if (p) { const e = sv.addEnemy('leader', p.x, p.z, p.y); e.guard = true; e.drawn = true; M.hvt = e.id; e.wear = SD.wearOf(meta.hulls[meta.hullOf[meta.hvtRoom] || 0].size, M.ms.obj); }
     } else if (M.ms.obj === 'hvt' && M.revisit && M.hvtAt) {
       // (come back to her once he's been dealt with: he's where he was left, dead or in restraints, not at large again. Her crew are at
       // their posts again, and her own officers among them: one of those isn't him)
       const a = M.hvtAt;
-      if (M.hvtSt === 2) { const e = sv.addEnemy('leader', a.x, a.z, hp * 1.4, a.y); e.state = 'cuffed'; e.armed = false; e.yaw = a.yaw; e.drawn = true; if (a.wear) e.wear = a.wear; M.hvt = e.id; }
+      if (M.hvtSt === 2) { const e = sv.addEnemy('leader', a.x, a.z, a.y); e.state = 'cuffed'; e.armed = false; e.yaw = a.yaw; e.drawn = true; if (a.wear) e.wear = a.wear; M.hvt = e.id; }
       else { // (his body: kept under a number no one living has, as the dead are by their own)
         const id = 900000 + M.ms.i; sv.bodies.set(id, { id, type: 'leader', def: (ENEMIES as any).leader, x: a.x, y: a.y, z: a.z, yaw: a.yaw, civ: false, secured: false, rec: null } as any); }
     }
@@ -514,7 +512,7 @@ export const SpaceSv = (() => {
       const p = spotIn(meta.cardRooms[key]); if (!p || M.keys[key]) continue;
       let best: Enemy | null = null, bd = 9;
       for (const e of sv.enemies.values()) { if (e.def.civ || e.id === M.hvt || M.cards.some((c) => c.eid === e.id) || Math.abs((e.y || 0) - p.y) > 2) continue; const d = Math.hypot(e.x - p.x, e.z - p.z); if (d < bd) { bd = d; best = e; } }
-      const e = best || Object.assign(sv.addEnemy('grunt', p.x, p.z, hp, p.y), { wear: SD.wearOf(meta.hulls[meta.hullOf[meta.cardRooms[key]] || 0].size, M.ms.obj) });
+      const e = best || Object.assign(sv.addEnemy('grunt', p.x, p.z, p.y), { wear: SD.wearOf(meta.hulls[meta.hullOf[meta.cardRooms[key]] || 0].size, M.ms.obj) });
       M.cards.push({ key, eid: e.id, x: e.x, z: e.z, y: e.y || 0, st: 0 });
     }
   }
@@ -577,12 +575,12 @@ export const SpaceSv = (() => {
         D.pods++; ch = true;
         if (s) {
           M.raid.push([s.c, s.nx, s.nz]);
-          const n = C.per + Math.floor(sv.level / 3) + (Math.max(1, sv.players.size) - 1), hp = 1 + 0.04 * (sv.level - 1), ax = s.nz ? 1 : 0, az = s.nx ? 1 : 0;
+          const n = C.per + Math.floor(sv.level / 3) + (Math.max(1, sv.players.size) - 1), ax = s.nz ? 1 : 0, az = s.nx ? 1 : 0;
           const spots = map.enemySpots.filter(([x, z, f]) => !(f || 0) && Math.hypot((x + 0.5) * TS - (s.x - s.nx * 3), (z + 0.5) * TS - (s.z - s.nz * 3)) < 5).sort(() => Math.random() - 0.5);
           const cx = rm ? (rm.cx + 0.5) * TS : s.x, cz = rm ? (rm.cz + 0.5) * TS : s.z, flow = sv.flowTo(cx, fy, cz);
           for (let k = 0; k < n; k++) {
             const q = spots[k % Math.max(1, spots.length)], x = q ? (q[0] + 0.5) * TS : s.x - s.nx * 2 + ax * (k - n / 2) * 0.7, z = q ? (q[1] + 0.5) * TS : s.z - s.nz * 2 + az * (k - n / 2) * 0.7;
-            const e = sv.addEnemy(k % 3 === 0 ? 'grunt' : k % 3 === 1 ? 'suspect' : 'rusher', x, z, hp, 0);
+            const e = sv.addEnemy(k % 3 === 0 ? 'grunt' : k % 3 === 1 ? 'suspect' : 'rusher', x, z, 0);
             e.wear = 'pirate'; e.bold = true; e.drawn = true;
             e.post = { x: cx + (Math.random() - 0.5) * 2, y: fy, z: cz + (Math.random() - 0.5) * 2, yaw: Math.random() * 6.28, flow }; e.home = { x: e.post.x, y: fy, z: e.post.z };
           }

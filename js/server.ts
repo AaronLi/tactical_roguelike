@@ -829,7 +829,6 @@ export const Server = {
   spawnEnemies() {
     const L = this.level, np = Math.max(1, this.players.size), U = G_U;
     const big = this.map!.theme.big || 1, hold = this.report.stronghold, count = Math.min(Math.round((4 + Math.floor(L * 1.5) + (np - 1) * 2) * (this.map!.theme.foes || 1) * (hold ? 1.5 : 1)), (hold ? 44 : 32) * big); // (a bigger map: more of them, and room for more)
-    const hpMult = 1 + 0.04 * (L - 1) + 0.1 * (np - 1);
     this.accMult = Math.min(1 + 0.03 * (L - 1), 1.5);
     this.dmgMult = 1 + 0.07 * (L - 1);
     const weights: [EnemyKind, number][] = [['suspect', 4], ['grunt', 2.5 + L * 0.2], ['rusher', 1 + L * 0.2], ['marksman', L >= 2 ? (0.8 + L * 0.15) * (this.map!.theme.lookouts || 1) : this.map!.theme.lookouts ? 0.6 : 0], ['heavy', L >= 3 ? 0.4 + L * 0.2 : 0]];
@@ -857,7 +856,7 @@ export const Server = {
       used.push([tx, tz, tf]);
       let roll = Math.random() * total, type: EnemyKind = 'grunt';
       for (const [ty, w] of weights) { if (roll < w) { type = ty; break; } roll -= w; }
-      const se = this.addEnemy(type, (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, hpMult, fy(tf));
+      const se = this.addEnemy(type, (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, fy(tf));
       if (hold) se.drawn = true; // (a stronghold's suspects have their weapons out already, not holstered)
     }
     // a leader, one at most, from level 2: more likely the bigger the map and in a stronghold. He takes the place of the suspect furthest from the
@@ -867,7 +866,7 @@ export const Server = {
       const sp = this.map!.spawn || { x: 0, z: 0 };
       let far: Enemy | null = null, fd = -1;
       for (const o of this.enemies.values()) { const d = Math.hypot(o.x - sp.x, o.z - sp.z); if (!o.def.civ && !o.def.boss && d > fd) { fd = d; far = o; } }
-      if (far) { this.enemies.delete(far.id); const le = this.addEnemy('leader', far.x, far.z, hpMult, far.y || 0); le.drawn = true; }
+      if (far) { this.enemies.delete(far.id); const le = this.addEnemy('leader', far.x, far.z, far.y || 0); le.drawn = true; }
     }
     // civilians caught up in it (more at a festival: some of them hiding behind the stalls' counters; the other
     // stalls were left as they ran)
@@ -878,7 +877,7 @@ export const Server = {
       const tx = Math.floor(s.x / TS), tz = Math.floor(s.z / TS);
       if (this.map!.t[tz * this.map!.W + tx] !== 0 || close(tx, tz, 0)) continue;
       used.push([tx, tz]);
-      const c = this.addEnemy('civ', s.x, s.z, 1);
+      const c = this.addEnemy('civ', s.x, s.z);
       c.state = 'hide'; c.hide = { x: s.x, z: s.z, lean: 0 }; c.crouch = true; c.yaw = s.yaw; c.peekT = 1 + Math.random() * 3;
       placed++;
     }
@@ -896,12 +895,12 @@ export const Server = {
       if (placed >= civs) break;
       if (close(tx, tz, tf)) continue;
       used.push([tx, tz, tf]);
-      this.addEnemy('civ', (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, 1, fy(tf));
+      this.addEnemy('civ', (tx + 0.5) * Level.TS, (tz + 0.5) * Level.TS, fy(tf));
       placed++;
     }
     if (Route.isBoss(L) && !SpaceSv.st.M) {
       const ex = this.map!.extract;
-      const b = this.addEnemy('warden', ex.x, ex.z, (1 + 0.5 * (Route.actOf(L) - 1)) * (1 + 0.35 * (np - 1)));
+      const b = this.addEnemy('warden', ex.x, ex.z);
       b.guard = true;
     }
   },
@@ -1002,12 +1001,12 @@ export const Server = {
     d.shield = id; d.speed = d.speed * sd.speed; e.point = true;
     if (e.wear === 'navy') d.tac = (d.tac || 0) | 2 | 4; // (a navy's: a green laser on the pistol)
   },
-  addEnemy(type: EnemyKind, x: number, z: number, hpMult: number, y = 0) {
+  addEnemy(type: EnemyKind, x: number, z: number, y = 0) { // (everyone their type's health (js/data.ts ENEMIES hp), however far the run's got or however many the squad: nothing scales it)
     if (this.map && this.map.terrain) y = Level.groundHeight(this.map, x, z); // (on the ground where it rolls, high or low: the Sandia Crest's)
     const def = this.equip(type);
     const e: Enemy = {
       id: this.nextEid++, type, def, x, z, yaw: Math.random() * Math.PI * 2,
-      hp: def.hp * hpMult, maxHp: def.hp * hpMult, alert: false, spot: 0, tgt: null, tgtD: 99, canSee: false,
+      hp: def.hp, maxHp: def.hp, alert: false, spot: 0, tgt: null, tgtD: 99, canSee: false,
       percT: Math.random() * 0.3, cool: 1, burstLeft: 0, aiming: false, aimT: 0, strafe: 0, strafeT: 0,
       idleT: Math.random() * 3, idleYaw: 0, pendingAlert: -1, lostT: 0, lastHit: null,
       cover: null, inCover: false, peek: false, peekT: 0, coverT: Math.random(), coverStuck: 0, crouch: false,
@@ -1781,7 +1780,7 @@ export const Server = {
         this.summons++;
         for (let i = 0; i < 3 + this.players.size; i++) {
           const a = Math.random() * Math.PI * 2;
-          const n = this.addEnemy('grunt', e.x + Math.cos(a) * 2.5, e.z + Math.sin(a) * 2.5, 1 + 0.1 * this.level, e.y || 0);
+          const n = this.addEnemy('grunt', e.x + Math.cos(a) * 2.5, e.z + Math.sin(a) * 2.5, e.y || 0);
           this.settle(n, 0.4);
           this.alertEnemy(n, false);
         }
